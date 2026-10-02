@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { type ColumnDef } from '@tanstack/react-table';
 import { Eye, Pencil, Plus, Trash2 } from 'lucide-react';
 import { DataTable } from '@/components/data-table';
+import { Money } from '@/components/ui/money';
 import { AdvancedFilterDialog } from '@/components/data-explorer/advanced-filter-dialog';
 import { ListToolbar, PageHeader, Pagination, type PageAction, type SortOption } from '@/components/nebrax';
 import { Badge } from '@/components/ui/badge';
@@ -310,11 +311,11 @@ export default function InvoicesPage() {
     },
     {
       accessorKey: 'total', header: t('total'),
-      cell: ({ row }) => <div className="num whitespace-nowrap text-end">{formatRiyal(row.original.total)}</div>,
+      cell: ({ row }) => <div className="whitespace-nowrap text-end"><Money value={row.original.total} /></div>,
     },
     {
       accessorKey: 'remaining', header: 'المتبقي',
-      cell: ({ row }) => <div className="num whitespace-nowrap text-end">{formatRiyal(row.original.remaining)}</div>,
+      cell: ({ row }) => <div className="whitespace-nowrap text-end"><Money value={row.original.remaining} /></div>,
     },
     {
       accessorKey: 'status', header: t('status'), enableSorting: false,
@@ -326,7 +327,7 @@ export default function InvoicesPage() {
     },
     {
       id: 'actions', header: '', enableSorting: false,
-      cell: ({ row }) => <div className="flex items-center justify-end gap-0.5">{rowActions(row.original)}</div>,
+      cell: ({ row }) => <div data-awj-row-actions="" className="flex items-center justify-end gap-0.5">{rowActions(row.original)}</div>,
     },
   ], [partnerNames, rowActions, t, ts]);
 
@@ -383,6 +384,7 @@ export default function InvoicesPage() {
         }}
         columnVisibility={columnVisibility}
         stickyHeader
+        stickyStartColumn
         mobileRecord={(invoice) => ({
           title: (
             <Link href={`/invoices/${invoice.id}`} className="num text-primary hover:underline">

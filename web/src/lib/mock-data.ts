@@ -3515,6 +3515,23 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
     });
   }
   if (clean === '/applications') return resolve({ data: mockApplications });
+  // علاقة «القيود المحاسبية» لمستند: القيد المرحَّل المرتبط به فقط (نفس شكل الخادم).
+  const accountingLink = clean.match(/^\/(invoices|purchases)\/([^/]+)\/accounting$/);
+  if (accountingLink && m === 'GET') {
+    const [, kind, docId] = accountingLink;
+    const sourceType = kind === 'invoices' ? 'App\\Models\\Invoice' : 'App\\Models\\Purchase';
+    const linked = mockJournalEntriesList.find((entry) => entry.source_type === sourceType && entry.source_id === docId);
+    const entry = linked
+      ? {
+        id: linked.id, number: linked.number, date: linked.entry_date, status: linked.status, description: linked.description,
+        lines: (mockJournalEntryLines[linked.id] ?? []).map((line) => ({
+          account_id: line.account_id, account_code: line.account_code, account_name: line.account_name,
+          description: line.description, debit: line.debit, credit: line.credit,
+        })),
+      }
+      : null;
+    return resolve({ data: kind === 'invoices' ? { sales_entry: entry, cost_entry: null } : { purchase_entry: entry } } as T);
+  }
   if (clean === '/journal-entries') {
     const search = (new URLSearchParams(path.split('?')[1] ?? '').get('search') ?? '').trim();
     const list = search
@@ -4207,7 +4224,14 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
   const purchaseMatch = clean.match(/^\/purchases\/([^/]+)$/);
   if (purchaseMatch) {
     const found = mockPurchases.find((p) => p.id === purchaseMatch[1]) ?? mockPurchases[0];
-    return resolve({ data: found });
+    // الحقول التي يعيدها الخادم دائماً في تفصيل الشراء وكانت غائبة عن العيّنة (فكان العرض يتعطّل بلا مرفقات).
+    return resolve({
+      data: {
+        attachments: [], discount: '0.00', shipping: '0.00', adjustment: '0.00',
+        received_status: 'pending', document_linked: false, due_date: null, received_date: null,
+        ...found,
+      },
+    });
   }
 
   // تفاصيل القيد: الحقول التي تزيد على سطر القائمة هي البنود ومرجع القيد المعكوس.

@@ -9,6 +9,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
 import { formatRiyal } from '@/lib/money';
+import { Money } from '@/components/ui/money';
+import { LineGridRow } from '@/components/workspace/line-grid';
 import { cn } from '@/lib/utils';
 
 export type AllocationKind = 'none' | 'single' | 'multiple';
@@ -48,10 +50,10 @@ export const LINE_GRID =
 
 /** تسميةٌ ظاهرة على الجوال والتابلت، ومخفيّةٌ للقارئ الآلي على الديسكتوب. */
 function LineField({
-  label, htmlFor, className, children,
-}: { label: string; htmlFor: string; className?: string; children: React.ReactNode }) {
+  label, htmlFor, className, col, children,
+}: { label: string; htmlFor: string; className?: string; col?: string; children: React.ReactNode }) {
   return (
-    <div className={cn('min-w-0', className)}>
+    <div data-awj-col={col} className={cn('min-w-0', className)}>
       <Label htmlFor={htmlFor} className="mb-0.5 block text-[11px] font-medium text-muted lg:sr-only lg:mb-0">
         {label}
       </Label>
@@ -115,7 +117,8 @@ export function InvoiceLineRow({
   const advancedId = `line-advanced-${line.key}`;
 
   return (
-    <div
+    <LineGridRow
+      invalid={belowMinimum || Boolean(allocationIssue)}
       className={cn(
         'rounded-lg border border-border p-2 lg:rounded-none lg:border-0 lg:p-0',
         // الفواصل ٦px على الجوال، والصفّ الكثيف من `lg` وحدها.
@@ -123,7 +126,7 @@ export function InvoiceLineRow({
       )}
     >
       <div className={cn('grid grid-cols-1 gap-x-2 gap-y-1.5 md:grid-cols-2 lg:items-center lg:gap-2 lg:gap-y-0', LINE_GRID)}>
-        <LineField label={t('item')} htmlFor={`${line.key}-product`}>
+        <LineField col="item" label={t('item')} htmlFor={`${line.key}-product`}>
           <Combobox
             id={`${line.key}-product`}
             value={line.productId ?? ''}
@@ -139,7 +142,7 @@ export function InvoiceLineRow({
           />
         </LineField>
 
-        <LineField label={t('description')} htmlFor={`${line.key}-description`}>
+        <LineField col="description" label={t('description')} htmlFor={`${line.key}-description`}>
           <Input
             id={`${line.key}-description`}
             placeholder={t('description')}
@@ -148,7 +151,7 @@ export function InvoiceLineRow({
           />
         </LineField>
 
-        <LineField label={t('price')} htmlFor={`${line.key}-price`}>
+        <LineField col="price" label={t('price')} htmlFor={`${line.key}-price`}>
           <Input
             id={`${line.key}-price`} className="num text-end" inputMode="decimal" dir="ltr" placeholder="0.00"
             value={line.price} onChange={(e) => onPatch({ price: e.target.value })}
@@ -160,7 +163,7 @@ export function InvoiceLineRow({
             تضغط خانة الكمية ولا تُعرَّف بسمةٍ لا يراها المستخدم. ومن `lg` يذيب
             `lg:contents` الغلاف فتعود الوحدة بجانب الكمية في الصفّ الكثيف،
             وتسميتها إلى `sr-only` كبقية تسميات الصفّ. */}
-        <LineField label={t('qty')} htmlFor={`${line.key}-qty`}>
+        <LineField col="qty" label={t('qty')} htmlFor={`${line.key}-qty`}>
           <div className="space-y-1.5 lg:flex lg:items-center lg:gap-1 lg:space-y-0">
             <Input
               id={`${line.key}-qty`} className="num text-end lg:flex-1" type="number" min={1} dir="ltr"
@@ -185,14 +188,14 @@ export function InvoiceLineRow({
           </div>
         </LineField>
 
-        <LineField label={t('line_discount_short')} htmlFor={`${line.key}-discount`}>
+        <LineField col="discount" label={t('line_discount_short')} htmlFor={`${line.key}-discount`}>
           <Input
             id={`${line.key}-discount`} className="num text-end" inputMode="decimal" dir="ltr" placeholder="0"
             value={line.disc} onChange={(e) => onPatch({ disc: e.target.value })}
           />
         </LineField>
 
-        <LineField label={t('tax')} htmlFor={`${line.key}-tax`}>
+        <LineField col="tax" label={t('tax')} htmlFor={`${line.key}-tax`}>
           <Input
             id={`${line.key}-tax`} className="num text-end" type="number" min={0} max={100} dir="ltr"
             value={line.tax} onChange={(e) => onPatch({ tax: e.target.value })}
@@ -204,7 +207,7 @@ export function InvoiceLineRow({
         <div className="col-span-full flex items-center justify-between gap-2 border-t border-border pt-1.5 md:col-span-2 lg:contents lg:border-0 lg:pt-0">
           <div className="lg:text-end">
             <span className="text-[11px] font-medium text-muted lg:hidden">{t('total_with_vat')}</span>{' '}
-            <span className="num text-sm font-semibold text-text lg:font-normal">{formatRiyal((net + lineTax) / 100)}</span>
+            <Money value={(net + lineTax) / 100} className="text-sm font-semibold text-text lg:font-normal" />
           </div>
           <Button
             type="button" variant="ghost" size="icon" className="shrink-0 lg:ms-auto"
@@ -374,6 +377,6 @@ export function InvoiceLineRow({
           )}
         </div>
       )}
-    </div>
+    </LineGridRow>
   );
 }

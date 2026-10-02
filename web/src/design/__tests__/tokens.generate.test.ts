@@ -72,7 +72,8 @@ describe('AWJ token drift guard', () => {
 
     expect(selectorLines.length).toBeGreaterThan(0);
     for (const selector of selectorLines) {
-      expect(selector.startsWith('html[data-awj-ui="3"]')).toBe(true);
+      // `@media (max-height…) {` wrappers are fine; the rule inside them is checked on its own line.
+      expect(selector.startsWith('html[data-awj-ui="3"]') || selector.startsWith('@media')).toBe(true);
     }
   });
 

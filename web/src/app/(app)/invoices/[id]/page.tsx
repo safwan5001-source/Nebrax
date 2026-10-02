@@ -23,8 +23,19 @@ import { useToast } from '@/components/ui/toast';
 import { InvoiceDocument, type Company, type Customer } from '@/components/invoices/invoice-document';
 import { CreateReturnDialog } from '@/components/returns/create-return-dialog';
 import { InvoiceNoteDialog } from '@/components/invoices/invoice-note-dialog';
-import { api, downloadFile } from '@/lib/api';
+import { api, downloadFile, hasApiStatus } from '@/lib/api';
 import { formatRiyal } from '@/lib/money';
+import { useAwjUi3 } from '@/lib/use-awj-ui3';
+import { Money } from '@/components/ui/money';
+import type { PageAction } from '@/components/nebrax/action-group';
+import {
+  DocumentCommandBar, DocumentContext, DocumentHeader, DocumentWorkspace, WorkspaceTabs, type WorkspaceTab,
+} from '@/components/workspace/document-workspace';
+import { LifecycleRail } from '@/components/workspace/lifecycle-rail';
+import { SALES_INVOICE_LIFECYCLE } from '@/components/workspace/lifecycle';
+import { LineGridView, type LineGridColumn } from '@/components/workspace/line-grid';
+import { PostedEntries } from '@/components/workspace/posted-entries';
+import { TotalsDock, type DockCell } from '@/components/workspace/totals-dock';
 import { documentExporter, printDocument } from '@/modules/documents/services/export';
 import { getTemplate, listTemplatesForDocumentType, DEFAULT_TEMPLATE_ID } from '@/modules/documents/registry/templates';
 import { DocumentScaler } from '@/modules/documents/components/document-scaler';
@@ -237,6 +248,10 @@ export default function InvoiceDetailPage() {
   const [pdfSharesPrintRoot, setPdfSharesPrintRoot] = useState(true);
   const [printLocked, setPrintLocked] = useState(false);
   const tt = useTranslations('invoiceTemplates');
+  const v3 = useAwjUi3();
+  const [wsTab, setWsTab] = useState('items');
+  const [accountingForbidden, setAccountingForbidden] = useState(false);
+  const [relationsFailed, setRelationsFailed] = useState(false);
 
   const partnerName = customer?.name ?? '—';
   const isDraft = invoice?.status === 'draft';
@@ -284,6 +299,12 @@ export default function InvoiceDetailPage() {
         if (inventoryRelations.status === 'fulfilled') setInventoryMovements(inventoryRelations.value.data);
         if (accountingRelations.status === 'fulfilled') setAccounting(accountingRelations.value.data);
         setRelationsUnavailable(paymentRelations.status === 'rejected' || noteRelations.status === 'rejected' || inventoryRelations.status === 'rejected' || accountingRelations.status === 'rejected');
+        // v3: صلاحية القيود قرار الخادم — 403 يُخفي التبويب كلياً، وأي فشل آخر يُعلَن.
+        setAccountingForbidden(accountingRelations.status === 'rejected' && hasApiStatus(accountingRelations.reason, 403));
+        setRelationsFailed(
+          paymentRelations.status === 'rejected' || noteRelations.status === 'rejected' || inventoryRelations.status === 'rejected'
+          || (accountingRelations.status === 'rejected' && !hasApiStatus(accountingRelations.reason, 403)),
+        );
         setRelationsLoading(false);
 
         // الفاتورة المرحّلة تقرأ مراجعتها المثبّتة حصراً؛ لا يعيد تعديل القالب أو
@@ -463,10 +484,19 @@ export default function InvoiceDetailPage() {
   const thermalPaper = thermalPaperForTemplate(thermalOutput?.templateId ?? null);
   const catalogType = invoiceCatalogDocumentType(invoice.zatca_document_type);
 
+  // v3: لوحة «المستند» تبقى مركَّبة لكنها مخفية على الشاشة حين لا تكون نشطة؛ التصدير
+  // يقرأ العنصر من DOM فيجب إظهارها أولاً. بلا بوابة v3 لا يتغيّر شيء.
+  async function revealDocument() {
+    if (!v3 || wsTab === 'document') return;
+    setWsTab('document');
+    await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+  }
+
   async function handleDownloadPdf() {
     if (!invoice) return;
     setBusy('pdf');
     try {
+      await revealDocument();
       const element = pdfDoc();
       if (!element) throw new Error('Invoice template is unavailable');
       await documentExporter.download({ element, fileName: invoice.number, paper: pdfPaper });
@@ -482,6 +512,7 @@ export default function InvoiceDetailPage() {
     if (!invoice) return;
     setBusy('share');
     try {
+      await revealDocument();
       const element = pdfDoc();
       if (!element) throw new Error('Invoice template is unavailable');
       const result = await documentExporter.share({ element, fileName: invoice.number, title: invoice.number, paper: pdfPaper });
@@ -587,6 +618,27 @@ export default function InvoiceDetailPage() {
     </>
   );
 
+  const invoiceDocumentEl = (
+      <InvoiceDocument
+        invoice={invoice}
+        company={company}
+        customer={customer}
+        qr={zatca?.qr ?? null}
+        templateId={templateId}
+        themeId={themeId}
+        footerText={footerText}
+        terms={termsText}
+        bank={bankText}
+        stampUrl={stampUrl}
+        signatureUrl={signatureUrl}
+        showLogo={showLogo}
+        logoUrl={logoUrl}
+        logoHeight={logoHeight}
+        layout={layout}
+        documentType={catalogType}
+      />
+  );
+
   const documentPreview = (
     <Card>
       <CardHeader className="no-print p-0">
@@ -604,29 +656,321 @@ export default function InvoiceDetailPage() {
       <CardContent id="invoice-document-content" className={documentOpen ? 'print:p-0' : 'hidden print:block print:p-0'}>
         <div className="rounded border border-border bg-background p-3 print:border-0 print:bg-transparent print:p-0">
           <DocumentScaler>
-            <InvoiceDocument
-              invoice={invoice}
-              company={company}
-              customer={customer}
-              qr={zatca?.qr ?? null}
-              templateId={templateId}
-              themeId={themeId}
-              footerText={footerText}
-              terms={termsText}
-              bank={bankText}
-              stampUrl={stampUrl}
-              signatureUrl={signatureUrl}
-              showLogo={showLogo}
-              logoUrl={logoUrl}
-              logoHeight={logoHeight}
-              layout={layout}
-              documentType={catalogType}
-            />
+            {invoiceDocumentEl}
           </DocumentScaler>
         </div>
       </CardContent>
     </Card>
   );
+
+  const printOutputs = (
+    <>
+    {!pdfSharesPrintRoot && pdfOutput && (
+      <InvoiceDocument
+        invoice={invoice}
+        company={company}
+        customer={customer}
+        qr={zatca?.qr ?? null}
+        {...documentPropsFromResolved(pdfOutput)}
+        documentType={catalogType}
+        rootId="pdf-print-root"
+      />
+    )}
+
+    {thermalPaper && thermalOutput && (
+      <InvoiceDocument
+        invoice={invoice}
+        company={company}
+        customer={customer}
+        qr={zatca?.qr ?? null}
+        {...documentPropsFromResolved(thermalOutput)}
+        documentType={catalogType}
+        rootId="thermal-print-root"
+      />
+    )}
+    </>
+  );
+
+  const dialogs = (
+    <>
+    <CreateReturnDialog
+      open={returnOpen}
+      onClose={() => setReturnOpen(false)}
+      onCreated={load}
+      fixedType="sales"
+      initialSalesInvoice={{ id: invoice.id, partnerId: invoice.partner_id }}
+    />
+    <InvoiceNoteDialog
+      open={noteOpen}
+      onClose={() => setNoteOpen(false)}
+      onSaved={load}
+      invoiceId={invoice.id}
+    />
+
+    <Dialog
+      open={pendingAction !== null}
+      onClose={() => (actioning ? null : setPendingAction(null))}
+      title={pendingAction === 'post' ? t('post') : t('delete_title')}
+    >
+      <p className="text-sm leading-6 text-text">
+        {pendingAction === 'post' ? t('post_confirm') : <>{t('delete_confirm')} <span className="num font-medium">{invoice.number}</span>؟</>}
+      </p>
+      <div className="mt-5 flex justify-end gap-2">
+        <Button variant="outline" disabled={actioning} onClick={() => setPendingAction(null)}>{t('retry')}</Button>
+        <Button variant={pendingAction === 'delete' ? 'danger' : 'primary'} disabled={actioning} onClick={confirmAction}>
+          {pendingAction === 'post' ? t('post') : t('delete')}
+        </Button>
+      </div>
+    </Dialog>
+    </>
+  );
+
+  if (v3) {
+    const lineColumns: LineGridColumn<Line>[] = [
+      { id: 'n', header: '#', className: 'w-10', cell: (_line, index) => <span className="num text-secondary">{index + 1}</span> },
+      {
+        id: 'item',
+        header: t('ws_item'),
+        cell: (line) => {
+          const name = line.product_name ?? line.description ?? '—';
+          const secondary = [line.product_code, line.product_name ? line.description : null].filter(Boolean).join(' · ');
+          return (
+            <div className="min-w-0 max-w-[28rem]">
+              <div className="truncate font-medium text-primary-ink" title={name}>{name}</div>
+              {secondary ? <div className="truncate text-xs text-secondary">{secondary}</div> : null}
+            </div>
+          );
+        },
+      },
+      { id: 'qty', header: t('qty'), align: 'end', cell: (line) => <span className="num">{line.quantity}</span> },
+      { id: 'price', header: t('unit_price'), align: 'end', priority: 'p2', cell: (line) => <Money value={line.unit_price} /> },
+      { id: 'rate', header: t('ws_tax_rate'), align: 'end', priority: 'p3', cell: (line) => <span className="num">{line.tax_rate}%</span> },
+      { id: 'tax', header: t('tax'), align: 'end', priority: 'p3', cell: (line) => <Money value={line.line_tax} /> },
+      { id: 'total', header: t('ws_line_total'), align: 'end', derived: true, cell: (line) => <Money value={line.line_total} className="font-semibold" /> },
+    ];
+    const paymentColumns: LineGridColumn<InvoicePayment>[] = [
+      { id: 'number', header: t('payment_number'), cell: (payment) => <Link href={`/payments/${payment.id}`} className="num font-medium text-primary hover:underline">{payment.number}</Link> },
+      { id: 'date', header: t('payment_date'), priority: 'p2', cell: (payment) => <span className="num">{payment.payment_date ?? '—'}</span> },
+      { id: 'method', header: t('payment_method'), priority: 'p2', cell: (payment) => paymentMethod(payment.method) },
+      { id: 'amount', header: t('voucher_amount'), align: 'end', cell: (payment) => <Money value={payment.amount} /> },
+      { id: 'allocated', header: t('allocated_amount'), align: 'end', cell: (payment) => <Money value={payment.allocated_amount} className="font-semibold" /> },
+      { id: 'status', header: t('status'), cell: (payment) => <Badge tone={statusTone[payment.status] ?? 'muted'}>{ts(payment.status)}</Badge> },
+    ];
+    const inventoryColumns: LineGridColumn<InvoiceInventoryMovement>[] = [
+      {
+        id: 'product', header: t('inventory_product'),
+        cell: (movement) => (
+          <div className="min-w-0">
+            <div className="truncate font-medium text-primary-ink">{movement.product?.name ?? '—'}</div>
+            {movement.product?.sku ? <div className="num truncate text-xs text-secondary">{movement.product.sku}</div> : null}
+          </div>
+        ),
+      },
+      { id: 'warehouse', header: t('inventory_warehouse'), priority: 'p2', cell: (movement) => (movement.warehouse ? `${movement.warehouse.code} · ${movement.warehouse.name}` : '—') },
+      { id: 'date', header: t('inventory_date'), priority: 'p2', cell: (movement) => <span className="num">{movement.movement_date ?? '—'}</span> },
+      {
+        id: 'direction', header: t('inventory_direction'),
+        cell: (movement) => (
+          <Badge tone={movement.type === 'out' ? 'warning' : movement.type === 'in' ? 'positive' : 'muted'}>
+            {movement.type === 'out' ? t('inventory_out') : movement.type === 'in' ? t('inventory_in') : t('inventory_adjustment')}
+          </Badge>
+        ),
+      },
+      { id: 'qty', header: t('qty'), align: 'end', cell: (movement) => <span className="num">{movement.quantity}</span> },
+      { id: 'unit', header: t('inventory_unit_cost'), align: 'end', priority: 'p3', cell: (movement) => <Money value={movement.unit_cost} /> },
+      { id: 'total', header: t('inventory_total_cost'), align: 'end', priority: 'p3', cell: (movement) => <Money value={movement.total_cost} /> },
+      { id: 'balance', header: t('inventory_balance'), align: 'end', cell: (movement) => <span className="num font-medium">{movement.balance_quantity}</span> },
+    ];
+    const loadingBlock = <div className="space-y-3 p-4"><Skeleton className="h-10 w-full" /><Skeleton className="h-10 w-full" /></div>;
+    const nonZero = (value: string | null | undefined) => value != null && Number.isFinite(Number(value)) && Number(value) !== 0;
+
+    const dockCells: DockCell[] = [
+      { key: 'subtotal', label: t('subtotal'), value: invoice.subtotal },
+      ...(nonZero(invoice.discount) ? [{ key: 'discount', label: t('discount'), value: invoice.discount }] : []),
+      ...(nonZero(invoice.shipping) ? [{ key: 'shipping', label: t('shipping'), value: invoice.shipping }] : []),
+      { key: 'tax', label: t('tax_amount'), value: invoice.tax_amount },
+      ...(nonZero(invoice.adjustment) ? [{ key: 'adjustment', label: t('adjustment'), value: invoice.adjustment }] : []),
+      ...(isPosted ? [{ key: 'paid', label: t('ws_paid_cell'), value: invoice.paid_amount }] : []),
+    ];
+
+    const wsTabs: WorkspaceTab[] = [
+      {
+        id: 'items',
+        label: t('ws_tab_items'),
+        count: invoice.lines.length,
+        content: (
+          <>
+            <LineGridView
+              columns={lineColumns}
+              rows={invoice.lines}
+              getKey={(line) => line.id}
+              ariaLabel={t('ws_lines_label')}
+              emptyLabel={t('ws_no_lines')}
+              footerNote={t('ws_derived_note')}
+              mobileRow={(line) => (
+                <div className="flex items-baseline justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="truncate text-sm font-medium text-primary-ink">{line.product_name ?? line.description ?? '—'}</div>
+                    <div className="num text-xs text-secondary">{line.quantity} × <Money value={line.unit_price} /></div>
+                  </div>
+                  <Money value={line.line_total} className="shrink-0 font-semibold" />
+                </div>
+              )}
+            />
+            {(invoice.notes || priceOverrides.length > 0) && (
+              <div className="space-y-3 border-t border-hairline p-4 text-sm">
+                {invoice.notes ? (
+                  <div>
+                    <p className="text-xs text-secondary">{t('notes')}</p>
+                    <p className="mt-1 whitespace-pre-wrap leading-6 text-primary-ink">{invoice.notes}</p>
+                  </div>
+                ) : null}
+                {priceOverrides.length > 0 ? (
+                  <div>
+                    <p className="text-xs font-medium text-primary-ink">{t('minimum_price_overrides')}</p>
+                    <ul className="mt-2 space-y-2">
+                      {priceOverrides.map((line) => (
+                        <li key={line.id} className="rounded-surface border border-warning/30 bg-warning/5 px-3 py-2">
+                          <p className="font-medium text-primary-ink">{line.product_name ?? line.description ?? t('unknown_item')}</p>
+                          <p className="mt-1 whitespace-pre-wrap leading-6 text-secondary">{line.minimum_price_override?.reason}</p>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+              </div>
+            )}
+          </>
+        ),
+      },
+      {
+        id: 'document',
+        label: t('document'),
+        keepMounted: true,
+        content: (
+          <div className="rounded-surface bg-sunken p-3 print:bg-transparent print:p-0">
+            <DocumentScaler>{invoiceDocumentEl}</DocumentScaler>
+          </div>
+        ),
+      },
+      {
+        id: 'payments',
+        label: t('payments'),
+        count: relationsLoading ? undefined : payments.length,
+        content: relationsLoading ? loadingBlock : (
+          <LineGridView columns={paymentColumns} rows={payments} getKey={(payment) => payment.id} ariaLabel={t('payments')} emptyLabel={t('no_payments')} />
+        ),
+      },
+      {
+        id: 'entries',
+        label: t('accounting'),
+        // مسودة: لا قيد مرتبط ولا معاينة مدعومة (غير مبنية) → التبويب مخفي. بلا صلاحية: مخفي كلياً.
+        hidden: isDraft || accountingForbidden,
+        content: relationsLoading ? loadingBlock : (
+          <PostedEntries
+            groups={[
+              { key: 'sales', title: t('sales_entry'), entry: accounting?.sales_entry ?? null, empty: t('no_sales_entry') },
+              { key: 'cost', title: t('cost_entry'), entry: accounting?.cost_entry ?? null, empty: t('no_cost_entry') },
+            ]}
+            labels={{
+              entryNumber: t('entry_number'), entryDate: t('entry_date'), description: t('description'), account: t('account'),
+              debit: t('debit'), credit: t('credit_amount'), openEntry: t('ws_open_entry'), readOnly: t('ws_read_only'),
+            }}
+            statusLabel={(status) => ts(status)}
+            statusTone={(status) => statusTone[status] ?? 'muted'}
+          />
+        ),
+      },
+      {
+        id: 'inventory',
+        label: t('inventory_movements'),
+        count: relationsLoading ? undefined : inventoryMovements.length,
+        content: relationsLoading ? loadingBlock : (
+          <LineGridView columns={inventoryColumns} rows={inventoryMovements} getKey={(movement) => movement.id} ariaLabel={t('inventory_movements')} emptyLabel={t('no_inventory_movements')} />
+        ),
+      },
+      {
+        id: 'notes',
+        label: t('notes_attachments'),
+        count: relationsLoading ? undefined : notesLog.length,
+        content: notesContent,
+      },
+    ];
+
+    const wsActions: PageAction[] = [
+      ...(isDraft ? [{ key: 'edit', label: t('edit'), icon: Pencil, href: `/invoices/${invoice.id}/edit`, variant: 'outline' as const, emphasis: 'secondary' as const }] : []),
+      { key: 'print', label: t('print'), icon: Printer, onClick: () => { void revealDocument().then(() => printDocument(paper, 'print-root')); }, variant: 'outline', emphasis: 'secondary' },
+      { key: 'pdf', label: busy === 'pdf' ? t('generating') : t('download_pdf'), icon: Download, onClick: handleDownloadPdf, variant: 'outline', emphasis: 'secondary' },
+      { key: 'share', label: t('share'), icon: Share2, onClick: handleShare, variant: 'outline', emphasis: 'secondary' },
+      { key: 'excel', label: t('excel'), icon: FileSpreadsheet, onClick: handleExcel, variant: 'outline', emphasis: 'secondary' },
+      ...(isPosted ? [{ key: 'return', label: t('create_return'), icon: RotateCcw, onClick: () => setReturnOpen(true), variant: 'outline' as const, emphasis: 'secondary' as const }] : []),
+      { key: 'duplicate', label: duplicating ? t('duplicating') : t('duplicate'), icon: Copy, onClick: duplicateInvoice, disabled: duplicating, variant: 'outline', emphasis: 'secondary' },
+      { key: 'note', label: t('add_note_attachment'), icon: Paperclip, onClick: () => setNoteOpen(true), variant: 'outline', emphasis: 'secondary' },
+      ...(thermalPaper ? [{ key: 'thermal', label: tPrint('thermal_print'), icon: Printer, onClick: () => printDocument(thermalPaper.paper, 'thermal-print-root'), variant: 'outline' as const, emphasis: 'secondary' as const }] : []),
+      ...(isDraft ? [{ key: 'delete', label: t('delete'), icon: Trash2, onClick: () => setPendingAction('delete'), variant: 'danger' as const, emphasis: 'secondary' as const }] : []),
+      // الفعل الرئيسي = العملية الصالحة التالية فعلاً (ترحيل لمسودة، تسجيل دفعة لمرحَّلة غير مسدّدة)
+      ...(isDraft ? [{ key: 'post', label: t('post'), icon: CheckCircle2, onClick: () => setPendingAction('post'), disabled: actioning, variant: 'primary' as const, emphasis: 'primary' as const }] : []),
+      ...(canCollect ? [{ key: 'collect', label: t('add_payment'), icon: Banknote, href: `/invoices/${invoice.id}/payments/new`, variant: 'primary' as const, emphasis: 'primary' as const }] : []),
+    ];
+
+    return (
+      <DocumentWorkspace>
+        <DocumentHeader
+          backHref="/invoices"
+          backLabel={t('back')}
+          number={invoice.number}
+          typeLabel={t('ws_type_sales_invoice')}
+          note={isPosted ? t('ws_posted_note') : undefined}
+        />
+        <DocumentCommandBar
+          toolbarLabel={t('ws_toolbar')}
+          state={
+            <LifecycleRail
+              definition={SALES_INVOICE_LIFECYCLE}
+              status={invoice.status}
+              paymentStatus={invoice.payment_status}
+              stateLabel={(state) => ts(state)}
+              documentAriaLabel={t('ws_lifecycle_document')}
+              paymentAriaLabel={t('ws_lifecycle_payment')}
+            />
+          }
+          actions={wsActions}
+        />
+        {relationsFailed && <p className="rounded-surface border border-hairline bg-band px-3 py-2 text-sm text-primary-ink">{t('relations_unavailable')}</p>}
+        <DocumentContext
+          party={
+            <div>
+              <p className="text-xs text-secondary">{t('partner')}</p>
+              <p className="mt-0.5 text-base font-semibold text-primary-ink">
+                {customer ? <Link href={`/partners/${invoice.partner_id}`} className="hover:underline">{partnerName}</Link> : partnerName}
+              </p>
+              {customer?.vat_number ? <p className="num text-xs text-secondary">{customer.vat_number}</p> : null}
+            </div>
+          }
+          facts={[
+            { label: t('date'), value: <span className="num">{invoice.invoice_date}</span> },
+            { label: t('due_date'), value: <span className="num">{invoice.due_date ?? '—'}</span> },
+            { label: t('payment_type'), value: invoice.payment_type === 'cash' ? t('cash') : t('credit') },
+            { label: t('cost_center'), value: invoice.cost_center ? `${invoice.cost_center.code} · ${invoice.cost_center.name}` : t('not_assigned') },
+          ]}
+        />
+        <WorkspaceTabs tabs={wsTabs} value={wsTab} onChange={setWsTab} />
+        <section aria-label={t('activity')} className="mt-3"><RevisionLog type="invoice" id={id} collapsible defaultOpen={false} /></section>
+        {printOutputs}
+        <TotalsDock
+          ariaLabel={t('ws_totals')}
+          cells={dockCells}
+          detailLabel={t('ws_totals_detail')}
+          outcome={{
+            label: t('ws_totals_outcome'),
+            value: invoice.total,
+            note: isPosted ? <>{t('ws_remaining_line')} <Money value={invoice.remaining} /></> : undefined,
+          }}
+        />
+        {dialogs}
+      </DocumentWorkspace>
+    );
+  }
 
   return (
     <div className="space-y-5">
@@ -759,61 +1103,11 @@ export default function InvoiceDetailPage() {
         <div className="lg:hidden"><Accordion><AccordionItem id="payments" title={t('payments')} count={relationsLoading ? undefined : payments.length} open={relationSection === 'payments'} onToggle={() => toggleRelationSection('payments')}>{paymentsContent}</AccordionItem><AccordionItem id="notes" title={t('notes_attachments')} count={relationsLoading ? undefined : notesLog.length} open={relationSection === 'notes'} onToggle={() => toggleRelationSection('notes')}>{notesContent}</AccordionItem><AccordionItem id="inventory" title={t('inventory_movements')} count={relationsLoading ? undefined : inventoryMovements.length} open={relationSection === 'inventory'} onToggle={() => toggleRelationSection('inventory')}>{inventoryContent}</AccordionItem><AccordionItem id="accounting" title={t('accounting')} open={relationSection === 'accounting'} onToggle={() => toggleRelationSection('accounting')}>{accountingContent}</AccordionItem></Accordion></div>
       </section>
 
-      {!pdfSharesPrintRoot && pdfOutput && (
-        <InvoiceDocument
-          invoice={invoice}
-          company={company}
-          customer={customer}
-          qr={zatca?.qr ?? null}
-          {...documentPropsFromResolved(pdfOutput)}
-          documentType={catalogType}
-          rootId="pdf-print-root"
-        />
-      )}
-
-      {thermalPaper && thermalOutput && (
-        <InvoiceDocument
-          invoice={invoice}
-          company={company}
-          customer={customer}
-          qr={zatca?.qr ?? null}
-          {...documentPropsFromResolved(thermalOutput)}
-          documentType={catalogType}
-          rootId="thermal-print-root"
-        />
-      )}
+      {printOutputs}
 
       <section aria-label={t('activity')}><RevisionLog type="invoice" id={id} collapsible defaultOpen={false} /></section>
 
-      <CreateReturnDialog
-        open={returnOpen}
-        onClose={() => setReturnOpen(false)}
-        onCreated={load}
-        fixedType="sales"
-        initialSalesInvoice={{ id: invoice.id, partnerId: invoice.partner_id }}
-      />
-      <InvoiceNoteDialog
-        open={noteOpen}
-        onClose={() => setNoteOpen(false)}
-        onSaved={load}
-        invoiceId={invoice.id}
-      />
-
-      <Dialog
-        open={pendingAction !== null}
-        onClose={() => (actioning ? null : setPendingAction(null))}
-        title={pendingAction === 'post' ? t('post') : t('delete_title')}
-      >
-        <p className="text-sm leading-6 text-text">
-          {pendingAction === 'post' ? t('post_confirm') : <>{t('delete_confirm')} <span className="num font-medium">{invoice.number}</span>؟</>}
-        </p>
-        <div className="mt-5 flex justify-end gap-2">
-          <Button variant="outline" disabled={actioning} onClick={() => setPendingAction(null)}>{t('retry')}</Button>
-          <Button variant={pendingAction === 'delete' ? 'danger' : 'primary'} disabled={actioning} onClick={confirmAction}>
-            {pendingAction === 'post' ? t('post') : t('delete')}
-          </Button>
-        </div>
-      </Dialog>
+      {dialogs}
     </div>
   );
 }

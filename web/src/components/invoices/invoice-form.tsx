@@ -9,6 +9,15 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { FieldGrid, FieldSpan, FormActions, FormAlert, FormPage, FormSection } from '@/components/nebrax';
 import { InvoiceLineRow, LINE_GRID } from '@/components/invoices/invoice-line-row';
+import { LineGrid, LineGridHeader } from '@/components/workspace/line-grid';
+import { TotalsDock } from '@/components/workspace/totals-dock';
+import {
+  DocumentCommandBar, DocumentHeader, DocumentWorkspace, WorkspaceTabs, type WorkspaceTab,
+} from '@/components/workspace/document-workspace';
+import { LifecycleRail } from '@/components/workspace/lifecycle-rail';
+import { SALES_INVOICE_LIFECYCLE } from '@/components/workspace/lifecycle';
+import type { PageAction } from '@/components/nebrax/action-group';
+import { useAwjUi3 } from '@/lib/use-awj-ui3';
 import { InvoiceTemplateSelector } from '@/components/invoices/invoice-template-selector';
 import { DocumentLanguageSelector } from '@/components/documents/document-language-selector';
 import { Input } from '@/components/ui/input';
@@ -132,6 +141,7 @@ export function InvoiceForm({ editId }: { editId?: string }) {
   const t = useTranslations('invoiceForm');
   const td = useTranslations('deliveryNotes');
   const tc = useTranslations('common');
+  const ts = useTranslations('status');
   const router = useRouter();
   const { success } = useToast();
 
@@ -649,53 +659,29 @@ export function InvoiceForm({ editId }: { editId?: string }) {
     </>
   );
 
-  const summaryRow = (label: string, value: string, tone?: 'positive' | 'muted') => (
-    <div className="flex items-baseline justify-between gap-3 text-sm">
-      <span className="text-muted">{label}</span>
-      <span className={cn('num text-end', tone === 'positive' ? 'text-positive' : 'text-text')}>{value}</span>
-    </div>
+  const v3 = useAwjUi3();
+  const [wsTab, setWsTab] = useState('payment');
+  const [adjOpen, setAdjOpen] = useState(false);
+
+  // v3: نفس الأرقام التي يحسبها النموذج اليوم (subMinor…totalMinor) تُعرض في الـDock؛ لا حساب جديد.
+  const totalsDock = (
+    <TotalsDock
+      variant="editor"
+      ariaLabel={t('totals_region')}
+      detailLabel={t('totals_detail')}
+      cells={[
+        { key: 'subtotal', label: t('subtotal'), value: subMinor / 100 },
+        ...(discountMinor > 0 ? [{ key: 'discount', label: t('discount'), value: -(discountMinor / 100) }] : []),
+        ...(shippingMinor > 0 ? [{ key: 'shipping', label: t('shipping'), value: shippingMinor / 100 }] : []),
+        { key: 'tax', label: t('tax_total'), value: taxMinor / 100 },
+        ...(adjustmentMinor !== 0 ? [{ key: 'adjustment', label: t('adjustment'), value: adjustmentMinor / 100 }] : []),
+      ]}
+      outcome={{ label: t('total'), value: totalMinor / 100 }}
+    />
   );
 
-  return (
-    <FormPage
-      width="full"
-      backHref="/invoices"
-      backLabel={t('back')}
-      title={editId ? t('edit_title') : t('new_title')}
-      actions={
-        <FormActions
-          secondary={<>
-            <Button asChild type="button" variant="ghost"><Link href='/invoices'>{t('cancel')}</Link></Button>
-            <Button type="button" variant="outline" disabled={!canSave} onClick={() => submit(false)}>{t('save_draft')}</Button>
-          </>}
-          primary={<Button type="button" disabled={!canSave} onClick={() => submit(true)}>{t('save_post')}</Button>}
-        />
-      }
-    >
-      {dialogs}
-
-      {!editId && <section className="flex flex-col gap-3 rounded border border-primary/25 bg-primary-soft/40 p-4 sm:flex-row sm:items-center sm:justify-between"><div><h2 className="font-medium text-text">{td('invoiceDraftAction')}</h2><p className="mt-1 text-sm text-muted">{td('invoiceDraftBoundaryHint')}</p></div><Button asChild variant="outline" className="shrink-0"><Link href="/delivery-notes/invoice-draft"><FileText className="h-4 w-4" strokeWidth={1.7} />{td('invoiceDraftAction')}</Link></Button></section>}
-
-      <div className="grid gap-3 lg:grid-cols-[1fr_320px]">
-        <InvoiceTemplateSelector
-          zatcaDocumentType={zatcaDocumentType}
-          branchId={invoiceBranchId}
-          overrideRevisionId={designOverrideRevisionId}
-          onChange={setDesignOverrideRevisionId}
-          onCompatibilityChange={setDesignCompatible}
-        />
-        <DocumentLanguageSelector
-          value={documentLanguage}
-          tenantDefault={tenantDefaultLanguage}
-          onChange={setDocumentLanguage}
-        />
-      </div>
-
-      {/* ═══ ١. العميل وهويّة الفاتورة ═══
-          العميل أولاً لأنه يقرّر قائمة الأسعار وشروط السداد، ثم ما يعرّف المستند. */}
-      <FormSection title={t('customer_section')} icon={Users}>
-        <FieldGrid columns={3}>
-          <FieldSpan className="space-y-1.5 lg:col-span-2">
+  const partnerControl = (
+    <>
             <Label htmlFor="partner">{t('partner')} <span className="text-negative">*</span></Label>
             <div className="flex items-center gap-2">
               <Combobox
@@ -713,13 +699,18 @@ export function InvoiceForm({ editId }: { editId?: string }) {
                 <span className="hidden sm:inline">{t('new_partner')}</span>
               </Button>
             </div>
-          </FieldSpan>
-          {!editId && <NumberPreviewField id="invoice-number" label={t('invoice_number')} number={suggestedNumber} loading={loadingNumber} />}
-          <div className="space-y-1.5">
+          </>
+  );
+
+  const dateField = (
+    <div className="space-y-1.5">
             <Label htmlFor="date">{t('invoice_date')}</Label>
             <Input id="date" type="date" dir="ltr" value={date} onChange={(e) => changeDate(e.target.value)} />
           </div>
-          <div className="space-y-1.5">
+  );
+
+  const zatcaField = (
+    <div className="space-y-1.5">
             <Label htmlFor="zatca-document-type">{t('zatca_document_type')}</Label>
             <Select
               id="zatca-document-type"
@@ -732,114 +723,67 @@ export function InvoiceForm({ editId }: { editId?: string }) {
             </Select>
             <p className="text-xs text-muted">{t('zatca_document_type_hint')}</p>
           </div>
-          <div className="space-y-1.5">
+  );
+
+  const termsField = (
+    <div className="space-y-1.5">
             <Label htmlFor="terms">{t('payment_terms')}</Label>
             <div className="relative">
               <Input id="terms" type="number" min={0} dir="ltr" className="num pe-14" value={terms} onChange={(e) => applyTerms(e.target.value)} />
               <span className="pointer-events-none absolute inset-y-0 end-3 flex items-center text-xs text-muted">{t('days')}</span>
             </div>
           </div>
-          <div className="space-y-1.5">
+  );
+
+  const dueField = (
+    <div className="space-y-1.5">
             <Label htmlFor="due">{t('due_date')}</Label>
             <Input id="due" type="date" dir="ltr" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
           </div>
-        </FieldGrid>
-      </FormSection>
+  );
 
-      {/* ═══ ٢. البنود — منطقة العمل الأولى ═══ */}
-      <FormSection
-        title={t('items_section')}
-        icon={ShoppingCart}
-        action={
-          <Button type="button" variant="outline" size="sm" onClick={addLine}>
-            <Plus className="h-3.5 w-3.5" strokeWidth={1.8} />{t('add_line')}
-          </Button>
-        }
-        contentClassName="space-y-2"
-      >
-        {/* رأس الأعمدة للصفّ الكثيف وحده — دونه لكل حقلٍ تسميتُه. */}
-        <div className={cn('hidden gap-2 px-1 text-[11px] font-medium text-muted lg:grid', LINE_GRID)}>
-          <div>{t('item')}</div>
-          <div>{t('description')}</div>
-          <div className="text-end">{t('price')}</div>
-          <div className="text-end">{t('qty')}</div>
-          <div className="text-end">{t('line_discount_short')}</div>
-          <div className="text-end">{t('tax')}</div>
-          <div className="text-end">{t('total_with_vat')}</div>
-          <div />
-        </div>
-
-        {lines.map((l) => {
-          const [net, lineTax] = lineNetTax(l);
-          const { minSalePrice, belowMinimum } = lineMinimum(l);
-          return (
-            <InvoiceLineRow
-              key={l.key}
-              line={l}
-              productOptions={productOptions}
-              units={products.find((p) => p.id === l.productId)?.units ?? []}
-              centers={centers}
-              net={net}
-              lineTax={lineTax}
-              minSalePrice={minSalePrice}
-              belowMinimum={belowMinimum}
-              allocationTotal={allocationMinorTotal(l)}
-              allocationIssue={allocationError(l)}
-              canRemove={lines.length > 1}
-              onPatch={(patch) => setLine(l.key, patch)}
-              onPickProduct={(productId) => void pickProduct(l.key, productId)}
-              onChangeUnit={(unit) => void changeLineUnit(l.key, unit)}
-              onNewProduct={() => setNewProductFor(l.key)}
-              onRemove={() => removeLine(l.key)}
-              onAllocationKind={(kind) => setAllocationKind(l.key, kind)}
-              onAllocationInputMode={(mode) => changeAllocationInputMode(l.key, mode)}
-              onAllocationPatch={(index, patch) => patchAllocation(l.key, index, patch)}
-              onAllocationAdd={() => addAllocation(l.key)}
-              onAllocationRemove={(index) => removeAllocation(l.key, index)}
-            />
-          );
-        })}
-
-        <p className="pt-1 text-xs leading-relaxed text-muted">{t('items_hint')}</p>
-        {missingQty && (
-          <p className="rounded border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning">
-            {t('qty_required')}
-          </p>
-        )}
-      </FormSection>
-
-      {/* ═══ ٣. التسويات التجارية ═══ */}
-      <FormSection title={t('discount_shipping')} icon={Tag}>
-        <FieldGrid columns={3}>
-          <div className="space-y-1.5">
+  const taxModeField = (
+    <div className="space-y-1.5">
             <Label htmlFor="taxmode">{t('tax_mode')}</Label>
             <Select id="taxmode" value={taxInclusive ? '1' : '0'} onChange={(e) => setTaxInclusive(e.target.value === '1')}>
               <option value="0">{t('tax_exclusive')}</option>
               <option value="1">{t('tax_inclusive')}</option>
             </Select>
           </div>
-          <div className="space-y-1.5">
+  );
+
+  const discountModeField = (
+    <div className="space-y-1.5">
             <Label htmlFor="dmode">{t('discount_mode')}</Label>
             <Select id="dmode" value={discountMode} onChange={(e) => setDiscountMode(e.target.value as 'amount' | 'percent')}>
               <option value="amount">{t('discount_amount')}</option>
               <option value="percent">{t('discount_percent')}</option>
             </Select>
           </div>
-          <div className="space-y-1.5">
+  );
+
+  const discountValueField = (
+    <div className="space-y-1.5">
             <Label htmlFor="dval">{discountMode === 'percent' ? t('discount_percent') : t('discount_amount')}</Label>
             <div className="relative">
               <Input id="dval" inputMode="decimal" dir="ltr" className="num pe-12 text-end" placeholder="0" value={discountInput} onChange={(e) => setDiscountInput(e.target.value)} />
               <span className="pointer-events-none absolute inset-y-0 end-3 flex items-center text-xs text-muted" aria-hidden="true">{discountMode === 'percent' ? '%' : SAUDI_RIYAL_SYMBOL}</span>
             </div>
           </div>
-          <div className="space-y-1.5">
+  );
+
+  const shippingField = (
+    <div className="space-y-1.5">
             <Label htmlFor="ship">{t('shipping')}</Label>
             <div className="relative">
               <Input id="ship" inputMode="decimal" dir="ltr" className="num pe-12 text-end" placeholder="0" value={shippingInput} onChange={(e) => setShippingInput(e.target.value)} />
               <span className="pointer-events-none absolute inset-y-0 end-3 flex items-center text-xs text-muted" aria-hidden="true">{SAUDI_RIYAL_SYMBOL}</span>
             </div>
           </div>
-          <div className="space-y-1.5">
+  );
+
+  const adjustmentField = (
+    <div className="space-y-1.5">
             <Label htmlFor="adj">{t('adjustment')}</Label>
             <div className="relative">
               <Input id="adj" inputMode="decimal" dir="ltr" className="num pe-12 text-end" placeholder="0" value={adjustmentInput} onChange={(e) => setAdjustmentInput(e.target.value)} />
@@ -847,35 +791,57 @@ export function InvoiceForm({ editId }: { editId?: string }) {
             </div>
             <p className="text-[11px] leading-relaxed text-muted">{t('adjustment_hint')}</p>
           </div>
-        </FieldGrid>
-      </FormSection>
+  );
 
-      {/* ═══ ٤. الإجماليات ═══
-          في تدفّق القراءة تحت التسويات التي تصنعها مباشرة، لا في عمودٍ جانبي:
-          العمود الجانبي كان يقتطع من عرض البنود — وهي منطقة العمل الأولى — نحو
-          ٣٠٠px عند كل مقاس، فيضيق صفّها الكثيف حتى تُقصّ أرقامه. */}
-      <Card>
-        <CardContent className="grid gap-x-8 gap-y-2 p-4 sm:grid-cols-2">
-          <div className="space-y-2">
-            {summaryRow(t('subtotal'), formatRiyal(subMinor / 100))}
-            {discountMinor > 0 && summaryRow(t('discount'), `-${formatRiyal(discountMinor / 100)}`, 'positive')}
-            {shippingMinor > 0 && summaryRow(t('shipping'), formatRiyal(shippingMinor / 100))}
-            {summaryRow(t('tax_total'), formatRiyal(taxMinor / 100))}
-            {adjustmentMinor !== 0 && summaryRow(t('adjustment'), `${adjustmentMinor > 0 ? '+' : ''}${formatRiyal(adjustmentMinor / 100)}`)}
-          </div>
-          <div className="flex flex-col justify-end gap-1 border-t border-border pt-3 sm:border-0 sm:pt-0">
-            <div className="flex items-baseline justify-between gap-3">
-              <span className="font-semibold text-text">{t('total')}</span>
-              <span className="num text-2xl font-bold text-primary-hover">{formatRiyal(totalMinor / 100)}</span>
-            </div>
-            <p className="text-[11px] leading-relaxed text-muted">{t('summary_hint')}</p>
-          </div>
-        </CardContent>
-      </Card>
+  const warehouseField = warehouses.length > 0 ? (
+    <div className="space-y-1.5">
+                <Label htmlFor="warehouse">{t('warehouse')}</Label>
+                <Select id="warehouse" value={warehouseId} onChange={(e) => setWarehouseId(e.target.value)}>
+                  <option value="">{t('warehouse_auto')}</option>
+                  {warehouses.map((warehouse) => (
+                    <option key={warehouse.id} value={warehouse.id}>{warehouse.code} — {warehouse.name}</option>
+                  ))}
+                </Select>
+                <p className="text-xs text-muted">{t('warehouse_hint')}</p>
+              </div>
+  ) : null;
 
-      {/* ═══ ٥. السداد — الخانة هي البوّابة ═══ */}
-      <FormSection title={t('payment_section')} icon={Wallet}>
-        <label className="flex cursor-pointer items-center gap-2 py-0.5 text-sm font-medium text-text">
+  const priceListField = priceLists.length > 0 ? (
+    <div className="space-y-1.5">
+                <Label htmlFor="price-list">{t('price_list')}</Label>
+                <div className="flex gap-2">
+                  <Select id="price-list" className="min-w-0 flex-1" value={priceListId} onChange={(e) => setPriceListId(e.target.value)}>
+                    <option value="">{t('price_list_base')}</option>
+                    {priceLists.map((list) => <option key={list.id} value={list.id} disabled={!list.is_active && list.id !== priceListId}>{list.name}{!list.is_active ? ` — ${t('price_list_inactive')}` : ''}</option>)}
+                  </Select>
+                  <Button type="button" variant="outline" size="sm" className="shrink-0" disabled={!priceListId || !priceLists.find((list) => list.id === priceListId)?.is_active || applyingPriceList} onClick={() => void applyPriceListToLines()}>{applyingPriceList ? t('price_list_applying') : t('price_list_apply')}</Button>
+                </div>
+                <p className="text-xs text-muted">{t('price_list_hint')}</p>
+              </div>
+  ) : null;
+
+  const costCenterField = centers.length > 0 ? (
+    <div className="space-y-1.5">
+                <Label htmlFor="center">{t('cost_center')}</Label>
+                <Select id="center" value={centerId} onChange={(e) => setCenterId(e.target.value)}>
+                  <option value="">{t('no_center')}</option>
+                  {centers.map((c) => (<option key={c.id} value={c.id}>{c.code} — {c.name}</option>))}
+                </Select>
+              </div>
+  ) : null;
+
+  const salespersonField = employees.length > 0 ? (
+    <div className="space-y-1.5">
+                <Label htmlFor="sp">{t('salesperson')}</Label>
+                <Select id="sp" value={salespersonId} onChange={(e) => setSalespersonId(e.target.value)}>
+                  <option value="">{t('no_salesperson')}</option>
+                  {employees.map((e2) => (<option key={e2.id} value={e2.id}>{e2.name}</option>))}
+                </Select>
+              </div>
+  ) : null;
+
+  const paymentBody = (
+    <><label className="flex cursor-pointer items-center gap-2 py-0.5 text-sm font-medium text-text">
           <input
             type="checkbox"
             className="h-4 w-4 shrink-0 accent-primary"
@@ -919,6 +885,287 @@ export function InvoiceForm({ editId }: { editId?: string }) {
             </div>
           </div>
         </div>
+      </>
+  );
+
+  const notesField = (
+    <textarea
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          rows={3}
+          className="min-h-20 w-full resize-y rounded border border-border bg-surface px-3 py-2 text-sm text-text placeholder:text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+          placeholder={t('notes')}
+        />
+  );
+
+  const lineGridEl = (
+    <LineGrid onAddLine={addLine} className="space-y-2">
+        {/* رأس الأعمدة للصفّ الكثيف وحده — دونه لكل حقلٍ تسميتُه. */}
+        <LineGridHeader className={cn('hidden gap-2 px-1 text-[11px] font-medium text-muted lg:grid', LINE_GRID)}>
+          <div>{t('item')}</div>
+          <div>{t('description')}</div>
+          <div className="text-end">{t('price')}</div>
+          <div className="text-end">{t('qty')}</div>
+          <div className="text-end">{t('line_discount_short')}</div>
+          <div className="text-end">{t('tax')}</div>
+          <div className="text-end">{t('total_with_vat')}</div>
+          <div />
+        </LineGridHeader>
+
+        {lines.map((l) => {
+          const [net, lineTax] = lineNetTax(l);
+          const { minSalePrice, belowMinimum } = lineMinimum(l);
+          return (
+            <InvoiceLineRow
+              key={l.key}
+              line={l}
+              productOptions={productOptions}
+              units={products.find((p) => p.id === l.productId)?.units ?? []}
+              centers={centers}
+              net={net}
+              lineTax={lineTax}
+              minSalePrice={minSalePrice}
+              belowMinimum={belowMinimum}
+              allocationTotal={allocationMinorTotal(l)}
+              allocationIssue={allocationError(l)}
+              canRemove={lines.length > 1}
+              onPatch={(patch) => setLine(l.key, patch)}
+              onPickProduct={(productId) => void pickProduct(l.key, productId)}
+              onChangeUnit={(unit) => void changeLineUnit(l.key, unit)}
+              onNewProduct={() => setNewProductFor(l.key)}
+              onRemove={() => removeLine(l.key)}
+              onAllocationKind={(kind) => setAllocationKind(l.key, kind)}
+              onAllocationInputMode={(mode) => changeAllocationInputMode(l.key, mode)}
+              onAllocationPatch={(index, patch) => patchAllocation(l.key, index, patch)}
+              onAllocationAdd={() => addAllocation(l.key)}
+              onAllocationRemove={(index) => removeAllocation(l.key, index)}
+            />
+          );
+        })}
+        </LineGrid>
+  );
+
+  const summaryRow = (label: string, value: string, tone?: 'positive' | 'muted') => (
+    <div className="flex items-baseline justify-between gap-3 text-sm">
+      <span className="text-muted">{label}</span>
+      <span className={cn('num text-end', tone === 'positive' ? 'text-positive' : 'text-text')}>{value}</span>
+    </div>
+  );
+
+
+  // ─── AWJ v3 — Document Workspace (gate ON فقط) ───
+  // نفس الحقول والحالة والتحقق والحفظ؛ يتغيّر التركيب فقط: رأس + شريط أوامر + سياق مضغوط + البنود
+  // كسطح البطل + تسويات في شريط واحد + تبويبات للثانوي + Dock. لا حساب جديد: المبالغ هي قيم النموذج نفسها.
+  if (v3) {
+    const wsActions: PageAction[] = [
+      { key: 'cancel', label: t('cancel'), href: '/invoices', variant: 'ghost', emphasis: 'secondary' },
+      ...(!editId ? [{ key: 'delivery-draft', label: td('invoiceDraftAction'), icon: FileText, href: '/delivery-notes/invoice-draft', variant: 'outline' as const, emphasis: 'secondary' as const }] : []),
+      { key: 'save-draft', label: t('save_draft'), onClick: () => submit(false), disabled: !canSave, variant: 'outline', emphasis: 'primary' },
+      { key: 'save-post', label: t('save_post'), onClick: () => submit(true), disabled: !canSave, variant: 'primary', emphasis: 'primary' },
+    ];
+    const wsTabs: WorkspaceTab[] = [
+      { id: 'payment', label: t('ws_tab_payment'), keepMounted: true, content: <div className="p-4">{paymentBody}</div> },
+      {
+        id: 'meta', label: t('ws_tab_meta'), keepMounted: true,
+        hidden: !(warehouseField || priceListField || costCenterField || salespersonField),
+        content: <div className="p-4"><FieldGrid columns={3}>{warehouseField}{priceListField}{costCenterField}{salespersonField}</FieldGrid></div>,
+      },
+      { id: 'notes', label: t('notes'), keepMounted: true, content: <div className="p-4">{notesField}</div> },
+      {
+        id: 'design', label: t('ws_tab_design'), keepMounted: true,
+        content: (
+          <div className="grid gap-3 p-4 lg:grid-cols-[1fr_320px]">
+            <InvoiceTemplateSelector
+              zatcaDocumentType={zatcaDocumentType}
+              branchId={invoiceBranchId}
+              overrideRevisionId={designOverrideRevisionId}
+              onChange={setDesignOverrideRevisionId}
+              onCompatibilityChange={setDesignCompatible}
+            />
+            <DocumentLanguageSelector value={documentLanguage} tenantDefault={tenantDefaultLanguage} onChange={setDocumentLanguage} />
+          </div>
+        ),
+      },
+    ];
+
+    return (
+      <DocumentWorkspace>
+        {dialogs}
+        <DocumentHeader
+          backHref="/invoices"
+          backLabel={t('back')}
+          number={suggestedNumber || <span className="font-sans">{editId ? t('edit_title') : t('new_title')}</span>}
+          typeLabel={t('ws_type')}
+          note={suggestedNumber ? (editId ? t('edit_title') : t('new_title')) : undefined}
+        />
+        <DocumentCommandBar
+          toolbarLabel={t('ws_toolbar')}
+          state={
+            <LifecycleRail
+              definition={SALES_INVOICE_LIFECYCLE}
+              status="draft"
+              stateLabel={(state) => ts(state)}
+              documentAriaLabel={t('ws_lifecycle_document')}
+              paymentAriaLabel={t('ws_lifecycle_payment')}
+            />
+          }
+          actions={wsActions}
+        />
+
+        <section data-awj-docws-context="" data-awj-ctxgrid="" className="grid grid-cols-2 gap-x-4 gap-y-3 md:grid-cols-3 lg:grid-cols-[minmax(0,2.2fr)_minmax(0,1.2fr)_minmax(0,0.8fr)_minmax(0,1.2fr)_minmax(0,1.6fr)]">
+          <div className="col-span-2 space-y-1.5 lg:col-span-1">{partnerControl}</div>
+          {dateField}
+          {termsField}
+          {dueField}
+          {zatcaField}
+        </section>
+
+        <section data-awj-linegrid-hero="" aria-label={t('items_section')}>
+          <div data-awj-linegrid-hero-bar="" className="flex items-center justify-between gap-3">
+            <h2 className="text-sm font-semibold text-primary-ink">
+              {t('items_section')} <span className="num text-secondary">({lines.length})</span>
+            </h2>
+            <Button type="button" variant="outline" size="sm" onClick={addLine}>
+              <Plus className="h-3.5 w-3.5" strokeWidth={1.8} />{t('add_line')}
+            </Button>
+          </div>
+          {lineGridEl}
+          {missingQty && (
+            <p className="m-2 rounded border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning">{t('qty_required')}</p>
+          )}
+        </section>
+
+        <section data-awj-adjust="" aria-label={t('discount_shipping')}>
+          <button
+            type="button"
+            className="flex w-full items-center justify-between text-sm font-semibold text-primary-ink md:hidden"
+            aria-expanded={adjOpen}
+            onClick={() => setAdjOpen((open) => !open)}
+          >
+            <span>{t('discount_shipping')}</span>
+            <span className="text-xs font-normal text-secondary">{adjOpen ? t('ws_collapse') : t('ws_expand')}</span>
+          </button>
+          <div data-awj-ctxgrid="" className={cn('grid-cols-2 gap-x-4 gap-y-3 md:mt-0 md:grid md:grid-cols-5', adjOpen ? 'mt-3 grid' : 'hidden')}>
+            {taxModeField}{discountModeField}{discountValueField}{shippingField}{adjustmentField}
+          </div>
+        </section>
+
+        <WorkspaceTabs tabs={wsTabs} value={wsTab} onChange={setWsTab} />
+
+        {error && <FormAlert>{error}</FormAlert>}
+        {totalsDock}
+      </DocumentWorkspace>
+    );
+  }
+
+  return (
+    <FormPage
+      width="full"
+      backHref="/invoices"
+      backLabel={t('back')}
+      title={editId ? t('edit_title') : t('new_title')}
+      actions={
+        <FormActions
+          secondary={<>
+            <Button asChild type="button" variant="ghost"><Link href='/invoices'>{t('cancel')}</Link></Button>
+            <Button type="button" variant="outline" disabled={!canSave} onClick={() => submit(false)}>{t('save_draft')}</Button>
+          </>}
+          primary={<Button type="button" disabled={!canSave} onClick={() => submit(true)}>{t('save_post')}</Button>}
+        />
+      }
+    >
+      {dialogs}
+
+      {!editId && <section className="flex flex-col gap-3 rounded border border-primary/25 bg-primary-soft/40 p-4 sm:flex-row sm:items-center sm:justify-between"><div><h2 className="font-medium text-text">{td('invoiceDraftAction')}</h2><p className="mt-1 text-sm text-muted">{td('invoiceDraftBoundaryHint')}</p></div><Button asChild variant="outline" className="shrink-0"><Link href="/delivery-notes/invoice-draft"><FileText className="h-4 w-4" strokeWidth={1.7} />{td('invoiceDraftAction')}</Link></Button></section>}
+
+      <div className="grid gap-3 lg:grid-cols-[1fr_320px]">
+        <InvoiceTemplateSelector
+          zatcaDocumentType={zatcaDocumentType}
+          branchId={invoiceBranchId}
+          overrideRevisionId={designOverrideRevisionId}
+          onChange={setDesignOverrideRevisionId}
+          onCompatibilityChange={setDesignCompatible}
+        />
+        <DocumentLanguageSelector
+          value={documentLanguage}
+          tenantDefault={tenantDefaultLanguage}
+          onChange={setDocumentLanguage}
+        />
+      </div>
+
+      {/* ═══ ١. العميل وهويّة الفاتورة ═══
+          العميل أولاً لأنه يقرّر قائمة الأسعار وشروط السداد، ثم ما يعرّف المستند. */}
+      <FormSection title={t('customer_section')} icon={Users}>
+        <FieldGrid columns={3}>
+          <FieldSpan className="space-y-1.5 lg:col-span-2">
+            {partnerControl}
+          </FieldSpan>
+          {!editId && <NumberPreviewField id="invoice-number" label={t('invoice_number')} number={suggestedNumber} loading={loadingNumber} />}
+          {dateField}
+          {zatcaField}
+          {termsField}
+          {dueField}
+        </FieldGrid>
+      </FormSection>
+
+      {/* ═══ ٢. البنود — منطقة العمل الأولى ═══ */}
+      <FormSection
+        title={t('items_section')}
+        icon={ShoppingCart}
+        action={
+          <Button type="button" variant="outline" size="sm" onClick={addLine}>
+            <Plus className="h-3.5 w-3.5" strokeWidth={1.8} />{t('add_line')}
+          </Button>
+        }
+        contentClassName="space-y-2"
+      >
+        {lineGridEl}
+
+        <p className="pt-1 text-xs leading-relaxed text-muted">{t('items_hint')}</p>
+        {missingQty && (
+          <p className="rounded border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning">
+            {t('qty_required')}
+          </p>
+        )}
+      </FormSection>
+
+      {/* ═══ ٣. التسويات التجارية ═══ */}
+      <FormSection title={t('discount_shipping')} icon={Tag}>
+        <FieldGrid columns={3}>
+          {taxModeField}
+          {discountModeField}
+          {discountValueField}
+          {shippingField}
+          {adjustmentField}
+        </FieldGrid>
+      </FormSection>
+
+      {/* ═══ ٤. الإجماليات ═══
+          في تدفّق القراءة تحت التسويات التي تصنعها مباشرة، لا في عمودٍ جانبي:
+          العمود الجانبي كان يقتطع من عرض البنود — وهي منطقة العمل الأولى — نحو
+          ٣٠٠px عند كل مقاس، فيضيق صفّها الكثيف حتى تُقصّ أرقامه. */}
+      <Card>
+        <CardContent className="grid gap-x-8 gap-y-2 p-4 sm:grid-cols-2">
+          <div className="space-y-2">
+            {summaryRow(t('subtotal'), formatRiyal(subMinor / 100))}
+            {discountMinor > 0 && summaryRow(t('discount'), `-${formatRiyal(discountMinor / 100)}`, 'positive')}
+            {shippingMinor > 0 && summaryRow(t('shipping'), formatRiyal(shippingMinor / 100))}
+            {summaryRow(t('tax_total'), formatRiyal(taxMinor / 100))}
+            {adjustmentMinor !== 0 && summaryRow(t('adjustment'), `${adjustmentMinor > 0 ? '+' : ''}${formatRiyal(adjustmentMinor / 100)}`)}
+          </div>
+          <div className="flex flex-col justify-end gap-1 border-t border-border pt-3 sm:border-0 sm:pt-0">
+            <div className="flex items-baseline justify-between gap-3">
+              <span className="font-semibold text-text">{t('total')}</span>
+              <span className="num text-2xl font-bold text-primary-hover">{formatRiyal(totalMinor / 100)}</span>
+            </div>
+            <p className="text-[11px] leading-relaxed text-muted">{t('summary_hint')}</p>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* ═══ ٥. السداد — الخانة هي البوّابة ═══ */}
+      <FormSection title={t('payment_section')} icon={Wallet}>
+        {paymentBody}
       </FormSection>
 
       {/* ═══ ٦. بيانات تشغيلية ومحاسبية ثانوية ═══
@@ -926,62 +1173,17 @@ export function InvoiceForm({ editId }: { editId?: string }) {
       {(warehouses.length > 0 || priceLists.length > 0 || centers.length > 0 || employees.length > 0) && (
         <FormSection title={t('meta_section')} icon={FileText}>
           <FieldGrid columns={3}>
-            {warehouses.length > 0 && (
-              <div className="space-y-1.5">
-                <Label htmlFor="warehouse">{t('warehouse')}</Label>
-                <Select id="warehouse" value={warehouseId} onChange={(e) => setWarehouseId(e.target.value)}>
-                  <option value="">{t('warehouse_auto')}</option>
-                  {warehouses.map((warehouse) => (
-                    <option key={warehouse.id} value={warehouse.id}>{warehouse.code} — {warehouse.name}</option>
-                  ))}
-                </Select>
-                <p className="text-xs text-muted">{t('warehouse_hint')}</p>
-              </div>
-            )}
-            {priceLists.length > 0 && (
-              <div className="space-y-1.5">
-                <Label htmlFor="price-list">{t('price_list')}</Label>
-                <div className="flex gap-2">
-                  <Select id="price-list" className="min-w-0 flex-1" value={priceListId} onChange={(e) => setPriceListId(e.target.value)}>
-                    <option value="">{t('price_list_base')}</option>
-                    {priceLists.map((list) => <option key={list.id} value={list.id} disabled={!list.is_active && list.id !== priceListId}>{list.name}{!list.is_active ? ` — ${t('price_list_inactive')}` : ''}</option>)}
-                  </Select>
-                  <Button type="button" variant="outline" size="sm" className="shrink-0" disabled={!priceListId || !priceLists.find((list) => list.id === priceListId)?.is_active || applyingPriceList} onClick={() => void applyPriceListToLines()}>{applyingPriceList ? t('price_list_applying') : t('price_list_apply')}</Button>
-                </div>
-                <p className="text-xs text-muted">{t('price_list_hint')}</p>
-              </div>
-            )}
-            {centers.length > 0 && (
-              <div className="space-y-1.5">
-                <Label htmlFor="center">{t('cost_center')}</Label>
-                <Select id="center" value={centerId} onChange={(e) => setCenterId(e.target.value)}>
-                  <option value="">{t('no_center')}</option>
-                  {centers.map((c) => (<option key={c.id} value={c.id}>{c.code} — {c.name}</option>))}
-                </Select>
-              </div>
-            )}
-            {employees.length > 0 && (
-              <div className="space-y-1.5">
-                <Label htmlFor="sp">{t('salesperson')}</Label>
-                <Select id="sp" value={salespersonId} onChange={(e) => setSalespersonId(e.target.value)}>
-                  <option value="">{t('no_salesperson')}</option>
-                  {employees.map((e2) => (<option key={e2.id} value={e2.id}>{e2.name}</option>))}
-                </Select>
-              </div>
-            )}
+            {warehouseField}
+            {priceListField}
+            {costCenterField}
+            {salespersonField}
           </FieldGrid>
         </FormSection>
       )}
 
       {/* ═══ ٧. الملاحظات ═══ */}
       <FormSection title={t('notes')} icon={StickyNote}>
-        <textarea
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-          rows={3}
-          className="min-h-20 w-full resize-y rounded border border-border bg-surface px-3 py-2 text-sm text-text placeholder:text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
-          placeholder={t('notes')}
-        />
+        {notesField}
       </FormSection>
 
       {error && <FormAlert>{error}</FormAlert>}

@@ -102,3 +102,23 @@ describe('mockApi POS loss-prevention Phase 4', () => {
     await mockApi('/sales-config/pos_loss_prevention', 'PUT', { data: previous.data });
   });
 });
+
+// انحدار: /purchases/pu-42 في وضع المعاينة كان ينهار بـ "Cannot read properties of undefined
+// (reading 'length')" لأن الـ mock لا يُرجع الحقول التي يضمنها الـ API الحقيقي دائماً
+// (attachments كمصفوفة) بينما الصفحة تقرأها مباشرةً.
+describe('mockApi purchase detail honours the real API contract', () => {
+  it('يُرجع attachments مصفوفةً وحقول المستند التي تقرؤها الصفحة بلا فحص', async () => {
+    const res = await mockApi<{ data: Record<string, unknown> }>('/purchases/pu-42');
+    expect(Array.isArray(res.data.attachments)).toBe(true);
+    for (const key of ['discount', 'shipping', 'adjustment', 'received_status']) {
+      expect(res.data[key]).toBeDefined();
+    }
+  });
+
+  it('يخدم قيود المستند المرحَّل لفاتورة المشتريات والمبيعات', async () => {
+    for (const path of ['/purchases/pu-42/accounting', '/invoices/inv-118/accounting']) {
+      const res = await mockApi<{ data: unknown }>(path);
+      expect(res).toBeDefined();
+    }
+  });
+});

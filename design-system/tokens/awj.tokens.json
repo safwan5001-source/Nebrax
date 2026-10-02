@@ -137,6 +137,22 @@
     "cap-w": { "value": "9px" },
     "cap-h": { "value": "3px" }
   },
+  "outcome": {
+    "fg": { "value": "{primitive.ink.50}" },
+    "label": { "value": "{primitive.ink.200}" },
+    "decimal": { "value": "{primitive.ink.300}" },
+    "rule": { "value": "{primitive.brand.300}" },
+    "positive": { "value": "{primitive.status.green.300}" }
+  },
+  "density": {
+    "grid-row-1l": { "standard": "36px", "compact": "32px" },
+    "grid-row-2l": { "standard": "44px", "compact": "38px" },
+    "grid-head-h": { "standard": "34px", "compact": "30px" },
+    "grid-cell-px": { "standard": "10px", "compact": "8px" },
+    "dock-h": { "standard": "68px", "compact": "56px" },
+    "dock-outcome-fs": { "standard": "28px", "compact": "22px" },
+    "cmdbar-h": { "standard": "46px", "compact": "42px" }
+  },
   "contrastChecks": [
     { "name": "text-primary/paper", "fg": "{semantic.text.primary}", "bg": "{semantic.surface.paper}", "min": 4.5 },
     { "name": "text-primary/desk", "fg": "{semantic.text.primary}", "bg": "{semantic.surface.desk}", "min": 4.5 },
@@ -157,6 +173,14 @@
     { "name": "theme.ink.shell-fg/shell-bg", "fg": "{theme.ink.shell-fg}", "bg": "{theme.ink.shell-bg}", "min": 4.5 },
     { "name": "theme.ink.shell-fg-muted/shell-bg", "fg": "{theme.ink.shell-fg-muted}", "bg": "{theme.ink.shell-bg}", "min": 4.5 },
     { "name": "theme.ink.shell-apex/shell-bg", "fg": "{theme.ink.shell-apex}", "bg": "{theme.ink.shell-bg}", "min": 3.0 },
-    { "name": "theme.ink.shell-field-line/shell-field-bg", "fg": "{theme.ink.shell-field-line}", "bg": "{theme.ink.shell-field-bg}", "min": 3.0 }
+    { "name": "theme.ink.shell-field-line/shell-field-bg", "fg": "{theme.ink.shell-field-line}", "bg": "{theme.ink.shell-field-bg}", "min": 3.0 },
+    { "name": "outcome-fg/outcome", "fg": "{outcome.fg}", "bg": "{semantic.surface.outcome}", "min": 4.5 },
+    { "name": "outcome-label/outcome", "fg": "{outcome.label}", "bg": "{semantic.surface.outcome}", "min": 4.5 },
+    { "name": "outcome-decimal/outcome", "fg": "{outcome.decimal}", "bg": "{semantic.surface.outcome}", "min": 4.5 },
+    { "name": "outcome-rule/outcome", "fg": "{outcome.rule}", "bg": "{semantic.surface.outcome}", "min": 3.0 },
+    { "name": "outcome-positive/outcome", "fg": "{outcome.positive}", "bg": "{semantic.surface.outcome}", "min": 4.5 },
+    { "name": "text-secondary/band", "fg": "{semantic.text.secondary}", "bg": "{semantic.surface.band}", "min": 4.5 },
+    { "name": "text-secondary/sunken", "fg": "{semantic.text.secondary}", "bg": "{semantic.surface.sunken}", "min": 4.5 },
+    { "name": "text-primary/sunken", "fg": "{semantic.text.primary}", "bg": "{semantic.surface.sunken}", "min": 4.5 }
   ]
 }

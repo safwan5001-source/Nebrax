@@ -84,7 +84,23 @@ export function buildTokens(tokens) {
   const themeDefault = resolveThemeBlock(tokens, tokens.theme.default);
   const themeInk = resolveThemeBlock(tokens, tokens.theme.ink);
 
-  return { base, themeDefault, themeInk };
+  // Mode-independent tokens: valid in light AND dark under the gate.
+  const modeless = {
+    ...resolveGroup(tokens, tokens.outcome, 'outcome'),
+    ...densityVars(tokens, 'standard'),
+  };
+
+  return { base, themeDefault, themeInk, modeless };
+}
+
+// Density tokens carry a `standard` value and a `compact` value. Compact applies
+// automatically on short viewports (FOUNDATIONS.md §14); there is no user-facing tier.
+function densityVars(tokens, tier) {
+  const out = {};
+  for (const [key, node] of Object.entries(tokens.density ?? {})) {
+    out[`--awj-${key}`] = resolveRef(node[tier], tokens);
+  }
+  return out;
 }
 
 function resolveThemeBlock(tokens, themeNode) {
@@ -101,14 +117,21 @@ function cssBlock(selector, vars, indent = '  ') {
 }
 
 export function buildCss(tokens) {
-  const { base, themeDefault, themeInk } = buildTokens(tokens);
+  const { base, themeDefault, themeInk, modeless } = buildTokens(tokens);
 
   const blocks = [];
+  blocks.push(cssBlock('html[data-awj-ui="3"]', modeless));
   blocks.push(
     cssBlock('html[data-awj-ui="3"]:not(.dark)', { ...base, ...themeDefault })
   );
   blocks.push(
     cssBlock('html[data-awj-ui="3"][data-awj-theme="ink"]:not(.dark)', themeInk)
+  );
+  blocks.push(
+    `@media (max-height: 740px) {\n${cssBlock('html[data-awj-ui="3"]', densityVars(tokens, 'compact'), '    ')
+      .split('\n')
+      .map((line) => `  ${line}`)
+      .join('\n')}\n}`
   );
   // Gate + Dark compatibility: H1 explicitly excludes a Dark redesign (that is H3/S10).
   // These aliases point the new --awj-* surface/text/border/shell tokens back at today's

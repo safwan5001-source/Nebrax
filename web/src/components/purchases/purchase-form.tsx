@@ -20,6 +20,8 @@ import { DocumentLanguageSelector } from '@/components/documents/document-langua
 import { api, ApiError } from '@/lib/api';
 import { useNumberPreview } from '@/lib/use-number-preview';
 import { formatRiyal, riyalToMinor } from '@/lib/money';
+import { Money } from '@/components/ui/money';
+import { LineGrid, LineGridHeader, LineGridRow } from '@/components/workspace/line-grid';
 import { getSystemTaxInclusive } from '@/lib/tax';
 import { cn } from '@/lib/utils';
 import type { Warehouse } from '@/lib/warehouse';
@@ -84,10 +86,10 @@ const LINE_GRID =
  * اسم الحقل في المقاسين معاً.
  */
 function LineField({
-  label, htmlFor, children,
-}: { label: string; htmlFor: string; children: React.ReactNode }) {
+  label, htmlFor, col, children,
+}: { label: string; htmlFor: string; col?: string; children: React.ReactNode }) {
   return (
-    <div className="min-w-0">
+    <div data-awj-col={col} className="min-w-0">
       <Label htmlFor={htmlFor} className="mb-0.5 block text-[11px] font-medium text-muted md:sr-only md:mb-0">
         {label}
       </Label>
@@ -617,8 +619,9 @@ export function PurchaseForm({ editId }: { editId?: string } = {}) {
           </Button>
         </CardHeader>
         <CardContent className="space-y-2">
+          <LineGrid onAddLine={addLine} className="space-y-2">
           {/* رأس الأعمدة للديسكتوب وحده — على الجوال لكل حقلٍ تسميتُه. */}
-          <div className={cn('hidden gap-2 px-1 text-[11px] font-medium text-muted md:grid', LINE_GRID)}>
+          <LineGridHeader className={cn('hidden gap-2 px-1 text-[11px] font-medium text-muted md:grid', LINE_GRID)}>
             <div>{t('item')}</div>
             <div>{t('description')}</div>
             <div className="text-end">{t('unit_price')}</div>
@@ -627,7 +630,7 @@ export function PurchaseForm({ editId }: { editId?: string } = {}) {
             <div className="text-end">{t('tax')}</div>
             <div className="text-end">{t('line_total')}</div>
             <div />
-          </div>
+          </LineGridHeader>
 
           {lines.map((l) => {
             const units = products.find((p) => p.id === l.productId)?.units ?? [];
@@ -635,7 +638,7 @@ export function PurchaseForm({ editId }: { editId?: string } = {}) {
             const rate = Number(l.tax) || 0;
             const withTax = taxInclusive ? gross : gross + Math.round((gross * rate) / 100);
             return (
-              <div
+              <LineGridRow
                 key={l.key}
                 className={cn(
                   // الجوال: عمودٌ واحد بفواصل ٦px وحشوٍ ضيّق — كل حقلٍ كامل العرض
@@ -645,7 +648,7 @@ export function PurchaseForm({ editId }: { editId?: string } = {}) {
                   LINE_GRID
                 )}
               >
-                <LineField label={t('item')} htmlFor={`${l.key}-product`}>
+                <LineField col="item" label={t('item')} htmlFor={`${l.key}-product`}>
                   <Combobox
                     id={`${l.key}-product`}
                     value={l.productId ?? ''}
@@ -660,7 +663,7 @@ export function PurchaseForm({ editId }: { editId?: string } = {}) {
                   />
                 </LineField>
 
-                <LineField label={t('description')} htmlFor={`${l.key}-description`}>
+                <LineField col="description" label={t('description')} htmlFor={`${l.key}-description`}>
                   <Input
                     id={`${l.key}-description`} placeholder={t('description')}
                     value={l.description}
@@ -668,7 +671,7 @@ export function PurchaseForm({ editId }: { editId?: string } = {}) {
                   />
                 </LineField>
 
-                <LineField label={t('unit_price')} htmlFor={`${l.key}-price`}>
+                <LineField col="price" label={t('unit_price')} htmlFor={`${l.key}-price`}>
                   <Input
                     id={`${l.key}-price`} className="num text-end" inputMode="decimal" dir="ltr" placeholder="0.00"
                     value={l.price} onChange={(e) => setLine(l.key, { price: e.target.value })}
@@ -677,7 +680,7 @@ export function PurchaseForm({ editId }: { editId?: string } = {}) {
 
                 {/* الوحدة تنزل تحت الكمية على الجوال فلا تضغط خانتها، وتعود
                     بجانبها على الديسكتوب حيث للخليّة عرضٌ يكفيهما. */}
-                <LineField label={t('qty')} htmlFor={`${l.key}-qty`}>
+                <LineField col="qty" label={t('qty')} htmlFor={`${l.key}-qty`}>
                   <div className="space-y-1.5 md:flex md:items-center md:gap-1 md:space-y-0">
                     <Input
                       id={`${l.key}-qty`} className="num text-end md:flex-1" type="number" min={1} dir="ltr"
@@ -697,14 +700,14 @@ export function PurchaseForm({ editId }: { editId?: string } = {}) {
                   </div>
                 </LineField>
 
-                <LineField label={t('line_discount')} htmlFor={`${l.key}-discount`}>
+                <LineField col="discount" label={t('line_discount')} htmlFor={`${l.key}-discount`}>
                   <Input
                     id={`${l.key}-discount`} className="num text-end" inputMode="decimal" dir="ltr" placeholder="0"
                     value={l.disc} onChange={(e) => setLine(l.key, { disc: e.target.value })}
                   />
                 </LineField>
 
-                <LineField label={t('tax')} htmlFor={`${l.key}-tax`}>
+                <LineField col="tax" label={t('tax')} htmlFor={`${l.key}-tax`}>
                   <Input
                     id={`${l.key}-tax`} className="num text-end" type="number" min={0} max={100} dir="ltr"
                     value={l.tax} onChange={(e) => setLine(l.key, { tax: e.target.value })}
@@ -716,7 +719,7 @@ export function PurchaseForm({ editId }: { editId?: string } = {}) {
                 <div className="flex items-center justify-between gap-2 border-t border-border pt-1.5 md:contents md:border-0 md:pt-0">
                   <div className="md:text-end">
                     <span className="text-[11px] font-medium text-muted md:hidden">{t('line_total')}</span>{' '}
-                    <span className="num text-sm font-semibold text-text md:font-normal">{formatRiyal(withTax / 100)}</span>
+                    <Money value={withTax / 100} className="text-sm font-semibold text-text md:font-normal" />
                   </div>
                   <Button
                     type="button" variant="ghost" size="icon" className="shrink-0 md:ms-auto"
@@ -725,9 +728,10 @@ export function PurchaseForm({ editId }: { editId?: string } = {}) {
                     <Trash2 className="h-4 w-4 text-negative" strokeWidth={1.7} />
                   </Button>
                 </div>
-              </div>
+              </LineGridRow>
             );
           })}
+          </LineGrid>
 
           <p className="pt-1 text-xs leading-relaxed text-muted">{t('items_hint')}</p>
           {lines.some((l) => !l.productId) && (

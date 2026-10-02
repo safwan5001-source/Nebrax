@@ -253,6 +253,7 @@ export default function JournalEntriesPage() {
       />
 
       <DataTable
+        stickyStartColumn
         columns={columns}
         data={entries}
         loading={loading}

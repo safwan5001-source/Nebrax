@@ -41,6 +41,7 @@ export default defineConfig({
       // يحتاج window/document/localStorage لاختبار بوابة AWJ v3 (Horizon 1).
       ['src/lib/__tests__/awj-ui-gate.test.ts', 'jsdom'],
       ['src/components/ui/__tests__/money.test.tsx', 'jsdom'],
+      ['src/components/workspace/**/*.test.tsx', 'jsdom'],
     ],
     include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
     setupFiles: ['./vitest.setup.ts'],
