@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 
-import { cleanup, renderHook } from '@testing-library/react';
+import { cleanup, renderHook, act } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { usePosCartNavigation } from './use-pos-cart-navigation';
+import { usePosCartLineSelection, usePosCartNavigation } from './use-pos-cart-navigation';
 
 afterEach(() => {
   cleanup();
@@ -78,5 +78,34 @@ describe('تنقل السلة بالكيبورد', () => {
 
     press('Delete');
     expect(onRemoveLine).not.toHaveBeenCalled();
+  });
+});
+
+describe('تحديد سطر السلة بعد تبديل المفتاح', () => {
+  it('يبقي المفتاح القديم إذا لم يعد ضمن الأسطر وswitchZoneToCart معطّل — لهذا يجب أن يحدّث setUnit المفتاح بنفسه', () => {
+    const { result, rerender } = renderHook(
+      ({ lines }: { lines: { key: string }[] }) => usePosCartLineSelection(lines, false),
+      { initialProps: { lines: [{ key: 'p:-:piece' }] } },
+    );
+    expect(result.current.selectedLineKey).toBe('p:-:piece');
+
+    rerender({ lines: [{ key: 'p:carton' }] });
+    expect(result.current.selectedLineKey).toBe('p:-:piece');
+  });
+
+  it('يحفظ المفتاح الذي يمرّره المستدعي عندما يصبح هو سطر الدمج أو السطر المعاد تسميته', () => {
+    const { result, rerender } = renderHook(
+      ({ lines }: { lines: { key: string }[] }) => usePosCartLineSelection(lines, false),
+      { initialProps: { lines: [{ key: 'p:-:piece' }, { key: 'p:-:carton' }] } },
+    );
+    expect(result.current.selectedLineKey).toBe('p:-:carton');
+
+    act(() => result.current.setSelectedLineKey('p:-:piece'));
+    rerender({ lines: [{ key: 'p:box' }, { key: 'p:-:carton' }] });
+    expect(result.current.selectedLineKey).toBe('p:-:piece');
+
+    act(() => result.current.setSelectedLineKey('p:-:carton'));
+    rerender({ lines: [{ key: 'p:-:carton' }] });
+    expect(result.current.selectedLineKey).toBe('p:-:carton');
   });
 });

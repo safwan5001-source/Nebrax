@@ -2,7 +2,7 @@
 
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { PosCartEmptyState, PosCartLineFrame, PosCartQtyControls, PosCartRemoveButton } from './pos-cart-line-controls';
+import { PosCartEmptyState, PosCartLineFrame, PosCartQtyControls, PosCartRemoveButton, PosSelectedLineUnitControl } from './pos-cart-line-controls';
 
 const labels = {
   apply: 'Apply',
@@ -142,5 +142,60 @@ describe('PosCartEmptyState', () => {
     expect(empty.className).toMatch(/py-6/);
     expect(empty.className).not.toMatch(/py-10/);
     expect(empty.querySelector('[class*="bg-primary"]')).toBeNull();
+  });
+});
+
+describe('PosSelectedLineUnitControl', () => {
+  it('يعرض قائمة فقط عند تمرير خيارات، والنص بخلاف ذلك (وحدة واحدة أو متغير)', () => {
+    const onChange = vi.fn();
+    const { rerender } = render(
+      <PosSelectedLineUnitControl
+        label="الوحدة"
+        unitName="حبة"
+        options={[
+          { name: 'حبة', marker: ' (افتراضي)' },
+          { name: 'كرتون', marker: '' },
+        ]}
+        onChange={onChange}
+      />,
+    );
+    const select = screen.getByTestId('pos-line-unit-select') as HTMLSelectElement;
+    expect(select.value).toBe('حبة');
+    expect(select.options[0].textContent).toContain('افتراضي');
+    fireEvent.change(select, { target: { value: 'كرتون' } });
+    expect(onChange).toHaveBeenCalledWith('كرتون');
+
+    rerender(<PosSelectedLineUnitControl label="الوحدة" unitName="حبة" options={null} onChange={onChange} />);
+    expect(screen.queryByTestId('pos-line-unit-select')).toBeNull();
+    expect(screen.getByTestId('pos-line-unit-text').textContent).toContain('حبة');
+
+    rerender(<PosSelectedLineUnitControl label="الوحدة" unitName="أساس" options={null} onChange={onChange} />);
+    expect(screen.queryByTestId('pos-line-unit-select')).toBeNull();
+    expect(screen.getByTestId('pos-line-unit-text').textContent).toContain('أساس');
+  });
+
+  it('يرث اتجاه RTL وLTR من الحاوية ولا يفرض اتجاهاً خاصاً', () => {
+    const { rerender } = render(
+      <div dir="rtl">
+        <PosSelectedLineUnitControl label="الوحدة" unitName="حبة" options={null} onChange={vi.fn()} />
+      </div>,
+    );
+    const rtl = screen.getByTestId('pos-line-unit-text');
+    expect(rtl.closest('[dir]')?.getAttribute('dir')).toBe('rtl');
+    expect(rtl.getAttribute('dir')).toBeNull();
+
+    rerender(
+      <div dir="ltr">
+        <PosSelectedLineUnitControl
+          label="Unit"
+          unitName="Piece"
+          options={[{ name: 'Piece', marker: '' }, { name: 'Box', marker: '' }]}
+          onChange={vi.fn()}
+        />
+      </div>,
+    );
+    const ltr = screen.getByTestId('pos-line-unit-select');
+    expect(ltr.closest('[dir]')?.getAttribute('dir')).toBe('ltr');
+    expect(ltr.getAttribute('dir')).toBeNull();
   });
 });
