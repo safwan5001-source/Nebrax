@@ -519,27 +519,333 @@ Preserve current proven behavior unless explicitly changed later:
 
 V3 should primarily recompose these behaviors visually instead of replacing them.
 
-## 12. Responsive behavior
+## 12. Touch / Responsive POS V3
 
-### Desktop / landscape tablet
+Responsive POS is not a compressed desktop screen. Each form factor gets a deliberate cashier composition while preserving one interaction model and one transaction state.
 
-- split catalog + cart;
-- full cashier workflow remains visible;
-- product density adapts to width and height;
-- no ERP sidebar.
+### 12.1 Responsive tiers
 
-### Portrait tablet / mobile
+#### Wide desktop
+Recommended target: `>= 1280px`.
 
-The exact composition remains **[OPEN]**.
+- persistent catalog + cart split;
+- approximately 65/35 visual balance;
+- horizontal category strip;
+- Standard or Visual product density;
+- full quick-action rail;
+- keyboard + pointer + scanner all first-class.
 
-Preferred direction:
+#### Compact desktop / iPad landscape
+Recommended target: approximately `900–1279px`.
 
-- products and cart become explicit workspaces/tabs;
-- cart may use a bottom sheet / full-height panel where appropriate;
-- primary Pay action remains reachable without precision tapping;
-- safe-area behavior is mandatory.
+- persistent catalog + cart split remains;
+- cart width protected from over-compression;
+- product grid loses columns before touch targets shrink;
+- secondary topbar labels collapse to icons / overflow;
+- categories stay horizontal and scrollable;
+- Standard becomes preferred density;
+- all critical targets remain at least 44px.
 
-The mobile version must not be treated as a desktop layout merely stacked vertically.
+#### Portrait tablet
+Recommended target: approximately `600–899px`.
+
+This is a dedicated two-workspace model:
+
+1. **Products**
+2. **Cart**
+
+Products remain the default workspace during item selection.
+
+A persistent bottom transaction bar shows:
+
+- cart item/quantity count;
+- current total;
+- clear **View cart / Pay** affordance.
+
+Opening Cart uses a **full-height transaction sheet/workspace**, not a narrow desktop side column.
+
+The cart workspace owns:
+
+- customer;
+- cart lines;
+- selected-line actions;
+- totals;
+- Pay action.
+
+Returning to Products must preserve search/category position and current cart state.
+
+#### Mobile / handheld
+Recommended target: `< 600px`.
+
+Mobile is supported for operational continuity, not treated as the primary high-volume cashier form factor.
+
+Use:
+
+- one primary workspace at a time;
+- compact cashier header;
+- sticky search;
+- horizontally scrollable categories;
+- 2-column or density-dependent product grid;
+- sticky bottom transaction bar;
+- cart as a full-screen sheet/workspace;
+- payment as a vertical terminal flow;
+- safe-area-aware sticky actions.
+
+No critical action should depend on hover, right-click, or tiny icon-only targets.
+
+### 12.2 Portrait tablet sale workspace
+
+Reference direction:
+
+```text
+┌──────────────────────────────────┐
+│ AWJ POS    Search / Barcode   ⋯  │
+├──────────────────────────────────┤
+│ All  Favorites  Drinks  Food →  │
+├──────────────────────────────────┤
+│ ┌────────────┐ ┌────────────┐   │
+│ │  Product   │ │  Product   │   │
+│ │   12.00    │ │    6.50    │   │
+│ └────────────┘ └────────────┘   │
+│ ┌────────────┐ ┌────────────┐   │
+│ │  Product   │ │  Product   │   │
+│ └────────────┘ └────────────┘   │
+│                                  │
+│                                  │
+├──────────────────────────────────┤
+│ 3 items          42.50 ﷼        │
+│ [        View cart / Pay       ] │
+└──────────────────────────────────┘
+```
+
+The bottom transaction bar is persistent whenever the cart is non-empty.
+
+### 12.3 Cart on portrait tablet / mobile
+
+**[DECIDED]** The cart uses a full-height sheet/workspace on portrait tablet and mobile.
+
+It should not use a partial-height bottom sheet for the main editing state because quantity editing, discount, customer, totals and Pay require stable vertical space.
+
+A partial bottom sheet may be used only for quick previews or one-step selectors.
+
+Reference direction:
+
+```text
+┌──────────────────────────────────┐
+│ ← Products       Current sale    │
+│ Cash customer             Change │
+├──────────────────────────────────┤
+│ Product A                       │
+│ 12.00              −   2   +    │
+│                           24.00  │
+│ ───────────────────────────────  │
+│ Product B                       │
+│ 18.50              −   1   +    │
+│                           18.50  │
+│                                  │
+│                                  │
+├──────────────────────────────────┤
+│ Subtotal                  42.50  │
+│ Discount                   0.00  │
+│ Tax                        6.38  │
+│ TOTAL                     48.88  │
+│ [            PAY               ] │
+└──────────────────────────────────┘
+```
+
+### 12.4 Touch target contract
+
+For Touch and AUTO-on-coarse-pointer modes:
+
+- ordinary interactive target: minimum 44×44px;
+- primary Pay / Confirm: 56–64px height;
+- quantity controls: minimum 44px each;
+- keypad keys: 56–64px;
+- category tabs/chips: minimum 44px effective height;
+- no precision-only overflow triggers smaller than the touch minimum.
+
+Visual density may decrease before target size is reduced.
+
+### 12.5 Product density by form factor
+
+Default recommendation:
+
+- Wide desktop: Standard, user may switch Visual / Compact.
+- Compact desktop / landscape tablet: Standard.
+- Portrait tablet: Standard with smaller image treatment.
+- Mobile: Compact or compact-Standard hybrid.
+
+The user-selected density should persist where practical, but AWJ may safely constrain impossible combinations on narrow screens.
+
+Example: Visual mode on a 390px phone may reduce image height or columns rather than create unusably large tiles.
+
+### 12.6 Search and scanner behavior
+
+Search remains a primary control across every form factor.
+
+Desktop / landscape:
+
+- central header search;
+- scanner input may be captured globally according to the existing scanner contract.
+
+Portrait / mobile:
+
+- sticky search field near the top of Products;
+- barcode action remains obvious;
+- opening Cart or Payment must not destroy scanner/focus state permanently;
+- returning to Products restores appropriate focus based on interaction mode.
+
+Touch redesign must not regress HID scanner behavior.
+
+### 12.7 Category behavior
+
+**[DECIDED]** V3 defaults to a horizontal, scrollable category strip.
+
+Reasons:
+
+- preserves catalog width;
+- works naturally for touch;
+- scales from tablet to mobile;
+- avoids a narrow permanent rail consuming valuable space.
+
+For extremely large category sets, V3 may add:
+
+- pinned Favorites / All;
+- horizontal scrolling;
+- overflow/search category picker.
+
+Do not restore a permanent desktop category rail solely because the current V2 has one.
+
+### 12.8 Sticky transaction controls
+
+On narrow layouts, the bottom transaction bar is a core navigation/state component.
+
+When cart is empty:
+
+- bar may collapse or show a disabled/empty state.
+
+When cart has items:
+
+- item/quantity count;
+- live total;
+- View cart / Pay action.
+
+The bar:
+
+- respects `safe-area-inset-bottom`;
+- never covers the final product row;
+- does not obscure system browser/home gestures;
+- remains visually separate from product tiles.
+
+### 12.9 Topbar adaptation
+
+The cashier header progressively simplifies.
+
+Priority retained at all sizes:
+
+1. POS identity/context;
+2. search or immediate access to search;
+3. connectivity;
+4. cashier/session access;
+5. overflow.
+
+Labels such as Recent invoices, Session management, Returns and Cash drawer move into overflow earlier on narrow layouts.
+
+Do not wrap the topbar into multiple dense rows.
+
+### 12.10 Orientation changes
+
+Rotating a device must not reset:
+
+- cart;
+- selected customer;
+- selected category;
+- search text where practical;
+- held-sale context;
+- payment inputs during an active payment flow unless existing safety rules require otherwise.
+
+Landscape may recompose from tabbed Products/Cart to split view without creating a second cart state.
+
+### 12.11 Short-height screens
+
+For landscape devices around 768–800px high:
+
+- reduce vertical chrome first;
+- reduce product media height second;
+- keep 44px interaction targets;
+- keep Pay/Confirm visible;
+- allow internal panel scrolling rather than whole-page vertical drift.
+
+The cashier should not need browser zoom to complete a sale.
+
+### 12.12 Touch feedback
+
+Touch interactions require immediate non-hover feedback:
+
+- pressed state;
+- selected state;
+- added quantity badge;
+- optional haptic/sound;
+- clear disabled state.
+
+Hover may enhance desktop but must never communicate required state by itself.
+
+### 12.13 Payment on portrait/mobile
+
+Payment follows the V3 vertical terminal flow already defined:
+
+1. sticky amount due;
+2. payment-method selector;
+3. active amount input;
+4. contextual keypad;
+5. paid / remaining / change strip;
+6. sticky Confirm payment.
+
+Cart details collapse behind an expandable summary.
+
+The numeric keypad may occupy most of the lower viewport in Touch mode, but the amount due and financial result remain visible.
+
+### 12.14 Receipt / success on touch
+
+After success:
+
+- success state is immediate and compact;
+- change is prominent when applicable;
+- Print / Receipt / New sale actions use large targets;
+- **New sale** is the primary continuation action;
+- the user should not be forced through multiple dismissal layers.
+
+### 12.15 Safe-area and viewport contract
+
+All sticky/footer controls must account for mobile safe areas.
+
+Implementation must verify at minimum:
+
+- iPad landscape;
+- iPad portrait;
+- 390px-class iPhone viewport;
+- 430px-class large iPhone viewport;
+- compact desktop around 1024×768;
+- standard desktop around 1440px.
+
+No horizontal page overflow is acceptable.
+
+### 12.16 Responsive state ownership
+
+Responsive composition changes presentation only.
+
+It must not create separate business-state owners for desktop vs mobile.
+
+One canonical state continues to own:
+
+- active cart;
+- customer;
+- session;
+- payment;
+- selected product/cart line;
+- checkout phase.
+
+Responsive components are views over that state, not forks of POS behavior.
 
 ## 13. Motion and feedback
 
@@ -639,9 +945,9 @@ Preferred implementation approach:
 ## 18. Open decisions
 
 - [OPEN] Cart surface: light vs ink/dark.
-- [OPEN] Horizontal category strip vs retained category rail for very large catalogs.
+- [DECIDED] Horizontal scrollable category strip is the V3 default; large catalogs use overflow/search rather than a permanent category rail.
 - [OPEN] Exact default density: Standard is preferred, but should be visually validated.
-- [OPEN] Portrait tablet/mobile cart composition.
+- [DECIDED] Portrait tablet/mobile use Products + Cart workspaces; Cart is a full-height sheet/workspace with a persistent bottom transaction bar from Products.
 - [DECIDED] Payment Workspace V3 uses a dedicated terminal-like workspace with dominant amount due, large payment-method selection, contextual numeric entry, explicit paid/remaining/change states, and one dominant confirm action.
 - [OPEN] Whether POS receives an explicit independent theme preference or follows the user's main theme with Floor-specific surfaces.
 
@@ -661,4 +967,4 @@ Preferred implementation approach:
 - Payment Workspace V3 is a dedicated terminal-like surface, not a small modal or generic form.
 - Payment keeps split tender, deferred policy, exact amount, change and checkout safety while simplifying the visual hierarchy.
 
-**Next design step:** Touch / responsive composition V3.
+**Next design step:** visual system details — cart surface, POS theme behavior, product-density default validation, and final implementation slicing.
