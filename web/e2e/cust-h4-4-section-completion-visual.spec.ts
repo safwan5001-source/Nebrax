@@ -112,7 +112,13 @@ test.describe('CUST-H4-4 — Banner / Benefits / Custom Content / App Promo (vis
       await addHomeSection(page, 'appPromo', true, 'الصفحة الرئيسية');
       const appPanel = sectionPanel(page, 'appPromo', true);
       await appPanel.getByLabel('اسم التطبيق').fill('تطبيق نبراس');
-      await appPanel.getByLabel('رابط App Store').fill('https://apps.apple.com/app/id123456789');
+      const iosUrlField = appPanel.getByLabel('رابط App Store');
+      await iosUrlField.fill('https://apps.apple.com/app/id123456789');
+      // CUST-H4-4 review fix — App Promo URL fields now commit on blur
+      // (not on every keystroke) to tolerate normal typing. Blur
+      // explicitly so the Canvas reflects the real, committed config the
+      // same way a merchant clicking away from the field would.
+      await iosUrlField.blur();
 
       await assertNoOverflow(page);
       await page.screenshot({ path: path.join(evidenceDir, `ar-${width}-sections.png`), fullPage: true });
@@ -147,7 +153,12 @@ test.describe('CUST-H4-4 — Banner / Benefits / Custom Content / App Promo (vis
     const appPanel = page.locator('[data-selected-section-settings="appPromo"]');
     await appPanel.getByLabel('اسم التطبيق').fill('تطبيق نبراس');
     await appPanel.getByLabel('رابط App Store').fill('https://apps.apple.com/app/id123456789');
-    await appPanel.getByLabel('رابط Google Play').fill('https://play.google.com/store/apps/details?id=sa.awj');
+    const androidUrlFieldAr = appPanel.getByLabel('رابط Google Play');
+    await androidUrlFieldAr.fill('https://play.google.com/store/apps/details?id=sa.awj');
+    // CUST-H4-4 review fix — commit both URL fields (blur) before reading
+    // the Canvas, which only reflects committed config, not the in-field
+    // draft a merchant is still typing.
+    await androidUrlFieldAr.blur();
 
     const canvas = page.locator('[data-preview-canvas]');
     await expect(canvas.locator('[data-preview-section-id] img')).toHaveCount(2); // both store badges, no banner image
@@ -182,12 +193,21 @@ test.describe('CUST-H4-4 — Banner / Benefits / Custom Content / App Promo (vis
     await addHomeSection(page, 'appPromo', false, 'Homepage');
     const appPanel = page.locator('[data-selected-section-settings="appPromo"]');
     await appPanel.getByLabel('App name').fill('AWJ App');
-    await appPanel.getByLabel('Google Play URL').fill('https://play.google.com/store/apps/details?id=sa.awj');
+    const androidUrlFieldEn = appPanel.getByLabel('Google Play URL');
+    await androidUrlFieldEn.fill('https://play.google.com/store/apps/details?id=sa.awj');
+    // CUST-H4-4 review fix — commit the URL field (blur) so the Canvas
+    // badge reflects the real, committed config.
+    await androidUrlFieldEn.blur();
 
     const bannerImg = page
       .locator('[data-preview-section-id="banner-1"] img, [data-preview-section] img')
       .first();
     await expect(bannerImg).toHaveAttribute('alt', 'Summer sale products on a wooden table');
+
+    // The committed Google Play URL must render as a real badge — proves
+    // the blur-commit fix actually reaches the Canvas, not just the input.
+    const appPromoSection = page.locator('[data-preview-section="appPromo"]');
+    await expect(appPromoSection.locator('img')).toHaveCount(1);
 
     await assertNoOverflow(page);
     await page.screenshot({ path: path.join(evidenceDir, 'en-desktop-sections.png'), fullPage: true });
