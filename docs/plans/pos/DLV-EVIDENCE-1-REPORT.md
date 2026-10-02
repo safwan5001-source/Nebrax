@@ -172,7 +172,7 @@ None blocks DLV-FOUNDATION-1 (DG-5, the only gate touching it, is resolved below
 **In scope (additive, config only):**
 1. Delivery platform profile bound to a tenant `SalesChannel` of `type=external` (R1; decided, DG-5). Channel slug convention `delivery-<platform>`: platform key (catalog of the six; extensible), display name (ar/en), collection mode (`platform_collected` | `merchant_collected`) as data only, external-order-reference policy (`required|optional|none`, default `optional`), logo asset reference (nullable string, no assets shipped), `is_active`.
 2. Append-only configuration **versions** (effective-dated, immutable) so later documents can reference a version id that survives edits.
-3. Optional per-branch override rows (`BelongsToBranch`) only where configured, never crossing tenant.
+3. Optional per-branch overrides (`BelongsToBranch`) only where configured, never crossing tenant. Overrides are append-only and versioned: an override row is immutable and linked to (or included in) a specific profile version, and editing creates a new version, so a recorded version id always resolves to the same effective configuration for every branch.
 4. Service layer (tenant guard, same-tenant validation, soft-disable not delete when referenced) and tenant-scoped REST CRUD under existing permissions (`company.manage` write, `invoices.view` read).
 5. Idempotent catalog seeding/enable action (explicit, no auto-creation for existing tenants).
 
@@ -185,7 +185,7 @@ None blocks DLV-FOUNDATION-1 (DG-5, the only gate touching it, is resolved below
 3. `merchant_collected` default semantics equal today's behavior; `platform_collected` is data only and drives no posting.
 4. Every new model classified (`CompanyWide` / `BelongsToBranch`); `BranchIsolationGuardTest` green.
 5. A published version is immutable; editing creates a new version; prior version still resolvable.
-6. Branch override applies only to the stated branch and tenant; no override ⇒ company default.
+6. Branch override applies only to the stated branch and tenant; no override ⇒ company default. Overrides are immutable once part of a version: editing a branch override creates a new version and the previously recorded version still resolves to its original effective branch configuration.
 7. Existing `SalesChannel` consumers (web/mobile/pos resolvers, storefront, commerce workspace) never return delivery channels in their flows; `CommerceModuleBoundaryTest` green.
 8. Unauthorized role ⇒ 403; foreign tenant/branch/channel ids ⇒ non-revealing 404/422; inactive/foreign `default_price_list_id` rules unchanged.
 9. Responses expose no secrets (none stored) and no ledger accounts.
@@ -194,7 +194,7 @@ None blocks DLV-FOUNDATION-1 (DG-5, the only gate touching it, is resolved below
 
 ## 14. Required tests — DLV-FOUNDATION-1
 
-- Unit/feature: profile create/update/disable; version immutability and effective resolution; branch override resolution; policy defaults; soft-disable when referenced.
+- Unit/feature: profile create/update/disable; version immutability and effective resolution; branch override resolution; historical resolution of a recorded version after later profile **and** branch-override edits; policy defaults; soft-disable when referenced.
 - Negative: cross-tenant channel/profile/override; cross-branch override; non-`external` channel rejected; unauthorized role; invalid UUID shape; duplicate slug/platform per tenant.
 - Isolation/regression: `BranchIsolationGuardTest`, `CommerceModuleBoundaryTest`, `MobileSalesChannelResolverTest`, `PaymentMethodChannelAvailability*Test`, `PosCheckoutTest`, `PosCheckoutIdempotencyTest`, `PosSessionTest`, `PosSessionCloseHandoverTest`, `PaymentGatewaySettlementAccountingTest` unchanged and green; journal-count-unchanged assertion on all new endpoints.
 - Migration: forward, fresh, and (where meaningful) rollback on SQLite + PostgreSQL.

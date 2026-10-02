@@ -17,7 +17,7 @@ This is the human-reviewable V1 queue. It is deliberately Markdown first. Do not
 
 ## Authorized horizon
 
-STATUS: ACTIVE
+STATUS: HISTORICAL — superseded 2026-10-02 as the active horizon by "Horizon: AWJ Delivery Platforms & Settlement V1" (end of this file). Task rows below keep their recorded statuses; do not select work from this section.
 
 **Horizon: Commerce Mobile API readiness closure V1**
 
@@ -482,7 +482,7 @@ If a task reaches a true `owner_gate`, Claude may continue only with independent
 
 ## Authorized horizon — AWJ App Builder Horizon V1
 
-STATUS: ACTIVE (2026-09-23) — authorized by `docs/plans/app-builder/AWJ_APP_BUILDER_HORIZON_V1.md`
+STATUS: HISTORICAL (was ACTIVE 2026-09-23; superseded 2026-10-02 by the Delivery Platforms horizon at the end of this file — do not select work from this section) — authorized by `docs/plans/app-builder/AWJ_APP_BUILDER_HORIZON_V1.md`
 and its bootstrap `docs/plans/app-builder/AWJ_APP_BUILDER_HORIZON_V1_BOOTSTRAP.md`, launched
 after AWJ Mobile Runtime Proof Horizon V1 closed (`main@95198157f1b64e0e437675d9c0e01f45479d776d`).
 
