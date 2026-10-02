@@ -18,6 +18,7 @@ Started from POS-UI-V3-1 (catalog pane + search in the topbar). The permanent ca
 - Density is `localStorage` key `awj-pos-density-v3`. Default `standard`. Compact never shows an image. Standard and Visual show an image only when `posCfg.show_product_images` is true.
 - In-cart badge sums existing line quantities. It does not change add-to-cart.
 - The vertical rail class `POS_DESKTOP_CATEGORIES_CLASS` is removed.
+- `globals.css` no longer forces a third `data-awj-floor-grid` track at 1024/1280. That rule was overriding `POS_SALE_GRID_CLASS` and would have left an empty rail column after the strip replaced the rail.
 
 ## Why this approach fits AWJ
 

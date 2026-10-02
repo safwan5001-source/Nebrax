@@ -42,6 +42,10 @@ describe('قشرة نقطة البيع المتجاوبة', () => {
     expect(gridRegion.indexOf('posProductsPaneClass')).toBeLessThan(gridRegion.indexOf('posCartPaneClass'));
     expect(page).toContain('data-testid="pos-category-strip"');
     expect(gridRegion).not.toContain('{catsPanel}');
+    const css = source('src/app/globals.css');
+    expect(css).not.toContain('minmax(360px, 5fr) minmax(0, 7fr) 112px');
+    expect(css).not.toContain('minmax(400px, 5fr) minmax(0, 7fr) 128px');
+    expect(css).not.toContain('data-awj-floor-cats');
   });
 
   it('PR-3: عمود السلة يمتد فعلياً على كامل عرض مساره في الشبكة (لا انكماش على عرض المحتوى)', () => {
