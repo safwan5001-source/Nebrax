@@ -224,6 +224,47 @@ export const CUSTOMIZER_MESSAGES = {
     sectionCustomContent: "محتوى محكوم",
     gatedSection:
       "العروض تنتظر محرك العروض المعتمد في أَوْج. لا يُسعَّر هذا القسم من هنا ولا يُنشر.",
+    // CUST-H4-2 — مكتبة الأقسام: تصنيفات التاكسونومي السبعة (معتمدة من
+    // CUST-H4-ARCH-1 §16)، أوصاف مختصرة بلغة التاجر لكل نوع قسم، وأسباب
+    // عدم الإمكانية حين تكون الحالة ليست LIVE أو حين يتعذّر الإضافة الآن.
+    sectionLibraryTitle: "مكتبة الأقسام",
+    sectionLibraryHint: "اختر قسماً لإضافته إلى الصفحة الرئيسية.",
+    sectionLibrarySearchLabel: "ابحث في مكتبة الأقسام",
+    sectionLibrarySearchPlaceholder: "ابحث بالاسم…",
+    sectionLibraryAllCategories: "الكل",
+    sectionLibraryEmptySearch: "لا أقسام مطابقة لبحثك.",
+    sectionLibraryAlreadyAdded: "أُضيف بالفعل",
+    sectionLibraryAdd: "إضافة",
+    // CUST-H4-2 (مراجعة — تلميع واجهة الجوال) — زرّ رجوع داخل المكتبة على
+    // الجوال، مختلف عن "إغلاق" ورقة الأقسام الخارجية: يعيد للقائمة ولا يُغلق
+    // الورقة.
+    sectionLibraryBack: "رجوع",
+    sectionLibraryStatePartial: "قيد الإكمال",
+    sectionCategoryProducts: "المنتجات",
+    sectionCategoryCategoriesNav: "التصنيفات والتنقل",
+    sectionCategoryOffersMarketing: "العروض والتسويق",
+    sectionCategoryMediaVideo: "الصور والفيديو",
+    sectionCategoryContent: "المحتوى",
+    sectionCategoryTrustServices: "الثقة والخدمات",
+    sectionCategoryAppCommunication: "التطبيق والتواصل",
+    sectionHeroDescription: "قسم افتتاحي بعنوان رئيسي وزر دعوة للعمل.",
+    sectionCategoriesDescription: "تصنيفات متجرك معروضة كبطاقات قابلة للتصفح.",
+    sectionNewArrivalsDescription: "أحدث المنتجات المضافة إلى الكتالوج.",
+    sectionWholesaleDescription: "تعريف بخدمة البيع بالجملة لعملاء المؤسسات.",
+    sectionBannerDescription: "شريط ترويجي بصورة وعنوان وزر.",
+    sectionFeaturedDescription: "مجموعة منتجات تختارها يدوياً لإبرازها.",
+    sectionOffersDescription: "منتجات بعروض حقيقية من كتالوجك.",
+    sectionBenefitsDescription: "مزايا متجرك المختصرة مثل الشحن والدفع الآمن.",
+    sectionAppPromoDescription: "روابط تحميل تطبيق متجرك على الجوال.",
+    sectionCustomContentDescription: "فقرات وعناوين نصية حرة.",
+    sectionFeaturedPartialReason:
+      "منتقي منتجات حقيقي قادم قريباً. حالياً يُضاف المنتج بكتابة معرّفه يدوياً.",
+    // CUST-H4-2 (مراجعة) — العروض مرئية في المكتبة لكنها غير قابلة للإضافة
+    // بعد: لا بنية تجارية حقيقية ولا عارض Canvas/منشور حقيقي لها اليوم. نصٌّ
+    // مخصّص لحالة «غير قابل للإضافة» في المكتبة، مستقلٌّ عن `gatedSection`
+    // (نص لوحة إعدادات instance موجود مسبقاً، سيناريو مختلف).
+    sectionOffersComingSoon:
+      "العروض قادمة. ستصبح قابلة للإضافة عند اكتمال بنيتها التجارية الحقيقية وعارضَيها في أَوْج.",
     selectedSectionHint: "تظهر هنا إعدادات القسم المحدد فقط.",
     sectionManagedNote:
       "محتوى هذا القسم يأتي من كتالوج أَوْج ولا يُحرَّر من هنا. يمكنك إظهاره أو إخفاؤه وإعادة ترتيبه.",
@@ -703,6 +744,48 @@ export const CUSTOMIZER_MESSAGES = {
     sectionCustomContent: "Controlled content",
     gatedSection:
       "Offers wait on AWJ's authoritative promotions engine. This section cannot set prices and is not published.",
+    // CUST-H4-2 — Section Library: the seven taxonomy categories (approved by
+    // CUST-H4-ARCH-1 §16), short merchant-facing descriptions per section
+    // type, and reasons shown when a state isn't LIVE or a card can't be
+    // added right now.
+    sectionLibraryTitle: "Section Library",
+    sectionLibraryHint: "Choose a section to add to the homepage.",
+    sectionLibrarySearchLabel: "Search the Section Library",
+    sectionLibrarySearchPlaceholder: "Search by name…",
+    sectionLibraryAllCategories: "All",
+    sectionLibraryEmptySearch: "No sections match your search.",
+    sectionLibraryAlreadyAdded: "Already added",
+    sectionLibraryAdd: "Add",
+    // CUST-H4-2 (review — mobile UX polish) — the Library's own back
+    // control on mobile, distinct from the outer Sections sheet's "Close":
+    // returns to the list, does not close the sheet.
+    sectionLibraryBack: "Back",
+    sectionLibraryStatePartial: "In progress",
+    sectionCategoryProducts: "Products",
+    sectionCategoryCategoriesNav: "Categories & Navigation",
+    sectionCategoryOffersMarketing: "Offers & Marketing",
+    sectionCategoryMediaVideo: "Images & Video",
+    sectionCategoryContent: "Content",
+    sectionCategoryTrustServices: "Trust & Services",
+    sectionCategoryAppCommunication: "App & Communication",
+    sectionHeroDescription: "An opening section with a headline and call-to-action.",
+    sectionCategoriesDescription: "Your store's categories shown as browsable cards.",
+    sectionNewArrivalsDescription: "The most recently added catalog products.",
+    sectionWholesaleDescription: "An introduction to your wholesale service.",
+    sectionBannerDescription: "A promotional strip with an image, title and button.",
+    sectionFeaturedDescription: "A hand-picked set of products to highlight.",
+    sectionOffersDescription: "Products with real, currently active offers from your catalog.",
+    sectionBenefitsDescription: "Short store perks like shipping and secure payment.",
+    sectionAppPromoDescription: "Download links for your store's mobile app.",
+    sectionCustomContentDescription: "Free-form headings and paragraphs.",
+    sectionFeaturedPartialReason:
+      "A real product picker is coming soon. For now, add a product by typing its id.",
+    // CUST-H4-2 (review fix) — Offers stays visible in the Library but is
+    // not addable yet: no real Commerce backend or Canvas/Published
+    // renderer exists today. Distinct from `gatedSection` (the existing
+    // selected-instance settings copy, a different scenario).
+    sectionOffersComingSoon:
+      "Offers is coming. It will become addable once its real Commerce backend and both renderers are built in AWJ.",
     selectedSectionHint: "Only the selected section's settings appear here.",
     sectionManagedNote:
       "This section's content comes from the AWJ catalog and cannot be edited here. You can show, hide and reorder it.",
