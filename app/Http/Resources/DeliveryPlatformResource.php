@@ -12,7 +12,7 @@ class DeliveryPlatformResource extends JsonResource
     public function toArray(Request $request): array
     {
         $catalog = DeliveryPlatformCatalog::get($this->platform_key);
-        $current = $this->relationLoaded('versions') ? $this->versions->last() : null;
+        $current = $this->relationLoaded('currentVersion') ? $this->currentVersion : null;
 
         return [
             'id' => $this->id,

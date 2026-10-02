@@ -298,6 +298,41 @@ class DeliveryPlatformApiTest extends TestCase
     }
 
     /** @test */
+    public function a_branch_referenced_by_a_platform_override_cannot_be_deleted_and_returns_a_deliberate_422(): void
+    {
+        $auth = $this->owner('dlv-api-branchdel');
+        $used = $this->branchOf($auth['token'], 'فرع مرجَع');
+        $free = $this->branchOf($auth['token'], 'فرع حر');
+        $this->create($auth['token'], ['branch_overrides' => [['branch_id' => $used, 'collection_mode' => 'platform_collected']]]);
+
+        $this->withToken($auth['token'])->deleteJson("/api/branches/{$used}")->assertStatus(422);
+        $this->withToken($auth['token'])->getJson('/api/branches')->assertJsonFragment(['id' => $used]);
+        // الفرع غير المرتبط بتجاوز يُحذف كما كان.
+        $this->withToken($auth['token'])->deleteJson("/api/branches/{$free}")->assertOk();
+    }
+
+    /** @test */
+    public function summary_responses_carry_only_the_current_version_and_the_history_endpoint_is_paginated(): void
+    {
+        $auth = $this->owner('dlv-api-summary');
+        $profile = $this->create($auth['token']);
+        foreach (['platform_collected', 'merchant_collected', 'platform_collected'] as $mode) {
+            $this->withToken($auth['token'])->putJson("/api/delivery-platforms/{$profile['id']}", ['collection_mode' => $mode])->assertOk();
+        }
+
+        $this->withToken($auth['token'])->getJson('/api/delivery-platforms')
+            ->assertOk()->assertJsonPath('data.0.current_version.version_number', 4);
+        $this->withToken($auth['token'])->getJson("/api/delivery-platforms/{$profile['id']}")
+            ->assertOk()->assertJsonPath('data.current_version.version_number', 4)
+            ->assertJsonPath('data.current_version.collection_mode', 'platform_collected');
+
+        $page = $this->withToken($auth['token'])->getJson("/api/delivery-platforms/{$profile['id']}/versions?per_page=2")
+            ->assertOk()->assertJsonCount(2, 'data')->assertJsonPath('meta.total', 4);
+        $this->assertSame([1, 2], array_column($page->json('data'), 'version_number'));
+        $this->withToken($auth['token'])->getJson("/api/delivery-platforms/{$profile['id']}/versions?per_page=101")->assertStatus(422);
+    }
+
+    /** @test */
     public function a_disabled_pos_application_blocks_configuration_for_that_tenant(): void
     {
         $auth = $this->registerTenant('dlv-api-app', 'owner@dlv-api-app.test', autoEnableApplications: false);

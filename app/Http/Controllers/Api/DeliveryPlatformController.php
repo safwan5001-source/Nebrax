@@ -20,7 +20,8 @@ use Illuminate\Http\Request;
  */
 class DeliveryPlatformController extends ApiController
 {
-    private const WITH = ['salesChannel', 'versions.overrides'];
+    // ردود ملخَّصة: النسخة الحالية فقط. الحوليّة الكاملة لنقطة `versions` وحدها (مُرقَّمة).
+    private const WITH = ['salesChannel'];
 
     public function __construct(private DeliveryPlatformConfigService $config) {}
 
@@ -36,9 +37,10 @@ class DeliveryPlatformController extends ApiController
 
     public function index(): JsonResponse
     {
-        return DeliveryPlatformResource::collection(
-            DeliveryPlatformProfile::query()->with(self::WITH)->orderBy('platform_key')->get()
-        )->response();
+        $profiles = DeliveryPlatformProfile::query()->with(self::WITH)->orderBy('platform_key')->get();
+        $this->config->attachCurrentVersions($profiles);
+
+        return DeliveryPlatformResource::collection($profiles)->response();
     }
 
     public function show(string $id): JsonResponse
@@ -50,7 +52,7 @@ class DeliveryPlatformController extends ApiController
     {
         $profile = $this->domain(fn () => $this->config->create($request->validated(), $request->user()));
 
-        return (new DeliveryPlatformResource($profile->load(self::WITH)))->response()->setStatusCode(201);
+        return (new DeliveryPlatformResource($this->withCurrent($profile->load(self::WITH))))->response()->setStatusCode(201);
     }
 
     public function update(UpdateDeliveryPlatformRequest $request, string $id): JsonResponse
@@ -58,14 +60,17 @@ class DeliveryPlatformController extends ApiController
         $profile = $this->profile($id);
         $updated = $this->domain(fn () => $this->config->update($profile, $request->validated(), $request->user()));
 
-        return (new DeliveryPlatformResource($updated->load(self::WITH)))->response();
+        return (new DeliveryPlatformResource($this->withCurrent($updated->load(self::WITH))))->response();
     }
 
-    public function versions(string $id): JsonResponse
+    public function versions(Request $request, string $id): JsonResponse
     {
-        $profile = $this->profile($id);
+        $perPage = (int) ($request->validate(['per_page' => ['nullable', 'integer', 'min:1', 'max:100']])['per_page'] ?? 50);
+        $profile = DeliveryPlatformProfile::query()->findOrFail($id);
 
-        return DeliveryPlatformVersionResource::collection($profile->versions)->response();
+        return DeliveryPlatformVersionResource::collection(
+            $profile->versions()->with('overrides')->paginate($perPage)
+        )->response();
     }
 
     /** الإعداد الفعلي لنسخة (`version_id`) أو لتاريخ (`at`) أو الأحدث، مع تجاوز الفرع (`branch_id`). */
@@ -76,7 +81,7 @@ class DeliveryPlatformController extends ApiController
             'at' => ['nullable', 'date'],
             'branch_id' => ['nullable', 'uuid'],
         ]);
-        $profile = $this->profile($id);
+        $profile = DeliveryPlatformProfile::query()->findOrFail($id);
 
         // فرع خارج نطاق المستخدم يُعامَل كغير موجود، لا كمرفوض: لا كشف.
         if (! empty($data['branch_id']) && ! $request->user()->canAccessBranch($data['branch_id'])) {
@@ -98,6 +103,13 @@ class DeliveryPlatformController extends ApiController
 
     private function profile(string $id): DeliveryPlatformProfile
     {
-        return DeliveryPlatformProfile::query()->with(self::WITH)->findOrFail($id);
+        return $this->withCurrent(DeliveryPlatformProfile::query()->with(self::WITH)->findOrFail($id));
+    }
+
+    private function withCurrent(DeliveryPlatformProfile $profile): DeliveryPlatformProfile
+    {
+        $this->config->attachCurrentVersions([$profile]);
+
+        return $profile;
     }
 }

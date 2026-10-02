@@ -146,6 +146,45 @@ final class DeliveryPlatformConfigService
         }));
     }
 
+    /**
+     * يعلّق **النسخة الحالية فقط** (مع تجاوزاتها) على كل ملف كعلاقة `currentVersion` —
+     * دون تحميل الحوليّة. استعلامان ثابتان مهما كثرت النسخ؛ `max` على عمود عددي
+     * (علاقة `ofMany` تفشل على PostgreSQL لأنها تجمّع بمعرّف UUID).
+     *
+     * @param  iterable<DeliveryPlatformProfile>  $profiles
+     */
+    public function attachCurrentVersions(iterable $profiles): void
+    {
+        $profiles = collect($profiles)->values();
+        if ($profiles->isEmpty()) {
+            return;
+        }
+
+        $max = Version::query()
+            ->whereIn('delivery_platform_profile_id', $profiles->pluck('id'))
+            ->selectRaw('delivery_platform_profile_id, max(version_number) as current_number')
+            ->groupBy('delivery_platform_profile_id')
+            ->pluck('current_number', 'delivery_platform_profile_id');
+
+        $current = collect();
+        if ($max->isNotEmpty()) {
+            $current = Version::query()->with('overrides')
+                ->where(function ($query) use ($max) {
+                    foreach ($max as $profileId => $number) {
+                        $query->orWhere(fn ($pair) => $pair
+                            ->where('delivery_platform_profile_id', $profileId)
+                            ->where('version_number', (int) $number));
+                    }
+                })
+                ->get()
+                ->keyBy('delivery_platform_profile_id');
+        }
+
+        foreach ($profiles as $profile) {
+            $profile->setRelation('currentVersion', $current->get($profile->id));
+        }
+    }
+
     public function latestVersion(DeliveryPlatformProfile $profile): Version
     {
         $version = Version::query()

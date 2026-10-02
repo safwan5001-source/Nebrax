@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Requests\StoreBranchRequest;
 use App\Http\Resources\BranchResource;
 use App\Models\Branch;
+use App\Models\DeliveryPlatformVersionOverride;
 use App\Support\BranchSettings;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
@@ -84,6 +85,12 @@ class BranchController extends ApiController
         // إلى سلسلة «بلا فرع» فتصطدم بأرقام فرعٍ محذوفٍ قبله. التعطيل يحفظها.
         if ($branch->hasDocuments()) {
             abort(422, 'لا يمكن حذف فرع له مستندات — عطّله بدل حذفه حفاظاً على مستنداته وأرقامها.');
+        }
+
+        // تجاوز منصة توصيل داخل نسخة تكوين إلحاقية ثابتة يرجع إلى الفرع (FK restrict):
+        // الحذف كان يسقط 500 من قاعدة البيانات — تعليمات التعطيل بدلاً منه.
+        if (DeliveryPlatformVersionOverride::query()->where('branch_id', $branch->id)->exists()) {
+            abort(422, 'لا يمكن حذف فرع له تجاوزات إعداد منصات توصيل — عطّله بدل حذفه حفاظاً على تاريخ الإعداد.');
         }
 
         $branch->delete();
