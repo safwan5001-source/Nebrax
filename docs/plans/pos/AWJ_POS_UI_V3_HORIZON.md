@@ -2,7 +2,7 @@
 
 **System:** AWJ Autonomous Engineering Horizon  
 **Horizon:** AWJ POS UI V3  
-**Status:** PROPOSED — owner review/merge required before execution launch  
+**Status:** APPROVED PLAN — execution launch requires an explicit owner command  
 **Prepared:** 2026-10-02  
 **Planning Base SHA:** `c2fcc694d9220e8c74989211c55dab655bc96a1e`  
 **Primary design source:** `docs/plans/design/AWJ_POS_UI_V3_VISUAL_DIRECTION.md`  
