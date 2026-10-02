@@ -52,10 +52,11 @@ describe('POS-FINAL-1 شريط السطر المحدد', () => {
     expect(page).toContain("setSensitiveAction({ type: 'item_removed'");
   });
 
-  it('لا يضغط شبكة المنتجات ولا يغيّر غلاف الجوال: الشريط داخل السلة والنسبة 1:2 كما هي', () => {
-    expect(POS_SALE_GRID_CLASS).toContain('lg:grid-cols-[minmax(280px,1fr)_minmax(0,2fr)_104px]');
-    expect(POS_SALE_GRID_CLASS).toContain('xl:grid-cols-[minmax(320px,1fr)_minmax(0,2fr)_148px]');
-    expect(POS_SALE_GRID_CLASS).toContain('md:grid-cols-[minmax(280px,340px)_minmax(0,1fr)]');
+  it('يبقي شريط السطر المحدد داخل السلة وشبكة V3 من عمودين', () => {
+    expect(POS_SALE_GRID_CLASS).toContain('lg:grid-cols-[minmax(0,13fr)_minmax(280px,7fr)]');
+    expect(POS_SALE_GRID_CLASS).toContain('xl:grid-cols-[minmax(0,13fr)_minmax(320px,7fr)]');
+    expect(POS_SALE_GRID_CLASS).toContain('md:grid-cols-[minmax(0,13fr)_minmax(240px,7fr)]');
+    expect(POS_SALE_GRID_CLASS).not.toContain('_104px');
     expect(page).toContain('POS_SALE_GRID_CLASS');
     expect(page).toContain('posCartPaneClass');
     expect(posCartPaneClass('products')).toContain('hidden md:flex');

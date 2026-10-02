@@ -1,5 +1,6 @@
 'use client';
 
+import type { ReactNode } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import { useRouter } from 'next/navigation';
 import { useTheme } from 'next-themes';
@@ -36,6 +37,7 @@ export function PosTopbar({
   exchangeDisabled = false,
   cashDrawerDisabled = true,
   cashDrawerBusy = false,
+  search,
 }: {
   cashier: string;
   branch: string;
@@ -59,6 +61,8 @@ export function PosTopbar({
   exchangeDisabled?: boolean;
   cashDrawerDisabled?: boolean;
   cashDrawerBusy?: boolean;
+  /** حقل البحث/الباركود نفسه — يُنقل إلى الشريط دون تغيير سلوك التركيز أو Enter. */
+  search?: ReactNode;
 }) {
   const t = useTranslations('pos');
   const tc = useTranslations('common');
@@ -116,7 +120,9 @@ export function PosTopbar({
         </div>
       </div>
 
-      <div className="hidden min-w-0 items-center gap-1.5 text-xs md:flex">
+      {search ? <div className="min-w-0 flex-1 px-1 sm:px-2">{search}</div> : <div className="flex-1" />}
+
+      <div className="hidden min-w-0 items-center gap-1.5 text-xs lg:flex">
         <CircleDot className={'h-3.5 w-3.5 shrink-0 ' + (online ? 'text-positive' : 'text-negative')} strokeWidth={1.8} aria-hidden />
         <span className={online ? 'text-text' : 'text-negative'}>{online ? t('network_connected') : t('network_offline')}</span>
       </div>
@@ -128,39 +134,7 @@ export function PosTopbar({
         </div>
       )}
 
-      <div className="ms-auto flex shrink-0 items-center gap-0.5 sm:gap-1">
-        <button
-          type="button"
-          onClick={onOpenRecentInvoices}
-          className="hidden min-h-11 items-center gap-2 rounded-md px-2.5 text-sm font-semibold text-text hover:bg-primary-soft hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 md:inline-flex"
-          aria-label={t('recent_pos_invoices')}
-        >
-          <ReceiptText className="h-4 w-4" strokeWidth={1.7} />
-          <span className="hidden xl:inline">{t('recent_pos_invoices')}</span>
-        </button>
-        <button
-          type="button"
-          onClick={onOpenHeld}
-          className="relative hidden min-h-11 items-center gap-2 rounded-md px-2.5 text-sm font-semibold text-text hover:bg-primary-soft hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 md:inline-flex"
-          aria-label={t('held')}
-        >
-          <Archive className="h-4 w-4" strokeWidth={1.7} />
-          <span className="hidden xl:inline">{t('held')}</span>
-          {heldCount > 0 && <span className="num grid min-w-5 place-items-center rounded bg-primary px-1.5 py-0.5 text-[11px] font-bold text-white">{heldCount}</span>}
-        </button>
-
-        {/* هذا زر «الجلسة» (POS Session) لا «الوردية» (Shift) — مفهومان منفصلان
-            (انظر `pos-workspace.ts`). الوردية شرط تنظيمي لبدء البيع، والجلسة
-            هي الكيان التشغيلي الذي يُفتح ويُغلق من هنا. */}
-        <button
-          type="button"
-          onClick={onManageSession}
-          className="hidden min-h-11 items-center gap-2 rounded-md px-2.5 text-sm font-semibold text-text hover:bg-primary-soft hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 lg:inline-flex"
-        >
-          <Power className="h-4 w-4" strokeWidth={1.7} />
-          <span>{t('manage_session')}</span>
-        </button>
-
+      <div className="flex shrink-0 items-center gap-0.5 sm:gap-1">
         <Dropdown
           align="end"
           menuLabel={t('more_actions')}
@@ -178,15 +152,12 @@ export function PosTopbar({
               {sessionLabel && <><span aria-hidden>·</span><span className="num">{sessionLabel}</span></>}
             </div>
           </div>
-          <div className="md:hidden">
-            <DropdownItem icon={ReceiptText} onClick={onOpenRecentInvoices}>{t('recent_pos_invoices')}</DropdownItem>
-            <DropdownItem icon={Archive} onClick={onOpenHeld}>
-              {heldCount > 0 ? `${t('held')} (${heldCount})` : t('held')}
-            </DropdownItem>
-          </div>
-          <div className="lg:hidden">
-            <DropdownItem icon={Power} onClick={onManageSession}>{t('manage_session')}</DropdownItem>
-          </div>
+          <DropdownItem icon={ReceiptText} onClick={onOpenRecentInvoices}>{t('recent_pos_invoices')}</DropdownItem>
+          <DropdownItem icon={Archive} onClick={onOpenHeld}>
+            {heldCount > 0 ? `${t('held')} (${heldCount})` : t('held')}
+          </DropdownItem>
+          {/* «الجلسة» لا «الوردية» — انظر pos-workspace.ts. الإجراء ثانوي في الفيض. */}
+          <DropdownItem icon={Power} onClick={onManageSession}>{t('manage_session')}</DropdownItem>
           {warehouses.length > 0 && (
             <label className="mx-1 my-1.5 flex items-center gap-2 rounded px-2 py-2 text-sm text-text hover:bg-primary-soft">
               <Warehouse className="h-4 w-4 shrink-0 text-muted" strokeWidth={1.7} />

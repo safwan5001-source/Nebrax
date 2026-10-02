@@ -1520,41 +1520,43 @@ export default function PosPage() {
   // زرّ الشريط العلوي وزرّ «بدء استبدال» في تفاصيل الفاتورة معاً بلا ازدواج.
   const canExchangeNow = cart.length > 0 && step !== 'payment' && !paying && !sessionInvalid;
 
+  const searchField = (
+    <div className="flex min-w-0 gap-2">
+      <button
+        type="button"
+        onClick={focusSearch}
+        className="grid h-11 w-11 shrink-0 place-items-center rounded-md border border-border bg-surface text-text hover:bg-primary-soft hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+        aria-label={t('barcode_search')}
+      >
+        <Barcode className="h-4 w-4" strokeWidth={1.7} />
+      </button>
+      <div className="flex h-11 min-w-0 flex-1 items-center gap-2 rounded-md border border-border bg-surface px-3 focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20">
+        <Search className="h-4 w-4 shrink-0 text-muted" strokeWidth={1.7} />
+        <input
+          ref={registerSearchInput}
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          onKeyDown={(e) => {
+            handleSearchKeyDown(e);
+            if (e.defaultPrevented) return;
+            if (e.key === 'Enter' && search.trim()) {
+              e.preventDefault();
+              if (scanCode(search.trim())) setSearch('');
+            }
+          }}
+          placeholder={t('search_products')}
+          className="min-w-0 flex-1 bg-transparent text-sm text-text outline-none placeholder:text-muted"
+        />
+        {policy.showShortcutHints ? (
+          <kbd className="num hidden rounded border border-border bg-background px-1.5 py-0.5 text-[10px] text-muted lg:block">F4</kbd>
+        ) : null}
+      </div>
+    </div>
+  );
+
   // ── لوحات فرعية ──────────────────────────────────────────────
   const productsPanel = (
     <section className={POS_PRODUCTS_PANEL_CLASS}>
-      <div className="flex gap-2">
-        <button
-          type="button"
-          onClick={focusSearch}
-          className="grid h-11 w-11 shrink-0 place-items-center rounded-md border border-border bg-surface text-text hover:bg-primary-soft hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
-          aria-label={t('barcode_search')}
-        >
-          <Barcode className="h-4 w-4" strokeWidth={1.7} />
-        </button>
-        <div className="flex h-11 flex-1 items-center gap-2 rounded-md border border-border bg-surface px-3 focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20">
-          <Search className="h-4 w-4 shrink-0 text-muted" strokeWidth={1.7} />
-          <input
-            ref={registerSearchInput}
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            onKeyDown={(e) => {
-              handleSearchKeyDown(e);
-              if (e.defaultPrevented) return;
-              if (e.key === 'Enter' && search.trim()) {
-                e.preventDefault();
-                if (scanCode(search.trim())) setSearch('');
-              }
-            }}
-            placeholder={t('search_products')}
-            className="min-w-0 flex-1 bg-transparent text-sm text-text outline-none placeholder:text-muted"
-          />
-          {policy.showShortcutHints ? (
-            <kbd className="num hidden rounded border border-border bg-background px-1.5 py-0.5 text-[10px] text-muted lg:block">F4</kbd>
-          ) : null}
-        </div>
-      </div>
-
       {/* تصنيفات POS على الجوال/التابلت: صور سريعة مع تمرير أفقي، ونفس الفلتر التشغيلي. */}
       <div className="-mx-3 flex flex-nowrap gap-2 overflow-x-auto px-3 pb-1 touch-pan-x sm:-mx-4 sm:px-4 lg:hidden" aria-label={t('categories')}>
         {CATS.map((item, index) => {
@@ -1774,7 +1776,7 @@ export default function PosPage() {
   const cartPanel = (
     // PR-3: `w-full` ضروري — الأب Flex ولا يمدّد عرض الابن تلقائياً؛ بدونه
     // يبقى العمود متقلّصاً على عرض محتواه فلا يظهر التوسيع الفعلي لعمود الشبكة.
-    <aside data-awj-floor-cart="" className="flex w-full min-h-0 flex-col overflow-hidden border-border bg-surface md:border-e">
+    <aside data-awj-floor-cart="" className="flex w-full min-h-0 min-w-0 flex-col overflow-hidden border-border bg-surface md:border-s">
       <div className="border-b border-border p-3">
         <div className="hidden items-center gap-1 overflow-x-auto pb-2 md:flex" role="tablist" aria-label={t('open_carts')}>
           {carts.map((cartState) => {
@@ -2143,6 +2145,7 @@ export default function PosPage() {
         onExchange={() => { setExchangePreselectId(null); setExchangeOpen(true); }}
         onLogout={requestLogout}
         exchangeDisabled={!canExchangeNow}
+        search={searchField}
       />
 
       {(sessionRevalidating || !online) && session && (
@@ -2204,11 +2207,15 @@ export default function PosPage() {
         )
       ) : (
         <>
-          {/* ديسكتوب lg+: 3 أعمدة. تابلت md: سلة+منتجات. جوال: تبويب واحد */}
+          {/* من md: كتالوج ~65% ثم سلة ~35%. الجوال: تبويب واحد */}
           <div data-awj-floor-grid="" className={POS_SALE_GRID_CLASS}>
-            <div className={posCartPaneClass(mobileTab)}>{cartPanel}</div>
             <div className={posProductsPaneClass(mobileTab)}>
-              {productsPanel}
+              <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden">
+                <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+                  {productsPanel}
+                </div>
+                {catsPanel}
+              </div>
               {/* شريط سلة عائم (جوال فقط — التابلت يعرض السلة بجانب المنتجات) */}
               {count > 0 && (
                 <button
@@ -2222,7 +2229,7 @@ export default function PosPage() {
                 </button>
               )}
             </div>
-            {catsPanel}
+            <div className={posCartPaneClass(mobileTab)}>{cartPanel}</div>
           </div>
 
           <PosShortcuts visible={policy.showShortcutHints} />

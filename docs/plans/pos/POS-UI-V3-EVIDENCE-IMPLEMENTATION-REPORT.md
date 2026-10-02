@@ -1,6 +1,6 @@
 # POS-UI-V3-EVIDENCE — Implementation Report
 
-STATUS: READY FOR REVIEW
+STATUS: MERGED
 DATE: 2026-10-02
 
 ## Outcome
@@ -44,25 +44,33 @@ Not run. No `web/**` or PHP source changes.
 
 ## CI
 
-Recorded on the PR against the exact final Head before merge. This section is not a substitute for the PR check list.
+Exact reviewed Head `57b952e74af93d960e3e03429263ec58b9b4a9de`:
+
+- Pull request run [37052282196](https://github.com/safwan5001-source/Nebrax/actions/runs/37052282196): php sqlite SUCCESS, php pgsql SUCCESS.
+- Push run [37052271206](https://github.com/safwan5001-source/Nebrax/actions/runs/37052271206): php sqlite SUCCESS, php pgsql SUCCESS.
+- Web CI did not run (no `web/**` change).
+
+Post-merge run on Merge SHA `d9942a6e264bf05aadc4f005485699cd04f41844`: [37054746308](https://github.com/safwan5001-source/Nebrax/actions/runs/37054746308) SUCCESS (php sqlite + pgsql).
 
 ## Pre-merge review
 
-- PRE_MERGE_REVIEW: PENDING until the exact final Head is reviewed
-- Reviewed Head SHA: the tip of `pos-ui-v3-evidence` after this report correction (authoritative SHA is the one cited by `PRE_MERGE_REVIEW` on the PR)
-- Findings / resolution: none in the evidence diff; formal pass is recorded on the PR at that tip
+- PRE_MERGE_REVIEW: PASS
+- Reviewed Head SHA: `57b952e74af93d960e3e03429263ec58b9b4a9de`
+- Findings / resolution: none. Comment: https://github.com/safwan5001-source/Nebrax/pull/1166#issuecomment-5959943715
 
 ## Merge
 
-- Merge status: not merged
-- Merge SHA: —
+- Merge status: merged
+- Merge SHA: `d9942a6e264bf05aadc4f005485699cd04f41844`
+- PR: https://github.com/safwan5001-source/Nebrax/pull/1166
+- Method: squash
 
 ## Post-merge review
 
-- POST_MERGE_REVIEW: PENDING
-- Reviewed Merge SHA: —
-- Target-branch checks/smoke: —
-- Findings / resolution: —
+- POST_MERGE_REVIEW: PASS
+- Reviewed Merge SHA: `d9942a6e264bf05aadc4f005485699cd04f41844`
+- Target-branch checks/smoke: `origin/main` is this merge commit. Evidence docs are on that commit. Post-merge CI [37054746308](https://github.com/safwan5001-source/Nebrax/actions/runs/37054746308) SUCCESS. No production smoke (docs only).
+- Findings / resolution: none. Comment: https://github.com/safwan5001-source/Nebrax/pull/1166#issuecomment-5960186994
 
 ## Self-review
 
@@ -116,11 +124,12 @@ None that blocks this Horizon. Portrait sticky transaction bar is intentionally 
 
 ## Git state
 
-- Branch: `pos-ui-v3-evidence`
-- PR: opened against `main` after this correction
+- Branch: `pos-ui-v3-evidence` (merged)
+- PR: https://github.com/safwan5001-source/Nebrax/pull/1166
 - Base SHA: `72a9c4e239cdca0dd90483878307eb328bdd70f4`
 - Evidence content SHA: `05b288ec8cea2e80ae352659d6001f15e0de9f63`
-- Head SHA: tip of `pos-ui-v3-evidence` after this correction commit. That tip, not `05b288ec`, is the review authority (`PRE_MERGE_REVIEW` records it verbatim).
+- Reviewed Head SHA: `57b952e74af93d960e3e03429263ec58b9b4a9de`
+- Merge SHA: `d9942a6e264bf05aadc4f005485699cd04f41844`
 
 ## Recommended next dependency-ready task
 
