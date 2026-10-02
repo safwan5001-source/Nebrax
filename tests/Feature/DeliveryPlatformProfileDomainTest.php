@@ -361,6 +361,17 @@ class DeliveryPlatformProfileDomainTest extends TestCase
         $this->assertSame(1, SalesChannel::count());
         $this->assertSame(1, $this->service()->latestVersion($first)->version_number);
 
+        // فراغ/مسافات في الأسماء والشعار = بلا رأي: إعادة محاولة بحمولة الإنشاء نفسها آمنة.
+        foreach (['', '   '] as $blank) {
+            [$blankRetry, $blankCreated] = $this->service()->ensure([
+                'platform_key' => 'keeta', 'collection_mode' => 'platform_collected',
+                'display_name' => $blank, 'display_name_en' => $blank, 'logo_asset_key' => $blank,
+            ]);
+            $this->assertFalse($blankCreated);
+            $this->assertSame($first->id, $blankRetry->id);
+        }
+        $this->assertSame(1, $this->service()->latestVersion($first)->version_number);
+
         // لا رأي في الحالة/المرجع لا يعيد تفعيل ملف معطّل ولا يغيّره.
         $this->service()->update($first, ['is_active' => false]);
         [$stillOff] = $this->service()->ensure(['platform_key' => 'keeta']);

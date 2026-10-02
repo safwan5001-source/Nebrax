@@ -128,7 +128,10 @@ final class DeliveryPlatformConfigService
             }
         }
         foreach (['display_name', 'display_name_en', 'logo_asset_key'] as $field) {
-            if (isset($input[$field]) && $this->nonEmpty($input[$field]) !== $current->{$field}) {
+            // فارغ/مسافات فقط = بلا رأي (كالغائب): لا يُقارَن، فلا تتحوّل إعادة المحاولة
+            // بحمولة الإنشاء نفسها (التي يستبدل `create` فراغها باسم الكتالوج) إلى تعارض.
+            $wanted = $this->nonEmpty($input[$field] ?? null);
+            if ($wanted !== null && $wanted !== $current->{$field}) {
                 throw $conflict();
             }
         }
