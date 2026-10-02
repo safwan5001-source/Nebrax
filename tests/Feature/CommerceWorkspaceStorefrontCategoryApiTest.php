@@ -425,4 +425,120 @@ class CommerceWorkspaceStorefrontCategoryApiTest extends TestCase
         $this->assertNull($bySlug['الأجهزة']['parent_name']);
         $this->assertSame('الأجهزة', $bySlug['الجوالات']['parent_name']);
     }
+
+    // ───────────────────────── CUST-H4-3 (parity fix) — root_only ─────────────────────────
+
+    /** @test */
+    public function default_list_behavior_is_unchanged_when_root_only_is_omitted(): void
+    {
+        $auth = $this->registerTenant('cat-root-only-default', 'owner@cat-root-only-default.test');
+        $seeded = $this->seedWebStorefront($auth['tenant_id']);
+
+        $root = $this->seedCategory($auth['tenant_id'], $seeded['channel'], ['name' => 'جذر']);
+        $this->seedCategory($auth['tenant_id'], $seeded['channel'], ['name' => 'فرعي', 'parent_id' => $root->id]);
+
+        $res = $this->withToken($auth['token'])
+            ->getJson($this->listPath($seeded['storefront']->id))
+            ->assertOk();
+
+        // Mixed-depth list, exactly as before this fix — root_only absent
+        // never implicitly filters.
+        $this->assertEqualsCanonicalizing(['جذر', 'فرعي'], array_column($res->json('data'), 'name'));
+    }
+
+    /** @test */
+    public function root_only_true_returns_only_categories_with_a_null_parent(): void
+    {
+        $auth = $this->registerTenant('cat-root-only-true', 'owner@cat-root-only-true.test');
+        $seeded = $this->seedWebStorefront($auth['tenant_id']);
+
+        $root = $this->seedCategory($auth['tenant_id'], $seeded['channel'], ['name' => 'جذر']);
+        $this->seedCategory($auth['tenant_id'], $seeded['channel'], ['name' => 'فرعي', 'parent_id' => $root->id]);
+
+        $res = $this->withToken($auth['token'])
+            ->getJson($this->listPath($seeded['storefront']->id).'?root_only=true')
+            ->assertOk();
+
+        $this->assertSame(['جذر'], array_column($res->json('data'), 'name'));
+    }
+
+    /** @test */
+    public function root_only_pagination_happens_after_the_filter_so_root_categories_are_never_starved_by_children(): void
+    {
+        $auth = $this->registerTenant('cat-root-only-pagination', 'owner@cat-root-only-pagination.test');
+        $seeded = $this->seedWebStorefront($auth['tenant_id']);
+
+        // Alphabetically-first children (sort before the roots below under
+        // the endpoint's own `orderBy('name')`) — enough of them to fully
+        // occupy a 2-row page on their own, exactly the scenario where a
+        // "fetch one page, then filter parentId===null client-side"
+        // approach would silently lose every root category below them.
+        // `$rootA` is itself a root category too (it has no `parent_id` of
+        // its own) in addition to being these children's parent — three
+        // root categories in total (`$rootA`, `$rootB`, `$rootC`).
+        $rootA = $this->seedCategory($auth['tenant_id'], $seeded['channel'], ['name' => 'ظ-أب']);
+        $this->seedCategory($auth['tenant_id'], $seeded['channel'], ['name' => 'أ-فرعي-1', 'parent_id' => $rootA->id]);
+        $this->seedCategory($auth['tenant_id'], $seeded['channel'], ['name' => 'أ-فرعي-2', 'parent_id' => $rootA->id]);
+        $this->seedCategory($auth['tenant_id'], $seeded['channel'], ['name' => 'أ-فرعي-3', 'parent_id' => $rootA->id]);
+        $rootB = $this->seedCategory($auth['tenant_id'], $seeded['channel'], ['name' => 'ر-جذر-ب']);
+        $rootC = $this->seedCategory($auth['tenant_id'], $seeded['channel'], ['name' => 'ر-جذر-ج']);
+
+        // Control: proves the premise — a plain (non-root-only), 2-row page
+        // really is fully consumed by the alphabetically-earlier children,
+        // with zero root categories reaching it.
+        $plainPage = $this->withToken($auth['token'])
+            ->getJson($this->listPath($seeded['storefront']->id).'?per_page=2')
+            ->assertOk();
+        $this->assertSame(['أ-فرعي-1', 'أ-فرعي-2'], array_column($plainPage->json('data'), 'name'));
+
+        // The actual fix: with root_only=true, the same 2-row first page
+        // contains only root categories — the filter ran before
+        // pagination, so the three children never consumed any of the
+        // page's rows at all, and all 3 real root categories are reachable
+        // (none lost/starved), 2 on this page and the 3rd on the next.
+        $rootOnlyPage = $this->withToken($auth['token'])
+            ->getJson($this->listPath($seeded['storefront']->id).'?root_only=true&per_page=2')
+            ->assertOk();
+        $this->assertSame([$rootB->id, $rootC->id], array_column($rootOnlyPage->json('data'), 'id'));
+        $this->assertSame(3, $rootOnlyPage->json('meta.pagination.total'));
+        $this->assertTrue($rootOnlyPage->json('meta.pagination.has_more'));
+
+        $rootOnlyPageTwo = $this->withToken($auth['token'])
+            ->getJson($this->listPath($seeded['storefront']->id).'?root_only=true&per_page=2&page=2')
+            ->assertOk();
+        $this->assertSame([$rootA->id], array_column($rootOnlyPageTwo->json('data'), 'id'));
+        $this->assertFalse($rootOnlyPageTwo->json('meta.pagination.has_more'));
+    }
+
+    /** @test */
+    public function root_only_still_respects_tenant_storefront_and_channel_publication_isolation(): void
+    {
+        $a = $this->registerTenant('cat-root-only-isolation-a', 'owner@cat-root-only-isolation-a.test');
+        $b = $this->registerTenant('cat-root-only-isolation-b', 'owner@cat-root-only-isolation-b.test');
+        $seededA = $this->seedWebStorefront($a['tenant_id']);
+        $seededB = $this->seedWebStorefront($b['tenant_id']);
+
+        $this->seedCategory($a['tenant_id'], $seededA['channel'], ['name' => 'جذر أ']);
+        $this->seedCategory($b['tenant_id'], $seededB['channel'], ['name' => 'جذر ب']);
+        // Unpublished root for tenant A — root_only must not bypass the
+        // existing publication-eligibility gate.
+        $this->seedCategory($a['tenant_id'], $seededA['channel'], ['name' => 'جذر غير منشور'], published: false);
+
+        $res = $this->withToken($a['token'])
+            ->getJson($this->listPath($seededA['storefront']->id).'?root_only=true')
+            ->assertOk();
+
+        $this->assertSame(['جذر أ'], array_column($res->json('data'), 'name'));
+    }
+
+    /** @test */
+    public function an_unsupported_root_only_value_fails_validation(): void
+    {
+        $auth = $this->registerTenant('cat-root-only-invalid', 'owner@cat-root-only-invalid.test');
+        $seeded = $this->seedWebStorefront($auth['tenant_id']);
+
+        $this->withToken($auth['token'])
+            ->getJson($this->listPath($seeded['storefront']->id).'?root_only=maybe')
+            ->assertStatus(422);
+    }
 }

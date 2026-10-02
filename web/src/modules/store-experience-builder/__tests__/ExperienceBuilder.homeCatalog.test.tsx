@@ -146,29 +146,39 @@ describe('ExperienceBuilder — CUST-H4-3 real Home catalog preview', () => {
     expect(img?.getAttribute('src')).toBe('https://cdn.example.test/p1.jpg');
   });
 
-  it('uses the tenant/storefront-scoped workspace reads with the right params: no search, sort=newest for products', async () => {
+  it('uses the tenant/storefront-scoped workspace reads with the right params: no search, sort=newest for products, rootOnly=true for categories', async () => {
     render(<ExperienceBuilder storefrontId="store-42" initialLocale="ar" />);
     await waitFor(() => expect(listCategoriesMock).toHaveBeenCalled());
     await waitFor(() => expect(listProductsMock).toHaveBeenCalledWith(
       'store-42',
       expect.objectContaining({ sort: 'newest', perPage: 8 }),
     ));
-    expect(listCategoriesMock).toHaveBeenCalledWith('store-42', expect.objectContaining({ perPage: 50 }));
+    // CUST-H4-3 (parity fix) — root-category scoping is a real,
+    // server-side filter requested via `rootOnly: true`, not a client-side
+    // `.filter()` over a larger fetched page.
+    expect(listCategoriesMock).toHaveBeenCalledWith('store-42', expect.objectContaining({ rootOnly: true, perPage: 12 }));
   });
 
-  it('filters categories to root-level only, matching Published\'s depth_eq:0 semantics', async () => {
+  it('relies on the server-side root-only filter rather than filtering a mixed-depth page on the client', async () => {
+    // Mirrors exactly what the real backend returns for `root_only=true`
+    // (CommerceWorkspaceStorefrontCategoryApiTest's own
+    // `root_only_true_returns_only_categories_with_a_null_parent`): only
+    // root rows, never a mixed page Canvas would need to filter itself.
     listCategoriesMock.mockResolvedValue({
       ok: true,
       hasMore: false,
-      data: [
-        categoryRow({ id: 'root-1', name: 'تصنيف رئيسي' }),
-        categoryRow({ id: 'child-1', name: 'تصنيف فرعي يجب ألا يظهر', parentId: 'root-1', parentName: 'تصنيف رئيسي' }),
-      ],
+      data: [categoryRow({ id: 'root-1', name: 'تصنيف رئيسي' })],
     });
 
     render(<ExperienceBuilder storefrontId="store-1" initialLocale="ar" />);
     await waitFor(() => expect(categoriesSection()?.textContent).toContain('تصنيف رئيسي'));
-    expect(categoriesSection()?.textContent ?? '').not.toContain('تصنيف فرعي يجب ألا يظهر');
+    await waitFor(() => expect(listCategoriesMock).toHaveBeenCalledWith(
+      'store-1',
+      expect.objectContaining({ rootOnly: true }),
+    ));
+    // Canvas renders exactly what the (mocked) server returned — it never
+    // re-derives root-ness itself from a `parentId` field.
+    expect(categoriesSection()?.querySelectorAll('li').length).toBe(1);
   });
 
   it('renders an honest empty state for real-but-empty catalog data, never fake content', async () => {

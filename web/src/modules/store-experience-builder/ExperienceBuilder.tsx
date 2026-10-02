@@ -894,22 +894,24 @@ export function ExperienceBuilder({
 
   // CUST-H4-3 — real data for the Home "categories" section's own Canvas
   // preview (`StorefrontPreviewCanvas`'s `categories` branch), replacing the
-  // static `PREVIEW_CATEGORIES` fixture. Root categories only (`parentId ===
-  // null`), matching Published's own `depth_eq: 0` semantics
-  // (`CategoriesSection.tsx`) — filtered client-side because the workspace
-  // list payload already carries `parent_id` for every row, so no new
-  // backend capability is needed here (unlike New Arrivals' sort, below).
-  // Bounded to one request at `per_page` max: a tenant with more root
-  // categories than fit on one page may show fewer tiles here than
-  // Published's own dedicated `depth_eq=0` query would — an accepted,
-  // documented limit for a bounded editor *preview*, not a second page-
-  // follow loop.
+  // static `PREVIEW_CATEGORIES` fixture. `rootOnly: true` (CUST-H4-3 parity
+  // fix) asks the backend to apply `whereNull('parent_id')` *before*
+  // pagination, matching Published's own `depth_eq: 0` semantics
+  // (`CategoriesSection.tsx`) exactly — this request fetches only the
+  // bounded number of root categories this section actually shows, never a
+  // larger mixed-depth page filtered down afterwards on the client (that
+  // approach could silently lose real root categories behind enough
+  // alphabetically-earlier children on a single page; the server-side
+  // filter can't, since it runs before the page is cut).
   async function loadHomeCategories() {
     if (!storefrontId) return;
     const token = ++homeCategoriesRequestRef.current;
     const originStorefrontId = storefrontId;
     setHomeCategoriesState("loading");
-    const result = await listWorkspaceCategories(storefrontId, { perPage: 50 });
+    const result = await listWorkspaceCategories(storefrontId, {
+      rootOnly: true,
+      perPage: HOME_CATEGORIES_PREVIEW_LIMIT,
+    });
     if (token !== homeCategoriesRequestRef.current || storefrontIdRef.current !== originStorefrontId) return;
     if (!result.ok) {
       setHomeCategoriesState("error");
@@ -917,9 +919,7 @@ export function ExperienceBuilder({
       return;
     }
     setHomeCategoriesState("ready");
-    setHomeCategories(
-      result.data.filter((category) => category.parentId === null).slice(0, HOME_CATEGORIES_PREVIEW_LIMIT),
-    );
+    setHomeCategories(result.data);
   }
 
   const categoriesSectionVisible = draft.homepage.sections.some(

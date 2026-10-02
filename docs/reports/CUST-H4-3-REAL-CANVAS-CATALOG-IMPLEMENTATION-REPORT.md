@@ -9,15 +9,31 @@
 
 ---
 
+## Revision Note 1 — P1 Categories parity fix (owner follow-up on PR #1167)
+
+The owner reviewed the first version of this slice and correctly identified that Categories was **not yet semantically equivalent to Published**: the implementation fetched up to 50 workspace categories (one page, ordered alphabetically) and then filtered to `parentId === null` **on the client**. Because the filter ran *after* pagination, a tenant with enough alphabetically-earlier child categories could have some of its real root categories pushed past the single fetched page and never reach the client at all — a genuine Canvas ↔ Published parity gap, not an accepted preview limitation as the first version of this report incorrectly characterized it in §13.
+
+**This revision adds a small, additive, backward-compatible server-side filter** — `root_only=true` on `CommerceWorkspaceStorefrontCategoryController::index` — applying `whereNull('parent_id')` **before** `paginate()`. Canvas's categories fetch now requests exactly `root_only=true&per_page=12` (the real section limit) and renders the server's answer directly, with no client-side re-derivation of root-ness. This closes the gap: pagination can no longer starve root categories behind children, because children are excluded from the query before any page is cut.
+
+Two real bugs were found and fixed while building this fix, both before this revision was pushed, not after:
+1. Laravel's bare `'boolean'` validation rule only accepts `[true, false, 0, 1, '0', '1']` (strict comparison) — it rejects the literal string `"true"` the task's own example URL (`root_only=true`) and every `URLSearchParams`-built client request actually send. Fixed by validating `root_only` as `in:true,false,1,0` instead, read via `$request->boolean()` (which already parses `"true"` correctly — only the validation step was wrong).
+2. A test-authoring bug (not a production bug): the first version of the new `root_only` pagination-ordering test misclassified a category that was itself root-level as "the parent, not a root," undercounting the real total/has_more metadata. Fixed in the test, not the controller.
+
+This revision changes: `app/Http/Controllers/Api/CommerceWorkspaceStorefrontCategoryController.php`, `tests/Feature/CommerceWorkspaceStorefrontCategoryApiTest.php`, `web/src/modules/commerce-workspace/workspace-categories.ts` (+ its test), `web/src/modules/store-experience-builder/ExperienceBuilder.tsx` (removes the client-side filter), `web/src/modules/store-experience-builder/__tests__/ExperienceBuilder.homeCatalog.test.tsx` (updated to assert the server-side contract instead of client-side filtering), and `web/src/lib/mock-data.ts` (the dev-fixture mock gains the same `root_only` filter so visual QA against it stays accurate — dev-only, not production code). The New Arrivals `sort=newest` work from the first revision is untouched, as instructed.
+
+Everything **not** touched by this revision — New Arrivals' data flow and tests, the honest loading/empty/error states, stale-response protection, request dedup, the out-of-scope header/footer chrome — is carried forward unchanged from the first revision; it was not reopened. Sections below are updated in place to describe the final, post-fix implementation rather than leaving a stale pre-fix description; §5 and §13 changed the most.
+
+---
+
 ## 1. Scope actually implemented
 
 Per the task brief and `CUST-H4-ARCH-1-SECTION-LIBRARY-ACTIVATION-CONTRACT.md` §5/§21/§35 (H4-3's own definition, "confirmed to need no new backend work... can run fully in parallel"):
 
-- Replaced the Home **"categories"** section's Canvas preview (`StorefrontPreviewCanvas.tsx`) from the static `PREVIEW_CATEGORIES` fixture to the real, tenant/storefront-scoped workspace categories read, filtered to root-level only (`parentId === null`) — matching Published's own `depth_eq: 0` semantics (`CategoriesSection.tsx`).
+- Replaced the Home **"categories"** section's Canvas preview (`StorefrontPreviewCanvas.tsx`) from the static `PREVIEW_CATEGORIES` fixture to the real, tenant/storefront-scoped workspace categories read, filtered to root-level only via a **server-side** `root_only=true` filter (`whereNull('parent_id')`, applied before pagination — see Revision Note 1) — matching Published's own `depth_eq: 0` semantics (`CategoriesSection.tsx`) with true semantic parity, not a client-side approximation.
 - Replaced the Home **"newArrivals"** section's Canvas preview from the static `PREVIEW_PRODUCTS` fixture to the real workspace products read, ordered by recency — matching Published's own `-available_on` (→ `created_at` desc) semantics (`NewArrivals.tsx`).
 - Added honest loading/empty/error states for both sections, with a retry affordance on error, never a fallback to fake data.
 - Added stale-response protection (a storefront switch, or a version switch, cannot let a slower previous request overwrite the newer one) and request dedup (each section fetches once per storefront, gated on the section actually being visible in the real, loaded config — not the transient default config shown before the Version loads).
-- **One small, additive, backward-compatible backend change** (escalated to and approved by the owner before implementation — see §2): an optional `sort=newest` query parameter on the existing `CommerceWorkspaceStorefrontProductController::index` endpoint, needed because that endpoint had no way to reproduce Published's recency ordering for New Arrivals otherwise (the task brief's own named stop condition — see §2).
+- **Two small, additive, backward-compatible backend changes**: an optional `sort=newest` query parameter on `CommerceWorkspaceStorefrontProductController::index` (escalated to and approved by the owner before implementation — see §2), and an optional `root_only=true` query parameter on `CommerceWorkspaceStorefrontCategoryController::index` (added in Revision Note 1, after the owner identified the first version's client-side root filtering as a real parity gap, not an accepted limitation).
 
 **Explicitly not touched**, per the task's scope guards: the header category-nav chip row and the footer "Shop" column, which still render from `PREVIEW_CATEGORIES` — these are unrelated chrome surfaces (not the "categories"/"newArrivals" home *sections* this task targets), confirmed in evidence-gathering and left exactly as they were (see §9's "Risks" for why, and why fixing them is out of this slice's bounded scope). No Banner/AppPromo/Featured/Offers work (H4-4/H4-5/H4-6/H4-7). No pricing/checkout logic. No persisted schema/section-content-contract change.
 
@@ -36,6 +52,7 @@ Per the task's own instruction, this was surfaced to the user **before any code 
 
 ## 3. Files changed
 
+**First revision (New Arrivals `sort=newest` + both sections' real-data wiring):**
 ```
  app/Http/Controllers/Api/CommerceWorkspaceStorefrontProductController.php     |  25 ++-   (M)
  tests/Feature/CommerceWorkspaceStorefrontProductApiTest.php                   |  76 ++++   (M)
@@ -50,7 +67,18 @@ Per the task's own instruction, this was surfaced to the user **before any code 
  web/src/modules/store-experience-builder/preview-fixtures.ts                  |  24 +-     (M)
 ```
 
-Zero database migrations. Zero changes to `routes/api.php` (the sort param is a query-string addition to an existing route, not a new route). Zero changes to `section-content.ts`, `GATED_HOME_SECTION_KEYS`, persisted presentation schema, or publish lifecycle.
+**Revision Note 1 (P1 Categories parity fix, this update):**
+```
+ app/Http/Controllers/Api/CommerceWorkspaceStorefrontCategoryController.php    |  25 ++-   (M)
+ tests/Feature/CommerceWorkspaceStorefrontCategoryApiTest.php                  | 109 +++++  (M)
+ web/src/lib/mock-data.ts                                                      |   6 +-     (M)
+ web/src/modules/commerce-workspace/workspace-categories.ts                    |   9 +-     (M)
+ web/src/modules/commerce-workspace/workspace-categories.test.ts               |  17 +      (M)
+ web/src/modules/store-experience-builder/ExperienceBuilder.tsx                |  16 +--    (M)
+ web/src/modules/store-experience-builder/__tests__/ExperienceBuilder.homeCatalog.test.tsx | 28 +-- (M)
+```
+
+Zero database migrations across both revisions. Zero changes to `routes/api.php` (both `sort` and `root_only` are query-string additions to existing routes, not new routes). Zero changes to `section-content.ts`, `GATED_HOME_SECTION_KEYS`, persisted presentation schema, or publish lifecycle. `web/src/lib/mock-data.ts` is a dev-fixture-only module (powers `/dev/customizer-versions` for visual QA), not production code.
 
 ---
 
@@ -72,15 +100,26 @@ No financial/accounting impact — this controller is a read-only Commerce-catal
 
 ---
 
-## 5. Categories data flow
+## 5. Categories data flow — backend `root_only=true` + the full flow (Revision Note 1)
 
-1. `ExperienceBuilder.tsx`'s new `loadHomeCategories()` calls the **unmodified** `listWorkspaceCategories(storefrontId, { perPage: 50 })` (`@/modules/commerce-workspace/workspace-categories`) — the exact client CUST-H2-4 already shipped and the Category-page preview picker already uses, called with different (home-section-appropriate) params.
-2. The result is filtered client-side to `category.parentId === null` (root only) — the payload already carries `parent_id` for every row, so no new backend capability was needed here, unlike New Arrivals.
-3. Sliced to 12 (matching Published's own `HOME_CATEGORY_LIMIT` default in `CategoriesSection.tsx`).
-4. Passed to `StorefrontPreviewCanvas` as `homeCategories: { id, name }[]` + `homeCategoriesState`.
-5. `StorefrontPreviewCanvas`'s `"categories"` branch renders these as real tiles (name only — see §9 on the `color`/child-count gap), with loading-skeleton/empty/error states.
+**Backend change** — `CommerceWorkspaceStorefrontCategoryController::index` (`app/Http/Controllers/Api/CommerceWorkspaceStorefrontCategoryController.php`):
 
-**Authority chain**: authenticated user → `SetTenant`/`SetBranch` → `EnsureActiveSubscription` → `EnsurePermission:commerce.manage` → `ownedStorefront()` (tenant-id equality check, 404 not 403 on mismatch) → `CommerceCategoryListing::publishedOn($storefront->sales_channel_id)` — unchanged, no new write path, no client-supplied tenant/storefront override possible (same contract CUST-H2-4's own 8-scenario isolation test suite already locks down, untouched by this slice).
+```php
+'root_only' => ['sometimes', 'nullable', 'string', 'in:true,false,1,0'],
+...
+if ($request->boolean('root_only')) {
+    $query->whereNull('parent_id');   // applied BEFORE ->paginate()
+}
+```
+
+Deliberately `in:true,false,1,0` rather than the bare `boolean` rule this codebase's other boolean filters use (e.g. `is_active` on `PublicProductController`): Laravel's `boolean` rule only strictly accepts `[true, false, 0, 1, '0', '1']` and rejects the literal query-string `"true"` — which is both this fix's own named example URL and what every `URLSearchParams`-built client request sends for a JS boolean. `$request->boolean('root_only')` (the *read*, as opposed to the *validation*) already parsed `"true"` correctly; only the validation rule needed the fix.
+
+**Full data flow:**
+1. `ExperienceBuilder.tsx`'s `loadHomeCategories()` calls `listWorkspaceCategories(storefrontId, { rootOnly: true, perPage: 12 })` (`@/modules/commerce-workspace/workspace-categories`) — `rootOnly` is a new, optional, additive client param (sent as `root_only=true` only when explicitly requested; every other caller, the Category-page preview picker, omits it and is unaffected).
+2. The backend applies `whereNull('parent_id')` **before** `->paginate()` — a page can never be filled with non-root rows that then starve real root categories off the end of the result, the exact parity gap the first version of this slice left open.
+3. **No client-side re-filtering or re-slicing.** `StorefrontPreviewCanvas` renders exactly the rows the server returns (`homeCategories: { id, name }[]` + `homeCategoriesState`) — real tiles (name only — see §13 on the `color`/child-count gap), with loading-skeleton/empty/error states.
+
+**Authority chain**: authenticated user → `SetTenant`/`SetBranch` → `EnsureActiveSubscription` → `EnsurePermission:commerce.manage` → `ownedStorefront()` (tenant-id equality check, 404 not 403 on mismatch) → `CommerceCategoryListing::publishedOn($storefront->sales_channel_id)` — unchanged by `root_only`; it is purely an additional `WHERE` clause composed with the existing eligibility subquery, never a replacement for it. No new write path, no client-supplied tenant/storefront override possible (same contract CUST-H2-4's own 8-scenario isolation test suite already locks down, re-verified green and extended with 5 new `root_only`-specific tests — §10).
 
 ## 6. New Arrivals data flow
 
@@ -95,17 +134,23 @@ No financial/accounting impact — this controller is a read-only Commerce-catal
 
 ## 7. Canvas ↔ Published parity evidence
 
+**Final documented data flow, per the owner's required framing:**
+
+> **Categories** — Canvas: authenticated workspace root-category read (`root_only=true`, server-side `whereNull('parent_id')` before pagination) → same storefront sales channel publication eligibility. Published: public Host-resolved root-category read (`depth_eq: 0`) → same storefront sales channel publication eligibility.
+>
+> **New Arrivals** — Canvas: authenticated workspace recency-ordered read (`sort=newest`, server-side `created_at` desc) → same storefront sales channel publication eligibility. Published: public Host-resolved recency-ordered read (`-available_on`) → same storefront sales channel publication eligibility.
+
 | | Canvas (this slice) | Published |
 |---|---|---|
-| Categories scope | root-level only (`parentId === null`, client-filtered) | `depth_eq: 0` (`CategoriesSection.tsx` → `store/v1/categories`) |
+| Categories scope | root-level only — **server-side** `root_only=true` (`whereNull('parent_id')`, before pagination) | `depth_eq: 0` (`CategoriesSection.tsx` → `store/v1/categories`) |
 | Categories channel/tenant | `Storefront.sales_channel_id` via `ownedStorefront()` (authenticated workspace) | `SalesChannel` resolved via `ResolveStorefrontDomain`/`StorefrontContext` (Host-resolved public) |
-| New Arrivals order | `created_at` desc (`sort=newest`, new) | `created_at` desc (`-available_on`, existing) |
+| New Arrivals order | `created_at` desc — **server-side** `sort=newest` | `created_at` desc (`-available_on`, existing) |
 | New Arrivals channel/tenant | same `ownedStorefront()` authority | same Host-resolved public authority |
 | Eligibility rule | `is_active` + `CommerceListing`/`CommerceCategoryListing` published on *this* channel | identical rule, same underlying tables, applied via the public read path |
 
-Per the task's own framing ("HTTP surfaces may differ... the important parity requirement is: same tenant/storefront sales channel, same publication eligibility, same section meaning, same real catalog truth"), parity is structural (same source tables, same eligibility predicate, same ordering rule), not a shared HTTP route — exactly the accepted shape for every other already-real section in this Horizon.
+Different HTTP surfaces (authenticated workspace vs. Host-resolved public) remain acceptable, per the task's own framing — the important parity requirement is same tenant/storefront sales channel, same publication eligibility, same section meaning, same real catalog truth. **Different category meaning is not acceptable, and is no longer present**: Categories parity no longer depends in any way on client-side filtering of a paginated, mixed-depth category list — the root-only semantic is enforced by the database query itself, before any page boundary is drawn, exactly like New Arrivals' recency ordering is enforced by the database query rather than a client-side sort.
 
-Visually confirmed (§11): the exact same 3 root categories and 3 products that `MOCK_WORKSPACE_CATEGORIES`/`MOCK_WORKSPACE_PRODUCTS` (the dev fixture's stand-in for the real backend) expose, with the 2 non-root categories correctly excluded.
+Visually confirmed (§11): the exact same 3 root categories and 3 products that `MOCK_WORKSPACE_CATEGORIES`/`MOCK_WORKSPACE_PRODUCTS` (the dev fixture's stand-in for the real backend, now also honoring `root_only` — see Revision Note 1) expose, with the 2 non-root categories correctly excluded by the fixture's own server-side-equivalent filter, not by Canvas.
 
 ---
 
@@ -123,52 +168,56 @@ Visually confirmed (§11): the exact same 3 root categories and 3 products that 
 
 ## 9. Tenant/security boundaries
 
-- No new route, no new controller, no new middleware. The `sort` addition goes through the exact same `auth:sanctum` → `SetTenant` → `SetBranch` → `EnsureActiveSubscription` → `EnsurePermission:commerce.manage` → `ownedStorefront()` chain every sibling route in this group already enforces.
+- No new route, no new controller, no new middleware, for either `sort=newest` or `root_only=true`. Both go through the exact same `auth:sanctum` → `SetTenant` → `SetBranch` → `EnsureActiveSubscription` → `EnsurePermission:commerce.manage` → `ownedStorefront()` chain every sibling route in their respective groups already enforces.
 - `sort=newest` cannot select or widen tenant/storefront/channel scope — it only changes `ORDER BY` on a query whose `WHERE` clause (tenant scope via `Product`'s own `BaseModel`, channel scope via `CommerceListing::sales_channel_id`) is unchanged and untouched by this diff.
+- `root_only=true` cannot select or widen tenant/storefront/channel scope either — it only *adds* a `WHERE parent_id IS NULL` clause composed (via `->where()`) with the existing `whereIn('id', $this->publishedCategoryIds(...))` eligibility subquery; it can only ever narrow the result set further, never bypass or replace the eligibility/tenant predicate.
 - New backend test `sort_newest_still_respects_tenant_isolation_and_eligibility` proves a second tenant's product never appears under `sort=newest` for the first tenant's storefront.
-- New backend test `an_unsupported_sort_value_is_rejected` proves the allow-list (`in:newest`) rejects anything else with a 422, not a silent fallback or a 500.
-- The existing 8-scenario tenant-isolation/404-vs-403/payload-minimization suite for this controller (foreign storefront, foreign product id, inactive subscription, self-service role denial, tenant-id injection via query/body, cost/margin field leakage) was re-run in full and is untouched and green (§12).
-- `listWorkspaceCategories` is called entirely unmodified — no new backend surface for Categories at all.
+- New backend test `root_only_still_respects_tenant_storefront_and_channel_publication_isolation` proves the same for Categories: a second tenant's root category never appears, and an unpublished root category for the *same* tenant is still correctly excluded — `root_only` narrows, it does not bypass, the publication gate.
+- New backend test `an_unsupported_sort_value_is_rejected` / `an_unsupported_root_only_value_fails_validation` prove each allow-list (`in:newest` / `in:true,false,1,0`) rejects anything else with a 422, not a silent fallback or a 500.
+- New backend test `root_only_pagination_happens_after_the_filter_so_root_categories_are_never_starved_by_children` is the direct proof the parity fix actually fixes the reported gap: a plain (non-`root_only`) 2-row page is shown to be fully consumed by alphabetically-earlier child categories (the control, proving the gap is real), while the same 2-row page with `root_only=true` contains only root categories, and a second page reaches the 3rd, confirming the filter runs before — not after — pagination.
+- The existing 8-scenario tenant-isolation/404-vs-403/payload-minimization suites for both controllers were re-run in full and are untouched and green (§10).
 
 ---
 
 ## 10. Tests and exact results
 
-**Backend** (`php artisan test --filter=CommerceWorkspaceStorefrontProductApiTest`, run from the scaffolded `nibras-app` project):
+**Backend, targeted** (`php artisan test --filter=...`, run from the scaffolded `nibras-app` project):
 ```
-21 tests passed (89 assertions) — 17 pre-existing + 4 new (default-order-unchanged, sort=newest ordering, sort=newest tenant isolation, invalid sort rejected)
+CommerceWorkspaceStorefrontProductApiTest     21 tests passed (89 assertions) — 17 pre-existing + 4 new (sort=newest)
+CommerceWorkspaceStorefrontCategoryApiTest    24 tests passed (94 assertions) — 19 pre-existing + 5 new (root_only)
 ```
 
-**Backend, full suite** (`php artisan test`, no `--filter`, 911s):
-```
-4978 passed, 59 failed, 51 skipped (31090 assertions)
-```
-The 59 failures are the exact same `Class "App\Mail\AuthActionMail" not found` scaffold-only artifact H4-2's own report documented and confirmed green on the PR's real CI (§12 of that report) — this session's local `nibras-app` checkout, not a real repository issue, and not touched by this diff. Passed count is +5 over H4-2's own documented `4973` baseline, matching the 4 new product-controller tests plus net test-count drift from this session's own scaffold; zero new failures.
+**Backend, full suite** (`php artisan test`, no `--filter`):
+
+First revision: 4978 passed, 59 failed, 51 skipped (31090 assertions), 911s. Revision Note 1 re-run: _filled in below once the background run for this revision completes_.
+
+The 59 failures are a **local-scaffold-only** artifact, root-caused precisely while building this revision (not merely asserted by precedent): this session's `setup.sh` (the local dev-session Laravel scaffold builder) never copies `app/Mail/` or `resources/views/` into the scaffolded `nibras-app` project, so every test that calls the shared `registerTenant()` helper hits `Class "App\Mail\AuthActionMail" not found` (the class exists in the core repo, `app/Mail/AuthActionMail.php`, but the local scaffold never receives it) when the registration endpoint tries to send a verification email. **`.github/workflows/ci.yml` — the repository's actual CI — copies both directories correctly** (`cp -r "$CORE/app/Mail/"*.php app/Mail/`, `cp -r "$CORE/resources/views/"* resources/views/`), confirming this is purely a gap in the local one-off scaffold script, not a real repository issue, and not something this diff introduced or could fix (`setup.sh` is out of this slice's scope). Copying both directories into the local `nibras-app` checkout (a local-only, uncommitted workaround, not part of this diff) made the previously-failing `registerTenant()`-dependent tests in the two controllers this revision touches pass cleanly, which is how the targeted 21/24 counts above were confirmed test-logic-clean rather than merely "passing around a known-broken helper."
 
 **Frontend, targeted** (`npx vitest run`):
 ```
-src/modules/commerce-workspace/workspace-products.test.ts            12 tests passed (+1: sort=newest query param)
-src/modules/store-experience-builder/__tests__/ExperienceBuilder.homeCatalog.test.tsx   8 tests passed (new file)
+src/modules/commerce-workspace/workspace-products.test.ts              12 tests passed (sort=newest query param)
+src/modules/commerce-workspace/workspace-categories.test.ts            12 tests passed (+1: root_only=true query param, Revision Note 1)
+src/modules/store-experience-builder/__tests__/ExperienceBuilder.homeCatalog.test.tsx   8 tests passed (2 of the 8 updated in Revision Note 1 to assert the server-side root_only contract instead of client-side filtering — same coverage, no test removed)
 src/modules/store-experience-builder/__tests__/ExperienceBuilder.categoryRegions.test.tsx   14 tests passed (1 assertion adjusted — see below)
 src/modules/store-experience-builder/__tests__/StorefrontPreviewCanvas.marketCard.test.tsx   16 tests passed (unchanged — confirms the idle-state grid-class regression was caught and fixed, not merely avoided)
 ```
 
 One pre-existing test's assertion needed adjustment, not weakening: `ExperienceBuilder.categoryRegions.test.tsx`'s "zero Products in the category" test asserted `listWorkspaceProducts.mock.calls[0]` was the category-grid call — no longer safe once the Home page's own new "New Arrivals" fetch (fired before the test switches to the Category page) also calls the same mocked client. Fixed to search all calls for the one carrying `categoryId`, preserving the exact same coverage.
 
-**Frontend, full module + route group**:
+**Frontend, full module + route group** (after Revision Note 1):
 ```
-web/src/modules/store-experience-builder + web/src/modules/commerce-workspace    440 tests passed, 0 failed
+web/src/modules/store-experience-builder + web/src/modules/commerce-workspace    441 tests passed, 0 failed
 src/app/(commerce)/commerce/appearance                                           41 tests passed, 0 failed
 ```
 
-**Frontend, full suite** (`npm test`):
+**Frontend, full suite** (`npm test`, after Revision Note 1):
 ```
-346 test files, 2674 tests passed, 0 failed
+346 test files, 2675 tests passed, 0 failed
 ```
 
-**TypeScript** (`npx tsc --noEmit`): same pre-existing, unrelated error set H4-2's own report documented on `main` (`pos/settings/configuration`, `gemini-card`, `document-language-selector`, `product-*`, `use-document-label-mode`, `useImportJobEngine`) — none of this slice's changed files appear in the list.
+**TypeScript** (`npx tsc --noEmit`): same pre-existing, unrelated error set H4-2's own report documented on `main` (`pos/settings/configuration`, `gemini-card`, `document-language-selector`, `product-*`, `use-document-label-mode`, `useImportJobEngine`, plus the pre-existing `section-*.test.tsx` spread-argument errors in `(commerce)/commerce/appearance`) — none of this slice's changed files appear in the list, in either revision.
 
-**Build** (`npm run build`): `✓ Compiled successfully in 22.5s`, `✓ Generating static pages (179/179)`.
+**Build** (`npm run build`, after Revision Note 1): `✓ Compiled successfully in 52s`, `✓ Generating static pages (179/179)`.
 
 ---
 
@@ -178,7 +227,7 @@ Real browser QA via the pre-installed headless Chromium (`/opt/pw-browsers/chrom
 
 **A fixture quirk discovered, not caused, by this slice**: every scenario this fixture seeds (`seedMockPresentationVersions`) defaults to `config: { version: 2 }` with no `homepage.sections` — and CUST-H4's own V2 document rule treats an explicit-but-empty section list as "the merchant cleared it" (unlike a pre-V2 legacy document, which falls back to the default 4 sections). This means the Home page in **every** scenario this fixture offers starts with zero rendered sections — a pre-existing fixture property this slice did not create and did not change. This spec adds the "categories"/"newArrivals" sections itself through the real, already-shipped CUST-H4-2 Section Library `onAdd` flow (the same interaction a merchant actually performs), rather than editing the shared fixture's seeding — keeping this slice's footprint to its own files.
 
-The fixture's demo-mode `mockApi()` already had dedicated handlers for the exact real routes this slice wires up (`MOCK_WORKSPACE_PRODUCTS`/`MOCK_WORKSPACE_CATEGORIES`, built for CUST-H2-3/H2-4's own visual QA) — this slice reuses that data as-is, adding none of its own.
+The fixture's demo-mode `mockApi()` already had dedicated handlers for the exact real routes this slice wires up (`MOCK_WORKSPACE_PRODUCTS`/`MOCK_WORKSPACE_CATEGORIES`, built for CUST-H2-3/H2-4's own visual QA) — this slice reuses that data as-is, adding none of its own. **Revision Note 1** taught the categories mock handler the same `root_only=true` filter the real backend now has (`web/src/lib/mock-data.ts`, dev-fixture-only, not production code) — without this, removing Canvas's client-side filter would have made the dev fixture itself start leaking non-root categories into the screenshots below, since the mock previously relied on Canvas doing that filtering for it. The screenshots were re-captured and re-inspected after this fix; the root-category set shown is unchanged from the first revision (proving the server-side filter produces the identical, correct result), but it is now genuinely the mock *server's* filter doing the work, not Canvas's own code.
 
 **Screenshots actually opened and inspected** (not just asserted on):
 
@@ -200,9 +249,9 @@ PR #1167 opened; GitHub Actions CI had not yet reported on this diff's exact hea
 ## 13. Risks / remaining items
 
 - **Header category-nav + footer "Shop" column still use `PREVIEW_CATEGORIES`.** Confirmed via direct evidence (grep + visual QA screenshot) to be unrelated chrome surfaces, not the "categories"/"newArrivals" home *sections* this task names — left untouched per the scope guard against touching unrelated Commerce workspace surfaces. A reasonable candidate for a future slice, not raised as a blocker here.
-- **Category tiles carry no merchant accent color or child count.** The workspace categories list payload (`CommerceWorkspaceStorefrontCategoryController::index`) returns `{id, name, parent_id, parent_name}` only — no `color` (unlike the public `StorefrontCategoryResource`, which does expose it) and no eager-loaded `children` count. Canvas renders a neutral-accent tile with no count badge rather than inventing either value — an honest, lower-fidelity rendering, not a fabrication. Fixing this would mean a second backend payload addition beyond the one already escalated and approved (§2); deliberately not done in this slice to keep the backend touch to exactly the one approved change.
-- **Categories are bounded to one `perPage=50` request, client-filtered to root.** A tenant with more than 50 categories, interleaved alphabetically with many non-root ones ahead of some root ones, could see fewer root tiles in Canvas than Published's own dedicated `depth_eq=0` query would return. Accepted as a bounded *editor preview* limitation (same precedent as `categoryGridProducts`' own bounded-page-not-exhaustive-count note already in this file) rather than adding a page-follow loop.
-- **59 pre-existing local backend test failures** are a scaffold artifact (`App\Mail\AuthActionMail not found` in this session's `nibras-app` checkout), already documented and confirmed real-CI-green by H4-2's own report; unrelated to and unaffected by this diff.
+- **Category tiles carry no merchant accent color or child count.** The workspace categories list payload (`CommerceWorkspaceStorefrontCategoryController::index`) returns `{id, name, parent_id, parent_name}` only — no `color` (unlike the public `StorefrontCategoryResource`, which does expose it) and no eager-loaded `children` count. Canvas renders a neutral-accent tile with no count badge rather than inventing either value — an honest, lower-fidelity rendering, not a fabrication. Fixing this would mean a third backend payload addition beyond the two already made (`sort`, `root_only`); deliberately not done in this slice to keep the backend touch minimal.
+- **Resolved in Revision Note 1 — no longer a risk:** Categories previously depended on fetching up to 50 mixed-depth rows and filtering to root on the client, which could under-represent a tenant's real root categories if enough alphabetically-earlier children filled the page first. This is now a real, bounded, server-side `root_only=true` query (`whereNull('parent_id')` before `paginate()`) — pagination can no longer starve root categories behind children, proven by a dedicated test with exactly that adversarial shape (§9/§10).
+- **59 pre-existing local backend test failures** — root-caused in Revision Note 1 (§10): `setup.sh` (local dev-session scaffold only) omits `app/Mail/` and `resources/views/` from its copy list, unlike `.github/workflows/ci.yml`, which copies both correctly. Confirmed real-CI-unaffected; unrelated to and unaffected by this diff. `setup.sh` itself was deliberately not patched — fixing a shared scaffold script is outside this slice's bounded scope, and the local-only workaround used to get a clean test signal (§10) was not committed.
 
 ---
 
