@@ -40,7 +40,11 @@ describe('legacy variable bridge', () => {
     expect(block).toContain('--surface: var(--awj-surface-paper)');
     expect(block).toContain('--muted: var(--awj-text-secondary)');
     // Not duplicated per mode, so Light and Dark can never drift apart again.
-    expect(css.match(/--surface: var\(--awj-surface-paper\)/g)).toHaveLength(1);
+    expect(css.match(/html\[data-awj-ui="3"\] \{\n  --background: var/g)).toHaveLength(1);
+    // The only other place the same targets appear is the popover re-bridge inside the shell chrome.
+    const rebridge = css.indexOf('[data-awj-shell] :is([role="menu"]');
+    expect(rebridge).toBeGreaterThan(-1);
+    expect(css.match(/--surface: var\(--awj-surface-paper\)/g)).toHaveLength(2);
   });
 
   it('leaves the v2.0 definitions untouched outside the gate', () => {
