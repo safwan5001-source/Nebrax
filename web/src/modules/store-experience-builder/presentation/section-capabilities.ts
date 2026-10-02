@@ -3,6 +3,7 @@ import {
   HOME_BUILDER_SECTION_KEYS,
   type HomeBuilderSectionKey,
 } from "./tokens";
+import type { CustomizerMessageKey } from "../messages";
 
 /**
  * STORE-CUSTOMIZER-V2-2 — Section Picker / Add / Duplicate capability model.
@@ -18,7 +19,67 @@ import {
  *
  * هذا النموذج UI-side فقط؛ الـnormalizers تبقى fail-closed كما هي ولا
  * تعتمد على هذه القواعد.
+ *
+ * CUST-H4-2 — formalized merchant-facing capability metadata (CUST-H4-ARCH-1
+ * §5/§17), so the Section Library can render search/category/state/add
+ * honestly from one registry instead of scattered conditionals
+ * (`GATED_HOME_SECTION_KEYS`, ad hoc badges). `state` mirrors the H4
+ * contract's truth matrix exactly — a PARTIAL section (`featured`) is never
+ * flattened to LIVE.
+ *
+ * CUST-H4-2 review fix — a GATED section is not automatically addable. No
+ * merchant-addable fake section: `offers` has neither the H4-6 real
+ * Commerce backend nor the H4-7 real Canvas/Published renderers yet, so it
+ * is visible in the Library but `merchantAddable: false`, disabled, with
+ * its own honest "coming soon" reason (`sectionOffersComingSoon`) — never
+ * hidden from the Library entirely. Current truth, and the only state this
+ * registry sets today:
+ *
+ *   offers.state = "gated",  offers.merchantAddable = false
+ *
+ * That pair only flips once both H4-6 and H4-7 ship:
+ *
+ *   offers.state = "live",   offers.merchantAddable = true
+ *
+ * No section in this registry is `merchantAddable: false` for any other
+ * reason today — see the field's own comment below.
  */
+export type SectionCapabilityState = "live" | "partial" | "gated" | "deferred";
+
+/** Section Library taxonomy (CUST-H4-ARCH-1 §16) — every category below maps
+ * to at least one section type, so none renders empty in the Library. */
+export type SectionLibraryCategory =
+  | "products"
+  | "categoriesNavigation"
+  | "offersMarketing"
+  | "mediaVideo"
+  | "content"
+  | "trustServices"
+  | "appCommunication";
+
+export const SECTION_LIBRARY_CATEGORIES: readonly SectionLibraryCategory[] = [
+  "products",
+  "categoriesNavigation",
+  "offersMarketing",
+  "mediaVideo",
+  "content",
+  "trustServices",
+  "appCommunication",
+];
+
+export const SECTION_LIBRARY_CATEGORY_LABEL: Record<
+  SectionLibraryCategory,
+  CustomizerMessageKey
+> = {
+  products: "sectionCategoryProducts",
+  categoriesNavigation: "sectionCategoryCategoriesNav",
+  offersMarketing: "sectionCategoryOffersMarketing",
+  mediaVideo: "sectionCategoryMediaVideo",
+  content: "sectionCategoryContent",
+  trustServices: "sectionCategoryTrustServices",
+  appCommunication: "sectionCategoryAppCommunication",
+};
+
 export interface SectionCapability {
   type: HomeBuilderSectionKey;
   /** null = بلا حد عددي للنوع (يبقى خاضعًا لـ MAX_HOME_SECTIONS). */
@@ -26,26 +87,155 @@ export interface SectionCapability {
   canDuplicate: boolean;
   /** Hero content is global today, so deleting its instance would misleadingly preserve that content. */
   canDelete: boolean;
+  /** Truth state per CUST-H4-ARCH-1 §5 — never flattened to "live". */
+  state: SectionCapabilityState;
+  /** Section Library taxonomy group (§16). */
+  category: SectionLibraryCategory;
+  /**
+   * False for a type withheld from the Library's addable results entirely
+   * (visible, disabled, `reasonKey` explains why — never hidden). `offers`
+   * is the one type set to `false` today (gated until H4-6/H4-7 ship, see
+   * module comment); every other type is `true`.
+   */
+  merchantAddable: boolean;
+  /** Localized card/composer title. */
+  titleKey: CustomizerMessageKey;
+  /** Short, non-technical merchant-facing description for the Library card. */
+  descriptionKey: CustomizerMessageKey;
+  /** Shown on the Library card when state !== "live". */
+  reasonKey?: CustomizerMessageKey;
 }
 
 export const SECTION_CAPABILITIES: Record<
   HomeBuilderSectionKey,
   SectionCapability
 > = {
-  hero: { type: "hero", maxInstances: 1, canDuplicate: false, canDelete: false },
-  categories: { type: "categories", maxInstances: 1, canDuplicate: false, canDelete: true },
-  newArrivals: { type: "newArrivals", maxInstances: 1, canDuplicate: false, canDelete: true },
-  wholesale: { type: "wholesale", maxInstances: 1, canDuplicate: false, canDelete: true },
-  banner: { type: "banner", maxInstances: null, canDuplicate: true, canDelete: true },
-  featured: { type: "featured", maxInstances: null, canDuplicate: true, canDelete: true },
-  offers: { type: "offers", maxInstances: null, canDuplicate: true, canDelete: true },
-  benefits: { type: "benefits", maxInstances: null, canDuplicate: true, canDelete: true },
-  appPromo: { type: "appPromo", maxInstances: 1, canDuplicate: false, canDelete: true },
+  hero: {
+    type: "hero",
+    maxInstances: 1,
+    canDuplicate: false,
+    canDelete: false,
+    state: "live",
+    category: "mediaVideo",
+    merchantAddable: true,
+    titleKey: "sectionHero",
+    descriptionKey: "sectionHeroDescription",
+  },
+  categories: {
+    type: "categories",
+    maxInstances: 1,
+    canDuplicate: false,
+    canDelete: true,
+    state: "live",
+    category: "categoriesNavigation",
+    merchantAddable: true,
+    titleKey: "sectionCategories",
+    descriptionKey: "sectionCategoriesDescription",
+  },
+  newArrivals: {
+    type: "newArrivals",
+    maxInstances: 1,
+    canDuplicate: false,
+    canDelete: true,
+    state: "live",
+    category: "categoriesNavigation",
+    merchantAddable: true,
+    titleKey: "sectionNewArrivals",
+    descriptionKey: "sectionNewArrivalsDescription",
+  },
+  wholesale: {
+    type: "wholesale",
+    maxInstances: 1,
+    canDuplicate: false,
+    canDelete: true,
+    state: "live",
+    category: "offersMarketing",
+    merchantAddable: true,
+    titleKey: "sectionWholesale",
+    descriptionKey: "sectionWholesaleDescription",
+  },
+  banner: {
+    type: "banner",
+    maxInstances: null,
+    canDuplicate: true,
+    canDelete: true,
+    state: "live",
+    category: "mediaVideo",
+    merchantAddable: true,
+    titleKey: "sectionBanner",
+    descriptionKey: "sectionBannerDescription",
+  },
+  featured: {
+    type: "featured",
+    maxInstances: null,
+    canDuplicate: true,
+    canDelete: true,
+    // CUST-H4-ARCH-1 §21 — real content/renderer/data source today; PARTIAL
+    // only because the Content tab is a raw product-id text input (no real
+    // picker yet, H4-5) and Published does an unbatched N+1 fetch. Never
+    // flattened to LIVE per the H4 contract.
+    state: "partial",
+    category: "products",
+    merchantAddable: true,
+    titleKey: "sectionFeatured",
+    descriptionKey: "sectionFeaturedDescription",
+    reasonKey: "sectionFeaturedPartialReason",
+  },
+  offers: {
+    type: "offers",
+    maxInstances: null,
+    canDuplicate: true,
+    canDelete: true,
+    // GATED today (CUST-H4-ARCH-1 §23) — target LIVE in H4-6/H4-7, not this
+    // slice. CUST-H4-2 review fix: no merchant-addable fake section — Offers
+    // has neither the H4-6 real Commerce backend nor the H4-7 real Canvas/
+    // Published renderers yet, so it must stay visible-but-not-addable, not
+    // "addable with a caveat badge." merchantAddable: false (changed from
+    // the first H4-2 revision's `true`, which the owner correctly rejected).
+    //
+    // Capability transition (documented, NOT performed by this slice):
+    //   today      → state: "gated",  merchantAddable: false
+    //   after H4-6 + H4-7 ship → state: "live", merchantAddable: true
+    // Do not flip this pair until both of those slices are actually done.
+    state: "gated",
+    category: "offersMarketing",
+    merchantAddable: false,
+    titleKey: "sectionOffers",
+    descriptionKey: "sectionOffersDescription",
+    reasonKey: "sectionOffersComingSoon",
+  },
+  benefits: {
+    type: "benefits",
+    maxInstances: null,
+    canDuplicate: true,
+    canDelete: true,
+    state: "live",
+    category: "trustServices",
+    merchantAddable: true,
+    titleKey: "sectionBenefits",
+    descriptionKey: "sectionBenefitsDescription",
+  },
+  appPromo: {
+    type: "appPromo",
+    maxInstances: 1,
+    canDuplicate: false,
+    canDelete: true,
+    state: "live",
+    category: "appCommunication",
+    merchantAddable: true,
+    titleKey: "sectionAppPromo",
+    descriptionKey: "sectionAppPromoDescription",
+  },
   customContent: {
     type: "customContent",
     maxInstances: null,
     canDuplicate: true,
     canDelete: true,
+    state: "live",
+    category: "content",
+    merchantAddable: true,
+    titleKey: "sectionCustomContent",
+    descriptionKey: "sectionCustomContentDescription",
   },
 };
 
@@ -55,6 +245,15 @@ export function sectionCapability(
   return SECTION_CAPABILITIES[type];
 }
 
+/** Section types in the given Library category (empty for none — doesn't happen today). */
+export function sectionTypesInCategory(
+  category: SectionLibraryCategory,
+): HomeBuilderSectionKey[] {
+  return HOME_BUILDER_SECTION_KEYS.filter(
+    (type) => SECTION_CAPABILITIES[type].category === category,
+  );
+}
+
 /** هل يمكن إضافة instance جديد من هذا النوع الآن؟ */
 export function canAddSectionType(
   sections: readonly PresentationHomeSection[],
@@ -62,6 +261,7 @@ export function canAddSectionType(
 ): boolean {
   if (sections.length >= MAX_HOME_SECTIONS) return false;
   const cap = SECTION_CAPABILITIES[type];
+  if (!cap.merchantAddable) return false;
   if (cap.maxInstances === null) return true;
   const count = sections.filter((section) => section.type === type).length;
   return count < cap.maxInstances;
