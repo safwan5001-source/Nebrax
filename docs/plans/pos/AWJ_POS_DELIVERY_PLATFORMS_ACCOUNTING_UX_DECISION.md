@@ -1,11 +1,9 @@
 # AWJ POS — Delivery Platforms Accounting & UX Decision
 
-**Status:** Evidence-first proposal — documentation only  
+**Status:** Architecture/accounting/UX decision — documentation only  
 **Date:** 2026-10-02  
-**Branch:** `docs/pos-delivery-platforms-accounting-ux`  
-**Base SHA:** `b6024bd25a826e3800238d9c3ea1c62920001614`  
-**Scope:** POS delivery channels, receivable/clearing, settlement/reconciliation, UX.  
-**No runtime code / no schema / no merge / no deploy.**
+**Scope:** Delivery-platform integration ownership, POS delivery channels, receivable/clearing, settlement/reconciliation, Delivery Hub and UX.  
+**Runtime/schema changes require separate implementation approval.**
 
 ## 1. Goal
 
@@ -250,20 +248,26 @@ The cashier must not choose ledger accounts manually.
 
 ### Automatic API mode
 
-For a verified native connector:
+For a verified native connector, **AWJ Backend owns the provider integration**. The browser/POS client must never own provider credentials, webhook verification, tenant resolution, idempotency or financial posting.
 
 ```text
-Platform webhook
--> trusted tenant/store mapping
--> idempotent order ingest
--> POS/order workspace
+Delivery platform
+-> AWJ Backend connector/webhook boundary
+-> authenticate + resolve tenant/store/branch
+-> idempotent external-order ingest
+-> AWJ order/domain state
+-> POS / Delivery Hub projection
 -> fulfillment
--> canonical Invoice/Payment domains
+-> canonical Invoice/Payment/Inventory domains
 -> platform receivable/clearing
 -> settlement/reconciliation
 ```
 
-Imported orders already carry the channel; cashier does not re-select it.
+The POS is a **consumer/operator surface**, not the integration owner. This means an order can be received and safely persisted even when no cashier screen is open.
+
+Imported orders already carry the channel and external order reference; cashier does not re-select or re-type them.
+
+Provider API keys, secrets and tokens remain server-side and encrypted under the canonical tenant-scoped secret mechanism. They must never be exposed to the POS/browser bundle.
 
 ### Manual fallback
 
@@ -276,7 +280,80 @@ Manual mode should capture at minimum:
 - collection policy
 - branch/store mapping
 
+The external order reference is manually entered only when it was not supplied by an integrated order source. Native/API orders must not ask the cashier to re-enter it.
+
 This makes the feature useful before all native integrations are approved.
+
+### Do not duplicate channel selection as a payment choice
+
+The cashier must not be required to choose the same platform twice, for example:
+
+```text
+Channel = Jahez
+Payment method = HungerStation
+```
+
+That creates an avoidable contradictory state.
+
+Preferred AWJ behavior:
+
+```text
+Cashier selects: HungerStation
+-> AWJ records Sales Channel = HungerStation
+-> configured collection policy = Platform Collected
+-> AWJ derives settlement treatment = Receivable from HungerStation
+```
+
+The cashier-facing checkout may display `آجل — مستحق من هنقرستيشن`, but the persisted domain model must not reduce the platform to a generic payment-method enum. Cash/card/multi-tender remain payment mechanisms; delivery channel and settlement counterparty remain separate semantic dimensions.
+
+### Delivery Hub / Online Orders workspace
+
+AWJ should provide a unified operational workspace for external delivery orders rather than treating delivery integration as checkout buttons only.
+
+Conceptual filter/navigation:
+
+```text
+طلبات التوصيل
+[ الكل ] [ HungerStation ] [ Jahez ] [ Keeta ] [ Mrsool ] [ Ninja ] [ The Chefz ]
+```
+
+A normalized order card/row should be able to expose, subject to provider capability:
+
+- platform logo + name
+- external order reference
+- branch/store
+- received time
+- order amount
+- normalized status
+- preparation/fulfillment state
+- provider-specific actions only when officially supported
+
+Conceptual lifecycle:
+
+```text
+Incoming -> Accepted -> Preparing -> Ready -> Handed off / Completed
+                    \-> Cancelled / Exception
+```
+
+Provider-native statuses must be preserved as source evidence and mapped to AWJ normalized states; AWJ must not invent provider actions or status transitions that the official connector does not support.
+
+The Delivery Hub is operational. Accounting remains authoritative in canonical Invoice/Payment/Ledger domains, and settlement/reconciliation remains a separate accounting workspace.
+
+### POS close / Z-report presentation
+
+Delivery-platform sales must be visible separately from physical tender expectations. A platform-collected order must not increase expected cash-drawer or card-terminal collections.
+
+Example presentation:
+
+```text
+Cash sales                  1,200
+Card-terminal sales         2,500
+HungerStation sales           850
+Jahez sales                   600
+Expected physical cash      1,200
+```
+
+This is reporting/presentation guidance, not authorization to redefine existing POS close accounting.
 
 ---
 
@@ -293,7 +370,35 @@ This follows AWJ’s existing design principle: daily accounting clarity, densit
 
 ---
 
-## 9. VAT / ZATCA boundary
+## 9. Inventory, cancellation and discount boundaries
+
+### Inventory event
+
+Printing is not an inventory accounting event by itself. AWJ must not encode a rule such as “deduct inventory when the receipt is printed”.
+
+Delivery orders must use the same canonical AWJ inventory/fulfillment event policy as equivalent POS orders. The implementation plan must explicitly define the stock-consumption/reversal event and test cancellation/retry behavior so printing or reprinting cannot duplicate stock movement.
+
+### Discounts
+
+The settlement/order model must preserve who economically funds a promotion:
+
+- merchant-funded discount;
+- platform-funded discount/reimbursement;
+- mixed/other provider adjustment when evidenced.
+
+These must not collapse into one generic discount when their accounting/tax treatment differs.
+
+### Cancellation / compensation
+
+Cancellation must reference the original order and, once a tax invoice exists, follow AWJ's canonical refund/credit-note rules.
+
+A provider payment after cancellation must not automatically be classified as sales revenue merely because the platform compensated the merchant. Compensation classification depends on the contract, source evidence and approved accounting/tax policy.
+
+Prepared-but-unsold food/waste is an inventory/cost event separate from cancellation of sales consideration. No automatic waste-expense posting is authorized by this document.
+
+---
+
+## 10. VAT / ZATCA boundary
 
 ZATCA distinguishes between agency arrangements where an agent acts in the principal’s name and arrangements where the agent acts in its own name. Therefore AWJ must not assume one legal/tax role for all delivery platforms.
 
@@ -312,7 +417,7 @@ Rules:
 
 ---
 
-## 10. Security and tenant-isolation gates
+## 11. Security and tenant-isolation gates
 
 No native connector may ship without:
 
@@ -331,7 +436,7 @@ No native connector may ship without:
 
 ---
 
-## 11. Backward compatibility
+## 12. Backward compatibility
 
 This feature is additive.
 
@@ -344,7 +449,7 @@ This feature is additive.
 
 ---
 
-## 12. Recommended delivery slices
+## 13. Recommended delivery slices
 
 ### DLV-1 — Channel foundation + manual POS UX
 
@@ -352,8 +457,18 @@ This feature is additive.
 - official logos + names
 - POS selector
 - external order reference
+- collection-policy derivation without duplicate “platform payment method” selection
 - no native API yet
 - no broad accounting refactor
+
+### DLV-1B — Delivery Hub foundation
+
+- unified online/delivery order workspace
+- normalized channel/status presentation
+- branch/store-scoped order visibility
+- manual and future native orders share one operational projection
+- no provider credentials in POS/browser
+- no native connector yet
 
 ### DLV-2 — Platform clearing + settlement
 
@@ -384,7 +499,7 @@ No reverse engineering.
 
 ---
 
-## 13. Locked decisions
+## 14. Locked decisions
 
 1. Delivery apps are **Sales Channels**, not simple payment methods.
 2. Invoice customer, channel and settlement counterparty are separate concepts.
@@ -396,11 +511,17 @@ No reverse engineering.
 8. Native connectors require official onboarding/contracts.
 9. Unknown settlement variance remains visible.
 10. Existing Invoice/Payment/Ledger/ZATCA/Tenant Isolation authority is preserved.
-11. This document authorizes no merge, deploy, schema or runtime accounting change.
+11. Native delivery APIs terminate at AWJ Backend; POS/browser is a consumer, never the credential/webhook/integration owner.
+12. Delivery Hub is the unified operational surface for external orders; settlement remains a separate accounting concern.
+13. Selecting a platform once must derive its configured collection treatment; cashier must not select the same platform again as a payment method.
+14. Printing is not an inventory event; canonical inventory/fulfillment rules remain authoritative.
+15. API-imported external order references are not manually re-entered.
+16. Cancellation compensation is not automatically classified as sales; evidence and approved accounting/tax policy govern classification.
+17. This document authorizes no deploy, schema or runtime accounting change.
 
 ---
 
-## 14. Open implementation items
+## 15. Open implementation items
 
 Before coding:
 
@@ -410,7 +531,9 @@ Before coding:
 - decide whether external order reference is mandatory per channel;
 - define semantic account names for platform clearing and fee expense;
 - inspect current POS checkout extension point and SalesChannel reuse opportunity;
-- define refund/credit-note interaction;
+- define refund/credit-note and cancellation-compensation interaction;
+- define the canonical inventory consumption/reversal event for delivery orders;
+- define normalized Delivery Hub statuses and provider-specific capability mapping;
 - define settlement matching and variance workflow;
-- produce focused implementation plans for DLV-1 and DLV-2 separately.
+- produce focused implementation plans for DLV-1, DLV-1B and DLV-2 separately.
 
