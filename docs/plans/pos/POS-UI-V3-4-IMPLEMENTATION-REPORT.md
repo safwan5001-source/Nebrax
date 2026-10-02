@@ -125,9 +125,10 @@ None that blocks this Horizon.
 ## Git state
 
 - Branch: `pos-ui-v3-4`
-- PR: pending
+- PR: https://github.com/safwan5001-source/Nebrax/pull/1173
 - Base SHA: `3429ec39018479671326928ecb732294404f2878`
-- Head SHA: recorded after commit; PRE_MERGE uses the exact final head
+- Implementation commit: `d31bf2daf0b74d898d89ba1168734ee3dfa128bc`
+- Head SHA: the branch tip that contains this report alignment. PRE_MERGE_REVIEW records that exact SHA.
 
 ## Recommended next dependency-ready task
 
