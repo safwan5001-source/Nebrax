@@ -154,7 +154,7 @@ describe('CUST-H4-2 review fix — Section Library follows the mobile Bottom She
     ).toBe('clean');
   });
 
-  it('closing the Library (its own back/close control) returns to the prior Sections composer state, without closing the sheet', async () => {
+  it('CUST-H4-2 review fix (UX polish) — the Library shows a Back control, not a second Close, and clicking it returns to the composer without closing the sheet', async () => {
     const user = userEvent.setup();
     render(<CommerceAppearancePage />);
     await waitFor(() => expect(showMock).toHaveBeenCalled());
@@ -165,12 +165,33 @@ describe('CUST-H4-2 review fix — Section Library follows the mobile Bottom She
 
     await user.click(within(sheet).getByRole('button', { name: /إضافة قسم/ }));
     const library = mobileSheet().querySelector('[data-section-picker]') as HTMLElement;
-    await user.click(within(library).getByLabelText('إغلاق'));
+
+    // Exactly one "×" on screen — the outer sheet's own close — not two.
+    expect(library.getAttribute('data-close-action')).toBe('back');
+    expect(within(library).queryByLabelText('إغلاق')).toBeNull();
+    const back = within(library).getByLabelText('رجوع');
+    expect(back.getAttribute('data-section-library-close-action')).toBe('back');
+    // The outer sheet's own "×" is still "إغلاق", outside the library root.
+    expect(within(sheet).getByLabelText('إغلاق')).toBeTruthy();
+    expect(library.contains(within(sheet).getByLabelText('إغلاق'))).toBe(false);
+
+    await user.click(back);
 
     // Same sheet, still open, composer list restored exactly as it was.
     const sameSheet = mobileSheet();
     expect(sameSheet).toBe(sheet);
     expect(sameSheet.querySelectorAll('[data-composer-section]')).toHaveLength(before);
+  });
+
+  it('the outer Sections sheet Close still closes the whole sheet (distinct from the Library Back)', async () => {
+    const user = userEvent.setup();
+    render(<CommerceAppearancePage />);
+    await waitFor(() => expect(showMock).toHaveBeenCalled());
+
+    await openMobileSectionsSheet(user);
+    const sheet = mobileSheet();
+    await user.click(within(sheet).getByLabelText('إغلاق'));
+    expect(screen.queryAllByRole('dialog')).toHaveLength(0);
   });
 
   it('search and category filtering work in the mobile Library, and adding a section works and returns to the composer', async () => {

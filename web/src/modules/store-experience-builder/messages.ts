@@ -235,6 +235,10 @@ export const CUSTOMIZER_MESSAGES = {
     sectionLibraryEmptySearch: "لا أقسام مطابقة لبحثك.",
     sectionLibraryAlreadyAdded: "أُضيف بالفعل",
     sectionLibraryAdd: "إضافة",
+    // CUST-H4-2 (مراجعة — تلميع واجهة الجوال) — زرّ رجوع داخل المكتبة على
+    // الجوال، مختلف عن "إغلاق" ورقة الأقسام الخارجية: يعيد للقائمة ولا يُغلق
+    // الورقة.
+    sectionLibraryBack: "رجوع",
     sectionLibraryStatePartial: "قيد الإكمال",
     sectionCategoryProducts: "المنتجات",
     sectionCategoryCategoriesNav: "التصنيفات والتنقل",
@@ -752,6 +756,10 @@ export const CUSTOMIZER_MESSAGES = {
     sectionLibraryEmptySearch: "No sections match your search.",
     sectionLibraryAlreadyAdded: "Already added",
     sectionLibraryAdd: "Add",
+    // CUST-H4-2 (review — mobile UX polish) — the Library's own back
+    // control on mobile, distinct from the outer Sections sheet's "Close":
+    // returns to the list, does not close the sheet.
+    sectionLibraryBack: "Back",
     sectionLibraryStatePartial: "In progress",
     sectionCategoryProducts: "Products",
     sectionCategoryCategoriesNav: "Categories & Navigation",

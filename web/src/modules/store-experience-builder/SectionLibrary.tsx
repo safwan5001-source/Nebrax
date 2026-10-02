@@ -19,8 +19,17 @@
  *   no new `mobileSheet` wiring), so the merchant never sees a centered
  *   modal stacked on top of the existing Bottom Sheet, and there is never
  *   more than one `aria-modal` surface on screen. The content's own
- *   header close button returns to the composer list (`setPickerOpen(false)`)
+ *   header control returns to the composer list (`setPickerOpen(false)`)
  *   without closing the sheet itself — a "back", not an "exit".
+ *
+ * CUST-H4-2 review fix (mobile UX polish): the header control's *meaning*
+ * differs by presentation even though the handler is identical
+ * (`onClose`), so its *affordance* must too — a second "×" next to the
+ * sheet's own "×" reads as "close" when it actually means "back". The
+ * `closeAction` prop ("close" | "back") switches the icon + accessible
+ * label only; `SectionLibraryDialog` (desktop, where the control really
+ * does close something) passes "close" explicitly, `HomepagePanel`'s
+ * mobile branch passes "back".
  *
  * Adding a section still goes through the existing `addSection`/
  * `canAddSectionType` model (`HomepagePanel`) in both presentations — this
@@ -88,12 +97,17 @@ export function SectionLibraryContent({
   onAdd,
   onClose,
   listMaxHeightClassName = "max-h-[60vh]",
+  closeAction = "close",
 }: {
   sections: readonly PresentationHomeSection[];
   t: (key: CustomizerMessageKey) => string;
   onAdd: (type: HomeBuilderSectionKey) => void;
   onClose: () => void;
   listMaxHeightClassName?: string;
+  /** "close" (desktop dialog — really closes something) vs "back" (mobile —
+   * returns to the composer inside the same still-open Bottom Sheet). Only
+   * the header control's icon/label change; `onClose` is called either way. */
+  closeAction?: "close" | "back";
 }) {
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState<CategoryFilter>("all");
@@ -123,7 +137,11 @@ export function SectionLibraryContent({
   const showHeadings = category === "all";
 
   return (
-    <div data-section-picker="" className="flex min-h-0 flex-col">
+    <div
+      data-section-picker=""
+      data-close-action={closeAction}
+      className="flex min-h-0 flex-col"
+    >
       <header className="flex shrink-0 items-start justify-between gap-2 border-b border-border p-4">
         <div className="min-w-0">
           <h2 className="text-sm font-semibold text-text">
@@ -133,11 +151,12 @@ export function SectionLibraryContent({
         </div>
         <button
           type="button"
-          aria-label={t("close")}
+          data-section-library-close-action={closeAction}
+          aria-label={closeAction === "back" ? t("sectionLibraryBack") : t("close")}
           onClick={onClose}
           className="shrink-0 rounded-md p-1.5 text-muted hover:bg-primary-soft hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
         >
-          <CloseIcon />
+          {closeAction === "back" ? <BackIcon /> : <CloseIcon />}
         </button>
       </header>
 
@@ -248,6 +267,7 @@ export function SectionLibraryDialog({
           onAdd={onAdd}
           onClose={onClose}
           listMaxHeightClassName="flex-1"
+          closeAction="close"
         />
       </section>
     </div>
@@ -360,6 +380,27 @@ function CloseIcon() {
   return (
     <svg viewBox="0 0 16 16" className="size-4" fill="none" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
       <path d="M3.5 3.5 12.5 12.5M12.5 3.5 3.5 12.5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+/**
+ * Drawn pointing start-ward (left) for LTR; `rtl:rotate-180` flips it to
+ * point right under RTL — the same logical-direction pattern
+ * `storefront/.../HeroSection.tsx` already uses for its own chevron
+ * (`rtl:rotate-180`), not a hardcoded locale check.
+ */
+function BackIcon() {
+  return (
+    <svg
+      viewBox="0 0 16 16"
+      className="size-4 rtl:rotate-180"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.5}
+      aria-hidden="true"
+    >
+      <path d="M9.5 3.5 4.5 8l5 4.5M4.5 8h7" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }

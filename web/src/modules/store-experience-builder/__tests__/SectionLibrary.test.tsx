@@ -222,3 +222,63 @@ describe("CUST-H4-2 review fix — SectionLibraryContent carries no dialog/modal
     expect(root.querySelector('[data-picker-option="banner"]')).toBeTruthy();
   });
 });
+
+describe("CUST-H4-2 review fix (mobile UX polish) — Back vs Close affordance", () => {
+  function renderContent(closeAction?: "close" | "back", locale: CustomizerLocale = "ar") {
+    const t = (key: Parameters<typeof customizerMessage>[1]) =>
+      customizerMessage(locale, key);
+    const onClose = vi.fn();
+    render(
+      <SectionLibraryContent
+        sections={DEFAULT_PRESENTATION_CONFIG.homepage.sections}
+        t={t}
+        onAdd={vi.fn()}
+        onClose={onClose}
+        closeAction={closeAction}
+      />,
+    );
+    const root = document.querySelector("[data-section-picker]") as HTMLElement;
+    return { root, onClose };
+  }
+
+  it('defaults to "close" (desktop semantics) when closeAction is omitted', () => {
+    const { root } = renderContent();
+    expect(root.getAttribute("data-close-action")).toBe("close");
+    expect(within(root).getByLabelText("إغلاق")).toBeTruthy();
+    expect(within(root).queryByLabelText("رجوع")).toBeNull();
+  });
+
+  it('closeAction="back" renders a Back control (رجوع), not Close (إغلاق), and still calls onClose', async () => {
+    const user = userEvent.setup();
+    const { root, onClose } = renderContent("back");
+    expect(root.getAttribute("data-close-action")).toBe("back");
+    expect(within(root).queryByLabelText("إغلاق")).toBeNull();
+    const back = within(root).getByLabelText("رجوع");
+    expect(back.getAttribute("data-section-library-close-action")).toBe("back");
+    await user.click(back);
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('closeAction="back" resolves the English label too, never a raw key', () => {
+    const { root } = renderContent("back", "en");
+    expect(within(root).getByLabelText("Back")).toBeTruthy();
+    expect(within(root).queryByLabelText("Close")).toBeNull();
+  });
+
+  it("SectionLibraryDialog (desktop) always exposes a real Close control, never Back", () => {
+    render(
+      <SectionLibraryDialog
+        sections={DEFAULT_PRESENTATION_CONFIG.homepage.sections}
+        t={(key) => customizerMessage("ar", key)}
+        onAdd={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    );
+    const dialogEl = screen.getByRole("dialog");
+    expect(dialogEl.querySelector("[data-section-picker]")?.getAttribute("data-close-action")).toBe(
+      "close",
+    );
+    expect(within(dialogEl).getByLabelText("إغلاق")).toBeTruthy();
+    expect(within(dialogEl).queryByLabelText("رجوع")).toBeNull();
+  });
+});

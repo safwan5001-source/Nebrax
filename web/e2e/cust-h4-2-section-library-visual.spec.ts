@@ -71,6 +71,20 @@ test.describe('CUST-H4-2 — Section Library mobile Bottom Sheet contract (visua
       await expect(library.locator('[data-picker-option="offers"]')).toBeDisabled();
       await expect(library.locator('[data-section-library-search]')).toBeVisible();
 
+      // CUST-H4-2 review fix (UX polish) — exactly one "×" (Close) on
+      // screen, belonging to the outer sheet; the Library's own control
+      // reads as "رجوع" (Back), never a second "إغلاق".
+      await expect(page.getByLabel('إغلاق')).toHaveCount(1);
+      await expect(library.getByLabel('إغلاق')).toHaveCount(0);
+      const back = library.getByLabel('رجوع');
+      await expect(back).toBeVisible();
+      await expect(back).toHaveAttribute('data-section-library-close-action', 'back');
+      // Drawn start-ward then flipped under rtl: — confirm the flip class
+      // is actually applied in this RTL render (structural check backing
+      // the screenshot's visual confirmation of the arrow's direction).
+      const backSvgClass = await back.locator('svg').getAttribute('class');
+      expect(backSvgClass).toContain('rtl:rotate-180');
+
       // Search remains usable.
       await library.locator('[data-section-library-search]').fill('شريط ترويجي');
       await expect(library.locator('[data-picker-option="banner"]')).toBeVisible();
@@ -86,12 +100,13 @@ test.describe('CUST-H4-2 — Section Library mobile Bottom Sheet contract (visua
       await assertNoOverflow(page);
       await page.screenshot({ path: path.join(evidenceDir, `ar-${width}-after-add.png`) });
 
-      // Re-open the Library and use its own close control — "back" to the
+      // Re-open the Library and use its own Back control — returns to the
       // composer, not an exit from the sheet.
       await sheet.locator('[data-add-section]').click();
       const libraryAgain = sheet.locator('[data-section-picker]');
       await expect(libraryAgain).toBeVisible();
-      await libraryAgain.getByLabel('إغلاق').click();
+      await page.screenshot({ path: path.join(evidenceDir, `ar-${width}-library-back-control.png`) });
+      await libraryAgain.getByLabel('رجوع').click();
       await expect(page.getByRole('dialog')).toHaveCount(1);
       await expect(sheet.locator('[data-section-picker]')).toHaveCount(0);
       await expect(sheet.locator('[data-composer-section="banner"]')).toBeVisible();
@@ -120,5 +135,10 @@ test.describe('CUST-H4-2 — Section Library mobile Bottom Sheet contract (visua
     // instance-count one) — the one assertion that holds unconditionally.
     await expect(dialog.locator('[data-picker-option="offers"]')).toBeDisabled();
     await expect(dialog.locator('[data-picker-option="banner"]')).toBeEnabled();
+
+    // CUST-H4-2 review fix (UX polish) — desktop keeps a real Close
+    // control (it genuinely closes the dialog here), never Back.
+    await expect(dialog.getByLabel('إغلاق')).toBeVisible();
+    await expect(dialog.getByLabel('رجوع')).toHaveCount(0);
   });
 });

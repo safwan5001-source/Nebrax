@@ -952,9 +952,11 @@ function HomepagePanel({
   // whole body in place, inside the same "sections" Bottom Sheet
   // `ExperienceBuilder.tsx` already opens, instead of stacking a second
   // centered dialog on top of it (never more than one aria-modal surface).
-  // Its own header close button calls `onClose` (= `setPickerOpen(false)`),
-  // which simply falls through to the normal return below — a "back" to
-  // the composer list, not an exit from the sheet itself.
+  // closeAction="back" (review fix — mobile UX polish): its header control
+  // reads as "رجوع"/"Back", not a second "×" next to the sheet's own close
+  // — it calls `onClose` (= `setPickerOpen(false)`), which simply falls
+  // through to the normal return below, returning to the composer list
+  // without exiting the sheet itself.
   if (pickerOpen && isMobileViewport) {
     return (
       <SectionLibraryContent
@@ -962,6 +964,7 @@ function HomepagePanel({
         t={t}
         onAdd={addSection}
         onClose={() => setPickerOpen(false)}
+        closeAction="back"
       />
     );
   }
