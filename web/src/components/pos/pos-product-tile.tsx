@@ -121,7 +121,7 @@ export function PosProductTile({
       {cartQty > 0 && (
         <span
           data-testid="pos-product-cart-qty"
-          className="num pointer-events-none absolute bottom-2 end-2 rounded-md bg-primary px-1.5 py-0.5 text-[11px] font-bold text-white"
+          className="num pointer-events-none absolute bottom-2 end-2 rounded-md bg-primary px-1.5 py-0.5 text-[11px] font-bold text-primary-foreground"
         >
           ×{cartQty}
         </span>

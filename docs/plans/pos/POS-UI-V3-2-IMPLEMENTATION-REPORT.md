@@ -16,7 +16,7 @@ Started from POS-UI-V3-1 (catalog pane + search in the topbar). The permanent ca
 - One strip. Favorites sets the existing `tab` filter. A category sets `cat` and clears favorites. All clears both. Same filter function as before.
 - `renderCategoryVisual` / `resolveCategoryVisual` still decide the small chip mark. No new palette.
 - Density is `localStorage` key `awj-pos-density-v3`. Default `standard`. Compact never shows an image. Standard and Visual show an image only when `posCfg.show_product_images` is true.
-- In-cart badge sums existing line quantities. It does not change add-to-cart.
+- In-cart badge sums existing line quantities. It does not change add-to-cart. The badge and the active density control use `text-primary-foreground` on `bg-primary` so Light/Dark stay on the semantic token (no new `text-white`).
 - The vertical rail class `POS_DESKTOP_CATEGORIES_CLASS` is removed.
 - `globals.css` no longer forces a third `data-awj-floor-grid` track at 1024/1280. That rule was overriding `POS_SALE_GRID_CLASS` and would have left an empty rail column after the strip replaced the rail.
 

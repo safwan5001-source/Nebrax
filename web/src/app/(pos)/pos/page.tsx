@@ -1627,7 +1627,7 @@ export default function PosPage() {
               type="button"
               aria-pressed={density === mode}
               onClick={() => chooseDensity(mode)}
-              className={'inline-flex min-h-11 items-center rounded-md px-2.5 text-xs font-semibold touch-manipulation focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ' + (density === mode ? 'bg-primary text-white' : 'text-muted hover:bg-surface hover:text-text')}
+              className={'inline-flex min-h-11 items-center rounded-md px-2.5 text-xs font-semibold touch-manipulation focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ' + (density === mode ? 'bg-primary text-primary-foreground' : 'text-muted hover:bg-surface hover:text-text')}
             >
               {t(`density_${mode}`)}
             </button>
