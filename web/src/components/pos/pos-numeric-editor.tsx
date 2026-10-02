@@ -30,6 +30,8 @@ interface PosNumericEditorProps {
   showKeypad: boolean;
   title: string;
   value: string;
+  /** ارتفاع مفاتيح اللوحة. الافتراضي يبقى لمحرر السلة؛ الدفع يطلب 56px. */
+  keyClassName?: string;
 }
 
 /**
@@ -50,6 +52,7 @@ export function PosNumericEditor({
   showKeypad,
   title,
   value,
+  keyClassName = 'min-h-12',
 }: PosNumericEditorProps) {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState(value);
@@ -138,7 +141,7 @@ export function PosNumericEditor({
                 key={digit}
                 type="button"
                 aria-label={labels.digit(digit)}
-                className="num min-h-12 rounded-md border border-border bg-background text-base font-semibold text-text hover:border-primary hover:bg-primary-soft active:bg-primary-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                className={cn('num rounded-md border border-border bg-background text-lg font-semibold text-text hover:border-primary hover:bg-primary-soft active:bg-primary-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40', keyClassName)}
                 onClick={() => append(digit)}
               >
                 {digit}
@@ -148,7 +151,7 @@ export function PosNumericEditor({
               <button
                 type="button"
                 aria-label={labels.decimal}
-                className="num min-h-12 rounded-md border border-border bg-background text-base font-semibold text-text hover:border-primary hover:bg-primary-soft active:bg-primary-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                className={cn('num rounded-md border border-border bg-background text-lg font-semibold text-text hover:border-primary hover:bg-primary-soft active:bg-primary-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40', keyClassName)}
                 onClick={() => append('.')}
               >
                 .
@@ -159,7 +162,7 @@ export function PosNumericEditor({
             <button
               type="button"
               aria-label={labels.digit('0')}
-              className="num min-h-12 rounded-md border border-border bg-background text-base font-semibold text-text hover:border-primary hover:bg-primary-soft active:bg-primary-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+              className={cn('num rounded-md border border-border bg-background text-lg font-semibold text-text hover:border-primary hover:bg-primary-soft active:bg-primary-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40', keyClassName)}
               onClick={() => append('0')}
             >
               0
@@ -167,7 +170,7 @@ export function PosNumericEditor({
             <button
               type="button"
               aria-label={labels.backspace}
-              className="grid min-h-12 place-items-center rounded-md border border-border bg-background text-text hover:border-primary hover:bg-primary-soft active:bg-primary-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+              className={cn('grid place-items-center rounded-md border border-border bg-background text-text hover:border-primary hover:bg-primary-soft active:bg-primary-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40', keyClassName)}
               onClick={() => updateDraft(draft.slice(0, -1))}
             >
               <Delete aria-hidden className="h-4 w-4" strokeWidth={1.7} />
