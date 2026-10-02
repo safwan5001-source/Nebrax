@@ -45,12 +45,12 @@ Not re-run as a full Next build in this environment. The previous slice compiled
 
 ## CI
 
-Pending on the PR. Must not open until POS-UI-V3-4 POST_MERGE_REVIEW passes.
+POS-UI-V3-4 POST_MERGE_REVIEW passed before this branch was pushed. This slice's own CI is pending on its PR.
 
 ## Pre-merge review
 
 - PRE_MERGE_REVIEW: PENDING
-- Reviewed Head SHA: pending
+- Reviewed Head SHA: pending exact final head
 - Findings / resolution: pending
 
 ## Merge
@@ -118,9 +118,10 @@ None.
 ## Git state
 
 - Branch: `pos-ui-v3-5`
-- PR: pending until V3-4 post-merge passes
+- PR: pending
 - Base SHA: `557740d3fe8b0e70432b62a5ac144c1256d1a1f4`
-- Head SHA: recorded at commit
+- Implementation commit: `e3b65122fb136a8609c46a5727835fa498d5b668`
+- Head SHA: branch tip after the report alignment. PRE_MERGE records that exact SHA.
 
 ## Recommended next dependency-ready task
 

@@ -50,25 +50,30 @@ Local Vitest, exit 0:
 
 ## CI
 
-Pending on the PR.
+PR checks on Head `4361616487b2a55c0ee88d779a3bbac300ab7383`:
+
+- Web CI success: https://github.com/safwan5001-source/Nebrax/actions/runs/37072839339
+- PHP CI pull_request success: https://github.com/safwan5001-source/Nebrax/actions/runs/37072839357
+- PHP CI push success: https://github.com/safwan5001-source/Nebrax/actions/runs/37072834014
 
 ## Pre-merge review
 
-- PRE_MERGE_REVIEW: PENDING
-- Reviewed Head SHA: pending exact final head
-- Findings / resolution: pending
+- PRE_MERGE_REVIEW: PASS
+- Reviewed Head SHA: `4361616487b2a55c0ee88d779a3bbac300ab7383`
+- Findings / resolution: none. Comment: https://github.com/safwan5001-source/Nebrax/pull/1173#issuecomment-5962749069
 
 ## Merge
 
-- Merge status: not merged
-- Merge SHA: —
+- Merge status: merged
+- PR: https://github.com/safwan5001-source/Nebrax/pull/1173
+- Merge SHA: `557740d3fe8b0e70432b62a5ac144c1256d1a1f4`
 
 ## Post-merge review
 
-- POST_MERGE_REVIEW: PENDING
-- Reviewed Merge SHA: —
-- Target-branch checks/smoke: —
-- Findings / resolution: —
+- POST_MERGE_REVIEW: PASS
+- Reviewed Merge SHA: `557740d3fe8b0e70432b62a5ac144c1256d1a1f4`
+- Target-branch checks/smoke: Web CI https://github.com/safwan5001-source/Nebrax/actions/runs/37074991616 and PHP CI https://github.com/safwan5001-source/Nebrax/actions/runs/37074991597 succeeded on `main`.
+- Findings / resolution: none. Comment: https://github.com/safwan5001-source/Nebrax/pull/1173#issuecomment-5962964229
 
 ## Self-review
 
