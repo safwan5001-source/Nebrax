@@ -2,6 +2,8 @@
 
 > This file is a durable resume point, not a substitute for Git/GitHub evidence.
 
+> **Active horizon (2026-10-02): AWJ Delivery Platforms & Settlement V1.** DLV-EVIDENCE-1 delivered in review (`docs/plans/pos/DLV-EVIDENCE-1-REPORT.md`, recommendation READY, base `3429ec39018479671326928ecb732294404f2878`). DLV-FOUNDATION-1 is evidence-ready but locked until EVIDENCE-1 is merged and post-merge reviewed. No runtime/schema/accounting change yet; no deploy.
+
 LAST_UPDATED: 2026-09-27 (**AWJ Store Business Identity Marks V1 is CLOSED.** PR #1080 `feat(store): present canonical CR and VAT with utility icons` merged as `071dfa3061fbb0c9393e02bdcba0ee9d150b17cd`. Canonical CR and VAT now render as labeled facts with decorative AWJ utility icons across Published Footer, storefront preview mirror, and merchant preview; no official-looking CR/VAT seal was introduced. SBC official-token loader and contracted tokenless `sbcVerified` behavior remain unchanged. Preview ↔ Published QA, RTL/LTR, required widths, missing-value states, and accessibility passed; no unresolved P1/P2. Post-merge auto-deploy statuses for Railway Nebrax/Web, Storefront, API, Scheduler and Vercel Nebrax/Storefront are all SUCCESS on the merge SHA. No manual deploy was performed. Horizon ends here; do not automatically start another Store/Payment/Trust horizon.)
 
 ## Previous snapshot

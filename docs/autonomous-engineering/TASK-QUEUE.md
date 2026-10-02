@@ -1236,3 +1236,16 @@ Home/Cart accept the resolved live Experience or keep the bundled default). Full
 shell-integration test proves all four branches (4 passed); full `flutter test` 356 passed, 0
 failed; `flutter analyze` clean. Real-device verification before any actual mobile distribution
 remains owed and unresolved, as previously recorded.
+
+## Horizon: AWJ Delivery Platforms & Settlement V1 (AUTHORIZED / ACTIVE)
+
+Source of truth: `docs/plans/pos/AWJ_DELIVERY_PLATFORMS_HORIZON_V1.md` (+ `-BOOTSTRAP.md`, merged via #1162/#1163). Decision: `docs/plans/pos/AWJ_POS_DELIVERY_PLATFORMS_ACCOUNTING_UX_DECISION.md`. Merge != Deploy; no deploy authorized.
+
+Only evidence-backed statuses are recorded here; unlisted tasks of the horizon plan are `blocked` on their stated dependencies and are not ready.
+
+| Order | Task ID | Status | Risk | Depends on | Evidence |
+|---|---|---|---|---|---|
+| 0 | DLV-EVIDENCE-1 | in_review (PR open, not merged) | high | accepted decision | `docs/plans/pos/DLV-EVIDENCE-1-REPORT.md`, recommendation READY |
+| 1 | DLV-FOUNDATION-1 | evidence_ready, LOCKED until DLV-EVIDENCE-1 is merged + POST_MERGE_REVIEW: PASS | high | DLV-EVIDENCE-1 | Report §12–§14 (additive config-only scope) |
+
+Owed gates (from the report §11), each blocking the named downstream task, none blocking FOUNDATION-1: DG-1/DG-3 (ACCOUNTING-1, SETTLEMENT-1), DG-2 (POS-1), DG-4 (CLOSE-1), DG-6 (HUB-1, REFUND-1, CONNECTOR-CORE-1), DG-7 (CONNECTOR-CORE-1), DG-8, DG-9. DG-5 (reuse `SalesChannel` type `external`) is confirmed at FOUNDATION-1 acceptance review.
