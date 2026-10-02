@@ -25,9 +25,24 @@ import type { CustomizerMessageKey } from "../messages";
  * honestly from one registry instead of scattered conditionals
  * (`GATED_HOME_SECTION_KEYS`, ad hoc badges). `state` mirrors the H4
  * contract's truth matrix exactly — a PARTIAL section (`featured`) is never
- * flattened to LIVE, and a GATED one (`offers`) stays addable-with-honest-
- * copy exactly as it is today (`isGatedHomeSection`/`gatedSection`), not
- * silently hidden — H4-2 does not reinterpret that decision.
+ * flattened to LIVE.
+ *
+ * CUST-H4-2 review fix — a GATED section is not automatically addable. No
+ * merchant-addable fake section: `offers` has neither the H4-6 real
+ * Commerce backend nor the H4-7 real Canvas/Published renderers yet, so it
+ * is visible in the Library but `merchantAddable: false`, disabled, with
+ * its own honest "coming soon" reason (`sectionOffersComingSoon`) — never
+ * hidden from the Library entirely. Current truth, and the only state this
+ * registry sets today:
+ *
+ *   offers.state = "gated",  offers.merchantAddable = false
+ *
+ * That pair only flips once both H4-6 and H4-7 ship:
+ *
+ *   offers.state = "live",   offers.merchantAddable = true
+ *
+ * No section in this registry is `merchantAddable: false` for any other
+ * reason today — see the field's own comment below.
  */
 export type SectionCapabilityState = "live" | "partial" | "gated" | "deferred";
 
@@ -76,7 +91,12 @@ export interface SectionCapability {
   state: SectionCapabilityState;
   /** Section Library taxonomy group (§16). */
   category: SectionLibraryCategory;
-  /** False only for a type withheld from the Library's addable results entirely. None today — see module comment. */
+  /**
+   * False for a type withheld from the Library's addable results entirely
+   * (visible, disabled, `reasonKey` explains why — never hidden). `offers`
+   * is the one type set to `false` today (gated until H4-6/H4-7 ship, see
+   * module comment); every other type is `true`.
+   */
   merchantAddable: boolean;
   /** Localized card/composer title. */
   titleKey: CustomizerMessageKey;

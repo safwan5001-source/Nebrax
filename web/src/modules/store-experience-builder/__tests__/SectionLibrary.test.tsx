@@ -4,7 +4,7 @@
 import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { SectionLibraryDialog } from "../SectionLibrary";
+import { SectionLibraryContent, SectionLibraryDialog } from "../SectionLibrary";
 import {
   DEFAULT_PRESENTATION_CONFIG,
   MAX_HOME_SECTIONS,
@@ -196,5 +196,29 @@ describe("CUST-H4-2 — Section Library UX", () => {
     ) as HTMLElement;
     await user.click(backdrop);
     expect(onClose).toHaveBeenCalled();
+  });
+});
+
+describe("CUST-H4-2 review fix — SectionLibraryContent carries no dialog/modal role of its own", () => {
+  it("renders with no role=dialog / aria-modal, so embedding it in an existing sheet never nests a second modal surface", () => {
+    const t = (key: Parameters<typeof customizerMessage>[1]) =>
+      customizerMessage("ar", key);
+    render(
+      <SectionLibraryContent
+        sections={DEFAULT_PRESENTATION_CONFIG.homepage.sections}
+        t={t}
+        onAdd={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    );
+    const root = document.querySelector("[data-section-picker]") as HTMLElement;
+    expect(root).toBeTruthy();
+    expect(root.getAttribute("role")).toBeNull();
+    expect(root.getAttribute("aria-modal")).toBeNull();
+    expect(screen.queryByRole("dialog")).toBeNull();
+    // Still fully functional stand-alone: title, search and cards present.
+    expect(screen.getByText("مكتبة الأقسام")).toBeTruthy();
+    expect(root.querySelector('[data-section-library-search]')).toBeTruthy();
+    expect(root.querySelector('[data-picker-option="banner"]')).toBeTruthy();
   });
 });

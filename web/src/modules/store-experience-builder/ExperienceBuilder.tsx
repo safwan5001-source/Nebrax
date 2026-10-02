@@ -1691,6 +1691,7 @@ export function ExperienceBuilder({
           onChange={updateDraft}
           selectedSection={selectedSection}
           onSelectSection={(id) => handleSelectSection(id, "sidebar")}
+          isMobileViewport={isMobileViewport}
         />
       );
     }
@@ -1756,6 +1757,7 @@ export function ExperienceBuilder({
         onChange={updateDraft}
         selectedSection={selectedSection}
         onSelectSection={(id) => handleSelectSection(id, "sidebar")}
+        isMobileViewport={isMobileViewport}
       />
     );
   }

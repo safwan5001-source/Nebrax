@@ -28,7 +28,7 @@ import {
   THEME_PRESETS,
   type ThemePresetId,
 } from "./presentation";
-import { SectionLibraryDialog } from "./SectionLibrary";
+import { SectionLibraryContent, SectionLibraryDialog } from "./SectionLibrary";
 import { buildWhatsAppUrl } from "./presentation/urls";
 import {
   bannerContentOf,
@@ -139,6 +139,10 @@ interface PanelsProps {
   onChange: (next: StorefrontPresentationConfig) => void;
   selectedSection?: string | null;
   onSelectSection?: (id: string | null) => void;
+  /** CUST-H4-2 mobile fix — only `HomepagePanel` reads this, to pick the
+   * Section Library's presentation: a centered dialog on desktop, inline
+   * content replacing the composer body on mobile (no nested Bottom Sheet). */
+  isMobileViewport?: boolean;
 }
 
 export function ControlPanels({
@@ -150,6 +154,7 @@ export function ControlPanels({
   onChange,
   selectedSection = null,
   onSelectSection,
+  isMobileViewport = false,
 }: PanelsProps) {
   const t = (key: CustomizerMessageKey) => customizerMessage(locale, key);
   const patch = (partial: Partial<StorefrontPresentationConfig>) =>
@@ -177,6 +182,7 @@ export function ControlPanels({
           patch={patch}
           selectedSection={selectedSection}
           onSelectSection={onSelectSection}
+          isMobileViewport={isMobileViewport}
         />
       );
     case "footer":
@@ -819,12 +825,14 @@ function HomepagePanel({
   patch,
   selectedSection = null,
   onSelectSection,
+  isMobileViewport = false,
 }: {
   config: StorefrontPresentationConfig;
   t: (key: CustomizerMessageKey) => string;
   patch: (partial: Partial<StorefrontPresentationConfig>) => void;
   selectedSection?: string | null;
   onSelectSection?: (id: string | null) => void;
+  isMobileViewport?: boolean;
 }) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const sections = config.homepage.sections;
@@ -939,6 +947,24 @@ function HomepagePanel({
     ? sections.findIndex((section) => section.id === selectedSection)
     : -1;
   const selected = selectedIndex >= 0 ? sections[selectedIndex] : null;
+
+  // CUST-H4-2 mobile fix — on mobile the Library *replaces* this panel's
+  // whole body in place, inside the same "sections" Bottom Sheet
+  // `ExperienceBuilder.tsx` already opens, instead of stacking a second
+  // centered dialog on top of it (never more than one aria-modal surface).
+  // Its own header close button calls `onClose` (= `setPickerOpen(false)`),
+  // which simply falls through to the normal return below — a "back" to
+  // the composer list, not an exit from the sheet itself.
+  if (pickerOpen && isMobileViewport) {
+    return (
+      <SectionLibraryContent
+        sections={sections}
+        t={t}
+        onAdd={addSection}
+        onClose={() => setPickerOpen(false)}
+      />
+    );
+  }
 
   return (
     <div className="space-y-7">

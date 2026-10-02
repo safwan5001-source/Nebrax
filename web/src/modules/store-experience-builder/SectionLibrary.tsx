@@ -6,16 +6,26 @@
  * (CUST-H4-ARCH-1 §16), a short description and an honest state per card,
  * and already-added/max-instance copy instead of a silently-disabled button.
  *
- * Centered dialog, not a Bottom Sheet — same markup on mobile and desktop,
- * same precedent `PublishConfirmDialog` already set in `ExperienceBuilder.tsx`
- * ("مركزيٌّ لا Bottom Sheet"). It opens from `HomepagePanel`'s own local
- * `pickerOpen` state, so on mobile it nests inside the generic "sections"
- * Bottom Sheet the same way the old inline list already did — no new wiring
- * into `ExperienceBuilder`'s `mobileSheet` state is needed.
+ * CUST-H4-2 review fix (mobile contract): the Library's actual content
+ * (`SectionLibraryContent`) is shared by both presentations, per the H4
+ * mobile UX contract's existing Bottom Sheet convention:
+ *
+ * - **Desktop** (`SectionLibraryDialog`): a centered dialog — same
+ *   precedent `PublishConfirmDialog` already set in `ExperienceBuilder.tsx`
+ *   ("مركزيٌّ لا Bottom Sheet").
+ * - **Mobile**: no second dialog at all. `HomepagePanel` renders
+ *   `SectionLibraryContent` directly in place of its own composer body
+ *   (same "sections" mobile sheet `ExperienceBuilder.tsx` already opens —
+ *   no new `mobileSheet` wiring), so the merchant never sees a centered
+ *   modal stacked on top of the existing Bottom Sheet, and there is never
+ *   more than one `aria-modal` surface on screen. The content's own
+ *   header close button returns to the composer list (`setPickerOpen(false)`)
+ *   without closing the sheet itself — a "back", not an "exit".
  *
  * Adding a section still goes through the existing `addSection`/
- * `canAddSectionType` model (`HomepagePanel`) — this file only renders the
- * picker surface; it owns no section-instance mutation logic itself.
+ * `canAddSectionType` model (`HomepagePanel`) in both presentations — this
+ * file only renders the picker surface; it owns no section-instance
+ * mutation logic itself.
  */
 
 import { useId, useState } from "react";
@@ -60,20 +70,33 @@ function addDisabledReasonKey(
   return null;
 }
 
-export function SectionLibraryDialog({
+/**
+ * The Library's actual search/category/card content, with no dialog/modal
+ * chrome of its own — shared verbatim by the desktop centered dialog and
+ * the mobile inline (Bottom Sheet) presentation. `listMaxHeightClassName`
+ * lets each presentation cap the scrollable card area without depending on
+ * a flex-sized ancestor: the desktop dialog is itself a bounded flex
+ * column (`flex-1` correctly fills it), but the mobile Bottom Sheet's own
+ * body is a plain `overflow-y-auto` div with no defined height for a
+ * `flex-1` child to fill — a fixed viewport-relative cap (`max-h-[*vh]`,
+ * the same fixed-height-region pattern `ProductPreviewPickerPanel` already
+ * uses for its own nested card list) works in both cases.
+ */
+export function SectionLibraryContent({
   sections,
   t,
   onAdd,
   onClose,
+  listMaxHeightClassName = "max-h-[60vh]",
 }: {
   sections: readonly PresentationHomeSection[];
   t: (key: CustomizerMessageKey) => string;
   onAdd: (type: HomeBuilderSectionKey) => void;
   onClose: () => void;
+  listMaxHeightClassName?: string;
 }) {
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState<CategoryFilter>("all");
-  const titleId = useId();
   const searchId = useId();
 
   const normalizedSearch = normalizeSearchText(search);
@@ -100,6 +123,109 @@ export function SectionLibraryDialog({
   const showHeadings = category === "all";
 
   return (
+    <div data-section-picker="" className="flex min-h-0 flex-col">
+      <header className="flex shrink-0 items-start justify-between gap-2 border-b border-border p-4">
+        <div className="min-w-0">
+          <h2 className="text-sm font-semibold text-text">
+            {t("sectionLibraryTitle")}
+          </h2>
+          <p className="mt-0.5 text-xs text-muted">{t("sectionLibraryHint")}</p>
+        </div>
+        <button
+          type="button"
+          aria-label={t("close")}
+          onClick={onClose}
+          className="shrink-0 rounded-md p-1.5 text-muted hover:bg-primary-soft hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+        >
+          <CloseIcon />
+        </button>
+      </header>
+
+      <div className="shrink-0 space-y-2.5 border-b border-border p-4">
+        <label className="sr-only" htmlFor={searchId}>
+          {t("sectionLibrarySearchLabel")}
+        </label>
+        <input
+          id={searchId}
+          type="search"
+          autoFocus
+          data-section-library-search=""
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+          placeholder={t("sectionLibrarySearchPlaceholder")}
+          className="h-9 w-full rounded-md border border-border bg-surface px-3 text-sm text-text placeholder:text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+        />
+        <div className="flex flex-wrap gap-1.5" role="group" aria-label={t("sectionLibrarySearchLabel")}>
+          <CategoryChip
+            label={t("sectionLibraryAllCategories")}
+            active={category === "all"}
+            onClick={() => setCategory("all")}
+          />
+          {SECTION_LIBRARY_CATEGORIES.map((cat) => (
+            <CategoryChip
+              key={cat}
+              label={t(SECTION_LIBRARY_CATEGORY_LABEL[cat])}
+              active={category === cat}
+              onClick={() => setCategory(cat)}
+              dataCategory={cat}
+            />
+          ))}
+        </div>
+      </div>
+
+      <div className={`${listMaxHeightClassName} overflow-y-auto p-4`}>
+        {totalVisible === 0 ? (
+          <p data-section-library-empty="" className="py-8 text-center text-sm text-muted">
+            {t("sectionLibraryEmptySearch")}
+          </p>
+        ) : (
+          <div className="space-y-5">
+            {groups.map((group) => (
+              <div key={group.category}>
+                {showHeadings ? (
+                  <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted">
+                    {t(SECTION_LIBRARY_CATEGORY_LABEL[group.category])}
+                  </h3>
+                ) : null}
+                <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  {group.types.map((type) => (
+                    <SectionLibraryCard
+                      key={type}
+                      type={type}
+                      sections={sections}
+                      t={t}
+                      onAdd={onAdd}
+                    />
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Desktop presentation — centered dialog, not a Bottom Sheet, same
+ * precedent `PublishConfirmDialog` already set in `ExperienceBuilder.tsx`
+ * ("مركزيٌّ لا Bottom Sheet"). Mobile uses `SectionLibraryContent` directly
+ * (see `HomepagePanel`) and never renders this wrapper — one `aria-modal`
+ * surface at a time, never two nested.
+ */
+export function SectionLibraryDialog({
+  sections,
+  t,
+  onAdd,
+  onClose,
+}: {
+  sections: readonly PresentationHomeSection[];
+  t: (key: CustomizerMessageKey) => string;
+  onAdd: (type: HomeBuilderSectionKey) => void;
+  onClose: () => void;
+}) {
+  return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
       role="presentation"
@@ -113,89 +239,16 @@ export function SectionLibraryDialog({
       <section
         role="dialog"
         aria-modal="true"
-        aria-labelledby={titleId}
-        data-section-picker=""
+        aria-label={t("sectionLibraryTitle")}
         className="flex max-h-[85dvh] w-full max-w-lg flex-col overflow-hidden rounded-xl border border-border bg-surface shadow-2xl"
       >
-        <header className="flex shrink-0 items-start justify-between gap-2 border-b border-border p-4">
-          <div className="min-w-0">
-            <h2 id={titleId} className="text-sm font-semibold text-text">
-              {t("sectionLibraryTitle")}
-            </h2>
-            <p className="mt-0.5 text-xs text-muted">{t("sectionLibraryHint")}</p>
-          </div>
-          <button
-            type="button"
-            aria-label={t("close")}
-            onClick={onClose}
-            className="shrink-0 rounded-md p-1.5 text-muted hover:bg-primary-soft hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
-          >
-            <CloseIcon />
-          </button>
-        </header>
-
-        <div className="shrink-0 space-y-2.5 border-b border-border p-4">
-          <label className="sr-only" htmlFor={searchId}>
-            {t("sectionLibrarySearchLabel")}
-          </label>
-          <input
-            id={searchId}
-            type="search"
-            autoFocus
-            data-section-library-search=""
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder={t("sectionLibrarySearchPlaceholder")}
-            className="h-9 w-full rounded-md border border-border bg-surface px-3 text-sm text-text placeholder:text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
-          />
-          <div className="flex flex-wrap gap-1.5" role="group" aria-label={t("sectionLibrarySearchLabel")}>
-            <CategoryChip
-              label={t("sectionLibraryAllCategories")}
-              active={category === "all"}
-              onClick={() => setCategory("all")}
-            />
-            {SECTION_LIBRARY_CATEGORIES.map((cat) => (
-              <CategoryChip
-                key={cat}
-                label={t(SECTION_LIBRARY_CATEGORY_LABEL[cat])}
-                active={category === cat}
-                onClick={() => setCategory(cat)}
-                dataCategory={cat}
-              />
-            ))}
-          </div>
-        </div>
-
-        <div className="flex-1 overflow-y-auto p-4">
-          {totalVisible === 0 ? (
-            <p data-section-library-empty="" className="py-8 text-center text-sm text-muted">
-              {t("sectionLibraryEmptySearch")}
-            </p>
-          ) : (
-            <div className="space-y-5">
-              {groups.map((group) => (
-                <div key={group.category}>
-                  {showHeadings ? (
-                    <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted">
-                      {t(SECTION_LIBRARY_CATEGORY_LABEL[group.category])}
-                    </h3>
-                  ) : null}
-                  <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                    {group.types.map((type) => (
-                      <SectionLibraryCard
-                        key={type}
-                        type={type}
-                        sections={sections}
-                        t={t}
-                        onAdd={onAdd}
-                      />
-                    ))}
-                  </ul>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+        <SectionLibraryContent
+          sections={sections}
+          t={t}
+          onAdd={onAdd}
+          onClose={onClose}
+          listMaxHeightClassName="flex-1"
+        />
       </section>
     </div>
   );
