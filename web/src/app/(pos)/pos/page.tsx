@@ -1892,21 +1892,28 @@ export default function PosPage() {
                 السطر عرضٌ للقراءة فقط. الكمية والسعر والخصم والوحدة تُعدَّل من
                 شريط السطر المحدد أسفل القائمة — لا منتقي وحدة ثانٍ هنا.
               */}
-              <div className="flex min-w-0 flex-1 flex-col gap-1">
+              <div className="flex min-w-0 flex-1 flex-col gap-2">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-sm font-semibold text-text">{line.description}</div>
-                    {line.unit ? <div className="mt-1 text-xs text-muted" data-testid="pos-cart-line-unit">{line.unit}</div> : null}
+                    {line.unit ? <div className="mt-0.5 text-xs text-muted" data-testid="pos-cart-line-unit">{line.unit}</div> : null}
                   </div>
-                  <div className="shrink-0 text-end">
-                    <div className="num text-xs text-muted">×{line.qty}</div>
-                    <div className="num text-sm font-bold text-text">{formatRiyal(lineCalc(line).total / 100)}</div>
-                  </div>
+                  <div className="num shrink-0 text-base font-bold text-text" data-testid="pos-cart-line-total">{formatRiyal(lineCalc(line).total / 100)}</div>
                 </div>
-                <div className="flex items-center justify-between text-xs text-muted">
-                  <span className="num">{formatRiyal(Number(effectiveLinePrice(line)))}</span>
-                  {lineDisc > 0 && <span className="num text-positive">−{formatRiyal(lineDisc / 100)}</span>}
-                </div>
+                <div className="num text-xs text-muted" data-testid="pos-cart-line-unit-price">{formatRiyal(Number(effectiveLinePrice(line)))}</div>
+                <PosCartQtyControls
+                  qty={line.qty}
+                  decreaseLabel={t('return_decrease')}
+                  increaseLabel={t('return_increase')}
+                  quantityLabel={t('quantity')}
+                  keypadTitle={t('numeric_keypad_edit_quantity')}
+                  showKeypad={posCfg.show_onscreen_numeric_keypad}
+                  labels={numericEditorLabels}
+                  onDecrease={() => setQty(line.key, -1)}
+                  onIncrease={() => setQty(line.key, 1)}
+                  onQtyChange={(value) => setQtyFromInput(line.key, value)}
+                />
+                {lineDisc > 0 && <span className="num text-xs text-positive">−{formatRiyal(lineDisc / 100)}</span>}
                 {priceErrors[line.key] && <p className="text-xs text-negative">{priceErrors[line.key]}</p>}
               </div>
             </PosCartLineFrame>
@@ -2093,7 +2100,7 @@ export default function PosPage() {
       <div data-awj-floor-outcome="" data-awj-surface="outcome" className="contents">
       <div className="space-y-1.5 border-t border-border bg-background p-3" data-testid="pos-cart-totals">
         <div className="flex justify-between text-sm"><span className="text-muted">{t('subtotal')}</span><span className="num font-semibold text-text">{formatRiyal(subMinor / 100)}</span></div>
-        {discMinor > 0 && <div className="flex justify-between text-sm"><span className="text-muted">{t('discount')}</span><span className="num font-semibold text-positive">−{formatRiyal(discMinor / 100)}</span></div>}
+        <div className="flex justify-between text-sm" data-testid="pos-cart-discount"><span className="text-muted">{t('discount')}</span><span className={'num font-semibold ' + (discMinor > 0 ? 'text-positive' : 'text-text')}>{discMinor > 0 ? '−' : ''}{formatRiyal(discMinor / 100)}</span></div>
         <div className="flex justify-between text-sm"><span className="text-muted">{t('tax')}</span><span className="num font-semibold text-text">{formatRiyal(taxMinor / 100)}</span></div>
         <div data-awj-floor-total="" className="flex items-baseline justify-between border-t border-border pt-2"><span className="text-sm font-semibold text-text">{t('total')}</span><span className="num text-xl font-bold text-text">{formatRiyal(totalMinor / 100)}</span></div>
       </div>

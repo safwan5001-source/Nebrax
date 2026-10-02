@@ -19,6 +19,12 @@ describe('POS-FINAL-1 شريط السطر المحدد', () => {
     expect(barStart).toBeGreaterThan(linesStart);
     expect(lineRegion).not.toContain('<select');
     expect(lineRegion).toContain('data-testid="pos-cart-line-unit"');
+    expect(lineRegion).toContain('data-testid="pos-cart-line-unit-price"');
+    expect(lineRegion).toContain('data-testid="pos-cart-line-total"');
+    expect(lineRegion).toContain('PosCartQtyControls');
+    expect(lineRegion).toContain('setQty(line.key, -1)');
+    expect(lineRegion).toContain('setQty(line.key, 1)');
+    expect(page).toContain('data-testid="pos-cart-discount"');
     expect(page).not.toContain('<select');
   });
 
