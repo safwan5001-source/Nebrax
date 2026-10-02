@@ -215,6 +215,12 @@ export const CUSTOMIZER_MESSAGES = {
     sectionHero: "البطل",
     sectionCategories: "التصنيفات",
     sectionNewArrivals: "وصل حديثاً",
+    // CUST-H4-3 — real-data loading/empty/error copy for the Home
+    // "categories"/"newArrivals" sections' own Canvas preview.
+    homeCategoriesLoadFailed: "تعذّر تحميل التصنيفات لهذا القسم.",
+    homeCategoriesEmpty: "لا تصنيفات رئيسية منشورة على هذا المتجر حتى الآن.",
+    homeNewArrivalsLoadFailed: "تعذّر تحميل المنتجات لهذا القسم.",
+    homeNewArrivalsEmpty: "لا منتجات منشورة على هذا المتجر حتى الآن.",
     sectionWholesale: "الجملة",
     sectionBanner: "شريط ترويجي",
     sectionFeatured: "منتجات مميزة",
@@ -735,6 +741,10 @@ export const CUSTOMIZER_MESSAGES = {
     sectionHero: "Hero",
     sectionCategories: "Categories",
     sectionNewArrivals: "New arrivals",
+    homeCategoriesLoadFailed: "Couldn't load categories for this section.",
+    homeCategoriesEmpty: "No published top-level categories on this store yet.",
+    homeNewArrivalsLoadFailed: "Couldn't load products for this section.",
+    homeNewArrivalsEmpty: "No published products on this store yet.",
     sectionWholesale: "Wholesale",
     sectionBanner: "Promotional banner",
     sectionFeatured: "Featured products",

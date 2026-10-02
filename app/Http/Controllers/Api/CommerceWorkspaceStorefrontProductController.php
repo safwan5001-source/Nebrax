@@ -51,6 +51,13 @@ use Illuminate\Http\Request;
  * فقط) — لا حمولة منتج كاملة لمجرَّد منتقٍ. التفصيل يعيد استخدام
  * `StorefrontProductResource` نفسه الذي يستثني أصلاً كل حقل تكلفة/هامش/مورّد/
  * مخزون داخلي (راجع تعليق ذلك المورد).
+ *
+ * **CUST-H4-3 — `sort=newest`**: إضافيٌّ واختياري بالكامل. عند غيابه يبقى
+ * الفرز الافتراضي (الاسم) كما هو حرفياً لكل مستدعٍ قائم (منتقي صفحة المنتج،
+ * حقل معرّفات Featured الخام). مُخصِّص الواجهة يستعمله فقط لمعاينة قسم «وصل
+ * حديثاً» الحقيقي على الصفحة الرئيسية، ليطابق ترتيب `-available_on` (→
+ * `created_at` تنازلياً) الذي تستعمله الواجهة المنشورة فعلاً
+ * (`StorefrontProductController`/`NewArrivals.tsx`) — لا معنى جديد يُخترع هنا.
  */
 class CommerceWorkspaceStorefrontProductController extends ApiController
 {
@@ -70,6 +77,14 @@ class CommerceWorkspaceStorefrontProductController extends ApiController
         $filters = $request->validate([
             'search' => ['sometimes', 'nullable', 'string', 'max:120'],
             'category_id' => ['sometimes', 'nullable', 'uuid'],
+            // CUST-H4-3 — Canvas's "New Arrivals" home-section preview needs
+            // the same recency ordering `StorefrontProductController`'s
+            // public `-available_on` sort (→ `created_at` desc) already
+            // gives Published (`NewArrivals.tsx`). Additive and opt-in only:
+            // every existing caller (Featured's raw-id input, the Product/
+            // Category preview pickers) omits `sort` and keeps today's
+            // alphabetical order unchanged.
+            'sort' => ['sometimes', 'nullable', 'string', 'in:newest'],
             'page' => ['sometimes', 'nullable', 'integer', 'min:1'],
             'per_page' => ['sometimes', 'nullable', 'integer', 'min:1', 'max:'.self::PER_PAGE_MAX],
         ]);
@@ -79,9 +94,13 @@ class CommerceWorkspaceStorefrontProductController extends ApiController
             ->whereIn('id', CommerceListing::query()
                 ->where('sales_channel_id', $storefront->sales_channel_id)
                 ->where('is_published', true)
-                ->select('product_id'))
-            ->orderBy('name')
-            ->orderBy('id');
+                ->select('product_id'));
+
+        if (($filters['sort'] ?? null) === 'newest') {
+            $query->orderByDesc('created_at')->orderByDesc('id');
+        } else {
+            $query->orderBy('name')->orderBy('id');
+        }
 
         if (filled($filters['search'] ?? null)) {
             $like = '%'.str_replace(['%', '_'], ['\\%', '\\_'], (string) $filters['search']).'%';
