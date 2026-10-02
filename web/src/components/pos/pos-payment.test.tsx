@@ -229,6 +229,7 @@ describe('PosPayment', () => {
       />,
     );
 
+    fireEvent.click(screen.getByText('Bank'));
     const bankAmount = screen.getByRole('textbox', { name: 'Bank' });
     fireEvent.change(bankAmount, { target: { value: '120.00' } });
 
@@ -263,6 +264,7 @@ describe('PosPayment', () => {
     );
 
     fireEvent.change(screen.getByRole('textbox', { name: 'Cash' }), { target: { value: '40.00' } });
+    fireEvent.click(screen.getByText('Bank'));
     fireEvent.change(screen.getByRole('textbox', { name: 'Bank' }), { target: { value: '60.00' } });
 
     expect(screen.getByTestId('pos-payment-paid').querySelector('.num')?.textContent).toContain('100.00');
@@ -299,7 +301,9 @@ describe('PosPayment', () => {
       />,
     );
 
+    fireEvent.click(screen.getByText('Bank'));
     fireEvent.change(screen.getByRole('textbox', { name: 'Bank' }), { target: { value: '50.00' } });
+    fireEvent.click(screen.getByText('Cash'));
     fireEvent.change(screen.getByRole('textbox', { name: 'Cash' }), { target: { value: '120.00' } });
 
     // غير النقدي يُطبَّق أولاً (50 من أصل 100 متبقية)، فيبقى 50 يُطبَّق عليها
@@ -381,6 +385,7 @@ describe('PosPayment', () => {
       />,
     );
 
+    fireEvent.click(screen.getByText('Bank'));
     fireEvent.change(screen.getByRole('textbox', { name: 'Bank' }), { target: { value: '40.00' } });
     fireEvent.click(screen.getByText('Cash'));
     fireEvent.click(screen.getByRole('button', { name: 'exact_amount' }));
@@ -432,5 +437,35 @@ describe('PosPayment', () => {
     );
     expect(screen.queryByRole('textbox', { name: 'Cash' })).toBeNull();
     expect(screen.getByRole('button', { name: 'Cash' })).toBeTruthy();
+  });
+
+  it('V3: يقسم الملخص والتفاعل 35/65 ويبقي حقلاً واحداً للمبلغ', () => {
+    const methods = [
+      ...paymentMethods,
+      { id: 'bank', name: 'Bank', name_en: 'Bank', settlement_type: 'bank' as const, is_active: true, is_default: false },
+    ];
+    render(
+      <PosPayment
+        allowDeferredPayment={false}
+        customerName="Walk-in"
+        defaultPaymentMethodId="cash"
+        error={null}
+        items={[{ name: 'Tea', qty: 1, unitPrice: '10.00', lineTotal: 1000 }]}
+        onBack={vi.fn()}
+        onConfirm={vi.fn()}
+        paying={false}
+        paymentMethods={methods}
+        paymentMethodsLoadError={null}
+        paymentMethodsLoading={false}
+        totalMinor={10000}
+      />,
+    );
+
+    const split = screen.getByTestId('pos-payment-split');
+    expect(split.className).toContain('minmax(240px,7fr)');
+    expect(split.className).toContain('minmax(0,13fr)');
+    expect(screen.getAllByRole('textbox')).toHaveLength(1);
+    expect(screen.getByTestId('pos-payment-remaining').getAttribute('data-payment-emphasis') ?? document.querySelector('[data-payment-emphasis="remaining"]')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Cash payment_methods' }).className).toMatch(/min-h-14/);
   });
 });
