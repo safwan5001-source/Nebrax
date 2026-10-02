@@ -104,6 +104,7 @@ use App\Http\Controllers\Api\PosLossPreventionController;
 use App\Http\Controllers\Api\PosInvestigationCaseController;
 use App\Http\Controllers\Api\PosLpDigestController;
 use App\Http\Controllers\Api\PosController;
+use App\Http\Controllers\Api\DeliveryPlatformController;
 use App\Http\Controllers\Api\PosDeviceController;
 use App\Http\Controllers\Api\PosSessionController;
 use App\Http\Controllers\Api\PrintTemplateController;
@@ -811,6 +812,16 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         Route::delete('cash-bank-accounts/{id}', [CashBankAccountController::class, 'destroy'])->middleware($perm('payments.manage'));
         Route::get('cash-bank-transfers', [CashBankAccountController::class, 'transfers'])->middleware($perm('payments.view'));
         Route::post('cash-bank-transfers', [CashBankAccountController::class, 'transfer'])->middleware($perm('payments.manage'));
+
+        // DLV-FOUNDATION-1 — إعداد منصات التوصيل (ملف + نسخ إلحاقية + حلّ تاريخي).
+        // إعداد فقط: لا قيد ولا سند ولا تغيير في POS. القراءة invoices.view، والتعديل company.manage.
+        Route::get('delivery-platforms/catalog', [DeliveryPlatformController::class, 'catalog'])->middleware([$perm('invoices.view'), $app('sales.pos')]);
+        Route::get('delivery-platforms', [DeliveryPlatformController::class, 'index'])->middleware([$perm('invoices.view'), $app('sales.pos')]);
+        Route::get('delivery-platforms/{id}', [DeliveryPlatformController::class, 'show'])->whereUuid('id')->middleware([$perm('invoices.view'), $app('sales.pos')]);
+        Route::get('delivery-platforms/{id}/versions', [DeliveryPlatformController::class, 'versions'])->whereUuid('id')->middleware([$perm('invoices.view'), $app('sales.pos')]);
+        Route::get('delivery-platforms/{id}/resolve', [DeliveryPlatformController::class, 'resolve'])->whereUuid('id')->middleware([$perm('invoices.view'), $app('sales.pos')]);
+        Route::post('delivery-platforms', [DeliveryPlatformController::class, 'store'])->middleware([$perm('company.manage'), $app('sales.pos')]);
+        Route::put('delivery-platforms/{id}', [DeliveryPlatformController::class, 'update'])->whereUuid('id')->middleware([$perm('company.manage'), $app('sales.pos')]);
 
         // طرق الدفع: بيان مالي مشترك يحدد وجهة السند ورسومه.
         Route::get('payment-methods', [PaymentMethodController::class, 'index'])->middleware($perm('payments.view'));
