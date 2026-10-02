@@ -942,16 +942,178 @@ Preferred implementation approach:
 - Claude Code: only if the redesign becomes a broad multi-file architectural refactor.
 - Codex / Work: not required for this design phase.
 
-## 18. Open decisions
 
-- [OPEN] Cart surface: light vs ink/dark.
+## 18. Visual system decisions
+
+### 18.1 Cart surface
+
+**[DECIDED]** The cart uses a **light high-contrast surface by default**, not a permanently dark/ink panel.
+
+Reasoning:
+
+- long cashier sessions benefit from lower contrast fatigue than a permanent dark block beside a light catalog;
+- product/catalog imagery remains visually coherent beside the cart;
+- financial hierarchy can be created through typography, spacing, separators and the total/pay area rather than a full dark panel;
+- dark mode continues to work naturally through theme tokens instead of introducing a second hard-coded theme inside POS.
+
+The cart still receives stronger visual separation than the catalog through:
+
+- elevated or docked surface role;
+- stronger divider;
+- slightly different background token;
+- stronger total area;
+- sticky Pay zone.
+
+A darker **Outcome surface** may still be used locally for the grand-total / payment result area when supported by the Floor tokens, but the whole cart should not become a permanent ink panel.
+
+### 18.2 POS theme behavior
+
+**[DECIDED]** POS follows the user's AWJ light/dark theme, with **Floor-specific tokens and surfaces**.
+
+There is no independent POS theme selector in V3.
+
+This keeps:
+
+- one user preference;
+- predictable dark-mode behavior;
+- simpler accessibility testing;
+- fewer combinations to maintain;
+- consistent brand semantics.
+
+Floor-specific visual identity comes from composition, density, media treatment, touch sizing, outcome emphasis and motion — not from a second theme engine.
+
+A future explicit high-contrast Floor option may be added separately if usability testing proves it useful.
+
+### 18.3 Default product density
+
+**[DECIDED]** **Standard** is the V3 default density.
+
+Why:
+
+- it balances visual recognition and catalog throughput;
+- it works across retail, flowers, cafés and general merchants;
+- it avoids forcing large imagery on supermarkets;
+- it avoids making the initial experience feel like a dense text grid.
+
+Rules:
+
+- merchant/user may switch to Compact or Visual;
+- narrow screens may constrain impossible combinations;
+- the chosen density should persist where practical;
+- POS configuration may later provide a store/device default without changing this V3 visual baseline.
+
+### 18.4 Surface hierarchy
+
+The visual order should be recognizable without relying on color:
+
+1. **Catalog surface** — discovery.
+2. **Cart dock** — current transaction.
+3. **Outcome area** — total / remaining / change.
+4. **Primary action** — Pay / Confirm.
+5. **Transient overlays** — selectors, numeric editor, quick view.
+
+Avoid stacking multiple card borders inside each other.
+
+### 18.5 Color and emphasis
+
+POS may feel more lively than Ledger, but V3 does not introduce a new brand palette.
+
+Use:
+
+- AWJ primary for active/selected/primary actions;
+- semantic colors only for their meanings;
+- neutral surfaces for structure;
+- product imagery for most visual richness.
+
+Do not use category rainbow colors as decoration. Category color may be used only when deliberately configured and readable.
+
+### 18.6 Corners, shadows and depth
+
+V3 may use slightly softer surfaces than dense Ledger screens, but must stay restrained.
+
+Direction:
+
+- product tiles: medium radius;
+- cart/payment dock: clear surface separation;
+- overlays/sheets: stronger radius where appropriate;
+- shadows: subtle and functional;
+- no glassmorphism, glow or gradient-heavy treatment.
+
+### 18.7 Typography
+
+Typography hierarchy should be stronger than Ledger without changing the font family contract.
+
+Priorities:
+
+- product name: clear and short-line readable;
+- product price: immediately scannable;
+- cart line total: stronger than metadata;
+- grand total / amount due: display scale;
+- shortcut/helper text: quiet and secondary.
+
+Money remains aligned and formatted through canonical AWJ financial formatting.
+
+## 19. Implementation slicing
+
+V3 should be implemented as small UI-only slices over the current POS foundation.
+
+Recommended sequence:
+
+### POS-UI-V3-1 — Floor shell + topbar + layout
+- simplified cashier header;
+- 65/35 desktop composition;
+- responsive shell;
+- no business-logic changes.
+
+### POS-UI-V3-2 — Product catalog
+- horizontal category strip;
+- Compact / Standard / Visual density;
+- simplified tile hierarchy;
+- added-to-cart quantity state.
+
+### POS-UI-V3-3 — Cart experience
+- cart surface hierarchy;
+- simplified cart lines;
+- touch quantity controls;
+- selected-line action treatment;
+- sticky totals / Pay zone.
+
+### POS-UI-V3-4 — Payment workspace
+- terminal-like payment composition;
+- large method selection;
+- contextual amount entry/keypad;
+- paid / remaining / change hierarchy;
+- success-state refinement.
+
+### POS-UI-V3-5 — Touch / responsive
+- portrait tablet Products/Cart workspaces;
+- full-height cart sheet/workspace;
+- sticky transaction bar;
+- mobile payment flow;
+- safe-area verification.
+
+### POS-UI-V3-6 — Visual QA and polish
+- Arabic RTL + English LTR;
+- light + dark;
+- Touch / Keyboard-Mouse / Hybrid;
+- 390 / 430 / 768 / 1024 / 1440 viewport evidence;
+- no horizontal overflow;
+- interaction/focus/scanner regression checks;
+- final screenshots and implementation report.
+
+Each slice should preserve existing checkout, session, accounting, RBAC, tenant isolation, scanner and payment contracts.
+
+
+## 20. Open decisions
+
+- [DECIDED] Cart surface is light/high-contrast by default; stronger Outcome treatment is local, not a permanent dark cart panel.
 - [DECIDED] Horizontal scrollable category strip is the V3 default; large catalogs use overflow/search rather than a permanent category rail.
-- [OPEN] Exact default density: Standard is preferred, but should be visually validated.
+- [DECIDED] Standard is the V3 default density; Compact and Visual remain selectable.
 - [DECIDED] Portrait tablet/mobile use Products + Cart workspaces; Cart is a full-height sheet/workspace with a persistent bottom transaction bar from Products.
 - [DECIDED] Payment Workspace V3 uses a dedicated terminal-like workspace with dominant amount due, large payment-method selection, contextual numeric entry, explicit paid/remaining/change states, and one dominant confirm action.
-- [OPEN] Whether POS receives an explicit independent theme preference or follows the user's main theme with Floor-specific surfaces.
+- [DECIDED] POS follows the user's AWJ light/dark theme with Floor-specific tokens; no independent POS theme selector in V3.
 
-## 19. Current design status
+## 21. Current design status
 
 **Approved direction so far:**
 
@@ -967,4 +1129,4 @@ Preferred implementation approach:
 - Payment Workspace V3 is a dedicated terminal-like surface, not a small modal or generic form.
 - Payment keeps split tender, deferred policy, exact amount, change and checkout safety while simplifying the visual hierarchy.
 
-**Next design step:** visual system details — cart surface, POS theme behavior, product-density default validation, and final implementation slicing.
+**Next design step:** prepare the first bounded implementation task for POS-UI-V3-1 (Floor shell + topbar + layout).
