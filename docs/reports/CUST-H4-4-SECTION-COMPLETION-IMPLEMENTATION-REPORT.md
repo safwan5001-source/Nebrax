@@ -3,9 +3,19 @@
 **Horizon:** CUST-H4 — Section Library & Section Quality
 **Slice:** H4-4 (Banner / Benefits / Custom Content / App Promo completion)
 **Base SHA:** `30ead922dbaf40a20bd7b10ac839876310e0de18` — `feat(store): use real catalog data in H4 Canvas (#1167)` (verified via `git fetch origin main && git rev-parse origin/main` at task start — confirmed this is `origin/main`'s own HEAD and the merged H4-3 PR, not assumed from the task brief)
-**Head SHA:** `86d2edacaebbfb25e4f61ac2b6c2be4e1ca51993`
+**Head SHA:** `b7aaa80b7dbe4d678a1551a6f7dc222e3351116e` (after the final-review-fixes round below; was `86d2edacaebbfb25e4f61ac2b6c2be4e1ca51993` at initial PR open)
 **Branch:** `feat/cust-h4-4-section-completion` (the task's own suggested name; the environment did not require a different one)
-**PR:** opened against `main`, not merged (see Final Response for the URL)
+**PR:** [safwan5001-source/Nebrax#1172](https://github.com/safwan5001-source/Nebrax/pull/1172), open against `main`, not merged
+
+---
+
+## 0. Final review fixes (this update)
+
+Two P2 review threads and one real, diff-caused Storefront CI failure were raised on PR #1172 after initial open. All three are fixed in this update — see §19 for the full account (root cause, fix, tests, final CI state). Summary:
+
+- **App Promo URL fields now tolerate normal character-by-character typing.** `ExperienceBuilder.updateDraft` normalizes the whole config synchronously on every `onChange`, and the apps normalizer replaces any not-yet-complete URL with `""` — a controlled input bound directly to `config.apps.iosUrl`/`androidUrl` was wiped after the first keystroke. Fixed with a shared `AppUrlField` component (local draft while editing, commits — and only then normalizes — on blur), applied to both the new `AppPromoFields` and the pre-existing `AppsPanel` (which had the identical bug, since both panels edit the same `config.apps` data).
+- **Banner `imageAlt` truncation is now Unicode-code-point-aware in both TypeScript normalizers**, matching the PHP server-authoritative normalizer's `mb_substr` semantics exactly. `.slice(0, 150)` counted UTF-16 code units, silently halving a 150-emoji alt text and risking an unpaired surrogate at the boundary; `truncateToCodePoints()` (`Array.from(value).slice(0, max).join("")`) fixes both twins.
+- **Storefront CI's real failure**: `storefront (lint + typecheck + test)` failed on a genuine Biome lint/format violation introduced by this PR's own new files (an unsorted import, two unwrapped long lines) — not a flake. Fixed with `pnpm check --write`.
 
 ---
 
@@ -288,6 +298,97 @@ New spec: `web/e2e/cust-h4-4-section-completion-visual.spec.ts`, **4/4 passed**.
 ## 17. Explicit H4-5 next step
 
 Unchanged by this slice, per CUST-H4-ARCH-1 §21/§35: **Featured Products** needs (1) a real multi-select product picker built on the already-shipped `commerce/workspace/storefronts/{id}/products` data layer (`workspace-products.ts`), replacing the current raw product-ID text input, and (2) a batched `ids[]` filter on `StorefrontProductController::index` plus a `fetchProductsByIds()` client helper, replacing `FeaturedShelf.tsx`'s current N unbatched per-product fetches with one batched read. Neither was touched by this slice.
+
+---
+
+## 19. Final review fixes — full account
+
+### 19.1 App Promo URL fields — preserve character-by-character typing
+
+**Root cause**, confirmed by reading the exact code path before changing anything: `ControlPanels`'s `patch()` calls the `onChange` prop, which in `ExperienceBuilder.tsx` is wired to `updateDraft()` (`ExperienceBuilder.tsx:1073-1075`) — `updateDraft` calls `normalizePresentationConfig(next)` **synchronously on every single call**, with no debounce. `config.apps.iosUrl`/`androidUrl` were plain controlled `<input>`s writing straight into `config.apps` on every keystroke (`AppPromoFields`, and identically the pre-existing `AppsPanel`). The apps branch of every normalizer (`isSafeAppStoreUrl(iosUrl) ? sanitizeExternalUrl(iosUrl) : ""`) requires a **complete**, already-allow-listed URL — typing `h`, `ht`, `htt`, ... normalizes each partial string to `""`, and since the input is controlled, it visibly clears after the very first character. This is not a hypothetical: `AppsPanel`'s pre-existing, identical fields had the exact same bug — I had copied its pattern verbatim into my new `AppPromoFields` without noticing it, confirmed by checking `AppsPanel`'s source directly after the review flagged line `ControlPanels.tsx:1915` (my new file's copy of the same pattern).
+
+**Fix**: a new shared `AppUrlField` component (`ControlPanels.tsx`) keeps a local `draft` string state while the input has focus, and only calls `onCommit(draft)` — which goes through the exact same `patch()`/`normalizePresentationConfig()` path every other field already uses — **on blur**. No second persistence model: the committed value is still validated/sanitized by the single existing normalizer authority, nothing is cached or duplicated elsewhere. Applied to **both** `AppPromoFields` (new, this slice) and `AppsPanel` (pre-existing) since they edit the identical `config.apps` fields — fixing one and not the other would leave the same stored value behaving inconsistently depending on which panel the merchant happened to use, which the task explicitly warned against ("existing AppsPanel behavior must remain consistent").
+
+One subtlety caught only by writing the tests: a naive `useEffect(() => setDraft(value), [value])` resync is insufficient — if a merchant types an invalid URL while the field was already empty, the normalizer correctly rejects it back to `""`, but `""` is the *same* value the prop already held, so a dependency-array effect keyed only on `value` never re-fires, leaving the input visibly showing the rejected text while the real config is already correctly empty. Fixed by resyncing whenever editing just stopped (an `isEditing` flag cleared on blur), not only when the prop value itself differs — see the in-code comment on `AppUrlField` for the full reasoning.
+
+**Files**: `web/src/modules/store-experience-builder/ControlPanels.tsx` (new `AppUrlField`; `AppPromoFields` and `AppsPanel` both updated to use it).
+
+**Tests added** (`web/src/modules/store-experience-builder/__tests__/ControlPanels.h4-4.test.tsx`), using a `StatefulHomepagePanel` test harness that reproduces the real `ExperienceBuilder.updateDraft` pipeline (re-normalizes on every `onChange`) rather than a bare spy, so these prove the actual reported bug is fixed end-to-end:
+- "typing a URL character-by-character does not clear the field"
+- "a valid App Store URL persists once typing is committed (blur)"
+- "a valid Google Play URL persists once typing is committed (blur)"
+- "an invalid/not-allow-listed final URL is rejected and sanitized on commit, same as before this fix"
+- "one-platform-only still works: committing the App Store URL never touches the untouched Google Play field"
+
+Result: 10/10 passed (5 pre-existing + 5 new).
+
+### 19.2 Banner `imageAlt` — Unicode code-point-aware truncation
+
+**Root cause**: both TypeScript normalizers used `asString(source.imageAlt).trim().slice(0, 150)`. `String.prototype.slice` counts **UTF-16 code units**. The PHP server-authoritative normalizer (`StorefrontPresentationNormalizer::normalizeOptionalSectionContent`) uses `mb_substr(..., 0, 150)`, which counts **Unicode code points** (characters). Every astral-plane character (most emoji, among other scripts) is one code point but two UTF-16 units — so `.slice(0, 150)` on 150 emoji kept only ~75, and a cut landing exactly between a surrogate pair's two halves would leave an unpaired/broken surrogate in the stored string.
+
+**Fix**: added `truncateToCodePoints(value, maxLength)` (`Array.from(value).slice(0, maxLength).join("")`) to both TS twins — `Array.from` iterates a string by code point, so slicing the resulting array can never split a surrogate pair, and the count now matches `mb_substr`'s semantics exactly. Only `imageAlt`'s truncation was changed; `title`/`subtitle`/`ctaLabel`'s pre-existing `.slice()` calls were left untouched (out of this fix's scope, unreported by the review, and the task explicitly said not to change the 150-character limit — this fix changes *how* the limit is counted, not the limit itself).
+
+**Files**: `web/src/modules/store-experience-builder/presentation/section-content.ts`, `storefront/src/lib/presentation/section-content.ts`.
+
+**Tests added** (both TS twins' `section-content.h4-4.test.ts`, byte-for-byte identical test bodies):
+- "keeps exactly 150 emoji when exactly at the limit (naive UTF-16 slice would keep only ~half)"
+- "truncates 151 emoji down to exactly 150"
+- "never cuts a mixed BMP + astral string into an unpaired surrogate at the boundary" (constructs the exact adversarial case — 149 ASCII characters + one emoji sitting on the boundary — proves the *old* `.slice()` would have broken it, then proves the fix doesn't)
+- "stays semantically aligned with the PHP server-authoritative normalizer's mb_substr"
+
+**PHP side**: no code change needed — `mb_substr` already counted code points correctly; this was the reference semantics the TS twins needed to match. Added one documenting test, `banner_image_alt_truncates_by_unicode_code_point_not_byte_or_utf16_unit` (`tests/Feature/StorefrontPresentationNormalizerTest.php`), asserting 151 emoji truncate to exactly 150 — locks in the semantics so a future PHP change can't silently drift from the now-matching TS twins.
+
+Result: web 13/13 passed (9 pre-existing + 4 new); storefront 13/13 passed (9 pre-existing + 4 new); PHP `StorefrontPresentationNormalizerTest` 38/38 passed (37 pre-existing + 1 new).
+
+### 19.3 Storefront CI failure — root cause, not a flake
+
+**Investigated directly**: pulled the `storefront (lint + typecheck + test)` job log (job id `111051193518`, run `37071324281`) rather than assuming the previously-documented local-sandbox timeout class of issue. The job failed in **23 seconds**, at the `pnpm check` (Biome) step — far too fast to be the test-runner timeout pattern seen before. The log showed two genuine, PR-caused issues:
+1. `src/lib/presentation/__tests__/section-content.h4-4.test.ts:8` — `assist/source/organizeImports`: the new test file's import block (`MAX_BANNER_IMAGE_ALT_LENGTH, emptyBannerContent, normalizeOptionalSectionContent`) was not in Biome's required sort order.
+2. `src/lib/presentation/section-content.ts` — `format`: the `imageAlt` line I added exceeded Biome's configured line-length and needed to wrap.
+
+This is **this PR's own new code failing this PR's own lint gate** — not a pre-existing or environmental flake, and not related to the previously-documented `php artisan test` local-scaffold gaps (a completely different job). Per the task's own instruction ("Do not assume it is the previously observed local timeout. Inspect the actual failing job/log first. Fix only if related to this PR"), this was fixed directly: `pnpm check --write` (Biome's own safe auto-fix), which reorganized the import and rewrapped the one line. Re-ran `pnpm check` clean (0 errors, 466 files) and re-ran the affected test file (13/13 passed) to confirm the auto-format didn't change behavior.
+
+**Files**: `storefront/src/lib/presentation/section-content.ts`, `storefront/src/lib/presentation/__tests__/section-content.h4-4.test.ts` (formatting only — no logic change beyond what §19.2 already describes).
+
+### 19.4 Visual QA re-run (behavior materially changed)
+
+The blur-commit fix (§19.1) changes *when* an App Promo URL reaches the Canvas — previously instant, now on blur. The existing `cust-h4-4-section-completion-visual.spec.ts` filled App Store/Google Play URL fields as the *last* interaction before taking screenshots or asserting on Canvas image counts in three places, with no explicit blur. Re-ran the spec after the fix to check: **it would have broken** — the AR desktop test's `toHaveCount(2)` assertion on Canvas badge images depends on committed config, not the in-field draft.
+
+Fixed the spec itself (not a workaround — this matches real merchant behavior, who eventually click away from a field): added explicit `.blur()` calls after the last URL field in each of the three sequences (AR mobile, AR desktop, EN desktop), and **strengthened** the EN desktop test with the same Canvas image-count assertion the AR desktop test already had (previously it only checked the banner image, not the App Promo badge) — this directly proves the blur-commit fix reaches the Canvas, not just the input element.
+
+Re-ran the full spec: **4/4 passed.** Screenshots re-inspected (`ar-desktop-sections.png`, `en-desktop-sections.png`) — both show the real "GET IT ON Google Play" / both-badge content correctly rendered after the blur-commit fix, identical in substance to the pre-fix screenshots (confirming the fix changed *only* the commit timing, not the final rendered result for a merchant who completes their edit).
+
+### 19.5 Final validation — full results
+
+```
+Targeted:
+  web:         ControlPanels.h4-4.test.tsx         10/10 passed (5 new)
+  web:         section-content.h4-4.test.ts        13/13 passed (4 new)
+  storefront:  section-content.h4-4.test.ts        13/13 passed (4 new)
+  php:         StorefrontPresentationNormalizerTest 38/38 passed (1 new)
+
+Broader:
+  web:         npx vitest run (full)        355 files / 2772 tests passed, 0 failed
+  storefront:  npx vitest run (full)        112 files / 778 tests passed, 0 failed
+               (the previously-reported AwjCheckoutFlow timeout did not reproduce this run)
+  storefront:  pnpm check (biome)           Checked 466 files, 0 errors
+  web:         npx tsc --noEmit             0 errors in any changed file (same pre-existing
+                                             unrelated baseline as before)
+  storefront:  npx tsc --noEmit             0 errors
+  web:         npm run build                ✓ compiled, full route table, .next/BUILD_ID present
+  storefront:  npm run build                ✓ compiled, 75/75 static pages, .next/BUILD_ID present
+  web:         Playwright visual spec        4/4 passed (re-run after the blur-commit behavior change)
+```
+
+### 19.6 Review threads
+
+Resolved on PR #1172 after the fixes above were pushed and the push's own CI confirmed green (see §19.7):
+1. "Preserve partial app URLs while merchants type" (`ControlPanels.tsx:1915`) — resolved.
+2. "Truncate alt text consistently by Unicode code points" (`section-content.ts:159`) — resolved.
+
+### 19.7 Final CI state
+
+Confirmed directly via the GitHub API on head `b7aaa80b7dbe4d678a1551a6f7dc222e3351116e` — see the Final Response for the exact check-run results.
 
 ---
 
