@@ -83,6 +83,7 @@ test.describe('Ink-Dark = Default-Dark', () => {
   test('dark mode renders the same shell background regardless of the Ink/Default preference', async ({ page }) => {
     await enterDemo(page, { 'awj:theme': 'ink', theme: 'dark' });
     await go(page, '/dashboard', true);
+    await expect(page.locator('html')).toHaveAttribute('data-awj-ui', '3');
 
     const shellBg = async () => page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--awj-shell-bg').trim());
     const inkBgResolved = await shellBg();
@@ -104,6 +105,7 @@ test.describe('Ink-Dark = Default-Dark', () => {
     // different shell colors (the whole point of the Ink theme existing).
     await enterDemo(page, { theme: 'light' });
     await go(page, '/dashboard', true);
+    await expect(page.locator('html')).toHaveAttribute('data-awj-ui', '3');
     const shellBg = () => page.evaluate(() =>
       getComputedStyle(document.documentElement).getPropertyValue('--awj-shell-bg').trim()
     );

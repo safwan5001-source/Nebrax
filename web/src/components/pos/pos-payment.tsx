@@ -156,9 +156,9 @@ export function PosPayment({
 
       <div className="grid min-h-0 flex-1 grid-cols-1 overflow-hidden lg:grid-cols-[340px_1fr]">
         <aside className="hidden flex-col border-b border-border bg-surface lg:flex lg:border-b-0 lg:border-e lg:overflow-y-auto">
-          <div className="border-b border-border p-4">
+          <div data-awj-floor-outcome="" data-awj-surface="outcome" className="border-b border-border p-4">
             <div className="mb-1.5 text-xs font-semibold text-muted">{t('invoice_total')}</div>
-            <div className="num text-3xl font-bold text-text">
+            <div data-awj-floor-due="" className="num text-3xl font-bold text-text">
               {formatRiyal(totalMinor / 100)}
             </div>
             <div className="mt-3 flex items-center gap-2 rounded-md border border-border bg-background px-3 py-2 text-xs font-semibold">
@@ -323,7 +323,7 @@ export function PosPayment({
               <div className="mb-1 text-[10px] font-semibold text-muted sm:mb-1.5 sm:text-[11px]">{t('remaining')}</div>
               <div className={'num truncate text-sm font-bold sm:text-lg ' + (remainingMinor > 0 ? 'text-negative' : 'text-text')} title={formatRiyal(remainingMinor / 100)}>{formatRiyal(remainingMinor / 100)}</div>
             </div>
-            <div className="min-w-0 rounded-md border border-border bg-surface p-2.5 sm:p-3" data-testid="pos-payment-change">
+            <div data-awj-floor-outcome="" data-awj-surface="outcome" data-awj-floor-change="" className="min-w-0 rounded-md border border-border bg-surface p-2.5 sm:p-3" data-testid="pos-payment-change">
               <div className="mb-1 text-[10px] font-semibold text-muted sm:mb-1.5 sm:text-[11px]">{t('change')}</div>
               <div className={'num truncate text-sm font-bold sm:text-lg ' + (changeMinor > 0 ? 'text-positive' : 'text-text')} title={formatRiyal(changeMinor / 100)}>{formatRiyal(changeMinor / 100)}</div>
             </div>

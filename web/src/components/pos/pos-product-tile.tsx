@@ -57,10 +57,11 @@ export function PosProductTile({
     && typeof product.reorder_level === 'number' && product.reorder_level > 0
     && product.quantity_on_hand <= product.reorder_level;
   return (
-    <div className="relative min-w-0">
+    <div data-awj-floor-tile-wrap="" className="relative min-w-0">
       <button
         type="button"
         ref={buttonRef}
+        data-awj-floor-tile=""
         aria-selected={selected}
         tabIndex={selected ? 0 : -1}
         onClick={onAdd}
@@ -74,7 +75,7 @@ export function PosProductTile({
         )}
       >
         {showImage && (
-          <div className={'w-full overflow-hidden border-b border-border bg-background ' + (product.pos_image?.download_url ? 'aspect-[4/3]' : 'h-12')}>
+          <div data-awj-media={product.pos_image?.download_url ? 'image' : 'placeholder'} className={'w-full overflow-hidden border-b border-border bg-background ' + (product.pos_image?.download_url ? 'aspect-[4/3]' : 'h-12')}>
             <PosProductImage path={product.pos_image?.download_url} alt={product.name} />
           </div>
         )}

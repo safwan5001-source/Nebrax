@@ -70,6 +70,9 @@ html[data-awj-ui="3"] {
   --awj-outcome-decimal: #A9B8D3;
   --awj-outcome-rule: #7FA8FF;
   --awj-outcome-positive: #7FD1A0;
+  --awj-outcome-action: #7FA8FF;
+  --awj-outcome-action-hover: #C2D2F2;
+  --awj-outcome-action-fg: #0E1A31;
   --awj-grid-row-1l: 36px;
   --awj-grid-row-2l: 44px;
   --awj-grid-head-h: 34px;
@@ -244,6 +247,82 @@ html[data-awj-ui="3"].dark {
   --awj-shell-field-line: #5A74A8;
   --awj-shell-focus-ring: #7FA8FF;
   --awj-shell-brandmark-bg: #2D5BDB;
+}
+
+html[data-awj-ui="3"] [data-posture="floor"] {
+  --awj-touch-min: 44px;
+  --awj-control-h: 48px;
+  --awj-action-h: 56px;
+  --awj-chrome-h: 56px;
+  --awj-row-1l: 48px;
+  --awj-row-2l: 56px;
+  --awj-display-money-fs: 36px;
+  --awj-motion-scale: 0.8;
+}
+
+html[data-awj-ui="3"] [data-posture="studio"] {
+  --awj-touch-min: 32px;
+  --awj-control-h: 32px;
+  --awj-chrome-h: 48px;
+  --awj-row-1l: 32px;
+  --awj-row-2l: 36px;
+  --awj-selection-overlay: #4F8CFF;
+  --awj-editor-chrome: #1B1E24;
+  --awj-editor-chrome-raised: #242830;
+  --awj-editor-chrome-fg: #E8EAEE;
+  --awj-editor-chrome-fg-muted: #A7ADB8;
+  --awj-editor-chrome-line: #323843;
+  --awj-editor-chrome-hover: #2C313A;
+  --awj-editor-chrome-active: #343A45;
+  --awj-editor-chrome-control-line: #6F7886;
+  --awj-editor-workspace: #2A2F37;
+  --awj-editor-focus-ring: #7FA8FF;
+  --awj-editor-action: #4F8CFF;
+  --awj-editor-action-fg: #0E1A31;
+  --awj-editor-positive: #7FD1A0;
+  --awj-editor-positive-bg: #17301F;
+  --awj-editor-warning: #F2C46D;
+  --awj-editor-warning-bg: #3A2E12;
+}
+
+html[data-awj-ui="3"] [data-posture="studio"] .awj-store-preview {
+  --awj-editor-chrome: initial;
+  --awj-editor-chrome-raised: initial;
+  --awj-editor-chrome-fg: initial;
+  --awj-editor-chrome-fg-muted: initial;
+  --awj-editor-chrome-line: initial;
+  --awj-editor-chrome-hover: initial;
+  --awj-editor-chrome-active: initial;
+  --awj-editor-chrome-control-line: initial;
+  --awj-editor-workspace: initial;
+  --awj-editor-focus-ring: initial;
+  --awj-editor-action: initial;
+  --awj-editor-action-fg: initial;
+  --awj-editor-positive: initial;
+  --awj-editor-positive-bg: initial;
+  --awj-editor-warning: initial;
+  --awj-editor-warning-bg: initial;
+}
+
+@media (max-height: 740px) {
+  html[data-awj-ui="3"] [data-posture="floor"] {
+      --awj-touch-min: 44px;
+      --awj-control-h: 44px;
+      --awj-action-h: 48px;
+      --awj-chrome-h: 48px;
+      --awj-row-1l: 44px;
+      --awj-row-2l: 48px;
+      --awj-display-money-fs: 28px;
+      --awj-motion-scale: 0.8;
+  }
+  html[data-awj-ui="3"] [data-posture="studio"] {
+      --awj-touch-min: 32px;
+      --awj-control-h: 30px;
+      --awj-chrome-h: 44px;
+      --awj-row-1l: 30px;
+      --awj-row-2l: 34px;
+      --awj-selection-overlay: #4F8CFF;
+  }
 }
 /* AWJ-TOKENS:GENERATED:END */
 
@@ -1100,4 +1179,364 @@ html[data-awj-ui="3"] [data-awj-card-title] {
     break-inside: avoid;
     page-break-inside: avoid;
   }
+}
+
+/* ------------------------------------------------------------------------------
+ * H4 — Platform postures (WORKSPACE_POSTURES.md). Everything below is gated and keyed on
+ * `data-posture` / inert markers; components carry no `if (posture)`. Postures change
+ * variables, surfaces and composition — never meaning, state colors or the money rules.
+ * ---------------------------------------------------------------------------- */
+
+/* Commerce Admin (Ledger variant): its own shell adopts the shared shell language by
+   redefining the legacy variables INSIDE the shell regions only, so the existing
+   text-text / text-muted / hover:bg-primary-soft utilities follow Default · Ink · Dark. */
+html[data-awj-ui="3"] [data-awj-shell-vars] {
+  --text: var(--awj-shell-fg);
+  --muted: var(--awj-shell-fg-muted);
+  --border: var(--awj-shell-line);
+  --primary-soft: var(--awj-shell-hover);
+  --primary: var(--awj-shell-apex);
+  --surface: var(--awj-shell-bg);
+}
+html[data-awj-ui="3"] [data-posture="ledger"] > [data-awj-shell="topbar"] {
+  box-shadow: var(--awj-shell-cast);
+}
+
+/* ===== FLOOR (POS) ===== */
+html[data-awj-ui="3"] [data-posture="floor"] {
+  background-color: var(--awj-surface-desk);
+}
+/* Cart is the transaction anchor: 5:7 instead of 1:2 (the owner prefers a wide cart), on
+   tablet-landscape and up. Category rail keeps its fixed width. */
+@media (min-width: 1024px) {
+  html[data-awj-ui="3"] [data-awj-floor-grid] {
+    grid-template-columns: minmax(360px, 5fr) minmax(0, 7fr) 112px;
+  }
+}
+@media (min-width: 1280px) {
+  html[data-awj-ui="3"] [data-awj-floor-grid] {
+    grid-template-columns: minmax(400px, 5fr) minmax(0, 7fr) 128px;
+  }
+}
+html[data-awj-ui="3"] [data-awj-floor-cart] {
+  background-color: var(--awj-surface-paper);
+  border-color: var(--awj-border-strong);
+}
+html[data-awj-ui="3"] [data-awj-floor-cats] {
+  background-color: var(--awj-surface-band);
+  border-color: var(--awj-border-hairline);
+}
+
+/* Cart lines: selected = tonal fill + edge ring + weight (never color alone). */
+html[data-awj-ui="3"] [data-awj-floor-line] {
+  min-height: var(--awj-row-2l, 56px);
+  border-color: var(--awj-border-hairline);
+}
+html[data-awj-ui="3"] [data-awj-floor-line][aria-selected="true"] {
+  background-color: var(--awj-state-selected);
+  box-shadow: inset 0 0 0 1px var(--awj-state-selected-edge);
+}
+html[data-awj-ui="3"] [data-awj-floor-line][aria-selected="true"] .font-semibold {
+  font-weight: 700;
+}
+
+/* Product tile: text is the identity. Selected (keyboard) = focus ring language; the
+   image-less strip keeps only the two 44px actions, with no placeholder glyph noise. */
+html[data-awj-ui="3"] [data-awj-floor-tile] {
+  background-color: var(--awj-surface-paper);
+  border-color: var(--awj-border-hairline);
+  border-radius: var(--awj-radius-surface);
+  min-height: 112px;
+}
+html[data-awj-ui="3"] [data-awj-floor-tile]:active {
+  background-color: var(--awj-state-selected);
+}
+html[data-awj-ui="3"] [data-awj-floor-tile][aria-selected="true"] {
+  border-color: var(--awj-state-focus-ring);
+  box-shadow: 0 0 0 2px var(--awj-state-focus-ring);
+}
+html[data-awj-ui="3"] [data-awj-floor-tile] [data-awj-media="placeholder"] {
+  height: var(--awj-touch-min, 44px);
+  border-bottom: 0;
+  background: transparent;
+}
+html[data-awj-ui="3"] [data-awj-floor-tile] [data-awj-media="placeholder"] > * {
+  visibility: hidden;
+}
+html[data-awj-ui="3"] [data-awj-floor-tile-wrap]:has([data-awj-media="placeholder"]) > button:not([data-awj-floor-tile]) {
+  top: 0;
+  inset-inline: 0 auto;
+  border-color: transparent;
+  background: transparent;
+}
+html[data-awj-ui="3"] [data-awj-floor-tile-wrap]:has([data-awj-media="placeholder"]) > button:not([data-awj-floor-tile]):last-of-type {
+  inset-inline: auto 0;
+}
+
+/* The Outcome Surface: totals + pay are ONE ink block (SIGNATURE_LANGUAGE.md §2). Its
+   legacy variables are redefined from the fixed outcome tokens so every utility inside
+   (text-text, text-muted, border-border, bg-background) renders correctly on ink in both
+   modes, and the pay action uses the outcome action pair (not the mode-dependent primary). */
+html[data-awj-ui="3"] [data-awj-floor-outcome] {
+  display: block;
+  flex-shrink: 0;
+  background-color: var(--awj-surface-outcome);
+  --text: var(--awj-outcome-fg);
+  --muted: var(--awj-outcome-label);
+  --border: var(--awj-border-ink, #22345a);
+  --background: transparent;
+  --positive: var(--awj-outcome-positive);
+  color: var(--awj-outcome-fg);
+}
+html[data-awj-ui="3"] [data-awj-floor-outcome] [data-testid="pos-cart-totals"] {
+  background: transparent;
+  border-color: transparent;
+  padding-block-end: 4px;
+}
+html[data-awj-ui="3"] [data-awj-floor-total] {
+  border-top: 0;
+  padding-top: 4px;
+  align-items: flex-end;
+}
+html[data-awj-ui="3"] [data-awj-floor-total] > span:first-child {
+  color: var(--awj-outcome-label);
+  font-size: 13px;
+  font-weight: 500;
+}
+/* Display money (token-sized) with the Ledger Rule under the final number only. */
+html[data-awj-ui="3"] [data-awj-floor-total] > .num {
+  font-size: var(--awj-display-money-fs, 36px);
+  line-height: 1.1;
+  font-weight: 500;
+  color: var(--awj-outcome-fg);
+  border-bottom: var(--awj-rule-ledger-on-outcome);
+  padding-bottom: 2px;
+}
+html[data-awj-ui="3"] [data-awj-floor-outcome] [data-testid="pos-cart-pay"] {
+  min-height: var(--awj-action-h, 56px);
+  border-radius: var(--awj-radius-control);
+  background-color: var(--awj-outcome-action);
+  color: var(--awj-outcome-action-fg);
+}
+html[data-awj-ui="3"] [data-awj-floor-outcome] [data-testid="pos-cart-pay"]:hover:not(:disabled) {
+  background-color: var(--awj-outcome-action-hover);
+}
+html[data-awj-ui="3"] [data-awj-floor-outcome] [data-testid="pos-cart-pay"]:disabled {
+  opacity: 1;
+  background-color: transparent;
+  color: var(--awj-outcome-label);
+  box-shadow: inset 0 0 0 1px var(--awj-outcome-label);
+}
+
+/* Payment screen (Floor): the amount due and the change owed are the two Outcome Surfaces
+   of this independent region (SIGNATURE_LANGUAGE.md §2 — the only sanctioned double). The
+   shared outcome rule above supplies the ink surface + variable redefinition; the shell
+   `display: contents` default is overridden because these wrappers are real boxes. */
+html[data-awj-ui="3"] [data-testid="pos-payment-screen"] [data-awj-floor-outcome] {
+  border-radius: 0;
+}
+html[data-awj-ui="3"] [data-awj-floor-due] {
+  font-size: var(--awj-display-money-fs, 36px);
+  line-height: 1.1;
+  font-weight: 500;
+  color: var(--awj-outcome-fg);
+  display: inline-block;
+  border-bottom: var(--awj-rule-ledger-on-outcome);
+  padding-bottom: 2px;
+}
+html[data-awj-ui="3"] [data-testid="pos-payment-screen"] [data-awj-floor-change] {
+  border-radius: var(--awj-radius-surface);
+  border-color: var(--awj-surface-outcome);
+}
+html[data-awj-ui="3"] [data-awj-floor-change] .num {
+  color: var(--awj-outcome-fg);
+  font-size: calc(var(--awj-display-money-fs, 36px) * 0.6);
+}
+html[data-awj-ui="3"] [data-awj-floor-change] .text-positive {
+  color: var(--awj-outcome-positive);
+}
+html[data-awj-ui="3"] [data-testid="pos-confirm-payment"] {
+  min-height: var(--awj-action-h, 56px);
+  border-radius: var(--awj-radius-control);
+}
+
+/* Floor cart: the list is the anchor, so the supporting strips tighten (touch targets stay
+   at the posture minimum — only padding and gaps shrink). */
+html[data-awj-ui="3"] [data-awj-floor-cart] [role="group"] {
+  padding: 8px 12px;
+}
+html[data-awj-ui="3"] [data-awj-floor-actions] {
+  padding: 8px 12px;
+}
+html[data-awj-ui="3"] [data-awj-floor-actions] button {
+  min-height: var(--awj-touch-min, 44px);
+}
+html[data-awj-ui="3"] [data-awj-floor-outcome] [data-testid="pos-cart-totals"] {
+  padding: 8px 12px 0;
+}
+html[data-awj-ui="3"] [data-awj-floor-outcome] [data-testid="pos-cart-totals"] > div + div {
+  margin-top: 0;
+}
+html[data-awj-ui="3"] [data-awj-floor-outcome] > div:last-child {
+  padding: 8px 12px 12px;
+}
+
+/* ===== STUDIO (Builder) =====
+   Graphite chrome (--awj-editor-*, mode-fixed) frames the Canvas; the Inspector stays on
+   Paper and follows Light/Dark like every other form surface. Merchant tokens (--store-*)
+   live only inside .awj-store-preview and are never read here; the chrome never reads them.
+   Existing structure is targeted through the builder's own data attributes — no JSX forks. */
+html[data-awj-ui="3"] [data-posture="studio"] [data-experience-builder] {
+  background-color: var(--awj-editor-workspace);
+  color: var(--awj-editor-chrome-fg);
+  /* The chrome regions below read the shared legacy utilities (text-text, text-muted,
+     border-border, hover:bg-primary-soft, bg-primary + text-primary-foreground), so those
+     variables are redefined from the editor palette inside the chrome regions only. */
+}
+html[data-awj-ui="3"] [data-posture="studio"] [data-experience-builder] > header,
+html[data-awj-ui="3"] [data-posture="studio"] [data-experience-builder] > div > nav,
+html[data-awj-ui="3"] [data-posture="studio"] [data-builder-preview] > div:first-child {
+  --text: var(--awj-editor-chrome-fg);
+  --muted: var(--awj-editor-chrome-fg-muted);
+  --border: var(--awj-editor-chrome-line);
+  --surface: var(--awj-editor-chrome-raised);
+  --background: var(--awj-editor-chrome);
+  --primary: var(--awj-editor-action);
+  --primary-foreground: var(--awj-editor-action-fg);
+  --primary-soft: var(--awj-editor-chrome-hover);
+  --positive: var(--awj-editor-positive);
+  --warning: var(--awj-editor-warning);
+  --positive-soft: var(--awj-editor-positive-bg);
+  --warning-soft: var(--awj-editor-warning-bg);
+  color: var(--awj-editor-chrome-fg);
+}
+html[data-awj-ui="3"] [data-posture="studio"] [data-experience-builder] > header {
+  background-color: var(--awj-editor-chrome);
+  border-color: var(--awj-editor-chrome-line);
+  box-shadow: none;
+}
+html[data-awj-ui="3"] [data-posture="studio"] [data-experience-builder] > header :is(button, a):focus-visible,
+html[data-awj-ui="3"] [data-posture="studio"] [data-experience-builder] > div > nav :is(button, a):focus-visible,
+html[data-awj-ui="3"] [data-posture="studio"] [data-builder-preview] :is(button, a):focus-visible {
+  outline-color: var(--awj-editor-focus-ring);
+}
+/* Control boundaries on graphite must stay ≥ 3:1 (WCAG 1.4.11). */
+html[data-awj-ui="3"] [data-posture="studio"] [data-experience-builder] > header :is(button, a, select, input):not([data-publish]),
+html[data-awj-ui="3"] [data-posture="studio"] [data-experience-builder] > header [data-device-option] {
+  border-color: var(--awj-editor-chrome-control-line);
+}
+html[data-awj-ui="3"] [data-posture="studio"] [data-experience-builder] > header .rounded-md.border.p-1 {
+  border-color: var(--awj-editor-chrome-control-line);
+}
+html[data-awj-ui="3"] [data-posture="studio"] [data-experience-builder] > header [data-publish] {
+  background-color: var(--awj-editor-action);
+  color: var(--awj-editor-action-fg);
+  box-shadow: none;
+}
+
+/* Left/right rail: graphite navigator; the current panel gets the editor Apex (chrome color,
+   never the merchant's), a tonal fill and weight — not color alone. */
+html[data-awj-ui="3"] [data-posture="studio"] [data-experience-builder] > div > nav {
+  background-color: var(--awj-editor-chrome);
+  border-color: var(--awj-editor-chrome-line);
+}
+html[data-awj-ui="3"] [data-posture="studio"] [data-experience-builder] > div > nav :is(.border-neutral-200, .border-b, .border-t) {
+  border-color: var(--awj-editor-chrome-line);
+}
+html[data-awj-ui="3"] [data-posture="studio"] [data-experience-builder] > div > nav .text-neutral-600 {
+  color: var(--awj-editor-chrome-fg-muted);
+}
+html[data-awj-ui="3"] [data-posture="studio"] [data-experience-builder] > div > nav .hover\:bg-neutral-50:hover {
+  background-color: var(--awj-editor-chrome-hover);
+}
+html[data-awj-ui="3"] [data-posture="studio"] [data-experience-builder] > div > nav .hover\:text-neutral-900:hover {
+  color: var(--awj-editor-chrome-fg);
+}
+html[data-awj-ui="3"] [data-posture="studio"] [data-experience-builder] > div > nav [aria-current="page"] {
+  position: relative;
+  background-color: var(--awj-editor-chrome-active);
+  color: var(--awj-editor-chrome-fg);
+  font-weight: 600;
+}
+html[data-awj-ui="3"] [data-posture="studio"] [data-experience-builder] > div > nav [aria-current="page"]::before {
+  content: '';
+  position: absolute;
+  inset-block: 7px;
+  inset-inline-start: 0;
+  width: var(--awj-apex-rail);
+  background: var(--awj-editor-focus-ring);
+  border-start-end-radius: 2px;
+  border-end-end-radius: 2px;
+}
+@media (forced-colors: active) {
+  html[data-awj-ui="3"] [data-posture="studio"] [data-experience-builder] > div > nav [aria-current="page"] {
+    border-inline-start: 3px solid Highlight;
+  }
+}
+
+/* Inspector: Paper surface following the user's mode through the shared tokens. The neutral
+   utilities the builder uses are mapped onto the same roles (Light looks as today). */
+html[data-awj-ui="3"] [data-posture="studio"] [data-builder-controls] {
+  --text: var(--awj-text-primary);
+  --muted: var(--awj-text-secondary);
+  --border: var(--awj-border-hairline);
+  --surface: var(--awj-surface-paper);
+  --background: var(--awj-surface-sunken);
+  --primary-soft: var(--awj-state-selected);
+  background-color: var(--awj-surface-paper);
+  border-color: var(--awj-border-strong);
+  color: var(--awj-text-primary);
+}
+html[data-awj-ui="3"] [data-posture="studio"] [data-builder-controls] .bg-white {
+  background-color: var(--awj-surface-paper);
+}
+html[data-awj-ui="3"] [data-posture="studio"] [data-builder-controls] :is(.border-neutral-200, .border-neutral-300) {
+  border-color: var(--awj-border-hairline);
+}
+html[data-awj-ui="3"] [data-posture="studio"] [data-builder-controls] :is(.text-neutral-500, .text-neutral-600, .text-neutral-700) {
+  color: var(--awj-text-secondary);
+}
+html[data-awj-ui="3"] [data-posture="studio"] [data-builder-controls] :is(.text-neutral-800, .text-neutral-900) {
+  color: var(--awj-text-primary);
+}
+html[data-awj-ui="3"] [data-posture="studio"] [data-builder-controls] :is(input, select, textarea) {
+  background-color: var(--awj-surface-paper);
+  border-color: var(--awj-border-control);
+  color: var(--awj-text-primary);
+}
+
+/* Canvas: the workspace floor is graphite, the device frame is the only bright object, so the
+   Canvas dominates without competing chrome. The frame is neutral (merchant colors stay inside). */
+html[data-awj-ui="3"] [data-posture="studio"] [data-builder-preview] > div:first-child {
+  background-color: var(--awj-editor-chrome-raised);
+  border-color: var(--awj-editor-chrome-line);
+  color: var(--awj-editor-chrome-fg-muted);
+  --editor-muted: var(--awj-editor-chrome-fg-muted);
+}
+html[data-awj-ui="3"] [data-posture="studio"] [data-builder-preview] > div:first-child :is(.text-neutral-500, .text-neutral-700) {
+  color: var(--awj-editor-chrome-fg-muted);
+}
+html[data-awj-ui="3"] [data-posture="studio"] [data-builder-preview] > div:first-child .font-medium {
+  color: var(--awj-editor-chrome-fg);
+}
+html[data-awj-ui="3"] [data-posture="studio"] [data-builder-preview] [data-customizer-scroll] {
+  background-color: var(--awj-editor-workspace);
+}
+html[data-awj-ui="3"] [data-posture="studio"] [data-preview-frame] {
+  border-color: var(--awj-editor-chrome-line);
+  border-radius: var(--awj-radius-surface);
+  box-shadow: var(--awj-elevation-3);
+}
+
+/* Selection on the Canvas is EDITOR chrome drawn over merchant content: chrome color, 2px,
+   2px offset (WORKSPACE_POSTURES.md §7.3); the merchant's --store-primary is not used. */
+html[data-awj-ui="3"] [data-posture="studio"] [data-preview-frame] .awj-preview-section-selected,
+html[data-awj-ui="3"] [data-posture="studio"] [data-preview-frame] .awj-preview-section:focus-visible {
+  outline: 2px solid var(--awj-selection-overlay);
+  outline-offset: 2px;
+}
+html[data-awj-ui="3"] [data-posture="studio"] [data-builder-preview] > div:first-child :is(.bg-white, [data-page-navigator-mobile]) {
+  background-color: var(--awj-editor-chrome-hover);
+  border-color: var(--awj-editor-chrome-control-line);
+  color: var(--awj-editor-chrome-fg);
 }

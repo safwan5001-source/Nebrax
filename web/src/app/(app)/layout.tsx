@@ -53,7 +53,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-background">
+    <div data-posture="ledger" className="flex min-h-screen flex-col bg-background">
       <AuthenticatedCompanyBrowserIdentity />
       <DemoBanner />
       <div className="flex min-h-0 flex-1">

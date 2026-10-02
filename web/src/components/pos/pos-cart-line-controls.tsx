@@ -33,6 +33,7 @@ export function PosCartLineFrame({
     <div
       ref={register}
       role="option"
+      data-awj-floor-line=""
       aria-selected={selected}
       tabIndex={selected ? 0 : -1}
       onClick={onSelect}

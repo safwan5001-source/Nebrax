@@ -27,6 +27,20 @@ describe('PosCartLineFrame', () => {
     fireEvent.click(screen.getByRole('option'));
     expect(onSelect).toHaveBeenCalledOnce();
   });
+
+  // Floor posture (H4): selection is exposed to assistive tech and to the gated stylesheet
+  // through aria-selected + an inert marker — never through color alone.
+  it('يعلن التحديد عبر aria-selected ويحمل علامة Floor الخاملة', () => {
+    render(
+      <PosCartLineFrame selected scanned={false} onSelect={vi.fn()}>
+        <span>Line A</span>
+      </PosCartLineFrame>,
+    );
+    const option = screen.getByRole('option');
+    expect(option.getAttribute('aria-selected')).toBe('true');
+    expect(option.hasAttribute('data-awj-floor-line')).toBe(true);
+    expect(option.getAttribute('tabindex')).toBe('0');
+  });
 });
 
 describe('PosCartRemoveButton', () => {
