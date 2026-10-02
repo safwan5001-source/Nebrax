@@ -335,6 +335,31 @@ class DeliveryPlatformApiTest extends TestCase
     }
 
     /** @test */
+    public function effective_from_is_returned_with_microseconds_and_round_trips_through_resolve(): void
+    {
+        $auth = $this->owner('dlv-api-micro');
+        $profile = $this->create($auth['token']);
+        foreach (['platform_collected', 'merchant_collected'] as $mode) {
+            $this->withToken($auth['token'])->putJson("/api/delivery-platforms/{$profile['id']}", ['collection_mode' => $mode])->assertOk();
+        }
+
+        $versions = $this->withToken($auth['token'])->getJson("/api/delivery-platforms/{$profile['id']}/versions")->assertOk()->json('data');
+        $this->assertCount(3, $versions);
+        $stamps = array_column($versions, 'effective_from');
+        $this->assertCount(3, array_unique($stamps), 'every version has a distinct effective time');
+        foreach ($stamps as $stamp) {
+            $this->assertMatchesRegularExpression('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6}[+-]\d{2}:\d{2}$/', $stamp);
+        }
+
+        // تمرير الطابع المُعاد كما هو إلى resolve يعيد النسخة نفسها (لا الأقدم).
+        foreach ($versions as $version) {
+            $this->withToken($auth['token'])
+                ->getJson("/api/delivery-platforms/{$profile['id']}/resolve?at=".urlencode($version['effective_from']))
+                ->assertOk()->assertJsonPath('data.version_number', $version['version_number']);
+        }
+    }
+
+    /** @test */
     public function a_branch_referenced_by_a_platform_override_cannot_be_deleted_and_returns_a_deliberate_422(): void
     {
         $auth = $this->owner('dlv-api-branchdel');

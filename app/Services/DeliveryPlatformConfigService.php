@@ -14,6 +14,7 @@ use Carbon\CarbonInterface;
 use DomainException;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use RuntimeException;
 
 /**
@@ -323,7 +324,7 @@ final class DeliveryPlatformConfigService
             'sales_channel_id' => $profile->sales_channel_id,
             'version_id' => $version->id,
             'version_number' => $version->version_number,
-            'effective_from' => $version->effective_from?->toIso8601String(),
+            'effective_from' => $version->effective_from?->format('Y-m-d\\TH:i:s.uP'),
             'is_active' => (bool) $version->is_active,
             'display_name' => $version->display_name,
             'display_name_en' => $version->display_name_en,
@@ -395,17 +396,32 @@ final class DeliveryPlatformConfigService
             throw new RuntimeException('تجاوزات الفروع يجب أن تكون قائمة.');
         }
 
-        $result = [];
+        // مرور أول: الشكل والتكرار وجمع المعرّفات — بلا أي استعلام.
+        $rows = [];
         foreach ($raw as $row) {
             $branchId = is_array($row) ? ($row['branch_id'] ?? null) : null;
             if (! is_string($branchId) || $branchId === '') {
                 throw new RuntimeException('كل تجاوز يحتاج فرعاً.');
             }
-            if (isset($result[$branchId])) {
+            if (isset($rows[$branchId])) {
                 throw new RuntimeException('لا يمكن تكرار الفرع نفسه في التجاوزات.');
             }
-            // TenantScope + نطاق المستخدم: فرع مستأجر آخر أو خارج نطاق الفاعل غير متاح.
-            if (! Branch::query()->whereKey($branchId)->exists() || ($actor !== null && ! $actor->canAccessBranch($branchId))) {
+            $rows[$branchId] = $row;
+        }
+        if ($rows === []) {
+            return [];
+        }
+
+        // الفروع ونطاق الفاعل تُحلّ **مرة واحدة للدفعة** (لا استعلامان لكل تجاوز).
+        // TenantScope: فرع مستأجر آخر لا يُحلّ. معرّف غير UUID يُعامَل كغير متاح
+        // (PostgreSQL يرفض النص غير UUID بخطأ 22P02 بدل أن يعيد صفراً).
+        $validIds = array_values(array_filter(array_keys($rows), fn ($id) => Str::isUuid((string) $id)));
+        $known = $validIds === [] ? [] : array_flip(Branch::query()->whereIn('id', $validIds)->pluck('id')->all());
+        $allowed = $actor?->allowedBranchIds();
+
+        $result = [];
+        foreach ($rows as $branchId => $row) {
+            if (! isset($known[$branchId]) || ($allowed !== null && ! in_array($branchId, $allowed, true))) {
                 throw new RuntimeException('الفرع غير متاح لهذا التجاوز.');
             }
             $mode = $row['collection_mode'] ?? null;
@@ -475,15 +491,7 @@ final class DeliveryPlatformConfigService
             'created_at' => $now,
         ]);
 
-        foreach ($overrides as $branchId => $row) {
-            Override::create([
-                'delivery_platform_profile_version_id' => $version->id,
-                'branch_id' => $branchId,
-                'collection_mode' => $row['collection_mode'],
-                'external_reference_policy' => $row['external_reference_policy'],
-                'created_at' => $now,
-            ]);
-        }
+        Override::createBatch($version, $overrides, $now);
 
         return $version;
     }

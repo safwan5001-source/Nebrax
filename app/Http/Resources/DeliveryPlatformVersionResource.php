@@ -27,7 +27,8 @@ class DeliveryPlatformVersionResource extends JsonResource
             'is_active' => $this->is_active,
             'change_reason' => $this->change_reason,
             'created_by' => $this->created_by,
-            'effective_from' => $this->effective_from?->toIso8601String(),
+            // ميكروثانية كاملة: إعادة تمريرها إلى `resolve?at=` تعيد النسخة نفسها لا الأقدم.
+            'effective_from' => $this->effective_from?->format('Y-m-d\\TH:i:s.uP'),
             'branch_overrides' => $this->overrides
                 ->filter(fn ($row) => $allowed === null || in_array($row->branch_id, $allowed, true))
                 ->map(fn ($row) => [

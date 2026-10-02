@@ -6,6 +6,7 @@ use App\Tenancy\BelongsToBranch;
 use App\Tenancy\TenantContext;
 use DomainException;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Str;
 use LogicException;
 
 /**
@@ -61,6 +62,60 @@ class DeliveryPlatformVersionOverride extends BaseModel
 
         static::updating(static fn () => throw new LogicException('تجاوز فرع داخل نسخة لا يُعدَّل؛ أنشئ نسخة جديدة.'));
         static::deleting(static fn () => throw new LogicException('تجاوز فرع داخل نسخة لا يُحذف.'));
+    }
+
+    /**
+     * إدراج دفعة تجاوزات لنسخة واحدة بنفس حرّاس `creating` لكن **مجمَّعة**: فرع/نسخة
+     * بالمستأجر النشط باستعلام واحد لكل الدفعة بدل استعلامين لكل تجاوز.
+     * الإدراج الجماعي لا يطلق أحداث النموذج، فتُكرَّر الفحوص هنا صراحةً.
+     *
+     * @param  array<string, array{collection_mode:?string,external_reference_policy:?string}>  $rows  مفتاحها معرّف الفرع
+     */
+    public static function createBatch(DeliveryPlatformProfileVersion $version, array $rows, \DateTimeInterface $at): void
+    {
+        if ($rows === []) {
+            return;
+        }
+        $context = app(TenantContext::class);
+        if (! $context->has()) {
+            throw new DomainException('Tenant context is required for delivery platform configuration.');
+        }
+        $tenantId = (string) $context->id();
+        if ((string) $version->tenant_id !== $tenantId
+            || ! DeliveryPlatformProfileVersion::query()->whereKey($version->getKey())->exists()) {
+            throw new DomainException('Override version must belong to the active tenant.');
+        }
+
+        $ids = array_map('strval', array_keys($rows));
+        foreach ($ids as $id) {
+            if (! Str::isUuid($id)) {
+                throw new DomainException('Override branch must belong to the active tenant.');
+            }
+        }
+        // TenantScope: فروع مستأجر آخر لا تُحلّ.
+        if (Branch::query()->whereIn('id', $ids)->count() !== count($ids)) {
+            throw new DomainException('Override branch must belong to the active tenant.');
+        }
+
+        $insert = [];
+        foreach ($rows as $branchId => $row) {
+            foreach (['collection_mode' => DeliveryPlatformProfileVersion::COLLECTION_MODES, 'external_reference_policy' => DeliveryPlatformProfileVersion::REFERENCE_POLICIES] as $field => $allowed) {
+                if (($row[$field] ?? null) !== null && ! in_array($row[$field], $allowed, true)) {
+                    throw new DomainException('Invalid override value.');
+                }
+            }
+            $insert[] = [
+                'id' => (string) Str::uuid(),
+                'tenant_id' => $tenantId,
+                'delivery_platform_profile_version_id' => $version->getKey(),
+                'branch_id' => (string) $branchId,
+                'collection_mode' => $row['collection_mode'] ?? null,
+                'external_reference_policy' => $row['external_reference_policy'] ?? null,
+                'created_at' => $at->format('Y-m-d H:i:s'),
+            ];
+        }
+
+        static::withoutGlobalScopes()->insert($insert);
     }
 
     public function version(): BelongsTo

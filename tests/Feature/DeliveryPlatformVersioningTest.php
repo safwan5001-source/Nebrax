@@ -386,6 +386,45 @@ class DeliveryPlatformVersioningTest extends TestCase
     }
 
     /** @test */
+    public function branch_authorization_is_resolved_once_per_override_batch_not_per_override(): void
+    {
+        $profile = $this->svc()->create(['platform_key' => 'keeta']);
+        $branches = collect(range(1, 12))->map(fn ($i) => $this->branch("BATCH{$i}"));
+        $actor = User::create([
+            'tenant_id' => $this->tenant->id, 'name' => 'مقيَّد', 'email' => 'batch@dlv.test',
+            'password' => 'password123', 'role' => 'admin',
+        ]);
+        $actor->branches()->sync($branches->pluck('id')->all());
+
+        $count = 0;
+        \Illuminate\Support\Facades\DB::listen(function ($q) use (&$count) {
+            if (str_contains($q->sql, 'branch_user') || str_contains($q->sql, 'from "branches"')) {
+                $count++;
+            }
+        });
+        $overrides = fn (int $n) => $branches->take($n)->map(fn ($b) => ['branch_id' => $b->id, 'collection_mode' => 'platform_collected'])->all();
+
+        $count = 0;
+        $this->svc()->update($profile, ['branch_overrides' => $overrides(2)], $actor);
+        $small = $count;
+        $count = 0;
+        $this->svc()->update($profile, ['branch_overrides' => $overrides(12)], $actor);
+
+        $this->assertSame($small, $count, 'authorization queries must not grow with the number of overrides');
+        $this->assertCount(12, DeliveryPlatformVersionOverride::query()
+            ->where('delivery_platform_profile_version_id', $this->svc()->latestVersion($profile)->id)->get());
+    }
+
+    /** @test */
+    public function a_non_uuid_branch_id_is_rejected_as_unavailable_without_a_database_error(): void
+    {
+        $profile = $this->svc()->create(['platform_key' => 'keeta']);
+
+        $this->expectException(RuntimeException::class);
+        $this->svc()->update($profile, ['branch_overrides' => [['branch_id' => 'br-1', 'collection_mode' => 'platform_collected']]]);
+    }
+
+    /** @test */
     public function a_branch_restricted_actor_cannot_set_or_erase_overrides_outside_their_branches(): void
     {
         $mine = $this->branch('MINE');
