@@ -98,3 +98,10 @@
 | 2 — فحوص التسرّب | **منفَّذة** (`web/src/design/__tests__/postures.test.ts`): Canvas لا يقرأ `--awj-*`؛ `storefront/src` لا يملك إلا `--awj-editor-*`؛ لا مكوّن إدارة خارج وحدة الاستوديو يقرأ `--store-*`؛ CSS الإدارة لا يقرأ `var(--store-…)`. + e2e بتوكنز تاجر معادية (`--store-primary:#ff00ff`) يثبت ثبات ألوان الـChrome |
 | عزل الـChrome عن Canvas | `.awj-store-preview` يُصفّر `--awj-editor-*`؛ التحديد على Canvas بتوكن مستقل `--awj-selection-overlay` (لون Chrome، مفتاح مسموح `selection-overlay`) |
 | 4 — عزل Canvas (جذر منطَّق/iframe) | `[OPEN]` كما هو — الجذر المنطَّق قائم ومحروس بما سبق |
+
+## 7. إثبات العزل (H5) `[DECIDED]`
+
+- **جسر المتغيّرات القديمة لا يدخل Canvas:** الـCanvas يقرأ `--store-*` فقط؛ المرجع الوحيد لمتغيّر قديم في وحدة المحرّر هو شريط تمرير المحرّر نفسه (`--muted/--primary` في `store-preview.css`) وهو Chrome لا محتوى تاجر.
+- **اختبار حيّ** (`awj-v3-h5-hardening.spec.ts`): مظهر `.awj-store-preview` المحسوب (الخلفية، اللون، العنوان، زر الإجراء، `--store-primary`) **متطابق** بين Default Light وInk Light وDark، و`--awj-editor-chrome` فارغ داخله.
+- **حزمة المتجر العامة** (`storefront/src`): لا إشارة إلى `data-awj-ui` أو `data-awj-theme` أو `data-awj-posture` أو مفاتيح `awj:*`؛ ولا `--awj-*` غير `--awj-editor-*` (من H4).
+- **البوابة:** `data-awj-ui` تُضبط على `<html>` للمسارات الإدارية فقط؛ المتجر العام في حزمة منفصلة لا تقرأها.
