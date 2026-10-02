@@ -58,7 +58,9 @@ describe('مصطلح الجلسة في شريط POS', () => {
       />,
     );
 
-    expect(screen.getByRole('button', { name: 'إدارة الجلسة' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'إجراءات إضافية' }));
+    expect(screen.getByRole('menuitem', { name: 'إدارة الجلسة' })).toBeTruthy();
+    expect(screen.queryByRole('menuitem', { name: 'إدارة الوردية' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'إدارة الوردية' })).toBeNull();
     expect(screen.getByTitle('الجلسة')).toBeTruthy();
   });
