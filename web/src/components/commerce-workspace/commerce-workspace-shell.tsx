@@ -73,7 +73,7 @@ export function CommerceWorkspaceShell({ children }: { children: React.ReactNode
 
   if (isAppBuilderWorkspace) {
     return (
-      <main id="commerce-workspace-content" className="h-screen w-full overflow-hidden bg-background [height:100dvh]">
+      <main id="commerce-workspace-content" data-posture="studio" className="h-screen w-full overflow-hidden bg-background [height:100dvh]">
         <div className="flex h-full min-h-0 flex-col">{children}</div>
       </main>
     );
@@ -81,15 +81,15 @@ export function CommerceWorkspaceShell({ children }: { children: React.ReactNode
 
   if (isExperienceBuilder) {
     return (
-      <main id="commerce-workspace-content" className="h-screen w-full overflow-hidden bg-background [height:100dvh]">
+      <main id="commerce-workspace-content" data-posture="studio" className="h-screen w-full overflow-hidden bg-background [height:100dvh]">
         <div className="flex h-full min-h-0 flex-col">{children}</div>
       </main>
     );
   }
 
   return (
-    <div className="flex h-screen w-full flex-col overflow-hidden bg-background [height:100dvh]">
-      <header className="no-print flex h-14 shrink-0 items-center gap-2 border-b border-border bg-surface px-3 sm:px-4">
+    <div data-posture="ledger" className="flex h-screen w-full flex-col overflow-hidden bg-background [height:100dvh]">
+      <header data-awj-shell="topbar" data-awj-shell-vars="" className="no-print flex h-14 shrink-0 items-center gap-2 border-b border-border bg-surface px-3 sm:px-4">
         <button
           type="button"
           ref={menuButtonRef}
@@ -191,7 +191,7 @@ export function CommerceWorkspaceShell({ children }: { children: React.ReactNode
       </header>
 
       <div className="flex min-h-0 flex-1">
-        <aside className={`no-print hidden shrink-0 overflow-y-auto border-e border-border bg-surface p-3 transition-[width] duration-150 ease-out lg:block ${sidebarCollapsed ? 'w-16' : 'w-64'}`}>
+        <aside data-awj-shell="sidebar" data-awj-shell-vars="" className={`no-print hidden shrink-0 overflow-y-auto border-e border-border bg-surface p-3 transition-[width] duration-150 ease-out lg:block ${sidebarCollapsed ? 'w-16' : 'w-64'}`}>
           <div className={sidebarCollapsed ? 'flex justify-center pb-3' : 'flex justify-end pb-3'}>
             <button
               type="button"
@@ -213,6 +213,7 @@ export function CommerceWorkspaceShell({ children }: { children: React.ReactNode
 
         {navigationOpen && <div className="fixed inset-0 z-40 bg-black/50 lg:hidden" onClick={dismissNavigation} aria-hidden />}
         <aside
+          data-awj-shell="sidebar" data-awj-shell-vars=""
           aria-hidden={!navigationOpen || undefined}
           {...(!navigationOpen ? { inert: true } : {})}
           className={`no-print fixed inset-y-0 start-0 z-50 flex w-72 flex-col border-e border-border bg-surface transition-transform duration-200 ease-out lg:hidden ${navigationOpen ? 'translate-x-0' : 'rtl:translate-x-full ltr:-translate-x-full'}`}

@@ -1782,7 +1782,7 @@ export default function PosPage() {
   const cartPanel = (
     // PR-3: `w-full` ضروري — الأب Flex ولا يمدّد عرض الابن تلقائياً؛ بدونه
     // يبقى العمود متقلّصاً على عرض محتواه فلا يظهر التوسيع الفعلي لعمود الشبكة.
-    <aside className="flex w-full min-h-0 flex-col overflow-hidden border-border bg-surface md:border-e">
+    <aside data-awj-floor-cart="" className="flex w-full min-h-0 flex-col overflow-hidden border-border bg-surface md:border-e">
       <div className="border-b border-border p-3">
         <div className="hidden items-center gap-1 overflow-x-auto pb-2 md:flex" role="tablist" aria-label={t('open_carts')}>
           {carts.map((cartState) => {
@@ -2031,7 +2031,7 @@ export default function PosPage() {
         );
       })()}
 
-      <div className="space-y-2 border-t border-border p-3">
+      <div data-awj-floor-actions="" className="space-y-2 border-t border-border p-3">
         <div className="grid grid-cols-2 gap-2">
           <button type="button" onClick={holdSale} disabled={cart.length === 0 || !session || holdBusy || catalogLoading} className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-md border border-border bg-surface px-3 text-sm font-semibold text-text touch-manipulation hover:border-primary disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40">
             <PauseCircle className="h-4 w-4" strokeWidth={1.7} />{t('hold')}
@@ -2044,11 +2044,14 @@ export default function PosPage() {
         </div>
       </div>
 
+      {/* Floor posture (H4): totals + pay form ONE Outcome Surface under the v3 gate. `contents`
+          keeps gate-off layout identical (the wrapper generates no box). */}
+      <div data-awj-floor-outcome="" data-awj-surface="outcome" className="contents">
       <div className="space-y-1.5 border-t border-border bg-background p-3" data-testid="pos-cart-totals">
         <div className="flex justify-between text-sm"><span className="text-muted">{t('subtotal')}</span><span className="num font-semibold text-text">{formatRiyal(subMinor / 100)}</span></div>
         {discMinor > 0 && <div className="flex justify-between text-sm"><span className="text-muted">{t('discount')}</span><span className="num font-semibold text-positive">−{formatRiyal(discMinor / 100)}</span></div>}
         <div className="flex justify-between text-sm"><span className="text-muted">{t('tax')}</span><span className="num font-semibold text-text">{formatRiyal(taxMinor / 100)}</span></div>
-        <div className="flex items-baseline justify-between border-t border-border pt-2"><span className="text-sm font-semibold text-text">{t('total')}</span><span className="num text-xl font-bold text-text">{formatRiyal(totalMinor / 100)}</span></div>
+        <div data-awj-floor-total="" className="flex items-baseline justify-between border-t border-border pt-2"><span className="text-sm font-semibold text-text">{t('total')}</span><span className="num text-xl font-bold text-text">{formatRiyal(totalMinor / 100)}</span></div>
       </div>
 
       <div className={POS_CART_PAY_FOOTER_CLASS}>
@@ -2067,11 +2070,12 @@ export default function PosPage() {
           {t('pay')}<span className="num">{formatRiyal(totalMinor / 100)}{policy.showShortcutHints ? <span className="hidden lg:inline"> · F9</span> : null}</span>
         </button>
       </div>
+      </div>
     </aside>
   );
 
   const catsPanel = (
-    <aside className={POS_DESKTOP_CATEGORIES_CLASS}>
+    <aside data-awj-floor-cats="" className={POS_DESKTOP_CATEGORIES_CLASS}>
       <h4 className="mb-1 px-1 text-xs font-bold text-muted">{t('categories')}</h4>
       {CATS.map((item) => {
         const { key, label } = item;
@@ -2199,7 +2203,7 @@ export default function PosPage() {
       ) : (
         <>
           {/* ديسكتوب lg+: 3 أعمدة. تابلت md: سلة+منتجات. جوال: تبويب واحد */}
-          <div className={POS_SALE_GRID_CLASS}>
+          <div data-awj-floor-grid="" className={POS_SALE_GRID_CLASS}>
             <div className={posCartPaneClass(mobileTab)}>{cartPanel}</div>
             <div className={posProductsPaneClass(mobileTab)}>
               {productsPanel}

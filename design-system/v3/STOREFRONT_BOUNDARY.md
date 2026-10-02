@@ -89,3 +89,12 @@
 | 2 | فحوص CI للتسرّب (grep + اختبار توكنز معادية) | 1 (أدوات) · 9 |
 | 3 | توثيق رسمي لنطاقي `--awj-*` و`--store-*` في جانبي الكود | 0 |
 | 4 | قرار عزل Canvas (جذر منطَّق أم iframe) | `[OPEN]` |
+
+## 6. حالة التنفيذ (H4) `[DECIDED]`
+
+| البند (§5) | الحالة |
+|---|---|
+| 1 — `--awj-editor-*` مولَّدة | **منفَّذ في `web/`**: تُولَّد من `awj.tokens.json` (`editor.*`). نسخة `storefront/` (`.awj-editor` بـhex منسوخة) **لم تُمسّ** (حزمة منفصلة) — تبقى مهمة توليد/تكافؤ لاحقة |
+| 2 — فحوص التسرّب | **منفَّذة** (`web/src/design/__tests__/postures.test.ts`): Canvas لا يقرأ `--awj-*`؛ `storefront/src` لا يملك إلا `--awj-editor-*`؛ لا مكوّن إدارة خارج وحدة الاستوديو يقرأ `--store-*`؛ CSS الإدارة لا يقرأ `var(--store-…)`. + e2e بتوكنز تاجر معادية (`--store-primary:#ff00ff`) يثبت ثبات ألوان الـChrome |
+| عزل الـChrome عن Canvas | `.awj-store-preview` يُصفّر `--awj-editor-*`؛ التحديد على Canvas بتوكن مستقل `--awj-selection-overlay` (لون Chrome، مفتاح مسموح `selection-overlay`) |
+| 4 — عزل Canvas (جذر منطَّق/iframe) | `[OPEN]` كما هو — الجذر المنطَّق قائم ومحروس بما سبق |

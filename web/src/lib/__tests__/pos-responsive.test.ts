@@ -45,7 +45,7 @@ describe('قشرة نقطة البيع المتجاوبة', () => {
     // منكمشاً على عرض محتواه (~300px) مهما اتسع مسار الشبكة. هذا الاختبار
     // يحرس وجود `w-full` على عنصر السلة حتى لا يتكرر الانكماش الصامت.
     const page = source('src/app/(pos)/pos/page.tsx');
-    expect(page).toMatch(/<aside className="flex w-full min-h-0 flex-col overflow-hidden border-border bg-surface md:border-e">/);
+    expect(page).toMatch(/<aside (?:data-awj-[a-z-]+="" )*className="flex w-full min-h-0 flex-col overflow-hidden border-border bg-surface md:border-e">/);
   });
 
   it('يحمي بطاقات الصور من التضييق الزائد على iPad landscape', () => {

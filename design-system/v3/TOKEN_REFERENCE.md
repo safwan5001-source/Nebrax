@@ -290,3 +290,23 @@
 | Outcome: fg · label · decimals · rule · green | 16.0 · 11.28 · 8.66 · 7.39 · 9.52 | 4.5 / 3.0 | ✓ |
 
 أمثلة التحقق الآلي المقترحة: [`GOVERNANCE.md`](./GOVERNANCE.md) §4.
+
+## 13. توكنز الـPostures والمحرّر (H4) — مولَّدة
+
+مصدرها `awj.tokens.json` (`posture.floor|studio`، `editor`، `outcome.action*`). تُبعَث تحت
+`html[data-awj-ui="3"] [data-posture="…"]` (والطبقة المضغوطة `max-height: 740px` تلقائياً).
+
+| التوكن | Floor (عادي · مضغوط) | Studio (عادي · مضغوط) |
+|---|---|---|
+| `--awj-touch-min` | 44 · 44 | 32 · 32 |
+| `--awj-control-h` | 48 · 44 | 32 · 30 |
+| `--awj-action-h` | 56 · 48 | — |
+| `--awj-chrome-h` | 56 · 48 | 48 · 44 |
+| `--awj-row-1l` / `--awj-row-2l` | 48/56 · 44/48 | 32/36 · 30/34 |
+| `--awj-display-money-fs` | 36 · 28 | — |
+| `--awj-motion-scale` | 0.8 | — |
+| `--awj-selection-overlay` | — | `brand-500` (لون Chrome فوق Canvas) |
+
+- **`--awj-editor-*`** (Studio فقط، ثابتة عبر السمة والوضع): `chrome` `#1B1E24` · `chrome-raised` · `chrome-fg` · `chrome-fg-muted` · `chrome-line` · `chrome-hover` · `chrome-active` · `chrome-control-line` · `workspace` · `focus-ring` · `action` · `action-fg` · `positive` · `warning` (+`-bg`).
+  تُصفَّر (`initial`) داخل `.awj-store-preview`. أزواج التباين (≥ 4.5 للنص، ≥ 3.0 لحدود التحكّم/التركيز/التحديد) ضمن سجل `contrastChecks` (74 زوجاً الآن).
+- **`--awj-outcome-action` / `-hover` / `-fg`**: زر الفعل الأساسي فوق سطح النتيجة الحبري (brand-300 / brand-200 على ink-900، ثابتة عبر الوضعين).

@@ -97,6 +97,33 @@ export function buildTokens(tokens) {
   return { base, themeDefault, themeInk, darkBase, modeless };
 }
 
+function indentBlock(block, pad) {
+  return block.split('\n').map((line) => `${pad}${line}`).join('\n');
+}
+
+// Posture tokens (Horizon 4, WORKSPACE_POSTURES.md §4): `posture.<name>.<key>` carries a
+// `standard` and a `compact` value. Compact applies on short viewports automatically, exactly
+// like the density tokens above; the posture name only selects WHICH variables a workspace
+// root defines (`data-posture`) — components read variables and never know the posture.
+function postureVars(tokens, posture, tier) {
+  const out = {};
+  for (const [key, node] of Object.entries(tokens.posture?.[posture] ?? {})) {
+    if (key.startsWith('$')) continue;
+    out[`--awj-${key}`] = resolveRef(node[tier], tokens);
+  }
+  return out;
+}
+
+// Studio editor chrome (--awj-editor-*): mode-fixed graphite, resolved once.
+function editorVars(tokens) {
+  const out = {};
+  for (const [key, node] of Object.entries(tokens.editor ?? {})) {
+    if (key.startsWith('$')) continue;
+    out[`--awj-editor-${key}`] = resolveRef(node.value, tokens);
+  }
+  return out;
+}
+
 // Dark v3 (Horizon 3, S10): real semantic dark tokens, not an alias back to the old
 // v2.0 `.dark` variables. Resolved the same way as the light `base` group above, from
 // design-system/tokens/awj.tokens.json `dark.*`. Shell tokens are deliberately absent
@@ -173,6 +200,24 @@ export function buildCss(tokens) {
   blocks.push(
     cssBlock('html[data-awj-ui="3"].dark', { ...darkBase, ...themeInk })
   );
+
+  // Postures (H4): variables only, scoped to the workspace root that opts in with
+  // `data-posture`. Ledger needs none — the base density tokens above are its values.
+  for (const posture of ['floor', 'studio']) {
+    const standard = postureVars(tokens, posture, 'standard');
+    const vars = posture === 'studio' ? { ...standard, ...editorVars(tokens) } : standard;
+    blocks.push(cssBlock(`html[data-awj-ui="3"] [data-posture="${posture}"]`, vars));
+  }
+  // Boundary (STOREFRONT_BOUNDARY.md §4): custom properties inherit, so the editor chrome
+  // tokens defined on the Studio root would reach the merchant Canvas subtree. The preview
+  // root explicitly resets them — the Canvas renders from --store-* only.
+  const editorReset = Object.fromEntries(Object.keys(editorVars(tokens)).map((name) => [name, 'initial']));
+  blocks.push(cssBlock('html[data-awj-ui="3"] [data-posture="studio"] .awj-store-preview', editorReset));
+  const compactBlocks = ['floor', 'studio']
+    .map((posture) => cssBlock(`html[data-awj-ui="3"] [data-posture="${posture}"]`, postureVars(tokens, posture, 'compact'), '    '))
+    .map((block) => indentBlock(block, '  '))
+    .join('\n');
+  blocks.push(`@media (max-height: 740px) {\n${compactBlocks}\n}`);
 
   return `${BEGIN_MARKER}\n${blocks.join('\n\n')}\n${END_MARKER}`;
 }

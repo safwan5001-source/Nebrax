@@ -162,4 +162,36 @@ describe('PosProductTile', () => {
     });
     expect(screen.getByTestId('pos-product-stock').textContent).toBe('Available: 12');
   });
+
+  // Floor posture (H4): the tile exposes inert markers the gated stylesheet keys on. They
+  // carry no behavior and no text, and must not change the accessible structure.
+  it('يحمل علامات Floor الخاملة دون تغيير بنيته الوصولية', () => {
+    renderTile();
+    const main = screen.getByRole('button', { name: /Water 330ml/ });
+    expect(main.hasAttribute('data-awj-floor-tile')).toBe(true);
+    expect(main.getAttribute('aria-selected')).toBe('false');
+    expect(main.closest('[data-awj-floor-tile-wrap]')).not.toBeNull();
+  });
+
+  it('يميّز وسائط البلاطة: صورة فعلية أم مساحة بلا صورة', () => {
+    const { container } = (() => {
+      renderTile();
+      return { container: document.body };
+    })();
+    expect(container.querySelector('[data-awj-media="image"]')).not.toBeNull();
+    cleanup();
+    renderTile({ product: { ...product, pos_image: null } });
+    expect(document.body.querySelector('[data-awj-media="placeholder"]')).not.toBeNull();
+    expect(document.body.querySelector('[data-awj-media="image"]')).toBeNull();
+  });
+
+  it('أزرار المفضلة والمعلومات تبقى ≥ 44px لمساً (min-h-11/min-w-11)', () => {
+    renderTile({ onOpenQuickView: vi.fn(), quickViewLabel: 'Quick view' });
+    for (const name of ['Favorites', 'Quick view']) {
+      const button = screen.getByRole('button', { name });
+      expect(button.className).toContain('min-h-11');
+      expect(button.className).toContain('min-w-11');
+    }
+  });
 });
+

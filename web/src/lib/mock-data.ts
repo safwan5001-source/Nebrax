@@ -3794,6 +3794,9 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
           ? [{ code: product.barcode, unit_name: product.unit, default_quantity: 1 }]
           : [],
         pos_image: listDemoProductMedia(product.id)[0] ?? null,
+        // العقد الحقيقي يُرجع المصفوفة دائماً (فارغة لمنتج بلا متغيّرات)؛ الصفحة تقرأ
+        // `.length` مباشرةً عند إضافة الصنف للسلة.
+        pos_variants: [],
         category_id: null,
         category: product.category,
         tax_rate: product.tax_rate,

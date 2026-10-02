@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { CommerceWorkspaceShell } from '@/components/commerce-workspace/commerce-workspace-shell';
 import { AuthenticatedCompanyBrowserIdentity } from '@/components/layout/company-browser-identity';
 import { currentUser, isAuthenticated } from '@/lib/auth';
+import { applyAwjUiGate } from '@/lib/awj-ui-gate';
 import { CommerceStoreProvider } from '@/modules/commerce-workspace/store-context';
 
 /**
@@ -25,6 +26,10 @@ export default function CommerceLayout({ children }: { children: React.ReactNode
       setReady(true);
     }
   }, [router]);
+
+  // AWJ v3 gate (opt-in only): Commerce Admin is Ledger, the builder routes are Studio —
+  // the shell sets data-posture per route; the gate itself is applied once for the group.
+  useEffect(() => applyAwjUiGate(), []);
 
   if (!ready) {
     return <div className="grid h-screen place-items-center bg-background text-muted [height:100dvh]">…</div>;

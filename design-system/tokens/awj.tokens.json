@@ -22,7 +22,7 @@
     "status": {
       "green": { "50": "#E8F5EC", "200": "#BFE2CB", "300": "#7FD1A0", "700": "#166534", "night-fg": "#16A34A", "night-bg": "#122A1D", "night-border": "#1F4A30" },
       "red": { "50": "#FDECEC", "200": "#F5C2C2", "700": "#B91C1C", "night-fg": "#F87171", "night-bg": "#2C1616", "night-border": "#4A2020" },
-      "amber": { "50": "#FDF3E3", "200": "#F1D9A8", "600": "#D97706", "800": "#92400E", "night-fg": "#D97706", "night-bg": "#2B210E", "night-border": "#4A3515" }
+      "amber": { "50": "#FDF3E3", "200": "#F1D9A8", "300": "#F2C46D", "600": "#D97706", "800": "#92400E", "night-fg": "#D97706", "night-bg": "#2B210E", "night-border": "#4A3515" }
     },
     "night": {
       "desk": "#07090C",
@@ -223,7 +223,50 @@
     "label": { "value": "{primitive.ink.200}" },
     "decimal": { "value": "{primitive.ink.300}" },
     "rule": { "value": "{primitive.brand.300}" },
-    "positive": { "value": "{primitive.status.green.300}" }
+    "positive": { "value": "{primitive.status.green.300}" },
+    "action": { "value": "{primitive.brand.300}" },
+    "action-hover": { "value": "{primitive.brand.200}" },
+    "action-fg": { "value": "{primitive.ink.900}" }
+  },
+  "posture": {
+    "$comment": "Workspace postures (H4, WORKSPACE_POSTURES.md §4). Only the closed list of allowed variation keys may appear here. Emitted under html[data-awj-ui=3] [data-posture=...] — components read the variables, never the posture name. `compact` applies automatically at max-height 740px (short-height layer).",
+    "floor": {
+      "touch-min": { "standard": "44px", "compact": "44px" },
+      "control-h": { "standard": "48px", "compact": "44px" },
+      "action-h": { "standard": "56px", "compact": "48px" },
+      "chrome-h": { "standard": "56px", "compact": "48px" },
+      "row-1l": { "standard": "48px", "compact": "44px" },
+      "row-2l": { "standard": "56px", "compact": "48px" },
+      "display-money-fs": { "standard": "36px", "compact": "28px" },
+      "motion-scale": { "standard": "0.8", "compact": "0.8" }
+    },
+    "studio": {
+      "touch-min": { "standard": "32px", "compact": "32px" },
+      "control-h": { "standard": "32px", "compact": "30px" },
+      "chrome-h": { "standard": "48px", "compact": "44px" },
+      "row-1l": { "standard": "32px", "compact": "30px" },
+      "row-2l": { "standard": "36px", "compact": "34px" },
+      "selection-overlay": { "standard": "{primitive.brand.500}", "compact": "{primitive.brand.500}" }
+    }
+  },
+  "editor": {
+    "$comment": "Studio editor chrome (--awj-editor-*). Mode-fixed graphite: it follows neither the user's Default/Ink theme nor Light/Dark, and never the merchant's --store-* tokens (STOREFRONT_BOUNDARY.md §4). Emitted only under [data-posture=studio].",
+    "chrome": { "value": "#1B1E24" },
+    "chrome-raised": { "value": "#242830" },
+    "chrome-fg": { "value": "#E8EAEE" },
+    "chrome-fg-muted": { "value": "#A7ADB8" },
+    "chrome-line": { "value": "#323843" },
+    "chrome-hover": { "value": "#2C313A" },
+    "chrome-active": { "value": "#343A45" },
+    "chrome-control-line": { "value": "#6F7886" },
+    "workspace": { "value": "#2A2F37" },
+    "focus-ring": { "value": "{primitive.brand.300}" },
+    "action": { "value": "{primitive.brand.500}" },
+    "action-fg": { "value": "{primitive.ink.900}" },
+    "positive": { "value": "{primitive.status.green.300}" },
+    "positive-bg": { "value": "#17301F" },
+    "warning": { "value": "{primitive.status.amber.300}" },
+    "warning-bg": { "value": "#3A2E12" }
   },
   "density": {
     "grid-row-1l": { "standard": "36px", "compact": "32px" },
@@ -290,6 +333,24 @@
     { "name": "dark outcome-edge/outcome (structural)", "fg": "{dark.outcome-edge}", "bg": "{semantic.surface.outcome}", "min": 1.2 },
     { "name": "dark shell(ink) fg/bg", "fg": "{theme.ink.shell-fg}", "bg": "{theme.ink.shell-bg}", "min": 4.5 },
     { "name": "dark shell(ink) fg-muted/bg", "fg": "{theme.ink.shell-fg-muted}", "bg": "{theme.ink.shell-bg}", "min": 4.5 },
+    { "name": "outcome-action-fg/outcome-action", "fg": "{outcome.action-fg}", "bg": "{outcome.action}", "min": 4.5 },
+    { "name": "outcome-action-fg/outcome-action-hover", "fg": "{outcome.action-fg}", "bg": "{outcome.action-hover}", "min": 4.5 },
+    { "name": "outcome-action/outcome (boundary)", "fg": "{outcome.action}", "bg": "{semantic.surface.outcome}", "min": 3.0 },
+    { "name": "editor chrome-fg/chrome", "fg": "{editor.chrome-fg}", "bg": "{editor.chrome}", "min": 4.5 },
+    { "name": "editor chrome-fg/chrome-active", "fg": "{editor.chrome-fg}", "bg": "{editor.chrome-active}", "min": 4.5 },
+    { "name": "editor chrome-fg-muted/chrome", "fg": "{editor.chrome-fg-muted}", "bg": "{editor.chrome}", "min": 4.5 },
+    { "name": "editor chrome-fg-muted/chrome-hover", "fg": "{editor.chrome-fg-muted}", "bg": "{editor.chrome-hover}", "min": 4.5 },
+    { "name": "editor chrome-fg-muted/workspace", "fg": "{editor.chrome-fg-muted}", "bg": "{editor.workspace}", "min": 4.5 },
+    { "name": "editor chrome-control-line/chrome (control boundary)", "fg": "{editor.chrome-control-line}", "bg": "{editor.chrome}", "min": 3.0 },
+    { "name": "editor focus-ring/chrome", "fg": "{editor.focus-ring}", "bg": "{editor.chrome}", "min": 3.0 },
+    { "name": "editor focus-ring/workspace", "fg": "{editor.focus-ring}", "bg": "{editor.workspace}", "min": 3.0 },
+    { "name": "editor action-fg/action", "fg": "{editor.action-fg}", "bg": "{editor.action}", "min": 4.5 },
+    { "name": "editor positive/chrome", "fg": "{editor.positive}", "bg": "{editor.chrome}", "min": 4.5 },
+    { "name": "editor positive/positive-bg", "fg": "{editor.positive}", "bg": "{editor.positive-bg}", "min": 4.5 },
+    { "name": "editor warning/chrome", "fg": "{editor.warning}", "bg": "{editor.chrome}", "min": 4.5 },
+    { "name": "editor warning/warning-bg", "fg": "{editor.warning}", "bg": "{editor.warning-bg}", "min": 4.5 },
+    { "name": "editor selection/white canvas", "fg": "{posture.studio.selection-overlay.standard}", "bg": "#FFFFFF", "min": 3.0 },
+    { "name": "editor chrome/workspace (structural)", "fg": "{editor.workspace}", "bg": "{editor.chrome}", "min": 1.1 },
     { "name": "dark shell(ink) apex/bg", "fg": "{theme.ink.shell-apex}", "bg": "{theme.ink.shell-bg}", "min": 3.0 }
   ]
 }

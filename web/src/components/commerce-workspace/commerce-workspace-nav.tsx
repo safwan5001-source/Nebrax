@@ -111,6 +111,9 @@ function WorkspaceLink({
     <Link
       href={item.href}
       aria-current={active ? 'page' : undefined}
+      data-awj-apex=""
+      data-awj-apex-on={active ? '' : undefined}
+      data-awj-shell-active={active ? '' : undefined}
       aria-label={collapsed ? label : undefined}
       title={collapsed ? label : undefined}
       onClick={onNavigate}
@@ -121,7 +124,7 @@ function WorkspaceLink({
         active ? 'bg-primary-soft font-medium text-primary' : 'text-text hover:bg-primary-soft hover:text-primary',
       )}
     >
-      {active && <span aria-hidden className="absolute inset-y-2 start-0 w-0.5 rounded bg-primary" />}
+      {active && <span aria-hidden data-awj-legacy-marker="" className="absolute inset-y-2 start-0 w-0.5 rounded bg-primary" />}
       <Icon aria-hidden="true" className="h-[18px] w-[18px] shrink-0" strokeWidth={1.7} />
       <span className={collapsed ? 'sr-only' : 'truncate'}>{label}</span>
       {collapsed && (
