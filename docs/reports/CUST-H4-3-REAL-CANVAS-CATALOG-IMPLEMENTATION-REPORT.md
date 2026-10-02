@@ -3,7 +3,7 @@
 **Horizon:** CUST-H4 — Section Library & Real Section Activation
 **Slice:** H4-3 (Real Canvas catalog parity for Categories / New Arrivals)
 **Base SHA:** `de8eee89e838c25d14f1e7c2064eff1d1720c633` — `feat(store): build CUST-H4 Section Library (H4-2) (#1154)` (verified directly via `git fetch origin main && git rev-parse origin/main` at task start; confirmed as `origin/main`'s own HEAD, not assumed from the task brief)
-**Head SHA:** _filled in after the commit below_
+**Head SHA:** `f4f17405ccc2f152a9e0ec3ed2840d04900b601c`
 **Branch:** `claude/tender-heisenberg-wzfczm` — **deviation from the task's suggested `feat/cust-h4-3-real-canvas-catalog`**, per this session's own Git Development Branch Requirements, which mandate developing on this pre-assigned branch name. Reported per the task's own "If the environment mandates another branch name, use it and report it" instruction.
 **PR:** _filled in after push_
 
