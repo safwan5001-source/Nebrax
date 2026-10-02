@@ -83,6 +83,24 @@ describe('workspace-categories client — CUST-H2-4', () => {
     expect(path).toContain('per_page=10');
   });
 
+  it('sends root_only=true only when explicitly requested (CUST-H4-3 parity fix)', async () => {
+    apiMock.mockResolvedValue({ data: [], meta: { pagination: { has_more: false } } });
+    await listWorkspaceCategories('store-1', { rootOnly: true, perPage: 12 });
+    const [path] = apiMock.mock.calls[0];
+    expect(path).toContain('root_only=true');
+    expect(path).toContain('per_page=12');
+
+    apiMock.mockClear();
+    await listWorkspaceCategories('store-1');
+    const [defaultPath] = apiMock.mock.calls[0];
+    expect(defaultPath).not.toContain('root_only');
+
+    apiMock.mockClear();
+    await listWorkspaceCategories('store-1', { rootOnly: false });
+    const [falsePath] = apiMock.mock.calls[0];
+    expect(falsePath).not.toContain('root_only');
+  });
+
   it('classifies a 404 as not_found without throwing', async () => {
     apiMock.mockRejectedValue(new ApiError(404, 'not found', {}));
     const result = await listWorkspaceCategories('store-1');

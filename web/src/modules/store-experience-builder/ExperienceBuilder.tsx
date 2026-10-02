@@ -85,6 +85,13 @@ export const PREVIEW_WIDTHS = {
   desktop: 1280,
 } as const;
 
+// CUST-H4-3 — bounds on the Home "categories"/"newArrivals" Canvas preview
+// fetches, matching Published's own homepage defaults (`CategoriesSection.tsx`'s
+// `HOME_CATEGORY_LIMIT`, `NewArrivals.tsx`'s `limit = 8`) rather than an
+// arbitrary editor-only number.
+const HOME_CATEGORIES_PREVIEW_LIMIT = 12;
+const HOME_NEW_ARRIVALS_PREVIEW_LIMIT = 8;
+
 export const STORE_BUILDER_SIDEBAR_STORAGE_KEY =
   "awj-store-builder-sidebar-collapsed";
 
@@ -193,6 +200,25 @@ export function ExperienceBuilder({
     "idle" | "loading" | "error" | "ready"
   >("idle");
   const categoryGridRequestRef = useRef(0);
+  // CUST-H4-3 — real catalog data for the Home "categories"/"newArrivals"
+  // sections' own Canvas preview. Deliberately **not** the same state as
+  // `categoryList`/`productList` above: those back the Product/Category
+  // *preview pickers*, scoped to the merchant's own live search term —
+  // incompatible filter semantics to reuse for a home section that must
+  // always show the storefront's real root categories / real newest
+  // products, never whatever the picker's search box currently holds.
+  // `"ready"` with an empty array *is* the honest empty state (no separate
+  // `"empty"` value), mirroring `categoryGridProductsState` above exactly.
+  const [homeCategories, setHomeCategories] = useState<WorkspaceCategorySummary[]>([]);
+  const [homeCategoriesState, setHomeCategoriesState] = useState<
+    "idle" | "loading" | "error" | "ready"
+  >("idle");
+  const homeCategoriesRequestRef = useRef(0);
+  const [homeNewArrivals, setHomeNewArrivals] = useState<WorkspaceProductSummary[]>([]);
+  const [homeNewArrivalsState, setHomeNewArrivalsState] = useState<
+    "idle" | "loading" | "error" | "ready"
+  >("idle");
+  const homeNewArrivalsRequestRef = useRef(0);
   const [pendingSectionScroll, setPendingSectionScroll] = useState<
     string | null
   >(null);
@@ -636,6 +662,15 @@ export function ExperienceBuilder({
     setCategoryGridProducts([]);
     setCategoryGridProductsTotal(0);
     setCategoryGridProductsState("idle");
+    // CUST-H4-3 — same reset as the Product/Category preview state above:
+    // a storefront/version switch must never let a previous storefront's
+    // categories/products survive into the newly-opened one's Home preview.
+    ++homeCategoriesRequestRef.current;
+    setHomeCategories([]);
+    setHomeCategoriesState("idle");
+    ++homeNewArrivalsRequestRef.current;
+    setHomeNewArrivals([]);
+    setHomeNewArrivalsState("idle");
 
     if (!storefrontId) {
       setBusy(null);
@@ -855,6 +890,114 @@ export function ExperienceBuilder({
 
   function handleRetryCategoryList() {
     void loadCategoryList(categorySearch);
+  }
+
+  // CUST-H4-3 — real data for the Home "categories" section's own Canvas
+  // preview (`StorefrontPreviewCanvas`'s `categories` branch), replacing the
+  // static `PREVIEW_CATEGORIES` fixture. `rootOnly: true` (CUST-H4-3 parity
+  // fix) asks the backend to apply `whereNull('parent_id')` *before*
+  // pagination, matching Published's own `depth_eq: 0` semantics
+  // (`CategoriesSection.tsx`) exactly — this request fetches only the
+  // bounded number of root categories this section actually shows, never a
+  // larger mixed-depth page filtered down afterwards on the client (that
+  // approach could silently lose real root categories behind enough
+  // alphabetically-earlier children on a single page; the server-side
+  // filter can't, since it runs before the page is cut).
+  async function loadHomeCategories() {
+    if (!storefrontId) return;
+    const token = ++homeCategoriesRequestRef.current;
+    const originStorefrontId = storefrontId;
+    setHomeCategoriesState("loading");
+    const result = await listWorkspaceCategories(storefrontId, {
+      rootOnly: true,
+      perPage: HOME_CATEGORIES_PREVIEW_LIMIT,
+    });
+    if (token !== homeCategoriesRequestRef.current || storefrontIdRef.current !== originStorefrontId) return;
+    if (!result.ok) {
+      setHomeCategoriesState("error");
+      setHomeCategories([]);
+      return;
+    }
+    setHomeCategoriesState("ready");
+    setHomeCategories(result.data);
+  }
+
+  const categoriesSectionVisible = draft.homepage.sections.some(
+    (section) => section.type === "categories" && section.visible,
+  );
+
+  useEffect(() => {
+    // `busy === "loading"` means `draft` is still the transient default
+    // config this component seeds itself with before the real, persisted
+    // Version config has loaded (see the `[storefrontId, versionId]` reset
+    // effect above) — evaluating `categoriesSectionVisible` against that
+    // placeholder, rather than waiting for the real one, could fire a fetch
+    // for a section the merchant's actual saved homepage doesn't even show.
+    if (
+      currentPage !== "home" ||
+      !storefrontId ||
+      busy === "loading" ||
+      !categoriesSectionVisible ||
+      homeCategoriesState !== "idle"
+    ) {
+      return;
+    }
+    void loadHomeCategories();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentPage, storefrontId, busy, categoriesSectionVisible, homeCategoriesState]);
+
+  function handleRetryHomeCategories() {
+    void loadHomeCategories();
+  }
+
+  // CUST-H4-3 — same role as `loadHomeCategories` above, for the Home
+  // "newArrivals" section, replacing the static `PREVIEW_PRODUCTS` fixture.
+  // `sort: "newest"` (CommerceWorkspaceStorefrontProductController, additive)
+  // reuses the exact recency rule Published's own `NewArrivals.tsx` already
+  // applies (`-available_on` → `created_at` desc) — the one case where the
+  // existing workspace endpoint genuinely needed a small, additive backend
+  // capability to match Published's section meaning, not a client-side
+  // approximation.
+  async function loadHomeNewArrivals() {
+    if (!storefrontId) return;
+    const token = ++homeNewArrivalsRequestRef.current;
+    const originStorefrontId = storefrontId;
+    setHomeNewArrivalsState("loading");
+    const result = await listWorkspaceProducts(storefrontId, {
+      sort: "newest",
+      perPage: HOME_NEW_ARRIVALS_PREVIEW_LIMIT,
+    });
+    if (token !== homeNewArrivalsRequestRef.current || storefrontIdRef.current !== originStorefrontId) return;
+    if (!result.ok) {
+      setHomeNewArrivalsState("error");
+      setHomeNewArrivals([]);
+      return;
+    }
+    setHomeNewArrivalsState("ready");
+    setHomeNewArrivals(result.data);
+  }
+
+  const newArrivalsSectionVisible = draft.homepage.sections.some(
+    (section) => section.type === "newArrivals" && section.visible,
+  );
+
+  useEffect(() => {
+    // Same "wait for the real config" rule as the categories effect above.
+    if (
+      currentPage !== "home" ||
+      !storefrontId ||
+      busy === "loading" ||
+      !newArrivalsSectionVisible ||
+      homeNewArrivalsState !== "idle"
+    ) {
+      return;
+    }
+    void loadHomeNewArrivals();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentPage, storefrontId, busy, newArrivalsSectionVisible, homeNewArrivalsState]);
+
+  function handleRetryHomeNewArrivals() {
+    void loadHomeNewArrivals();
   }
 
   function handleSelectCategoryRegion(id: string) {
@@ -2267,6 +2410,12 @@ export function ExperienceBuilder({
                   categoryGridProductsState={categoryGridProductsState}
                   categoryGridProducts={categoryGridProducts.map((p) => ({ id: p.id, name: p.name, thumbnailUrl: p.thumbnailUrl }))}
                   categoryGridProductsTotal={categoryGridProductsTotal}
+                  homeCategoriesState={homeCategoriesState}
+                  homeCategories={homeCategories.map((c) => ({ id: c.id, name: c.name }))}
+                  onRetryHomeCategories={handleRetryHomeCategories}
+                  homeNewArrivalsState={homeNewArrivalsState}
+                  homeNewArrivals={homeNewArrivals.map((p) => ({ id: p.id, name: p.name, thumbnailUrl: p.thumbnailUrl }))}
+                  onRetryHomeNewArrivals={handleRetryHomeNewArrivals}
                 />
               </div>
             </div>

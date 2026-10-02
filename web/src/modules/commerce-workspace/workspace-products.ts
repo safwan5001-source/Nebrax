@@ -205,7 +205,7 @@ function mapDetail(payload: unknown): WorkspaceProductDetail | null {
 
 export async function listWorkspaceProducts(
   storefrontId: string,
-  params: { search?: string; categoryId?: string; page?: number; perPage?: number } = {},
+  params: { search?: string; categoryId?: string; sort?: 'newest'; page?: number; perPage?: number } = {},
   signal?: AbortSignal,
 ): Promise<WorkspaceProductListOutcome> {
   try {
@@ -216,6 +216,11 @@ export async function listWorkspaceProducts(
     // the public Commerce API already applies (`category_id` on this exact
     // route), never a client-side filter over a fetched list.
     if (params.categoryId) query.set('category_id', params.categoryId);
+    // CUST-H4-3 — feeds the Home "New Arrivals" section's real Canvas
+    // preview with the same recency order Published already uses
+    // (`-available_on` → `created_at` desc). Omitted entirely by every other
+    // caller, which keeps the default alphabetical order unchanged.
+    if (params.sort) query.set('sort', params.sort);
     if (params.page) query.set('page', String(params.page));
     if (params.perPage) query.set('per_page', String(params.perPage));
     const qs = query.toString();

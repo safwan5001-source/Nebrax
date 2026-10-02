@@ -3735,9 +3735,16 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
   // dev-harness-only posture as the Product fixtures above.
   const workspaceCategoriesListMatch = clean.match(/^\/commerce\/workspace\/storefronts\/([^/]+)\/categories$/);
   if (workspaceCategoriesListMatch) {
-    const search = (new URLSearchParams(path.split('?')[1] ?? '').get('search') ?? '').trim().toLowerCase();
+    const listQuery = new URLSearchParams(path.split('?')[1] ?? '');
+    const search = (listQuery.get('search') ?? '').trim().toLowerCase();
+    // CUST-H4-3 (parity fix) — mirrors `CommerceWorkspaceStorefrontCategoryController`'s
+    // real `root_only=true` filter (`whereNull('parent_id')`), applied
+    // before the fixture's own pagination, same as the real endpoint.
+    const rootOnly = listQuery.get('root_only') === 'true';
     const parentNameById = new Map(MOCK_WORKSPACE_CATEGORIES.map((c) => [c.id, c.name]));
-    const rows = MOCK_WORKSPACE_CATEGORIES.filter((c) => !search || c.name.toLowerCase().includes(search));
+    const rows = MOCK_WORKSPACE_CATEGORIES.filter(
+      (c) => (!search || c.name.toLowerCase().includes(search)) && (!rootOnly || c.parent_id === null),
+    );
     return resolve({
       data: rows.map((c) => ({
         id: c.id,

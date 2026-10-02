@@ -11,7 +11,6 @@ import {
   officialSocialLinkClassName,
 } from "./OfficialSocialMark";
 import { StoreBrand, storeContainerClassName } from "./StoreBrand";
-import { categoryAccent } from "./category-accent";
 import {
   isGatedHomeSection,
   previewStoreName,
@@ -50,7 +49,6 @@ import {
 } from "./messages";
 import {
   PREVIEW_CATEGORIES,
-  PREVIEW_PRODUCTS,
   PREVIEW_STORE_NAME,
 } from "./preview-fixtures";
 import "./store-preview.css";
@@ -131,6 +129,29 @@ interface StorefrontPreviewCanvasProps {
   categoryGridProductsState?: "idle" | "loading" | "error" | "ready";
   categoryGridProducts?: { id: string; name: string; thumbnailUrl: string | null }[];
   categoryGridProductsTotal?: number;
+  /**
+   * CUST-H4-3 — the Home "categories" section's own real Canvas preview:
+   * the storefront's real root (top-level) categories, replacing the static
+   * `PREVIEW_CATEGORIES` fixture this branch used before. Sourced from the
+   * same tenant/storefront-scoped workspace categories read `product_grid`
+   * above already uses — never invented client-side. `"idle"` is rendered
+   * identically to an empty `"ready"` list (no data fetched yet looks the
+   * same as "nothing eligible"), exactly like `categoryGridProductsState`'s
+   * own convention above.
+   */
+  homeCategoriesState?: "idle" | "loading" | "error" | "ready";
+  homeCategories?: { id: string; name: string }[];
+  onRetryHomeCategories?: () => void;
+  /**
+   * CUST-H4-3 — the Home "newArrivals" section's own real Canvas preview:
+   * the storefront's real most-recently-created eligible products, ordered
+   * the same way Published's own `NewArrivals.tsx` orders them
+   * (`-available_on` → `created_at` desc), replacing the static
+   * `PREVIEW_PRODUCTS` fixture this branch used before.
+   */
+  homeNewArrivalsState?: "idle" | "loading" | "error" | "ready";
+  homeNewArrivals?: { id: string; name: string; thumbnailUrl: string | null }[];
+  onRetryHomeNewArrivals?: () => void;
 }
 
 export interface StorefrontBusinessIdentity {
@@ -170,6 +191,12 @@ export function StorefrontPreviewCanvas({
   categoryGridProductsState = "idle",
   categoryGridProducts = [],
   categoryGridProductsTotal = 0,
+  homeCategoriesState = "idle",
+  homeCategories = [],
+  onRetryHomeCategories,
+  homeNewArrivalsState = "idle",
+  homeNewArrivals = [],
+  onRetryHomeNewArrivals,
 }: StorefrontPreviewCanvasProps) {
   const t = (key: CustomizerMessageKey) => customizerMessage(locale, key);
   const storeName = previewStoreName(
@@ -527,43 +554,73 @@ export function StorefrontPreviewCanvas({
               return (
                 <section key="categories" aria-labelledby="preview-categories">
                   <SectionRule title={t("browseCategories")} action={t("viewAll")} />
-                  <ul className={cn("mt-4 grid", categoriesGap, categoriesColumns)}>
-                    {PREVIEW_CATEGORIES.map((category) => {
-                      const accent = categoryAccent(category.color);
-                      return (
+                  {/* "idle" (no fetch triggered yet — e.g. no storefrontId,
+                      or a direct render with no `ExperienceBuilder` data
+                      wired up) renders identically to "loading": unknown
+                      is not the same claim as "confirmed empty," so it must
+                      not jump straight to the empty-state copy. */}
+                  {homeCategoriesState === "loading" || homeCategoriesState === "idle" ? (
+                    <ul
+                      aria-hidden="true"
+                      className={cn("mt-4 grid", categoriesGap, categoriesColumns)}
+                    >
+                      {Array.from({ length: 6 }).map((_, index) => (
+                        <li
+                          key={index}
+                          className={cn(
+                            "animate-pulse rounded-store bg-store-surface-muted",
+                            isMarket ? "h-14" : "h-16",
+                          )}
+                        />
+                      ))}
+                    </ul>
+                  ) : homeCategoriesState === "error" ? (
+                    <div
+                      data-home-categories-error=""
+                      className="mt-4 flex flex-col items-center gap-2 rounded-store border border-dashed border-store-border px-4 py-8 text-center"
+                    >
+                      <p className="text-sm text-store-muted-foreground">{t("homeCategoriesLoadFailed")}</p>
+                      {onRetryHomeCategories && (
+                        <button
+                          type="button"
+                          onClick={onRetryHomeCategories}
+                          className="rounded-store border border-store-border px-3 py-1.5 text-xs font-medium text-store-foreground hover:bg-store-surface-muted"
+                        >
+                          {t("retry")}
+                        </button>
+                      )}
+                    </div>
+                  ) : homeCategories.length === 0 ? (
+                    <p
+                      data-home-categories-empty=""
+                      className="mt-4 rounded-store border border-dashed border-store-border px-4 py-8 text-center text-sm text-store-muted-foreground"
+                    >
+                      {t("homeCategoriesEmpty")}
+                    </p>
+                  ) : (
+                    <ul className={cn("mt-4 grid", categoriesGap, categoriesColumns)}>
+                      {homeCategories.map((category) => (
                         <li key={category.id}>
                           <div
                             className={cn(
                               "flex h-full flex-col justify-center gap-0.5 rounded-store border border-store-border border-s-[3px] bg-store-surface",
                               isMarket ? "px-3 py-2.5" : "px-4 py-3.5",
                             )}
-                            style={{ borderInlineStartColor: accent.rule }}
+                            style={{ borderInlineStartColor: "var(--store-border-strong)" }}
                           >
-                            {accent.isMerchantColor && (
-                              <span
-                                aria-hidden="true"
-                                className="mb-1 h-2 w-full rounded-store"
-                                style={{ backgroundColor: accent.rule }}
-                              />
-                            )}
                             <span
                               className={cn(
                                 "line-clamp-2 font-bold leading-snug text-store-foreground",
                                 isMarket ? "text-xs" : "text-sm",
                               )}
                             >
-                              {category.name[locale]}
+                              <bdi>{category.name}</bdi>
                             </span>
-                            {category.childCount > 0 && !isMarket && (
-                              <span className="text-xs text-store-muted-foreground tabular-nums">
-                                {category.childCount}
-                              </span>
-                            )}
                           </div>
                         </li>
-                      );
-                    })}
-                  </ul>
+                      ))}
+                    </ul>
+                  )}
                 </section>
               );
             }
@@ -572,41 +629,90 @@ export function StorefrontPreviewCanvas({
               return (
                 <section key="newArrivals" aria-labelledby="preview-arrivals">
                   <SectionRule title={t("newArrivals")} action={t("viewAll")} />
-                  <ul className={cn("mt-4 grid gap-3", newArrivalsColumns)}>
-                    {PREVIEW_PRODUCTS.map((product) => (
-                      <li
-                        key={product.id}
-                        className="overflow-hidden rounded-store border border-store-border bg-store-surface"
-                      >
-                        <div
-                          className={cn(
-                            cardImageHeight,
-                            "relative bg-store-surface-muted",
-                          )}
+                  {/* Same "idle" ≡ "loading" rule as the categories section
+                      above — see its comment. */}
+                  {homeNewArrivalsState === "loading" || homeNewArrivalsState === "idle" ? (
+                    <ul
+                      aria-hidden="true"
+                      className={cn("mt-4 grid gap-3", newArrivalsColumns)}
+                    >
+                      {Array.from({ length: 4 }).map((_, index) => (
+                        <li
+                          key={index}
+                          className="overflow-hidden rounded-store border border-store-border bg-store-surface"
                         >
-                          {/* Decorative only — the real quick-view dialog
-                              (`QuickView.tsx`) needs a live cart/store
-                              context this static preview frame doesn't
-                              have. This mirrors its trigger's exact
-                              position/icon so a merchant sees the
-                              affordance before publishing. */}
-                          {isMarket && (
-                            <span className="absolute bottom-2 start-2 inline-flex size-8 items-center justify-center rounded-full bg-store-surface/90 text-store-foreground shadow-sm">
-                              <Eye className="size-4" aria-hidden="true" />
-                            </span>
-                          )}
-                        </div>
-                        <div className={cardPad}>
-                          <p className="text-[11px] text-store-muted-foreground">
-                            {product.category[locale]}
-                          </p>
-                          <p className="mt-0.5 line-clamp-2 text-sm font-semibold text-store-foreground">
-                            {product.name[locale]}
-                          </p>
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
+                          <div className={cn(cardImageHeight, "animate-pulse bg-store-surface-muted")} />
+                          <div className={cardPad}>
+                            <div className="h-3 w-3/4 animate-pulse rounded-store bg-store-surface-muted" />
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : homeNewArrivalsState === "error" ? (
+                    <div
+                      data-home-new-arrivals-error=""
+                      className="mt-4 flex flex-col items-center gap-2 rounded-store border border-dashed border-store-border px-4 py-8 text-center"
+                    >
+                      <p className="text-sm text-store-muted-foreground">{t("homeNewArrivalsLoadFailed")}</p>
+                      {onRetryHomeNewArrivals && (
+                        <button
+                          type="button"
+                          onClick={onRetryHomeNewArrivals}
+                          className="rounded-store border border-store-border px-3 py-1.5 text-xs font-medium text-store-foreground hover:bg-store-surface-muted"
+                        >
+                          {t("retry")}
+                        </button>
+                      )}
+                    </div>
+                  ) : homeNewArrivals.length === 0 ? (
+                    <p
+                      data-home-new-arrivals-empty=""
+                      className="mt-4 rounded-store border border-dashed border-store-border px-4 py-8 text-center text-sm text-store-muted-foreground"
+                    >
+                      {t("homeNewArrivalsEmpty")}
+                    </p>
+                  ) : (
+                    <ul className={cn("mt-4 grid gap-3", newArrivalsColumns)}>
+                      {homeNewArrivals.map((product) => (
+                        <li
+                          key={product.id}
+                          className="overflow-hidden rounded-store border border-store-border bg-store-surface"
+                        >
+                          <div
+                            className={cn(
+                              cardImageHeight,
+                              "relative bg-store-surface-muted",
+                            )}
+                          >
+                            {product.thumbnailUrl ? (
+                              // eslint-disable-next-line @next/next/no-img-element -- tenant media URL, not a static asset
+                              <img
+                                src={product.thumbnailUrl}
+                                alt=""
+                                className="size-full object-cover"
+                              />
+                            ) : null}
+                            {/* Decorative only — the real quick-view dialog
+                                (`QuickView.tsx`) needs a live cart/store
+                                context this static preview frame doesn't
+                                have. This mirrors its trigger's exact
+                                position/icon so a merchant sees the
+                                affordance before publishing. */}
+                            {isMarket && (
+                              <span className="absolute bottom-2 start-2 inline-flex size-8 items-center justify-center rounded-full bg-store-surface/90 text-store-foreground shadow-sm">
+                                <Eye className="size-4" aria-hidden="true" />
+                              </span>
+                            )}
+                          </div>
+                          <div className={cardPad}>
+                            <p className="line-clamp-2 text-sm font-semibold text-store-foreground">
+                              <bdi>{product.name}</bdi>
+                            </p>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </section>
               );
             }

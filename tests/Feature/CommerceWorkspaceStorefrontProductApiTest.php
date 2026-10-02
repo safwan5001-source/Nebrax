@@ -435,4 +435,83 @@ class CommerceWorkspaceStorefrontProductApiTest extends TestCase
 
         $this->assertSame([], $res->json('data'));
     }
+
+    // ───────────────────────── CUST-H4-3 — sort=newest (feeds the Home "New Arrivals" Canvas preview) ─────────────────────────
+
+    /** @test */
+    public function default_order_is_unchanged_alphabetical_when_sort_is_omitted(): void
+    {
+        $auth = $this->registerTenant('prod-sort-default', 'owner@prod-sort-default.test');
+        $seeded = $this->seedWebStorefront($auth['tenant_id']);
+
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $this->seedProduct($seeded['channel'], ['name' => 'زيتون', 'name_en' => 'Olive']);
+        $this->seedProduct($seeded['channel'], ['name' => 'أرز', 'name_en' => 'Rice']);
+        app(TenantContext::class)->forget();
+
+        $res = $this->withToken($auth['token'])
+            ->getJson($this->listPath($seeded['storefront']->id))
+            ->assertOk();
+
+        $this->assertSame(['أرز', 'زيتون'], array_column($res->json('data'), 'name'));
+    }
+
+    /** @test */
+    public function sort_newest_orders_by_most_recently_created_first(): void
+    {
+        $auth = $this->registerTenant('prod-sort-newest', 'owner@prod-sort-newest.test');
+        $seeded = $this->seedWebStorefront($auth['tenant_id']);
+
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $oldest = $this->seedProduct($seeded['channel'], ['name' => 'زيتون أول']);
+        $oldest->forceFill(['created_at' => now()->subDays(3)])->save();
+        $middle = $this->seedProduct($seeded['channel'], ['name' => 'أرز وسط']);
+        $middle->forceFill(['created_at' => now()->subDay()])->save();
+        $newest = $this->seedProduct($seeded['channel'], ['name' => 'موز حديث']);
+        $newest->forceFill(['created_at' => now()])->save();
+        app(TenantContext::class)->forget();
+
+        $res = $this->withToken($auth['token'])
+            ->getJson($this->listPath($seeded['storefront']->id).'?sort=newest')
+            ->assertOk();
+
+        $this->assertSame(
+            [$newest->id, $middle->id, $oldest->id],
+            array_column($res->json('data'), 'id'),
+        );
+    }
+
+    /** @test */
+    public function sort_newest_still_respects_tenant_isolation_and_eligibility(): void
+    {
+        $a = $this->registerTenant('prod-sort-isolation-a', 'owner@prod-sort-isolation-a.test');
+        $b = $this->registerTenant('prod-sort-isolation-b', 'owner@prod-sort-isolation-b.test');
+        $seededA = $this->seedWebStorefront($a['tenant_id']);
+        $seededB = $this->seedWebStorefront($b['tenant_id']);
+
+        app(TenantContext::class)->set($a['tenant_id']);
+        $this->seedProduct($seededA['channel'], ['name' => 'منتج أ']);
+        app(TenantContext::class)->forget();
+
+        app(TenantContext::class)->set($b['tenant_id']);
+        $this->seedProduct($seededB['channel'], ['name' => 'منتج ب']);
+        app(TenantContext::class)->forget();
+
+        $res = $this->withToken($a['token'])
+            ->getJson($this->listPath($seededA['storefront']->id).'?sort=newest')
+            ->assertOk();
+
+        $this->assertSame(['منتج أ'], array_column($res->json('data'), 'name'));
+    }
+
+    /** @test */
+    public function an_unsupported_sort_value_is_rejected(): void
+    {
+        $auth = $this->registerTenant('prod-sort-invalid', 'owner@prod-sort-invalid.test');
+        $seeded = $this->seedWebStorefront($auth['tenant_id']);
+
+        $this->withToken($auth['token'])
+            ->getJson($this->listPath($seeded['storefront']->id).'?sort=price_asc')
+            ->assertStatus(422);
+    }
 }

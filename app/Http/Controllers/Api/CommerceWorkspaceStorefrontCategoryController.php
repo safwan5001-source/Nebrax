@@ -44,6 +44,17 @@ use Illuminate\Http\Request;
  * مسار `storefront.v1.*`، يُسقِط المورد حقل `image` تلقائياً بمنطقه القائم
  * (`isStorefrontRequest()`) — يطابق «صورة غلاف التصنيف مؤجَّلة» في هذه الشريحة
  * دون أي منطق إضافي هنا.
+ *
+ * **CUST-H4-3 (تصحيح التكافؤ) — `root_only=true`**: إضافيٌّ واختياري
+ * بالكامل؛ غيابه يُبقي السلوك الافتراضي (قائمة مختلطة الأعماق) كما هو حرفياً
+ * لكل مستدعٍ قائم (منتقي صفحة التصنيف). الفلتر `whereNull('parent_id')`
+ * يُطبَّق **قبل** `paginate()` لا بعده — هذا هو الفارق الجوهري عن ترشيح طرف
+ * العميل: صفحةٌ أولى مزدحمة بتصنيفات فرعية لن «تُجوِّع» تصنيفات رئيسية تقع
+ * بعدها أبجدياً. مُخصِّص الواجهة يستعمله لمعاينة قسم «التصنيفات» الحقيقي على
+ * الصفحة الرئيسية، ليطابق `depth_eq: 0` الذي تستعمله الواجهة المنشورة فعلاً
+ * (`StorefrontCategoryController`/`CategoriesSection.tsx`) — لا معنى جديد
+ * يُخترع هنا، ونفس مبدأ `sort=newest` الذي أضافه
+ * `CommerceWorkspaceStorefrontProductController` لنفس السبب بالضبط.
  */
 class CommerceWorkspaceStorefrontCategoryController extends ApiController
 {
@@ -64,6 +75,27 @@ class CommerceWorkspaceStorefrontCategoryController extends ApiController
 
         $filters = $request->validate([
             'search' => ['sometimes', 'nullable', 'string', 'max:120'],
+            // CUST-H4-3 (parity fix) — additive and opt-in only. Every
+            // existing caller (the Category-page preview picker) omits it
+            // and keeps today's mixed-depth list unchanged. When present,
+            // the `whereNull('parent_id')` filter below is applied *before*
+            // `paginate()`, so a page is never filled with non-root rows
+            // that then starve root categories off the end of the result —
+            // the exact parity gap a client-side filter-after-fetch would
+            // have left open.
+            //
+            // Deliberately `in:true,false,1,0` rather than the bare
+            // `boolean` rule this codebase's other boolean filters use
+            // (e.g. `PublicProductController`'s `is_active`): Laravel's
+            // `boolean` rule only accepts the literal values
+            // `[true, false, 0, 1, '0', '1']` (strict comparison) — it
+            // rejects the query-string `"true"`/`"false"` a URL literally
+            // spelling `root_only=true` sends, which is both this slice's
+            // own URL (and every `URLSearchParams`-built request from the
+            // web client, which serializes a JS boolean as that exact
+            // string) — accepting only `1`/`0` here would 422 on the one
+            // request shape this fix exists to serve.
+            'root_only' => ['sometimes', 'nullable', 'string', 'in:true,false,1,0'],
             'page' => ['sometimes', 'nullable', 'integer', 'min:1'],
             'per_page' => ['sometimes', 'nullable', 'integer', 'min:1', 'max:'.self::PER_PAGE_MAX],
         ]);
@@ -78,6 +110,10 @@ class CommerceWorkspaceStorefrontCategoryController extends ApiController
         if (filled($filters['search'] ?? null)) {
             $like = '%'.str_replace(['%', '_'], ['\\%', '\\_'], (string) $filters['search']).'%';
             $query->where('name', 'like', $like);
+        }
+
+        if ($request->boolean('root_only')) {
+            $query->whereNull('parent_id');
         }
 
         $perPage = min((int) ($filters['per_page'] ?? self::PER_PAGE_DEFAULT), self::PER_PAGE_MAX);

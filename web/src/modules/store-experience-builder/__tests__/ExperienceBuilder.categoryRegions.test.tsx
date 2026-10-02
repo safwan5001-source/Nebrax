@@ -269,7 +269,12 @@ describe('ExperienceBuilder — CUST-H2-4 Category page structured editing', () 
     const user = userEvent.setup();
     await renderReady(user);
     await waitFor(() => expect(listProductsMock).toHaveBeenCalled());
-    expect(listProductsMock.mock.calls[0][1]).toMatchObject({ categoryId: 'cat-1' });
+    // CUST-H4-3 — the Home page's own "New Arrivals" section preview also
+    // calls this same mocked client (unrelated `sort: "newest"` request,
+    // fired before this test switches to the Category page below), so the
+    // category-grid call is no longer necessarily `calls[0]` — find it by
+    // its own distinguishing param instead of assuming call order.
+    expect(listProductsMock.mock.calls.some((call) => (call[1] as Record<string, unknown>)?.categoryId === 'cat-1')).toBe(true);
     await waitFor(() =>
       expect(document.querySelector('[data-category-preview-no-products]')).not.toBeNull(),
     );

@@ -129,12 +129,19 @@ function mapDetail(payload: unknown): WorkspaceCategoryDetail | null {
 
 export async function listWorkspaceCategories(
   storefrontId: string,
-  params: { search?: string; page?: number; perPage?: number } = {},
+  params: { search?: string; rootOnly?: boolean; page?: number; perPage?: number } = {},
   signal?: AbortSignal,
 ): Promise<WorkspaceCategoryListOutcome> {
   try {
     const query = new URLSearchParams();
     if (params.search) query.set('search', params.search);
+    // CUST-H4-3 (parity fix) — feeds the Home "categories" section's real
+    // Canvas preview with a true server-side root-category query
+    // (`whereNull('parent_id')`, applied before pagination), matching
+    // Published's own `depth_eq: 0` semantics exactly. Sent only when
+    // explicitly requested — every other caller (the Category-page preview
+    // picker) omits it and keeps today's mixed-depth list unchanged.
+    if (params.rootOnly) query.set('root_only', 'true');
     if (params.page) query.set('page', String(params.page));
     if (params.perPage) query.set('per_page', String(params.perPage));
     const qs = query.toString();

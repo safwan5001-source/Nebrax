@@ -104,6 +104,19 @@ describe('workspace-products client — CUST-H2-3', () => {
     expect(path).toContain('per_page=10');
   });
 
+  it('sends sort=newest only when explicitly requested (CUST-H4-3)', async () => {
+    apiMock.mockResolvedValue({ data: [], meta: { pagination: { has_more: false } } });
+    await listWorkspaceProducts('store-1', { sort: 'newest', perPage: 8 });
+    const [path] = apiMock.mock.calls[0];
+    expect(path).toContain('sort=newest');
+    expect(path).toContain('per_page=8');
+
+    apiMock.mockClear();
+    await listWorkspaceProducts('store-1');
+    const [defaultPath] = apiMock.mock.calls[0];
+    expect(defaultPath).not.toContain('sort=');
+  });
+
   it('classifies a 404 as not_found without throwing', async () => {
     apiMock.mockRejectedValue(new ApiError(404, 'not found', {}));
     const result = await listWorkspaceProducts('store-1');
