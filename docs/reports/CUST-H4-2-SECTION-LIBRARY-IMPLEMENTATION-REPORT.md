@@ -3,7 +3,7 @@
 **Horizon:** CUST-H4 — Section Library & Real Section Activation
 **Slice:** H4-2 (Capability Registry + Section Library UX)
 **Base SHA:** `b6024bd25a826e3800238d9c3ea1c62920001614` — `docs(store): define CUST-H4 section library and activation contract (#1150)`
-**Mobile-contract fix commit (Head SHA):** `350f0d3f77d48a2f531ffdd111f09a2e65b3f556`
+**Mobile UX polish commit (Head SHA):** `f6da3659bc0eb6ad0a8b04f82efd4b0a39663bf3`
 **Branch:** `feat/cust-h4-2-section-library`
 **PR:** [safwan5001-source/Nebrax#1154](https://github.com/safwan5001-source/Nebrax/pull/1154), open against `main`, not merged
 
@@ -103,6 +103,43 @@ a separate modal paradigm").
   `/dev/customizer-versions` fixture (no backend/login needed — the same
   pattern `cust-h2-2-page-navigator.spec.ts` already uses) — see §13.
 
+## Revision Note 3 (owner/reviewer correction on PR #1154 — Back vs Close affordance)
+
+Revision 2 correctly moved the Library inside the existing mobile Bottom
+Sheet instead of stacking a second dialog on top of it, but left its own
+header control as a "×" (Close) icon — identical in appearance to the
+outer sheet's own "×", right above it. Both controls called a handler
+named `onClose`, but they do different things: the outer "×" exits the
+whole Sections sheet; the inner one only returns to the composer list.
+Two identical-looking "×" controls for two different actions is confusing.
+
+**This revision:**
+
+- Adds `closeAction?: "close" | "back"` to `SectionLibraryContent` (default
+  `"close"`, preserving every existing desktop call site's behavior without
+  changes). Only the header control's **icon and accessible label** switch
+  on this prop — the handler is still `onClose` either way; nothing about
+  *what* happens changes, only how it's presented.
+- `SectionLibraryDialog` (desktop) now passes `closeAction="close"`
+  explicitly — unchanged behavior, made explicit per the review's own
+  "small explicit prop" guidance.
+- `HomepagePanel`'s mobile branch (`ControlPanels.tsx`) now passes
+  `closeAction="back"` — the control reads "رجوع"/"Back" with a directional
+  arrow instead of "×", labeled via a new `sectionLibraryBack` message key
+  (ar/en), distinct from the existing `close` key the outer sheet's "×"
+  still uses.
+- The arrow is drawn pointing start-ward (left, LTR) and flipped under
+  `rtl:rotate-180` — the exact same logical-direction Tailwind pattern
+  `storefront/.../HeroSection.tsx` already uses for its own chevron, not a
+  hardcoded locale check. Under RTL it correctly points right (toward
+  "back" in a right-to-left reading flow).
+- New `data-section-picker`/`data-close-action` and
+  `data-section-library-close-action` attributes make the distinction
+  assertable in tests (and inspectable in the browser) without relying on
+  icon shape alone.
+- Desktop is otherwise untouched — same `SectionLibraryDialog`, same close
+  behavior, same tests passing unchanged.
+
 ---
 
 ## 1. Scope actually implemented
@@ -135,31 +172,31 @@ Laravel files are part of this diff.
 
 ## 2. Files changed
 
-Cumulative diff vs. Base SHA (both review-fix revisions included; `git
-diff --stat` on the staged tree, so new files are counted too):
+Cumulative diff vs. Base SHA (all three review-fix revisions included;
+`git diff --stat` on the staged tree, so new files are counted too):
 
 ```
- web/e2e/cust-h4-2-section-library-visual.spec.ts                          | 124 ++++       (A, new)
+ web/e2e/cust-h4-2-section-library-visual.spec.ts                          | 144 ++++       (A, new — Rev. 2; extended in Rev. 3)
  web/src/app/(commerce)/commerce/appearance/section-instances.test.tsx     |  49 ++-         (M)
- web/src/app/(commerce)/commerce/appearance/section-library-mobile.test.tsx| 249 +++++       (A, new)
- web/src/modules/store-experience-builder/ControlPanels.tsx                |  82 ++--         (M)
+ web/src/app/(commerce)/commerce/appearance/section-library-mobile.test.tsx| 270 +++++       (A, new — Rev. 2; extended in Rev. 3)
+ web/src/modules/store-experience-builder/ControlPanels.tsx                |  85 ++--         (M)
  web/src/modules/store-experience-builder/ExperienceBuilder.tsx            |   2 +            (M)
- web/src/modules/store-experience-builder/SectionLibrary.tsx               | 469 +++++++++++  (A, new — Revision 1; restructured in Revision 2)
- web/src/modules/store-experience-builder/__tests__/SectionLibrary.test.tsx| 224 ++++++++++    (A, new — Revision 1; extended in Revision 2)
+ web/src/modules/store-experience-builder/SectionLibrary.tsx               | 510 +++++++++++  (A, new — Rev. 1; restructured Rev. 2; closeAction added Rev. 3)
+ web/src/modules/store-experience-builder/__tests__/SectionLibrary.test.tsx| 284 ++++++++++    (A, new — Rev. 1; extended Rev. 2 and Rev. 3)
  web/src/modules/store-experience-builder/__tests__/section-capabilities.test.ts | 134 ++++++ (M)
- web/src/modules/store-experience-builder/messages.ts                      |  75 ++++          (M)
+ web/src/modules/store-experience-builder/messages.ts                      |  83 ++++          (M)
  web/src/modules/store-experience-builder/presentation/section-capabilities.ts | 218 +++++++- (M)
- 10 files changed, 1571 insertions(+), 55 deletions(-)
+ 10 files changed, 1724 insertions(+), 55 deletions(-)
 ```
 
-This fix's own diff (Revision 2 only, on top of the Revision-1 commits
-`b6f360b`/`1135c56`/`6a4103c`/`716906e`) touches 9 files: `SectionLibrary.tsx`
-(split into `SectionLibraryContent`/`SectionLibraryDialog`), `ControlPanels.tsx`
-(mobile wiring), `ExperienceBuilder.tsx` (`isMobileViewport` prop threaded
-to both `<ControlPanels>` call sites), `presentation/section-capabilities.ts`
-(comment cleanup only — see §3), `SectionLibrary.test.tsx` (new
-`SectionLibraryContent` test), and 2 new test files (`section-library-mobile.test.tsx`,
-`cust-h4-2-section-library-visual.spec.ts`) plus this report.
+This fix's own diff (Revision 3 only, on top of the Revision-1/2 commits
+`b6f360b`/`1135c56`/`6a4103c`/`716906e`/`350f0d3`/`46fd93a`) touches 6
+files: `SectionLibrary.tsx` (`closeAction` prop + `BackIcon`),
+`ControlPanels.tsx` (`closeAction="back"` on the mobile call site),
+`messages.ts` (new `sectionLibraryBack` key, ar/en), `SectionLibrary.test.tsx`
+(4 new tests), `section-library-mobile.test.tsx` (1 new test + 1 updated),
+and `e2e/cust-h4-2-section-library-visual.spec.ts` (back-vs-close
+assertions + new screenshots) — plus this report.
 
 ---
 
@@ -238,7 +275,8 @@ category/card content, shared by two presentations, chosen by
   الجوال وسطح المكتب"): a `fixed inset-0` backdrop, `role="dialog"
   aria-modal="true"`, `max-w-lg`, `max-h-[85dvh]`, independent
   `overflow-y-auto` on the card list (`flex-1`) with header/search/chips
-  fixed.
+  fixed. `closeAction="close"` — the header control is a real "×" Close,
+  because on desktop it genuinely closes the dialog.
 - **Mobile** (`isMobileViewport === true`) — **no dialog wrapper at all.**
   `HomepagePanel` renders `SectionLibraryContent` directly, in place of its
   own composer body, inside the *same* generic "sections" mobile Bottom
@@ -251,7 +289,12 @@ category/card content, shared by two presentations, chosen by
   `ProductPreviewPickerPanel` already uses). There is never more than one
   `role="dialog"`/`aria-modal="true"` surface on screen — see Revision
   Note 2 for why the first revision's "always a centered dialog, even on
-  mobile" approach was wrong and what replaced it.
+  mobile" approach was wrong and what replaced it. `closeAction="back"`
+  (Revision Note 3) — the header control reads "رجوع"/"Back" with a
+  directional arrow (`rtl:rotate-180`, same logical-flip pattern
+  `storefront/.../HeroSection.tsx`'s own chevron already uses), not a
+  second "×" next to the outer sheet's real Close — it returns to the
+  composer, the sheet itself never closes.
 - **Search** matches a simple lower-cased substring against each type's
   translated title + description (`normalizeSearchText`) — no new fuzzy-
   search infrastructure, per the task's own guidance that simple matching
@@ -327,7 +370,7 @@ independently of this hierarchy and is unaffected by it — it reflects
   direction-dependent absolute positioning, so RTL/LTR mirrors purely via
   the `dir` attribute the rest of the Customizer already sets.
 
-## 8. Mobile behavior (rewritten for Revision 2 — real architecture)
+## 8. Mobile behavior (rewritten for Revision 2 — real architecture; Back/Close polish in Revision 3)
 
 - **Follows the existing Bottom Sheet contract, not a nested modal.** The
   Library opens *inside* the same generic "sections" mobile Bottom Sheet
@@ -336,11 +379,20 @@ independently of this hierarchy and is unaffected by it — it reflects
   composer content in place — confirmed by a real browser test asserting
   `page.getByRole('dialog')` stays at count 1 throughout open → search →
   add → close.
-- **Back, not exit.** The Library's own header close button
-  (`aria-label="إغلاق"`) calls `setPickerOpen(false)`, which simply falls
-  through to `HomepagePanel`'s normal composer render — the sheet itself
-  never closes. Verified both at the component level and via a real
-  browser round-trip (open → close → composer visible again, same sheet).
+- **Back, not a second Close (Revision Note 3).** The Library's own header
+  control now reads `aria-label="رجوع"`/`"Back"` with a directional arrow
+  icon — not `aria-label="إغلاق"` (Close), which the outer Sections sheet's
+  own control keeps exclusively. Clicking it calls `setPickerOpen(false)`,
+  which simply falls through to `HomepagePanel`'s normal composer render —
+  the sheet itself never closes. Verified at three levels: a component
+  test asserting the label/icon pair for `closeAction="back"` vs
+  `"close"`; an `ExperienceBuilder`-level integration test asserting
+  exactly one `aria-label="إغلاق"` element exists on the whole page while
+  the Library is open (the outer sheet's), that the Library's own control
+  is `aria-label="رجوع"` and is *not* a descendant of anything labeled
+  "إغلاق", and that clicking it returns to the composer in the same still-
+  open sheet; and a real browser test confirming the same, plus that the
+  outer sheet's own "إغلاق" still closes the whole sheet when clicked.
 - **Preserves document state.** Opening the Library only sets local
   `pickerOpen` state; it never touches `StorefrontPresentationConfig` —
   confirmed in the browser test by reading
@@ -392,6 +444,15 @@ only because visual QA surfaced it directly.
   (`SectionLibraryContent` renders with `role`/`aria-modal` both absent)
   and by the browser test's running `page.getByRole('dialog')` count
   assertion at every step.
+- **Never two identically-labeled controls for two different actions**
+  (Revision Note 3). The header control's accessible name now matches
+  what it actually does: `aria-label="رجوع"`/`"Back"` on mobile
+  (`closeAction="back"`), `aria-label="إغلاق"`/`"Close"` on desktop
+  (`closeAction="close"`, the default) — a screen reader user on mobile
+  never hears "Close" twice for two different outcomes. The back arrow is
+  `aria-hidden="true"` (decorative; the button's own `aria-label` carries
+  the meaning), drawn start-ward and flipped via `rtl:rotate-180` so it
+  always points toward "previous" in the active reading direction.
 - Every section card is a genuine `<button>` (never a click-only `<div>`),
   keyboard-focusable and keyboard-activatable natively, `disabled` for
   non-addable states (so screen readers and keyboard users get the native
@@ -427,59 +488,65 @@ through the `t()` callback the rest of the module already uses.
 
 ## 11. Tests executed — exact results
 
-Re-run in full after this mobile-contract fix (component split +
-`isMobileViewport` wiring + comment cleanup + new/updated tests):
+Re-run in full after this mobile UX polish (Back/Close affordance split +
+new/updated tests):
 
 **Targeted (new/changed) suites:**
 
 ```
-src/modules/store-experience-builder/__tests__/section-capabilities.test.ts    22 tests passed  (unchanged by this fix — no runtime state changed, see §3)
-src/modules/store-experience-builder/__tests__/SectionLibrary.test.tsx         14 tests passed  (+1: SectionLibraryContent carries no dialog/modal role)
+src/modules/store-experience-builder/__tests__/section-capabilities.test.ts    22 tests passed  (unchanged by this fix — no runtime state changed)
+src/modules/store-experience-builder/__tests__/SectionLibrary.test.tsx         18 tests passed  (+4: closeAction default, back-renders-not-close + calls onClose, English back label, SectionLibraryDialog always shows real Close)
 src/app/(commerce)/commerce/appearance/section-instances.test.tsx              12 tests passed  (unchanged by this fix)
 src/app/(commerce)/commerce/appearance/section-editing.test.tsx                 8 tests passed  (unchanged by this fix)
-src/app/(commerce)/commerce/appearance/section-library-mobile.test.tsx          6 tests passed  (new — real ExperienceBuilder mobile-viewport integration: single-dialog, document-preserving open, back-to-composer close, search/category/add, Offers non-addable, singleton already-added, all exercised through the actual mobile Bottom Sheet path)
+src/app/(commerce)/commerce/appearance/section-library-mobile.test.tsx          7 tests passed  (+1: new test proving the outer sheet's own Close still closes the whole sheet, distinct from the Library's Back; the existing "closing returns to composer" test was strengthened to assert the single-"×"/Back-not-Close distinction explicitly)
 ```
 
 **Full module directory** (`web/src/modules/store-experience-builder`):
-25 test files, **262 tests passed** (+1, the new
-`SectionLibraryContent`-carries-no-dialog-role test), 0 failed.
+25 test files, **266 tests passed** (+4), 0 failed.
 
 **Full `(commerce)` route group** (`web/src/app/(commerce)`): 19 test
-files (+1), **188 tests passed** (+6), 0 failed.
+files (unchanged — no new files, existing ones extended), **189 tests
+passed** (+1), 0 failed.
 
 **Full web suite** (`npm test`, i.e. `vitest run` across all of `web/src`):
-337 test files (+1), **2533 tests passed** (+7), 0 failed.
+337 test files, **2538 tests passed** (+5), 0 failed.
 
-**Real browser (Playwright)** — new:
+**Real browser (Playwright)** — extended:
 `e2e/cust-h4-2-section-library-visual.spec.ts`, run against the
 `desktop` project (each test sets its own explicit viewport, same
 convention `cust-h2-2-page-navigator.spec.ts` already uses), Chromium,
 against the existing `/dev/customizer-versions` demo fixture (no Laravel
-server, no login): **3 passed, 0 failed** — AR 390, AR 430, AR desktop.
-See §13 for what was actually inspected.
+server, no login): **3 passed, 0 failed** — AR 390, AR 430, AR desktop,
+now with explicit Back-vs-Close assertions (exactly one `aria-label="إغلاق"`
+on screen while the mobile Library is open, the Library's own control is
+`aria-label="رجوع"`, its SVG carries the `rtl:rotate-180` class, and the
+desktop dialog exposes `aria-label="إغلاق"` and never `"رجوع"`). See §13
+for what was actually inspected.
 
 **TypeScript** (`npx tsc --noEmit`): pre-existing, unrelated errors exist on
 `main` in files this slice never touches (`pos/settings/configuration`,
 `gemini-card`, `document-language-selector`, `product-*`,
-`use-document-label-mode`, `useImportJobEngine`). The new
-`section-library-mobile.test.tsx` carries the same pre-existing
-`(...args: unknown[]) => showMock(...args)` spread-argument TS2556 note its
-sibling fixtures (`section-instances.test.tsx`, `section-selection.test.tsx`)
-already carry — copied verbatim from that established pattern, not a new
-issue this fix introduced. None of the files this slice changed otherwise
-appear in the error list.
+`use-document-label-mode`, `useImportJobEngine`). None of the files this
+fix changed appear in the error list.
 
 **Build** (`npm run build`), re-run after this fix:
-`✓ Compiled successfully in 15.5s`, `✓ Generating static pages (179/179)` —
+`✓ Compiled successfully in 44s`, `✓ Generating static pages (179/179)` —
 clean, no errors.
 
 **Backend** (`php artisan test`, full suite, no `--filter`, run from the
 scaffolded `nibras-app` Laravel project per this repo's test-environment
-convention): consistent across all three runs so far (first H4-2 revision,
-the Offers review fix, and this mobile-contract fix) — **4973 passed, 59
-failed, 51 skipped (31069 assertions)**. **Zero PHP/Laravel files are part
-of this diff, in any revision** — every revision of this slice is `web/`
-TypeScript (+ one new Playwright e2e spec) only. §12 shows the
+convention): confirmed consistent across all four rounds (first H4-2
+revision, the Offers review fix, the mobile-contract fix, and this
+Back/Close polish) — **4973 passed, 59 failed, 51 skipped (31069
+assertions)**. This round's own re-run (932s) matches the prior three
+exactly; an earlier same-round attempt produced a spurious 184-failure
+result because the session's compact-hook scaffold rebuild raced the
+background test run and corrupted the `nibras-app` checkout mid-suite —
+discarded once the `.env` rebuild timestamp exposed the race, and
+re-run clean to get this confirmed number.
+**Zero PHP/Laravel files are part of this diff, in any revision** — every
+revision of this slice is `web/` TypeScript (+ one Playwright e2e spec)
+only. §12 shows the
 authoritative result: the PR's own CI runs `php artisan test` fresh on
 both SQLite and PostgreSQL and both are green, confirming the local 59
 failures are an artifact of this session's own scaffold, not a real issue.
@@ -520,22 +587,26 @@ same fixture `cust-h2-2-page-navigator.spec.ts` already uses — mounts the
 real `ExperienceBuilder`, no Laravel server, no login) made this possible
 without standing up the full backend.
 
-New spec: `e2e/cust-h4-2-section-library-visual.spec.ts`, run via
+Spec: `e2e/cust-h4-2-section-library-visual.spec.ts`, run via
 `npx playwright test e2e/cust-h4-2-section-library-visual.spec.ts
 --project=desktop` (each test sets its own explicit viewport, same
 convention `cust-h2-2-page-navigator.spec.ts` already established), with
 `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` pointed at the pre-installed browser
 (the repo's own `playwright.config.ts` looks for `/usr/bin/chromium` etc.,
-none of which exist in this execution environment). **3/3 passed.**
+none of which exist in this execution environment). **3/3 passed**,
+re-run after this Back/Close polish with new assertions and new
+screenshots added.
 
 **Widths actually inspected, as the task required — screenshots opened and
 read, not just asserted on:**
 
 - **AR 390** (`ar-390-sections-sheet.png`, `ar-390-library-open.png`,
-  `ar-390-library-search.png`, `ar-390-after-add.png`) — the Library opens
-  inside the same "sections" sheet (one dialog, titled "الأقسام", with the
-  Library's own "مكتبة الأقسام" header directly beneath it, no stacked
-  second overlay); category chips wrap cleanly in two rows with no
+  `ar-390-library-search.png`, `ar-390-after-add.png`,
+  `ar-390-library-back-control.png`) — the Library opens inside the same
+  "sections" sheet (one dialog, titled "الأقسام" with its own real "×"
+  Close, and the Library's own "مكتبة الأقسام" header directly beneath it
+  — **now showing a right-pointing back arrow, not a second "×"**, no
+  stacked second overlay); category chips wrap cleanly in two rows with no
   clipping; cards render with their thumbnail glyph, title, description,
   and (for `featured`) the "قيد الإكمال" badge; search for "شريط ترويجي"
   correctly narrows to the one matching card under "الصور والفيديو" with
@@ -544,21 +615,30 @@ read, not just asserted on:**
   "شريط ترويجي" with a visibility toggle) — the exact same selection
   behavior the pre-existing desktop Add flow already had.
 - **AR 430** (`ar-430-sections-sheet.png`, `ar-430-library-open.png`,
-  `ar-430-library-search.png`, `ar-430-after-add.png`) — same checks,
-  confirming the layout isn't 390-specific; chips and cards use the extra
-  40px cleanly, still no horizontal overflow.
+  `ar-430-library-search.png`, `ar-430-after-add.png`,
+  `ar-430-library-back-control.png`) — same checks, confirming the layout
+  isn't 390-specific; chips and cards use the extra 40px cleanly, still no
+  horizontal overflow; the back arrow renders identically.
 - **AR desktop** (1440×960; `ar-desktop-homepage-panel.png`,
   `ar-desktop-library-dialog.png`) — the centered dialog renders correctly
   over the dimmed Canvas (which stays visible and in place behind it, per
   the "Canvas remains dominant" requirement), two-column card grid with
   category headings, `offers` visibly disabled with its own "غير مفعّل"
-  badge and the new "العروض قادمة…" reason text, `banner` visibly enabled.
+  badge and the "العروض قادمة…" reason text, `banner` visibly enabled —
+  and the dialog's own header control is still a plain "×" (Close), not an
+  arrow, confirmed both visually and via the spec's explicit assertion.
 
 **What the spec additionally asserts, beyond what a screenshot alone
 shows:** at every step, `page.getByRole('dialog')` stays at count 1 (the
 structural "no nested modal" guarantee); `document.documentElement
 .scrollWidth <= clientWidth + 1` (no horizontal overflow) at both mobile
-widths; the Library content's own root carries no `role` attribute.
+widths; the Library content's own root carries no `role` attribute;
+**exactly one `aria-label="إغلاق"` element exists on the whole mobile page
+while the Library is open** (the outer sheet's), the Library's own control
+is `aria-label="رجوع"`, and its `<svg>` carries the `rtl:rotate-180` class
+(the structural half of confirming the arrow actually flips under RTL —
+the screenshots are the visual half); the desktop dialog's control is
+`aria-label="إغلاق"` and there is no `"رجوع"` anywhere in it.
 
 **One real finding from this pass**, unrelated to the Section Library
 itself and out of this fix's scope: at this fixture's true-mobile
@@ -598,6 +678,15 @@ for H4-8's own cross-section QA pass rather than duplicated here.
   the registry rather than a hand-authored map — a deliberate de-
   duplication, not a behavior change; every existing `SECTION_LABEL[type]`
   call site is untouched.
+- Revision 3's `closeAction` prop is additive and defaults to `"close"`,
+  so every pre-existing caller of `SectionLibraryContent`/
+  `SectionLibraryDialog` other than `ControlPanels.tsx`'s mobile early
+  return keeps its prior Close semantics without being touched. Only one
+  call site (`ControlPanels.tsx`'s `pickerOpen && isMobileViewport` branch)
+  passes `closeAction="back"`.
+- The Back icon (`BackIcon`) is a new, separate `<svg>` from `CloseIcon` —
+  not a CSS rotation of the same glyph — so a future change to one shape
+  cannot accidentally also change the other's meaning.
 
 ## 15. Confirmation of what remains for H4-3 through H4-8
 
@@ -640,10 +729,19 @@ Owner/reviewer review of this PR, specifically:
    Library now replaces the existing "sections" Bottom Sheet's own content
    on mobile instead of stacking a second centered dialog on top of it —
    matches the merged H4 architecture's mobile UX contract.
-3. Optionally fold the pre-existing double-mount `HomepagePanel` layout
+3. Confirm the Back-vs-Close affordance fix (§5, §8, §9, Revision Note 3)
+   — mobile shows exactly one Close "×" (the outer Bottom Sheet's), and
+   the inner Library header control is a direction-correct Back arrow
+   (`رجوع`/`Back`) that returns to the composer without closing the
+   sheet; desktop is unaffected and keeps its own real Close control.
+4. Optionally fold the pre-existing double-mount `HomepagePanel` layout
    quirk (§8, §14) into a follow-up ticket; not blocking.
-4. On approval, proceed to H4-3/H4-4/H4-5 (independently parallelizable
+5. On approval, proceed to H4-3/H4-4/H4-5 (independently parallelizable
    per the Horizon's own sequencing) and H4-6 (Offers backend, startable
    independently of all of them) — H4-6+H4-7 are also what unlocks
    flipping `offers` to `state: "live", merchantAddable: true` per §4's
    documented transition.
+
+This closes out the three review-fix rounds raised on PR #1154 (Offers
+addability, mobile Bottom Sheet contract, Back-vs-Close affordance). No
+further rework is pending from this session absent new reviewer feedback.
