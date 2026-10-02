@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   canAddSectionType,
   canDuplicateSection,
@@ -1623,13 +1623,13 @@ function AppsPanel({
             }
           />
         </Field>
-        <AppUrlField
+        <DeferredCommitField
           label={t("iosUrl")}
           placeholder="https://apps.apple.com/..."
           value={config.apps.iosUrl}
           onCommit={(iosUrl) => patch({ apps: { ...config.apps, iosUrl } })}
         />
-        <AppUrlField
+        <DeferredCommitField
           label={t("androidUrl")}
           placeholder="https://play.google.com/..."
           value={config.apps.androidUrl}
@@ -1715,13 +1715,12 @@ function BannerFields({
       <Field label={t("bannerImageUrl")}>
         <input className={inputClass} value={value.imageUrl ?? ""} onChange={(event) => set({ imageUrl: event.target.value || null })} />
       </Field>
-      <Field label={t("bannerImageAlt")} hint={t("bannerImageAltHint")}>
-        <input
-          className={inputClass}
-          value={value.imageAlt ?? ""}
-          onChange={(event) => set({ imageAlt: event.target.value })}
-        />
-      </Field>
+      <DeferredCommitField
+        label={t("bannerImageAlt")}
+        hint={t("bannerImageAltHint")}
+        value={value.imageAlt ?? ""}
+        onCommit={(imageAlt) => set({ imageAlt })}
+      />
     </div>
   );
 }
@@ -1869,56 +1868,66 @@ function FeaturedFields({
 }
 
 /**
- * CUST-H4-4 review fix — `patch` normalizes the whole config synchronously
- * on every call (`ExperienceBuilder.updateDraft`), and the apps normalizer
- * replaces anything that isn't already a complete allow-listed URL with
- * `""`. Bound directly to `config.apps.iosUrl`/`androidUrl` as a plain
- * controlled input, that wipes the field after the very first keystroke —
- * normal typing becomes impossible. This keeps a local draft while the
- * field has focus and only commits (and therefore only normalizes) on
- * blur, so a merchant can type a URL character by character; the final
- * value still goes through the exact same `onCommit`/`patch`/normalizer
- * path every other field already uses — no second persistence model, no
- * weakening of URL safety. `isEditing` (not a bare `[value]` dependency)
- * gates the resync: a naive `useEffect(() => setDraft(value), [value])`
- * misses the case where a rejected URL normalizes back to the exact same
- * value the field already held (e.g. an invalid URL committed while the
- * field was already `""`) — `value` never "changes" in that case, so the
- * effect would never fire and the input would keep showing the rejected
- * text instead of the authoritative empty value. Resyncing whenever
- * editing just stopped (blur), regardless of whether `value` itself
- * differs from before, is correct in every case; resyncing only applies
- * once `isEditing` is false, so it never fires mid-keystroke.
+ * Deferred local draft for inputs whose parent commit immediately
+ * normalizes the whole config (`ExperienceBuilder.updateDraft` →
+ * `normalizePresentationConfig`).
+ *
+ * App Store / Google Play URLs are replaced with `""` until they are a
+ * complete allow-listed URL, so writing every keystroke into `config.apps`
+ * clears the field. Banner `imageAlt` is trimmed (and code-point truncated)
+ * on every commit, so a trailing space between words such as `Summer sale`
+ * disappears before the next character is typed.
+ *
+ * The raw draft stays local while the field is focused or being typed.
+ * Normalization runs only at the blur/commit boundary, through the same
+ * `onCommit` → `patch` path every other field already uses — no second
+ * persistence model. After editing stops, the draft resyncs to the
+ * authoritative `value` even when that string did not change (an invalid
+ * URL rejected back to the existing `""`, or whitespace-only alt text
+ * trimmed to `""`). External `value` updates apply only while the field
+ * is not being edited, so a parent refresh cannot clobber in-progress text.
+ * `draftRef` is what gets committed, not the `draft` state closed over by
+ * `onBlur`, so a blur in the same turn as the last keystroke cannot drop
+ * the character that has not re-rendered yet.
  */
-function AppUrlField({
+function DeferredCommitField({
   label,
+  hint,
   placeholder,
   value,
   onCommit,
 }: {
   label: string;
+  hint?: string;
   placeholder?: string;
   value: string;
   onCommit: (value: string) => void;
 }) {
   const [draft, setDraft] = useState(value);
   const [isEditing, setIsEditing] = useState(false);
+  const draftRef = useRef(value);
   useEffect(() => {
-    if (!isEditing) setDraft(value);
+    if (!isEditing) {
+      draftRef.current = value;
+      setDraft(value);
+    }
   }, [value, isEditing]);
   return (
-    <Field label={label}>
+    <Field label={label} hint={hint}>
       <input
         className={inputClass}
         value={draft}
         placeholder={placeholder}
+        onFocus={() => setIsEditing(true)}
         onChange={(event) => {
+          draftRef.current = event.target.value;
           setIsEditing(true);
           setDraft(event.target.value);
         }}
         onBlur={() => {
-          onCommit(draft);
+          const next = draftRef.current;
           setIsEditing(false);
+          onCommit(next);
         }}
       />
     </Field>
@@ -1952,13 +1961,13 @@ function AppPromoFields({
           }
         />
       </Field>
-      <AppUrlField
+      <DeferredCommitField
         label={t("iosUrl")}
         placeholder="https://apps.apple.com/..."
         value={config.apps.iosUrl}
         onCommit={(iosUrl) => patch({ apps: { ...config.apps, iosUrl } })}
       />
-      <AppUrlField
+      <DeferredCommitField
         label={t("androidUrl")}
         placeholder="https://play.google.com/..."
         value={config.apps.androidUrl}

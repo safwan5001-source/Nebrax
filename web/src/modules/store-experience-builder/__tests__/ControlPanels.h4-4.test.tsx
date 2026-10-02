@@ -16,6 +16,7 @@ import {
   normalizePresentationConfig,
 } from "../presentation/config";
 import type { StorefrontPresentationConfig } from "../presentation/config";
+import { MAX_BANNER_IMAGE_ALT_LENGTH } from "../presentation/section-content";
 
 function withSections(
   sections: StorefrontPresentationConfig["homepage"]["sections"],
@@ -90,6 +91,9 @@ describe("Store Customizer — Banner imageAlt field (CUST-H4-4)", () => {
 
     const alt = screen.getByLabelText(/Image alt text/);
     fireEvent.change(alt, { target: { value: "صورة لمنتجات الصيف" } });
+    // Deferred commit: keystrokes stay local until blur.
+    expect(onChange).not.toHaveBeenCalled();
+    fireEvent.blur(alt);
 
     expect(onChange).toHaveBeenCalledTimes(1);
     const next = onChange.mock.calls[0][0] as StorefrontPresentationConfig;
@@ -203,7 +207,7 @@ describe("Store Customizer — App Promo's own Content tab (CUST-H4-4)", () => {
  * tests prove the actual reported bug is fixed: a plain controlled input
  * bound to `config.apps.iosUrl`/`androidUrl` got wiped to `""` after the
  * first keystroke, because the apps normalizer replaces any not-yet-complete
- * URL with `""`. `AppUrlField` now keeps a local draft and only commits
+ * URL with `""`. `DeferredCommitField` now keeps a local draft and only commits
  * (and therefore only normalizes) on blur.
  */
 function StatefulHomepagePanel({
@@ -244,8 +248,9 @@ describe("Store Customizer — App Promo URL fields tolerate normal typing (CUST
     // Every real `ExperienceBuilder.updateDraft`-style re-normalize would,
     // before this fix, have wiped the field back to "" after the very
     // first keystroke (an incomplete URL is not yet allow-listed). Since
-    // AppUrlField only commits on blur, no re-normalize has happened yet
-    // and the full typed text must still be present.
+    // App Store / Google Play fields only commit on blur, so no
+    // re-normalize has happened yet and the full typed text must still
+    // be present.
     expect(input.value).toBe("https://apps.apple.com/app/id123456789");
   });
 
@@ -318,5 +323,232 @@ describe("Store Customizer — App Promo URL fields tolerate normal typing (CUST
 
     expect(ios.value).toBe("https://apps.apple.com/app/id123456789");
     expect(android.value).toBe("");
+  });
+
+  it("an external URL syncs into the field when it is not being edited", () => {
+    const initial = withSections([
+      { id: "appPromo-1", type: "appPromo", visible: true },
+    ]);
+    const external = withSections(
+      [{ id: "appPromo-1", type: "appPromo", visible: true }],
+      { iosUrl: "https://apps.apple.com/app/id999" },
+    );
+    const { rerender } = render(
+      <ControlPanels
+        panel="homepage"
+        config={initial}
+        locale="en"
+        liveStoreName={null}
+        onChange={() => {}}
+        selectedSection="appPromo-1"
+      />,
+    );
+    const input = screen.getByLabelText("App Store URL") as HTMLInputElement;
+    expect(input.value).toBe("");
+
+    rerender(
+      <ControlPanels
+        panel="homepage"
+        config={external}
+        locale="en"
+        liveStoreName={null}
+        onChange={() => {}}
+        selectedSection="appPromo-1"
+      />,
+    );
+
+    expect(input.value).toBe("https://apps.apple.com/app/id999");
+  });
+
+  it("an external URL does not clobber a URL the merchant is still typing", () => {
+    const initial = withSections([
+      { id: "appPromo-1", type: "appPromo", visible: true },
+    ]);
+    const external = withSections(
+      [{ id: "appPromo-1", type: "appPromo", visible: true }],
+      { iosUrl: "https://apps.apple.com/app/id999" },
+    );
+    const { rerender } = render(
+      <ControlPanels
+        panel="homepage"
+        config={initial}
+        locale="en"
+        liveStoreName={null}
+        onChange={() => {}}
+        selectedSection="appPromo-1"
+      />,
+    );
+    const input = screen.getByLabelText("App Store URL") as HTMLInputElement;
+    fireEvent.focus(input);
+    fireEvent.change(input, {
+      target: { value: "https://apps.apple.com/app/id1" },
+    });
+
+    rerender(
+      <ControlPanels
+        panel="homepage"
+        config={external}
+        locale="en"
+        liveStoreName={null}
+        onChange={() => {}}
+        selectedSection="appPromo-1"
+      />,
+    );
+
+    expect(input.value).toBe("https://apps.apple.com/app/id1");
+  });
+});
+
+function bannerSectionConfig(imageAlt = ""): StorefrontPresentationConfig {
+  return withSections([
+    {
+      id: "banner-1",
+      type: "banner",
+      visible: true,
+      content: {
+        title: "Summer",
+        subtitle: "",
+        ctaLabel: "",
+        ctaHref: "",
+        imageUrl: "https://example.com/banner.jpg",
+        imageAlt,
+      },
+    },
+  ]);
+}
+
+describe("Store Customizer — Banner imageAlt defers trim until blur (CUST-H4-4 review fix)", () => {
+  afterEach(() => cleanup());
+
+  it("typing Summer sale preserves the space while editing", async () => {
+    const user = userEvent.setup();
+    render(
+      <StatefulHomepagePanel
+        initialConfig={bannerSectionConfig()}
+        selectedSection="banner-1"
+      />,
+    );
+
+    const input = screen.getByLabelText(/Image alt text/) as HTMLInputElement;
+    await user.type(input, "Summer sale");
+
+    expect(input.value).toBe("Summer sale");
+  });
+
+  it("blur commits the trimmed authoritative alt text", async () => {
+    const user = userEvent.setup();
+    render(
+      <StatefulHomepagePanel
+        initialConfig={bannerSectionConfig()}
+        selectedSection="banner-1"
+      />,
+    );
+
+    const input = screen.getByLabelText(/Image alt text/) as HTMLInputElement;
+    await user.type(input, "  Summer sale  ");
+    expect(input.value).toBe("  Summer sale  ");
+    await user.tab();
+
+    expect(input.value).toBe("Summer sale");
+  });
+
+  it("a whitespace-only alt text normalizes to empty on commit", async () => {
+    const user = userEvent.setup();
+    render(
+      <StatefulHomepagePanel
+        initialConfig={bannerSectionConfig()}
+        selectedSection="banner-1"
+      />,
+    );
+
+    const input = screen.getByLabelText(/Image alt text/) as HTMLInputElement;
+    await user.type(input, "   ");
+    expect(input.value).toBe("   ");
+    await user.tab();
+
+    expect(input.value).toBe("");
+  });
+
+  it("emoji alt text is truncated to 150 code points only on commit", () => {
+    const emoji = "😀";
+    render(
+      <StatefulHomepagePanel
+        initialConfig={bannerSectionConfig()}
+        selectedSection="banner-1"
+      />,
+    );
+
+    const input = screen.getByLabelText(/Image alt text/) as HTMLInputElement;
+    fireEvent.change(input, {
+      target: { value: emoji.repeat(MAX_BANNER_IMAGE_ALT_LENGTH + 1) },
+    });
+    expect(Array.from(input.value)).toHaveLength(MAX_BANNER_IMAGE_ALT_LENGTH + 1);
+
+    fireEvent.blur(input);
+
+    expect(Array.from(input.value)).toHaveLength(MAX_BANNER_IMAGE_ALT_LENGTH);
+    expect(input.value).toBe(emoji.repeat(MAX_BANNER_IMAGE_ALT_LENGTH));
+    expect(
+      /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?:^|[^\uD800-\uDBFF])[\uDC00-\uDFFF]/.test(
+        input.value,
+      ),
+    ).toBe(false);
+  });
+
+  it("an external imageAlt syncs when the field is not being edited", () => {
+    const { rerender } = render(
+      <ControlPanels
+        panel="homepage"
+        config={bannerSectionConfig("")}
+        locale="en"
+        liveStoreName={null}
+        onChange={() => {}}
+        selectedSection="banner-1"
+      />,
+    );
+    const input = screen.getByLabelText(/Image alt text/) as HTMLInputElement;
+    expect(input.value).toBe("");
+
+    rerender(
+      <ControlPanels
+        panel="homepage"
+        config={bannerSectionConfig("Updated outside")}
+        locale="en"
+        liveStoreName={null}
+        onChange={() => {}}
+        selectedSection="banner-1"
+      />,
+    );
+
+    expect(input.value).toBe("Updated outside");
+  });
+
+  it("an external imageAlt does not clobber text the merchant is still typing", () => {
+    const { rerender } = render(
+      <ControlPanels
+        panel="homepage"
+        config={bannerSectionConfig("")}
+        locale="en"
+        liveStoreName={null}
+        onChange={() => {}}
+        selectedSection="banner-1"
+      />,
+    );
+    const input = screen.getByLabelText(/Image alt text/) as HTMLInputElement;
+    fireEvent.focus(input);
+    fireEvent.change(input, { target: { value: "Summer sale" } });
+
+    rerender(
+      <ControlPanels
+        panel="homepage"
+        config={bannerSectionConfig("Updated outside")}
+        locale="en"
+        liveStoreName={null}
+        onChange={() => {}}
+        selectedSection="banner-1"
+      />,
+    );
+
+    expect(input.value).toBe("Summer sale");
   });
 });

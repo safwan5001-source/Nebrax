@@ -3,7 +3,7 @@
 **Horizon:** CUST-H4 — Section Library & Section Quality
 **Slice:** H4-4 (Banner / Benefits / Custom Content / App Promo completion)
 **Base SHA:** `30ead922dbaf40a20bd7b10ac839876310e0de18` — `feat(store): use real catalog data in H4 Canvas (#1167)` (verified via `git fetch origin main && git rev-parse origin/main` at task start — confirmed this is `origin/main`'s own HEAD and the merged H4-3 PR, not assumed from the task brief)
-**Head SHA:** `b7aaa80b7dbe4d678a1551a6f7dc222e3351116e` (after the final-review-fixes round below; was `86d2edacaebbfb25e4f61ac2b6c2be4e1ca51993` at initial PR open)
+**Head SHA:** updated in §20 after the second review-fix round (branch `feat/cust-h4-4-section-completion`; was `94ecc91abdab022ec9875c05bf6cdbb0f98da098` at the start of this round, and `b7aaa80b7dbe4d678a1551a6f7dc222e3351116e` after the first review-fix round)
 **Branch:** `feat/cust-h4-4-section-completion` (the task's own suggested name; the environment did not require a different one)
 **PR:** [safwan5001-source/Nebrax#1172](https://github.com/safwan5001-source/Nebrax/pull/1172), open against `main`, not merged
 
@@ -395,3 +395,81 @@ Confirmed directly via the GitHub API on head `b7aaa80b7dbe4d678a1551a6f7dc222e3
 ## 18. No Merge / No Deploy / No Production release
 
 This task did not merge the PR, did not deploy anything, and did not release anything to production. The PR remains open, pending review.
+
+---
+
+## 20. Second review round — deferred editing, Unicode confirmation, Playwright Tab
+
+Four P2 threads were still open on PR #1172 at `94ecc91abdab022ec9875c05bf6cdbb0f98da098`. Two of them (partial App Promo URL typing, and UTF-16 `slice` on `imageAlt`) had already been fixed in `278f536` / `b7aaa80` and were outdated on the diff. Two were still live: banner `imageAlt` lost spaces while typing, and the visual spec's second App Promo URL was not committed before the both-badges assertion (the blur commit raced the review comment by ~28s; this round replaces that blur with Tab so focus actually leaves the field).
+
+### 20.1 Deferred-editing primitive
+
+One component, `DeferredCommitField` in `web/src/modules/store-experience-builder/ControlPanels.tsx`, replaces the previous `AppUrlField`.
+
+Behavior:
+
+- Local `draft` plus a `draftRef` hold the raw text while the field is focused or receiving keystrokes.
+- `onChange` updates only that local draft. It does not call `patch` / `normalizePresentationConfig`.
+- `onBlur` commits `draftRef.current` through the existing `onCommit` → `patch` path. Normalization and sanitization still happen only there. No second persistence model.
+- A `useEffect` copies the incoming `value` back into the draft only when `isEditing` is false, including the case where the authoritative value did not change (invalid URL rejected back to the existing `""`, whitespace-only alt text trimmed to `""`).
+- External `value` updates while the merchant is editing do not clobber the draft.
+
+Applied to:
+
+- App Store URL and Google Play URL in both `AppPromoFields` and `AppsPanel` (same `config.apps` fields).
+- Banner `imageAlt`, so a trailing space in `Summer sale` survives until blur. Trim and the 150-code-point cap still run inside `normalizeBanner` at commit.
+
+### 20.2 Unicode truncation
+
+No further code change. Both TypeScript normalizers already truncate with:
+
+```ts
+function truncateToCodePoints(value: string, maxLength: number): string {
+  return Array.from(value).slice(0, maxLength).join("");
+}
+```
+
+in `web/src/modules/store-experience-builder/presentation/section-content.ts` and `storefront/src/lib/presentation/section-content.ts`. The limit stays 150. `Array.from` iterates Unicode code points, so 150 emoji stay 150, 151 become 150, and a mixed BMP + astral string is not split into an unpaired surrogate. PHP remains `mb_substr(..., 0, 150)` in `StorefrontPresentationNormalizer`. This round re-ran the existing web, storefront, and (via CI) PHP tests that lock that contract. PHP sources were not modified.
+
+### 20.3 Playwright
+
+`web/e2e/cust-h4-4-section-completion-visual.spec.ts` now presses Tab after each App Promo URL fill, including after the second URL in the AR desktop both-platforms case, and after banner `imageAlt` fills. The both-badges assertion is unchanged: `canvas.locator('[data-preview-section-id] img')` must have count 2. iOS-only and Android-only cases still assert a single committed badge where they did before.
+
+### 20.4 Tests and results
+
+Focused:
+
+- web `ControlPanels.h4-4.test.tsx`: 18/18 passed (character-by-character URLs, blur commit, invalid URL sanitized to `""`, external URL sync when idle, no clobber while typing, `Summer sale` space preserved while typing, trim on blur, whitespace-only → `""`, 151 emoji → 150 code points on commit, external imageAlt sync).
+- web `section-content.h4-4.test.ts`: 13/13 passed.
+- storefront `section-content.h4-4.test.ts`: 13/13 passed.
+
+Broader:
+
+- web `npx vitest run`: 355 files / 2780 tests passed, 0 failed.
+- web `npx tsc --noEmit`: exit 2, 16 pre-existing errors, none in `ControlPanels.tsx`, `section-content.ts`, or the H4-4 spec.
+- web `npm run build`: compiled successfully, 179/179 static pages, `.next/BUILD_ID` present (`Hpm8S4st7mEcv_DVqSWGQ`).
+- storefront `pnpm check`: 466 files, 0 errors.
+- storefront `tsc --noEmit`: 0 errors.
+- storefront `vitest run`: 112 files / 778 tests passed, 0 failed.
+- storefront `pnpm run build`: compiled successfully (Next.js 16.2.11), `.next/BUILD_ID` present (`xvZ6Hze2XJEo98XbznA3m`). Pre-existing page-data warnings (`SPREE_API_URL` / `AWJ_COMMERCE_API_URL` unset in this sandbox) did not fail the build.
+- Playwright `e2e/cust-h4-4-section-completion-visual.spec.ts --project=desktop`: **4/4 passed** (46.8s), including the AR desktop both-badges `toHaveCount(2)` after Tab on the second URL.
+
+PHP `StorefrontPresentationNormalizer` was not changed in this round. The code-point test added in §19.2 still describes the server behavior. This sandbox cannot `apt-get install` PHP (`setgroups` / `_apt` permission denied). CI on the push is the authoritative PHP result and is recorded below once the checks finish.
+
+### 20.5 Review threads and CI
+
+Resolved only after this diff was pushed and the corresponding checks were verified. Thread ids:
+
+1. `PRRT_kwDOS52FT86oghfp` — partial App Promo URLs while typing.
+2. `PRRT_kwDOS52FT86oghfv` — Unicode code-point truncation.
+3. `PRRT_kwDOS52FT86ogxZI` — blur/Tab the second App Promo URL before both badges.
+4. `PRRT_kwDOS52FT86og4OV` — preserve spaces while typing banner alt text.
+
+CI state is filled in from the GitHub check runs on the new head. No merge. No deploy. No production release.
+
+### 20.6 Remaining risks
+
+- Other banner fields (`title`, `subtitle`, `ctaLabel`) still trim on every keystroke via `.trim().slice()`. Out of scope; the review named only `imageAlt`.
+- `DeferredCommitField` commits on blur only. A merchant who types a URL and publishes without leaving the field would publish the previous committed value. That matches the review's required commit boundary. The visual spec and the editor tests both leave the field before asserting.
+- Playwright Tab moves focus to the next control (often the footer-links toggle). It does not activate that control.
+

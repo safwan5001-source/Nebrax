@@ -88,6 +88,8 @@ test.describe('CUST-H4-4 — Banner / Benefits / Custom Content / App Promo (vis
       await bannerPanel.getByLabel('رابط الزر').fill('https://example.com/sale');
       await bannerPanel.getByLabel('رابط الصورة (https)').fill('https://picsum.photos/seed/awj-banner/800/400');
       await bannerPanel.getByLabel(/النص البديل للصورة/).fill('صورة لمنتجات العرض الصيفي معروضة على طاولة خشبية');
+      // imageAlt commits on blur. Tab away before later canvas screenshots.
+      await bannerPanel.getByLabel(/النص البديل للصورة/).press('Tab');
 
       // Benefits — multiple items, one with a long body to exercise wrapping.
       await addHomeSection(page, 'benefits', true, 'الصفحة الرئيسية');
@@ -114,11 +116,9 @@ test.describe('CUST-H4-4 — Banner / Benefits / Custom Content / App Promo (vis
       await appPanel.getByLabel('اسم التطبيق').fill('تطبيق نبراس');
       const iosUrlField = appPanel.getByLabel('رابط App Store');
       await iosUrlField.fill('https://apps.apple.com/app/id123456789');
-      // CUST-H4-4 review fix — App Promo URL fields now commit on blur
-      // (not on every keystroke) to tolerate normal typing. Blur
-      // explicitly so the Canvas reflects the real, committed config the
-      // same way a merchant clicking away from the field would.
-      await iosUrlField.blur();
+      // CUST-H4-4 review fix — App Promo URL fields commit on blur, not on
+      // every keystroke. Tab away so the Canvas reflects the committed URL.
+      await iosUrlField.press('Tab');
 
       await assertNoOverflow(page);
       await page.screenshot({ path: path.join(evidenceDir, `ar-${width}-sections.png`), fullPage: true });
@@ -152,13 +152,14 @@ test.describe('CUST-H4-4 — Banner / Benefits / Custom Content / App Promo (vis
     await addHomeSection(page, 'appPromo', false, 'الصفحة الرئيسية');
     const appPanel = page.locator('[data-selected-section-settings="appPromo"]');
     await appPanel.getByLabel('اسم التطبيق').fill('تطبيق نبراس');
-    await appPanel.getByLabel('رابط App Store').fill('https://apps.apple.com/app/id123456789');
+    const iosUrlFieldAr = appPanel.getByLabel('رابط App Store');
+    await iosUrlFieldAr.fill('https://apps.apple.com/app/id123456789');
+    await iosUrlFieldAr.press('Tab');
     const androidUrlFieldAr = appPanel.getByLabel('رابط Google Play');
     await androidUrlFieldAr.fill('https://play.google.com/store/apps/details?id=sa.awj');
-    // CUST-H4-4 review fix — commit both URL fields (blur) before reading
-    // the Canvas, which only reflects committed config, not the in-field
-    // draft a merchant is still typing.
-    await androidUrlFieldAr.blur();
+    // CUST-H4-4 review fix — the second URL stays local until focus leaves.
+    // Tab away before asserting both badges. A canvas query does not blur.
+    await androidUrlFieldAr.press('Tab');
 
     const canvas = page.locator('[data-preview-canvas]');
     await expect(canvas.locator('[data-preview-section-id] img')).toHaveCount(2); // both store badges, no banner image
@@ -179,6 +180,7 @@ test.describe('CUST-H4-4 — Banner / Benefits / Custom Content / App Promo (vis
     await bannerPanel.getByLabel('Title').fill('Summer Sale');
     await bannerPanel.getByLabel('Image URL (https)').fill('https://picsum.photos/seed/awj-en/800/400');
     await bannerPanel.getByLabel(/Image alt text/).fill('Summer sale products on a wooden table');
+    await bannerPanel.getByLabel(/Image alt text/).press('Tab');
 
     await addHomeSection(page, 'benefits', false, 'Homepage');
     const benefitsPanel = page.locator('[data-selected-section-settings="benefits"]');
@@ -195,9 +197,9 @@ test.describe('CUST-H4-4 — Banner / Benefits / Custom Content / App Promo (vis
     await appPanel.getByLabel('App name').fill('AWJ App');
     const androidUrlFieldEn = appPanel.getByLabel('Google Play URL');
     await androidUrlFieldEn.fill('https://play.google.com/store/apps/details?id=sa.awj');
-    // CUST-H4-4 review fix — commit the URL field (blur) so the Canvas
-    // badge reflects the real, committed config.
-    await androidUrlFieldEn.blur();
+    // CUST-H4-4 review fix — commit the URL field before the Canvas badge
+    // assertion. Tab leaves the field; querying the canvas does not.
+    await androidUrlFieldEn.press('Tab');
 
     const bannerImg = page
       .locator('[data-preview-section-id="banner-1"] img, [data-preview-section] img')
