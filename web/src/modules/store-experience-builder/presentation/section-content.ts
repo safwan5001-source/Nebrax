@@ -138,6 +138,20 @@ export function normalizeOptionalSectionContent(
   return undefined;
 }
 
+/**
+ * CUST-H4-4 review fix — `String.prototype.slice` counts UTF-16 code
+ * units, not characters: an astral codepoint (most emoji, among other
+ * scripts) is two UTF-16 units, so `slice(0, 150)` on 150 emoji keeps only
+ * ~75 of them and can cut a surrogate pair in half, leaving an unpaired
+ * surrogate. The PHP server-authoritative normalizer uses `mb_substr`,
+ * which counts actual characters (Unicode code points) — this keeps the
+ * two aligned. `Array.from` iterates a string by code point, so slicing
+ * the resulting array operates on whole characters, never a half-surrogate.
+ */
+function truncateToCodePoints(value: string, maxLength: number): string {
+  return Array.from(value).slice(0, maxLength).join("");
+}
+
 export function sanitizeContentHref(value: string): string {
   const trimmed = value.trim();
   if (!trimmed) return "";
@@ -156,7 +170,7 @@ function normalizeBanner(source: Record<string, unknown>): BannerContent {
     ctaLabel: asString(source.ctaLabel).trim().slice(0, 80),
     ctaHref: sanitizeContentHref(asString(source.ctaHref)),
     imageUrl: image,
-    imageAlt: asString(source.imageAlt).trim().slice(0, MAX_BANNER_IMAGE_ALT_LENGTH),
+    imageAlt: truncateToCodePoints(asString(source.imageAlt).trim(), MAX_BANNER_IMAGE_ALT_LENGTH),
   };
 }
 

@@ -511,6 +511,44 @@ class StorefrontPresentationNormalizerTest extends TestCase
         $this->assertSame('', $normalized['homepage']['sections'][0]['content']['imageAlt']);
     }
 
+    /**
+     * CUST-H4-4 review fix — documents the server-authoritative semantics
+     * the two TypeScript normalizers (web + storefront) must now match:
+     * `mb_substr` truncates by Unicode code point (character), not by byte
+     * or UTF-16 code unit. 150 astral-codepoint emoji stay 150 emoji; a
+     * UTF-16-unit-counting truncation (JavaScript's bare `.slice()`, before
+     * this fix) would have kept only ~75.
+     *
+     * @test
+     */
+    public function banner_image_alt_truncates_by_unicode_code_point_not_byte_or_utf16_unit(): void
+    {
+        $emoji = "\u{1F600}"; // 😀 — 4 bytes in UTF-8, 2 UTF-16 code units, 1 character.
+        $normalized = $this->normalizer->normalize([
+            'version' => 2,
+            'homepage' => [
+                'sections' => [
+                    [
+                        'id' => 'banner-a',
+                        'type' => 'banner',
+                        'visible' => true,
+                        'content' => [
+                            'title' => 'عرض',
+                            'imageAlt' => str_repeat($emoji, 151),
+                        ],
+                    ],
+                ],
+            ],
+        ]);
+
+        $alt = $normalized['homepage']['sections'][0]['content']['imageAlt'];
+        $this->assertSame(
+            StorefrontPresentationNormalizer::MAX_BANNER_IMAGE_ALT_LENGTH,
+            mb_strlen($alt),
+        );
+        $this->assertSame(str_repeat($emoji, StorefrontPresentationNormalizer::MAX_BANNER_IMAGE_ALT_LENGTH), $alt);
+    }
+
     /** @test */
     public function client_supplied_version_is_overwritten_and_is_not_authority(): void
     {

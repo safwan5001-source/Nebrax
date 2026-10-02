@@ -95,4 +95,63 @@ describe("Banner imageAlt normalization (CUST-H4-4)", () => {
     expect(content.imageUrl).toBeNull();
     expect(content.imageAlt).toBe("a safe description");
   });
+
+  describe("Unicode code-point-aware truncation (review fix)", () => {
+    const EMOJI = "😀"; // U+1F600 — an astral codepoint: 2 UTF-16 units, 1 character.
+
+    it(`keeps exactly ${MAX_BANNER_IMAGE_ALT_LENGTH} emoji when exactly at the limit (naive UTF-16 slice would keep only ~half)`, () => {
+      const input = EMOJI.repeat(MAX_BANNER_IMAGE_ALT_LENGTH);
+      const content = normalizeOptionalSectionContent("banner", {
+        title: "x",
+        imageAlt: input,
+      }) as { imageAlt: string };
+      expect(Array.from(content.imageAlt)).toHaveLength(MAX_BANNER_IMAGE_ALT_LENGTH);
+      expect(content.imageAlt).toBe(input);
+    });
+
+    it(`truncates ${MAX_BANNER_IMAGE_ALT_LENGTH + 1} emoji down to exactly ${MAX_BANNER_IMAGE_ALT_LENGTH}`, () => {
+      const input = EMOJI.repeat(MAX_BANNER_IMAGE_ALT_LENGTH + 1);
+      const content = normalizeOptionalSectionContent("banner", {
+        title: "x",
+        imageAlt: input,
+      }) as { imageAlt: string };
+      expect(Array.from(content.imageAlt)).toHaveLength(MAX_BANNER_IMAGE_ALT_LENGTH);
+      expect(content.imageAlt).toBe(EMOJI.repeat(MAX_BANNER_IMAGE_ALT_LENGTH));
+    });
+
+    it("never cuts a mixed BMP + astral string into an unpaired surrogate at the boundary", () => {
+      // 149 plain ASCII characters + one astral emoji sitting exactly on the
+      // 150-codepoint boundary. A naive `string.slice(0, 150)` (UTF-16
+      // units) would keep only the emoji's high surrogate, producing a
+      // broken/unpaired surrogate at the end of the string.
+      const input = `${"a".repeat(MAX_BANNER_IMAGE_ALT_LENGTH - 1)}${EMOJI}more text after`;
+      const naiveBroken = input.slice(0, MAX_BANNER_IMAGE_ALT_LENGTH);
+      // Confirms the scenario actually would have broken under the old
+      // behavior, so this test is proving something real.
+      expect(naiveBroken.endsWith(EMOJI)).toBe(false);
+
+      const content = normalizeOptionalSectionContent("banner", {
+        title: "x",
+        imageAlt: input,
+      }) as { imageAlt: string };
+      expect(content.imageAlt).toBe(`${"a".repeat(MAX_BANNER_IMAGE_ALT_LENGTH - 1)}${EMOJI}`);
+      expect(Array.from(content.imageAlt)).toHaveLength(MAX_BANNER_IMAGE_ALT_LENGTH);
+      // No lone surrogate anywhere in the result.
+      expect(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?:^|[^\uD800-\uDBFF])[\uDC00-\uDFFF]/.test(content.imageAlt)).toBe(false);
+    });
+
+    it("stays semantically aligned with the PHP server-authoritative normalizer's mb_substr (code-point counting, not UTF-16 units)", () => {
+      // Twin assertion of tests/Feature/StorefrontPresentationNormalizerTest.php's
+      // `banner_image_alt_truncates_by_unicode_code_point_not_utf16_unit` —
+      // both must agree that 150 emoji stay 150 emoji.
+      const input = EMOJI.repeat(MAX_BANNER_IMAGE_ALT_LENGTH);
+      const content = normalizeOptionalSectionContent("banner", {
+        title: "x",
+        imageAlt: input,
+      }) as { imageAlt: string };
+      expect(Array.from(content.imageAlt)).toHaveLength(MAX_BANNER_IMAGE_ALT_LENGTH);
+      // The storefront twin (storefront/.../section-content.h4-4.test.ts)
+      // asserts the identical expectation on its own normalizer.
+    });
+  });
 });

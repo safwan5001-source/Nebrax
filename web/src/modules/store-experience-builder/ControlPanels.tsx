@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   canAddSectionType,
   canDuplicateSection,
@@ -1623,28 +1623,18 @@ function AppsPanel({
             }
           />
         </Field>
-        <Field label={t("iosUrl")}>
-          <input
-            className={inputClass}
-            value={config.apps.iosUrl}
-            placeholder="https://apps.apple.com/..."
-            onChange={(event) =>
-              patch({ apps: { ...config.apps, iosUrl: event.target.value } })
-            }
-          />
-        </Field>
-        <Field label={t("androidUrl")}>
-          <input
-            className={inputClass}
-            value={config.apps.androidUrl}
-            placeholder="https://play.google.com/..."
-            onChange={(event) =>
-              patch({
-                apps: { ...config.apps, androidUrl: event.target.value },
-              })
-            }
-          />
-        </Field>
+        <AppUrlField
+          label={t("iosUrl")}
+          placeholder="https://apps.apple.com/..."
+          value={config.apps.iosUrl}
+          onCommit={(iosUrl) => patch({ apps: { ...config.apps, iosUrl } })}
+        />
+        <AppUrlField
+          label={t("androidUrl")}
+          placeholder="https://play.google.com/..."
+          value={config.apps.androidUrl}
+          onCommit={(androidUrl) => patch({ apps: { ...config.apps, androidUrl } })}
+        />
       </Section>
       <Section title={t("appsPlacement")}>
         <div className="divide-y divide-neutral-200 border-y border-neutral-200">
@@ -1878,6 +1868,63 @@ function FeaturedFields({
   );
 }
 
+/**
+ * CUST-H4-4 review fix — `patch` normalizes the whole config synchronously
+ * on every call (`ExperienceBuilder.updateDraft`), and the apps normalizer
+ * replaces anything that isn't already a complete allow-listed URL with
+ * `""`. Bound directly to `config.apps.iosUrl`/`androidUrl` as a plain
+ * controlled input, that wipes the field after the very first keystroke —
+ * normal typing becomes impossible. This keeps a local draft while the
+ * field has focus and only commits (and therefore only normalizes) on
+ * blur, so a merchant can type a URL character by character; the final
+ * value still goes through the exact same `onCommit`/`patch`/normalizer
+ * path every other field already uses — no second persistence model, no
+ * weakening of URL safety. `isEditing` (not a bare `[value]` dependency)
+ * gates the resync: a naive `useEffect(() => setDraft(value), [value])`
+ * misses the case where a rejected URL normalizes back to the exact same
+ * value the field already held (e.g. an invalid URL committed while the
+ * field was already `""`) — `value` never "changes" in that case, so the
+ * effect would never fire and the input would keep showing the rejected
+ * text instead of the authoritative empty value. Resyncing whenever
+ * editing just stopped (blur), regardless of whether `value` itself
+ * differs from before, is correct in every case; resyncing only applies
+ * once `isEditing` is false, so it never fires mid-keystroke.
+ */
+function AppUrlField({
+  label,
+  placeholder,
+  value,
+  onCommit,
+}: {
+  label: string;
+  placeholder?: string;
+  value: string;
+  onCommit: (value: string) => void;
+}) {
+  const [draft, setDraft] = useState(value);
+  const [isEditing, setIsEditing] = useState(false);
+  useEffect(() => {
+    if (!isEditing) setDraft(value);
+  }, [value, isEditing]);
+  return (
+    <Field label={label}>
+      <input
+        className={inputClass}
+        value={draft}
+        placeholder={placeholder}
+        onChange={(event) => {
+          setIsEditing(true);
+          setDraft(event.target.value);
+        }}
+        onBlur={() => {
+          onCommit(draft);
+          setIsEditing(false);
+        }}
+      />
+    </Field>
+  );
+}
+
 // CUST-H4-4 — same config.apps fields/validators the standalone AppsPanel
 // already edits (AppsPanel stays, for merchants who land there first via
 // "التطبيقات"/Applications settings). Editing here keeps `setVisible`'s
@@ -1905,28 +1952,18 @@ function AppPromoFields({
           }
         />
       </Field>
-      <Field label={t("iosUrl")}>
-        <input
-          className={inputClass}
-          value={config.apps.iosUrl}
-          placeholder="https://apps.apple.com/..."
-          onChange={(event) =>
-            patch({ apps: { ...config.apps, iosUrl: event.target.value } })
-          }
-        />
-      </Field>
-      <Field label={t("androidUrl")}>
-        <input
-          className={inputClass}
-          value={config.apps.androidUrl}
-          placeholder="https://play.google.com/..."
-          onChange={(event) =>
-            patch({
-              apps: { ...config.apps, androidUrl: event.target.value },
-            })
-          }
-        />
-      </Field>
+      <AppUrlField
+        label={t("iosUrl")}
+        placeholder="https://apps.apple.com/..."
+        value={config.apps.iosUrl}
+        onCommit={(iosUrl) => patch({ apps: { ...config.apps, iosUrl } })}
+      />
+      <AppUrlField
+        label={t("androidUrl")}
+        placeholder="https://play.google.com/..."
+        value={config.apps.androidUrl}
+        onCommit={(androidUrl) => patch({ apps: { ...config.apps, androidUrl } })}
+      />
       <Toggle
         compact
         label={t("showAppFooter")}

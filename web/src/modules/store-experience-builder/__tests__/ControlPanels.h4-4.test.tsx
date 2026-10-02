@@ -8,9 +8,13 @@
  */
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ControlPanels } from "../ControlPanels";
-import { DEFAULT_PRESENTATION_CONFIG } from "../presentation/config";
+import {
+  DEFAULT_PRESENTATION_CONFIG,
+  normalizePresentationConfig,
+} from "../presentation/config";
 import type { StorefrontPresentationConfig } from "../presentation/config";
 
 function withSections(
@@ -189,5 +193,130 @@ describe("Store Customizer — App Promo's own Content tab (CUST-H4-4)", () => {
     expect(next.apps.showFooterLinks).toBe(true);
     const section = next.homepage.sections.find((s) => s.id === "appPromo-1");
     expect(section?.visible).toBe(true);
+  });
+});
+
+/**
+ * CUST-H4-4 review fix — reproduces the exact real-world pipeline
+ * (`ExperienceBuilder.updateDraft`: every `onChange` re-normalizes the
+ * whole config synchronously) rather than a bare `vi.fn()` spy, so these
+ * tests prove the actual reported bug is fixed: a plain controlled input
+ * bound to `config.apps.iosUrl`/`androidUrl` got wiped to `""` after the
+ * first keystroke, because the apps normalizer replaces any not-yet-complete
+ * URL with `""`. `AppUrlField` now keeps a local draft and only commits
+ * (and therefore only normalizes) on blur.
+ */
+function StatefulHomepagePanel({
+  initialConfig,
+  selectedSection,
+}: {
+  initialConfig: StorefrontPresentationConfig;
+  selectedSection: string;
+}) {
+  const [config, setConfig] = useState(initialConfig);
+  return (
+    <ControlPanels
+      panel="homepage"
+      config={config}
+      locale="en"
+      liveStoreName={null}
+      onChange={(next) => setConfig(normalizePresentationConfig(next))}
+      selectedSection={selectedSection}
+    />
+  );
+}
+
+describe("Store Customizer — App Promo URL fields tolerate normal typing (CUST-H4-4 review fix)", () => {
+  afterEach(() => cleanup());
+
+  it("typing a URL character-by-character does not clear the field", async () => {
+    const user = userEvent.setup();
+    const config = withSections([
+      { id: "appPromo-1", type: "appPromo", visible: true },
+    ]);
+    render(
+      <StatefulHomepagePanel initialConfig={config} selectedSection="appPromo-1" />,
+    );
+
+    const input = screen.getByLabelText("App Store URL") as HTMLInputElement;
+    await user.type(input, "https://apps.apple.com/app/id123456789");
+
+    // Every real `ExperienceBuilder.updateDraft`-style re-normalize would,
+    // before this fix, have wiped the field back to "" after the very
+    // first keystroke (an incomplete URL is not yet allow-listed). Since
+    // AppUrlField only commits on blur, no re-normalize has happened yet
+    // and the full typed text must still be present.
+    expect(input.value).toBe("https://apps.apple.com/app/id123456789");
+  });
+
+  it("a valid App Store URL persists once typing is committed (blur)", async () => {
+    const user = userEvent.setup();
+    const config = withSections([
+      { id: "appPromo-1", type: "appPromo", visible: true },
+    ]);
+    render(
+      <StatefulHomepagePanel initialConfig={config} selectedSection="appPromo-1" />,
+    );
+
+    const input = screen.getByLabelText("App Store URL") as HTMLInputElement;
+    await user.type(input, "https://apps.apple.com/app/id123456789");
+    await user.tab();
+
+    expect(input.value).toBe("https://apps.apple.com/app/id123456789");
+  });
+
+  it("a valid Google Play URL persists once typing is committed (blur)", async () => {
+    const user = userEvent.setup();
+    const config = withSections([
+      { id: "appPromo-1", type: "appPromo", visible: true },
+    ]);
+    render(
+      <StatefulHomepagePanel initialConfig={config} selectedSection="appPromo-1" />,
+    );
+
+    const input = screen.getByLabelText("Google Play URL") as HTMLInputElement;
+    await user.type(input, "https://play.google.com/store/apps/details?id=sa.awj");
+    await user.tab();
+
+    expect(input.value).toBe(
+      "https://play.google.com/store/apps/details?id=sa.awj",
+    );
+  });
+
+  it("an invalid/not-allow-listed final URL is rejected and sanitized on commit, same as before this fix", async () => {
+    const user = userEvent.setup();
+    const config = withSections([
+      { id: "appPromo-1", type: "appPromo", visible: true },
+    ]);
+    render(
+      <StatefulHomepagePanel initialConfig={config} selectedSection="appPromo-1" />,
+    );
+
+    const input = screen.getByLabelText("App Store URL") as HTMLInputElement;
+    await user.type(input, "https://not-a-real-app-store.example.com/app");
+    await user.tab();
+
+    // Not on `apps.apple.com` — the existing `isSafeAppStoreUrl` allow-list
+    // still rejects it on commit, exactly as it always has. No weakening
+    // of URL safety: the normalizer, not this component, makes that call.
+    expect(input.value).toBe("");
+  });
+
+  it("one-platform-only still works: committing the App Store URL never touches the untouched Google Play field", async () => {
+    const user = userEvent.setup();
+    const config = withSections([
+      { id: "appPromo-1", type: "appPromo", visible: true },
+    ]);
+    render(
+      <StatefulHomepagePanel initialConfig={config} selectedSection="appPromo-1" />,
+    );
+
+    const ios = screen.getByLabelText("App Store URL") as HTMLInputElement;
+    const android = screen.getByLabelText("Google Play URL") as HTMLInputElement;
+    await user.type(ios, "https://apps.apple.com/app/id123456789");
+    await user.tab();
+
+    expect(ios.value).toBe("https://apps.apple.com/app/id123456789");
+    expect(android.value).toBe("");
   });
 });
