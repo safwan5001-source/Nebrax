@@ -243,22 +243,281 @@ In Touch mode, keyboard hints may become tappable quick actions instead of remai
 
 Final shortcut map remains governed by the existing POS shortcut contract; V3 must not silently change destructive or financial shortcuts.
 
-## 11. Payment Workspace — direction only
+## 11. Payment Workspace V3
 
-Payment is the next major V3 design surface and is **not yet fully specified in this document**.
+Payment is a dedicated workspace inside the same POS session, not a small modal and not a generic form.
 
-Current direction:
+Its purpose is to let the cashier answer three questions instantly:
 
-- payment becomes a purpose-built terminal-like workspace;
-- grand total is visually dominant;
-- payment methods are large and obvious;
-- keypad/input interaction is touch-friendly;
-- paid / remaining / change states are immediately readable;
-- split payment remains first-class;
-- deferred payment remains policy-driven;
-- customer/cart summary remains available without competing with tender entry.
+1. **How much is due?**
+2. **How is the customer paying?**
+3. **Is anything remaining or due back as change?**
 
-A dedicated section will be added after visual design review.
+### 11.1 Desktop / landscape composition
+
+Preferred composition:
+
+- approximately **34–38%** transaction summary;
+- approximately **62–66%** payment interaction area.
+
+Reference direction:
+
+```text
+┌────────────────────────────────────────────────────────────────────────────┐
+│  ← Back to cart                         Payment                    Online  │
+├───────────────────────────────┬────────────────────────────────────────────┤
+│                               │                                            │
+│  AMOUNT DUE                   │  Payment method                            │
+│                               │                                            │
+│  129.75 ﷼                    │  ┌────────────┐ ┌────────────┐             │
+│                               │  │   Cash     │ │   Card     │             │
+│  Customer                     │  │  Banknote  │ │   Mada     │             │
+│  Walk-in customer             │  └────────────┘ └────────────┘             │
+│                               │                                            │
+│  4 items                      │  ┌────────────┐ ┌────────────┐             │
+│  ─────────────────────────    │  │ Bank / POS │ │   Other    │             │
+│  Product A            45.00   │  └────────────┘ └────────────┘             │
+│  Product B            22.50   │                                            │
+│  Product C            62.25   │  Received                                  │
+│                               │  ┌──────────────────────────────────────┐  │
+│                               │  │             150.00                   │  │
+│                               │  └──────────────────────────────────────┘  │
+│                               │                                            │
+│                               │  [ exact ] [ 50 ] [ 100 ] [ 200 ] [ 500 ] │
+│                               │                                            │
+│                               │  Paid        Remaining        Change        │
+│                               │  129.75      0.00             20.25         │
+│                               │                                            │
+│                               │  █████████ CONFIRM PAYMENT ███████████    │
+└───────────────────────────────┴────────────────────────────────────────────┘
+```
+
+The composition mirrors correctly in RTL/LTR without changing hierarchy.
+
+### 11.2 Amount due
+
+The amount due is the strongest numerical element on the payment screen.
+
+Rules:
+
+- use large display money typography;
+- no decorative animation on the value;
+- always show currency;
+- retain exact AWJ financial formatting;
+- do not bury the total inside a card grid;
+- customer identity and item count remain secondary.
+
+The left/summary panel is informative, not interactive-first.
+
+### 11.3 Payment methods
+
+Payment methods should be large, obvious touch targets.
+
+Each method tile should show:
+
+- recognizable icon;
+- payment-method name;
+- optional short terminal/account hint only when useful;
+- selected/applied state;
+- entered amount when split payment is active.
+
+Selection must not depend on color alone.
+
+Avoid:
+
+- tiny radio buttons;
+- dense form rows;
+- one input permanently visible inside every payment-method card;
+- making all methods equally visually loud after one is selected.
+
+### 11.4 Single-method payment
+
+For the common case, selecting one method should minimize work.
+
+Preferred behavior:
+
+1. cashier selects Cash / Card / other method;
+2. AWJ preselects or proposes the exact remaining amount;
+3. cashier confirms directly when no amount editing is needed.
+
+For cash:
+
+- entered cash may exceed due amount;
+- change is calculated and displayed prominently.
+
+For non-cash:
+
+- amounts above the allowable remaining amount remain invalid according to current payment semantics;
+- the UI explains the state immediately.
+
+### 11.5 Split payment
+
+Split tender remains first-class, but should not make the normal payment case feel complex.
+
+Direction:
+
+- first selected method receives focus;
+- entered amount becomes a visible applied line/chip;
+- remaining amount updates immediately;
+- selecting a second method automatically targets the remaining amount;
+- multiple applied methods remain visible in a compact stack.
+
+Example:
+
+```text
+Paid
+Cash              50.00
+Mada               79.75
+────────────────────────
+Paid              129.75
+Remaining           0.00
+```
+
+The cashier must always understand which method owns each amount.
+
+### 11.6 Numeric entry / keypad
+
+The keypad should be **contextual**, not permanently consume desktop space unless Touch mode or device configuration benefits from it.
+
+Desktop keyboard mode:
+
+- focus amount input;
+- physical numpad works immediately;
+- quick amount chips remain available;
+- onscreen keypad may stay collapsed.
+
+Touch mode:
+
+- numeric keypad appears as a dedicated large surface;
+- keys approximately 56–64px;
+- decimal, clear and backspace are visually distinct but not decorative;
+- exact amount is a first-class shortcut.
+
+The keypad must never hide the due / remaining / change values.
+
+### 11.7 Quick amounts
+
+Quick amounts are speed controls, not decorative chips.
+
+Preferred set derives from context:
+
+- Exact remaining amount;
+- common cash denominations;
+- locally appropriate rounded values.
+
+The first action is always the exact remaining amount.
+
+Static values may include 50 / 100 / 200 / 500 SAR where appropriate, but implementation should preserve current payment semantics and avoid silently introducing currency assumptions outside the existing Saudi context.
+
+### 11.8 Paid / Remaining / Change
+
+These three states form a compact financial result strip.
+
+Hierarchy:
+
+- **Remaining** is strongest while payment is incomplete.
+- **Change** becomes strongest when cash exceeds the due amount.
+- **Paid** remains visible but secondary.
+
+Semantic color may assist, but amount labels and signs remain mandatory.
+
+Example:
+
+```text
+Paid            Remaining            Change
+129.75          0.00                 20.25
+```
+
+When payment is incomplete and deferred payment is not allowed, the Confirm action remains unavailable with a clear reason.
+
+### 11.9 Deferred payment
+
+Deferred payment remains policy-driven and should not appear as a generic extra payment method if that misrepresents the existing accounting model.
+
+UI direction:
+
+- if deferred settlement is permitted and a balance remains, show an explicit **Remaining on account / Deferred** state;
+- show the customer identity clearly when deferred balance exists;
+- do not expose ledger-account choices to the cashier;
+- never imply that unpaid and paid amounts are equivalent.
+
+The exact wording must follow the existing AWJ accounting/payment contract.
+
+### 11.10 Confirm payment
+
+The confirm action is the single dominant action on the payment screen.
+
+Requirements:
+
+- 56–64px touch-oriented height;
+- full-width or near-full-width in the payment pane;
+- clear amount/status context;
+- disabled reason must be understandable;
+- while submitting/recovering, interaction is locked against duplicate checkout;
+- offline blocking remains explicit.
+
+Do not place another equally dominant primary button beside it.
+
+### 11.11 Success state
+
+Successful payment should feel conclusive but fast.
+
+Preferred feedback:
+
+- immediate success state;
+- optional sound/haptic;
+- invoice number;
+- paid amount / change if relevant;
+- concise actions such as Print / New sale / View receipt.
+
+Do not force a long animated celebration.
+
+The next-sale path should be obvious and require minimal movement.
+
+### 11.12 Payment workspace visual hierarchy
+
+The payment surface may be more expressive than Ledger UI, but should still use restrained hierarchy:
+
+- one dominant amount;
+- one selected payment-method area;
+- one contextual numeric-entry area;
+- one financial result strip;
+- one primary confirm action.
+
+Avoid a dashboard-like grid of equally weighted cards.
+
+### 11.13 Mobile / portrait direction
+
+On narrow screens, payment becomes a vertical sequence:
+
+1. sticky amount due;
+2. payment methods;
+3. amount entry / keypad;
+4. paid / remaining / change;
+5. sticky confirm action.
+
+The item/cart summary collapses behind a compact expandable summary.
+
+The Confirm action respects safe-area insets and remains reachable without scrolling back to the top.
+
+### 11.14 Reuse from current payment implementation
+
+Preserve current proven behavior unless explicitly changed later:
+
+- configured payment methods;
+- default payment method;
+- cash vs bank settlement semantics;
+- split tender;
+- exact-amount helper;
+- quick amounts;
+- change calculation;
+- deferred-payment policy;
+- payment-method loading/error states;
+- offline block;
+- checkout submitting/recovering lock;
+- current checkout authority and idempotency behavior.
+
+V3 should primarily recompose these behaviors visually instead of replacing them.
 
 ## 12. Responsive behavior
 
@@ -383,7 +642,7 @@ Preferred implementation approach:
 - [OPEN] Horizontal category strip vs retained category rail for very large catalogs.
 - [OPEN] Exact default density: Standard is preferred, but should be visually validated.
 - [OPEN] Portrait tablet/mobile cart composition.
-- [OPEN] Payment Workspace V3 final layout.
+- [DECIDED] Payment Workspace V3 uses a dedicated terminal-like workspace with dominant amount due, large payment-method selection, contextual numeric entry, explicit paid/remaining/change states, and one dominant confirm action.
 - [OPEN] Whether POS receives an explicit independent theme preference or follows the user's main theme with Floor-specific surfaces.
 
 ## 19. Current design status
@@ -399,5 +658,7 @@ Preferred implementation approach:
 - Cart actions are simplified and touch-oriented.
 - Total + Pay are visually dominant.
 - POS should be more attractive and lively than Ledger screens without losing speed or trust.
+- Payment Workspace V3 is a dedicated terminal-like surface, not a small modal or generic form.
+- Payment keeps split tender, deferred policy, exact amount, change and checkout safety while simplifying the visual hierarchy.
 
-**Next design step:** Payment Workspace V3.
+**Next design step:** Touch / responsive composition V3.
