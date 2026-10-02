@@ -30,7 +30,9 @@ export function BannerBand({
           // biome-ignore lint/performance/noImgElement: merchant banner is a runtime https URL, not a static import
           <img
             src={content.imageUrl}
-            alt=""
+            // Decorative (empty alt) until the merchant authors real alt
+            // text — never a guessed or duplicated description.
+            alt={content.imageAlt?.trim() || ""}
             className="h-36 w-full rounded-store object-cover md:h-40 md:w-56 md:shrink-0"
           />
         ) : null}

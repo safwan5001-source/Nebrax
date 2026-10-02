@@ -11,12 +11,20 @@ export const MAX_FEATURED_PRODUCTS = 8;
 
 const SAFE_ID = /^[a-zA-Z0-9_-]{1,64}$/;
 
+export const MAX_BANNER_IMAGE_ALT_LENGTH = 150;
+
 export interface BannerContent {
   title: string;
   subtitle: string;
   ctaLabel: string;
   ctaHref: string;
   imageUrl: string | null;
+  /**
+   * CUST-H4-4 — optional merchant-authored alt text for `imageUrl`.
+   * Additive; absent/empty keeps the image decorative (`alt=""`), matching
+   * every document stored before this field existed.
+   */
+  imageAlt?: string;
 }
 
 export interface BenefitItem {
@@ -56,6 +64,7 @@ export function emptyBannerContent(): BannerContent {
     ctaLabel: "",
     ctaHref: "",
     imageUrl: null,
+    imageAlt: "",
   };
 }
 
@@ -147,6 +156,7 @@ function normalizeBanner(source: Record<string, unknown>): BannerContent {
     ctaLabel: asString(source.ctaLabel).trim().slice(0, 80),
     ctaHref: sanitizeContentHref(asString(source.ctaHref)),
     imageUrl: image,
+    imageAlt: asString(source.imageAlt).trim().slice(0, MAX_BANNER_IMAGE_ALT_LENGTH),
   };
 }
 

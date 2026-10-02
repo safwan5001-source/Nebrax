@@ -749,7 +749,11 @@ export function StorefrontPreviewCanvas({
                   ) : (
                     <div className="flex min-w-0 flex-col gap-4 p-5 md:flex-row md:items-center md:p-8">
                       {banner.imageUrl ? (
-                        <img src={banner.imageUrl} alt="" className="h-36 w-full rounded-store object-cover md:h-40 md:w-56 md:shrink-0" />
+                        <img
+                          src={banner.imageUrl}
+                          alt={banner.imageAlt?.trim() || ""}
+                          className="h-36 w-full rounded-store object-cover md:h-40 md:w-56 md:shrink-0"
+                        />
                       ) : null}
                       <div className="min-w-0">
                         {banner.title ? (

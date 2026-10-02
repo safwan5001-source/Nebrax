@@ -1035,9 +1035,7 @@ function HomepagePanel({
                 }
               />
             ) : selected.type === "appPromo" ? (
-              <p className="text-xs leading-relaxed text-neutral-500">
-                {t("appPromoNote")}
-              </p>
+              <AppPromoFields config={config} t={t} patch={patch} />
             ) : isGatedHomeSection(selected.type) ? (
               <p className="text-xs leading-relaxed text-neutral-500">
                 {t("gatedSection")}
@@ -1727,6 +1725,13 @@ function BannerFields({
       <Field label={t("bannerImageUrl")}>
         <input className={inputClass} value={value.imageUrl ?? ""} onChange={(event) => set({ imageUrl: event.target.value || null })} />
       </Field>
+      <Field label={t("bannerImageAlt")} hint={t("bannerImageAltHint")}>
+        <input
+          className={inputClass}
+          value={value.imageAlt ?? ""}
+          onChange={(event) => set({ imageAlt: event.target.value })}
+        />
+      </Field>
     </div>
   );
 }
@@ -1869,6 +1874,67 @@ function FeaturedFields({
       >
         + {t("addProduct")}
       </button>
+    </div>
+  );
+}
+
+// CUST-H4-4 — same config.apps fields/validators the standalone AppsPanel
+// already edits (AppsPanel stays, for merchants who land there first via
+// "التطبيقات"/Applications settings). Editing here keeps `setVisible`'s
+// existing showHomepageSection sync intact — this panel never touches
+// `visible` or `showHomepageSection` itself, only the content fields and
+// the separate footer-placement toggle.
+function AppPromoFields({
+  config,
+  t,
+  patch,
+}: {
+  config: StorefrontPresentationConfig;
+  t: (key: CustomizerMessageKey) => string;
+  patch: (partial: Partial<StorefrontPresentationConfig>) => void;
+}) {
+  return (
+    <div className="space-y-3">
+      <p className="text-xs leading-relaxed text-neutral-500">{t("appsHint")}</p>
+      <Field label={t("appName")}>
+        <input
+          className={inputClass}
+          value={config.apps.appName}
+          onChange={(event) =>
+            patch({ apps: { ...config.apps, appName: event.target.value } })
+          }
+        />
+      </Field>
+      <Field label={t("iosUrl")}>
+        <input
+          className={inputClass}
+          value={config.apps.iosUrl}
+          placeholder="https://apps.apple.com/..."
+          onChange={(event) =>
+            patch({ apps: { ...config.apps, iosUrl: event.target.value } })
+          }
+        />
+      </Field>
+      <Field label={t("androidUrl")}>
+        <input
+          className={inputClass}
+          value={config.apps.androidUrl}
+          placeholder="https://play.google.com/..."
+          onChange={(event) =>
+            patch({
+              apps: { ...config.apps, androidUrl: event.target.value },
+            })
+          }
+        />
+      </Field>
+      <Toggle
+        compact
+        label={t("showAppFooter")}
+        checked={config.apps.showFooterLinks}
+        onChange={(showFooterLinks) =>
+          patch({ apps: { ...config.apps, showFooterLinks } })
+        }
+      />
     </div>
   );
 }

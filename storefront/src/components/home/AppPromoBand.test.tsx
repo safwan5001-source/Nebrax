@@ -37,6 +37,38 @@ describe("AppPromoBand", () => {
     expect(screen.queryByRole("img", { name: "App Store" })).toBeNull();
   });
 
+  it("renders the iOS badge only when only the App Store URL is valid", () => {
+    render(
+      <AppPromoBand
+        {...labels}
+        iosUrl="https://apps.apple.com/app/id123"
+        androidUrl=""
+      />,
+    );
+    expect(screen.getByRole("img", { name: "App Store" })).toBeTruthy();
+    expect(screen.queryByRole("img", { name: "Google Play" })).toBeNull();
+  });
+
+  it("renders both badges when both store URLs are valid (CUST-H4-4)", () => {
+    render(
+      <AppPromoBand
+        {...labels}
+        iosUrl="https://apps.apple.com/app/id123"
+        androidUrl="https://play.google.com/store/apps/details?id=sa.awj"
+      />,
+    );
+    const ios = screen.getByRole("img", { name: "App Store" });
+    const android = screen.getByRole("img", { name: "Google Play" });
+    expect(ios.closest("a")).toHaveAttribute(
+      "href",
+      "https://apps.apple.com/app/id123",
+    );
+    expect(android.closest("a")).toHaveAttribute(
+      "href",
+      "https://play.google.com/store/apps/details?id=sa.awj",
+    );
+  });
+
   it("uses the Arabic publisher badges for ar", () => {
     render(
       <AppPromoBand

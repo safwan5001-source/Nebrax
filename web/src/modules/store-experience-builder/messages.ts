@@ -281,6 +281,9 @@ export const CUSTOMIZER_MESSAGES = {
     bannerCtaLabel: "نص الزر",
     bannerCtaHref: "رابط الزر",
     bannerImageUrl: "رابط الصورة (https)",
+    bannerImageAlt: "النص البديل للصورة (اختياري)",
+    bannerImageAltHint:
+      "يصف الصورة لمستخدمي قارئ الشاشة. اتركه فارغاً إن كانت الصورة زخرفية فقط.",
     benefitTitle: "عنوان الميزة",
     benefitBody: "وصف الميزة",
     addBenefit: "إضافة ميزة",
@@ -806,6 +809,9 @@ export const CUSTOMIZER_MESSAGES = {
     bannerCtaLabel: "Button label",
     bannerCtaHref: "Button link",
     bannerImageUrl: "Image URL (https)",
+    bannerImageAlt: "Image alt text (optional)",
+    bannerImageAltHint:
+      "Describes the image for screen-reader users. Leave empty if the image is purely decorative.",
     benefitTitle: "Benefit title",
     benefitBody: "Benefit text",
     addBenefit: "Add benefit",
