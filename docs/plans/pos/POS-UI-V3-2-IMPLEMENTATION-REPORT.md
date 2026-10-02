@@ -38,22 +38,22 @@ Presentation preference only. Server image flag, favorites storage, category con
 
 ## Tests and exact results
 
-Local Vitest, exit 0: `pos-density.test.ts`, `pos-responsive.test.ts`, `pos-product-tile.test.tsx`, `selected-line-bar.test.ts`, `page.test.tsx` — 5 files, 34 passed.
+Local Vitest after cherry-pick onto the V3-1 merge, exit 0: `pos-density.test.ts`, `pos-responsive.test.ts`, `pos-product-tile.test.tsx`, `selected-line-bar.test.ts`, `page.test.tsx` — 5 files, 34 passed.
 
 `npx tsc --noEmit` reports pre-existing errors in unrelated tests. No error line matched `pos-product-tile`, `pos-density`, `(pos)/pos/page`, or `pos-responsive`.
 
 ## Build / lint / typecheck
 
-Full `npm run build` is the Web CI gate and will be recorded on the PR Head. Not re-run locally after this slice beyond `tsc` (see above).
+`npm run build` in `web/` exited 0 after the cherry-pick onto `96977ab382e8defe402490ed77d3727783aa7a19`. That script is the Web CI typecheck+build gate.
 
 ## CI
 
-Pending on the PR Head after POS-UI-V3-1 is merged and this branch is rebased.
+Pending on the PR Head. Web CI is required (`web/**`). Root PHP CI also runs. Do not treat this file's commit as the reviewed Head until the PR tip is recorded in PRE_MERGE_REVIEW.
 
 ## Pre-merge review
 
 - PRE_MERGE_REVIEW: PENDING
-- Reviewed Head SHA: tip when the PR is opened
+- Reviewed Head SHA: branch tip when the PR is opened (review authority is that tip, not a SHA written inside this file)
 - Findings / resolution: —
 
 ## Merge
@@ -121,9 +121,10 @@ None that is a Decision Gate.
 ## Git state
 
 - Branch: `pos-ui-v3-2`
-- PR: not opened until POS-UI-V3-1 is merged
-- Base SHA: POS-UI-V3-1 merge SHA
-- Head SHA: tip after rebase onto that merge
+- PR: opened after POS-UI-V3-1 POST_MERGE_REVIEW PASS
+- Base SHA: `96977ab382e8defe402490ed77d3727783aa7a19` (POS-UI-V3-1 merge, PR #1168)
+- Catalog commit: `bb78871` (cherry-pick of `8e0a67a` onto that base)
+- Head SHA: branch tip after the report correction; the PRE_MERGE comment records the exact reviewed SHA
 
 ## Recommended next dependency-ready task
 
