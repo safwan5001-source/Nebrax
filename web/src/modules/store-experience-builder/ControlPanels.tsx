@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   canAddSectionType,
   canDuplicateSection,
@@ -1035,9 +1035,7 @@ function HomepagePanel({
                 }
               />
             ) : selected.type === "appPromo" ? (
-              <p className="text-xs leading-relaxed text-neutral-500">
-                {t("appPromoNote")}
-              </p>
+              <AppPromoFields config={config} t={t} patch={patch} />
             ) : isGatedHomeSection(selected.type) ? (
               <p className="text-xs leading-relaxed text-neutral-500">
                 {t("gatedSection")}
@@ -1625,28 +1623,18 @@ function AppsPanel({
             }
           />
         </Field>
-        <Field label={t("iosUrl")}>
-          <input
-            className={inputClass}
-            value={config.apps.iosUrl}
-            placeholder="https://apps.apple.com/..."
-            onChange={(event) =>
-              patch({ apps: { ...config.apps, iosUrl: event.target.value } })
-            }
-          />
-        </Field>
-        <Field label={t("androidUrl")}>
-          <input
-            className={inputClass}
-            value={config.apps.androidUrl}
-            placeholder="https://play.google.com/..."
-            onChange={(event) =>
-              patch({
-                apps: { ...config.apps, androidUrl: event.target.value },
-              })
-            }
-          />
-        </Field>
+        <DeferredCommitField
+          label={t("iosUrl")}
+          placeholder="https://apps.apple.com/..."
+          value={config.apps.iosUrl}
+          onCommit={(iosUrl) => patch({ apps: { ...config.apps, iosUrl } })}
+        />
+        <DeferredCommitField
+          label={t("androidUrl")}
+          placeholder="https://play.google.com/..."
+          value={config.apps.androidUrl}
+          onCommit={(androidUrl) => patch({ apps: { ...config.apps, androidUrl } })}
+        />
       </Section>
       <Section title={t("appsPlacement")}>
         <div className="divide-y divide-neutral-200 border-y border-neutral-200">
@@ -1727,6 +1715,12 @@ function BannerFields({
       <Field label={t("bannerImageUrl")}>
         <input className={inputClass} value={value.imageUrl ?? ""} onChange={(event) => set({ imageUrl: event.target.value || null })} />
       </Field>
+      <DeferredCommitField
+        label={t("bannerImageAlt")}
+        hint={t("bannerImageAltHint")}
+        value={value.imageAlt ?? ""}
+        onCommit={(imageAlt) => set({ imageAlt })}
+      />
     </div>
   );
 }
@@ -1869,6 +1863,124 @@ function FeaturedFields({
       >
         + {t("addProduct")}
       </button>
+    </div>
+  );
+}
+
+/**
+ * Deferred local draft for inputs whose parent commit immediately
+ * normalizes the whole config (`ExperienceBuilder.updateDraft` →
+ * `normalizePresentationConfig`).
+ *
+ * App Store / Google Play URLs are replaced with `""` until they are a
+ * complete allow-listed URL, so writing every keystroke into `config.apps`
+ * clears the field. Banner `imageAlt` is trimmed (and code-point truncated)
+ * on every commit, so a trailing space between words such as `Summer sale`
+ * disappears before the next character is typed.
+ *
+ * The raw draft stays local while the field is focused or being typed.
+ * Normalization runs only at the blur/commit boundary, through the same
+ * `onCommit` → `patch` path every other field already uses — no second
+ * persistence model. After editing stops, the draft resyncs to the
+ * authoritative `value` even when that string did not change (an invalid
+ * URL rejected back to the existing `""`, or whitespace-only alt text
+ * trimmed to `""`). External `value` updates apply only while the field
+ * is not being edited, so a parent refresh cannot clobber in-progress text.
+ * `draftRef` is what gets committed, not the `draft` state closed over by
+ * `onBlur`, so a blur in the same turn as the last keystroke cannot drop
+ * the character that has not re-rendered yet.
+ */
+function DeferredCommitField({
+  label,
+  hint,
+  placeholder,
+  value,
+  onCommit,
+}: {
+  label: string;
+  hint?: string;
+  placeholder?: string;
+  value: string;
+  onCommit: (value: string) => void;
+}) {
+  const [draft, setDraft] = useState(value);
+  const [isEditing, setIsEditing] = useState(false);
+  const draftRef = useRef(value);
+  useEffect(() => {
+    if (!isEditing) {
+      draftRef.current = value;
+      setDraft(value);
+    }
+  }, [value, isEditing]);
+  return (
+    <Field label={label} hint={hint}>
+      <input
+        className={inputClass}
+        value={draft}
+        placeholder={placeholder}
+        onFocus={() => setIsEditing(true)}
+        onChange={(event) => {
+          draftRef.current = event.target.value;
+          setIsEditing(true);
+          setDraft(event.target.value);
+        }}
+        onBlur={() => {
+          const next = draftRef.current;
+          setIsEditing(false);
+          onCommit(next);
+        }}
+      />
+    </Field>
+  );
+}
+
+// CUST-H4-4 — same config.apps fields/validators the standalone AppsPanel
+// already edits (AppsPanel stays, for merchants who land there first via
+// "التطبيقات"/Applications settings). Editing here keeps `setVisible`'s
+// existing showHomepageSection sync intact — this panel never touches
+// `visible` or `showHomepageSection` itself, only the content fields and
+// the separate footer-placement toggle.
+function AppPromoFields({
+  config,
+  t,
+  patch,
+}: {
+  config: StorefrontPresentationConfig;
+  t: (key: CustomizerMessageKey) => string;
+  patch: (partial: Partial<StorefrontPresentationConfig>) => void;
+}) {
+  return (
+    <div className="space-y-3">
+      <p className="text-xs leading-relaxed text-neutral-500">{t("appsHint")}</p>
+      <Field label={t("appName")}>
+        <input
+          className={inputClass}
+          value={config.apps.appName}
+          onChange={(event) =>
+            patch({ apps: { ...config.apps, appName: event.target.value } })
+          }
+        />
+      </Field>
+      <DeferredCommitField
+        label={t("iosUrl")}
+        placeholder="https://apps.apple.com/..."
+        value={config.apps.iosUrl}
+        onCommit={(iosUrl) => patch({ apps: { ...config.apps, iosUrl } })}
+      />
+      <DeferredCommitField
+        label={t("androidUrl")}
+        placeholder="https://play.google.com/..."
+        value={config.apps.androidUrl}
+        onCommit={(androidUrl) => patch({ apps: { ...config.apps, androidUrl } })}
+      />
+      <Toggle
+        compact
+        label={t("showAppFooter")}
+        checked={config.apps.showFooterLinks}
+        onChange={(showFooterLinks) =>
+          patch({ apps: { ...config.apps, showFooterLinks } })
+        }
+      />
     </div>
   );
 }

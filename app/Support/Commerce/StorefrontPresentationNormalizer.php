@@ -68,6 +68,9 @@ final class StorefrontPresentationNormalizer
 
     public const MAX_FEATURED_PRODUCTS = 8;
 
+    /** CUST-H4-4 — banner `imageAlt`. Twin of MAX_BANNER_IMAGE_ALT_LENGTH in both section-content.ts files. */
+    public const MAX_BANNER_IMAGE_ALT_LENGTH = 150;
+
     public const HOME_BUILDER_SECTION_KEYS = [
         'hero',
         'categories',
@@ -610,6 +613,10 @@ final class StorefrontPresentationNormalizer
                 'ctaLabel' => mb_substr(trim($this->asString($source['ctaLabel'] ?? null)), 0, 80),
                 'ctaHref' => $this->sanitizeContentHref($this->asString($source['ctaHref'] ?? null)),
                 'imageUrl' => $this->sanitizeExternalUrl($this->asString($source['imageUrl'] ?? null)),
+                // CUST-H4-4 — optional, plain text only. Not part of the
+                // emptiness check below: stray alt text with no title,
+                // subtitle, CTA, or image is still an empty banner.
+                'imageAlt' => mb_substr(trim($this->asString($source['imageAlt'] ?? null)), 0, self::MAX_BANNER_IMAGE_ALT_LENGTH),
             ];
             $empty = $content['title'] === ''
                 && $content['subtitle'] === ''

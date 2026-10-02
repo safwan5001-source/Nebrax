@@ -411,6 +411,144 @@ class StorefrontPresentationNormalizerTest extends TestCase
         $this->assertArrayNotHasKey('content', $plain['homepage']['sections'][0]);
     }
 
+    /**
+     * CUST-H4-4 — banner `imageAlt`: additive, bounded, plain text.
+     *
+     * @test
+     */
+    public function banner_image_alt_is_trimmed_bounded_plain_text_and_additive(): void
+    {
+        $normalized = $this->normalizer->normalize([
+            'version' => 2,
+            'homepage' => [
+                'sections' => [
+                    [
+                        'id' => 'banner-a',
+                        'type' => 'banner',
+                        'visible' => true,
+                        'content' => [
+                            'title' => 'عرض',
+                            'imageUrl' => 'https://cdn.example.com/banner.jpg',
+                            'imageAlt' => '  '.str_repeat('a', 400).'  ',
+                        ],
+                    ],
+                ],
+            ],
+        ]);
+
+        $alt = $normalized['homepage']['sections'][0]['content']['imageAlt'];
+        $this->assertSame(StorefrontPresentationNormalizer::MAX_BANNER_IMAGE_ALT_LENGTH, mb_strlen($alt));
+        $this->assertSame(str_repeat('a', StorefrontPresentationNormalizer::MAX_BANNER_IMAGE_ALT_LENGTH), $alt);
+    }
+
+    /** @test */
+    public function banner_image_alt_defaults_to_empty_string_for_pre_h4_4_documents(): void
+    {
+        // A document stored before this field existed carries no `imageAlt`
+        // key at all. The server must not fail or omit the key — it
+        // normalizes to the empty string, same as every other banner string
+        // field's absence.
+        $normalized = $this->normalizer->normalize([
+            'version' => 2,
+            'homepage' => [
+                'sections' => [
+                    [
+                        'id' => 'banner-a',
+                        'type' => 'banner',
+                        'visible' => true,
+                        'content' => [
+                            'title' => 'عرض',
+                            'imageUrl' => 'https://cdn.example.com/banner.jpg',
+                        ],
+                    ],
+                ],
+            ],
+        ]);
+
+        $this->assertSame('', $normalized['homepage']['sections'][0]['content']['imageAlt']);
+    }
+
+    /** @test */
+    public function banner_image_alt_alone_does_not_make_an_otherwise_empty_banner_non_empty(): void
+    {
+        $normalized = $this->normalizer->normalize([
+            'version' => 2,
+            'homepage' => [
+                'sections' => [
+                    [
+                        'id' => 'banner-a',
+                        'type' => 'banner',
+                        'visible' => true,
+                        'content' => ['imageAlt' => 'stray text with nothing else'],
+                    ],
+                ],
+            ],
+        ]);
+
+        $this->assertArrayNotHasKey('content', $normalized['homepage']['sections'][0]);
+    }
+
+    /** @test */
+    public function banner_image_alt_rejects_a_non_string_value_to_the_empty_default(): void
+    {
+        $normalized = $this->normalizer->normalize([
+            'version' => 2,
+            'homepage' => [
+                'sections' => [
+                    [
+                        'id' => 'banner-a',
+                        'type' => 'banner',
+                        'visible' => true,
+                        'content' => [
+                            'title' => 'عرض',
+                            'imageAlt' => ['not' => 'a string'],
+                        ],
+                    ],
+                ],
+            ],
+        ]);
+
+        $this->assertSame('', $normalized['homepage']['sections'][0]['content']['imageAlt']);
+    }
+
+    /**
+     * CUST-H4-4 review fix — documents the server-authoritative semantics
+     * the two TypeScript normalizers (web + storefront) must now match:
+     * `mb_substr` truncates by Unicode code point (character), not by byte
+     * or UTF-16 code unit. 150 astral-codepoint emoji stay 150 emoji; a
+     * UTF-16-unit-counting truncation (JavaScript's bare `.slice()`, before
+     * this fix) would have kept only ~75.
+     *
+     * @test
+     */
+    public function banner_image_alt_truncates_by_unicode_code_point_not_byte_or_utf16_unit(): void
+    {
+        $emoji = "\u{1F600}"; // 😀 — 4 bytes in UTF-8, 2 UTF-16 code units, 1 character.
+        $normalized = $this->normalizer->normalize([
+            'version' => 2,
+            'homepage' => [
+                'sections' => [
+                    [
+                        'id' => 'banner-a',
+                        'type' => 'banner',
+                        'visible' => true,
+                        'content' => [
+                            'title' => 'عرض',
+                            'imageAlt' => str_repeat($emoji, 151),
+                        ],
+                    ],
+                ],
+            ],
+        ]);
+
+        $alt = $normalized['homepage']['sections'][0]['content']['imageAlt'];
+        $this->assertSame(
+            StorefrontPresentationNormalizer::MAX_BANNER_IMAGE_ALT_LENGTH,
+            mb_strlen($alt),
+        );
+        $this->assertSame(str_repeat($emoji, StorefrontPresentationNormalizer::MAX_BANNER_IMAGE_ALT_LENGTH), $alt);
+    }
+
     /** @test */
     public function client_supplied_version_is_overwritten_and_is_not_authority(): void
     {
