@@ -3,7 +3,7 @@
 **Horizon:** CUST-H4 — Section Library & Section Quality
 **Slice:** H4-4 (Banner / Benefits / Custom Content / App Promo completion)
 **Base SHA:** `30ead922dbaf40a20bd7b10ac839876310e0de18` — `feat(store): use real catalog data in H4 Canvas (#1167)` (verified via `git fetch origin main && git rev-parse origin/main` at task start — confirmed this is `origin/main`'s own HEAD and the merged H4-3 PR, not assumed from the task brief)
-**Head SHA:** updated in §20 after the second review-fix round (branch `feat/cust-h4-4-section-completion`; was `94ecc91abdab022ec9875c05bf6cdbb0f98da098` at the start of this round, and `b7aaa80b7dbe4d678a1551a6f7dc222e3351116e` after the first review-fix round)
+**Head SHA:** `039346ba642107b44fb1e3a2899ebabf59d87eb8` — `fix(store): defer imageAlt and App Promo URL commits until blur` (this round; was `94ecc91abdab022ec9875c05bf6cdbb0f98da098` at the start of the round). CI in §20.5 is for that SHA. This docs update does not change runtime code.
 **Branch:** `feat/cust-h4-4-section-completion` (the task's own suggested name; the environment did not require a different one)
 **PR:** [safwan5001-source/Nebrax#1172](https://github.com/safwan5001-source/Nebrax/pull/1172), open against `main`, not merged
 
@@ -458,14 +458,27 @@ PHP `StorefrontPresentationNormalizer` was not changed in this round. The code-p
 
 ### 20.5 Review threads and CI
 
-Resolved only after this diff was pushed and the corresponding checks were verified. Thread ids:
+Code commit `039346ba642107b44fb1e3a2899ebabf59d87eb8` — every check on that SHA completed green before the threads were resolved. The same SHA ran twice (push + pull_request). Both copies succeeded:
 
-1. `PRRT_kwDOS52FT86oghfp` — partial App Promo URLs while typing.
-2. `PRRT_kwDOS52FT86oghfv` — Unicode code-point truncation.
-3. `PRRT_kwDOS52FT86ogxZI` — blur/Tab the second App Promo URL before both badges.
-4. `PRRT_kwDOS52FT86og4OV` — preserve spaces while typing banner alt text.
+| Check | push | pull_request |
+|---|---|---|
+| web build (Next.js) | success | success |
+| storefront (lint + typecheck + test) | (not in the push CI workflow; covered by the pull_request Storefront CI run) | success |
+| merchant preview visual QA | — | success |
+| published footer visual QA | — | success |
+| php artisan test (L11, sqlite) | success | success |
+| php artisan test (L11, pgsql) | success (run 37075624257, completed 2026-10-02T23:16:01Z) | success (run 37075628814, job 111064771254, completed 2026-10-02T23:26:30Z) |
 
-CI state is filled in from the GitHub check runs on the new head. No merge. No deploy. No production release.
+No failing job. No rerun. PHP sources were unchanged in this round; the green PHP jobs are the full `php artisan test` suite, not a reduced filter.
+
+Resolved after that green result:
+
+1. `PRRT_kwDOS52FT86oghfp` — partial App Promo URLs while typing. `DeferredCommitField` keeps the raw URL until blur.
+2. `PRRT_kwDOS52FT86oghfv` — Unicode code-point truncation. Already on the branch via `truncateToCodePoints` (`Array.from`); re-verified, not rewritten.
+3. `PRRT_kwDOS52FT86ogxZI` — second App Promo URL. The spec presses Tab after the second fill, before `toHaveCount(2)`.
+4. `PRRT_kwDOS52FT86og4OV` — banner alt spaces. The same `DeferredCommitField` commits `imageAlt` on blur, so `Summer sale` keeps its space while typing.
+
+No merge. No deploy. No production release.
 
 ### 20.6 Remaining risks
 
