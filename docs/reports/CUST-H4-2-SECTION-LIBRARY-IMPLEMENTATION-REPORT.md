@@ -3,7 +3,7 @@
 **Horizon:** CUST-H4 — Section Library & Real Section Activation
 **Slice:** H4-2 (Capability Registry + Section Library UX)
 **Base SHA:** `b6024bd25a826e3800238d9c3ea1c62920001614` — `docs(store): define CUST-H4 section library and activation contract (#1150)`
-**Review-fix commit (Head SHA):** `1135c56ea39facbbff6833ec9a68073e01277156`
+**Mobile-contract fix commit (Head SHA):** `350f0d3f77d48a2f531ffdd111f09a2e65b3f556`
 **Branch:** `feat/cust-h4-2-section-library`
 **PR:** [safwan5001-source/Nebrax#1154](https://github.com/safwan5001-source/Nebrax/pull/1154), open against `main`, not merged
 
@@ -55,6 +55,54 @@ this slice's own new Library UI.
   the 7-category taxonomy, the dialog UX itself — is carried forward
   unchanged; it was not reopened.
 
+## Revision Note 2 (owner/reviewer correction on PR #1154 — mobile contract)
+
+Revision 1's `SectionLibraryDialog` was a centered dialog on **both** desktop
+and mobile, explicitly documented as such ("Centered dialog, not a Bottom
+Sheet — same markup on mobile and desktop"). On mobile this opened **nested
+inside** the existing "sections" Bottom Sheet `ExperienceBuilder.tsx` already
+provides — a second `aria-modal` surface stacked on top of the first,
+contradicting the merged H4 architecture's own mobile UX contract (§26:
+"The Section Picker must follow the same Bottom Sheet pattern on mobile, not
+a separate modal paradigm").
+
+**This revision:**
+
+- Splits the component (`SectionLibrary.tsx`) into `SectionLibraryContent`
+  (the actual search/category/card content, no dialog/modal chrome of its
+  own) and `SectionLibraryDialog` (the existing centered-dialog wrapper,
+  desktop-only now, built from `SectionLibraryContent`).
+- **Desktop:** unchanged — `SectionLibraryDialog`, same centered-dialog
+  precedent as `PublishConfirmDialog`.
+- **Mobile:** `HomepagePanel` (`ControlPanels.tsx`) now renders
+  `SectionLibraryContent` **directly in place of its own composer body**
+  when the picker is open and `isMobileViewport` is true — inside the
+  *same* "sections" Bottom Sheet `ExperienceBuilder.tsx` already opens, via
+  an early return, not a new dialog. No new `mobileSheet` state/wiring was
+  needed: `isMobileViewport` is threaded through as one new optional prop
+  (`PanelsProps` → `HomepagePanel`), reusing the exact `isMobileViewport`
+  state `ExperienceBuilder` already computes. There is never more than one
+  `role="dialog"`/`aria-modal="true"` surface on screen on mobile.
+- The Library's own header close button becomes a **back** control on
+  mobile (`onClose` → `setPickerOpen(false)`, which simply falls through to
+  the normal composer render) rather than an **exit** — the sheet itself
+  never closes, satisfying "Back/close behavior must return cleanly to the
+  previous Sections state."
+- The card list's scroll region switched from `flex-1 overflow-y-auto`
+  (which depends on an ancestor flex column with a defined height — true
+  for the desktop dialog, not true for the mobile sheet's own plain
+  `overflow-y-auto` body) to a fixed `max-h-[*vh]` cap — the same
+  fixed-height nested-scroll-region pattern `ProductPreviewPickerPanel`
+  already uses elsewhere in this module — so "independent scrolling" holds
+  in both presentations without depending on a specific ancestor layout.
+- Fixed the two stale comments P2 flagged in `section-capabilities.ts` (the
+  module-level "stays addable-with-honest-copy" line and the
+  `merchantAddable` field's "None today" line) — both described the
+  pre-Revision-1-fix behavior; no runtime state changed in this revision.
+- Added real browser visual QA via Playwright against the existing
+  `/dev/customizer-versions` fixture (no backend/login needed — the same
+  pattern `cust-h2-2-page-navigator.spec.ts` already uses) — see §13.
+
 ---
 
 ## 1. Scope actually implemented
@@ -87,19 +135,31 @@ Laravel files are part of this diff.
 
 ## 2. Files changed
 
-Cumulative diff vs. Base SHA (first H4-2 revision + this review fix,
-same 7 files, no new files added by the fix):
+Cumulative diff vs. Base SHA (both review-fix revisions included; `git
+diff --stat` on the staged tree, so new files are counted too):
 
 ```
- web/src/app/(commerce)/commerce/appearance/section-instances.test.tsx     |  49 +-   (M)
- web/src/modules/store-experience-builder/ControlPanels.tsx                |  56 +-   (M)
- web/src/modules/store-experience-builder/SectionLibrary.tsx               | 416 ++++ (A, new)
- web/src/modules/store-experience-builder/__tests__/SectionLibrary.test.tsx| 200 ++++ (A, new)
- web/src/modules/store-experience-builder/__tests__/section-capabilities.test.ts | 134 ++ (M)
- web/src/modules/store-experience-builder/messages.ts                      |  75 ++   (M)
- web/src/modules/store-experience-builder/presentation/section-capabilities.ts | 198 ++ (M)
- 7 files changed, 1073 insertions(+), 55 deletions(-)
+ web/e2e/cust-h4-2-section-library-visual.spec.ts                          | 124 ++++       (A, new)
+ web/src/app/(commerce)/commerce/appearance/section-instances.test.tsx     |  49 ++-         (M)
+ web/src/app/(commerce)/commerce/appearance/section-library-mobile.test.tsx| 249 +++++       (A, new)
+ web/src/modules/store-experience-builder/ControlPanels.tsx                |  82 ++--         (M)
+ web/src/modules/store-experience-builder/ExperienceBuilder.tsx            |   2 +            (M)
+ web/src/modules/store-experience-builder/SectionLibrary.tsx               | 469 +++++++++++  (A, new — Revision 1; restructured in Revision 2)
+ web/src/modules/store-experience-builder/__tests__/SectionLibrary.test.tsx| 224 ++++++++++    (A, new — Revision 1; extended in Revision 2)
+ web/src/modules/store-experience-builder/__tests__/section-capabilities.test.ts | 134 ++++++ (M)
+ web/src/modules/store-experience-builder/messages.ts                      |  75 ++++          (M)
+ web/src/modules/store-experience-builder/presentation/section-capabilities.ts | 218 +++++++- (M)
+ 10 files changed, 1571 insertions(+), 55 deletions(-)
 ```
+
+This fix's own diff (Revision 2 only, on top of the Revision-1 commits
+`b6f360b`/`1135c56`/`6a4103c`/`716906e`) touches 9 files: `SectionLibrary.tsx`
+(split into `SectionLibraryContent`/`SectionLibraryDialog`), `ControlPanels.tsx`
+(mobile wiring), `ExperienceBuilder.tsx` (`isMobileViewport` prop threaded
+to both `<ControlPanels>` call sites), `presentation/section-capabilities.ts`
+(comment cleanup only — see §3), `SectionLibrary.test.tsx` (new
+`SectionLibraryContent` test), and 2 new test files (`section-library-mobile.test.tsx`,
+`cust-h4-2-section-library-visual.spec.ts`) plus this report.
 
 ---
 
@@ -166,23 +226,32 @@ not as part of this or any H4-2 follow-up.
 
 ## 5. Section Library UX behavior
 
-`SectionLibraryDialog` (`SectionLibrary.tsx`), opened from `HomepagePanel`'s
-existing local `pickerOpen` state (same trigger button as before):
+`SectionLibraryContent` (`SectionLibrary.tsx`) holds the actual search/
+category/card content, shared by two presentations, chosen by
+`HomepagePanel` (`ControlPanels.tsx`) from the `isMobileViewport` prop
+`ExperienceBuilder.tsx` threads down:
 
-- **Centered dialog**, not a Bottom Sheet — reuses the exact precedent
-  `PublishConfirmDialog` already established in `ExperienceBuilder.tsx`
-  ("مركزيٌّ لا Bottom Sheet — نفس الترميز على الجوال وسطح المكتب"): a
-  `fixed inset-0` backdrop, `role="dialog" aria-modal="true"`, `max-w-lg`,
-  `max-h-[85dvh]` with independent `overflow-y-auto` on the card list only
-  (header/search/chips stay fixed).
-- **No new `ExperienceBuilder` wiring.** Because `HomepagePanel` (and thus
-  the picker) is already rendered both in the desktop sidebar and inside
-  the generic mobile "sections" Bottom Sheet, the new dialog nests inside
-  that existing Bottom Sheet on mobile automatically — confirmed no
-  `transform`/`filter`/`will-change` exists on any ancestor (there's an
-  explicit prior-art comment in `ExperienceBuilder.tsx` confirming this),
-  so the dialog's own `fixed` positioning escapes to the viewport correctly
-  without a portal.
+- **Desktop** (`isMobileViewport === false`) — `SectionLibraryDialog` wraps
+  `SectionLibraryContent` in a **centered dialog**, reusing the exact
+  precedent `PublishConfirmDialog` already established in
+  `ExperienceBuilder.tsx` ("مركزيٌّ لا Bottom Sheet — نفس الترميز على
+  الجوال وسطح المكتب"): a `fixed inset-0` backdrop, `role="dialog"
+  aria-modal="true"`, `max-w-lg`, `max-h-[85dvh]`, independent
+  `overflow-y-auto` on the card list (`flex-1`) with header/search/chips
+  fixed.
+- **Mobile** (`isMobileViewport === true`) — **no dialog wrapper at all.**
+  `HomepagePanel` renders `SectionLibraryContent` directly, in place of its
+  own composer body, inside the *same* generic "sections" mobile Bottom
+  Sheet `ExperienceBuilder.tsx` already opens (an early return in
+  `HomepagePanel`, gated on `pickerOpen && isMobileViewport`) — not a
+  second stacked dialog. The card list's scroll region uses a fixed
+  `max-h-[60vh]` cap instead of `flex-1` here, since the mobile sheet's own
+  body is a plain `overflow-y-auto` div with no defined height for a
+  `flex-1` child to fill (the same fixed-height nested-scroll pattern
+  `ProductPreviewPickerPanel` already uses). There is never more than one
+  `role="dialog"`/`aria-modal="true"` surface on screen — see Revision
+  Note 2 for why the first revision's "always a centered dialog, even on
+  mobile" approach was wrong and what replaced it.
 - **Search** matches a simple lower-cased substring against each type's
   translated title + description (`normalizeSearchText`) — no new fuzzy-
   search infrastructure, per the task's own guidance that simple matching
@@ -258,30 +327,71 @@ independently of this hierarchy and is unaffected by it — it reflects
   direction-dependent absolute positioning, so RTL/LTR mirrors purely via
   the `dir` attribute the rest of the Customizer already sets.
 
-## 8. Mobile behavior
+## 8. Mobile behavior (rewritten for Revision 2 — real architecture)
 
-- Reuses the established preview-first mobile Customizer model: the
-  Library opens as an additive dialog, not a new product/navigation
-  concept.
+- **Follows the existing Bottom Sheet contract, not a nested modal.** The
+  Library opens *inside* the same generic "sections" mobile Bottom Sheet
+  `ExperienceBuilder.tsx` already provides (reached via the bottom-nav "+
+  إضافة قسم" button or the "الأقسام" tab), replacing that sheet's own
+  composer content in place — confirmed by a real browser test asserting
+  `page.getByRole('dialog')` stays at count 1 throughout open → search →
+  add → close.
+- **Back, not exit.** The Library's own header close button
+  (`aria-label="إغلاق"`) calls `setPickerOpen(false)`, which simply falls
+  through to `HomepagePanel`'s normal composer render — the sheet itself
+  never closes. Verified both at the component level and via a real
+  browser round-trip (open → close → composer visible again, same sheet).
+- **Preserves document state.** Opening the Library only sets local
+  `pickerOpen` state; it never touches `StorefrontPresentationConfig` —
+  confirmed in the browser test by reading
+  `[data-experience-builder]`'s `data-lifecycle` attribute (stays
+  `"clean"` after merely opening the Library).
 - Search input is a real `<input type="search">` with an associated
-  `sr-only` `<label>` — usable with the on-screen keyboard open; the card
-  list area scrolls independently of the header/search/chips (`overflow-
-  y-auto` scoped to the list container only), so opening the keyboard
-  cannot trap or hide the search field.
-- No horizontal overflow: the dialog is `w-full max-w-lg` with `p-4`
-  gutters and a `grid-cols-1 sm:grid-cols-2` card grid, so at 390/430px
-  width cards stack in a single column with no clipped content.
-- Opening/closing the Library only toggles `HomepagePanel`'s local
-  `pickerOpen` boolean — it never touches `StorefrontPresentationConfig`,
-  so Canvas scroll position, selection, and Draft/dirty state are
-  unaffected by open/close (structural guarantee, not something that
-  needed a new test: the dialog receives `sections` read-only and emits
-  only `onAdd`/`onClose`).
+  `sr-only` `<label>`, usable with the on-screen keyboard open; the card
+  list area is capped at `max-h-[60vh]` with its own `overflow-y-auto`
+  (see §5 for why this differs from the desktop dialog's `flex-1`).
+- No horizontal overflow at 390/430px — verified both by the Vitest
+  integration suite and, now, by a real rendered browser at both exact
+  widths (`document.documentElement.scrollWidth <= clientWidth`,
+  screenshotted; see §13).
+- Add still goes through the same `addSection` path `HomepagePanel`
+  already had — verified end-to-end in the browser: adding `banner`
+  returns to the composer with a new, visible `banner` row and the newly
+  added instance's own settings shown (identical selection behavior to
+  the pre-existing desktop flow).
+
+**Observation from visual QA, pre-existing, not touched by this fix:** at
+the `/dev/customizer-versions` fixture's true-mobile viewport,
+`HomepagePanel` is actually mounted *twice* simultaneously — once inside
+`ExperienceBuilder`'s CSS-hidden (`class="hidden ... lg:flex"`) desktop
+`<aside>`, once inside the mobile Bottom Sheet — because the `<aside>`'s
+hidden/visible class is driven by `mobilePane` ("edit"/"preview") alone,
+with no explicit `isMobileViewport` check forcing it hidden below the
+`lg` breakpoint. In every path this fix's own tests and visual QA actually
+exercise, `mobilePane` stays at its default (`"preview"`), so the `<aside>`
+copy is never visually shown — but it does mean a test or a future change
+must not write an unscoped `page.locator(...)` query on this page expecting
+exactly one match for composer-row/picker selectors; ours are explicitly
+scoped to the visible sheet (see `cust-h4-2-section-library-visual.spec.ts`).
+This is pre-existing `ExperienceBuilder.tsx` behavior unrelated to the
+Section Library, out of this fix's bounded scope, and is recorded here
+only because visual QA surfaced it directly.
 
 ## 9. Accessibility behavior
 
-- Real `<dialog>`-pattern markup: `role="dialog"`, `aria-modal="true"`,
-  `aria-labelledby` pointing at the visible `<h2>` title.
+- Real `<dialog>`-pattern markup on desktop: `role="dialog"`,
+  `aria-modal="true"`, `aria-label` set to the Library's title (switched
+  from `aria-labelledby` + a shared `useId()` in Revision 1 to a plain
+  `aria-label` in Revision 2, matching `ExperienceBuilder.tsx`'s own
+  generic mobile sheet precedent exactly, once the title's owning `<h2>`
+  moved into the now-shared `SectionLibraryContent` and no longer had a
+  single fixed id to cross-reference from two different wrapper contexts).
+- **Never more than one `aria-modal` surface.** On mobile,
+  `SectionLibraryContent` carries no `role`/`aria-modal` of its own — only
+  the pre-existing outer sheet does — confirmed by a dedicated unit test
+  (`SectionLibraryContent` renders with `role`/`aria-modal` both absent)
+  and by the browser test's running `page.getByRole('dialog')` count
+  assertion at every step.
 - Every section card is a genuine `<button>` (never a click-only `<div>`),
   keyboard-focusable and keyboard-activatable natively, `disabled` for
   non-addable states (so screen readers and keyboard users get the native
@@ -317,52 +427,65 @@ through the `t()` callback the rest of the module already uses.
 
 ## 11. Tests executed — exact results
 
-Re-run in full after the review fix (Offers `merchantAddable: false` +
-the `addDisabledReasonKey` hierarchy fix + updated/added tests):
+Re-run in full after this mobile-contract fix (component split +
+`isMobileViewport` wiring + comment cleanup + new/updated tests):
 
 **Targeted (new/changed) suites:**
 
 ```
-src/modules/store-experience-builder/__tests__/section-capabilities.test.ts   22 tests passed  (+2: non-addable + transition-documentation tests)
-src/modules/store-experience-builder/__tests__/SectionLibrary.test.tsx        13 tests passed  (+2: offers-disabled-with-reason + offers-click-never-adds)
-src/app/(commerce)/commerce/appearance/section-instances.test.tsx             12 tests passed  (+1: offers-withheld integration test; multi-instance example switched from offers → benefits)
-src/app/(commerce)/commerce/appearance/section-editing.test.tsx               8 tests passed  (unchanged — duplicate-button behavior for an existing offers instance is untouched by this fix)
+src/modules/store-experience-builder/__tests__/section-capabilities.test.ts    22 tests passed  (unchanged by this fix — no runtime state changed, see §3)
+src/modules/store-experience-builder/__tests__/SectionLibrary.test.tsx         14 tests passed  (+1: SectionLibraryContent carries no dialog/modal role)
+src/app/(commerce)/commerce/appearance/section-instances.test.tsx              12 tests passed  (unchanged by this fix)
+src/app/(commerce)/commerce/appearance/section-editing.test.tsx                 8 tests passed  (unchanged by this fix)
+src/app/(commerce)/commerce/appearance/section-library-mobile.test.tsx          6 tests passed  (new — real ExperienceBuilder mobile-viewport integration: single-dialog, document-preserving open, back-to-composer close, search/category/add, Offers non-addable, singleton already-added, all exercised through the actual mobile Bottom Sheet path)
 ```
 
 **Full module directory** (`web/src/modules/store-experience-builder`):
-25 test files, **261 tests passed**, 0 failed.
+25 test files, **262 tests passed** (+1, the new
+`SectionLibraryContent`-carries-no-dialog-role test), 0 failed.
 
-**Full `(commerce)` route group** (`web/src/app/(commerce)`):
-18 test files, **182 tests passed**, 0 failed.
+**Full `(commerce)` route group** (`web/src/app/(commerce)`): 19 test
+files (+1), **188 tests passed** (+6), 0 failed.
 
 **Full web suite** (`npm test`, i.e. `vitest run` across all of `web/src`):
-336 test files, **2526 tests passed**, 0 failed.
+337 test files (+1), **2533 tests passed** (+7), 0 failed.
+
+**Real browser (Playwright)** — new:
+`e2e/cust-h4-2-section-library-visual.spec.ts`, run against the
+`desktop` project (each test sets its own explicit viewport, same
+convention `cust-h2-2-page-navigator.spec.ts` already uses), Chromium,
+against the existing `/dev/customizer-versions` demo fixture (no Laravel
+server, no login): **3 passed, 0 failed** — AR 390, AR 430, AR desktop.
+See §13 for what was actually inspected.
 
 **TypeScript** (`npx tsc --noEmit`): pre-existing, unrelated errors exist on
 `main` in files this slice never touches (`pos/settings/configuration`,
 `gemini-card`, `document-language-selector`, `product-*`,
-`use-document-label-mode`, `useImportJobEngine` — all pre-existing strict-
-mode/test-typing gaps unrelated to Section Library/capabilities). None of
-the 7 files this slice changed appear in that error list.
+`use-document-label-mode`, `useImportJobEngine`). The new
+`section-library-mobile.test.tsx` carries the same pre-existing
+`(...args: unknown[]) => showMock(...args)` spread-argument TS2556 note its
+sibling fixtures (`section-instances.test.tsx`, `section-selection.test.tsx`)
+already carry — copied verbatim from that established pattern, not a new
+issue this fix introduced. None of the files this slice changed otherwise
+appear in the error list.
 
-**Build** (`npm run build`), re-run after the review fix:
-`✓ Compiled successfully in 16.3s`, `✓ Generating static pages (179/179)` —
+**Build** (`npm run build`), re-run after this fix:
+`✓ Compiled successfully in 15.5s`, `✓ Generating static pages (179/179)` —
 clean, no errors.
 
 **Backend** (`php artisan test`, full suite, no `--filter`, run from the
 scaffolded `nibras-app` Laravel project per this repo's test-environment
-convention): on the first H4-2 revision, locally, in this session's
-scaffold: **4973 passed, 59 failed, 51 skipped (31069 assertions)**. Re-run
-after this review fix for completeness — **zero PHP/Laravel files are part
-of this diff, in either revision**, so this slice (and this fix) is
-`web/` TypeScript only (presentation/UI layer, capability metadata, and
-localization strings) and cannot itself change any backend test outcome.
-§12 shows the authoritative result: the PR's own CI runs `php artisan
-test` fresh on both SQLite and PostgreSQL and both are green, confirming
-the local 59 failures are an artifact of this session's own scaffold, not
-a real issue. No accounting/journal-entry table applies to this report:
-this slice never calls `LedgerService::post` or any financial service —
-it is a presentation/registry/UI-only change.
+convention): consistent across all three runs so far (first H4-2 revision,
+the Offers review fix, and this mobile-contract fix) — **4973 passed, 59
+failed, 51 skipped (31069 assertions)**. **Zero PHP/Laravel files are part
+of this diff, in any revision** — every revision of this slice is `web/`
+TypeScript (+ one new Playwright e2e spec) only. §12 shows the
+authoritative result: the PR's own CI runs `php artisan test` fresh on
+both SQLite and PostgreSQL and both are green, confirming the local 59
+failures are an artifact of this session's own scaffold, not a real issue.
+No accounting/journal-entry table applies to this report: this slice never
+calls `LedgerService::post` or any financial service — it is a
+presentation/registry/UI-only change.
 
 ## 12. CI status
 
@@ -389,36 +512,84 @@ authoritative gate, passes cleanly.
 
 ## 13. Visual QA
 
-**Not performed with real screenshots in this session** — no browser/dev-
-server screenshot tool was available in this execution environment for
-this task. What *was* verified instead, and should be treated as a
-substitute, not an equivalent:
+**Performed with real screenshots in this session**, correcting the first
+revision's honest gap. A pre-installed headless Chromium
+(`/opt/pw-browsers/chromium-1194`) plus the repository's own existing
+Playwright e2e harness and `/dev/customizer-versions` demo fixture (the
+same fixture `cust-h2-2-page-navigator.spec.ts` already uses — mounts the
+real `ExperienceBuilder`, no Laravel server, no login) made this possible
+without standing up the full backend.
 
-- The full rendered DOM tree was inspected via Vitest's
-  `--reporter`/failure-diff output while iterating on the component (the
-  `SectionLibrary.test.tsx` failures during development printed the full
-  serialized DOM, which was read and used to fix two test-query bugs —
-  see commit history for the corrected `getByRole("heading", …)` queries).
-- Responsive class choices (`max-w-lg`, `grid-cols-1 sm:grid-cols-2`,
-  `max-h-[85dvh]`, `p-4` gutters) were chosen by directly matching the
-  classes `PublishConfirmDialog` and `ProductPreviewPickerPanel` already
-  use at the same breakpoints in this same module, not invented fresh.
-- RTL was exercised functionally (the default test locale is `ar`, and
-  every assertion runs against the Arabic-rendered DOM), but no pixel-
-  level screenshot comparison at 390/430/768/1024/1280/1440 was captured.
+New spec: `e2e/cust-h4-2-section-library-visual.spec.ts`, run via
+`npx playwright test e2e/cust-h4-2-section-library-visual.spec.ts
+--project=desktop` (each test sets its own explicit viewport, same
+convention `cust-h2-2-page-navigator.spec.ts` already established), with
+`PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` pointed at the pre-installed browser
+(the repo's own `playwright.config.ts` looks for `/usr/bin/chromium` etc.,
+none of which exist in this execution environment). **3/3 passed.**
 
-**This is recorded honestly as a gap, not claimed as done.** If a real
-visual QA pass (actual screenshots at the six specified widths, both
-directions) is required before this slice is considered fully closed, it
-should be treated as a follow-up on this same PR rather than assumed.
+**Widths actually inspected, as the task required — screenshots opened and
+read, not just asserted on:**
+
+- **AR 390** (`ar-390-sections-sheet.png`, `ar-390-library-open.png`,
+  `ar-390-library-search.png`, `ar-390-after-add.png`) — the Library opens
+  inside the same "sections" sheet (one dialog, titled "الأقسام", with the
+  Library's own "مكتبة الأقسام" header directly beneath it, no stacked
+  second overlay); category chips wrap cleanly in two rows with no
+  clipping; cards render with their thumbnail glyph, title, description,
+  and (for `featured`) the "قيد الإكمال" badge; search for "شريط ترويجي"
+  correctly narrows to the one matching card under "الصور والفيديو" with
+  its "إضافة" action visible; after clicking it, the sheet returns to the
+  composer, now on the newly-added instance's own settings panel (title
+  "شريط ترويجي" with a visibility toggle) — the exact same selection
+  behavior the pre-existing desktop Add flow already had.
+- **AR 430** (`ar-430-sections-sheet.png`, `ar-430-library-open.png`,
+  `ar-430-library-search.png`, `ar-430-after-add.png`) — same checks,
+  confirming the layout isn't 390-specific; chips and cards use the extra
+  40px cleanly, still no horizontal overflow.
+- **AR desktop** (1440×960; `ar-desktop-homepage-panel.png`,
+  `ar-desktop-library-dialog.png`) — the centered dialog renders correctly
+  over the dimmed Canvas (which stays visible and in place behind it, per
+  the "Canvas remains dominant" requirement), two-column card grid with
+  category headings, `offers` visibly disabled with its own "غير مفعّل"
+  badge and the new "العروض قادمة…" reason text, `banner` visibly enabled.
+
+**What the spec additionally asserts, beyond what a screenshot alone
+shows:** at every step, `page.getByRole('dialog')` stays at count 1 (the
+structural "no nested modal" guarantee); `document.documentElement
+.scrollWidth <= clientWidth + 1` (no horizontal overflow) at both mobile
+widths; the Library content's own root carries no `role` attribute.
+
+**One real finding from this pass**, unrelated to the Section Library
+itself and out of this fix's scope: at this fixture's true-mobile
+viewport, `HomepagePanel` is mounted twice in the DOM simultaneously (see
+§8's "Observation" paragraph) — discovered because an early, unscoped
+version of the spec's locators hit Playwright's strict-mode "resolved to 2
+elements" error. The spec's final locators are explicitly scoped to the
+visible sheet to avoid this; the underlying pre-existing duplication is
+recorded, not fixed, per this task's scope guard.
+
+**Not covered in this pass** (unchanged from the first revision's honest
+disclosure): 768/1024/1280 tablet-ish widths, and English/LTR. The task's
+explicit minimum for this fix was 390 RTL, 430 RTL, and desktop — all
+three are covered above. A fuller width/direction matrix is recommended
+for H4-8's own cross-section QA pass rather than duplicated here.
 
 ## 14. Risks / remaining items
 
-- Visual QA (§13) is code-level/DOM-level verified, not screenshot-
-  verified. Recommend a follow-up visual pass (desktop + mobile, both
-  directions) before treating H4-2 as fully closed, ideally folded into
-  H4-8's own cross-section QA pass per the Horizon plan rather than
-  duplicated here.
+- Visual QA (§13) now covers real screenshots at 390 RTL, 430 RTL, and
+  desktop — the task's explicit minimum. 768/1024/1280 and English/LTR
+  remain code-level/functionally-tested only (RTL default locale, logical
+  CSS); recommend folding a fuller width/direction matrix into H4-8's own
+  cross-section QA pass rather than duplicating it here.
+- `HomepagePanel` is mounted twice simultaneously at true-mobile viewports
+  in the `/dev/customizer-versions` fixture (§8's "Observation") — a
+  pre-existing `ExperienceBuilder.tsx` layout quirk (the desktop `<aside>`'s
+  hidden/visible class doesn't check `isMobileViewport`), surfaced by this
+  fix's own visual QA but not caused by it and out of this fix's bounded
+  scope. Worth a follow-up ticket; not blocking, since it never actually
+  renders visible content at these viewports in any path this fix or the
+  existing test suite exercises.
 - The 59 local backend test failures (§11) are confirmed, via the PR's own
   green `php artisan test (L11, sqlite/pgsql)` CI checks (§12), to be an
   artifact of this session's local `nibras-app` scaffold only — not a real
@@ -465,10 +636,13 @@ Owner/reviewer review of this PR, specifically:
 1. Confirm the corrected Offers behavior (§4, Revision Note 1) — visible,
    `state: "gated"`, `merchantAddable: false`, disabled with an honest
    "coming soon" reason — matches intent.
-2. Decide whether a real screenshot-based visual QA pass is required
-   before H4-2 is considered closed, or deferred to H4-8 as this report
-   recommends.
-3. On approval, proceed to H4-3/H4-4/H4-5 (independently parallelizable
+2. Confirm the corrected mobile behavior (§5, §8, Revision Note 2) — the
+   Library now replaces the existing "sections" Bottom Sheet's own content
+   on mobile instead of stacking a second centered dialog on top of it —
+   matches the merged H4 architecture's mobile UX contract.
+3. Optionally fold the pre-existing double-mount `HomepagePanel` layout
+   quirk (§8, §14) into a follow-up ticket; not blocking.
+4. On approval, proceed to H4-3/H4-4/H4-5 (independently parallelizable
    per the Horizon's own sequencing) and H4-6 (Offers backend, startable
    independently of all of them) — H4-6+H4-7 are also what unlocks
    flipping `offers` to `state: "live", merchantAddable: true` per §4's
