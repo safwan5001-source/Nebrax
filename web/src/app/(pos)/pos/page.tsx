@@ -50,7 +50,7 @@ import { PosVariantPickerDialog, type PosVariantPickerOption } from '@/component
 import { PosReturnDialog } from '@/components/pos/pos-return-dialog';
 import { PosNumericEditor } from '@/components/pos/pos-numeric-editor';
 import { PosProductTile } from '@/components/pos/pos-product-tile';
-import { PosCartEmptyState, PosCartLineFrame, PosCartQtyControls, PosCartRemoveButton } from '@/components/pos/pos-cart-line-controls';
+import { PosCartEmptyState, PosCartLineFrame, PosCartQtyControls, PosCartRemoveButton, PosSelectedLineUnitControl } from '@/components/pos/pos-cart-line-controls';
 import { Dropdown } from '@/components/ui/dropdown';
 import { CustomerPickerDialog, type PosCustomer } from '@/components/pos/customer-picker';
 import { PosAuditReasonDialog } from '@/components/pos/pos-audit-reason-dialog';
@@ -64,6 +64,7 @@ import { usePosKeyboardShortcuts } from '@/components/pos/interactions/use-pos-k
 import { isPosDialogOpen, type PosDialogFlags } from '@/components/pos/interactions/pos-interaction-context';
 import { usePosProductNavigation, usePosProductSelection, usePosSearchFieldNavigation } from '@/components/pos/interactions/use-pos-product-navigation';
 import { appendPosCartProduct, matchPosBarcode } from '@/lib/pos-barcode';
+import { planPosCartUnitChange } from '@/lib/pos-unit-change';
 import { POS_FEEDBACK_DEFAULTS, posSound, type PosFeedbackSettings, type PosSoundEvent } from '@/lib/pos-sound';
 import { runPosCheckout } from '@/lib/pos-checkout';
 import {
@@ -168,7 +169,7 @@ interface Product {
   pos_variants: PosVariant[];
   /**
    * PR-UOM2-3: عرضٌ بحتٌ — يُستعمَل فقط لوسم خيار الوحدة الافتراضية في قائمة
-   * اختيار الوحدة بالسطر (`(افتراضي)`). لا يُقرأ في `addProduct`/`pricedUnit`
+   * شريط السطر المحدد (`(افتراضي)`). لا يُقرأ في `addProduct`/`pricedUnit`
    * ولا يغيّر الوحدة/الكمية/السعر تلقائياً؛ القرار D-A يبقى نافذاً حرفياً.
    */
   default_sales_unit?: string | null;
@@ -802,24 +803,15 @@ export default function PosPage() {
 
   const setUnit = (key: string, unitName: string) => {
     const before = cart.find((line) => line.key === key);
-    setCart((current) => {
-      const line = current.find((item) => item.key === key);
-      if (!line || line.productId === null) return current;
-      const product = products.find((item) => item.id === line.productId);
-      const unit = product?.pos_units.find((item) => item.name === unitName);
-      if (!unit || unit.name === line.unit) return current;
-
-      const sameUnit = current.find((item) => item.key !== key && item.productId === line.productId && item.unit === unit.name);
-      if (sameUnit) {
-        return current
-          .filter((item) => item.key !== key)
-          .map((item) => item.key === sameUnit.key ? { ...item, qty: item.qty + line.qty } : item);
-      }
-
-      return current.map((item) => item.key === key
-        ? { ...item, key: `${line.productId}:${unit.name}`, unit: unit.name, price: unit.price }
-        : item);
-    });
+    const unitsFor = (items: PosCartLine[]) => {
+      const line = items.find((item) => item.key === key);
+      return line?.productId ? products.find((item) => item.id === line.productId)?.pos_units : undefined;
+    };
+    // المفتاح يُعاد كتابته أو يُدمَج؛ نحدّث التحديد من لقطة السلة الظاهرة قبل setState
+    // حتى لا يُبقي الخطاف المفتاح القديم (switchZoneToCart = false).
+    const planned = planPosCartUnitChange(cart, key, unitName, unitsFor(cart));
+    if (planned) setSelectedLineKey(planned.selectedKey);
+    setCart((current) => planPosCartUnitChange(current, key, unitName, unitsFor(current))?.items ?? current);
     if (before) void recordCartForensics('item_quantity_changed', { before: { item: auditLine(before) }, after: { item: { ...auditLine(before), unit: unitName } } });
   };
   const setQty = (k: string, d: number) => {
@@ -1836,11 +1828,9 @@ export default function PosPage() {
         </div>
       </div>
 
-      <div ref={registerCartContainer} tabIndex={-1} className="min-h-0 flex-1 overflow-y-auto px-3 outline-none">
+      <div ref={registerCartContainer} tabIndex={-1} data-testid="pos-cart-lines" className="min-h-0 flex-1 overflow-y-auto px-3 outline-none">
         {cart.length === 0 && <PosCartEmptyState message={t('empty_cart')} />}
         {cart.map((line) => {
-          const lineProduct = line.productId ? products.find((product) => product.id === line.productId) : undefined;
-          const units = lineProduct?.pos_units ?? [];
           // PR-3: التحديد البصري يظهر في كل أوضاع التفاعل (لمس/ماوس/كيبورد) — لم
           // يعد مقصوراً على وضع الكيبورد المتقدّم؛ منطق التحديد نفسه لم يتغيّر.
           const lineSelected = selectedLineKey === line.key;
@@ -1857,27 +1847,14 @@ export default function PosPage() {
               register={(element) => registerCartLine(line.key, element)}
             >
               {/*
-                PR-3 (تصحيح المراجعة): السطر عرضٌ مضغوط للقراءة فقط — لا محرِّر
-                مكرَّر هنا. الكمية والسعر والخصم تُعدَّل حصراً عبر شريط التحكّم
-                السفلي للسطر المحدَّد (انظر أسفل قائمة الأسطر).
+                السطر عرضٌ للقراءة فقط. الكمية والسعر والخصم والوحدة تُعدَّل من
+                شريط السطر المحدد أسفل القائمة — لا منتقي وحدة ثانٍ هنا.
               */}
               <div className="flex min-w-0 flex-1 flex-col gap-1">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-sm font-semibold text-text">{line.description}</div>
-                    {/* VAR-POS-1: سطر متغيّرٍ مثبَّتٌ على وحدة الأساس عمداً — الكتالوج
-                        يحلّ سعر المتغيّر لوحدة الأساس فقط اليوم، فتبديل الوحدة هنا
-                        كان سيستعمل تسعير الأب صامتاً. */}
-                    {line.productId !== null && !line.productVariantId && units.length > 1 ? (
-                      <select aria-label={tprod('unit')} value={line.unit ?? ''} onChange={(event) => setUnit(line.key, event.target.value)} onClick={(event) => event.stopPropagation()} className="mt-1 min-h-11 max-w-28 rounded border border-border bg-background px-1.5 text-xs text-text outline-none focus-visible:ring-2 focus-visible:ring-primary/40">
-                        {units.map((unit) => (
-                          <option key={unit.name} value={unit.name}>
-                            {unit.name}
-                            {lineProduct?.default_sales_unit && unit.name === lineProduct.default_sales_unit ? ` (${tprod('default_sales_unit_marker')})` : ''}
-                          </option>
-                        ))}
-                      </select>
-                    ) : line.unit ? <div className="mt-1 text-xs text-muted">{line.unit}</div> : null}
+                    {line.unit ? <div className="mt-1 text-xs text-muted" data-testid="pos-cart-line-unit">{line.unit}</div> : null}
                   </div>
                   <div className="shrink-0 text-end">
                     <div className="num text-xs text-muted">×{line.qty}</div>
@@ -1899,29 +1876,53 @@ export default function PosPage() {
         const selectedLine = cart.find((l) => l.key === selectedLineKey) ?? null;
         const noSelection = !selectedLine;
         const lineGross = selectedLine ? lineCalc(selectedLine).gross : 0;
+        const selectedProduct = selectedLine?.productId ? products.find((product) => product.id === selectedLine.productId) : undefined;
+        const selectedUnits = selectedProduct?.pos_units ?? [];
+        // VAR-POS-1: المتغير مثبت على وحدة الأساس — تبديل الوحدة كان يسعّر بسعر الأب.
+        const canPickUnit = Boolean(selectedLine && selectedLine.productId !== null && !selectedLine.productVariantId && selectedUnits.length > 1);
+        const unitOptions = canPickUnit
+          ? selectedUnits.map((unit) => ({
+              name: unit.name,
+              marker: selectedProduct?.default_sales_unit && unit.name === selectedProduct.default_sales_unit ? ` (${tprod('default_sales_unit_marker')})` : '',
+            }))
+          : null;
         return (
           <div
-            className="flex items-stretch gap-1.5 border-t border-border p-3"
+            className="flex flex-col gap-2 border-t border-border p-3"
             role="group"
             aria-label={t('selected_line_controls')}
+            data-testid="pos-selected-line-controls"
             onClick={(event) => event.stopPropagation()}
           >
-            <div className="flex min-w-0 flex-1 flex-col gap-1">
-              <span className="truncate text-[11px] font-semibold text-muted">{t('quantity')}</span>
-              <PosCartQtyControls
-                qty={selectedLine?.qty ?? 1}
-                decreaseLabel={t('return_decrease')}
-                increaseLabel={t('return_increase')}
-                quantityLabel={t('quantity')}
-                keypadTitle={t('numeric_keypad_edit_quantity')}
-                showKeypad={posCfg.show_onscreen_numeric_keypad}
-                labels={numericEditorLabels}
-                disabled={noSelection}
-                onDecrease={() => selectedLine && setQty(selectedLine.key, -1)}
-                onIncrease={() => selectedLine && setQty(selectedLine.key, 1)}
-                onQtyChange={(value) => selectedLine && setQtyFromInput(selectedLine.key, value)}
-              />
+            <div className="flex items-end gap-1.5" data-testid="pos-selected-line-row-primary">
+              <div className="flex min-w-0 flex-1 flex-col gap-1">
+                <span className="truncate text-[11px] font-semibold text-muted">{tprod('unit')}</span>
+                <PosSelectedLineUnitControl
+                  label={tprod('unit')}
+                  unitName={selectedLine?.unit ?? null}
+                  options={unitOptions}
+                  disabled={noSelection}
+                  onChange={(unitName) => selectedLine && setUnit(selectedLine.key, unitName)}
+                />
+              </div>
+              <div className="flex min-w-0 flex-1 flex-col gap-1">
+                <span className="truncate text-[11px] font-semibold text-muted">{t('quantity')}</span>
+                <PosCartQtyControls
+                  qty={selectedLine?.qty ?? 1}
+                  decreaseLabel={t('return_decrease')}
+                  increaseLabel={t('return_increase')}
+                  quantityLabel={t('quantity')}
+                  keypadTitle={t('numeric_keypad_edit_quantity')}
+                  showKeypad={posCfg.show_onscreen_numeric_keypad}
+                  labels={numericEditorLabels}
+                  disabled={noSelection}
+                  onDecrease={() => selectedLine && setQty(selectedLine.key, -1)}
+                  onIncrease={() => selectedLine && setQty(selectedLine.key, 1)}
+                  onQtyChange={(value) => selectedLine && setQtyFromInput(selectedLine.key, value)}
+                />
+              </div>
             </div>
+            <div className="flex items-end gap-1.5" data-testid="pos-selected-line-row-secondary">
 
             {posCfg.allow_unit_price_override && (
               <div className="flex min-w-0 flex-1 flex-col gap-1">
@@ -2026,6 +2027,7 @@ export default function PosPage() {
                 disabled={noSelection}
                 onRemove={() => selectedLine && remove(selectedLine.key)}
               />
+            </div>
             </div>
           </div>
         );

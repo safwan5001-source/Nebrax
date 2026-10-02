@@ -142,6 +142,53 @@ export function PosCartQtyControls({
   );
 }
 
+/**
+ * وحدة السطر المحدد داخل الشريط القائم — ليست مساراً ثانياً للتسعير.
+ * `options === null` يعني عرضاً نصياً (وحدة واحدة، أو متغير مقفول، أو بلا تحديد).
+ */
+export function PosSelectedLineUnitControl({
+  label,
+  unitName,
+  options,
+  disabled = false,
+  onChange,
+}: {
+  label: string;
+  unitName: string | null;
+  options: { name: string; marker: string }[] | null;
+  disabled?: boolean;
+  onChange: (unitName: string) => void;
+}) {
+  if (!options || disabled) {
+    return (
+      <div
+        data-testid="pos-line-unit-text"
+        className="flex min-h-12 min-w-0 items-center truncate rounded-md border border-border bg-background px-2 text-sm text-text aria-disabled:opacity-40"
+        aria-disabled={disabled ? true : undefined}
+      >
+        <span className="truncate">{unitName || '—'}</span>
+      </div>
+    );
+  }
+
+  return (
+    <select
+      aria-label={label}
+      data-testid="pos-line-unit-select"
+      value={unitName ?? ''}
+      onChange={(event) => onChange(event.target.value)}
+      onClick={(event) => event.stopPropagation()}
+      className="min-h-12 w-full min-w-0 rounded-md border border-border bg-background px-2 text-sm text-text outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+    >
+      {options.map((unit) => (
+        <option key={unit.name} value={unit.name}>
+          {unit.name}{unit.marker}
+        </option>
+      ))}
+    </select>
+  );
+}
+
 /** حالة السلة الفارغة: مضغوطة وهادئة، بلا مساحة ميتة أو صندوق أيقونة ملوّن. */
 export function PosCartEmptyState({ message }: { message: string }) {
   return (
