@@ -213,6 +213,58 @@ The future model must support:
 
 **Do not assume one order equals one bank transfer.**
 
+### Platform commission policy and expected-vs-actual reconciliation
+
+AWJ must not model a delivery platform as having one timeless hard-coded commission percentage.
+
+The future configuration should support an **effective-dated commission/settlement policy** scoped conceptually by:
+
+```text
+Tenant
+-> Platform
+-> Store / Branch (when contractually different)
+-> Contract / Effective period
+```
+
+A policy may describe, only where supported by the merchant-platform contract:
+
+- expected commission rate or fee rule;
+- contractual calculation base (for example, which amount the percentage applies to);
+- effective-from / effective-to dates;
+- branch/store overrides where the contract genuinely differs;
+- known fixed or typed service fees;
+- expected tax treatment metadata, without assuming recoverability.
+
+The configured policy is an **expectation and reconciliation aid**, not authoritative settlement evidence and not permission to fabricate a provider invoice.
+
+Example:
+
+```text
+Contractual commission base      1,000
+Expected commission rate           20%
+Expected commission                200
+Provider statement commission      210
+Variance                            10 -> requires reconciliation
+```
+
+AWJ must compare **expected commission** against the **actual authoritative provider settlement/fee evidence**. A variance must remain visible and typed/unreconciled until explained; the system must not silently change the configured percentage or post the difference to miscellaneous expense.
+
+The cashier does not calculate, edit or approve platform commission during checkout. Commission policy belongs to configuration/accounting, while POS only records or consumes the sales channel/order context.
+
+### Channel pricing is separate from commission
+
+A merchant may publish different item prices on a delivery platform. AWJ must not derive platform menu prices by blindly adding the commission percentage to POS prices.
+
+Keep these concepts separate:
+
+```text
+Channel selling price
+!= expected platform commission
+!= actual settlement deduction
+```
+
+Future channel pricing should use the canonical AWJ pricing/publication model (for example a channel price list or explicit published price), so a product can have an intentional platform price independent of the platform's commission formula.
+
 ---
 
 ## 7. POS UX decision
@@ -477,6 +529,8 @@ High accounting risk.
 - semantic account routing
 - platform clearing/receivable
 - settlement aggregate
+- effective-dated platform commission/fee policy
+- expected-vs-actual commission variance
 - fee/tax/adjustment components
 - reconciliation equation
 - bank routing
@@ -517,7 +571,10 @@ No reverse engineering.
 14. Printing is not an inventory event; canonical inventory/fulfillment rules remain authoritative.
 15. API-imported external order references are not manually re-entered.
 16. Cancellation compensation is not automatically classified as sales; evidence and approved accounting/tax policy govern classification.
-17. This document authorizes no deploy, schema or runtime accounting change.
+17. Platform commission configuration is effective-dated and is an expected/reconciliation policy; authoritative provider settlement evidence remains the actual source for settlement.
+18. Channel selling prices are separate from commission percentages and actual settlement deductions.
+19. Cashiers do not calculate or edit platform commission during checkout.
+20. This document authorizes no deploy, schema or runtime accounting change.
 
 ---
 
@@ -534,6 +591,8 @@ Before coding:
 - define refund/credit-note and cancellation-compensation interaction;
 - define the canonical inventory consumption/reversal event for delivery orders;
 - define normalized Delivery Hub statuses and provider-specific capability mapping;
-- define settlement matching and variance workflow;
+- define platform commission policy scope, calculation-base semantics and effective dating;
+- define channel-specific pricing reuse against canonical AWJ pricing/publication models;
+- define settlement matching and expected-vs-actual commission variance workflow;
 - produce focused implementation plans for DLV-1, DLV-1B and DLV-2 separately.
 
