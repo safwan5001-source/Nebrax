@@ -31,8 +31,9 @@ return new class extends Migration
             $table->boolean('is_active');
             $table->string('change_reason', 500)->nullable();
             $table->foreignUuid('created_by')->nullable()->constrained('users')->nullOnDelete();
-            $table->timestamp('effective_from');
-            $table->timestamp('created_at')->nullable();
+            // دقة ميكروثانية: نسختان في الثانية نفسها تبقيان مرتَّبتين زمنياً (نظير product_activities).
+            $table->timestamp('effective_from', 6);
+            $table->timestamp('created_at', 6)->nullable();
 
             $table->unique(['delivery_platform_profile_id', 'version_number'], 'dpp_versions_profile_number_unique');
             $table->index(['tenant_id', 'delivery_platform_profile_id', 'effective_from'], 'dpp_versions_profile_effective_idx');

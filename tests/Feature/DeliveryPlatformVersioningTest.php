@@ -214,6 +214,44 @@ class DeliveryPlatformVersioningTest extends TestCase
     }
 
     /** @test */
+    public function resolution_by_timestamp_honours_utc_offsets(): void
+    {
+        Carbon::setTestNow('2026-10-02 07:00:00'); // UTC (توقيت التطبيق)
+        $profile = $this->svc()->create(['platform_key' => 'keeta']);
+        Carbon::setTestNow('2026-10-02 12:00:00');
+        $this->svc()->update($profile, ['collection_mode' => 'platform_collected']);
+
+        // 09:59+03:00 = 06:59 UTC: قبل أي نسخة. 10:00+03:00 = 07:00 UTC: النسخة 1 لا 2.
+        $this->assertNull($this->svc()->resolve($profile, null, null, Carbon::parse('2026-10-02T09:59:00+03:00')));
+        $this->assertSame(1, $this->svc()->resolve($profile, null, null, Carbon::parse('2026-10-02T10:00:00+03:00'))['version_number']);
+        // 14:59+03:00 = 11:59 UTC: ما زالت 1؛ 15:00+03:00 = 12:00 UTC: النسخة 2.
+        $this->assertSame(1, $this->svc()->resolve($profile, null, null, Carbon::parse('2026-10-02T14:59:00+03:00'))['version_number']);
+        $this->assertSame(2, $this->svc()->resolve($profile, null, null, Carbon::parse('2026-10-02T15:00:00+03:00'))['version_number']);
+        // نفس اللحظة بإزاحة أخرى تعطي النتيجة نفسها.
+        $this->assertSame(2, $this->svc()->resolve($profile, null, null, Carbon::parse('2026-10-02T12:00:00+00:00'))['version_number']);
+        $this->assertSame(2, $this->svc()->resolve($profile, null, null, Carbon::parse('2026-10-02T05:00:00-07:00'))['version_number']);
+    }
+
+    /** @test */
+    public function versions_written_within_the_same_instant_get_distinct_ordered_effective_times(): void
+    {
+        Carbon::setTestNow('2026-10-02 10:00:00'); // الساعة مجمَّدة: ثلاث كتابات في اللحظة نفسها
+        $profile = $this->svc()->create(['platform_key' => 'keeta']);
+        $this->svc()->update($profile, ['collection_mode' => 'platform_collected']);
+        $this->svc()->update($profile, ['collection_mode' => 'merchant_collected']);
+
+        $times = Version::query()->where('delivery_platform_profile_id', $profile->id)
+            ->orderBy('version_number')->get()->map(fn ($v) => $v->effective_from->format('Y-m-d H:i:s.u'))->all();
+        $this->assertSame(['2026-10-02 10:00:00.000000', '2026-10-02 10:00:00.000001', '2026-10-02 10:00:00.000002'], $times);
+
+        // لحظة بين الكتابتين تُحلّ إلى النسخة التي كانت فعّالة فعلاً، لا الأحدث.
+        $at = fn (string $t) => $this->svc()->resolve($profile, null, null, Carbon::parse($t))['version_number'];
+        $this->assertSame(1, $at('2026-10-02 10:00:00.000000'));
+        $this->assertSame(2, $at('2026-10-02 10:00:00.000001'));
+        $this->assertSame(3, $at('2026-10-02 10:00:00.000002'));
+    }
+
+    /** @test */
     public function version_and_timestamp_together_are_rejected(): void
     {
         $profile = $this->svc()->create(['platform_key' => 'keeta']);

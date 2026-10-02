@@ -35,6 +35,9 @@ class DeliveryPlatformProfileVersion extends BaseModel implements CompanyWide
 
     public $timestamps = false;
 
+    /** دقة ميكروثانية: يحفظ ترتيب نسختين متتاليتين داخل الثانية الواحدة. */
+    protected $dateFormat = 'Y-m-d H:i:s.u';
+
     protected $fillable = [
         'tenant_id', 'delivery_platform_profile_id', 'version_number',
         'collection_mode', 'external_reference_policy',

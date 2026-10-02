@@ -291,7 +291,10 @@ final class DeliveryPlatformConfigService
         if ($versionId !== null) {
             $version = $query->whereKey($versionId)->first();
         } elseif ($at !== null) {
-            $version = $query->where('effective_from', '<=', $at)->orderByDesc('version_number')->first();
+            // الفعالية تُخزَّن بتوقيت التطبيق وبالميكروثانية: يُحوَّل الزمن (بما فيه أي إزاحة
+            // `+03:00`) إلى توقيت التطبيق ويُربَط نصّاً بالدقة نفسها، لا بصيغة الثواني الافتراضية.
+            $instant = $at->copy()->setTimezone(config('app.timezone'))->format('Y-m-d H:i:s.u');
+            $version = $query->where('effective_from', '<=', $instant)->orderByDesc('version_number')->first();
         } else {
             $version = $query->orderByDesc('version_number')->first();
         }
@@ -445,6 +448,17 @@ final class DeliveryPlatformConfigService
     ): Version {
         $this->assertValues($values);
         $now = now();
+        // الساعة قد ترجع أو تتساوى بين كاتبَين: effective_from لا ينقص أبداً عن سابقه.
+        $previous = Version::query()
+            ->where('delivery_platform_profile_id', $profile->id)
+            ->orderByDesc('version_number')
+            ->value('effective_from');
+        if ($previous !== null) {
+            $previous = \Illuminate\Support\Carbon::parse($previous);
+            if ($now->lte($previous)) {
+                $now = $previous->copy()->addMicrosecond();
+            }
+        }
 
         $version = Version::create([
             'delivery_platform_profile_id' => $profile->id,
