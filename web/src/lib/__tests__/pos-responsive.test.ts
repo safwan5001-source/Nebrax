@@ -4,7 +4,6 @@ import { describe, expect, it } from 'vitest';
 import {
   POS_CART_FAB_CLASS,
   POS_CART_PAY_FOOTER_CLASS,
-  POS_DESKTOP_CATEGORIES_CLASS,
   POS_MOBILE_NAV_CLASS,
   POS_PRODUCTS_PANEL_CLASS,
   POS_SALE_GRID_CLASS,
@@ -41,7 +40,8 @@ describe('قشرة نقطة البيع المتجاوبة', () => {
     const gridAt = page.indexOf('data-awj-floor-grid');
     const gridRegion = page.slice(gridAt, page.indexOf('PosShortcuts', gridAt));
     expect(gridRegion.indexOf('posProductsPaneClass')).toBeLessThan(gridRegion.indexOf('posCartPaneClass'));
-    expect(gridRegion.indexOf('{catsPanel}')).toBeLessThan(gridRegion.indexOf('posCartPaneClass'));
+    expect(page).toContain('data-testid="pos-category-strip"');
+    expect(gridRegion).not.toContain('{catsPanel}');
   });
 
   it('PR-3: عمود السلة يمتد فعلياً على كامل عرض مساره في الشبكة (لا انكماش على عرض المحتوى)', () => {
@@ -73,9 +73,6 @@ describe('قشرة نقطة البيع المتجاوبة', () => {
     expect(POS_PRODUCTS_PANEL_CLASS).toContain('p-3');
     expect(POS_PRODUCTS_PANEL_CLASS).toContain('sm:p-4');
     expect(POS_PRODUCTS_PANEL_CLASS).not.toContain('lg:p-5');
-    expect(POS_DESKTOP_CATEGORIES_CLASS).toContain('p-2');
-    expect(POS_DESKTOP_CATEGORIES_CLASS).toContain('lg:flex');
-    expect(POS_DESKTOP_CATEGORIES_CLASS).toContain('xl:p-3');
   });
 
   it('يخفي الشريط السفلي وFAB تحت md ويعيد البادئة عند التابلت', () => {
@@ -113,7 +110,8 @@ describe('قشرة نقطة البيع المتجاوبة', () => {
     const page = source('src/app/(pos)/pos/page.tsx');
     expect(page).toContain('POS_SALE_GRID_CLASS');
     expect(page).toContain('POS_PRODUCTS_PANEL_CLASS');
-    expect(page).toContain('POS_DESKTOP_CATEGORIES_CLASS');
+    expect(page).toContain('data-testid="pos-category-strip"');
+    expect(page).not.toContain('POS_DESKTOP_CATEGORIES_CLASS');
     expect(page).toContain('posCartPaneClass');
     expect(page).toContain('posProductsPaneClass');
     expect(page).toContain('posProductGridClass');

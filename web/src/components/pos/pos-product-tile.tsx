@@ -1,7 +1,8 @@
 'use client';
 
-import { Barcode, Info, Star } from 'lucide-react';
+import { Info, Star } from 'lucide-react';
 import { PosProductImage } from '@/components/pos/pos-product-image';
+import type { PosDensityMode } from '@/lib/pos-density';
 import { cn } from '@/lib/utils';
 
 export interface PosProductTileProduct {
@@ -23,6 +24,8 @@ export interface PosProductTileProduct {
 export function PosProductTile({
   product,
   showImage,
+  density = 'standard',
+  cartQty = 0,
   selected,
   isFavorite,
   availableLabel,
@@ -38,6 +41,10 @@ export function PosProductTile({
 }: {
   product: PosProductTileProduct;
   showImage: boolean;
+  /** POS UI V3. Standard is the default. Compact hides media. */
+  density?: PosDensityMode;
+  /** Sum of quantities already in the cart for this product. Presentation only. */
+  cartQty?: number;
   selected: boolean;
   isFavorite: boolean;
   availableLabel: string;
@@ -56,6 +63,10 @@ export function PosProductTile({
   const lowStock = !outOfStock && product.track_inventory
     && typeof product.reorder_level === 'number' && product.reorder_level > 0
     && product.quantity_on_hand <= product.reorder_level;
+  const showStock = outOfStock || lowStock;
+  const imageClass = density === 'visual'
+    ? (product.pos_image?.download_url ? 'aspect-square' : 'h-16')
+    : (product.pos_image?.download_url ? 'aspect-[4/3]' : 'h-12');
   return (
     <div data-awj-floor-tile-wrap="" className="relative min-w-0">
       <button
@@ -68,14 +79,14 @@ export function PosProductTile({
         onFocus={onFocus}
         className={cn(
           'group flex w-full touch-manipulation select-none flex-col overflow-hidden rounded-lg border bg-surface text-start',
-          'transition-[border-color,background-color] duration-150 hover:border-primary active:border-primary active:bg-primary-soft',
+          'transition-[border-color,background-color,transform] duration-150 motion-reduce:transition-none hover:border-primary active:scale-[0.98] active:border-primary active:bg-primary-soft motion-reduce:active:scale-100',
           'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40',
           selected ? 'border-primary ring-2 ring-primary/40' : 'border-border',
-          showImage ? 'min-h-[172px]' : 'min-h-32',
+          showImage && density === 'visual' ? 'min-h-[220px]' : showImage ? 'min-h-[172px]' : 'min-h-24',
         )}
       >
         {showImage && (
-          <div data-awj-media={product.pos_image?.download_url ? 'image' : 'placeholder'} className={'w-full overflow-hidden border-b border-border bg-background ' + (product.pos_image?.download_url ? 'aspect-[4/3]' : 'h-12')}>
+          <div data-awj-media={product.pos_image?.download_url ? 'image' : 'placeholder'} className={'w-full overflow-hidden border-b border-border bg-background ' + imageClass}>
             <PosProductImage path={product.pos_image?.download_url} alt={product.name} />
           </div>
         )}
@@ -87,36 +98,34 @@ export function PosProductTile({
             {product.sale_price_label}
           </span>
 
-          <div className="mt-auto min-w-0 space-y-1.5 border-t border-border pt-2 text-[10px] text-muted">
-            {product.barcode ? (
-              <span className="flex min-w-0 items-center gap-1" title={product.barcode} data-testid="pos-product-barcode">
-                <Barcode className="h-3.5 w-3.5 shrink-0" strokeWidth={1.7} aria-hidden="true" />
-                <span className="num min-w-0 truncate" dir="ltr">{product.barcode}</span>
-              </span>
-            ) : null}
-            {product.track_inventory && (
-              <div data-testid="pos-product-stock">
-                <span
-                  className={cn(
-                    'num block truncate whitespace-nowrap',
-                    outOfStock ? 'font-semibold text-negative' : lowStock ? 'font-semibold text-warning' : undefined,
-                  )}
-                >
-                  {outOfStock && outOfStockLabel ? outOfStockLabel : `${availableLabel}: ${product.quantity_on_hand}`}
-                </span>
-                {/* سطر مستقل، لا لاحقة على سطر الكمية: الدمج في سطر واحد مقصوص
-                    كان يبتر «مخزون منخفض»/«Low stock» عند العرض العادي للبطاقة —
-                    حالة يجب أن تبقى مقروءة كاملةً دوماً. */}
-                {!outOfStock && lowStock && lowStockLabel && (
-                  <span className="block truncate whitespace-nowrap font-semibold text-warning" data-testid="pos-product-low-stock">
-                    {lowStockLabel}
-                  </span>
+          {showStock && (
+            <div className="mt-auto min-w-0 border-t border-border pt-2 text-[10px] text-muted" data-testid="pos-product-stock">
+              <span
+                className={cn(
+                  'num block truncate whitespace-nowrap',
+                  outOfStock ? 'font-semibold text-negative' : 'font-semibold text-warning',
                 )}
-              </div>
-            )}
-          </div>
+              >
+                {outOfStock && outOfStockLabel ? outOfStockLabel : `${availableLabel}: ${product.quantity_on_hand}`}
+              </span>
+              {!outOfStock && lowStock && lowStockLabel && (
+                <span className="block truncate whitespace-nowrap font-semibold text-warning" data-testid="pos-product-low-stock">
+                  {lowStockLabel}
+                </span>
+              )}
+            </div>
+          )}
         </div>
       </button>
+
+      {cartQty > 0 && (
+        <span
+          data-testid="pos-product-cart-qty"
+          className="num pointer-events-none absolute bottom-2 end-2 rounded-md bg-primary px-1.5 py-0.5 text-[11px] font-bold text-white"
+        >
+          ×{cartQty}
+        </span>
+      )}
 
       <button
         type="button"
