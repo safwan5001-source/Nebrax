@@ -1251,7 +1251,8 @@ Only evidence-backed statuses are recorded here; unlisted tasks of the horizon p
 | 3 | DLV-ACCOUNTING-1 | done (merged; PR #1184, merge SHA `a1bc3769751a919643a335fd4b84ea43c241a221`; PRE_MERGE_REVIEW: PASS and POST_MERGE_REVIEW: PASS recorded by the owner; no deploy) | critical | DLV-FOUNDATION-1 (done) + DG-1/DG-2 + DG-3 simple-collector bound | PR #1184. Bounded to platform-collected AR clearing and `delivery_invoice_contexts`. No commission, fee tax, settlement, POS selector, or Hub. |
 | 4 | DELIVERY-DECISION-PASS-2 | done (merged; PR #1193, merge SHA `3a94eb36635208e33acc4dbd90572140c47e7e4c`; OD-DG-8, OD-DG-9 for POS, OD-DG-6 with narrowing) | high | DLV-ACCOUNTING-1 (done) | `docs/plans/pos/DELIVERY-DECISION-PASS-2-REPORT.md` |
 | 5 | DLV-POS-1 | done (merged; PR #1194, squash SHA `42c0deb91909755fa1e59cada84fa90f57a897cd`; owner confirmed the merge; no production deploy; this pass does not repeat post-merge review) | high | DLV-FOUNDATION-1 (done); DG-2 resolved; OD-DG-8 accepted; OD-DG-9 accepted for POS only | `docs/plans/pos/DLV-POS-1-IMPLEMENTATION-REPORT.md` |
-| 6 | DELIVERY-DECISION-PASS-3 | in_review (not merged; OD-DG-9-HUB and OD-DG-6-TRIGGER accepted as written; DG-8-IMPORT and DG-3 not accepted; no Hub implementation) | high | DLV-POS-1 (done); OD-DG-6 accepted with narrowing | `docs/plans/pos/DELIVERY-DECISION-PASS-3-REPORT.md` |
+| 6 | DELIVERY-DECISION-PASS-3 | done (merged; PR #1195, squash SHA `615d634a1ab387b12b5124917ff435c762f1aca3`; OD-DG-9-HUB and OD-DG-6-TRIGGER accepted; DG-8-IMPORT and DG-3 not accepted; no Hub implementation) | high | DLV-POS-1 (done); OD-DG-6 accepted with narrowing | `docs/plans/pos/DELIVERY-DECISION-PASS-3-REPORT.md` |
+| 7 | DELIVERY-DECISION-PASS-4 | in_review (not merged; projection state machine and order identity are recommendations only; slice is not ready) | high | DELIVERY-DECISION-PASS-3 (done); OD-DG-9-HUB; OD-DG-6 pre-post rule | `docs/plans/pos/DELIVERY-DECISION-PASS-4-REPORT.md` |
 
 Owed gates — original text is DLV-EVIDENCE-1-REPORT.md §11. DG-1/DG-2/DG-3 resolutions are in DELIVERY-DECISION-PASS-1-REPORT.md. DG-6/DG-8/DG-9 acceptances are in DELIVERY-DECISION-PASS-2-REPORT.md.
 
@@ -1272,13 +1273,14 @@ Owed gates — original text is DLV-EVIDENCE-1-REPORT.md §11. DG-1/DG-2/DG-3 re
 
 A task must not be promoted to `ready` while any gate mapped to it is unresolved.
 
-**Dependency readiness after the OD-DG-9-HUB and OD-DG-6-TRIGGER acceptances on PR #1195 (not merged, not implemented):**
-- **DLV-POS-1 is merged** (PR #1194, squash `42c0deb91909755fa1e59cada84fa90f57a897cd`). No production deploy. Do not start the next task from that merge.
-- **DLV-HUB-1 (full) is BLOCKED.** The trigger shape and the Hub permission split are accepted. Building the financial command is still blocked on DG-8-IMPORT. Enabling VAT recognition is still blocked on DG-3. Option B is not readiness.
-- **Projection-only Hub is not a task and is not READY.** OD-DG-9-HUB clears its authorization blocker, and it still must not post. It is not promoted: its own slice still depends on the unaccepted §9 state table and §14 order identity. Do not invent the task or start it from this PR.
+**Dependency readiness after DELIVERY-DECISION-PASS-4 (recommendations, not Owner Decisions):**
+- **DLV-POS-1 is merged** (PR #1194, squash `42c0deb91909755fa1e59cada84fa90f57a897cd`). No production deploy.
+- **DELIVERY-DECISION-PASS-3 is merged** (PR #1195, squash `615d634a1ab387b12b5124917ff435c762f1aca3`). OD-DG-9-HUB and OD-DG-6-TRIGGER stand. They are not a build permit.
+- **DLV-HUB-1 (full) is BLOCKED.** Building the financial command is still blocked on DG-8-IMPORT. Enabling VAT recognition is still blocked on DG-3.
+- **Projection-only Hub is not a task and is not READY.** Pass 4 recommends a linear state machine (OD-HUB-STATES) and a live-row identity that excludes branch and the display reference (OD-HUB-IDENTITY). Neither is accepted. The slice still must not post. Do not invent the task or start it from this PR.
 - **DLV-COMMISSION-1 remains BLOCKED** (EXTERNAL_EVIDENCE_REQUIRED under DG-3).
 - **DLV-SETTLEMENT-1 remains BLOCKED** on COMMISSION-1 and per-platform DG-3 evidence.
 - DLV-RECON-1, REFUND-1, CLOSE-1, CONNECTOR-CORE-1 and the provider tasks remain blocked on their own dependencies.
 
-Next step is not a Hub implementation. DG-8-IMPORT and DG-3 stay open. §9 and §14 stay unaccepted recommendations. Do not start a hub, commission, settlement, connector, or refund task from this PR.
+Next step is an Owner Decision on OD-HUB-STATES and OD-HUB-IDENTITY. Do not start a hub, commission, settlement, connector, or refund task from this PR.
 
