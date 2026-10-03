@@ -1249,7 +1249,7 @@ Only evidence-backed statuses are recorded here; unlisted tasks of the horizon p
 | 1 | DLV-FOUNDATION-1 | done (merged; PR #1174, merge SHA `5e80830033aed602833afd091b28857f92d9f068`; PRE_MERGE_REVIEW: PASS and POST_MERGE_REVIEW: PASS recorded by the owner) | high | DLV-EVIDENCE-1 (done) | `docs/plans/pos/DLV-FOUNDATION-1-IMPLEMENTATION-REPORT.md` |
 | 2 | DELIVERY-DECISION-PASS-1 | done (merged; PR #1177, merge SHA `49ecc540a116acc9c503d87c34efeca7fa59cd2d`; records DG-1/DG-2/DG-3 only) | high | DLV-FOUNDATION-1 (done) | `docs/plans/pos/DELIVERY-DECISION-PASS-1-REPORT.md` |
 | 3 | DLV-ACCOUNTING-1 | done (merged; PR #1184, merge SHA `a1bc3769751a919643a335fd4b84ea43c241a221`; PRE_MERGE_REVIEW: PASS and POST_MERGE_REVIEW: PASS recorded by the owner; no deploy) | critical | DLV-FOUNDATION-1 (done) + DG-1/DG-2 + DG-3 simple-collector bound | PR #1184. Bounded to platform-collected AR clearing and `delivery_invoice_contexts`. No commission, fee tax, settlement, POS selector, or Hub. |
-| 4 | DELIVERY-DECISION-PASS-2 | in_review (docs-only packets for DG-6/DG-8/DG-9; recommendations are not owner decisions) | high | DLV-ACCOUNTING-1 (done) | `docs/plans/pos/DELIVERY-DECISION-PASS-2-REPORT.md` |
+| 4 | DELIVERY-DECISION-PASS-2 | in_review (PR #1193, docs-only packets for DG-6/DG-8/DG-9; recommendations are not owner decisions) | high | DLV-ACCOUNTING-1 (done) | `docs/plans/pos/DELIVERY-DECISION-PASS-2-REPORT.md` |
 
 Owed gates — original text is DLV-EVIDENCE-1-REPORT.md §11. DG-1/DG-2/DG-3 resolutions are in DELIVERY-DECISION-PASS-1-REPORT.md. DG-6/DG-8/DG-9 recommendations are in DELIVERY-DECISION-PASS-2-REPORT.md and are **not accepted** until Safwan answers the Owner Decisions in that report.
 

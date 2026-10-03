@@ -4,7 +4,7 @@
 **Horizon:** `docs/plans/pos/AWJ_DELIVERY_PLATFORMS_HORIZON_V1.md` (ACTIVE)
 **Nature:** evidence / architecture / documentation only. No production code, migration, API, POS, Hub, pricing, permission, connector, commission, or settlement implementation.
 **Base SHA (`origin/main` at start):** `a1bc3769751a919643a335fd4b84ea43c241a221`
-**Confirmed on that SHA:** DLV-ACCOUNTING-1 is merged as PR [#1184](https://github.com/safwan5001-source/Nebrax/pull/1184). Merge SHA equals the base SHA. No production deploy.
+**PR:** [#1193](https://github.com/safwan5001-source/Nebrax/pull/1193) (`docs/dlv-decision-pass-2`). Head SHA is the PR head, not restated here, because this commit cannot contain its own hash.
 **Prior evidence reused, not re-investigated from zero:** `DLV-EVIDENCE-1-REPORT.md`, `DELIVERY-DECISION-PASS-1-REPORT.md`, `DLV-FOUNDATION-1-IMPLEMENTATION-REPORT.md`, and the DLV-ACCOUNTING-1 code now on this base.
 
 This pass does **not** mark any Owner Decision resolved. Each packet ends with an exact question for Safwan. Recommendations below are **PROPOSED AWJ DECISION**, distinct from **PROVEN REPOSITORY FACT**.
