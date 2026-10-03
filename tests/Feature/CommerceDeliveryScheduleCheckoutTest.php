@@ -441,6 +441,38 @@ class CommerceDeliveryScheduleCheckoutTest extends TestCase
     }
 
     /** @test */
+    public function a_checkout_selection_holds_a_shared_channel_lock_through_validation_and_save(): void
+    {
+        if (DB::connection()->getDriverName() !== 'pgsql') {
+            $this->markTestSkipped('FOR SHARE يظهر في SQL على PostgreSQL فقط.');
+        }
+
+        $store = $this->mobileStore('h7b-select-lock', ['is_enabled' => true]);
+        [$slot] = $this->slotIds($store);
+        $cart = $this->checkout($store);
+
+        $baseline = DB::transactionLevel();
+        $log = [];
+        DB::listen(function ($q) use (&$log) {
+            if (str_contains($q->sql, 'from "sales_channels"') && str_contains($q->sql, 'for share')) {
+                $log[] = ['lock', DB::transactionLevel()];
+            } elseif (str_contains($q->sql, 'from "commerce_delivery_slots"') && str_contains($q->sql, '"is_active"')) {
+                $log[] = ['read', DB::transactionLevel()];
+            } elseif (str_starts_with($q->sql, 'insert into "commerce_checkout_schedules"')) {
+                $log[] = ['save', DB::transactionLevel()];
+            }
+        });
+        $this->schedule($store, $cart, '2026-10-08', $slot)->assertOk();
+
+        $types = array_column($log, 0);
+        $this->assertContains('save', $types);
+        $this->assertLessThan(array_search('read', $types, true), array_search('lock', $types, true), 'the slot was read before the channel lock');
+        foreach ($log as [, $level]) {
+            $this->assertGreaterThan($baseline, $level, 'the lock/read/save ran outside the transaction');
+        }
+    }
+
+    /** @test */
     public function the_slot_row_is_locked_inside_the_order_transaction_before_the_capacity_count(): void
     {
         if (DB::connection()->getDriverName() !== 'pgsql') {

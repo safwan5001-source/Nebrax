@@ -401,6 +401,11 @@ final class CommerceDeliveryScheduleService
         if ($method === null) {
             throw ValidationException::withMessages(['schedule' => 'اختر طريقة التوصيل أولاً.']);
         }
+        // قفلٌ مشترك على صف القناة طوال التحقق والحفظ: تحرير النوافذ/السياسة/مناطق الشحن يقفله `FOR UPDATE`، فلا تُحذف
+        // النافذة بين `selectable()` و`save()` (انتهاك FK ⇒ 500 بدل 422). المعاملة يفتحها `CommerceCheckoutService`.
+        if (SalesChannel::query()->whereKey($checkout->sales_channel_id)->sharedLock()->first() === null) {
+            throw ValidationException::withMessages(['schedule' => 'الموعد المختار غير متاح.']);
+        }
         $selected = $this->selectable($checkout, $method, $date, $slotId);
         if ($selected === null) {
             throw ValidationException::withMessages(['schedule' => 'الموعد المختار غير متاح.']);
