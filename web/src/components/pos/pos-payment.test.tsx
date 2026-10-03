@@ -466,6 +466,12 @@ describe('PosPayment', () => {
     expect(split.className).toContain('minmax(0,13fr)');
     expect(screen.getAllByRole('textbox')).toHaveLength(1);
     expect(screen.getByTestId('pos-payment-remaining').getAttribute('data-payment-emphasis') ?? document.querySelector('[data-payment-emphasis="remaining"]')).toBeTruthy();
+    const strip = document.querySelector('[data-payment-emphasis]');
+    expect(strip?.className).toContain('grid-cols-3');
+    const remainingAmount = screen.getByTestId('pos-payment-remaining').querySelector('.num');
+    expect(remainingAmount?.className).toMatch(/text-negative/);
+    expect(remainingAmount?.className).toMatch(/sm:text-2xl/);
+    expect(remainingAmount?.className).not.toMatch(/truncate/);
     expect(screen.getByRole('button', { name: 'Cash payment_methods' }).className).toMatch(/min-h-14/);
   });
 });

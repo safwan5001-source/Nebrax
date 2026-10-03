@@ -318,15 +318,15 @@ export function PosPayment({
           >
             <div className="min-w-0 rounded-md border border-border bg-surface p-2.5 sm:p-3" data-testid="pos-payment-paid">
               <div className="mb-1 text-[10px] font-semibold text-muted sm:mb-1.5 sm:text-[11px]">{t('paid')}</div>
-              <div className={'num truncate font-bold text-base ' + (paidMinor > 0 ? 'text-positive' : 'text-text')} title={formatRiyal(paidMinor / 100)}>{formatRiyal(paidMinor / 100)}</div>
+              <div className={'num font-bold leading-tight text-base [overflow-wrap:anywhere] ' + (paidMinor > 0 ? 'text-positive' : 'text-text')} title={formatRiyal(paidMinor / 100)}>{formatRiyal(paidMinor / 100)}</div>
             </div>
             <div className={'min-w-0 rounded-md border bg-surface p-2.5 sm:p-3 ' + (remainingDominant ? 'border-negative' : 'border-border')} data-testid="pos-payment-remaining">
               <div className="mb-1 text-[10px] font-semibold text-muted sm:mb-1.5 sm:text-[11px]">{t('remaining')}</div>
-              <div className={'num truncate font-bold ' + (remainingDominant ? 'text-2xl text-negative' : 'text-base text-text')} title={formatRiyal(remainingMinor / 100)}>{formatRiyal(remainingMinor / 100)}</div>
+              <div className={'num font-bold leading-tight [overflow-wrap:anywhere] ' + (remainingDominant ? 'text-base text-negative sm:text-2xl' : 'text-base text-text')} title={formatRiyal(remainingMinor / 100)}>{formatRiyal(remainingMinor / 100)}</div>
             </div>
             <div data-awj-floor-outcome="" data-awj-surface="outcome" data-awj-floor-change="" className="min-w-0 rounded-md border border-border bg-surface p-2.5 sm:p-3" data-testid="pos-payment-change">
               <div className="mb-1 text-[10px] font-semibold text-muted sm:mb-1.5 sm:text-[11px]">{t('change')}</div>
-              <div className={'num truncate font-bold ' + (changeDominant ? 'text-2xl text-positive' : 'text-base text-text')} title={formatRiyal(changeMinor / 100)}>{formatRiyal(changeMinor / 100)}</div>
+              <div className={'num font-bold leading-tight [overflow-wrap:anywhere] ' + (changeDominant ? 'text-base text-positive sm:text-2xl' : 'text-base text-text')} title={formatRiyal(changeMinor / 100)}>{formatRiyal(changeMinor / 100)}</div>
             </div>
           </div>
 
