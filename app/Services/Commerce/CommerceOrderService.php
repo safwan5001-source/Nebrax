@@ -225,8 +225,14 @@ class CommerceOrderService
 
             $total = $order->delivery_amount_minor;
             foreach ($lines as $line) {
+                // FLOWERS-H4b / ADR-16: لقطة التخصيص تُنسخ مع السطر داخل المعاملة نفسها.
+                $personalization = $line['personalization'] ?? [];
+                unset($line['personalization']);
                 $created = $order->lines()->create($line);
                 $total = $this->addMinorAmountOrFail($total, $created->line_total);
+                foreach ($personalization as $row) {
+                    $created->personalizations()->create($row);
+                }
             }
             $order->update(['total' => $total]);
 
@@ -260,7 +266,7 @@ class CommerceOrderService
             // يكون قديماً وغير مقفولٍ أصلاً هنا).
             $order->update(['status' => CommerceOrder::STATUS_CONFIRMED, 'confirmed_at' => now()]);
 
-            return $order->fresh(['lines', 'snapshot', 'gift']);
+            return $order->fresh(['lines.personalizations', 'snapshot', 'gift']);
         });
     }
 

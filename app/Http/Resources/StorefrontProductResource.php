@@ -50,6 +50,22 @@ class StorefrontProductResource extends JsonResource
         parent::__construct($resource);
     }
 
+    /** @var array<int, array<string, mixed>> FLOWERS-H4a / ADR-16 — مُدخَلات التخصيص النشطة (تفصيل فقط). */
+    private array $personalization = [];
+
+    /**
+     * يُلحق تعريفات التخصيص النشطة. تظهر في التفصيل **فقط حين توجد** — منتج بلا تعريفات
+     * بشكلٍ مطابق حرفياً لما قبل H4.
+     *
+     * @param  array<int, array<string, mixed>>  $fields
+     */
+    public function withPersonalization(array $fields): static
+    {
+        $this->personalization = $fields;
+
+        return $this;
+    }
+
     public function toArray(Request $request): array
     {
         $thumbnail = $this->galleryMedia[0] ?? null;
@@ -76,6 +92,7 @@ class StorefrontProductResource extends JsonResource
             'is_variant_managed' => $this->resource->isVariantManaged(),
             'options' => $this->when($this->options !== null, fn () => $this->options),
             'variants' => $this->when($this->variants !== null, fn () => $this->variants),
+            'personalization' => $this->when($this->detailed && $this->personalization !== [], fn () => ['fields' => $this->personalization]),
             'created_at' => $this->resource->created_at?->toIso8601String(),
             'updated_at' => $this->resource->updated_at?->toIso8601String(),
         ];

@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Tenancy\CompanyWide;
 use App\Tenancy\ResolvesBranchReferences;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * سطر التزام تجاري — لقطة تاريخية لما اتُّفق عليه، لا مرجعاً حياً يُعاد
@@ -35,6 +36,12 @@ class CommerceOrderLine extends BaseModel implements CompanyWide
     protected $attributes = [
         'unit_factor' => 1,
     ];
+
+    /** FLOWERS-H4b / ADR-16 — لقطة التخصيص الثابتة لهذا السطر (صفر أو أكثر). */
+    public function personalizations(): HasMany
+    {
+        return $this->hasMany(CommerceOrderLinePersonalization::class, 'commerce_order_line_id')->orderBy('sort_order');
+    }
 
     public function order(): BelongsTo
     {

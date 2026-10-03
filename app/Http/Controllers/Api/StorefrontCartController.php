@@ -24,12 +24,15 @@ final class StorefrontCartController extends PublicApiController
 
     public function store(Request $request, CommerceCartService $carts): JsonResponse
     {
-        $this->rejectUnknown($request, ['product_id', 'product_variant_id', 'unit_key', 'quantity']);
+        $this->rejectUnknown($request, ['product_id', 'product_variant_id', 'unit_key', 'quantity', 'personalization']);
         $data = $request->validate([
             'product_id' => ['required', 'uuid'],
             'product_variant_id' => ['sometimes', 'nullable', 'uuid'],
             'unit_key' => ['sometimes', 'string', 'max:80'],
             'quantity' => ['required', 'integer', 'min:1', 'max:2147483647'],
+            // FLOWERS-H4b / ADR-16 — خريطة مفتاح⇒نص؛ التحقق الفعلي مقابل تعريفات المنتج في الخدمة.
+            'personalization' => ['sometimes', 'nullable', 'array', 'max:8'],
+            'personalization.*' => ['nullable', 'string', 'max:2000'],
         ]);
 
         $lookup = $carts->findByToken($request->cookie(CommerceCartService::COOKIE_NAME));
@@ -44,6 +47,7 @@ final class StorefrontCartController extends PublicApiController
                 $data['unit_key'] ?? 'base',
                 $data['quantity'],
                 $data['product_variant_id'] ?? null,
+                $data['personalization'] ?? null,
             );
         } catch (CartNotFoundException) {
             return $this->clearCookie($this->notFound($request));
