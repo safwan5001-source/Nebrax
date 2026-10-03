@@ -268,6 +268,25 @@ class CommerceDeliveryScheduleTest extends TestCase
     }
 
     /** @test */
+    public function a_window_inside_the_spring_forward_gap_is_not_offered_that_day(): void
+    {
+        $store = $this->store('ds-dst');
+        // 2027-03-14 02:30 غير موجودة في نيويورك (02:00 → 03:00)
+        $service = $this->configure($store, ['timezone' => 'America/New_York', 'max_days_ahead' => 3], [
+            $this->slot('ليلاً', '02:30', '03:30'),
+        ]);
+        $instant = CarbonImmutable::parse('2027-03-13 12:00:00', 'UTC');
+
+        $options = $service->options($store['channel_id'], 'delivery', null, null, $instant);
+
+        $dates = array_column($options['dates'], 'date');
+        $this->assertNotContains('2027-03-14', $dates);
+        $this->assertContains('2027-03-15', $dates);
+        $this->assertSame('02:30', $options['dates'][0]['slots'][0]['start_time']);
+        app(TenantContext::class)->forget();
+    }
+
+    /** @test */
     public function inactive_windows_are_never_offered_and_the_required_flag_is_passed_through(): void
     {
         $store = $this->store('ds-inactive');

@@ -241,6 +241,11 @@ final class CommerceDeliveryScheduleService
                     continue;
                 }
                 $start = $day->setTimeFromTimeString($slot->start_time);
+                // وقت جداري غير موجود (فجوة الانتقال إلى التوقيت الصيفي: 02:30 تُطبَّع إلى 03:30) ⇒ لا نافذة في
+                // هذا اليوم بدل عرض بدايةٍ لا تطابق اللحظة المحسوبة.
+                if ($start->format('H:i') !== $slot->start_time) {
+                    continue;
+                }
                 if ($start->lessThan($earliestInstant)) {
                     continue;
                 }
