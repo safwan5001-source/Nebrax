@@ -70,7 +70,8 @@ final class CatalogFacetFilter
         }
 
         return [
-            'brand_id' => filled($validated['brand_id'] ?? null) ? (string) $validated['brand_id'] : null,
+            // UUID بأحرف كبيرة يجتاز التحقق؛ نوحّده للشكل المعياري قبل البحث والمقارنة (SQLite نصّيّ).
+            'brand_id' => filled($validated['brand_id'] ?? null) ? strtolower((string) $validated['brand_id']) : null,
             'collection' => filled($validated['collection'] ?? null) ? (string) $validated['collection'] : null,
             'facets' => $facets,
         ];

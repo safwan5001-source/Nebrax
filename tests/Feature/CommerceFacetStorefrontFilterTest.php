@@ -261,6 +261,11 @@ class CommerceFacetStorefrontFilterTest extends TestCase
         // غير المنشور لا يدخل العدّ
         $this->assertSame(1, $brands[$brandA->id]['count']);
 
+        // UUID بأحرف كبيرة يُعامل كنظيره الصغير: يرشّح ويُعلَّم selected.
+        $upper = $this->list($f['tenant'], 'brand_id='.strtoupper($brandA->id));
+        $this->assertSame(['ورد جوري'], $this->names($upper));
+        $this->assertTrue(collect($upper->json('meta.brands'))->firstWhere('id', $brandA->id)['selected']);
+
         // علامة مختارة بعدّاد صفر تبقى في meta.brands (ليُمكن إلغاؤها)، لا تختفي.
         $zero = collect($this->list($f['tenant'], "brand_id={$brandB->id}&facet[recipient]=her")->json('meta.brands'))->keyBy('id');
         $this->assertSame(0, $zero[$brandB->id]['count']);
