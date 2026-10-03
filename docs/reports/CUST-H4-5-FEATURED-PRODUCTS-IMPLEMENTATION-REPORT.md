@@ -5,7 +5,7 @@
 **Base SHA:** `6c085e6819b563a45702a6bf0a45084de16130a2` — `feat(commerce): FLOWERS H2b — facet & brand filtering on public catalog (#1188)` (verified via `git fetch origin main && git rev-parse origin/main` at task start; confirmed as `origin/main`'s own HEAD). H4-4 (PR #1172) is merged into this history (`241a06f feat(store): complete H4 content sections (#1172)`) but `main` has since advanced through several unrelated slices (FLOWERS H1/H2, DLV-POS/ACCOUNTING).
 **Head SHA:** `dafd107` (branch tip at time of this report)
 **Branch:** `feat/cust-h4-5-featured-products` (the task's own suggested name; no environment override needed)
-**PR:** opened against `main`, not merged — see Final Response for the URL/number
+**PR:** [safwan5001-source/Nebrax#1197](https://github.com/safwan5001-source/Nebrax/pull/1197), open against `main`, not merged
 
 ---
 
