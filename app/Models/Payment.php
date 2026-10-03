@@ -25,7 +25,7 @@ class Payment extends BaseModel
     protected $fillable = [
         'branch_id',
         'tenant_id', 'number', 'partner_id', 'invoice_id', 'pos_session_id', 'classification_id',
-        'direction', 'method', 'payment_method_id', 'payment_method_name', 'payment_gateway_id', 'reference', 'payment_details', 'cash_account_id', 'payment_date', 'amount',
+        'direction', 'method', 'payment_method_id', 'payment_method_name', 'payment_gateway_id', 'delivery_platform_profile_id', 'reference', 'payment_details', 'cash_account_id', 'payment_date', 'amount',
         'status', 'notes', 'journal_entry_id', 'reversal_entry_id', 'reversed_at', 'print_template_revision_id', 'pdf_template_revision_id', 'thermal_template_revision_id', 'created_by', 'collector_employee_id',
     ];
 
@@ -81,6 +81,12 @@ class Payment extends BaseModel
     public function paymentGateway(): BelongsTo
     {
         return $this->belongsTo(PaymentGateway::class);
+    }
+
+    /** ملف منصة توصيل مربوط عند التحصيل لدى المنصة — اختياري، ويُحوّل القبض إلى مقاصة المنصة لا إلى النقد/البنك. */
+    public function deliveryPlatformProfile(): BelongsTo
+    {
+        return $this->belongsTo(DeliveryPlatformProfile::class);
     }
 
     /** القيد الأصلي الذي ولّده ترحيل السند. */

@@ -228,6 +228,9 @@ paths:
         - $ref: '#/components/parameters/ProductsSearch'
         - $ref: '#/components/parameters/ProductsCategoryId'
         - $ref: '#/components/parameters/ProductsSort'
+        - $ref: '#/components/parameters/ProductsBrandId'
+        - $ref: '#/components/parameters/ProductsCollection'
+        - $ref: '#/components/parameters/ProductsFacet'
       responses:
         '200':
           description: A page of products (list rows never carry media/options/variants).
@@ -239,6 +242,31 @@ paths:
         '401': { $ref: '#/components/responses/Unauthenticated' }
         '404': { $ref: '#/components/responses/NotFound' }
         '422': { $ref: '#/components/responses/ValidationError' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+  /collections:
+    parameters:
+      - $ref: '#/components/parameters/RequestId'
+    get:
+      operationId: listCollections
+      tags: [Catalog]
+      summary: List merchant collections that have visible products on the mobile channel
+      description: >
+        Active, manually curated collections (ADR-14 §2.3). `product_count`
+        counts only members that pass the product publication gate; collections
+        with no visible member are omitted. Read the members with
+        `GET /products?collection=<slug>`.
+      x-auth-tier: read
+      responses:
+        '200':
+          description: The collections.
+          headers:
+            X-Request-Id: { $ref: '#/components/headers/XRequestId' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CollectionListResponse' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { $ref: '#/components/responses/NotFound' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
 
   /products/{id}:
@@ -1125,6 +1153,35 @@ components:
       in: query
       required: false
       schema: { type: string, format: uuid }
+    ProductsBrandId:
+      name: brand_id
+      in: query
+      required: false
+      description: Built-in brand filter (ANDed with every other filter).
+      schema: { type: string, format: uuid }
+    ProductsCollection:
+      name: collection
+      in: query
+      required: false
+      description: >
+        Restrict to the members of an active merchant collection (by slug, ADR-14 §2.3).
+        A context constraint like `category_id`: facet counts are computed inside it.
+        Without an explicit `sort`, members follow the merchant's order. An unknown
+        or non-active slug yields an empty list.
+      schema: { type: string, maxLength: 64 }
+    ProductsFacet:
+      name: facet
+      in: query
+      required: false
+      style: deepObject
+      explode: true
+      description: >
+        Merchant-governed catalog facets, `facet[<facet key>]=<value slug>[,<value slug>…]`
+        (ADR-14). OR within one facet, AND across facets. An unknown or inactive
+        facet key / value slug yields an empty list (fail closed). At most 10 facets.
+      schema:
+        type: object
+        additionalProperties: { type: string }
     ProductsSort:
       name: sort
       in: query
@@ -1449,7 +1506,70 @@ components:
       required: [data, meta]
       properties:
         data: { type: array, items: { $ref: '#/components/schemas/ProductListItem' } }
-        meta: { $ref: '#/components/schemas/PaginationMeta' }
+        meta: { $ref: '#/components/schemas/ProductListMeta' }
+
+    CollectionListResponse:
+      type: object
+      additionalProperties: false
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [slug, title, title_en, description, product_count]
+            properties:
+              slug: { type: string }
+              title: { type: string }
+              title_en: { type: [string, 'null'] }
+              description: { type: [string, 'null'] }
+              product_count: { type: integer }
+        meta: { $ref: '#/components/schemas/SuccessMeta' }
+
+    ProductListMeta:
+      type: object
+      additionalProperties: false
+      required: [request_id, pagination, facets, brands]
+      properties:
+        request_id: { type: string }
+        pagination: { $ref: '#/components/schemas/PaginationMeta/properties/pagination' }
+        facets:
+          type: array
+          description: Filterable facets with disjunctive counts for the current result context (ADR-14). Zero-count values are omitted unless selected.
+          items:
+            type: object
+            additionalProperties: false
+            required: [key, system_key, name, name_en, values]
+            properties:
+              key: { type: string }
+              system_key: { type: [string, 'null'], enum: [occasion, recipient, null] }
+              name: { type: string }
+              name_en: { type: [string, 'null'] }
+              values:
+                type: array
+                items:
+                  type: object
+                  additionalProperties: false
+                  required: [slug, name, name_en, count, selected]
+                  properties:
+                    slug: { type: string }
+                    name: { type: string }
+                    name_en: { type: [string, 'null'] }
+                    count: { type: integer }
+                    selected: { type: boolean }
+        brands:
+          type: array
+          description: Built-in brand dimension with disjunctive counts.
+          items:
+            type: object
+            additionalProperties: false
+            required: [id, name, count, selected]
+            properties:
+              id: { type: string, format: uuid }
+              name: { type: string }
+              count: { type: integer }
+              selected: { type: boolean }
 
     CartItem:
       type: object

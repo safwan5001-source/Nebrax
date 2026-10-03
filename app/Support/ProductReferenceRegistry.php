@@ -4,7 +4,9 @@ namespace App\Support;
 
 use App\Models\BarcodeRegistryEntry;
 use App\Models\CommerceCartItem;
+use App\Models\CommerceCollectionProduct;
 use App\Models\CommerceListing;
+use App\Models\CommerceProductFacetValue;
 use App\Models\CommerceOrderLine;
 use App\Models\CreditNoteLine;
 use App\Models\DeliveryNoteLine;
@@ -177,6 +179,13 @@ final class ProductReferenceRegistry
         // مباشر لا هذا التصنيف)، لا هذا السجلّ — الموازي هنا تماماً حالة
         // `ProductOption` نفسها أعلاه.
         ProductUnitPrice::class => ['key' => 'product_unit_prices', 'classes' => [self::OWNED_CHILD]],
+        // H2a (ADR-14): إسناد قيمة سِمة (مناسبة/مستلم/لون…) لمنتج — تصنيفٌ
+        // تجاري تابعٌ بالكامل للمنتج، بلا تاريخٍ مالي ولا أثر مخزني. لا يمنع
+        // الحذف (وسمٌ لا مستند)، ويُنظَّف مع الحذف الحقيقي وحده.
+        CommerceProductFacetValue::class => ['key' => 'commerce_product_facet_values', 'classes' => [self::OWNED_CHILD]],
+        // H2c: عضوية منتجٍ في مجموعة تسويقية يدوية — توصيفٌ عرضي بلا أثر مالي أو
+        // مخزني، كإسناد السِمة تماماً: لا يمنع الحذف الحقيقي ويُنظَّف معه.
+        CommerceCollectionProduct::class => ['key' => 'commerce_collection_products', 'classes' => [self::OWNED_CHILD]],
 
         // COM-CART-2: السلة المجهولة حالة مؤقتة وليست دليلاً تاريخياً ولا
         // تهيئةً تجارية حية. حذف المنتج لا تمنعه سلة مهجورة؛ يبقى السطر

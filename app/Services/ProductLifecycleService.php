@@ -3,6 +3,8 @@
 namespace App\Services;
 
 use App\Models\BarcodeRegistryEntry;
+use App\Models\CommerceCollectionProduct;
+use App\Models\CommerceProductFacetValue;
 use App\Models\InventoryStockAlert;
 use App\Models\Product;
 use App\Models\ProductActivity;
@@ -145,6 +147,10 @@ class ProductLifecycleService
             // بلا متغيّرات قائمة الآن (`ProductVariant` مانعٌ أعلى)، فالباقي
             // صفّ المنتج نفسه فقط.
             $product->unitPrices()->delete();
+            // H2a: إسنادات السِمات التجارية تابعٌ مملوك (OWNED_CHILD) بلا علاقة
+            // Eloquent على المنتج؛ تُحذف صراحةً لا اتكالاً على cascade وحده.
+            $this->referenceQuery(CommerceProductFacetValue::class, $product)->delete();
+            $this->referenceQuery(CommerceCollectionProduct::class, $product)->delete();
             $product->delete();
 
             // إعادة الفحص بعد الحذف وقبل الـcommit: تحت READ COMMITTED (افتراض

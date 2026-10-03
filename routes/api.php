@@ -704,6 +704,7 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         Route::post('pos/carts/{cartId}/events', [PosAuditController::class, 'recordCartEvent'])->middleware([$perm('invoices.manage'), $app('sales.pos')]);
         Route::post('pos/approval-requests', [PosAuditController::class, 'requestApproval'])->middleware([$perm('invoices.manage'), $app('sales.pos')]);
         Route::post('pos/checkout', [PosController::class, 'checkout'])->middleware([$perm('invoices.manage'), $app('sales.pos')]);
+        Route::get('pos/delivery-platforms', [PosController::class, 'deliveryPlatforms'])->middleware([$perm('invoices.manage'), $app('sales.pos')]);
         Route::get('pos/recent-invoices', [PosController::class, 'recentInvoices'])->middleware([$perm('invoices.manage'), $app('sales.pos')]);
         Route::get('pos/held-sales', [PosController::class, 'heldSales'])->middleware([$perm('invoices.manage'), $app('sales.pos')]);
         Route::post('pos/held-sales', [PosController::class, 'storeHeldSale'])->middleware([$perm('invoices.manage'), $app('sales.pos')]);

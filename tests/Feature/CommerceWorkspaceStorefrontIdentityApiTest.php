@@ -282,10 +282,12 @@ class CommerceWorkspaceStorefrontIdentityApiTest extends TestCase
         $res = $this->withToken($auth['token'])->getJson('/api/commerce/workspace/storefronts')->assertOk();
 
         $this->assertSame(
-            ['id', 'name', 'sales_channel_id', 'is_active', 'preview_url', 'default_locale'],
+            ['id', 'name', 'sales_channel_id', 'is_active', 'preview_url', 'default_locale', 'business_vertical', 'vertical_profile'],
             array_keys($res->json('data.stores.0'))
         );
         $this->assertSame('ar', $res->json('data.stores.0.default_locale'));
+        // FLOWERS-H1: المفتاحان الجديدان إضافيان بحتان بعد الستة القائمة، وملف المتجر القائم `general`.
+        $this->assertSame('general', $res->json('data.stores.0.business_vertical'));
     }
 
     /** @test */

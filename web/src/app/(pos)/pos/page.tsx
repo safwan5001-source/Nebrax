@@ -44,6 +44,7 @@ import { resolveCategoryVisual } from '@/lib/pos-category-presentation';
 import { cartHasUnsavedData, createPosActiveCart, usePosActiveCarts, type PosCartLine } from '@/components/pos/use-pos-active-carts';
 import { PosShortcuts } from '@/components/pos/pos-shortcuts';
 import { PosPayment, type PaymentSummaryItem, type PosPaymentMethod, type PosTender } from '@/components/pos/pos-payment';
+import type { PosDeliveryPlatformOption } from '@/components/pos/pos-delivery-platform-picker';
 import { PosExchangeDialog } from '@/components/pos/pos-exchange-dialog';
 import { PosHeldSalesDialog, type PosHeldSale } from '@/components/pos/pos-held-sales-dialog';
 import { PosVariantPickerDialog, type PosVariantPickerOption } from '@/components/pos/pos-variant-picker-dialog';
@@ -353,6 +354,9 @@ export default function PosPage() {
   const [paymentMethods, setPaymentMethods] = useState<PosPaymentMethod[]>([]);
   const [paymentMethodsLoading, setPaymentMethodsLoading] = useState(true);
   const [paymentMethodsError, setPaymentMethodsError] = useState<string | null>(null);
+  const [deliveryPlatforms, setDeliveryPlatforms] = useState<PosDeliveryPlatformOption[]>([]);
+  const [selectedDeliveryPlatformId, setSelectedDeliveryPlatformId] = useState<string | null>(null);
+  const [deliveryReference, setDeliveryReference] = useState('');
   // وضع الضريبة من إعدادات النظام (متضمَّن/غير متضمَّن) — يوحّد سلوك كل المعاملات.
   const [systemTaxInclusive, setSystemTaxInclusive] = useState(false);
   // الوردية (الجلسة النقدية) — تُربط بالبيع: تُفتح قبل البيع وتُغلق بعدّ النقد.
@@ -654,6 +658,9 @@ export default function PosPage() {
       .then((r) => setPaymentMethods(r.data.filter((method) => method.is_active)))
       .catch((err) => setPaymentMethodsError(err instanceof ApiError ? err.message : tc('loadFailed')))
       .finally(() => setPaymentMethodsLoading(false));
+    api<{ data: PosDeliveryPlatformOption[] }>('/pos/delivery-platforms')
+      .then((r) => setDeliveryPlatforms(r.data))
+      .catch(() => setDeliveryPlatforms([]));
     getSystemTaxInclusive().then(setSystemTaxInclusive).catch(() => {});
     api<{ data: PosDevice[] }>('/pos-devices').then((r) => setDevices(r.data.filter((device) => device.is_active))).catch(() => {});
     // الجلسة المفتوحة الحالية (إن وُجدت) تُتبنّى هنا. بلا جلسة تُحوَّل الصفحة
@@ -1338,6 +1345,10 @@ export default function PosPage() {
             discount: posCfg.allow_discount ? lineCalc(l).disc : 0, // خصم السطر بالهللات (مقيَّد ≤ إجمالي السطر)
           }));
           // إتمام ذري: فاتورة مرحّلة ثم سند قبض لكل وسيلة مهيأة عبر المحرّكات المحاسبية.
+          const selectedPlatform = deliveryPlatforms.find((platform) => platform.id === selectedDeliveryPlatformId) ?? null;
+          const reference = selectedPlatform && selectedPlatform.external_reference_policy !== 'none'
+            ? deliveryReference.trim() || null
+            : null;
           return api<PosCheckoutResponse>('/pos/checkout', {
             method: 'POST',
             body: {
@@ -1349,7 +1360,11 @@ export default function PosPage() {
               tax_inclusive: taxInclusive,
               notes: activeCart.note.trim() || null,
               items,
-              tenders,
+              tenders: selectedPlatform?.collection_mode === 'platform_collected' ? [] : tenders,
+              ...(selectedPlatform ? {
+                delivery_platform_profile_id: selectedPlatform.id,
+                external_order_reference: reference,
+              } : {}),
             },
           });
         };
@@ -1373,6 +1388,8 @@ export default function PosPage() {
           onCheckoutSuccess: (checkout) => {
             checkoutAttemptRef.current.resetAfterSuccess();
             setCheckoutPhase('success');
+            setSelectedDeliveryPlatformId(null);
+            setDeliveryReference('');
             // مسح sync فوري حتى لا تُستعاد السلة المباعة بعد reload قبل دورة React.
             if (activeCartStorageKey && cartSnapshotScope) {
               const cleared = markSaleClearedSync({
@@ -1480,7 +1497,7 @@ export default function PosPage() {
         setCheckoutPhase((phase) => (phase === 'success' ? 'idle' : phase === 'submitting' || phase === 'recovering' ? 'idle' : phase));
       }
     },
-    [activeCart, activeCartId, activeCartStorageKey, applyClearedSaleState, cart, cartSnapshotScope, carts, catalogLoading, closeCart, online, pendingAttempt, sessionInvalid, setPendingAttempt, success, systemTaxInclusive, t, tc, toast, selectedCustomer, posCfg.receipt_footer, posCfg.allow_discount, posCfg.allow_unit_price_override, taxInclusive, company, warehouseId, session, products, playPosFeedback, ensureAuditCart, totalMinor],
+    [activeCart, activeCartId, activeCartStorageKey, applyClearedSaleState, cart, cartSnapshotScope, carts, catalogLoading, closeCart, online, pendingAttempt, sessionInvalid, setPendingAttempt, success, systemTaxInclusive, t, tc, toast, selectedCustomer, posCfg.receipt_footer, posCfg.allow_discount, posCfg.allow_unit_price_override, taxInclusive, company, warehouseId, session, products, playPosFeedback, ensureAuditCart, totalMinor, deliveryPlatforms, selectedDeliveryPlatformId, deliveryReference],
   );
 
   const summaryItems: PaymentSummaryItem[] = cart.map((l) => ({
@@ -2211,6 +2228,11 @@ export default function PosPage() {
           onConfirm={confirmPayment}
           showOnscreenNumericKeypad={posCfg.show_onscreen_numeric_keypad}
           numericEditorLabels={numericEditorLabels}
+          deliveryPlatforms={deliveryPlatforms}
+          selectedDeliveryPlatformId={selectedDeliveryPlatformId}
+          onSelectDeliveryPlatform={setSelectedDeliveryPlatformId}
+          externalOrderReference={deliveryReference}
+          onExternalOrderReference={setDeliveryReference}
         />
       ) : workspaceMode === 'invoices' ? (
         selectedInvoiceId ? (
