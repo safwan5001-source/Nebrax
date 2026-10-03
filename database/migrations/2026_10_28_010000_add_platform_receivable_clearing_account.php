@@ -55,6 +55,14 @@ return new class extends Migration
         $context->forget();
     }
 
+    /**
+     * **لا تستولي على حساب تجاريٍ قائم بنفس الكود:** مستأجر أنشأ حساباً مخصَّصاً
+     * بالكود `1180` قبل هذه الهجرة (تجميعي، معطَّل، أو من نوع مختلف) لا يصلح
+     * حساب مقاصة منصات توصيل؛ تعيين الدور إليه صامتاً كان سيحوّل تحصيلات
+     * المنصة إلى حساب المستأجر الخاص دون علمه. الهجرة تفشل بصراحة لذلك
+     * المستأجر بدل انتحال حسابه — تعيين الدور يبقى غائباً (فشل مغلق في
+     * `AccountRoleResolver`) حتى يُحلّ التعارض يدوياً.
+     */
     private function ensureAccount(
         string $tenantId,
         string $code,
@@ -63,7 +71,15 @@ return new class extends Migration
         string $nameEn,
         string $type,
     ): void {
-        if (Account::query()->where('code', $code)->exists()) {
+        $existing = Account::query()->where('code', $code)->first();
+        if ($existing !== null) {
+            if ($existing->is_group || $existing->type !== $type || ! $existing->is_active) {
+                throw new RuntimeException(
+                    "تعارض: الحساب بالكود {$code} لدى المستأجر {$tenantId} موجود مسبقاً بشكل لا يصلح حساب مقاصة ".
+                    "(تجميعي أو معطَّل أو من نوع مختلف) — راجع الحساب يدوياً قبل إعادة تشغيل الهجرة."
+                );
+            }
+
             return;
         }
 

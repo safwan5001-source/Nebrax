@@ -314,6 +314,10 @@ class PaymentService
                 $targets[$alloc->id] = $target;
             }
 
+            if ($payment->direction === 'received') {
+                $this->assertPlatformContextNotBypassed($payment, $targets);
+            }
+
             $usesGatewayClearing = $this->usesGatewayClearing($payment);
             if ($usesGatewayClearing) {
                 $this->assertGatewayStillValid($payment);
@@ -462,6 +466,34 @@ class PaymentService
         $profile = DeliveryPlatformProfile::query()->whereKey($payment->delivery_platform_profile_id)->first();
         if ($profile === null) {
             throw new RuntimeException('ملف منصة التوصيل يجب أن يخص المستأجر النشط.');
+        }
+    }
+
+    /**
+     * عكس `assertDeliveryContextMatches`: فاتورة مثبّت عليها سياق منصة توصيل
+     * بتحصيل platform_collected لا تُقبل سداداً عادياً (نقد/بنك/بوابة) يتجاهل
+     * ذلك السياق — وإلا كان التحقق اختيارياً وأمكن لمسار سداد عادٍ أن يختلق
+     * نقداً/بنكاً لفاتورةٍ سياسة تحصيلها المسجَّلة تقول إن المنصة حصّلتها.
+     * يُفحص **بصرف النظر** عن `delivery_platform_profile_id` على السند، لأن
+     * غيابه هو بالضبط الالتفاف المطلوب سدّه.
+     *
+     * @param  array<string, \Illuminate\Database\Eloquent\Model>  $targets  allocatable_id => target model
+     */
+    private function assertPlatformContextNotBypassed(Payment $payment, array $targets): void
+    {
+        foreach ($targets as $target) {
+            if (! $target instanceof Invoice) {
+                continue;
+            }
+
+            $context = DeliveryInvoiceContext::query()->where('invoice_id', $target->id)->first();
+            if ($context === null || $context->collection_mode !== DeliveryPlatformProfileVersion::COLLECTION_PLATFORM) {
+                continue;
+            }
+
+            if ((string) $payment->delivery_platform_profile_id !== (string) $context->delivery_platform_profile_id) {
+                throw new RuntimeException('الفاتورة مثبّت عليها سياق منصة توصيل بتحصيل platform_collected؛ يجب أن يحمل سند القبض ملف المنصة نفسه.');
+            }
         }
     }
 

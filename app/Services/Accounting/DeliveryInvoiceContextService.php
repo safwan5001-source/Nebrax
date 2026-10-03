@@ -42,19 +42,27 @@ class DeliveryInvoiceContextService
             }
 
             $existing = DeliveryInvoiceContext::query()->where('invoice_id', $locked->id)->first();
+            $explicitVersionId = $options['version_id'] ?? null;
 
-            $resolved = $this->configService->resolve($profile, $locked->branch_id, $options['version_id'] ?? null);
-            if ($resolved === null) {
-                throw new RuntimeException('منصة التوصيل بلا نسخة تكوين فعّالة.');
-            }
-
+            // إعادة محاولة بلا نسخة صريحة لفاتورة مسجَّلة بالفعل لا تُعاد مقارنتها
+            // بأحدث نسخة حالياً — تعديلٌ لاحق على الملف بين المحاولتين كان سيحوّل
+            // إعادة المحاولة العادية (بلا نسخة محدَّدة) إلى تعارضٍ زائف رغم أن
+            // الصف الثابت الموجود هو نفسه هوية العملية المكتملة فعلاً. تعارضٌ
+            // حقيقي (ملف مختلف، أو نسخة مطلوبة صراحةً تخالف المسجَّل) يبقى مرفوضاً.
             if ($existing !== null) {
-                if ((string) $existing->delivery_platform_profile_id !== (string) $profile->id
-                    || (string) $existing->delivery_platform_profile_version_id !== (string) $resolved['version_id']) {
+                if ((string) $existing->delivery_platform_profile_id !== (string) $profile->id) {
                     throw new RuntimeException('الفاتورة مرتبطة بسياق منصة توصيل مختلف مسبقاً — السياق لا يُعدَّل.');
+                }
+                if ($explicitVersionId !== null && (string) $existing->delivery_platform_profile_version_id !== (string) $explicitVersionId) {
+                    throw new RuntimeException('الفاتورة مرتبطة بسياق نسخة تكوين مختلفة مسبقاً — السياق لا يُعدَّل.');
                 }
 
                 return $existing;
+            }
+
+            $resolved = $this->configService->resolve($profile, $locked->branch_id, $explicitVersionId);
+            if ($resolved === null) {
+                throw new RuntimeException('منصة التوصيل بلا نسخة تكوين فعّالة.');
             }
 
             try {

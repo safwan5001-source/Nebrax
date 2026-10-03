@@ -264,6 +264,72 @@ class DeliveryPlatformAccountingTest extends TestCase
     }
 
     /** @test */
+    public function ordinary_cash_payment_on_a_platform_collected_invoice_is_rejected(): void
+    {
+        $profile = $this->platformProfile('jahez', Version::COLLECTION_PLATFORM);
+        $invoice = $this->postedInvoice(100000);
+        $this->contexts->record($invoice, $profile);
+
+        $journalsBefore = JournalEntry::count();
+        $draft = $this->payments->create([
+            'partner_id' => $this->customer->id,
+            'invoice_id' => $invoice->id,
+            'amount' => 115000,
+            'method' => 'cash',
+        ]);
+
+        $this->expectException(RuntimeException::class);
+        try {
+            $this->payments->post($draft);
+        } finally {
+            $this->assertSame($journalsBefore, JournalEntry::count());
+            $this->assertSame(0, $invoice->fresh()->paid_amount);
+        }
+    }
+
+    /** @test */
+    public function recording_without_an_explicit_version_survives_a_later_profile_revision(): void
+    {
+        $profile = $this->platformProfile('jahez', Version::COLLECTION_PLATFORM);
+        $invoice = $this->postedInvoice(100000);
+
+        $first = $this->contexts->record($invoice, $profile);
+
+        // تعديل لاحق ينتج نسخة 2 — إعادة محاولة التسجيل بلا نسخة محدَّدة صراحةً
+        // يجب أن تعيد الصف الثابت القائم لا أن تتعارض معه.
+        $this->platforms->update($profile->fresh(), ['display_name' => 'جاهز (محدَّث)']);
+
+        $second = $this->contexts->record($invoice, $profile->fresh());
+
+        $this->assertSame($first->id, $second->id);
+        $this->assertSame(1, DeliveryInvoiceContext::count());
+    }
+
+    /** @test */
+    public function backfill_migration_refuses_to_commandeer_an_existing_non_clearing_account_at_1180(): void
+    {
+        $legacyTenant = Tenant::create(['name' => 'مستأجر قديم', 'slug' => 'dlv-acc-1-legacy']);
+        app(TenantContext::class)->set($legacyTenant->id);
+        Account::create([
+            'tenant_id' => $legacyTenant->id,
+            'code' => '1180',
+            'name' => 'حساب مخصص للمستأجر',
+            'name_en' => 'Custom Tenant Account',
+            'type' => 'liability',
+            'normal_balance' => 'credit',
+            'is_group' => false,
+            'is_system' => false,
+        ]);
+        app(TenantContext::class)->set($this->tenant->id);
+
+        $migration = require database_path('migrations/2026_10_28_010000_add_platform_receivable_clearing_account.php');
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('تعارض');
+        $migration->up();
+    }
+
+    /** @test */
     public function platform_collected_payment_without_any_invoice_allocation_is_rejected(): void
     {
         $profile = $this->platformProfile('jahez', Version::COLLECTION_PLATFORM);
