@@ -2,13 +2,13 @@
 
 > This file is a durable resume point, not a substitute for Git/GitHub evidence.
 
-LAST_UPDATED: 2026-10-03 (**AWJ Delivery Platforms & Settlement Horizon V1 is the single ACTIVE horizon.** DLV-EVIDENCE-1, DLV-FOUNDATION-1, DELIVERY-DECISION-PASS-1, DLV-ACCOUNTING-1, DELIVERY-DECISION-PASS-2, and DLV-POS-1 are merged. DLV-POS-1 squash is `42c0deb91909755fa1e59cada84fa90f57a897cd` (PR #1194). No production deploy. **DELIVERY-DECISION-PASS-3 is in review and not merged.** It recommends, and does not accept, a Hub permission split (`delivery_hub.view` / `delivery_hub.operate`, financial posting only with existing `invoices.manage`) and an explicit invoice command that does not run on accept. DG-9-HUB, DG-6-TRIGGER, proposed DG-8-IMPORT, and DG-3 stay open. Full DLV-HUB-1 is BLOCKED. A projection-only Hub is not a task and is not READY. No deploy.)
+LAST_UPDATED: 2026-10-03 (**AWJ Delivery Platforms & Settlement Horizon V1 is the single ACTIVE horizon.** DLV-EVIDENCE-1, DLV-FOUNDATION-1, DELIVERY-DECISION-PASS-1, DLV-ACCOUNTING-1, DELIVERY-DECISION-PASS-2, and DLV-POS-1 are merged. DLV-POS-1 squash is `42c0deb91909755fa1e59cada84fa90f57a897cd` (PR #1194). No production deploy. **DELIVERY-DECISION-PASS-3 is in review and not merged.** OD-DG-9-HUB and OD-DG-6-TRIGGER are ACCEPTED as written in that report. DG-8-IMPORT and DG-3 stay open, so the accepted trigger is not a build permit. Full DLV-HUB-1 is BLOCKED. The projection-only Hub is not a task and is not READY: authorization is decided, but §9 and §14 were not accepted. No deploy.)
 LAYER_VERSION: V1
 STATUS: ACTIVE — AWJ Delivery Platforms & Settlement Horizon V1 (authoritative queue: `TASK-QUEUE.md`, section "Horizon: AWJ Delivery Platforms & Settlement V1"). Every snapshot, STATUS and objective below this section is historical and superseded.
 
 ## Current objective
 
-DELIVERY-DECISION-PASS-3 is in review. Do not merge it from this note and do not deploy. Do not start DLV-HUB-1, a projection-only Hub, commission, settlement, connectors, or refunds. The Pass 3 text is a recommendation, not an Owner Decision. DG-9-HUB, DG-6-TRIGGER, DG-8-IMPORT, and DG-3 stay open. Merge != Deploy.
+DELIVERY-DECISION-PASS-3 is in review. Do not merge it from this note and do not deploy. OD-DG-9-HUB and OD-DG-6-TRIGGER are accepted and are not an implementation order. Do not start DLV-HUB-1, a projection-only Hub, commission, settlement, connectors, or refunds. DG-8-IMPORT and DG-3 stay open. §9 and §14 stay unaccepted. Merge != Deploy.
 
 ## Previous snapshot (historical, superseded)
 

@@ -7,9 +7,18 @@
 **That SHA is the squash of PR #1194 (DLV-POS-1).** It was the tip of `origin/main` when this branch was cut. This file does not embed its own commit hash.
 **Prior evidence reused, not re-opened:** Decision Pass 1, Decision Pass 2, DLV-FOUNDATION-1, DLV-ACCOUNTING-1, and the merged DLV-POS-1 behavior. DG-1, DG-2, DG-5, DG-8, DG-9-POS, and the accepted narrowing of DG-6 are not re-decided.
 
-Nothing in this report is an accepted Owner Decision. Each recommendation is labeled **RECOMMENDATION — NOT ACCEPTED**. Implementation stays blocked until Safwan accepts or rejects it.
+Nothing below reopens DG-8-IMPORT or DG-3. Those stay **OPEN**. No Hub, connector, permission string, or accounting code is added by recording these acceptances.
 
-DG-3 is not reopened and is not silently closed. Commission VAT, fee VAT, agent/principal, and any provider-specific tax point or ZATCA role stay unauthorized.
+## Owner acceptances (2026-10-03)
+
+Safwan accepted two decisions **as written in this report**. They are Owner Decisions. They are not a merge and not a deploy.
+
+| ID | Status | What was accepted | What was not accepted |
+|---|---|---|---|
+| **OD-DG-9-HUB** | **ACCEPTED** | §5. `delivery_hub.view` and `delivery_hub.operate`. Financial posting, later, still needs existing `invoices.manage` plus `delivery_hub.view`. No new posting permission. Branch fail-closed. | §9's full state table, §14 order identity, and any implementation. |
+| **OD-DG-6-TRIGGER** | **ACCEPTED** | §8 shape. No operational status posts. An explicit command is the only transition. One transaction. Platform clearing has no drawer. Merchant-collected creates no invented tender. | Building or enabling that command. §8 itself says it must not be implemented until DG-8-IMPORT, and must not recognize VAT for a named platform until DG-3. |
+
+Sections that still say **RECOMMENDATION — NOT ACCEPTED** were not accepted. DG-8-IMPORT and DG-3 are not decided here.
 
 ---
 
@@ -17,10 +26,10 @@ DG-3 is not reopened and is not silently closed. Commission VAT, fee VAT, agent/
 
 | Question | Classification | Result in this PR |
 |---|---|---|
-| DG-9-HUB — who may view or operate a Delivery Hub inbox | **NEW DECISION REQUIRED** | Recommendation only. Gate stays **OPEN**. |
-| DG-6-TRIGGER — when an operational order may become a posted `Invoice` | **NEW DECISION REQUIRED** for the system command shape. **EXTERNAL EVIDENCE REQUIRED** before that command may recognize VAT for any named platform. | Recommendation only. Gate stays **OPEN**. |
-| Projection-only Hub with no invoice | Safe to specify. Not safe to mark `ready`. | Described. Not a queue task. Not started. |
-| DLV-HUB-1 (full, including a financial transition) | **BLOCKED** | Not ready. |
+| DG-9-HUB — who may view or operate a Delivery Hub inbox | **ACCEPTED** (OD-DG-9-HUB) | §5 is now the decision. No permission string is added in this PR. |
+| DG-6-TRIGGER — when an operational order may become a posted `Invoice` | **ACCEPTED** as the command shape (OD-DG-6-TRIGGER). **EXTERNAL EVIDENCE REQUIRED** before that command may be built or may recognize VAT. | §8 is the decision. DG-8-IMPORT blocks building it. DG-3 blocks enabling VAT recognition. Gate is not an implementation permit. |
+| Projection-only Hub with no invoice | Authorization blocker cleared. Still not `ready`. | Not a queue task. Not started. §9 and §14 were not accepted. |
+| DLV-HUB-1 (full, including a financial transition) | **BLOCKED** | Trigger shape is accepted. The command is still not implementable. |
 
 ---
 
@@ -70,7 +79,7 @@ Later permissions are not added to `accountant` or `staff` automatically. Exampl
 
 Branch authority is already not a permission string. It is `BranchContext` plus `User::canAccessBranch()`. A user assigned to branch A does not gain branch B by holding a broader document permission. Unrestricted means no branch rows, not "all branches including another tenant".
 
-**Classification:** **PROVEN REUSE** of the view/operate/financial split and of branch allow-lists. **PROVEN NON-REUSE** of `invoices.manage`, `sales.pos`, and `delivery_notes.*` as the Hub capability. **NEW DECISION REQUIRED** for the actual permission strings, because no current string means "delivery inbox".
+**Classification:** **PROVEN REUSE** of the view/operate/financial split and of branch allow-lists. **PROVEN NON-REUSE** of `invoices.manage`, `sales.pos`, and `delivery_notes.*` as the Hub capability. **ACCEPTED** as OD-DG-9-HUB for the two new strings. Those strings are not added to `Rbac` in this PR.
 
 ---
 
@@ -80,21 +89,21 @@ Branch authority is already not a permission string. It is `BranchContext` plus 
 |---|---|---|
 | A. Reuse `invoices.manage` + `sales.pos` for the inbox | One less permission | Rejected. It grants accounting and POS authority in order to accept an order. |
 | B. Reuse `delivery_notes.*` | Copies a real split, wrong document | Rejected. |
-| C. New inbox permissions, and the existing invoice permission only for the financial command | View and operate do not post. Posting still requires `invoices.manage`. | **Recommended. Not accepted.** |
+| C. New inbox permissions, and the existing invoice permission only for the financial command | View and operate do not post. Posting still requires `invoices.manage`. | **ACCEPTED as OD-DG-9-HUB.** Not implemented in this PR. |
 | D. One new `delivery_hub.manage` that also posts | Smaller matrix, second accounting authority | Rejected. The Hub must not become a posting role. |
 
 ---
 
-## 5. DG-9-HUB recommendation
+## 5. DG-9-HUB decision
 
-**RECOMMENDATION — NOT ACCEPTED. Gate DG-9-HUB stays OPEN.**
+**OD-DG-9-HUB — ACCEPTED 2026-10-03.** The text below is the decision. It does not add the permission strings in this PR, and it does not start a Hub.
 
 1. Add two permissions, not granted to `accountant`, `staff`, or `self_service` by default. `owner` and `admin` receive them only through existing `*`.
    - `delivery_hub.view` — list and read operational orders in scope.
    - `delivery_hub.operate` — route, accept, reject, cancel before posting, preparing, ready, and operational handoff. No invoice, payment, journal, or stock method may be called under this permission alone.
-2. Do not add `delivery_hub.post` or `delivery_hub.invoice`. The financial transition, if it is later accepted, requires the existing `invoices.manage` **in addition to** `delivery_hub.view` on that order. `delivery_hub.operate` is neither necessary nor sufficient to post. A pure operator cannot post. A pure invoice clerk cannot see or move orders they are not allowed to view.
+2. Do not add `delivery_hub.post` or `delivery_hub.invoice`. The financial command in §8, when it is later built, requires the existing `invoices.manage` **in addition to** `delivery_hub.view` on that order. `delivery_hub.operate` is neither necessary nor sufficient to post. A pure operator cannot post. A pure invoice clerk cannot see or move orders they are not allowed to view.
 3. `sales.pos` is not required. The Hub path is not `PosService::checkout` and must not open or attach a POS session. DLV-POS-1 remains the only path that sells from a cashier session.
-4. Configuration of platform profiles stays on today's admin authority (`company.manage`). This recommendation does not move it.
+4. Configuration of platform profiles stays on today's admin authority (`company.manage`, plus the existing `sales.pos` application gate on those routes). This decision does not move it.
 5. Branch rule, fail closed:
    - The list is the active branch, and only if `canAccessBranch` is true.
    - A direct id for another branch, or for a branch the user cannot access, is not found. It is not mutated and it does not reveal the other branch's payload.
@@ -104,11 +113,11 @@ Branch authority is already not a permission string. It is `BranchContext` plus 
 
 ### Answers to the authorization questions
 
-| Question | Recommendation, not an acceptance |
+| Question | Accepted decision |
 |---|---|
 | Who may view? | `delivery_hub.view` inside the branch rule above. |
 | Who may accept, reject/cancel before post, prepare, ready, hand off? | `delivery_hub.operate` inside the same branch rule. |
-| Who may start the canonical sale? | `invoices.manage` and `delivery_hub.view` on that order, and only through the explicit command in §8. Not `operate` alone. Not `sales.pos`. |
+| Who may start the canonical sale? | `invoices.manage` and `delivery_hub.view` on that order, and only through the explicit command in §8. Not `operate` alone. Not `sales.pos`. The command itself is still not implementable; see §8. |
 | Reuse or dedicate? | Dedicate the inbox. Reuse `invoices.manage` only for the financial command. |
 | Minimum design | Two new strings. No new financial permission. No grant on existing limited roles. |
 
@@ -128,7 +137,7 @@ Facts that constrain the crossing:
 6. `InvoiceService::post` recognizes output VAT at post time using the invoice lines. ADR material already cited in Pass 2 refused a default legal invoice clock. DG-3 still forbids treating a software clock as a provider's legal tax point.
 7. After a document is posted, reversal of a commercial return is `ReturnService::post`, not a status edit. Customer cash refunds are a further permission (`customer_refunds.manage`) and are out of scope here.
 
-**Classification of the shape:** **PROVEN REUSE** of `InvoiceService::post`, context-then-clearing, and "status is not a posting event". **NEW DECISION REQUIRED** to choose the explicit command and the merchant-collected cash behavior. **EXTERNAL EVIDENCE REQUIRED** (DG-3) before that command is allowed to recognize VAT for a named platform.
+**Classification of the shape:** **PROVEN REUSE** of `InvoiceService::post`, context-then-clearing, and "status is not a posting event". **ACCEPTED** as OD-DG-6-TRIGGER for the explicit command and the merchant-collected "no invented tender" rule. **EXTERNAL EVIDENCE REQUIRED** (DG-8-IMPORT, then DG-3) before that command may be built or enabled.
 
 ---
 
@@ -138,14 +147,14 @@ Facts that constrain the crossing:
 |---|---|---|
 | A. Post automatically on accept | `InvoiceService::post` inside accept | A cancel after accept is already a refund. Inventory and VAT move before the merchant has asked for a sale. Rejected. |
 | B. Post automatically on ready or handoff | Same, later clock | Still an implicit tax-recognition event. Still rejected as an automatic clock. DG-3 is not satisfied by picking "handoff". |
-| C. Explicit command. No operational status posts. | Operator or integrator calls one server action. The action is the only system recognition event. | **Recommended shape. Not accepted.** Legal timing per platform stays DG-3. |
+| C. Explicit command. No operational status posts. | Operator or integrator calls one server action. The action is the only system recognition event. | **ACCEPTED as OD-DG-6-TRIGGER.** Legal timing per platform stays DG-3. Building it stays blocked on DG-8-IMPORT. |
 | D. Leave the trigger unspecified and block every Hub, including a projection | — | Rejected. Pass 2 already separated the projection from the trigger. |
 
 ---
 
-## 8. DG-6-TRIGGER recommendation
+## 8. DG-6-TRIGGER decision
 
-**RECOMMENDATION — NOT ACCEPTED. Gate DG-6-TRIGGER stays OPEN.**
+**OD-DG-6-TRIGGER — ACCEPTED 2026-10-03.** The shape below is the decision. Acceptance does **not** authorize building the command and does **not** close DG-8-IMPORT or DG-3.
 
 ### System recognition
 
@@ -166,7 +175,7 @@ The command, when implemented later, must run in one database transaction:
 6. If the resolved mode is `merchant_collected`: stop after the invoice and the context. Do **not** create a cash, bank, or drawer tender. Recording the money the courier handed over stays on the existing payment authority, later, with real tender evidence. Fabricating cash here would reopen DG-4.
 7. Link the order to that one invoice and mark it financially posted **in the same transaction**. If any step throws, the order must not say posted.
 
-`Invoice.partner_id` stays the canonical customer or walk-in. The platform never becomes the partner (DG-2). Price and tax on that invoice are not decided for imported orders by this recommendation; see §15. Until §15 is accepted, the command must not be implemented even if this section is accepted.
+`Invoice.partner_id` stays the canonical customer or walk-in. The platform never becomes the partner (DG-2). Price and tax on that invoice are not decided for imported orders; see §15. Until §15 is accepted, this accepted command must not be implemented.
 
 `PosService::checkout` is not the Hub authority. It requires an open POS session and is the manual cashier path already shipped.
 
@@ -188,19 +197,22 @@ All fail closed. No default branch. No default warehouse when more than one acti
 | State | See the window above. |
 | Idempotency | See §14. |
 
-### What this recommendation deliberately does not decide
+### What this decision deliberately does not decide
 
-Shipping the command would recognize VAT at `InvoiceService::post`. That is a legal tax point only if the platform's evidence says so. **No platform has that evidence in the repo.** Therefore:
+Shipping the command would recognize VAT at `InvoiceService::post`. That is a legal tax point only if the platform's evidence says so. **No platform has that evidence in the repo.** Therefore, even after OD-DG-6-TRIGGER:
 
-- Accepting the command **shape** does not authorize enabling it.
-- Per platform, the command stays **EXTERNAL EVIDENCE REQUIRED** under DG-3 until Safwan has a source for that platform's tax point, or explicitly accepts a temporary "system recognition only, not a legal tax-point claim" policy for that platform.
-- This does **not** block a projection-only Hub that never calls `InvoiceService`.
+- Accepting the command **shape** does not authorize implementing or enabling it.
+- **DG-8-IMPORT stays OPEN.** The command must not be implemented until imported-order price authority is an Owner Decision. This acceptance does not choose that price.
+- Per platform, the command stays **EXTERNAL EVIDENCE REQUIRED** under DG-3 until Safwan has a source for that platform's tax point, or explicitly accepts a temporary "system recognition only, not a legal tax-point claim" policy for that platform. DG-3 is not decided here.
+- This does **not** turn a projection-only Hub into a financial task. A projection still must not call `InvoiceService`.
 
 ---
 
 ## 9. Operational state machine boundary
 
-**RECOMMENDATION — NOT ACCEPTED.** Names are a vocabulary for a later task, not a schema.
+**RECOMMENDATION — NOT ACCEPTED**, except for the posting window already named inside accepted §8.
+
+OD-DG-6-TRIGGER accepts only this window: the command may run from `accepted`, `preparing`, `ready`, or operationally handed off, and must not run from `received` or `unrouted`. The table below is still a vocabulary, not a schema, and was not itself accepted. Do not treat it as permission to create the states.
 
 | State | Who sets it | Financial effect |
 |---|---|---|
@@ -227,7 +239,7 @@ The Hub is not a second ledger.
 connector or manual intake
         → operational order (tenant, then branch once routed)
         → received / accepted / preparing / ready / handed_off / cancelled_before_post
-        → explicit command only   [NOT ACCEPTED; DG-3 still blocks enabling it]
+        → explicit command only   [SHAPE ACCEPTED; do not build until DG-8-IMPORT; do not enable VAT until DG-3]
         → InvoiceService::create + InvoiceService::post
         → DeliveryInvoiceContext
         → platform_collected clearing receipt   OR   merchant_collected with no tender
@@ -340,20 +352,22 @@ No route, permission, schema, or POS behavior changes in this PR. Existing cashi
 |---|---|
 | DG-1, DG-2, DG-5, DG-8 (POS), DG-9-POS | Unchanged. Accepted or resolved earlier. |
 | DG-6 architecture (Option B, pre-post has no ledger effect) | Unchanged. Accepted. |
-| DG-9-HUB | **OPEN.** Recommendation in §5. Needs an Owner Decision. |
-| DG-6-TRIGGER | **OPEN.** Recommendation in §8. Needs an Owner Decision. Enabling VAT recognition also needs DG-3 per platform. |
-| DG-8-IMPORT | **Not previously numbered. Proposed. OPEN.** Provider price versus AWJ catalog for non-POS orders. Blocks the financial command only. |
-| DG-3 | **OPEN** external evidence. Still blocks commission, settlement, fee tax, and enabling the trigger's VAT recognition. |
-| DG-4 | **OPEN.** Close/Z-report. Untouched. The recommendation refuses to attach Hub clearing to a POS session so it does not force a DG-4 decision. |
+| DG-9-HUB | **ACCEPTED 2026-10-03** as OD-DG-9-HUB (§5). Not implemented. |
+| DG-6-TRIGGER | **ACCEPTED 2026-10-03** as OD-DG-6-TRIGGER (§8 shape only). Building the command stays blocked on DG-8-IMPORT. Enabling VAT recognition stays DG-3. |
+| DG-8-IMPORT | **OPEN / PROPOSED.** Not accepted in this update. Does not reopen OD-DG-8. Blocks building the financial command. Does not by itself block a projection that posts nothing. |
+| DG-3 | **OPEN** external evidence. Still blocks commission, settlement, fee tax, and enabling the trigger's VAT recognition. Not decided here. |
+| DG-4 | **OPEN.** Close/Z-report. Untouched. The accepted trigger still refuses to attach Hub clearing to a POS session. |
 | DG-7 | **OPEN.** Connectors. Untouched. |
+| §9 state table, §14 order identity | **NOT ACCEPTED.** Recommendations only. They are why the projection slice is not `ready`. |
 
 ---
 
 ## 23. Effect on the Horizon queue
 
 - DLV-POS-1 is merged on this base (PR #1194, squash `42c0deb91909755fa1e59cada84fa90f57a897cd`). This pass does not redo its post-merge review and does not deploy.
+- OD-DG-9-HUB and OD-DG-6-TRIGGER are recorded as accepted. This PR is still not merged.
 - No implementation task is marked `ready`.
-- DLV-HUB-1 is not started.
+- DLV-HUB-1 is not started. The accepted trigger is not a build permit.
 
 ---
 
@@ -361,44 +375,49 @@ No route, permission, schema, or POS behavior changes in this PR. Existing cashi
 
 **BLOCKED.** Not partially ready as a single task.
 
-The full task includes a financial transition. That transition still needs Owner Decisions on DG-9-HUB, DG-6-TRIGGER, and DG-8-IMPORT, and DG-3 before VAT is recognized for a platform. Option B being accepted is not readiness.
+OD-DG-9-HUB and OD-DG-6-TRIGGER remove the open authorization question and the open "what posts" question. They do not remove DG-8-IMPORT or DG-3. The full task includes a financial transition. That command must not be implemented until imported price authority is accepted, and must not be enabled until DG-3 is satisfied for that platform. Option B being accepted is not readiness.
 
 ---
 
-## 25. Smallest slice that could become ready later
+## 25. Smallest slice — status after the two acceptances
 
-**Candidate only. Not a queue row. Not `ready`. Not started.**
+**NOT READY. Not a queue row. Not started. Do not implement it from this PR.**
 
-Working name: a projection-only Hub (do not implement it from this PR).
+What changed:
 
-Included, after Safwan accepts §5 and the state table in §9:
+- OD-DG-9-HUB clears the authorization blocker. View/operate versus `invoices.manage`, and the branch fail-closed rule, are decided.
+- OD-DG-6-TRIGGER confirms that a projection must not post. Accept, prepare, ready, handoff, and cancel-before-post still create no revenue, VAT, COGS, stock, cash, bank, or AR clearing. The slice does not need the financial command, DG-8-IMPORT, or DG-3.
+
+What does **not** change:
+
+- The slice's own contents still include the §9 state table and the §14 identity uniqueness. Those two sections were **not** accepted.
+- Promoting the slice to `ready` would silently accept a schema and an order-identity key. That is not done.
+- No task named projection-only Hub is added to the queue.
+
+Included only after a later acceptance of §9 and §14, and still not in this PR:
 
 - tenant operational orders;
-- `delivery_hub.view` and `delivery_hub.operate` exactly as recommended;
+- `delivery_hub.view` and `delivery_hub.operate` exactly as accepted in §5;
 - branch routing and the fail-closed rules in §5 and §12;
 - the non-posting states, including cancel-before-post;
 - identity uniqueness in §14 for rows that have a provider order id;
 - preserved provider status text as inert evidence.
 
-Excluded until their own accepted decisions:
+Still excluded:
 
 - any call to `InvoiceService`, `PaymentService`, or inventory;
-- the explicit post command;
-- price selection for imported lines (DG-8-IMPORT);
+- the explicit post command, until DG-8-IMPORT and then DG-3;
+- price selection for imported lines;
 - webhooks, connectors, commission, settlement, refunds;
 - a POS session or a drawer total.
 
-This slice does **not** need DG-6-TRIGGER or DG-3, because it creates no invoice and no VAT. It **does** need DG-9-HUB to be accepted. Until that acceptance, it stays undescribed as a `ready` task.
-
 ---
 
-## Owner Decisions required before any Hub implementation
+## Owner Decisions
 
-This is a Decision Escalation. The recommendations are not in force.
+1. **OD-DG-9-HUB — ACCEPTED 2026-10-03.** §5 stands: `delivery_hub.view` + `delivery_hub.operate`; posting only with existing `invoices.manage` plus view; branch fail-closed. Not implemented here.
+2. **OD-DG-6-TRIGGER — ACCEPTED 2026-10-03.** §8 stands: explicit command, not on accept; one transaction; platform clearing without a drawer; merchant-collected with no fabricated tender. Building it is still blocked. Enabling VAT recognition is still blocked.
+3. **OD-DG-8-IMPORT** — **still required** before that command is built. Not accepted. POS pricing stays OD-DG-8.
+4. **DG-3** — **still required** before the command is enabled for any named platform. Not accepted. Not invented here.
 
-1. **OD-DG-9-HUB** — accept, narrow, or reject §5 (`delivery_hub.view` + `delivery_hub.operate`; posting only with existing `invoices.manage`; branch fail-closed).
-2. **OD-DG-6-TRIGGER** — accept, narrow, or reject §8 (explicit command, not on accept; one transaction; platform clearing without a drawer; merchant-collected with no fabricated tender).
-3. **OD-DG-8-IMPORT** — still required before that command is built. Not asked as a guess in this pass. POS pricing stays as OD-DG-8.
-4. **DG-3** — still required before the command is enabled for any named platform. Not asked to be invented here.
-
-No production deploy. No merge authority is implied by this document.
+No production deploy. Recording these acceptances does not merge this PR.
