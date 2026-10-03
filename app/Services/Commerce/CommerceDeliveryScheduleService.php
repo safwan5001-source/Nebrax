@@ -255,7 +255,16 @@ final class CommerceDeliveryScheduleService
 
             if ($available !== []) {
                 $dates[] = ['date' => $date, 'slots' => $available];
-                $earliest ??= ['date' => $date, 'slot_id' => $available[0]['id']];
+                if ($earliest === null) {
+                    // الأبكر بوقت البداية لا بترتيب العرض (`sort_order` تقديمي قد لا يكون زمنياً)؛ التعادل للأسبق ترتيباً.
+                    $first = $available[0];
+                    foreach ($available as $candidate) {
+                        if ($candidate['start_time'] < $first['start_time']) {
+                            $first = $candidate;
+                        }
+                    }
+                    $earliest = ['date' => $date, 'slot_id' => $first['id']];
+                }
             }
         }
 

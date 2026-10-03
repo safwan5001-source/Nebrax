@@ -131,6 +131,26 @@ class CommerceDeliveryScheduleTest extends TestCase
     }
 
     /** @test */
+    public function earliest_is_the_soonest_start_not_the_display_order(): void
+    {
+        $store = $this->store('ds-earliest');
+        // المساءً مُرسَلة أولاً فيأخذ sort_order أدنى؛ العصر يبدأ أبكر
+        $service = $this->configure($store, [], [
+            $this->slot('مساءً', '19:00', '22:00'),
+            $this->slot('عصراً', '14:00', '18:00'),
+            $this->slot('تعادل', '14:00', '15:00'),
+        ]);
+
+        $options = $service->options($store['channel_id'], 'delivery', null, null, $this->now());
+
+        $byLabel = collect($options['dates'][0]['slots'])->keyBy('label');
+        $this->assertSame('2026-10-07', $options['earliest']['date']);
+        $this->assertSame($byLabel['عصراً']['id'], $options['earliest']['slot_id']); // 14:00 أبكر من 19:00، والتعادل للأسبق ترتيباً
+        $this->assertSame(['مساءً', 'عصراً', 'تعادل'], array_column($options['dates'][0]['slots'], 'label')); // العرض بترتيب الإدارة
+        app(TenantContext::class)->forget();
+    }
+
+    /** @test */
     public function lead_time_is_measured_to_the_window_start(): void
     {
         $store = $this->store('ds-lead');
