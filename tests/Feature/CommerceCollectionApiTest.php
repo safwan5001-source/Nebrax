@@ -35,7 +35,7 @@ class CommerceCollectionApiTest extends TestCase
     private function makeProduct(string $tenantId, string $name): Product
     {
         app(TenantContext::class)->set($tenantId);
-        $product = Product::create(['name' => $name, 'type' => 'goods', 'unit' => 'pcs', 'sale_price' => 100, 'is_active' => true]);
+        $product = Product::create(['name' => $name, 'type' => 'good', 'unit' => 'piece', 'sale_price' => 100, 'is_active' => true]);
         app(TenantContext::class)->forget();
 
         return $product;
