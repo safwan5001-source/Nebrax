@@ -64,10 +64,14 @@ class DeliveryInvoiceContext extends BaseModel
                 throw new DomainException('Delivery invoice context invoice must belong to the active tenant.');
             }
 
-            // الفرع دائماً فرع الفاتورة نفسها — حجّة واحدة، لا تُنتحَل بفرع آخر.
-            if ($context->branch_id !== null && (string) $context->branch_id !== (string) $invoice->branch_id) {
-                throw new DomainException('Delivery invoice context branch must match its invoice branch.');
-            }
+            // الفرع دائماً فرع الفاتورة نفسها — حجّة واحدة، **تُفرَض دوماً** ولا
+            // تُقارَن: `BelongsToBranch` (مُستخدَمة أدناه) تملأ الحقل من الفرع
+            // النشط إن وجده فارغاً **قبل** هذا الحارس، فحتى تمريرٌ صريح لـ
+            // `branch_id => null` (فاتورة بلا فرع) يُستبدل بفرعٍ نشطٍ مختلف من
+            // سياق التنفيذ — بالضبط حالة تسجيلٍ من مهمة خلفية بفرع نشط آخر.
+            // الفرع هنا بُعد كتابة بلا أثر عزل (توثيق `BelongsToBranch`)، فالفرض
+            // غير المشروط آمن ولا يحتاج رفضاً: القيمة المخزَّنة تبقى صحيحة دوماً
+            // بصرف النظر عمّا مُرِّر.
             $context->branch_id = $invoice->branch_id;
 
             $channel = SalesChannel::query()->whereKey($context->sales_channel_id)->first();
@@ -91,9 +95,16 @@ class DeliveryInvoiceContext extends BaseModel
                 throw new DomainException('Delivery invoice context version must belong to its platform profile.');
             }
 
-            if (! in_array($context->collection_mode, DeliveryPlatformProfileVersion::COLLECTION_MODES, true)) {
-                throw new DomainException('Invalid collection mode.');
-            }
+            // collection_mode يُشتَقّ من سلسلة النسخة/التجاوز نفسها، لا يُؤخذ من
+            // قيمة يرسلها المستدعي — إنشاء مباشر يتجاوز الخدمة (`DeliveryInvoiceContextService`)
+            // لا يملك فرصة لإدخال قيمة مزيَّفة لا تطابق الإعداد المعتمد فعلاً.
+            $override = $context->branch_id !== null
+                ? DeliveryPlatformVersionOverride::query()
+                    ->where('delivery_platform_profile_version_id', $version->id)
+                    ->where('branch_id', $context->branch_id)
+                    ->first()
+                : null;
+            $context->collection_mode = $override?->collection_mode ?? $version->collection_mode;
 
             $context->created_at ??= now();
         });

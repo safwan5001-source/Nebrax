@@ -19,8 +19,8 @@ use App\Services\Accounting\DeliveryInvoiceContextService;
 use App\Services\Accounting\InvoiceService;
 use App\Services\Accounting\PaymentService;
 use App\Services\DeliveryPlatformConfigService;
+use App\Tenancy\BranchContext;
 use App\Tenancy\TenantContext;
-use DomainException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use RuntimeException;
 use Tests\TestCase;
@@ -306,6 +306,70 @@ class DeliveryPlatformAccountingTest extends TestCase
     }
 
     /** @test */
+    public function direct_context_creation_cannot_forge_a_collection_mode_that_contradicts_its_version(): void
+    {
+        $profile = $this->platformProfile('jahez', Version::COLLECTION_MERCHANT);
+        $invoice = $this->postedInvoice(100000);
+        $version = $this->platforms->latestVersion($profile->fresh());
+
+        $context = DeliveryInvoiceContext::create([
+            'invoice_id' => $invoice->id,
+            'sales_channel_id' => $profile->sales_channel_id,
+            'delivery_platform_profile_id' => $profile->id,
+            'delivery_platform_profile_version_id' => $version->id,
+            // محاولة انتحال: الملف merchant_collected فعلاً، لكن هذا القيمة platform_collected.
+            'collection_mode' => Version::COLLECTION_PLATFORM,
+        ]);
+
+        $this->assertSame(Version::COLLECTION_MERCHANT, $context->collection_mode);
+    }
+
+    /** @test */
+    public function recording_from_a_different_active_branch_context_pins_the_invoice_own_branch(): void
+    {
+        $profile = $this->platformProfile('jahez', Version::COLLECTION_PLATFORM);
+        $invoice = $this->postedInvoice(100000);
+        $recordingBranch = Branch::create(['name' => 'فرع آخر نشط', 'code' => 'REC1']);
+
+        app(BranchContext::class)->set($recordingBranch->id);
+        try {
+            $context = $this->contexts->record($invoice, $profile);
+        } finally {
+            app(BranchContext::class)->forget();
+        }
+
+        $this->assertSame($invoice->branch_id, $context->branch_id);
+        $this->assertNotSame($recordingBranch->id, $context->branch_id);
+    }
+
+    /** @test */
+    public function backfill_migration_refuses_an_active_non_group_custom_asset_account_at_1180_that_is_not_system_seeded(): void
+    {
+        $legacyTenant = Tenant::create(['name' => 'مستأجر قديم بحساب مطابق صادفةً', 'slug' => 'dlv-acc-1-coincidence']);
+        app(TenantContext::class)->set($legacyTenant->id);
+        Account::create([
+            'tenant_id' => $legacyTenant->id,
+            'code' => '1180',
+            'name' => 'حساب أصل خاص بالمستأجر',
+            'name_en' => 'Tenant Own Asset Account',
+            // يطابق كل شرط سطحي (نوعٌ صحيح، ليس تجميعياً، نشط) إلا is_system —
+            // وهذا تماماً ما يجب أن يرفضه الفحص.
+            'type' => 'asset',
+            'normal_balance' => 'debit',
+            'is_group' => false,
+            'is_active' => true,
+            'is_system' => false,
+        ]);
+        app(TenantContext::class)->set($this->tenant->id);
+
+        $migration = require database_path('migrations/2026_10_28_010000_add_platform_receivable_clearing_account.php');
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('تعارض');
+        $migration->up();
+    }
+
+    /** @test */
     public function backfill_migration_refuses_to_commandeer_an_existing_non_clearing_account_at_1180(): void
     {
         $legacyTenant = Tenant::create(['name' => 'مستأجر قديم', 'slug' => 'dlv-acc-1-legacy']);
@@ -421,14 +485,13 @@ class DeliveryPlatformAccountingTest extends TestCase
     }
 
     /** @test */
-    public function forging_a_different_branch_on_delivery_invoice_context_is_rejected(): void
+    public function a_different_branch_id_passed_at_creation_is_overridden_by_the_invoice_own_branch(): void
     {
         $invoice = $this->postedInvoice(100000);
         $profile = $this->platformProfile('jahez', Version::COLLECTION_PLATFORM);
         $otherBranch = Branch::create(['name' => 'فرع آخر', 'code' => 'B2']);
 
-        $this->expectException(DomainException::class);
-        DeliveryInvoiceContext::create([
+        $context = DeliveryInvoiceContext::create([
             'invoice_id' => $invoice->id,
             'branch_id' => $otherBranch->id,
             'sales_channel_id' => $profile->sales_channel_id,
@@ -436,6 +499,9 @@ class DeliveryPlatformAccountingTest extends TestCase
             'delivery_platform_profile_version_id' => $this->platforms->latestVersion($profile->fresh())->id,
             'collection_mode' => Version::COLLECTION_PLATFORM,
         ]);
+
+        $this->assertSame($invoice->branch_id, $context->branch_id);
+        $this->assertNotSame($otherBranch->id, $context->branch_id);
     }
 
     /** @test */

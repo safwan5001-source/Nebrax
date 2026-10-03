@@ -68,6 +68,11 @@ class DeliveryInvoiceContextService
             try {
                 return DeliveryInvoiceContext::create([
                     'invoice_id' => $locked->id,
+                    // صريحاً: `BelongsToBranch` يملأ `branch_id` من الفرع النشط إن
+                    // غاب — فسياقٌ يُسجَّل من سياق فرع يخالف فرع الفاتورة (مهمة
+                    // خلفية لاحقة تعمل بفرع آخر) كان سيُرفض خطأً كـ«منتحَل» في
+                    // حارس النموذج. تمريره هنا يمنع الـtrait من استبداله أصلاً.
+                    'branch_id' => $locked->branch_id,
                     'sales_channel_id' => $resolved['sales_channel_id'],
                     'delivery_platform_profile_id' => $profile->id,
                     'delivery_platform_profile_version_id' => $resolved['version_id'],
