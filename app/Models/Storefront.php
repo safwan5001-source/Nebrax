@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\Commerce\BusinessVertical;
 use App\Tenancy\CompanyWide;
 use App\Tenancy\TenantContext;
 use App\Tenancy\TenantScope;
@@ -75,6 +76,19 @@ class Storefront extends BaseModel implements CompanyWide
                 throw new RuntimeException('يجب أن تكون قناة البيع من نوع ويب لربطها بمتجر.');
             }
         });
+    }
+
+    /**
+     * FLOWERS-H1 — ملف النشاط (جدول جانبي 1:1). غياب الصفّ = `general`.
+     */
+    public function businessProfile(): HasOne
+    {
+        return $this->hasOne(StorefrontBusinessProfile::class);
+    }
+
+    public function businessVertical(): BusinessVertical
+    {
+        return $this->businessProfile?->businessVertical() ?? BusinessVertical::default();
     }
 
     public function salesChannel(): BelongsTo
