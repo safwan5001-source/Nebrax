@@ -2,13 +2,13 @@
 
 > This file is a durable resume point, not a substitute for Git/GitHub evidence.
 
-LAST_UPDATED: 2026-10-03 (**AWJ Delivery Platforms & Settlement Horizon V1 is the single ACTIVE horizon.** DLV-EVIDENCE-1 through DLV-PLATFORM-MGMT-UI-1 are merged. Platform management squash is `bcc1563ed4659c1145c998b5097301ffa100fd09`. No production deploy. **DLV-PLATFORM-LOGOS-1 is in review and not merged.** It adds the six publisher App Store icons through the shared presentation registry only. Full DLV-HUB-1 stays BLOCKED on DG-8-IMPORT and DG-3. No deploy.)
+LAST_UPDATED: 2026-10-03 (**AWJ Delivery Platforms & Settlement Horizon V1 is the single ACTIVE horizon.** DLV-EVIDENCE-1 through DLV-PLATFORM-LOGOS-1 are merged. Logos squash is `f875467428014b86faa082ca467d41df8d8f340a`. No production deploy. **DELIVERY-DECISION-PASS-5 is in review and not merged.** OD-DG-8-IMPORT is **ACCEPTED** as Option B. The financial command is not started. Full DLV-HUB-1 stays BLOCKED on DG-3. No deploy.)
 LAYER_VERSION: V1
 STATUS: ACTIVE — AWJ Delivery Platforms & Settlement Horizon V1 (authoritative queue: `TASK-QUEUE.md`, section "Horizon: AWJ Delivery Platforms & Settlement V1"). Every snapshot, STATUS and objective below this section is historical and superseded.
 
 ## Current objective
 
-DLV-PLATFORM-LOGOS-1 is in review. Do not merge it from this note and do not deploy. It is visual identity only: official icons plus names, from the shared registry. It does not authorize a connector or a financial command. Do not start full DLV-HUB-1, commission, settlement, connectors, or refunds. DG-8-IMPORT and DG-3 stay open. Merge != Deploy.
+DELIVERY-DECISION-PASS-5 is in review. Do not merge it from this note and do not deploy. OD-DG-8-IMPORT is accepted as Option B: a frozen provider commercial snapshot. That does not build the financial command and does not enable VAT. Do not start full DLV-HUB-1, commission, settlement, connectors, or refunds. DG-3 stays open. Merge != Deploy.
 
 ## Previous snapshot (historical, superseded)
 
