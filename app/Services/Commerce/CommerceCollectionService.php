@@ -61,14 +61,15 @@ final class CommerceCollectionService
         }
 
         try {
-            $collection = CommerceCollection::create([
+            // savepoint: انتهاك القيد الفريد لا يسمّم معاملةً خارجية (PostgreSQL).
+            $collection = DB::transaction(fn () => CommerceCollection::create([
                 'slug' => $slug,
                 'title' => trim($data['title']),
                 'title_en' => $titleEn,
                 'description' => $this->nullableTrim($data['description'] ?? null),
                 'status' => $data['status'] ?? CommerceCollection::STATUS_DRAFT,
                 'sort_order' => $data['sort_order'] ?? 0,
-            ]);
+            ]));
         } catch (QueryException $e) {
             throw $this->uniqueOr($e);
         }
@@ -108,7 +109,7 @@ final class CommerceCollectionService
         }
 
         try {
-            $collection->forceFill($update)->save();
+            DB::transaction(fn () => $collection->forceFill($update)->save());
         } catch (QueryException $e) {
             throw $this->uniqueOr($e);
         }
