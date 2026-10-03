@@ -1,3 +1,5 @@
+> **Evidence precedence notice (2026-10-03):** This document is a preliminary FNP evidence pass. For the current FNP Saudi storefront, use `FNP_DEEP_EVIDENCE_1_REPORT.md` and `FNP_DEEP_EVIDENCE_1_CAPABILITY_MATRIX.md` from PR #1181 as the higher-authority evidence where they verify, correct, or supersede statements here. In particular, `checkout.fnp.sa` is a live legacy Shopify surface; evidence about current storefront behavior should prefer direct observations from `www.fnp.sa` and the public APIs used by that storefront. See §36 "Corrections & deltas vs prior AWJ FNP passes" in the deep report.
+
 # FNP Flowers & Gifts Evidence Pass
 
 **Status:** External Evidence Pass — Documentation only  
