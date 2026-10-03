@@ -780,7 +780,31 @@ Changing vertical must not silently delete merchant data.
 
 ---
 
-## H15 — Cross-Horizon Integration / Polish
+## H15 — Theme / Presentation Pack
+
+Implement presentation only after the underlying business contracts are stable.
+
+Targets may include:
+- a generic reusable Flowers & Gifts presentation preset/theme;
+- optional Nebras-inspired reference styling only where it remains generic and does not hard-code Nebras business behavior;
+- seasonal presentation presets where they are pure presentation/configuration.
+
+Theme code must not own:
+- Occasion/Recipient data;
+- delivery truth;
+- gift-message persistence;
+- personalization persistence;
+- add-on pricing;
+- inventory;
+- checkout validation.
+
+This slice corresponds to `FLOWERS-THEME-1`.
+
+Merge and continue.
+
+---
+
+## H16 — Cross-Horizon Integration / Polish
 
 After safe slices are merged:
 
@@ -802,7 +826,42 @@ Create and merge a polish PR only if real integration changes are required.
 
 ---
 
-# 10. Explicit evidence-gated domains
+# 10. Mapping to the previously approved task sequence
+
+This Horizon does not replace the previously documented task names; it groups them into an autonomous execution program.
+
+| Horizon slice | Existing task / contract |
+|---|---|
+| H1 | Vertical enablement/profile foundation implied by the approved Flowers Vertical direction |
+| H2 | `FLOWERS-TAXONOMY-1` |
+| H3 | `FLOWERS-GIFTING-IDENTITY-1` |
+| H4 | `FLOWERS-PERSONALIZATION-1` |
+| H5 | `FLOWERS-CONTENT-1` |
+| H6 | `FLOWERS-ADDONS-1` |
+| H7 | `FLOWERS-DELIVERY-CONTRACT-1` |
+| H8 | `FLOWERS-AVAILABILITY-1` + `FLOWERS-SAMEDAY-1` |
+| H9 | `FLOWERS-BUILDER-1` |
+| H10–H12 | Storefront/PDP/checkout implementation of the approved contracts |
+| H13 | `FLOWERS-ACCOUNT-BRIDGE-1` plus safe saved-recipient/order-account integration |
+| H14 | Vertical onboarding/default configuration from `AWJ_FLOWERS_GIFTS_VERTICAL_V1.md` |
+| H15 | `FLOWERS-THEME-1` |
+| H16 | Cross-Horizon integration/polish/closure |
+
+Evidence-gated tasks remain explicit:
+- `FLOWERS-RETURNS-CANCELLATION-EVIDENCE-1`;
+- `FLOWERS-SUBSTITUTION-EVIDENCE-1`;
+- `FLOWERS-FAILED-DELIVERY-EVIDENCE-1`;
+- `FLOWERS-BUNDLE-EVIDENCE-1`;
+- `FLOWERS-BOM-EVIDENCE-1`;
+- `FLOWERS-RECIPIENT-ADDRESS-1`;
+- `FLOWERS-MONEY-GIFT-EVIDENCE-1`;
+- `FLOWERS-CORPORATE-GIFTING-EVIDENCE-1`.
+
+These names should be preserved in implementation reports and PR descriptions for continuity.
+
+---
+
+# 19. Explicit evidence-gated domains
 
 The following are NOT automatic implementation requirements.
 
