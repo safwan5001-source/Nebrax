@@ -45,25 +45,31 @@ Not re-run as a full Next build in this environment. The previous slice compiled
 
 ## CI
 
-POS-UI-V3-4 POST_MERGE_REVIEW passed before this branch was pushed. This slice's own CI is pending on its PR.
+PR checks on Head `687ae76bf702fc61c4530328aae5aa9172510baf`:
+
+- Web CI pull_request: https://github.com/safwan5001-source/Nebrax/actions/runs/37076834746
+- Web CI push: https://github.com/safwan5001-source/Nebrax/actions/runs/37076833081
+- PHP CI pull_request: https://github.com/safwan5001-source/Nebrax/actions/runs/37076834720
+- PHP CI push: https://github.com/safwan5001-source/Nebrax/actions/runs/37076833078
 
 ## Pre-merge review
 
-- PRE_MERGE_REVIEW: PENDING
-- Reviewed Head SHA: pending exact final head
-- Findings / resolution: pending
+- PRE_MERGE_REVIEW: PASS
+- Reviewed Head SHA: `687ae76bf702fc61c4530328aae5aa9172510baf`
+- Findings / resolution: none. Comment: https://github.com/safwan5001-source/Nebrax/pull/1175#issuecomment-5963174196
 
 ## Merge
 
-- Merge status: not merged
-- Merge SHA: —
+- Merge status: merged
+- PR: https://github.com/safwan5001-source/Nebrax/pull/1175
+- Merge SHA: `a9708738b707441e64fc76029e272d2ae1e58fa7`
 
 ## Post-merge review
 
-- POST_MERGE_REVIEW: PENDING
-- Reviewed Merge SHA: —
-- Target-branch checks/smoke: —
-- Findings / resolution: —
+- POST_MERGE_REVIEW: PASS
+- Reviewed Merge SHA: `a9708738b707441e64fc76029e272d2ae1e58fa7`
+- Target-branch checks/smoke: Web CI https://github.com/safwan5001-source/Nebrax/actions/runs/37078599746 and PHP CI https://github.com/safwan5001-source/Nebrax/actions/runs/37078599667 succeeded on `main`.
+- Findings / resolution: none. Recorded on PR #1175.
 
 ## Self-review
 
