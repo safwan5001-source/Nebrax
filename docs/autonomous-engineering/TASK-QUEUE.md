@@ -1254,7 +1254,8 @@ Only evidence-backed statuses are recorded here; unlisted tasks of the horizon p
 | 6 | DELIVERY-DECISION-PASS-3 | done (merged; PR #1195, squash SHA `615d634a1ab387b12b5124917ff435c762f1aca3`; OD-DG-9-HUB and OD-DG-6-TRIGGER accepted; DG-8-IMPORT and DG-3 not accepted; no Hub implementation) | high | DLV-POS-1 (done); OD-DG-6 accepted with narrowing | `docs/plans/pos/DELIVERY-DECISION-PASS-3-REPORT.md` |
 | 7 | DELIVERY-DECISION-PASS-4 | done (merged; PR #1196, squash SHA `13808e15cfea2ded9e64bcfd4c838971f7581b3b`; OD-HUB-STATES and OD-HUB-IDENTITY accepted; projection specification READY; no Hub implementation in that PR) | high | DELIVERY-DECISION-PASS-3 (done); OD-DG-9-HUB; OD-DG-6 pre-post rule | `docs/plans/pos/DELIVERY-DECISION-PASS-4-REPORT.md` |
 | 8 | DLV-HUB-PROJECTION-1 | done (merged; PR #1198, squash SHA `07c3820a9603061819b9a580b671d975a5ccf0aa`; operational projection only; no invoice, payment, VAT, COGS, stock, POS session, or financial transition) | high | DELIVERY-DECISION-PASS-4 (done); OD-HUB-STATES; OD-HUB-IDENTITY; OD-DG-9-HUB | `docs/plans/pos/DLV-HUB-PROJECTION-1-IMPLEMENTATION-REPORT.md` |
-| 9 | DLV-HUB-UI-1 | in_review (not merged; operational workspace and shared platform presentation registry; no official logo file; no accounting, inventory, POS redesign, or connector) | high | DLV-HUB-PROJECTION-1 (done) | `docs/plans/pos/DLV-HUB-UI-1-IMPLEMENTATION-REPORT.md` |
+| 9 | DLV-HUB-UI-1 | done (merged; PR #1200, squash SHA `625366e1a61903d68935fd8c11f18a16778bd6b4`; operational workspace and shared platform presentation registry; no official logo file) | high | DLV-HUB-PROJECTION-1 (done) | `docs/plans/pos/DLV-HUB-UI-1-IMPLEMENTATION-REPORT.md` |
+| 10 | DLV-PLATFORM-MGMT-UI-1 | in_review (not merged; management workspace on the existing foundation API and the shared registry; no connector and no logo file) | high | DLV-HUB-UI-1 (done); DLV-FOUNDATION-1 (done) | `docs/plans/pos/DLV-PLATFORM-MGMT-UI-1-IMPLEMENTATION-REPORT.md` |
 
 Owed gates — original text is DLV-EVIDENCE-1-REPORT.md §11. DG-1/DG-2/DG-3 resolutions are in DELIVERY-DECISION-PASS-1-REPORT.md. DG-6/DG-8/DG-9 acceptances are in DELIVERY-DECISION-PASS-2-REPORT.md.
 
@@ -1271,17 +1272,17 @@ Owed gates — original text is DLV-EVIDENCE-1-REPORT.md §11. DG-1/DG-2/DG-3 re
 | DG-8 | POS-1 | **ACCEPTED.** Platform selection does not change canonical POS price. No new channel pricing in DLV-POS-1. |
 | DG-8-IMPORT | Future non-POS imported order price (provider price vs AWJ catalog) | **OPEN / PROPOSED.** Not accepted. Does not reopen OD-DG-8. Blocks building the financial command only. |
 | DG-9-POS | POS-1 | **ACCEPTED.** No new permission merely to select an active configured platform on an authorized POS sale. |
-| DG-9-HUB | Full HUB-1 authorization, and the authorization half of any future projection-only Hub | **ACCEPTED 2026-10-03** as OD-DG-9-HUB. `delivery_hub.view` + `delivery_hub.operate` are implemented for the operational projection (merged in DLV-HUB-PROJECTION-1). The operational workspace is DLV-HUB-UI-1, in review. Posting still needs existing `invoices.manage` plus view, and that command is not implemented. |
+| DG-9-HUB | Full HUB-1 authorization, and the authorization half of any future projection-only Hub | **ACCEPTED 2026-10-03** as OD-DG-9-HUB. `delivery_hub.view` + `delivery_hub.operate` are implemented for the operational projection (merged in DLV-HUB-PROJECTION-1). The operational workspace is DLV-HUB-UI-1, merged in PR #1200. Posting still needs existing `invoices.manage` plus view, and that command is not implemented. |
 
 A task must not be promoted to `ready` while any gate mapped to it is unresolved.
 
-**Dependency readiness after DLV-HUB-UI-1 (in review, not merged):**
-- **DLV-HUB-PROJECTION-1 is merged** (PR #1198, squash `07c3820a9603061819b9a580b671d975a5ccf0aa`). No production deploy.
+**Dependency readiness after DLV-PLATFORM-MGMT-UI-1 (in review, not merged):**
+- **DLV-HUB-UI-1 is merged** (PR #1200, squash `625366e1a61903d68935fd8c11f18a16778bd6b4`). No production deploy.
 - **DLV-HUB-1 (full) is BLOCKED** and stays separate. Building the financial command is still blocked on DG-8-IMPORT. Enabling VAT recognition is still blocked on DG-3.
-- **DLV-HUB-UI-1 is the operational workspace only.** It does not post, price, or connect a provider. Do not start a second hub UI from this note.
+- **DLV-PLATFORM-MGMT-UI-1 is configuration UI only.** It does not connect a provider, post, or change clearing. Do not start a second platform-management screen from this note.
 - **DLV-COMMISSION-1 remains BLOCKED** (EXTERNAL_EVIDENCE_REQUIRED under DG-3).
 - **DLV-SETTLEMENT-1 remains BLOCKED** on COMMISSION-1 and per-platform DG-3 evidence.
 - DLV-RECON-1, REFUND-1, CLOSE-1, CONNECTOR-CORE-1 and the provider tasks remain blocked on their own dependencies.
 
-Next step is review of DLV-HUB-UI-1. Do not merge it from this note. Do not start full HUB-1, commission, settlement, connector, or refund work. Merge != Deploy.
+Next step is review of DLV-PLATFORM-MGMT-UI-1. Do not merge it from this note. Do not start full HUB-1, commission, settlement, connector, or refund work. Merge != Deploy.
 
