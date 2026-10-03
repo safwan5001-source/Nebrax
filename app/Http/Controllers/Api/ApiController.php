@@ -27,6 +27,10 @@ abstract class ApiController extends Controller
         } catch (\App\Services\Pos\PosIdempotencyConflictException $e) {
             // تعارض idempotency → 409 من المتحكّم، لا 422 عام.
             throw $e;
+        } catch (\App\Services\DeliveryHub\DeliveryHubNotFoundException) {
+            abort(404);
+        } catch (\App\Services\DeliveryHub\DeliveryHubConflictException) {
+            abort(409, 'تعارض في هوية طلب التوصيل.');
         } catch (RuntimeException $e) {
             abort(422, $e->getMessage());
         }
