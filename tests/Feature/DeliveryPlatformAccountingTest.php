@@ -21,6 +21,7 @@ use App\Services\Accounting\PaymentService;
 use App\Services\DeliveryPlatformConfigService;
 use App\Tenancy\BranchContext;
 use App\Tenancy\TenantContext;
+use DomainException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use RuntimeException;
 use Tests\TestCase;
@@ -322,6 +323,46 @@ class DeliveryPlatformAccountingTest extends TestCase
         ]);
 
         $this->assertSame(Version::COLLECTION_MERCHANT, $context->collection_mode);
+    }
+
+    /** @test */
+    public function direct_context_creation_on_a_draft_invoice_is_rejected(): void
+    {
+        $profile = $this->platformProfile('jahez', Version::COLLECTION_PLATFORM);
+        $version = $this->platforms->latestVersion($profile->fresh());
+        $draftInvoice = app(InvoiceService::class)->create(
+            ['partner_id' => $this->customer->id, 'payment_type' => 'credit'],
+            [['quantity' => 1, 'unit_price' => 100000, 'tax_rate' => 15]]
+        );
+
+        $this->expectException(DomainException::class);
+        DeliveryInvoiceContext::create([
+            'invoice_id' => $draftInvoice->id,
+            'sales_channel_id' => $profile->sales_channel_id,
+            'delivery_platform_profile_id' => $profile->id,
+            'delivery_platform_profile_version_id' => $version->id,
+        ]);
+    }
+
+    /** @test */
+    public function direct_context_creation_cannot_bypass_the_external_reference_policy(): void
+    {
+        $profile = $this->platforms->create([
+            'platform_key' => 'jahez',
+            'collection_mode' => Version::COLLECTION_PLATFORM,
+            'external_reference_policy' => Version::REFERENCE_REQUIRED,
+        ]);
+        $version = $this->platforms->latestVersion($profile->fresh());
+        $invoice = $this->postedInvoice(100000);
+
+        $this->expectException(DomainException::class);
+        DeliveryInvoiceContext::create([
+            'invoice_id' => $invoice->id,
+            'sales_channel_id' => $profile->sales_channel_id,
+            'delivery_platform_profile_id' => $profile->id,
+            'delivery_platform_profile_version_id' => $version->id,
+            // سياسة المنصة تتطلب مرجعاً — لا مرجع هنا.
+        ]);
     }
 
     /** @test */

@@ -63,6 +63,13 @@ class DeliveryInvoiceContext extends BaseModel
             if ($invoice === null) {
                 throw new DomainException('Delivery invoice context invoice must belong to the active tenant.');
             }
+            // يُفرَض هنا لا في الخدمة فقط — إنشاء مباشر يتجاوز
+            // `DeliveryInvoiceContextService::record()` لا يُعفى من الشرط. مسودة
+            // قابلة للحذف (`InvoiceService::deleteDraft()`)؛ قيد FK المقيَّد على
+            // `invoice_id` كان سيعطّل حذفها لو حملت سياقاً.
+            if (! $invoice->isPosted()) {
+                throw new DomainException('Delivery invoice context requires a posted invoice.');
+            }
 
             // الفرع دائماً فرع الفاتورة نفسها — حجّة واحدة، **تُفرَض دوماً** ولا
             // تُقارَن: `BelongsToBranch` (مُستخدَمة أدناه) تملأ الحقل من الفرع
@@ -105,6 +112,18 @@ class DeliveryInvoiceContext extends BaseModel
                     ->first()
                 : null;
             $context->collection_mode = $override?->collection_mode ?? $version->collection_mode;
+
+            // سياسة المرجع الخارجي تُفرَض هنا أيضاً — لا في الخدمة فقط — لنفس
+            // سبب فرض collection_mode أعلاه: إنشاء مباشر يتجاوز الخدمة لا يُعفى.
+            $reference = is_string($context->external_order_reference) ? trim($context->external_order_reference) : null;
+            $context->external_order_reference = $reference === '' ? null : $reference;
+            $referencePolicy = $override?->external_reference_policy ?? $version->external_reference_policy;
+            if ($referencePolicy === DeliveryPlatformProfileVersion::REFERENCE_REQUIRED && $context->external_order_reference === null) {
+                throw new DomainException('Delivery invoice context requires an external order reference under this platform\'s policy.');
+            }
+            if ($referencePolicy === DeliveryPlatformProfileVersion::REFERENCE_NONE && $context->external_order_reference !== null) {
+                throw new DomainException('Delivery invoice context platform policy does not accept an external order reference.');
+            }
 
             $context->created_at ??= now();
         });
