@@ -61,14 +61,15 @@ final class CommerceFacetService
         }
 
         try {
-            $facet = CommerceFacet::create([
+            // معاملة (savepoint عند التداخل) كي لا ينتهك القيد الفريد معاملةً خارجية قائمة (PostgreSQL).
+            $facet = DB::transaction(fn () => CommerceFacet::create([
                 'key' => $data['key'],
                 'system_key' => $data['system_key'] ?? null,
                 'name' => trim($data['name']),
                 'name_en' => $this->nullableTrim($data['name_en'] ?? null),
                 'sort_order' => $data['sort_order'] ?? 0,
                 'is_active' => $data['is_active'] ?? true,
-            ]);
+            ]));
         } catch (QueryException $e) {
             throw $this->uniqueOr($e, 'المفتاح أو البُعد النظامي مستخدم بالفعل.');
         }
@@ -144,14 +145,14 @@ final class CommerceFacetService
         }
 
         try {
-            $value = CommerceFacetValue::create([
+            $value = DB::transaction(fn () => CommerceFacetValue::create([
                 'commerce_facet_id' => $facet->id,
                 'slug' => $slug,
                 'name' => $name,
                 'name_en' => $nameEn,
                 'sort_order' => $data['sort_order'] ?? 0,
                 'is_active' => $data['is_active'] ?? true,
-            ]);
+            ]));
         } catch (QueryException $e) {
             throw $this->uniqueOr($e, 'المعرّف النصي (slug) مستخدم بالفعل في هذا البُعد.');
         }
@@ -188,7 +189,7 @@ final class CommerceFacetService
         }
 
         try {
-            $value->forceFill($update)->save();
+            DB::transaction(fn () => $value->forceFill($update)->save());
         } catch (QueryException $e) {
             throw $this->uniqueOr($e, 'المعرّف النصي (slug) مستخدم بالفعل في هذا البُعد.');
         }
