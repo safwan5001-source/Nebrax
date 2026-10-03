@@ -19,6 +19,7 @@ import {
   presentationConfigsEqual,
   type StorefrontPresentationConfig,
 } from "./presentation";
+import { featuredContentOf } from "./presentation/section-content";
 import { ProductPreviewPicker } from "./ProductPreviewPicker";
 import { ProductPreviewPickerPanel } from "./ProductPreviewPickerPanel";
 import { ProductRegionInspector } from "./ProductRegionInspector";
@@ -219,6 +220,37 @@ export function ExperienceBuilder({
     "idle" | "loading" | "error" | "ready"
   >("idle");
   const homeNewArrivalsRequestRef = useRef(0);
+  // CUST-H4-5 — real batched resolution for "featured" sections' own Canvas
+  // preview. Unlike `homeCategories`/`homeNewArrivals` above, "featured" is
+  // **not** a singleton section type (`canDuplicate: true` — a merchant may
+  // add several Featured rails, each curating its own products), so this is
+  // keyed by section instance id rather than one shared slot. The picker's
+  // own "selected products" chips (`ControlPanels`) read the same map, so
+  // one batched `ids[]` read per section instance serves both the Canvas
+  // preview and the editor's selected-chips display — no second fetch.
+  const [featuredResolved, setFeaturedResolved] = useState<
+    Record<string, WorkspaceProductSummary[]>
+  >({});
+  const [featuredResolvedState, setFeaturedResolvedState] = useState<
+    Record<string, "idle" | "loading" | "error" | "ready">
+  >({});
+  // Tracks the serialized `productIds` this section id was last resolved
+  // for (or is resolving for), so the effect below re-fetches only when the
+  // merchant's own selection actually changed — not on every unrelated
+  // re-render, and not forever-"idle" like the singleton sections' gate
+  // (which never needs to react to content edits because they have none).
+  const featuredResolvedKeyRef = useRef<Record<string, string>>({});
+  const featuredRequestRef = useRef<Record<string, number>>({});
+  // The multi-select picker's own search/list state — deliberately separate
+  // from `productList`/`productListState` above (CUST-H2-3's single-select
+  // Product-page preview picker, bound to `previewProductId`): different
+  // selection model, same underlying `listWorkspaceProducts()` data layer.
+  const [featuredPickerSearch, setFeaturedPickerSearch] = useState("");
+  const [featuredPickerList, setFeaturedPickerList] = useState<WorkspaceProductSummary[]>([]);
+  const [featuredPickerListState, setFeaturedPickerListState] = useState<
+    "idle" | "loading" | "error" | "ready"
+  >("idle");
+  const featuredPickerRequestRef = useRef(0);
   const [pendingSectionScroll, setPendingSectionScroll] = useState<
     string | null
   >(null);
@@ -671,6 +703,20 @@ export function ExperienceBuilder({
     ++homeNewArrivalsRequestRef.current;
     setHomeNewArrivals([]);
     setHomeNewArrivalsState("idle");
+    // CUST-H4-5 — same reset, for the per-section-instance Featured
+    // resolution and the picker's own search list: a storefront/version
+    // switch must never let a previous storefront's featured products (or
+    // stale "already resolved this key" bookkeeping) survive into the
+    // newly-opened one, and the picker's candidate list must re-query the
+    // new storefront's own catalog rather than keep showing the old one's.
+    featuredRequestRef.current = {};
+    featuredResolvedKeyRef.current = {};
+    setFeaturedResolved({});
+    setFeaturedResolvedState({});
+    ++featuredPickerRequestRef.current;
+    setFeaturedPickerList([]);
+    setFeaturedPickerListState("idle");
+    setFeaturedPickerSearch("");
 
     if (!storefrontId) {
       setBusy(null);
@@ -998,6 +1044,110 @@ export function ExperienceBuilder({
 
   function handleRetryHomeNewArrivals() {
     void loadHomeNewArrivals();
+  }
+
+  // CUST-H4-5 — resolves one "featured" section instance's curated
+  // `productIds` into real catalog rows, via the same authenticated
+  // workspace endpoint the picker's own search already uses (`ids[]`
+  // filter, additive to `CommerceWorkspaceStorefrontProductController`).
+  // One request per section instance, never per product. A failed/removed/
+  // foreign id is simply absent from the result — fail-closed, matching
+  // every other section's "omit, never fabricate" rule.
+  async function loadFeaturedResolution(sectionId: string, productIds: string[]) {
+    if (!storefrontId) return;
+    const originStorefrontId = storefrontId;
+    const token = (featuredRequestRef.current[sectionId] ?? 0) + 1;
+    featuredRequestRef.current[sectionId] = token;
+    setFeaturedResolvedState((prev) => ({ ...prev, [sectionId]: "loading" }));
+    const result = await listWorkspaceProducts(storefrontId, { ids: productIds });
+    if (
+      featuredRequestRef.current[sectionId] !== token ||
+      storefrontIdRef.current !== originStorefrontId
+    ) {
+      return;
+    }
+    if (!result.ok) {
+      setFeaturedResolvedState((prev) => ({ ...prev, [sectionId]: "error" }));
+      setFeaturedResolved((prev) => ({ ...prev, [sectionId]: [] }));
+      return;
+    }
+    setFeaturedResolvedState((prev) => ({ ...prev, [sectionId]: "ready" }));
+    setFeaturedResolved((prev) => ({ ...prev, [sectionId]: result.data }));
+  }
+
+  useEffect(() => {
+    // Same "wait for the real config" rule as the categories/newArrivals
+    // effects above. Unlike those singleton sections, this iterates every
+    // visible "featured" instance and re-fetches only the ones whose own
+    // `productIds` changed since the last fetch for that section id
+    // (`featuredResolvedKeyRef`) — a merchant editing one Featured section's
+    // selection must not re-fetch a sibling Featured section that didn't
+    // change, and an unrelated re-render must not re-fetch either.
+    if (currentPage !== "home" || !storefrontId || busy === "loading") return;
+    for (const section of draft.homepage.sections) {
+      if (section.type !== "featured" || !section.visible) continue;
+      const ids = featuredContentOf(section).productIds.filter((id) => id);
+      const key = ids.join(",");
+      if (featuredResolvedKeyRef.current[section.id] === key) continue;
+      featuredResolvedKeyRef.current[section.id] = key;
+      if (ids.length === 0) {
+        setFeaturedResolved((prev) => ({ ...prev, [section.id]: [] }));
+        setFeaturedResolvedState((prev) => ({ ...prev, [section.id]: "ready" }));
+        continue;
+      }
+      void loadFeaturedResolution(section.id, ids);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentPage, storefrontId, busy, draft.homepage.sections]);
+
+  function handleRetryFeaturedResolution(sectionId: string) {
+    const section = draft.homepage.sections.find((item) => item.id === sectionId);
+    if (!section) return;
+    const ids = featuredContentOf(section).productIds.filter((id) => id);
+    if (ids.length === 0) return;
+    void loadFeaturedResolution(sectionId, ids);
+  }
+
+  // The picker's own candidate list — a plain search over eligible
+  // products, independent of which (if any) are already selected. Selected
+  // state is computed for display from the section's own `productIds`, not
+  // from this list, so a selected product need not appear on the current
+  // search page to still show as selected.
+  async function loadFeaturedPickerList(search?: string) {
+    if (!storefrontId) return;
+    const token = ++featuredPickerRequestRef.current;
+    const originStorefrontId = storefrontId;
+    setFeaturedPickerListState("loading");
+    const result = await listWorkspaceProducts(storefrontId, { search: search || undefined, perPage: 50 });
+    if (token !== featuredPickerRequestRef.current || storefrontIdRef.current !== originStorefrontId) return;
+    if (!result.ok) {
+      setFeaturedPickerListState("error");
+      setFeaturedPickerList([]);
+      return;
+    }
+    setFeaturedPickerListState("ready");
+    setFeaturedPickerList(result.data);
+  }
+
+  useEffect(() => {
+    // Loads the picker's candidate list once, the first time a "featured"
+    // section becomes selected — mirrors the Product-page preview picker's
+    // own open-triggered load, but eagerly (this picker is inline in the
+    // section's own Content tab, not behind a dropdown to open).
+    if (!storefrontId || featuredPickerListState !== "idle") return;
+    const section = draft.homepage.sections.find((item) => item.id === selectedSection);
+    if (!section || section.type !== "featured") return;
+    void loadFeaturedPickerList(featuredPickerSearch);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedSection, storefrontId, draft.homepage.sections, featuredPickerListState]);
+
+  function handleFeaturedPickerSearchChange(value: string) {
+    setFeaturedPickerSearch(value);
+    void loadFeaturedPickerList(value);
+  }
+
+  function handleRetryFeaturedPickerList() {
+    void loadFeaturedPickerList(featuredPickerSearch);
   }
 
   function handleSelectCategoryRegion(id: string) {
@@ -1835,6 +1985,14 @@ export function ExperienceBuilder({
           selectedSection={selectedSection}
           onSelectSection={(id) => handleSelectSection(id, "sidebar")}
           isMobileViewport={isMobileViewport}
+          featuredPickerSearch={featuredPickerSearch}
+          featuredPickerListState={featuredPickerListState}
+          featuredPickerList={featuredPickerList}
+          onFeaturedPickerSearchChange={handleFeaturedPickerSearchChange}
+          onRetryFeaturedPickerList={handleRetryFeaturedPickerList}
+          featuredResolved={featuredResolved}
+          featuredResolvedState={featuredResolvedState}
+          onRetryFeaturedResolution={handleRetryFeaturedResolution}
         />
       );
     }
@@ -1901,6 +2059,14 @@ export function ExperienceBuilder({
         selectedSection={selectedSection}
         onSelectSection={(id) => handleSelectSection(id, "sidebar")}
         isMobileViewport={isMobileViewport}
+        featuredPickerSearch={featuredPickerSearch}
+        featuredPickerListState={featuredPickerListState}
+        featuredPickerList={featuredPickerList}
+        onFeaturedPickerSearchChange={handleFeaturedPickerSearchChange}
+        onRetryFeaturedPickerList={handleRetryFeaturedPickerList}
+        featuredResolved={featuredResolved}
+        featuredResolvedState={featuredResolvedState}
+        onRetryFeaturedResolution={handleRetryFeaturedResolution}
       />
     );
   }
@@ -2416,6 +2582,9 @@ export function ExperienceBuilder({
                   homeNewArrivalsState={homeNewArrivalsState}
                   homeNewArrivals={homeNewArrivals.map((p) => ({ id: p.id, name: p.name, thumbnailUrl: p.thumbnailUrl }))}
                   onRetryHomeNewArrivals={handleRetryHomeNewArrivals}
+                  featuredResolved={featuredResolved}
+                  featuredResolvedState={featuredResolvedState}
+                  onRetryFeatured={handleRetryFeaturedResolution}
                 />
               </div>
             </div>

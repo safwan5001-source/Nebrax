@@ -205,7 +205,22 @@ function mapDetail(payload: unknown): WorkspaceProductDetail | null {
 
 export async function listWorkspaceProducts(
   storefrontId: string,
-  params: { search?: string; categoryId?: string; sort?: 'newest'; page?: number; perPage?: number } = {},
+  params: {
+    search?: string;
+    categoryId?: string;
+    sort?: 'newest';
+    page?: number;
+    perPage?: number;
+    /**
+     * CUST-H4-5 — batched resolution for the Home "Featured" section's real
+     * Canvas preview and the picker's own "selected products" chips. Bounded
+     * to `MAX_FEATURED_PRODUCTS` (8) by the backend's own validation; passing
+     * more fails the request rather than silently truncating it. Omitted
+     * entirely by every other caller (search list, category grid, new
+     * arrivals), which keeps their existing behavior unchanged.
+     */
+    ids?: string[];
+  } = {},
   signal?: AbortSignal,
 ): Promise<WorkspaceProductListOutcome> {
   try {
@@ -223,6 +238,7 @@ export async function listWorkspaceProducts(
     if (params.sort) query.set('sort', params.sort);
     if (params.page) query.set('page', String(params.page));
     if (params.perPage) query.set('per_page', String(params.perPage));
+    for (const id of params.ids ?? []) query.append('ids[]', id);
     const qs = query.toString();
     const path = qs ? `${commerceWorkspaceProductsPath(storefrontId)}?${qs}` : commerceWorkspaceProductsPath(storefrontId);
     const payload = await api<unknown>(path, { signal });

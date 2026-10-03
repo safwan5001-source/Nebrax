@@ -48,6 +48,7 @@ import {
   type CustomizerMessageKey,
   customizerMessage,
 } from "./messages";
+import type { WorkspaceProductSummary } from "@/modules/commerce-workspace/workspace-products";
 
 export type CustomizerPanel =
   | "theme"
@@ -143,6 +144,22 @@ interface PanelsProps {
    * Section Library's presentation: a centered dialog on desktop, inline
    * content replacing the composer body on mobile (no nested Bottom Sheet). */
   isMobileViewport?: boolean;
+  /**
+   * CUST-H4-5 — the real multi-select "Featured" product picker's own
+   * search/list (independent of which section is selected) and the
+   * per-section-instance batched resolution of already-selected products
+   * (keyed by section id — "featured" is not a singleton section type).
+   * All owned/fetched by `ExperienceBuilder`; this component stays purely
+   * presentational, same as every other home-section data seam.
+   */
+  featuredPickerSearch?: string;
+  featuredPickerListState?: "idle" | "loading" | "error" | "ready";
+  featuredPickerList?: WorkspaceProductSummary[];
+  onFeaturedPickerSearchChange?: (value: string) => void;
+  onRetryFeaturedPickerList?: () => void;
+  featuredResolved?: Record<string, WorkspaceProductSummary[]>;
+  featuredResolvedState?: Record<string, "idle" | "loading" | "error" | "ready">;
+  onRetryFeaturedResolution?: (sectionId: string) => void;
 }
 
 export function ControlPanels({
@@ -155,6 +172,14 @@ export function ControlPanels({
   selectedSection = null,
   onSelectSection,
   isMobileViewport = false,
+  featuredPickerSearch = "",
+  featuredPickerListState = "idle",
+  featuredPickerList = [],
+  onFeaturedPickerSearchChange,
+  onRetryFeaturedPickerList,
+  featuredResolved = {},
+  featuredResolvedState = {},
+  onRetryFeaturedResolution,
 }: PanelsProps) {
   const t = (key: CustomizerMessageKey) => customizerMessage(locale, key);
   const patch = (partial: Partial<StorefrontPresentationConfig>) =>
@@ -183,6 +208,14 @@ export function ControlPanels({
           selectedSection={selectedSection}
           onSelectSection={onSelectSection}
           isMobileViewport={isMobileViewport}
+          featuredPickerSearch={featuredPickerSearch}
+          featuredPickerListState={featuredPickerListState}
+          featuredPickerList={featuredPickerList}
+          onFeaturedPickerSearchChange={onFeaturedPickerSearchChange}
+          onRetryFeaturedPickerList={onRetryFeaturedPickerList}
+          featuredResolved={featuredResolved}
+          featuredResolvedState={featuredResolvedState}
+          onRetryFeaturedResolution={onRetryFeaturedResolution}
         />
       );
     case "footer":
@@ -826,6 +859,14 @@ function HomepagePanel({
   selectedSection = null,
   onSelectSection,
   isMobileViewport = false,
+  featuredPickerSearch = "",
+  featuredPickerListState = "idle",
+  featuredPickerList = [],
+  onFeaturedPickerSearchChange,
+  onRetryFeaturedPickerList,
+  featuredResolved = {},
+  featuredResolvedState = {},
+  onRetryFeaturedResolution,
 }: {
   config: StorefrontPresentationConfig;
   t: (key: CustomizerMessageKey) => string;
@@ -833,6 +874,14 @@ function HomepagePanel({
   selectedSection?: string | null;
   onSelectSection?: (id: string | null) => void;
   isMobileViewport?: boolean;
+  featuredPickerSearch?: string;
+  featuredPickerListState?: "idle" | "loading" | "error" | "ready";
+  featuredPickerList?: WorkspaceProductSummary[];
+  onFeaturedPickerSearchChange?: (value: string) => void;
+  onRetryFeaturedPickerList?: () => void;
+  featuredResolved?: Record<string, WorkspaceProductSummary[]>;
+  featuredResolvedState?: Record<string, "idle" | "loading" | "error" | "ready">;
+  onRetryFeaturedResolution?: (sectionId: string) => void;
 }) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const sections = config.homepage.sections;
@@ -1024,7 +1073,7 @@ function HomepagePanel({
                 }
               />
             ) : selected.type === "featured" ? (
-              <FeaturedFields
+              <FeaturedPickerFields
                 productIds={featuredContentOf(selected).productIds}
                 t={t}
                 onChange={(productIds) =>
@@ -1033,6 +1082,14 @@ function HomepagePanel({
                     content: productIds.length ? { productIds } : undefined,
                   })
                 }
+                search={featuredPickerSearch}
+                listState={featuredPickerListState}
+                list={featuredPickerList}
+                onSearchChange={onFeaturedPickerSearchChange}
+                onRetryList={onRetryFeaturedPickerList}
+                selectedProducts={featuredResolved[selected.id] ?? []}
+                selectedState={featuredResolvedState[selected.id] ?? "idle"}
+                onRetrySelected={() => onRetryFeaturedResolution?.(selected.id)}
               />
             ) : selected.type === "appPromo" ? (
               <AppPromoFields config={config} t={t} patch={patch} />
@@ -1828,41 +1885,208 @@ function CustomFields({
   );
 }
 
-function FeaturedFields({
+/**
+ * CUST-H4-5 — real multi-select product picker, replacing the raw
+ * product-id text input. Selection/order/dedupe/max all live here as plain
+ * array operations on `productIds` (the same presentation-only contract —
+ * no price/image/name is ever written back, only ids); display data for
+ * the already-selected chips and the candidate list both come from props
+ * owned by `ExperienceBuilder` (`selectedProducts` is the same batched
+ * `ids[]` resolution that feeds the Canvas preview — no second fetch).
+ */
+function FeaturedPickerFields({
   productIds,
   t,
   onChange,
+  search,
+  listState,
+  list,
+  onSearchChange,
+  onRetryList,
+  selectedProducts,
+  selectedState,
+  onRetrySelected,
 }: {
   productIds: string[];
   t: (key: CustomizerMessageKey) => string;
   onChange: (productIds: string[]) => void;
+  search: string;
+  listState: "idle" | "loading" | "error" | "ready";
+  list: WorkspaceProductSummary[];
+  onSearchChange?: (value: string) => void;
+  onRetryList?: () => void;
+  selectedProducts: WorkspaceProductSummary[];
+  selectedState: "idle" | "loading" | "error" | "ready";
+  onRetrySelected?: () => void;
 }) {
+  const atMax = productIds.length >= MAX_FEATURED_PRODUCTS;
+  const byId = new Map(selectedProducts.map((product) => [product.id, product]));
+
+  function toggle(id: string) {
+    if (productIds.includes(id)) {
+      onChange(productIds.filter((existing) => existing !== id));
+      return;
+    }
+    if (atMax) return;
+    onChange([...productIds, id]);
+  }
+
+  function move(id: string, delta: number) {
+    const index = productIds.indexOf(id);
+    if (index < 0) return;
+    onChange(moveIndex(productIds, index, delta));
+  }
+
   return (
-    <div className="space-y-3">
-      <p className="text-xs leading-relaxed text-neutral-500">{t("featuredHint")}</p>
-      {productIds.map((id, index) => (
-        <div key={`${id}-${index}`} className="flex items-center gap-2">
-          <input
-            className={inputClass}
-            aria-label={t("featuredProductId")}
-            value={id}
-            onChange={(event) =>
-              onChange(productIds.map((row, i) => (i === index ? event.target.value.trim() : row)))
-            }
-          />
-          <button type="button" className="text-xs text-neutral-500" onClick={() => onChange(productIds.filter((_, i) => i !== index))}>
-            {t("removeItem")}
-          </button>
+    <div className="space-y-4">
+      <p className="text-xs leading-relaxed text-muted">{t("featuredHint")}</p>
+
+      <div data-featured-selected="">
+        <div className="flex items-baseline justify-between">
+          <p className="text-xs font-medium text-text">
+            {t("featuredSelectedLabel")}
+          </p>
+          <span className="text-xs text-muted" aria-live="polite">
+            {productIds.length}/{MAX_FEATURED_PRODUCTS}
+          </span>
         </div>
-      ))}
-      <button
-        type="button"
-        disabled={productIds.length >= MAX_FEATURED_PRODUCTS}
-        className="text-xs font-medium disabled:opacity-40"
-        onClick={() => onChange([...productIds, ""])}
-      >
-        + {t("addProduct")}
-      </button>
+        {productIds.length === 0 ? (
+          <p className="mt-1.5 text-xs text-muted">{t("featuredSelectedEmpty")}</p>
+        ) : selectedState === "error" ? (
+          <div className="mt-1.5 flex items-center gap-2">
+            <span className="text-xs text-muted">{t("featuredPickerLoadFailed")}</span>
+            <button type="button" className="text-xs font-medium text-text" onClick={onRetrySelected}>
+              {t("retry")}
+            </button>
+          </div>
+        ) : (
+          <ul className="mt-2 space-y-1.5">
+            {productIds.map((id, index) => {
+              const product = byId.get(id);
+              return (
+                <li
+                  key={id}
+                  data-featured-selected-item={id}
+                  className="flex items-center gap-2 rounded-md border border-border px-2 py-1.5"
+                >
+                  <span className="flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-md bg-surface-muted">
+                    {product?.thumbnailUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element -- thumbnail is an untrusted tenant media URL, not a static asset
+                      <img src={product.thumbnailUrl} alt="" className="size-full object-cover" />
+                    ) : null}
+                  </span>
+                  <span className="min-w-0 flex-1 truncate text-sm">
+                    {selectedState === "loading" || selectedState === "idle" ? (
+                      <span className="text-muted">{t("featuredPickerLoading")}</span>
+                    ) : (
+                      <bdi>{product?.name ?? id}</bdi>
+                    )}
+                  </span>
+                  <span className="flex shrink-0">
+                    <button
+                      type="button"
+                      className={iconBtnClass}
+                      aria-label={t("moveUp")}
+                      disabled={index === 0}
+                      onClick={() => move(id, -1)}
+                    >
+                      ↑
+                    </button>
+                    <button
+                      type="button"
+                      className={iconBtnClass}
+                      aria-label={t("moveDown")}
+                      disabled={index === productIds.length - 1}
+                      onClick={() => move(id, 1)}
+                    >
+                      ↓
+                    </button>
+                  </span>
+                  <button
+                    type="button"
+                    className="shrink-0 text-xs text-muted"
+                    onClick={() => onChange(productIds.filter((existing) => existing !== id))}
+                  >
+                    {t("removeItem")}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+        {atMax ? <p className="mt-1.5 text-xs text-muted">{t("featuredMaxReachedHint")}</p> : null}
+      </div>
+
+      <div className="space-y-2 border-t border-border pt-3">
+        <label className="sr-only" htmlFor="featured-picker-search">
+          {t("featuredPickerSearchLabel")}
+        </label>
+        <input
+          id="featured-picker-search"
+          type="search"
+          value={search}
+          onChange={(event) => onSearchChange?.(event.target.value)}
+          placeholder={t("featuredPickerSearchPlaceholder")}
+          className={inputClass}
+        />
+        <div
+          role="listbox"
+          aria-label={t("featuredPickerResultsLabel")}
+          aria-multiselectable="true"
+          className="flex max-h-56 flex-col gap-0.5 overflow-y-auto"
+        >
+          {listState === "loading" || listState === "idle" ? (
+            <p data-featured-picker-loading="" className="px-2 py-3 text-center text-xs text-muted">
+              {t("featuredPickerLoading")}
+            </p>
+          ) : listState === "error" ? (
+            <div data-featured-picker-error="" className="flex flex-col items-center gap-2 px-2 py-3 text-center text-xs text-muted">
+              <span>{t("featuredPickerLoadFailed")}</span>
+              <button
+                type="button"
+                onClick={onRetryList}
+                className="rounded-md border border-border px-2 py-1 text-xs font-medium text-text"
+              >
+                {t("retry")}
+              </button>
+            </div>
+          ) : list.length === 0 ? (
+            <p data-featured-picker-empty="" className="px-2 py-3 text-center text-xs text-muted">
+              {t("featuredPickerEmpty")}
+            </p>
+          ) : (
+            list.map((product) => {
+              const selected = productIds.includes(product.id);
+              const disabled = !selected && atMax;
+              return (
+                <button
+                  key={product.id}
+                  type="button"
+                  role="option"
+                  aria-selected={selected}
+                  disabled={disabled}
+                  data-featured-option={product.id}
+                  onClick={() => toggle(product.id)}
+                  className={`flex min-h-10 w-full items-center gap-2 rounded-md px-2 text-start text-sm disabled:opacity-40 ${
+                    selected ? "bg-primary-soft font-medium text-primary" : "text-text hover:bg-primary-soft"
+                  }`}
+                >
+                  <span className="flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-md bg-surface-muted">
+                    {product.thumbnailUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element -- thumbnail is an untrusted tenant media URL, not a static asset
+                      <img src={product.thumbnailUrl} alt="" className="size-full object-cover" />
+                    ) : null}
+                  </span>
+                  <span className="min-w-0 flex-1 truncate">
+                    <bdi>{product.name}</bdi>
+                  </span>
+                  {selected ? <span aria-hidden="true">✓</span> : null}
+                </button>
+              );
+            })
+          )}
+        </div>
+      </div>
     </div>
   );
 }

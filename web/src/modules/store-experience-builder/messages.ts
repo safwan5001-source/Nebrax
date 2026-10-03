@@ -221,6 +221,10 @@ export const CUSTOMIZER_MESSAGES = {
     homeCategoriesEmpty: "لا تصنيفات رئيسية منشورة على هذا المتجر حتى الآن.",
     homeNewArrivalsLoadFailed: "تعذّر تحميل المنتجات لهذا القسم.",
     homeNewArrivalsEmpty: "لا منتجات منشورة على هذا المتجر حتى الآن.",
+    // CUST-H4-5 — real-data loading/empty/error copy for a "featured"
+    // section's own Canvas preview (one resolution per section instance).
+    homeFeaturedLoadFailed: "تعذّر تحميل المنتجات المميّزة لهذا القسم.",
+    homeFeaturedEmpty: "لم تُختَر منتجات مميّزة لهذا القسم بعد.",
     sectionWholesale: "الجملة",
     sectionBanner: "شريط ترويجي",
     sectionFeatured: "منتجات مميزة",
@@ -263,8 +267,6 @@ export const CUSTOMIZER_MESSAGES = {
     sectionBenefitsDescription: "مزايا متجرك المختصرة مثل الشحن والدفع الآمن.",
     sectionAppPromoDescription: "روابط تحميل تطبيق متجرك على الجوال.",
     sectionCustomContentDescription: "فقرات وعناوين نصية حرة.",
-    sectionFeaturedPartialReason:
-      "منتقي منتجات حقيقي قادم قريباً. حالياً يُضاف المنتج بكتابة معرّفه يدوياً.",
     // CUST-H4-2 (مراجعة) — العروض مرئية في المكتبة لكنها غير قابلة للإضافة
     // بعد: لا بنية تجارية حقيقية ولا عارض Canvas/منشور حقيقي لها اليوم. نصٌّ
     // مخصّص لحالة «غير قابل للإضافة» في المكتبة، مستقلٌّ عن `gatedSection`
@@ -290,10 +292,19 @@ export const CUSTOMIZER_MESSAGES = {
     blockText: "النص",
     addHeading: "إضافة عنوان",
     addParagraph: "إضافة فقرة",
-    featuredProductId: "معرّف المنتج",
-    addProduct: "إضافة منتج",
     featuredHint:
       "يُحفظ معرّف المنتج فقط. السعر والمخزون والتوفر تُعرض من الكتالوج المنشور ولا تُنسخ هنا.",
+    // CUST-H4-5 — real multi-select product picker, replacing the raw
+    // product-id text input.
+    featuredPickerSearchLabel: "بحث عن منتج لإضافته",
+    featuredPickerResultsLabel: "نتائج البحث عن منتجات",
+    featuredPickerSearchPlaceholder: "ابحث بالاسم أو رمز الصنف…",
+    featuredPickerLoading: "جارٍ تحميل المنتجات…",
+    featuredPickerLoadFailed: "تعذّر تحميل المنتجات.",
+    featuredPickerEmpty: "لا منتجات مؤهَّلة على هذا المتجر بعد.",
+    featuredSelectedLabel: "المنتجات المختارة",
+    featuredSelectedEmpty: "لم تُختَر منتجات بعد.",
+    featuredMaxReachedHint: "الحد الأقصى 8 منتجات.",
     appPromoNote:
       "روابط التطبيق تُؤخذ من إعدادات التطبيقات، ولا يظهر القسم إلا إذا كان الرابط لمتجر آبل أو جوجل حقيقياً.",
     removeItem: "حذف",
@@ -748,6 +759,8 @@ export const CUSTOMIZER_MESSAGES = {
     homeCategoriesEmpty: "No published top-level categories on this store yet.",
     homeNewArrivalsLoadFailed: "Couldn't load products for this section.",
     homeNewArrivalsEmpty: "No published products on this store yet.",
+    homeFeaturedLoadFailed: "Couldn't load the featured products for this section.",
+    homeFeaturedEmpty: "No featured products chosen for this section yet.",
     sectionWholesale: "Wholesale",
     sectionBanner: "Promotional banner",
     sectionFeatured: "Featured products",
@@ -791,8 +804,6 @@ export const CUSTOMIZER_MESSAGES = {
     sectionBenefitsDescription: "Short store perks like shipping and secure payment.",
     sectionAppPromoDescription: "Download links for your store's mobile app.",
     sectionCustomContentDescription: "Free-form headings and paragraphs.",
-    sectionFeaturedPartialReason:
-      "A real product picker is coming soon. For now, add a product by typing its id.",
     // CUST-H4-2 (review fix) — Offers stays visible in the Library but is
     // not addable yet: no real Commerce backend or Canvas/Published
     // renderer exists today. Distinct from `gatedSection` (the existing
@@ -818,10 +829,17 @@ export const CUSTOMIZER_MESSAGES = {
     blockText: "Text",
     addHeading: "Add heading",
     addParagraph: "Add paragraph",
-    featuredProductId: "Product id",
-    addProduct: "Add product",
     featuredHint:
       "Only the product id is stored. Price, stock and availability stay on the published catalog and are not copied here.",
+    featuredPickerSearchLabel: "Search for a product to add",
+    featuredPickerResultsLabel: "Product search results",
+    featuredPickerSearchPlaceholder: "Search by name or SKU…",
+    featuredPickerLoading: "Loading products…",
+    featuredPickerLoadFailed: "Couldn't load products.",
+    featuredPickerEmpty: "No eligible products on this store yet.",
+    featuredSelectedLabel: "Selected products",
+    featuredSelectedEmpty: "No products selected yet.",
+    featuredMaxReachedHint: "Maximum 8 products.",
     appPromoNote:
       "App links come from the Apps settings. The section appears only when an Apple or Google store link is real.",
     removeItem: "Remove",

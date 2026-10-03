@@ -151,7 +151,7 @@ describe("CUST-H4-2 capability registry — state/category/library metadata", ()
       newArrivals: "live",
       wholesale: "live",
       banner: "live",
-      featured: "partial",
+      featured: "live",
       offers: "gated",
       benefits: "live",
       appPromo: "live",
@@ -170,9 +170,12 @@ describe("CUST-H4-2 capability registry — state/category/library metadata", ()
     }
   });
 
-  it("documents Featured as truthfully PARTIAL with a merchant-facing reason, not silently LIVE", () => {
-    expect(SECTION_CAPABILITIES.featured.state).toBe("partial");
-    expect(SECTION_CAPABILITIES.featured.reasonKey).toBeTruthy();
+  it("documents Featured as truthfully LIVE now that CUST-H4-5 shipped the real picker + batched read", () => {
+    expect(SECTION_CAPABILITIES.featured.state).toBe("live");
+    expect(SECTION_CAPABILITIES.featured.merchantAddable).toBe(true);
+    // LIVE sections never carry a reasonKey (that field only explains a
+    // non-live state on the Library card).
+    expect(SECTION_CAPABILITIES.featured.reasonKey).toBeUndefined();
   });
 
   it("documents Offers as truthfully GATED and NOT merchant-addable yet (CUST-H4-2 review fix)", () => {

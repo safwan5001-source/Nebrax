@@ -152,6 +152,18 @@ interface StorefrontPreviewCanvasProps {
   homeNewArrivalsState?: "idle" | "loading" | "error" | "ready";
   homeNewArrivals?: { id: string; name: string; thumbnailUrl: string | null }[];
   onRetryHomeNewArrivals?: () => void;
+  /**
+   * CUST-H4-5 — the Home "featured" section's own real Canvas preview.
+   * Keyed by section instance id (not a single slot, unlike the two props
+   * above) because "featured" is not a singleton section type — a page can
+   * hold several Featured rails, each curating its own products. Resolved
+   * via one batched `ids[]` read per section instance, the exact same data
+   * the picker's own "selected products" chips show — replacing the bare
+   * id-text-chip list this branch rendered before.
+   */
+  featuredResolved?: Record<string, { id: string; name: string; thumbnailUrl: string | null }[]>;
+  featuredResolvedState?: Record<string, "idle" | "loading" | "error" | "ready">;
+  onRetryFeatured?: (sectionId: string) => void;
 }
 
 export interface StorefrontBusinessIdentity {
@@ -197,6 +209,9 @@ export function StorefrontPreviewCanvas({
   homeNewArrivalsState = "idle",
   homeNewArrivals = [],
   onRetryHomeNewArrivals,
+  featuredResolved = {},
+  featuredResolvedState = {},
+  onRetryFeatured,
 }: StorefrontPreviewCanvasProps) {
   const t = (key: CustomizerMessageKey) => customizerMessage(locale, key);
   const storeName = previewStoreName(
@@ -815,20 +830,84 @@ export function StorefrontPreviewCanvas({
             }
 
             if (section.type === "featured") {
+              // CUST-H4-5 — real Commerce product data, resolved in one
+              // batched `ids[]` request per section instance (see
+              // `ExperienceBuilder`'s `featuredResolved` map) — never the
+              // bare id-text-chip list this branch rendered before.
               const ids = featuredContentOf(section).productIds.filter((id) => id);
+              const resolvedState = ids.length === 0 ? "ready" : (featuredResolvedState[section.id] ?? "idle");
+              const products = featuredResolved[section.id] ?? [];
+              const headingId = `preview-featured-${section.id}`;
               return (
-                <section key={section.id}>
-                  <h2 className="text-base font-extrabold">{t("sectionFeatured")}</h2>
-                  <p className="mt-1 text-xs text-store-muted-foreground">{t("featuredHint")}</p>
-                  {ids.length > 0 ? (
-                    <ul className="mt-3 flex flex-wrap gap-2">
-                      {ids.map((id) => (
-                        <li key={id} className="max-w-full break-all rounded-store border border-store-border px-2 py-1 text-xs">
-                          {id}
+                <section key={section.id} aria-labelledby={headingId}>
+                  <h2 id={headingId} className="text-base font-extrabold">{t("sectionFeatured")}</h2>
+                  {resolvedState === "loading" || resolvedState === "idle" ? (
+                    <ul
+                      aria-hidden="true"
+                      className={cn("mt-4 grid gap-3", newArrivalsColumns)}
+                    >
+                      {Array.from({ length: Math.min(ids.length, 4) || 4 }).map((_, index) => (
+                        <li
+                          key={index}
+                          className="overflow-hidden rounded-store border border-store-border bg-store-surface"
+                        >
+                          <div className={cn(cardImageHeight, "animate-pulse bg-store-surface-muted")} />
+                          <div className={cardPad}>
+                            <div className="h-3 w-3/4 animate-pulse rounded-store bg-store-surface-muted" />
+                          </div>
                         </li>
                       ))}
                     </ul>
-                  ) : null}
+                  ) : resolvedState === "error" ? (
+                    <div
+                      data-home-featured-error=""
+                      className="mt-4 flex flex-col items-center gap-2 rounded-store border border-dashed border-store-border px-4 py-8 text-center"
+                    >
+                      <p className="text-sm text-store-muted-foreground">{t("homeFeaturedLoadFailed")}</p>
+                      <button
+                        type="button"
+                        onClick={() => onRetryFeatured?.(section.id)}
+                        className="rounded-store border border-store-border px-3 py-1.5 text-xs font-medium text-store-foreground hover:bg-store-surface-muted"
+                      >
+                        {t("retry")}
+                      </button>
+                    </div>
+                  ) : products.length === 0 ? (
+                    <p
+                      data-home-featured-empty=""
+                      className="mt-4 rounded-store border border-dashed border-store-border px-4 py-8 text-center text-sm text-store-muted-foreground"
+                    >
+                      {t("homeFeaturedEmpty")}
+                    </p>
+                  ) : (
+                    <ul className={cn("mt-4 grid gap-3", newArrivalsColumns)}>
+                      {ids
+                        .map((id) => products.find((product) => product.id === id))
+                        .filter((product): product is NonNullable<typeof product> => product !== undefined)
+                        .map((product) => (
+                          <li
+                            key={product.id}
+                            className="overflow-hidden rounded-store border border-store-border bg-store-surface"
+                          >
+                            <div className={cn(cardImageHeight, "bg-store-surface-muted")}>
+                              {product.thumbnailUrl ? (
+                                // eslint-disable-next-line @next/next/no-img-element -- tenant media URL, not a static asset
+                                <img
+                                  src={product.thumbnailUrl}
+                                  alt=""
+                                  className="size-full object-cover"
+                                />
+                              ) : null}
+                            </div>
+                            <div className={cardPad}>
+                              <p className="line-clamp-2 text-sm font-semibold text-store-foreground">
+                                <bdi>{product.name}</bdi>
+                              </p>
+                            </div>
+                          </li>
+                        ))}
+                    </ul>
+                  )}
                 </section>
               );
             }

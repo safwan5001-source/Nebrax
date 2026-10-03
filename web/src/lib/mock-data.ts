@@ -3705,10 +3705,15 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
     // region with the same category_id-filtered shape the real endpoint
     // returns; never a client-side filter over an unrelated list.
     const categoryId = listQuery.get('category_id');
+    // CUST-H4-5 — batched `ids[]` resolution for the Home "Featured"
+    // section's picker chips + Canvas preview (dev fixture only; the real
+    // filter lives in `CommerceWorkspaceStorefrontProductController`).
+    const ids = listQuery.getAll('ids[]');
     const rows = MOCK_WORKSPACE_PRODUCTS.filter(
       (p) =>
         (!search || p.name.toLowerCase().includes(search) || (p.name_en ?? '').toLowerCase().includes(search))
-        && (!categoryId || p.category_id === categoryId),
+        && (!categoryId || p.category_id === categoryId)
+        && (ids.length === 0 || ids.includes(p.id)),
     );
     return resolve({
       data: rows.map((p) => ({

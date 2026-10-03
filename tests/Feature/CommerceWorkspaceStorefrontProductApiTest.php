@@ -514,4 +514,167 @@ class CommerceWorkspaceStorefrontProductApiTest extends TestCase
             ->getJson($this->listPath($seeded['storefront']->id).'?sort=price_asc')
             ->assertStatus(422);
     }
+
+    // ───────────────────────── CUST-H4-5 — ids[] batched read (feeds the Home "Featured" Canvas preview + picker's selected chips) ─────────────────────────
+
+    private function idsQuery(array $ids): string
+    {
+        return collect($ids)->map(fn ($id) => 'ids[]='.$id)->implode('&');
+    }
+
+    /** @test */
+    public function ids_filter_returns_exactly_the_requested_eligible_products(): void
+    {
+        $auth = $this->registerTenant('prod-ids-basic', 'owner@prod-ids-basic.test');
+        $seeded = $this->seedWebStorefront($auth['tenant_id']);
+
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $a = $this->seedProduct($seeded['channel'], ['name' => 'أ']);
+        $b = $this->seedProduct($seeded['channel'], ['name' => 'ب']);
+        $this->seedProduct($seeded['channel'], ['name' => 'ج']); // not requested
+        app(TenantContext::class)->forget();
+
+        $res = $this->withToken($auth['token'])
+            ->getJson($this->listPath($seeded['storefront']->id).'?'.$this->idsQuery([$a->id, $b->id]))
+            ->assertOk();
+
+        $this->assertEqualsCanonicalizing([$a->id, $b->id], array_column($res->json('data'), 'id'));
+    }
+
+    /** @test */
+    public function ids_filter_still_respects_tenant_isolation(): void
+    {
+        $a = $this->registerTenant('prod-ids-tenant-a', 'owner@prod-ids-tenant-a.test');
+        $b = $this->registerTenant('prod-ids-tenant-b', 'owner@prod-ids-tenant-b.test');
+        $seededA = $this->seedWebStorefront($a['tenant_id']);
+        $seededB = $this->seedWebStorefront($b['tenant_id']);
+
+        app(TenantContext::class)->set($b['tenant_id']);
+        $foreignProduct = $this->seedProduct($seededB['channel'], ['name' => 'منتج أجنبي']);
+        app(TenantContext::class)->forget();
+
+        $res = $this->withToken($a['token'])
+            ->getJson($this->listPath($seededA['storefront']->id).'?'.$this->idsQuery([$foreignProduct->id]))
+            ->assertOk();
+
+        $this->assertSame([], $res->json('data'));
+    }
+
+    /** @test */
+    public function ids_filter_still_respects_channel_publication_eligibility(): void
+    {
+        $auth = $this->registerTenant('prod-ids-channel', 'owner@prod-ids-channel.test');
+        $seededWeb = $this->seedWebStorefront($auth['tenant_id'], ['slug' => 'web-store']);
+
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $mobileChannel = SalesChannel::create([
+            'slug' => 'mobile', 'name' => 'تطبيق الجوال', 'type' => SalesChannel::TYPE_MOBILE, 'is_active' => true,
+        ]);
+        $mobileOnlyProduct = $this->seedProduct($mobileChannel);
+        app(TenantContext::class)->forget();
+
+        $res = $this->withToken($auth['token'])
+            ->getJson($this->listPath($seededWeb['storefront']->id).'?'.$this->idsQuery([$mobileOnlyProduct->id]))
+            ->assertOk();
+
+        $this->assertSame([], $res->json('data'));
+    }
+
+    /** @test */
+    public function ids_filter_silently_omits_an_unpublished_or_inactive_id_instead_of_erroring(): void
+    {
+        $auth = $this->registerTenant('prod-ids-unpub', 'owner@prod-ids-unpub.test');
+        $seeded = $this->seedWebStorefront($auth['tenant_id']);
+
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $eligible = $this->seedProduct($seeded['channel'], ['name' => 'مؤهَّل']);
+        $unpublished = $this->seedProduct($seeded['channel'], ['name' => 'غير منشور'], published: false);
+        $inactive = $this->seedProduct($seeded['channel'], ['name' => 'غير نشط']);
+        $inactive->update(['is_active' => false]);
+        app(TenantContext::class)->forget();
+
+        $res = $this->withToken($auth['token'])
+            ->getJson($this->listPath($seeded['storefront']->id).'?'.$this->idsQuery([$eligible->id, $unpublished->id, $inactive->id]))
+            ->assertOk();
+
+        $this->assertSame([$eligible->id], array_column($res->json('data'), 'id'));
+    }
+
+    /** @test */
+    public function duplicate_ids_in_the_filter_are_deduplicated_safely(): void
+    {
+        $auth = $this->registerTenant('prod-ids-dup', 'owner@prod-ids-dup.test');
+        $seeded = $this->seedWebStorefront($auth['tenant_id']);
+
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $product = $this->seedProduct($seeded['channel'], ['name' => 'منتج']);
+        app(TenantContext::class)->forget();
+
+        $res = $this->withToken($auth['token'])
+            ->getJson($this->listPath($seeded['storefront']->id).'?'.$this->idsQuery([$product->id, $product->id]))
+            ->assertOk();
+
+        $this->assertSame([$product->id], array_column($res->json('data'), 'id'));
+    }
+
+    /** @test */
+    public function a_non_uuid_id_in_the_filter_fails_validation(): void
+    {
+        $auth = $this->registerTenant('prod-ids-invalid', 'owner@prod-ids-invalid.test');
+        $seeded = $this->seedWebStorefront($auth['tenant_id']);
+
+        $this->withToken($auth['token'])
+            ->getJson($this->listPath($seeded['storefront']->id).'?'.$this->idsQuery(['not-a-uuid']))
+            ->assertStatus(422);
+    }
+
+    /** @test */
+    public function more_than_the_max_featured_products_in_the_filter_fails_validation(): void
+    {
+        $auth = $this->registerTenant('prod-ids-maxout', 'owner@prod-ids-maxout.test');
+        $seeded = $this->seedWebStorefront($auth['tenant_id']);
+
+        $ids = array_map(fn () => (string) Str::uuid(), range(1, 9));
+
+        $this->withToken($auth['token'])
+            ->getJson($this->listPath($seeded['storefront']->id).'?'.$this->idsQuery($ids))
+            ->assertStatus(422);
+    }
+
+    /** @test */
+    public function exactly_the_max_featured_products_in_the_filter_is_accepted(): void
+    {
+        $auth = $this->registerTenant('prod-ids-max-ok', 'owner@prod-ids-max-ok.test');
+        $seeded = $this->seedWebStorefront($auth['tenant_id']);
+
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $products = [];
+        for ($i = 0; $i < 8; $i++) {
+            $products[] = $this->seedProduct($seeded['channel'], ['name' => "منتج {$i}"]);
+        }
+        app(TenantContext::class)->forget();
+
+        $res = $this->withToken($auth['token'])
+            ->getJson($this->listPath($seeded['storefront']->id).'?'.$this->idsQuery(array_map(fn ($p) => $p->id, $products)))
+            ->assertOk();
+
+        $this->assertCount(8, $res->json('data'));
+    }
+
+    /** @test */
+    public function omitting_ids_keeps_the_default_list_behavior_unchanged(): void
+    {
+        $auth = $this->registerTenant('prod-ids-omitted', 'owner@prod-ids-omitted.test');
+        $seeded = $this->seedWebStorefront($auth['tenant_id']);
+
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $this->seedProduct($seeded['channel'], ['name' => 'منتج واحد']);
+        app(TenantContext::class)->forget();
+
+        $res = $this->withToken($auth['token'])
+            ->getJson($this->listPath($seeded['storefront']->id))
+            ->assertOk();
+
+        $this->assertCount(1, $res->json('data'));
+    }
 }

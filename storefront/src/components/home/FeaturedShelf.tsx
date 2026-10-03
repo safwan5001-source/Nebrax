@@ -1,6 +1,6 @@
 import { ProductCard } from "@/components/products/ProductCard";
 import { ProductCarousel } from "@/components/products/ProductCarousel";
-import { fetchProduct } from "@/lib/commerce/products";
+import { fetchProductsByIds } from "@/lib/commerce/products";
 import type { ThemePresetId } from "@/lib/presentation/tokens";
 
 export async function FeaturedShelf({
@@ -22,12 +22,25 @@ export async function FeaturedShelf({
   themePreset?: ThemePresetId;
 }) {
   const isMarket = themePreset === "awj-market";
-  const settled = await Promise.allSettled(
-    productIds.map((id) => fetchProduct(id)),
-  );
-  const products = settled.flatMap((result) =>
-    result.status === "fulfilled" ? [result.value] : [],
-  );
+  // CUST-H4-5 — one batched request instead of N per-id fetches. The API
+  // may answer in any order, so the merchant's stored `productIds` order is
+  // restored here — that array is presentation's own authority over display
+  // order (see the architecture contract's "Order semantics"), never the
+  // database's. A product id that failed to resolve (foreign, unpublished,
+  // deleted) is simply missing from `byId` and dropped by `.filter()` below
+  // — the same fail-closed, no-fabricated-fallback behavior the previous
+  // per-id `Promise.allSettled` loop already had.
+  const resolved = await fetchProductsByIds(productIds).catch((error) => {
+    console.error("FeaturedShelf: failed to load featured products", error);
+    return [];
+  });
+  const byId = new Map(resolved.map((product) => [product.id, product]));
+  const products = productIds
+    .map((id) => byId.get(id))
+    .filter(
+      (product): product is NonNullable<typeof product> =>
+        product !== undefined,
+    );
   if (products.length === 0) return null;
 
   return (
