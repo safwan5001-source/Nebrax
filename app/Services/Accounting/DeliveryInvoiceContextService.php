@@ -116,10 +116,14 @@ class DeliveryInvoiceContextService
                 ]);
             } catch (QueryException $e) {
                 // سباق: سياق أُنشئ بين الفحص والإدراج (unique(invoice_id)) — يُعامَل كمتكرر إن لم يتعارض.
+                // نفس شروط التوافق المطبَّقة على الصف الموجود أعلاه حرفياً — ملف
+                // ونسخة ومرجع خارجي، لا الملف والنسخة فقط؛ فائزٌ بمرجع مختلف
+                // ليس تكراراً للطلب الحالي.
                 $race = DeliveryInvoiceContext::query()->where('invoice_id', $locked->id)->first();
                 if ($race !== null
                     && (string) $race->delivery_platform_profile_id === (string) $profile->id
-                    && (string) $race->delivery_platform_profile_version_id === (string) $resolved['version_id']) {
+                    && (string) $race->delivery_platform_profile_version_id === (string) $resolved['version_id']
+                    && ($providedReference === null || $providedReference === (string) $race->external_order_reference)) {
                     return $race;
                 }
 

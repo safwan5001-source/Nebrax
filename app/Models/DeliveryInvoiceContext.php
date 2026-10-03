@@ -7,6 +7,7 @@ use App\Tenancy\ResolvesBranchReferences;
 use App\Tenancy\TenantContext;
 use DomainException;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Facades\DB;
 use LogicException;
 
 /**
@@ -48,6 +49,16 @@ class DeliveryInvoiceContext extends BaseModel
     protected static function booted(): void
     {
         static::creating(function (self $context): void {
+            // `lockForUpdate()` أدناه بلا معاملة محيطة يُفرَج عنه فوراً بعد
+            // الـSELECT، فلا يسلسل شيئاً — سباقٌ حقيقي مع `PaymentService::post()`
+            // المتزامن يبقى ممكناً. الفشل هنا صريح ومبكر لا صمتٌ لاحق: كل
+            // مستدعٍ حقيقي (`DeliveryInvoiceContextService::record()`) يفتح
+            // معاملته بالفعل؛ اختبارات `RefreshDatabase` تفتح معاملتها الخاصة
+            // لكل اختبار فتعبر هذا الشرط دون أي تدخّل إضافي.
+            if (DB::transactionLevel() < 1) {
+                throw new DomainException('Delivery invoice context must be created within a database transaction.');
+            }
+
             $tenantContext = app(TenantContext::class);
             if (! $tenantContext->has()) {
                 throw new DomainException('Tenant context is required for delivery invoice context.');
