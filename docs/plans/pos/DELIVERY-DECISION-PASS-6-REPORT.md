@@ -154,7 +154,7 @@ No field is implied by the platform logo or by the channel slug.
 
 ## 9. Fail-closed rules
 
-1. Missing role, invoice responsibility, or collection role rejects the financial command.
+1. Missing `financial_role_status`, `invoice_responsibility`, `collection_role`, or the merchant's VAT-registration status at the time of supply rejects the financial command. One known field does not waive the others.
 2. A role may be set only from evidence for that provider configuration, never copied from another provider.
 3. Merchant VAT registration is an input. A non-registered restaurant does not inherit the registered-restaurant path.
 4. The command posts the frozen snapshot, not the live catalog, and not the net settlement.
@@ -165,7 +165,7 @@ No field is implied by the platform logo or by the channel slug.
 
 ---
 
-## 10. Allowed while role = UNKNOWN
+## 10. Allowed while any required tax input is UNKNOWN
 
 - Operational intake, routing, and the Hub state machine.
 - Product mapping.
@@ -174,7 +174,7 @@ No field is implied by the platform logo or by the channel slug.
 
 ---
 
-## 11. Disabled while role = UNKNOWN
+## 11. Disabled while any required tax input is UNKNOWN
 
 - `InvoiceService::create` and `InvoiceService::post` for that imported order.
 - VAT recognition on that transition.
@@ -228,7 +228,7 @@ For every merchant configuration that should later post:
 
 Please accept or reject this gate only:
 
-> An imported delivery order may not become a canonical invoice while that provider configuration's financial role is `UNKNOWN`. `UNKNOWN` is the default for HungerStation, Jahez, Mrsool, Keeta, Ninja, and The Chefz. Published terms do not flip the flag. The Hub, mapping, and the frozen snapshot may continue. Commission, settlement, fee VAT, and provider refunds stay disabled. Manual POS is unchanged.
+> An imported delivery order may not become a canonical invoice unless that provider configuration has every one of these set from evidence, and none of them is `UNKNOWN`: `financial_role_status`, `invoice_responsibility`, `collection_role`, and the merchant's VAT-registration status at the time of supply. Clearing only the role field does not authorize posting. The default for HungerStation, Jahez, Mrsool, Keeta, Ninja, and The Chefz is `UNKNOWN` on every one of those inputs. Published terms do not flip any flag. The Hub, mapping, and the frozen snapshot may continue. Commission, settlement, fee VAT, and provider refunds stay disabled. Manual POS is unchanged.
 
 This pass does not ask you to declare any platform an agent, a principal, or a collector. DG-3 stays open after the gate, until a later decision accepts one configuration's evidence.
 
