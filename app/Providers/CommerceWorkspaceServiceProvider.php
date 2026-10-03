@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Http\Controllers\Api\CommerceCategoryPublicationController;
+use App\Http\Controllers\Api\CommerceCollectionController;
 use App\Http\Controllers\Api\CommerceFacetController;
 use App\Http\Controllers\Api\CommerceProductPublicationController;
 use App\Http\Middleware\EnsureActiveSubscription;
@@ -105,6 +106,34 @@ final class CommerceWorkspaceServiceProvider extends ServiceProvider
                 ->middleware(EnsurePermission::class.':products.manage');
             Route::delete('{id}/values/{valueId}', [CommerceFacetController::class, 'destroyValue'])
                 ->whereUuid(['id', 'valueId'])
+                ->middleware(EnsurePermission::class.':products.manage');
+        });
+
+        Route::middleware([
+            ForceJsonResponse::class,
+            IdentifyTenantHostname::class,
+            'auth:sanctum',
+            EnsureUserPrincipal::class,
+            SetTenant::class,
+            SetBranch::class,
+            EnsureActiveSubscription::class,
+        ])->prefix('api/commerce/workspace/collections')->group(function (): void {
+            // FLOWERS-H2 / ADR-14 §2.3 — المجموعات التسويقية اليدوية وعضويتها المرتّبة.
+            Route::get('/', [CommerceCollectionController::class, 'index'])
+                ->middleware(EnsurePermission::class.':products.view');
+            Route::post('/', [CommerceCollectionController::class, 'store'])
+                ->middleware(EnsurePermission::class.':products.manage');
+            Route::put('{id}', [CommerceCollectionController::class, 'update'])
+                ->whereUuid('id')
+                ->middleware(EnsurePermission::class.':products.manage');
+            Route::delete('{id}', [CommerceCollectionController::class, 'destroy'])
+                ->whereUuid('id')
+                ->middleware(EnsurePermission::class.':products.manage');
+            Route::get('{id}/products', [CommerceCollectionController::class, 'members'])
+                ->whereUuid('id')
+                ->middleware(EnsurePermission::class.':products.view');
+            Route::put('{id}/products', [CommerceCollectionController::class, 'replaceMembers'])
+                ->whereUuid('id')
                 ->middleware(EnsurePermission::class.':products.manage');
         });
     }

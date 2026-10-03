@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\BarcodeRegistryEntry;
+use App\Models\CommerceCollectionProduct;
 use App\Models\CommerceProductFacetValue;
 use App\Models\InventoryStockAlert;
 use App\Models\Product;
@@ -149,6 +150,7 @@ class ProductLifecycleService
             // H2a: إسنادات السِمات التجارية تابعٌ مملوك (OWNED_CHILD) بلا علاقة
             // Eloquent على المنتج؛ تُحذف صراحةً لا اتكالاً على cascade وحده.
             $this->referenceQuery(CommerceProductFacetValue::class, $product)->delete();
+            $this->referenceQuery(CommerceCollectionProduct::class, $product)->delete();
             $product->delete();
 
             // إعادة الفحص بعد الحذف وقبل الـcommit: تحت READ COMMITTED (افتراض

@@ -7,12 +7,12 @@ use App\Models\CommerceFacetValue;
 use App\Models\CommerceProductFacetValue;
 use App\Models\Product;
 use App\Models\Tenant;
+use App\Support\Commerce\CatalogSlug;
 use App\Tenancy\BranchScope;
 use App\Tenancy\TenantContext;
 use DomainException;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 use RuntimeException;
 
 /**
@@ -372,15 +372,7 @@ final class CommerceFacetService
 
     private function deriveSlug(CommerceFacet $facet, string $source): string
     {
-        $base = Str::limit(Str::slug($source), 56, '');
-        $base = $base !== '' ? $base : 'value';
-
-        $slug = $base;
-        for ($i = 2; $this->slugTaken($facet, $slug, null); $i++) {
-            $slug = $base.'-'.$i;
-        }
-
-        return $slug;
+        return CatalogSlug::derive($source, fn (string $slug) => $this->slugTaken($facet, $slug, null), 'value');
     }
 
     private function normalize(string $value): string

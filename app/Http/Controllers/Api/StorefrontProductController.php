@@ -87,10 +87,17 @@ class StorefrontProductController extends PublicApiController
         // الأساسي (بوابة النشر + بحث + تصنيف) يُحفظ للعدّ التفريقي في `meta`.
         $facetFilter = new CatalogFacetFilter();
         $facetSelection = CatalogFacetFilter::selection($filters);
+        $facetFilter->applyCollection($query, $facetSelection);
         $baseQuery = clone $query;
         $facetFilter->apply($query, $facetSelection);
 
-        $this->applySort($query, $filters['sort'] ?? null, self::SORTS, 'name');
+        if ($facetSelection['collection'] !== null && blank($filters['sort'] ?? null)) {
+            // داخل مجموعة بلا `sort` صريح: ترتيب التاجر للأعضاء.
+            $facetFilter->orderByCollectionPosition($query, $facetSelection);
+            $query->orderBy('name');
+        } else {
+            $this->applySort($query, $filters['sort'] ?? null, self::SORTS, 'name');
+        }
 
         $paginator = $query->paginate($this->perPage($request));
 

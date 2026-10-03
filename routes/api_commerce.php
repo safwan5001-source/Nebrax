@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\CommerceCartController;
+use App\Http\Controllers\Api\CommerceCatalogCollectionController;
 use App\Http\Controllers\Api\CommerceCategoryController;
 use App\Http\Controllers\Api\CommerceCheckoutController;
 use App\Http\Controllers\Api\CommerceCustomerAddressController;
@@ -87,6 +88,9 @@ Route::middleware([
     // route is gated by the resolved web channel — see CommerceProductController.
     Route::get('categories', [CommerceCategoryController::class, 'index'])->name('categories.index');
     Route::get('categories/{id}', [CommerceCategoryController::class, 'show'])->whereUuid('id')->name('categories.show');
+
+    // FLOWERS-H2 / ADR-14 §2.3 — مجموعات تسويقية يدوية (قراءة فقط، مبوَّبة بنشر المنتج).
+    Route::get('collections', [CommerceCatalogCollectionController::class, 'index'])->name('collections.index');
 
     Route::get('products', [CommerceProductController::class, 'index'])->name('products.index');
     Route::get('products/{id}', [CommerceProductController::class, 'show'])->whereUuid('id')->name('products.show');

@@ -3,6 +3,7 @@
 namespace App\Support\Commerce;
 
 use App\Models\Brand;
+use App\Models\CommerceCollection;
 use App\Models\CommerceFacet;
 use App\Tenancy\BranchScope;
 use App\Tenancy\TenantContext;
@@ -44,6 +45,7 @@ final class CatalogFacetFilter
     {
         return [
             'brand_id' => ['sometimes', 'nullable', 'uuid'],
+            'collection' => ['sometimes', 'nullable', 'string', 'max:64'],
             'facet' => ['sometimes', 'nullable', 'array', 'max:'.self::MAX_SELECTED_FACETS],
             'facet.*' => ['nullable', 'string', 'max:1000', static function (string $attribute, mixed $value, \Closure $fail): void {
                 // رفضٌ صريح بدل البتر الصامت: بترُ ما بعد العشرين كان سيُسقط slug مجهولاً ويُخلّ بالفشل المغلق.
@@ -56,7 +58,7 @@ final class CatalogFacetFilter
 
     /**
      * @param  array<string, mixed>  $validated
-     * @return array{brand_id: ?string, facets: array<string, list<string>>}
+     * @return array{brand_id: ?string, collection: ?string, facets: array<string, list<string>>}
      */
     public static function selection(array $validated): array
     {
@@ -70,6 +72,7 @@ final class CatalogFacetFilter
         return [
             // UUID بأحرف كبيرة يجتاز التحقق؛ نوحّده للشكل المعياري قبل البحث والمقارنة (SQLite نصّيّ).
             'brand_id' => filled($validated['brand_id'] ?? null) ? strtolower((string) $validated['brand_id']) : null,
+            'collection' => filled($validated['collection'] ?? null) ? (string) $validated['collection'] : null,
             'facets' => $facets,
         ];
     }
@@ -80,16 +83,70 @@ final class CatalogFacetFilter
         return array_values(array_unique(array_filter(array_map('trim', explode(',', $raw)), static fn ($s) => $s !== '')));
     }
 
-    /** @param array{brand_id: ?string, facets: array<string, list<string>>} $selection */
+    /** @param array{brand_id: ?string, collection: ?string, facets: array<string, list<string>>} $selection */
     public function isActive(array $selection): bool
     {
-        return $selection['brand_id'] !== null || $selection['facets'] !== [];
+        return $selection['brand_id'] !== null || $selection['collection'] !== null || $selection['facets'] !== [];
+    }
+
+    /**
+     * سياق المجموعة (`collection=<slug>`): قيد **سياقي** كالتصنيف لا بُعد ترشيح —
+     * يُطبَّق على الاستعلام الأساسي قبل العدّ فتُحسب الأبعاد داخل المجموعة. مجموعة
+     * مجهولة أو غير مفعَّلة ⇒ نتيجة فارغة (فشل مغلق).
+     *
+     * @param  array{brand_id: ?string, collection: ?string, facets: array<string, list<string>>}  $selection
+     */
+    public function applyCollection(Builder $products, array $selection): void
+    {
+        if ($selection['collection'] === null) {
+            return;
+        }
+
+        $collectionId = CommerceCollection::query()
+            ->where('status', CommerceCollection::STATUS_ACTIVE)
+            ->where('slug', $selection['collection'])
+            ->value('id');
+
+        if ($collectionId === null) {
+            $products->whereRaw('0 = 1');
+
+            return;
+        }
+
+        $products->whereExists(function ($exists) use ($collectionId): void {
+            $exists->from('commerce_collection_products as ccp')
+                ->selectRaw('1')
+                ->whereColumn('ccp.product_id', 'products.id')
+                ->where('ccp.commerce_collection_id', $collectionId);
+        });
+    }
+
+    /** ترتيب أعضاء المجموعة كما رتّبها التاجر (يُستعمل حين لا `sort` صريح). */
+    public function orderByCollectionPosition(Builder $products, array $selection): void
+    {
+        if ($selection['collection'] === null) {
+            return;
+        }
+
+        $collectionId = CommerceCollection::query()
+            ->where('status', CommerceCollection::STATUS_ACTIVE)
+            ->where('slug', $selection['collection'])
+            ->value('id');
+
+        if ($collectionId === null) {
+            return;
+        }
+
+        $products->orderByRaw(
+            '(select ccp.position from commerce_collection_products as ccp where ccp.product_id = products.id and ccp.commerce_collection_id = ?) asc',
+            [$collectionId],
+        );
     }
 
     /**
      * يطبّق الاختيار على استعلام المنتجات.
      *
-     * @param  array{brand_id: ?string, facets: array<string, list<string>>}  $selection
+     * @param  array{brand_id: ?string, collection: ?string, facets: array<string, list<string>>}  $selection
      */
     public function apply(Builder $products, array $selection, ?string $exceptFacetKey = null, bool $withBrand = true): void
     {
@@ -134,7 +191,7 @@ final class CatalogFacetFilter
      * `meta.facets` + `meta.brands` بعدٍّ تفريقي فوق الاستعلام الأساسي (بوابة
      * النشر + البحث + التصنيف، **بلا** brand/facets).
      *
-     * @param  array{brand_id: ?string, facets: array<string, list<string>>}  $selection
+     * @param  array{brand_id: ?string, collection: ?string, facets: array<string, list<string>>}  $selection
      * @return array{facets: list<array<string, mixed>>, brands: list<array<string, mixed>>}
      */
     public function meta(Builder $base, array $selection): array

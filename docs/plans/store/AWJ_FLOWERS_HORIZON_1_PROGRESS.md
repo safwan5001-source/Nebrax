@@ -33,8 +33,8 @@ No Deploy or Production change is authorized by this Horizon.
 |---|---|---|---|---|
 | H1 | Business Vertical Foundation | MERGED | #1186 | `83635d6` |
 | H2a | Taxonomy — facets: ADR-14, data model, admin API | MERGED | #1187 | `fbc0eeb` |
-| H2b | Taxonomy — storefront/mobile facet filtering | PR OPEN (#1188) | #1188 | — |
-| H2c | Taxonomy — collections | PR OPEN (#1189) | #1189 | — |
+| H2b | Taxonomy — storefront/mobile facet filtering | MERGED | #1188 | `6c085e6` |
+| H2c | Taxonomy — collections | PR OPEN (#1189), in CI | #1189 | — |
 | H2d | Taxonomy — merchandising admin UI | PR OPEN (#1190) | #1190 | — |
 | H3 | Gifting Identity & Gift Message | ON HOLD (PR open, awaits H2) | #1191 | — |
 | H4 | Personalization | ON HOLD (PR open, awaits H2) | #1192 | — |
@@ -170,6 +170,35 @@ Copy this section for every completed/active slice.
 #### Next
 
 - H2b → H2c → H2d in order, then re-verify H3 and H4 against the new main.
+
+### H2b — Storefront / mobile facet filtering
+
+**Status:** MERGED  
+**Base SHA:** `fbc0eeb715e92dc955b958a3fdb86bf0a1b8a0b9` (main after H2a)  
+**Branch:** `flowers/h2b-facet-storefront-filter`  
+**PR:** #1188 (stacked on H2a, retargeted to `main` after H2a merged)  
+**Head SHA:** `a66b77e864e80f1461d6ab404f8d21222f91931a`  
+**Merge SHA:** `6c085e6819b563a45702a6bf0a45084de16130a2` (squash)
+
+#### What was implemented
+
+- `CatalogFacetFilter`, the single source of truth for public filtering semantics, used by both `store/v1` and `commerce/v1` product lists: `facet[<key>]=a,b` is OR within a facet and AND across facets; `brand_id` ANDs with the rest.
+- Fail closed everywhere: an unknown or inactive facet or value, an empty facet entry, or an unknown or inactive brand returns an empty list; more than 20 values in one facet is rejected with 422; brand UUIDs are lower-cased before lookup.
+- `meta.facets` and `meta.brands` carry disjunctive counts (selection never narrows its own counts); a selected brand stays visible at count 0; one grouped query per active facet plus one for brands.
+- Publication gate remains first: unpublished products never appear in results or counts.
+
+#### Tests / CI
+
+- `CommerceFacetStorefrontFilterTest` (12 cases) including fail-closed variants, uppercase UUID, inactive brand, over-limit input, mobile parity; OpenAPI contract tests. CI sqlite and pgsql green on the head; pgsql also verified locally on PostgreSQL 16.
+
+#### Tenant isolation / backward compatibility
+
+- Tenant-scoped counts and lookups; cross-tenant filtering returns nothing. Stores without facets return the same list with additive empty `meta.facets` and `meta.brands`.
+- No journal, ledger, inventory, price or ZATCA behaviour touched.
+
+#### Next
+
+- H2c (collections), then H2d (admin UI).
 
 ---
 
