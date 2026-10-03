@@ -226,6 +226,75 @@ class CommerceDeliveryScheduleCheckoutTest extends TestCase
         $this->assertSame(0, CommerceOrder::withoutGlobalScopes()->count());
     }
 
+    /** @test */
+    public function a_required_schedule_is_not_forced_when_no_window_applies_to_the_destination(): void
+    {
+        $store = $this->mobileStore('h7b-zone-req', ['is_enabled' => true, 'is_required' => true]);
+        app(TenantContext::class)->set($store['tenant']->id);
+        $zone = CommerceShippingZone::create(['name' => 'الدمام', 'match_type' => 'city', 'match_value' => 'الدمام', 'rate_amount_minor' => 1500]);
+        app(CommerceDeliveryScheduleService::class)->replaceSlots($store['channel']->id, [
+            ['method' => 'delivery', 'label' => 'الدمام فقط', 'start_time' => '19:00', 'end_time' => '22:00', 'shipping_zone_id' => $zone->id],
+        ]);
+        app(TenantContext::class)->forget();
+
+        // وجهة خارج المنطقة: لا نافذة تنطبق ⇒ لا يُلزَم بموعد لا يستطيع اختياره
+        $outside = $this->checkout($store, 'standard', 'الرياض');
+        $this->complete($store, $outside)->assertCreated()->assertJsonMissingPath('data.order.schedule');
+
+        // وجهة داخل المنطقة: النافذة تنطبق ⇒ الموعد إلزامي
+        $inside = $this->checkout($store, 'standard', 'الدمام');
+        $this->complete($store, $inside, 'h7b-key-inside')->assertStatus(409)->assertJsonPath('error.details.items.0.reason', 'schedule_required');
+    }
+
+    /** @test */
+    public function the_order_revalidates_the_committed_configuration_under_the_final_lock(): void
+    {
+        $store = $this->mobileStore('h7b-final', ['is_enabled' => true]);
+        [$evening, $late] = $this->slotIds($store);
+
+        // طلبٌ قائم (بنافذة أخرى) يُستعمل حاملاً لاستدعاء الخدمة مباشرةً بلقطةٍ التُقطت قبل التحرير.
+        $cart = $this->checkout($store);
+        $this->schedule($store, $cart, '2026-10-08', $late)->assertOk();
+        $this->complete($store, $cart)->assertCreated();
+
+        app(TenantContext::class)->set($store['tenant']->id);
+        $service = app(CommerceDeliveryScheduleService::class);
+        $channel = $store['channel']->id;
+        $existing = CommerceOrder::query()->firstOrFail();
+        $order = fn () => $existing;
+        $captured = [
+            'method' => 'delivery', 'delivery_date' => '2026-10-08', 'slot_id' => $evening, 'slot_label' => 'مساءً',
+            'slot_label_en' => null, 'start_time' => '19:00', 'end_time' => '22:00', 'timezone' => 'Asia/Riyadh',
+        ];
+        $expectRefused = function (string $why) use ($service, $order, $captured): void {
+            try {
+                DB::transaction(fn () => $service->snapshotToOrder($order(), $captured, 'الدمام', null));
+                $this->fail("a stale schedule was accepted: {$why}");
+            } catch (\App\Services\Commerce\CheckoutReviewRequiredException $e) {
+                $this->assertSame(1, CommerceOrderSchedule::query()->count(), $why);
+            }
+        };
+
+        // 1) نافذة حُرِّرت (الهوية ثابتة) بعد التقاط اللقطة: أوقات وتسمية مختلفة
+        $service->replaceSlots($channel, [
+            ['id' => $evening, 'method' => 'delivery', 'label' => 'مساء جديد', 'start_time' => '20:00', 'end_time' => '23:00'],
+        ]);
+        $expectRefused('slot edited in place');
+
+        // 2) تاريخ حُجب بعد الالتقاط
+        $service->replaceSlots($channel, [
+            ['id' => $evening, 'method' => 'delivery', 'label' => 'مساءً', 'start_time' => '19:00', 'end_time' => '22:00'],
+        ]);
+        $service->replaceBlockedDates($channel, [['date' => '2026-10-08', 'method' => 'all']]);
+        $expectRefused('date blocked');
+
+        // 3) الجدولة عُطِّلت
+        $service->replaceBlockedDates($channel, []);
+        $service->saveSettings($channel, ['is_enabled' => false]);
+        $expectRefused('scheduling disabled');
+        app(TenantContext::class)->forget();
+    }
+
     // ── الإلزامية ───────────────────────────────────────────────────────
 
     /** @test */

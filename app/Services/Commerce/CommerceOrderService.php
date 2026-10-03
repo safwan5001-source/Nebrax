@@ -282,7 +282,7 @@ class CommerceOrderService
 
             // FLOWERS-H7b / ADR-19: لقطة موعد التسليم تحت قفل صف النافذة (السعة)؛ ممتلئة ⇒ review-required يُلغي المعاملة كلها.
             if (! empty($header['schedule'])) {
-                app(CommerceDeliveryScheduleService::class)->snapshotToOrder($order, $header['schedule']);
+                app(CommerceDeliveryScheduleService::class)->snapshotToOrder($order, $header['schedule'], $header['delivery_city'] ?? null, $header['delivery_region'] ?? null);
             }
 
             // نقلٌ صريحٌ أخير إلى confirmed — لا مسار خارجي رأى draft قط

@@ -227,6 +227,26 @@ final class CommerceDeliveryScheduleService
     // ── التوفّر المشتق ───────────────────────────────────────────────────
 
     /**
+     * النوافذ النشطة لطريقةٍ ووجهة: المصدر الوحيد لقاعدة «نافذة تنطبق على هذه الوجهة» (العرض، والاختيار، وإلزامية
+     * الإتمام) — نافذة مقيَّدة بمنطقةٍ أخرى لا تنطبق، فلا تُلزم المتسوّق بموعدٍ لا يستطيع اختياره.
+     *
+     * @return \Illuminate\Support\Collection<int, CommerceDeliverySlot>
+     */
+    private function applicableSlots(string $salesChannelId, string $method, ?string $city, ?string $region)
+    {
+        $zoneId = $method === CommerceDeliverySlot::METHOD_DELIVERY ? $this->shipping->resolveZone($city, $region)?->id : null;
+
+        return CommerceDeliverySlot::query()
+            ->where('sales_channel_id', $salesChannelId)
+            ->where('method', $method)
+            ->where('is_active', true)
+            ->orderBy('sort_order')->orderBy('start_time')
+            ->get()
+            ->filter(fn (CommerceDeliverySlot $s) => $s->shipping_zone_id === null || $s->shipping_zone_id === $zoneId)
+            ->values();
+    }
+
+    /**
      * الخيارات العامة المتاحة فعلاً الآن (نوافذ قابلة للاختيار فقط، بلا سعات ولا حقول داخلية). `$city`/`$region`
      * يرشّحان العرض فقط للتوصيل؛ إعادة التحقق عند الإتمام (H7b) تعتمد وجهة Checkout **المخزَّنة**.
      *
@@ -252,15 +272,7 @@ final class CommerceDeliveryScheduleService
 
         $ambiguous = $this->ambiguousWallClockIntervals($timezone, $local->startOfDay()->subDay(), $local->startOfDay()->addDays($setting->max_days_ahead + 2));
 
-        $zoneId = $method === CommerceDeliverySlot::METHOD_DELIVERY ? $this->shipping->resolveZone($city, $region)?->id : null;
-        $slots = CommerceDeliverySlot::query()
-            ->where('sales_channel_id', $salesChannelId)
-            ->where('method', $method)
-            ->where('is_active', true)
-            ->orderBy('sort_order')->orderBy('start_time')
-            ->get()
-            ->filter(fn (CommerceDeliverySlot $s) => $s->shipping_zone_id === null || $s->shipping_zone_id === $zoneId)
-            ->values();
+        $slots = $this->applicableSlots($salesChannelId, $method, $city, $region);
 
         // السعة: عدّ الحجوزات (لقطات الطلبات) لكل (نافذة، تاريخ) في المدى باستعلام مجمَّع واحد — بلا N+1 — لإخفاء النافذة
         // الممتلئة. السلطة النهائية للعدّ عند إنشاء الطلب تحت قفل صف النافذة (`snapshotToOrder`)؛ هذا للعرض والاختيار.
@@ -448,8 +460,8 @@ final class CommerceDeliveryScheduleService
 
         $method = $this->slotMethodFor($checkout->delivery_method);
         if ($row === null) {
-            $needed = $settings['required'] && $method !== null && CommerceDeliverySlot::query()
-                ->where('sales_channel_id', $checkout->sales_channel_id)->where('method', $method)->where('is_active', true)->exists();
+            $needed = $settings['required'] && $method !== null
+                && $this->applicableSlots($checkout->sales_channel_id, $method, $checkout->delivery_city, $checkout->delivery_region)->isNotEmpty();
             if ($needed) {
                 throw new CheckoutReviewRequiredException('اختر موعد التسليم.', [['item_id' => 'schedule', 'reason' => 'schedule_required']]);
             }
@@ -484,11 +496,29 @@ final class CommerceDeliveryScheduleService
      *
      * @throws CheckoutReviewRequiredException
      */
-    public function snapshotToOrder(CommerceOrder $order, array $schedule): CommerceOrderSchedule
+    public function snapshotToOrder(CommerceOrder $order, array $schedule, ?string $city = null, ?string $region = null): CommerceOrderSchedule
     {
+        $unavailable = fn () => new CheckoutReviewRequiredException('الموعد المختار لم يعد متاحاً — اختر موعداً آخر.', [['item_id' => 'schedule', 'reason' => 'schedule_unavailable']]);
+
+        // نفس ترتيب أقفال الإدارة (القناة ثم النافذة): تحرير السياسة/النوافذ/التواريخ المحجوبة يقفل صف القناة `FOR UPDATE`؛ قفلٌ مشترك هنا يستبعد المحرِّر دون تسلسل الطلبات بعضها بعضاً، فلا
+        // يتقاطع مع هذه المعاملة. ثم إعادة التحقق الكاملة **بعد القفل** على الحالة المُلتزَمة: الطلب لا يحفظ إلا
+        // لقطةً مطابقةً حرفياً لما هو متاح الآن (تحرير نافذة بقيت هويتها لا يمرّر طريقة/منطقة/تسمية/أوقاتاً قديمة).
+        if (SalesChannel::query()->whereKey($order->sales_channel_id)->sharedLock()->first() === null) {
+            throw $unavailable();
+        }
         $slot = CommerceDeliverySlot::query()->whereKey($schedule['slot_id'])->lockForUpdate()->first();
         if ($slot === null || ! $slot->is_active) {
-            throw new CheckoutReviewRequiredException('الموعد المختار لم يعد متاحاً — اختر موعداً آخر.', [['item_id' => 'schedule', 'reason' => 'schedule_unavailable']]);
+            throw $unavailable();
+        }
+
+        $current = $this->selectableFor($order->sales_channel_id, $schedule['method'], $city, $region, $schedule['delivery_date'], $schedule['slot_id']);
+        if ($current === null
+            || $current['timezone'] !== $schedule['timezone']
+            || $current['slot']['label'] !== $schedule['slot_label']
+            || $current['slot']['label_en'] !== $schedule['slot_label_en']
+            || $current['slot']['start_time'] !== $schedule['start_time']
+            || $current['slot']['end_time'] !== $schedule['end_time']) {
+            throw $unavailable();
         }
 
         if ($slot->capacity !== null) {
@@ -536,7 +566,13 @@ final class CommerceDeliveryScheduleService
      */
     private function selectable(CommerceCheckout $checkout, string $method, string $date, string $slotId): ?array
     {
-        $options = $this->options($checkout->sales_channel_id, $method, $checkout->delivery_city, $checkout->delivery_region);
+        return $this->selectableFor($checkout->sales_channel_id, $method, $checkout->delivery_city, $checkout->delivery_region, $date, $slotId);
+    }
+
+    /** @return array{slot: array<string, mixed>, timezone: string}|null */
+    private function selectableFor(string $salesChannelId, string $method, ?string $city, ?string $region, string $date, string $slotId): ?array
+    {
+        $options = $this->options($salesChannelId, $method, $city, $region);
         if (! $options['enabled']) {
             return null;
         }

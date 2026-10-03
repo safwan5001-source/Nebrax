@@ -36,6 +36,8 @@ Scheduling is **a channel-level policy layered on the existing shipping/fulfilme
 ### 2.3 H7b — checkout, capacity and order snapshot (implemented)
 
 - `PATCH checkout/schedule {date, slot_id}` stores the choice on the open checkout (both keys required; both `null` clears); `complete()` revalidates with the stored method/destination and `now` (`schedule_unavailable` / `schedule_required` ⇒ review-required, no order). Checkout methods `standard`/`pickup` map to slot methods `delivery`/`pickup`. Scheduling is required only for a method that has at least one active window — a method with no window is never forced to pick a date.
+- "A window applies" is one rule (`applicableSlots`: active, method match, zone null or the stored destination's zone) shared by display, selection and the required check — a window restricted to another zone never forces a date.
+- The order transaction takes a shared lock on the channel row (admin edits hold it `FOR UPDATE`) then the slot row, and **re-runs the full availability check on the committed state**; the snapshot is stored only if it equals what is selectable now (a window edited in place, a newly blocked date or a disabled policy refuses with `schedule_unavailable`, no order).
 - Slot replacement is id-stable (`slots[].id` upserts in place) so editing a window never orphans checkout selections or resets its capacity history.
 - Capacity is enforced by counting confirmed order schedules for (slot, date) **under a row lock on the slot** inside the order transaction, so two checkouts cannot both take the last place. The order stores an **immutable schedule snapshot** (method, date, slot label/times, timezone); serializers expose `schedule` only when present.
 
