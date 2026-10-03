@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\CommerceCategoryPublicationController;
 use App\Http\Controllers\Api\CommerceCollectionController;
 use App\Http\Controllers\Api\CommerceFacetController;
 use App\Http\Controllers\Api\CommercePersonalizationController;
+use App\Http\Controllers\Api\CommerceProductContentController;
 use App\Http\Controllers\Api\CommerceProductPublicationController;
 use App\Http\Middleware\EnsureActiveSubscription;
 use App\Http\Middleware\EnsurePermission;
@@ -58,6 +59,14 @@ final class CommerceWorkspaceServiceProvider extends ServiceProvider
                 ->whereUuid('id')
                 ->middleware(EnsurePermission::class.':products.view');
             Route::put('{id}/personalization', [CommercePersonalizationController::class, 'replace'])
+                ->whereUuid('id')
+                ->middleware(EnsurePermission::class.':products.manage');
+
+            // FLOWERS-H5 / ADR-17 — كتل المحتوى المهيكلة لكل منتج. RBAC يطابق النشر.
+            Route::get('{id}/content', [CommerceProductContentController::class, 'show'])
+                ->whereUuid('id')
+                ->middleware(EnsurePermission::class.':products.view');
+            Route::put('{id}/content', [CommerceProductContentController::class, 'replace'])
                 ->whereUuid('id')
                 ->middleware(EnsurePermission::class.':products.manage');
         });

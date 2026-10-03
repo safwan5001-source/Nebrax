@@ -1,6 +1,6 @@
 # AWJ Flowers & Gifts — Horizon 1 Progress
 
-**Status:** IN PROGRESS — H1, H2 (a–d) and H3 merged; H4 in CI  
+**Status:** IN PROGRESS — H1–H4 merged; H5 in CI  
 **Date:** 2026-10-03  
 **Planning Base:** `main` @ `318cc72d10bb304cef4b401f548772008ea1618e`  
 **Execution Authority:** `AWJ_FLOWERS_HORIZON_1_AUTONOMOUS_EXECUTION.md`  
@@ -21,7 +21,7 @@ Completed and merged before Horizon implementation:
 | Flowers & Gifts vertical direction | MERGED | PR #1179 / Merge SHA `318cc72d10bb304cef4b401f548772008ea1618e` |
 | Autonomous implementation Horizon | DOCUMENTATION IN PROGRESS | this planning branch |
 
-H1, all of H2 (a–d) and H3 are merged (see the per-slice log below). H4 (#1192) is rebuilt on the new main and being merged next (review → CI → merge → sync main). H5 has a pushed branch with no PR, and H6 exists only locally. No further Flowers PR is opened until the backlog is reduced.
+H1–H4 are merged (see the per-slice log below); the open Flowers backlog was emptied before H5 was rebuilt on the new main and opened as a PR. H6 exists only locally and does not start until H5 is merged. One slice at a time: review → CI → merge → sync main → next.
 
 No Deploy or Production change is authorized by this Horizon.
 
@@ -37,8 +37,8 @@ No Deploy or Production change is authorized by this Horizon.
 | H2c | Taxonomy — collections | MERGED | #1189 | `5851d00` |
 | H2d | Taxonomy — merchandising admin UI | MERGED | #1190 | `1e8ba70` |
 | H3 | Gifting Identity & Gift Message | MERGED | #1191 | `d2b8cac` |
-| H4 | Personalization | PR OPEN (#1192), rebuilt on main, in CI | #1192 | — |
-| H5 | Structured Product Content | NOT STARTED | — | — |
+| H4 | Personalization | MERGED | #1192 | `a4866df` |
+| H5 | Structured Product Content | PR OPEN, rebuilt on main, in CI | (see log) | — |
 | H6 | Add-ons | NOT STARTED | — | — |
 | H7 | Delivery Scheduling Contract | NOT STARTED | — | — |
 | H8 | Availability / Same-day | NOT STARTED | — | — |
@@ -292,6 +292,36 @@ Copy this section for every completed/active slice.
 #### Next
 
 - H4 (personalization), rebuilt on this main.
+
+### H4 — Product personalization (text, textarea, select)
+
+**Status:** MERGED  
+**Base SHA:** `d2b8cac4cc6f726f26683fb4054263d7e9280096` (main after H3; originally cut from `9c71d236…`, rebuilt on main)  
+**Branch:** `flowers/h4-personalization`  
+**PR:** #1192  
+**Head SHA:** `6eb9d9403b88f603ba474c3228c430c20febd25a`  
+**Merge SHA:** `a4866dfd4df2fa5919e49d51ee2f846f6021b6f6` (squash)
+
+#### What was implemented
+
+- ADR-16: personalization is a customer input, never SKU identity (never a variant). Per-product field definitions (text, textarea, select) are validated server-side and the validated input becomes part of the cart line identity, so different card texts are separate lines and identical input merges.
+- Additive tables for definitions and options, cart-line personalization (with a signature added to both partial identity indexes, existing rows unchanged) and an immutable order-line snapshot with no foreign key to the live definition (history survives edits).
+- Admin `GET/PUT products/{id}/personalization`; public product detail exposes active fields only; cart add, guest-to-customer merge and checkout carry and re-validate input (`personalization_invalid` → review-required, no order); payloads gain `personalization` only on personalized lines.
+- Reconciled with H3 on rebuild: checkout completion runs the gift check and loads personalizations; order creation loads both relations.
+- Product lifecycle: `CommerceProductPersonalizationField` is classified `OWNED_CHILD` and removed with a true product delete.
+
+#### Tests / CI
+
+- `CommerceProductPersonalizationApiTest` (10 incl. lifecycle) and `CommercePersonalizationCartTest` (10); 481 registry, personalization, gift, OpenAPI contract, boundary, checkout, cart, order and catalog tests passed locally on PostgreSQL before the push. CI sqlite, pgsql and web build green on the head.
+
+#### Tenant isolation / backward compatibility / risks
+
+- CompanyWide tenant-owned models with structural guards; no price modifier in V1, so no financial total or tax impact and no posting table. Ordinary (non-personalized) cart and order payloads are unchanged.
+- No shopper or admin UI yet, and customer image upload (H4c) is intentionally not included.
+
+#### Next
+
+- H5 (structured content), rebuilt on this main.
 
 ---
 

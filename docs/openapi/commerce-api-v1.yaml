@@ -1437,6 +1437,24 @@ components:
         updated_at: { type: [string, 'null'], format: date-time }
         media: { type: array, items: { $ref: '#/components/schemas/ProductMediaItem' } }
         personalization: { $ref: '#/components/schemas/ProductPersonalization' }
+        content_blocks: { $ref: '#/components/schemas/ProductContentBlocks' }
+
+    ProductContentBlocks:
+      description: >
+        Merchant-authored structured content (composition, care, allergens, …; ADR-17). Plain
+        text, never HTML. Present on a product detail only when at least one active block exists.
+        Merchant-provided information, not a compliance claim.
+      type: array
+      items:
+        type: object
+        additionalProperties: false
+        required: [type, body, body_en]
+        properties:
+          type:
+            type: string
+            enum: [composition, care, natural_variation, included_items, dimensions, materials, allergens, storage, preparation_notes, personalization_instructions]
+          body: { type: string }
+          body_en: { type: [string, 'null'] }
 
     ProductPersonalization:
       description: >
@@ -1535,6 +1553,7 @@ components:
         options: { type: array, items: { $ref: '#/components/schemas/ProductOption' } }
         variants: { type: array, items: { $ref: '#/components/schemas/ProductVariant' } }
         personalization: { $ref: '#/components/schemas/ProductPersonalization' }
+        content_blocks: { $ref: '#/components/schemas/ProductContentBlocks' }
 
     ProductListResponse:
       type: object

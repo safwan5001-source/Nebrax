@@ -6,6 +6,7 @@ use App\Models\BarcodeRegistryEntry;
 use App\Models\CommerceCartItem;
 use App\Models\CommerceCollectionProduct;
 use App\Models\CommerceListing;
+use App\Models\CommerceProductContentBlock;
 use App\Models\CommerceProductPersonalizationField;
 use App\Models\CommerceProductFacetValue;
 use App\Models\CommerceOrderLine;
@@ -191,6 +192,9 @@ final class ProductReferenceRegistry
         // (خياراته تتبعه بـcascade). الطلبات التاريخية تحمل لقطتها الخاصة في
         // `commerce_order_line_personalizations` ولا تشير إلى التعريف، فلا يمنع الحذف.
         CommerceProductPersonalizationField::class => ['key' => 'commerce_product_personalization_fields', 'classes' => [self::OWNED_CHILD]],
+        // H5 / ADR-17: كتل محتوى المنتج المهيكلة (تركيبة/عناية/تغليف) نصٌّ تسويقي تابع بالكامل
+        // للمنتج — بلا أثر مالي أو مخزني، لا يمنع الحذف الحقيقي ويُنظَّف معه.
+        CommerceProductContentBlock::class => ['key' => 'commerce_product_content_blocks', 'classes' => [self::OWNED_CHILD]],
 
         // COM-CART-2: السلة المجهولة حالة مؤقتة وليست دليلاً تاريخياً ولا
         // تهيئةً تجارية حية. حذف المنتج لا تمنعه سلة مهجورة؛ يبقى السطر
