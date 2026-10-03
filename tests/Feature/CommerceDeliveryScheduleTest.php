@@ -329,6 +329,25 @@ class CommerceDeliveryScheduleTest extends TestCase
     }
 
     /** @test */
+    public function once_todays_cutoff_has_passed_it_stays_passed_across_a_dst_rollback(): void
+    {
+        $store = $this->store('ds-cutoff-dst');
+        // 2027-11-07 نيويورك: 01:45 EDT (05:45Z) ثم 01:10 EST (06:10Z) بعد رجوع الساعة
+        $service = $this->configure($store, ['timezone' => 'America/New_York', 'cutoff_time' => '01:45', 'max_days_ahead' => 3], [
+            $this->slot('مساءً', '19:00', '22:00'),
+        ]);
+        $at = fn (string $utc) => $service->options($store['channel_id'], 'delivery', null, null, CarbonImmutable::parse($utc, 'UTC'));
+
+        // قبل الإغلاق: اليوم مفتوح (01:30 EDT)
+        $this->assertSame(['مساءً'], $this->labels($at('2027-11-07 05:30:00'), '2027-11-07'));
+        // بعد أول 01:45 (01:50 EDT) ثم بعد رجوع الساعة (01:10 EST): مغلق في الحالتين
+        $this->assertSame([], $this->labels($at('2027-11-07 05:50:00'), '2027-11-07'));
+        $this->assertSame([], $this->labels($at('2027-11-07 06:10:00'), '2027-11-07'));
+        $this->assertSame(['مساءً'], $this->labels($at('2027-11-07 06:10:00'), '2027-11-08'));
+        app(TenantContext::class)->forget();
+    }
+
+    /** @test */
     public function unexpected_database_failures_stay_server_errors_and_are_not_returned_as_validation_messages(): void
     {
         $store = $this->store('ds-db-fail');

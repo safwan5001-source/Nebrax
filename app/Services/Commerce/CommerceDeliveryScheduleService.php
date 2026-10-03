@@ -216,7 +216,11 @@ final class CommerceDeliveryScheduleService
         $timezone = $this->timezoneFor($setting);
         $local = CarbonImmutable::instance($now ?? CarbonImmutable::now())->setTimezone($timezone);
         $earliestInstant = $local->addMinutes($setting->lead_time_minutes);
-        $cutoffPassed = $setting->cutoff_time !== null && $local->format('H:i') >= $setting->cutoff_time;
+        // الإغلاق اليومي لحظةٌ لا مقارنة نصية `H:i`: عند رجوع الساعة يتكرّر الوقت الجداري فيعود النص أصغر من الإغلاق
+        // ويُعاد فتح اليوم بعد إغلاقه. اللحظة تُحسم على أول وقوع (EDT) فما إن تُجتاز تبقى مجتازة؛ وفي فجوة الانتقال
+        // يُطبَّع الوقت إلى اللحظة التالية للفجوة.
+        $cutoffInstant = $setting->cutoff_time !== null ? $local->startOfDay()->setTimeFromTimeString($setting->cutoff_time) : null;
+        $cutoffPassed = $cutoffInstant !== null && $local->greaterThanOrEqualTo($cutoffInstant);
 
         $ambiguous = $this->ambiguousWallClockIntervals($timezone, $local->startOfDay()->subDay(), $local->startOfDay()->addDays($setting->max_days_ahead + 2));
 
