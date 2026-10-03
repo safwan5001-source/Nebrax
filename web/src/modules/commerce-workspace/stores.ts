@@ -9,6 +9,15 @@
 
 import { api } from '@/lib/api';
 
+/**
+ * FLOWERS-H1 — ملفات نشاط المتجر. قائمة محدودة تملكها المنصة وتطابق
+ * `App\Support\Commerce\BusinessVertical`؛ مفتاحٌ مجهول يقرأ `general`.
+ */
+export const COMMERCE_BUSINESS_VERTICALS = ['general', 'flowers_gifts'] as const;
+export type CommerceBusinessVertical = (typeof COMMERCE_BUSINESS_VERTICALS)[number];
+
+export type CommerceVerticalCapability = { key: string; available: boolean };
+
 export type CommerceStoreOption = {
   id: string;
   name: string;
@@ -16,6 +25,9 @@ export type CommerceStoreOption = {
   isActive: boolean;
   previewUrl: string | null;
   defaultLocale: string | null;
+  businessVertical: CommerceBusinessVertical;
+  /** القدرات الموصى بها لملف النشاط المحفوظ، وهل بُنيت (من الخادم لا من العميل). */
+  recommendedCapabilities: CommerceVerticalCapability[];
 };
 
 /** STORE-ADMIN-ADOPT-1B-1 — الحقيقة الوحيدة للغات المدعومة، تطابق الخادم. */
@@ -52,11 +64,15 @@ export async function loadCommerceStoreCatalog(): Promise<CommerceStoreCatalog> 
  */
 export async function provisionCommerceStorefront(
   name?: string,
+  businessVertical?: CommerceBusinessVertical,
 ): Promise<{ ok: true; store: CommerceStoreOption } | { ok: false; message: string }> {
   try {
+    const body: Record<string, string> = {};
+    if (name && name.trim() !== '') body.name = name.trim();
+    if (businessVertical) body.business_vertical = businessVertical;
     const payload = await api<unknown>(COMMERCE_STORE_ADMIN_LIST_PATH, {
       method: 'POST',
-      body: name && name.trim() !== '' ? { name: name.trim() } : {},
+      body,
     });
     const store = extractProvisionedStore(payload);
     if (!store) return { ok: false, message: 'invalid_payload' };
@@ -74,7 +90,11 @@ export async function provisionCommerceStorefront(
  */
 export async function updateCommerceStorefrontIdentity(
   id: string,
-  attributes: { name?: string; default_locale?: CommerceStoreLocale },
+  attributes: {
+    name?: string;
+    default_locale?: CommerceStoreLocale;
+    business_vertical?: CommerceBusinessVertical;
+  },
 ): Promise<{ ok: true; store: CommerceStoreOption } | { ok: false; message: string }> {
   try {
     const payload = await api<unknown>(`${COMMERCE_STORE_ADMIN_LIST_PATH}/${id}`, {
@@ -174,7 +194,27 @@ function mapStoreOption(raw: unknown): CommerceStoreOption | null {
     isActive: row.is_active === true,
     previewUrl: sanitizePreviewUrl(row.preview_url),
     defaultLocale: typeof row.default_locale === 'string' ? row.default_locale : null,
+    businessVertical: mapBusinessVertical(row.business_vertical),
+    recommendedCapabilities: mapRecommendedCapabilities(row.vertical_profile),
   };
+}
+
+function mapBusinessVertical(value: unknown): CommerceBusinessVertical {
+  return (COMMERCE_BUSINESS_VERTICALS as readonly unknown[]).includes(value)
+    ? (value as CommerceBusinessVertical)
+    : 'general';
+}
+
+function mapRecommendedCapabilities(profile: unknown): CommerceVerticalCapability[] {
+  if (!profile || typeof profile !== 'object') return [];
+  const raw = (profile as { recommended_capabilities?: unknown }).recommended_capabilities;
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter(
+      (item): item is { key: string; available?: unknown } =>
+        !!item && typeof item === 'object' && typeof (item as { key?: unknown }).key === 'string',
+    )
+    .map((item) => ({ key: item.key, available: item.available === true }));
 }
 
 function sanitizePreviewUrl(value: unknown): string | null {

@@ -12,6 +12,7 @@ import {
   Paintbrush,
   Plug,
   ShoppingBag,
+  Tags,
   Store,
   Truck,
 } from 'lucide-react';
@@ -33,6 +34,7 @@ const ICONS: Record<string, typeof Store> = {
   '/commerce': LayoutDashboard,
   '/commerce/stores': Store,
   '/commerce/published-products': ShoppingBag,
+  '/commerce/merchandising': Tags,
   '/commerce/themes': Palette,
   '/commerce/appearance': Paintbrush,
   '/commerce/domains': Globe,

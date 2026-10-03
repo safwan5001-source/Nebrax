@@ -6,6 +6,7 @@ use App\Models\SalesChannel;
 use App\Models\Storefront;
 use App\Models\StorefrontDomain;
 use App\Models\Tenant;
+use App\Support\Commerce\BusinessVertical;
 use App\Support\ManagedStorefrontHostname;
 use App\Support\StorefrontBaseDomainMisconfiguredException;
 use App\Tenancy\TenantContext;
@@ -50,7 +51,7 @@ final class StorefrontProvisioningService
     /**
      * @return array{id: string, name: string, sales_channel_id: string, is_active: bool, preview_url: string, default_locale: string, created: bool}
      */
-    public function provisionFirstStorefrontForCurrentTenant(?string $displayName = null): array
+    public function provisionFirstStorefrontForCurrentTenant(?string $displayName = null, ?BusinessVertical $vertical = null): array
     {
         $tenantId = app(TenantContext::class)->id();
         if ($tenantId === null) {
@@ -61,7 +62,7 @@ final class StorefrontProvisioningService
         // معاملة ولا يقفل أي صفّ — فشلٌ مغلق مبكرٌ بلا أي أثر جزئي.
         $baseDomain = ManagedStorefrontHostname::configuredBaseDomain();
 
-        return DB::transaction(function () use ($tenantId, $baseDomain, $displayName) {
+        return DB::transaction(function () use ($tenantId, $baseDomain, $displayName, $vertical) {
             // مرساة التسلسل: يقفل صفّ المستأجر نفسه، فطلبا تزويدٍ متزامنان
             // لنفس المستأجر يتسلسلان — الثاني يرى دوماً ما التزمه الأول.
             $tenant = Tenant::whereKey($tenantId)->lockForUpdate()->first();
@@ -73,6 +74,11 @@ final class StorefrontProvisioningService
 
             $channel = $this->ensureWebSalesChannel($tenant);
             $storefront = $this->ensureStorefront($channel, $tenant, $displayName);
+            // FLOWERS-H1: ملف النشاط يُسنَد عند **إنشاء** المتجر فقط؛ إعادة
+            // التزويد لمتجر قائم لا تغيّره (التغيير عبر PUT الهوية الصريح).
+            if ($vertical !== null && $storefront->wasRecentlyCreated) {
+                app(StorefrontBusinessProfileService::class)->assign($storefront, $vertical);
+            }
             $domain = $this->ensureManagedDomain($storefront, $tenantId, $hostname);
 
             return [
@@ -82,6 +88,7 @@ final class StorefrontProvisioningService
                 'is_active' => (bool) $storefront->is_active,
                 'preview_url' => 'https://'.$domain->hostname.'/',
                 'default_locale' => $storefront->default_locale,
+                'business_vertical' => $storefront->fresh('businessProfile')->businessVertical()->value,
                 'created' => (bool) $domain->wasRecentlyCreated,
             ];
         });

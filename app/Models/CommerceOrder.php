@@ -141,6 +141,12 @@ class CommerceOrder extends BaseModel implements CompanyWide
         return $this->hasOne(CommerceOrderSnapshot::class);
     }
 
+    /** FLOWERS-H3 / ADR-15 — لقطة الإهداء الثابتة (مستلم التوصيل + المُرسِل المعروض + الرسالة) — صفرٌ أو سطرٌ واحد. */
+    public function gift(): HasOne
+    {
+        return $this->hasOne(CommerceOrderGift::class, 'commerce_order_id');
+    }
+
     /** COM-MOBILE-PAYMENTS-1 — التزام الدفع (ADR-04) — واحدٌ لكل طلب في V1. */
     public function paymentIntent(): HasOne
     {

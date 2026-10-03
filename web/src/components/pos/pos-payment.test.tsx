@@ -474,4 +474,43 @@ describe('PosPayment', () => {
     expect(remainingAmount?.className).not.toMatch(/truncate/);
     expect(screen.getByRole('button', { name: 'Cash payment_methods' }).className).toMatch(/min-h-14/);
   });
+
+  it('اختيار منصة تحصّل المبلغ يخفي وسائل الدفع ويرسل سلّة وسائل فارغة', () => {
+    const onConfirm = vi.fn();
+    render(
+      <PosPayment
+        allowDeferredPayment={false}
+        customerName="Walk-in"
+        defaultPaymentMethodId="cash"
+        error={null}
+        items={[]}
+        onBack={vi.fn()}
+        onConfirm={onConfirm}
+        paying={false}
+        paymentMethods={paymentMethods}
+        paymentMethodsLoadError={null}
+        paymentMethodsLoading={false}
+        totalMinor={10000}
+        deliveryPlatforms={[{
+          id: 'jahez',
+          platform_key: 'jahez',
+          display_name: 'جاهز',
+          display_name_en: 'Jahez',
+          logo_asset_key: null,
+          collection_mode: 'platform_collected',
+          external_reference_policy: 'optional',
+        }]}
+        selectedDeliveryPlatformId="jahez"
+        externalOrderReference=""
+        onSelectDeliveryPlatform={vi.fn()}
+        onExternalOrderReference={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId('pos-delivery-platforms').textContent).toContain('Jahez');
+    expect(screen.getByTestId('pos-platform-collected-note')).toBeTruthy();
+    expect(screen.queryByRole('textbox', { name: 'Cash' })).toBeNull();
+    fireEvent.click(screen.getByTestId('pos-confirm-payment'));
+    expect(onConfirm).toHaveBeenCalledWith([]);
+  });
 });

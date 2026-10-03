@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\StorefrontCartController;
 use App\Http\Controllers\Api\StorefrontCategoryController;
+use App\Http\Controllers\Api\StorefrontCollectionController;
 use App\Http\Controllers\Api\StorefrontCheckoutController;
 use App\Http\Controllers\Api\StorefrontConfigController;
 use App\Http\Controllers\Api\StorefrontMediaController;
@@ -40,6 +41,9 @@ Route::middleware([
     Route::get('categories', [StorefrontCategoryController::class, 'index'])->name('categories.index');
     Route::get('categories/{id}', [StorefrontCategoryController::class, 'show'])->whereUuid('id')->name('categories.show');
 
+    // FLOWERS-H2 / ADR-14 §2.3 — مجموعات تسويقية يدوية (قراءة فقط).
+    Route::get('collections', [StorefrontCollectionController::class, 'index'])->name('collections.index');
+
     Route::get('products', [StorefrontProductController::class, 'index'])->name('products.index');
     Route::get('products/{id}', [StorefrontProductController::class, 'show'])->whereUuid('id')->name('products.show');
 
@@ -65,6 +69,8 @@ Route::middleware([
         Route::post('checkout', [StorefrontCheckoutController::class, 'store'])->name('checkout.store');
         Route::patch('checkout/contact', [StorefrontCheckoutController::class, 'updateContact'])->name('checkout.contact.update');
         Route::patch('checkout/address', [StorefrontCheckoutController::class, 'updateAddress'])->name('checkout.address.update');
+        // FLOWERS-H3 / ADR-15 — هوية الإهداء ورسالته.
+        Route::patch('checkout/gift', [StorefrontCheckoutController::class, 'updateGift'])->name('checkout.gift.update');
         Route::patch('checkout/delivery', [StorefrontCheckoutController::class, 'updateDelivery'])->name('checkout.delivery.update');
         Route::patch('checkout/payment', [StorefrontCheckoutController::class, 'updatePayment'])->name('checkout.payment.update');
         Route::post('checkout/complete', [StorefrontCheckoutController::class, 'complete'])->name('checkout.complete');
@@ -92,6 +98,8 @@ if (! app()->environment('production')) {
     ])->group(function () {
         Route::get('categories', [StorefrontCategoryController::class, 'index'])->name('legacy.categories.index');
         Route::get('categories/{id}', [StorefrontCategoryController::class, 'show'])->whereUuid('id')->name('legacy.categories.show');
+
+        Route::get('collections', [StorefrontCollectionController::class, 'index'])->name('legacy.collections.index');
 
         Route::get('products', [StorefrontProductController::class, 'index'])->name('legacy.products.index');
         Route::get('products/{id}', [StorefrontProductController::class, 'show'])->whereUuid('id')->name('legacy.products.show');

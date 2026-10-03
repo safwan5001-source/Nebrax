@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\CommerceCartController;
+use App\Http\Controllers\Api\CommerceCatalogCollectionController;
 use App\Http\Controllers\Api\CommerceCategoryController;
 use App\Http\Controllers\Api\CommerceCheckoutController;
 use App\Http\Controllers\Api\CommerceCustomerAddressController;
@@ -88,6 +89,9 @@ Route::middleware([
     Route::get('categories', [CommerceCategoryController::class, 'index'])->name('categories.index');
     Route::get('categories/{id}', [CommerceCategoryController::class, 'show'])->whereUuid('id')->name('categories.show');
 
+    // FLOWERS-H2 / ADR-14 §2.3 — مجموعات تسويقية يدوية (قراءة فقط، مبوَّبة بنشر المنتج).
+    Route::get('collections', [CommerceCatalogCollectionController::class, 'index'])->name('collections.index');
+
     Route::get('products', [CommerceProductController::class, 'index'])->name('products.index');
     Route::get('products/{id}', [CommerceProductController::class, 'show'])->whereUuid('id')->name('products.show');
 
@@ -155,6 +159,8 @@ Route::middleware([
     Route::post('checkout', [CommerceCheckoutController::class, 'store'])->name('checkout.store');
     Route::patch('checkout/contact', [CommerceCheckoutController::class, 'updateContact'])->name('checkout.contact.update');
     Route::patch('checkout/address', [CommerceCheckoutController::class, 'updateAddress'])->name('checkout.address.update');
+    // FLOWERS-H3 / ADR-15 — هوية الإهداء ورسالته.
+    Route::patch('checkout/gift', [CommerceCheckoutController::class, 'updateGift'])->name('checkout.gift.update');
     Route::patch('checkout/delivery', [CommerceCheckoutController::class, 'updateDelivery'])->name('checkout.delivery.update');
     Route::patch('checkout/payment', [CommerceCheckoutController::class, 'updatePayment'])->name('checkout.payment.update');
     Route::post('checkout/complete', [CommerceCheckoutController::class, 'complete'])->name('checkout.complete');

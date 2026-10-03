@@ -155,6 +155,31 @@ final class CommerceCheckoutController extends PublicApiController
         );
     }
 
+    /**
+     * FLOWERS-H3 / ADR-15 — سياق الإهداء: مستلم التوصيل، المُرسِل المعروض، الرسالة.
+     * لا مبلغ ولا سعر ولا هوية محاسبية في الطلب. مرفوضٌ ما دامت سياسة الإهداء
+     * معطَّلة للقناة (ما عدا `is_gift=false` الذي يمسح دوماً).
+     */
+    public function updateGift(Request $request, CommerceCheckoutService $checkouts): JsonResponse
+    {
+        $this->rejectUnknown($request, ['is_gift', 'recipient_name', 'recipient_phone', 'sender_name', 'hide_sender', 'message']);
+        $data = $request->validate([
+            'is_gift' => ['sometimes', 'boolean'],
+            'recipient_name' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'recipient_phone' => ['sometimes', 'nullable', 'string', 'max:32', 'regex:/^[0-9+\-\s()]{5,32}$/'],
+            'sender_name' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'hide_sender' => ['sometimes', 'boolean'],
+            // الحد الفعلي (≤ 500) تفرضه الخدمة من سياسة القناة؛ هذا سقف دفاعي للحمولة.
+            'message' => ['sometimes', 'nullable', 'string', 'max:2000'],
+        ]);
+
+        return $this->withCurrentCheckout(
+            $request,
+            $checkouts,
+            fn (CommerceCheckout $checkout) => $checkouts->updateGift($checkout, $data),
+        );
+    }
+
     public function updateAddress(Request $request, CommerceCheckoutService $checkouts, CommerceCustomerAddressService $addresses): JsonResponse
     {
         // COM-MOBILE-ADDRESSES-1 (ADR-08) — closes the pre-existing gap where

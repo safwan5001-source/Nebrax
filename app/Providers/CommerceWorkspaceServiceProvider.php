@@ -3,6 +3,8 @@
 namespace App\Providers;
 
 use App\Http\Controllers\Api\CommerceCategoryPublicationController;
+use App\Http\Controllers\Api\CommerceCollectionController;
+use App\Http\Controllers\Api\CommerceFacetController;
 use App\Http\Controllers\Api\CommercePersonalizationController;
 use App\Http\Controllers\Api\CommerceProductContentController;
 use App\Http\Controllers\Api\CommerceProductPublicationController;
@@ -45,6 +47,13 @@ final class CommerceWorkspaceServiceProvider extends ServiceProvider
                 ->whereUuid('id')
                 ->middleware(EnsurePermission::class.':products.manage');
 
+            // FLOWERS-H2 / ADR-14 — إسناد قيم الأبعاد الوصفية لمنتج. RBAC يطابق النشر.
+            Route::get('{id}/facets', [CommerceFacetController::class, 'productAssignments'])
+                ->whereUuid('id')
+                ->middleware(EnsurePermission::class.':products.view');
+            Route::put('{id}/facets', [CommerceFacetController::class, 'replaceProductAssignments'])
+                ->whereUuid('id')
+                ->middleware(EnsurePermission::class.':products.manage');
             // FLOWERS-H4a / ADR-16 — تعريفات التخصيص لكل منتج. RBAC يطابق النشر.
             Route::get('{id}/personalization', [CommercePersonalizationController::class, 'show'])
                 ->whereUuid('id')
@@ -81,6 +90,66 @@ final class CommerceWorkspaceServiceProvider extends ServiceProvider
                 ->whereUuid('id')
                 ->middleware(EnsurePermission::class.':products.view');
             Route::put('{id}/publication', [CommerceCategoryPublicationController::class, 'update'])
+                ->whereUuid('id')
+                ->middleware(EnsurePermission::class.':products.manage');
+        });
+
+        Route::middleware([
+            ForceJsonResponse::class,
+            IdentifyTenantHostname::class,
+            'auth:sanctum',
+            EnsureUserPrincipal::class,
+            SetTenant::class,
+            SetBranch::class,
+            EnsureActiveSubscription::class,
+        ])->prefix('api/commerce/workspace/facets')->group(function (): void {
+            // FLOWERS-H2 / ADR-14 — الأبعاد الوصفية وقيمها. products.view للقراءة
+            // وproducts.manage للكتابة — بلا صلاحية جديدة (نمط COM-CATALOG-1/2).
+            Route::get('/', [CommerceFacetController::class, 'index'])
+                ->middleware(EnsurePermission::class.':products.view');
+            Route::post('/', [CommerceFacetController::class, 'store'])
+                ->middleware(EnsurePermission::class.':products.manage');
+            Route::put('{id}', [CommerceFacetController::class, 'update'])
+                ->whereUuid('id')
+                ->middleware(EnsurePermission::class.':products.manage');
+            Route::delete('{id}', [CommerceFacetController::class, 'destroy'])
+                ->whereUuid('id')
+                ->middleware(EnsurePermission::class.':products.manage');
+            Route::post('{id}/values', [CommerceFacetController::class, 'storeValue'])
+                ->whereUuid('id')
+                ->middleware(EnsurePermission::class.':products.manage');
+            Route::put('{id}/values/{valueId}', [CommerceFacetController::class, 'updateValue'])
+                ->whereUuid(['id', 'valueId'])
+                ->middleware(EnsurePermission::class.':products.manage');
+            Route::delete('{id}/values/{valueId}', [CommerceFacetController::class, 'destroyValue'])
+                ->whereUuid(['id', 'valueId'])
+                ->middleware(EnsurePermission::class.':products.manage');
+        });
+
+        Route::middleware([
+            ForceJsonResponse::class,
+            IdentifyTenantHostname::class,
+            'auth:sanctum',
+            EnsureUserPrincipal::class,
+            SetTenant::class,
+            SetBranch::class,
+            EnsureActiveSubscription::class,
+        ])->prefix('api/commerce/workspace/collections')->group(function (): void {
+            // FLOWERS-H2 / ADR-14 §2.3 — المجموعات التسويقية اليدوية وعضويتها المرتّبة.
+            Route::get('/', [CommerceCollectionController::class, 'index'])
+                ->middleware(EnsurePermission::class.':products.view');
+            Route::post('/', [CommerceCollectionController::class, 'store'])
+                ->middleware(EnsurePermission::class.':products.manage');
+            Route::put('{id}', [CommerceCollectionController::class, 'update'])
+                ->whereUuid('id')
+                ->middleware(EnsurePermission::class.':products.manage');
+            Route::delete('{id}', [CommerceCollectionController::class, 'destroy'])
+                ->whereUuid('id')
+                ->middleware(EnsurePermission::class.':products.manage');
+            Route::get('{id}/products', [CommerceCollectionController::class, 'members'])
+                ->whereUuid('id')
+                ->middleware(EnsurePermission::class.':products.view');
+            Route::put('{id}/products', [CommerceCollectionController::class, 'replaceMembers'])
                 ->whereUuid('id')
                 ->middleware(EnsurePermission::class.':products.manage');
         });

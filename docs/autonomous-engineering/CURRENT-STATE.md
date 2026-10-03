@@ -2,13 +2,17 @@
 
 > This file is a durable resume point, not a substitute for Git/GitHub evidence.
 
-LAST_UPDATED: 2026-10-03 (**AWJ Delivery Platforms & Settlement Horizon V1 is the single ACTIVE horizon.** DLV-EVIDENCE-1 merged (PR #1171). DLV-FOUNDATION-1 merged (PR #1174, merge SHA `5e80830033aed602833afd091b28857f92d9f068`) — additive tenant-scoped delivery-platform profile layer over `SalesChannel(type=external)`, configuration only. **Safwan recorded owner decisions for DG-1/DG-2/DG-3 (PR #1177, in review):** DG-1 RESOLVED (Option A — dedicated `platform_receivable_clearing` role, no per-platform GL account, no `Partner`-as-platform, no `JournalLine` platform dimension in V1); DG-2 RESOLVED for the manual POS flow (default/walk-in customer, never the platform; immutable snapshot in a dedicated side table, not new `invoices` columns); DG-3 PARTIALLY RESOLVED as a per-platform external-evidence gate (legal/tax role UNKNOWN per platform until its contract exists; ACCOUNTING-1 authorized only for the tax-role-independent simple-collector foundation — no fee_tax, no commission VAT recovery, no tax-point assumption, no agent/principal treatment, until that platform's evidence arrives). **DLV-ACCOUNTING-1 is now dependency-ready, bounded to that simple-collector foundation — not yet started.** DLV-POS-1 remains blocked (DG-8, DG-9 untouched). DLV-HUB-1 and DLV-SETTLEMENT-1 remain blocked. No deploy.)
+LAST_UPDATED: 2026-10-03 (**AWJ Delivery Platforms & Settlement Horizon V1 is the single ACTIVE horizon.** DLV-EVIDENCE-1 through DLV-POS-1 are merged. DELIVERY-DECISION-PASS-3 is merged at `615d634a1ab387b12b5124917ff435c762f1aca3` (PR #1195): OD-DG-9-HUB and OD-DG-6-TRIGGER are accepted. No production deploy. **DELIVERY-DECISION-PASS-4 is in review and not merged.** OD-HUB-STATES and OD-HUB-IDENTITY are accepted in that PR. The projection-only Hub specification is READY and not started: operational projection only, no invoice, payment, VAT, COGS, stock, POS session, or financial transition. Full DLV-HUB-1 stays BLOCKED on DG-8-IMPORT and DG-3. No deploy.)
 LAYER_VERSION: V1
 STATUS: ACTIVE — AWJ Delivery Platforms & Settlement Horizon V1 (authoritative queue: `TASK-QUEUE.md`, section "Horizon: AWJ Delivery Platforms & Settlement V1"). Every snapshot, STATUS and objective below this section is historical and superseded.
 
 ## Current objective
 
-Land PR #1177 (DELIVERY-DECISION-PASS-1: records the DG-1/DG-2/DG-3 owner decisions — review, exact-head CI, merge by owner, post-merge review). DLV-ACCOUNTING-1 is dependency-ready within the bounded simple-collector scope the decisions name, but is **not started** — do not begin its implementation until separately authorized to start. Do not promote DLV-POS-1, DLV-HUB-1 or DLV-SETTLEMENT-1 while their mapped gates (DG-8/DG-9/DG-6/DG-3-per-platform) are open. Stop at any Decision Gate, owner production gate, or blocker. Merge != Deploy.
+DELIVERY-DECISION-PASS-4 is in review. Do not merge it from this note and do not deploy. OD-HUB-STATES and OD-HUB-IDENTITY are accepted in the unmerged report. The projection-only specification is READY and must not be started from this PR. Do not start DLV-HUB-1, commission, settlement, connectors, or refunds. DG-8-IMPORT and DG-3 stay open and still block only the financial command. Merge != Deploy.
+
+## Previous snapshot (historical, superseded)
+
+LAST_UPDATED: 2026-10-03 (pre-ACCOUNTING-1 durable text). The queue then still described PR #1177 as in review and DLV-ACCOUNTING-1 as ready-but-not-started. Both were overtaken on main by #1177 (`49ecc540a116acc9c503d87c34efeca7fa59cd2d`) and #1184 (`a1bc3769751a919643a335fd4b84ea43c241a221`). Objective at that time: land #1177 and do not promote POS-1 / HUB-1 / SETTLEMENT-1 while DG-8 / DG-9 / DG-6 / per-platform DG-3 were open.
 
 ## Previous snapshot (historical, superseded)
 

@@ -50,6 +50,20 @@ class CommerceProductContentApiTest extends TestCase
     }
 
     /** @test */
+    public function content_blocks_never_block_a_true_product_delete_and_are_cleaned_with_it(): void
+    {
+        $auth = $this->registerTenant('ct-life', 'owner@ct-life.test');
+        $product = $this->makeProduct($auth['tenant_id']);
+        $this->withToken($auth['token'])->putJson($this->url($product), ['blocks' => $this->blocks()])->assertOk();
+
+        app(TenantContext::class)->set($auth['tenant_id']);
+        app(\App\Services\ProductLifecycleService::class)->delete($product, null);
+
+        $this->assertSame(0, CommerceProductContentBlock::query()->count());
+        app(TenantContext::class)->forget();
+    }
+
+    /** @test */
     public function an_owner_replaces_and_reads_content_blocks_in_order(): void
     {
         $auth = $this->registerTenant('ct-def', 'owner@ct-def.test');

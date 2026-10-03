@@ -1247,30 +1247,40 @@ Only evidence-backed statuses are recorded here; unlisted tasks of the horizon p
 |---|---|---|---|---|---|
 | 0 | DLV-EVIDENCE-1 | done (merged; PR #1171, merge SHA `c0098d38762fc2d113ab189fd7d85acebe0f5c8f`; POST_MERGE_REVIEW: PASS recorded by the owner — main CI sqlite was green and pgsql in progress when last observed here) | high | accepted decision | `docs/plans/pos/DLV-EVIDENCE-1-REPORT.md` |
 | 1 | DLV-FOUNDATION-1 | done (merged; PR #1174, merge SHA `5e80830033aed602833afd091b28857f92d9f068`; PRE_MERGE_REVIEW: PASS and POST_MERGE_REVIEW: PASS recorded by the owner) | high | DLV-EVIDENCE-1 (done) | `docs/plans/pos/DLV-FOUNDATION-1-IMPLEMENTATION-REPORT.md` |
-| 2 | DELIVERY-DECISION-PASS-1 | in_review (PR #1177 open against base `5e80830033aed602833afd091b28857f92d9f068`; owner decisions for DG-1/DG-2/DG-3 recorded 2026-10-03) | high | DLV-FOUNDATION-1 (done) | `docs/plans/pos/DELIVERY-DECISION-PASS-1-REPORT.md` |
+| 2 | DELIVERY-DECISION-PASS-1 | done (merged; PR #1177, merge SHA `49ecc540a116acc9c503d87c34efeca7fa59cd2d`; records DG-1/DG-2/DG-3 only) | high | DLV-FOUNDATION-1 (done) | `docs/plans/pos/DELIVERY-DECISION-PASS-1-REPORT.md` |
+| 3 | DLV-ACCOUNTING-1 | done (merged; PR #1184, merge SHA `a1bc3769751a919643a335fd4b84ea43c241a221`; PRE_MERGE_REVIEW: PASS and POST_MERGE_REVIEW: PASS recorded by the owner; no deploy) | critical | DLV-FOUNDATION-1 (done) + DG-1/DG-2 + DG-3 simple-collector bound | PR #1184. Bounded to platform-collected AR clearing and `delivery_invoice_contexts`. No commission, fee tax, settlement, POS selector, or Hub. |
+| 4 | DELIVERY-DECISION-PASS-2 | done (merged; PR #1193, merge SHA `3a94eb36635208e33acc4dbd90572140c47e7e4c`; OD-DG-8, OD-DG-9 for POS, OD-DG-6 with narrowing) | high | DLV-ACCOUNTING-1 (done) | `docs/plans/pos/DELIVERY-DECISION-PASS-2-REPORT.md` |
+| 5 | DLV-POS-1 | done (merged; PR #1194, squash SHA `42c0deb91909755fa1e59cada84fa90f57a897cd`; owner confirmed the merge; no production deploy; this pass does not repeat post-merge review) | high | DLV-FOUNDATION-1 (done); DG-2 resolved; OD-DG-8 accepted; OD-DG-9 accepted for POS only | `docs/plans/pos/DLV-POS-1-IMPLEMENTATION-REPORT.md` |
+| 6 | DELIVERY-DECISION-PASS-3 | done (merged; PR #1195, squash SHA `615d634a1ab387b12b5124917ff435c762f1aca3`; OD-DG-9-HUB and OD-DG-6-TRIGGER accepted; DG-8-IMPORT and DG-3 not accepted; no Hub implementation) | high | DLV-POS-1 (done); OD-DG-6 accepted with narrowing | `docs/plans/pos/DELIVERY-DECISION-PASS-3-REPORT.md` |
+| 7 | DELIVERY-DECISION-PASS-4 | in_review (not merged; OD-HUB-STATES and OD-HUB-IDENTITY accepted in this PR; projection-only specification is READY and not started; full HUB-1 stays blocked) | high | DELIVERY-DECISION-PASS-3 (done); OD-DG-9-HUB; OD-DG-6 pre-post rule | `docs/plans/pos/DELIVERY-DECISION-PASS-4-REPORT.md` |
 
-Owed gates — authoritative text and blocker mapping is report §11 (DLV-EVIDENCE-1-REPORT.md); resolutions below are recorded in `DELIVERY-DECISION-PASS-1-REPORT.md`'s "OWNER DECISIONS RECORDED (2026-10-03)" section:
+Owed gates — original text is DLV-EVIDENCE-1-REPORT.md §11. DG-1/DG-2/DG-3 resolutions are in DELIVERY-DECISION-PASS-1-REPORT.md. DG-6/DG-8/DG-9 acceptances are in DELIVERY-DECISION-PASS-2-REPORT.md.
 
 | Gate | Blocks | Status |
 |---|---|---|
-| DG-1 | ACCOUNTING-1 | **RESOLVED 2026-10-03.** Option A: dedicated `platform_receivable_clearing` role (sibling to `gateway_clearing`). No per-platform GL account, no `Partner`-as-platform, no `JournalLine` platform dimension in V1. Per-platform reporting via subledger/document data. |
-| DG-2 | POS-1, ACCOUNTING-1 | **RESOLVED 2026-10-03** for the current manual POS flow. `partner_id` = tenant's default/walk-in customer (never the platform). Immutable snapshot in a dedicated side table (not new `invoices` columns), pinning invoice/sales_channel/delivery_platform_profile/delivery_platform_profile_version/external_order_reference/collection_mode. Real end-customer identity from provider APIs deferred to a separately designed/evidenced task. |
-| DG-3 | ACCOUNTING-1, SETTLEMENT-1 | **PARTIALLY RESOLVED / EXTERNAL EVIDENCE GATE, 2026-10-03.** Legal/tax role UNKNOWN per platform until that platform's contract is obtained (never inferred cross-platform). ACCOUNTING-1 authorized **only** for the tax-role-independent simple-collector foundation (gross invoice + AR clearing, no fabricated cash/bank). Fee/fee-tax/commission-VAT/tax-point/agent-principal posting stays unauthorized per platform until its contract evidence exists; SETTLEMENT-1/COMMISSION-1 stay blocked. |
+| DG-1 | ACCOUNTING-1 | **RESOLVED 2026-10-03.** Option A, implemented by DLV-ACCOUNTING-1. |
+| DG-2 | POS-1, ACCOUNTING-1 | **RESOLVED 2026-10-03** for the manual POS flow. Side table implemented by DLV-ACCOUNTING-1. |
+| DG-3 | COMMISSION-1, SETTLEMENT-1, tax point | **PARTIALLY RESOLVED / EXTERNAL EVIDENCE GATE.** Simple-collector foundation is implemented. Fee/fee-tax/commission-VAT/tax-point/agent-principal stay unauthorized per platform. |
 | DG-4 | CLOSE-1 | Untouched — OPEN |
-| DG-6 | HUB-1, REFUND-1, CONNECTOR-CORE-1 | Untouched — OPEN |
+| DG-5 | — | **CLOSED** in DLV-EVIDENCE-1 (reuse `SalesChannel` type `external`). |
+| DG-6 | Architecture only. Invoice creation stays on DG-6-TRIGGER. | **ACCEPTED WITH NARROWING.** Option B: tenant/branch operational inbox, not `CommerceOrder`, no revenue/VAT/COGS/stock/cash/AR clearing on receive, route, accept, prepare, or cancel-before-post. |
+| DG-6-TRIGGER | Only the transition from an operational delivery order to a canonical posted invoice | **ACCEPTED 2026-10-03** as OD-DG-6-TRIGGER. Explicit command, not on accept; one transaction; no invented merchant tender; clearing stays off the POS drawer. Acceptance does not authorize building the command (DG-8-IMPORT) or enabling VAT recognition (DG-3). Not a blocker for a projection that creates no invoices. |
 | DG-7 | CONNECTOR-CORE-1 | Untouched — OPEN |
-| DG-8 | POS-1 and later channel pricing | Untouched — OPEN |
-| DG-9 | HUB-1, POS-1 | Untouched — OPEN |
-| DG-5 | RESOLVED in DLV-EVIDENCE-1-REPORT.md (reuse `SalesChannel` type `external`, slug `delivery-<platform>`) | CLOSED |
+| DG-8 | POS-1 | **ACCEPTED.** Platform selection does not change canonical POS price. No new channel pricing in DLV-POS-1. |
+| DG-8-IMPORT | Future non-POS imported order price (provider price vs AWJ catalog) | **OPEN / PROPOSED.** Not accepted. Does not reopen OD-DG-8. Blocks building the financial command only. |
+| DG-9-POS | POS-1 | **ACCEPTED.** No new permission merely to select an active configured platform on an authorized POS sale. |
+| DG-9-HUB | Full HUB-1 authorization, and the authorization half of any future projection-only Hub | **ACCEPTED 2026-10-03** as OD-DG-9-HUB. `delivery_hub.view` + `delivery_hub.operate`; posting later still needs existing `invoices.manage` plus view. Not implemented. |
 
 A task must not be promoted to `ready` while any gate mapped to it is unresolved.
 
-**Dependency readiness after the 2026-10-03 owner decisions (evidence-based; code existing is not readiness; a decision recorded is not implementation):**
-- **DLV-ACCOUNTING-1 is now READY**, strictly bounded to the DG-3-authorized simple-collector foundation (DG-1 posting shape + DG-2 customer/snapshot): gross invoice unchanged, platform-clearing AR payment per Option A, dedicated immutable side-table snapshot. **Explicitly excluded from this bounded scope:** `fee_tax` posting, commission VAT recovery, tax-point assumptions, per-platform GL accounts, `JournalLine` platform dimension, `Partner`-as-platform. Implementation has **not** started — this pass only records the decision and recomputes readiness.
-- **DLV-POS-1 remains BLOCKED**, narrowed from DG-2/DG-8/DG-9 to DG-8/DG-9 only (DG-2 no longer blocks it).
-- **DLV-HUB-1 remains BLOCKED** on DG-6/DG-9 (unchanged).
-- **DLV-SETTLEMENT-1 remains BLOCKED** on ACCOUNTING-1 (now ready, but SETTLEMENT-1 itself still needs ACCOUNTING-1's implementation to exist) plus per-platform DG-3 evidence (unresolved for all six platforms).
-- DLV-COMMISSION-1, RECON-1, REFUND-1, CLOSE-1, CONNECTOR-CORE-1 and the provider tasks remain blocked by their own dependencies, unchanged by this pass.
+**Dependency readiness after DELIVERY-DECISION-PASS-4 (in review, not merged):**
+- **DLV-POS-1 is merged** (PR #1194, squash `42c0deb91909755fa1e59cada84fa90f57a897cd`). No production deploy.
+- **DELIVERY-DECISION-PASS-3 is merged** (PR #1195, squash `615d634a1ab387b12b5124917ff435c762f1aca3`). OD-DG-9-HUB and OD-DG-6-TRIGGER stand. They are not a build permit for the financial command.
+- **DLV-HUB-1 (full) is BLOCKED** and stays separate. Building the financial command is still blocked on DG-8-IMPORT. Enabling VAT recognition is still blocked on DG-3.
+- **Projection-only Hub specification is READY and is not started.** OD-HUB-STATES, OD-HUB-IDENTITY, and OD-DG-9-HUB are accepted, with the pre-post rule. READY means a later implementation of the operational projection only: no `InvoiceService`, no `PaymentService`, no VAT, no COGS, no stock movement, no POS session, and no financial transition. This PR does not add that task and does not start it.
+- **DLV-COMMISSION-1 remains BLOCKED** (EXTERNAL_EVIDENCE_REQUIRED under DG-3).
+- **DLV-SETTLEMENT-1 remains BLOCKED** on COMMISSION-1 and per-platform DG-3 evidence.
+- DLV-RECON-1, REFUND-1, CLOSE-1, CONNECTOR-CORE-1 and the provider tasks remain blocked on their own dependencies.
 
-Next task: implement DLV-ACCOUNTING-1 within the bounded scope above, once separately authorized to start (this pass stops at the decision/report; it does not launch implementation).
+Next step is not an implementation. Do not start the projection Hub, full HUB-1, commission, settlement, connector, or refund work from this PR. Merge != Deploy.
 
