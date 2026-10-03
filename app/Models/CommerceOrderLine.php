@@ -21,7 +21,7 @@ class CommerceOrderLine extends BaseModel implements CompanyWide
     use ResolvesBranchReferences;
 
     protected $fillable = [
-        'tenant_id', 'commerce_order_id', 'product_id', 'product_variant_id',
+        'tenant_id', 'commerce_order_id', 'parent_line_id', 'product_id', 'product_variant_id',
         'product_name_snapshot', 'variant_descriptor_snapshot',
         'quantity', 'unit_name', 'unit_factor', 'unit_price', 'line_total',
     ];

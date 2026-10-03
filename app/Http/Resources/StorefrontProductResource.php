@@ -79,6 +79,19 @@ class StorefrontProductResource extends JsonResource
         return $this;
     }
 
+    /** @var array<int, array<string, mixed>> FLOWERS-H6 / ADR-18 — الإضافات المتاحة (تفصيل فقط). */
+    private array $addons = [];
+
+    /**
+     * @param  array<int, array<string, mixed>>  $addons
+     */
+    public function withAddons(array $addons): static
+    {
+        $this->addons = $addons;
+
+        return $this;
+    }
+
     public function toArray(Request $request): array
     {
         $thumbnail = $this->galleryMedia[0] ?? null;
@@ -107,6 +120,7 @@ class StorefrontProductResource extends JsonResource
             'variants' => $this->when($this->variants !== null, fn () => $this->variants),
             'content_blocks' => $this->when($this->detailed && $this->contentBlocks !== [], fn () => $this->contentBlocks),
             'personalization' => $this->when($this->detailed && $this->personalization !== [], fn () => ['fields' => $this->personalization]),
+            'addons' => $this->when($this->detailed && $this->addons !== [], fn () => $this->addons),
             'created_at' => $this->resource->created_at?->toIso8601String(),
             'updated_at' => $this->resource->updated_at?->toIso8601String(),
         ];

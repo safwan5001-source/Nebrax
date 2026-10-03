@@ -8,6 +8,7 @@ use App\Models\CommerceCheckout;
 use App\Models\CommerceListing;
 use App\Models\CommerceOrder;
 use App\Models\CommercePaymentIntent;
+use App\Models\CommerceProductAddon;
 use App\Models\PaymentMethod;
 use App\Models\Product;
 use App\Models\ProductWarehouseStock;
@@ -645,9 +646,19 @@ final class CommerceCheckoutService
         $lines = [];
         $failures = [];
 
+        $byId = $items->keyBy('id');
+
         foreach ($items as $item) {
             if ($item->product_id === null) {
                 $failures[] = ['item_id' => $item->id, 'reason' => 'unavailable'];
+
+                continue;
+            }
+
+            // FLOWERS-H6 / ADR-18 — سطر إضافة: العلاقة بأبيه ما زالت معرَّفة ونشطة وضمن الحد
+            // وكميته = كمية الأب × كمية لكل أب؛ وإلا review-required بلا طلب.
+            if ($item->parent_item_id !== null && ! $this->addonRelationHolds($item, $byId->get($item->parent_item_id))) {
+                $failures[] = ['item_id' => $item->id, 'reason' => 'addon_unavailable'];
 
                 continue;
             }
@@ -773,6 +784,9 @@ final class CommerceCheckoutService
                 'unit_price' => $price->amount,
                 'line_total' => $price->amount * $item->quantity,
                 'personalization' => $personalizationRows,
+                // مفاتيح داخلية لربط أسطر الإضافات بأبيها عند إنشاء الطلب (تُنزَع هناك).
+                'cart_item_id' => $item->id,
+                'parent_cart_item_id' => $item->parent_item_id,
             ];
         }
 
@@ -781,6 +795,32 @@ final class CommerceCheckoutService
         }
 
         return $lines;
+    }
+
+    /**
+     * FLOWERS-H6 / ADR-18 — هل ما زالت علاقة الإضافة بأبيها قائمة وقت الإتمام؟ تُقرأ مقابل
+     * `commerce_product_addons` **الحالية** (قد يعدّلها التاجر بين الإضافة للسلة والإتمام).
+     */
+    private function addonRelationHolds(CommerceCartItem $child, ?CommerceCartItem $parent): bool
+    {
+        if ($parent === null || $parent->product_id === null) {
+            return false;
+        }
+
+        $relation = CommerceProductAddon::query()
+            ->where('product_id', $parent->product_id)
+            ->where('addon_product_id', $child->product_id)
+            ->where('is_active', true)
+            ->first();
+        if ($relation === null || ($relation->addon_variant_id ?? null) !== ($child->product_variant_id ?? null)) {
+            return false;
+        }
+
+        $perParent = (int) ($child->per_parent_quantity ?? 0);
+
+        return $perParent >= 1
+            && $perParent <= $relation->max_quantity
+            && $child->quantity === $perParent * $parent->quantity;
     }
 
     /**

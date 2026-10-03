@@ -1,6 +1,6 @@
 # AWJ Flowers & Gifts — Horizon 1 Progress
 
-**Status:** IN PROGRESS — H1–H4 merged; H5 in CI  
+**Status:** IN PROGRESS — H1–H5 merged; H6 in review  
 **Date:** 2026-10-03  
 **Planning Base:** `main` @ `318cc72d10bb304cef4b401f548772008ea1618e`  
 **Execution Authority:** `AWJ_FLOWERS_HORIZON_1_AUTONOMOUS_EXECUTION.md`  
@@ -21,7 +21,7 @@ Completed and merged before Horizon implementation:
 | Flowers & Gifts vertical direction | MERGED | PR #1179 / Merge SHA `318cc72d10bb304cef4b401f548772008ea1618e` |
 | Autonomous implementation Horizon | DOCUMENTATION IN PROGRESS | this planning branch |
 
-H1–H4 are merged (see the per-slice log below); the open Flowers backlog was emptied before H5 was rebuilt on the new main and opened as a PR. H6 exists only locally and does not start until H5 is merged. One slice at a time: review → CI → merge → sync main → next.
+H1–H5 are merged (see the per-slice log below); the open Flowers backlog was emptied before H5 was rebuilt on the new main, and H6 was rebuilt on the H5 main. One slice at a time: review → CI → merge → sync main → next.
 
 No Deploy or Production change is authorized by this Horizon.
 
@@ -38,8 +38,8 @@ No Deploy or Production change is authorized by this Horizon.
 | H2d | Taxonomy — merchandising admin UI | MERGED | #1190 | `1e8ba70` |
 | H3 | Gifting Identity & Gift Message | MERGED | #1191 | `d2b8cac` |
 | H4 | Personalization | MERGED | #1192 | `a4866df` |
-| H5 | Structured Product Content | PR OPEN, rebuilt on main, in CI | (see log) | — |
-| H6 | Add-ons | NOT STARTED | — | — |
+| H5 | Structured Product Content | MERGED | #1199 | `8663d48` |
+| H6 | Add-ons | PR OPEN, in review | (see log) | — |
 | H7 | Delivery Scheduling Contract | NOT STARTED | — | — |
 | H8 | Availability / Same-day | NOT STARTED | — | — |
 | H9 | Store Builder Flowers Experience | NOT STARTED | — | — |
@@ -322,6 +322,54 @@ Copy this section for every completed/active slice.
 #### Next
 
 - H5 (structured content), rebuilt on this main.
+
+---
+
+### H5 — Structured product content (ADR-17)
+
+**Status:** MERGED  
+**Base SHA:** `a4866dfd4df2fa5919e49d51ee2f846f6021b6f6` (main after H4)  
+**Branch:** `flowers/h5-structured-content`  
+**PR:** #1199  
+**Head SHA:** `e409a533ba71126aeebceadfa4cf18c44081d3ca`  
+**Merge SHA:** `8663d489b618c03d31439dc6ce885b6e5fb267e0` (squash)
+
+#### What was implemented
+
+- Merchant-authored content blocks per product (composition, care, natural variation, included items, dimensions, materials, allergens, storage, preparation notes, personalization instructions): plain text only, never HTML, ordered, individually activatable.
+- Admin `GET/PUT products/{id}/content` (atomic replace, RBAC like publication); public product detail exposes active blocks only, and the key is absent when none exist.
+- `CommerceProductContentBlock` is `OWNED_CHILD` and removed with a true product delete.
+
+#### Tests / CI / risks
+
+- API, lifecycle, isolation, public-exposure and contract tests passed locally on PostgreSQL and sqlite; CI sqlite, pgsql and web build green on the head (one unrelated `ZatcaQrCertificateMaterialExtractorTest` random-key failure was re-run once and passed).
+- No admin or shopper UI yet (planned with the PDP/builder slices).
+
+---
+
+### H6 — Add-ons backed by real products (ADR-18)
+
+**Status:** PR OPEN, in review  
+**Base SHA:** `8663d489b618c03d31439dc6ce885b6e5fb267e0` (main after H5)  
+**Branch:** `flowers/h6-addons`  
+
+#### What was implemented
+
+- ADR-18: an add-on is an explicit parent ⇒ real-product relation (`commerce_product_addons`); price, stock and publication always come from the add-on product's own paths. The client sends product ids and quantities only; any price field is rejected.
+- Cart: each add-on is its own child line (`parent_item_id`), quantity = parent quantity × per-parent quantity (recomputed on parent update, removed with the parent, child lines cannot be edited or removed directly). The selection is folded into the parent's line signature, so different selections are separate lines and identical ones merge. Guest-to-customer merge re-adds the parent with its add-ons.
+- Checkout re-validates every relation at completion (inactive relation, lowered max, unpublished add-on → `addon_unavailable`, review-required, no order); add-on stock and price are checked and resolved per line. Order lines keep `parent_line_id`; payloads gain `addon_of`/`line_id` only when add-ons exist.
+- Admin `GET/PUT products/{id}/addons` (RBAC like publication, self-service denied); public product detail exposes sellable add-ons (published, priced, with availability) and the key is absent when there are none.
+- Product lifecycle: the relation is `OWNED_CHILD` and cleaned when the product is either the parent or the add-on.
+- Hardening carried from H4 review: the product lock in personalization/add-on replacement keeps tenant + soft-delete scopes, so a product deleted after load is a 404 instead of a foreign-key failure (tested).
+- SQLite-only: adding the parent foreign key rebuilds the table and drops the partial `WHERE` of the cart identity indexes, so the migration recreates them (caught by the existing variant tests).
+
+#### Tests
+
+- `CommerceProductAddonApiTest` (10) and `CommerceAddonCartTest` (18); 1342 Commerce/Storefront/registry/contract/boundary tests passed on PostgreSQL and the same set on sqlite (the only local failures are `FuelSaleServiceTest`, which needs the `bcmath` extension absent from this container and is unrelated).
+
+#### Risks
+
+- No admin or shopper UI yet; add-on pricing has no discount modifiers in V1 (no tax or posting change; CommerceOrder is still not an Invoice).
 
 ---
 

@@ -289,8 +289,9 @@ final class CommerceCartService
             }
 
             if ($guestCart !== null && $customerCart !== null) {
-                foreach ($guestCart->items()->get() as $item) {
-                    if ($item->product_id === null) {
+                foreach ($guestCart->items()->with(['personalizations', 'addonItems'])->get() as $item) {
+                    // FLOWERS-H6: أسطر الإضافات تُعاد بناؤها مع أبيها، لا بمعزل عنه.
+                    if ($item->product_id === null || $item->parent_item_id !== null) {
                         continue;
                     }
 
@@ -303,6 +304,11 @@ final class CommerceCartService
                             $item->product_variant_id,
                             // FLOWERS-H4b: التخصيص ينتقل مع السطر (يُعاد التحقق منه مقابل التعريف الحالي).
                             $item->personalizations->isEmpty() ? null : ProductPersonalizationService::inputFromRows($item->personalizations),
+                            $item->addonItems->isEmpty() ? null : $item->addonItems->map(fn ($child) => [
+                                'product_id' => $child->product_id,
+                                'product_variant_id' => $child->product_variant_id,
+                                'quantity' => $child->per_parent_quantity ?? 1,
+                            ])->values()->all(),
                         );
                     } catch (ValidationException) {
                         // FLOWERS-H4b: مُدخَل التخصيص لم يعد صالحاً للتعريف الحالي — يسقط هذا السطر
@@ -381,11 +387,11 @@ final class CommerceCartService
     }
 
     /** @return array{cart: CommerceCart, token: ?string, created: bool, data: array<string, mixed>} */
-    public function add(?CommerceCart $knownCart, string $productId, string $unitKey, int $quantity, ?string $variantId = null, ?array $personalization = null): array
+    public function add(?CommerceCart $knownCart, string $productId, string $unitKey, int $quantity, ?string $variantId = null, ?array $personalization = null, ?array $addons = null): array
     {
         $rawToken = null;
 
-        return DB::transaction(function () use ($knownCart, $productId, $unitKey, $quantity, $variantId, $personalization, &$rawToken): array {
+        return DB::transaction(function () use ($knownCart, $productId, $unitKey, $quantity, $variantId, $personalization, $addons, &$rawToken): array {
             $context = $this->context();
             $created = false;
 
@@ -455,7 +461,9 @@ final class CommerceCartService
             // FLOWERS-H4b / ADR-16 — مُدخَل التخصيص يُتحقَّق من الخادم مقابل التعريفات النشطة
             // الحالية، وبصمته جزء من هوية السطر (منتج + مُدخَل مختلف ⇒ سطر منفصل).
             $personalizationRows = app(ProductPersonalizationService::class)->normalizeInput($candidate['product'], $personalization);
-            $signature = ProductPersonalizationService::signature($personalizationRows);
+            // FLOWERS-H6 / ADR-18 — اختيار الإضافات يُتحقَّق من علاقات الأب النشطة، ويدخل في بصمة السطر.
+            $addonSelection = app(ProductAddonService::class)->normalizeSelection($candidate['product'], $addons);
+            $signature = ProductPersonalizationService::signature($personalizationRows, $addonSelection);
 
             $line = CommerceCartItem::query()
                 ->where('cart_id', $cart->id)
@@ -467,6 +475,7 @@ final class CommerceCartService
                 ->first();
 
             $nameSnapshot = $this->nameSnapshot($candidate['product'], $variant);
+            $newLine = null;
 
             if ($line !== null) {
                 $quantity = $this->safeQuantityAdd($line->quantity, $quantity);
@@ -491,6 +500,10 @@ final class CommerceCartService
                 }
             }
 
+            if ($addonSelection !== []) {
+                $this->syncAddonLines($cart, $line ?? $newLine, $addonSelection);
+            }
+
             $cart->update(['expires_at' => now()->addDays(self::LIFETIME_DAYS)]);
 
             return [
@@ -500,6 +513,59 @@ final class CommerceCartService
                 'data' => $this->serialize($cart),
             ];
         }, 3);
+    }
+
+    /**
+     * FLOWERS-H6 / ADR-18 — ينشئ/يحدّث أسطر الإضافات لسطر أب: كل إضافة سطر مستقل مفتاحه
+     * `a:<parent id>` وكميته = كمية الأب × كمية لكل أب. أهلية البيع (نشر/سعر/وحدة) عبر
+     * `purchasable()` نفسه — فإضافة غير قابلة للشراء ترفض الإضافة كلها (معاملة واحدة).
+     *
+     * @param  list<array{addon_product_id: string, addon_variant_id: ?string, per_parent_quantity: int}>  $selection
+     */
+    private function syncAddonLines(CommerceCart $cart, CommerceCartItem $parent, array $selection): void
+    {
+        foreach ($selection as $addon) {
+            $candidate = $this->purchasable($addon['addon_product_id'], 'base', $addon['addon_variant_id'], lockEligibility: true);
+            $signature = 'a:'.$parent->id;
+            $quantity = $this->safeMultiply($addon['per_parent_quantity'], $parent->quantity);
+
+            $child = CommerceCartItem::query()
+                ->where('cart_id', $cart->id)
+                ->where('product_id', $candidate['product']->id)
+                ->where('product_variant_id', $candidate['variant']?->id)
+                ->where('unit_key', $candidate['unit_key'])
+                ->where('personalization_signature', $signature)
+                ->lockForUpdate()
+                ->first();
+
+            $attributes = [
+                'quantity' => $quantity,
+                'product_name_snapshot' => $this->nameSnapshot($candidate['product'], $candidate['variant']),
+                'unit_name_snapshot' => $candidate['unit_name'],
+                'parent_item_id' => $parent->id,
+                'per_parent_quantity' => $addon['per_parent_quantity'],
+            ];
+
+            if ($child !== null) {
+                $child->update($attributes);
+            } else {
+                CommerceCartItem::create($attributes + [
+                    'cart_id' => $cart->id,
+                    'product_id' => $candidate['product']->id,
+                    'product_variant_id' => $candidate['variant']?->id,
+                    'unit_key' => $candidate['unit_key'],
+                    'personalization_signature' => $signature,
+                ]);
+            }
+        }
+    }
+
+    /** يعيد حساب كميات أسطر الإضافات بعد تغيّر كمية الأب (الكمية الجديدة للأب محفوظة سلفاً). */
+    private function recomputeAddonQuantities(CommerceCartItem $parent): void
+    {
+        foreach ($parent->addonItems()->lockForUpdate()->get() as $child) {
+            $child->update(['quantity' => $this->safeMultiply((int) ($child->per_parent_quantity ?? 1), $parent->quantity)]);
+        }
     }
 
     /** @return array<string, mixed> */
@@ -517,8 +583,14 @@ final class CommerceCartService
                 throw new CartNotFoundException('عنصر السلة غير متاح للتحديث.');
             }
 
+            if ($line->parent_item_id !== null) {
+                // FLOWERS-H6: كمية الإضافة = كمية الأب × كمية لكل أب — تتبع الأب ولا تُعدَّل منفردة.
+                throw new RuntimeException('كمية الإضافة تتبع كمية المنتج الأساسي.');
+            }
+
             $this->purchasable($line->product_id, $line->unit_key, $line->product_variant_id, lockEligibility: true);
             $line->update(['quantity' => $quantity]);
+            $this->recomputeAddonQuantities($line);
             $cart->update(['expires_at' => now()->addDays(self::LIFETIME_DAYS)]);
 
             return $this->serialize($cart);
@@ -538,6 +610,11 @@ final class CommerceCartService
 
             if ($line === null) {
                 throw new CartNotFoundException('عنصر السلة غير موجود.');
+            }
+
+            if ($line->parent_item_id !== null) {
+                // FLOWERS-H6: الإضافة جزء من هوية سطر أبيها (بصمته)؛ تُزال بإزالة الأب وإعادة إضافته.
+                throw new RuntimeException('تُزال الإضافة بإزالة المنتج الأساسي.');
             }
 
             $line->delete();
@@ -596,6 +673,11 @@ final class CommerceCartService
                 'line_total' => ['amount_minor' => $lineTotal, 'currency' => $currency],
                 'available' => $available,
             ];
+            if ($line->parent_item_id !== null) {
+                // FLOWERS-H6 / ADR-18 — سطر إضافة: يشير إلى سطر أبيه؛ السطر العادي بلا تغيير.
+                $items[array_key_last($items)]['addon_of'] = $line->parent_item_id;
+                $items[array_key_last($items)]['per_parent_quantity'] = $line->per_parent_quantity;
+            }
             if ($line->personalizations->isNotEmpty()) {
                 // يظهر فقط للسطر المخصَّص — سطر عادي بلا تغيير في الشكل.
                 $items[array_key_last($items)]['personalization'] = $line->personalizations->map(fn ($p) => [

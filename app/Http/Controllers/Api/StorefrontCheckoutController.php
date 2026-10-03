@@ -324,7 +324,7 @@ final class StorefrontCheckoutController extends PublicApiController
                 'status' => $order->paymentIntent?->status,
                 'payment_method_name' => $order->paymentIntent?->payment_method_name,
             ],
-            'items' => $order->lines->map(fn ($line) => CommerceOrderSerializer::serializeLine($line, $currency))->all(),
+            'items' => CommerceOrderSerializer::serializeLines($order->lines, $currency),
             'created_at' => $order->created_at?->toIso8601String(),
         ];
     }

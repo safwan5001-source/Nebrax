@@ -11,6 +11,7 @@ use App\Services\Commerce\AvailableToSellService;
 use App\Services\Commerce\CommercePriceResolver;
 use App\Services\Commerce\FulfillmentPolicyNotConfiguredException;
 use App\Services\Commerce\FulfillmentPolicyService;
+use App\Services\Commerce\ProductAddonService;
 use App\Services\Commerce\ProductContentService;
 use App\Services\Commerce\ProductPersonalizationService;
 use App\Services\ProductMediaGalleryService;
@@ -224,6 +225,12 @@ class CommerceProductController extends PublicApiController
         $blocks = app(ProductContentService::class)->publicBlocks($id);
         if ($blocks !== []) {
             $resource['content_blocks'] = $blocks;
+        }
+
+        // FLOWERS-H6 / ADR-18 — الإضافات المتاحة، فقط حين توجد.
+        $addons = app(ProductAddonService::class)->publicAddons($id, $channelId, $currency, null, $warehouse, true);
+        if ($addons !== []) {
+            $resource['addons'] = $addons;
         }
 
         return PublicApiResponse::success($request, $resource);

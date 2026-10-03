@@ -24,7 +24,8 @@ final class StorefrontCartController extends PublicApiController
 
     public function store(Request $request, CommerceCartService $carts): JsonResponse
     {
-        $this->rejectUnknown($request, ['product_id', 'product_variant_id', 'unit_key', 'quantity', 'personalization']);
+        $this->rejectUnknown($request, ['product_id', 'product_variant_id', 'unit_key', 'quantity', 'personalization', 'addons']);
+        \App\Services\Commerce\ProductAddonService::rejectUnknownSelectionKeys($request->input('addons'));
         $data = $request->validate([
             'product_id' => ['required', 'uuid'],
             'product_variant_id' => ['sometimes', 'nullable', 'uuid'],
@@ -33,6 +34,11 @@ final class StorefrontCartController extends PublicApiController
             // FLOWERS-H4b / ADR-16 — خريطة مفتاح⇒نص؛ التحقق الفعلي مقابل تعريفات المنتج في الخدمة.
             'personalization' => ['sometimes', 'nullable', 'array', 'max:8'],
             'personalization.*' => ['nullable', 'string', 'max:2000'],
+            // FLOWERS-H6 / ADR-18 — معرّفات منتجات وكمية لكل أب فقط؛ لا حقل سعر، والتحقق في الخدمة.
+            'addons' => ['sometimes', 'nullable', 'array', 'max:'.\App\Services\Commerce\ProductAddonService::MAX_ADDONS],
+            'addons.*.product_id' => ['required', 'uuid'],
+            'addons.*.product_variant_id' => ['sometimes', 'nullable', 'uuid'],
+            'addons.*.quantity' => ['sometimes', 'integer', 'min:1', 'max:'.\App\Models\CommerceProductAddon::MAX_QUANTITY_CEILING],
         ]);
 
         $lookup = $carts->findByToken($request->cookie(CommerceCartService::COOKIE_NAME));
@@ -48,6 +54,7 @@ final class StorefrontCartController extends PublicApiController
                 $data['quantity'],
                 $data['product_variant_id'] ?? null,
                 $data['personalization'] ?? null,
+                isset($data['addons']) ? array_values($data['addons']) : null,
             );
         } catch (CartNotFoundException) {
             return $this->clearCookie($this->notFound($request));
@@ -109,6 +116,10 @@ final class StorefrontCartController extends PublicApiController
             $data = $carts->remove($lookup['cart'], (string) $request->route('item'));
         } catch (CartNotFoundException) {
             return $this->notFoundAfterMutation($request, $carts);
+        } catch (PDOException $e) {
+            throw $e;
+        } catch (RuntimeException $e) {
+            abort(422, $e->getMessage());
         }
 
         $response = PublicApiResponse::success($request, $data);
