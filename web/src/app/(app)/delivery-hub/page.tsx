@@ -10,6 +10,7 @@ import {
   readHubContext,
   readHubOrders,
   type DeliveryHubAction,
+  type DeliveryHubBranchOption,
   type DeliveryHubOrderView,
   type DeliveryHubState,
 } from '@/lib/delivery-hub';
@@ -18,7 +19,7 @@ import { hasPermission } from '@/lib/permissions';
 interface HubContext {
   can_see_unrouted: boolean;
   platforms: Array<{ id: string; platform_key: string; name: string | null; name_en: string | null }>;
-  branches: Array<{ id: string; name: string }>;
+  branches: DeliveryHubBranchOption[];
 }
 
 export default function DeliveryHubPage() {
