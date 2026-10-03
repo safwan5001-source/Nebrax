@@ -9,6 +9,18 @@ This pass does **not** close DG-1/DG-2/DG-3 on the owner's behalf. Each packet e
 
 ---
 
+## OWNER DECISIONS RECORDED (2026-10-03)
+
+Safwan reviewed this packet and recorded the following decisions. **Nothing is implemented by this update** — it is the durable record of what was decided, so ACCOUNTING-1/POS-1 can be scoped against a closed decision instead of an open option set. Each decision is repeated verbatim (summarized where noted) under its own gate below.
+
+- **DG-1 — RESOLVED.** Option A (dedicated `platform_receivable_clearing` role, sibling in concept to `gateway_clearing`). No GL account per platform. No `Partner`-as-platform for convenience. No `JournalLine` platform dimension in V1. Per-platform reporting via subledger/document data, not separate GL accounts.
+- **DG-2 — RESOLVED** for the current manual POS delivery flow. Tenant's existing default/walk-in POS customer. Delivery platform never becomes `Invoice.partner_id`. Trusted end-customer identity from provider APIs is deferred to a separately designed/evidenced task. Immutable delivery context in a dedicated side table (not widened `invoices`), pinning at minimum: invoice, sales_channel, delivery_platform_profile, delivery_platform_profile_version, external_order_reference, collection_mode. External provider IDs are never authority. Invoice Customer / Sales Channel / Settlement Counterparty stay strictly separate.
+- **DG-3 — PARTIALLY RESOLVED / EXTERNAL EVIDENCE GATE.** Legal/tax role remains UNKNOWN for all six platforms until platform-specific official contract/terms evidence is obtained; one platform's treatment is never inferred from another's. ACCOUNTING-1 is authorized **only** for the tax-role-independent/simple-collector foundation DG-1+DG-2 establish (normal gross invoice, platform clearing of AR, no fabricated cash/bank). **Not authorized by this decision:** platform commission VAT recovery, `fee_tax` posting, platform-specific tax-point assumptions, agent/principal tax treatment, or any settlement tax treatment requiring contract evidence. This is the **currently authorized simple-collector foundation**, not a claim that DG-1/DG-2 behavior is universally correct for every provider regardless of contract — if a provider's contract later establishes a materially different legal role, that provider's integration stops at its own gate and its invoice/customer/tax treatment is reviewed before activation.
+
+See the recomputed **Dependency Matrix** at the end of this report for what these decisions do and do not unlock.
+
+---
+
 ## DG-1 — Platform-collected accounting representation
 
 ### Question
@@ -105,6 +117,17 @@ Option A most directly extends a shipped, tested pattern with the least new surf
 ### Exact owner decision required
 > **Safwan:** confirm whether platform-collected consideration should (a) reuse a `gateway_clearing`-shaped sibling role per Option A, (b) carry a per-platform dimension on the clearing journal line per Option B, or (c) use `Partner` as the settlement counterparty per Option C — and whether per-platform GL-level reporting is a requirement now or can wait for the settlement document itself to carry that detail.
 
+### Owner decision (RESOLVED 2026-10-03)
+> **Option A.** Dedicated `platform_receivable_clearing` role, sibling in concept to `gateway_clearing`, exactly as described above. Binding constraints for ACCOUNTING-1's implementation:
+> - preserve gross invoice/sale (step 1 above, unchanged);
+> - clear invoice AR without fabricating cash/bank (step 2 above, via the new role);
+> - record platform identity on the authoritative delivery/payment/settlement document (the `Payment` row and, later, the settlement document — **not** the GL account, **not** the journal line);
+> - do **not** create a separate GL account per platform;
+> - do **not** use `Partner` as the platform merely for convenience (Option C is closed);
+> - do **not** require a platform dimension on `JournalLine` in V1 (Option B's per-line dimension is closed for V1).
+>
+> Per-platform reporting is required through subledger/document data (`Payment.delivery_platform_profile_id` and the eventual settlement document), not through separate GL accounts or journal-line dimensions. This closes Options B and C for V1; Option A is the implementation path for ACCOUNTING-1.
+
 ---
 
 ## DG-2 — Invoice customer + immutable snapshot location
@@ -163,6 +186,11 @@ Not applicable to DG-2 (purely an internal data-model question).
 ### Exact owner decision required
 > **Safwan:** confirm (1) whether POS delivery sales should always use the tenant's existing default/walk-in customer today, with per-tenant choice of a real end customer deferred to a later task; and (2) confirm the snapshot lives in a new dedicated immutable side table (not new `invoices` columns) keyed to a specific `delivery_platform_profile_version_id`.
 
+### Owner decision (RESOLVED 2026-10-03)
+> **(1) `partner_id`:** for the current manual POS delivery flow, use the tenant's existing configured default/walk-in POS customer (Option 1(a)). The delivery platform must never become `Invoice.partner_id` merely because it collected the money. A future trusted end-customer identity sourced from provider APIs (Options 1(b)/1(c)) is deferred and must be separately designed and evidenced before it is built — it is not authorized by this decision.
+>
+> **(2) Snapshot location:** a dedicated immutable side table (Option 2(b)), not new `invoices` columns. The immutable context must pin at least: invoice, sales_channel, delivery_platform_profile, delivery_platform_profile_version, external_order_reference, collection_mode. External provider IDs are never authority (unchanged from the packet's evidence). Invoice Customer, Sales Channel, and Settlement Counterparty remain strictly separate — the snapshot records the channel/profile/version/reference/collection-mode context, never a counterparty identity (that remains DG-1/ACCOUNTING-1 scope, recorded on the `Payment`/settlement document, not here).
+
 ---
 
 ## DG-3 — Tax / ZATCA role (legal/tax decision gate — no inference)
@@ -219,15 +247,24 @@ Treat DG-3 as blocking any **settlement** posting (SETTLEMENT-1) for every platf
 ### Exact owner decision required
 > **Safwan:** produce (or confirm AWJ does not yet hold) a signed merchant agreement or official tax-role statement for each of the six platforms. Until produced, confirm that ACCOUNTING-1 may proceed with DG-1 steps 1–2 (gross-preserving invoice + clearing payment, tax-role-independent) while SETTLEMENT-1/COMMISSION-1 (fee/fee-tax posting) remain blocked per-platform pending that evidence.
 
+### Owner decision (PARTIALLY RESOLVED / EXTERNAL EVIDENCE GATE — 2026-10-03)
+> For all six platforms, legal/tax role remains **UNKNOWN** until platform-specific official contract/terms evidence is obtained. One platform's tax treatment is never inferred from another's — each of the six is evaluated independently when its evidence arrives.
+>
+> **Authorized now:** ACCOUNTING-1 may proceed, but **only** for the tax-role-independent/simple-collector foundation DG-1 and DG-2 establish — normal gross invoice, platform clearing of AR, no fabricated cash/bank (DG-1's steps 1–2).
+>
+> **Not authorized by this decision** (for any platform, pending its own contract evidence): platform commission VAT recovery; `fee_tax` posting; platform-specific tax-point assumptions; agent/principal tax treatment; any settlement tax treatment requiring contract evidence. These remain blocked on SETTLEMENT-1/COMMISSION-1 per platform, exactly as the packet's own recommendation already stated.
+>
+> **Important — scope of this authorization:** this does not state that DG-1/DG-2 behavior is universally correct for every provider regardless of contract. It is the currently authorized simple-collector foundation only. If a provider's contract later establishes a materially different legal role (e.g. that provider transacts with the end customer in its own name), that provider's integration must stop at its own gate, and its invoice/customer/tax treatment must be reviewed before activation — the foundation built for the simple-collector case is not assumed to carry over unreviewed.
+
 ---
 
-## Dependency Matrix
+## Dependency Matrix (recomputed after the 2026-10-03 owner decisions)
 
-| Task | Depends on | Status after this pass | Why |
+| Task | Depends on | Status after owner decisions | Why |
 |---|---|---|---|
-| **DLV-POS-1** | FOUNDATION-1 (done) + DG-2 | **BLOCKED** | DG-2 (invoice customer + snapshot location) is not an owner decision yet — only a recommended option set. POS-1's acceptance criteria require knowing where channel/version/external-ref are stamped before the checkout request/checksum can be scoped. |
+| **DLV-ACCOUNTING-1** | FOUNDATION-1 (done) + DG-1 (resolved) + DG-2 (resolved) + DG-3 (bounded) | **READY — bounded scope only** | DG-1 closes the posting shape (Option A, `platform_receivable_clearing`), DG-2 closes the customer/snapshot question (default/walk-in customer + dedicated immutable side table), and DG-3 explicitly authorizes exactly this bounded scope (gross invoice + AR clearing, no fabricated cash/bank) as the tax-role-independent simple-collector foundation. **Scope is bounded**: no `fee_tax`, no commission VAT recovery, no tax-point assumption, no per-platform GL account, no `JournalLine` platform dimension, no `Partner`-as-platform. Those remain out of ACCOUNTING-1 by the owner's own decision and stay with SETTLEMENT-1/COMMISSION-1, each still blocked. **Not started by this pass** — DELIVERY-DECISION-PASS-1 recorded the decision only; implementation is a separate authorized task. |
+| **DLV-POS-1** | FOUNDATION-1 (done) + DG-2 (resolved) + DG-8, DG-9 (untouched) | **BLOCKED** (narrowed) | DG-2 is now resolved and no longer blocks POS-1. DG-8 (channel-price precedence vs. partner price list) and DG-9 (dedicated capability key/permission strings) are **untouched by this owner-decision pass** — it covered DG-1/DG-2/DG-3 only. POS-1 remains blocked until DG-8 and/or DG-9 are themselves resolved or explicitly scoped out of a first POS-1 slice. |
 | **DLV-HUB-1** | FOUNDATION-1 (done) + DG-6, DG-9 | **BLOCKED** (unchanged) | DG-6 (inventory-consumption event for API-ingested orders, `CommerceOrder` vs. separate projection) and DG-9 (capability key/permissions) are untouched by this pass — out of its scope (DG-1/2/3 only). |
-| **DLV-ACCOUNTING-1** | FOUNDATION-1 (done) + DG-1, DG-2, DG-3 | **BLOCKED** | DG-1 (posting representation), DG-2 (where the counterparty/customer identity question is settled), and DG-3 (tax role, gates settlement-adjacent posting only — but ACCOUNTING-1's own acceptance criteria per the Horizon plan bundle DG-1 resolution as a prerequisite) all require an owner decision, not just options. |
-| **DLV-SETTLEMENT-1** | ACCOUNTING-1 + COMMISSION-1 + DG-3 (per-platform) | **BLOCKED** | Depends on ACCOUNTING-1 (itself blocked) and is additionally gated per-platform on DG-3's external evidence (fee/fee-tax posting). |
+| **DLV-SETTLEMENT-1** | ACCOUNTING-1 (now ready, bounded) + COMMISSION-1 + DG-3 (per-platform, unresolved) | **BLOCKED** | DG-3's owner decision explicitly withholds authorization for fee/fee-tax/commission posting per platform until that platform's own contract evidence exists. Remains blocked regardless of ACCOUNTING-1's bounded readiness. |
 
-**Net effect of this pass:** no task moves from BLOCKED to READY. This pass converts three open-ended Decision Gates into three concrete, answerable owner questions (see each packet's "Exact owner decision required"), which is the explicit purpose of DELIVERY-DECISION-PASS-1. DG-5 remains the only resolved gate (from DLV-EVIDENCE-1); DG-4, DG-6, DG-7, DG-8, DG-9 are unchanged and out of this pass's scope.
+**Net effect of this owner-decision update:** **DLV-ACCOUNTING-1 is now dependency-ready**, strictly bounded to the tax-role-independent simple-collector foundation named in the DG-3 decision — implementation is a separate, not-yet-started task. **DLV-POS-1 remains BLOCKED**, narrowed from three blocking gates to two (DG-8, DG-9), neither touched by this pass. DLV-HUB-1 and DLV-SETTLEMENT-1 are unchanged. DG-5 remains resolved (from DLV-EVIDENCE-1); DG-1/DG-2 are now resolved/RESOLVED, DG-3 is PARTIALLY RESOLVED (external evidence gate, per-platform); DG-4, DG-6, DG-7, DG-8, DG-9 are unchanged and remain open.

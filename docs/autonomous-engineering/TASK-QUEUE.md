@@ -1247,15 +1247,15 @@ Only evidence-backed statuses are recorded here; unlisted tasks of the horizon p
 |---|---|---|---|---|---|
 | 0 | DLV-EVIDENCE-1 | done (merged; PR #1171, merge SHA `c0098d38762fc2d113ab189fd7d85acebe0f5c8f`; POST_MERGE_REVIEW: PASS recorded by the owner — main CI sqlite was green and pgsql in progress when last observed here) | high | accepted decision | `docs/plans/pos/DLV-EVIDENCE-1-REPORT.md` |
 | 1 | DLV-FOUNDATION-1 | done (merged; PR #1174, merge SHA `5e80830033aed602833afd091b28857f92d9f068`; PRE_MERGE_REVIEW: PASS and POST_MERGE_REVIEW: PASS recorded by the owner) | high | DLV-EVIDENCE-1 (done) | `docs/plans/pos/DLV-FOUNDATION-1-IMPLEMENTATION-REPORT.md` |
-| 2 | DELIVERY-DECISION-PASS-1 | in_review (PR open against base `5e80830033aed602833afd091b28857f92d9f068`) | high | DLV-FOUNDATION-1 (done) | `docs/plans/pos/DELIVERY-DECISION-PASS-1-REPORT.md` |
+| 2 | DELIVERY-DECISION-PASS-1 | in_review (PR #1177 open against base `5e80830033aed602833afd091b28857f92d9f068`; owner decisions for DG-1/DG-2/DG-3 recorded 2026-10-03) | high | DLV-FOUNDATION-1 (done) | `docs/plans/pos/DELIVERY-DECISION-PASS-1-REPORT.md` |
 
-Owed gates — authoritative text and blocker mapping is report §11; complete mapping copied here (none blocks FOUNDATION-1):
+Owed gates — authoritative text and blocker mapping is report §11 (DLV-EVIDENCE-1-REPORT.md); resolutions below are recorded in `DELIVERY-DECISION-PASS-1-REPORT.md`'s "OWNER DECISIONS RECORDED (2026-10-03)" section:
 
 | Gate | Blocks | Status |
 |---|---|---|
-| DG-1 | ACCOUNTING-1 | Decision Packet prepared (`DELIVERY-DECISION-PASS-1-REPORT.md`); still OPEN — awaiting owner decision |
-| DG-2 | POS-1, ACCOUNTING-1 | Decision Packet prepared; still OPEN — awaiting owner decision |
-| DG-3 | ACCOUNTING-1, SETTLEMENT-1 | Decision Packet prepared; still OPEN — per-platform OWNER_GATE (no merchant contract held for any of the six platforms) |
+| DG-1 | ACCOUNTING-1 | **RESOLVED 2026-10-03.** Option A: dedicated `platform_receivable_clearing` role (sibling to `gateway_clearing`). No per-platform GL account, no `Partner`-as-platform, no `JournalLine` platform dimension in V1. Per-platform reporting via subledger/document data. |
+| DG-2 | POS-1, ACCOUNTING-1 | **RESOLVED 2026-10-03** for the current manual POS flow. `partner_id` = tenant's default/walk-in customer (never the platform). Immutable snapshot in a dedicated side table (not new `invoices` columns), pinning invoice/sales_channel/delivery_platform_profile/delivery_platform_profile_version/external_order_reference/collection_mode. Real end-customer identity from provider APIs deferred to a separately designed/evidenced task. |
+| DG-3 | ACCOUNTING-1, SETTLEMENT-1 | **PARTIALLY RESOLVED / EXTERNAL EVIDENCE GATE, 2026-10-03.** Legal/tax role UNKNOWN per platform until that platform's contract is obtained (never inferred cross-platform). ACCOUNTING-1 authorized **only** for the tax-role-independent simple-collector foundation (gross invoice + AR clearing, no fabricated cash/bank). Fee/fee-tax/commission-VAT/tax-point/agent-principal posting stays unauthorized per platform until its contract evidence exists; SETTLEMENT-1/COMMISSION-1 stay blocked. |
 | DG-4 | CLOSE-1 | Untouched — OPEN |
 | DG-6 | HUB-1, REFUND-1, CONNECTOR-CORE-1 | Untouched — OPEN |
 | DG-7 | CONNECTOR-CORE-1 | Untouched — OPEN |
@@ -1263,7 +1263,14 @@ Owed gates — authoritative text and blocker mapping is report §11; complete m
 | DG-9 | HUB-1, POS-1 | Untouched — OPEN |
 | DG-5 | RESOLVED in DLV-EVIDENCE-1-REPORT.md (reuse `SalesChannel` type `external`, slug `delivery-<platform>`) | CLOSED |
 
-A task must not be promoted to `ready` while any gate mapped to it is unresolved. **DELIVERY-DECISION-PASS-1 does not close DG-1/DG-2/DG-3** — it only converts them into concrete owner questions (see the report's "Exact owner decision required" under each packet). They remain OPEN until Safwan answers them.
+A task must not be promoted to `ready` while any gate mapped to it is unresolved.
 
-**Dependency readiness after DELIVERY-DECISION-PASS-1 (evidence-based; code existing is not readiness):** no downstream task is dependency-ready. DLV-ACCOUNTING-1 remains BLOCKED on DG-1/DG-2/DG-3 (owner decision, not just options, required). DLV-POS-1 remains BLOCKED on DG-2/DG-8/DG-9. DLV-HUB-1 remains BLOCKED on DG-6/DG-9. DLV-SETTLEMENT-1 remains BLOCKED on ACCOUNTING-1 plus per-platform DG-3 evidence. DLV-COMMISSION-1, RECON-1, REFUND-1, CLOSE-1, CONNECTOR-CORE-1 and the provider tasks remain blocked by their own dependencies, unchanged by this pass. Next owner action: answer the three "Exact owner decision required" questions in `docs/plans/pos/DELIVERY-DECISION-PASS-1-REPORT.md`.
+**Dependency readiness after the 2026-10-03 owner decisions (evidence-based; code existing is not readiness; a decision recorded is not implementation):**
+- **DLV-ACCOUNTING-1 is now READY**, strictly bounded to the DG-3-authorized simple-collector foundation (DG-1 posting shape + DG-2 customer/snapshot): gross invoice unchanged, platform-clearing AR payment per Option A, dedicated immutable side-table snapshot. **Explicitly excluded from this bounded scope:** `fee_tax` posting, commission VAT recovery, tax-point assumptions, per-platform GL accounts, `JournalLine` platform dimension, `Partner`-as-platform. Implementation has **not** started — this pass only records the decision and recomputes readiness.
+- **DLV-POS-1 remains BLOCKED**, narrowed from DG-2/DG-8/DG-9 to DG-8/DG-9 only (DG-2 no longer blocks it).
+- **DLV-HUB-1 remains BLOCKED** on DG-6/DG-9 (unchanged).
+- **DLV-SETTLEMENT-1 remains BLOCKED** on ACCOUNTING-1 (now ready, but SETTLEMENT-1 itself still needs ACCOUNTING-1's implementation to exist) plus per-platform DG-3 evidence (unresolved for all six platforms).
+- DLV-COMMISSION-1, RECON-1, REFUND-1, CLOSE-1, CONNECTOR-CORE-1 and the provider tasks remain blocked by their own dependencies, unchanged by this pass.
+
+Next task: implement DLV-ACCOUNTING-1 within the bounded scope above, once separately authorized to start (this pass stops at the decision/report; it does not launch implementation).
 
