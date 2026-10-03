@@ -105,39 +105,52 @@ final class CommerceWorkspaceStorefrontsService
             throw new RuntimeException('لا سياق مستأجر نشط.');
         }
 
-        $storefront = Storefront::query()->find($storefrontId);
-        if ($storefront === null || $storefront->tenant_id !== $tenantId) {
-            return null;
-        }
+        return DB::transaction(function () use ($storefrontId, $attributes, $tenantId) {
+            // FLOWERS-H1 atomic settings update:
+            // serialize concurrent settings writes for this storefront and keep
+            // identity + business profile in one database transaction. The
+            // profile service may open a nested Laravel transaction, but it
+            // shares this connection/root transaction and cannot commit these
+            // writes independently.
+            $storefront = Storefront::query()
+                ->whereKey($storefrontId)
+                ->lockForUpdate()
+                ->first();
 
-        $update = [];
-        if (array_key_exists('name', $attributes) && $attributes['name'] !== null) {
-            $update['name'] = $attributes['name'];
-        }
-        if (array_key_exists('default_locale', $attributes) && $attributes['default_locale'] !== null) {
-            $update['default_locale'] = $attributes['default_locale'];
-        }
-
-        if ($update !== []) {
-            $storefront->forceFill($update)->save();
-        }
-
-        if (array_key_exists('business_vertical', $attributes) && $attributes['business_vertical'] !== null) {
-            $vertical = BusinessVertical::tryFrom($attributes['business_vertical']);
-            if ($vertical === null) {
-                throw new RuntimeException('ملف النشاط غير معروف.');
+            if ($storefront === null || $storefront->tenant_id !== $tenantId) {
+                return null;
             }
-            app(StorefrontBusinessProfileService::class)->assign($storefront, $vertical);
-        }
 
-        $this->loadAuthorizedPreviewDomains($storefront);
+            $update = [];
+            if (array_key_exists('name', $attributes) && $attributes['name'] !== null) {
+                $update['name'] = $attributes['name'];
+            }
+            if (array_key_exists('default_locale', $attributes) && $attributes['default_locale'] !== null) {
+                $update['default_locale'] = $attributes['default_locale'];
+            }
 
-        $channel = $storefront->salesChannel;
-        if ($channel === null || $channel->tenant_id !== $tenantId || $channel->type !== SalesChannel::TYPE_WEB) {
-            return null;
-        }
+            if ($update !== []) {
+                $storefront->forceFill($update)->save();
+            }
 
-        return $this->presentStore($storefront, $channel, $tenantId);
+            if (array_key_exists('business_vertical', $attributes) && $attributes['business_vertical'] !== null) {
+                $vertical = BusinessVertical::tryFrom($attributes['business_vertical']);
+                if ($vertical === null) {
+                    throw new RuntimeException('ملف النشاط غير معروف.');
+                }
+
+                app(StorefrontBusinessProfileService::class)->assign($storefront, $vertical);
+            }
+
+            $this->loadAuthorizedPreviewDomains($storefront);
+
+            $channel = $storefront->salesChannel;
+            if ($channel === null || $channel->tenant_id !== $tenantId || $channel->type !== SalesChannel::TYPE_WEB) {
+                return null;
+            }
+
+            return $this->presentStore($storefront, $channel, $tenantId);
+        });
     }
 
     /**
