@@ -148,6 +148,8 @@ class CommerceModuleBoundaryTest extends TestCase
         'commerce/v1/checkout/gift',
         // COM-MOBILE-PAYMENTS-1 — اختيار طريقة الدفع.
         'commerce/v1/checkout/payment',
+        // FLOWERS-H7b / ADR-19 — موعد التسليم (تاريخ + نافذة).
+        'commerce/v1/checkout/schedule',
         // FLOWERS-H2 / ADR-14 §2.3 — مجموعات تسويقية يدوية (قراءة فقط).
         'commerce/v1/collections',
         // FLOWERS-H7a / ADR-19 — خيارات جدولة التسليم المتاحة (قراءة فقط).

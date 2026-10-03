@@ -13,6 +13,7 @@ use App\Services\ApiClientKeyService;
 use App\Services\Commerce\ShippingRateService;
 use App\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
@@ -145,6 +146,39 @@ class CommerceShippingZoneTest extends TestCase
     }
 
     // ── Merchant configuration API (commerce.manage) ────────────────────
+
+    /** @test */
+    public function zone_writes_lock_the_channel_rows_first_inside_their_transaction(): void
+    {
+        if (DB::connection()->getDriverName() !== 'pgsql') {
+            $this->markTestSkipped('FOR UPDATE يظهر في SQL على PostgreSQL فقط.');
+        }
+
+        // FLOWERS-H7b: أهلية نوافذ التسليم تعتمد على المناطق؛ كاتبها يشارك في بروتوكول قفل القناة.
+        $auth = $this->registerTenant('zones-lock', 'owner@zones-lock.test');
+        $baseline = DB::transactionLevel();
+        $log = [];
+        DB::listen(function ($q) use (&$log) {
+            if (str_contains($q->sql, 'from "sales_channels"') && str_contains($q->sql, 'for update')) {
+                $log[] = ['lock', DB::transactionLevel()];
+            } elseif (preg_match('/^(insert into|update|delete from) "commerce_shipping_zones"/', $q->sql)) {
+                $log[] = ['write', DB::transactionLevel()];
+            }
+        });
+
+        $zoneId = $this->withToken($auth['token'])->postJson('/api/commerce/workspace/shipping-zones', [
+            'name' => 'الدمام', 'match_type' => 'city', 'match_value' => 'الدمام', 'rate_amount_minor' => 2500,
+        ])->assertCreated()->json('data.id');
+        $this->withToken($auth['token'])->putJson('/api/commerce/workspace/shipping-zones/'.$zoneId, [
+            'name' => 'الدمام', 'match_type' => 'city', 'match_value' => 'الدمام', 'rate_amount_minor' => 3000,
+        ])->assertOk();
+        $this->withToken($auth['token'])->deleteJson('/api/commerce/workspace/shipping-zones/'.$zoneId)->assertOk();
+
+        $this->assertSame(['lock', 'write', 'lock', 'write', 'lock', 'write'], array_column($log, 0));
+        foreach ($log as [, $level]) {
+            $this->assertGreaterThan($baseline, $level, 'a zone lock/write ran outside its transaction');
+        }
+    }
 
     /** @test */
     public function an_owner_can_create_list_update_and_delete_a_zone(): void

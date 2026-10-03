@@ -165,6 +165,8 @@ Route::middleware([
     Route::patch('checkout/address', [CommerceCheckoutController::class, 'updateAddress'])->name('checkout.address.update');
     // FLOWERS-H3 / ADR-15 — هوية الإهداء ورسالته.
     Route::patch('checkout/gift', [CommerceCheckoutController::class, 'updateGift'])->name('checkout.gift.update');
+    // FLOWERS-H7b / ADR-19 — موعد التسليم (تاريخ + نافذة).
+    Route::patch('checkout/schedule', [CommerceCheckoutController::class, 'updateSchedule'])->name('checkout.schedule.update');
     Route::patch('checkout/delivery', [CommerceCheckoutController::class, 'updateDelivery'])->name('checkout.delivery.update');
     Route::patch('checkout/payment', [CommerceCheckoutController::class, 'updatePayment'])->name('checkout.payment.update');
     Route::post('checkout/complete', [CommerceCheckoutController::class, 'complete'])->name('checkout.complete');
