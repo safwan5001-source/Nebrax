@@ -5,6 +5,7 @@ namespace App\Services\Commerce;
 use App\Models\CommerceCollection;
 use App\Models\CommerceCollectionProduct;
 use App\Models\Product;
+use App\Models\Tenant;
 use App\Support\Commerce\CatalogSlug;
 use App\Tenancy\BranchScope;
 use App\Tenancy\TenantContext;
@@ -46,31 +47,36 @@ final class CommerceCollectionService
     /** @param array{title: string, title_en?: ?string, description?: ?string, slug?: ?string, status?: string, sort_order?: int} $data */
     public function create(array $data): array
     {
-        $this->tenantId();
-
-        if (CommerceCollection::query()->count() >= self::MAX_COLLECTIONS) {
-            throw new CommerceTaxonomyConflictException('بلغت الحد الأقصى لعدد المجموعات.');
-        }
-
+        $tenantId = $this->tenantId();
         $titleEn = $this->nullableTrim($data['title_en'] ?? null);
         $explicit = filled($data['slug'] ?? null);
-        $slug = $explicit
-            ? (string) $data['slug']
-            : CatalogSlug::derive($titleEn ?? $data['title'], fn (string $s) => $this->slugTaken($s, null), 'collection');
-        if ($explicit && $this->slugTaken($slug, null)) {
-            throw new CommerceTaxonomyConflictException('المعرّف النصي (slug) مستخدم بالفعل.');
-        }
 
         try {
             // savepoint: انتهاك القيد الفريد لا يسمّم معاملةً خارجية (PostgreSQL).
-            $collection = DB::transaction(fn () => CommerceCollection::create([
-                'slug' => $slug,
-                'title' => trim($data['title']),
-                'title_en' => $titleEn,
-                'description' => $this->nullableTrim($data['description'] ?? null),
-                'status' => $data['status'] ?? CommerceCollection::STATUS_DRAFT,
-                'sort_order' => $data['sort_order'] ?? 0,
-            ]));
+            $collection = DB::transaction(function () use ($data, $tenantId, $titleEn, $explicit) {
+                // قفل صفّ المستأجر يُسلسل العدّ والإدراج فلا يتجاوز طلبان متزامنان الحد.
+                Tenant::query()->whereKey($tenantId)->lockForUpdate()->first();
+
+                if (CommerceCollection::query()->count() >= self::MAX_COLLECTIONS) {
+                    throw new CommerceTaxonomyConflictException('بلغت الحد الأقصى لعدد المجموعات.');
+                }
+
+                $slug = $explicit
+                    ? (string) $data['slug']
+                    : CatalogSlug::derive($titleEn ?? $data['title'], fn (string $s) => $this->slugTaken($s, null), 'collection');
+                if ($explicit && $this->slugTaken($slug, null)) {
+                    throw new CommerceTaxonomyConflictException('المعرّف النصي (slug) مستخدم بالفعل.');
+                }
+
+                return CommerceCollection::create([
+                    'slug' => $slug,
+                    'title' => trim($data['title']),
+                    'title_en' => $titleEn,
+                    'description' => $this->nullableTrim($data['description'] ?? null),
+                    'status' => $data['status'] ?? CommerceCollection::STATUS_DRAFT,
+                    'sort_order' => $data['sort_order'] ?? 0,
+                ]);
+            });
         } catch (QueryException $e) {
             throw $this->uniqueOr($e);
         }

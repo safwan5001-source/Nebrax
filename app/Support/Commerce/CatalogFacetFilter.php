@@ -64,17 +64,14 @@ final class CatalogFacetFilter
     {
         $facets = [];
         foreach ((array) ($validated['facet'] ?? []) as $key => $raw) {
-            if (! is_string($raw) || trim($raw) === '') {
-                continue;
-            }
-            $slugs = self::slugsOf($raw);
-            if ($slugs !== []) {
-                $facets[(string) $key] = $slugs;
-            }
+            // مدخلٌ فارغ (`facet[x]=` أو `,,,`) يُحفظ بقيمٍ فارغة فيُنتج apply() نتيجةً فارغة (فشل مغلق)،
+            // لا أن يُسقَط فيُرجع الكتالوج غير المصفّى.
+            $facets[(string) $key] = is_string($raw) ? self::slugsOf($raw) : [];
         }
 
         return [
-            'brand_id' => filled($validated['brand_id'] ?? null) ? (string) $validated['brand_id'] : null,
+            // UUID بأحرف كبيرة يجتاز التحقق؛ نوحّده للشكل المعياري قبل البحث والمقارنة (SQLite نصّيّ).
+            'brand_id' => filled($validated['brand_id'] ?? null) ? strtolower((string) $validated['brand_id']) : null,
             'collection' => filled($validated['collection'] ?? null) ? (string) $validated['collection'] : null,
             'facets' => $facets,
         ];
