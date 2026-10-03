@@ -2670,6 +2670,112 @@ const MOCK_WORKSPACE_PRODUCTS = [
 ];
 
 /**
+ * CUST-H4-7 — dev-harness fixture for the workspace Offers read
+ * (`GET /commerce/workspace/storefronts/{id}/offers`). The REAL evaluation
+ * (live/hidden, reason, both prices, percent) is computed by
+ * `StorefrontOfferResolver` on the backend; this fixture returns pre-evaluated
+ * rows in exactly that payload shape so the Customizer's picker/Canvas can be
+ * exercised visually without a Laravel server. It covers the QA matrix: live
+ * with image, live without image (fallback), a sub-half-percent (0%) live
+ * discount, very long names, and hidden rows for several reasons incl. a
+ * deleted product (`product: null`). Never used as merchant runtime data.
+ */
+function mockOffer(
+  id: string,
+  position: number,
+  product: { name: string; name_en: string | null; thumbnail_url: string | null } | null,
+  evaluation:
+    | { live: { reference: number; offer: number; percent: number } }
+    | { hidden: string },
+) {
+  const live = 'live' in evaluation ? evaluation.live : null;
+  return {
+    id,
+    product_id: `mock-offer-product-${id}`,
+    product: product ? { id: `mock-offer-product-${id}`, ...product, is_variant_managed: false } : null,
+    starts_at: null,
+    ends_at: null,
+    is_active: true,
+    position,
+    evaluation: {
+      is_live: live !== null,
+      reason: 'hidden' in evaluation ? evaluation.hidden : null,
+      reference_price: live ? { amount_minor: live.reference, currency: 'SAR' } : null,
+      offer_price: live ? { amount_minor: live.offer, currency: 'SAR' } : null,
+      discount_percent: live ? live.percent : null,
+    },
+    created_at: '2026-10-01T00:00:00.000Z',
+    updated_at: '2026-10-01T00:00:00.000Z',
+  };
+}
+
+/** Dev-harness switch for the Offers fixture's state matrix (loading/empty/error QA). */
+let mockOffersMode: 'list' | 'empty' | 'error' = 'list';
+export function setMockOffersMode(mode: 'list' | 'empty' | 'error'): void {
+  mockOffersMode = mode;
+}
+
+const MOCK_WORKSPACE_OFFERS = [
+  mockOffer('offer-helmet', 0, {
+    name: 'خوذة دراجة هوائية مقاومة للصدمات مع تهوية كاملة وعاكسات ليلية',
+    name_en: 'Impact-Resistant Bike Helmet with Full Ventilation and Night Reflectors',
+    thumbnail_url: '/dev/fixtures/helmet.svg',
+  }, { live: { reference: 18900, offer: 14900, percent: 21 } }),
+  mockOffer('offer-headphones', 1, {
+    name: 'سماعة لاسلكية',
+    name_en: 'Wireless Headphones',
+    thumbnail_url: null,
+  }, { live: { reference: 25000, offer: 19000, percent: 24 } }),
+  mockOffer('offer-sub-percent', 2, {
+    name: 'حقيبة ظهر يومية',
+    name_en: 'Everyday Backpack',
+    thumbnail_url: '/dev/fixtures/helmet.svg',
+  }, { live: { reference: 25000, offer: 24999, percent: 0 } }),
+  mockOffer('offer-long-name', 3, {
+    name: 'جهاز منزلي متعدد الاستخدامات بمواصفات احترافية وضمان ممتد لخمس سنوات مع خدمة صيانة منزلية مجانية',
+    name_en: 'Professional-Grade Multi-Purpose Home Appliance with Five-Year Extended Warranty and Free In-Home Service',
+    thumbnail_url: null,
+  }, { live: { reference: 129900, offer: 99900, percent: 23 } }),
+  mockOffer('offer-watch', 4, {
+    name: 'ساعة ذكية',
+    name_en: 'Smart Watch',
+    thumbnail_url: '/dev/fixtures/helmet.svg',
+  }, { live: { reference: 54900, offer: 39900, percent: 27 } }),
+  mockOffer('offer-lamp', 5, {
+    name: 'مصباح مكتبي',
+    name_en: 'Desk Lamp',
+    thumbnail_url: null,
+  }, { live: { reference: 9900, offer: 7900, percent: 20 } }),
+  mockOffer('offer-scheduled', 6, {
+    name: 'كاميرا رقمية',
+    name_en: 'Digital Camera',
+    thumbnail_url: null,
+  }, { hidden: 'scheduled' }),
+  mockOffer('offer-out-of-stock', 7, {
+    name: 'سماعة ألعاب',
+    name_en: 'Gaming Headset',
+    thumbnail_url: null,
+  }, { hidden: 'out_of_stock' }),
+  mockOffer('offer-expired', 8, {
+    name: 'ماوس لاسلكي',
+    name_en: 'Wireless Mouse',
+    thumbnail_url: null,
+  }, { hidden: 'expired' }),
+  mockOffer('offer-not-discounted', 9, {
+    name: 'لوحة مفاتيح ميكانيكية',
+    name_en: 'Mechanical Keyboard',
+    thumbnail_url: null,
+  }, { hidden: 'not_discounted' }),
+  mockOffer('offer-deleted-product', 10, null, { hidden: 'product_unavailable' }),
+  mockOffer('offer-variant', 11, {
+    name: 'حذاء رياضي',
+    name_en: 'Running Shoes',
+    thumbnail_url: null,
+  }, { hidden: 'variant_managed' }),
+];
+
+
+/**
  * CUST-H2-4 — ثوابت تصنيفات مساحة عمل Commerce الوهمية، بنفس الشكل الحرفي
  * الذي يعيده `CommerceWorkspaceStorefrontCategoryController` الحقيقي —
  * يقرؤها `workspace-categories.ts` عبر نفس دوال التخطيط التي تستهلك
@@ -3724,6 +3830,20 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
         is_variant_managed: p.is_variant_managed,
       })),
       meta: { pagination: { page: 1, per_page: 20, total: rows.length, last_page: 1, has_more: false } },
+    });
+  }
+  // CUST-H4-7 — Workspace Offers read for the Customizer's Offers picker and
+  // Canvas (dev fixture only; the real endpoint is
+  // `CommerceWorkspaceStorefrontOfferController::index`).   // a deterministic list by default; `setMockOffersMode` switches the
+  // empty/error states for visual QA.
+  const workspaceOffersListMatch = clean.match(/^\/commerce\/workspace\/storefronts\/([^/]+)\/offers$/);
+  if (workspaceOffersListMatch) {
+    if (mockOffersMode === 'error') {
+      return Promise.reject(Object.assign(new Error('تعذّر تحميل العروض.'), { status: 500 }));
+    }
+    return resolve({
+      data: mockOffersMode === 'empty' ? [] : MOCK_WORKSPACE_OFFERS,
+      meta: { max_offers: 12 },
     });
   }
   const workspaceProductMatch = clean.match(/^\/commerce\/workspace\/storefronts\/([^/]+)\/products\/([^/]+)$/);

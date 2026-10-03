@@ -36,9 +36,11 @@ import {
   customContentOf,
   emptyBannerContent,
   featuredContentOf,
+  offersContentOf,
   MAX_BENEFIT_ITEMS,
   MAX_CUSTOM_BLOCKS,
   MAX_FEATURED_PRODUCTS,
+  MAX_OFFERS,
   type BannerContent,
   type BenefitItem,
   type CustomBlock,
@@ -49,6 +51,14 @@ import {
   customizerMessage,
 } from "./messages";
 import type { WorkspaceProductSummary } from "@/modules/commerce-workspace/workspace-products";
+import type { WorkspaceOffer } from "@/modules/commerce-workspace/workspace-offers";
+import {
+  formatOfferMoney,
+  isDiscountBadgeVisible,
+  offerDiscountBadgeText,
+  offerDisplayName,
+  offerReasonMessageKey,
+} from "./offers-display";
 
 export type CustomizerPanel =
   | "theme"
@@ -160,6 +170,15 @@ interface PanelsProps {
   featuredResolved?: Record<string, WorkspaceProductSummary[]>;
   featuredResolvedState?: Record<string, "idle" | "loading" | "error" | "ready">;
   onRetryFeaturedResolution?: (sectionId: string) => void;
+  /**
+   * CUST-H4-7 — the one shared workspace Offers read (all candidates with
+   * their live/hidden evaluation). Every "offers" section instance selects
+   * from this same list by its own `offerIds`; owned/fetched by
+   * `ExperienceBuilder`, so this component stays purely presentational.
+   */
+  offers?: WorkspaceOffer[];
+  offersState?: "idle" | "loading" | "error" | "ready";
+  onRetryOffers?: () => void;
 }
 
 export function ControlPanels({
@@ -180,6 +199,9 @@ export function ControlPanels({
   featuredResolved = {},
   featuredResolvedState = {},
   onRetryFeaturedResolution,
+  offers = [],
+  offersState = "idle",
+  onRetryOffers,
 }: PanelsProps) {
   const t = (key: CustomizerMessageKey) => customizerMessage(locale, key);
   const patch = (partial: Partial<StorefrontPresentationConfig>) =>
@@ -216,6 +238,10 @@ export function ControlPanels({
           featuredResolved={featuredResolved}
           featuredResolvedState={featuredResolvedState}
           onRetryFeaturedResolution={onRetryFeaturedResolution}
+          locale={locale}
+          offers={offers}
+          offersState={offersState}
+          onRetryOffers={onRetryOffers}
         />
       );
     case "footer":
@@ -867,6 +893,10 @@ function HomepagePanel({
   featuredResolved = {},
   featuredResolvedState = {},
   onRetryFeaturedResolution,
+  locale = "ar",
+  offers = [],
+  offersState = "idle",
+  onRetryOffers,
 }: {
   config: StorefrontPresentationConfig;
   t: (key: CustomizerMessageKey) => string;
@@ -882,6 +912,10 @@ function HomepagePanel({
   featuredResolved?: Record<string, WorkspaceProductSummary[]>;
   featuredResolvedState?: Record<string, "idle" | "loading" | "error" | "ready">;
   onRetryFeaturedResolution?: (sectionId: string) => void;
+  locale?: CustomizerLocale;
+  offers?: WorkspaceOffer[];
+  offersState?: "idle" | "loading" | "error" | "ready";
+  onRetryOffers?: () => void;
 }) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const sections = config.homepage.sections;
@@ -1090,6 +1124,21 @@ function HomepagePanel({
                 selectedProducts={featuredResolved[selected.id] ?? []}
                 selectedState={featuredResolvedState[selected.id] ?? "idle"}
                 onRetrySelected={() => onRetryFeaturedResolution?.(selected.id)}
+              />
+            ) : selected.type === "offers" ? (
+              <OffersPickerFields
+                offerIds={offersContentOf(selected).offerIds}
+                t={t}
+                locale={locale}
+                onChange={(offerIds) =>
+                  updateSection(selectedIndex, {
+                    ...selected,
+                    content: offerIds.length ? { offerIds } : undefined,
+                  })
+                }
+                offers={offers}
+                state={offersState}
+                onRetry={onRetryOffers}
               />
             ) : selected.type === "appPromo" ? (
               <AppPromoFields config={config} t={t} patch={patch} />
@@ -2080,6 +2129,271 @@ function FeaturedPickerFields({
                   <span className="min-w-0 flex-1 truncate">
                     <bdi>{product.name}</bdi>
                   </span>
+                  {selected ? <span aria-hidden="true">✓</span> : null}
+                </button>
+              );
+            })
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * CUST-H4-7 — real multi-select Offers picker. Same selection model as
+ * `FeaturedPickerFields` (ordered id array: toggle/dedupe/max/reorder/remove)
+ * but over the *configured Offers* list rather than a product search: the
+ * workspace Offers read returns every candidate (≤12) with its live/hidden
+ * evaluation, so there is nothing to search and no request per offer.
+ *
+ * Only `offerIds` is ever written back. Prices, discount, status and names
+ * are display-only values the server computed (`WorkspaceOffer`); nothing
+ * here derives or edits them, and the raw offer id is never rendered.
+ *
+ * A selected id that is hidden stays in the draft (scheduled offers can be
+ * pre-selected) and is shown honestly with its reason; one that no longer
+ * exists at all is shown as "no longer available" and stays removable — it is
+ * never silently dropped and never faked into a card.
+ */
+function OfferSummary({
+  offer,
+  t,
+  locale,
+}: {
+  offer: WorkspaceOffer;
+  t: (key: CustomizerMessageKey) => string;
+  locale: CustomizerLocale;
+}) {
+  const name = offerDisplayName(offer, locale);
+  return (
+    <span className="relative flex min-w-0 flex-1 flex-col gap-0.5">
+      <span className="line-clamp-2 break-words text-sm">
+        <bdi>{name ?? t("offersUnavailable")}</bdi>
+      </span>
+      {offer.isLive ? (
+        <span data-offer-status="live" className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-xs">
+          <span className="font-medium text-text">
+            <span aria-hidden="true">✓ </span>
+            {t("offersStatusLive")}
+          </span>
+          {offer.offerPrice ? (
+            <span>
+              <span className="sr-only">{t("offersOfferPrice")}: </span>
+              <bdi className="font-semibold text-text">{formatOfferMoney(offer.offerPrice, locale)}</bdi>
+            </span>
+          ) : null}
+          {offer.referencePrice ? (
+            <span className="text-muted line-through">
+              <span className="sr-only">{t("offersReferencePrice")}: </span>
+              <bdi>{formatOfferMoney(offer.referencePrice, locale)}</bdi>
+            </span>
+          ) : null}
+          {isDiscountBadgeVisible(offer.discountPercent) ? (
+            <span className="rounded-sm bg-primary-soft px-1.5 py-px text-[11px] font-semibold text-primary">
+              <bdi>{offerDiscountBadgeText(offer.discountPercent, locale)}</bdi>
+            </span>
+          ) : null}
+        </span>
+      ) : (
+        <span data-offer-status="hidden" className="text-xs text-muted">
+          <span className="font-medium text-text">
+            <span aria-hidden="true">○ </span>
+            {t("offersStatusHidden")}
+          </span>
+          {" — "}
+          {t("offersNotShownBecause")} {t(offerReasonMessageKey(offer.reason))}
+        </span>
+      )}
+    </span>
+  );
+}
+
+function OfferThumb({ offer }: { offer: WorkspaceOffer | undefined }) {
+  return (
+    <span className="flex size-8 shrink-0 items-center justify-center self-start overflow-hidden rounded-md bg-surface-muted">
+      {offer?.product?.thumbnailUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element -- thumbnail is an untrusted tenant media URL, not a static asset
+        <img src={offer.product.thumbnailUrl} alt="" className="size-full object-cover" />
+      ) : null}
+    </span>
+  );
+}
+
+function OffersPickerFields({
+  offerIds,
+  t,
+  locale,
+  onChange,
+  offers,
+  state,
+  onRetry,
+}: {
+  offerIds: string[];
+  t: (key: CustomizerMessageKey) => string;
+  locale: CustomizerLocale;
+  onChange: (offerIds: string[]) => void;
+  offers: WorkspaceOffer[];
+  state: "idle" | "loading" | "error" | "ready";
+  onRetry?: () => void;
+}) {
+  const atMax = offerIds.length >= MAX_OFFERS;
+  const byId = new Map(offers.map((offer) => [offer.id, offer]));
+  const pending = state === "idle" || state === "loading";
+
+  function toggle(id: string) {
+    if (offerIds.includes(id)) {
+      onChange(offerIds.filter((existing) => existing !== id));
+      return;
+    }
+    if (atMax) return;
+    onChange([...offerIds, id]);
+  }
+
+  return (
+    <div className="space-y-4">
+      <p className="text-xs leading-relaxed text-muted">{t("offersHint")}</p>
+
+      <div data-offers-selected="">
+        <div className="flex items-baseline justify-between">
+          <p className="text-xs font-medium text-text">{t("offersSelectedLabel")}</p>
+          <span className="text-xs text-muted" aria-live="polite">
+            {offerIds.length}/{MAX_OFFERS}
+          </span>
+        </div>
+        {offerIds.length === 0 ? (
+          <p className="mt-1.5 text-xs text-muted">{t("offersSelectedEmpty")}</p>
+        ) : state === "error" ? (
+          <div className="mt-1.5 flex items-center gap-2">
+            <span className="text-xs text-muted">{t("offersLoadFailed")}</span>
+            <button type="button" className="text-xs font-medium text-text" onClick={onRetry}>
+              {t("retry")}
+            </button>
+          </div>
+        ) : (
+          <ul className="mt-2 space-y-1.5">
+            {offerIds.map((id, index) => {
+              const offer = byId.get(id);
+              const missing = !pending && offer === undefined;
+              // Accessible names carry the product's name so "move up" /
+              // "remove" are unambiguous per row (never the raw offer id).
+              const rowName = (offer && offerDisplayName(offer, locale)) ?? t("offersUnavailable");
+              return (
+                <li
+                  key={id}
+                  data-offers-selected-item={id}
+                  className="flex items-center gap-2 rounded-md border border-border px-2 py-1.5"
+                >
+                  <OfferThumb offer={offer} />
+                  {pending ? (
+                    <span className="min-w-0 flex-1 text-sm text-muted">{t("offersLoading")}</span>
+                  ) : missing ? (
+                    <span data-offers-unavailable="" className="flex min-w-0 flex-1 flex-col gap-0.5">
+                      <span className="text-sm font-medium">{t("offersUnavailable")}</span>
+                      <span className="text-xs text-muted">{t("offersUnavailableHint")}</span>
+                    </span>
+                  ) : offer ? (
+                    <OfferSummary offer={offer} t={t} locale={locale} />
+                  ) : null}
+                  <span className="flex shrink-0">
+                    <button
+                      type="button"
+                      className={iconBtnClass}
+                      aria-label={`${t("offersMoveUp")}: ${rowName}`}
+                      disabled={index === 0}
+                      onClick={() => onChange(moveIndex(offerIds, index, -1))}
+                    >
+                      ↑
+                    </button>
+                    <button
+                      type="button"
+                      className={iconBtnClass}
+                      aria-label={`${t("offersMoveDown")}: ${rowName}`}
+                      disabled={index === offerIds.length - 1}
+                      onClick={() => onChange(moveIndex(offerIds, index, 1))}
+                    >
+                      ↓
+                    </button>
+                  </span>
+                  <button
+                    type="button"
+                    className="shrink-0 text-xs text-muted"
+                    aria-label={`${t("offersRemove")}: ${rowName}`}
+                    onClick={() => onChange(offerIds.filter((existing) => existing !== id))}
+                  >
+                    {t("removeItem")}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+        {atMax ? <p className="mt-1.5 text-xs text-muted">{t("offersMaxReachedHint")}</p> : null}
+      </div>
+
+      <div className="space-y-2 border-t border-border pt-3">
+        <div className="flex items-center justify-between gap-2">
+          <p id="offers-picker-list-label" className="text-xs font-medium text-text">
+            {t("offersListLabel")}
+          </p>
+          <button
+            type="button"
+            className="text-xs text-muted underline-offset-2 hover:underline"
+            disabled={pending}
+            onClick={onRetry}
+          >
+            {t("offersRefresh")}
+          </button>
+        </div>
+        <div
+          role="listbox"
+          aria-labelledby="offers-picker-list-label"
+          aria-multiselectable="true"
+          className="flex max-h-72 flex-col gap-0.5 overflow-y-auto"
+        >
+          {pending ? (
+            <p data-offers-picker-loading="" className="px-2 py-3 text-center text-xs text-muted">
+              {t("offersLoading")}
+            </p>
+          ) : state === "error" ? (
+            <div
+              data-offers-picker-error=""
+              className="flex flex-col items-center gap-2 px-2 py-3 text-center text-xs text-muted"
+            >
+              <span>{t("offersLoadFailed")}</span>
+              <button
+                type="button"
+                onClick={onRetry}
+                className="rounded-md border border-border px-2 py-1 text-xs font-medium text-text"
+              >
+                {t("retry")}
+              </button>
+            </div>
+          ) : offers.length === 0 ? (
+            <p data-offers-picker-empty="" className="px-2 py-3 text-center text-xs text-muted">
+              {t("offersEmpty")}
+            </p>
+          ) : (
+            offers.map((offer) => {
+              const selected = offerIds.includes(offer.id);
+              const disabled = !selected && atMax;
+              return (
+                <button
+                  key={offer.id}
+                  type="button"
+                  role="option"
+                  aria-selected={selected}
+                  disabled={disabled}
+                  data-offers-option={offer.id}
+                  onClick={() => toggle(offer.id)}
+                  // `shrink-0`: rows live in a height-limited flex column; without it they
+                  // compress below their content height and overlap each other.
+                  className={`flex min-h-10 w-full shrink-0 items-center gap-2 rounded-md px-2 py-1.5 text-start disabled:opacity-40 ${
+                    selected ? "bg-primary-soft text-primary" : "text-text hover:bg-primary-soft"
+                  }`}
+                >
+                  <OfferThumb offer={offer} />
+                  <OfferSummary offer={offer} t={t} locale={locale} />
                   {selected ? <span aria-hidden="true">✓</span> : null}
                 </button>
               );

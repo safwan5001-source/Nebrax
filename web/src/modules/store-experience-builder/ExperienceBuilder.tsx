@@ -32,6 +32,7 @@ import {
   type WorkspaceProductDetail,
   type WorkspaceProductSummary,
 } from "@/modules/commerce-workspace/workspace-products";
+import { listWorkspaceOffers, type WorkspaceOffer } from "@/modules/commerce-workspace/workspace-offers";
 import {
   listWorkspaceCategories,
   showWorkspaceCategory,
@@ -251,6 +252,16 @@ export function ExperienceBuilder({
     "idle" | "loading" | "error" | "ready"
   >("idle");
   const featuredPickerRequestRef = useRef(0);
+  // CUST-H4-7 — ONE workspace Offers read per storefront/version, shared by
+  // every "offers" section instance, the editor's picker and the Canvas. The
+  // endpoint returns the whole (≤12) candidate list with each row's live/
+  // hidden evaluation, so "which offers does this instance show" is a local
+  // lookup over `offerIds` — never a request per offer or per instance. The
+  // per-instance selection itself stays in each section's own `content`.
+  const [offersRows, setOffersRows] = useState<WorkspaceOffer[]>([]);
+  const [offersState, setOffersState] = useState<"idle" | "loading" | "error" | "ready">("idle");
+  const offersRequestRef = useRef(0);
+  const offersAbortRef = useRef<AbortController | null>(null);
   const [pendingSectionScroll, setPendingSectionScroll] = useState<
     string | null
   >(null);
@@ -717,6 +728,14 @@ export function ExperienceBuilder({
     setFeaturedPickerList([]);
     setFeaturedPickerListState("idle");
     setFeaturedPickerSearch("");
+    // CUST-H4-7 — same reset for the shared Offers read: abort anything in
+    // flight and bump the token so a late response from the previous
+    // storefront can never repopulate the newly-opened one.
+    offersAbortRef.current?.abort();
+    offersAbortRef.current = null;
+    ++offersRequestRef.current;
+    setOffersRows([]);
+    setOffersState("idle");
 
     if (!storefrontId) {
       setBusy(null);
@@ -1148,6 +1167,58 @@ export function ExperienceBuilder({
 
   function handleRetryFeaturedPickerList() {
     void loadFeaturedPickerList(featuredPickerSearch);
+  }
+
+  // CUST-H4-7 — the single workspace Offers read (see `offersRows`). Aborts a
+  // superseded in-flight request and drops any response whose token or
+  // storefront is no longer current, so a refresh/retry/switch can never be
+  // overwritten by an older answer.
+  async function loadOffers() {
+    if (!storefrontId) return;
+    const originStorefrontId = storefrontId;
+    offersAbortRef.current?.abort();
+    const controller = new AbortController();
+    offersAbortRef.current = controller;
+    const token = ++offersRequestRef.current;
+    setOffersState("loading");
+    const result = await listWorkspaceOffers(storefrontId, controller.signal);
+    if (token !== offersRequestRef.current || storefrontIdRef.current !== originStorefrontId) return;
+    if (!result.ok) {
+      setOffersState("error");
+      setOffersRows([]);
+      return;
+    }
+    setOffersState("ready");
+    setOffersRows(result.data);
+  }
+
+  // Needed only while an Offers instance is rendered on the Canvas (visible)
+  // or being edited (selected). A store that merely carries the default
+  // hidden, never-opened Offers row issues no request at all.
+  const hasOffersSection = draft.homepage.sections.some(
+    (section) => section.type === "offers" && (section.visible || section.id === selectedSection),
+  );
+
+  useEffect(() => {
+    // Same "wait for the real config" rule as the other Home reads: load
+    // once (any number of Offers instances share it), only on Home and only
+    // when an Offers section is visible or selected.
+    if (currentPage !== "home" || !storefrontId || busy === "loading" || !hasOffersSection || offersState !== "idle") {
+      return;
+    }
+    void loadOffers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentPage, storefrontId, busy, hasOffersSection, offersState]);
+
+  useEffect(
+    () => () => {
+      offersAbortRef.current?.abort();
+    },
+    [],
+  );
+
+  function handleRetryOffers() {
+    void loadOffers();
   }
 
   function handleSelectCategoryRegion(id: string) {
@@ -1993,6 +2064,9 @@ export function ExperienceBuilder({
           featuredResolved={featuredResolved}
           featuredResolvedState={featuredResolvedState}
           onRetryFeaturedResolution={handleRetryFeaturedResolution}
+          offers={offersRows}
+          offersState={offersState}
+          onRetryOffers={handleRetryOffers}
         />
       );
     }
@@ -2067,6 +2141,9 @@ export function ExperienceBuilder({
         featuredResolved={featuredResolved}
         featuredResolvedState={featuredResolvedState}
         onRetryFeaturedResolution={handleRetryFeaturedResolution}
+        offers={offersRows}
+        offersState={offersState}
+        onRetryOffers={handleRetryOffers}
       />
     );
   }
@@ -2585,6 +2662,9 @@ export function ExperienceBuilder({
                   featuredResolved={featuredResolved}
                   featuredResolvedState={featuredResolvedState}
                   onRetryFeatured={handleRetryFeaturedResolution}
+                  offers={offersRows}
+                  offersState={offersState}
+                  onRetryOffers={handleRetryOffers}
                 />
               </div>
             </div>

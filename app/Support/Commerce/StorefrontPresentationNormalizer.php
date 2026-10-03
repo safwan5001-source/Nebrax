@@ -68,6 +68,9 @@ final class StorefrontPresentationNormalizer
 
     public const MAX_FEATURED_PRODUCTS = 8;
 
+    /** CUST-H4-7 — `OffersContent.offerIds`. Twin of MAX_OFFERS in both section-content.ts files. */
+    public const MAX_OFFERS = 8;
+
     /** CUST-H4-4 — banner `imageAlt`. Twin of MAX_BANNER_IMAGE_ALT_LENGTH in both section-content.ts files. */
     public const MAX_BANNER_IMAGE_ALT_LENGTH = 150;
 
@@ -598,7 +601,7 @@ final class StorefrontPresentationNormalizer
     /**
      * محتوى اختياري لكل instance. الغياب يعني فارغاً، والمحتوى الفارغ
      * لا يُكتب حتى تبقى وثائق {id,type,visible} كما هي. الأنواع التي
-     * لا تحمل محتوى (ومنها offers) تُسقِط أي content يُهرَّب.
+     * لا تحمل محتوى تُسقِط أي content يُهرَّب (offers صار يحمل `offerIds` منذ CUST-H4-7).
      *
      * @return array<string, mixed>|null
      */
@@ -699,6 +702,33 @@ final class StorefrontPresentationNormalizer
             }
 
             return $ids === [] ? null : ['productIds' => $ids];
+        }
+
+        if ($type === 'offers') {
+            // CUST-H4-7 — مراجع `storefront_offers.id` فقط؛ لا منتج ولا اسم ولا
+            // سعر ولا نسبة ولا تاريخ ولا حالة حياة (سلطة Commerce). توأم
+            // normalizeOffers في ملفَّي section-content.ts.
+            $ids = [];
+            $seen = [];
+            foreach (is_array($source['offerIds'] ?? null) ? $source['offerIds'] : [] as $value) {
+                if (! is_string($value)) {
+                    continue;
+                }
+                $token = trim($value);
+                if (preg_match('/^[a-zA-Z0-9_-]{1,64}$/', $token) !== 1) {
+                    continue;
+                }
+                if (isset($seen[$token])) {
+                    continue;
+                }
+                $seen[$token] = true;
+                $ids[] = $token;
+                if (count($ids) >= self::MAX_OFFERS) {
+                    break;
+                }
+            }
+
+            return $ids === [] ? null : ['offerIds' => $ids];
         }
 
         return null;

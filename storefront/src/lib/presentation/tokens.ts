@@ -86,9 +86,13 @@ export const IMPLEMENTED_HOME_SECTION_KEYS = DEFAULT_HOME_SECTIONS.map(
   (section) => section.key,
 );
 
-export const GATED_HOME_SECTION_KEYS = [
-  "offers",
-] as const satisfies readonly HomeBuilderSectionKey[];
+/**
+ * Section types the Canvas/Published cannot honestly render yet. Empty since
+ * CUST-H4-7 made `offers` LIVE (twin of the web `tokens.ts`); the mechanism
+ * stays for any future section that ships ahead of its real backend.
+ */
+export const GATED_HOME_SECTION_KEYS =
+  [] as const satisfies readonly HomeBuilderSectionKey[];
 
 export const SOCIAL_NETWORKS = [
   "instagram",

@@ -20,6 +20,13 @@ import type { CategoryPageRegionKey, PageRegionInstance, PageType, ProductPageRe
 import type { WorkspaceProductDetail } from "@/modules/commerce-workspace/workspace-products";
 import type { WorkspaceCategoryDetail } from "@/modules/commerce-workspace/workspace-categories";
 import { displayLocale } from "@/lib/formatting";
+import type { WorkspaceOffer } from "@/modules/commerce-workspace/workspace-offers";
+import {
+  formatOfferMoney,
+  isDiscountBadgeVisible,
+  offerDiscountBadgeText,
+  offerDisplayName,
+} from "./offers-display";
 import { PageIcon, pageLabelKey } from "./PageNavigatorPanel";
 import {
   fontPresetFamilyStack,
@@ -33,6 +40,7 @@ import {
   benefitsContentOf,
   customContentOf,
   featuredContentOf,
+  offersContentOf,
 } from "./presentation/section-content";
 import {
   buildWhatsAppUrl,
@@ -164,6 +172,16 @@ interface StorefrontPreviewCanvasProps {
   featuredResolved?: Record<string, { id: string; name: string; thumbnailUrl: string | null }[]>;
   featuredResolvedState?: Record<string, "idle" | "loading" | "error" | "ready">;
   onRetryFeatured?: (sectionId: string) => void;
+  /**
+   * CUST-H4-7 — the one shared workspace Offers read (every candidate with
+   * its server-computed live/hidden evaluation). Each "offers" section
+   * instance maps its own stored `offerIds` over this list; hidden or
+   * missing ids render no card (never a fabricated one), and no price,
+   * discount or status is computed here.
+   */
+  offers?: WorkspaceOffer[];
+  offersState?: "idle" | "loading" | "error" | "ready";
+  onRetryOffers?: () => void;
 }
 
 export interface StorefrontBusinessIdentity {
@@ -212,6 +230,9 @@ export function StorefrontPreviewCanvas({
   featuredResolved = {},
   featuredResolvedState = {},
   onRetryFeatured,
+  offers = [],
+  offersState = "idle",
+  onRetryOffers,
 }: StorefrontPreviewCanvasProps) {
   const t = (key: CustomizerMessageKey) => customizerMessage(locale, key);
   const storeName = previewStoreName(
@@ -906,6 +927,127 @@ export function StorefrontPreviewCanvas({
                             </div>
                           </li>
                         ))}
+                    </ul>
+                  )}
+                </section>
+              );
+            }
+
+            if (section.type === "offers") {
+              // CUST-H4-7 — real Commerce data. The workspace Offers read is
+              // shared by every Offers instance (one request); this instance
+              // keeps only the rows its own `offerIds` selects, in the
+              // merchant's stored order. A hidden/missing selected offer is
+              // omitted (the editor explains why) — Canvas never invents a
+              // card, a price or a discount, and never recomputes any of them.
+              const ids = offersContentOf(section).offerIds.filter((id) => id);
+              const resolvedState = ids.length === 0 ? "ready" : offersState;
+              const byId = new Map(offers.map((offer) => [offer.id, offer]));
+              const liveOffers = ids
+                .map((id) => byId.get(id))
+                .filter(
+                  (offer): offer is WorkspaceOffer & { product: NonNullable<WorkspaceOffer["product"]> } =>
+                    offer !== undefined && offer.isLive && offer.product !== null,
+                );
+              const headingId = `preview-offers-${section.id}`;
+              return (
+                <section key={section.id} aria-labelledby={headingId}>
+                  <h2 id={headingId} className="text-base font-extrabold">{t("sectionOffers")}</h2>
+                  {resolvedState === "loading" || resolvedState === "idle" ? (
+                    <ul
+                      aria-hidden="true"
+                      className={cn("mt-4 grid gap-3", newArrivalsColumns)}
+                    >
+                      {Array.from({ length: Math.min(ids.length, 4) || 4 }).map((_, index) => (
+                        <li
+                          key={index}
+                          className="overflow-hidden rounded-store border border-store-border bg-store-surface"
+                        >
+                          <div className={cn(cardImageHeight, "animate-pulse bg-store-surface-muted")} />
+                          <div className={cardPad}>
+                            <div className="h-3 w-3/4 animate-pulse rounded-store bg-store-surface-muted" />
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : resolvedState === "error" ? (
+                    <div
+                      data-home-offers-error=""
+                      className="mt-4 flex flex-col items-center gap-2 rounded-store border border-dashed border-store-border px-4 py-8 text-center"
+                    >
+                      <p className="text-sm text-store-muted-foreground">{t("homeOffersLoadFailed")}</p>
+                      <button
+                        type="button"
+                        onClick={() => onRetryOffers?.()}
+                        className="rounded-store border border-store-border px-3 py-1.5 text-xs font-medium text-store-foreground hover:bg-store-surface-muted"
+                      >
+                        {t("retry")}
+                      </button>
+                    </div>
+                  ) : ids.length === 0 ? (
+                    <p
+                      data-home-offers-empty=""
+                      className="mt-4 rounded-store border border-dashed border-store-border px-4 py-8 text-center text-sm text-store-muted-foreground"
+                    >
+                      {t("homeOffersEmpty")}
+                    </p>
+                  ) : liveOffers.length === 0 ? (
+                    <p
+                      data-home-offers-none-live=""
+                      className="mt-4 rounded-store border border-dashed border-store-border px-4 py-8 text-center text-sm text-store-muted-foreground"
+                    >
+                      {t("homeOffersNoneLive")}
+                    </p>
+                  ) : (
+                    <ul className={cn("mt-4 grid gap-3", newArrivalsColumns)}>
+                      {liveOffers.map((offer) => (
+                        <li
+                          key={offer.id}
+                          data-home-offer-card=""
+                          // `relative` contains the card's sr-only price labels: an absolutely
+                          // positioned sr-only span otherwise escapes the clipped preview
+                          // scroller and widens the document (horizontal page scroll).
+                          className="relative min-w-0 overflow-hidden rounded-store border border-store-border bg-store-surface"
+                        >
+                          <div className={cn(cardImageHeight, "relative bg-store-surface-muted")}>
+                            {offer.product.thumbnailUrl ? (
+                              // eslint-disable-next-line @next/next/no-img-element -- tenant media URL, not a static asset
+                              <img
+                                src={offer.product.thumbnailUrl}
+                                alt=""
+                                className="size-full object-cover"
+                              />
+                            ) : null}
+                            {isDiscountBadgeVisible(offer.discountPercent) ? (
+                              <span
+                                data-home-offer-badge=""
+                                className="absolute start-2 top-2 rounded-md bg-store-foreground px-2 py-0.5 text-[0.625rem] font-bold text-store-surface"
+                              >
+                                <bdi>{offerDiscountBadgeText(offer.discountPercent, locale)}</bdi>
+                              </span>
+                            ) : null}
+                          </div>
+                          <div className={cardPad}>
+                            <p className="line-clamp-2 break-words text-sm font-semibold text-store-foreground">
+                              <bdi>{offerDisplayName(offer, locale)}</bdi>
+                            </p>
+                            <p className="mt-1.5 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                              {offer.offerPrice ? (
+                                <span className="text-sm font-black text-store-primary">
+                                  <span className="sr-only">{t("offersOfferPrice")}: </span>
+                                  <bdi data-home-offer-price="">{formatOfferMoney(offer.offerPrice, locale)}</bdi>
+                                </span>
+                              ) : null}
+                              {offer.referencePrice ? (
+                                <span className="text-xs text-store-muted-foreground line-through">
+                                  <span className="sr-only">{t("offersReferencePrice")}: </span>
+                                  <bdi data-home-offer-reference="">{formatOfferMoney(offer.referencePrice, locale)}</bdi>
+                                </span>
+                              ) : null}
+                            </p>
+                          </div>
+                        </li>
+                      ))}
                     </ul>
                   )}
                 </section>

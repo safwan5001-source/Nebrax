@@ -26,25 +26,13 @@ import type { CustomizerMessageKey } from "../messages";
  * (`GATED_HOME_SECTION_KEYS`, ad hoc badges). `state` mirrors the H4
  * contract's truth matrix exactly — a non-LIVE section is never flattened
  * to LIVE until its real gap is actually closed (`featured` was PARTIAL
- * until CUST-H4-5 shipped its real picker + batched read; `offers` remains
- * GATED until H4-6/H4-7 ship, see below).
+ * until CUST-H4-5 shipped its real picker + batched read; `offers` was GATED
+ * until CUST-H4-6 shipped the Commerce backend and CUST-H4-7 shipped its
+ * real picker, Canvas and Published renderers).
  *
- * CUST-H4-2 review fix — a GATED section is not automatically addable. No
- * merchant-addable fake section: `offers` has neither the H4-6 real
- * Commerce backend nor the H4-7 real Canvas/Published renderers yet, so it
- * is visible in the Library but `merchantAddable: false`, disabled, with
- * its own honest "coming soon" reason (`sectionOffersComingSoon`) — never
- * hidden from the Library entirely. Current truth, and the only state this
- * registry sets today:
- *
- *   offers.state = "gated",  offers.merchantAddable = false
- *
- * That pair only flips once both H4-6 and H4-7 ship:
- *
- *   offers.state = "live",   offers.merchantAddable = true
- *
- * No section in this registry is `merchantAddable: false` for any other
- * reason today — see the field's own comment below.
+ * Every section type is now LIVE and merchant-addable. The `partial`/`gated`/
+ * `deferred` states and `reasonKey` remain in the model for any future
+ * section that ships before its real gap is closed — none uses them today.
  */
 export type SectionCapabilityState = "live" | "partial" | "gated" | "deferred";
 
@@ -95,9 +83,8 @@ export interface SectionCapability {
   category: SectionLibraryCategory;
   /**
    * False for a type withheld from the Library's addable results entirely
-   * (visible, disabled, `reasonKey` explains why — never hidden). `offers`
-   * is the one type set to `false` today (gated until H4-6/H4-7 ship, see
-   * module comment); every other type is `true`.
+   * (visible, disabled, `reasonKey` explains why — never hidden). Every type
+   * is `true` today (`offers` flipped in CUST-H4-7).
    */
   merchantAddable: boolean;
   /** Localized card/composer title. */
@@ -191,23 +178,19 @@ export const SECTION_CAPABILITIES: Record<
     maxInstances: null,
     canDuplicate: true,
     canDelete: true,
-    // GATED today (CUST-H4-ARCH-1 §23) — target LIVE in H4-6/H4-7, not this
-    // slice. CUST-H4-2 review fix: no merchant-addable fake section — Offers
-    // has neither the H4-6 real Commerce backend nor the H4-7 real Canvas/
-    // Published renderers yet, so it must stay visible-but-not-addable, not
-    // "addable with a caveat badge." merchantAddable: false (changed from
-    // the first H4-2 revision's `true`, which the owner correctly rejected).
-    //
-    // Capability transition (documented, NOT performed by this slice):
-    //   today      → state: "gated",  merchantAddable: false
-    //   after H4-6 + H4-7 ship → state: "live", merchantAddable: true
-    // Do not flip this pair until both of those slices are actually done.
-    state: "gated",
+    // CUST-H4-7 — LIVE end-to-end on the real H4-6 Commerce source: a typed
+    // `OffersContent{offerIds}` (references only), a real merchant picker over
+    // the configured Offers (one shared workspace read), a real Canvas card
+    // that renders only server-evaluated live offers, and a real Published
+    // `OffersShelf` reading the Host-resolved `GET /store/v1/offers`. Price,
+    // discount and live status stay Commerce authority on both surfaces; the
+    // merchant-authored `offerIds` order is the single display-order authority.
+    // No `reasonKey` — LIVE sections never carry one.
+    state: "live",
     category: "offersMarketing",
-    merchantAddable: false,
+    merchantAddable: true,
     titleKey: "sectionOffers",
     descriptionKey: "sectionOffersDescription",
-    reasonKey: "sectionOffersComingSoon",
   },
   benefits: {
     type: "benefits",

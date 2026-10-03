@@ -267,12 +267,6 @@ export const CUSTOMIZER_MESSAGES = {
     sectionBenefitsDescription: "مزايا متجرك المختصرة مثل الشحن والدفع الآمن.",
     sectionAppPromoDescription: "روابط تحميل تطبيق متجرك على الجوال.",
     sectionCustomContentDescription: "فقرات وعناوين نصية حرة.",
-    // CUST-H4-2 (مراجعة) — العروض مرئية في المكتبة لكنها غير قابلة للإضافة
-    // بعد: لا بنية تجارية حقيقية ولا عارض Canvas/منشور حقيقي لها اليوم. نصٌّ
-    // مخصّص لحالة «غير قابل للإضافة» في المكتبة، مستقلٌّ عن `gatedSection`
-    // (نص لوحة إعدادات instance موجود مسبقاً، سيناريو مختلف).
-    sectionOffersComingSoon:
-      "العروض قادمة. ستصبح قابلة للإضافة عند اكتمال بنيتها التجارية الحقيقية وعارضَيها في أَوْج.",
     selectedSectionHint: "تظهر هنا إعدادات القسم المحدد فقط.",
     sectionManagedNote:
       "محتوى هذا القسم يأتي من كتالوج أَوْج ولا يُحرَّر من هنا. يمكنك إظهاره أو إخفاؤه وإعادة ترتيبه.",
@@ -305,6 +299,45 @@ export const CUSTOMIZER_MESSAGES = {
     featuredSelectedLabel: "المنتجات المختارة",
     featuredSelectedEmpty: "لم تُختَر منتجات بعد.",
     featuredMaxReachedHint: "الحد الأقصى 8 منتجات.",
+    // CUST-H4-7 — منتقي العروض الحقيقي (يُخزَّن معرّف العرض فقط).
+    offersHint:
+      "يُحفظ معرّف العرض فقط. السعر والخصم وحالة الظهور تُقرأ من العروض المهيّأة في المتجر ولا تُنسخ هنا ولا تُعدَّل من هذه القائمة.",
+    offersSelectedLabel: "العروض المختارة",
+    offersSelectedEmpty: "لم تُختَر عروض بعد.",
+    offersMaxReachedHint: "الحد الأقصى 8 عروض.",
+    offersListLabel: "العروض المهيّأة في المتجر",
+    offersLoading: "جارٍ تحميل العروض…",
+    offersLoadFailed: "تعذّر تحميل العروض.",
+    offersEmpty:
+      "لا عروض مهيّأة لهذا المتجر بعد. عند تهيئة عرض لمنتج منشور سيظهر هنا ويمكنك اختياره.",
+    offersRefresh: "تحديث القائمة",
+    offersMoveUp: "نقل العرض لأعلى",
+    offersMoveDown: "نقل العرض لأسفل",
+    offersRemove: "إزالة العرض من الاختيار",
+    offersStatusLive: "ظاهر الآن",
+    offersStatusHidden: "غير ظاهر",
+    offersNotShownBecause: "السبب:",
+    offersUnavailable: "عرض لم يعد متاحاً",
+    offersUnavailableHint:
+      "هذا العرض المحفوظ لم يعد موجوداً في المتجر. لن يظهر للزوّار؛ احذفه من الاختيار.",
+    offersReferencePrice: "السعر الأساسي",
+    offersOfferPrice: "سعر العرض",
+    offersDiscountOff: "خصم",
+    offersReason_inactive: "العرض موقوف",
+    offersReason_scheduled: "لم تبدأ فترته بعد",
+    offersReason_expired: "انتهت فترته",
+    offersReason_product_unavailable: "المنتج غير نشط أو غير منشور على هذا المتجر",
+    offersReason_variant_managed: "المنتج متعدد الخيارات (غير مدعوم في العروض حالياً)",
+    offersReason_not_discounted: "لا يوجد خصم فعلي على المنتج الآن",
+    offersReason_price_unresolved: "تعذّر تحديد سعر العرض",
+    offersReason_out_of_stock: "غير متوفر في المخزون",
+    offersReason_fulfillment_not_configured: "لا مستودع تجهيز مهيّأ لهذه القناة",
+    offersReason_availability_unresolved: "تعذّر التحقق من التوفر",
+    offersReason_unknown: "غير ظاهر لسبب غير معروف",
+    homeOffersLoadFailed: "تعذّر تحميل العروض لهذا القسم.",
+    homeOffersEmpty: "لم تُختَر عروض لهذا القسم بعد.",
+    homeOffersNoneLive:
+      "لا عرض ظاهر الآن ضمن اختيارك. لن يظهر هذا القسم في المتجر المنشور حتى يصبح أحدها ظاهراً.",
     appPromoNote:
       "روابط التطبيق تُؤخذ من إعدادات التطبيقات، ولا يظهر القسم إلا إذا كان الرابط لمتجر آبل أو جوجل حقيقياً.",
     removeItem: "حذف",
@@ -804,12 +837,6 @@ export const CUSTOMIZER_MESSAGES = {
     sectionBenefitsDescription: "Short store perks like shipping and secure payment.",
     sectionAppPromoDescription: "Download links for your store's mobile app.",
     sectionCustomContentDescription: "Free-form headings and paragraphs.",
-    // CUST-H4-2 (review fix) — Offers stays visible in the Library but is
-    // not addable yet: no real Commerce backend or Canvas/Published
-    // renderer exists today. Distinct from `gatedSection` (the existing
-    // selected-instance settings copy, a different scenario).
-    sectionOffersComingSoon:
-      "Offers is coming. It will become addable once its real Commerce backend and both renderers are built in AWJ.",
     selectedSectionHint: "Only the selected section's settings appear here.",
     sectionManagedNote:
       "This section's content comes from the AWJ catalog and cannot be edited here. You can show, hide and reorder it.",
@@ -840,6 +867,45 @@ export const CUSTOMIZER_MESSAGES = {
     featuredSelectedLabel: "Selected products",
     featuredSelectedEmpty: "No products selected yet.",
     featuredMaxReachedHint: "Maximum 8 products.",
+    // CUST-H4-7 — real Offers picker (only the offer id is stored).
+    offersHint:
+      "Only the offer id is stored. Price, discount and visibility are read from the offers configured on the store — they are not copied here and cannot be edited from this list.",
+    offersSelectedLabel: "Selected offers",
+    offersSelectedEmpty: "No offers selected yet.",
+    offersMaxReachedHint: "Maximum 8 offers.",
+    offersListLabel: "Offers configured on this store",
+    offersLoading: "Loading offers…",
+    offersLoadFailed: "Couldn't load offers.",
+    offersEmpty:
+      "No offers are configured for this store yet. Once an offer is configured for a published product it will appear here for you to select.",
+    offersRefresh: "Refresh list",
+    offersMoveUp: "Move offer up",
+    offersMoveDown: "Move offer down",
+    offersRemove: "Remove offer from selection",
+    offersStatusLive: "Live now",
+    offersStatusHidden: "Not shown",
+    offersNotShownBecause: "Reason:",
+    offersUnavailable: "Offer no longer available",
+    offersUnavailableHint:
+      "This saved offer no longer exists on the store. It won't appear to visitors; remove it from the selection.",
+    offersReferencePrice: "Base price",
+    offersOfferPrice: "Offer price",
+    offersDiscountOff: "off",
+    offersReason_inactive: "The offer is switched off",
+    offersReason_scheduled: "Its period hasn't started yet",
+    offersReason_expired: "Its period has ended",
+    offersReason_product_unavailable: "The product is inactive or not published on this store",
+    offersReason_variant_managed: "The product has variants (not supported in Offers yet)",
+    offersReason_not_discounted: "The product has no real discount right now",
+    offersReason_price_unresolved: "The offer price couldn't be determined",
+    offersReason_out_of_stock: "Out of stock",
+    offersReason_fulfillment_not_configured: "No fulfillment warehouse is configured for this channel",
+    offersReason_availability_unresolved: "Availability couldn't be verified",
+    offersReason_unknown: "Not shown for an unrecognised reason",
+    homeOffersLoadFailed: "Couldn't load the offers for this section.",
+    homeOffersEmpty: "No offers chosen for this section yet.",
+    homeOffersNoneLive:
+      "None of your selected offers is live right now. This section won't appear on the published store until one of them is.",
     appPromoNote:
       "App links come from the Apps settings. The section appears only when an Apple or Google store link is real.",
     removeItem: "Remove",

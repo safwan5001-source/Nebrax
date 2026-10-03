@@ -777,4 +777,125 @@ class StorefrontPresentationNormalizerTest extends TestCase
 
         return $decoded;
     }
+
+    /**
+     * CUST-H4-7 — `OffersContent{offerIds}`: references only, max 8, trimmed,
+     * deduplicated, unsafe/non-string tokens dropped, order preserved, empty
+     * omitted, every Commerce fact stripped. Twin of the web/storefront
+     * `section-content.ts` normalizers (see the shared fixtures there).
+     *
+     * @return array<string, mixed>|null
+     */
+    private function offersContent(mixed $content): ?array
+    {
+        $section = ['id' => 'offers-a', 'type' => 'offers', 'visible' => true];
+        if ($content !== self::ABSENT) {
+            $section['content'] = $content;
+        }
+        $normalized = $this->normalizer->normalize([
+            'version' => 2,
+            'homepage' => ['sections' => [$section]],
+        ]);
+        $row = collect($normalized['homepage']['sections'])->firstWhere('id', 'offers-a');
+
+        return $row['content'] ?? null;
+    }
+
+    private const ABSENT = '__absent__';
+
+    public function test_offers_content_keeps_ids_in_merchant_order(): void
+    {
+        $this->assertSame(
+            ['offer-c', 'offer-a', 'offer-b'],
+            $this->offersContent(['offerIds' => ['offer-c', 'offer-a', 'offer-b']])['offerIds'],
+        );
+    }
+
+    public function test_offers_content_dedupes_trims_and_drops_invalid_tokens(): void
+    {
+        $content = $this->offersContent(['offerIds' => [
+            ' offer-a ', 'offer-a', 'bad id', '', '   ', 42, null, ['x'], 'a/b', str_repeat('x', 65), 'offer-b',
+        ]]);
+
+        $this->assertSame(['offer-a', 'offer-b'], $content['offerIds']);
+    }
+
+    public function test_offers_content_is_capped_at_eight(): void
+    {
+        $ids = array_map(fn (int $i) => "offer-$i", range(1, 12));
+
+        $this->assertSame(array_slice($ids, 0, 8), $this->offersContent(['offerIds' => $ids])['offerIds']);
+        $this->assertSame(8, StorefrontPresentationNormalizer::MAX_OFFERS);
+    }
+
+    public function test_offers_content_omits_empty_shapes(): void
+    {
+        $this->assertNull($this->offersContent(self::ABSENT));
+        $this->assertNull($this->offersContent([]));
+        $this->assertNull($this->offersContent(['offerIds' => []]));
+        $this->assertNull($this->offersContent(['offerIds' => 'offer-a']));
+        $this->assertNull($this->offersContent(['offerIds' => ['bad id', '']]));
+        $this->assertNull($this->offersContent('offer-a'));
+        $this->assertNull($this->offersContent([['offer-a']]));
+    }
+
+    public function test_offers_content_persists_only_offer_ids(): void
+    {
+        $content = $this->offersContent([
+            'offerIds' => ['offer-a'],
+            'productIds' => ['p-1'],
+            'name' => 'Phone',
+            'image' => 'https://cdn.example.com/x.jpg',
+            'referencePrice' => 100,
+            'offerPrice' => 50,
+            'discountPercent' => 50,
+            'stock' => 3,
+            'startsAt' => '2026-01-01',
+            'isLive' => true,
+        ]);
+
+        $this->assertSame(['offerIds' => ['offer-a']], $content);
+    }
+
+    public function test_offers_content_is_stable_across_renormalization(): void
+    {
+        $first = $this->normalizer->normalize([
+            'version' => 2,
+            'homepage' => ['sections' => [[
+                'id' => 'offers-a', 'type' => 'offers', 'visible' => true,
+                'content' => ['offerIds' => ['offer-b', 'offer-a', 'offer-b']],
+            ]]],
+        ]);
+        $second = $this->normalizer->normalize($first);
+
+        $this->assertSame($first['homepage']['sections'], $second['homepage']['sections']);
+    }
+
+    public function test_legacy_offers_section_without_content_stays_valid(): void
+    {
+        $normalized = $this->normalizer->normalize([
+            'version' => 2,
+            'homepage' => ['sections' => [['id' => 'offers-a', 'type' => 'offers', 'visible' => true]]],
+        ]);
+
+        $this->assertSame(
+            [['id' => 'offers-a', 'type' => 'offers', 'visible' => true]],
+            $normalized['homepage']['sections'],
+        );
+    }
+
+    public function test_offers_instances_keep_independent_content(): void
+    {
+        $normalized = $this->normalizer->normalize([
+            'version' => 2,
+            'homepage' => ['sections' => [
+                ['id' => 'offers-a', 'type' => 'offers', 'visible' => true, 'content' => ['offerIds' => ['o-1', 'o-2']]],
+                ['id' => 'offers-b', 'type' => 'offers', 'visible' => true, 'content' => ['offerIds' => ['o-2', 'o-1']]],
+            ]],
+        ]);
+        $sections = collect($normalized['homepage']['sections'])->keyBy('id');
+
+        $this->assertSame(['o-1', 'o-2'], $sections['offers-a']['content']['offerIds']);
+        $this->assertSame(['o-2', 'o-1'], $sections['offers-b']['content']['offerIds']);
+    }
 }

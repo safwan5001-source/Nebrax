@@ -14,7 +14,7 @@ import {
   SECTION_LIBRARY_CATEGORY_LABEL,
   sectionTypesInCategory,
 } from "../presentation";
-import { customizerMessage } from "../messages";
+import { CUSTOMIZER_MESSAGES, customizerMessage } from "../messages";
 
 const SAFE_ID = /^[a-zA-Z0-9_-]{1,64}$/;
 
@@ -144,7 +144,9 @@ describe("CUST-H4-2 capability registry — state/category/library metadata", ()
 
   it("never flattens a non-live state to live (H4-1 §5 truth matrix)", () => {
     // Exact truth matrix from CUST-H4-ARCH-1 §5 — PARTIAL/GATED sections must
-    // keep their honest state, not read as LIVE.
+    // keep their honest state, not read as LIVE. As of CUST-H4-7 every
+    // section is genuinely LIVE (Offers has its real backend, picker, Canvas
+    // and Published renderer).
     const expected: Record<string, string> = {
       hero: "live",
       categories: "live",
@@ -152,7 +154,7 @@ describe("CUST-H4-2 capability registry — state/category/library metadata", ()
       wholesale: "live",
       banner: "live",
       featured: "live",
-      offers: "gated",
+      offers: "live",
       benefits: "live",
       appPromo: "live",
       customContent: "live",
@@ -162,7 +164,7 @@ describe("CUST-H4-2 capability registry — state/category/library metadata", ()
     }
   });
 
-  it("keeps offers' formalized gated state consistent with the existing isGatedHomeSection gate", () => {
+  it("keeps the formalized gated state consistent with the existing isGatedHomeSection gate (empty today)", () => {
     for (const type of HOME_BUILDER_SECTION_KEYS) {
       expect(SECTION_CAPABILITIES[type].state === "gated").toBe(
         isGatedHomeSection(type),
@@ -178,34 +180,35 @@ describe("CUST-H4-2 capability registry — state/category/library metadata", ()
     expect(SECTION_CAPABILITIES.featured.reasonKey).toBeUndefined();
   });
 
-  it("documents Offers as truthfully GATED and NOT merchant-addable yet (CUST-H4-2 review fix)", () => {
-    expect(SECTION_CAPABILITIES.offers.state).toBe("gated");
-    expect(SECTION_CAPABILITIES.offers.reasonKey).toBeTruthy();
-    // No merchant-addable fake section: Offers has neither the H4-6 real
-    // Commerce backend nor the H4-7 real Canvas/Published renderers yet, so
-    // it must be withheld from merchant-addable results — visible, but not
-    // addable — until those slices land. Do not flip this to `true` outside
-    // of that transition (see the capability-transition comment in
-    // `section-capabilities.ts`).
-    expect(SECTION_CAPABILITIES.offers.merchantAddable).toBe(false);
+  it("documents Offers as LIVE and merchant-addable now that CUST-H4-6 + H4-7 shipped (no gated reason/badge left)", () => {
+    expect(SECTION_CAPABILITIES.offers.state).toBe("live");
+    expect(SECTION_CAPABILITIES.offers.merchantAddable).toBe(true);
+    // LIVE sections never carry a reasonKey, and the stale "coming soon"
+    // copy is gone from both locales.
+    expect(SECTION_CAPABILITIES.offers.reasonKey).toBeUndefined();
+    expect("sectionOffersComingSoon" in CUSTOMIZER_MESSAGES.ar).toBe(false);
+    expect("sectionOffersComingSoon" in CUSTOMIZER_MESSAGES.en).toBe(false);
+    expect(isGatedHomeSection("offers")).toBe(false);
   });
 
-  it("still shows Offers in the Library, still disallows adding it, via the public canAddSectionType/hasAddableSectionType API", () => {
+  it("lets a merchant add Offers via the public canAddSectionType/hasAddableSectionType API, with independent instances", () => {
     const sections = DEFAULT_PRESENTATION_CONFIG.homepage.sections;
-    expect(canAddSectionType(sections, "offers")).toBe(false);
-    // Removing every offers instance must not make it addable either — the
-    // capability-level gate is independent of instance count.
+    expect(canAddSectionType(sections, "offers")).toBe(true);
     const withoutOffers = sections.filter((s) => s.type !== "offers");
-    expect(canAddSectionType(withoutOffers, "offers")).toBe(false);
+    expect(canAddSectionType(withoutOffers, "offers")).toBe(true);
+    // canDuplicate / maxInstances: null — several Offers rails are allowed.
+    expect(SECTION_CAPABILITIES.offers.canDuplicate).toBe(true);
+    expect(SECTION_CAPABILITIES.offers.maxInstances).toBeNull();
+    expect(SECTION_CAPABILITIES.offers.category).toBe("offersMarketing");
   });
 
-  it("documents the Offers capability transition this slice does NOT perform", () => {
-    // Current H4-2: gated + withheld from merchant-addable results.
-    expect(SECTION_CAPABILITIES.offers.state).toBe("gated");
-    expect(SECTION_CAPABILITIES.offers.merchantAddable).toBe(false);
-    // The future pair (state: "live", merchantAddable: true) only applies
-    // once H4-6 (real Commerce backend) and H4-7 (real Canvas/Published
-    // renderers) both ship — not in this PR.
+  it("leaves every other section's capability state unchanged by the Offers transition", () => {
+    for (const type of HOME_BUILDER_SECTION_KEYS) {
+      expect(SECTION_CAPABILITIES[type].state).toBe("live");
+      expect(SECTION_CAPABILITIES[type].merchantAddable).toBe(true);
+    }
+    // Featured stays live (H4-5) with its own duplicate rules untouched.
+    expect(SECTION_CAPABILITIES.featured.canDuplicate).toBe(true);
   });
 
   it("maps every section to exactly one of the 7 taxonomy categories, none empty", () => {
@@ -245,10 +248,10 @@ describe("CUST-H4-2 capability registry — state/category/library metadata", ()
   });
 
   it("merchantAddable gates canAddSectionType independently of instance count", () => {
-    // Every type except `offers` (withheld until H4-6/H4-7, see above) is
-    // reachable via canAddSectionType once instance-count rules allow it.
+    // Every type is merchant-addable (Offers flipped in CUST-H4-7), so
+    // instance-count rules are the only remaining gate.
     for (const type of HOME_BUILDER_SECTION_KEYS) {
-      expect(SECTION_CAPABILITIES[type].merchantAddable).toBe(type !== "offers");
+      expect(SECTION_CAPABILITIES[type].merchantAddable).toBe(true);
     }
     const sections = DEFAULT_PRESENTATION_CONFIG.homepage.sections.filter(
       (s) => s.type !== "appPromo",

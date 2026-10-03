@@ -158,7 +158,7 @@ describe('commerce appearance — STORE-CUSTOMIZER-V2-2 section editing', () => 
     expect(within(block).queryByText('عنوان البطل')).toBeNull();
   });
 
-  it('shows the gated note for gated sections without content fields', async () => {
+  it('shows the real Offers picker (not a gated note) for an offers section', async () => {
     const user = userEvent.setup();
     render(<CommerceAppearancePage />);
     await waitFor(() => expect(showMock).toHaveBeenCalled());
@@ -169,8 +169,12 @@ describe('commerce appearance — STORE-CUSTOMIZER-V2-2 section editing', () => 
 
     const block = selectedSettings() as HTMLElement;
     expect(block.getAttribute('data-selected-section-settings')).toBe('offers');
-    expect(block.textContent).toContain('محرك العروض');
-    expect(block.textContent).not.toContain('عنوان');
+    // CUST-H4-7 — Offers is LIVE: the Content tab hosts the real picker, with
+    // its selected-count header, never the old "no offers engine" note.
+    expect(block.textContent).toContain('العروض المختارة');
+    expect(block.textContent).toContain('0/8');
+    expect(block.textContent).not.toContain('محرك العروض');
+    expect(block.textContent).not.toContain('غير مفعّل');
   });
 
   it('toggles visibility from the selected block and keeps preview in sync', async () => {
