@@ -12,6 +12,7 @@ use App\Services\ProductMediaGalleryService;
 use App\Tenancy\BranchScope;
 use App\Tenancy\TenantContext;
 use DomainException;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use RuntimeException;
@@ -70,14 +71,23 @@ final class ProductAddonService
         }
 
         return DB::transaction(function () use ($product, $addons, $ids) {
-            // BranchScope وحده يُرفع؛ TenantScope وSoftDeletes يبقيان، فمنتجٌ حُذف بين تحميل المتحكّم
-            // وهذا القفل يُرفض بـ404 بدل نجاحٍ فارغ أو 500 من قيد المفتاح الأجنبي.
-            Product::withoutGlobalScope(BranchScope::class)->whereKey($product->id)->lockForUpdate()->firstOrFail();
+            // قفلٌ واحد لاتحاد (الأب + منتجات الإضافة) بترتيب المعرّف الشامل: مديران يضبطان علاقتين متبادلتين
+            // (أ→ب وب→أ) يطلبان الأقفال بنفس الترتيب فلا دورة انتظار ولا deadlock. BranchScope وحده يُرفع؛
+            // TenantScope وSoftDeletes يبقيان، فمنتجٌ حُذف بين تحميل المتحكّم وهذا القفل (الأب أو الهدف) لا يُقفل
+            // فيُرفض: الأب بـ404 بدل نجاحٍ فارغ أو 500 من قيد المفتاح الأجنبي، والهدف برسالة «غير موجود».
+            // تعطيلٌ أو حذفٌ متزامن لمنتج إضافة إما ينتهي قبل قراءتنا فنرفضه، أو ينتظر التزامنا فيرى العلاقة ويُنظّفها.
+            $locked = Product::withoutGlobalScope(BranchScope::class)
+                ->whereIn('id', array_values(array_unique([$product->id, ...$ids])))
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get()
+                ->keyBy('id');
+            if (! $locked->has($product->id)) {
+                throw (new ModelNotFoundException)->setModel(Product::class, [$product->id]);
+            }
 
-            // المنتجات تُحلّ عبر Product::query() (TenantScope + نطاق الفرع للمستخدم الإداري) وتُقفل (بترتيب
-            // المعرّف لتفادي التشابك): تعطيلٌ أو حذفٌ متزامن لمنتج إضافة إما ينتهي قبل قراءتنا فنرفضه، أو ينتظر
-            // التزامنا فيرى العلاقة ويُنظَّفها — فلا تُحفَظ علاقة بمنتجٍ غير نشط أو محذوف.
-            $found = Product::query()->whereIn('id', $ids)->orderBy('id')->lockForUpdate()->get()->keyBy('id');
+            // الأهداف تُحلّ بعد القفل عبر Product::query() (TenantScope + نطاق الفرع للمستخدم الإداري).
+            $found = Product::query()->whereIn('id', $ids)->get()->keyBy('id');
             $needsInput = $this->productsRequiringPersonalization($ids);
             foreach ($addons as $addon) {
                 $target = $found[$addon['addon_product_id']] ?? null;

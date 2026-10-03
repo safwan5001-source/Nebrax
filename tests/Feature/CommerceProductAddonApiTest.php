@@ -393,7 +393,7 @@ class CommerceProductAddonApiTest extends TestCase
     }
 
     /** @test */
-    public function replacing_locks_the_addon_targets_in_id_order(): void
+    public function replacing_locks_the_parent_and_targets_in_one_global_id_order(): void
     {
         if (\Illuminate\Support\Facades\DB::connection()->getDriverName() !== 'pgsql') {
             $this->markTestSkipped('FOR UPDATE يظهر في SQL على PostgreSQL فقط.');
@@ -404,13 +404,17 @@ class CommerceProductAddonApiTest extends TestCase
         $a = $this->makeProduct($auth['tenant_id'], 'أ');
         $b = $this->makeProduct($auth['tenant_id'], 'ب');
 
-        $queries = [];
-        \Illuminate\Support\Facades\DB::listen(function ($q) use (&$queries) {
-            $queries[] = $q->sql;
+        $locks = [];
+        \Illuminate\Support\Facades\DB::listen(function ($q) use (&$locks) {
+            if (str_contains($q->sql, 'from "products"') && str_contains($q->sql, 'for update')) {
+                $locks[] = ['sql' => $q->sql, 'bindings' => $q->bindings];
+            }
         });
         $this->withToken($auth['token'])->putJson($this->url($bouquet), ['addons' => [['addon_product_id' => $a->id], ['addon_product_id' => $b->id]]])->assertOk();
 
-        $locked = array_filter($queries, fn ($sql) => str_contains($sql, 'from "products"') && str_contains($sql, '"id" in') && str_contains($sql, 'order by "id"') && str_contains($sql, 'for update'));
-        $this->assertNotEmpty($locked, 'add-on targets were read without a row lock');
+        // قفلٌ واحد للاتحاد (الأب + الهدفان) مرتَّب بالمعرّف — لا قفل منفصل للأب يسبق الأهداف (دورة deadlock)
+        $this->assertCount(1, $locks, 'parent and targets must be locked by a single ordered query');
+        $this->assertStringContainsString('order by "id"', $locks[0]['sql']);
+        $this->assertEqualsCanonicalizing([$bouquet->id, $a->id, $b->id], array_values(array_intersect($locks[0]['bindings'], [$bouquet->id, $a->id, $b->id])));
     }
 }
