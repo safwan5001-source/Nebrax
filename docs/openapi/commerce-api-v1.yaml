@@ -539,6 +539,41 @@ paths:
         '422': { $ref: '#/components/responses/ValidationError' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
 
+  /checkout/gift:
+    parameters:
+      - $ref: '#/components/parameters/RequestId'
+      - $ref: '#/components/parameters/CartToken'
+      - $ref: '#/components/parameters/OptionalCustomerToken'
+    patch:
+      operationId: updateCheckoutGift
+      tags: [Checkout]
+      summary: Set or clear the gift context (delivery recipient, displayed sender, message)
+      description: >
+        ADR-15. Keeps the purchaser (`contact`), the delivery recipient, the
+        displayed gift sender and the message separate. Refused with 422 while
+        the channel's gift policy is disabled (`gift_options.enabled`), except
+        `is_gift: false`, which always clears. The recipient never becomes an
+        ERP customer; the sender display name is never an accounting identity.
+      x-auth-tier: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CheckoutGiftUpdate' }
+      responses:
+        '200':
+          description: The updated checkout.
+          headers:
+            X-Request-Id: { $ref: '#/components/headers/XRequestId' }
+            X-Cart-Token: { $ref: '#/components/headers/XCartToken' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CheckoutResponse' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
   /checkout/delivery:
     parameters:
       - $ref: '#/components/parameters/RequestId'
@@ -1532,6 +1567,8 @@ components:
             amount: { $ref: '#/components/schemas/Money' }
             address: { $ref: '#/components/schemas/CheckoutAddress' }
         payment: { $ref: '#/components/schemas/CheckoutPayment' }
+        gift: { $ref: '#/components/schemas/Gift' }
+        gift_options: { $ref: '#/components/schemas/GiftOptions' }
         cart: { $ref: '#/components/schemas/Cart' }
 
     CheckoutResponse:
@@ -1541,6 +1578,39 @@ components:
       properties:
         data: { $ref: '#/components/schemas/Checkout' }
         meta: { $ref: '#/components/schemas/SuccessMeta' }
+
+    Gift:
+      description: The gift context, or `null` when the order/checkout is not a gift.
+      type: [object, 'null']
+      additionalProperties: false
+      required: [recipient_name, recipient_phone, sender_display_name, hide_sender, message]
+      properties:
+        recipient_name: { type: [string, 'null'] }
+        recipient_phone: { type: [string, 'null'] }
+        sender_display_name: { type: [string, 'null'] }
+        hide_sender: { type: boolean }
+        message: { type: [string, 'null'] }
+
+    GiftOptions:
+      type: object
+      additionalProperties: false
+      required: [enabled, message_max_length, allow_hide_sender, recipient_phone_required]
+      properties:
+        enabled: { type: boolean }
+        message_max_length: { type: integer }
+        allow_hide_sender: { type: boolean }
+        recipient_phone_required: { type: boolean }
+
+    CheckoutGiftUpdate:
+      type: object
+      additionalProperties: false
+      properties:
+        is_gift: { type: boolean }
+        recipient_name: { type: [string, 'null'], maxLength: 255 }
+        recipient_phone: { type: [string, 'null'], maxLength: 32 }
+        sender_name: { type: [string, 'null'], maxLength: 255 }
+        hide_sender: { type: boolean }
+        message: { type: [string, 'null'], maxLength: 2000 }
 
     CheckoutContactUpdate:
       type: object
@@ -1623,7 +1693,7 @@ components:
     Order:
       type: object
       additionalProperties: false
-      required: [id, number, status, delivery_method, total, contact, delivery, payment, items, created_at]
+      required: [id, number, status, delivery_method, total, contact, delivery, gift, payment, items, created_at]
       properties:
         id: { type: string, format: uuid }
         number: { type: string }
@@ -1653,6 +1723,7 @@ components:
             postal_code: { type: [string, 'null'] }
             notes: { type: [string, 'null'] }
             amount: { $ref: '#/components/schemas/Money' }
+        gift: { $ref: '#/components/schemas/Gift' }
         payment: { $ref: '#/components/schemas/OrderPayment' }
         items:
           type: array

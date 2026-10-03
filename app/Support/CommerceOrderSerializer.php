@@ -72,6 +72,14 @@ final class CommerceOrderSerializer
                 // هذا الحقل تفصيلٌ للعرض فقط، لا مصدر حقيقة إضافياً.
                 'amount' => ['amount_minor' => $order->delivery_amount_minor, 'currency' => $currency],
             ],
+            // FLOWERS-H3 / ADR-15 — لقطة الإهداء الثابتة؛ null لطلب بلا إهداء.
+            'gift' => $order->gift === null ? null : [
+                'recipient_name' => $order->gift->recipient_name,
+                'recipient_phone' => $order->gift->recipient_phone,
+                'sender_display_name' => $order->gift->sender_display_name,
+                'hide_sender' => (bool) $order->gift->hide_sender,
+                'message' => $order->gift->message,
+            ],
             'payment' => [
                 'method' => $order->paymentIntent?->method,
                 'status' => $order->paymentIntent?->status,

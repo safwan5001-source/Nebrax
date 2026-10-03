@@ -235,8 +235,10 @@ class CommerceOrderService
                 'contact_name' => $header['contact_name'],
                 'email' => $header['contact_email'],
                 'phone' => $header['contact_phone'],
-                'shipping_recipient_name' => $header['contact_name'],
-                'shipping_phone' => $header['contact_phone'],
+                // FLOWERS-H3 / ADR-15: مستلم التوصيل من الإهداء حين وُجد، وإلا المشتري
+                // كما كان دوماً (سلوك المتاجر العامة بلا أي تغيير).
+                'shipping_recipient_name' => $header['gift']['recipient_name'] ?? $header['contact_name'],
+                'shipping_phone' => $header['gift']['recipient_phone'] ?? $header['contact_phone'],
                 'shipping_country' => $header['delivery_country'],
                 'shipping_region' => $header['delivery_region'],
                 'shipping_city' => $header['delivery_city'],
@@ -248,13 +250,17 @@ class CommerceOrderService
                 'shipping_notes' => $header['delivery_notes'],
             ]);
 
+            if (! empty($header['gift'])) {
+                app(CommerceGiftService::class)->snapshotToOrder($order, $header['gift']);
+            }
+
             // نقلٌ صريحٌ أخير إلى confirmed — لا مسار خارجي رأى draft قط
             // (انظر توثيق الدالة أعلاه). لا استدعاء لـ confirm() القائمة:
             // تلك تفتح معاملتها/تقفل صفّها الخاص لسيناريو مختلف (طلبٌ قد
             // يكون قديماً وغير مقفولٍ أصلاً هنا).
             $order->update(['status' => CommerceOrder::STATUS_CONFIRMED, 'confirmed_at' => now()]);
 
-            return $order->fresh(['lines', 'snapshot']);
+            return $order->fresh(['lines', 'snapshot', 'gift']);
         });
     }
 

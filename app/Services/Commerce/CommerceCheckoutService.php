@@ -326,6 +326,24 @@ final class CommerceCheckoutService
     }
 
     /**
+     * FLOWERS-H3 / ADR-15 — يضبط/يمسح سياق الإهداء (مستلم التوصيل، المُرسِل
+     * المعروض، الرسالة). لا مبلغ ولا سعر ولا هوية محاسبية؛ السياسة من
+     * `CommerceGiftSetting` للقناة، وكل التحقق في `CommerceGiftService`.
+     *
+     * @param  array<string, mixed>  $fields is_gift, recipient_name, recipient_phone, sender_name, hide_sender, message
+     */
+    public function updateGift(CommerceCheckout $knownCheckout, array $fields): array
+    {
+        return DB::transaction(function () use ($knownCheckout, $fields): array {
+            $checkout = $this->lockUsableCheckout($knownCheckout);
+            app(CommerceGiftService::class)->applyToCheckout($checkout, $fields);
+            $checkout->update(['expires_at' => now()->addMinutes(self::LIFETIME_MINUTES)]);
+
+            return $this->serialize($checkout, $this->cartFor($checkout));
+        }, 3);
+    }
+
+    /**
      * @param  array<string, string|null>  $fields مفاتيحها أعمدة delivery_* (عنوان) جاهزة من المتحكّم.
      *
      * (COM-MOBILE-SHIPPING-1) العنوان وطريقة التوصيل يُضبطان عبر نداءين
@@ -526,6 +544,9 @@ final class CommerceCheckoutService
                 );
             }
 
+            // FLOWERS-H3 / ADR-15 — إعادة تحقق الإهداء قبل أي كتابة؛ null = لا إهداء.
+            $gift = app(CommerceGiftService::class)->resolveForCompletion($checkout);
+
             $items = $cart->items()->orderBy('created_at')->orderBy('id')->get();
             if ($items->isEmpty()) {
                 throw new CheckoutReviewRequiredException(
@@ -554,6 +575,7 @@ final class CommerceCheckoutService
                 'delivery_additional_number' => $checkout->delivery_additional_number,
                 'delivery_postal_code' => $checkout->delivery_postal_code,
                 'delivery_notes' => $checkout->delivery_notes,
+                'gift' => $gift,
             ], $lines);
 
             // COM-MOBILE-PAYMENTS-1 (ADR-04/ADR-09) — نفس معاملة إنشاء
@@ -822,6 +844,9 @@ final class CommerceCheckoutService
                 'payment_method_name' => $checkout->paymentMethod?->name,
                 'method' => $this->previewPaymentMethod($checkout->delivery_method),
             ],
+            // FLOWERS-H3 / ADR-15 — سياق الإهداء الحالي وقيود القناة التي تحتاجها الواجهة.
+            'gift' => app(CommerceGiftService::class)->forCheckout($checkout),
+            'gift_options' => app(CommerceGiftService::class)->optionsForChannel($checkout->sales_channel_id),
             'cart' => $cartData,
         ];
     }
