@@ -25,6 +25,7 @@ export const COMMERCE_WORKSPACE_NAV_GROUPS: CommerceWorkspaceNavGroup[] = [
     items: [
       { href: '/commerce/stores', labelKey: 'stores' },
       { href: '/commerce/published-products', labelKey: 'publishedProducts' },
+      { href: '/commerce/merchandising', labelKey: 'merchandising' },
       { href: '/commerce/themes', labelKey: 'themeGallery' },
       { href: '/commerce/appearance', labelKey: 'appearance' },
       { href: '/app-builder', labelKey: 'appBuilder', appKey: 'commerce.app_builder', permission: 'apps_builder.view' },

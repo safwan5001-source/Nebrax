@@ -1,0 +1,218 @@
+// @vitest-environment jsdom
+import * as React from 'react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+
+const apiMock = vi.fn();
+vi.mock('@/lib/api', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/api')>()),
+  api: (...args: unknown[]) => apiMock(...args),
+}));
+
+const user = { current: { role: 'owner', permissions: undefined as string[] | undefined } };
+vi.mock('@/lib/auth', () => ({ currentUser: () => user.current }));
+vi.mock('next-intl', () => ({ useLocale: () => 'en', useTranslations: () => (key: string) => key }));
+
+import CommerceMerchandisingPage from './page';
+import { ToastProvider } from '@/components/ui/toast';
+
+function renderPage() {
+  return render(
+    <ToastProvider>
+      <CommerceMerchandisingPage />
+    </ToastProvider>,
+  );
+}
+
+const occasion = {
+  id: 'f1', key: 'occasion', system_key: 'occasion', name: 'Occasion', name_en: null, sort_order: 0, is_active: true,
+  values: [
+    { id: 'v1', slug: 'birthday', name: 'Birthday', name_en: null, sort_order: 0, is_active: true, product_count: 2 },
+    { id: 'v2', slug: 'wedding', name: 'Wedding', name_en: null, sort_order: 1, is_active: true, product_count: 0 },
+  ],
+};
+
+afterEach(() => {
+  cleanup();
+  apiMock.mockReset();
+  user.current = { role: 'owner', permissions: undefined };
+});
+
+describe('Merchandising — dimensions tab', () => {
+  it('lists facets and values, blocks deleting an assigned value and offers only missing presets', async () => {
+    apiMock.mockResolvedValueOnce({ data: { facets: [occasion] } });
+    renderPage();
+
+    expect(await screen.findByText('Birthday')).toBeTruthy();
+    expect(screen.getByText('2 products')).toBeTruthy();
+    expect((screen.getByRole('button', { name: 'Delete Birthday' }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole('button', { name: 'Delete Wedding' }) as HTMLButtonElement).disabled).toBe(false);
+    expect(screen.queryByRole('button', { name: 'Add “Occasion”' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Add “Recipient”' })).toBeTruthy();
+  });
+
+  it('creates the recipient preset with the system key and refreshes from the server', async () => {
+    apiMock
+      .mockResolvedValueOnce({ data: { facets: [occasion] } })
+      .mockResolvedValueOnce({ data: { facet: { id: 'f2', key: 'recipient', name: 'Recipient', system_key: 'recipient' } } })
+      .mockResolvedValueOnce({ data: { facets: [occasion, { id: 'f2', key: 'recipient', system_key: 'recipient', name: 'Recipient', is_active: true, values: [] }] } });
+    renderPage();
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Add “Recipient”' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(() => expect(apiMock).toHaveBeenCalledTimes(3));
+    expect(apiMock).toHaveBeenNthCalledWith(2, '/commerce/workspace/facets', {
+      method: 'POST',
+      body: { key: 'recipient', name: 'Recipient', name_en: 'Recipient', system_key: 'recipient' },
+    });
+    expect(await screen.findByRole('heading', { name: 'Recipient' })).toBeTruthy();
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('keeps the dialog open and shows a failure when the request is rejected', async () => {
+    apiMock
+      .mockResolvedValueOnce({ data: { facets: [occasion] } })
+      .mockRejectedValueOnce(new Error('network'));
+    renderPage();
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Add value' }));
+    await userEvent.type(screen.getByLabelText('Value name'), 'Birthday');
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    // خطأ غير HTTP ⇒ العبارة العامة (لا نص خادم مُختلَق)
+    expect(await screen.findByText('Could not save. Please try again.')).toBeTruthy();
+    expect(screen.getByRole('dialog')).toBeTruthy();
+  });
+
+  it('requires a name before sending anything', async () => {
+    apiMock.mockResolvedValueOnce({ data: { facets: [occasion] } });
+    renderPage();
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Add value' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    expect(await screen.findByText('A name is required.')).toBeTruthy();
+    expect(apiMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('is read-only without products.manage', async () => {
+    user.current = { role: 'staff', permissions: ['products.view'] };
+    apiMock.mockResolvedValueOnce({ data: { facets: [occasion] } });
+    renderPage();
+
+    expect(await screen.findByText('Birthday')).toBeTruthy();
+    expect(screen.getByText(/view only/)).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'New dimension' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Add value' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Edit Birthday' })).toBeNull();
+  });
+
+  it('shows an error state with retry when the load fails', async () => {
+    apiMock.mockRejectedValueOnce(new Error('boom')).mockResolvedValueOnce({ data: { facets: [] } });
+    renderPage();
+
+    expect(await screen.findByText('Could not load the data.')).toBeTruthy();
+    await userEvent.click(screen.getByRole('button', { name: 'retry' }));
+    expect(await screen.findByText('No dimensions yet')).toBeTruthy();
+  });
+});
+
+describe('Merchandising — collections tab', () => {
+  const collection = { id: 'c1', slug: 'best', title: 'Best sellers', title_en: null, description: null, status: 'active', sort_order: 0, member_count: 2 };
+
+  async function openCollections() {
+    apiMock.mockResolvedValueOnce({ data: { facets: [] } }); // facets tab initial
+    renderPage();
+    apiMock.mockResolvedValueOnce({ data: { collections: [collection] } });
+    await userEvent.click(await screen.findByRole('tab', { name: 'Collections' }));
+  }
+
+  it('reorders members and saves the exact order', async () => {
+    await openCollections();
+    apiMock.mockResolvedValueOnce({
+      data: { products: [
+        { product_id: 'a', name: 'Roses', name_en: null, sku: null, is_active: true, position: 0 },
+        { product_id: 'b', name: 'Tulips', name_en: null, sku: null, is_active: true, position: 1 },
+      ] },
+    });
+    await userEvent.click(await screen.findByRole('button', { name: 'Manage products' }));
+    expect(await screen.findByText('Roses')).toBeTruthy();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Move down: Roses' }));
+    const items = within(screen.getByRole('dialog')).getAllByRole('listitem');
+    expect(items[0].textContent).toContain('Tulips');
+
+    apiMock.mockResolvedValueOnce({ data: { products: [] } }); // PUT
+    apiMock.mockResolvedValueOnce({ data: { collections: [collection] } }); // refresh
+    await userEvent.click(screen.getByRole('button', { name: 'Save order' }));
+
+    await waitFor(() =>
+      expect(apiMock).toHaveBeenCalledWith('/commerce/workspace/collections/c1/products', {
+        method: 'PUT',
+        body: { product_ids: ['b', 'a'] },
+      }),
+    );
+  });
+
+  it('disables moving the first item up and the last item down', async () => {
+    await openCollections();
+    apiMock.mockResolvedValueOnce({
+      data: { products: [
+        { product_id: 'a', name: 'Roses', is_active: true, position: 0 },
+        { product_id: 'b', name: 'Tulips', is_active: true, position: 1 },
+      ] },
+    });
+    await userEvent.click(await screen.findByRole('button', { name: 'Manage products' }));
+    await screen.findByText('Roses');
+
+    expect((screen.getByRole('button', { name: 'Move up: Roses' }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole('button', { name: 'Move down: Tulips' }) as HTMLButtonElement).disabled).toBe(true);
+  });
+});
+
+describe('Merchandising — assign tab', () => {
+  it('guides to create dimensions first when there are none', async () => {
+    apiMock.mockResolvedValueOnce({ data: { facets: [] } }); // facets tab
+    renderPage();
+    apiMock.mockResolvedValueOnce({ data: { facets: [] } }); // assign tab
+    await userEvent.click(await screen.findByRole('tab', { name: 'Assign products' }));
+
+    expect(await screen.findByText(/Create a dimension and values first/)).toBeTruthy();
+  });
+});
+
+describe('Merchandising — assigning values to a product', () => {
+  it('loads the product\'s values, toggles one and saves the exact set', async () => {
+    apiMock.mockResolvedValueOnce({ data: { facets: [occasion] } }); // facets tab
+    renderPage();
+    apiMock.mockResolvedValueOnce({ data: { facets: [occasion] } }); // assign tab
+    await userEvent.click(await screen.findByRole('tab', { name: 'Assign products' }));
+
+    apiMock.mockResolvedValueOnce({
+      data: [{ id: 'p1', sku: 'ROSE-1', name: 'Red roses', name_en: null, is_active: true, is_published: true, stores: [] }],
+      meta: { current_page: 1, last_page: 1, per_page: 10, total: 1 },
+    });
+    await userEvent.type(await screen.findByLabelText('Search a product by name or SKU'), 'rose');
+    expect(await screen.findByText('Red roses', undefined, { timeout: 3000 })).toBeTruthy();
+
+    apiMock.mockResolvedValueOnce({ data: { value_ids: ['v1'] } }); // current assignments
+    await userEvent.click(screen.getByRole('button', { name: 'Edit' }));
+    const birthday = (await screen.findByRole('checkbox', { name: 'Birthday' })) as HTMLInputElement;
+    await waitFor(() => expect(birthday.checked).toBe(true));
+
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Wedding' }));
+    apiMock.mockResolvedValueOnce({ data: { value_ids: ['v1', 'v2'] } }); // PUT
+    apiMock.mockResolvedValueOnce({ data: { facets: [occasion] } }); // refresh counts
+    await userEvent.click(screen.getByRole('button', { name: 'Save assignment' }));
+
+    await waitFor(() =>
+      expect(apiMock).toHaveBeenCalledWith('/commerce/workspace/products/p1/facets', {
+        method: 'PUT',
+        body: { value_ids: ['v1', 'v2'] },
+      }),
+    );
+    expect(await screen.findByText('Classification saved.')).toBeTruthy();
+  });
+});
