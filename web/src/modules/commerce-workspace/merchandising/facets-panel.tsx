@@ -87,16 +87,16 @@ export function FacetsPanel({ t, canManage }: { t: T; canManage: boolean }) {
         {canManage ? (
           <div className="flex flex-wrap gap-2">
             {!hasSystem('occasion') ? (
-              <Button type="button" variant="outline" size="sm" onClick={() => setDialog({ kind: 'create-facet', preset: 'occasion' })}>
+              <Button type="button" disabled={busyId !== null} variant="outline" size="sm" onClick={() => setDialog({ kind: 'create-facet', preset: 'occasion' })}>
                 {t('merchPresetOccasion')}
               </Button>
             ) : null}
             {!hasSystem('recipient') ? (
-              <Button type="button" variant="outline" size="sm" onClick={() => setDialog({ kind: 'create-facet', preset: 'recipient' })}>
+              <Button type="button" disabled={busyId !== null} variant="outline" size="sm" onClick={() => setDialog({ kind: 'create-facet', preset: 'recipient' })}>
                 {t('merchPresetRecipient')}
               </Button>
             ) : null}
-            <Button type="button" size="sm" onClick={() => setDialog({ kind: 'create-facet' })}>
+            <Button type="button" disabled={busyId !== null} size="sm" onClick={() => setDialog({ kind: 'create-facet' })}>
               <Plus className="h-4 w-4" aria-hidden="true" /> {t('merchFacetCreate')}
             </Button>
           </div>
@@ -129,7 +129,7 @@ export function FacetsPanel({ t, canManage }: { t: T; canManage: boolean }) {
                       onCheckedChange={() => void toggleFacet(facet)}
                       aria-label={`${facet.isActive ? t('merchDisable') : t('merchEnable')} ${facet.name}`}
                     />
-                    <Button type="button" variant="ghost" size="icon" aria-label={`${t('merchEdit')} ${facet.name}`} onClick={() => setDialog({ kind: 'edit-facet', facet })}>
+                    <Button type="button" disabled={busyId !== null} variant="ghost" size="icon" aria-label={`${t('merchEdit')} ${facet.name}`} onClick={() => setDialog({ kind: 'edit-facet', facet })}>
                       <Pencil className="h-4 w-4" aria-hidden="true" />
                     </Button>
                     <Button
@@ -137,7 +137,7 @@ export function FacetsPanel({ t, canManage }: { t: T; canManage: boolean }) {
                       variant="ghost"
                       size="icon"
                       aria-label={`${t('merchDelete')} ${facet.name}`}
-                      disabled={facet.values.some((v) => v.productCount > 0)}
+                      disabled={busyId !== null || facet.values.some((v) => v.productCount > 0)}
                       title={facet.values.some((v) => v.productCount > 0) ? t('merchDeleteBlocked') : undefined}
                       onClick={() => setDialog({ kind: 'delete-facet', facet })}
                     >
@@ -165,14 +165,14 @@ export function FacetsPanel({ t, canManage }: { t: T; canManage: boolean }) {
                           onCheckedChange={() => void toggleValue(facet, value)}
                           aria-label={`${value.isActive ? t('merchDisable') : t('merchEnable')} ${value.name}`}
                         />
-                        <Button type="button" variant="ghost" size="icon" aria-label={`${t('merchEdit')} ${value.name}`} onClick={() => setDialog({ kind: 'edit-value', facet, value })}>
+                        <Button type="button" disabled={busyId !== null} variant="ghost" size="icon" aria-label={`${t('merchEdit')} ${value.name}`} onClick={() => setDialog({ kind: 'edit-value', facet, value })}>
                           <Pencil className="h-4 w-4" aria-hidden="true" />
                         </Button>
                         <Button
                           type="button"
                           variant="ghost"
                           size="icon"
-                          disabled={value.productCount > 0}
+                          disabled={busyId !== null || value.productCount > 0}
                           title={value.productCount > 0 ? t('merchDeleteBlocked') : undefined}
                           aria-label={`${t('merchDelete')} ${value.name}`}
                           onClick={() => setDialog({ kind: 'delete-value', facet, value })}
@@ -187,7 +187,7 @@ export function FacetsPanel({ t, canManage }: { t: T; canManage: boolean }) {
 
               {canManage ? (
                 <div className="border-t border-border px-3 py-2">
-                  <Button type="button" variant="ghost" size="sm" onClick={() => setDialog({ kind: 'add-value', facet })}>
+                  <Button type="button" disabled={busyId !== null} variant="ghost" size="sm" onClick={() => setDialog({ kind: 'add-value', facet })}>
                     <Plus className="h-4 w-4" aria-hidden="true" /> {t('merchValueAdd')}
                   </Button>
                 </div>

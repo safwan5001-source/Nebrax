@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useLocale } from 'next-intl';
-import { Tabs } from '@/components/ui/tabs';
+import { TabPanel, Tabs } from '@/components/ui/tabs';
 import { PageHeader } from '@/components/nebrax';
 import { currentUser } from '@/lib/auth';
 import { hasPermission } from '@/lib/permissions';
@@ -43,9 +43,21 @@ export default function CommerceMerchandisingPage() {
         onChange={(id) => setTab(id as Tab)}
       />
 
-      {tab === 'facets' ? <FacetsPanel t={t} canManage={canManage} /> : null}
-      {tab === 'collections' ? <CollectionsPanel t={t} canManage={canManage} /> : null}
-      {tab === 'products' ? <AssignPanel t={t} canManage={canManage} /> : null}
+      {tab === 'facets' ? (
+        <TabPanel id="facets">
+          <FacetsPanel t={t} canManage={canManage} />
+        </TabPanel>
+      ) : null}
+      {tab === 'collections' ? (
+        <TabPanel id="collections">
+          <CollectionsPanel t={t} canManage={canManage} />
+        </TabPanel>
+      ) : null}
+      {tab === 'products' ? (
+        <TabPanel id="products">
+          <AssignPanel t={t} canManage={canManage} />
+        </TabPanel>
+      ) : null}
     </div>
   );
 }

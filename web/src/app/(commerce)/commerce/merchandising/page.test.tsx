@@ -287,6 +287,10 @@ describe('Merchandising — concurrent toggles and stale picker rows', () => {
     await userEvent.click(await screen.findByRole('switch', { name: 'Disable Occasion' }));
 
     expect((screen.getByRole('switch', { name: 'Disable Recipient' }) as HTMLButtonElement).disabled).toBe(true);
+    // وكل أدوات التعديل الأخرى تُقفل أيضاً ريثما تنتهي الكتابة وإعادة التحميل
+    expect((screen.getByRole('button', { name: 'Edit Occasion' }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole('button', { name: 'Edit Birthday' }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole('button', { name: 'New dimension' }) as HTMLButtonElement).disabled).toBe(true);
 
     apiMock.mockResolvedValueOnce({ data: { facets: [occasion, other] } });
     finish({ data: { facet: { id: 'f1' } } });
@@ -457,6 +461,18 @@ describe('Merchandising — load-more across an A→B→A search', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Show more' }));
     expect(await screen.findByText('Rose C')).toBeTruthy();
     expect(apiMock).toHaveBeenLastCalledWith(expect.stringContaining('page=2'));
+  });
+});
+
+describe('Merchandising — tab semantics', () => {
+  it('wraps the active content in the tab panel its tab controls', async () => {
+    apiMock.mockResolvedValueOnce({ data: { facets: [occasion] } });
+    renderPage();
+    await screen.findByText('Birthday');
+    const panel = screen.getByRole('tabpanel');
+    expect(panel.id).toBe('panel-facets');
+    expect(screen.getByRole('tab', { name: 'Dimensions' }).getAttribute('aria-controls')).toBe('panel-facets');
+    expect(within(panel).getByText('Birthday')).toBeTruthy();
   });
 });
 
