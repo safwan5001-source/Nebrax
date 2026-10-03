@@ -181,6 +181,27 @@ class CommerceFacetApiTest extends TestCase
     }
 
     /** @test */
+    public function assignment_is_rejected_for_a_product_deleted_after_it_was_loaded(): void
+    {
+        $auth = $this->registerTenant('fx-gone', 'owner@fx-gone.test');
+        $value = $this->createValue($auth['token'], $this->createFacet($auth['token'])['id']);
+        $product = $this->makeProduct($auth['tenant_id']);
+
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $stale = Product::query()->findOrFail($product->id);
+        $product->delete();
+
+        try {
+            app(CommerceFacetService::class)->replaceAssignments($stale, [$value['id']]);
+            $this->fail('assignment accepted for a deleted product');
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException) {
+            $this->assertSame(0, CommerceProductFacetValue::query()->count());
+        } finally {
+            app(TenantContext::class)->forget();
+        }
+    }
+
+    /** @test */
     public function a_foreign_tenant_value_or_product_is_rejected_and_writes_nothing(): void
     {
         $a = $this->registerTenant('fx-iso-a', 'owner@fx-iso-a.test');
