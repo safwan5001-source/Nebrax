@@ -9,6 +9,7 @@ use App\Models\StorefrontBusinessProfile;
 use App\Models\StorefrontDomain;
 use App\Support\Commerce\BusinessVertical;
 use App\Support\Commerce\VerticalCapability;
+use App\Services\Commerce\CommerceWorkspaceStorefrontsService;
 use App\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use RuntimeException;
@@ -149,6 +150,34 @@ class FlowersBusinessVerticalApiTest extends TestCase
             ->assertOk()->assertJsonPath('data.store.business_vertical', 'flowers_gifts');
         $this->withToken($auth['token'])->putJson($this->path($id), ['business_vertical' => null])
             ->assertOk()->assertJsonPath('data.store.business_vertical', 'flowers_gifts');
+    }
+
+    /** @test */
+    public function identity_and_vertical_changes_roll_back_together_when_the_vertical_write_fails(): void
+    {
+        $auth = $this->registerTenant('v-atomic', 'owner@v-atomic.test');
+        $seeded = $this->seedWebStorefront($auth['tenant_id']);
+        $id = $seeded['storefront']->id;
+        $originalName = $seeded['storefront']->name;
+
+        app(TenantContext::class)->set($auth['tenant_id']);
+
+        try {
+            app(CommerceWorkspaceStorefrontsService::class)->updateIdentityForCurrentTenant($id, [
+                'name' => 'اسم يجب ألا يثبت',
+                'business_vertical' => 'not-a-real-vertical',
+            ]);
+            $this->fail('Expected the invalid vertical to abort the atomic settings update.');
+        } catch (RuntimeException $e) {
+            $this->assertSame('ملف النشاط غير معروف.', $e->getMessage());
+        } finally {
+            app(TenantContext::class)->forget();
+        }
+
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $this->assertSame($originalName, Storefront::query()->findOrFail($id)->name);
+        $this->assertSame(0, StorefrontBusinessProfile::query()->where('storefront_id', $id)->count());
+        app(TenantContext::class)->forget();
     }
 
     /** @test */
