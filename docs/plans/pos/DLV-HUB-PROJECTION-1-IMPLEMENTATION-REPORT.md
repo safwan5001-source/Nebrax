@@ -13,7 +13,7 @@ Base is the squash of PR #1196, `13808e15cfea2ded9e64bcfd4c838971f7581b3b`. OD-H
 
 ## Approach chosen
 
-One table `delivery_hub_orders`. One service. Two permissions added to `Rbac::PERMISSIONS` only: `delivery_hub.view` and `delivery_hub.operate`. They are not granted to accountant, staff, or self_service. Owner and admin already have `*`. Intake and transitions are `operate`. Reads are `view`. No `sales.pos` gate. Database unique indexes back the provider triple and the tenant UUID. A unique violation retries inside a new transaction and then replays or conflicts. `reject` writes `cancelled_before_post`.
+One table `delivery_hub_orders`. One service. Two permissions added to `Rbac::PERMISSIONS` only: `delivery_hub.view` and `delivery_hub.operate`. They are not granted to accountant, staff, or self_service. Owner and admin already have `*`. Intake and transitions are `operate`. Reads are `view`. No `sales.pos` gate. Database unique indexes back the provider triple and the tenant UUID. A unique violation retries inside a new transaction and then replays or conflicts. `reject` writes `cancelled_before_post`. The model uses `BelongsToBranch` so the isolation guard classifies it, and the create-time branch stamp is disabled so an ambient branch cannot turn an unrouted row into a routed one. The new service directory is on the CI and assemble copy lists.
 
 ## Why this approach fits AWJ
 
@@ -34,6 +34,9 @@ It reuses tenant scope, branch allow-lists, and the existing 404 fail-closed hab
 - `app/Support/Rbac.php`
 - `routes/api.php`
 - `tests/Feature/DeliveryHubProjectionTest.php`
+- `.github/workflows/ci.yml`
+- `deploy/assemble.sh`
+- `setup.sh`
 - `docs/autonomous-engineering/TASK-QUEUE.md`
 - `docs/autonomous-engineering/CURRENT-STATE.md`
 

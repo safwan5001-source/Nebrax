@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\User;
+use App\Tenancy\BelongsToBranch;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use RuntimeException;
 
@@ -12,6 +13,8 @@ use RuntimeException;
  */
 class DeliveryHubOrder extends BaseModel
 {
+    use BelongsToBranch;
+
     public const UNROUTED = 'unrouted';
 
     public const RECEIVED = 'received';
@@ -69,14 +72,18 @@ class DeliveryHubOrder extends BaseModel
         });
     }
 
+    /**
+     * الوجهة صريحة فقط. سمة BelongsToBranch تُستخدم للتصنيف بلا نطاق عام،
+     * لكن وسم الإنشاء من X-Branch-Id أو الفرع الرئيسي يُلغى هنا: صف unrouted
+     * يجب أن يبقى بلا فرع حتى يُسمّى الوجهة في الطلب.
+     */
+    public static function bootBelongsToBranch(): void
+    {
+    }
+
     public function profile(): BelongsTo
     {
         return $this->belongsTo(DeliveryPlatformProfile::class, 'delivery_platform_profile_id');
-    }
-
-    public function branch(): BelongsTo
-    {
-        return $this->belongsTo(Branch::class);
     }
 
     public function visibleTo(User $user): bool
