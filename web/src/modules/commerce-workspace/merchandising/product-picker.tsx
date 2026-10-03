@@ -29,8 +29,13 @@ export function ProductPicker({
   const [search, setSearch] = useState('');
   const [results, setResults] = useState<PickerProduct[] | null>(null);
   const [failed, setFailed] = useState(false);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   useEffect(() => {
+    setPage(1);
+    setHasMore(false);
     if (search.trim() === '') {
       setResults(null);
       setFailed(false);
@@ -42,6 +47,7 @@ export function ProductPicker({
         const page = await loadProductPublicationList({ search, perPage: 10 });
         if (!cancelled) {
           setResults(page.items.map((item) => ({ id: item.id, name: item.name, sku: item.sku })));
+          setHasMore(page.meta.currentPage < page.meta.lastPage);
           setFailed(false);
         }
       } catch {
@@ -55,6 +61,25 @@ export function ProductPicker({
   }, [search]);
 
   const visible = (results ?? []).filter((p) => !excludeIds.includes(p.id));
+
+  async function loadMore() {
+    if (loadingMore) return;
+    setLoadingMore(true);
+    try {
+      const next = await loadProductPublicationList({ search, perPage: 10, page: page + 1 });
+      setResults((current) => [
+        ...(current ?? []),
+        ...next.items.filter((item) => !(current ?? []).some((c) => c.id === item.id)).map((item) => ({ id: item.id, name: item.name, sku: item.sku })),
+      ]);
+      setPage(next.meta.currentPage);
+      setHasMore(next.meta.currentPage < next.meta.lastPage);
+      setFailed(false);
+    } catch {
+      setFailed(true);
+    } finally {
+      setLoadingMore(false);
+    }
+  }
 
   return (
     <div className="space-y-2">
@@ -74,9 +99,10 @@ export function ProductPicker({
       </div>
       {failed ? <p role="alert" className="text-xs text-negative">{t('merchLoadFailed')}</p> : null}
       {results !== null && !failed ? (
-        visible.length === 0 ? (
+        visible.length === 0 && !hasMore ? (
           <p className="text-xs text-muted">{t('merchNoResults')}</p>
         ) : (
+          <>
           <ul className="divide-y divide-border rounded border border-border">
             {visible.map((product) => (
               <li key={product.id} className="flex items-center justify-between gap-2 px-3 py-2">
@@ -90,6 +116,12 @@ export function ProductPicker({
               </li>
             ))}
           </ul>
+          {hasMore ? (
+            <Button type="button" variant="outline" size="sm" onClick={() => void loadMore()} disabled={loadingMore}>
+              {t('merchLoadMore')}
+            </Button>
+          ) : null}
+          </>
         )
       ) : null}
     </div>

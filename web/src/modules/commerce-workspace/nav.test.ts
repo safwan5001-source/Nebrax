@@ -46,6 +46,13 @@ describe('commerce workspace navigation', () => {
     expect(isNavEntryVisible(appBuilder!, new Set(['commerce.app_builder']), { role: 'admin' })).toBe(false);
   });
 
+  it('hides Merchandising from roles without products.view, which every backing route requires', () => {
+    const merchandising = COMMERCE_WORKSPACE_NAV_GROUPS.flatMap((group) => group.items).find((item) => item.href === '/commerce/merchandising');
+    expect(merchandising).toMatchObject({ permission: 'products.view' });
+    expect(isNavEntryVisible(merchandising!, new Set(), { role: 'staff', permissions: [] })).toBe(false);
+    expect(isNavEntryVisible(merchandising!, new Set(), { role: 'staff', permissions: ['products.view'] })).toBe(true);
+  });
+
   it('does not add copies of AWJ core modules', () => {
     expect(COMMERCE_WORKSPACE_HREFS).not.toContain('/products');
     expect(COMMERCE_WORKSPACE_HREFS).not.toContain('/partners');

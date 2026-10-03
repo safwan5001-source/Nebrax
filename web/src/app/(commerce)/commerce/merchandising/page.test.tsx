@@ -218,6 +218,29 @@ describe('Merchandising — collections for read-only users and pending writes',
   });
 });
 
+describe('Merchandising — product picker pagination', () => {
+  it('offers later pages when the first page is fully excluded or truncated', async () => {
+    apiMock.mockResolvedValueOnce({ data: { facets: [occasion] } });
+    renderPage();
+    apiMock.mockResolvedValueOnce({ data: { facets: [occasion] } });
+    await userEvent.click(await screen.findByRole('tab', { name: 'Assign products' }));
+
+    const page = (n: number, last: number, items: Array<{ id: string; name: string }>) => ({
+      data: items.map((i) => ({ ...i, sku: null, name_en: null, is_active: true, is_published: true, stores: [] })),
+      meta: { current_page: n, last_page: last, per_page: 10, total: 11 },
+    });
+    apiMock.mockResolvedValueOnce(page(1, 2, [{ id: 'p1', name: 'Rose A' }]));
+    await userEvent.type(await screen.findByLabelText('Search a product by name or SKU'), 'rose');
+    expect(await screen.findByText('Rose A', undefined, { timeout: 3000 })).toBeTruthy();
+
+    apiMock.mockResolvedValueOnce(page(2, 2, [{ id: 'p2', name: 'Rose B' }]));
+    await userEvent.click(screen.getByRole('button', { name: 'Show more' }));
+    expect(await screen.findByText('Rose B')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Show more' })).toBeNull();
+    expect(apiMock).toHaveBeenLastCalledWith(expect.stringContaining('page=2'));
+  });
+});
+
 describe('Merchandising — assign tab', () => {
   it('guides to create dimensions first when there are none', async () => {
     apiMock.mockResolvedValueOnce({ data: { facets: [] } }); // facets tab
