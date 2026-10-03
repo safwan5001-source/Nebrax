@@ -63,6 +63,8 @@ describe('commerce store selector catalog', () => {
           isActive: true,
           previewUrl: 'https://a.example/',
           defaultLocale: 'ar',
+          businessVertical: 'general',
+          recommendedCapabilities: [],
         },
       ],
     });
@@ -90,7 +92,7 @@ describe('commerce store selector catalog', () => {
     const catalog: CommerceStoreCatalog = {
       status: 'ready',
       stores: [
-        { id: 'store-a', name: 'Store A', salesChannelId: 'ch-a', isActive: true, previewUrl: 'https://a.example', defaultLocale: 'ar' },
+        { id: 'store-a', name: 'Store A', salesChannelId: 'ch-a', isActive: true, previewUrl: 'https://a.example', defaultLocale: 'ar', businessVertical: 'general', recommendedCapabilities: [] },
       ],
     };
 
@@ -105,8 +107,8 @@ describe('commerce store selector catalog', () => {
     const catalog: CommerceStoreCatalog = {
       status: 'ready',
       stores: [
-        { id: 'store-a', name: 'Store A', salesChannelId: 'ch-a', isActive: true, previewUrl: 'https://shop.example/', defaultLocale: 'ar' },
-        { id: 'store-b', name: 'Store B', salesChannelId: 'ch-b', isActive: true, previewUrl: 'javascript:alert(1)', defaultLocale: 'ar' },
+        { id: 'store-a', name: 'Store A', salesChannelId: 'ch-a', isActive: true, previewUrl: 'https://shop.example/', defaultLocale: 'ar', businessVertical: 'general', recommendedCapabilities: [] },
+        { id: 'store-b', name: 'Store B', salesChannelId: 'ch-b', isActive: true, previewUrl: 'javascript:alert(1)', defaultLocale: 'ar', businessVertical: 'general', recommendedCapabilities: [] },
       ],
     };
 
@@ -134,7 +136,7 @@ describe('commerce storefront provisioning (COM-STORE-PROVISION-1)', () => {
     expect(apiMock).toHaveBeenCalledWith('/commerce/workspace/storefronts', { method: 'POST', body: {} });
     expect(result).toEqual({
       ok: true,
-      store: { id: 'store-x', name: 'X', salesChannelId: 'ch-x', isActive: true, previewUrl: 'https://x.example/', defaultLocale: 'ar' },
+      store: { id: 'store-x', name: 'X', salesChannelId: 'ch-x', isActive: true, previewUrl: 'https://x.example/', defaultLocale: 'ar', businessVertical: 'general', recommendedCapabilities: [] },
     });
   });
 
@@ -176,7 +178,7 @@ describe('commerce storefront identity update (STORE-ADMIN-ADOPT-1B-1)', () => {
     });
     expect(result).toEqual({
       ok: true,
-      store: { id: 'store-x', name: 'الاسم الجديد', salesChannelId: 'ch-x', isActive: true, previewUrl: null, defaultLocale: 'en' },
+      store: { id: 'store-x', name: 'الاسم الجديد', salesChannelId: 'ch-x', isActive: true, previewUrl: null, defaultLocale: 'en', businessVertical: 'general', recommendedCapabilities: [] },
     });
   });
 
@@ -216,7 +218,7 @@ describe('commerce storefront lifecycle (STORE-ADMIN-LIFECYCLE-1)', () => {
     expect(String(apiMock.mock.calls[0][0])).not.toContain('activate-edge');
     expect(result).toEqual({
       ok: true,
-      store: { id: 'store-x', name: 'X', salesChannelId: 'ch-x', isActive: true, previewUrl: 'https://x.example/', defaultLocale: 'ar' },
+      store: { id: 'store-x', name: 'X', salesChannelId: 'ch-x', isActive: true, previewUrl: 'https://x.example/', defaultLocale: 'ar', businessVertical: 'general', recommendedCapabilities: [] },
     });
   });
 
@@ -236,7 +238,7 @@ describe('commerce storefront lifecycle (STORE-ADMIN-LIFECYCLE-1)', () => {
     expect(String(apiMock.mock.calls[0][0])).not.toContain('activate-edge');
     expect(result).toEqual({
       ok: true,
-      store: { id: 'store-x', name: 'X', salesChannelId: 'ch-x', isActive: false, previewUrl: null, defaultLocale: 'ar' },
+      store: { id: 'store-x', name: 'X', salesChannelId: 'ch-x', isActive: false, previewUrl: null, defaultLocale: 'ar', businessVertical: 'general', recommendedCapabilities: [] },
     });
   });
 
@@ -256,5 +258,67 @@ describe('commerce storefront lifecycle (STORE-ADMIN-LIFECYCLE-1)', () => {
       ok: false,
       message: 'invalid_payload',
     });
+  });
+});
+
+describe('business vertical (FLOWERS-H1)', () => {
+  const base = { id: 'store-v', name: 'V', sales_channel_id: 'ch', is_active: true, preview_url: null, default_locale: 'ar' };
+
+  it('maps the saved vertical and the server-reported capability availability', () => {
+    const catalog = mapCommerceStoreAdminList({
+      data: {
+        stores: [
+          {
+            ...base,
+            business_vertical: 'flowers_gifts',
+            vertical_profile: {
+              key: 'flowers_gifts',
+              recommended_capabilities: [
+                { key: 'occasions', available: true },
+                { key: 'gift_message', available: false },
+                { key: 5 },
+              ],
+            },
+          },
+        ],
+      },
+    });
+
+    expect(catalog.status).toBe('ready');
+    if (catalog.status !== 'ready') return;
+    expect(catalog.stores[0].businessVertical).toBe('flowers_gifts');
+    expect(catalog.stores[0].recommendedCapabilities).toEqual([
+      { key: 'occasions', available: true },
+      { key: 'gift_message', available: false },
+    ]);
+  });
+
+  it('falls back to general for a missing or unknown vertical and never invents availability', () => {
+    const catalog = mapCommerceStoreAdminList({
+      data: {
+        stores: [
+          { ...base, id: 'a', business_vertical: 'grocery' },
+          { ...base, id: 'b', vertical_profile: { recommended_capabilities: [{ key: 'occasions', available: 'yes' }] } },
+        ],
+      },
+    });
+
+    if (catalog.status !== 'ready') throw new Error('expected ready');
+    expect(catalog.stores[0].businessVertical).toBe('general');
+    expect(catalog.stores[0].recommendedCapabilities).toEqual([]);
+    expect(catalog.stores[1].recommendedCapabilities).toEqual([{ key: 'occasions', available: false }]);
+  });
+
+  it('sends business_vertical on provisioning only when chosen', async () => {
+    apiMock.mockResolvedValue({ data: { store: { ...base, business_vertical: 'flowers_gifts' } } });
+
+    await provisionCommerceStorefront(undefined, 'flowers_gifts');
+    expect(apiMock).toHaveBeenLastCalledWith('/commerce/workspace/storefronts', {
+      method: 'POST',
+      body: { business_vertical: 'flowers_gifts' },
+    });
+
+    await provisionCommerceStorefront();
+    expect(apiMock).toHaveBeenLastCalledWith('/commerce/workspace/storefronts', { method: 'POST', body: {} });
   });
 });

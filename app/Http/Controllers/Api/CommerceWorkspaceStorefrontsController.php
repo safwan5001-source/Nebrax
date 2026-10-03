@@ -19,6 +19,7 @@ use App\Services\Commerce\StorefrontEdgeMisconfiguredException;
 use App\Services\Commerce\StorefrontEdgeUnavailableException;
 use App\Services\Commerce\StorefrontHostnameConflictException;
 use App\Services\Commerce\StorefrontProvisioningService;
+use App\Support\Commerce\BusinessVertical;
 use App\Support\Dns\DnsOperationalException;
 use App\Support\InvalidHostnameException;
 use App\Support\StorefrontBaseDomainMisconfiguredException;
@@ -67,7 +68,10 @@ class CommerceWorkspaceStorefrontsController extends ApiController
         }
 
         try {
-            $result = $provisioning->provisionFirstStorefrontForCurrentTenant($request->validated('name'));
+            $result = $provisioning->provisionFirstStorefrontForCurrentTenant(
+                $request->validated('name'),
+                BusinessVertical::tryFrom((string) $request->validated('business_vertical')),
+            );
         } catch (StorefrontBaseDomainMisconfiguredException $e) {
             abort(500, $e->getMessage());
         } catch (StorefrontHostnameConflictException $e) {
