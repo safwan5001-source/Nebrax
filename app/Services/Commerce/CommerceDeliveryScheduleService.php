@@ -215,7 +215,9 @@ final class CommerceDeliveryScheduleService
 
         $timezone = $this->timezoneFor($setting);
         $local = CarbonImmutable::instance($now ?? CarbonImmutable::now())->setTimezone($timezone);
-        $earliestInstant = $local->addMinutes($setting->lead_time_minutes);
+        // مهلة التجهيز زمنٌ منقضٍ حقيقي: بالثواني على الطابع الزمني لا `addMinutes()` — فحسابها الجداري/المنقضي عند
+        // عبور انتقال التوقيت الصيفي يختلف بين إصدارات Carbon/PHP، والنتيجة هنا لا تتأثر بذلك.
+        $earliestInstant = $local->setTimestamp($local->getTimestamp() + $setting->lead_time_minutes * 60);
         // الإغلاق اليومي لحظةٌ لا مقارنة نصية `H:i`: عند رجوع الساعة يتكرّر الوقت الجداري فيعود النص أصغر من الإغلاق
         // ويُعاد فتح اليوم بعد إغلاقه. اللحظة تُحسم على أول وقوع (EDT) فما إن تُجتاز تبقى مجتازة؛ وفي فجوة الانتقال
         // يُطبَّع الوقت الجداري المعدوم بإضافة طول الفجوة (02:30 ⇒ 03:30 EDT).

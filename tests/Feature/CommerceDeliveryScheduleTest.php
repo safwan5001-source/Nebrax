@@ -329,6 +329,23 @@ class CommerceDeliveryScheduleTest extends TestCase
     }
 
     /** @test */
+    public function lead_time_is_elapsed_time_across_a_spring_forward_transition(): void
+    {
+        $store = $this->store('ds-lead-dst');
+        // 2027-03-14 01:30 EST + 90 دقيقة فعلية = 04:00 EDT (الجدار يقفز 02:00 → 03:00)؛ لا 03:00
+        $service = $this->configure($store, ['timezone' => 'America/New_York', 'lead_time_minutes' => 90, 'max_days_ahead' => 2], [
+            $this->slot('ثلاثة ونصف', '03:30', '04:30'),
+            $this->slot('أربعة', '04:00', '05:00'),
+        ]);
+
+        $options = $service->options($store['channel_id'], 'delivery', null, null, CarbonImmutable::parse('2027-03-14 06:30:00', 'UTC'));
+
+        $this->assertSame(['أربعة'], $this->labels($options, '2027-03-14')); // 03:30 بعد 60 دقيقة فقط ⇒ مرفوضة
+        $this->assertSame(['ثلاثة ونصف', 'أربعة'], $this->labels($options, '2027-03-15'));
+        app(TenantContext::class)->forget();
+    }
+
+    /** @test */
     public function once_todays_cutoff_has_passed_it_stays_passed_across_a_dst_rollback(): void
     {
         $store = $this->store('ds-cutoff-dst');
