@@ -98,3 +98,44 @@ export function deliveryHubListPath(input: {
   if (input.branchId) params.set('branch_id', input.branchId);
   return `/delivery-hub/orders?${params.toString()}`;
 }
+
+/** سياق المعاينة يعيد مصفوفة فارغة. لا نمرّرها ككائن حتى لا تنهار القائمة. */
+export function readHubContext(value: unknown): {
+  can_see_unrouted: boolean;
+  platforms: Array<{ id: string; platform_key: string; name: string | null; name_en: string | null }>;
+  branches: DeliveryHubBranchOption[];
+} {
+  const empty = {
+    can_see_unrouted: false,
+    platforms: [] as Array<{ id: string; platform_key: string; name: string | null; name_en: string | null }>,
+    branches: [] as DeliveryHubBranchOption[],
+  };
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return empty;
+  const row = value as { can_see_unrouted?: unknown; platforms?: unknown; branches?: unknown };
+  const platforms = Array.isArray(row.platforms)
+    ? row.platforms.flatMap((item) => {
+      if (!item || typeof item !== 'object') return [];
+      const platform = item as { id?: unknown; platform_key?: unknown; name?: unknown; name_en?: unknown };
+      if (typeof platform.id !== 'string' || typeof platform.platform_key !== 'string') return [];
+      return [{
+        id: platform.id,
+        platform_key: platform.platform_key,
+        name: typeof platform.name === 'string' ? platform.name : null,
+        name_en: typeof platform.name_en === 'string' ? platform.name_en : null,
+      }];
+    })
+    : [];
+  const branches = Array.isArray(row.branches)
+    ? row.branches.flatMap((item) => {
+      if (!item || typeof item !== 'object') return [];
+      const branch = item as { id?: unknown; name?: unknown };
+      if (typeof branch.id !== 'string' || typeof branch.name !== 'string') return [];
+      return [{ id: branch.id, name: branch.name }];
+    })
+    : [];
+  return { can_see_unrouted: row.can_see_unrouted === true, platforms, branches };
+}
+
+export function readHubOrders(value: unknown): DeliveryHubOrderView[] {
+  return Array.isArray(value) ? value as DeliveryHubOrderView[] : [];
+}

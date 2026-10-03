@@ -7,8 +7,9 @@ import { api, ApiError } from '@/lib/api';
 import { currentUser } from '@/lib/auth';
 import {
   deliveryHubListPath,
+  readHubContext,
+  readHubOrders,
   type DeliveryHubAction,
-  type DeliveryHubBranchOption,
   type DeliveryHubOrderView,
   type DeliveryHubState,
 } from '@/lib/delivery-hub';
@@ -17,7 +18,7 @@ import { hasPermission } from '@/lib/permissions';
 interface HubContext {
   can_see_unrouted: boolean;
   platforms: Array<{ id: string; platform_key: string; name: string | null; name_en: string | null }>;
-  branches: DeliveryHubBranchOption[];
+  branches: Array<{ id: string; name: string }>;
 }
 
 export default function DeliveryHubPage() {
@@ -53,18 +54,22 @@ export default function DeliveryHubPage() {
       .then((result) => {
         if (seq !== requestSeq.current) return;
         const last = Math.max(1, result.meta?.last_page ?? 1);
+        const rows = readHubOrders(result.data);
         setLastPage(last);
         if (page > last) {
           clamped = true;
           setOrders([]);
+          setSelectedId(null);
           setPage(last);
           return;
         }
-        setOrders(result.data);
-        setSelectedId((current) => (current && result.data.some((order) => order.id === current) ? current : null));
+        setOrders(rows);
+        setSelectedId((current) => (current && rows.some((order) => order.id === current) ? current : null));
       })
       .catch((caught) => {
         if (seq !== requestSeq.current) return;
+        setOrders([]);
+        setSelectedId(null);
         setError(caught instanceof ApiError ? caught.message : t('loadFailed'));
       })
       .finally(() => {
@@ -78,8 +83,8 @@ export default function DeliveryHubPage() {
 
   useEffect(() => {
     if (!canView) return;
-    api<{ data: HubContext }>('/delivery-hub/context')
-      .then((result) => setContext(result.data))
+    api<{ data: unknown }>('/delivery-hub/context')
+      .then((result) => setContext(readHubContext(result.data)))
       .catch(() => setContext({ can_see_unrouted: false, platforms: [], branches: [] }));
   }, [canView]);
 
@@ -88,11 +93,18 @@ export default function DeliveryHubPage() {
     load();
   }, [canView, load]);
 
+  function resetQueue(): void {
+    setOrders([]);
+    setSelectedId(null);
+    setLoading(true);
+    setError(null);
+  }
+
   function changeState(next: DeliveryHubState | 'all'): void {
     if (next === 'unrouted' && !context.can_see_unrouted) return;
+    resetQueue();
     setState(next);
     setPage(1);
-    setSelectedId(null);
   }
 
   function act(order: DeliveryHubOrderView, action: DeliveryHubAction, destinationBranchId: string | null): void {
@@ -143,10 +155,10 @@ export default function DeliveryHubPage() {
       page={page}
       lastPage={lastPage}
       onState={changeState}
-      onPlatform={(id) => { setPlatformId(id); setPage(1); }}
-      onBranch={(id) => { setBranchId(id); setPage(1); }}
+      onPlatform={(id) => { resetQueue(); setPlatformId(id); setPage(1); }}
+      onBranch={(id) => { resetQueue(); setBranchId(id); setPage(1); }}
       onSelect={setSelectedId}
-      onPage={setPage}
+      onPage={(next) => { resetQueue(); setPage(next); }}
       onAction={act}
     />
   );

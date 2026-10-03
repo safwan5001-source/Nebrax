@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { deliveryHubActions, deliveryHubListPath } from './delivery-hub';
+import { deliveryHubActions, deliveryHubListPath, readHubContext, readHubOrders } from './delivery-hub';
 import { deliveryPlatformLabel, deliveryPlatformPresentation, deliveryPlatformPresentations } from './delivery-platform-registry';
 
 describe('delivery platform registry', () => {
@@ -63,5 +63,18 @@ describe('delivery hub list query', () => {
     const all = new URL(deliveryHubListPath({ state: 'all', platformId: '', branchId: '', page: 1 }), 'http://local');
     expect(all.searchParams.get('state')).toBeNull();
     expect(all.searchParams.get('unrouted')).toBeNull();
+  });
+});
+
+describe('delivery hub response boundary', () => {
+  it('does not treat a demo array as branch context or an order list', () => {
+    expect(readHubContext([])).toEqual({ can_see_unrouted: false, platforms: [], branches: [] });
+    expect(readHubContext({
+      can_see_unrouted: true,
+      platforms: [{ id: 'p', platform_key: 'jahez', name: 'جاهز', name_en: 'Jahez' }],
+      branches: [{ id: 'b', name: 'الأول' }],
+    }).can_see_unrouted).toBe(true);
+    expect(readHubOrders([])).toEqual([]);
+    expect(readHubOrders(undefined)).toEqual([]);
   });
 });

@@ -271,10 +271,13 @@ function DeliveryHubDetail({
   onAction: (order: DeliveryHubOrderView, action: DeliveryHubAction, destinationBranchId: string | null) => void;
 }) {
   const t = useTranslations('deliveryHub');
+  const orderId = order?.id ?? null;
+  const [destinationOrderId, setDestinationOrderId] = useState<string | null>(orderId);
   const [destination, setDestination] = useState('');
-  useEffect(() => {
+  if (destinationOrderId !== orderId) {
+    setDestinationOrderId(orderId);
     setDestination('');
-  }, [order?.id]);
+  }
   if (!order) return null;
 
   const actions = deliveryHubActions({
@@ -284,6 +287,7 @@ function DeliveryHubDetail({
     branchCount: branches.length,
   });
   const destinations = branches.filter((branch) => branch.id !== order.branch_id);
+  const destinationIsValid = destinations.some((branch) => branch.id === destination);
 
   return (
     <aside className="space-y-3 rounded border border-border bg-surface p-4" data-testid="delivery-hub-detail" aria-label={t('detailTitle')}>
@@ -326,7 +330,7 @@ function DeliveryHubDetail({
             type="button"
             variant={action === 'cancel' || action === 'reject' ? 'outline' : 'primary'}
             className="min-h-11"
-            disabled={busy || ((action === 'route' || action === 'reroute') && destination === '')}
+            disabled={busy || ((action === 'route' || action === 'reroute') && !destinationIsValid)}
             onClick={() => onAction(order, action, action === 'route' || action === 'reroute' ? destination : null)}
           >
             {t(action)}
