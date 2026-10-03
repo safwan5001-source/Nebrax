@@ -145,6 +145,9 @@ Not a schema and not a migration. A future configuration would need at least:
 | `financial_role_status` | `unknown`, `merchant_seller`, `platform_deemed_supplier`, `platform_principal` | `unknown` |
 | `invoice_responsibility` | `unknown`, `merchant`, `platform`, `split_meal_and_fee` | `unknown` |
 | `collection_role` | `unknown`, `platform_collects_for_merchant`, `merchant_collects`, `platform_collects_as_seller` | `unknown` |
+| `merchant_vat_status_at_supply` | `unknown`, `registered`, `not_registered` | `unknown` |
+
+`merchant_vat_status_at_supply` is a snapshot for that supply. It is not the tenant's current nullable `vat_number`. A null number is not `not_registered`, and a present number does not prove the status on the supply date. `unknown` rejects the command. Only an explicit `registered` or `not_registered`, recorded for that supply, satisfies the accepted gate.
 
 `split_meal_and_fee` is the only Keeta-terms shape that matches a merchant meal invoice plus a separate fee invoice. It is not a global value. Keemart would be a different configuration if it is ever in scope. It is not in scope now.
 
