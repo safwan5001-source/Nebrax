@@ -64,13 +64,9 @@ final class CatalogFacetFilter
     {
         $facets = [];
         foreach ((array) ($validated['facet'] ?? []) as $key => $raw) {
-            if (! is_string($raw) || trim($raw) === '') {
-                continue;
-            }
-            $slugs = self::slugsOf($raw);
-            if ($slugs !== []) {
-                $facets[(string) $key] = $slugs;
-            }
+            // مدخلٌ فارغ (`facet[x]=` أو `,,,`) يُحفظ بقيمٍ فارغة فيُنتج apply() نتيجةً فارغة (فشل مغلق)،
+            // لا أن يُسقَط فيُرجع الكتالوج غير المصفّى.
+            $facets[(string) $key] = is_string($raw) ? self::slugsOf($raw) : [];
         }
 
         return [

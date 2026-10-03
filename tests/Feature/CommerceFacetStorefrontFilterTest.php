@@ -135,7 +135,7 @@ class CommerceFacetStorefrontFilterTest extends TestCase
     {
         $f = $this->floristFixture();
 
-        foreach (['facet[nope]=birthday', 'facet[occasion]=nope', 'facet[occasion]=birthday&facet[x]=y'] as $q) {
+        foreach (['facet[nope]=birthday', 'facet[occasion]=nope', 'facet[occasion]=birthday&facet[x]=y', 'facet[nope]=', 'facet[occasion]=,,,'] as $q) {
             $this->assertSame([], $this->names($this->list($f['tenant'], $q)), $q);
         }
         // قيمة مجهولة بجوار قيمة معروفة داخل البُعد نفسه: مغلق عند الفشل أيضاً (ADR-14)،
