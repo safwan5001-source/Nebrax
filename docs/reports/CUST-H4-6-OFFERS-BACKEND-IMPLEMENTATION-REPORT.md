@@ -81,11 +81,12 @@ Constraints / indexes: **unique `(storefront_id, product_id)`** (duplicate = exp
 { "data": [ { "id", "product_id", "name", "name_en", "thumbnail_url",
               "reference_price": {"amount_minor", "currency"},
               "offer_price":     {"amount_minor", "currency"},
+              "discount_percent",            // derived, fresh on read, never stored
               "starts_at", "ends_at" } ],
   "meta": { "request_id" } }
 ```
 
-Only **live** offers (active ∧ in window ∧ product active+published on this channel ∧ genuinely discounted), ordered by `position, created_at, id`, capped at 12. Nothing about *why* something is hidden is ever exposed publicly.
+Only **live** offers (active ∧ in window ∧ product active+published on this channel ∧ genuinely discounted ∧ currently sellable per `AvailableToSellService` — §6.1), ordered by `position, created_at, id`, capped at 12. Nothing about *why* something is hidden is ever exposed publicly.
 
 ## 6. Authoritative discount determination
 
@@ -95,9 +96,25 @@ Only **live** offers (active ∧ in window ∧ product active+published on this 
 - `offerPrice = CommercePriceResolver->resolve($product->id, $channelId)->amount` — anonymous (no partner), base unit: byte-for-byte the price Cart V1 charges. A test proves `offer_price == resolver amount == cart line unit_price`.
 - Equal, higher, unresolved, or a resolver exception (corrupt/deleted/foreign price-list reference) ⇒ **omitted (fail-closed)**.
 - Computed fresh on every read; nothing stored. Tax is absent by design (as in the resolver). No new pricing semantics were invented: the discount is exactly "the channel's active price list overrides the base price downward", which is the only discount mechanism existing Commerce pricing has.
-- **No percentage, no savings amount, no strikethrough flag.** The contract (§23.3 step 4) sketched `discountPercent`; per this task's rule ("do not fabricate… unless the pricing API explicitly supports and proves them") it is deferred. The two proven numbers are returned; H4-7 decides whether/how to derive badge math from them.
+- **`discount_percent` (added in the review-fix round, §23.3 step 4)** — *derived*, never an authority: `round((referencePrice − offerPrice) / referencePrice × 100)` computed fresh on every read from the two numbers above, **only** when `referencePrice > 0` and `0 ≤ offerPrice < referencePrice` (otherwise the row is already omitted, so no percentage exists for a non-genuine discount). Rounding is half-up in **pure integer arithmetic** (`intdiv(2·diff·100 + ref, 2·ref)`, identical to PHP `round()` for positive values, no float). Examples: 25000→19000 = 24; 3→2 = 33; 3→1 = 67; 8→7 = 13 (12.5↑); 200→199 = 1 (0.5↑); 25000→24999 = **0** (a genuine sub-half-percent discount; H4-7 may choose not to show a 0% badge); free item → 100. Never persisted; no workspace payload accepts it (`discount_percent`, `discount_percentage`, `discount_amount`, `savings`, `offer_price`, `reference_price`, `in_stock`, `percent`, `price`… are all rejected 422). Still **no savings amount and no strikethrough flag**.
 - Contract nuance (judgement call, flagged): `reference_price` is `Product.sale_price`, which the resolver does not expose itself. It is returned because it *is* the proof of the discount the filter relies on; H4-7 should treat it as "base price", not as a "was-price" claim.
 - Not a promotions engine: no coupon / cart / checkout / invoice / POS / customer-specific logic; no change to any pricing path (`CommercePriceResolver`, `PriceListService`, cart, checkout, invoice math all untouched).
+
+### 6.1 Sellability (ATS) — added in the review-fix round (§23.3 step 5)
+
+A candidate with a genuine discount is **live only if it is currently sellable on this storefront's channel**, reusing the existing authorities and **mirroring exactly what `CommerceCheckoutService`/`CommerceOrderReservationService` already enforce** — no new inventory logic:
+
+| Product | Rule | Not-live reason (workspace only) |
+|---|---|---|
+| `track_inventory = false` (default; services, untracked) | no availability check — checkout/reservation skip it too | — (sellable) |
+| tracked, channel has no usable fulfillment warehouse (`FulfillmentPolicyService::resolveWarehouseFor` throws: no policy / channel or warehouse inactive) | cannot be fulfilled | `fulfillment_not_configured` (checkout's own failure reason) |
+| tracked, `AvailableToSellService::forWarehouse(product, channelWarehouse).availableToSell <= 0` (on-hand − active reservations, floored at 0; negative legacy on-hand ⇒ 0) | not sellable | `out_of_stock` |
+| tracked, ATS lookup throws | fail-closed | `availability_unresolved` |
+
+- ATS is evaluated **after** the price gate and only for genuinely-discounted candidates, so non-discounted rows cost no inventory queries.
+- Warehouse = the channel's own fulfillment warehouse only: stock in any other warehouse of the tenant, or in another tenant, never counts (tested: other-warehouse stock, other-tenant stock, two channels of one tenant with different warehouses).
+- **No inventory numbers** are exposed anywhere (asserted); the public payload is unchanged apart from the extra `discount_percent`. No merchant setting was introduced. General storefront product lists are untouched (they still list out-of-stock products with an informational `in_stock: false`; asserted).
+- Honest note: this makes Offers *stricter* than the product list by design (§23.3 step 5, owner-confirmed in review).
 
 ## 7. Host resolution, tenant isolation, sales-channel eligibility
 
@@ -113,7 +130,7 @@ Only **live** offers (active ∧ in window ∧ product active+published on this 
 
 - Batched: one query each for products, publication, thumbnails (shared-media layer, same ordering as `resolveGallery`), price-list items; currency read once.
 - Two *necessary-condition* short-circuits skip resolver calls whose answer is already known: (1) channel has no default price list ⇒ every product resolves to base ⇒ no discount; (2) product has no explicit item in that list ⇒ same. These narrow work; they are **not** a price source — every surviving candidate is priced by `CommercePriceResolver`.
-- Measured (sqlite, includes middleware/auth/host-resolution baseline): **1 live offer = 17 queries, 8 = 66, 12 = 94 (≈7/offer)**; **12 non-discountable candidates = constant (≤14)**. Bounded by the 12-offer cap and linear. The ≈7/offer comes from the existing per-product `CommercePriceResolver::resolve()` (Product, SalesChannel, Tenant, PriceList, PriceListItem lookups) + one `sale_price` read. There is **no existing batch-safe resolver entry point**; adding one would be a pricing refactor, which is out of scope and not needed at a ≤12 cap — so this is reported, not "fixed". Asserted in tests (≤8/offer, ≤120 total at 12).
+- Measured (sqlite, includes middleware/auth/host-resolution baseline), **untracked products** (no ATS check): **1 live offer = 17 queries, 8 = 66, 12 = 94 (≈7/offer)**; **12 non-discountable candidates = constant (≤14)**. **Tracked products (ATS check, added in the review-fix round): 1 live offer = 24 queries, 12 = 145 (≈11/offer)** — ATS adds ≈4 queries per live tracked offer (`AvailableToSellService::forWarehouse`: product exists, warehouse exists, stock row, active reservations) plus one fulfillment-warehouse resolution per read. This remains a **known, documented H4-6 performance limitation**: bounded by the unchanged 12-offer cap, linear, and **not** fixed here — neither pricing nor ATS has a batch entry point and adding one is a broader refactor, explicitly out of scope. Bounded by the 12-offer cap and linear. The ≈7/offer comes from the existing per-product `CommercePriceResolver::resolve()` (Product, SalesChannel, Tenant, PriceList, PriceListItem lookups) + one `sale_price` read. There is **no existing batch-safe resolver entry point**; adding one would be a pricing refactor, which is out of scope and not needed at a ≤12 cap — so this is reported, not "fixed". Asserted in tests (untracked ≤8/offer and ≤120 total at 12; tracked ≤12/offer).
 - **Pre-existing finding (not changed):** `StorefrontProductController::index()` prices the *list* with `Product.sale_price` directly (its comment assumes no price list applies anonymously), whereas `show()` and the cart use the resolver which *does* apply the channel default price list. For a channel with a default price list the product list can therefore show the base price while detail/cart show the lower one. Offers deliberately use the resolver path. Worth a separate ticket; not touched here (a regression test pins the list output as unchanged).
 
 ## 10. Time-window semantics
@@ -153,29 +170,26 @@ No `web/`, no pricing/cart/checkout/invoice/POS/accounting file touched.
 
 ## 12. Tests / results
 
-**New tests: 92** (3 files) + 1 shared fixture trait — all green on **SQLite and PostgreSQL 16**.
+**New tests: 124** (model 13, workspace 45, public 66) + 1 shared fixture trait — all green on **SQLite and PostgreSQL 16**. Initial slice: 92; review-fix round (ATS + `discount_percent`): +32.
 
 | File | Tests | Covers |
 |---|---|---|
 | `StorefrontOfferModelTest` | 13 | exact column list (no price/discount column), `$fillable`, unique pair + read-path indexes, relations, foreign-tenant product/storefront rejected, tenant scope, strict window, SQL-vs-memory boundary parity, deterministic ordering, **OWNED_CHILD cleanup on true product delete**, `CompanyWide` |
-| `CommerceWorkspaceStorefrontOfferApiTest` | 36 | create/list/update/delete, defaults + append position, UTC storage, validation, invalid windows, **10 forbidden fields** (price/discount/percent/…/tenant_id/storefront_id) rejected 422 with nothing persisted, duplicate 409, uniform ineligible-product 422 (foreign/missing/unpublished/inactive/other-channel indistinguishable), variant-managed rejected, 12-cap, evaluation reasons, workspace-vs-public parity, partial update + `null` clears, product change rules, delete, **tenant A vs B on every verb → 404 with no mutation**, foreign≡unknown storefront, cross-tenant offer id via own storefront, same-tenant sibling storefront, soft-deleted storefront, 401, 403 (`staff`, `self_service`), **no price/product/price-list/journal/invoice side effects** |
-| `StorefrontOfferPublicApiTest` | 43 | genuine discount returned (25000→19000) with both real prices; payload allow-list (no percent/saving/cost/internal facts); **offer price == `CommercePriceResolver` == real cart line price**; no row ⇒ omitted; no price list / no item / equal / higher / inactive list ⇒ omitted; corrupt price-list reference ⇒ fail-closed (no 500); live tracking of price-list edits; **variant-managed omitted** (and a simple product beside it unaffected); unpublished/inactive/other-channel product omitted; **10 window cases** incl. exact boundaries; inactive offer; UTC ISO output; deterministic order; read bounded at the cap; **Host A≠B**, same-tenant second storefront, query/header injection ignored, wrong gateway secret, unknown/unverified/inactive domain & storefront ⇒ 404, route has no parameters, raw-SQL-planted foreign product can't surface; thumbnail; existing `store/v1/products` output unchanged; **query budgets** |
+| `CommerceWorkspaceStorefrontOfferApiTest` | 45 | CRUD, defaults/append position, UTC, validation, invalid windows, **16 forbidden fields** (price/discount/percent/discount_percent/discount_amount/savings/offer_price/reference_price/in_stock/tenant_id/storefront_id/…) rejected 422 with nothing persisted, duplicate 409, uniform ineligible-product 422, variant-managed rejected, 12-cap, evaluation reasons, **`discount_percent` in evaluation (24 live / null otherwise)**, **honest `out_of_stock` / `fulfillment_not_configured` reasons (on-hand, reserved, untracked live, no policy)**, **tenant-A-vs-B stock isolation in the workspace**, workspace-vs-public parity, partial update, tenant/storefront isolation on every verb, RBAC, no financial side effects |
+| `StorefrontOfferPublicApiTest` | 66 | genuine discount live with both real prices + `discount_percent`; payload allow-list (no saving amount, stock numbers or internal facts); offer price == resolver == real cart line; omitted when not genuine (no row / no list / no item / equal / higher / inactive list / corrupt ref / zero base); **9 percentage cases incl. half-up rounding (12.5→13, 0.5→1, 0.4→0, tiny→0, free→100), fresh on every read, never stored**; **ATS: available ⇒ live; zero / reserved-out / negative on-hand / no fulfillment policy / inactive warehouse ⇒ omitted; untracked product needs no stock (checkout parity); other-warehouse and other-tenant stock never counts; two channels of one tenant use their own warehouse; product-list behavior unchanged**; variants fail-closed; unpublished/inactive/other-channel; 10 window cases; ordering; cap; Host A≠B, same-tenant sibling storefront, input/header injection ignored, gateway secret, 404s, route has no params, raw-SQL-planted foreign row; thumbnail; existing product endpoints unchanged; query budgets (untracked and tracked) |
 
-Other gates touched/verified:
-- `BranchIsolationGuardTest`, `CommerceModuleBoundaryTest` (allow-list updated), `ProductReferenceClassificationGuardTest` (failed on the first full run → fixed, §11.1), `ProductLifecycleTest` — green.
-- Web: `section-capabilities.test.ts` 22/22 — `offers.state === "gated"`, `merchantAddable === false` (no web file changed).
+Mutation check: disabling the ATS gate makes 8 of the new public tests fail (restored) — the tests exercise the gate, not just run beside it.
 
-**Targeted** (offers + guards + lifecycle + boundary): 109 passed (762 assertions) on SQLite **and** on PostgreSQL 16.
+Other gates verified: `BranchIsolationGuardTest`, `CommerceModuleBoundaryTest`, `ProductReferenceClassificationGuardTest`, `ProductLifecycleTest`, `AvailableToSell*`, `InventoryReservation*`, `FulfillmentPolicy*` — green. Web: `section-capabilities.test.ts` 22/22 (`offers.state === "gated"`, `merchantAddable === false`; no web file changed).
 
-**PostgreSQL 16 broad subset** (`Commerce|Storefront|ProductLifecycle|ProductReference|PriceList|BranchIsolation|TenantIsolation|ApplicationCatalog`): **1436 passed, 0 failed** (8225 assertions).
+**Focused** (offers + ATS/reservation/fulfillment + guards + lifecycle + boundary): SQLite **203 passed (3 skipped, PG-only)**; PostgreSQL 16 **206 passed**, 0 failed.
 
-**Full suite, SQLite** (`php artisan test`, no filter): **5331 passed, 51 skipped, 57 failed**. The 57 failures are in 17 classes that are **environmental in this sandbox and fail identically on unmodified `origin/main`**, none touching Offers:
-- `bcmul()` undefined — `bcmath` ext not installed locally (CI installs it): `Fuel*` (6 classes).
-- `Aws\Exception\AwsException` not found — `league/flysystem-aws-s3-v3` not installed locally (CI installs it): `ProductMediaR2*`, `R2*` (7 classes).
-- Mail transport/mailable not sent: `AuthRecoveryTest`, `UserInvitationTest`, `ResendMailTransportTest`; plus `ProductOptionValueVisualTest`, `FuelSupplyReceivingApiTest` (500s).
-- Baseline proof: with this branch's changes stashed, the 6 classes with non-obvious causes failed with the same tests (24 failures in that run); on this head the same tests fail. The one test this branch *did* break on the first full run (`ProductReferenceClassificationGuardTest`) is fixed; the count dropped 58 → 57.
+**Broader Commerce/Storefront/Product/PriceList/Inventory/Fulfillment/ATS/isolation/POS filter:**
+- SQLite: **2802 passed, 23 failed** — all in environmental classes (`Fuel*`, `ProductMediaR2*`, `ProductOptionValueVisualTest`: missing `bcmath` / AWS SDK locally; CI installs them) that fail identically on unmodified `main`.
+- PostgreSQL 16 (same filter minus the environmental `ProductMediaR2*`/`R2*`/`Fuel*` classes): **2395 passed, 0 failed**. (An unexcluded PG run stalled inside `ProductMediaR2DeleteTest` after its missing-AWS-SDK error left a transaction open — environmental, not Offers.)
+- An earlier full unfiltered SQLite run (initial slice) was 5331 passed / 57 environmental failures, identical set on `main`; the CI run on the PR is the authoritative full-suite result on both drivers.
 
-Perf measurement (sqlite, includes middleware baseline): 1 live offer = 17 queries, 8 = 66, 12 = 94 (≈7/offer); 12 non-discountable candidates = constant ≤14.
+Perf (sqlite, incl. middleware baseline): untracked: 1→17, 8→66, 12→94 (≈7/offer); **tracked with ATS: 1→24, 12→145 (≈11/offer)**; 12 non-discountable candidates = constant ≤14. Cap unchanged at 12; no batch refactor (see §9).
 
 ## 13. Build / CI
 
@@ -188,11 +202,12 @@ Perf measurement (sqlite, includes middleware baseline): 1 live offer = 17 queri
 1. **Variant-managed products unsupported** (§8) — needs an owner decision before Offers can cover multi-variant catalogs (likely common for flowers/apparel verticals).
 2. **12-offer cap** is a chosen constant (bounds pricing cost: ≈7 queries/offer). Raise only together with a batch-capable price path.
 3. **Per-offer query cost** (§9) — acceptable at ≤12, not for hundreds; no batch resolver exists.
-4. **`reference_price` provenance** — base price, not a merchant "was-price"; badge/strikethrough wording is an H4-7/product decision.
-5. **A price-list item of 0** counts as a genuine discount (it is exactly what checkout would charge); H4-7 may want to special-case "free" display.
-6. **Pre-existing list-vs-detail price drift** (§9) — outside this slice, flagged for follow-up.
-7. **Availability (ATS) is not part of "live"** — contract §23.3 step 5 asks for the `AvailableToSellService` check, but no existing storefront read hides a product at ATS 0 (they expose an informational `in_stock`; reservation/checkout is the real gate), and hide-vs-show is a business policy (CLAUDE.md rule 6). Open owner decision: (a) add a batched `in_stock` to each offer, matching `store/v1/products` (cheap, recommended), or (b) hide out-of-stock offers behind a setting. Raised by the Codex review on #1202.
-8. No financial review beyond the contract's reasoning (§23.6/§23.7): nothing here writes or reads accounting state, but the owner may still wish to confirm that reading is in scope.
+4. **Per-offer query cost grew with ATS** — ≈7 → ≈11 queries per live *tracked* offer (§9); still bounded by the unchanged 12-offer cap; no batch pricing/ATS path exists.
+5. **`reference_price` provenance** — base price, not a merchant "was-price"; badge/strikethrough wording is an H4-7/product decision.
+6. **A price-list item of 0** counts as a genuine discount (it is exactly what checkout would charge); H4-7 may want to special-case "free" display.
+7. **Pre-existing list-vs-detail price drift** (§9) — outside this slice, flagged for follow-up.
+7. ~~Availability (ATS) is not part of "live"~~ — **resolved in the review-fix round** (§6.1, owner-confirmed): ATS is now enforced. Original note follows for the record: **Availability (ATS) is not part of "live"** — contract §23.3 step 5 asks for the `AvailableToSellService` check, but no existing storefront read hides a product at ATS 0 (they expose an informational `in_stock`; reservation/checkout is the real gate), and hide-vs-show is a business policy (CLAUDE.md rule 6). Open owner decision: (a) add a batched `in_stock` to each offer, matching `store/v1/products` (cheap, recommended), or (b) hide out-of-stock offers behind a setting. Raised by the Codex review on #1202.
+9. No financial review beyond the contract's reasoning (§23.6/§23.7): nothing here writes or reads accounting state, but the owner may still wish to confirm that reading is in scope.
 
 ## 15. H4-7 handoff
 
@@ -200,7 +215,9 @@ Perf measurement (sqlite, includes middleware baseline): 1 live offer = 17 queri
 - Published: `GET /store/v1/offers` — no params; already filtered; slice client-side to the section's `offerIds` (preserve the section's order) or show all up to 8.
 - Create/edit: `POST/PATCH/DELETE` as above; surface 409 (duplicate), 422 (`product_id` ineligible / window / cap), and **never send price/discount fields**.
 - Both TypeScript twins of `section-content.ts` get `OffersContent { offerIds: string[] }` only; `GATED_HOME_SECTION_KEYS` drops `offers`; flip `SECTION_CAPABILITIES.offers` to LIVE/`merchantAddable: true` **only in H4-7**, together with the editor and the published component.
-- Decide badge math (percent/savings) from `reference_price`/`offer_price`; add a dedicated backend field only if H4-8 review demands it.
+- Use the backend `discount_percent` for the badge (do not recompute client-side); it may be `0` for sub-half-percent genuine discounts — decide whether to hide a 0% badge. No savings amount is provided.
+- Offers that are out of stock / unfulfillable are already excluded from the public read; in the Canvas, `evaluation.reason` (`out_of_stock`, `fulfillment_not_configured`, …) explains why a configured offer is not shown.
+- **Variant-managed products remain unsupported (fail-closed)** — needs an explicit later product decision on the representative price (cheapest? "from X"? per-variant?). Nothing is invented here.
 - Optional: `commerce.offers` in `DataResourceRegistry` must read `store/v1/offers` (no id).
 
 ## 16. Confirmations

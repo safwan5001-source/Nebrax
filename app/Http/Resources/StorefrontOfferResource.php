@@ -11,7 +11,7 @@ use App\Services\Commerce\StorefrontOfferView;
  * **العام**: قائمة سماح ضيقة للعروض الحيّة فقط — لا سبب حجب ولا حالة تهيئة ولا
  * تكلفة/هامش/مخزون خام (نفس صنف البيانات العلنية في `store/v1/products`).
  * الأسعار `{amount_minor, currency}` بنفس شكل `price` في `StorefrontProductResource`.
- * **لا نسبة ولا وفر ولا سعر مشطوب مُصرَّح به** — الرقمان فقط (مؤجَّل لـ H4-7).
+ * `discount_percent` مشتقّ طازج (§23.3 خطوة 4) لا سلطة سعر؛ لا مبلغ وفر ولا سعر مشطوب.
  *
  * **الإداري**: يضيف حقول التهيئة (`is_active`/`position`/`created_at`...) و`evaluation`
  * بسبب الحجب، ليعرف التاجر أي مرشّحاتٍ تُعرض فعلاً الآن (§23.7 من العقد).
@@ -33,6 +33,7 @@ final class StorefrontOfferResource
             'thumbnail_url' => $thumbnail,
             'reference_price' => ['amount_minor' => $view->referencePrice, 'currency' => $view->currency],
             'offer_price' => ['amount_minor' => $view->offerPrice, 'currency' => $view->currency],
+            'discount_percent' => $view->discountPercent,
             'starts_at' => $view->offer->starts_at?->toIso8601String(),
             'ends_at' => $view->offer->ends_at?->toIso8601String(),
         ];
@@ -65,6 +66,7 @@ final class StorefrontOfferResource
                 'reason' => $view->reason,
                 'reference_price' => $view->live ? ['amount_minor' => $view->referencePrice, 'currency' => $view->currency] : null,
                 'offer_price' => $view->live ? ['amount_minor' => $view->offerPrice, 'currency' => $view->currency] : null,
+                'discount_percent' => $view->live ? $view->discountPercent : null,
             ],
             'created_at' => $offer->created_at?->toIso8601String(),
             'updated_at' => $offer->updated_at?->toIso8601String(),

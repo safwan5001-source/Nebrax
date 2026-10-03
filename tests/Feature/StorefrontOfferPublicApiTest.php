@@ -79,13 +79,14 @@ class StorefrontOfferPublicApiTest extends TestCase
             ->assertJsonPath('data.0.offer_price.amount_minor', 19000)
             ->assertJsonPath('data.0.offer_price.currency', 'SAR')
             ->assertJsonPath('data.0.reference_price.currency', 'SAR')
+            ->assertJsonPath('data.0.discount_percent', 24) // (25000-19000)/25000 = 24%
             ->assertJsonPath('data.0.starts_at', null)
             ->assertJsonPath('data.0.ends_at', null);
         $this->assertNotEmpty($res->json('meta.request_id'));
     }
 
     /** @test */
-    public function the_payload_never_fabricates_a_percentage_a_saving_or_exposes_internal_facts(): void
+    public function the_payload_has_no_saving_amount_stock_numbers_or_internal_facts(): void
     {
         $s = $this->discountedStore('shape.example.test');
         app(TenantContext::class)->set($s['tenant']->id);
@@ -95,12 +96,12 @@ class StorefrontOfferPublicApiTest extends TestCase
         $row = $this->getJson($this->offersUrl($s['host']))->assertOk()->json('data.0');
 
         $this->assertEqualsCanonicalizing(
-            ['id', 'product_id', 'name', 'name_en', 'thumbnail_url', 'reference_price', 'offer_price', 'starts_at', 'ends_at'],
+            ['id', 'product_id', 'name', 'name_en', 'thumbnail_url', 'reference_price', 'offer_price', 'discount_percent', 'starts_at', 'ends_at'],
             array_keys($row),
         );
         $body = json_encode($row);
-        foreach (['percent', 'saving', 'discount', 'avg_cost', 'purchase_price', 'internal_notes', 'quantity', 'tax_rate', 'tenant_id', 'storefront_id', 'is_active', 'position', 'reason'] as $forbidden) {
-            $this->assertStringNotContainsString($forbidden, $body, "payload leaked/fabricated «{$forbidden}»");
+        foreach (['saving', 'discount_amount', 'avg_cost', 'purchase_price', 'internal_notes', 'quantity', 'tax_rate', 'tenant_id', 'storefront_id', 'is_active', 'position', 'reason', 'available', 'on_hand', 'in_stock'] as $forbidden) {
+            $this->assertStringNotContainsString($forbidden, $body, "payload leaked «{$forbidden}»");
         }
     }
 
@@ -221,6 +222,226 @@ class StorefrontOfferPublicApiTest extends TestCase
         \App\Models\PriceListItem::query()->where('product_id', $s['product']->id)->update(['price' => 30000]);
         app(TenantContext::class)->forget();
         $this->getJson($this->offersUrl($s['host']))->assertJsonPath('data', []);
+    }
+
+    // ───────────────────────── Derived discount_percent ─────────────────────────
+
+    /**
+     * @test
+     *
+     * @dataProvider percentCases
+     */
+    public function discount_percent_is_derived_from_the_two_authoritative_prices_with_half_up_rounding(int $base, int $list, int $expected): void
+    {
+        $tenant = $this->publicTenant();
+        $host = 'pct-'.$base.'-'.$list.'.example.test';
+        ['channel' => $channel, 'storefront' => $storefront] = $this->offerStore($tenant->id, $host);
+        $product = $this->offerProduct($tenant->id, $channel, ['sale_price' => $base]);
+        $this->channelPriceList($tenant->id, $channel, [$product->id => $list]);
+        $this->makeOffer($tenant->id, $storefront, $product);
+
+        $this->getJson($this->offersUrl($host))->assertOk()
+            ->assertJsonPath('data.0.reference_price.amount_minor', $base)
+            ->assertJsonPath('data.0.offer_price.amount_minor', $list)
+            ->assertJsonPath('data.0.discount_percent', $expected);
+
+        $this->assertSame($expected, StorefrontOfferResolver::discountPercent($base, $list));
+    }
+
+    public static function percentCases(): array
+    {
+        return [
+            'exact 24%' => [25000, 19000, 24],
+            'exact 50%' => [10000, 5000, 50],
+            'down: 33.33 -> 33' => [3, 2, 33],
+            'up: 66.67 -> 67' => [3, 1, 67],
+            'half rounds up: 12.5 -> 13' => [8, 7, 13],
+            'half rounds up: 0.5 -> 1' => [200, 199, 1],
+            'just below half: 0.4 -> 0' => [250, 249, 0],
+            'tiny genuine discount -> 0' => [25000, 24999, 0],
+            'free item -> 100' => [25000, 0, 100],
+        ];
+    }
+
+    /** @test */
+    public function discount_percent_is_never_computed_for_a_non_genuine_discount_because_the_row_is_omitted(): void
+    {
+        foreach ([[25000, 25000], [25000, 26000]] as $i => [$base, $list]) {
+            $tenant = $this->publicTenant();
+            $host = "nopct{$i}.example.test";
+            ['channel' => $channel, 'storefront' => $storefront] = $this->offerStore($tenant->id, $host);
+            $product = $this->offerProduct($tenant->id, $channel, ['sale_price' => $base]);
+            $this->channelPriceList($tenant->id, $channel, [$product->id => $list]);
+            $this->makeOffer($tenant->id, $storefront, $product);
+
+            $this->getJson($this->offersUrl($host))->assertOk()->assertJsonPath('data', []);
+        }
+    }
+
+    /** @test */
+    public function a_zero_base_price_never_yields_a_percentage_or_a_live_offer(): void
+    {
+        $tenant = $this->publicTenant();
+        ['channel' => $channel, 'storefront' => $storefront] = $this->offerStore($tenant->id, 'zero-base.example.test');
+        $product = $this->offerProduct($tenant->id, $channel, ['sale_price' => 0]);
+        $this->channelPriceList($tenant->id, $channel, [$product->id => 0]);
+        $this->makeOffer($tenant->id, $storefront, $product);
+
+        $this->getJson($this->offersUrl('zero-base.example.test'))->assertOk()->assertJsonPath('data', []);
+    }
+
+    /** @test */
+    public function discount_percent_is_fresh_on_every_read_and_never_stored(): void
+    {
+        $s = $this->discountedStore('pct-live.example.test');
+        $this->getJson($this->offersUrl($s['host']))->assertJsonPath('data.0.discount_percent', 24);
+
+        app(TenantContext::class)->set($s['tenant']->id);
+        \App\Models\PriceListItem::query()->where('product_id', $s['product']->id)->update(['price' => 12500]);
+        app(TenantContext::class)->forget();
+
+        $this->getJson($this->offersUrl($s['host']))->assertJsonPath('data.0.discount_percent', 50);
+    }
+
+    // ───────────────────────── Sellability (AvailableToSellService) ─────────────────────────
+
+    /** @return array{tenant: \App\Models\Tenant, channel: \App\Models\SalesChannel, storefront: \App\Models\Storefront, host: string, product: Product, warehouse: \App\Models\Warehouse} */
+    private function trackedDiscountedStore(string $host, int $onHand, int $reserved = 0): array
+    {
+        $tenant = $this->publicTenant();
+        ['channel' => $channel, 'storefront' => $storefront] = $this->offerStore($tenant->id, $host);
+        $warehouse = $this->fulfillmentWarehouse($tenant->id, $channel);
+        $product = $this->offerProduct($tenant->id, $channel, ['track_inventory' => true, 'sale_price' => 25000]);
+        $this->stockAt($tenant->id, $warehouse, $product, $onHand, $reserved);
+        $this->channelPriceList($tenant->id, $channel, [$product->id => 19000]);
+        $this->makeOffer($tenant->id, $storefront, $product);
+
+        return compact('tenant', 'channel', 'storefront', 'host', 'product', 'warehouse');
+    }
+
+    /** @test */
+    public function a_genuine_discount_with_available_to_sell_stock_is_live(): void
+    {
+        $s = $this->trackedDiscountedStore('ats-ok.example.test', onHand: 5);
+
+        $this->getJson($this->offersUrl($s['host']))->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.product_id', $s['product']->id)
+            ->assertJsonPath('data.0.discount_percent', 24);
+    }
+
+    /** @test */
+    public function a_genuine_discount_with_zero_available_to_sell_is_omitted_publicly(): void
+    {
+        $s = $this->trackedDiscountedStore('ats-zero.example.test', onHand: 0);
+
+        $this->getJson($this->offersUrl($s['host']))->assertOk()->assertJsonPath('data', []);
+    }
+
+    /** @test */
+    public function active_reservations_that_consume_all_stock_make_the_offer_unavailable(): void
+    {
+        $s = $this->trackedDiscountedStore('ats-reserved.example.test', onHand: 3, reserved: 3);
+        $this->getJson($this->offersUrl($s['host']))->assertOk()->assertJsonPath('data', []);
+
+        $s2 = $this->trackedDiscountedStore('ats-partly.example.test', onHand: 3, reserved: 2);
+        $this->getJson($this->offersUrl($s2['host']))->assertOk()->assertJsonCount(1, 'data');
+    }
+
+    /** @test */
+    public function negative_legacy_on_hand_is_unavailable_not_live(): void
+    {
+        $s = $this->trackedDiscountedStore('ats-neg.example.test', onHand: -4);
+
+        $this->getJson($this->offersUrl($s['host']))->assertOk()->assertJsonPath('data', []);
+    }
+
+    /** @test */
+    public function an_untracked_product_needs_no_stock_exactly_like_checkout(): void
+    {
+        // track_inventory=false (the default): no fulfillment policy, no stock rows — still sellable.
+        $s = $this->discountedStore('ats-untracked.example.test');
+
+        $this->getJson($this->offersUrl($s['host']))->assertOk()->assertJsonCount(1, 'data');
+    }
+
+    /** @test */
+    public function a_tracked_product_on_a_channel_without_a_fulfillment_policy_is_omitted(): void
+    {
+        $tenant = $this->publicTenant();
+        ['channel' => $channel, 'storefront' => $storefront] = $this->offerStore($tenant->id, 'ats-nopolicy.example.test');
+        $product = $this->offerProduct($tenant->id, $channel, ['track_inventory' => true]);
+        $this->channelPriceList($tenant->id, $channel, [$product->id => 100]);
+        $this->makeOffer($tenant->id, $storefront, $product);
+
+        $this->getJson($this->offersUrl('ats-nopolicy.example.test'))->assertOk()->assertJsonPath('data', []);
+    }
+
+    /** @test */
+    public function an_inactive_fulfillment_warehouse_makes_tracked_offers_unavailable(): void
+    {
+        $s = $this->trackedDiscountedStore('ats-inactivewh.example.test', onHand: 9);
+        app(TenantContext::class)->set($s['tenant']->id);
+        \App\Models\Warehouse::query()->whereKey($s['warehouse']->id)->update(['is_active' => false]);
+        app(TenantContext::class)->forget();
+
+        $this->getJson($this->offersUrl($s['host']))->assertOk()->assertJsonPath('data', []);
+    }
+
+    /** @test */
+    public function stock_in_a_non_fulfillment_warehouse_or_another_tenant_does_not_make_an_offer_available(): void
+    {
+        // A: tracked product stocked 0 in its channel warehouse, but 50 in an unrelated warehouse of the same tenant.
+        $a = $this->trackedDiscountedStore('iso-a.example.test', onHand: 0);
+        app(TenantContext::class)->set($a['tenant']->id);
+        $other = \App\Models\Warehouse::create(['code' => 'OTHER', 'name' => 'مخزن غير تنفيذي', 'is_active' => true]);
+        app(TenantContext::class)->forget();
+        $this->stockAt($a['tenant']->id, $other, $a['product'], 50);
+
+        // B (another tenant): its own tracked product is well stocked.
+        $b = $this->trackedDiscountedStore('iso-b.example.test', onHand: 25);
+
+        $this->getJson($this->offersUrl('iso-a.example.test'))->assertOk()->assertJsonPath('data', []);
+        $this->assertSame(
+            [$b['product']->id],
+            collect($this->getJson($this->offersUrl('iso-b.example.test'))->assertOk()->json('data'))->pluck('product_id')->all(),
+        );
+    }
+
+    /** @test */
+    public function two_channels_of_one_tenant_use_their_own_fulfillment_warehouse(): void
+    {
+        $tenant = $this->publicTenant();
+        ['channel' => $webA, 'storefront' => $sfA] = $this->offerStore($tenant->id, 'ch-a.example.test', 'web');
+        ['channel' => $webB, 'storefront' => $sfB] = $this->offerStore($tenant->id, 'ch-b.example.test', 'web-b');
+        $whA = $this->fulfillmentWarehouse($tenant->id, $webA);
+        $whB = $this->fulfillmentWarehouse($tenant->id, $webB);
+
+        $product = $this->offerProduct($tenant->id, $webA, ['track_inventory' => true]);
+        app(TenantContext::class)->set($tenant->id);
+        \App\Models\CommerceListing::create(['product_id' => $product->id, 'sales_channel_id' => $webB->id, 'is_published' => true]);
+        app(TenantContext::class)->forget();
+
+        $this->stockAt($tenant->id, $whB, $product, 10); // stocked only for channel B's warehouse
+        $this->channelPriceList($tenant->id, $webA, [$product->id => 100]);
+        $this->channelPriceList($tenant->id, $webB, [$product->id => 100]);
+        $this->makeOffer($tenant->id, $sfA, $product);
+        $this->makeOffer($tenant->id, $sfB, $product);
+
+        $this->getJson($this->offersUrl('ch-a.example.test'))->assertOk()->assertJsonPath('data', []);
+        $this->getJson($this->offersUrl('ch-b.example.test'))->assertOk()->assertJsonCount(1, 'data');
+    }
+
+    /** @test */
+    public function sellability_never_changes_general_product_list_behavior(): void
+    {
+        $s = $this->trackedDiscountedStore('ats-list.example.test', onHand: 0);
+
+        // Out-of-stock: hidden from Offers, but still listed (informational in_stock=false) by store/v1/products.
+        $this->getJson($this->offersUrl($s['host']))->assertOk()->assertJsonPath('data', []);
+        $list = $this->getJson('http://ats-list.example.test/store/v1/products')->assertOk();
+        $this->assertSame([$s['product']->id], collect($list->json('data'))->pluck('id')->all());
+        $this->assertFalse($list->json('data.0.in_stock'));
     }
 
     // ───────────────────────── Variant-managed products ─────────────────────────
@@ -598,6 +819,35 @@ class StorefrontOfferPublicApiTest extends TestCase
         fwrite(STDERR, "\n[offers perf] queries: 1→{$counts[1]}, 8→{$counts[8]}, 12→{$counts[12]}, per-offer≈".round($perOffer, 2)."\n");
         $this->assertLessThanOrEqual(8, $perOffer);
         $this->assertLessThanOrEqual(120, $counts[12]);
+    }
+
+    /** @test */
+    public function tracked_live_offers_add_a_bounded_availability_cost_per_offer(): void
+    {
+        $counts = [];
+        foreach ([1, 12] as $n) {
+            $tenant = $this->publicTenant();
+            $host = "perft{$n}.example.test";
+            ['channel' => $channel, 'storefront' => $storefront] = $this->offerStore($tenant->id, $host);
+            $warehouse = $this->fulfillmentWarehouse($tenant->id, $channel);
+            $products = [];
+            $prices = [];
+            for ($i = 0; $i < $n; $i++) {
+                $products[] = $product = $this->offerProduct($tenant->id, $channel, ['track_inventory' => true]);
+                $this->stockAt($tenant->id, $warehouse, $product, 10);
+                $prices[$product->id] = 100;
+            }
+            $this->channelPriceList($tenant->id, $channel, $prices);
+            foreach ($products as $i => $product) {
+                $this->makeOffer($tenant->id, $storefront, $product, ['position' => $i]);
+            }
+
+            $counts[$n] = $this->countQueries(fn () => $this->getJson($this->offersUrl($host))->assertOk()->assertJsonCount($n, 'data'));
+        }
+
+        $perOffer = ($counts[12] - $counts[1]) / 11;
+        fwrite(STDERR, "\n[offers perf, tracked/ATS] queries: 1→{$counts[1]}, 12→{$counts[12]}, per-offer≈".round($perOffer, 2)."\n");
+        $this->assertLessThanOrEqual(12, $perOffer);
     }
 
     private function countQueries(callable $fn): int

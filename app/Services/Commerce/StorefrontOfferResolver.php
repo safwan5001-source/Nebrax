@@ -33,8 +33,22 @@ use RuntimeException;
  *                   مساوٍ أو أعلى أو غير محسوم أو الحسم رمى — يُحجب (fail-closed).
  *
  * لا حساب خصمٍ هنا خارج هذا الحسم، ولا شيء يُخزَّن. الضريبة غائبة عمداً كما في
- * `CommercePriceResolver`. لا نسبة ولا وفر ولا سعر مشطوب: حسابُ الشارات مؤجَّلٌ
- * لـ H4-7 ويُبنى على الرقمين المُعادَين هنا.
+ * `CommercePriceResolver`.
+ *
+ * **النسبة مشتقّة لا سلطة** (§23.3 خطوة 4): `discountPercent = round((ref − offer)
+ * / ref × 100)` تُحسب طازجةً عند كل قراءة من الرقمين المُثبَتَين أعلاه فقط، بعد
+ * التأكد أن `ref > 0` و`0 ≤ offer < ref`، وتُقرَّب بنصفٍ لأعلى بحسابٍ صحيحٍ بلا
+ * float (`(2·diff·100 + ref) div 2·ref`). لا تُخزَّن، ولا تُقبل في أي حمولة كتابة.
+ * قد تساوي 0 لخصمٍ دون نصف بالمئة — خصمٌ حقيقي تعرضه الواجهة كما تراه مناسباً.
+ *
+ * **قابلية البيع (ATS)** — بوابة ثانية بعد الخصم، تعكس **حرفياً** ما يطبّقه
+ * `CommerceCheckoutService` فعلاً عند الإتمام، لا منطق مخزون جديداً:
+ *   - منتجٌ `track_inventory = false` ⇒ لا فحص توفّر (كما يتخطّاه Checkout/الحجز).
+ *   - منتجٌ متتبَّع ⇒ مخزن تنفيذ القناة عبر `FulfillmentPolicyService` (غيابه ⇒
+ *     `fulfillment_not_configured`، نفس سبب الفشل في Checkout) ثم
+ *     `AvailableToSellService::forWarehouse()`؛ `availableToSell <= 0` ⇒ `out_of_stock`.
+ * العرض غير القابل للبيع لا يظهر علناً. هذه البوابة خاصةٌ بقسم العروض؛ قوائم
+ * المنتجات العامة تبقى تعرض `in_stock` معلوماتياً كما هي.
  *
  * **منتجٌ متعدد الخيارات يُحجب دوماً** (`variant_managed`): لا سعر مرجعي ولا
  * سعر عرض للأب (`resolve()` يرفض `variantId = null` له فشلاً مغلَقاً)، واختيار
@@ -67,7 +81,18 @@ final class StorefrontOfferResolver
 
     public const REASON_PRICE_UNRESOLVED = 'price_unresolved';
 
-    public function __construct(private readonly CommercePriceResolver $prices) {}
+    public const REASON_OUT_OF_STOCK = 'out_of_stock';
+
+    /** نفس سبب فشل `CommerceCheckoutService` لمنتجٍ متتبَّع بلا مخزن تنفيذ. */
+    public const REASON_FULFILLMENT_NOT_CONFIGURED = 'fulfillment_not_configured';
+
+    public const REASON_AVAILABILITY_UNRESOLVED = 'availability_unresolved';
+
+    public function __construct(
+        private readonly CommercePriceResolver $prices,
+        private readonly AvailableToSellService $availability,
+        private readonly FulfillmentPolicyService $fulfillment,
+    ) {}
 
     /**
      * القراءة العامة: العروض الحيّة الآن فقط، بترتيبٍ حتمي. نفس `evaluate()` الذي
@@ -165,6 +190,11 @@ final class StorefrontOfferResolver
 
         $priced = $this->price($priceable, $products, $salesChannelId);
 
+        // قابلية البيع تُفحص للمنتجات ذات الخصم الحقيقي وحدها: لا استعلامات مخزون
+        // لما سيُحجب أصلاً.
+        $liveCandidates = array_filter($priceable, fn (StorefrontOffer $o) => $priced[$o->id][0] === null);
+        $unsellable = $this->unsellable($liveCandidates, $products, $salesChannelId);
+
         $currency = null;
         $views = [];
         foreach ($offers as $offer) {
@@ -178,6 +208,7 @@ final class StorefrontOfferResolver
             }
 
             [$reason, $reference, $offerPrice] = $priced[$offer->id];
+            $reason ??= $unsellable[$offer->id] ?? null;
             if ($reason !== null) {
                 $views[] = new StorefrontOfferView($offer, $product, false, $reason, null, null, null, $thumbnail);
 
@@ -185,7 +216,10 @@ final class StorefrontOfferResolver
             }
 
             $currency ??= $this->currency();
-            $views[] = new StorefrontOfferView($offer, $product, true, null, $reference, $offerPrice, $currency, $thumbnail);
+            $views[] = new StorefrontOfferView(
+                $offer, $product, true, null, $reference, $offerPrice, $currency, $thumbnail,
+                self::discountPercent($reference, $offerPrice),
+            );
         }
 
         return $views;
@@ -245,9 +279,70 @@ final class StorefrontOfferResolver
 
             $reference = (int) $product->sale_price;
 
-            $out[$id] = $resolved->resolved && $resolved->amount !== null && $resolved->amount < $reference
+            $out[$id] = $resolved->resolved && $resolved->amount !== null
+                && $reference > 0 && $resolved->amount >= 0 && $resolved->amount < $reference
                 ? [null, $reference, $resolved->amount]
                 : $notDiscounted();
+        }
+
+        return $out;
+    }
+
+    /**
+     * نسبة الخصم الصحيحة المقرَّبة (نصفٌ لأعلى) من السعرين المُثبَتَين — بلا float،
+     * وتُستدعى فقط بعد التحقق من `ref > 0` و`0 <= offer < ref`.
+     */
+    public static function discountPercent(int $reference, int $offer): int
+    {
+        return intdiv(($reference - $offer) * 200 + $reference, 2 * $reference);
+    }
+
+    /**
+     * @param  array<string, StorefrontOffer>  $candidates  عروضٌ لها خصمٌ حقيقي.
+     * @param  Collection<string, Product>  $products
+     * @return array<string, string> offer id ⇒ سبب عدم القابلية للبيع (الصالحة لا تظهر).
+     */
+    private function unsellable(array $candidates, Collection $products, string $salesChannelId): array
+    {
+        $out = [];
+        $warehouse = null;
+        $warehouseFailed = false;
+
+        foreach ($candidates as $id => $offer) {
+            $product = $products->get($offer->product_id);
+
+            // كما يتخطّاه Checkout/الحجز: غير المتتبَّع لا فحص توفّر له.
+            if (! $product->track_inventory) {
+                continue;
+            }
+
+            if ($warehouse === null && ! $warehouseFailed) {
+                try {
+                    $warehouse = $this->fulfillment->resolveWarehouseFor($salesChannelId);
+                } catch (FulfillmentPolicyNotConfiguredException) {
+                    $warehouseFailed = true;
+                } catch (RuntimeException) {
+                    $warehouseFailed = true;
+                }
+            }
+
+            if ($warehouse === null) {
+                $out[$id] = self::REASON_FULFILLMENT_NOT_CONFIGURED;
+
+                continue;
+            }
+
+            try {
+                $atsOk = $this->availability->forWarehouse($product->id, $warehouse->id)->availableToSell > 0;
+            } catch (RuntimeException) {
+                $out[$id] = self::REASON_AVAILABILITY_UNRESOLVED;
+
+                continue;
+            }
+
+            if (! $atsOk) {
+                $out[$id] = self::REASON_OUT_OF_STOCK;
+            }
         }
 
         return $out;

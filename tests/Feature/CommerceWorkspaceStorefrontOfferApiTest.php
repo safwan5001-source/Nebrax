@@ -166,6 +166,8 @@ class CommerceWorkspaceStorefrontOfferApiTest extends TestCase
             'discount_percent' => ['discount_percent', 20], 'sale_price' => ['sale_price', 1], 'original_price' => ['original_price', 5],
             'price_list_id' => ['price_list_id', 'x'], 'tenant_id' => ['tenant_id', 'x'], 'storefront_id' => ['storefront_id', 'x'],
             'sales_channel_id' => ['sales_channel_id', 'x'],
+            'discount_amount' => ['discount_amount', 500], 'savings' => ['savings', 500], 'discount_percentage' => ['discount_percentage', 10],
+            'offer_price' => ['offer_price', 1], 'reference_price' => ['reference_price', 2], 'in_stock' => ['in_stock', true],
         ];
     }
 
@@ -310,8 +312,76 @@ class CommerceWorkspaceStorefrontOfferApiTest extends TestCase
         $this->assertSame([true, false, false, false, false, false], $rows->pluck('evaluation.is_live')->all());
         $this->assertSame(25000, $rows[0]['evaluation']['reference_price']['amount_minor']);
         $this->assertSame(19000, $rows[0]['evaluation']['offer_price']['amount_minor']);
+        $this->assertSame(24, $rows[0]['evaluation']['discount_percent']);
+        $this->assertNull($rows[1]['evaluation']['discount_percent']);
         $this->assertNull($rows[1]['evaluation']['offer_price']);
         $this->assertSame(StorefrontOfferResolver::MAX_OFFERS_PER_STOREFRONT, $res->json('meta.max_offers'));
+    }
+
+    /** @test */
+    public function list_reports_the_honest_sellability_reason_for_a_discounted_but_unsellable_candidate(): void
+    {
+        $m = $this->merchant('off-ats');
+        $tid = $m['auth']['tenant_id'];
+        $warehouse = $this->fulfillmentWarehouse($tid, $m['channel']);
+
+        $ok = $this->offerProduct($tid, $m['channel'], ['name' => 'متوفر', 'track_inventory' => true]);
+        $empty = $this->offerProduct($tid, $m['channel'], ['name' => 'نافد', 'track_inventory' => true]);
+        $reserved = $this->offerProduct($tid, $m['channel'], ['name' => 'محجوز', 'track_inventory' => true]);
+        $untracked = $this->offerProduct($tid, $m['channel'], ['name' => 'غير متتبَّع']);
+        $this->stockAt($tid, $warehouse, $ok, 5);
+        $this->stockAt($tid, $warehouse, $empty, 0);
+        $this->stockAt($tid, $warehouse, $reserved, 2, reserved: 2);
+        $this->channelPriceList($tid, $m['channel'], [$ok->id => 100, $empty->id => 100, $reserved->id => 100, $untracked->id => 100]);
+        foreach ([$ok, $empty, $reserved, $untracked] as $i => $p) {
+            $this->makeOffer($tid, $m['storefront'], $p, ['position' => $i]);
+        }
+
+        $rows = collect($this->withToken($m['auth']['token'])->getJson($this->path($m['storefront']->id))->assertOk()->json('data'));
+
+        $this->assertSame(['متوفر', 'نافد', 'محجوز', 'غير متتبَّع'], $rows->pluck('product.name')->all());
+        $this->assertSame([null, 'out_of_stock', 'out_of_stock', null], $rows->pluck('evaluation.reason')->all());
+        $this->assertSame([true, false, false, true], $rows->pluck('evaluation.is_live')->all());
+        // لا أرقام مخزون في أي استجابة.
+        $this->assertStringNotContainsString('on_hand', $rows->toJson());
+        $this->assertStringNotContainsString('available_to_sell', $rows->toJson());
+    }
+
+    /** @test */
+    public function list_reports_fulfillment_not_configured_for_a_tracked_product_without_a_policy(): void
+    {
+        $m = $this->merchant('off-ats-nopolicy');
+        $tid = $m['auth']['tenant_id'];
+        $p = $this->offerProduct($tid, $m['channel'], ['track_inventory' => true]);
+        $this->channelPriceList($tid, $m['channel'], [$p->id => 100]);
+        $this->makeOffer($tid, $m['storefront'], $p);
+
+        $this->withToken($m['auth']['token'])->getJson($this->path($m['storefront']->id))->assertOk()
+            ->assertJsonPath('data.0.evaluation.is_live', false)
+            ->assertJsonPath('data.0.evaluation.reason', 'fulfillment_not_configured');
+    }
+
+    /** @test */
+    public function workspace_sellability_ignores_another_tenants_stock(): void
+    {
+        $a = $this->merchant('off-ats-iso-a');
+        $b = $this->merchant('off-ats-iso-b');
+        $whA = $this->fulfillmentWarehouse($a['auth']['tenant_id'], $a['channel']);
+        $whB = $this->fulfillmentWarehouse($b['auth']['tenant_id'], $b['channel']);
+        $pA = $this->offerProduct($a['auth']['tenant_id'], $a['channel'], ['track_inventory' => true]);
+        $pB = $this->offerProduct($b['auth']['tenant_id'], $b['channel'], ['track_inventory' => true]);
+        $this->stockAt($a['auth']['tenant_id'], $whA, $pA, 0);
+        $this->stockAt($b['auth']['tenant_id'], $whB, $pB, 99);
+        $this->channelPriceList($a['auth']['tenant_id'], $a['channel'], [$pA->id => 100]);
+        $this->channelPriceList($b['auth']['tenant_id'], $b['channel'], [$pB->id => 100]);
+        $this->makeOffer($a['auth']['tenant_id'], $a['storefront'], $pA);
+        $this->makeOffer($b['auth']['tenant_id'], $b['storefront'], $pB);
+
+        $this->withToken($a['auth']['token'])->getJson($this->path($a['storefront']->id))->assertOk()
+            ->assertJsonPath('data.0.evaluation.reason', 'out_of_stock');
+        $this->withToken($b['auth']['token'])->getJson($this->path($b['storefront']->id))->assertOk()
+            ->assertJsonPath('data.0.evaluation.is_live', true)
+            ->assertJsonPath('data.0.evaluation.discount_percent', 100); // (25000-100)/25000 = 99.6% -> 100
     }
 
     /** @test */

@@ -3,6 +3,10 @@
 namespace Tests\Feature;
 
 use App\Models\CommerceListing;
+use App\Models\FulfillmentPolicy;
+use App\Models\ProductWarehouseStock;
+use App\Models\Warehouse;
+use App\Services\Commerce\InventoryReservationService;
 use App\Models\PriceList;
 use App\Models\PriceListItem;
 use App\Models\Product;
@@ -152,5 +156,31 @@ trait SeedsStorefrontOffers
         app(TenantContext::class)->forget();
 
         return [$product->fresh(), $v1->fresh(), $v2->fresh()];
+    }
+
+    /** مخزن تنفيذ القناة (FulfillmentPolicy) — شرط فحص التوفّر لمنتجٍ متتبَّع. */
+    protected function fulfillmentWarehouse(string $tenantId, SalesChannel $channel): Warehouse
+    {
+        app(TenantContext::class)->set($tenantId);
+
+        $warehouse = Warehouse::create(['code' => 'WH-'.Str::random(5), 'name' => 'مخزن '.Str::random(4), 'is_active' => true]);
+        FulfillmentPolicy::create(['sales_channel_id' => $channel->id, 'warehouse_id' => $warehouse->id]);
+
+        app(TenantContext::class)->forget();
+
+        return $warehouse;
+    }
+
+    /** رصيدٌ في مخزنٍ بعينه + حجزٌ نشط اختياري (يقلّل ATS). */
+    protected function stockAt(string $tenantId, Warehouse $warehouse, Product $product, int $quantity, int $reserved = 0): void
+    {
+        app(TenantContext::class)->set($tenantId);
+
+        ProductWarehouseStock::create(['product_id' => $product->id, 'warehouse_id' => $warehouse->id, 'quantity' => $quantity]);
+        if ($reserved > 0) {
+            app(InventoryReservationService::class)->acquire($product->id, $warehouse->id, $reserved, 'k-'.Str::random(8));
+        }
+
+        app(TenantContext::class)->forget();
     }
 }
