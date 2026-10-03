@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\CommerceCategoryPublicationController;
 use App\Http\Controllers\Api\CommerceCollectionController;
 use App\Http\Controllers\Api\CommerceFacetController;
 use App\Http\Controllers\Api\CommercePersonalizationController;
+use App\Http\Controllers\Api\CommerceProductAddonController;
 use App\Http\Controllers\Api\CommerceProductContentController;
 use App\Http\Controllers\Api\CommerceProductPublicationController;
 use App\Http\Middleware\EnsureActiveSubscription;
@@ -59,6 +60,14 @@ final class CommerceWorkspaceServiceProvider extends ServiceProvider
                 ->whereUuid('id')
                 ->middleware(EnsurePermission::class.':products.view');
             Route::put('{id}/personalization', [CommercePersonalizationController::class, 'replace'])
+                ->whereUuid('id')
+                ->middleware(EnsurePermission::class.':products.manage');
+
+            // FLOWERS-H6 / ADR-18 — الإضافات الاختيارية لكل منتج. RBAC يطابق النشر.
+            Route::get('{id}/addons', [CommerceProductAddonController::class, 'show'])
+                ->whereUuid('id')
+                ->middleware(EnsurePermission::class.':products.view');
+            Route::put('{id}/addons', [CommerceProductAddonController::class, 'replace'])
                 ->whereUuid('id')
                 ->middleware(EnsurePermission::class.':products.manage');
 

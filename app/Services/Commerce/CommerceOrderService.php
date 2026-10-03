@@ -224,15 +224,35 @@ class CommerceOrderService
             ]);
 
             $total = $order->delivery_amount_minor;
+            $createdByCartItem = [];
+            $parentLinks = [];
             foreach ($lines as $line) {
                 // FLOWERS-H4b / ADR-16: لقطة التخصيص تُنسخ مع السطر داخل المعاملة نفسها.
                 $personalization = $line['personalization'] ?? [];
-                unset($line['personalization']);
+                // FLOWERS-H6 / ADR-18: مفاتيح ربط الإضافات بأبيها داخليةٌ، لا أعمدة على السطر.
+                $cartItemId = $line['cart_item_id'] ?? null;
+                $parentCartItemId = $line['parent_cart_item_id'] ?? null;
+                unset($line['personalization'], $line['cart_item_id'], $line['parent_cart_item_id']);
                 $created = $order->lines()->create($line);
                 $total = $this->addMinorAmountOrFail($total, $created->line_total);
                 foreach ($personalization as $row) {
                     $created->personalizations()->create($row);
                 }
+                if ($cartItemId !== null) {
+                    $createdByCartItem[$cartItemId] = $created->id;
+                }
+                if ($parentCartItemId !== null) {
+                    $parentLinks[$created->id] = $parentCartItemId;
+                }
+            }
+            // ربط الإضافات بأسطر أبيها بعد إنشاء الجميع (لا افتراض لترتيب الإنشاء). المجموع يبقى
+            // مجموع الأسطر ببساطة — لا سلطة مالية جديدة.
+            foreach ($parentLinks as $lineId => $parentCartItemId) {
+                $parentLineId = $createdByCartItem[$parentCartItemId] ?? null;
+                if ($parentLineId === null) {
+                    throw new RuntimeException('سطر الأب لإضافةٍ غير موجود في الطلب.');
+                }
+                $order->lines()->whereKey($lineId)->update(['parent_line_id' => $parentLineId]);
             }
             $order->update(['total' => $total]);
 

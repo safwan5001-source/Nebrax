@@ -1438,6 +1438,27 @@ components:
         media: { type: array, items: { $ref: '#/components/schemas/ProductMediaItem' } }
         personalization: { $ref: '#/components/schemas/ProductPersonalization' }
         content_blocks: { $ref: '#/components/schemas/ProductContentBlocks' }
+        addons: { $ref: '#/components/schemas/ProductAddons' }
+
+    ProductAddons:
+      description: >
+        Optional add-ons the shopper may attach to this product (ADR-18). Present on a product
+        detail only when at least one active, published, priced add-on exists. Prices are
+        informational; the server re-prices every add-on line.
+      type: array
+      items:
+        type: object
+        additionalProperties: false
+        required: [product_id, product_variant_id, name, name_en, price, in_stock, max_quantity, thumbnail_url]
+        properties:
+          product_id: { type: string, format: uuid }
+          product_variant_id: { type: [string, 'null'], format: uuid }
+          name: { type: string }
+          name_en: { type: [string, 'null'] }
+          price: { $ref: '#/components/schemas/Money' }
+          in_stock: { type: [boolean, 'null'] }
+          max_quantity: { type: integer, minimum: 1 }
+          thumbnail_url: { type: [string, 'null'] }
 
     ProductContentBlocks:
       description: >
@@ -1554,6 +1575,7 @@ components:
         variants: { type: array, items: { $ref: '#/components/schemas/ProductVariant' } }
         personalization: { $ref: '#/components/schemas/ProductPersonalization' }
         content_blocks: { $ref: '#/components/schemas/ProductContentBlocks' }
+        addons: { $ref: '#/components/schemas/ProductAddons' }
 
     ProductListResponse:
       type: object
@@ -1643,6 +1665,13 @@ components:
         line_total: { $ref: '#/components/schemas/Money' }
         available: { type: boolean }
         personalization: { $ref: '#/components/schemas/LinePersonalization' }
+        addon_of:
+          description: Present only on an add-on line (ADR-18); the id of the parent cart line. Removing the parent removes the add-on.
+          type: string
+          format: uuid
+        per_parent_quantity:
+          description: Present only on an add-on line; the add-on quantity is this value times the parent quantity.
+          type: integer
 
     LinePersonalization:
       description: The customer's personalization values for a line (ADR-16). Present only on a personalized line.
@@ -1694,6 +1723,20 @@ components:
           type: [object, 'null']
           maxProperties: 8
           additionalProperties: { type: [string, 'null'], maxLength: 2000 }
+        addons:
+          description: >
+            Optional add-ons (ADR-18), validated against the product's active add-on relations.
+            No price field is accepted. Each becomes its own cart line priced by the server.
+          type: [array, 'null']
+          maxItems: 8
+          items:
+            type: object
+            additionalProperties: false
+            required: [product_id]
+            properties:
+              product_id: { type: string, format: uuid }
+              product_variant_id: { type: [string, 'null'], format: uuid }
+              quantity: { type: integer, minimum: 1, maximum: 10 }
 
     CartItemUpdate:
       type: object
@@ -1937,6 +1980,14 @@ components:
               unit_price: { $ref: '#/components/schemas/Money' }
               line_total: { $ref: '#/components/schemas/Money' }
               personalization: { $ref: '#/components/schemas/LinePersonalization' }
+              line_id:
+                description: Present on an add-on line and on its parent (ADR-18).
+                type: string
+                format: uuid
+              addon_of:
+                description: Present only on an add-on line; the `line_id` of its parent line.
+                type: string
+                format: uuid
         created_at: { type: [string, 'null'], format: date-time }
 
     GuestOrderResponse:

@@ -85,9 +85,36 @@ final class CommerceOrderSerializer
                 'status' => $order->paymentIntent?->status,
                 'payment_method_name' => $order->paymentIntent?->payment_method_name,
             ],
-            'items' => $order->lines->map(fn ($line) => self::serializeLine($line, $currency))->all(),
+            'items' => self::serializeLines($order->lines, $currency),
             'created_at' => $order->created_at?->toIso8601String(),
         ];
+    }
+
+    /**
+     * أسطر الطلب العامة. بلا إضافات (الحالة العامة) يبقى الترتيب والشكل كما كانا حرفياً؛ وعند
+     * وجودها (FLOWERS-H6 / ADR-18) يتبع كل أبٍ أسطر إضافاته، ويحمل الأب `line_id` وتحمل الإضافة
+     * `line_id` و`addon_of` — السطر العادي بلا أي مفتاح جديد.
+     *
+     * @param  \Illuminate\Support\Collection<int, mixed>  $lines
+     * @return list<array<string, mixed>>
+     */
+    public static function serializeLines($lines, string $currency): array
+    {
+        $parentIds = $lines->pluck('parent_line_id')->filter()->unique()->flip();
+        if ($parentIds->isEmpty()) {
+            return $lines->map(fn ($line) => self::serializeLine($line, $currency))->values()->all();
+        }
+
+        $children = $lines->filter(fn ($line) => $line->parent_line_id !== null)->groupBy('parent_line_id');
+        $ordered = [];
+        foreach ($lines->filter(fn ($line) => $line->parent_line_id === null) as $line) {
+            $ordered[] = $line;
+            foreach ($children->get($line->id, collect()) as $child) {
+                $ordered[] = $child;
+            }
+        }
+
+        return array_map(fn ($line) => self::serializeLine($line, $currency, $parentIds->has($line->id)), $ordered);
     }
 
     /**
@@ -96,7 +123,7 @@ final class CommerceOrderSerializer
      *
      * @return array<string, mixed>
      */
-    public static function serializeLine($line, string $currency): array
+    public static function serializeLine($line, string $currency, bool $isAddonParent = false): array
     {
         $row = [
             'product_id' => $line->product_id,
@@ -106,6 +133,13 @@ final class CommerceOrderSerializer
             'unit_price' => ['amount_minor' => $line->unit_price, 'currency' => $currency],
             'line_total' => ['amount_minor' => $line->line_total, 'currency' => $currency],
         ];
+
+        if ($isAddonParent || $line->parent_line_id !== null) {
+            $row['line_id'] = $line->id;
+        }
+        if ($line->parent_line_id !== null) {
+            $row['addon_of'] = $line->parent_line_id;
+        }
 
         if ($line->personalizations->isNotEmpty()) {
             $row['personalization'] = $line->personalizations->map(fn ($p) => [

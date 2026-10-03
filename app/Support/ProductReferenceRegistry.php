@@ -6,6 +6,7 @@ use App\Models\BarcodeRegistryEntry;
 use App\Models\CommerceCartItem;
 use App\Models\CommerceCollectionProduct;
 use App\Models\CommerceListing;
+use App\Models\CommerceProductAddon;
 use App\Models\CommerceProductContentBlock;
 use App\Models\CommerceProductPersonalizationField;
 use App\Models\CommerceProductFacetValue;
@@ -195,6 +196,10 @@ final class ProductReferenceRegistry
         // H5 / ADR-17: كتل محتوى المنتج المهيكلة (تركيبة/عناية/تغليف) نصٌّ تسويقي تابع بالكامل
         // للمنتج — بلا أثر مالي أو مخزني، لا يمنع الحذف الحقيقي ويُنظَّف معه.
         CommerceProductContentBlock::class => ['key' => 'commerce_product_content_blocks', 'classes' => [self::OWNED_CHILD]],
+        // H6 / ADR-18: علاقة إضافة اختيارية (أب ← منتج إضافة) — توصيفٌ تجاري بلا أثر مالي أو مخزني.
+        // تُنظَّف حين يكون المنتج أباً (`product_id`) أو إضافةً (`addon_product_id`)؛ سطور الطلبات
+        // التاريخية تحمل لقطتها ولا تشير إلى العلاقة.
+        CommerceProductAddon::class => ['key' => 'commerce_product_addons', 'classes' => [self::OWNED_CHILD]],
 
         // COM-CART-2: السلة المجهولة حالة مؤقتة وليست دليلاً تاريخياً ولا
         // تهيئةً تجارية حية. حذف المنتج لا تمنعه سلة مهجورة؛ يبقى السطر

@@ -644,10 +644,34 @@ final class CommerceCheckoutService
         $warehouse = null;
         $lines = [];
         $failures = [];
+        /** @var array<string, int> الكمية الأساسية المطلوبة تراكمياً لكل (منتج|متغيّر|مخزن) عبر أسطر السلة. */
+        $stockDemand = [];
+
+        $byId = $items->keyBy('id');
+
+        // FLOWERS-H6 — سلة فيها أسطر إضافات: تُقفل صفوف كل منتجاتها دفعةً واحدة بترتيب المعرّف الشامل (نفس
+        // ترتيب ProductAddonService::replace()/lockForCart) قبل حلقة الأقفال المفردة بترتيب سطور السلة، وإلا
+        // دار deadlock مع تعديل العلاقة حين يقفل الإتمامُ الأبَ قبل الإضافة ويقفلهما replace() مرتَّبَين.
+        // السلة بلا إضافات لا يتغيّر مسارها.
+        if ($items->contains(fn ($item) => $item->parent_item_id !== null)) {
+            Product::withoutGlobalScope(BranchScope::class)
+                ->whereIn('id', $items->pluck('product_id')->filter()->unique()->values()->all())
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->pluck('id');
+        }
 
         foreach ($items as $item) {
             if ($item->product_id === null) {
                 $failures[] = ['item_id' => $item->id, 'reason' => 'unavailable'];
+
+                continue;
+            }
+
+            // FLOWERS-H6 / ADR-18 — سطر إضافة: العلاقة بأبيه ما زالت معرَّفة ونشطة وضمن الحد
+            // وكميته = كمية الأب × كمية لكل أب؛ وإلا review-required بلا طلب.
+            if ($item->parent_item_id !== null && ! app(ProductAddonService::class)->relationHolds($item, $byId->get($item->parent_item_id))) {
+                $failures[] = ['item_id' => $item->id, 'reason' => 'addon_unavailable'];
 
                 continue;
             }
@@ -753,9 +777,13 @@ final class CommerceCheckoutService
                 $onHand = (int) ($stockRow->quantity ?? 0);
                 $activeReserved = $this->reservations->activeReservedQuantity($product->id, $warehouse->id, $variant?->id);
                 $available = max(0, $onHand - $activeReserved);
-                $baseQuantity = $item->quantity * max(1, $unitFactor);
+                // الطلب يُجمَّع عبر **كل** أسطر السلة لنفس (منتج، متغيّر، مخزن): سطرا إضافةٍ لنفس الصنف
+                // (أو إضافة + سطر مستقل، أو سطرا تخصيصٍ مختلفان) يرى كلٌّ منهما الرصيد نفسه فيمرّان معاً
+                // وهما معاً يتجاوزانه. (فحص نقطة زمنية لا حجز — عقد التوفّر في رأس الصنف باقٍ كما هو.)
+                $demandKey = $product->id.'|'.($variant?->id ?? '').'|'.$warehouse->id;
+                $stockDemand[$demandKey] = ($stockDemand[$demandKey] ?? 0) + $item->quantity * max(1, $unitFactor);
 
-                if ($available < $baseQuantity) {
+                if ($available < $stockDemand[$demandKey]) {
                     $failures[] = ['item_id' => $item->id, 'reason' => 'insufficient_stock'];
 
                     continue;
@@ -773,6 +801,9 @@ final class CommerceCheckoutService
                 'unit_price' => $price->amount,
                 'line_total' => $price->amount * $item->quantity,
                 'personalization' => $personalizationRows,
+                // مفاتيح داخلية لربط أسطر الإضافات بأبيها عند إنشاء الطلب (تُنزَع هناك).
+                'cart_item_id' => $item->id,
+                'parent_cart_item_id' => $item->parent_item_id,
             ];
         }
 

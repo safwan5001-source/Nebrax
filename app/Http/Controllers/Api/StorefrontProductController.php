@@ -14,6 +14,7 @@ use App\Services\Commerce\AvailableToSellService;
 use App\Services\Commerce\CommercePriceResolver;
 use App\Services\Commerce\FulfillmentPolicyNotConfiguredException;
 use App\Services\Commerce\FulfillmentPolicyService;
+use App\Services\Commerce\ProductAddonService;
 use App\Services\Commerce\ProductContentService;
 use App\Services\Commerce\ProductPersonalizationService;
 use App\Services\ProductMediaGalleryService;
@@ -306,6 +307,7 @@ class StorefrontProductController extends PublicApiController
 
         $resource->withPersonalization(app(ProductPersonalizationService::class)->publicFields($id));
         $resource->withContentBlocks(app(ProductContentService::class)->publicBlocks($id));
+        $resource->withAddons(app(ProductAddonService::class)->publicAddons($id, $channelId, $currency, $tenantSlug, $warehouse));
 
         return PublicApiResponse::resource($request, $resource);
     }

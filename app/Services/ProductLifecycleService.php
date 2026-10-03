@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\BarcodeRegistryEntry;
 use App\Models\CommerceCollectionProduct;
+use App\Models\CommerceProductAddon;
 use App\Models\CommerceProductContentBlock;
 use App\Models\CommerceProductFacetValue;
 use App\Models\CommerceProductPersonalizationField;
@@ -157,6 +158,9 @@ class ProductLifecycleService
             $this->referenceQuery(CommerceProductPersonalizationField::class, $product)->delete();
             // H5: كتل المحتوى المهيكل تابعٌ مملوك — تُحذف صراحةً مع المنتج.
             $this->referenceQuery(CommerceProductContentBlock::class, $product)->delete();
+            // H6: علاقات الإضافات تابعٌ مملوك — حين يكون المنتج أباً أو إضافةً (حذفه الناعم لا يُفعّل cascade).
+            $this->referenceQuery(CommerceProductAddon::class, $product)->delete();
+            BranchScope::reference(CommerceProductAddon::class)->where('addon_product_id', $product->id)->delete();
             $product->delete();
 
             // إعادة الفحص بعد الحذف وقبل الـcommit: تحت READ COMMITTED (افتراض

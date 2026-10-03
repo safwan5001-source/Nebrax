@@ -6,6 +6,7 @@ use App\Models\CommerceProductPersonalizationField;
 use App\Models\CommerceProductPersonalizationOption;
 use App\Models\Product;
 use App\Support\Commerce\PlainText;
+use App\Tenancy\BranchScope;
 use App\Tenancy\TenantContext;
 use DomainException;
 use Illuminate\Support\Facades\DB;
@@ -61,7 +62,9 @@ final class ProductPersonalizationService
         }
 
         return DB::transaction(function () use ($product, $fields) {
-            Product::withoutGlobalScopes()->whereKey($product->id)->lockForUpdate()->first();
+            // BranchScope وحده يُرفع؛ TenantScope وSoftDeletes يبقيان، فمنتجٌ حُذف بين تحميل المتحكّم
+            // وهذا القفل يُرفض بـ404 بدل نجاحٍ فارغ أو 500 من قيد المفتاح الأجنبي.
+            Product::withoutGlobalScope(BranchScope::class)->whereKey($product->id)->lockForUpdate()->firstOrFail();
 
             CommerceProductPersonalizationField::query()->where('product_id', $product->id)->delete();
 
@@ -192,17 +195,31 @@ final class ProductPersonalizationService
         return $rows;
     }
 
-    /** بصمة هوية السطر: فارغة بلا تخصيص، وإلا SHA-256 للأزواج (مفتاح، قيمة) مرتّبةً بالمفتاح. */
-    public static function signature(array $rows): string
+    /**
+     * بصمة هوية السطر: فارغة بلا تخصيص ولا إضافات، وإلا SHA-256 للأزواج (مفتاح، قيمة)
+     * مرتّبةً بالمفتاح — وعند وجود إضافات (ADR-18) تُضمَّن قائمتها المرتّبة (منتج، متغيّر، كمية
+     * لكل أب) فيختلف «باقة + شوكولاتة» عن «باقة». بلا إضافات تبقى البصمة مطابقة لـH4 حرفياً.
+     *
+     * @param  list<array{field_key: string, value: string}>  $rows
+     * @param  list<array{addon_product_id: string, addon_variant_id: ?string, per_parent_quantity: int}>  $addons
+     */
+    public static function signature(array $rows, array $addons = []): string
     {
-        if ($rows === []) {
+        if ($rows === [] && $addons === []) {
             return '';
         }
 
         $pairs = array_map(static fn (array $r) => [$r['field_key'], $r['value']], $rows);
         usort($pairs, static fn (array $a, array $b) => strcmp($a[0], $b[0]));
 
-        return hash('sha256', json_encode($pairs, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR));
+        if ($addons === []) {
+            return hash('sha256', json_encode($pairs, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR));
+        }
+
+        $triples = array_map(static fn (array $a) => [$a['addon_product_id'], $a['addon_variant_id'], $a['per_parent_quantity']], $addons);
+        usort($triples, static fn (array $a, array $b) => strcmp($a[0], $b[0]));
+
+        return hash('sha256', json_encode(['p' => $pairs, 'a' => $triples], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR));
     }
 
     /**

@@ -15,9 +15,10 @@ class CommerceCartItem extends BaseModel implements CompanyWide
     protected $fillable = [
         'tenant_id', 'cart_id', 'product_id', 'product_variant_id', 'product_name_snapshot',
         'unit_key', 'unit_name_snapshot', 'quantity', 'personalization_signature',
+        'parent_item_id', 'per_parent_quantity',
     ];
 
-    protected $casts = ['quantity' => 'integer'];
+    protected $casts = ['quantity' => 'integer', 'per_parent_quantity' => 'integer'];
 
     protected $attributes = ['personalization_signature' => ''];
 
@@ -25,6 +26,18 @@ class CommerceCartItem extends BaseModel implements CompanyWide
     public function personalizations(): HasMany
     {
         return $this->hasMany(CommerceCartItemPersonalization::class, 'cart_item_id')->orderBy('sort_order');
+    }
+
+    /** FLOWERS-H6 / ADR-18 — سطر الأب لسطر إضافة (null لسطر عادي). */
+    public function parentItem(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'parent_item_id');
+    }
+
+    /** FLOWERS-H6 / ADR-18 — أسطر الإضافات المرتبطة بهذا السطر. */
+    public function addonItems(): HasMany
+    {
+        return $this->hasMany(self::class, 'parent_item_id')->orderBy('created_at')->orderBy('id');
     }
 
     public function cart(): BelongsTo
