@@ -301,6 +301,34 @@ class CommerceDeliveryScheduleTest extends TestCase
     }
 
     /** @test */
+    public function every_channel_lock_is_taken_inside_a_transaction(): void
+    {
+        $store = $this->store('ds-lock-tx');
+        app(TenantContext::class)->set($store['tenant_id']);
+        $service = app(CommerceDeliveryScheduleService::class);
+
+        // الاختبار نفسه داخل معاملة (RefreshDatabase)، فالمعيار مستوى التداخل الأساسي + 1 على الأقل.
+        $baseline = \Illuminate\Support\Facades\DB::transactionLevel();
+        $levels = [];
+        \Illuminate\Support\Facades\DB::listen(function ($q) use (&$levels) {
+            // قفل القناة يقرأ `select *`؛ حارس النموذج يقرأ عمودين فقط ولا يُحتسب.
+            if (str_contains($q->sql, 'select * from "sales_channels"') && str_contains($q->sql, 'limit 1')) {
+                $levels[] = \Illuminate\Support\Facades\DB::transactionLevel();
+            }
+        });
+
+        $service->saveSettings($store['channel_id'], ['is_enabled' => true]);
+        $service->replaceSlots($store['channel_id'], [$this->slot('صباحاً', '09:00', '12:00')]);
+        $service->replaceBlockedDates($store['channel_id'], [['date' => '2026-12-25']]);
+
+        $this->assertCount(3, $levels);
+        foreach ($levels as $level) {
+            $this->assertGreaterThan($baseline, $level, 'the channel row lock was taken outside a transaction');
+        }
+        app(TenantContext::class)->forget();
+    }
+
+    /** @test */
     public function invalid_settings_are_rejected_and_change_nothing(): void
     {
         $store = $this->store('ds-bad-settings');

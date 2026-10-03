@@ -49,12 +49,17 @@ final class CommerceDeliveryScheduleService
     public function saveSettings(string $salesChannelId, array $data): array
     {
         $this->tenantId();
-        $this->lockChannel($salesChannelId);
 
-        $setting = CommerceDeliveryScheduleSetting::query()->where('sales_channel_id', $salesChannelId)->first()
-            ?? new CommerceDeliveryScheduleSetting(['sales_channel_id' => $salesChannelId]);
-        $setting->fill(array_intersect_key($data, array_flip(['is_enabled', 'is_required', 'timezone', 'lead_time_minutes', 'cutoff_time', 'max_days_ahead'])));
-        $setting->save();
+        // القفل والقراءة والحفظ في معاملة واحدة: خارجها يُحرَّر قفل القناة فور انتهاء SELECT (autocommit) فيرى
+        // طلبان متزامنان «لا صفّ» ويتصادمان على الفهرس الفريد، فيُرفض أحدهما بدل أن يتسلسلا.
+        DB::transaction(function () use ($salesChannelId, $data) {
+            $this->lockChannel($salesChannelId);
+
+            $setting = CommerceDeliveryScheduleSetting::query()->where('sales_channel_id', $salesChannelId)->first()
+                ?? new CommerceDeliveryScheduleSetting(['sales_channel_id' => $salesChannelId]);
+            $setting->fill(array_intersect_key($data, array_flip(['is_enabled', 'is_required', 'timezone', 'lead_time_minutes', 'cutoff_time', 'max_days_ahead'])));
+            $setting->save();
+        });
 
         return $this->settings($salesChannelId);
     }
