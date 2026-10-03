@@ -267,8 +267,6 @@ export const CUSTOMIZER_MESSAGES = {
     sectionBenefitsDescription: "مزايا متجرك المختصرة مثل الشحن والدفع الآمن.",
     sectionAppPromoDescription: "روابط تحميل تطبيق متجرك على الجوال.",
     sectionCustomContentDescription: "فقرات وعناوين نصية حرة.",
-    sectionFeaturedPartialReason:
-      "منتقي منتجات حقيقي قادم قريباً. حالياً يُضاف المنتج بكتابة معرّفه يدوياً.",
     // CUST-H4-2 (مراجعة) — العروض مرئية في المكتبة لكنها غير قابلة للإضافة
     // بعد: لا بنية تجارية حقيقية ولا عارض Canvas/منشور حقيقي لها اليوم. نصٌّ
     // مخصّص لحالة «غير قابل للإضافة» في المكتبة، مستقلٌّ عن `gatedSection`
@@ -806,8 +804,6 @@ export const CUSTOMIZER_MESSAGES = {
     sectionBenefitsDescription: "Short store perks like shipping and secure payment.",
     sectionAppPromoDescription: "Download links for your store's mobile app.",
     sectionCustomContentDescription: "Free-form headings and paragraphs.",
-    sectionFeaturedPartialReason:
-      "A real product picker is coming soon. For now, add a product by typing its id.",
     // CUST-H4-2 (review fix) — Offers stays visible in the Library but is
     // not addable yet: no real Commerce backend or Canvas/Published
     // renderer exists today. Distinct from `gatedSection` (the existing

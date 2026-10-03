@@ -162,11 +162,13 @@ describe("CUST-H4-2 — Section Library UX", () => {
     expect(onAdd).not.toHaveBeenCalled();
   });
 
-  it("Featured (partial) remains addable, as currently designed — unaffected by the Offers fix", () => {
+  it("Featured is LIVE (CUST-H4-5) and addable, with no partial/gated badge — unaffected by the Offers fix", () => {
     renderLibrary();
     const featured = card("featured");
     expect(featured.disabled).toBe(false);
-    expect(within(dialog()).getByText("قيد الإكمال")).toBeTruthy();
+    expect(featured.dataset.sectionState).toBe("live");
+    expect(within(featured).queryByText("قيد الإكمال")).toBeNull();
+    expect(within(featured).queryByText("غير مفعّل")).toBeNull();
   });
 
   it("resolves Arabic and English labels without ever rendering a raw message key", () => {

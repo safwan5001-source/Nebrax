@@ -24,8 +24,10 @@ import type { CustomizerMessageKey } from "../messages";
  * §5/§17), so the Section Library can render search/category/state/add
  * honestly from one registry instead of scattered conditionals
  * (`GATED_HOME_SECTION_KEYS`, ad hoc badges). `state` mirrors the H4
- * contract's truth matrix exactly — a PARTIAL section (`featured`) is never
- * flattened to LIVE.
+ * contract's truth matrix exactly — a non-LIVE section is never flattened
+ * to LIVE until its real gap is actually closed (`featured` was PARTIAL
+ * until CUST-H4-5 shipped its real picker + batched read; `offers` remains
+ * GATED until H4-6/H4-7 ship, see below).
  *
  * CUST-H4-2 review fix — a GATED section is not automatically addable. No
  * merchant-addable fake section: `offers` has neither the H4-6 real
@@ -170,16 +172,19 @@ export const SECTION_CAPABILITIES: Record<
     maxInstances: null,
     canDuplicate: true,
     canDelete: true,
-    // CUST-H4-ARCH-1 §21 — real content/renderer/data source today; PARTIAL
-    // only because the Content tab is a raw product-id text input (no real
-    // picker yet, H4-5) and Published does an unbatched N+1 fetch. Never
-    // flattened to LIVE per the H4 contract.
-    state: "partial",
+    // CUST-H4-5 — LIVE: a real merchant multi-select picker replaces the
+    // old raw product-id text input, real Commerce product data hydrates
+    // both the picker's selected chips and the Canvas preview (one batched
+    // `ids[]` read per section instance, not per product), Published's
+    // `FeaturedShelf` resolves the same way (one batched read replacing the
+    // prior N unbatched `fetchProduct` calls), and the merchant-authored
+    // `productIds` order is the single display-order authority on both
+    // Canvas and Published. No `reasonKey` — LIVE sections never carry one.
+    state: "live",
     category: "products",
     merchantAddable: true,
     titleKey: "sectionFeatured",
     descriptionKey: "sectionFeaturedDescription",
-    reasonKey: "sectionFeaturedPartialReason",
   },
   offers: {
     type: "offers",
