@@ -36,6 +36,12 @@ class StorefrontProductController extends PublicApiController
 {
     private const SORTS = ['name' => 'name', 'sale_price' => 'sale_price', 'created_at' => 'created_at'];
 
+    /**
+     * CUST-H4-5 — يطابق `MAX_FEATURED_PRODUCTS` في عقد محتوى قسم «منتجات
+     * مميّزة» (كلا نسختي `section-content.ts`) — مصدر الحد نفسه.
+     */
+    private const IDS_FILTER_MAX = 8;
+
     public function index(Request $request): JsonResponse
     {
         $filters = $request->validate([
@@ -44,6 +50,13 @@ class StorefrontProductController extends PublicApiController
             'sort' => ['sometimes', 'nullable', 'string', 'max:40'],
             'page' => ['sometimes', 'nullable', 'integer', 'min:1'],
             'per_page' => ['sometimes', 'nullable', 'integer', 'min:1', 'max:100'],
+            // CUST-H4-5 — قراءة دفعة واحدة محدودة للقسم المنشور «منتجات
+            // مميّزة» (`FeaturedShelf.tsx`)، تستبدل N طلبٍ مستقلٍّ لكل معرّف
+            // (`fetchProduct` لكل عنصر) بطلبٍ واحد. تتركّب فوق بوابة النشر/
+            // التفعيل القائمة بـ`whereIn` إضافية فقط — لا تُغيّرها ولا تُضعفها؛
+            // معرّفٌ أجنبي أو غير منشور يسقط من النتيجة صمتاً، لا تسريب وجوده.
+            'ids' => ['sometimes', 'array', 'max:'.self::IDS_FILTER_MAX],
+            'ids.*' => ['uuid'],
             ...CatalogFacetFilter::rules(),
         ]);
 
@@ -58,6 +71,10 @@ class StorefrontProductController extends PublicApiController
                 ->where('is_published', true)
                 ->select('product_id'))
             ->with(['productCategory:id,name']);
+
+        if (filled($filters['ids'] ?? null)) {
+            $query->whereIn('id', array_values(array_unique($filters['ids'])));
+        }
 
         if (filled($filters['search'] ?? null)) {
             $like = $this->likeTerm((string) $filters['search']);

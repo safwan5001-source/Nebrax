@@ -128,7 +128,7 @@ export type StorefrontFetchInit = {
 
 export type StorefrontQueryParams = Record<
   string,
-  string | number | boolean | undefined | null
+  string | number | boolean | readonly string[] | undefined | null
 >;
 
 async function raiseForErrorResponse(response: Response): Promise<never> {
@@ -162,9 +162,17 @@ export async function storefrontFetch<T>(
 
   if (params) {
     for (const [key, value] of Object.entries(params)) {
-      if (value !== undefined && value !== null && value !== "") {
-        url.searchParams.set(key, String(value));
+      if (value === undefined || value === null || value === "") continue;
+      if (Array.isArray(value)) {
+        // CUST-H4-5 — a batched `ids[]` read (e.g. for the Home "Featured"
+        // shelf) sends one repeated key per id, the convention PHP/Laravel's
+        // query parser already understands (`ids[]=a&ids[]=b` →
+        // `$request->ids === ['a', 'b']`), matching the workspace client's
+        // identical `ids[]` serialization (`workspace-products.ts`).
+        for (const item of value) url.searchParams.append(`${key}[]`, item);
+        continue;
       }
+      url.searchParams.set(key, String(value));
     }
   }
 

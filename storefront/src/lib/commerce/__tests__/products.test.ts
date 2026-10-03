@@ -14,9 +14,8 @@ vi.mock("next/headers", () => ({ headers: mocks.headers }));
 vi.mock("next-intl/server", () => ({ getLocale: mocks.getLocale }));
 
 const { StorefrontApiError } = await import("../config");
-const { fetchProduct, fetchProductFilters, fetchProducts } = await import(
-  "../products"
-);
+const { fetchProduct, fetchProductFilters, fetchProducts, fetchProductsByIds } =
+  await import("../products");
 
 function jsonResponse(body: unknown, ok = true, status = 200): Response {
   return {
@@ -230,6 +229,59 @@ describe("commerce/products", () => {
       status: 500,
       code: "http_error",
     });
+  });
+
+  it("sends a single batched request with repeated ids[] query params (CUST-H4-5)", async () => {
+    const body: AwjListResponse<AwjProduct> = {
+      data: [sampleAwjProduct({ id: "p1" }), sampleAwjProduct({ id: "p2" })],
+      meta: {
+        request_id: "req-ids",
+        pagination: {
+          page: 1,
+          per_page: 20,
+          total: 2,
+          last_page: 1,
+          has_more: false,
+        },
+      },
+    };
+    vi.mocked(fetch).mockResolvedValueOnce(jsonResponse(body));
+
+    const products = await fetchProductsByIds(["p1", "p2"]);
+
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(products.map((p) => p.id)).toEqual(["p1", "p2"]);
+    const [url] = vi.mocked(fetch).mock.calls[0];
+    expect(String(url)).toContain("ids%5B%5D=p1");
+    expect(String(url)).toContain("ids%5B%5D=p2");
+  });
+
+  it("returns an empty list and makes no request at all for an empty id list", async () => {
+    const products = await fetchProductsByIds([]);
+
+    expect(products).toEqual([]);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("omits a foreign/unpublished id from the batched result without throwing", async () => {
+    const body: AwjListResponse<AwjProduct> = {
+      data: [sampleAwjProduct({ id: "p1" })],
+      meta: {
+        request_id: "req-ids-partial",
+        pagination: {
+          page: 1,
+          per_page: 20,
+          total: 1,
+          last_page: 1,
+          has_more: false,
+        },
+      },
+    };
+    vi.mocked(fetch).mockResolvedValueOnce(jsonResponse(body));
+
+    const products = await fetchProductsByIds(["p1", "foreign-or-missing"]);
+
+    expect(products.map((p) => p.id)).toEqual(["p1"]);
   });
 
   it("returns an empty facet list (the AWJ catalog API supports no filters)", async () => {

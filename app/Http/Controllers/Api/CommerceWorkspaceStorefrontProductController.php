@@ -58,12 +58,24 @@ use Illuminate\Http\Request;
  * حديثاً» الحقيقي على الصفحة الرئيسية، ليطابق ترتيب `-available_on` (→
  * `created_at` تنازلياً) الذي تستعمله الواجهة المنشورة فعلاً
  * (`StorefrontProductController`/`NewArrivals.tsx`) — لا معنى جديد يُخترع هنا.
+ *
+ * **CUST-H4-5 — `ids[]`**: إضافيٌّ واختياري بالكامل، لمنتقي/معاينة قسم
+ * «منتجات مميّزة» الحقيقي على الصفحة الرئيسية. يحلّ دفعة واحدة محدودة
+ * (≤8، مطابقةً لـ`MAX_FEATURED_PRODUCTS` في عقد المحتوى بالواجهة) من
+ * معرّفات منتجات مُخزَّنة في تهيئة العرض، بدل طلبٍ مستقلٍّ لكل معرّف (N+1).
+ * يتركّب فوق بوابة الأهلية القائمة (نشط + منشور على قناة *هذا* المتجر) بـ
+ * `whereIn` إضافية — لا يُغيّرها ولا يتجاوزها؛ معرّفٌ أجنبي أو غير مؤهَّل
+ * يسقط من النتيجة صمتاً (لا تسريب، لا خطأ) تماماً كما يفعل الفشل الجزئي في
+ * المعاينة اليوم. الحمولة نفسها (`WorkspaceProductSummary`) — لا حقل جديد.
  */
 class CommerceWorkspaceStorefrontProductController extends ApiController
 {
     private const PER_PAGE_DEFAULT = 20;
 
     private const PER_PAGE_MAX = 50;
+
+    /** يطابق `MAX_FEATURED_PRODUCTS` في `section-content.ts` (كلا النسختين) — مصدر الحد نفسه. */
+    private const IDS_FILTER_MAX = 8;
 
     public function index(Request $request, string $id): JsonResponse
     {
@@ -87,6 +99,8 @@ class CommerceWorkspaceStorefrontProductController extends ApiController
             'sort' => ['sometimes', 'nullable', 'string', 'in:newest'],
             'page' => ['sometimes', 'nullable', 'integer', 'min:1'],
             'per_page' => ['sometimes', 'nullable', 'integer', 'min:1', 'max:'.self::PER_PAGE_MAX],
+            'ids' => ['sometimes', 'array', 'max:'.self::IDS_FILTER_MAX],
+            'ids.*' => ['uuid'],
         ]);
 
         $query = Product::query()
@@ -95,6 +109,10 @@ class CommerceWorkspaceStorefrontProductController extends ApiController
                 ->where('sales_channel_id', $storefront->sales_channel_id)
                 ->where('is_published', true)
                 ->select('product_id'));
+
+        if (filled($filters['ids'] ?? null)) {
+            $query->whereIn('id', array_values(array_unique($filters['ids'])));
+        }
 
         if (($filters['sort'] ?? null) === 'newest') {
             $query->orderByDesc('created_at')->orderByDesc('id');

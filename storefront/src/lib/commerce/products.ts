@@ -93,6 +93,39 @@ export async function fetchProduct(idOrSlug: string): Promise<Product> {
 }
 
 /**
+ * CUST-H4-5 — one batched read for the Home "Featured" shelf
+ * (`FeaturedShelf.tsx`), replacing N independent `fetchProduct(id)` calls
+ * (one per curated id) with a single `ids[]`-filtered list request. Bounded
+ * by `MAX_FEATURED_PRODUCTS` (8) on the backend, which rejects a longer
+ * list rather than silently truncating it — callers here are already
+ * bounded by the same constant (`FeaturedContent.productIds`), so this
+ * never sends more than the backend accepts.
+ *
+ * Returns matches in **whatever order the API responds with** — never the
+ * requested order. The caller (`FeaturedShelf`) re-sorts the results back
+ * into the merchant's stored `productIds` order, which is presentation's
+ * own authority over display order; this function stays a plain data read.
+ * A foreign/unpublished/deleted id is simply absent from the result array
+ * (no error, no placeholder) — the same fail-closed contract the previous
+ * per-id `Promise.allSettled` loop already had.
+ */
+export async function fetchProductsByIds(
+  ids: readonly string[],
+): Promise<Product[]> {
+  if (ids.length === 0) return [];
+  const response = await storefrontFetch<AwjListResponse<AwjProduct>>(
+    "products",
+    {
+      ids,
+    },
+  );
+  const locale = await getLocale();
+  return response.data.map((product) =>
+    mapAwjProductToViewModel(product, locale),
+  );
+}
+
+/**
  * AWJ has no faceted search (no product-variant/option-value model to
  * facet on — see AWJ_SPREE_TECHNICAL_FIT_AUDIT.md §4) and the AWJ catalog
  * API does not understand Spree's Ransack (`q[...]`) query shape that

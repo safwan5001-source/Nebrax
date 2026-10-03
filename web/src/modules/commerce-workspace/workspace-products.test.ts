@@ -117,6 +117,26 @@ describe('workspace-products client — CUST-H2-3', () => {
     expect(defaultPath).not.toContain('sort=');
   });
 
+  it('sends ids[] as repeated query params only when provided (CUST-H4-5)', async () => {
+    apiMock.mockResolvedValue({ data: [], meta: { pagination: { has_more: false } } });
+    await listWorkspaceProducts('store-1', { ids: ['p1', 'p2'] });
+    const [path] = apiMock.mock.calls[0];
+    expect(path).toContain('ids%5B%5D=p1');
+    expect(path).toContain('ids%5B%5D=p2');
+
+    apiMock.mockClear();
+    await listWorkspaceProducts('store-1');
+    const [defaultPath] = apiMock.mock.calls[0];
+    expect(defaultPath).not.toContain('ids');
+  });
+
+  it('sends no ids[] param at all for an empty ids array', async () => {
+    apiMock.mockResolvedValue({ data: [], meta: { pagination: { has_more: false } } });
+    await listWorkspaceProducts('store-1', { ids: [] });
+    const [path] = apiMock.mock.calls[0];
+    expect(path).not.toContain('ids');
+  });
+
   it('classifies a 404 as not_found without throwing', async () => {
     apiMock.mockRejectedValue(new ApiError(404, 'not found', {}));
     const result = await listWorkspaceProducts('store-1');

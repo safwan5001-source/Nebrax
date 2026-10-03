@@ -403,4 +403,121 @@ class StorefrontCatalogApiTest extends TestCase
         $this->assertNotContains('مصنّف معطّل', $names);
         $this->assertNotContains('تصنيف مستأجر آخر', $names);
     }
+
+    // ── CUST-H4-5 — ids[] batched read (feeds the Published "Featured" shelf, replacing N per-id fetches) ──
+
+    private function idsQuery(array $ids): string
+    {
+        return collect($ids)->map(fn ($id) => 'ids[]='.$id)->implode('&');
+    }
+
+    /** @test */
+    public function ids_filter_returns_exactly_the_requested_published_products(): void
+    {
+        ['tenant' => $tenant, 'channel' => $channel] = $this->seedStore('ids-basic');
+        $a = $this->publishedProduct($tenant, $channel, ['name' => 'أ']);
+        $b = $this->publishedProduct($tenant, $channel, ['name' => 'ب']);
+        $this->publishedProduct($tenant, $channel, ['name' => 'ج']); // not requested
+
+        $res = $this->getJson("/store/v1/{$tenant->slug}/products?".$this->idsQuery([$a->id, $b->id]))->assertOk();
+
+        $this->assertEqualsCanonicalizing([$a->id, $b->id], collect($res->json('data'))->pluck('id')->all());
+    }
+
+    /** @test */
+    public function ids_filter_never_leaks_a_foreign_tenants_product(): void
+    {
+        ['tenant' => $tenantA, 'channel' => $channelA] = $this->seedStore('ids-tenant-a');
+        ['tenant' => $tenantB, 'channel' => $channelB] = $this->seedStore('ids-tenant-b');
+        $productA = $this->publishedProduct($tenantA, $channelA, ['name' => 'منتج أ']);
+        $productB = $this->publishedProduct($tenantB, $channelB, ['name' => 'منتج ب']);
+
+        $res = $this->getJson("/store/v1/{$tenantA->slug}/products?".$this->idsQuery([$productA->id, $productB->id]))->assertOk();
+
+        $this->assertSame([$productA->id], collect($res->json('data'))->pluck('id')->all());
+    }
+
+    /** @test */
+    public function ids_filter_never_leaks_a_product_published_only_on_a_different_channel(): void
+    {
+        ['tenant' => $tenant, 'channel' => $webChannel] = $this->seedStore('ids-channel');
+
+        app(TenantContext::class)->set($tenant->id);
+        $mobileChannel = SalesChannel::create([
+            'slug' => 'mobile', 'name' => 'تطبيق الجوال', 'type' => SalesChannel::TYPE_MOBILE, 'is_active' => true,
+        ]);
+        $mobileOnlyProduct = Product::create([
+            'sku' => 'SKU-'.Str::random(6), 'name' => 'منتج الجوال فقط', 'type' => 'good',
+            'unit' => 'piece', 'sale_price' => 10000, 'is_active' => true,
+        ]);
+        CommerceListing::create([
+            'product_id' => $mobileOnlyProduct->id, 'sales_channel_id' => $mobileChannel->id, 'is_published' => true,
+        ]);
+        app(TenantContext::class)->forget();
+
+        $res = $this->getJson("/store/v1/{$tenant->slug}/products?".$this->idsQuery([$mobileOnlyProduct->id]))->assertOk();
+
+        $this->assertSame([], $res->json('data'));
+    }
+
+    /** @test */
+    public function ids_filter_silently_omits_an_unpublished_or_inactive_id_instead_of_erroring(): void
+    {
+        ['tenant' => $tenant, 'channel' => $channel] = $this->seedStore('ids-unpub');
+        $eligible = $this->publishedProduct($tenant, $channel, ['name' => 'مؤهَّل']);
+
+        app(TenantContext::class)->set($tenant->id);
+        $inactive = $this->publishedProduct($tenant, $channel, ['name' => 'غير نشط']);
+        app(TenantContext::class)->forget();
+        app(TenantContext::class)->set($tenant->id);
+        $inactive->update(['is_active' => false]);
+        $notListed = Product::create([
+            'sku' => 'SKU-'.Str::random(6), 'name' => 'غير منشور', 'type' => 'good',
+            'unit' => 'piece', 'sale_price' => 10000, 'is_active' => true,
+        ]);
+        app(TenantContext::class)->forget();
+
+        $res = $this->getJson("/store/v1/{$tenant->slug}/products?".$this->idsQuery([$eligible->id, $inactive->id, $notListed->id]))->assertOk();
+
+        $this->assertSame([$eligible->id], collect($res->json('data'))->pluck('id')->all());
+    }
+
+    /** @test */
+    public function duplicate_ids_in_the_filter_are_deduplicated_safely(): void
+    {
+        ['tenant' => $tenant, 'channel' => $channel] = $this->seedStore('ids-dup');
+        $product = $this->publishedProduct($tenant, $channel, ['name' => 'منتج']);
+
+        $res = $this->getJson("/store/v1/{$tenant->slug}/products?".$this->idsQuery([$product->id, $product->id]))->assertOk();
+
+        $this->assertSame([$product->id], collect($res->json('data'))->pluck('id')->all());
+    }
+
+    /** @test */
+    public function a_non_uuid_id_in_the_filter_fails_validation(): void
+    {
+        ['tenant' => $tenant] = $this->seedStore('ids-invalid');
+
+        $this->getJson("/store/v1/{$tenant->slug}/products?".$this->idsQuery(['not-a-uuid']))->assertStatus(422);
+    }
+
+    /** @test */
+    public function more_than_the_max_featured_products_in_the_filter_fails_validation(): void
+    {
+        ['tenant' => $tenant] = $this->seedStore('ids-maxout');
+        $ids = array_map(fn () => (string) Str::uuid(), range(1, 9));
+
+        $this->getJson("/store/v1/{$tenant->slug}/products?".$this->idsQuery($ids))->assertStatus(422);
+    }
+
+    /** @test */
+    public function omitting_ids_keeps_the_default_list_behavior_unchanged(): void
+    {
+        ['tenant' => $tenant, 'channel' => $channel] = $this->seedStore('ids-omitted');
+        $this->publishedProduct($tenant, $channel, ['name' => 'منتج واحد']);
+
+        $res = $this->getJson("/store/v1/{$tenant->slug}/products")->assertOk();
+
+        $this->assertCount(1, $res->json('data'));
+    }
 }
