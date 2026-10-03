@@ -4,6 +4,7 @@ namespace App\Services\Accounting;
 
 use App\Models\DeliveryInvoiceContext;
 use App\Models\DeliveryPlatformProfile;
+use App\Models\DeliveryPlatformProfileVersion;
 use App\Models\Invoice;
 use App\Models\Partner;
 use App\Models\Payment;
@@ -465,22 +466,30 @@ class PaymentService
     }
 
     /**
-     * تحصيل منصة لا يُقبل إلا على فاتورة مثبّت عليها سياق **لنفس** ملف المنصة
-     * المربوط بالسند — لا تخمين، ولا اكتفاء بمنصةٍ ما: التتبّع من المستند إلى
-     * الإعداد المعتمد (DLV-FOUNDATION-1) يجب أن يبقى واضحاً ومطابقاً.
+     * تحصيل منصة لا يُقبل إلا على فاتورة واحدة على الأقل مثبّت عليها سياق
+     * **لنفس** ملف المنصة المربوط بالسند **وبسياسة تحصيل platform_collected
+     * فعلاً** — لا تخمين، ولا اكتفاء بمنصةٍ ما: التتبّع من المستند إلى الإعداد
+     * المعتمد (DLV-FOUNDATION-1) يجب أن يبقى واضحاً ومطابقاً.
+     *
+     * سندٌ بلا أي تخصيص (مثلاً نسخة `duplicate()` التي تُسقط التخصيصات عمداً
+     * وتُبقي `delivery_platform_profile_id`) لا يملك فاتورة يتحقق أمامها، فلا
+     * يُقبل أبداً — خلاف ذلك يُنتج قيد مقاصة منصة بلا أي فاتورة مقابلة.
      *
      * @param  array<string, \Illuminate\Database\Eloquent\Model>  $targets  allocatable_id => target model
      */
     private function assertDeliveryContextMatches(Payment $payment, array $targets): void
     {
-        foreach ($targets as $target) {
-            if (! $target instanceof Invoice) {
-                continue;
-            }
+        $invoiceTargets = array_filter($targets, fn ($target) => $target instanceof Invoice);
+        if ($invoiceTargets === []) {
+            throw new RuntimeException('تحصيل منصة التوصيل يجب أن يُخصَّص على فاتورة واحدة على الأقل.');
+        }
 
+        foreach ($invoiceTargets as $target) {
             $context = DeliveryInvoiceContext::query()->where('invoice_id', $target->id)->first();
-            if ($context === null || (string) $context->delivery_platform_profile_id !== (string) $payment->delivery_platform_profile_id) {
-                throw new RuntimeException('سند القبض لا يطابق سياق منصة التوصيل المثبّت على الفاتورة.');
+            if ($context === null
+                || (string) $context->delivery_platform_profile_id !== (string) $payment->delivery_platform_profile_id
+                || $context->collection_mode !== DeliveryPlatformProfileVersion::COLLECTION_PLATFORM) {
+                throw new RuntimeException('سند القبض لا يطابق سياق منصة توصيل بتحصيل platform_collected مثبّت على الفاتورة.');
             }
         }
     }

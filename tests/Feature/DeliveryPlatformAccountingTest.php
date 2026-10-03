@@ -264,6 +264,52 @@ class DeliveryPlatformAccountingTest extends TestCase
     }
 
     /** @test */
+    public function platform_collected_payment_without_any_invoice_allocation_is_rejected(): void
+    {
+        $profile = $this->platformProfile('jahez', Version::COLLECTION_PLATFORM);
+
+        $journalsBefore = JournalEntry::count();
+        $draft = $this->payments->create([
+            'partner_id' => $this->customer->id,
+            'amount' => 115000,
+            'method' => 'bank',
+            'delivery_platform_profile_id' => $profile->id,
+        ]);
+
+        $this->expectException(RuntimeException::class);
+        try {
+            $this->payments->post($draft);
+        } finally {
+            $this->assertSame($journalsBefore, JournalEntry::count());
+        }
+    }
+
+    /** @test */
+    public function platform_collected_payment_against_a_merchant_collected_context_is_rejected(): void
+    {
+        $profile = $this->platformProfile('jahez', Version::COLLECTION_MERCHANT);
+        $invoice = $this->postedInvoice(100000);
+        $this->contexts->record($invoice, $profile);
+
+        $journalsBefore = JournalEntry::count();
+        $draft = $this->payments->create([
+            'partner_id' => $this->customer->id,
+            'invoice_id' => $invoice->id,
+            'amount' => 115000,
+            'method' => 'bank',
+            'delivery_platform_profile_id' => $profile->id,
+        ]);
+
+        $this->expectException(RuntimeException::class);
+        try {
+            $this->payments->post($draft);
+        } finally {
+            $this->assertSame($journalsBefore, JournalEntry::count());
+            $this->assertSame(0, $invoice->fresh()->paid_amount);
+        }
+    }
+
+    /** @test */
     public function recording_the_same_delivery_context_twice_is_idempotent(): void
     {
         $profile = $this->platformProfile('jahez', Version::COLLECTION_PLATFORM);
