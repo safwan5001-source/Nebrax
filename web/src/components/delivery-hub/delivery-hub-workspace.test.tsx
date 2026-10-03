@@ -45,11 +45,15 @@ function renderWorkspace(overrides: Partial<React.ComponentProps<typeof Delivery
         canSeeUnrouted
         selectedId="order-1"
         busy={false}
+        loading={false}
         error={null}
+        page={1}
+        lastPage={2}
         onState={vi.fn()}
         onPlatform={vi.fn()}
         onBranch={vi.fn()}
         onSelect={vi.fn()}
+        onPage={vi.fn()}
         onAction={onAction}
         {...overrides}
       />
@@ -67,6 +71,8 @@ describe('DeliveryHubWorkspace', () => {
     expect(screen.queryByText('handedOffHint')).toBeNull();
     expect(screen.queryByText('posted')).toBeNull();
     expect(screen.queryByRole('button', { name: 'pay' })).toBeNull();
+    expect(document.querySelector('[data-testid="delivery-platform-mark"] img')).toBeNull();
+    expect(document.querySelector('time')?.getAttribute('dateTime')).toBe(order.created_at);
     expect(document.querySelector('[dir="rtl"] [data-testid="delivery-hub-desktop-table"] .text-start')).toBeTruthy();
     expect(screen.getByTestId('delivery-hub-mobile-list')).toBeTruthy();
     expect(screen.getByTestId('delivery-hub-desktop-table')).toBeTruthy();
@@ -92,5 +98,83 @@ describe('DeliveryHubWorkspace', () => {
     renderWorkspace({ error: 'تعذر تنفيذ الانتقال', selectedId: null });
     expect(screen.getByRole('alert').textContent).toBe('تعذر تنفيذ الانتقال');
     expect(screen.queryByTestId('delivery-hub-detail')).toBeNull();
+  });
+
+  it('keeps later pages reachable and clears a stale destination', async () => {
+    const user = userEvent.setup();
+    const onPage = vi.fn();
+    const view = render(
+      <DeliveryHubWorkspace
+        orders={[order]}
+        branches={[{ id: 'branch-a', name: 'الفرع الأول' }, { id: 'branch-b', name: 'الفرع الثاني' }]}
+        platforms={[]}
+        state="received"
+        platformId=""
+        branchId=""
+        canOperate
+        canSeeUnrouted
+        selectedId="order-1"
+        busy={false}
+        loading={false}
+        error={null}
+        page={1}
+        lastPage={3}
+        onState={vi.fn()}
+        onPlatform={vi.fn()}
+        onBranch={vi.fn()}
+        onSelect={vi.fn()}
+        onPage={onPage}
+        onAction={vi.fn()}
+      />
+    );
+    await user.click(screen.getByRole('button', { name: 'next' }));
+    expect(onPage).toHaveBeenCalledWith(2);
+    await user.selectOptions(screen.getByLabelText('destination'), 'branch-b');
+    view.rerender(
+      <DeliveryHubWorkspace
+        orders={[{ ...order, id: 'order-2', branch_id: 'branch-b', branch_name: 'الفرع الثاني' }]}
+        branches={[{ id: 'branch-a', name: 'الفرع الأول' }, { id: 'branch-b', name: 'الفرع الثاني' }]}
+        platforms={[]}
+        state="received"
+        platformId=""
+        branchId=""
+        canOperate
+        canSeeUnrouted
+        selectedId="order-2"
+        busy={false}
+        loading={false}
+        error={null}
+        page={1}
+        lastPage={3}
+        onState={vi.fn()}
+        onPlatform={vi.fn()}
+        onBranch={vi.fn()}
+        onSelect={vi.fn()}
+        onPage={onPage}
+        onAction={vi.fn()}
+      />
+    );
+    expect((screen.getByLabelText('destination') as HTMLSelectElement).value).toBe('');
+  });
+
+  it('closes the detail with Escape and hides the pager on a single page', async () => {
+    const user = userEvent.setup();
+    const onSelect = vi.fn();
+    renderWorkspace({ onSelect, lastPage: 1 });
+    expect(screen.queryByRole('button', { name: 'next' })).toBeNull();
+    await user.keyboard('{Escape}');
+    expect(onSelect).toHaveBeenCalledWith(null);
+  });
+
+  it('labels operational hand-off without a payment or posting control', () => {
+    renderWorkspace({
+      orders: [{ ...order, state: 'handed_off' }],
+      state: 'handed_off',
+    });
+    expect(screen.getByText('handedOffHint')).toBeTruthy();
+    expect(screen.getByText('noFinancial')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'pay' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'posted' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'handoff' })).toBeNull();
   });
 });

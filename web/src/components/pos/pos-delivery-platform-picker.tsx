@@ -2,6 +2,7 @@
 
 import { useLocale, useTranslations } from 'next-intl';
 import { DeliveryPlatformMark } from '@/components/delivery/delivery-platform-mark';
+import { deliveryPlatformLabel } from '@/lib/delivery-platform-registry';
 
 export interface PosDeliveryPlatformOption {
   id: string;
@@ -13,7 +14,7 @@ export interface PosDeliveryPlatformOption {
   external_reference_policy: 'required' | 'optional' | 'none';
 }
 
-/** اسم المنصة دائماً ظاهر. لا شعار بعيد ولا إيموجي — الأصول الرسمية غير متوفرة في المستودع. */
+/** اسم المنصة دائماً ظاهر من السجل المركزي. لا شعار بعيد ولا إيموجي. */
 export function PosDeliveryPlatformPicker({
   platforms,
   selectedId,
@@ -37,7 +38,10 @@ export function PosDeliveryPlatformPicker({
   const showReference = selected !== null && selected.external_reference_policy !== 'none';
 
   function label(platform: PosDeliveryPlatformOption): string {
-    return locale === 'en' ? platform.display_name_en || platform.display_name : platform.display_name;
+    return deliveryPlatformLabel(platform.platform_key, locale, {
+      name: platform.display_name,
+      nameEn: platform.display_name_en,
+    });
   }
 
   return (

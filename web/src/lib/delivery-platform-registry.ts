@@ -1,22 +1,24 @@
 /**
- * سجل عرض منصات التوصيل — مصدر واحد للاسم والعلامة.
+ * سجل عرض منصات التوصيل — المصدر الوحيد للاسم والعلامة.
  *
- * لا شعار رسمي في المستودع. إرشادات العلامات (جاهز وغيرها) تشترط الملف الأصلي
- * ولا تمنح ترخيص إعادة التوزيع هنا. ملف Wikimedia لهنقرستيشن موسوم كعلامة تجارية.
- * مجموعة Keeta Network تخص كياناً آخر وليست منصة التوصيل. العلامة هنا حرف محايد
- * وليست إعادة رسم للشعار. الاسم الظاهر يبقى المعرّف المقروء.
+ * لا يُلتزم بشعار رسمي: إرشادات جاهز تشترط الملف الأصلي وتمنع إعادة الرسم،
+ * ونص حقوق جاهز يمنع إعادة النشر. وسم Wikimedia لهنقرستيشن علامة تجارية.
+ * لا رخصة إعادة توزيع مؤكدة لمرسول أو كيتا أو نينجا أو ذا شيفز.
+ * Brandfetch وبحث الصور ليسا ترخيصاً. الحرف المحايد ليس الشعار.
+ * الاسم الظاهر يبقى المعرّف المقروء دائماً.
  */
 export interface DeliveryPlatformPresentation {
   key: string;
   nameAr: string;
   nameEn: string;
-  logoSrc: null;
+  /** مسار أصل مرخّص داخل التطبيق، أو null عند علامة AWJ المحايدة. */
+  logoSrc: string | null;
   fallback: 'monogram';
   monogram: string;
 }
 
 export const DELIVERY_PLATFORM_LOGO_POLICY =
-  'No official logo is committed. Brand masters are not licensed for this repository, and a generated or searched image is not a substitute.';
+  'No official logo is committed. Brand masters are not licensed for redistribution in this repository, and a generated or searched image is not a substitute.';
 
 const PLATFORMS: readonly DeliveryPlatformPresentation[] = [
   { key: 'hungerstation', nameAr: 'هنقرستيشن', nameEn: 'HungerStation', logoSrc: null, fallback: 'monogram', monogram: 'H' },
@@ -40,4 +42,15 @@ export function deliveryPlatformPresentation(key: string | null | undefined): De
 
 export function deliveryPlatformMonogram(key: string | null | undefined, name: string): string {
   return deliveryPlatformPresentation(key)?.monogram ?? (name.trim().slice(0, 1) || '—');
+}
+
+/** الاسم المعتمد من السجل أولاً، ثم اسم الواجهة، ثم المفتاح. */
+export function deliveryPlatformLabel(
+  key: string | null | undefined,
+  locale: string,
+  fallback?: { name?: string | null; nameEn?: string | null },
+): string {
+  const known = deliveryPlatformPresentation(key);
+  if (locale === 'en') return known?.nameEn || fallback?.nameEn || fallback?.name || key || '';
+  return known?.nameAr || fallback?.name || fallback?.nameEn || key || '';
 }

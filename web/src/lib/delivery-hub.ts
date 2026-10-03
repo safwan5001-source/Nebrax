@@ -1,3 +1,5 @@
+import { deliveryPlatformLabel } from './delivery-platform-registry';
+
 export const DELIVERY_HUB_STATES = [
   'unrouted',
   'received',
@@ -68,7 +70,31 @@ export function deliveryHubActions(input: {
   return next ? [next, 'cancel', 'reject'] : ['cancel', 'reject'];
 }
 
-export function deliveryHubPlatformLabel(order: Pick<DeliveryHubOrderView, 'platform_name' | 'platform_name_en' | 'platform_key'>, locale: string): string {
-  if (locale === 'en') return order.platform_name_en || order.platform_name || order.platform_key || '';
-  return order.platform_name || order.platform_name_en || order.platform_key || '';
+export function deliveryHubPlatformLabel(
+  order: Pick<DeliveryHubOrderView, 'platform_name' | 'platform_name_en' | 'platform_key'>,
+  locale: string,
+): string {
+  return deliveryPlatformLabel(order.platform_key, locale, {
+    name: order.platform_name,
+    nameEn: order.platform_name_en,
+  });
+}
+
+/** استعلام القائمة الموجود فقط. بلا بحث: واجهة الإسقاط لا تقبل مرجعاً نصياً. */
+export function deliveryHubListPath(input: {
+  state: DeliveryHubState | 'all';
+  platformId: string;
+  branchId: string;
+  page: number;
+  perPage?: number;
+}): string {
+  const params = new URLSearchParams({
+    per_page: String(input.perPage ?? 50),
+    page: String(Math.max(1, input.page)),
+  });
+  if (input.state === 'unrouted') params.set('unrouted', '1');
+  else if (input.state !== 'all') params.set('state', input.state);
+  if (input.platformId) params.set('delivery_platform_profile_id', input.platformId);
+  if (input.branchId) params.set('branch_id', input.branchId);
+  return `/delivery-hub/orders?${params.toString()}`;
 }

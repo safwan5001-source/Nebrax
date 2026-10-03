@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { deliveryHubActions } from './delivery-hub';
-import { deliveryPlatformPresentation, deliveryPlatformPresentations } from './delivery-platform-registry';
+import { deliveryHubActions, deliveryHubListPath } from './delivery-hub';
+import { deliveryPlatformLabel, deliveryPlatformPresentation, deliveryPlatformPresentations } from './delivery-platform-registry';
 
 describe('delivery platform registry', () => {
   it('names every known platform and commits no logo file', () => {
@@ -15,6 +15,14 @@ describe('delivery platform registry', () => {
     expect(deliveryPlatformPresentation('unknown')).toBeNull();
     expect(deliveryPlatformPresentation('keeta')?.nameEn).toBe('Keeta');
   });
+
+  it('prefers the registry name and keeps an unknown platform readable', () => {
+    expect(deliveryPlatformLabel('jahez', 'en', { name: 'Other', nameEn: 'Other' })).toBe('Jahez');
+    expect(deliveryPlatformLabel('jahez', 'ar', { name: 'Other', nameEn: 'Other' })).toBe('جاهز');
+    expect(deliveryPlatformLabel('custom', 'ar', { name: 'خاصة', nameEn: 'Custom' })).toBe('خاصة');
+    expect(deliveryPlatformLabel('custom', 'en', { name: 'خاصة', nameEn: null })).toBe('خاصة');
+    expect(deliveryPlatformLabel(null, 'ar', {})).toBe('');
+  });
 });
 
 describe('delivery hub actions', () => {
@@ -28,5 +36,32 @@ describe('delivery hub actions', () => {
     expect(deliveryHubActions({ state: 'ready', canOperate: true, canSeeUnrouted: true, branchCount: 1 })).toEqual(['handoff', 'cancel', 'reject']);
     expect(deliveryHubActions({ state: 'handed_off', canOperate: true, canSeeUnrouted: true, branchCount: 1 })).toEqual(['cancel', 'reject']);
     expect(deliveryHubActions({ state: 'cancelled_before_post', canOperate: true, canSeeUnrouted: true, branchCount: 2 })).toEqual([]);
+  });
+});
+
+describe('delivery hub list query', () => {
+  it('combines the supported filters and does not invent a search parameter', () => {
+    const received = new URL(deliveryHubListPath({
+      state: 'received',
+      platformId: '11111111-1111-1111-1111-111111111111',
+      branchId: '22222222-2222-2222-2222-222222222222',
+      page: 3,
+    }), 'http://local');
+    expect(received.searchParams.get('state')).toBe('received');
+    expect(received.searchParams.get('page')).toBe('3');
+    expect(received.searchParams.get('per_page')).toBe('50');
+    expect(received.searchParams.get('delivery_platform_profile_id')).toBe('11111111-1111-1111-1111-111111111111');
+    expect(received.searchParams.get('branch_id')).toBe('22222222-2222-2222-2222-222222222222');
+    expect(received.searchParams.get('unrouted')).toBeNull();
+    expect(received.searchParams.get('search')).toBeNull();
+    expect(received.searchParams.get('q')).toBeNull();
+
+    const unrouted = new URL(deliveryHubListPath({ state: 'unrouted', platformId: '', branchId: '', page: 1 }), 'http://local');
+    expect(unrouted.searchParams.get('unrouted')).toBe('1');
+    expect(unrouted.searchParams.get('state')).toBeNull();
+
+    const all = new URL(deliveryHubListPath({ state: 'all', platformId: '', branchId: '', page: 1 }), 'http://local');
+    expect(all.searchParams.get('state')).toBeNull();
+    expect(all.searchParams.get('unrouted')).toBeNull();
   });
 });
