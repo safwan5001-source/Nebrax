@@ -6,7 +6,7 @@
 **Base SHA (`origin/main` at start):** `48051f2cc7d5d2c7fc50d45892aa29fe53d643fa`
 **That SHA is the squash of PR #1205 (DELIVERY-DECISION-PASS-5).** OD-DG-8-IMPORT is already accepted there as Option B. This file does not embed its own commit hash.
 
-**DG-3 is not closed.** No platform is accepted here as agent, principal, or collector. The recommendation is a fail-closed posting gate. It becomes a decision only if Safwan accepts **OD-DG-3-POSTING-GATE**.
+**DG-3 is not closed.** No platform is accepted as agent, principal, or collector. **OD-DG-3-POSTING-GATE is ACCEPTED 2026-10-03** as proposed in §15. Acceptance does not build the financial command, does not enable VAT, and does not flip any platform flag.
 
 Not reopened: OD-DG-8, OD-DG-8-IMPORT, OD-DG-9-POS, OD-DG-9-HUB, OD-DG-6, OD-DG-6-TRIGGER, OD-HUB-STATES, OD-HUB-IDENTITY, DG-1, DG-2, DG-5, or the already shipped simple-collector foundation used by manual POS.
 
@@ -222,14 +222,12 @@ For every merchant configuration that should later post:
 
 ---
 
-## 15. Owner decision required
+## 15. Owner decision
 
-**OD-DG-3-POSTING-GATE — not accepted in this PR.**
+**OD-DG-3-POSTING-GATE — ACCEPTED 2026-10-03 as proposed.**
 
-Please accept or reject this gate only:
+Safwan accepted this gate only:
 
 > An imported delivery order may not become a canonical invoice unless that provider configuration has every one of these set from evidence, and none of them is `UNKNOWN`: `financial_role_status`, `invoice_responsibility`, `collection_role`, and the merchant's VAT-registration status at the time of supply. Clearing only the role field does not authorize posting. The default for HungerStation, Jahez, Mrsool, Keeta, Ninja, and The Chefz is `UNKNOWN` on every one of those inputs. Published terms do not flip any flag. The Hub, mapping, and the frozen snapshot may continue. Commission, settlement, fee VAT, and provider refunds stay disabled. Manual POS is unchanged.
 
-This pass does not ask you to declare any platform an agent, a principal, or a collector. DG-3 stays open after the gate, until a later decision accepts one configuration's evidence.
-
-No production deploy.
+This acceptance does not declare any platform an agent, a principal, or a collector. DG-3 stays open until a later decision accepts one configuration's evidence. The financial command is not started. No production deploy.

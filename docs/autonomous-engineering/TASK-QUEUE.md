@@ -1258,7 +1258,7 @@ Only evidence-backed statuses are recorded here; unlisted tasks of the horizon p
 | 10 | DLV-PLATFORM-MGMT-UI-1 | done (merged; PR #1203, squash SHA `bcc1563ed4659c1145c998b5097301ffa100fd09`; management workspace on the existing foundation API and the shared registry; no connector) | high | DLV-HUB-UI-1 (done); DLV-FOUNDATION-1 (done) | `docs/plans/pos/DLV-PLATFORM-MGMT-UI-1-IMPLEMENTATION-REPORT.md` |
 | 11 | DLV-PLATFORM-LOGOS-1 | done (merged; PR #1204, squash SHA `f875467428014b86faa082ca467d41df8d8f340a`; six publisher App Store icons through the shared registry) | high | DLV-PLATFORM-MGMT-UI-1 (done); DLV-HUB-UI-1 (done); DLV-POS-1 (done) | `docs/plans/pos/DLV-PLATFORM-LOGOS-1-IMPLEMENTATION-REPORT.md` |
 | 12 | DELIVERY-DECISION-PASS-5 | done (merged; PR #1205, squash SHA `48051f2cc7d5d2c7fc50d45892aa29fe53d643fa`; OD-DG-8-IMPORT accepted as Option B; no financial command) | high | DLV-HUB-PROJECTION-1 (done); OD-DG-6-TRIGGER; OD-DG-8 | `docs/plans/pos/DELIVERY-DECISION-PASS-5-REPORT.md` |
-| 13 | DELIVERY-DECISION-PASS-6 | in_review (not merged; DG-3 posting gate recommended and not accepted; no platform role accepted; no financial command) | high | DELIVERY-DECISION-PASS-5 (done); OD-DG-8-IMPORT | `docs/plans/pos/DELIVERY-DECISION-PASS-6-REPORT.md` |
+| 13 | DELIVERY-DECISION-PASS-6 | in_review (not merged; OD-DG-3-POSTING-GATE accepted; DG-3 not closed; no platform role accepted; no financial command) | high | DELIVERY-DECISION-PASS-5 (done); OD-DG-8-IMPORT | `docs/plans/pos/DELIVERY-DECISION-PASS-6-REPORT.md` |
 
 Owed gates — original text is DLV-EVIDENCE-1-REPORT.md §11. DG-1/DG-2/DG-3 resolutions are in DELIVERY-DECISION-PASS-1-REPORT.md. DG-6/DG-8/DG-9 acceptances are in DELIVERY-DECISION-PASS-2-REPORT.md.
 
@@ -1266,11 +1266,11 @@ Owed gates — original text is DLV-EVIDENCE-1-REPORT.md §11. DG-1/DG-2/DG-3 re
 |---|---|---|
 | DG-1 | ACCOUNTING-1 | **RESOLVED 2026-10-03.** Option A, implemented by DLV-ACCOUNTING-1. |
 | DG-2 | POS-1, ACCOUNTING-1 | **RESOLVED 2026-10-03** for the manual POS flow. Side table implemented by DLV-ACCOUNTING-1. |
-| DG-3 | COMMISSION-1, SETTLEMENT-1, tax point, and the imported-order invoice transition | **PARTIALLY RESOLVED / EXTERNAL EVIDENCE GATE.** Simple-collector foundation remains the manual POS scope. Pass 6 recommends OD-DG-3-POSTING-GATE and does **not** accept it. No platform role is accepted. Fee/fee-tax/commission-VAT/tax-point stay unauthorized. |
+| DG-3 | COMMISSION-1, SETTLEMENT-1, tax point, and the imported-order invoice transition | **PARTIALLY RESOLVED / EXTERNAL EVIDENCE GATE.** Simple-collector foundation remains the manual POS scope. **OD-DG-3-POSTING-GATE is ACCEPTED 2026-10-03.** Posting still requires evidenced financial role, invoice responsibility, collection role, and supply-time VAT status together. No platform role is accepted. Fee/fee-tax/commission-VAT/tax-point stay unauthorized. |
 | DG-4 | CLOSE-1 | Untouched — OPEN |
 | DG-5 | — | **CLOSED** in DLV-EVIDENCE-1 (reuse `SalesChannel` type `external`). |
 | DG-6 | Architecture only. Invoice creation stays on DG-6-TRIGGER. | **ACCEPTED WITH NARROWING.** Option B: tenant/branch operational inbox, not `CommerceOrder`, no revenue/VAT/COGS/stock/cash/AR clearing on receive, route, accept, prepare, or cancel-before-post. |
-| DG-6-TRIGGER | Only the transition from an operational delivery order to a canonical posted invoice | **ACCEPTED 2026-10-03** as OD-DG-6-TRIGGER. Explicit command, not on accept; one transaction; no invented merchant tender; clearing stays off the POS drawer. The price-authority block is lifted by OD-DG-8-IMPORT (Pass 5, Option B). Enabling VAT recognition stays blocked on DG-3. The command is not started. Not a blocker for a projection that creates no invoices. |
+| DG-6-TRIGGER | Only the transition from an operational delivery order to a canonical posted invoice | **ACCEPTED 2026-10-03** as OD-DG-6-TRIGGER. Explicit command, not on accept; one transaction; no invented merchant tender; clearing stays off the POS drawer. The price-authority block is lifted by OD-DG-8-IMPORT (Pass 5, Option B). OD-DG-3-POSTING-GATE is accepted: the command still rejects while financial role, invoice responsibility, collection role, or supply-time VAT status is UNKNOWN. The command is not started. Not a blocker for a projection that creates no invoices. |
 | DG-7 | CONNECTOR-CORE-1 | Untouched — OPEN |
 | DG-8 | POS-1 | **ACCEPTED.** Platform selection does not change canonical POS price. No new channel pricing in DLV-POS-1. |
 | DG-8-IMPORT | Future non-POS imported order price (provider price vs AWJ catalog) | **ACCEPTED 2026-10-03** as OD-DG-8-IMPORT Option B. Frozen provider commercial snapshot. Does not reopen OD-DG-8. Does not implement the command. VAT recognition stays DG-3. |
@@ -1279,13 +1279,14 @@ Owed gates — original text is DLV-EVIDENCE-1-REPORT.md §11. DG-1/DG-2/DG-3 re
 
 A task must not be promoted to `ready` while any gate mapped to it is unresolved.
 
-**Dependency readiness after DELIVERY-DECISION-PASS-6 (in review, not merged):**
+**Dependency readiness after DELIVERY-DECISION-PASS-6 (in review, not merged; OD-DG-3-POSTING-GATE accepted):**
 - **DELIVERY-DECISION-PASS-5 is merged** (PR #1205, squash `48051f2cc7d5d2c7fc50d45892aa29fe53d643fa`). OD-DG-8-IMPORT is accepted as Option B. No production deploy.
-- **DG-3 is not closed.** No provider is accepted as agent, principal, or collector.
-- **DLV-HUB-1 (full) stays BLOCKED on DG-3.** Do not start the financial command from this note.
+- **OD-DG-3-POSTING-GATE is ACCEPTED.** An imported order does not become an invoice unless financial role, invoice responsibility, collection role, and supply-time VAT status are all evidenced. This note does not implement the command.
+- **DG-3 is not closed.** No provider is accepted as agent, principal, or collector. All six stay UNKNOWN on those inputs.
+- **DLV-HUB-1 (full) stays BLOCKED.** Do not start the financial command from this note.
 - **DLV-COMMISSION-1 remains BLOCKED** (EXTERNAL_EVIDENCE_REQUIRED under DG-3).
 - **DLV-SETTLEMENT-1 remains BLOCKED** on COMMISSION-1 and per-platform DG-3 evidence.
 - DLV-RECON-1, REFUND-1, CLOSE-1, CONNECTOR-CORE-1 and the provider tasks remain blocked on their own dependencies.
 
-Next step is the owner's choice on OD-DG-3-POSTING-GATE. Do not treat that choice as a platform role. Do not merge this note into an acceptance. Do not start full HUB-1, commission, settlement, connector, or refund work. Merge != Deploy.
+Next step is review of this acceptance record. Do not merge it from this note. Do not start full HUB-1, commission, settlement, connector, or refund work. Merge != Deploy.
 
