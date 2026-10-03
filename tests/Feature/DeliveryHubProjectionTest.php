@@ -9,6 +9,7 @@ use App\Models\JournalEntry;
 use App\Models\Payment;
 use App\Models\PosSession;
 use App\Models\StockMovement;
+use App\Models\Tenant;
 use App\Support\Rbac;
 use App\Tenancy\TenantContext;
 use Illuminate\Database\UniqueConstraintViolationException;
@@ -414,6 +415,12 @@ class DeliveryHubProjectionTest extends TestCase
     /** @param  array<int, string>  $branchIds */
     private function restricted(array $auth, array $branchIds, string $email): string
     {
+        $tenant = Tenant::findOrFail($auth['tenant_id']);
+        $limits = $tenant->plan_limits ?? [];
+        $limits['users'] = null;
+        $tenant->plan_limits = $limits;
+        $tenant->save();
+
         $this->withToken($auth['token'])->postJson('/api/users', [
             'name' => 'مشغّل فرع',
             'email' => $email,

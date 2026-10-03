@@ -9,7 +9,7 @@ Operational Delivery Hub projection only. A tenant-owned row, the accepted §4 s
 
 ## Repository evidence / root cause
 
-Base is the squash of PR #1196, `13808e15cfea2ded9e64bcfd4c838971f7581b3b`. OD-HUB-STATES, OD-HUB-IDENTITY, and OD-DG-9-HUB are accepted. `DeliveryPlatformProfile` is company-wide. `external_order_reference` is not an identity. Branch allow-lists use `null` for unrestricted. PostgreSQL and SQLite do not treat NULL as equal in a unique index, so branch stays out of the provider key and a nullable provider id does not collapse manual rows.
+Base at the start of this implementation was the squash of PR #1196, `13808e15cfea2ded9e64bcfd4c838971f7581b3b`. The branch was then brought up to latest `origin/main` `a4866dfd4df2fa5919e49d51ee2f846f6021b6f6`. OD-HUB-STATES, OD-HUB-IDENTITY, and OD-DG-9-HUB are accepted. `DeliveryPlatformProfile` is company-wide. `external_order_reference` is not an identity. Branch allow-lists use `null` for unrestricted. PostgreSQL and SQLite do not treat NULL as equal in a unique index, so branch stays out of the provider key and a nullable provider id does not collapse manual rows.
 
 ## Approach chosen
 
