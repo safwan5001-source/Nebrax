@@ -2,13 +2,13 @@
 
 > This file is a durable resume point, not a substitute for Git/GitHub evidence.
 
-LAST_UPDATED: 2026-10-02 (**AWJ Delivery Platforms & Settlement Horizon V1 is the single ACTIVE horizon.** DLV-EVIDENCE-1 delivered, PR in review (`docs/plans/pos/DLV-EVIDENCE-1-REPORT.md`, recommendation READY, base `3429ec39018479671326928ecb732294404f2878`). DLV-FOUNDATION-1 is evidence-ready but locked until EVIDENCE-1 is merged and post-merge reviewed. No runtime/schema/accounting change yet. No deploy.)
+LAST_UPDATED: 2026-10-02 (**AWJ Delivery Platforms & Settlement Horizon V1 is the single ACTIVE horizon.** DLV-EVIDENCE-1 is merged (PR #1171, `c0098d38762fc2d113ab189fd7d85acebe0f5c8f`). DLV-FOUNDATION-1 is implemented and in review (additive tenant-scoped delivery-platform profile layer over `SalesChannel(type=external)` with append-only versions and version-bound branch overrides; configuration only, no accounting/POS/Commerce behavior change). No downstream task is dependency-ready: each remaining task is blocked by an open Decision Gate (see `TASK-QUEUE.md`). No deploy.)
 LAYER_VERSION: V1
 STATUS: ACTIVE — AWJ Delivery Platforms & Settlement Horizon V1 (authoritative queue: `TASK-QUEUE.md`, section "Horizon: AWJ Delivery Platforms & Settlement V1"). Every snapshot, STATUS and objective below this section is historical and superseded.
 
 ## Current objective
 
-Deliver DLV-EVIDENCE-1 (PR review/merge + post-merge review), then promote DLV-FOUNDATION-1 only when its dependency is satisfied. Stop at any Decision Gate, owner production gate, or blocker. Merge != Deploy.
+Land DLV-FOUNDATION-1 (PR review, exact-head CI, merge by owner, post-merge review). Then obtain owner Decision Packets (DG-1/DG-2/DG-3 first); do not promote DLV-ACCOUNTING-1, DLV-POS-1 or DLV-HUB-1 while their gates are open. Stop at any Decision Gate, owner production gate, or blocker. Merge != Deploy.
 
 ## Previous snapshot (historical, superseded)
 

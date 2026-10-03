@@ -1245,8 +1245,8 @@ Only evidence-backed statuses are recorded here; unlisted tasks of the horizon p
 
 | Order | Task ID | Status | Risk | Depends on | Evidence |
 |---|---|---|---|---|---|
-| 0 | DLV-EVIDENCE-1 | in_review (PR open, not merged) | high | accepted decision | `docs/plans/pos/DLV-EVIDENCE-1-REPORT.md`, recommendation READY |
-| 1 | DLV-FOUNDATION-1 | evidence_ready, LOCKED until DLV-EVIDENCE-1 is merged + POST_MERGE_REVIEW: PASS | high | DLV-EVIDENCE-1 | Report §12–§14 (additive config-only scope) |
+| 0 | DLV-EVIDENCE-1 | done (merged; PR #1171, merge SHA `c0098d38762fc2d113ab189fd7d85acebe0f5c8f`; POST_MERGE_REVIEW: PASS recorded by the owner — main CI sqlite was green and pgsql in progress when last observed here) | high | accepted decision | `docs/plans/pos/DLV-EVIDENCE-1-REPORT.md` |
+| 1 | DLV-FOUNDATION-1 | in_review (PR open against base `c0098d38762fc2d113ab189fd7d85acebe0f5c8f`; not merged; PRE_MERGE_REVIEW pending exact-head CI) | high | DLV-EVIDENCE-1 (done) | `docs/plans/pos/DLV-FOUNDATION-1-IMPLEMENTATION-REPORT.md` |
 
 Owed gates — authoritative text and blocker mapping is report §11; complete mapping copied here (none blocks FOUNDATION-1):
 
@@ -1263,3 +1263,6 @@ Owed gates — authoritative text and blocker mapping is report §11; complete m
 | DG-5 | RESOLVED in the report (reuse `SalesChannel` type `external`, slug `delivery-<platform>`); no longer open |
 
 A task must not be promoted to `ready` while any gate mapped to it is unresolved.
+
+**Dependency readiness after DLV-FOUNDATION-1 (evidence-based; code existing is not readiness):** no downstream task is dependency-ready, even once FOUNDATION-1 is merged and post-merge reviewed, because each is blocked by an open Decision Gate mapped above — DLV-ACCOUNTING-1 (DG-1, DG-2, DG-3), DLV-POS-1 (DG-2, DG-8, DG-9), DLV-HUB-1 (DG-6, DG-9). DLV-COMMISSION-1, SETTLEMENT-1, RECON-1, REFUND-1, CLOSE-1, CONNECTOR-CORE-1 and the provider tasks remain blocked by their own dependencies. Next owner action: Decision Packets for the gates above (start with DG-1/DG-2/DG-3, which unblock ACCOUNTING-1 and POS-1).
+

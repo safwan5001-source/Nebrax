@@ -5,7 +5,9 @@ namespace App\Http\Controllers\Api;
 use App\Http\Requests\StoreBranchRequest;
 use App\Http\Resources\BranchResource;
 use App\Models\Branch;
+use App\Models\DeliveryPlatformVersionOverride;
 use App\Support\BranchSettings;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
 
@@ -86,7 +88,27 @@ class BranchController extends ApiController
             abort(422, 'لا يمكن حذف فرع له مستندات — عطّله بدل حذفه حفاظاً على مستنداته وأرقامها.');
         }
 
-        $branch->delete();
+        // تجاوز منصة توصيل داخل نسخة تكوين إلحاقية ثابتة يرجع إلى الفرع (FK restrict):
+        // الحذف كان يسقط 500 من قاعدة البيانات — تعليمات التعطيل بدلاً منه.
+        $overrideMessage = 'لا يمكن حذف فرع له تجاوزات إعداد منصات توصيل — عطّله بدل حذفه حفاظاً على تاريخ الإعداد.';
+        $referenced = fn () => DeliveryPlatformVersionOverride::query()->where('branch_id', $branch->id)->exists();
+        if ($referenced()) {
+            abort(422, $overrideMessage);
+        }
+
+        try {
+            // معاملة (savepoint إن كانت متداخلة): فشل FK لا يُبقي الاتصال في معاملة ملغاة على PostgreSQL.
+            DB::transaction(fn () => $branch->delete());
+        } catch (QueryException $e) {
+            // سباق: تجاوز أُنشئ بين الفحص والحذف — قيد FK هو الحارس الأخير، فيُترجَم إلى 422.
+            // أي فشل آخر في قاعدة البيانات يبقى 500 كما كان.
+            if (($e->errorInfo[0] ?? null) === '23503' || str_contains(strtolower($e->getMessage()), 'foreign key')) {
+                if ($referenced()) {
+                    abort(422, $overrideMessage);
+                }
+            }
+            throw $e;
+        }
 
         return response()->json(['message' => 'deleted']);
     }
