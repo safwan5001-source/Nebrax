@@ -1,6 +1,8 @@
 'use client';
 
 import { useLocale, useTranslations } from 'next-intl';
+import { DeliveryPlatformMark } from '@/components/delivery/delivery-platform-mark';
+import { deliveryPlatformLabel } from '@/lib/delivery-platform-registry';
 
 export interface PosDeliveryPlatformOption {
   id: string;
@@ -12,7 +14,7 @@ export interface PosDeliveryPlatformOption {
   external_reference_policy: 'required' | 'optional' | 'none';
 }
 
-/** اسم المنصة دائماً ظاهر. لا شعار بعيد ولا إيموجي — الأصول الرسمية غير متوفرة في المستودع. */
+/** اسم المنصة دائماً ظاهر من السجل المركزي. لا شعار بعيد ولا إيموجي. */
 export function PosDeliveryPlatformPicker({
   platforms,
   selectedId,
@@ -36,7 +38,10 @@ export function PosDeliveryPlatformPicker({
   const showReference = selected !== null && selected.external_reference_policy !== 'none';
 
   function label(platform: PosDeliveryPlatformOption): string {
-    return locale === 'en' ? platform.display_name_en || platform.display_name : platform.display_name;
+    return deliveryPlatformLabel(platform.platform_key, locale, {
+      name: platform.display_name,
+      nameEn: platform.display_name_en,
+    });
   }
 
   return (
@@ -74,13 +79,7 @@ export function PosDeliveryPlatformPicker({
                 (active ? 'border-primary bg-primary-soft ring-2 ring-primary/30' : 'border-border')
               }
             >
-              <span aria-hidden className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary-soft text-sm font-bold text-primary">
-                {name.trim().slice(0, 1)}
-              </span>
-              <span className="min-w-0">
-                <span className="block truncate text-sm font-semibold">{name}</span>
-                {platform.logo_asset_key ? <span className="sr-only">{t('delivery_logo_unavailable')}</span> : null}
-              </span>
+              <DeliveryPlatformMark platformKey={platform.platform_key} name={name} />
             </button>
           );
         })}

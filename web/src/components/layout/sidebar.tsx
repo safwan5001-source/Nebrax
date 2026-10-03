@@ -133,6 +133,7 @@ const GROUPS: NavGroup[] = [
     items: [
       { href: '/invoices', icon: FileText, key: 'invoicesManage', built: true },
       { href: '/delivery-notes', icon: ClipboardCheck, key: 'deliveryNotes', built: true, appKey: 'sales.invoicing', permission: 'delivery_notes.view' },
+      { href: '/delivery-hub', icon: Truck, key: 'deliveryHub', built: true, permission: 'delivery_hub.view' },
       { href: '/invoices/new', icon: FilePlus, key: 'invoiceCreate', built: true },
       { href: '/quotes', icon: ClipboardList, key: 'quotesManage', built: true },
       { href: '/quotes/new', icon: FilePlus2, key: 'quoteCreate', built: true },

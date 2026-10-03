@@ -827,6 +827,7 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         Route::put('delivery-platforms/{id}', [DeliveryPlatformController::class, 'update'])->whereUuid('id')->middleware([$perm('company.manage'), $app('sales.pos')]);
 
         // DLV-HUB-PROJECTION-1 — إسقاط تشغيلي. ليس بيعاً ولا ترحيلاً ولا موصّلاً.
+        Route::get('delivery-hub/context', [DeliveryHubOrderController::class, 'context'])->middleware($perm('delivery_hub.view'));
         Route::get('delivery-hub/orders', [DeliveryHubOrderController::class, 'index'])->middleware($perm('delivery_hub.view'));
         Route::post('delivery-hub/orders', [DeliveryHubOrderController::class, 'store'])->middleware($perm('delivery_hub.operate'));
         Route::get('delivery-hub/orders/{id}', [DeliveryHubOrderController::class, 'show'])->whereUuid('id')->middleware($perm('delivery_hub.view'));

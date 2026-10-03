@@ -279,6 +279,9 @@ class DeliveryHubOrderService
         if ($branch === null || ! $user->canAccessBranch((string) $branch->id)) {
             throw new DeliveryHubNotFoundException();
         }
+        if (! $branch->is_active) {
+            throw new RuntimeException('انتقال الحالة غير مسموح.');
+        }
 
         return (string) $branch->id;
     }
