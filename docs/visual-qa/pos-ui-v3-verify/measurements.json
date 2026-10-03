@@ -1,0 +1,295 @@
+{
+  "shots": [
+    {
+      "file": "390-ar-light-products.png",
+      "viewport": "390x844",
+      "locale": "ar",
+      "theme": "light",
+      "workspace": "products"
+    },
+    {
+      "file": "390-ar-dark-products.png",
+      "viewport": "390x844",
+      "locale": "ar",
+      "theme": "dark",
+      "workspace": "products"
+    },
+    {
+      "file": "390-en-light-products.png",
+      "viewport": "390x844",
+      "locale": "en",
+      "theme": "light",
+      "workspace": "products"
+    },
+    {
+      "file": "390-ar-light-cart.png",
+      "viewport": "390x844",
+      "locale": "ar",
+      "theme": "light",
+      "workspace": "cart"
+    },
+    {
+      "file": "390-ar-light-payment.png",
+      "viewport": "390x844",
+      "locale": "ar",
+      "theme": "light",
+      "workspace": "payment"
+    },
+    {
+      "file": "430-ar-light-products.png",
+      "viewport": "430x932",
+      "locale": "ar",
+      "theme": "light",
+      "workspace": "products"
+    },
+    {
+      "file": "430-en-dark-cart.png",
+      "viewport": "430x932",
+      "locale": "en",
+      "theme": "dark",
+      "workspace": "cart"
+    },
+    {
+      "file": "tablet-portrait-ar-light-products.png",
+      "viewport": "768x1024",
+      "locale": "ar",
+      "theme": "light",
+      "workspace": "products"
+    },
+    {
+      "file": "tablet-portrait-ar-light-cart.png",
+      "viewport": "768x1024",
+      "locale": "ar",
+      "theme": "light",
+      "workspace": "cart"
+    },
+    {
+      "file": "ipad-landscape-ar-light-products.png",
+      "viewport": "1180x820",
+      "locale": "ar",
+      "theme": "light",
+      "workspace": "products"
+    },
+    {
+      "file": "ipad-landscape-en-dark-payment.png",
+      "viewport": "1180x820",
+      "locale": "en",
+      "theme": "dark",
+      "workspace": "payment"
+    },
+    {
+      "file": "1024-ar-light-products.png",
+      "viewport": "1024x768",
+      "locale": "ar",
+      "theme": "light",
+      "workspace": "products"
+    },
+    {
+      "file": "1024-en-light-cart.png",
+      "viewport": "1024x768",
+      "locale": "en",
+      "theme": "light",
+      "workspace": "cart"
+    },
+    {
+      "file": "1440-ar-light-products.png",
+      "viewport": "1440x900",
+      "locale": "ar",
+      "theme": "light",
+      "workspace": "products"
+    },
+    {
+      "file": "1440-ar-dark-products.png",
+      "viewport": "1440x900",
+      "locale": "ar",
+      "theme": "dark",
+      "workspace": "products"
+    },
+    {
+      "file": "1440-en-light-products.png",
+      "viewport": "1440x900",
+      "locale": "en",
+      "theme": "light",
+      "workspace": "products"
+    },
+    {
+      "file": "1440-en-dark-payment.png",
+      "viewport": "1440x900",
+      "locale": "en",
+      "theme": "dark",
+      "workspace": "payment"
+    },
+    {
+      "file": "1440-ar-light-search.png",
+      "viewport": "1440x900",
+      "locale": "ar",
+      "theme": "light",
+      "workspace": "search"
+    },
+    {
+      "file": "1440-ar-light-keyboard-wedge.png",
+      "viewport": "1440x900",
+      "locale": "ar",
+      "theme": "light",
+      "workspace": "scanner-keyboard-wedge"
+    },
+    {
+      "file": "1440-ar-light-qty.png",
+      "viewport": "1440x900",
+      "locale": "ar",
+      "theme": "light",
+      "workspace": "quantity"
+    },
+    {
+      "file": "1440-ar-light-payment-amounts.png",
+      "viewport": "1440x900",
+      "locale": "ar",
+      "theme": "light",
+      "workspace": "payment-amounts"
+    }
+  ],
+  "findings": [],
+  "measurements": [
+    {
+      "id": "390-ar-light-products",
+      "overflow": 0,
+      "dir": "rtl",
+      "dark": false,
+      "clipped": []
+    },
+    {
+      "id": "390-ar-dark-products",
+      "overflow": 0,
+      "dir": "rtl",
+      "dark": true,
+      "clipped": []
+    },
+    {
+      "id": "390-en-light-products",
+      "overflow": 0,
+      "dir": "ltr",
+      "dark": false,
+      "clipped": []
+    },
+    {
+      "id": "390-ar-light-cart",
+      "overflow": 0,
+      "dir": "rtl",
+      "dark": false,
+      "clipped": []
+    },
+    {
+      "id": "390-ar-light-payment",
+      "overflow": 0,
+      "dir": "rtl",
+      "dark": false,
+      "clipped": []
+    },
+    {
+      "id": "430-ar-light-products",
+      "overflow": 0,
+      "dir": "rtl",
+      "dark": false,
+      "clipped": []
+    },
+    {
+      "id": "430-en-dark-cart",
+      "overflow": 0,
+      "dir": "ltr",
+      "dark": true,
+      "clipped": []
+    },
+    {
+      "id": "tablet-portrait-ar-light-products",
+      "overflow": 0,
+      "dir": "rtl",
+      "dark": false,
+      "clipped": []
+    },
+    {
+      "id": "tablet-portrait-ar-light-cart",
+      "overflow": 0,
+      "dir": "rtl",
+      "dark": false,
+      "clipped": []
+    },
+    {
+      "id": "ipad-landscape-ar-light-products",
+      "overflow": 0,
+      "dir": "rtl",
+      "dark": false,
+      "clipped": []
+    },
+    {
+      "id": "ipad-landscape-en-dark-payment",
+      "overflow": 0,
+      "dir": "ltr",
+      "dark": true,
+      "clipped": []
+    },
+    {
+      "id": "1024-ar-light-products",
+      "overflow": 0,
+      "dir": "rtl",
+      "dark": false,
+      "clipped": []
+    },
+    {
+      "id": "1024-en-light-cart",
+      "overflow": 0,
+      "dir": "ltr",
+      "dark": false,
+      "clipped": []
+    },
+    {
+      "id": "1440-ar-light-products",
+      "overflow": 0,
+      "dir": "rtl",
+      "dark": false,
+      "clipped": []
+    },
+    {
+      "id": "1440-ar-dark-products",
+      "overflow": 0,
+      "dir": "rtl",
+      "dark": true,
+      "clipped": []
+    },
+    {
+      "id": "1440-en-light-products",
+      "overflow": 0,
+      "dir": "ltr",
+      "dark": false,
+      "clipped": []
+    },
+    {
+      "id": "1440-en-dark-payment",
+      "overflow": 0,
+      "dir": "ltr",
+      "dark": true,
+      "clipped": []
+    },
+    {
+      "id": "payment-amounts",
+      "remaining": "المتبقي 0.00 ⃁",
+      "change": "الباقي للعميل 2,590.75 ⃁",
+      "confirmEnabled": true
+    },
+    {
+      "id": "390-bar",
+      "barBox": {
+        "x": 0,
+        "y": 707,
+        "width": 390,
+        "height": 73
+      },
+      "payBox": {
+        "x": 12,
+        "y": 716,
+        "width": 54.65625,
+        "height": 56
+      },
+      "paddingBottom": "8px"
+    }
+  ]
+}

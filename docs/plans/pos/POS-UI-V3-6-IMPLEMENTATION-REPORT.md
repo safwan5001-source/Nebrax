@@ -1,6 +1,6 @@
 # POS-UI-V3-6 — Implementation Report
 
-STATUS: READY FOR REVIEW
+STATUS: MERGED
 DATE: 2026-10-03
 
 ## Outcome
@@ -81,25 +81,36 @@ Not re-run. This slice does not change executable code. Web CI on the parent mer
 
 ## CI
 
-Pending on the PR.
+Exact reviewed Head `e18b94672f75507d7498087ff983c448aa8187d8`:
+
+- PHP pull request [37080354304](https://github.com/safwan5001-source/Nebrax/actions/runs/37080354304) SUCCESS (sqlite + pgsql).
+- PHP push [37080345658](https://github.com/safwan5001-source/Nebrax/actions/runs/37080345658) SUCCESS (sqlite + pgsql).
+- Web CI did not run (no `web/**` change).
+
+Post-merge on Merge SHA `675749c6d16f7d9a1c9c80fc01a31d05b2d9c087`:
+
+- PHP CI [37081812418](https://github.com/safwan5001-source/Nebrax/actions/runs/37081812418) SUCCESS (sqlite + pgsql).
+- Web CI did not run (docs only).
 
 ## Pre-merge review
 
-- PRE_MERGE_REVIEW: PENDING
-- Reviewed Head SHA: pending
-- Findings / resolution: pending
+- PRE_MERGE_REVIEW: PASS
+- Reviewed Head SHA: `e18b94672f75507d7498087ff983c448aa8187d8`
+- Findings / resolution: none. Comment: https://github.com/safwan5001-source/Nebrax/pull/1176#issuecomment-5963568790
 
 ## Merge
 
-- Merge status: not merged
-- Merge SHA: —
+- Merge status: merged
+- Merge SHA: `675749c6d16f7d9a1c9c80fc01a31d05b2d9c087`
+- PR: https://github.com/safwan5001-source/Nebrax/pull/1176
+- Method: squash
 
 ## Post-merge review
 
-- POST_MERGE_REVIEW: PENDING
-- Reviewed Merge SHA: —
-- Target-branch checks/smoke: —
-- Findings / resolution: —
+- POST_MERGE_REVIEW: PASS
+- Reviewed Merge SHA: `675749c6d16f7d9a1c9c80fc01a31d05b2d9c087`
+- Target-branch checks/smoke: `origin/main` is this merge commit. PHP CI above succeeded. No production deploy.
+- Findings / resolution: none. Comment: https://github.com/safwan5001-source/Nebrax/pull/1176#issuecomment-5963763357
 
 ## Self-review
 
@@ -153,12 +164,13 @@ A later pass with a real cashier session should capture the six viewports in ar/
 
 ## Git state
 
-- Branch: `pos-ui-v3-6`
-- PR: pending
+- Branch: `pos-ui-v3-6` (merged)
+- PR: https://github.com/safwan5001-source/Nebrax/pull/1176
 - Base SHA: `241a06f87a61ff2d006e0758c1776abd9c815a71`
 - Implementation commit: `40a3fa7c97dcab244f90ba25fa83c87e38404dcd`
-- Head SHA: branch tip after the V3-5 merge-evidence alignment. PRE_MERGE records that exact SHA.
+- Reviewed Head SHA: `e18b94672f75507d7498087ff983c448aa8187d8`
+- Merge SHA: `675749c6d16f7d9a1c9c80fc01a31d05b2d9c087`
 
 ## Recommended next dependency-ready task
 
-POS-UI-V3-CLOSE after this slice merges, carrying the browser-matrix gap as a known limitation rather than a silent pass.
+POS-UI-V3-CLOSE. The browser-matrix gap stays a known limitation.
