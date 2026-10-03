@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Models\CommerceDeliveryBlockedDate;
 use App\Models\CommerceDeliveryScheduleSetting;
 use App\Models\CommerceDeliverySlot;
+use App\Models\SalesChannel;
 use App\Models\Storefront;
 use App\Services\Commerce\CommerceDeliveryScheduleService;
 use App\Tenancy\TenantContext;
@@ -16,7 +17,7 @@ use PDOException;
 use RuntimeException;
 
 /**
- * FLOWERS-H7a / ADR-19 — إدارة سياسة جدولة التسليم لقناة متجر ويب. `{id}` محدِّد متجر فقط؛ الملكية عبر
+ * FLOWERS-H7a / ADR-19 — إدارة سياسة جدولة التسليم لقناة متجر ويب أو قناة جوال. `{id}` محدِّد متجر (أو قناة جوال) فقط؛ الملكية عبر
  * `TenantContext` (404 غير كاشف). كتابةٌ بـ`commerce.manage` ولا مفتاح قناة/مستأجر من العميل — القناة
  * تُشتقّ من المتجر الموثوق (كـ`CommerceGiftSettingsController`).
  */
@@ -25,7 +26,7 @@ final class CommerceDeliveryScheduleController extends ApiController
     public function show(Request $request, CommerceDeliveryScheduleService $schedule, string $id): JsonResponse
     {
         $this->denySelfService($request);
-        $channelId = $this->ownedStorefront($id)->sales_channel_id;
+        $channelId = $this->ownedChannelId($request, $id);
 
         return response()->json(['data' => $this->document($schedule, $channelId)]);
     }
@@ -41,7 +42,7 @@ final class CommerceDeliveryScheduleController extends ApiController
             'cutoff_time' => ['sometimes', 'nullable', 'string', 'regex:'.CommerceDeliveryScheduleSetting::TIME_PATTERN],
             'max_days_ahead' => ['sometimes', 'integer', 'min:1', 'max:'.CommerceDeliveryScheduleSetting::MAX_DAYS_AHEAD],
         ]);
-        $channelId = $this->ownedStorefront($id)->sales_channel_id;
+        $channelId = $this->ownedChannelId($request, $id);
 
         try {
             $schedule->saveSettings($channelId, $data);
@@ -70,7 +71,7 @@ final class CommerceDeliveryScheduleController extends ApiController
             'slots.*.shipping_zone_id' => ['sometimes', 'nullable', 'uuid'],
             'slots.*.is_active' => ['sometimes', 'boolean'],
         ]);
-        $channelId = $this->ownedStorefront($id)->sales_channel_id;
+        $channelId = $this->ownedChannelId($request, $id);
 
         try {
             $schedule->replaceSlots($channelId, array_values($data['slots']));
@@ -90,7 +91,7 @@ final class CommerceDeliveryScheduleController extends ApiController
             'blocked_dates.*.method' => ['sometimes', Rule::in([CommerceDeliveryBlockedDate::METHOD_ALL, ...CommerceDeliverySlot::METHODS])],
             'blocked_dates.*.reason' => ['sometimes', 'nullable', 'string', 'max:120'],
         ]);
-        $channelId = $this->ownedStorefront($id)->sales_channel_id;
+        $channelId = $this->ownedChannelId($request, $id);
 
         try {
             $schedule->replaceBlockedDates($channelId, array_values($data['blocked_dates']));
@@ -111,17 +112,29 @@ final class CommerceDeliveryScheduleController extends ApiController
         ];
     }
 
-    private function ownedStorefront(string $id): Storefront
+    /**
+     * قناة السياسة: لمتجر ويب (`storefronts/{id}`: القناة تُشتقّ من المتجر الموثوق) أو لقناة جوال
+     * (`mobile-channels/{id}`: معرّف `SalesChannel` من نوع mobile ونشط). كلاهما بنطاق المستأجر و404 غير كاشف؛
+     * لا مفتاح قناة يُقبل من الجسم، فلا يمكن توجيه السياسة إلى قناة مستأجر آخر ولا إلى نوع قناة غير مقصود.
+     */
+    private function ownedChannelId(Request $request, string $id): string
     {
         $tenantId = app(TenantContext::class)->id();
         if ($tenantId === null) {
             throw new RuntimeException('لا سياق مستأجر نشط.');
         }
 
+        if (($request->route()?->defaults['channel'] ?? null) === 'mobile') {
+            $channel = SalesChannel::query()->whereKey($id)->where('type', SalesChannel::TYPE_MOBILE)->where('is_active', true)->first();
+            abort_if($channel === null || $channel->tenant_id !== $tenantId, 404, 'قناة الجوال غير موجودة.');
+
+            return $channel->id;
+        }
+
         $storefront = Storefront::query()->find($id);
         abort_if($storefront === null || $storefront->tenant_id !== $tenantId, 404, 'المتجر غير موجود.');
 
-        return $storefront;
+        return $storefront->sales_channel_id;
     }
 
     private function denySelfService(Request $request): void

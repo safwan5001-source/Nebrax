@@ -888,6 +888,12 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         Route::put('commerce/workspace/storefronts/{id}/delivery-schedule/slots', [CommerceDeliveryScheduleController::class, 'replaceSlots'])->whereUuid('id')->middleware($perm('commerce.manage'));
         Route::put('commerce/workspace/storefronts/{id}/delivery-schedule/blocked-dates', [CommerceDeliveryScheduleController::class, 'replaceBlockedDates'])->whereUuid('id')->middleware($perm('commerce.manage'));
 
+        // نفس السياسة لقناة جوال (معرّف SalesChannel من نوع mobile ونشط) — بلا Storefront لقنوات الجوال أبداً.
+        Route::get('commerce/workspace/mobile-channels/{id}/delivery-schedule', [CommerceDeliveryScheduleController::class, 'show'])->whereUuid('id')->defaults('channel', 'mobile')->middleware($perm('commerce.manage'));
+        Route::put('commerce/workspace/mobile-channels/{id}/delivery-schedule/settings', [CommerceDeliveryScheduleController::class, 'updateSettings'])->whereUuid('id')->defaults('channel', 'mobile')->middleware($perm('commerce.manage'));
+        Route::put('commerce/workspace/mobile-channels/{id}/delivery-schedule/slots', [CommerceDeliveryScheduleController::class, 'replaceSlots'])->whereUuid('id')->defaults('channel', 'mobile')->middleware($perm('commerce.manage'));
+        Route::put('commerce/workspace/mobile-channels/{id}/delivery-schedule/blocked-dates', [CommerceDeliveryScheduleController::class, 'replaceBlockedDates'])->whereUuid('id')->defaults('channel', 'mobile')->middleware($perm('commerce.manage'));
+
         // STORE-ADMIN-ADOPT-1B-2: رؤية نطاقات متجر قائم — قراءة فقط،
         // بلا أي فعل كتابي على StorefrontDomain. نفس صلاحية 1B-1
         // (commerce.manage): حالة النطاق/التحقّق أكثر حساسية من قائمة

@@ -70,6 +70,11 @@ class CommerceModuleBoundaryTest extends TestCase
         'api/commerce/workspace/facets/{id}',
         'api/commerce/workspace/facets/{id}/values',
         'api/commerce/workspace/facets/{id}/values/{valueId}',
+        // FLOWERS-H7a / ADR-19 — سياسة جدولة التسليم لقناة جوال.
+        'api/commerce/workspace/mobile-channels/{id}/delivery-schedule',
+        'api/commerce/workspace/mobile-channels/{id}/delivery-schedule/blocked-dates',
+        'api/commerce/workspace/mobile-channels/{id}/delivery-schedule/settings',
+        'api/commerce/workspace/mobile-channels/{id}/delivery-schedule/slots',
         // COM-CATALOG-1 — قائمة مساحة عمل نشر المنتجات (قراءة فقط فوق COM-WS-3).
         'api/commerce/workspace/products/publication',
         // FLOWERS-H6 / ADR-18 — إضافات المنتج الاختيارية.
