@@ -62,8 +62,14 @@ class CommerceModuleBoundaryTest extends TestCase
         // COM-CATALOG-2 — مساحة عمل نشر التصنيفات (قراءة + استبدال مجموعة النشر).
         'api/commerce/workspace/categories/publication',
         'api/commerce/workspace/categories/{id}/publication',
+        // FLOWERS-H2 / ADR-14 — الأبعاد الوصفية للكتالوج وقيمها وإسنادها للمنتجات.
+        'api/commerce/workspace/facets',
+        'api/commerce/workspace/facets/{id}',
+        'api/commerce/workspace/facets/{id}/values',
+        'api/commerce/workspace/facets/{id}/values/{valueId}',
         // COM-CATALOG-1 — قائمة مساحة عمل نشر المنتجات (قراءة فقط فوق COM-WS-3).
         'api/commerce/workspace/products/publication',
+        'api/commerce/workspace/products/{id}/facets',
         'api/commerce/workspace/products/{id}/publication',
         // COM-MOBILE-SHIPPING-1 — مناطق شحن مُهيَّأة من التاجر (ADR-10).
         'api/commerce/workspace/shipping-zones',
