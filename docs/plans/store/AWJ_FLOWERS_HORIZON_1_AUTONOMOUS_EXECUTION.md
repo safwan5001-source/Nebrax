@@ -861,7 +861,7 @@ These names should be preserved in implementation reports and PR descriptions fo
 
 ---
 
-# 19. Explicit evidence-gated domains
+# 11. Explicit evidence-gated domains
 
 The following are NOT automatic implementation requirements.
 
@@ -902,7 +902,7 @@ Perishable and personalized products require dedicated policy evidence.
 
 ---
 
-# 11. Testing standard
+# 12. Testing standard
 
 Run progressively:
 1. focused tests;
@@ -972,7 +972,7 @@ Never weaken security, accounting, Tenant Isolation or financial tests merely to
 
 ---
 
-# 12. Performance standard
+# 13. Performance standard
 
 Inspect:
 - facet queries;
@@ -994,7 +994,7 @@ Do not introduce uncontrolled per-product query loops.
 
 ---
 
-# 13. Visual and accessibility QA
+# 14. Visual and accessibility QA
 
 For changed UI, verify where relevant:
 
@@ -1033,7 +1033,7 @@ Accessibility minimum:
 
 ---
 
-# 14. CI behavior
+# 15. CI behavior
 
 Avoid wasteful polling.
 
@@ -1049,7 +1049,7 @@ Never bypass a meaningful security/financial/Tenant Isolation failure.
 
 ---
 
-# 15. Living progress log
+# 16. Living progress log
 
 The authoritative progress ledger is:
 
@@ -1076,7 +1076,7 @@ The progress log is the primary handoff source for “where are we?” and must 
 
 ---
 
-# 16. Required final report
+# 17. Required final report
 
 At completion create:
 
@@ -1118,7 +1118,7 @@ PRODUCTION: NOT CHANGED
 
 ---
 
-# 17. Definition of Done
+# 18. Definition of Done
 
 The Horizon is done only when the safe scope has been:
 
@@ -1148,7 +1148,7 @@ Safe implementation should continue automatically until all non-gated Horizon sl
 
 ---
 
-# 18. Final execution directive
+# 19. Final execution directive
 
 Normal behavior:
 
