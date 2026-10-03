@@ -53,6 +53,22 @@ final class MobileSalesChannelResolver
     ) {}
 
     /**
+     * قناة الجوال المعتمدة للمستأجر: الأقدم نشاطاً من نوع mobile (التعادل بالمعرّف). مصدرٌ واحد تستعمله
+     * `ResolveCommerceChannel` لخدمة `/commerce/v1` ومسارات إدارة السياسات لقناة الجوال، فلا تُكتب سياسة لقناةٍ
+     * لا يخدمها أي طلب عام.
+     */
+    public function canonicalForTenant(string $tenantId): ?SalesChannel
+    {
+        return SalesChannel::query()
+            ->where('tenant_id', $tenantId)
+            ->where('type', SalesChannel::TYPE_MOBILE)
+            ->where('is_active', true)
+            ->orderBy('created_at')
+            ->orderBy('id')
+            ->first();
+    }
+
+    /**
      * Resolve and establish context for a mobile sales channel.
      *
      * @param  string  $tenantId  Already-trusted tenant id (not client-supplied — see class docblock).

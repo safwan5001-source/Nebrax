@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\StorefrontCategoryController;
 use App\Http\Controllers\Api\StorefrontCollectionController;
 use App\Http\Controllers\Api\StorefrontCheckoutController;
 use App\Http\Controllers\Api\StorefrontConfigController;
+use App\Http\Controllers\Api\StorefrontDeliveryScheduleController;
 use App\Http\Controllers\Api\StorefrontMediaController;
 use App\Http\Controllers\Api\StorefrontProductController;
 use App\Http\Middleware\EnforcePublicApiRateLimit;
@@ -43,6 +44,9 @@ Route::middleware([
 
     // FLOWERS-H2 / ADR-14 §2.3 — مجموعات تسويقية يدوية (قراءة فقط).
     Route::get('collections', [StorefrontCollectionController::class, 'index'])->name('collections.index');
+
+    // FLOWERS-H7a / ADR-19 — خيارات جدولة التسليم المتاحة فعلاً (قراءة فقط).
+    Route::get('delivery-schedule', [StorefrontDeliveryScheduleController::class, 'show'])->name('delivery_schedule.show');
 
     Route::get('products', [StorefrontProductController::class, 'index'])->name('products.index');
     Route::get('products/{id}', [StorefrontProductController::class, 'show'])->whereUuid('id')->name('products.show');
@@ -100,6 +104,7 @@ if (! app()->environment('production')) {
         Route::get('categories/{id}', [StorefrontCategoryController::class, 'show'])->whereUuid('id')->name('legacy.categories.show');
 
         Route::get('collections', [StorefrontCollectionController::class, 'index'])->name('legacy.collections.index');
+        Route::get('delivery-schedule', [StorefrontDeliveryScheduleController::class, 'show'])->name('legacy.delivery_schedule.show');
 
         Route::get('products', [StorefrontProductController::class, 'index'])->name('legacy.products.index');
         Route::get('products/{id}', [StorefrontProductController::class, 'show'])->whereUuid('id')->name('legacy.products.show');
