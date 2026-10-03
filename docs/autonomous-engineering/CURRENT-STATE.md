@@ -2,13 +2,13 @@
 
 > This file is a durable resume point, not a substitute for Git/GitHub evidence.
 
-LAST_UPDATED: 2026-10-03 (**AWJ Delivery Platforms & Settlement Horizon V1 is the single ACTIVE horizon.** DLV-EVIDENCE-1 through DLV-HUB-UI-1 are merged. Hub UI squash is `625366e1a61903d68935fd8c11f18a16778bd6b4`. No production deploy. **DLV-PLATFORM-MGMT-UI-1 is in review and not merged.** It is the platform setup screen on the existing foundation API and the shared presentation registry. No official logo file. Full DLV-HUB-1 stays BLOCKED on DG-8-IMPORT and DG-3. No deploy.)
+LAST_UPDATED: 2026-10-03 (**AWJ Delivery Platforms & Settlement Horizon V1 is the single ACTIVE horizon.** DLV-EVIDENCE-1 through DLV-PLATFORM-MGMT-UI-1 are merged. Platform management squash is `bcc1563ed4659c1145c998b5097301ffa100fd09`. No production deploy. **DLV-PLATFORM-LOGOS-1 is in review and not merged.** It adds the six publisher App Store icons through the shared presentation registry only. Full DLV-HUB-1 stays BLOCKED on DG-8-IMPORT and DG-3. No deploy.)
 LAYER_VERSION: V1
 STATUS: ACTIVE — AWJ Delivery Platforms & Settlement Horizon V1 (authoritative queue: `TASK-QUEUE.md`, section "Horizon: AWJ Delivery Platforms & Settlement V1"). Every snapshot, STATUS and objective below this section is historical and superseded.
 
 ## Current objective
 
-DLV-PLATFORM-MGMT-UI-1 is in review. Do not merge it from this note and do not deploy. It does not authorize a connector or a financial command. Do not start full DLV-HUB-1, commission, settlement, connectors, or refunds. DG-8-IMPORT and DG-3 stay open. Merge != Deploy.
+DLV-PLATFORM-LOGOS-1 is in review. Do not merge it from this note and do not deploy. It is visual identity only: official icons plus names, from the shared registry. It does not authorize a connector or a financial command. Do not start full DLV-HUB-1, commission, settlement, connectors, or refunds. DG-8-IMPORT and DG-3 stay open. Merge != Deploy.
 
 ## Previous snapshot (historical, superseded)
 

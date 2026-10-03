@@ -71,7 +71,8 @@ describe('DeliveryHubWorkspace', () => {
     expect(screen.queryByText('handedOffHint')).toBeNull();
     expect(screen.queryByText('posted')).toBeNull();
     expect(screen.queryByRole('button', { name: 'pay' })).toBeNull();
-    expect(document.querySelector('[data-testid="delivery-platform-mark"] img')).toBeNull();
+    expect(document.querySelector('[data-testid="delivery-hub-desktop-table"] [data-testid="delivery-platform-mark"] img')?.getAttribute('src')).toBe('/delivery-platforms/jahez.png');
+    expect(document.querySelector('[data-testid="delivery-hub-mobile-list"] [data-testid="delivery-platform-mark"] img')?.getAttribute('src')).toBe('/delivery-platforms/jahez.png');
     expect(document.querySelector('time')?.getAttribute('dateTime')).toBe(order.created_at);
     expect(document.querySelector('[dir="rtl"] [data-testid="delivery-hub-desktop-table"] .text-start')).toBeTruthy();
     expect(screen.getByTestId('delivery-hub-mobile-list')).toBeTruthy();
