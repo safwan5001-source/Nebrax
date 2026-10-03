@@ -313,6 +313,59 @@ describe('Merchandising — concurrent toggles and stale picker rows', () => {
   });
 });
 
+describe('Merchandising — state that must not leak across products or queries', () => {
+  const row = (id: string, name: string) => ({ id, name, sku: null, name_en: null, is_active: true, is_published: true, stores: [] });
+
+  it('does not keep a pending "Show more" from blocking the next query', async () => {
+    apiMock.mockResolvedValueOnce({ data: { facets: [occasion] } });
+    renderPage();
+    apiMock.mockResolvedValueOnce({ data: { facets: [occasion] } });
+    await userEvent.click(await screen.findByRole('tab', { name: 'Assign products' }));
+
+    apiMock.mockResolvedValueOnce({ data: [row('p1', 'Rose A')], meta: { current_page: 1, last_page: 2, per_page: 10, total: 11 } });
+    const search = await screen.findByLabelText('Search a product by name or SKU');
+    await userEvent.type(search, 'rose');
+    expect(await screen.findByText('Rose A', undefined, { timeout: 3000 })).toBeTruthy();
+
+    apiMock.mockImplementationOnce(() => new Promise(() => undefined)); // "Show more" for the first query never settles
+    await userEvent.click(screen.getByRole('button', { name: 'Show more' }));
+
+    apiMock.mockResolvedValueOnce({ data: [row('p2', 'Tulip A')], meta: { current_page: 1, last_page: 2, per_page: 10, total: 11 } });
+    await userEvent.clear(search);
+    await userEvent.type(search, 'tulip');
+    expect(await screen.findByText('Tulip A', undefined, { timeout: 3000 })).toBeTruthy();
+    expect((screen.getByRole('button', { name: 'Show more' }) as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it('clears product A\'s save error when product B is selected', async () => {
+    apiMock.mockResolvedValueOnce({ data: { facets: [occasion] } });
+    renderPage();
+    apiMock.mockResolvedValueOnce({ data: { facets: [occasion] } });
+    await userEvent.click(await screen.findByRole('tab', { name: 'Assign products' }));
+
+    const search = await screen.findByLabelText('Search a product by name or SKU');
+    apiMock.mockResolvedValueOnce({ data: [row('p1', 'Red roses')], meta: { current_page: 1, last_page: 1, per_page: 10, total: 1 } });
+    await userEvent.type(search, 'rose');
+    expect(await screen.findByText('Red roses', undefined, { timeout: 3000 })).toBeTruthy();
+    apiMock.mockResolvedValueOnce({ data: { value_ids: ['v1'] } });
+    await userEvent.click(screen.getByRole('button', { name: 'Edit' }));
+    await screen.findByRole('checkbox', { name: 'Birthday' });
+
+    apiMock.mockRejectedValueOnce(new Error('network')); // PUT for A fails
+    await userEvent.click(screen.getByRole('button', { name: 'Save assignment' }));
+    expect(await screen.findByText('Could not save. Please try again.')).toBeTruthy();
+
+    apiMock.mockResolvedValueOnce({ data: [row('p2', 'Tulips')], meta: { current_page: 1, last_page: 1, per_page: 10, total: 1 } });
+    await userEvent.clear(search);
+    await userEvent.type(search, 'tulip');
+    expect(await screen.findByText('Tulips', undefined, { timeout: 3000 })).toBeTruthy();
+    apiMock.mockResolvedValueOnce({ data: { value_ids: [] } });
+    await userEvent.click(screen.getByRole('button', { name: 'Edit' }));
+
+    await waitFor(() => expect(screen.queryByText('Could not save. Please try again.')).toBeNull());
+  });
+});
+
 describe('Merchandising — assign tab', () => {
   it('guides to create dimensions first when there are none', async () => {
     apiMock.mockResolvedValueOnce({ data: { facets: [] } }); // facets tab

@@ -33,6 +33,7 @@ export function AssignPanel({ t, canManage }: { t: T; canManage: boolean }) {
     if (!product) return;
     let cancelled = false;
     setSelected(null);
+    setError(null); // فشل حفظ منتجٍ سابق لا يظهر داخل لوحة منتجٍ آخر
     void loadProductFacetValueIds(product.id).then((ids) => {
       if (!cancelled) setSelected(ids ?? 'error');
     });

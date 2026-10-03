@@ -39,6 +39,7 @@ export function ProductPicker({
   useEffect(() => {
     setPage(1);
     setHasMore(false);
+    setLoadingMore(false); // طلب «عرض المزيد» لاستعلامٍ سابق لا يحجب زرّ الاستعلام الجديد
     // نتائج الاستعلام السابق لا تبقى قابلةً للنقر تحت نصٍّ جديد ريثما تصل استجابته.
     setResults(null);
     setFailed(false);
@@ -83,7 +84,7 @@ export function ProductPicker({
     } catch {
       if (currentSearch.current === requestedSearch) setFailed(true);
     } finally {
-      setLoadingMore(false);
+      if (currentSearch.current === requestedSearch) setLoadingMore(false);
     }
   }
 
