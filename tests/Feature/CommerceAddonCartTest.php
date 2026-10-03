@@ -225,6 +225,32 @@ class CommerceAddonCartTest extends TestCase
     }
 
     /** @test */
+    public function the_cart_locks_parent_and_addon_products_in_one_global_id_order_before_any_eligibility_check(): void
+    {
+        if (\Illuminate\Support\Facades\DB::connection()->getDriverName() !== 'pgsql') {
+            $this->markTestSkipped('FOR UPDATE يظهر في SQL على PostgreSQL فقط.');
+        }
+
+        $f = $this->fixture('ac-lock-order');
+        $locks = [];
+        \Illuminate\Support\Facades\DB::listen(function ($q) use (&$locks) {
+            if (str_contains($q->sql, 'from "products"') && str_contains($q->sql, 'for update')) {
+                $locks[] = ['sql' => $q->sql, 'bindings' => $q->bindings];
+            }
+        });
+
+        $this->add($f['store'], $f['bouquet'], ['addons' => [
+            ['product_id' => $f['chocolate']->id],
+            ['product_id' => $f['balloon']->id],
+        ]])->assertCreated();
+
+        // أول قفل منتجات هو قفل الاتحاد (الأب + الإضافتان) مرتَّباً بالمعرّف، قبل قفل `purchasable()` المفرد
+        $ids = [$f['bouquet']->id, $f['chocolate']->id, $f['balloon']->id];
+        $this->assertStringContainsString('order by "id"', $locks[0]['sql']);
+        $this->assertEqualsCanonicalizing($ids, array_values(array_intersect($locks[0]['bindings'], $ids)));
+    }
+
+    /** @test */
     public function removing_the_parent_removes_its_addons(): void
     {
         $f = $this->fixture('ac-rm');

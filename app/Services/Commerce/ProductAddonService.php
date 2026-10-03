@@ -293,6 +293,34 @@ final class ProductAddonService
     }
 
     /**
+     * يقفل صفوف الأب وكل منتجات الاختيار معاً بترتيب المعرّف الشامل — نفس ترتيب `replace()` — قبل أي فحص
+     * أهلية في مسار السلة. من دونه يقفل السلة الأبَ ثم الإضافةَ بترتيب اختيار العميل، فيدور deadlock مع
+     * `replace()` حين يسبق معرّفُ الإضافة معرّفَ الأب. لا يفعل شيئاً بلا إضافات. (BranchScope يُرفع كما
+     * في `purchasable()`؛ TenantScope وSoftDeletes باقيان.)
+     *
+     * @param  list<array<string, mixed>>|null  $selection  صفوف الاختيار الخام (product_id)
+     */
+    public function lockForCart(string $parentProductId, ?array $selection): void
+    {
+        if ($selection === null || $selection === []) {
+            return;
+        }
+
+        $ids = [$parentProductId];
+        foreach ($selection as $row) {
+            if (is_array($row) && is_string($row['product_id'] ?? null) && $row['product_id'] !== '') {
+                $ids[] = $row['product_id'];
+            }
+        }
+
+        Product::withoutGlobalScope(BranchScope::class)
+            ->whereIn('id', array_values(array_unique($ids)))
+            ->orderBy('id')
+            ->lockForUpdate()
+            ->pluck('id');
+    }
+
+    /**
      * يرفض أي مفتاح غير `product_id`/`product_variant_id`/`quantity` داخل صفوف الاختيار — أهمّها
      * أي حقل سعر: العميل لا يحمل سعراً على الإطلاق، والسعر من الخادم حصراً.
      */

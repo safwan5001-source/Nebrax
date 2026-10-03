@@ -455,6 +455,10 @@ final class CommerceCartService
                 $cart = $this->lockUsableCart($knownCart->id);
             }
 
+            // FLOWERS-H6 — أقفال منتجات الأب والإضافات بترتيب معرّف شامل واحد قبل أي فحص أهلية (يتفادى deadlock
+            // مع ProductAddonService::replace() حين يسبق معرّفُ الإضافة معرّفَ الأب).
+            app(ProductAddonService::class)->lockForCart($productId, $addons);
+
             $candidate = $this->purchasable($productId, $unitKey, $variantId, lockEligibility: true);
             $variant = $candidate['variant'];
 
