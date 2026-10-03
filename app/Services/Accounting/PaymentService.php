@@ -2,6 +2,8 @@
 
 namespace App\Services\Accounting;
 
+use App\Models\DeliveryInvoiceContext;
+use App\Models\DeliveryPlatformProfile;
 use App\Models\Invoice;
 use App\Models\Partner;
 use App\Models\Payment;
@@ -68,6 +70,10 @@ class PaymentService
         $date      = $data['payment_date'] ?? now()->toDateString();
         [$method, $cashAccountId, $paymentMethod] = $this->resolvePaymentSetup($data);
         $gatewayId = $this->resolvePaymentGatewayId($data, $direction);
+        $deliveryPlatformProfileId = $this->resolveDeliveryPlatformProfileId($data, $direction);
+        if ($gatewayId !== null && $deliveryPlatformProfileId !== null) {
+            throw new RuntimeException('السند لا يمكن أن يرتبط ببوابة دفع ومنصة توصيل معاً.');
+        }
 
         // المستند المستهدَف حسب الاتجاه: قبض→فاتورة مبيعات، صرف→فاتورة مشتريات.
         [$targetClass, $key] = $direction === 'received'
@@ -94,7 +100,7 @@ class PaymentService
             throw new RuntimeException("مجموع التخصيصات ({$sum}) يجب أن يساوي مبلغ السند ({$amount}).");
         }
 
-        return DB::transaction(function () use ($data, $amount, $direction, $date, $allocs, $method, $cashAccountId, $paymentMethod, $gatewayId) {
+        return DB::transaction(function () use ($data, $amount, $direction, $date, $allocs, $method, $cashAccountId, $paymentMethod, $gatewayId, $deliveryPlatformProfileId) {
             // النسخ قد يكون لمستند تاريخي بلا فرع. نحفظ نطاق المصدر صراحةً،
             // فلا تنتقل النسخة إلى الفرع الرئيسي للطلب ثم تصطدم برقمه القديم.
             $hasExplicitBranch = array_key_exists('branch_id', $data);
@@ -114,6 +120,7 @@ class PaymentService
                 'payment_method_id' => $paymentMethod['id'],
                 'payment_method_name' => $paymentMethod['name'],
                 'payment_gateway_id' => $gatewayId,
+                'delivery_platform_profile_id' => $deliveryPlatformProfileId,
                 'reference'       => $data['reference'] ?? null,
                 'payment_details' => $data['payment_details'] ?? null,
                 'collector_employee_id' => $data['collector_employee_id'] ?? null,
@@ -164,6 +171,12 @@ class PaymentService
         $gatewayId = array_key_exists('payment_gateway_id', $data)
             ? $this->resolvePaymentGatewayId($data, $direction)
             : $payment->payment_gateway_id;
+        $deliveryPlatformProfileId = array_key_exists('delivery_platform_profile_id', $data)
+            ? $this->resolveDeliveryPlatformProfileId($data, $direction)
+            : $payment->delivery_platform_profile_id;
+        if ($gatewayId !== null && $deliveryPlatformProfileId !== null) {
+            throw new RuntimeException('السند لا يمكن أن يرتبط ببوابة دفع ومنصة توصيل معاً.');
+        }
         [$targetClass, $key] = $direction === 'received'
             ? [Invoice::class, 'invoice_id']
             : [Purchase::class, 'purchase_id'];
@@ -185,7 +198,7 @@ class PaymentService
             throw new RuntimeException("مجموع التخصيصات ({$sum}) يجب أن يساوي مبلغ السند ({$amount}).");
         }
 
-        return DB::transaction(function () use ($payment, $data, $amount, $normalized, $method, $cashAccountId, $paymentMethod, $gatewayId) {
+        return DB::transaction(function () use ($payment, $data, $amount, $normalized, $method, $cashAccountId, $paymentMethod, $gatewayId, $deliveryPlatformProfileId) {
             $payment->update([
                 'partner_id'      => $data['partner_id'],
                 'invoice_id'      => $data['invoice_id'] ?? null,
@@ -193,6 +206,7 @@ class PaymentService
                 'payment_method_id' => $paymentMethod['id'],
                 'payment_method_name' => $paymentMethod['name'],
                 'payment_gateway_id' => $gatewayId,
+                'delivery_platform_profile_id' => $deliveryPlatformProfileId,
                 'reference'       => $data['reference'] ?? null,
                 'payment_details' => array_key_exists('payment_details', $data) ? $data['payment_details'] : $payment->payment_details,
                 'collector_employee_id' => array_key_exists('collector_employee_id', $data) ? $data['collector_employee_id'] : $payment->collector_employee_id,
@@ -226,6 +240,7 @@ class PaymentService
             'method'          => $payment->method,
             'payment_method_id' => $payment->payment_method_id,
             'payment_gateway_id' => $payment->payment_gateway_id,
+            'delivery_platform_profile_id' => $payment->delivery_platform_profile_id,
             'reference'       => $payment->reference,
             'payment_details' => $payment->payment_details,
             'collector_employee_id' => $payment->collector_employee_id,
@@ -303,9 +318,15 @@ class PaymentService
                 $this->assertGatewayStillValid($payment);
             }
 
+            $usesPlatformClearing = $this->usesPlatformClearing($payment);
+            if ($usesPlatformClearing) {
+                $this->assertPlatformStillValid($payment);
+                $this->assertDeliveryContextMatches($payment, $targets);
+            }
+
             // الحساب المختار كيان خزينة/بنك فعلي؛ تُفحص صلاحية الإيداع أو السحب عند الأثر المالي لا عند إنشاء المسودة فقط.
             $cashEntity = $this->cashBankAccounts->resolveForPayment($payment->cash_account_id, $payment->method);
-            if (! $usesGatewayClearing) {
+            if (! $usesGatewayClearing && ! $usesPlatformClearing) {
                 $this->cashBankAccounts->assertAllowed(
                     $cashEntity,
                     $payment->direction === 'received' ? 'deposit' : 'withdraw',
@@ -315,9 +336,11 @@ class PaymentService
             $cashAccountId = $cashEntity->account_id;
 
             if ($payment->direction === 'received') {
-                $collectionAccountId = $usesGatewayClearing
-                    ? $this->accountRoles->resolve('gateway_clearing')->id
-                    : $cashAccountId;
+                $collectionAccountId = match (true) {
+                    $usesGatewayClearing => $this->accountRoles->resolve('gateway_clearing')->id,
+                    $usesPlatformClearing => $this->accountRoles->resolve('platform_receivable_clearing')->id,
+                    default => $cashAccountId,
+                };
 
                 $lines = [[
                     'account_id' => $collectionAccountId,
@@ -407,6 +430,58 @@ class PaymentService
         $gateway = PaymentGateway::query()->whereKey($payment->payment_gateway_id)->first();
         if ($gateway === null) {
             throw new RuntimeException('بوابة الدفع يجب أن تخص المستأجر النشط.');
+        }
+    }
+
+    private function usesPlatformClearing(Payment $payment): bool
+    {
+        return $payment->direction === 'received' && filled($payment->delivery_platform_profile_id);
+    }
+
+    private function resolveDeliveryPlatformProfileId(array $data, string $direction): ?string
+    {
+        $profileId = $data['delivery_platform_profile_id'] ?? null;
+        if (! filled($profileId)) {
+            return null;
+        }
+        if ($direction !== 'received') {
+            throw new RuntimeException('منصة التوصيل تخص سندات القبض فقط.');
+        }
+
+        $profile = DeliveryPlatformProfile::query()->whereKey($profileId)->first();
+        if ($profile === null) {
+            throw new RuntimeException('ملف منصة التوصيل يجب أن يخص المستأجر النشط.');
+        }
+
+        return $profile->id;
+    }
+
+    private function assertPlatformStillValid(Payment $payment): void
+    {
+        $profile = DeliveryPlatformProfile::query()->whereKey($payment->delivery_platform_profile_id)->first();
+        if ($profile === null) {
+            throw new RuntimeException('ملف منصة التوصيل يجب أن يخص المستأجر النشط.');
+        }
+    }
+
+    /**
+     * تحصيل منصة لا يُقبل إلا على فاتورة مثبّت عليها سياق **لنفس** ملف المنصة
+     * المربوط بالسند — لا تخمين، ولا اكتفاء بمنصةٍ ما: التتبّع من المستند إلى
+     * الإعداد المعتمد (DLV-FOUNDATION-1) يجب أن يبقى واضحاً ومطابقاً.
+     *
+     * @param  array<string, \Illuminate\Database\Eloquent\Model>  $targets  allocatable_id => target model
+     */
+    private function assertDeliveryContextMatches(Payment $payment, array $targets): void
+    {
+        foreach ($targets as $target) {
+            if (! $target instanceof Invoice) {
+                continue;
+            }
+
+            $context = DeliveryInvoiceContext::query()->where('invoice_id', $target->id)->first();
+            if ($context === null || (string) $context->delivery_platform_profile_id !== (string) $payment->delivery_platform_profile_id) {
+                throw new RuntimeException('سند القبض لا يطابق سياق منصة التوصيل المثبّت على الفاتورة.');
+            }
         }
     }
 

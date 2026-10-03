@@ -168,6 +168,15 @@ final class AccountingRoles
             'domain' => 'payments',
             'configurable' => true,
         ],
+        'platform_receivable_clearing' => [
+            'label_ar' => 'مستحقات منصات التوصيل',
+            'label_en' => 'Delivery Platform Receivable Clearing',
+            'description_ar' => 'حساب المقاصة الذي يمثل مديونية منصة التوصيل عن طلبات تُحصَّل لدى المنصة لا نقداً/بنكاً.',
+            'description_en' => 'Clearing asset representing the delivery platform\'s debt for platform-collected orders, in place of cash/bank.',
+            'legacy_code' => '1180',
+            'domain' => 'payments',
+            'configurable' => true,
+        ],
     ];
 
     /** @var array<string, array{label_ar:string,label_en:string}> ترتيب العرض للمجموعات في واجهة توجيه الحسابات. */
