@@ -304,6 +304,31 @@ class CommerceDeliveryScheduleTest extends TestCase
     }
 
     /** @test */
+    public function windows_with_a_repeated_wall_clock_time_are_not_offered_on_the_fall_back_day(): void
+    {
+        $store = $this->store('ds-dst-fall');
+        // 2027-11-07 نيويورك: 01:00–02:00 تتكرّر (EDT ثم EST)
+        $service = $this->configure($store, ['timezone' => 'America/New_York', 'max_days_ahead' => 5], [
+            $this->slot('مكرّرة البداية', '01:30', '03:00'),
+            $this->slot('مكرّرة النهاية', '00:15', '01:45'),
+            $this->slot('قبل التكرار', '00:15', '00:45'),
+            $this->slot('عند نهاية الفترة', '02:00', '03:00'), // 02:00 ليست مكرّرة (النهاية حصرية)
+        ]);
+        $instant = CarbonImmutable::parse('2027-11-05 12:00:00', 'UTC');
+
+        $options = $service->options($store['channel_id'], 'delivery', null, null, $instant);
+
+        $this->assertSame(['قبل التكرار', 'عند نهاية الفترة'], $this->labels($options, '2027-11-07'));
+        $this->assertSame(['مكرّرة البداية', 'مكرّرة النهاية', 'قبل التكرار', 'عند نهاية الفترة'], $this->labels($options, '2027-11-08'));
+        $this->assertSame(['مكرّرة البداية', 'مكرّرة النهاية', 'قبل التكرار', 'عند نهاية الفترة'], $this->labels($options, '2027-11-06'));
+
+        // منطقة بلا انتقالات: لا شيء يُهمَل
+        $service->saveSettings($store['channel_id'], ['timezone' => 'UTC']);
+        $this->assertCount(4, array_values($this->labels($service->options($store['channel_id'], 'delivery', null, null, $instant), '2027-11-07')));
+        app(TenantContext::class)->forget();
+    }
+
+    /** @test */
     public function unexpected_database_failures_stay_server_errors_and_are_not_returned_as_validation_messages(): void
     {
         $store = $this->store('ds-db-fail');

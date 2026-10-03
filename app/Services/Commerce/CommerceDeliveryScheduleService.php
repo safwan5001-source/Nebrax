@@ -11,6 +11,7 @@ use App\Models\Tenant;
 use App\Tenancy\TenantContext;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
+use DateTimeZone;
 use DomainException;
 use Illuminate\Support\Facades\DB;
 use PDOException;
@@ -217,6 +218,8 @@ final class CommerceDeliveryScheduleService
         $earliestInstant = $local->addMinutes($setting->lead_time_minutes);
         $cutoffPassed = $setting->cutoff_time !== null && $local->format('H:i') >= $setting->cutoff_time;
 
+        $ambiguous = $this->ambiguousWallClockIntervals($timezone, $local->startOfDay()->subDay(), $local->startOfDay()->addDays($setting->max_days_ahead + 2));
+
         $zoneId = $method === CommerceDeliverySlot::METHOD_DELIVERY ? $this->shipping->resolveZone($city, $region)?->id : null;
         $slots = CommerceDeliverySlot::query()
             ->where('sales_channel_id', $salesChannelId)
@@ -253,6 +256,11 @@ final class CommerceDeliveryScheduleService
                 // النهاية كذلك: `01:30–02:30` بدايتها موجودة ونهايتها لا، فتكون نقطةً نهائية مستحيلة للعميل واللقطة.
                 if ($start->format('H:i') !== $slot->start_time
                     || $day->setTimeFromTimeString($slot->end_time)->format('H:i') !== $slot->end_time) {
+                    continue;
+                }
+                // وقت جداري مكرَّر (ساعة الرجوع من التوقيت الصيفي) لا يحدّد لحظةً واحدة: يُهمَل في ذلك اليوم
+                // كالفجوة، بدل أن يختار PHP إحدى اللحظتين بصمت فيُسقط الثانية أو يعرض لحظةً غامضة.
+                if ($this->isAmbiguous($ambiguous, $date, $slot->start_time) || $this->isAmbiguous($ambiguous, $date, $slot->end_time)) {
                     continue;
                 }
                 if ($start->lessThan($earliestInstant)) {
@@ -293,6 +301,45 @@ final class CommerceDeliveryScheduleService
     }
 
     // ── مساعدات ─────────────────────────────────────────────────────────
+
+    /**
+     * فترات الأوقات الجدارية المتكرّرة (عند رجوع الساعة) ضمن النطاق، بثواني «الحائط المحلي» منذ epoch
+     * (لحظة الانتقال + الإزاحة الجديدة ≤ w < لحظة الانتقال + الإزاحة السابقة). مصدرها بيانات المنطقة نفسها
+     * لا سلوك PHP الضمني. بلا انتقالات (مثل UTC) ⇒ مصفوفة فارغة.
+     *
+     * @return list<array{0: int, 1: int}>
+     */
+    private function ambiguousWallClockIntervals(string $timezone, CarbonInterface $from, CarbonInterface $to): array
+    {
+        $transitions = (new DateTimeZone($timezone))->getTransitions($from->getTimestamp(), $to->getTimestamp());
+        $intervals = [];
+        for ($i = 1, $n = count($transitions); $i < $n; $i++) {
+            $before = $transitions[$i - 1]['offset'];
+            $after = $transitions[$i]['offset'];
+            if ($after < $before) {
+                $intervals[] = [$transitions[$i]['ts'] + $after, $transitions[$i]['ts'] + $before];
+            }
+        }
+
+        return $intervals;
+    }
+
+    /** @param  list<array{0: int, 1: int}>  $intervals */
+    private function isAmbiguous(array $intervals, string $date, string $time): bool
+    {
+        if ($intervals === []) {
+            return false;
+        }
+
+        $wall = CarbonImmutable::parse("{$date} {$time}:00", 'UTC')->getTimestamp();
+        foreach ($intervals as [$start, $end]) {
+            if ($wall >= $start && $wall < $end) {
+                return true;
+            }
+        }
+
+        return false;
+    }
 
     private function timezoneFor(?CommerceDeliveryScheduleSetting $setting): string
     {
