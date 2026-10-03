@@ -203,6 +203,7 @@ export function DeliveryHubWorkspace({
           ) : null}
         </div>
         <DeliveryHubDetail
+          key={selected?.id ?? 'closed'}
           order={selected}
           branches={branches}
           canOperate={canOperate}
@@ -273,13 +274,7 @@ function DeliveryHubDetail({
   onAction: (order: DeliveryHubOrderView, action: DeliveryHubAction, destinationBranchId: string | null) => void;
 }) {
   const t = useTranslations('deliveryHub');
-  const orderId = order?.id ?? null;
-  const [destinationOrderId, setDestinationOrderId] = useState<string | null>(orderId);
   const [destination, setDestination] = useState('');
-  if (destinationOrderId !== orderId) {
-    setDestinationOrderId(orderId);
-    setDestination('');
-  }
   if (!order) return null;
 
   const destinations = branches.filter((branch) => branch.is_active && branch.id !== order.branch_id);
