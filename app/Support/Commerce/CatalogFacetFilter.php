@@ -32,6 +32,9 @@ final class CatalogFacetFilter
     /** @var array<string, CommerceFacet>|null */
     private ?array $activeFacets = null;
 
+    /** @var array<string, bool> */
+    private array $activeBrands = [];
+
     /**
      * قواعد التحقق المشتركة للمتحكّمين العامين.
      *
@@ -42,7 +45,12 @@ final class CatalogFacetFilter
         return [
             'brand_id' => ['sometimes', 'nullable', 'uuid'],
             'facet' => ['sometimes', 'nullable', 'array', 'max:'.self::MAX_SELECTED_FACETS],
-            'facet.*' => ['nullable', 'string', 'max:1000'],
+            'facet.*' => ['nullable', 'string', 'max:1000', static function (string $attribute, mixed $value, \Closure $fail): void {
+                // رفضٌ صريح بدل البتر الصامت: بترُ ما بعد العشرين كان سيُسقط slug مجهولاً ويُخلّ بالفشل المغلق.
+                if (is_string($value) && count(self::slugsOf($value)) > self::MAX_SLUGS_PER_FACET) {
+                    $fail('عدد قيم البُعد الواحد يتجاوز '.self::MAX_SLUGS_PER_FACET.'.');
+                }
+            }],
         ];
     }
 
@@ -57,9 +65,9 @@ final class CatalogFacetFilter
             if (! is_string($raw) || trim($raw) === '') {
                 continue;
             }
-            $slugs = array_values(array_unique(array_filter(array_map('trim', explode(',', $raw)), static fn ($s) => $s !== '')));
+            $slugs = self::slugsOf($raw);
             if ($slugs !== []) {
-                $facets[(string) $key] = array_slice($slugs, 0, self::MAX_SLUGS_PER_FACET);
+                $facets[(string) $key] = $slugs;
             }
         }
 
@@ -67,6 +75,12 @@ final class CatalogFacetFilter
             'brand_id' => filled($validated['brand_id'] ?? null) ? (string) $validated['brand_id'] : null,
             'facets' => $facets,
         ];
+    }
+
+    /** @return list<string> */
+    private static function slugsOf(string $raw): array
+    {
+        return array_values(array_unique(array_filter(array_map('trim', explode(',', $raw)), static fn ($s) => $s !== '')));
     }
 
     /** @param array{brand_id: ?string, facets: array<string, list<string>>} $selection */
@@ -83,6 +97,12 @@ final class CatalogFacetFilter
     public function apply(Builder $products, array $selection, ?string $exceptFacetKey = null, bool $withBrand = true): void
     {
         if ($withBrand && $selection['brand_id'] !== null) {
+            // علامة غير نشطة/مجهولة ⇒ فارغ (فشل مغلق): لا نُبقي مرشّحاً لا تعرضه meta.brands ولا يمكن إلغاؤه.
+            if (! $this->isActiveBrand($selection['brand_id'])) {
+                $products->whereRaw('0 = 1');
+
+                return;
+            }
             $products->where('products.brand_id', $selection['brand_id']);
         }
 
@@ -214,6 +234,15 @@ final class CatalogFacetFilter
             ])
             ->values()
             ->all();
+    }
+
+    private function isActiveBrand(string $brandId): bool
+    {
+        return $this->activeBrands[$brandId] ??= Brand::query()
+            ->withoutGlobalScope(BranchScope::class)
+            ->whereKey($brandId)
+            ->where('is_active', true)
+            ->exists();
     }
 
     /** @return array<string, CommerceFacet> نشطة بقيمها النشطة، مفهرسة بالمفتاح — تُحمَّل مرة لكل طلب. */
