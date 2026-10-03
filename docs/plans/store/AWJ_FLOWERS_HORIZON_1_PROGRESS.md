@@ -45,7 +45,8 @@ No Deploy or Production change is authorized by this Horizon.
 | H12 | Cart & Checkout Gifting UX | NOT STARTED | — | — |
 | H13 | Account / Saved Recipient / Order Experience | NOT STARTED | — | — |
 | H14 | Vertical Onboarding & Defaults | NOT STARTED | — | — |
-| H15 | Cross-Horizon Integration / Polish | NOT STARTED | — | — |
+| H15 | Theme / Presentation Pack | NOT STARTED | — | — |
+| H16 | Cross-Horizon Integration / Polish | NOT STARTED | — | — |
 
 ---
 
