@@ -208,6 +208,23 @@ class CommerceAddonCartTest extends TestCase
     }
 
     /** @test */
+    public function derived_addon_quantities_beyond_the_column_limit_are_a_422_not_a_server_error(): void
+    {
+        $f = $this->fixture('ac-overflow');
+        $max = 2147483647;
+
+        // إضافة جديدة: الأب بالحد الأقصى × إضافة بكمية 2 ⇒ مرفوض كاملاً (معاملة واحدة)
+        $this->add($f['store'], $f['bouquet'], ['quantity' => $max, 'addons' => [['product_id' => $f['chocolate']->id, 'quantity' => 2]]])->assertStatus(422);
+        $this->assertSame(0, CommerceCartItem::withoutGlobalScopes()->count());
+
+        // تحديث لاحق لكمية الأب يتجاوز الاشتقاق ⇒ 422 وتبقى الكميات كما هي
+        $res = $this->add($f['store'], $f['bouquet'], ['addons' => [['product_id' => $f['chocolate']->id, 'quantity' => 2]]])->assertCreated();
+        $lines = $this->byName($res);
+        $this->patchJson("/commerce/v1/cart/items/{$lines['باقة']['id']}", ['quantity' => $max], $this->headers($f['store'], $this->cartToken($res)))->assertStatus(422);
+        $this->assertSame([1, 2], CommerceCartItem::withoutGlobalScopes()->orderBy('quantity')->pluck('quantity')->all());
+    }
+
+    /** @test */
     public function removing_the_parent_removes_its_addons(): void
     {
         $f = $this->fixture('ac-rm');

@@ -527,7 +527,7 @@ final class CommerceCartService
         foreach ($selection as $addon) {
             $candidate = $this->purchasable($addon['addon_product_id'], 'base', $addon['addon_variant_id'], lockEligibility: true);
             $signature = 'a:'.$parent->id;
-            $quantity = $this->safeMultiply($addon['per_parent_quantity'], $parent->quantity);
+            $quantity = $this->derivedAddonQuantity($addon['per_parent_quantity'], $parent->quantity);
 
             $child = CommerceCartItem::query()
                 ->where('cart_id', $cart->id)
@@ -564,7 +564,7 @@ final class CommerceCartService
     private function recomputeAddonQuantities(CommerceCartItem $parent): void
     {
         foreach ($parent->addonItems()->lockForUpdate()->get() as $child) {
-            $child->update(['quantity' => $this->safeMultiply((int) ($child->per_parent_quantity ?? 1), $parent->quantity)]);
+            $child->update(['quantity' => $this->derivedAddonQuantity((int) ($child->per_parent_quantity ?? 1), $parent->quantity)]);
         }
     }
 
@@ -968,6 +968,19 @@ final class CommerceCartService
         }
 
         return $quantity;
+    }
+
+    /**
+     * كمية سطر الإضافة المشتقّة (كمية الأب × لكل أب) بنفس سقف كمية السلة (عمود `quantity`): تجاوزه
+     * يرفع نفس استثناء التجاوز الذي يحوّله المتحكّم إلى 422، لا خطأ قاعدة بيانات 500.
+     */
+    private function derivedAddonQuantity(int $perParent, int $parentQuantity): int
+    {
+        if ($perParent < 1 || $parentQuantity < 1 || $parentQuantity > intdiv(2147483647, $perParent)) {
+            throw new CommerceCartQuantityOverflowException('الكمية أكبر من الحد المسموح.');
+        }
+
+        return $perParent * $parentQuantity;
     }
 
     private function safeMultiply(int $amount, int $quantity): int
