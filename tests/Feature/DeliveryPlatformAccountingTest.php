@@ -495,6 +495,35 @@ class DeliveryPlatformAccountingTest extends TestCase
     }
 
     /** @test */
+    public function recording_a_merchant_collected_context_on_an_already_collected_invoice_is_allowed(): void
+    {
+        $profile = $this->platformProfile('jahez', Version::COLLECTION_MERCHANT);
+        $invoice = app(InvoiceService::class)->create(
+            ['partner_id' => $this->customer->id, 'payment_type' => 'cash', 'is_paid' => true, 'payment_method' => 'cash'],
+            [['quantity' => 1, 'unit_price' => 100000, 'tax_rate' => 15]]
+        );
+        $invoice = app(InvoiceService::class)->post($invoice);
+        $this->assertGreaterThan(0, $invoice->paid_amount);
+
+        // التاجر نفسه حصّل الفاتورة نقداً — متوافقٌ تماماً مع merchant_collected،
+        // على عكس platform_collected.
+        $context = $this->contexts->record($invoice, $profile);
+
+        $this->assertSame(Version::COLLECTION_MERCHANT, $context->collection_mode);
+    }
+
+    /** @test */
+    public function recording_a_new_context_on_a_deactivated_platform_version_is_rejected(): void
+    {
+        $profile = $this->platformProfile('jahez', Version::COLLECTION_PLATFORM);
+        $this->platforms->update($profile->fresh(), ['is_active' => false]);
+        $invoice = $this->postedInvoice(100000);
+
+        $this->expectException(RuntimeException::class);
+        $this->contexts->record($invoice, $profile->fresh());
+    }
+
+    /** @test */
     public function backfill_migration_refuses_an_active_non_group_custom_asset_account_at_1180_that_is_not_system_seeded(): void
     {
         $legacyTenant = Tenant::create(['name' => 'مستأجر قديم بحساب مطابق صادفةً', 'slug' => 'dlv-acc-1-coincidence']);

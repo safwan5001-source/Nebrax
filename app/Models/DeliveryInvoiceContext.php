@@ -87,14 +87,6 @@ class DeliveryInvoiceContext extends BaseModel
             if (! $invoice->isPosted()) {
                 throw new DomainException('Delivery invoice context requires a posted invoice.');
             }
-            // فاتورة "مدفوعة بالفعل" (`InvoiceService::settle()`) تُحصَّل بسند
-            // قبض نقد/بنك عادي **لحظة الترحيل** — قبل أن يُسجَّل أي سياق. سياقٌ
-            // platform_collected على فاتورة مُحصَّلة فعلاً يناقض الواقع: لا قيد
-            // مقاصة منصة موجود، والتحصيل الحقيقي أُغلق بالفعل على AR.
-            if ($invoice->paid_amount > 0) {
-                throw new DomainException('Delivery invoice context cannot be recorded after the invoice has already been collected.');
-            }
-
             // الفرع دائماً فرع الفاتورة نفسها — حجّة واحدة، **تُفرَض دوماً** ولا
             // تُقارَن: `BelongsToBranch` (مُستخدَمة أدناه) تملأ الحقل من الفرع
             // النشط إن وجده فارغاً **قبل** هذا الحارس، فحتى تمريرٌ صريح لـ
@@ -125,6 +117,12 @@ class DeliveryInvoiceContext extends BaseModel
             if ((string) $version->delivery_platform_profile_id !== (string) $profile->id) {
                 throw new DomainException('Delivery invoice context version must belong to its platform profile.');
             }
+            // نسخة معطَّلة (منصة أُلغي تفعيلها) لا تُستقبِل سياقاً جديداً — سياق
+            // مسجَّل بالفعل على نسخة كانت نشطة وقت التسجيل يبقى صحيحاً تاريخياً
+            // ولا يُمسّ (هذا الحارس على creating فقط، لا على القراءة).
+            if (! $version->is_active) {
+                throw new DomainException('Delivery invoice context cannot reference a deactivated platform version.');
+            }
 
             // collection_mode يُشتَقّ من سلسلة النسخة/التجاوز نفسها، لا يُؤخذ من
             // قيمة يرسلها المستدعي — إنشاء مباشر يتجاوز الخدمة (`DeliveryInvoiceContextService`)
@@ -136,6 +134,15 @@ class DeliveryInvoiceContext extends BaseModel
                     ->first()
                 : null;
             $context->collection_mode = $override?->collection_mode ?? $version->collection_mode;
+
+            // فاتورة "مدفوعة بالفعل" (`InvoiceService::settle()`) تُحصَّل بسند
+            // قبض نقد/بنك عادي **لحظة الترحيل**. هذا يناقض سياق platform_collected
+            // حصراً (لا قيد مقاصة منصة موجود، والتحصيل الحقيقي أُغلق بالفعل على
+            // AR) — أمّا merchant_collected فمتوافقٌ تماماً مع هذا التدفّق: التاجر
+            // نفسه حصّل الفاتورة نقداً، وهذا بالضبط ما يصفه السياق.
+            if ($context->collection_mode === DeliveryPlatformProfileVersion::COLLECTION_PLATFORM && $invoice->paid_amount > 0) {
+                throw new DomainException('Delivery invoice context cannot record platform_collected after the invoice has already been collected.');
+            }
 
             // سياسة المرجع الخارجي تُفرَض هنا أيضاً — لا في الخدمة فقط — لنفس
             // سبب فرض collection_mode أعلاه: إنشاء مباشر يتجاوز الخدمة لا يُعفى.
