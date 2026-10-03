@@ -47,7 +47,10 @@ export function FacetsPanel({ t, canManage }: { t: T; canManage: boolean }) {
     void load();
   }, [load]);
 
+  // تبديلٌ واحد في الطيران: كل المفاتيح تُعطَّل ريثما يكتمل الكتابة وإعادة التحميل، فلا يتسابق
+  // تحميلان ولا تُمسح علامة الانشغال مبكراً.
   const toggleFacet = async (facet: Facet) => {
+    if (busyId !== null) return;
     setBusyId(facet.id);
     setToggleError(null);
     const result = await updateFacet(facet.id, { isActive: !facet.isActive });
@@ -57,6 +60,7 @@ export function FacetsPanel({ t, canManage }: { t: T; canManage: boolean }) {
   };
 
   const toggleValue = async (facet: Facet, value: FacetValue) => {
+    if (busyId !== null) return;
     setBusyId(value.id);
     setToggleError(null);
     const result = await updateFacetValue(facet.id, value.id, { isActive: !value.isActive });
@@ -121,7 +125,7 @@ export function FacetsPanel({ t, canManage }: { t: T; canManage: boolean }) {
                   <div className="flex items-center gap-1.5">
                     <Switch
                       checked={facet.isActive}
-                      disabled={busyId === facet.id}
+                      disabled={busyId !== null}
                       onCheckedChange={() => void toggleFacet(facet)}
                       aria-label={`${facet.isActive ? t('merchDisable') : t('merchEnable')} ${facet.name}`}
                     />
@@ -157,7 +161,7 @@ export function FacetsPanel({ t, canManage }: { t: T; canManage: boolean }) {
                       <div className="flex items-center gap-1.5">
                         <Switch
                           checked={value.isActive}
-                          disabled={busyId === value.id}
+                          disabled={busyId !== null}
                           onCheckedChange={() => void toggleValue(facet, value)}
                           aria-label={`${value.isActive ? t('merchDisable') : t('merchEnable')} ${value.name}`}
                         />

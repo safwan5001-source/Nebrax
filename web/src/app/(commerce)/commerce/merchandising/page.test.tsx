@@ -276,6 +276,43 @@ describe('Merchandising — toggles and stale paging', () => {
   });
 });
 
+describe('Merchandising — concurrent toggles and stale picker rows', () => {
+  it('disables every switch while one activation is in flight', async () => {
+    const other = { ...occasion, id: 'f2', key: 'recipient', system_key: 'recipient', name: 'Recipient', values: [] };
+    apiMock.mockResolvedValueOnce({ data: { facets: [occasion, other] } });
+    renderPage();
+
+    let finish: (value: unknown) => void = () => undefined;
+    apiMock.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
+    await userEvent.click(await screen.findByRole('switch', { name: 'Disable Occasion' }));
+
+    expect((screen.getByRole('switch', { name: 'Disable Recipient' }) as HTMLButtonElement).disabled).toBe(true);
+
+    apiMock.mockResolvedValueOnce({ data: { facets: [occasion, other] } });
+    finish({ data: { facet: { id: 'f1' } } });
+    await waitFor(() => expect((screen.getByRole('switch', { name: 'Disable Recipient' }) as HTMLButtonElement).disabled).toBe(false));
+  });
+
+  it('removes old picker rows as soon as the query changes', async () => {
+    apiMock.mockResolvedValueOnce({ data: { facets: [occasion] } });
+    renderPage();
+    apiMock.mockResolvedValueOnce({ data: { facets: [occasion] } });
+    await userEvent.click(await screen.findByRole('tab', { name: 'Assign products' }));
+
+    apiMock.mockResolvedValueOnce({
+      data: [{ id: 'p1', name: 'Rose A', sku: null, name_en: null, is_active: true, is_published: true, stores: [] }],
+      meta: { current_page: 1, last_page: 1, per_page: 10, total: 1 },
+    });
+    const search = await screen.findByLabelText('Search a product by name or SKU');
+    await userEvent.type(search, 'rose');
+    expect(await screen.findByText('Rose A', undefined, { timeout: 3000 })).toBeTruthy();
+
+    apiMock.mockImplementationOnce(() => new Promise(() => undefined)); // next query never resolves
+    await userEvent.type(search, 's');
+    await waitFor(() => expect(screen.queryByText('Rose A')).toBeNull());
+  });
+});
+
 describe('Merchandising — assign tab', () => {
   it('guides to create dimensions first when there are none', async () => {
     apiMock.mockResolvedValueOnce({ data: { facets: [] } }); // facets tab

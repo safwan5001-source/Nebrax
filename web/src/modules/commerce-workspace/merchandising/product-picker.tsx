@@ -39,9 +39,10 @@ export function ProductPicker({
   useEffect(() => {
     setPage(1);
     setHasMore(false);
+    // نتائج الاستعلام السابق لا تبقى قابلةً للنقر تحت نصٍّ جديد ريثما تصل استجابته.
+    setResults(null);
+    setFailed(false);
     if (search.trim() === '') {
-      setResults(null);
-      setFailed(false);
       return;
     }
     let cancelled = false;
