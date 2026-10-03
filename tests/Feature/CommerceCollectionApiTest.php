@@ -114,6 +114,22 @@ class CommerceCollectionApiTest extends TestCase
     }
 
     /** @test */
+    public function collection_membership_never_blocks_a_true_product_delete_and_is_cleaned_with_it(): void
+    {
+        $auth = $this->registerTenant('col-life', 'owner@col-life.test');
+        $collection = $this->createCollection($auth['token']);
+        $product = $this->makeProduct($auth['tenant_id'], 'منتج');
+        $this->withToken($auth['token'])->putJson(self::BASE."/{$collection['id']}/products", ['product_ids' => [$product->id]])->assertOk();
+
+        app(TenantContext::class)->set($auth['tenant_id']);
+        app(\App\Services\ProductLifecycleService::class)->delete($product, null);
+
+        $this->assertSame(0, CommerceCollectionProduct::query()->count());
+        $this->assertSame(1, CommerceCollection::query()->count(), 'the collection itself survives');
+        app(TenantContext::class)->forget();
+    }
+
+    /** @test */
     public function a_company_wide_collection_can_hold_products_of_every_branch_even_when_products_are_isolated(): void
     {
         $auth = $this->registerTenant('col-branches', 'owner@col-branches.test');
