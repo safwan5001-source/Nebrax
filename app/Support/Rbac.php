@@ -61,6 +61,9 @@ class Rbac
         'products.view', 'products.manage',
         'invoices.view', 'invoices.manage',
         'delivery_notes.view', 'delivery_notes.manage', 'delivery_notes.confirm', 'delivery_notes.cancel', 'delivery_notes.invoice',
+        // صندوق التوصيل التشغيلي (OD-DG-9-HUB): owner/admin عبر `*` فقط.
+        // لا يُمنح للمحاسب ولا للموظف ولا للخدمة الذاتية. ليس صلاحية ترحيل.
+        'delivery_hub.view', 'delivery_hub.operate',
         'payments.view', 'payments.manage',
         'purchases.view', 'purchases.manage',
         'returns.view', 'returns.manage',

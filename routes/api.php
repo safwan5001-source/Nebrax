@@ -106,6 +106,7 @@ use App\Http\Controllers\Api\PosInvestigationCaseController;
 use App\Http\Controllers\Api\PosLpDigestController;
 use App\Http\Controllers\Api\PosController;
 use App\Http\Controllers\Api\DeliveryPlatformController;
+use App\Http\Controllers\Api\DeliveryHubOrderController;
 use App\Http\Controllers\Api\PosDeviceController;
 use App\Http\Controllers\Api\PosSessionController;
 use App\Http\Controllers\Api\PrintTemplateController;
@@ -824,6 +825,13 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         Route::get('delivery-platforms/{id}/resolve', [DeliveryPlatformController::class, 'resolve'])->whereUuid('id')->middleware([$perm('invoices.view'), $app('sales.pos')]);
         Route::post('delivery-platforms', [DeliveryPlatformController::class, 'store'])->middleware([$perm('company.manage'), $app('sales.pos')]);
         Route::put('delivery-platforms/{id}', [DeliveryPlatformController::class, 'update'])->whereUuid('id')->middleware([$perm('company.manage'), $app('sales.pos')]);
+
+        // DLV-HUB-PROJECTION-1 — إسقاط تشغيلي. ليس بيعاً ولا ترحيلاً ولا موصّلاً.
+        Route::get('delivery-hub/orders', [DeliveryHubOrderController::class, 'index'])->middleware($perm('delivery_hub.view'));
+        Route::post('delivery-hub/orders', [DeliveryHubOrderController::class, 'store'])->middleware($perm('delivery_hub.operate'));
+        Route::get('delivery-hub/orders/{id}', [DeliveryHubOrderController::class, 'show'])->whereUuid('id')->middleware($perm('delivery_hub.view'));
+        Route::post('delivery-hub/orders/{id}/transition', [DeliveryHubOrderController::class, 'transition'])->whereUuid('id')->middleware($perm('delivery_hub.operate'));
+
 
         // طرق الدفع: بيان مالي مشترك يحدد وجهة السند ورسومه.
         Route::get('payment-methods', [PaymentMethodController::class, 'index'])->middleware($perm('payments.view'));
