@@ -198,7 +198,7 @@ Themes remain presentation only
 | Corporate gifting enquiry | PARTIAL_EXTENSIBLE | ERP customers/quotes + Commerce foundations | Reuse ERP B2B primitives | No gifting campaign/multi-recipient workflow | FLOWERS-CORPORATE-GIFTING-EVIDENCE-1 |
 | Bulk pricing | PARTIAL_EXTENSIBLE | price-list foundations exist | Reuse shared pricing | Need current storefront/B2B exposure contract | FLOWERS-CORPORATE-GIFTING-EVIDENCE-1 |
 | Store Builder | PROVEN_EXISTING | `StorefrontPresentationConfig` + section registry | Reuse | Add new section types/data sources, not new builder | FLOWERS-BUILDER-1 |
-| Multi-page builder | PROVEN_EXISTING / PARTIAL | pagePresentation seam exists | Reuse | Flowers-specific PDP/category controls need bounded sections | FLOWERS-BUILDER-1 |
+| Multi-page builder | PARTIAL_EXTENSIBLE | pagePresentation seam exists | Reuse the proven multi-page presentation seam | Flowers-specific PDP/category controls and data-bound sections still require bounded extension | FLOWERS-BUILDER-1 |
 | Themes | PROVEN_EXISTING | theme presets / AWJ Market direction | Reuse | Theme must not own business logic | FLOWERS-THEME-1 |
 | Arabic/RTL | PROVEN_EXISTING | storefront system | Reuse | Seed labels/content still need localization | — |
 
