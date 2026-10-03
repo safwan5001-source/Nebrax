@@ -50,6 +50,18 @@ class CommerceProductContentApiTest extends TestCase
     }
 
     /** @test */
+    public function the_line_limit_counts_lines_not_separators(): void
+    {
+        $auth = $this->registerTenant('ct-lines', 'owner@ct-lines.test');
+        $product = $this->makeProduct($auth['tenant_id']);
+        $lines = fn (int $n) => implode("\n", array_map(fn ($i) => "سطر {$i}", range(1, $n)));
+
+        $this->withToken($auth['token'])->putJson($this->url($product), ['blocks' => [['block_type' => 'care', 'body' => $lines(40)]]])->assertOk();
+        $this->withToken($auth['token'])->putJson($this->url($product), ['blocks' => [['block_type' => 'care', 'body' => $lines(41)]]])->assertStatus(422);
+        $this->withToken($auth['token'])->putJson($this->url($product), ['blocks' => [['block_type' => 'care', 'body' => 'ok', 'body_en' => $lines(41)]]])->assertStatus(422);
+    }
+
+    /** @test */
     public function content_blocks_never_block_a_true_product_delete_and_are_cleaned_with_it(): void
     {
         $auth = $this->registerTenant('ct-life', 'owner@ct-life.test');
@@ -71,9 +83,13 @@ class CommerceProductContentApiTest extends TestCase
 
         $res = $this->withToken($auth['token'])->putJson($this->url($product), ['blocks' => $this->blocks()])->assertOk();
 
-        $this->assertSame(['composition', 'care', 'allergens'], array_column($res->json('data.blocks'), 'type'));
+        $this->assertSame(['composition', 'care', 'allergens'], array_column($res->json('data.blocks'), 'block_type'));
         $this->assertSame("ضعها في ماء بارد.\nغيّر الماء يومياً.", $res->json('data.blocks.1.body'));
         $this->assertFalse($res->json('data.blocks.2.is_active'));
+        $this->assertSame($res->json('data.blocks'), $this->withToken($auth['token'])->getJson($this->url($product))->json('data.blocks'));
+
+        // المخرجات تصلح كمدخلات كما هي (round-trip) دون تعديل
+        $this->withToken($auth['token'])->putJson($this->url($product), ['blocks' => $res->json('data.blocks')])->assertOk();
         $this->assertSame($res->json('data.blocks'), $this->withToken($auth['token'])->getJson($this->url($product))->json('data.blocks'));
 
         // استبدال idempotent + إزالة ما غاب

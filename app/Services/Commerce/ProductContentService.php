@@ -53,7 +53,7 @@ final class ProductContentService
             }
             $bodyEn = PlainText::normalize($block['body_en'] ?? null, true);
             foreach ([$body, $bodyEn] as $text) {
-                if ($text !== null && (PlainText::length($text) > CommerceProductContentBlock::MAX_BODY_LENGTH || substr_count($text, "\n") > self::MAX_LINES)) {
+                if ($text !== null && (PlainText::length($text) > CommerceProductContentBlock::MAX_BODY_LENGTH || substr_count($text, "\n") + 1 > self::MAX_LINES)) {
                     throw new DomainException('نص كتلة المحتوى يتجاوز الحد المسموح.');
                 }
             }
@@ -85,12 +85,13 @@ final class ProductContentService
     /** @return array<string, mixed> */
     private function present(CommerceProductContentBlock $block, bool $admin): array
     {
-        $row = ['type' => $block->block_type, 'body' => $block->body, 'body_en' => $block->body_en];
+        // الإدارة تعيد الشكل نفسه الذي يقبله `replace()` (block_type + is_active) فيصحّ ردّ المخرجات كما هي؛
+        // الواجهة العامة تبقى على `type` (عقدها المنشور).
         if ($admin) {
-            $row['is_active'] = $block->is_active;
+            return ['block_type' => $block->block_type, 'body' => $block->body, 'body_en' => $block->body_en, 'is_active' => $block->is_active];
         }
 
-        return $row;
+        return ['type' => $block->block_type, 'body' => $block->body, 'body_en' => $block->body_en];
     }
 
     private function assertProductTenant(Product $product): void
