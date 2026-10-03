@@ -6,7 +6,7 @@
 **Base SHA (`origin/main` at start):** `615d634a1ab387b12b5124917ff435c762f1aca3`
 **That SHA is the squash of PR #1195 (DELIVERY-DECISION-PASS-3).** It was the tip of `origin/main` when this branch was cut. This file does not embed its own commit hash.
 
-Nothing in this report is an Owner Decision. Each new recommendation is labeled **RECOMMENDATION — NOT ACCEPTED**.
+OD-HUB-STATES is an Owner Decision and is **ACCEPTED** as §4. OD-HUB-IDENTITY remains a recommendation and is **NOT ACCEPTED**. The revised §6 is for review. The agent does not accept it.
 
 Not reopened: OD-DG-9-HUB, OD-DG-6-TRIGGER, DG-1, DG-2, DG-5, OD-DG-8 (POS price), OD-DG-9-POS, and the accepted narrowing of DG-6 (pre-post has no ledger effect).
 
@@ -16,15 +16,15 @@ Not decided here: DG-8-IMPORT, DG-3, DG-4, DG-7, connectors, webhooks, commissio
 
 ## 1. What this pass is for
 
-Pass 3 left the projection-only slice **not ready** because §9 (state table) and §14 (order identity) were not accepted. This pass tightens those two requirements against current repository evidence. It does not implement them and does not accept them.
+Pass 3 left the projection-only slice **not ready** because §9 (state table) and §14 (order identity) were not accepted. This pass tightens those two requirements against current repository evidence. It does not implement them. Safwan accepted the state machine. He did not accept the identity recommendation, and the identity text below is a revision for review, not an acceptance.
 
 | Question | Classification | Result |
 |---|---|---|
-| Operational states, transitions, branch immutability, and who may move each state | **NEW DECISION REQUIRED** | Recommendation §4. Not accepted. |
-| Identity and intake idempotency, including manual intake with no provider id | **NEW DECISION REQUIRED** | Recommendation §6. Not accepted. One deliberate change from Pass 3 §14: a cancelled row does not keep the provider id locked forever. |
-| Projection-only Hub slice | Still blocked on those two owner decisions | **NOT READY.** Not a queue task. Not started. |
+| Operational states, transitions, branch immutability, and who may move each state | **ACCEPTED** | OD-HUB-STATES. §4 as documented. Not a build permit. |
+| Identity and intake idempotency, including manual intake with no provider id | **NEW DECISION REQUIRED** | Revised recommendation §6. Not accepted. The provider triple is permanent. Cancel does not release it and does not insert a successor. |
+| Projection-only Hub slice | Still blocked on the identity decision | **NOT READY.** Not a queue task. Not started. |
 
-The slice, if those decisions are later accepted, still must not call `InvoiceService`, `PaymentService`, or inventory, and must not open a POS session.
+The slice, even after §6 is later accepted, still must not call `InvoiceService`, `PaymentService`, or inventory, and must not open a POS session.
 
 ---
 
@@ -54,13 +54,13 @@ PostgreSQL and SQLite both treat `NULL` as distinct inside a unique index. A key
 |---|---|---|
 | A. Free status field. Any operate user may set any name. | Smallest code | Rejected. It cannot express immutability or who may route. |
 | B. Pass 3 §9 table, including a `posted` state, and reroute only by an unrestricted user | Already written | `posted` is the financial command. It does not belong on a projection that must not post. "Unrestricted only" is stricter than `canAccessBranch` and blocks a user who is assigned to both branches. |
-| C. Linear projection states, no `posted`, no skips, no backward moves. Reroute only before accept, using `canAccessBranch` on both ends. | Matches OD-DG-9-HUB and the pre-post rule | **Recommended. Not accepted.** |
+| C. Linear projection states, no `posted`, no skips, no backward moves. Reroute only before accept, using `canAccessBranch` on both ends. | Matches OD-DG-9-HUB and the pre-post rule | **ACCEPTED** as OD-HUB-STATES. |
 
 ---
 
-## 4. State-machine recommendation
+## 4. State machine
 
-**RECOMMENDATION — NOT ACCEPTED.**
+**ACCEPTED — OD-HUB-STATES.** Safwan accepted this section as documented: the states, the transitions, who may move them, branch immutability, the `reject` mapping, and the repeat-versus-reroute rule. Accepting this section does not accept §6 and does not authorize an automatic successor row. The last branch-immutability bullet points at §6. That pointer is read under the revised identity recommendation, which is not accepted: resending the same provider id is the same order, not a new row. No reopen or recreate command is designed here.
 
 This slice has no `posted` state and no transition into one. `handed_off` is operational completion only. It is not a sale.
 
@@ -102,7 +102,7 @@ Any other edge is rejected. The row stays unchanged. A direct id outside the act
 
 ### Reject
 
-OD-DG-9-HUB already names `reject` as an operate verb, separately from cancel-before-post. This recommendation does not add a `rejected` state and does not delete that verb.
+OD-DG-9-HUB already names `reject` as an operate verb, separately from cancel-before-post. This accepted section does not add a `rejected` state and does not delete that verb.
 
 `reject` writes `cancelled_before_post`. It uses the same terminal, the same branch freeze, and the same absence of a ledger effect as cancel. It is allowed from the same non-terminal states, under the same `delivery_hub.operate` and branch rule as the cancel edges. It is not a financial reversal and not a third permission.
 
@@ -110,7 +110,7 @@ An implementation must not invent a second terminal for reject. Limiting reject 
 
 `delivery_hub.view` never moves a state. `invoices.manage` does not move a state. `sales.pos` is not involved.
 
-Creating the row is an intake, not a view. The recommendation is that intake uses `delivery_hub.operate` rather than a third permission. An intake that lands in `unrouted` is allowed only for an actor who may see that queue (no branch restriction). An actor who is restricted to one branch must name a destination they can access; the row then starts in `received`. That is part of this same unaccepted recommendation, not a new RBAC string in this PR.
+Creating the row is an intake, not a view. Intake uses `delivery_hub.operate` rather than a third permission. An intake that lands in `unrouted` is allowed only for an actor who may see that queue (no branch restriction). An actor who is restricted to one branch must name a destination they can access; the row then starts in `received`. That intake rule is part of this accepted section. It does not add an RBAC string in this PR.
 
 ### Branch immutability
 
@@ -127,14 +127,14 @@ Creating the row is an intake, not a view. The recommendation is that intake use
 |---|---|---|
 | A. Human `external_order_reference` alone | Whatever the operator typed | The accounting migration already says this value is not an identity. Two orders can share a display number. A retry can duplicate. |
 | B. Copy POS: `tenant + branch + key` | Includes branch | Branch is often null at intake, and `NULL` does not collide in the unique indexes this repo runs on. The same provider id could then exist twice. |
-| C. Pass 3 §14 forever, including cancelled rows | `tenant + profile + provider_order_id` for every row | One live row. But cancel-then-new-projection, which §9 described, could never insert the successor. |
-| D. Same triple for the **live** row only, plus a separate UUID intake key when there is no provider id | Branch stays out. Display reference stays out. | **Recommended. Not accepted.** |
+| C. Pass 3 §14 forever, including cancelled rows | `tenant + profile + provider_order_id` for every row that has a provider id | A second intake cannot insert. That is now the required V1 rule, not a defect. **Revised recommendation. Not accepted.** |
+| D. Same triple for the **live** row only, released by cancel so one successor can be inserted | Branch stays out. Display reference stays out. | Owner refused the release. Cancellation must not create a new row for the same provider id. **Withdrawn. Not recommended.** |
 
 ---
 
 ## 6. Identity recommendation
 
-**RECOMMENDATION — NOT ACCEPTED.**
+**RECOMMENDATION — NOT ACCEPTED.** Safwan refused the previous text, which released the provider id on cancel. This section is the revision for review. The agent does not accept it.
 
 ### Two values
 
@@ -143,41 +143,35 @@ Creating the row is an intake, not a view. The recommendation is that intake use
 | `provider_order_id` | Identity when the external system has a stable order id. Not the display number. |
 | `external_order_reference` | What a person reads. Optional under the existing reference policy. Never the uniqueness key and never the intake retry key. |
 
-Branch is **not** part of either key. The profile is company-wide, and the branch may be unknown or later corrected. Putting branch in the key would allow a second live row.
+Branch is **not** part of either key. The profile is company-wide, and the branch may be unknown or later corrected. Putting branch in the key would allow a second row.
 
-### Live-row uniqueness
+### Permanent provider identity
 
-For a row that is not `cancelled_before_post`:
+When `provider_order_id` is present, V1 uniqueness includes every state, including `cancelled_before_post`:
 
 `tenant_id + delivery_platform_profile_id + provider_order_id`
 
-when `provider_order_id` is present.
-
-A second live row with that triple is rejected. It does not create another order.
-
-A cancelled row keeps its history but **releases** that triple so a later intake can create one successor. This is the modification of Pass 3 §14. Without it, "cancel and start a new projection" is impossible.
+`cancelled_before_post` does not release that triple. The cancelled row keeps its identity and its history. A later intake with the same triple is the same order. It must not insert a successor. This pass does not design a reopen or recreate command. If one is needed later, it is a separate explicit decision and a separate command, not a result of cancellation.
 
 ### Retries
 
-Same conflict rule as POS checkout and the delivery-note draft builder. Do not reuse `PosCheckoutAttempt`, and do not put `branch_id` in the key.
+Same checksum rule as POS checkout and the delivery-note draft builder. Do not reuse `PosCheckoutAttempt`, and do not put `branch_id` in the key.
 
 An intake must carry a provider id, an intake UUID, or both. If neither is present, reject it. Do not insert.
 
-1. If an intake UUID is present and a row with `tenant_id + idempotency_key` already exists in any state: the same checksum returns that row; a different checksum conflicts. Stop. The body is not written and no second row is created. This includes a cancelled row, so the original request cannot mint a successor.
-2. If a provider id is present and a **live** row already has that triple:
-   - no UUID on the request: the same checksum returns that live row; a different checksum conflicts;
-   - a new UUID: conflict. A different request must not replay the live row and must not insert another one.
-   Stop. A UUID that already exists was returned or conflicted in step 1, so this step does not look the UUID up again.
-3. If a provider id is present, no live row has that triple, and one or more **cancelled** rows do:
-   - no UUID: the same checksum returns the earliest cancelled row with that checksum; a checksum that matches none conflicts. Do not insert. Resending the original provider id is a retry, not a successor;
-   - a new UUID: this is the one allowed successor. Insert one live row. The cancelled rows keep their own UUIDs.
-4. Otherwise there is no existing row for this UUID and no existing provider triple. Insert one row.
+1. If an intake UUID is present and a row with `tenant_id + idempotency_key` already exists in any state, including `cancelled_before_post`: the same checksum returns that row; a different checksum conflicts. Stop. The body is not written and no second row is created.
+2. If a provider id is present and any row, in any state, already has that permanent triple:
+   - the same checksum returns that row, including when it is `cancelled_before_post`;
+   - a different checksum conflicts;
+   - a new UUID also conflicts.
+   Stop. Do not insert. Resending the provider id is not a new order.
+3. Otherwise there is no existing row for this UUID and no existing provider triple. Insert one row.
 
-A successor therefore always needs a new UUID, and it can exist only because the cancelled row released the live triple. The original UUID stays unique across every state.
+There is no step that inserts a successor because a row was cancelled.
 
 The checksum covers profile, provider id, intake key, normalized display reference, an explicit destination branch if one was sent, and a hash of the inert intake payload. Amounts inside that payload are **not** a price. This pass does not choose DG-8-IMPORT. The projection must not copy them onto an invoice, a price list, a tax rate, or a stock line. Hashing them only detects that a retry differs.
 
-Operator transitions are not a second identity. They do not allocate a new key.
+Operator transitions are not a second identity. They do not allocate a new key. Cancelling does not allocate one either.
 
 ### Manual or import intake with no provider id
 
@@ -186,12 +180,17 @@ Do not mint the identity from the display reference.
 - The client sends an `idempotency_key` that is a UUID, once, on the first intake.
 - The server stores that key. It does not derive it from the reference text.
 - That UUID is unique for the tenant across every state, including `cancelled_before_post`.
-- The same UUID replays the same row, or conflicts if the checksum differs. It never inserts a second row. A successor after cancel needs a **new** UUID.
+- The same UUID and the same checksum replay that row. The same UUID and a different checksum conflict. Neither inserts a second row.
+- The cancelled manual row keeps that UUID. This pass does not define a recreate command, and a different UUID is not an automatic reopen of the cancelled row.
 - The row still requires a resolvable `delivery_platform_profile_id`. An unknown platform is rejected. This pass does not invent a profile-less order.
-- If both a provider id and an intake UUID are present, the UUID is tested first. An existing UUID returns or conflicts and never falls through into an insert. A new UUID still cannot create a second live row for a provider id that already has one (step 2).
+- If both a provider id and an intake UUID are present, the UUID is tested first. An existing UUID returns or conflicts and never falls through into an insert. A new UUID still cannot create a second row when that provider triple already exists in any state (step 2).
 - V1 does not attach a provider id onto a row that was created without one. That would be a second identity rule and is not recommended here.
 
 Foreign tenant ids do not resolve. The error does not include another tenant's display name.
+
+### What the accepted §4 pointer does not do
+
+Accepted §4 says a wrong branch after accept is cancel, then a new intake of the same provider id, not an in-place branch edit. Under this recommendation that intake does not insert. The same checksum replays the cancelled row. A different checksum conflicts. The branch stays frozen. A second projection for that provider id would require a future explicit command, which this pass does not specify.
 
 ---
 
@@ -208,7 +207,7 @@ Foreign tenant ids do not resolve. The error does not include another tenant's d
 
 ## 8. What stays outside this slice
 
-Even after an acceptance of §4 and §6, the projection still excludes:
+Even after an acceptance of §6, the projection still excludes:
 
 - `InvoiceService`, `PaymentService`, journals, VAT, COGS, stock movements, and POS sessions;
 - the explicit post command (OD-DG-6-TRIGGER's shape stays accepted, and building it stays blocked on DG-8-IMPORT and DG-3);
@@ -224,7 +223,7 @@ Even after an acceptance of §4 and §6, the projection still excludes:
 
 **Projection-only Hub: NOT READY. Not a queue row. Not started.**
 
-OD-DG-9-HUB and the pre-post accounting rule are already accepted. They are not sufficient. The state graph and the identity key are still Owner Decisions. Marking the slice `ready` would accept §4 and §6 without Safwan.
+OD-HUB-STATES is accepted. OD-DG-9-HUB and the pre-post accounting rule are already accepted. None of that is sufficient. OD-HUB-IDENTITY is a revised recommendation and is not accepted. Marking the slice `ready` would accept §6 without Safwan. Accepting the state machine does not start an implementation.
 
 Full DLV-HUB-1 stays **BLOCKED**. DG-8-IMPORT and DG-3 are untouched.
 
@@ -232,7 +231,7 @@ Full DLV-HUB-1 stays **BLOCKED**. DG-8-IMPORT and DG-3 are untouched.
 
 ## Owner Decisions required
 
-1. **OD-HUB-STATES** — accept, narrow, or reject §4 (linear states, no `posted` in the projection, immutability at `accepted`, reroute only before accept via `canAccessBranch` on both branches, a same-state repeat does not apply when the destination branch changes, cancel from every non-terminal state, and `reject` is that same cancel terminal rather than a new state).
-2. **OD-HUB-IDENTITY** — accept, narrow, or reject §6 (live uniqueness without branch and without the display reference; cancelled rows release the provider id; a successor requires a new UUID and resending the original request does not insert; manual intake uses a client UUID, not the reference).
+1. **OD-HUB-STATES** — **ACCEPTED** as §4 (linear states, no `posted` in the projection, immutability at `accepted`, reroute only before accept via `canAccessBranch` on both branches, a same-state repeat does not apply when the destination branch changes, cancel from every non-terminal state, and `reject` is that same cancel terminal rather than a new state). Acceptance does not authorize a successor row.
+2. **OD-HUB-IDENTITY** — still required. Accept, narrow, or reject the **revised** §6. It is not accepted. The revision is: the provider triple is permanent across every state, including `cancelled_before_post`; cancel does not release `provider_order_id` and does not insert a successor; no reopen or recreate command is designed; branch stays out of the key; `external_order_reference` is display only; manual intake with no provider id uses a client UUID; the same UUID and the same checksum replay; the same UUID and a different checksum conflict; neither a provider id nor a UUID rejects the intake.
 
 No production deploy. This document does not merge itself and does not start an implementation.
