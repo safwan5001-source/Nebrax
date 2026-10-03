@@ -14,6 +14,7 @@ use App\Services\Commerce\AvailableToSellService;
 use App\Services\Commerce\CommercePriceResolver;
 use App\Services\Commerce\FulfillmentPolicyNotConfiguredException;
 use App\Services\Commerce\FulfillmentPolicyService;
+use App\Services\Commerce\ProductPersonalizationService;
 use App\Services\ProductMediaGalleryService;
 use App\Support\DocumentLineVariantResolver;
 use App\Support\Commerce\CatalogFacetFilter;
@@ -284,6 +285,8 @@ class StorefrontProductController extends PublicApiController
                 $galleryMedia,
             );
         }
+
+        $resource->withPersonalization(app(ProductPersonalizationService::class)->publicFields($id));
 
         return PublicApiResponse::resource($request, $resource);
     }

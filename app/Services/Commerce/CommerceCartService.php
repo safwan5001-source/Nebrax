@@ -18,6 +18,7 @@ use App\Tenancy\StorefrontContext;
 use App\Tenancy\TenantContext;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use PDOException;
 use RuntimeException;
 
@@ -294,7 +295,18 @@ final class CommerceCartService
                     }
 
                     try {
-                        $this->add($customerCart, $item->product_id, $item->unit_key, $item->quantity, $item->product_variant_id);
+                        $this->add(
+                            $customerCart,
+                            $item->product_id,
+                            $item->unit_key,
+                            $item->quantity,
+                            $item->product_variant_id,
+                            // FLOWERS-H4b: التخصيص ينتقل مع السطر (يُعاد التحقق منه مقابل التعريف الحالي).
+                            $item->personalizations->isEmpty() ? null : ProductPersonalizationService::inputFromRows($item->personalizations),
+                        );
+                    } catch (ValidationException) {
+                        // FLOWERS-H4b: مُدخَل التخصيص لم يعد صالحاً للتعريف الحالي — يسقط هذا السطر
+                        // وحده كما يسقط سطرٌ لم يعد قابلاً للشراء؛ لا يُجهض الدمج كله.
                     } catch (CommerceCartLineNotPurchasableException) {
                         // (Codex, PR #924, P2, fifth round) The *only*
                         // droppable failure: this specific line's own
@@ -369,11 +381,11 @@ final class CommerceCartService
     }
 
     /** @return array{cart: CommerceCart, token: ?string, created: bool, data: array<string, mixed>} */
-    public function add(?CommerceCart $knownCart, string $productId, string $unitKey, int $quantity, ?string $variantId = null): array
+    public function add(?CommerceCart $knownCart, string $productId, string $unitKey, int $quantity, ?string $variantId = null, ?array $personalization = null): array
     {
         $rawToken = null;
 
-        return DB::transaction(function () use ($knownCart, $productId, $unitKey, $quantity, $variantId, &$rawToken): array {
+        return DB::transaction(function () use ($knownCart, $productId, $unitKey, $quantity, $variantId, $personalization, &$rawToken): array {
             $context = $this->context();
             $created = false;
 
@@ -440,11 +452,17 @@ final class CommerceCartService
             $candidate = $this->purchasable($productId, $unitKey, $variantId, lockEligibility: true);
             $variant = $candidate['variant'];
 
+            // FLOWERS-H4b / ADR-16 — مُدخَل التخصيص يُتحقَّق من الخادم مقابل التعريفات النشطة
+            // الحالية، وبصمته جزء من هوية السطر (منتج + مُدخَل مختلف ⇒ سطر منفصل).
+            $personalizationRows = app(ProductPersonalizationService::class)->normalizeInput($candidate['product'], $personalization);
+            $signature = ProductPersonalizationService::signature($personalizationRows);
+
             $line = CommerceCartItem::query()
                 ->where('cart_id', $cart->id)
                 ->where('product_id', $candidate['product']->id)
                 ->where('product_variant_id', $variant?->id)
                 ->where('unit_key', $candidate['unit_key'])
+                ->where('personalization_signature', $signature)
                 ->lockForUpdate()
                 ->first();
 
@@ -458,7 +476,7 @@ final class CommerceCartService
                     'unit_name_snapshot' => $candidate['unit_name'],
                 ]);
             } else {
-                CommerceCartItem::create([
+                $newLine = CommerceCartItem::create([
                     'cart_id' => $cart->id,
                     'product_id' => $candidate['product']->id,
                     'product_variant_id' => $variant?->id,
@@ -466,7 +484,11 @@ final class CommerceCartService
                     'unit_key' => $candidate['unit_key'],
                     'unit_name_snapshot' => $candidate['unit_name'],
                     'quantity' => $quantity,
+                    'personalization_signature' => $signature,
                 ]);
+                foreach ($personalizationRows as $row) {
+                    $newLine->personalizations()->create($row);
+                }
             }
 
             $cart->update(['expires_at' => now()->addDays(self::LIFETIME_DAYS)]);
@@ -535,7 +557,7 @@ final class CommerceCartService
 
         $items = [];
         $subtotal = 0;
-        foreach ($cart->items()->orderBy('created_at')->orderBy('id')->get() as $line) {
+        foreach ($cart->items()->with('personalizations')->orderBy('created_at')->orderBy('id')->get() as $line) {
             $available = false;
             $productName = $line->product_name_snapshot;
             $unitName = $line->unit_name_snapshot;
@@ -574,6 +596,16 @@ final class CommerceCartService
                 'line_total' => ['amount_minor' => $lineTotal, 'currency' => $currency],
                 'available' => $available,
             ];
+            if ($line->personalizations->isNotEmpty()) {
+                // يظهر فقط للسطر المخصَّص — سطر عادي بلا تغيير في الشكل.
+                $items[array_key_last($items)]['personalization'] = $line->personalizations->map(fn ($p) => [
+                    'key' => $p->field_key,
+                    'label' => $p->label,
+                    'label_en' => $p->label_en,
+                    'value' => $p->value,
+                    'value_label' => $p->value_label,
+                ])->values()->all();
+            }
         }
 
         return [

@@ -23,6 +23,7 @@ use App\Tenancy\TenantContext;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use RuntimeException;
 
 /**
@@ -547,7 +548,7 @@ final class CommerceCheckoutService
             // FLOWERS-H3 / ADR-15 — إعادة تحقق الإهداء قبل أي كتابة؛ null = لا إهداء.
             $gift = app(CommerceGiftService::class)->resolveForCompletion($checkout);
 
-            $items = $cart->items()->orderBy('created_at')->orderBy('id')->get();
+            $items = $cart->items()->with('personalizations')->orderBy('created_at')->orderBy('id')->get();
             if ($items->isEmpty()) {
                 throw new CheckoutReviewRequiredException(
                     'السلة فارغة.',
@@ -709,6 +710,19 @@ final class CommerceCheckoutService
                 continue;
             }
 
+            // FLOWERS-H4b / ADR-16 — إعادة تحقق التخصيص مقابل التعريفات **الحالية** (قد يُعدَّل
+            // التعريف بين الإضافة للسلة والإتمام): فشلٌ مغلق صريح بلا طلب.
+            try {
+                $personalizationRows = app(ProductPersonalizationService::class)->normalizeInput(
+                    $product,
+                    $item->personalizations->isEmpty() ? null : ProductPersonalizationService::inputFromRows($item->personalizations),
+                );
+            } catch (ValidationException) {
+                $failures[] = ['item_id' => $item->id, 'reason' => 'personalization_invalid'];
+
+                continue;
+            }
+
             // منتج/خدمة غير متتبَّعة المخزون (الافتراض الفعلي) لا فحص توفّرٍ
             // لها — نفس تخطّي CommerceOrderReservationService::reserve() حرفياً.
             if ($product->track_inventory) {
@@ -758,6 +772,7 @@ final class CommerceCheckoutService
                 'unit_factor' => $unitFactor,
                 'unit_price' => $price->amount,
                 'line_total' => $price->amount * $item->quantity,
+                'personalization' => $personalizationRows,
             ];
         }
 

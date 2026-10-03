@@ -12,6 +12,7 @@ use App\Services\Commerce\CheckoutReviewRequiredException;
 use App\Services\Commerce\CommerceCartService;
 use App\Services\Commerce\CommerceCheckoutService;
 use App\Services\PaymentMethodChannelAvailabilityService;
+use App\Support\CommerceOrderSerializer;
 use App\Support\PublicApiErrorCode;
 use App\Support\PublicApiIdempotency;
 use App\Support\PublicApiResponse;
@@ -323,14 +324,7 @@ final class StorefrontCheckoutController extends PublicApiController
                 'status' => $order->paymentIntent?->status,
                 'payment_method_name' => $order->paymentIntent?->payment_method_name,
             ],
-            'items' => $order->lines->map(fn ($line) => [
-                'product_id' => $line->product_id,
-                'product_name' => $line->product_name_snapshot,
-                'unit_name' => $line->unit_name,
-                'quantity' => $line->quantity,
-                'unit_price' => ['amount_minor' => $line->unit_price, 'currency' => $currency],
-                'line_total' => ['amount_minor' => $line->line_total, 'currency' => $currency],
-            ])->all(),
+            'items' => $order->lines->map(fn ($line) => CommerceOrderSerializer::serializeLine($line, $currency))->all(),
             'created_at' => $order->created_at?->toIso8601String(),
         ];
     }

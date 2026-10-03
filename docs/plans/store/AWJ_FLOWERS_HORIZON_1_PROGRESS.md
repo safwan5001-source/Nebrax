@@ -1,6 +1,6 @@
 # AWJ Flowers & Gifts — Horizon 1 Progress
 
-**Status:** IN PROGRESS — H1 and H2 (a–d) merged; H3 in CI, H4 next  
+**Status:** IN PROGRESS — H1, H2 (a–d) and H3 merged; H4 in CI  
 **Date:** 2026-10-03  
 **Planning Base:** `main` @ `318cc72d10bb304cef4b401f548772008ea1618e`  
 **Execution Authority:** `AWJ_FLOWERS_HORIZON_1_AUTONOMOUS_EXECUTION.md`  
@@ -21,7 +21,7 @@ Completed and merged before Horizon implementation:
 | Flowers & Gifts vertical direction | MERGED | PR #1179 / Merge SHA `318cc72d10bb304cef4b401f548772008ea1618e` |
 | Autonomous implementation Horizon | DOCUMENTATION IN PROGRESS | this planning branch |
 
-H1 and all of H2 (a–d) are merged (see the per-slice log below). H3 and H4 have open PRs (#1191, #1192); each is rebuilt on the new main and merged strictly in order (review → CI → merge → sync main). H5 has a pushed branch with no PR, and H6 exists only locally. No further Flowers PR is opened until the backlog is reduced.
+H1, all of H2 (a–d) and H3 are merged (see the per-slice log below). H4 (#1192) is rebuilt on the new main and being merged next (review → CI → merge → sync main). H5 has a pushed branch with no PR, and H6 exists only locally. No further Flowers PR is opened until the backlog is reduced.
 
 No Deploy or Production change is authorized by this Horizon.
 
@@ -36,8 +36,8 @@ No Deploy or Production change is authorized by this Horizon.
 | H2b | Taxonomy — storefront/mobile facet filtering | MERGED | #1188 | `6c085e6` |
 | H2c | Taxonomy — collections | MERGED | #1189 | `5851d00` |
 | H2d | Taxonomy — merchandising admin UI | MERGED | #1190 | `1e8ba70` |
-| H3 | Gifting Identity & Gift Message | PR OPEN (#1191), rebuilt on main, in CI | #1191 | — |
-| H4 | Personalization | ON HOLD (PR open, awaits H2) | #1192 | — |
+| H3 | Gifting Identity & Gift Message | MERGED | #1191 | `d2b8cac` |
+| H4 | Personalization | PR OPEN (#1192), rebuilt on main, in CI | #1192 | — |
 | H5 | Structured Product Content | NOT STARTED | — | — |
 | H6 | Add-ons | NOT STARTED | — | — |
 | H7 | Delivery Scheduling Contract | NOT STARTED | — | — |
@@ -263,6 +263,35 @@ Copy this section for every completed/active slice.
 #### Next
 
 - H3 (gifting identity) then H4 (personalization), each rebuilt on the new main.
+
+### H3 — Gifting identity and gift message
+
+**Status:** MERGED  
+**Base SHA:** `1e8ba7055d73db29770e307ad9b1f7f01fbe1cbb` (main after H2d; originally cut from `9c71d236…`, rebuilt on main)  
+**Branch:** `flowers/h3-gifting-identity`  
+**PR:** #1191  
+**Head SHA:** `58bd4245771235d17bd5328d10b37d1fc057367f`  
+**Merge SHA:** `d2b8cac4cc6f726f26683fb4054263d7e9280096` (squash)
+
+#### What was implemented
+
+- ADR-15: purchaser/contact, delivery recipient (existing order-snapshot `shipping_recipient_*`), gift sender display and gift message are four separate identities; a recipient never becomes an ERP `Partner` and the sender display is never an accounting identity.
+- Additive tables `commerce_gift_settings` (policy per sales channel, disabled by default, typed columns), `commerce_checkout_gifts` (1:1 open checkout) and `commerce_order_gifts` (immutable once confirmed).
+- `PATCH checkout/gift` on both store/v1 and commerce/v1 with sanitized bounded plain text and policy gating; completion re-validates and snapshots inside the same idempotent transaction (`gift_unavailable` / `gift_incomplete` produce review-required with no order); workspace `GET/PUT storefronts/{id}/gift-settings`.
+- Non-gift checkouts and orders are unchanged (`gift: null`).
+
+#### Tests / CI
+
+- `CommerceGiftIdentityTest` (16 cases), OpenAPI contract and route-boundary tests; 401 checkout/cart/order/contract tests passed locally on PostgreSQL before the push. CI sqlite, pgsql and web build green on the head.
+
+#### Tenant isolation / backward compatibility / risks
+
+- CompanyWide tenant-owned models with structural tenant guards; settings API returns non-revealing 404. No journal, VAT, ZATCA, inventory, pricing or numbering behaviour changed, so no posting table applies.
+- No shopper or admin UI yet: gift settings and checkout UI belong to H12 and a follow-up settings slice, so the feature stays disabled for every tenant until then.
+
+#### Next
+
+- H4 (personalization), rebuilt on this main.
 
 ---
 

@@ -85,15 +85,38 @@ final class CommerceOrderSerializer
                 'status' => $order->paymentIntent?->status,
                 'payment_method_name' => $order->paymentIntent?->payment_method_name,
             ],
-            'items' => $order->lines->map(fn ($line) => [
-                'product_id' => $line->product_id,
-                'product_name' => $line->product_name_snapshot,
-                'unit_name' => $line->unit_name,
-                'quantity' => $line->quantity,
-                'unit_price' => ['amount_minor' => $line->unit_price, 'currency' => $currency],
-                'line_total' => ['amount_minor' => $line->line_total, 'currency' => $currency],
-            ])->all(),
+            'items' => $order->lines->map(fn ($line) => self::serializeLine($line, $currency))->all(),
             'created_at' => $order->created_at?->toIso8601String(),
         ];
+    }
+
+    /**
+     * سطر طلب عام. `personalization` (FLOWERS-H4b / ADR-16) يظهر فقط للسطر المخصَّص —
+     * سطر عادي بلا تغيير في الشكل.
+     *
+     * @return array<string, mixed>
+     */
+    public static function serializeLine($line, string $currency): array
+    {
+        $row = [
+            'product_id' => $line->product_id,
+            'product_name' => $line->product_name_snapshot,
+            'unit_name' => $line->unit_name,
+            'quantity' => $line->quantity,
+            'unit_price' => ['amount_minor' => $line->unit_price, 'currency' => $currency],
+            'line_total' => ['amount_minor' => $line->line_total, 'currency' => $currency],
+        ];
+
+        if ($line->personalizations->isNotEmpty()) {
+            $row['personalization'] = $line->personalizations->map(fn ($p) => [
+                'key' => $p->field_key,
+                'label' => $p->label,
+                'label_en' => $p->label_en,
+                'value' => $p->value,
+                'value_label' => $p->value_label,
+            ])->values()->all();
+        }
+
+        return $row;
     }
 }
