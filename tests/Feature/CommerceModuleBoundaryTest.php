@@ -63,6 +63,9 @@ class CommerceModuleBoundaryTest extends TestCase
         'api/commerce/workspace/categories/publication',
         'api/commerce/workspace/categories/{id}/publication',
         // FLOWERS-H2 / ADR-14 — الأبعاد الوصفية للكتالوج وقيمها وإسنادها للمنتجات.
+        'api/commerce/workspace/collections',
+        'api/commerce/workspace/collections/{id}',
+        'api/commerce/workspace/collections/{id}/products',
         'api/commerce/workspace/facets',
         'api/commerce/workspace/facets/{id}',
         'api/commerce/workspace/facets/{id}/values',
@@ -122,6 +125,8 @@ class CommerceModuleBoundaryTest extends TestCase
         'commerce/v1/checkout/delivery',
         // COM-MOBILE-PAYMENTS-1 — اختيار طريقة الدفع.
         'commerce/v1/checkout/payment',
+        // FLOWERS-H2 / ADR-14 §2.3 — مجموعات تسويقية يدوية (قراءة فقط).
+        'commerce/v1/collections',
         // APP-BUILDER-19 — أحدث تجربة App Builder منشورة (حلقة الجلب/التخزين المؤقت).
         'commerce/v1/experience',
         // COM-MOBILE-AUTH-1 — ملف العميل الموثَّق (X-Customer-Token).

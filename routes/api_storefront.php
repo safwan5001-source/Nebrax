@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\StorefrontCartController;
 use App\Http\Controllers\Api\StorefrontCategoryController;
+use App\Http\Controllers\Api\StorefrontCollectionController;
 use App\Http\Controllers\Api\StorefrontCheckoutController;
 use App\Http\Controllers\Api\StorefrontConfigController;
 use App\Http\Controllers\Api\StorefrontMediaController;
@@ -39,6 +40,9 @@ Route::middleware([
 ])->group(function () {
     Route::get('categories', [StorefrontCategoryController::class, 'index'])->name('categories.index');
     Route::get('categories/{id}', [StorefrontCategoryController::class, 'show'])->whereUuid('id')->name('categories.show');
+
+    // FLOWERS-H2 / ADR-14 §2.3 — مجموعات تسويقية يدوية (قراءة فقط).
+    Route::get('collections', [StorefrontCollectionController::class, 'index'])->name('collections.index');
 
     Route::get('products', [StorefrontProductController::class, 'index'])->name('products.index');
     Route::get('products/{id}', [StorefrontProductController::class, 'show'])->whereUuid('id')->name('products.show');
@@ -92,6 +96,8 @@ if (! app()->environment('production')) {
     ])->group(function () {
         Route::get('categories', [StorefrontCategoryController::class, 'index'])->name('legacy.categories.index');
         Route::get('categories/{id}', [StorefrontCategoryController::class, 'show'])->whereUuid('id')->name('legacy.categories.show');
+
+        Route::get('collections', [StorefrontCollectionController::class, 'index'])->name('legacy.collections.index');
 
         Route::get('products', [StorefrontProductController::class, 'index'])->name('legacy.products.index');
         Route::get('products/{id}', [StorefrontProductController::class, 'show'])->whereUuid('id')->name('legacy.products.show');
