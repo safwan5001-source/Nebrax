@@ -147,6 +147,12 @@ class CommerceOrder extends BaseModel implements CompanyWide
         return $this->hasOne(CommerceOrderGift::class, 'commerce_order_id');
     }
 
+    /** FLOWERS-H7b / ADR-19 — لقطة موعد التسليم الثابتة — صفرٌ أو سطرٌ واحد. */
+    public function schedule(): HasOne
+    {
+        return $this->hasOne(CommerceOrderSchedule::class, 'commerce_order_id');
+    }
+
     /** COM-MOBILE-PAYMENTS-1 — التزام الدفع (ADR-04) — واحدٌ لكل طلب في V1. */
     public function paymentIntent(): HasOne
     {
