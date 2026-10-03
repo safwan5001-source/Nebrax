@@ -642,6 +642,42 @@ paths:
         '422': { $ref: '#/components/responses/ValidationError' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
 
+  /checkout/schedule:
+    parameters:
+      - $ref: '#/components/parameters/RequestId'
+      - $ref: '#/components/parameters/CartToken'
+      - $ref: '#/components/parameters/OptionalCustomerToken'
+    patch:
+      operationId: updateCheckoutSchedule
+      tags: [Checkout]
+      summary: Select (or clear) the requested delivery/pickup date and time window
+      description: >
+        ADR-19. Both `date` and `slot_id` are required keys; send both `null` to clear. A selection is
+        validated against the checkout's stored method and destination (lead time, cut-off, blocked
+        dates, weekday, zone, capacity) and refused with 422 when it is not selectable or the channel's
+        scheduling is off. Completion re-validates and returns `409 review_required` with
+        `schedule_required` / `schedule_unavailable` when the choice is missing or no longer valid;
+        capacity is enforced when the order is created. Nothing is reserved at selection time.
+      x-auth-tier: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CheckoutScheduleUpdate' }
+      responses:
+        '200':
+          description: The updated checkout.
+          headers:
+            X-Request-Id: { $ref: '#/components/headers/XRequestId' }
+            X-Cart-Token: { $ref: '#/components/headers/XCartToken' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CheckoutResponse' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
   /checkout/delivery:
     parameters:
       - $ref: '#/components/parameters/RequestId'
@@ -1894,6 +1930,7 @@ components:
             address: { $ref: '#/components/schemas/CheckoutAddress' }
         payment: { $ref: '#/components/schemas/CheckoutPayment' }
         gift: { $ref: '#/components/schemas/Gift' }
+        schedule: { $ref: '#/components/schemas/CheckoutSchedule' }
         gift_options: { $ref: '#/components/schemas/GiftOptions' }
         cart: { $ref: '#/components/schemas/Cart' }
 
@@ -1937,6 +1974,46 @@ components:
         sender_name: { type: [string, 'null'], maxLength: 255 }
         hide_sender: { type: boolean }
         message: { type: [string, 'null'], maxLength: 2000 }
+
+    CheckoutSchedule:
+      description: The selected delivery/pickup date and window on an open checkout. Present only once a choice was stored (ADR-19).
+      type: object
+      additionalProperties: false
+      required: [date, slot, valid]
+      properties:
+        date: { type: string, format: date }
+        slot:
+          description: The window when it is still selectable for the stored method/destination, else `null`.
+          type: [object, 'null']
+          additionalProperties: true
+        valid: { type: boolean }
+
+    OrderSchedule:
+      description: The immutable delivery/pickup schedule snapshot on an order. Present only when one was chosen.
+      type: object
+      additionalProperties: false
+      required: [method, date, slot, timezone]
+      properties:
+        method: { type: string, enum: [delivery, pickup] }
+        date: { type: string, format: date }
+        slot:
+          type: object
+          additionalProperties: false
+          required: [label, label_en, start_time, end_time]
+          properties:
+            label: { type: string }
+            label_en: { type: [string, 'null'] }
+            start_time: { type: string }
+            end_time: { type: string }
+        timezone: { type: string }
+
+    CheckoutScheduleUpdate:
+      type: object
+      additionalProperties: false
+      required: [date, slot_id]
+      properties:
+        date: { type: [string, 'null'], format: date }
+        slot_id: { type: [string, 'null'], format: uuid }
 
     CheckoutContactUpdate:
       type: object
@@ -2050,6 +2127,7 @@ components:
             notes: { type: [string, 'null'] }
             amount: { $ref: '#/components/schemas/Money' }
         gift: { $ref: '#/components/schemas/Gift' }
+        schedule: { $ref: '#/components/schemas/OrderSchedule' }
         payment: { $ref: '#/components/schemas/OrderPayment' }
         items:
           type: array

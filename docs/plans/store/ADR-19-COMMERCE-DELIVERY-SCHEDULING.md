@@ -33,9 +33,10 @@ Scheduling is **a channel-level policy layered on the existing shipping/fulfilme
 - Public read `GET delivery-schedule?method=&city=&region=` on `store/v1` and `commerce/v1` returns only selectable slots (no capacity numbers, no internal ids beyond the slot id). Destination inputs only *filter the display*; H7b revalidates against the **stored** checkout destination.
 - Admin API under `commerce/workspace/storefronts/{id}/delivery-schedule…` for a web channel and `commerce/workspace/mobile-channel/delivery-schedule…` for the tenant's **canonical mobile channel** — the oldest active `type=mobile` channel, the same one `/commerce/v1` serves (`MobileSalesChannelResolver::canonicalForTenant`, shared by the middleware and the admin path, so a policy can never be written for a channel no public request reads). `commerce.manage`; self-service denied; tenant-scoped 404 (also when the tenant has no active mobile channel): `GET` (policy + slots + blocked dates), `PUT settings`, `PUT slots` (atomic replace), `PUT blocked-dates` (atomic replace). Same controller and service for both; no channel key is accepted from the client. Channel rows are locked for replacement.
 
-### 2.3 H7b (recorded here so the contract is one document)
+### 2.3 H7b — checkout, capacity and order snapshot (implemented)
 
-- `PATCH checkout/schedule {date, slot_id}` stores the choice on the open checkout; `complete()` revalidates with the stored method/destination and `now` (`schedule_unavailable` / `schedule_required` ⇒ review-required, no order).
+- `PATCH checkout/schedule {date, slot_id}` stores the choice on the open checkout (both keys required; both `null` clears); `complete()` revalidates with the stored method/destination and `now` (`schedule_unavailable` / `schedule_required` ⇒ review-required, no order). Checkout methods `standard`/`pickup` map to slot methods `delivery`/`pickup`. Scheduling is required only for a method that has at least one active window — a method with no window is never forced to pick a date.
+- Slot replacement is id-stable (`slots[].id` upserts in place) so editing a window never orphans checkout selections or resets its capacity history.
 - Capacity is enforced by counting confirmed order schedules for (slot, date) **under a row lock on the slot** inside the order transaction, so two checkouts cannot both take the last place. The order stores an **immutable schedule snapshot** (method, date, slot label/times, timezone); serializers expose `schedule` only when present.
 
 ## 3. Rejected / Not adopted

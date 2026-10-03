@@ -343,6 +343,35 @@ class CommerceDeliveryScheduleCheckoutTest extends TestCase
     }
 
     /** @test */
+    public function the_order_time_count_is_the_race_guard_when_a_full_slot_slips_past_revalidation(): void
+    {
+        $store = $this->mobileStore('h7b-race', ['is_enabled' => true], [
+            ['method' => 'delivery', 'label' => 'محدودة', 'start_time' => '19:00', 'end_time' => '22:00', 'capacity' => 1],
+        ]);
+        [$slot] = $this->slotIds($store);
+        $cart = $this->checkout($store);
+        $this->schedule($store, $cart, '2026-10-08', $slot)->assertOk();
+        $this->complete($store, $cart)->assertCreated();
+
+        // طلبٌ منافس تجاوز إعادة التحقق قبل أن يُرى حجز الأول: العدّ تحت القفل هو خط الدفاع الأخير.
+        app(TenantContext::class)->set($store['tenant']->id);
+        $order = CommerceOrder::query()->firstOrFail();
+        $payload = [
+            'method' => 'delivery', 'delivery_date' => '2026-10-08', 'slot_id' => $slot, 'slot_label' => 'محدودة',
+            'slot_label_en' => null, 'start_time' => '19:00', 'end_time' => '22:00', 'timezone' => 'Asia/Riyadh',
+        ];
+
+        try {
+            app(CommerceDeliveryScheduleService::class)->snapshotToOrder($order, $payload);
+            $this->fail('expected the full slot to be refused');
+        } catch (\App\Services\Commerce\CheckoutReviewRequiredException $e) {
+            $this->assertSame(1, CommerceOrderSchedule::query()->count());
+        } finally {
+            app(TenantContext::class)->forget();
+        }
+    }
+
+    /** @test */
     public function the_slot_row_is_locked_inside_the_order_transaction_before_the_capacity_count(): void
     {
         if (DB::connection()->getDriverName() !== 'pgsql') {
@@ -361,7 +390,8 @@ class CommerceDeliveryScheduleCheckoutTest extends TestCase
         DB::listen(function ($q) use (&$events) {
             if (str_contains($q->sql, 'from "commerce_delivery_slots"') && str_contains($q->sql, 'for update')) {
                 $events[] = ['type' => 'lock', 'level' => DB::transactionLevel()];
-            } elseif (str_contains($q->sql, 'count(*)') && str_contains($q->sql, 'commerce_order_schedules')) {
+            // العدّ الحاسم فقط (Eloquent ->count()) — لا استعلام العرض المجمّع المقروء قبل المعاملة
+            } elseif (str_contains($q->sql, 'count(*) as aggregate') && str_contains($q->sql, 'commerce_order_schedules')) {
                 $events[] = ['type' => 'count', 'level' => DB::transactionLevel()];
             }
         });
