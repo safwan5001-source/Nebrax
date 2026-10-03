@@ -7,9 +7,21 @@
 **PR:** [#1193](https://github.com/safwan5001-source/Nebrax/pull/1193) (`docs/dlv-decision-pass-2`). Head SHA is the PR head, not restated here, because this commit cannot contain its own hash.
 **Prior evidence reused, not re-investigated from zero:** `DLV-EVIDENCE-1-REPORT.md`, `DELIVERY-DECISION-PASS-1-REPORT.md`, `DLV-FOUNDATION-1-IMPLEMENTATION-REPORT.md`, and the DLV-ACCOUNTING-1 code now on this base.
 
-This pass does **not** mark any Owner Decision resolved. Each packet ends with an exact question for Safwan. Recommendations below are **PROPOSED AWJ DECISION**, distinct from **PROVEN REPOSITORY FACT**.
+This pass records Safwan's answers below. It does not implement them. Recommendations that were not accepted stay proposals. **PROVEN REPOSITORY FACT** and **OWNER DECISION** stay distinct.
 
 DG-3 is not reopened. Commission VAT, fee VAT, platform tax-invoice treatment, agent/principal status, platform-specific tax point, settlement VAT recovery, and provider-specific ZATCA semantics stay unauthorized.
+
+---
+
+## OWNER DECISIONS RECORDED
+
+Safwan accepted the following on this PR. Nothing in this update is production code.
+
+- **OD-DG-8 — ACCEPTED.** In V1, selecting a delivery platform does not change the product price. DLV-POS-1 keeps canonical POS pricing (`PosService` / `PosCustomerPriceListResolver` / `ProductPricingService`). No new channel pricing. Commission is not a markup and is not a cashier price edit.
+- **OD-DG-9 — ACCEPTED FOR POS ONLY.** No new permission merely to select an already-active configured platform during a POS sale the user can already post (`invoices.manage` + `sales.pos`). Configuration writes stay on `company.manage`. **DG-9-HUB remains OPEN.**
+- **OD-DG-6 — ACCEPTED WITH NARROWING.** Option B. The Delivery Hub is a tenant-scoped and branch-scoped operational projection / inbox. It is not `CommerceOrder` and it is not an accounting or inventory authority. Receiving, routing, accepting, preparing, and cancelling before posting do not create revenue, VAT, COGS, stock movement, cash/bank movement, or AR clearing. **DG-6-TRIGGER remains OPEN only for the transition from that operational order to a canonical posted invoice.** It is not a blocker for a later projection-only Hub that does not create invoices.
+
+No other Owner Decision was taken. DG-3, DG-4, DG-7, DG-9-HUB, and DG-6-TRIGGER stay open.
 
 ---
 
@@ -20,7 +32,7 @@ DG-3 is not reopened. Commission VAT, fee VAT, platform tax-invoice treatment, a
 | DELIVERY-DECISION-PASS-1 is on `main` | commit `49ecc540a116acc9c503d87c34efeca7fa59cd2d`, PR #1177. The queue text that still said "PR #1177 in_review" was stale on this base. |
 | DLV-ACCOUNTING-1 is done | PR #1184 merged; merge SHA `a1bc3769751a919643a335fd4b84ea43c241a221`. Owner task record: `PRE_MERGE_REVIEW: PASS`, `POST_MERGE_REVIEW: PASS`. No deploy. |
 | What ACCOUNTING-1 actually shipped | `platform_receivable_clearing` role (legacy `1180`); immutable `delivery_invoice_contexts`; `DeliveryInvoiceContextService::record()`; `payments.delivery_platform_profile_id` clearing branch in `PaymentService::post()`. No POS selector, no Hub, no commission, no settlement, no new permission. |
-| What it did not decide | DG-4, DG-6, DG-7, DG-8, DG-9 remain open until an owner decision says otherwise. DG-3 remains a per-platform external-evidence gate. |
+| What it did not decide | DG-4 and DG-7 remain open. DG-3 remains a per-platform external-evidence gate. DG-9-HUB and DG-6-TRIGGER remain open after the 2026-10-03 acceptances below. |
 
 `DeliveryInvoiceContext` (`app/Models/DeliveryInvoiceContext.php`) is an accounting pin on an already-posted invoice. Its own comment states `external_order_reference` is informational and is **not** an identity, lookup, or matching key. It is not an operational order inbox.
 
@@ -102,7 +114,7 @@ Option A preserves current POS cash/card/customer-list behavior exactly, includi
 
 ### 8. Recommended AWJ decision
 
-**PROPOSED.** Resolve DG-8 as Option A:
+**ACCEPTED.** DG-8 is Option A:
 
 - Selecting a delivery platform does not change the item price in V1.
 - DLV-POS-1 reuses `PosService` / `PosCustomerPriceListResolver` / `ProductPricingService` unchanged.
@@ -112,11 +124,11 @@ Option A preserves current POS cash/card/customer-list behavior exactly, includi
 
 ### 9. Exact Owner Decision required
 
-**OD-DG-8.** Does Safwan accept Option A above, verbatim, as the V1 pricing rule for DLV-POS-1? Yes or no. A no requires a different packet. This pass does not implement either answer.
+**OD-DG-8 — ACCEPTED.** Safwan accepted Option A as the V1 pricing rule. This update does not implement it.
 
 ### 10. Downstream tasks affected
 
-- **DLV-POS-1** — this gate is one of the two remaining blockers (with the POS slice of DG-9).
+- **DLV-POS-1** — unblocked on pricing. Still not started in this PR.
 - **DLV-COMMISSION-1** — stays a separate expectation policy. DG-8 does not authorize it.
 - Later channel-pricing work — explicitly not unlocked.
 
@@ -180,7 +192,7 @@ No permission string is added or removed. Existing POS roles keep the same sale 
 
 ### 8. Recommended AWJ decision
 
-**PROPOSED.** Split DG-9:
+**ACCEPTED FOR POS ONLY.** DG-9 is split:
 
 - **DG-9-POS — recommend RESOLVE** for DLV-POS-1 only:
   - Do not create a permission merely to select a configured, active delivery platform.
@@ -191,12 +203,12 @@ No permission string is added or removed. Existing POS roles keep the same sale 
 
 ### 9. Exact Owner Decision required
 
-**OD-DG-9.** Does Safwan accept the split above: DG-9 resolved for DLV-POS-1 selection only, and explicitly still open for DLV-HUB-1? Yes or no.
+**OD-DG-9 — ACCEPTED FOR POS ONLY.** DG-9 is resolved for selecting a configured platform on an already-authorized POS sale. **DG-9-HUB remains OPEN.** This update does not add a permission.
 
 ### 10. Downstream tasks affected
 
-- **DLV-POS-1** — unblocked on permissions if OD-DG-9 is yes (still needs OD-DG-8).
-- **DLV-HUB-1** — still blocked on DG-9-HUB even if OD-DG-9 is yes.
+- **DLV-POS-1** — unblocked on permissions.
+- **DLV-HUB-1** — still blocked on DG-9-HUB. The POS acceptance does not authorize Hub actions.
 - **DLV-CONNECTOR-CORE-1** — untouched; credentials remain a later security design (DG-7 still open).
 
 ---
@@ -316,33 +328,32 @@ Option B does not change POS checkout, Commerce checkout, invoice posting, reser
 
 ### 8. Recommended AWJ decision
 
-**PROPOSED.** Resolve the **architecture** of DG-6 as Option B, and leave the **invoice-trigger clock** open.
+**ACCEPTED WITH NARROWING.** The architecture of DG-6 is Option B. The invoice-trigger clock stays open, and only for the step that creates a posted invoice.
 
-Resolved part (recommend Safwan accept):
+Accepted:
 
-1. Delivery Hub is an operational projection / inbox. It is not `CommerceOrder` and not `DeliveryInvoiceContext`.
-2. Receiving, validating, storing, routing, printing, or changing an operational status does **not** by itself post revenue, clear AR, post COGS, move stock, move cash/bank, create a platform settlement, or fabricate an accounting document.
+1. Delivery Hub is an operational projection / inbox. It is tenant-scoped and branch-scoped. It is not `CommerceOrder` and not `DeliveryInvoiceContext`.
+2. Receiving, validating, storing, routing, accepting, preparing, printing, or cancelling before a canonical invoice is posted does **not** by itself post revenue, VAT, COGS, stock, cash/bank, AR clearing, or a platform settlement, and does not fabricate an accounting document.
 3. Inventory movement and COGS for the eventual sale stay inside `InvoiceService::post` → `InventoryService::recordSaleCogs`. No Hub-local stock write. No second COGS.
 4. The smallest safe representation, when a later task builds it, is a tenant-and-branch-scoped inbox row: platform profile, pinned config version, provider external order id, normalized operational status, preserved provider-native status, branch routing result, nullable `invoice_id` after the canonical invoice exists, idempotency unique on `(tenant, profile, external order id)`. No amounts that accounting will later trust as the gross sale. Gross sale remains the invoice.
 5. Cancellation boundary:
    - **Before** a canonical invoice is posted: operational cancellation only. No financial reversal, because no financial posting exists.
    - **After** posting: do not delete or rewrite posted journals, stock movements, or the invoice. The commercial and inventory reversal authority is `ReturnService::post` (POS-originated returns go through `PosReturnService`). `CreditNoteService` is a financial-only alternative and does not move stock. `CustomerRefundService` moves cash only when a real cash refund exists; it is not the stock authority and is the wrong tool for a platform-collected clearing reversal. How platform-clearing payments reverse is **not** decided here (DLV-REFUND-1 / settlement), beyond "use existing services; do not rewrite history".
 
-Not decided, and **must not be treated as decided**:
+Still open, and not a projection blocker:
 
-- **DG-6-TRIGGER.** Which operational moment, if any, may call `InvoiceService::post` for an API-ingested order (accept vs handoff vs completion vs never inside Hub V1). Repository evidence proves only that the post is the inventory/COGS/revenue event for a sale that already exists. It does not prove which kitchen/courier moment is that sale. ADR-01 refused a default. DG-3 forbids a tax-point guess. Webhook receipt and printing are proven non-candidates. The positive choice among the remaining business moments is an owner decision with VAT/ZATCA consequences, not an inference from filenames.
+- **DG-6-TRIGGER.** Which moment may move an operational delivery order across to a canonical posted `Invoice` (`InvoiceService::post`). That transition is the only thing this gate still blocks. It does **not** block a projection-only Hub that never creates invoices. ADR-01 refused a default invoice clock. DG-3 forbids treating that clock as a tax point. Webhook receipt, routing, acceptance, preparation, printing, and pre-posting cancellation are already decided: they are operational only.
 
 ### 9. Exact Owner Decision required
 
-**OD-DG-6.** Does Safwan accept Option B and the cancellation boundary above, while explicitly leaving DG-6-TRIGGER open? Yes or no.
-
-Accepting this does **not** authorize DLV-HUB-1 to create invoices, and it does **not** choose a tax point.
+**OD-DG-6 — ACCEPTED WITH NARROWING.** Option B and the pre-posting boundary above are accepted. DG-6-TRIGGER stays open solely for the operational-order → posted-invoice transition. Accepting this does **not** authorize invoice creation inside the Hub and does **not** choose a tax point.
 
 ### 10. Downstream tasks affected
 
-- **DLV-HUB-1** — architecture stops being "CommerceOrder vs inbox vs invoice-on-receipt". It stays blocked (see matrix) on DG-9-HUB and on DG-6-TRIGGER if the task would post invoices. A projection-only Hub still needs the Hub permission decision.
-- **DLV-REFUND-1** — must call `ReturnService` / existing refund services after posting; must not invent a delete. Still depends on Hub plus accounting, and on the trigger that was left open.
-- **DLV-CONNECTOR-CORE-1** — webhooks may only upsert the future inbox idempotently. They must not post. DG-7 (connector security) stays open and is untouched.
+- **DLV-HUB-1 (full)** — architecture is no longer open, but the full task is not READY. DG-9-HUB is still open. Any behavior that creates or posts an invoice is still blocked by DG-6-TRIGGER.
+- **Projection-only Hub** — not a queue task today. DG-6-TRIGGER does not block it, because it must not create invoices. It can be split into its own task only after DG-9-HUB is decided. It is not READY and is not started here.
+- **DLV-REFUND-1** — must call `ReturnService` / existing refund services after posting; must not invent a delete. Still blocked. The post-invoice reversal of platform clearing is not decided.
+- **DLV-CONNECTOR-CORE-1** — webhooks may only upsert the future inbox idempotently. They must not post. DG-7 stays open.
 
 ---
 
@@ -369,19 +380,22 @@ Unchanged from Decision Pass 1 and from the #1184 implementation:
 
 ## Dependency matrix
 
-Statuses below are **after this evidence pass and before Safwan answers**. A recommendation is not readiness. ACCOUNTING-1 being merged does not promote its children by itself.
+Recalculated after Safwan's acceptances on PR #1193. Acceptance is not implementation. This PR does not start DLV-POS-1.
 
-| Task | Current status | Blocking gates | If the owner accepts this pass's recommendations |
+Checked and **not** blockers for DLV-POS-1: DG-2 (resolved; side table already shipped in #1184), DG-4 (CLOSE-1 only), DG-6-TRIGGER (Hub invoice clock only; ordinary POS checkout already has its post event), DG-7, DG-9-HUB, and DG-3's per-platform tax questions. Gap G12 (no official logo bytes in the repo) is an implementation constraint: show the configured name and a nullable `logo_asset_key`, and do not invent logo assets. It is not a Decision Gate.
+
+| Task | Status after acceptance | Remaining gate | What this acceptance does |
 |---|---|---|---|
-| DLV-POS-1 | **DECISION_REQUIRED** | OD-DG-8 and OD-DG-9 (POS slice). DG-2 is already resolved. FOUNDATION-1 and ACCOUNTING-1 are merged but POS-1 does not need the clearing posting in order to be specified; it must not invent price or permission behavior. | **Becomes the next implementation candidate (READY)** for a manual selector that reuses current POS price resolution, adds no permission, and does not post commission. Not started by this PR. |
-| DLV-HUB-1 | **DECISION_REQUIRED** | OD-DG-6 (architecture) still unanswered. Even after a yes: **DG-9-HUB remains OPEN**, and **DG-6-TRIGGER remains OPEN**. | Architecture is fixed (Option B). Hub is **not** READY. A projection-only slice would still need a Hub capability decision. Any slice that creates invoices stays blocked on DG-6-TRIGGER (tax point / DG-3). |
-| DLV-COMMISSION-1 | **BLOCKED** | ACCOUNTING-1 dependency is now met (PR #1184). Promotion is still refused: contractual calculation base, fee VAT, and commission VAT are **EXTERNAL_EVIDENCE_REQUIRED** under DG-3. Horizon text also keeps commission separate from channel price (DG-8 does not unlock it). | No change. Still not READY. |
-| DLV-SETTLEMENT-1 | **BLOCKED** and **EXTERNAL_EVIDENCE_REQUIRED** | Needs COMMISSION-1's expectation policy plus per-platform DG-3 contract evidence (fee, fee-tax, settlement VAT). ACCOUNTING-1's clearing account is necessary and not sufficient. | No change. Still not READY. |
-| DLV-REFUND-1 | **BLOCKED** | Needs a posted-invoice reversal design on top of `ReturnService` and a Hub (or POS) linkage. DG-6-TRIGGER open. DG-3 settlement reversal not evidenced. | Cancellation *boundary* is written down. Implementation still not READY. |
-| DLV-CONNECTOR-CORE-1 | **BLOCKED** | DG-7 untouched. Hub inbox does not exist. | Webhook rule is written down (idempotent inbox only). Implementation still not READY. |
-| DLV-CLOSE-1 | **BLOCKED** | DG-4 untouched (close/Z-report vs physical tender). Also needs POS-1. | No change. |
+| DLV-POS-1 | **READY** | None of DG-8 / DG-9-POS / DG-2. FOUNDATION-1 and the accounting pin it must call already exist. | Next implementation candidate: manual selector, canonical POS price unchanged, no new permission, no commission posting, no new channel price list. **Not started by this PR.** |
+| DLV-HUB-1 (full) | **DECISION_REQUIRED** | **DG-9-HUB** (open) and **DG-6-TRIGGER** (open for any path that creates or posts an invoice). Option B architecture is accepted. | Does not become READY. |
+| Projection-only Hub | **Not a task. Not READY.** | Blocked only by **DG-9-HUB**. Explicitly **not** blocked by DG-6-TRIGGER, provided the slice creates no invoice, revenue, VAT, COGS, stock, cash, or AR clearing. | May be split into its own task after DG-9-HUB is decided. Not split, not named as ready, and not started here. |
+| DLV-COMMISSION-1 | **BLOCKED** / **EXTERNAL_EVIDENCE_REQUIRED** | DG-3 contractual calculation base and fee/commission VAT. DG-8 acceptance keeps commission off the selling price. | Not promoted. |
+| DLV-SETTLEMENT-1 | **BLOCKED** / **EXTERNAL_EVIDENCE_REQUIRED** | COMMISSION-1 plus per-platform DG-3. | Not promoted. |
+| DLV-REFUND-1 | **BLOCKED** | Post-invoice reversal still has to go through `ReturnService`. Platform-clearing reversal and DG-6-TRIGGER are not decided. | Boundary recorded only. |
+| DLV-CONNECTOR-CORE-1 | **BLOCKED** | DG-7. Inbox does not exist yet. | Webhook rule recorded only. |
+| DLV-CLOSE-1 | **BLOCKED** | DG-4, and it still waits on POS-1 being implemented, not merely ready. | Not promoted. |
 
-No task is promoted to READY by this pull request.
+**Next READY task: DLV-POS-1.** Do not start it from this documentation update. No merge. No deploy.
 
 ---
 
@@ -403,6 +417,6 @@ CI is recorded in the PR conversation after the push. This document does not cla
 
 **PRE_MERGE_REVIEW: NOT RECORDED.**
 
-This PR is waiting for Safwan's owner decisions. It must not be merged as if the recommendations were already accepted, and a PASS stamp is invalid until the exact Head SHA, review, and required CI are observed. No deploy.
+Owner decisions OD-DG-8, OD-DG-9 (POS only), and OD-DG-6 (narrowed) are recorded. That is not merge authority. A PASS stamp still requires the exact Head SHA, review, and required CI. No deploy.
 
-**Next READY task:** none, until OD-DG-8 and OD-DG-9 are accepted. If both are accepted, the next implementation task is **DLV-POS-1** only, in a separate PR. Do not start it from this pass.
+**Next READY task: DLV-POS-1**, in a separate PR. Do not start it from this update.
