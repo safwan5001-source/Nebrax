@@ -1249,8 +1249,8 @@ Only evidence-backed statuses are recorded here; unlisted tasks of the horizon p
 | 1 | DLV-FOUNDATION-1 | done (merged; PR #1174, merge SHA `5e80830033aed602833afd091b28857f92d9f068`; PRE_MERGE_REVIEW: PASS and POST_MERGE_REVIEW: PASS recorded by the owner) | high | DLV-EVIDENCE-1 (done) | `docs/plans/pos/DLV-FOUNDATION-1-IMPLEMENTATION-REPORT.md` |
 | 2 | DELIVERY-DECISION-PASS-1 | done (merged; PR #1177, merge SHA `49ecc540a116acc9c503d87c34efeca7fa59cd2d`; records DG-1/DG-2/DG-3 only) | high | DLV-FOUNDATION-1 (done) | `docs/plans/pos/DELIVERY-DECISION-PASS-1-REPORT.md` |
 | 3 | DLV-ACCOUNTING-1 | done (merged; PR #1184, merge SHA `a1bc3769751a919643a335fd4b84ea43c241a221`; PRE_MERGE_REVIEW: PASS and POST_MERGE_REVIEW: PASS recorded by the owner; no deploy) | critical | DLV-FOUNDATION-1 (done) + DG-1/DG-2 + DG-3 simple-collector bound | PR #1184. Bounded to platform-collected AR clearing and `delivery_invoice_contexts`. No commission, fee tax, settlement, POS selector, or Hub. |
-| 4 | DELIVERY-DECISION-PASS-2 | in_review (PR #1193; owner acceptances recorded in the report, not yet merged) | high | DLV-ACCOUNTING-1 (done) | `docs/plans/pos/DELIVERY-DECISION-PASS-2-REPORT.md` |
-| 5 | DLV-POS-1 | **ready** (not started; do not start from PR #1193) | high | DLV-FOUNDATION-1 (done); DG-2 resolved; OD-DG-8 accepted; OD-DG-9 accepted for POS only | Decision pass 2. Canonical POS price unchanged. No new permission. No new channel price list. |
+| 4 | DELIVERY-DECISION-PASS-2 | done (merged; PR #1193, merge SHA `3a94eb36635208e33acc4dbd90572140c47e7e4c`; OD-DG-8, OD-DG-9 for POS, OD-DG-6 with narrowing) | high | DLV-ACCOUNTING-1 (done) | `docs/plans/pos/DELIVERY-DECISION-PASS-2-REPORT.md` |
+| 5 | DLV-POS-1 | in_review (not merged; manual platform selection on canonical POS checkout; no new permission; no channel pricing) | high | DLV-FOUNDATION-1 (done); DG-2 resolved; OD-DG-8 accepted; OD-DG-9 accepted for POS only | `docs/plans/pos/DLV-POS-1-IMPLEMENTATION-REPORT.md` |
 
 Owed gates — original text is DLV-EVIDENCE-1-REPORT.md §11. DG-1/DG-2/DG-3 resolutions are in DELIVERY-DECISION-PASS-1-REPORT.md. DG-6/DG-8/DG-9 acceptances are in DELIVERY-DECISION-PASS-2-REPORT.md.
 
@@ -1271,12 +1271,12 @@ Owed gates — original text is DLV-EVIDENCE-1-REPORT.md §11. DG-1/DG-2/DG-3 re
 A task must not be promoted to `ready` while any gate mapped to it is unresolved.
 
 **Dependency readiness after the acceptances on PR #1193 (not implementation):**
-- **DLV-POS-1 is READY.** No remaining decision gate. Not started. This documentation PR must not implement it.
+- **DLV-POS-1 is in review and is not merged.** It is no longer a decision gate. Do not start the next task from that PR.
 - **DLV-HUB-1 (full) is not READY.** DG-9-HUB and DG-6-TRIGGER (invoice creation/posting) remain open. Option B is accepted and is not by itself readiness.
 - **Projection-only Hub is not a task and is not READY.** DG-6-TRIGGER does not block it. It may be split into its own task only after DG-9-HUB is decided. Do not invent that task or start it here.
 - **DLV-COMMISSION-1 remains BLOCKED** (EXTERNAL_EVIDENCE_REQUIRED under DG-3).
 - **DLV-SETTLEMENT-1 remains BLOCKED** on COMMISSION-1 and per-platform DG-3 evidence.
 - DLV-RECON-1, REFUND-1, CLOSE-1, CONNECTOR-CORE-1 and the provider tasks remain blocked on their own dependencies.
 
-Next task after this PR is reviewed: DLV-POS-1, in a separate implementation PR. Do not start it from PR #1193.
+Next task after DLV-POS-1 is reviewed and merged is still not DLV-HUB-1. Do not start a hub, commission, settlement, or connector task from the POS PR.
 
