@@ -508,6 +508,7 @@ describe('PosPayment', () => {
     );
 
     expect(screen.getByTestId('pos-delivery-platforms').textContent).toContain('Jahez');
+    expect(screen.getByTestId('pos-delivery-platforms').querySelector('img')?.getAttribute('src')).toBe('/delivery-platforms/jahez.png');
     expect(screen.getByTestId('pos-platform-collected-note')).toBeTruthy();
     expect(screen.queryByRole('textbox', { name: 'Cash' })).toBeNull();
     fireEvent.click(screen.getByTestId('pos-confirm-payment'));

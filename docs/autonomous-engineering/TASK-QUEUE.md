@@ -1255,7 +1255,8 @@ Only evidence-backed statuses are recorded here; unlisted tasks of the horizon p
 | 7 | DELIVERY-DECISION-PASS-4 | done (merged; PR #1196, squash SHA `13808e15cfea2ded9e64bcfd4c838971f7581b3b`; OD-HUB-STATES and OD-HUB-IDENTITY accepted; projection specification READY; no Hub implementation in that PR) | high | DELIVERY-DECISION-PASS-3 (done); OD-DG-9-HUB; OD-DG-6 pre-post rule | `docs/plans/pos/DELIVERY-DECISION-PASS-4-REPORT.md` |
 | 8 | DLV-HUB-PROJECTION-1 | done (merged; PR #1198, squash SHA `07c3820a9603061819b9a580b671d975a5ccf0aa`; operational projection only; no invoice, payment, VAT, COGS, stock, POS session, or financial transition) | high | DELIVERY-DECISION-PASS-4 (done); OD-HUB-STATES; OD-HUB-IDENTITY; OD-DG-9-HUB | `docs/plans/pos/DLV-HUB-PROJECTION-1-IMPLEMENTATION-REPORT.md` |
 | 9 | DLV-HUB-UI-1 | done (merged; PR #1200, squash SHA `625366e1a61903d68935fd8c11f18a16778bd6b4`; operational workspace and shared platform presentation registry; no official logo file) | high | DLV-HUB-PROJECTION-1 (done) | `docs/plans/pos/DLV-HUB-UI-1-IMPLEMENTATION-REPORT.md` |
-| 10 | DLV-PLATFORM-MGMT-UI-1 | in_review (not merged; management workspace on the existing foundation API and the shared registry; no connector and no logo file) | high | DLV-HUB-UI-1 (done); DLV-FOUNDATION-1 (done) | `docs/plans/pos/DLV-PLATFORM-MGMT-UI-1-IMPLEMENTATION-REPORT.md` |
+| 10 | DLV-PLATFORM-MGMT-UI-1 | done (merged; PR #1203, squash SHA `bcc1563ed4659c1145c998b5097301ffa100fd09`; management workspace on the existing foundation API and the shared registry; no connector) | high | DLV-HUB-UI-1 (done); DLV-FOUNDATION-1 (done) | `docs/plans/pos/DLV-PLATFORM-MGMT-UI-1-IMPLEMENTATION-REPORT.md` |
+| 11 | DLV-PLATFORM-LOGOS-1 | in_review (not merged; six publisher App Store icons through the shared registry; logo plus name on management, Hub, and POS; no financial or connector change) | high | DLV-PLATFORM-MGMT-UI-1 (done); DLV-HUB-UI-1 (done); DLV-POS-1 (done) | `docs/plans/pos/DLV-PLATFORM-LOGOS-1-IMPLEMENTATION-REPORT.md` |
 
 Owed gates — original text is DLV-EVIDENCE-1-REPORT.md §11. DG-1/DG-2/DG-3 resolutions are in DELIVERY-DECISION-PASS-1-REPORT.md. DG-6/DG-8/DG-9 acceptances are in DELIVERY-DECISION-PASS-2-REPORT.md.
 
@@ -1276,13 +1277,14 @@ Owed gates — original text is DLV-EVIDENCE-1-REPORT.md §11. DG-1/DG-2/DG-3 re
 
 A task must not be promoted to `ready` while any gate mapped to it is unresolved.
 
-**Dependency readiness after DLV-PLATFORM-MGMT-UI-1 (in review, not merged):**
+**Dependency readiness after DLV-PLATFORM-LOGOS-1 (in review, not merged):**
+- **DLV-PLATFORM-MGMT-UI-1 is merged** (PR #1203, squash `bcc1563ed4659c1145c998b5097301ffa100fd09`). No production deploy.
 - **DLV-HUB-UI-1 is merged** (PR #1200, squash `625366e1a61903d68935fd8c11f18a16778bd6b4`). No production deploy.
 - **DLV-HUB-1 (full) is BLOCKED** and stays separate. Building the financial command is still blocked on DG-8-IMPORT. Enabling VAT recognition is still blocked on DG-3.
-- **DLV-PLATFORM-MGMT-UI-1 is configuration UI only.** It does not connect a provider, post, or change clearing. Do not start a second platform-management screen from this note.
+- **DLV-PLATFORM-LOGOS-1 is visual identity only.** It does not connect a provider, post, or change clearing. Do not add a second logo map.
 - **DLV-COMMISSION-1 remains BLOCKED** (EXTERNAL_EVIDENCE_REQUIRED under DG-3).
 - **DLV-SETTLEMENT-1 remains BLOCKED** on COMMISSION-1 and per-platform DG-3 evidence.
 - DLV-RECON-1, REFUND-1, CLOSE-1, CONNECTOR-CORE-1 and the provider tasks remain blocked on their own dependencies.
 
-Next step is review of DLV-PLATFORM-MGMT-UI-1. Do not merge it from this note. Do not start full HUB-1, commission, settlement, connector, or refund work. Merge != Deploy.
+Next step is review of DLV-PLATFORM-LOGOS-1. Do not merge it from this note. Do not start full HUB-1, commission, settlement, connector, or refund work. Merge != Deploy.
 

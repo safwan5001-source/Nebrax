@@ -14,7 +14,7 @@ export interface PosDeliveryPlatformOption {
   external_reference_policy: 'required' | 'optional' | 'none';
 }
 
-/** اسم المنصة دائماً ظاهر من السجل المركزي. لا شعار بعيد ولا إيموجي. */
+/** الاسم والشعار من السجل المركزي فقط. لا يُقرأ logo_asset_key كمسار صورة. */
 export function PosDeliveryPlatformPicker({
   platforms,
   selectedId,

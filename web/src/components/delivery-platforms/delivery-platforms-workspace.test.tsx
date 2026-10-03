@@ -49,7 +49,7 @@ function renderWorkspace(canManage = true) {
 }
 
 describe('DeliveryPlatformsWorkspace', () => {
-  it('shows every canonical platform by name, with a neutral mark and no connector state', () => {
+  it('shows every canonical platform by name and official logo, with no connector state', () => {
     renderWorkspace();
     for (const name of ['هنقرستيشن', 'جاهز', 'مرسول', 'كيتا', 'نينجا', 'ذا شيفز']) {
       expect(screen.getAllByText(name).length).toBeGreaterThan(0);
@@ -58,7 +58,9 @@ describe('DeliveryPlatformsWorkspace', () => {
     expect(screen.getByText('notAnIntegration')).toBeTruthy();
     expect(screen.getByText('configuredIsNotConnected')).toBeTruthy();
     expect(document.body.textContent).not.toMatch(/\bConnected\b|\bSynced\b|\bLive\b|API Active|متصل/);
-    expect(document.querySelector('[data-testid="delivery-platform-mark"] img')).toBeNull();
+    expect(document.querySelector('[data-testid="delivery-platform-mark"] img')?.getAttribute('src')).toMatch(/^\/delivery-platforms\/.+\.png$/);
+    expect(document.querySelector('[data-testid="delivery-platforms-desktop-table"] img')).toBeTruthy();
+    expect(document.querySelector('[data-testid="delivery-platforms-mobile-list"] img')).toBeTruthy();
     expect(document.querySelector('[dir="rtl"] [data-testid="delivery-platforms-desktop-table"] .text-start')).toBeTruthy();
     expect(screen.getByTestId('delivery-platforms-mobile-list')).toBeTruthy();
     expect(screen.getByText('الفرع الأول')).toBeTruthy();

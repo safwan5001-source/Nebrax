@@ -12,7 +12,7 @@ describe('delivery platform management', () => {
     const rows = platformManagementRows(readPlatformProfiles([]));
     expect(rows.map((row) => row.key)).toEqual(deliveryPlatformPresentations().map((platform) => platform.key));
     expect(rows.every((row) => row.status === 'unconfigured')).toBe(true);
-    expect(deliveryPlatformPresentations().every((platform) => platform.logoSrc === null)).toBe(true);
+    expect(deliveryPlatformPresentations().every((platform) => platform.logoSrc?.startsWith('/delivery-platforms/'))).toBe(true);
   });
 
   it('rejects a demo array and keeps an active profile distinct from an inactive one', () => {

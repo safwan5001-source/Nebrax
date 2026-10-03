@@ -3,11 +3,11 @@ import { deliveryHubActions, deliveryHubListPath, readHubContext, readHubOrders 
 import { deliveryPlatformLabel, deliveryPlatformPresentation, deliveryPlatformPresentations } from './delivery-platform-registry';
 
 describe('delivery platform registry', () => {
-  it('names every known platform and commits no logo file', () => {
+  it('names every known platform and points at its official logo file', () => {
     const keys = deliveryPlatformPresentations().map((platform) => platform.key);
     expect(keys).toEqual(['hungerstation', 'jahez', 'mrsool', 'keeta', 'ninja', 'the_chefz']);
     for (const platform of deliveryPlatformPresentations()) {
-      expect(platform.logoSrc).toBeNull();
+      expect(platform.logoSrc).toBe(`/delivery-platforms/${platform.key === 'the_chefz' ? 'the-chefz' : platform.key}.png`);
       expect(platform.fallback).toBe('monogram');
       expect(platform.nameAr.length).toBeGreaterThan(0);
       expect(platform.nameEn.length).toBeGreaterThan(0);
