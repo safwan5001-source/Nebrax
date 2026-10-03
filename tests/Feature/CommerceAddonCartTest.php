@@ -396,6 +396,34 @@ class CommerceAddonCartTest extends TestCase
     }
 
     /** @test */
+    public function a_stale_addon_relation_is_shown_unavailable_in_the_cart_and_excluded_from_the_subtotal(): void
+    {
+        $f = $this->fixture('ac-stale-cart');
+        $res = $this->add($f['store'], $f['bouquet'], ['addons' => [
+            ['product_id' => $f['chocolate']->id, 'quantity' => 2],
+            ['product_id' => $f['balloon']->id],
+        ]])->assertCreated();
+        $cart = $this->cartToken($res);
+        $this->assertSame(27500, $res->json('data.subtotal.amount_minor'));
+        $this->assertFalse($res->json('data.has_unavailable_items'));
+
+        // يخفّض التاجر حدّ الشوكولاتة تحت المختار ويعطّل علاقة البالون
+        $this->relate($f['store'], $f['bouquet'], [
+            ['addon_product_id' => $f['chocolate']->id, 'max_quantity' => 1],
+            ['addon_product_id' => $f['balloon']->id, 'is_active' => false],
+        ]);
+
+        $after = $this->getJson('/commerce/v1/cart', $this->headers($f['store'], $cart))->assertOk();
+        $lines = $this->byName($after);
+        $this->assertTrue($lines['باقة']['available']);
+        $this->assertFalse($lines['شوكولاتة']['available']);
+        $this->assertFalse($lines['بالون']['available']);
+        $this->assertSame(0, $lines['شوكولاتة']['line_total']['amount_minor']);
+        $this->assertTrue($after->json('data.has_unavailable_items'));
+        $this->assertSame(20000, $after->json('data.subtotal.amount_minor')); // الأب وحده
+    }
+
+    /** @test */
     public function lowering_the_max_quantity_after_adding_blocks_completion(): void
     {
         $f = $this->fixture('ac-reval-max');

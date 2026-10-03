@@ -4,6 +4,7 @@ namespace App\Services\Commerce;
 
 use App\Http\Resources\StorefrontProductResource;
 use App\Models\CommerceListing;
+use App\Models\CommerceCartItem;
 use App\Models\CommerceProductAddon;
 use App\Models\CommerceProductPersonalizationField;
 use App\Models\Product;
@@ -290,6 +291,34 @@ final class ProductAddonService
         }
 
         return $variantId === null;
+    }
+
+    /**
+     * هل ما زالت علاقة سطر الإضافة بأبيه قائمة؟ تُقرأ مقابل `commerce_product_addons` **الحالية** (قد يعدّلها
+     * التاجر بعد الإضافة للسلة): علاقة نشطة بنفس المتغيّر، كمية لكل أب ضمن الحد، وكمية الابن = لكل أب × كمية
+     * الأب. مصدر واحد يستعمله الإتمام (يرفض بـ`addon_unavailable`) وعرض السلة (يعلّم السطر غير متاح)، فلا
+     * يظهر في السلة سطرٌ متاحٌ يرفضه الإتمام.
+     */
+    public function relationHolds(CommerceCartItem $child, ?CommerceCartItem $parent): bool
+    {
+        if ($parent === null || $parent->product_id === null) {
+            return false;
+        }
+
+        $relation = CommerceProductAddon::query()
+            ->where('product_id', $parent->product_id)
+            ->where('addon_product_id', $child->product_id)
+            ->where('is_active', true)
+            ->first();
+        if ($relation === null || ($relation->addon_variant_id ?? null) !== ($child->product_variant_id ?? null)) {
+            return false;
+        }
+
+        $perParent = (int) ($child->per_parent_quantity ?? 0);
+
+        return $perParent >= 1
+            && $perParent <= $relation->max_quantity
+            && $child->quantity === $perParent * $parent->quantity;
     }
 
     /**

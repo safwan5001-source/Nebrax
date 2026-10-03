@@ -638,7 +638,9 @@ final class CommerceCartService
 
         $items = [];
         $subtotal = 0;
-        foreach ($cart->items()->with('personalizations')->orderBy('created_at')->orderBy('id')->get() as $line) {
+        $lines = $cart->items()->with('personalizations')->orderBy('created_at')->orderBy('id')->get();
+        $linesById = $lines->keyBy('id');
+        foreach ($lines as $line) {
             $available = false;
             $productName = $line->product_name_snapshot;
             $unitName = $line->unit_name_snapshot;
@@ -660,6 +662,14 @@ final class CommerceCartService
                 } catch (RuntimeException) {
                     // Retained unavailable lines are display/removal-only and total zero.
                 }
+            }
+
+            // FLOWERS-H6 — سطر إضافة لم تعد علاقته بأبيه قائمة (عُطّلت/حُذفت/نزل الحد) غير متاح كما يرفضه
+            // الإتمام: لا يدخل المجموع ويضيء has_unavailable_items فيعرف المتسوّق أن عليه إعادة بناء الأب.
+            if ($available && $line->parent_item_id !== null
+                && ! app(ProductAddonService::class)->relationHolds($line, $linesById->get($line->parent_item_id))) {
+                $available = false;
+                $unitPrice = 0;
             }
 
             $lineTotal = $available ? $this->safeMultiply($unitPrice, $line->quantity) : 0;
