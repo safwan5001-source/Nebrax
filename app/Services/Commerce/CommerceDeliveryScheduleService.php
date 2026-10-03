@@ -218,7 +218,7 @@ final class CommerceDeliveryScheduleService
         $earliestInstant = $local->addMinutes($setting->lead_time_minutes);
         // الإغلاق اليومي لحظةٌ لا مقارنة نصية `H:i`: عند رجوع الساعة يتكرّر الوقت الجداري فيعود النص أصغر من الإغلاق
         // ويُعاد فتح اليوم بعد إغلاقه. اللحظة تُحسم على أول وقوع (EDT) فما إن تُجتاز تبقى مجتازة؛ وفي فجوة الانتقال
-        // يُطبَّع الوقت إلى اللحظة التالية للفجوة.
+        // يُطبَّع الوقت الجداري المعدوم بإضافة طول الفجوة (02:30 ⇒ 03:30 EDT).
         $cutoffInstant = $setting->cutoff_time !== null ? $local->startOfDay()->setTimeFromTimeString($setting->cutoff_time) : null;
         $cutoffPassed = $cutoffInstant !== null && $local->greaterThanOrEqualTo($cutoffInstant);
 
