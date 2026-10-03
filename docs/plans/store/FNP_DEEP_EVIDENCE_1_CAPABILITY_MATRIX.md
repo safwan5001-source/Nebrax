@@ -133,7 +133,7 @@
 | Regional aliasing (Mecca=Jeddah, Dammam/Jubail/Dhahran=Khobar) | OBSERVED | https://api.fnp.qa/talaash/v1/web/product-list | Identical counts and feeds | HIGH | HIGH — zone clusters | — |
 | Per-region homepage CMS feeds | OBSERVED | https://api.fnp.qa/consumer/api/feed/active?type=homepage | KSA HP Riyadh / JED / EST / MED / default; Madinah 7 vs 9 components | HIGH | MED — regional merchandising | Who curates feeds? |
 | Unknown city falls back silently; API says serviceable:true with 0 products | OBSERVED | https://api.fnp.qa/talaash/v1/web/product-list?geoId=taif | UI normalises to Riyadh | HIGH | HIGH — serviceability semantics | — |
-| 21 SEO city landing pages | OBSERVED | https://www.fnp.sa/en/gifts-dammam | {gifts,flowers,cakes} × 8 cities; Madinah missing | HIGH | MED — city SEO | — |
+| 21 SEO city landing pages | OBSERVED | https://www.fnp.sa/en/gifts-dammam | 21 indexed city landing pages were observed across gifts/flowers/cakes; not every product-family × city combination exists, and Madinah is missing from this set | HIGH | MED — city SEO | Which family/city combinations are intentionally omitted? |
 
 ## Gifting identity, account, wishlist, orders, lifecycle, notifications (19)
 
