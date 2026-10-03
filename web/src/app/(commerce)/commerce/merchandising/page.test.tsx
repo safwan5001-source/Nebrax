@@ -428,6 +428,38 @@ describe('Merchandising — edits while a save or a later page is in flight', ()
   });
 });
 
+describe('Merchandising — load-more across an A→B→A search', () => {
+  it('ignores an old page-two response even when the text returns to the same query', async () => {
+    apiMock.mockResolvedValueOnce({ data: { facets: [occasion] } });
+    renderPage();
+    apiMock.mockResolvedValueOnce({ data: { facets: [occasion] } });
+    await userEvent.click(await screen.findByRole('tab', { name: 'Assign products' }));
+
+    const row = (id: string, name: string) => ({ id, name, sku: null, name_en: null, is_active: true, is_published: true, stores: [] });
+    apiMock.mockResolvedValueOnce({ data: [row('p1', 'Rose A')], meta: { current_page: 1, last_page: 3, per_page: 10, total: 25 } });
+    const search = await screen.findByLabelText('Search a product by name or SKU');
+    await userEvent.type(search, 'rose');
+    expect(await screen.findByText('Rose A', undefined, { timeout: 3000 })).toBeTruthy();
+
+    let finishOld: (value: unknown) => void = () => undefined;
+    apiMock.mockImplementationOnce(() => new Promise((resolve) => { finishOld = resolve; })); // page 2 of the first "rose"
+    await userEvent.click(screen.getByRole('button', { name: 'Show more' }));
+
+    await userEvent.clear(search);
+    apiMock.mockResolvedValueOnce({ data: [row('p3', 'Rose B')], meta: { current_page: 1, last_page: 3, per_page: 10, total: 25 } });
+    await userEvent.type(search, 'rose'); // back to the same text, a new generation
+    finishOld({ data: [row('p9', 'Stale page two')], meta: { current_page: 2, last_page: 3, per_page: 10, total: 25 } });
+
+    expect(await screen.findByText('Rose B', undefined, { timeout: 3000 })).toBeTruthy();
+    expect(screen.queryByText('Stale page two')).toBeNull();
+
+    apiMock.mockResolvedValueOnce({ data: [row('p4', 'Rose C')], meta: { current_page: 2, last_page: 3, per_page: 10, total: 25 } });
+    await userEvent.click(screen.getByRole('button', { name: 'Show more' }));
+    expect(await screen.findByText('Rose C')).toBeTruthy();
+    expect(apiMock).toHaveBeenLastCalledWith(expect.stringContaining('page=2'));
+  });
+});
+
 describe('Merchandising — assign tab', () => {
   it('guides to create dimensions first when there are none', async () => {
     apiMock.mockResolvedValueOnce({ data: { facets: [] } }); // facets tab

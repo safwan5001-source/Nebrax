@@ -36,11 +36,11 @@ export function ProductPicker({
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
-  // الاستعلام الحالي — استجابة «عرض المزيد» لاستعلامٍ قديم تُهمل.
-  const currentSearch = useRef(search);
-  currentSearch.current = search;
+  // جيل البحث: يزيد مع كل تغيّر في النص (حتى A→B→A يُنتج جيلاً جديداً) فتُهمل استجابة «عرض المزيد» القديمة.
+  const generation = useRef(0);
 
   useEffect(() => {
+    generation.current += 1;
     setPage(1);
     setHasMore(false);
     setMoreFailed(false);
@@ -57,6 +57,7 @@ export function ProductPicker({
         const page = await loadProductPublicationList({ search, perPage: 10 });
         if (!cancelled) {
           setResults(page.items.map((item) => ({ id: item.id, name: item.name, sku: item.sku })));
+          setPage(page.meta.currentPage);
           setHasMore(page.meta.currentPage < page.meta.lastPage);
           setFailed(false);
         }
@@ -74,12 +75,12 @@ export function ProductPicker({
 
   async function loadMore() {
     if (loadingMore) return;
-    const requestedSearch = search;
+    const requestedGeneration = generation.current;
     setLoadingMore(true);
     setMoreFailed(false);
     try {
-      const next = await loadProductPublicationList({ search: requestedSearch, perPage: 10, page: page + 1 });
-      if (currentSearch.current !== requestedSearch) return;
+      const next = await loadProductPublicationList({ search, perPage: 10, page: page + 1 });
+      if (generation.current !== requestedGeneration) return;
       setResults((current) => [
         ...(current ?? []),
         ...next.items.filter((item) => !(current ?? []).some((c) => c.id === item.id)).map((item) => ({ id: item.id, name: item.name, sku: item.sku })),
@@ -88,9 +89,9 @@ export function ProductPicker({
       setHasMore(next.meta.currentPage < next.meta.lastPage);
     } catch {
       // فشل صفحةٍ لاحقة لا يُخفي ما حُمِّل: تبقى الصفوف ويبقى الزرّ كإعادة محاولة.
-      if (currentSearch.current === requestedSearch) setMoreFailed(true);
+      if (generation.current === requestedGeneration) setMoreFailed(true);
     } finally {
-      if (currentSearch.current === requestedSearch) setLoadingMore(false);
+      if (generation.current === requestedGeneration) setLoadingMore(false);
     }
   }
 
