@@ -47,12 +47,6 @@ class DeliveryInvoiceContextService
             if (! $locked->isPosted()) {
                 throw new RuntimeException('سياق منصة التوصيل يُسجَّل على فاتورة مرحّلة فقط.');
             }
-            // فاتورة "مدفوعة بالفعل" (`InvoiceService::settle()`) حُصِّلت بسند
-            // قبض نقد/بنك عادي لحظة الترحيل — تسجيل سياق منصة بعد ذلك يناقض
-            // الواقع المحاسبي القائم فعلاً.
-            if ($locked->paid_amount > 0) {
-                throw new RuntimeException('لا يمكن تسجيل سياق منصة توصيل على فاتورة مُحصَّلة بالفعل.');
-            }
 
             $existing = DeliveryInvoiceContext::query()->where('invoice_id', $locked->id)->first();
             $explicitVersionId = $options['version_id'] ?? null;
@@ -78,6 +72,16 @@ class DeliveryInvoiceContextService
                 }
 
                 return $existing;
+            }
+
+            // فاتورة "مدفوعة بالفعل" (`InvoiceService::settle()`) حُصِّلت بسند
+            // قبض نقد/بنك عادي لحظة الترحيل — تسجيل سياق منصة **جديد** بعد ذلك
+            // يناقض الواقع المحاسبي القائم فعلاً. يُفحص هنا بعد التحقق من وجود
+            // سياق سابق لا قبله: تحصيل منصة لاحق لسياق مسجَّل مسبقاً صحيحٌ تماماً
+            // ويرفع paid_amount فوق صفر — إعادة محاولة التسجيل حينها تكرارٌ مشروع
+            // لا تناقض، ويجب أن تعيد الصف الثابت كما في أي إعادة محاولة أخرى.
+            if ($locked->paid_amount > 0) {
+                throw new RuntimeException('لا يمكن تسجيل سياق منصة توصيل جديد على فاتورة مُحصَّلة بالفعل.');
             }
 
             $resolved = $this->configService->resolve($profile, $locked->branch_id, $explicitVersionId);

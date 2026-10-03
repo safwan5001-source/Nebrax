@@ -477,6 +477,24 @@ class DeliveryPlatformAccountingTest extends TestCase
     }
 
     /** @test */
+    public function retrying_record_after_the_platform_itself_has_since_collected_the_invoice_is_still_idempotent(): void
+    {
+        $profile = $this->platformProfile('jahez', Version::COLLECTION_PLATFORM);
+        $invoice = $this->postedInvoice(100000);
+
+        $first = $this->contexts->record($invoice, $profile);
+        $this->collectPlatform($invoice, 115000, $profile);
+        $this->assertGreaterThan(0, $invoice->fresh()->paid_amount);
+
+        // إعادة محاولة مشروعة بعد أن حصّلت المنصة الفاتورة فعلاً (الحالة
+        // المتوقعة تماماً) — ليست سياقاً جديداً يناقض الواقع، بل تكرار لصفٍ قائم.
+        $second = $this->contexts->record($invoice, $profile);
+
+        $this->assertSame($first->id, $second->id);
+        $this->assertSame(1, DeliveryInvoiceContext::count());
+    }
+
+    /** @test */
     public function backfill_migration_refuses_an_active_non_group_custom_asset_account_at_1180_that_is_not_system_seeded(): void
     {
         $legacyTenant = Tenant::create(['name' => 'مستأجر قديم بحساب مطابق صادفةً', 'slug' => 'dlv-acc-1-coincidence']);

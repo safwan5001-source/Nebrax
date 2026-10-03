@@ -59,7 +59,13 @@ class DeliveryInvoiceContext extends BaseModel
             $context->tenant_id = $tenantId;
 
             // TenantScope: فاتورة مستأجر آخر لا تُحلّ وتُعامَل كغير موجودة.
-            $invoice = Invoice::query()->whereKey($context->invoice_id)->first();
+            // `lockForUpdate()`: يسلسل هذا الإنشاء مع أي `PaymentService::post()`
+            // متزامن يقفل الفاتورة نفسها — كلاهما داخل معاملة (الخدمة تفتحها
+            // دوماً؛ إنشاء مباشر خارج معاملة لا يستفيد من القفل، لكنه لا يفقد
+            // شيئاً كان موجوداً). بلا هذا القفل: قراءة `paid_amount` هنا يمكن أن
+            // تسبق التزام دفعة متزامنة تُحصِّل الفاتورة نقداً، فيُثبَّت سياق
+            // platform_collected على فاتورة سيتبيّن أنها حُصِّلت نقداً للتو.
+            $invoice = Invoice::query()->whereKey($context->invoice_id)->lockForUpdate()->first();
             if ($invoice === null) {
                 throw new DomainException('Delivery invoice context invoice must belong to the active tenant.');
             }
