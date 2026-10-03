@@ -60,7 +60,7 @@ PostgreSQL and SQLite both treat `NULL` as distinct inside a unique index. A key
 
 ## 4. State machine
 
-**ACCEPTED — OD-HUB-STATES.** Safwan accepted this section as documented: the states, the transitions, who may move them, branch immutability, the `reject` mapping, and the repeat-versus-reroute rule. Accepting this section does not accept §6 and does not authorize an automatic successor row. The last branch-immutability bullet points at §6. That pointer is read under the revised identity recommendation, which is not accepted: resending the same provider id is the same order, not a new row. No reopen or recreate command is designed here.
+**ACCEPTED — OD-HUB-STATES.** Safwan accepted the states, the transitions, who may move them, branch immutability, the `reject` mapping, and the repeat-versus-reroute rule. He then corrected the wrong-branch sentence: after `accepted` the branch is not changed; a wrong branch may be cancelled operationally; reopen, recreate, and reassignment after cancel are outside V1 and need a separate explicit decision and command. There is no automatic successor and no new intake of the same provider order id. The rest of this section is unchanged. Accepting it does not accept §6.
 
 This slice has no `posted` state and no transition into one. `handed_off` is operational completion only. It is not a sale.
 
@@ -117,7 +117,7 @@ Creating the row is an intake, not a view. Intake uses `delivery_hub.operate` ra
 - Missing or ambiguous store identity does not pick a branch.
 - Before `accepted`, the only branch writes are the two edges above.
 - At `accepted` and after, including `handed_off` and `cancelled_before_post`, the branch is not edited.
-- A wrong branch after accept is cancel, then a **new** intake of the same provider id (see §6). It is not an in-place edit.
+- After `accepted` the branch is not changed. A wrong branch may be cancelled operationally. Reopen, recreate, and reassignment after that cancel are outside V1 and need a separate explicit decision and command. There is no automatic successor and no new intake of the same provider order id.
 
 ---
 
@@ -188,10 +188,6 @@ Do not mint the identity from the display reference.
 
 Foreign tenant ids do not resolve. The error does not include another tenant's display name.
 
-### What the accepted §4 pointer does not do
-
-Accepted §4 says a wrong branch after accept is cancel, then a new intake of the same provider id, not an in-place branch edit. Under this recommendation that intake does not insert. The same checksum replays the cancelled row. A different checksum conflicts. The branch stays frozen. A second projection for that provider id would require a future explicit command, which this pass does not specify.
-
 ---
 
 ## 7. Tenant and branch isolation
@@ -231,7 +227,7 @@ Full DLV-HUB-1 stays **BLOCKED**. DG-8-IMPORT and DG-3 are untouched.
 
 ## Owner Decisions required
 
-1. **OD-HUB-STATES** — **ACCEPTED** as §4 (linear states, no `posted` in the projection, immutability at `accepted`, reroute only before accept via `canAccessBranch` on both branches, a same-state repeat does not apply when the destination branch changes, cancel from every non-terminal state, and `reject` is that same cancel terminal rather than a new state). Acceptance does not authorize a successor row.
+1. **OD-HUB-STATES** — **ACCEPTED** as §4 (linear states, no `posted` in the projection, immutability at `accepted`, reroute only before accept via `canAccessBranch` on both branches, a same-state repeat does not apply when the destination branch changes, cancel from every non-terminal state, and `reject` is that same cancel terminal rather than a new state). A wrong branch after accept may be cancelled operationally. It is not a new intake of the same provider order id. Reopen, recreate, and reassignment after cancel are outside V1.
 2. **OD-HUB-IDENTITY** — still required. Accept, narrow, or reject the **revised** §6. It is not accepted. The revision is: the provider triple is permanent across every state, including `cancelled_before_post`; cancel does not release `provider_order_id` and does not insert a successor; no reopen or recreate command is designed; branch stays out of the key; `external_order_reference` is display only; manual intake with no provider id uses a client UUID; the same UUID and the same checksum replay; the same UUID and a different checksum conflict; neither a provider id nor a UUID rejects the intake.
 
 No production deploy. This document does not merge itself and does not start an implementation.
