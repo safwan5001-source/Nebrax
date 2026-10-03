@@ -106,6 +106,31 @@ final class StorefrontCheckoutController extends PublicApiController
         );
     }
 
+    /**
+     * FLOWERS-H3 / ADR-15 — سياق الإهداء: مستلم التوصيل، المُرسِل المعروض، الرسالة.
+     * لا مبلغ ولا سعر ولا هوية محاسبية في الطلب. مرفوضٌ ما دامت سياسة الإهداء
+     * معطَّلة للقناة (ما عدا `is_gift=false` الذي يمسح دوماً).
+     */
+    public function updateGift(Request $request, CommerceCheckoutService $checkouts): JsonResponse
+    {
+        $this->rejectUnknown($request, ['is_gift', 'recipient_name', 'recipient_phone', 'sender_name', 'hide_sender', 'message']);
+        $data = $request->validate([
+            'is_gift' => ['sometimes', 'boolean'],
+            'recipient_name' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'recipient_phone' => ['sometimes', 'nullable', 'string', 'max:32', 'regex:/^[0-9+\-\s()]{5,32}$/'],
+            'sender_name' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'hide_sender' => ['sometimes', 'boolean'],
+            // الحد الفعلي (≤ 500) تفرضه الخدمة من سياسة القناة؛ هذا سقف دفاعي للحمولة.
+            'message' => ['sometimes', 'nullable', 'string', 'max:2000'],
+        ]);
+
+        return $this->withCurrentCheckout(
+            $request,
+            $checkouts,
+            fn (CommerceCheckout $checkout) => $checkouts->updateGift($checkout, $data),
+        );
+    }
+
     public function updateAddress(Request $request, CommerceCheckoutService $checkouts): JsonResponse
     {
         $allowed = ['country', 'region', 'city', 'district', 'street', 'postal_code', 'notes'];
@@ -284,6 +309,14 @@ final class StorefrontCheckoutController extends PublicApiController
                 // COM-MOBILE-SHIPPING-1: مسبقاً محسوباً ضمن `total` أعلاه —
                 // هذا الحقل تفصيلٌ للعرض فقط، لا مصدر حقيقة إضافياً.
                 'amount' => ['amount_minor' => $order->delivery_amount_minor, 'currency' => $currency],
+            ],
+            // FLOWERS-H3 / ADR-15 — لقطة الإهداء الثابتة؛ null لطلب بلا إهداء.
+            'gift' => $order->gift === null ? null : [
+                'recipient_name' => $order->gift->recipient_name,
+                'recipient_phone' => $order->gift->recipient_phone,
+                'sender_display_name' => $order->gift->sender_display_name,
+                'hide_sender' => (bool) $order->gift->hide_sender,
+                'message' => $order->gift->message,
             ],
             'payment' => [
                 'method' => $order->paymentIntent?->method,

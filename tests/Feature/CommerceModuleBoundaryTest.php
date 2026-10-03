@@ -91,6 +91,8 @@ class CommerceModuleBoundaryTest extends TestCase
         'api/commerce/workspace/storefronts/{id}/domains/{domainId}/make-primary',
         'api/commerce/workspace/storefronts/{id}/domains/{domainId}/refresh-edge',
         'api/commerce/workspace/storefronts/{id}/domains/{domainId}/verify',
+        // FLOWERS-H3 / ADR-15 — سياسة الإهداء.
+        'api/commerce/workspace/storefronts/{id}/gift-settings',
         'api/commerce/workspace/storefronts/{id}/presentation',
         'api/commerce/workspace/storefronts/{id}/presentation/publish',
         // CUST-H1-1 — أساس نسخ مظهر المتجر (list/create/read/save/rename/delete).
@@ -123,6 +125,8 @@ class CommerceModuleBoundaryTest extends TestCase
         'commerce/v1/checkout/complete',
         'commerce/v1/checkout/contact',
         'commerce/v1/checkout/delivery',
+        // FLOWERS-H3 / ADR-15 — هوية الإهداء ورسالته.
+        'commerce/v1/checkout/gift',
         // COM-MOBILE-PAYMENTS-1 — اختيار طريقة الدفع.
         'commerce/v1/checkout/payment',
         // FLOWERS-H2 / ADR-14 §2.3 — مجموعات تسويقية يدوية (قراءة فقط).

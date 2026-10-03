@@ -1,6 +1,6 @@
 # AWJ Flowers & Gifts — Horizon 1 Progress
 
-**Status:** IN PROGRESS — H1 and H2a merged; H2b–H2d in review/CI  
+**Status:** IN PROGRESS — H1 and H2 (a–d) merged; H3 in CI, H4 next  
 **Date:** 2026-10-03  
 **Planning Base:** `main` @ `318cc72d10bb304cef4b401f548772008ea1618e`  
 **Execution Authority:** `AWJ_FLOWERS_HORIZON_1_AUTONOMOUS_EXECUTION.md`  
@@ -21,7 +21,7 @@ Completed and merged before Horizon implementation:
 | Flowers & Gifts vertical direction | MERGED | PR #1179 / Merge SHA `318cc72d10bb304cef4b401f548772008ea1618e` |
 | Autonomous implementation Horizon | DOCUMENTATION IN PROGRESS | this planning branch |
 
-H1 and H2a are merged (see the per-slice log below). H2b–H2d are open as a temporary stack and are being merged strictly in order (review → CI → merge → sync main). H3 and H4 have open PRs (#1191, #1192) that are **on hold** until H2 is fully merged; H5 has a pushed branch with no PR, and H6 exists only locally. No further Flowers PR is opened until the backlog is reduced.
+H1 and all of H2 (a–d) are merged (see the per-slice log below). H3 and H4 have open PRs (#1191, #1192); each is rebuilt on the new main and merged strictly in order (review → CI → merge → sync main). H5 has a pushed branch with no PR, and H6 exists only locally. No further Flowers PR is opened until the backlog is reduced.
 
 No Deploy or Production change is authorized by this Horizon.
 
@@ -35,8 +35,8 @@ No Deploy or Production change is authorized by this Horizon.
 | H2a | Taxonomy — facets: ADR-14, data model, admin API | MERGED | #1187 | `fbc0eeb` |
 | H2b | Taxonomy — storefront/mobile facet filtering | MERGED | #1188 | `6c085e6` |
 | H2c | Taxonomy — collections | MERGED | #1189 | `5851d00` |
-| H2d | Taxonomy — merchandising admin UI | PR OPEN (#1190), in CI | #1190 | — |
-| H3 | Gifting Identity & Gift Message | ON HOLD (PR open, awaits H2) | #1191 | — |
+| H2d | Taxonomy — merchandising admin UI | MERGED | #1190 | `1e8ba70` |
+| H3 | Gifting Identity & Gift Message | PR OPEN (#1191), rebuilt on main, in CI | #1191 | — |
 | H4 | Personalization | ON HOLD (PR open, awaits H2) | #1192 | — |
 | H5 | Structured Product Content | NOT STARTED | — | — |
 | H6 | Add-ons | NOT STARTED | — | — |
@@ -231,6 +231,38 @@ Copy this section for every completed/active slice.
 #### Next
 
 - H2d (admin UI), then re-verify H3 and H4 against the new main.
+
+### H2d — Merchandising admin UI
+
+**Status:** MERGED  
+**Base SHA:** `5851d00893689ae29e1b94075e1de45f35827dea` (main after H2c)  
+**Branch:** `flowers/h2d-merchandising-admin-ui` (tree rebuilt as main + H2d after the H2c squash)  
+**PR:** #1190 (retargeted to `main`)  
+**Head SHA:** `723216f6afc7246f5be75564259fa08db337404a`  
+**Merge SHA:** `1e8ba7055d73db29770e307ad9b1f7f01fbe1cbb` (squash)
+
+#### What was implemented
+
+- Commerce-workspace page `/commerce/merchandising` (nav entry gated on `products.view`): dimensions (facets and values, core presets offered only when missing, enable/disable, delete blocked while assigned), collections (create/edit/status, members dialog with server-side search, reorder, remove, exact-order save, read-only member view for view-only users), and product assignment.
+- Review hardening: dialogs cannot be dismissed while a write is pending; only one activation in flight; stale save, stale load-more (including A→B→A) and stale picker rows are discarded; a failed load-more keeps loaded rows and offers retry; edits are locked while a save is pending; activation failures are shown; tab content is wrapped in the matching `TabPanel`.
+
+#### Tests / CI / visual
+
+- 26 vitest cases on the page, 11 on the client, nav and message-parity tests. CI (sqlite, pgsql, web build) green on the head.
+- Visual: Playwright spec `web/e2e/flowers-h2-merchandising.spec.ts` (AR 390/430/1024/1440, members dialog, collections, EN 390 LTR with keyboard focus, no horizontal overflow) was run and its screenshots reviewed before the review fixes; it was not re-run after the final rebuild.
+
+#### Tenant isolation / backward compatibility
+
+- Frontend-only; all writes go through the tenant-scoped admin APIs; no tenant identifier is sent. No ledger, inventory, price or checkout change.
+
+#### Deferred / risks
+
+- Tenant-wide product search in the collection picker for multi-branch tenants with product sharing disabled (needs a backend endpoint).
+- No automated browser run of the merchandising flow after the final review fixes.
+
+#### Next
+
+- H3 (gifting identity) then H4 (personalization), each rebuilt on the new main.
 
 ---
 

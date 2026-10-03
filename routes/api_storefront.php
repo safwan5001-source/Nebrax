@@ -69,6 +69,8 @@ Route::middleware([
         Route::post('checkout', [StorefrontCheckoutController::class, 'store'])->name('checkout.store');
         Route::patch('checkout/contact', [StorefrontCheckoutController::class, 'updateContact'])->name('checkout.contact.update');
         Route::patch('checkout/address', [StorefrontCheckoutController::class, 'updateAddress'])->name('checkout.address.update');
+        // FLOWERS-H3 / ADR-15 — هوية الإهداء ورسالته.
+        Route::patch('checkout/gift', [StorefrontCheckoutController::class, 'updateGift'])->name('checkout.gift.update');
         Route::patch('checkout/delivery', [StorefrontCheckoutController::class, 'updateDelivery'])->name('checkout.delivery.update');
         Route::patch('checkout/payment', [StorefrontCheckoutController::class, 'updatePayment'])->name('checkout.payment.update');
         Route::post('checkout/complete', [StorefrontCheckoutController::class, 'complete'])->name('checkout.complete');

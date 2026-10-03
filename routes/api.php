@@ -37,6 +37,7 @@ use App\Http\Controllers\Api\PreviewSessionController;
 use App\Http\Controllers\Api\PreviewExchangeReferenceController;
 use App\Http\Controllers\Api\CommercePaymentIntentController;
 use App\Http\Controllers\Api\CommerceShippingZoneController;
+use App\Http\Controllers\Api\CommerceGiftSettingsController;
 use App\Http\Controllers\Api\CommerceWorkspaceStorefrontsController;
 use App\Http\Controllers\Api\CommerceWorkspaceStorefrontPresentationController;
 use App\Http\Controllers\Api\CommerceWorkspaceStorefrontPresentationVersionController;
@@ -867,6 +868,10 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         // الهوية (commerce.manage). أفعال صريحة وليست PATCH عاماً.
         Route::post('commerce/workspace/storefronts/{id}/activate', [CommerceWorkspaceStorefrontsController::class, 'activate'])->middleware($perm('commerce.manage'));
         Route::post('commerce/workspace/storefronts/{id}/deactivate', [CommerceWorkspaceStorefrontsController::class, 'deactivate'])->middleware($perm('commerce.manage'));
+
+        // FLOWERS-H3 / ADR-15: سياسة الإهداء لقناة المتجر — قراءة وكتابة بـcommerce.manage.
+        Route::get('commerce/workspace/storefronts/{id}/gift-settings', [CommerceGiftSettingsController::class, 'show'])->whereUuid('id')->middleware($perm('commerce.manage'));
+        Route::put('commerce/workspace/storefronts/{id}/gift-settings', [CommerceGiftSettingsController::class, 'update'])->whereUuid('id')->middleware($perm('commerce.manage'));
 
         // STORE-ADMIN-ADOPT-1B-2: رؤية نطاقات متجر قائم — قراءة فقط،
         // بلا أي فعل كتابي على StorefrontDomain. نفس صلاحية 1B-1
