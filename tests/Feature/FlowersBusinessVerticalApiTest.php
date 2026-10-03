@@ -159,7 +159,7 @@ class FlowersBusinessVerticalApiTest extends TestCase
         $id = $seeded['storefront']->id;
 
         app(TenantContext::class)->set($auth['tenant_id']);
-        $product = Product::create(['name' => 'باقة ورد جوري', 'type' => 'goods', 'unit' => 'pcs']);
+        $product = Product::create(['name' => 'باقة ورد جوري', 'type' => 'good', 'unit' => 'piece']);
         app(TenantContext::class)->forget();
 
         $this->withToken($auth['token'])->putJson($this->path($id), ['business_vertical' => 'flowers_gifts'])->assertOk();
