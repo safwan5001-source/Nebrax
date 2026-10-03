@@ -12,6 +12,7 @@ use App\Models\Product;
 use App\Models\SalesChannel;
 use App\Models\Tenant;
 use App\Services\ApiClientKeyService;
+use App\Support\Commerce\CatalogFacetFilter;
 use App\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
@@ -267,6 +268,23 @@ class CommerceFacetStorefrontFilterTest extends TestCase
     }
 
     /** @test */
+    public function an_inactive_brand_filter_fails_closed(): void
+    {
+        $f = $this->floristFixture();
+        app(TenantContext::class)->set($f['tenant']->id);
+        $brand = Brand::create(['name' => 'علامة']);
+        $f['p']['roses']->update(['brand_id' => $brand->id]);
+        app(TenantContext::class)->forget();
+
+        $this->assertSame(['ورد جوري'], $this->names($this->list($f['tenant'], "brand_id={$brand->id}")));
+
+        app(TenantContext::class)->set($f['tenant']->id);
+        $brand->update(['is_active' => false]);
+        app(TenantContext::class)->forget();
+        $this->assertSame([], $this->names($this->list($f['tenant'], "brand_id={$brand->id}")));
+    }
+
+    /** @test */
     public function malformed_filter_input_is_rejected_with_422(): void
     {
         ['tenant' => $tenant] = $this->seedStore('bad');
@@ -275,6 +293,9 @@ class CommerceFacetStorefrontFilterTest extends TestCase
         $this->getJson("/store/v1/{$tenant->slug}/products?brand_id=not-a-uuid")->assertStatus(422);
         $many = implode('&', array_map(fn ($i) => "facet[k{$i}]=a", range(1, 11)));
         $this->getJson("/store/v1/{$tenant->slug}/products?{$many}")->assertStatus(422);
+        // أكثر من الحد من القيم في بُعد واحد: يُرفض بدل أن يُبتر فيُسقط قيمةً مجهولة صامتاً.
+        $tooMany = implode(',', array_map(fn ($i) => "v{$i}", range(1, CatalogFacetFilter::MAX_SLUGS_PER_FACET + 1)));
+        $this->getJson("/store/v1/{$tenant->slug}/products?facet[occasion]={$tooMany}")->assertStatus(422);
     }
 
     /** @test */
