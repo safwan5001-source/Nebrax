@@ -134,10 +134,20 @@ final class ProductAddonService
             ->whereIn('id', CommerceListing::query()->where('sales_channel_id', $channelId)->where('is_published', true)->select('product_id'))
             ->get()->keyBy('id');
 
+        $variants = ProductVariant::query()
+            ->whereIn('id', $relations->pluck('addon_variant_id')->filter())
+            ->where('is_active', true)
+            ->get()->keyBy('id');
+
         $out = [];
         foreach ($relations as $relation) {
             $addon = $products[$relation->addon_product_id] ?? null;
             if ($addon === null) {
+                continue;
+            }
+            // متغيّرٌ عُطِّل أو حُذف بعد ضبط العلاقة (FK يصفّر العمود): الإضافة غير قابلة للبيع فتُحذف
+            // من العرض بدل أن يرمي حلّ السعر استثناءً فيفشل تفصيل المنتج الأب كله.
+            if (! $this->variantStateSellable($addon, $relation->addon_variant_id, $variants->get($relation->addon_variant_id))) {
                 continue;
             }
 
@@ -146,7 +156,7 @@ final class ProductAddonService
                 continue;
             }
 
-            $variant = $relation->addon_variant_id !== null ? ProductVariant::query()->find($relation->addon_variant_id) : null;
+            $variant = $relation->addon_variant_id !== null ? $variants->get($relation->addon_variant_id) : null;
             $inStock = $warehouse !== null
                 ? $availability->forWarehouse($addon->id, $warehouse->id, $relation->addon_variant_id)->availableToSell > 0
                 : null;
@@ -201,6 +211,12 @@ final class ProductAddonService
             }
 
             $variantId = $row['product_variant_id'] ?? null;
+            $relationVariant = $relation->addon_variant_id !== null
+                ? ProductVariant::query()->whereKey($relation->addon_variant_id)->where('is_active', true)->first()
+                : null;
+            if (! $this->variantStateSellable(Product::query()->find($productId), $relation->addon_variant_id, $relationVariant)) {
+                throw ValidationException::withMessages(['addons' => 'إضافة غير متاحة لهذا المنتج.']);
+            }
             if (($relation->addon_variant_id ?? null) !== ($variantId ?: null)) {
                 throw ValidationException::withMessages(['addons' => 'متغيّر الإضافة لا يطابق المعرَّف للمنتج.']);
             }
@@ -214,6 +230,22 @@ final class ProductAddonService
         }
 
         return array_values($out);
+    }
+
+    /**
+     * حالة متغيّر العلاقة سليمة: منتجٌ متعدد المتغيّرات يحتاج متغيّراً نشطاً موجوداً، ومنتجٌ بسيط
+     * لا يحمل متغيّراً. (لا استثناء ولا تخمين: تُستعمل قبل أي حلّ سعر أو توفّر.)
+     */
+    private function variantStateSellable(?Product $addon, ?string $variantId, ?ProductVariant $variant): bool
+    {
+        if ($addon === null) {
+            return false;
+        }
+        if ($addon->isVariantManaged()) {
+            return $variantId !== null && $variant !== null && $variant->product_id === $addon->id;
+        }
+
+        return $variantId === null;
     }
 
     /**

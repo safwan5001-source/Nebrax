@@ -306,4 +306,48 @@ class CommerceProductAddonApiTest extends TestCase
         $this->getJson("/commerce/v1/products/{$pb->id}", $headersA)->assertNotFound();
         $this->assertSame([$ab->id], array_column($this->getJson("/commerce/v1/products/{$pb->id}", $headersB)->assertOk()->json('data.addons'), 'product_id'));
     }
+
+    /** @return array{0: Product, 1: \App\Models\ProductVariant} */
+    private function variantAddon(Tenant $tenant, SalesChannel $channel): array
+    {
+        app(TenantContext::class)->set($tenant->id);
+        $product = Product::create(['name' => 'وردة', 'sku' => 'ROSE-'.Str::random(5), 'sale_price' => 2000, 'unit' => 'piece', 'is_active' => true]);
+        $color = $product->options()->create(['tenant_id' => $tenant->id, 'name' => 'اللون', 'name_key' => 'اللون', 'sort_order' => 0]);
+        $red = $color->values()->create(['tenant_id' => $tenant->id, 'value' => 'أحمر', 'value_key' => 'أحمر', 'sort_order' => 0]);
+        $variants = app(\App\Services\ProductVariantService::class);
+        $variants->enableVariantManagement($product, null);
+        $variant = $variants->createSingleVariant($product->fresh(), [$red->id], null)['variant'];
+        $variant->unitPrices()->create(['tenant_id' => $tenant->id, 'product_id' => $product->id, 'unit_name' => $product->unit, 'price' => 2500]);
+        CommerceListing::create(['product_id' => $product->id, 'sales_channel_id' => $channel->id, 'is_published' => true]);
+        app(TenantContext::class)->forget();
+
+        return [$product->fresh(), $variant->fresh()];
+    }
+
+    /** @test */
+    public function a_disabled_or_deleted_addon_variant_drops_the_addon_instead_of_failing_the_parent_detail(): void
+    {
+        ['tenant' => $tenant, 'channel' => $channel] = $this->publicStore('ad-variant');
+        $bouquet = $this->publish($tenant, $channel, 'باقة');
+        [$rose, $red] = $this->variantAddon($tenant, $channel);
+        $this->relate($tenant, $bouquet, [['addon_product_id' => $rose->id, 'addon_variant_id' => $red->id]]);
+        $url = "/store/v1/{$tenant->slug}/products/{$bouquet->id}";
+
+        $addons = $this->getJson($url)->assertOk()->json('data.addons');
+        $this->assertSame([$red->id], array_column($addons, 'product_variant_id'));
+        $this->assertSame(2500, $addons[0]['price']['amount_minor']);
+
+        // تعطيل المتغيّر
+        app(TenantContext::class)->set($tenant->id);
+        app(\App\Services\ProductVariantService::class)->updateVariant($red->fresh(), ['is_active' => false], null);
+        app(TenantContext::class)->forget();
+        $this->assertArrayNotHasKey('addons', $this->getJson($url)->assertOk()->json('data'));
+
+        // حذف المتغيّر (FK يصفّر addon_variant_id) — يبقى التفصيل سليماً
+        app(TenantContext::class)->set($tenant->id);
+        app(\App\Services\ProductVariantService::class)->updateVariant($red->fresh(), ['is_active' => true], null);
+        \Illuminate\Support\Facades\DB::table('commerce_product_addons')->update(['addon_variant_id' => null]);
+        app(TenantContext::class)->forget();
+        $this->assertArrayNotHasKey('addons', $this->getJson($url)->assertOk()->json('data'));
+    }
 }
