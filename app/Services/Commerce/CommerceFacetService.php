@@ -7,6 +7,7 @@ use App\Models\CommerceFacetValue;
 use App\Models\CommerceProductFacetValue;
 use App\Models\Product;
 use App\Models\Tenant;
+use App\Tenancy\BranchScope;
 use App\Tenancy\TenantContext;
 use DomainException;
 use Illuminate\Database\QueryException;
@@ -271,7 +272,9 @@ final class CommerceFacetService
 
         return DB::transaction(function () use ($product, $valueIds) {
             // يُسلسل التعديلات المتزامنة على المنتج نفسه.
-            Product::withoutGlobalScopes()->whereKey($product->id)->lockForUpdate()->first();
+            // BranchScope وحده يُرفع (الإسناد تصنيفٌ على مستوى المؤسسة)؛ TenantScope وSoftDeletes يبقيان،
+            // فمنتجٌ حُذف بين تحميل المتحكّم وهذا القفل يُرفض (404) ولا يُترك له إسناد.
+            Product::withoutGlobalScope(BranchScope::class)->whereKey($product->id)->lockForUpdate()->firstOrFail();
 
             // يمسك صفوف الأبعاد المعنيّة (مرتَّبةً بالمعرّف تجنّباً للتشابك) فيُسلسل الإسناد مع
             // حذف/تعطيل القيمة أو البُعد، ثم يُعاد تحميل القيم تحت القفل فلا نعتمد قراءةً قديمة.
