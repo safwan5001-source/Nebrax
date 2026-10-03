@@ -6,7 +6,7 @@
 **Base SHA (`origin/main` at start):** `615d634a1ab387b12b5124917ff435c762f1aca3`
 **That SHA is the squash of PR #1195 (DELIVERY-DECISION-PASS-3).** It was the tip of `origin/main` when this branch was cut. This file does not embed its own commit hash.
 
-OD-HUB-STATES is an Owner Decision and is **ACCEPTED** as §4. OD-HUB-IDENTITY remains a recommendation and is **NOT ACCEPTED**. The revised §6 is for review. The agent does not accept it.
+OD-HUB-STATES is an Owner Decision and is **ACCEPTED** as §4. OD-HUB-IDENTITY is an Owner Decision and is **ACCEPTED** as the revised §6: the provider triple is permanent. Neither acceptance starts an implementation.
 
 Not reopened: OD-DG-9-HUB, OD-DG-6-TRIGGER, DG-1, DG-2, DG-5, OD-DG-8 (POS price), OD-DG-9-POS, and the accepted narrowing of DG-6 (pre-post has no ledger effect).
 
@@ -16,15 +16,15 @@ Not decided here: DG-8-IMPORT, DG-3, DG-4, DG-7, connectors, webhooks, commissio
 
 ## 1. What this pass is for
 
-Pass 3 left the projection-only slice **not ready** because §9 (state table) and §14 (order identity) were not accepted. This pass tightens those two requirements against current repository evidence. It does not implement them. Safwan accepted the state machine. He did not accept the identity recommendation, and the identity text below is a revision for review, not an acceptance.
+Pass 3 left the projection-only slice **not ready** because §9 (state table) and §14 (order identity) were not accepted. This pass tightened those two requirements. It does not implement them. Safwan accepted the state machine and then accepted the revised permanent identity.
 
 | Question | Classification | Result |
 |---|---|---|
-| Operational states, transitions, branch immutability, and who may move each state | **ACCEPTED** | OD-HUB-STATES. §4 as documented. Not a build permit. |
-| Identity and intake idempotency, including manual intake with no provider id | **NEW DECISION REQUIRED** | Revised recommendation §6. Not accepted. The provider triple is permanent. Cancel does not release it and does not insert a successor. |
-| Projection-only Hub slice | Still blocked on the identity decision | **NOT READY.** Not a queue task. Not started. |
+| Operational states, transitions, branch immutability, and who may move each state | **ACCEPTED** | OD-HUB-STATES. §4. Not a build by itself. |
+| Identity and intake idempotency, including manual intake with no provider id | **ACCEPTED** | OD-HUB-IDENTITY. Revised §6. The provider triple is permanent. Cancel does not release it and does not insert a successor. |
+| Projection-only Hub slice | Decisions for this slice are accepted | **READY as a specification. Not started.** This PR does not open or start the implementation. |
 
-The slice, even after §6 is later accepted, still must not call `InvoiceService`, `PaymentService`, or inventory, and must not open a POS session.
+The slice is accepted only as an operational projection. It still must not call `InvoiceService`, `PaymentService`, or inventory, and must not open a POS session or take a financial transition.
 
 ---
 
@@ -127,14 +127,14 @@ Creating the row is an intake, not a view. Intake uses `delivery_hub.operate` ra
 |---|---|---|
 | A. Human `external_order_reference` alone | Whatever the operator typed | The accounting migration already says this value is not an identity. Two orders can share a display number. A retry can duplicate. |
 | B. Copy POS: `tenant + branch + key` | Includes branch | Branch is often null at intake, and `NULL` does not collide in the unique indexes this repo runs on. The same provider id could then exist twice. |
-| C. Pass 3 §14 forever, including cancelled rows | `tenant + profile + provider_order_id` for every row that has a provider id | A second intake cannot insert. That is now the required V1 rule, not a defect. **Revised recommendation. Not accepted.** |
+| C. Pass 3 §14 forever, including cancelled rows | `tenant + profile + provider_order_id` for every row that has a provider id | A second intake cannot insert. That is the required V1 rule. **ACCEPTED** as OD-HUB-IDENTITY. |
 | D. Same triple for the **live** row only, released by cancel so one successor can be inserted | Branch stays out. Display reference stays out. | Owner refused the release. Cancellation must not create a new row for the same provider id. **Withdrawn. Not recommended.** |
 
 ---
 
-## 6. Identity recommendation
+## 6. Identity
 
-**RECOMMENDATION — NOT ACCEPTED.** Safwan refused the previous text, which released the provider id on cancel. This section is the revision for review. The agent does not accept it.
+**ACCEPTED — OD-HUB-IDENTITY.** Safwan accepted this revised section. The provider identity is permanent: `tenant_id + delivery_platform_profile_id + provider_order_id`, including after `cancelled_before_post`. The earlier text that released the provider id on cancel stays withdrawn. Accepting this section does not start an implementation.
 
 ### Two values
 
@@ -184,7 +184,7 @@ Do not mint the identity from the display reference.
 - The cancelled manual row keeps that UUID. This pass does not define a recreate command, and a different UUID is not an automatic reopen of the cancelled row.
 - The row still requires a resolvable `delivery_platform_profile_id`. An unknown platform is rejected. This pass does not invent a profile-less order.
 - If both a provider id and an intake UUID are present, the UUID is tested first. An existing UUID returns or conflicts and never falls through into an insert. A new UUID still cannot create a second row when that provider triple already exists in any state (step 2).
-- V1 does not attach a provider id onto a row that was created without one. That would be a second identity rule and is not recommended here.
+- V1 does not attach a provider id onto a row that was created without one. That would be a second identity rule and is outside this accepted rule.
 
 Foreign tenant ids do not resolve. The error does not include another tenant's display name.
 
@@ -203,7 +203,7 @@ Foreign tenant ids do not resolve. The error does not include another tenant's d
 
 ## 8. What stays outside this slice
 
-Even after an acceptance of §6, the projection still excludes:
+§6 is accepted. The projection still excludes:
 
 - `InvoiceService`, `PaymentService`, journals, VAT, COGS, stock movements, and POS sessions;
 - the explicit post command (OD-DG-6-TRIGGER's shape stays accepted, and building it stays blocked on DG-8-IMPORT and DG-3);
@@ -217,17 +217,19 @@ Even after an acceptance of §6, the projection still excludes:
 
 ## 9. Readiness
 
-**Projection-only Hub: NOT READY. Not a queue row. Not started.**
+**Projection-only Hub: READY as a specification. Not started. This PR does not open an implementation row and does not start one.**
 
-OD-HUB-STATES is accepted. OD-DG-9-HUB and the pre-post accounting rule are already accepted. None of that is sufficient. OD-HUB-IDENTITY is a revised recommendation and is not accepted. Marking the slice `ready` would accept §6 without Safwan. Accepting the state machine does not start an implementation.
+The decisions that blocked this slice were OD-HUB-STATES, OD-HUB-IDENTITY, and the already accepted OD-DG-9-HUB, together with the accepted pre-post rule. Those are now accepted. DG-8-IMPORT and DG-3 do not block a projection that does not post, does not choose an imported price, and does not recognize VAT.
 
-Full DLV-HUB-1 stays **BLOCKED**. DG-8-IMPORT and DG-3 are untouched.
+READY here means a later implementation may build only the operational projection: a tenant-owned row, the §4 state machine, the permanent §6 identity, a client UUID when there is no provider id, and the OD-DG-9-HUB branch rules. It must not call `InvoiceService`, `PaymentService`, or inventory. It must not open a POS session, post an invoice, or take the financial transition.
+
+Full DLV-HUB-1 stays **BLOCKED** and separate. Building its financial command stays blocked on DG-8-IMPORT. Enabling VAT recognition stays blocked on DG-3. Those gates are untouched.
 
 ---
 
-## Owner Decisions required
+## Owner Decisions
 
 1. **OD-HUB-STATES** — **ACCEPTED** as §4 (linear states, no `posted` in the projection, immutability at `accepted`, reroute only before accept via `canAccessBranch` on both branches, a same-state repeat does not apply when the destination branch changes, cancel from every non-terminal state, and `reject` is that same cancel terminal rather than a new state). A wrong branch after accept may be cancelled operationally. It is not a new intake of the same provider order id. Reopen, recreate, and reassignment after cancel are outside V1.
-2. **OD-HUB-IDENTITY** — still required. Accept, narrow, or reject the **revised** §6. It is not accepted. The revision is: the provider triple is permanent across every state, including `cancelled_before_post`; cancel does not release `provider_order_id` and does not insert a successor; no reopen or recreate command is designed; branch stays out of the key; `external_order_reference` is display only; manual intake with no provider id uses a client UUID; the same UUID and the same checksum replay; the same UUID and a different checksum conflict; neither a provider id nor a UUID rejects the intake.
+2. **OD-HUB-IDENTITY** — **ACCEPTED** as the revised §6. The provider triple `tenant_id + delivery_platform_profile_id + provider_order_id` is permanent across every state, including `cancelled_before_post`. Cancel does not release `provider_order_id` and does not insert a successor. No reopen or recreate command is specified. Branch stays out of the key. `external_order_reference` is display only. Manual intake with no provider id uses a client UUID. The same UUID and the same checksum replay. The same UUID and a different checksum conflict. Neither a provider id nor a UUID rejects the intake.
 
 No production deploy. This document does not merge itself and does not start an implementation.

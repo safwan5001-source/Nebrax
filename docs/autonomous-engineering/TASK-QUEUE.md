@@ -1252,7 +1252,7 @@ Only evidence-backed statuses are recorded here; unlisted tasks of the horizon p
 | 4 | DELIVERY-DECISION-PASS-2 | done (merged; PR #1193, merge SHA `3a94eb36635208e33acc4dbd90572140c47e7e4c`; OD-DG-8, OD-DG-9 for POS, OD-DG-6 with narrowing) | high | DLV-ACCOUNTING-1 (done) | `docs/plans/pos/DELIVERY-DECISION-PASS-2-REPORT.md` |
 | 5 | DLV-POS-1 | done (merged; PR #1194, squash SHA `42c0deb91909755fa1e59cada84fa90f57a897cd`; owner confirmed the merge; no production deploy; this pass does not repeat post-merge review) | high | DLV-FOUNDATION-1 (done); DG-2 resolved; OD-DG-8 accepted; OD-DG-9 accepted for POS only | `docs/plans/pos/DLV-POS-1-IMPLEMENTATION-REPORT.md` |
 | 6 | DELIVERY-DECISION-PASS-3 | done (merged; PR #1195, squash SHA `615d634a1ab387b12b5124917ff435c762f1aca3`; OD-DG-9-HUB and OD-DG-6-TRIGGER accepted; DG-8-IMPORT and DG-3 not accepted; no Hub implementation) | high | DLV-POS-1 (done); OD-DG-6 accepted with narrowing | `docs/plans/pos/DELIVERY-DECISION-PASS-3-REPORT.md` |
-| 7 | DELIVERY-DECISION-PASS-4 | in_review (not merged; OD-HUB-STATES accepted in this PR; OD-HUB-IDENTITY revised and not accepted; slice is not ready) | high | DELIVERY-DECISION-PASS-3 (done); OD-DG-9-HUB; OD-DG-6 pre-post rule | `docs/plans/pos/DELIVERY-DECISION-PASS-4-REPORT.md` |
+| 7 | DELIVERY-DECISION-PASS-4 | in_review (not merged; OD-HUB-STATES and OD-HUB-IDENTITY accepted in this PR; projection-only specification is READY and not started; full HUB-1 stays blocked) | high | DELIVERY-DECISION-PASS-3 (done); OD-DG-9-HUB; OD-DG-6 pre-post rule | `docs/plans/pos/DELIVERY-DECISION-PASS-4-REPORT.md` |
 
 Owed gates — original text is DLV-EVIDENCE-1-REPORT.md §11. DG-1/DG-2/DG-3 resolutions are in DELIVERY-DECISION-PASS-1-REPORT.md. DG-6/DG-8/DG-9 acceptances are in DELIVERY-DECISION-PASS-2-REPORT.md.
 
@@ -1275,12 +1275,12 @@ A task must not be promoted to `ready` while any gate mapped to it is unresolved
 
 **Dependency readiness after DELIVERY-DECISION-PASS-4 (in review, not merged):**
 - **DLV-POS-1 is merged** (PR #1194, squash `42c0deb91909755fa1e59cada84fa90f57a897cd`). No production deploy.
-- **DELIVERY-DECISION-PASS-3 is merged** (PR #1195, squash `615d634a1ab387b12b5124917ff435c762f1aca3`). OD-DG-9-HUB and OD-DG-6-TRIGGER stand. They are not a build permit.
-- **DLV-HUB-1 (full) is BLOCKED.** Building the financial command is still blocked on DG-8-IMPORT. Enabling VAT recognition is still blocked on DG-3.
-- **Projection-only Hub is not a task and is not READY.** OD-HUB-STATES is accepted as the linear projection state machine. OD-HUB-IDENTITY is revised and not accepted: `tenant + profile + provider_order_id` stays unique after cancel, and cancel does not insert a successor. The slice still must not post. Do not invent the task or start it from this PR.
+- **DELIVERY-DECISION-PASS-3 is merged** (PR #1195, squash `615d634a1ab387b12b5124917ff435c762f1aca3`). OD-DG-9-HUB and OD-DG-6-TRIGGER stand. They are not a build permit for the financial command.
+- **DLV-HUB-1 (full) is BLOCKED** and stays separate. Building the financial command is still blocked on DG-8-IMPORT. Enabling VAT recognition is still blocked on DG-3.
+- **Projection-only Hub specification is READY and is not started.** OD-HUB-STATES, OD-HUB-IDENTITY, and OD-DG-9-HUB are accepted, with the pre-post rule. READY means a later implementation of the operational projection only: no `InvoiceService`, no `PaymentService`, no VAT, no COGS, no stock movement, no POS session, and no financial transition. This PR does not add that task and does not start it.
 - **DLV-COMMISSION-1 remains BLOCKED** (EXTERNAL_EVIDENCE_REQUIRED under DG-3).
 - **DLV-SETTLEMENT-1 remains BLOCKED** on COMMISSION-1 and per-platform DG-3 evidence.
 - DLV-RECON-1, REFUND-1, CLOSE-1, CONNECTOR-CORE-1 and the provider tasks remain blocked on their own dependencies.
 
-Next step is an Owner Decision on the revised OD-HUB-IDENTITY. OD-HUB-STATES is accepted and is not a build permit. Do not start a hub, commission, settlement, connector, or refund task from this PR.
+Next step is not an implementation. Do not start the projection Hub, full HUB-1, commission, settlement, connector, or refund work from this PR. Merge != Deploy.
 

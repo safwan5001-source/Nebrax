@@ -2,13 +2,13 @@
 
 > This file is a durable resume point, not a substitute for Git/GitHub evidence.
 
-LAST_UPDATED: 2026-10-03 (**AWJ Delivery Platforms & Settlement Horizon V1 is the single ACTIVE horizon.** DLV-EVIDENCE-1 through DLV-POS-1 are merged. DELIVERY-DECISION-PASS-3 is merged at `615d634a1ab387b12b5124917ff435c762f1aca3` (PR #1195): OD-DG-9-HUB and OD-DG-6-TRIGGER are accepted. No production deploy. **DELIVERY-DECISION-PASS-4 is in review and not merged.** OD-HUB-STATES is accepted in that PR as the projection state machine. OD-HUB-IDENTITY is a revised recommendation and is not accepted: the provider triple stays permanent, and cancel does not insert a successor. The projection-only Hub is not READY. Full DLV-HUB-1 stays BLOCKED on DG-8-IMPORT and DG-3. No deploy.)
+LAST_UPDATED: 2026-10-03 (**AWJ Delivery Platforms & Settlement Horizon V1 is the single ACTIVE horizon.** DLV-EVIDENCE-1 through DLV-POS-1 are merged. DELIVERY-DECISION-PASS-3 is merged at `615d634a1ab387b12b5124917ff435c762f1aca3` (PR #1195): OD-DG-9-HUB and OD-DG-6-TRIGGER are accepted. No production deploy. **DELIVERY-DECISION-PASS-4 is in review and not merged.** OD-HUB-STATES and OD-HUB-IDENTITY are accepted in that PR. The projection-only Hub specification is READY and not started: operational projection only, no invoice, payment, VAT, COGS, stock, POS session, or financial transition. Full DLV-HUB-1 stays BLOCKED on DG-8-IMPORT and DG-3. No deploy.)
 LAYER_VERSION: V1
 STATUS: ACTIVE — AWJ Delivery Platforms & Settlement Horizon V1 (authoritative queue: `TASK-QUEUE.md`, section "Horizon: AWJ Delivery Platforms & Settlement V1"). Every snapshot, STATUS and objective below this section is historical and superseded.
 
 ## Current objective
 
-DELIVERY-DECISION-PASS-4 is in review. Do not merge it from this note and do not deploy. OD-HUB-STATES is accepted in the unmerged report. OD-HUB-IDENTITY is revised and is not an Owner Decision. Do not start a projection-only Hub, DLV-HUB-1, commission, settlement, connectors, or refunds. DG-8-IMPORT and DG-3 stay open. Merge != Deploy.
+DELIVERY-DECISION-PASS-4 is in review. Do not merge it from this note and do not deploy. OD-HUB-STATES and OD-HUB-IDENTITY are accepted in the unmerged report. The projection-only specification is READY and must not be started from this PR. Do not start DLV-HUB-1, commission, settlement, connectors, or refunds. DG-8-IMPORT and DG-3 stay open and still block only the financial command. Merge != Deploy.
 
 ## Previous snapshot (historical, superseded)
 
