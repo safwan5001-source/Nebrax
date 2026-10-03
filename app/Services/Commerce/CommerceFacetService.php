@@ -6,6 +6,7 @@ use App\Models\CommerceFacet;
 use App\Models\CommerceFacetValue;
 use App\Models\CommerceProductFacetValue;
 use App\Models\Product;
+use App\Models\Tenant;
 use App\Tenancy\TenantContext;
 use DomainException;
 use Illuminate\Database\QueryException;
@@ -54,22 +55,27 @@ final class CommerceFacetService
     /** @param array{key: string, name: string, name_en?: ?string, system_key?: ?string, sort_order?: int, is_active?: bool} $data */
     public function createFacet(array $data): array
     {
-        $this->tenantId();
-
-        if (CommerceFacet::query()->count() >= self::MAX_FACETS) {
-            throw new CommerceTaxonomyConflictException('بلغت الحد الأقصى لعدد الأبعاد.');
-        }
+        $tenantId = $this->tenantId();
 
         try {
             // معاملة (savepoint عند التداخل) كي لا ينتهك القيد الفريد معاملةً خارجية قائمة (PostgreSQL).
-            $facet = DB::transaction(fn () => CommerceFacet::create([
-                'key' => $data['key'],
-                'system_key' => $data['system_key'] ?? null,
-                'name' => trim($data['name']),
-                'name_en' => $this->nullableTrim($data['name_en'] ?? null),
-                'sort_order' => $data['sort_order'] ?? 0,
-                'is_active' => $data['is_active'] ?? true,
-            ]));
+            $facet = DB::transaction(function () use ($data, $tenantId) {
+                // قفل صفّ المستأجر يُسلسل العدّ والإدراج، فلا يتجاوز طلبان متزامنان الحدّ.
+                Tenant::query()->whereKey($tenantId)->lockForUpdate()->first();
+
+                if (CommerceFacet::query()->count() >= self::MAX_FACETS) {
+                    throw new CommerceTaxonomyConflictException('بلغت الحد الأقصى لعدد الأبعاد.');
+                }
+
+                return CommerceFacet::create([
+                    'key' => $data['key'],
+                    'system_key' => $data['system_key'] ?? null,
+                    'name' => trim($data['name']),
+                    'name_en' => $this->nullableTrim($data['name_en'] ?? null),
+                    'sort_order' => $data['sort_order'] ?? 0,
+                    'is_active' => $data['is_active'] ?? true,
+                ]);
+            });
         } catch (QueryException $e) {
             throw $this->uniqueOr($e, 'المفتاح أو البُعد النظامي مستخدم بالفعل.');
         }
@@ -125,39 +131,47 @@ final class CommerceFacetService
     /** @param array{name: string, name_en?: ?string, slug?: ?string, sort_order?: int, is_active?: bool} $data */
     public function createValue(string $facetId, array $data): ?array
     {
-        $facet = CommerceFacet::query()->find($facetId);
-        if ($facet === null) {
+        if (CommerceFacet::query()->whereKey($facetId)->doesntExist()) {
             return null;
-        }
-
-        if (CommerceFacetValue::query()->where('commerce_facet_id', $facet->id)->count() >= self::MAX_VALUES_PER_FACET) {
-            throw new CommerceTaxonomyConflictException('بلغت الحد الأقصى لعدد قيم هذا البُعد.');
         }
 
         $name = trim($data['name']);
         $nameEn = $this->nullableTrim($data['name_en'] ?? null);
-        $this->assertNameUnique($facet, $name, $nameEn, null);
-
-        $explicit = filled($data['slug'] ?? null);
-        $slug = $explicit ? (string) $data['slug'] : $this->deriveSlug($facet, $nameEn ?? $name);
-        if ($explicit && $this->slugTaken($facet, $slug, null)) {
-            throw new CommerceTaxonomyConflictException('المعرّف النصي (slug) مستخدم بالفعل في هذا البُعد.');
-        }
 
         try {
-            $value = DB::transaction(fn () => CommerceFacetValue::create([
-                'commerce_facet_id' => $facet->id,
-                'slug' => $slug,
-                'name' => $name,
-                'name_en' => $nameEn,
-                'sort_order' => $data['sort_order'] ?? 0,
-                'is_active' => $data['is_active'] ?? true,
-            ]));
+            $value = DB::transaction(function () use ($facetId, $data, $name, $nameEn) {
+                // قفل صفّ البُعد يُسلسل فحوص الحدّ والاسم والـslug مع الإدراج.
+                $facet = CommerceFacet::query()->lockForUpdate()->find($facetId);
+                if ($facet === null) {
+                    return null;
+                }
+
+                if (CommerceFacetValue::query()->where('commerce_facet_id', $facet->id)->count() >= self::MAX_VALUES_PER_FACET) {
+                    throw new CommerceTaxonomyConflictException('بلغت الحد الأقصى لعدد قيم هذا البُعد.');
+                }
+
+                $this->assertNameUnique($facet, $name, $nameEn, null);
+
+                $explicit = filled($data['slug'] ?? null);
+                $slug = $explicit ? (string) $data['slug'] : $this->deriveSlug($facet, $nameEn ?? $name);
+                if ($explicit && $this->slugTaken($facet, $slug, null)) {
+                    throw new CommerceTaxonomyConflictException('المعرّف النصي (slug) مستخدم بالفعل في هذا البُعد.');
+                }
+
+                return CommerceFacetValue::create([
+                    'commerce_facet_id' => $facet->id,
+                    'slug' => $slug,
+                    'name' => $name,
+                    'name_en' => $nameEn,
+                    'sort_order' => $data['sort_order'] ?? 0,
+                    'is_active' => $data['is_active'] ?? true,
+                ]);
+            });
         } catch (QueryException $e) {
             throw $this->uniqueOr($e, 'المعرّف النصي (slug) مستخدم بالفعل في هذا البُعد.');
         }
 
-        return $this->presentValue($value, 0);
+        return $value === null ? null : $this->presentValue($value, 0);
     }
 
     /** @param array{name?: string, name_en?: ?string, slug?: string, sort_order?: int, is_active?: bool} $data */
@@ -307,7 +321,7 @@ final class CommerceFacetService
 
     private function assertNameUnique(CommerceFacet $facet, string $name, ?string $nameEn, ?string $exceptId): void
     {
-        $needles = array_filter([$this->normalize($name), $nameEn !== null ? $this->normalize($nameEn) : null]);
+        $needles = array_filter([$this->normalize($name), $nameEn !== null ? $this->normalize($nameEn) : null], static fn ($n) => $n !== null && $n !== '');
 
         $existing = CommerceFacetValue::query()
             ->where('commerce_facet_id', $facet->id)
@@ -315,7 +329,7 @@ final class CommerceFacetService
             ->get(['name', 'name_en']);
 
         foreach ($existing as $row) {
-            $names = array_filter([$this->normalize($row->name), $row->name_en !== null ? $this->normalize($row->name_en) : null]);
+            $names = array_filter([$this->normalize($row->name), $row->name_en !== null ? $this->normalize($row->name_en) : null], static fn ($n) => $n !== null && $n !== '');
             if (array_intersect($needles, $names) !== []) {
                 throw new CommerceTaxonomyConflictException('توجد قيمة بنفس الاسم في هذا البُعد.');
             }

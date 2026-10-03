@@ -113,6 +113,15 @@ class CommerceFacetApiTest extends TestCase
     }
 
     /** @test */
+    public function a_value_named_zero_is_still_checked_for_duplicates(): void
+    {
+        $auth = $this->registerTenant('fx-zero', 'owner@fx-zero.test');
+        $facet = $this->createFacet($auth['token']);
+        $this->withToken($auth['token'])->postJson(self::BASE."/{$facet['id']}/values", ['name' => '0', 'slug' => 'zero-a'])->assertCreated();
+        $this->withToken($auth['token'])->postJson(self::BASE."/{$facet['id']}/values", ['name' => '0', 'slug' => 'zero-b'])->assertStatus(409);
+    }
+
+    /** @test */
     public function an_arabic_only_value_gets_a_valid_ascii_slug(): void
     {
         $auth = $this->registerTenant('fx-ar', 'owner@fx-ar.test');
