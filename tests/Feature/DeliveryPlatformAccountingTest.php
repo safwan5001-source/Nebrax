@@ -343,6 +343,64 @@ class DeliveryPlatformAccountingTest extends TestCase
     }
 
     /** @test */
+    public function recording_a_context_on_a_draft_invoice_is_rejected(): void
+    {
+        $profile = $this->platformProfile('jahez', Version::COLLECTION_PLATFORM);
+        $draftInvoice = app(InvoiceService::class)->create(
+            ['partner_id' => $this->customer->id, 'payment_type' => 'credit'],
+            [['quantity' => 1, 'unit_price' => 100000, 'tax_rate' => 15]]
+        );
+
+        $this->expectException(RuntimeException::class);
+        $this->contexts->record($draftInvoice, $profile);
+    }
+
+    /** @test */
+    public function recording_without_a_required_external_reference_is_rejected(): void
+    {
+        $profile = $this->platforms->create([
+            'platform_key' => 'jahez',
+            'collection_mode' => Version::COLLECTION_PLATFORM,
+            'external_reference_policy' => Version::REFERENCE_REQUIRED,
+        ]);
+        $invoice = $this->postedInvoice(100000);
+
+        $this->expectException(RuntimeException::class);
+        $this->contexts->record($invoice, $profile);
+    }
+
+    /** @test */
+    public function recording_with_a_reference_when_the_policy_forbids_one_is_rejected(): void
+    {
+        $profile = $this->platforms->create([
+            'platform_key' => 'jahez',
+            'collection_mode' => Version::COLLECTION_PLATFORM,
+            'external_reference_policy' => Version::REFERENCE_NONE,
+        ]);
+        $invoice = $this->postedInvoice(100000);
+
+        $this->expectException(RuntimeException::class);
+        $this->contexts->record($invoice, $profile, ['external_order_reference' => 'SHOULD-NOT-BE-ALLOWED']);
+    }
+
+    /** @test */
+    public function retrying_with_a_different_external_reference_is_rejected_not_silently_accepted(): void
+    {
+        $profile = $this->platformProfile('jahez', Version::COLLECTION_PLATFORM);
+        $invoice = $this->postedInvoice(100000);
+
+        $first = $this->contexts->record($invoice, $profile, ['external_order_reference' => 'REF-1']);
+
+        $this->expectException(RuntimeException::class);
+        try {
+            $this->contexts->record($invoice, $profile, ['external_order_reference' => 'REF-2']);
+        } finally {
+            $this->assertSame('REF-1', $first->fresh()->external_order_reference);
+            $this->assertSame(1, DeliveryInvoiceContext::count());
+        }
+    }
+
+    /** @test */
     public function backfill_migration_refuses_an_active_non_group_custom_asset_account_at_1180_that_is_not_system_seeded(): void
     {
         $legacyTenant = Tenant::create(['name' => 'مستأجر قديم بحساب مطابق صادفةً', 'slug' => 'dlv-acc-1-coincidence']);

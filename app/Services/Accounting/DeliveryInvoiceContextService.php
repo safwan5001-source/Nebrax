@@ -4,6 +4,7 @@ namespace App\Services\Accounting;
 
 use App\Models\DeliveryInvoiceContext;
 use App\Models\DeliveryPlatformProfile;
+use App\Models\DeliveryPlatformProfileVersion as Version;
 use App\Models\Invoice;
 use App\Models\User;
 use App\Services\DeliveryPlatformConfigService;
@@ -40,9 +41,16 @@ class DeliveryInvoiceContextService
             if ($locked === null) {
                 throw new RuntimeException('الفاتورة يجب أن تخص المستأجر النشط.');
             }
+            // مسودة قابلة للحذف (`InvoiceService::deleteDraft()`)؛ قيد FK المقيَّد
+            // على `invoice_id` كان سيعطّل حذفها لو حملت سياقاً. السياق توثيقٌ
+            // لمستندٍ نهائي، فيُسجَّل بعد الترحيل حصراً — لا حاجة لتنسيقٍ مع الحذف.
+            if (! $locked->isPosted()) {
+                throw new RuntimeException('سياق منصة التوصيل يُسجَّل على فاتورة مرحّلة فقط.');
+            }
 
             $existing = DeliveryInvoiceContext::query()->where('invoice_id', $locked->id)->first();
             $explicitVersionId = $options['version_id'] ?? null;
+            $providedReference = $this->normalizeReference($options['external_order_reference'] ?? null);
 
             // إعادة محاولة بلا نسخة صريحة لفاتورة مسجَّلة بالفعل لا تُعاد مقارنتها
             // بأحدث نسخة حالياً — تعديلٌ لاحق على الملف بين المحاولتين كان سيحوّل
@@ -56,6 +64,12 @@ class DeliveryInvoiceContextService
                 if ($explicitVersionId !== null && (string) $existing->delivery_platform_profile_version_id !== (string) $explicitVersionId) {
                     throw new RuntimeException('الفاتورة مرتبطة بسياق نسخة تكوين مختلفة مسبقاً — السياق لا يُعدَّل.');
                 }
+                // مرجعٌ خارجي صريح يخالف المسجَّل تعارضٌ حقيقي — لا يُعامَل كتكرار
+                // صامت يُبقي القديم بينما يظن المستدعي أن الجديد أُثبت. غياب المرجع
+                // في إعادة المحاولة (لا رأي) يبقى كما كان أول مرة.
+                if ($providedReference !== null && $providedReference !== (string) $existing->external_order_reference) {
+                    throw new RuntimeException('الفاتورة مرتبطة بمرجع طلب خارجي مختلف مسبقاً — السياق لا يُعدَّل.');
+                }
 
                 return $existing;
             }
@@ -63,6 +77,16 @@ class DeliveryInvoiceContextService
             $resolved = $this->configService->resolve($profile, $locked->branch_id, $explicitVersionId);
             if ($resolved === null) {
                 throw new RuntimeException('منصة التوصيل بلا نسخة تكوين فعّالة.');
+            }
+
+            // سياسة المرجع الخارجي الفعلية (الفرع يرثها من النسخة أو يتجاوزها) —
+            // `required` بلا مرجع، أو `none` مع مرجع، تناقضٌ صريح مع الإعداد
+            // المعتمد يُرفض قبل أي كتابة، لا تجاهلٌ صامت لسياسة التحصيل المثبّتة.
+            if ($resolved['external_reference_policy'] === Version::REFERENCE_REQUIRED && $providedReference === null) {
+                throw new RuntimeException('سياسة منصة التوصيل تتطلب مرجع طلب خارجي ولم يُرسَل أي مرجع.');
+            }
+            if ($resolved['external_reference_policy'] === Version::REFERENCE_NONE && $providedReference !== null) {
+                throw new RuntimeException('سياسة منصة التوصيل لا تقبل مرجع طلب خارجي.');
             }
 
             try {
@@ -77,7 +101,7 @@ class DeliveryInvoiceContextService
                     'delivery_platform_profile_id' => $profile->id,
                     'delivery_platform_profile_version_id' => $resolved['version_id'],
                     'collection_mode' => $resolved['collection_mode'],
-                    'external_order_reference' => $options['external_order_reference'] ?? null,
+                    'external_order_reference' => $providedReference,
                     'created_by' => $actor?->id,
                 ]);
             } catch (QueryException $e) {
@@ -92,5 +116,12 @@ class DeliveryInvoiceContextService
                 throw $e;
             }
         });
+    }
+
+    private function normalizeReference(mixed $value): ?string
+    {
+        $value = is_string($value) ? trim($value) : null;
+
+        return $value === null || $value === '' ? null : $value;
     }
 }
