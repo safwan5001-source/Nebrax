@@ -14,6 +14,7 @@ use App\Http\Resources\PosExchangeResource;
 use App\Http\Resources\PosHeldSaleResource;
 use App\Http\Resources\ProductResource;
 use App\Http\Resources\ReturnResource;
+use App\Models\DeliveryPlatformProfile;
 use App\Models\Invoice;
 use App\Models\Partner;
 use App\Models\PosExchange;
@@ -22,6 +23,8 @@ use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\ReturnDocument;
 use App\Models\ReturnLine;
+use App\Models\SalesChannel;
+use App\Support\DeliveryPlatformCatalog;
 use App\Support\Money;
 use App\Support\PosSettings;
 use App\Support\SensitiveCostPolicy;
@@ -31,6 +34,7 @@ use App\Services\Accounting\PosCustomerPriceListResolver;
 use App\Services\Accounting\PosHeldSaleService;
 use App\Services\Accounting\PosReturnService;
 use App\Services\Accounting\PosSessionService;
+use App\Services\DeliveryPlatformConfigService;
 use App\Services\Pos\PosBarcodeResolver;
 use App\Services\Pos\PosCatalogInventoryPreparer;
 use App\Services\Pos\PosCatalogPricePreparer;
@@ -231,6 +235,51 @@ class PosController extends ApiController
     }
 
     /**
+     * منصات التوصيل المتاحة لاختيار الكاشير على الفرع النشط فقط.
+     * لا حسابات ولا عمولة ولا أسرار ولا نسخة يرسلها العميل لاحقاً.
+     * `collection_mode` تلميح عرض؛ الإتمام يعيد اشتقاقه ولا يثق به.
+     */
+    public function deliveryPlatforms(DeliveryPlatformConfigService $config): JsonResponse
+    {
+        $branchId = $this->activeBranchId();
+        $profiles = DeliveryPlatformProfile::query()
+            ->with('salesChannel')
+            ->where('is_active', true)
+            ->orderBy('platform_key')
+            ->get();
+
+        $items = [];
+        foreach ($profiles as $profile) {
+            $channel = $profile->salesChannel;
+            $expectedSlug = DeliveryPlatformCatalog::channelSlug((string) $profile->platform_key);
+            if ($channel === null
+                || ! $channel->is_active
+                || $channel->type !== SalesChannel::TYPE_EXTERNAL
+                || $channel->slug !== $expectedSlug) {
+                continue;
+            }
+
+            $resolved = $config->resolve($profile, $branchId);
+            if ($resolved === null || ! $resolved['is_active']) {
+                continue;
+            }
+
+            $catalog = DeliveryPlatformCatalog::get((string) $profile->platform_key) ?? ['name' => $profile->platform_key, 'name_en' => $profile->platform_key];
+            $items[] = [
+                'id' => $profile->id,
+                'platform_key' => $profile->platform_key,
+                'display_name' => $resolved['display_name'] ?: $catalog['name'],
+                'display_name_en' => $resolved['display_name_en'] ?: $catalog['name_en'],
+                'logo_asset_key' => $resolved['logo_asset_key'],
+                'collection_mode' => $resolved['collection_mode'],
+                'external_reference_policy' => $resolved['external_reference_policy'],
+            ];
+        }
+
+        return response()->json(['data' => $items]);
+    }
+
+    /**
      * آخر فواتير POS المرحّلة في نطاق الفرع النشط. لا يخلط الاستعلام الفواتير
      * العادية بفواتير الكاشير لأن `pos_session_id` شرط صريح، ولا يحمل السجل كاملاً
      * إلى المتصفح قبل تطبيق الحد والترتيب.
@@ -256,12 +305,25 @@ class PosController extends ApiController
             ->where('status', 'posted')
             ->where('direction', 'received')
             ->orderBy('created_at')
-            ->get(['invoice_id', 'payment_method_name', 'method'])
+            ->get(['invoice_id', 'payment_method_name', 'method', 'delivery_platform_profile_id'])
             ->groupBy('invoice_id');
 
-        return response()->json(['data' => $invoices->map(function (Invoice $invoice) use ($paymentsByInvoice) {
+        $platformNames = DeliveryPlatformProfile::query()
+            ->whereIn('id', $paymentsByInvoice->flatten()->pluck('delivery_platform_profile_id')->filter()->unique()->values())
+            ->pluck('platform_key', 'id');
+
+        return response()->json(['data' => $invoices->map(function (Invoice $invoice) use ($paymentsByInvoice, $platformNames) {
             $methods = ($paymentsByInvoice->get($invoice->id) ?? collect())
-                ->map(fn (Payment $payment) => $payment->payment_method_name ?: $payment->method)
+                ->map(function (Payment $payment) use ($platformNames) {
+                    if ($payment->delivery_platform_profile_id) {
+                        $key = $platformNames->get($payment->delivery_platform_profile_id);
+                        $catalog = is_string($key) ? DeliveryPlatformCatalog::get($key) : null;
+
+                        return $catalog['name'] ?? 'منصة توصيل';
+                    }
+
+                    return $payment->payment_method_name ?: $payment->method;
+                })
                 ->filter()
                 ->unique()
                 ->values();

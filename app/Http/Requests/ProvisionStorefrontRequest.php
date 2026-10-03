@@ -2,7 +2,9 @@
 
 namespace App\Http\Requests;
 
+use App\Support\Commerce\BusinessVertical;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 /**
  * COM-STORE-PROVISION-1 — تزويد أول متجر إلكتروني للمستأجر الحالي.
@@ -23,6 +25,8 @@ class ProvisionStorefrontRequest extends FormRequest
     {
         return [
             'name' => ['sometimes', 'nullable', 'string', 'max:255'],
+            // FLOWERS-H1: ملف النشاط عند إنشاء متجر جديد فقط (لا يغيّر متجراً قائماً).
+            'business_vertical' => ['sometimes', 'nullable', 'string', Rule::in(BusinessVertical::values())],
         ];
     }
 }

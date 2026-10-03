@@ -72,6 +72,21 @@ class CommerceProductPersonalizationApiTest extends TestCase
     }
 
     /** @test */
+    public function personalization_definitions_never_block_a_true_product_delete_and_are_cleaned_with_it(): void
+    {
+        $auth = $this->registerTenant('pz-life', 'owner@pz-life.test');
+        $product = $this->makeProduct($auth['tenant_id']);
+        $this->withToken($auth['token'])->putJson($this->url($product), ['fields' => $this->cakeFields()])->assertOk();
+
+        app(TenantContext::class)->set($auth['tenant_id']);
+        app(\App\Services\ProductLifecycleService::class)->delete($product, null);
+
+        $this->assertSame(0, CommerceProductPersonalizationField::query()->count());
+        $this->assertSame(0, CommerceProductPersonalizationOption::query()->count());
+        app(TenantContext::class)->forget();
+    }
+
+    /** @test */
     public function replacing_is_atomic_idempotent_and_removes_what_is_absent(): void
     {
         $auth = $this->registerTenant('pz-replace', 'owner@pz-replace.test');

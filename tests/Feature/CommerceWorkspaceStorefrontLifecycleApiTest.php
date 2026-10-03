@@ -234,7 +234,7 @@ class CommerceWorkspaceStorefrontLifecycleApiTest extends TestCase
         $this->assertNull($res->json('data.store.preview_url'));
         $this->assertSame($seeded['storefront']->id, $res->json('data.store.id'));
         $this->assertSame(
-            ['id', 'name', 'sales_channel_id', 'is_active', 'preview_url', 'default_locale'],
+            ['id', 'name', 'sales_channel_id', 'is_active', 'preview_url', 'default_locale', 'business_vertical', 'vertical_profile'],
             array_keys($res->json('data.store'))
         );
 

@@ -2,12 +2,14 @@
 
 namespace App\Http\Requests;
 
+use App\Support\Commerce\BusinessVertical;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
 
 /**
  * STORE-ADMIN-ADOPT-1B-1 — تحديث هوية متجر قائم (`name`/`default_locale`
- * فقط). لا تُقبل هوية (مستأجر/قناة/متجر/نطاق) من العميل — `{id}` في المسار
+ * + `business_vertical` من FLOWERS-H1). لا تُقبل هوية (مستأجر/قناة/متجر/نطاق) من العميل — `{id}` في المسار
  * يحدّد أي صفّ يُراد تحديثه، لا مَن يتصرّف كمستأجر؛ الملكية تُعاد التحقق منها
  * في الخدمة عبر `TenantContext`، لا من جسم الطلب.
  *
@@ -30,6 +32,8 @@ class UpdateStorefrontIdentityRequest extends FormRequest
         return [
             'name' => ['sometimes', 'nullable', 'string', 'max:255'],
             'default_locale' => ['sometimes', 'nullable', 'string', 'in:'.implode(',', self::ALLOWED_LOCALES)],
+            // FLOWERS-H1: قائمة محدودة تملكها المنصة — لا نصٌّ حر ولا قواعد.
+            'business_vertical' => ['sometimes', 'nullable', 'string', Rule::in(BusinessVertical::values())],
         ];
     }
 
@@ -67,7 +71,7 @@ class UpdateStorefrontIdentityRequest extends FormRequest
      * الحقل إطلاقاً حين لا يُرسله العميل أصلاً (تمييز «لم يُرسَل» عن «أُرسل
      * فارغاً» يبقى في يد الخدمة).
      *
-     * @return array{name?: ?string, default_locale?: ?string}
+     * @return array{name?: ?string, default_locale?: ?string, business_vertical?: ?string}
      */
     public function normalizedAttributes(): array
     {
@@ -80,6 +84,10 @@ class UpdateStorefrontIdentityRequest extends FormRequest
 
         if ($this->has('default_locale')) {
             $attributes['default_locale'] = $this->input('default_locale');
+        }
+
+        if ($this->has('business_vertical')) {
+            $attributes['business_vertical'] = $this->input('business_vertical');
         }
 
         return $attributes;

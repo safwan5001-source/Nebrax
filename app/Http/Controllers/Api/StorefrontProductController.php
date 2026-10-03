@@ -17,6 +17,7 @@ use App\Services\Commerce\FulfillmentPolicyService;
 use App\Services\Commerce\ProductPersonalizationService;
 use App\Services\ProductMediaGalleryService;
 use App\Support\DocumentLineVariantResolver;
+use App\Support\Commerce\CatalogFacetFilter;
 use App\Support\PublicApiResponse;
 use App\Tenancy\BranchScope;
 use App\Tenancy\StorefrontContext;
@@ -44,6 +45,7 @@ class StorefrontProductController extends PublicApiController
             'sort' => ['sometimes', 'nullable', 'string', 'max:40'],
             'page' => ['sometimes', 'nullable', 'integer', 'min:1'],
             'per_page' => ['sometimes', 'nullable', 'integer', 'min:1', 'max:100'],
+            ...CatalogFacetFilter::rules(),
         ]);
 
         $storefront = app(StorefrontContext::class);
@@ -82,7 +84,21 @@ class StorefrontProductController extends PublicApiController
             }
         }
 
-        $this->applySort($query, $filters['sort'] ?? null, self::SORTS, 'name');
+        // FLOWERS-H2 / ADR-14 — الأبعاد الوصفية والعلامة التجارية. الاستعلام
+        // الأساسي (بوابة النشر + بحث + تصنيف) يُحفظ للعدّ التفريقي في `meta`.
+        $facetFilter = new CatalogFacetFilter();
+        $facetSelection = CatalogFacetFilter::selection($filters);
+        $facetFilter->applyCollection($query, $facetSelection);
+        $baseQuery = clone $query;
+        $facetFilter->apply($query, $facetSelection);
+
+        if ($facetSelection['collection'] !== null && blank($filters['sort'] ?? null)) {
+            // داخل مجموعة بلا `sort` صريح: ترتيب التاجر للأعضاء.
+            $facetFilter->orderByCollectionPosition($query, $facetSelection);
+            $query->orderBy('name');
+        } else {
+            $this->applySort($query, $filters['sort'] ?? null, self::SORTS, 'name');
+        }
 
         $paginator = $query->paginate($this->perPage($request));
 
@@ -126,6 +142,7 @@ class StorefrontProductController extends PublicApiController
             'data' => $data,
             'meta' => [
                 'request_id' => PublicApiResponse::requestId($request),
+                ...$facetFilter->meta($baseQuery, $facetSelection),
                 'pagination' => [
                     'page' => $paginator->currentPage(),
                     'per_page' => $paginator->perPage(),
