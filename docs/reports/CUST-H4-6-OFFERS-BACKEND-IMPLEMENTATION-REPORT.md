@@ -3,9 +3,9 @@
 | | |
 |---|---|
 | **Base SHA** | `513ced7e3c51480053a508e23be81759b45a9f8e` (`origin/main`, the merge of H4-5 PR #1197 — verified directly, not assumed) |
-| **Head SHA** | `__HEAD_SHA__` |
+| **Head SHA** | `133bcabc6d887f87d26b59b3825b8cc515574a2e` (implementation commit; later commits on the branch only touch this report) |
 | **Branch** | `feat/cust-h4-6-offers-backend` |
-| **PR** | __PR__ |
+| **PR** | #1202 — https://github.com/safwan5001-source/Nebrax/pull/1202 |
 | **Scope** | H4-6 backend/data contract only. No Canvas/Published UI (H4-7). |
 | **Offers capability** | **still `state: "gated"`, `merchantAddable: false`** — untouched |
 | **Merge / Deploy / Production** | **None.** Not merged, not deployed, not released. |
