@@ -7,6 +7,7 @@ use App\Models\Storefront;
 use App\Models\StorefrontDomain;
 use App\Services\Commerce\Edge\EdgeSnapshot;
 use App\Services\Commerce\Edge\StorefrontEdgeClient;
+use App\Support\Commerce\BusinessVertical;
 use App\Support\HostnameNormalizer;
 use App\Support\IcannRegistrableDomain;
 use App\Support\InvalidHostnameException;
@@ -46,6 +47,7 @@ final class CommerceWorkspaceStorefrontsService
         $storefronts = Storefront::query()
             ->with([
                 'salesChannel',
+                'businessProfile',
                 'domains' => function ($query) {
                     $query->where('is_active', true)
                         ->where('verification_status', StorefrontDomain::VERIFICATION_VERIFIED)
@@ -89,8 +91,12 @@ final class CommerceWorkspaceStorefrontsService
      * موجود أو يخصّ مستأجراً آخر يُترجَم دوماً إلى `null` (404 لا 403 على
      * مستوى المتحكم) — لا تسريب وجود.
      *
-     * @param  array{name?: ?string, default_locale?: ?string}  $attributes
-     * @return array{id: string, name: string, sales_channel_id: string, is_active: bool, preview_url: ?string, default_locale: string}|null
+     * FLOWERS-H1: `business_vertical` (إن أُرسل) يُحفظ في الجدول الجانبي
+     * `storefront_business_profiles` عبر `StorefrontBusinessProfileService`
+     * — تغييره لا يمسّ منتجاً ولا قسماً ولا أي بيانات للتاجر.
+     *
+     * @param  array{name?: ?string, default_locale?: ?string, business_vertical?: ?string}  $attributes
+     * @return array{id: string, name: string, sales_channel_id: string, is_active: bool, preview_url: ?string, default_locale: string, business_vertical: string, vertical_profile: array}|null
      */
     public function updateIdentityForCurrentTenant(string $storefrontId, array $attributes): ?array
     {
@@ -114,6 +120,14 @@ final class CommerceWorkspaceStorefrontsService
 
         if ($update !== []) {
             $storefront->forceFill($update)->save();
+        }
+
+        if (array_key_exists('business_vertical', $attributes) && $attributes['business_vertical'] !== null) {
+            $vertical = BusinessVertical::tryFrom($attributes['business_vertical']);
+            if ($vertical === null) {
+                throw new RuntimeException('ملف النشاط غير معروف.');
+            }
+            app(StorefrontBusinessProfileService::class)->assign($storefront, $vertical);
         }
 
         $this->loadAuthorizedPreviewDomains($storefront);
@@ -881,10 +895,12 @@ final class CommerceWorkspaceStorefrontsService
      * تمثيل موحَّد لمتجر مساحة العمل: `is_active` الفعلي، و`preview_url`
      * فقط حين يكون المتجر والقناة نشطين ويوجد نطاق مصرَّح.
      *
-     * @return array{id: string, name: string, sales_channel_id: string, is_active: bool, preview_url: ?string, default_locale: string}
+     * @return array{id: string, name: string, sales_channel_id: string, is_active: bool, preview_url: ?string, default_locale: string, business_vertical: string, vertical_profile: array}
      */
     private function presentStore(Storefront $storefront, SalesChannel $channel, string $tenantId): array
     {
+        $vertical = $storefront->businessVertical();
+
         return [
             'id' => $storefront->id,
             'name' => $storefront->name,
@@ -894,12 +910,14 @@ final class CommerceWorkspaceStorefrontsService
                 ? $this->authorizedPreviewUrl($storefront, $tenantId)
                 : null,
             'default_locale' => $storefront->default_locale,
+            'business_vertical' => $vertical->value,
+            'vertical_profile' => $vertical->profile(),
         ];
     }
 
     private function loadAuthorizedPreviewDomains(Storefront $storefront): void
     {
-        $storefront->load(['salesChannel', 'domains' => function ($query) {
+        $storefront->load(['salesChannel', 'businessProfile', 'domains' => function ($query) {
             $query->where('is_active', true)
                 ->where('verification_status', StorefrontDomain::VERIFICATION_VERIFIED)
                 ->orderByDesc('is_primary')
