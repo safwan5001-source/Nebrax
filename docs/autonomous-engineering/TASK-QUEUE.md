@@ -1246,23 +1246,24 @@ Only evidence-backed statuses are recorded here; unlisted tasks of the horizon p
 | Order | Task ID | Status | Risk | Depends on | Evidence |
 |---|---|---|---|---|---|
 | 0 | DLV-EVIDENCE-1 | done (merged; PR #1171, merge SHA `c0098d38762fc2d113ab189fd7d85acebe0f5c8f`; POST_MERGE_REVIEW: PASS recorded by the owner — main CI sqlite was green and pgsql in progress when last observed here) | high | accepted decision | `docs/plans/pos/DLV-EVIDENCE-1-REPORT.md` |
-| 1 | DLV-FOUNDATION-1 | in_review (PR open against base `c0098d38762fc2d113ab189fd7d85acebe0f5c8f`; not merged; PRE_MERGE_REVIEW pending exact-head CI) | high | DLV-EVIDENCE-1 (done) | `docs/plans/pos/DLV-FOUNDATION-1-IMPLEMENTATION-REPORT.md` |
+| 1 | DLV-FOUNDATION-1 | done (merged; PR #1174, merge SHA `5e80830033aed602833afd091b28857f92d9f068`; PRE_MERGE_REVIEW: PASS and POST_MERGE_REVIEW: PASS recorded by the owner) | high | DLV-EVIDENCE-1 (done) | `docs/plans/pos/DLV-FOUNDATION-1-IMPLEMENTATION-REPORT.md` |
+| 2 | DELIVERY-DECISION-PASS-1 | in_review (PR open against base `5e80830033aed602833afd091b28857f92d9f068`) | high | DLV-FOUNDATION-1 (done) | `docs/plans/pos/DELIVERY-DECISION-PASS-1-REPORT.md` |
 
 Owed gates — authoritative text and blocker mapping is report §11; complete mapping copied here (none blocks FOUNDATION-1):
 
-| Gate | Blocks |
-|---|---|
-| DG-1 | ACCOUNTING-1 |
-| DG-2 | POS-1, ACCOUNTING-1 |
-| DG-3 | ACCOUNTING-1, SETTLEMENT-1 |
-| DG-4 | CLOSE-1 |
-| DG-6 | HUB-1, REFUND-1, CONNECTOR-CORE-1 |
-| DG-7 | CONNECTOR-CORE-1 |
-| DG-8 | POS-1 and later channel pricing |
-| DG-9 | HUB-1, POS-1 |
-| DG-5 | RESOLVED in the report (reuse `SalesChannel` type `external`, slug `delivery-<platform>`); no longer open |
+| Gate | Blocks | Status |
+|---|---|---|
+| DG-1 | ACCOUNTING-1 | Decision Packet prepared (`DELIVERY-DECISION-PASS-1-REPORT.md`); still OPEN — awaiting owner decision |
+| DG-2 | POS-1, ACCOUNTING-1 | Decision Packet prepared; still OPEN — awaiting owner decision |
+| DG-3 | ACCOUNTING-1, SETTLEMENT-1 | Decision Packet prepared; still OPEN — per-platform OWNER_GATE (no merchant contract held for any of the six platforms) |
+| DG-4 | CLOSE-1 | Untouched — OPEN |
+| DG-6 | HUB-1, REFUND-1, CONNECTOR-CORE-1 | Untouched — OPEN |
+| DG-7 | CONNECTOR-CORE-1 | Untouched — OPEN |
+| DG-8 | POS-1 and later channel pricing | Untouched — OPEN |
+| DG-9 | HUB-1, POS-1 | Untouched — OPEN |
+| DG-5 | RESOLVED in DLV-EVIDENCE-1-REPORT.md (reuse `SalesChannel` type `external`, slug `delivery-<platform>`) | CLOSED |
 
-A task must not be promoted to `ready` while any gate mapped to it is unresolved.
+A task must not be promoted to `ready` while any gate mapped to it is unresolved. **DELIVERY-DECISION-PASS-1 does not close DG-1/DG-2/DG-3** — it only converts them into concrete owner questions (see the report's "Exact owner decision required" under each packet). They remain OPEN until Safwan answers them.
 
-**Dependency readiness after DLV-FOUNDATION-1 (evidence-based; code existing is not readiness):** no downstream task is dependency-ready, even once FOUNDATION-1 is merged and post-merge reviewed, because each is blocked by an open Decision Gate mapped above — DLV-ACCOUNTING-1 (DG-1, DG-2, DG-3), DLV-POS-1 (DG-2, DG-8, DG-9), DLV-HUB-1 (DG-6, DG-9). DLV-COMMISSION-1, SETTLEMENT-1, RECON-1, REFUND-1, CLOSE-1, CONNECTOR-CORE-1 and the provider tasks remain blocked by their own dependencies. Next owner action: Decision Packets for the gates above (start with DG-1/DG-2/DG-3, which unblock ACCOUNTING-1 and POS-1).
+**Dependency readiness after DELIVERY-DECISION-PASS-1 (evidence-based; code existing is not readiness):** no downstream task is dependency-ready. DLV-ACCOUNTING-1 remains BLOCKED on DG-1/DG-2/DG-3 (owner decision, not just options, required). DLV-POS-1 remains BLOCKED on DG-2/DG-8/DG-9. DLV-HUB-1 remains BLOCKED on DG-6/DG-9. DLV-SETTLEMENT-1 remains BLOCKED on ACCOUNTING-1 plus per-platform DG-3 evidence. DLV-COMMISSION-1, RECON-1, REFUND-1, CLOSE-1, CONNECTOR-CORE-1 and the provider tasks remain blocked by their own dependencies, unchanged by this pass. Next owner action: answer the three "Exact owner decision required" questions in `docs/plans/pos/DELIVERY-DECISION-PASS-1-REPORT.md`.
 

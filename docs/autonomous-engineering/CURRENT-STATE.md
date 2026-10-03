@@ -2,13 +2,13 @@
 
 > This file is a durable resume point, not a substitute for Git/GitHub evidence.
 
-LAST_UPDATED: 2026-10-02 (**AWJ Delivery Platforms & Settlement Horizon V1 is the single ACTIVE horizon.** DLV-EVIDENCE-1 is merged (PR #1171, `c0098d38762fc2d113ab189fd7d85acebe0f5c8f`). DLV-FOUNDATION-1 is implemented and in review (additive tenant-scoped delivery-platform profile layer over `SalesChannel(type=external)` with append-only versions and version-bound branch overrides; configuration only, no accounting/POS/Commerce behavior change). No downstream task is dependency-ready: each remaining task is blocked by an open Decision Gate (see `TASK-QUEUE.md`). No deploy.)
+LAST_UPDATED: 2026-10-03 (**AWJ Delivery Platforms & Settlement Horizon V1 is the single ACTIVE horizon.** DLV-EVIDENCE-1 merged (PR #1171, `c0098d38762fc2d113ab189fd7d85acebe0f5c8f`). DLV-FOUNDATION-1 merged (PR #1174, merge SHA `5e80830033aed602833afd091b28857f92d9f068`; PRE_MERGE_REVIEW: PASS, POST_MERGE_REVIEW: PASS) — additive tenant-scoped delivery-platform profile layer over `SalesChannel(type=external)` with append-only versions and version-bound branch overrides; configuration only, no accounting/POS/Commerce behavior change. DELIVERY-DECISION-PASS-1 prepared Decision Packets for DG-1 (platform-collected posting representation), DG-2 (invoice customer + immutable snapshot location) and DG-3 (tax/ZATCA role — per-platform OWNER_GATE, no merchant contract held for any of the six platforms) — each packet ends in a concrete owner question, none closed by this pass. No downstream task is dependency-ready: every remaining task is blocked by an open Decision Gate (see `TASK-QUEUE.md`). No deploy.)
 LAYER_VERSION: V1
 STATUS: ACTIVE — AWJ Delivery Platforms & Settlement Horizon V1 (authoritative queue: `TASK-QUEUE.md`, section "Horizon: AWJ Delivery Platforms & Settlement V1"). Every snapshot, STATUS and objective below this section is historical and superseded.
 
 ## Current objective
 
-Land DLV-FOUNDATION-1 (PR review, exact-head CI, merge by owner, post-merge review). Then obtain owner Decision Packets (DG-1/DG-2/DG-3 first); do not promote DLV-ACCOUNTING-1, DLV-POS-1 or DLV-HUB-1 while their gates are open. Stop at any Decision Gate, owner production gate, or blocker. Merge != Deploy.
+Obtain Safwan's answers to the three "Exact owner decision required" questions in `docs/plans/pos/DELIVERY-DECISION-PASS-1-REPORT.md` (DG-1, DG-2, DG-3). Do not promote DLV-ACCOUNTING-1, DLV-POS-1, DLV-HUB-1 or DLV-SETTLEMENT-1 while their mapped gates are open. Stop at any Decision Gate, owner production gate, or blocker. Merge != Deploy.
 
 ## Previous snapshot (historical, superseded)
 
