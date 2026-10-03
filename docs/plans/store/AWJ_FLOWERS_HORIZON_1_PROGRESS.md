@@ -34,8 +34,8 @@ No Deploy or Production change is authorized by this Horizon.
 | H1 | Business Vertical Foundation | MERGED | #1186 | `83635d6` |
 | H2a | Taxonomy — facets: ADR-14, data model, admin API | MERGED | #1187 | `fbc0eeb` |
 | H2b | Taxonomy — storefront/mobile facet filtering | MERGED | #1188 | `6c085e6` |
-| H2c | Taxonomy — collections | PR OPEN (#1189), in CI | #1189 | — |
-| H2d | Taxonomy — merchandising admin UI | PR OPEN (#1190) | #1190 | — |
+| H2c | Taxonomy — collections | MERGED | #1189 | `5851d00` |
+| H2d | Taxonomy — merchandising admin UI | PR OPEN (#1190), in CI | #1190 | — |
 | H3 | Gifting Identity & Gift Message | ON HOLD (PR open, awaits H2) | #1191 | — |
 | H4 | Personalization | ON HOLD (PR open, awaits H2) | #1192 | — |
 | H5 | Structured Product Content | NOT STARTED | — | — |
@@ -199,6 +199,38 @@ Copy this section for every completed/active slice.
 #### Next
 
 - H2c (collections), then H2d (admin UI).
+
+### H2c — Manual collections
+
+**Status:** MERGED  
+**Base SHA:** `6c085e6819b563a45702a6bf0a45084de16130a2` (main after H2b)  
+**Branch:** `flowers/h2c-collections` (tree rebuilt as main + H2c after the H2b squash, to avoid replaying already-merged commits)  
+**PR:** #1189 (stacked, retargeted to `main`)  
+**Head SHA:** `acf85afe6cb02afcc223a0e4e1220e3d0f8e3389`  
+**Merge SHA:** `5851d00893689ae29e1b94075e1de45f35827dea` (squash)
+
+#### What was implemented
+
+- Additive migration `commerce_collections` (+ ordered membership), CompanyWide models, `CommerceCollectionService`, admin API `api/commerce/workspace/collections…` and public reads (`store/v1`, `commerce/v1`) gated by product publication.
+- Shared slug derivation (`CatalogSlug`), `CatalogCollectionReader`, and `collection=<slug>` as a contextual constraint in `CatalogFacetFilter` (like category, not a facet), with facet counts computed inside the collection context.
+- Hardening from review: member validation lifts only `BranchScope` (company-wide collections can hold products from every branch even with product sharing off), collection limit serialized with a tenant row lock, membership classified `OWNED_CHILD` and removed with a true product delete.
+
+#### Tests / CI
+
+- `CommerceCollectionApiTest` (13 cases incl. cross-branch curation and lifecycle cleanup), registry/guard suites, route allow-list and OpenAPI contract tests. CI sqlite and pgsql green; PostgreSQL 16 verified locally.
+- One CI run hit the unrelated `ZatcaQrCertificateMaterialExtractorTest` random-key flake and was re-run once.
+
+#### Tenant isolation / backward compatibility
+
+- Tenant-scoped everywhere; foreign tenant collections/products rejected without revealing existence. Draft or unknown collections fail closed on public reads. No ledger, inventory, price, order or ZATCA change.
+
+#### Deferred / risks
+
+- Tenant-wide product search for the collection picker in multi-branch tenants with product sharing disabled (needs a backend endpoint); operators can switch branch meanwhile.
+
+#### Next
+
+- H2d (admin UI), then re-verify H3 and H4 against the new main.
 
 ---
 
