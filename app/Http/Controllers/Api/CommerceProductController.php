@@ -11,6 +11,7 @@ use App\Services\Commerce\AvailableToSellService;
 use App\Services\Commerce\CommercePriceResolver;
 use App\Services\Commerce\FulfillmentPolicyNotConfiguredException;
 use App\Services\Commerce\FulfillmentPolicyService;
+use App\Services\Commerce\ProductContentService;
 use App\Services\Commerce\ProductPersonalizationService;
 use App\Services\ProductMediaGalleryService;
 use App\Support\DocumentLineVariantResolver;
@@ -200,6 +201,12 @@ class CommerceProductController extends PublicApiController
         $personalization = app(ProductPersonalizationService::class)->publicFields($id);
         if ($personalization !== []) {
             $resource['personalization'] = ['fields' => $personalization];
+        }
+
+        // FLOWERS-H5 / ADR-17 — كتل المحتوى النشطة، فقط حين توجد.
+        $blocks = app(ProductContentService::class)->publicBlocks($id);
+        if ($blocks !== []) {
+            $resource['content_blocks'] = $blocks;
         }
 
         return PublicApiResponse::success($request, $resource);

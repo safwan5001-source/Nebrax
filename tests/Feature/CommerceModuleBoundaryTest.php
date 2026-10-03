@@ -64,6 +64,8 @@ class CommerceModuleBoundaryTest extends TestCase
         'api/commerce/workspace/categories/{id}/publication',
         // COM-CATALOG-1 — قائمة مساحة عمل نشر المنتجات (قراءة فقط فوق COM-WS-3).
         'api/commerce/workspace/products/publication',
+        // FLOWERS-H5 / ADR-17 — كتل محتوى المنتج المهيكلة.
+        'api/commerce/workspace/products/{id}/content',
         // FLOWERS-H4a / ADR-16 — تعريفات التخصيص لكل منتج.
         'api/commerce/workspace/products/{id}/personalization',
         'api/commerce/workspace/products/{id}/publication',
