@@ -31,7 +31,11 @@ In particular:
 - `FLOWERS-DELIVERY-CONTRACT-1` decides service levels/date/slot/cutoff/lead-time/capacity/earliest-delivery.
 - bundles, bouquet BOM, substitutions, failed delivery, no-address gifting, and money gifts remain evidence/architecture-gated.
 
-This document still does **not** authorize implementation.
+This document is the product/architecture direction. Autonomous implementation authority, merge gates, stop conditions, and slice sequencing are defined separately in `AWJ_FLOWERS_HORIZON_1_AUTONOMOUS_EXECUTION.md`.
+
+The live execution ledger is `AWJ_FLOWERS_HORIZON_1_PROGRESS.md`.
+
+This direction document alone does **not** authorize implementation; implementation/merge authority exists only through the Horizon execution document. Neither document authorizes Deploy or Production changes.
 
 ---
 
