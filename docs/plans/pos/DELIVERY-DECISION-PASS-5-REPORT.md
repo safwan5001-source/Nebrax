@@ -6,7 +6,7 @@
 **Base SHA (`origin/main` at start):** `f875467428014b86faa082ca467d41df8d8f340a`
 **That SHA is the squash of PR #1204 (DLV-PLATFORM-LOGOS-1).** This file does not embed its own commit hash.
 
-**DG-8-IMPORT is not accepted.** The recommendation below is Option B. It becomes a decision only if Safwan accepts **OD-DG-8-IMPORT**. This pass does not build the financial command.
+**OD-DG-8-IMPORT — ACCEPTED 2026-10-03 as Option B.** The accepted rule is the frozen provider commercial snapshot in §5–§13. This acceptance does not build the financial command, does not enable VAT, and does not close DG-3.
 
 Not reopened: OD-DG-8 (manual POS price), OD-DG-9-POS, OD-DG-9-HUB, OD-DG-6, OD-DG-6-TRIGGER, OD-HUB-STATES, OD-HUB-IDENTITY, DG-1, DG-2, DG-5.
 
@@ -84,7 +84,7 @@ These already hold and this recommendation does not weaken them.
 
 ## 5. Recommended architecture
 
-**Recommend Option B. Not accepted.**
+**ACCEPTED.** OD-DG-8-IMPORT is Option B. The architecture below is the decision. This acceptance does not implement it.
 
 The commercial authority for an imported HungerStation, Jahez, Mrsool, Keeta, Ninja, or The Chefz order is a typed provider snapshot frozen at intake. `InvoiceService` later posts that snapshot. It does not ask the live catalog what the order should have cost.
 
@@ -239,7 +239,7 @@ This recommendation does not decide:
 - whether a platform-funded amount is later a receivable, a contra-revenue, or something else;
 - whether a ZATCA document may use a tax rate that no longer matches the product.
 
-Enabling VAT recognition for a named platform stays **EXTERNAL EVIDENCE REQUIRED** under DG-3. Accepting Option B would remove the price-authority block on building the command. It would not by itself authorize enabling that command for VAT.
+Enabling VAT recognition for a named platform stays **EXTERNAL EVIDENCE REQUIRED** under DG-3. OD-DG-8-IMPORT is accepted, so the price-authority block is lifted. A command that calls `InvoiceService::post` still recognizes VAT. This acceptance does not authorize building or enabling that command, and it does not start DLV-HUB-1.
 
 ---
 
@@ -265,29 +265,20 @@ Enabling VAT recognition for a named platform stays **EXTERNAL EVIDENCE REQUIRED
 
 ---
 
-## 16. Owner decision requested
+## 16. Owner decision
 
-**OD-DG-8-IMPORT — not accepted in this PR.**
+**OD-DG-8-IMPORT — ACCEPTED 2026-10-03 as Option B.**
 
-Please choose one:
-
-| Choice | Effect |
-|---|---|
-| **Accept Option B** as OD-DG-8-IMPORT | Imported commercial price is the frozen provider snapshot in §6–§13. Manual POS stays OD-DG-8. The financial command is still not built by that acceptance, and VAT recognition stays blocked on DG-3. |
-| **Accept Option A** | The future command would reprice from the live AWJ catalog. That contradicts the no-silent-reprice invariant. Not recommended. |
-| **Accept Option C** | Two price authorities. Not recommended. A hybrid still needs a written rule that does not invent discounts. This pass does not offer one. |
-| **Reject all three** | DG-8-IMPORT stays open. The financial command stays unbuilt. |
-
-Accepting B does not accept DG-3, does not start DLV-HUB-1, and does not deploy.
+Safwan accepted the recommended rule. The imported commercial price is the frozen provider snapshot in §6–§13. Options A and C were not accepted. Manual POS stays OD-DG-8. DG-3 stays open. This acceptance does not build the financial command and does not deploy.
 
 ---
 
 ## 17. Downstream
 
-| Task | After this recommendation, before an acceptance |
+| Task | After OD-DG-8-IMPORT |
 |---|---|
 | Projection Hub (already merged) | Unchanged. Still must not price or post. |
-| Full DLV-HUB-1 financial command | **BLOCKED.** Still blocked on an accepted OD-DG-8-IMPORT, then on DG-3 before VAT is enabled. |
+| Full DLV-HUB-1 financial command | **BLOCKED on DG-3.** The price-authority block is lifted. The command is not started. Enabling it would recognize VAT, and that stays unauthorized. |
 | DLV-COMMISSION-1, DLV-SETTLEMENT-1 | **BLOCKED** on DG-3. Platform-funded amounts are not their implementation permit. |
 | DLV-POS-1 | Unchanged. OD-DG-8 stays accepted. |
 
