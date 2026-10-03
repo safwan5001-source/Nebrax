@@ -86,46 +86,54 @@ final class CommerceFacetService
     /** @param array{name?: string, name_en?: ?string, sort_order?: int, is_active?: bool} $data */
     public function updateFacet(string $facetId, array $data): ?array
     {
-        $facet = CommerceFacet::query()->find($facetId);
-        if ($facet === null) {
-            return null;
-        }
-
-        $update = [];
-        if (array_key_exists('name', $data)) {
-            $update['name'] = trim((string) $data['name']);
-        }
-        if (array_key_exists('name_en', $data)) {
-            $update['name_en'] = $this->nullableTrim($data['name_en']);
-        }
-        foreach (['sort_order', 'is_active'] as $field) {
-            if (array_key_exists($field, $data)) {
-                $update[$field] = $data[$field];
+        $facet = DB::transaction(function () use ($facetId, $data) {
+            // نفس بروتوكول القفل: كل تعديل يمسّ البُعد أو قيمه يمسك صفّ البُعد أولاً.
+            $facet = CommerceFacet::query()->lockForUpdate()->find($facetId);
+            if ($facet === null) {
+                return null;
             }
-        }
-        if ($update !== []) {
-            $facet->forceFill($update)->save();
-        }
 
-        return $this->presentFacet($facet->load('values'), $this->valueCounts($facet));
+            $update = [];
+            if (array_key_exists('name', $data)) {
+                $update['name'] = trim((string) $data['name']);
+            }
+            if (array_key_exists('name_en', $data)) {
+                $update['name_en'] = $this->nullableTrim($data['name_en']);
+            }
+            foreach (['sort_order', 'is_active'] as $field) {
+                if (array_key_exists($field, $data)) {
+                    $update[$field] = $data[$field];
+                }
+            }
+            if ($update !== []) {
+                $facet->forceFill($update)->save();
+            }
+
+            return $facet;
+        });
+
+        return $facet === null ? null : $this->presentFacet($facet->load('values'), $this->valueCounts($facet));
     }
 
     /** @return bool|null null = غير موجود */
     public function deleteFacet(string $facetId): ?bool
     {
-        $facet = CommerceFacet::query()->with('values')->find($facetId);
-        if ($facet === null) {
-            return null;
-        }
+        return DB::transaction(function () use ($facetId) {
+            // القفل يُسلسل الحذف مع أي إسنادٍ يمسك صفّ البُعد نفسه (انظر replaceAssignments).
+            $facet = CommerceFacet::query()->lockForUpdate()->find($facetId);
+            if ($facet === null) {
+                return null;
+            }
 
-        $valueIds = $facet->values->pluck('id')->all();
-        if ($valueIds !== [] && DB::table('commerce_product_facet_values')->whereIn('commerce_facet_value_id', $valueIds)->exists()) {
-            throw new CommerceTaxonomyConflictException('لا يمكن حذف بُعد له منتجات مُسنَدة — عطّله بدلاً من ذلك.');
-        }
+            $valueIds = CommerceFacetValue::query()->where('commerce_facet_id', $facet->id)->pluck('id')->all();
+            if ($valueIds !== [] && DB::table('commerce_product_facet_values')->whereIn('commerce_facet_value_id', $valueIds)->exists()) {
+                throw new CommerceTaxonomyConflictException('لا يمكن حذف بُعد له منتجات مُسنَدة — عطّله بدلاً من ذلك.');
+            }
 
-        $facet->delete();
+            $facet->delete();
 
-        return true;
+            return true;
+        });
     }
 
     /** @param array{name: string, name_en?: ?string, slug?: ?string, sort_order?: int, is_active?: bool} $data */
@@ -177,54 +185,61 @@ final class CommerceFacetService
     /** @param array{name?: string, name_en?: ?string, slug?: string, sort_order?: int, is_active?: bool} $data */
     public function updateValue(string $facetId, string $valueId, array $data): ?array
     {
-        $value = CommerceFacetValue::query()
-            ->where('commerce_facet_id', $facetId)
-            ->find($valueId);
-        if ($value === null) {
-            return null;
-        }
-        $facet = CommerceFacet::query()->findOrFail($facetId);
-
-        $name = array_key_exists('name', $data) ? trim((string) $data['name']) : $value->name;
-        $nameEn = array_key_exists('name_en', $data) ? $this->nullableTrim($data['name_en']) : $value->name_en;
-        $this->assertNameUnique($facet, $name, $nameEn, $value->id);
-
-        $update = ['name' => $name, 'name_en' => $nameEn];
-        if (array_key_exists('slug', $data) && $data['slug'] !== $value->slug) {
-            if ($this->slugTaken($facet, (string) $data['slug'], $value->id)) {
-                throw new CommerceTaxonomyConflictException('المعرّف النصي (slug) مستخدم بالفعل في هذا البُعد.');
-            }
-            $update['slug'] = $data['slug'];
-        }
-        foreach (['sort_order', 'is_active'] as $field) {
-            if (array_key_exists($field, $data)) {
-                $update[$field] = $data[$field];
-            }
-        }
-
         try {
-            DB::transaction(fn () => $value->forceFill($update)->save());
+            $value = DB::transaction(function () use ($facetId, $valueId, $data) {
+                // نفس قفل createValue: فحص الاسم/الـslug والحفظ تحت صفّ البُعد.
+                $facet = CommerceFacet::query()->lockForUpdate()->find($facetId);
+                $value = $facet === null ? null : CommerceFacetValue::query()->where('commerce_facet_id', $facet->id)->find($valueId);
+                if ($value === null) {
+                    return null;
+                }
+
+                $name = array_key_exists('name', $data) ? trim((string) $data['name']) : $value->name;
+                $nameEn = array_key_exists('name_en', $data) ? $this->nullableTrim($data['name_en']) : $value->name_en;
+                $this->assertNameUnique($facet, $name, $nameEn, $value->id);
+
+                $update = ['name' => $name, 'name_en' => $nameEn];
+                if (array_key_exists('slug', $data) && $data['slug'] !== $value->slug) {
+                    if ($this->slugTaken($facet, (string) $data['slug'], $value->id)) {
+                        throw new CommerceTaxonomyConflictException('المعرّف النصي (slug) مستخدم بالفعل في هذا البُعد.');
+                    }
+                    $update['slug'] = $data['slug'];
+                }
+                foreach (['sort_order', 'is_active'] as $field) {
+                    if (array_key_exists($field, $data)) {
+                        $update[$field] = $data[$field];
+                    }
+                }
+
+                $value->forceFill($update)->save();
+
+                return $value;
+            });
         } catch (QueryException $e) {
             throw $this->uniqueOr($e, 'المعرّف النصي (slug) مستخدم بالفعل في هذا البُعد.');
         }
 
-        return $this->presentValue($value, $this->assignedCount($value->id));
+        return $value === null ? null : $this->presentValue($value, $this->assignedCount($value->id));
     }
 
     public function deleteValue(string $facetId, string $valueId): ?bool
     {
-        $value = CommerceFacetValue::query()->where('commerce_facet_id', $facetId)->find($valueId);
-        if ($value === null) {
-            return null;
-        }
+        return DB::transaction(function () use ($facetId, $valueId) {
+            // القفل نفسه الذي يمسكه الإسناد: إسنادٌ سبق الحذف يُنتج 409 مؤكَّداً، والعكس يُرفض الإسناد.
+            $facet = CommerceFacet::query()->lockForUpdate()->find($facetId);
+            $value = $facet === null ? null : CommerceFacetValue::query()->where('commerce_facet_id', $facet->id)->find($valueId);
+            if ($value === null) {
+                return null;
+            }
 
-        if ($this->assignedCount($value->id) > 0) {
-            throw new CommerceTaxonomyConflictException('لا يمكن حذف قيمة مُسنَدة لمنتجات — عطّلها بدلاً من ذلك.');
-        }
+            if ($this->assignedCount($value->id) > 0) {
+                throw new CommerceTaxonomyConflictException('لا يمكن حذف قيمة مُسنَدة لمنتجات — عطّلها بدلاً من ذلك.');
+            }
 
-        $value->delete();
+            $value->delete();
 
-        return true;
+            return true;
+        });
     }
 
     /** @return list<string> معرّفات القيم المُسنَدة للمنتج */
@@ -257,6 +272,13 @@ final class CommerceFacetService
         return DB::transaction(function () use ($product, $valueIds) {
             // يُسلسل التعديلات المتزامنة على المنتج نفسه.
             Product::withoutGlobalScopes()->whereKey($product->id)->lockForUpdate()->first();
+
+            // يمسك صفوف الأبعاد المعنيّة (مرتَّبةً بالمعرّف تجنّباً للتشابك) فيُسلسل الإسناد مع
+            // حذف/تعطيل القيمة أو البُعد، ثم يُعاد تحميل القيم تحت القفل فلا نعتمد قراءةً قديمة.
+            $facetIds = CommerceFacetValue::query()->whereIn('id', $valueIds)->pluck('commerce_facet_id')->unique()->sort()->values()->all();
+            if ($facetIds !== []) {
+                CommerceFacet::query()->whereIn('id', $facetIds)->orderBy('id')->lockForUpdate()->get(['id']);
+            }
 
             $values = CommerceFacetValue::query()->with('facet:id,is_active')->whereIn('id', $valueIds)->get()->keyBy('id');
             if ($values->count() !== count($valueIds)) {
