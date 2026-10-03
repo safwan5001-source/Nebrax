@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Http\Controllers\Api\CommerceCategoryPublicationController;
+use App\Http\Controllers\Api\CommercePersonalizationController;
 use App\Http\Controllers\Api\CommerceProductPublicationController;
 use App\Http\Middleware\EnsureActiveSubscription;
 use App\Http\Middleware\EnsurePermission;
@@ -40,6 +41,14 @@ final class CommerceWorkspaceServiceProvider extends ServiceProvider
                 ->whereUuid('id')
                 ->middleware(EnsurePermission::class.':products.view');
             Route::put('{id}/publication', [CommerceProductPublicationController::class, 'update'])
+                ->whereUuid('id')
+                ->middleware(EnsurePermission::class.':products.manage');
+
+            // FLOWERS-H4a / ADR-16 — تعريفات التخصيص لكل منتج. RBAC يطابق النشر.
+            Route::get('{id}/personalization', [CommercePersonalizationController::class, 'show'])
+                ->whereUuid('id')
+                ->middleware(EnsurePermission::class.':products.view');
+            Route::put('{id}/personalization', [CommercePersonalizationController::class, 'replace'])
                 ->whereUuid('id')
                 ->middleware(EnsurePermission::class.':products.manage');
         });

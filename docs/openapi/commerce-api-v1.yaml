@@ -1344,6 +1344,41 @@ components:
         created_at: { type: [string, 'null'], format: date-time }
         updated_at: { type: [string, 'null'], format: date-time }
         media: { type: array, items: { $ref: '#/components/schemas/ProductMediaItem' } }
+        personalization: { $ref: '#/components/schemas/ProductPersonalization' }
+
+    ProductPersonalization:
+      description: >
+        Customer-input fields the merchant defined for this product (ADR-16). Present on a
+        product detail **only** when the product has at least one active field. Inputs are
+        not variants and carry no price effect.
+      type: object
+      additionalProperties: false
+      required: [fields]
+      properties:
+        fields:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [key, type, label, label_en, help_text, is_required, max_length, options]
+            properties:
+              key: { type: string }
+              type: { type: string, enum: [text, textarea, select] }
+              label: { type: string }
+              label_en: { type: [string, 'null'] }
+              help_text: { type: [string, 'null'] }
+              is_required: { type: boolean }
+              max_length: { type: [integer, 'null'] }
+              options:
+                type: array
+                items:
+                  type: object
+                  additionalProperties: false
+                  required: [value_key, label]
+                  properties:
+                    value_key: { type: string }
+                    label: { type: string }
+                    label_en: { type: [string, 'null'] }
 
     ProductOption:
       type: object
@@ -1407,6 +1442,7 @@ components:
         media: { type: array, items: { $ref: '#/components/schemas/ProductMediaItem' } }
         options: { type: array, items: { $ref: '#/components/schemas/ProductOption' } }
         variants: { type: array, items: { $ref: '#/components/schemas/ProductVariant' } }
+        personalization: { $ref: '#/components/schemas/ProductPersonalization' }
 
     ProductListResponse:
       type: object
@@ -1432,6 +1468,21 @@ components:
         unit_price: { $ref: '#/components/schemas/Money' }
         line_total: { $ref: '#/components/schemas/Money' }
         available: { type: boolean }
+        personalization: { $ref: '#/components/schemas/LinePersonalization' }
+
+    LinePersonalization:
+      description: The customer's personalization values for a line (ADR-16). Present only on a personalized line.
+      type: array
+      items:
+        type: object
+        additionalProperties: false
+        required: [key, label, label_en, value, value_label]
+        properties:
+          key: { type: string }
+          label: { type: string }
+          label_en: { type: [string, 'null'] }
+          value: { type: string }
+          value_label: { type: [string, 'null'] }
 
     Cart:
       type: object
@@ -1461,6 +1512,14 @@ components:
         product_variant_id: { type: [string, 'null'], format: uuid }
         unit_key: { type: string, maxLength: 80 }
         quantity: { type: integer, minimum: 1 }
+        personalization:
+          description: >
+            Customer input keyed by the product's personalization field key (ADR-16). Validated
+            server-side against the product's active definitions; the same product with the same
+            input merges quantity, different input is a separate line.
+          type: [object, 'null']
+          maxProperties: 8
+          additionalProperties: { type: [string, 'null'], maxLength: 2000 }
 
     CartItemUpdate:
       type: object
@@ -1667,6 +1726,7 @@ components:
               quantity: { type: integer }
               unit_price: { $ref: '#/components/schemas/Money' }
               line_total: { $ref: '#/components/schemas/Money' }
+              personalization: { $ref: '#/components/schemas/LinePersonalization' }
         created_at: { type: [string, 'null'], format: date-time }
 
     GuestOrderResponse:

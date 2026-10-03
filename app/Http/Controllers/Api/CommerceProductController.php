@@ -11,6 +11,7 @@ use App\Services\Commerce\AvailableToSellService;
 use App\Services\Commerce\CommercePriceResolver;
 use App\Services\Commerce\FulfillmentPolicyNotConfiguredException;
 use App\Services\Commerce\FulfillmentPolicyService;
+use App\Services\Commerce\ProductPersonalizationService;
 use App\Services\ProductMediaGalleryService;
 use App\Support\DocumentLineVariantResolver;
 use App\Support\PublicApiResponse;
@@ -194,6 +195,12 @@ class CommerceProductController extends PublicApiController
         }
 
         $resource = $this->toResource($request, $product, $channelId, $currency, $warehouse, $prices, $availability, $gallery, true);
+
+        // FLOWERS-H4a / ADR-16 — يظهر فقط حين يملك المنتج مُدخَلات تخصيص نشطة.
+        $personalization = app(ProductPersonalizationService::class)->publicFields($id);
+        if ($personalization !== []) {
+            $resource['personalization'] = ['fields' => $personalization];
+        }
 
         return PublicApiResponse::success($request, $resource);
     }
