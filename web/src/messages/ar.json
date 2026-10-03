@@ -8967,6 +8967,7 @@
     "filterBranch": "الفرع",
     "allPlatforms": "كل المنصات",
     "allBranches": "الفروع المتاحة",
+    "inactiveBranch": "غير نشط",
     "platform": "المنصة",
     "reference": "المرجع الظاهر",
     "providerOrder": "رقم طلب المنصة",

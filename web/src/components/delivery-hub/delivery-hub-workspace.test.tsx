@@ -36,7 +36,7 @@ function renderWorkspace(overrides: Partial<React.ComponentProps<typeof Delivery
     <div dir="rtl">
       <DeliveryHubWorkspace
         orders={[order]}
-        branches={[{ id: 'branch-a', name: 'الفرع الأول' }, { id: 'branch-b', name: 'الفرع الثاني' }]}
+        branches={[{ id: 'branch-a', name: 'الفرع الأول', is_active: true }, { id: 'branch-b', name: 'الفرع الثاني', is_active: true }]}
         platforms={[{ id: 'profile-1', platform_key: 'jahez', name: 'جاهز', name_en: 'Jahez' }]}
         state="received"
         platformId=""
@@ -106,7 +106,7 @@ describe('DeliveryHubWorkspace', () => {
     const view = render(
       <DeliveryHubWorkspace
         orders={[order]}
-        branches={[{ id: 'branch-a', name: 'الفرع الأول' }, { id: 'branch-b', name: 'الفرع الثاني' }]}
+        branches={[{ id: 'branch-a', name: 'الفرع الأول', is_active: true }, { id: 'branch-b', name: 'الفرع الثاني', is_active: true }]}
         platforms={[]}
         state="received"
         platformId=""
@@ -133,7 +133,7 @@ describe('DeliveryHubWorkspace', () => {
     view.rerender(
       <DeliveryHubWorkspace
         orders={[{ ...order, id: 'order-2', branch_id: 'branch-b', branch_name: 'الفرع الثاني' }]}
-        branches={[{ id: 'branch-a', name: 'الفرع الأول' }, { id: 'branch-b', name: 'الفرع الثاني' }]}
+        branches={[{ id: 'branch-a', name: 'الفرع الأول', is_active: true }, { id: 'branch-b', name: 'الفرع الثاني', is_active: true }]}
         platforms={[]}
         state="received"
         platformId=""
@@ -164,6 +164,17 @@ describe('DeliveryHubWorkspace', () => {
     expect(screen.queryByRole('button', { name: 'next' })).toBeNull();
     await user.keyboard('{Escape}');
     expect(onSelect).toHaveBeenCalledWith(null);
+  });
+
+  it('does not offer an inactive branch as a routing destination', () => {
+    renderWorkspace({
+      branches: [
+        { id: 'branch-a', name: 'الفرع الأول', is_active: true },
+        { id: 'branch-b', name: 'الفرع الثاني', is_active: false },
+      ],
+    });
+    expect(screen.queryByRole('button', { name: 'reroute' })).toBeNull();
+    expect(screen.getByRole('option', { name: 'الفرع الثاني — inactiveBranch' })).toBeTruthy();
   });
 
   it('labels operational hand-off without a payment or posting control', () => {

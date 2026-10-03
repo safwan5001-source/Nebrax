@@ -133,7 +133,9 @@ export function DeliveryHubWorkspace({
           <Select id="hub-branch" value={branchId} onChange={(event) => onBranch(event.target.value)}>
             <option value="">{t('allBranches')}</option>
             {branches.map((branch) => (
-              <option key={branch.id} value={branch.id}>{branch.name}</option>
+              <option key={branch.id} value={branch.id}>
+                {branch.name}{branch.is_active ? '' : ` — ${t('inactiveBranch')}`}
+              </option>
             ))}
           </Select>
         </div>
@@ -280,13 +282,13 @@ function DeliveryHubDetail({
   }
   if (!order) return null;
 
+  const destinations = branches.filter((branch) => branch.is_active && branch.id !== order.branch_id);
   const actions = deliveryHubActions({
     state: order.state,
     canOperate,
     canSeeUnrouted,
-    branchCount: branches.length,
+    destinationCount: destinations.length,
   });
-  const destinations = branches.filter((branch) => branch.id !== order.branch_id);
   const destinationIsValid = destinations.some((branch) => branch.id === destination);
 
   return (

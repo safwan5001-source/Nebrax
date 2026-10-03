@@ -403,6 +403,34 @@ class DeliveryHubProjectionTest extends TestCase
         $this->assertStringNotContainsString('P-ctx', $limited->getContent());
     }
 
+    /** @test */
+    public function an_inactive_branch_is_not_a_routing_target(): void
+    {
+        $auth = $this->registerTenant('inact', 'owner@inact.test');
+        [$first, $second] = $this->twoBranches($auth['token']);
+        $this->withToken($auth['token'])->putJson("/api/branches/{$second}", [
+            'name' => 'فرع ثان',
+            'is_active' => false,
+        ])->assertOk();
+        $profile = $this->platform($auth['token']);
+        $created = $this->withToken($auth['token'])->postJson('/api/delivery-hub/orders', [
+            'delivery_platform_profile_id' => $profile,
+            'provider_order_id' => 'P-inact',
+            'branch_id' => $first,
+        ])->assertCreated();
+
+        $context = $this->withToken($auth['token'])->getJson('/api/delivery-hub/context')->assertOk();
+        $rows = collect($context['data']['branches'])->keyBy('id');
+        $this->assertTrue($rows[$first]['is_active']);
+        $this->assertFalse($rows[$second]['is_active']);
+
+        $this->transition($auth['token'], $created['data']['id'], 'route', $second)->assertStatus(422);
+        $this->withToken($auth['token'])->getJson('/api/delivery-hub/orders/'.$created['data']['id'])
+            ->assertOk()
+            ->assertJsonPath('data.branch_id', $first)
+            ->assertJsonPath('data.state', DeliveryHubOrder::RECEIVED);
+    }
+
     /** @return array{0: array{token: string, tenant_id: string}, 1: string, 2: string} */
     private function receivedOrder(string $slug): array
     {

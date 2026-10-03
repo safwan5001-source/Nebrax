@@ -8967,6 +8967,7 @@
     "filterBranch": "Branch",
     "allPlatforms": "All platforms",
     "allBranches": "Available branches",
+    "inactiveBranch": "Inactive",
     "platform": "Platform",
     "reference": "Display reference",
     "providerOrder": "Provider order id",

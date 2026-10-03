@@ -38,7 +38,7 @@ The list response includes platform key, catalog names, and branch name. `GET /a
 - Orders past the first page are reachable, and an out-of-range page clamps to the last page.
 - In-flight list responses are ignored when a newer filter or page request has started. A transition refresh uses the latest query. Changing a filter or page clears the previous rows and selection, including when that request fails.
 - The reroute destination clears in the same render as the selected order, and a destination outside the authorized list cannot be submitted.
-- Direct navigation without `delivery_hub.view` shows a denial and does not call the hub API. A payload that is not a context object, including the demo fallback array, stays fail-closed and does not crash the workspace.
+- Direct navigation without `delivery_hub.view` shows a denial and does not call the hub API. A payload that is not a context object, including the demo fallback array, stays fail-closed and does not crash the workspace. An inactive branch stays visible for historical filtering and is rejected as a route destination by the server. A payload that is not a context object, including the demo fallback array, stays fail-closed and does not crash the workspace.
 
 ## Known limitations
 

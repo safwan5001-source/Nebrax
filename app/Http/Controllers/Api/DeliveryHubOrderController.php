@@ -46,9 +46,10 @@ class DeliveryHubOrderController extends ApiController
             'data' => [
                 'can_see_unrouted' => $allowed === null,
                 'platforms' => $platforms,
-                'branches' => $branches->get(['id', 'name'])->map(fn (Branch $branch) => [
+                'branches' => $branches->get(['id', 'name', 'is_active'])->map(fn (Branch $branch) => [
                     'id' => $branch->id,
                     'name' => $branch->name,
+                    'is_active' => (bool) $branch->is_active,
                 ])->values(),
             ],
         ]);

@@ -34,13 +34,14 @@ export interface DeliveryHubOrderView {
 export interface DeliveryHubBranchOption {
   id: string;
   name: string;
+  is_active: boolean;
 }
 
 export function deliveryHubActions(input: {
   state: DeliveryHubState;
   canOperate: boolean;
   canSeeUnrouted: boolean;
-  branchCount: number;
+  destinationCount: number;
 }): DeliveryHubAction[] {
   if (!input.canOperate) return [];
 
@@ -49,14 +50,14 @@ export function deliveryHubActions(input: {
   if (input.state === 'unrouted') {
     if (!input.canSeeUnrouted) return [];
     const actions: DeliveryHubAction[] = [];
-    if (input.branchCount > 0) actions.push('route');
+    if (input.destinationCount > 0) actions.push('route');
     actions.push('cancel', 'reject');
     return actions;
   }
 
   if (input.state === 'received') {
     const actions: DeliveryHubAction[] = ['accept'];
-    if (input.branchCount > 1) actions.push('reroute');
+    if (input.destinationCount > 0) actions.push('reroute');
     actions.push('cancel', 'reject');
     return actions;
   }
@@ -130,7 +131,7 @@ export function readHubContext(value: unknown): {
       if (!item || typeof item !== 'object') return [];
       const branch = item as { id?: unknown; name?: unknown };
       if (typeof branch.id !== 'string' || typeof branch.name !== 'string') return [];
-      return [{ id: branch.id, name: branch.name }];
+      return [{ id: branch.id, name: branch.name, is_active: branch.is_active === true }];
     })
     : [];
   return { can_see_unrouted: row.can_see_unrouted === true, platforms, branches };

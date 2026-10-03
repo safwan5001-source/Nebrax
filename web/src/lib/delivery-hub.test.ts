@@ -27,15 +27,16 @@ describe('delivery platform registry', () => {
 
 describe('delivery hub actions', () => {
   it('follows the accepted linear machine and hides actions from view-only users', () => {
-    expect(deliveryHubActions({ state: 'received', canOperate: false, canSeeUnrouted: true, branchCount: 2 })).toEqual([]);
-    expect(deliveryHubActions({ state: 'unrouted', canOperate: true, canSeeUnrouted: false, branchCount: 1 })).toEqual([]);
-    expect(deliveryHubActions({ state: 'unrouted', canOperate: true, canSeeUnrouted: true, branchCount: 1 })).toEqual(['route', 'cancel', 'reject']);
-    expect(deliveryHubActions({ state: 'received', canOperate: true, canSeeUnrouted: true, branchCount: 2 })).toEqual(['accept', 'reroute', 'cancel', 'reject']);
-    expect(deliveryHubActions({ state: 'received', canOperate: true, canSeeUnrouted: true, branchCount: 1 })).toEqual(['accept', 'cancel', 'reject']);
-    expect(deliveryHubActions({ state: 'accepted', canOperate: true, canSeeUnrouted: true, branchCount: 2 })).toEqual(['preparing', 'cancel', 'reject']);
-    expect(deliveryHubActions({ state: 'ready', canOperate: true, canSeeUnrouted: true, branchCount: 1 })).toEqual(['handoff', 'cancel', 'reject']);
-    expect(deliveryHubActions({ state: 'handed_off', canOperate: true, canSeeUnrouted: true, branchCount: 1 })).toEqual(['cancel', 'reject']);
-    expect(deliveryHubActions({ state: 'cancelled_before_post', canOperate: true, canSeeUnrouted: true, branchCount: 2 })).toEqual([]);
+    expect(deliveryHubActions({ state: 'received', canOperate: false, canSeeUnrouted: true, destinationCount: 1 })).toEqual([]);
+    expect(deliveryHubActions({ state: 'unrouted', canOperate: true, canSeeUnrouted: false, destinationCount: 1 })).toEqual([]);
+    expect(deliveryHubActions({ state: 'unrouted', canOperate: true, canSeeUnrouted: true, destinationCount: 1 })).toEqual(['route', 'cancel', 'reject']);
+    expect(deliveryHubActions({ state: 'unrouted', canOperate: true, canSeeUnrouted: true, destinationCount: 0 })).toEqual(['cancel', 'reject']);
+    expect(deliveryHubActions({ state: 'received', canOperate: true, canSeeUnrouted: true, destinationCount: 1 })).toEqual(['accept', 'reroute', 'cancel', 'reject']);
+    expect(deliveryHubActions({ state: 'received', canOperate: true, canSeeUnrouted: true, destinationCount: 0 })).toEqual(['accept', 'cancel', 'reject']);
+    expect(deliveryHubActions({ state: 'accepted', canOperate: true, canSeeUnrouted: true, destinationCount: 1 })).toEqual(['preparing', 'cancel', 'reject']);
+    expect(deliveryHubActions({ state: 'ready', canOperate: true, canSeeUnrouted: true, destinationCount: 0 })).toEqual(['handoff', 'cancel', 'reject']);
+    expect(deliveryHubActions({ state: 'handed_off', canOperate: true, canSeeUnrouted: true, destinationCount: 0 })).toEqual(['cancel', 'reject']);
+    expect(deliveryHubActions({ state: 'cancelled_before_post', canOperate: true, canSeeUnrouted: true, destinationCount: 1 })).toEqual([]);
   });
 });
 
@@ -72,7 +73,7 @@ describe('delivery hub response boundary', () => {
     expect(readHubContext({
       can_see_unrouted: true,
       platforms: [{ id: 'p', platform_key: 'jahez', name: 'جاهز', name_en: 'Jahez' }],
-      branches: [{ id: 'b', name: 'الأول' }],
+      branches: [{ id: 'b', name: 'الأول', is_active: true }],
     }).can_see_unrouted).toBe(true);
     expect(readHubOrders([])).toEqual([]);
     expect(readHubOrders(undefined)).toEqual([]);
