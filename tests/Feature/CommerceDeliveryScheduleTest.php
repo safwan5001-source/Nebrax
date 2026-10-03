@@ -287,6 +287,64 @@ class CommerceDeliveryScheduleTest extends TestCase
     }
 
     /** @test */
+    public function a_window_whose_end_falls_in_the_spring_forward_gap_is_not_offered_that_day(): void
+    {
+        $store = $this->store('ds-dst-end');
+        // البداية 01:30 موجودة، النهاية 02:30 غير موجودة يوم 2027-03-14 في نيويورك
+        $service = $this->configure($store, ['timezone' => 'America/New_York', 'max_days_ahead' => 3], [
+            $this->slot('فجراً', '01:30', '02:30'),
+        ]);
+
+        $options = $service->options($store['channel_id'], 'delivery', null, null, CarbonImmutable::parse('2027-03-13 12:00:00', 'UTC'));
+
+        $dates = array_column($options['dates'], 'date');
+        $this->assertNotContains('2027-03-14', $dates);
+        $this->assertContains('2027-03-15', $dates);
+        app(TenantContext::class)->forget();
+    }
+
+    /** @test */
+    public function unexpected_database_failures_stay_server_errors_and_are_not_returned_as_validation_messages(): void
+    {
+        $store = $this->store('ds-db-fail');
+        $armed = true;
+        $boom = function () use (&$armed) {
+            if ($armed) {
+                throw new \Illuminate\Database\QueryException('sqlite', 'insert into secret_table', ['secret-binding'], new \PDOException('SQLSTATE secret detail'));
+            }
+        };
+        CommerceDeliverySlot::creating($boom);
+        CommerceDeliveryBlockedDate::creating($boom);
+        CommerceDeliveryScheduleSetting::creating($boom);
+
+        try {
+            app(TenantContext::class)->set($store['tenant_id']);
+            $service = app(CommerceDeliveryScheduleService::class);
+            foreach ([
+                fn () => $service->saveSettings($store['channel_id'], ['is_enabled' => true]),
+                fn () => $service->replaceSlots($store['channel_id'], [$this->slot('صباحاً', '09:00', '12:00')]),
+                fn () => $service->replaceBlockedDates($store['channel_id'], [['date' => '2026-12-25']]),
+            ] as $call) {
+                try {
+                    $call();
+                    $this->fail('a database failure was swallowed');
+                } catch (\Illuminate\Database\QueryException) {
+                    $this->addToAssertionCount(1); // لم يُحوَّل إلى DomainException
+                }
+            }
+            app(TenantContext::class)->forget();
+
+            // عبر الـAPI: خطأ خادم (500) لا 422
+            $put = fn (string $suffix, array $body) => $this->withToken($store['token'])->putJson($this->url($store, $suffix), $body);
+            $put('/settings', ['is_enabled' => true])->assertStatus(500);
+            $put('/slots', ['slots' => [['method' => 'delivery', 'label' => 'x', 'start_time' => '09:00', 'end_time' => '10:00']]])->assertStatus(500);
+            $put('/blocked-dates', ['blocked_dates' => [['date' => '2026-12-25']]])->assertStatus(500);
+        } finally {
+            $armed = false; // يعطّل المستمعين (بالمرجع) حتى لو بقوا مسجَّلين
+        }
+    }
+
+    /** @test */
     public function inactive_windows_are_never_offered_and_the_required_flag_is_passed_through(): void
     {
         $store = $this->store('ds-inactive');

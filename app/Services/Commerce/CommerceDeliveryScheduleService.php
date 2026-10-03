@@ -13,6 +13,7 @@ use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use DomainException;
 use Illuminate\Support\Facades\DB;
+use PDOException;
 use RuntimeException;
 
 /**
@@ -129,6 +130,9 @@ final class CommerceDeliveryScheduleService
                 foreach ($rows as $row) {
                     CommerceDeliverySlot::create($row + ['sales_channel_id' => $salesChannelId]);
                 }
+            } catch (PDOException $e) {
+                // فشل قاعدة بيانات غير متوقع يبقى خطأ خادم — لا يُحوَّل إلى 422 يكشف نص SQL للعميل.
+                throw $e;
             } catch (RuntimeException $e) {
                 throw new DomainException($e->getMessage());
             }
@@ -182,6 +186,9 @@ final class CommerceDeliveryScheduleService
                         'reason' => $reason === '' ? null : $reason,
                     ]);
                 }
+            } catch (PDOException $e) {
+                // فشل قاعدة بيانات غير متوقع يبقى خطأ خادم — لا يُحوَّل إلى 422 يكشف نص SQL للعميل.
+                throw $e;
             } catch (RuntimeException $e) {
                 throw new DomainException($e->getMessage());
             }
@@ -243,7 +250,9 @@ final class CommerceDeliveryScheduleService
                 $start = $day->setTimeFromTimeString($slot->start_time);
                 // وقت جداري غير موجود (فجوة الانتقال إلى التوقيت الصيفي: 02:30 تُطبَّع إلى 03:30) ⇒ لا نافذة في
                 // هذا اليوم بدل عرض بدايةٍ لا تطابق اللحظة المحسوبة.
-                if ($start->format('H:i') !== $slot->start_time) {
+                // النهاية كذلك: `01:30–02:30` بدايتها موجودة ونهايتها لا، فتكون نقطةً نهائية مستحيلة للعميل واللقطة.
+                if ($start->format('H:i') !== $slot->start_time
+                    || $day->setTimeFromTimeString($slot->end_time)->format('H:i') !== $slot->end_time) {
                     continue;
                 }
                 if ($start->lessThan($earliestInstant)) {

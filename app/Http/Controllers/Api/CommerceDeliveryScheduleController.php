@@ -12,6 +12,7 @@ use DomainException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use PDOException;
 use RuntimeException;
 
 /**
@@ -44,6 +45,8 @@ final class CommerceDeliveryScheduleController extends ApiController
 
         try {
             $schedule->saveSettings($channelId, $data);
+        } catch (PDOException $e) {
+            throw $e;
         } catch (RuntimeException $e) {
             abort(422, $e->getMessage());
         }
