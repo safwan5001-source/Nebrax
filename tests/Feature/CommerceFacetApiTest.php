@@ -28,7 +28,7 @@ class CommerceFacetApiTest extends TestCase
     private function makeProduct(string $tenantId, string $name = 'باقة ورد'): Product
     {
         app(TenantContext::class)->set($tenantId);
-        $product = Product::create(['name' => $name, 'type' => 'goods', 'unit' => 'pcs']);
+        $product = Product::create(['name' => $name, 'type' => 'good', 'unit' => 'piece']);
         app(TenantContext::class)->forget();
 
         return $product;
