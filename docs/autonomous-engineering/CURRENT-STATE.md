@@ -2,13 +2,13 @@
 
 > This file is a durable resume point, not a substitute for Git/GitHub evidence.
 
-LAST_UPDATED: 2026-10-03 (**AWJ Delivery Platforms & Settlement Horizon V1 is the single ACTIVE horizon.** DLV-EVIDENCE-1 through DELIVERY-DECISION-PASS-4 are merged. PASS-4 squash is `13808e15cfea2ded9e64bcfd4c838971f7581b3b`: OD-HUB-STATES and OD-HUB-IDENTITY are accepted. No production deploy. **DLV-HUB-PROJECTION-1 is in review and not merged.** It implements only the operational projection. Full DLV-HUB-1 stays BLOCKED on DG-8-IMPORT and DG-3. No deploy.)
+LAST_UPDATED: 2026-10-03 (**AWJ Delivery Platforms & Settlement Horizon V1 is the single ACTIVE horizon.** DLV-EVIDENCE-1 through DLV-HUB-PROJECTION-1 are merged. Projection squash is `07c3820a9603061819b9a580b671d975a5ccf0aa`. No production deploy. **DLV-HUB-UI-1 is in review and not merged.** It is the operational workspace and a shared presentation registry with neutral marks, not official logo files. Full DLV-HUB-1 stays BLOCKED on DG-8-IMPORT and DG-3. No deploy.)
 LAYER_VERSION: V1
 STATUS: ACTIVE — AWJ Delivery Platforms & Settlement Horizon V1 (authoritative queue: `TASK-QUEUE.md`, section "Horizon: AWJ Delivery Platforms & Settlement V1"). Every snapshot, STATUS and objective below this section is historical and superseded.
 
 ## Current objective
 
-DLV-HUB-PROJECTION-1 is in review. Do not merge it from this note and do not deploy. The operational projection may be built only inside that PR's scope. Do not start full DLV-HUB-1, commission, settlement, connectors, or refunds. DG-8-IMPORT and DG-3 stay open and still block only the financial command. Merge != Deploy.
+DLV-HUB-UI-1 is in review. Do not merge it from this note and do not deploy. It does not authorize a financial command. Do not start full DLV-HUB-1, commission, settlement, connectors, or refunds. DG-8-IMPORT and DG-3 stay open. Merge != Deploy.
 
 ## Previous snapshot (historical, superseded)
 

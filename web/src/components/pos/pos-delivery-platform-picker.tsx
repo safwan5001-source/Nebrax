@@ -1,6 +1,7 @@
 'use client';
 
 import { useLocale, useTranslations } from 'next-intl';
+import { DeliveryPlatformMark } from '@/components/delivery/delivery-platform-mark';
 
 export interface PosDeliveryPlatformOption {
   id: string;
@@ -74,13 +75,7 @@ export function PosDeliveryPlatformPicker({
                 (active ? 'border-primary bg-primary-soft ring-2 ring-primary/30' : 'border-border')
               }
             >
-              <span aria-hidden className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary-soft text-sm font-bold text-primary">
-                {name.trim().slice(0, 1)}
-              </span>
-              <span className="min-w-0">
-                <span className="block truncate text-sm font-semibold">{name}</span>
-                {platform.logo_asset_key ? <span className="sr-only">{t('delivery_logo_unavailable')}</span> : null}
-              </span>
+              <DeliveryPlatformMark platformKey={platform.platform_key} name={name} />
             </button>
           );
         })}

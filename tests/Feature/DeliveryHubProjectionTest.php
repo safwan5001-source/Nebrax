@@ -365,6 +365,44 @@ class DeliveryHubProjectionTest extends TestCase
         ])->assertCreated()->assertJsonPath('data.state', DeliveryHubOrder::RECEIVED);
     }
 
+    /** @test */
+    public function hub_context_and_filters_stay_inside_the_actor_scope(): void
+    {
+        $auth = $this->registerTenant('ctx', 'owner@ctx.test');
+        [$first, $second] = $this->twoBranches($auth['token']);
+        $profile = $this->platform($auth['token']);
+        $created = $this->withToken($auth['token'])->postJson('/api/delivery-hub/orders', [
+            'delivery_platform_profile_id' => $profile,
+            'provider_order_id' => 'P-ctx',
+            'branch_id' => $second,
+        ])->assertCreated();
+        $this->assertSame('jahez', $created['data']['platform_key']);
+        $this->assertSame('جاهز', $created['data']['platform_name']);
+        $this->assertArrayNotHasKey('amount', $created['data']);
+
+        $context = $this->withToken($auth['token'])->getJson('/api/delivery-hub/context')->assertOk();
+        $this->assertTrue($context['data']['can_see_unrouted']);
+        $this->assertTrue(collect($context['data']['platforms'])->contains('id', $profile));
+
+        $this->withToken($auth['token'])->getJson('/api/delivery-hub/orders?state=received&delivery_platform_profile_id='.$profile)
+            ->assertOk()
+            ->assertJsonPath('data.0.id', $created['data']['id']);
+        $this->withToken($auth['token'])->getJson('/api/delivery-hub/orders?state=accepted')
+            ->assertOk()
+            ->assertJsonCount(0, 'data');
+
+        $other = $this->registerTenant('ctxb', 'owner@ctxb.test');
+        $this->withToken($auth['token'])->getJson('/api/delivery-hub/orders?delivery_platform_profile_id='.$this->platform($other['token']))
+            ->assertOk()
+            ->assertJsonCount(0, 'data');
+
+        $token = $this->restricted($auth, [$first], 'one@ctx.test');
+        $limited = $this->withToken($token)->getJson('/api/delivery-hub/context')->assertOk();
+        $this->assertFalse($limited['data']['can_see_unrouted']);
+        $this->assertSame([$first], collect($limited['data']['branches'])->pluck('id')->all());
+        $this->assertStringNotContainsString('P-ctx', $limited->getContent());
+    }
+
     /** @return array{0: array{token: string, tenant_id: string}, 1: string, 2: string} */
     private function receivedOrder(string $slug): array
     {
