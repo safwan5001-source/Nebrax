@@ -345,6 +345,41 @@ class DeliveryPlatformAccountingTest extends TestCase
     }
 
     /** @test */
+    public function recording_a_context_on_an_already_collected_invoice_is_rejected(): void
+    {
+        $profile = $this->platformProfile('jahez', Version::COLLECTION_PLATFORM);
+        $invoice = app(InvoiceService::class)->create(
+            ['partner_id' => $this->customer->id, 'payment_type' => 'cash', 'is_paid' => true, 'payment_method' => 'cash'],
+            [['quantity' => 1, 'unit_price' => 100000, 'tax_rate' => 15]]
+        );
+        $invoice = app(InvoiceService::class)->post($invoice);
+        $this->assertGreaterThan(0, $invoice->paid_amount);
+
+        $this->expectException(RuntimeException::class);
+        $this->contexts->record($invoice, $profile);
+    }
+
+    /** @test */
+    public function direct_context_creation_on_an_already_collected_invoice_is_rejected(): void
+    {
+        $profile = $this->platformProfile('jahez', Version::COLLECTION_PLATFORM);
+        $version = $this->platforms->latestVersion($profile->fresh());
+        $invoice = app(InvoiceService::class)->create(
+            ['partner_id' => $this->customer->id, 'payment_type' => 'cash', 'is_paid' => true, 'payment_method' => 'cash'],
+            [['quantity' => 1, 'unit_price' => 100000, 'tax_rate' => 15]]
+        );
+        $invoice = app(InvoiceService::class)->post($invoice);
+
+        $this->expectException(DomainException::class);
+        DeliveryInvoiceContext::create([
+            'invoice_id' => $invoice->id,
+            'sales_channel_id' => $profile->sales_channel_id,
+            'delivery_platform_profile_id' => $profile->id,
+            'delivery_platform_profile_version_id' => $version->id,
+        ]);
+    }
+
+    /** @test */
     public function direct_context_creation_cannot_bypass_the_external_reference_policy(): void
     {
         $profile = $this->platforms->create([

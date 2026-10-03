@@ -70,6 +70,13 @@ class DeliveryInvoiceContext extends BaseModel
             if (! $invoice->isPosted()) {
                 throw new DomainException('Delivery invoice context requires a posted invoice.');
             }
+            // فاتورة "مدفوعة بالفعل" (`InvoiceService::settle()`) تُحصَّل بسند
+            // قبض نقد/بنك عادي **لحظة الترحيل** — قبل أن يُسجَّل أي سياق. سياقٌ
+            // platform_collected على فاتورة مُحصَّلة فعلاً يناقض الواقع: لا قيد
+            // مقاصة منصة موجود، والتحصيل الحقيقي أُغلق بالفعل على AR.
+            if ($invoice->paid_amount > 0) {
+                throw new DomainException('Delivery invoice context cannot be recorded after the invoice has already been collected.');
+            }
 
             // الفرع دائماً فرع الفاتورة نفسها — حجّة واحدة، **تُفرَض دوماً** ولا
             // تُقارَن: `BelongsToBranch` (مُستخدَمة أدناه) تملأ الحقل من الفرع
