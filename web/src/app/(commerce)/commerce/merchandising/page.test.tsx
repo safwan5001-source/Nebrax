@@ -47,6 +47,8 @@ describe('Merchandising — dimensions tab', () => {
     expect(await screen.findByText('Birthday')).toBeTruthy();
     expect(screen.getByText('2 products')).toBeTruthy();
     expect((screen.getByRole('button', { name: 'Delete Birthday' }) as HTMLButtonElement).disabled).toBe(true);
+    // البُعد كله لا يُحذف ما دامت قيمة منه مُسنَدة (الخادم يرفضه 409)
+    expect((screen.getByRole('button', { name: 'Delete Occasion' }) as HTMLButtonElement).disabled).toBe(true);
     expect((screen.getByRole('button', { name: 'Delete Wedding' }) as HTMLButtonElement).disabled).toBe(false);
     expect(screen.queryByRole('button', { name: 'Add “Occasion”' })).toBeNull();
     expect(screen.getByRole('button', { name: 'Add “Recipient”' })).toBeTruthy();
@@ -169,6 +171,50 @@ describe('Merchandising — collections tab', () => {
 
     expect((screen.getByRole('button', { name: 'Move up: Roses' }) as HTMLButtonElement).disabled).toBe(true);
     expect((screen.getByRole('button', { name: 'Move down: Tulips' }) as HTMLButtonElement).disabled).toBe(true);
+  });
+});
+
+describe('Merchandising — collections for read-only users and pending writes', () => {
+  const collection = { id: 'c1', slug: 'best', title: 'Best sellers', title_en: null, description: null, status: 'active', sort_order: 0, member_count: 2 };
+
+  it('lets a view-only user inspect the members read-only', async () => {
+    user.current = { role: 'staff', permissions: ['products.view'] };
+    apiMock.mockResolvedValueOnce({ data: { facets: [] } });
+    renderPage();
+    apiMock.mockResolvedValueOnce({ data: { collections: [collection] } });
+    await userEvent.click(await screen.findByRole('tab', { name: 'Collections' }));
+    apiMock.mockResolvedValueOnce({
+      data: { products: [
+        { product_id: 'a', name: 'Roses', name_en: null, sku: null, is_active: true, position: 0 },
+        { product_id: 'b', name: 'Tulips', name_en: null, sku: null, is_active: true, position: 1 },
+      ] },
+    });
+    await userEvent.click(await screen.findByRole('button', { name: 'View products' }));
+
+    expect(await screen.findByText('Roses')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Move down: Roses' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Remove: Roses' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Save order' })).toBeNull();
+    expect(screen.queryByLabelText('Search a product by name or SKU')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Close' })).toBeTruthy();
+  });
+
+  it('keeps a form dialog open on Escape while its request is pending', async () => {
+    apiMock.mockResolvedValueOnce({ data: { facets: [occasion] } });
+    renderPage();
+    await userEvent.click(await screen.findByRole('button', { name: 'Add value' }));
+    await userEvent.type(screen.getByLabelText('Value name'), 'Anniversary');
+
+    let finish: (value: unknown) => void = () => undefined;
+    apiMock.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await userEvent.keyboard('{Escape}');
+
+    expect(screen.getByRole('dialog')).toBeTruthy();
+
+    apiMock.mockResolvedValueOnce({ data: { facets: [occasion] } });
+    finish({ data: { value: { id: 'v9', slug: 'anniversary', name: 'Anniversary' } } });
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
   });
 });
 

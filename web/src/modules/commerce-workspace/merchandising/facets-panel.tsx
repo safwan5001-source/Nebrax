@@ -119,7 +119,15 @@ export function FacetsPanel({ t, canManage }: { t: T; canManage: boolean }) {
                     <Button type="button" variant="ghost" size="icon" aria-label={`${t('merchEdit')} ${facet.name}`} onClick={() => setDialog({ kind: 'edit-facet', facet })}>
                       <Pencil className="h-4 w-4" aria-hidden="true" />
                     </Button>
-                    <Button type="button" variant="ghost" size="icon" aria-label={`${t('merchDelete')} ${facet.name}`} onClick={() => setDialog({ kind: 'delete-facet', facet })}>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      aria-label={`${t('merchDelete')} ${facet.name}`}
+                      disabled={facet.values.some((v) => v.productCount > 0)}
+                      title={facet.values.some((v) => v.productCount > 0) ? t('merchDeleteBlocked') : undefined}
+                      onClick={() => setDialog({ kind: 'delete-facet', facet })}
+                    >
                       <Trash2 className="h-4 w-4" aria-hidden="true" />
                     </Button>
                   </div>

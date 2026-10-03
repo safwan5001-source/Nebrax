@@ -79,19 +79,21 @@ export function CollectionsPanel({ t, canManage }: { t: T; canManage: boolean })
                   <code dir="ltr">{collection.slug}</code> · {collection.memberCount} {t('merchProductsSuffix')}
                 </p>
               </div>
-              {canManage ? (
-                <div className="flex items-center gap-1.5">
-                  <Button type="button" variant="outline" size="sm" onClick={() => setDialog({ kind: 'members', collection })}>
-                    {t('merchManageProducts')}
-                  </Button>
+              <div className="flex items-center gap-1.5">
+                <Button type="button" variant="outline" size="sm" onClick={() => setDialog({ kind: 'members', collection })}>
+                  {canManage ? t('merchManageProducts') : t('merchViewProducts')}
+                </Button>
+                {canManage ? (
+                  <>
                   <Button type="button" variant="ghost" size="icon" aria-label={`${t('merchEdit')} ${collection.title}`} onClick={() => setDialog({ kind: 'edit', collection })}>
                     <Pencil className="h-4 w-4" aria-hidden="true" />
                   </Button>
                   <Button type="button" variant="ghost" size="icon" aria-label={`${t('merchDelete')} ${collection.title}`} onClick={() => setDialog({ kind: 'delete', collection })}>
                     <Trash2 className="h-4 w-4" aria-hidden="true" />
                   </Button>
-                </div>
-              ) : null}
+                  </>
+                ) : null}
+              </div>
             </li>
           ))}
         </ul>
@@ -145,6 +147,7 @@ export function CollectionsPanel({ t, canManage }: { t: T; canManage: boolean })
       {dialog?.kind === 'members' ? (
         <MembersDialog
           t={t}
+          canManage={canManage}
           collection={dialog.collection}
           onClose={() => setDialog(null)}
           onSaved={async () => {
@@ -160,11 +163,13 @@ export function CollectionsPanel({ t, canManage }: { t: T; canManage: boolean })
 
 function MembersDialog({
   t,
+  canManage,
   collection,
   onClose,
   onSaved,
 }: {
   t: T;
+  canManage: boolean;
   collection: Collection;
   onClose: () => void;
   onSaved: () => Promise<void>;
@@ -186,7 +191,7 @@ function MembersDialog({
   const rows = Array.isArray(members) ? members : [];
 
   async function save() {
-    if (saving) return;
+    if (saving || !canManage) return;
     setSaving(true);
     setError(null);
     const result = await replaceCollectionMembers(collection.id, rows.map((m) => m.productId));
@@ -199,11 +204,12 @@ function MembersDialog({
   }
 
   return (
-    <Dialog open onClose={onClose} title={`${t('merchMembersTitle')} — ${collection.title}`} className="max-w-xl">
+    <Dialog open onClose={saving ? () => undefined : onClose} title={`${t('merchMembersTitle')} — ${collection.title}`} className="max-w-xl">
       {members === null ? <LoadingState variant="table" rows={3} label={t('merchLoading')} surface="bare" /> : null}
       {members === 'error' ? <ErrorState message={t('merchLoadFailed')} surface="bare" /> : null}
       {Array.isArray(members) ? (
         <div className="space-y-4">
+          {canManage ? (
           <ProductPicker
             t={t}
             idPrefix="merch-members"
@@ -217,6 +223,7 @@ function MembersDialog({
               )
             }
           />
+          ) : null}
 
           {rows.length === 0 ? (
             <p className="text-sm text-muted">{t('merchMembersEmpty')}</p>
@@ -229,6 +236,7 @@ function MembersDialog({
                     {member.name}
                     {!member.isActive ? <Badge tone="muted" className="ms-2">{t('merchInactive')}</Badge> : null}
                   </span>
+                  {canManage ? (
                   <span className="flex shrink-0 items-center gap-1">
                     <Button type="button" variant="ghost" size="icon" disabled={index === 0} aria-label={`${t('merchMoveUp')}: ${member.name}`} onClick={() => setMembers(moveItem(rows, index, -1))}>
                       <ArrowUp className="h-4 w-4" aria-hidden="true" />
@@ -240,6 +248,7 @@ function MembersDialog({
                       <X className="h-4 w-4" aria-hidden="true" />
                     </Button>
                   </span>
+                  ) : null}
                 </li>
               ))}
             </ol>
@@ -249,11 +258,13 @@ function MembersDialog({
 
           <div className="flex justify-end gap-2">
             <Button type="button" variant="outline" onClick={onClose} disabled={saving}>
-              {t('merchCancel')}
+              {canManage ? t('merchCancel') : t('merchClose')}
             </Button>
-            <Button type="button" onClick={() => void save()} disabled={saving}>
-              {t('merchMembersSave')}
-            </Button>
+            {canManage ? (
+              <Button type="button" onClick={() => void save()} disabled={saving}>
+                {t('merchMembersSave')}
+              </Button>
+            ) : null}
           </div>
         </div>
       ) : null}

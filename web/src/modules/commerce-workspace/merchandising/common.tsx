@@ -70,7 +70,7 @@ export function FieldsDialog({
   }
 
   return (
-    <Dialog open onClose={onClose} title={title}>
+    <Dialog open onClose={saving ? () => undefined : onClose} title={title}>
       <form onSubmit={submit} className="space-y-3" noValidate>
         {fields.map((field) => (
           <div key={field.id} className="space-y-1.5">
@@ -149,7 +149,7 @@ export function ConfirmDialog({
   }
 
   return (
-    <Dialog open onClose={onClose} title={title}>
+    <Dialog open onClose={busy ? () => undefined : onClose} title={title}>
       <div className="space-y-3">
         <p className="text-sm text-text">{message}</p>
         {error ? (
