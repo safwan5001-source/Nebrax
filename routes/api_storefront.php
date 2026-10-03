@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\StorefrontCollectionController;
 use App\Http\Controllers\Api\StorefrontCheckoutController;
 use App\Http\Controllers\Api\StorefrontConfigController;
 use App\Http\Controllers\Api\StorefrontMediaController;
+use App\Http\Controllers\Api\StorefrontOfferController;
 use App\Http\Controllers\Api\StorefrontProductController;
 use App\Http\Middleware\EnforcePublicApiRateLimit;
 use App\Http\Middleware\RequireStorefrontMutationGateway;
@@ -51,6 +52,10 @@ Route::middleware([
     Route::get('media/{id}', [StorefrontMediaController::class, 'show'])->whereUuid('id')->name('media.show');
 
     Route::get('storefront', [StorefrontConfigController::class, 'show'])->name('storefront.show');
+
+    // CUST-H4-6 — العروض الحيّة (خصمٌ حقيقي من CommercePriceResolver). مسار Host
+    // فقط: لا معرّف متجر في الرابط ولا يُقبل من أي مدخل، وليس له نظير متوارَث.
+    Route::get('offers', [StorefrontOfferController::class, 'index'])->name('offers.index');
 
     Route::get('cart', [StorefrontCartController::class, 'show'])->name('cart.show');
     Route::middleware(RequireStorefrontMutationGateway::class)->group(function () {
