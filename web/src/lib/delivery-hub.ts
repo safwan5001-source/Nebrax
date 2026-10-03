@@ -129,7 +129,7 @@ export function readHubContext(value: unknown): {
   const branches = Array.isArray(row.branches)
     ? row.branches.flatMap((item) => {
       if (!item || typeof item !== 'object') return [];
-      const branch = item as { id?: unknown; name?: unknown };
+      const branch = item as { id?: unknown; name?: unknown; is_active?: unknown };
       if (typeof branch.id !== 'string' || typeof branch.name !== 'string') return [];
       return [{ id: branch.id, name: branch.name, is_active: branch.is_active === true }];
     })
