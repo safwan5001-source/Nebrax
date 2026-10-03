@@ -191,7 +191,8 @@ Perf measurement (sqlite, includes middleware baseline): 1 live offer = 17 queri
 4. **`reference_price` provenance** — base price, not a merchant "was-price"; badge/strikethrough wording is an H4-7/product decision.
 5. **A price-list item of 0** counts as a genuine discount (it is exactly what checkout would charge); H4-7 may want to special-case "free" display.
 6. **Pre-existing list-vs-detail price drift** (§9) — outside this slice, flagged for follow-up.
-7. No financial review beyond the contract's reasoning (§23.6/§23.7): nothing here writes or reads accounting state, but the owner may still wish to confirm that reading is in scope.
+7. **Availability (ATS) is not part of "live"** — contract §23.3 step 5 asks for the `AvailableToSellService` check, but no existing storefront read hides a product at ATS 0 (they expose an informational `in_stock`; reservation/checkout is the real gate), and hide-vs-show is a business policy (CLAUDE.md rule 6). Open owner decision: (a) add a batched `in_stock` to each offer, matching `store/v1/products` (cheap, recommended), or (b) hide out-of-stock offers behind a setting. Raised by the Codex review on #1202.
+8. No financial review beyond the contract's reasoning (§23.6/§23.7): nothing here writes or reads accounting state, but the owner may still wish to confirm that reading is in scope.
 
 ## 15. H4-7 handoff
 
