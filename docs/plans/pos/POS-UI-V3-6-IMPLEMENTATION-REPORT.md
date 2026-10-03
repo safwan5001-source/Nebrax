@@ -9,7 +9,7 @@ Code-level visual and interaction audit of the merged V3 sale shell. No business
 
 ## Repository evidence / root cause
 
-Started from POS-UI-V3-5 merge SHA `a9708738b707441e64fc76029e272d2ae1e58fa7` after PRE_MERGE on `687ae76bf702fc61c4530328aae5aa9172510baf` (PR #1175).
+Started from latest `main` `241a06f87a61ff2d006e0758c1776abd9c815a71` (`feat(store): complete H4 content sections (#1172)`). That commit contains the POS-UI-V3-5 merge `a9708738b707441e64fc76029e272d2ae1e58fa7` after PRE_MERGE on `687ae76bf702fc61c4530328aae5aa9172510baf` (PR #1175). #1172 is outside this Horizon and is not modified here.
 
 The Horizon asks for a viewport, theme, direction, and interaction matrix. This environment has the web unit tests and the source, not a signed-in cashier session. Fabricating screenshots would violate the Horizon's truth rule.
 
@@ -69,7 +69,7 @@ The protocol forbids claiming a check that was not observed.
 ## Changed files
 
 - `docs/plans/pos/POS-UI-V3-6-IMPLEMENTATION-REPORT.md`
-- `docs/plans/pos/POS-UI-V3-5-IMPLEMENTATION-REPORT.md` (merge evidence, once post-merge CI is recorded)
+- `docs/plans/pos/POS-UI-V3-5-IMPLEMENTATION-REPORT.md` (PRE_MERGE, merge SHA, POST_MERGE)
 
 ## Tests and exact results
 
@@ -154,9 +154,10 @@ A later pass with a real cashier session should capture the six viewports in ar/
 ## Git state
 
 - Branch: `pos-ui-v3-6`
-- PR: pending until V3-5 POST_MERGE_REVIEW passes
-- Base SHA: `a9708738b707441e64fc76029e272d2ae1e58fa7`
-- Head SHA: recorded at commit
+- PR: pending
+- Base SHA: `241a06f87a61ff2d006e0758c1776abd9c815a71`
+- Implementation commit: `40a3fa7c97dcab244f90ba25fa83c87e38404dcd`
+- Head SHA: branch tip after the V3-5 merge-evidence alignment. PRE_MERGE records that exact SHA.
 
 ## Recommended next dependency-ready task
 
