@@ -5,6 +5,7 @@ namespace App\Services\Commerce;
 use App\Models\CommerceProductContentBlock;
 use App\Models\Product;
 use App\Support\Commerce\PlainText;
+use App\Tenancy\BranchScope;
 use App\Tenancy\TenantContext;
 use DomainException;
 use Illuminate\Support\Facades\DB;
@@ -61,7 +62,9 @@ final class ProductContentService
         }
 
         return DB::transaction(function () use ($product, $normalized) {
-            Product::withoutGlobalScopes()->whereKey($product->id)->lockForUpdate()->first();
+            // BranchScope وحده يُرفع (المحتوى على مستوى المؤسسة)؛ TenantScope وSoftDeletes يبقيان، فمنتجٌ
+            // حُذف بين تحميل المتحكّم وهذا القفل يُرفض بـ404 بدل 200 فارغ أو 500 من قيد المفتاح الأجنبي.
+            Product::withoutGlobalScope(BranchScope::class)->whereKey($product->id)->lockForUpdate()->firstOrFail();
             CommerceProductContentBlock::query()->where('product_id', $product->id)->delete();
 
             foreach ($normalized as $position => $row) {

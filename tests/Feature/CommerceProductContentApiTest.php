@@ -50,6 +50,27 @@ class CommerceProductContentApiTest extends TestCase
     }
 
     /** @test */
+    public function replacing_content_for_a_product_deleted_after_it_was_loaded_is_not_found(): void
+    {
+        $auth = $this->registerTenant('ct-gone', 'owner@ct-gone.test');
+        $product = $this->makeProduct($auth['tenant_id']);
+
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $stale = Product::query()->findOrFail($product->id);
+        $product->delete();
+
+        foreach ([[], [['block_type' => 'care', 'body' => 'ok']]] as $blocks) {
+            try {
+                app(ProductContentService::class)->replace($stale, $blocks);
+                $this->fail('replace accepted a deleted product');
+            } catch (\Illuminate\Database\Eloquent\ModelNotFoundException) {
+                $this->assertSame(0, CommerceProductContentBlock::query()->count());
+            }
+        }
+        app(TenantContext::class)->forget();
+    }
+
+    /** @test */
     public function the_line_limit_counts_lines_not_separators(): void
     {
         $auth = $this->registerTenant('ct-lines', 'owner@ct-lines.test');
