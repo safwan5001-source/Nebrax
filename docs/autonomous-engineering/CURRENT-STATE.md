@@ -2,13 +2,13 @@
 
 > This file is a durable resume point, not a substitute for Git/GitHub evidence.
 
-LAST_UPDATED: 2026-10-03 (**AWJ Delivery Platforms & Settlement Horizon V1 is the single ACTIVE horizon.** DLV-EVIDENCE-1 through DLV-PLATFORM-LOGOS-1 are merged. Logos squash is `f875467428014b86faa082ca467d41df8d8f340a`. No production deploy. **DELIVERY-DECISION-PASS-5 is in review and not merged.** OD-DG-8-IMPORT is **ACCEPTED** as Option B. The financial command is not started. Full DLV-HUB-1 stays BLOCKED on DG-3. No deploy.)
+LAST_UPDATED: 2026-10-03 (**AWJ Delivery Platforms & Settlement Horizon V1 is the single ACTIVE horizon.** DLV-EVIDENCE-1 through DELIVERY-DECISION-PASS-5 are merged. Pass 5 squash is `48051f2cc7d5d2c7fc50d45892aa29fe53d643fa`. OD-DG-8-IMPORT is accepted as Option B. No production deploy. **DELIVERY-DECISION-PASS-6 is in review and not merged.** It does not close DG-3. Full DLV-HUB-1 stays BLOCKED on DG-3. No deploy.)
 LAYER_VERSION: V1
 STATUS: ACTIVE — AWJ Delivery Platforms & Settlement Horizon V1 (authoritative queue: `TASK-QUEUE.md`, section "Horizon: AWJ Delivery Platforms & Settlement V1"). Every snapshot, STATUS and objective below this section is historical and superseded.
 
 ## Current objective
 
-DELIVERY-DECISION-PASS-5 is in review. Do not merge it from this note and do not deploy. OD-DG-8-IMPORT is accepted as Option B: a frozen provider commercial snapshot. That does not build the financial command and does not enable VAT. Do not start full DLV-HUB-1, commission, settlement, connectors, or refunds. DG-3 stays open. Merge != Deploy.
+DELIVERY-DECISION-PASS-6 is in review. Do not merge it from this note and do not deploy. DG-3 is not closed. The recommendation is a fail-closed posting gate: an imported order whose provider role is UNKNOWN does not become an invoice. Do not start full DLV-HUB-1, commission, settlement, connectors, or refunds. Merge != Deploy.
 
 ## Previous snapshot (historical, superseded)
 

@@ -1257,7 +1257,8 @@ Only evidence-backed statuses are recorded here; unlisted tasks of the horizon p
 | 9 | DLV-HUB-UI-1 | done (merged; PR #1200, squash SHA `625366e1a61903d68935fd8c11f18a16778bd6b4`; operational workspace and shared platform presentation registry; no official logo file) | high | DLV-HUB-PROJECTION-1 (done) | `docs/plans/pos/DLV-HUB-UI-1-IMPLEMENTATION-REPORT.md` |
 | 10 | DLV-PLATFORM-MGMT-UI-1 | done (merged; PR #1203, squash SHA `bcc1563ed4659c1145c998b5097301ffa100fd09`; management workspace on the existing foundation API and the shared registry; no connector) | high | DLV-HUB-UI-1 (done); DLV-FOUNDATION-1 (done) | `docs/plans/pos/DLV-PLATFORM-MGMT-UI-1-IMPLEMENTATION-REPORT.md` |
 | 11 | DLV-PLATFORM-LOGOS-1 | done (merged; PR #1204, squash SHA `f875467428014b86faa082ca467d41df8d8f340a`; six publisher App Store icons through the shared registry) | high | DLV-PLATFORM-MGMT-UI-1 (done); DLV-HUB-UI-1 (done); DLV-POS-1 (done) | `docs/plans/pos/DLV-PLATFORM-LOGOS-1-IMPLEMENTATION-REPORT.md` |
-| 12 | DELIVERY-DECISION-PASS-5 | in_review (not merged; OD-DG-8-IMPORT accepted as Option B; no financial command; DG-3 still open) | high | DLV-HUB-PROJECTION-1 (done); OD-DG-6-TRIGGER; OD-DG-8 | `docs/plans/pos/DELIVERY-DECISION-PASS-5-REPORT.md` |
+| 12 | DELIVERY-DECISION-PASS-5 | done (merged; PR #1205, squash SHA `48051f2cc7d5d2c7fc50d45892aa29fe53d643fa`; OD-DG-8-IMPORT accepted as Option B; no financial command) | high | DLV-HUB-PROJECTION-1 (done); OD-DG-6-TRIGGER; OD-DG-8 | `docs/plans/pos/DELIVERY-DECISION-PASS-5-REPORT.md` |
+| 13 | DELIVERY-DECISION-PASS-6 | in_review (not merged; DG-3 posting gate recommended and not accepted; no platform role accepted; no financial command) | high | DELIVERY-DECISION-PASS-5 (done); OD-DG-8-IMPORT | `docs/plans/pos/DELIVERY-DECISION-PASS-6-REPORT.md` |
 
 Owed gates — original text is DLV-EVIDENCE-1-REPORT.md §11. DG-1/DG-2/DG-3 resolutions are in DELIVERY-DECISION-PASS-1-REPORT.md. DG-6/DG-8/DG-9 acceptances are in DELIVERY-DECISION-PASS-2-REPORT.md.
 
@@ -1265,7 +1266,7 @@ Owed gates — original text is DLV-EVIDENCE-1-REPORT.md §11. DG-1/DG-2/DG-3 re
 |---|---|---|
 | DG-1 | ACCOUNTING-1 | **RESOLVED 2026-10-03.** Option A, implemented by DLV-ACCOUNTING-1. |
 | DG-2 | POS-1, ACCOUNTING-1 | **RESOLVED 2026-10-03** for the manual POS flow. Side table implemented by DLV-ACCOUNTING-1. |
-| DG-3 | COMMISSION-1, SETTLEMENT-1, tax point | **PARTIALLY RESOLVED / EXTERNAL EVIDENCE GATE.** Simple-collector foundation is implemented. Fee/fee-tax/commission-VAT/tax-point/agent-principal stay unauthorized per platform. |
+| DG-3 | COMMISSION-1, SETTLEMENT-1, tax point, and the imported-order invoice transition | **PARTIALLY RESOLVED / EXTERNAL EVIDENCE GATE.** Simple-collector foundation remains the manual POS scope. Pass 6 recommends OD-DG-3-POSTING-GATE and does **not** accept it. No platform role is accepted. Fee/fee-tax/commission-VAT/tax-point stay unauthorized. |
 | DG-4 | CLOSE-1 | Untouched — OPEN |
 | DG-5 | — | **CLOSED** in DLV-EVIDENCE-1 (reuse `SalesChannel` type `external`). |
 | DG-6 | Architecture only. Invoice creation stays on DG-6-TRIGGER. | **ACCEPTED WITH NARROWING.** Option B: tenant/branch operational inbox, not `CommerceOrder`, no revenue/VAT/COGS/stock/cash/AR clearing on receive, route, accept, prepare, or cancel-before-post. |
@@ -1278,13 +1279,13 @@ Owed gates — original text is DLV-EVIDENCE-1-REPORT.md §11. DG-1/DG-2/DG-3 re
 
 A task must not be promoted to `ready` while any gate mapped to it is unresolved.
 
-**Dependency readiness after DELIVERY-DECISION-PASS-5 (in review, not merged; OD-DG-8-IMPORT accepted):**
-- **DLV-PLATFORM-LOGOS-1 is merged** (PR #1204, squash `f875467428014b86faa082ca467d41df8d8f340a`). No production deploy.
-- **OD-DG-8-IMPORT is ACCEPTED as Option B.** The imported commercial price is the frozen provider snapshot. This note does not implement it.
-- **DLV-HUB-1 (full) stays BLOCKED on DG-3.** The price-authority block is lifted. Do not start the financial command from this note. Enabling it would recognize VAT, and that stays unauthorized.
+**Dependency readiness after DELIVERY-DECISION-PASS-6 (in review, not merged):**
+- **DELIVERY-DECISION-PASS-5 is merged** (PR #1205, squash `48051f2cc7d5d2c7fc50d45892aa29fe53d643fa`). OD-DG-8-IMPORT is accepted as Option B. No production deploy.
+- **DG-3 is not closed.** No provider is accepted as agent, principal, or collector.
+- **DLV-HUB-1 (full) stays BLOCKED on DG-3.** Do not start the financial command from this note.
 - **DLV-COMMISSION-1 remains BLOCKED** (EXTERNAL_EVIDENCE_REQUIRED under DG-3).
 - **DLV-SETTLEMENT-1 remains BLOCKED** on COMMISSION-1 and per-platform DG-3 evidence.
 - DLV-RECON-1, REFUND-1, CLOSE-1, CONNECTOR-CORE-1 and the provider tasks remain blocked on their own dependencies.
 
-Next step is review of this acceptance record. Do not merge it from this note. Do not start full HUB-1, commission, settlement, connector, or refund work. Merge != Deploy.
+Next step is the owner's choice on OD-DG-3-POSTING-GATE. Do not treat that choice as a platform role. Do not merge this note into an acceptance. Do not start full HUB-1, commission, settlement, connector, or refund work. Merge != Deploy.
 
