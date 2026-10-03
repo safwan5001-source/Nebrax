@@ -37,16 +37,7 @@ return new class extends Migration
         // SQLite لا يضيف مفتاحاً أجنبياً بـALTER: يعيد Laravel بناء الجدول من مخطّطه المُستبطَن، والفهارس
         // الجزئية (WHERE) تُفقَد شرطها فتصير فريدةً كاملة — فيُمنَع سطرا متغيّرَين لمنتجٍ واحد. نعيد
         // إنشاءها حرفياً كما عرّفتها migration التخصيص. PostgreSQL لا يعيد بناءً فلا يحتاج.
-        if (DB::connection()->getDriverName() === 'sqlite') {
-            DB::statement('DROP INDEX IF EXISTS commerce_cart_items_variant_identity_unique');
-            DB::statement('DROP INDEX IF EXISTS commerce_cart_items_simple_identity_unique');
-            DB::statement(
-                'CREATE UNIQUE INDEX commerce_cart_items_simple_identity_unique ON commerce_cart_items (cart_id, product_id, unit_key, personalization_signature) WHERE product_variant_id IS NULL'
-            );
-            DB::statement(
-                'CREATE UNIQUE INDEX commerce_cart_items_variant_identity_unique ON commerce_cart_items (cart_id, product_id, product_variant_id, unit_key, personalization_signature) WHERE product_variant_id IS NOT NULL'
-            );
-        }
+        $this->restorePartialCartIdentityIndexes();
 
         Schema::table('commerce_order_lines', function (Blueprint $table) {
             $table->foreignUuid('parent_line_id')->nullable()->constrained('commerce_order_lines')->cascadeOnDelete();
@@ -57,12 +48,34 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('commerce_order_lines', function (Blueprint $table) {
+            // SQLite لا يُسقط عموداً ما دام عليه فهرس (PostgreSQL يُسقطه تلقائياً) — يُسقَط صراحةً أولاً.
+            $table->dropIndex(['parent_line_id']);
             $table->dropConstrainedForeignId('parent_line_id');
         });
         Schema::table('commerce_cart_items', function (Blueprint $table) {
+            $table->dropIndex(['parent_item_id']);
             $table->dropConstrainedForeignId('parent_item_id');
             $table->dropColumn('per_parent_quantity');
         });
+        // نفس فقدان شرط الفهارس الجزئية يحدث عند إعادة بناء الجدول في التراجع على SQLite.
+        $this->restorePartialCartIdentityIndexes();
         Schema::dropIfExists('commerce_product_addons');
+    }
+
+    /** تعريف الفهرسين حرفياً كما أنشأتهما migration التخصيص (SQLite فقط؛ PostgreSQL لا يعيد بناء الجدول). */
+    private function restorePartialCartIdentityIndexes(): void
+    {
+        if (DB::connection()->getDriverName() !== 'sqlite') {
+            return;
+        }
+
+        DB::statement('DROP INDEX IF EXISTS commerce_cart_items_variant_identity_unique');
+        DB::statement('DROP INDEX IF EXISTS commerce_cart_items_simple_identity_unique');
+        DB::statement(
+            'CREATE UNIQUE INDEX commerce_cart_items_simple_identity_unique ON commerce_cart_items (cart_id, product_id, unit_key, personalization_signature) WHERE product_variant_id IS NULL'
+        );
+        DB::statement(
+            'CREATE UNIQUE INDEX commerce_cart_items_variant_identity_unique ON commerce_cart_items (cart_id, product_id, product_variant_id, unit_key, personalization_signature) WHERE product_variant_id IS NOT NULL'
+        );
     }
 };

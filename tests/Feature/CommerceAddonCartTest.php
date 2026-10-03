@@ -408,6 +408,34 @@ class CommerceAddonCartTest extends TestCase
     }
 
     /** @test */
+    public function stock_demand_is_aggregated_across_every_line_of_the_same_addon(): void
+    {
+        $f = $this->fixture('ac-stock-agg');
+        app(TenantContext::class)->set($f['store']['tenant']->id);
+        Product::query()->findOrFail($f['chocolate']->id)->update(['track_inventory' => true]);
+        $warehouse = Warehouse::create(['name' => 'مخزن', 'code' => 'AD-W2', 'is_default' => true]);
+        app(FulfillmentPolicyService::class)->setFixedWarehouse($f['store']['channel']->id, $warehouse->id);
+        ProductWarehouseStock::create(['product_id' => $f['chocolate']->id, 'warehouse_id' => $warehouse->id, 'quantity' => 2]);
+        app(TenantContext::class)->forget();
+
+        // أبٌ بإضافة 1 + أبٌ ثانٍ (اختيار مختلف) بإضافة 2: كل سطر وحده ≤ 2 لكن مجموعهما 3 > 2 ⇒ يُرفض الإتمام.
+        $a = $this->add($f['store'], $f['bouquet'], ['addons' => [['product_id' => $f['chocolate']->id, 'quantity' => 1]]])->assertCreated();
+        $cart = $this->cartToken($a);
+        $this->add($f['store'], $f['bouquet'], ['addons' => [['product_id' => $f['chocolate']->id, 'quantity' => 2]]], $cart)->assertOk();
+        $this->readyCheckout($f['store'], $cart);
+
+        $res = $this->complete($f['store'], $cart)->assertStatus(409);
+        $this->assertSame('insufficient_stock', $res->json('error.details.items.0.reason'));
+        $this->assertSame(0, CommerceOrder::withoutGlobalScopes()->count());
+
+        // الرصيد يغطي المجموع (1 + 2 = 3 ≤ 3) ⇒ يمرّ
+        app(TenantContext::class)->set($f['store']['tenant']->id);
+        ProductWarehouseStock::query()->where('product_id', $f['chocolate']->id)->update(['quantity' => 3]);
+        app(TenantContext::class)->forget();
+        $this->complete($f['store'], $cart, 'ad-key-0002')->assertCreated();
+    }
+
+    /** @test */
     public function addons_coexist_with_personalization_and_the_selection_is_part_of_the_line_identity(): void
     {
         $f = $this->fixture('ac-pers');

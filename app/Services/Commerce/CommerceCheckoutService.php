@@ -645,6 +645,8 @@ final class CommerceCheckoutService
         $warehouse = null;
         $lines = [];
         $failures = [];
+        /** @var array<string, int> الكمية الأساسية المطلوبة تراكمياً لكل (منتج|متغيّر|مخزن) عبر أسطر السلة. */
+        $stockDemand = [];
 
         $byId = $items->keyBy('id');
 
@@ -764,9 +766,13 @@ final class CommerceCheckoutService
                 $onHand = (int) ($stockRow->quantity ?? 0);
                 $activeReserved = $this->reservations->activeReservedQuantity($product->id, $warehouse->id, $variant?->id);
                 $available = max(0, $onHand - $activeReserved);
-                $baseQuantity = $item->quantity * max(1, $unitFactor);
+                // الطلب يُجمَّع عبر **كل** أسطر السلة لنفس (منتج، متغيّر، مخزن): سطرا إضافةٍ لنفس الصنف
+                // (أو إضافة + سطر مستقل، أو سطرا تخصيصٍ مختلفان) يرى كلٌّ منهما الرصيد نفسه فيمرّان معاً
+                // وهما معاً يتجاوزانه. (فحص نقطة زمنية لا حجز — عقد التوفّر في رأس الصنف باقٍ كما هو.)
+                $demandKey = $product->id.'|'.($variant?->id ?? '').'|'.$warehouse->id;
+                $stockDemand[$demandKey] = ($stockDemand[$demandKey] ?? 0) + $item->quantity * max(1, $unitFactor);
 
-                if ($available < $baseQuantity) {
+                if ($available < $stockDemand[$demandKey]) {
                     $failures[] = ['item_id' => $item->id, 'reason' => 'insufficient_stock'];
 
                     continue;
