@@ -7,6 +7,7 @@ import { formatRiyal, riyalToMinor } from '@/lib/money';
 import type { PosCheckoutPhase } from '@/lib/pos-checkout-attempt';
 import { PosNumericEditor } from '@/components/pos/pos-numeric-editor';
 import { orderedTenderPayload, simulateTenders, type PosTenderInput } from '@/lib/pos-payment-tender';
+import { PosDeliveryPlatformPicker, type PosDeliveryPlatformOption } from '@/components/pos/pos-delivery-platform-picker';
 
 export interface PaymentSummaryItem { name: string; qty: number; unitPrice: string; lineTotal: number }
 export interface PosPaymentMethod {
@@ -37,6 +38,11 @@ export function PosPayment({
   onConfirm,
   showOnscreenNumericKeypad = false,
   numericEditorLabels,
+  deliveryPlatforms = [],
+  selectedDeliveryPlatformId = null,
+  onSelectDeliveryPlatform,
+  externalOrderReference = '',
+  onExternalOrderReference,
 }: {
   totalMinor: number;
   items: PaymentSummaryItem[];
@@ -63,6 +69,11 @@ export function PosPayment({
     digit: (digit: string) => string;
     value: string;
   };
+  deliveryPlatforms?: PosDeliveryPlatformOption[];
+  selectedDeliveryPlatformId?: string | null;
+  onSelectDeliveryPlatform?: (id: string | null) => void;
+  externalOrderReference?: string;
+  onExternalOrderReference?: (value: string) => void;
 }) {
   const t = useTranslations('pos');
   const locale = useLocale();
@@ -102,11 +113,17 @@ export function PosPayment({
   const paidMinor = totalMinor - sim.remainingMinor;
   const remainingMinor = sim.remainingMinor;
   const changeMinor = sim.changeMinor;
+  const selectedPlatform = deliveryPlatforms.find((platform) => platform.id === selectedDeliveryPlatformId) ?? null;
+  const platformCollected = selectedPlatform?.collection_mode === 'platform_collected';
+  const referenceOk = selectedPlatform?.external_reference_policy !== 'required' || externalOrderReference.trim() !== '';
   const canConfirm = totalMinor > 0
-    && !paymentMethodsLoadError
-    && paymentMethods.length > 0
-    && sim.invalidMethodId === null
-    && (allowDeferredPayment || remainingMinor <= 0);
+    && referenceOk
+    && (platformCollected
+      ? true
+      : !paymentMethodsLoadError
+        && paymentMethods.length > 0
+        && sim.invalidMethodId === null
+        && (allowDeferredPayment || remainingMinor <= 0));
   const selectedMethod = paymentMethods.find((method) => method.id === selectedMethodId) ?? null;
   const locked = paying || offline || checkoutPhase === 'submitting' || checkoutPhase === 'recovering';
 
@@ -196,6 +213,16 @@ export function PosPayment({
             </div>
           </section>
 
+          <PosDeliveryPlatformPicker
+            platforms={deliveryPlatforms}
+            selectedId={selectedDeliveryPlatformId}
+            reference={externalOrderReference}
+            disabled={locked}
+            onSelect={(id) => onSelectDeliveryPlatform?.(id)}
+            onReference={(value) => onExternalOrderReference?.(value)}
+          />
+
+          {platformCollected ? null : (
           <div>
             <div className="mb-2 text-sm font-bold lg:mb-3">{t('payment_methods')}</div>
             {paymentMethodsLoading ? (
@@ -239,8 +266,9 @@ export function PosPayment({
               </div>
             )}
           </div>
+          )}
 
-          {selectedMethod && (
+          {selectedMethod && !platformCollected && (
             <div>
               <div className="mb-2 text-sm font-bold">{t('received_amount')}</div>
               {showOnscreenNumericKeypad && numericEditorLabels ? (
@@ -275,7 +303,7 @@ export function PosPayment({
             </div>
           )}
 
-          {allowDeferredPayment ? (
+          {!platformCollected && (allowDeferredPayment ? (
             <div className="rounded-lg border border-border bg-background px-3 py-2.5 text-xs text-muted">
               <CalendarClock className="me-1.5 inline h-3.5 w-3.5" strokeWidth={1.7} />
               {t('deferred_payment')}
@@ -289,8 +317,9 @@ export function PosPayment({
             <div className="rounded-lg border border-warning/30 bg-warning/10 px-3 py-2.5 text-xs text-text">
               {t('deferred_payment_disabled')}
             </div>
-          )}
+          ))}
 
+          {!platformCollected && (
           <div>
             <div className="mb-2 text-sm font-bold lg:mb-2.5">{t('quick_amounts')}</div>
             <div className="grid grid-cols-3 gap-2 sm:flex sm:flex-wrap">
@@ -311,6 +340,7 @@ export function PosPayment({
               ))}
             </div>
           </div>
+          )}
 
           <div
             className="grid grid-cols-3 gap-2 sm:gap-3"
@@ -318,19 +348,19 @@ export function PosPayment({
           >
             <div className="min-w-0 rounded-md border border-border bg-surface p-2.5 sm:p-3" data-testid="pos-payment-paid">
               <div className="mb-1 text-[10px] font-semibold text-muted sm:mb-1.5 sm:text-[11px]">{t('paid')}</div>
-              <div className={'num font-bold leading-tight text-base [overflow-wrap:anywhere] ' + (paidMinor > 0 ? 'text-positive' : 'text-text')} title={formatRiyal(paidMinor / 100)}>{formatRiyal(paidMinor / 100)}</div>
+              <div className={'num font-bold leading-tight text-base [overflow-wrap:anywhere] ' + (platformCollected || paidMinor > 0 ? 'text-positive' : 'text-text')} title={formatRiyal((platformCollected ? totalMinor : paidMinor) / 100)}>{formatRiyal((platformCollected ? totalMinor : paidMinor) / 100)}</div>
             </div>
-            <div className={'min-w-0 rounded-md border bg-surface p-2.5 sm:p-3 ' + (remainingDominant ? 'border-negative' : 'border-border')} data-testid="pos-payment-remaining">
+            <div className={'min-w-0 rounded-md border bg-surface p-2.5 sm:p-3 ' + (!platformCollected && remainingDominant ? 'border-negative' : 'border-border')} data-testid="pos-payment-remaining">
               <div className="mb-1 text-[10px] font-semibold text-muted sm:mb-1.5 sm:text-[11px]">{t('remaining')}</div>
-              <div className={'num font-bold leading-tight [overflow-wrap:anywhere] ' + (remainingDominant ? 'text-base text-negative sm:text-2xl' : 'text-base text-text')} title={formatRiyal(remainingMinor / 100)}>{formatRiyal(remainingMinor / 100)}</div>
+              <div className={'num font-bold leading-tight [overflow-wrap:anywhere] ' + (!platformCollected && remainingDominant ? 'text-base text-negative sm:text-2xl' : 'text-base text-text')} title={formatRiyal((platformCollected ? 0 : remainingMinor) / 100)}>{formatRiyal((platformCollected ? 0 : remainingMinor) / 100)}</div>
             </div>
             <div data-awj-floor-outcome="" data-awj-surface="outcome" data-awj-floor-change="" className="min-w-0 rounded-md border border-border bg-surface p-2.5 sm:p-3" data-testid="pos-payment-change">
               <div className="mb-1 text-[10px] font-semibold text-muted sm:mb-1.5 sm:text-[11px]">{t('change')}</div>
-              <div className={'num font-bold leading-tight [overflow-wrap:anywhere] ' + (changeDominant ? 'text-base text-positive sm:text-2xl' : 'text-base text-text')} title={formatRiyal(changeMinor / 100)}>{formatRiyal(changeMinor / 100)}</div>
+              <div className={'num font-bold leading-tight [overflow-wrap:anywhere] ' + (!platformCollected && changeDominant ? 'text-base text-positive sm:text-2xl' : 'text-base text-text')} title={formatRiyal((platformCollected ? 0 : changeMinor) / 100)}>{formatRiyal((platformCollected ? 0 : changeMinor) / 100)}</div>
             </div>
           </div>
 
-          {(error ?? paymentMethodsLoadError) && (
+          {(error ?? (!platformCollected ? paymentMethodsLoadError : null)) && (
             <p className="rounded-lg bg-negative/10 px-3 py-2 text-xs text-negative" role="alert">
               {error ?? paymentMethodsLoadError}
             </p>
@@ -348,10 +378,10 @@ export function PosPayment({
           type="button"
           data-testid="pos-confirm-payment"
           onClick={() => {
-            if (!canConfirm || locked || paymentMethodsLoading) return;
-            onConfirm(tenderPayload());
+            if (!canConfirm || locked || (!platformCollected && paymentMethodsLoading)) return;
+            onConfirm(platformCollected ? [] : tenderPayload());
           }}
-          disabled={!canConfirm || locked || paymentMethodsLoading}
+          disabled={!canConfirm || locked || (!platformCollected && paymentMethodsLoading)}
           aria-busy={locked}
           className="flex min-h-14 flex-1 items-center justify-center gap-2.5 rounded-md bg-primary px-4 py-3 text-base font-bold text-white touch-manipulation focus-visible:ring-2 focus-visible:ring-primary/40 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50"
         >
