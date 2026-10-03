@@ -21,7 +21,7 @@ export default function DeliveryPlatformsPage() {
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [appEnabled, setAppEnabled] = useState<boolean | null>(null);
+  const [posApp, setPosApp] = useState<'unknown' | 'on' | 'off'>('unknown');
   const requestSeq = useRef(0);
 
   useEffect(() => { setMounted(true); }, []);
@@ -55,13 +55,17 @@ export default function DeliveryPlatformsPage() {
     api<{ data: Record<string, boolean> | unknown }>('/applications/nav-state')
       .then((result) => {
         const data = result.data;
-        setAppEnabled(Boolean(data && typeof data === 'object' && !Array.isArray(data) && data['sales.pos'] === true));
+        if (!data || typeof data !== 'object' || Array.isArray(data) || !('sales.pos' in data)) {
+          setPosApp('unknown');
+          return;
+        }
+        setPosApp(data['sales.pos'] === true ? 'on' : 'off');
       })
-      .catch(() => setAppEnabled(false));
+      .catch(() => setPosApp('unknown'));
   }, [canView]);
 
   useEffect(() => {
-    if (!canView || appEnabled !== true) return;
+    if (!canView || posApp === 'off') return;
     load();
     api<{ data: Array<{ id?: string; name?: string; is_active?: boolean }> }>('/branches')
       .then((result) => {
@@ -72,7 +76,7 @@ export default function DeliveryPlatformsPage() {
           : []);
       })
       .catch(() => setBranches([]));
-  }, [appEnabled, canView, load]);
+  }, [canView, load, posApp]);
 
   function save(profileId: string | null, body: Record<string, unknown>): void {
     if (!canManage) return;
@@ -96,7 +100,7 @@ export default function DeliveryPlatformsPage() {
     );
   }
 
-  if (appEnabled === false) {
+  if (posApp === 'off') {
     return (
       <section className="space-y-2">
         <h1 className="text-xl font-semibold text-text">{t('title')}</h1>
@@ -112,7 +116,7 @@ export default function DeliveryPlatformsPage() {
       canManage={canManage}
       selectedKey={selectedKey}
       busy={busy}
-      loading={loading || appEnabled === null}
+      loading={loading}
       error={error}
       onSelect={setSelectedKey}
       onSave={save}
