@@ -228,6 +228,8 @@ paths:
         - $ref: '#/components/parameters/ProductsSearch'
         - $ref: '#/components/parameters/ProductsCategoryId'
         - $ref: '#/components/parameters/ProductsSort'
+        - $ref: '#/components/parameters/ProductsBrandId'
+        - $ref: '#/components/parameters/ProductsFacet'
       responses:
         '200':
           description: A page of products (list rows never carry media/options/variants).
@@ -1090,6 +1092,25 @@ components:
       in: query
       required: false
       schema: { type: string, format: uuid }
+    ProductsBrandId:
+      name: brand_id
+      in: query
+      required: false
+      description: Built-in brand filter (ANDed with every other filter).
+      schema: { type: string, format: uuid }
+    ProductsFacet:
+      name: facet
+      in: query
+      required: false
+      style: deepObject
+      explode: true
+      description: >
+        Merchant-governed catalog facets, `facet[<facet key>]=<value slug>[,<value slug>…]`
+        (ADR-14). OR within one facet, AND across facets. An unknown or inactive
+        facet key / value slug yields an empty list (fail closed). At most 10 facets.
+      schema:
+        type: object
+        additionalProperties: { type: string }
     ProductsSort:
       name: sort
       in: query
@@ -1414,7 +1435,51 @@ components:
       required: [data, meta]
       properties:
         data: { type: array, items: { $ref: '#/components/schemas/ProductListItem' } }
-        meta: { $ref: '#/components/schemas/PaginationMeta' }
+        meta: { $ref: '#/components/schemas/ProductListMeta' }
+
+    ProductListMeta:
+      type: object
+      additionalProperties: false
+      required: [request_id, pagination, facets, brands]
+      properties:
+        request_id: { type: string }
+        pagination: { $ref: '#/components/schemas/PaginationMeta/properties/pagination' }
+        facets:
+          type: array
+          description: Filterable facets with disjunctive counts for the current result context (ADR-14). Zero-count values are omitted unless selected.
+          items:
+            type: object
+            additionalProperties: false
+            required: [key, system_key, name, name_en, values]
+            properties:
+              key: { type: string }
+              system_key: { type: [string, 'null'], enum: [occasion, recipient, null] }
+              name: { type: string }
+              name_en: { type: [string, 'null'] }
+              values:
+                type: array
+                items:
+                  type: object
+                  additionalProperties: false
+                  required: [slug, name, name_en, count, selected]
+                  properties:
+                    slug: { type: string }
+                    name: { type: string }
+                    name_en: { type: [string, 'null'] }
+                    count: { type: integer }
+                    selected: { type: boolean }
+        brands:
+          type: array
+          description: Built-in brand dimension with disjunctive counts.
+          items:
+            type: object
+            additionalProperties: false
+            required: [id, name, count, selected]
+            properties:
+              id: { type: string, format: uuid }
+              name: { type: string }
+              count: { type: integer }
+              selected: { type: boolean }
 
     CartItem:
       type: object
