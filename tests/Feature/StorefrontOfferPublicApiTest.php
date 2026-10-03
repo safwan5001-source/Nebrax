@@ -260,7 +260,39 @@ class StorefrontOfferPublicApiTest extends TestCase
             'just below half: 0.4 -> 0' => [250, 249, 0],
             'tiny genuine discount -> 0' => [25000, 24999, 0],
             'free item -> 100' => [25000, 0, 100],
+            // bigint-range prices: the naive (diff*200) overflows PHP_INT_MAX and would 500.
+            'huge exact 50%' => [50_000_000_000_000_000, 25_000_000_000_000_000, 50],
+            'huge 12.5 -> 13' => [8_000_000_000_000_000_000, 7_000_000_000_000_000_000, 13],
+            'huge free -> 100' => [9_000_000_000_000_000_000, 0, 100],
         ];
+    }
+
+    /** @test */
+    public function discount_percent_is_overflow_safe_up_to_php_int_max(): void
+    {
+        $max = PHP_INT_MAX; // 9223372036854775807
+
+        $this->assertSame(100, StorefrontOfferResolver::discountPercent($max, 0));
+        $this->assertSame(50, StorefrontOfferResolver::discountPercent($max, intdiv($max, 2)));
+        $this->assertSame(67, StorefrontOfferResolver::discountPercent($max, intdiv($max, 3)));
+        $this->assertSame(75, StorefrontOfferResolver::discountPercent($max, intdiv($max, 4)));
+        $this->assertSame(90, StorefrontOfferResolver::discountPercent($max, intdiv($max, 10)));
+        $this->assertSame(0, StorefrontOfferResolver::discountPercent($max, $max - 1));
+    }
+
+    /** @test */
+    public function a_huge_base_price_does_not_500_the_public_or_workspace_read(): void
+    {
+        $tenant = $this->publicTenant();
+        ['channel' => $channel, 'storefront' => $storefront] = $this->offerStore($tenant->id, 'huge.example.test');
+        $product = $this->offerProduct($tenant->id, $channel, ['sale_price' => 50_000_000_000_000_000]);
+        $this->channelPriceList($tenant->id, $channel, [$product->id => 25_000_000_000_000_000]);
+        $this->makeOffer($tenant->id, $storefront, $product);
+
+        $this->getJson($this->offersUrl('huge.example.test'))->assertOk()
+            ->assertJsonPath('data.0.reference_price.amount_minor', 50_000_000_000_000_000)
+            ->assertJsonPath('data.0.offer_price.amount_minor', 25_000_000_000_000_000)
+            ->assertJsonPath('data.0.discount_percent', 50);
     }
 
     /** @test */

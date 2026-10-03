@@ -38,7 +38,7 @@ use RuntimeException;
  * **النسبة مشتقّة لا سلطة** (§23.3 خطوة 4): `discountPercent = round((ref − offer)
  * / ref × 100)` تُحسب طازجةً عند كل قراءة من الرقمين المُثبَتَين أعلاه فقط، بعد
  * التأكد أن `ref > 0` و`0 ≤ offer < ref`، وتُقرَّب بنصفٍ لأعلى بحسابٍ صحيحٍ بلا
- * float (`(2·diff·100 + ref) div 2·ref`). لا تُخزَّن، ولا تُقبل في أي حمولة كتابة.
+ * float ولا تجاوز (قسمة طويلة آمنة حتى `PHP_INT_MAX` — انظر `discountPercent()`). لا تُخزَّن، ولا تُقبل في أي حمولة كتابة.
  * قد تساوي 0 لخصمٍ دون نصف بالمئة — خصمٌ حقيقي تعرضه الواجهة كما تراه مناسباً.
  *
  * **قابلية البيع (ATS)** — بوابة ثانية بعد الخصم، تعكس **حرفياً** ما يطبّقه
@@ -289,12 +289,33 @@ final class StorefrontOfferResolver
     }
 
     /**
-     * نسبة الخصم الصحيحة المقرَّبة (نصفٌ لأعلى) من السعرين المُثبَتَين — بلا float،
-     * وتُستدعى فقط بعد التحقق من `ref > 0` و`0 <= offer < ref`.
+     * نسبة الخصم الصحيحة المقرَّبة (نصفٌ لأعلى) من السعرين المُثبَتَين — تُستدعى فقط
+     * بعد التحقق من `ref > 0` و`0 <= offer < ref`.
+     *
+     * **بلا float ولا bcmath ولا تجاوز**: السعر عمود bigint (حتى ~9.2e18)، فضربه في
+     * 100/200 يتجاوز `PHP_INT_MAX` لأسعار ضخمة صالحة ويتحوّل float فيفشل `intdiv`.
+     * لذا قسمةٌ طويلة خطوةً خطوة: 100 إضافة للفرق `a` على باقٍ `rem < ref`، وكل خطوة
+     * تقارن بـ`ref - a` بدل جمعٍ قد يتجاوز — فكل قيمةٍ وسيطة ضمن [0, ref]. الناتج هو
+     * `floor(100·a / ref)` تماماً، ثم التقريب لأعلى عند `2·rem >= ref` (مكافئاً
+     * `rem >= ref - rem` بلا ضرب). مطابقٌ لـ`round()` على القيم الموجبة حرفياً.
      */
     public static function discountPercent(int $reference, int $offer): int
     {
-        return intdiv(($reference - $offer) * 200 + $reference, 2 * $reference);
+        $diff = $reference - $offer;
+        $headroom = $reference - $diff;
+        $quotient = 0;
+        $remainder = 0;
+
+        for ($i = 0; $i < 100; $i++) {
+            if ($remainder >= $headroom) {
+                $quotient++;
+                $remainder -= $headroom;
+            } else {
+                $remainder += $diff;
+            }
+        }
+
+        return $remainder >= $reference - $remainder ? $quotient + 1 : $quotient;
     }
 
     /**
