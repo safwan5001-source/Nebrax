@@ -40,6 +40,7 @@ use App\Http\Controllers\Api\CommerceShippingZoneController;
 use App\Http\Controllers\Api\CommerceDeliveryScheduleController;
 use App\Http\Controllers\Api\CommerceGiftSettingsController;
 use App\Http\Controllers\Api\CommerceWorkspaceStorefrontsController;
+use App\Http\Controllers\Api\CommerceWorkspaceStorefrontOfferController;
 use App\Http\Controllers\Api\CommerceWorkspaceStorefrontPresentationController;
 use App\Http\Controllers\Api\CommerceWorkspaceStorefrontPresentationVersionController;
 use App\Http\Controllers\Api\CommerceWorkspaceStorefrontCategoryController;
@@ -995,6 +996,23 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
             ->middleware($perm('commerce.manage'));
         Route::get('commerce/workspace/storefronts/{id}/categories/{category}', [CommerceWorkspaceStorefrontCategoryController::class, 'show'])
             ->whereUuid('id')->whereUuid('category')
+            ->middleware($perm('commerce.manage'));
+
+        // CUST-H4-6: تهيئة عروض المتجر (تنسيق وجدولة فقط — لا سعر/خصم في أي جسم) +
+        // قراءة معاينة Canvas بنفس `StorefrontOfferResolver` الذي تستعمله القراءة
+        // العامة `GET /store/v1/offers`. نفس صلاحية بقية مسارات المتجر
+        // (commerce.manage)، والملكية بـ`ownedStorefront()` (404 لا 403).
+        Route::get('commerce/workspace/storefronts/{id}/offers', [CommerceWorkspaceStorefrontOfferController::class, 'index'])
+            ->whereUuid('id')
+            ->middleware($perm('commerce.manage'));
+        Route::post('commerce/workspace/storefronts/{id}/offers', [CommerceWorkspaceStorefrontOfferController::class, 'store'])
+            ->whereUuid('id')
+            ->middleware($perm('commerce.manage'));
+        Route::patch('commerce/workspace/storefronts/{id}/offers/{offer}', [CommerceWorkspaceStorefrontOfferController::class, 'update'])
+            ->whereUuid('id')->whereUuid('offer')
+            ->middleware($perm('commerce.manage'));
+        Route::delete('commerce/workspace/storefronts/{id}/offers/{offer}', [CommerceWorkspaceStorefrontOfferController::class, 'destroy'])
+            ->whereUuid('id')->whereUuid('offer')
             ->middleware($perm('commerce.manage'));
 
         // COM-MOBILE-SHIPPING-1 (ADR-10): مناطق شحن مُهيَّأة من التاجر —

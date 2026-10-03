@@ -37,6 +37,7 @@ use App\Models\SkuRegistryEntry;
 use App\Models\StockMovement;
 use App\Models\StockPermitLine;
 use App\Models\StocktakeLine;
+use App\Models\StorefrontOffer;
 
 /**
  * ═══════════════════════════════════════════════════════════════
@@ -189,6 +190,11 @@ final class ProductReferenceRegistry
         // H2c: عضوية منتجٍ في مجموعة تسويقية يدوية — توصيفٌ عرضي بلا أثر مالي أو
         // مخزني، كإسناد السِمة تماماً: لا يمنع الحذف الحقيقي ويُنظَّف معه.
         CommerceCollectionProduct::class => ['key' => 'commerce_collection_products', 'classes' => [self::OWNED_CHILD]],
+        // CUST-H4-6: مرشّح عرضٍ على متجر (تنسيق وجدولة فقط — لا سعر ولا خصم ولا
+        // مخزون، والخصم الحقيقي يُقرأ وقت العرض من CommercePriceResolver). توصيفٌ
+        // عرضي تابعٌ بالكامل للمنتج بلا تاريخٍ مالي ولا أثرٍ مخزني، كعضوية المجموعة
+        // اليدوية تماماً: لا يمنع الحذف الحقيقي ويُنظَّف معه صراحةً.
+        StorefrontOffer::class => ['key' => 'storefront_offers', 'classes' => [self::OWNED_CHILD]],
         // H4 / ADR-16: تعريف حقل تخصيص (نص/قائمة) يخصّ المنتج — مواصفة تجارية تابعة بالكامل له
         // (خياراته تتبعه بـcascade). الطلبات التاريخية تحمل لقطتها الخاصة في
         // `commerce_order_line_personalizations` ولا تشير إلى التعريف، فلا يمنع الحذف.

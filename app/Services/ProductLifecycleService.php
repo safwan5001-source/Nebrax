@@ -12,6 +12,7 @@ use App\Models\InventoryStockAlert;
 use App\Models\Product;
 use App\Models\ProductActivity;
 use App\Models\SkuRegistryEntry;
+use App\Models\StorefrontOffer;
 use App\Services\DocumentCenter\DocumentStorageService;
 use App\Support\ProductReferenceRegistry;
 use App\Tenancy\BranchScope;
@@ -154,6 +155,8 @@ class ProductLifecycleService
             // Eloquent على المنتج؛ تُحذف صراحةً لا اتكالاً على cascade وحده.
             $this->referenceQuery(CommerceProductFacetValue::class, $product)->delete();
             $this->referenceQuery(CommerceCollectionProduct::class, $product)->delete();
+            // CUST-H4-6: مرشّحات العروض تابعٌ مملوك (تنسيق فقط) — تُحذف صراحةً مع المنتج.
+            $this->referenceQuery(StorefrontOffer::class, $product)->delete();
             // H4: تعريفات التخصيص (والخيارات عبر cascade) تابعٌ مملوك — تُحذف صراحةً مع المنتج.
             $this->referenceQuery(CommerceProductPersonalizationField::class, $product)->delete();
             // H5: كتل المحتوى المهيكل تابعٌ مملوك — تُحذف صراحةً مع المنتج.
