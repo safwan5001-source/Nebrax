@@ -74,7 +74,7 @@ This slice has no `posted` state and no transition into one. `handed_off` is ope
 | `preparing` | Operate | Immutable. | None. |
 | `ready` | Operate | Immutable. | None. |
 | `handed_off` | Operate | Immutable. | None. Not an invoice. |
-| `cancelled_before_post` | Operate | Frozen as it was. | None. Terminal. |
+| `cancelled_before_post` | Operate: cancel or reject. Reject is not its own state. | Frozen as it was. | None. Terminal. |
 
 There is no warehouse on these states. Pass 3 §13 already says warehouse is a posting input. This slice does not move stock, so it does not collect one.
 
@@ -82,7 +82,7 @@ Provider status text, if a later intake carries it, is stored as inert evidence.
 
 ### Allowed transitions
 
-No skips. No backward edge. A repeated command that asks for the state the row is already in returns that same row and does not create another.
+No skips. No backward edge. A repeated command returns the same row and does not create another **only** when it asks for the state the row is already in and does not name a different destination branch. A `received` → `received` command that names another branch is the reroute edge below, not that repeat. Naming the branch the row is already on is a repeat, and the row stays unchanged.
 
 | From | To | Who | Rule |
 |---|---|---|---|
@@ -99,6 +99,14 @@ No skips. No backward edge. A repeated command that asks for the state the row i
 | `handed_off` | anything except cancel | — | No exit. |
 
 Any other edge is rejected. The row stays unchanged. A direct id outside the actor's branch scope is not found and its body is not returned.
+
+### Reject
+
+OD-DG-9-HUB already names `reject` as an operate verb, separately from cancel-before-post. This recommendation does not add a `rejected` state and does not delete that verb.
+
+`reject` writes `cancelled_before_post`. It uses the same terminal, the same branch freeze, and the same absence of a ledger effect as cancel. It is allowed from the same non-terminal states, under the same `delivery_hub.operate` and branch rule as the cancel edges. It is not a financial reversal and not a third permission.
+
+An implementation must not invent a second terminal for reject. Limiting reject to states before `accepted` would be a narrowing of OD-HUB-STATES. This pass does not add that limit.
 
 `delivery_hub.view` never moves a state. `invoices.manage` does not move a state. `sales.pos` is not involved.
 
@@ -157,9 +165,9 @@ An intake must carry a provider id, an intake UUID, or both. If neither is prese
 
 1. If an intake UUID is present and a row with `tenant_id + idempotency_key` already exists in any state: the same checksum returns that row; a different checksum conflicts. Stop. The body is not written and no second row is created. This includes a cancelled row, so the original request cannot mint a successor.
 2. If a provider id is present and a **live** row already has that triple:
-   - no new UUID (the request has no UUID, or the UUID is the one already stored on that live row): the same checksum returns it; a different checksum conflicts;
+   - no UUID on the request: the same checksum returns that live row; a different checksum conflicts;
    - a new UUID: conflict. A different request must not replay the live row and must not insert another one.
-   Stop.
+   Stop. A UUID that already exists was returned or conflicted in step 1, so this step does not look the UUID up again.
 3. If a provider id is present, no live row has that triple, and one or more **cancelled** rows do:
    - no UUID: the same checksum returns the earliest cancelled row with that checksum; a checksum that matches none conflicts. Do not insert. Resending the original provider id is a retry, not a successor;
    - a new UUID: this is the one allowed successor. Insert one live row. The cancelled rows keep their own UUIDs.
@@ -224,7 +232,7 @@ Full DLV-HUB-1 stays **BLOCKED**. DG-8-IMPORT and DG-3 are untouched.
 
 ## Owner Decisions required
 
-1. **OD-HUB-STATES** — accept, narrow, or reject §4 (linear states, no `posted` in the projection, immutability at `accepted`, reroute only before accept via `canAccessBranch` on both branches, cancel from every non-terminal state).
+1. **OD-HUB-STATES** — accept, narrow, or reject §4 (linear states, no `posted` in the projection, immutability at `accepted`, reroute only before accept via `canAccessBranch` on both branches, a same-state repeat does not apply when the destination branch changes, cancel from every non-terminal state, and `reject` is that same cancel terminal rather than a new state).
 2. **OD-HUB-IDENTITY** — accept, narrow, or reject §6 (live uniqueness without branch and without the display reference; cancelled rows release the provider id; a successor requires a new UUID and resending the original request does not insert; manual intake uses a client UUID, not the reference).
 
 No production deploy. This document does not merge itself and does not start an implementation.
