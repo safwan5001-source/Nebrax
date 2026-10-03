@@ -212,6 +212,7 @@ function MembersDialog({
           {canManage ? (
           <ProductPicker
             t={t}
+            disabled={saving}
             idPrefix="merch-members"
             actionLabel={t('merchAddProduct')}
             excludeIds={rows.map((m) => m.productId)}
@@ -238,13 +239,13 @@ function MembersDialog({
                   </span>
                   {canManage ? (
                   <span className="flex shrink-0 items-center gap-1">
-                    <Button type="button" variant="ghost" size="icon" disabled={index === 0} aria-label={`${t('merchMoveUp')}: ${member.name}`} onClick={() => setMembers(moveItem(rows, index, -1))}>
+                    <Button type="button" variant="ghost" size="icon" disabled={saving || index === 0} aria-label={`${t('merchMoveUp')}: ${member.name}`} onClick={() => setMembers(moveItem(rows, index, -1))}>
                       <ArrowUp className="h-4 w-4" aria-hidden="true" />
                     </Button>
-                    <Button type="button" variant="ghost" size="icon" disabled={index === rows.length - 1} aria-label={`${t('merchMoveDown')}: ${member.name}`} onClick={() => setMembers(moveItem(rows, index, 1))}>
+                    <Button type="button" variant="ghost" size="icon" disabled={saving || index === rows.length - 1} aria-label={`${t('merchMoveDown')}: ${member.name}`} onClick={() => setMembers(moveItem(rows, index, 1))}>
                       <ArrowDown className="h-4 w-4" aria-hidden="true" />
                     </Button>
-                    <Button type="button" variant="ghost" size="icon" aria-label={`${t('merchRemove')}: ${member.name}`} onClick={() => setMembers(rows.filter((m) => m.productId !== member.productId))}>
+                    <Button type="button" variant="ghost" size="icon" disabled={saving} aria-label={`${t('merchRemove')}: ${member.name}`} onClick={() => setMembers(rows.filter((m) => m.productId !== member.productId))}>
                       <X className="h-4 w-4" aria-hidden="true" />
                     </Button>
                   </span>

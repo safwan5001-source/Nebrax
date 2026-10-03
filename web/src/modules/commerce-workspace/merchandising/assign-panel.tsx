@@ -106,7 +106,7 @@ export function AssignPanel({ t, canManage }: { t: T; canManage: boolean }) {
                               className="accent-primary"
                               checked={checked}
                               // عُطّل البُعد: تُزال القيم المُسنَدة فقط، ولا تُضاف قيمٌ جديدة (يرفضها الخادم).
-                              disabled={!facet.isActive && !checked}
+                              disabled={saving || (!facet.isActive && !checked)}
                               onChange={() => toggle(value.id)}
                             />
                             <span>{value.name}</span>

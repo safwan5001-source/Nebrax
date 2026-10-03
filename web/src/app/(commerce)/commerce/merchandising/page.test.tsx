@@ -366,6 +366,68 @@ describe('Merchandising — state that must not leak across products or queries'
   });
 });
 
+describe('Merchandising — edits while a save or a later page is in flight', () => {
+  const row = (id: string, name: string) => ({ id, name, sku: null, name_en: null, is_active: true, is_published: true, stores: [] });
+
+  it('keeps loaded rows and offers a retry when "Show more" fails', async () => {
+    apiMock.mockResolvedValueOnce({ data: { facets: [occasion] } });
+    renderPage();
+    apiMock.mockResolvedValueOnce({ data: { facets: [occasion] } });
+    await userEvent.click(await screen.findByRole('tab', { name: 'Assign products' }));
+
+    apiMock.mockResolvedValueOnce({ data: [row('p1', 'Rose A')], meta: { current_page: 1, last_page: 2, per_page: 10, total: 11 } });
+    await userEvent.type(await screen.findByLabelText('Search a product by name or SKU'), 'rose');
+    expect(await screen.findByText('Rose A', undefined, { timeout: 3000 })).toBeTruthy();
+
+    apiMock.mockRejectedValueOnce(new Error('network'));
+    await userEvent.click(screen.getByRole('button', { name: 'Show more' }));
+
+    expect(await screen.findByText('Could not load the data.')).toBeTruthy();
+    expect(screen.getByText('Rose A')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Show more' })).toBeTruthy();
+  });
+
+  it('disables the assignment checkboxes while the save is pending', async () => {
+    apiMock.mockResolvedValueOnce({ data: { facets: [occasion] } });
+    renderPage();
+    apiMock.mockResolvedValueOnce({ data: { facets: [occasion] } });
+    await userEvent.click(await screen.findByRole('tab', { name: 'Assign products' }));
+    apiMock.mockResolvedValueOnce({ data: [row('p1', 'Red roses')], meta: { current_page: 1, last_page: 1, per_page: 10, total: 1 } });
+    await userEvent.type(await screen.findByLabelText('Search a product by name or SKU'), 'rose');
+    expect(await screen.findByText('Red roses', undefined, { timeout: 3000 })).toBeTruthy();
+    apiMock.mockResolvedValueOnce({ data: { value_ids: ['v1'] } });
+    await userEvent.click(screen.getByRole('button', { name: 'Edit' }));
+    await screen.findByRole('checkbox', { name: 'Wedding' });
+
+    apiMock.mockImplementationOnce(() => new Promise(() => undefined)); // the PUT never settles
+    await userEvent.click(screen.getByRole('button', { name: 'Save assignment' }));
+
+    expect((screen.getByRole('checkbox', { name: 'Wedding' }) as HTMLInputElement).disabled).toBe(true);
+  });
+
+  it('disables member edits in the collection dialog while saving', async () => {
+    const collection = { id: 'c1', slug: 'best', title: 'Best sellers', title_en: null, description: null, status: 'active', sort_order: 0, member_count: 2 };
+    apiMock.mockResolvedValueOnce({ data: { facets: [] } });
+    renderPage();
+    apiMock.mockResolvedValueOnce({ data: { collections: [collection] } });
+    await userEvent.click(await screen.findByRole('tab', { name: 'Collections' }));
+    apiMock.mockResolvedValueOnce({
+      data: { products: [
+        { product_id: 'a', name: 'Roses', name_en: null, sku: null, is_active: true, position: 0 },
+        { product_id: 'b', name: 'Tulips', name_en: null, sku: null, is_active: true, position: 1 },
+      ] },
+    });
+    await userEvent.click(await screen.findByRole('button', { name: 'Manage products' }));
+    await screen.findByText('Roses');
+
+    apiMock.mockImplementationOnce(() => new Promise(() => undefined));
+    await userEvent.click(screen.getByRole('button', { name: 'Save order' }));
+
+    expect((screen.getByRole('button', { name: 'Move down: Roses' }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole('button', { name: 'Remove: Tulips' }) as HTMLButtonElement).disabled).toBe(true);
+  });
+});
+
 describe('Merchandising — assign tab', () => {
   it('guides to create dimensions first when there are none', async () => {
     apiMock.mockResolvedValueOnce({ data: { facets: [] } }); // facets tab

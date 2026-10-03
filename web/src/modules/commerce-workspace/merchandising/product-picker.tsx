@@ -18,17 +18,21 @@ export function ProductPicker({
   idPrefix,
   actionLabel,
   excludeIds = [],
+  disabled = false,
   onPick,
 }: {
   t: T;
   idPrefix: string;
   actionLabel: string;
   excludeIds?: string[];
+  /** يعطّل أزرار الإضافة (مثلاً أثناء حفظٍ جارٍ فلا تضيع تعديلاتٌ بعد لقطة الحفظ). */
+  disabled?: boolean;
   onPick: (product: PickerProduct) => void;
 }) {
   const [search, setSearch] = useState('');
   const [results, setResults] = useState<PickerProduct[] | null>(null);
   const [failed, setFailed] = useState(false);
+  const [moreFailed, setMoreFailed] = useState(false);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -39,6 +43,7 @@ export function ProductPicker({
   useEffect(() => {
     setPage(1);
     setHasMore(false);
+    setMoreFailed(false);
     setLoadingMore(false); // طلب «عرض المزيد» لاستعلامٍ سابق لا يحجب زرّ الاستعلام الجديد
     // نتائج الاستعلام السابق لا تبقى قابلةً للنقر تحت نصٍّ جديد ريثما تصل استجابته.
     setResults(null);
@@ -71,6 +76,7 @@ export function ProductPicker({
     if (loadingMore) return;
     const requestedSearch = search;
     setLoadingMore(true);
+    setMoreFailed(false);
     try {
       const next = await loadProductPublicationList({ search: requestedSearch, perPage: 10, page: page + 1 });
       if (currentSearch.current !== requestedSearch) return;
@@ -80,9 +86,9 @@ export function ProductPicker({
       ]);
       setPage(next.meta.currentPage);
       setHasMore(next.meta.currentPage < next.meta.lastPage);
-      setFailed(false);
     } catch {
-      if (currentSearch.current === requestedSearch) setFailed(true);
+      // فشل صفحةٍ لاحقة لا يُخفي ما حُمِّل: تبقى الصفوف ويبقى الزرّ كإعادة محاولة.
+      if (currentSearch.current === requestedSearch) setMoreFailed(true);
     } finally {
       if (currentSearch.current === requestedSearch) setLoadingMore(false);
     }
@@ -117,12 +123,13 @@ export function ProductPicker({
                   {product.name}
                   {product.sku ? <span className="ms-2 text-xs text-muted" dir="ltr">{product.sku}</span> : null}
                 </span>
-                <Button type="button" variant="outline" size="sm" onClick={() => onPick(product)}>
+                <Button type="button" variant="outline" size="sm" disabled={disabled} onClick={() => onPick(product)}>
                   {actionLabel}
                 </Button>
               </li>
             ))}
           </ul>
+          {moreFailed ? <p role="alert" className="text-xs text-negative">{t('merchLoadFailed')}</p> : null}
           {hasMore ? (
             <Button type="button" variant="outline" size="sm" onClick={() => void loadMore()} disabled={loadingMore}>
               {t('merchLoadMore')}
