@@ -29,25 +29,30 @@ final class ShippingRateService
 {
     public function resolveRateMinor(?string $city, ?string $region): int
     {
-        $rate = $this->matchZone(CommerceShippingZone::MATCH_TYPE_CITY, $city)
-            ?? $this->matchZone(CommerceShippingZone::MATCH_TYPE_REGION, $region);
-
-        return $rate ?? 0;
+        return $this->resolveZone($city, $region)?->rate_amount_minor ?? 0;
     }
 
-    private function matchZone(string $matchType, ?string $value): ?int
+    /**
+     * المنطقة المطابقة نفسها التي يستند إليها الرسم (المدينة قبل المنطقة) — مصدر واحد للمطابقة تستهلكه جدولة
+     * التسليم (FLOWERS-H7 / ADR-19) فلا مطابقة موازية للوجهة.
+     */
+    public function resolveZone(?string $city, ?string $region): ?CommerceShippingZone
+    {
+        return $this->matchZone(CommerceShippingZone::MATCH_TYPE_CITY, $city)
+            ?? $this->matchZone(CommerceShippingZone::MATCH_TYPE_REGION, $region);
+    }
+
+    private function matchZone(string $matchType, ?string $value): ?CommerceShippingZone
     {
         $value = trim((string) $value);
         if ($value === '') {
             return null;
         }
 
-        $zone = CommerceShippingZone::query()
+        return CommerceShippingZone::query()
             ->where('is_active', true)
             ->where('match_type', $matchType)
             ->where('match_value_normalized', mb_strtolower($value))
             ->first();
-
-        return $zone?->rate_amount_minor;
     }
 }
