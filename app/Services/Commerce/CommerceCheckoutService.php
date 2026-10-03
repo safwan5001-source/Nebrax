@@ -650,6 +650,18 @@ final class CommerceCheckoutService
 
         $byId = $items->keyBy('id');
 
+        // FLOWERS-H6 — سلة فيها أسطر إضافات: تُقفل صفوف كل منتجاتها دفعةً واحدة بترتيب المعرّف الشامل (نفس
+        // ترتيب ProductAddonService::replace()/lockForCart) قبل حلقة الأقفال المفردة بترتيب سطور السلة، وإلا
+        // دار deadlock مع تعديل العلاقة حين يقفل الإتمامُ الأبَ قبل الإضافة ويقفلهما replace() مرتَّبَين.
+        // السلة بلا إضافات لا يتغيّر مسارها.
+        if ($items->contains(fn ($item) => $item->parent_item_id !== null)) {
+            Product::withoutGlobalScope(BranchScope::class)
+                ->whereIn('id', $items->pluck('product_id')->filter()->unique()->values()->all())
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->pluck('id');
+        }
+
         foreach ($items as $item) {
             if ($item->product_id === null) {
                 $failures[] = ['item_id' => $item->id, 'reason' => 'unavailable'];
