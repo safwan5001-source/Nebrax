@@ -8,7 +8,7 @@ STATUS: ACTIVE — AWJ Delivery Platforms & Settlement Horizon V1 (authoritative
 
 ## Current objective
 
-DELIVERY-DECISION-PASS-6 is in review. Do not merge it from this note and do not deploy. OD-DG-3-POSTING-GATE is accepted: an imported order does not become an invoice while financial role, invoice responsibility, collection role, or the merchant's VAT status at supply time is UNKNOWN. DG-3 is not closed. No platform is agent, principal, or collector. Do not start full DLV-HUB-1, commission, settlement, connectors, or refunds. Merge != Deploy.
+DELIVERY-DECISION-PASS-6 is in review. Do not merge it from this note and do not deploy. OD-DG-3-POSTING-GATE is accepted and is necessary, not sufficient: an imported order does not become an invoice while financial role, invoice responsibility, collection role, or the merchant's VAT status at supply time is UNKNOWN. The tax point stays blocked. This acceptance is not a system-recognition policy. DG-3 is not closed. No platform is agent, principal, or collector. Do not start full DLV-HUB-1, commission, settlement, connectors, or refunds. Merge != Deploy.
 
 ## Previous snapshot (historical, superseded)
 

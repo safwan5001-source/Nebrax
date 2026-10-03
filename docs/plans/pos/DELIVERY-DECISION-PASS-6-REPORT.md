@@ -162,6 +162,7 @@ No field is implied by the platform logo or by the channel slug.
 6. Platform fee VAT is not recovered and is not posted inside the customer invoice.
 7. The customer on the invoice is not changed to the platform unless `invoice_responsibility` is an accepted platform-seller value.
 8. Manual POS checkout is unchanged.
+9. The four accepted gate fields are necessary and not sufficient. `InvoiceService::post` recognizes VAT at post time. The command stays rejected until that configuration also has the tax-point evidence or the explicit temporary policy in §12.6. OD-DG-3-POSTING-GATE is not that policy.
 
 ---
 
@@ -190,15 +191,16 @@ No field is implied by the platform logo or by the channel slug.
 
 OD-DG-6-TRIGGER still describes the only future command. OD-DG-8-IMPORT removed the price-authority block. DG-3 still blocks enabling it.
 
-The minimum evidence before that command may run for one configuration is:
+The accepted gate is necessary and not sufficient. Before that command may run for one configuration, all of the following are required:
 
 1. The merchant's accepted terms, or the published standard terms that merchant accepted, stating who sells the meal and who issues the customer tax invoice.
 2. The merchant's VAT registration status at the time of supply.
 3. A separate answer for delivery and for the platform fee, if those amounts are in the order.
 4. A snapshot that already separates merchant-funded and platform-funded discounts.
 5. An explicit configuration value, not a default, and an owner acceptance of that value.
+6. Provider-specific tax-point evidence, or a later owner decision that explicitly accepts a temporary "system recognition only, not a legal tax-point claim" policy for that provider. OD-DG-3-POSTING-GATE is not that policy. Pass 3 already records that `InvoiceService::post` recognizes VAT immediately and that the operator command is not a legal tax point.
 
-Until then the command stays unbuilt and, once built, stays rejected for that configuration.
+Until every item above is present, the command stays unbuilt and, once built, stays rejected for that configuration.
 
 ---
 
@@ -230,4 +232,4 @@ Safwan accepted this gate only:
 
 > An imported delivery order may not become a canonical invoice unless that provider configuration has every one of these set from evidence, and none of them is `UNKNOWN`: `financial_role_status`, `invoice_responsibility`, `collection_role`, and the merchant's VAT-registration status at the time of supply. Clearing only the role field does not authorize posting. The default for HungerStation, Jahez, Mrsool, Keeta, Ninja, and The Chefz is `UNKNOWN` on every one of those inputs. Published terms do not flip any flag. The Hub, mapping, and the frozen snapshot may continue. Commission, settlement, fee VAT, and provider refunds stay disabled. Manual POS is unchanged.
 
-This acceptance does not declare any platform an agent, a principal, or a collector. DG-3 stays open until a later decision accepts one configuration's evidence. The financial command is not started. No production deploy.
+This acceptance does not declare any platform an agent, a principal, or a collector. It is not a tax-point decision and it is not a temporary system-recognition policy. DG-3 stays open until a later decision accepts one configuration's evidence, including the tax point. The financial command is not started. No production deploy.
