@@ -23,6 +23,9 @@ class StorePosSaleRequest extends FormRequest
             // يثبت مخزن الإخراج على الفاتورة الناتجة من عملية نقطة البيع.
             'warehouse_id'        => ['nullable', 'uuid'],
             'tax_inclusive'       => ['nullable', 'boolean'],
+            // DLV-POS-1: هوية الملف فقط. وضع التحصيل والنسخة والحساب لا تُقبل من العميل.
+            'delivery_platform_profile_id' => ['nullable', 'uuid'],
+            'external_order_reference' => ['nullable', 'string', 'max:255'],
             'items'               => ['required', 'array', 'min:1'],
             'items.*.product_id'  => ['nullable', 'uuid'],
             // VAR-POS-1: هويّة المتغيّر الفعلي — إضافيّ، فارغ لمنتجٍ بسيط.
@@ -36,7 +39,8 @@ class StorePosSaleRequest extends FormRequest
             'items.*.discount'    => ['nullable', 'integer', 'min:0', 'max:100000000000'], // هللات
             'items.*.minimum_price_override_reason' => ['nullable', 'string', 'min:3', 'max:500'],
             'notes'               => ['nullable', 'string', 'max:2000'],
-            'tenders'             => ['required', 'array', 'max:20'],
+            // بلا منصة تبقى الوسائل مطلوبة كما كانت. مع منصة قد يشتق الخادم تحصيلاً بلا وسيلة.
+            'tenders'             => ['required_without:delivery_platform_profile_id', 'array', 'max:20'],
         ];
 
         // العقد الجديد: قائمة وسائل مهيأة بالهللات. العقد القديم يبقى مقبولاً
@@ -57,5 +61,26 @@ class StorePosSaleRequest extends FormRequest
             'tenders.transfer' => ['nullable', 'integer', 'min:0', 'max:100000000000'],
             'tenders.credit'   => ['nullable', 'integer', 'min:0', 'max:100000000000'],
         ];
+    }
+
+    public function withValidator(\Illuminate\Validation\Validator $validator): void
+    {
+        $validator->after(function (\Illuminate\Validation\Validator $validator): void {
+            foreach ([
+                'collection_mode',
+                'delivery_platform_profile_version_id',
+                'version_id',
+                'clearing_account_id',
+                'gl_account_id',
+                'accounting_role',
+                'commission',
+                'commission_rate',
+                'tax_treatment',
+            ] as $field) {
+                if ($this->exists($field)) {
+                    $validator->errors()->add($field, 'هذا الحقل لا يُقبل من نقطة البيع؛ الخادم يحدد سلوك المنصة.');
+                }
+            }
+        });
     }
 }

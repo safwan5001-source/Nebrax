@@ -154,7 +154,8 @@ final class CatalogFacetFilter
                 ? []
                 : $facet->values->whereIn('slug', $slugs)->pluck('id')->all();
 
-            if ($valueIds === []) {
+            // أي slug مجهول أو غير نشط ⇒ نتيجة فارغة (مغلق عند الفشل)، لا تجاهلٌ صامت له.
+            if ($valueIds === [] || count($valueIds) !== count($slugs)) {
                 $products->whereRaw('0 = 1');
 
                 return;
@@ -247,20 +248,25 @@ final class CatalogFacetFilter
             ->select('products.brand_id', DB::raw('count(*) as aggregate'))
             ->pluck('aggregate', 'brand_id');
 
-        if ($counts->isEmpty()) {
+        // العلامة المختارة تبقى ظاهرةً بعدّاد صفر ليتمكّن العميل من رؤيتها وإلغائها.
+        $ids = $counts->keys()->all();
+        if ($selection['brand_id'] !== null) {
+            $ids[] = $selection['brand_id'];
+        }
+        if ($ids === []) {
             return [];
         }
 
         return Brand::query()
             ->withoutGlobalScope(BranchScope::class)
-            ->whereIn('id', $counts->keys())
+            ->whereIn('id', array_values(array_unique($ids)))
             ->where('is_active', true)
             ->orderBy('name')
             ->get(['id', 'name'])
             ->map(fn (Brand $brand) => [
                 'id' => $brand->id,
                 'name' => $brand->name,
-                'count' => (int) $counts[$brand->id],
+                'count' => (int) ($counts[$brand->id] ?? 0),
                 'selected' => $selection['brand_id'] === $brand->id,
             ])
             ->values()

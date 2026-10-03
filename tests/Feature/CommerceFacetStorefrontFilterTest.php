@@ -137,8 +137,9 @@ class CommerceFacetStorefrontFilterTest extends TestCase
         foreach (['facet[nope]=birthday', 'facet[occasion]=nope', 'facet[occasion]=birthday&facet[x]=y'] as $q) {
             $this->assertSame([], $this->names($this->list($f['tenant'], $q)), $q);
         }
-        // قيمة مجهولة بجوار قيمة معروفة داخل البُعد نفسه: OR يكفي بالمعروفة.
-        $this->assertCount(2, $this->list($f['tenant'], 'facet[occasion]=birthday,nope')->json('data'));
+        // قيمة مجهولة بجوار قيمة معروفة داخل البُعد نفسه: مغلق عند الفشل أيضاً (ADR-14)،
+        // لا يُكتفى بالمعروفة.
+        $this->assertSame([], $this->names($this->list($f['tenant'], 'facet[occasion]=birthday,nope')));
 
         app(TenantContext::class)->set($f['tenant']->id);
         $f['occasion']['values']['graduation']->update(['is_active' => false]);
@@ -258,6 +259,11 @@ class CommerceFacetStorefrontFilterTest extends TestCase
         $this->assertSame(1, $brands[$brandB->id]['count']);
         // غير المنشور لا يدخل العدّ
         $this->assertSame(1, $brands[$brandA->id]['count']);
+
+        // علامة مختارة بعدّاد صفر تبقى في meta.brands (ليُمكن إلغاؤها)، لا تختفي.
+        $zero = collect($this->list($f['tenant'], "brand_id={$brandB->id}&facet[recipient]=her")->json('meta.brands'))->keyBy('id');
+        $this->assertSame(0, $zero[$brandB->id]['count']);
+        $this->assertTrue($zero[$brandB->id]['selected']);
     }
 
     /** @test */

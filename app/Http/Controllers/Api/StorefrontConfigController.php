@@ -3,8 +3,10 @@
 namespace App\Http\Controllers\Api;
 
 use App\Models\Storefront;
+use App\Models\StorefrontBusinessProfile;
 use App\Models\Tenant;
 use App\Services\Commerce\StorefrontPresentationService;
+use App\Support\Commerce\BusinessVertical;
 use App\Support\PublicApiResponse;
 use App\Tenancy\StorefrontContext;
 use Illuminate\Http\JsonResponse;
@@ -31,6 +33,7 @@ class StorefrontConfigController extends PublicApiController
 
         $name = null;
         $defaultLocale = null;
+        $businessVertical = BusinessVertical::default();
         $presentation = null;
         $businessIdentity = [
             'legal_name' => null,
@@ -46,6 +49,10 @@ class StorefrontConfigController extends PublicApiController
 
             $name = $row?->name;
             $defaultLocale = $row?->default_locale;
+            $businessVertical = StorefrontBusinessProfile::query()
+                ->where('storefront_id', $context->storefrontId())
+                ->where('tenant_id', $context->tenantId())
+                ->first()?->businessVertical() ?? BusinessVertical::default();
             $presentation = $presentations->publishedSnapshotForStorefront($context->storefrontId());
             if (is_array($presentation) && isset($presentation['sbc']) && is_array($presentation['sbc'])) {
                 $presentation['sbc']['authentication_number'] = '';
@@ -74,6 +81,7 @@ class StorefrontConfigController extends PublicApiController
             'data' => [
                 'name' => $name,
                 'default_locale' => $defaultLocale,
+                'business_vertical' => $businessVertical->value,
                 'business_identity' => $businessIdentity,
                 'presentation' => $presentation,
             ],

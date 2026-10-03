@@ -3,6 +3,8 @@
 namespace App\Services\Accounting;
 
 use App\Models\Branch;
+use App\Models\DeliveryPlatformProfile;
+use App\Models\DeliveryPlatformProfileVersion as Version;
 use App\Models\Invoice;
 use App\Models\Partner;
 use App\Models\PaymentMethod;
@@ -10,6 +12,10 @@ use App\Models\PosCheckoutAttempt;
 use App\Models\PriceList;
 use App\Models\Product;
 use App\Models\ProductVariant;
+use App\Models\SalesChannel;
+use App\Models\User;
+use App\Services\DeliveryPlatformConfigService;
+use App\Support\DeliveryPlatformCatalog;
 use App\Support\PosSettings;
 use App\Support\Settings;
 use App\Services\Pos\CashDrawerService;
@@ -42,6 +48,8 @@ class PosService
         protected PosCustomerPriceListResolver $customerPriceLists,
         protected CashDrawerService $cashDrawer,
         protected PosAuditService $audit,
+        protected DeliveryPlatformConfigService $deliveryPlatforms,
+        protected DeliveryInvoiceContextService $deliveryContexts,
     ) {}
 
     /**
@@ -190,10 +198,25 @@ class PosService
 
         // تضمن تهيئة المؤسسة الجديدة كتالوجاً تشغيلياً واحداً فقط، ولا تعيد
         // أي وسيلة حذفها مالكها بعد وجود الكتالوج.
+        // DLV-POS-1: اختيار المنصة لا يغيّر السعر (قائمة العميل أعلاه لم تُمس).
+        // وضع التحصيل والنسخة يُشتقّان هنا من الإعداد الفعلي للفرع، لا من المتصفح.
+        $delivery = $this->authoritativeDeliveryPlatform($data['delivery_platform_profile_id'] ?? null, $branchId);
+        $externalReference = $this->normalizeDeliveryReference($data['external_order_reference'] ?? null);
+        $this->assertDeliveryReference($delivery, $externalReference);
+        $platformCollected = $delivery !== null
+            && $delivery['resolved']['collection_mode'] === Version::COLLECTION_PLATFORM;
+
         $this->cashBankAccounts->bootstrapDefaults();
-        $this->assertPosPaymentMethodsAvailable();
         $tenders = $this->normalizedTenders($data['tenders'] ?? []);
-        $methods = $this->configuredPaymentMethods($tenders);
+        if ($platformCollected) {
+            if ($tenders !== []) {
+                throw new RuntimeException('تحصيل منصة التوصيل لا يقبل وسيلة دفع في نقطة البيع.');
+            }
+            $methods = [];
+        } else {
+            $this->assertPosPaymentMethodsAvailable();
+            $methods = $this->configuredPaymentMethods($tenders);
+        }
 
         // بدء الإتمام دليل خادمي من داخل المعاملة الفعلية؛ لا يعتمد على
         // before/after أو مبلغ مرسل من العميل.
@@ -229,37 +252,63 @@ class PosService
         ], $data['items']);
         $invoice = $this->invoices->post($invoice);
 
-        $remaining = (int) $invoice->total;
-        foreach ($tenders as $tender) {
-            $method = $methods[$tender['payment_method_id']];
-            $amount = $tender['amount'];
-
-            // الفكّة لا تتولد إلا من النقد. لا نقبل تحصيلاً بنكياً أكبر من
-            // المتبقي لأنه لا يقابل ذمة ولا يمثل مبلغاً محصلاً في POS.
-            if ($method->settlement_type === 'bank' && $amount > $remaining) {
-                throw new RuntimeException('لا يمكن أن يتجاوز مبلغ وسيلة الدفع البنكية المتبقي من إجمالي البيع.');
+        if ($platformCollected) {
+            // السياق قبل السند: platform_collected يُرفض على فاتورة محصّلة مسبقاً.
+            $this->pinDeliveryContext($invoice, $delivery, $externalReference, $data['actor'] ?? null);
+            if ((int) $invoice->total <= 0) {
+                throw new RuntimeException('لا يمكن تحصيل منصة على فاتورة بلا إجمالي.');
             }
-
-            $applied = min($amount, $remaining);
-            if ($applied <= 0) {
-                continue;
-            }
-
-            // 2) سند قبض بالوسيلة المهيأة: PaymentService يلتقط الحساب
-            // المقابل واسم الوسيلة ثم يرحّل القيد المتوازن عبر LedgerService.
+            // بلا pos_session_id: سند المقاصة ليس نقداً ولا بطاقة في مطابقة الدرج.
+            // method=bank يطابق مسار DLV-ACCOUNTING-1 ولا يدخل مجموع النقد (method=cash).
             $payment = $this->payments->post($this->payments->create([
-                'partner_id'        => $invoice->partner_id,
-                'invoice_id'        => $invoice->id,
-                'pos_session_id'    => $session->id,
-                'direction'         => 'received',
-                'payment_method_id' => $method->id,
-                'amount'            => $applied,
-                'notes'             => "{$method->name} — بيع {$invoice->number}",
-                'created_by'        => $data['created_by'] ?? null,
+                'partner_id' => $invoice->partner_id,
+                'invoice_id' => $invoice->id,
+                'direction' => 'received',
+                'method' => 'bank',
+                'amount' => (int) $invoice->total,
+                'delivery_platform_profile_id' => $delivery['profile']->id,
+                'notes' => "تحصيل منصة — {$invoice->number}",
+                'created_by' => $data['created_by'] ?? null,
             ]), $data['actor'] ?? null);
             $paymentIds[] = $payment->id;
+            $remaining = 0;
+        } else {
+            $remaining = (int) $invoice->total;
+            foreach ($tenders as $tender) {
+                $method = $methods[$tender['payment_method_id']];
+                $amount = $tender['amount'];
 
-            $remaining -= $applied;
+                // الفكّة لا تتولد إلا من النقد. لا نقبل تحصيلاً بنكياً أكبر من
+                // المتبقي لأنه لا يقابل ذمة ولا يمثل مبلغاً محصلاً في POS.
+                if ($method->settlement_type === 'bank' && $amount > $remaining) {
+                    throw new RuntimeException('لا يمكن أن يتجاوز مبلغ وسيلة الدفع البنكية المتبقي من إجمالي البيع.');
+                }
+
+                $applied = min($amount, $remaining);
+                if ($applied <= 0) {
+                    continue;
+                }
+
+                // 2) سند قبض بالوسيلة المهيأة: PaymentService يلتقط الحساب
+                // المقابل واسم الوسيلة ثم يرحّل القيد المتوازن عبر LedgerService.
+                $payment = $this->payments->post($this->payments->create([
+                    'partner_id'        => $invoice->partner_id,
+                    'invoice_id'        => $invoice->id,
+                    'pos_session_id'    => $session->id,
+                    'direction'         => 'received',
+                    'payment_method_id' => $method->id,
+                    'amount'            => $applied,
+                    'notes'             => "{$method->name} — بيع {$invoice->number}",
+                    'created_by'        => $data['created_by'] ?? null,
+                ]), $data['actor'] ?? null);
+                $paymentIds[] = $payment->id;
+
+                $remaining -= $applied;
+            }
+
+            if ($delivery !== null) {
+                $this->pinDeliveryContext($invoice, $delivery, $externalReference, $data['actor'] ?? null);
+            }
         }
 
         if ($remaining > 0 && ! PosSettings::allowsDeferredPayment()) {
@@ -395,8 +444,91 @@ class PosService
             'items' => $items,
             'tenders' => $normalizedTenders,
         ];
+        // المفتاحان يُدرجان فقط عند وجود اختيار. غيابهما يُبقي بصمة البيع العادي
+        // مطابقة لما قبل DLV-POS-1، فلا تتعارض إعادة محاولة عابرة للنشر.
+        $platformId = ($data['delivery_platform_profile_id'] ?? null) ?: null;
+        $externalReference = $this->normalizeDeliveryReference($data['external_order_reference'] ?? null);
+        if ($platformId !== null || $externalReference !== null) {
+            $payload['delivery_platform_profile_id'] = $platformId;
+            $payload['external_order_reference'] = $externalReference;
+        }
 
         return hash('sha256', json_encode($payload, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE));
+    }
+
+    /**
+     * هوية المنصة فقط من العميل. وضع التحصيل والنسخة والقناة تُحلّ من إعداد
+     * الفرع النشط. معرّف مستأجر آخر لا يُحلّ (TenantScope) ويُرفض بنفس الرسالة.
+     *
+     * @return array{profile: DeliveryPlatformProfile, resolved: array<string, mixed>}|null
+     */
+    private function authoritativeDeliveryPlatform(mixed $profileId, string $branchId): ?array
+    {
+        if ($profileId === null || $profileId === '') {
+            return null;
+        }
+        if (! is_string($profileId)) {
+            throw new RuntimeException('منصة التوصيل غير متاحة لهذا البيع.');
+        }
+
+        $profile = DeliveryPlatformProfile::query()->with('salesChannel')->whereKey($profileId)->first();
+        if ($profile === null || ! $profile->is_active) {
+            throw new RuntimeException('منصة التوصيل غير متاحة لهذا البيع.');
+        }
+
+        $channel = $profile->salesChannel;
+        $expectedSlug = DeliveryPlatformCatalog::channelSlug((string) $profile->platform_key);
+        if ($channel === null
+            || ! $channel->is_active
+            || $channel->type !== SalesChannel::TYPE_EXTERNAL
+            || $channel->slug !== $expectedSlug) {
+            throw new RuntimeException('منصة التوصيل غير متاحة لهذا البيع.');
+        }
+
+        $resolved = $this->deliveryPlatforms->resolve($profile, $branchId);
+        if ($resolved === null
+            || ! $resolved['is_active']
+            || ($resolved['sales_channel_id'] ?? null) !== $profile->sales_channel_id) {
+            throw new RuntimeException('منصة التوصيل غير متاحة لهذا البيع.');
+        }
+
+        return ['profile' => $profile, 'resolved' => $resolved];
+    }
+
+    private function normalizeDeliveryReference(mixed $value): ?string
+    {
+        $value = is_string($value) ? trim($value) : null;
+
+        return $value === null || $value === '' ? null : $value;
+    }
+
+    /** @param  array{profile: DeliveryPlatformProfile, resolved: array<string, mixed>}|null  $delivery */
+    private function assertDeliveryReference(?array $delivery, ?string $reference): void
+    {
+        if ($delivery === null) {
+            if ($reference !== null) {
+                throw new RuntimeException('مرجع الطلب الخارجي يُقبل فقط مع منصة توصيل.');
+            }
+
+            return;
+        }
+
+        $policy = $delivery['resolved']['external_reference_policy'];
+        if ($policy === Version::REFERENCE_REQUIRED && $reference === null) {
+            throw new RuntimeException('سياسة منصة التوصيل تتطلب مرجع طلب خارجي ولم يُرسَل أي مرجع.');
+        }
+        if ($policy === Version::REFERENCE_NONE && $reference !== null) {
+            throw new RuntimeException('سياسة منصة التوصيل لا تقبل مرجع طلب خارجي.');
+        }
+    }
+
+    /** @param  array{profile: DeliveryPlatformProfile, resolved: array<string, mixed>}  $delivery */
+    private function pinDeliveryContext(Invoice $invoice, array $delivery, ?string $reference, mixed $actor): void
+    {
+        $this->deliveryContexts->record($invoice, $delivery['profile'], [
+            'version_id' => $delivery['resolved']['version_id'],
+            'external_order_reference' => $reference,
+        ], $actor instanceof User ? $actor : null);
     }
 
     private function isUniqueConstraintViolation(QueryException $e): bool
