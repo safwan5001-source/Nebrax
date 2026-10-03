@@ -5,6 +5,7 @@ namespace App\Services\Commerce;
 use App\Http\Resources\StorefrontProductResource;
 use App\Models\CommerceListing;
 use App\Models\CommerceProductAddon;
+use App\Models\CommerceProductPersonalizationField;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Services\ProductMediaGalleryService;
@@ -73,8 +74,11 @@ final class ProductAddonService
             // وهذا القفل يُرفض بـ404 بدل نجاحٍ فارغ أو 500 من قيد المفتاح الأجنبي.
             Product::withoutGlobalScope(BranchScope::class)->whereKey($product->id)->lockForUpdate()->firstOrFail();
 
-            // المنتجات تُحلّ عبر Product::query() (TenantScope + نطاق الفرع للمستخدم الإداري).
-            $found = Product::query()->whereIn('id', $ids)->get()->keyBy('id');
+            // المنتجات تُحلّ عبر Product::query() (TenantScope + نطاق الفرع للمستخدم الإداري) وتُقفل (بترتيب
+            // المعرّف لتفادي التشابك): تعطيلٌ أو حذفٌ متزامن لمنتج إضافة إما ينتهي قبل قراءتنا فنرفضه، أو ينتظر
+            // التزامنا فيرى العلاقة ويُنظَّفها — فلا تُحفَظ علاقة بمنتجٍ غير نشط أو محذوف.
+            $found = Product::query()->whereIn('id', $ids)->orderBy('id')->lockForUpdate()->get()->keyBy('id');
+            $needsInput = $this->productsRequiringPersonalization($ids);
             foreach ($addons as $addon) {
                 $target = $found[$addon['addon_product_id']] ?? null;
                 if ($target === null) {
@@ -82,6 +86,9 @@ final class ProductAddonService
                 }
                 if (! $target->is_active) {
                     throw new DomainException("منتج الإضافة «{$target->name}» غير نشط.");
+                }
+                if (isset($needsInput[$target->id])) {
+                    throw new DomainException("منتج الإضافة «{$target->name}» يتطلب إدخال تخصيص إلزامي لا يمكن جمعه كإضافة.");
                 }
                 $variantId = $addon['addon_variant_id'] ?? null;
                 if ($target->isVariantManaged() && $variantId === null) {
@@ -134,6 +141,7 @@ final class ProductAddonService
             ->whereIn('id', CommerceListing::query()->where('sales_channel_id', $channelId)->where('is_published', true)->select('product_id'))
             ->get()->keyBy('id');
 
+        $needsInput = $this->productsRequiringPersonalization($relations->pluck('addon_product_id')->all());
         $variants = ProductVariant::query()
             ->whereIn('id', $relations->pluck('addon_variant_id')->filter())
             ->where('is_active', true)
@@ -142,7 +150,9 @@ final class ProductAddonService
         $out = [];
         foreach ($relations as $relation) {
             $addon = $products[$relation->addon_product_id] ?? null;
-            if ($addon === null) {
+            // إضافة تطلب تخصيصاً إلزامياً (أُضيف لها بعد ضبط العلاقة): لا يمكن جمع مُدخَلها كسطر تابع،
+            // فيُخفى بدل عرضٍ يفشل عند الإتمام.
+            if ($addon === null || isset($needsInput[$addon->id])) {
                 continue;
             }
             // متغيّرٌ عُطِّل أو حُذف بعد ضبط العلاقة (FK يصفّر العمود): الإضافة غير قابلة للبيع فتُحذف
@@ -210,6 +220,9 @@ final class ProductAddonService
                 throw ValidationException::withMessages(['addons' => 'لا يمكن تكرار الإضافة نفسها.']);
             }
 
+            if ($this->productsRequiringPersonalization([$productId]) !== []) {
+                throw ValidationException::withMessages(['addons' => 'إضافة غير متاحة لهذا المنتج.']);
+            }
             $variantId = $row['product_variant_id'] ?? null;
             $relationVariant = $relation->addon_variant_id !== null
                 ? ProductVariant::query()->whereKey($relation->addon_variant_id)->where('is_active', true)->first()
@@ -236,6 +249,27 @@ final class ProductAddonService
      * حالة متغيّر العلاقة سليمة: منتجٌ متعدد المتغيّرات يحتاج متغيّراً نشطاً موجوداً، ومنتجٌ بسيط
      * لا يحمل متغيّراً. (لا استثناء ولا تخمين: تُستعمل قبل أي حلّ سعر أو توفّر.)
      */
+    /**
+     * منتجات (من المعرّفات) لها حقل تخصيص إلزامي نشط — لا تصلح كإضافة لأن سطر الإضافة لا يحمل مُدخَلاً.
+     *
+     * @param  list<string>  $productIds
+     * @return array<string, true> مفتاحه معرّف المنتج
+     */
+    private function productsRequiringPersonalization(array $productIds): array
+    {
+        if ($productIds === []) {
+            return [];
+        }
+
+        return CommerceProductPersonalizationField::query()
+            ->whereIn('product_id', $productIds)
+            ->where('is_active', true)
+            ->where('is_required', true)
+            ->pluck('product_id')
+            ->mapWithKeys(fn ($id) => [$id => true])
+            ->all();
+    }
+
     private function variantStateSellable(?Product $addon, ?string $variantId, ?ProductVariant $variant): bool
     {
         if ($addon === null) {

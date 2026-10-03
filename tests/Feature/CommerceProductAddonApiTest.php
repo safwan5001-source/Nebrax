@@ -350,4 +350,67 @@ class CommerceProductAddonApiTest extends TestCase
         app(TenantContext::class)->forget();
         $this->assertArrayNotHasKey('addons', $this->getJson($url)->assertOk()->json('data'));
     }
+
+    private function requiredField(): array
+    {
+        return [['key' => 'card', 'type' => 'text', 'label' => 'البطاقة', 'is_required' => true, 'max_length' => 20]];
+    }
+
+    /** @test */
+    public function an_addon_requiring_personalization_is_refused_hidden_and_not_cartable(): void
+    {
+        $auth = $this->registerTenant('ad-pers', 'owner@ad-pers.test');
+        $bouquet = $this->makeProduct($auth['tenant_id']);
+        $card = $this->makeProduct($auth['tenant_id'], 'بطاقة مطبوعة');
+        app(TenantContext::class)->set($auth['tenant_id']);
+        app(ProductPersonalizationService::class)->replaceDefinitions($card, $this->requiredField());
+        app(TenantContext::class)->forget();
+
+        // علاقة جديدة بمنتج يطلب تخصيصاً إلزامياً ⇒ مرفوضة
+        $this->withToken($auth['token'])->putJson($this->url($bouquet), ['addons' => [['addon_product_id' => $card->id]]])->assertStatus(422);
+        $this->assertSame(0, CommerceProductAddon::withoutGlobalScopes()->count());
+    }
+
+    /** @test */
+    public function a_required_field_added_to_an_existing_addon_hides_it_and_blocks_the_cart(): void
+    {
+        ['tenant' => $tenant, 'channel' => $channel] = $this->publicStore('ad-pers-late', SalesChannel::TYPE_MOBILE);
+        $bouquet = $this->publish($tenant, $channel, 'باقة');
+        $card = $this->publish($tenant, $channel, 'بطاقة');
+        $this->relate($tenant, $bouquet, [['addon_product_id' => $card->id]]);
+
+        $service = app(ApiClientKeyService::class);
+        $headers = ['Authorization' => 'Bearer '.$service->issueKey($service->createClient($tenant, 'mobile-app', true), 'default', [])->plainTextToken];
+        $this->assertSame([$card->id], array_column($this->getJson("/commerce/v1/products/{$bouquet->id}", $headers)->assertOk()->json('data.addons'), 'product_id'));
+
+        // يضيف التاجر لاحقاً حقلاً إلزامياً لمنتج الإضافة
+        app(TenantContext::class)->set($tenant->id);
+        app(ProductPersonalizationService::class)->replaceDefinitions($card, $this->requiredField());
+        app(TenantContext::class)->forget();
+
+        $this->assertArrayNotHasKey('addons', $this->getJson("/commerce/v1/products/{$bouquet->id}", $headers)->assertOk()->json('data'));
+        $this->postJson('/commerce/v1/cart/items', ['product_id' => $bouquet->id, 'quantity' => 1, 'addons' => [['product_id' => $card->id]]], $headers)->assertStatus(422);
+    }
+
+    /** @test */
+    public function replacing_locks_the_addon_targets_in_id_order(): void
+    {
+        if (\Illuminate\Support\Facades\DB::connection()->getDriverName() !== 'pgsql') {
+            $this->markTestSkipped('FOR UPDATE يظهر في SQL على PostgreSQL فقط.');
+        }
+
+        $auth = $this->registerTenant('ad-lock', 'owner@ad-lock.test');
+        $bouquet = $this->makeProduct($auth['tenant_id']);
+        $a = $this->makeProduct($auth['tenant_id'], 'أ');
+        $b = $this->makeProduct($auth['tenant_id'], 'ب');
+
+        $queries = [];
+        \Illuminate\Support\Facades\DB::listen(function ($q) use (&$queries) {
+            $queries[] = $q->sql;
+        });
+        $this->withToken($auth['token'])->putJson($this->url($bouquet), ['addons' => [['addon_product_id' => $a->id], ['addon_product_id' => $b->id]]])->assertOk();
+
+        $locked = array_filter($queries, fn ($sql) => str_contains($sql, 'from "products"') && str_contains($sql, '"id" in') && str_contains($sql, 'order by "id"') && str_contains($sql, 'for update'));
+        $this->assertNotEmpty($locked, 'add-on targets were read without a row lock');
+    }
 }
