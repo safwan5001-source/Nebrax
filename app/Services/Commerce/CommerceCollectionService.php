@@ -6,6 +6,7 @@ use App\Models\CommerceCollection;
 use App\Models\CommerceCollectionProduct;
 use App\Models\Product;
 use App\Support\Commerce\CatalogSlug;
+use App\Tenancy\BranchScope;
 use App\Tenancy\TenantContext;
 use DomainException;
 use Illuminate\Database\QueryException;
@@ -159,7 +160,9 @@ final class CommerceCollectionService
                 return null;
             }
 
-            $found = Product::query()->whereIn('id', $productIds)->pluck('id')->all();
+            // المجموعة CompanyWide: تُختار أعضاؤها من كل فروع المستأجر، فيُرفع BranchScope
+            // وحده ويبقى TenantScope ساريّاً (كما في قراءة العضوية العامة).
+            $found = BranchScope::reference(Product::class)->whereIn('id', $productIds)->pluck('id')->all();
             if (count($found) !== count($productIds)) {
                 throw new DomainException('أحد المنتجات المحددة غير موجود لهذا المستأجر.');
             }

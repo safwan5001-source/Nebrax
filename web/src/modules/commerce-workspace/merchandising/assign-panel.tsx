@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Tags } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/toast';
@@ -17,6 +17,9 @@ export function AssignPanel({ t, canManage }: { t: T; canManage: boolean }) {
   const [selected, setSelected] = useState<string[] | null | 'error'>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // المنتج المعروض الآن — نتيجة حفظٍ لمنتجٍ سابق لا تُكتب فوق منتجٍ اختير بعده.
+  const currentProductId = useRef<string | null>(null);
+  currentProductId.current = product?.id ?? null;
 
   const loadAll = useCallback(async () => {
     setFacets((await loadFacets()) ?? 'error');
@@ -48,15 +51,17 @@ export function AssignPanel({ t, canManage }: { t: T; canManage: boolean }) {
 
   async function save() {
     if (!product || saving) return;
+    const savedProductId = product.id;
     setSaving(true);
     setError(null);
-    const result = await replaceProductFacetValueIds(product.id, ids);
+    const result = await replaceProductFacetValueIds(savedProductId, ids);
     setSaving(false);
     if (!result.ok) {
-      setError(writeFailureMessage(result, t));
+      if (currentProductId.current === savedProductId) setError(writeFailureMessage(result, t));
       return;
     }
-    setSelected(result.data);
+    // تغيّر المنتج أثناء الحفظ: الحفظ نجح على الخادم، لكن لوحة المنتج الجديد لا تُمسّ.
+    if (currentProductId.current === savedProductId) setSelected(result.data);
     await loadAll();
     success(t('merchAssignSaved'));
   }
@@ -80,7 +85,7 @@ export function AssignPanel({ t, canManage }: { t: T; canManage: boolean }) {
                 const values = facet.values.filter((v) => v.isActive || ids.includes(v.id));
                 if (values.length === 0) return null;
                 return (
-                  <fieldset key={facet.id} className="space-y-1.5" disabled={!canManage || !facet.isActive && !values.some((v) => ids.includes(v.id))}>
+                  <fieldset key={facet.id} className="space-y-1.5" disabled={!canManage}>
                     <legend className="text-xs font-medium text-text">
                       {facet.name}
                       {!facet.isActive ? ` (${t('merchInactive')})` : ''}
@@ -99,6 +104,8 @@ export function AssignPanel({ t, canManage }: { t: T; canManage: boolean }) {
                               type="checkbox"
                               className="accent-primary"
                               checked={checked}
+                              // عُطّل البُعد: تُزال القيم المُسنَدة فقط، ولا تُضاف قيمٌ جديدة (يرفضها الخادم).
+                              disabled={!facet.isActive && !checked}
                               onChange={() => toggle(value.id)}
                             />
                             <span>{value.name}</span>

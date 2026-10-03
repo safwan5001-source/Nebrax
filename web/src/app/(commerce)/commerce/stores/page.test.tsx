@@ -252,6 +252,90 @@ describe('Commerce stores page — store identity settings', () => {
 });
 
 /**
+ * FLOWERS-H1 — «نوع النشاط» داخل حوار إعدادات المتجر: يعرض الاختيار الحالي،
+ * يرسل `business_vertical` فقط عند تغييره، ويعرض القدرات الموصى بها بحالتها
+ * الحقيقية من الخادم.
+ */
+describe('Commerce stores page — business type (FLOWERS-H1)', () => {
+  afterEach(() => {
+    cleanup();
+    apiMock.mockReset();
+    user.current = { role: 'owner', permissions: undefined };
+  });
+
+  const generalStore = {
+    id: 's1',
+    name: 'My Store',
+    sales_channel_id: 'ch1',
+    is_active: true,
+    preview_url: 'https://my.store.test/',
+    default_locale: 'ar',
+    business_vertical: 'general',
+    vertical_profile: { key: 'general', recommended_capabilities: [] },
+  };
+
+  it('shows both business types with the saved one selected and no recommendations for general', async () => {
+    apiMock.mockResolvedValueOnce({ data: { stores: [generalStore] } });
+    renderPage();
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Store settings' }));
+
+    expect((screen.getByRole('radio', { name: /General retail/ }) as HTMLInputElement).checked).toBe(true);
+    expect((screen.getByRole('radio', { name: /Flowers & Gifts/ }) as HTMLInputElement).checked).toBe(false);
+    expect(screen.getByText(/never deletes products or settings/)).toBeTruthy();
+    expect(screen.queryByText('Recommended for your current business type')).toBeNull();
+  });
+
+  it('sends business_vertical only when the type changed', async () => {
+    apiMock
+      .mockResolvedValueOnce({ data: { stores: [generalStore] } })
+      .mockResolvedValueOnce({ data: { store: { ...generalStore, business_vertical: 'flowers_gifts' } } })
+      .mockResolvedValueOnce({ data: { stores: [{ ...generalStore, business_vertical: 'flowers_gifts' }] } });
+
+    renderPage();
+    await userEvent.click(await screen.findByRole('button', { name: 'Store settings' }));
+    await userEvent.click(screen.getByRole('radio', { name: /Flowers & Gifts/ }));
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(apiMock).toHaveBeenNthCalledWith(2, '/commerce/workspace/storefronts/s1', {
+      method: 'PUT',
+      body: { name: 'My Store', default_locale: 'ar', business_vertical: 'flowers_gifts' },
+    });
+  });
+
+  it('lists the recommended capabilities with honest ready / coming-soon status', async () => {
+    apiMock.mockResolvedValueOnce({
+      data: {
+        stores: [
+          {
+            ...generalStore,
+            business_vertical: 'flowers_gifts',
+            vertical_profile: {
+              key: 'flowers_gifts',
+              recommended_capabilities: [
+                { key: 'occasions', available: true },
+                { key: 'gift_message', available: false },
+                { key: 'unknown_future_capability', available: true },
+              ],
+            },
+          },
+        ],
+      },
+    });
+    renderPage();
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Store settings' }));
+
+    expect((screen.getByRole('radio', { name: /Flowers & Gifts/ }) as HTMLInputElement).checked).toBe(true);
+    expect(screen.getByText('Recommended for your current business type')).toBeTruthy();
+    expect(screen.getByText('Occasions').parentElement?.textContent).toContain('Ready');
+    expect(screen.getByText('Gift message').parentElement?.textContent).toContain('Coming soon');
+    expect(screen.queryByText('unknown_future_capability')).toBeNull();
+  });
+});
+
+/**
  * STORE-ADMIN-LIFECYCLE-1 — Activate/Deactivate on `/commerce/stores`:
  * truthful badge, confirmation before deactivate, storefront-id POSTs (never
  * domain edge URLs), permission gating, and settings remaining on inactive rows.

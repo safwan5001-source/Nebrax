@@ -114,6 +114,32 @@ class CommerceCollectionApiTest extends TestCase
     }
 
     /** @test */
+    public function a_company_wide_collection_can_hold_products_of_every_branch_even_when_products_are_isolated(): void
+    {
+        $auth = $this->registerTenant('col-branches', 'owner@col-branches.test');
+        $main = $this->withToken($auth['token'])->getJson('/api/branches')['data'][0]['id'];
+        $other = $this->withToken($auth['token'])->postJson('/api/branches', ['name' => 'فرع الخبر'])->assertCreated()['data']['id'];
+        $make = fn (string $branch, string $name) => $this->withToken($auth['token'])->withHeaders(['X-Branch-Id' => $branch])
+            ->postJson('/api/products', ['name' => $name, 'type' => 'good', 'sale_price' => 100])->assertCreated()['data']['id'];
+        $inMain = $make($main, 'منتج الرئيسي');
+        $inOther = $make($other, 'منتج الخبر');
+
+        app(TenantContext::class)->set($auth['tenant_id']);
+        \App\Support\BranchSettings::merge(['share_products' => false]);
+        app(TenantContext::class)->forget();
+
+        $collection = $this->createCollection($auth['token']);
+        $url = self::BASE."/{$collection['id']}/products";
+        // الاختبار يمرّر الترويسة كمعامل ثالث لئلا تتسرّب إلى الطلبات التالية.
+        $this->putJson($url, ['product_ids' => [$inMain, $inOther]], [
+            'Authorization' => 'Bearer '.$auth['token'], 'X-Branch-Id' => $main,
+        ])->assertOk();
+
+        $rows = $this->getJson($url, ['Authorization' => 'Bearer '.$auth['token'], 'X-Branch-Id' => $main])->assertOk()->json('data.products');
+        $this->assertSame([$inMain, $inOther], array_column($rows, 'product_id'));
+    }
+
+    /** @test */
     public function membership_is_ordered_idempotent_and_replaces_as_a_set(): void
     {
         $auth = $this->registerTenant('col-members', 'owner@col-members.test');

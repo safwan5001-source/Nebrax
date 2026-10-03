@@ -215,4 +215,62 @@ describe('Merchandising — assigning values to a product', () => {
     );
     expect(await screen.findByText('Classification saved.')).toBeTruthy();
   });
+  async function openProduct(product: { id: string; sku: string; name: string }, assigned: string[], facets: unknown[]) {
+    apiMock.mockResolvedValueOnce({
+      data: [{ ...product, name_en: null, is_active: true, is_published: true, stores: [] }],
+      meta: { current_page: 1, last_page: 1, per_page: 10, total: 1 },
+    });
+    const search = await screen.findByLabelText('Search a product by name or SKU');
+    await userEvent.clear(search);
+    await userEvent.type(search, product.sku.toLowerCase());
+    expect(await screen.findByText(product.name, undefined, { timeout: 3000 })).toBeTruthy();
+    apiMock.mockResolvedValueOnce({ data: { value_ids: assigned } });
+    await userEvent.click(screen.getByRole('button', { name: 'Edit' }));
+    void facets;
+  }
+
+  it('never offers new values of a deactivated dimension, but keeps assigned ones removable', async () => {
+    const inactive = {
+      ...occasion,
+      is_active: false,
+      values: [
+        { id: 'v1', slug: 'birthday', name: 'Birthday', name_en: null, sort_order: 0, is_active: true, product_count: 1 },
+        { id: 'v2', slug: 'wedding', name: 'Wedding', name_en: null, sort_order: 1, is_active: true, product_count: 0 },
+      ],
+    };
+    apiMock.mockResolvedValueOnce({ data: { facets: [inactive] } });
+    renderPage();
+    apiMock.mockResolvedValueOnce({ data: { facets: [inactive] } });
+    await userEvent.click(await screen.findByRole('tab', { name: 'Assign products' }));
+    await openProduct({ id: 'p1', sku: 'ROSE-1', name: 'Red roses' }, ['v1'], [inactive]);
+
+    const assigned = (await screen.findByRole('checkbox', { name: 'Birthday' })) as HTMLInputElement;
+    await waitFor(() => expect(assigned.checked).toBe(true));
+    expect(assigned.disabled).toBe(false);
+    expect((screen.getByRole('checkbox', { name: 'Wedding' }) as HTMLInputElement).disabled).toBe(true);
+  });
+
+  it('ignores a save result that arrives after another product was selected', async () => {
+    apiMock.mockResolvedValueOnce({ data: { facets: [occasion] } });
+    renderPage();
+    apiMock.mockResolvedValueOnce({ data: { facets: [occasion] } });
+    await userEvent.click(await screen.findByRole('tab', { name: 'Assign products' }));
+    await openProduct({ id: 'p1', sku: 'ROSE-1', name: 'Red roses' }, ['v1'], [occasion]);
+    await waitFor(() => expect((screen.getByRole('checkbox', { name: 'Birthday' }) as HTMLInputElement).checked).toBe(true));
+
+    let finishSave: (value: unknown) => void = () => undefined;
+    apiMock.mockImplementationOnce(() => new Promise((resolve) => { finishSave = resolve; })); // PUT for p1 stays pending
+    await userEvent.click(screen.getByRole('button', { name: 'Save assignment' }));
+
+    await openProduct({ id: 'p2', sku: 'TULIP-1', name: 'Tulips' }, ['v2'], [occasion]);
+    await waitFor(() => expect((screen.getByRole('checkbox', { name: 'Wedding' }) as HTMLInputElement).checked).toBe(true));
+
+    apiMock.mockResolvedValueOnce({ data: { facets: [occasion] } }); // refresh after the late save
+    finishSave({ data: { value_ids: ['v1'] } });
+    await waitFor(() => expect(apiMock).toHaveBeenCalledWith('/commerce/workspace/products/p1/facets', expect.anything()));
+
+    // لوحة المنتج الثاني لم تُستبدل بنتيجة المنتج الأول
+    expect((screen.getByRole('checkbox', { name: 'Wedding' }) as HTMLInputElement).checked).toBe(true);
+    expect((screen.getByRole('checkbox', { name: 'Birthday' }) as HTMLInputElement).checked).toBe(false);
+  });
 });

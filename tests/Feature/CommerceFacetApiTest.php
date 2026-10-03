@@ -154,6 +154,24 @@ class CommerceFacetApiTest extends TestCase
     }
 
     /** @test */
+    public function facet_assignments_never_block_a_true_product_delete_and_are_cleaned_with_it(): void
+    {
+        $auth = $this->registerTenant('fx-life', 'owner@fx-life.test');
+        $value = $this->createValue($auth['token'], $this->createFacet($auth['token'])['id']);
+        $product = $this->makeProduct($auth['tenant_id']);
+        $this->withToken($auth['token'])
+            ->putJson("/api/commerce/workspace/products/{$product->id}/facets", ['value_ids' => [$value['id']]])
+            ->assertOk();
+
+        app(TenantContext::class)->set($auth['tenant_id']);
+        app(\App\Services\ProductLifecycleService::class)->delete($product, null);
+
+        $this->assertSame(0, CommerceProductFacetValue::query()->count());
+        $this->assertSame(1, CommerceFacetValue::query()->count(), 'the value itself is catalog taxonomy and survives');
+        app(TenantContext::class)->forget();
+    }
+
+    /** @test */
     public function a_foreign_tenant_value_or_product_is_rejected_and_writes_nothing(): void
     {
         $a = $this->registerTenant('fx-iso-a', 'owner@fx-iso-a.test');
