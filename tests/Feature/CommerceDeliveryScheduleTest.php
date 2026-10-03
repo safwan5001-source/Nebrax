@@ -568,42 +568,64 @@ class CommerceDeliveryScheduleTest extends TestCase
     }
 
     /** @test */
-    public function the_mobile_channel_is_configurable_through_its_own_admin_path_and_is_served_by_the_mobile_endpoint(): void
+    public function the_mobile_admin_path_targets_the_same_canonical_channel_the_mobile_endpoint_serves(): void
     {
         $store = $this->store('ds-mobile-admin');
         $other = $this->store('ds-mobile-admin-b');
+        $tenant = Tenant::query()->findOrFail($store['tenant_id']);
+
         app(TenantContext::class)->set($store['tenant_id']);
-        $mobile = SalesChannel::create(['slug' => 'mobile', 'name' => 'جوال', 'type' => SalesChannel::TYPE_MOBILE, 'is_active' => true]);
-        $inactive = SalesChannel::create(['slug' => 'mobile-old', 'name' => 'قديم', 'type' => SalesChannel::TYPE_MOBILE, 'is_active' => false]);
+        // قناتان نشطتان: الأقدم هي المعتمدة (كما تحسمها ResolveCommerceChannel)
+        $older = SalesChannel::create(['slug' => 'mobile-a', 'name' => 'جوال قديم', 'type' => SalesChannel::TYPE_MOBILE, 'is_active' => true]);
+        $newer = SalesChannel::create(['slug' => 'mobile-b', 'name' => 'جوال جديد', 'type' => SalesChannel::TYPE_MOBILE, 'is_active' => true]);
+        \Illuminate\Support\Facades\DB::table('sales_channels')->where('id', $older->id)->update(['created_at' => '2026-01-01 00:00:00']);
+        \Illuminate\Support\Facades\DB::table('sales_channels')->where('id', $newer->id)->update(['created_at' => '2026-06-01 00:00:00']);
         app(TenantContext::class)->forget();
         app(TenantContext::class)->set($other['tenant_id']);
         $foreignMobile = SalesChannel::create(['slug' => 'mobile', 'name' => 'جوال ب', 'type' => SalesChannel::TYPE_MOBILE, 'is_active' => true]);
         app(TenantContext::class)->forget();
-        $url = fn (string $id, string $suffix = '') => "/api/commerce/workspace/mobile-channels/{$id}/delivery-schedule{$suffix}";
+        $url = fn (string $suffix = '') => "/api/commerce/workspace/mobile-channel/delivery-schedule{$suffix}";
 
-        $this->withToken($store['token'])->putJson($url($mobile->id, '/settings'), ['is_enabled' => true, 'max_days_ahead' => 5])->assertOk();
-        $this->withToken($store['token'])->putJson($url($mobile->id, '/slots'), ['slots' => [['method' => 'delivery', 'label' => 'مساءً', 'start_time' => '23:00', 'end_time' => '23:59']]])->assertOk();
-        $doc = $this->withToken($store['token'])->putJson($url($mobile->id, '/blocked-dates'), ['blocked_dates' => [['date' => '2030-01-01']]])->assertOk();
+        $this->withToken($store['token'])->putJson($url('/settings'), ['is_enabled' => true, 'max_days_ahead' => 5])->assertOk();
+        $this->withToken($store['token'])->putJson($url('/slots'), ['slots' => [['method' => 'delivery', 'label' => 'مساءً', 'start_time' => '23:00', 'end_time' => '23:59']]])->assertOk();
+        $doc = $this->withToken($store['token'])->putJson($url('/blocked-dates'), ['blocked_dates' => [['date' => '2030-01-01']]])->assertOk();
         $this->assertTrue($doc->json('data.settings.enabled'));
         $this->assertSame('مساءً', $doc->json('data.slots.0.label'));
 
-        // السياسة على قناة الجوال وحدها: القناة الويب للمستأجر نفسه بقيت معطّلة
-        $this->assertFalse($this->withToken($store['token'])->getJson($this->url($store))->json('data.settings.enabled'));
-
-        // الخدمة ترى سياسة قناة الجوال (وهي التي يخدمها /commerce/v1/delivery-schedule)
+        // كُتبت للقناة المعتمدة (الأقدم) وحدها؛ لا الأحدث ولا الويب ولا قناة مستأجر آخر
         app(TenantContext::class)->set($store['tenant_id']);
-        $this->assertTrue(app(CommerceDeliveryScheduleService::class)->options($mobile->id, 'delivery')['enabled']);
+        $service = app(CommerceDeliveryScheduleService::class);
+        $this->assertTrue($service->settings($older->id)['enabled']);
+        $this->assertFalse($service->settings($newer->id)['enabled']);
+        $this->assertFalse($service->settings($store['channel_id'])['enabled']);
+        app(TenantContext::class)->forget();
+        app(TenantContext::class)->set($other['tenant_id']);
+        $this->assertFalse(app(CommerceDeliveryScheduleService::class)->settings($foreignMobile->id)['enabled']);
         app(TenantContext::class)->forget();
 
-        // قناة غير نشطة، قناة مستأجر آخر، ومعرّف قناة ويب: 404 غير كاشف
-        $this->withToken($store['token'])->getJson($url($inactive->id))->assertNotFound();
-        $this->withToken($store['token'])->getJson($url($foreignMobile->id))->assertNotFound();
-        $this->withToken($store['token'])->putJson($url($foreignMobile->id, '/settings'), ['is_enabled' => true])->assertNotFound();
-        $this->withToken($store['token'])->getJson($url($store['channel_id']))->assertNotFound();
+        // وهي نفسها ما يقرأه /commerce/v1/delivery-schedule فعلاً
+        $keys = app(ApiClientKeyService::class);
+        $headers = ['Authorization' => 'Bearer '.$keys->issueKey($keys->createClient($tenant, 'mobile-app', true), 'default', [])->plainTextToken];
+        $public = $this->getJson('/commerce/v1/delivery-schedule', $headers)->assertOk();
+        $this->assertTrue($public->json('data.enabled'));
+        $this->assertNotEmpty($public->json('data.dates'));
 
-        // RBAC نفسه
+        // قراءة الإدارة تعكس السياسة المكتوبة، والأذونات كما هي
+        $this->assertSame('مساءً', $this->withToken($store['token'])->getJson($url())->assertOk()->json('data.slots.0.label'));
         $staff = $this->tokenForRole($store['tenant_id'], 'staff', 'staff@ds-mobile-admin.test');
-        $this->withToken($staff)->getJson($url($mobile->id))->assertForbidden();
+        $this->withToken($staff)->getJson($url())->assertForbidden();
+    }
+
+    /** @test */
+    public function the_mobile_admin_path_is_a_404_when_the_tenant_has_no_active_mobile_channel(): void
+    {
+        $store = $this->store('ds-mobile-none');
+        app(TenantContext::class)->set($store['tenant_id']);
+        SalesChannel::create(['slug' => 'mobile-off', 'name' => 'متوقف', 'type' => SalesChannel::TYPE_MOBILE, 'is_active' => false]);
+        app(TenantContext::class)->forget();
+
+        $this->withToken($store['token'])->getJson('/api/commerce/workspace/mobile-channel/delivery-schedule')->assertNotFound();
+        $this->withToken($store['token'])->putJson('/api/commerce/workspace/mobile-channel/delivery-schedule/settings', ['is_enabled' => true])->assertNotFound();
     }
 
     /** @test */

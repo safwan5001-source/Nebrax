@@ -2,7 +2,6 @@
 
 namespace App\Http\Middleware;
 
-use App\Models\SalesChannel;
 use App\Services\Commerce\MobileSalesChannelResolver;
 use App\Tenancy\TenantContext;
 use Closure;
@@ -60,12 +59,7 @@ class ResolveCommerceChannel
             abort(404, 'تعذّر تحديد قناة جوال صالحة.');
         }
 
-        $channel = SalesChannel::query()
-            ->where('tenant_id', $tenantId)
-            ->where('type', SalesChannel::TYPE_MOBILE)
-            ->where('is_active', true)
-            ->orderBy('created_at')
-            ->first();
+        $channel = $this->resolver->canonicalForTenant($tenantId);
 
         if ($channel === null) {
             abort(404, 'تعذّر تحديد قناة جوال صالحة لهذا المستأجر.');

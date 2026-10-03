@@ -5,9 +5,9 @@ namespace App\Http\Controllers\Api;
 use App\Models\CommerceDeliveryBlockedDate;
 use App\Models\CommerceDeliveryScheduleSetting;
 use App\Models\CommerceDeliverySlot;
-use App\Models\SalesChannel;
 use App\Models\Storefront;
 use App\Services\Commerce\CommerceDeliveryScheduleService;
+use App\Services\Commerce\MobileSalesChannelResolver;
 use App\Tenancy\TenantContext;
 use DomainException;
 use Illuminate\Http\JsonResponse;
@@ -17,13 +17,13 @@ use PDOException;
 use RuntimeException;
 
 /**
- * FLOWERS-H7a / ADR-19 — إدارة سياسة جدولة التسليم لقناة متجر ويب أو قناة جوال. `{id}` محدِّد متجر (أو قناة جوال) فقط؛ الملكية عبر
+ * FLOWERS-H7a / ADR-19 — إدارة سياسة جدولة التسليم لقناة متجر ويب أو لقناة الجوال المعتمدة. `{id}` محدِّد متجر فقط (ولا معرّف لمسار الجوال)؛ الملكية عبر
  * `TenantContext` (404 غير كاشف). كتابةٌ بـ`commerce.manage` ولا مفتاح قناة/مستأجر من العميل — القناة
  * تُشتقّ من المتجر الموثوق (كـ`CommerceGiftSettingsController`).
  */
 final class CommerceDeliveryScheduleController extends ApiController
 {
-    public function show(Request $request, CommerceDeliveryScheduleService $schedule, string $id): JsonResponse
+    public function show(Request $request, CommerceDeliveryScheduleService $schedule, ?string $id = null): JsonResponse
     {
         $this->denySelfService($request);
         $channelId = $this->ownedChannelId($request, $id);
@@ -31,7 +31,7 @@ final class CommerceDeliveryScheduleController extends ApiController
         return response()->json(['data' => $this->document($schedule, $channelId)]);
     }
 
-    public function updateSettings(Request $request, CommerceDeliveryScheduleService $schedule, string $id): JsonResponse
+    public function updateSettings(Request $request, CommerceDeliveryScheduleService $schedule, ?string $id = null): JsonResponse
     {
         $this->denySelfService($request);
         $data = $request->validate([
@@ -55,7 +55,7 @@ final class CommerceDeliveryScheduleController extends ApiController
         return response()->json(['data' => $this->document($schedule, $channelId)]);
     }
 
-    public function replaceSlots(Request $request, CommerceDeliveryScheduleService $schedule, string $id): JsonResponse
+    public function replaceSlots(Request $request, CommerceDeliveryScheduleService $schedule, ?string $id = null): JsonResponse
     {
         $this->denySelfService($request);
         $data = $request->validate([
@@ -82,7 +82,7 @@ final class CommerceDeliveryScheduleController extends ApiController
         return response()->json(['data' => $this->document($schedule, $channelId)]);
     }
 
-    public function replaceBlockedDates(Request $request, CommerceDeliveryScheduleService $schedule, string $id): JsonResponse
+    public function replaceBlockedDates(Request $request, CommerceDeliveryScheduleService $schedule, ?string $id = null): JsonResponse
     {
         $this->denySelfService($request);
         $data = $request->validate([
@@ -113,11 +113,12 @@ final class CommerceDeliveryScheduleController extends ApiController
     }
 
     /**
-     * قناة السياسة: لمتجر ويب (`storefronts/{id}`: القناة تُشتقّ من المتجر الموثوق) أو لقناة جوال
-     * (`mobile-channels/{id}`: معرّف `SalesChannel` من نوع mobile ونشط). كلاهما بنطاق المستأجر و404 غير كاشف؛
-     * لا مفتاح قناة يُقبل من الجسم، فلا يمكن توجيه السياسة إلى قناة مستأجر آخر ولا إلى نوع قناة غير مقصود.
+     * قناة السياسة: لمتجر ويب (`storefronts/{id}`: القناة تُشتقّ من المتجر الموثوق) أو لقناة الجوال المعتمدة للمستأجر
+     * (`mobile-channel`: بلا معرّف — هي نفسها التي تخدمها `/commerce/v1` عبر `MobileSalesChannelResolver::
+     * canonicalForTenant`، فلا تُكتب سياسة لقناةٍ لا يخدمها أي طلب عام). بنطاق المستأجر و404 غير كاشف؛ لا مفتاح
+     * قناة يُقبل من العميل أصلاً.
      */
-    private function ownedChannelId(Request $request, string $id): string
+    private function ownedChannelId(Request $request, ?string $id): string
     {
         $tenantId = app(TenantContext::class)->id();
         if ($tenantId === null) {
@@ -125,8 +126,8 @@ final class CommerceDeliveryScheduleController extends ApiController
         }
 
         if (($request->route()?->defaults['channel'] ?? null) === 'mobile') {
-            $channel = SalesChannel::query()->whereKey($id)->where('type', SalesChannel::TYPE_MOBILE)->where('is_active', true)->first();
-            abort_if($channel === null || $channel->tenant_id !== $tenantId, 404, 'قناة الجوال غير موجودة.');
+            $channel = app(MobileSalesChannelResolver::class)->canonicalForTenant($tenantId);
+            abort_if($channel === null, 404, 'لا توجد قناة جوال نشطة.');
 
             return $channel->id;
         }
