@@ -241,6 +241,41 @@ describe('Merchandising — product picker pagination', () => {
   });
 });
 
+describe('Merchandising — toggles and stale paging', () => {
+  it('explains a failed activation instead of silently snapping back', async () => {
+    apiMock
+      .mockResolvedValueOnce({ data: { facets: [occasion] } })
+      .mockRejectedValueOnce(new Error('network'))
+      .mockResolvedValueOnce({ data: { facets: [occasion] } });
+    renderPage();
+
+    await userEvent.click(await screen.findByRole('switch', { name: 'Disable Occasion' }));
+    expect(await screen.findByText('Could not save. Please try again.')).toBeTruthy();
+  });
+
+  it('drops a pending "Show more" response once the search text changed', async () => {
+    apiMock.mockResolvedValueOnce({ data: { facets: [occasion] } });
+    renderPage();
+    apiMock.mockResolvedValueOnce({ data: { facets: [occasion] } });
+    await userEvent.click(await screen.findByRole('tab', { name: 'Assign products' }));
+
+    const row = (id: string, name: string) => ({ id, name, sku: null, name_en: null, is_active: true, is_published: true, stores: [] });
+    apiMock.mockResolvedValueOnce({ data: [row('p1', 'Rose A')], meta: { current_page: 1, last_page: 2, per_page: 10, total: 11 } });
+    const search = await screen.findByLabelText('Search a product by name or SKU');
+    await userEvent.type(search, 'rose');
+    expect(await screen.findByText('Rose A', undefined, { timeout: 3000 })).toBeTruthy();
+
+    let finish: (value: unknown) => void = () => undefined;
+    apiMock.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
+    await userEvent.click(screen.getByRole('button', { name: 'Show more' }));
+
+    await userEvent.clear(search);
+    finish({ data: [row('p9', 'Stale Rose')], meta: { current_page: 2, last_page: 2, per_page: 10, total: 11 } });
+    await waitFor(() => expect(screen.queryByText('Rose A')).toBeNull());
+    expect(screen.queryByText('Stale Rose')).toBeNull();
+  });
+});
+
 describe('Merchandising — assign tab', () => {
   it('guides to create dimensions first when there are none', async () => {
     apiMock.mockResolvedValueOnce({ data: { facets: [] } }); // facets tab

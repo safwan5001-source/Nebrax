@@ -36,6 +36,7 @@ export function FacetsPanel({ t, canManage }: { t: T; canManage: boolean }) {
   const [facets, setFacets] = useState<Facet[] | null | 'error'>(null);
   const [dialog, setDialog] = useState<Dialog | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [toggleError, setToggleError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     const result = await loadFacets();
@@ -48,14 +49,18 @@ export function FacetsPanel({ t, canManage }: { t: T; canManage: boolean }) {
 
   const toggleFacet = async (facet: Facet) => {
     setBusyId(facet.id);
-    await updateFacet(facet.id, { isActive: !facet.isActive });
+    setToggleError(null);
+    const result = await updateFacet(facet.id, { isActive: !facet.isActive });
+    if (!result.ok) setToggleError(writeFailureMessage(result, t));
     await load();
     setBusyId(null);
   };
 
   const toggleValue = async (facet: Facet, value: FacetValue) => {
     setBusyId(value.id);
-    await updateFacetValue(facet.id, value.id, { isActive: !value.isActive });
+    setToggleError(null);
+    const result = await updateFacetValue(facet.id, value.id, { isActive: !value.isActive });
+    if (!result.ok) setToggleError(writeFailureMessage(result, t));
     await load();
     setBusyId(null);
   };
@@ -93,6 +98,10 @@ export function FacetsPanel({ t, canManage }: { t: T; canManage: boolean }) {
           </div>
         ) : null}
       </div>
+
+      {toggleError ? (
+        <p role="alert" className="rounded bg-negative/10 px-3 py-2 text-xs text-negative">{toggleError}</p>
+      ) : null}
 
       {facets.length === 0 ? (
         <EmptyState icon={Layers} title={t('merchFacetsEmptyTitle')} description={t('merchFacetsEmptyDescription')} />

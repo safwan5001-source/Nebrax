@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -32,6 +32,9 @@ export function ProductPicker({
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
+  // الاستعلام الحالي — استجابة «عرض المزيد» لاستعلامٍ قديم تُهمل.
+  const currentSearch = useRef(search);
+  currentSearch.current = search;
 
   useEffect(() => {
     setPage(1);
@@ -64,9 +67,11 @@ export function ProductPicker({
 
   async function loadMore() {
     if (loadingMore) return;
+    const requestedSearch = search;
     setLoadingMore(true);
     try {
-      const next = await loadProductPublicationList({ search, perPage: 10, page: page + 1 });
+      const next = await loadProductPublicationList({ search: requestedSearch, perPage: 10, page: page + 1 });
+      if (currentSearch.current !== requestedSearch) return;
       setResults((current) => [
         ...(current ?? []),
         ...next.items.filter((item) => !(current ?? []).some((c) => c.id === item.id)).map((item) => ({ id: item.id, name: item.name, sku: item.sku })),
@@ -75,7 +80,7 @@ export function ProductPicker({
       setHasMore(next.meta.currentPage < next.meta.lastPage);
       setFailed(false);
     } catch {
-      setFailed(true);
+      if (currentSearch.current === requestedSearch) setFailed(true);
     } finally {
       setLoadingMore(false);
     }
