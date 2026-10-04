@@ -8,6 +8,7 @@ for (const [loc, widths] of [['ar', [390, 430, 768, 1024, 1280, 1440]], ['en', [
     clearLimit();
     const page = await ctx.newPage();
     await page.goto(`http://a.h48.test:3001/sa/${loc}`, { waitUntil: 'networkidle', timeout: 90000 });
+    await page.waitForSelector('[data-offer-card]', { timeout: 5000 }).catch(() => {});
     await page.addStyleTag({ content: 'nextjs-portal{display:none!important}' });
     const sec = page.locator('section[aria-labelledby]').filter({ has: page.locator('[data-offer-card]') });
     const n = await sec.count();

@@ -73,7 +73,7 @@ await pub.close();
 const b2 = await browser(['--host-resolver-rules=MAP *.h48.test 127.0.0.1']);
 const pp = await (await b2.newContext({ viewport: { width: 1440, height: 1000 } })).newPage();
 const pubReqs = []; pp.on('request', (r) => { if (/\/store\/v1\/offers/.test(r.url())) pubReqs.push(r.url()); });
-const readPub = async (host) => { await pp.goto(`http://${host}:3001/sa/ar`, { waitUntil: 'networkidle', timeout: 90000 }); const secs = pp.locator('section[aria-labelledby]').filter({ has: pp.locator('[data-offer-card]') });
+const readPub = async (host) => { await pp.goto(`http://${host}:3001/sa/ar`, { waitUntil: 'networkidle', timeout: 90000 }); await pp.waitForSelector('[data-offer-card]', { timeout: 5000 }).catch(() => {}); const secs = pp.locator('section[aria-labelledby]').filter({ has: pp.locator('[data-offer-card]') });
   const out = []; for (let i = 0; i < await secs.count(); i++) out.push(await secs.nth(i).locator('[data-offer-card]').evaluateAll(els => els.map(e => ({ t: e.innerText.replace(/\n/g,' | '), price: e.querySelector('[data-offer-price]')?.textContent, ref: e.querySelector('[data-offer-reference]')?.textContent, badge: e.querySelector('[data-offer-badge]')?.textContent })))); return out; };
 const pubA = await readPub('a.h48.test'); await pp.screenshot({ path: `${OUT}/27-published-A.png`, fullPage: true });
 log('   published A sections:', JSON.stringify(pubA.map(s => s.map(c => c.t.slice(0, 60)))));
@@ -95,6 +95,7 @@ await page.getByRole('button', { name: 'حفظ المسودة' }).click(); await
 ok((await cardNames(0)).length === 1, 'draft S1 now has 1 card');
 const b3 = await browser(['--host-resolver-rules=MAP *.h48.test 127.0.0.1']); const p3 = await (await b3.newContext()).newPage();
 await p3.goto('http://a.h48.test:3001/sa/ar', { waitUntil: 'networkidle', timeout: 90000 });
+await p3.waitForSelector('[data-offer-card]', { timeout: 5000 }).catch(() => {});
 const n = await p3.locator('section[aria-labelledby]').filter({ has: p3.locator('[data-offer-card]') }).first().locator('[data-offer-card]').count();
 ok(n === 2, 'published S1 still has 2 cards (draft did not leak)'); await b3.close();
 log('8. delete offer A2 -> cleans references in BOTH instances');
