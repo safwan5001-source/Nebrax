@@ -1,6 +1,6 @@
 # AWJ Flowers & Gifts — Horizon 1 Progress
 
-**Status:** IN PROGRESS — H1–H11 merged; H12 in review  
+**Status:** IN PROGRESS — H1–H12 merged; H13 in review  
 **Date:** 2026-10-03  
 **Planning Base:** `main` @ `318cc72d10bb304cef4b401f548772008ea1618e`  
 **Execution Authority:** `AWJ_FLOWERS_HORIZON_1_AUTONOMOUS_EXECUTION.md`  
@@ -49,8 +49,8 @@ No Deploy or Production change is authorized by this Horizon.
 | H9c | Store Builder — builder UI (library, editors, canvas); default document intentionally unchanged | MERGED | #1216 | `4bb8d17` |
 | H10 | Storefront Discovery UX — gifting filters on the listing | MERGED | #1217 | `6e98a01` |
 | H11 | Flowers/Gifts PDP — gifting blocks on the product page | MERGED | #1218 | `6c7b81e` |
-| H12 | Cart & Checkout Gifting UX — cart/order lines (H12a), schedule + gift checkout stages (H12b) | PR OPEN, in review | (see log) | — |
-| H13 | Account / Saved Recipient / Order Experience | NOT STARTED | — | — |
+| H12 | Cart & Checkout Gifting UX — cart/order lines (H12a), schedule + gift checkout stages (H12b) | MERGED | #1219 | `1f15d5f` |
+| H13 | Account / Saved Recipient / Order Experience (ADR-24) | PR OPEN, in review | (see log) | — |
 | H14 | Vertical Onboarding & Defaults | NOT STARTED | — | — |
 | H15 | Theme / Presentation Pack | NOT STARTED | — | — |
 | H16 | Cross-Horizon Integration / Polish | NOT STARTED | — | — |
@@ -641,7 +641,7 @@ Copy this section for every completed/active slice.
 
 ### H12 — Cart & Checkout Gifting UX (ADR-23)
 
-**Status:** PR OPEN, in review (two commits: H12a lines, H12b checkout stages)  
+**Status:** MERGED — PR #1219, squash `1f15d5f421203fcd1d6707dfd05ef28205786b4c`; head `a5117336521a07d3c76804561af5f1c33083e653`; CI 8/8 green (sqlite + pgsql, storefront, both visual QA); no review threads (Codex out of quota)  
 **Base SHA:** `6c7b81eb756dfffc82afa6a4d8a37135a9c94919` (main after H11)  
 **Branch:** `flowers/h12-cart-checkout-gifting`  
 
@@ -685,3 +685,14 @@ MERGES: only according to Horizon authorization
 DEPLOY: NOT PERFORMED
 PRODUCTION: NOT CHANGED
 ```
+
+### H13 — Account order experience (ADR-24)
+
+**Status:** PR in review  
+**Base SHA:** `1f15d5f421203fcd1d6707dfd05ef28205786b4c` (main after H12)  
+**Branch:** `flowers/h13-account-order-gifting`
+
+- **Built.** `OrderGiftingDetails` — the requested date/window and the gift card of a placed order — shared by the confirmation screen and the account order detail; the account detail also nests add-ons under their own bouquet. Fixture `ACCOUNT_GIFT_ORDER_PREVIEW` and a `order-detail-gift` surface on the dev preview. Storefront suite 1001 green; AR mobile and EN desktop reviewed in a browser.
+- **Evidence-driven scope.** `store/v1` is anonymous and every storefront account capability is `design_only`; the commerce customer address book already pairs recipient name + phone with a destination. So saved recipients (would duplicate it and need identity), re-order (needs server re-pricing/availability) and wishlist (shared capability not ready) are **DEFERRED** with the reasons and the safe path recorded in ADR-24; no timeline state is invented.
+- **Residual.** The account order detail remains gated by `ACCOUNT_ORDER_LOOKUP_CAPABILITY`; it lights up when a storefront customer-identity contract lands.
+

@@ -5,9 +5,10 @@ import Link from "next/link";
 import { useLocale, useTranslations } from "next-intl";
 import { AccountOrderStatus } from "@/components/account/AccountOrderStatus";
 import { awjOrderLineView, CartLine } from "@/components/cart/CartLine";
+import { OrderGiftingDetails } from "@/components/orders/OrderGiftingDetails";
 import { useCartLineImages } from "@/hooks/useCartLineImages";
 import { localeDirection } from "@/i18n/locales";
-import { formatMinorAmount } from "@/lib/commerce/cart-types";
+import { formatMinorAmount, lineGroups } from "@/lib/commerce/cart-types";
 import {
   AWJ_DELIVERY_METHODS,
   type StorefrontOrder,
@@ -108,17 +109,28 @@ export function AccountOrderDetail({
           {t("orderItems")}
         </h2>
         <ul className="mt-1 divide-y divide-store-border">
-          {order.items.map((item, index) => (
-            <li key={`${item.productId ?? "item"}-${index}`}>
-              <CartLine
-                view={awjOrderLineView(
-                  item,
-                  index,
-                  basePath,
-                  item.productId ? images[item.productId] : null,
-                )}
-                density="summary"
-              />
+          {lineGroups(
+            order.items.map((item, index) => ({ item, index })),
+            {
+              id: ({ item }) => item.lineId,
+              parent: ({ item }) => item.addonOf,
+            },
+          ).map(({ line, addons }) => (
+            <li
+              key={`${line.item.lineId ?? line.item.productId ?? "item"}-${line.index}`}
+            >
+              {[line, ...addons].map(({ item, index }) => (
+                <CartLine
+                  key={`${item.lineId ?? item.productId ?? "item"}-${index}`}
+                  view={awjOrderLineView(
+                    item,
+                    index,
+                    basePath,
+                    item.productId ? images[item.productId] : null,
+                  )}
+                  density="summary"
+                />
+              ))}
             </li>
           ))}
         </ul>
@@ -134,6 +146,12 @@ export function AccountOrderDetail({
           {tawj("success.notPaidNote")}
         </p>
       </section>
+
+      {(order.gift || order.schedule) && (
+        <div className="mt-6 border-t border-store-border pt-5">
+          <OrderGiftingDetails order={order} className="" />
+        </div>
+      )}
 
       <div className="mt-6 grid grid-cols-1 gap-6 border-t border-store-border pt-5 sm:grid-cols-2">
         <div>
