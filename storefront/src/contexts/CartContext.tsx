@@ -17,6 +17,7 @@ import type {
   StorefrontCart,
   StorefrontCartLine,
 } from "@/lib/commerce/cart-types";
+import type { PdpSelections } from "@/lib/commerce/pdp-gifting";
 import {
   addAwjItem,
   addToCart as addToCartAction,
@@ -60,6 +61,7 @@ interface CartContextType {
     quantity?: number,
     unitKey?: string,
     variantId?: string | null,
+    selections?: PdpSelections,
   ) => Promise<void>;
   updateItem: (lineItemId: string, quantity: number) => Promise<void>;
   removeItem: (lineItemId: string) => Promise<void>;
@@ -136,6 +138,7 @@ export function CartProvider({
       quantity = 1,
       unitKey?: string,
       variantId?: string | null,
+      selections?: PdpSelections,
     ) => {
       await mutateCart(
         () =>
@@ -144,7 +147,7 @@ export function CartProvider({
               // chosen variant, because `store/v1` takes both. On the Spree
               // surface `id` is already a variant id and there is no second
               // identifier to pass.
-              addAwjItem(id, quantity, unitKey ?? "base", variantId)
+              addAwjItem(id, quantity, unitKey ?? "base", variantId, selections)
             : addToCartAction(id, quantity, surface),
         t("failedToAddItem"),
         () => setIsOpen(true),

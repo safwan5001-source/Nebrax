@@ -357,6 +357,7 @@ describe("cart server actions", () => {
         2,
         "unit:xyz",
         undefined,
+        undefined,
       );
       expect(result).toEqual({ success: true, cart: awjCart });
       expect(mockClient.carts.items.create).not.toHaveBeenCalled();
@@ -373,6 +374,7 @@ describe("cart server actions", () => {
         1,
         "base",
         "variant-9",
+        undefined,
       );
     });
 

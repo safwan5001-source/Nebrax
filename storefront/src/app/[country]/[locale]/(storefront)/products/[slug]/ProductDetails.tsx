@@ -12,6 +12,10 @@ import { StoreContainer } from "@/components/layout/StoreContainer";
 import { HiddenPricePrompt } from "@/components/products/HiddenPricePrompt";
 import { MediaGallery } from "@/components/products/MediaGallery";
 import { ProductCustomFields } from "@/components/products/ProductCustomFields";
+import { AddonPicker, addonKey } from "@/components/products/pdp/AddonPicker";
+import { ContentBlocks } from "@/components/products/pdp/ContentBlocks";
+import { DeliveryPromiseNote } from "@/components/products/pdp/DeliveryPromiseNote";
+import { PersonalizationFields } from "@/components/products/pdp/PersonalizationFields";
 import { ShareButton } from "@/components/products/ShareButton";
 import { VariantPicker } from "@/components/products/VariantPicker";
 import { WishlistButton } from "@/components/products/WishlistButton";
@@ -20,6 +24,12 @@ import { useCart } from "@/contexts/CartContext";
 import { useHiddenPricing } from "@/contexts/HiddenPricingContext";
 import { useStore } from "@/contexts/StoreContext";
 import { trackAddToCart, trackViewItem } from "@/lib/analytics/gtm";
+import {
+  EMPTY_PRODUCT_GIFTING,
+  missingRequiredFields,
+  type PdpSelections,
+  type ProductGifting,
+} from "@/lib/commerce/pdp-gifting";
 import type {
   PagePresentation,
   ProductPageRegionKey,
@@ -108,6 +118,25 @@ export function ProductDetails({
 
   const [quantity, setQuantity] = useState(1);
   const [loading, setLoading] = useState(false);
+
+  /*
+   * FLOWERS-H11 — gifting blocks exist on the AWJ (DTC) catalog only; the
+   * wholesale/Spree product has none. Empty for any product without them, so
+   * every existing PDP renders exactly as before.
+   */
+  const gifting: ProductGifting =
+    surface === "wholesale"
+      ? EMPTY_PRODUCT_GIFTING
+      : ((product as { gifting?: ProductGifting }).gifting ??
+        EMPTY_PRODUCT_GIFTING);
+  const [personalizationValues, setPersonalizationValues] = useState<
+    Record<string, string>
+  >({});
+  const [addonQuantities, setAddonQuantities] = useState<
+    Record<string, number>
+  >({});
+  const [showPersonalizationErrors, setShowPersonalizationErrors] =
+    useState(false);
 
   // Track product view (analytics - client-only side effect)
   useEffect(() => {
@@ -199,8 +228,49 @@ export function ProductDetails({
       // so a mis-wired caller cannot post a parent id for a variant product.
       if (isVariantManaged && !awjVariantId) return;
 
+      // Required personalization is checked here only to save a round trip and
+      // point at the first gap; the server re-validates every answer.
+      const missing = missingRequiredFields(
+        gifting.personalization,
+        personalizationValues,
+      );
+      if (missing.length > 0) {
+        setShowPersonalizationErrors(true);
+        document
+          .querySelector<HTMLElement>(
+            `[data-personalization-field="${missing[0]}"] input, [data-personalization-field="${missing[0]}"] textarea, [data-personalization-field="${missing[0]}"] select`,
+          )
+          ?.focus();
+        return;
+      }
+      const selections: PdpSelections = {
+        personalization: Object.fromEntries(
+          gifting.personalization
+            .map((field) => [field.key, personalizationValues[field.key] ?? ""])
+            .filter(([, value]) => value.trim() !== ""),
+        ),
+        addons: gifting.addons
+          .map((addon) => ({
+            productId: addon.productId,
+            variantId: addon.variantId,
+            quantity: addonQuantities[addonKey(addon)] ?? 0,
+          }))
+          .filter((addon) => addon.quantity >= 1),
+      };
+
       setLoading(true);
-      await addItem(product.id, quantity, "base", awjVariantId);
+      // Nothing chosen → nothing extra is sent (the request is unchanged for a
+      // product without gifting inputs).
+      const hasSelections =
+        Object.keys(selections.personalization).length > 0 ||
+        selections.addons.length > 0;
+      await addItem(
+        product.id,
+        quantity,
+        "base",
+        awjVariantId,
+        hasSelections ? selections : undefined,
+      );
       setLoading(false);
       trackAddToCart(product, selectedVariant, quantity, currency);
       return;
@@ -303,28 +373,36 @@ export function ProductDetails({
         )}
       </div>
     ),
-    availability: !needsOptionChoice ? (
-      /*
-       * Availability is stated only once it means something. For a
-       * variant-managed product that is after a variant is chosen — before
-       * then the parent's rolled-up flag would answer a question the
-       * shopper has not asked yet. Data absence stays authoritative
-       * regardless of the region's own visibility flag.
-       */
-      <p className="mt-2 text-xs font-medium">
-        {inStock ? (
-          <span className="inline-flex items-center gap-1.5 text-store-success">
-            <CircleCheckBig className="size-4" aria-hidden="true" />
-            {t("inStock")}
-          </span>
-        ) : (
-          <span className="inline-flex items-center gap-1.5 text-store-destructive">
-            <CircleX className="size-4" aria-hidden="true" />
-            {t("outOfStock")}
-          </span>
-        )}
-      </p>
-    ) : null,
+    availability:
+      !needsOptionChoice || gifting.deliveryPromise ? (
+        <>
+          {!needsOptionChoice ? (
+            /*
+             * Availability is stated only once it means something. For a
+             * variant-managed product that is after a variant is chosen — before
+             * then the parent's rolled-up flag would answer a question the
+             * shopper has not asked yet. Data absence stays authoritative
+             * regardless of the region's own visibility flag.
+             */
+            <p className="mt-2 text-xs font-medium">
+              {inStock ? (
+                <span className="inline-flex items-center gap-1.5 text-store-success">
+                  <CircleCheckBig className="size-4" aria-hidden="true" />
+                  {t("inStock")}
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1.5 text-store-destructive">
+                  <CircleX className="size-4" aria-hidden="true" />
+                  {t("outOfStock")}
+                </span>
+              )}
+            </p>
+          ) : null}
+          {gifting.deliveryPromise ? (
+            <DeliveryPromiseNote promise={gifting.deliveryPromise} />
+          ) : null}
+        </>
+      ) : null,
     variant_selector: showVariantSelector ? (
       <div className="mt-5 border-t border-store-border pt-5">
         <VariantPicker
@@ -337,6 +415,33 @@ export function ProductDetails({
     ) : null,
     quantity_cta: (
       <>
+        {/*
+            FLOWERS-H11 — purchase configuration (personalization answers and
+            optional add-ons) sits with the CTA it feeds, outside the fixed
+            AWJ Market bar below so the bar still only holds quantity + add.
+          */}
+        {!pricesHidden && (
+          <>
+            <PersonalizationFields
+              fields={gifting.personalization}
+              values={personalizationValues}
+              onChange={(key, value) =>
+                setPersonalizationValues((current) => ({
+                  ...current,
+                  [key]: value,
+                }))
+              }
+              showErrors={showPersonalizationErrors}
+            />
+            <AddonPicker
+              addons={gifting.addons}
+              quantities={addonQuantities}
+              onChange={(key, qty) =>
+                setAddonQuantities((current) => ({ ...current, [key]: qty }))
+              }
+            />
+          </>
+        )}
         {/*
             AWJ Market's benchmark keeps quantity + add-to-cart reachable
             without scrolling on a phone (see the coverage matrix's PDP
@@ -404,21 +509,28 @@ export function ProductDetails({
         {isMarket && <div aria-hidden="true" className="h-20 md:hidden" />}
       </>
     ),
-    description: descriptionText ? (
-      <section className="mt-5 border-t border-store-border pt-5">
-        <h2 className="mb-2 text-sm font-bold text-store-foreground">
-          {t("description")}
-        </h2>
-        {/*
+    description:
+      descriptionText || gifting.contentBlocks.length > 0 ? (
+        <>
+          {descriptionText ? (
+            <section className="mt-5 border-t border-store-border pt-5">
+              <h2 className="mb-2 text-sm font-bold text-store-foreground">
+                {t("description")}
+              </h2>
+              {/*
             AWJ's description is a plain text column, not authored HTML —
             rendering it through `dangerouslySetInnerHTML` both lost its
             line breaks and treated merchant input as markup.
           */}
-        <p className="whitespace-pre-line text-sm leading-relaxed text-store-muted-foreground">
-          {descriptionText}
-        </p>
-      </section>
-    ) : null,
+              <p className="whitespace-pre-line text-sm leading-relaxed text-store-muted-foreground">
+                {descriptionText}
+              </p>
+            </section>
+          ) : null}
+          {/* FLOWERS-H11 — structured product information (composition, care, allergens…). */}
+          <ContentBlocks blocks={gifting.contentBlocks} />
+        </>
+      ) : null,
     // `ProductCustomFields` already returns `null` internally for an empty
     // list; mirrored here too so `[data-region]` never renders an empty
     // wrapper for a region with nothing to show — consistent with how

@@ -12,6 +12,7 @@ import {
   type StorefrontCart,
 } from "./cart-types";
 import { storefrontCartRequest } from "./config";
+import type { PdpSelections } from "./pdp-gifting";
 import type { AwjResourceResponse } from "./types";
 
 /**
@@ -47,7 +48,20 @@ export async function addAwjCartItem(
   quantity: number,
   unitKey: string = "base",
   variantId?: string | null,
+  selections?: PdpSelections,
 ): Promise<StorefrontCart> {
+  // FLOWERS-H11 — the shopper's gifting choices, sent only when present. The
+  // server validates every answer and re-prices every add-on line; nothing
+  // computed here is trusted. Keys are omitted (never sent empty) because
+  // `store/v1` rejects unknown shapes outright.
+  const personalization = Object.fromEntries(
+    Object.entries(selections?.personalization ?? {}).filter(
+      ([, value]) => value.trim() !== "",
+    ),
+  );
+  const addons = (selections?.addons ?? []).filter(
+    (addon) => addon.quantity >= 1,
+  );
   const response = await storefrontCartRequest<AwjResourceResponse<AwjCart>>(
     "POST",
     "cart/items",
@@ -59,6 +73,18 @@ export async function addAwjCartItem(
       // keys outright, and it treats an absent `product_variant_id` as "simple
       // product" — so a null must not be sent as a key with a null value.
       ...(variantId ? { product_variant_id: variantId } : {}),
+      ...(Object.keys(personalization).length > 0 ? { personalization } : {}),
+      ...(addons.length > 0
+        ? {
+            addons: addons.map((addon) => ({
+              product_id: addon.productId,
+              ...(addon.variantId
+                ? { product_variant_id: addon.variantId }
+                : {}),
+              quantity: addon.quantity,
+            })),
+          }
+        : {}),
     },
   );
   return mapAwjCartToViewModel(response.data);
