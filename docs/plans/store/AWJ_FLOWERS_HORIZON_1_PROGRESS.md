@@ -1,6 +1,6 @@
 # AWJ Flowers & Gifts — Horizon 1 Progress
 
-**Status:** IN PROGRESS — H1–H8a merged; H8b in review  
+**Status:** IN PROGRESS — H1–H8b merged; H9a in review  
 **Date:** 2026-10-03  
 **Planning Base:** `main` @ `318cc72d10bb304cef4b401f548772008ea1618e`  
 **Execution Authority:** `AWJ_FLOWERS_HORIZON_1_AUTONOMOUS_EXECUTION.md`  
@@ -43,8 +43,10 @@ No Deploy or Production change is authorized by this Horizon.
 | H7a | Delivery scheduling — policy, windows, blocked dates, derived availability, public options, admin API | MERGED | #1206 | `bbe59d1` |
 | H7b | Delivery scheduling — checkout schedule, order snapshot, capacity locks, revalidation | MERGED | #1208 | `01fb179` |
 | H8a | Availability / Same-day — derived promise seam, product preparation time, `commerce/v1` exposure | MERGED | #1210 | `f7c18bc` |
-| H8b | Availability / Same-day — `store/v1` parity and `deliver_today` filter | PR OPEN, in review | (see log) | — |
-| H9 | Store Builder Flowers Experience | NOT STARTED | — | — |
+| H8b | Availability / Same-day — `store/v1` parity and `deliver_today` filter | MERGED | #1211 | `0ed7b6c` |
+| H9a | Store Builder — data-backed section content contract (ADR-21) | PR OPEN, in review | (see log) | — |
+| H9b | Store Builder — storefront renderers for the data-backed sections | NOT STARTED | — | — |
+| H9c | Store Builder — builder UI (library, panels, canvas) and default-document entries | NOT STARTED | — | — |
 | H10 | Storefront Discovery UX | NOT STARTED | — | — |
 | H11 | Flowers/Gifts PDP | NOT STARTED | — | — |
 | H12 | Cart & Checkout Gifting UX | NOT STARTED | — | — |
@@ -463,9 +465,12 @@ Copy this section for every completed/active slice.
 
 ### H8b — Availability / Same-day: storefront parity and Deliver Today (ADR-20 §2.4)
 
-**Status:** PR OPEN, in review  
+**Status:** MERGED  
 **Base SHA:** `f7c18bcbf235ddff5414be6bd869f9fa486746e6` (main after H8a)  
 **Branch:** `flowers/h8b-storefront-promise`  
+**PR:** #1211  
+**Head SHA:** `0c6fced86aa86a9a391dddc4358e594eb5387e6c`  
+**Merge SHA:** `0ed7b6cdd387b5262606e7223a144292221f943b` (squash)
 
 #### What was implemented
 
@@ -476,9 +481,35 @@ Copy this section for every completed/active slice.
 
 - `CommerceDeliveryPromiseTest` grew to 13: filter semantics and live changes (stock, cut-off), pagination totals, composition with search, off/invalid values, the candidate limit, and web storefront parity; four more mutations each caught.
 
+#### Review loop / CI
+
+- Three Codex findings (documented `true|false` boolean query values; bound the candidate query before materialising; exclude inactive variants from the promise), each fixed with a test verified to fail without the fix. One CI job failed on `ZatcaQrCertificateMaterialExtractorTest` (a byte-dependent random-key test in code this slice does not touch; it passed on a sibling run of the same commit and on re-run) — noted on the PR; the probable root cause is recorded under Risks in the final report.
+
 #### Deferred
 
 - Pre-computed Deliver Today index for very large catalogs; pickup promise; UI (H10/H11).
+
+---
+
+### H9a — Store Builder: data-backed section content contract (ADR-21)
+
+**Status:** PR OPEN, in review  
+**Base SHA:** `0ed7b6cdd387b5262606e7223a144292221f943b` (main after H8b)  
+**Branch:** `flowers/h9-builder-sections`  
+
+#### What was implemented
+
+- ADR-21: the Horizon's candidate sections are three generic data-backed types — `productShelf` (collection or facet-value source, optional deliver-today, limit), `discovery` (facet dimension or brand), `deliveryPromise` (optional editorial text) — that store references/text only and read everything else live.
+- `StorefrontPresentationNormalizer` accepts and normalizes the three types fail-closed (`HOME_DATA_SECTION_KEYS`), **without** changing the default document; both TypeScript twins (`web` and `storefront` `section-content.ts`) gained the same types, readers and normalizers.
+- One shared fixture (`tests/Fixtures/presentation/data-sections.json`, 21 cases) is read by the PHP test and both TS tests, so the three normalizers cannot drift.
+
+#### Tests
+
+- `StorefrontPresentationDataSectionsTest` (3, PHP) and `section-content.data-sections.test.ts` (27 each in `web` and `storefront`); the existing normalizer/default-document tests are unchanged and green; a mutated limit bound is caught by the fixture.
+
+#### Next
+
+- H9b renders the sections in the public storefront; H9c adds the builder UI and the default-document entries (and updates the default fixtures/twins together).
 
 ---
 
