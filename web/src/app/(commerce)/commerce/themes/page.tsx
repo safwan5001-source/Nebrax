@@ -17,7 +17,9 @@ import {
   deletePresentationVersion,
   savePresentationVersion,
 } from '@/modules/commerce-workspace/presentation-versions';
-import { presetSelectionPatch, THEME_PRESETS } from '@/modules/store-experience-builder/presentation';
+import { applyFlowersGiftSections, presetSelectionPatch, THEME_PRESETS } from '@/modules/store-experience-builder/presentation';
+import { loadFacets } from '@/modules/commerce-workspace/merchandising/client';
+import { loadVerticalSetup } from '@/modules/commerce-workspace/vertical-setup';
 
 export default function CommerceThemesPage() {
   const locale = useLocale();
@@ -28,6 +30,27 @@ export default function CommerceThemesPage() {
   const canManage = hasPermission(viewer?.permissions, viewer?.role, 'commerce.manage');
   const [applyingThemeId, setApplyingThemeId] = useState<string | null>(null);
   const [applyError, setApplyError] = useState<string | null>(null);
+
+  async function floralGiftSections(sections: Parameters<typeof applyFlowersGiftSections>[0]) {
+    if (!selectedStoreId) return null;
+    try {
+      const [facets, setup] = await Promise.all([loadFacets(), loadVerticalSetup(selectedStoreId)]);
+      const keyOf = (systemKey: 'occasion' | 'recipient') =>
+        facets?.find((facet) => facet.systemKey === systemKey && facet.isActive)?.key ?? null;
+      return applyFlowersGiftSections(sections, {
+        facetKeys: { occasion: keyOf('occasion'), recipient: keyOf('recipient') },
+        deliveryScheduleConfigured:
+          setup?.items.find((item) => item.key === 'delivery_scheduling')?.state === 'configured',
+        copy: {
+          occasionTitle: t('bloomSectionOccasion'),
+          recipientTitle: t('bloomSectionRecipient'),
+          deliveryPromiseTitle: t('bloomSectionDelivery'),
+        },
+      });
+    } catch {
+      return null;
+    }
+  }
 
   async function handleUseTheme(theme: ThemeRegistryEntry) {
     if (!selectedStoreId || !canManage || !isRuntimeBackedTheme(theme) || applyingThemeId) {
@@ -55,9 +78,13 @@ export default function CommerceThemesPage() {
       return;
     }
 
+    // FLOWERS-H15: the gift pack only adds what the store can back, and never blocks the theme itself.
+    const giftSections = theme.category === 'floral' ? await floralGiftSections(created.data.config.homepage.sections) : null;
+    const presetPatch = presetSelectionPatch(created.data.config, preset);
     const nextConfig = {
       ...created.data.config,
-      ...presetSelectionPatch(created.data.config, preset),
+      ...presetPatch,
+      ...(giftSections ? { homepage: { ...created.data.config.homepage, sections: giftSections } } : {}),
     };
     const saved = await savePresentationVersion(
       selectedStoreId,
@@ -130,7 +157,11 @@ function ThemeCard({
     <article className="overflow-hidden rounded-xl border border-border bg-surface shadow-sm">
       <div className="grid min-h-[320px] md:grid-cols-[minmax(0,1.12fr)_minmax(260px,0.88fr)]">
         <div className="border-b border-border bg-background p-4 md:border-b-0 md:border-e">
-          <ThemePreview variant={theme.category} muted={!available} />
+          <ThemePreview
+            variant={theme.category}
+            muted={!available}
+            primary={THEME_PRESETS.find((preset) => preset.id === theme.presetId)?.primary ?? null}
+          />
         </div>
 
         <div className="flex flex-col p-5">
@@ -196,10 +227,16 @@ function ThemeCard({
 function ThemePreview({
   variant,
   muted,
+  primary,
 }: {
   variant: ThemeRegistryEntry['category'];
   muted: boolean;
+  /** The preset's real primary color, so each card previews its own identity (not the admin app's). */
+  primary: string | null;
 }) {
+  const tint = (percent: number) =>
+    primary ? { backgroundColor: `color-mix(in srgb, ${primary} ${percent}%, transparent)` } : undefined;
+  const cls = (fallback: string) => (primary ? '' : fallback);
   return (
     <div
       aria-hidden
@@ -213,7 +250,7 @@ function ThemePreview({
       </div>
       <div className="border-b border-border px-4 py-3">
         <div className="flex items-center justify-between gap-4">
-          <div className="h-5 w-20 rounded bg-primary/90" />
+          <div className={`h-5 w-20 rounded ${cls('bg-primary/90')}`} style={tint(90)} />
           <div className="flex gap-2">
             <div className="h-3 w-12 rounded bg-muted/60" />
             <div className="h-3 w-12 rounded bg-muted/60" />
@@ -222,11 +259,11 @@ function ThemePreview({
         </div>
       </div>
       <div className="p-4">
-        <div className="grid min-h-28 place-items-center rounded-lg bg-primary-soft px-6 text-center">
+        <div className={`grid min-h-28 place-items-center rounded-lg px-6 text-center ${cls('bg-primary-soft')}`} style={tint(12)}>
           <div className="space-y-2">
-            <div className="mx-auto h-4 w-32 rounded bg-primary/75" />
-            <div className="mx-auto h-2.5 w-44 rounded bg-primary/20" />
-            <div className="mx-auto h-7 w-20 rounded bg-primary" />
+            <div className={`mx-auto h-4 w-32 rounded ${cls('bg-primary/75')}`} style={tint(75)} />
+            <div className={`mx-auto h-2.5 w-44 rounded ${cls('bg-primary/20')}`} style={tint(20)} />
+            <div className={`mx-auto h-7 w-20 rounded ${cls('bg-primary')}`} style={primary ? { backgroundColor: primary } : undefined} />
           </div>
         </div>
         <div className="mt-4 grid grid-cols-3 gap-3">

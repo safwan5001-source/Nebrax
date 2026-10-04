@@ -18,13 +18,14 @@ describe('Theme Gallery registry', () => {
   it('does not expose planned themes as runtime presets', () => {
     const planned = THEME_REGISTRY.filter((theme) => theme.status === 'planned');
 
-    expect(planned.map((theme) => theme.id)).toEqual(['boutique-floral-01']);
+    // No planned entries remain: the floral theme shipped as AWJ Bloom (FLOWERS-H15).
+    expect(planned).toEqual([]);
     expect(planned.every((theme) => theme.presetId === null)).toBe(true);
     expect(planned.every((theme) => !isRuntimeBackedTheme(theme))).toBe(true);
   });
 
-  it('ships AWJ Modern and AWJ Market as the available gallery themes', () => {
-    expect(availableThemes().map((theme) => theme.id)).toEqual(['awj-modern', 'awj-market']);
+  it('ships AWJ Modern, AWJ Market and AWJ Bloom as the available gallery themes', () => {
+    expect(availableThemes().map((theme) => theme.id)).toEqual(['awj-modern', 'awj-market', 'awj-bloom']);
     expect(THEME_REGISTRY.find((theme) => theme.id === 'awj-modern')).toMatchObject({
       status: 'available',
       presetId: 'awj-modern',
@@ -33,9 +34,10 @@ describe('Theme Gallery registry', () => {
       status: 'available',
       presetId: 'awj-market',
     });
-    expect(THEME_REGISTRY.find((theme) => theme.id === 'boutique-floral-01')).toMatchObject({
-      status: 'planned',
-      presetId: null,
+    expect(THEME_REGISTRY.find((theme) => theme.id === 'awj-bloom')).toMatchObject({
+      status: 'available',
+      presetId: 'awj-bloom',
+      category: 'floral',
     });
   });
 });

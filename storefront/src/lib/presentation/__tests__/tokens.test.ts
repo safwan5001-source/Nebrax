@@ -39,9 +39,15 @@ describe("presentation tokens", () => {
       "sand",
       "slate",
       "awj-market",
+      "awj-bloom",
     ]);
     expect(presetPrimary("awj-market")).toBe("#0f766e");
     expect(primaryForeground("#0f766e")).toBe("#ffffff");
+  });
+
+  it("FLOWERS-H15: awj-bloom has its own primary with white foreground", () => {
+    expect(presetPrimary("awj-bloom")).toBe("#9d2449");
+    expect(primaryForeground("#9d2449")).toBe("#ffffff");
   });
 
   it("CUST-H3-2: registers the curated tajawal-geist preset alongside cairo-geist", () => {

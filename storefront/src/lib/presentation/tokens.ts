@@ -9,6 +9,7 @@ export const THEME_PRESETS = [
   { id: "sand", primary: "#92400e", labelKey: "presetSand" },
   { id: "slate", primary: "#334155", labelKey: "presetSlate" },
   { id: "awj-market", primary: "#0f766e", labelKey: "presetAwjMarket" },
+  { id: "awj-bloom", primary: "#9d2449", labelKey: "presetAwjBloom" },
 ] as const;
 
 export type ThemePresetId = (typeof THEME_PRESETS)[number]["id"];
