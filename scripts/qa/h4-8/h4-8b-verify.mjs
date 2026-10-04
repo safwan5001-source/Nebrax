@@ -107,16 +107,62 @@ await checkSection('section[aria-labelledby="preview-arrivals"]', 'New Arrivals'
 await checkSection('section[aria-labelledby^="preview-featured-"]', 'Featured');
 await checkSection('section[aria-labelledby^="preview-offers-"]', 'Offers');
 
+// Settle pass right before the screenshot: dev-mode (React 18 Strict Mode
+// double-effect) can briefly re-show the skeleton after a section already
+// resolved once above. Poll each section's own <img> until it is the real,
+// decoded image (not the animate-pulse placeholder, which has no <img> at
+// all) so the screenshot captures the final, settled state a merchant would
+// actually see, not a mid-refetch flicker.
+async function waitForRealImage(labelSelector, name, timeoutMs = 15000) {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    const img = page.locator(labelSelector).locator('img').first();
+    if ((await img.count()) > 0) {
+      const w = await img.evaluate((el) => el.naturalWidth).catch(() => 0);
+      if (w > 0) return true;
+    }
+    await page.waitForTimeout(300);
+  }
+  ok(false, `${name}: did not settle on a real loaded image before the screenshot (still showing skeleton after ${timeoutMs}ms)`);
+  return false;
+}
+await waitForRealImage('section[aria-labelledby="preview-arrivals"]', 'New Arrivals (pre-screenshot)');
+await waitForRealImage('section[aria-labelledby^="preview-featured-"]', 'Featured (pre-screenshot)');
+await waitForRealImage('section[aria-labelledby^="preview-offers-"]', 'Offers (pre-screenshot)');
+await page.waitForTimeout(500);
+
 log('media network requests (browser):', JSON.stringify(mediaRequests));
 log('media network responses (browser):', JSON.stringify(mediaResponses));
 ok(mediaRequests.length > 0, 'the browser issued at least one real HTTP request for a workspace media URL');
 ok(mediaRequests.every((r) => r.hasAuth === false), 'none of those <img>-triggered requests carried an Authorization header');
 ok(mediaResponses.length > 0 && mediaResponses.every((r) => r.status === 200), 'every workspace media response was 200');
 
-await page.screenshot({ path: `${OUT}/h4-8b-canvas-desktop.png`, fullPage: true });
-await page.setViewportSize({ width: 390, height: 844 });
-await page.waitForTimeout(500);
-await page.screenshot({ path: `${OUT}/h4-8b-canvas-mobile-390.png`, fullPage: true });
+// The Canvas is an internally-scrolling panel (`[data-preview-canvas]`),
+// not page-level scroll — `page.screenshot({fullPage:true})` captures the
+// outer viewport only and can miss cards below the panel's own scroll
+// fold. Screenshot the panel element itself (Playwright scrolls an element
+// screenshot's target fully into view before capturing), which is also the
+// more honest "what the merchant actually sees" frame per surface.
+async function settleAfterResize(width, height) {
+  await page.setViewportSize({ width, height });
+  await page.waitForTimeout(500);
+  await waitForRealImage('section[aria-labelledby="preview-arrivals"]', `resize ${width}x${height} New Arrivals`);
+  await waitForRealImage('section[aria-labelledby^="preview-featured-"]', `resize ${width}x${height} Featured`);
+  await waitForRealImage('section[aria-labelledby^="preview-offers-"]', `resize ${width}x${height} Offers`);
+  await page.waitForTimeout(300);
+}
+
+await settleAfterResize(1440, 1000);
+await page.locator('[data-preview-canvas]').screenshot({ path: `${OUT}/h4-8b-canvas-desktop.png` });
+await page.locator('section[aria-labelledby="preview-arrivals"]').screenshot({ path: `${OUT}/h4-8b-new-arrivals.png` });
+await page.locator('section[aria-labelledby^="preview-featured-"]').screenshot({ path: `${OUT}/h4-8b-featured.png` });
+await page.locator('section[aria-labelledby^="preview-offers-"]').screenshot({ path: `${OUT}/h4-8b-offers.png` });
+
+await settleAfterResize(390, 844);
+await page.locator('[data-preview-canvas]').screenshot({ path: `${OUT}/h4-8b-canvas-mobile-390.png` });
+await page.locator('section[aria-labelledby="preview-arrivals"]').screenshot({ path: `${OUT}/h4-8b-new-arrivals-mobile.png` });
+await page.locator('section[aria-labelledby^="preview-featured-"]').screenshot({ path: `${OUT}/h4-8b-featured-mobile.png` });
+await page.locator('section[aria-labelledby^="preview-offers-"]').screenshot({ path: `${OUT}/h4-8b-offers-mobile.png` });
 
 await b.close();
 finish();
