@@ -41,6 +41,7 @@ use App\Http\Controllers\Api\CommerceDeliveryScheduleController;
 use App\Http\Controllers\Api\CommerceGiftSettingsController;
 use App\Http\Controllers\Api\CommerceVerticalSetupController;
 use App\Http\Controllers\Api\CommerceWorkspaceStorefrontsController;
+use App\Http\Controllers\Api\CommerceWorkspaceMediaController;
 use App\Http\Controllers\Api\CommerceWorkspaceStorefrontOfferController;
 use App\Http\Controllers\Api\CommerceWorkspaceStorefrontPresentationController;
 use App\Http\Controllers\Api\CommerceWorkspaceStorefrontPresentationVersionController;
@@ -205,6 +206,21 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
     Route::post('login', [AuthController::class, 'login'])->middleware('throttle:5,1');
     Route::get('company-browser-identity', [CompanyBrowserIdentityController::class, 'show'])
         ->middleware('throttle:60,1');
+
+    // CUST-H4-8b: وسائط منتجٍ لمعاينة مساحة عمل Commerce (Canvas — وصل
+    // حديثاً/مميّزة/عروض). عمداً **بلا** `auth:sanctum`: `<img src>` عادي في
+    // متصفّح التاجر لا يحمل ترويسة Authorization (الواجهة تُصادِق بـBearer
+    // من localStorage لا بكعكة جلسة — `web/src/lib/api.ts`)، فالتوقيع
+    // (`signed`، ميزة Laravel القياسية) هو السلطة الوحيدة هنا — يُولَّد فقط
+    // من داخل سياقٍ مُصادَقٍ بالكامل (commerce.manage + ownedStorefront())
+    // عبر `StorefrontProductResource::buildWorkspaceMediaUrl()`. انظر
+    // `CommerceWorkspaceMediaController` لعقد الحراسة الكامل (عزل مستأجر/
+    // نشر على قناة هذا المتجر تحديداً، 404 غير كاشف).
+    Route::get('commerce/workspace/storefronts/{id}/media/{media}', [CommerceWorkspaceMediaController::class, 'show'])
+        ->whereUuid('id')->whereUuid('media')
+        ->middleware('signed')
+        ->name('commerce.workspace.media.show');
+
     Route::post('forgot-password', [AuthController::class, 'forgotPassword'])->middleware('throttle:auth-recovery');
     Route::post('reset-password', [AuthController::class, 'resetPassword'])->middleware('throttle:auth-reset');
     Route::post('email/verify', [AuthController::class, 'verifyEmail'])->middleware('throttle:auth-reset');

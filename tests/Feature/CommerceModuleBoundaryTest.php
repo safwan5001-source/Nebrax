@@ -111,6 +111,9 @@ class CommerceModuleBoundaryTest extends TestCase
         'api/commerce/workspace/storefronts/{id}/domains/{domainId}/verify',
         // FLOWERS-H3 / ADR-15 — سياسة الإهداء.
         'api/commerce/workspace/storefronts/{id}/gift-settings',
+        // CUST-H4-8b — وسائط مساحة عمل Canvas الموقَّعة (بلا auth:sanctum —
+        // التوقيع هو السلطة، انظر CommerceWorkspaceMediaController).
+        'api/commerce/workspace/storefronts/{id}/media/{media}',
         // CUST-H4-6 — تهيئة عروض المتجر (تنسيق وجدولة فقط) + قراءة معاينة Canvas.
         'api/commerce/workspace/storefronts/{id}/offers',
         'api/commerce/workspace/storefronts/{id}/offers/{offer}',
