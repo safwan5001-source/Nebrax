@@ -17,3 +17,11 @@ export async function login(page, locale = 'ar') {
   await page.waitForURL((u) => !u.pathname.startsWith('/login'), { timeout: 30000 });
 }
 export const log = (...a) => console.log(...a);
+
+/** Assertion collector: `finish()` prints the summary and makes the PROCESS fail (exit 1) when any check failed. */
+export function checks() {
+  let fails = 0;
+  const ok = (cond, msg) => { if (!cond) fails++; log(cond ? '  PASS' : '  FAIL', msg); return !!cond; };
+  const finish = () => { log('FAILS', fails); if (fails > 0) process.exitCode = 1; return fails; };
+  return { ok, finish };
+}

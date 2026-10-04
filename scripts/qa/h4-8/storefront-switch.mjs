@@ -1,6 +1,6 @@
-import { browser, login, WEB, OUT, SEED, log } from './lib.mjs';
+import { browser, login, WEB, OUT, SEED, log, checks } from './lib.mjs';
 const b = await browser(); const ctx = await b.newContext({ viewport: { width: 1440, height: 1000 } }); const page = await ctx.newPage();
-let fails = 0; const ok = (c, m) => { if (!c) fails++; log(c ? '  PASS' : '  FAIL', m); };
+const { ok, finish } = checks();
 const offerReqs = []; page.on('request', (r) => { if (/\/offers(\?|$)/.test(r.url()) && r.method()==='GET') offerReqs.push(r.url().replace(/^.*storefronts\//,'').slice(0,8)); });
 await login(page);
 await page.goto(`${WEB}/commerce/appearance`); await page.waitForSelector('[data-experience-builder]', { timeout: 60000 }); await page.waitForTimeout(3500);
@@ -29,4 +29,4 @@ const back = await page.locator('[data-selected-section-settings="offers"]').inn
 ok(!back.includes('المتجر ب'), 'switching back to A: no stale B offer');
 log('   GET offers storefront ids over session:', JSON.stringify(offerReqs));
 // header overflow baseline on B? (plain Banner draft) — measure at 1024 on B after adding banner
-await b.close(); log('FAILS', fails);
+await b.close(); finish();

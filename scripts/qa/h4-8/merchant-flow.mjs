@@ -1,9 +1,9 @@
-import { browser, login, WEB, OUT, SEED, log } from './lib.mjs';
+import { browser, login, WEB, OUT, SEED, log, checks } from './lib.mjs';
 const b = await browser(); const ctx = await b.newContext({ viewport: { width: 1440, height: 1000 } }); const page = await ctx.newPage();
 const reqs = []; const errs = [];
 page.on('request', (r) => { if (r.url().includes('/api/commerce')) reqs.push(`${r.method()} ${r.url().replace(/^.*\/api\//,'').replace(SEED.storefrontA,'{A}')}`); });
 page.on('console', (m) => m.type() === 'error' && errs.push(m.text().slice(0, 140)));
-let fails = 0; const ok = (c, m) => { if (!c) fails++; log(c ? '  PASS' : '  FAIL', m); };
+const { ok, finish } = checks();
 const shot = (n) => page.screenshot({ path: `${OUT}/${n}.png`, fullPage: false });
 const panel = () => page.locator('[data-selected-section-settings="offers"]');
 const canvasSecs = () => page.locator('[data-preview-canvas] section[aria-labelledby^="preview-offers-"]');
@@ -106,4 +106,4 @@ ok(selS2.length === 1 && !selS2[0].includes('أ٢'), 'A2 removed from S2 selecti
 ok((await cardNames(0)).length === 1 && (await cardNames(1)).length === 1, 'canvases: A2 gone from both');
 await shot('29-after-delete');
 await b.close();
-log('FAILS', fails); log('errs', [...new Set(errs)].map(e=>e.slice(0,90)).join('\n')); log('REQS', reqs.length); log(reqs.join('\n'));
+finish(); log('errs', [...new Set(errs)].map(e=>e.slice(0,90)).join('\n')); log('REQS', reqs.length); log(reqs.join('\n'));

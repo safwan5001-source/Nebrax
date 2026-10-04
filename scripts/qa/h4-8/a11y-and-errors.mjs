@@ -1,6 +1,6 @@
-import { browser, login, WEB, OUT, SEED, API, log } from './lib.mjs';
+import { browser, login, WEB, OUT, SEED, API, log, checks } from './lib.mjs';
 const b = await browser(); const ctx = await b.newContext({ viewport: { width: 1440, height: 1000 } }); const page = await ctx.newPage();
-let fails = 0; const ok = (c, m) => { if (!c) fails++; log(c ? '  PASS' : '  FAIL', m); };
+const { ok, finish } = checks();
 await login(page);
 const tok = await page.evaluate(() => localStorage.getItem('token'));
 const api = (method, path, body) => fetch(`${API}/api/commerce/workspace/storefronts/${SEED.storefrontA}${path}`, { method, headers: { Authorization: `Bearer ${tok}`, Accept: 'application/json', 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined }).then(async (r) => ({ status: r.status, json: await r.json().catch(() => null) }));
@@ -16,8 +16,9 @@ const secs = await page.locator('[data-preview-canvas] section[aria-labelledby^=
 ok(secs.length >= 2 && new Set(secs.map(s => s.lb)).size === secs.length && secs.every(s => s.exists), 'canvas Offers sections have unique, resolving aria-labelledby');
 // focus / Escape — edit
 const edit = P().locator('[data-offer-edit]').first(); await edit.focus(); await page.keyboard.press('Enter'); await page.waitForTimeout(500);
-const f1 = await page.evaluate(() => document.activeElement?.tagName + ':' + (document.activeElement?.textContent || '').slice(0, 20)); log('   focus after open edit form:', f1);
-ok(/H|DIV|FORM|SECTION/.test(f1) || true, 'form opened'); await page.keyboard.press('Escape'); await page.waitForTimeout(400);
+const focus1 = await page.evaluate(() => { const a = document.activeElement; return { tag: a?.tagName, inForm: !!a?.closest('[data-offer-form="edit"]'), text: (a?.textContent || '').slice(0, 30) }; }); log('   focus after open edit form:', JSON.stringify(focus1));
+ok(await P().locator('[data-offer-form="edit"]').count() === 1, 'edit form opened');
+ok(focus1.tag === 'H3' && focus1.inForm && /تعديل العرض/.test(focus1.text), 'focus moved to the edit form heading (H3 inside the form)'); await page.keyboard.press('Escape'); await page.waitForTimeout(400);
 ok(await P().locator('[data-offer-form]').count() === 0, 'Escape closes form');
 const back = await page.evaluate(() => document.activeElement?.hasAttribute('data-offer-edit')); ok(back, 'focus restored to Edit opener');
 // delete alertdialog
@@ -56,4 +57,4 @@ await P().locator('[data-offer-add]').click(); await page.waitForTimeout(400);
 await page.route('**/storefronts/*/products**', (r) => r.fulfill({ status: 500, contentType: 'application/json', body: '{}' }));
 await P().locator('[data-offer-product-search]').fill('منتج'); await page.waitForTimeout(1500);
 ok(await P().locator('[data-offer-product-error]').count() === 1, 'product search 500 -> error state'); await page.screenshot({ path: `${OUT}/42-search-error.png` }); await page.unroute('**/storefronts/*/products**');
-await b.close(); log('FAILS', fails);
+await b.close(); finish();

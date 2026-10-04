@@ -116,7 +116,7 @@ Known pre-existing builder-header overflow when the draft is dirty at 768/1024: 
 
 ## 11. Accessibility (real browser)
 
-PASS: edit/delete buttons carry product-named accessible names; every row states live/hidden **in text** (✓/○ glyph + reason, not colour only); Canvas Offers sections have unique, resolving `aria-labelledby`; opening the form focuses its heading, **Escape closes it and focus returns to the opener**; delete `alertdialog` is named, **Cancel is focused first**, Escape cancels and returns focus to the Delete opener; form `direction: rtl`; product images are decorative (`alt=""`, name adjacent) on Published and Canvas. (A screen-reader pass was not done — no AT in the sandbox.)
+(Harness note: the form-open focus check asserts the real active element — an `H3` inside the edit form — and was proven non-vacuous with a deliberate negative run; harness scripts now exit non-zero on any failed assertion, see `checks-selftest.mjs`.) PASS: edit/delete buttons carry product-named accessible names; every row states live/hidden **in text** (✓/○ glyph + reason, not colour only); Canvas Offers sections have unique, resolving `aria-labelledby`; opening the form focuses its heading, **Escape closes it and focus returns to the opener**; delete `alertdialog` is named, **Cancel is focused first**, Escape cancels and returns focus to the Delete opener; form `direction: rtl`; product images are decorative (`alt=""`, name adjacent) on Published and Canvas. (A screen-reader pass was not done — no AT in the sandbox.)
 
 ## 12. Error / degraded states
 

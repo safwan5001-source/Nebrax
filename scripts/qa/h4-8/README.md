@@ -12,3 +12,5 @@ See `docs/reports/CUST-H4-8-INTEGRATED-QA-REPORT.md` for setup, results and cave
 4. Run scripts with `node <script>.mjs` (long ones in the foreground; the public unauth limit is 30/min/IP, scripts clear the cache between loads).
 
 `merchant-flow.mjs` is the main merchant → draft → reload → publish → parity flow. PHP scripts run from `/home/user/nibras-app` (`php <script>.php`).
+
+Assertions use `checks()` from `lib.mjs`: any failed check makes the process exit 1 (`node checks-selftest.mjs` verifies this).
