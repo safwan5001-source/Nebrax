@@ -33,6 +33,59 @@ class DeliveryPlatformProfileVersion extends BaseModel implements CompanyWide
 
     public const REFERENCE_POLICIES = [self::REFERENCE_REQUIRED, self::REFERENCE_OPTIONAL, self::REFERENCE_NONE];
 
+    public const SELLING_UNKNOWN = 'unknown';
+
+    public const SELLING_MERCHANT = 'merchant_seller';
+
+    public const SELLING_PLATFORM = 'platform_seller';
+
+    public const SELLING_ROLES = [self::SELLING_UNKNOWN, self::SELLING_MERCHANT, self::SELLING_PLATFORM];
+
+    public const INVOICE_UNKNOWN = 'unknown';
+
+    public const INVOICE_MERCHANT_ISSUES = 'merchant_issues';
+
+    public const INVOICE_PLATFORM_ON_BEHALF = 'platform_on_behalf';
+
+    public const INVOICE_PLATFORM_AS_SUPPLIER = 'platform_as_supplier';
+
+    public const INVOICE_RESPONSIBILITIES = [
+        self::INVOICE_UNKNOWN,
+        self::INVOICE_MERCHANT_ISSUES,
+        self::INVOICE_PLATFORM_ON_BEHALF,
+        self::INVOICE_PLATFORM_AS_SUPPLIER,
+    ];
+
+    public const COLLECTION_ROLE_UNKNOWN = 'unknown';
+
+    public const COLLECTION_ROLE_PLATFORM_FOR_MERCHANT = 'platform_collects_for_merchant';
+
+    public const COLLECTION_ROLE_MERCHANT = 'merchant_collects';
+
+    public const COLLECTION_ROLE_PLATFORM_AS_SELLER = 'platform_collects_as_seller';
+
+    public const COLLECTION_ROLES = [
+        self::COLLECTION_ROLE_UNKNOWN,
+        self::COLLECTION_ROLE_PLATFORM_FOR_MERCHANT,
+        self::COLLECTION_ROLE_MERCHANT,
+        self::COLLECTION_ROLE_PLATFORM_AS_SELLER,
+    ];
+
+    public const VAT_UNKNOWN = 'unknown';
+
+    public const VAT_REGISTERED = 'registered';
+
+    public const VAT_NOT_REGISTERED = 'not_registered';
+
+    public const VAT_STATUSES = [self::VAT_UNKNOWN, self::VAT_REGISTERED, self::VAT_NOT_REGISTERED];
+
+    public const FINANCIAL_FIELDS = [
+        'selling_role',
+        'invoice_responsibility',
+        'collection_role',
+        'merchant_vat_status_at_supply',
+    ];
+
     public $timestamps = false;
 
     /** دقة ميكروثانية: يحفظ ترتيب نسختين متتاليتين داخل الثانية الواحدة. */
@@ -42,6 +95,8 @@ class DeliveryPlatformProfileVersion extends BaseModel implements CompanyWide
         'tenant_id', 'delivery_platform_profile_id', 'version_number',
         'collection_mode', 'external_reference_policy',
         'display_name', 'display_name_en', 'logo_asset_key', 'is_active',
+        'selling_role', 'invoice_responsibility', 'collection_role', 'merchant_vat_status_at_supply',
+        'financial_evidence_ref', 'financial_verified_at',
         'change_reason', 'created_by', 'effective_from', 'created_at',
     ];
 
@@ -50,6 +105,7 @@ class DeliveryPlatformProfileVersion extends BaseModel implements CompanyWide
         'is_active' => 'boolean',
         'effective_from' => 'datetime',
         'created_at' => 'datetime',
+        'financial_verified_at' => 'datetime',
     ];
 
     protected static function booted(): void
@@ -69,6 +125,16 @@ class DeliveryPlatformProfileVersion extends BaseModel implements CompanyWide
             }
             if (! in_array($version->external_reference_policy, self::REFERENCE_POLICIES, true)) {
                 throw new DomainException('Invalid external reference policy.');
+            }
+            $version->selling_role ??= self::SELLING_UNKNOWN;
+            $version->invoice_responsibility ??= self::INVOICE_UNKNOWN;
+            $version->collection_role ??= self::COLLECTION_ROLE_UNKNOWN;
+            $version->merchant_vat_status_at_supply ??= self::VAT_UNKNOWN;
+            if (! in_array($version->selling_role, self::SELLING_ROLES, true)
+                || ! in_array($version->invoice_responsibility, self::INVOICE_RESPONSIBILITIES, true)
+                || ! in_array($version->collection_role, self::COLLECTION_ROLES, true)
+                || ! in_array($version->merchant_vat_status_at_supply, self::VAT_STATUSES, true)) {
+                throw new DomainException('Invalid delivery financial role.');
             }
             if (! DeliveryPlatformProfile::query()->whereKey($version->delivery_platform_profile_id)->exists()) {
                 throw new DomainException('Delivery platform profile must belong to the active tenant.');

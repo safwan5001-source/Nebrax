@@ -1258,7 +1258,8 @@ Only evidence-backed statuses are recorded here; unlisted tasks of the horizon p
 | 10 | DLV-PLATFORM-MGMT-UI-1 | done (merged; PR #1203, squash SHA `bcc1563ed4659c1145c998b5097301ffa100fd09`; management workspace on the existing foundation API and the shared registry; no connector) | high | DLV-HUB-UI-1 (done); DLV-FOUNDATION-1 (done) | `docs/plans/pos/DLV-PLATFORM-MGMT-UI-1-IMPLEMENTATION-REPORT.md` |
 | 11 | DLV-PLATFORM-LOGOS-1 | done (merged; PR #1204, squash SHA `f875467428014b86faa082ca467d41df8d8f340a`; six publisher App Store icons through the shared registry) | high | DLV-PLATFORM-MGMT-UI-1 (done); DLV-HUB-UI-1 (done); DLV-POS-1 (done) | `docs/plans/pos/DLV-PLATFORM-LOGOS-1-IMPLEMENTATION-REPORT.md` |
 | 12 | DELIVERY-DECISION-PASS-5 | done (merged; PR #1205, squash SHA `48051f2cc7d5d2c7fc50d45892aa29fe53d643fa`; OD-DG-8-IMPORT accepted as Option B; no financial command) | high | DLV-HUB-PROJECTION-1 (done); OD-DG-6-TRIGGER; OD-DG-8 | `docs/plans/pos/DELIVERY-DECISION-PASS-5-REPORT.md` |
-| 13 | DELIVERY-DECISION-PASS-6 | in_review (not merged; OD-DG-3-POSTING-GATE accepted; DG-3 not closed; no platform role accepted; no financial command) | high | DELIVERY-DECISION-PASS-5 (done); OD-DG-8-IMPORT | `docs/plans/pos/DELIVERY-DECISION-PASS-6-REPORT.md` |
+| 13 | DELIVERY-DECISION-PASS-6 | done (merged; PR #1207, merge SHA `aea1e9290503da1325be5713654dd98ad4beb5c8`; OD-DG-3-POSTING-GATE accepted; DG-3 not closed; no platform role accepted; no financial command) | high | DELIVERY-DECISION-PASS-5 (done); OD-DG-8-IMPORT | `docs/plans/pos/DELIVERY-DECISION-PASS-6-REPORT.md` |
+| 14 | DLV-FINANCIAL-ROLE-CONFIG-1 | in_review (not merged; versioned fail-closed financial-role configuration; no invoice command) | high | DELIVERY-DECISION-PASS-6 (done); OD-DG-3-POSTING-GATE | `docs/plans/pos/DLV-FINANCIAL-ROLE-CONFIG-1-IMPLEMENTATION-REPORT.md` |
 
 Owed gates — original text is DLV-EVIDENCE-1-REPORT.md §11. DG-1/DG-2/DG-3 resolutions are in DELIVERY-DECISION-PASS-1-REPORT.md. DG-6/DG-8/DG-9 acceptances are in DELIVERY-DECISION-PASS-2-REPORT.md.
 
@@ -1279,14 +1280,14 @@ Owed gates — original text is DLV-EVIDENCE-1-REPORT.md §11. DG-1/DG-2/DG-3 re
 
 A task must not be promoted to `ready` while any gate mapped to it is unresolved.
 
-**Dependency readiness after DELIVERY-DECISION-PASS-6 (in review, not merged; OD-DG-3-POSTING-GATE accepted):**
-- **DELIVERY-DECISION-PASS-5 is merged** (PR #1205, squash `48051f2cc7d5d2c7fc50d45892aa29fe53d643fa`). OD-DG-8-IMPORT is accepted as Option B. No production deploy.
-- **OD-DG-3-POSTING-GATE is ACCEPTED.** It is necessary and not sufficient. An imported order does not become an invoice unless financial role, invoice responsibility, collection role, and supply-time VAT status are all evidenced. A known platform-seller or deemed-supplier value still does not authorize the restaurant invoice. The tax point remains a separate block. This acceptance is not a temporary system-recognition policy. This note does not implement the command.
-- **DG-3 is not closed.** No provider is accepted as agent, principal, or collector. All six stay UNKNOWN on those inputs.
-- **DLV-HUB-1 (full) stays BLOCKED.** Do not start the financial command from this note.
+**Dependency readiness after DLV-FINANCIAL-ROLE-CONFIG-1 (in review, not merged):**
+- **DELIVERY-DECISION-PASS-6 is merged** (PR #1207, merge SHA `aea1e9290503da1325be5713654dd98ad4beb5c8`). OD-DG-3-POSTING-GATE is accepted. DG-3 is not closed. No provider is accepted as agent, principal, or collector.
+- This task stores the four gate dimensions on the immutable platform version and evaluates them. `eligible` is not permission to post. `posting_authorized` stays false. The tax point remains a separate block.
+- **The imported-order invoice command is not started.**
+- **DLV-HUB-1 (full) stays BLOCKED.**
 - **DLV-COMMISSION-1 remains BLOCKED** (EXTERNAL_EVIDENCE_REQUIRED under DG-3).
 - **DLV-SETTLEMENT-1 remains BLOCKED** on COMMISSION-1 and per-platform DG-3 evidence.
 - DLV-RECON-1, REFUND-1, CLOSE-1, CONNECTOR-CORE-1 and the provider tasks remain blocked on their own dependencies.
 
-Next step is review of this acceptance record. Do not merge it from this note. Do not start full HUB-1, commission, settlement, connector, or refund work. Merge != Deploy.
+Do not merge this note from itself. Do not deploy. Merge != Deploy.
 

@@ -76,9 +76,20 @@ describe('DeliveryPlatformsWorkspace', () => {
     cleanup();
     const { onSave } = renderWorkspace(true);
     await user.click(screen.getByRole('button', { name: 'save' }));
+    expect(screen.getByTestId('financial-role-config')).toBeTruthy();
+    expect(screen.getByTestId('financial-gate-decision').textContent).toBe('gateBlocked');
+    expect(document.body.textContent).not.toMatch(/Ready for financial posting|جاهز للترحيل/);
+    expect(onSave).toHaveBeenCalledWith('profile-jahez', expect.objectContaining({
+      selling_role: 'unknown',
+      invoice_responsibility: 'unknown',
+      collection_role: 'unknown',
+      merchant_vat_status_at_supply: 'unknown',
+    }));
     expect(onSave).toHaveBeenCalledWith('profile-jahez', expect.not.objectContaining({
       logo_asset_key: expect.anything(),
       connected: expect.anything(),
+      posting_authorized: expect.anything(),
+      financial_verified_at: expect.anything(),
     }));
     expect(readOnly.onSave).not.toHaveBeenCalled();
   });

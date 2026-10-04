@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources;
 
+use App\Services\DeliveryFinancialRoleGate;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -25,6 +26,13 @@ class DeliveryPlatformVersionResource extends JsonResource
             'display_name_en' => $this->display_name_en,
             'logo_asset_key' => $this->logo_asset_key,
             'is_active' => $this->is_active,
+            'selling_role' => $this->selling_role,
+            'invoice_responsibility' => $this->invoice_responsibility,
+            'collection_role' => $this->collection_role,
+            'merchant_vat_status_at_supply' => $this->merchant_vat_status_at_supply,
+            'financial_evidence_ref' => $this->financial_evidence_ref,
+            'financial_verified_at' => $this->financial_verified_at?->format('Y-m-d\\TH:i:s.uP'),
+            'financial_gate' => app(DeliveryFinancialRoleGate::class)->evaluate($this->resource),
             'change_reason' => $this->change_reason,
             'created_by' => $this->created_by,
             // ميكروثانية كاملة: إعادة تمريرها إلى `resolve?at=` تعيد النسخة نفسها لا الأقدم.

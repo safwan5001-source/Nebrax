@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { deliveryPlatformPresentations } from './delivery-platform-registry';
 import {
@@ -52,8 +53,18 @@ describe('delivery platform management', () => {
       overrides: [{ branch_id: 'branch-a', collection_mode: 'platform_collected', external_reference_policy: 'optional' }],
     }, true);
     expect(body.platform_key).toBe('jahez');
+    expect(body.selling_role).toBe('unknown');
+    expect(body.invoice_responsibility).toBe('unknown');
+    expect(body.collection_role).toBe('unknown');
+    expect(body.merchant_vat_status_at_supply).toBe('unknown');
+    expect(body).not.toHaveProperty('financial_verified_at');
+    expect(body).not.toHaveProperty('posting_authorized');
     expect(body).not.toHaveProperty('logo_asset_key');
     expect(body).not.toHaveProperty('connected');
     expect(JSON.stringify(body)).not.toMatch(/webhook|credential|connector/i);
+    const ar = readFileSync(new URL('../messages/ar.json', import.meta.url), 'utf8');
+    const en = readFileSync(new URL('../messages/en.json', import.meta.url), 'utf8');
+    expect(ar).not.toContain('جاهز للترحيل');
+    expect(en).not.toMatch(/Ready for financial posting/i);
   });
 });

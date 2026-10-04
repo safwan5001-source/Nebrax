@@ -2,13 +2,13 @@
 
 > This file is a durable resume point, not a substitute for Git/GitHub evidence.
 
-LAST_UPDATED: 2026-10-03 (**AWJ Delivery Platforms & Settlement Horizon V1 is the single ACTIVE horizon.** DLV-EVIDENCE-1 through DELIVERY-DECISION-PASS-5 are merged. Pass 5 squash is `48051f2cc7d5d2c7fc50d45892aa29fe53d643fa`. OD-DG-8-IMPORT is accepted as Option B. No production deploy. **DELIVERY-DECISION-PASS-6 is in review and not merged.** OD-DG-3-POSTING-GATE is **ACCEPTED**. DG-3 is not closed. No platform role is accepted. Full DLV-HUB-1 stays BLOCKED. No deploy.)
+LAST_UPDATED: 2026-10-04 (**AWJ Delivery Platforms & Settlement Horizon V1 is the single ACTIVE horizon.** DELIVERY-DECISION-PASS-6 is merged at `aea1e9290503da1325be5713654dd98ad4beb5c8`. OD-DG-3-POSTING-GATE is accepted. DG-3 is not closed. **DLV-FINANCIAL-ROLE-CONFIG-1 is in review and not merged.** It stores the gate. It does not post. No deploy.)
 LAYER_VERSION: V1
 STATUS: ACTIVE — AWJ Delivery Platforms & Settlement Horizon V1 (authoritative queue: `TASK-QUEUE.md`, section "Horizon: AWJ Delivery Platforms & Settlement V1"). Every snapshot, STATUS and objective below this section is historical and superseded.
 
 ## Current objective
 
-DELIVERY-DECISION-PASS-6 is in review. Do not merge it from this note and do not deploy. OD-DG-3-POSTING-GATE is accepted and is necessary, not sufficient: an imported order does not become an invoice while financial role, invoice responsibility, collection role, or the merchant's VAT status at supply time is UNKNOWN. A known platform-seller or deemed-supplier value still does not authorize the restaurant invoice. The tax point stays blocked. This acceptance is not a system-recognition policy. DG-3 is not closed. No platform is agent, principal, or collector. Do not start full DLV-HUB-1, commission, settlement, connectors, or refunds. Merge != Deploy.
+DLV-FINANCIAL-ROLE-CONFIG-1 is in review. Do not merge it from this note and do not deploy. The four gate dimensions live on the immutable platform version and default to unknown. A platform-seller value does not authorize the restaurant invoice. The evaluator never authorizes posting. DG-3 is not closed. Do not start the invoice command, commission, settlement, connectors, or refunds. Merge != Deploy.
 
 ## Previous snapshot (historical, superseded)
 
