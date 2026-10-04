@@ -4670,6 +4670,7 @@
     "default_sales_unit_marker": "default",
     "product_media": "Product images",
     "product_media_hint": "Upload up to 8 JPG, PNG or WebP images, up to 5 MB each. Images are private and visible only to authorised users.",
+    "product_image_guidance": "For best results, use a clear, high-quality image. A square image (1:1) is preferred. Keep the product centered because some layouts may crop the image edges.\n\n1200 × 1200 px is a good choice for square images, but it is not required.",
     "upload_media": "Upload images",
     "no_media": "No product images yet.",
     "media_uploaded": "Product images uploaded.",

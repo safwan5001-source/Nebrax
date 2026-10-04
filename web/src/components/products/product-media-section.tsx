@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { api, ApiError, fetchImageUrl } from '@/lib/api';
+import { ProductMediaGuidance } from './product-media-guidance';
 
 export const MAX_PRODUCT_IMAGES = 8;
 export const MAX_PRODUCT_IMAGE_SIZE = 5 * 1024 * 1024;
@@ -171,6 +172,7 @@ export function ProductMediaSection({
         <div>
           <CardTitle>{t('product_media')}</CardTitle>
           <p className="mt-1 text-xs leading-relaxed text-muted">{t('product_media_hint')}</p>
+          <ProductMediaGuidance />
         </div>
         {!isCreateMode && (
           <Button type="button" size="sm" onClick={() => fileInputRef.current?.click()} disabled={uploading || loading || atLimit}>
