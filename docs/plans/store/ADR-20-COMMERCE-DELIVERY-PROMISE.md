@@ -47,7 +47,7 @@ same_day    = deliverable ∧ earliest.date == today in the channel timezone
 ### 2.4 H8b — `store/v1` parity and Deliver Today
 
 - `store/v1` `GET /products` and `/products/{id}` expose the same `delivery_promise` (same service, same conditions, same `city`/`region` parameters).
-- `deliver_today=true` on both public lists (`DeliverTodayFilter`): the candidate set (published, after search/category/collection) is evaluated in constant-query chunks of 500 with the same promise, then `products.id IN (same-day ids)` is applied **before** facet counting, sorting and pagination, so totals and facet counts reflect the filter. Nothing is stored; the result moves with stock, preparation time, cut-off, blocked dates and capacity.
+- `deliver_today=true` on both public lists (`DeliverTodayFilter`): the candidate set (published, after search/category/collection) is evaluated in constant-query chunks of 500 with the same promise, then `products.id IN (same-day ids)` is applied **before** facet counting, sorting and pagination, so totals and facet counts reflect the filter. The candidate query is bounded (`LIMIT cap + 1`) before materialisation, and `deliver_today` accepts `true|false|1|0`. Nothing is stored; the result moves with stock, preparation time, cut-off, blocked dates and capacity.
 - Scheduling off ⇒ nothing is promised ⇒ empty result (fail closed). More than 5 000 candidates ⇒ 422 (fail closed, never silent truncation). Larger catalogs need a pre-computed index (deferred).
 
 ## 3. Rejected / Not adopted

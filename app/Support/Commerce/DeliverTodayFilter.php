@@ -5,6 +5,7 @@ namespace App\Support\Commerce;
 use App\Models\Product;
 use App\Services\Commerce\CommerceDeliveryPromiseService;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -31,12 +32,13 @@ class DeliverTodayFilter
     /** قواعد التحقق الإضافية للمتحكّمين (`city`/`region` يعلنهما كل متحكّم). */
     public static function rules(): array
     {
-        return ['deliver_today' => ['sometimes', 'nullable', 'boolean']];
+        // قيم الاستعلام النصّية الموثَّقة صراحةً: Laravel `boolean` يرفض "true"/"false" التي يُنتجها عقد OpenAPI المنطقي.
+        return ['deliver_today' => ['sometimes', 'nullable', Rule::in(['1', '0', 'true', 'false', 1, 0, true, false])]];
     }
 
     public static function requested(array $filters): bool
     {
-        return (bool) ($filters['deliver_today'] ?? false);
+        return filter_var($filters['deliver_today'] ?? false, FILTER_VALIDATE_BOOLEAN);
     }
 
     /**
@@ -45,7 +47,8 @@ class DeliverTodayFilter
      */
     public function apply(Builder $query, string $salesChannelId, ?string $city, ?string $region): void
     {
-        $candidates = (clone $query)->setEagerLoads([])->reorder()->get(['products.id', 'products.variant_state']);
+        // حدٌّ قبل التحميل (`max + 1`): تجاوز السقف يُكتشف دون جلب المجموعة كلها فلا يُرهق العامل.
+        $candidates = (clone $query)->setEagerLoads([])->reorder()->limit($this->maxCandidates() + 1)->get(['products.id', 'products.variant_state']);
         if ($candidates->count() > $this->maxCandidates()) {
             throw ValidationException::withMessages(['deliver_today' => 'نطاق البحث أوسع من أن يُقيَّم «التسليم اليوم» — ضيّق البحث أو التصنيف.']);
         }

@@ -339,6 +339,10 @@ class CommerceDeliveryPromiseTest extends TestCase
         $this->assertSame(2, $page->json('meta.pagination.total'));
         $this->assertTrue($page->json('data.0.delivery_promise.same_day'));
 
+        // التمثيلات النصّية الموثَّقة لقيمة المنطق (OpenAPI `boolean`): true/false كما 1/0
+        $this->assertSame($sorted([$f['a']->id, $f['d']->id]), $this->listIds($store, '?deliver_today=true'));
+        $this->assertCount(4, $this->listIds($store, '?deliver_today=false'));
+
         // يتركّب مع البحث
         $this->assertSame([$f['d']->id], $this->listIds($store, '?deliver_today=1&search='.rawurlencode('ثالثة')));
 
@@ -375,6 +379,15 @@ class CommerceDeliveryPromiseTest extends TestCase
 
         $refused = $this->getJson('/commerce/v1/products?deliver_today=1', $this->headers($f['store']))->assertStatus(422);
         $this->assertStringContainsString('deliver_today', json_encode($refused->json(), JSON_UNESCAPED_UNICODE));
+        // الحدّ يُطبَّق على الاستعلام نفسه (max + 1) قبل التحميل — لا جلب لمجموعة غير محدودة ثم عدّها
+        $limits = [];
+        DB::listen(function ($q) use (&$limits) {
+            if (str_contains($q->sql, 'from "products"') && str_contains($q->sql, '"variant_state"') && preg_match('/limit 3\b/', $q->sql)) {
+                $limits[] = 3;
+            }
+        });
+        $this->getJson('/commerce/v1/products?deliver_today=1', $this->headers($f['store']))->assertStatus(422);
+        $this->assertNotEmpty($limits, 'the candidate query was not bounded to max + 1');
         // عدد المرشّحين ضمن الحد (بحث يضيّق) يُقيَّم عادياً
         $this->assertSame([$f['d']->id], $this->listIds($f['store'], '?deliver_today=1&search='.rawurlencode('ثالثة')));
     }
