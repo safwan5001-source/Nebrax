@@ -1,6 +1,6 @@
 # AWJ Flowers & Gifts — Horizon 1 Progress
 
-**Status:** IN PROGRESS — H1–H9c merged; H10 in review  
+**Status:** IN PROGRESS — H1–H10 merged; H11 in review  
 **Date:** 2026-10-03  
 **Planning Base:** `main` @ `318cc72d10bb304cef4b401f548772008ea1618e`  
 **Execution Authority:** `AWJ_FLOWERS_HORIZON_1_AUTONOMOUS_EXECUTION.md`  
@@ -47,8 +47,8 @@ No Deploy or Production change is authorized by this Horizon.
 | H9a | Store Builder — data-backed section content contract (ADR-21) | MERGED | #1212 | `5f34585` |
 | H9b | Store Builder — storefront renderers for the data-backed sections (+ listing deep-link context) | MERGED | #1213 | `c90f758` |
 | H9c | Store Builder — builder UI (library, editors, canvas); default document intentionally unchanged | MERGED | #1216 | `4bb8d17` |
-| H10 | Storefront Discovery UX — gifting filters on the listing | PR OPEN, in review | (see log) | — |
-| H11 | Flowers/Gifts PDP | NOT STARTED | — | — |
+| H10 | Storefront Discovery UX — gifting filters on the listing | MERGED | #1217 | `6e98a01` |
+| H11 | Flowers/Gifts PDP — gifting blocks on the product page | PR OPEN, in review | (see log) | — |
 | H12 | Cart & Checkout Gifting UX | NOT STARTED | — | — |
 | H13 | Account / Saved Recipient / Order Experience | NOT STARTED | — | — |
 | H14 | Vertical Onboarding & Defaults | NOT STARTED | — | — |
@@ -585,9 +585,11 @@ Copy this section for every completed/active slice.
 
 ### H10 — Storefront Discovery UX: gifting filters
 
-**Status:** PR OPEN, in review  
+**Status:** MERGED  
 **Base SHA:** `4bb8d17852c8a618f826c35120c31d2f39a9c4ee` (main after H9c)  
 **Branch:** `flowers/h10-discovery-ux`  
+**PR:** #1217 · **Head SHA:** `5bd3ab50f7322efe3f676c33857c618b6903c21c` · **Merge SHA:** `6e98a011926f4abd990610d1bd9ee9027e82b7d2` (squash)  
+**CI on head:** all 8 jobs green (sqlite + pgsql, storefront, both visual QA). Codex reached its review usage limit before reviewing this PR, so no automated review ran; no threads were opened.  
 
 #### What was implemented
 
@@ -605,6 +607,33 @@ Copy this section for every completed/active slice.
 #### Deferred
 
 - Destination/availability context in discovery (needs the destination model — H11/H12); a facet search box for very large value lists; collection and brand names on active chips (the list meta does not carry collection titles); filter-aware JSON-LD/SEO.
+
+---
+
+### H11 — Flowers/Gifts PDP: gifting blocks on the product page (ADR-22)
+
+**Status:** PR OPEN, in review  
+**Base SHA:** `6e98a011926f4abd990610d1bd9ee9027e82b7d2` (main after H10)  
+**Branch:** `flowers/h11-pdp`  
+
+#### What was implemented
+
+- The PDP renders the blocks the `store/v1` product detail already returns — delivery promise (ADR-20), personalization fields (ADR-16), add-ons (ADR-18) and structured content blocks (ADR-17) — normalized by `pdp-gifting.ts` (validated keys / UUIDs / currencies / dates / clock times, bounded counts, locale-picked names, malformed rows dropped). No backend change.
+- Personalization: text / textarea / select with labels, help text, required/optional, `max_length`, character counter, `aria-invalid` + described errors; add-to-cart is blocked client-side only for an unanswered required field (focus goes to the first gap) — the server re-validates every answer.
+- Add-ons: optional checkboxes with a quantity select bounded by the API's per-add-on maximum (≤ 10); an out-of-stock add-on is shown as unavailable; prices are informational (server re-prices).
+- Cart: the line carries `personalization` (non-empty answers only) and `addons` (`product_id`, `product_variant_id?`, `quantity`) — no price anywhere; both are omitted entirely when nothing was chosen, so a product without gifting inputs adds to cart exactly as before. `addItem` / `addAwjItem` / `addAwjCartItem` gained one optional `selections` argument.
+- Delivery promise: "today" only from the server's `same_day` flag; any other date shown as a plain calendar date (the promise has no timezone, so the storefront never guesses "tomorrow"); a not-deliverable promise shows a neutral line.
+- **AWJ DECISION (ADR-22):** no new page-region keys (that would change the presentation contract in PHP and both TS twins and stored tenant documents). The promise sits under `availability`, personalization and add-ons with `quantity_cta`, structured information under `description`. Wholesale (Spree) products carry no gifting data.
+- Six locales gained 26 strings (`check:locales` green).
+
+#### Tests
+
+- Storefront: 950 tests green (new: `pdp-gifting` parsing/validation, cart request shape incl. omitted-when-empty and no price, and the PDP — blocks render only when present, required gate + focus, selections sent as ids/quantities, unavailable add-on disabled, max length, optional-only adds straight away, promise wording, wholesale ignores gifting). Mutations (skipping the required gate; showing gifting on the wholesale surface) each caught. `tsc`, `biome check`, `check:locales` clean.
+- Visual: screenshots reviewed in Arabic and English at mobile and desktop widths against a throwaway local fixture (not committed); the required-field error appears on a blocked add. (The fixture's default locale made English pages show Arabic data — a fixture property, not a product issue.)
+
+#### Deferred
+
+- Destination entry on the PDP and a destination-aware promise (needs the destination model — H12); recommendations (no API).
 
 ---
 
