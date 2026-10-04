@@ -132,6 +132,25 @@ final class StorefrontCheckoutController extends PublicApiController
         );
     }
 
+    /**
+     * FLOWERS-H7b / ADR-19 — موعد التسليم (تاريخ + نافذة) أو مسحه (`date`/`slot_id` معاً null). لا مبلغ ولا سعر ولا
+     * مخزون في الطلب؛ الصلاحية من سياسة القناة وطريقة Checkout ووجهته المخزَّنتين، ويُعاد التحقق عند الإتمام.
+     */
+    public function updateSchedule(Request $request, CommerceCheckoutService $checkouts): JsonResponse
+    {
+        $this->rejectUnknown($request, ['date', 'slot_id']);
+        $data = $request->validate([
+            'date' => ['present', 'nullable', 'string', 'date_format:Y-m-d'],
+            'slot_id' => ['present', 'nullable', 'uuid'],
+        ]);
+
+        return $this->withCurrentCheckout(
+            $request,
+            $checkouts,
+            fn (CommerceCheckout $checkout) => $checkouts->updateSchedule($checkout, $data['date'], $data['slot_id']),
+        );
+    }
+
     public function updateAddress(Request $request, CommerceCheckoutService $checkouts): JsonResponse
     {
         $allowed = ['country', 'region', 'city', 'district', 'street', 'postal_code', 'notes'];
@@ -319,6 +338,8 @@ final class StorefrontCheckoutController extends PublicApiController
                 'hide_sender' => (bool) $order->gift->hide_sender,
                 'message' => $order->gift->message,
             ],
+            // FLOWERS-H7b / ADR-19 — لقطة موعد التسليم الثابتة؛ المفتاح غائب لطلب بلا جدولة (شكل مطابق لما قبل H7).
+            ...($order->schedule === null ? [] : ['schedule' => \App\Services\Commerce\CommerceDeliveryScheduleService::presentOrder($order->schedule)]),
             'payment' => [
                 'method' => $order->paymentIntent?->method,
                 'status' => $order->paymentIntent?->status,

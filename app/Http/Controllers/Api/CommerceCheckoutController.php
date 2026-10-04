@@ -180,6 +180,25 @@ final class CommerceCheckoutController extends PublicApiController
         );
     }
 
+    /**
+     * FLOWERS-H7b / ADR-19 — موعد التسليم (تاريخ + نافذة) أو مسحه (`date`/`slot_id` معاً null). لا مبلغ ولا سعر ولا
+     * مخزون في الطلب؛ الصلاحية من سياسة القناة وطريقة Checkout ووجهته المخزَّنتين، ويُعاد التحقق عند الإتمام.
+     */
+    public function updateSchedule(Request $request, CommerceCheckoutService $checkouts): JsonResponse
+    {
+        $this->rejectUnknown($request, ['date', 'slot_id']);
+        $data = $request->validate([
+            'date' => ['present', 'nullable', 'string', 'date_format:Y-m-d'],
+            'slot_id' => ['present', 'nullable', 'uuid'],
+        ]);
+
+        return $this->withCurrentCheckout(
+            $request,
+            $checkouts,
+            fn (CommerceCheckout $checkout) => $checkouts->updateSchedule($checkout, $data['date'], $data['slot_id']),
+        );
+    }
+
     public function updateAddress(Request $request, CommerceCheckoutService $checkouts, CommerceCustomerAddressService $addresses): JsonResponse
     {
         // COM-MOBILE-ADDRESSES-1 (ADR-08) — closes the pre-existing gap where

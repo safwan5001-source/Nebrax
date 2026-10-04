@@ -4,7 +4,9 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Requests\StoreCommerceShippingZoneRequest;
 use App\Models\CommerceShippingZone;
+use App\Services\Commerce\ShippingRateService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\DB;
 
 /**
  * COM-MOBILE-SHIPPING-1 (ADR-10) — إدارة مناطق الشحن المُهيَّأة من التاجر.
@@ -34,9 +36,12 @@ class CommerceShippingZoneController extends ApiController
     public function store(StoreCommerceShippingZoneRequest $request): JsonResponse
     {
         $data = $request->validated();
-        $this->assertMatchValueFree($data['match_type'], $data['match_value']);
+        $zone = DB::transaction(function () use ($data): CommerceShippingZone {
+            app(ShippingRateService::class)->lockChannelsForZoneChange();
+            $this->assertMatchValueFree($data['match_type'], $data['match_value']);
 
-        $zone = CommerceShippingZone::create($data);
+            return CommerceShippingZone::create($data);
+        });
 
         return response()->json(['data' => $this->serialize($zone)], 201);
     }
@@ -45,9 +50,12 @@ class CommerceShippingZoneController extends ApiController
     {
         $zone = CommerceShippingZone::findOrFail($id);
         $data = $request->validated();
-        $this->assertMatchValueFree($data['match_type'], $data['match_value'], $zone->id);
+        DB::transaction(function () use ($zone, $data): void {
+            app(ShippingRateService::class)->lockChannelsForZoneChange();
+            $this->assertMatchValueFree($data['match_type'], $data['match_value'], $zone->id);
 
-        $zone->update($data);
+            $zone->update($data);
+        });
 
         return response()->json(['data' => $this->serialize($zone->fresh())]);
     }
@@ -55,7 +63,10 @@ class CommerceShippingZoneController extends ApiController
     public function destroy(string $id): JsonResponse
     {
         $zone = CommerceShippingZone::findOrFail($id);
-        $zone->delete();
+        DB::transaction(function () use ($zone): void {
+            app(ShippingRateService::class)->lockChannelsForZoneChange();
+            $zone->delete();
+        });
 
         return response()->json(['message' => 'deleted']);
     }

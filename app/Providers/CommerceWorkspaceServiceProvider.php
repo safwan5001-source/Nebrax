@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\CommerceFacetController;
 use App\Http\Controllers\Api\CommercePersonalizationController;
 use App\Http\Controllers\Api\CommerceProductAddonController;
 use App\Http\Controllers\Api\CommerceProductContentController;
+use App\Http\Controllers\Api\CommerceProductPreparationController;
 use App\Http\Controllers\Api\CommerceProductPublicationController;
 use App\Http\Middleware\EnsureActiveSubscription;
 use App\Http\Middleware\EnsurePermission;
@@ -68,6 +69,14 @@ final class CommerceWorkspaceServiceProvider extends ServiceProvider
                 ->whereUuid('id')
                 ->middleware(EnsurePermission::class.':products.view');
             Route::put('{id}/addons', [CommerceProductAddonController::class, 'replace'])
+                ->whereUuid('id')
+                ->middleware(EnsurePermission::class.':products.manage');
+
+            // FLOWERS-H8 / ADR-20 — مهلة تجهيز المنتج (مدخل وعد التسليم). RBAC يطابق النشر.
+            Route::get('{id}/preparation', [CommerceProductPreparationController::class, 'show'])
+                ->whereUuid('id')
+                ->middleware(EnsurePermission::class.':products.view');
+            Route::put('{id}/preparation', [CommerceProductPreparationController::class, 'replace'])
                 ->whereUuid('id')
                 ->middleware(EnsurePermission::class.':products.manage');
 

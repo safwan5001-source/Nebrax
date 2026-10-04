@@ -70,6 +70,11 @@ class CommerceModuleBoundaryTest extends TestCase
         'api/commerce/workspace/facets/{id}',
         'api/commerce/workspace/facets/{id}/values',
         'api/commerce/workspace/facets/{id}/values/{valueId}',
+        // FLOWERS-H7a / ADR-19 — سياسة جدولة التسليم لقناة جوال.
+        'api/commerce/workspace/mobile-channel/delivery-schedule',
+        'api/commerce/workspace/mobile-channel/delivery-schedule/blocked-dates',
+        'api/commerce/workspace/mobile-channel/delivery-schedule/settings',
+        'api/commerce/workspace/mobile-channel/delivery-schedule/slots',
         // COM-CATALOG-1 — قائمة مساحة عمل نشر المنتجات (قراءة فقط فوق COM-WS-3).
         'api/commerce/workspace/products/publication',
         // FLOWERS-H6 / ADR-18 — إضافات المنتج الاختيارية.
@@ -79,6 +84,8 @@ class CommerceModuleBoundaryTest extends TestCase
         'api/commerce/workspace/products/{id}/facets',
         // FLOWERS-H4a / ADR-16 — تعريفات التخصيص لكل منتج.
         'api/commerce/workspace/products/{id}/personalization',
+        // FLOWERS-H8 / ADR-20 — مهلة تجهيز المنتج (مدخل وعد التسليم).
+        'api/commerce/workspace/products/{id}/preparation',
         'api/commerce/workspace/products/{id}/publication',
         // COM-MOBILE-SHIPPING-1 — مناطق شحن مُهيَّأة من التاجر (ADR-10).
         'api/commerce/workspace/shipping-zones',
@@ -91,6 +98,11 @@ class CommerceModuleBoundaryTest extends TestCase
         'api/commerce/workspace/storefronts/{id}/categories',
         'api/commerce/workspace/storefronts/{id}/categories/{category}',
         'api/commerce/workspace/storefronts/{id}/deactivate',
+        // FLOWERS-H7a / ADR-19 — سياسة جدولة التسليم.
+        'api/commerce/workspace/storefronts/{id}/delivery-schedule',
+        'api/commerce/workspace/storefronts/{id}/delivery-schedule/blocked-dates',
+        'api/commerce/workspace/storefronts/{id}/delivery-schedule/settings',
+        'api/commerce/workspace/storefronts/{id}/delivery-schedule/slots',
         'api/commerce/workspace/storefronts/{id}/domains',
         'api/commerce/workspace/storefronts/{id}/domains/{domainId}',
         'api/commerce/workspace/storefronts/{id}/domains/{domainId}/activate-edge',
@@ -99,6 +111,9 @@ class CommerceModuleBoundaryTest extends TestCase
         'api/commerce/workspace/storefronts/{id}/domains/{domainId}/verify',
         // FLOWERS-H3 / ADR-15 — سياسة الإهداء.
         'api/commerce/workspace/storefronts/{id}/gift-settings',
+        // CUST-H4-6 — تهيئة عروض المتجر (تنسيق وجدولة فقط) + قراءة معاينة Canvas.
+        'api/commerce/workspace/storefronts/{id}/offers',
+        'api/commerce/workspace/storefronts/{id}/offers/{offer}',
         'api/commerce/workspace/storefronts/{id}/presentation',
         'api/commerce/workspace/storefronts/{id}/presentation/publish',
         // CUST-H1-1 — أساس نسخ مظهر المتجر (list/create/read/save/rename/delete).
@@ -135,8 +150,12 @@ class CommerceModuleBoundaryTest extends TestCase
         'commerce/v1/checkout/gift',
         // COM-MOBILE-PAYMENTS-1 — اختيار طريقة الدفع.
         'commerce/v1/checkout/payment',
+        // FLOWERS-H7b / ADR-19 — موعد التسليم (تاريخ + نافذة).
+        'commerce/v1/checkout/schedule',
         // FLOWERS-H2 / ADR-14 §2.3 — مجموعات تسويقية يدوية (قراءة فقط).
         'commerce/v1/collections',
+        // FLOWERS-H7a / ADR-19 — خيارات جدولة التسليم المتاحة (قراءة فقط).
+        'commerce/v1/delivery-schedule',
         // APP-BUILDER-19 — أحدث تجربة App Builder منشورة (حلقة الجلب/التخزين المؤقت).
         'commerce/v1/experience',
         // COM-MOBILE-AUTH-1 — ملف العميل الموثَّق (X-Customer-Token).

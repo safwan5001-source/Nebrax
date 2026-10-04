@@ -183,6 +183,32 @@ final class InventoryReservationService
     }
 
     /**
+     * نفس `activeReservedQuantity` لعدّة منتجات في استعلام مجمَّع واحد (بلا N+1) — مصدر الحالة `active` واحد.
+     *
+     * @param  list<string>  $productIds
+     * @return array<string, array<string, int>> `productId => [variantKey => qty]` (`variantKey` = `''` للمنتج البسيط)
+     */
+    public function activeReservedMany(array $productIds, string $warehouseId): array
+    {
+        if ($productIds === []) {
+            return [];
+        }
+
+        $reserved = [];
+        foreach (InventoryReservation::query()
+            ->whereIn('product_id', $productIds)
+            ->where('warehouse_id', $warehouseId)
+            ->where('status', InventoryReservation::STATUS_ACTIVE)
+            ->selectRaw('product_id, product_variant_id, sum(base_quantity) as reserved')
+            ->groupBy('product_id', 'product_variant_id')
+            ->get() as $row) {
+            $reserved[$row->product_id][(string) $row->product_variant_id] = (int) $row->reserved;
+        }
+
+        return $reserved;
+    }
+
+    /**
      * @throws InvalidReservationStateTransitionException الحجز ليس ACTIVE ولا في الحالة الهدف أصلاً.
      */
     private function transition(string $reservationId, string $targetStatus, string $timestampColumn): InventoryReservation

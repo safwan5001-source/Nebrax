@@ -9,6 +9,7 @@ use App\Models\CommerceListing;
 use App\Models\CommerceProductAddon;
 use App\Models\CommerceProductContentBlock;
 use App\Models\CommerceProductPersonalizationField;
+use App\Models\CommerceProductPreparation;
 use App\Models\CommerceProductFacetValue;
 use App\Models\CommerceOrderLine;
 use App\Models\CreditNoteLine;
@@ -37,6 +38,7 @@ use App\Models\SkuRegistryEntry;
 use App\Models\StockMovement;
 use App\Models\StockPermitLine;
 use App\Models\StocktakeLine;
+use App\Models\StorefrontOffer;
 
 /**
  * ═══════════════════════════════════════════════════════════════
@@ -189,12 +191,19 @@ final class ProductReferenceRegistry
         // H2c: عضوية منتجٍ في مجموعة تسويقية يدوية — توصيفٌ عرضي بلا أثر مالي أو
         // مخزني، كإسناد السِمة تماماً: لا يمنع الحذف الحقيقي ويُنظَّف معه.
         CommerceCollectionProduct::class => ['key' => 'commerce_collection_products', 'classes' => [self::OWNED_CHILD]],
+        // CUST-H4-6: مرشّح عرضٍ على متجر (تنسيق وجدولة فقط — لا سعر ولا خصم ولا
+        // مخزون، والخصم الحقيقي يُقرأ وقت العرض من CommercePriceResolver). توصيفٌ
+        // عرضي تابعٌ بالكامل للمنتج بلا تاريخٍ مالي ولا أثرٍ مخزني، كعضوية المجموعة
+        // اليدوية تماماً: لا يمنع الحذف الحقيقي ويُنظَّف معه صراحةً.
+        StorefrontOffer::class => ['key' => 'storefront_offers', 'classes' => [self::OWNED_CHILD]],
         // H4 / ADR-16: تعريف حقل تخصيص (نص/قائمة) يخصّ المنتج — مواصفة تجارية تابعة بالكامل له
         // (خياراته تتبعه بـcascade). الطلبات التاريخية تحمل لقطتها الخاصة في
         // `commerce_order_line_personalizations` ولا تشير إلى التعريف، فلا يمنع الحذف.
         CommerceProductPersonalizationField::class => ['key' => 'commerce_product_personalization_fields', 'classes' => [self::OWNED_CHILD]],
         // H5 / ADR-17: كتل محتوى المنتج المهيكلة (تركيبة/عناية/تغليف) نصٌّ تسويقي تابع بالكامل
         // للمنتج — بلا أثر مالي أو مخزني، لا يمنع الحذف الحقيقي ويُنظَّف معه.
+        // H8 / ADR-20: مهلة تجهيز المنتج تابعٌ مملوك — بلا أثر مالي أو مخزني، تُنظَّف مع الحذف الحقيقي.
+        CommerceProductPreparation::class => ['key' => 'commerce_product_preparations', 'classes' => [self::OWNED_CHILD]],
         CommerceProductContentBlock::class => ['key' => 'commerce_product_content_blocks', 'classes' => [self::OWNED_CHILD]],
         // H6 / ADR-18: علاقة إضافة اختيارية (أب ← منتج إضافة) — توصيفٌ تجاري بلا أثر مالي أو مخزني.
         // تُنظَّف حين يكون المنتج أباً (`product_id`) أو إضافةً (`addon_product_id`)؛ سطور الطلبات

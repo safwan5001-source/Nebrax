@@ -8,10 +8,12 @@ use App\Models\CommerceProductAddon;
 use App\Models\CommerceProductContentBlock;
 use App\Models\CommerceProductFacetValue;
 use App\Models\CommerceProductPersonalizationField;
+use App\Models\CommerceProductPreparation;
 use App\Models\InventoryStockAlert;
 use App\Models\Product;
 use App\Models\ProductActivity;
 use App\Models\SkuRegistryEntry;
+use App\Models\StorefrontOffer;
 use App\Services\DocumentCenter\DocumentStorageService;
 use App\Support\ProductReferenceRegistry;
 use App\Tenancy\BranchScope;
@@ -154,10 +156,14 @@ class ProductLifecycleService
             // Eloquent على المنتج؛ تُحذف صراحةً لا اتكالاً على cascade وحده.
             $this->referenceQuery(CommerceProductFacetValue::class, $product)->delete();
             $this->referenceQuery(CommerceCollectionProduct::class, $product)->delete();
+            // CUST-H4-6: مرشّحات العروض تابعٌ مملوك (تنسيق فقط) — تُحذف صراحةً مع المنتج.
+            $this->referenceQuery(StorefrontOffer::class, $product)->delete();
             // H4: تعريفات التخصيص (والخيارات عبر cascade) تابعٌ مملوك — تُحذف صراحةً مع المنتج.
             $this->referenceQuery(CommerceProductPersonalizationField::class, $product)->delete();
             // H5: كتل المحتوى المهيكل تابعٌ مملوك — تُحذف صراحةً مع المنتج.
             $this->referenceQuery(CommerceProductContentBlock::class, $product)->delete();
+            // H8: مهلة التجهيز تابعٌ مملوك — تُحذف صراحةً مع المنتج.
+            $this->referenceQuery(CommerceProductPreparation::class, $product)->delete();
             // H6: علاقات الإضافات تابعٌ مملوك — حين يكون المنتج أباً أو إضافةً (حذفه الناعم لا يُفعّل cascade).
             $this->referenceQuery(CommerceProductAddon::class, $product)->delete();
             BranchScope::reference(CommerceProductAddon::class)->where('addon_product_id', $product->id)->delete();

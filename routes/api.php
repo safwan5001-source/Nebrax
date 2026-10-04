@@ -37,8 +37,10 @@ use App\Http\Controllers\Api\PreviewSessionController;
 use App\Http\Controllers\Api\PreviewExchangeReferenceController;
 use App\Http\Controllers\Api\CommercePaymentIntentController;
 use App\Http\Controllers\Api\CommerceShippingZoneController;
+use App\Http\Controllers\Api\CommerceDeliveryScheduleController;
 use App\Http\Controllers\Api\CommerceGiftSettingsController;
 use App\Http\Controllers\Api\CommerceWorkspaceStorefrontsController;
+use App\Http\Controllers\Api\CommerceWorkspaceStorefrontOfferController;
 use App\Http\Controllers\Api\CommerceWorkspaceStorefrontPresentationController;
 use App\Http\Controllers\Api\CommerceWorkspaceStorefrontPresentationVersionController;
 use App\Http\Controllers\Api\CommerceWorkspaceStorefrontCategoryController;
@@ -882,6 +884,18 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         Route::get('commerce/workspace/storefronts/{id}/gift-settings', [CommerceGiftSettingsController::class, 'show'])->whereUuid('id')->middleware($perm('commerce.manage'));
         Route::put('commerce/workspace/storefronts/{id}/gift-settings', [CommerceGiftSettingsController::class, 'update'])->whereUuid('id')->middleware($perm('commerce.manage'));
 
+        // FLOWERS-H7a / ADR-19: سياسة جدولة التسليم لقناة المتجر (إعداد + نوافذ + تواريخ محجوبة) — commerce.manage.
+        Route::get('commerce/workspace/storefronts/{id}/delivery-schedule', [CommerceDeliveryScheduleController::class, 'show'])->whereUuid('id')->middleware($perm('commerce.manage'));
+        Route::put('commerce/workspace/storefronts/{id}/delivery-schedule/settings', [CommerceDeliveryScheduleController::class, 'updateSettings'])->whereUuid('id')->middleware($perm('commerce.manage'));
+        Route::put('commerce/workspace/storefronts/{id}/delivery-schedule/slots', [CommerceDeliveryScheduleController::class, 'replaceSlots'])->whereUuid('id')->middleware($perm('commerce.manage'));
+        Route::put('commerce/workspace/storefronts/{id}/delivery-schedule/blocked-dates', [CommerceDeliveryScheduleController::class, 'replaceBlockedDates'])->whereUuid('id')->middleware($perm('commerce.manage'));
+
+        // نفس السياسة لقناة الجوال المعتمدة للمستأجر (الأقدم نشاطاً، كما تخدمها /commerce/v1) — بلا معرّف ولا Storefront.
+        Route::get('commerce/workspace/mobile-channel/delivery-schedule', [CommerceDeliveryScheduleController::class, 'show'])->defaults('channel', 'mobile')->middleware($perm('commerce.manage'));
+        Route::put('commerce/workspace/mobile-channel/delivery-schedule/settings', [CommerceDeliveryScheduleController::class, 'updateSettings'])->defaults('channel', 'mobile')->middleware($perm('commerce.manage'));
+        Route::put('commerce/workspace/mobile-channel/delivery-schedule/slots', [CommerceDeliveryScheduleController::class, 'replaceSlots'])->defaults('channel', 'mobile')->middleware($perm('commerce.manage'));
+        Route::put('commerce/workspace/mobile-channel/delivery-schedule/blocked-dates', [CommerceDeliveryScheduleController::class, 'replaceBlockedDates'])->defaults('channel', 'mobile')->middleware($perm('commerce.manage'));
+
         // STORE-ADMIN-ADOPT-1B-2: رؤية نطاقات متجر قائم — قراءة فقط،
         // بلا أي فعل كتابي على StorefrontDomain. نفس صلاحية 1B-1
         // (commerce.manage): حالة النطاق/التحقّق أكثر حساسية من قائمة
@@ -982,6 +996,23 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
             ->middleware($perm('commerce.manage'));
         Route::get('commerce/workspace/storefronts/{id}/categories/{category}', [CommerceWorkspaceStorefrontCategoryController::class, 'show'])
             ->whereUuid('id')->whereUuid('category')
+            ->middleware($perm('commerce.manage'));
+
+        // CUST-H4-6: تهيئة عروض المتجر (تنسيق وجدولة فقط — لا سعر/خصم في أي جسم) +
+        // قراءة معاينة Canvas بنفس `StorefrontOfferResolver` الذي تستعمله القراءة
+        // العامة `GET /store/v1/offers`. نفس صلاحية بقية مسارات المتجر
+        // (commerce.manage)، والملكية بـ`ownedStorefront()` (404 لا 403).
+        Route::get('commerce/workspace/storefronts/{id}/offers', [CommerceWorkspaceStorefrontOfferController::class, 'index'])
+            ->whereUuid('id')
+            ->middleware($perm('commerce.manage'));
+        Route::post('commerce/workspace/storefronts/{id}/offers', [CommerceWorkspaceStorefrontOfferController::class, 'store'])
+            ->whereUuid('id')
+            ->middleware($perm('commerce.manage'));
+        Route::patch('commerce/workspace/storefronts/{id}/offers/{offer}', [CommerceWorkspaceStorefrontOfferController::class, 'update'])
+            ->whereUuid('id')->whereUuid('offer')
+            ->middleware($perm('commerce.manage'));
+        Route::delete('commerce/workspace/storefronts/{id}/offers/{offer}', [CommerceWorkspaceStorefrontOfferController::class, 'destroy'])
+            ->whereUuid('id')->whereUuid('offer')
             ->middleware($perm('commerce.manage'));
 
         // COM-MOBILE-SHIPPING-1 (ADR-10): مناطق شحن مُهيَّأة من التاجر —

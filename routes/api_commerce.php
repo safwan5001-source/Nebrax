@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\CommerceCartController;
 use App\Http\Controllers\Api\CommerceCatalogCollectionController;
+use App\Http\Controllers\Api\CommerceDeliveryScheduleOptionsController;
 use App\Http\Controllers\Api\CommerceCategoryController;
 use App\Http\Controllers\Api\CommerceCheckoutController;
 use App\Http\Controllers\Api\CommerceCustomerAddressController;
@@ -92,6 +93,9 @@ Route::middleware([
     // FLOWERS-H2 / ADR-14 §2.3 — مجموعات تسويقية يدوية (قراءة فقط، مبوَّبة بنشر المنتج).
     Route::get('collections', [CommerceCatalogCollectionController::class, 'index'])->name('collections.index');
 
+    // FLOWERS-H7a / ADR-19 — خيارات جدولة التسليم المتاحة فعلاً (قراءة فقط).
+    Route::get('delivery-schedule', [CommerceDeliveryScheduleOptionsController::class, 'show'])->name('delivery_schedule.show');
+
     Route::get('products', [CommerceProductController::class, 'index'])->name('products.index');
     Route::get('products/{id}', [CommerceProductController::class, 'show'])->whereUuid('id')->name('products.show');
 
@@ -161,6 +165,8 @@ Route::middleware([
     Route::patch('checkout/address', [CommerceCheckoutController::class, 'updateAddress'])->name('checkout.address.update');
     // FLOWERS-H3 / ADR-15 — هوية الإهداء ورسالته.
     Route::patch('checkout/gift', [CommerceCheckoutController::class, 'updateGift'])->name('checkout.gift.update');
+    // FLOWERS-H7b / ADR-19 — موعد التسليم (تاريخ + نافذة).
+    Route::patch('checkout/schedule', [CommerceCheckoutController::class, 'updateSchedule'])->name('checkout.schedule.update');
     Route::patch('checkout/delivery', [CommerceCheckoutController::class, 'updateDelivery'])->name('checkout.delivery.update');
     Route::patch('checkout/payment', [CommerceCheckoutController::class, 'updatePayment'])->name('checkout.payment.update');
     Route::post('checkout/complete', [CommerceCheckoutController::class, 'complete'])->name('checkout.complete');
