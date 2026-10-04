@@ -26,6 +26,18 @@ jobs:
       - name: Build production image
         run: docker build -t awj-api-runtime-smoke .
 
+      - name: Verify GD image capabilities
+        run: |
+          set -euo pipefail
+          docker run --rm --entrypoint php awj-api-runtime-smoke -r '
+            if (!extension_loaded("gd")) { fwrite(STDERR, "GD extension is not loaded.\n"); exit(1); }
+            $info = gd_info();
+            foreach (["JPEG Support", "PNG Support", "WebP Support"] as $capability) {
+                if (empty($info[$capability])) { fwrite(STDERR, "Missing GD capability: {$capability}\n"); exit(1); }
+            }
+            echo "GD capabilities verified: JPEG, PNG, WebP\n";
+          '
+
       - name: Verify Apache configuration
         run: |
           set -euo pipefail

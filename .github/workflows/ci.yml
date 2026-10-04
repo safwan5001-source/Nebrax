@@ -77,8 +77,11 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: '8.4'
-          extensions: mbstring, pdo_sqlite, sqlite3, pgsql, pdo_pgsql, bcmath, intl, fileinfo, zip, dom
+          extensions: mbstring, pdo_sqlite, sqlite3, pgsql, pdo_pgsql, bcmath, intl, fileinfo, zip, dom, gd
           coverage: none
+
+      - name: التحقق من GD وصيغ الصور وعمليات resize الأساسية
+        run: php "$GITHUB_WORKSPACE/tests/Fixtures/gd-runtime-smoke.php"
 
       - name: تثبيت محركات PDF وXML
         run: |
