@@ -1,0 +1,143 @@
+{
+    "data": [
+        {
+            "id": "00000000-0000-4000-8000-000000000001",
+            "name": "باقة جوري",
+            "name_en": null,
+            "description": null,
+            "sku": "JOURNEY-BOUQUET",
+            "category": null,
+            "price": {
+                "amount_minor": 24000,
+                "currency": "SAR"
+            },
+            "in_stock": true,
+            "thumbnail_url": null,
+            "is_variant_managed": false,
+            "delivery_promise": {
+                "deliverable": true,
+                "same_day": true,
+                "earliest": {
+                    "date": "2026-10-07",
+                    "slot": {
+                        "id": "00000000-0000-4000-8000-000000000002",
+                        "label": "مساءً",
+                        "label_en": "Evening",
+                        "start_time": "16:00",
+                        "end_time": "20:00"
+                    }
+                },
+                "reason": null
+            },
+            "created_at": "2026-10-07T07:00:00+00:00",
+            "updated_at": "2026-10-07T07:00:00+00:00"
+        },
+        {
+            "id": "00000000-0000-4000-8000-000000000003",
+            "name": "بالون",
+            "name_en": null,
+            "description": null,
+            "sku": "JOURNEY-BALLOON",
+            "category": null,
+            "price": {
+                "amount_minor": 1500,
+                "currency": "SAR"
+            },
+            "in_stock": true,
+            "thumbnail_url": null,
+            "is_variant_managed": false,
+            "delivery_promise": {
+                "deliverable": true,
+                "same_day": true,
+                "earliest": {
+                    "date": "2026-10-07",
+                    "slot": {
+                        "id": "00000000-0000-4000-8000-000000000002",
+                        "label": "مساءً",
+                        "label_en": "Evening",
+                        "start_time": "16:00",
+                        "end_time": "20:00"
+                    }
+                },
+                "reason": null
+            },
+            "created_at": "2026-10-07T07:00:00+00:00",
+            "updated_at": "2026-10-07T07:00:00+00:00"
+        },
+        {
+            "id": "00000000-0000-4000-8000-000000000004",
+            "name": "علبة شوكولاتة",
+            "name_en": null,
+            "description": null,
+            "sku": "JOURNEY-CHOCOLATE",
+            "category": null,
+            "price": {
+                "amount_minor": 7000,
+                "currency": "SAR"
+            },
+            "in_stock": true,
+            "thumbnail_url": null,
+            "is_variant_managed": false,
+            "delivery_promise": {
+                "deliverable": true,
+                "same_day": true,
+                "earliest": {
+                    "date": "2026-10-07",
+                    "slot": {
+                        "id": "00000000-0000-4000-8000-000000000002",
+                        "label": "مساءً",
+                        "label_en": "Evening",
+                        "start_time": "16:00",
+                        "end_time": "20:00"
+                    }
+                },
+                "reason": null
+            },
+            "created_at": "2026-10-07T07:00:00+00:00",
+            "updated_at": "2026-10-07T07:00:00+00:00"
+        }
+    ],
+    "meta": {
+        "request_id": "00000000-0000-4000-8000-000000000005",
+        "facets": [
+            {
+                "key": "occasion",
+                "system_key": "occasion",
+                "name": "المناسبة",
+                "name_en": "Occasion",
+                "values": [
+                    {
+                        "slug": "birthday",
+                        "name": "عيد ميلاد",
+                        "name_en": "Birthday",
+                        "count": 1,
+                        "selected": false
+                    }
+                ]
+            },
+            {
+                "key": "recipient",
+                "system_key": "recipient",
+                "name": "المُهدى إليه",
+                "name_en": "Recipient",
+                "values": [
+                    {
+                        "slug": "for-her",
+                        "name": "لها",
+                        "name_en": "For her",
+                        "count": 1,
+                        "selected": false
+                    }
+                ]
+            }
+        ],
+        "brands": [],
+        "pagination": {
+            "page": 1,
+            "per_page": 10,
+            "total": 3,
+            "last_page": 1,
+            "has_more": false
+        }
+    }
+}

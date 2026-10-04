@@ -81,6 +81,9 @@ class ResolveStorefrontTenant
             ->where('type', SalesChannel::TYPE_WEB)
             ->where('is_active', true)
             ->orderBy('created_at')
+            // created_at بدقة الثانية: قناتان تُنشآن في الثانية نفسها تتعادلان فتُرجع Postgres أيّاً منهما — كسر التعادل بالمعرّف
+            // (UUID مرتَّب زمنياً) يجعل «أقدم قناة ويب» حتمياً (FLOWERS-H16: وجده فشلٌ متقطع في CI).
+            ->orderBy('id')
             ->first();
 
         if ($channel === null) {

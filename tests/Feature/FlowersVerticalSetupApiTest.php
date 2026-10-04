@@ -238,6 +238,21 @@ class FlowersVerticalSetupApiTest extends TestCase
         $byKey = array_column($this->withToken($token)->getJson($this->path($ctx['id']))->json('data.setup.items'), null, 'key');
         $this->assertSame('not_configured', $byKey['delivery_scheduling']['state']);
 
+        // نافذة فعلية ⇒ الجدولة مهيَّأة؛ لكن «يصل اليوم» يحتاج مخزن تنفيذ للقناة أيضاً (وإلا الوعد not_configured).
+        $this->withToken($token)->putJson('/api/commerce/workspace/storefronts/'.$ctx['id'].'/delivery-schedule/slots', ['slots' => [
+            ['method' => 'delivery', 'label' => 'مساءً', 'start_time' => '16:00', 'end_time' => '20:00'],
+        ]])->assertOk();
+        $byKey = array_column($this->withToken($token)->getJson($this->path($ctx['id']))->json('data.setup.items'), null, 'key');
+        $this->assertSame('configured', $byKey['delivery_scheduling']['state']);
+        $this->assertSame('not_configured', $byKey['same_day_delivery']['state']);
+
+        app(TenantContext::class)->set($ctx['auth']['tenant_id']);
+        $warehouse = \App\Models\Warehouse::create(['name' => 'مخزن', 'code' => 'VS-W1', 'is_default' => true]);
+        app(\App\Services\Commerce\FulfillmentPolicyService::class)->setFixedWarehouse(Storefront::query()->findOrFail($ctx['id'])->sales_channel_id, $warehouse->id);
+        app(TenantContext::class)->forget();
+        $byKey = array_column($this->withToken($token)->getJson($this->path($ctx['id']))->json('data.setup.items'), null, 'key');
+        $this->assertSame('configured', $byKey['same_day_delivery']['state']);
+
         $this->withToken($token)->putJson('/api/commerce/workspace/storefronts/'.$ctx['id'].'/gift-settings', ['is_enabled' => false])->assertOk();
         $byKey = array_column($this->withToken($token)->getJson($this->path($ctx['id']))->json('data.setup.items'), null, 'key');
         $this->assertSame('not_configured', $byKey['gift_message']['state']);

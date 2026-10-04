@@ -73,8 +73,9 @@ final class StorefrontVerticalSetupService
             VerticalCapability::Personalization->value => CommerceProductPersonalizationField::query()->where('is_active', true)->distinct()->count('product_id'),
             VerticalCapability::AddOns->value => CommerceProductAddon::query()->where('is_active', true)->distinct()->count('product_id'),
             VerticalCapability::DeliveryScheduling->value => $scheduleOn && $slots > 0 ? $slots : 0,
-            // «يصل اليوم» يُشتقّ من جدولة مفعّلة بنوافذ فعلية (ADR-20) — لا إعداد مستقل له.
-            VerticalCapability::SameDayDelivery->value => $scheduleOn && $slots > 0 ? $slots : 0,
+            // «يصل اليوم» يُشتقّ (ADR-20) من جدولة مفعّلة بنوافذ فعلية **ومخزن تنفيذ معيَّن للقناة** (ATS) — بدون
+            // سياسة تنفيذ يقول الوعد `not_configured` لكل منتج، فلا نُظهرها مهيَّأة (FLOWERS-H16: وجدها اختبار الرحلة الكاملة).
+            VerticalCapability::SameDayDelivery->value => $scheduleOn && $slots > 0 && $this->hasFulfillmentWarehouse($channelId) ? $slots : 0,
             VerticalCapability::StructuredContent->value => CommerceProductContentBlock::query()->where('is_active', true)->distinct()->count('product_id'),
             VerticalCapability::VerticalSections->value => $sections['draft'],
         ];
@@ -275,6 +276,17 @@ final class StorefrontVerticalSetupService
         }
 
         return ['facets' => $facets, 'would_create' => $total];
+    }
+
+    private function hasFulfillmentWarehouse(string $salesChannelId): bool
+    {
+        try {
+            app(FulfillmentPolicyService::class)->resolveWarehouseFor($salesChannelId);
+
+            return true;
+        } catch (FulfillmentPolicyNotConfiguredException) {
+            return false;
+        }
     }
 
     /** @return array{draft: int, published: int} */

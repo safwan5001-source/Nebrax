@@ -1,0 +1,127 @@
+{
+    "data": {
+        "status": "active",
+        "contact": {
+            "name": "سالم الأحمدي",
+            "phone": "0501234567",
+            "email": "salem@example.com"
+        },
+        "delivery": {
+            "method": "standard",
+            "amount": {
+                "amount_minor": 0,
+                "currency": "SAR"
+            },
+            "address": {
+                "country": "SA",
+                "region": null,
+                "city": "الدمام",
+                "district": "الشاطئ",
+                "street": "شارع الملك فهد",
+                "building_no": null,
+                "additional_number": null,
+                "postal_code": "31411",
+                "notes": null
+            }
+        },
+        "payment": {
+            "payment_method_id": null,
+            "payment_method_name": null,
+            "method": "cod"
+        },
+        "gift": {
+            "recipient_name": "ريم الحربي",
+            "recipient_phone": "0555550101",
+            "sender_display_name": "سالم",
+            "hide_sender": false,
+            "message": "كل عام وأنتِ بخير\nمع محبتي"
+        },
+        "gift_options": {
+            "enabled": true,
+            "message_max_length": 250,
+            "allow_hide_sender": true,
+            "recipient_phone_required": true
+        },
+        "cart": {
+            "status": "active",
+            "items": [
+                {
+                    "id": "00000000-0000-4000-8000-000000000009",
+                    "product_id": "00000000-0000-4000-8000-000000000001",
+                    "product_variant_id": null,
+                    "variant_descriptor": null,
+                    "product_name": "باقة جوري",
+                    "unit_key": "base",
+                    "unit_name": "piece",
+                    "quantity": 1,
+                    "unit_price": {
+                        "amount_minor": 24000,
+                        "currency": "SAR"
+                    },
+                    "line_total": {
+                        "amount_minor": 24000,
+                        "currency": "SAR"
+                    },
+                    "available": true,
+                    "personalization": [
+                        {
+                            "key": "card-name",
+                            "label": "الاسم على البطاقة",
+                            "label_en": "Name on the card",
+                            "value": "ريم",
+                            "value_label": null
+                        },
+                        {
+                            "key": "wrap",
+                            "label": "التغليف",
+                            "label_en": "Wrapping",
+                            "value": "satin",
+                            "value_label": "ساتان"
+                        }
+                    ]
+                },
+                {
+                    "id": "00000000-0000-4000-8000-000000000010",
+                    "product_id": "00000000-0000-4000-8000-000000000004",
+                    "product_variant_id": null,
+                    "variant_descriptor": null,
+                    "product_name": "علبة شوكولاتة",
+                    "unit_key": "base",
+                    "unit_name": "piece",
+                    "quantity": 2,
+                    "unit_price": {
+                        "amount_minor": 7000,
+                        "currency": "SAR"
+                    },
+                    "line_total": {
+                        "amount_minor": 14000,
+                        "currency": "SAR"
+                    },
+                    "available": true,
+                    "addon_of": "00000000-0000-4000-8000-000000000009",
+                    "per_parent_quantity": 2
+                }
+            ],
+            "subtotal": {
+                "amount_minor": 38000,
+                "currency": "SAR"
+            },
+            "currency": "SAR",
+            "has_unavailable_items": false
+        },
+        "schedule": {
+            "date": "2026-10-08",
+            "slot": {
+                "id": "00000000-0000-4000-8000-000000000002",
+                "label": "مساءً",
+                "label_en": "Evening",
+                "start_time": "16:00",
+                "end_time": "20:00"
+            },
+            "valid": true
+        }
+    },
+    "meta": {
+        "request_id": "00000000-0000-4000-8000-000000000017"
+    }
+}

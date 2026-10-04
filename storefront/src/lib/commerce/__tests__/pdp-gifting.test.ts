@@ -76,6 +76,38 @@ describe("parseProductGifting (FLOWERS-H11)", () => {
     );
   });
 
+  it("accepts the slug keys the admin API stores (hyphens, up to 48 chars) and still rejects unsafe ones (FLOWERS-H16)", () => {
+    const keys = [
+      "card-name",
+      "engraving-text-line-2",
+      "a".repeat(48),
+      "card_text",
+    ];
+    const parsed = parseProductGifting(
+      { personalization: { fields: keys.map((key) => field({ key })) } },
+      "ar",
+    );
+    expect(parsed.personalization.map((f) => f.key)).toEqual(keys);
+
+    const rejected = parseProductGifting(
+      {
+        personalization: {
+          fields: [
+            "a".repeat(49),
+            "-lead",
+            "trail-",
+            "Upper",
+            "a b",
+            "a--b",
+            'x"y',
+          ].map((key) => field({ key })),
+        },
+      },
+      "ar",
+    );
+    expect(rejected.personalization).toEqual([]);
+  });
+
   it("drops invalid, duplicate and unanswerable fields, and bounds the count", () => {
     const raw = {
       personalization: {
