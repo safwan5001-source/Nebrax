@@ -84,6 +84,8 @@ class CommerceModuleBoundaryTest extends TestCase
         'api/commerce/workspace/products/{id}/facets',
         // FLOWERS-H4a / ADR-16 — تعريفات التخصيص لكل منتج.
         'api/commerce/workspace/products/{id}/personalization',
+        // FLOWERS-H8 / ADR-20 — مهلة تجهيز المنتج (مدخل وعد التسليم).
+        'api/commerce/workspace/products/{id}/preparation',
         'api/commerce/workspace/products/{id}/publication',
         // COM-MOBILE-SHIPPING-1 — مناطق شحن مُهيَّأة من التاجر (ADR-10).
         'api/commerce/workspace/shipping-zones',

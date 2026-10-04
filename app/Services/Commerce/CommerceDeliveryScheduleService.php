@@ -254,16 +254,29 @@ final class CommerceDeliveryScheduleService
      */
     public function options(string $salesChannelId, string $method, ?string $city = null, ?string $region = null, ?CarbonInterface $now = null): array
     {
+        $context = $this->context($salesChannelId, $method, $city, $region, $now);
+
+        return $context === null
+            ? ['enabled' => false, 'required' => false, 'method' => $method, 'timezone' => null, 'earliest' => null, 'dates' => []]
+            : $this->evaluate($context);
+    }
+
+    /**
+     * يحمّل كل ما يلزم لتقييم التوفّر **مرة واحدة** (سياسة، نوافذ منطبقة، حجوزات مجمَّعة، تواريخ محجوبة، فترات التوقيت
+     * الصيفي) — ثم `evaluate()` بالذاكرة فقط. يسمح بحساب وعدٍ لعشرات المنتجات بمُهَل تجهيز مختلفة بلا استعلامات
+     * إضافية لكل منتج (H8). null = الجدولة معطَّلة/الطريقة غير معروفة.
+     *
+     * @return array<string, mixed>|null
+     */
+    public function context(string $salesChannelId, string $method, ?string $city = null, ?string $region = null, ?CarbonInterface $now = null): ?array
+    {
         $setting = CommerceDeliveryScheduleSetting::query()->where('sales_channel_id', $salesChannelId)->first();
         if ($setting === null || ! $setting->is_enabled || ! in_array($method, CommerceDeliverySlot::METHODS, true)) {
-            return ['enabled' => false, 'required' => false, 'method' => $method, 'timezone' => null, 'earliest' => null, 'dates' => []];
+            return null;
         }
 
         $timezone = $this->timezoneFor($setting);
         $local = CarbonImmutable::instance($now ?? now())->setTimezone($timezone);
-        // مهلة التجهيز زمنٌ منقضٍ حقيقي: بالثواني على الطابع الزمني لا `addMinutes()` — فحسابها الجداري/المنقضي عند
-        // عبور انتقال التوقيت الصيفي يختلف بين إصدارات Carbon/PHP، والنتيجة هنا لا تتأثر بذلك.
-        $earliestInstant = $local->setTimestamp($local->getTimestamp() + $setting->lead_time_minutes * 60);
         // الإغلاق اليومي لحظةٌ لا مقارنة نصية `H:i`: عند رجوع الساعة يتكرّر الوقت الجداري فيعود النص أصغر من الإغلاق
         // ويُعاد فتح اليوم بعد إغلاقه. اللحظة تُحسم على أول وقوع (EDT) فما إن تُجتاز تبقى مجتازة؛ وفي فجوة الانتقال
         // يُطبَّع الوقت الجداري المعدوم بإضافة طول الفجوة (02:30 ⇒ 03:30 EDT).
@@ -294,6 +307,36 @@ final class CommerceDeliveryScheduleService
             ->whereIn('method', [CommerceDeliveryBlockedDate::METHOD_ALL, $method])
             ->pluck('date')
             ->flip();
+
+        return [
+            'setting' => $setting, 'method' => $method, 'timezone' => $timezone, 'local' => $local,
+            'cutoffPassed' => $cutoffPassed, 'slots' => $slots, 'booked' => $booked, 'blocked' => $blocked, 'ambiguous' => $ambiguous,
+        ];
+    }
+
+    /**
+     * تقييم التوفّر من سياقٍ محمَّل. `$minLeadMinutes` مهلة تجهيز **المنتج**: المهلة الفعلية = الأكبر بينها وبين مهلة
+     * القناة (لا جمع — مهلة القناة حدٌّ أدنى لمعالجة أي طلب، فلا تُحسب مرتين). `$stopAtEarliest` يقطع الحلقة عند
+     * أول يوم متاح (للوعد؛ لا حاجة لباقي الأيام).
+     *
+     * @param  array<string, mixed>  $context
+     */
+    public function evaluate(array $context, ?int $minLeadMinutes = null, bool $stopAtEarliest = false): array
+    {
+        /** @var CommerceDeliveryScheduleSetting $setting */
+        $setting = $context['setting'];
+        $method = $context['method'];
+        $timezone = $context['timezone'];
+        $local = $context['local'];
+        $cutoffPassed = $context['cutoffPassed'];
+        $slots = $context['slots'];
+        $booked = $context['booked'];
+        $blocked = $context['blocked'];
+        $ambiguous = $context['ambiguous'];
+
+        // مهلة التجهيز زمنٌ منقضٍ حقيقي: بالثواني على الطابع الزمني لا `addMinutes()` — فحسابها الجداري/المنقضي عند
+        // عبور انتقال التوقيت الصيفي يختلف بين إصدارات Carbon/PHP، والنتيجة هنا لا تتأثر بذلك.
+        $earliestInstant = $local->setTimestamp($local->getTimestamp() + max($setting->lead_time_minutes, $minLeadMinutes ?? 0) * 60);
 
         $dates = [];
         $earliest = null;
@@ -348,6 +391,9 @@ final class CommerceDeliveryScheduleService
                         }
                     }
                     $earliest = ['date' => $date, 'slot_id' => $first['id']];
+                    if ($stopAtEarliest) {
+                        break;
+                    }
                 }
             }
         }

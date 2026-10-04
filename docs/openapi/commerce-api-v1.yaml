@@ -231,6 +231,8 @@ paths:
         - $ref: '#/components/parameters/ProductsBrandId'
         - $ref: '#/components/parameters/ProductsCollection'
         - $ref: '#/components/parameters/ProductsFacet'
+        - $ref: '#/components/parameters/DeliveryCity'
+        - $ref: '#/components/parameters/DeliveryRegion'
       responses:
         '200':
           description: A page of products (list rows never carry media/options/variants).
@@ -324,6 +326,9 @@ paths:
         then reflect the cheapest variant / any-variant-in-stock, never an
         ambiguous parent figure.
       x-auth-tier: read
+      parameters:
+        - $ref: '#/components/parameters/DeliveryCity'
+        - $ref: '#/components/parameters/DeliveryRegion'
       responses:
         '200':
           description: The product (detail always includes `media`, unlike the list row).
@@ -1219,6 +1224,18 @@ components:
       in: query
       required: false
       schema: { type: integer, minimum: 1, maximum: 100 }
+    DeliveryCity:
+      name: city
+      in: query
+      required: false
+      description: Destination city used only to derive `delivery_promise` (zone-restricted windows apply by destination).
+      schema: { type: string, maxLength: 120 }
+    DeliveryRegion:
+      name: region
+      in: query
+      required: false
+      description: Destination region used only to derive `delivery_promise`.
+      schema: { type: string, maxLength: 120 }
     ProductsSearch:
       name: search
       in: query
@@ -1479,6 +1496,7 @@ components:
         is_variant_managed: { type: boolean }
         created_at: { type: [string, 'null'], format: date-time }
         updated_at: { type: [string, 'null'], format: date-time }
+        delivery_promise: { $ref: '#/components/schemas/DeliveryPromise' }
 
     ProductDetail:
       type: object
@@ -1515,6 +1533,30 @@ components:
         personalization: { $ref: '#/components/schemas/ProductPersonalization' }
         content_blocks: { $ref: '#/components/schemas/ProductContentBlocks' }
         addons: { $ref: '#/components/schemas/ProductAddons' }
+        delivery_promise: { $ref: '#/components/schemas/DeliveryPromise' }
+
+    DeliveryPromise:
+      description: >
+        ADR-20. Derived at request time from published stock (ATS), the channel's delivery schedule and the product's
+        preparation time — never stored. Present only while the channel's delivery scheduling is enabled. `same_day`
+        is true only when the earliest selectable window is today in the channel timezone and changes automatically
+        with stock, cut-off, blocked dates, capacity and preparation time. Delivery only (pickup is out of scope).
+      type: object
+      additionalProperties: false
+      required: [deliverable, same_day, earliest, reason]
+      properties:
+        deliverable: { type: boolean }
+        same_day: { type: boolean }
+        earliest:
+          type: [object, 'null']
+          additionalProperties: false
+          required: [date, slot]
+          properties:
+            date: { type: string, format: date }
+            slot: { $ref: '#/components/schemas/DeliveryScheduleSlot' }
+        reason:
+          type: [string, 'null']
+          enum: [not_configured, out_of_stock, no_slot, null]
 
     ProductAddons:
       description: >
@@ -1652,6 +1694,7 @@ components:
         personalization: { $ref: '#/components/schemas/ProductPersonalization' }
         content_blocks: { $ref: '#/components/schemas/ProductContentBlocks' }
         addons: { $ref: '#/components/schemas/ProductAddons' }
+        delivery_promise: { $ref: '#/components/schemas/DeliveryPromise' }
 
     ProductListResponse:
       type: object

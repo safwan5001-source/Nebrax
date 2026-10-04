@@ -8,6 +8,7 @@ use App\Models\CommerceListing;
 use App\Models\Product;
 use App\Models\Tenant;
 use App\Services\Commerce\AvailableToSellService;
+use App\Services\Commerce\CommerceDeliveryPromiseService;
 use App\Services\Commerce\CommercePriceResolver;
 use App\Services\Commerce\FulfillmentPolicyNotConfiguredException;
 use App\Services\Commerce\FulfillmentPolicyService;
@@ -87,6 +88,8 @@ class CommerceProductController extends PublicApiController
             'sort' => ['sometimes', 'nullable', 'string', 'max:40'],
             'page' => ['sometimes', 'nullable', 'integer', 'min:1'],
             'per_page' => ['sometimes', 'nullable', 'integer', 'min:1', 'max:100'],
+            'city' => ['sometimes', 'nullable', 'string', 'max:120'],
+            'region' => ['sometimes', 'nullable', 'string', 'max:120'],
             ...CatalogFacetFilter::rules(),
         ]);
 
@@ -156,6 +159,15 @@ class CommerceProductController extends PublicApiController
             ->map(fn (Product $product) => $this->toResource($request, $product, $channelId, $currency, $warehouse, $prices, $availability, $gallery, false))
             ->all();
 
+        // FLOWERS-H8 / ADR-20 — وعد التسليم المشتق (استعلامات ثابتة لا تتبع عدد الصفوف)؛ المفتاح غائب حين الجدولة معطَّلة.
+        $promises = app(CommerceDeliveryPromiseService::class)
+            ->forProducts($channelId, $paginator->getCollection(), $filters['city'] ?? null, $filters['region'] ?? null);
+        if ($promises !== null) {
+            foreach ($paginator->getCollection()->values() as $i => $product) {
+                $data[$i]['delivery_promise'] = $promises[$product->id];
+            }
+        }
+
         return new JsonResponse([
             'data' => $data,
             'meta' => [
@@ -180,6 +192,10 @@ class CommerceProductController extends PublicApiController
         ProductMediaGalleryService $gallery,
     ): JsonResponse {
         $id = (string) $request->route('id');
+        $destination = $request->validate([
+            'city' => ['sometimes', 'nullable', 'string', 'max:120'],
+            'region' => ['sometimes', 'nullable', 'string', 'max:120'],
+        ]);
 
         $storefront = app(StorefrontContext::class);
         $channelId = $storefront->salesChannelId();
@@ -214,6 +230,13 @@ class CommerceProductController extends PublicApiController
         }
 
         $resource = $this->toResource($request, $product, $channelId, $currency, $warehouse, $prices, $availability, $gallery, true);
+
+        // FLOWERS-H8 / ADR-20 — وعد التسليم المشتق؛ المفتاح غائب حين الجدولة معطَّلة على القناة.
+        $promise = app(CommerceDeliveryPromiseService::class)
+            ->forProducts($channelId, [$product], $destination['city'] ?? null, $destination['region'] ?? null);
+        if ($promise !== null) {
+            $resource['delivery_promise'] = $promise[$product->id];
+        }
 
         // FLOWERS-H4a / ADR-16 — يظهر فقط حين يملك المنتج مُدخَلات تخصيص نشطة.
         $personalization = app(ProductPersonalizationService::class)->publicFields($id);
