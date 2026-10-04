@@ -21,6 +21,7 @@ use App\Services\Commerce\ProductPersonalizationService;
 use App\Tenancy\TenantContext;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
@@ -218,6 +219,48 @@ class FlowersEndToEndJourneyTest extends TestCase
         $this->assertSame(38000, $order['total']['amount_minor']);
 
         $this->assertMatchesContract();
+    }
+
+    /** @test */
+    public function the_listing_query_count_does_not_grow_with_the_number_of_products(): void
+    {
+        $p = $this->seedFlowersStore();
+        // ما يُستثنى: استعلاما الصورة المصغّرة وسعر الوحدة لكل منتج — N+1 قديم في قائمة الكتالوج العامة (خارج الأفق،
+        // مسجَّل في التقرير الختامي). كل ما أضافه الأفق (وعد التسليم، الأبعاد، المحتوى) يجب أن يبقى ثابتاً.
+        $count = function (): int {
+            DB::flushQueryLog();
+            DB::enableQueryLog();
+            $this->api('GET', 'products?per_page=50')->assertOk();
+            $n = count(array_filter(
+                DB::getQueryLog(),
+                static fn (array $q) => ! str_contains($q['query'], '"product_media"') && ! str_contains($q['query'], '"product_unit_prices"'),
+            ));
+            DB::disableQueryLog();
+
+            return $n;
+        };
+        $count(); // يسخّن ذاكرات الخدمة قبل القياس
+        $few = $count();
+
+        // اثنا عشر منتجاً إضافياً: منشورة، بمخزون، ومسنَدة لقيمتَي تصنيف — وبكتل محتوى وتخصيص.
+        $tenant = Tenant::query()->latest('created_at')->firstOrFail();
+        app(TenantContext::class)->set($tenant->id);
+        $channel = SalesChannel::query()->where('slug', 'web')->firstOrFail();
+        $warehouse = Warehouse::query()->firstOrFail();
+        $facets = app(CommerceFacetService::class)->list();
+        $valueIds = [$facets[0]['values'][0]['id'], $facets[1]['values'][0]['id']];
+        for ($i = 0; $i < 12; $i++) {
+            $extra = Product::create(['name' => "منتج {$i}", 'sku' => "JOURNEY-X{$i}", 'unit' => 'piece', 'sale_price' => 5000 + $i, 'is_active' => true]);
+            CommerceListing::create(['product_id' => $extra->id, 'sales_channel_id' => $channel->id, 'is_published' => true]);
+            ProductWarehouseStock::create(['product_id' => $extra->id, 'warehouse_id' => $warehouse->id, 'quantity' => 10]);
+            app(CommerceFacetService::class)->replaceAssignments($extra, $valueIds);
+            app(ProductContentService::class)->replace($extra, [['block_type' => 'care', 'body' => 'عناية']]);
+        }
+        app(TenantContext::class)->forget();
+
+        $many = $count();
+        $this->assertSame($few, $many, "عدد استعلامات القائمة نما من {$few} إلى {$many} مع زيادة المنتجات — N+1 في وعد التسليم أو الأبعاد أو المحتوى (ما أضافه الأفق).");
+        $this->assertNotNull($p['bouquet']);
     }
 
     // ── العقد المشترك ───────────────────────────────────────────────────

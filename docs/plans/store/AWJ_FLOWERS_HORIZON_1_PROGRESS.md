@@ -1,6 +1,6 @@
 # AWJ Flowers & Gifts — Horizon 1 Progress
 
-**Status:** IN PROGRESS — H1–H14 merged; H15 in review  
+**Status:** IN PROGRESS — H1–H15 merged; H16 in review  
 **Date:** 2026-10-03  
 **Planning Base:** `main` @ `318cc72d10bb304cef4b401f548772008ea1618e`  
 **Execution Authority:** `AWJ_FLOWERS_HORIZON_1_AUTONOMOUS_EXECUTION.md`  
@@ -52,8 +52,8 @@ No Deploy or Production change is authorized by this Horizon.
 | H12 | Cart & Checkout Gifting UX — cart/order lines (H12a), schedule + gift checkout stages (H12b) | MERGED | #1219 | `1f15d5f` |
 | H13 | Account / Saved Recipient / Order Experience (ADR-24) | MERGED | #1220 | `52e1096` |
 | H14 | Vertical Onboarding & Defaults (ADR-25) | MERGED | #1221 | `064a91e` |
-| H15 | Theme / Presentation Pack — AWJ Bloom (ADR-26) | PR OPEN, in review | (see log) | — |
-| H16 | Cross-Horizon Integration / Polish | NOT STARTED | — | — |
+| H15 | Theme / Presentation Pack — AWJ Bloom (ADR-26) | MERGED | #1222 | `b1eb5ba` |
+| H16 | Cross-Horizon Integration / Polish (real-API journey contract + fixes) | PR OPEN, in review | (see log) | — |
 
 ---
 
@@ -710,7 +710,7 @@ PRODUCTION: NOT CHANGED
 
 ### H15 — Theme / presentation pack: AWJ Bloom (ADR-26)
 
-**Status:** PR in review  
+**Status:** MERGED — PR #1222, squash `b1eb5ba6f85a0b7872f85d42a92d5b58ed0860ef`; head `0c3f183de1d245a67de2ca0e4fb3dd8202051839`; CI 10/10 green after one re-run of pgsql (an unrelated intermittent failure, root-caused and fixed in H16); no review threads (Codex out of quota)  
 **Base SHA:** `064a91e7df3d31962758364911608e1f8631e114` (main after H14)  
 **Branch:** `flowers/h15-bloom-presentation`
 
@@ -718,5 +718,16 @@ PRODUCTION: NOT CHANGED
 - **Gallery.** The planned "Boutique Floral" placeholder is replaced by the applicable AWJ Bloom entry. Applying it creates a **new draft version** (never the published store or the working draft) with the preset and — only where the store can back them — a `discovery` section per active occasion/recipient facet (the merchant's own facet key) and a `deliveryPromise` band when scheduling is configured. Placed after the hero; existing sections keep order/content; idempotent; section limits respected; if data can't be read the theme still applies (colour only). Other gallery themes never read store data. Gallery cards now preview each theme's own colour.
 - **Boundaries held.** No taxonomy, delivery truth, gift/personalization persistence, add-on pricing, inventory or checkout validation owned by the theme; no Nebras-specific behaviour or branding.
 - **Tests.** Normalizer/PHP, storefront tokens + config, web registry/preset/pack/gallery-page tests; e2e (AR 390/1440, EN 1440, apply → saved sections) with screenshots. Full web suite 3145 green; storefront 1003 green; `check:locales` clean.
-- **Residual.** Bloom is a colour + section starter, not a full visual redesign (typography/imagery, seasonal variants — evidence-gated). 
+- **Residual.** Bloom is a colour + section starter, not a full visual redesign (typography/imagery, seasonal variants — evidence-gated).
+
+### H16 — Cross-horizon integration / polish
+
+**Status:** PR in review  
+**Base SHA:** `b1eb5ba6f85a0b7872f85d42a92d5b58ed0860ef` (main after H15)  
+**Branch:** `flowers/h16-integration`
+
+- **Method.** One test drives the whole Flowers journey through the **real** `store/v1` API (`FlowersEndToEndJourneyTest`) and captures every response into `contracts/flowers-journey/*.json` (ids normalised to stable placeholder UUIDs). The backend compares live responses with the committed contract on every CI run; the storefront parses the same files with its real mappers (`flowers-journey-contract.test.ts`). `setup.sh`, `ci.yml` and the storefront CI path filter copy/trigger on the new folder.
+- **Findings, all fixed.** (1) The storefront silently dropped personalization fields whose key contains a hyphen (the admin API stores slug keys; the storefront accepted only underscores) — a required field disappeared and the product could not be added. (2) H14 reported "Deliver today" as set up with windows alone; it also needs a fulfilment warehouse. (3) An intermittent pgsql failure on #1222 was root-caused to a same-second `created_at` tie in the legacy storefront resolver ("oldest web channel"); deterministic tie-break + a test that no longer depends on timing. (4) A query-count guard proves the Horizon's catalog additions are constant per request; two **pre-existing**, non-Horizon per-product queries (`product_media`, `product_unit_prices`) are excluded and recorded as a risk.
+- **Reviews with no change needed.** Tenant isolation, backward compatibility, RTL/LTR and mobile (slice evidence), docs.
+- **Final report** written: `AWJ_FLOWERS_HORIZON_1_FINAL_REPORT.md` (this PR).
 
