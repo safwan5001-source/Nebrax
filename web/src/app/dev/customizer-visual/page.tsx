@@ -17,7 +17,13 @@ const BANNER_IMAGE =
 
 const TOKEN = "AwjUnbrokenToken".repeat(6);
 
-type Scenario = "populated" | "empty" | "long" | "missing-media" | "missing-product";
+type Scenario =
+  | "populated"
+  | "empty"
+  | "long"
+  | "missing-media"
+  | "missing-product"
+  | "data-sections";
 type PreviewViewport = "mobile" | "tablet" | "desktop";
 
 function scenarioOf(value: string | null): Scenario {
@@ -25,7 +31,8 @@ function scenarioOf(value: string | null): Scenario {
     value === "empty" ||
     value === "long" ||
     value === "missing-media" ||
-    value === "missing-product"
+    value === "missing-product" ||
+    value === "data-sections"
   ) {
     return value;
   }
@@ -75,7 +82,46 @@ function copy(locale: "ar" | "en", scenario: Scenario) {
   };
 }
 
+/** FLOWERS-H9c — the three data-backed sections (ADR-21), authored and incomplete. */
+function dataSectionsConfig(locale: "ar" | "en") {
+  const ar = locale === "ar";
+  return normalizePresentationConfig({
+    version: 2,
+    branding: { displayName: ar ? "متجر النور" : "Al Noor" },
+    homepage: {
+      sections: [
+        {
+          id: "promise-1",
+          type: "deliveryPromise",
+          visible: true,
+          content: { title: ar ? "توصيل طازج" : "Fresh delivery", body: "" },
+        },
+        {
+          id: "shelf-1",
+          type: "productShelf",
+          visible: true,
+          content: {
+            title: ar ? "ورود لليوم" : "Roses for today",
+            source: { kind: "collection", slug: "roses" },
+            deliverToday: true,
+            limit: 8,
+          },
+        },
+        {
+          id: "discovery-1",
+          type: "discovery",
+          visible: true,
+          content: { title: "", axis: "facet", dimension: "occasion", display: "tiles" },
+        },
+        // No stored content: the builder flags it as not appearing in the store.
+        { id: "shelf-2", type: "productShelf", visible: true },
+      ],
+    },
+  });
+}
+
 function configFor(locale: "ar" | "en", scenario: Scenario) {
+  if (scenario === "data-sections") return dataSectionsConfig(locale);
   const text = copy(locale, scenario);
   const empty = scenario === "empty";
   const missingMedia = scenario === "missing-media";
