@@ -52,7 +52,9 @@ ZATCA says the written contract is not enough if it does not match the actual tr
 These are general rules. They are not findings about a named platform.
 
 **Agents Guideline, version one, July 2020**  
-https://zatca.gov.sa/en/HelpCenter/guidelines/Documents/Agents%20Guideline.pdf
+The live ZATCA address now returns Not Found, checked 2026-10-04: `https://zatca.gov.sa/en/HelpCenter/guidelines/Documents/Agents%20Guideline.pdf`  
+The retained copy is the Wayback capture of that same file on 2022-04-19 (38 pages, Version 1, July 2020):  
+https://web.archive.org/web/20220419220231/https://zatca.gov.sa/en/HelpCenter/guidelines/Documents/Agents%20Guideline.pdf
 
 - An agent acting in the principal's name does not become the supplier. The tax invoice shows the principal's name and TIN. The agent may issue it only if the third-party billing conditions are met. The principal keeps the primary VAT liability.
 - An agent acting in the agent's own name is deemed to supply the goods or services. The tax invoice shows the agent's name and TIN.
