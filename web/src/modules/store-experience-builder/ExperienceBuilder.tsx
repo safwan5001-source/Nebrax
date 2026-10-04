@@ -32,7 +32,14 @@ import {
   type WorkspaceProductDetail,
   type WorkspaceProductSummary,
 } from "@/modules/commerce-workspace/workspace-products";
-import { listWorkspaceOffers, type WorkspaceOffer } from "@/modules/commerce-workspace/workspace-offers";
+import {
+  createWorkspaceOffer,
+  deleteWorkspaceOffer,
+  listWorkspaceOffers,
+  updateWorkspaceOffer,
+  type WorkspaceOffer,
+} from "@/modules/commerce-workspace/workspace-offers";
+import { type OfferManagement, removeOfferIdFromSections, upsertOffer } from "./offers-management";
 import {
   listWorkspaceCategories,
   showWorkspaceCategory,
@@ -260,6 +267,7 @@ export function ExperienceBuilder({
   // per-instance selection itself stays in each section's own `content`.
   const [offersRows, setOffersRows] = useState<WorkspaceOffer[]>([]);
   const [offersState, setOffersState] = useState<"idle" | "loading" | "error" | "ready">("idle");
+  const [offersMax, setOffersMax] = useState<number | null>(null);
   const offersRequestRef = useRef(0);
   const offersAbortRef = useRef<AbortController | null>(null);
   const [pendingSectionScroll, setPendingSectionScroll] = useState<
@@ -735,6 +743,7 @@ export function ExperienceBuilder({
     offersAbortRef.current = null;
     ++offersRequestRef.current;
     setOffersRows([]);
+    setOffersMax(null);
     setOffersState("idle");
 
     if (!storefrontId) {
@@ -1173,28 +1182,30 @@ export function ExperienceBuilder({
   // superseded in-flight request and drops any response whose token or
   // storefront is no longer current, so a refresh/retry/switch can never be
   // overwritten by an older answer.
-  async function loadOffers() {
+  async function loadOffers(options: { silent?: boolean } = {}) {
     if (!storefrontId) return;
     const originStorefrontId = storefrontId;
     offersAbortRef.current?.abort();
     const controller = new AbortController();
     offersAbortRef.current = controller;
     const token = ++offersRequestRef.current;
-    setOffersState("loading");
+    // A silent reload (CUST-H4-7b reconciliation after a mutation) keeps the
+    // rows on screen instead of flashing the skeleton, and a failed silent
+    // reload keeps what the mutation response already established.
+    if (!options.silent) setOffersState("loading");
     const result = await listWorkspaceOffers(storefrontId, controller.signal);
     if (token !== offersRequestRef.current || storefrontIdRef.current !== originStorefrontId) return;
     if (!result.ok) {
+      if (options.silent) return;
       setOffersState("error");
       setOffersRows([]);
       return;
     }
     setOffersState("ready");
     setOffersRows(result.data);
+    if (result.maxOffers !== null) setOffersMax(result.maxOffers);
   }
 
-  // Needed only while an Offers instance is rendered on the Canvas (visible)
-  // or being edited (selected). A store that merely carries the default
-  // hidden, never-opened Offers row issues no request at all.
   const hasOffersSection = draft.homepage.sections.some(
     (section) => section.type === "offers" && (section.visible || section.id === selectedSection),
   );
@@ -1220,6 +1231,61 @@ export function ExperienceBuilder({
   function handleRetryOffers() {
     void loadOffers();
   }
+
+  // CUST-H4-7b — merchant CRUD over the H4-6 backend. The server's response is
+  // the only truth: a successful create/update upserts the single evaluated row
+  // it returned and then reconciles with a silent re-read (order + every other
+  // row's live evaluation); a delete removes the row and the deleted id from
+  // EVERY Offers section's `offerIds` in one draft change. Results for a
+  // storefront that is no longer current never touch state.
+  function removeDeletedOfferFromSections(offerId: string) {
+    const base = draftRef.current;
+    const { sections, changed } = removeOfferIdFromSections(base.homepage.sections, offerId);
+    if (!changed) return;
+    updateDraft({ ...base, homepage: { ...base.homepage, sections } });
+  }
+
+  const offerManagement: OfferManagement | undefined = storefrontId
+    ? {
+        maxOffers: offersMax,
+        searchProducts: (search, signal) =>
+          listWorkspaceProducts(storefrontId, { search: search || undefined, perPage: 50 }, signal),
+        create: async (input) => {
+          const result = await createWorkspaceOffer(storefrontId, input);
+          if (storefrontIdRef.current !== storefrontId) return result;
+          if (result.ok) {
+            setOffersRows((rows) => upsertOffer(rows, result.data));
+            setOffersState("ready");
+            void loadOffers({ silent: true });
+          }
+          return result;
+        },
+        update: async (offerId, input) => {
+          const result = await updateWorkspaceOffer(storefrontId, offerId, input);
+          if (storefrontIdRef.current !== storefrontId) return result;
+          if (result.ok) {
+            setOffersRows((rows) => upsertOffer(rows, result.data));
+            void loadOffers({ silent: true });
+          } else if (result.reason === "not_found") {
+            // Deleted elsewhere meanwhile — show the server's truth.
+            void loadOffers({ silent: true });
+          }
+          return result;
+        },
+        remove: async (offerId) => {
+          const result = await deleteWorkspaceOffer(storefrontId, offerId);
+          if (storefrontIdRef.current !== storefrontId) return result;
+          // A 404 means the offer is already gone: same end state as a delete.
+          if (result.ok || result.reason === "not_found") {
+            setOffersRows((rows) => rows.filter((row) => row.id !== offerId));
+            removeDeletedOfferFromSections(offerId);
+            void loadOffers({ silent: true });
+            return { ok: true };
+          }
+          return result;
+        },
+      }
+    : undefined;
 
   function handleSelectCategoryRegion(id: string) {
     setSelectedCategoryRegion(id);
@@ -2067,6 +2133,7 @@ export function ExperienceBuilder({
           offers={offersRows}
           offersState={offersState}
           onRetryOffers={handleRetryOffers}
+          offerManagement={offerManagement}
         />
       );
     }
@@ -2144,6 +2211,7 @@ export function ExperienceBuilder({
         offers={offersRows}
         offersState={offersState}
         onRetryOffers={handleRetryOffers}
+        offerManagement={offerManagement}
       />
     );
   }

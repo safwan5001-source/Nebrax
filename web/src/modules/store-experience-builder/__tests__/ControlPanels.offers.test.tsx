@@ -288,13 +288,14 @@ describe("Store Customizer — Offers real picker (CUST-H4-7)", () => {
     expect(offerIdsOf(onChange)).toEqual(ids.slice(1));
   });
 
-  it("announces the selected count politely and exposes the candidates as a labelled multi-select listbox", () => {
+  it("announces the selected count politely and exposes the candidates as a labelled group of toggle buttons (aria-pressed)", () => {
     renderPicker({ offerIds: ["o1"], offers: [liveOffer({ id: "o1" }), liveOffer({ id: "o2" })] });
     expect(document.querySelector('[aria-live="polite"]')?.textContent).toBe("1/8");
-    const listbox = screen.getByRole("listbox", { name: "العروض المهيّأة في المتجر" });
-    expect(listbox.getAttribute("aria-multiselectable")).toBe("true");
-    expect(option("o1").getAttribute("aria-selected")).toBe("true");
-    expect(option("o2").getAttribute("aria-selected")).toBe("false");
+    expect(screen.getByRole("group", { name: "العروض المهيّأة في المتجر" })).not.toBeNull();
+    expect(option("o1").getAttribute("aria-pressed")).toBe("true");
+    expect(option("o2").getAttribute("aria-pressed")).toBe("false");
+    // Each toggle has a meaningful accessible name that carries the product name.
+    expect(screen.getAllByRole("button", { name: /اختيار العرض لهذا القسم: هاتف ذكي/ }).length).toBe(2);
   });
 
   it("is keyboard operable: Enter on a focused option selects it", async () => {
@@ -352,7 +353,7 @@ describe("Store Customizer — Offers real picker (CUST-H4-7)", () => {
     const name = option("o1").querySelector(".line-clamp-2") as HTMLElement;
     expect(name).not.toBeNull();
     expect(name.className).toContain("break-words");
-    expect(option("o1").className).toContain("w-full");
+    expect(option("o1").className).toContain("min-w-0");
   });
 
   it("keeps multiple Offers sections independent: selecting in one never touches the other", async () => {

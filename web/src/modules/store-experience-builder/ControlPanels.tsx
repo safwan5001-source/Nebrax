@@ -52,13 +52,10 @@ import {
 } from "./messages";
 import type { WorkspaceProductSummary } from "@/modules/commerce-workspace/workspace-products";
 import type { WorkspaceOffer } from "@/modules/commerce-workspace/workspace-offers";
-import {
-  formatOfferMoney,
-  isDiscountBadgeVisible,
-  offerDiscountBadgeText,
-  offerDisplayName,
-  offerReasonMessageKey,
-} from "./offers-display";
+import { OfferCatalog } from "./OfferCatalog";
+import { OfferSummary, OfferThumb } from "./OfferParts";
+import { offerDisplayName } from "./offers-display";
+import type { OfferManagement } from "./offers-management";
 
 export type CustomizerPanel =
   | "theme"
@@ -179,6 +176,8 @@ interface PanelsProps {
   offers?: WorkspaceOffer[];
   offersState?: "idle" | "loading" | "error" | "ready";
   onRetryOffers?: () => void;
+  /** CUST-H4-7b — merchant CRUD actions over the configured Offers catalog. */
+  offerManagement?: OfferManagement;
 }
 
 export function ControlPanels({
@@ -202,6 +201,7 @@ export function ControlPanels({
   offers = [],
   offersState = "idle",
   onRetryOffers,
+  offerManagement,
 }: PanelsProps) {
   const t = (key: CustomizerMessageKey) => customizerMessage(locale, key);
   const patch = (partial: Partial<StorefrontPresentationConfig>) =>
@@ -242,6 +242,7 @@ export function ControlPanels({
           offers={offers}
           offersState={offersState}
           onRetryOffers={onRetryOffers}
+          offerManagement={offerManagement}
         />
       );
     case "footer":
@@ -897,6 +898,7 @@ function HomepagePanel({
   offers = [],
   offersState = "idle",
   onRetryOffers,
+  offerManagement,
 }: {
   config: StorefrontPresentationConfig;
   t: (key: CustomizerMessageKey) => string;
@@ -916,6 +918,7 @@ function HomepagePanel({
   offers?: WorkspaceOffer[];
   offersState?: "idle" | "loading" | "error" | "ready";
   onRetryOffers?: () => void;
+  offerManagement?: OfferManagement;
 }) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const sections = config.homepage.sections;
@@ -1139,6 +1142,7 @@ function HomepagePanel({
                 offers={offers}
                 state={offersState}
                 onRetry={onRetryOffers}
+                management={offerManagement}
               />
             ) : selected.type === "appPromo" ? (
               <AppPromoFields config={config} t={t} patch={patch} />
@@ -2156,70 +2160,6 @@ function FeaturedPickerFields({
  * exists at all is shown as "no longer available" and stays removable — it is
  * never silently dropped and never faked into a card.
  */
-function OfferSummary({
-  offer,
-  t,
-  locale,
-}: {
-  offer: WorkspaceOffer;
-  t: (key: CustomizerMessageKey) => string;
-  locale: CustomizerLocale;
-}) {
-  const name = offerDisplayName(offer, locale);
-  return (
-    <span className="relative flex min-w-0 flex-1 flex-col gap-0.5">
-      <span className="line-clamp-2 break-words text-sm">
-        <bdi>{name ?? t("offersUnavailable")}</bdi>
-      </span>
-      {offer.isLive ? (
-        <span data-offer-status="live" className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-xs">
-          <span className="font-medium text-text">
-            <span aria-hidden="true">✓ </span>
-            {t("offersStatusLive")}
-          </span>
-          {offer.offerPrice ? (
-            <span>
-              <span className="sr-only">{t("offersOfferPrice")}: </span>
-              <bdi className="font-semibold text-text">{formatOfferMoney(offer.offerPrice, locale)}</bdi>
-            </span>
-          ) : null}
-          {offer.referencePrice ? (
-            <span className="text-muted line-through">
-              <span className="sr-only">{t("offersReferencePrice")}: </span>
-              <bdi>{formatOfferMoney(offer.referencePrice, locale)}</bdi>
-            </span>
-          ) : null}
-          {isDiscountBadgeVisible(offer.discountPercent) ? (
-            <span className="rounded-sm bg-primary-soft px-1.5 py-px text-[11px] font-semibold text-primary">
-              <bdi>{offerDiscountBadgeText(offer.discountPercent, locale)}</bdi>
-            </span>
-          ) : null}
-        </span>
-      ) : (
-        <span data-offer-status="hidden" className="text-xs text-muted">
-          <span className="font-medium text-text">
-            <span aria-hidden="true">○ </span>
-            {t("offersStatusHidden")}
-          </span>
-          {" — "}
-          {t("offersNotShownBecause")} {t(offerReasonMessageKey(offer.reason))}
-        </span>
-      )}
-    </span>
-  );
-}
-
-function OfferThumb({ offer }: { offer: WorkspaceOffer | undefined }) {
-  return (
-    <span className="flex size-8 shrink-0 items-center justify-center self-start overflow-hidden rounded-md bg-surface-muted">
-      {offer?.product?.thumbnailUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element -- thumbnail is an untrusted tenant media URL, not a static asset
-        <img src={offer.product.thumbnailUrl} alt="" className="size-full object-cover" />
-      ) : null}
-    </span>
-  );
-}
-
 function OffersPickerFields({
   offerIds,
   t,
@@ -2228,6 +2168,7 @@ function OffersPickerFields({
   offers,
   state,
   onRetry,
+  management,
 }: {
   offerIds: string[];
   t: (key: CustomizerMessageKey) => string;
@@ -2236,6 +2177,7 @@ function OffersPickerFields({
   offers: WorkspaceOffer[];
   state: "idle" | "loading" | "error" | "ready";
   onRetry?: () => void;
+  management?: OfferManagement;
 }) {
   const atMax = offerIds.length >= MAX_OFFERS;
   const byId = new Map(offers.map((offer) => [offer.id, offer]));
@@ -2331,76 +2273,17 @@ function OffersPickerFields({
         {atMax ? <p className="mt-1.5 text-xs text-muted">{t("offersMaxReachedHint")}</p> : null}
       </div>
 
-      <div className="space-y-2 border-t border-border pt-3">
-        <div className="flex items-center justify-between gap-2">
-          <p id="offers-picker-list-label" className="text-xs font-medium text-text">
-            {t("offersListLabel")}
-          </p>
-          <button
-            type="button"
-            className="text-xs text-muted underline-offset-2 hover:underline"
-            disabled={pending}
-            onClick={onRetry}
-          >
-            {t("offersRefresh")}
-          </button>
-        </div>
-        <div
-          role="listbox"
-          aria-labelledby="offers-picker-list-label"
-          aria-multiselectable="true"
-          className="flex max-h-72 flex-col gap-0.5 overflow-y-auto"
-        >
-          {pending ? (
-            <p data-offers-picker-loading="" className="px-2 py-3 text-center text-xs text-muted">
-              {t("offersLoading")}
-            </p>
-          ) : state === "error" ? (
-            <div
-              data-offers-picker-error=""
-              className="flex flex-col items-center gap-2 px-2 py-3 text-center text-xs text-muted"
-            >
-              <span>{t("offersLoadFailed")}</span>
-              <button
-                type="button"
-                onClick={onRetry}
-                className="rounded-md border border-border px-2 py-1 text-xs font-medium text-text"
-              >
-                {t("retry")}
-              </button>
-            </div>
-          ) : offers.length === 0 ? (
-            <p data-offers-picker-empty="" className="px-2 py-3 text-center text-xs text-muted">
-              {t("offersEmpty")}
-            </p>
-          ) : (
-            offers.map((offer) => {
-              const selected = offerIds.includes(offer.id);
-              const disabled = !selected && atMax;
-              return (
-                <button
-                  key={offer.id}
-                  type="button"
-                  role="option"
-                  aria-selected={selected}
-                  disabled={disabled}
-                  data-offers-option={offer.id}
-                  onClick={() => toggle(offer.id)}
-                  // `shrink-0`: rows live in a height-limited flex column; without it they
-                  // compress below their content height and overlap each other.
-                  className={`flex min-h-10 w-full shrink-0 items-center gap-2 rounded-md px-2 py-1.5 text-start disabled:opacity-40 ${
-                    selected ? "bg-primary-soft text-primary" : "text-text hover:bg-primary-soft"
-                  }`}
-                >
-                  <OfferThumb offer={offer} />
-                  <OfferSummary offer={offer} t={t} locale={locale} />
-                  {selected ? <span aria-hidden="true">✓</span> : null}
-                </button>
-              );
-            })
-          )}
-        </div>
-      </div>
+      <OfferCatalog
+        offers={offers}
+        state={state}
+        onRetry={onRetry}
+        selectedIds={offerIds}
+        atMaxSelected={atMax}
+        onToggle={toggle}
+        locale={locale}
+        t={t}
+        management={management}
+      />
     </div>
   );
 }

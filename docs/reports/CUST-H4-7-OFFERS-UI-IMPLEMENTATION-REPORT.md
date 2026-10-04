@@ -1,9 +1,11 @@
 # CUST-H4-7 — Offers Canvas + Published + Merchant UI — Implementation Report
 
+> **Revision H4-7b (merchant CRUD UI)** is documented in the last section of this file. §16 risk 1 below ("no merchant UI to create offers") is **resolved** by H4-7b.
+
 | | |
 |---|---|
 | **Base SHA** | `f73e5b0ed568bdb38b514cf2385d321d65594d17` (`origin/main`, the merge of H4-6 PR #1202 — verified directly via `git fetch` + `merge-base --is-ancestor`, not assumed) |
-| **Head SHA** | `bee5dc722cfddc19479de56b90976d23abbdb62e` (implementation commit; later commits on the branch only touch this report) |
+| **Head SHA** | see **H4-7b** below (original H4-7 implementation commit: `bee5dc722cfddc19479de56b90976d23abbdb62e`; H4-7b adds commits on the same branch/PR) |
 | **Branch** | `feat/cust-h4-7-offers-ui` |
 | **PR** | #1209 — https://github.com/safwan5001-source/Nebrax/pull/1209 |
 | **Offers capability** | **`state: "live"`, `merchantAddable: true`** |
@@ -116,7 +118,7 @@ Also: `sr-only` price labels escaped the clipped preview scroller and widened th
 Unchanged: up to ~145 queries for 12 tracked live offers (≈11/offer); cap stays 12; no pricing batch refactor attempted. Frontend adds exactly one workspace read (editor) and one public read (Published).
 
 ## 16. Risks / remaining
-1. **No merchant UI to create/configure offers.** H4-6 shipped backend CRUD only; H4-7 (per scope) selects existing offers and shows an honest empty state. Until a bounded configuration UI exists, a merchant cannot populate the list without API access. **Owner decision needed** (suggest a small H4-7b "Offers configuration" slice) — this is the main reason "LIVE" is end-to-end for the section but not yet self-serve.
+1. ~~**No merchant UI to create/configure offers.**~~ **Resolved in H4-7b (see below).** Original note: H4-6 shipped backend CRUD only; H4-7 (per scope) selects existing offers and shows an honest empty state. Until a bounded configuration UI exists, a merchant cannot populate the list without API access. **Owner decision needed** (suggest a small H4-7b "Offers configuration" slice) — this is the main reason "LIVE" is end-to-end for the section but not yet self-serve.
 2. Variant-managed products stay unsupported (fail-closed, H4-6).
 3. Published `OfferCard` is link-only (no add-to-cart) — product page is the purchase surface; revisit if product wants quick-add.
 4. Storefront price formatting reuses the existing `ar-SA` formatter (Arabic-Indic digits), Canvas uses `displayLocale` (Latin digits) — pre-existing divergence.
@@ -130,3 +132,72 @@ Integrated QA: end-to-end Canvas↔Published parity against a real Laravel insta
 - **Offers is LIVE** (`state: "live"`, `merchantAddable: true`).
 - No pricing authority change; no Cart/Checkout/POS/Invoice change; no journal entries.
 - **No Merge. No Deploy. No Production release.**
+
+---
+
+# H4-7b revision — merchant CRUD UI for configured Offers
+
+## A. Why this was required before calling Offers genuinely LIVE
+H4-7 flipped Offers to `live` / `merchantAddable: true`, but the only way to create a `storefront_offers` row was the H4-6 API. A merchant could add the section and select *existing* offers, and on a store with none saw an empty state with no action — a dead end. H4-7b adds the smallest merchant-facing CRUD over the **existing** H4-6 endpoints (no new endpoint, no backend change, no pricing change), inside the existing Offers section Content panel. It is not a promotions engine.
+
+## B. Exact files changed (15, all `web/`; zero backend / storefront / pricing / cart / checkout / POS / invoice files)
+**New:** `OfferCatalog.tsx` (list + inline form + inline delete confirmation), `OfferParts.tsx` (row summary/thumb, moved out of `ControlPanels.tsx`), `offers-management.ts` (types + pure helpers), `__tests__/OfferCatalog.test.tsx` (43), `__tests__/ExperienceBuilder.offers-crud.test.tsx` (12), `__tests__/offers-management.test.ts` (10), `e2e/cust-h4-7b-offers-crud-visual.spec.ts` (7 scenarios).
+**Modified:** `workspace-offers.ts` (+ `.test.ts`: 40 total, 12 new), `ExperienceBuilder.tsx`, `ControlPanels.tsx`, `messages.ts` (ar+en), `lib/mock-data.ts` (dev fixture CRUD), `__tests__/ControlPanels.offers.test.tsx`, `__tests__/offers-fixtures.ts`.
+(`main` was merged into the branch once — merge commit, no history rewrite; it brought only unrelated backend work.)
+
+## C. Create / edit / delete UX
+- **Location:** the Offers section's Content panel — the *Configured offers* list replaces nothing else and adds no page or modal. On mobile it lives in the existing Bottom Sheet: **one dialog only**, the form and the delete confirmation are inline (verified: `dialog` count stays 1 at 390/430).
+- **List rows:** thumbnail, name, live/hidden status in text (✓ / ○) with the server's hidden reason, both prices + backend percent when live, the configured window (central `formatDateTime`), a select toggle (`aria-pressed`, per-instance `offerIds`), **Edit** and **Delete** buttons whose accessible names carry the product name. Rows are now a labelled group of toggle buttons (was a `listbox`) because a listbox cannot host edit/delete buttons.
+- **Empty state:** explanatory text + a primary **Create offer** button. With ≥1 offer, an **Add offer** button sits above the list; at the server cap it is disabled and says why (`meta.max_offers`, 12).
+- **One inline form for create and edit:** Product (see §D), *Offer is active* checkbox, *Starts at* / *Ends at* (optional native `datetime-local`, each with a labelled *Clear*), *Order* (optional integer 0–9999, blank = server appends), Save/Cancel. Opening it moves focus to its heading; Escape / Cancel close it and return focus to the opener. A fixed note states the price boundary. **There is no price, discount, savings, tax, stock or price-list field** (asserted by test).
+- **Edit** sends only what changed (`null` clears a bound); an unchanged edit closes with no request. Editing an offer whose product was deleted works without inventing a name.
+- **Delete:** inline `role="alertdialog"` (same pattern as the version manager), Cancel focused, Escape cancels, double-confirm blocked, failure shows an alert and allows retry. The copy states the offer is also removed from every Offers section's selection and that this section change is saved with the draft.
+
+## D. Product picker source
+`searchProducts` → `listWorkspaceProducts(storefrontId, {search, perPage: 50}, signal)` — the same real workspace product read the Featured picker uses (storefront-scoped, tenant from session). Each result shows name (EN name under the English UI) + image or honest fallback. **Variant-managed products are disabled with the H4-6 reason** (no variant pricing invented); a product that already has an offer is disabled "Already has an offer" (basic UX guard only — the server stays the authority and 409 is still handled). Loading / empty / error+retry states; superseded searches are aborted and a late answer can't overwrite a newer one. No raw product-id input anywhere.
+
+## E. Mutation + error handling
+Client (`createWorkspaceOffer` / `updateWorkspaceOffer` / `deleteWorkspaceOffer`): the exact H4-6 allow-list body (`product_id, starts_at, ends_at, is_active, position`), storefront-scoped paths, AbortSignal; outcomes classified `forbidden` (403) · `not_found` (404) · `conflict` (409) · `validation` (422, per-field messages from `errors`) · `failed`.
+UI: **409** → product field says the product is already configured; **422** → server messages shown on the offending field (`product_id` — ineligible/foreign/cap, `starts_at`, `ends_at` — invalid range, `position`) with `aria-invalid` + `aria-describedby`, a red border (colour is not the only cue — text + `role="alert"` summary), input preserved, form stays open; **404 / 403 / network / 5xx** → plain localized alert. Client-side guards are limited to: product required, position is an integer 0–9999. **No client date-range rule** — an invalid range is the backend's 422, displayed as returned (tested + visually verified).
+Dates: native `datetime-local` (local) ↔ ISO instant with `Z` (`localInputToIso` / `isoToLocalInput`, round-trip tested); no timezone policy invented.
+
+## F. Reconciliation (no shadow model)
+After a successful create/update the single evaluated row from the response is upserted (position-ordered) and a **silent** re-read follows (no skeleton flash; a failed silent re-read keeps the response's state). Canvas, picker and selected rows all derive from that one shared state, so they reflect the server immediately (verified: toggling `is_active` off → row turns hidden with the server reason **and** the Canvas card disappears). A failed mutation changes nothing. A 404 on update triggers a re-read and tells the merchant; the form keeps its last-seen row instead of vanishing.
+
+## G. Dangling `offerId` cleanup
+On delete success (or a 404 = "already gone"), `removeOfferIdFromSections` removes the id from **every** Offers section instance (visible or hidden; other section types untouched) in **one** draft change, via `updateDraft` from the latest draft ref. An instance left with no ids drops its `content` (empty omission). If no section referenced the id the draft is **not** dirtied. A failed delete changes nothing. The draft change is unsaved until the merchant saves (stated in the confirmation copy). Other already-saved versions that still reference the id are harmless: Published omits ids the public API does not return, and the editor shows "no longer available".
+
+## H. Multi-instance behaviour
+Two authorities stay separate: the configured catalog is storefront-level Commerce data (one shared read/mutation path in `ExperienceBuilder`); `offerIds` stays per-section content. Creating/editing a configured offer never touches any section's `offerIds` and never auto-selects it; selecting changes only the section being edited; deleting cleans all instances. Tested with 2–4 simultaneous Offers instances.
+
+## I. Tests / results
+| Suite | Result |
+|---|---|
+| `workspace-offers.test.ts` | 40 (12 new: create/update/delete, allow-list body, 409, 422 field errors, 403/404/5xx/network/malformed, abort) |
+| `OfferCatalog.test.tsx` | 43 (empty→create, fields/labels, product source/search/errors, variant + taken disabled, required/position guards, dates→ISO, active toggle, double-submit, server errors 409/422/404/403/5xx, edit diffing, delete confirm/cancel/Escape/failure/double-confirm, cap, no-management mode) |
+| `ExperienceBuilder.offers-crud.test.tsx` | 12 (create→selectable→Canvas, silent reconcile, 409 leaves state, edit reflects server, 404 update, delete cleans all instances, no dangling rows, dirty/not-dirty draft, 404-delete, failed delete, authorities independent) |
+| `offers-management.test.ts` | 10 (date conversion, `removeOfferIdFromSections`, `upsertOffer`) |
+| web full vitest | **372 files / 3063 tests passed** (includes the design-token drift ratchet and central date-formatting guardrail, which caught and fixed two first-draft violations) |
+| web tsc | no new errors in any file touched (pre-existing set unchanged) |
+| web `npm run build` | Compiled successfully |
+| Playwright H4-7 + H4-7b specs | 19 / 19 |
+Regression: Offers still `live` / `merchantAddable: true`; capability/section-library suites unchanged and green; Canvas still real data; Published and the storefront package untouched; nothing price-shaped is writable (client body allow-list + form has no such field); H4-6 pricing/ATS rules untouched; no Cart/Checkout/POS/Invoice file in the H4-7b diff.
+
+## J. Visual QA (screenshots opened and inspected)
+Desktop AR 1440: empty state, create form (empty and filled), configured list + Canvas card, edit form, edited→hidden (server reason + card gone), delete confirmation, after-delete (empty again, no dangling row), invalid-range error, populated catalog at the cap (Add disabled), read-error state. **Mobile AR 390 and 430:** empty, create form, list, edit form, delete confirmation — all inside the single Bottom Sheet, no horizontal overflow, controls ≥ 36px tall, date fields usable. **Desktop EN LTR:** create form, list, delete confirmation. Long product names (the 70-character helmet fixture) clamp to two lines; hidden rows show their reason; the 0%-badge rule is unchanged.
+Two first-draft defects were found and fixed during QA: `aria-invalid:` is not a Tailwind-3 default variant (the red invalid border was missing — now `aria-[invalid=true]:` and asserted by computed style), and the Escape key did nothing until focus moved into the form (focus now moves to the form heading on open).
+The dev harness (`/dev/customizer-versions`, `?offers=empty|error`) now mutates an in-memory Offers list through a router branch that mirrors the H4-6 response shapes (409 / 422 / cap / forbidden key). It is fixture code, never merchant data.
+
+## K. CI
+See PR #1209 checks (not observed at the time of writing).
+
+## L. Remaining risks
+1. The picker/CRUD UI is only exercised against the dev fixture and mocked clients here — it has not run against a real Laravel instance (H4-8).
+2. Validation messages for 422 are the backend's Arabic strings shown verbatim (also under the English UI); localizing them needs backend error codes (not added — out of scope).
+3. Position is a raw number field (no drag-reorder of configured offers); acceptable for a thin CRUD, drag-reorder would be a UX follow-up.
+4. The 409-duplicate path is mostly pre-empted client-side (taken products are disabled) and covered by unit/integration tests rather than a screenshot.
+5. Variant-managed products remain unsupported (H4-6 owner decision pending); the 12-offer cap and the ≈145-query backend limit are unchanged.
+6. Pre-existing, unrelated: the builder header toolbar overflows the document at 768/1024 px once the draft is dirty.
+
+## M. Confirmations
+Offers remains **LIVE** (`state: "live"`, `merchantAddable: true`). **No Merge. No Deploy. No Production release.**

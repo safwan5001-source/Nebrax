@@ -12,6 +12,9 @@ vi.mock('@/lib/api', async () => {
 
 import {
   commerceWorkspaceOffersPath,
+  createWorkspaceOffer,
+  deleteWorkspaceOffer,
+  updateWorkspaceOffer,
   isKnownOfferReason,
   KNOWN_OFFER_REASONS,
   listWorkspaceOffers,
@@ -63,6 +66,8 @@ describe('workspace-offers client — CUST-H4-7', () => {
       data: [
         {
           id: 'o1',
+          productId: 'p1',
+          position: 0,
           product: { name: 'هاتف', nameEn: 'Phone', thumbnailUrl: 'https://cdn.example.test/p1.jpg' },
           isActive: true,
           startsAt: null,
@@ -192,5 +197,131 @@ describe('workspace-offers client — CUST-H4-7', () => {
     expect(apiMock).toHaveBeenCalledTimes(1);
     expect(apiMock.mock.calls[0][0]).toBe('/commerce/workspace/storefronts/s1/offers');
     expect(Object.keys(apiMock.mock.calls[0][1] as object)).toEqual(['signal']);
+  });
+});
+
+describe('workspace-offers client mutations — CUST-H4-7b', () => {
+  const validation = (errors: Record<string, string[]>, message = 'The given data was invalid.') =>
+    new ApiError(422, message, { message, errors });
+
+  it('creates with the exact H4-6 allow-list body, a POST to the storefront-scoped path, and parses the evaluated row', async () => {
+    apiMock.mockResolvedValueOnce({ data: liveRow({ id: 'new-1', position: 3 }) });
+    const outcome = await createWorkspaceOffer('s1', {
+      productId: 'p9',
+      isActive: true,
+      startsAt: '2026-12-01T09:00:00.000Z',
+      endsAt: null,
+      position: 3,
+    });
+    expect(apiMock).toHaveBeenCalledTimes(1);
+    expect(apiMock.mock.calls[0][0]).toBe('/commerce/workspace/storefronts/s1/offers');
+    const init = apiMock.mock.calls[0][1] as { method: string; body: Record<string, unknown> };
+    expect(init.method).toBe('POST');
+    expect(init.body).toEqual({
+      product_id: 'p9',
+      is_active: true,
+      starts_at: '2026-12-01T09:00:00.000Z',
+      ends_at: null,
+      position: 3,
+    });
+    expect(outcome).toMatchObject({ ok: true, data: { id: 'new-1', position: 3, isLive: true } });
+  });
+
+  it('omits position when blank (the server appends) and never sends any price/discount/tenant key', async () => {
+    apiMock.mockResolvedValueOnce({ data: liveRow() });
+    await createWorkspaceOffer('s1', { productId: 'p9', isActive: false, position: null });
+    const body = (apiMock.mock.calls[0][1] as { body: Record<string, unknown> }).body;
+    expect(Object.keys(body).sort()).toEqual(['is_active', 'product_id']);
+    for (const forbidden of ['price', 'discount', 'discount_percent', 'percent', 'tenant_id', 'storefront_id', 'sale_price', 'price_list_id']) {
+      expect(forbidden in body).toBe(false);
+    }
+  });
+
+  it('PATCHes only the supplied keys; null clears a date', async () => {
+    apiMock.mockResolvedValueOnce({ data: liveRow() });
+    await updateWorkspaceOffer('s1', 'o1', { endsAt: null, isActive: false });
+    expect(apiMock.mock.calls[0][0]).toBe('/commerce/workspace/storefronts/s1/offers/o1');
+    const init = apiMock.mock.calls[0][1] as { method: string; body: Record<string, unknown> };
+    expect(init.method).toBe('PATCH');
+    expect(init.body).toEqual({ ends_at: null, is_active: false });
+  });
+
+  it('DELETEs the storefront-scoped offer', async () => {
+    apiMock.mockResolvedValueOnce(null);
+    expect(await deleteWorkspaceOffer('s1', 'o1')).toEqual({ ok: true });
+    expect(apiMock.mock.calls[0][0]).toBe('/commerce/workspace/storefronts/s1/offers/o1');
+    expect((apiMock.mock.calls[0][1] as { method: string }).method).toBe('DELETE');
+  });
+
+  it('maps 409 to a conflict (duplicate product), keeping the server message', async () => {
+    apiMock.mockRejectedValueOnce(new ApiError(409, 'هذا المنتج مُهيَّأ مسبقاً كعرض على هذا المتجر.', {}));
+    expect(await createWorkspaceOffer('s1', { productId: 'p9' })).toEqual({
+      ok: false,
+      reason: 'conflict',
+      message: 'هذا المنتج مُهيَّأ مسبقاً كعرض على هذا المتجر.',
+      fieldErrors: {},
+    });
+  });
+
+  it('maps 422 to per-field server messages (ineligible product, invalid window, cap, position)', async () => {
+    apiMock.mockRejectedValueOnce(
+      validation({
+        product_id: ['المنتج غير مؤهَّل.'],
+        ends_at: ['يجب أن يكون وقت النهاية بعد وقت البداية.'],
+        position: ['x'],
+        unrelated: ['ignored'],
+      }),
+    );
+    const outcome = await updateWorkspaceOffer('s1', 'o1', { productId: 'p9' });
+    expect(outcome).toMatchObject({ ok: false, reason: 'validation' });
+    if (outcome.ok) return;
+    expect(outcome.fieldErrors).toEqual({
+      product_id: 'المنتج غير مؤهَّل.',
+      ends_at: 'يجب أن يكون وقت النهاية بعد وقت البداية.',
+      position: 'x',
+    });
+  });
+
+  it('a 422 without an errors map still classifies as validation with the message', async () => {
+    apiMock.mockRejectedValueOnce(new ApiError(422, 'حقل غير مسموح', {}));
+    expect(await createWorkspaceOffer('s1', { productId: 'p9' })).toMatchObject({
+      ok: false,
+      reason: 'validation',
+      message: 'حقل غير مسموح',
+      fieldErrors: {},
+    });
+  });
+
+  it.each([
+    [403, 'forbidden'],
+    [404, 'not_found'],
+    [500, 'failed'],
+  ] as const)('classifies %s as %s for every mutation', async (status, reason) => {
+    for (const run of [
+      () => createWorkspaceOffer('s1', { productId: 'p' }),
+      () => updateWorkspaceOffer('s1', 'o1', { isActive: true }),
+      () => deleteWorkspaceOffer('s1', 'o1'),
+    ]) {
+      apiMock.mockRejectedValueOnce(new ApiError(status, 'x', {}));
+      expect(await run()).toMatchObject({ ok: false, reason });
+    }
+  });
+
+  it('treats a network error as a failure, and a malformed success payload as invalid', async () => {
+    apiMock.mockRejectedValueOnce(new TypeError('Failed to fetch'));
+    expect(await createWorkspaceOffer('s1', { productId: 'p' })).toMatchObject({ ok: false, reason: 'failed' });
+    apiMock.mockResolvedValueOnce({ data: { nope: true } });
+    expect(await updateWorkspaceOffer('s1', 'o1', { isActive: true })).toMatchObject({
+      ok: false,
+      reason: 'failed',
+      message: 'invalid_payload',
+    });
+  });
+
+  it('forwards the AbortSignal', async () => {
+    const controller = new AbortController();
+    apiMock.mockResolvedValueOnce(null);
+    await deleteWorkspaceOffer('s1', 'o1', controller.signal);
+    expect((apiMock.mock.calls[0][1] as { signal?: AbortSignal }).signal).toBe(controller.signal);
   });
 });
