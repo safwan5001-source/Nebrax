@@ -33,6 +33,18 @@ describe("normalizePresentationConfig", () => {
     });
   });
 
+  it("FLOWERS-H15: accepts awj-bloom with its own default primary, and a merchant color survives", () => {
+    expect(
+      normalizePresentationConfig({ themePreset: "awj-bloom" }),
+    ).toMatchObject({ themePreset: "awj-bloom", primaryColor: "#9d2449" });
+    expect(
+      normalizePresentationConfig({
+        themePreset: "awj-bloom",
+        primaryColor: "#123456",
+      }),
+    ).toMatchObject({ themePreset: "awj-bloom", primaryColor: "#123456" });
+  });
+
   it("a merchant-chosen color survives on awj-market like any other preset", () => {
     expect(
       normalizePresentationConfig({

@@ -49,6 +49,22 @@ class StorefrontPresentationNormalizerTest extends TestCase
     }
 
     /** @test */
+    public function awj_bloom_preset_is_accepted_with_its_own_default_primary_and_keeps_a_merchant_color(): void
+    {
+        $normalized = $this->normalizer->normalize(['themePreset' => 'awj-bloom']);
+        $this->assertSame('awj-bloom', $normalized['themePreset']);
+        $this->assertSame('#9d2449', $normalized['primaryColor']);
+        $this->assertSame(StorefrontPresentationNormalizer::THEME_PRESETS['awj-bloom'], $normalized['primaryColor']);
+
+        $custom = $this->normalizer->normalize(['themePreset' => 'awj-bloom', 'primaryColor' => '#123456']);
+        $this->assertSame('awj-bloom', $custom['themePreset']);
+        $this->assertSame('#123456', $custom['primaryColor']);
+
+        // Stale or malformed variants still fail closed.
+        $this->assertSame('awj-modern', $this->normalizer->normalize(['themePreset' => 'awj-bloom-v0'])['themePreset']);
+    }
+
+    /** @test */
     public function a_stale_awj_market_typo_still_fails_closed_to_awj_modern(): void
     {
         $normalized = $this->normalizer->normalize(['themePreset' => 'awj-market-v0']);

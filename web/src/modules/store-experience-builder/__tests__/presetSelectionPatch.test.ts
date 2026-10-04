@@ -100,3 +100,16 @@ describe('color input -> matchPreset -> presetSelectionPatch (Codex P2 finding o
     expect(patch).toEqual({ themePreset: 'awj-market', primaryColor: '#123456' });
   });
 });
+
+describe('presetSelectionPatch — AWJ Bloom (FLOWERS-H15)', () => {
+  const bloom = THEME_PRESETS.find((preset) => preset.id === 'awj-bloom')!;
+
+  it('is registered with its own accessible primary and changes only theme + color (no bundle)', () => {
+    expect(bloom.primary).toBe('#9d2449');
+    expect(presetSelectionPatch({ ...DEFAULT_PRESENTATION_CONFIG }, bloom)).toEqual({
+      themePreset: 'awj-bloom',
+      primaryColor: '#9d2449',
+    });
+  });
+});
+

@@ -42,6 +42,8 @@ final class StorefrontPresentationNormalizer
         'sand' => '#92400e',
         'slate' => '#334155',
         'awj-market' => '#0f766e',
+        // FLOWERS-H15 / ADR-26 — «بلوم»: ملف عرض عام للورد والهدايا. لونٌ فقط هنا؛ الحزمة المبدئية (زوايا…) في المُخصِّص.
+        'awj-bloom' => '#9d2449',
     ];
 
     /**

@@ -40,11 +40,12 @@ export const THEME_REGISTRY: readonly ThemeRegistryEntry[] = [
     category: 'retail',
   },
   {
-    id: 'boutique-floral-01',
-    presetId: null,
-    nameKey: 'themeNameBoutiqueFloral',
-    descriptionKey: 'themeDescriptionBoutiqueFloral',
-    status: 'planned',
+    // FLOWERS-H15 / ADR-26 — presentation only: a color identity plus, on apply, gift sections the store can back.
+    id: 'awj-bloom',
+    presetId: 'awj-bloom',
+    nameKey: 'themeNameAwjBloom',
+    descriptionKey: 'themeDescriptionAwjBloom',
+    status: 'available',
     official: true,
     category: 'floral',
   },
