@@ -43,7 +43,7 @@ import type {
  *    variants), so every Spree `Media` size field points at the same URL.
  */
 
-function formatMoney(amountMinor: number, currency: string): string {
+export function formatMoney(amountMinor: number, currency: string): string {
   try {
     return new Intl.NumberFormat("ar-SA", {
       style: "currency",
@@ -159,7 +159,7 @@ export const AWJ_CATEGORY_MEDIA_PROXY_PATH_PREFIX =
  * Other URLs remain untouched for backward compatibility with existing API
  * consumers and test fixtures.
  */
-function toRenderableMediaUrl(url: string | null): string | null {
+export function toRenderableMediaUrl(url: string | null): string | null {
   if (!url) return null;
 
   try {

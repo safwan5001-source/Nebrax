@@ -8,6 +8,7 @@ import { sanitizeExternalUrl } from "./urls";
 export const MAX_BENEFIT_ITEMS = 6;
 export const MAX_CUSTOM_BLOCKS = 8;
 export const MAX_FEATURED_PRODUCTS = 8;
+export const MAX_OFFERS = 8;
 
 const SAFE_ID = /^[a-zA-Z0-9_-]{1,64}$/;
 
@@ -51,11 +52,22 @@ export interface FeaturedContent {
   productIds: string[];
 }
 
+/**
+ * CUST-H4-7 — Offers presentation content. References `storefront_offers.id`
+ * (Commerce authority) and nothing else: no product id, name, image, price,
+ * discount, stock, date or live state is ever persisted here. Those are read
+ * fresh from the workspace/public Offers APIs.
+ */
+export interface OffersContent {
+  offerIds: string[];
+}
+
 export type SectionContent =
   | BannerContent
   | BenefitsContent
   | CustomContent
-  | FeaturedContent;
+  | FeaturedContent
+  | OffersContent;
 
 export function emptyBannerContent(): BannerContent {
   return {
@@ -110,6 +122,17 @@ export function featuredContentOf(section: {
     : { productIds: [] };
 }
 
+export function offersContentOf(section: {
+  type: string;
+  content?: SectionContent;
+}): OffersContent {
+  return section.type === "offers" &&
+    section.content &&
+    "offerIds" in section.content
+    ? section.content
+    : { offerIds: [] };
+}
+
 export function normalizeOptionalSectionContent(
   type: string,
   raw: unknown,
@@ -134,6 +157,10 @@ export function normalizeOptionalSectionContent(
   if (type === "featured") {
     const content = normalizeFeatured(source);
     return content.productIds.length === 0 ? undefined : content;
+  }
+  if (type === "offers") {
+    const content = normalizeOffers(source);
+    return content.offerIds.length === 0 ? undefined : content;
   }
   return undefined;
 }
@@ -229,6 +256,22 @@ function normalizeFeatured(source: Record<string, unknown>): FeaturedContent {
     if (productIds.length >= MAX_FEATURED_PRODUCTS) break;
   }
   return { productIds };
+}
+
+function normalizeOffers(source: Record<string, unknown>): OffersContent {
+  if (!Array.isArray(source.offerIds)) return { offerIds: [] };
+  const offerIds: string[] = [];
+  for (const value of source.offerIds) {
+    if (typeof value !== "string") continue;
+    const id = value.trim();
+    // Unlike Featured's draft-friendly empty-token allowance, an offer id is
+    // always a real storefront_offers uuid: an empty/unsafe token is dropped.
+    if (!SAFE_ID.test(id)) continue;
+    if (offerIds.includes(id)) continue;
+    offerIds.push(id);
+    if (offerIds.length >= MAX_OFFERS) break;
+  }
+  return { offerIds };
 }
 
 function safeToken(value: unknown, fallback: string): string {

@@ -8,7 +8,9 @@ import { describe, expect, it } from "vitest";
 import {
   emptyBannerContent,
   MAX_BANNER_IMAGE_ALT_LENGTH,
+  MAX_OFFERS,
   normalizeOptionalSectionContent,
+  offersContentOf,
 } from "../section-content";
 
 describe("Banner imageAlt normalization (CUST-H4-4)", () => {
@@ -159,5 +161,103 @@ describe("Banner imageAlt normalization (CUST-H4-4)", () => {
         MAX_BANNER_IMAGE_ALT_LENGTH,
       );
     });
+  });
+});
+
+describe("OffersContent normalization (CUST-H4-7)", () => {
+  const offers = (raw: unknown) =>
+    normalizeOptionalSectionContent("offers", raw);
+
+  it("keeps offer ids in the merchant's order", () => {
+    expect(offers({ offerIds: ["offer-c", "offer-a", "offer-b"] })).toEqual({
+      offerIds: ["offer-c", "offer-a", "offer-b"],
+    });
+  });
+
+  it("trims, dedupes (first wins) and drops invalid / non-string tokens", () => {
+    expect(
+      offers({
+        offerIds: [
+          " offer-a ",
+          "offer-a",
+          "bad id",
+          "",
+          "   ",
+          42,
+          null,
+          ["x"],
+          "a/b",
+          "x".repeat(65),
+          "offer-b",
+        ],
+      }),
+    ).toEqual({ offerIds: ["offer-a", "offer-b"] });
+  });
+
+  it(`caps at ${MAX_OFFERS} ids`, () => {
+    const ids = Array.from({ length: 12 }, (_, i) => `offer-${i + 1}`);
+    expect(MAX_OFFERS).toBe(8);
+    expect(offers({ offerIds: ids })).toEqual({ offerIds: ids.slice(0, 8) });
+  });
+
+  it("omits every empty / malformed shape", () => {
+    for (const raw of [
+      undefined,
+      null,
+      {},
+      [],
+      "offer-a",
+      [["offer-a"]],
+      { offerIds: [] },
+      { offerIds: "offer-a" },
+      { offerIds: ["bad id", ""] },
+    ]) {
+      expect(offers(raw)).toBeUndefined();
+    }
+  });
+
+  it("persists only offer ids — no product, name, image, price, discount, stock, date or live state", () => {
+    expect(
+      offers({
+        offerIds: ["offer-a"],
+        productIds: ["p-1"],
+        name: "Phone",
+        image: "https://cdn.example.com/x.jpg",
+        referencePrice: 100,
+        offerPrice: 50,
+        discountPercent: 50,
+        stock: 3,
+        startsAt: "2026-01-01",
+        isLive: true,
+      }),
+    ).toEqual({ offerIds: ["offer-a"] });
+  });
+
+  it("is idempotent across re-normalization", () => {
+    const first = offers({ offerIds: ["offer-b", "offer-a", "offer-b"] });
+    expect(offers(first)).toEqual(first);
+  });
+
+  it("offersContentOf reads only offers sections and falls back to empty", () => {
+    expect(
+      offersContentOf({ type: "offers", content: { offerIds: ["offer-a"] } }),
+    ).toEqual({ offerIds: ["offer-a"] });
+    expect(offersContentOf({ type: "offers" })).toEqual({ offerIds: [] });
+    // A foreign content shape on an offers section is never reinterpreted.
+    expect(
+      offersContentOf({ type: "offers", content: { productIds: ["p-1"] } }),
+    ).toEqual({ offerIds: [] });
+    expect(
+      offersContentOf({ type: "featured", content: { offerIds: ["offer-a"] } }),
+    ).toEqual({ offerIds: [] });
+  });
+
+  it("other section types never produce offers content", () => {
+    expect(
+      normalizeOptionalSectionContent("featured", { offerIds: ["o"] }),
+    ).toBeUndefined();
+    expect(
+      normalizeOptionalSectionContent("hero", { offerIds: ["o"] }),
+    ).toBeUndefined();
   });
 });

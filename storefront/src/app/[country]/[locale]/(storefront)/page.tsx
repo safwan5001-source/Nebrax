@@ -8,6 +8,7 @@ import { CustomContentBand } from "@/components/home/CustomContentBand";
 import { FeaturedShelf } from "@/components/home/FeaturedShelf";
 import { HeroSection } from "@/components/home/HeroSection";
 import { NewArrivalsSection } from "@/components/home/NewArrivalsSection";
+import { OffersShelf } from "@/components/home/OffersShelf";
 import { WholesaleSection } from "@/components/home/WholesaleSection";
 import { StoreContainer } from "@/components/layout/StoreContainer";
 import { fetchStorefrontConfig } from "@/lib/commerce/storefront";
@@ -22,6 +23,7 @@ import {
   benefitsContentOf,
   customContentOf,
   featuredContentOf,
+  offersContentOf,
 } from "@/lib/presentation/section-content";
 import type { ThemePresetId } from "@/lib/presentation/tokens";
 
@@ -88,8 +90,9 @@ export default async function HomePage({ params }: HomePageProps) {
   };
 
   // No presentation keeps the default implemented stack. A published v2
-  // document is already normalized: absence is deletion, offers stay
-  // unpublished, and empty authored sections render nothing.
+  // document is already normalized: absence is deletion, and empty authored
+  // sections (including an Offers section whose selected offers are not live)
+  // render nothing.
   const nodes: React.ReactNode[] = presentation
     ? await publishedNodes(presentation.homepage.sections, {
         implemented,
@@ -100,6 +103,7 @@ export default async function HomePage({ params }: HomePageProps) {
         apps: presentation.apps,
         benefitsTitle: homeCopy("benefits"),
         featuredTitle: homeCopy("featured"),
+        offersTitle: homeCopy("offers"),
         appTitle: homeCopy("appPromo"),
         appStoreLabel: homeCopy("appStore"),
         playStoreLabel: homeCopy("playStore"),
@@ -132,6 +136,7 @@ async function publishedNodes(
     };
     benefitsTitle: string;
     featuredTitle: string;
+    offersTitle: string;
     appTitle: string;
     appStoreLabel: string;
     playStoreLabel: string;
@@ -139,7 +144,7 @@ async function publishedNodes(
 ): Promise<React.ReactNode[]> {
   const nodes: React.ReactNode[] = [];
   for (const section of sections) {
-    if (!section.visible || section.type === "offers") continue;
+    if (!section.visible) continue;
     if (
       section.type === "hero" ||
       section.type === "categories" ||
@@ -211,6 +216,25 @@ async function publishedNodes(
           title={ctx.featuredTitle}
           headingId={`featured-${section.id}`}
           themePreset={ctx.themePreset}
+        />,
+      );
+      continue;
+    }
+    if (section.type === "offers") {
+      // CUST-H4-7 — real Offers. The stored ids are references to
+      // `storefront_offers`; liveness, prices and the discount come from the
+      // Host-resolved `GET /store/v1/offers` inside `OffersShelf`.
+      const offerIds = offersContentOf(section).offerIds.filter((id) =>
+        /^[a-zA-Z0-9_-]{1,64}$/.test(id),
+      );
+      if (offerIds.length === 0) continue;
+      nodes.push(
+        <OffersShelf
+          key={section.id}
+          offerIds={offerIds}
+          basePath={ctx.basePath}
+          title={ctx.offersTitle}
+          headingId={`offers-${section.id}`}
         />,
       );
       continue;

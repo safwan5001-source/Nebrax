@@ -4,7 +4,11 @@ import { notFound, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { ExperienceBuilder } from "@/modules/store-experience-builder/ExperienceBuilder";
 import { enableDemo } from "@/lib/demo";
-import { seedMockPresentationVersions, setMockSchedulingRuntimeActive } from "@/lib/mock-data";
+import {
+  seedMockPresentationVersions,
+  setMockOffersMode,
+  setMockSchedulingRuntimeActive,
+} from "@/lib/mock-data";
 
 /**
  * CUST-H1-2 — ثابتة تحقّق بصري فقط، غير مرتبطة بالمنتج. تركّب `ExperienceBuilder`
@@ -144,9 +148,15 @@ function Fixture() {
   const locale = params.get("locale") === "en" ? "en" : "ar";
   const scenario = scenarioOf(params.get("scenario"));
 
+  // CUST-H4-7 — `?offers=empty|error` switches the Offers fixture's state
+  // (default: the full live/hidden list). Dev-only visual-QA switch.
+  const offersParam = params.get("offers");
   if (typeof window !== "undefined") {
     enableDemo();
     seedFor(scenario);
+    setMockOffersMode(
+      offersParam === "empty" || offersParam === "error" ? offersParam : "list",
+    );
   }
 
   return (

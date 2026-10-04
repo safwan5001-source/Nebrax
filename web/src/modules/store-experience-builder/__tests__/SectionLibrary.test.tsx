@@ -139,30 +139,25 @@ describe("CUST-H4-2 — Section Library UX", () => {
     expect(onAdd).not.toHaveBeenCalled();
   });
 
-  it("Offers (gated) is visible in the Library but NOT addable, with its own merchant-facing reason — CUST-H4-2 review fix", () => {
+  it("Offers is LIVE (CUST-H4-7): visible, addable, with no gated badge or coming-soon reason", () => {
     renderLibrary();
     const offers = card("offers");
-    // Visible, not hidden.
     expect(offers).toBeTruthy();
-    // Not addable: no real Commerce backend or Canvas/Published renderer
-    // exists yet (H4-6/H4-7), so the card must be disabled.
-    expect(offers.disabled).toBe(true);
-    expect(within(dialog()).getByText("غير مفعّل")).toBeTruthy();
-    expect(
-      within(offers).getByText(
-        "العروض قادمة. ستصبح قابلة للإضافة عند اكتمال بنيتها التجارية الحقيقية وعارضَيها في أَوْج.",
-      ),
-    ).toBeTruthy();
+    expect(offers.disabled).toBe(false);
+    expect(offers.dataset.sectionState).toBe("live");
+    expect(within(offers).queryByText("غير مفعّل")).toBeNull();
+    expect(within(dialog()).queryByText("غير مفعّل")).toBeNull();
+    expect(within(offers).queryByText(/العروض قادمة/)).toBeNull();
   });
 
-  it("clicking the disabled Offers card never calls onAdd", async () => {
+  it("clicking the Offers card calls onAdd('offers')", async () => {
     const user = userEvent.setup();
     const { onAdd } = renderLibrary();
     await user.click(card("offers"));
-    expect(onAdd).not.toHaveBeenCalled();
+    expect(onAdd).toHaveBeenCalledWith("offers");
   });
 
-  it("Featured is LIVE (CUST-H4-5) and addable, with no partial/gated badge — unaffected by the Offers fix", () => {
+  it("Featured is LIVE (CUST-H4-5) and addable, with no partial/gated badge — unaffected by the Offers transition", () => {
     renderLibrary();
     const featured = card("featured");
     expect(featured.disabled).toBe(false);

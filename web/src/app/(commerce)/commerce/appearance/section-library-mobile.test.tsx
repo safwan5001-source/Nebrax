@@ -227,7 +227,7 @@ describe('CUST-H4-2 review fix — Section Library follows the mobile Bottom She
     expect(sheetAfter.querySelectorAll('[data-composer-section="banner"]')).toHaveLength(2);
   });
 
-  it('Offers remains visible, gated and non-addable in the mobile Library; clicking it never adds anything', async () => {
+  it('Offers is LIVE and addable in the mobile Library: no gated badge, and clicking it adds an instance (CUST-H4-7)', async () => {
     const user = userEvent.setup();
     render(<CommerceAppearancePage />);
     await waitFor(() => expect(showMock).toHaveBeenCalled());
@@ -240,17 +240,17 @@ describe('CUST-H4-2 review fix — Section Library follows the mobile Bottom She
     const offers = library.querySelector('[data-picker-option="offers"]') as HTMLButtonElement;
 
     expect(offers).toBeTruthy();
-    expect(offers.disabled).toBe(true);
-    expect(within(library).getByText('غير مفعّل')).toBeTruthy();
+    expect(offers.disabled).toBe(false);
+    expect(within(library).queryByText('غير مفعّل')).toBeNull();
+    expect(within(library).queryByText(/العروض قادمة/)).toBeNull();
 
-    const before = mobileSheet().querySelectorAll('[data-composer-section="offers"]').length;
     await user.click(offers);
-    // Still inside the Library (a disabled button click is a no-op) and no
-    // new offers instance was created.
-    expect(mobileSheet().querySelector('[data-section-picker]')).toBeTruthy();
+    // The mobile Library closes after an add and the composer shows the
+    // default seeded `offers` row plus the newly added instance.
+    expect(mobileSheet().querySelector('[data-section-picker]')).toBeNull();
     expect(
       mobileSheet().querySelectorAll('[data-composer-section="offers"]'),
-    ).toHaveLength(before);
+    ).toHaveLength(2);
   });
 
   it('an already-added singleton (hero) stays disabled with its reason in the mobile Library', async () => {

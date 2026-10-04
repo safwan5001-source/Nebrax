@@ -2670,6 +2670,118 @@ const MOCK_WORKSPACE_PRODUCTS = [
 ];
 
 /**
+ * CUST-H4-7 — dev-harness fixture for the workspace Offers read
+ * (`GET /commerce/workspace/storefronts/{id}/offers`). The REAL evaluation
+ * (live/hidden, reason, both prices, percent) is computed by
+ * `StorefrontOfferResolver` on the backend; this fixture returns pre-evaluated
+ * rows in exactly that payload shape so the Customizer's picker/Canvas can be
+ * exercised visually without a Laravel server. It covers the QA matrix: live
+ * with image, live without image (fallback), a sub-half-percent (0%) live
+ * discount, very long names, and hidden rows for several reasons incl. a
+ * deleted product (`product: null`). Never used as merchant runtime data.
+ */
+function mockOffer(
+  id: string,
+  position: number,
+  product: { name: string; name_en: string | null; thumbnail_url: string | null } | null,
+  evaluation:
+    | { live: { reference: number; offer: number; percent: number } }
+    | { hidden: string },
+) {
+  const live = 'live' in evaluation ? evaluation.live : null;
+  return {
+    id,
+    product_id: `mock-offer-product-${id}`,
+    product: product ? { id: `mock-offer-product-${id}`, ...product, is_variant_managed: false } : null,
+    starts_at: null,
+    ends_at: null,
+    is_active: true,
+    position,
+    evaluation: {
+      is_live: live !== null,
+      reason: 'hidden' in evaluation ? evaluation.hidden : null,
+      reference_price: live ? { amount_minor: live.reference, currency: 'SAR' } : null,
+      offer_price: live ? { amount_minor: live.offer, currency: 'SAR' } : null,
+      discount_percent: live ? live.percent : null,
+    },
+    created_at: '2026-10-01T00:00:00.000Z',
+    updated_at: '2026-10-01T00:00:00.000Z',
+  };
+}
+
+/** Dev-harness switch for the Offers fixture's state matrix (loading/empty/error QA). */
+let mockOffersMode: 'list' | 'empty' | 'error' = 'list';
+/** In-memory mutable copy so create/edit/delete can be exercised in the dev harness. */
+let mockOffersState: ReturnType<typeof mockOffer>[] = [];
+let mockOffersSeq = 0;
+export function setMockOffersMode(mode: 'list' | 'empty' | 'error'): void {
+  mockOffersMode = mode;
+  mockOffersState = mode === 'empty' ? [] : MOCK_WORKSPACE_OFFERS.map((offer) => structuredClone(offer));
+  mockOffersSeq = 0;
+}
+
+const MOCK_WORKSPACE_OFFERS = [
+  mockOffer('offer-helmet', 0, {
+    name: 'خوذة دراجة هوائية مقاومة للصدمات مع تهوية كاملة وعاكسات ليلية',
+    name_en: 'Impact-Resistant Bike Helmet with Full Ventilation and Night Reflectors',
+    thumbnail_url: '/dev/fixtures/helmet.svg',
+  }, { live: { reference: 18900, offer: 14900, percent: 21 } }),
+  mockOffer('offer-headphones', 1, {
+    name: 'سماعة لاسلكية',
+    name_en: 'Wireless Headphones',
+    thumbnail_url: null,
+  }, { live: { reference: 25000, offer: 19000, percent: 24 } }),
+  mockOffer('offer-sub-percent', 2, {
+    name: 'حقيبة ظهر يومية',
+    name_en: 'Everyday Backpack',
+    thumbnail_url: '/dev/fixtures/helmet.svg',
+  }, { live: { reference: 25000, offer: 24999, percent: 0 } }),
+  mockOffer('offer-long-name', 3, {
+    name: 'جهاز منزلي متعدد الاستخدامات بمواصفات احترافية وضمان ممتد لخمس سنوات مع خدمة صيانة منزلية مجانية',
+    name_en: 'Professional-Grade Multi-Purpose Home Appliance with Five-Year Extended Warranty and Free In-Home Service',
+    thumbnail_url: null,
+  }, { live: { reference: 129900, offer: 99900, percent: 23 } }),
+  mockOffer('offer-watch', 4, {
+    name: 'ساعة ذكية',
+    name_en: 'Smart Watch',
+    thumbnail_url: '/dev/fixtures/helmet.svg',
+  }, { live: { reference: 54900, offer: 39900, percent: 27 } }),
+  mockOffer('offer-lamp', 5, {
+    name: 'مصباح مكتبي',
+    name_en: 'Desk Lamp',
+    thumbnail_url: null,
+  }, { live: { reference: 9900, offer: 7900, percent: 20 } }),
+  mockOffer('offer-scheduled', 6, {
+    name: 'كاميرا رقمية',
+    name_en: 'Digital Camera',
+    thumbnail_url: null,
+  }, { hidden: 'scheduled' }),
+  mockOffer('offer-out-of-stock', 7, {
+    name: 'سماعة ألعاب',
+    name_en: 'Gaming Headset',
+    thumbnail_url: null,
+  }, { hidden: 'out_of_stock' }),
+  mockOffer('offer-expired', 8, {
+    name: 'ماوس لاسلكي',
+    name_en: 'Wireless Mouse',
+    thumbnail_url: null,
+  }, { hidden: 'expired' }),
+  mockOffer('offer-not-discounted', 9, {
+    name: 'لوحة مفاتيح ميكانيكية',
+    name_en: 'Mechanical Keyboard',
+    thumbnail_url: null,
+  }, { hidden: 'not_discounted' }),
+  mockOffer('offer-deleted-product', 10, null, { hidden: 'product_unavailable' }),
+  mockOffer('offer-variant', 11, {
+    name: 'حذاء رياضي',
+    name_en: 'Running Shoes',
+    thumbnail_url: null,
+  }, { hidden: 'variant_managed' }),
+];
+mockOffersState = MOCK_WORKSPACE_OFFERS.map((offer) => structuredClone(offer));
+
+
+/**
  * CUST-H2-4 — ثوابت تصنيفات مساحة عمل Commerce الوهمية، بنفس الشكل الحرفي
  * الذي يعيده `CommerceWorkspaceStorefrontCategoryController` الحقيقي —
  * يقرؤها `workspace-categories.ts` عبر نفس دوال التخطيط التي تستهلك
@@ -2782,6 +2894,119 @@ function mockVersionSummary(storefrontId: string, row: MockPresentationVersionRo
 
 function mockVersionDetail(storefrontId: string, row: MockPresentationVersionRow) {
   return { ...mockVersionSummary(storefrontId, row), config: row.config };
+}
+
+/** CUST-H4-7b — dev-harness stand-in for `CommerceWorkspaceStorefrontOfferController` (never merchant data). */
+function offerRejection(status: number, message: string, errors?: Record<string, string[]>) {
+  return Promise.reject(Object.assign(new Error(message), { status, body: { message, errors } }));
+}
+
+const MOCK_OFFER_FIELDS = ['product_id', 'starts_at', 'ends_at', 'is_active', 'position'];
+
+function evaluateMockOffer(
+  product: (typeof MOCK_WORKSPACE_PRODUCTS)[number] | null,
+  write: { is_active: boolean; starts_at: string | null; ends_at: string | null },
+): { live: { reference: number; offer: number; percent: number } } | { hidden: string } {
+  const now = Date.now();
+  if (!write.is_active) return { hidden: 'inactive' };
+  if (write.starts_at && new Date(write.starts_at).getTime() > now) return { hidden: 'scheduled' };
+  if (write.ends_at && new Date(write.ends_at).getTime() < now) return { hidden: 'expired' };
+  if (!product) return { hidden: 'product_unavailable' };
+  // Only the helmet has a channel-price-list discount in this fixture; every
+  // other product has none, so the (mock) backend says so honestly.
+  if (product.id === 'mock-product-helmet') return { live: { reference: 18900, offer: 15900, percent: 16 } };
+  return { hidden: 'not_discounted' };
+}
+
+function handleMockOffers(method: string, offerId: string | null, body: unknown): Promise<any> {
+  if (method === 'GET' && offerId === null) {
+    if (mockOffersMode === 'error') {
+      return Promise.reject(Object.assign(new Error('تعذّر تحميل العروض.'), { status: 500 }));
+    }
+    return Promise.resolve({ data: mockOffersState, meta: { max_offers: 12 } });
+  }
+  if (method === 'DELETE' && offerId) {
+    const before = mockOffersState.length;
+    mockOffersState = mockOffersState.filter((offer) => offer.id !== offerId);
+    return before === mockOffersState.length
+      ? offerRejection(404, 'العرض غير موجود.')
+      : Promise.resolve({ data: { deleted: true } });
+  }
+  if ((method === 'POST' && offerId === null) || (method === 'PATCH' && offerId)) {
+    const input = (body && typeof body === 'object' ? body : {}) as Record<string, unknown>;
+    const unknown = Object.keys(input).filter((key) => !MOCK_OFFER_FIELDS.includes(key));
+    if (unknown.length > 0) {
+      return offerRejection(
+        422,
+        'The given data was invalid.',
+        Object.fromEntries(unknown.map((key) => [key, ['حقل غير مسموح: العروض تنسيقٌ وجدولة فقط، والسعر والخصم يأتيان من التسعير القائم.']])),
+      );
+    }
+    const current = offerId ? mockOffersState.find((offer) => offer.id === offerId) : undefined;
+    if (offerId && !current) return offerRejection(404, 'العرض غير موجود.');
+    const productId = (input.product_id as string | undefined) ?? current?.product_id;
+    const productChanged = !current || (input.product_id !== undefined && input.product_id !== current.product_id);
+    const product = MOCK_WORKSPACE_PRODUCTS.find((p) => p.id === productId) ?? null;
+    if (productChanged && (!product || product.is_variant_managed)) {
+      return offerRejection(422, 'The given data was invalid.', {
+        product_id: ['المنتج غير مؤهَّل: يجب أن يكون نشطاً ومنشوراً على هذا المتجر وغير متعدد الخيارات.'],
+      });
+    }
+    if (productChanged && mockOffersState.some((offer) => offer.id !== offerId && offer.product_id === productId)) {
+      return offerRejection(409, 'هذا المنتج مُهيَّأ مسبقاً كعرض على هذا المتجر.');
+    }
+    if (!offerId && mockOffersState.length >= 12) {
+      return offerRejection(422, 'The given data was invalid.', {
+        product_id: ['بلغ المتجر الحد الأقصى من العروض المهيَّأة (12).'],
+      });
+    }
+    const startsAt = 'starts_at' in input ? (input.starts_at as string | null) : (current?.starts_at ?? null);
+    const endsAt = 'ends_at' in input ? (input.ends_at as string | null) : (current?.ends_at ?? null);
+    if (startsAt && endsAt && new Date(startsAt).getTime() >= new Date(endsAt).getTime()) {
+      return offerRejection(422, 'The given data was invalid.', {
+        ends_at: ['يجب أن يكون وقت النهاية بعد وقت البداية.'],
+      });
+    }
+    const isActive = 'is_active' in input ? Boolean(input.is_active) : (current?.is_active ?? true);
+    const position =
+      typeof input.position === 'number'
+        ? input.position
+        : (current?.position ?? mockOffersState.reduce((max, offer) => Math.max(max, offer.position + 1), 0));
+    const bounds = { is_active: isActive, starts_at: startsAt, ends_at: endsAt };
+    const productView = product
+      ? { name: product.name, name_en: product.name_en, thumbnail_url: product.media[0]?.url ?? null }
+      : current?.product
+        ? { name: current.product.name, name_en: current.product.name_en, thumbnail_url: current.product.thumbnail_url }
+        : null;
+    // A seeded fixture row keeps its own price evidence while only its flags /
+    // bounds change; a catalog product is priced by `evaluateMockOffer`.
+    const kept = current && !productChanged && !product ? current.evaluation : null;
+    const evaluation =
+      kept && kept.is_live && kept.reference_price && kept.offer_price
+        ? (() => {
+            const gate = evaluateMockOffer(null, bounds);
+            return 'hidden' in gate && gate.hidden !== 'product_unavailable'
+              ? gate
+              : { live: { reference: kept.reference_price.amount_minor, offer: kept.offer_price.amount_minor, percent: kept.discount_percent ?? 0 } };
+          })()
+        : kept
+          ? (() => {
+              const gate = evaluateMockOffer(null, bounds);
+              return 'hidden' in gate && gate.hidden !== 'product_unavailable' ? gate : { hidden: kept.reason ?? 'not_discounted' };
+            })()
+          : evaluateMockOffer(product, bounds);
+    const row = mockOffer(offerId ?? `mock-offer-new-${++mockOffersSeq}`, position, productView, evaluation);
+    row.product_id = productId ?? row.product_id;
+    row.starts_at = startsAt as never;
+    row.ends_at = endsAt as never;
+    row.is_active = isActive;
+    mockOffersState = (offerId
+      ? mockOffersState.map((offer) => (offer.id === offerId ? row : offer))
+      : [...mockOffersState, row]
+    ).sort((a, b) => a.position - b.position);
+    return Promise.resolve({ data: row });
+  }
+  return offerRejection(405, 'Method not allowed.');
 }
 
 export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknown): Promise<T> {
@@ -3390,6 +3615,13 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
       return resolve({ data: opened });
     }
 
+    // CUST-H4-7b — Offers create/update/delete. Matched here, before the generic
+    // `{ id: 'demo-new' }` default below, exactly as the note underneath requires.
+    const offersMutationMatch = clean.match(/^\/commerce\/workspace\/storefronts\/[^/]+\/offers(?:\/([^/]+))?$/);
+    if (offersMutationMatch) {
+      return handleMockOffers(m, offersMutationMatch[1] ?? null, body);
+    }
+
     // CUST-H1-3 — نشر فوري لنسخة محدَّدة. مُدرَجٌ هنا داخل فرع `m !== 'GET'`
     // (لا بعد نهايته كبقية مسارات النسخ الأخرى) لأن هذا الفرع ينتهي بقيمة
     // نجاح افتراضية عامة (`{ id: 'demo-new' }`) تسبق أي مطابقة لاحقة خارجه —
@@ -3725,6 +3957,17 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
       })),
       meta: { pagination: { page: 1, per_page: 20, total: rows.length, last_page: 1, has_more: false } },
     });
+  }
+  // CUST-H4-7 — Workspace Offers read for the Customizer's Offers picker and
+  // Canvas (dev fixture only; the real endpoint is
+  // `CommerceWorkspaceStorefrontOfferController`). A deterministic list by
+  // default; `setMockOffersMode` switches the empty/error states for visual QA,
+  // and POST/PATCH/DELETE mutate it in memory with the REAL H4-6 error shapes
+  // (409 duplicate, 422 ineligible / window / cap / forbidden key).
+  const workspaceOffersListMatch = clean.match(/^\/commerce\/workspace\/storefronts\/([^/]+)\/offers$/);
+  const workspaceOfferItemMatch = clean.match(/^\/commerce\/workspace\/storefronts\/([^/]+)\/offers\/([^/]+)$/);
+  if (workspaceOffersListMatch || workspaceOfferItemMatch) {
+    return handleMockOffers(method.toUpperCase(), workspaceOfferItemMatch?.[2] ?? null, body);
   }
   const workspaceProductMatch = clean.match(/^\/commerce\/workspace\/storefronts\/([^/]+)\/products\/([^/]+)$/);
   if (workspaceProductMatch) {

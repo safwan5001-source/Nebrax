@@ -135,6 +135,27 @@ export interface AwjPagination {
   has_more: boolean;
 }
 
+/**
+ * CUST-H4-7 — one row of `GET /store/v1/offers`. Only LIVE offers are ever
+ * returned (the backend filters; nothing about hidden offers is exposed). Both
+ * prices and `discount_percent` are server-derived from Commerce pricing — the
+ * storefront displays them and never computes, rounds or re-derives any of
+ * them. `id` is `storefront_offers.id`, the reference `OffersContent.offerIds`
+ * stores; `product_id` is the catalog product it points at.
+ */
+export interface AwjOffer {
+  id: string;
+  product_id: string;
+  name: string;
+  name_en: string | null;
+  thumbnail_url: string | null;
+  reference_price: AwjMoney;
+  offer_price: AwjMoney;
+  discount_percent: number;
+  starts_at: string | null;
+  ends_at: string | null;
+}
+
 export interface AwjListResponse<T> {
   data: T[];
   meta: { request_id: string; pagination: AwjPagination };
