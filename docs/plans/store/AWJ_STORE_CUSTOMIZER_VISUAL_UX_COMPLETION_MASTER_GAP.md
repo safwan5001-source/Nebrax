@@ -127,7 +127,7 @@ Not re-investigated (proven in prior reports and treated as evidence): versions/
 - Salla's *interactive editor* and *design options* articles do not document undo/redo, draft semantics, or per-control mobile behaviour; I do not claim Salla lacks them, only that it is **undocumented in the pages read**.
 - Salla Twilight docs list components but **do not document** autoplay, recommended image dimensions for sliders, or RTL notes (stated explicitly by the Enhanced Slider page).
 - Daftra's tutorials are step lists; the drag-and-drop **content-page element palette is not enumerated** in them, so I cannot say which blocks Daftra offers. Daftra warns that editing template default pages (homepage) "requires sufficient knowledge of web page programming" (**DAF-TPLEDIT**).
-- Production environment flags (`PRODUCT_MEDIA_R2_ENABLED`, `CATEGORY_MEDIA_R2_ENABLED`, `DOCUMENT_DURABLE_STORAGE_ENABLED`) cannot be read from the repo — see Unknown U1.
+- Production environment flags (`PRODUCT_MEDIA_R2_ENABLED`, `CATEGORY_MEDIA_R2_ENABLED`, `DOCUMENT_DURABLE_STORAGE_ENABLED`) cannot be read from the repo — see Unknown U1. This is an **operational verification item only**; it does not reopen the closed storage decision (§8.0).
 
 ---
 
@@ -233,7 +233,7 @@ There is **no `design`/`style` namespace on sections, header, footer or global c
 
 | ID | Capability | AWJ today | Repo evidence | Salla | Daftra | Gap | Proposed direction | Status | Pri | Deps / Risks |
 |---|---|---|---|---|---|---|---|---|---|---|
-| G01 | Theme presets as complete visual systems | 7 colour presets; only `awj-market`/`awj-bloom` carry a starting bundle (density/card/header) | `TOK THEME_PRESETS`, `CFG PRESET_STARTING_BUNDLES`, `CP ThemePanel` | Themes are full templates: layout + features + visuals (SAL-STORE) | Template = framework of look *and* functions (DAF-TPL) | A preset today is a colour; a professional theme must define palette, fonts, spacing, header, footer, cards, buttons, default section styles, hero, navigation, layouts | Presets become **bundles** over the new design contract; applying stays non-destructive (Preview → Apply summary → new Draft Version). **[HV]** | PARTIAL | P1 | G04, G17, C01, F12, TG08 |
+| G01 | Theme presets as complete visual systems | 7 colour presets; only `awj-market`/`awj-bloom` carry a starting bundle (density/card/header) | `TOK THEME_PRESETS`, `CFG PRESET_STARTING_BUNDLES`, `CP ThemePanel` | Themes are full templates: layout + features + visuals (SAL-STORE) | Template = framework of look *and* functions (DAF-TPL) | A preset today is a colour; a professional theme must define palette, fonts, spacing, header, footer, cards, buttons, default section styles, hero, navigation, layouts | Presets become **bundles** over the new design contract; applying stays non-destructive (Preview → Apply summary → new Draft Version). **[HV]** | PARTIAL | P1 | G04, G17, C01, F03, TG08 |
 | G02 | Primary colour | Hex picker + WCAG contrast hint; derives 9 CSS tokens | `CP ThemePanel`, `TOK presentationCssVars` | Store colour from list (SAL-IDENT) | — | none | keep | COMPLETE | — | — |
 | G03 | Accent / secondary colour | Field persisted + normalised; **no builder control, no storefront consumer** (only the mobile app-builder reads it) | grep `accentColor`: `CFG:87,449`, `web/…/app-builder/theme-panel.tsx:47`; none in `storefront/src` renderers | — | — | Dead field = fake capability in the contract | Outcome depends on the new palette model (accent becomes a first-class palette slot, or is retired) → **V1B**, decided in V0 **[HV]** | PARTIAL | P1 | G04/G18; V1B; O6 |
 | G04 | Colour system (page/section background, text, heading, link, button, border, overlay, footer/header colours) | All colours derive from **one primary** + fixed neutral tokens; nothing else is merchant-editable | `TOK presentationCssVars`, `Header.tsx bg-store-surface`, `Footer.tsx bg-store-footer` | Banner/Slider: text colour, bg colour, bg image; light/dark footer; transparent header; dark bars (SAL-HOME, SAL-THEME-PAGES, SAL-DESIGN) | — | Stores cannot look different from one another beyond one hue | Merchant palette with named roles (brand, accent, surface, text, heading, link, border, overlay) editable via picker/hex/swatches; automatic foreground + contrast gate (G14). Presets are *starting points*, not the ceiling. **[HV]** | MISSING | P1 | G18, G14, C01 |
@@ -246,7 +246,7 @@ There is **no `design`/`style` namespace on sections, header, footer or global c
 | G11 | Product / category / marketing card design | standard / compact only | `TOK PRODUCT_CARD_PRESETS`, `public-rhythm.publishedProductCardBodyClass` | Image-as-cover vs full image; vertical layout; card styles (coupon/standard) (SAL-DESIGN, SAL-HOME) | — | No radius/border/shadow/background/padding/alignment/image ratio/fit/badge position/hover options | Card design contract (see PC06) — commerce data stays authoritative. **[HV]** | PARTIAL | P1 | PC06, G10 |
 | G12 | Container width / spacing rhythm | Fixed `--store-content-max`; density only | `StoreContainer.tsx` | — | — | Owner has not decided global width control; per-section `contained∣full` and `maxWidth` presets are covered by C01 | Global content width presets (narrow/standard/wide) + per-section width; **[DECISION]** only for the global preset | PRODUCT_DECISION_REQUIRED | P2 | O8 |
 | G13 | Dark / light storefront mode | None | — | Dark mode for header/footer bars (SAL-DESIGN); Wesam dark mode (SAL-THEME-PAGES) | — | Full automatic dark theme would double every palette role | Per-surface *inverse/dark* palettes (header/footer/section) are in; a visitor-facing light/dark switch is **[DECISION]** | PRODUCT_DECISION_REQUIRED | P3 | O8 |
-| G14 | Contrast guardrails | Warn-only on primary vs white | `CP ThemePanel contrastWarn`, `TOK contrastRatio/primaryForeground` | — | — | Every merchant-colour control multiplies the risk | Guardrails *help, not restrict*: auto foreground suggestion; warn <4.5:1 body / <3:1 large text & UI; **block save only below 3:1 for text-on-background that carries content**; merchant can override a warning but not a block. **[HV]** | PARTIAL | P1 | G04, G18 |
+| G14 | Contrast guardrails | Warn-only on primary vs white | `CP ThemePanel contrastWarn`, `TOK contrastRatio/primaryForeground` | — | — | Every merchant-colour control multiplies the risk | Guardrails *help, not restrict* (policy in §9.2): **automatic accessible foreground selection first**; targets **≥4.5:1 for normal text**, **≥3:1 only for large text and applicable non-text UI** (WCAG 2.1 SC 1.4.3 / 1.4.11); warn near-threshold or uncomputable cases; block publish only for informative text/UI that misses its own target, always with a one-click fix (auto foreground or nearest compliant colour) so no background colour is ever forbidden. **[HV]** | PARTIAL | P1 | G04, G18 |
 | G15 | Gradients | None | — | Banner/Slider background colour or image; no gradient documented (SAL-HOME) | — | Hero default is a hard-coded primary gradient the merchant cannot change | Bounded gradient: `none∣solid∣linear`, **two palette/hex colours**, angle presets (0/45/90/135/180/…), optional third stop later; no free-form CSS string; rendered as one `linear-gradient()` from validated values; contrast computed against the *worst* stop. Cheap (no image bytes, no CLS). **[HV]** | MISSING | P1 | G04, G14 |
 | G16 | Typographic scale & section-heading presentation | Fixed sizes; one `SectionHeading` treatment (accent bar) | `SectionHeading.tsx` | — | — | No size/weight/alignment/ornament choice for headings | See G06; plus heading presentation presets (bar / plain / centered / underlined) per section. **[HV]** | MISSING | P2 | G06, C01 |
 | G17 | Button design system | One solid style; CTA colours fixed to primary | `HeroSection.tsx`, `BannerBand.tsx`, `ui/button.tsx` | — | — | No solid/outline/soft/link variants, no size, colour or hover choice, no icon placement | Global button style (`solid∣soft∣outline∣link`, radius from G09, size S/M/L, palette role, hover treatment) + per-CTA override limited to style & colour role; icon start/end (logical). Consistency preserved because only roles/variants are selectable. **[HV]** | MISSING | P1 | G04, G14 |
@@ -267,7 +267,7 @@ There is **no `design`/`style` namespace on sections, header, footer or global c
 | M09 | Customizer media contract (ownership, metadata, usage, delete policy, dimensions, variants, lifecycle) | Pattern proven for products (`commerce.manage`, 404-indistinguishable, signed workspace route) but **no customizer media contract** | `CUST-H4-ARCH-1 §24` (sketch); `ProductMedia.php`; `ServesProductMediaBytes.php` | — | — | Storage platform is **settled** (existing AWJ decision); the *contract details* are not authorised | Implement the contract in §8 on the existing R2 foundation — **O2 covers details only**. **[HV]** | BACKEND_GATED | P0 | O2, M12 |
 | M10 | Logo / compact logo / favicon storage | Base64 data-URLs inside presentation JSON (≤512 KiB each) via `FileReader.readAsDataURL`, or pasted https | `CP LogoField`, `PN cappedLogo`, `capabilities.ts BRANDING_PERSISTENCE_CAPABILITY="design_only"` | Upload; identity applies to every theme (SAL-IDENT) | — | The 2026-09-26 "keep embedded" decision is **superseded** (§4.5). Remaining: (a) 3×512 KiB ≈ whole `MAX_DOCUMENT_BYTES` → save rejected; (b) Base64 duplicated into every version; (c) stringified every render | Move logos/favicon to media references on the approved R2 foundation; read legacy data-URLs forever; migrate lazily on next save (no bulk rewrite). **[HV]** | PARTIAL | P1 | M09, V4 |
 | M11 | Empty / loading / uploading / error states | none (no upload) | — | — | — | Must be designed with M01 | See §26 | MISSING | P1 | M01 |
-| M12 | Production enablement of the approved R2 foundation for new media | R2 write flags default **false**; Production values not visible from the repo | `config/product_media.php`, `config/category_media.php`, `docs/storage.md` | — | — | Not a platform question (approved) but an **operational precondition**: customizer media must never silently fall back to the ephemeral `document` disk | Customizer media domain is **R2-only**; picker shows a capability-gated state if R2 is not configured; verify flags (U1) before enabling uploads. **[HV]** | BACKEND_GATED | P0 | U1 |
+| M12 | Operational prerequisite: Production R2 config verified before enabling Customizer media | R2 write flags default **false**; Production values not visible from the repo | `config/product_media.php`, `config/category_media.php`, `docs/storage.md` | — | — | **Not an architecture or product decision** (storage is CLOSED/approved and is not reopened by flag state); an **operational precondition** to verify before enabling Customizer media in Production: customizer media must never silently fall back to the ephemeral `document` disk | Customizer media domain is **R2-only**; picker shows a capability-gated state if R2 is not configured; operations verify R2 flags/credentials (U1) as a go-live checklist item before enabling uploads/reads. **[HV]** | BACKEND_GATED | P0 | U1 |
 | M13 | R2 lifecycle: orphan cleanup, replace, version/restore safety | Product media bulk-delete cleans R2 best-effort *after* commit (accepted orphan risk) | `docs/storage.md` "Delete behavior (R2-4D)" | Deleting a file removes it everywhere and substitutes default (SAL-MEDIA) | — | Customizer references live in draft + versions + published + scheduled; naive delete breaks any of them; H5 Restore will resurrect old references | Soft-delete state + reference scan (draft, all versions, published, scheduled); block with usage list; physical R2 delete by a reconciler only when unreferenced for N days; restore-safe by construction. **[HV]** | MISSING | P1 | M09, H5 |
 | M14 | SEO impact of media | Banner alt optional; no dimensions; no `og:image` from Customizer | `BannerBand.tsx` | Alt text (≤70 chars on product images) is documented as an SEO signal (SAL-IMG) | — | Missing width/height/alt/lazy policy hurts CLS and image indexing; hero image could feed social share image | Alt on media object (AR/EN) with per-usage override; explicit dimensions; `loading`/`fetchPriority` policy; optional `og:image` from logo/hero only through the approved public media route. **[HV]** | MISSING | P2 | M05, M07 |
 
@@ -372,7 +372,7 @@ There is **no `design`/`style` namespace on sections, header, footer or global c
 |---|---|---|---|---|---|---|---|---|---|---|
 | F01 | Content (tagline ≤200, copyright ≤120, logo, contact, WhatsApp, social ≤8, apps) | Complete, sanitised | `CFG footer/contact/social/apps`, `Footer.tsx` | support channels, social, app links (SAL-THEME-PAGES) | — | none | keep | COMPLETE | — | — |
 | F02 | Footer colours: background, text, heading, link, hover | Fixed `--store-footer*` tokens | `Footer.tsx:204` | light/dark footer (Wesam, SAL-THEME-PAGES) | — | No control; footer is brand-critical | Palette-role colours incl. hover, gradient, opacity; auto contrast. **[HV]** | MISSING | P1 | G04, G15, G14 |
-| F03 | Footer layout variants | Fixed grid `grid-cols-2 sm:grid-cols-3` + contact grid | `Footer.tsx:234,302` | — | — | One layout | **≥6**: *compact*, *columns*, *centered*, *editorial* (large tagline + sparse links), *minimal* (single row), *brand-heavy* (large logo + CTA band) — each with defined mobile stacking and RTL mirroring (§20). **[HV]** | MISSING | P1 | F12 |
+| F03 | Footer layout variants | Fixed grid `grid-cols-2 sm:grid-cols-3` + contact grid | `Footer.tsx:234,302` | — | — | One layout | **≥6**: *compact*, *columns*, *centered*, *editorial* (large tagline + sparse links), *minimal* (single row), *brand-heavy* (large logo + CTA band) — each with defined mobile stacking and RTL mirroring (§20). **[HV]** | MISSING | P1 | F10 |
 | F04 | Footer navigation groups | Code-fixed: policy links + category links | `lib/constants/policies.ts`, `Footer.tsx` | choose menu for footer (SAL-MENU) | — | Merchant cannot add/rename/reorder footer links | `footer.groups[≤6]` × links (same kinds & pickers as header), group titles, per-group column span. **[HV]** | MISSING | P1 | NV02, NV09 |
 | F05 | Footer top divider, border, spacing, padding, column gap | none | — | — | — | Owner: do not defer | `divider: none∣line∣wave∣angle` (see C05), border width/colour, padding top/bottom presets, column gap presets. **[HV]** | MISSING | P1 | C05, G10 |
 | F06 | Footer mobile layout | stacked 2-col | `Footer.tsx` | — | — | untested with long AR/EN | Each layout defines its mobile stack explicitly (§20); verified in DoD. **[HV]** | PARTIAL | P1 | F03 |
@@ -504,6 +504,8 @@ There is **no `design`/`style` namespace on sections, header, footer or global c
 | "Do not rewrite existing presentation documents" | **Retained** — Base64 logos and https URLs keep rendering; migration is lazy on next save, never a bulk rewrite |
 | "Do not enable `DOCUMENT_DURABLE_STORAGE_ENABLED` from Store Customizer" | **Retained** — the Customizer uses the **R2 domain**, not `DocumentStorageService` |
 
+**Operational prerequisite — not a decision.** The architectural decision to use AWJ's approved official R2-backed storage foundation is **CLOSED** and must not be reopened because of runtime flag or configuration state. Verifying Production R2 flags/credentials (U1) is only a **pre-enablement operational check** that must pass before Customizer media writes/reads are turned on in Production; it is neither a product decision nor a storage-architecture decision, and a failed check means *fix the configuration*, not *choose another storage*.
+
 **What is still open (O2 only):** the *Customizer Media Contract details* — media ownership, metadata, usage references, delete policy, dimensions, variants, lifecycle (§8.2). Storage platform selection is **not** open.
 
 ### 8.1 Reuse map
@@ -532,7 +534,7 @@ There is **no `design`/`style` namespace on sections, header, footer or global c
 | **Public read gate** | Host-resolved route serves a media id **only if the resolved storefront's published config references it**, else uniform 404 — otherwise an unpublished campaign image would be world-readable by guessing ids. |
 | **Lifecycle / R2** | Orphan reconciliation (see M13); original + variants share a prefix so deletion is one prefix-scoped operation per asset (no bucket listing); restore-safe (H5). |
 | **Cache** | Content-hashed variant names → `Cache-Control: public, max-age=31536000, immutable`; workspace preview stays `private, max-age=600`. |
-| **R2-only** | No `document`-disk fallback for this domain; if R2 is not configured the picker shows a capability-gated state (M12). |
+| **R2-only** | No `document`-disk fallback for this domain; if R2 is not configured in an environment the picker shows a capability-gated state (M12) — an operational condition to fix, not a reason to reopen the storage decision. |
 | **Legacy** | Existing https `imageUrl` and Base64 logos render forever; UI offers the picker, "external URL" demoted to Advanced. |
 
 ### 8.3 Merchant UX (modelled on **[Salla]** SAL-MEDIA + **[Daftra]** DAF-GALADD, simplified)
@@ -576,7 +578,13 @@ Global tokens set the brand; **sections may override a bounded, typed subset** (
 
 **Controls (`ColourField`)**: native colour picker · hex input (validated `#rrggbb`) · palette swatches (the roles above) · preset swatches (from the theme) · **recent colours** (per store, local, ≤8) · "suggest foreground" · live contrast badge for the role pair. Presets (`default/soft/brand/inverse/muted`) remain as one-click starting points — **not** the ceiling.
 
-**Contrast policy (help, not restrict):** compute automatically against the effective background (for gradients: worst stop; for image+overlay: the server-sampled luminance blended with the overlay). Warn below 4.5:1 body / 3:1 large text and UI; **block save only when informative text falls below 3:1** and offer the nearest compliant foreground in one click; the merchant may override warnings, never blocks. Decorative text may be flagged `decorative` to opt out.
+**Contrast policy (help, not restrict) — in this order:**
+
+1. **Automatic accessible foreground first.** For every text-on-surface pair the engine picks the foreground (light or dark neutral, or a brand tint) that meets the target. Because a light or dark neutral always reaches ≥4.5:1 against any background, **no merchant background colour is ever rejected** — only a manually forced foreground can fail.
+2. **Targets (WCAG 2.1 AA).** **Normal text ≥ 4.5:1** (SC 1.4.3). **Large text** (≥ 24 px, or ≥ 18.66 px bold) **and applicable non-text UI** — input/button boundaries needed to identify a control, focus indicators, meaningful icons/graphics — **≥ 3:1** (SC 1.4.3 large-text, SC 1.4.11). 3:1 is **never** accepted for normal text. Logos, decorative elements and disabled controls are exempt (flagged `decorative`).
+3. **Effective background.** Gradients: evaluate the worst stop. Image + overlay: server-sampled luminance blended with the overlay (a sampled estimate, hence tier 4).
+4. **Warning tier.** Pair within ~0.5 of its target, estimated cases (image/overlay), hover/focus states that differ from rest state: show the ratio, the nearest compliant colour and a one-click apply; the merchant may proceed.
+5. **Blocking tier.** Publish is blocked only for **informative text below 4.5:1 (normal) or below 3:1 (large text / applicable UI)**. The block always carries the one-click fix from tier 1, so it constrains the *pairing*, never the brand colour itself; decorative/exempt items are unaffected. Whether normal-text failures block or only warn at the 3:1–4.5:1 band is a V0-confirmable policy level — it must never be relaxed to treat 3:1 as sufficient for normal text.
 
 ### 9.3 Gradients — evaluation
 
@@ -909,7 +917,7 @@ Builder and storefront verified AR+EN at six widths (H4-8). New work must specif
 |---|---|
 | Keyboard operation / focus / focus return | verified for Offers CRUD (H4-8 §11); not for whole builder |
 | Accessible names, labelled upload inputs | present for logos (H3-1) |
-| Contrast | primary only; centralise (G14) |
+| Contrast | primary only; centralise with the §9.2 policy (4.5:1 normal text, 3:1 large text/applicable UI, auto-foreground first) (G14) |
 | Alt text | partial (M05) |
 | Motion preferences | CSS rule exists; required for slider/ticker |
 | Carousel/announcement a11y | not yet applicable → specified in §12/§15 |
@@ -1024,7 +1032,7 @@ Builder and storefront verified AR+EN at six widths (H4-8). New work must specif
 
 | Guardrail | Prevents | Must **not** prevent |
 |---|---|---|
-| Contrast engine (suggest → warn → block only <3:1 informative text) | unreadable text | any brand colour, dark or light, vivid or muted |
+| Contrast engine (§9.2): automatic accessible foreground → warn (near-threshold/estimated) → block only informative text below 4.5:1 (normal) or 3:1 (large text / applicable UI), always with a one-click fix | unreadable text | any brand or background colour, dark or light, vivid or muted — the fix adjusts the *foreground* first |
 | Typed `design` + capability flags + fail-closed normalisers (PHP authority + 2 TS twins) | injected/unknown properties, document bloat | expressive combinations of valid values |
 | Responsive-by-construction variants (defined mobile stack + RTL for each) | broken layouts at 390-1440 | layout variety |
 | Safe URLs / sanitised media refs / R2-only media / reference-gated public reads | XSS, hotlink tracking, enumeration | merchant imagery |
@@ -1095,13 +1103,13 @@ V0 ─┬─► V2 (media) ─► V4 (picker/editor/logos) ─┬─► V6 (hero
                                  ├─► V9 (cards/category/blocks)
                                  └─► V1B (accent, 768 inspector, header overflow, delete rule)
 ```
-External: R2 configured in Production (U1) · imaging capability (U4) · CSP position (U3) · remaining Owner decisions (§35). **H5 depends on V2/V5 being stable** (Restore ↔ media references; Undo ↔ design JSON).
+External (operational prerequisites, not decisions): Production R2 configuration verified (U1) · imaging capability (U4) · CSP position (U3) · remaining Owner decisions (§35). **H5 depends on V2/V5 being stable** (Restore ↔ media references; Undo ↔ design JSON).
 
 ## 34. Risks
 
 | # | Risk | Mitigation |
 |---|---|---|
-| R1 | Production R2 flags off ⇒ media on ephemeral disk | R2-only domain; gated state; U1 before V2 merge |
+| R1 | **Operational:** Production R2 flags/credentials absent or off when Customizer media is enabled | R2-only domain (never falls back to the ephemeral disk); gated state; go-live checklist verifies U1 before enabling writes/reads in Production — storage decision stays closed |
 | R2 | Public media enumerable before publish | reference-gated public route; uniform 404 |
 | R3 | Deleting used media breaks scheduled/old versions | block-with-usage; soft-delete; publish validation |
 | R4 | Parity drift ×3 normalisers as the contract grows | golden fixtures + generated resolver + parity test |
@@ -1167,7 +1175,7 @@ External: R2 configured in Production (U1) · imaging capability (U4) · CSP pos
 - [ ] Every visual control has Canvas ↔ saved Draft ↔ Published parity test; no Canvas-only styling.
 - [ ] Backward compatibility: a pre-HV document renders byte-identically (golden fixtures).
 - [ ] Tenant isolation tests for media (upload, signed read, public read, delete, usage, foreign ids, unpublished ids) and R2 lifecycle (orphan reconciler, soft-delete, restore safety).
-- [ ] R2 configuration verified in Production **before** enabling uploads.
+- [ ] Operational prerequisite: R2 flags/credentials verified in Production **before** enabling Customizer media writes/reads (not a storage decision).
 - [ ] Real-browser matrix **390, 430, 768, 1024, 1280, 1440 × AR/EN**, long Arabic/English, editor and storefront; 768 has an inspector; every Footer/Header/Hero/Banner/Slider variant checked at mobile + RTL.
 - [ ] Keyboard-only pass and **screen-reader pass (NVDA + VoiceOver)** recorded.
 - [ ] Reduced-motion verified for slider/ticker/reveal/hover; contrast engine verified for every colour control incl. gradients and overlays.
@@ -1268,8 +1276,8 @@ Every item previously deferred or prohibited is re-classified. **IN** = in this 
 
 ## 38. Final recommendation
 
-1. **Proceed with CUST-HV (Option A, approved)** — V0 first; **V1A may start immediately** (four code/doc fixes, no new architecture).
-2. **Media:** implement the Customizer media contract (O2 details) on the existing R2 foundation; no parallel store; verify Production R2 flags (U1) first.
+1. **Proceed with CUST-HV (Option A, approved)** — V0 first; **V1A may start immediately** (five code/doc fixes — DEF-1, DEF-3a, DEF-4, DEF-9, DEF-10 — no new architecture).
+2. **Media:** implement the Customizer media contract (O2 details) on the existing R2 foundation; no parallel store. Production R2 flag/config verification (U1) is an operational go-live prerequisite, not a decision.
 3. **Ship the Announcement bar early (V3)**; it needs no media.
 4. **Introduce the Section Visual Contract + palette + Inspector IA (V5) before any per-surface visual work**, so Hero/Banner/Header/Footer/Slider all land on one vocabulary and one parity harness.
 5. Treat guardrails as help, not restriction: the success test is that two merchants' stores look genuinely different while remaining readable, responsive and safe.
@@ -1327,9 +1335,9 @@ Every item previously deferred or prohibited is re-classified. **IN** = in this 
 | Future Undo/Redo compatibility | UR01 | plain JSON, refs by id |
 | Salla / Daftra evidence | §3, §5-6, §36A | mandatory per slice |
 
-**Gaps in this pass:** no live browser, no AT, Production flags unknown, Daftra block palette unknown, Salla undo/mobile specifics undocumented in pages read.
+**Gaps in this pass:** no live browser, no AT, Production R2 flag state not verified (operational check), Daftra block palette unknown, Salla undo/mobile specifics undocumented in pages read.
 
-**Unknowns:** U1 Production values of `PRODUCT_MEDIA_R2_ENABLED` / `CATEGORY_MEDIA_R2_ENABLED` (render.yaml stale vs Railway) · U2 Daftra drag-drop element palette · U3 CSP at the edge (none in `next.config.ts`/`proxy.ts`/`vercel.json`) · U4 GD/Imagick availability · U5 published-config cache vs time-based expiry · U6 Swiper RTL in `ProductCarousel` · U7 screen-reader behaviour · U8 hero Canvas↔Published visual equivalence not re-run.
+**Unknowns:** U1 Production values of `PRODUCT_MEDIA_R2_ENABLED` / `CATEGORY_MEDIA_R2_ENABLED` (render.yaml stale vs Railway) — an operational check, not an open decision · U2 Daftra drag-drop element palette · U3 CSP at the edge (none in `next.config.ts`/`proxy.ts`/`vercel.json`) · U4 GD/Imagick availability · U5 published-config cache vs time-based expiry · U6 Swiper RTL in `ProductCarousel` · U7 screen-reader behaviour · U8 hero Canvas↔Published visual equivalence not re-run.
 
 ---
 
@@ -1339,10 +1347,10 @@ Every item previously deferred or prohibited is re-classified. **IN** = in this 
 |---|---|
 | Reviewed | Customizer UI, presentation contract (PHP + 2 TS twins), published renderers, media/storage stack, theme gallery, roadmap/H4 closure/QA reports |
 | External official docs inspected | Salla ≈19 pages (help centre + Twilight, incl. product image editor), Daftra 10 tutorials |
-| Master Gap Matrix rows | **189** |
-| — COMPLETE | **30** |
-| — PARTIAL | **36** |
-| — MISSING | **94** |
+| Master Gap Matrix rows | **193** |
+| — COMPLETE | **31** |
+| — PARTIAL | **38** |
+| — MISSING | **95** |
 | — INTENTIONALLY_DEFERRED | **12** |
 | — PRODUCT_DECISION_REQUIRED | **13** |
 | — BACKEND_GATED | **4** |
