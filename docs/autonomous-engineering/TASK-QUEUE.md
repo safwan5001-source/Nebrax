@@ -1281,7 +1281,7 @@ A task must not be promoted to `ready` while any gate mapped to it is unresolved
 
 **Dependency readiness after DELIVERY-DECISION-PASS-6 (in review, not merged; OD-DG-3-POSTING-GATE accepted):**
 - **DELIVERY-DECISION-PASS-5 is merged** (PR #1205, squash `48051f2cc7d5d2c7fc50d45892aa29fe53d643fa`). OD-DG-8-IMPORT is accepted as Option B. No production deploy.
-- **OD-DG-3-POSTING-GATE is ACCEPTED.** It is necessary and not sufficient. An imported order does not become an invoice unless financial role, invoice responsibility, collection role, and supply-time VAT status are all evidenced. The tax point remains a separate block. This acceptance is not a temporary system-recognition policy. This note does not implement the command.
+- **OD-DG-3-POSTING-GATE is ACCEPTED.** It is necessary and not sufficient. An imported order does not become an invoice unless financial role, invoice responsibility, collection role, and supply-time VAT status are all evidenced. A known platform-seller or deemed-supplier value still does not authorize the restaurant invoice. The tax point remains a separate block. This acceptance is not a temporary system-recognition policy. This note does not implement the command.
 - **DG-3 is not closed.** No provider is accepted as agent, principal, or collector. All six stay UNKNOWN on those inputs.
 - **DLV-HUB-1 (full) stays BLOCKED.** Do not start the financial command from this note.
 - **DLV-COMMISSION-1 remains BLOCKED** (EXTERNAL_EVIDENCE_REQUIRED under DG-3).
