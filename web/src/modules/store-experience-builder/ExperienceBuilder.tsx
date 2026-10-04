@@ -1257,6 +1257,11 @@ export function ExperienceBuilder({
             setOffersRows((rows) => upsertOffer(rows, result.data));
             setOffersState("ready");
             void loadOffers({ silent: true });
+          } else if (result.reason === "conflict") {
+            // Someone configured this product meanwhile (another tab / merchant):
+            // show the server's truth so the conflicting row is visible and the
+            // product is taken in the picker (found by the CUST-H4-8 real-API QA).
+            void loadOffers({ silent: true });
           }
           return result;
         },

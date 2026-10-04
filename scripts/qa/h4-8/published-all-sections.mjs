@@ -1,0 +1,14 @@
+import { browser, login, WEB, OUT, log } from './lib.mjs';
+import { execSync } from 'node:child_process';
+execSync('cd /home/user/nibras-app && php artisan cache:clear', { stdio: 'ignore' });
+const b = await browser(['--host-resolver-rules=MAP *.h48.test 127.0.0.1']);
+const pp = await (await b.newContext({ viewport: { width: 1280, height: 900 } })).newPage();
+await pp.goto('http://a.h48.test:3001/sa/ar', { waitUntil: 'networkidle', timeout: 90000 });
+const txt = await pp.locator('main').innerText().catch(async () => pp.locator('body').innerText());
+const has = (s) => txt.includes(s);
+log('banner:', has('تخفيضات الخريف') && has('عروض حقيقية على منتجات مختارة'), '| benefits:', has('شحن سريع') && has('دفع آمن'), '| customContent:', has('عن متجرنا') && has('نص حر محكوم'));
+const headings = await pp.locator('h2').allInnerTexts(); log('section order (h2):', JSON.stringify(headings));
+const feat = pp.locator('section[aria-labelledby]').filter({ hasText: 'مختارات المتجر' }); log('featured cards (names, order):', JSON.stringify(await feat.locator('a').evaluateAll(a => a.map(x => x.innerText.split('\n').filter(Boolean)[0]).filter(Boolean))));
+log('app promo present:', has('تطبيق') || (await pp.locator('a[href*="apps.apple.com"], a[href*="play.google.com"]').count()) > 0);
+await pp.screenshot({ path: `${OUT}/50-published-all.png`, fullPage: true });
+await b.close();
