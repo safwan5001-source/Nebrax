@@ -375,7 +375,9 @@ function normalizeProductShelf(
   source: Record<string, unknown>,
 ): ProductShelfContent | undefined {
   const raw =
-    source.source && typeof source.source === "object" && !Array.isArray(source.source)
+    source.source &&
+    typeof source.source === "object" &&
+    !Array.isArray(source.source)
       ? (source.source as Record<string, unknown>)
       : {};
   let shelfSource: ShelfSource | undefined;
@@ -394,7 +396,10 @@ function normalizeProductShelf(
       ? Math.max(SHELF_LIMIT_MIN, Math.min(SHELF_LIMIT_MAX, source.limit))
       : SHELF_LIMIT_DEFAULT;
   const content: ProductShelfContent = {
-    title: truncateToCodePoints(asString(source.title).trim(), MAX_SECTION_TITLE_LENGTH),
+    title: truncateToCodePoints(
+      asString(source.title).trim(),
+      MAX_SECTION_TITLE_LENGTH,
+    ),
     deliverToday,
     limit,
   };
@@ -407,9 +412,14 @@ function normalizeDiscovery(
 ): DiscoveryContent | undefined {
   const dimension = safeToken(source.dimension, "");
   if (!dimension) return undefined;
-  const display = DISCOVERY_DISPLAYS.find((candidate) => candidate === source.display);
+  const display = DISCOVERY_DISPLAYS.find(
+    (candidate) => candidate === source.display,
+  );
   return {
-    title: truncateToCodePoints(asString(source.title).trim(), MAX_SECTION_TITLE_LENGTH),
+    title: truncateToCodePoints(
+      asString(source.title).trim(),
+      MAX_SECTION_TITLE_LENGTH,
+    ),
     dimension,
     display: display ?? "tiles",
   };
@@ -418,7 +428,10 @@ function normalizeDiscovery(
 function normalizeDeliveryPromise(
   source: Record<string, unknown>,
 ): DeliveryPromiseContent | undefined {
-  const title = truncateToCodePoints(asString(source.title).trim(), MAX_SECTION_TITLE_LENGTH);
+  const title = truncateToCodePoints(
+    asString(source.title).trim(),
+    MAX_SECTION_TITLE_LENGTH,
+  );
   const body = truncateToCodePoints(
     asString(source.body).trim(),
     MAX_DELIVERY_PROMISE_BODY_LENGTH,

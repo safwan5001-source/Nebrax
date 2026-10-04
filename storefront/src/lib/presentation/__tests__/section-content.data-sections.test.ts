@@ -12,8 +12,8 @@ import {
   discoveryContentOf,
   normalizeOptionalSectionContent,
   productShelfContentOf,
-  SHELF_LIMIT_DEFAULT,
   type SectionContent,
+  SHELF_LIMIT_DEFAULT,
 } from "../section-content";
 
 interface Case {
@@ -26,7 +26,11 @@ interface Case {
 // Both apps run vitest from their own directory (one level below the repo root).
 const fixture = JSON.parse(
   readFileSync(
-    resolve(process.cwd(), "..", "tests/Fixtures/presentation/data-sections.json"),
+    resolve(
+      process.cwd(),
+      "..",
+      "tests/Fixtures/presentation/data-sections.json",
+    ),
     "utf8",
   ),
 ) as { cases: Case[] };
@@ -34,12 +38,19 @@ const fixture = JSON.parse(
 describe("data-backed section content (shared fixture)", () => {
   it("has cases for every new type", () => {
     const types = new Set(fixture.cases.map((c) => c.type));
-    expect([...types].sort()).toEqual(["deliveryPromise", "discovery", "productShelf"]);
+    expect([...types].sort()).toEqual([
+      "deliveryPromise",
+      "discovery",
+      "productShelf",
+    ]);
   });
 
   for (const testCase of fixture.cases) {
     it(testCase.name, () => {
-      const actual = normalizeOptionalSectionContent(testCase.type, testCase.input);
+      const actual = normalizeOptionalSectionContent(
+        testCase.type,
+        testCase.input,
+      );
       if (testCase.expected === null) {
         expect(actual).toBeUndefined();
       } else {
@@ -58,9 +69,14 @@ describe("data-backed section content (shared fixture)", () => {
 
   it("is idempotent", () => {
     for (const testCase of fixture.cases) {
-      const once = normalizeOptionalSectionContent(testCase.type, testCase.input);
+      const once = normalizeOptionalSectionContent(
+        testCase.type,
+        testCase.input,
+      );
       if (once === undefined) continue;
-      expect(normalizeOptionalSectionContent(testCase.type, once)).toEqual(once);
+      expect(normalizeOptionalSectionContent(testCase.type, once)).toEqual(
+        once,
+      );
     }
   });
 
@@ -75,20 +91,34 @@ describe("data-backed section content (shared fixture)", () => {
       dimension: "",
       display: "tiles",
     });
-    expect(deliveryPromiseContentOf({ type: "discovery" })).toEqual({ title: "", body: "" });
+    expect(deliveryPromiseContentOf({ type: "discovery" })).toEqual({
+      title: "",
+      body: "",
+    });
   });
 
   it("content readers return the stored content for the matching type", () => {
     const shelf = normalizeOptionalSectionContent("productShelf", {
       source: { kind: "collection", slug: "best-sellers" },
     }) as SectionContent;
-    expect(productShelfContentOf({ type: "productShelf", content: shelf }).source).toEqual({
+    expect(
+      productShelfContentOf({ type: "productShelf", content: shelf }).source,
+    ).toEqual({
       kind: "collection",
       slug: "best-sellers",
     });
-    const disc = normalizeOptionalSectionContent("discovery", { dimension: "occasion" }) as SectionContent;
-    expect(discoveryContentOf({ type: "discovery", content: disc }).dimension).toBe("occasion");
-    const promise = normalizeOptionalSectionContent("deliveryPromise", { body: "x" }) as SectionContent;
-    expect(deliveryPromiseContentOf({ type: "deliveryPromise", content: promise }).body).toBe("x");
+    const disc = normalizeOptionalSectionContent("discovery", {
+      dimension: "occasion",
+    }) as SectionContent;
+    expect(
+      discoveryContentOf({ type: "discovery", content: disc }).dimension,
+    ).toBe("occasion");
+    const promise = normalizeOptionalSectionContent("deliveryPromise", {
+      body: "x",
+    }) as SectionContent;
+    expect(
+      deliveryPromiseContentOf({ type: "deliveryPromise", content: promise })
+        .body,
+    ).toBe("x");
   });
 });

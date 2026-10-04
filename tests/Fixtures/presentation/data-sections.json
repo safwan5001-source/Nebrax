@@ -333,6 +333,54 @@
    "type": "deliveryPromise",
    "input": "text",
    "expected": null
+  },
+  {
+   "name": "shelf: an integral float limit counts as an integer (6.0 === 6)",
+   "type": "productShelf",
+   "input": {"source":{"kind":"collection","slug":"x"},"limit":6.0},
+   "expected": {
+    "title": "",
+    "source": {
+     "kind": "collection",
+     "slug": "x"
+    },
+    "deliverToday": false,
+    "limit": 6
+   }
+  },
+  {
+   "name": "shelf: a non-integral float limit falls back to the default",
+   "type": "productShelf",
+   "input": {
+    "source": {
+     "kind": "collection",
+     "slug": "x"
+    },
+    "limit": 6.5
+   },
+   "expected": {
+    "title": "",
+    "source": {
+     "kind": "collection",
+     "slug": "x"
+    },
+    "deliverToday": false,
+    "limit": 8
+   }
+  },
+  {
+   "name": "shelf: a huge limit clamps to the maximum",
+   "type": "productShelf",
+   "input": {"source":{"kind":"collection","slug":"x"},"limit":100000000000000000000},
+   "expected": {
+    "title": "",
+    "source": {
+     "kind": "collection",
+     "slug": "x"
+    },
+    "deliverToday": false,
+    "limit": 12
+   }
   }
  ]
 }

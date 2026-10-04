@@ -777,8 +777,11 @@ final class StorefrontPresentationNormalizer
             if ($normalizedSource === null && ! $deliverToday) {
                 return null;
             }
+            // عدد صحيح JSON: `6` و`6.0` كلاهما قيمةٌ صحيحة (PHP يفكّ الثانية float بينما JS لا يميّزها) — فتقبل التوائم
+            // الثلاثة الاثنتين ولا ينحرف المعاينة عن المخزَّن. float غير صحيح أو غير منتهٍ ⇒ الافتراضي. القصّ قبل التحويل.
             $limit = $source['limit'] ?? null;
-            $limit = is_int($limit) ? max(self::SHELF_LIMIT_MIN, min(self::SHELF_LIMIT_MAX, $limit)) : self::SHELF_LIMIT_DEFAULT;
+            $integral = is_int($limit) || (is_float($limit) && is_finite($limit) && floor($limit) === $limit);
+            $limit = $integral ? (int) max(self::SHELF_LIMIT_MIN, min(self::SHELF_LIMIT_MAX, $limit)) : self::SHELF_LIMIT_DEFAULT;
             $content = ['title' => $title, 'deliverToday' => $deliverToday, 'limit' => $limit];
             if ($normalizedSource !== null) {
                 $content['source'] = $normalizedSource;
