@@ -1,6 +1,6 @@
 # AWJ Flowers & Gifts — Horizon 1 Progress
 
-**Status:** IN PROGRESS — H1–H12 merged; H13 in review  
+**Status:** IN PROGRESS — H1–H13 merged; H14 in review  
 **Date:** 2026-10-03  
 **Planning Base:** `main` @ `318cc72d10bb304cef4b401f548772008ea1618e`  
 **Execution Authority:** `AWJ_FLOWERS_HORIZON_1_AUTONOMOUS_EXECUTION.md`  
@@ -50,8 +50,8 @@ No Deploy or Production change is authorized by this Horizon.
 | H10 | Storefront Discovery UX — gifting filters on the listing | MERGED | #1217 | `6e98a01` |
 | H11 | Flowers/Gifts PDP — gifting blocks on the product page | MERGED | #1218 | `6c7b81e` |
 | H12 | Cart & Checkout Gifting UX — cart/order lines (H12a), schedule + gift checkout stages (H12b) | MERGED | #1219 | `1f15d5f` |
-| H13 | Account / Saved Recipient / Order Experience (ADR-24) | PR OPEN, in review | (see log) | — |
-| H14 | Vertical Onboarding & Defaults | NOT STARTED | — | — |
+| H13 | Account / Saved Recipient / Order Experience (ADR-24) | MERGED | #1220 | `52e1096` |
+| H14 | Vertical Onboarding & Defaults (ADR-25) | PR OPEN, in review | (see log) | — |
 | H15 | Theme / Presentation Pack | NOT STARTED | — | — |
 | H16 | Cross-Horizon Integration / Polish | NOT STARTED | — | — |
 
@@ -688,11 +688,23 @@ PRODUCTION: NOT CHANGED
 
 ### H13 — Account order experience (ADR-24)
 
-**Status:** PR in review  
+**Status:** MERGED — PR #1220, squash `52e1096dd8a571081ae727d98c2c66f7bf83d126`; head `25dbe49f3293a89ecda64d27d2e93af7e3520e64`; CI 8/8 green (sqlite + pgsql, storefront, both visual QA); no review threads (Codex out of quota)  
 **Base SHA:** `1f15d5f421203fcd1d6707dfd05ef28205786b4c` (main after H12)  
 **Branch:** `flowers/h13-account-order-gifting`
 
 - **Built.** `OrderGiftingDetails` — the requested date/window and the gift card of a placed order — shared by the confirmation screen and the account order detail; the account detail also nests add-ons under their own bouquet. Fixture `ACCOUNT_GIFT_ORDER_PREVIEW` and a `order-detail-gift` surface on the dev preview. Storefront suite 1001 green; AR mobile and EN desktop reviewed in a browser.
 - **Evidence-driven scope.** `store/v1` is anonymous and every storefront account capability is `design_only`; the commerce customer address book already pairs recipient name + phone with a destination. So saved recipients (would duplicate it and need identity), re-order (needs server re-pricing/availability) and wishlist (shared capability not ready) are **DEFERRED** with the reasons and the safe path recorded in ADR-24; no timeline state is invented.
 - **Residual.** The account order detail remains gated by `ACCOUNT_ORDER_LOOKUP_CAPABILITY`; it lights up when a storefront customer-identity contract lands.
+
+### H14 — Vertical onboarding & defaults (ADR-25)
+
+**Status:** PR in review  
+**Base SHA:** `52e1096dd8a571081ae727d98c2c66f7bf83d126` (main after H13)  
+**Branch:** `flowers/h14-vertical-onboarding`
+
+- **Backend (additive; no migration).** `VerticalCapability::isAvailable()` now reports the truth (all nine built; it had stayed `false` since H1, so the dashboard said "Coming soon" for finished capabilities). `GET …/storefronts/{id}/vertical-setup` returns a per-capability `configured | not_configured` status **derived from real configuration** (never a stored flag): active occasion/recipient values, gift policy on, scheduling on *with* a window, products with personalization / add-ons / content, a visible data-backed home section. `GET|POST …/vertical-setup/starters` previews / applies a finite starter catalog (12 occasions, 10 recipients, AR+EN) — additive and idempotent, through `CommerceFacetService`: existing facets/values (by slug or name, any language, active or disabled, renamed or not) are never overwritten, re-enabled or duplicated; a plain facet holding the key is reported `blocked` and untouched. Apply needs `commerce.manage` + `products.manage`.
+- **Web.** The store settings dialog shows "Gift business setup" for a Flowers & Gifts store: live checklist (links only to screens that exist), preview → confirm for starters. AR/EN, RTL checked at 390 and 1440.
+- **Not done on purpose.** No policy is switched on (gift, scheduling, add-ons, personalization stay merchant decisions); no builder sections are auto-written (the builder owns draft/publish revisions); changing the vertical back to `general` deletes nothing (tested).
+- **Tests.** `FlowersVerticalSetupApiTest` (10 cases: general store, fresh store, preview-writes-nothing, idempotency, merchant-edit preservation, blocked key, vertical switch-back, status-from-real-settings, tenant isolation + RBAC); `CommerceModuleBoundaryTest` allowlist updated; web client + panel + stores page + e2e. Full web suite 3132 green. Local full PHP run: only environment failures (no `bcmath`, no AWS SDK in this container — Fuel and ProductMedia R2 classes); CI is authoritative.
+- **Residual risk — adoption gap (for the final report).** The dashboard has **no screens** for the gift policy, the delivery schedule (settings, windows, blocked dates) or per-product personalization, add-ons and content blocks — they are API-only. The checklist says so ("No screen yet"). Building them is the main step before a merchant can enable these features without API access.
 

@@ -6,6 +6,9 @@ import path from 'node:path';
  * FLOWERS-H1 — التحقق البصري لاختيار «نوع النشاط» داخل إعدادات المتجر.
  * الخادم مُعترَض (page.route) بحمولة تطابق عقد `commerce/workspace/storefronts`
  * الفعلي؛ لا بيانات تُخترع خارج هذا العقد.
+ *
+ * FLOWERS-H14: متجر الهدايا يعرض الآن «إعداد نشاط الهدايا» (حالة مشتقّة من الخادم + القيم المبدئية)
+ * بدل قائمة «موصى به» الثابتة؛ المعترِض يخدم `vertical-setup` بحمولة تطابق عقد H14.
  */
 const evidenceDir = path.resolve(process.cwd(), 'test-results/flowers-h1-business-type');
 
@@ -36,7 +39,20 @@ const store = (vertical: 'general' | 'flowers_gifts') => ({
   },
 });
 
+const SETUP_ITEMS = (occasionsDone: boolean) => [
+  { key: 'occasions', available: true, state: occasionsDone ? 'configured' : 'not_configured', count: occasionsDone ? 12 : 0, manage_in: 'merchandising' },
+  { key: 'recipients', available: true, state: occasionsDone ? 'configured' : 'not_configured', count: occasionsDone ? 10 : 0, manage_in: 'merchandising' },
+  { key: 'gift_message', available: true, state: 'not_configured', count: 0, manage_in: 'gift_settings' },
+  { key: 'personalization', available: true, state: 'not_configured', count: 0, manage_in: 'products' },
+  { key: 'add_ons', available: true, state: 'not_configured', count: 0, manage_in: 'products' },
+  { key: 'delivery_scheduling', available: true, state: 'not_configured', count: 0, manage_in: 'delivery_schedule' },
+  { key: 'same_day_delivery', available: true, state: 'not_configured', count: 0, manage_in: 'delivery_schedule' },
+  { key: 'structured_content', available: true, state: 'not_configured', count: 0, manage_in: 'products' },
+  { key: 'vertical_sections', available: true, state: 'not_configured', count: 0, manage_in: 'store_builder' },
+];
+
 async function seed(page: Page, vertical: 'general' | 'flowers_gifts') {
+  let applied = false;
   await page.addInitScript(() => {
     localStorage.setItem('token', 'test-token');
     localStorage.setItem('user', JSON.stringify({
@@ -45,6 +61,28 @@ async function seed(page: Page, vertical: 'general' | 'flowers_gifts') {
   });
   await page.route('**/api/**', async (route) => {
     const url = route.request().url();
+    if (url.includes('/vertical-setup/starters')) {
+      if (route.request().method() === 'POST') {
+        applied = true;
+        return route.fulfill({ json: { data: { starters: { created: 22, facets: [] } } } });
+      }
+      return route.fulfill({
+        json: {
+          data: {
+            starters: {
+              would_create: 22,
+              facets: [
+                { system_key: 'occasion', facet: 'missing', missing_values: Array(12).fill({}), existing_values: [] },
+                { system_key: 'recipient', facet: 'missing', missing_values: Array(10).fill({}), existing_values: [] },
+              ],
+            },
+          },
+        },
+      });
+    }
+    if (url.includes('/vertical-setup')) {
+      return route.fulfill({ json: { data: { setup: { vertical: 'flowers_gifts', items: SETUP_ITEMS(applied) } } } });
+    }
     if (url.includes('/commerce/workspace/storefronts')) {
       return route.fulfill({ json: { data: { stores: [store(vertical)] } } });
     }
@@ -77,24 +115,25 @@ test.describe('FLOWERS-H1 — business type in store settings', () => {
   });
 
   for (const [w, h] of [[390, 844], [430, 932], [1440, 960]] as const) {
-    test(`AR ${w} — flowers & gifts selected, recommended list, no overflow`, async ({ page }) => {
+    test(`AR ${w} — flowers & gifts selected, setup checklist, no overflow`, async ({ page }) => {
       await page.setViewportSize({ width: w, height: h });
       await seed(page, 'flowers_gifts');
       await openSettings(page, 'ar');
       const dialog = page.getByRole('dialog');
       await expect(dialog.getByRole('radio', { name: /ورد وهدايا/ })).toBeChecked();
-      await expect(dialog.getByText('موصى به لنشاطك الحالي')).toBeVisible();
+      await expect(dialog.getByText('إعداد نشاط الهدايا')).toBeVisible();
+      await expect(dialog.getByText('لا شاشة بعد').first()).toBeVisible();
       await assertNoOverflow(page);
       await page.screenshot({ path: path.join(evidenceDir, `ar-${w}-flowers.png`) });
     });
   }
 
-  test('AR 390 — general store has no recommendation list', async ({ page }) => {
+  test('AR 390 — general store has no setup checklist', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await seed(page, 'general');
     await openSettings(page, 'ar');
     await expect(page.getByRole('dialog').getByRole('radio', { name: /تجزئة عامة/ })).toBeChecked();
-    await expect(page.getByText('موصى به لنشاطك الحالي')).toHaveCount(0);
+    await expect(page.getByText('إعداد نشاط الهدايا')).toHaveCount(0);
     await assertNoOverflow(page);
     await page.screenshot({ path: path.join(evidenceDir, 'ar-390-general.png') });
   });
@@ -108,5 +147,29 @@ test.describe('FLOWERS-H1 — business type in store settings', () => {
     await expect(flowers).toBeFocused();
     await assertNoOverflow(page);
     await page.screenshot({ path: path.join(evidenceDir, 'en-390-flowers.png') });
+  });
+
+  test('AR 390 — preview then add starter values refreshes the checklist', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await seed(page, 'flowers_gifts');
+    await openSettings(page, 'ar');
+    const dialog = page.getByRole('dialog');
+    await dialog.getByRole('button', { name: 'معاينة القيم المبدئية' }).click();
+    await expect(dialog.getByText('+12')).toBeVisible();
+    await assertNoOverflow(page);
+    await page.screenshot({ path: path.join(evidenceDir, 'ar-390-starters-preview.png') });
+    await dialog.getByRole('button', { name: /^إضافة \(22\)/ }).click();
+    await expect(dialog.getByText('تمت إضافة القيم المبدئية (22)')).toBeVisible();
+    await expect(dialog.locator('[data-setup-progress]')).toContainText('2 / 9');
+    await page.screenshot({ path: path.join(evidenceDir, 'ar-390-starters-applied.png') });
+  });
+
+  test('EN 1440 — setup checklist on desktop', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 960 });
+    await seed(page, 'flowers_gifts');
+    await openSettings(page, 'en');
+    await expect(page.getByRole('dialog').getByText('Gift business setup')).toBeVisible();
+    await assertNoOverflow(page);
+    await page.screenshot({ path: path.join(evidenceDir, 'en-1440-flowers.png') });
   });
 });

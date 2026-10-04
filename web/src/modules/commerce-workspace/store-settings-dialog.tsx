@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
 import { commerceWorkspaceMessage } from '@/modules/commerce-workspace/messages';
+import { VerticalSetupPanel } from '@/modules/commerce-workspace/vertical-setup-panel';
 import {
   COMMERCE_BUSINESS_VERTICALS,
   updateCommerceStorefrontIdentity,
@@ -151,7 +152,9 @@ export function StoreSettingsDialog({
           </div>
         </fieldset>
 
-        {store.recommendedCapabilities.length > 0 ? (
+        {store.businessVertical === 'flowers_gifts' ? (
+          <VerticalSetupPanel storeId={store.id} locale={locale} />
+        ) : store.recommendedCapabilities.length > 0 ? (
           <section aria-label={t('storeVerticalRecommendedTitle')} className="space-y-1.5">
             <h3 className="text-xs font-medium text-text">{t('storeVerticalRecommendedTitle')}</h3>
             <ul className="divide-y divide-border rounded border border-border">

@@ -304,34 +304,51 @@ describe('Commerce stores page — business type (FLOWERS-H1)', () => {
     });
   });
 
-  it('lists the recommended capabilities with honest ready / coming-soon status', async () => {
-    apiMock.mockResolvedValueOnce({
-      data: {
-        stores: [
-          {
-            ...generalStore,
-            business_vertical: 'flowers_gifts',
-            vertical_profile: {
-              key: 'flowers_gifts',
-              recommended_capabilities: [
-                { key: 'occasions', available: true },
-                { key: 'gift_message', available: false },
-                { key: 'unknown_future_capability', available: true },
-              ],
+  it('shows the setup checklist from the server for a Flowers & Gifts store (FLOWERS-H14)', async () => {
+    apiMock
+      .mockResolvedValueOnce({
+        data: {
+          stores: [
+            {
+              ...generalStore,
+              business_vertical: 'flowers_gifts',
+              vertical_profile: { key: 'flowers_gifts', recommended_capabilities: [{ key: 'occasions', available: true }] },
             },
+          ],
+        },
+      })
+      .mockResolvedValueOnce({
+        data: {
+          setup: {
+            vertical: 'flowers_gifts',
+            items: [
+              { key: 'occasions', available: true, state: 'configured', count: 12, manage_in: 'merchandising' },
+              { key: 'gift_message', available: true, state: 'not_configured', count: 0, manage_in: 'gift_settings' },
+              { key: 'unknown_future_capability', available: true, state: 'configured', count: 1, manage_in: 'x' },
+            ],
           },
-        ],
-      },
-    });
+        },
+      });
     renderPage();
 
     await userEvent.click(await screen.findByRole('button', { name: 'Store settings' }));
 
     expect((screen.getByRole('radio', { name: /Flowers & Gifts/ }) as HTMLInputElement).checked).toBe(true);
-    expect(screen.getByText('Recommended for your current business type')).toBeTruthy();
-    expect(screen.getByText('Occasions').parentElement?.textContent).toContain('Ready');
-    expect(screen.getByText('Gift message').parentElement?.textContent).toContain('Coming soon');
+    await screen.findByText('Gift business setup');
+    expect(apiMock).toHaveBeenNthCalledWith(2, '/commerce/workspace/storefronts/s1/vertical-setup');
+    expect(screen.getByText('Occasions').parentElement?.textContent).toContain('Set up');
+    expect(screen.getByText('Gift message').parentElement?.textContent).toContain('Not set up');
     expect(screen.queryByText('unknown_future_capability')).toBeNull();
+  });
+
+  it('shows no setup checklist and makes no setup request for a general store', async () => {
+    apiMock.mockResolvedValueOnce({ data: { stores: [generalStore] } });
+    renderPage();
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Store settings' }));
+
+    expect(screen.queryByText('Gift business setup')).toBeNull();
+    expect(apiMock).toHaveBeenCalledTimes(1);
   });
 });
 
