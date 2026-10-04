@@ -1,13 +1,16 @@
 # AWJ Flowers & Gifts — Horizon 1 Final Report
 
 **Date:** 2026-10-04
-**Execution authority:** `AWJ_FLOWERS_HORIZON_1_AUTONOMOUS_EXECUTION.md` · progress log: `AWJ_FLOWERS_HORIZON_1_PROGRESS.md` · per-decision records: `ADR-14` … `ADR-26`
+**Execution authority:** `AWJ_FLOWERS_HORIZON_1_AUTONOMOUS_EXECUTION.md` · progress log: `AWJ_FLOWERS_HORIZON_1_PROGRESS.md` · per-decision records: `ADR-14` … `ADR-26` · successor: `AWJ_FLOWERS_HORIZON_2_MERCHANT_ADMIN_SURFACES.md`
 
 ```text
 MERGES: PERFORMED AS AUTHORIZED
-DEPLOY: NOT PERFORMED
-PRODUCTION: NOT CHANGED
+MANUAL DEPLOY: NOT PERFORMED
+AUTOMATIC CI/CD DEPLOY: OBSERVED AFTER MERGES TO main
+FINAL H16 RAILWAY STATE: SUCCESS on storefront, nibras-api, Nebrax and awj-scheduler
 ```
+
+> Historical correction: Horizon 1 did not trigger a manual deploy, but Railway is connected to `main` and auto-deployed merged commits. Therefore the earlier wording “Production unchanged” was not factually correct. Horizon 2 must distinguish manual deploy actions from automatic CI/CD effects.
 
 ---
 
@@ -203,13 +206,15 @@ Reviews performed with no change required: tenant isolation (every new model/rou
 
 **Deferred high-risk / evidence-gated domains (not implemented, by design):** bundles and bouquet composition, per-recipient addresses and recipient notification, no-address gifting, customer file upload for personalization, saved recipients, re-order, wishlist, online/card payment, fees/VAT on gateways, seasonal presets, Nebras-specific styling or behaviour, App Builder/mobile gifting UI.
 
-## 21. Next recommended Horizon — "Flowers Merchant Admin Surfaces"
+## 21. Successor Horizon — Flowers Merchant Admin Surfaces
 
-1. Gift policy settings screen (enable, message length, hide-sender, phone-required).
-2. Delivery schedule screens (settings, windows with capacity, blocked dates, per-product preparation time) — also the home of the fulfilment-warehouse prompt.
-3. Product workspace tabs: personalization fields, add-on picker, content blocks.
-4. Then, evidence-permitting: mobile (`commerce/v1`) gifting UI in App Builder, saved recipients via the customer address book once a storefront customer-identity contract exists, and seasonal presets.
+The successor is now formally defined by:
+
+- `AWJ_FLOWERS_HORIZON_2_MERCHANT_ADMIN_SURFACES.md` — authoritative autonomous execution plan;
+- `AWJ_FLOWERS_HORIZON_2_PROGRESS.md` — required per-slice progress ledger.
+
+Horizon 2 closes the merchant-adoption gap with a mandatory UI/UX quality gate for every admin surface: Gift Policy, Delivery Scheduling, Windows/Capacity, Blocked Dates, Fulfillment Warehouse, Product Preparation, Personalization, Add-ons, Structured Content, unified Product Gifting workspace, Setup Center V2, onboarding, RBAC/Tenant Isolation, cross-surface RTL/mobile polish, a real merchant journey contract, and final integration/reporting.
 
 ---
 
-**MERGES: PERFORMED AS AUTHORIZED · DEPLOY: NOT PERFORMED · PRODUCTION: NOT CHANGED**
+**MERGES: PERFORMED AS AUTHORIZED · MANUAL DEPLOY: NOT PERFORMED · AUTOMATIC RAILWAY DEPLOY: OBSERVED AND SUCCESSFUL FOR FINAL H16 SHA**
