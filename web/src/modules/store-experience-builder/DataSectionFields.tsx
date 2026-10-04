@@ -81,14 +81,17 @@ function RemoteStatus({
 }) {
   if (remote.state === "loading") {
     return (
-      <p role="status" className="text-xs text-neutral-500">
+      <p role="status" className="text-xs text-muted">
         {t("dataLoading")}
       </p>
     );
   }
   if (remote.state === "error") {
     return (
-      <p role="alert" className="flex items-center gap-2 text-xs text-red-700">
+      <p
+        role="alert"
+        className="flex items-center gap-2 border border-danger/30 bg-danger/10 px-3 py-2 text-xs text-text"
+      >
         <span>{t("dataLoadFailed")}</span>
         <button type="button" className="font-medium underline" onClick={retry}>
           {t("dataRetry")}
@@ -112,7 +115,7 @@ function Incomplete({ message }: { message: string }) {
     <p
       role="note"
       data-section-incomplete=""
-      className="border border-amber-300 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900"
+      className="border border-warning/30 bg-warning/10 px-3 py-2 text-xs leading-5 text-text"
     >
       {message}
     </p>
@@ -255,7 +258,7 @@ export function ProductShelfFields({
           <RemoteStatus remote={collections} retry={retryCollections} t={t} />
           {collections.state === "ready" ? (
             activeCollections.length === 0 && slug === "" ? (
-              <p className="text-xs text-neutral-500">{t("shelfNoCollections")}</p>
+              <p className="text-xs text-muted">{t("shelfNoCollections")}</p>
             ) : (
               <Field label={t("shelfCollectionLabel")}>
                 <select
@@ -285,7 +288,7 @@ export function ProductShelfFields({
           <RemoteStatus remote={facets} retry={retryFacets} t={t} />
           {facets.state === "ready" ? (
             activeFacets.length === 0 && facetKey === "" ? (
-              <p className="text-xs text-neutral-500">{t("shelfNoFacets")}</p>
+              <p className="text-xs text-muted">{t("shelfNoFacets")}</p>
             ) : (
               <>
                 <Field label={t("shelfFacetLabel")}>
@@ -339,7 +342,7 @@ export function ProductShelfFields({
         checked={deliverToday}
         onChange={(value) => commit({ deliverToday: value })}
       />
-      <p className="text-xs leading-5 text-neutral-500">{t("shelfDeliverTodayHint")}</p>
+      <p className="text-xs leading-5 text-muted">{t("shelfDeliverTodayHint")}</p>
 
       <Field label={t("shelfLimitLabel")}>
         <select
@@ -437,7 +440,7 @@ export function DiscoveryFields({
           <RemoteStatus remote={facets} retry={retryFacets} t={t} />
           {facets.state === "ready" ? (
             activeFacets.length === 0 && dimension === "" ? (
-              <p className="text-xs text-neutral-500">{t("shelfNoFacets")}</p>
+              <p className="text-xs text-muted">{t("shelfNoFacets")}</p>
             ) : (
               <Field label={t("discoveryDimensionLabel")}>
                 <select
@@ -509,7 +512,7 @@ export function DeliveryPromiseFields({
 
   return (
     <div className="space-y-4" data-data-section="deliveryPromise">
-      <p className="text-xs leading-5 text-neutral-500">{t("deliveryPromiseNote")}</p>
+      <p className="text-xs leading-5 text-muted">{t("deliveryPromiseNote")}</p>
       <TitleField value={title} onChange={(value) => commit(value, body)} t={t} />
       <Field label={t("deliveryPromiseBodyLabel")}>
         <textarea
