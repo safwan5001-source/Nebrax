@@ -92,7 +92,28 @@ export const HOME_BUILDER_SECTION_KEYS = [
   "customContent",
 ] as const;
 
-export type HomeBuilderSectionKey = (typeof HOME_BUILDER_SECTION_KEYS)[number];
+/**
+ * FLOWERS-H9 / ADR-21 — data-backed sections (twin of PHP
+ * `HOME_DATA_SECTION_KEYS`). Merchant-addable in the builder and rendered by the
+ * storefront, but deliberately *not* in `HOME_BUILDER_SECTION_KEYS` (the default
+ * document's key list): like every addable instance they are created on demand
+ * with their own id, so the default document is unchanged.
+ */
+export const HOME_DATA_SECTION_KEYS = [
+  "productShelf",
+  "discovery",
+  "deliveryPromise",
+] as const;
+
+export type HomeDataSectionKey = (typeof HOME_DATA_SECTION_KEYS)[number];
+
+/** Every section type the builder knows (default-document types + data-backed). */
+export const ALL_HOME_SECTION_KEYS = [
+  ...HOME_BUILDER_SECTION_KEYS,
+  ...HOME_DATA_SECTION_KEYS,
+] as const;
+
+export type HomeBuilderSectionKey = (typeof ALL_HOME_SECTION_KEYS)[number];
 
 /** Sections the public storefront actually renders today. */
 export const IMPLEMENTED_HOME_SECTION_KEYS = DEFAULT_HOME_SECTIONS.map(

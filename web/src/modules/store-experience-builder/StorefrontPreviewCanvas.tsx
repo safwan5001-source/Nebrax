@@ -40,7 +40,10 @@ import {
   benefitsContentOf,
   customContentOf,
   featuredContentOf,
+  deliveryPromiseContentOf,
+  discoveryContentOf,
   offersContentOf,
+  productShelfContentOf,
 } from "./presentation/section-content";
 import {
   buildWhatsAppUrl,
@@ -72,6 +75,9 @@ const SECTION_TITLE: Record<string, CustomizerMessageKey> = {
   benefits: "sectionBenefits",
   appPromo: "sectionAppPromo",
   customContent: "sectionCustomContent",
+  productShelf: "sectionProductShelf",
+  discovery: "sectionDiscovery",
+  deliveryPromise: "sectionDeliveryPromise",
 };
 
 interface StorefrontPreviewCanvasProps {
@@ -1086,6 +1092,59 @@ export function StorefrontPreviewCanvas({
                       />
                     ) : null}
                   </div>
+                </section>
+              );
+            }
+
+            if (
+              section.type === "productShelf" ||
+              section.type === "discovery" ||
+              section.type === "deliveryPromise"
+            ) {
+              // FLOWERS-H9c / ADR-21 — data-backed sections read live store data
+              // on the published storefront. The builder never fabricates
+              // products, counts or delivery windows: this is an honest
+              // placeholder that shows only what the merchant authored. An
+              // incomplete section (no stored content) is flagged because the
+              // storefront omits it.
+              const incomplete =
+                section.type !== "deliveryPromise" && section.content === undefined;
+              let title = "";
+              let note: CustomizerMessageKey = "canvasShelfLive";
+              let badge: string | null = null;
+              if (section.type === "productShelf") {
+                const shelf = productShelfContentOf(section);
+                title = shelf.title.trim();
+                note = "canvasShelfLive";
+                badge = shelf.deliverToday ? t("canvasShelfDeliverToday") : null;
+              } else if (section.type === "discovery") {
+                title = discoveryContentOf(section).title.trim();
+                note = "canvasDiscoveryLive";
+              } else {
+                const promise = deliveryPromiseContentOf(section);
+                title = promise.title.trim();
+                note = "canvasDeliveryPromiseLive";
+              }
+              const headingId = `preview-data-${section.id}`;
+              return (
+                <section
+                  key={section.id}
+                  aria-labelledby={headingId}
+                  data-home-data-section={section.type}
+                  data-incomplete={incomplete ? "" : undefined}
+                  className="rounded-store border border-dashed border-store-border-strong bg-store-surface px-4 py-5"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <h2 id={headingId} className="text-sm font-bold text-store-foreground">
+                      {title || t(SECTION_TITLE[section.type] ?? "sectionCustomContent")}
+                    </h2>
+                    {badge ? (
+                      <span className="text-[11px] font-medium text-store-muted-foreground">{badge}</span>
+                    ) : null}
+                  </div>
+                  <p className="mt-1 text-xs text-store-muted-foreground">
+                    {incomplete ? t("canvasDataSectionIncomplete") : t(note)}
+                  </p>
                 </section>
               );
             }

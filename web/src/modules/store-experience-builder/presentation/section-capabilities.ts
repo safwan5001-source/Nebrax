@@ -1,6 +1,6 @@
 import { MAX_HOME_SECTIONS, type PresentationHomeSection } from "./config";
 import {
-  HOME_BUILDER_SECTION_KEYS,
+  ALL_HOME_SECTION_KEYS,
   type HomeBuilderSectionKey,
 } from "./tokens";
 import type { CustomizerMessageKey } from "../messages";
@@ -225,6 +225,40 @@ export const SECTION_CAPABILITIES: Record<
     titleKey: "sectionCustomContent",
     descriptionKey: "sectionCustomContentDescription",
   },
+  // FLOWERS-H9 / ADR-21 — data-backed sections (read live by the storefront).
+  productShelf: {
+    type: "productShelf",
+    maxInstances: null,
+    canDuplicate: true,
+    canDelete: true,
+    state: "live",
+    category: "products",
+    merchantAddable: true,
+    titleKey: "sectionProductShelf",
+    descriptionKey: "sectionProductShelfDescription",
+  },
+  discovery: {
+    type: "discovery",
+    maxInstances: null,
+    canDuplicate: true,
+    canDelete: true,
+    state: "live",
+    category: "categoriesNavigation",
+    merchantAddable: true,
+    titleKey: "sectionDiscovery",
+    descriptionKey: "sectionDiscoveryDescription",
+  },
+  deliveryPromise: {
+    type: "deliveryPromise",
+    maxInstances: 1,
+    canDuplicate: false,
+    canDelete: true,
+    state: "live",
+    category: "trustServices",
+    merchantAddable: true,
+    titleKey: "sectionDeliveryPromise",
+    descriptionKey: "sectionDeliveryPromiseDescription",
+  },
 };
 
 export function sectionCapability(
@@ -237,7 +271,7 @@ export function sectionCapability(
 export function sectionTypesInCategory(
   category: SectionLibraryCategory,
 ): HomeBuilderSectionKey[] {
-  return HOME_BUILDER_SECTION_KEYS.filter(
+  return ALL_HOME_SECTION_KEYS.filter(
     (type) => SECTION_CAPABILITIES[type].category === category,
   );
 }
@@ -259,7 +293,7 @@ export function canAddSectionType(
 export function hasAddableSectionType(
   sections: readonly PresentationHomeSection[],
 ): boolean {
-  return HOME_BUILDER_SECTION_KEYS.some((type) =>
+  return ALL_HOME_SECTION_KEYS.some((type) =>
     canAddSectionType(sections, type),
   );
 }

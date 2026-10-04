@@ -37,6 +37,13 @@ Rules:
 - Honest deep links: the products listing now carries a *catalog context* from the URL (`collection`, `facet[key]`, `brand_id`, `deliver_today`) through page 1 and load-more to the public list; unknown values yield an empty list (fail closed) and a short note with a "show all" link. Full filter UI remains H10.
 - The storefront accepts the three types when parsing a published document (`HOME_DATA_SECTION_KEYS`) but they are still not in the default document or the builder key lists (H9c).
 
+### 2.2 H9c — builder UI (implemented)
+
+- **Library & registry:** the three types are `live`, merchant-addable entries (`productShelf` and `discovery`: many instances, duplicable; `deliveryPromise`: one instance). `HOME_DATA_SECTION_KEYS` is a separate list; `ALL_HOME_SECTION_KEYS` (= builder keys + data keys) drives acceptance and the registry, while `HOME_BUILDER_SECTION_KEYS` — and therefore the default document — is unchanged.
+- **Editors** (`DataSectionFields.tsx`) edit references and text only. Collection and facet pickers read the merchant's real *active* collections / facets / values; a stored reference that is no longer listed stays selectable so it is never silently dropped. Each editor keeps a local draft and commits `undefined` content while the choice is incomplete (the normalizer would drop it anyway), with an explicit warning that the section will not appear in the store.
+- **Canvas** shows the authored title, a "deliver today" badge where set, and an honest "live data appears here" note — never products, counts or dates. A shelf/discovery section with no stored content is flagged as not appearing in the store.
+- **Default document — AWJ DECISION:** the three entries are *not* added to the default document. Doing so would change every existing and new tenant's storefront and break the byte-identical contract; presets that place them (a flowers home layout) belong to the vertical onboarding slice (H14), which applies them to the merchant's draft explicitly.
+
 ## 3. Rejected / Not adopted
 
 - One bespoke type per candidate (twenty types, twenty normalizers/panels/renderers, hard-coded labels).
@@ -46,7 +53,7 @@ Rules:
 
 ## 4. Consequences
 
-- Existing documents and the default document are byte-identical until H9c.
+- Existing documents and the default document stay byte-identical (data sections are opt-in additions by the merchant or by a vertical preset, H14).
 - A shelf/discovery source that no longer exists simply renders nothing (the live read returns no products/values) — never an error and never invented data.
 
 ## 5. Unknown / deferred

@@ -12,7 +12,7 @@ import {
   FONT_PRESETS,
   type FontPresetId,
   hasAddableSectionType,
-  HOME_BUILDER_SECTION_KEYS,
+  ALL_HOME_SECTION_KEYS,
   type HomeBuilderSectionKey,
   isGatedHomeSection,
   MAX_HOME_SECTIONS,
@@ -34,9 +34,12 @@ import {
   bannerContentOf,
   benefitsContentOf,
   customContentOf,
+  deliveryPromiseContentOf,
+  discoveryContentOf,
   emptyBannerContent,
   featuredContentOf,
   offersContentOf,
+  productShelfContentOf,
   MAX_BENEFIT_ITEMS,
   MAX_CUSTOM_BLOCKS,
   MAX_FEATURED_PRODUCTS,
@@ -52,6 +55,11 @@ import {
 } from "./messages";
 import type { WorkspaceProductSummary } from "@/modules/commerce-workspace/workspace-products";
 import type { WorkspaceOffer } from "@/modules/commerce-workspace/workspace-offers";
+import {
+  DeliveryPromiseFields,
+  DiscoveryFields,
+  ProductShelfFields,
+} from "./DataSectionFields";
 import { OfferCatalog } from "./OfferCatalog";
 import { OfferSummary, OfferThumb } from "./OfferParts";
 import { offerDisplayName } from "./offers-display";
@@ -128,7 +136,7 @@ const PAGE_LABEL: Record<
 // other `SECTION_LABEL[type]` call site in this file is untouched.
 const SECTION_LABEL: Record<HomeBuilderSectionKey, CustomizerMessageKey> =
   Object.fromEntries(
-    HOME_BUILDER_SECTION_KEYS.map((type) => [
+    ALL_HOME_SECTION_KEYS.map((type) => [
       type,
       SECTION_CAPABILITIES[type].titleKey,
     ]),
@@ -271,7 +279,7 @@ export function ControlPanels({
   }
 }
 
-function Field({
+export function Field({
   label,
   hint,
   children,
@@ -352,9 +360,9 @@ function Segmented<T extends string>({
   );
 }
 
-const inputClass =
+export const inputClass =
   "h-10 w-full border border-neutral-300 bg-white px-3 text-sm text-neutral-900 outline-none focus:border-primary focus-visible:ring-2 focus-visible:ring-primary/40";
-const selectClass = inputClass;
+export const selectClass = inputClass;
 const btnClass =
   "inline-flex h-8 items-center border border-neutral-300 bg-white px-2.5 text-xs font-medium text-neutral-800 hover:bg-neutral-50";
 export const iconBtnClass =
@@ -1143,6 +1151,35 @@ function HomepagePanel({
                 state={offersState}
                 onRetry={onRetryOffers}
                 management={offerManagement}
+              />
+            ) : selected.type === "productShelf" ? (
+              <ProductShelfFields
+                key={selected.id}
+                content={productShelfContentOf(selected)}
+                locale={locale}
+                t={t}
+                onChange={(content) =>
+                  updateSection(selectedIndex, { ...selected, content })
+                }
+              />
+            ) : selected.type === "discovery" ? (
+              <DiscoveryFields
+                key={selected.id}
+                content={discoveryContentOf(selected)}
+                locale={locale}
+                t={t}
+                onChange={(content) =>
+                  updateSection(selectedIndex, { ...selected, content })
+                }
+              />
+            ) : selected.type === "deliveryPromise" ? (
+              <DeliveryPromiseFields
+                key={selected.id}
+                content={deliveryPromiseContentOf(selected)}
+                t={t}
+                onChange={(content) =>
+                  updateSection(selectedIndex, { ...selected, content })
+                }
               />
             ) : selected.type === "appPromo" ? (
               <AppPromoFields config={config} t={t} patch={patch} />

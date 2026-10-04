@@ -4,6 +4,7 @@ import {
   FONT_PRESETS,
   GATED_HOME_SECTION_KEYS,
   HEADER_STYLES,
+  ALL_HOME_SECTION_KEYS,
   HOME_BUILDER_SECTION_KEYS,
   PRODUCT_CARD_PRESETS,
   PRESENTATION_CONFIG_VERSION,
@@ -313,7 +314,7 @@ function resolveHomeBuilderSections(
       id = key;
       type = key;
     }
-    if (!(HOME_BUILDER_SECTION_KEYS as readonly string[]).includes(type)) {
+    if (!(ALL_HOME_SECTION_KEYS as readonly string[]).includes(type)) {
       continue;
     }
     if (seenIds.has(id)) continue;
