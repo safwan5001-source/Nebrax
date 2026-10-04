@@ -20,6 +20,7 @@ import { ProductPublicationFields } from './product-publication-fields';
 import { ProductMultiBarcodeTable } from './product-multi-barcode-table';
 import { replaceProductPublication } from '@/modules/products/publication';
 import { useProductPublication } from '@/modules/products/use-product-publication';
+import { ProductMediaGuidance } from './product-media-guidance';
 
 export interface Product {
   id: string;
@@ -540,6 +541,7 @@ export function ProductDialog({
               <div>
                 <h3 id="edit-product-media-title" className="text-sm font-medium text-text">{t('product_media')}</h3>
                 <p className="mt-1 text-xs leading-relaxed text-muted">{t('product_media_hint')}</p>
+                <ProductMediaGuidance />
               </div>
               <span className="num text-xs text-muted">{t('selected_media_count', { count: media.length, max: MAX_PRODUCT_IMAGES })}</span>
             </div>

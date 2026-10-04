@@ -368,9 +368,24 @@ describe('ProductWorkspace', () => {
 
       await screen.findByText('صور المنتج');
       expect(screen.getByText('سيتم رفع الصور المختارة تلقائياً فور نجاح الحفظ الأول للمنتج.')).toBeTruthy();
+      expect(screen.getByText('لأفضل نتيجة، استخدم صورة واضحة وعالية الجودة، ويفضل أن تكون مربعة (1:1). حافظ على المنتج في منتصف الصورة لأن بعض طرق العرض قد تقوم بقص الأطراف. 1200 × 1200 بكسل خيار ممتاز للصور المربعة، لكنه ليس شرطًا.')).toBeTruthy();
       // لا زرّ رفعٍ حيّ (السلطة الحقيقية) قبل وجود `productId` — فقط منتقي ملفٍّ محلي.
       expect(screen.queryByRole('button', { name: /رفع الصور/ })).toBeNull();
       expect(apiMock.mock.calls.some(([path]) => typeof path === 'string' && path.includes('/media'))).toBe(false);
+    });
+
+    it('renders the final English guidance and accepts a non-square image without dimension validation', async () => {
+      const user = userEvent.setup();
+      render(wrapEn(<ProductWorkspace mode="create" />));
+
+      expect(await screen.findByText('For best results, use a clear, high-quality image. A square image (1:1) is preferred. Keep the product centered because some layouts may crop the image edges. 1200 × 1200 px is a good choice for square images, but it is not required.')).toBeTruthy();
+
+      // The uploader validates type/size only; a rectangular image remains selectable.
+      const nonSquareImage = new File(['landscape-image'], 'landscape.png', { type: 'image/png' });
+      await user.upload(screen.getByLabelText('Upload images') as HTMLInputElement, nonSquareImage);
+
+      expect(screen.getByText('landscape.png')).toBeTruthy();
+      expect(screen.queryByRole('alert')).toBeNull();
     });
 
     it('a successful first Save unlocks the media gallery in place and uploads pending files exactly once', async () => {
