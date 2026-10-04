@@ -38,20 +38,30 @@ import { AddressStage } from "@/components/checkout/awj/AddressStage";
 import { AwjOrderConfirmation } from "@/components/checkout/awj/Confirmation";
 import { ContactStage } from "@/components/checkout/awj/ContactStage";
 import { DeliveryStage } from "@/components/checkout/awj/DeliveryStage";
+import { GiftStage } from "@/components/checkout/awj/GiftStage";
 import { PaymentStage } from "@/components/checkout/awj/PaymentStage";
 import { ReviewStage } from "@/components/checkout/awj/ReviewStage";
 import {
+  type ScheduleLoad,
+  ScheduleStage,
+} from "@/components/checkout/awj/ScheduleStage";
+import {
   type AddressForm,
-  CHECKOUT_STAGES,
+  activeCheckoutStages,
   type CheckoutStage,
   type ContactForm,
   EMPTY_ADDRESS,
   EMPTY_CONTACT,
+  EMPTY_GIFT,
+  EMPTY_SCHEDULE,
+  type GiftForm,
+  type ScheduleDraft,
 } from "@/components/checkout/awj/types";
 import { CheckoutProgress } from "@/components/checkout/CheckoutProgress";
 import { Button } from "@/components/ui/button";
 import { useCartLineImages } from "@/hooks/useCartLineImages";
 import { formatMinorAmount, lineGroups } from "@/lib/commerce/cart-types";
+import { scheduleMethodFor } from "@/lib/commerce/checkout-gifting";
 import {
   clearPersistedIdempotencyKey,
   resolveIdempotencyKey,
@@ -67,12 +77,15 @@ import {
 import {
   completeAwjCheckoutAction,
   getAwjCheckoutIdentity,
+  getAwjDeliverySchedule,
   getAwjPaymentMethods,
   startOrResumeAwjCheckout,
   updateAwjAddress,
   updateAwjContact,
   updateAwjDelivery,
+  updateAwjGift,
   updateAwjPayment,
+  updateAwjSchedule,
 } from "@/lib/data/awj-checkout";
 import { extractBasePath } from "@/lib/utils/path";
 
@@ -100,6 +113,39 @@ function toAddressForm(checkout: StorefrontCheckout): AddressForm {
   };
 }
 
+function toGiftForm(checkout: StorefrontCheckout): GiftForm {
+  const gift = checkout.gift;
+  if (!gift) return EMPTY_GIFT;
+  return {
+    isGift: true,
+    recipientName: gift.recipientName ?? "",
+    recipientPhone: gift.recipientPhone ?? "",
+    senderName: gift.senderDisplayName ?? "",
+    hideSender: gift.hideSender,
+    message: gift.message ?? "",
+  };
+}
+
+function toScheduleDraft(checkout: StorefrontCheckout): ScheduleDraft {
+  const schedule = checkout.schedule;
+  // A stored choice that is no longer selectable carries no slot; the shopper
+  // is asked to choose again rather than shown a window that cannot be booked.
+  if (!schedule?.slot) return EMPTY_SCHEDULE;
+  return { date: schedule.date, slotId: schedule.slot.id };
+}
+
+/** The label key of the primary button that leads *into* a stage. */
+const CONTINUE_LABEL: Record<CheckoutStage, string> = {
+  contact: "continueToAddress",
+  address: "continueToAddress",
+  delivery: "continueToDelivery",
+  schedule: "continueToSchedule",
+  gift: "continueToGift",
+  payment: "continueToPayment",
+  review: "continueToReview",
+  confirmation: "continueToReview",
+};
+
 export function AwjCheckoutFlow() {
   const t = useTranslations("awjCheckout");
   const tc = useTranslations("common");
@@ -120,6 +166,19 @@ export function AwjCheckoutFlow() {
   const [completing, setCompleting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [reviewIssues, setReviewIssues] = useState<AwjReviewIssue[]>([]);
+  // FLOWERS-H12b — gift details and delivery date/window (both optional stages).
+  const [gift, setGift] = useState<GiftForm>(EMPTY_GIFT);
+  const [scheduleDraft, setScheduleDraft] =
+    useState<ScheduleDraft>(EMPTY_SCHEDULE);
+  const [scheduleLoad, setScheduleLoad] = useState<ScheduleLoad>({
+    state: "loading",
+  });
+  // Whether the channel offers scheduling at all (read once, up front, so the
+  // step counter does not change under the shopper mid-flow).
+  const [scheduleEnabled, setScheduleEnabled] = useState(false);
+  // A completion refusal can demand a stage the up-front read did not predict.
+  const [forceSchedule, setForceSchedule] = useState(false);
+  const [forceGift, setForceGift] = useState(false);
 
   // One Idempotency-Key per checkout *attempt*, persisted in localStorage
   // scoped to this checkout's identity (see `checkout-idempotency.ts`) so it
@@ -155,6 +214,13 @@ export function AwjCheckoutFlow() {
         ? (nextCheckout.delivery.method as AwjDeliveryMethod)
         : null,
     );
+    setGift(toGiftForm(nextCheckout));
+    setScheduleDraft(toScheduleDraft(nextCheckout));
+    // Channel-level policy: asking for the delivery method is enough to learn
+    // whether scheduling is on. Any failure reads as "not offered" — a refusal
+    // at completion still routes the shopper here (see `handleComplete`).
+    const probe = await getAwjDeliverySchedule("delivery");
+    setScheduleEnabled(probe?.enabled === true);
     const methods = await getAwjPaymentMethods();
     setPaymentMethods(methods);
     // A sole enabled method has no real choice to make — pre-select it as a
@@ -184,6 +250,30 @@ export function AwjCheckoutFlow() {
       window.scrollTo({ top: 0, behavior: "auto" });
     }
   }, []);
+
+  const scheduleMethod = scheduleMethodFor(deliveryMethod);
+  const storedCity = checkout?.delivery.address.city ?? null;
+  const storedRegion = checkout?.delivery.address.region ?? null;
+
+  const loadSchedule = useCallback(async () => {
+    if (!scheduleMethod) return;
+    setScheduleLoad({ state: "loading" });
+    const result = await getAwjDeliverySchedule(scheduleMethod, {
+      city: storedCity,
+      region: storedRegion,
+    });
+    setScheduleLoad(
+      result ? { state: "ready", schedule: result } : { state: "error" },
+    );
+  }, [scheduleMethod, storedCity, storedRegion]);
+
+  // The options are read fresh each time the schedule stage is shown: they
+  // depend on the clock, the saved method and destination, and capacity.
+  useEffect(() => {
+    if (stage === "schedule" && flowState === "stage") {
+      void loadSchedule();
+    }
+  }, [stage, flowState, loadSchedule]);
 
   /**
    * Saves the current stage to its own endpoint, then advances. A failure keeps
@@ -233,6 +323,65 @@ export function AwjCheckoutFlow() {
             return;
           }
           setCheckout(result.checkout);
+        } else if (from === "schedule") {
+          const stored = checkout?.schedule;
+          const storedSlotId = stored?.slot?.id ?? null;
+          if (scheduleDraft.date && scheduleDraft.slotId) {
+            if (
+              scheduleDraft.date !== stored?.date ||
+              scheduleDraft.slotId !== storedSlotId
+            ) {
+              const result = await updateAwjSchedule({
+                date: scheduleDraft.date,
+                slot_id: scheduleDraft.slotId,
+              });
+              if (!result.success) {
+                setFormError(result.error);
+                return;
+              }
+              setCheckout(result.checkout);
+            }
+          } else if (stored) {
+            // The shopper cleared an earlier choice — clear it on the server too.
+            const result = await updateAwjSchedule({
+              date: null,
+              slot_id: null,
+            });
+            if (!result.success) {
+              setFormError(result.error);
+              return;
+            }
+            setCheckout(result.checkout);
+          }
+        } else if (from === "gift") {
+          if (gift.isGift) {
+            const result = await updateAwjGift({
+              is_gift: true,
+              recipient_name: gift.recipientName.trim(),
+              recipient_phone: gift.recipientPhone.trim()
+                ? gift.recipientPhone.trim()
+                : null,
+              sender_name: gift.senderName.trim()
+                ? gift.senderName.trim()
+                : null,
+              hide_sender: gift.hideSender,
+              message: gift.message.trim() ? gift.message.trim() : null,
+            });
+            if (!result.success) {
+              setFormError(result.error);
+              return;
+            }
+            setCheckout(result.checkout);
+          } else if (checkout?.gift) {
+            // Turned the gift off after saving details — `is_gift: false`
+            // always clears (the server allows it even if gifting was disabled).
+            const result = await updateAwjGift({ is_gift: false });
+            if (!result.success) {
+              setFormError(result.error);
+              return;
+            }
+            setCheckout(result.checkout);
+          }
         } else if (from === "payment") {
           // Optional: the backend creates the Payment Intent either way
           // (`payment_method_name` stays null if none was ever chosen — see
@@ -257,7 +406,16 @@ export function AwjCheckoutFlow() {
         setSaving(false);
       }
     },
-    [contact, address, deliveryMethod, paymentMethodId, checkout, goTo],
+    [
+      contact,
+      address,
+      deliveryMethod,
+      paymentMethodId,
+      checkout,
+      scheduleDraft,
+      gift,
+      goTo,
+    ],
   );
 
   const handleComplete = useCallback(async () => {
@@ -290,11 +448,27 @@ export function AwjCheckoutFlow() {
         // (availability, price, stock) keeps them on review, where the
         // refreshed lines — now carrying up-to-date `available` flags — are
         // what explains the change.
+        setGift(toGiftForm(result.checkout));
+        setScheduleDraft(toScheduleDraft(result.checkout));
         const reasons = new Set(result.items.map((issue) => issue.reason));
         if (reasons.has("contact_incomplete")) {
           goTo("contact");
         } else if (reasons.has("delivery_method_missing")) {
           goTo("delivery");
+        } else if (
+          reasons.has("schedule_required") ||
+          reasons.has("schedule_unavailable")
+        ) {
+          // The up-front read may have missed it (or failed): the server's
+          // refusal is authoritative, so the stage exists from here on.
+          setForceSchedule(true);
+          goTo("schedule");
+        } else if (
+          (reasons.has("gift_incomplete") || reasons.has("gift_unavailable")) &&
+          result.checkout.giftOptions.enabled
+        ) {
+          setForceGift(true);
+          goTo("gift");
         } else if (reasons.has("empty_cart")) {
           setFlowState("empty");
         }
@@ -332,16 +506,26 @@ export function AwjCheckoutFlow() {
     [reviewIssues, checkout, t],
   );
 
+  const giftEnabled = (checkout?.giftOptions.enabled ?? false) || forceGift;
+  const stages = useMemo(
+    () =>
+      activeCheckoutStages({
+        schedule: scheduleEnabled || forceSchedule,
+        gift: giftEnabled,
+      }),
+    [scheduleEnabled, forceSchedule, giftEnabled],
+  );
+
   const steps = useMemo(
     () =>
-      CHECKOUT_STAGES.map((key) => ({
+      stages.map((key) => ({
         key,
         label: t(`steps.${key}`),
       })),
-    [t],
+    [stages, t],
   );
 
-  const stageIndex = CHECKOUT_STAGES.indexOf(stage);
+  const stageIndex = stages.indexOf(stage);
 
   const lineImages = useCartLineImages(
     checkout?.cart.items.map((line) => line.productId) ?? [],
@@ -387,6 +571,22 @@ export function AwjCheckoutFlow() {
     address.country.trim() && address.city.trim() && address.street.trim(),
   );
 
+  const scheduleSelected = Boolean(scheduleDraft.date && scheduleDraft.slotId);
+  // The schedule stage never lets the shopper into a dead end: it blocks only
+  // while loading, or when the channel requires a window that cannot be chosen
+  // yet; a failed read leaves Continue open (the server decides at completion).
+  const scheduleReady =
+    scheduleLoad.state === "ready"
+      ? !scheduleLoad.schedule.required || scheduleSelected
+      : scheduleLoad.state === "error";
+  const giftReady =
+    !gift.isGift ||
+    Boolean(
+      gift.recipientName.trim() &&
+        (!checkout.giftOptions.recipientPhoneRequired ||
+          gift.recipientPhone.trim()),
+    );
+
   return (
     <div className="mx-auto w-full max-w-store px-4 py-6 sm:px-6 lg:px-8 lg:py-10">
       <h1 className="sr-only">{t("title")}</h1>
@@ -431,6 +631,36 @@ export function AwjCheckoutFlow() {
               t={t}
             />
           )}
+          {stage === "schedule" && scheduleMethod && (
+            <ScheduleStage
+              load={scheduleLoad}
+              draft={scheduleDraft}
+              onChange={setScheduleDraft}
+              onRetry={loadSchedule}
+              selectionInvalid={
+                checkout.schedule !== null && !checkout.schedule.valid
+              }
+              method={scheduleMethod}
+              t={t}
+            />
+          )}
+          {stage === "gift" && (
+            <GiftStage
+              gift={gift}
+              options={checkout.giftOptions}
+              onChange={(next) =>
+                setGift(
+                  // Turning the gift on, default the card's "from" to the
+                  // purchaser's name; it stays editable and is never an account
+                  // identity.
+                  !gift.isGift && next.isGift && !next.senderName
+                    ? { ...next, senderName: contact.name.trim() }
+                    : next,
+                )
+              }
+              t={t}
+            />
+          )}
           {stage === "payment" && (
             <PaymentStage
               paymentMethods={paymentMethods}
@@ -441,7 +671,12 @@ export function AwjCheckoutFlow() {
             />
           )}
           {stage === "review" && (
-            <ReviewStage checkout={checkout} onEdit={goTo} t={t} />
+            <ReviewStage
+              checkout={checkout}
+              stages={stages}
+              onEdit={goTo}
+              t={t}
+            />
           )}
 
           {formError && (
@@ -455,11 +690,14 @@ export function AwjCheckoutFlow() {
 
           <StageActions
             stage={stage}
+            stages={stages}
             saving={saving}
             completing={completing}
             contactReady={contactReady}
             addressReady={addressReady}
             deliveryMethod={deliveryMethod}
+            scheduleReady={scheduleReady}
+            giftReady={giftReady}
             onBack={goTo}
             onAdvance={saveAndAdvance}
             onComplete={handleComplete}
@@ -515,11 +753,14 @@ export function AwjCheckoutFlow() {
 
 function StageActions({
   stage,
+  stages,
   saving,
   completing,
   contactReady,
   addressReady,
   deliveryMethod,
+  scheduleReady,
+  giftReady,
   onBack,
   onAdvance,
   onComplete,
@@ -527,59 +768,47 @@ function StageActions({
   tc,
 }: {
   stage: CheckoutStage;
+  stages: readonly CheckoutStage[];
   saving: boolean;
   completing: boolean;
   contactReady: boolean;
   addressReady: boolean;
   deliveryMethod: AwjDeliveryMethod | null;
+  scheduleReady: boolean;
+  giftReady: boolean;
   onBack: (stage: CheckoutStage) => void;
   onAdvance: (from: CheckoutStage, to: CheckoutStage) => void;
   onComplete: () => void;
   t: ReturnType<typeof useTranslations>;
   tc: ReturnType<typeof useTranslations>;
 }) {
-  const back: Partial<Record<CheckoutStage, CheckoutStage>> = {
-    address: "contact",
-    delivery: "address",
-    payment: "delivery",
-    review: "payment",
-  };
-  const previous = back[stage];
+  // Previous / next come from the stages this checkout actually has, so a
+  // store without scheduling or gifting walks the original six unchanged.
+  const index = stages.indexOf(stage);
+  const previous = index > 0 ? stages[index - 1] : undefined;
+  const next = index >= 0 ? stages[index + 1] : undefined;
 
-  const primary = (() => {
-    switch (stage) {
-      case "contact":
-        return {
-          label: t("continueToAddress"),
-          disabled: !contactReady,
-          onClick: () => onAdvance("contact", "address"),
+  const readiness: Partial<Record<CheckoutStage, boolean>> = {
+    contact: contactReady,
+    address: addressReady,
+    delivery: deliveryMethod !== null,
+    schedule: scheduleReady,
+    gift: giftReady,
+    // Optional, never blocking: completing with no payment method ever chosen
+    // still succeeds (see `saveAndAdvance`'s own `payment` branch and
+    // `CommercePaymentIntentService`'s doc) — there is nothing here a
+    // shopper could get "wrong" by skipping.
+    payment: true,
+  };
+
+  const primary =
+    stage === "review" || stage === "confirmation" || !next
+      ? null
+      : {
+          label: t(CONTINUE_LABEL[next] as "continueToReview"),
+          disabled: !(readiness[stage] ?? false),
+          onClick: () => onAdvance(stage, next),
         };
-      case "address":
-        return {
-          label: t("continueToDelivery"),
-          disabled: !addressReady,
-          onClick: () => onAdvance("address", "delivery"),
-        };
-      case "delivery":
-        return {
-          label: t("continueToPayment"),
-          disabled: !deliveryMethod,
-          onClick: () => onAdvance("delivery", "payment"),
-        };
-      case "payment":
-        // Optional, never blocking: completing with no method ever chosen
-        // still succeeds (see `saveAndAdvance`'s own `payment` branch and
-        // `CommercePaymentIntentService`'s doc) — there is nothing here a
-        // shopper could get "wrong" by skipping.
-        return {
-          label: t("continueToReview"),
-          disabled: false,
-          onClick: () => onAdvance("payment", "review"),
-        };
-      default:
-        return null;
-    }
-  })();
 
   return (
     <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">

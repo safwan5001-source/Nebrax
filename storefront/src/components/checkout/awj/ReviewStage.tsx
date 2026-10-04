@@ -2,10 +2,16 @@
 
 import { Pencil, ShieldAlert } from "lucide-react";
 import type { useTranslations } from "next-intl";
+import { useLocale } from "next-intl";
 import { StageShell } from "@/components/checkout/awj/StageShell";
+import type { CheckoutStage } from "@/components/checkout/awj/types";
 import { Button } from "@/components/ui/button";
 import { formatMinorAmount } from "@/lib/commerce/cart-types";
 import type { StorefrontCheckout } from "@/lib/commerce/checkout-types";
+import {
+  formatDeliveryWindow,
+  formatPlainDate,
+} from "@/lib/utils/delivery-day";
 
 /**
  * Stage 5 — review and place the order.
@@ -26,13 +32,17 @@ import type { StorefrontCheckout } from "@/lib/commerce/checkout-types";
  */
 export function ReviewStage({
   checkout,
+  stages,
   onEdit,
   t,
 }: {
   checkout: StorefrontCheckout;
-  onEdit: (stage: "contact" | "address" | "delivery" | "payment") => void;
+  /** The stages this checkout has — scheduling and gifting rows only appear when offered. */
+  stages: readonly CheckoutStage[];
+  onEdit: (stage: CheckoutStage) => void;
   t: ReturnType<typeof useTranslations>;
 }) {
+  const locale = useLocale();
   const address = checkout.delivery.address;
   const addressLine = [
     address.street,
@@ -104,6 +114,41 @@ export function ReviewStage({
           </span>
         </ReviewRow>
 
+        {stages.includes("schedule") && (
+          <ReviewRow
+            label={t("review.scheduleLabel")}
+            onEdit={() => onEdit("schedule")}
+            editLabel={t("review.editSchedule")}
+            t={t}
+          >
+            {checkout.schedule?.slot ? (
+              <ScheduleSummary
+                date={checkout.schedule.date}
+                slot={checkout.schedule.slot}
+                locale={locale}
+                t={t}
+              />
+            ) : (
+              <span className="block">{t("review.notSet")}</span>
+            )}
+          </ReviewRow>
+        )}
+
+        {stages.includes("gift") && (
+          <ReviewRow
+            label={t("review.giftLabel")}
+            onEdit={() => onEdit("gift")}
+            editLabel={t("review.editGift")}
+            t={t}
+          >
+            {checkout.gift ? (
+              <GiftSummary gift={checkout.gift} t={t} />
+            ) : (
+              <span className="block">{t("review.notSet")}</span>
+            )}
+          </ReviewRow>
+        )}
+
         <ReviewRow
           label={t("payment.heading")}
           onEdit={() => onEdit("payment")}
@@ -125,6 +170,74 @@ export function ReviewStage({
         <span>{t("review.commitmentNotice")}</span>
       </p>
     </StageShell>
+  );
+}
+
+function ScheduleSummary({
+  date,
+  slot,
+  locale,
+  t,
+}: {
+  date: string;
+  slot: {
+    label: string;
+    labelEn: string | null;
+    startTime: string;
+    endTime: string;
+  };
+  locale: string;
+  t: ReturnType<typeof useTranslations>;
+}) {
+  // The stored checkout carries no timezone, so a plain calendar date — never
+  // a "today"/"tomorrow" the browser would have to guess.
+  const day = formatPlainDate(date, locale);
+  const window = formatDeliveryWindow(slot.startTime, slot.endTime, locale);
+  const label =
+    locale.toLowerCase().startsWith("en") && slot.labelEn
+      ? slot.labelEn
+      : slot.label;
+  return (
+    <>
+      <span className="block">{day}</span>
+      <span className="mt-1 block text-xs text-store-muted-foreground">
+        {label}
+        {window ? <bdi className="ms-2">{window}</bdi> : null}
+      </span>
+      <span className="sr-only">{t("schedule.requestedNote")}</span>
+    </>
+  );
+}
+
+function GiftSummary({
+  gift,
+  t,
+}: {
+  gift: NonNullable<StorefrontCheckout["gift"]>;
+  t: ReturnType<typeof useTranslations>;
+}) {
+  return (
+    <>
+      <span className="block">
+        {t("review.giftTo")}: {gift.recipientName}
+        {gift.recipientPhone ? (
+          <span className="ms-2">
+            <bdi dir="ltr">{gift.recipientPhone}</bdi>
+          </span>
+        ) : null}
+      </span>
+      <span className="mt-1 block text-xs text-store-muted-foreground">
+        {t("review.giftFrom")}:{" "}
+        {gift.hideSender
+          ? t("review.giftAnonymous")
+          : (gift.senderDisplayName ?? t("review.notSet"))}
+      </span>
+      {gift.message ? (
+        <span className="mt-1 block whitespace-pre-line text-xs text-store-muted-foreground">
+          {t("review.giftMessage")}: {gift.message}
+        </span>
+      ) : null}
+    </>
   );
 }
 

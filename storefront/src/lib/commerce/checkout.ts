@@ -8,6 +8,10 @@
  */
 
 import {
+  mapDeliverySchedule,
+  type StorefrontDeliverySchedule,
+} from "./checkout-gifting";
+import {
   type AwjCheckout,
   type AwjOrder,
   type AwjPaymentMethod,
@@ -16,7 +20,7 @@ import {
   type StorefrontCheckout,
   type StorefrontOrder,
 } from "./checkout-types";
-import { storefrontCartRequest } from "./config";
+import { storefrontCartRequest, storefrontFetch } from "./config";
 import type { AwjResourceResponse } from "./types";
 
 /**
@@ -126,6 +130,67 @@ export async function updateAwjCheckoutPayment(
     AwjResourceResponse<AwjCheckout>
   >("PATCH", "checkout/payment", { payment_method_id: paymentMethodId });
   return mapAwjCheckoutToViewModel(response.data);
+}
+
+/**
+ * `PATCH checkout/gift` (ADR-15). Send `{ is_gift: false }` to clear. The
+ * server refuses a gift payload while the channel's gift policy is off and
+ * sanitizes the message; this only forwards what the shopper typed.
+ */
+export interface AwjGiftInput {
+  is_gift?: boolean;
+  recipient_name?: string | null;
+  recipient_phone?: string | null;
+  sender_name?: string | null;
+  hide_sender?: boolean;
+  message?: string | null;
+}
+
+export async function updateAwjCheckoutGift(
+  fields: AwjGiftInput,
+): Promise<StorefrontCheckout> {
+  const response = await storefrontCartRequest<
+    AwjResourceResponse<AwjCheckout>
+  >("PATCH", "checkout/gift", fields);
+  return mapAwjCheckoutToViewModel(response.data);
+}
+
+/**
+ * `PATCH checkout/schedule` (ADR-19). Both keys are required by the API; send
+ * both `null` to clear. Nothing is reserved at selection time — capacity is
+ * enforced when the order is created, so completion can still refuse.
+ */
+export async function updateAwjCheckoutSchedule(selection: {
+  date: string | null;
+  slot_id: string | null;
+}): Promise<StorefrontCheckout> {
+  const response = await storefrontCartRequest<
+    AwjResourceResponse<AwjCheckout>
+  >("PATCH", "checkout/schedule", selection);
+  return mapAwjCheckoutToViewModel(response.data);
+}
+
+/**
+ * The windows that can be chosen right now (`GET delivery-schedule`): lead
+ * time, cut-off, blocked dates, weekdays and the destination zone are already
+ * applied by the server in the channel's timezone. `city` / `region` only
+ * narrow this display — completion re-validates against the stored checkout
+ * destination. Never cached: the answer depends on the clock and capacity.
+ */
+export async function fetchAwjDeliverySchedule(
+  method: "delivery" | "pickup",
+  destination?: { city?: string | null; region?: string | null },
+): Promise<StorefrontDeliverySchedule> {
+  const response = await storefrontFetch<{ data: unknown }>(
+    "delivery-schedule",
+    {
+      method,
+      city: destination?.city ?? undefined,
+      region: destination?.region ?? undefined,
+    },
+    { cache: "no-store" },
+  );
+  return mapDeliverySchedule(response.data, method);
 }
 
 /** `POST /checkout/complete` success payload. */

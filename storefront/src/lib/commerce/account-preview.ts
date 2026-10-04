@@ -33,6 +33,8 @@ export const ACCOUNT_ORDER_PREVIEW: StorefrontOrder = {
     status: "awaiting_collection",
     payment_method_name: "نقدي",
   },
+  gift: null,
+  schedule: null,
   items: [
     {
       productId: "p-cups",

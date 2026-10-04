@@ -23,6 +23,17 @@ function addDays(date: string, days: number): string {
   return next.toISOString().slice(0, 10);
 }
 
+/** A calendar date (`Y-m-d`) as "Tuesday, 6 October" — no timezone, no today/tomorrow. */
+export function formatPlainDate(date: string, locale: string): string | null {
+  if (!ISO_DATE.test(date)) return null;
+  return new Intl.DateTimeFormat(locale, {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    timeZone: "UTC",
+  }).format(new Date(`${date}T12:00:00Z`));
+}
+
 export function formatDeliveryDay(input: {
   date: string;
   timezone: string;
@@ -35,12 +46,7 @@ export function formatDeliveryDay(input: {
   const today = dateInTimezone(input.now ?? new Date(), input.timezone);
   if (input.date === today) return input.todayLabel;
   if (input.date === addDays(today, 1)) return input.tomorrowLabel;
-  return new Intl.DateTimeFormat(input.locale, {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    timeZone: "UTC",
-  }).format(new Date(`${input.date}T12:00:00Z`));
+  return formatPlainDate(input.date, input.locale);
 }
 
 /** `19:00`–`22:00` as a locale-formatted range, or null for a malformed pair. */

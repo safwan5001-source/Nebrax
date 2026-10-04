@@ -2,12 +2,16 @@
 
 import { CheckCircle2, Info, Printer } from "lucide-react";
 import Link from "next/link";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { awjOrderLineView, CartLine } from "@/components/cart/CartLine";
 import { Button } from "@/components/ui/button";
 import { useCartLineImages } from "@/hooks/useCartLineImages";
 import { formatMinorAmount, lineGroups } from "@/lib/commerce/cart-types";
 import type { StorefrontOrder } from "@/lib/commerce/checkout-types";
+import {
+  formatDeliveryWindow,
+  formatPlainDate,
+} from "@/lib/utils/delivery-day";
 
 /**
  * Stage 6 — order confirmation.
@@ -37,6 +41,7 @@ export function AwjOrderConfirmation({
 }) {
   const t = useTranslations("awjCheckout");
   const tc = useTranslations("common");
+  const locale = useLocale();
   const images = useCartLineImages(order.items.map((item) => item.productId));
 
   const address = [
@@ -156,6 +161,53 @@ export function AwjOrderConfirmation({
           )}
         </DetailCard>
       </div>
+
+      {(order.schedule || order.gift) && (
+        <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+          {order.schedule && (
+            <DetailCard title={t("success.scheduleHeading")}>
+              <p>{formatPlainDate(order.schedule.date, locale)}</p>
+              <p className="mt-1 text-store-muted-foreground">
+                {locale.toLowerCase().startsWith("en") &&
+                order.schedule.slot.labelEn
+                  ? order.schedule.slot.labelEn
+                  : order.schedule.slot.label}
+                {formatDeliveryWindow(
+                  order.schedule.slot.startTime,
+                  order.schedule.slot.endTime,
+                  locale,
+                ) ? (
+                  <bdi className="ms-2">
+                    {formatDeliveryWindow(
+                      order.schedule.slot.startTime,
+                      order.schedule.slot.endTime,
+                      locale,
+                    )}
+                  </bdi>
+                ) : null}
+              </p>
+            </DetailCard>
+          )}
+          {order.gift && (
+            <DetailCard title={t("success.giftHeading")}>
+              <p>
+                {t("review.giftTo")}: {order.gift.recipientName}
+              </p>
+              <p className="mt-1 text-store-muted-foreground">
+                {t("review.giftFrom")}:{" "}
+                {order.gift.hideSender
+                  ? t("review.giftAnonymous")
+                  : (order.gift.senderDisplayName ?? "—")}
+              </p>
+              {order.gift.message ? (
+                <p className="mt-1 whitespace-pre-line text-store-muted-foreground">
+                  {order.gift.message}
+                </p>
+              ) : null}
+            </DetailCard>
+          )}
+        </div>
+      )}
 
       <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">
         <Button asChild size="lg">

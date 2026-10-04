@@ -31,6 +31,12 @@ const mockActions = vi.hoisted(() => ({
   getAwjPaymentMethods: vi.fn().mockResolvedValue([]),
   updateAwjPayment: vi.fn(),
   completeAwjCheckoutAction: vi.fn(),
+  // FLOWERS-H12b — the optional schedule and gift stages. Scheduling reads as
+  // "not offered" by default, so the original six-stage journey is what every
+  // pre-existing test below exercises.
+  getAwjDeliverySchedule: vi.fn().mockResolvedValue(null),
+  updateAwjSchedule: vi.fn(),
+  updateAwjGift: vi.fn(),
   // Fixed by default — real localStorage-backed persistence
   // (`@/lib/commerce/checkout-idempotency`) is exercised for real via
   // jsdom's real `localStorage`, not mocked, so these tests prove actual
@@ -107,6 +113,14 @@ function baseCheckout(): StorefrontCheckout {
       payment_method_name: null,
       method: null,
     },
+    gift: null,
+    giftOptions: {
+      enabled: false,
+      messageMaxLength: 250,
+      allowHideSender: true,
+      recipientPhoneRequired: true,
+    },
+    schedule: null,
     cart: cartWithItem(),
   };
 }
@@ -202,6 +216,7 @@ describe("AwjCheckoutFlow", () => {
     }
     mockActions.getAwjCheckoutIdentity.mockResolvedValue("identity-a");
     mockActions.getAwjPaymentMethods.mockResolvedValue([]);
+    mockActions.getAwjDeliverySchedule.mockResolvedValue(null);
     localStorage.clear();
   });
 

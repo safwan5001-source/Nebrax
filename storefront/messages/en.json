@@ -851,7 +851,15 @@
       "editDelivery": "Edit delivery method",
       "notSet": "Not set",
       "commitmentNotice": "Placing the order records a commercial commitment to buy it. No payment is taken now; the store confirms the final amount and how to pay.",
-      "editPayment": "Edit payment method"
+      "editPayment": "Edit payment method",
+      "editSchedule": "Edit date and time",
+      "editGift": "Edit gift details",
+      "scheduleLabel": "Requested date & time",
+      "giftLabel": "Gift",
+      "giftTo": "To",
+      "giftFrom": "From",
+      "giftAnonymous": "Anonymous",
+      "giftMessage": "Message"
     },
     "reviewRequired": {
       "title": "Your order needs review",
@@ -865,14 +873,21 @@
         "contact_incomplete": "Your contact information is incomplete",
         "delivery_method_missing": "Please select a delivery method",
         "empty_cart": "Your cart is empty",
-        "unknown": "This item needs your attention"
+        "unknown": "This item needs your attention",
+        "gift_incomplete": "The gift details are incomplete",
+        "gift_unavailable": "Gift options are no longer available",
+        "schedule_required": "Please choose a delivery date and time",
+        "schedule_unavailable": "The date and time you chose is no longer available — please choose again",
+        "addon_unavailable": "An extra for this item is no longer available"
       }
     },
     "success": {
       "heading": "Order placed",
       "notPaidNote": "This order is confirmed as a commercial commitment. No payment has been processed.",
       "orderNumberLabel": "Order number",
-      "print": "Print"
+      "print": "Print",
+      "scheduleHeading": "Requested date & time",
+      "giftHeading": "Gift"
     },
     "steps": {
       "contact": "Contact",
@@ -880,7 +895,9 @@
       "delivery": "Delivery",
       "payment": "Payment",
       "review": "Review",
-      "confirmation": "Confirmation"
+      "confirmation": "Confirmation",
+      "schedule": "Date & time",
+      "gift": "Gift"
     },
     "stepCounter": "Step {current} of {total}",
     "payment": {
@@ -902,6 +919,44 @@
     },
     "continueToAddress": "Continue to address",
     "continueToDelivery": "Continue to delivery",
-    "continueToPayment": "Continue to payment"
+    "continueToPayment": "Continue to payment",
+    "continueToSchedule": "Continue to date & time",
+    "continueToGift": "Continue to gift details",
+    "schedule": {
+      "heading": "Delivery date & time",
+      "headingPickup": "Pickup date & time",
+      "description": "Choose when you would like your order delivered.",
+      "descriptionPickup": "Choose when you will collect your order.",
+      "loading": "Loading available times…",
+      "loadFailed": "We could not load the available times.",
+      "retry": "Try again",
+      "noWindows": "No time windows are available right now.",
+      "noWindowsOptional": "No time windows are available for this method. You can continue without choosing one.",
+      "requiredNote": "A date and time are required for this order.",
+      "dateLabel": "Choose a date",
+      "slotLabel": "Choose a time window",
+      "today": "Today",
+      "tomorrow": "Tomorrow",
+      "noPreference": "No preference",
+      "requestedNote": "Your choice is sent to the store with your order. The store confirms it.",
+      "invalidSelection": "Your earlier choice is no longer available. Please choose again.",
+      "selectedSummary": "{day}, {window}"
+    },
+    "gift": {
+      "heading": "Gift details",
+      "description": "Is this order a gift for someone else?",
+      "isGift": "This order is a gift",
+      "recipientHeading": "Who is it for?",
+      "recipientName": "Recipient's name",
+      "recipientPhone": "Recipient's phone",
+      "recipientPhoneHint": "So the courier can reach them on delivery.",
+      "senderHeading": "From",
+      "senderName": "Name shown on the card",
+      "senderHint": "Shown on the gift card only, not used for your account.",
+      "hideSender": "Send anonymously (hide my name)",
+      "message": "Gift message",
+      "messageHint": "Printed on the card. Plain text only.",
+      "messageCount": "{count} / {max}"
+    }
   }
 }

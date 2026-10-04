@@ -139,12 +139,9 @@ export function CartLine({
       >
         <p className="min-w-0 text-sm text-store-foreground">
           <span className="break-words">{view.name}</span>
-          <bdi
-            dir="ltr"
-            className="ms-2 inline-block text-xs text-store-muted-foreground tabular-nums"
-          >
-            ×{view.quantity}
-          </bdi>
+          <span className="ms-2 text-xs text-store-muted-foreground tabular-nums">
+            <bdi dir="ltr">×{view.quantity}</bdi>
+          </span>
           {unavailable && (
             <span className="ms-2 text-xs font-medium text-store-destructive">
               {t("itemUnavailable")}
