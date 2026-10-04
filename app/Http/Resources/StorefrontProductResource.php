@@ -6,6 +6,7 @@ use App\Models\Product;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Support\Facades\Route as RouteFacade;
+use Illuminate\Support\Facades\URL;
 
 /**
  * Public storefront catalog — تمثيل منتج للقراءة العامة المجهولة. قائمة سماح
@@ -198,6 +199,38 @@ class StorefrontProductResource extends JsonResource
         return RouteFacade::has('commerce.v1.media.show')
             ? route('commerce.v1.media.show', ['id' => $mediaId])
             : "/commerce/v1/media/{$mediaId}";
+    }
+
+    /**
+     * CUST-H4-8b — نظير `commerceMediaPayload()` لحمولة **مساحة عمل** Commerce
+     * (Canvas: وصل حديثاً/مميّزة/عروض)، لا حدّ ثقة الجوال. `/commerce/v1/media`
+     * محروسٌ بـ`bearer` لا يستطيع `<img>` عادي في متصفح التاجر تزويده —
+     * (CUST-H4-8 §15، B1). يبني رابطاً موقَّعاً قصير الأجل
+     * (`buildWorkspaceMediaUrl()`) يخدمه `CommerceWorkspaceMediaController`
+     * بلا مصادقة Bearer على الإطلاق — التوقيع نفسه هو السلطة.
+     *
+     * @param  iterable<\App\Models\ProductMedia>  $items
+     * @return array<int, array{id:string,url:string,alt:?string,position:?int}>
+     */
+    public static function workspaceMediaPayload(iterable $items, string $storefrontId): array
+    {
+        return self::buildPayload($items, fn (string $id) => self::buildWorkspaceMediaUrl($id, $storefrontId));
+    }
+
+    /**
+     * رابطٌ موقَّعٌ (`URL::temporarySignedRoute`) لا يُولَّد إلا من داخل سياقٍ
+     * مُصادَقٍ بالكامل (`commerce.manage` + `ownedStorefront()`) — المُستدعي
+     * مسؤولٌ عن ذلك، هذا البانى مجرّد تركيب رابط. مدّة قصيرة (دقائق) تحدّ
+     * التعرّض: كل تحميل قائمةٍ جديد من التاجر يُصدِر روابط جديدة، فلا حاجة
+     * لرابطٍ طويل الأجل لصورةٍ واحدة.
+     */
+    public static function buildWorkspaceMediaUrl(string $mediaId, string $storefrontId): string
+    {
+        return URL::temporarySignedRoute(
+            'commerce.workspace.media.show',
+            now()->addMinutes(20),
+            ['id' => $storefrontId, 'media' => $mediaId],
+        );
     }
 
     /**

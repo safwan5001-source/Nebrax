@@ -7,10 +7,7 @@ use App\Models\ProductMedia;
 use App\Services\DocumentCenter\DocumentStorageService;
 use App\Services\R2StorageService;
 use App\Tenancy\StorefrontContext;
-use Aws\Exception\AwsException;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
-use RuntimeException;
 
 /**
  * ═══════════════════════════════════════════════════════════════
@@ -50,6 +47,8 @@ use RuntimeException;
  */
 class CommerceMediaController extends PublicApiController
 {
+    use ServesProductMediaBytes;
+
     public function __construct(
         private readonly DocumentStorageService $documentStorage,
         private readonly R2StorageService $r2,
@@ -76,43 +75,6 @@ class CommerceMediaController extends PublicApiController
             abort(404, 'الوسائط غير موجودة.');
         }
 
-        $headers = [
-            'Content-Type' => $media->mime_type ?? 'application/octet-stream',
-            'Cache-Control' => 'private, max-age=3600',
-        ];
-
-        if ($media->disk === 'document') {
-            try {
-                $stream = $this->documentStorage->readStream($this->documentStorage->profile(), $media->path);
-            } catch (RuntimeException) {
-                abort(404, 'الوسائط غير موجودة.');
-            }
-
-            return response()->streamDownload(function () use ($stream): void {
-                fpassthru($stream);
-                fclose($stream);
-            }, $media->original_name, $headers, 'inline');
-        }
-
-        if ($media->disk === 'r2') {
-            try {
-                $body = $this->r2->get(ProductMedia::R2_DOMAIN, (string) $media->product_id, basename($media->path));
-            } catch (RuntimeException|AwsException $exception) {
-                abort(404, 'الوسائط غير موجودة.');
-            }
-
-            return response()->streamDownload(function () use ($body): void {
-                echo (string) $body;
-            }, $media->original_name, $headers, 'inline');
-        }
-
-        // توافق قراءة فقط مع سجلاتٍ قديمة محتملة كتبت مباشرةً على قرصٍ مسمّى
-        // (راجع تعليق الصنف أعلاه) — يطابق `ProductController::downloadMedia()` حرفياً.
-        $disk = Storage::disk($media->disk);
-        if (! $disk->exists($media->path)) {
-            abort(404, 'الوسائط غير موجودة.');
-        }
-
-        return $disk->response($media->path, $media->original_name, $headers);
+        return $this->streamProductMediaBytes($media, $this->documentStorage, $this->r2, 'private, max-age=3600');
     }
 }

@@ -148,8 +148,8 @@ class CommerceWorkspaceStorefrontProductController extends ApiController
         $paginator = $query->paginate($perPage, ['*'], 'page', (int) ($filters['page'] ?? 1));
 
         $gallery = app(ProductMediaGalleryService::class);
-        $data = $paginator->getCollection()->map(function (Product $product) use ($gallery) {
-            $media = StorefrontProductResource::commerceMediaPayload($gallery->resolveGallery($product));
+        $data = $paginator->getCollection()->map(function (Product $product) use ($gallery, $storefront) {
+            $media = StorefrontProductResource::workspaceMediaPayload($gallery->resolveGallery($product), $storefront->id);
 
             return [
                 'id' => $product->id,
@@ -221,8 +221,8 @@ class CommerceWorkspaceStorefrontProductController extends ApiController
         }
 
         $resource = $productModel->isVariantManaged()
-            ? $this->variantResource($request, $productModel, $channelId, $currency, $warehouse, $prices, $availability, $gallery)
-            : $this->simpleResource($request, $productModel, $channelId, $currency, $warehouse, $prices, $availability, $gallery);
+            ? $this->variantResource($request, $productModel, $storefront->id, $channelId, $currency, $warehouse, $prices, $availability, $gallery)
+            : $this->simpleResource($request, $productModel, $storefront->id, $channelId, $currency, $warehouse, $prices, $availability, $gallery);
 
         return response()->json(['data' => $resource]);
     }
@@ -231,6 +231,7 @@ class CommerceWorkspaceStorefrontProductController extends ApiController
     private function simpleResource(
         Request $request,
         Product $product,
+        string $storefrontId,
         string $channelId,
         string $currency,
         $warehouse,
@@ -246,7 +247,7 @@ class CommerceWorkspaceStorefrontProductController extends ApiController
             $inStock = $availability->forWarehouse($product->id, $warehouse->id)->availableToSell > 0;
         }
 
-        $galleryMedia = StorefrontProductResource::commerceMediaPayload($gallery->resolveGallery($product));
+        $galleryMedia = StorefrontProductResource::workspaceMediaPayload($gallery->resolveGallery($product), $storefrontId);
 
         return (new StorefrontProductResource($product, $price, $currency, $inStock, true, null, $galleryMedia))->resolve($request);
     }
@@ -260,6 +261,7 @@ class CommerceWorkspaceStorefrontProductController extends ApiController
     private function variantResource(
         Request $request,
         Product $product,
+        string $storefrontId,
         string $channelId,
         string $currency,
         $warehouse,
@@ -297,7 +299,7 @@ class CommerceWorkspaceStorefrontProductController extends ApiController
                 'option_value_ids' => $optionValueIds,
                 'price' => ['amount_minor' => $variantPrice->amount ?? 0, 'currency' => $currency],
                 'in_stock' => $variantInStock,
-                'media' => StorefrontProductResource::commerceMediaPayload($gallery->resolveGallery($product, $variant)),
+                'media' => StorefrontProductResource::workspaceMediaPayload($gallery->resolveGallery($product, $variant), $storefrontId),
             ];
         }
 
@@ -313,7 +315,7 @@ class CommerceWorkspaceStorefrontProductController extends ApiController
                 ])->all(),
             ])->all();
 
-        $galleryMedia = StorefrontProductResource::commerceMediaPayload($gallery->resolveGallery($product));
+        $galleryMedia = StorefrontProductResource::workspaceMediaPayload($gallery->resolveGallery($product), $storefrontId);
 
         return (new StorefrontProductResource(
             $product,

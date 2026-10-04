@@ -39,8 +39,14 @@ final class StorefrontOfferResource
         ];
     }
 
-    /** @return array<string, mixed> */
-    public static function workspace(StorefrontOfferView $view): array
+    /**
+     * CUST-H4-8b — `$storefrontId` إضافيٌّ لبناء رابط وسائط مساحة العمل
+     * الموقَّع (`workspaceMediaPayload()`) بدل `/commerce/v1/media` المحروس
+     * بـBearer الذي لا يستطيع `<img>` عادي في Canvas تزويده (CUST-H4-8 §15، B1).
+     *
+     * @return array<string, mixed>
+     */
+    public static function workspace(StorefrontOfferView $view, string $storefrontId): array
     {
         $offer = $view->offer;
         $product = $view->product;
@@ -53,7 +59,7 @@ final class StorefrontOfferResource
                 'name' => $product->name,
                 'name_en' => $product->name_en,
                 'thumbnail_url' => $view->thumbnail !== null
-                    ? StorefrontProductResource::commerceMediaPayload([$view->thumbnail])[0]['url']
+                    ? StorefrontProductResource::workspaceMediaPayload([$view->thumbnail], $storefrontId)[0]['url']
                     : null,
                 'is_variant_managed' => $product->isVariantManaged(),
             ],

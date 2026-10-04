@@ -40,7 +40,7 @@ class CommerceWorkspaceStorefrontOfferController extends ApiController
         $views = $resolver->allForStorefront($storefront->id, $storefront->sales_channel_id);
 
         return response()->json([
-            'data' => array_map(fn ($view) => StorefrontOfferResource::workspace($view), $views),
+            'data' => array_map(fn ($view) => StorefrontOfferResource::workspace($view, $storefront->id), $views),
             'meta' => ['max_offers' => StorefrontOfferResolver::MAX_OFFERS_PER_STOREFRONT],
         ]);
     }
@@ -99,7 +99,7 @@ class CommerceWorkspaceStorefrontOfferController extends ApiController
     {
         [$view] = $resolver->evaluate(collect([$offer]), $storefront->sales_channel_id);
 
-        return StorefrontOfferResource::workspace($view);
+        return StorefrontOfferResource::workspace($view, $storefront->id);
     }
 
     private function storefrontOr404(StorefrontOfferService $offers, string $id): Storefront
