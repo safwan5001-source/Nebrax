@@ -1,0 +1,32 @@
+import { browser, login, WEB, OUT, SEED, log, checks } from './lib.mjs';
+const b = await browser(); const ctx = await b.newContext({ viewport: { width: 1440, height: 1000 } }); const page = await ctx.newPage();
+const { ok, finish } = checks();
+const offerReqs = []; page.on('request', (r) => { if (/\/offers(\?|$)/.test(r.url()) && r.method()==='GET') offerReqs.push(r.url().replace(/^.*storefronts\//,'').slice(0,8)); });
+await login(page);
+await page.goto(`${WEB}/commerce/appearance`); await page.waitForSelector('[data-experience-builder]', { timeout: 60000 }); await page.waitForTimeout(3500);
+await page.getByRole('button', { name: /الصفحة الرئيسية/ }).first().click().catch(()=>{}); await page.waitForTimeout(600);
+await page.locator('[data-composer-section="offers"]').nth(1).locator('button:not([aria-label])').first().click(); await page.waitForTimeout(1200);
+const panelA = await page.locator('[data-selected-section-settings="offers"]').innerText();
+ok(panelA.includes('منتج ب') && !panelA.includes('المتجر ب'), 'store A panel lists A offers, not B');
+log('   names store A:', JSON.stringify((await page.locator('[data-selected-section-settings="offers"] [data-offers-option]').evaluateAll(e => e.map(x => x.innerText.split('\n')[0])))));
+// switch to B (store selector lives in the commerce shell; selection is in-memory -> client nav back)
+const goShell = async () => { await page.getByText('الخروج إلى التجارة').first().click(); await page.waitForTimeout(2500); };
+const pickStore = async (re) => { await page.getByRole('button', { name: 'المتجر' }).first().click(); const items = await page.getByRole('menuitem').allInnerTexts(); log('   store menu:', JSON.stringify(items)); await page.getByRole('menuitem').filter({ hasText: re }).first().click(); await page.waitForTimeout(1500); await page.locator('a[href="/commerce/appearance"]').first().click(); await page.waitForSelector('[data-experience-builder]', { timeout: 60000 }); await page.waitForTimeout(3500); };
+await goShell(); await pickStore(/web2/);
+await page.screenshot({ path: `${OUT}/30-store-B.png` });
+await page.getByRole('button', { name: 'إنشاء أول نسخة' }).waitFor({ timeout: 20000 });
+await page.getByPlaceholder(/مثال/).fill('B QA'); await page.getByRole('button', { name: 'إنشاء أول نسخة' }).click(); await page.waitForTimeout(2500);
+await page.getByRole('button', { name: /الصفحة الرئيسية/ }).first().click(); await page.waitForTimeout(600);
+await page.locator('[data-add-section]').click(); await page.locator('[data-picker-option="offers"]').click(); await page.waitForTimeout(2200);
+const pB = page.locator('[data-selected-section-settings="offers"]'); const txtB = await pB.innerText();
+log('   store B names:', JSON.stringify(await pB.locator('[data-offers-option]').evaluateAll(e => e.map(x => x.innerText.split('\n')[0]))));
+ok(txtB.includes('منتج المتجر ب') && !txtB.includes('منتج ب —') && !txtB.includes('منتج غريب') && !txtB.includes('مستأجر غريب'), 'store B panel lists only B offer (no A / foreign)');
+await page.screenshot({ path: `${OUT}/31-store-B-offers.png` });
+await goShell(); await pickStore(/^(?!.*web2).*web.*/);
+await page.getByRole('button', { name: /الصفحة الرئيسية/ }).first().click().catch(()=>{}); await page.waitForTimeout(500);
+await page.locator('[data-composer-section="offers"]').nth(1).locator('button:not([aria-label])').first().click(); await page.waitForTimeout(1200);
+const back = await page.locator('[data-selected-section-settings="offers"]').innerText();
+ok(!back.includes('المتجر ب'), 'switching back to A: no stale B offer');
+log('   GET offers storefront ids over session:', JSON.stringify(offerReqs));
+// header overflow baseline on B? (plain Banner draft) — measure at 1024 on B after adding banner
+await b.close(); finish();

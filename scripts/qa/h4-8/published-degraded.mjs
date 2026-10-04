@@ -1,0 +1,17 @@
+import { browser, SEED, API, OUT, log } from './lib.mjs';
+import { execSync } from 'node:child_process';
+const clear = () => execSync('cd /home/user/nibras-app && php artisan cache:clear', { stdio: 'ignore' });
+const tok = (await (await fetch(`${API}/api/login`, { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify({ email: SEED.email, password: SEED.password }) })).json()).token;
+const api = (m, p, body) => fetch(`${API}/api/commerce/workspace/storefronts/${SEED.storefrontA}${p}`, { method: m, headers: { Authorization: `Bearer ${tok}`, Accept: 'application/json', 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined }).then(async (r) => ({ status: r.status, json: await r.json().catch(() => null) }));
+const b = await browser(['--host-resolver-rules=MAP *.h48.test 127.0.0.1']);
+const read = async (tag) => { clear(); const page = await (await b.newContext({ viewport: { width: 1280, height: 900 } })).newPage(); const errs = []; page.on('pageerror', (e) => errs.push(e.message.slice(0, 80)));
+  const resp = await page.goto('http://a.h48.test:3001/sa/ar', { waitUntil: 'networkidle', timeout: 90000 }); const n = await page.locator('[data-offer-card]').count(); const secs = await page.locator('section[aria-labelledby]').filter({ has: page.locator('[data-offer-card]') }).count();
+  const emptyHeadings = await page.getByRole('heading', { name: 'العروض' }).count();
+  log(`${tag}: http ${resp.status()} offerCards=${n} offerSections=${secs} 'العروض' headings=${emptyHeadings} pageerrors=${errs.length}`); await page.close(); };
+await read('baseline (A,B live; A2 deleted -> id missing in published)');
+const list = (await api('GET', '/offers')).json.data; const A = list.find(o => (o.product?.id ?? o.product_id) === SEED.products.A), B = list.find(o => (o.product?.id ?? o.product_id) === SEED.products.B);
+await api('PATCH', `/offers/${A.id}`, { is_active: false }); await api('PATCH', `/offers/${B.id}`, { is_active: false });
+await read('zero live offers (A,B deactivated)');
+await api('PATCH', `/offers/${A.id}`, { is_active: true }); await api('PATCH', `/offers/${B.id}`, { is_active: true });
+await read('restored');
+await b.close();

@@ -208,9 +208,13 @@ describe('ExperienceBuilder — CUST-H4-7b Offers CRUD reconciliation', () => {
       expect(cardNames('offers-1')).toEqual(['الأول']);
     });
 
-    it('a 409 duplicate leaves the catalog untouched and shows the error on the product field', async () => {
+    it('a 409 duplicate shows the error, then silently re-reads so the conflicting row is visible after the form closes', async () => {
       server = [named('o1', 'الأول')];
-      createOfferMock.mockResolvedValueOnce({ ok: false, reason: 'conflict', message: 'dup', fieldErrors: {} });
+      createOfferMock.mockImplementationOnce(async () => {
+        // Another tab configured prod-b meanwhile: the server now has it.
+        server = [...server, named('o-conflict', 'ب')];
+        return { ok: false, reason: 'conflict', message: 'dup', fieldErrors: {} };
+      });
       await renderBuilder(configWith([{ id: 'offers-1', offerIds: [] }]));
       await selectSection('offers-1');
       fireEvent.click(q('[data-offer-add]'));
@@ -218,9 +222,12 @@ describe('ExperienceBuilder — CUST-H4-7b Offers CRUD reconciliation', () => {
       fireEvent.click(q('[data-offer-product-option="prod-b"]'));
       fireEvent.click(q('[data-offer-submit]'));
       await waitFor(() => expect(q('[data-offer-field-error="product_id"]')).not.toBeNull());
-      // No reload was triggered by a failed mutation; the server state is unchanged.
-      expect(listOffersMock).toHaveBeenCalledTimes(1);
-      expect(server.map((o) => o.id)).toEqual(['o1']);
+      // The error stays on the form; one silent reconcile read shows the server truth.
+      await waitFor(() => expect(listOffersMock).toHaveBeenCalledTimes(2));
+      // Closing the form returns to the list, which already shows the conflicting row
+      // (verified against the real API in CUST-H4-8: no manual refresh needed).
+      fireEvent.click(q('[data-offer-cancel]'));
+      await waitFor(() => expect(q('[data-offers-option="o-conflict"]')).not.toBeNull());
     });
   });
 
