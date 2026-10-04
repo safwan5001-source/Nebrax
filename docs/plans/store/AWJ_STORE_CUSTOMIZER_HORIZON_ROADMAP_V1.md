@@ -584,6 +584,12 @@ Until that exists, font upload remains gated while curated fonts can remain LIVE
 
 ## HORIZON CUST-H4 — Section Library & Section Quality
 
+> **STATUS: CLOSED / COMPLETE — 2026-10-04.**
+> Final merged verification SHA: `27a8049c5254794f49031e841d4a2549aab7e4cf` (PR #1226, "qa(store): CUST-H4-8 verification rerun after H4-8b — READY FOR H4 CLOSURE").
+> Final verdict: all ten merchant-visible homepage sections (`hero, categories, newArrivals, wholesale, banner, featured, offers, benefits, appPromo, customContent`) are **LIVE**, merchant-addable, backed by real contracts and real data, with verified Canvas ↔ Published parity. Offers closed as a real, bounded Commerce-referencing capability (`storefront_offers` + `StorefrontOfferResolver`, real pricing via the existing `CommercePriceResolver`), not GATED. Canvas product-media blocker B1 (workspace `<img>` tags returning `401`/`ERR_BLOCKED_BY_ORB` against the mobile-only media route) was found during H4-8 integrated QA and resolved in H4-8b (signed workspace media route), then independently re-verified on the real stack in the H4-8 rerun. No H4 blockers remain.
+> Evidence: `docs/reports/CUST-H4-CLOSURE-REPORT.md` (full evidence chain, section-by-section final state, Offers architecture, media resolution, tenant isolation, parity, tests).
+> Per §14 below, the next roadmap-defined horizon is **CUST-H5 — Undo / Redo, Recovery & Change Confidence**. Starting it requires its own Evidence Pass and is not authorized by this closure note alone.
+
 **Purpose:** turn the current registry into a useful merchant content toolbox.
 
 ### Library UX
