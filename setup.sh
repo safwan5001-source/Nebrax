@@ -24,7 +24,8 @@ fi
 cd "$APP_DIR"
 
 echo "▶ 3/6  تثبيت Sanctum + تفعيل مسارات API..."
-composer require laravel/sanctum resend/resend-php --quiet
+composer require laravel/sanctum resend/resend-php intervention/image-laravel:4.1.1 --quiet
+php "$CORE_DIR/tests/Fixtures/intervention-image-runtime-smoke.php" "$APP_DIR"
 php artisan install:api --no-interaction --quiet || true
 # لدينا جدول personal_access_tokens ضمن migration النواة — نحذف نسخة Sanctum المنشورة لتجنّب التكرار
 rm -f database/migrations/*_create_personal_access_tokens_table.php 2>/dev/null || true
