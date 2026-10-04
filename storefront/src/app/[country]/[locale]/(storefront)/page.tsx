@@ -265,7 +265,7 @@ async function publishedNodes(
     }
     if (section.type === "discovery") {
       const content = discoveryContentOf(section);
-      if (!content.dimension) continue;
+      if (content.axis === "facet" && !content.dimension) continue;
       nodes.push(
         <DiscoverySection
           key={section.id}

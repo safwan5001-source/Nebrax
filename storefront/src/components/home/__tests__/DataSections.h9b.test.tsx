@@ -9,7 +9,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   fetchShelfProducts: vi.fn(),
-  fetchDiscoveryAxis: vi.fn(),
+  fetchDiscoveryValues: vi.fn(),
   fetchEarliestDelivery: vi.fn(),
 }));
 
@@ -48,7 +48,7 @@ vi.mock("@/components/products/ProductCarousel", () => ({
 vi.mock("@/lib/commerce/data-sections", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/commerce/data-sections")>()),
   fetchShelfProducts: mocks.fetchShelfProducts,
-  fetchDiscoveryAxis: mocks.fetchDiscoveryAxis,
+  fetchDiscoveryValues: mocks.fetchDiscoveryValues,
   fetchEarliestDelivery: mocks.fetchEarliestDelivery,
 }));
 
@@ -155,7 +155,6 @@ describe("ProductShelfSection", () => {
 describe("DiscoverySection", () => {
   const base = { basePath: "/sa/ar", locale: "ar", headingId: "disc-a" };
   const axis = {
-    dimension: "occasion",
     name: "المناسبة",
     options: [
       { value: "eid", name: "العيد", count: 4 },
@@ -164,14 +163,22 @@ describe("DiscoverySection", () => {
   };
 
   it("renders tiles linking to the facet-filtered listing", async () => {
-    mocks.fetchDiscoveryAxis.mockResolvedValue(axis);
+    mocks.fetchDiscoveryValues.mockResolvedValue(axis);
     render(
       (await DiscoverySection({
         ...base,
-        content: { title: "", dimension: "occasion", display: "tiles" },
+        content: {
+          title: "",
+          axis: "facet",
+          dimension: "occasion",
+          display: "tiles",
+        },
       })) as React.JSX.Element,
     );
-    expect(mocks.fetchDiscoveryAxis).toHaveBeenCalledWith("occasion");
+    expect(mocks.fetchDiscoveryValues).toHaveBeenCalledWith({
+      axis: "facet",
+      dimension: "occasion",
+    });
     const link = screen.getByRole("link", { name: "العيد" });
     const url = new URL(link.getAttribute("href") as string, "https://x.test");
     expect(url.pathname).toBe("/sa/ar/products");
@@ -180,7 +187,7 @@ describe("DiscoverySection", () => {
   });
 
   it("renders chips, honours a merchant title, and caps the options", async () => {
-    mocks.fetchDiscoveryAxis.mockResolvedValue({
+    mocks.fetchDiscoveryValues.mockResolvedValue({
       ...axis,
       options: Array.from({ length: 20 }, (_, i) => ({
         value: `v${i}`,
@@ -193,6 +200,7 @@ describe("DiscoverySection", () => {
         ...base,
         content: {
           title: "تسوّق حسب المناسبة",
+          axis: "facet",
           dimension: "occasion",
           display: "chips",
         },
@@ -205,8 +213,7 @@ describe("DiscoverySection", () => {
   });
 
   it("links brands by id with a brand title fallback", async () => {
-    mocks.fetchDiscoveryAxis.mockResolvedValue({
-      dimension: "brand",
+    mocks.fetchDiscoveryValues.mockResolvedValue({
       name: "",
       options: [
         {
@@ -219,7 +226,7 @@ describe("DiscoverySection", () => {
     render(
       (await DiscoverySection({
         ...base,
-        content: { title: "", dimension: "brand", display: "tiles" },
+        content: { title: "", axis: "brand", display: "tiles" },
       })) as React.JSX.Element,
     );
     expect(screen.getByRole("heading", { name: "shopByBrand" })).toBeTruthy();
@@ -234,19 +241,59 @@ describe("DiscoverySection", () => {
     );
   });
 
-  it("leaves no section when the dimension has no visible value or the read fails", async () => {
-    mocks.fetchDiscoveryAxis.mockResolvedValueOnce(null);
+  it('treats a merchant facet keyed "brand" as a facet, not as the built-in brands', async () => {
+    mocks.fetchDiscoveryValues.mockResolvedValue({
+      name: "الماركة",
+      options: [{ value: "gucci", name: "غوتشي", count: 2 }],
+    });
+    render(
+      (await DiscoverySection({
+        ...base,
+        content: {
+          title: "",
+          axis: "facet",
+          dimension: "brand",
+          display: "tiles",
+        },
+      })) as React.JSX.Element,
+    );
+    expect(mocks.fetchDiscoveryValues).toHaveBeenCalledWith({
+      axis: "facet",
+      dimension: "brand",
+    });
+    const url = new URL(
+      screen
+        .getByRole("link", { name: "غوتشي" })
+        .getAttribute("href") as string,
+      "https://x.test",
+    );
+    expect(url.searchParams.get("facet[brand]")).toBe("gucci");
+    expect(url.searchParams.has("brand_id")).toBe(false);
+  });
+
+  it("renders nothing for a facet axis with no dimension", async () => {
     expect(
       await DiscoverySection({
         ...base,
-        content: { title: "", dimension: "x", display: "tiles" },
+        content: { title: "", axis: "facet", dimension: "", display: "tiles" },
       }),
     ).toBeNull();
-    mocks.fetchDiscoveryAxis.mockRejectedValueOnce(new Error("down"));
+    expect(mocks.fetchDiscoveryValues).not.toHaveBeenCalled();
+  });
+
+  it("leaves no section when the dimension has no visible value or the read fails", async () => {
+    mocks.fetchDiscoveryValues.mockResolvedValueOnce(null);
     expect(
       await DiscoverySection({
         ...base,
-        content: { title: "", dimension: "x", display: "tiles" },
+        content: { title: "", axis: "facet", dimension: "x", display: "tiles" },
+      }),
+    ).toBeNull();
+    mocks.fetchDiscoveryValues.mockRejectedValueOnce(new Error("down"));
+    expect(
+      await DiscoverySection({
+        ...base,
+        content: { title: "", axis: "facet", dimension: "x", display: "tiles" },
       }),
     ).toBeNull();
   });

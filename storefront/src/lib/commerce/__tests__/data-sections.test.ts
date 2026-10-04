@@ -11,7 +11,7 @@ vi.mock("next-intl/server", () => ({ getLocale: mocks.getLocale }));
 
 const {
   discoveryListingParams,
-  fetchDiscoveryAxis,
+  fetchDiscoveryValues,
   fetchEarliestDelivery,
   fetchShelfProducts,
   shelfListingParams,
@@ -176,14 +176,16 @@ describe("commerce/data-sections — FLOWERS-H9b", () => {
 
     it("reads values and counts from the list meta with one per_page=1 request", async () => {
       fetchMock.mockResolvedValue(jsonResponse({ data: [], meta }));
-      const axis = await fetchDiscoveryAxis("occasion");
+      const axis = await fetchDiscoveryValues({
+        axis: "facet",
+        dimension: "occasion",
+      });
 
       expect(fetchMock).toHaveBeenCalledTimes(1);
       expect(
         new URL(fetchMock.mock.calls[0][0]).searchParams.get("per_page"),
       ).toBe("1");
       expect(axis).toEqual({
-        dimension: "occasion",
         name: "المناسبة",
         options: [{ value: "eid", name: "العيد", count: 4 }],
       });
@@ -192,15 +194,17 @@ describe("commerce/data-sections — FLOWERS-H9b", () => {
     it("uses English names under the English locale and falls back to Arabic", async () => {
       mocks.getLocale.mockResolvedValue("en");
       fetchMock.mockResolvedValue(jsonResponse({ data: [], meta }));
-      const axis = await fetchDiscoveryAxis("occasion");
+      const axis = await fetchDiscoveryValues({
+        axis: "facet",
+        dimension: "occasion",
+      });
       expect(axis?.name).toBe("Occasion");
       expect(axis?.options[0].name).toBe("Eid");
     });
 
     it("reads the brand axis and drops brands with no products", async () => {
       fetchMock.mockResolvedValue(jsonResponse({ data: [], meta }));
-      expect(await fetchDiscoveryAxis("brand")).toEqual({
-        dimension: "brand",
+      expect(await fetchDiscoveryValues({ axis: "brand" })).toEqual({
         name: "",
         options: [{ value: B1, name: "علامة", count: 3 }],
       });
@@ -208,19 +212,31 @@ describe("commerce/data-sections — FLOWERS-H9b", () => {
 
     it("is null for an unknown dimension, an empty axis, or a response without facet meta", async () => {
       fetchMock.mockResolvedValue(jsonResponse({ data: [], meta }));
-      expect(await fetchDiscoveryAxis("nope")).toBeNull();
+      expect(
+        await fetchDiscoveryValues({ axis: "facet", dimension: "nope" }),
+      ).toBeNull();
       fetchMock.mockResolvedValue(
         jsonResponse({ data: [], meta: { pagination } }),
       );
-      expect(await fetchDiscoveryAxis("occasion")).toBeNull();
-      expect(await fetchDiscoveryAxis("brand")).toBeNull();
+      expect(
+        await fetchDiscoveryValues({ axis: "facet", dimension: "occasion" }),
+      ).toBeNull();
+      expect(await fetchDiscoveryValues({ axis: "brand" })).toBeNull();
     });
 
     it("maps an option to its listing deep link", () => {
-      expect(discoveryListingParams("occasion", "eid")).toEqual({
+      expect(
+        discoveryListingParams({ axis: "facet", dimension: "occasion" }, "eid"),
+      ).toEqual({
         "facet[occasion]": "eid",
       });
-      expect(discoveryListingParams("brand", B1)).toEqual({ brand_id: B1 });
+      expect(discoveryListingParams({ axis: "brand" }, B1)).toEqual({
+        brand_id: B1,
+      });
+      // A merchant facet that is literally keyed "brand" is still a facet.
+      expect(
+        discoveryListingParams({ axis: "facet", dimension: "brand" }, "gucci"),
+      ).toEqual({ "facet[brand]": "gucci" });
     });
   });
 

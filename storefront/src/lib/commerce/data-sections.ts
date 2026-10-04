@@ -73,8 +73,13 @@ export interface DiscoveryOption {
   count: number;
 }
 
-export interface DiscoveryAxis {
-  dimension: string;
+/** Which values to read: a merchant facet by key, or the built-in brands. */
+export type DiscoverySelector =
+  | { axis: "facet"; dimension: string }
+  | { axis: "brand" };
+
+export interface DiscoveryValues {
+  /** The facet's display name; empty for brands (the caller supplies a title). */
   name: string;
   options: DiscoveryOption[];
 }
@@ -92,8 +97,6 @@ type AwjFacetMeta = {
 };
 
 type AwjBrandMeta = { id: string; name: string; count: number };
-
-const BRAND_DIMENSION = "brand";
 
 /**
  * An option is only offered when the listing can honour its link: the same
@@ -117,16 +120,16 @@ function pickName(
  * `per_page=1` request carries the whole meta; the products themselves are
  * ignored. Returns null when the dimension has no visible value.
  */
-export async function fetchDiscoveryAxis(
-  dimension: string,
-): Promise<DiscoveryAxis | null> {
+export async function fetchDiscoveryValues(
+  selector: DiscoverySelector,
+): Promise<DiscoveryValues | null> {
   const response = await storefrontFetch<{
     data: unknown[];
     meta: { pagination: AwjPagination; facets?: unknown; brands?: unknown };
   }>("products", { per_page: 1 });
   const locale = await getLocale();
 
-  if (dimension === BRAND_DIMENSION) {
+  if (selector.axis === "brand") {
     const brands = Array.isArray(response.meta.brands)
       ? (response.meta.brands as unknown[])
       : [];
@@ -147,7 +150,7 @@ export async function fetchDiscoveryAxis(
         name: brand.name,
         count: brand.count,
       }));
-    return options.length === 0 ? null : { dimension, name: "", options };
+    return options.length === 0 ? null : { name: "", options };
   }
 
   const facets = Array.isArray(response.meta.facets)
@@ -156,7 +159,7 @@ export async function fetchDiscoveryAxis(
   const facet = facets
     .filter(isRecord)
     .map((row) => row as unknown as AwjFacetMeta)
-    .find((row) => row.key === dimension);
+    .find((row) => row.key === selector.dimension);
   if (!facet || !Array.isArray(facet.values)) return null;
 
   const options = facet.values
@@ -177,7 +180,6 @@ export async function fetchDiscoveryAxis(
     }));
   if (options.length === 0) return null;
   return {
-    dimension,
     name: pickName(facet.name, facet.name_en, locale),
     options,
   };
@@ -185,12 +187,12 @@ export async function fetchDiscoveryAxis(
 
 /** The listing deep-link query for one discovery option. */
 export function discoveryListingParams(
-  dimension: string,
+  selector: DiscoverySelector,
   value: string,
 ): Record<string, string> {
-  return dimension === BRAND_DIMENSION
+  return selector.axis === "brand"
     ? { brand_id: value }
-    : { [`facet[${dimension}]`]: value };
+    : { [`facet[${selector.dimension}]`]: value };
 }
 
 // ── deliveryPromise ─────────────────────────────────────────────────────
