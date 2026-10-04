@@ -7,7 +7,7 @@
 | الحقل | القيمة |
 |---|---|
 | Base SHA | `cb6478281577b9a9abdd6ed31c339afb23db9940` |
-| Head SHA |  |
+| Head SHA | `eb3c68b77eb16584c89ae2d22f0ea01a54bf7bf5` (implementation commit; report commit follows) |
 | Branch | `awj-product-image-guidance-1` |
 | PR | [#1227](https://github.com/safwan5001-source/Nebrax/pull/1227) |
 | الحالة | Open — بانتظار مراجعة ونتائج CI |
