@@ -2,7 +2,7 @@
 
 import { Trash2 } from "lucide-react";
 import Link from "next/link";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { QuantityPickerField } from "@/components/cart/QuantityPickerField";
 import { usePublishedThemeMarker } from "@/components/layout/PublishedThemeMarker";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,7 @@ import { ProductImage } from "@/components/ui/product-image";
 import {
   formatMinorAmount,
   type StorefrontCartLine,
+  type StorefrontLinePersonalization,
 } from "@/lib/commerce/cart-types";
 import type { StorefrontOrder } from "@/lib/commerce/checkout-types";
 import { cn } from "@/lib/utils";
@@ -64,6 +65,14 @@ export interface CartLineView {
   lineTotalLabel: string | null;
   /** Strikethrough original, where the caller's authority provides one. */
   compareAtLabel?: string | null;
+  /** The shopper's personalization answers (ADR-16), printed under the name. */
+  details?: StorefrontLinePersonalization[];
+  /**
+   * True for an add-on line (ADR-18). It rides on its parent: shown nested and
+   * read-only — its quantity follows the parent's and it is removed with it
+   * (the API refuses to change or remove it on its own).
+   */
+  addon?: boolean;
 }
 
 interface CartLineProps {
@@ -98,6 +107,7 @@ export function CartLine({
 }: CartLineProps) {
   const t = useTranslations("cart");
   const tc = useTranslations("common");
+  const locale = useLocale();
   const isMarket = usePublishedThemeMarker() === "awj-market";
 
   const readOnly = density === "summary";
@@ -116,6 +126,39 @@ export function CartLine({
       {view.name}
     </span>
   );
+
+  if (view.addon) {
+    // An add-on rides on its parent line (ADR-18): nested, read-only, no
+    // controls — the API refuses to change or remove it on its own.
+    return (
+      <div
+        className="ms-4 flex items-baseline justify-between gap-3 border-s-2 border-store-border ps-3 pb-2 sm:ms-6"
+        data-testid="cart-line"
+        data-addon="true"
+        data-available={view.available ? "true" : "false"}
+      >
+        <p className="min-w-0 text-sm text-store-foreground">
+          <span className="break-words">{view.name}</span>
+          <bdi
+            dir="ltr"
+            className="ms-2 inline-block text-xs text-store-muted-foreground tabular-nums"
+          >
+            ×{view.quantity}
+          </bdi>
+          {unavailable && (
+            <span className="ms-2 text-xs font-medium text-store-destructive">
+              {t("itemUnavailable")}
+            </span>
+          )}
+        </p>
+        {!unavailable && view.lineTotalLabel ? (
+          <bdi className="shrink-0 text-sm font-semibold tabular-nums text-store-foreground">
+            {view.lineTotalLabel}
+          </bdi>
+        ) : null}
+      </div>
+    );
+  }
 
   return (
     <div
@@ -177,6 +220,26 @@ export function CartLine({
                   </span>
                 ))}
               </p>
+            )}
+            {view.details && view.details.length > 0 && (
+              <dl
+                data-line-personalization=""
+                className="mt-1 space-y-0.5 text-xs text-store-muted-foreground"
+              >
+                {view.details.map((detail) => (
+                  <div key={detail.key} className="flex gap-1.5">
+                    <dt className="shrink-0 font-medium">
+                      {locale.toLowerCase().startsWith("en") && detail.labelEn
+                        ? detail.labelEn
+                        : detail.label}
+                      :
+                    </dt>
+                    <dd className="min-w-0 whitespace-pre-line break-words text-store-foreground">
+                      {detail.display}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
             )}
           </div>
 
@@ -278,6 +341,8 @@ export function awjCartLineView(
     available: line.available,
     unitPriceLabel: line.available ? formatMinorAmount(line.unitPrice) : null,
     lineTotalLabel: line.available ? formatMinorAmount(line.lineTotal) : null,
+    details: line.personalization ?? [],
+    addon: typeof line.addonOf === "string",
   };
 }
 
@@ -289,7 +354,7 @@ export function awjOrderLineView(
   imageUrl: string | null | undefined,
 ): CartLineView {
   return {
-    id: `${item.productId ?? "item"}-${index}`,
+    id: item.lineId ?? `${item.productId ?? "item"}-${index}`,
     name: item.productName,
     href: item.productId ? `${basePath}/products/${item.productId}` : null,
     imageUrl: imageUrl ?? null,
@@ -298,5 +363,7 @@ export function awjOrderLineView(
     available: true,
     unitPriceLabel: formatMinorAmount(item.unitPrice),
     lineTotalLabel: formatMinorAmount(item.lineTotal),
+    details: item.personalization ?? [],
+    addon: typeof item.addonOf === "string",
   };
 }

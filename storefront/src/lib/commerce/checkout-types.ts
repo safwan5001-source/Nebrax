@@ -12,8 +12,17 @@
  * module doc.
  */
 
-import type { AwjCart, StorefrontCart } from "./cart-types";
-import { mapAwjCartToViewModel } from "./cart-types";
+import type {
+  AwjCart,
+  AwjLinePersonalization,
+  StorefrontCart,
+  StorefrontLinePersonalization,
+} from "./cart-types";
+import {
+  groupAddonLines,
+  mapAwjCartToViewModel,
+  mapLinePersonalization,
+} from "./cart-types";
 
 export interface AwjMoney {
   amount_minor: number;
@@ -103,6 +112,12 @@ export interface AwjOrder {
     quantity: number;
     unit_price: AwjMoney;
     line_total: AwjMoney;
+    /** ADR-16 — present only on a personalized line. */
+    personalization?: AwjLinePersonalization[];
+    /** ADR-18 — present on an add-on line and on its parent. */
+    line_id?: string;
+    /** ADR-18 — present only on an add-on line: the parent's `line_id`. */
+    addon_of?: string;
   }>;
   created_at: string | null;
 }
@@ -157,6 +172,11 @@ export interface StorefrontOrder {
     quantity: number;
     unitPrice: AwjMoney;
     lineTotal: AwjMoney;
+    personalization: StorefrontLinePersonalization[];
+    /** Set on a parent line that has add-ons and on the add-on lines themselves. */
+    lineId: string | null;
+    /** Parent `lineId` when this is an add-on line, else `null`. */
+    addonOf: string | null;
   }>;
   createdAt: string | null;
 }
@@ -187,16 +207,31 @@ export function mapAwjOrderToViewModel(order: AwjOrder): StorefrontOrder {
     contact: order.contact,
     delivery: order.delivery,
     payment: order.payment,
-    items: order.items.map((item) => ({
-      productId: item.product_id,
-      productName: item.product_name,
-      unitName: item.unit_name,
-      quantity: item.quantity,
-      unitPrice: item.unit_price,
-      lineTotal: item.line_total,
-    })),
+    items: groupOrderItems(
+      order.items.map((item) => ({
+        productId: item.product_id,
+        productName: item.product_name,
+        unitName: item.unit_name,
+        quantity: item.quantity,
+        unitPrice: item.unit_price,
+        lineTotal: item.line_total,
+        personalization: mapLinePersonalization(item.personalization),
+        lineId: typeof item.line_id === "string" ? item.line_id : null,
+        addonOf: typeof item.addon_of === "string" ? item.addon_of : null,
+      })),
+    ),
     createdAt: order.created_at,
   };
+}
+
+/** Add-on lines directly under their parent line (see `groupAddonLines`). */
+function groupOrderItems(
+  items: StorefrontOrder["items"],
+): StorefrontOrder["items"] {
+  return groupAddonLines(items, {
+    id: (item) => item.lineId,
+    parent: (item) => item.addonOf,
+  });
 }
 
 /**

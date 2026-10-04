@@ -51,7 +51,7 @@ import {
 import { CheckoutProgress } from "@/components/checkout/CheckoutProgress";
 import { Button } from "@/components/ui/button";
 import { useCartLineImages } from "@/hooks/useCartLineImages";
-import { formatMinorAmount } from "@/lib/commerce/cart-types";
+import { formatMinorAmount, lineGroups } from "@/lib/commerce/cart-types";
 import {
   clearPersistedIdempotencyKey,
   resolveIdempotencyKey,
@@ -488,16 +488,22 @@ export function AwjCheckoutFlow() {
           }
         >
           <ul className="divide-y divide-store-border">
-            {checkout.cart.items.map((line) => (
+            {lineGroups(checkout.cart.items, {
+              id: (line) => line.id,
+              parent: (line) => line.addonOf,
+            }).map(({ line, addons }) => (
               <li key={line.id}>
-                <CartLine
-                  view={awjCartLineView(
-                    line,
-                    basePath,
-                    line.productId ? lineImages[line.productId] : null,
-                  )}
-                  density="summary"
-                />
+                {[line, ...addons].map((row) => (
+                  <CartLine
+                    key={row.id}
+                    view={awjCartLineView(
+                      row,
+                      basePath,
+                      row.productId ? lineImages[row.productId] : null,
+                    )}
+                    density="summary"
+                  />
+                ))}
               </li>
             ))}
           </ul>

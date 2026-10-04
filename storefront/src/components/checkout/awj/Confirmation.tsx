@@ -6,7 +6,7 @@ import { useTranslations } from "next-intl";
 import { awjOrderLineView, CartLine } from "@/components/cart/CartLine";
 import { Button } from "@/components/ui/button";
 import { useCartLineImages } from "@/hooks/useCartLineImages";
-import { formatMinorAmount } from "@/lib/commerce/cart-types";
+import { formatMinorAmount, lineGroups } from "@/lib/commerce/cart-types";
 import type { StorefrontOrder } from "@/lib/commerce/checkout-types";
 
 /**
@@ -92,17 +92,28 @@ export function AwjOrderConfirmation({
           {tc("orderSummary")}
         </h2>
         <ul className="divide-y divide-store-border px-5">
-          {order.items.map((item, index) => (
-            <li key={`${item.productId ?? "item"}-${index}`}>
-              <CartLine
-                view={awjOrderLineView(
-                  item,
-                  index,
-                  basePath,
-                  item.productId ? images[item.productId] : null,
-                )}
-                density="summary"
-              />
+          {lineGroups(
+            order.items.map((item, index) => ({ item, index })),
+            {
+              id: ({ item }) => item.lineId,
+              parent: ({ item }) => item.addonOf,
+            },
+          ).map(({ line, addons }) => (
+            <li
+              key={`${line.item.lineId ?? line.item.productId ?? "item"}-${line.index}`}
+            >
+              {[line, ...addons].map(({ item, index }) => (
+                <CartLine
+                  key={`${item.lineId ?? item.productId ?? "item"}-${index}`}
+                  view={awjOrderLineView(
+                    item,
+                    index,
+                    basePath,
+                    item.productId ? images[item.productId] : null,
+                  )}
+                  density="summary"
+                />
+              ))}
             </li>
           ))}
         </ul>

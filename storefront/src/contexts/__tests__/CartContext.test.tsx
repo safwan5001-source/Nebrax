@@ -110,6 +110,19 @@ describe("CartContext", () => {
     expect(result.current.itemCount).toBe(3); // 2 + 1
   });
 
+  it("does not count add-on lines in the bag badge (FLOWERS-H12a)", async () => {
+    mockGetAwjCart.mockResolvedValue({
+      kind: "awj" as const,
+      items: [
+        { id: "li-1", quantity: 2, name: "Bouquet", addonOf: null },
+        { id: "li-2", quantity: 4, name: "Chocolates", addonOf: "li-1" },
+      ],
+    } as never);
+    const { result } = renderHook(() => useCart(), { wrapper });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.itemCount).toBe(2);
+  });
+
   it("sets cart to null when initial load fails", async () => {
     mockGetAwjCart.mockRejectedValue(new Error("Network error"));
 

@@ -5,6 +5,7 @@ import type { StorefrontCheckout } from "@/lib/commerce/checkout-types";
 import { AwjCheckoutFlow } from "../AwjCheckoutFlow";
 
 vi.mock("next-intl", () => ({
+  useLocale: () => "ar",
   useTranslations: (namespace: string) => {
     const fn = (key: string, vars?: Record<string, unknown>) =>
       vars
@@ -66,6 +67,9 @@ function cartWithItem() {
         unitPrice: { amount_minor: 2500, currency: "SAR" },
         lineTotal: { amount_minor: 5000, currency: "SAR" },
         available: true,
+        personalization: [],
+        addonOf: null,
+        perParentQuantity: null,
       },
     ],
     subtotal: { amount_minor: 5000, currency: "SAR" },
