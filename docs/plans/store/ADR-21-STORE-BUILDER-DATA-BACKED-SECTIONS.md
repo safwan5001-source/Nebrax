@@ -18,10 +18,12 @@ The Horizon's candidate sections (occasions, recipients, flower types, gift cate
 | Type | Stores (content) | Reads live |
 |---|---|---|
 | `productShelf` | `title` (≤ 80), optional `source` = `{kind:'collection', slug}` or `{kind:'facet', key, value}`, `deliverToday` (bool), `limit` (2–12, default 8) | products (price, availability, promise) via the public product list |
-| `discovery` | `title` (≤ 80), `dimension` (a facet key, or `brand`), `display` (`tiles`\|`chips`) | facet values / brands and counts from the product list meta |
+| `discovery` | `title` (≤ 80), `axis` (`facet` + `dimension` = the facet key, or `brand`), `display` (`tiles`\|`chips`) | facet values / brands and counts from the product list meta |
 | `deliveryPromise` | optional editorial `title` (≤ 80) and `body` (≤ 200) | the earliest slot from the public delivery schedule |
 
 Rules:
+
+0. **The brand axis is a discriminated kind, not a magic value.** A merchant facet may legitimately be keyed `brand`; `axis: "brand"` (no dimension) selects the built-in brands, `axis: "facet"` + `dimension` selects a merchant facet — so both stay targetable.
 
 1. **Sections consume data; they own no business truth.** Content never holds product ids, names, prices, stock, discounts, facet values, counts, dates or slots. A shelf with only `deliverToday` is valid ("Deliver Today"); a shelf with neither a usable source nor `deliverToday` has no content.
 2. **Fail closed, twin-aligned.** Slugs/keys use the existing safe-token rule; titles are plain text bounded by code points; non-boolean `deliverToday` is false; non-integer `limit` falls back to the default; unknown source kinds, unsafe tokens and unknown displays are dropped; extra keys are dropped; empty content is omitted. PHP and both TS normalizers read **one shared fixture** (`tests/Fixtures/presentation/data-sections.json`) in their tests.

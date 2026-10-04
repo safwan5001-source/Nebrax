@@ -83,8 +83,13 @@ export const SHELF_LIMIT_MAX = 12;
 export const SHELF_LIMIT_DEFAULT = 8;
 export const DISCOVERY_DISPLAYS = ["tiles", "chips"] as const;
 export type DiscoveryDisplay = (typeof DISCOVERY_DISPLAYS)[number];
-/** Special discovery axis: brands (not a descriptive facet). */
-export const DISCOVERY_BRAND_DIMENSION = "brand";
+/**
+ * Discovery axis: a merchant facet (`facet` + `dimension` = its key) or brands
+ * (`brand`). A discriminated kind — not a magic `dimension` value — so a facet
+ * whose key happens to be `brand` stays targetable.
+ */
+export const DISCOVERY_AXES = ["facet", "brand"] as const;
+export type DiscoveryAxis = (typeof DISCOVERY_AXES)[number];
 
 export type ShelfSource =
   | { kind: "collection"; slug: string }
@@ -99,7 +104,9 @@ export interface ProductShelfContent {
 
 export interface DiscoveryContent {
   title: string;
-  dimension: string;
+  axis: DiscoveryAxis;
+  /** The facet key; present only for the `facet` axis. */
+  dimension?: string;
   display: DiscoveryDisplay;
 }
 
@@ -201,9 +208,9 @@ export function discoveryContentOf(section: {
 }): DiscoveryContent {
   return section.type === "discovery" &&
     section.content &&
-    "dimension" in section.content
+    "axis" in section.content
     ? section.content
-    : { title: "", dimension: "", display: "tiles" };
+    : { title: "", axis: "facet", dimension: "", display: "tiles" };
 }
 
 export function deliveryPromiseContentOf(section: {
@@ -410,8 +417,9 @@ function normalizeProductShelf(
 function normalizeDiscovery(
   source: Record<string, unknown>,
 ): DiscoveryContent | undefined {
-  const dimension = safeToken(source.dimension, "");
-  if (!dimension) return undefined;
+  const axis: DiscoveryAxis = source.axis === "brand" ? "brand" : "facet";
+  const dimension = axis === "facet" ? safeToken(source.dimension, "") : "";
+  if (axis === "facet" && !dimension) return undefined;
   const display = DISCOVERY_DISPLAYS.find(
     (candidate) => candidate === source.display,
   );
@@ -420,7 +428,8 @@ function normalizeDiscovery(
       asString(source.title).trim(),
       MAX_SECTION_TITLE_LENGTH,
     ),
-    dimension,
+    axis,
+    ...(axis === "facet" ? { dimension } : {}),
     display: display ?? "tiles",
   };
 }

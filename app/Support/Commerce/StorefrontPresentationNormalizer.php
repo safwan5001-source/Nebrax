@@ -84,8 +84,11 @@ final class StorefrontPresentationNormalizer
 
     public const DISCOVERY_DISPLAYS = ['tiles', 'chips'];
 
-    /** المحور الخاص لـ«تسوّق حسب العلامة» (غير بُعدٍ وصفي). */
-    public const DISCOVERY_BRAND_DIMENSION = 'brand';
+    /**
+     * محور الاستكشاف: بُعدٌ وصفيّ للتاجر (`facet` + `dimension` = مفتاحه) أو العلامات (`brand`). نوعٌ مُميَّز لا
+     * قيمة خاصة داخل `dimension`: بُعدٌ وصفيّ مفتاحه `brand` صالح اليوم ويجب أن يبقى قابلاً للاستهداف.
+     */
+    public const DISCOVERY_AXES = ['facet', 'brand'];
 
     /** CUST-H4-4 — banner `imageAlt`. Twin of MAX_BANNER_IMAGE_ALT_LENGTH in both section-content.ts files. */
     public const MAX_BANNER_IMAGE_ALT_LENGTH = 150;
@@ -791,18 +794,20 @@ final class StorefrontPresentationNormalizer
         }
 
         if ($type === 'discovery') {
-            // FLOWERS-H9 / ADR-21 — «تسوّق حسب …»: مفتاح بُعدٍ وصفي (أو `brand`) فقط؛ القيم والأعداد تُقرأ من ميتا
-            // قائمة المنتجات العامة، فلا تُخزَّن هنا ولا تُختلق.
-            $dimension = $this->safeId($source['dimension'] ?? null, '');
-            if ($dimension === '') {
+            // FLOWERS-H9 / ADR-21 — «تسوّق حسب …»: محورٌ مُميَّز (`facet` بمفتاح بُعدٍ وصفي، أو `brand`)؛ القيم والأعداد
+            // تُقرأ من ميتا قائمة المنتجات العامة، فلا تُخزَّن هنا ولا تُختلق.
+            $axis = $this->inList($source['axis'] ?? null, self::DISCOVERY_AXES, 'facet');
+            $dimension = $axis === 'facet' ? $this->safeId($source['dimension'] ?? null, '') : '';
+            if ($axis === 'facet' && $dimension === '') {
                 return null;
             }
 
-            return [
+            return array_filter([
                 'title' => mb_substr(trim($this->asString($source['title'] ?? null)), 0, self::MAX_SECTION_TITLE_LENGTH),
-                'dimension' => $dimension,
+                'axis' => $axis,
+                'dimension' => $axis === 'facet' ? $dimension : null,
                 'display' => $this->inList($source['display'] ?? null, self::DISCOVERY_DISPLAYS, 'tiles'),
-            ];
+            ], static fn ($v) => $v !== null);
         }
 
         if ($type === 'deliveryPromise') {

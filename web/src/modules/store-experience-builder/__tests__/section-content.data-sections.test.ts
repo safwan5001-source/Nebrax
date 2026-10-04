@@ -72,6 +72,7 @@ describe("data-backed section content (shared fixture)", () => {
     });
     expect(discoveryContentOf({ type: "productShelf" })).toEqual({
       title: "",
+      axis: "facet",
       dimension: "",
       display: "tiles",
     });

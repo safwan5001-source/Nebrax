@@ -214,18 +214,20 @@
    },
    "expected": {
     "title": "تسوّق حسب المناسبة",
+    "axis": "facet",
     "dimension": "occasion",
     "display": "chips"
    }
   },
   {
-   "name": "discovery: brand axis and default display",
+   "name": "discovery: a merchant facet whose key is \"brand\" stays a facet (no magic dimension value)",
    "type": "discovery",
    "input": {
     "dimension": "brand"
    },
    "expected": {
     "title": "",
+    "axis": "facet",
     "dimension": "brand",
     "display": "tiles"
    }
@@ -245,6 +247,7 @@
    },
    "expected": {
     "title": "",
+    "axis": "facet",
     "dimension": "recipient",
     "display": "tiles"
    }
@@ -276,6 +279,7 @@
    },
    "expected": {
     "title": "اااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااا",
+    "axis": "facet",
     "dimension": "occasion",
     "display": "tiles"
    }
@@ -337,7 +341,13 @@
   {
    "name": "shelf: an integral float limit counts as an integer (6.0 === 6)",
    "type": "productShelf",
-   "input": {"source":{"kind":"collection","slug":"x"},"limit":6.0},
+   "input": {
+    "source": {
+     "kind": "collection",
+     "slug": "x"
+    },
+    "limit": 6.0
+   },
    "expected": {
     "title": "",
     "source": {
@@ -371,7 +381,13 @@
   {
    "name": "shelf: a huge limit clamps to the maximum",
    "type": "productShelf",
-   "input": {"source":{"kind":"collection","slug":"x"},"limit":100000000000000000000},
+   "input": {
+    "source": {
+     "kind": "collection",
+     "slug": "x"
+    },
+    "limit": 100000000000000000000
+   },
    "expected": {
     "title": "",
     "source": {
@@ -381,6 +397,55 @@
     "deliverToday": false,
     "limit": 12
    }
+  },
+  {
+   "name": "discovery: the brand axis carries no dimension",
+   "type": "discovery",
+   "input": {
+    "axis": "brand",
+    "dimension": "occasion",
+    "display": "chips",
+    "title": " الماركات "
+   },
+   "expected": {
+    "title": "الماركات",
+    "axis": "brand",
+    "display": "chips"
+   }
+  },
+  {
+   "name": "discovery: the brand axis needs no dimension",
+   "type": "discovery",
+   "input": {
+    "axis": "brand"
+   },
+   "expected": {
+    "title": "",
+    "axis": "brand",
+    "display": "tiles"
+   }
+  },
+  {
+   "name": "discovery: an unknown axis falls back to facet and needs a dimension",
+   "type": "discovery",
+   "input": {
+    "axis": "products",
+    "dimension": "occasion"
+   },
+   "expected": {
+    "title": "",
+    "axis": "facet",
+    "dimension": "occasion",
+    "display": "tiles"
+   }
+  },
+  {
+   "name": "discovery: an unknown axis without a dimension is omitted",
+   "type": "discovery",
+   "input": {
+    "axis": "products"
+   },
+   "expected": null
   }
  ]
 }
