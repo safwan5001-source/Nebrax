@@ -9,6 +9,7 @@ import {
   updateAwjCartItem,
 } from "@/lib/commerce/cart";
 import type { StorefrontCart } from "@/lib/commerce/cart-types";
+import type { PdpSelections } from "@/lib/commerce/pdp-gifting";
 import {
   cacheTagSuffix,
   clearCartCookies,
@@ -64,9 +65,16 @@ export async function addAwjItem(
   quantity: number,
   unitKey = "base",
   variantId?: string | null,
+  selections?: PdpSelections,
 ) {
   return actionResult(async () => {
-    const cart = await addAwjCartItem(productId, quantity, unitKey, variantId);
+    const cart = await addAwjCartItem(
+      productId,
+      quantity,
+      unitKey,
+      variantId,
+      selections,
+    );
     updateTag(awjCartTag());
     return { cart };
   }, "Failed to add item to cart");

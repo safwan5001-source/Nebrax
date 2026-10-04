@@ -5,6 +5,7 @@ import type {
   Price,
   Variant,
 } from "@spree/sdk";
+import { parseProductGifting } from "./pdp-gifting";
 import type {
   AwjCategory,
   AwjCategoryRef,
@@ -359,6 +360,7 @@ export function mapAwjProductToViewModel(
 
   return {
     isVariantManaged,
+    gifting: parseProductGifting(product, locale ?? ""),
     id: product.id,
     name: displayProductName(product, locale),
     slug: product.id,

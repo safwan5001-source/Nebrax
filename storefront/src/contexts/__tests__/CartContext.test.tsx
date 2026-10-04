@@ -145,6 +145,7 @@ describe("CartContext", () => {
         2,
         "unit:abc",
         undefined,
+        undefined,
       );
       expect(mockAddToCart).not.toHaveBeenCalled();
       expect(result.current.cart).toBe(updatedCart);
@@ -170,6 +171,7 @@ describe("CartContext", () => {
         1,
         "base",
         undefined,
+        undefined,
       );
     });
 
@@ -191,10 +193,11 @@ describe("CartContext", () => {
         1,
         "base",
         "variant-7",
+        undefined,
       );
     });
 
-    it("never sends a price — only product id, quantity, unit key and variant", async () => {
+    it("never sends a price — only product id, quantity, unit key, variant and optional gifting selections", async () => {
       mockAddAwjItem.mockResolvedValue({
         success: true as const,
         cart: updatedCart,
@@ -207,8 +210,10 @@ describe("CartContext", () => {
       });
 
       const call = mockAddAwjItem.mock.calls[0];
-      expect(call).toHaveLength(4);
-      expect(call).toEqual(["product-1", 1, "base", undefined]);
+      // Product, quantity, unit key, variant, and (FLOWERS-H11) the optional
+      // gifting selections — no price field anywhere.
+      expect(call).toHaveLength(5);
+      expect(call).toEqual(["product-1", 1, "base", undefined, undefined]);
     });
 
     it("shows error toast and does not update cart on failure", async () => {

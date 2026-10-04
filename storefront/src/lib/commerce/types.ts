@@ -84,6 +84,12 @@ export interface AwjProduct {
   options?: AwjProductOption[];
   /** Detail responses only; absent on the listing. */
   variants?: AwjProductVariant[];
+  /** FLOWERS-H11 — gifting blocks (detail only, each present only when non-empty); parsed in `pdp-gifting.ts`. */
+  personalization?: unknown;
+  content_blocks?: unknown;
+  addons?: unknown;
+  /** ADR-20 — list and detail; present only while delivery scheduling is on. */
+  delivery_promise?: unknown;
   created_at: string | null;
   updated_at: string | null;
 }
@@ -114,6 +120,8 @@ export type StoreCategory = import("@spree/sdk").Category & {
  */
 export type StoreProduct = import("@spree/sdk").Product & {
   isVariantManaged: boolean;
+  /** FLOWERS-H11 — normalized gifting blocks (empty for a product without any). */
+  gifting: import("./pdp-gifting").ProductGifting;
 };
 
 export interface AwjCategory {

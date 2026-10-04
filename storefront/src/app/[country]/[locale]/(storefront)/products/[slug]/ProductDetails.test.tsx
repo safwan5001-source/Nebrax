@@ -111,7 +111,13 @@ describe("ProductDetails", () => {
     // The fourth argument is the variant: null for a simple product, because
     // `store/v1` treats an absent variant as "this product sells in its own
     // right". A synthetic default-variant id must never take its place.
-    expect(mockAddItem).toHaveBeenCalledWith("product-1", 1, "base", null);
+    expect(mockAddItem).toHaveBeenCalledWith(
+      "product-1",
+      1,
+      "base",
+      null,
+      undefined,
+    );
     expect(mockAddItem).not.toHaveBeenCalledWith(
       "variant-master",
       expect.anything(),
@@ -316,7 +322,13 @@ describe("ProductDetails — AWJ Market mobile purchase bar", () => {
 
     await user.click(screen.getByText("addToCart"));
 
-    expect(mockAddItem).toHaveBeenCalledWith("product-1", 1, "base", null);
+    expect(mockAddItem).toHaveBeenCalledWith(
+      "product-1",
+      1,
+      "base",
+      null,
+      undefined,
+    );
   });
 });
 
