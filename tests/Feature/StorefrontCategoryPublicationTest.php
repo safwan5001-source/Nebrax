@@ -194,6 +194,9 @@ class StorefrontCategoryPublicationTest extends TestCase
         $channelB = SalesChannel::create([
             'slug' => 'web-second', 'name' => 'متجر ثانٍ', 'type' => SalesChannel::TYPE_WEB, 'is_active' => true,
         ]);
+        // created_at بدقة الثانية: القناتان تُنشآن في الثانية نفسها فيتعادلان وتتبدّل «الأقدم» بين تشغيل وآخر (Postgres).
+        // نجعل الأولى أقدم صراحةً — المسار المتوارث يحلّ أقدم قناة ويب.
+        SalesChannel::query()->whereKey($channelA->id)->update(['created_at' => now()->subMinutes(5)]);
         app(TenantContext::class)->forget();
 
         $category = $this->category($tenant, 'تصنيف متعدد القنوات');

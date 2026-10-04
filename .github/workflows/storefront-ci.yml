@@ -3,10 +3,10 @@ name: Storefront CI
 on:
   push:
     branches: ['**']
-    paths: ['storefront/**', '.github/workflows/storefront-ci.yml']
+    paths: ['storefront/**', 'contracts/flowers-journey/**', '.github/workflows/storefront-ci.yml']
   pull_request:
     branches: ['**']
-    paths: ['storefront/**', '.github/workflows/storefront-ci.yml']
+    paths: ['storefront/**', 'contracts/flowers-journey/**', '.github/workflows/storefront-ci.yml']
 
 jobs:
   check:

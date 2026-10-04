@@ -111,7 +111,7 @@ jobs:
           mkdir -p app/Contracts app/Mail app/Jobs/Accounting app/Jobs/DocumentCenter app/Services app/Services/Accounting app/Services/Commerce app/Services/Commerce/Edge app/Services/Commerce/Otp app/Services/DocumentCenter app/Services/AppBuilder app/Services/DeliveryHub app/Services/Pos app/Services/Pos/Hardware app/Services/Reporting app/Services/PrintTemplates app/Support app/Support/Inventory app/Support/Dns app/Support/Commerce \
                    app/Tenancy app/Http/Middleware app/Http/Controllers/Api \
                    app/Http/Requests app/Http/Resources app/Console/Commands \
-                   app/Models/Concerns tests/Feature tests/Fixtures/presentation routes config docs/openapi contracts/app-builder
+                   app/Models/Concerns tests/Feature tests/Fixtures/presentation routes config docs/openapi contracts/app-builder contracts/flowers-journey
           cp -r "$CORE/app/Models/"*.php                  app/Models/
           cp -r "$CORE/app/Mail/"*.php                    app/Mail/ 2>/dev/null || true
           cp -r "$CORE/app/Contracts/"*.php                app/Contracts/
@@ -159,6 +159,9 @@ jobs:
           # عقد LIVE-PREVIEW مشترك (LIVE-PREVIEW-2/7) — يقرأه اختبار الإثبات المتكامل عبر
           # base_path('contracts/app-builder/…')؛ نفس الملفات التي تقرأها اختبارات TypeScript/Dart مباشرة.
           cp -r "$CORE/contracts/app-builder/"*.json      contracts/app-builder/
+          # عقد رحلة الورود والهدايا (FLOWERS-H16): استجابات store/v1 الحقيقية؛ يقارنها FlowersEndToEndJourneyTest
+          # بالواقع، ويقرؤها اختبار واجهة المتجر بمحلّلاته الفعلية.
+          cp -r "$CORE/contracts/flowers-journey/"*.json  contracts/flowers-journey/
 
       - name: تسجيل TenancyServiceProvider + حذف users migration الافتراضية
         working-directory: ${{ env.APP_DIR }}

@@ -90,7 +90,15 @@ export const MAX_SELECT_OPTIONS = 40;
 /** `CommerceProductAddon::MAX_QUANTITY_CEILING` — a larger value is a contract violation. */
 export const MAX_ADDON_QUANTITY = 10;
 
-const FIELD_KEY = /^[a-z0-9][a-z0-9_]{0,39}$/;
+/**
+ * A personalization key as the API stores it: the admin endpoint validates `fields.*.key` as a slug
+ * (`a-b-c`, up to 48 characters — `CommercePersonalizationController`). Underscores are tolerated too. The first
+ * version of this pattern allowed only underscores, so a real key such as `card-name` was silently dropped from the
+ * page — and a dropped *required* field leaves the shopper unable to add the product (found by the real-API
+ * journey contract test, FLOWERS-H16).
+ */
+const FIELD_KEY = /^[a-z0-9]+(?:[-_][a-z0-9]+)*$/;
+const FIELD_KEY_MAX = 48;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 const CLOCK = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -123,6 +131,7 @@ function parseFields(raw: unknown, locale: string): PersonalizationField[] {
     if (
       !key ||
       !FIELD_KEY.test(key) ||
+      key.length > FIELD_KEY_MAX ||
       seen.has(key) ||
       !label ||
       (type !== "text" && type !== "textarea" && type !== "select")
