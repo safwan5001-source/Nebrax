@@ -44,7 +44,9 @@ enum VerticalCapability: string
     case VerticalSections = 'vertical_sections';
 
     /**
-     * هل القدرة مبنيّة ومدموجة في الكود؟ تُحدَّث شريحةً بشريحة.
+     * هل القدرة مبنيّة ومدموجة في الكود؟ تُحدَّث شريحةً بشريحة. كلّ قدرات أفق الهدايا الأول
+     * مدموجة (H2–H9) — «مبنيّة» لا تعني «مُفعَّلة» لمتجر بعينه: الحالة الفعلية لكل متجر
+     * تُقرأ من إعداده الحقيقي في `StorefrontVerticalSetupService`.
      */
     public function isAvailable(): bool
     {
@@ -57,7 +59,7 @@ enum VerticalCapability: string
             self::AddOns,
             self::DeliveryScheduling,
             self::SameDayDelivery,
-            self::VerticalSections => false,
+            self::VerticalSections => true,
         };
     }
 

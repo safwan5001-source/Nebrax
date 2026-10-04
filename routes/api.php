@@ -39,6 +39,7 @@ use App\Http\Controllers\Api\CommercePaymentIntentController;
 use App\Http\Controllers\Api\CommerceShippingZoneController;
 use App\Http\Controllers\Api\CommerceDeliveryScheduleController;
 use App\Http\Controllers\Api\CommerceGiftSettingsController;
+use App\Http\Controllers\Api\CommerceVerticalSetupController;
 use App\Http\Controllers\Api\CommerceWorkspaceStorefrontsController;
 use App\Http\Controllers\Api\CommerceWorkspaceStorefrontOfferController;
 use App\Http\Controllers\Api\CommerceWorkspaceStorefrontPresentationController;
@@ -883,6 +884,11 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         // FLOWERS-H3 / ADR-15: سياسة الإهداء لقناة المتجر — قراءة وكتابة بـcommerce.manage.
         Route::get('commerce/workspace/storefronts/{id}/gift-settings', [CommerceGiftSettingsController::class, 'show'])->whereUuid('id')->middleware($perm('commerce.manage'));
         Route::put('commerce/workspace/storefronts/{id}/gift-settings', [CommerceGiftSettingsController::class, 'update'])->whereUuid('id')->middleware($perm('commerce.manage'));
+
+        // FLOWERS-H14 / ADR-25: قائمة تهيئة الملف + القيم المبدئية (إضافية ومثالية التكرار). التطبيق يكتب أبعاد الكتالوج فيتطلب products.manage أيضاً.
+        Route::get('commerce/workspace/storefronts/{id}/vertical-setup', [CommerceVerticalSetupController::class, 'show'])->whereUuid('id')->middleware($perm('commerce.manage'));
+        Route::get('commerce/workspace/storefronts/{id}/vertical-setup/starters', [CommerceVerticalSetupController::class, 'previewStarters'])->whereUuid('id')->middleware($perm('commerce.manage'));
+        Route::post('commerce/workspace/storefronts/{id}/vertical-setup/starters', [CommerceVerticalSetupController::class, 'applyStarters'])->whereUuid('id')->middleware([$perm('commerce.manage'), $perm('products.manage')]);
 
         // FLOWERS-H7a / ADR-19: سياسة جدولة التسليم لقناة المتجر (إعداد + نوافذ + تواريخ محجوبة) — commerce.manage.
         Route::get('commerce/workspace/storefronts/{id}/delivery-schedule', [CommerceDeliveryScheduleController::class, 'show'])->whereUuid('id')->middleware($perm('commerce.manage'));

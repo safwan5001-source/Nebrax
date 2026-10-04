@@ -127,6 +127,9 @@ class CommerceModuleBoundaryTest extends TestCase
         // مُخصِّص صفحة المنتج. قراءة فقط، أهليتها مقيَّدة بقناة هذا المتجر تحديداً.
         'api/commerce/workspace/storefronts/{id}/products',
         'api/commerce/workspace/storefronts/{id}/products/{product}',
+        // FLOWERS-H14 / ADR-25 — قائمة تهيئة ملف الهدايا والقيم المبدئية.
+        'api/commerce/workspace/storefronts/{id}/vertical-setup',
+        'api/commerce/workspace/storefronts/{id}/vertical-setup/starters',
         // COM-MOBILE-ADDRESSES-1 — دفتر عناوين العميل الموثَّق (X-Customer-Token).
         'commerce/v1/addresses',
         'commerce/v1/addresses/{id}',
