@@ -30,6 +30,13 @@ Rules:
 3. **Seasonal and editorial needs reuse existing mechanisms.** Valentine's/Mother's Day/Ramadan/Eid/graduation/campaigns = a merchant collection or facet value + a merchant-authored shelf title. Care guide, why-shop-with-us and store story = the existing `benefits` / `customContent` sections (presets belong to H14 onboarding), not new types.
 4. **Staged exposure.** H9a makes the server accept and normalize the three types **without** adding them to the default document or to the builder/storefront key lists, so the default document and its TS twins do not change and no merchant can add a section the storefront cannot yet render. H9b adds storefront rendering; H9c adds the builder UI and only then the default-document entries.
 
+### 2.1 H9b — storefront runtime (implemented)
+
+- `store/v1` home renders the three types from the published document: `ProductShelfSection` (live `GET products` with `collection=` / `facet[key]=` / `deliver_today=`), `DiscoverySection` (values and counts from the product list `meta.facets` / `meta.brands`, one `per_page=1` request), `DeliveryPromiseBand` (earliest window from `GET delivery-schedule`). Each omits itself on an empty or failed read; the deliver-today shelf and the delivery band bypass fetch caching.
+- Options are offered only when the listing can honour the link (slug / brand-UUID shape), so a tile never opens an unfiltered list under a misleading label.
+- Honest deep links: the products listing now carries a *catalog context* from the URL (`collection`, `facet[key]`, `brand_id`, `deliver_today`) through page 1 and load-more to the public list; unknown values yield an empty list (fail closed) and a short note with a "show all" link. Full filter UI remains H10.
+- The storefront accepts the three types when parsing a published document (`HOME_DATA_SECTION_KEYS`) but they are still not in the default document or the builder key lists (H9c).
+
 ## 3. Rejected / Not adopted
 
 - One bespoke type per candidate (twenty types, twenty normalizers/panels/renderers, hard-coded labels).

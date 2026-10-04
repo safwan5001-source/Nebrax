@@ -45,7 +45,7 @@ No Deploy or Production change is authorized by this Horizon.
 | H8a | Availability / Same-day — derived promise seam, product preparation time, `commerce/v1` exposure | MERGED | #1210 | `f7c18bc` |
 | H8b | Availability / Same-day — `store/v1` parity and `deliver_today` filter | MERGED | #1211 | `0ed7b6c` |
 | H9a | Store Builder — data-backed section content contract (ADR-21) | PR OPEN, in review | (see log) | — |
-| H9b | Store Builder — storefront renderers for the data-backed sections | NOT STARTED | — | — |
+| H9b | Store Builder — storefront renderers for the data-backed sections (+ listing deep-link context) | IN PROGRESS (stacked on H9a) | — | — |
 | H9c | Store Builder — builder UI (library, panels, canvas) and default-document entries | NOT STARTED | — | — |
 | H10 | Storefront Discovery UX | NOT STARTED | — | — |
 | H11 | Flowers/Gifts PDP | NOT STARTED | — | — |
@@ -509,7 +509,30 @@ Copy this section for every completed/active slice.
 
 #### Next
 
-- H9b renders the sections in the public storefront; H9c adds the builder UI and the default-document entries (and updates the default fixtures/twins together).
+- H9b (below) renders the sections in the public storefront; H9c adds the builder UI and the default-document entries (and updates the default fixtures/twins together).
+
+---
+
+### H9b — Store Builder: storefront renderers and listing deep-link context (ADR-21 §2.1)
+
+**Status:** IN PROGRESS (built on the H9a branch; opens its PR once H9a is merged)  
+**Branch:** `flowers/h9b-storefront-sections`  
+
+#### What was implemented
+
+- Public home renders `productShelf`, `discovery` and `deliveryPromise` from the published document through live `store/v1` reads (products by collection/facet/deliver-today, facet and brand values with counts from the list meta, the earliest delivery window); each omits itself on an empty or failed read; time-sensitive reads are never cached.
+- Discovery options are offered only when the listing can honour them (slug / UUID shape); a shelf "view all" and every tile deep-link to the listing.
+- Products listing carries `collection`, `facet[key]`, `brand_id`, `deliver_today` from the URL through page 1 and load-more to the public list (flat params; unknown tokens dropped; the island remounts when the context changes) with a short note and a "show all" link. Full filter UI remains H10.
+- Six locales gained the section/listing strings (`check:locales` green). The storefront parses the three types (`HOME_DATA_SECTION_KEYS`) without changing the default document.
+
+#### Tests
+
+- Storefront: 893 tests green (new: delivery-day formatting incl. store-timezone "today", listing-context parsing, fetcher query/cache/mapping and the deep-link forwarding, the three section components); `tsc` and `biome check` clean. Eight mutations (cache/no-cache, token validation, empty omission, failure fallback, malformed date) each caught.
+- The storefront app has no CI in this repository; its dependencies were installed from its pnpm lockfile locally.
+
+#### Deferred
+
+- Builder UI and default-document entries (H9c); filter UI, facet chips and destination context (H10); visual QA of the new sections (H9c harness).
 
 ---
 

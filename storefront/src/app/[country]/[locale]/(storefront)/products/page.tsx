@@ -1,10 +1,16 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { StoreContainer } from "@/components/layout/StoreContainer";
 import { ProductListing } from "@/components/products/ProductListing";
 import { resolveCurrency } from "@/lib/data/markets";
 import { getProductFilters, getProducts } from "@/lib/data/products";
 import { generateProductsMetadata } from "@/lib/metadata/products";
+import {
+  hasListingContext,
+  listingContextParams,
+  parseListingContext,
+} from "@/lib/utils/listing-context";
 import { parseListingSearchParams } from "@/lib/utils/listing-search-params";
 
 interface ProductsPageProps {
@@ -33,14 +39,26 @@ export default async function ProductsPage({
 
   const listingState = parseListingSearchParams(rawSearchParams);
   const query = listingState.query;
+  // FLOWERS-H9b — catalog context (collection / facet / brand / deliver today)
+  // from a home section link; forwarded to the public list verbatim.
+  const context = parseListingContext(rawSearchParams);
+  const contextActive = hasListingContext(context);
 
   const t = await getTranslations({
     locale: locale as Locale,
     namespace: "products",
   });
 
-  const listId = query ? "search-results" : "all-products";
-  const listName = query ? "Search Results" : "All Products";
+  const listId = query
+    ? "search-results"
+    : contextActive
+      ? "curated-selection"
+      : "all-products";
+  const listName = query
+    ? "Search Results"
+    : contextActive
+      ? "Curated Selection"
+      : "All Products";
 
   return (
     // One measure and one rhythm, the same `StoreContainer` the shell and the
@@ -56,9 +74,20 @@ export default async function ProductsPage({
           <h1 className="text-base font-extrabold leading-tight text-store-foreground md:text-lg">
             {query ? t("searchResultsFor", { query }) : t("allProducts")}
           </h1>
-          {!query && (
+          {!query && !contextActive && (
             <p className="mt-0.5 hidden text-xs text-store-muted-foreground md:block">
               {t("browseCollection")}
+            </p>
+          )}
+          {!query && contextActive && (
+            <p className="mt-0.5 text-xs text-store-muted-foreground">
+              {t("curatedSelection")}{" "}
+              <Link
+                href={`${basePath}/products`}
+                className="font-bold text-store-primary hover:underline"
+              >
+                {t("clearSelection")}
+              </Link>
             </p>
           )}
         </div>
@@ -72,6 +101,7 @@ export default async function ProductsPage({
         listId={listId}
         listName={listName}
         fetchProducts={getProducts}
+        baseParams={contextActive ? listingContextParams(context) : undefined}
         fetchFilters={getProductFilters}
         emptyMessage={
           query ? t("noMatchingProducts", { query }) : t("tryAdjustingFilters")

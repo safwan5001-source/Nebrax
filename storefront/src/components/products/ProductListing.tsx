@@ -2,7 +2,6 @@ import type {
   PaginatedResponse,
   Product,
   ProductFiltersResponse,
-  ProductListParams,
 } from "@spree/sdk";
 import { Search } from "lucide-react";
 import { getTranslations } from "next-intl/server";
@@ -12,6 +11,7 @@ import { ListingAnalytics } from "@/components/products/ListingAnalytics";
 import { ListingFilterBar } from "@/components/products/ListingFilterBar";
 import { ProductListingSkeleton } from "@/components/products/ProductListingSkeleton";
 import { PRODUCT_CARD_FIELDS } from "@/lib/data/cached";
+import type { StorefrontListParams } from "@/lib/utils/listing-context";
 import {
   type ListingSearchParams,
   listingKey,
@@ -32,14 +32,14 @@ interface ProductListingProps {
   listName: string;
   categoryId?: string;
   /** Extra params always merged into the products list fetch (e.g. in_category). */
-  baseParams?: ProductListParams;
+  baseParams?: StorefrontListParams;
   /**
    * Server action fetching a page of products. Must be a server action
    * reference (not an inline closure) so it can be passed to the client
    * InfiniteProductList island for subsequent load-more calls.
    */
   fetchProducts: (
-    params: ProductListParams,
+    params: StorefrontListParams,
   ) => Promise<PaginatedResponse<Product>>;
   /** Fetcher for the facet data (filters + sort options). Server-only. */
   fetchFilters: (
@@ -105,7 +105,7 @@ async function ProductListingInner({
   // restricts the payload to what <ProductCard> and listing analytics
   // actually read — shrinking the cached entry, the RSC→client
   // serialization, and the streaming HTML.
-  const listParams: ProductListParams = {
+  const listParams: StorefrontListParams = {
     limit: PAGE_SIZE,
     ...queryParams,
     ...baseParams,
@@ -160,7 +160,7 @@ async function ProductListingInner({
             // new instance mounts with products already populated,
             // the user sees the grid update in place with no loading
             // fallback shown.
-            key={listingKey(state)}
+            key={`${listingKey(state)}|${JSON.stringify(baseParams ?? {})}`}
             initialProducts={products}
             initialPage={1}
             totalPages={totalPages}
