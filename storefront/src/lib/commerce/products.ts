@@ -7,6 +7,7 @@ import type {
 import { getLocale } from "next-intl/server";
 import type { StorefrontListParams } from "@/lib/utils/listing-context";
 import { storefrontFetch } from "./config";
+import { type ListingFacets, parseListingFacets } from "./listing-facets";
 import { mapAwjProductToViewModel } from "./mappers";
 import type { AwjListResponse, AwjProduct, AwjResourceResponse } from "./types";
 
@@ -75,9 +76,16 @@ function buildPaginationMeta(
   };
 }
 
+/**
+ * Page-1 meta of the listing carries the disjunctive facet / brand counts the
+ * gifting filters render (FLOWERS-H10). Extra to Spree's pagination meta, so
+ * every other consumer of `PaginatedResponse<Product>` is unaffected.
+ */
+export type ProductListMeta = PaginationMeta & { listingFacets: ListingFacets };
+
 export async function fetchProducts(
   params: StorefrontListParams | undefined,
-): Promise<PaginatedResponse<Product>> {
+): Promise<PaginatedResponse<Product> & { meta: ProductListMeta }> {
   const response = await storefrontFetch<AwjListResponse<AwjProduct>>(
     "products",
     {
@@ -103,7 +111,13 @@ export async function fetchProducts(
 
   return {
     data,
-    meta: buildPaginationMeta(response.meta.pagination, data.length),
+    meta: {
+      ...buildPaginationMeta(response.meta.pagination, data.length),
+      listingFacets: parseListingFacets(
+        response.meta as { facets?: unknown; brands?: unknown },
+        locale,
+      ),
+    },
   };
 }
 

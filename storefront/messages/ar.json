@@ -261,7 +261,10 @@
     "share": "مشاركة",
     "linkCopied": "تم نسخ الرابط",
     "curatedSelection": "عرض مختارات من منتجاتنا",
-    "clearSelection": "عرض كل المنتجات"
+    "clearSelection": "عرض كل المنتجات",
+    "giftingBrand": "العلامة التجارية",
+    "giftingDeliverToday": "التسليم اليوم",
+    "giftingActive": "الفلاتر المفعّلة"
   },
   "navigation": {
     "home": "الرئيسية",

@@ -12,6 +12,7 @@ vi.mock("next-intl/server", () => ({ getLocale: mocks.getLocale }));
 const {
   discoveryListingParams,
   fetchDiscoveryValues,
+  fetchDeliveryScheduleEnabled,
   fetchEarliestDelivery,
   fetchShelfProducts,
   shelfListingParams,
@@ -301,6 +302,26 @@ describe("commerce/data-sections — FLOWERS-H9b", () => {
         }),
       );
       expect(await fetchEarliestDelivery()).toBeNull();
+    });
+  });
+
+  describe("fetchDeliveryScheduleEnabled (FLOWERS-H10)", () => {
+    it("is true only when scheduling is explicitly enabled", async () => {
+      fetchMock.mockResolvedValue(jsonResponse({ data: { enabled: true } }));
+      expect(await fetchDeliveryScheduleEnabled()).toBe(true);
+      fetchMock.mockResolvedValue(jsonResponse({ data: { enabled: false } }));
+      expect(await fetchDeliveryScheduleEnabled()).toBe(false);
+      fetchMock.mockResolvedValue(jsonResponse({ data: {} }));
+      expect(await fetchDeliveryScheduleEnabled()).toBe(false);
+      fetchMock.mockResolvedValue(jsonResponse({ data: { enabled: "yes" } }));
+      expect(await fetchDeliveryScheduleEnabled()).toBe(false);
+    });
+
+    it("reads as unavailable when the request fails", async () => {
+      fetchMock.mockResolvedValue(jsonResponse({}, false, 500));
+      expect(await fetchDeliveryScheduleEnabled()).toBe(false);
+      fetchMock.mockRejectedValue(new Error("network"));
+      expect(await fetchDeliveryScheduleEnabled()).toBe(false);
     });
   });
 

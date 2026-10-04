@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { StoreContainer } from "@/components/layout/StoreContainer";
 import { ProductListing } from "@/components/products/ProductListing";
 import { JsonLd } from "@/components/seo/JsonLd";
+import { fetchDeliveryScheduleEnabled } from "@/lib/commerce/data-sections";
 import { fetchPublishedPresentation } from "@/lib/commerce/storefront";
 import { getCategory, getCategoryProducts } from "@/lib/data/categories";
 import { resolveCurrency } from "@/lib/data/markets";
@@ -11,6 +12,10 @@ import { generateCategoryMetadata } from "@/lib/metadata/category";
 import { publishedPageContainerPaddingClass } from "@/lib/presentation/public-rhythm";
 import { buildBreadcrumbJsonLd } from "@/lib/seo";
 import { getStoreUrl } from "@/lib/store";
+import {
+  listingContextParams,
+  parseListingContext,
+} from "@/lib/utils/listing-context";
 import { parseListingSearchParams } from "@/lib/utils/listing-search-params";
 import { CategoryBanner } from "./CategoryBanner";
 
@@ -62,6 +67,9 @@ export default async function CategoryPage({
   const storeUrl = getStoreUrl();
   const currency = await resolveCurrency(country);
   const listingState = parseListingSearchParams(rawSearchParams);
+  // FLOWERS-H10 — gifting filters (facet / brand / deliver today) apply inside
+  // a category too; forwarded verbatim next to the category scope.
+  const context = parseListingContext(rawSearchParams);
 
   // Pre-bind categoryId onto the server action so the client-side
   // InfiniteProductList island gets a single-arg (params) fetcher it can
@@ -93,9 +101,13 @@ export default async function CategoryPage({
           listId={`category-${category.id}`}
           listName={`Category: ${category.name}`}
           categoryId={category.id}
-          baseParams={{ in_category: category.id }}
+          baseParams={{
+            in_category: category.id,
+            ...listingContextParams(context),
+          }}
           fetchProducts={fetchCategoryProducts}
           fetchFilters={getProductFilters}
+          fetchDeliverTodayAvailable={fetchDeliveryScheduleEnabled}
         />
       </StoreContainer>
     </div>
