@@ -65,6 +65,7 @@ final class DeliveryPlatformConfigService
             ]);
 
             $overrides = $this->normalizeOverrides($input['branch_overrides'] ?? [], $actor);
+            $financial = $this->financialInput($input, null);
             $this->appendVersion($profile, 1, [
                 'collection_mode' => $input['collection_mode'] ?? Version::COLLECTION_MERCHANT,
                 'external_reference_policy' => $input['external_reference_policy'] ?? Version::REFERENCE_OPTIONAL,
@@ -72,6 +73,7 @@ final class DeliveryPlatformConfigService
                 'display_name_en' => $this->nonEmpty($input['display_name_en'] ?? null) ?? $catalog['name_en'],
                 'logo_asset_key' => $this->nonEmpty($input['logo_asset_key'] ?? null),
                 'is_active' => $profile->is_active,
+                ...$financial,
             ], $overrides, $input['change_reason'] ?? null, $actor);
 
             return $profile->fresh();
@@ -139,6 +141,15 @@ final class DeliveryPlatformConfigService
         if (isset($input['is_active']) && (bool) $input['is_active'] !== (bool) $current->is_active) {
             throw $conflict();
         }
+        foreach (Version::FINANCIAL_FIELDS as $field) {
+            if (isset($input[$field]) && $input[$field] !== $current->{$field}) {
+                throw $conflict();
+            }
+        }
+        if (array_key_exists('financial_evidence_ref', $input)
+            && $this->nonEmpty($input['financial_evidence_ref']) !== $current->financial_evidence_ref) {
+            throw $conflict();
+        }
         if (isset($input['branch_overrides'])) {
             $provided = $this->normalizeOverrides($input['branch_overrides'], $actor);
             $existing = $this->overrideMap($current);
@@ -181,7 +192,12 @@ final class DeliveryPlatformConfigService
                     : $current->logo_asset_key,
                 // null = غير مُرسَل (لا يعني تعطيلاً): الحقل الغائب أو null يُبقي القيمة الحالية.
                 'is_active' => isset($changes['is_active']) ? (bool) $changes['is_active'] : (bool) $current->is_active,
+                ...$this->financialInput($changes, $current),
             ];
+            if ($this->financialTuple($desired) !== $this->financialTuple($this->versionValues($current))
+                && ! array_key_exists('financial_evidence_ref', $changes)) {
+                throw new RuntimeException('تغيير الدور المالي يحتاج مرجع دليل.');
+            }
 
             $desiredOverrides = $currentOverrides;
             // null/غائب = بلا تغيير؛ [] صريحة = مسح المتاح للفاعل.
@@ -333,6 +349,14 @@ final class DeliveryPlatformConfigService
             'branch_override_applied' => $override !== null,
             'collection_mode' => $override?->collection_mode ?? $version->collection_mode,
             'external_reference_policy' => $override?->external_reference_policy ?? $version->external_reference_policy,
+            'selling_role' => $version->selling_role,
+            'invoice_responsibility' => $version->invoice_responsibility,
+            'collection_role' => $version->collection_role,
+            'merchant_vat_status_at_supply' => $version->merchant_vat_status_at_supply,
+            'financial_evidence_ref' => $version->financial_evidence_ref,
+            'financial_verified_at' => $version->financial_verified_at?->format('Y-m-d\\TH:i:s.uP'),
+            'financial_role_branch_override' => false,
+            'financial_gate' => app(DeliveryFinancialRoleGate::class)->evaluate($version),
         ];
     }
 
@@ -463,18 +487,28 @@ final class DeliveryPlatformConfigService
         ?User $actor,
     ): Version {
         $this->assertValues($values);
+        $this->assertFinancial($values);
         $now = now();
         // الساعة قد ترجع أو تتساوى بين كاتبَين: effective_from لا ينقص أبداً عن سابقه.
         $previous = Version::query()
             ->where('delivery_platform_profile_id', $profile->id)
             ->orderByDesc('version_number')
-            ->value('effective_from');
+            ->first();
         if ($previous !== null) {
-            $previous = \Illuminate\Support\Carbon::parse($previous);
-            if ($now->lte($previous)) {
-                $now = $previous->copy()->addMicrosecond();
+            $previousAt = \Illuminate\Support\Carbon::parse($previous->effective_from);
+            if ($now->lte($previousAt)) {
+                $now = $previousAt->copy()->addMicrosecond();
             }
         }
+
+        $legalChanged = $previous === null || $this->financialTuple($values) !== $this->financialTuple($this->versionValues($previous))
+            || $this->nonEmpty($values['financial_evidence_ref'] ?? null) !== $previous->financial_evidence_ref;
+        if ($legalChanged && $this->financialMaterial($values) && $this->nonEmpty($values['financial_evidence_ref'] ?? null) === null) {
+            throw new RuntimeException('تغيير الدور المالي يحتاج مرجع دليل.');
+        }
+        $verifiedAt = ! $legalChanged
+            ? $previous?->financial_verified_at
+            : ($this->financialMaterial($values) ? $now : null);
 
         $version = Version::create([
             'delivery_platform_profile_id' => $profile->id,
@@ -485,6 +519,12 @@ final class DeliveryPlatformConfigService
             'display_name_en' => $values['display_name_en'],
             'logo_asset_key' => $values['logo_asset_key'],
             'is_active' => (bool) $values['is_active'],
+            'selling_role' => $values['selling_role'],
+            'invoice_responsibility' => $values['invoice_responsibility'],
+            'collection_role' => $values['collection_role'],
+            'merchant_vat_status_at_supply' => $values['merchant_vat_status_at_supply'],
+            'financial_evidence_ref' => $this->nonEmpty($values['financial_evidence_ref'] ?? null),
+            'financial_verified_at' => $verifiedAt,
             'change_reason' => $this->nonEmpty($reason),
             'created_by' => $actor?->id,
             'effective_from' => $now,
@@ -520,6 +560,11 @@ final class DeliveryPlatformConfigService
             'display_name_en' => $version->display_name_en,
             'logo_asset_key' => $version->logo_asset_key,
             'is_active' => (bool) $version->is_active,
+            'selling_role' => $version->selling_role,
+            'invoice_responsibility' => $version->invoice_responsibility,
+            'collection_role' => $version->collection_role,
+            'merchant_vat_status_at_supply' => $version->merchant_vat_status_at_supply,
+            'financial_evidence_ref' => $version->financial_evidence_ref,
         ];
     }
 
@@ -532,10 +577,69 @@ final class DeliveryPlatformConfigService
         ksort($overrides);
         $values = array_intersect_key($values, array_flip([
             'collection_mode', 'external_reference_policy', 'display_name', 'display_name_en', 'logo_asset_key', 'is_active',
+            'selling_role', 'invoice_responsibility', 'collection_role', 'merchant_vat_status_at_supply', 'financial_evidence_ref',
         ]));
         ksort($values);
 
         return json_encode([$values, $overrides], JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE);
+    }
+
+    /** @param array<string, mixed> $values */
+    private function assertFinancial(array $values): void
+    {
+        foreach ([
+            'selling_role' => Version::SELLING_ROLES,
+            'invoice_responsibility' => Version::INVOICE_RESPONSIBILITIES,
+            'collection_role' => Version::COLLECTION_ROLES,
+            'merchant_vat_status_at_supply' => Version::VAT_STATUSES,
+        ] as $field => $allowed) {
+            if (! in_array($values[$field] ?? null, $allowed, true)) {
+                throw new RuntimeException('قيمة الدور المالي غير صالحة.');
+            }
+        }
+    }
+
+    /**
+     * الحقول الغائبة تُنسخ من النسخة الحالية. الإنشاء يبدأ من unknown.
+     *
+     * @param  array<string, mixed>  $input
+     * @return array<string, mixed>
+     */
+    private function financialInput(array $input, ?Version $current): array
+    {
+        $values = [];
+        foreach (Version::FINANCIAL_FIELDS as $field) {
+            // null صريح = بلا رأي، كالحقول التشغيلية: الإنشاء يبقى unknown والتعديل يُبقي الحالي.
+            $values[$field] = array_key_exists($field, $input) && $input[$field] !== null
+                ? $input[$field]
+                : ($current?->{$field} ?? 'unknown');
+        }
+        $values['financial_evidence_ref'] = array_key_exists('financial_evidence_ref', $input)
+            ? $this->nonEmpty($input['financial_evidence_ref'])
+            : $current?->financial_evidence_ref;
+
+        return $values;
+    }
+
+    /** @param array<string, mixed> $values */
+    private function financialTuple(array $values): string
+    {
+        return implode('|', array_map(
+            fn (string $field) => (string) ($values[$field] ?? ''),
+            [...Version::FINANCIAL_FIELDS, 'financial_evidence_ref'],
+        ));
+    }
+
+    /** @param array<string, mixed> $values */
+    private function financialMaterial(array $values): bool
+    {
+        foreach (Version::FINANCIAL_FIELDS as $field) {
+            if (($values[$field] ?? 'unknown') !== 'unknown') {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function nonEmpty(mixed $value): ?string

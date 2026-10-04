@@ -9,8 +9,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
 import {
+  COLLECTION_ROLES,
+  INVOICE_RESPONSIBILITIES,
   PLATFORM_COLLECTION_MODES,
   PLATFORM_REFERENCE_POLICIES,
+  SELLING_ROLES,
+  VAT_STATUSES,
   draftFromRow,
   platformSaveBody,
   type PlatformBranchOverride,
@@ -200,6 +204,42 @@ function PlatformDetail({
             {PLATFORM_REFERENCE_POLICIES.map((policy) => <option key={policy} value={policy}>{t(`policy_${policy}`)}</option>)}
           </Select>
         </div>
+        <fieldset className="space-y-3" data-testid="financial-role-config">
+          <legend className="text-sm font-medium text-text">{t('financialRole')}</legend>
+          <p className="text-sm text-muted">{t('financialRoleHint')}</p>
+          <div>
+            <Label htmlFor="selling-role">{t('sellingRole')}</Label>
+            <Select id="selling-role" disabled={!canManage} value={draft.sellingRole} onChange={(event) => setDraft({ ...draft, sellingRole: event.target.value as PlatformDraft['sellingRole'] })}>
+              {SELLING_ROLES.map((role) => <option key={role} value={role}>{t(`selling_${role}`)}</option>)}
+            </Select>
+          </div>
+          <div>
+            <Label htmlFor="invoice-responsibility">{t('invoiceResponsibility')}</Label>
+            <Select id="invoice-responsibility" disabled={!canManage} value={draft.invoiceResponsibility} onChange={(event) => setDraft({ ...draft, invoiceResponsibility: event.target.value as PlatformDraft['invoiceResponsibility'] })}>
+              {INVOICE_RESPONSIBILITIES.map((role) => <option key={role} value={role}>{t(`invoice_${role}`)}</option>)}
+            </Select>
+          </div>
+          <div>
+            <Label htmlFor="collection-role">{t('collectionRole')}</Label>
+            <Select id="collection-role" disabled={!canManage} value={draft.collectionRole} onChange={(event) => setDraft({ ...draft, collectionRole: event.target.value as PlatformDraft['collectionRole'] })}>
+              {COLLECTION_ROLES.map((role) => <option key={role} value={role}>{t(`collect_${role}`)}</option>)}
+            </Select>
+          </div>
+          <div>
+            <Label htmlFor="vat-status">{t('vatStatus')}</Label>
+            <Select id="vat-status" disabled={!canManage} value={draft.vatStatus} onChange={(event) => setDraft({ ...draft, vatStatus: event.target.value as PlatformDraft['vatStatus'] })}>
+              {VAT_STATUSES.map((status) => <option key={status} value={status}>{t(`vat_${status}`)}</option>)}
+            </Select>
+          </div>
+          <div>
+            <Label htmlFor="financial-evidence">{t('evidenceRef')}</Label>
+            <Input id="financial-evidence" className="min-h-11" disabled={!canManage} value={draft.evidenceRef} onChange={(event) => setDraft({ ...draft, evidenceRef: event.target.value })} />
+          </div>
+          <p className="text-sm text-text" data-testid="financial-gate-decision">
+            {row.profile?.financial_gate_decision === 'eligible' ? t('gateEligible') : t('gateBlocked')}
+          </p>
+          <p className="text-sm text-muted">{t('gatePostingBlocked')}</p>
+        </fieldset>
         <label className="flex min-h-11 items-center gap-2 text-sm text-text">
           <input type="checkbox" checked={draft.isActive} disabled={!canManage} onChange={(event) => setDraft({ ...draft, isActive: event.target.checked })} />
           {t('enabled')}

@@ -7,9 +7,17 @@ import { deliveryPlatformPresentations, deliveryPlatformPresentation } from '@/l
 
 export const PLATFORM_COLLECTION_MODES = ['platform_collected', 'merchant_collected'] as const;
 export const PLATFORM_REFERENCE_POLICIES = ['required', 'optional', 'none'] as const;
+export const SELLING_ROLES = ['unknown', 'merchant_seller', 'platform_seller'] as const;
+export const INVOICE_RESPONSIBILITIES = ['unknown', 'merchant_issues', 'platform_on_behalf', 'platform_as_supplier'] as const;
+export const COLLECTION_ROLES = ['unknown', 'platform_collects_for_merchant', 'merchant_collects', 'platform_collects_as_seller'] as const;
+export const VAT_STATUSES = ['unknown', 'registered', 'not_registered'] as const;
 
 export type PlatformCollectionMode = (typeof PLATFORM_COLLECTION_MODES)[number];
 export type PlatformReferencePolicy = (typeof PLATFORM_REFERENCE_POLICIES)[number];
+export type SellingRole = (typeof SELLING_ROLES)[number];
+export type InvoiceResponsibility = (typeof INVOICE_RESPONSIBILITIES)[number];
+export type CollectionRole = (typeof COLLECTION_ROLES)[number];
+export type VatStatus = (typeof VAT_STATUSES)[number];
 
 export interface PlatformBranchOverride {
   branch_id: string;
@@ -28,6 +36,13 @@ export interface PlatformProfileRecord {
   external_reference_policy: string | null;
   display_name: string | null;
   display_name_en: string | null;
+  selling_role: SellingRole;
+  invoice_responsibility: InvoiceResponsibility;
+  collection_role: CollectionRole;
+  merchant_vat_status_at_supply: VatStatus;
+  financial_evidence_ref: string | null;
+  financial_gate_decision: string | null;
+  financial_gate_posting_authorized: boolean;
   overrides: PlatformBranchOverride[];
 }
 
@@ -44,6 +59,11 @@ export interface PlatformDraft {
   displayName: string;
   displayNameEn: string;
   changeReason: string;
+  sellingRole: SellingRole;
+  invoiceResponsibility: InvoiceResponsibility;
+  collectionRole: CollectionRole;
+  vatStatus: VatStatus;
+  evidenceRef: string;
   overrides: PlatformBranchOverride[];
 }
 
@@ -57,6 +77,10 @@ function isMode(value: string | null | undefined): value is PlatformCollectionMo
 
 function isPolicy(value: string | null | undefined): value is PlatformReferencePolicy {
   return PLATFORM_REFERENCE_POLICIES.includes(value as PlatformReferencePolicy);
+}
+
+function oneOf<T extends string>(value: unknown, allowed: readonly T[], fallback: T): T {
+  return typeof value === 'string' && allowed.includes(value as T) ? value as T : fallback;
 }
 
 export function readPlatformProfiles(value: unknown): PlatformProfileRecord[] {
@@ -83,6 +107,9 @@ export function readPlatformProfiles(value: unknown): PlatformProfileRecord[] {
         }];
       })
       : [];
+    const gate = version?.financial_gate && typeof version.financial_gate === 'object'
+      ? version.financial_gate as Record<string, unknown>
+      : null;
     return [{
       id: row.id,
       platform_key: row.platform_key,
@@ -94,6 +121,13 @@ export function readPlatformProfiles(value: unknown): PlatformProfileRecord[] {
       external_reference_policy: text(version?.external_reference_policy),
       display_name: text(version?.display_name),
       display_name_en: text(version?.display_name_en),
+      selling_role: oneOf(version?.selling_role, SELLING_ROLES, 'unknown'),
+      invoice_responsibility: oneOf(version?.invoice_responsibility, INVOICE_RESPONSIBILITIES, 'unknown'),
+      collection_role: oneOf(version?.collection_role, COLLECTION_ROLES, 'unknown'),
+      merchant_vat_status_at_supply: oneOf(version?.merchant_vat_status_at_supply, VAT_STATUSES, 'unknown'),
+      financial_evidence_ref: text(version?.financial_evidence_ref),
+      financial_gate_decision: text(gate?.decision),
+      financial_gate_posting_authorized: gate?.posting_authorized === true,
       overrides,
     }];
   });
@@ -122,6 +156,11 @@ export function draftFromRow(row: PlatformManagementRow): PlatformDraft {
     displayName: profile?.display_name ?? '',
     displayNameEn: profile?.display_name_en ?? '',
     changeReason: '',
+    sellingRole: profile?.selling_role ?? 'unknown',
+    invoiceResponsibility: profile?.invoice_responsibility ?? 'unknown',
+    collectionRole: profile?.collection_role ?? 'unknown',
+    vatStatus: profile?.merchant_vat_status_at_supply ?? 'unknown',
+    evidenceRef: profile?.financial_evidence_ref ?? '',
     overrides: (profile?.overrides ?? []).map((override) => ({ ...override })),
   };
 }
@@ -135,6 +174,11 @@ export function platformSaveBody(key: string, draft: PlatformDraft, creating: bo
     display_name: draft.displayName.trim(),
     display_name_en: draft.displayNameEn.trim(),
     change_reason: draft.changeReason.trim() || null,
+    selling_role: draft.sellingRole,
+    invoice_responsibility: draft.invoiceResponsibility,
+    collection_role: draft.collectionRole,
+    merchant_vat_status_at_supply: draft.vatStatus,
+    financial_evidence_ref: draft.evidenceRef.trim() || null,
     branch_overrides: draft.overrides.map((override) => ({
       branch_id: override.branch_id,
       collection_mode: override.collection_mode,
