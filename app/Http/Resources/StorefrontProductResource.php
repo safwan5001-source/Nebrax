@@ -92,6 +92,17 @@ class StorefrontProductResource extends JsonResource
         return $this;
     }
 
+    /** @var ?array<string, mixed> FLOWERS-H8 / ADR-20 — وعد التسليم المشتق (قائمة وتفصيل)؛ null = لا مفتاح. */
+    private ?array $deliveryPromise = null;
+
+    /** @param  ?array<string, mixed>  $promise */
+    public function withDeliveryPromise(?array $promise): static
+    {
+        $this->deliveryPromise = $promise;
+
+        return $this;
+    }
+
     public function toArray(Request $request): array
     {
         $thumbnail = $this->galleryMedia[0] ?? null;
@@ -121,6 +132,7 @@ class StorefrontProductResource extends JsonResource
             'content_blocks' => $this->when($this->detailed && $this->contentBlocks !== [], fn () => $this->contentBlocks),
             'personalization' => $this->when($this->detailed && $this->personalization !== [], fn () => ['fields' => $this->personalization]),
             'addons' => $this->when($this->detailed && $this->addons !== [], fn () => $this->addons),
+            'delivery_promise' => $this->when($this->deliveryPromise !== null, fn () => $this->deliveryPromise),
             'created_at' => $this->resource->created_at?->toIso8601String(),
             'updated_at' => $this->resource->updated_at?->toIso8601String(),
         ];

@@ -1,6 +1,6 @@
 # ADR-20 — Derived Delivery Promise (FLOWERS-AVAILABILITY-1 / FLOWERS-SAMEDAY-1)
 
-**Status:** Accepted for implementation within `AWJ_FLOWERS_HORIZON_1_AUTONOMOUS_EXECUTION.md` slice H8 (H8a: promise seam, preparation time, `commerce/v1` exposure; H8b: `store/v1` parity and the `deliver_today` filter)
+**Status:** Accepted for implementation within `AWJ_FLOWERS_HORIZON_1_AUTONOMOUS_EXECUTION.md` slice H8 (H8a: promise seam, preparation time, `commerce/v1` exposure — merged #1210; H8b: `store/v1` parity and the `deliver_today` filter)
 **Date:** 2026-10-03
 **Scope:** shared Commerce read seam — not Flowers-only
 
@@ -44,6 +44,12 @@ same_day    = deliverable ∧ earliest.date == today in the channel timezone
 - Payload: `{deliverable, same_day, earliest: {date, slot{id,label,label_en,start_time,end_time}} | null, reason: null | not_configured | out_of_stock | no_slot}`. Preparation minutes are not exposed.
 - The promise is informational. Checkout still revalidates the chosen window server-side (ADR-19); stock is still checked at completion (ADR-01/02). A promise never reserves stock.
 
+### 2.4 H8b — `store/v1` parity and Deliver Today
+
+- `store/v1` `GET /products` and `/products/{id}` expose the same `delivery_promise` (same service, same conditions, same `city`/`region` parameters).
+- `deliver_today=true` on both public lists (`DeliverTodayFilter`): the candidate set (published, after search/category/collection) is evaluated in constant-query chunks of 500 with the same promise, then `products.id IN (same-day ids)` is applied **before** facet counting, sorting and pagination, so totals and facet counts reflect the filter. The candidate query is bounded (`LIMIT cap + 1`) before materialisation, and `deliver_today` accepts `true|false|1|0`. Nothing is stored; the result moves with stock, preparation time, cut-off, blocked dates and capacity.
+- Scheduling off ⇒ nothing is promised ⇒ empty result (fail closed). More than 5 000 candidates ⇒ 422 (fail closed, never silent truncation). Larger catalogs need a pre-computed index (deferred).
+
 ## 3. Rejected / Not adopted
 
 - Storing a "deliver today" flag or any cached promise (would go stale; "must change automatically").
@@ -59,4 +65,4 @@ same_day    = deliverable ∧ earliest.date == today in the channel timezone
 
 ## 5. Unknown / deferred
 
-H8b (`store/v1` parity and the `deliver_today` list filter); promise for pickup; per-variant preparation time; promise on cart lines.
+A pre-computed Deliver Today index for catalogs over 5 000 products; promise for pickup; per-variant preparation time; promise on cart lines.

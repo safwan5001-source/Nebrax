@@ -233,6 +233,7 @@ paths:
         - $ref: '#/components/parameters/ProductsFacet'
         - $ref: '#/components/parameters/DeliveryCity'
         - $ref: '#/components/parameters/DeliveryRegion'
+        - $ref: '#/components/parameters/DeliverToday'
       responses:
         '200':
           description: A page of products (list rows never carry media/options/variants).
@@ -1224,6 +1225,16 @@ components:
       in: query
       required: false
       schema: { type: integer, minimum: 1, maximum: 100 }
+    DeliverToday:
+      name: deliver_today
+      in: query
+      required: false
+      description: >
+        ADR-20. `true` keeps only products whose derived `delivery_promise.same_day` is true (evaluated over the
+        candidate set after search/category/collection and before facet filters and pagination). Empty while the
+        channel's delivery scheduling is off. A candidate set larger than 5000 products is refused with 422 rather
+        than silently truncated.
+      schema: { type: boolean }
     DeliveryCity:
       name: city
       in: query

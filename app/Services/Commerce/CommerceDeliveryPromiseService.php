@@ -4,6 +4,7 @@ namespace App\Services\Commerce;
 
 use App\Models\CommerceDeliverySlot;
 use App\Models\Product;
+use App\Models\ProductVariant;
 use Carbon\CarbonInterface;
 
 /**
@@ -59,6 +60,15 @@ final class CommerceDeliveryPromiseService
             $stock = null;
         }
 
+        // متغيّرٌ معطَّل يحتفظ بمخزونه التاريخي لكنه غير قابل للبيع (التفصيل والسلة يرفضانه) فلا يُحتسب في الوعد.
+        $managed = array_keys(array_filter($list, fn (Product $p) => $p->isVariantManaged()));
+        $activeVariants = [];
+        if ($managed !== []) {
+            foreach (ProductVariant::query()->whereIn('product_id', $managed)->where('is_active', true)->get(['id', 'product_id']) as $variant) {
+                $activeVariants[$variant->product_id][$variant->id] = true;
+            }
+        }
+
         $prep = $this->preparation->minutesMany(array_keys($list));
         $today = $context['local']->format('Y-m-d');
         $byLead = [];
@@ -70,7 +80,7 @@ final class CommerceDeliveryPromiseService
 
                 continue;
             }
-            if (! $this->inStock($product, $stock[$id] ?? [])) {
+            if (! $this->inStock($product, $stock[$id] ?? [], $activeVariants[$id] ?? [])) {
                 $promises[$id] = $this->none(self::REASON_OUT_OF_STOCK);
 
                 continue;
@@ -88,12 +98,15 @@ final class CommerceDeliveryPromiseService
         return $promises;
     }
 
-    /** @param  array<string, int>  $variants `variantKey => ats` */
-    private function inStock(Product $product, array $variants): bool
+    /**
+     * @param  array<string, int>  $variants  `variantKey => ats`
+     * @param  array<string, true>  $activeVariantIds  متغيّرات المنتج النشطة (للمنتج متعدد الخيارات فقط)
+     */
+    private function inStock(Product $product, array $variants, array $activeVariantIds): bool
     {
         if ($product->isVariantManaged()) {
             foreach ($variants as $key => $quantity) {
-                if ($key !== '' && $quantity > 0) {
+                if ($key !== '' && $quantity > 0 && isset($activeVariantIds[$key])) {
                     return true;
                 }
             }

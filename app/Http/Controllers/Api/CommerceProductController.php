@@ -90,6 +90,7 @@ class CommerceProductController extends PublicApiController
             'per_page' => ['sometimes', 'nullable', 'integer', 'min:1', 'max:100'],
             'city' => ['sometimes', 'nullable', 'string', 'max:120'],
             'region' => ['sometimes', 'nullable', 'string', 'max:120'],
+            ...\App\Support\Commerce\DeliverTodayFilter::rules(),
             ...CatalogFacetFilter::rules(),
         ]);
 
@@ -133,6 +134,9 @@ class CommerceProductController extends PublicApiController
         $facetFilter = new CatalogFacetFilter();
         $facetSelection = CatalogFacetFilter::selection($filters);
         $facetFilter->applyCollection($query, $facetSelection);
+        if (\App\Support\Commerce\DeliverTodayFilter::requested($filters)) {
+            app(\App\Support\Commerce\DeliverTodayFilter::class)->apply($query, $channelId, $filters['city'] ?? null, $filters['region'] ?? null);
+        }
         $baseQuery = clone $query;
         $facetFilter->apply($query, $facetSelection);
 
