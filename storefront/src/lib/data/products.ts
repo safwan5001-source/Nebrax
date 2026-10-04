@@ -1,12 +1,12 @@
 "use server";
 
-import type { ProductListParams } from "@spree/sdk";
 import {
   fetchProduct,
   fetchProductFilters,
   fetchProducts,
 } from "@/lib/commerce/products";
 import type { Surface } from "@/lib/spree";
+import type { StorefrontListParams } from "@/lib/utils/listing-context";
 
 /**
  * COM-7-P1: product data now comes from the AWJ Store catalog adapter
@@ -32,7 +32,7 @@ import type { Surface } from "@/lib/spree";
  * cache key/tag, per AWJ_STOREFRONT_PLACEMENT_TENANT_RESOLUTION_DECISION.md §9.
  */
 export async function cachedListProducts(
-  params: ProductListParams | undefined,
+  params: StorefrontListParams | undefined,
   _options?: { locale?: string; country?: string },
   _surface?: Surface,
   _userToken?: string,
@@ -41,7 +41,7 @@ export async function cachedListProducts(
 }
 
 export async function getProducts(
-  params?: ProductListParams,
+  params?: StorefrontListParams,
   surface: Surface = "dtc",
 ) {
   return cachedListProducts(params, undefined, surface, undefined);

@@ -135,7 +135,15 @@
     "appPromo": "تطبيق المتجر",
     "appStore": "App Store",
     "playStore": "Google Play",
-    "subcategories": "{count, plural, zero {لا أقسام فرعية} one {قسم فرعي} two {قسمان فرعيان} few {# أقسام فرعية} many {# قسماً فرعياً} other {# قسم فرعي}}"
+    "subcategories": "{count, plural, zero {لا أقسام فرعية} one {قسم فرعي} two {قسمان فرعيان} few {# أقسام فرعية} many {# قسماً فرعياً} other {# قسم فرعي}}",
+    "deliverToday": "توصيل اليوم",
+    "shopSelection": "تسوّق المختارات",
+    "discoverBy": "تسوّق حسب",
+    "shopByBrand": "تسوّق حسب العلامة التجارية",
+    "earliestDelivery": "أقرب موعد توصيل",
+    "deliveryToday": "اليوم",
+    "deliveryTomorrow": "غداً",
+    "deliveryAt": "{day}، {window}"
   },
   "cart": {
     "cart": "السلة",
@@ -251,7 +259,9 @@
     "quickView": "معاينة سريعة",
     "viewFullDetails": "عرض كل التفاصيل",
     "share": "مشاركة",
-    "linkCopied": "تم نسخ الرابط"
+    "linkCopied": "تم نسخ الرابط",
+    "curatedSelection": "عرض مختارات من منتجاتنا",
+    "clearSelection": "عرض كل المنتجات"
   },
   "navigation": {
     "home": "الرئيسية",

@@ -3,9 +3,9 @@ import type {
   PaginationMeta,
   Product,
   ProductFiltersResponse,
-  ProductListParams,
 } from "@spree/sdk";
 import { getLocale } from "next-intl/server";
+import type { StorefrontListParams } from "@/lib/utils/listing-context";
 import { storefrontFetch } from "./config";
 import { mapAwjProductToViewModel } from "./mappers";
 import type { AwjListResponse, AwjProduct, AwjResourceResponse } from "./types";
@@ -29,6 +29,23 @@ const SORT_TO_AWJ: Record<string, string> = {
 function mapSort(sort: string | undefined): string | undefined {
   if (!sort) return undefined;
   return SORT_TO_AWJ[sort];
+}
+
+function stringParam(value: unknown): string | undefined {
+  return typeof value === "string" && value !== "" ? value : undefined;
+}
+
+/** Forwards the flat `facet[<key>]` entries (PHP array query) and nothing else. */
+function facetQuery(
+  params: StorefrontListParams | undefined,
+): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [key, value] of Object.entries(params ?? {})) {
+    if (/^facet\[[a-z0-9_-]{1,64}\]$/.test(key) && typeof value === "string") {
+      out[key] = value;
+    }
+  }
+  return out;
 }
 
 function buildPaginationMeta(
@@ -59,7 +76,7 @@ function buildPaginationMeta(
 }
 
 export async function fetchProducts(
-  params: ProductListParams | undefined,
+  params: StorefrontListParams | undefined,
 ): Promise<PaginatedResponse<Product>> {
   const response = await storefrontFetch<AwjListResponse<AwjProduct>>(
     "products",
@@ -69,7 +86,14 @@ export async function fetchProducts(
       search: params?.search,
       category_id: params?.in_category,
       sort: mapSort(params?.sort),
+      // FLOWERS-H9b — catalog context forwarded verbatim to the public list.
+      collection: stringParam(params?.collection),
+      brand_id: stringParam(params?.brand_id),
+      deliver_today: params?.deliver_today === true ? "true" : undefined,
+      ...facetQuery(params),
     },
+    // "Deliver today" depends on the clock, stock and capacity: never cached.
+    params?.deliver_today === true ? { cache: "no-store" } : undefined,
   );
 
   const locale = await getLocale();

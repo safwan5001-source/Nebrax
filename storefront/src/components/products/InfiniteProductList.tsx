@@ -1,12 +1,13 @@
 "use client";
 
-import type { PaginatedResponse, Product, ProductListParams } from "@spree/sdk";
+import type { PaginatedResponse, Product } from "@spree/sdk";
 import { Loader2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { usePublishedThemeMarker } from "@/components/layout/PublishedThemeMarker";
 import { ProductCard } from "@/components/products/ProductCard";
 import { cn } from "@/lib/utils";
+import type { StorefrontListParams } from "@/lib/utils/listing-context";
 
 interface InfiniteProductListProps {
   initialProducts: Product[];
@@ -16,12 +17,14 @@ interface InfiniteProductListProps {
    * SDK list params describing the current filter/sort/query state,
    * including the `limit` that the next-page fetch should reuse.
    */
-  listParams: ProductListParams;
+  listParams: StorefrontListParams;
   /**
    * Server action fetching one page of products. Already bound to any
    * fixed context (e.g. categoryId) on the server before being passed.
    */
-  fetchPage: (params: ProductListParams) => Promise<PaginatedResponse<Product>>;
+  fetchPage: (
+    params: StorefrontListParams,
+  ) => Promise<PaginatedResponse<Product>>;
   basePath: string;
   categoryId?: string;
   listId?: string;

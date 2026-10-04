@@ -17,7 +17,9 @@ import {
   HEADER_STYLES,
   type HeaderStyleId,
   HOME_BUILDER_SECTION_KEYS,
+  HOME_DATA_SECTION_KEYS,
   type HomeBuilderSectionKey,
+  type HomeDataSectionKey,
   isSafeHexColor,
   PRESENTATION_CONFIG_VERSION,
   PRODUCT_CARD_PRESETS,
@@ -61,7 +63,7 @@ export interface PresentationNavLink {
  */
 export interface PresentationHomeSection {
   id: string;
-  type: HomeBuilderSectionKey;
+  type: HomeBuilderSectionKey | HomeDataSectionKey;
   visible: boolean;
   /** Present only when this instance has non-empty authored content. */
   content?: SectionContent;
@@ -326,7 +328,10 @@ function resolveHomeBuilderSections(
       id = key;
       type = key;
     }
-    if (!(HOME_BUILDER_SECTION_KEYS as readonly string[]).includes(type)) {
+    if (
+      !(HOME_BUILDER_SECTION_KEYS as readonly string[]).includes(type) &&
+      !(HOME_DATA_SECTION_KEYS as readonly string[]).includes(type)
+    ) {
       continue;
     }
     if (seenIds.has(id)) continue;
@@ -335,7 +340,7 @@ function resolveHomeBuilderSections(
     seenTypes.add(type);
     const section: PresentationHomeSection = {
       id,
-      type: type as HomeBuilderSectionKey,
+      type: type as HomeBuilderSectionKey | HomeDataSectionKey,
       visible: asBoolean(entry.visible, false),
     };
     const content = normalizeOptionalSectionContent(type, entry.content);
@@ -570,7 +575,7 @@ export function normalizePresentationConfig(
   };
 }
 
-export function isGatedHomeSection(key: HomeBuilderSectionKey): boolean {
+export function isGatedHomeSection(key: string): boolean {
   return (GATED_HOME_SECTION_KEYS as readonly string[]).includes(key);
 }
 

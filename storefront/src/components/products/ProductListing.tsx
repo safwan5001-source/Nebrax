@@ -2,7 +2,6 @@ import type {
   PaginatedResponse,
   Product,
   ProductFiltersResponse,
-  ProductListParams,
 } from "@spree/sdk";
 import { Search } from "lucide-react";
 import { getTranslations } from "next-intl/server";
@@ -12,6 +11,7 @@ import { ListingAnalytics } from "@/components/products/ListingAnalytics";
 import { ListingFilterBar } from "@/components/products/ListingFilterBar";
 import { ProductListingSkeleton } from "@/components/products/ProductListingSkeleton";
 import { PRODUCT_CARD_FIELDS } from "@/lib/data/cached";
+import type { StorefrontListParams } from "@/lib/utils/listing-context";
 import {
   type ListingSearchParams,
   listingKey,
@@ -32,14 +32,14 @@ interface ProductListingProps {
   listName: string;
   categoryId?: string;
   /** Extra params always merged into the products list fetch (e.g. in_category). */
-  baseParams?: ProductListParams;
+  baseParams?: StorefrontListParams;
   /**
    * Server action fetching a page of products. Must be a server action
    * reference (not an inline closure) so it can be passed to the client
    * InfiniteProductList island for subsequent load-more calls.
    */
   fetchProducts: (
-    params: ProductListParams,
+    params: StorefrontListParams,
   ) => Promise<PaginatedResponse<Product>>;
   /** Fetcher for the facet data (filters + sort options). Server-only. */
   fetchFilters: (
@@ -105,7 +105,7 @@ async function ProductListingInner({
   // restricts the payload to what <ProductCard> and listing analytics
   // actually read — shrinking the cached entry, the RSC→client
   // serialization, and the streaming HTML.
-  const listParams: ProductListParams = {
+  const listParams: StorefrontListParams = {
     limit: PAGE_SIZE,
     ...queryParams,
     ...baseParams,
@@ -141,6 +141,10 @@ async function ProductListingInner({
   const totalPages = productsResponse.meta.pages;
 
   const hasResults = products.length > 0;
+  // Catalog context (collection / facet / brand / deliver-today) is part of
+  // the listing identity: the island remount AND the analytics de-dupe key
+  // must both change when only the context does (e.g. "show all products").
+  const contextKey = `${listingKey(state)}|${JSON.stringify(baseParams ?? {})}`;
 
   return (
     <>
@@ -160,7 +164,7 @@ async function ProductListingInner({
             // new instance mounts with products already populated,
             // the user sees the grid update in place with no loading
             // fallback shown.
-            key={listingKey(state)}
+            key={contextKey}
             initialProducts={products}
             initialPage={1}
             totalPages={totalPages}
@@ -178,7 +182,7 @@ async function ProductListingInner({
             listName={listName}
             query={state.query}
             currency={currency}
-            stateKey={listingKey(state)}
+            stateKey={contextKey}
           />
         </>
       ) : (

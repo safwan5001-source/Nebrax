@@ -135,7 +135,15 @@
     "appPromo": "Aplikacja",
     "appStore": "App Store",
     "playStore": "Google Play",
-    "subcategories": "{count, plural, one {# podkategoria} few {# podkategorie} many {# podkategorii} other {# podkategorii}}"
+    "subcategories": "{count, plural, one {# podkategoria} few {# podkategorie} many {# podkategorii} other {# podkategorii}}",
+    "deliverToday": "Dostawa dziś",
+    "shopSelection": "Zobacz wybór",
+    "discoverBy": "Kupuj według",
+    "shopByBrand": "Kupuj według marki",
+    "earliestDelivery": "Najbliższa dostawa",
+    "deliveryToday": "Dziś",
+    "deliveryTomorrow": "Jutro",
+    "deliveryAt": "{day}, {window}"
   },
   "cart": {
     "cart": "Koszyk",
@@ -251,7 +259,9 @@
     "quickView": "Szybki podgląd",
     "viewFullDetails": "Zobacz pełne szczegóły",
     "share": "Udostępnij",
-    "linkCopied": "Link skopiowany"
+    "linkCopied": "Link skopiowany",
+    "curatedSelection": "Wybór naszych produktów",
+    "clearSelection": "Pokaż wszystkie produkty"
   },
   "navigation": {
     "home": "Strona główna",

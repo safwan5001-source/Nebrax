@@ -830,7 +830,10 @@ function HomepagePanel({
               </div>
               <div className="min-w-0 flex-1 px-1">
                 <p className="truncate text-[13px] font-medium text-awj-editor-foreground">
-                  {t(SECTION_LABEL[section.type])}
+                  {t(
+                    SECTION_LABEL[section.type as HomeBuilderSectionKey] ??
+                      "sectionCustomContent",
+                  )}
                 </p>
                 {isGatedHomeSection(section.type) ? (
                   <p className="text-[10px] leading-none text-awj-editor-disabled">

@@ -135,7 +135,15 @@
     "appPromo": "Store app",
     "appStore": "App Store",
     "playStore": "Google Play",
-    "subcategories": "{count, plural, one {# subcategory} other {# subcategories}}"
+    "subcategories": "{count, plural, one {# subcategory} other {# subcategories}}",
+    "deliverToday": "Deliver today",
+    "shopSelection": "Shop the selection",
+    "discoverBy": "Shop by",
+    "shopByBrand": "Shop by brand",
+    "earliestDelivery": "Earliest delivery",
+    "deliveryToday": "Today",
+    "deliveryTomorrow": "Tomorrow",
+    "deliveryAt": "{day}, {window}"
   },
   "cart": {
     "cart": "Cart",
@@ -251,7 +259,9 @@
     "quickView": "Quick view",
     "viewFullDetails": "View full details",
     "share": "Share",
-    "linkCopied": "Link copied"
+    "linkCopied": "Link copied",
+    "curatedSelection": "Showing a selection of our products",
+    "clearSelection": "Show all products"
   },
   "navigation": {
     "home": "Home",

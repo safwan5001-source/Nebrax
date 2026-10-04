@@ -1,6 +1,6 @@
 # AWJ Flowers & Gifts — Horizon 1 Progress
 
-**Status:** IN PROGRESS — H1–H8b merged; H9a in review  
+**Status:** IN PROGRESS — H1–H9a merged; H9b in review  
 **Date:** 2026-10-03  
 **Planning Base:** `main` @ `318cc72d10bb304cef4b401f548772008ea1618e`  
 **Execution Authority:** `AWJ_FLOWERS_HORIZON_1_AUTONOMOUS_EXECUTION.md`  
@@ -44,8 +44,8 @@ No Deploy or Production change is authorized by this Horizon.
 | H7b | Delivery scheduling — checkout schedule, order snapshot, capacity locks, revalidation | MERGED | #1208 | `01fb179` |
 | H8a | Availability / Same-day — derived promise seam, product preparation time, `commerce/v1` exposure | MERGED | #1210 | `f7c18bc` |
 | H8b | Availability / Same-day — `store/v1` parity and `deliver_today` filter | MERGED | #1211 | `0ed7b6c` |
-| H9a | Store Builder — data-backed section content contract (ADR-21) | PR OPEN, in review | (see log) | — |
-| H9b | Store Builder — storefront renderers for the data-backed sections | NOT STARTED | — | — |
+| H9a | Store Builder — data-backed section content contract (ADR-21) | MERGED | #1212 | `5f34585` |
+| H9b | Store Builder — storefront renderers for the data-backed sections (+ listing deep-link context) | PR OPEN, in review | (see log) | — |
 | H9c | Store Builder — builder UI (library, panels, canvas) and default-document entries | NOT STARTED | — | — |
 | H10 | Storefront Discovery UX | NOT STARTED | — | — |
 | H11 | Flowers/Gifts PDP | NOT STARTED | — | — |
@@ -493,23 +493,54 @@ Copy this section for every completed/active slice.
 
 ### H9a — Store Builder: data-backed section content contract (ADR-21)
 
-**Status:** PR OPEN, in review  
+**Status:** MERGED  
 **Base SHA:** `0ed7b6cdd387b5262606e7223a144292221f943b` (main after H8b)  
 **Branch:** `flowers/h9-builder-sections`  
+**PR:** #1212  
+**Head SHA:** `7a610ff597414f4d5d2f0fd688e2be4174fb0eeb`  
+**Merge SHA:** `5f34585b2cd84e41360b9b9fa7f7250cdd0d1c0a` (squash)
 
 #### What was implemented
 
 - ADR-21: the Horizon's candidate sections are three generic data-backed types — `productShelf` (collection or facet-value source, optional deliver-today, limit), `discovery` (facet dimension or brand), `deliveryPromise` (optional editorial text) — that store references/text only and read everything else live.
 - `StorefrontPresentationNormalizer` accepts and normalizes the three types fail-closed (`HOME_DATA_SECTION_KEYS`), **without** changing the default document; both TypeScript twins (`web` and `storefront` `section-content.ts`) gained the same types, readers and normalizers.
-- One shared fixture (`tests/Fixtures/presentation/data-sections.json`, 21 cases) is read by the PHP test and both TS tests, so the three normalizers cannot drift.
+- One shared fixture (`tests/Fixtures/presentation/data-sections.json`, 28 cases after review) is read by the PHP test and both TS tests, so the three normalizers cannot drift.
 
 #### Tests
 
 - `StorefrontPresentationDataSectionsTest` (3, PHP) and `section-content.data-sections.test.ts` (27 each in `web` and `storefront`); the existing normalizer/default-document tests are unchanged and green; a mutated limit bound is caught by the fixture.
 
+#### Review loop / CI
+
+- Three Codex findings, each fixed with a test verified to fail without the fix: the storefront fixture-loading test under jsdom, `6.0` vs `6` integral-float parity in PHP, and a collision between a merchant facet keyed `brand` and the brand axis (now a discriminated `axis: facet | brand`). The repository's storefront CI job (`lint + typecheck + test`) caught Biome formatting, fixed. All ten CI jobs green on the head.
+
 #### Next
 
-- H9b renders the sections in the public storefront; H9c adds the builder UI and the default-document entries (and updates the default fixtures/twins together).
+- H9b (below) renders the sections in the public storefront; H9c adds the builder UI and the default-document entries (and updates the default fixtures/twins together).
+
+---
+
+### H9b — Store Builder: storefront renderers and listing deep-link context (ADR-21 §2.1)
+
+**Status:** PR OPEN, in review  
+**Base SHA:** `5f34585b2cd84e41360b9b9fa7f7250cdd0d1c0a` (main after H9a)  
+**Branch:** `flowers/h9b-storefront-sections`  
+
+#### What was implemented
+
+- Public home renders `productShelf`, `discovery` and `deliveryPromise` from the published document through live `store/v1` reads (products by collection/facet/deliver-today, facet and brand values with counts from the list meta, the earliest delivery window); each omits itself on an empty or failed read; time-sensitive reads are never cached.
+- Discovery options are offered only when the listing can honour them (slug / UUID shape); a shelf "view all" and every tile deep-link to the listing.
+- Products listing carries `collection`, `facet[key]`, `brand_id`, `deliver_today` from the URL through page 1 and load-more to the public list (flat params; unknown tokens dropped; the island remounts when the context changes) with a short note and a "show all" link. Full filter UI remains H10.
+- Six locales gained the section/listing strings (`check:locales` green). The storefront parses the three types (`HOME_DATA_SECTION_KEYS`) without changing the default document.
+
+#### Tests
+
+- Storefront: 902 tests green (new: delivery-day formatting incl. store-timezone "today", listing-context parsing, fetcher query/cache/mapping and the deep-link forwarding, the three section components); `tsc` and `biome check` clean. Eight mutations (cache/no-cache, token validation, empty omission, failure fallback, malformed date) each caught.
+- The storefront has its own CI job (`storefront (lint + typecheck + test)`); locally its dependencies are installed from the pnpm lockfile.
+
+#### Deferred
+
+- Builder UI and default-document entries (H9c); filter UI, facet chips and destination context (H10); visual QA of the new sections (H9c harness).
 
 ---
 

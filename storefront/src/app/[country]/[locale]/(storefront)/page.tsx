@@ -5,10 +5,13 @@ import { BannerBand } from "@/components/home/BannerBand";
 import { BenefitsBand } from "@/components/home/BenefitsBand";
 import { CategoriesSection } from "@/components/home/CategoriesSection";
 import { CustomContentBand } from "@/components/home/CustomContentBand";
+import { DeliveryPromiseBand } from "@/components/home/DeliveryPromiseBand";
+import { DiscoverySection } from "@/components/home/DiscoverySection";
 import { FeaturedShelf } from "@/components/home/FeaturedShelf";
 import { HeroSection } from "@/components/home/HeroSection";
 import { NewArrivalsSection } from "@/components/home/NewArrivalsSection";
 import { OffersShelf } from "@/components/home/OffersShelf";
+import { ProductShelfSection } from "@/components/home/ProductShelfSection";
 import { WholesaleSection } from "@/components/home/WholesaleSection";
 import { StoreContainer } from "@/components/layout/StoreContainer";
 import { fetchStorefrontConfig } from "@/lib/commerce/storefront";
@@ -22,8 +25,11 @@ import {
   bannerContentOf,
   benefitsContentOf,
   customContentOf,
+  deliveryPromiseContentOf,
+  discoveryContentOf,
   featuredContentOf,
   offersContentOf,
+  productShelfContentOf,
 } from "@/lib/presentation/section-content";
 import type { ThemePresetId } from "@/lib/presentation/tokens";
 
@@ -235,6 +241,49 @@ async function publishedNodes(
           basePath={ctx.basePath}
           title={ctx.offersTitle}
           headingId={`offers-${section.id}`}
+        />,
+      );
+      continue;
+    }
+    if (section.type === "productShelf") {
+      // FLOWERS-H9b / ADR-21 — a source reference and/or deliver-today only;
+      // products, prices and availability are read live inside the section.
+      const content = productShelfContentOf(section);
+      if (!content.source && !content.deliverToday) continue;
+      nodes.push(
+        <ProductShelfSection
+          key={section.id}
+          content={content}
+          basePath={ctx.basePath}
+          locale={ctx.locale}
+          currency={ctx.currency}
+          headingId={`shelf-${section.id}`}
+          themePreset={ctx.themePreset}
+        />,
+      );
+      continue;
+    }
+    if (section.type === "discovery") {
+      const content = discoveryContentOf(section);
+      if (content.axis === "facet" && !content.dimension) continue;
+      nodes.push(
+        <DiscoverySection
+          key={section.id}
+          content={content}
+          basePath={ctx.basePath}
+          locale={ctx.locale}
+          headingId={`discovery-${section.id}`}
+        />,
+      );
+      continue;
+    }
+    if (section.type === "deliveryPromise") {
+      nodes.push(
+        <DeliveryPromiseBand
+          key={section.id}
+          content={deliveryPromiseContentOf(section)}
+          locale={ctx.locale}
+          headingId={`delivery-promise-${section.id}`}
         />,
       );
       continue;
