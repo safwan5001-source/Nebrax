@@ -3,6 +3,7 @@ import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { StoreContainer } from "@/components/layout/StoreContainer";
 import { ProductListing } from "@/components/products/ProductListing";
+import { fetchDeliveryScheduleEnabled } from "@/lib/commerce/data-sections";
 import { resolveCurrency } from "@/lib/data/markets";
 import { getProductFilters, getProducts } from "@/lib/data/products";
 import { generateProductsMetadata } from "@/lib/metadata/products";
@@ -103,6 +104,7 @@ export default async function ProductsPage({
         fetchProducts={getProducts}
         baseParams={contextActive ? listingContextParams(context) : undefined}
         fetchFilters={getProductFilters}
+        fetchDeliverTodayAvailable={fetchDeliveryScheduleEnabled}
         emptyMessage={
           query ? t("noMatchingProducts", { query }) : t("tryAdjustingFilters")
         }

@@ -6,10 +6,15 @@ import type {
 import { Search } from "lucide-react";
 import { getTranslations } from "next-intl/server";
 import { type ReactElement, Suspense } from "react";
+import { GiftingFilters } from "@/components/products/GiftingFilters";
 import { InfiniteProductList } from "@/components/products/InfiniteProductList";
 import { ListingAnalytics } from "@/components/products/ListingAnalytics";
 import { ListingFilterBar } from "@/components/products/ListingFilterBar";
 import { ProductListingSkeleton } from "@/components/products/ProductListingSkeleton";
+import {
+  EMPTY_LISTING_FACETS,
+  type ListingFacets,
+} from "@/lib/commerce/listing-facets";
 import { PRODUCT_CARD_FIELDS } from "@/lib/data/cached";
 import type { StorefrontListParams } from "@/lib/utils/listing-context";
 import {
@@ -47,6 +52,12 @@ interface ProductListingProps {
   ) => Promise<ProductFiltersResponse>;
   /** Shown when the fetch returns zero results. */
   emptyMessage?: string;
+  /**
+   * Resolves whether the store offers delivery scheduling, which gates the
+   * gifting "Deliver today" filter. Read inside the Suspense boundary, in
+   * parallel with the product fetch; omitted → the filter is not offered.
+   */
+  fetchDeliverTodayAvailable?: () => Promise<boolean>;
 }
 
 /**
@@ -92,6 +103,7 @@ async function ProductListingInner({
   fetchProducts,
   fetchFilters,
   emptyMessage,
+  fetchDeliverTodayAvailable,
 }: ProductListingProps): Promise<ReactElement> {
   const t = await getTranslations({ locale, namespace: "products" });
 
@@ -128,19 +140,28 @@ async function ProductListingInner({
   // error boundary rather than masquerade as a legitimate empty
   // results page. Filters fetch is cosmetic (facet counts) so we fall
   // back to a bare filter bar on failure.
-  const [productsResponse, filtersResponse] = await Promise.all([
-    fetchProducts({ ...listParams, page: 1 }),
-    fetchFilters(filterFetchParams).catch((error) => {
-      console.error("ProductListing: filters fetch failed", error);
-      return null;
-    }),
-  ]);
+  const [productsResponse, filtersResponse, deliverTodayAvailable] =
+    await Promise.all([
+      fetchProducts({ ...listParams, page: 1 }),
+      fetchFilters(filterFetchParams).catch((error) => {
+        console.error("ProductListing: filters fetch failed", error);
+        return null;
+      }),
+      fetchDeliverTodayAvailable
+        ? fetchDeliverTodayAvailable().catch(() => false)
+        : Promise.resolve(false),
+    ]);
 
   const products = productsResponse.data;
   const totalCount = productsResponse.meta.count;
   const totalPages = productsResponse.meta.pages;
 
   const hasResults = products.length > 0;
+  // Facet / brand counts ride on page 1's meta (FLOWERS-H10); other listing
+  // surfaces whose fetcher does not provide them simply render no group.
+  const listingFacets: ListingFacets =
+    (productsResponse.meta as { listingFacets?: ListingFacets })
+      .listingFacets ?? EMPTY_LISTING_FACETS;
   // Catalog context (collection / facet / brand / deliver-today) is part of
   // the listing identity: the island remount AND the analytics de-dupe key
   // must both change when only the context does (e.g. "show all products").
@@ -148,6 +169,10 @@ async function ProductListingInner({
 
   return (
     <>
+      <GiftingFilters
+        facets={listingFacets}
+        deliverTodayAvailable={deliverTodayAvailable}
+      />
       <ListingFilterBar
         filtersData={filtersResponse}
         activeFilters={state.filters}

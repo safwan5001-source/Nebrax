@@ -86,6 +86,8 @@ describe("commerce/products", () => {
       in: 2,
       previous: null,
       next: null,
+      // FLOWERS-H10 — no facet/brand meta in the response → none rendered.
+      listingFacets: { groups: [], brands: [] },
     });
 
     const [url, init] = vi.mocked(fetch).mock.calls[0];

@@ -246,3 +246,20 @@ export async function fetchEarliestDelivery(): Promise<DeliveryEarliest | null> 
     timezone: data.timezone,
   };
 }
+
+/**
+ * Whether the store offers delivery scheduling at all — gates the listing's
+ * "Deliver today" filter (FLOWERS-H10): without scheduling the derived filter
+ * can only return an empty list. Any failure reads as "not available".
+ */
+export async function fetchDeliveryScheduleEnabled(): Promise<boolean> {
+  try {
+    const response = await storefrontFetch<{ data?: { enabled?: boolean } }>(
+      "delivery-schedule",
+      { method: "delivery" },
+    );
+    return response.data?.enabled === true;
+  } catch {
+    return false;
+  }
+}

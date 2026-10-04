@@ -261,7 +261,10 @@
     "share": "Udostępnij",
     "linkCopied": "Link skopiowany",
     "curatedSelection": "Wybór naszych produktów",
-    "clearSelection": "Pokaż wszystkie produkty"
+    "clearSelection": "Pokaż wszystkie produkty",
+    "giftingBrand": "Marka",
+    "giftingDeliverToday": "Dostawa dziś",
+    "giftingActive": "Aktywne filtry"
   },
   "navigation": {
     "home": "Strona główna",

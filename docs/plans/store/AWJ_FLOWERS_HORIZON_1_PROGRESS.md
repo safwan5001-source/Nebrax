@@ -1,6 +1,6 @@
 # AWJ Flowers & Gifts — Horizon 1 Progress
 
-**Status:** IN PROGRESS — H1–H9b merged; H9c in review  
+**Status:** IN PROGRESS — H1–H9c merged; H10 in review  
 **Date:** 2026-10-03  
 **Planning Base:** `main` @ `318cc72d10bb304cef4b401f548772008ea1618e`  
 **Execution Authority:** `AWJ_FLOWERS_HORIZON_1_AUTONOMOUS_EXECUTION.md`  
@@ -46,8 +46,8 @@ No Deploy or Production change is authorized by this Horizon.
 | H8b | Availability / Same-day — `store/v1` parity and `deliver_today` filter | MERGED | #1211 | `0ed7b6c` |
 | H9a | Store Builder — data-backed section content contract (ADR-21) | MERGED | #1212 | `5f34585` |
 | H9b | Store Builder — storefront renderers for the data-backed sections (+ listing deep-link context) | MERGED | #1213 | `c90f758` |
-| H9c | Store Builder — builder UI (library, editors, canvas); default document intentionally unchanged | PR OPEN, in review | (see log) | — |
-| H10 | Storefront Discovery UX | NOT STARTED | — | — |
+| H9c | Store Builder — builder UI (library, editors, canvas); default document intentionally unchanged | MERGED | #1216 | `4bb8d17` |
+| H10 | Storefront Discovery UX — gifting filters on the listing | PR OPEN, in review | (see log) | — |
 | H11 | Flowers/Gifts PDP | NOT STARTED | — | — |
 | H12 | Cart & Checkout Gifting UX | NOT STARTED | — | — |
 | H13 | Account / Saved Recipient / Order Experience | NOT STARTED | — | — |
@@ -553,9 +553,11 @@ Copy this section for every completed/active slice.
 
 ### H9c — Store Builder: builder UI for the data-backed sections (ADR-21 §2.2)
 
-**Status:** PR OPEN, in review  
+**Status:** MERGED  
 **Base SHA:** `c90f7587ebfac8e5df1e13b64758641bb2ed60ea` (main after H9b)  
 **Branch:** `flowers/h9c-builder-ui`  
+**PR:** #1216 · **Head SHA:** `17e1a8358ef2ac6132290303b60ef05c1b424254` · **Merge SHA:** `4bb8d17852c8a618f826c35120c31d2f39a9c4ee` (squash)  
+**CI on head:** all 8 jobs green (web build, sqlite + pgsql, storefront, both visual QA).  
 
 #### What was implemented
 
@@ -570,9 +572,39 @@ Copy this section for every completed/active slice.
 - Web builder suite: 536 tests green (new: editor behaviour incl. active-only options, incomplete handling and retry; Canvas placeholders in AR/EN; registry/truth-matrix updates). Mutation (dropping the active-collection filter) caught by the editor test. `tsc` clean for the module.
 - Visual: `e2e/flowers-h9c-data-sections-visual.spec.ts` against `/dev/customizer-visual?scenario=data-sections` (AR/EN × mobile/desktop) passes locally; screenshots reviewed. The spec is not part of the CI workflow's path-filtered spec list. The shared preview shell has a pre-existing 1px LTR document overflow (also on the existing `populated` scenario), so the spec asserts on the sections themselves.
 
+#### Review and CI notes
+
+- First CI run was red (`web build`): the **whole** web suite caught two tests outside the builder module — the commerce appearance section-library order test (it enumerated the old section list) and the semantic-token drift ratchet (fixed-palette classes in the new editors). Both fixed (test updated; editors moved to `text-muted` / `border-danger` / `border-warning` tokens). **Lesson recorded:** run the full `web` vitest suite, not only the module, before pushing web changes.
+- One Codex finding (P2): the shelf editor dropped a stored facet value once it had been deactivated (the fallback check ran against all values, the options only rendered active ones). Fixed by checking the active values; the new editor test fails without the fix. Codex then hit its review usage limit, so no further automated review ran on this PR.
+
 #### Deferred
 
 - Filter UI, facet chips and destination context (H10); flowers home preset (H14).
+
+---
+
+### H10 — Storefront Discovery UX: gifting filters
+
+**Status:** PR OPEN, in review  
+**Base SHA:** `4bb8d17852c8a618f826c35120c31d2f39a9c4ee` (main after H9c)  
+**Branch:** `flowers/h10-discovery-ux`  
+
+#### What was implemented
+
+- Gifting filters above the product grid on `/products` and category pages: occasion and recipient first, then any merchant facet, brand, and "Deliver today" — as accessible toggle buttons (`aria-pressed`, fieldset/legend groups, 44px targets) with live counts. Selected filters appear as removable chips; "Clear all" removes only the gifting filters (the collection, search, sort and price stay).
+- **Data:** no backend change and no extra request — the public product list already returns disjunctive facet and brand counts in `meta` (`CatalogFacetFilter::meta`); `parseListingFacets` only normalizes that payload (validated slugs / UUIDs / names / counts, bounded sizes, system facets ordered first, a selected value kept at count 0 so it can be removed). It rides on page 1's meta as `listingFacets`; other listing surfaces without it render nothing.
+- State lives in the URL (`facet[key]` comma-OR list, `brand_id`, `deliver_today`), edited by pure helpers that leave unrelated keys alone; `router.push` in a transition with `scroll:false`. Category pages now parse and forward the same context.
+- "Deliver today" is offered only when the store has delivery scheduling (`delivery-schedule.enabled`, read in parallel inside the Suspense boundary; failure reads as unavailable) or while it is already active, so it can always be turned off.
+- Mobile: groups collapse behind one "Filters (n)" button (`aria-expanded` / `aria-controls`) while the active chips stay visible and removable; desktop shows the groups in up to three columns. RTL-safe logical spacing. Six locales gained three strings (`check:locales` green).
+
+#### Tests
+
+- Storefront: 930 tests green (new: facet-meta parsing and validation, URL edit helpers, the filter component incl. URL pushes / pressed state / chips / clear-all / deliver-today gating / mobile toggle, `ProductListing` wiring, `fetchDeliveryScheduleEnabled`). Mutations (clear-all also dropping the collection; always showing Deliver today) each caught. `tsc` and `biome check` clean.
+- Visual: a throwaway local fixture with realistic facet/brand meta, screenshots reviewed in Arabic and English at mobile and desktop widths (real clicks update the URL). Not committed. Note: the Next dev server only hydrates pages loaded via `localhost` (not `127.0.0.1`) — an environment quirk, not a product issue.
+
+#### Deferred
+
+- Destination/availability context in discovery (needs the destination model — H11/H12); a facet search box for very large value lists; collection and brand names on active chips (the list meta does not carry collection titles); filter-aware JSON-LD/SEO.
 
 ---
 
