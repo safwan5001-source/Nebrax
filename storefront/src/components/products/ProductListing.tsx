@@ -141,6 +141,10 @@ async function ProductListingInner({
   const totalPages = productsResponse.meta.pages;
 
   const hasResults = products.length > 0;
+  // Catalog context (collection / facet / brand / deliver-today) is part of
+  // the listing identity: the island remount AND the analytics de-dupe key
+  // must both change when only the context does (e.g. "show all products").
+  const contextKey = `${listingKey(state)}|${JSON.stringify(baseParams ?? {})}`;
 
   return (
     <>
@@ -160,7 +164,7 @@ async function ProductListingInner({
             // new instance mounts with products already populated,
             // the user sees the grid update in place with no loading
             // fallback shown.
-            key={`${listingKey(state)}|${JSON.stringify(baseParams ?? {})}`}
+            key={contextKey}
             initialProducts={products}
             initialPage={1}
             totalPages={totalPages}
@@ -178,7 +182,7 @@ async function ProductListingInner({
             listName={listName}
             query={state.query}
             currency={currency}
-            stateKey={listingKey(state)}
+            stateKey={contextKey}
           />
         </>
       ) : (
