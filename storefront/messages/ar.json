@@ -851,7 +851,15 @@
       "editDelivery": "تعديل طريقة الاستلام",
       "notSet": "لم تُحدَّد",
       "commitmentNotice": "بإنشاء الطلب تسجّل التزاماً تجارياً بشرائه. لا تتم أي عملية دفع الآن، ويؤكّد لك المتجر المبلغ النهائي وطريقة السداد.",
-      "editPayment": "تعديل طريقة الدفع"
+      "editPayment": "تعديل طريقة الدفع",
+      "editSchedule": "تعديل الموعد",
+      "editGift": "تعديل تفاصيل الهدية",
+      "scheduleLabel": "الموعد المطلوب",
+      "giftLabel": "الهدية",
+      "giftTo": "إلى",
+      "giftFrom": "من",
+      "giftAnonymous": "مجهول",
+      "giftMessage": "الرسالة"
     },
     "reviewRequired": {
       "title": "طلبك يحتاج إلى مراجعة",
@@ -865,14 +873,21 @@
         "contact_incomplete": "بيانات التواصل غير مكتملة",
         "delivery_method_missing": "الرجاء اختيار طريقة استلام",
         "empty_cart": "سلتك فارغة",
-        "unknown": "هذا العنصر يحتاج إلى مراجعتك"
+        "unknown": "هذا العنصر يحتاج إلى مراجعتك",
+        "gift_incomplete": "تفاصيل الهدية غير مكتملة",
+        "gift_unavailable": "خيارات الهدية لم تعد متاحة",
+        "schedule_required": "يرجى اختيار تاريخ ووقت التوصيل",
+        "schedule_unavailable": "الموعد الذي اخترته لم يعد متاحاً — يرجى الاختيار من جديد",
+        "addon_unavailable": "إضافة لهذا المنتج لم تعد متاحة"
       }
     },
     "success": {
       "heading": "تم إنشاء الطلب",
       "notPaidNote": "هذا الطلب مؤكَّد كالتزام تجاري فقط، ولم تتم أي عملية دفع بعد.",
       "orderNumberLabel": "رقم الطلب",
-      "print": "طباعة"
+      "print": "طباعة",
+      "scheduleHeading": "الموعد المطلوب",
+      "giftHeading": "الهدية"
     },
     "steps": {
       "contact": "بيانات التواصل",
@@ -880,7 +895,9 @@
       "delivery": "طريقة الاستلام",
       "payment": "الدفع",
       "review": "المراجعة",
-      "confirmation": "التأكيد"
+      "confirmation": "التأكيد",
+      "schedule": "الموعد",
+      "gift": "الهدية"
     },
     "stepCounter": "الخطوة {current} من {total}",
     "payment": {
@@ -902,6 +919,44 @@
     },
     "continueToAddress": "متابعة إلى العنوان",
     "continueToDelivery": "متابعة إلى التوصيل",
-    "continueToPayment": "متابعة إلى الدفع"
+    "continueToPayment": "متابعة إلى الدفع",
+    "continueToSchedule": "المتابعة إلى الموعد",
+    "continueToGift": "المتابعة إلى تفاصيل الهدية",
+    "schedule": {
+      "heading": "موعد التوصيل",
+      "headingPickup": "موعد الاستلام",
+      "description": "اختر الوقت الذي تفضّل أن يصلك فيه الطلب.",
+      "descriptionPickup": "اختر الوقت الذي ستستلم فيه طلبك.",
+      "loading": "جارٍ تحميل المواعيد المتاحة…",
+      "loadFailed": "تعذّر تحميل المواعيد المتاحة.",
+      "retry": "إعادة المحاولة",
+      "noWindows": "لا توجد مواعيد متاحة حالياً.",
+      "noWindowsOptional": "لا توجد مواعيد متاحة لهذه الطريقة. يمكنك المتابعة دون اختيار موعد.",
+      "requiredNote": "اختيار التاريخ والوقت مطلوب لهذا الطلب.",
+      "dateLabel": "اختر التاريخ",
+      "slotLabel": "اختر الفترة الزمنية",
+      "today": "اليوم",
+      "tomorrow": "غداً",
+      "noPreference": "بدون تفضيل",
+      "requestedNote": "يُرسل اختيارك إلى المتجر مع طلبك، ويؤكده المتجر.",
+      "invalidSelection": "اختيارك السابق لم يعد متاحاً. يرجى الاختيار من جديد.",
+      "selectedSummary": "{day}، {window}"
+    },
+    "gift": {
+      "heading": "تفاصيل الهدية",
+      "description": "هل هذا الطلب هدية لشخص آخر؟",
+      "isGift": "هذا الطلب هدية",
+      "recipientHeading": "لمن الهدية؟",
+      "recipientName": "اسم المُهدى إليه",
+      "recipientPhone": "جوال المُهدى إليه",
+      "recipientPhoneHint": "ليتمكن المندوب من التواصل معه عند التسليم.",
+      "senderHeading": "من",
+      "senderName": "الاسم الظاهر على البطاقة",
+      "senderHint": "يظهر على بطاقة الهدية فقط ولا يرتبط بحسابك.",
+      "hideSender": "إرسال دون ذكر اسمي",
+      "message": "رسالة الهدية",
+      "messageHint": "تُطبع على البطاقة. نص عادي فقط.",
+      "messageCount": "{count} / {max}"
+    }
   }
 }

@@ -13,7 +13,7 @@ import { useCart } from "@/contexts/CartContext";
 import { useCartLineImages } from "@/hooks/useCartLineImages";
 import { localeDirection } from "@/i18n/locales";
 import { trackViewCart } from "@/lib/analytics/gtm";
-import { isStorefrontCart } from "@/lib/commerce/cart-types";
+import { isStorefrontCart, lineGroups } from "@/lib/commerce/cart-types";
 import { extractBasePath } from "@/lib/utils/path";
 
 /**
@@ -106,19 +106,27 @@ export default function CartPage() {
           className="rounded-store border border-store-border bg-store-surface px-4 sm:px-5"
         >
           <ul className="divide-y divide-store-border">
-            {awjCart.items.map((line) => (
+            {lineGroups(awjCart.items, {
+              id: (line) => line.id,
+              parent: (line) => line.addonOf,
+            }).map(({ line, addons }) => (
               <li key={line.id}>
-                <CartLine
-                  view={awjCartLineView(
-                    line,
-                    basePath,
-                    line.productId ? images[line.productId] : null,
-                  )}
-                  density="page"
-                  disabled={updating}
-                  onQuantityChange={(quantity) => updateItem(line.id, quantity)}
-                  onRemove={() => removeItem(line.id)}
-                />
+                {[line, ...addons].map((row) => (
+                  <CartLine
+                    key={row.id}
+                    view={awjCartLineView(
+                      row,
+                      basePath,
+                      row.productId ? images[row.productId] : null,
+                    )}
+                    density="page"
+                    disabled={updating}
+                    onQuantityChange={(quantity) =>
+                      updateItem(row.id, quantity)
+                    }
+                    onRemove={() => removeItem(row.id)}
+                  />
+                ))}
               </li>
             ))}
           </ul>

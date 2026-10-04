@@ -851,7 +851,15 @@
       "editDelivery": "Edit delivery method",
       "notSet": "Not set",
       "commitmentNotice": "Placing the order records a commercial commitment to buy it. No payment is taken now; the store confirms the final amount and how to pay.",
-      "editPayment": "Edit payment method"
+      "editPayment": "Edit payment method",
+      "editSchedule": "Edytuj termin",
+      "editGift": "Edytuj dane prezentu",
+      "scheduleLabel": "Wybrany termin",
+      "giftLabel": "Prezent",
+      "giftTo": "Do",
+      "giftFrom": "Od",
+      "giftAnonymous": "Anonimowo",
+      "giftMessage": "Wiadomość"
     },
     "reviewRequired": {
       "title": "Your order needs review",
@@ -865,14 +873,21 @@
         "contact_incomplete": "Your contact information is incomplete",
         "delivery_method_missing": "Please select a delivery method",
         "empty_cart": "Your cart is empty",
-        "unknown": "This item needs your attention"
+        "unknown": "This item needs your attention",
+        "gift_incomplete": "Dane prezentu są niekompletne",
+        "gift_unavailable": "Opcje prezentu nie są już dostępne",
+        "schedule_required": "Wybierz datę i godzinę dostawy",
+        "schedule_unavailable": "Wybrany termin nie jest już dostępny — wybierz ponownie",
+        "addon_unavailable": "Dodatek do tego produktu nie jest już dostępny"
       }
     },
     "success": {
       "heading": "Order placed",
       "notPaidNote": "This order is confirmed as a commercial commitment. No payment has been processed.",
       "orderNumberLabel": "Order number",
-      "print": "Print"
+      "print": "Print",
+      "scheduleHeading": "Wybrany termin",
+      "giftHeading": "Prezent"
     },
     "steps": {
       "contact": "Contact",
@@ -880,7 +895,9 @@
       "delivery": "Delivery",
       "payment": "Payment",
       "review": "Review",
-      "confirmation": "Confirmation"
+      "confirmation": "Confirmation",
+      "schedule": "Termin",
+      "gift": "Prezent"
     },
     "stepCounter": "Step {current} of {total}",
     "payment": {
@@ -902,6 +919,44 @@
     },
     "continueToAddress": "Continue to address",
     "continueToDelivery": "Continue to delivery",
-    "continueToPayment": "Continue to payment"
+    "continueToPayment": "Continue to payment",
+    "continueToSchedule": "Przejdź do daty i godziny",
+    "continueToGift": "Przejdź do danych prezentu",
+    "schedule": {
+      "heading": "Termin dostawy",
+      "headingPickup": "Termin odbioru",
+      "description": "Wybierz, kiedy chcesz otrzymać zamówienie.",
+      "descriptionPickup": "Wybierz, kiedy odbierzesz zamówienie.",
+      "loading": "Ładowanie dostępnych terminów…",
+      "loadFailed": "Nie udało się wczytać dostępnych terminów.",
+      "retry": "Spróbuj ponownie",
+      "noWindows": "Obecnie brak dostępnych terminów.",
+      "noWindowsOptional": "Dla tej metody brak dostępnych terminów. Możesz kontynuować bez wyboru.",
+      "requiredNote": "Dla tego zamówienia wymagane są data i godzina.",
+      "dateLabel": "Wybierz datę",
+      "slotLabel": "Wybierz przedział czasu",
+      "today": "Dziś",
+      "tomorrow": "Jutro",
+      "noPreference": "Bez preferencji",
+      "requestedNote": "Twój wybór zostanie przesłany do sklepu wraz z zamówieniem. Sklep go potwierdzi.",
+      "invalidSelection": "Twój wcześniejszy wybór nie jest już dostępny. Wybierz ponownie.",
+      "selectedSummary": "{day}, {window}"
+    },
+    "gift": {
+      "heading": "Dane prezentu",
+      "description": "Czy to zamówienie jest prezentem dla kogoś innego?",
+      "isGift": "To zamówienie jest prezentem",
+      "recipientHeading": "Dla kogo?",
+      "recipientName": "Imię i nazwisko odbiorcy",
+      "recipientPhone": "Telefon odbiorcy",
+      "recipientPhoneHint": "Aby kurier mógł się z nim skontaktować przy dostawie.",
+      "senderHeading": "Od",
+      "senderName": "Imię widoczne na karcie",
+      "senderHint": "Widoczne tylko na karcie prezentowej, nie jest używane dla Twojego konta.",
+      "hideSender": "Wyślij anonimowo (ukryj moje imię)",
+      "message": "Wiadomość do prezentu",
+      "messageHint": "Zostanie wydrukowana na karcie. Tylko zwykły tekst.",
+      "messageCount": "{count} / {max}"
+    }
   }
 }

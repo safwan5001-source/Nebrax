@@ -201,7 +201,8 @@ export function CartProvider({
     () =>
       cart?.items?.reduce(
         (sum: number, item: LineItem | StorefrontCartLine) =>
-          sum + item.quantity,
+          // An add-on rides on its parent line (ADR-18) and is not counted.
+          "addonOf" in item && item.addonOf ? sum : sum + item.quantity,
         0,
       ) ?? 0,
     [cart],

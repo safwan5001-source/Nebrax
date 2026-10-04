@@ -26,7 +26,11 @@ import { useCart } from "@/contexts/CartContext";
 import { useCartLineImages } from "@/hooks/useCartLineImages";
 import { localeDirection } from "@/i18n/locales";
 import { trackRemoveFromCart, trackViewCart } from "@/lib/analytics/gtm";
-import { formatMinorAmount, isStorefrontCart } from "@/lib/commerce/cart-types";
+import {
+  formatMinorAmount,
+  isStorefrontCart,
+  lineGroups,
+} from "@/lib/commerce/cart-types";
 import { extractBasePath } from "@/lib/utils/path";
 
 const ExpressCheckoutButton = dynamic(
@@ -172,22 +176,28 @@ export function CartDrawer() {
           ) : (
             <ul className="divide-y divide-store-border bg-store-surface px-4">
               {awjCart
-                ? awjCart.items.map((line) => (
+                ? lineGroups(awjCart.items, {
+                    id: (line) => line.id,
+                    parent: (line) => line.addonOf,
+                  }).map(({ line, addons }) => (
                     <li key={line.id}>
-                      <CartLine
-                        view={awjCartLineView(
-                          line,
-                          basePath,
-                          line.productId ? images[line.productId] : null,
-                        )}
-                        density="drawer"
-                        disabled={updating}
-                        onNavigate={closeCart}
-                        onQuantityChange={(quantity) =>
-                          updateItem(line.id, quantity)
-                        }
-                        onRemove={() => removeItem(line.id)}
-                      />
+                      {[line, ...addons].map((row) => (
+                        <CartLine
+                          key={row.id}
+                          view={awjCartLineView(
+                            row,
+                            basePath,
+                            row.productId ? images[row.productId] : null,
+                          )}
+                          density="drawer"
+                          disabled={updating}
+                          onNavigate={closeCart}
+                          onQuantityChange={(quantity) =>
+                            updateItem(row.id, quantity)
+                          }
+                          onRemove={() => removeItem(row.id)}
+                        />
+                      ))}
                     </li>
                   ))
                 : (spreeCart?.items ?? []).map((line) => (

@@ -12,8 +12,27 @@
  * module doc.
  */
 
-import type { AwjCart, StorefrontCart } from "./cart-types";
-import { mapAwjCartToViewModel } from "./cart-types";
+import type {
+  AwjCart,
+  AwjLinePersonalization,
+  StorefrontCart,
+  StorefrontLinePersonalization,
+} from "./cart-types";
+import {
+  groupAddonLines,
+  mapAwjCartToViewModel,
+  mapLinePersonalization,
+} from "./cart-types";
+import {
+  mapCheckoutSchedule,
+  mapGift,
+  mapGiftOptions,
+  mapOrderSchedule,
+  type StorefrontGift,
+  type StorefrontGiftOptions,
+  type StorefrontOrderSchedule,
+  type StorefrontSchedule,
+} from "./checkout-gifting";
 
 export interface AwjMoney {
   amount_minor: number;
@@ -68,7 +87,50 @@ export interface AwjCheckout {
     payment_method_name: string | null;
     method: string | null;
   };
+  /** ADR-15 — `null` when the checkout is not a gift; absent on an older API. */
+  gift?: AwjGift | null;
+  /** ADR-15 — the channel's gift policy; absent on an older API (treated as disabled). */
+  gift_options?: AwjGiftOptions;
+  /** ADR-19 — present only once a date/window was stored. */
+  schedule?: AwjCheckoutSchedule;
   cart: AwjCart;
+}
+
+/** ADR-15 — the gift context exactly as the API sends it. */
+export interface AwjGift {
+  recipient_name: string | null;
+  recipient_phone: string | null;
+  sender_display_name: string | null;
+  hide_sender: boolean;
+  message: string | null;
+}
+
+/** ADR-15 — the channel's gift policy (limits the shopper UI needs). */
+export interface AwjGiftOptions {
+  enabled: boolean;
+  message_max_length: number;
+  allow_hide_sender: boolean;
+  recipient_phone_required: boolean;
+}
+
+/** ADR-19 — the stored selection on an open checkout. `slot` is `null` once it is no longer selectable. */
+export interface AwjCheckoutSchedule {
+  date: string;
+  slot: Record<string, unknown> | null;
+  valid: boolean;
+}
+
+/** ADR-19 — the immutable schedule snapshot on an order. */
+export interface AwjOrderSchedule {
+  method: "delivery" | "pickup";
+  date: string;
+  slot: {
+    label: string;
+    label_en: string | null;
+    start_time: string;
+    end_time: string;
+  };
+  timezone: string;
 }
 
 /** Raw `POST /checkout/complete` success payload — the `order` field, per `StorefrontCheckoutController::serializeOrder()`. */
@@ -91,6 +153,10 @@ export interface AwjOrder {
     postal_code: string | null;
     notes: string | null;
   };
+  /** ADR-15 — `null`/absent when the order is not a gift. */
+  gift?: AwjGift | null;
+  /** ADR-19 — present only when a date/window was chosen. */
+  schedule?: AwjOrderSchedule;
   payment: {
     method: string | null;
     status: string | null;
@@ -103,6 +169,12 @@ export interface AwjOrder {
     quantity: number;
     unit_price: AwjMoney;
     line_total: AwjMoney;
+    /** ADR-16 — present only on a personalized line. */
+    personalization?: AwjLinePersonalization[];
+    /** ADR-18 — present on an add-on line and on its parent. */
+    line_id?: string;
+    /** ADR-18 — present only on an add-on line: the parent's `line_id`. */
+    addon_of?: string;
   }>;
   created_at: string | null;
 }
@@ -138,6 +210,12 @@ export interface StorefrontCheckout {
     address: AwjCheckout["delivery"]["address"];
   };
   payment: AwjCheckout["payment"];
+  /** FLOWERS-H12b — `null` when the checkout is not a gift. */
+  gift: StorefrontGift | null;
+  /** The channel's gift policy; disabled when the API sends none. */
+  giftOptions: StorefrontGiftOptions;
+  /** The stored delivery date/window, or `null` when none was chosen. */
+  schedule: StorefrontSchedule | null;
   cart: StorefrontCart;
 }
 
@@ -150,6 +228,10 @@ export interface StorefrontOrder {
   contact: AwjOrder["contact"];
   delivery: AwjOrder["delivery"];
   payment: AwjOrder["payment"];
+  /** FLOWERS-H12b — `null` when the order is not a gift. */
+  gift: StorefrontGift | null;
+  /** The requested date/window snapshot, or `null` when none was chosen. */
+  schedule: StorefrontOrderSchedule | null;
   items: Array<{
     productId: string | null;
     productName: string;
@@ -157,6 +239,11 @@ export interface StorefrontOrder {
     quantity: number;
     unitPrice: AwjMoney;
     lineTotal: AwjMoney;
+    personalization: StorefrontLinePersonalization[];
+    /** Set on a parent line that has add-ons and on the add-on lines themselves. */
+    lineId: string | null;
+    /** Parent `lineId` when this is an add-on line, else `null`. */
+    addonOf: string | null;
   }>;
   createdAt: string | null;
 }
@@ -173,6 +260,9 @@ export function mapAwjCheckoutToViewModel(
       address: checkout.delivery.address,
     },
     payment: checkout.payment,
+    gift: mapGift(checkout.gift),
+    giftOptions: mapGiftOptions(checkout.gift_options),
+    schedule: mapCheckoutSchedule(checkout.schedule),
     cart: mapAwjCartToViewModel(checkout.cart),
   };
 }
@@ -187,16 +277,33 @@ export function mapAwjOrderToViewModel(order: AwjOrder): StorefrontOrder {
     contact: order.contact,
     delivery: order.delivery,
     payment: order.payment,
-    items: order.items.map((item) => ({
-      productId: item.product_id,
-      productName: item.product_name,
-      unitName: item.unit_name,
-      quantity: item.quantity,
-      unitPrice: item.unit_price,
-      lineTotal: item.line_total,
-    })),
+    gift: mapGift(order.gift),
+    schedule: mapOrderSchedule(order.schedule),
+    items: groupOrderItems(
+      order.items.map((item) => ({
+        productId: item.product_id,
+        productName: item.product_name,
+        unitName: item.unit_name,
+        quantity: item.quantity,
+        unitPrice: item.unit_price,
+        lineTotal: item.line_total,
+        personalization: mapLinePersonalization(item.personalization),
+        lineId: typeof item.line_id === "string" ? item.line_id : null,
+        addonOf: typeof item.addon_of === "string" ? item.addon_of : null,
+      })),
+    ),
     createdAt: order.created_at,
   };
+}
+
+/** Add-on lines directly under their parent line (see `groupAddonLines`). */
+function groupOrderItems(
+  items: StorefrontOrder["items"],
+): StorefrontOrder["items"] {
+  return groupAddonLines(items, {
+    id: (item) => item.lineId,
+    parent: (item) => item.addonOf,
+  });
 }
 
 /**

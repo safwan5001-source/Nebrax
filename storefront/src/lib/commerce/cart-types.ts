@@ -21,6 +21,19 @@ export interface AwjCartMoney {
   currency: string;
 }
 
+/**
+ * One personalization answer on a line (ADR-16), exactly as the API sends it.
+ * `value_label` is the chosen option's label for a `select` field and `null`
+ * for free text.
+ */
+export interface AwjLinePersonalization {
+  key: string;
+  label: string;
+  label_en: string | null;
+  value: string;
+  value_label: string | null;
+}
+
 /** Raw `store/v1/cart*` line shape, exactly as `CommerceCartService::serialize()` returns it. */
 export interface AwjCartLine {
   id: string;
@@ -46,6 +59,12 @@ export interface AwjCartLine {
    * resolves). Never dropped silently — see CommerceCartService::serialize().
    */
   available: boolean;
+  /** ADR-16 — present only on a personalized line. */
+  personalization?: AwjLinePersonalization[];
+  /** ADR-18 — present only on an add-on line: the id of its parent line. */
+  addon_of?: string;
+  /** ADR-18 — present only on an add-on line: quantity per unit of the parent. */
+  per_parent_quantity?: number;
 }
 
 /**
@@ -75,6 +94,52 @@ export interface StorefrontCartLine {
   unitPrice: AwjCartMoney;
   lineTotal: AwjCartMoney;
   available: boolean;
+  /** The shopper's personalization answers; empty for an ordinary line. */
+  personalization: StorefrontLinePersonalization[];
+  /** Parent line id when this is an add-on line (ADR-18), else `null`. */
+  addonOf: string | null;
+  /** Add-on quantity per unit of its parent; `null` on an ordinary line. */
+  perParentQuantity: number | null;
+}
+
+/** A personalization answer ready to print — the label is chosen by locale in the UI. */
+export interface StorefrontLinePersonalization {
+  key: string;
+  label: string;
+  labelEn: string | null;
+  /** What to show: the option label for a choice, the text otherwise. */
+  display: string;
+}
+
+/** Normalizes the API's personalization rows; anything malformed is dropped. */
+export function mapLinePersonalization(
+  rows: AwjLinePersonalization[] | undefined,
+): StorefrontLinePersonalization[] {
+  if (!Array.isArray(rows)) return [];
+  const out: StorefrontLinePersonalization[] = [];
+  for (const row of rows) {
+    if (
+      typeof row !== "object" ||
+      row === null ||
+      typeof row.key !== "string" ||
+      typeof row.label !== "string" ||
+      typeof row.value !== "string"
+    ) {
+      continue;
+    }
+    const display =
+      typeof row.value_label === "string" && row.value_label.trim() !== ""
+        ? row.value_label
+        : row.value;
+    if (display.trim() === "") continue;
+    out.push({
+      key: row.key,
+      label: row.label,
+      labelEn: typeof row.label_en === "string" ? row.label_en : null,
+      display,
+    });
+  }
+  return out;
 }
 
 export interface StorefrontCart {
@@ -87,8 +152,73 @@ export interface StorefrontCart {
   itemCount: number;
 }
 
+/**
+ * Puts every add-on line directly under its parent, keeping the API's order
+ * otherwise. The API lists lines by creation time, so two bouquets with their
+ * own add-ons would otherwise interleave. An add-on whose parent is missing is
+ * kept (never dropped) after the grouped lines — the server already marks it
+ * unavailable.
+ */
+export function groupAddonLines<T>(
+  rows: readonly T[],
+  ids: { id: (row: T) => string | null; parent: (row: T) => string | null },
+): T[] {
+  const children = new Map<string, T[]>();
+  const parents: T[] = [];
+  const known = new Set<string>();
+  for (const row of rows) {
+    const id = ids.id(row);
+    if (ids.parent(row) === null && id !== null) known.add(id);
+  }
+  const orphans: T[] = [];
+  for (const row of rows) {
+    const parent = ids.parent(row);
+    if (parent === null) {
+      parents.push(row);
+    } else if (known.has(parent)) {
+      const list = children.get(parent) ?? [];
+      list.push(row);
+      children.set(parent, list);
+    } else {
+      orphans.push(row);
+    }
+  }
+  const out: T[] = [];
+  for (const row of parents) {
+    out.push(row);
+    const id = ids.id(row);
+    if (id !== null) out.push(...(children.get(id) ?? []));
+  }
+  return [...out, ...orphans];
+}
+
+/**
+ * Display groups: an ordinary line with the add-ons that ride on it. An add-on
+ * whose parent is not in the list becomes a group of its own (it stays visible).
+ */
+export function lineGroups<T>(
+  rows: readonly T[],
+  ids: { id: (row: T) => string | null; parent: (row: T) => string | null },
+): Array<{ line: T; addons: T[] }> {
+  const groups: Array<{ line: T; addons: T[] }> = [];
+  const byId = new Map<string, { line: T; addons: T[] }>();
+  for (const row of rows) {
+    const parent = ids.parent(row);
+    const target = parent === null ? undefined : byId.get(parent);
+    if (target) {
+      target.addons.push(row);
+      continue;
+    }
+    const group = { line: row, addons: [] as T[] };
+    groups.push(group);
+    const id = ids.id(row);
+    if (id !== null && parent === null) byId.set(id, group);
+  }
+  return groups;
+}
+
 export function mapAwjCartToViewModel(cart: AwjCart): StorefrontCart {
-  const items = cart.items.map(
+  const lines = cart.items.map(
     (line): StorefrontCartLine => ({
       id: line.id,
       productId: line.product_id,
@@ -101,8 +231,19 @@ export function mapAwjCartToViewModel(cart: AwjCart): StorefrontCart {
       unitPrice: line.unit_price,
       lineTotal: line.line_total,
       available: line.available,
+      personalization: mapLinePersonalization(line.personalization),
+      addonOf: typeof line.addon_of === "string" ? line.addon_of : null,
+      perParentQuantity:
+        typeof line.per_parent_quantity === "number"
+          ? line.per_parent_quantity
+          : null,
     }),
   );
+
+  const items = groupAddonLines(lines, {
+    id: (line) => line.id,
+    parent: (line) => line.addonOf,
+  });
 
   return {
     kind: "awj",
@@ -110,7 +251,12 @@ export function mapAwjCartToViewModel(cart: AwjCart): StorefrontCart {
     subtotal: cart.subtotal,
     currency: cart.currency,
     hasUnavailableItems: cart.has_unavailable_items,
-    itemCount: items.reduce((sum, item) => sum + item.quantity, 0),
+    // Add-on lines ride on their parent (ADR-18): "a bouquet and a chocolate
+    // box" is one thing in the bag, so only the lines the shopper added count.
+    itemCount: items.reduce(
+      (sum, item) => (item.addonOf ? sum : sum + item.quantity),
+      0,
+    ),
   };
 }
 

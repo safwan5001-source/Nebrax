@@ -5,15 +5,20 @@ import { getAwjCartToken } from "@/lib/commerce/cart-cookies";
 import {
   type AwjAddressInput,
   type AwjContactInput,
+  type AwjGiftInput,
   completeAwjCheckout,
   createOrResumeAwjCheckout,
   fetchAwjCheckout,
+  fetchAwjDeliverySchedule,
   fetchAwjPaymentMethods,
   updateAwjCheckoutAddress,
   updateAwjCheckoutContact,
   updateAwjCheckoutDelivery,
+  updateAwjCheckoutGift,
   updateAwjCheckoutPayment,
+  updateAwjCheckoutSchedule,
 } from "@/lib/commerce/checkout";
+import type { StorefrontDeliverySchedule } from "@/lib/commerce/checkout-gifting";
 import {
   type AwjPaymentMethod,
   type AwjReviewIssue,
@@ -105,6 +110,40 @@ export async function updateAwjDelivery(method: string) {
     const checkout = await updateAwjCheckoutDelivery(method);
     return { checkout };
   }, "Could not save your delivery method. Please try again.");
+}
+
+/** FLOWERS-H12b — set or clear the gift context (ADR-15). */
+export async function updateAwjGift(fields: AwjGiftInput) {
+  return actionResult(async () => {
+    const checkout = await updateAwjCheckoutGift(fields);
+    return { checkout };
+  }, "Could not save the gift details. Please try again.");
+}
+
+/** FLOWERS-H12b — choose (or clear, with both `null`) the delivery date and window (ADR-19). */
+export async function updateAwjSchedule(selection: {
+  date: string | null;
+  slot_id: string | null;
+}) {
+  return actionResult(async () => {
+    const checkout = await updateAwjCheckoutSchedule(selection);
+    return { checkout };
+  }, "Could not save the delivery date. Please try again.");
+}
+
+/**
+ * The windows that can be chosen right now. `null` on any failure — the stage
+ * then says plainly that dates cannot be loaded instead of inventing any.
+ */
+export async function getAwjDeliverySchedule(
+  method: "delivery" | "pickup",
+  destination?: { city?: string | null; region?: string | null },
+): Promise<StorefrontDeliverySchedule | null> {
+  try {
+    return await fetchAwjDeliverySchedule(method, destination);
+  } catch {
+    return null;
+  }
 }
 
 /** The payment methods this channel has enabled. Empty array on any failure — never throws to the caller. */

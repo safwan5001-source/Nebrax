@@ -851,7 +851,15 @@
       "editDelivery": "Edit delivery method",
       "notSet": "Not set",
       "commitmentNotice": "Placing the order records a commercial commitment to buy it. No payment is taken now; the store confirms the final amount and how to pay.",
-      "editPayment": "Edit payment method"
+      "editPayment": "Edit payment method",
+      "editSchedule": "Termin bearbeiten",
+      "editGift": "Geschenkangaben bearbeiten",
+      "scheduleLabel": "Gewünschter Termin",
+      "giftLabel": "Geschenk",
+      "giftTo": "An",
+      "giftFrom": "Von",
+      "giftAnonymous": "Anonym",
+      "giftMessage": "Nachricht"
     },
     "reviewRequired": {
       "title": "Your order needs review",
@@ -865,14 +873,21 @@
         "contact_incomplete": "Your contact information is incomplete",
         "delivery_method_missing": "Please select a delivery method",
         "empty_cart": "Your cart is empty",
-        "unknown": "This item needs your attention"
+        "unknown": "This item needs your attention",
+        "gift_incomplete": "Die Geschenkangaben sind unvollständig",
+        "gift_unavailable": "Geschenkoptionen sind nicht mehr verfügbar",
+        "schedule_required": "Bitte wählen Sie Liefertermin und Uhrzeit",
+        "schedule_unavailable": "Der gewählte Termin ist nicht mehr verfügbar — bitte erneut wählen",
+        "addon_unavailable": "Eine Zugabe zu diesem Artikel ist nicht mehr verfügbar"
       }
     },
     "success": {
       "heading": "Order placed",
       "notPaidNote": "This order is confirmed as a commercial commitment. No payment has been processed.",
       "orderNumberLabel": "Order number",
-      "print": "Print"
+      "print": "Print",
+      "scheduleHeading": "Gewünschter Termin",
+      "giftHeading": "Geschenk"
     },
     "steps": {
       "contact": "Contact",
@@ -880,7 +895,9 @@
       "delivery": "Delivery",
       "payment": "Payment",
       "review": "Review",
-      "confirmation": "Confirmation"
+      "confirmation": "Confirmation",
+      "schedule": "Termin",
+      "gift": "Geschenk"
     },
     "stepCounter": "Step {current} of {total}",
     "payment": {
@@ -902,6 +919,44 @@
     },
     "continueToAddress": "Continue to address",
     "continueToDelivery": "Continue to delivery",
-    "continueToPayment": "Continue to payment"
+    "continueToPayment": "Continue to payment",
+    "continueToSchedule": "Weiter zu Datum & Uhrzeit",
+    "continueToGift": "Weiter zu den Geschenkangaben",
+    "schedule": {
+      "heading": "Liefertermin",
+      "headingPickup": "Abholtermin",
+      "description": "Wählen Sie, wann Ihre Bestellung geliefert werden soll.",
+      "descriptionPickup": "Wählen Sie, wann Sie Ihre Bestellung abholen.",
+      "loading": "Verfügbare Zeiten werden geladen…",
+      "loadFailed": "Die verfügbaren Zeiten konnten nicht geladen werden.",
+      "retry": "Erneut versuchen",
+      "noWindows": "Derzeit sind keine Zeitfenster verfügbar.",
+      "noWindowsOptional": "Für diese Methode sind keine Zeitfenster verfügbar. Sie können ohne Auswahl fortfahren.",
+      "requiredNote": "Für diese Bestellung sind Datum und Uhrzeit erforderlich.",
+      "dateLabel": "Datum wählen",
+      "slotLabel": "Zeitfenster wählen",
+      "today": "Heute",
+      "tomorrow": "Morgen",
+      "noPreference": "Keine Präferenz",
+      "requestedNote": "Ihre Auswahl wird mit der Bestellung an den Shop gesendet. Der Shop bestätigt sie.",
+      "invalidSelection": "Ihre frühere Auswahl ist nicht mehr verfügbar. Bitte wählen Sie erneut.",
+      "selectedSummary": "{day}, {window}"
+    },
+    "gift": {
+      "heading": "Geschenkangaben",
+      "description": "Ist diese Bestellung ein Geschenk für jemand anderen?",
+      "isGift": "Diese Bestellung ist ein Geschenk",
+      "recipientHeading": "Für wen ist es?",
+      "recipientName": "Name des Empfängers",
+      "recipientPhone": "Telefon des Empfängers",
+      "recipientPhoneHint": "Damit der Kurier ihn bei der Lieferung erreichen kann.",
+      "senderHeading": "Von",
+      "senderName": "Auf der Karte angezeigter Name",
+      "senderHint": "Wird nur auf der Geschenkkarte angezeigt, nicht für Ihr Konto verwendet.",
+      "hideSender": "Anonym senden (meinen Namen ausblenden)",
+      "message": "Geschenknachricht",
+      "messageHint": "Wird auf die Karte gedruckt. Nur Text.",
+      "messageCount": "{count} / {max}"
+    }
   }
 }

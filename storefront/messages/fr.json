@@ -851,7 +851,15 @@
       "editDelivery": "Edit delivery method",
       "notSet": "Not set",
       "commitmentNotice": "Placing the order records a commercial commitment to buy it. No payment is taken now; the store confirms the final amount and how to pay.",
-      "editPayment": "Edit payment method"
+      "editPayment": "Edit payment method",
+      "editSchedule": "Modifier la date et l'heure",
+      "editGift": "Modifier les détails du cadeau",
+      "scheduleLabel": "Date et heure demandées",
+      "giftLabel": "Cadeau",
+      "giftTo": "Pour",
+      "giftFrom": "De",
+      "giftAnonymous": "Anonyme",
+      "giftMessage": "Message"
     },
     "reviewRequired": {
       "title": "Your order needs review",
@@ -865,14 +873,21 @@
         "contact_incomplete": "Your contact information is incomplete",
         "delivery_method_missing": "Please select a delivery method",
         "empty_cart": "Your cart is empty",
-        "unknown": "This item needs your attention"
+        "unknown": "This item needs your attention",
+        "gift_incomplete": "Les détails du cadeau sont incomplets",
+        "gift_unavailable": "Les options cadeau ne sont plus disponibles",
+        "schedule_required": "Veuillez choisir une date et une heure de livraison",
+        "schedule_unavailable": "La date et l'heure choisies ne sont plus disponibles — veuillez choisir à nouveau",
+        "addon_unavailable": "Un extra pour cet article n'est plus disponible"
       }
     },
     "success": {
       "heading": "Order placed",
       "notPaidNote": "This order is confirmed as a commercial commitment. No payment has been processed.",
       "orderNumberLabel": "Order number",
-      "print": "Print"
+      "print": "Print",
+      "scheduleHeading": "Date et heure demandées",
+      "giftHeading": "Cadeau"
     },
     "steps": {
       "contact": "Contact",
@@ -880,7 +895,9 @@
       "delivery": "Delivery",
       "payment": "Payment",
       "review": "Review",
-      "confirmation": "Confirmation"
+      "confirmation": "Confirmation",
+      "schedule": "Date et heure",
+      "gift": "Cadeau"
     },
     "stepCounter": "Step {current} of {total}",
     "payment": {
@@ -902,6 +919,44 @@
     },
     "continueToAddress": "Continue to address",
     "continueToDelivery": "Continue to delivery",
-    "continueToPayment": "Continue to payment"
+    "continueToPayment": "Continue to payment",
+    "continueToSchedule": "Continuer vers la date et l'heure",
+    "continueToGift": "Continuer vers les détails du cadeau",
+    "schedule": {
+      "heading": "Date et heure de livraison",
+      "headingPickup": "Date et heure de retrait",
+      "description": "Choisissez quand vous souhaitez être livré.",
+      "descriptionPickup": "Choisissez quand vous retirerez votre commande.",
+      "loading": "Chargement des créneaux disponibles…",
+      "loadFailed": "Impossible de charger les créneaux disponibles.",
+      "retry": "Réessayer",
+      "noWindows": "Aucun créneau n'est disponible pour le moment.",
+      "noWindowsOptional": "Aucun créneau n'est disponible pour ce mode. Vous pouvez continuer sans en choisir.",
+      "requiredNote": "Une date et une heure sont requises pour cette commande.",
+      "dateLabel": "Choisissez une date",
+      "slotLabel": "Choisissez un créneau",
+      "today": "Aujourd'hui",
+      "tomorrow": "Demain",
+      "noPreference": "Sans préférence",
+      "requestedNote": "Votre choix est transmis à la boutique avec la commande. La boutique le confirme.",
+      "invalidSelection": "Votre choix précédent n'est plus disponible. Veuillez choisir à nouveau.",
+      "selectedSummary": "{day}, {window}"
+    },
+    "gift": {
+      "heading": "Détails du cadeau",
+      "description": "Cette commande est-elle un cadeau pour quelqu'un d'autre ?",
+      "isGift": "Cette commande est un cadeau",
+      "recipientHeading": "Pour qui ?",
+      "recipientName": "Nom du destinataire",
+      "recipientPhone": "Téléphone du destinataire",
+      "recipientPhoneHint": "Pour que le livreur puisse le joindre à la livraison.",
+      "senderHeading": "De la part de",
+      "senderName": "Nom affiché sur la carte",
+      "senderHint": "Affiché uniquement sur la carte cadeau, non utilisé pour votre compte.",
+      "hideSender": "Envoyer anonymement (masquer mon nom)",
+      "message": "Message cadeau",
+      "messageHint": "Imprimé sur la carte. Texte brut uniquement.",
+      "messageCount": "{count} / {max}"
+    }
   }
 }
