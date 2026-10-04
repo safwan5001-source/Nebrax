@@ -131,6 +131,21 @@ describe("Store Builder — data-backed section editors (ADR-21)", () => {
       expect(select.value).toBe("gone");
     });
 
+    it("keeps a stored facet value selectable when it has since been deactivated", async () => {
+      renderPanel(
+        withSection("productShelf", {
+          title: "",
+          source: { kind: "facet", key: "occasion", value: "retired" },
+          deliverToday: false,
+          limit: 8,
+        }),
+      );
+      const value = (await screen.findByLabelText("Value")) as HTMLSelectElement;
+      await waitFor(() => expect(value.value).toBe("retired"));
+      // The deactivated value is not offered as a fresh choice, only preserved.
+      expect(Array.from(value.options).filter((o) => o.value === "retired")).toHaveLength(1);
+    });
+
     it("shows a retryable error when collections cannot be loaded", async () => {
       merchandising.loadCollections.mockResolvedValueOnce(null).mockResolvedValue(COLLECTIONS);
       renderPanel(withSection("productShelf", { title: "", source: { kind: "collection", slug: "roses" }, deliverToday: false, limit: 8 }));

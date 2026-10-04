@@ -232,6 +232,11 @@ export function ProductShelfFields({
       ? facets.data.filter((facet: Facet) => facet.isActive)
       : [];
   const selectedFacet = activeFacets.find((facet) => facet.key === facetKey);
+  // Only active values are offered; a stored value outside this list is kept
+  // as an explicit fallback option so the reference is never silently lost.
+  const activeValues = (selectedFacet?.values ?? []).filter(
+    (value) => value.isActive,
+  );
   const complete =
     deliverToday ||
     (kind === "collection" && slug !== "") ||
@@ -319,16 +324,14 @@ export function ProductShelfFields({
                   >
                     <option value="">{t("shelfFacetValuePlaceholder")}</option>
                     {facetValue !== "" &&
-                    !selectedFacet?.values.some((value) => value.slug === facetValue) ? (
+                    !activeValues.some((value) => value.slug === facetValue) ? (
                       <option value={facetValue}>{facetValue}</option>
                     ) : null}
-                    {(selectedFacet?.values ?? [])
-                      .filter((value) => value.isActive)
-                      .map((value) => (
-                        <option key={value.id} value={value.slug}>
-                          {localized(value.name, value.nameEn, locale)}
-                        </option>
-                      ))}
+                    {activeValues.map((value) => (
+                      <option key={value.id} value={value.slug}>
+                        {localized(value.name, value.nameEn, locale)}
+                      </option>
+                    ))}
                   </select>
                 </Field>
               </>
