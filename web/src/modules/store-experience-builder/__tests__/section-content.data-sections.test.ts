@@ -5,7 +5,7 @@
  * (tests/Fixtures/presentation/data-sections.json), so none can drift silently.
  */
 import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
+import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   deliveryPromiseContentOf,
@@ -23,11 +23,10 @@ interface Case {
   expected: unknown;
 }
 
+// Both apps run vitest from their own directory (one level below the repo root).
 const fixture = JSON.parse(
   readFileSync(
-    fileURLToPath(
-      new URL("../../../../../tests/Fixtures/presentation/data-sections.json", import.meta.url),
-    ),
+    resolve(process.cwd(), "..", "tests/Fixtures/presentation/data-sections.json"),
     "utf8",
   ),
 ) as { cases: Case[] };
