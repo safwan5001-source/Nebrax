@@ -11,6 +11,7 @@ use App\Models\ProductVariant;
 use App\Models\ProductWarehouseStock;
 use App\Models\Tenant;
 use App\Services\Commerce\AvailableToSellService;
+use App\Services\Commerce\CommerceDeliveryPromiseService;
 use App\Services\Commerce\CommercePriceResolver;
 use App\Services\Commerce\FulfillmentPolicyNotConfiguredException;
 use App\Services\Commerce\FulfillmentPolicyService;
@@ -20,6 +21,7 @@ use App\Services\Commerce\ProductPersonalizationService;
 use App\Services\ProductMediaGalleryService;
 use App\Support\DocumentLineVariantResolver;
 use App\Support\Commerce\CatalogFacetFilter;
+use App\Support\Commerce\DeliverTodayFilter;
 use App\Support\PublicApiResponse;
 use App\Tenancy\BranchScope;
 use App\Tenancy\StorefrontContext;
@@ -60,6 +62,10 @@ class StorefrontProductController extends PublicApiController
             // معرّفٌ أجنبي أو غير منشور يسقط من النتيجة صمتاً، لا تسريب وجوده.
             'ids' => ['sometimes', 'array', 'max:'.self::IDS_FILTER_MAX],
             'ids.*' => ['uuid'],
+            // FLOWERS-H8 / ADR-20 — وجهة اشتقاق وعد التسليم ومرشّح «التسليم اليوم».
+            'city' => ['sometimes', 'nullable', 'string', 'max:120'],
+            'region' => ['sometimes', 'nullable', 'string', 'max:120'],
+            ...DeliverTodayFilter::rules(),
             ...CatalogFacetFilter::rules(),
         ]);
 
@@ -108,6 +114,9 @@ class StorefrontProductController extends PublicApiController
         $facetFilter = new CatalogFacetFilter();
         $facetSelection = CatalogFacetFilter::selection($filters);
         $facetFilter->applyCollection($query, $facetSelection);
+        if (DeliverTodayFilter::requested($filters)) {
+            app(DeliverTodayFilter::class)->apply($query, $channelId, $filters['city'] ?? null, $filters['region'] ?? null);
+        }
         $baseQuery = clone $query;
         $facetFilter->apply($query, $facetSelection);
 
@@ -142,7 +151,11 @@ class StorefrontProductController extends PublicApiController
         // كل متغيّرات كل منتجٍ في الصفحة) — القائمة تعرض `is_variant_managed`
         // فقط؛ السعر والمتغيّرات الفعلية تُحلّ في `show()` عند الدخول للمنتج
         // (قرار نطاقٍ موثَّق في التقرير، لا نقص أمان: لا سعرٌ مُختلَقٌ يُعرض).
-        $data = $paginator->getCollection()->map(function (Product $product) use ($request, $currency, $inStockByProduct, $tenantSlug, $gallery): array {
+        // FLOWERS-H8 / ADR-20 — وعد التسليم المشتق بدفعة ثابتة الاستعلامات؛ null حين الجدولة معطَّلة (فلا مفتاح).
+        $promises = app(CommerceDeliveryPromiseService::class)
+            ->forProducts($channelId, $paginator->getCollection(), $filters['city'] ?? null, $filters['region'] ?? null);
+
+        $data = $paginator->getCollection()->map(function (Product $product) use ($request, $currency, $inStockByProduct, $tenantSlug, $gallery, $promises): array {
             $galleryMedia = StorefrontProductResource::mediaPayload($gallery->resolveGallery($product), $tenantSlug);
             $price = $product->isVariantManaged() ? 0 : (int) $product->sale_price;
 
@@ -154,7 +167,7 @@ class StorefrontProductController extends PublicApiController
                 false,
                 $tenantSlug,
                 $galleryMedia,
-            ))->resolve($request);
+            ))->withDeliveryPromise($promises[$product->id] ?? null)->resolve($request);
         })->all();
 
         return new JsonResponse([
@@ -183,6 +196,10 @@ class StorefrontProductController extends PublicApiController
         // غير مُعلَنة في التوقيع بجانب اعتماديات مُحقَّنة أخرى، حسم Laravel
         // لمواضع معاملات الطريق يصبح هشّاً (رُصد تجريبياً ربطه بقيمة خاطئة).
         $id = (string) $request->route('id');
+        $destination = $request->validate([
+            'city' => ['sometimes', 'nullable', 'string', 'max:120'],
+            'region' => ['sometimes', 'nullable', 'string', 'max:120'],
+        ]);
 
         $storefront = app(StorefrontContext::class);
         $channelId = $storefront->salesChannelId();
@@ -305,6 +322,10 @@ class StorefrontProductController extends PublicApiController
             );
         }
 
+        // FLOWERS-H8 / ADR-20 — وعد التسليم المشتق؛ المفتاح غائب حين الجدولة معطَّلة على القناة.
+        $promise = app(CommerceDeliveryPromiseService::class)
+            ->forProducts($channelId, [$product], $destination['city'] ?? null, $destination['region'] ?? null);
+        $resource->withDeliveryPromise($promise[$product->id] ?? null);
         $resource->withPersonalization(app(ProductPersonalizationService::class)->publicFields($id));
         $resource->withContentBlocks(app(ProductContentService::class)->publicBlocks($id));
         $resource->withAddons(app(ProductAddonService::class)->publicAddons($id, $channelId, $currency, $tenantSlug, $warehouse));

@@ -1,6 +1,6 @@
 # AWJ Flowers & Gifts — Horizon 1 Progress
 
-**Status:** IN PROGRESS — H1–H7b merged; H8a in progress  
+**Status:** IN PROGRESS — H1–H8a merged; H8b in review  
 **Date:** 2026-10-03  
 **Planning Base:** `main` @ `318cc72d10bb304cef4b401f548772008ea1618e`  
 **Execution Authority:** `AWJ_FLOWERS_HORIZON_1_AUTONOMOUS_EXECUTION.md`  
@@ -42,8 +42,8 @@ No Deploy or Production change is authorized by this Horizon.
 | H6 | Add-ons | MERGED | #1201 | `f86d36d` |
 | H7a | Delivery scheduling — policy, windows, blocked dates, derived availability, public options, admin API | MERGED | #1206 | `bbe59d1` |
 | H7b | Delivery scheduling — checkout schedule, order snapshot, capacity locks, revalidation | MERGED | #1208 | `01fb179` |
-| H8a | Availability / Same-day — derived promise seam, product preparation time, `commerce/v1` exposure | IN PROGRESS | — | — |
-| H8b | Availability / Same-day — `store/v1` parity and `deliver_today` filter | NOT STARTED | — | — |
+| H8a | Availability / Same-day — derived promise seam, product preparation time, `commerce/v1` exposure | MERGED | #1210 | `f7c18bc` |
+| H8b | Availability / Same-day — `store/v1` parity and `deliver_today` filter | PR OPEN, in review | (see log) | — |
 | H9 | Store Builder Flowers Experience | NOT STARTED | — | — |
 | H10 | Storefront Discovery UX | NOT STARTED | — | — |
 | H11 | Flowers/Gifts PDP | NOT STARTED | — | — |
@@ -437,9 +437,12 @@ Copy this section for every completed/active slice.
 
 ### H8a — Availability / Same-day: derived delivery promise (ADR-20)
 
-**Status:** IN PROGRESS  
+**Status:** MERGED  
 **Base SHA:** `01fb1791318685ec035ccb4be8b2227d1b49155d` (main after H7b)  
 **Branch:** `flowers/h8-availability`  
+**PR:** #1210  
+**Head SHA:** `633b9014051f2ffd977ffdde485c6169d979a4dc`  
+**Merge SHA:** `f7c18bcbf235ddff5414be6bd869f9fa486746e6` (squash)
 
 #### What was implemented
 
@@ -448,9 +451,34 @@ Copy this section for every completed/active slice.
 - `CommerceDeliveryScheduleService` split into `context()` (loaded once) and `evaluate()` (in memory); `options()` unchanged in behaviour. `AvailableToSellService::forWarehouseMany` / `InventoryReservationService::activeReservedMany` give batched ATS with the same definitions.
 - `CommerceDeliveryPromiseService::forProducts` — constant query count regardless of products or distinct lead times; `commerce/v1` product list and detail gain `delivery_promise` only while scheduling is enabled; optional `city`/`region` select zone-restricted windows.
 
+#### Tests / CI
+
+- `CommerceDeliveryPromiseTest` (9) and `CommerceProductPreparationApiTest` (5); four mutations each caught. CI sqlite + pgsql green on the head; no review findings (the reviewer had reached its usage limit).
+
 #### Deferred to H8b
 
 - `store/v1` parity and the `deliver_today` list filter; pickup promise.
+
+---
+
+### H8b — Availability / Same-day: storefront parity and Deliver Today (ADR-20 §2.4)
+
+**Status:** PR OPEN, in review  
+**Base SHA:** `f7c18bcbf235ddff5414be6bd869f9fa486746e6` (main after H8a)  
+**Branch:** `flowers/h8b-storefront-promise`  
+
+#### What was implemented
+
+- `store/v1` product list and detail expose `delivery_promise` (same service and conditions as `commerce/v1`; key absent while scheduling is off; `city`/`region` validated).
+- `deliver_today=true` on both public lists via `DeliverTodayFilter`: derived (never stored), evaluated over the candidate set in constant-query chunks and applied before facet counts, sorting and pagination. Scheduling off ⇒ empty; more than 5 000 candidates ⇒ 422 (fail closed).
+
+#### Tests
+
+- `CommerceDeliveryPromiseTest` grew to 13: filter semantics and live changes (stock, cut-off), pagination totals, composition with search, off/invalid values, the candidate limit, and web storefront parity; four more mutations each caught.
+
+#### Deferred
+
+- Pre-computed Deliver Today index for very large catalogs; pickup promise; UI (H10/H11).
 
 ---
 

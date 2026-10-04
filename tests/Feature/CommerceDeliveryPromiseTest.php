@@ -8,6 +8,9 @@ use App\Models\CommerceShippingZone;
 use App\Models\Product;
 use App\Models\ProductWarehouseStock;
 use App\Models\SalesChannel;
+use App\Models\Storefront;
+use App\Models\StorefrontDomain;
+use App\Support\Commerce\DeliverTodayFilter;
 use App\Models\Tenant;
 use App\Models\Warehouse;
 use App\Services\ApiClientKeyService;
@@ -296,5 +299,132 @@ class CommerceDeliveryPromiseTest extends TestCase
         $this->inTenant($b, function () use ($a) {
             $this->assertSame([], app(ProductPreparationService::class)->minutesMany([$a['product']->id]));
         });
+    }
+
+    /** @return array{store: array, a: Product, b: Product, c: Product, d: Product} A وD اليوم، B مهلة طويلة، C بلا مخزون */
+    private function dayFixture(string $slug): array
+    {
+        $store = $this->store($slug);
+        [$b, $c, $d] = $this->inTenant($store, function () use ($store) {
+            $b = $this->product($store['channel'], $store['warehouse'], 'مؤجلة', 5);
+            app(ProductPreparationService::class)->set($b, 720);
+            $c = $this->product($store['channel'], $store['warehouse'], 'منتهية', 0);
+            $d = $this->product($store['channel'], $store['warehouse'], 'ثالثة', 5);
+
+            return [$b, $c, $d];
+        });
+
+        return ['store' => $store, 'a' => $store['product'], 'b' => $b, 'c' => $c, 'd' => $d];
+    }
+
+    private function listIds(array $store, string $query): array
+    {
+        return collect($this->getJson('/commerce/v1/products'.$query, $this->headers($store))->assertOk()->json('data'))->pluck('id')->sort()->values()->all();
+    }
+
+    /** @test */
+    public function deliver_today_keeps_only_products_promised_today_and_follows_eligibility_changes(): void
+    {
+        $f = $this->dayFixture('dt-basic');
+        $store = $f['store'];
+        $sorted = fn (array $ids) => collect($ids)->sort()->values()->all();
+
+        $this->assertSame($sorted([$f['a']->id, $f['d']->id]), $this->listIds($store, '?deliver_today=1'));
+        // بدون المرشّح أو بقيمة false: القائمة كاملة
+        $this->assertCount(4, $this->listIds($store, ''));
+        $this->assertCount(4, $this->listIds($store, '?deliver_today=0'));
+
+        // المجموع والترقيم يعكسان المرشّح لا القائمة كلها
+        $page = $this->getJson('/commerce/v1/products?deliver_today=1&per_page=1', $this->headers($store))->assertOk();
+        $this->assertSame(2, $page->json('meta.pagination.total'));
+        $this->assertTrue($page->json('data.0.delivery_promise.same_day'));
+
+        // يتركّب مع البحث
+        $this->assertSame([$f['d']->id], $this->listIds($store, '?deliver_today=1&search='.rawurlencode('ثالثة')));
+
+        // مخزون A ينفد ⇒ يسقط تلقائياً دون أي تعديل آخر
+        $this->inTenant($store, fn () => ProductWarehouseStock::query()->where('product_id', $f['a']->id)->update(['quantity' => 0]));
+        $this->assertSame([$f['d']->id], $this->listIds($store, '?deliver_today=1'));
+
+        // إغلاق يومي مضى ⇒ لا تسليم اليوم لأحد
+        $this->inTenant($store, fn () => app(CommerceDeliveryScheduleService::class)->saveSettings($store['channel']->id, ['is_enabled' => true, 'cutoff_time' => '09:00']));
+        $this->assertSame([], $this->listIds($store, '?deliver_today=1'));
+    }
+
+    /** @test */
+    public function deliver_today_is_empty_while_scheduling_is_off_and_invalid_values_are_rejected(): void
+    {
+        $store = $this->store('dt-off', []);
+
+        $this->assertSame([], $this->listIds($store, '?deliver_today=1'));
+        $this->assertCount(1, $this->listIds($store, ''));
+        $this->getJson('/commerce/v1/products?deliver_today=maybe', $this->headers($store))->assertStatus(422);
+    }
+
+    /** @test */
+    public function a_candidate_set_beyond_the_limit_is_refused_instead_of_silently_truncated(): void
+    {
+        $f = $this->dayFixture('dt-cap');
+        $this->app->bind(DeliverTodayFilter::class, fn ($app) => new class($app->make(CommerceDeliveryPromiseService::class)) extends DeliverTodayFilter
+        {
+            protected function maxCandidates(): int
+            {
+                return 2;
+            }
+        });
+
+        $refused = $this->getJson('/commerce/v1/products?deliver_today=1', $this->headers($f['store']))->assertStatus(422);
+        $this->assertStringContainsString('deliver_today', json_encode($refused->json(), JSON_UNESCAPED_UNICODE));
+        // عدد المرشّحين ضمن الحد (بحث يضيّق) يُقيَّم عادياً
+        $this->assertSame([$f['d']->id], $this->listIds($f['store'], '?deliver_today=1&search='.rawurlencode('ثالثة')));
+    }
+
+    /** @test */
+    public function the_web_storefront_gets_the_same_promise_and_filter(): void
+    {
+        $host = 'promise-web.example.com';
+        config(['storefront.gateway_secret' => 'pr-gateway-secret']);
+        $tenant = Tenant::create(['name' => $host, 'slug' => 'pw-'.Str::random(8), 'vat_number' => '300000000000003', 'currency' => 'SAR', 'is_active' => true]);
+        app(TenantContext::class)->set($tenant->id);
+        $channel = SalesChannel::create(['slug' => 'web', 'name' => 'Web', 'type' => SalesChannel::TYPE_WEB, 'is_active' => true]);
+        $storefront = Storefront::create(['slug' => 'main', 'name' => 'Main', 'sales_channel_id' => $channel->id, 'is_active' => true]);
+        StorefrontDomain::create(['storefront_id' => $storefront->id, 'hostname' => $host, 'type' => StorefrontDomain::TYPE_CUSTOM, 'is_active' => true, 'verification_status' => StorefrontDomain::VERIFICATION_VERIFIED]);
+        $warehouse = Warehouse::create(['name' => 'مخزن', 'code' => 'PW-'.Str::random(4), 'is_default' => true]);
+        app(FulfillmentPolicyService::class)->setFixedWarehouse($channel->id, $warehouse->id);
+        $today = $this->product($channel, $warehouse, 'اليوم', 5);
+        $later = $this->product($channel, $warehouse, 'لاحقاً', 5);
+        app(ProductPreparationService::class)->set($later, 720);
+        $service = app(CommerceDeliveryScheduleService::class);
+        $service->saveSettings($channel->id, ['is_enabled' => true]);
+        $service->replaceSlots($channel->id, [
+            ['method' => 'delivery', 'label' => 'صباحاً', 'start_time' => '09:00', 'end_time' => '12:00'],
+            ['method' => 'delivery', 'label' => 'مساءً', 'start_time' => '19:00', 'end_time' => '22:00'],
+        ]);
+        app(TenantContext::class)->forget();
+
+        $headers = ['X-Storefront-Forwarded-Host' => $host, 'X-Storefront-Gateway-Secret' => 'pr-gateway-secret'];
+        $base = 'http://laravel-internal.test/store/v1/';
+
+        $list = $this->withHeaders($headers)->getJson($base.'products')->assertOk();
+        $rows = collect($list->json('data'))->keyBy('id');
+        $this->assertTrue($rows[$today->id]['delivery_promise']['same_day']);
+        $this->assertFalse($rows[$later->id]['delivery_promise']['same_day']);
+        $this->assertSame('صباحاً', $rows[$later->id]['delivery_promise']['earliest']['slot']['label']);
+
+        $filtered = $this->withHeaders($headers)->getJson($base.'products?deliver_today=1')->assertOk();
+        $this->assertSame([$today->id], array_column($filtered->json('data'), 'id'));
+        $this->assertSame(1, $filtered->json('meta.pagination.total'));
+
+        $detail = $this->withHeaders($headers)->getJson($base.'products/'.$later->id)->assertOk();
+        $this->assertFalse($detail->json('data.delivery_promise.same_day'));
+        $this->withHeaders($headers)->getJson($base.'products/'.$later->id.'?city='.str_repeat('م', 121))->assertStatus(422);
+
+        // الجدولة معطَّلة ⇒ لا مفتاح وعد
+        app(TenantContext::class)->set($tenant->id);
+        $service->saveSettings($channel->id, ['is_enabled' => false]);
+        app(TenantContext::class)->forget();
+        $off = $this->withHeaders($headers)->getJson($base.'products')->assertOk();
+        $this->assertArrayNotHasKey('delivery_promise', $off->json('data.0'));
+        $this->assertSame([], $this->withHeaders($headers)->getJson($base.'products?deliver_today=1')->json('data'));
     }
 }
