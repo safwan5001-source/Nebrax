@@ -62,12 +62,55 @@ export interface OffersContent {
   offerIds: string[];
 }
 
+/**
+ * FLOWERS-H9a / ADR-21 — data-backed sections. They consume Commerce data and
+ * own no business truth: a shelf stores only a *source reference* (a
+ * collection slug or one facet value) plus the derived "deliver today"
+ * switch; discovery stores only a facet dimension key (or `brand`); the
+ * delivery promise stores only optional editorial text. Products, prices,
+ * stock, facet values, counts and delivery dates are always read live.
+ */
+export const MAX_SECTION_TITLE_LENGTH = 80;
+export const MAX_DELIVERY_PROMISE_BODY_LENGTH = 200;
+export const SHELF_LIMIT_MIN = 2;
+export const SHELF_LIMIT_MAX = 12;
+export const SHELF_LIMIT_DEFAULT = 8;
+export const DISCOVERY_DISPLAYS = ["tiles", "chips"] as const;
+export type DiscoveryDisplay = (typeof DISCOVERY_DISPLAYS)[number];
+/** Special discovery axis: brands (not a descriptive facet). */
+export const DISCOVERY_BRAND_DIMENSION = "brand";
+
+export type ShelfSource =
+  | { kind: "collection"; slug: string }
+  | { kind: "facet"; key: string; value: string };
+
+export interface ProductShelfContent {
+  title: string;
+  source?: ShelfSource;
+  deliverToday: boolean;
+  limit: number;
+}
+
+export interface DiscoveryContent {
+  title: string;
+  dimension: string;
+  display: DiscoveryDisplay;
+}
+
+export interface DeliveryPromiseContent {
+  title: string;
+  body: string;
+}
+
 export type SectionContent =
   | BannerContent
   | BenefitsContent
   | CustomContent
   | FeaturedContent
-  | OffersContent;
+  | OffersContent
+  | ProductShelfContent
+  | DiscoveryContent
+  | DeliveryPromiseContent;
 
 export function emptyBannerContent(): BannerContent {
   return {
@@ -84,7 +127,8 @@ export function bannerContentOf(section: {
   type: string;
   content?: SectionContent;
 }): BannerContent {
-  return section.type === "banner" && section.content && "title" in section.content
+  return section.type === "banner" && section.content &&
+    "ctaLabel" in section.content
     ? section.content
     : emptyBannerContent();
 }
@@ -133,6 +177,39 @@ export function offersContentOf(section: {
     : { offerIds: [] };
 }
 
+export function productShelfContentOf(section: {
+  type: string;
+  content?: SectionContent;
+}): ProductShelfContent {
+  return section.type === "productShelf" &&
+    section.content &&
+    "deliverToday" in section.content
+    ? section.content
+    : { title: "", deliverToday: false, limit: SHELF_LIMIT_DEFAULT };
+}
+
+export function discoveryContentOf(section: {
+  type: string;
+  content?: SectionContent;
+}): DiscoveryContent {
+  return section.type === "discovery" &&
+    section.content &&
+    "dimension" in section.content
+    ? section.content
+    : { title: "", dimension: "", display: "tiles" };
+}
+
+export function deliveryPromiseContentOf(section: {
+  type: string;
+  content?: SectionContent;
+}): DeliveryPromiseContent {
+  return section.type === "deliveryPromise" &&
+    section.content &&
+    "body" in section.content
+    ? section.content
+    : { title: "", body: "" };
+}
+
 export function normalizeOptionalSectionContent(
   type: string,
   raw: unknown,
@@ -161,6 +238,15 @@ export function normalizeOptionalSectionContent(
   if (type === "offers") {
     const content = normalizeOffers(source);
     return content.offerIds.length === 0 ? undefined : content;
+  }
+  if (type === "productShelf") {
+    return normalizeProductShelf(source);
+  }
+  if (type === "discovery") {
+    return normalizeDiscovery(source);
+  }
+  if (type === "deliveryPromise") {
+    return normalizeDeliveryPromise(source);
   }
   return undefined;
 }
@@ -272,6 +358,61 @@ function normalizeOffers(source: Record<string, unknown>): OffersContent {
     if (offerIds.length >= MAX_OFFERS) break;
   }
   return { offerIds };
+}
+
+function normalizeProductShelf(
+  source: Record<string, unknown>,
+): ProductShelfContent | undefined {
+  const raw =
+    source.source && typeof source.source === "object" && !Array.isArray(source.source)
+      ? (source.source as Record<string, unknown>)
+      : {};
+  let shelfSource: ShelfSource | undefined;
+  if (raw.kind === "collection") {
+    const slug = safeToken(raw.slug, "");
+    if (slug) shelfSource = { kind: "collection", slug };
+  } else if (raw.kind === "facet") {
+    const key = safeToken(raw.key, "");
+    const value = safeToken(raw.value, "");
+    if (key && value) shelfSource = { kind: "facet", key, value };
+  }
+  const deliverToday = source.deliverToday === true;
+  if (!shelfSource && !deliverToday) return undefined;
+  const limit =
+    typeof source.limit === "number" && Number.isInteger(source.limit)
+      ? Math.max(SHELF_LIMIT_MIN, Math.min(SHELF_LIMIT_MAX, source.limit))
+      : SHELF_LIMIT_DEFAULT;
+  const content: ProductShelfContent = {
+    title: truncateToCodePoints(asString(source.title).trim(), MAX_SECTION_TITLE_LENGTH),
+    deliverToday,
+    limit,
+  };
+  if (shelfSource) content.source = shelfSource;
+  return content;
+}
+
+function normalizeDiscovery(
+  source: Record<string, unknown>,
+): DiscoveryContent | undefined {
+  const dimension = safeToken(source.dimension, "");
+  if (!dimension) return undefined;
+  const display = DISCOVERY_DISPLAYS.find((candidate) => candidate === source.display);
+  return {
+    title: truncateToCodePoints(asString(source.title).trim(), MAX_SECTION_TITLE_LENGTH),
+    dimension,
+    display: display ?? "tiles",
+  };
+}
+
+function normalizeDeliveryPromise(
+  source: Record<string, unknown>,
+): DeliveryPromiseContent | undefined {
+  const title = truncateToCodePoints(asString(source.title).trim(), MAX_SECTION_TITLE_LENGTH);
+  const body = truncateToCodePoints(
+    asString(source.body).trim(),
+    MAX_DELIVERY_PROMISE_BODY_LENGTH,
+  );
+  return title === "" && body === "" ? undefined : { title, body };
 }
 
 function safeToken(value: unknown, fallback: string): string {

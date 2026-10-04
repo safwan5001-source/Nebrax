@@ -71,6 +71,22 @@ final class StorefrontPresentationNormalizer
     /** CUST-H4-7 — `OffersContent.offerIds`. Twin of MAX_OFFERS in both section-content.ts files. */
     public const MAX_OFFERS = 8;
 
+    /** FLOWERS-H9a / ADR-21 — حدود محتوى الأقسام المرتبطة بالبيانات. توأم الثوابت في ملفَّي section-content.ts. */
+    public const MAX_SECTION_TITLE_LENGTH = 80;
+
+    public const MAX_DELIVERY_PROMISE_BODY_LENGTH = 200;
+
+    public const SHELF_LIMIT_MIN = 2;
+
+    public const SHELF_LIMIT_MAX = 12;
+
+    public const SHELF_LIMIT_DEFAULT = 8;
+
+    public const DISCOVERY_DISPLAYS = ['tiles', 'chips'];
+
+    /** المحور الخاص لـ«تسوّق حسب العلامة» (غير بُعدٍ وصفي). */
+    public const DISCOVERY_BRAND_DIMENSION = 'brand';
+
     /** CUST-H4-4 — banner `imageAlt`. Twin of MAX_BANNER_IMAGE_ALT_LENGTH in both section-content.ts files. */
     public const MAX_BANNER_IMAGE_ALT_LENGTH = 150;
 
@@ -85,6 +101,17 @@ final class StorefrontPresentationNormalizer
         'benefits',
         'appPromo',
         'customContent',
+    ];
+
+    /**
+     * FLOWERS-H9 / ADR-21 — أقسام تستهلك بيانات Commerce ولا تملك حقيقة تجارية. **مقبولة للتخزين** (المحتوى مُطبَّع
+     * fail-closed) لكنها خارج القائمة الافتراضية للوثيقة حتى يضيفها المُنشئ وواجهة المتجر (H9b/H9c) — فلا تتغيّر
+     * الوثيقة الافتراضية ولا توأماها في TS قبل ذلك.
+     */
+    public const HOME_DATA_SECTION_KEYS = [
+        'productShelf',
+        'discovery',
+        'deliveryPromise',
     ];
 
     public const IMPLEMENTED_HOME_SECTION_KEYS = [
@@ -563,7 +590,7 @@ final class StorefrontPresentationNormalizer
                 $type = $id;
             }
 
-            if (! in_array($type, self::HOME_BUILDER_SECTION_KEYS, true)) {
+            if (! in_array($type, self::HOME_BUILDER_SECTION_KEYS, true) && ! in_array($type, self::HOME_DATA_SECTION_KEYS, true)) {
                 continue;
             }
             if (isset($seenIds[$id])) {
@@ -729,6 +756,58 @@ final class StorefrontPresentationNormalizer
             }
 
             return $ids === [] ? null : ['offerIds' => $ids];
+        }
+
+        if ($type === 'productShelf') {
+            // FLOWERS-H9 / ADR-21 — رفّ منتجات مرتبط بالبيانات: **مرجع مصدر فقط** (مجموعة أو قيمة بُعد وصفي) ومرشّح
+            // «التسليم اليوم». لا معرّفات منتجات ولا أسعار ولا توفر ولا وعد — كلها تُقرأ حيّةً من واجهة المنتجات العامة.
+            $title = mb_substr(trim($this->asString($source['title'] ?? null)), 0, self::MAX_SECTION_TITLE_LENGTH);
+            $src = $this->object($source['source'] ?? null);
+            $kind = $src['kind'] ?? null;
+            $normalizedSource = null;
+            if ($kind === 'collection') {
+                $slug = $this->safeId($src['slug'] ?? null, '');
+                $normalizedSource = $slug === '' ? null : ['kind' => 'collection', 'slug' => $slug];
+            } elseif ($kind === 'facet') {
+                $key = $this->safeId($src['key'] ?? null, '');
+                $value = $this->safeId($src['value'] ?? null, '');
+                $normalizedSource = $key === '' || $value === '' ? null : ['kind' => 'facet', 'key' => $key, 'value' => $value];
+            }
+            $deliverToday = ($source['deliverToday'] ?? false) === true;
+            if ($normalizedSource === null && ! $deliverToday) {
+                return null;
+            }
+            $limit = $source['limit'] ?? null;
+            $limit = is_int($limit) ? max(self::SHELF_LIMIT_MIN, min(self::SHELF_LIMIT_MAX, $limit)) : self::SHELF_LIMIT_DEFAULT;
+            $content = ['title' => $title, 'deliverToday' => $deliverToday, 'limit' => $limit];
+            if ($normalizedSource !== null) {
+                $content['source'] = $normalizedSource;
+            }
+
+            return $content;
+        }
+
+        if ($type === 'discovery') {
+            // FLOWERS-H9 / ADR-21 — «تسوّق حسب …»: مفتاح بُعدٍ وصفي (أو `brand`) فقط؛ القيم والأعداد تُقرأ من ميتا
+            // قائمة المنتجات العامة، فلا تُخزَّن هنا ولا تُختلق.
+            $dimension = $this->safeId($source['dimension'] ?? null, '');
+            if ($dimension === '') {
+                return null;
+            }
+
+            return [
+                'title' => mb_substr(trim($this->asString($source['title'] ?? null)), 0, self::MAX_SECTION_TITLE_LENGTH),
+                'dimension' => $dimension,
+                'display' => $this->inList($source['display'] ?? null, self::DISCOVERY_DISPLAYS, 'tiles'),
+            ];
+        }
+
+        if ($type === 'deliveryPromise') {
+            // FLOWERS-H9 / ADR-21 — نصّ تحريري اختياري فقط؛ الموعد الفعلي يُقرأ حيّاً من `delivery-schedule`.
+            $title = mb_substr(trim($this->asString($source['title'] ?? null)), 0, self::MAX_SECTION_TITLE_LENGTH);
+            $body = mb_substr(trim($this->asString($source['body'] ?? null)), 0, self::MAX_DELIVERY_PROMISE_BODY_LENGTH);
+
+            return $title === '' && $body === '' ? null : ['title' => $title, 'body' => $body];
         }
 
         return null;

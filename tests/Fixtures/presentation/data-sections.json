@@ -1,0 +1,338 @@
+{
+ "_comment": "FLOWERS-H9a / ADR-21 — shared normalizer parity cases. Read by StorefrontPresentationDataSectionsTest (PHP), and both section-content tests (web, storefront).",
+ "cases": [
+  {
+   "name": "shelf: collection source, trimmed title, in-range limit",
+   "type": "productShelf",
+   "input": {
+    "title": "  الأكثر مبيعاً  ",
+    "source": {
+     "kind": "collection",
+     "slug": "best-sellers"
+    },
+    "deliverToday": false,
+    "limit": 6
+   },
+   "expected": {
+    "title": "الأكثر مبيعاً",
+    "source": {
+     "kind": "collection",
+     "slug": "best-sellers"
+    },
+    "deliverToday": false,
+    "limit": 6
+   }
+  },
+  {
+   "name": "shelf: facet source",
+   "type": "productShelf",
+   "input": {
+    "source": {
+     "kind": "facet",
+     "key": "occasion",
+     "value": "mothers-day"
+    }
+   },
+   "expected": {
+    "title": "",
+    "source": {
+     "kind": "facet",
+     "key": "occasion",
+     "value": "mothers-day"
+    },
+    "deliverToday": false,
+    "limit": 8
+   }
+  },
+  {
+   "name": "shelf: deliver today needs no source",
+   "type": "productShelf",
+   "input": {
+    "title": "اليوم",
+    "deliverToday": true
+   },
+   "expected": {
+    "title": "اليوم",
+    "deliverToday": true,
+    "limit": 8
+   }
+  },
+  {
+   "name": "shelf: no usable source and no deliver today is omitted",
+   "type": "productShelf",
+   "input": {
+    "title": "فارغ",
+    "source": {
+     "kind": "collection",
+     "slug": "bad slug"
+    },
+    "deliverToday": false
+   },
+   "expected": null
+  },
+  {
+   "name": "shelf: unknown source kind is omitted",
+   "type": "productShelf",
+   "input": {
+    "source": {
+     "kind": "product",
+     "slug": "x"
+    }
+   },
+   "expected": null
+  },
+  {
+   "name": "shelf: facet source needs both key and value",
+   "type": "productShelf",
+   "input": {
+    "source": {
+     "kind": "facet",
+     "key": "occasion"
+    }
+   },
+   "expected": null
+  },
+  {
+   "name": "shelf: deliverToday must be a real boolean, extras are dropped, limit clamps",
+   "type": "productShelf",
+   "input": {
+    "source": {
+     "kind": "collection",
+     "slug": "x",
+     "price": 1,
+     "productIds": [
+      "a"
+     ]
+    },
+    "deliverToday": "yes",
+    "limit": 99,
+    "html": "<b>x</b>",
+    "products": [
+     1,
+     2
+    ]
+   },
+   "expected": {
+    "title": "",
+    "source": {
+     "kind": "collection",
+     "slug": "x"
+    },
+    "deliverToday": false,
+    "limit": 12
+   }
+  },
+  {
+   "name": "shelf: limit below minimum clamps up",
+   "type": "productShelf",
+   "input": {
+    "source": {
+     "kind": "collection",
+     "slug": "x"
+    },
+    "limit": 0
+   },
+   "expected": {
+    "title": "",
+    "source": {
+     "kind": "collection",
+     "slug": "x"
+    },
+    "deliverToday": false,
+    "limit": 2
+   }
+  },
+  {
+   "name": "shelf: non-integer limit falls back to the default",
+   "type": "productShelf",
+   "input": {
+    "source": {
+     "kind": "collection",
+     "slug": "x"
+    },
+    "limit": "6"
+   },
+   "expected": {
+    "title": "",
+    "source": {
+     "kind": "collection",
+     "slug": "x"
+    },
+    "deliverToday": false,
+    "limit": 8
+   }
+  },
+  {
+   "name": "shelf: title is bounded by code points, not UTF-16 units",
+   "type": "productShelf",
+   "input": {
+    "source": {
+     "kind": "collection",
+     "slug": "x"
+    },
+    "title": "😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀"
+   },
+   "expected": {
+    "title": "😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀",
+    "source": {
+     "kind": "collection",
+     "slug": "x"
+    },
+    "deliverToday": false,
+    "limit": 8
+   }
+  },
+  {
+   "name": "shelf: non-string title becomes empty",
+   "type": "productShelf",
+   "input": {
+    "source": {
+     "kind": "collection",
+     "slug": "x"
+    },
+    "title": {
+     "x": 1
+    }
+   },
+   "expected": {
+    "title": "",
+    "source": {
+     "kind": "collection",
+     "slug": "x"
+    },
+    "deliverToday": false,
+    "limit": 8
+   }
+  },
+  {
+   "name": "discovery: facet dimension",
+   "type": "discovery",
+   "input": {
+    "title": " تسوّق حسب المناسبة ",
+    "dimension": "occasion",
+    "display": "chips"
+   },
+   "expected": {
+    "title": "تسوّق حسب المناسبة",
+    "dimension": "occasion",
+    "display": "chips"
+   }
+  },
+  {
+   "name": "discovery: brand axis and default display",
+   "type": "discovery",
+   "input": {
+    "dimension": "brand"
+   },
+   "expected": {
+    "title": "",
+    "dimension": "brand",
+    "display": "tiles"
+   }
+  },
+  {
+   "name": "discovery: unknown display falls back to tiles and extras are dropped",
+   "type": "discovery",
+   "input": {
+    "dimension": "recipient",
+    "display": "carousel",
+    "values": [
+     {
+      "slug": "x"
+     }
+    ],
+    "count": 3
+   },
+   "expected": {
+    "title": "",
+    "dimension": "recipient",
+    "display": "tiles"
+   }
+  },
+  {
+   "name": "discovery: unsafe or missing dimension is omitted",
+   "type": "discovery",
+   "input": {
+    "dimension": "bad dim"
+   },
+   "expected": null
+  },
+  {
+   "name": "discovery: non-string dimension is omitted",
+   "type": "discovery",
+   "input": {
+    "dimension": [
+     "occasion"
+    ]
+   },
+   "expected": null
+  },
+  {
+   "name": "discovery: title bounded",
+   "type": "discovery",
+   "input": {
+    "dimension": "occasion",
+    "title": "اااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااا"
+   },
+   "expected": {
+    "title": "اااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااا",
+    "dimension": "occasion",
+    "display": "tiles"
+   }
+  },
+  {
+   "name": "delivery promise: trimmed bounded editorial text",
+   "type": "deliveryPromise",
+   "input": {
+    "title": "  توصيل في نفس اليوم  ",
+    "body": "بببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببب"
+   },
+   "expected": {
+    "title": "توصيل في نفس اليوم",
+    "body": "بببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببببب"
+   }
+  },
+  {
+   "name": "delivery promise: body only is kept",
+   "type": "deliveryPromise",
+   "input": {
+    "body": "اطلب قبل الظهر"
+   },
+   "expected": {
+    "title": "",
+    "body": "اطلب قبل الظهر"
+   }
+  },
+  {
+   "name": "delivery promise: empty text is omitted",
+   "type": "deliveryPromise",
+   "input": {
+    "title": "  ",
+    "body": ""
+   },
+   "expected": null
+  },
+  {
+   "name": "delivery promise: html stays plain text, live facts are dropped",
+   "type": "deliveryPromise",
+   "input": {
+    "title": "<b>x</b>",
+    "body": "y",
+    "earliest": "2026-10-08",
+    "slot": {
+     "id": "z"
+    }
+   },
+   "expected": {
+    "title": "<b>x</b>",
+    "body": "y"
+   }
+  },
+  {
+   "name": "delivery promise: non-object content is omitted",
+   "type": "deliveryPromise",
+   "input": "text",
+   "expected": null
+  }
+ ]
+}
