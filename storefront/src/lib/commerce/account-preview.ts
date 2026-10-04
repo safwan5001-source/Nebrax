@@ -61,3 +61,64 @@ export const ACCOUNT_ORDER_PREVIEW: StorefrontOrder = {
   ],
   createdAt: "2026-09-12T10:15:00.000Z",
 };
+
+/**
+ * A gifting order (FLOWERS-H13): an add-on under its bouquet, a personalised
+ * line, a gift card and a requested delivery window. Same status as
+ * `ACCOUNT_ORDER_PREVIEW` — a test/dev fixture, never a production default.
+ */
+export const ACCOUNT_GIFT_ORDER_PREVIEW: StorefrontOrder = {
+  ...ACCOUNT_ORDER_PREVIEW,
+  id: "ord-preview-gift-1",
+  number: "AWJ-10533",
+  total: { amount_minor: 31000, currency: "SAR" },
+  gift: {
+    recipientName: "ريم الحربي",
+    recipientPhone: "+966555550101",
+    senderDisplayName: "نورة",
+    hideSender: false,
+    message: "كل عام وأنتِ بخير\nمع محبتي",
+  },
+  schedule: {
+    method: "delivery",
+    date: "2026-09-14",
+    slot: {
+      label: "مساءً",
+      labelEn: "Evening",
+      startTime: "16:00",
+      endTime: "20:00",
+    },
+    timezone: "Asia/Riyadh",
+  },
+  items: [
+    {
+      productId: "p-bouquet",
+      productName: "باقة ورد جوري",
+      unitName: "باقة",
+      quantity: 1,
+      unitPrice: { amount_minor: 24000, currency: "SAR" },
+      lineTotal: { amount_minor: 24000, currency: "SAR" },
+      personalization: [
+        {
+          key: "card_name",
+          label: "الاسم على البطاقة",
+          labelEn: "Name on the card",
+          display: "ريم",
+        },
+      ],
+      lineId: "line-1",
+      addonOf: null,
+    },
+    {
+      productId: "p-choc",
+      productName: "علبة شوكولاتة",
+      unitName: "علبة",
+      quantity: 1,
+      unitPrice: { amount_minor: 7000, currency: "SAR" },
+      lineTotal: { amount_minor: 7000, currency: "SAR" },
+      personalization: [],
+      lineId: "line-2",
+      addonOf: "line-1",
+    },
+  ],
+};

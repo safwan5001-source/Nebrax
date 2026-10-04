@@ -14,7 +14,10 @@ import { AccountSignIn } from "@/components/account/AccountSignIn";
 import { AccountWishlist } from "@/components/account/AccountWishlist";
 import { AuthContext, type User } from "@/contexts/AuthContext";
 import { WishlistProvider } from "@/contexts/WishlistContext";
-import { ACCOUNT_ORDER_PREVIEW } from "@/lib/commerce/account-preview";
+import {
+  ACCOUNT_GIFT_ORDER_PREVIEW,
+  ACCOUNT_ORDER_PREVIEW,
+} from "@/lib/commerce/account-preview";
 import ar from "../../../../messages/ar.json";
 import en from "../../../../messages/en.json";
 
@@ -31,6 +34,7 @@ const SURFACES = [
   "orders",
   "orders-empty",
   "order-detail",
+  "order-detail-gift",
   "addresses",
   "wishlist",
   "profile",
@@ -51,6 +55,8 @@ function previewPath(locale: "ar" | "en", surface: Surface) {
       return `${base}/orders`;
     case "order-detail":
       return `${base}/orders/${ACCOUNT_ORDER_PREVIEW.id}`;
+    case "order-detail-gift":
+      return `${base}/orders/${ACCOUNT_GIFT_ORDER_PREVIEW.id}`;
     case "addresses":
       return `${base}/addresses`;
     case "wishlist":
@@ -180,6 +186,12 @@ function StoreUi5Preview() {
                   {surface === "order-detail" && (
                     <AccountOrderDetail
                       order={ACCOUNT_ORDER_PREVIEW}
+                      basePath={`/sa/${locale}`}
+                    />
+                  )}
+                  {surface === "order-detail-gift" && (
+                    <AccountOrderDetail
+                      order={ACCOUNT_GIFT_ORDER_PREVIEW}
                       basePath={`/sa/${locale}`}
                     />
                   )}

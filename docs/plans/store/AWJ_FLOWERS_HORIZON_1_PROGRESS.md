@@ -50,7 +50,7 @@ No Deploy or Production change is authorized by this Horizon.
 | H10 | Storefront Discovery UX — gifting filters on the listing | MERGED | #1217 | `6e98a01` |
 | H11 | Flowers/Gifts PDP — gifting blocks on the product page | MERGED | #1218 | `6c7b81e` |
 | H12 | Cart & Checkout Gifting UX — cart/order lines (H12a), schedule + gift checkout stages (H12b) | PR OPEN, in review | (see log) | — |
-| H13 | Account / Saved Recipient / Order Experience | NOT STARTED | — | — |
+| H13 | Account / Saved Recipient / Order Experience (ADR-24) | LOCAL (branch stacked on H12) | (see log) | — |
 | H14 | Vertical Onboarding & Defaults | NOT STARTED | — | — |
 | H15 | Theme / Presentation Pack | NOT STARTED | — | — |
 | H16 | Cross-Horizon Integration / Polish | NOT STARTED | — | — |
@@ -685,3 +685,13 @@ MERGES: only according to Horizon authorization
 DEPLOY: NOT PERFORMED
 PRODUCTION: NOT CHANGED
 ```
+
+### H13 — Account order experience (ADR-24)
+
+**Status:** IN PROGRESS (stacked on H12 while #1219 is in CI)  
+**Branch:** `flowers/h13-account-order-gifting`
+
+- **Built.** `OrderGiftingDetails` — the requested date/window and the gift card of a placed order — shared by the confirmation screen and the account order detail; the account detail also nests add-ons under their own bouquet. Fixture `ACCOUNT_GIFT_ORDER_PREVIEW` and a `order-detail-gift` surface on the dev preview. Storefront suite 1001 green; AR mobile and EN desktop reviewed in a browser.
+- **Evidence-driven scope.** `store/v1` is anonymous and every storefront account capability is `design_only`; the commerce customer address book already pairs recipient name + phone with a destination. So saved recipients (would duplicate it and need identity), re-order (needs server re-pricing/availability) and wishlist (shared capability not ready) are **DEFERRED** with the reasons and the safe path recorded in ADR-24; no timeline state is invented.
+- **Residual.** The account order detail remains gated by `ACCOUNT_ORDER_LOOKUP_CAPABILITY`; it lights up when a storefront customer-identity contract lands.
+
