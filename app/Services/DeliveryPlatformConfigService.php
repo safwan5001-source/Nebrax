@@ -609,7 +609,8 @@ final class DeliveryPlatformConfigService
     {
         $values = [];
         foreach (Version::FINANCIAL_FIELDS as $field) {
-            $values[$field] = array_key_exists($field, $input)
+            // null صريح = بلا رأي، كالحقول التشغيلية: الإنشاء يبقى unknown والتعديل يُبقي الحالي.
+            $values[$field] = array_key_exists($field, $input) && $input[$field] !== null
                 ? $input[$field]
                 : ($current?->{$field} ?? 'unknown');
         }

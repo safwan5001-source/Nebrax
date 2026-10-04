@@ -217,5 +217,19 @@ class DeliveryFinancialRoleGateTest extends TestCase
 
         $this->withToken($auth['token'])->putJson("/api/delivery-platforms/{$created['id']}", $this->compatible())
             ->assertOk()->assertJsonPath('data.current_version.version_number', 1);
+
+        $nullable = $this->withToken($auth['token'])->postJson('/api/delivery-platforms', [
+            'platform_key' => 'jahez',
+            'selling_role' => null,
+            'invoice_responsibility' => null,
+            'collection_role' => null,
+            'merchant_vat_status_at_supply' => null,
+        ])->assertCreated()->json('data');
+        $this->assertSame('unknown', $nullable['current_version']['selling_role']);
+        $this->withToken($auth['token'])->putJson("/api/delivery-platforms/{$created['id']}", [
+            'selling_role' => null,
+        ])->assertOk()
+            ->assertJsonPath('data.current_version.version_number', 1)
+            ->assertJsonPath('data.current_version.selling_role', 'merchant_seller');
     }
 }

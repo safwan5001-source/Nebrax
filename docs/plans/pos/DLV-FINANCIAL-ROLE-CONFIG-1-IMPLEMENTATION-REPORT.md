@@ -25,7 +25,7 @@ The four dimensions are columns on `delivery_platform_profile_versions`, which i
 
 ## Evidence
 
-`financial_evidence_ref` is a string of at most 500 characters. No contract file is stored. `financial_verified_at` is set by the server when a non-unknown snapshot is written. `created_by` is the existing version actor. A legal change must send `financial_evidence_ref` in that request. An operational-only change copies the previous legal snapshot, including its verification time.
+`financial_evidence_ref` is a string of at most 500 characters. No contract file is stored. `financial_verified_at` is set by the server when a non-unknown snapshot is written. `created_by` is the existing version actor. A legal change must send `financial_evidence_ref` in that request. An operational-only change copies the previous legal snapshot, including its verification time. An explicit `null` on one of the four role fields is no opinion: create stays `unknown`, and update keeps the current value. It is not a validated value that later fails in the domain.
 
 ## Evaluator
 
