@@ -6,6 +6,7 @@ use App\Models\CommerceListing;
 use App\Models\CommerceProductPreparation;
 use App\Models\CommerceShippingZone;
 use App\Models\Product;
+use App\Models\ProductVariant;
 use App\Models\ProductWarehouseStock;
 use App\Models\SalesChannel;
 use App\Models\Storefront;
@@ -439,5 +440,30 @@ class CommerceDeliveryPromiseTest extends TestCase
         $off = $this->withHeaders($headers)->getJson($base.'products')->assertOk();
         $this->assertArrayNotHasKey('delivery_promise', $off->json('data.0'));
         $this->assertSame([], $this->withHeaders($headers)->getJson($base.'products?deliver_today=1')->json('data'));
+    }
+
+    /** @test */
+    public function only_active_variants_with_stock_make_a_variant_managed_product_deliverable(): void
+    {
+        $store = $this->store('pr-variant');
+        [$product, $disabled, $active] = $this->inTenant($store, function () use ($store) {
+            $product = $this->product($store['channel'], $store['warehouse'], 'متعددة', 0);
+            ProductWarehouseStock::query()->where('product_id', $product->id)->delete();
+            $product->variant_state = 'variant_managed';
+            $product->save();
+            $disabled = ProductVariant::create(['product_id' => $product->id, 'sku' => 'VD-'.Str::random(6), 'combination_key' => 'dis-'.Str::random(5), 'is_active' => false]);
+            $active = ProductVariant::create(['product_id' => $product->id, 'sku' => 'VA-'.Str::random(6), 'combination_key' => 'act-'.Str::random(5), 'is_active' => true]);
+            // المخزون التاريخي يبقى على المتغيّر المعطَّل؛ النشط بلا مخزون
+            ProductWarehouseStock::create(['product_id' => $product->id, 'product_variant_id' => $disabled->id, 'warehouse_id' => $store['warehouse']->id, 'quantity' => 4]);
+            ProductWarehouseStock::create(['product_id' => $product->id, 'product_variant_id' => $active->id, 'warehouse_id' => $store['warehouse']->id, 'quantity' => 0]);
+
+            return [$product, $disabled, $active];
+        });
+
+        $this->assertSame('out_of_stock', $this->promise($store, $product)['reason']);
+        $this->assertSame([], collect($this->getJson('/commerce/v1/products?deliver_today=1', $this->headers($store))->json('data'))->pluck('id')->intersect([$product->id])->all());
+
+        $this->inTenant($store, fn () => ProductWarehouseStock::query()->where('product_variant_id', $active->id)->update(['quantity' => 2]));
+        $this->assertTrue($this->promise($store, $product)['same_day']);
     }
 }
