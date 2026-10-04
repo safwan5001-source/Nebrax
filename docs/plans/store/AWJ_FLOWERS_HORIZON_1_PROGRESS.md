@@ -1,6 +1,6 @@
 # AWJ Flowers & Gifts — Horizon 1 Progress
 
-**Status:** IN PROGRESS — H1–H10 merged; H11 in review  
+**Status:** IN PROGRESS — H1–H11 merged; H12 in review  
 **Date:** 2026-10-03  
 **Planning Base:** `main` @ `318cc72d10bb304cef4b401f548772008ea1618e`  
 **Execution Authority:** `AWJ_FLOWERS_HORIZON_1_AUTONOMOUS_EXECUTION.md`  
@@ -48,8 +48,8 @@ No Deploy or Production change is authorized by this Horizon.
 | H9b | Store Builder — storefront renderers for the data-backed sections (+ listing deep-link context) | MERGED | #1213 | `c90f758` |
 | H9c | Store Builder — builder UI (library, editors, canvas); default document intentionally unchanged | MERGED | #1216 | `4bb8d17` |
 | H10 | Storefront Discovery UX — gifting filters on the listing | MERGED | #1217 | `6e98a01` |
-| H11 | Flowers/Gifts PDP — gifting blocks on the product page | PR OPEN, in review | (see log) | — |
-| H12 | Cart & Checkout Gifting UX | NOT STARTED | — | — |
+| H11 | Flowers/Gifts PDP — gifting blocks on the product page | MERGED | #1218 | `6c7b81e` |
+| H12 | Cart & Checkout Gifting UX — cart/order lines (H12a), schedule + gift checkout stages (H12b) | PR OPEN, in review | (see log) | — |
 | H13 | Account / Saved Recipient / Order Experience | NOT STARTED | — | — |
 | H14 | Vertical Onboarding & Defaults | NOT STARTED | — | — |
 | H15 | Theme / Presentation Pack | NOT STARTED | — | — |
@@ -612,9 +612,11 @@ Copy this section for every completed/active slice.
 
 ### H11 — Flowers/Gifts PDP: gifting blocks on the product page (ADR-22)
 
-**Status:** PR OPEN, in review  
+**Status:** MERGED  
 **Base SHA:** `6e98a011926f4abd990610d1bd9ee9027e82b7d2` (main after H10)  
 **Branch:** `flowers/h11-pdp`  
+**PR:** #1218 · **Head SHA:** `54f1079482f9be89341a9350bfd48757cbced5c0` · **Merge SHA:** `6c7b81eb756dfffc82afa6a4d8a37135a9c94919` (squash)  
+**CI on head:** all 8 jobs green. Codex reached its review usage limit before reviewing this PR; no threads were opened.  
 
 #### What was implemented
 
@@ -634,6 +636,30 @@ Copy this section for every completed/active slice.
 #### Deferred
 
 - Destination entry on the PDP and a destination-aware promise (needs the destination model — H12); recommendations (no API).
+
+---
+
+### H12 — Cart & Checkout Gifting UX (ADR-23)
+
+**Status:** PR OPEN, in review (two commits: H12a lines, H12b checkout stages)  
+**Base SHA:** `6c7b81eb756dfffc82afa6a4d8a37135a9c94919` (main after H11)  
+**Branch:** `flowers/h12-cart-checkout-gifting`  
+
+#### What was implemented
+
+- **H12a — lines.** Personalization answers print under the line name; add-on lines are grouped under their own parent (the API lists lines by creation time) and shown nested and read-only — the API refuses to change or remove an add-on on its own — on the cart page, drawer, checkout summary and confirmation. Orders map the same fields (`personalization`, `line_id`, `addon_of`). The bag badge and item count no longer include add-ons.
+- **H12b — checkout.** Two optional stages that exist only when the channel offers them: **date & time** (ADR-19: only server-listed windows, channel-timezone "today/tomorrow", required vs optional as the channel says, retry on a failed read, never a silent dead end, nothing reserved at selection) and **gift** (ADR-15: recipient name / phone, the card's "from" defaulting to the purchaser and optionally hidden, a plain-text message — limits and required fields from the store's `gift_options`). A store with neither policy keeps the original six stages. Sequence: contact → address → delivery → date & time → gift → payment → review → confirmation. Review and confirmation show the requested date/window and the gift; completion refusals (`schedule_*`, `gift_*`) route back to the right stage, adding it to the step list if the up-front read missed it.
+- Wire/view models for gift, gift options and schedule with defensive validation (`checkout-gifting.ts`); client functions and server actions for `checkout/gift`, `checkout/schedule`, `delivery-schedule`. Six locales gained the stage, schedule, gift, review and refusal strings.
+- **AWJ DECISION (ADR-23):** optional stages only when offered; date before gift; no editable add-on lines; confirmation states what was *requested*, not a fulfilment promise.
+
+#### Tests
+
+- Storefront: 997 tests green. New: line mapping / grouping / badge (cart and order), nested add-on rendering, the schedule and gift stages end to end (step counts, required vs optional, blocking rules, saves to their own endpoints, clearing, policy-driven fields, refusals routed back and the stage added to the step list, review rows), gift/schedule model mapping and client requests, confirmation cards. The original checkout tests keep passing (only their mocks gained the new actions). Mutations (not adding the stage on a refusal; ignoring "required") each caught. `tsc`, `biome check`, `check:locales` clean.
+- Visual: full Arabic mobile run (schedule → gift → review → confirmation) and the cart page reviewed against a stateful local fixture; an RTL spacing bug (a gap on the wrong side of a `dir=ltr` element) was found and fixed in the process.
+
+#### Deferred
+
+- A separate delivery address for the recipient beyond the existing address stage; saved recipients and re-order (H13); no-address gifting and recipient notification (evidence-gated).
 
 ---
 
