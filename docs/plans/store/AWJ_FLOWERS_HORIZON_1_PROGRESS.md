@@ -1,6 +1,6 @@
 # AWJ Flowers & Gifts — Horizon 1 Progress
 
-**Status:** IN PROGRESS — H1–H13 merged; H14 in review  
+**Status:** IN PROGRESS — H1–H14 merged; H15 in review  
 **Date:** 2026-10-03  
 **Planning Base:** `main` @ `318cc72d10bb304cef4b401f548772008ea1618e`  
 **Execution Authority:** `AWJ_FLOWERS_HORIZON_1_AUTONOMOUS_EXECUTION.md`  
@@ -51,8 +51,8 @@ No Deploy or Production change is authorized by this Horizon.
 | H11 | Flowers/Gifts PDP — gifting blocks on the product page | MERGED | #1218 | `6c7b81e` |
 | H12 | Cart & Checkout Gifting UX — cart/order lines (H12a), schedule + gift checkout stages (H12b) | MERGED | #1219 | `1f15d5f` |
 | H13 | Account / Saved Recipient / Order Experience (ADR-24) | MERGED | #1220 | `52e1096` |
-| H14 | Vertical Onboarding & Defaults (ADR-25) | PR OPEN, in review | (see log) | — |
-| H15 | Theme / Presentation Pack | NOT STARTED | — | — |
+| H14 | Vertical Onboarding & Defaults (ADR-25) | MERGED | #1221 | `064a91e` |
+| H15 | Theme / Presentation Pack — AWJ Bloom (ADR-26) | PR OPEN, in review | (see log) | — |
 | H16 | Cross-Horizon Integration / Polish | NOT STARTED | — | — |
 
 ---
@@ -698,7 +698,7 @@ PRODUCTION: NOT CHANGED
 
 ### H14 — Vertical onboarding & defaults (ADR-25)
 
-**Status:** PR in review  
+**Status:** MERGED — PR #1221, squash `064a91e7df3d31962758364911608e1f8631e114`; head `2ea23977e6067cddd5be0f2c86c84312ef18bf34`; CI 6/6 green (sqlite + pgsql, web build, both runs); no review threads (Codex out of quota)  
 **Base SHA:** `52e1096dd8a571081ae727d98c2c66f7bf83d126` (main after H13)  
 **Branch:** `flowers/h14-vertical-onboarding`
 
@@ -707,4 +707,16 @@ PRODUCTION: NOT CHANGED
 - **Not done on purpose.** No policy is switched on (gift, scheduling, add-ons, personalization stay merchant decisions); no builder sections are auto-written (the builder owns draft/publish revisions); changing the vertical back to `general` deletes nothing (tested).
 - **Tests.** `FlowersVerticalSetupApiTest` (10 cases: general store, fresh store, preview-writes-nothing, idempotency, merchant-edit preservation, blocked key, vertical switch-back, status-from-real-settings, tenant isolation + RBAC); `CommerceModuleBoundaryTest` allowlist updated; web client + panel + stores page + e2e. Full web suite 3132 green. Local full PHP run: only environment failures (no `bcmath`, no AWS SDK in this container — Fuel and ProductMedia R2 classes); CI is authoritative.
 - **Residual risk — adoption gap (for the final report).** The dashboard has **no screens** for the gift policy, the delivery schedule (settings, windows, blocked dates) or per-product personalization, add-ons and content blocks — they are API-only. The checklist says so ("No screen yet"). Building them is the main step before a merchant can enable these features without API access.
+
+### H15 — Theme / presentation pack: AWJ Bloom (ADR-26)
+
+**Status:** PR in review  
+**Base SHA:** `064a91e7df3d31962758364911608e1f8631e114` (main after H14)  
+**Branch:** `flowers/h15-bloom-presentation`
+
+- **Preset.** `awj-bloom` added to the closed preset allow-list in all three mirrors at once (PHP normalizer, web tokens, storefront tokens) with AR/EN labels (web builder, storefront customizer, App Builder preset list). Rosewood primary `#9d2449` (7.55:1 with white text). Colour identity only — **no starting bundle**; unknown/old ids still fail closed; existing stores untouched.
+- **Gallery.** The planned "Boutique Floral" placeholder is replaced by the applicable AWJ Bloom entry. Applying it creates a **new draft version** (never the published store or the working draft) with the preset and — only where the store can back them — a `discovery` section per active occasion/recipient facet (the merchant's own facet key) and a `deliveryPromise` band when scheduling is configured. Placed after the hero; existing sections keep order/content; idempotent; section limits respected; if data can't be read the theme still applies (colour only). Other gallery themes never read store data. Gallery cards now preview each theme's own colour.
+- **Boundaries held.** No taxonomy, delivery truth, gift/personalization persistence, add-on pricing, inventory or checkout validation owned by the theme; no Nebras-specific behaviour or branding.
+- **Tests.** Normalizer/PHP, storefront tokens + config, web registry/preset/pack/gallery-page tests; e2e (AR 390/1440, EN 1440, apply → saved sections) with screenshots. Full web suite 3145 green; storefront 1003 green; `check:locales` clean.
+- **Residual.** Bloom is a colour + section starter, not a full visual redesign (typography/imagery, seasonal variants — evidence-gated). 
 
