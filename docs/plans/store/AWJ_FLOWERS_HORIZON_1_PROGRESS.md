@@ -1,6 +1,6 @@
 # AWJ Flowers & Gifts — Horizon 1 Progress
 
-**Status:** IN PROGRESS — H1–H9a merged; H9b in review  
+**Status:** IN PROGRESS — H1–H9b merged; H9c in review  
 **Date:** 2026-10-03  
 **Planning Base:** `main` @ `318cc72d10bb304cef4b401f548772008ea1618e`  
 **Execution Authority:** `AWJ_FLOWERS_HORIZON_1_AUTONOMOUS_EXECUTION.md`  
@@ -45,8 +45,8 @@ No Deploy or Production change is authorized by this Horizon.
 | H8a | Availability / Same-day — derived promise seam, product preparation time, `commerce/v1` exposure | MERGED | #1210 | `f7c18bc` |
 | H8b | Availability / Same-day — `store/v1` parity and `deliver_today` filter | MERGED | #1211 | `0ed7b6c` |
 | H9a | Store Builder — data-backed section content contract (ADR-21) | MERGED | #1212 | `5f34585` |
-| H9b | Store Builder — storefront renderers for the data-backed sections (+ listing deep-link context) | PR OPEN, in review | (see log) | — |
-| H9c | Store Builder — builder UI (library, panels, canvas) and default-document entries | NOT STARTED | — | — |
+| H9b | Store Builder — storefront renderers for the data-backed sections (+ listing deep-link context) | MERGED | #1213 | `c90f758` |
+| H9c | Store Builder — builder UI (library, editors, canvas); default document intentionally unchanged | PR OPEN, in review | (see log) | — |
 | H10 | Storefront Discovery UX | NOT STARTED | — | — |
 | H11 | Flowers/Gifts PDP | NOT STARTED | — | — |
 | H12 | Cart & Checkout Gifting UX | NOT STARTED | — | — |
@@ -522,9 +522,11 @@ Copy this section for every completed/active slice.
 
 ### H9b — Store Builder: storefront renderers and listing deep-link context (ADR-21 §2.1)
 
-**Status:** PR OPEN, in review  
+**Status:** MERGED  
 **Base SHA:** `5f34585b2cd84e41360b9b9fa7f7250cdd0d1c0a` (main after H9a)  
 **Branch:** `flowers/h9b-storefront-sections`  
+**PR:** #1213 · **Head SHA:** `1bb906dbc396b91864ce44ecdee5cb562e0b362f` · **Merge SHA:** `c90f7587ebfac8e5df1e13b64758641bb2ed60ea` (squash)  
+**CI on head:** all 8 jobs green (sqlite + pgsql, storefront lint/typecheck/test, merchant-preview and published-footer visual QA).  
 
 #### What was implemented
 
@@ -538,9 +540,39 @@ Copy this section for every completed/active slice.
 - Storefront: 902 tests green (new: delivery-day formatting incl. store-timezone "today", listing-context parsing, fetcher query/cache/mapping and the deep-link forwarding, the three section components); `tsc` and `biome check` clean. Eight mutations (cache/no-cache, token validation, empty omission, failure fallback, malformed date) each caught.
 - The storefront has its own CI job (`storefront (lint + typecheck + test)`); locally its dependencies are installed from the pnpm lockfile.
 
+#### Review and CI notes
+
+- One Codex finding (P2): the listing analytics key ignored the catalog context, so a same-route navigation that changed only `collection` / `facet[...]` / `brand_id` / `deliver_today` suppressed `view_item_list`. Fixed with one shared `contextKey` for the island and the analytics `stateKey`; the new `ProductListing.test.tsx` fails without the fix.
+- `published footer visual QA` returned 404 for `/sa/en` for the whole dev-server wait on the first head. It did not reproduce locally (clean `.next`, same fixture and env: 200) and passed on the next head. Recorded as a **transient, unreproduced** CI failure — not root-caused. The final report lists it as a residual risk.
+
 #### Deferred
 
-- Builder UI and default-document entries (H9c); filter UI, facet chips and destination context (H10); visual QA of the new sections (H9c harness).
+- Builder UI (H9c); filter UI, facet chips and destination context (H10).
+
+---
+
+### H9c — Store Builder: builder UI for the data-backed sections (ADR-21 §2.2)
+
+**Status:** PR OPEN, in review  
+**Base SHA:** `c90f7587ebfac8e5df1e13b64758641bb2ed60ea` (main after H9b)  
+**Branch:** `flowers/h9c-builder-ui`  
+
+#### What was implemented
+
+- Library/registry: `productShelf` and `discovery` (many instances, duplicable) and `deliveryPromise` (one instance) are live, merchant-addable. `HOME_DATA_SECTION_KEYS` is separate; `ALL_HOME_SECTION_KEYS` drives acceptance and the registry; `HOME_BUILDER_SECTION_KEYS` — and so the default document — is unchanged.
+- Editors (`DataSectionFields.tsx`): references and text only; real *active* collections / facets / values from the Merchandising API with loading, error and retry; stored references no longer listed stay selectable; incomplete choices commit `undefined` content with an explicit "will not appear in the store" warning.
+- Canvas: authored title, deliver-today badge and an honest "live data appears here" note — never products, counts or dates; sections with no stored content are flagged.
+- Arabic and English strings; library glyphs.
+- **AWJ DECISION:** the default document is *not* changed (ADR-21 §2.2); flowers layouts are applied to the merchant's draft by the vertical onboarding slice (H14).
+
+#### Tests
+
+- Web builder suite: 536 tests green (new: editor behaviour incl. active-only options, incomplete handling and retry; Canvas placeholders in AR/EN; registry/truth-matrix updates). Mutation (dropping the active-collection filter) caught by the editor test. `tsc` clean for the module.
+- Visual: `e2e/flowers-h9c-data-sections-visual.spec.ts` against `/dev/customizer-visual?scenario=data-sections` (AR/EN × mobile/desktop) passes locally; screenshots reviewed. The spec is not part of the CI workflow's path-filtered spec list. The shared preview shell has a pre-existing 1px LTR document overflow (also on the existing `populated` scenario), so the spec asserts on the sections themselves.
+
+#### Deferred
+
+- Filter UI, facet chips and destination context (H10); flowers home preset (H14).
 
 ---
 

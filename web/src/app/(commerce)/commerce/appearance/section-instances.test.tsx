@@ -137,14 +137,17 @@ describe('commerce appearance — STORE-CUSTOMIZER-V2-2 section instances', () =
     // trust&services → app&communication), not declaration order.
     expect(options.map((el) => el.getAttribute('data-picker-option'))).toEqual([
       'featured',
+      'productShelf',
       'categories',
       'newArrivals',
+      'discovery',
       'wholesale',
       'offers',
       'hero',
       'banner',
       'customContent',
       'benefits',
+      'deliveryPromise',
       'appPromo',
     ]);
     expect(picker.textContent).toContain('شريط ترويجي');

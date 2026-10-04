@@ -3,7 +3,9 @@ import {
   canAddSectionType,
   canDuplicateSection,
   DEFAULT_PRESENTATION_CONFIG,
+  ALL_HOME_SECTION_KEYS,
   HOME_BUILDER_SECTION_KEYS,
+  HOME_DATA_SECTION_KEYS,
   hasAddableSectionType,
   isGatedHomeSection,
   MAX_HOME_SECTIONS,
@@ -29,7 +31,7 @@ function section(
 describe("section capabilities (STORE-CUSTOMIZER-V2-2)", () => {
   it("covers every registered section type exactly once", () => {
     expect(Object.keys(SECTION_CAPABILITIES).sort()).toEqual(
-      [...HOME_BUILDER_SECTION_KEYS].sort(),
+      [...ALL_HOME_SECTION_KEYS].sort(),
     );
   });
 
@@ -129,15 +131,15 @@ describe("CUST-H4-2 capability registry — state/category/library metadata", ()
   it("has exactly one well-formed capability entry per registered type, no unknowns", () => {
     const keys = Object.keys(SECTION_CAPABILITIES);
     expect(new Set(keys).size).toBe(keys.length);
-    expect(keys.sort()).toEqual([...HOME_BUILDER_SECTION_KEYS].sort());
-    for (const type of HOME_BUILDER_SECTION_KEYS) {
+    expect(keys.sort()).toEqual([...ALL_HOME_SECTION_KEYS].sort());
+    for (const type of ALL_HOME_SECTION_KEYS) {
       expect(SECTION_CAPABILITIES[type].type).toBe(type);
     }
   });
 
   it("only uses valid state values from the H4 vocabulary", () => {
     const valid = new Set(["live", "partial", "gated", "deferred"]);
-    for (const type of HOME_BUILDER_SECTION_KEYS) {
+    for (const type of ALL_HOME_SECTION_KEYS) {
       expect(valid.has(SECTION_CAPABILITIES[type].state)).toBe(true);
     }
   });
@@ -158,14 +160,18 @@ describe("CUST-H4-2 capability registry — state/category/library metadata", ()
       benefits: "live",
       appPromo: "live",
       customContent: "live",
+      // FLOWERS-H9 / ADR-21 — read live by the storefront (H9b renderers).
+      productShelf: "live",
+      discovery: "live",
+      deliveryPromise: "live",
     };
-    for (const type of HOME_BUILDER_SECTION_KEYS) {
+    for (const type of ALL_HOME_SECTION_KEYS) {
       expect(SECTION_CAPABILITIES[type].state).toBe(expected[type]);
     }
   });
 
   it("keeps the formalized gated state consistent with the existing isGatedHomeSection gate (empty today)", () => {
-    for (const type of HOME_BUILDER_SECTION_KEYS) {
+    for (const type of ALL_HOME_SECTION_KEYS) {
       expect(SECTION_CAPABILITIES[type].state === "gated").toBe(
         isGatedHomeSection(type),
       );
@@ -203,7 +209,7 @@ describe("CUST-H4-2 capability registry — state/category/library metadata", ()
   });
 
   it("leaves every other section's capability state unchanged by the Offers transition", () => {
-    for (const type of HOME_BUILDER_SECTION_KEYS) {
+    for (const type of ALL_HOME_SECTION_KEYS) {
       expect(SECTION_CAPABILITIES[type].state).toBe("live");
       expect(SECTION_CAPABILITIES[type].merchantAddable).toBe(true);
     }
@@ -214,7 +220,7 @@ describe("CUST-H4-2 capability registry — state/category/library metadata", ()
   it("maps every section to exactly one of the 7 taxonomy categories, none empty", () => {
     expect(SECTION_LIBRARY_CATEGORIES.length).toBe(7);
     const covered = new Set<string>();
-    for (const type of HOME_BUILDER_SECTION_KEYS) {
+    for (const type of ALL_HOME_SECTION_KEYS) {
       const category = SECTION_CAPABILITIES[type].category;
       expect(SECTION_LIBRARY_CATEGORIES.includes(category)).toBe(true);
       covered.add(category);
@@ -231,7 +237,7 @@ describe("CUST-H4-2 capability registry — state/category/library metadata", ()
     for (const category of SECTION_LIBRARY_CATEGORIES) {
       keys.add(SECTION_LIBRARY_CATEGORY_LABEL[category]);
     }
-    for (const type of HOME_BUILDER_SECTION_KEYS) {
+    for (const type of ALL_HOME_SECTION_KEYS) {
       const cap = SECTION_CAPABILITIES[type];
       keys.add(cap.titleKey);
       keys.add(cap.descriptionKey);
@@ -250,12 +256,35 @@ describe("CUST-H4-2 capability registry — state/category/library metadata", ()
   it("merchantAddable gates canAddSectionType independently of instance count", () => {
     // Every type is merchant-addable (Offers flipped in CUST-H4-7), so
     // instance-count rules are the only remaining gate.
-    for (const type of HOME_BUILDER_SECTION_KEYS) {
+    for (const type of ALL_HOME_SECTION_KEYS) {
       expect(SECTION_CAPABILITIES[type].merchantAddable).toBe(true);
     }
     const sections = DEFAULT_PRESENTATION_CONFIG.homepage.sections.filter(
       (s) => s.type !== "appPromo",
     );
     expect(canAddSectionType(sections, "appPromo")).toBe(true);
+  });
+});
+
+describe("FLOWERS-H9c data-backed sections (ADR-21)", () => {
+  it("are addable, live, and kept out of the default document's key list", () => {
+    for (const type of HOME_DATA_SECTION_KEYS) {
+      expect(SECTION_CAPABILITIES[type].state).toBe("live");
+      expect(SECTION_CAPABILITIES[type].merchantAddable).toBe(true);
+      expect(canAddSectionType([], type)).toBe(true);
+      expect(HOME_BUILDER_SECTION_KEYS).not.toContain(type);
+      expect(ALL_HOME_SECTION_KEYS).toContain(type);
+    }
+    expect(DEFAULT_PRESENTATION_CONFIG.homepage.sections.some((entry) =>
+      (HOME_DATA_SECTION_KEYS as readonly string[]).includes(entry.type),
+    )).toBe(false);
+  });
+
+  it("allows many shelves/discovery blocks but a single delivery promise", () => {
+    const shelves = [section("a", "productShelf"), section("b", "productShelf")];
+    expect(canAddSectionType(shelves, "productShelf")).toBe(true);
+    expect(canAddSectionType([section("a", "deliveryPromise")], "deliveryPromise")).toBe(false);
+    expect(canDuplicateSection(shelves, shelves[0])).toBe(true);
+    expect(canDuplicateSection([section("a", "deliveryPromise")], section("a", "deliveryPromise"))).toBe(false);
   });
 });

@@ -504,6 +504,29 @@ function SectionGlyph({ type }: { type: HomeBuilderSectionKey }) {
           <path d="M4 5h12M4 9h12M4 13h8" />
         </svg>
       );
+    case "productShelf":
+      return (
+        <svg {...common}>
+          <rect x="3" y="4" width="5" height="7" rx="0.75" />
+          <rect x="12" y="4" width="5" height="7" rx="0.75" />
+          <path d="M3 14h5M12 14h5" />
+        </svg>
+      );
+    case "discovery":
+      return (
+        <svg {...common}>
+          <circle cx="8.5" cy="8.5" r="4.5" />
+          <path d="M12 12l4.5 4.5" />
+        </svg>
+      );
+    case "deliveryPromise":
+      return (
+        <svg {...common}>
+          <path d="M2.5 6.5h9v7h-9zM11.5 9h3l2 2v2.5h-5" />
+          <circle cx="6" cy="14.5" r="1.25" />
+          <circle cx="14" cy="14.5" r="1.25" />
+        </svg>
+      );
     default:
       return null;
   }
