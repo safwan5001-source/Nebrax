@@ -9,6 +9,7 @@ use App\Models\CommerceListing;
 use App\Models\CommerceProductAddon;
 use App\Models\CommerceProductContentBlock;
 use App\Models\CommerceProductPersonalizationField;
+use App\Models\CommerceProductPreparation;
 use App\Models\CommerceProductFacetValue;
 use App\Models\CommerceOrderLine;
 use App\Models\CreditNoteLine;
@@ -201,6 +202,8 @@ final class ProductReferenceRegistry
         CommerceProductPersonalizationField::class => ['key' => 'commerce_product_personalization_fields', 'classes' => [self::OWNED_CHILD]],
         // H5 / ADR-17: كتل محتوى المنتج المهيكلة (تركيبة/عناية/تغليف) نصٌّ تسويقي تابع بالكامل
         // للمنتج — بلا أثر مالي أو مخزني، لا يمنع الحذف الحقيقي ويُنظَّف معه.
+        // H8 / ADR-20: مهلة تجهيز المنتج تابعٌ مملوك — بلا أثر مالي أو مخزني، تُنظَّف مع الحذف الحقيقي.
+        CommerceProductPreparation::class => ['key' => 'commerce_product_preparations', 'classes' => [self::OWNED_CHILD]],
         CommerceProductContentBlock::class => ['key' => 'commerce_product_content_blocks', 'classes' => [self::OWNED_CHILD]],
         // H6 / ADR-18: علاقة إضافة اختيارية (أب ← منتج إضافة) — توصيفٌ تجاري بلا أثر مالي أو مخزني.
         // تُنظَّف حين يكون المنتج أباً (`product_id`) أو إضافةً (`addon_product_id`)؛ سطور الطلبات

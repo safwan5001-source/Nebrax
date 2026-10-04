@@ -80,6 +80,8 @@ final class CommerceOrderSerializer
                 'hide_sender' => (bool) $order->gift->hide_sender,
                 'message' => $order->gift->message,
             ],
+            // FLOWERS-H7b / ADR-19 — لقطة موعد التسليم الثابتة؛ المفتاح غائب لطلب بلا جدولة (شكل مطابق لما قبل H7).
+            ...($order->schedule === null ? [] : ['schedule' => \App\Services\Commerce\CommerceDeliveryScheduleService::presentOrder($order->schedule)]),
             'payment' => [
                 'method' => $order->paymentIntent?->method,
                 'status' => $order->paymentIntent?->status,

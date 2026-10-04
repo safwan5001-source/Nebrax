@@ -280,13 +280,18 @@ class CommerceOrderService
                 app(CommerceGiftService::class)->snapshotToOrder($order, $header['gift']);
             }
 
+            // FLOWERS-H7b / ADR-19: لقطة موعد التسليم تحت قفل صف النافذة (السعة)؛ ممتلئة ⇒ review-required يُلغي المعاملة كلها.
+            if (! empty($header['schedule'])) {
+                app(CommerceDeliveryScheduleService::class)->snapshotToOrder($order, $header['schedule'], $header['delivery_city'] ?? null, $header['delivery_region'] ?? null);
+            }
+
             // نقلٌ صريحٌ أخير إلى confirmed — لا مسار خارجي رأى draft قط
             // (انظر توثيق الدالة أعلاه). لا استدعاء لـ confirm() القائمة:
             // تلك تفتح معاملتها/تقفل صفّها الخاص لسيناريو مختلف (طلبٌ قد
             // يكون قديماً وغير مقفولٍ أصلاً هنا).
             $order->update(['status' => CommerceOrder::STATUS_CONFIRMED, 'confirmed_at' => now()]);
 
-            return $order->fresh(['lines.personalizations', 'snapshot', 'gift']);
+            return $order->fresh(['lines.personalizations', 'snapshot', 'gift', 'schedule']);
         });
     }
 

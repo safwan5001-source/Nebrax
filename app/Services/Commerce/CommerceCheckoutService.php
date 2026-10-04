@@ -345,6 +345,21 @@ final class CommerceCheckoutService
     }
 
     /**
+     * FLOWERS-H7b / ADR-19 — يضبط/يمسح موعد التسليم (تاريخ + نافذة). `null/null` يمسح. السياسة والتوفّر من
+     * `CommerceDeliveryScheduleService` وحده بطريقة Checkout ووجهته المخزَّنتين؛ لا سعر ولا مخزون ولا حجز.
+     */
+    public function updateSchedule(CommerceCheckout $knownCheckout, ?string $date, ?string $slotId): array
+    {
+        return DB::transaction(function () use ($knownCheckout, $date, $slotId): array {
+            $checkout = $this->lockUsableCheckout($knownCheckout);
+            app(CommerceDeliveryScheduleService::class)->applyToCheckout($checkout, $date, $slotId);
+            $checkout->update(['expires_at' => now()->addMinutes(self::LIFETIME_MINUTES)]);
+
+            return $this->serialize($checkout, $this->cartFor($checkout));
+        }, 3);
+    }
+
+    /**
      * @param  array<string, string|null>  $fields مفاتيحها أعمدة delivery_* (عنوان) جاهزة من المتحكّم.
      *
      * (COM-MOBILE-SHIPPING-1) العنوان وطريقة التوصيل يُضبطان عبر نداءين
@@ -548,6 +563,10 @@ final class CommerceCheckoutService
             // FLOWERS-H3 / ADR-15 — إعادة تحقق الإهداء قبل أي كتابة؛ null = لا إهداء.
             $gift = app(CommerceGiftService::class)->resolveForCompletion($checkout);
 
+            // FLOWERS-H7b / ADR-19 — إعادة تحقق موعد التسليم بالطريقة والوجهة المخزَّنتين قبل أي كتابة؛ null = لا جدولة.
+            // السعة تُحسم لاحقاً تحت قفل صف النافذة داخل إنشاء الطلب.
+            $schedule = app(CommerceDeliveryScheduleService::class)->resolveForCompletion($checkout);
+
             $items = $cart->items()->with('personalizations')->orderBy('created_at')->orderBy('id')->get();
             if ($items->isEmpty()) {
                 throw new CheckoutReviewRequiredException(
@@ -577,6 +596,7 @@ final class CommerceCheckoutService
                 'delivery_postal_code' => $checkout->delivery_postal_code,
                 'delivery_notes' => $checkout->delivery_notes,
                 'gift' => $gift,
+                'schedule' => $schedule,
             ], $lines);
 
             // COM-MOBILE-PAYMENTS-1 (ADR-04/ADR-09) — نفس معاملة إنشاء
@@ -894,7 +914,19 @@ final class CommerceCheckoutService
             'gift' => app(CommerceGiftService::class)->forCheckout($checkout),
             'gift_options' => app(CommerceGiftService::class)->optionsForChannel($checkout->sales_channel_id),
             'cart' => $cartData,
-        ];
+        ] + $this->scheduleKey($checkout);
+    }
+
+    /**
+     * FLOWERS-H7b — مفتاح `schedule` يظهر **فقط** حين يوجد اختيار موعد؛ Checkout بلا جدولة بشكلٍ مطابق حرفياً لما قبل H7.
+     *
+     * @return array{schedule?: array{date: string, slot: ?array<string, mixed>, valid: bool}}
+     */
+    private function scheduleKey(CommerceCheckout $checkout): array
+    {
+        $schedule = app(CommerceDeliveryScheduleService::class)->forCheckout($checkout);
+
+        return $schedule === null ? [] : ['schedule' => $schedule];
     }
 
     private function previewPaymentMethod(?string $deliveryMethod): ?string

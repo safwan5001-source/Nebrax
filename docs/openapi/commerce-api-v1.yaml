@@ -231,6 +231,8 @@ paths:
         - $ref: '#/components/parameters/ProductsBrandId'
         - $ref: '#/components/parameters/ProductsCollection'
         - $ref: '#/components/parameters/ProductsFacet'
+        - $ref: '#/components/parameters/DeliveryCity'
+        - $ref: '#/components/parameters/DeliveryRegion'
       responses:
         '200':
           description: A page of products (list rows never carry media/options/variants).
@@ -324,6 +326,9 @@ paths:
         then reflect the cheapest variant / any-variant-in-stock, never an
         ambiguous parent figure.
       x-auth-tier: read
+      parameters:
+        - $ref: '#/components/parameters/DeliveryCity'
+        - $ref: '#/components/parameters/DeliveryRegion'
       responses:
         '200':
           description: The product (detail always includes `media`, unlike the list row).
@@ -628,6 +633,42 @@ paths:
         content:
           application/json:
             schema: { $ref: '#/components/schemas/CheckoutGiftUpdate' }
+      responses:
+        '200':
+          description: The updated checkout.
+          headers:
+            X-Request-Id: { $ref: '#/components/headers/XRequestId' }
+            X-Cart-Token: { $ref: '#/components/headers/XCartToken' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CheckoutResponse' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+  /checkout/schedule:
+    parameters:
+      - $ref: '#/components/parameters/RequestId'
+      - $ref: '#/components/parameters/CartToken'
+      - $ref: '#/components/parameters/OptionalCustomerToken'
+    patch:
+      operationId: updateCheckoutSchedule
+      tags: [Checkout]
+      summary: Select (or clear) the requested delivery/pickup date and time window
+      description: >
+        ADR-19. Both `date` and `slot_id` are required keys; send both `null` to clear. A selection is
+        validated against the checkout's stored method and destination (lead time, cut-off, blocked
+        dates, weekday, zone, capacity) and refused with 422 when it is not selectable or the channel's
+        scheduling is off. Completion re-validates and returns `409 review_required` with
+        `schedule_required` / `schedule_unavailable` when the choice is missing or no longer valid;
+        capacity is enforced when the order is created. Nothing is reserved at selection time.
+      x-auth-tier: write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CheckoutScheduleUpdate' }
       responses:
         '200':
           description: The updated checkout.
@@ -1183,6 +1224,18 @@ components:
       in: query
       required: false
       schema: { type: integer, minimum: 1, maximum: 100 }
+    DeliveryCity:
+      name: city
+      in: query
+      required: false
+      description: Destination city used only to derive `delivery_promise` (zone-restricted windows apply by destination).
+      schema: { type: string, maxLength: 120 }
+    DeliveryRegion:
+      name: region
+      in: query
+      required: false
+      description: Destination region used only to derive `delivery_promise`.
+      schema: { type: string, maxLength: 120 }
     ProductsSearch:
       name: search
       in: query
@@ -1443,6 +1496,7 @@ components:
         is_variant_managed: { type: boolean }
         created_at: { type: [string, 'null'], format: date-time }
         updated_at: { type: [string, 'null'], format: date-time }
+        delivery_promise: { $ref: '#/components/schemas/DeliveryPromise' }
 
     ProductDetail:
       type: object
@@ -1479,6 +1533,30 @@ components:
         personalization: { $ref: '#/components/schemas/ProductPersonalization' }
         content_blocks: { $ref: '#/components/schemas/ProductContentBlocks' }
         addons: { $ref: '#/components/schemas/ProductAddons' }
+        delivery_promise: { $ref: '#/components/schemas/DeliveryPromise' }
+
+    DeliveryPromise:
+      description: >
+        ADR-20. Derived at request time from published stock (ATS), the channel's delivery schedule and the product's
+        preparation time — never stored. Present only while the channel's delivery scheduling is enabled. `same_day`
+        is true only when the earliest selectable window is today in the channel timezone and changes automatically
+        with stock, cut-off, blocked dates, capacity and preparation time. Delivery only (pickup is out of scope).
+      type: object
+      additionalProperties: false
+      required: [deliverable, same_day, earliest, reason]
+      properties:
+        deliverable: { type: boolean }
+        same_day: { type: boolean }
+        earliest:
+          type: [object, 'null']
+          additionalProperties: false
+          required: [date, slot]
+          properties:
+            date: { type: string, format: date }
+            slot: { $ref: '#/components/schemas/DeliveryScheduleSlot' }
+        reason:
+          type: [string, 'null']
+          enum: [not_configured, out_of_stock, no_slot, null]
 
     ProductAddons:
       description: >
@@ -1616,6 +1694,7 @@ components:
         personalization: { $ref: '#/components/schemas/ProductPersonalization' }
         content_blocks: { $ref: '#/components/schemas/ProductContentBlocks' }
         addons: { $ref: '#/components/schemas/ProductAddons' }
+        delivery_promise: { $ref: '#/components/schemas/DeliveryPromise' }
 
     ProductListResponse:
       type: object
@@ -1894,6 +1973,7 @@ components:
             address: { $ref: '#/components/schemas/CheckoutAddress' }
         payment: { $ref: '#/components/schemas/CheckoutPayment' }
         gift: { $ref: '#/components/schemas/Gift' }
+        schedule: { $ref: '#/components/schemas/CheckoutSchedule' }
         gift_options: { $ref: '#/components/schemas/GiftOptions' }
         cart: { $ref: '#/components/schemas/Cart' }
 
@@ -1937,6 +2017,46 @@ components:
         sender_name: { type: [string, 'null'], maxLength: 255 }
         hide_sender: { type: boolean }
         message: { type: [string, 'null'], maxLength: 2000 }
+
+    CheckoutSchedule:
+      description: The selected delivery/pickup date and window on an open checkout. Present only once a choice was stored (ADR-19).
+      type: object
+      additionalProperties: false
+      required: [date, slot, valid]
+      properties:
+        date: { type: string, format: date }
+        slot:
+          description: The window when it is still selectable for the stored method/destination, else `null`.
+          type: [object, 'null']
+          additionalProperties: true
+        valid: { type: boolean }
+
+    OrderSchedule:
+      description: The immutable delivery/pickup schedule snapshot on an order. Present only when one was chosen.
+      type: object
+      additionalProperties: false
+      required: [method, date, slot, timezone]
+      properties:
+        method: { type: string, enum: [delivery, pickup] }
+        date: { type: string, format: date }
+        slot:
+          type: object
+          additionalProperties: false
+          required: [label, label_en, start_time, end_time]
+          properties:
+            label: { type: string }
+            label_en: { type: [string, 'null'] }
+            start_time: { type: string }
+            end_time: { type: string }
+        timezone: { type: string }
+
+    CheckoutScheduleUpdate:
+      type: object
+      additionalProperties: false
+      required: [date, slot_id]
+      properties:
+        date: { type: [string, 'null'], format: date }
+        slot_id: { type: [string, 'null'], format: uuid }
 
     CheckoutContactUpdate:
       type: object
@@ -2050,6 +2170,7 @@ components:
             notes: { type: [string, 'null'] }
             amount: { $ref: '#/components/schemas/Money' }
         gift: { $ref: '#/components/schemas/Gift' }
+        schedule: { $ref: '#/components/schemas/OrderSchedule' }
         payment: { $ref: '#/components/schemas/OrderPayment' }
         items:
           type: array

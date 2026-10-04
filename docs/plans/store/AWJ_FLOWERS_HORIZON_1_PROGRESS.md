@@ -1,6 +1,6 @@
 # AWJ Flowers & Gifts — Horizon 1 Progress
 
-**Status:** IN PROGRESS — H1–H6 merged; H7a in review  
+**Status:** IN PROGRESS — H1–H7b merged; H8a in progress  
 **Date:** 2026-10-03  
 **Planning Base:** `main` @ `318cc72d10bb304cef4b401f548772008ea1618e`  
 **Execution Authority:** `AWJ_FLOWERS_HORIZON_1_AUTONOMOUS_EXECUTION.md`  
@@ -40,9 +40,10 @@ No Deploy or Production change is authorized by this Horizon.
 | H4 | Personalization | MERGED | #1192 | `a4866df` |
 | H5 | Structured Product Content | MERGED | #1199 | `8663d48` |
 | H6 | Add-ons | MERGED | #1201 | `f86d36d` |
-| H7a | Delivery scheduling — policy, windows, blocked dates, derived availability, public options, admin API | PR OPEN, in review | (see log) | — |
-| H7b | Delivery scheduling — checkout schedule, order snapshot, capacity locks, revalidation | NOT STARTED | — | — |
-| H8 | Availability / Same-day | NOT STARTED | — | — |
+| H7a | Delivery scheduling — policy, windows, blocked dates, derived availability, public options, admin API | MERGED | #1206 | `bbe59d1` |
+| H7b | Delivery scheduling — checkout schedule, order snapshot, capacity locks, revalidation | MERGED | #1208 | `01fb179` |
+| H8a | Availability / Same-day — derived promise seam, product preparation time, `commerce/v1` exposure | IN PROGRESS | — | — |
+| H8b | Availability / Same-day — `store/v1` parity and `deliver_today` filter | NOT STARTED | — | — |
 | H9 | Store Builder Flowers Experience | NOT STARTED | — | — |
 | H10 | Storefront Discovery UX | NOT STARTED | — | — |
 | H11 | Flowers/Gifts PDP | NOT STARTED | — | — |
@@ -378,9 +379,12 @@ Copy this section for every completed/active slice.
 
 ### H7a — Delivery scheduling: policy, windows, blocked dates, availability (ADR-19)
 
-**Status:** PR OPEN, in review  
+**Status:** MERGED  
 **Base SHA:** `f86d36d453540df2ddf4bb18cc5c9b8a1d837e40` (main after H6)  
 **Branch:** `flowers/h7-delivery-scheduling`  
+**PR:** #1206  
+**Head SHA:** `7515f2fa6244c6026efcc799b6010082e3b91c7a`  
+**Merge SHA:** `bbe59d17cdf20f43ba0e889735cef6359dcbf2ed` (squash)
 
 #### What was implemented
 
@@ -391,11 +395,62 @@ Copy this section for every completed/active slice.
 
 #### Tests
 
-- `CommerceDeliveryScheduleTest` (19): derived availability with a fixed clock (same-day start, lead time boundary, cut-off, blocked dates per method, weekday mask, horizon, zone matching precedence, policy timezone vs client, inactive, required flag), admin round trip and validation, atomic replacement, RBAC and tenant isolation, model guards, public and mobile contracts. Six mutations of the availability rules were each caught.
+- `CommerceDeliveryScheduleTest` (29 after review): derived availability with a fixed clock (same-day start, lead time boundary, cut-off, blocked dates per method, weekday mask, horizon, zone matching precedence, policy timezone vs client, inactive, required flag), admin round trip and validation, atomic replacement, RBAC and tenant isolation, model guards, public and mobile contracts. Six mutations of the availability rules were each caught.
 
 #### Deferred to H7b / H8
 
 - Checkout schedule selection, order snapshot, capacity enforcement under a slot row lock and completion revalidation (H7b); per-product lead time and "deliver today" eligibility (H8).
+
+---
+
+### H7b — Delivery scheduling: checkout selection, capacity, order snapshot (ADR-19 §2.3)
+
+**Status:** MERGED  
+**Base SHA:** `bbe59d17cdf20f43ba0e889735cef6359dcbf2ed` (main after H7a)  
+**Branch:** `flowers/h7b-checkout-schedule`  
+**PR:** #1208  
+**Head SHA:** `449fd5bba6dff1a5dc683b5cef6740e273698c76`  
+**Merge SHA:** `01fb1791318685ec035ccb4be8b2227d1b49155d` (squash)
+
+#### What was implemented
+
+- `PATCH checkout/schedule {date, slot_id}` (store/v1 and commerce/v1; both keys required, both `null` clears). A choice is validated by the same `CommerceDeliveryScheduleService` authority against the checkout's **stored** method and destination (checkout `standard`/`pickup` map to slot `delivery`/`pickup`) and is refused with 422 when scheduling is off or the choice is not selectable (lead time, cut-off, blocked date, weekday, zone, full slot). Nothing is reserved at selection time.
+- Checkout payload gains `schedule {date, slot, valid}` only once a choice exists; a later change that invalidates it (method, destination, policy, slot edit, capacity) shows `valid: false` and forces review at completion.
+- Completion re-validates before any write (`schedule_required` when the channel requires a window that exists for the chosen method, `schedule_unavailable` otherwise → `409 review_required`, no order). A method with no active window is never forced to pick a date. The schedule key joins the idempotency fingerprint only when present.
+- Capacity: inside the order transaction the slot row is locked `FOR UPDATE` and confirmed `commerce_order_schedules` for (slot, date) are counted before the order schedule is written, so two checkouts cannot take the last place. The order stores an immutable snapshot (method, date, window label/times, timezone) — `CommerceOrderSchedule` rejects create/update/delete once the order is confirmed; serializers expose `schedule` only when present.
+- Admin slot replacement is now id-stable (`slots.*.id` upserts in place, absent ids are removed): editing a window keeps open checkout selections and its capacity history instead of orphaning them via delete/recreate.
+- Additive tables `commerce_checkout_schedules` and `commerce_order_schedules` (SQLite-safe both directions). OpenAPI updated (`PATCH /checkout/schedule`, checkout/order `schedule`).
+
+#### Tests
+
+- `CommerceDeliveryScheduleCheckoutTest` (21 after review; three PostgreSQL-only lock-protocol tests): scheduling-off no-op, snapshot, invalid selections, method-first/pickup windows, zone-restricted windows follow the stored destination, required/optional, post-selection changes force review, in-place window edit keeps its id, capacity at selection/completion, order-time race guard (direct call; verified to fail with the check removed), slot lock inside the transaction before the count (PostgreSQL; verified to fail with the lock removed), frozen snapshot, idempotent replay, clear, admin replace by id, web parity.
+
+#### Review loop / CI
+
+- Seven Codex findings (zone-aware required check, final revalidation under channel+slot locks, shared channel lock on selection, shipping-zone writers joining the lock protocol, plus earlier ones) each fixed with a test verified to fail without the fix; CI sqlite + pgsql green on the head, all threads resolved. The reviewer later hit its usage limit; no open finding remained.
+
+#### Risks / deferred
+
+- Per-product lead time and "deliver today" eligibility remain H8; no admin or shopper UI for scheduling yet (H9/H12).
+
+---
+
+### H8a — Availability / Same-day: derived delivery promise (ADR-20)
+
+**Status:** IN PROGRESS  
+**Base SHA:** `01fb1791318685ec035ccb4be8b2227d1b49155d` (main after H7b)  
+**Branch:** `flowers/h8-availability`  
+
+#### What was implemented
+
+- ADR-20: the promise is derived per request from ATS + the channel schedule + product preparation time; nothing is stored. Effective lead = max(channel lead, product preparation) (not the sum).
+- `commerce_product_preparations` (one row per product, absent = none; `OWNED_CHILD`, cleaned with a true delete) and admin `GET/PUT commerce/workspace/products/{id}/preparation`.
+- `CommerceDeliveryScheduleService` split into `context()` (loaded once) and `evaluate()` (in memory); `options()` unchanged in behaviour. `AvailableToSellService::forWarehouseMany` / `InventoryReservationService::activeReservedMany` give batched ATS with the same definitions.
+- `CommerceDeliveryPromiseService::forProducts` — constant query count regardless of products or distinct lead times; `commerce/v1` product list and detail gain `delivery_promise` only while scheduling is enabled; optional `city`/`region` select zone-restricted windows.
+
+#### Deferred to H8b
+
+- `store/v1` parity and the `deliver_today` list filter; pickup promise.
 
 ---
 

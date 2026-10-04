@@ -92,4 +92,31 @@ final class AvailableToSellService
             availableToSell: max(0, $onHand - $activeReserved),
         );
     }
+
+    /**
+     * جاهزية البيع لعدّة منتجات في مخزنٍ واحد باستعلامين مجمَّعين (On Hand + المحجوز النشط) — لقوائم/بطاقات/وعد
+     * التسليم بلا N+1. نفس مصدرَي `forWarehouse` (لا حساب موازٍ): `max(0, onHand - activeReserved)` لكل
+     * (منتج، متغيّر). لا فحص وجود هنا — المستدعي يمرّر منتجاتٍ حمّلها بنطاق المستأجر.
+     *
+     * @param  list<string>  $productIds
+     * @return array<string, array<string, int>> `productId => [variantKey => availableToSell]` (`variantKey` = `''` للبسيط)
+     */
+    public function forWarehouseMany(array $productIds, string $warehouseId): array
+    {
+        if ($productIds === []) {
+            return [];
+        }
+
+        $reserved = $this->reservations->activeReservedMany($productIds, $warehouseId);
+        $result = [];
+        foreach (ProductWarehouseStock::query()
+            ->whereIn('product_id', $productIds)
+            ->where('warehouse_id', $warehouseId)
+            ->get(['product_id', 'product_variant_id', 'quantity']) as $row) {
+            $key = (string) $row->product_variant_id;
+            $result[$row->product_id][$key] = max(0, (int) $row->quantity - ($reserved[$row->product_id][$key] ?? 0));
+        }
+
+        return $result;
+    }
 }

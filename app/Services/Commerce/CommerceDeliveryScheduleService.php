@@ -2,9 +2,13 @@
 
 namespace App\Services\Commerce;
 
+use App\Models\CommerceCheckout;
+use App\Models\CommerceCheckoutSchedule;
 use App\Models\CommerceDeliveryBlockedDate;
 use App\Models\CommerceDeliveryScheduleSetting;
 use App\Models\CommerceDeliverySlot;
+use App\Models\CommerceOrder;
+use App\Models\CommerceOrderSchedule;
 use App\Models\CommerceShippingZone;
 use App\Models\SalesChannel;
 use App\Models\Tenant;
@@ -14,6 +18,7 @@ use Carbon\CarbonInterface;
 use DateTimeZone;
 use DomainException;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use PDOException;
 use RuntimeException;
 
@@ -89,8 +94,9 @@ final class CommerceDeliveryScheduleService
     }
 
     /**
-     * استبدال ذرّي لكل نوافذ القناة. الصفّ بلا `id` جديد؛ الأخير يُحذف إن غاب. (الطلبات القائمة تحمل لقطتها
-     * ولا تشير إلى النافذة بمفتاح أجنبي حاجز.)
+     * استبدال ذرّي لمجموعة نوافذ القناة **بالمعرّف**: صفٌّ بـ`id` موجود يُحدَّث في مكانه (فيبقى معرّفه، وتبقى
+     * اختيارات Checkout المفتوحة وعدّ السعة التاريخي مربوطة به)، وبلا `id` يُنشأ، وما غاب من الطلب يُحذف.
+     * معرّف لا يخصّ هذه القناة ⇒ رفض لا إنشاء بصمت.
      *
      * @param  list<array<string, mixed>>  $slots
      * @return list<array<string, mixed>>
@@ -100,6 +106,11 @@ final class CommerceDeliveryScheduleService
         $this->tenantId();
         if (count($slots) > CommerceDeliverySlot::MAX_PER_CHANNEL) {
             throw new DomainException('عدد النوافذ يتجاوز الحد المسموح للقناة.');
+        }
+
+        $ids = array_filter(array_column($slots, 'id'));
+        if (count($ids) !== count(array_unique($ids))) {
+            throw new DomainException('لا يمكن تكرار معرّف النافذة نفسه.');
         }
 
         return DB::transaction(function () use ($salesChannelId, $slots) {
@@ -113,23 +124,38 @@ final class CommerceDeliveryScheduleService
                 }
 
                 $rows[] = [
-                    'method' => $slot['method'],
-                    'label' => trim((string) $slot['label']),
-                    'label_en' => isset($slot['label_en']) && trim((string) $slot['label_en']) !== '' ? trim((string) $slot['label_en']) : null,
-                    'start_time' => $slot['start_time'],
-                    'end_time' => $slot['end_time'],
-                    'weekday_mask' => $this->maskFrom($slot['weekdays'] ?? null),
-                    'capacity' => $slot['capacity'] ?? null,
-                    'shipping_zone_id' => $zoneId,
-                    'sort_order' => $position,
-                    'is_active' => (bool) ($slot['is_active'] ?? true),
+                    'id' => $slot['id'] ?? null,
+                    'attributes' => [
+                        'method' => $slot['method'],
+                        'label' => trim((string) $slot['label']),
+                        'label_en' => isset($slot['label_en']) && trim((string) $slot['label_en']) !== '' ? trim((string) $slot['label_en']) : null,
+                        'start_time' => $slot['start_time'],
+                        'end_time' => $slot['end_time'],
+                        'weekday_mask' => $this->maskFrom($slot['weekdays'] ?? null),
+                        'capacity' => $slot['capacity'] ?? null,
+                        'shipping_zone_id' => $zoneId,
+                        'sort_order' => $position,
+                        'is_active' => (bool) ($slot['is_active'] ?? true),
+                    ],
                 ];
             }
 
             try {
-                CommerceDeliverySlot::query()->where('sales_channel_id', $salesChannelId)->delete();
+                $existing = CommerceDeliverySlot::query()->where('sales_channel_id', $salesChannelId)->lockForUpdate()->get()->keyBy('id');
+                $keep = [];
                 foreach ($rows as $row) {
-                    CommerceDeliverySlot::create($row + ['sales_channel_id' => $salesChannelId]);
+                    if ($row['id'] !== null) {
+                        $model = $existing[$row['id']] ?? throw new DomainException('نافذة غير موجودة لهذه القناة.');
+                        $model->fill($row['attributes'])->save();
+                        $keep[$model->id] = true;
+                    } else {
+                        $keep[CommerceDeliverySlot::create($row['attributes'] + ['sales_channel_id' => $salesChannelId])->id] = true;
+                    }
+                }
+                foreach ($existing as $id => $model) {
+                    if (! isset($keep[$id])) {
+                        $model->delete();
+                    }
                 }
             } catch (PDOException $e) {
                 // فشل قاعدة بيانات غير متوقع يبقى خطأ خادم — لا يُحوَّل إلى 422 يكشف نص SQL للعميل.
@@ -201,6 +227,26 @@ final class CommerceDeliveryScheduleService
     // ── التوفّر المشتق ───────────────────────────────────────────────────
 
     /**
+     * النوافذ النشطة لطريقةٍ ووجهة: المصدر الوحيد لقاعدة «نافذة تنطبق على هذه الوجهة» (العرض، والاختيار، وإلزامية
+     * الإتمام) — نافذة مقيَّدة بمنطقةٍ أخرى لا تنطبق، فلا تُلزم المتسوّق بموعدٍ لا يستطيع اختياره.
+     *
+     * @return \Illuminate\Support\Collection<int, CommerceDeliverySlot>
+     */
+    private function applicableSlots(string $salesChannelId, string $method, ?string $city, ?string $region)
+    {
+        $zoneId = $method === CommerceDeliverySlot::METHOD_DELIVERY ? $this->shipping->resolveZone($city, $region)?->id : null;
+
+        return CommerceDeliverySlot::query()
+            ->where('sales_channel_id', $salesChannelId)
+            ->where('method', $method)
+            ->where('is_active', true)
+            ->orderBy('sort_order')->orderBy('start_time')
+            ->get()
+            ->filter(fn (CommerceDeliverySlot $s) => $s->shipping_zone_id === null || $s->shipping_zone_id === $zoneId)
+            ->values();
+    }
+
+    /**
      * الخيارات العامة المتاحة فعلاً الآن (نوافذ قابلة للاختيار فقط، بلا سعات ولا حقول داخلية). `$city`/`$region`
      * يرشّحان العرض فقط للتوصيل؛ إعادة التحقق عند الإتمام (H7b) تعتمد وجهة Checkout **المخزَّنة**.
      *
@@ -208,16 +254,29 @@ final class CommerceDeliveryScheduleService
      */
     public function options(string $salesChannelId, string $method, ?string $city = null, ?string $region = null, ?CarbonInterface $now = null): array
     {
+        $context = $this->context($salesChannelId, $method, $city, $region, $now);
+
+        return $context === null
+            ? ['enabled' => false, 'required' => false, 'method' => $method, 'timezone' => null, 'earliest' => null, 'dates' => []]
+            : $this->evaluate($context);
+    }
+
+    /**
+     * يحمّل كل ما يلزم لتقييم التوفّر **مرة واحدة** (سياسة، نوافذ منطبقة، حجوزات مجمَّعة، تواريخ محجوبة، فترات التوقيت
+     * الصيفي) — ثم `evaluate()` بالذاكرة فقط. يسمح بحساب وعدٍ لعشرات المنتجات بمُهَل تجهيز مختلفة بلا استعلامات
+     * إضافية لكل منتج (H8). null = الجدولة معطَّلة/الطريقة غير معروفة.
+     *
+     * @return array<string, mixed>|null
+     */
+    public function context(string $salesChannelId, string $method, ?string $city = null, ?string $region = null, ?CarbonInterface $now = null): ?array
+    {
         $setting = CommerceDeliveryScheduleSetting::query()->where('sales_channel_id', $salesChannelId)->first();
         if ($setting === null || ! $setting->is_enabled || ! in_array($method, CommerceDeliverySlot::METHODS, true)) {
-            return ['enabled' => false, 'required' => false, 'method' => $method, 'timezone' => null, 'earliest' => null, 'dates' => []];
+            return null;
         }
 
         $timezone = $this->timezoneFor($setting);
-        $local = CarbonImmutable::instance($now ?? CarbonImmutable::now())->setTimezone($timezone);
-        // مهلة التجهيز زمنٌ منقضٍ حقيقي: بالثواني على الطابع الزمني لا `addMinutes()` — فحسابها الجداري/المنقضي عند
-        // عبور انتقال التوقيت الصيفي يختلف بين إصدارات Carbon/PHP، والنتيجة هنا لا تتأثر بذلك.
-        $earliestInstant = $local->setTimestamp($local->getTimestamp() + $setting->lead_time_minutes * 60);
+        $local = CarbonImmutable::instance($now ?? now())->setTimezone($timezone);
         // الإغلاق اليومي لحظةٌ لا مقارنة نصية `H:i`: عند رجوع الساعة يتكرّر الوقت الجداري فيعود النص أصغر من الإغلاق
         // ويُعاد فتح اليوم بعد إغلاقه. اللحظة تُحسم على أول وقوع (EDT) فما إن تُجتاز تبقى مجتازة؛ وفي فجوة الانتقال
         // يُطبَّع الوقت الجداري المعدوم بإضافة طول الفجوة (02:30 ⇒ 03:30 EDT).
@@ -226,21 +285,58 @@ final class CommerceDeliveryScheduleService
 
         $ambiguous = $this->ambiguousWallClockIntervals($timezone, $local->startOfDay()->subDay(), $local->startOfDay()->addDays($setting->max_days_ahead + 2));
 
-        $zoneId = $method === CommerceDeliverySlot::METHOD_DELIVERY ? $this->shipping->resolveZone($city, $region)?->id : null;
-        $slots = CommerceDeliverySlot::query()
-            ->where('sales_channel_id', $salesChannelId)
-            ->where('method', $method)
-            ->where('is_active', true)
-            ->orderBy('sort_order')->orderBy('start_time')
-            ->get()
-            ->filter(fn (CommerceDeliverySlot $s) => $s->shipping_zone_id === null || $s->shipping_zone_id === $zoneId)
-            ->values();
+        $slots = $this->applicableSlots($salesChannelId, $method, $city, $region);
+
+        // السعة: عدّ الحجوزات (لقطات الطلبات) لكل (نافذة، تاريخ) في المدى باستعلام مجمَّع واحد — بلا N+1 — لإخفاء النافذة
+        // الممتلئة. السلطة النهائية للعدّ عند إنشاء الطلب تحت قفل صف النافذة (`snapshotToOrder`)؛ هذا للعرض والاختيار.
+        $booked = [];
+        $capacitySlotIds = $slots->filter(fn (CommerceDeliverySlot $s) => $s->capacity !== null)->pluck('id')->all();
+        if ($capacitySlotIds !== []) {
+            foreach (CommerceOrderSchedule::query()
+                ->whereIn('commerce_delivery_slot_id', $capacitySlotIds)
+                ->whereBetween('delivery_date', [$local->startOfDay()->format('Y-m-d'), $local->startOfDay()->addDays($setting->max_days_ahead)->format('Y-m-d')])
+                ->selectRaw('commerce_delivery_slot_id as slot_id, delivery_date as booked_date, count(*) as booked_count')
+                ->groupBy('commerce_delivery_slot_id', 'delivery_date')
+                ->get() as $row) {
+                $booked[$row->slot_id.'|'.$row->booked_date] = (int) $row->booked_count;
+            }
+        }
 
         $blocked = CommerceDeliveryBlockedDate::query()
             ->where('sales_channel_id', $salesChannelId)
             ->whereIn('method', [CommerceDeliveryBlockedDate::METHOD_ALL, $method])
             ->pluck('date')
             ->flip();
+
+        return [
+            'setting' => $setting, 'method' => $method, 'timezone' => $timezone, 'local' => $local,
+            'cutoffPassed' => $cutoffPassed, 'slots' => $slots, 'booked' => $booked, 'blocked' => $blocked, 'ambiguous' => $ambiguous,
+        ];
+    }
+
+    /**
+     * تقييم التوفّر من سياقٍ محمَّل. `$minLeadMinutes` مهلة تجهيز **المنتج**: المهلة الفعلية = الأكبر بينها وبين مهلة
+     * القناة (لا جمع — مهلة القناة حدٌّ أدنى لمعالجة أي طلب، فلا تُحسب مرتين). `$stopAtEarliest` يقطع الحلقة عند
+     * أول يوم متاح (للوعد؛ لا حاجة لباقي الأيام).
+     *
+     * @param  array<string, mixed>  $context
+     */
+    public function evaluate(array $context, ?int $minLeadMinutes = null, bool $stopAtEarliest = false): array
+    {
+        /** @var CommerceDeliveryScheduleSetting $setting */
+        $setting = $context['setting'];
+        $method = $context['method'];
+        $timezone = $context['timezone'];
+        $local = $context['local'];
+        $cutoffPassed = $context['cutoffPassed'];
+        $slots = $context['slots'];
+        $booked = $context['booked'];
+        $blocked = $context['blocked'];
+        $ambiguous = $context['ambiguous'];
+
+        // مهلة التجهيز زمنٌ منقضٍ حقيقي: بالثواني على الطابع الزمني لا `addMinutes()` — فحسابها الجداري/المنقضي عند
+        // عبور انتقال التوقيت الصيفي يختلف بين إصدارات Carbon/PHP، والنتيجة هنا لا تتأثر بذلك.
+        $earliestInstant = $local->setTimestamp($local->getTimestamp() + max($setting->lead_time_minutes, $minLeadMinutes ?? 0) * 60);
 
         $dates = [];
         $earliest = null;
@@ -254,6 +350,9 @@ final class CommerceDeliveryScheduleService
             $available = [];
             foreach ($slots as $slot) {
                 if (! $slot->runsOn($day->dayOfWeek)) {
+                    continue;
+                }
+                if ($slot->capacity !== null && ($booked[$slot->id.'|'.$date] ?? 0) >= $slot->capacity) {
                     continue;
                 }
                 $start = $day->setTimeFromTimeString($slot->start_time);
@@ -292,6 +391,9 @@ final class CommerceDeliveryScheduleService
                         }
                     }
                     $earliest = ['date' => $date, 'slot_id' => $first['id']];
+                    if ($stopAtEarliest) {
+                        break;
+                    }
                 }
             }
         }
@@ -307,6 +409,238 @@ final class CommerceDeliveryScheduleService
     }
 
     // ── مساعدات ─────────────────────────────────────────────────────────
+
+    // ── Checkout / Order (H7b) ──────────────────────────────────────────
+
+    /** طريقة نافذة الجدولة المقابلة لطريقة Checkout (`standard` ⇒ `delivery`)؛ null لطريقة غير مختارة/غير معروفة. */
+    public function slotMethodFor(?string $checkoutDeliveryMethod): ?string
+    {
+        return match ($checkoutDeliveryMethod) {
+            'standard' => CommerceDeliverySlot::METHOD_DELIVERY,
+            'pickup' => CommerceDeliverySlot::METHOD_PICKUP,
+            default => null,
+        };
+    }
+
+    /**
+     * يضبط/يمسح اختيار موعد Checkout (داخل المعاملة وعلى الصف المقفول). `null/null` يمسح دوماً. غير ذلك: الجدولة
+     * مفعَّلة، طريقة التوصيل مختارة، والموعد (تاريخ + نافذة) قابل للاختيار الآن لوجهة Checkout **المخزَّنة**.
+     *
+     * @return array{date: string, slot: ?array<string, mixed>, valid: bool}|null
+     */
+    public function applyToCheckout(CommerceCheckout $checkout, ?string $date, ?string $slotId): ?array
+    {
+        $existing = CommerceCheckoutSchedule::query()->where('commerce_checkout_id', $checkout->id)->first();
+
+        if ($date === null && $slotId === null) {
+            $existing?->delete();
+
+            return null;
+        }
+        if ($date === null || $slotId === null) {
+            throw ValidationException::withMessages(['schedule' => 'حدّد التاريخ والنافذة معاً.']);
+        }
+        if (! $this->settings($checkout->sales_channel_id)['enabled']) {
+            throw ValidationException::withMessages(['schedule' => 'جدولة التسليم غير مفعّلة لهذا المتجر.']);
+        }
+        $method = $this->slotMethodFor($checkout->delivery_method);
+        if ($method === null) {
+            throw ValidationException::withMessages(['schedule' => 'اختر طريقة التوصيل أولاً.']);
+        }
+        // قفلٌ مشترك على صف القناة طوال التحقق والحفظ: تحرير النوافذ/السياسة/مناطق الشحن يقفله `FOR UPDATE`، فلا تُحذف
+        // النافذة بين `selectable()` و`save()` (انتهاك FK ⇒ 500 بدل 422). المعاملة يفتحها `CommerceCheckoutService`.
+        if (SalesChannel::query()->whereKey($checkout->sales_channel_id)->sharedLock()->first() === null) {
+            throw ValidationException::withMessages(['schedule' => 'الموعد المختار غير متاح.']);
+        }
+        $selected = $this->selectable($checkout, $method, $date, $slotId);
+        if ($selected === null) {
+            throw ValidationException::withMessages(['schedule' => 'الموعد المختار غير متاح.']);
+        }
+
+        $row = $existing ?? new CommerceCheckoutSchedule(['commerce_checkout_id' => $checkout->id]);
+        $row->fill(['delivery_date' => $date, 'commerce_delivery_slot_id' => $selected['slot']['id']])->save();
+
+        return ['date' => $date, 'slot' => $selected['slot'], 'valid' => true];
+    }
+
+    /**
+     * الاختيار الحالي لـCheckout للعرض: `valid` يقول إن كان ما زال قابلاً للاختيار الآن (قد تتغيّر الطريقة أو الوجهة أو
+     * السياسة بعده). null حين لا اختيار — فلا كلفة استعلام إضافية لـCheckout بلا جدولة.
+     *
+     * @return array{date: string, slot: ?array<string, mixed>, valid: bool}|null
+     */
+    public function forCheckout(CommerceCheckout $checkout): ?array
+    {
+        $row = CommerceCheckoutSchedule::query()->where('commerce_checkout_id', $checkout->id)->first();
+        if ($row === null) {
+            return null;
+        }
+
+        $method = $this->slotMethodFor($checkout->delivery_method);
+        $selected = $method === null || $row->commerce_delivery_slot_id === null
+            ? null
+            : $this->selectable($checkout, $method, $row->delivery_date, $row->commerce_delivery_slot_id);
+
+        return [
+            'date' => $row->delivery_date,
+            'slot' => $selected['slot'] ?? null,
+            'valid' => $selected !== null,
+        ];
+    }
+
+    /**
+     * إعادة تحقق نهائية وقت الإتمام (قبل أي كتابة) بطريقة Checkout ووجهته **المخزَّنتين**. null = لا جدولة.
+     * إلزامية الجدولة تسري على الطرق التي لها نوافذ نشطة فقط (طريقة بلا أي نافذة مهيّأة لا تُلزَم بموعد).
+     *
+     * @return array{method: string, delivery_date: string, slot_id: string, slot_label: string, slot_label_en: ?string, start_time: string, end_time: string, timezone: string}|null
+     *
+     * @throws CheckoutReviewRequiredException
+     */
+    public function resolveForCompletion(CommerceCheckout $checkout): ?array
+    {
+        $settings = $this->settings($checkout->sales_channel_id);
+        $row = CommerceCheckoutSchedule::query()->where('commerce_checkout_id', $checkout->id)->first();
+
+        if (! $settings['enabled']) {
+            if ($row !== null) {
+                throw new CheckoutReviewRequiredException('جدولة التسليم لم تعد متاحة — راجع الموعد.', [['item_id' => 'schedule', 'reason' => 'schedule_unavailable']]);
+            }
+
+            return null;
+        }
+
+        $method = $this->slotMethodFor($checkout->delivery_method);
+        if ($row === null) {
+            $needed = $settings['required'] && $method !== null
+                && $this->applicableSlots($checkout->sales_channel_id, $method, $checkout->delivery_city, $checkout->delivery_region)->isNotEmpty();
+            if ($needed) {
+                throw new CheckoutReviewRequiredException('اختر موعد التسليم.', [['item_id' => 'schedule', 'reason' => 'schedule_required']]);
+            }
+
+            return null;
+        }
+
+        $selected = $method === null || $row->commerce_delivery_slot_id === null
+            ? null
+            : $this->selectable($checkout, $method, $row->delivery_date, $row->commerce_delivery_slot_id);
+        if ($selected === null) {
+            throw new CheckoutReviewRequiredException('الموعد المختار لم يعد متاحاً — اختر موعداً آخر.', [['item_id' => 'schedule', 'reason' => 'schedule_unavailable']]);
+        }
+
+        return [
+            'method' => $method,
+            'delivery_date' => $row->delivery_date,
+            'slot_id' => $selected['slot']['id'],
+            'slot_label' => $selected['slot']['label'],
+            'slot_label_en' => $selected['slot']['label_en'],
+            'start_time' => $selected['slot']['start_time'],
+            'end_time' => $selected['slot']['end_time'],
+            'timezone' => $selected['timezone'],
+        ];
+    }
+
+    /**
+     * يكتب لقطة الموعد الثابتة داخل معاملة إنشاء الطلب (قبل التأكيد) **تحت قفل صف النافذة**: العدّ بعد القفل، فلا
+     * يأخذ طلبان متزامنان آخر مكانٍ معاً (الثاني ينتظر القفل ثم يرى حجز الأول). السعة الممتلئة ⇒ review-required.
+     *
+     * @param  array{method: string, delivery_date: string, slot_id: string, slot_label: string, slot_label_en: ?string, start_time: string, end_time: string, timezone: string}  $schedule
+     *
+     * @throws CheckoutReviewRequiredException
+     */
+    public function snapshotToOrder(CommerceOrder $order, array $schedule, ?string $city = null, ?string $region = null): CommerceOrderSchedule
+    {
+        $unavailable = fn () => new CheckoutReviewRequiredException('الموعد المختار لم يعد متاحاً — اختر موعداً آخر.', [['item_id' => 'schedule', 'reason' => 'schedule_unavailable']]);
+
+        // نفس ترتيب أقفال الإدارة (القناة ثم النافذة): تحرير السياسة/النوافذ/التواريخ المحجوبة يقفل صف القناة `FOR UPDATE`؛ قفلٌ مشترك هنا يستبعد المحرِّر دون تسلسل الطلبات بعضها بعضاً، فلا
+        // يتقاطع مع هذه المعاملة. ثم إعادة التحقق الكاملة **بعد القفل** على الحالة المُلتزَمة: الطلب لا يحفظ إلا
+        // لقطةً مطابقةً حرفياً لما هو متاح الآن (تحرير نافذة بقيت هويتها لا يمرّر طريقة/منطقة/تسمية/أوقاتاً قديمة).
+        if (SalesChannel::query()->whereKey($order->sales_channel_id)->sharedLock()->first() === null) {
+            throw $unavailable();
+        }
+        $slot = CommerceDeliverySlot::query()->whereKey($schedule['slot_id'])->lockForUpdate()->first();
+        if ($slot === null || ! $slot->is_active) {
+            throw $unavailable();
+        }
+
+        $current = $this->selectableFor($order->sales_channel_id, $schedule['method'], $city, $region, $schedule['delivery_date'], $schedule['slot_id']);
+        if ($current === null
+            || $current['timezone'] !== $schedule['timezone']
+            || $current['slot']['label'] !== $schedule['slot_label']
+            || $current['slot']['label_en'] !== $schedule['slot_label_en']
+            || $current['slot']['start_time'] !== $schedule['start_time']
+            || $current['slot']['end_time'] !== $schedule['end_time']) {
+            throw $unavailable();
+        }
+
+        if ($slot->capacity !== null) {
+            $booked = CommerceOrderSchedule::query()
+                ->where('commerce_delivery_slot_id', $slot->id)
+                ->where('delivery_date', $schedule['delivery_date'])
+                ->count();
+            if ($booked >= $slot->capacity) {
+                throw new CheckoutReviewRequiredException('اكتملت سعة هذا الموعد — اختر موعداً آخر.', [['item_id' => 'schedule', 'reason' => 'schedule_unavailable']]);
+            }
+        }
+
+        return $order->schedule()->create([
+            'method' => $schedule['method'],
+            'delivery_date' => $schedule['delivery_date'],
+            'commerce_delivery_slot_id' => $slot->id,
+            'slot_label' => $schedule['slot_label'],
+            'slot_label_en' => $schedule['slot_label_en'],
+            'start_time' => $schedule['start_time'],
+            'end_time' => $schedule['end_time'],
+            'timezone' => $schedule['timezone'],
+        ]);
+    }
+
+    /** @return array{method: string, date: string, slot: array{label: string, label_en: ?string, start_time: string, end_time: string}, timezone: string} */
+    public static function presentOrder(CommerceOrderSchedule $schedule): array
+    {
+        return [
+            'method' => $schedule->method,
+            'date' => $schedule->delivery_date,
+            'slot' => [
+                'label' => $schedule->slot_label,
+                'label_en' => $schedule->slot_label_en,
+                'start_time' => $schedule->start_time,
+                'end_time' => $schedule->end_time,
+            ],
+            'timezone' => $schedule->timezone,
+        ];
+    }
+
+    /**
+     * النافذة المطلوبة إن كانت قابلة للاختيار الآن لطريقة Checkout ووجهته المخزَّنة (المصدر الوحيد: `options()`).
+     *
+     * @return array{slot: array<string, mixed>, timezone: string}|null
+     */
+    private function selectable(CommerceCheckout $checkout, string $method, string $date, string $slotId): ?array
+    {
+        return $this->selectableFor($checkout->sales_channel_id, $method, $checkout->delivery_city, $checkout->delivery_region, $date, $slotId);
+    }
+
+    /** @return array{slot: array<string, mixed>, timezone: string}|null */
+    private function selectableFor(string $salesChannelId, string $method, ?string $city, ?string $region, string $date, string $slotId): ?array
+    {
+        $options = $this->options($salesChannelId, $method, $city, $region);
+        if (! $options['enabled']) {
+            return null;
+        }
+
+        foreach ($options['dates'] as $day) {
+            if ($day['date'] !== $date) {
+                continue;
+            }
+            foreach ($day['slots'] as $slot) {
+                if ($slot['id'] === $slotId) {
+                    return ['slot' => $slot, 'timezone' => (string) $options['timezone']];
+                }
+            }
+        }
+
+        return null;
+    }
 
     /**
      * فترات الأوقات الجدارية المتكرّرة (عند رجوع الساعة) ضمن النطاق، بثواني «الحائط المحلي» منذ epoch

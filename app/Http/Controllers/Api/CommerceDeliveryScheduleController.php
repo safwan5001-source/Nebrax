@@ -60,6 +60,8 @@ final class CommerceDeliveryScheduleController extends ApiController
         $this->denySelfService($request);
         $data = $request->validate([
             'slots' => ['present', 'array', 'max:'.CommerceDeliverySlot::MAX_PER_CHANNEL],
+            // معرّف نافذة موجودة يُحدَّث في مكانه (يُحفظ معرّفها واختيارات Checkout وعدّ السعة)؛ بلا معرّف تُنشأ.
+            'slots.*.id' => ['sometimes', 'nullable', 'uuid'],
             'slots.*.method' => ['required', Rule::in(CommerceDeliverySlot::METHODS)],
             'slots.*.label' => ['required', 'string', 'max:80'],
             'slots.*.label_en' => ['sometimes', 'nullable', 'string', 'max:80'],
