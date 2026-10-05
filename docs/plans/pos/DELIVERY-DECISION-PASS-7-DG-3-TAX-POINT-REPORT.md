@@ -101,11 +101,15 @@ commercial substance, provider/merchant evidence, and VAT classification must
 establish whether it is a goods component, a separately supplied service, or
 part of another supply.
 
-Before selecting a tax-point rule, AWJ must classify every relevant order
-component (at minimum meal/goods, delivery, platform fee, and any separately
-priced adjustment) as goods, service, or unresolved. `UNKNOWN` classification
-blocks selection for that component. The derived result must retain the
-classification evidence and the applicable Article 23 policy path/subparagraph.
+Before selecting a tax-point rule, AWJ must classify every customer-facing
+order component included in the customer sale (at minimum meal/goods,
+delivery when charged to the customer, and any separately priced customer
+adjustment) as goods, service, or unresolved. `UNKNOWN` classification blocks
+selection for that customer-sale component. A platform's separate B2B
+commission/brokerage fee is not a customer-sale component: preserve it as raw
+evidence, but evaluate it under its own later fee/settlement gate. The derived
+result must retain the classification evidence and the applicable Article 23
+policy path/subparagraph.
 
 ### C. Actual supply, invoice, payment, and advance payment
 
@@ -306,7 +310,9 @@ Derived result:
   state whose semantics are documented, at order and component/result level;
 - one or more derived tax-point results, each keyed by stable order component
   or supply reference, classified goods/service, allocated taxable amount and
-  currency, selected date/instant, and legal timezone basis;
+  currency, selected date/instant, and legal timezone basis. The result set
+  covers customer-sale components only; a platform B2B fee has a separate
+  result and gate;
 - each result's selected event kind and raw evidence reference(s). A partial
   advance creates a result only for the proven allocated amount/component; it
   must not mark the whole order or remaining value proven;
@@ -314,6 +320,16 @@ Derived result:
 - derivation timestamp and actor/system version;
 - conflict/override reason if a corrected authoritative event superseded an
   earlier unposted interpretation.
+
+Multiple proven results must also have a future canonical-reporting projection
+decision. A single order-level `invoice_date` and whole-order VAT posting must
+not collapse allocated results whose legal tax points fall in different VAT
+periods. The future implementation must either split the legally relevant tax
+documents/postings by component/period or use an approved canonical
+component-level reporting authority that preserves each allocated result,
+amount, and tax period. Merely proving each result in the snapshot is not
+enough if the posting/reporting layer still reports the full tax amount under
+one date.
 
 The raw provider value must never be replaced by `now()`, posting time, or a
 new provider value without retaining the prior version. A posted invoice's
@@ -362,8 +378,11 @@ Future implementation must preserve these invariants:
 The future imported-order posting gate should require an explicit equivalent
 of:
 
-`tax_point_status = proven` for every required component/result and allocated
-taxable amount, not merely once for the order header.
+`tax_point_status = proven` for every required customer-sale component/result
+and allocated taxable amount, not merely once for the order header, plus a
+proven canonical-reporting projection for every result. The separate platform
+B2B fee remains outside this customer-sale gate and requires its own later
+fee/invoice/evidence gate.
 
 alongside the existing role, invoice-responsibility, collection-role, and
 merchant-VAT-status-at-supply requirements. `known` may be useful as an
@@ -383,8 +402,9 @@ Universal:
 - apply G1 Article 23 for both classified goods and services, using the
   applicable goods or service subparagraph, with Saudi implementing
   provisions/guidance applied to the facts;
-- classify every relevant component as goods, service, or `UNKNOWN` before
-  selecting the corresponding rule;
+- classify every customer-sale component as goods, service, or `UNKNOWN`
+  before selecting the corresponding rule; keep a platform B2B fee outside
+  this customer-sale gate and under its own later fee gate;
 - separate supply, invoice issue, payment receipt, advance payment, delivery,
   platform fee, settlement, and remittance;
 - preserve actual historical event times and retain raw evidence;
@@ -395,7 +415,7 @@ Provider/merchant-specific:
 
 - whether an event is dispatch, placing at disposal, service performance/
   completion under Article 23(2)(d), actual receipt, or invoice issue for each
-  component;
+  customer-sale component;
 - whether a provider collects as agent, principal, or merely processes payment;
 - meal versus delivery supply and invoice responsibility;
 - effective policy version and accepted merchant agreement;
@@ -403,9 +423,11 @@ Provider/merchant-specific:
 
 Required evidence is the combination of G1's applicable Article 23 rule,
 current Saudi implementing material, the effective merchant/provider
-agreement, component classification, merchant VAT status at supply, raw event
-and payment/invoice evidence, allocated taxable amounts, and a deterministic
-policy derivation. If any material element is absent or contradictory, posting
+agreement, customer-sale component classification, merchant VAT status at
+supply, raw event and payment/invoice evidence, allocated taxable amounts,
+canonical-reporting projection, and a deterministic policy derivation. The
+platform B2B fee follows its own later evidence and posting gate. If any
+material element for the customer sale is absent or contradictory, posting
 remains blocked.
 
 ### Owner decision required
