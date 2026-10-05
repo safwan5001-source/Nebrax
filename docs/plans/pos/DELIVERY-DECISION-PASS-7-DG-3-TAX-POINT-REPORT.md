@@ -67,7 +67,7 @@ and guidance sources; the HungerStation terms are provider evidence only.
 | Z3 | ZATCA, *Guideline for Persons Liable to Pay Tax in Special Cases — Deemed Suppliers* | https://zatca.gov.sa/en/HelpCenter/guidelines/Documents/Guideline-for-Persons-Liable-to-Pay-Tax-in-Special-Cases-Deemed-Suppliers.pdf | Current official guideline URL; accessed 2026-10-05 | Article 47 marketplace/deemed-supplier concepts, including the significance of supplier VAT registration and the distinction between meal, delivery, and platform-fee supplies. | Its food-delivery examples are general. They do not prove the role or event mapping of HungerStation, Jahez, Keeta, Mrsool, Ninja, or The Chefz. |
 | Z4 | ZATCA, *Guideline for Tax Invoicing and Records under VAT Provisions*, version 3 | https://zatca.gov.sa/en/HelpCenter/guidelines/Documents/Guideline-for-Tax-Invoicing-and-Records-under-VAT-Provisions.pdf | May 2026; accessed 2026-10-05 | Tax-invoice timing, electronic invoicing, records, and the distinction between issuing a document and proving the underlying supply. | Invoice issue alone is not a universal provider-specific supply event; it does not establish merchant/platform principal status. |
 | Z5 | ZATCA, *Agents Guideline*, version 1, July 2020 | Official ZATCA publication; the prior repository evidence records the original URL as unavailable and the archived official capture at https://web.archive.org/web/20220419220231/https://zatca.gov.sa/en/HelpCenter/guidelines/Documents/Agents%20Guideline.pdf | July 2020; access/recheck 2026-10-05 | Disclosed-agent versus own-name-agent consequences, including invoice identity and primary VAT responsibility. | An agency label in a provider's user terms is not enough to establish the VAT result for a particular merchant transaction. |
-| Z6 | ZATCA, *Value Added Tax Implementing Regulations* (bilingual), Article 46, Cash Accounting Basis | https://zatca.gov.sa/en/RulesRegulations/VAT/Documents/Value-Added-Tax-Approved-Implementing-Regulations-Bilingual.pdf | Current official consolidated source cited by exact-head review; accessed 2026-10-05 | Where an effective cash-accounting election applies, output tax is included when and to the extent payment is made. The reporting-period projection therefore depends on effective accounting basis and auditable payment allocation, not registration status or legal supply date alone. | It does not change the underlying legal date/time of supply into a payment date, and it does not authorize AWJ revenue, COGS, AR, or stock posting on payment. |
+| Z6 | ZATCA, *VAT Implementing Regulations* official regulations page, Article 46 (Cash Accounting Basis) | https://zatca.gov.sa/en/RulesRegulations/Taxes/Pages/VATImplementingRegulations.aspx | Official live ZATCA regulations page used by the repository's prior VAT evidence; accessed 2026-10-05 | Article 46 is the authority for the cash-accounting treatment: where legally effective, output tax is included when and to the extent consideration is paid/received. The reporting-period projection therefore depends on effective accounting basis and auditable payment allocation, not registration status or legal supply date alone. | It does not change the underlying legal date/time of supply into a payment date, and it does not authorize AWJ revenue, COGS, AR, or stock posting on payment. The exact publication/version identifier and retained text must be frozen before implementation. |
 | Z7 | ZATCA, *E-Invoicing Detailed Guideline*, Section 8, advance payments | https://zatca.gov.sa/en/E-Invoicing/Introduction/Guidelines/Documents/E-Invoicing_Detailed__Guideline.pdf | Current official guideline; accessed 2026-10-05 | For the advance-payment lifecycle described in Section 8, the advance-payment invoice uses invoice type code `386`; the later tax invoice uses type code `388` and references the advance invoice so the advance can be accounted for in the final document flow. | It does not make an advance document an AWJ canonical sale/inventory posting. Exact clearance/reporting profile and correction documents remain dependent on the applicable invoice scenario and current ZATCA rules. |
 | P1 | HungerStation, *General Terms and Conditions for Restaurant Contracts* | https://hungerstation.com/sa-ar/general-terms-conditions-restaurant-contracts | Page states updated 2026-08-06; rechecked 2026-10-05 | For the published ordinary restaurant relationship: the restaurant sells its products through the platform, supplies the customer tax invoice with the order, HungerStation may collect electronic customer payments, balances are reconciled/transferred, and HungerStation separately invoices restaurant amounts/fees. | It does not prove a named merchant's signed agreement, exact payment-receipt instant, delivery event semantics, VAT status at supply, or a universal HungerStation tax-point rule. |
 
@@ -126,8 +126,11 @@ component classification or adjustment characterization and its evidence.
   under G1 Article 23, or performance/completion under G1 Article 23(2)(d),
   subject to earlier payment/invoice rules.
 - An invoice issued before that event can advance the tax point where the
-  applicable G1 rule and Saudi implementing material treat invoice issue as
-  the earlier event. It does not prove that the named party is the supplier.
+  applicable G1 rule and Saudi implementing material treat issue of a valid tax
+  invoice as the earlier event. A pro-forma invoice, order confirmation,
+  receipt, payment request, or other commercial document is not enough. AWJ
+  must prove the supplier, supplier VAT role/TIN, valid tax-invoice type and
+  status, and allocated supplied component before selecting its issue time.
 - Payment actually received before supply, including an advance payment, can
   advance the tax point for the amount received under the payment rule. A
   payment authorization or an uncompleted card hold is not automatically
@@ -153,7 +156,7 @@ invoice is not the customer's meal supply.
 The legal date/time of supply and the VAT return period are related but are not
 always identical concepts. Under Z6 Article 46, where a merchant has an
 effective cash-accounting-basis election, output tax is included when and only
-to the extent payment is made. The Article 23 legal tax-point result remains
+to the extent consideration is paid/received. The Article 23 legal tax-point result remains
 preserved; a separate reporting projection applies the merchant's effective
 VAT accounting basis and deterministic payment allocation.
 
@@ -178,8 +181,10 @@ separate obligations. For the advance-payment scenario supported by Z7 §8, an
 actual taxable advance requires the advance-payment invoice flow using type
 code `386`; the later tax invoice uses type code `388` and references the
 advance invoice. AWJ must preserve document identifiers, issue timestamps,
-type codes, ZATCA reporting/clearance evidence as applicable, references, and
-the allocated amounts used by the later document.
+type codes, supplier identity/TIN, supplier role, invoice-responsibility
+evidence, ZATCA reporting/clearance evidence as applicable, references, and the
+allocated amounts used by the later document. A generic commercial or pro-forma
+document does not satisfy this proof.
 
 A generic VAT reporting entry is not sufficient where that document lifecycle
 is legally required. Conversely, neither document is permission to call
@@ -212,7 +217,7 @@ it the applicable earliest event.
 | 10. Courier pickup | Conditional by component | Pickup can be relevant to the goods dispatch rule under G1 Article 23 where the component is goods and the factual delivery arrangement fits that rule. It is not a service-completion rule and is not universally a tax point; preserve pickup proof, actor, location, component, and goods identity. |
 | 11. Merchant handoff to courier | Conditional/otherwise UNKNOWN | Handoff may coincide with goods dispatch or transfer of control, but the event label alone does not prove that and does not complete a service by default. Preserve handoff time, component, and courier acceptance. |
 | 12. Delivery to customer | Conditional by component | Delivery can be the actual placing-at-disposal event for goods, or evidence of completed performance for a separately supplied delivery service, where the classification and contract support that result and no earlier applicable event occurred. Preserve delivery confirmation, time, component, location/precision, and order linkage. |
-| 13. Invoice issuance | Conditional, potentially advancing | An invoice issued before another applicable event can be the earliest statutory event under G1 Article 23 as applicable. Preserve issuer, invoice number, issue time, type code, TIN, raw payload, component allocation, ZATCA status, and document references. Do not infer the VAT reporting period without the effective VAT accounting basis. |
+| 13. Invoice issuance | Conditional, potentially advancing | Only a proven valid tax invoice for the identified supplier and allocated supplied component can be the earlier event under G1 Article 23. Preserve issuer, supplier/TIN, invoice responsibility, invoice number, issue time, type code/status, raw payload, component allocation, ZATCA status, and document references. A pro-forma/order confirmation cannot advance the tax point; do not infer the VAT reporting period without the effective VAT accounting basis. |
 | 14. Cancellation before supply | No supply tax point unless an earlier invoice/payment event already occurred | Cancellation does not itself create a supply. Check whether an invoice or actual advance payment already created a tax point. Preserve cancellation time, reason, actor, and prior events. |
 | 15. Cancellation after payment | Does not erase an earlier payment tax point | The earlier advance/payment consequence remains; preserve cancellation and payment evidence. Credit-note/refund treatment is a later legal/accounting action, not a re-dating of the original event. |
 | 16. Refund after supply | No new sale tax point | Refund/correction may require a credit note or other prescribed document under the applicable facts. Preserve original tax point and refund/correction evidence; do not replace the original date. |
@@ -253,10 +258,12 @@ Where cash accounting applies, the reporting projection additionally requires
 the legally relevant payment date and deterministic allocation under Z6.
 
 **H — Early invoice:** Yes, invoice issue can advance the tax point where the
-applicable G1 Article 23 rule applies. Invoice issue does not determine
-supplier identity or cure missing merchant/platform role evidence. For an
-actual taxable advance, the applicable Z7 §8 advance-payment document flow is
-an additional gate; it is not an ordinary AWJ sale posting.
+applicable G1 Article 23 rule and the document is proven to be a valid tax
+invoice for the identified supplier and allocated component. Invoice issue does
+not determine supplier identity or cure missing merchant/platform role
+evidence; a pro-forma/order confirmation is not enough. For an actual taxable
+advance, the applicable Z7 §8 advance-payment document flow is an additional
+gate; it is not an ordinary AWJ sale posting.
 
 **I — Settlement/remittance:** No for the underlying customer sale. Use only as
 later clearing/remittance evidence unless a separate supply is being analyzed.
@@ -362,8 +369,10 @@ Raw evidence, per relevant event:
   settlement statement, delivery proof), received-at, and ingestion attempt;
 - payment authorization, capture, actual receipt/credit, recipient, amount,
   currency, and provider reference as separate facts;
-- merchant invoice number, issuer/TIN, issue time, document type, and raw
-  invoice reference;
+- supplier identity, VAT role/TIN, invoice responsibility, and the pinned
+  financial-role evidence for every supplied component/result;
+- merchant/provider invoice number, issuer/TIN, issue time, document type,
+  validity/status evidence, and raw invoice reference;
 - dispatch/pickup/handoff/delivery proof and event correction status;
 - cancellation/refund/correction references, without deleting original facts;
 - merchant VAT status at supply and the effective financial-role configuration
@@ -373,6 +382,8 @@ Raw evidence, per relevant event:
   evidence reference, verification time, and pinned policy version;
 - deterministic payment allocations linking paid amount, currency, payer,
   recipient, payment event, supplied component/result, and unallocated balance;
+- tax category/rate and VAT minor-unit values for each taxable allocation, plus
+  the residual-allocation metadata;
 - each monetary element's characterization as supplied goods, supplied
   services, discount/consideration adjustment with proven funding/tax
   treatment, non-supply/non-taxable document adjustment, or `UNKNOWN`;
@@ -386,10 +397,16 @@ Derived result:
 - `tax_point_status`: `unknown`, `known`, `proven`, or an equivalent explicit
   state whose semantics are documented, at order and component/result level;
 - one or more derived tax-point results, each keyed by stable order component
-  or supply reference, classified goods/service, allocated taxable amount and
-  currency, selected date/instant, and legal timezone basis. The result set
+  or supply reference, immutable supplier identity, supplier VAT role/TIN,
+  invoice responsibility, classified goods/service, allocated taxable amount
+  and currency, selected date/instant, and legal timezone basis. The result set
   covers customer-sale components only; a platform B2B fee has a separate
-  result and gate;
+  result and gate. Each supplier/component is gated independently;
+- the effective VAT category/rate, allocated VAT amount in minor units, and a
+  deterministic residual-allocation rule. Independent rounding must not create
+  drift: allocated VAT amounts must reconcile exactly to the applicable
+  component/tax-category total and, when the canonical sale is eventually
+  represented, to its canonical tax amount without duplicate VAT;
 - a separate VAT reporting-period projection for each taxable result/amount,
   carrying the pinned accounting-basis version and, for cash accounting, the
   payment allocation(s) that caused inclusion to the extent paid. The legal
@@ -397,6 +414,9 @@ Derived result:
 - each result's selected event kind and raw evidence reference(s). A partial
   advance creates a result only for the proven allocated amount/component; it
   must not mark the whole order or remaining value proven;
+- valid tax-invoice proof for an invoice-issue event, including supplier/TIN,
+  invoice responsibility, document type/status, and allocated component. A
+  pro-forma/order confirmation cannot select an early tax point;
 - tax-document lifecycle status and references where Z7 §8 applies. A proven
   reporting projection without its required tax-document evidence remains
   incomplete;
@@ -584,6 +604,11 @@ applicable. They are not implementation choices made by this report:
    treatment, non-supply/non-taxable document adjustment, or `UNKNOWN`.
    Unknown amounts affecting VAT block posting; AWJ's existing non-taxable
    adjustment semantics are not reinterpreted.
+4. **Per-result supplier and tax allocation proof:** immutable supplier/VAT
+   role/TIN and invoice responsibility per supplied component, valid tax-invoice
+   proof for any early-document event, and exact taxable/VAT/rate residual
+   allocation. A result cannot inherit another supplier's document or VAT
+   amount.
 
 ## 15. Proactive bounded closure review
 
@@ -603,6 +628,10 @@ P2 corrections against accepted `DELIVERY-DECISION-PASS-3`,
 - Actual supplied goods/services, discounts/consideration adjustments, and
   non-supply/non-taxable adjustments are not conflated. Unproven payer/tax
   treatment blocks VAT derivation rather than creating a default.
+- Early invoice timing requires valid tax-invoice proof for the identified
+  supplier/component; pro-forma and order-confirmation documents do not qualify.
+- Every result carries supplier/VAT-role/invoice-responsibility and exact
+  taxable-base/rate/VAT allocation; residual rounding is deterministic.
 - Customer sale remains separate from the platform-to-merchant B2B fee;
   settlement/remittance and webhook receipt remain non-tax-point events.
 - One canonical `InvoiceService::post` path retains Revenue, AR, COGS, and
@@ -612,7 +641,7 @@ P2 corrections against accepted `DELIVERY-DECISION-PASS-3`,
   accounting-basis version, policy version, and raw evidence remain pinned to
   historical facts; current configuration cannot reinterpret history.
 
-No remaining contradiction was selected as a hidden business rule. The three
+No remaining contradiction was selected as a hidden business rule. The four
 future design gates in §14 keep posting blocked. `OD-DG-3-TAX-POINT` remains
 **PROPOSED** and DG-3 is not globally closed.
 
