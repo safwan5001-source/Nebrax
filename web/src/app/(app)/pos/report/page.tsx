@@ -3,7 +3,7 @@
 /** تقرير X/Z من مصدر جلسة واحد؛ لا تختلط فيه فواتير جلسات أو فروع أخرى. */
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { Printer } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -14,6 +14,8 @@ import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/table';
 import { api, ApiError } from '@/lib/api';
 import { formatRiyal, formatRiyalShort, isNegative } from '@/lib/money';
 import { ReportMetricGrid, ReportMobileRows, ReportScreenHeader } from '@/components/reports/report-workspace-ui';
+import { DeliveryPlatformMark } from '@/components/delivery/delivery-platform-mark';
+import { deliveryPlatformLabel } from '@/lib/delivery-platform-registry';
 
 interface Session {
   id: string; number: string; status: 'open' | 'closed';
@@ -21,7 +23,29 @@ interface Session {
   expected_balance: string | null; difference: string | null;
   opened_at: string | null; closed_at: string | null;
 }
-interface Report { cash_sales: string; cash_refunds: string; cash_in: string; cash_out: string; sales_count: number; returns_count: number; returns_total: string; net_sales: string; average: string; expected: string }
+interface DeliveryPlatformReportRow {
+  delivery_platform_profile_id: string;
+  delivery_platform_profile_version_id: string;
+  platform_key: string;
+  display_name: string;
+  display_name_en: string | null;
+  logo_asset_key: string | null;
+  sales_count: number;
+  total: string;
+  platform_collected_total: string;
+  merchant_collected_total: string;
+}
+interface Report {
+  cash_sales: string; cash_refunds: string; cash_in: string; cash_out: string;
+  sales_count: number; returns_count: number; returns_total: string; gross_sales: string; net_sales: string; average: string; expected: string;
+  delivery_platforms: {
+    sales_count: number;
+    total: string;
+    platform_collected_total: string;
+    merchant_collected_total: string;
+    platforms: DeliveryPlatformReportRow[];
+  };
+}
 interface SessionSale { id: string; number: string; invoice_date: string | null; payment_type: string; total: string }
 interface SessionReturn { id: string; number: string; return_date: string | null; payment_type: string; total: string }
 interface ReportResponse { session: Session; report: Report; sales: SessionSale[]; returns: SessionReturn[] }
@@ -29,6 +53,7 @@ interface ReportResponse { session: Session; report: Report; sales: SessionSale[
 export default function PosReportPage() {
   const t = useTranslations('posReport');
   const ts = useTranslations('posSessions');
+  const locale = useLocale();
   const [sessions, setSessions] = useState<Session[]>([]);
   const [selectedId, setSelectedId] = useState('');
   const [session, setSession] = useState<Session | null>(null);
@@ -87,6 +112,7 @@ export default function PosReportPage() {
     { label: ts('cash_refunds'), value: report ? formatRiyalShort(report.cash_refunds) : '—', tone: report && report.cash_refunds !== '0.00' ? 'negative' as const : undefined },
     { label: ts('cash_in_total'), value: report ? formatRiyalShort(report.cash_in) : '—' },
     { label: ts('cash_out_total'), value: report ? formatRiyalShort(report.cash_out) : '—' },
+    { label: t('gross_session_sales'), value: report ? formatRiyalShort(report.gross_sales) : '—' },
     { label: ts('net_sales'), value: report ? formatRiyalShort(report.net_sales) : '—' },
     { label: t('count'), value: report ? String(report.sales_count) : '—' },
     { label: ts('returns_count'), value: report ? String(report.returns_count) : '—' },
@@ -114,6 +140,23 @@ export default function PosReportPage() {
     {reportError && <div className="rounded border border-border bg-surface p-4"><p role="alert" className="text-sm text-negative">{reportError}</p><Button variant="outline" size="sm" className="mt-2" onClick={() => void loadReport()}>{t('retry')}</Button></div>}
     {session && <div className="flex items-center gap-2 text-sm"><Badge tone={closed ? 'positive' : 'warning'}>{closed ? ts('closed_status') : ts('open_status')}</Badge>{session.opened_at && <span className="num text-muted">{session.opened_at.slice(0, 16).replace('T', ' ')}</span>}</div>}
     {reportLoading && !report ? <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">{Array.from({ length: 4 }, (_, index) => <Skeleton key={index} className="h-24 w-full" />)}</div> : <ReportMetricGrid metrics={metrics} />}
+
+    {report && report.delivery_platforms.sales_count > 0 && <Card data-testid="pos-report-delivery-platforms"><CardHeader><CardTitle>{t('delivery_platforms')}</CardTitle></CardHeader><CardContent className="space-y-3">
+      <p className="text-xs text-muted">{t('delivery_platforms_hint')}</p>
+      <div className="grid gap-2 sm:grid-cols-3">
+        {[
+          [t('delivery_sales_total'), report.delivery_platforms.total],
+          [t('platform_collected_sales'), report.delivery_platforms.platform_collected_total],
+          [t('merchant_collected_sales'), report.delivery_platforms.merchant_collected_total],
+        ].map(([label, amount]) => <div key={String(label)} className="rounded-md border border-border bg-surface-subtle px-3 py-2"><p className="text-xs text-muted">{label}</p><p className="num mt-1 text-sm font-semibold text-text">{formatRiyal(String(amount))}</p></div>)}
+      </div>
+      <div className="divide-y divide-border rounded-md border border-border">
+        {report.delivery_platforms.platforms.map((platform) => {
+          const label = deliveryPlatformLabel(platform.platform_key, locale, { name: platform.display_name, nameEn: platform.display_name_en });
+          return <div key={platform.delivery_platform_profile_version_id} className="flex flex-wrap items-center justify-between gap-3 px-3 py-2.5"><DeliveryPlatformMark platformKey={platform.platform_key} name={label || t('unknown_delivery_platform')} /><div className="text-end text-sm"><p className="num font-semibold text-text">{formatRiyal(platform.total)}</p><p className="text-xs text-muted">{t('delivery_invoice_count', { count: platform.sales_count })}</p></div></div>;
+        })}
+      </div>
+    </CardContent></Card>}
 
     {session && !reportError && <Card><CardHeader><CardTitle>{t('recent')}</CardTitle></CardHeader><CardContent>
       {reportLoading ? <Skeleton className="h-32 w-full" /> : sales.length === 0 ? <p className="py-8 text-center text-sm text-muted">{t('empty')}</p> : <>
