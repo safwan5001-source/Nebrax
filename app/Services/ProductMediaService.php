@@ -128,10 +128,21 @@ class ProductMediaService
                 throw new RuntimeException('تعذّر حفظ الصورة ومشتقاتها. تحقق من إعداد تخزين الملفات الدائم ثم أعد المحاولة.', previous: $exception);
             }
 
-            // خارج try/catch التخزين عمداً: فشل هوية `ProductMedia::booted()`
-            // (قيمة خيارٍ/متغيّرٍ لا تخصّ هذا المنتج، أو تعارض مستأجر) يجب أن
-            // يظهر برسالته الحقيقية، لا يُموَّه برسالة عطل تخزينٍ مضلِّلة.
-            $media->save();
+            // فشل هوية `ProductMedia::booted()` (قيمة خيارٍ/متغيّرٍ لا تخصّ
+            // هذا المنتج، أو تعارض مستأجر) يجب أن يظهر برسالته الحقيقية، لا
+            // يُموَّه برسالة عطل تخزينٍ مضلِّلة. لكن الأصل والمشتقات كُتبت
+            // قبل المحاولة، لذا ننظفها بأفضل جهد ثم نرمي الاستثناء نفسه.
+            try {
+                $media->save();
+            } catch (\Throwable $exception) {
+                try {
+                    $this->deleteStoredFilesBestEffort($media, $storedDerivatives, true);
+                } catch (\Throwable $cleanupException) {
+                    report($cleanupException);
+                }
+
+                throw $exception;
+            }
             $created[] = $media;
         }
 
@@ -238,6 +249,8 @@ class ProductMediaService
     /** @return array{0:string,1:string} disk, path */
     private function storeOriginal(Product $product, string $filename, UploadedFile $file): array
     {
+        $disk = 'document';
+
         if ($this->r2Enabled()) {
             $bytes = file_get_contents($file->getRealPath());
             if ($bytes === false) {
@@ -259,7 +272,7 @@ class ProductMediaService
             fclose($stream);
         }
 
-        return ['document', $path];
+        return [$disk, $path];
     }
 
     private function storeDerivative(ProductMedia $media, string $name, string $bytes, string $mimeType): void
