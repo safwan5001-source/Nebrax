@@ -9,6 +9,11 @@
 **Context:** CUST-H4 is CLOSED (`docs/reports/CUST-H4-CLOSURE-REPORT.md`) and is **not** reopened here.
 **Roadmap:** unchanged. Modifying `AWJ_STORE_CUSTOMIZER_HORIZON_ROADMAP_V1.md` and renumbering H5/H6 are separate later actions.
 
+> **Errata — superseded by the CUST-HV V0 contract (2026-10-05).** This document is preserved as the approved evidence/proposal record; where it conflicts with `CUST-HV-V0-DECISIONS-AND-ARCHITECTURE-CONTRACT.md`, **the V0 contract governs**. In particular:
+> 1. **Imaging capability is no longer unknown (U4 / "confirm GD/Imagick").** AWJ-PRODUCT-MEDIA-3A.2 (PR #1229, `155b2a3`) proves **GD with JPEG, PNG and WebP** in the production Docker image, with resize/read/write and production-image Docker smoke passing. Open for V2 are only: raw GD vs a pinned library (e.g. Intervention Image), dependency/version, memory limits, concurrency/runtime cost, real-image quality tuning, final quality values, EXIF orientation. Server-generated variants remain an Owner decision, not reopened.
+> 2. **V1A now contains six items** (DEF-1, DEF-3a, DEF-4, DEF-9, DEF-10 and **DEF-11 / builder toolbar primary-action reachability**, which subsumes DEF-8), not five. **DEF-7 (768 editing surface) stays in V1B.**
+> 3. The Roadmap **has** been updated (CUST-HV inserted before H5; no renumbering), and O1, O18 and the options marked "recommended" in §35 were resolved in the V0 decision register (D-01…D-33).
+
 > **Evidence-discipline labels used throughout**
 > **[AWJ-Existing]** already approved / current behaviour · **[Salla]** what official Salla documentation proves ·
 > **[Daftra]** what official Daftra documentation proves · **[AWJ-Proposal]** recommendation · **[Owner-Decision]** Safwan must choose.
@@ -330,7 +335,7 @@ There is **no `design`/`style` namespace on sections, header, footer or global c
 
 | ID | Capability | AWJ today | Repo evidence | Salla | Daftra | Gap | Proposed direction | Status | Pri | Deps / Risks |
 |---|---|---|---|---|---|---|---|---|---|---|
-| N01 | Announcement bar (one/many; text, icon, link) | **Nothing** | grep `announcement|promo.?bar|marquee|ticker`: no match in `storefront/src`, builder, normalizer | **Yes**: multiple; title, text, icon, link (SAL-PROMO) | — | Missing first-class chrome | Global chrome region `announcements[]` (≤5), see §12. **[HV]** | MISSING | P1 | none (media-independent) |
+| N01 | Announcement bar (one/many; text, icon, link) | **Nothing** | grep `announcement\|promo.?bar\|marquee\|ticker`: no match in `storefront/src`, builder, normalizer | **Yes**: multiple; title, text, icon, link (SAL-PROMO) | — | Missing first-class chrome | Global chrome region `announcements[]` (≤5), see §12. **[HV]** | MISSING | P1 | none (media-independent) |
 | N02 | Bar colours (bg, text, icon, link) | n/a | — | background + text colour (SAL-PROMO, SAL-ADV) | — | — | Full palette-role colours via ColourField with contrast gate; gradient allowed (G15). **[HV]** | MISSING | P1 | G04, G15 |
 | N03 | Ticker / moving text | n/a | — | "moving text" toggle (SAL-PROMO) | — | Motion policy | Included: CSS marquee, speed presets (slow/normal/fast), pauses on hover/focus + visible pause button, static under reduced-motion, direction follows `dir`, full text always reachable. **[HV]** | MISSING | P1 | O5, MO01 |
 | N04 | Expiry, scheduling, page targeting | n/a | — | **expiry date**, **pages**, **theme-version** scope (SAL-PROMO) | — | — | `startsAt?`, `endsAt?`, `pages: home∣product∣category∣all`; version scope is automatic (lives in the presentation document) | MISSING | P1 | cache (U5) |
@@ -901,7 +906,7 @@ Evidence: **prior** real-browser QA only (H4-8 rerun, AR/EN); **this pass ran no
 |---|---|---|---|
 | 390 / 430 | preview-first, Bottom Sheet, no overflow (H4-8 §10) | no overflow | Header custom links absent (NV03); long AR/EN covered by `customizer-visual-verification/*` screenshots (not re-inspected here) |
 | 768 | **Canvas only, no section-editing surface (R02)** | no overflow | tablet merchants cannot edit sections → **V1B** (decided with the new IA) |
-| 1024 | builder header overflows when dirty (39 px, pre-existing, R03) | ok | **V1B** (toolbar may change with the new IA) |
+| 1024 | builder header overflows when dirty (39 px, pre-existing, R03) | ok | ~~V1B~~ → **V1A** with DEF-11 (V0 baseline: actions are off-screen even when clean; Errata ¶2) |
 | 1280 / 1440 | ok | ok | — |
 | Canvas scaling | viewport simulated in JS (`viewport` prop), not CSS | CSS breakpoints | drift risk (PA-2) |
 
@@ -971,7 +976,7 @@ Builder and storefront verified AR+EN at six widths (H4-8). New work must specif
 | DEF-5 | Three max-size logos exceed `MAX_DOCUMENT_BYTES` (1.5 MiB) → save rejected; Base64 copied into every version | `PN:34-36`, `StorefrontPresentationService.php:553` | Medium | **V4** (needs media) |
 | DEF-6 | Section delete is immediate even with authored content | `CP deleteSection` | Low | **V1B** (rule depends on IA + H5 undo toast) |
 | DEF-7 | No section-editing surface at 768 px | H4-8 §10 | Medium | **V1B** |
-| DEF-8 | Builder header overflows when draft is dirty at 768/1024 | H4-8 §10 | Low | **V1B** (toolbar may change with the new IA) |
+| DEF-8 | Builder header overflows when draft is dirty at 768/1024 | H4-8 §10 | Low | ~~V1B~~ → **V1A** (subsumed by **DEF-11**, the clean-state toolbar reachability defect found in the V0 baseline; Errata ¶2) |
 | DEF-9 | `capabilities.ts` header comment says version history DEFERRED (stale since H1) | `capabilities.ts:9,30` | Low | **V1A** (doc/comment; the exported constant is read-only metadata — verify no consumer before touching) |
 | DEF-10 | `HeroSection.tsx` prop doc says "AWJ exposes no hero contract today, so nothing supplies these yet" — the layout *does* pass `heroHeadline/heroSubheadline` | `HeroSection.tsx:11-12` vs `page.tsx:60,73` | Low | **V1A** (comment only) |
 
@@ -985,7 +990,7 @@ Builder and storefront verified AR+EN at six widths (H4-8). New work must specif
 - **Images:** product proxy images render `unoptimized`; banner is a raw `<img>` without width/height/priority. Hero/slider imagery without variants would regress LCP/CLS/bandwidth.
 - **Budget (proposed):** first hero/slide ≤150 KB WebP at mobile width, `fetchPriority=high` on **one** LCP image per page, all others lazy with explicit dimensions (CLS <0.1); slider ≤8 slides, Swiper dynamic; announcement is text-only.
 - **Cheap vs expensive design:** gradients, colours, borders, shadows, separators (inline SVG/CSS) cost **zero network bytes** — they are the preferred route to visual variety; media-backed backgrounds cost variants + LCP risk and need the budget above. Backdrop blur, animated gradients and parallax are the costly ones (rejected/later).
-- **Variants (O3, U4):** no resize library is referenced in `composer.json` (grep negative — confirm GD/Imagick on the Railway image). Options: server variants at upload (recommended), edge resizing (new infrastructure), or originals with caps (not for hero).
+- **Variants (O3, U4):** *[Superseded — Errata ¶1: GD with JPEG/PNG/WebP is proven in the production image by PR #1229.]* ~~no resize library is referenced in `composer.json` (grep negative — confirm GD/Imagick on the Railway image)~~; still open for V2: raw GD vs a pinned library, memory, concurrency, quality tuning. Options: server variants at upload (recommended), edge resizing (new infrastructure), or originals with caps (not for hero).
 - **Canvas:** media list paginated (24) with thumbnails; picker state local to avoid whole-`ExperienceBuilder` rerenders (file is 3,365 lines); selecting/editing one section must not re-mount siblings; the crop UI works on a downscaled preview, not the original.
 - **Document growth:** `design` objects add bytes per section; keep enum/preset values short, store only non-default fields, and keep `MAX_DOCUMENT_BYTES` headroom once logos leave the JSON.
 - **SEO:** hero text stays real text, one `<h1>`, alt policy (M14/SE01), no text baked into images.
@@ -1079,8 +1084,8 @@ Every slice begins with the **Implementation Evidence Gate** (§36A).
 | Slice | Scope | Exit | Depends |
 |---|---|---|---|
 | **V0 — Decisions & contracts (docs)** | Close remaining O-items; ADR "Customizer media on R2" (O2 details); Section Visual Contract; Colour/Typography/Button/Motion tokens; Announcement contract; Footer/Header layout specs; Inspector IA incl. 768; golden fixtures; **baseline six-width browser evidence run** | Owner sign-off | — |
-| **V1A — Independent defects (may start now)** | DEF-1 mobile custom links; DEF-4 honest Preview label/behaviour; DEF-9 + DEF-10 + DEF-3a comment/doc fixes. Each with tests; **no new visual architecture** | defects closed, CI green | none |
-| **V1B — Contract-dependent UX defects (after V0)** | `accentColor` outcome (DEF-2); 768/tablet inspector (DEF-7); builder-header overflow (DEF-8); delete-confirmation rule (DEF-6) — all follow the V0 IA | closed together with V5 | V0, V5 |
+| **V1A — Independent defects (may start now)** | DEF-1 mobile custom links; DEF-4 honest Preview label/behaviour; DEF-9 + DEF-10 + DEF-3a comment/doc fixes; **+ DEF-11 toolbar primary-action reachability (added by the V0 sync — six items; Errata ¶2)**. Each with tests; **no new visual architecture** | defects closed, CI green | none |
+| **V1B — Contract-dependent UX defects (after V0)** | `accentColor` outcome (DEF-2); 768/tablet inspector (DEF-7); ~~builder-header overflow (DEF-8)~~ (moved to V1A with DEF-11); delete-confirmation rule (DEF-6) — all follow the V0 IA; **DEF-7 stays here** | closed together with V5 | V0, V5 |
 | **V2 — Customizer Media Foundation (backend)** | `storefront_media` on R2 domain, upload/list/patch/delete+usage, soft-delete/reconciler, signed workspace read, reference-gated public read, publish validation, variants pipeline, tenancy/RBAC tests | isolation + lifecycle suites green | V0 |
 | **V3 — Announcement bar** | contract ×3, Canvas + Published, ticker/rotation/sticky/dismiss, scheduling, targeting, a11y, parity | parity + a11y checks | V0 |
 | **V4 — MediaPicker, image editor, logos** | shared picker; crop/focal/fit/rotate/reset; mobile override (if O9); logos/favicon → refs (lazy migration; fixes DEF-5) | states table §26 | V2 |
@@ -1103,7 +1108,7 @@ V0 ─┬─► V2 (media) ─► V4 (picker/editor/logos) ─┬─► V6 (hero
                                  ├─► V9 (cards/category/blocks)
                                  └─► V1B (accent, 768 inspector, header overflow, delete rule)
 ```
-External (operational prerequisites, not decisions): Production R2 configuration verified (U1) · imaging capability (U4) · CSP position (U3) · remaining Owner decisions (§35). **H5 depends on V2/V5 being stable** (Restore ↔ media references; Undo ↔ design JSON).
+External (operational prerequisites, not decisions): Production R2 configuration verified (U1) · imaging implementation choices (U4 — capability proven, Errata ¶1) · CSP position (U3) · remaining Owner decisions (§35). **H5 depends on V2/V5 being stable** (Restore ↔ media references; Undo ↔ design JSON).
 
 ## 34. Risks
 
@@ -1276,7 +1281,7 @@ Every item previously deferred or prohibited is re-classified. **IN** = in this 
 
 ## 38. Final recommendation
 
-1. **Proceed with CUST-HV (Option A, approved)** — V0 first; **V1A may start immediately** (five code/doc fixes — DEF-1, DEF-3a, DEF-4, DEF-9, DEF-10 — no new architecture).
+1. **Proceed with CUST-HV (Option A, approved)** — V0 first; **V1A may start immediately** (*originally five; now six with DEF-11 — Errata ¶2*: DEF-1, DEF-3a, DEF-4, DEF-9, DEF-10, DEF-11 — no new architecture).
 2. **Media:** implement the Customizer media contract (O2 details) on the existing R2 foundation; no parallel store. Production R2 flag/config verification (U1) is an operational go-live prerequisite, not a decision.
 3. **Ship the Announcement bar early (V3)**; it needs no media.
 4. **Introduce the Section Visual Contract + palette + Inspector IA (V5) before any per-surface visual work**, so Hero/Banner/Header/Footer/Slider all land on one vocabulary and one parity harness.
@@ -1337,7 +1342,7 @@ Every item previously deferred or prohibited is re-classified. **IN** = in this 
 
 **Gaps in this pass:** no live browser, no AT, Production R2 flag state not verified (operational check), Daftra block palette unknown, Salla undo/mobile specifics undocumented in pages read.
 
-**Unknowns:** U1 Production values of `PRODUCT_MEDIA_R2_ENABLED` / `CATEGORY_MEDIA_R2_ENABLED` (render.yaml stale vs Railway) — an operational check, not an open decision · U2 Daftra drag-drop element palette · U3 CSP at the edge (none in `next.config.ts`/`proxy.ts`/`vercel.json`) · U4 GD/Imagick availability · U5 published-config cache vs time-based expiry · U6 Swiper RTL in `ProductCarousel` · U7 screen-reader behaviour · U8 hero Canvas↔Published visual equivalence not re-run.
+**Unknowns:** U1 Production values of `PRODUCT_MEDIA_R2_ENABLED` / `CATEGORY_MEDIA_R2_ENABLED` (render.yaml stale vs Railway) — an operational check, not an open decision · U2 Daftra drag-drop element palette · U3 CSP at the edge (none in `next.config.ts`/`proxy.ts`/`vercel.json`) · ~~U4 GD/Imagick availability~~ *(resolved: GD proven — Errata ¶1; open only: library choice, memory, concurrency, quality)* · U5 published-config cache vs time-based expiry · U6 Swiper RTL in `ProductCarousel` · U7 screen-reader behaviour · U8 hero Canvas↔Published visual equivalence not re-run.
 
 ---
 

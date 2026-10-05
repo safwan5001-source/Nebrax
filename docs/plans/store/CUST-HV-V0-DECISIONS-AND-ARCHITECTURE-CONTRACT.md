@@ -3,7 +3,7 @@
 **Horizon:** CUST-HV — Visual Design, Media & Merchant UX Completion (runs **before** CUST-H5; H4 stays CLOSED)
 **Slice:** V0 — Decisions & Contracts (documentation / architecture only)
 **Repository:** `safwan5001-source/Nebrax`
-**Base SHA:** `5fd6e596c2217e5b524744a24156db615a9933a7` (`origin/main`; PR #1230 merged)
+**Base SHA:** `155b2a3efb4bda1a77ae308ffd92f33c3a0dc28d` (`origin/main` after the final sync; includes PR #1230 and **AWJ-PRODUCT-MEDIA-3A.2**, PR #1229). Authored at `5fd6e596c2217e5b524744a24156db615a9933a7`; the sync brought in only `Dockerfile`, CI workflows, `tests/Fixtures/gd-runtime-smoke.php` and the 3A.2 report — **no `app/`, `web/` or `storefront/` runtime code changed**, so the contracts and the browser baseline remain valid.
 **Authority chain:** `AWJ_STORE_CUSTOMIZER_VISUAL_UX_COMPLETION_MASTER_GAP.md` (approved evidence + proposals) → **this document** (frozen contracts for V1+) → slice implementation reports.
 **Companion:** `CUST-HV-V0-BASELINE-VISUAL-EVIDENCE-REPORT.md` (browser baseline) · Roadmap section "HORIZON CUST-HV" in `AWJ_STORE_CUSTOMIZER_HORIZON_ROADMAP_V1.md`.
 **Status:** Proposed for Owner review (docs-only PR). Nothing here authorises merge, deploy or Production change. **No application code is changed.**
@@ -36,7 +36,7 @@ Out of scope for V0: any implementation of V1A…V11, any content-page backend, 
 |---|---|---|---|---|
 | D-01 | O1 | **Storage architecture is CLOSED.** Customizer media reuses AWJ's approved official durable/R2-backed foundation. No parallel store, no localStorage, no Base64-first architecture, no second storage service. The 2026-09-26 `KEEP_EMBEDDED_MEDIA_UNTIL_PERSISTENT_STORAGE_IS_AUTHORIZED` decision is **superseded** (§7.1). | FROZEN | §7 |
 | D-02 | O2 | **Customizer Media Contract approved**: tenant-scoped, `commerce.manage`, metadata, dimensions, alt text, usage references, safe-delete, soft-delete + orphan reconciliation, publish-time reference validation, public access only when referenced by Published state, signed/private workspace reads, no path/disk leakage. | FROZEN | §7 |
-| D-03 | O3 | **Server-generated modern variants**: WebP (JPEG fallback), a practical width ladder, original retained where required, explicit width/height. No external image platform unless evidence proves the server path unsuitable. | FROZEN (library choice → V2 evidence, N-1) | §7.5 |
+| D-03 | O3 | **Server-generated modern variants**: WebP (JPEG fallback), a practical width ladder, original retained where required, explicit width/height. No external image platform unless V2 evidence proves the production runtime unsuitable. | FROZEN (GD runtime proven; library/tuning → V2, N-1) | §7.5 |
 | D-04 | O21 | **Image editing = bounded Option B**: crop, focal point, fit, aspect presets, rotate, zoom-in-crop, reset-to-original. **No** filters, colour correction, Photoshop-style editing or arbitrary transforms. | FROZEN | §7.6 |
 | D-05 | O9 | **Optional mobile-image override** for Hero, Banner, Slider. One responsive document stays authoritative; art direction, not a mobile theme. | FROZEN | §7.7 |
 | D-06 | O6 | `accentColor` becomes a **real first-class palette role**. | FROZEN | §4 |
@@ -66,14 +66,15 @@ Out of scope for V0: any implementation of V1A…V11, any content-page backend, 
 | D-30 | Theme | Themes are complete visual systems; apply = Preview → Apply summary → **new Draft Version**; never overwrites Published. | FROZEN | §16 |
 | D-31 | O18 | **Option A**: CUST-HV inserted before H5; H5/H6 not renumbered. | FROZEN | Roadmap |
 | D-32 | O19 | Defect lanes split V1A / V1B. | FROZEN | §20 |
+| D-33 | Owner sync 2026-10-05 | **DEF-11 / BL-1 (builder toolbar primary actions off-screen) is promoted to V1A**, narrowly scoped: Save / Publish / Exit (the required primary actions) reachable at 390 · 430 · 768 · 1024 · 1280 · 1440 in AR and EN, via a responsive overflow mechanism where necessary; **no full toolbar redesign, no V5 Inspector/IA pre-implementation**. DEF-8 (dirty-state sibling of the same overflow) is subsumed. **DEF-7 / 768 inspector stays V1B.** | FROZEN | §20 |
 
 ### 1.2 Decisions that could not be safely frozen (and why)
 
 | ID | Item | Why not frozen | Handling |
 |---|---|---|---|
-| N-1 | **Imaging capability / library** for variants and crop rendering (U4) | No imaging library is referenced in `composer.json`; the Railway PHP image's GD/Imagick availability is unverifiable from the repo | Contract fixes *what* (server-generated WebP + JPEG fallback, width ladder). V2's Evidence Gate must verify GD/Imagick and memory limits. If the server path is unsuitable → **STOP and return to Owner** (no external platform without evidence) |
+| N-1 | **Imaging implementation choices** — the server imaging **capability is PROVEN** | **Proven Existing Capability** (`AWJ-PRODUCT-MEDIA-3A.2-IMPLEMENTATION-REPORT.md`, PR #1229, merged as `155b2a3`): the production Docker image (`php:8.3-apache`) loads **GD with JPEG, PNG and WebP support**; the runtime smoke (`tests/Fixtures/gd-runtime-smoke.php` — load, `gd_info()` format flags, create/read, resize 4×2→2×1 preserving the ratio, write JPEG and WebP) runs during the image build and in `runtime-smoke.yml`; production-image Docker smoke and CI = **PASS**. Not part of that slice and therefore still absent: Imagick, the `exif` extension, Intervention Image, any derivative generation, and an actual Railway deploy of the image. | The Owner decision that image variants are **server-generated is NOT reopened** (only V2 evidence proving the production runtime unsuitable could do so → then **STOP and return to Owner**). **Still open for V2:** (a) raw GD directly vs a pinned higher-level library such as Intervention Image (planned separately as AWJ-PRODUCT-MEDIA-3A.3); (b) dependency/version choice; (c) memory limits; (d) concurrency/runtime cost; (e) real-image quality tuning; (f) final variant quality/compression values; (g) EXIF-orientation handling (no `exif` extension in the image). V2 must also coordinate with the product-media derivative work (AWJ-PRODUCT-MEDIA-3 `thumbnail`/`card`) so AWJ ends up with **one** imaging path, not two |
 | N-2 | Production values of `PRODUCT_MEDIA_R2_ENABLED` / `CATEGORY_MEDIA_R2_ENABLED` / R2 credentials (U1) | Not readable from the repo | **Operational go-live prerequisite**, not a decision (§7.1). Customizer media is R2-only and fail-closed |
-| N-3 | **DEF-11** (builder toolbar actions off-screen in the clean state — new in V0 baseline) lane | Fix is independent of new visual architecture (suggests V1A) but touches toolbar IA also reshaped by the 768 editing surface (suggests V1B) | Registered as V1B by default; **Owner may promote to V1A** (§20) |
+| N-3 | ~~DEF-11 lane~~ — **RESOLVED**: promoted to V1A by the Owner (D-33) | — | no longer open |
 | N-4 | Exact **overlap preset geometry** (O23) | Needs a visual prototype to prove focus-ring/clipping safety | Preset *mechanism* frozen; numeric geometry finalised in V5/V6 with six-width evidence |
 | N-5 | **Font catalogue** (which pairs) | Licensing and subsetting need slice-time verification | Rules frozen: self-hosted, OFL-class licences only, ≥ 6 pairs, Arabic+Latin, `font-display: swap`, subset |
 | N-6 | Variant **numeric ladder** and quality | Needs measurement on real images | Ladder frozen as 480/768/1280/1920 (+160/320 thumbnails); quality tuned in V2 |
@@ -342,11 +343,13 @@ Foreign/missing ids return the established uniform non-revealing 404. **No respo
 
 ### 7.4 Validation
 
-`jpg/jpeg/png/webp` only; no SVG, no GIF/animated; max 5 MB (same as product media); magic-byte sniffing (not extension); decoded dimensions: min 320 px on the short edge (warn below the per-usage recommendation, block below 320), max pixel count 40 MP, max 8192 px per edge; strip EXIF (privacy) after reading orientation; per-tenant library quota (plan-limit hook, default to be set in V2). Upload rate limiting reuses the workspace write limiter.
+`jpg/jpeg/png/webp` only; no SVG, no GIF/animated; max 5 MB (same as product media); magic-byte sniffing (not extension); decoded dimensions: min 320 px on the short edge (warn below the per-usage recommendation, block below 320), max pixel count 40 MP, max 8192 px per edge; strip EXIF (privacy) after applying orientation — the production image has **no `exif` extension** (3A.2 deliberately left it out), so orientation handling is a V2 choice (add `exif`, or a library that reads orientation); per-tenant library quota (plan-limit hook, default to be set in V2). Upload rate limiting reuses the workspace write limiter.
 
 ### 7.5 Variants (D-03)
 
-Server-generated after applying crop/rotate: **WebP** at widths **480 / 768 / 1280 / 1920** (+ **160 / 320** thumbnails), JPEG fallback for clients without WebP, original retained (needed for re-cropping and as the source of truth), explicit `width`/`height` stored per variant. Filenames are content-hashed → `Cache-Control: public, max-age=31536000, immutable` on the public route; workspace stays `private, max-age=600`. Renderers emit `srcset`/`sizes` from the ladder and `width`/`height` to prevent CLS. **No external image platform** unless V2's evidence proves the server path unsuitable (N-1) — then STOP for Owner review.
+Server-generated after applying crop/rotate: **WebP** at widths **480 / 768 / 1280 / 1920** (+ **160 / 320** thumbnails), JPEG fallback for clients without WebP, original retained (needed for re-cropping and as the source of truth), explicit `width`/`height` stored per variant. Filenames are content-hashed → `Cache-Control: public, max-age=31536000, immutable` on the public route; workspace stays `private, max-age=600`. Renderers emit `srcset`/`sizes` from the ladder and `width`/`height` to prevent CLS. 
+
+**Proven Existing Capability (PR #1229 / `155b2a3`):** GD with JPEG, PNG and WebP is loaded in the production Docker image, with resize/read/write smoke and production-image Docker smoke passing. **Still open for V2 (N-1):** raw GD vs a pinned higher-level library (e.g. Intervention Image, AWJ-PRODUCT-MEDIA-3A.3), dependency/version, memory limits, concurrency/runtime cost, real-image quality tuning, final quality/compression values, EXIF orientation. The Owner decision that variants are server-generated is **not reopened**; **no external image platform** unless V2 evidence proves the production runtime unsuitable — then STOP for Owner review. V2 shares a single imaging path with the product-media derivative work (MEDIA-3).
 
 ### 7.6 Image editing (D-04) — bounded Option B
 
@@ -711,7 +714,7 @@ User-saved presets: a store-level `presets[]` (design-only JSON, ≤ 24) is poss
 
 Rules: no empty tab ever; Design groups collapsible with "common first" (background/colour, variant, alignment); every control change updates the Canvas immediately and is part of the same draft revision; the contrast badge sits beside each colour pair.
 
-**Tablet (768 px) must have a real editing surface** (BL-3 / DEF-7): below `lg` the inspector opens as a **side drawer** (≥ 320 px, over the Canvas) at 768 and a **bottom sheet** below 600; the navigation rail becomes a drawer; the toolbar collapses secondary actions into an overflow menu so **Save, Publish and Exit are always visible** (BL-1). At 1024 px the Canvas must keep a usable width (≥ 560 px) — the nav rail collapses to icons. Final geometry is decided and evidenced in V1B/V5; the requirement (a visible editing surface and reachable primary actions at every width in both directions) is frozen.
+**Tablet (768 px) must have a real editing surface** (BL-3 / DEF-7): below `lg` the inspector opens as a **side drawer** (≥ 320 px, over the Canvas) at 768 and a **bottom sheet** below 600; the navigation rail becomes a drawer. (Toolbar primary-action reachability — **Save, Publish and Exit always visible** — is **not** part of this IA work: it is delivered earlier and narrowly by **V1A / DEF-11**, §20.1; V1B/V5 may restyle the overflow mechanism but must preserve the guarantee.) At 1024 px the Canvas must keep a usable width (≥ 560 px) — the nav rail collapses to icons. Final geometry is decided and evidenced in V1B/V5; the requirement (a visible editing surface at 768 px and reachable primary actions at every width in both directions) is frozen.
 
 ---
 
@@ -722,9 +725,9 @@ Every slice: (1) **Implementation Evidence Gate** (§21.3) → (2) UX contract r
 | Slice | Scope (what it may touch) | Must NOT | Exit gate | Depends on |
 |---|---|---|---|---|
 | **V0** Decisions & Contracts | this document, Roadmap section, baseline evidence | any code | Owner approves PR | — |
-| **V1A** Independent defects | DEF-1 (custom links in `MobileMenu`), DEF-3a/DEF-9/DEF-10 (stale comments/docs), DEF-4 (honest theme Preview label/behaviour). Each with tests | new design/media architecture; toolbar/IA redesign | defects closed, CI green, six-width check for DEF-1 | none |
-| **V1B** Contract-dependent UX defects | DEF-2 (accent role outcome per §4.1), DEF-6 (delete-confirmation rule), DEF-7/BL-3 (768 editing surface), DEF-8 + DEF-11/BL-1 (toolbar overflow/primary actions), BL-4 (1024 Canvas width) | before V0 approval and the V5 IA decisions | Save/Publish/Exit reachable at all widths in AR+EN; editing surface at 768 | V0; co-designed with V5 |
-| **V2** Customizer Media Foundation | `storefront_media` model/migration, R2 domain, upload/list/patch/delete/usage, signed workspace route, published-reference gate, variants pipeline, reconciler, publish-time validation, RBAC, tenant tests (§7) | picker UI; any Production flag change | isolation + lifecycle suites green; N-1 evidence recorded | V0 (+ N-2 prerequisite before enabling in Production) |
+| **V1A** Independent defects (**six**) | DEF-1 (custom links in `MobileMenu`), DEF-3a/DEF-9/DEF-10 (stale comments/docs), DEF-4 (honest theme Preview label/behaviour), **DEF-11/BL-1 (builder toolbar primary actions reachable — narrow scope, §20.1; subsumes DEF-8)**. Each with tests | new design/media architecture; **full toolbar redesign**; V5 Inspector/IA; the 768 editing surface | defects closed, CI green; six-width AR+EN check for DEF-1 **and** DEF-11 (clean and dirty states) | none |
+| **V1B** Contract-dependent UX defects | DEF-2 (accent role outcome per §4.1), DEF-6 (delete-confirmation rule), **DEF-7/BL-3 (768 editing surface — depends on the new editor IA)**, BL-4 (1024 Canvas width) | before V0 approval and the V5 IA decisions; must not re-open V1A's primary-action guarantee | visible editing surface at 768 and a usable Canvas width at 1024 in AR+EN | V0; co-designed with V5 |
+| **V2** Customizer Media Foundation | `storefront_media` model/migration, R2 domain, upload/list/patch/delete/usage, signed workspace route, published-reference gate, variants pipeline, reconciler, publish-time validation, RBAC, tenant tests (§7) | picker UI; any Production flag change | isolation + lifecycle suites green; N-1 choices recorded (library, version, memory, concurrency, quality values) | V0 (+ N-2 prerequisite before enabling in Production) |
 | **V3** Announcement Bar | `announcements` contract ×3, Canvas + Published, ticker/rotation/sticky/dismiss, window + targeting, a11y, parity (§12) | media features | parity + a11y + reduced-motion checks | V0 |
 | **V4** MediaPicker / Image Editor / Logos | picker, crop/focal/fit/rotate/reset, mobile override mechanism, logos+favicon → `MediaRef` (lazy migration; fixes DEF-5) (§7) | design contract fields | states table implemented; legacy documents render unchanged | V2 |
 | **V5** Section Visual Contract / Inspector / Colour | `design` per type, palette roles, `ColourField`, contrast engine (client + PHP publish gate), gradients, buttons, surfaces, separators, overlap presets, Content/Design/Layout inspector, copy/paste style, reset design (§3-§6, §18) | per-surface features beyond the contract | back-compat proof (absent design ⇒ identical); contrast tests | V0 |
@@ -736,15 +739,15 @@ Every slice: (1) **Implementation Evidence Gate** (§21.3) → (2) UX contract r
 | **V11** Verification & Closure | six widths × AR/EN, long content, AT pass, parity harness, perf budgets, EN storefront seed (BL-9), closure report | new features | Horizon DoD (Master Gap §36) | all |
 
 ```
-V1A (independent) ──────────────────────────────────────────────────► may ship before/alongside V0 approval
+V1A (6 independent defects, incl. DEF-11 toolbar reachability) ───────► may ship before/alongside V0 approval
 V0 ─┬─► V2 ─► V4 ─┬─► V6 ──┐
     │             ├─► V8 ──┼─► V10 ─► V11
     ├─► V3 ───────┤        │
     └─► V5 ─┬─► V7 (needs V6 for overlay-on-hero)
             ├─► V9
-            └─► V1B (co-designed with V5)
+            └─► V1B (768 editing surface, accent, delete rule, 1024 Canvas width — co-designed with V5; builds on V1A's toolbar guarantee)
 ```
-Dependencies from the approved Master Gap are **preserved unchanged**; the only refinement is that **V1B is co-designed with V5** (its 768 surface and toolbar must follow the Content/Design/Layout IA) and V7's overlay-on-hero explicitly depends on V6.
+Dependencies from the approved Master Gap are **preserved unchanged**; the refinements are that **V1B is co-designed with V5** (its 768 surface must follow the Content/Design/Layout IA) and that **DEF-11 moved from V1B to V1A** (Owner sync, D-33) because primary-action reachability is independent of the new visual architecture and V7's overlay-on-hero explicitly depends on V6.
 
 **H5 (Undo/Redo & Recovery)** follows CUST-HV; the HV contract keeps the document plain immutable JSON and media referenced by id so Undo/Restore stay cheap. **H6 (Advanced Extensibility)** remains later.
 
@@ -762,13 +765,24 @@ Dependencies from the approved Master Gap are **preserved unchanged**; the only 
 | DEF-2 | `accentColor` unused | **V1B** (outcome fixed by §4.1: becomes a live palette role) | Master Gap |
 | DEF-6 | section delete without confirmation (rule depends on IA + H5 undo) | **V1B** | Master Gap |
 | DEF-7 / BL-3 | no editing surface at 768 px | **V1B** | baseline §3 |
-| DEF-8 | builder header overflow when dirty at 768/1024 | **V1B** (subsumed by DEF-11) | H4-8 §10 |
-| **DEF-11 / BL-1** | **builder toolbar primary actions (Publish, Save draft, Schedule) off-screen in the clean state (AR ≤ 1024, EN ≤ 1280); Publish unreachable by scrolling in AR at 390/430/768** — *new in V0* | **V1B by default; Owner may promote to V1A** (N-3) | baseline §3.1 |
+| DEF-8 | builder header overflow when dirty at 768/1024 | **V1A** (subsumed by DEF-11 — same overflow mechanism; dirty state is in DEF-11's verification) | H4-8 §10 |
+| **DEF-11 / BL-1** | **builder toolbar primary actions (Publish, Save draft, Schedule) off-screen in the clean state (AR ≤ 1024, EN ≤ 1280); Publish unreachable by scrolling in AR at 390/430/768** — *new in V0; reachability defect that violates the previously closed H0 "no clipped primary actions" gate* | **V1A (promoted by the Owner, D-33)** — narrow scope, §20.1 | baseline §3.1 |
 | DEF-3b | category page ignores category image | V9 | Master Gap |
 | DEF-5 | three max logos exceed the document cap; Base64 duplicated per version | V4 | Master Gap |
 | BL-4 | Canvas ≈ 486 px wide at 1024 | V1B | baseline §3 |
 
-**V1A is confirmed independent of new visual architecture:** each fix is local (a prop passed through, a label/href, comment edits) and none depends on `design`, palette, media or the new inspector IA.
+**V1A is confirmed independent of new visual architecture.** Its six items are local — a prop passed through (DEF-1), a label/href (DEF-4), comment/doc edits (DEF-3a, DEF-9, DEF-10) and a responsive toolbar overflow (DEF-11) — and none depends on `design`, palette, media or the new inspector IA. **DEF-7 (768 editing surface) is deliberately kept in V1B** because the correct surface depends on the new editor IA.
+
+### 20.1 V1A handling of DEF-11 (narrow, frozen)
+
+| Aspect | Contract |
+|---|---|
+| Required primary actions | **Exit to Commerce, Save draft, Publish** — always visible (not in an overflow) at 390, 430, 768, 1024, 1280, 1440 in **Arabic RTL and English LTR**, in the **clean, dirty and version-conflict** states |
+| Secondary controls | page selector, version selector, viewport-mode switch, Open store, Schedule, status text may collapse into a single keyboard-operable **overflow ("More") menu** that exposes the same actions; unsaved/saved/conflict status must stay perceivable (icon + text, or at the top of the overflow) |
+| Mechanism | responsive overflow with logical (RTL-correct) alignment; **no** horizontal-scroll toolbar, **no** re-ordering of Save/Publish semantics, version logic or permission checks |
+| Non-goals | no full toolbar redesign; no Inspector/IA work (V5); no 768 editing surface (V1B); no design tokens; no new menus beyond the overflow |
+| Verification | geometry assertions that Exit/Save/Publish rects lie inside the viewport at all six widths × AR/EN × {clean, dirty, conflict}; keyboard reach + focus return for the overflow; the existing publish/save tests unchanged and green; before/after screenshots |
+| Longevity | the overflow is interim UI: V1B/V5 may restyle or relocate it but **must preserve the primary-action reachability guarantee** (tested forever) |
 
 ---
 
@@ -806,7 +820,7 @@ Each slice report must (1) re-inspect the **current** relevant Salla and Daftra 
 
 | Check | Result |
 |---|---|
-| Base SHA verified (`git fetch`; `5fd6e59…` is `origin/main`, PR #1230 merged) | ✔ |
+| Base SHA verified (`git fetch`; authored at `5fd6e59…`; **final sync to `155b2a3…` = `origin/main` incl. PR #1229**; sync diff touched no `app/`, `web/` or `storefront/` runtime code) | ✔ |
 | Fresh branch from latest `origin/main`; **no application file modified** (`git diff --name-only` limited to docs + screenshots/JSON under `docs/plans/store/`) | ✔ |
 | Existing PHP tests that back the compatibility contract (§2.2): `StorefrontPresentationNormalizerTest` + `StorefrontPresentationLegacyCompatibilityForkTest` | **70 passed, 350 assertions** (unknown keys dropped, legacy documents preserved, forward behaviour) |
 | Existing web unit tests for section capabilities / presentation config / page regions | **56 passed** |
@@ -823,14 +837,14 @@ No test was modified, skipped or added; no app code was touched to make a check 
 |---|---|---|
 | R-1 | Contract breadth ⇒ combinatorial state explosion (variants × colours × breakpoints × RTL) | typed capability flags; every variant defines mobile + RTL; snapshot matrix; golden fixtures |
 | R-2 | Three-implementation drift (PHP + 2 TS) | generated resolver + fixtures + parity harness (§3.5/§2.2) |
-| R-3 | Imaging capability on the server (N-1) | V2 evidence gate; STOP to Owner if unsuitable |
+| R-3 | Imaging **implementation** risk (capability proven; library/version, memory, concurrency, quality, EXIF — N-1) and duplicate imaging paths with product media (MEDIA-3) | V2 evidence gate and measurement on real images; one shared imaging path; STOP to Owner only if the production runtime proves unsuitable |
 | R-4 | Production R2 configuration (N-2) | operational go-live checklist; gated picker state |
 | R-5 | Contrast engine too strict/loose | auto-foreground first; block only informative text; override of warn-tier only; tests |
 | R-6 | Document growth | non-default storage, 2 KB per-section budget, logos leave the JSON (V4) |
 | R-7 | Overlap/transparent-header regressions in focus/legibility | preset-only, ≥ md only, keyboard traversal tests, fallback to solid |
 | R-8 | Public media enumeration | published-reference gate, uniform 404 |
 | R-9 | Delete vs scheduled/restored versions | block-with-usage, soft delete, publish validation |
-| R-10 | Toolbar defect (DEF-11) ships unnoticed while features pile up | recommend promoting to V1A (N-3) |
+| R-10 | Toolbar defect (DEF-11) ships unnoticed while features pile up | **Mitigated** — promoted to V1A (D-33), which may start immediately |
 | U-1 | CSP at the edge (U3 in Master Gap) | V2/V8 evidence gate; required before custom fonts |
 | U-2 | Published-config caching vs time windows (U5) | dynamic scope or cache-key input (§8.4) |
 | U-3 | Swiper RTL (U6) | verify before the Slider slice |

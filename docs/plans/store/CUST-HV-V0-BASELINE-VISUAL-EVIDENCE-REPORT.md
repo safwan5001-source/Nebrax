@@ -1,7 +1,7 @@
 # CUST-HV V0 — Baseline Visual Evidence Report
 
 **Type:** Evidence only (no product code touched, no issue fixed).
-**Base SHA:** `5fd6e596c2217e5b524744a24156db615a9933a7` (`origin/main`, PR #1230 merged)
+**Captured at Base SHA:** `5fd6e596c2217e5b524744a24156db615a9933a7` (PR #1230 merged). **Latest `origin/main` at final sync:** `155b2a3efb4bda1a77ae308ffd92f33c3a0dc28d` (adds AWJ-PRODUCT-MEDIA-3A.2: `Dockerfile`, CI workflows, a GD smoke fixture and its report only — **no `app/`, `web/` or `storefront/` runtime change**, so this baseline remains valid).
 **Captured:** 2026-10-04 / 2026-10-05 · **Browser:** Playwright + pre-installed Chromium 147 (headless, real clicks)
 **Parent contract:** `docs/plans/store/CUST-HV-V0-DECISIONS-AND-ARCHITECTURE-CONTRACT.md`
 **Screenshots / raw data:** `docs/plans/store/cust-hv-v0-baseline/` (JPEG q55; `baseline-builder.json`, `baseline-published-and-themes.json`)
@@ -116,9 +116,9 @@ Three runtime-backed themes (AWJ Modern, AWJ Market, AWJ Bloom) as wireframe car
 
 | ID | Finding | Evidence | Severity | Proposed lane |
 |---|---|---|---|---|
-| **BL-1** | Builder toolbar actions (Publish; Save draft; Schedule; Mobile) sit outside the viewport in the **clean** state: AR ≤ 1024 px, EN ≤ 1280 px; Publish unreachable by scrolling in AR at 390/430/768 | §3 table, §3.1 | **High** (primary action; violates the H0 gate) | V1B (toolbar IA); **Owner may promote to V1A** — the fix (overflow menu / responsive toolbar) needs no new visual architecture |
+| **BL-1** | Builder toolbar actions (Publish; Save draft; Schedule; Mobile) sit outside the viewport in the **clean** state: AR ≤ 1024 px, EN ≤ 1280 px; Publish unreachable by scrolling in AR at 390/430/768 | §3 table, §3.1 | **High** (current reachability defect; violates the closed H0 "no clipped primary actions" gate) | **V1A — promoted by the Owner (2026-10-05).** Narrow scope: Exit / Save draft / Publish always reachable at all six widths in AR and EN (clean, dirty, conflict) via a responsive overflow; **no full toolbar redesign, no V5 Inspector/IA** (contract §20.1). Independent of the Section Visual Contract |
 | **BL-2** | Custom header links not visible < 1024 px (= DEF-1) | §5 | High | V1A |
-| **BL-3** | No visible section-editing surface at 768 px (= DEF-7) | §3 table | Medium | V1B |
+| **BL-3** | No visible section-editing surface at 768 px (= DEF-7) | §3 table | Medium | **V1B** (depends on the new editor IA — deliberately *not* pulled into V1A) |
 | **BL-4** | At 1024 px the Canvas is ~486 px wide (3-column layout) | §3 | Low–Medium | V1B (IA) |
 | **BL-5** | Theme "Preview" opens the live store (= DEF-4) | §4 | Medium | V1A |
 | **BL-6** | Inspector is flat with no tabs; Banner/Hero expose content fields only (no design, no media upload; image is a URL text box) | §3 | — (baseline for V5/V6) | V5/V6 |

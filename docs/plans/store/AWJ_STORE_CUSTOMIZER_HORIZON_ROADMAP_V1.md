@@ -679,8 +679,8 @@ Avoid inventing a different settings experience for every component.
 | Slice | Name | Depends on |
 |---|---|---|
 | **V0** | Decisions & Contracts | — |
-| **V1A** | Independent Defects (DEF-1 mobile custom links · DEF-3a/9/10 stale docs · DEF-4 honest theme Preview) | none (may start immediately) |
-| **V1B** | Contract-dependent UX Defects (accent role · 768 editing surface · toolbar overflow/primary actions · delete-confirmation rule) | V0; co-designed with V5 |
+| **V1A** | Independent Defects — six: DEF-1 mobile custom links · DEF-3a/9/10 stale docs · DEF-4 honest theme Preview · **DEF-11 builder toolbar primary actions reachable at all widths (narrow: Exit/Save/Publish + responsive overflow; no toolbar redesign, no V5 IA; subsumes DEF-8)** | none (may start immediately) |
+| **V1B** | Contract-dependent UX Defects (accent role · **768 editing surface** · 1024 Canvas width · delete-confirmation rule) | V0; co-designed with V5 |
 | **V2** | Customizer Media Foundation | V0 |
 | **V3** | Announcement Bar | V0 |
 | **V4** | Media Picker / Image Editor / Logos | V2 |
