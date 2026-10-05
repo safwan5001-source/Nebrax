@@ -62,7 +62,7 @@ evidence only.
 
 | Ref | Authority and title | Official URL | Date / access | What it proves | What it does not prove |
 |---|---|---|---|---|---|
-| G1 | GCC Secretariat, *Unified VAT Agreement for the States of the Gulf Cooperation Council*, Article 23 (goods) and Article 24 (services) | https://www.gcc-sg.org/en-us/CouncilMinisterial/Pages/UnifiedGCCAgreementforVAT.aspx | Official GCC source; accessed 2026-10-05 | Article 23 contains the general goods date-of-supply rule, including the earliest applicable disposal/dispatch, payment, and invoice events. Article 24 supplies the corresponding services timing framework, including performance/completion and earlier payment/invoice events where applicable. | It does not map a named provider webhook, acceptance state, pickup, or settlement to supply without facts. |
+| G1 | GCC Unified VAT Agreement, Article 23 (tax due date for goods and services) | https://tax.gov.ae/-/media/Files/FTA/links/Legislation/VAT/02-GCC-VAT-Agreement.pdf | Official FTA-hosted copy of the GCC Agreement; accessed 2026-10-05 | Article 23 contains the tax due-date framework for goods and services: the earliest applicable event, including disposal/dispatch for goods and completion of services, with payment and invoice timing where applicable. Article 24 concerns imports and is not the domestic service rule. | It does not map a named provider webhook, acceptance state, pickup, or settlement to supply without facts. |
 | Z1 | ZATCA, *VAT Implementing Regulations* | https://zatca.gov.sa/en/RulesRegulations/VAT/Pages/VATImplementingRegulations.aspx | Current official regulations page; accessed 2026-10-05 | Saudi implementing provisions and special timing cases that supplement/apply the GCC framework. It is not the source attributed here for the general Article 23 goods rule. | It does not map a named provider webhook, acceptance state, pickup, or settlement to supply without facts. |
 | Z2 | ZATCA, *VAT Law* | https://zatca.gov.sa/en/RulesRegulations/VAT/Pages/VATLaw.aspx | Current official law page; accessed 2026-10-05 | The statutory framework for taxable supplies, tax invoices, consideration, and tax liability. | It does not decide the commercial role of a platform from a consumer UI label. |
 | Z3 | ZATCA, *Guideline for Persons Liable to Pay Tax in Special Cases — Deemed Suppliers* | https://zatca.gov.sa/en/HelpCenter/guidelines/Documents/Guideline-for-Persons-Liable-to-Pay-Tax-in-Special-Cases-Deemed-Suppliers.pdf | Current official guideline URL; accessed 2026-10-05 | Article 47 marketplace/deemed-supplier concepts, including the significance of supplier VAT registration and the distinction between meal, delivery, and platform-fee supplies. | Its food-delivery examples are general. They do not prove the role or event mapping of HungerStation, Jahez, Keeta, Mrsool, Ninja, or The Chefz. |
@@ -92,10 +92,10 @@ own analysis (Z3).
 
 ### B. Service components and classification
 
-Article 24 of G1 governs services rather than applying the goods dispatch rule
-by analogy. For a service component, the relevant actual-supply event is the
-performance/completion of the service, subject to the Agreement's earlier
-payment and invoice timing rules and Saudi implementing guidance. A delivery
+Article 23 of G1 governs both goods and services. For a service component,
+Article 23(2)(d)'s completion/performance event applies rather than the goods
+dispatch rule, subject to the Agreement's earlier payment and invoice timing
+rules and Saudi implementing guidance. A delivery
 charge is not presumed to be a service or a separate supply: the contract,
 commercial substance, provider/merchant evidence, and VAT classification must
 establish whether it is a goods component, a separately supplied service, or
@@ -105,14 +105,14 @@ Before selecting a tax-point rule, AWJ must classify every relevant order
 component (at minimum meal/goods, delivery, platform fee, and any separately
 priced adjustment) as goods, service, or unresolved. `UNKNOWN` classification
 blocks selection for that component. The derived result must retain the
-classification evidence and the Article 23 or Article 24 policy path.
+classification evidence and the applicable Article 23 policy path/subparagraph.
 
 ### C. Actual supply, invoice, payment, and advance payment
 
 - An actual supply event can create the tax point when it is the applicable
   statutory event for the classified component: disposal/dispatch for goods
-  under G1 Article 23, or performance/completion for services under G1 Article
-  24, subject to earlier payment/invoice rules.
+  under G1 Article 23, or performance/completion under G1 Article 23(2)(d),
+  subject to earlier payment/invoice rules.
 - An invoice issued before that event can advance the tax point where the
   applicable G1 rule and Saudi implementing material treat invoice issue as
   the earlier event. It does not prove that the named party is the supplier.
@@ -157,7 +157,7 @@ it the applicable earliest event.
 | 10. Courier pickup | Conditional by component | Pickup can be relevant to the goods dispatch rule under G1 Article 23 where the component is goods and the factual delivery arrangement fits that rule. It is not a service-completion rule and is not universally a tax point; preserve pickup proof, actor, location, component, and goods identity. |
 | 11. Merchant handoff to courier | Conditional/otherwise UNKNOWN | Handoff may coincide with goods dispatch or transfer of control, but the event label alone does not prove that and does not complete a service by default. Preserve handoff time, component, and courier acceptance. |
 | 12. Delivery to customer | Conditional by component | Delivery can be the actual placing-at-disposal event for goods, or evidence of completed performance for a separately supplied delivery service, where the classification and contract support that result and no earlier applicable event occurred. Preserve delivery confirmation, time, component, location/precision, and order linkage. |
-| 13. Invoice issuance | Conditional, potentially advancing | An invoice issued before another applicable event can be the earliest statutory event under G1 Articles 23/24 as applicable. Preserve issuer, invoice number, issue time, TIN, tax period, raw payload, component allocation, and whether it is merchant invoice or provider invoice. |
+| 13. Invoice issuance | Conditional, potentially advancing | An invoice issued before another applicable event can be the earliest statutory event under G1 Article 23 as applicable. Preserve issuer, invoice number, issue time, TIN, tax period, raw payload, component allocation, and whether it is merchant invoice or provider invoice. |
 | 14. Cancellation before supply | No supply tax point unless an earlier invoice/payment event already occurred | Cancellation does not itself create a supply. Check whether an invoice or actual advance payment already created a tax point. Preserve cancellation time, reason, actor, and prior events. |
 | 15. Cancellation after payment | Does not erase an earlier payment tax point | The earlier advance/payment consequence remains; preserve cancellation and payment evidence. Credit-note/refund treatment is a later legal/accounting action, not a re-dating of the original event. |
 | 16. Refund after supply | No new sale tax point | Refund/correction may require a credit note or other prescribed document under the applicable facts. Preserve original tax point and refund/correction evidence; do not replace the original date. |
@@ -180,8 +180,8 @@ universal completion event.
 
 **E — Pickup/handoff:** Conditionally possible only where it is the applicable
 dispatch/transport or transfer event under G1 Article 23 for a goods
-component, and not as the service rule under Article 24. Provider labels alone
-are insufficient.
+component, and not as a substitute for the service-completion rule in Article
+23(2)(d). Provider labels alone are insufficient.
 
 **F — Delivery:** Conditionally possible when delivery places a goods
 component at the customer's disposal, or completes a separately supplied
@@ -196,7 +196,7 @@ Platform collection as agent must be analyzed under the contract and Z5; the
 platform's collection does not by itself make the platform the meal supplier.
 
 **H — Early invoice:** Yes, invoice issue can advance the tax point where the
-applicable G1 Article 23/24 rule applies. Invoice issue does not determine
+applicable G1 Article 23 rule applies. Invoice issue does not determine
 supplier identity or cure missing merchant/platform role evidence.
 
 **I — Settlement/remittance:** No for the underlying customer sale. Use only as
@@ -380,8 +380,9 @@ evidence-backed provider policy, with UNKNOWN blocking.**
 
 Universal:
 
-- apply G1 Article 23 for classified goods and G1 Article 24 for classified
-  services, with Saudi implementing provisions/guidance applied to the facts;
+- apply G1 Article 23 for both classified goods and services, using the
+  applicable goods or service subparagraph, with Saudi implementing
+  provisions/guidance applied to the facts;
 - classify every relevant component as goods, service, or `UNKNOWN` before
   selecting the corresponding rule;
 - separate supply, invoice issue, payment receipt, advance payment, delivery,
@@ -393,13 +394,14 @@ Universal:
 Provider/merchant-specific:
 
 - whether an event is dispatch, placing at disposal, service performance/
-  completion, actual receipt, or invoice issue for each component;
+  completion under Article 23(2)(d), actual receipt, or invoice issue for each
+  component;
 - whether a provider collects as agent, principal, or merely processes payment;
 - meal versus delivery supply and invoice responsibility;
 - effective policy version and accepted merchant agreement;
 - correction/refund evidence and payment-recipient semantics.
 
-Required evidence is the combination of G1's applicable Article 23/24 rule,
+Required evidence is the combination of G1's applicable Article 23 rule,
 current Saudi implementing material, the effective merchant/provider
 agreement, component classification, merchant VAT status at supply, raw event
 and payment/invoice evidence, allocated taxable amounts, and a deterministic
