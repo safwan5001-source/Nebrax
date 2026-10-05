@@ -5,6 +5,7 @@
 - Base SHA: `b0c3574225531ed907991bd9c5f23a7e8f5d66bb` (`origin/main` at implementation start).
 - Implementation head SHA: `5a32eb47bd19ca6075b3c0f947bbf24fea6817e0`.
 - Local implementation commit: `8a6698b19b096412bc5b8a79d6d45199dafe65eb`.
+- Follow-up implementation head: `152a041868f8d8814ddb5410099e761c61008686`.
 - Branch: `feat/awj-product-media-3-derivatives`.
 - PR: [#1235 — AWJ-PRODUCT-MEDIA-3 — Add secure product image derivatives](https://github.com/safwan5001-source/Nebrax/pull/1235).
 
@@ -19,11 +20,13 @@ slice was verified to be identical between that base and the fetched
   `ProductMediaService::attachToProduct()`.
 - Derivative class: `ProductMediaDerivativeService` owns decode, EXIF-safe
   orientation, scale-down, encoding, and per-derivative duration collection.
+  It uses Intervention v4's verified `decodePath()` API.
 - Timing: generation is synchronous inside the established upload path. No
   queue was added.
 - Storage flow: `ProductMediaService` writes original, thumbnail, and card
   through the same existing document/R2 abstraction, then saves the
-  `ProductMedia` row.
+  `ProductMedia` row. A save exception triggers best-effort compensating
+  deletion before that same exception is rethrown.
 - Fallback: the protected derivative endpoint returns the original when an
   old row has no derivative. Existing `download_url` stays unchanged.
 
@@ -64,6 +67,17 @@ slice was verified to be identical between that base and the fetched
 - Legacy rows remain valid. Missing or unsupported historical derivative
   paths fall back to the original protected download endpoint.
 
+## Save-failure compensation follow-up
+
+- Review finding: original, thumbnail, and card could be stored successfully
+  before `ProductMedia::save()` threw, leaving orphaned objects without a row.
+- Fix: only the `save()` call is wrapped. On an exception, the existing
+  best-effort storage cleanup removes generated derivatives and the original.
+  A cleanup error is reported but cannot replace the save exception.
+- Exception behavior: the exact original exception object is rethrown; model
+  guards, database errors, and tenant-isolation errors are not converted to a
+  generic storage exception.
+
 ## Security
 
 - Tenant isolation remains anchored at tenant-scoped `Product::findOrFail()`
@@ -82,17 +96,28 @@ Commands/results:
 
 - `git diff --check` — passed.
 - `docker run --rm --mount type=bind,src=/workspace/Nebrax,dst=/core,readonly php:8.3-cli ... php -l ...` — passed for all ten changed PHP files.
+- Follow-up focused PHP 8.3 syntax check for `ProductMediaService.php` and
+  `ProductMediaDerivativeTest.php` — passed.
 - Focused derivative coverage added in `ProductMediaDerivativeTest`: JPEG,
   PNG, WebP, portrait/landscape geometry, no-upscale, dimension bounds,
   legacy fallback, deletion, authorization, and cross-tenant isolation.
 - Existing R2 write/delete and bulk lifecycle-cleanup tests were extended for
   both derivative objects.
+- Regression test `a_product_media_save_failure_cleans_stored_files_and_rethrows_the_same_exception` forces a `ProductMedia::saving` exception only
+  after original, thumbnail, and card are present. It verifies the same
+  exception object/message is rethrown, all three objects are removed, and no
+  row persists on the document/local path.
 - The local production Docker Runtime Smoke could not start: Composer failed
   before Laravel assembly on the managed environment's untrusted TLS chain
   (`curl error 60`). No insecure TLS workaround was introduced.
-- GitHub Actions CI run `8053` is queued for PR #1235 at the time of this
-  report. It runs the Laravel suite on SQLite and PostgreSQL and is the
-  authoritative Docker-independent runtime verification for this repository.
+- GitHub Actions CI run `8055` exposed two PR-owned compatibility issues:
+  `ImageManager::read()` is unavailable in the installed Intervention v4
+  runtime, and the existing R2 contract expects an explicit
+  `$disk = 'document'` default. The follow-up changes `read()` to
+  `decodePath()` and restores that behavior-neutral default.
+- A new CI run is required for follow-up head
+  `152a041868f8d8814ddb5410099e761c61008686`; its live result will be recorded
+  on PR #1235. The SQLite result above is not treated as passing.
 
 ## Performance
 
