@@ -71,10 +71,14 @@ class ProductMediaR2DeleteTest extends TestCase
         $decoy = $this->attachR2Media($product, 'decoy.webp');
         $target = $this->attachR2Media($product, 'target.webp');
 
-        $expectedKey = "tenant/{$product->tenant_id}/product-media/{$product->id}/target.webp";
+        $expectedKeys = [
+            "tenant/{$product->tenant_id}/product-media/{$product->id}/{$target->id}-thumbnail.webp",
+            "tenant/{$product->tenant_id}/product-media/{$product->id}/{$target->id}-card.webp",
+            "tenant/{$product->tenant_id}/product-media/{$product->id}/target.webp",
+        ];
         $client->shouldNotReceive('deleteObjects');
-        $client->shouldReceive('deleteObject')->once()
-            ->with(['Bucket' => 'awj-product-media-test', 'Key' => $expectedKey])
+        $client->shouldReceive('deleteObject')->times(3)
+            ->with(Mockery::on(fn (array $args): bool => $args['Bucket'] === 'awj-product-media-test' && in_array($args['Key'], $expectedKeys, true)))
             ->andReturn([]);
 
         $this->withToken($auth['token'])->deleteJson("/api/products/{$product->id}/media/{$target->id}")
