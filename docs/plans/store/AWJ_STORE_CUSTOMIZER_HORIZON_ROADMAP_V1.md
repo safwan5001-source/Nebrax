@@ -8,6 +8,7 @@
 **Persistence authority:** `docs/plans/store/AWJ_STORE_CUSTOMIZER_PERSISTENCE_ARCHITECTURE.md`  
 **Design authority:** AWJ Design System + storefront responsive/design-system documents  
 **Execution method:** **Horizon system** — evidence-first, one coherent capability horizon at a time, with explicit closure gates
+**Revision 2026-10-05:** inserted **CUST-HV — Visual Design, Media & Merchant UX Completion** between CUST-H4 (CLOSED) and CUST-H5 (Owner decision, Option A; evidence: `AWJ_STORE_CUSTOMIZER_VISUAL_UX_COMPLETION_MASTER_GAP.md`, contracts: `CUST-HV-V0-DECISIONS-AND-ARCHITECTURE-CONTRACT.md`). H5/H6 are **not renumbered**.
 
 ---
 
@@ -589,6 +590,8 @@ Until that exists, font upload remains gated while curated fonts can remain LIVE
 > Final verdict: all ten merchant-visible homepage sections (`hero, categories, newArrivals, wholesale, banner, featured, offers, benefits, appPromo, customContent`) are **LIVE**, merchant-addable, backed by real contracts and real data, with verified Canvas ↔ Published parity. Offers closed as a real, bounded Commerce-referencing capability (`storefront_offers` + `StorefrontOfferResolver`, real pricing via the existing `CommercePriceResolver`), not GATED. Canvas product-media blocker B1 (workspace `<img>` tags returning `401`/`ERR_BLOCKED_BY_ORB` against the mobile-only media route) was found during H4-8 integrated QA and resolved in H4-8b (signed workspace media route), then independently re-verified on the real stack in the H4-8 rerun. No H4 blockers remain.
 > Evidence: `docs/reports/CUST-H4-CLOSURE-REPORT.md` (full evidence chain, section-by-section final state, Offers architecture, media resolution, tenant isolation, parity, tests).
 > Per §14 below, the next roadmap-defined horizon is **CUST-H5 — Undo / Redo, Recovery & Change Confidence**. Starting it requires its own Evidence Pass and is not authorized by this closure note alone.
+>
+> **Update 2026-10-05:** **H4 remains CLOSED.** By Owner decision the next capability Horizon is **CUST-HV** (below); CUST-H5 follows after CUST-HV.
 
 **Purpose:** turn the current registry into a useful merchant content toolbox.
 
@@ -650,7 +653,61 @@ Avoid inventing a different settings experience for every component.
 
 ---
 
+## HORIZON CUST-HV — Visual Design, Media & Merchant UX Completion
+
+> **STATUS: ACTIVE NEXT CAPABILITY HORIZON — V0 (Decisions & Contracts) delivered for Owner review.**
+> Inserted by Owner decision (**Option A**, 2026-10-05) between CUST-H4 and CUST-H5. **CUST-H4 remains CLOSED and is not reopened.** CUST-H5 (Undo/Redo & Recovery) follows **after** CUST-HV; CUST-H6 (Advanced Extensibility) remains later. No horizon is renumbered by this insertion.
+> **Evidence:** `docs/plans/store/AWJ_STORE_CUSTOMIZER_VISUAL_UX_COMPLETION_MASTER_GAP.md` (Master Gap, PR #1230).
+> **Contracts:** `docs/plans/store/CUST-HV-V0-DECISIONS-AND-ARCHITECTURE-CONTRACT.md` · **Baseline:** `docs/plans/store/CUST-HV-V0-BASELINE-VISUAL-EVIDENCE-REPORT.md`.
+> Starting any slice other than V0 requires its own Evidence Gate and, for merge, explicit Owner approval. Deploy/Production always needs separate approval.
+
+**Purpose:** turn the structurally mature Customizer into a **professional, expressive, highly customizable visual store builder** — *creative freedom inside a safe typed design system* — and complete the merchant workflow around it.
+
+**Two design systems (non-negotiable):** the **editor chrome** follows the AWJ ERP design system (clarity, speed, consistency, balanced density, RTL-first, accessibility, restrained motion); the **merchant storefront** follows the merchant's brand and supports broad creative control. Guardrails prevent invalid contrast, broken responsive layouts, unsafe code, fake commerce capabilities and security problems — they do not restrict colour, backgrounds, layout variants, imagery, typography variation, spacing, borders, shadows or expressive Header/Footer/Banner/Hero styling. Not in scope: Webflow/Figma-style freedom, arbitrary CSS/JS, absolute positioning.
+
+### Scope (summary — contracts in the V0 document)
+
+- **Media:** tenant-scoped Customizer media on the approved R2-backed foundation (storage architecture is CLOSED), picker/library, server-generated WebP variants, bounded image editing (crop · focal · fit · aspect · rotate · reset), optional mobile-image override, safe delete, publish-time validation, reference-gated public reads.
+- **Visual system:** merchant palette (incl. a live accent role), two-colour gradients, contrast engine (auto-foreground first; ≥ 4.5:1 normal text; 3:1 only for large text/applicable UI), typography families/scales, buttons, surfaces, separators, bounded overlap and motion.
+- **Section Visual Contract:** typed per-section capability groups; absent design ⇒ today's output.
+- **Surfaces:** Hero & Banner v2 (per-instance Hero), Header (layouts, transparent/overlay-on-hero, sticky), **Footer as a first-class surface (six layouts)**, nested navigation + icon registry, Announcement bar, Slider, Gallery, richer cards, shared content-block vocabulary.
+- **Merchant UX:** Content/Design/Layout inspector (progressive), a real editing surface at 768 px, reachable primary actions at every width, section labels, copy/paste style, reset design, built-in presets, drag reorder, hover action bar, complete-system themes (Preview → Apply summary → **new Draft Version**).
+- **Out of scope for HV:** content-page backend, mega menu, custom fonts (represented, deferred), user-saved presets, collage/masonry, Undo/Redo (H5), custom CSS/JS (H6), visitor-facing dark/light switch.
+
+### Slices
+
+| Slice | Name | Depends on |
+|---|---|---|
+| **V0** | Decisions & Contracts | — |
+| **V1A** | Independent Defects (DEF-1 mobile custom links · DEF-3a/9/10 stale docs · DEF-4 honest theme Preview) | none (may start immediately) |
+| **V1B** | Contract-dependent UX Defects (accent role · 768 editing surface · toolbar overflow/primary actions · delete-confirmation rule) | V0; co-designed with V5 |
+| **V2** | Customizer Media Foundation | V0 |
+| **V3** | Announcement Bar | V0 |
+| **V4** | Media Picker / Image Editor / Logos | V2 |
+| **V5** | Section Visual Contract / Inspector / Colour | V0 |
+| **V6** | Hero & Banner v2 | V2, V4, V5 |
+| **V7** | Header / Footer / Navigation | V5 (V6 for overlay-on-hero) |
+| **V8** | Slider / Gallery / Motion | V2, V4, V5 |
+| **V9** | Cards / Product & Category Presentation / Content Blocks | V4, V5 |
+| **V10** | Theme Gallery / Editing Workflow Polish | V5-V9 |
+| **V11** | Verification & Closure | all |
+
+### Horizon-specific gates
+
+- Every slice begins with the **Implementation Evidence Gate** (current Salla + Daftra official docs: adopt / change / reject, with reasons).
+- Rollout order for contract changes: **PHP normalizer → storefront renderer → web builder**; additive optional keys only; golden fixtures prove "absent design ⇒ identical output".
+- Every visual control has Canvas ↔ saved Draft ↔ Published parity tests.
+- Tenant isolation, RBAC (`commerce.manage`), host-resolved Published runtime, Draft/Published separation, Version semantics, revision concurrency, fail-closed normalisation, safe URLs and **commerce truth** may not be weakened.
+- Production R2 configuration is an **operational go-live prerequisite**, not a design decision.
+- Closure requires the Master Gap §36 Definition of Done (six widths × AR/EN, keyboard + screen-reader pass, reduced-motion, contrast, LCP/CLS budgets, commerce-firewall tests).
+
+**Exit:** Horizon Closure Report. Only then does CUST-H5 start.
+
+---
+
 ## HORIZON CUST-H5 — Undo / Redo, Recovery & Change Confidence
+
+> **Sequencing note (2026-10-05):** CUST-H5 follows **CUST-HV**. The HV contract keeps the presentation document plain immutable JSON with media referenced by id so Undo/Redo and version Restore remain cheap; Restore re-validates media references. H5 is **not renumbered**.
 
 **Purpose:** make experimentation safe.
 
@@ -891,16 +948,17 @@ AWJ decisions:
 
 After the in-flight current Customizer/Mobile baseline is formally closed:
 
-1. **CUST-H1 — Theme Copies & Safe Publication Lifecycle**
-2. **CUST-H2 — Multi-Page Visual Builder**
-3. **CUST-H3 — Store Identity Studio**
-4. **CUST-H4 — Section Library & Section Quality**
-5. **CUST-H5 — Undo / Redo, Recovery & Change Confidence**
-6. **CUST-H6 — Advanced Extensibility**
+1. **CUST-H1 — Theme Copies & Safe Publication Lifecycle** *(closed)*
+2. **CUST-H2 — Multi-Page Visual Builder** *(closed)*
+3. **CUST-H3 — Store Identity Studio** *(closed)*
+4. **CUST-H4 — Section Library & Section Quality** *(CLOSED — not reopened)*
+4A. **CUST-HV — Visual Design, Media & Merchant UX Completion** *(active next capability Horizon; inserted by Owner decision, Option A, 2026-10-05; H5/H6 not renumbered)*
+5. **CUST-H5 — Undo / Redo, Recovery & Change Confidence** *(after CUST-HV)*
+6. **CUST-H6 — Advanced Extensibility** *(later)*
 
 This is a dependency-oriented order, not a rigid calendar.
 
-A Horizon may be re-ordered only after a focused Evidence Pass proves that another dependency should come first.
+A Horizon may be re-ordered only after a focused Evidence Pass proves that another dependency should come first. (CUST-HV was inserted on that basis: Undo/Redo and Restore are only cheap and safe once the document schema and media references stop changing — see the Master Gap §31.)
 
 ---
 
@@ -1192,6 +1250,8 @@ For avoidance of doubt, the following items are **required work or explicit gate
 33. Custom JavaScript remains blocked until a dedicated security architecture gate approves it.
 
 If an item above is intentionally postponed, its state must be recorded as **DEFERRED** or **GATED**. It must never silently disappear from the roadmap.
+
+**CUST-HV ownership (2026-10-05):** items 8, 9, 12, 13, 14 (decision), 15, 16, 18, 19, 20, 24-26 and 29 are additionally owned by CUST-HV; items 21-23 remain with CUST-H5; 30-33 remain with CUST-H6. Custom-font implementation (item 14) is deferred to late CUST-HV or an immediate follow-up and is represented in the HV architecture.
 
 ---
 

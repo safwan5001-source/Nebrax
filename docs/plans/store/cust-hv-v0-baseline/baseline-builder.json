@@ -1,0 +1,883 @@
+{
+ "builder": [
+  {
+   "locale": "ar",
+   "w": 390,
+   "dirAttr": "rtl",
+   "overflow": 0,
+   "toolbar": {
+    "vw": 390,
+    "hdrScroll": 432,
+    "hdrClient": 390,
+    "clipped": [
+     "نشر"
+    ],
+    "count": 5,
+    "labels": [
+     "الخروج إلى التجارة",
+     "Baseline draft",
+     "فتح المتجر ↗",
+     "حفظ المسودة",
+     "نشر"
+    ]
+   },
+   "canvas": {
+    "w": 364,
+    "h": 3066,
+    "chrome": [
+     "header",
+     "branding",
+     "footer",
+     "branding",
+     "social"
+    ],
+    "sections": [
+     "hero",
+     "categories",
+     "newArrivals",
+     "wholesale",
+     "banner",
+     "featured",
+     "benefits",
+     "appPromo",
+     "customContent"
+    ],
+    "hasH1": true
+   },
+   "inspectorBefore": false,
+   "afterBannerClick": {
+    "settings": "banner",
+    "panels": 14,
+    "tabs": 0,
+    "dialog": true,
+    "selectedOutline": false,
+    "overflow": 0
+   }
+  },
+  {
+   "locale": "ar",
+   "w": 430,
+   "dirAttr": "rtl",
+   "overflow": 0,
+   "toolbar": {
+    "vw": 430,
+    "hdrScroll": 449,
+    "hdrClient": 430,
+    "clipped": [
+     "نشر"
+    ],
+    "count": 5,
+    "labels": [
+     "الخروج إلى التجارة",
+     "Baseline draft",
+     "فتح المتجر ↗",
+     "حفظ المسودة",
+     "نشر"
+    ]
+   },
+   "canvas": {
+    "w": 388,
+    "h": 3066,
+    "chrome": [
+     "header",
+     "branding",
+     "footer",
+     "branding",
+     "social"
+    ],
+    "sections": [
+     "hero",
+     "categories",
+     "newArrivals",
+     "wholesale",
+     "banner",
+     "featured",
+     "benefits",
+     "appPromo",
+     "customContent"
+    ],
+    "hasH1": true
+   },
+   "inspectorBefore": false,
+   "afterBannerClick": {
+    "settings": "banner",
+    "panels": 14,
+    "tabs": 0,
+    "dialog": true,
+    "selectedOutline": false,
+    "overflow": 0
+   }
+  },
+  {
+   "locale": "ar",
+   "w": 768,
+   "dirAttr": "rtl",
+   "overflow": 0,
+   "toolbar": {
+    "vw": 768,
+    "hdrScroll": 839,
+    "hdrClient": 768,
+    "clipped": [
+     "حفظ المسودة",
+     "نشر"
+    ],
+    "count": 32,
+    "labels": [
+     "الخروج إلى التجارة",
+     "الصفحة المعروضة حالياً",
+     "الرئيسية",
+     "صفحة المنتج",
+     "صفحة التصنيف",
+     "نسخة التصميم قيد التعديل",
+     "+ نسخة جديدة",
+     "فتح للتعديل",
+     "تكرار النسخة",
+     "نشر الآن",
+     "جدولة",
+     "إعادة تسمية",
+     "حذف",
+     "فتح للتعديل",
+     "تكرار النسخة",
+     "نشر الآن",
+     "جدولة",
+     "إعادة تسمية",
+     "حذف",
+     "عرض",
+     "إنشاء مسودة من هذه النسخ",
+     "فتح للتعديل",
+     "تكرار النسخة",
+     "نشر الآن",
+     "جدولة",
+     "إعادة تسمية",
+     "فتح المتجر ↗",
+     "حاسوب",
+     "جهاز لوحي",
+     "جوال",
+     "حفظ المسودة",
+     "نشر"
+    ]
+   },
+   "canvas": {
+    "w": 726,
+    "h": 2928,
+    "chrome": [
+     "header",
+     "branding",
+     "footer",
+     "branding",
+     "social"
+    ],
+    "sections": [
+     "hero",
+     "categories",
+     "newArrivals",
+     "wholesale",
+     "banner",
+     "featured",
+     "benefits",
+     "appPromo",
+     "customContent"
+    ],
+    "hasH1": true
+   },
+   "inspectorBefore": false,
+   "afterBannerClick": {
+    "settings": "banner",
+    "panels": 7,
+    "tabs": 0,
+    "dialog": false,
+    "selectedOutline": false,
+    "overflow": 0
+   }
+  },
+  {
+   "locale": "ar",
+   "w": 1024,
+   "dirAttr": "rtl",
+   "overflow": 0,
+   "toolbar": {
+    "vw": 1024,
+    "hdrScroll": 1116,
+    "hdrClient": 1024,
+    "clipped": [
+     "نشر",
+     "جدولة"
+    ],
+    "count": 34,
+    "labels": [
+     "الخروج إلى التجارة",
+     "الصفحة المعروضة حالياً",
+     "الرئيسية",
+     "صفحة المنتج",
+     "صفحة التصنيف",
+     "نسخة التصميم قيد التعديل",
+     "+ نسخة جديدة",
+     "فتح للتعديل",
+     "تكرار النسخة",
+     "نشر الآن",
+     "جدولة",
+     "إعادة تسمية",
+     "حذف",
+     "فتح للتعديل",
+     "تكرار النسخة",
+     "نشر الآن",
+     "جدولة",
+     "إعادة تسمية",
+     "حذف",
+     "عرض",
+     "إنشاء مسودة من هذه النسخ",
+     "فتح للتعديل",
+     "تكرار النسخة",
+     "نشر الآن",
+     "جدولة",
+     "إعادة تسمية",
+     "فتح المتجر ↗",
+     "حاسوب",
+     "جهاز لوحي",
+     "جوال",
+     "استعادة الافتراضي",
+     "حفظ المسودة",
+     "نشر",
+     "جدولة"
+    ]
+   },
+   "canvas": {
+    "w": 486,
+    "h": 2984,
+    "chrome": [
+     "header",
+     "branding",
+     "footer",
+     "branding",
+     "social"
+    ],
+    "sections": [
+     "hero",
+     "categories",
+     "newArrivals",
+     "wholesale",
+     "banner",
+     "featured",
+     "benefits",
+     "appPromo",
+     "customContent"
+    ],
+    "hasH1": true
+   },
+   "inspectorBefore": false,
+   "afterBannerClick": {
+    "settings": "banner",
+    "panels": 7,
+    "tabs": 0,
+    "dialog": false,
+    "selectedOutline": false,
+    "overflow": 0
+   }
+  },
+  {
+   "locale": "ar",
+   "w": 1280,
+   "dirAttr": "rtl",
+   "overflow": 0,
+   "toolbar": {
+    "vw": 1280,
+    "hdrScroll": 1280,
+    "hdrClient": 1280,
+    "clipped": [],
+    "count": 34,
+    "labels": [
+     "الخروج إلى التجارة",
+     "الصفحة المعروضة حالياً",
+     "الرئيسية",
+     "صفحة المنتج",
+     "صفحة التصنيف",
+     "نسخة التصميم قيد التعديل",
+     "+ نسخة جديدة",
+     "فتح للتعديل",
+     "تكرار النسخة",
+     "نشر الآن",
+     "جدولة",
+     "إعادة تسمية",
+     "حذف",
+     "فتح للتعديل",
+     "تكرار النسخة",
+     "نشر الآن",
+     "جدولة",
+     "إعادة تسمية",
+     "حذف",
+     "عرض",
+     "إنشاء مسودة من هذه النسخ",
+     "فتح للتعديل",
+     "تكرار النسخة",
+     "نشر الآن",
+     "جدولة",
+     "إعادة تسمية",
+     "فتح المتجر ↗",
+     "حاسوب",
+     "جهاز لوحي",
+     "جوال",
+     "استعادة الافتراضي",
+     "حفظ المسودة",
+     "نشر",
+     "جدولة"
+    ]
+   },
+   "canvas": {
+    "w": 698,
+    "h": 2928,
+    "chrome": [
+     "header",
+     "branding",
+     "footer",
+     "branding",
+     "social"
+    ],
+    "sections": [
+     "hero",
+     "categories",
+     "newArrivals",
+     "wholesale",
+     "banner",
+     "featured",
+     "benefits",
+     "appPromo",
+     "customContent"
+    ],
+    "hasH1": true
+   },
+   "inspectorBefore": false,
+   "afterBannerClick": {
+    "settings": "banner",
+    "panels": 7,
+    "tabs": 0,
+    "dialog": false,
+    "selectedOutline": false,
+    "overflow": 0
+   }
+  },
+  {
+   "locale": "ar",
+   "w": 1440,
+   "dirAttr": "rtl",
+   "overflow": 0,
+   "toolbar": {
+    "vw": 1440,
+    "hdrScroll": 1440,
+    "hdrClient": 1440,
+    "clipped": [],
+    "count": 34,
+    "labels": [
+     "الخروج إلى التجارة",
+     "الصفحة المعروضة حالياً",
+     "الرئيسية",
+     "صفحة المنتج",
+     "صفحة التصنيف",
+     "نسخة التصميم قيد التعديل",
+     "+ نسخة جديدة",
+     "فتح للتعديل",
+     "تكرار النسخة",
+     "نشر الآن",
+     "جدولة",
+     "إعادة تسمية",
+     "حذف",
+     "فتح للتعديل",
+     "تكرار النسخة",
+     "نشر الآن",
+     "جدولة",
+     "إعادة تسمية",
+     "حذف",
+     "عرض",
+     "إنشاء مسودة من هذه النسخ",
+     "فتح للتعديل",
+     "تكرار النسخة",
+     "نشر الآن",
+     "جدولة",
+     "إعادة تسمية",
+     "فتح المتجر ↗",
+     "حاسوب",
+     "جهاز لوحي",
+     "جوال",
+     "استعادة الافتراضي",
+     "حفظ المسودة",
+     "نشر",
+     "جدولة"
+    ]
+   },
+   "canvas": {
+    "w": 858,
+    "h": 2908,
+    "chrome": [
+     "header",
+     "branding",
+     "footer",
+     "branding",
+     "social"
+    ],
+    "sections": [
+     "hero",
+     "categories",
+     "newArrivals",
+     "wholesale",
+     "banner",
+     "featured",
+     "benefits",
+     "appPromo",
+     "customContent"
+    ],
+    "hasH1": true
+   },
+   "inspectorBefore": false,
+   "afterBannerClick": {
+    "settings": "banner",
+    "panels": 7,
+    "tabs": 0,
+    "dialog": false,
+    "selectedOutline": false,
+    "overflow": 0
+   }
+  },
+  {
+   "locale": "en",
+   "w": 390,
+   "dirAttr": "ltr",
+   "overflow": 0,
+   "toolbar": {
+    "vw": 390,
+    "hdrScroll": 476,
+    "hdrClient": 390,
+    "clipped": [
+     "Save draft",
+     "Publish"
+    ],
+    "count": 5,
+    "labels": [
+     "Exit to Commerce",
+     "Baseline draft",
+     "Open store ↗",
+     "Save draft",
+     "Publish"
+    ]
+   },
+   "canvas": {
+    "w": 364,
+    "h": 3122,
+    "chrome": [
+     "header",
+     "branding",
+     "footer",
+     "branding",
+     "social"
+    ],
+    "sections": [
+     "hero",
+     "categories",
+     "newArrivals",
+     "wholesale",
+     "banner",
+     "featured",
+     "benefits",
+     "appPromo",
+     "customContent"
+    ],
+    "hasH1": true
+   },
+   "inspectorBefore": false,
+   "afterBannerClick": {
+    "settings": "banner",
+    "panels": 14,
+    "tabs": 0,
+    "dialog": true,
+    "selectedOutline": false,
+    "overflow": 0
+   }
+  },
+  {
+   "locale": "en",
+   "w": 430,
+   "dirAttr": "ltr",
+   "overflow": 0,
+   "toolbar": {
+    "vw": 430,
+    "hdrScroll": 495,
+    "hdrClient": 430,
+    "clipped": [
+     "Publish"
+    ],
+    "count": 5,
+    "labels": [
+     "Exit to Commerce",
+     "Baseline draft",
+     "Open store ↗",
+     "Save draft",
+     "Publish"
+    ]
+   },
+   "canvas": {
+    "w": 388,
+    "h": 3086,
+    "chrome": [
+     "header",
+     "branding",
+     "footer",
+     "branding",
+     "social"
+    ],
+    "sections": [
+     "hero",
+     "categories",
+     "newArrivals",
+     "wholesale",
+     "banner",
+     "featured",
+     "benefits",
+     "appPromo",
+     "customContent"
+    ],
+    "hasH1": true
+   },
+   "inspectorBefore": false,
+   "afterBannerClick": {
+    "settings": "banner",
+    "panels": 14,
+    "tabs": 0,
+    "dialog": true,
+    "selectedOutline": false,
+    "overflow": 0
+   }
+  },
+  {
+   "locale": "en",
+   "w": 768,
+   "dirAttr": "ltr",
+   "overflow": 0,
+   "toolbar": {
+    "vw": 768,
+    "hdrScroll": 964,
+    "hdrClient": 768,
+    "clipped": [
+     "Mobile",
+     "Save draft",
+     "Publish"
+    ],
+    "count": 32,
+    "labels": [
+     "Exit to Commerce",
+     "Page currently being vie",
+     "Home",
+     "Product page",
+     "Category page",
+     "Design version being edi",
+     "+ New version",
+     "Open to edit",
+     "Duplicate version",
+     "Publish now",
+     "Schedule",
+     "Rename",
+     "Delete",
+     "Open to edit",
+     "Duplicate version",
+     "Publish now",
+     "Schedule",
+     "Rename",
+     "Delete",
+     "View",
+     "Create a draft from this",
+     "Open to edit",
+     "Duplicate version",
+     "Publish now",
+     "Schedule",
+     "Rename",
+     "Open store ↗",
+     "Desktop",
+     "Tablet",
+     "Mobile",
+     "Save draft",
+     "Publish"
+    ]
+   },
+   "canvas": {
+    "w": 726,
+    "h": 2928,
+    "chrome": [
+     "header",
+     "branding",
+     "footer",
+     "branding",
+     "social"
+    ],
+    "sections": [
+     "hero",
+     "categories",
+     "newArrivals",
+     "wholesale",
+     "banner",
+     "featured",
+     "benefits",
+     "appPromo",
+     "customContent"
+    ],
+    "hasH1": true
+   },
+   "inspectorBefore": false,
+   "afterBannerClick": {
+    "settings": "banner",
+    "panels": 7,
+    "tabs": 0,
+    "dialog": false,
+    "selectedOutline": false,
+    "overflow": 0
+   }
+  },
+  {
+   "locale": "en",
+   "w": 1024,
+   "dirAttr": "ltr",
+   "overflow": 0,
+   "toolbar": {
+    "vw": 1024,
+    "hdrScroll": 1271,
+    "hdrClient": 1024,
+    "clipped": [
+     "Save draft",
+     "Publish",
+     "Schedule"
+    ],
+    "count": 34,
+    "labels": [
+     "Exit to Commerce",
+     "Page currently being vie",
+     "Home",
+     "Product page",
+     "Category page",
+     "Design version being edi",
+     "+ New version",
+     "Open to edit",
+     "Duplicate version",
+     "Publish now",
+     "Schedule",
+     "Rename",
+     "Delete",
+     "Open to edit",
+     "Duplicate version",
+     "Publish now",
+     "Schedule",
+     "Rename",
+     "Delete",
+     "View",
+     "Create a draft from this",
+     "Open to edit",
+     "Duplicate version",
+     "Publish now",
+     "Schedule",
+     "Rename",
+     "Open store ↗",
+     "Desktop",
+     "Tablet",
+     "Mobile",
+     "Restore default",
+     "Save draft",
+     "Publish",
+     "Schedule"
+    ]
+   },
+   "canvas": {
+    "w": 486,
+    "h": 2984,
+    "chrome": [
+     "header",
+     "branding",
+     "footer",
+     "branding",
+     "social"
+    ],
+    "sections": [
+     "hero",
+     "categories",
+     "newArrivals",
+     "wholesale",
+     "banner",
+     "featured",
+     "benefits",
+     "appPromo",
+     "customContent"
+    ],
+    "hasH1": true
+   },
+   "inspectorBefore": false,
+   "afterBannerClick": {
+    "settings": "banner",
+    "panels": 7,
+    "tabs": 0,
+    "dialog": false,
+    "selectedOutline": false,
+    "overflow": 0
+   }
+  },
+  {
+   "locale": "en",
+   "w": 1280,
+   "dirAttr": "ltr",
+   "overflow": 0,
+   "toolbar": {
+    "vw": 1280,
+    "hdrScroll": 1320,
+    "hdrClient": 1280,
+    "clipped": [
+     "Schedule"
+    ],
+    "count": 34,
+    "labels": [
+     "Exit to Commerce",
+     "Page currently being vie",
+     "Home",
+     "Product page",
+     "Category page",
+     "Design version being edi",
+     "+ New version",
+     "Open to edit",
+     "Duplicate version",
+     "Publish now",
+     "Schedule",
+     "Rename",
+     "Delete",
+     "Open to edit",
+     "Duplicate version",
+     "Publish now",
+     "Schedule",
+     "Rename",
+     "Delete",
+     "View",
+     "Create a draft from this",
+     "Open to edit",
+     "Duplicate version",
+     "Publish now",
+     "Schedule",
+     "Rename",
+     "Open store ↗",
+     "Desktop",
+     "Tablet",
+     "Mobile",
+     "Restore default",
+     "Save draft",
+     "Publish",
+     "Schedule"
+    ]
+   },
+   "canvas": {
+    "w": 698,
+    "h": 2928,
+    "chrome": [
+     "header",
+     "branding",
+     "footer",
+     "branding",
+     "social"
+    ],
+    "sections": [
+     "hero",
+     "categories",
+     "newArrivals",
+     "wholesale",
+     "banner",
+     "featured",
+     "benefits",
+     "appPromo",
+     "customContent"
+    ],
+    "hasH1": true
+   },
+   "inspectorBefore": false,
+   "afterBannerClick": {
+    "settings": "banner",
+    "panels": 7,
+    "tabs": 0,
+    "dialog": false,
+    "selectedOutline": false,
+    "overflow": 0
+   }
+  },
+  {
+   "locale": "en",
+   "w": 1440,
+   "dirAttr": "ltr",
+   "overflow": 0,
+   "toolbar": {
+    "vw": 1440,
+    "hdrScroll": 1440,
+    "hdrClient": 1440,
+    "clipped": [],
+    "count": 34,
+    "labels": [
+     "Exit to Commerce",
+     "Page currently being vie",
+     "Home",
+     "Product page",
+     "Category page",
+     "Design version being edi",
+     "+ New version",
+     "Open to edit",
+     "Duplicate version",
+     "Publish now",
+     "Schedule",
+     "Rename",
+     "Delete",
+     "Open to edit",
+     "Duplicate version",
+     "Publish now",
+     "Schedule",
+     "Rename",
+     "Delete",
+     "View",
+     "Create a draft from this",
+     "Open to edit",
+     "Duplicate version",
+     "Publish now",
+     "Schedule",
+     "Rename",
+     "Open store ↗",
+     "Desktop",
+     "Tablet",
+     "Mobile",
+     "Restore default",
+     "Save draft",
+     "Publish",
+     "Schedule"
+    ]
+   },
+   "canvas": {
+    "w": 858,
+    "h": 2928,
+    "chrome": [
+     "header",
+     "branding",
+     "footer",
+     "branding",
+     "social"
+    ],
+    "sections": [
+     "hero",
+     "categories",
+     "newArrivals",
+     "wholesale",
+     "banner",
+     "featured",
+     "benefits",
+     "appPromo",
+     "customContent"
+    ],
+    "hasH1": true
+   },
+   "inspectorBefore": false,
+   "afterBannerClick": {
+    "settings": "banner",
+    "panels": 7,
+    "tabs": 0,
+    "dialog": false,
+    "selectedOutline": false,
+    "overflow": 0
+   }
+  }
+ ],
+ "themes": [],
+ "published": []
+}
