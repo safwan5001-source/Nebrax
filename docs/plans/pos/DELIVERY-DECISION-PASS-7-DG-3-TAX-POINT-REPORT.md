@@ -1,10 +1,10 @@
 # DELIVERY-DECISION-PASS-7 — DG-3 tax point
 
-**Task:** `DELIVERY-DECISION-PASS-7`  
-**Decision:** `OD-DG-3-TAX-POINT`  
-**Nature:** evidence, architecture decision, and durable documentation only.  
-**Base SHA (`origin/main` at start):** `230d9f020f859705db8a5c0ae07db1acb453e5d7`  
-**Access date:** 2026-10-05  
+**Task:** `DELIVERY-DECISION-PASS-7`
+**Decision:** `OD-DG-3-TAX-POINT`
+**Nature:** evidence, architecture decision, and durable documentation only.
+**Base SHA (`origin/main` at start):** `230d9f020f859705db8a5c0ae07db1acb453e5d7`
+**Access date:** 2026-10-05
 **Status:** proposed; no production behavior is enabled by this report.
 
 ## 1. Executive conclusion
