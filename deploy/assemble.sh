@@ -17,7 +17,8 @@ fi
 cd "$APP_DIR"
 
 echo "▶ 2/4  Sanctum + تخزين S3/R2 + تفعيل طبقة الـ API..."
-composer require laravel/sanctum league/flysystem-aws-s3-v3:^3.0 predis/predis:^2.2 resend/resend-php --no-interaction
+composer require laravel/sanctum league/flysystem-aws-s3-v3:^3.0 predis/predis:^2.2 resend/resend-php intervention/image-laravel:4.1.1 --no-interaction
+php "$CORE_DIR/tests/Fixtures/intervention-image-runtime-smoke.php" "$APP_DIR"
 php artisan install:api --no-interaction --without-migration-prompt || true
 rm -f database/migrations/*_create_personal_access_tokens_table.php 2>/dev/null || true
 

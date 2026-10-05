@@ -24,6 +24,7 @@ ENV COMPOSER_ALLOW_SUPERUSER=1 \
 COPY . /core
 RUN bash /core/deploy/assemble.sh /core /app \
     && php /core/tests/Fixtures/gd-runtime-smoke.php \
+    && php /core/tests/Fixtures/intervention-image-runtime-smoke.php /app \
     && mkdir -p \
         /app/storage/framework/cache/data \
         /app/storage/framework/sessions \
