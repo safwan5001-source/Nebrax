@@ -62,8 +62,8 @@ and guidance sources; the HungerStation terms are provider evidence only.
 | Ref | Authority and title | Official URL | Date / access | What it proves | What it does not prove |
 |---|---|---|---|---|---|
 | G1 | GCC Unified VAT Agreement, Article 23 (tax due date for goods and services) | https://tax.gov.ae/-/media/Files/FTA/links/Legislation/VAT/02-GCC-VAT-Agreement.pdf | Official FTA-hosted copy of the GCC Agreement; accessed 2026-10-05 | Article 23 contains the tax due-date framework for goods and services: the earliest applicable event, including disposal/dispatch for goods and completion of services, with payment and invoice timing where applicable. Article 24 concerns imports and is not the domestic service rule. | It does not map a named provider webhook, acceptance state, pickup, or settlement to supply without facts. |
-| Z1 | ZATCA, *VAT Implementing Regulations* | https://zatca.gov.sa/en/RulesRegulations/VAT/Pages/VATImplementingRegulations.aspx | Current official regulations page; accessed 2026-10-05 | Saudi implementing provisions and special timing cases that supplement/apply the GCC framework. It is not the source attributed here for the general Article 23 goods rule. | It does not map a named provider webhook, acceptance state, pickup, or settlement to supply without facts. |
-| Z2 | ZATCA, *VAT Law* | https://zatca.gov.sa/en/RulesRegulations/VAT/Pages/VATLaw.aspx | Current official law page; accessed 2026-10-05 | The statutory framework for taxable supplies, tax invoices, consideration, and tax liability. | It does not decide the commercial role of a platform from a consumer UI label. |
+| Z1 | ZATCA, *VAT Implementing Regulations* | https://zatca.gov.sa/en/RulesRegulations/Taxes/Pages/VATImplementingRegulations.aspx | Current official regulations page; accessed 2026-10-05 | Saudi implementing provisions and special timing cases that supplement/apply the GCC framework. It is not the source attributed here for the general Article 23 goods rule. | It does not map a named provider webhook, acceptance state, pickup, or settlement to supply without facts. |
+| Z2 | ZATCA, *VAT Law* | https://www.zatca.gov.sa/en/RulesRegulations/Taxes/Pages/VATLaw.aspx | Current official law page; accessed 2026-10-05 | The statutory framework for taxable supplies, tax invoices, consideration, and tax liability. | It does not decide the commercial role of a platform from a consumer UI label. |
 | Z3 | ZATCA, *Guideline for Persons Liable to Pay Tax in Special Cases — Deemed Suppliers* | https://zatca.gov.sa/en/HelpCenter/guidelines/Documents/Guideline-for-Persons-Liable-to-Pay-Tax-in-Special-Cases-Deemed-Suppliers.pdf | Current official guideline URL; accessed 2026-10-05 | Article 47 marketplace/deemed-supplier concepts, including the significance of supplier VAT registration and the distinction between meal, delivery, and platform-fee supplies. | Its food-delivery examples are general. They do not prove the role or event mapping of HungerStation, Jahez, Keeta, Mrsool, Ninja, or The Chefz. |
 | Z4 | ZATCA, *Guideline for Tax Invoicing and Records under VAT Provisions*, version 3 | https://zatca.gov.sa/en/HelpCenter/guidelines/Documents/Guideline-for-Tax-Invoicing-and-Records-under-VAT-Provisions.pdf | May 2026; accessed 2026-10-05 | Tax-invoice timing, electronic invoicing, records, and the distinction between issuing a document and proving the underlying supply. | Invoice issue alone is not a universal provider-specific supply event; it does not establish merchant/platform principal status. |
 | Z5 | ZATCA, *Agents Guideline*, version 1, July 2020 | Official ZATCA publication; the prior repository evidence records the original URL as unavailable and the archived official capture at https://web.archive.org/web/20220419220231/https://zatca.gov.sa/en/HelpCenter/guidelines/Documents/Agents%20Guideline.pdf | July 2020; access/recheck 2026-10-05 | Disclosed-agent versus own-name-agent consequences, including invoice identity and primary VAT responsibility. | An agency label in a provider's user terms is not enough to establish the VAT result for a particular merchant transaction. |
@@ -293,6 +293,23 @@ accrual` or legally applicable `cash_accounting` basis. Missing basis evidence
 is `UNKNOWN`, not an accrual default. Cash-basis allocation changes neither
 the number nor timing of canonical sale/inventory recognition events.
 
+For a proven cash-accounting basis, an unpaid or partially paid supplied amount
+may have a legal tax point but no reportable VAT period yet. The future
+projection must represent that result explicitly as `pending_unpaid` (or an
+equivalent not-yet-reportable state), with zero allocated payment for the
+unpaid amount; it must not invent a period or treat the amount as paid. Later
+payment allocation extends that result idempotently. This state does not itself
+authorize posting: if AWJ's canonical accounting model cannot safely carry the
+pending VAT projection and later clearing, the imported-order path remains
+blocked.
+
+Conversely, once that pending state and its later-clearing invariant are
+proved representable, the absence of payment alone must not force an ordinary
+canonical sale to wait for collection: `InvoiceService::post` remains governed
+by the separate proven-supply and financial-role gates. The pending state is a
+VAT-reporting status only and never creates an additional sale, AR, Revenue,
+VAT, COGS, or Stock event.
+
 ## 7. HungerStation application
 
 P1 still supports the ordinary published restaurant relationship described in
@@ -375,8 +392,10 @@ Raw evidence, per relevant event:
   validity/status evidence, and raw invoice reference;
 - dispatch/pickup/handoff/delivery proof and event correction status;
 - cancellation/refund/correction references, without deleting original facts;
-- merchant VAT status at supply and the effective financial-role configuration
-  version;
+- effective VAT-registration status, VAT role/TIN, and supporting evidence at
+  supply for every component supplier (including a separately supplied
+  delivery supplier where proven), plus the effective financial-role
+  configuration version;
 - effective VAT accounting-basis evidence (`standard/accrual`, legally
   applicable `cash_accounting`, or `UNKNOWN`), its effective interval,
   evidence reference, verification time, and pinned policy version;
@@ -398,8 +417,9 @@ Derived result:
   state whose semantics are documented, at order and component/result level;
 - one or more derived tax-point results, each keyed by stable order component
   or supply reference, immutable supplier identity, supplier VAT role/TIN,
-  invoice responsibility, classified goods/service, allocated taxable amount
-  and currency, selected date/instant, and legal timezone basis. The result set
+  effective VAT-registration status and evidence, invoice responsibility,
+  classified goods/service, allocated taxable amount and currency, selected
+  date/instant, and legal timezone basis. The result set
   covers customer-sale components only; a platform B2B fee has a separate
   result and gate. Each supplier/component is gated independently;
 - the effective VAT category/rate, allocated VAT amount in minor units, and a
@@ -409,8 +429,11 @@ Derived result:
   represented, to its canonical tax amount without duplicate VAT;
 - a separate VAT reporting-period projection for each taxable result/amount,
   carrying the pinned accounting-basis version and, for cash accounting, the
-  payment allocation(s) that caused inclusion to the extent paid. The legal
-  tax-point timestamp is retained and is not overwritten by this projection;
+  payment allocation(s) that caused inclusion to the extent paid. A proven
+  cash-basis result with unpaid consideration is explicitly
+  `pending_unpaid`/not-yet-reportable until an auditable payment allocation
+  exists; no reporting period is fabricated. The legal tax-point timestamp is
+  retained and is not overwritten by this projection;
 - each result's selected event kind and raw evidence reference(s). A partial
   advance creates a result only for the proven allocated amount/component; it
   must not mark the whole order or remaining value proven;
@@ -605,10 +628,10 @@ applicable. They are not implementation choices made by this report:
    Unknown amounts affecting VAT block posting; AWJ's existing non-taxable
    adjustment semantics are not reinterpreted.
 4. **Per-result supplier and tax allocation proof:** immutable supplier/VAT
-   role/TIN and invoice responsibility per supplied component, valid tax-invoice
-   proof for any early-document event, and exact taxable/VAT/rate residual
-   allocation. A result cannot inherit another supplier's document or VAT
-   amount.
+   role/TIN, effective VAT-registration status with supporting evidence, and
+   invoice responsibility per supplied component; valid tax-invoice proof for
+   any early-document event; and exact taxable/VAT/rate residual allocation.
+   A result cannot inherit another supplier's status, document, or VAT amount.
 
 ## 15. Proactive bounded closure review
 
@@ -632,6 +655,9 @@ P2 corrections against accepted `DELIVERY-DECISION-PASS-3`,
   supplier/component; pro-forma and order-confirmation documents do not qualify.
 - Every result carries supplier/VAT-role/invoice-responsibility and exact
   taxable-base/rate/VAT allocation; residual rounding is deterministic.
+- Cash-basis unpaid consideration remains explicitly
+  `pending_unpaid`/not-yet-reportable until deterministic payment allocation;
+  no period is invented, and later allocation is idempotent.
 - Customer sale remains separate from the platform-to-merchant B2B fee;
   settlement/remittance and webhook receipt remain non-tax-point events.
 - One canonical `InvoiceService::post` path retains Revenue, AR, COGS, and
