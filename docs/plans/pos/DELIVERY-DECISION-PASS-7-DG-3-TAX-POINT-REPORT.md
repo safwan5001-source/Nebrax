@@ -331,6 +331,24 @@ amount, and tax period. Merely proving each result in the snapshot is not
 enough if the posting/reporting layer still reports the full tax amount under
 one date.
 
+That projection decision must not use an ordinary AWJ sales invoice for a
+partial advance slice. Under accepted `DELIVERY-DECISION-PASS-3` §8 and §16,
+`InvoiceService::post` is the canonical sale authority and performs the sale's
+journal plus inventory/COGS effects; it is not a VAT-timing allocation tool.
+The future delivery-order path must preserve one canonical sale/inventory
+recognition path. It must not call `InvoiceService::post` multiple times for
+one order merely to represent multiple VAT dates, and VAT allocations must
+never create duplicate or premature Revenue, VAT, AR, COGS, or Stock effects.
+
+Advance-payment VAT therefore requires a separately designed accounting/tax
+projection, such as an appropriate VAT advance/liability or tax-reporting
+projection, with a later deterministic reconcile/clear against the canonical
+sale. This report does not choose that mechanism. Until it is designed and
+proven safe in AWJ's canonical accounting model, the imported-order posting
+path remains blocked. Multiple VAT tax-point allocations describe VAT timing
+only; they do not imply multiple sales invoices, sale-recognition events,
+inventory postings, or COGS postings.
+
 The raw provider value must never be replaced by `now()`, posting time, or a
 new provider value without retaining the prior version. A posted invoice's
 historical result is not reinterpreted by later configuration changes.
