@@ -73,7 +73,7 @@ final class ProductMediaDerivativeService
 
         foreach (self::MAX_DIMENSIONS as $name => $maxDimension) {
             $startedAt = hrtime(true);
-            $image = $this->images->read($sourcePath);
+            $image = $this->images->decodePath($sourcePath);
 
             // Intervention owns EXIF orientation handling; there is no custom
             // EXIF parser or mutation of the original upload.
