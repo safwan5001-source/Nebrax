@@ -4178,8 +4178,8 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
     return resolve({
       session: s,
       report: closed
-        ? { cash_sales: '3880.00', cash_refunds: '120.00', cash_in: '50.00', cash_out: '30.00', sales_count: 2, returns_count: 1, returns_total: '120.00', net_sales: '3880.00', average: '2000.00', expected: '4380.00' }
-        : { cash_sales: '1150.00', cash_refunds: '0.00', cash_in: '0.00', cash_out: '0.00', sales_count: 1, returns_count: 0, returns_total: '0.00', net_sales: '1150.00', average: '1150.00', expected: '1650.00' },
+        ? { cash_sales: '3880.00', cash_refunds: '120.00', cash_in: '50.00', cash_out: '30.00', sales_count: 2, returns_count: 1, returns_total: '120.00', gross_sales: '4000.00', net_sales: '3880.00', average: '2000.00', expected: '4380.00', delivery_platforms: { sales_count: 0, total: '0.00', platform_collected_total: '0.00', merchant_collected_total: '0.00', platforms: [] } }
+        : { cash_sales: '1150.00', cash_refunds: '0.00', cash_in: '0.00', cash_out: '0.00', sales_count: 1, returns_count: 0, returns_total: '0.00', gross_sales: '1150.00', net_sales: '1150.00', average: '1150.00', expected: '1650.00', delivery_platforms: { sales_count: 0, total: '0.00', platform_collected_total: '0.00', merchant_collected_total: '0.00', platforms: [] } },
       sales: closed
         ? [
             { id: 'inv-pos-session-1', number: 'INV-POS-0101', invoice_date: '2026-06-27', payment_type: 'cash', total: '2300.00' },

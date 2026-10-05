@@ -17,6 +17,8 @@ describe('POS session report integrity', () => {
     expect(page).not.toContain("api<{ data: Invoice[] }>('/invoices')");
     expect(page).not.toContain('.slice(0, 10)');
     expect(page).toContain('`-${formatRiyal(item.total)}`');
+    expect(page).toContain('report.delivery_platforms.platform_collected_total');
+    expect(page).toContain('data-testid="pos-report-delivery-platforms"');
     expect(page).not.toContain('href={`/returns/${item.id}`}');
     expect(page).not.toContain('href: `/returns/${item.id}`');
   });
