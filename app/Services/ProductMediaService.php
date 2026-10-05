@@ -19,10 +19,10 @@ use RuntimeException;
  * ═══════════════════════════════════════════════════════════════
  *  ProductMediaService — التخزين الفعلي لوسائط قيمة الخيار/المتغيّر (VAR-MEDIA-1)
  * ═══════════════════════════════════════════════════════════════
- *  يوازي منطق `ProductController::storeMedia()`/`destroyMedia()` القائم
- *  حرفياً (نفس `DocumentStorageService`، نفس مسار التخزين، نفس نمط الحذف
- *  بعد الالتزام) لكن للنطاقين الجديدين. مسار المنتج القائم **لم يُمسّ** —
- *  هذا الصنف إضافةٌ موازية لا إعادة كتابة.
+ *  هو سلطة التخزين الواحدة لمسارات وسائط المنتج الثلاثة (المشتركة/قيمة
+ *  الخيار/المتغيّر): نفس `DocumentStorageService` وR2 ونمط الحذف بعد
+ *  الالتزام. يبقى المتحكم طبقة HTTP رفيعة؛ لذلك تُكتب المشتقات بجانب الأصل
+ *  ضمن العزل نفسه، ولا ينشأ مسار تخزين موازٍ أو عام.
  *
  *  **سقف الثمان صورٍ لكل نطاقٍ على حدة**، لا مُجمَّعاً مع صور المنتج ولا مع
  *  نطاقاتٍ أخرى: القيمة القائمة (٨) خاصة بمعرض المنتج المشترك وحده منذ
@@ -37,6 +37,7 @@ class ProductMediaService
     public function __construct(
         private readonly DocumentStorageService $documentStorage,
         private readonly R2StorageService $r2,
+        private readonly ProductMediaDerivativeService $derivatives,
     ) {}
 
     /** AWJ-R2-4A: يبقى false افتراضياً — تراجعٌ فوريٌّ بمتغيّر بيئة بلا نشر كود. */
@@ -102,50 +103,36 @@ class ProductMediaService
         foreach (array_values($files) as $offset => $file) {
             $extension = strtolower($file->getClientOriginalExtension() ?: $file->extension() ?: 'bin');
             $filename = Str::uuid().".{$extension}";
-
-            if ($this->r2Enabled()) {
-                // بايتاتٌ في الذاكرة لا مجرى: حجم الملف محدودٌ أصلاً (5 ميغابايت،
-                // StoreProductMediaRequest)، وتفادياً لعلّة قائمة في
-                // R2StorageService::put() تستدعي is_readable() على مجرًى لا اسم
-                // ملف — لا يُصلَح هنا (خارج نطاق وسائط المنتج، AWJ-R2-2 مدموجة).
-                $bytes = file_get_contents($file->getRealPath());
-                try {
-                    $path = $this->r2->put(ProductMedia::R2_DOMAIN, (string) $product->id, $filename, $bytes, $file->getMimeType());
-                } catch (RuntimeException|AwsException $exception) {
-                    throw new RuntimeException('تعذّر حفظ الصورة. تحقق من إعداد تخزين الملفات الدائم ثم أعد المحاولة.');
-                }
-                $disk = 'r2';
-            } else {
-                $path = "product-media/{$product->tenant_id}/{$product->id}/{$filename}";
-                $profile = $this->documentStorage->profile();
-                $stream = fopen($file->getRealPath(), 'rb');
-                try {
-                    try {
-                        $this->documentStorage->put($profile, $path, $stream);
-                    } catch (RuntimeException $exception) {
-                        throw new RuntimeException('تعذّر حفظ الصورة. تحقق من إعداد تخزين الملفات الدائم ثم أعد المحاولة.');
-                    }
-                    $disk = 'document';
-                } finally {
-                    if (is_resource($stream)) {
-                        fclose($stream);
-                    }
-                }
-            }
-
-            // خارج try/catch التخزين عمداً: فشل هوية `ProductMedia::booted()`
-            // (قيمة خيارٍ/متغيّرٍ لا تخصّ هذا المنتج، أو تعارض مستأجر) يجب أن
-            // يظهر برسالته الحقيقية، لا يُموَّه برسالة عطل تخزينٍ مضلِّلة.
-            $created[] = ProductMedia::create(array_merge([
+            $media = new ProductMedia(array_merge([
                 'product_id' => $product->id,
-                'disk' => $disk,
-                'path' => $path,
                 'original_name' => $file->getClientOriginalName(),
                 'mime_type' => $file->getMimeType(),
                 'size' => $file->getSize(),
                 'sort_order' => $start + $offset,
                 'uploaded_by' => $uploadedBy,
             ], $scope));
+            $media->id = (string) Str::uuid();
+
+            $storedDerivatives = [];
+            try {
+                [$media->disk, $media->path] = $this->storeOriginal($product, $filename, $file);
+                $this->derivatives->generate($file, function (string $name, string $bytes, string $mimeType) use ($media, &$storedDerivatives): void {
+                    $this->storeDerivative($media, $name, $bytes, $mimeType);
+                    $storedDerivatives[] = $name;
+                });
+            } catch (\Throwable $exception) {
+                if ($media->path !== null) {
+                    $this->deleteStoredFilesBestEffort($media, $storedDerivatives, true);
+                }
+
+                throw new RuntimeException('تعذّر حفظ الصورة ومشتقاتها. تحقق من إعداد تخزين الملفات الدائم ثم أعد المحاولة.', previous: $exception);
+            }
+
+            // خارج try/catch التخزين عمداً: فشل هوية `ProductMedia::booted()`
+            // (قيمة خيارٍ/متغيّرٍ لا تخصّ هذا المنتج، أو تعارض مستأجر) يجب أن
+            // يظهر برسالته الحقيقية، لا يُموَّه برسالة عطل تخزينٍ مضلِّلة.
+            $media->save();
+            $created[] = $media;
         }
 
         return $created;
@@ -153,26 +140,65 @@ class ProductMediaService
 
     public function delete(ProductMedia $media): void
     {
-        $disk = $media->disk;
-        $path = $media->path;
-
-        if ($disk === 'r2') {
-            try {
-                $this->r2->delete(ProductMedia::R2_DOMAIN, (string) $media->product_id, basename($path));
-            } catch (RuntimeException|AwsException $exception) {
-                throw new RuntimeException('تعذّر حذف ملف الوسيط من التخزين الدائم. أعد المحاولة.');
+        try {
+            // Delete optional children first. If this fails, the original and
+            // row remain intact; if original deletion later fails, the row
+            // still safely falls back to the original.
+            foreach ($this->derivativePaths($media) as $path) {
+                $this->deleteStoredPath($media->disk, $media->product_id, $path, false);
             }
-        } elseif ($disk === 'document') {
-            try {
-                $this->documentStorage->delete($this->documentStorage->profile(), $path);
-            } catch (RuntimeException $exception) {
-                throw new RuntimeException('تعذّر حذف ملف الوسيط من التخزين الدائم. أعد المحاولة.');
-            }
-        } else {
-            Storage::disk($disk)->delete($path);
+            $this->deleteStoredPath($media->disk, $media->product_id, $media->path, true);
+        } catch (RuntimeException|AwsException $exception) {
+            throw new RuntimeException('تعذّر حذف ملف الوسيط من التخزين الدائم. أعد المحاولة.', previous: $exception);
         }
 
         $media->delete();
+    }
+
+    public function derivativePath(ProductMedia $media, string $name): string
+    {
+        $format = ProductMediaDerivativeService::formatForMime($media->mime_type);
+        ProductMediaDerivativeService::maxDimension($name);
+
+        if ($media->disk === 'r2') {
+            return "{$media->id}-{$name}.{$format['extension']}";
+        }
+
+        return dirname($media->path)."/derivatives/{$media->id}/{$name}.{$format['extension']}";
+    }
+
+    public function derivativeMimeType(ProductMedia $media): string
+    {
+        return ProductMediaDerivativeService::formatForMime($media->mime_type)['mime_type'];
+    }
+
+    public function derivativeDownloadName(ProductMedia $media, string $name): string
+    {
+        $format = ProductMediaDerivativeService::formatForMime($media->mime_type);
+        $base = pathinfo($media->original_name, PATHINFO_FILENAME) ?: 'product-image';
+
+        return "{$base}-{$name}.{$format['extension']}";
+    }
+
+    public function existingDerivativePath(ProductMedia $media, string $name): ?string
+    {
+        try {
+            $path = $this->derivativePath($media, $name);
+        } catch (RuntimeException) {
+            // Rows created before derivatives (or a historical unsupported
+            // image) retain their original through the documented fallback.
+            return null;
+        }
+
+        if ($media->disk === 'r2') {
+            return $this->r2->exists(ProductMedia::R2_DOMAIN, (string) $media->product_id, basename($path)) ? $path : null;
+        }
+
+        if ($media->disk === 'document') {
+            return $this->documentStorage->exists($this->documentStorage->profile(), $path) ? $path : null;
+        }
+
+        return Storage::disk($media->disk)->exists($path) ? $path : null;
     }
 
     /**
@@ -181,42 +207,140 @@ class ProductMediaService
      * `ProductLifecycleService::delete()` حرفياً. يُستعمل عند حذفٍ حقيقي
      * لمتغيّرٍ/قيمةٍ حتى لا يبقى وسيطٌ يتيم.
      *
-     * @return list<array{disk: string, path: string, product_id: string}> ليُحذَف بعد الالتزام
+     * @return list<array{id: string, disk: string, path: string, mime_type: ?string, product_id: string}> ليُحذَف بعد الالتزام
      */
     public function collectAndQueueDeletion(HasMany|Builder $mediaRelation): array
     {
-        $files = $mediaRelation->get(['disk', 'path', 'product_id'])
-            ->map(fn ($m) => ['disk' => $m->disk, 'path' => $m->path, 'product_id' => $m->product_id])->all();
+        $files = $mediaRelation->get(['id', 'disk', 'path', 'mime_type', 'product_id'])
+            ->map(fn ($m) => ['id' => $m->id, 'disk' => $m->disk, 'path' => $m->path, 'mime_type' => $m->mime_type, 'product_id' => $m->product_id])->all();
         $mediaRelation->delete();
 
         return $files;
     }
 
-    /** @param  list<array{disk: string, path: string, product_id: string}>  $files */
+    /** @param  list<array{id: string, disk: string, path: string, mime_type: ?string, product_id: string}>  $files */
     public function deleteFiles(array $files): void
     {
         foreach ($files as $item) {
-            if ($item['disk'] === 'r2') {
-                try {
-                    $this->r2->delete(ProductMedia::R2_DOMAIN, (string) $item['product_id'], basename($item['path']));
-                } catch (RuntimeException|AwsException $exception) {
-                    report($exception);
+            try {
+                $media = new ProductMedia($item);
+                $media->id = $item['id'];
+                foreach ($this->derivativePaths($media) as $path) {
+                    $this->deleteStoredPath($item['disk'], $item['product_id'], $path, false);
                 }
+                $this->deleteStoredPath($item['disk'], $item['product_id'], $item['path'], false);
+            } catch (RuntimeException|AwsException $exception) {
+                report($exception);
+            }
+        }
+    }
 
-                continue;
+    /** @return array{0:string,1:string} disk, path */
+    private function storeOriginal(Product $product, string $filename, UploadedFile $file): array
+    {
+        if ($this->r2Enabled()) {
+            $bytes = file_get_contents($file->getRealPath());
+            if ($bytes === false) {
+                throw new RuntimeException('Uploaded product image is unavailable for storage.');
             }
 
-            if ($item['disk'] === 'document') {
+            return ['r2', $this->r2->put(ProductMedia::R2_DOMAIN, (string) $product->id, $filename, $bytes, $file->getMimeType())];
+        }
+
+        $path = "product-media/{$product->tenant_id}/{$product->id}/{$filename}";
+        $stream = fopen($file->getRealPath(), 'rb');
+        if (! is_resource($stream)) {
+            throw new RuntimeException('Uploaded product image is unavailable for storage.');
+        }
+
+        try {
+            $this->documentStorage->put($this->documentStorage->profile(), $path, $stream);
+        } finally {
+            fclose($stream);
+        }
+
+        return ['document', $path];
+    }
+
+    private function storeDerivative(ProductMedia $media, string $name, string $bytes, string $mimeType): void
+    {
+        $path = $this->derivativePath($media, $name);
+        if ($media->disk === 'r2') {
+            $this->r2->put(ProductMedia::R2_DOMAIN, (string) $media->product_id, basename($path), $bytes, $mimeType);
+
+            return;
+        }
+
+        if ($media->disk === 'document') {
+            $stream = fopen('php://temp', 'w+b');
+            fwrite($stream, $bytes);
+            rewind($stream);
+            try {
+                $this->documentStorage->put($this->documentStorage->profile(), $path, $stream);
+            } finally {
+                fclose($stream);
+            }
+
+            return;
+        }
+
+        Storage::disk($media->disk)->put($path, $bytes);
+    }
+
+    private function deleteStoredFilesBestEffort(ProductMedia $media, array $storedDerivatives, bool $includeOriginal): void
+    {
+        foreach ($storedDerivatives as $name) {
+            try {
+                $this->deleteStoredPath($media->disk, $media->product_id, $this->derivativePath($media, $name), false);
+            } catch (RuntimeException|AwsException $exception) {
+                report($exception);
+            }
+        }
+
+        if ($includeOriginal) {
+            try {
+                $this->deleteStoredPath($media->disk, $media->product_id, $media->path, false);
+            } catch (RuntimeException|AwsException $exception) {
+                report($exception);
+            }
+        }
+    }
+
+    /** @return list<string> */
+    private function derivativePaths(ProductMedia $media): array
+    {
+        try {
+            return array_map(
+                fn (string $name): string => $this->derivativePath($media, $name),
+                ProductMediaDerivativeService::names(),
+            );
+        } catch (RuntimeException) {
+            return [];
+        }
+    }
+
+    private function deleteStoredPath(string $disk, string $productId, string $path, bool $required): void
+    {
+        if ($disk === 'r2') {
+            $this->r2->delete(ProductMedia::R2_DOMAIN, $productId, basename($path));
+
+            return;
+        }
+
+        if ($disk === 'document') {
+            if ($required || $this->documentStorage->exists($this->documentStorage->profile(), $path)) {
                 try {
-                    $this->documentStorage->delete($this->documentStorage->profile(), $item['path']);
+                    $this->documentStorage->delete($this->documentStorage->profile(), $path);
                 } catch (RuntimeException $exception) {
-                    report($exception);
+                    throw $exception;
                 }
-
-                continue;
             }
 
-            Storage::disk($item['disk'])->delete($item['path']);
+            return;
+        }
+
+        if ($required || Storage::disk($disk)->exists($path)) {
+            Storage::disk($disk)->delete($path);
         }
     }
 }
