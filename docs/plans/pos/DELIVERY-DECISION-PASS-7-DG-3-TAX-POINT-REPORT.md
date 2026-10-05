@@ -55,12 +55,15 @@ commission, settlement, reconciliation, refund, connector, or webhook work.
 
 ## 3. Evidence method and source register
 
-The following are the decision sources. The first three are general Saudi
-VAT evidence; the HungerStation terms are provider evidence only.
+The following are the decision sources. G1 is the GCC primary instrument for
+the general goods/services date-of-supply rules; Z1/Z2/Z3/Z4 are Saudi
+implementation and guidance sources; the HungerStation terms are provider
+evidence only.
 
 | Ref | Authority and title | Official URL | Date / access | What it proves | What it does not prove |
 |---|---|---|---|---|---|
-| Z1 | ZATCA, *VAT Implementing Regulations* | https://zatca.gov.sa/en/RulesRegulations/VAT/Pages/VATImplementingRegulations.aspx | Current official regulations page; accessed 2026-10-05 | The Regulations' date-of-supply and payment/invoice provisions, including the goods rule and special timing provisions. The relevant provisions must be read in the current consolidated text. | It does not map a named provider webhook, acceptance state, pickup, or settlement to supply without facts. |
+| G1 | GCC Secretariat, *Unified VAT Agreement for the States of the Gulf Cooperation Council*, Article 23 (goods) and Article 24 (services) | https://www.gcc-sg.org/en-us/CouncilMinisterial/Pages/UnifiedGCCAgreementforVAT.aspx | Official GCC source; accessed 2026-10-05 | Article 23 contains the general goods date-of-supply rule, including the earliest applicable disposal/dispatch, payment, and invoice events. Article 24 supplies the corresponding services timing framework, including performance/completion and earlier payment/invoice events where applicable. | It does not map a named provider webhook, acceptance state, pickup, or settlement to supply without facts. |
+| Z1 | ZATCA, *VAT Implementing Regulations* | https://zatca.gov.sa/en/RulesRegulations/VAT/Pages/VATImplementingRegulations.aspx | Current official regulations page; accessed 2026-10-05 | Saudi implementing provisions and special timing cases that supplement/apply the GCC framework. It is not the source attributed here for the general Article 23 goods rule. | It does not map a named provider webhook, acceptance state, pickup, or settlement to supply without facts. |
 | Z2 | ZATCA, *VAT Law* | https://zatca.gov.sa/en/RulesRegulations/VAT/Pages/VATLaw.aspx | Current official law page; accessed 2026-10-05 | The statutory framework for taxable supplies, tax invoices, consideration, and tax liability. | It does not decide the commercial role of a platform from a consumer UI label. |
 | Z3 | ZATCA, *Guideline for Persons Liable to Pay Tax in Special Cases — Deemed Suppliers* | https://zatca.gov.sa/en/HelpCenter/guidelines/Documents/Guideline-for-Persons-Liable-to-Pay-Tax-in-Special-Cases-Deemed-Suppliers.pdf | Current official guideline URL; accessed 2026-10-05 | Article 47 marketplace/deemed-supplier concepts, including the significance of supplier VAT registration and the distinction between meal, delivery, and platform-fee supplies. | Its food-delivery examples are general. They do not prove the role or event mapping of HungerStation, Jahez, Keeta, Mrsool, Ninja, or The Chefz. |
 | Z4 | ZATCA, *Guideline for Tax Invoicing and Records under VAT Provisions*, version 3 | https://zatca.gov.sa/en/HelpCenter/guidelines/Documents/Guideline-for-Tax-Invoicing-and-Records-under-VAT-Provisions.pdf | May 2026; accessed 2026-10-05 | Tax-invoice timing, electronic invoicing, records, and the distinction between issuing a document and proving the underlying supply. | Invoice issue alone is not a universal provider-specific supply event; it does not establish merchant/platform principal status. |
@@ -74,26 +77,45 @@ report says `UNKNOWN`; it does not fill the gap with industry practice.
 
 ### A. Goods date of supply
 
-Under the goods date-of-supply rule in the current VAT Implementing
-Regulations (Z1), the tax point is generally the earliest of the applicable
-statutory events: the goods being placed at the customer's disposal, the
-dispatch/transport event where the Regulations make that the relevant event,
-receipt of payment, or issuance of the invoice. The exact wording and
-exceptions in the current consolidated Regulations control.
+Under Article 23 of the GCC Unified VAT Agreement (G1), the goods tax point
+is generally the earliest applicable statutory event: the goods being placed
+at the customer's disposal, the dispatch/transport event where Article 23
+makes that the relevant event, receipt of payment, or issuance of the invoice.
+Saudi implementing provisions (Z1) and current ZATCA guidance apply the
+framework and address special cases; they are not the source of the general
+Article 23 rule.
 
 This is an **earliest applicable legal event** rule, not an instruction to
 choose whichever timestamp an API happens to expose. A food order may include
 separate supplies (for example meal and delivery); each supply can require its
 own analysis (Z3).
 
-### B. Actual supply, invoice, payment, and advance payment
+### B. Service components and classification
+
+Article 24 of G1 governs services rather than applying the goods dispatch rule
+by analogy. For a service component, the relevant actual-supply event is the
+performance/completion of the service, subject to the Agreement's earlier
+payment and invoice timing rules and Saudi implementing guidance. A delivery
+charge is not presumed to be a service or a separate supply: the contract,
+commercial substance, provider/merchant evidence, and VAT classification must
+establish whether it is a goods component, a separately supplied service, or
+part of another supply.
+
+Before selecting a tax-point rule, AWJ must classify every relevant order
+component (at minimum meal/goods, delivery, platform fee, and any separately
+priced adjustment) as goods, service, or unresolved. `UNKNOWN` classification
+blocks selection for that component. The derived result must retain the
+classification evidence and the Article 23 or Article 24 policy path.
+
+### C. Actual supply, invoice, payment, and advance payment
 
 - An actual supply event can create the tax point when it is the applicable
-  statutory event for the goods and the goods are placed at the customer's
-  disposal or dispatched under the relevant rule.
+  statutory event for the classified component: disposal/dispatch for goods
+  under G1 Article 23, or performance/completion for services under G1 Article
+  24, subject to earlier payment/invoice rules.
 - An invoice issued before that event can advance the tax point where the
-  Regulations treat invoice issue as the earlier event. It does not prove that
-  the named party is the supplier.
+  applicable G1 rule and Saudi implementing material treat invoice issue as
+  the earlier event. It does not prove that the named party is the supplier.
 - Payment actually received before supply, including an advance payment, can
   advance the tax point for the amount received under the payment rule. A
   payment authorization or an uncompleted card hold is not automatically
@@ -106,7 +128,7 @@ own analysis (Z3).
   must preserve all three and derive the result from the effective policy and
   evidence, rather than overwrite one with another.
 
-### C. Agent and marketplace boundary
+### D. Agent and marketplace boundary
 
 Z3 and Z5 distinguish the supplier from an agent and address deemed suppliers.
 The restaurant's VAT registration status and the actual contractual/economic
@@ -129,13 +151,13 @@ it the applicable earliest event.
 | 4. Merchant accepts order | No, by itself; otherwise UNKNOWN if contract says acceptance completes a supply | Acceptance normally proves an operational commitment, not the statutory goods event. Preserve it; do not select it without authoritative mapping. |
 | 5. Payment authorization | No, by itself | An authorization/hold is not necessarily receipt. Preserve authorization status, amount, currency, and provider reference separately. |
 | 6. Payment capture | Conditional | Capture is evidence of a payment operation, not conclusive proof that the merchant or platform received funds. Preserve capture time and status; require settlement/payment evidence for receipt. |
-| 7. Advance payment received | Yes, conditionally | Actual receipt before supply can create an advance-payment tax point for the amount received under Z1. Preserve received/credited time, recipient, amount, instrument, and proof of actual receipt. |
-| 8. Preparation starts | No, on current evidence | Preparation is not one of the general goods events. It may be relevant evidence of later performance, but no source proves preparation alone creates the tax point. |
+| 7. Advance payment received | Yes, conditionally and only for the amount/component received | Actual receipt before supply can create an advance-payment tax point for the amount received under G1 and applicable Saudi guidance. A partial advance does not prove the entire order or remaining consideration has that tax point. Preserve received/credited time, recipient, amount, allocation, instrument, and proof of actual receipt. |
+| 8. Preparation starts | No for goods; otherwise UNKNOWN absent service evidence | Preparation is not a general goods event. For a service, it may be evidence in the performance timeline, but no source makes preparation alone the universal service-completion event. Preserve it without selecting it by default. |
 | 9. Ready | No, by itself | Ready is a kitchen/platform state, not customer disposal or dispatch. Preserve it as operational evidence only. |
-| 10. Courier pickup | Conditional | Pickup can be relevant where it is the legally relevant dispatch/transport event under Z1 and the factual delivery arrangement fits that rule. It is not universally tax point; preserve pickup proof, actor, location, and goods identity. |
-| 11. Merchant handoff to courier | Conditional/otherwise UNKNOWN | Handoff may coincide with dispatch or transfer of control, but the event label alone does not prove that. Preserve handoff time and courier acceptance; do not equate it with pickup without evidence. |
-| 12. Delivery to customer | Conditional | Delivery can be the actual placing-at-disposal event where no earlier applicable invoice/payment/dispatch event occurred, and is important evidence of completed supply. Preserve delivery confirmation, time, location/precision, and order linkage. |
-| 13. Invoice issuance | Conditional, potentially advancing | An invoice issued before another applicable event can be the earliest statutory event under Z1. Preserve issuer, invoice number, issue time, TIN, tax period, raw payload, and whether it is merchant invoice or provider invoice. |
+| 10. Courier pickup | Conditional by component | Pickup can be relevant to the goods dispatch rule under G1 Article 23 where the component is goods and the factual delivery arrangement fits that rule. It is not a service-completion rule and is not universally a tax point; preserve pickup proof, actor, location, component, and goods identity. |
+| 11. Merchant handoff to courier | Conditional/otherwise UNKNOWN | Handoff may coincide with goods dispatch or transfer of control, but the event label alone does not prove that and does not complete a service by default. Preserve handoff time, component, and courier acceptance. |
+| 12. Delivery to customer | Conditional by component | Delivery can be the actual placing-at-disposal event for goods, or evidence of completed performance for a separately supplied delivery service, where the classification and contract support that result and no earlier applicable event occurred. Preserve delivery confirmation, time, component, location/precision, and order linkage. |
+| 13. Invoice issuance | Conditional, potentially advancing | An invoice issued before another applicable event can be the earliest statutory event under G1 Articles 23/24 as applicable. Preserve issuer, invoice number, issue time, TIN, tax period, raw payload, component allocation, and whether it is merchant invoice or provider invoice. |
 | 14. Cancellation before supply | No supply tax point unless an earlier invoice/payment event already occurred | Cancellation does not itself create a supply. Check whether an invoice or actual advance payment already created a tax point. Preserve cancellation time, reason, actor, and prior events. |
 | 15. Cancellation after payment | Does not erase an earlier payment tax point | The earlier advance/payment consequence remains; preserve cancellation and payment evidence. Credit-note/refund treatment is a later legal/accounting action, not a re-dating of the original event. |
 | 16. Refund after supply | No new sale tax point | Refund/correction may require a credit note or other prescribed document under the applicable facts. Preserve original tax point and refund/correction evidence; do not replace the original date. |
@@ -152,15 +174,20 @@ Acceptance may be evidence in a particular contract, but AWJ needs the
 contract plus the statutory mapping; otherwise it is `UNKNOWN`/non-authority.
 
 **D — Preparation:** Rejected as a universal rule. Preparation is not the
-general goods event in Z1. It may support a factual timeline only.
+general goods event in G1 Article 23. For a service it may support a factual
+performance timeline, but no reviewed source makes preparation alone the
+universal completion event.
 
 **E — Pickup/handoff:** Conditionally possible only where it is the applicable
-dispatch/transport or transfer event under the Regulations and the evidence
-identifies what was supplied and when. Provider labels alone are insufficient.
+dispatch/transport or transfer event under G1 Article 23 for a goods
+component, and not as the service rule under Article 24. Provider labels alone
+are insufficient.
 
-**F — Delivery:** Conditionally possible when delivery places the goods at the
-customer's disposal and no earlier applicable invoice/payment/dispatch event
-has already fixed the tax point. It is not automatically the tax point.
+**F — Delivery:** Conditionally possible when delivery places a goods
+component at the customer's disposal, or completes a separately supplied
+service where the classification and evidence support that result. It is not
+automatically the tax point and delivery is not presumed to be a separate
+service.
 
 **G — Platform payment:** An actual advance received can advance the tax point;
 authorization is not equivalent to receipt. Capture is not enough without
@@ -168,9 +195,9 @@ evidence of actual receipt or the legally relevant deemed-receipt/agent fact.
 Platform collection as agent must be analyzed under the contract and Z5; the
 platform's collection does not by itself make the platform the meal supplier.
 
-**H — Early invoice:** Yes, invoice issue can advance the tax point where Z1's
-earliest-event rule applies. Invoice issue does not determine supplier identity
-or cure missing merchant/platform role evidence.
+**H — Early invoice:** Yes, invoice issue can advance the tax point where the
+applicable G1 Article 23/24 rule applies. Invoice issue does not determine
+supplier identity or cure missing merchant/platform role evidence.
 
 **I — Settlement/remittance:** No for the underlying customer sale. Use only as
 later clearing/remittance evidence unless a separate supply is being analyzed.
@@ -276,9 +303,13 @@ Raw evidence, per relevant event:
 Derived result:
 
 - `tax_point_status`: `unknown`, `known`, `proven`, or an equivalent explicit
-  state whose semantics are documented;
-- selected `vat_date_of_supply` instant/date and the legal timezone basis;
-- selected event kind and raw evidence reference(s);
+  state whose semantics are documented, at order and component/result level;
+- one or more derived tax-point results, each keyed by stable order component
+  or supply reference, classified goods/service, allocated taxable amount and
+  currency, selected date/instant, and legal timezone basis;
+- each result's selected event kind and raw evidence reference(s). A partial
+  advance creates a result only for the proven allocated amount/component; it
+  must not mark the whole order or remaining value proven;
 - tax-point policy ID/version and evidence version;
 - derivation timestamp and actor/system version;
 - conflict/override reason if a corrected authoritative event superseded an
@@ -311,6 +342,8 @@ instant or calendar-date basis.
 Future implementation must preserve these invariants:
 
 - duplicate event: one evidence identity and no second tax-point effect;
+- partial advance: allocate the proven tax point to the paid amount/component;
+  do not collapse multiple dates or amounts into one order-level result;
 - out-of-order event: retain the event and recompute only an unposted,
   versioned derived result when policy permits;
 - late delivery confirmation: never use its receipt time as the event time;
@@ -329,7 +362,8 @@ Future implementation must preserve these invariants:
 The future imported-order posting gate should require an explicit equivalent
 of:
 
-`tax_point_status = proven`
+`tax_point_status = proven` for every required component/result and allocated
+taxable amount, not merely once for the order header.
 
 alongside the existing role, invoice-responsibility, collection-role, and
 merchant-VAT-status-at-supply requirements. `known` may be useful as an
@@ -346,7 +380,10 @@ evidence-backed provider policy, with UNKNOWN blocking.**
 
 Universal:
 
-- apply the current Saudi VAT earliest-applicable-event rules;
+- apply G1 Article 23 for classified goods and G1 Article 24 for classified
+  services, with Saudi implementing provisions/guidance applied to the facts;
+- classify every relevant component as goods, service, or `UNKNOWN` before
+  selecting the corresponding rule;
 - separate supply, invoice issue, payment receipt, advance payment, delivery,
   platform fee, settlement, and remittance;
 - preserve actual historical event times and retain raw evidence;
@@ -355,17 +392,19 @@ Universal:
 
 Provider/merchant-specific:
 
-- whether an event is dispatch, placing at disposal, actual receipt, or invoice
-  issue;
+- whether an event is dispatch, placing at disposal, service performance/
+  completion, actual receipt, or invoice issue for each component;
 - whether a provider collects as agent, principal, or merely processes payment;
 - meal versus delivery supply and invoice responsibility;
 - effective policy version and accepted merchant agreement;
 - correction/refund evidence and payment-recipient semantics.
 
-Required evidence is the combination of the current ZATCA rule, the effective
-merchant/provider agreement, the merchant VAT status at supply, raw event and
-payment/invoice evidence, and a deterministic policy derivation. If any
-material element is absent or contradictory, posting remains blocked.
+Required evidence is the combination of G1's applicable Article 23/24 rule,
+current Saudi implementing material, the effective merchant/provider
+agreement, component classification, merchant VAT status at supply, raw event
+and payment/invoice evidence, allocated taxable amounts, and a deterministic
+policy derivation. If any material element is absent or contradictory, posting
+remains blocked.
 
 ### Owner decision required
 
