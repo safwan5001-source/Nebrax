@@ -5,7 +5,14 @@
 **Nature:** evidence, architecture decision, and durable documentation only.
 **Base SHA (`origin/main` at start):** `230d9f020f859705db8a5c0ae07db1acb453e5d7`
 **Access date:** 2026-10-05
-**Status:** proposed; no production behavior is enabled by this report.
+**Historical pre-merge status:** proposed; no production behavior was enabled
+by this report.
+**Current durable decision status:** **ACCEPTED** by Safwan after PR #1233
+merged at `b0c3574225531ed907991bd9c5f23a7e8f5d66bb`.
+**Accepted decision:** Option D — hybrid universal Saudi/GCC VAT principles,
+versioned evidence-backed provider/merchant policy, and `UNKNOWN` fail-closed.
+Acceptance is architecture/documentation only; it does not authorize imported
+posting, VAT posting, provider enablement, or deployment.
 
 ## 1. Executive conclusion
 
@@ -602,10 +609,10 @@ platform B2B fee follows its own later evidence and posting gate. If any
 material element for the customer sale is absent or contradictory, posting
 remains blocked.
 
-### Owner decision required
+### Owner decision and current state
 
-Safwan must approve or reject `OD-DG-3-TAX-POINT` as written. Approval would
-approve the architecture/documentation decision only; it would not authorize
+Safwan accepted `OD-DG-3-TAX-POINT` after PR #1233 merged. The acceptance
+approves the architecture/documentation decision only; it does not authorize
 production implementation, imported-order posting, VAT recognition, provider
 enablement, or deployment.
 
@@ -668,8 +675,9 @@ P2 corrections against accepted `DELIVERY-DECISION-PASS-3`,
   historical facts; current configuration cannot reinterpret history.
 
 No remaining contradiction was selected as a hidden business rule. The four
-future design gates in §14 keep posting blocked. `OD-DG-3-TAX-POINT` remains
-**PROPOSED** and DG-3 is not globally closed.
+future design gates in §14 remain implementation prerequisites and keep
+imported posting blocked where applicable. `OD-DG-3-TAX-POINT` is **ACCEPTED**
+as the architecture decision; DG-3 is not a production enablement flag.
 
 ## 16. Explicit out-of-scope implementation
 
@@ -681,13 +689,16 @@ or production behavior.
 
 ## 17. Next Horizon task recommendation
 
-After owner approval, create a documentation/architecture follow-up that
-freezes the evidence contract and policy vocabulary, then a separately
-authorized implementation task for an immutable raw-event/tax-point evidence
-snapshot and a posting-gate check. That task must first obtain one named
-merchant's accepted HungerStation agreement, payment evidence, invoice
-payload, and event semantics. It must remain blocked for any provider whose
-role or tax-point evidence is still `UNKNOWN`.
+The next documentation/architecture follow-up is
+`DELIVERY-DECISION-PASS-8`, which freezes the evidence contract and policy
+vocabulary. Any later implementation task for an immutable raw-event/tax-point
+evidence snapshot or posting-prerequisite evaluator requires separate
+authorization and must first obtain one named merchant's accepted
+HungerStation agreement, payment evidence, invoice payload, and event
+semantics. It remains blocked for any provider whose role or tax-point evidence
+is still `UNKNOWN`.
 
-**PRE_MERGE_REVIEW: PENDING exact-final-head CI and review closure.**
-No merge or deploy is authorized by this report.
+**Historical PRE_MERGE_REVIEW:** PASS was recorded on PR #1233's exact final
+head before merge. **Current merge:** PR #1233 merged at
+`b0c3574225531ed907991bd9c5f23a7e8f5d66bb`. Neither state authorizes deploy or
+production behavior.
