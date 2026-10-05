@@ -10,6 +10,7 @@ use App\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+use RuntimeException;
 use Tests\TestCase;
 
 class ProductMediaDerivativeTest extends TestCase
@@ -159,6 +160,54 @@ class ProductMediaDerivativeTest extends TestCase
             ->get("/api/products/{$product->id}/media/{$legacy->id}/derivatives/thumbnail")
             ->assertOk()->assertHeader('Content-Type', 'image/png');
         $this->assertSame($legacyBytes, $fallback->streamedContent());
+    }
+
+    /** @test */
+    public function a_product_media_save_failure_cleans_stored_files_and_rethrows_the_same_exception(): void
+    {
+        $this->fakeDocumentStorage();
+        $auth = $this->registerTenant('derivative-save-failure');
+        $productData = $this->product($auth['token'], 'DERIVATIVE-SAVE-FAILURE-001');
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $product = Product::findOrFail($productData['id']);
+        $service = app(ProductMediaService::class);
+        $saveFailure = new RuntimeException('simulated product media save failure');
+        $storedBeforeSave = false;
+        $failedMedia = null;
+
+        ProductMedia::saving(function (ProductMedia $media) use ($service, $saveFailure, &$storedBeforeSave, &$failedMedia): void {
+            if ($media->original_name !== 'save-fails.jpg') {
+                return;
+            }
+
+            $failedMedia = clone $media;
+            $storedBeforeSave = collect([
+                $media->path,
+                $service->derivativePath($media, ProductMediaDerivativeService::THUMBNAIL),
+                $service->derivativePath($media, ProductMediaDerivativeService::CARD),
+            ])->every(fn (string $path): bool => Storage::disk('local')->exists($path));
+
+            throw $saveFailure;
+        });
+
+        try {
+            $service->attachToProduct($product, [$this->image('save-fails.jpg', 'jpeg', 1200, 800)], null);
+            $this->fail('The simulated ProductMedia save failure was not thrown.');
+        } catch (RuntimeException $exception) {
+            $this->assertSame($saveFailure, $exception);
+            $this->assertSame('simulated product media save failure', $exception->getMessage());
+        } finally {
+            app(TenantContext::class)->forget();
+        }
+
+        $this->assertTrue($storedBeforeSave, 'Original, thumbnail, and card must all exist before the intentional save failure.');
+        $this->assertInstanceOf(ProductMedia::class, $failedMedia);
+        Storage::disk('local')->assertMissing([
+            $failedMedia->path,
+            $service->derivativePath($failedMedia, ProductMediaDerivativeService::THUMBNAIL),
+            $service->derivativePath($failedMedia, ProductMediaDerivativeService::CARD),
+        ]);
+        $this->assertDatabaseMissing('product_media', ['id' => $failedMedia->id]);
     }
 
     /** @test */
