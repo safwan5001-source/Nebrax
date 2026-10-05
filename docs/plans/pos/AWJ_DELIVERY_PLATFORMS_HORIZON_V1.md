@@ -210,6 +210,13 @@ No reduction of financial/security verification to save quota.
 
 ## 8. Decision Gates
 
+`DELIVERY-DECISION-PASS-7` records the DG-3 tax-point decision packet in
+`docs/plans/pos/DELIVERY-DECISION-PASS-7-DG-3-TAX-POINT-REPORT.md`. It
+recommends a hybrid of universal Saudi VAT timing principles and
+versioned, evidence-backed provider policy; unresolved or contradictory tax
+facts remain a posting blocker. This reference does not authorize the
+imported-order command or change the financial-role gate.
+
 Stop and issue a Decision Packet when any of these is material and not already proven:
 
 - accounting posting semantics conflict with canonical AWJ authority;
