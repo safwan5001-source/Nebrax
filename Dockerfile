@@ -6,9 +6,11 @@ FROM php:8.3-apache
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
         git unzip zip poppler-utils libpq-dev libzip-dev libonig-dev libsqlite3-dev libxml2-dev libxml2-utils \
+        libfreetype6-dev libjpeg62-turbo-dev libpng-dev libwebp-dev \
     && rm -rf /var/lib/apt/lists/*
 
-RUN docker-php-ext-install pdo_pgsql pdo_sqlite mbstring bcmath zip opcache dom \
+RUN docker-php-ext-configure gd --with-freetype --with-jpeg --with-webp \
+    && docker-php-ext-install gd pdo_pgsql pdo_sqlite mbstring bcmath zip opcache dom \
     && a2dismod mpm_event mpm_worker || true \
     && a2enmod mpm_prefork rewrite \
     && apache2ctl configtest
@@ -21,6 +23,7 @@ ENV COMPOSER_ALLOW_SUPERUSER=1 \
 
 COPY . /core
 RUN bash /core/deploy/assemble.sh /core /app \
+    && php /core/tests/Fixtures/gd-runtime-smoke.php \
     && mkdir -p \
         /app/storage/framework/cache/data \
         /app/storage/framework/sessions \
