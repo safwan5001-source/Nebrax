@@ -44,6 +44,8 @@ use App\Http\Controllers\Api\CommerceVerticalSetupController;
 use App\Http\Controllers\Api\CommerceWorkspaceStorefrontsController;
 use App\Http\Controllers\Api\CommerceWorkspaceMediaController;
 use App\Http\Controllers\Api\CommerceWorkspaceStorefrontMediaController;
+use App\Http\Controllers\Api\CommerceWorkspaceStorefrontMediaDerivativeController;
+use App\Http\Controllers\Api\CommerceWorkspaceStorefrontMediaDerivativeFileController;
 use App\Http\Controllers\Api\CommerceWorkspaceStorefrontMediaFileController;
 use App\Http\Controllers\Api\CommerceWorkspaceStorefrontOfferController;
 use App\Http\Controllers\Api\CommerceWorkspaceStorefrontPresentationController;
@@ -233,6 +235,13 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         ->where('file', '[A-Za-z0-9._-]{1,40}')
         ->middleware(['signed', 'throttle:240,1'])
         ->name('commerce.workspace.storefront-media.file');
+
+    // CUST-HV V2b: ملفٌ مُشتقٌّ من تحويل استخدام — نفس نموذج الثقة تماماً.
+    Route::get('commerce/workspace/storefront-media/{media}/derivatives/{file}', [CommerceWorkspaceStorefrontMediaDerivativeFileController::class, 'show'])
+        ->whereUuid('media')
+        ->where('file', '[a-f0-9]{32}\.(webp|jpg)')
+        ->middleware(['signed', 'throttle:240,1'])
+        ->name('commerce.workspace.storefront-media.derivative');
 
     Route::post('forgot-password', [AuthController::class, 'forgotPassword'])->middleware('throttle:auth-recovery');
     Route::post('reset-password', [AuthController::class, 'resetPassword'])->middleware('throttle:auth-reset');
@@ -995,6 +1004,14 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         Route::post('commerce/workspace/storefront-media/{mediaId}/retry', [CommerceWorkspaceStorefrontMediaController::class, 'retry'])
             ->whereUuid('mediaId')
             ->middleware([$perm('commerce.manage'), 'throttle:30,1']);
+        // CUST-HV V2b: مشتقّات تحويل الاستخدام. `derivatives` يضمن الحالة النهائية
+        // لاستخدامٍ واحد (توليدٌ محدود)؛ `derivatives/status` قراءةٌ بحتة بلا توليد.
+        Route::post('commerce/workspace/storefront-media/{mediaId}/derivatives', [CommerceWorkspaceStorefrontMediaDerivativeController::class, 'ensure'])
+            ->whereUuid('mediaId')
+            ->middleware([$perm('commerce.manage'), 'throttle:60,1']);
+        Route::post('commerce/workspace/storefront-media/{mediaId}/derivatives/status', [CommerceWorkspaceStorefrontMediaDerivativeController::class, 'status'])
+            ->whereUuid('mediaId')
+            ->middleware($perm('commerce.manage'));
 
         // CUST-H1-1: أساس نسخ المظهر المستقلّة (list/create/read/save/rename/delete).
         // لا نشر ولا جدولة هنا — الرأس أعلاه يبقى مصدر القراءة العامة كما هو.

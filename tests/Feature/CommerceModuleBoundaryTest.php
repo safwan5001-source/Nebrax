@@ -93,8 +93,11 @@ class CommerceModuleBoundaryTest extends TestCase
         // CUST-HV V2a — مكتبة وسائط المُخصِّص على مستوى المستأجر (+ قراءة المتغيّرات الموقَّعة).
         'api/commerce/workspace/storefront-media',
         'api/commerce/workspace/storefront-media/{mediaId}',
+        'api/commerce/workspace/storefront-media/{mediaId}/derivatives',
+        'api/commerce/workspace/storefront-media/{mediaId}/derivatives/status',
         'api/commerce/workspace/storefront-media/{mediaId}/retry',
         'api/commerce/workspace/storefront-media/{mediaId}/usage',
+        'api/commerce/workspace/storefront-media/{media}/derivatives/{file}',
         'api/commerce/workspace/storefront-media/{media}/variants/{file}',
         'api/commerce/workspace/storefronts',
         'api/commerce/workspace/storefronts/create',

@@ -48,6 +48,22 @@ return [
     'thumbnail_widths' => [160, 320],
     'quality' => ['webp' => 82, 'jpg' => 85],
 
+    // V2b — per-usage transform derivatives (V0 §7.5). Nominal widths are the
+    // base ladder (they enter the transformKey); each usage is 4 widths × 2
+    // formats = 8 files from ONE decode. Generation is inline and bounded to one
+    // usage per request (no worker, no scheduler — AWJ Production has neither).
+    'derivative_widths' => [480, 768, 1280, 1920],
+    // `pending` older than this is read as failed(interrupted) and may be
+    // re-claimed by the next request: a crashed/timed-out request can never
+    // leave a usage permanently pending (AMEND-21). Must exceed the slowest
+    // legitimate single-usage render (measured in the V2b report).
+    'derivative_lease_seconds' => (int) env('STOREFRONT_MEDIA_DERIVATIVE_LEASE_SECONDS', 120),
+    // Abuse bounds, not UX limits: a crop edit saves a new usage key, so the
+    // V2c reconciler (not these caps) is what reclaims superseded framings.
+    'max_derivative_usages_per_media' => 200,
+    'max_derivative_rows_per_tenant' => 4000,
+    'max_status_transforms_per_request' => 16,
+
     // Soft-delete retention before the reconciler may purge (V0 §7.9).
     'purge_after_days' => 30,
 

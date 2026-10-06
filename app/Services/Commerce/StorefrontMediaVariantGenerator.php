@@ -133,6 +133,103 @@ final class StorefrontMediaVariantGenerator
         ];
     }
 
+    /**
+     * CUST-HV V2b — يُصيِّر **إطاراً واحداً** (تحويل استخدامٍ) بعدة عروضٍ اسمية
+     * من فكٍّ واحد للأصل (مسار التصوير الواحد N-1): اتجاه EXIF → تدوير المستخدم
+     * (بعقارب الساعة) → قصّ → تكبير حول نقطة التركيز → تصغيرٌ تنازليٌّ في المكان.
+     * وحدة عملٍ محدودة بالبناء: فكٌّ واحد + ترميزاتٌ بعدد (عروضٍ مميّزة × صيغتين).
+     *
+     * **لا تكبير:** العرض المُصيَّر = min(الاسمي، عرض الإطار)؛ فعرضان اسميّان
+     * أكبر من الإطار يشتركان في ناتجٍ واحدٍ يُرمَّز مرةً ويُسلَّم لكلٍّ منهما
+     * (يبقى لكلٍّ مفتاحه ولا يتغيّر ناتج المفتاح).
+     *
+     * @param  list<int>  $widths  العروض الاسمية (مفاتيح المشتقّات)
+     * @param  callable(int $width, string $format, string $bytes, string $mime, int $renderedWidth, int $renderedHeight): void  $store
+     * @return array{avg_luminance:int, dominant_colour:string, frame:array{width:int,height:int}}
+     */
+    public function renderTransform(string $sourcePath, StorefrontMediaTransform $transform, array $widths, callable $store): array
+    {
+        $image = $this->images->decodePath($sourcePath);
+        $image = $this->exifAvailable()
+            ? $image->orient()
+            : $this->applyOrientation($image, StorefrontMediaOrientation::read($sourcePath));
+
+        if ($transform->rotate !== 0) {
+            // Intervention 4: الزاوية الموجبة بعقارب الساعة — كدلالة CSS (وكجدول
+            // الاتجاه أعلاه: EXIF 6 = `rotate(90)`).
+            $image->rotate($transform->rotate);
+        }
+
+        [$x, $y, $w, $h] = self::region($image->width(), $image->height(), $transform);
+        if ($w !== $image->width() || $h !== $image->height()) {
+            $image->crop($w, $h, $x, $y);
+        }
+        $frame = ['width' => $image->width(), 'height' => $image->height()];
+
+        $widths = array_values(array_unique(array_map('intval', $widths)));
+        rsort($widths);
+
+        /** @var array<string,string> $encoded مفتاحه "{renderedWidth}.{format}" — يُرمَّز مرةً لكل عرضٍ فعليّ */
+        $encoded = [];
+        foreach ($widths as $nominal) {
+            $target = min($nominal, $image->width());
+            if ($image->width() > $target) {
+                $image->scaleDown(width: $target);
+            }
+            foreach ([self::FORMAT_WEBP, self::FORMAT_JPG] as $format) {
+                $cacheKey = $image->width().'.'.$format;
+                if (! isset($encoded[$cacheKey])) {
+                    $quality = (int) config("storefront_media.quality.{$format}", 85);
+                    $encoded[$cacheKey] = (string) ($format === self::FORMAT_WEBP
+                        ? $image->encodeUsingMediaType('image/webp', $quality)
+                        : $image->encodeUsingMediaType('image/jpeg', $quality));
+                }
+                $store($nominal, $format, $encoded[$cacheKey], self::MIME[$format], $image->width(), $image->height());
+            }
+        }
+
+        [$luminance, $colour] = $this->sampleStatistics($image);
+
+        return ['avg_luminance' => $luminance, 'dominant_colour' => $colour, 'frame' => $frame];
+    }
+
+    /**
+     * مستطيل الإطار بالبكسل [x, y, w, h] على الصورة بعد الاتجاه والتدوير.
+     * القصّ مستطيلٌ مُطبَّع (0–1)؛ `zoom` > 1 يضيّقه حول نقطة التركيز (كنسبةٍ
+     * داخل المستطيل، المنتصف عند غيابها) مع بقاء النافذة داخله. بلا قصّ: الإطار
+     * كامل ولا تكبير. نقطة التركيز/الملاءمة وحدهما لا يغيّران البكسلات إلا عبر
+     * التكبير (هما `object-position`/`object-fit` عند العرض).
+     *
+     * @return array{0:int,1:int,2:int,3:int}
+     */
+    public static function region(int $imageWidth, int $imageHeight, StorefrontMediaTransform $transform): array
+    {
+        if ($transform->crop === null) {
+            return [0, 0, $imageWidth, $imageHeight];
+        }
+
+        $crop = $transform->crop;
+        $x0 = (int) round($crop['x'] * $imageWidth);
+        $y0 = (int) round($crop['y'] * $imageHeight);
+        $cw = max(1, min($imageWidth - $x0, (int) round($crop['w'] * $imageWidth)));
+        $ch = max(1, min($imageHeight - $y0, (int) round($crop['h'] * $imageHeight)));
+
+        if ($transform->zoom > 1.0) {
+            $zw = max(1, (int) round($cw / $transform->zoom));
+            $zh = max(1, (int) round($ch / $transform->zoom));
+            $fx = ($transform->focal['x'] ?? 50) / 100;
+            $fy = ($transform->focal['y'] ?? 50) / 100;
+            $cx = $x0 + $fx * $cw;
+            $cy = $y0 + $fy * $ch;
+            $x0 = (int) max($x0, min($x0 + $cw - $zw, (int) round($cx - $zw / 2)));
+            $y0 = (int) max($y0, min($y0 + $ch - $zh, (int) round($cy - $zh / 2)));
+            $cw = $zw;
+            $ch = $zh;
+        }
+
+        return [$x0, $y0, $cw, $ch];
+    }
+
     private function exifAvailable(): bool
     {
         return $this->exifExtension ?? function_exists('exif_read_data');

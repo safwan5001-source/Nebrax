@@ -262,7 +262,7 @@ class StorefrontMediaService
      * بل بميزانية لكل طلب مُعايَرة على RSS المقيس (انظر `config/storefront_media.php`).
      * الصورة المُدوَّرة بالاتجاه تكلّف نسخةً إضافية، فتُحتسب بعاملٍ أعلى.
      */
-    private function assertDecodable(int $width, int $height, int $orientation): void
+    public function assertDecodable(int $width, int $height, int $orientation): void
     {
         $rotated = in_array($orientation, [3, 4, 5, 6, 7, 8], true);
         $buffers = (float) config($rotated ? 'storefront_media.decode_buffers_rotated' : 'storefront_media.decode_buffers_plain');
