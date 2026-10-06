@@ -12,10 +12,12 @@ import { flowersAdminT } from './messages';
 import { ReadinessList } from './readiness-list';
 import { ScheduleRulesPanel } from './schedule-rules-panel';
 import { WindowsPanel } from './windows-panel';
+import { BlockedDatesPanel } from './blocked-dates-panel';
+import { todayInZone, groupBlocked } from './blocked-dates';
 
 type Phase = { kind: 'loading' } | { kind: 'failed'; failure: AdminFailure } | { kind: 'ready'; document: ScheduleDocument };
 
-export const DELIVERY_TABS = ['rules', 'windows'] as const;
+export const DELIVERY_TABS = ['rules', 'windows', 'blocked'] as const;
 export type DeliveryTabId = (typeof DELIVERY_TABS)[number];
 
 const isTab = (value: string | null): value is DeliveryTabId => (DELIVERY_TABS as readonly (string | null)[]).includes(value);
@@ -73,6 +75,7 @@ export function DeliveryWorkspace({ storeId, locale }: { storeId: string; locale
 
   const { document } = phase;
   const activeWindows = document.slots.filter((slot) => slot.isActive).length;
+  const upcomingBlocked = groupBlocked(document.blockedDates, todayInZone(document.settings.timezone)).upcoming.length;
   const setDocument = (next: ScheduleDocument) => setPhase({ kind: 'ready', document: next });
 
   return (
@@ -106,6 +109,7 @@ export function DeliveryWorkspace({ storeId, locale }: { storeId: string; locale
           tabs={[
             { id: 'rules', label: t('schedTabRules') },
             { id: 'windows', label: t('winTab'), count: document.slots.length },
+            { id: 'blocked', label: t('blkTab'), count: upcomingBlocked },
           ]}
           value={tab}
           onChange={(id) => setTab(id as DeliveryTabId)}
@@ -113,8 +117,10 @@ export function DeliveryWorkspace({ storeId, locale }: { storeId: string; locale
         <TabPanel id={tab}>
           {tab === 'rules' ? (
             <ScheduleRulesPanel storeId={storeId} locale={locale} settings={document.settings} onSaved={setDocument} />
-          ) : (
+          ) : tab === 'windows' ? (
             <WindowsPanel storeId={storeId} locale={locale} document={document} onDocument={setDocument} />
+          ) : (
+            <BlockedDatesPanel storeId={storeId} locale={locale} document={document} onDocument={setDocument} />
           )}
         </TabPanel>
       </div>

@@ -103,6 +103,7 @@ final class CommerceDeliveryScheduleController extends ApiController
         $this->denySelfService($request);
         $data = $request->validate([
             'blocked_dates' => ['present', 'array', 'max:'.CommerceDeliveryBlockedDate::MAX_PER_CHANNEL],
+            'expected_revision' => ['sometimes', 'nullable', 'string', 'max:64'],
             'blocked_dates.*.date' => ['required', 'string', 'date_format:Y-m-d'],
             'blocked_dates.*.method' => ['sometimes', Rule::in([CommerceDeliveryBlockedDate::METHOD_ALL, ...CommerceDeliverySlot::METHODS])],
             'blocked_dates.*.reason' => ['sometimes', 'nullable', 'string', 'max:120'],
@@ -110,7 +111,9 @@ final class CommerceDeliveryScheduleController extends ApiController
         $channelId = $this->ownedChannelId($request, $id);
 
         try {
-            $schedule->replaceBlockedDates($channelId, array_values($data['blocked_dates']));
+            $schedule->replaceBlockedDates($channelId, array_values($data['blocked_dates']), $data['expected_revision'] ?? null);
+        } catch (StaleRevisionException $e) {
+            abort(409, $e->getMessage());
         } catch (DomainException $e) {
             abort(422, $e->getMessage());
         }
@@ -122,11 +125,14 @@ final class CommerceDeliveryScheduleController extends ApiController
     private function document(CommerceDeliveryScheduleService $schedule, string $channelId): array
     {
         $slots = $schedule->slots($channelId); // قراءة واحدة: القائمة وبصمتها من اللقطة نفسها
+        $blocked = $schedule->blockedDates($channelId);
+
         return [
             'settings' => $schedule->settings($channelId),
             'slots' => $slots,
             'slots_revision' => $schedule->revisionFor($slots),
-            'blocked_dates' => $schedule->blockedDates($channelId),
+            'blocked_dates' => $blocked,
+            'blocked_dates_revision' => $schedule->blockedRevisionFor($blocked),
         ];
     }
 

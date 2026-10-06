@@ -192,6 +192,18 @@ final class CommerceDeliveryScheduleService
         });
     }
 
+    /** بصمة التواريخ المحجوبة الحالية (انظر {@see slotsRevision()}). */
+    public function blockedRevision(string $salesChannelId): string
+    {
+        return $this->blockedRevisionFor($this->blockedDates($salesChannelId));
+    }
+
+    /** @param  list<array{date: string, method: string, reason: ?string}>  $rows */
+    public function blockedRevisionFor(array $rows): string
+    {
+        return sha1((string) json_encode($rows));
+    }
+
     /** @return list<array{date: string, method: string, reason: ?string}> */
     public function blockedDates(string $salesChannelId): array
     {
@@ -207,7 +219,7 @@ final class CommerceDeliveryScheduleService
      * @param  list<array{date: string, method?: string, reason?: ?string}>  $rows
      * @return list<array{date: string, method: string, reason: ?string}>
      */
-    public function replaceBlockedDates(string $salesChannelId, array $rows): array
+    public function replaceBlockedDates(string $salesChannelId, array $rows, ?string $expectedRevision = null): array
     {
         $this->tenantId();
         if (count($rows) > CommerceDeliveryBlockedDate::MAX_PER_CHANNEL) {
@@ -223,8 +235,12 @@ final class CommerceDeliveryScheduleService
             $seen[$key] = true;
         }
 
-        return DB::transaction(function () use ($salesChannelId, $rows) {
+        return DB::transaction(function () use ($salesChannelId, $rows, $expectedRevision) {
             $this->lockChannel($salesChannelId);
+
+            if ($expectedRevision !== null && ! hash_equals($this->blockedRevision($salesChannelId), $expectedRevision)) {
+                throw new StaleRevisionException('تغيّرت التواريخ المحجوبة على الخادم منذ قرأتها. حدّث الصفحة وراجعها ثم أعد المحاولة.');
+            }
 
             try {
                 CommerceDeliveryBlockedDate::query()->where('sales_channel_id', $salesChannelId)->delete();

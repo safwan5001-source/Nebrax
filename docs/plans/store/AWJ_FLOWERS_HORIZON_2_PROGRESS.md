@@ -1,6 +1,6 @@
 # AWJ Flowers & Gifts — Horizon 2 Progress
 
-**Status:** IN PROGRESS — H2-1, H2-2 merged; H2-3 in review  
+**Status:** IN PROGRESS — H2-1…H2-3 merged; H2-4 in review  
 **Date:** 2026-10-04  
 **Planning Base:** `main` @ `6ded662bfada8f72f5ebf321dcf27b08be7939c1`  
 **Execution Base (H2-1):** `main` @ `afe223cb654154fa55234ff2e360233bbc933ec3`  
@@ -28,8 +28,8 @@ Horizon 1 is complete.
 |---|---|---|---|---|
 | H2-1 | Gift Policy Admin | MERGED | #1237 | `cfc16aa` |
 | H2-2 | Delivery Schedule Admin | MERGED | #1238 | `37d462f` |
-| H2-3 | Delivery Windows & Capacity | PR OPEN | (see log) | — |
-| H2-4 | Blocked Dates & Exceptions | NOT STARTED | — | — |
+| H2-3 | Delivery Windows & Capacity | MERGED | #1239 | `5ff339b` |
+| H2-4 | Blocked Dates & Exceptions | PR OPEN | (see log) | — |
 | H2-5 | Fulfillment Warehouse Setup | NOT STARTED | — | — |
 | H2-6 | Product Preparation Time | NOT STARTED | — | — |
 | H2-7 | Product Personalization Admin | NOT STARTED | — | — |
@@ -166,10 +166,12 @@ A UI slice is not complete until its progress entry records:
 
 ### H2-3 — Delivery Windows & Capacity
 
-**Status:** PR OPEN  
+**Status:** MERGED  
 **Base SHA:** `37d462f54e091a4ba630b41ec3210b90e00e3b21` (H2-2 merged)  
 **Branch:** `flowers/h2-3-delivery-windows`  
-**PR / Head / Merge SHA:** recorded in the next slice's ledger update after merge
+**PR:** #1239  
+**Head SHA:** `3218ebf` (first head `ebc930b`)  
+**Merge SHA:** `5ff339b7581be46891766d7361edb6446f8d1057` (squash)
 
 #### Contract / scope
 - Existing contract: `PUT …/delivery-schedule/slots` (full-set, id-stable replace; `sort_order` = presentation order) and read-only `GET commerce/workspace/shipping-zones` (zone restriction for delivery windows).
@@ -178,6 +180,12 @@ A UI slice is not complete until its progress entry records:
 #### UI / information architecture
 - New "Windows" tab in the delivery workspace: windows grouped by method (delivery / pickup), each row showing label (AR/EN), time range, weekdays, capacity, zone, active state; add/edit in a dialog, reorder, activate/deactivate, delete behind a destructive confirmation (open checkouts keep their windows' ids — replace is id-stable). Capacity is entered as a number or "unlimited"; remaining capacity is never computed on the client (server authority).
 - Tabs `?tab=rules|windows`; the H2-11 checklist deep-links `delivery_scheduling` here.
+
+#### Review findings (Codex, 10 findings over four rounds — all verified valid, fixed, answered, resolved; then Codex hit its usage limit)
+- Concurrency (P1×3): preflight read failure must abort the write; a stale list must close the edit dialog (no retry of an old draft); and the check must be **atomic with the write** → server-side `expected_revision` under the channel lock (409), with `slots_revision` derived from the *same* snapshot as the returned slots.
+- Zones (P2×4): inactive zones not offered for new selection; zones refreshed on every dialog open; a newly chosen zone revalidated on save and **fails closed** if the read fails; each row shows its destination.
+- Unsaved work (P2×2): the window draft registers with the unsaved guard; tab switching confirms before dropping a rules draft.
+- CI: one sqlite job failed on the unrelated ZATCA certificate test again (EC coordinates lose leading zero bytes in `openssl_pkey_get_details`, ≈1/128 random keys); fixed in the test itself (pad to 32 bytes). Merged on a fully green pull_request-event run (sqlite, pgsql, web).
 
 #### Tests
 - `slot-editor.test.ts`, `weekday-names.test.ts`, `windows-panel.test.tsx`; backend `CommerceDeliveryScheduleTest` (30 tests incl. the new shared-weekday case) green locally.
@@ -190,10 +198,42 @@ A UI slice is not complete until its progress entry records:
 - Additive UI; the validation change only accepts input that was wrongly rejected before.
 
 #### Deployment observation
-- Manual deploy: NOT PERFORMED; production verification: NOT PERFORMED.
+- Manual deploy: NOT PERFORMED; automatic CI/CD: not observable from GitHub; production verification: NOT PERFORMED.
 
 #### Next
 - H2-4 — Blocked Dates & Exceptions.
+
+---
+
+### H2-4 — Blocked Dates & Exceptions
+
+**Status:** PR OPEN  
+**Base SHA:** `5ff339b7581be46891766d7361edb6446f8d1057` (H2-3 merged)  
+**Branch:** `flowers/h2-4-blocked-dates`  
+**PR / Head / Merge SHA:** recorded in the next slice's ledger update after merge
+
+#### Contract / scope
+- Existing contract: `PUT …/delivery-schedule/blocked-dates` (full-set replace of `{date Y-m-d, method all|delivery|pickup, reason}`; dates are calendar days in the store time zone).
+- Backend (additive): `expected_revision` on that PUT + `blocked_dates_revision` in the document, compared **inside the channel lock** (409, nothing written) — the same optimistic-concurrency pattern as slots, applied up front after the H2-3 review.
+
+#### UI / information architecture
+- "Blocked dates" tab: an add form (date, applies to all/delivery/pickup, optional reason) and the list with upcoming dates first (weekday + day/month/year, Latin digits) and past dates folded away with a confirmed bulk removal. Duplicate / overlapping-with-"all" / over-limit entries are refused locally with described errors; the server's rejection is always shown.
+- The half-filled form registers with the unsaved guard (browser warning, in-app navigation and tab/store switch confirmations); a failed freshness read aborts the write; a stale list refreshes the view and stops the action.
+
+#### Tests
+- `blocked-dates.test.ts`, `blocked-dates-panel.test.tsx` (revision sent, stale ⇒ refresh without write, pre-read fallback aborts on failure, unsaved guard); backend `CommerceDeliveryScheduleTest` (32 tests incl. the blocked-dates revision case); Playwright `flowers-h2-4-blocked-dates.spec.ts` (11 cases, AR/EN × 390/430/1024/1440, dark).
+
+#### Tenant Isolation / RBAC
+- No tenant/channel id from the client; `commerce.manage` read+write; foreign store ⇒ 404 (covered by the H2-13 access matrix).
+
+#### Backward compatibility
+- Additive; omitting `expected_revision` keeps the previous unconditional replace.
+
+#### Deployment observation
+- Manual deploy: NOT PERFORMED; production verification: NOT PERFORMED.
+
+#### Next
+- H2-5 — Fulfilment Warehouse Setup.
 
 ---
 
