@@ -4,7 +4,7 @@
 
 - Base SHA: `37d462f54e091a4ba630b41ec3210b90e00e3b21` (`origin/main` at start).
 - Implementation head SHA: `adf6cccae14a02b93265dd856be1747e7f4109cd`.
-- Published branch head at PR creation: `24bc08facd3497fb85c3a1393d95580720a7e4de`.
+- Validation head SHA: `eeffede68b813e055e16f024ca585c9d5f8d8aa2`.
 - Branch: `feat/awj-product-media-4-consumer-wiring`.
 - PR: [#1247 — AWJ-PRODUCT-MEDIA-4 — Wire image derivatives to Storefront and POS](https://github.com/safwan5001-source/Nebrax/pull/1247).
 
@@ -63,18 +63,24 @@ or image generation policy changed.
 - PHP syntax: changed controllers, resources, routes, and focused feature
   tests — passed in PHP 8.3 Docker.
 - Storefront focused tests: `npx vitest run src/lib/commerce/__tests__/mappers.test.ts src/components/products/__tests__/ProductCard.test.tsx` — 44 passed.
+- Storefront Flowers contract test: `npx vitest run src/lib/commerce/__tests__/flowers-journey-contract.test.ts` — 7 passed.
 - Storefront Biome and TypeScript: focused `biome check` and
   `npx tsc --noEmit` — passed.
 - Storefront build: `npm run build` — passed. Missing local Commerce/Spree
   configuration emitted expected non-fatal static-generation warnings.
 - POS focused tests: `npx vitest run src/components/pos/pos-product-tile.test.tsx src/components/pos/pos-variant-picker-dialog.test.tsx` — 22 passed.
 - Web build: `npm run build` — passed.
-- Focused Laravel tests are queued for PR CI because this repository checkout
-  is the core layer and does not contain a Laravel `vendor/` runtime. CI
-  assembles Laravel 11 before running them.
+- PR CI run 8175: `php artisan test` passed for both Laravel 11/SQLite and
+  Laravel 11/PostgreSQL after CI assembled the runtime.
+- PR CI: Storefront CI run 537, Web CI run 3625, and Store Brand QA run 167
+  passed.
 - Added/extended backend coverage covers published derivative delivery,
   legacy original fallback, unpublished rejection, cross-tenant rejection,
   malformed derivative routes, POS card URLs, and POS variant thumbnail URLs.
+- The first CI attempt correctly detected that additive `card_url` fields
+  needed the closed OpenAPI schemas and Flowers shared response contracts.
+  Those contracts were updated in `eeffede6`; the subsequent full CI run
+  passed on both database engines.
 
 ## Files changed
 
@@ -90,13 +96,16 @@ or image generation policy changed.
 - `tests/Feature/StorefrontDomainMediaVisibilityTest.php`
 - `tests/Feature/PosVariantMediaTest.php`
 - `tests/Feature/ProductBarcodeAndMediaTest.php`
+- `docs/openapi/commerce-api-v1.yaml`
+- `contracts/flowers-journey/01-product-list.json`
+- `contracts/flowers-journey/02-product-detail.json`
 
 ## Risks / remaining
 
 - No backfill was run. Legacy media deliberately uses the original fallback.
 - Public derivative storage is still private and publication-gated; the public
   route is only a byte-delivery boundary, not a bucket/CDN change.
-- Full Laravel suite and security checks remain to be recorded from PR CI.
+- The final implementation CI run passed on both supported test databases.
 
 ## Next recommended task
 
