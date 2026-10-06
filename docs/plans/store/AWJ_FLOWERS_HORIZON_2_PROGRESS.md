@@ -1,6 +1,6 @@
 # AWJ Flowers & Gifts — Horizon 2 Progress
 
-**Status:** IN PROGRESS — H2-1…H2-9 merged; H2-10 in review  
+**Status:** IN PROGRESS — H2-1…H2-10 merged; H2-11 in review  
 **Date:** 2026-10-04  
 **Planning Base:** `main` @ `6ded662bfada8f72f5ebf321dcf27b08be7939c1`  
 **Execution Base (H2-1):** `main` @ `afe223cb654154fa55234ff2e360233bbc933ec3`  
@@ -35,8 +35,8 @@ Horizon 1 is complete.
 | H2-7 | Product Personalization Admin | MERGED | #1246 | `f294c2d` |
 | H2-8 | Product Add-ons Admin | MERGED | #1248 | `bb03b69` |
 | H2-9 | Structured Product Content Admin | MERGED | #1249 | `f8ec475` |
-| H2-10 | Unified Product Gifting Workspace | PR OPEN | (see log) | — |
-| H2-11 | Vertical Setup Center V2 | NOT STARTED | — | — |
+| H2-10 | Unified Product Gifting Workspace | MERGED | #1250 | `4a22e81` |
+| H2-11 | Vertical Setup Center V2 | PR OPEN | (see log) | — |
 | H2-12 | Merchant Onboarding Flow | NOT STARTED | — | — |
 | H2-13 | Permissions / RBAC / Tenant Isolation Pass | NOT STARTED | — | — |
 | H2-14 | Admin UX / RTL / Mobile Polish | NOT STARTED | — | — |
@@ -431,10 +431,12 @@ A UI slice is not complete until its progress entry records:
 
 ### H2-10 — Unified Product Gifting Workspace
 
-**Status:** PR OPEN  
+**Status:** MERGED  
 **Base SHA:** `f8ec4757f932da6ff350a24fbdf5998f2ca82f64` (H2-9 merged)  
 **Branch:** `flowers/h2-10-product-gifting-workspace`  
-**PR / Head / Merge SHA:** recorded in the next slice's ledger update after merge
+**PR:** #1250  
+**Head SHA:** `b6f1c9b`  
+**Merge SHA:** `4a22e811f6ff723d6b95a5c396ca80e6ca8e0903` (squash)
 
 #### Contract / scope
 - Frontend-only composition: no new API, no new persistence. The four product-level sections (preparation time, personalization, add-ons, structured content) keep their own independent endpoints, validation, revisions and Save bars; the workspace only unifies navigation and context.
@@ -451,11 +453,44 @@ A UI slice is not complete until its progress entry records:
 #### Backward compatibility
 - Additive; the H2-6 `?tab=gifting` deep link and every earlier section behave as before.
 
+#### Review / CI
+- Codex had reached its usage limit, so CI was the only automated gate (self-review of the diff against the lessons from H2-7/H2-8). Merged on a fully green head (sqlite, pgsql, web; both runs).
+
 #### Deployment observation
 - Manual deploy: NOT PERFORMED; production verification: NOT PERFORMED.
 
 #### Next
 - H2-11 — Vertical Setup Center V2.
+
+---
+
+### H2-11 — Vertical Setup Center V2
+
+**Status:** PR OPEN  
+**Base SHA:** `4a22e811f6ff723d6b95a5c396ca80e6ca8e0903` (H2-10 merged)  
+**Branch:** `flowers/h2-11-setup-center`  
+**PR / Head / Merge SHA:** recorded in the next slice's ledger update after merge
+
+#### Contract / scope
+- Frontend-only. **No stored completion flag**: step state comes from the existing server-derived `vertical-setup` endpoint (per-capability `configured` / `not_configured` + counter), enriched with the *reason* a step is incomplete from the real admin documents (gift policy, delivery schedule, fulfilment warehouse). A document that fails to load means "no extra explanation", never an invented reason; a failure of `vertical-setup` itself is the screen's failure (retry). Unknown server keys are ignored. Starter occasions/recipients reuse the existing preview-then-apply client (ADR-25), adding only missing values.
+
+#### UI / information architecture
+- On `/commerce`, for a store with the Flowers & Gifts profile and a user holding `commerce.manage`, the overview becomes the **setup center** (other stores/users keep the previous overview — no change for general retail): overall progress (count + progressbar), the **next incomplete step** with one primary "Continue" action, then five groups — Catalog & discovery · Gifting · Delivery · Products · Store presentation — each step showing its state (icon + sr-only text, not colour alone), what is missing in the merchant's language, and a button to the real screen that fixes it (delivery steps deep-link to `?tab=windows|rules|fulfilment`; product capabilities say a product must be chosen first). Store switch remounts the centre (no stale cross-store data).
+
+#### Tests
+- `derive.test.ts` (reasons/links/ordering/unknown keys), `setup-center.test.tsx`, `page.setup.test.tsx` (profile + permission gating), Playwright `flowers-h2-11-setup-center.spec.ts`.
+
+#### Tenant Isolation / RBAC
+- No new routes; every read/write is an existing `commerce.manage`-scoped, store-owned endpoint. Not shown (and not requested) without `commerce.manage`.
+
+#### Backward compatibility
+- Additive; non-Flowers stores and users without `commerce.manage` see the unchanged overview.
+
+#### Deployment observation
+- Manual deploy: NOT PERFORMED; production verification: NOT PERFORMED.
+
+#### Next
+- H2-12 — Merchant Onboarding Flow.
 
 ---
 
