@@ -11,6 +11,7 @@ import { useToast } from '@/components/ui/toast';
 import { failureText } from './failure-text';
 import { saveFulfillment, type FulfillmentDocument, type FulfillmentWarehouse } from './fulfillment';
 import { flowersAdminT } from './messages';
+import { useUnsavedGuard } from './use-unsaved-guard';
 
 const label = (w: FulfillmentWarehouse) => [w.name, w.code ? `(${w.code})` : null, w.city].filter(Boolean).join(' — ').replace(' — (', ' (');
 
@@ -38,6 +39,7 @@ export function FulfillmentPanel({
 
   const active = document.warehouses.filter((w) => w.isActive);
   const dirty = choice !== '' && choice !== (document.current?.id ?? '');
+  useUnsavedGuard(dirty);
   const currentInactive = document.current !== null && !document.current.isActive;
 
   async function onSubmit(event: React.FormEvent) {

@@ -75,6 +75,19 @@ describe('FulfillmentPanel', () => {
     expect(screen.getByText('All changes saved')).toBeTruthy();
   });
 
+  it('warns the browser before leaving with an unsaved choice, like every other settings screen', async () => {
+    open({ current: null, warehouses: [wh('1'), wh('2')] });
+    const select = await screen.findByLabelText('Fulfilment warehouse', { selector: 'select' });
+    const leave = () => {
+      const event = new Event('beforeunload', { cancelable: true });
+      window.dispatchEvent(event);
+      return event.defaultPrevented;
+    };
+    expect(leave()).toBe(false);
+    await userEvent.selectOptions(select, '2');
+    expect(leave()).toBe(true);
+  });
+
   it('offers only active warehouses and warns when the assigned one went inactive', async () => {
     open({ current: wh('1', { is_active: false }), warehouses: [wh('1', { is_active: false }), wh('2'), wh('3', { is_active: false })] });
     await screen.findByRole('region', { name: 'Fulfilment warehouse' });
