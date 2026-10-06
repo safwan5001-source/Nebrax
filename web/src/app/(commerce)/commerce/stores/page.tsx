@@ -20,6 +20,7 @@ import {
   type CommerceStoreOption,
 } from '@/modules/commerce-workspace/stores';
 import { StoreSettingsDialog } from '@/modules/commerce-workspace/store-settings-dialog';
+import { CreateStoreDialog } from '@/modules/commerce-workspace/create-store-dialog';
 
 /**
  * COM-STORE-PROVISION-1 — شاشة «المتاجر»: تعرض الكتالوج الموثوق من
@@ -36,6 +37,7 @@ export default function CommerceStoresPage() {
   const { catalog, refresh } = useCommerceStoreContext();
   const { error: showErrorToast, success: showSuccessToast } = useToast();
   const [creating, setCreating] = useState(false);
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [settingsStore, setSettingsStore] = useState<CommerceStoreOption | null>(null);
   const [deactivateStore, setDeactivateStore] = useState<CommerceStoreOption | null>(null);
   const [lifecycleBusyId, setLifecycleBusyId] = useState<string | null>(null);
@@ -95,6 +97,13 @@ export default function CommerceStoresPage() {
   return (
     <div className="space-y-5">
       <PageHeader eyebrow={t('title')} title={t('stores')} />
+      {canManage && catalog.status === 'ready' ? (
+        <div className="flex justify-end">
+          <Button type="button" onClick={() => setCreateDialogOpen(true)}>
+            {t('createStoreAction')}
+          </Button>
+        </div>
+      ) : null}
 
       {catalog.status === 'loading' ? <LoadingState variant="table" rows={3} /> : null}
 
@@ -195,6 +204,18 @@ export default function CommerceStoresPage() {
           onSaved={async (storeId) => {
             await refresh(storeId);
             showSuccessToast(t('storeSettingsSuccess'));
+          }}
+        />
+      ) : null}
+
+      {createDialogOpen ? (
+        <CreateStoreDialog
+          open
+          locale={locale}
+          onClose={() => setCreateDialogOpen(false)}
+          onCreated={async (storeId) => {
+            await refresh(storeId);
+            showSuccessToast(t('createStoreSuccess'));
           }}
         />
       ) : null}

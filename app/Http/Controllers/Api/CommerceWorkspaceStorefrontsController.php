@@ -3,9 +3,11 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Requests\AddStorefrontCustomDomainRequest;
+use App\Http\Requests\CreateStorefrontRequest;
 use App\Http\Requests\ProvisionStorefrontRequest;
 use App\Http\Requests\UpdateStorefrontIdentityRequest;
 use App\Services\Commerce\CommerceWorkspaceStorefrontsService;
+use App\Services\Commerce\CreateStorefrontForCurrentTenant;
 use App\Services\Commerce\CustomDomainNotReadyForPrimaryException;
 use App\Services\Commerce\DomainNotActivatedForEdgeException;
 use App\Services\Commerce\DomainNotDisconnectableException;
@@ -87,6 +89,32 @@ class CommerceWorkspaceStorefrontsController extends ApiController
             'data' => ['store' => $result],
             'meta' => ['created' => $created],
         ], $created ? 201 : 200);
+    }
+
+    /** AWJ-MULTI-STORE-1 — إنشاء متجر ثانٍ وما بعده؛ لا يعيد تعريف التزويد الأول. */
+    public function createAdditional(
+        CreateStorefrontRequest $request,
+        CreateStorefrontForCurrentTenant $creator,
+    ): JsonResponse {
+        if ($request->user()?->role === 'self_service') {
+            abort(403, 'مساحة عمل التجارة غير متاحة لحساب الخدمة الذاتية.');
+        }
+
+        try {
+            $store = $creator->create($request->normalizedName(), $request->locale());
+        } catch (StorefrontBaseDomainMisconfiguredException $e) {
+            abort(500, $e->getMessage());
+        } catch (StorefrontHostnameConflictException $e) {
+            abort(409, $e->getMessage());
+        } catch (RuntimeException $e) {
+            abort(422, $e->getMessage());
+        }
+        $created = $store['created'];
+        unset($store['created']);
+        return response()->json([
+            'data' => ['store' => $store],
+            'meta' => ['created' => $created],
+        ], 201);
     }
 
     /**

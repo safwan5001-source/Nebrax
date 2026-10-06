@@ -281,7 +281,7 @@ final class CommerceWorkspaceStorefrontsService
         $hostname = HostnameNormalizer::normalize($rawHostname);
 
         $baseDomain = ManagedStorefrontHostname::configuredBaseDomain();
-        if ($hostname === $baseDomain || ManagedStorefrontHostname::isUnderBaseDomain($hostname, $baseDomain)) {
+        if ($hostname === $baseDomain || ManagedStorefrontHostname::isWithinBaseDomain($hostname, $baseDomain)) {
             throw new ManagedNamespaceHostnameException(
                 'هذا الاسم ضمن نطاق أَوْج المُدار للمتاجر — لا يمكن إضافته كنطاق مخصَّص.'
             );
@@ -779,7 +779,7 @@ final class CommerceWorkspaceStorefrontsService
         }
 
         $base = ManagedStorefrontHostname::configuredBaseDomain();
-        if ($domain->hostname === $base || ManagedStorefrontHostname::isUnderBaseDomain($domain->hostname, $base)) {
+        if ($domain->hostname === $base || ManagedStorefrontHostname::isWithinBaseDomain($domain->hostname, $base)) {
             throw new DomainNotEligibleForEdgeException(
                 'لا يمكن تفعيل نطاق يقع ضمن نطاق أَوْج المُدار.'
             );
