@@ -60,6 +60,7 @@ export function Topbar({
       >
         <Search className="h-4 w-4 shrink-0 text-muted" strokeWidth={1.6} />
         <input
+          aria-label={t('search')}
           placeholder={t('search')}
           className="h-full w-40 bg-transparent text-sm text-text placeholder:text-muted focus:outline-none"
         />

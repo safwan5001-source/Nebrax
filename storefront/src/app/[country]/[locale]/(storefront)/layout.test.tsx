@@ -268,4 +268,71 @@ describe("StorefrontLayout", () => {
       expect(cardStyle.props.children).toBe(page);
     }
   });
+  // CUST-HV V1A / DEF-1 — one source for the published custom links: the desktop
+  // Header and the mobile menu receive the same sanitised list, so a link a
+  // visitor can see at 1280px is also reachable on a phone.
+  it("hands the same published custom links to the desktop Header and the mobile menu", async () => {
+    const presentation = {
+      ...DEFAULT_PRESENTATION_CONFIG,
+      header: {
+        ...DEFAULT_PRESENTATION_CONFIG.header,
+        links: [
+          {
+            id: "nav-about",
+            label: "About",
+            kind: "content" as const,
+            href: "/about",
+            enabled: true,
+          },
+          {
+            id: "nav-off",
+            label: "Hidden",
+            kind: "content" as const,
+            href: "/hidden",
+            enabled: false,
+          },
+          {
+            id: "nav-bad",
+            label: "Unsafe",
+            kind: "external" as const,
+            href: "javascript:alert(1)",
+            enabled: true,
+          },
+        ],
+      },
+    };
+    vi.mocked(fetchStorefrontConfig).mockResolvedValueOnce({
+      name: "متجر الاختبار",
+      default_locale: "ar",
+      business_identity: {
+        legal_name: "شركة الاختبار",
+        cr_number: "7050247977",
+        vat_number: null,
+      },
+      presentation,
+    });
+
+    // With a published presentation the chrome sits inside the theme wrapper.
+    const root = (await StorefrontLayout({
+      children: <section>Storefront content</section>,
+      params: Promise.resolve({ country: "sa", locale: "ar" }),
+    })) as ReactElement<{ children: ReactElement<{ children: ReactNode }> }>;
+    const header = Children.toArray(root.props.children.props.children).find(
+      (element) => (element as ReactElement).type === Header,
+    ) as ReactElement<{
+      extraLinks?: unknown;
+      mobileNavigation: ReactElement<{
+        children: ReactElement<{ extraLinks: unknown }>;
+      }>;
+    }>;
+    const desktopLinks = header.props.extraLinks;
+    const mobileNavigation = header.props.mobileNavigation;
+
+    expect(desktopLinks).toEqual([
+      { id: "nav-about", label: "About", href: "/sa/ar/about" },
+    ]);
+    expect(mobileNavigation.props.children.props.extraLinks).toEqual(
+      desktopLinks,
+    );
+  });
 });

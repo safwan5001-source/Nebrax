@@ -8,9 +8,11 @@ interface HeroSectionProps {
   locale: string;
   storeName: string | null;
   /**
-   * Merchant-configured hero content. AWJ exposes no hero contract today, so
-   * nothing supplies these yet; they exist so STORE-UI-6 can fill the band
-   * without the homepage being restructured around it.
+   * Merchant-configured hero copy from the published presentation
+   * (`homepage.heroHeadline` / `homepage.heroSubheadline`); the Home page
+   * passes both. An empty headline falls back to the store name; an empty
+   * subheadline renders nothing. Only this copy is configurable today — image,
+   * overlay, CTA and per-instance design belong to CUST-HV V6.
    */
   headline?: string | null;
   subheadline?: string | null;
@@ -22,9 +24,10 @@ interface HeroSectionProps {
  * The storefront masthead.
  *
  * It states who the store is and offers one way into the catalogue, and that is
- * all it claims. `store/v1/storefront` carries a name and a default locale —
- * no banner, no tagline, no campaign — so there is nothing else here that would
- * be true.
+ * all it claims. The live storefront contract carries a name and a default
+ * locale, and the merchant's published presentation adds a headline and a
+ * subheadline — no banner image, no campaign — so there is nothing else here
+ * that would be true.
  *
  * With no merchant image to place, the band is deliberately plain: the store's
  * name set large on the approved palette, one CTA, and nothing else. An earlier

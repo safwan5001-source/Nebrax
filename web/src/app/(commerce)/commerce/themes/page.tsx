@@ -108,6 +108,27 @@ export default function CommerceThemesPage() {
         eyebrow={t('title')}
         title={t('themeGallery')}
         description={t('themeGalleryDescription')}
+        actionsSlot={
+          // One honest link to the *published* store. It is deliberately not a
+          // per-theme "Preview": it shows the live store, never the theme
+          // (CUST-HV DEF-4). A true theme preview is V10.
+          viewStoreUrl ? (
+            <a
+              href={viewStoreUrl}
+              target="_blank"
+              rel="noreferrer"
+              data-testid="theme-gallery-view-live"
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-border bg-surface px-4 text-sm font-medium text-text hover:bg-primary-soft hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+            >
+              {t('themeGalleryViewLive')}
+              <ExternalLink className="h-4 w-4" aria-hidden />
+            </a>
+          ) : (
+            <span className="inline-flex min-h-11 items-center text-xs text-muted">
+              {t('themeGalleryViewLiveUnavailable')}
+            </span>
+          )
+        }
       />
 
       {applyError ? (
@@ -121,7 +142,6 @@ export default function CommerceThemesPage() {
           <ThemeCard
             key={theme.id}
             theme={theme}
-            viewStoreUrl={viewStoreUrl}
             selectedStoreId={selectedStoreId}
             canManage={canManage}
             applying={applyingThemeId === theme.id}
@@ -136,7 +156,6 @@ export default function CommerceThemesPage() {
 
 function ThemeCard({
   theme,
-  viewStoreUrl,
   selectedStoreId,
   canManage,
   applying,
@@ -144,7 +163,6 @@ function ThemeCard({
   t,
 }: {
   theme: ThemeRegistryEntry;
-  viewStoreUrl: string | null;
   selectedStoreId: string | null;
   canManage: boolean;
   applying: boolean;
@@ -200,22 +218,6 @@ function ThemeCard({
               >
                 {t('themeGalleryCustomize')}
               </Link>
-
-              {viewStoreUrl ? (
-                <a
-                  href={viewStoreUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-border bg-surface px-4 text-sm font-medium text-text hover:bg-primary-soft hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
-                >
-                  {t('themeGalleryPreview')}
-                  <ExternalLink className="h-4 w-4" aria-hidden />
-                </a>
-              ) : (
-                <span className="inline-flex min-h-11 items-center text-xs text-muted">
-                  {t('themeGalleryPreviewUnavailable')}
-                </span>
-              )}
             </div>
           ) : null}
         </div>

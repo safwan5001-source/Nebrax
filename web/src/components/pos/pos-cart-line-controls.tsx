@@ -39,7 +39,7 @@ export function PosCartLineFrame({
       onClick={onSelect}
       onFocus={onSelect}
       className={cn(
-        'flex gap-2 border-b py-3 outline-none last:border-0',
+        'flex gap-2 border-b py-2 outline-none last:border-0',
         'transition-colors motion-reduce:transition-none',
         'focus-visible:ring-2 focus-visible:ring-primary/40',
         scanned || selected ? 'border-primary bg-primary-soft' : 'border-border',

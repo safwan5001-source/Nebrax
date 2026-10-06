@@ -3,7 +3,6 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { FormAlert } from '@/components/nebrax';
 import { Button } from '@/components/ui/button';
-import { Dialog } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
@@ -14,6 +13,7 @@ import { ALL_WEEKDAYS, hasErrors, validateSlotDraft, type SlotDraft, type SlotEr
 import type { ShippingZoneOption } from './shipping-zones';
 import { weekdayName, weekdayOrder } from './weekday-names';
 import { cn } from '@/lib/utils';
+import { FlowersDialog } from './flowers-dialog';
 import { useUnsavedGuard } from './use-unsaved-guard';
 
 export type ZoneState = { kind: 'loading' } | { kind: 'failed' } | { kind: 'ready'; zones: ShippingZoneOption[] };
@@ -89,7 +89,7 @@ export function SlotDialog({
   const allSelected = draft.weekdays.length === 7;
 
   return (
-    <Dialog open onClose={saving ? () => undefined : onClose} title={title}>
+    <FlowersDialog open onClose={saving ? () => undefined : onClose} title={title}>
       <form onSubmit={submit} noValidate className="space-y-4" data-slot-form>
         <fieldset className="space-y-1.5">
           <legend className="text-sm font-medium text-text">{t('winMethod')}</legend>
@@ -274,6 +274,6 @@ export function SlotDialog({
           </Button>
         </div>
       </form>
-    </Dialog>
+    </FlowersDialog>
   );
 }

@@ -12,10 +12,10 @@ import { groupSteps, nextStep, setupProgress, type MissingReason, type SetupGrou
 import { StartersBox } from './starters-box';
 import { useSetupState } from './use-setup-state';
 
-type CommerceKey = Parameters<typeof commerceWorkspaceMessage>[1];
+export type CommerceKey = Parameters<typeof commerceWorkspaceMessage>[1];
 
 /** مفتاح القدرة من الخادم → نص موجود في حزمة التجارة (نفس نصوص قائمة الإعداد القديمة، فلا تُكرَّر). */
-const CAPABILITY_LABEL: Record<string, CommerceKey> = {
+export const CAPABILITY_LABEL: Record<string, CommerceKey> = {
   occasions: 'storeCapOccasions',
   recipients: 'storeCapRecipients',
   gift_message: 'storeCapGiftMessage',
@@ -36,7 +36,7 @@ const GROUP_LABEL: Record<SetupGroupId, FlowersAdminMessageKey> = {
 };
 
 /** وصف الحالة المهيّأة بحسب معنى عدّاد كل قدرة (قيم، فترات، منتجات، أقسام). */
-function configuredText(step: SetupStep, t: ReturnType<typeof flowersAdminT>): string {
+export function configuredText(step: SetupStep, t: ReturnType<typeof flowersAdminT>): string {
   switch (step.key) {
     case 'occasions':
     case 'recipients':
@@ -54,7 +54,7 @@ function configuredText(step: SetupStep, t: ReturnType<typeof flowersAdminT>): s
   }
 }
 
-const MISSING_TEXT: Record<MissingReason, FlowersAdminMessageKey> = {
+export const MISSING_TEXT: Record<MissingReason, FlowersAdminMessageKey> = {
   no_values: 'setupMissNoValues',
   gift_off: 'setupMissGiftOff',
   schedule_off: 'setupMissScheduleOff',
@@ -101,9 +101,14 @@ export function SetupCenter({ storeId, locale }: { storeId: string; locale: stri
             <p className="text-xs text-muted">
               {t('setupNext')}: <span className="text-text">{tc(CAPABILITY_LABEL[next.key])}</span>
             </p>
-            <Button asChild size="sm">
-              <Link href={next.href} data-setup-next>{t('setupContinue')}</Link>
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button asChild size="sm" variant="outline">
+                <Link href="/commerce/onboarding" data-setup-guided>{progress.done === 0 ? t('onbEntryStart') : t('onbEntryResume')}</Link>
+              </Button>
+              <Button asChild size="sm">
+                <Link href={next.href} data-setup-next>{t('setupContinue')}</Link>
+              </Button>
+            </div>
           </div>
         ) : (
           <p className="text-xs text-positive" data-setup-complete>{t('setupAllDone')}</p>

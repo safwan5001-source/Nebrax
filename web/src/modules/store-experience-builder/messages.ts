@@ -18,6 +18,11 @@ export const CUSTOMIZER_MESSAGES = {
     publish: "نشر",
     openStore: "فتح المتجر ↗",
     exit: "الخروج إلى التجارة",
+    // CUST-HV V1A (DEF-11) — قائمة «المزيد» في شريط المحرر: تضم الإجراءات
+    // الثانوية التي لا تتسع لها العروض الضيقة، وتبقى «حفظ المسودة» و«نشر»
+    // و«الخروج» ظاهرة دوماً خارجها.
+    moreActions: "المزيد من الإجراءات",
+    previewDevice: "وضع المعاينة",
     currentPage: "الرئيسية",
     // CUST-H2-2 — منتقي الصفحة: منفصل دلالياً وبصرياً عن منتقي النسخة
     // (راجع تعليق `VersionSelector.tsx`). "الصفحة" تعني أي صفحة متجر
@@ -676,6 +681,10 @@ export const CUSTOMIZER_MESSAGES = {
     publish: "Publish",
     openStore: "Open store ↗",
     exit: "Exit to Commerce",
+    // CUST-HV V1A (DEF-11) — the toolbar's "More" menu: secondary actions that
+    // narrow widths cannot fit. Save draft, Publish and Exit never move into it.
+    moreActions: "More actions",
+    previewDevice: "Preview device",
     currentPage: "Home",
     // CUST-H2-2 — Page Navigator: distinct in meaning and visual weight from
     // the Version selector (see `VersionSelector.tsx`'s own comment). "Page"

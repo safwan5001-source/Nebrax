@@ -1909,27 +1909,17 @@ export default function PosPage() {
                 السطر عرضٌ للقراءة فقط. الكمية والسعر والخصم والوحدة تُعدَّل من
                 شريط السطر المحدد أسفل القائمة — لا منتقي وحدة ثانٍ هنا.
               */}
-              <div className="flex min-w-0 flex-1 flex-col gap-2">
+              <div className="flex min-w-0 flex-1 flex-col gap-1">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-sm font-semibold text-text">{line.description}</div>
-                    {line.unit ? <div className="mt-0.5 text-xs text-muted" data-testid="pos-cart-line-unit">{line.unit}</div> : null}
+                    {line.unit ? <div className="mt-0.5 text-[11px] text-muted" data-testid="pos-cart-line-unit">{line.unit}</div> : null}
                   </div>
                   <div className="num shrink-0 text-base font-bold text-text" data-testid="pos-cart-line-total">{formatRiyal(lineCalc(line).total / 100)}</div>
                 </div>
-                <div className="num text-xs text-muted" data-testid="pos-cart-line-unit-price">{formatRiyal(Number(effectiveLinePrice(line)))}</div>
-                <PosCartQtyControls
-                  qty={line.qty}
-                  decreaseLabel={t('return_decrease')}
-                  increaseLabel={t('return_increase')}
-                  quantityLabel={t('quantity')}
-                  keypadTitle={t('numeric_keypad_edit_quantity')}
-                  showKeypad={posCfg.show_onscreen_numeric_keypad}
-                  labels={numericEditorLabels}
-                  onDecrease={() => setQty(line.key, -1)}
-                  onIncrease={() => setQty(line.key, 1)}
-                  onQtyChange={(value) => setQtyFromInput(line.key, value)}
-                />
+                <div className="num text-xs text-muted" data-testid="pos-cart-line-quantity-price">
+                  {line.qty} × {formatRiyal(Number(effectiveLinePrice(line)))}
+                </div>
                 {lineDisc > 0 && <span className="num text-xs text-positive">−{formatRiyal(lineDisc / 100)}</span>}
                 {priceErrors[line.key] && <p className="text-xs text-negative">{priceErrors[line.key]}</p>}
               </div>
@@ -1954,7 +1944,7 @@ export default function PosPage() {
           : null;
         return (
           <div
-            className="flex flex-col gap-2 border-t border-border p-3"
+            className="flex flex-col gap-1.5 border-t border-border p-2.5"
             role="group"
             aria-label={t('selected_line_controls')}
             data-testid="pos-selected-line-controls"
@@ -2099,12 +2089,12 @@ export default function PosPage() {
         );
       })()}
 
-      <div data-awj-floor-actions="" className="space-y-2 border-t border-border p-3">
+      <div data-awj-floor-actions="" className="space-y-1.5 border-t border-border p-2.5">
         <div className="grid grid-cols-2 gap-2">
-          <button type="button" onClick={holdSale} disabled={cart.length === 0 || !session || holdBusy || catalogLoading} className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-md border border-border bg-surface px-3 text-sm font-semibold text-text touch-manipulation hover:border-primary disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40">
+          <button type="button" onClick={holdSale} disabled={cart.length === 0 || !session || holdBusy || catalogLoading} className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-md border border-border bg-surface px-2.5 text-sm font-semibold text-text touch-manipulation hover:border-primary disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40">
             <PauseCircle className="h-4 w-4" strokeWidth={1.7} />{t('hold')}
           </button>
-          <button type="button" onClick={() => setNoteOpen(true)} className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-md border border-border bg-surface px-3 text-sm font-semibold text-text touch-manipulation hover:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40">
+          <button type="button" onClick={() => setNoteOpen(true)} className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-md border border-border bg-surface px-2.5 text-sm font-semibold text-text touch-manipulation hover:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40">
             <StickyNote className="h-4 w-4" strokeWidth={1.7} />
             {t('cart_note')}
             {activeCart.note.trim() !== '' && <span className="h-1.5 w-1.5 rounded-full bg-primary" aria-hidden />}
@@ -2115,10 +2105,6 @@ export default function PosPage() {
       {/* Floor posture (H4): totals + pay form ONE Outcome Surface under the v3 gate. `contents`
           keeps gate-off layout identical (the wrapper generates no box). */}
       <div data-awj-floor-outcome="" data-awj-surface="outcome" className="contents">
-      <div className="border-t border-border bg-background px-3 py-2" data-testid="pos-cart-totals">
-        <div data-awj-floor-total="" className="flex items-baseline justify-between"><span className="text-sm font-semibold text-text">{t('total')}</span><span className="num text-xl font-bold text-text">{formatRiyal(totalMinor / 100)}</span></div>
-      </div>
-
       <div className={POS_CART_PAY_FOOTER_CLASS}>
         <button
           type="button"

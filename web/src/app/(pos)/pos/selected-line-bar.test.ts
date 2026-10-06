@@ -19,16 +19,18 @@ describe('POS-FINAL-1 شريط السطر المحدد', () => {
     expect(barStart).toBeGreaterThan(linesStart);
     expect(lineRegion).not.toContain('<select');
     expect(lineRegion).toContain('data-testid="pos-cart-line-unit"');
-    expect(lineRegion).toContain('data-testid="pos-cart-line-unit-price"');
+    expect(lineRegion).toContain('data-testid="pos-cart-line-quantity-price"');
     expect(lineRegion).toContain('data-testid="pos-cart-line-total"');
-    expect(lineRegion).toContain('PosCartQtyControls');
-    expect(lineRegion).toContain('setQty(line.key, -1)');
-    expect(lineRegion).toContain('setQty(line.key, 1)');
+    expect(lineRegion).not.toContain('PosCartQtyControls');
+    expect(lineRegion).not.toContain('setQty(line.key, -1)');
+    expect(lineRegion).not.toContain('setQty(line.key, 1)');
     expect(page).not.toContain('data-testid="pos-cart-discount"');
+    expect(page).not.toContain('data-testid="pos-cart-totals"');
+    expect(page).not.toContain('data-awj-floor-total');
     expect(page).not.toContain('<select');
   });
 
-  it('يضع الوحدة والكمية في الصف الأول والسعر والخصم والحذف في الصف الثاني داخل عمود السلة', () => {
+  it('يبقي تحرير الكمية في شريط السطر المحدد فقط ويضع بقية الأدوات في الصف الثاني', () => {
     expect(barRegion).toContain('data-testid="pos-selected-line-row-primary"');
     expect(barRegion).toContain('data-testid="pos-selected-line-row-secondary"');
     expect(barRegion.indexOf('PosSelectedLineUnitControl')).toBeLessThan(barRegion.indexOf('PosCartQtyControls'));
