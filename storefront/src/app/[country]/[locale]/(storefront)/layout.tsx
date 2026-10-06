@@ -2,6 +2,7 @@ import type { Category } from "@spree/sdk";
 import { connection } from "next/server";
 import { getTranslations } from "next-intl/server";
 import { cache, Suspense } from "react";
+import { AnnouncementBar } from "@/components/layout/AnnouncementBar";
 import type { StoreNavCategory } from "@/components/layout/CategoryNav";
 import { CategoryNav } from "@/components/layout/CategoryNav";
 import { Footer, FooterCategoryLinks } from "@/components/layout/Footer";
@@ -214,8 +215,17 @@ export default async function StorefrontLayout({
     } => Boolean(item),
   );
 
+  const announcements = presentation?.announcements ?? null;
+
   const chrome = (
     <>
+      {announcements?.enabled ? (
+        <AnnouncementBar
+          doc={announcements}
+          basePath={basePath}
+          serverNow={Date.now()}
+        />
+      ) : null}
       <Header
         basePath={basePath}
         locale={locale as Locale}

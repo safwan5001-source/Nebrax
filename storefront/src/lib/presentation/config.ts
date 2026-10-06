@@ -1,7 +1,4 @@
-import {
-  type AnnouncementsDoc,
-  normalizeAnnouncements,
-} from "./announcements";
+import { type AnnouncementsDoc, normalizeAnnouncements } from "./announcements";
 import {
   normalizePagePresentation,
   type PagePresentation,

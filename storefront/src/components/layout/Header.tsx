@@ -108,7 +108,7 @@ export async function Header({
   const homeHref = basePath || "/";
 
   return (
-    <header className="sticky top-0 z-40 bg-store-surface">
+    <header className="sticky top-(--store-announcement-height) z-40 bg-store-surface">
       <a
         href="#main-content"
         className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:start-4 focus:z-50 focus:rounded-store focus:border focus:border-store-border focus:bg-store-surface focus:px-3 focus:py-2 focus:shadow-sm focus:text-sm focus:font-medium focus:text-store-foreground"

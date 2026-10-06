@@ -55,6 +55,15 @@
     "skipToContent": "Skip to content",
     "submitSearch": "Search"
   },
+  "announcements": {
+    "region": "Announcements",
+    "previous": "Previous announcement",
+    "next": "Next announcement",
+    "pause": "Pause announcements",
+    "play": "Resume announcements",
+    "dismiss": "Dismiss announcement",
+    "position": "Announcement {current} of {total}"
+  },
   "regionPreferences": {
     "title": "Region and language",
     "description": "Choose your region and language. Currency is set by the selected region.",

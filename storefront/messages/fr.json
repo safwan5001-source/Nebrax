@@ -55,6 +55,15 @@
     "skipToContent": "Aller au contenu",
     "submitSearch": "Rechercher"
   },
+  "announcements": {
+    "region": "Annonces",
+    "previous": "Annonce précédente",
+    "next": "Annonce suivante",
+    "pause": "Mettre les annonces en pause",
+    "play": "Reprendre les annonces",
+    "dismiss": "Fermer l'annonce",
+    "position": "Annonce {current} sur {total}"
+  },
   "regionPreferences": {
     "title": "Région et langue",
     "description": "Choisissez votre région et votre langue. La devise dépend de la région sélectionnée.",

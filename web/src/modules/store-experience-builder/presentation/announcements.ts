@@ -38,7 +38,12 @@ export const ANNOUNCEMENT_ICONS = [
 ] as const;
 export type AnnouncementIconKey = (typeof ANNOUNCEMENT_ICONS)[number];
 
-export const ANNOUNCEMENT_PAGES = ["home", "product", "category", "all"] as const;
+export const ANNOUNCEMENT_PAGES = [
+  "home",
+  "product",
+  "category",
+  "all",
+] as const;
 export type AnnouncementPageTarget = (typeof ANNOUNCEMENT_PAGES)[number];
 
 export const ANNOUNCEMENT_ROTATE_INTERVALS = [6, 8, 10] as const;
@@ -47,7 +52,8 @@ export type AnnouncementRotateInterval =
 export const ANNOUNCEMENT_DEFAULT_ROTATE_INTERVAL = 8;
 
 export const ANNOUNCEMENT_TICKER_SPEEDS = ["slow", "normal", "fast"] as const;
-export type AnnouncementTickerSpeed = (typeof ANNOUNCEMENT_TICKER_SPEEDS)[number];
+export type AnnouncementTickerSpeed =
+  (typeof ANNOUNCEMENT_TICKER_SPEEDS)[number];
 
 export const MIN_TEXT_CONTRAST = 4.5;
 
@@ -90,9 +96,15 @@ export interface AnnouncementsDoc {
 
 // ───────────────────────────── normalisation ─────────────────────────────
 
+const PHP_TRIM_CHARS = new Set([" ", "\t", "\n", "\r", "\0", "\x0B"]);
+
 /** PHP `trim()` — ASCII whitespace and NUL only (JS `trim()` also strips NBSP etc.). */
 function phpTrim(value: string): string {
-  return value.replace(/^[ \t\n\r\0\x0B]+|[ \t\n\r\0\x0B]+$/g, "");
+  let start = 0;
+  let end = value.length;
+  while (start < end && PHP_TRIM_CHARS.has(value[start])) start += 1;
+  while (end > start && PHP_TRIM_CHARS.has(value[end - 1])) end -= 1;
+  return value.slice(start, end);
 }
 
 /** PHP `mb_substr($s, 0, $n)` — code points, not UTF-16 units. */
@@ -125,7 +137,9 @@ function normalizeSurface(raw: unknown): Announcement["surface"] | undefined {
   if (!isRecord(raw)) return undefined;
   const colour = (value: unknown): AnnouncementColour | null => {
     const hex =
-      isRecord(value) && typeof value.hex === "string" ? phpTrim(value.hex) : "";
+      isRecord(value) && typeof value.hex === "string"
+        ? phpTrim(value.hex)
+        : "";
     return isSafeHexColor(hex) ? { hex: hex.toLowerCase() } : null;
   };
   const background = colour(raw.background);
@@ -138,9 +152,13 @@ function normalizeSurface(raw: unknown): Announcement["surface"] | undefined {
   return surface;
 }
 
-function normalizeItem(raw: Record<string, unknown>, index: number): Announcement {
+function normalizeItem(
+  raw: Record<string, unknown>,
+  index: number,
+): Announcement {
+  // `\p{Cc}` = the C0 + C1 control characters, exactly PHP's `/\p{Cc}+/u`.
   const flattened = (typeof raw.text === "string" ? raw.text : "").replace(
-    /[\u0000-\u001f\u007f-\u009f]+/g,
+    /\p{Cc}+/gu,
     " ",
   );
   const item: Announcement = {
@@ -171,18 +189,24 @@ function normalizeItem(raw: Record<string, unknown>, index: number): Announcemen
           : "";
       if (value !== "") kept[edge] = value;
     }
-    if (kept.startsAt !== undefined || kept.endsAt !== undefined) item.window = kept;
+    if (kept.startsAt !== undefined || kept.endsAt !== undefined)
+      item.window = kept;
   }
 
   if (Array.isArray(raw.pages)) {
     const chosen = new Set<string>();
     for (const page of raw.pages) {
-      if (typeof page === "string" && (ANNOUNCEMENT_PAGES as readonly string[]).includes(page)) {
+      if (
+        typeof page === "string" &&
+        (ANNOUNCEMENT_PAGES as readonly string[]).includes(page)
+      ) {
         chosen.add(page);
       }
     }
     if (chosen.size > 0 && !chosen.has("all")) {
-      item.pages = (["home", "product", "category"] as const).filter((p) => chosen.has(p));
+      item.pages = (["home", "product", "category"] as const).filter((p) =>
+        chosen.has(p),
+      );
     }
   }
 
@@ -267,10 +291,13 @@ const ISO_INSTANT =
 export function parseAnnouncementInstant(value: string): number | null {
   const m = ISO_INSTANT.exec(value);
   if (!m) return null;
-  const [year, month, day, hour, minute] = [m[1], m[2], m[3], m[4], m[5]].map(Number);
+  const [year, month, day, hour, minute] = [m[1], m[2], m[3], m[4], m[5]].map(
+    Number,
+  );
   const second = m[6] === undefined ? 0 : Number(m[6]);
   if (hour > 23 || minute > 59 || second > 59) return null;
-  if (m[9] !== undefined && (Number(m[9]) > 23 || Number(m[10]) > 59)) return null;
+  if (m[9] !== undefined && (Number(m[9]) > 23 || Number(m[10]) > 59))
+    return null;
 
   const calendar = new Date(Date.UTC(year, month - 1, day));
   if (
@@ -281,7 +308,8 @@ export function parseAnnouncementInstant(value: string): number | null {
     return null;
   }
 
-  const millis = m[7] === undefined ? 0 : Number(m[7].padEnd(3, "0").slice(0, 3));
+  const millis =
+    m[7] === undefined ? 0 : Number(m[7].padEnd(3, "0").slice(0, 3));
   let utc = Date.UTC(year, month - 1, day, hour, minute, second, millis);
   if (m[8] !== "Z") {
     const sign = m[8].startsWith("-") ? -1 : 1;
@@ -290,7 +318,11 @@ export function parseAnnouncementInstant(value: string): number | null {
   return utc;
 }
 
-export type AnnouncementWindowState = "open" | "scheduled" | "expired" | "invalid";
+export type AnnouncementWindowState =
+  | "open"
+  | "scheduled"
+  | "expired"
+  | "invalid";
 
 /**
  * `startsAt` inclusive, `endsAt` exclusive. A malformed or inverted window is
@@ -302,8 +334,13 @@ export function announcementWindowState(
 ): AnnouncementWindowState {
   if (!window) return "open";
   const start =
-    window.startsAt === undefined ? null : parseAnnouncementInstant(window.startsAt);
-  const end = window.endsAt === undefined ? null : parseAnnouncementInstant(window.endsAt);
+    window.startsAt === undefined
+      ? null
+      : parseAnnouncementInstant(window.startsAt);
+  const end =
+    window.endsAt === undefined
+      ? null
+      : parseAnnouncementInstant(window.endsAt);
   if (window.startsAt !== undefined && start === null) return "invalid";
   if (window.endsAt !== undefined && end === null) return "invalid";
   if (start !== null && end !== null && end <= start) return "invalid";
@@ -327,13 +364,18 @@ export function announcementPageKind(
   basePath: string,
 ): AnnouncementPageKind | null {
   const base = basePath.replace(/\/+$/, "");
-  if (base !== "" && pathname !== base && !pathname.startsWith(`${base}/`)) return null;
+  if (base !== "" && pathname !== base && !pathname.startsWith(`${base}/`))
+    return null;
   const rest = pathname.slice(base.length).replace(/\/+$/, "");
   if (rest === "") return "home";
   const segments = rest.split("/").filter(Boolean);
   switch (segments[0]) {
     case "products":
-      return segments.length === 1 ? "other" : segments.length === 2 ? "product" : null;
+      return segments.length === 1
+        ? "other"
+        : segments.length === 2
+          ? "product"
+          : null;
     case "c":
       return segments.length >= 2 ? "category" : null;
     case "policies":
@@ -358,7 +400,7 @@ export function eligibleAnnouncements(
   kind: AnnouncementPageKind | null,
   nowMs: number,
 ): Announcement[] {
-  if (!doc || !doc.enabled) return [];
+  if (!doc?.enabled) return [];
   return doc.items.filter(
     (item) =>
       item.enabled &&
@@ -396,7 +438,8 @@ const AUTO_DARK = "#000000";
  * whereas a near-black like #111827 falls to ≈ 4.40:1 on mid-tones.
  */
 export function autoForeground(backgroundHex: string): string {
-  return contrastRatio(AUTO_LIGHT, backgroundHex) >= contrastRatio(AUTO_DARK, backgroundHex)
+  return contrastRatio(AUTO_LIGHT, backgroundHex) >=
+    contrastRatio(AUTO_DARK, backgroundHex)
     ? AUTO_LIGHT
     : AUTO_DARK;
 }
@@ -421,7 +464,10 @@ export function resolveAnnouncementSurface(
   if (!surface) return null;
   const background = surface.background.hex;
   const auto = autoForeground(background);
-  const pick = (chosen: AnnouncementColour | undefined, fallback: string): [string, boolean] => {
+  const pick = (
+    chosen: AnnouncementColour | undefined,
+    fallback: string,
+  ): [string, boolean] => {
     if (!chosen) return [fallback, false];
     return contrastRatio(chosen.hex, background) >= MIN_TEXT_CONTRAST
       ? [chosen.hex, false]

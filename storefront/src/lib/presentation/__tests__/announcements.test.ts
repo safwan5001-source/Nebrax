@@ -25,7 +25,12 @@ import { contrastRatio } from "../tokens";
  */
 interface Fixture {
   cases: { name: string; input: unknown; expected: unknown }[];
-  contrast: { fg: string; bg: string; ratio: number; passesNormalText: boolean }[];
+  contrast: {
+    fg: string;
+    bg: string;
+    ratio: number;
+    passesNormalText: boolean;
+  }[];
   autoForeground: { background: string; foreground: string }[];
   windows: {
     name: string;
@@ -38,7 +43,11 @@ interface Fixture {
 // Both apps run vitest from their own directory (one level below the repo root).
 const fixture = JSON.parse(
   readFileSync(
-    resolve(process.cwd(), "..", "tests/Fixtures/presentation/announcements.json"),
+    resolve(
+      process.cwd(),
+      "..",
+      "tests/Fixtures/presentation/announcements.json",
+    ),
     "utf8",
   ),
 ) as Fixture;
@@ -59,12 +68,21 @@ describe("announcements — normaliser parity with PHP (shared fixture)", () => 
 
   it("an absent document stays absent through the whole config normaliser", () => {
     expect("announcements" in normalizePresentationConfig({})).toBe(false);
-    expect("announcements" in normalizePresentationConfig({ announcements: null })).toBe(false);
-    expect("announcements" in normalizePresentationConfig({ announcements: { enabled: false, items: [] } })).toBe(false);
+    expect(
+      "announcements" in normalizePresentationConfig({ announcements: null }),
+    ).toBe(false);
+    expect(
+      "announcements" in
+        normalizePresentationConfig({
+          announcements: { enabled: false, items: [] },
+        }),
+    ).toBe(false);
   });
 
   it("a present document survives the whole config normaliser untouched", () => {
-    const doc = fixture.cases.find((c) => c.name.startsWith("behaviour: only non-default"));
+    const doc = fixture.cases.find((c) =>
+      c.name.startsWith("behaviour: only non-default"),
+    );
     const config = normalizePresentationConfig({ announcements: doc?.input });
     expect(config.announcements).toEqual(doc?.expected);
   });
@@ -95,7 +113,9 @@ describe("announcements — contrast maths (shared fixture)", () => {
     expect(resolved?.link).toBe("#767676");
     expect(resolved?.failsContrast).toBe(true);
     for (const value of [resolved?.foreground, resolved?.link]) {
-      expect(contrastRatio(value as string, "#ffffff")).toBeGreaterThanOrEqual(4.5);
+      expect(contrastRatio(value as string, "#ffffff")).toBeGreaterThanOrEqual(
+        4.5,
+      );
     }
   });
 
@@ -104,11 +124,25 @@ describe("announcements — contrast maths (shared fixture)", () => {
   });
 
   it("a custom background without a text colour always gets a readable one — across the whole grey ramp and the saturated primaries", () => {
-    const ramp = Array.from({ length: 256 }, (_, v) => `#${v.toString(16).padStart(2, "0").repeat(3)}`);
-    for (const hex of [...ramp, "#d1456a", "#ff9900", "#0f766e", "#fde68a", "#ff0000", "#00ff00", "#0000ff"]) {
+    const ramp = Array.from(
+      { length: 256 },
+      (_, v) => `#${v.toString(16).padStart(2, "0").repeat(3)}`,
+    );
+    for (const hex of [
+      ...ramp,
+      "#d1456a",
+      "#ff9900",
+      "#0f766e",
+      "#fde68a",
+      "#ff0000",
+      "#00ff00",
+      "#0000ff",
+    ]) {
       const resolved = resolveAnnouncementSurface({ background: { hex } });
       expect(resolved?.failsContrast).toBe(false);
-      expect(contrastRatio(resolved?.foreground as string, hex)).toBeGreaterThanOrEqual(4.5);
+      expect(
+        contrastRatio(resolved?.foreground as string, hex),
+      ).toBeGreaterThanOrEqual(4.5);
     }
   });
 });
@@ -127,14 +161,24 @@ describe("announcements — window evaluation (shared fixture)", () => {
 
   it("reports scheduled / expired distinctly from invalid", () => {
     const now = Date.parse("2026-10-06T12:00:00Z");
-    expect(announcementWindowState({ startsAt: "2026-11-01T00:00:00Z" }, now)).toBe("scheduled");
-    expect(announcementWindowState({ endsAt: "2026-09-01T00:00:00Z" }, now)).toBe("expired");
+    expect(
+      announcementWindowState({ startsAt: "2026-11-01T00:00:00Z" }, now),
+    ).toBe("scheduled");
+    expect(
+      announcementWindowState({ endsAt: "2026-09-01T00:00:00Z" }, now),
+    ).toBe("expired");
   });
 
   it("parses only strict instants", () => {
-    expect(parseAnnouncementInstant("2026-10-06T12:00:00Z")).toBe(Date.UTC(2026, 9, 6, 12));
-    expect(parseAnnouncementInstant("2026-10-06T15:00:00+03:00")).toBe(Date.UTC(2026, 9, 6, 12));
-    expect(parseAnnouncementInstant("2026-10-06T12:00:00.250Z")).toBe(Date.UTC(2026, 9, 6, 12, 0, 0, 250));
+    expect(parseAnnouncementInstant("2026-10-06T12:00:00Z")).toBe(
+      Date.UTC(2026, 9, 6, 12),
+    );
+    expect(parseAnnouncementInstant("2026-10-06T15:00:00+03:00")).toBe(
+      Date.UTC(2026, 9, 6, 12),
+    );
+    expect(parseAnnouncementInstant("2026-10-06T12:00:00.250Z")).toBe(
+      Date.UTC(2026, 9, 6, 12, 0, 0, 250),
+    );
     expect(parseAnnouncementInstant("2026-10-06")).toBeNull();
     expect(parseAnnouncementInstant("2026-10-06 12:00:00Z")).toBeNull();
     expect(parseAnnouncementInstant("")).toBeNull();
@@ -144,14 +188,25 @@ describe("announcements — window evaluation (shared fixture)", () => {
     const doc = normalizeAnnouncements({
       enabled: true,
       items: [
-        { id: "a", text: "x", window: { startsAt: "2026-10-07T00:00:00Z", endsAt: "2026-10-09T00:00:00Z" } },
+        {
+          id: "a",
+          text: "x",
+          window: {
+            startsAt: "2026-10-07T00:00:00Z",
+            endsAt: "2026-10-09T00:00:00Z",
+          },
+        },
         { id: "b", text: "x", window: { endsAt: "2026-10-06T18:00:00Z" } },
         { id: "c", text: "x", window: { startsAt: "garbage" } },
       ],
     });
     const now = Date.parse("2026-10-06T12:00:00Z");
-    expect(nextAnnouncementBoundary(doc, now)).toBe(Date.parse("2026-10-06T18:00:00Z"));
-    expect(nextAnnouncementBoundary(doc, Date.parse("2026-10-10T00:00:00Z"))).toBeNull();
+    expect(nextAnnouncementBoundary(doc, now)).toBe(
+      Date.parse("2026-10-06T18:00:00Z"),
+    );
+    expect(
+      nextAnnouncementBoundary(doc, Date.parse("2026-10-10T00:00:00Z")),
+    ).toBeNull();
     expect(nextAnnouncementBoundary(null, now)).toBeNull();
   });
 });
@@ -168,14 +223,25 @@ describe("announcements — eligibility and page targeting", () => {
       { id: "c", text: "C" },
       { id: "d", text: "D" },
     ]);
-    expect(eligibleAnnouncements(d, "home", now).map((i) => i.id)).toEqual(["c", "d"]);
+    expect(eligibleAnnouncements(d, "home", now).map((i) => i.id)).toEqual([
+      "c",
+      "d",
+    ]);
   });
 
   it("a disabled bar, an empty text and an invalid window never render", () => {
-    expect(eligibleAnnouncements(doc([{ id: "a", text: "A" }], false), "home", now)).toEqual([]);
-    expect(eligibleAnnouncements(doc([{ id: "a", text: "   " }]), "home", now)).toEqual([]);
     expect(
-      eligibleAnnouncements(doc([{ id: "a", text: "A", window: { endsAt: "x" } }]), "home", now),
+      eligibleAnnouncements(doc([{ id: "a", text: "A" }], false), "home", now),
+    ).toEqual([]);
+    expect(
+      eligibleAnnouncements(doc([{ id: "a", text: "   " }]), "home", now),
+    ).toEqual([]);
+    expect(
+      eligibleAnnouncements(
+        doc([{ id: "a", text: "A", window: { endsAt: "x" } }]),
+        "home",
+        now,
+      ),
     ).toEqual([]);
     expect(eligibleAnnouncements(null, "home", now)).toEqual([]);
   });
@@ -187,11 +253,26 @@ describe("announcements — eligibility and page targeting", () => {
       { id: "x", text: "X" },
       { id: "a", text: "A", pages: ["all"] },
     ]);
-    expect(eligibleAnnouncements(d, "home", now).map((i) => i.id)).toEqual(["h", "x", "a"]);
-    expect(eligibleAnnouncements(d, "product", now).map((i) => i.id)).toEqual(["p", "x", "a"]);
-    expect(eligibleAnnouncements(d, "category", now).map((i) => i.id)).toEqual(["p", "x", "a"]);
+    expect(eligibleAnnouncements(d, "home", now).map((i) => i.id)).toEqual([
+      "h",
+      "x",
+      "a",
+    ]);
+    expect(eligibleAnnouncements(d, "product", now).map((i) => i.id)).toEqual([
+      "p",
+      "x",
+      "a",
+    ]);
+    expect(eligibleAnnouncements(d, "category", now).map((i) => i.id)).toEqual([
+      "p",
+      "x",
+      "a",
+    ]);
     // "other" (listing, policies…) only ever shows untargeted/all items.
-    expect(eligibleAnnouncements(d, "other", now).map((i) => i.id)).toEqual(["x", "a"]);
+    expect(eligibleAnnouncements(d, "other", now).map((i) => i.id)).toEqual([
+      "x",
+      "a",
+    ]);
   });
 
   it("never renders where the page is not on the allow-list (cart, checkout, account, unknown)", () => {
@@ -203,11 +284,17 @@ describe("announcements — eligibility and page targeting", () => {
     const base = "/sa/ar";
     expect(announcementPageKind("/sa/ar", base)).toBe("home");
     expect(announcementPageKind("/sa/ar/", base)).toBe("home");
-    expect(announcementPageKind("/sa/ar/products/blue-mug", base)).toBe("product");
+    expect(announcementPageKind("/sa/ar/products/blue-mug", base)).toBe(
+      "product",
+    );
     expect(announcementPageKind("/sa/ar/products", base)).toBe("other");
     expect(announcementPageKind("/sa/ar/c/mugs", base)).toBe("category");
-    expect(announcementPageKind("/sa/ar/c/mugs/ceramic", base)).toBe("category");
-    expect(announcementPageKind("/sa/ar/policies/shipping", base)).toBe("other");
+    expect(announcementPageKind("/sa/ar/c/mugs/ceramic", base)).toBe(
+      "category",
+    );
+    expect(announcementPageKind("/sa/ar/policies/shipping", base)).toBe(
+      "other",
+    );
     for (const blocked of [
       "/sa/ar/cart",
       "/sa/ar/checkout",
@@ -229,21 +316,33 @@ describe("announcements — eligibility and page targeting", () => {
 
 describe("announcements — dismissal identity", () => {
   const item = (over: Record<string, unknown> = {}) =>
-    (normalizeAnnouncements({ enabled: true, items: [{ id: "promo", text: "خصم 20٪", ...over }] }) as AnnouncementsDoc)
-      .items[0];
+    (
+      normalizeAnnouncements({
+        enabled: true,
+        items: [{ id: "promo", text: "خصم 20٪", ...over }],
+      }) as AnnouncementsDoc
+    ).items[0];
 
   it("keys on the announcement id and a hash of text / link / window only", () => {
     const key = announcementDismissKey(item());
     expect(key).toMatch(/^awj\.ann\.promo\.[0-9a-f]{8}$/);
     expect(announcementDismissKey(item())).toBe(key);
-    expect(announcementDismissKey(item({ icon: "tag", surface: { background: { hex: "#112233" } } }))).toBe(key);
+    expect(
+      announcementDismissKey(
+        item({ icon: "tag", surface: { background: { hex: "#112233" } } }),
+      ),
+    ).toBe(key);
   });
 
   it("editing the message, the link or the window makes it reappear", () => {
     const base = announcementContentHash(item());
     expect(announcementContentHash(item({ text: "خصم 25٪" }))).not.toBe(base);
     expect(announcementContentHash(item({ href: "/offers" }))).not.toBe(base);
-    expect(announcementContentHash(item({ window: { endsAt: "2026-12-31T00:00:00Z" } }))).not.toBe(base);
+    expect(
+      announcementContentHash(
+        item({ window: { endsAt: "2026-12-31T00:00:00Z" } }),
+      ),
+    ).not.toBe(base);
   });
 
   it("carries no user or tenant identifier", () => {
