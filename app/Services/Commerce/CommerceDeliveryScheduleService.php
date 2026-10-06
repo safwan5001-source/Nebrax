@@ -94,6 +94,15 @@ final class CommerceDeliveryScheduleService
     }
 
     /**
+     * بصمة محتوى النوافذ الحالية: تتغيّر مع أي تعديل (حقل أو ترتيب أو إضافة أو حذف). يقرؤها العميل مع المستند ويعيدها
+     * عند الاستبدال (`expected_revision`) فيُرفض الاستبدال المبني على نسخة قديمة **داخل القفل** (تحسُّب لسباق مديرَين).
+     */
+    public function slotsRevision(string $salesChannelId): string
+    {
+        return sha1((string) json_encode($this->slots($salesChannelId)));
+    }
+
+    /**
      * استبدال ذرّي لمجموعة نوافذ القناة **بالمعرّف**: صفٌّ بـ`id` موجود يُحدَّث في مكانه (فيبقى معرّفه، وتبقى
      * اختيارات Checkout المفتوحة وعدّ السعة التاريخي مربوطة به)، وبلا `id` يُنشأ، وما غاب من الطلب يُحذف.
      * معرّف لا يخصّ هذه القناة ⇒ رفض لا إنشاء بصمت.
@@ -101,7 +110,7 @@ final class CommerceDeliveryScheduleService
      * @param  list<array<string, mixed>>  $slots
      * @return list<array<string, mixed>>
      */
-    public function replaceSlots(string $salesChannelId, array $slots): array
+    public function replaceSlots(string $salesChannelId, array $slots, ?string $expectedRevision = null): array
     {
         $this->tenantId();
         if (count($slots) > CommerceDeliverySlot::MAX_PER_CHANNEL) {
@@ -113,8 +122,12 @@ final class CommerceDeliveryScheduleService
             throw new DomainException('لا يمكن تكرار معرّف النافذة نفسه.');
         }
 
-        return DB::transaction(function () use ($salesChannelId, $slots) {
+        return DB::transaction(function () use ($salesChannelId, $slots, $expectedRevision) {
             $this->lockChannel($salesChannelId);
+
+            if ($expectedRevision !== null && ! hash_equals($this->slotsRevision($salesChannelId), $expectedRevision)) {
+                throw new StaleRevisionException('تغيّرت الفترات على الخادم منذ قرأتها. حدّث الصفحة وراجعها ثم أعد المحاولة.');
+            }
 
             $rows = [];
             foreach (array_values($slots) as $position => $slot) {

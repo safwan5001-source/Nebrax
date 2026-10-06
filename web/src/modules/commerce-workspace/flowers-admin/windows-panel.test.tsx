@@ -15,6 +15,7 @@ import { renderIntl } from '@/test-utils/intl';
 import { DeliveryWorkspace } from './delivery-workspace';
 
 afterEach(() => {
+  withRevision = true;
   cleanup();
   apiMock.mockReset();
   window.history.replaceState(null, '', '/');
@@ -24,8 +25,11 @@ const slot = (over: Record<string, unknown> = {}) => ({
   id: 'w1', method: 'delivery', label: 'صباحاً', label_en: 'Morning', start_time: '09:00', end_time: '12:00',
   weekdays: [0, 1, 2, 3, 4, 5, 6], capacity: null, shipping_zone_id: null, sort_order: 0, is_active: true, ...over,
 });
+let withRevision = true;
+const revisionOf = (slots: unknown[]) => JSON.stringify(slots);
 const doc = (slots: unknown[]) => ({
   data: {
+    ...(withRevision ? { slots_revision: revisionOf(slots) } : {}),
     settings: { enabled: true, required: true, timezone: 'Asia/Riyadh', lead_time_minutes: 0, cutoff_time: null, max_days_ahead: 30 },
     slots,
     blocked_dates: [],
@@ -42,6 +46,8 @@ function server(initial: unknown[], opts: { rejectSave?: ApiError } = {}) {
     if (path.includes('shipping-zones')) return zones;
     if (options?.method === 'PUT' && path.endsWith('/slots')) {
       if (opts.rejectSave) throw opts.rejectSave;
+      const expected = (options.body as { expected_revision?: string }).expected_revision;
+      if (expected !== undefined && expected !== revisionOf(current)) throw new ApiError(409, 'stale', {});
       writes.push(options.body);
       current = options.body!.slots.map((s, i) => ({
         id: s.id ?? `new-${i}`, label_en: null, shipping_zone_id: null, sort_order: i, ...s,
@@ -69,6 +75,29 @@ async function openWindows(slots: unknown[], opts: { rejectSave?: ApiError } = {
 }
 
 describe('WindowsPanel', () => {
+  it('shows each window\'s destination restriction in the list', async () => {
+    zones = { data: [{ id: 'z1', name: 'الرياض', is_active: true }] };
+    await openWindows([slot({ id: 'a', label: 'A', shipping_zone_id: 'z1' }), slot({ id: 'b', label: 'B' })]);
+    await waitFor(() => expect(document.querySelector('[data-window-row="a"] [data-window-zone]')?.textContent).toBe('Destination: الرياض'));
+    expect(document.querySelector('[data-window-row="b"] [data-window-zone]')).toBeNull();
+  });
+
+  it('revalidates a newly chosen zone on save: disabled meanwhile ⇒ error in the dialog and no write', async () => {
+    zones = { data: [{ id: 'z1', name: 'الرياض', is_active: true }] };
+    const srv = await openWindows([slot({ id: 'a', label: 'A' })]);
+    await userEvent.click(screen.getByRole('button', { name: 'Edit: A' }));
+    const dialog = screen.getByRole('dialog');
+    const select = await within(dialog).findByLabelText('Delivery destination', { selector: 'select' });
+    await waitFor(() => expect((select as HTMLSelectElement).options.length).toBeGreaterThan(1));
+    await userEvent.selectOptions(select, 'z1');
+    zones = { data: [{ id: 'z1', name: 'الرياض', is_active: false }] }; // عطّلها مدير آخر بعد فتح الحوار
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
+
+    expect(await within(dialog).findByText(/no longer available/)).toBeTruthy();
+    expect(srv.writes).toHaveLength(0);
+    zones = { data: [{ id: 'z1', name: 'الرياض', is_active: true }] };
+  });
+
   it('does not offer inactive shipping zones for new selection but keeps an already assigned one', async () => {
     zones = { data: [
       { id: 'z1', name: 'الرياض', is_active: true },
@@ -214,7 +243,16 @@ describe('WindowsPanel', () => {
     expect(srv.writes).toHaveLength(0);
   });
 
-  it('never writes when the preflight read fails', async () => {
+  it('sends the revision it read, so the server (not a racy pre-read) rejects a stale replacement', async () => {
+    const srv = await openWindows([slot({ id: 'a', label: 'A' })]);
+    await userEvent.click(screen.getByRole('button', { name: 'Delete: A' }));
+    await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Delete' }));
+    await waitFor(() => expect(srv.writes).toHaveLength(1));
+    expect((srv.writes[0] as { expected_revision?: string }).expected_revision).toBe(revisionOf([slot({ id: 'a', label: 'A' })]));
+  });
+
+  it('without a server revision it falls back to the pre-read and never writes when that read fails', async () => {
+    withRevision = false;
     const srv = await openWindows([slot({ id: 'a', label: 'A' })]);
     srv.failRead();
     await userEvent.click(screen.getByRole('button', { name: 'Delete: A' }));

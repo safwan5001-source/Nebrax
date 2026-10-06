@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ArrowDown, ArrowUp, CalendarClock, Pencil, Plus, Trash2 } from 'lucide-react';
 import { EmptyState, FormAlert } from '@/components/nebrax';
 import { Button } from '@/components/ui/button';
@@ -54,16 +54,35 @@ export function WindowsPanel({
   const [zones, setZones] = useState<ZoneState | null>(null);
   const slots = document.slots;
 
+  function refreshZones() {
+    void loadShippingZones().then((result) => setZones(result.ok ? { kind: 'ready', zones: result.data } : (current) => (current?.kind === 'ready' ? current : { kind: 'failed' })));
+  }
+  // المناطق تُقرأ عند الفتح (لعرض وجهة كل نافذة) وتُجدَّد عند كل فتح حوار، فلا يبقى خيارٌ عُطّل بعد أول قراءة.
+  useEffect(refreshZones, [storeId]); // eslint-disable-line react-hooks/exhaustive-deps
+
   async function persist(next: DeliverySlot[]): Promise<string | null> {
-    const fresh = await loadSchedule(storeId);
-    // الفحص المسبق جزء من سلامة الكتابة: إن تعذّر إثبات أن القائمة لم تتغيّر فلا نكتب استبدالاً كاملاً من نسخةٍ قديمة.
-    if (!fresh.ok) return failureText(fresh, t);
-    if (slotsSignature(fresh.data.slots) !== slotsSignature(slots)) {
-      onDocument(fresh.data);
-      return t('winStale');
+    // الاستبدال كامل، فالتحقق من «لم يتغيّر شيء» يجب أن يتم **داخل قفل الخادم** (بصمة `expected_revision` ⇒ 409): قراءةٌ
+    // مسبقة ثم كتابة لا تمنع سباق مديرَين. الفحص المسبق أدناه احتياطٌ فقط لخادمٍ لا يُعيد البصمة، وفشله يُوقف الكتابة.
+    const revision = document.slotsRevision ?? null;
+    if (revision === null) {
+      const fresh = await loadSchedule(storeId);
+      if (!fresh.ok) return failureText(fresh, t);
+      if (slotsSignature(fresh.data.slots) !== slotsSignature(slots)) {
+        onDocument(fresh.data);
+        return t('winStale');
+      }
     }
-    const saved = await saveSlots(storeId, next);
-    if (!saved.ok) return failureText(saved, t);
+    const saved = await saveSlots(storeId, next, revision);
+    if (!saved.ok) {
+      if (saved.kind === 'conflict') {
+        const fresh = await loadSchedule(storeId);
+        if (fresh.ok) onDocument(fresh.data);
+
+        return t('winStale');
+      }
+
+      return failureText(saved, t);
+    }
     onDocument(saved.data);
 
     return null;
@@ -82,14 +101,21 @@ export function WindowsPanel({
   function openDialog(next: DialogState) {
     setNotice(null);
     setDialog(next);
-    if (next && zones === null) {
-      setZones({ kind: 'loading' });
-      void loadShippingZones().then((result) => setZones(result.ok ? { kind: 'ready', zones: result.data } : { kind: 'failed' }));
-    }
+    if (next) refreshZones();
   }
 
   async function submitDialog(draft: SlotDraft): Promise<string | null> {
     if (!dialog) return null;
+    // وجهةٌ اختيرت حديثاً تُتحقَّق من حالتها الآن (قد يعطّلها مدير آخر بعد فتح الحوار): لا تُحفظ نافذة نشطة على وجهة لا تتطابق معها أي وجهة.
+    const assigned = dialog.kind === 'edit' ? (slots[dialog.index]?.shippingZoneId ?? null) : null;
+    if (draft.shippingZoneId !== '' && draft.shippingZoneId !== assigned) {
+      const latest = await loadShippingZones();
+      if (latest.ok) {
+        setZones({ kind: 'ready', zones: latest.data });
+        const zone = latest.data.find((z) => z.id === draft.shippingZoneId);
+        if (!zone || !zone.isActive) return t('winZoneUnavailable');
+      }
+    }
     const next =
       dialog.kind === 'add'
         ? [...slots, draftToSlot(draft, null)]
@@ -125,6 +151,12 @@ export function WindowsPanel({
     return null;
   }
 
+  const zoneName = (zoneId: string): string => {
+    const zone = zones?.kind === 'ready' ? zones.zones.find((z) => z.id === zoneId) : undefined;
+    if (!zone) return t('winZoneKept');
+
+    return zone.isActive ? zone.name : `${zone.name} — ${t('winZoneInactive')}`;
+  };
   const methodLabel = (method: DeliveryMethod) => (method === 'delivery' ? t('winMethodDelivery') : t('winMethodPickup'));
   const editing = dialog?.kind === 'edit' ? slots[dialog.index] : null;
   const toDelete = deleteIndex !== null ? slots[deleteIndex] : null;
@@ -181,6 +213,11 @@ export function WindowsPanel({
                         <div className="min-w-0">
                           <p className={cn('truncate font-medium', slot.isActive ? 'text-text' : 'text-muted')}>{slot.label}</p>
                           {slot.labelEn ? <p className="truncate text-xs text-muted"><bdi>{slot.labelEn}</bdi></p> : null}
+                          {slot.shippingZoneId ? (
+                            <p className="truncate text-xs text-muted" data-window-zone>
+                              {t('winZoneRow', { name: zoneName(slot.shippingZoneId) })}
+                            </p>
+                          ) : null}
                         </div>
                         <p>
                           <bdi className="num">{slot.startTime} – {slot.endTime}</bdi>

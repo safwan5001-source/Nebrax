@@ -8,6 +8,7 @@ use App\Models\CommerceDeliverySlot;
 use App\Models\Storefront;
 use App\Services\Commerce\CommerceDeliveryScheduleService;
 use App\Services\Commerce\MobileSalesChannelResolver;
+use App\Services\Commerce\StaleRevisionException;
 use App\Tenancy\TenantContext;
 use DomainException;
 use Illuminate\Http\JsonResponse;
@@ -61,6 +62,8 @@ final class CommerceDeliveryScheduleController extends ApiController
         $this->denySelfService($request);
         $data = $request->validate([
             'slots' => ['present', 'array', 'max:'.CommerceDeliverySlot::MAX_PER_CHANNEL],
+            // اختياري: بصمة النوافذ كما قرأها العميل (`slots_revision`)؛ إن لم تعد تطابق الحالية داخل القفل ⇒ 409 بلا كتابة.
+            'expected_revision' => ['sometimes', 'nullable', 'string', 'max:64'],
             // معرّف نافذة موجودة يُحدَّث في مكانه (يُحفظ معرّفها واختيارات Checkout وعدّ السعة)؛ بلا معرّف تُنشأ.
             'slots.*.id' => ['sometimes', 'nullable', 'uuid'],
             'slots.*.method' => ['required', Rule::in(CommerceDeliverySlot::METHODS)],
@@ -85,7 +88,9 @@ final class CommerceDeliveryScheduleController extends ApiController
         $channelId = $this->ownedChannelId($request, $id);
 
         try {
-            $schedule->replaceSlots($channelId, array_values($data['slots']));
+            $schedule->replaceSlots($channelId, array_values($data['slots']), $data['expected_revision'] ?? null);
+        } catch (StaleRevisionException $e) {
+            abort(409, $e->getMessage());
         } catch (DomainException $e) {
             abort(422, $e->getMessage());
         }
@@ -119,6 +124,7 @@ final class CommerceDeliveryScheduleController extends ApiController
         return [
             'settings' => $schedule->settings($channelId),
             'slots' => $schedule->slots($channelId),
+            'slots_revision' => $schedule->slotsRevision($channelId),
             'blocked_dates' => $schedule->blockedDates($channelId),
         ];
     }

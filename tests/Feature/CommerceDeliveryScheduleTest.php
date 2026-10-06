@@ -769,4 +769,30 @@ class CommerceDeliveryScheduleTest extends TestCase
         $this->assertNotEmpty($res->json('data.dates'));
         $this->getJson('/commerce/v1/delivery-schedule?method=courier', $headers)->assertStatus(422);
     }
+
+    /** @test */
+    public function a_replacement_built_on_a_stale_revision_is_rejected_under_the_lock_without_writing(): void
+    {
+        $store = $this->store('ds-revision');
+        $slot = fn (string $label, array $extra = []) => ['method' => 'delivery', 'label' => $label, 'start_time' => '09:00', 'end_time' => '12:00'] + $extra;
+
+        $first = $this->withToken($store['token'])->putJson($this->url($store, '/slots'), ['slots' => [$slot('A')]])->assertOk();
+        $revision = $first->json('data.slots_revision');
+        $this->assertSame(40, strlen($revision));
+        $this->assertSame($revision, $this->withToken($store['token'])->getJson($this->url($store))->json('data.slots_revision'));
+
+        // مدير ثانٍ يحفظ بالبصمة نفسها: ينجح، وتتغيّر البصمة.
+        $second = $this->withToken($store['token'])->putJson($this->url($store, '/slots'), ['expected_revision' => $revision, 'slots' => [
+            $slot('A', ['id' => $first->json('data.slots.0.id')]), $slot('B'),
+        ]])->assertOk();
+        $this->assertNotSame($revision, $second->json('data.slots_revision'));
+
+        // الأول (ما زال يحمل البصمة القديمة) يُرفض 409 ولا يمسح نافذة B.
+        $this->withToken($store['token'])->putJson($this->url($store, '/slots'), ['expected_revision' => $revision, 'slots' => [$slot('Mine')]])
+            ->assertStatus(409);
+        $this->assertSame(['A', 'B'], array_column($this->withToken($store['token'])->getJson($this->url($store))->json('data.slots'), 'label'));
+
+        // بلا بصمة: السلوك السابق (استبدال غير مشروط) يبقى.
+        $this->withToken($store['token'])->putJson($this->url($store, '/slots'), ['slots' => [$slot('Only')]])->assertOk();
+    }
 }
