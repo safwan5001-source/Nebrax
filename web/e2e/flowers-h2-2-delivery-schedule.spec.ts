@@ -91,6 +91,29 @@ test.describe('FLOWERS-H2-2 — delivery schedule rules', () => {
     await assertNoOverflow(page);
   });
 
+  test('EN 1440 — an unsaved draft asks before an in-app link or store switch drops it', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 960 });
+    await seedAdmin(page, 'en', schedule({ doc: baseDoc({}, [slot]) }));
+    await page.goto('/commerce/delivery');
+    const days = page.getByLabel('Maximum booking horizon');
+    await days.fill('21');
+    const prompts: string[] = [];
+    let accept = false;
+    page.on('dialog', async (dialog) => {
+      prompts.push(dialog.message());
+      if (accept) await dialog.accept();
+      else await dialog.dismiss();
+    });
+    await page.getByRole('link', { name: 'Gifting' }).first().click();
+    await expect.poll(() => prompts.length).toBe(1);
+    expect(prompts[0]).toContain('unsaved changes');
+    await expect(page).toHaveURL(/\/commerce\/delivery$/);
+    await expect(days).toHaveValue('21');
+    accept = true;
+    await page.getByRole('link', { name: 'Gifting' }).first().click();
+    await expect(page).toHaveURL(/\/commerce\/gifting$/);
+  });
+
   test('EN 1440 — server rejection keeps the draft; load failure offers retry', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 960 });
     const state = { doc: baseDoc({ enabled: false }, [slot]), fail: 'save' as 'save' | 'load' | undefined };
