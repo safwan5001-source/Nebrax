@@ -163,11 +163,16 @@ describe("ProductCard", () => {
     expect(screen.getByText("outOfStock")).toBeInTheDocument();
   });
 
-  it("renders image when thumbnail_url is provided", () => {
-    render(<ProductCard product={baseProduct} basePath="/us/en" />);
+  it("prefers the explicit card derivative over the historical thumbnail URL", () => {
+    const productWithCard = {
+      ...baseProduct,
+      card_url: "https://example.com/shirt-card.jpg",
+    } as typeof baseProduct & { card_url: string };
+
+    render(<ProductCard product={productWithCard} basePath="/us/en" />);
 
     const img = screen.getByRole("img");
-    expect(img).toHaveAttribute("src", "https://example.com/shirt.jpg");
+    expect(img).toHaveAttribute("src", "https://example.com/shirt-card.jpg");
     expect(img).toHaveAttribute("alt", "Classic T-Shirt");
   });
 

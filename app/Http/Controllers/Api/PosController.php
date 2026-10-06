@@ -141,9 +141,15 @@ class PosController extends ApiController
                     'sku' => $variant->sku,
                     'descriptor' => DocumentLineVariantResolver::descriptorFromLoadedOptionValues($variant),
                     'price' => $variantPrices[$variant->id] ?? 0,
-                    // VAR-FU-5/GAP-06: نفس شكل `pos_image` حرفياً — رابط تحميلٍ
-                    // مصادَقٌ عليه فقط، أو null، بلا كشف مسار تخزينٍ داخلي.
-                    'image' => $cover ? ['download_url' => "/api/products/{$product->id}/media/{$cover->id}/download"] : null,
+                    // Explicit derivative URLs are deterministic and protected
+                    // by the same product-media permission as the original.
+                    // No storage existence checks happen during serialization;
+                    // the derivative endpoint supplies the legacy fallback.
+                    'image' => $cover ? [
+                        'download_url' => "/api/products/{$product->id}/media/{$cover->id}/download",
+                        'thumbnail_url' => "/api/products/{$product->id}/media/{$cover->id}/derivatives/thumbnail",
+                        'card_url' => "/api/products/{$product->id}/media/{$cover->id}/derivatives/card",
+                    ] : null,
                 ];
             })->values()->all());
             $product->setAttribute('sale_price', $units[0]['price'] ?? (int) $product->sale_price);

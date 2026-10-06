@@ -19,6 +19,10 @@ export interface AwjProductCategoryRef {
 export interface AwjProductMedia {
   id: string;
   url: string;
+  /** Optional for compatibility with storefront responses before MEDIA-4. */
+  thumbnail_url?: string | null;
+  /** Optional for compatibility with storefront responses before MEDIA-4. */
+  card_url?: string | null;
   alt: string | null;
   position: number;
 }
@@ -71,6 +75,8 @@ export interface AwjProduct {
   /** null = availability unknown (channel has no fulfillment policy configured). */
   in_stock: boolean | null;
   thumbnail_url: string | null;
+  /** Additive bounded source for catalogue-card consumers. */
+  card_url?: string | null;
   media?: AwjProductMedia[];
   /**
    * True when the product sells through variants rather than in its own right.
@@ -120,6 +126,8 @@ export type StoreCategory = import("@spree/sdk").Category & {
  */
 export type StoreProduct = import("@spree/sdk").Product & {
   isVariantManaged: boolean;
+  /** Explicit 800 px card derivative; thumbnail_url remains the original fallback. */
+  card_url: string | null;
   /** FLOWERS-H11 — normalized gifting blocks (empty for a product without any). */
   gifting: import("./pdp-gifting").ProductGifting;
 };

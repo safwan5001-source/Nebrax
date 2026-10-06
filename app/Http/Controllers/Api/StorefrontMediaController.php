@@ -7,6 +7,7 @@ use App\Models\CommerceCategoryListing;
 use App\Models\ProductCategory;
 use App\Models\ProductMedia;
 use App\Services\DocumentCenter\DocumentStorageService;
+use App\Services\ProductMediaService;
 use App\Services\R2StorageService;
 use App\Tenancy\StorefrontContext;
 use App\Tenancy\BranchScope;
@@ -38,24 +39,55 @@ class StorefrontMediaController extends PublicApiController
     public function __construct(
         private readonly DocumentStorageService $documentStorage,
         private readonly R2StorageService $r2,
+        private readonly ProductMediaService $productMedia,
     ) {}
 
     public function show(Request $request)
     {
+        $media = $this->publishedMedia($request);
+        return $this->streamProductMediaBytes($media, $this->documentStorage, $this->r2, 'public, max-age=3600');
+    }
+
+    /**
+     * Public counterpart of the protected ERP derivative endpoint. The
+     * derivative name is route-constrained; the resolved storage path is
+     * deterministic server state, never request input. Missing derivatives
+     * deliberately fall back to the original for legacy ProductMedia rows.
+     */
+    public function showDerivative(Request $request)
+    {
+        $media = $this->publishedMedia($request);
+        $derivative = (string) $request->route('derivative');
+        $path = $this->productMedia->existingDerivativePath($media, $derivative);
+
+        if ($path === null) {
+            return $this->streamProductMediaBytes($media, $this->documentStorage, $this->r2, 'public, max-age=3600');
+        }
+
+        return $this->streamProductMediaPath(
+            $media,
+            $path,
+            $this->productMedia->derivativeDownloadName($media, $derivative),
+            $this->productMedia->derivativeMimeType($media),
+            $this->documentStorage,
+            $this->r2,
+            'public, max-age=3600',
+        );
+    }
+
+    private function publishedMedia(Request $request): ProductMedia
+    {
         // يُقرأ صراحةً من الطلب لا كوسيط مربوط بالاسم — انظر تعليق
         // StorefrontProductController::show().
         $id = (string) $request->route('id');
-
         $media = ProductMedia::query()->find($id);
         if ($media === null) {
             abort(404, 'الوسائط غير موجودة.');
         }
 
-        $storefront = app(StorefrontContext::class);
-
         $isPublished = CommerceListing::query()
             ->where('product_id', $media->product_id)
-            ->where('sales_channel_id', $storefront->salesChannelId())
+            ->where('sales_channel_id', app(StorefrontContext::class)->salesChannelId())
             ->where('is_published', true)
             ->exists();
 
@@ -63,7 +95,7 @@ class StorefrontMediaController extends PublicApiController
             abort(404, 'الوسائط غير موجودة.');
         }
 
-        return $this->streamProductMediaBytes($media, $this->documentStorage, $this->r2, 'public, max-age=3600');
+        return $media;
     }
 
     /**

@@ -165,9 +165,17 @@ export function toRenderableMediaUrl(url: string | null): string | null {
 
   try {
     const parsed = new URL(url, "http://awj.invalid");
-    const match = parsed.pathname.match(/^\/store\/v1\/media\/([^/]+)$/);
+    const match = parsed.pathname.match(
+      /^\/store\/v1\/media\/([^/]+)(?:\/derivatives\/(thumbnail|card))?$/,
+    );
     if (match) {
-      return `${AWJ_MEDIA_PROXY_PATH_PREFIX}${encodeURIComponent(match[1])}`;
+      const derivative = match[2];
+      return derivative
+        ? AWJ_MEDIA_PROXY_PATH_PREFIX +
+            encodeURIComponent(match[1]) +
+            "/derivatives/" +
+            derivative
+        : AWJ_MEDIA_PROXY_PATH_PREFIX + encodeURIComponent(match[1]);
     }
   } catch {
     // Keep the original URL if an upstream producer sends a non-URL value.
@@ -241,8 +249,15 @@ function toVariants(
   });
 }
 
-function toMedia(media: AwjProductMedia, productId: string): Media {
+export type StorefrontMedia = Media & {
+  thumbnail_url: string | null;
+  card_url: string | null;
+};
+
+function toMedia(media: AwjProductMedia, productId: string): StorefrontMedia {
   const url = toRenderableMediaUrl(media.url);
+  const thumbnailUrl = toRenderableMediaUrl(media.thumbnail_url ?? null) ?? url;
+  const cardUrl = toRenderableMediaUrl(media.card_url ?? null) ?? url;
 
   return {
     id: media.id,
@@ -261,6 +276,8 @@ function toMedia(media: AwjProductMedia, productId: string): Media {
     large_url: url,
     xlarge_url: url,
     og_image_url: url,
+    thumbnail_url: thumbnailUrl,
+    card_url: cardUrl,
   };
 }
 
@@ -385,6 +402,9 @@ export function mapAwjProductToViewModel(
     description_html: null,
     default_variant_id: `${product.id}-default`,
     thumbnail_url: toRenderableMediaUrl(product.thumbnail_url),
+    card_url:
+      toRenderableMediaUrl(product.card_url ?? null) ??
+      toRenderableMediaUrl(product.thumbnail_url),
     tags: [],
     price,
     original_price: null,

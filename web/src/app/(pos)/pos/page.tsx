@@ -156,7 +156,7 @@ interface PosVariant {
   descriptor: string | null;
   price: string;
   /** VAR-FU-5/GAP-06: غلاف الوسائط المحلول لهذا المتغيّر (ProductMediaGalleryService). */
-  image?: { download_url: string } | null;
+  image?: { download_url: string; thumbnail_url?: string | null; card_url?: string | null } | null;
 }
 interface Product {
   id: string;
@@ -174,7 +174,7 @@ interface Product {
    * ولا يغيّر الوحدة/الكمية/السعر تلقائياً؛ القرار D-A يبقى نافذاً حرفياً.
    */
   default_sales_unit?: string | null;
-  pos_image?: { download_url: string } | null;
+  pos_image?: { download_url: string; thumbnail_url?: string | null; card_url?: string | null } | null;
   category_id: string | null;
   category: string | null;
   category_image?: { download_url: string } | null;

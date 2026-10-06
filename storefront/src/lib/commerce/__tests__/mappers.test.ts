@@ -88,6 +88,7 @@ describe("mapAwjProductToViewModel", () => {
 
     expect(viewModel.media).toHaveLength(2);
     expect(viewModel.thumbnail_url).toBe("https://example.test/media/1");
+    expect(viewModel.card_url).toBe("https://example.test/media/1");
     expect(viewModel.media?.[1].alt).toBe("alt text");
     expect(viewModel.primary_media?.id).toBe("media-1");
   });
@@ -111,6 +112,34 @@ describe("mapAwjProductToViewModel", () => {
     expect(viewModel.primary_media?.original_url).toBe(
       "/api/storefront/media/media-1",
     );
+  });
+
+  it("maps explicit public derivatives without replacing PDP originals", () => {
+    const viewModel = mapAwjProductToViewModel(
+      baseProduct({
+        card_url: "/store/v1/media/media-1/derivatives/card",
+        media: [
+          {
+            id: "media-1",
+            url: "/store/v1/media/media-1",
+            thumbnail_url: "/store/v1/media/media-1/derivatives/thumbnail",
+            card_url: "/store/v1/media/media-1/derivatives/card",
+            alt: null,
+            position: 0,
+          },
+        ],
+      }),
+    );
+
+    expect(viewModel.card_url).toBe(
+      "/api/storefront/media/media-1/derivatives/card",
+    );
+    expect(viewModel.primary_media?.original_url).toBe(
+      "/api/storefront/media/media-1",
+    );
+    expect(
+      (viewModel.primary_media as { thumbnail_url?: string }).thumbnail_url,
+    ).toBe("/api/storefront/media/media-1/derivatives/thumbnail");
   });
 
   it("treats in_stock: null as unknown availability, not out-of-stock", () => {

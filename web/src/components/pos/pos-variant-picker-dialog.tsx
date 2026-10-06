@@ -13,7 +13,7 @@ export interface PosVariantPickerOption {
    *  فارغاً للتخزين المشترك، وسائط قيمة الخيار، أو الحصرية للمتغيّر — الأولوية
    *  محسومة خادمياً عبر ProductMediaGalleryService). `undefined`/`null` = لا
    *  وسائط محلولة، يُعرض الاحتياط الحالي (`PosProductImage`) كما هو. */
-  image?: { download_url: string } | null;
+  image?: { download_url: string; thumbnail_url?: string | null } | null;
 }
 
 interface Props {
@@ -54,7 +54,7 @@ export function PosVariantPickerDialog({ open, productName, variants, onSelect, 
           >
             {showImages && (
               <span className="h-11 w-11 shrink-0 overflow-hidden rounded border border-border bg-background">
-                <PosProductImage path={variant.image?.download_url} alt={variant.descriptor ?? variant.sku ?? ''} />
+                <PosProductImage path={variant.image?.thumbnail_url ?? variant.image?.download_url} alt={variant.descriptor ?? variant.sku ?? ''} />
               </span>
             )}
             <span className="min-w-0 flex-1 truncate text-sm font-medium text-text">{variant.descriptor ?? variant.sku ?? variant.id}</span>

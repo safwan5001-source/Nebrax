@@ -126,6 +126,9 @@ class StorefrontProductResource extends JsonResource
             ],
             'in_stock' => $this->inStock,
             'thumbnail_url' => $thumbnail['url'] ?? null,
+            // Additive: catalogue cards can prefer this bounded derivative
+            // while historical thumbnail_url remains the original media URL.
+            'card_url' => $thumbnail['card_url'] ?? null,
             'media' => $this->when($this->detailed, fn () => $this->galleryMedia),
             'is_variant_managed' => $this->resource->isVariantManaged(),
             'options' => $this->when($this->options !== null, fn () => $this->options),
@@ -145,11 +148,15 @@ class StorefrontProductResource extends JsonResource
      * الممرَّرة للمُنشئ، ولبناء وسائط كل متغيّرٍ في `$variants` أيضاً.
      *
      * @param  iterable<\App\Models\ProductMedia>  $items
-     * @return array<int, array{id:string,url:string,alt:?string,position:?int}>
+     * @return array<int, array{id:string,url:string,thumbnail_url:string,card_url:string,alt:?string,position:?int}>
      */
     public static function mediaPayload(iterable $items, ?string $tenantSlug): array
     {
-        return self::buildPayload($items, fn (string $id) => self::buildMediaUrl($id, $tenantSlug));
+        return self::buildPayload(
+            $items,
+            fn (string $id) => self::buildMediaUrl($id, $tenantSlug),
+            fn (string $id, string $derivative) => self::buildDerivativeUrl($id, $derivative, $tenantSlug),
+        );
     }
 
     /**
@@ -178,6 +185,19 @@ class StorefrontProductResource extends JsonResource
         return RouteFacade::has('storefront.v1.media.show')
             ? route('storefront.v1.media.show', ['id' => $mediaId], false)
             : "/store/v1/media/{$mediaId}";
+    }
+
+    public static function buildDerivativeUrl(string $mediaId, string $derivative, ?string $tenantSlug): string
+    {
+        if ($tenantSlug !== null) {
+            return RouteFacade::has('storefront.v1.legacy.media.derivative.show')
+                ? route('storefront.v1.legacy.media.derivative.show', ['tenantSlug' => $tenantSlug, 'id' => $mediaId, 'derivative' => $derivative], false)
+                : "/store/v1/{$tenantSlug}/media/{$mediaId}/derivatives/{$derivative}";
+        }
+
+        return RouteFacade::has('storefront.v1.media.derivative.show')
+            ? route('storefront.v1.media.derivative.show', ['id' => $mediaId, 'derivative' => $derivative], false)
+            : "/store/v1/media/{$mediaId}/derivatives/{$derivative}";
     }
 
     /**
@@ -235,18 +255,23 @@ class StorefrontProductResource extends JsonResource
 
     /**
      * @param  iterable<\App\Models\ProductMedia>  $items
-     * @return array<int, array{id:string,url:string,alt:?string,position:?int}>
+     * @return array<int, array{id:string,url:string,thumbnail_url?:string,card_url?:string,alt:?string,position:?int}>
      */
-    private static function buildPayload(iterable $items, callable $urlBuilder): array
+    private static function buildPayload(iterable $items, callable $urlBuilder, ?callable $derivativeUrlBuilder = null): array
     {
         $out = [];
         foreach ($items as $item) {
-            $out[] = [
+            $entry = [
                 'id' => $item->id,
                 'url' => $urlBuilder($item->id),
                 'alt' => $item->original_name,
                 'position' => $item->sort_order,
             ];
+            if ($derivativeUrlBuilder !== null) {
+                $entry['thumbnail_url'] = $derivativeUrlBuilder($item->id, 'thumbnail');
+                $entry['card_url'] = $derivativeUrlBuilder($item->id, 'card');
+            }
+            $out[] = $entry;
         }
 
         return $out;

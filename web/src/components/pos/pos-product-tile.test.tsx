@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { PosProductTile } from './pos-product-tile';
 
 vi.mock('./pos-product-image', () => ({
-  PosProductImage: ({ alt }: { alt: string }) => <span>{alt}</span>,
+  PosProductImage: ({ alt, path }: { alt: string; path?: string | null }) => <span data-testid="pos-product-image" data-path={path ?? ''}>{alt}</span>,
 }));
 
 const product = {
@@ -182,6 +182,11 @@ describe('PosProductTile', () => {
     expect(document.body.querySelector('[data-awj-media="image"]')).toBeNull();
   });
 
+  it('يفضّل مشتق card داخل البلاطة مع بقاء رابط الأصل احتياطاً', () => {
+    renderTile({ product: { ...product, pos_image: { download_url: '/original.png', card_url: '/card.png' } } });
+    expect(screen.getByTestId('pos-product-image').getAttribute('data-path')).toBe('/card.png');
+  });
+
   it('أزرار المفضلة والمعلومات تبقى ≥ 44px لمساً (min-h-11/min-w-11)', () => {
     renderTile({ onOpenQuickView: vi.fn(), quickViewLabel: 'Quick view' });
     for (const name of ['Favorites', 'Quick view']) {
@@ -191,4 +196,3 @@ describe('PosProductTile', () => {
     }
   });
 });
-

@@ -91,6 +91,7 @@ class PosVariantMediaTest extends TestCase
         $image = $this->posImage($auth['token'], $product->id);
         $this->assertNotNull($image);
         $this->assertSame("/api/products/{$product->id}/media/{$media->id}/download", $image['download_url']);
+        $this->assertSame("/api/products/{$product->id}/media/{$media->id}/derivatives/card", $image['card_url']);
     }
 
     // ═══════════════════ ٢-٤) الأولوية الثلاثية ═══════════════════
@@ -106,6 +107,7 @@ class PosVariantMediaTest extends TestCase
 
         $variants = $this->variantsOf($auth['token'], $product->id);
         $this->assertSame("/api/products/{$product->id}/media/{$exact->id}/download", $variants[$blackL->id]['image']['download_url']);
+        $this->assertSame("/api/products/{$product->id}/media/{$exact->id}/derivatives/thumbnail", $variants[$blackL->id]['image']['thumbnail_url']);
     }
 
     /** @test */
