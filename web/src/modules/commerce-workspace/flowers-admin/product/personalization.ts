@@ -186,7 +186,7 @@ export type FieldError =
   | { field: 'label'; code: 'required' | 'tooLong' }
   | { field: 'labelEn' | 'helpText'; code: 'tooLong' }
   | { field: 'maxLength'; code: 'range' }
-  | { field: 'options'; code: 'none' | 'tooMany' }
+  | { field: 'options'; code: 'none' | 'tooMany' | 'noneActive' }
   | { field: 'optionKey'; code: 'format' | 'duplicate'; index: number }
   | { field: 'optionLabel'; code: 'required' | 'tooLong'; index: number }
   | { field: 'optionLabelEn'; code: 'tooLong'; index: number };
@@ -209,6 +209,8 @@ export function validateField(field: PersonalizationField, others: readonly Pers
   } else {
     if (field.options.length === 0) errors.push({ field: 'options', code: 'none' });
     if (field.options.length > MAX_OPTIONS) errors.push({ field: 'options', code: 'tooMany' });
+    // اختيارٌ فعّال وإلزامي بلا خيار فعّال لا يستوفيه أي طلب سلة ⇒ يصير المنتج غير قابل للشراء.
+    if (field.options.length > 0 && field.isActive && field.isRequired && !field.options.some((o) => o.isActive)) errors.push({ field: 'options', code: 'noneActive' });
     field.options.forEach((option, index) => {
       if (!isSlug(option.valueKey)) errors.push({ field: 'optionKey', code: 'format', index });
       else if (field.options.findIndex((o) => o.valueKey === option.valueKey) !== index) errors.push({ field: 'optionKey', code: 'duplicate', index });

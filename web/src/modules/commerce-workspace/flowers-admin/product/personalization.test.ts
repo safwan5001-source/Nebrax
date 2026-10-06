@@ -126,6 +126,15 @@ describe('personalization draft logic', () => {
     expect(validateField({ ...ribbon, options: [{ ...ribbon.options[0], labelEn: 'x'.repeat(120) }] }, [])).toEqual([]);
   });
 
+  it('a required active select needs an active option, otherwise the product becomes unpurchasable', () => {
+    const [, ribbon] = fields();
+    const allOff = { ...ribbon, isActive: true, isRequired: true, options: ribbon.options.map((o) => ({ ...o, isActive: false })) };
+    expect(validateField(allOff, [])).toContainEqual({ field: 'options', code: 'noneActive' });
+    expect(validateField({ ...allOff, isRequired: false }, [])).toEqual([]);
+    expect(validateField({ ...allOff, isActive: false }, [])).toEqual([]);
+    expect(validateField({ ...allOff, options: [{ ...allOff.options[0], isActive: true }] }, [])).toEqual([]);
+  });
+
   it('a select needs at least one valid option with a unique key and a label', () => {
     const [, ribbon] = fields();
     expect(validateField({ ...ribbon, options: [] }, [])).toContainEqual({ field: 'options', code: 'none' });

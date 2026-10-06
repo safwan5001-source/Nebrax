@@ -88,7 +88,7 @@ final class ProductPersonalizationService
                 $options = $data['options'] ?? [];
 
                 if ($type === CommerceProductPersonalizationField::TYPE_SELECT) {
-                    $this->assertOptions($data['key'], $options);
+                    $this->assertOptions($data['key'], $options, (bool) ($data['is_active'] ?? true) && (bool) ($data['is_required'] ?? false));
                 } elseif ($options !== []) {
                     throw new DomainException("المُدخَل «{$data['key']}» ليس اختياراً فلا يقبل خيارات.");
                 }
@@ -255,7 +255,7 @@ final class ProductPersonalizationService
     }
 
     /** @param list<array<string, mixed>> $options */
-    private function assertOptions(string $fieldKey, array $options): void
+    private function assertOptions(string $fieldKey, array $options, bool $activeAndRequired = false): void
     {
         if ($options === []) {
             throw new DomainException("المُدخَل «{$fieldKey}» من نوع اختيار ويحتاج خياراً واحداً على الأقل.");
@@ -266,6 +266,10 @@ final class ProductPersonalizationService
         $values = array_column($options, 'value_key');
         if (count($values) !== count(array_unique($values))) {
             throw new DomainException("مفاتيح خيارات المُدخَل «{$fieldKey}» يجب أن تكون فريدة.");
+        }
+        // اختيارٌ فعّال وإلزامي بلا أي خيار فعّال لا يستوفيه أي طلب سلة ⇒ يصير المنتج غير قابل للشراء.
+        if ($activeAndRequired && ! array_filter($options, fn ($o) => (bool) ($o['is_active'] ?? true))) {
+            throw new DomainException("المُدخَل «{$fieldKey}» فعّال وإلزامي ويحتاج خياراً فعّالاً واحداً على الأقل (وإلا لا يمكن شراء المنتج).");
         }
     }
 

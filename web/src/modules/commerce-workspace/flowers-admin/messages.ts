@@ -253,6 +253,7 @@ export const FLOWERS_ADMIN_MESSAGES = {
     persErrKeyDuplicate: 'هذا المعرّف مستخدم بالفعل.',
     persErrLength: 'أدخل عدداً صحيحاً بين 1 و{max}.',
     persErrNoOptions: 'أضف خياراً واحداً على الأقل.',
+    persErrNoActiveOption: 'المُدخَل إلزامي وفعّال: فعّل خياراً واحداً على الأقل، وإلا لن يتمكّن أحد من شراء المنتج.',
     persErrTooManyOptions: 'الحد الأقصى {max} خياراً.',
     // إضافات المنتج — H2-8
     addonTitle: 'إضافات المنتج',
@@ -622,6 +623,7 @@ export const FLOWERS_ADMIN_MESSAGES = {
     persErrKeyDuplicate: 'This identifier is already used.',
     persErrLength: 'Enter a whole number between 1 and {max}.',
     persErrNoOptions: 'Add at least one option.',
+    persErrNoActiveOption: 'This input is required and active: turn on at least one option, otherwise nobody can buy the product.',
     persErrTooManyOptions: 'The maximum is {max} options.',
     addonTitle: 'Product add-ons',
     addonIntro: 'Optional products the shopper adds alongside this one (chocolates, a balloon…). Each add-on is a real product sold at its own price and stock; no prices are set here.',
