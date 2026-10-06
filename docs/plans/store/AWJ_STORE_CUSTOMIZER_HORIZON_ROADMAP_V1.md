@@ -8,6 +8,7 @@
 **Persistence authority:** `docs/plans/store/AWJ_STORE_CUSTOMIZER_PERSISTENCE_ARCHITECTURE.md`  
 **Design authority:** AWJ Design System + storefront responsive/design-system documents  
 **Execution method:** **Horizon system** — evidence-first, one coherent capability horizon at a time, with explicit closure gates
+**CUST-HV execution authority:** `docs/plans/store/CUST-HV-MASTER-HORIZON-EXECUTION.md` — autonomous slice-by-slice execution from V1A→V11 with creative autonomy, mandatory safety gates, independent PRs, Design Quality Passes, and no automatic merge/deploy.
 **Revision 2026-10-05:** inserted **CUST-HV — Visual Design, Media & Merchant UX Completion** between CUST-H4 (CLOSED) and CUST-H5 (Owner decision, Option A; evidence: `AWJ_STORE_CUSTOMIZER_VISUAL_UX_COMPLETION_MASTER_GAP.md`, contracts: `CUST-HV-V0-DECISIONS-AND-ARCHITECTURE-CONTRACT.md`). H5/H6 are **not renumbered**.
 
 ---
