@@ -74,8 +74,19 @@ export function mapPersonalization(payload: unknown): PersonalizationField[] | n
   return fields.map(mapField).filter((f): f is PersonalizationField => f !== null);
 }
 
-export const loadPersonalization = (productId: string): Promise<AdminResult<PersonalizationField[]>> =>
-  adminCall(async () => mapPersonalization(await api<unknown>(productPath(productId, 'personalization'))));
+/** القائمة + بصمتها (`revision`) كما أعادهما الخادم؛ البصمة تُعاد عند الحفظ فيرفض الخادم الاستبدال القديم داخل القفل. */
+export type PersonalizationDocument = { fields: PersonalizationField[]; revision: string | null };
+
+export function mapPersonalizationDocument(payload: unknown): PersonalizationDocument | null {
+  const fields = mapPersonalization(payload);
+  if (!fields) return null;
+  const revision = obj(obj(payload)?.data)?.revision;
+
+  return { fields, revision: typeof revision === 'string' && revision !== '' ? revision : null };
+}
+
+export const loadPersonalization = (productId: string): Promise<AdminResult<PersonalizationDocument>> =>
+  adminCall(async () => mapPersonalizationDocument(await api<unknown>(productPath(productId, 'personalization'))));
 
 const blankToNull = (v: string): string | null => (v.trim() === '' ? null : v.trim());
 
@@ -97,8 +108,15 @@ export function personalizationPayload(fields: readonly PersonalizationField[]) 
   };
 }
 
-export const savePersonalization = (productId: string, fields: readonly PersonalizationField[]): Promise<AdminResult<PersonalizationField[]>> =>
-  adminCall(async () => mapPersonalization(await api<unknown>(productPath(productId, 'personalization'), { method: 'PUT', body: personalizationPayload(fields) })));
+export const savePersonalization = (productId: string, fields: readonly PersonalizationField[], expectedRevision: string | null = null): Promise<AdminResult<PersonalizationDocument>> =>
+  adminCall(async () =>
+    mapPersonalizationDocument(
+      await api<unknown>(productPath(productId, 'personalization'), {
+        method: 'PUT',
+        body: { ...(expectedRevision ? { expected_revision: expectedRevision } : {}), ...personalizationPayload(fields) },
+      }),
+    ),
+  );
 
 // ── منطق المسوّدة ────────────────────────────────────────────────────────────────
 

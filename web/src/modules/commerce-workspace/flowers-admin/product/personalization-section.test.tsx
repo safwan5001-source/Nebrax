@@ -26,16 +26,22 @@ const select = (over: Row = {}): Row => ({
   options: [{ value_key: 'red', label: 'أحمر', label_en: 'Red', is_active: true }], ...over,
 });
 
-function server(initial: Row[], opts: { rejectSave?: ApiError; canManage?: boolean } = {}) {
+function server(initial: Row[], opts: { rejectSave?: ApiError; canManage?: boolean; noRevision?: boolean } = {}) {
   let current = initial;
-  const writes: { fields: Row[] }[] = [];
-  apiMock.mockImplementation(async (_path: string, options?: { method?: string; body?: { fields: Row[] } }) => {
+  let readFails = false;
+  const writes: { fields: Row[]; expected_revision?: string }[] = [];
+  const revisionOf = (rows: Row[]) => JSON.stringify(rows);
+  const doc = () => ({ data: { fields: current, ...(opts.noRevision ? {} : { revision: revisionOf(current) }) } });
+  apiMock.mockImplementation(async (_path: string, options?: { method?: string; body?: { fields: Row[]; expected_revision?: string } }) => {
     if (options?.method === 'PUT') {
       if (opts.rejectSave) throw opts.rejectSave;
+      if (options.body!.expected_revision !== undefined && options.body!.expected_revision !== revisionOf(current)) throw new ApiError(409, 'stale', {});
       writes.push(options.body!);
       current = options.body!.fields.map((f) => ({ label_en: null, help_text: null, max_length: null, options: [], ...f }));
+    } else if (readFails) {
+      throw new ApiError(500, 'boom', {});
     }
-    return { data: { fields: current } };
+    return doc();
   });
   renderIntl(
     <ToastProvider>
@@ -44,7 +50,7 @@ function server(initial: Row[], opts: { rejectSave?: ApiError; canManage?: boole
     'en',
   );
 
-  return { writes, setRemote: (next: Row[]) => { current = next; } };
+  return { writes, setRemote: (next: Row[]) => { current = next; }, failRead: () => { readFails = true; } };
 }
 
 describe('PersonalizationSection', () => {
@@ -158,6 +164,25 @@ describe('PersonalizationSection', () => {
     expect(await screen.findByText(/changed on the server since you opened this page/)).toBeTruthy();
     expect(srv.writes).toHaveLength(0);
     expect(document.querySelectorAll('[data-personalization-row]')).toHaveLength(2);
+  });
+
+  it('sends the revision it read; the server rejects a stale replacement under its lock and the view refreshes', async () => {
+    const srv = server([text()]);
+    await userEvent.click(await screen.findByRole('button', { name: 'Delete: الاسم على البطاقة' }));
+    await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Delete' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(srv.writes).toHaveLength(1));
+    expect(srv.writes[0].expected_revision).toBe(JSON.stringify([text()]));
+  });
+
+  it('without a server revision it falls back to the pre-read and never writes when that read fails', async () => {
+    const srv = server([text()], { noRevision: true });
+    await userEvent.click(await screen.findByRole('button', { name: 'Delete: الاسم على البطاقة' }));
+    await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Delete' }));
+    srv.failRead();
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(document.querySelector('[role="alert"]')).not.toBeNull());
+    expect(srv.writes).toHaveLength(0);
   });
 
   it('is read-only without products.manage: view only, no add/save/reorder/delete', async () => {

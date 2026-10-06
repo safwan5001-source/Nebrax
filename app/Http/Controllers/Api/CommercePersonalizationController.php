@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Models\CommerceProductPersonalizationField;
 use App\Models\Product;
 use App\Services\Commerce\ProductPersonalizationService;
+use App\Services\Commerce\StaleRevisionException;
 use DomainException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -24,7 +25,9 @@ final class CommercePersonalizationController extends ApiController
         $this->denySelfService($request);
         $product = Product::query()->findOrFail($id);
 
-        return response()->json(['data' => ['fields' => $personalization->definitions($product)]]);
+        $fields = $personalization->definitions($product);
+
+        return response()->json(['data' => ['fields' => $fields, 'revision' => $personalization->revisionFor($fields)]]);
     }
 
     public function replace(Request $request, ProductPersonalizationService $personalization, string $id): JsonResponse
@@ -32,6 +35,8 @@ final class CommercePersonalizationController extends ApiController
         $this->denySelfService($request);
         $data = $request->validate([
             'fields' => ['present', 'array', 'max:'.ProductPersonalizationService::MAX_FIELDS],
+            // اختياري: بصمة التعريفات كما قرأها العميل؛ إن لم تعد تطابق الحالية داخل القفل ⇒ 409 بلا كتابة.
+            'expected_revision' => ['sometimes', 'nullable', 'string', 'max:64'],
             'fields.*.key' => ['required', 'string', 'max:48', self::SLUG],
             'fields.*.type' => ['required', 'string', Rule::in(CommerceProductPersonalizationField::TYPES)],
             'fields.*.label' => ['required', 'string', 'max:120', 'regex:/\S/'],
@@ -49,12 +54,14 @@ final class CommercePersonalizationController extends ApiController
         $product = Product::query()->findOrFail($id);
 
         try {
-            $fields = $personalization->replaceDefinitions($product, array_values($data['fields']));
+            $fields = $personalization->replaceDefinitions($product, array_values($data['fields']), $data['expected_revision'] ?? null);
+        } catch (StaleRevisionException $e) {
+            abort(409, $e->getMessage());
         } catch (DomainException $e) {
             abort(422, $e->getMessage());
         }
 
-        return response()->json(['data' => ['fields' => $fields]]);
+        return response()->json(['data' => ['fields' => $fields, 'revision' => $personalization->revisionFor($fields)]]);
     }
 
     private function denySelfService(Request $request): void

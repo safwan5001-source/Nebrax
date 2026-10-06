@@ -25,7 +25,7 @@ import {
 } from './personalization';
 import { SectionState } from './section-state';
 
-type Phase = { kind: 'loading' } | { kind: 'failed'; failure: AdminFailure } | { kind: 'ready'; saved: PersonalizationField[] };
+type Phase = { kind: 'loading' } | { kind: 'failed'; failure: AdminFailure } | { kind: 'ready'; saved: PersonalizationField[]; revision: string | null };
 type DialogState = { kind: 'add'; field: PersonalizationField } | { kind: 'edit'; index: number } | null;
 
 /**
@@ -53,8 +53,8 @@ export function PersonalizationSection({ productId, locale, canManage }: { produ
         setPhase({ kind: 'failed', failure: result });
         return;
       }
-      setDraft(result.data);
-      setPhase({ kind: 'ready', saved: result.data });
+      setDraft(result.data.fields);
+      setPhase({ kind: 'ready', saved: result.data.fields, revision: result.data.revision });
     });
     return () => {
       current = false;
@@ -78,22 +78,42 @@ export function PersonalizationSection({ productId, locale, canManage }: { produ
     }
     setSaving(true);
     setNotice(null);
-    const fresh = await loadPersonalization(productId);
-    if (fresh.ok && signature(fresh.data) !== signature(saved)) {
+    // الاستبدال كامل ⇒ التحقق من «لم يتغيّر شيء» داخل قفل الخادم (`expected_revision` ⇒ 409). الفحص المسبق احتياطٌ لخادمٍ بلا
+    // بصمة، وفشل قراءته يُوقف الحفظ بدل أن يكتب من نسخة قد تكون قديمة.
+    const revision = phase.kind === 'ready' ? phase.revision : null;
+    if (revision === null) {
+      const fresh = await loadPersonalization(productId);
+      if (!fresh.ok) {
+        setSaving(false);
+        setNotice({ tone: 'error', text: failureText(fresh, t) });
+        return;
+      }
+      if (signature(fresh.data.fields) !== signature(saved)) {
+        setSaving(false);
+        setDraft(fresh.data.fields);
+        setPhase({ kind: 'ready', saved: fresh.data.fields, revision: fresh.data.revision });
+        setNotice({ tone: 'warning', text: t('persStale') });
+        return;
+      }
+    }
+    const result = await savePersonalization(productId, draft, revision);
+    if (!result.ok && result.kind === 'conflict') {
+      const fresh = await loadPersonalization(productId);
       setSaving(false);
-      setDraft(fresh.data);
-      setPhase({ kind: 'ready', saved: fresh.data });
+      if (fresh.ok) {
+        setDraft(fresh.data.fields);
+        setPhase({ kind: 'ready', saved: fresh.data.fields, revision: fresh.data.revision });
+      }
       setNotice({ tone: 'warning', text: t('persStale') });
       return;
     }
-    const result = await savePersonalization(productId, draft);
     setSaving(false);
     if (!result.ok) {
       setNotice({ tone: 'error', text: failureText(result, t) });
       return;
     }
-    setDraft(result.data);
-    setPhase({ kind: 'ready', saved: result.data });
+    setDraft(result.data.fields);
+    setPhase({ kind: 'ready', saved: result.data.fields, revision: result.data.revision });
     toastSuccess(t('persSaved'));
   }
 

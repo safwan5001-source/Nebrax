@@ -259,4 +259,26 @@ class CommerceProductPersonalizationApiTest extends TestCase
         $this->assertSame(['cake-text', 'card', 'flavor'], array_column($res->json('data.personalization.fields'), 'key'));
         $this->assertTrue($res->json('data.personalization.fields.0.is_required'));
     }
+
+    /** @test */
+    public function a_replacement_built_on_a_stale_revision_is_rejected_under_the_product_lock_without_writing(): void
+    {
+        $auth = $this->registerTenant('pz-revision', 'owner@pz-revision.test');
+        $product = $this->makeProduct($auth['tenant_id']);
+        $token = $auth['token'];
+        $field = fn (string $key, string $label) => ['key' => $key, 'type' => 'text', 'label' => $label];
+
+        $first = $this->withToken($token)->putJson($this->url($product), ['fields' => [$field('a', 'أ')]])->assertOk();
+        $revision = $first->json('data.revision');
+        $this->assertSame(40, strlen($revision));
+        $this->assertSame($revision, $this->withToken($token)->getJson($this->url($product))->json('data.revision'));
+
+        $second = $this->withToken($token)->putJson($this->url($product), ['expected_revision' => $revision, 'fields' => [$field('a', 'أ'), $field('b', 'ب')]])->assertOk();
+        $this->assertNotSame($revision, $second->json('data.revision'));
+
+        $this->withToken($token)->putJson($this->url($product), ['expected_revision' => $revision, 'fields' => [$field('mine', 'لي')]])->assertStatus(409);
+        $this->assertSame(['a', 'b'], array_column($this->withToken($token)->getJson($this->url($product))->json('data.fields'), 'key'));
+
+        $this->withToken($token)->putJson($this->url($product), ['fields' => [$field('only', 'وحيد')]])->assertOk(); // بلا بصمة: السلوك السابق
+    }
 }
