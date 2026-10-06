@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  */
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AnnouncementPreview } from "../AnnouncementPreview";
@@ -132,6 +132,35 @@ describe("Announcements panel (CUST-HV V3)", () => {
     expect(Number.parseFloat(readout.textContent?.match(/(\d+\.\d+):1/)?.[1] ?? "0")).toBeGreaterThanOrEqual(4.5);
   });
 
+  it("a link colour that cannot publish is visible and fixable, even when it came from an older draft or the API", async () => {
+    const onChange = renderPanel({
+      enabled: true,
+      items: [
+        {
+          id: "a",
+          text: "x",
+          enabled: true,
+          surface: { background: { hex: "#777777" }, link: { hex: "#888888" } },
+        },
+      ],
+    });
+    const readout = document.querySelector("[data-announcement-link-contrast]") as HTMLElement;
+    expect(readout.textContent).toContain("will not publish");
+    // Switching back to "same as text" drops the offending value entirely.
+    await userEvent.click(screen.getByRole("button", { name: "Same as text" }));
+    expect(lastDoc(onChange).items[0].surface?.link).toBeUndefined();
+    expect(lastDoc(onChange).items[0].surface?.background.hex).toBe("#777777");
+  });
+
+  it("offers a link colour only where a link exists, and starts from the text colour", async () => {
+    const onChange = renderPanel({
+      enabled: true,
+      items: [{ id: "a", text: "x", enabled: true, href: "/offers", surface: { background: { hex: "#0f766e" } } }],
+    });
+    await userEvent.click(screen.getAllByRole("button", { name: "Custom" })[1]);
+    expect(lastDoc(onChange).items[0].surface?.link?.hex).toBe("#ffffff");
+  });
+
   it("window edges are entered in store time and stored as a UTC instant; clearing removes them", () => {
     const onChange = renderPanel({ enabled: true, items: [{ id: "a", text: "x", enabled: true }] });
     fireEvent.change(screen.getByLabelText("Starts — Date"), { target: { value: "2026-07-01" } });
@@ -211,6 +240,30 @@ describe("Announcement preview (Canvas)", () => {
     rerender(<AnnouncementPreview doc={doc} page="product" locale="en" />);
     expect(await screen.findByText("Everywhere")).toBeTruthy();
     expect(screen.queryByText("Home only")).toBeNull();
+  });
+
+  it("re-evaluates at the next window boundary so an open builder keeps matching the storefront", async () => {
+    vi.useFakeTimers({ toFake: ["Date", "setTimeout", "clearTimeout"] });
+    vi.setSystemTime(Date.parse("2026-06-15T12:00:00Z"));
+    const windowed: AnnouncementsDoc = {
+      enabled: true,
+      items: [
+        { id: "a", text: "Launching soon", enabled: true, window: { startsAt: "2026-06-15T12:10:00.000Z" } },
+        { id: "b", text: "Until launch", enabled: true, window: { endsAt: "2026-06-15T12:10:00.000Z" } },
+      ],
+    };
+    render(<AnnouncementPreview doc={windowed} page="home" locale="en" />);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(screen.getByText("Until launch")).toBeTruthy();
+    expect(screen.queryByText("Launching soon")).toBeNull();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10 * 60_000 + 200);
+    });
+    expect(screen.getByText("Launching soon")).toBeTruthy();
+    expect(screen.queryByText("Until launch")).toBeNull();
   });
 
   it("renders nothing when disabled and says so when nothing is eligible", async () => {

@@ -477,20 +477,24 @@ describe("AnnouncementBar (CUST-HV V3)", () => {
         { ticker: true, ...extra },
       );
 
-    it("keeps the full text reachable once for assistive tech and hides the visual copies", () => {
+    it("keeps the first copy (links included) in the accessibility tree and removes only the loop duplicate from AT and tab order", () => {
       mountBar(ticker());
       const region = screen.getByRole("region");
       expect(region.getAttribute("data-mode")).toBe("ticker");
-      expect(region.querySelector(".sr-only")?.textContent).toBe(
-        "شحن مجاني · خصم 20٪",
-      );
       const track = region.querySelector(".awj-ann-track") as HTMLElement;
-      expect(track.getAttribute("aria-hidden")).toBe("true");
-      // Two copies for the seamless loop; only the first is keyboard-reachable.
-      const links = track.querySelectorAll("a");
-      expect(links).toHaveLength(2);
-      expect(links[0].getAttribute("tabindex")).toBeNull();
-      expect(links[1].getAttribute("tabindex")).toBe("-1");
+      expect(track.getAttribute("aria-hidden")).toBeNull();
+      const [first, second] = Array.from(track.querySelectorAll("ul"));
+      expect(first.getAttribute("aria-hidden")).toBeNull();
+      expect(first.hasAttribute("inert")).toBe(false);
+      expect(second.getAttribute("aria-hidden")).toBe("true");
+      expect(second.hasAttribute("inert")).toBe(true);
+      // The only reachable link is the real one — and it is *not* hidden from AT.
+      expect(first.querySelectorAll("a")).toHaveLength(1);
+      expect(
+        first.querySelector("a")?.closest("[aria-hidden='true']"),
+      ).toBeNull();
+      // No duplicated off-screen text: nothing is read twice.
+      expect(region.querySelector(".sr-only")).toBeNull();
     });
 
     it("travels the way the text reads: mirrored in RTL, natural in LTR", () => {

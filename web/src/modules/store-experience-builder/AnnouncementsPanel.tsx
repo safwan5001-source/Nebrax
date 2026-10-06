@@ -391,6 +391,15 @@ function ItemEditor({
       : null;
   const customTextFails =
     surface?.text !== undefined && ratio !== null && ratio < MIN_TEXT_CONTRAST;
+  // The link colour is validated at Publish exactly like the text colour, so the
+  // panel must let the merchant see and fix it — including a value that arrived
+  // from an older draft or the API with no UI of its own.
+  const linkRatio =
+    surface?.link !== undefined && backgroundHex !== undefined
+      ? contrastRatio(surface.link.hex, backgroundHex)
+      : null;
+  const customLinkFails = linkRatio !== null && linkRatio < MIN_TEXT_CONTRAST;
+  const showLinkColour = item.href !== undefined || surface?.link !== undefined;
   const pages = item.pages ?? [];
   const windowInvalid = announcementWindowState(item.window, nowMs) === "invalid";
 
@@ -522,6 +531,54 @@ function ItemEditor({
                 />
               ) : null}
             </div>
+            {showLinkColour ? (
+              <div className="space-y-1.5">
+                <span className="block text-[12px] font-medium text-muted">
+                  {t("annLinkColour")}
+                </span>
+                <Segmented
+                  value={surface.link ? "custom" : "auto"}
+                  onChange={(mode) => {
+                    const { link: _drop, ...rest } = surface;
+                    setSurface(
+                      mode === "auto"
+                        ? rest
+                        : { ...rest, link: { hex: textHex } },
+                    );
+                  }}
+                  options={[
+                    { id: "auto" as const, label: t("annLinkAuto") },
+                    { id: "custom" as const, label: t("annTextCustom") },
+                  ]}
+                />
+                {surface.link ? (
+                  <ColourField
+                    label={t("annLinkColour")}
+                    hex={surface.link.hex}
+                    onChange={(hex) => setSurface({ ...surface, link: { hex } })}
+                    hideLabel
+                  />
+                ) : null}
+              </div>
+            ) : null}
+            {linkRatio !== null ? (
+              <p
+                data-announcement-link-contrast=""
+                role="status"
+                className={`text-[12px] leading-5 ${
+                  customLinkFails ? "text-negative" : "text-muted"
+                }`}
+              >
+                {t("annLinkColour")}: {" "}
+                <span className="tabular-nums" dir="ltr">
+                  {linkRatio.toFixed(2)}:1
+                </span>{" "}
+                ·{" "}
+                {customLinkFails
+                  ? `${t("annContrastFail")}. ${t("annContrastFallback")}`
+                  : t("annContrastOk")}
+              </p>
+            ) : null}
             {ratio !== null ? (
               <p
                 data-announcement-contrast=""

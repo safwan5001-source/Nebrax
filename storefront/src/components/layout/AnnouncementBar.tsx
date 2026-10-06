@@ -121,12 +121,10 @@ function ItemContent({
   item,
   basePath,
   linkClass,
-  focusable = true,
 }: {
   item: Announcement;
   basePath: string;
   linkClass: string;
-  focusable?: boolean;
 }) {
   const Icon = item.icon ? ICONS[item.icon] : null;
   const body = (
@@ -139,23 +137,17 @@ function ItemContent({
     return <span className="inline-flex items-center gap-2">{body}</span>;
   }
   const external = !item.href.startsWith("/");
-  const tabIndex = focusable ? undefined : -1;
   return external ? (
     <a
       href={item.href}
       target="_blank"
       rel="noopener noreferrer"
-      tabIndex={tabIndex}
       className={linkClass}
     >
       {body}
     </a>
   ) : (
-    <Link
-      href={`${basePath}${item.href}`}
-      tabIndex={tabIndex}
-      className={linkClass}
-    >
+    <Link href={`${basePath}${item.href}`} className={linkClass}>
       {body}
     </Link>
   );
@@ -396,20 +388,24 @@ export function AnnouncementBar({
               className="awj-ann-viewport overflow-hidden py-2"
               style={tickerStyle}
             >
-              {/* Full text always reachable by assistive tech, once. */}
-              <span className="sr-only">
-                {items.map((item) => item.text).join(" · ")}
-              </span>
-              <div className="awj-ann-track" aria-hidden="true">
+              {/* The first copy is the real, accessible list (links included).
+                  Only the second copy — the one that makes the loop seamless —
+                  is removed from the accessibility tree *and* from tab order
+                  (`inert`), so nothing focusable is ever hidden from AT. */}
+              <div className="awj-ann-track">
                 {[0, 1].map((copy) => (
-                  <ul key={copy} className="awj-ann-copy">
+                  <ul
+                    key={copy}
+                    className="awj-ann-copy"
+                    aria-hidden={copy === 1 ? true : undefined}
+                    inert={copy === 1}
+                  >
                     {items.map((item) => (
                       <li key={item.id}>
                         <ItemContent
                           item={item}
                           basePath={basePath}
                           linkClass={linkClass}
-                          focusable={copy === 0}
                         />
                       </li>
                     ))}

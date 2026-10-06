@@ -21,9 +21,12 @@ import {
   type AnnouncementPageKind,
   type AnnouncementsDoc,
   eligibleAnnouncements,
+  nextAnnouncementBoundary,
   resolveAnnouncementSurface,
 } from "./presentation/announcements";
 import type { PageType } from "./presentation/page-regions";
+
+const MAX_TIMER_MS = 24 * 60 * 60 * 1000;
 
 /** Fixed bar height in the preview — the sticky header offsets by exactly this. */
 export const ANNOUNCEMENT_PREVIEW_HEIGHT = 36;
@@ -62,6 +65,19 @@ export function AnnouncementPreview({
   useEffect(() => {
     setNowMs(Date.now());
   }, [doc]);
+
+  // A builder left open across a window boundary must keep matching what the
+  // storefront will show: re-evaluate at the next `startsAt`/`endsAt`, the same
+  // way the published bar does (one timer, clamped so a far-future date can
+  // never overflow `setTimeout`).
+  useEffect(() => {
+    if (nowMs === null) return;
+    const boundary = nextAnnouncementBoundary(doc, nowMs);
+    if (boundary === null) return;
+    const wait = Math.min(Math.max(boundary - nowMs, 0) + 50, MAX_TIMER_MS);
+    const timer = setTimeout(() => setNowMs(Date.now()), wait);
+    return () => clearTimeout(timer);
+  }, [doc, nowMs]);
 
   if (!doc || !announcementBarVisible(doc) || nowMs === null) return null;
 
