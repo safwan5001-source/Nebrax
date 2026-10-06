@@ -121,10 +121,11 @@ final class CommerceDeliveryScheduleController extends ApiController
     /** @return array<string, mixed> */
     private function document(CommerceDeliveryScheduleService $schedule, string $channelId): array
     {
+        $slots = $schedule->slots($channelId); // قراءة واحدة: القائمة وبصمتها من اللقطة نفسها
         return [
             'settings' => $schedule->settings($channelId),
-            'slots' => $schedule->slots($channelId),
-            'slots_revision' => $schedule->slotsRevision($channelId),
+            'slots' => $slots,
+            'slots_revision' => $schedule->revisionFor($slots),
             'blocked_dates' => $schedule->blockedDates($channelId),
         ];
     }

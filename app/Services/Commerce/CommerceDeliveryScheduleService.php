@@ -99,7 +99,18 @@ final class CommerceDeliveryScheduleService
      */
     public function slotsRevision(string $salesChannelId): string
     {
-        return sha1((string) json_encode($this->slots($salesChannelId)));
+        return $this->revisionFor($this->slots($salesChannelId));
+    }
+
+    /**
+     * البصمة من **لقطة** نوافذ بعينها: يبني المتحكم الاستجابة من قراءةٍ واحدة فتتطابق البصمة مع القائمة المُعادة
+     * (قراءتان منفصلتان قد تفصل بينهما كتابة مدير آخر فتُربط قائمة قديمة ببصمة جديدة).
+     *
+     * @param  list<array<string, mixed>>  $slots
+     */
+    public function revisionFor(array $slots): string
+    {
+        return sha1((string) json_encode($slots));
     }
 
     /**
