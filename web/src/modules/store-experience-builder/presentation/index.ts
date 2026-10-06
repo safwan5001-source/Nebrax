@@ -1,3 +1,4 @@
+export * from "./announcements";
 export * from "./capabilities";
 export * from "./config";
 export * from "./flowers-pack";

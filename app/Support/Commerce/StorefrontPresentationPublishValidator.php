@@ -112,14 +112,27 @@ final class StorefrontPresentationPublishValidator
 
             return null;
         }
-        // `2026-02-31T…` يُقبل بصيغته لدى بعض المحلّلين فيُزاح؛ نشترط ألا يتغيّر اليوم.
-        if (preg_match('/^(\d{4})-(\d{2})-(\d{2})/', $value, $m) === 1 && ! checkdate((int) $m[2], (int) $m[3], (int) $m[1])) {
-            $errors[$path] = ['code' => 'window_invalid_timestamp', 'message' => 'تاريخ غير موجود في التقويم.'];
+        // صالحٌ تقويمياً وزمنياً: `2026-02-31` و`T24:00` و`T10:60` و`+25:00` تُقبل لدى بعض
+        // المحلّلين بإزاحةٍ صامتة؛ نرفضها صراحةً. (نفس القواعد في `parseAnnouncementInstant` بـTS.)
+        if (! self::isCalendarAndClockValid($value)) {
+            $errors[$path] = ['code' => 'window_invalid_timestamp', 'message' => 'تاريخ أو وقت غير موجود.'];
 
             return null;
         }
 
         return $instant;
+    }
+
+    private static function isCalendarAndClockValid(string $value): bool
+    {
+        if (preg_match('/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?(?:\.\d{1,6})?(Z|[+-](\d{2}):(\d{2}))$/', $value, $m) !== 1) {
+            return false;
+        }
+        if (! checkdate((int) $m[2], (int) $m[3], (int) $m[1]) || (int) $m[4] > 23 || (int) $m[5] > 59 || (int) ($m[6] ?? 0) > 59) {
+            return false;
+        }
+
+        return ! isset($m[8]) || ((int) $m[8] <= 23 && (int) $m[9] <= 59);
     }
 
     /** نسبة التباين WCAG 2.x بين لونين معتمين (`#rrggbb`). */
@@ -145,11 +158,16 @@ final class StorefrontPresentationPublishValidator
         return 0.2126 * $channels[0] + 0.7152 * $channels[1] + 0.0722 * $channels[2];
     }
 
-    /** المقدّمة التلقائية: الأبيض أو الأسود الداكن — أيهما أعلى تبايناً (يربط عند التساوي بالأبيض). */
+    /**
+     * المقدّمة التلقائية: الأبيض أو **الأسود الصافي** — أيهما أعلى تبايناً (يربط
+     * عند التساوي بالأبيض). الأسود الصافي لا شبه الأسود عمداً: الأفضل من
+     * الأبيض/الأسود ≥ 4.58:1 على أي لون معتم، بينما `#111827` ينزل إلى ≈ 4.40:1
+     * على الدرجات الوسطى فيكذب ضمان «لا يُرفض أي لون خلفية» (V0 §4.5.1).
+     */
     public static function autoForeground(string $backgroundHex): string
     {
-        return self::contrastRatio('#ffffff', $backgroundHex) >= self::contrastRatio('#111827', $backgroundHex)
+        return self::contrastRatio('#ffffff', $backgroundHex) >= self::contrastRatio('#000000', $backgroundHex)
             ? '#ffffff'
-            : '#111827';
+            : '#000000';
     }
 }

@@ -91,6 +91,18 @@ class StorefrontPresentationAnnouncementsTest extends TestCase
 
     // ───────────────────────── publish gate (unit) ─────────────────────────
 
+    /** @test */
+    public function the_gate_agrees_with_the_shared_window_cases_on_what_is_publishable(): void
+    {
+        foreach ($this->fixture()['windows'] as $case) {
+            if ($case['window'] === null) {
+                continue;
+            }
+            $errors = $this->errorsFor(['window' => $case['window']]);
+            $this->assertSame($case['publishable'], $errors === [], $case['name'].' → '.json_encode($errors));
+        }
+    }
+
     /** @param array<string,mixed> $item */
     private function errorsFor(array $item, bool $barEnabled = true): array
     {
