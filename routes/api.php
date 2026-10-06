@@ -467,6 +467,9 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         Route::get('products/{id}/media', [ProductController::class, 'indexMedia'])->middleware($perm('products.view'));
         Route::post('products/{id}/media', [ProductController::class, 'storeMedia'])->middleware($perm('products.manage'));
         Route::get('products/{id}/media/{mediaId}/download', [ProductController::class, 'downloadMedia'])->middleware($perm('products.view'));
+        Route::get('products/{id}/media/{mediaId}/derivatives/{derivative}', [ProductController::class, 'downloadMediaDerivative'])
+            ->whereIn('derivative', ['thumbnail', 'card'])
+            ->middleware($perm('products.view'));
         Route::delete('products/{id}/media/{mediaId}', [ProductController::class, 'destroyMedia'])->middleware($perm('products.manage'));
         Route::post('products', [ProductController::class, 'store'])->middleware($perm('products.manage'));
         Route::put('products/{id}', [ProductController::class, 'update'])->middleware($perm('products.manage'));

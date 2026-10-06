@@ -126,6 +126,87 @@ class PosDeliveryPlatformCheckoutTest extends TestCase
     }
 
     /** @test */
+    public function session_report_separates_delivery_sales_from_physical_tender_expectations_without_double_counting(): void
+    {
+        [$auth, $sessionId, $partnerId, $cash, $bank] = $this->readyPos('close-report', true);
+        $platformCollected = $this->platform($auth['token'], 'jahez', Version::COLLECTION_PLATFORM);
+        $merchantCollected = $this->platform($auth['token'], 'keeta', Version::COLLECTION_MERCHANT);
+
+        // النقد/البطاقة الاعتياديان يظلان جزءاً من عهدة الجلسة.
+        $this->checkout($auth['token'], $partnerId, $sessionId, [$this->tender($cash, 11500)])->assertCreated();
+        $this->checkout($auth['token'], $partnerId, $sessionId, [$this->tender($bank, 11500)])->assertCreated();
+        // سند المقاصة البنكي للمنصة لا يحمل pos_session_id ولا يصير «بطاقة» في الإغلاق.
+        $this->checkout($auth['token'], $partnerId, $sessionId, [], [
+            'delivery_platform_profile_id' => $platformCollected['id'],
+        ])->assertCreated();
+        // تحصيل التاجر على قناة التوصيل يتبع وسائل الجلسة القائمة، مرة واحدة فقط.
+        $this->checkout($auth['token'], $partnerId, $sessionId, [$this->tender($cash, 11500)], [
+            'delivery_platform_profile_id' => $merchantCollected['id'],
+        ])->assertCreated();
+        $this->checkout($auth['token'], $partnerId, $sessionId, [$this->tender($bank, 11500)], [
+            'delivery_platform_profile_id' => $merchantCollected['id'],
+        ])->assertCreated();
+
+        $report = $this->withToken($auth['token'])->getJson("/api/pos-sessions/{$sessionId}/report")
+            ->assertOk()
+            ->assertJsonPath('report.sales_count', 5)
+            ->assertJsonPath('report.gross_sales', '575.00')
+            ->assertJsonPath('report.net_sales', '575.00')
+            ->assertJsonPath('report.cash_sales', '230.00')
+            ->assertJsonPath('report.expected', '230.00')
+            ->assertJsonPath('report.delivery_platforms.sales_count', 3)
+            ->assertJsonPath('report.delivery_platforms.total', '345.00')
+            ->assertJsonPath('report.delivery_platforms.platform_collected_total', '115.00')
+            ->assertJsonPath('report.delivery_platforms.merchant_collected_total', '230.00');
+
+        $platformRows = collect($report->json('report.delivery_platforms.platforms'))->keyBy('platform_key');
+        $this->assertSame('115.00', $platformRows['jahez']['total']);
+        $this->assertSame('115.00', $platformRows['jahez']['platform_collected_total']);
+        $this->assertSame('0.00', $platformRows['jahez']['merchant_collected_total']);
+        $this->assertSame('230.00', $platformRows['keeta']['total']);
+        $this->assertSame('0.00', $platformRows['keeta']['platform_collected_total']);
+        $this->assertSame('230.00', $platformRows['keeta']['merchant_collected_total']);
+
+        $preview = $this->withToken($auth['token'])->getJson("/api/pos-sessions/{$sessionId}/closing-preview")
+            ->assertOk();
+        $this->assertSame('230.00', $preview->json('data.cash_drawer.expected_amount'));
+        $this->assertCount(1, $preview->json('data.payment_methods'));
+        $this->assertSame($bank['id'], $preview->json('data.payment_methods.0.payment_method_id'));
+        $this->assertSame('230.00', $preview->json('data.payment_methods.0.expected_amount'));
+
+        // لا تنشئ المبيعات المحصلة من المنصة فرق صندوق أو بطاقة عند الإغلاق.
+        $this->withToken($auth['token'])->postJson("/api/pos-sessions/{$sessionId}/close", [
+            'closing_balance' => 23000,
+            'payment_counts' => [['payment_method_id' => $bank['id'], 'counted_amount' => 23000]],
+        ])->assertOk()
+            ->assertJsonPath('data.expected_balance', '230.00')
+            ->assertJsonPath('data.difference', '0.00');
+    }
+
+    /** @test */
+    public function session_report_keeps_sessions_without_delivery_context_backward_compatible_and_scoped(): void
+    {
+        [$auth, $sessionId, $partnerId, $cash] = $this->readyPos('report-scope');
+        $this->checkout($auth['token'], $partnerId, $sessionId, [$this->tender($cash, 11500)])->assertCreated();
+
+        $this->withToken($auth['token'])->getJson("/api/pos-sessions/{$sessionId}/report")
+            ->assertOk()
+            ->assertJsonPath('report.net_sales', '115.00')
+            ->assertJsonPath('report.delivery_platforms.sales_count', 0)
+            ->assertJsonPath('report.delivery_platforms.total', '0.00')
+            ->assertJsonPath('report.delivery_platforms.platforms', []);
+
+        // جلسة المستأجر/الفرع ليست مرجعاً يمكن استكشافه من نطاق آخر.
+        $foreign = $this->registerTenant('dlv-pos-report-foreign', 'owner@dlv-pos-report-foreign.test');
+        $this->withToken($foreign['token'])->getJson("/api/pos-sessions/{$sessionId}/report")->assertNotFound();
+
+        $otherBranch = $this->withToken($auth['token'])->postJson('/api/branches', ['name' => 'فرع تقرير آخر'])->assertCreated()['data']['id'];
+        $this->withToken($auth['token'])->withHeaders(['X-Branch-Id' => $otherBranch])
+            ->getJson("/api/pos-sessions/{$sessionId}/report")
+            ->assertNotFound();
+    }
+
+    /** @test */
     public function the_active_branch_not_a_client_branch_id_selects_the_collection_mode(): void
     {
         $auth = $this->registerTenant('dlv-pos-branch', 'owner@dlv-pos-branch.test');

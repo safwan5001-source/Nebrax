@@ -103,7 +103,8 @@ jobs:
       - name: تثبيت Sanctum + تخزين S3/R2 + تفعيل مسارات API
         working-directory: ${{ env.APP_DIR }}
         run: |
-          composer require laravel/sanctum league/flysystem-aws-s3-v3:^3.0 predis/predis:^2.2 resend/resend-php --quiet
+          composer require laravel/sanctum league/flysystem-aws-s3-v3:^3.0 predis/predis:^2.2 resend/resend-php intervention/image-laravel:4.1.1 --quiet
+          php "$GITHUB_WORKSPACE/tests/Fixtures/intervention-image-runtime-smoke.php" "$APP_DIR"
           php artisan install:api --no-interaction --quiet || true
           rm -f database/migrations/*_create_personal_access_tokens_table.php
 

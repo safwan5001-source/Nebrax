@@ -3668,6 +3668,7 @@
     "title": "POS report",
     "subtitle": "A trustworthy X/Z report built only from the selected session's documents.",
     "total_sales": "Total cash sales",
+    "gross_session_sales": "Gross session sales",
     "cash_sales": "Cash sales (shift)",
     "count": "Invoice count",
     "avg": "Average invoice",
@@ -3684,7 +3685,14 @@
     "x_report": "X report — current reading",
     "z_report": "Z report — final close",
     "returns": "Posted session returns",
-    "returns_empty": "No posted returns in this session"
+    "returns_empty": "No posted returns in this session",
+    "delivery_platforms": "Delivery platforms",
+    "delivery_platforms_hint": "Channel sales are informational. Platform-collected amounts are excluded from cashier cash, card, and physical-tender expectations.",
+    "delivery_sales_total": "Delivery sales",
+    "platform_collected_sales": "Platform-collected sales",
+    "merchant_collected_sales": "Merchant-collected sales",
+    "delivery_invoice_count": "{count, plural, one {# invoice} other {# invoices}}",
+    "unknown_delivery_platform": "Delivery platform"
   },
   "posSessions": {
     "title": "POS sessions",

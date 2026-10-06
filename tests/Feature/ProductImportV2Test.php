@@ -7,9 +7,9 @@ use App\Models\Product;
 use App\Models\ProductCategory;
 use App\Models\StockMovement;
 use App\Models\UnitTemplate;
-use App\Services\DocumentCenter\DocumentStorageService;
 use App\Services\ProductImportService;
 use App\Services\ProductLifecycleService;
+use App\Services\ProductMediaService;
 use App\Support\SpreadsheetWriter;
 use App\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -712,7 +712,7 @@ class ProductImportV2Test extends TestCase
         $auth = $this->registerTenant();
 
         // فشلٌ مصطنع **داخل** المعاملة: أقرب ما يحاكي عطلاً بعد كتابة أول صف.
-        $this->app->bind(ProductLifecycleService::class, fn ($app) => new class($app->make(DocumentStorageService::class)) extends ProductLifecycleService
+        $this->app->bind(ProductLifecycleService::class, fn ($app) => new class($app->make(ProductMediaService::class)) extends ProductLifecycleService
         {
             public function create(Product $product, ?string $userId): void
             {

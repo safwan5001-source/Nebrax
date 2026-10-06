@@ -334,6 +334,7 @@ class PosSessionController extends ApiController
         // صفوف البيع ومجاميعها تُشتق من اللقطة المحمّلة نفسها. فلا يمكن أن
         // يتغيّر sales_count/average عن الصفوف إذا اكتمل checkout متزامن.
         $report = $this->sessions->report($session, $salesInvoices, $returnDocuments);
+        $deliveryPlatforms = $this->sessions->deliveryPlatformSalesReport($session, $salesInvoices);
         $sales = $salesInvoices
             ->map(fn (Invoice $invoice) => [
                 'id' => $invoice->id,
@@ -363,9 +364,24 @@ class PosSessionController extends ApiController
                 'sales_count' => $report['sales_count'],
                 'returns_count' => $report['returns_count'],
                 'returns_total' => Money::toRiyal($report['returns_total']),
+                'gross_sales' => Money::toRiyal($report['gross_sales']),
                 'net_sales' => Money::toRiyal($report['net_sales']),
                 'average' => Money::toRiyal($report['average']),
                 'expected' => Money::toRiyal($report['expected']),
+                // قناة معلوماتية فقط: لا تدخل قيم المنصة المحصّلة في مطابقة
+                // النقد/البطاقات، إذ إن سند المقاصة لا يحمل pos_session_id.
+                'delivery_platforms' => [
+                    'sales_count' => $deliveryPlatforms['sales_count'],
+                    'total' => Money::toRiyal($deliveryPlatforms['total']),
+                    'platform_collected_total' => Money::toRiyal($deliveryPlatforms['platform_collected_total']),
+                    'merchant_collected_total' => Money::toRiyal($deliveryPlatforms['merchant_collected_total']),
+                    'platforms' => array_map(static fn (array $platform): array => [
+                        ...$platform,
+                        'total' => Money::toRiyal($platform['total']),
+                        'platform_collected_total' => Money::toRiyal($platform['platform_collected_total']),
+                        'merchant_collected_total' => Money::toRiyal($platform['merchant_collected_total']),
+                    ], $deliveryPlatforms['platforms']),
+                ],
             ],
             // تفاصيل التقرير من المصدر نفسه الذي كوّن المجاميع؛ لا تعتمد الواجهة
             // على قائمة الفواتير العامة أو نافذة زمنية قابلة للاختلاط بين الجلسات.

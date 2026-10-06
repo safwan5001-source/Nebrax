@@ -122,12 +122,17 @@ export function timeZoneDisplayLabel(timeZone: string, locale: "ar" | "en"): str
   return locale === "ar" ? `بتوقيت ${zone} (${offset})` : `${zone} time (${offset})`;
 }
 
-function timeZoneOffsetLabel(timeZone: string): string {
+const offsetFormatters = new Map<string, Intl.DateTimeFormat>();
+
+/** «GMT+03:00» لمنطقة (الآن)؛ «UTC» إن لم تُفهم. المُنسِّق يُخزَّن لكل منطقة (إنشاؤه مكلف وقوائم المناطق طويلة). */
+export function timeZoneOffsetLabel(timeZone: string): string {
   try {
-    const part = new Intl.DateTimeFormat("en-US", {
-      timeZone,
-      timeZoneName: "longOffset",
-    })
+    let formatter = offsetFormatters.get(timeZone);
+    if (!formatter) {
+      formatter = new Intl.DateTimeFormat("en-US", { timeZone, timeZoneName: "longOffset" });
+      offsetFormatters.set(timeZone, formatter);
+    }
+    const part = formatter
       .formatToParts(new Date())
       .find((p) => p.type === "timeZoneName");
     return part?.value ?? "UTC";

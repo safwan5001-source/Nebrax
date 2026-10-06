@@ -98,8 +98,10 @@ class ProductMediaR2BulkCleanupSemanticsTest extends TestCase
         // الصفّ زال من القاعدة فور collectAndQueueDeletion() — قبل أي استدعاء تخزينٍ إطلاقاً.
         $this->assertNull(ProductMedia::find($seed['media']->id));
         $this->assertSame([[
+            'id' => $seed['media']->id,
             'disk' => 'r2',
             'path' => $seed['media']->path,
+            'mime_type' => 'image/webp',
             'product_id' => $seed['product']->id,
         ]], $files);
     }
@@ -110,7 +112,7 @@ class ProductMediaR2BulkCleanupSemanticsTest extends TestCase
         $client = $this->mockR2();
         $seed = $this->seedR2Media('bulk-fail');
 
-        $expectedKey = $seed['media']->path;
+        $expectedKey = "tenant/{$seed['tenant']->id}/product-media/{$seed['product']->id}/{$seed['media']->id}-thumbnail.webp";
         $client->shouldReceive('deleteObject')->once()
             ->with(['Bucket' => 'awj-product-media-test', 'Key' => $expectedKey])
             ->andThrow(new AwsException(

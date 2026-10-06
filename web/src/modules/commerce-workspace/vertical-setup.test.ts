@@ -113,9 +113,9 @@ describe('vertical setup client', () => {
 });
 
 describe('setup destinations', () => {
-  it('has no link for settings that have no dashboard screen yet', () => {
-    expect(SETUP_DESTINATIONS.gift_settings).toBeNull();
-    expect(SETUP_DESTINATIONS.delivery_schedule).toBeNull();
+  it('links the settings that have a dashboard screen', () => {
+    expect(SETUP_DESTINATIONS.gift_settings).toBe('/commerce/gifting');
+    expect(SETUP_DESTINATIONS.delivery_schedule).toBe('/commerce/delivery');
     expect(SETUP_DESTINATIONS.merchandising).toBe('/commerce/merchandising');
   });
 });

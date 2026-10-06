@@ -3,6 +3,7 @@
 namespace App\Services\Accounting;
 
 use App\Models\Account;
+use App\Models\DeliveryInvoiceContext;
 use App\Models\Invoice;
 use App\Models\JournalEntry;
 use App\Models\Payment;
@@ -756,7 +757,7 @@ class PosSessionService
      * تقرير X/Z يقرأ مستندات الجلسة الثابتة لا نافذةً زمنية: نقد البيع يدخل،
      * وردّ النقد المرحّل يخرج، وحركات الدرج التشغيلية لا تمسّ القيود.
      *
-     * @return array{cash_sales:int,cash_refunds:int,cash_in:int,cash_out:int,sales_count:int,returns_count:int,returns_total:int,net_sales:int,average:int,expected:int}
+     * @return array{cash_sales:int,cash_refunds:int,cash_in:int,cash_out:int,sales_count:int,returns_count:int,returns_total:int,gross_sales:int,net_sales:int,average:int,expected:int}
      */
     public function report(PosSession $session, ?EloquentCollection $postedInvoices = null, ?EloquentCollection $postedReturns = null): array
     {
@@ -781,9 +782,101 @@ class PosSessionService
             'sales_count' => $count,
             'returns_count' => $returnsCount,
             'returns_total' => $returnsTotal,
+            'gross_sales' => $salesTotal,
             'net_sales' => $salesTotal - $returnsTotal,
             'average' => $count > 0 ? intdiv($salesTotal, $count) : 0,
             'expected' => $session->opening_balance + $cash['net'],
+        ];
+    }
+
+    /**
+     * معلومات قنوات التوصيل في تقرير الجلسة، لا مطابقة وسائل تحصيل الكاشير.
+     *
+     * المصدر هو مجموعة فواتير التقرير المحمّلة نفسها (`invoices.pos_session_id`)،
+     * ثم السياق المثبّت على كل فاتورة. لذلك لا ينسب التقرير عملية لمنصة أو لجلسة
+     * بالوقت أو بالكاشير أو بالفرع. دفعة `platform_collected` لا تحمل جلسة POS
+     * عمداً، فلا تدخل هذه الأرقام في `cashMovement()` ولا في مطابقة الإغلاق.
+     *
+     * @return array{sales_count:int,total:int,platform_collected_total:int,merchant_collected_total:int,platforms:array<int,array<string,mixed>>}
+     */
+    public function deliveryPlatformSalesReport(PosSession $session, EloquentCollection $postedInvoices): array
+    {
+        $invoiceTotals = $postedInvoices->keyBy('id');
+        if ($invoiceTotals->isEmpty()) {
+            return $this->emptyDeliveryPlatformSalesReport();
+        }
+
+        // نقيّد بالسياق الثلاثي الصريح حتى لو وصل هنا صفّ فواتير خاطئ مستقبلاً؛
+        // `invoice_id` وحده ليس تفويضاً لقراءة سياق مستأجر أو فرع آخر.
+        $contexts = DeliveryInvoiceContext::query()
+            ->with([
+                'profile:id,tenant_id,platform_key',
+                'profileVersion:id,tenant_id,delivery_platform_profile_id,display_name,display_name_en,logo_asset_key',
+            ])
+            ->where('tenant_id', $session->tenant_id)
+            ->where('branch_id', $session->branch_id)
+            ->whereIn('invoice_id', $invoiceTotals->keys()->all())
+            ->get();
+
+        $groups = [];
+        foreach ($contexts as $context) {
+            $invoice = $invoiceTotals->get($context->invoice_id);
+            $profile = $context->profile;
+            $version = $context->profileVersion;
+            if (! $invoice || ! $profile || ! $version) {
+                // لا نخمن منصة أو اسماً من مرجع خارجي. قيود السياق تحمي هذه
+                // العلاقة؛ إن تلفت بيانات تاريخية، يبقى البيع الإجمالي صحيحاً
+                // ولا يُعاد تصنيفه في تقرير القنوات.
+                continue;
+            }
+
+            // النسخة المثبّتة هي مصدر الاسم/الشعار التاريخي؛ لا نعيد قراءة
+            // الإعداد الحالي ثم نعيد تفسير مبيعات جلسة قديمة.
+            $key = implode(':', [$context->delivery_platform_profile_id, $context->delivery_platform_profile_version_id]);
+            $groups[$key] ??= [
+                'delivery_platform_profile_id' => $context->delivery_platform_profile_id,
+                'delivery_platform_profile_version_id' => $context->delivery_platform_profile_version_id,
+                'platform_key' => $profile->platform_key,
+                'display_name' => $version->display_name,
+                'display_name_en' => $version->display_name_en,
+                'logo_asset_key' => $version->logo_asset_key,
+                'sales_count' => 0,
+                'total' => 0,
+                'platform_collected_total' => 0,
+                'merchant_collected_total' => 0,
+            ];
+
+            $amount = (int) $invoice->total;
+            $groups[$key]['sales_count']++;
+            $groups[$key]['total'] += $amount;
+            if ($context->collection_mode === 'platform_collected') {
+                $groups[$key]['platform_collected_total'] += $amount;
+            } else {
+                $groups[$key]['merchant_collected_total'] += $amount;
+            }
+        }
+
+        ksort($groups);
+        $platforms = array_values($groups);
+
+        return [
+            'sales_count' => array_sum(array_column($platforms, 'sales_count')),
+            'total' => array_sum(array_column($platforms, 'total')),
+            'platform_collected_total' => array_sum(array_column($platforms, 'platform_collected_total')),
+            'merchant_collected_total' => array_sum(array_column($platforms, 'merchant_collected_total')),
+            'platforms' => $platforms,
+        ];
+    }
+
+    /** @return array{sales_count:int,total:int,platform_collected_total:int,merchant_collected_total:int,platforms:array<int,array<string,mixed>>} */
+    private function emptyDeliveryPlatformSalesReport(): array
+    {
+        return [
+            'sales_count' => 0,
+            'total' => 0,
+            'platform_collected_total' => 0,
+            'merchant_collected_total' => 0,
+            'platforms' => [],
         ];
     }
 

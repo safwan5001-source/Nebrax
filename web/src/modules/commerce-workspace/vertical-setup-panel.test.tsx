@@ -19,6 +19,7 @@ const ITEMS = [
   { key: 'occasions', available: true, state: 'not_configured', count: 0, manage_in: 'merchandising' },
   { key: 'gift_message', available: true, state: 'configured', count: 1, manage_in: 'gift_settings' },
   { key: 'delivery_scheduling', available: true, state: 'not_configured', count: 0, manage_in: 'delivery_schedule' },
+  { key: 'recipients', available: true, state: 'not_configured', count: 0, manage_in: 'future_screen' },
   { key: 'unknown_future_capability', available: true, state: 'configured', count: 1, manage_in: 'x' },
 ];
 const setup = (items = ITEMS) => ({ data: { setup: { vertical: 'flowers_gifts', items } } });
@@ -41,15 +42,18 @@ describe('VerticalSetupPanel', () => {
 
     await waitFor(() => expect(document.querySelector('[data-vertical-setup]')).not.toBeNull());
     expect(document.querySelector('[data-setup-item="unknown_future_capability"]')).toBeNull();
-    expect(document.querySelector('[data-setup-progress]')?.textContent).toContain('1 / 3');
+    expect(document.querySelector('[data-setup-progress]')?.textContent).toContain('1 / 4');
 
     const occasions = document.querySelector('[data-setup-item="occasions"]') as HTMLElement;
     expect(occasions.textContent).toContain('Not set up');
     expect(occasions.querySelector('a')?.getAttribute('href')).toBe('/commerce/merchandising');
 
     const schedule = document.querySelector('[data-setup-item="delivery_scheduling"]') as HTMLElement;
-    expect(schedule.querySelector('a')).toBeNull();
-    expect(schedule.textContent).toContain('No screen yet');
+    expect(schedule.querySelector('a')?.getAttribute('href')).toBe('/commerce/delivery');
+
+    const future = document.querySelector('[data-setup-item="recipients"]') as HTMLElement;
+    expect(future.querySelector('a')).toBeNull();
+    expect(future.textContent).toContain('No screen yet');
 
     expect((document.querySelector('[data-setup-item="gift_message"]') as HTMLElement).textContent).toContain('Set up');
   });

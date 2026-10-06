@@ -52,6 +52,7 @@ export const COMMERCE_WORKSPACE_MESSAGES = {
     groupChannel: 'القناة',
     domains: 'النطاقات',
     delivery: 'التوصيل وإعدادات القناة',
+    gifting: 'الإهداء',
     integrations: 'التكاملات',
     overviewTitle: 'مركز قيادة التجارة',
     overviewDescription:
@@ -395,6 +396,7 @@ export const COMMERCE_WORKSPACE_MESSAGES = {
     groupChannel: 'Channel',
     domains: 'Domains',
     delivery: 'Delivery and channel settings',
+    gifting: 'Gifting',
     integrations: 'Integrations',
     overviewTitle: 'Commerce command center',
     overviewDescription:

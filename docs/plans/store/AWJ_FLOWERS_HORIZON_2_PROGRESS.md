@@ -1,8 +1,10 @@
 # AWJ Flowers & Gifts — Horizon 2 Progress
 
-**Status:** PLANNED — execution not started  
+**Status:** IN PROGRESS — H2-1…H2-3 merged; H2-4 in review  
 **Date:** 2026-10-04  
 **Planning Base:** `main` @ `6ded662bfada8f72f5ebf321dcf27b08be7939c1`  
+**Execution Base (H2-1):** `main` @ `afe223cb654154fa55234ff2e360233bbc933ec3`  
+**Cross-slice decisions:** `ADR-27-FLOWERS-MERCHANT-ADMIN-SURFACES.md`  
 **Execution Authority:** `AWJ_FLOWERS_HORIZON_2_MERCHANT_ADMIN_SURFACES.md`  
 **Predecessor Final Report:** `AWJ_FLOWERS_HORIZON_1_FINAL_REPORT.md`
 
@@ -24,10 +26,10 @@ Horizon 1 is complete.
 
 | Slice | Scope | Status | PR | Merge SHA |
 |---|---|---|---|---|
-| H2-1 | Gift Policy Admin | NOT STARTED | — | — |
-| H2-2 | Delivery Schedule Admin | NOT STARTED | — | — |
-| H2-3 | Delivery Windows & Capacity | NOT STARTED | — | — |
-| H2-4 | Blocked Dates & Exceptions | NOT STARTED | — | — |
+| H2-1 | Gift Policy Admin | MERGED | #1237 | `cfc16aa` |
+| H2-2 | Delivery Schedule Admin | MERGED | #1238 | `37d462f` |
+| H2-3 | Delivery Windows & Capacity | MERGED | #1239 | `5ff339b` |
+| H2-4 | Blocked Dates & Exceptions | PR OPEN | (see log) | — |
 | H2-5 | Fulfillment Warehouse Setup | NOT STARTED | — | — |
 | H2-6 | Product Preparation Time | NOT STARTED | — | — |
 | H2-7 | Product Personalization Admin | NOT STARTED | — | — |
@@ -60,6 +62,178 @@ A UI slice is not complete until its progress entry records:
 - no horizontal overflow;
 - design-token compliance;
 - confirmation that no AI-template visual patterns were introduced.
+
+---
+
+## Per-slice log
+
+### H2-1 — Gift Policy Admin
+
+**Status:** MERGED  
+**Base SHA:** `afe223cb654154fa55234ff2e360233bbc933ec3`  
+**Branch:** `flowers/h2-1-gift-policy-admin`  
+**PR:** #1237  
+**Head SHA:** `bda518e53185f37ffa2c00196644ad004cb08769` (first head `562ba7d3062e33e20540fc0a4001e6c9929d1b7d`)  
+**Merge SHA:** `cfc16aa93527c3e2f11aab418355354499ef27b3` (squash)
+
+#### Contract / scope
+- Existing contract only: `GET|PUT /commerce/workspace/storefronts/{id}/gift-settings` (`commerce.manage`), four fields — `is_enabled`, `message_max_length` (1–500, default 250), `allow_hide_sender` (default on), `recipient_phone_required` (default on). The plan's "message required / sender display" fields do not exist in the backend contract and were **not** invented.
+- No backend change. No migration. Store ownership is derived server-side (`{id}` is a store selector; foreign store → 404).
+
+#### UI / information architecture
+- New workspace page `/commerce/gifting` ("الإهداء" / "Gifting") in the Channel group (permission `commerce.manage`, Gift icon). One compact settings surface (`SettingsList`: one row per setting, no card-per-field), a plain-language "what shoppers will see" summary derived from the draft (text only, not a second renderer), dirty/saved indicator, Save + Discard.
+- Switching gifting off keeps the other values (full field set is always sent; an info note says so).
+- Shared kit introduced for the Horizon (`web/src/modules/commerce-workspace/flowers-admin/`): `admin-http`, `messages` (AR/EN + parity test), `StoreGate`, `SettingsList/SettingRow`, `useUnsavedGuard`, `failureText`. Decisions recorded in `ADR-27`.
+- The H14 checklist deep-links `gift_settings` → `/commerce/gifting`.
+
+#### Review findings (Codex, both verified valid and fixed in `bda518e`, threads answered and resolved)
+- **P1** — the workspace store selector is hidden below `md`, so on mobile the page configured the default store without naming it. Fixed: `StoreGate` shows the target store (switchable when several) on small screens, hidden from `md` up; `store-gate.test.tsx` + a 390px multi-store Playwright case.
+- **P2** — summary promised "the sender name always appears" when hiding is off, which the checkout does not guarantee. Fixed copy: "The option to hide the sender name is not offered."
+
+#### Tests
+- `gift-settings.test.ts`, `gift-policy-panel.test.tsx`, `store-gate.test.tsx`, `messages.test.ts` (AR/EN parity); nav/vertical-setup tests updated.
+- Full web suite: 381 files / 3164 tests passed; `npm run build` exit 0.
+- CI on the merged head: php artisan test (sqlite) ✅, php artisan test (pgsql) ✅, web build ✅ (pull_request run). The duplicate push-event run's pgsql job was still running when the PR-event run was fully green; merged on the green PR-event run.
+
+#### Visual QA (Playwright `e2e/flowers-h2-1-gift-policy.spec.ts`, 15 cases; screenshots reviewed)
+- Arabic RTL and English LTR at 390/430/1024/1440 populated: no horizontal overflow, `dir` correct.
+- Dirty → invalid length (described error, `aria-invalid`) → save success; Space toggles the switch with a visible focus ring; server-422 keeps draft; load error offers Retry; `commerce.manage`-less user gets a permission state and **zero** API calls; dark mode 390; multi-store mobile store context.
+- Design-token compliance: semantic tokens/primitives only; no gradients/glow/heavy shadows/colored icon boxes.
+
+#### Tenant Isolation / RBAC
+- No new server surface; no tenant/channel identifier sent by the client; route enforces `commerce.manage` for read and write.
+
+#### Backward compatibility
+- Additive web screen + nav item + destination-map entry. Nothing is enabled automatically; non-Flowers stores unaffected.
+
+#### Deferred
+- Mobile channel gift policy (no `mobile-channel/gift-settings` route; App Builder/mobile gifting admin is outside Horizon 2).
+
+#### Deployment observation
+- Manual deploy: NOT PERFORMED
+- Automatic CI/CD deploy: recorded in the final report (Railway is connected to `main`; per-merge observation is limited to what GitHub exposes — no deployment status/check from Railway appeared on the PR)
+- Production verification: NOT PERFORMED
+
+#### Next
+- H2-2 — Delivery Schedule Admin.
+
+---
+
+### H2-2 — Delivery Schedule Admin
+
+**Status:** MERGED  
+**Base SHA:** `cfc16aa93527c3e2f11aab418355354499ef27b3`  
+**Branch:** `flowers/h2-2-delivery-schedule-admin`  
+**PR:** #1238  
+**Head SHA:** `830b77d` (first head `01c5913`)  
+**Merge SHA:** `37d462f54e091a4ba630b41ec3210b90e00e3b21` (squash)
+
+#### Contract / scope
+- Existing contract only: `GET /commerce/workspace/storefronts/{id}/delivery-schedule` and `PUT …/delivery-schedule/settings` (`commerce.manage`): `is_enabled`, `is_required`, `timezone` (any IANA id the server accepts), `lead_time_minutes` (0–43 200), `cutoff_time` (`HH:MM` or null), `max_days_ahead` (1–90). The whole document (settings + windows + blocked dates) is read once and shared by the tabs; every save returns it in full.
+- No backend change. The full client for windows and blocked dates (used by H2-3/H2-4) ships here with tests.
+
+#### UI / information architecture
+- `/commerce/delivery` (previously a placeholder) now hosts the delivery workspace. Top: a **readiness strip** with the prerequisites that are true on the server today (scheduling on, ≥1 active window) — explicitly labelled as basic prerequisites, not an availability promise. Below: the "Availability rules" settings surface.
+- Timezone is prominent: a picker (common GCC/MENA zones first, then all IANA zones; an unusual saved zone stays selectable), plus a live "Time now in the store" clock computed in that zone so the effect of the choice is concrete. Lead time is entered with a unit (minutes/hours/days, best unit chosen on load, converted to minutes), cut-off is a time input with an explicit "no cut-off" state, booking horizon 1–90 days.
+- Switching the schedule off keeps the saved rules (note shown). Deep links: `?tab=` selects a tab; the H14 checklist now links `delivery_schedule` → `/commerce/delivery`.
+
+#### Review findings (Codex, six P2 findings over four rounds — all verified valid, fixed, answered, resolved)
+- Timezone choices came from the browser ICU list (aliases such as `Asia/Calcutta` the API rejects) → then from a too-small curated list → finally the **complete** `DateTimeZone::listIdentifiers()` set (419 ids) pinned by test; labels memoized and `Intl` formatters cached (perf).
+- Orphan `role=tabpanel` with no tab bar → plain container until the tab bar ships.
+- Unsaved drafts were lost on store switch and on in-app navigation (neither fires `beforeunload`) → workspace-level unsaved registry: store switch and any in-app link now ask first (browser Back remains unguarded — App Router has no reliable hook).
+- Process note: `date-formatting-guardrail` (no direct `Intl.DateTimeFormat` outside `lib/`) failed the first web build; fixed by routing through `lib/timezone`.
+- CI: duplicate push/PR runs; one PR-run sqlite job failed on an unrelated random-key ZATCA certificate test (`ZatcaQrCertificateMaterialExtractorTest`, leading-zero EC coordinate) and passed on the identical commit in the push run; merged on a fully green head.
+
+#### Tests
+- `delivery-schedule.test.ts` (mapping, limits, unit conversion, payload field names), `timezones.test.ts`, `delivery-workspace.test.tsx` (8 cases: load/units/clock, readiness honesty, save payload, local validation with aria, clear cut-off, server 422, retry + unusual zone, 403 + stale-store response).
+
+#### Visual QA (`e2e/flowers-h2-2-delivery-schedule.spec.ts`, 13 cases; screenshots reviewed)
+- AR/EN × 390/430/1024/1440 no overflow; enabled-without-windows shows the missing prerequisite; invalid days/lead → described errors → save; server rejection keeps the draft; load failure retry; permission state with no request; dark 390.
+
+#### Tenant Isolation / RBAC
+- Client sends no tenant/channel id; `commerce.manage` for read+write (route); page issues no request without it.
+
+#### Backward compatibility
+- Replaces a placeholder page; no behaviour change for existing stores.
+
+#### Deployment observation
+- Manual deploy: NOT PERFORMED; automatic CI/CD: not observable from GitHub (no Railway status on the PR); production verification: NOT PERFORMED.
+
+#### Next
+- H2-3 — Delivery Windows & Capacity.
+
+---
+
+### H2-3 — Delivery Windows & Capacity
+
+**Status:** MERGED  
+**Base SHA:** `37d462f54e091a4ba630b41ec3210b90e00e3b21` (H2-2 merged)  
+**Branch:** `flowers/h2-3-delivery-windows`  
+**PR:** #1239  
+**Head SHA:** `3218ebf` (first head `ebc930b`)  
+**Merge SHA:** `5ff339b7581be46891766d7361edb6446f8d1057` (squash)
+
+#### Contract / scope
+- Existing contract: `PUT …/delivery-schedule/slots` (full-set, id-stable replace; `sort_order` = presentation order) and read-only `GET commerce/workspace/shipping-zones` (zone restriction for delivery windows).
+- **Backend (additive, two changes):** (1) `PUT …/slots` accepts an optional `expected_revision`; the document now carries `slots_revision` (sha1 of the current windows). The comparison runs **inside the channel lock**, so a replacement built on a stale list is rejected with 409 without writing (two administrators saving at the same moment can no longer overwrite each other); omitting it keeps the old unconditional behaviour. (2) **Found by driving the real API, not by mocks:** `slots.*.weekdays.*` used Laravel `distinct`, which compares values across *all* windows, so two windows on the same weekdays (morning + evening — the commonest setup) were rejected with "duplicate value". Uniqueness is now checked per window; regression test added. Strictly more permissive; no response shape change; no migration.
+
+#### UI / information architecture
+- New "Windows" tab in the delivery workspace: windows grouped by method (delivery / pickup), each row showing label (AR/EN), time range, weekdays, capacity, zone, active state; add/edit in a dialog, reorder, activate/deactivate, delete behind a destructive confirmation (open checkouts keep their windows' ids — replace is id-stable). Capacity is entered as a number or "unlimited"; remaining capacity is never computed on the client (server authority).
+- Tabs `?tab=rules|windows`; the H2-11 checklist deep-links `delivery_scheduling` here.
+
+#### Review findings (Codex, 10 findings over four rounds — all verified valid, fixed, answered, resolved; then Codex hit its usage limit)
+- Concurrency (P1×3): preflight read failure must abort the write; a stale list must close the edit dialog (no retry of an old draft); and the check must be **atomic with the write** → server-side `expected_revision` under the channel lock (409), with `slots_revision` derived from the *same* snapshot as the returned slots.
+- Zones (P2×4): inactive zones not offered for new selection; zones refreshed on every dialog open; a newly chosen zone revalidated on save and **fails closed** if the read fails; each row shows its destination.
+- Unsaved work (P2×2): the window draft registers with the unsaved guard; tab switching confirms before dropping a rules draft.
+- CI: one sqlite job failed on the unrelated ZATCA certificate test again (EC coordinates lose leading zero bytes in `openssl_pkey_get_details`, ≈1/128 random keys); fixed in the test itself (pad to 32 bytes). Merged on a fully green pull_request-event run (sqlite, pgsql, web).
+
+#### Tests
+- `slot-editor.test.ts`, `weekday-names.test.ts`, `windows-panel.test.tsx`; backend `CommerceDeliveryScheduleTest` (30 tests incl. the new shared-weekday case) green locally.
+- Playwright `flowers-h2-3-delivery-windows.spec.ts`: AR/EN × 390/430/1024/1440, dialog validation, delete confirmation, server rejection, dark mode.
+
+#### Tenant Isolation / RBAC
+- No tenant/channel id from the client; `commerce.manage` read+write; zone ids validated server-side per tenant.
+
+#### Backward compatibility
+- Additive UI; the validation change only accepts input that was wrongly rejected before.
+
+#### Deployment observation
+- Manual deploy: NOT PERFORMED; automatic CI/CD: not observable from GitHub; production verification: NOT PERFORMED.
+
+#### Next
+- H2-4 — Blocked Dates & Exceptions.
+
+---
+
+### H2-4 — Blocked Dates & Exceptions
+
+**Status:** PR OPEN  
+**Base SHA:** `5ff339b7581be46891766d7361edb6446f8d1057` (H2-3 merged)  
+**Branch:** `flowers/h2-4-blocked-dates`  
+**PR / Head / Merge SHA:** recorded in the next slice's ledger update after merge
+
+#### Contract / scope
+- Existing contract: `PUT …/delivery-schedule/blocked-dates` (full-set replace of `{date Y-m-d, method all|delivery|pickup, reason}`; dates are calendar days in the store time zone).
+- Backend (additive): `expected_revision` on that PUT + `blocked_dates_revision` in the document, compared **inside the channel lock** (409, nothing written) — the same optimistic-concurrency pattern as slots, applied up front after the H2-3 review.
+
+#### UI / information architecture
+- "Blocked dates" tab: an add form (date, applies to all/delivery/pickup, optional reason) and the list with upcoming dates first (weekday + day/month/year, Latin digits) and past dates folded away with a confirmed bulk removal. Duplicate / overlapping-with-"all" / over-limit entries are refused locally with described errors; the server's rejection is always shown.
+- The half-filled form registers with the unsaved guard (browser warning, in-app navigation and tab/store switch confirmations); a failed freshness read aborts the write; a stale list refreshes the view and stops the action.
+
+#### Tests
+- `blocked-dates.test.ts`, `blocked-dates-panel.test.tsx` (revision sent, stale ⇒ refresh without write, pre-read fallback aborts on failure, unsaved guard); backend `CommerceDeliveryScheduleTest` (32 tests incl. the blocked-dates revision case); Playwright `flowers-h2-4-blocked-dates.spec.ts` (11 cases, AR/EN × 390/430/1024/1440, dark).
+
+#### Tenant Isolation / RBAC
+- No tenant/channel id from the client; `commerce.manage` read+write; foreign store ⇒ 404 (covered by the H2-13 access matrix).
+
+#### Backward compatibility
+- Additive; omitting `expected_revision` keeps the previous unconditional replace.
+
+#### Deployment observation
+- Manual deploy: NOT PERFORMED; production verification: NOT PERFORMED.
+
+#### Next
+- H2-5 — Fulfilment Warehouse Setup.
 
 ---
 

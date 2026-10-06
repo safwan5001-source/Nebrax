@@ -3668,6 +3668,7 @@
     "title": "تقرير نقاط البيع",
     "subtitle": "تقرير X/Z موثوق مبني حصراً على مستندات الجلسة المختارة.",
     "total_sales": "إجمالي المبيعات النقدية",
+    "gross_session_sales": "إجمالي مبيعات الجلسة",
     "cash_sales": "مبيعات نقدية (الوردية)",
     "count": "عدد الفواتير",
     "avg": "متوسط الفاتورة",
@@ -3684,7 +3685,14 @@
     "x_report": "تقرير X — قراءة حالية",
     "z_report": "تقرير Z — إغلاق نهائي",
     "returns": "مرتجعات الجلسة المرحّلة",
-    "returns_empty": "لا توجد مرتجعات مرحّلة في هذه الجلسة"
+    "returns_empty": "لا توجد مرتجعات مرحّلة في هذه الجلسة",
+    "delivery_platforms": "منصات التوصيل",
+    "delivery_platforms_hint": "مبيعات القناة معلوماتية. المبالغ التي حصّلتها المنصة مستبعدة من توقعات نقد الكاشير والبطاقات والعهدة الفعلية.",
+    "delivery_sales_total": "مبيعات التوصيل",
+    "platform_collected_sales": "مبيعات حصّلتها المنصة",
+    "merchant_collected_sales": "مبيعات حصّلها التاجر",
+    "delivery_invoice_count": "{count, plural, one {# فاتورة} other {# فواتير}}",
+    "unknown_delivery_platform": "منصة توصيل"
   },
   "posSessions": {
     "title": "جلسات نقطة البيع",

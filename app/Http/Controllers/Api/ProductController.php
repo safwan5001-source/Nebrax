@@ -31,6 +31,7 @@ use App\Services\DocumentCenter\DocumentStorageService;
 use App\Services\ProductExportService;
 use App\Services\ProductImportService;
 use App\Services\ProductLifecycleService;
+use App\Services\ProductMediaService;
 use App\Services\ProductPricingService;
 use App\Services\ProductService;
 use App\Services\R2StorageService;
@@ -41,7 +42,6 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
 use RuntimeException;
 
 class ProductController extends ApiController
@@ -53,15 +53,10 @@ class ProductController extends ApiController
         protected ProductImportService $imports,
         protected ProductExportService $exports,
         protected ProductLifecycleService $lifecycle,
+        protected ProductMediaService $media,
         protected ProductService $products,
         protected ProductPricingService $pricing,
     ) {}
-
-    /** AWJ-R2-4A: يبقى false افتراضياً — تراجعٌ فوريٌّ بمتغيّر بيئة بلا نشر كود. */
-    private function r2Enabled(): bool
-    {
-        return (bool) config('product_media.r2.enabled', false);
-    }
 
     /**
      * تحقق مراجع المنتج: المورّد طرف ضمن المستأجر، وحسابا المبيعات/التكلفة
@@ -632,53 +627,10 @@ class ProductController extends ApiController
         if ($product->media()->count() + count($files) > 8) {
             abort(422, 'الحد الأقصى لوسائط المنتج هو 8 صور. احذف صورة قبل الرفع.');
         }
-        $start = (int) ($product->media()->max('sort_order') ?? -1) + 1;
-
-        foreach ($files as $offset => $file) {
-            $extension = strtolower($file->getClientOriginalExtension() ?: $file->extension() ?: 'bin');
-            $filename = Str::uuid() . ".{$extension}";
-
-            if ($this->r2Enabled()) {
-                // بايتاتٌ في الذاكرة لا مجرى: حجم الملف محدودٌ أصلاً (5 ميغابايت،
-                // StoreProductMediaRequest)، وتفادياً لعلّة قائمة في
-                // R2StorageService::put() تستدعي is_readable() على مجرًى لا اسم
-                // ملف — لا يُصلَح هنا (خارج نطاق وسائط المنتج، AWJ-R2-2 مدموجة).
-                $bytes = file_get_contents($file->getRealPath());
-                try {
-                    $path = $this->r2->put(ProductMedia::R2_DOMAIN, (string) $product->id, $filename, $bytes, $file->getMimeType());
-                } catch (RuntimeException|AwsException $exception) {
-                    // لا نسجل مرفقاً يشير إلى كائن لم يكتب؛ تبقى الرسالة قابلة للتشخيص دون كشف السر.
-                    abort(503, 'تعذّر حفظ صورة المنتج. تحقق من إعداد تخزين الملفات الدائم ثم أعد المحاولة.');
-                }
-                $disk = 'r2';
-            } else {
-                // "document" يعني تخزيناً دائماً خاصاً عبر S3/R2، لا قرص حاوية Render المؤقت.
-                $path = "product-media/{$product->tenant_id}/{$product->id}/{$filename}";
-                $profile = $this->documentStorage->profile();
-                $stream = fopen($file->getRealPath(), 'rb');
-                try {
-                    try {
-                        $this->documentStorage->put($profile, $path, $stream);
-                    } catch (RuntimeException $exception) {
-                        abort(503, 'تعذّر حفظ صورة المنتج. تحقق من إعداد تخزين الملفات الدائم ثم أعد المحاولة.');
-                    }
-                    $disk = 'document';
-                } finally {
-                    if (is_resource($stream)) {
-                        fclose($stream);
-                    }
-                }
-            }
-
-            $product->media()->create([
-                'disk' => $disk,
-                'path' => $path,
-                'original_name' => $file->getClientOriginalName(),
-                'mime_type' => $file->getMimeType(),
-                'size' => $file->getSize(),
-                'sort_order' => $start + $offset,
-                'uploaded_by' => $request->user()?->id,
-            ]);
+        try {
+            $this->media->attachToProduct($product, $files, $request->user()?->id);
+        } catch (RuntimeException $exception) {
+            abort(503, $exception->getMessage());
         }
 
         return ProductMediaResource::collection($product->media()->orderBy('sort_order')->get())
@@ -694,9 +646,37 @@ class ProductController extends ApiController
         // نفسه فعلياً. عزل المستأجر والصلاحية (`products.view`) لا يتغيّران —
         // كلاهما على مستوى المنتج نفسه (`Product::findOrFail` مُعزول tenant).
         $media = $product->allMedia()->whereKey($mediaId)->firstOrFail();
+        return $this->downloadMediaPath($media, $media->path, $media->original_name, $media->mime_type);
+    }
+
+    public function downloadMediaDerivative(string $id, string $mediaId, string $derivative)
+    {
+        $product = Product::findOrFail($id);
+        $media = $product->allMedia()->whereKey($mediaId)->firstOrFail();
+
+        try {
+            $path = $this->media->existingDerivativePath($media, $derivative);
+        } catch (RuntimeException|AwsException) {
+            abort(404, 'ملف الوسيط غير موجود.');
+        }
+
+        if ($path === null) {
+            return $this->downloadMediaPath($media, $media->path, $media->original_name, $media->mime_type);
+        }
+
+        return $this->downloadMediaPath(
+            $media,
+            $path,
+            $this->media->derivativeDownloadName($media, $derivative),
+            $this->media->derivativeMimeType($media),
+        );
+    }
+
+    private function downloadMediaPath(ProductMedia $media, string $path, string $downloadName, ?string $mimeType)
+    {
         if ($media->disk === 'document') {
             try {
-                $stream = $this->documentStorage->readStream($this->documentStorage->profile(), $media->path);
+                $stream = $this->documentStorage->readStream($this->documentStorage->profile(), $path);
             } catch (RuntimeException $exception) {
                 abort(404, 'ملف الوسيط غير موجود.');
             }
@@ -704,33 +684,33 @@ class ProductController extends ApiController
             return response()->streamDownload(function () use ($stream): void {
                 fpassthru($stream);
                 fclose($stream);
-            }, $media->original_name, [
-                'Content-Type' => $media->mime_type ?? 'application/octet-stream',
+            }, $downloadName, [
+                'Content-Type' => $mimeType ?? 'application/octet-stream',
             ]);
         }
 
         if ($media->disk === 'r2') {
             try {
-                $body = $this->r2->get(ProductMedia::R2_DOMAIN, (string) $media->product_id, basename($media->path));
+                $body = $this->r2->get(ProductMedia::R2_DOMAIN, (string) $media->product_id, basename($path));
             } catch (RuntimeException|AwsException $exception) {
                 abort(404, 'ملف الوسيط غير موجود.');
             }
 
             return response()->streamDownload(function () use ($body): void {
                 echo (string) $body;
-            }, $media->original_name, [
-                'Content-Type' => $media->mime_type ?? 'application/octet-stream',
+            }, $downloadName, [
+                'Content-Type' => $mimeType ?? 'application/octet-stream',
             ]);
         }
 
         // توافق قراءة فقط مع السجلات القديمة التي كتبت إلى القرص المحلي قبل هذا الإصلاح.
         $disk = Storage::disk($media->disk);
-        if (! $disk->exists($media->path)) {
+        if (! $disk->exists($path)) {
             abort(404, 'ملف الوسيط غير موجود.');
         }
 
-        return $disk->download($media->path, $media->original_name, [
-            'Content-Type' => $media->mime_type ?? 'application/octet-stream',
+        return $disk->download($path, $downloadName, [
+            'Content-Type' => $mimeType ?? 'application/octet-stream',
         ]);
     }
 
@@ -738,24 +718,11 @@ class ProductController extends ApiController
     {
         $product = Product::findOrFail($id);
         $media = $product->media()->whereKey($mediaId)->firstOrFail();
-        $disk = $media->disk;
-        $path = $media->path;
-        if ($disk === 'r2') {
-            try {
-                $this->r2->delete(ProductMedia::R2_DOMAIN, (string) $media->product_id, basename($path));
-            } catch (RuntimeException|AwsException $exception) {
-                abort(503, 'تعذّر حذف ملف الوسيط من التخزين الدائم. أعد المحاولة.');
-            }
-        } elseif ($disk === 'document') {
-            try {
-                $this->documentStorage->delete($this->documentStorage->profile(), $path);
-            } catch (RuntimeException $exception) {
-                abort(503, 'تعذّر حذف ملف الوسيط من التخزين الدائم. أعد المحاولة.');
-            }
-        } else {
-            Storage::disk($disk)->delete($path);
+        try {
+            $this->media->delete($media);
+        } catch (RuntimeException $exception) {
+            abort(503, $exception->getMessage());
         }
-        $media->delete();
 
         return response()->json(['message' => 'تم حذف الوسيط.']);
     }

@@ -1,11 +1,18 @@
 # AWJ Delivery Platforms & Settlement Horizon V1
 
 **System:** AWJ Autonomous Engineering Horizon  
-**Status:** PROPOSED — owner authorization required before autonomous implementation  
+**Status:** ACTIVE — PASS-7 accepted; PASS-8 merged; each implementation still requires its own authorization
 **Prepared:** 2026-10-02  
 **Planning Base SHA:** `78ca324504db30185bc074fd91e77efbccaf7267`  
 **Primary decision:** `docs/plans/pos/AWJ_POS_DELIVERY_PLATFORMS_ACCOUNTING_UX_DECISION.md`  
 **Execution protocol:** `docs/autonomous-engineering/AWJ-HORIZON-SYSTEM.md`
+
+**Current DG-3 state:** `OD-DG-3-TAX-POINT` is **ACCEPTED** by Safwan as
+Option D (hybrid universal Saudi/GCC principles + versioned
+evidence-backed provider/merchant policy + `UNKNOWN` fail-closed), merged in
+PR #1233 at `b0c3574225531ed907991bd9c5f23a7e8f5d66bb`. This is an
+architecture/documentation acceptance only. It does not authorize imported
+financial posting, VAT posting, provider enablement, or deployment.
 
 ## 1. Horizon objective
 
@@ -111,6 +118,28 @@ Any discovered material conflict with the locked accounting/security decisions b
 
 Tasks are promoted to `ready` one at a time from current-main evidence. An unmerged dependency does not unlock its child.
 
+### 5.1 PASS-7 / PASS-8 durable reconciliation
+
+The original queue order remains historical and is not silently rewritten.
+PASS-7 is now accepted, but its evidence-backed prerequisites remain required
+before any imported financial transition. PASS-8 freezes the evidence contract,
+version vocabulary, posting-prerequisite matrix, and accounting-
+representability boundary; it does not implement those prerequisites.
+
+`DLV-CLOSE-1` is implemented on its focused PR and awaits the ordinary review/
+merge gates. It remains bounded to POS close/Z-report presentation and
+channel-total separation, using existing manual-POS session attribution only; it
+does not require imported-order VAT recognition. `DLV-COMMISSION-1`,
+`DLV-SETTLEMENT-1`, `DLV-RECON-1`, `DLV-REFUND-1`, `DLV-CONNECTOR-CORE-1`, and
+all imported financial-transition work remain blocked by their respective
+evidence, provider, DG-3, or owner gates. Manual POS remains independent and
+unchanged.
+
+After `DLV-CLOSE-1` merges, no further delivery financial implementation task is
+promoted as ready. `DLV-CONNECTOR-CORE-1` is only a candidate for a separately
+authorized projection/intake-security scope; it is not authorization for
+imported-order financial behavior.
+
 ## 6. Task acceptance highlights
 
 ### DLV-FOUNDATION-1
@@ -209,6 +238,13 @@ Financial/security/tenant tasks require, where applicable:
 No reduction of financial/security verification to save quota.
 
 ## 8. Decision Gates
+
+`DELIVERY-DECISION-PASS-7` records the DG-3 tax-point decision packet in
+`docs/plans/pos/DELIVERY-DECISION-PASS-7-DG-3-TAX-POINT-REPORT.md`. It
+recommends a hybrid of universal Saudi VAT timing principles and
+versioned, evidence-backed provider policy; unresolved or contradictory tax
+facts remain a posting blocker. This reference does not authorize the
+imported-order command or change the financial-role gate.
 
 Stop and issue a Decision Packet when any of these is material and not already proven:
 
