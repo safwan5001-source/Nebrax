@@ -1,0 +1,949 @@
+{
+ "builder": [
+  {
+   "locale": "ar",
+   "w": 390,
+   "dirAttr": "rtl",
+   "overflow": 0,
+   "toolbar": {
+    "vw": 390,
+    "hdrScroll": 426,
+    "hdrClient": 390,
+    "clipped": [
+     "نشر"
+    ],
+    "count": 5,
+    "labels": [
+     "الخروج إلى التجارة",
+     "نسخ التصميم",
+     "فتح المتجر ↗",
+     "حفظ المسودة",
+     "نشر"
+    ]
+   },
+   "canvas": {
+    "w": 364,
+    "h": 1920,
+    "chrome": [
+     "header",
+     "branding",
+     "footer",
+     "branding"
+    ],
+    "sections": [
+     "hero",
+     "categories",
+     "newArrivals",
+     "wholesale"
+    ],
+    "hasH1": true
+   },
+   "inspectorBefore": false
+  },
+  {
+   "locale": "ar",
+   "w": 430,
+   "dirAttr": "rtl",
+   "overflow": 0,
+   "toolbar": {
+    "vw": 430,
+    "hdrScroll": 442,
+    "hdrClient": 430,
+    "clipped": [
+     "نشر"
+    ],
+    "count": 5,
+    "labels": [
+     "الخروج إلى التجارة",
+     "نسخ التصميم",
+     "فتح المتجر ↗",
+     "حفظ المسودة",
+     "نشر"
+    ]
+   },
+   "canvas": {
+    "w": 388,
+    "h": 1920,
+    "chrome": [
+     "header",
+     "branding",
+     "footer",
+     "branding"
+    ],
+    "sections": [
+     "hero",
+     "categories",
+     "newArrivals",
+     "wholesale"
+    ],
+    "hasH1": true
+   },
+   "inspectorBefore": false
+  },
+  {
+   "locale": "ar",
+   "w": 768,
+   "dirAttr": "rtl",
+   "overflow": 0,
+   "toolbar": {
+    "vw": 768,
+    "hdrScroll": 839,
+    "hdrClient": 768,
+    "clipped": [
+     "حفظ المسودة",
+     "نشر"
+    ],
+    "count": 27,
+    "labels": [
+     "الخروج إلى التجارة",
+     "الصفحة المعروضة حالياً",
+     "الرئيسية",
+     "صفحة المنتج",
+     "صفحة التصنيف",
+     "نسخة التصميم قيد التعديل",
+     "+ نسخة جديدة",
+     "فتح للتعديل",
+     "تكرار النسخة",
+     "نشر الآن",
+     "جدولة",
+     "إعادة تسمية",
+     "حذف",
+     "فتح للتعديل",
+     "تكرار النسخة",
+     "نشر الآن",
+     "جدولة",
+     "إعادة تسمية",
+     "حذف",
+     "عرض",
+     "إنشاء مسودة من هذه النسخ",
+     "فتح المتجر ↗",
+     "حاسوب",
+     "جهاز لوحي",
+     "جوال",
+     "حفظ المسودة",
+     "نشر"
+    ]
+   },
+   "canvas": {
+    "w": 726,
+    "h": 1844,
+    "chrome": [
+     "header",
+     "branding",
+     "footer",
+     "branding"
+    ],
+    "sections": [
+     "hero",
+     "categories",
+     "newArrivals",
+     "wholesale"
+    ],
+    "hasH1": true
+   },
+   "inspectorBefore": false
+  },
+  {
+   "locale": "ar",
+   "w": 1024,
+   "dirAttr": "rtl",
+   "overflow": 0,
+   "toolbar": {
+    "vw": 1024,
+    "hdrScroll": 1119,
+    "hdrClient": 1024,
+    "clipped": [
+     "نشر",
+     "جدولة"
+    ],
+    "count": 29,
+    "labels": [
+     "الخروج إلى التجارة",
+     "الصفحة المعروضة حالياً",
+     "الرئيسية",
+     "صفحة المنتج",
+     "صفحة التصنيف",
+     "نسخة التصميم قيد التعديل",
+     "+ نسخة جديدة",
+     "فتح للتعديل",
+     "تكرار النسخة",
+     "نشر الآن",
+     "جدولة",
+     "إعادة تسمية",
+     "حذف",
+     "فتح للتعديل",
+     "تكرار النسخة",
+     "نشر الآن",
+     "جدولة",
+     "إعادة تسمية",
+     "حذف",
+     "عرض",
+     "إنشاء مسودة من هذه النسخ",
+     "فتح المتجر ↗",
+     "حاسوب",
+     "جهاز لوحي",
+     "جوال",
+     "استعادة الافتراضي",
+     "حفظ المسودة",
+     "نشر",
+     "جدولة"
+    ]
+   },
+   "canvas": {
+    "w": 486,
+    "h": 1924,
+    "chrome": [
+     "header",
+     "branding",
+     "footer",
+     "branding"
+    ],
+    "sections": [
+     "hero",
+     "categories",
+     "newArrivals",
+     "wholesale"
+    ],
+    "hasH1": true
+   },
+   "inspectorBefore": false
+  },
+  {
+   "locale": "ar",
+   "w": 1280,
+   "dirAttr": "rtl",
+   "overflow": 0,
+   "toolbar": {
+    "vw": 1280,
+    "hdrScroll": 1280,
+    "hdrClient": 1280,
+    "clipped": [],
+    "count": 29,
+    "labels": [
+     "الخروج إلى التجارة",
+     "الصفحة المعروضة حالياً",
+     "الرئيسية",
+     "صفحة المنتج",
+     "صفحة التصنيف",
+     "نسخة التصميم قيد التعديل",
+     "+ نسخة جديدة",
+     "فتح للتعديل",
+     "تكرار النسخة",
+     "نشر الآن",
+     "جدولة",
+     "إعادة تسمية",
+     "حذف",
+     "فتح للتعديل",
+     "تكرار النسخة",
+     "نشر الآن",
+     "جدولة",
+     "إعادة تسمية",
+     "حذف",
+     "عرض",
+     "إنشاء مسودة من هذه النسخ",
+     "فتح المتجر ↗",
+     "حاسوب",
+     "جهاز لوحي",
+     "جوال",
+     "استعادة الافتراضي",
+     "حفظ المسودة",
+     "نشر",
+     "جدولة"
+    ]
+   },
+   "canvas": {
+    "w": 698,
+    "h": 1864,
+    "chrome": [
+     "header",
+     "branding",
+     "footer",
+     "branding"
+    ],
+    "sections": [
+     "hero",
+     "categories",
+     "newArrivals",
+     "wholesale"
+    ],
+    "hasH1": true
+   },
+   "inspectorBefore": false
+  },
+  {
+   "locale": "ar",
+   "w": 1440,
+   "dirAttr": "rtl",
+   "overflow": 0,
+   "toolbar": {
+    "vw": 1440,
+    "hdrScroll": 1440,
+    "hdrClient": 1440,
+    "clipped": [],
+    "count": 29,
+    "labels": [
+     "الخروج إلى التجارة",
+     "الصفحة المعروضة حالياً",
+     "الرئيسية",
+     "صفحة المنتج",
+     "صفحة التصنيف",
+     "نسخة التصميم قيد التعديل",
+     "+ نسخة جديدة",
+     "فتح للتعديل",
+     "تكرار النسخة",
+     "نشر الآن",
+     "جدولة",
+     "إعادة تسمية",
+     "حذف",
+     "فتح للتعديل",
+     "تكرار النسخة",
+     "نشر الآن",
+     "جدولة",
+     "إعادة تسمية",
+     "حذف",
+     "عرض",
+     "إنشاء مسودة من هذه النسخ",
+     "فتح المتجر ↗",
+     "حاسوب",
+     "جهاز لوحي",
+     "جوال",
+     "استعادة الافتراضي",
+     "حفظ المسودة",
+     "نشر",
+     "جدولة"
+    ]
+   },
+   "canvas": {
+    "w": 858,
+    "h": 1844,
+    "chrome": [
+     "header",
+     "branding",
+     "footer",
+     "branding"
+    ],
+    "sections": [
+     "hero",
+     "categories",
+     "newArrivals",
+     "wholesale"
+    ],
+    "hasH1": true
+   },
+   "inspectorBefore": false
+  },
+  {
+   "locale": "en",
+   "w": 390,
+   "dirAttr": "ltr",
+   "overflow": 0,
+   "toolbar": {
+    "vw": 390,
+    "hdrScroll": 479,
+    "hdrClient": 390,
+    "clipped": [
+     "Save draft",
+     "Publish"
+    ],
+    "count": 5,
+    "labels": [
+     "Exit to Commerce",
+     "Design versions",
+     "Open store ↗",
+     "Save draft",
+     "Publish"
+    ]
+   },
+   "canvas": {
+    "w": 364,
+    "h": 1960,
+    "chrome": [
+     "header",
+     "branding",
+     "footer",
+     "branding"
+    ],
+    "sections": [
+     "hero",
+     "categories",
+     "newArrivals",
+     "wholesale"
+    ],
+    "hasH1": true
+   },
+   "inspectorBefore": false
+  },
+  {
+   "locale": "en",
+   "w": 430,
+   "dirAttr": "ltr",
+   "overflow": 0,
+   "toolbar": {
+    "vw": 430,
+    "hdrScroll": 498,
+    "hdrClient": 430,
+    "clipped": [
+     "Publish"
+    ],
+    "count": 5,
+    "labels": [
+     "Exit to Commerce",
+     "Design versions",
+     "Open store ↗",
+     "Save draft",
+     "Publish"
+    ]
+   },
+   "canvas": {
+    "w": 388,
+    "h": 1940,
+    "chrome": [
+     "header",
+     "branding",
+     "footer",
+     "branding"
+    ],
+    "sections": [
+     "hero",
+     "categories",
+     "newArrivals",
+     "wholesale"
+    ],
+    "hasH1": true
+   },
+   "inspectorBefore": false
+  },
+  {
+   "locale": "en",
+   "w": 768,
+   "dirAttr": "ltr",
+   "overflow": 0,
+   "toolbar": {
+    "vw": 768,
+    "hdrScroll": 964,
+    "hdrClient": 768,
+    "clipped": [
+     "Mobile",
+     "Save draft",
+     "Publish"
+    ],
+    "count": 27,
+    "labels": [
+     "Exit to Commerce",
+     "Page currently being vie",
+     "Home",
+     "Product page",
+     "Category page",
+     "Design version being edi",
+     "+ New version",
+     "Open to edit",
+     "Duplicate version",
+     "Publish now",
+     "Schedule",
+     "Rename",
+     "Delete",
+     "Open to edit",
+     "Duplicate version",
+     "Publish now",
+     "Schedule",
+     "Rename",
+     "Delete",
+     "View",
+     "Create a draft from this",
+     "Open store ↗",
+     "Desktop",
+     "Tablet",
+     "Mobile",
+     "Save draft",
+     "Publish"
+    ]
+   },
+   "canvas": {
+    "w": 726,
+    "h": 1844,
+    "chrome": [
+     "header",
+     "branding",
+     "footer",
+     "branding"
+    ],
+    "sections": [
+     "hero",
+     "categories",
+     "newArrivals",
+     "wholesale"
+    ],
+    "hasH1": true
+   },
+   "inspectorBefore": false
+  },
+  {
+   "locale": "en",
+   "w": 1024,
+   "dirAttr": "ltr",
+   "overflow": 0,
+   "toolbar": {
+    "vw": 1024,
+    "hdrScroll": 1299,
+    "hdrClient": 1024,
+    "clipped": [
+     "Save draft",
+     "Publish",
+     "Schedule"
+    ],
+    "count": 29,
+    "labels": [
+     "Exit to Commerce",
+     "Page currently being vie",
+     "Home",
+     "Product page",
+     "Category page",
+     "Design version being edi",
+     "+ New version",
+     "Open to edit",
+     "Duplicate version",
+     "Publish now",
+     "Schedule",
+     "Rename",
+     "Delete",
+     "Open to edit",
+     "Duplicate version",
+     "Publish now",
+     "Schedule",
+     "Rename",
+     "Delete",
+     "View",
+     "Create a draft from this",
+     "Open store ↗",
+     "Desktop",
+     "Tablet",
+     "Mobile",
+     "Restore default",
+     "Save draft",
+     "Publish",
+     "Schedule"
+    ]
+   },
+   "canvas": {
+    "w": 486,
+    "h": 1944,
+    "chrome": [
+     "header",
+     "branding",
+     "footer",
+     "branding"
+    ],
+    "sections": [
+     "hero",
+     "categories",
+     "newArrivals",
+     "wholesale"
+    ],
+    "hasH1": true
+   },
+   "inspectorBefore": false
+  },
+  {
+   "locale": "en",
+   "w": 1280,
+   "dirAttr": "ltr",
+   "overflow": 0,
+   "toolbar": {
+    "vw": 1280,
+    "hdrScroll": 1348,
+    "hdrClient": 1280,
+    "clipped": [
+     "Schedule"
+    ],
+    "count": 29,
+    "labels": [
+     "Exit to Commerce",
+     "Page currently being vie",
+     "Home",
+     "Product page",
+     "Category page",
+     "Design version being edi",
+     "+ New version",
+     "Open to edit",
+     "Duplicate version",
+     "Publish now",
+     "Schedule",
+     "Rename",
+     "Delete",
+     "Open to edit",
+     "Duplicate version",
+     "Publish now",
+     "Schedule",
+     "Rename",
+     "Delete",
+     "View",
+     "Create a draft from this",
+     "Open store ↗",
+     "Desktop",
+     "Tablet",
+     "Mobile",
+     "Restore default",
+     "Save draft",
+     "Publish",
+     "Schedule"
+    ]
+   },
+   "canvas": {
+    "w": 698,
+    "h": 1864,
+    "chrome": [
+     "header",
+     "branding",
+     "footer",
+     "branding"
+    ],
+    "sections": [
+     "hero",
+     "categories",
+     "newArrivals",
+     "wholesale"
+    ],
+    "hasH1": true
+   },
+   "inspectorBefore": false
+  },
+  {
+   "locale": "en",
+   "w": 1440,
+   "dirAttr": "ltr",
+   "overflow": 0,
+   "toolbar": {
+    "vw": 1440,
+    "hdrScroll": 1440,
+    "hdrClient": 1440,
+    "clipped": [],
+    "count": 29,
+    "labels": [
+     "Exit to Commerce",
+     "Page currently being vie",
+     "Home",
+     "Product page",
+     "Category page",
+     "Design version being edi",
+     "+ New version",
+     "Open to edit",
+     "Duplicate version",
+     "Publish now",
+     "Schedule",
+     "Rename",
+     "Delete",
+     "Open to edit",
+     "Duplicate version",
+     "Publish now",
+     "Schedule",
+     "Rename",
+     "Delete",
+     "View",
+     "Create a draft from this",
+     "Open store ↗",
+     "Desktop",
+     "Tablet",
+     "Mobile",
+     "Restore default",
+     "Save draft",
+     "Publish",
+     "Schedule"
+    ]
+   },
+   "canvas": {
+    "w": 858,
+    "h": 1864,
+    "chrome": [
+     "header",
+     "branding",
+     "footer",
+     "branding"
+    ],
+    "sections": [
+     "hero",
+     "categories",
+     "newArrivals",
+     "wholesale"
+    ],
+    "hasH1": true
+   },
+   "inspectorBefore": false
+  }
+ ],
+ "themes": [
+  {
+   "locale": "ar",
+   "w": 390,
+   "overflow": 0,
+   "cards": 3,
+   "previewLinkHref": [
+    "https://a.h48.test/",
+    "https://a.h48.test/",
+    "https://a.h48.test/"
+   ]
+  },
+  {
+   "locale": "ar",
+   "w": 430,
+   "overflow": 0,
+   "cards": 3,
+   "previewLinkHref": [
+    "https://a.h48.test/",
+    "https://a.h48.test/",
+    "https://a.h48.test/"
+   ]
+  },
+  {
+   "locale": "ar",
+   "w": 768,
+   "overflow": 0,
+   "cards": 3,
+   "previewLinkHref": [
+    "https://a.h48.test/",
+    "https://a.h48.test/",
+    "https://a.h48.test/"
+   ]
+  },
+  {
+   "locale": "ar",
+   "w": 1024,
+   "overflow": 0,
+   "cards": 3,
+   "previewLinkHref": [
+    "https://a.h48.test/",
+    "https://a.h48.test/",
+    "https://a.h48.test/"
+   ]
+  },
+  {
+   "locale": "ar",
+   "w": 1280,
+   "overflow": 0,
+   "cards": 3,
+   "previewLinkHref": [
+    "https://a.h48.test/",
+    "https://a.h48.test/",
+    "https://a.h48.test/"
+   ]
+  },
+  {
+   "locale": "ar",
+   "w": 1440,
+   "overflow": 0,
+   "cards": 3,
+   "previewLinkHref": [
+    "https://a.h48.test/",
+    "https://a.h48.test/",
+    "https://a.h48.test/"
+   ]
+  },
+  {
+   "locale": "en",
+   "w": 390,
+   "overflow": 0,
+   "cards": 3,
+   "previewLinkHref": [
+    "https://a.h48.test/",
+    "https://a.h48.test/",
+    "https://a.h48.test/"
+   ]
+  },
+  {
+   "locale": "en",
+   "w": 1440,
+   "overflow": 0,
+   "cards": 3,
+   "previewLinkHref": [
+    "https://a.h48.test/",
+    "https://a.h48.test/",
+    "https://a.h48.test/"
+   ]
+  }
+ ],
+ "published": [
+  {
+   "loc": "ar",
+   "w": 390,
+   "dir": "rtl",
+   "lang": "ar",
+   "overflow": 0,
+   "header": true,
+   "h1": "متجر نبراس للقرطاسية",
+   "h2s": [
+    "أحدث المنتجات",
+    "تخفيضات الخريف",
+    "مختارات المتجر",
+    "مزايا المتجر",
+    "عن متجرنا",
+    "معلومات المنشأة",
+    "التواصل"
+   ],
+   "footer": true,
+   "customNavLinkInDom": 1,
+   "customNavLinkVisible": false,
+   "headerHeight": 113,
+   "customNavLinkInMobileMenu": false,
+   "mobileMenuOpened": false
+  },
+  {
+   "loc": "ar",
+   "w": 430,
+   "dir": "rtl",
+   "lang": "ar",
+   "overflow": 0,
+   "header": true,
+   "h1": "متجر نبراس للقرطاسية",
+   "h2s": [
+    "أحدث المنتجات",
+    "تخفيضات الخريف",
+    "مختارات المتجر",
+    "مزايا المتجر",
+    "عن متجرنا",
+    "معلومات المنشأة",
+    "التواصل"
+   ],
+   "footer": true,
+   "customNavLinkInDom": 1,
+   "customNavLinkVisible": false,
+   "headerHeight": 113,
+   "customNavLinkInMobileMenu": false,
+   "mobileMenuOpened": false
+  },
+  {
+   "loc": "ar",
+   "w": 768,
+   "dir": "rtl",
+   "lang": "ar",
+   "overflow": 0,
+   "header": true,
+   "h1": "متجر نبراس للقرطاسية",
+   "h2s": [
+    "أحدث المنتجات",
+    "تخفيضات الخريف",
+    "مختارات المتجر",
+    "مزايا المتجر",
+    "عن متجرنا",
+    "معلومات المنشأة",
+    "التواصل"
+   ],
+   "footer": true,
+   "customNavLinkInDom": 1,
+   "customNavLinkVisible": false,
+   "headerHeight": 133,
+   "customNavLinkInMobileMenu": false,
+   "mobileMenuOpened": false
+  },
+  {
+   "loc": "ar",
+   "w": 1024,
+   "dir": "rtl",
+   "lang": "ar",
+   "overflow": 0,
+   "header": true,
+   "h1": "متجر نبراس للقرطاسية",
+   "h2s": [
+    "أحدث المنتجات",
+    "تخفيضات الخريف",
+    "مختارات المتجر",
+    "مزايا المتجر",
+    "عن متجرنا",
+    "معلومات المنشأة",
+    "التواصل"
+   ],
+   "footer": true,
+   "customNavLinkInDom": 1,
+   "customNavLinkVisible": true,
+   "headerHeight": 133
+  },
+  {
+   "loc": "ar",
+   "w": 1280,
+   "dir": "rtl",
+   "lang": "ar",
+   "overflow": 0,
+   "header": true,
+   "h1": "متجر نبراس للقرطاسية",
+   "h2s": [
+    "أحدث المنتجات",
+    "تخفيضات الخريف",
+    "مختارات المتجر",
+    "مزايا المتجر",
+    "عن متجرنا",
+    "معلومات المنشأة",
+    "التواصل"
+   ],
+   "footer": true,
+   "customNavLinkInDom": 1,
+   "customNavLinkVisible": true,
+   "headerHeight": 133
+  },
+  {
+   "loc": "ar",
+   "w": 1440,
+   "dir": "rtl",
+   "lang": "ar",
+   "overflow": 0,
+   "header": true,
+   "h1": "متجر نبراس للقرطاسية",
+   "h2s": [
+    "أحدث المنتجات",
+    "تخفيضات الخريف",
+    "مختارات المتجر",
+    "مزايا المتجر",
+    "عن متجرنا",
+    "معلومات المنشأة",
+    "التواصل"
+   ],
+   "footer": true,
+   "customNavLinkInDom": 1,
+   "customNavLinkVisible": true,
+   "headerHeight": 133
+  },
+  {
+   "loc": "en",
+   "w": 390,
+   "dir": "rtl",
+   "lang": "ar",
+   "overflow": 0,
+   "header": true,
+   "h1": "متجر نبراس للقرطاسية",
+   "h2s": [
+    "أحدث المنتجات",
+    "تخفيضات الخريف",
+    "مختارات المتجر",
+    "مزايا المتجر",
+    "عن متجرنا",
+    "معلومات المنشأة",
+    "التواصل"
+   ],
+   "footer": true,
+   "customNavLinkInDom": 1,
+   "customNavLinkVisible": false,
+   "headerHeight": 113,
+   "customNavLinkInMobileMenu": false,
+   "mobileMenuOpened": false
+  },
+  {
+   "loc": "en",
+   "w": 1440,
+   "dir": "rtl",
+   "lang": "ar",
+   "overflow": 0,
+   "header": true,
+   "h1": "متجر نبراس للقرطاسية",
+   "h2s": [
+    "أحدث المنتجات",
+    "تخفيضات الخريف",
+    "مختارات المتجر",
+    "مزايا المتجر",
+    "عن متجرنا",
+    "معلومات المنشأة",
+    "التواصل"
+   ],
+   "footer": true,
+   "customNavLinkInDom": 1,
+   "customNavLinkVisible": true,
+   "headerHeight": 133
+  }
+ ]
+}
