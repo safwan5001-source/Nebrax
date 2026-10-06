@@ -43,6 +43,8 @@ use App\Http\Controllers\Api\CommerceGiftSettingsController;
 use App\Http\Controllers\Api\CommerceVerticalSetupController;
 use App\Http\Controllers\Api\CommerceWorkspaceStorefrontsController;
 use App\Http\Controllers\Api\CommerceWorkspaceMediaController;
+use App\Http\Controllers\Api\CommerceWorkspaceStorefrontMediaController;
+use App\Http\Controllers\Api\CommerceWorkspaceStorefrontMediaFileController;
 use App\Http\Controllers\Api\CommerceWorkspaceStorefrontOfferController;
 use App\Http\Controllers\Api\CommerceWorkspaceStorefrontPresentationController;
 use App\Http\Controllers\Api\CommerceWorkspaceStorefrontPresentationVersionController;
@@ -221,6 +223,16 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         ->whereUuid('id')->whereUuid('media')
         ->middleware('signed')
         ->name('commerce.workspace.media.show');
+
+    // CUST-HV V2a: متغيّر وسائط المُخصِّص لمعاينة مساحة العمل. نفس نموذج الثقة
+    // أعلاه (CUST-H4-8b): **بلا** `auth:sanctum` لأن `<img src>` لا يحمل Bearer،
+    // والتوقيع هو السلطة. يخدم المتغيّرات فقط (لا الأصل)، ويطابق المستأجر
+    // الموقَّع يدوياً ويعيد فحص الحالة في كل قراءة — انظر المتحكّم.
+    Route::get('commerce/workspace/storefront-media/{media}/variants/{file}', [CommerceWorkspaceStorefrontMediaFileController::class, 'show'])
+        ->whereUuid('media')
+        ->where('file', '[A-Za-z0-9._-]{1,40}')
+        ->middleware(['signed', 'throttle:240,1'])
+        ->name('commerce.workspace.storefront-media.file');
 
     Route::post('forgot-password', [AuthController::class, 'forgotPassword'])->middleware('throttle:auth-recovery');
     Route::post('reset-password', [AuthController::class, 'resetPassword'])->middleware('throttle:auth-reset');
@@ -963,6 +975,26 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         Route::post('commerce/workspace/storefronts/{id}/presentation/publish', [CommerceWorkspaceStorefrontPresentationController::class, 'publish'])
             ->whereUuid('id')
             ->middleware($perm('commerce.manage'));
+
+        // CUST-HV V2a: مكتبة وسائط المُخصِّص على مستوى المستأجر (رفع/قائمة/تعديل/
+        // حذف آمن/استخدام/إعادة محاولة). نفس صلاحية بقية مسارات المظهر
+        // (commerce.manage) — لا صلاحية جديدة. الرفع بسقف طلباتٍ صريح.
+        Route::get('commerce/workspace/storefront-media', [CommerceWorkspaceStorefrontMediaController::class, 'index'])
+            ->middleware($perm('commerce.manage'));
+        Route::post('commerce/workspace/storefront-media', [CommerceWorkspaceStorefrontMediaController::class, 'store'])
+            ->middleware([$perm('commerce.manage'), 'throttle:30,1']);
+        Route::patch('commerce/workspace/storefront-media/{mediaId}', [CommerceWorkspaceStorefrontMediaController::class, 'update'])
+            ->whereUuid('mediaId')
+            ->middleware($perm('commerce.manage'));
+        Route::delete('commerce/workspace/storefront-media/{mediaId}', [CommerceWorkspaceStorefrontMediaController::class, 'destroy'])
+            ->whereUuid('mediaId')
+            ->middleware($perm('commerce.manage'));
+        Route::get('commerce/workspace/storefront-media/{mediaId}/usage', [CommerceWorkspaceStorefrontMediaController::class, 'usage'])
+            ->whereUuid('mediaId')
+            ->middleware($perm('commerce.manage'));
+        Route::post('commerce/workspace/storefront-media/{mediaId}/retry', [CommerceWorkspaceStorefrontMediaController::class, 'retry'])
+            ->whereUuid('mediaId')
+            ->middleware([$perm('commerce.manage'), 'throttle:30,1']);
 
         // CUST-H1-1: أساس نسخ المظهر المستقلّة (list/create/read/save/rename/delete).
         // لا نشر ولا جدولة هنا — الرأس أعلاه يبقى مصدر القراءة العامة كما هو.
