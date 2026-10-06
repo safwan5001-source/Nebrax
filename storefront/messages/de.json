@@ -55,6 +55,15 @@
     "skipToContent": "Zum Inhalt springen",
     "submitSearch": "Suchen"
   },
+  "announcements": {
+    "region": "Ankündigungen",
+    "previous": "Vorherige Ankündigung",
+    "next": "Nächste Ankündigung",
+    "pause": "Ankündigungen pausieren",
+    "play": "Ankündigungen fortsetzen",
+    "dismiss": "Ankündigung schließen",
+    "position": "Ankündigung {current} von {total}"
+  },
   "regionPreferences": {
     "title": "Region und Sprache",
     "description": "Wählen Sie Ihre Region und Sprache. Die Währung wird durch die ausgewählte Region festgelegt.",

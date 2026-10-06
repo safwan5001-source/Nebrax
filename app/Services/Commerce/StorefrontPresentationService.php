@@ -6,6 +6,7 @@ use App\Models\Storefront;
 use App\Models\StorefrontPresentation;
 use App\Models\StorefrontPresentationVersion;
 use App\Support\Commerce\StorefrontPresentationNormalizer;
+use App\Support\Commerce\StorefrontPresentationPublishValidator;
 use App\Tenancy\TenantContext;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
@@ -25,10 +26,15 @@ use RuntimeException;
  */
 final class StorefrontPresentationService
 {
+    private readonly StorefrontPresentationPublishValidator $publishValidator;
+
     public function __construct(
         private readonly StorefrontPresentationNormalizer $normalizer,
         private readonly StorefrontPresentationVersionBackfillService $backfill,
-    ) {}
+        ?StorefrontPresentationPublishValidator $publishValidator = null,
+    ) {
+        $this->publishValidator = $publishValidator ?? new StorefrontPresentationPublishValidator;
+    }
 
     /**
      * @return array{
@@ -202,6 +208,7 @@ final class StorefrontPresentationService
                 $this->effectiveSchemaTag($row->draft_config ?? [], (int) $row->draft_schema_version),
             );
             $this->assertStoredSize($normalized);
+            $this->publishValidator->assertPublishable($normalized);
 
             $published = is_array($row->published_config) ? $row->published_config : null;
             $contentUnchanged = $row->published_revision !== null
