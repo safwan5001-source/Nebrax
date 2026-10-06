@@ -191,6 +191,21 @@ describe('PersonalizationSection', () => {
     expect(srv.writes[0].expected_revision).toBe(JSON.stringify([text()]));
   });
 
+  it('after a 409 whose refresh read fails it does not claim a refresh, and drops the stale revision so the next save re-reads first', async () => {
+    const srv = server([text()]);
+    await userEvent.click(await screen.findByRole('button', { name: 'Delete: الاسم على البطاقة' }));
+    await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Delete' }));
+    srv.setRemote([text({ label: 'غُيّر في مكان آخر' })]);
+    srv.failRead();
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(document.querySelector('[role="alert"]')).not.toBeNull());
+    expect(screen.queryByText(/refreshed|reloaded/i)).toBeNull();
+    expect(srv.writes).toHaveLength(0);
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(document.querySelector('[role="alert"]')).not.toBeNull());
+    expect(srv.writes).toHaveLength(0); // الفحص المسبق يفشل مغلقاً بدل أن يكتب بنسخة قديمة
+  });
+
   it('without a server revision it falls back to the pre-read and never writes when that read fails', async () => {
     const srv = server([text()], { noRevision: true });
     await userEvent.click(await screen.findByRole('button', { name: 'Delete: الاسم على البطاقة' }));

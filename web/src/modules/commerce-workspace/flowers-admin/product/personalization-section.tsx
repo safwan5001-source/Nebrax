@@ -102,10 +102,14 @@ export function PersonalizationSection({ productId, locale, canManage }: { produ
     if (!result.ok && result.kind === 'conflict') {
       const fresh = await loadPersonalization(productId);
       setSaving(false);
-      if (fresh.ok) {
-        setDraft(fresh.data.fields);
-        setPhase({ kind: 'ready', saved: fresh.data.fields, revision: fresh.data.revision });
+      if (!fresh.ok) {
+        // لم نستطع التحديث: لا ندّعي ذلك، ونُسقط البصمة القديمة كي لا يتكرر التعارض نفسه؛ الحفظ التالي يمرّ بالفحص المسبق (يفشل مغلقاً).
+        setPhase({ kind: 'ready', saved, revision: null });
+        setNotice({ tone: 'error', text: failureText(fresh, t) });
+        return;
       }
+      setDraft(fresh.data.fields);
+      setPhase({ kind: 'ready', saved: fresh.data.fields, revision: fresh.data.revision });
       setNotice({ tone: 'warning', text: t('persStale') });
       return;
     }

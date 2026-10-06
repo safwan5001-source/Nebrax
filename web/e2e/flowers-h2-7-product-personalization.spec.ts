@@ -125,6 +125,26 @@ test.describe('FLOWERS-H2-7 — product personalization', () => {
     await page.screenshot({ path: path.join(dir, 'en-1440-server-error.png'), fullPage: true });
   });
 
+  test('EN 1440 — leaving the Gifting tab with an unsaved draft asks first; declining keeps the draft', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 960 });
+    await seedAdmin(page, 'en', server({ fields: FIELDS }));
+    await page.goto('/products/p1');
+    await page.getByRole('tab', { name: 'Gifting' }).click();
+    await page.getByRole('tab', { name: PERS.en }).click();
+    await page.getByRole('button', { name: 'Move down: الاسم على البطاقة' }).click();
+    await expect(page.getByText('Unsaved changes')).toBeVisible();
+
+    const messages: string[] = [];
+    page.once('dialog', (d) => { messages.push(d.message()); void d.dismiss(); });
+    await page.getByRole('tab').first().click();
+    await expect(page.getByText('Unsaved changes')).toBeVisible(); // رُفض التجاهل ⇒ بقينا في تبويب الهدايا بمسوّدتنا
+    expect(messages[0]).toMatch(/unsaved changes/i);
+
+    page.once('dialog', (d) => { void d.accept(); });
+    await page.getByRole('tab').first().click();
+    await expect(page.getByText('Unsaved changes')).toHaveCount(0);
+  });
+
   test('EN 390 read-only + empty state; dark', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await seedAdmin(page, 'en', server({ fields: FIELDS }), { permissions: ['products.view', 'commerce.manage'], role: 'staff' });
