@@ -127,7 +127,7 @@ test.describe('FLOWERS-H2-7 — product personalization', () => {
 
   test('EN 390 read-only + empty state; dark', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
-    await seedAdmin(page, 'en', server({ fields: FIELDS }), { permissions: ['products.view'], role: 'staff' });
+    await seedAdmin(page, 'en', server({ fields: FIELDS }), { permissions: ['products.view', 'commerce.manage'], role: 'staff' });
     await page.goto('/products/p1');
     await page.getByRole('tab', { name: 'Gifting' }).click();
     await page.getByRole('tab', { name: PERS.en }).click();
