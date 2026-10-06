@@ -1,6 +1,6 @@
 # AWJ Flowers & Gifts — Horizon 2 Progress
 
-**Status:** IN PROGRESS — H2-1…H2-10 merged; H2-11 in review  
+**Status:** IN PROGRESS — H2-1…H2-11 merged; H2-12 in review  
 **Date:** 2026-10-04  
 **Planning Base:** `main` @ `6ded662bfada8f72f5ebf321dcf27b08be7939c1`  
 **Execution Base (H2-1):** `main` @ `afe223cb654154fa55234ff2e360233bbc933ec3`  
@@ -36,8 +36,8 @@ Horizon 1 is complete.
 | H2-8 | Product Add-ons Admin | MERGED | #1248 | `bb03b69` |
 | H2-9 | Structured Product Content Admin | MERGED | #1249 | `f8ec475` |
 | H2-10 | Unified Product Gifting Workspace | MERGED | #1250 | `4a22e81` |
-| H2-11 | Vertical Setup Center V2 | PR OPEN | (see log) | — |
-| H2-12 | Merchant Onboarding Flow | NOT STARTED | — | — |
+| H2-11 | Vertical Setup Center V2 | MERGED | #1251 | `df85e5a` |
+| H2-12 | Merchant Onboarding Flow | PR OPEN | (see log) | — |
 | H2-13 | Permissions / RBAC / Tenant Isolation Pass | NOT STARTED | — | — |
 | H2-14 | Admin UX / RTL / Mobile Polish | NOT STARTED | — | — |
 | H2-15 | Real Merchant Journey Contract | NOT STARTED | — | — |
@@ -466,10 +466,12 @@ A UI slice is not complete until its progress entry records:
 
 ### H2-11 — Vertical Setup Center V2
 
-**Status:** PR OPEN  
+**Status:** MERGED  
 **Base SHA:** `4a22e811f6ff723d6b95a5c396ca80e6ca8e0903` (H2-10 merged)  
 **Branch:** `flowers/h2-11-setup-center`  
-**PR / Head / Merge SHA:** recorded in the next slice's ledger update after merge
+**PR:** #1251  
+**Head SHA:** `5758474`  
+**Merge SHA:** `df85e5a75af37bce171388b2f554b9cf670630fd` (squash)
 
 #### Contract / scope
 - Frontend-only. **No stored completion flag**: step state comes from the existing server-derived `vertical-setup` endpoint (per-capability `configured` / `not_configured` + counter), enriched with the *reason* a step is incomplete from the real admin documents (gift policy, delivery schedule, fulfilment warehouse). A document that fails to load means "no extra explanation", never an invented reason; a failure of `vertical-setup` itself is the screen's failure (retry). Unknown server keys are ignored. Starter occasions/recipients reuse the existing preview-then-apply client (ADR-25), adding only missing values.
@@ -486,11 +488,44 @@ A UI slice is not complete until its progress entry records:
 #### Backward compatibility
 - Additive; non-Flowers stores and users without `commerce.manage` see the unchanged overview.
 
+#### Review / CI
+- Codex had reached its usage limit, so CI was the only automated gate (self-review of the diff: the centre remounts per store so no stale cross-store state; every destination is an existing screen). Merged on a fully green head (sqlite, pgsql, web; both runs).
+
 #### Deployment observation
 - Manual deploy: NOT PERFORMED; production verification: NOT PERFORMED.
 
 #### Next
 - H2-12 — Merchant Onboarding Flow.
+
+---
+
+### H2-12 — Merchant Onboarding Flow
+
+**Status:** PR OPEN  
+**Base SHA:** `df85e5a75af37bce171388b2f554b9cf670630fd` (H2-11 merged)  
+**Branch:** `flowers/h2-12-merchant-onboarding`  
+**PR / Head / Merge SHA:** recorded in the next slice's ledger update after merge
+
+#### Contract / scope
+- Frontend-only. A guided, resumable walk through the same capabilities and order as the setup center. **No stored state**: steps and their status are derived from the real configuration (`useSetupState`, shared with H2-11); the position lives in the URL (`?step=`), so coming back from another screen — or tomorrow — resumes from the actual state (first incomplete step when no step is requested). Skipping is always allowed: a skipped step stays "not configured" and nothing is enabled automatically.
+
+#### UI / information architecture
+- New page `/commerce/onboarding` (reached from the setup center): left step list on desktop (current step marked with `aria-current="step"`, state icon + sr-only text), counter + progressbar on every viewport, one card per step explaining *what it does and why* (AR/EN), its real status (done + counter, or what's missing), a single primary action opening the real screen, the starter-values box on the occasions/recipients steps (preview-then-apply, existing client), and Back / Next / Finish with direction-aware chevrons for RTL/LTR. Non-Flowers stores and users without `commerce.manage` get an explicit empty state and no requests; store switch remounts the flow.
+
+#### Tests
+- `onboarding-flow.test.tsx`, extended `derive.test.ts` (`resolveCurrentIndex`), Playwright `flowers-h2-12-onboarding.spec.ts`.
+
+#### Tenant Isolation / RBAC
+- No new routes — reads/writes are the same existing `commerce.manage`-scoped, store-owned endpoints as H2-11; the hidden state is not the only guard (routes enforce permission).
+
+#### Backward compatibility
+- Additive page; nothing existing changes besides the entry link in the setup center.
+
+#### Deployment observation
+- Manual deploy: NOT PERFORMED; production verification: NOT PERFORMED.
+
+#### Next
+- H2-13 — Permissions / RBAC / Tenant Isolation Pass.
 
 ---
 
