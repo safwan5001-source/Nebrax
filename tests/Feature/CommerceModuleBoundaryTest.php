@@ -91,6 +91,7 @@ class CommerceModuleBoundaryTest extends TestCase
         'api/commerce/workspace/shipping-zones',
         'api/commerce/workspace/shipping-zones/{id}',
         'api/commerce/workspace/storefronts',
+        'api/commerce/workspace/storefronts/create',
         'api/commerce/workspace/storefronts/{id}',
         'api/commerce/workspace/storefronts/{id}/activate',
         // CUST-H2-4 — قراءة تصنيفات مساحة عمل Commerce لمنتقي "معاينة تصنيف"

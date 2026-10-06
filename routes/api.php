@@ -889,6 +889,8 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         // حقيقي (قناة بيع + متجر + نطاق مُدار من AWJ)، فيُحرَس بصلاحية
         // مخصَّصة (commerce.manage) لا استثناء الخدمة الذاتية وحده.
         Route::post('commerce/workspace/storefronts', [CommerceWorkspaceStorefrontsController::class, 'store'])->middleware($perm('commerce.manage'));
+        // AWJ-MULTI-STORE-1: إنشاء متجر ثانٍ وما بعده، منفصل عن عقد التزويد الأول.
+        Route::post('commerce/workspace/storefronts/create', [CommerceWorkspaceStorefrontsController::class, 'createAdditional'])->middleware($perm('commerce.manage'));
 
         // STORE-ADMIN-ADOPT-1B-1: تصحيح/تعريب هوية متجر قائم — name/default_locale
         // فقط. نفس صلاحية التزويد (commerce.manage): فعلٌ كتابي حقيقي على بنية

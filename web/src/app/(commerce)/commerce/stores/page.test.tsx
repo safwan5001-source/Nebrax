@@ -482,3 +482,36 @@ describe('Commerce stores page — store lifecycle', () => {
     await waitFor(() => expect(screen.queryByText('Activating…')).toBeNull());
   });
 });
+
+
+describe('Commerce stores page — additional-store creation', () => {
+  afterEach(() => {
+    cleanup();
+    apiMock.mockReset();
+    user.current = { role: 'owner', permissions: undefined };
+  });
+
+  it('shows the additional-store action only in ready state, opens its dialog, and refreshes after creation', async () => {
+    apiMock
+      .mockResolvedValueOnce({ data: { stores: [{ id: 's1', name: 'Main', sales_channel_id: 'c1', is_active: true, preview_url: null }] } })
+      .mockResolvedValueOnce({ data: { store: { id: 's2', name: 'Gifts', sales_channel_id: 'c2', is_active: true, preview_url: null, default_locale: 'ar' } } })
+      .mockResolvedValueOnce({ data: { stores: [
+        { id: 's1', name: 'Main', sales_channel_id: 'c1', is_active: true, preview_url: null },
+        { id: 's2', name: 'Gifts', sales_channel_id: 'c2', is_active: true, preview_url: null },
+      ] } });
+
+    renderPage();
+    await userEvent.click(await screen.findByRole('button', { name: 'Create online store' }));
+    expect(screen.getByRole('dialog', { name: 'Create a new store' })).toBeTruthy();
+
+    await userEvent.type(screen.getByLabelText('Store name'), 'Gifts');
+    await userEvent.click(screen.getByRole('button', { name: 'Create store' }));
+
+    expect(await screen.findByText('Gifts')).toBeTruthy();
+    expect(apiMock).toHaveBeenNthCalledWith(2, '/commerce/workspace/storefronts/create', {
+      method: 'POST',
+      body: { name: 'Gifts', default_locale: 'ar' },
+    });
+    expect(apiMock).toHaveBeenNthCalledWith(3, '/commerce/workspace/storefronts');
+  });
+});

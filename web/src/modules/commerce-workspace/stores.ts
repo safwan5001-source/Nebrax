@@ -43,6 +43,7 @@ export type CommerceStoreCatalog =
 
 /** Tenant-scoped ERP admin list. Not the public Host-resolved storefront API. */
 export const COMMERCE_STORE_ADMIN_LIST_PATH = '/commerce/workspace/storefronts';
+export const COMMERCE_STORE_CREATE_PATH = '/commerce/workspace/storefronts/create';
 
 export async function loadCommerceStoreCatalog(): Promise<CommerceStoreCatalog> {
   if (!COMMERCE_STORE_ADMIN_LIST_PATH) {
@@ -79,6 +80,25 @@ export async function provisionCommerceStorefront(
     return { ok: true, store };
   } catch (error) {
     const message = error instanceof Error ? error.message : 'provision_failed';
+    return { ok: false, message };
+  }
+}
+
+/** AWJ-MULTI-STORE-1 — إنشاء متجر إضافي؛ لا يستخدم عقد التزويد الأول. */
+export async function createCommerceStorefront(
+  name: string,
+  defaultLocale: CommerceStoreLocale = 'ar',
+): Promise<{ ok: true; store: CommerceStoreOption } | { ok: false; message: string }> {
+  try {
+    const payload = await api<unknown>(COMMERCE_STORE_CREATE_PATH, {
+      method: 'POST',
+      body: { name: name.trim(), default_locale: defaultLocale },
+    });
+    const store = extractProvisionedStore(payload);
+    if (!store) return { ok: false, message: 'invalid_payload' };
+    return { ok: true, store };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'create_failed';
     return { ok: false, message };
   }
 }

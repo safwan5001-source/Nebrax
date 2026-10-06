@@ -97,6 +97,30 @@ final class ManagedStorefrontHostname
         return $hostname;
     }
 
+    /** hostname إضافي بصيغة `{store-slug}.{tenant-slug}.{base-domain}`. */
+    public static function forAdditionalStoreSlug(string $storeSlug, string $tenantSlug, ?string $baseDomain = null): string
+    {
+        $baseDomain = $baseDomain === null
+            ? self::configuredBaseDomain()
+            : self::normalizeBaseDomain($baseDomain);
+        if (trim($storeSlug) === '' || trim($tenantSlug) === '') {
+            throw new StorefrontBaseDomainMisconfiguredException('هوية المتجر أو المستأجر فارغة — لا يمكن توليد نطاق متجر.');
+        }
+        try {
+            return HostnameNormalizer::normalize($storeSlug.'.'.$tenantSlug.'.'.$baseDomain);
+        } catch (InvalidHostnameException $e) {
+            throw new StorefrontBaseDomainMisconfiguredException(
+                'تعذّر توليد نطاق متجر إضافي صالح: '.$e->getMessage()
+            );
+        }
+    }
+
+    /** هل hostname يقع ضمن namespace AWJ المُدار، بما في ذلك المتاجر الإضافية؟ */
+    public static function isWithinBaseDomain(string $hostname, string $baseDomain): bool
+    {
+        return $hostname === $baseDomain || str_ends_with($hostname, '.'.$baseDomain);
+    }
+
     /**
      * هل `$hostname` **شريحة واحدة بالضبط** فوق `$baseDomain` (كلاهما مطبَّع
      * مسبقاً)؟ حصراً — لا يقبل `$hostname === $baseDomain` (يجب أن يملك

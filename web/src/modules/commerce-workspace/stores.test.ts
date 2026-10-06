@@ -8,6 +8,7 @@ import {
   loadCommerceStoreCatalog,
   mapCommerceStoreAdminList,
   provisionCommerceStorefront,
+  createCommerceStorefront,
   resolveViewStoreUrl,
   selectStoreId,
   updateCommerceStorefrontIdentity,
@@ -160,6 +161,26 @@ describe('commerce storefront provisioning (COM-STORE-PROVISION-1)', () => {
     apiMock.mockResolvedValue({ data: {} });
 
     await expect(provisionCommerceStorefront()).resolves.toEqual({ ok: false, message: 'invalid_payload' });
+  });
+});
+
+describe('multi-store creation (AWJ-MULTI-STORE-1)', () => {
+  it('uses the explicit create route and sends only display identity fields', async () => {
+    apiMock.mockResolvedValue({
+      data: { store: { id: 'store-2', name: 'Gifts', sales_channel_id: 'channel-2', is_active: true, preview_url: 'https://gifts.tenant.store.test/', default_locale: 'en' } },
+    });
+    await expect(createCommerceStorefront('  Gifts  ', 'en')).resolves.toMatchObject({ ok: true });
+    expect(apiMock).toHaveBeenCalledWith('/commerce/workspace/storefronts/create', {
+      method: 'POST',
+      body: { name: 'Gifts', default_locale: 'en' },
+    });
+    expect(String(apiMock.mock.calls[0][1]?.body)).not.toContain('tenant_id');
+    expect(String(apiMock.mock.calls[0][1]?.body)).not.toContain('hostname');
+  });
+
+  it('returns a safe failure for API errors', async () => {
+    apiMock.mockRejectedValue(new Error('validation'));
+    await expect(createCommerceStorefront('')).resolves.toEqual({ ok: false, message: 'validation' });
   });
 });
 
