@@ -99,7 +99,7 @@ test.describe('FLOWERS-H2-6 — product preparation time', () => {
 
   test('EN 390 — read-only (products.view only): fields disabled, no save controls', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
-    await seedAdmin(page, 'en', preparation({ minutes: 120 }), { permissions: ['products.view'], role: 'staff' });
+    await seedAdmin(page, 'en', preparation({ minutes: 120 }), { permissions: ['products.view', 'commerce.manage'], role: 'staff' });
     await page.goto('/products/p1');
     await page.getByRole('tab', { name: 'Gifting' }).click();
     await expect(page.getByLabel('This product’s preparation time')).toBeDisabled();
