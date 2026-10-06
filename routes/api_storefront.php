@@ -53,6 +53,8 @@ Route::middleware([
     Route::get('products/{id}', [StorefrontProductController::class, 'show'])->whereUuid('id')->name('products.show');
 
     Route::get('media/categories/{id}', [StorefrontMediaController::class, 'showCategory'])->whereUuid('id')->name('media.category.show');
+    Route::get('media/{id}/derivatives/{derivative}', [StorefrontMediaController::class, 'showDerivative'])
+        ->whereUuid('id')->whereIn('derivative', ['thumbnail', 'card'])->name('media.derivative.show');
     Route::get('media/{id}', [StorefrontMediaController::class, 'show'])->whereUuid('id')->name('media.show');
 
     Route::get('storefront', [StorefrontConfigController::class, 'show'])->name('storefront.show');
@@ -117,6 +119,8 @@ if (! app()->environment('production')) {
         Route::get('products/{id}', [StorefrontProductController::class, 'show'])->whereUuid('id')->name('legacy.products.show');
 
         Route::get('media/categories/{id}', [StorefrontMediaController::class, 'showCategory'])->whereUuid('id')->name('legacy.media.category.show');
+        Route::get('media/{id}/derivatives/{derivative}', [StorefrontMediaController::class, 'showDerivative'])
+            ->whereUuid('id')->whereIn('derivative', ['thumbnail', 'card'])->name('legacy.media.derivative.show');
         Route::get('media/{id}', [StorefrontMediaController::class, 'show'])->whereUuid('id')->name('legacy.media.show');
 
         Route::get('storefront', [StorefrontConfigController::class, 'show'])->name('legacy.storefront.show');

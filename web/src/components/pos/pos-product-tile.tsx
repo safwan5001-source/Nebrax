@@ -11,7 +11,7 @@ export interface PosProductTileProduct {
   sku: string | null;
   barcode?: string | null;
   sale_price_label: string;
-  pos_image?: { download_url: string } | null;
+  pos_image?: { download_url: string; card_url?: string | null } | null;
   track_inventory: boolean;
   quantity_on_hand: number;
   /** حد إعادة الطلب من بطاقة المنتج نفسها (نفس عتبة «مخزون منخفض» في قائمة
@@ -87,7 +87,7 @@ export function PosProductTile({
       >
         {showImage && (
           <div data-awj-media={product.pos_image?.download_url ? 'image' : 'placeholder'} className={'w-full overflow-hidden border-b border-border bg-background ' + imageClass}>
-            <PosProductImage path={product.pos_image?.download_url} alt={product.name} />
+            <PosProductImage path={product.pos_image?.card_url ?? product.pos_image?.download_url} alt={product.name} />
           </div>
         )}
 

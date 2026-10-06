@@ -389,10 +389,13 @@ class ProductBarcodeAndMediaTest extends TestCase
         $imaged = collect($catalog)->firstWhere('id', $withImage['id']);
         $plain = collect($catalog)->firstWhere('id', $withoutImage['id']);
         $expectedUrl = "/api/products/{$withImage['id']}/media/{$media['id']}/download";
+        $expectedCardUrl = "/api/products/{$withImage['id']}/media/{$media['id']}/derivatives/card";
 
         $this->assertSame($expectedUrl, $imaged['pos_image']['download_url']);
+        $this->assertSame($expectedCardUrl, $imaged['pos_image']['card_url']);
         $this->assertNull($plain['pos_image']);
         $this->withToken($auth['token'])->get($expectedUrl)->assertOk();
+        $this->withToken($auth['token'])->get($expectedCardUrl)->assertOk();
     }
 
     /** @test */

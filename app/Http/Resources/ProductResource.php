@@ -100,6 +100,8 @@ class ProductResource extends JsonResource
 
                 return $media ? [
                     'download_url' => "/api/products/{$this->id}/media/{$media->id}/download",
+                    'thumbnail_url' => "/api/products/{$this->id}/media/{$media->id}/derivatives/thumbnail",
+                    'card_url' => "/api/products/{$this->id}/media/{$media->id}/derivatives/card",
                 ] : null;
             }),
             'reorder_level'    => $this->reorder_level,

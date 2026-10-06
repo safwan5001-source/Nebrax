@@ -30,8 +30,10 @@ const LazyMediaLightbox = dynamic(
   },
 );
 
+type GalleryMedia = Media & { thumbnail_url?: string | null };
+
 interface MediaGalleryProps {
-  images: Media[];
+  images: GalleryMedia[];
   productName: string;
   activeIndex?: number | null;
 }
@@ -43,9 +45,15 @@ function getMainImageUrl(media: Media | undefined): string | null {
   return media.xlarge_url || media.large_url || media.original_url || null;
 }
 
-function getThumbImageUrl(media: Media | undefined): string | null {
+function getThumbImageUrl(media: GalleryMedia | undefined): string | null {
   if (!media) return null;
-  return media.small_url || media.mini_url || media.original_url || null;
+  return (
+    media.thumbnail_url ||
+    media.small_url ||
+    media.mini_url ||
+    media.original_url ||
+    null
+  );
 }
 
 export function MediaGallery(props: MediaGalleryProps) {

@@ -22,7 +22,10 @@ vi.mock('./pos-dialog', () => ({
 
 const black: PosVariantPickerOption = {
   id: 'v-black', sku: 'SHIRT-BLACK', descriptor: 'أسود / كبير', price: '150.00',
-  image: { download_url: '/api/products/p1/media/m-black/download' },
+  image: {
+    download_url: '/api/products/p1/media/m-black/download',
+    thumbnail_url: '/api/products/p1/media/m-black/derivatives/thumbnail',
+  },
 };
 const white: PosVariantPickerOption = {
   id: 'v-white', sku: 'SHIRT-WHITE', descriptor: 'أبيض / صغير', price: '160.00',
@@ -39,7 +42,7 @@ describe('PosVariantPickerDialog', () => {
 
     const images = screen.getAllByTestId('pos-product-image');
     expect(images).toHaveLength(2);
-    expect(images[0]!.getAttribute('data-path')).toBe('/api/products/p1/media/m-black/download');
+    expect(images[0]!.getAttribute('data-path')).toBe('/api/products/p1/media/m-black/derivatives/thumbnail');
     // لا صورة محلولة لأبيض — يمرّ `undefined`/فارغ فيتولّى `PosProductImage` احتياطه القائم.
     expect(images[1]!.getAttribute('data-path')).toBe('');
   });

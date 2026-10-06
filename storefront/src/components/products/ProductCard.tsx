@@ -42,7 +42,10 @@ export const ProductCard = memo(function ProductCard({
   const themePreset = usePublishedThemeMarker();
   const { addItem, surface } = useCart();
   const [adding, setAdding] = useState(false);
-  const imageUrl = product.thumbnail_url || null;
+  const imageUrl =
+    (product as Product & { card_url?: string | null }).card_url ??
+    product.thumbnail_url ??
+    null;
 
   // Current display price
   const displayPrice = product.price?.display_amount;

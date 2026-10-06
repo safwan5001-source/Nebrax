@@ -10,6 +10,7 @@ use App\Models\Storefront;
 use App\Models\StorefrontDomain;
 use App\Models\Tenant;
 use App\Services\R2StorageService;
+use App\Services\ProductMediaService;
 use App\Tenancy\TenantContext;
 use Aws\S3\S3ClientInterface;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -144,6 +145,68 @@ class StorefrontDomainMediaVisibilityTest extends TestCase
     }
 
     /** @test */
+    public function published_storefront_card_derivative_uses_the_existing_public_media_boundary(): void
+    {
+        Storage::fake('local');
+        ['tenant' => $tenant, 'channel' => $channel] = $this->seedDomainStore('derivative-store.example.com');
+        $product = $this->publishedProduct($tenant, $channel);
+
+        app(TenantContext::class)->set($tenant->id);
+        $media = ProductMedia::create([
+            'product_id' => $product->id,
+            'disk' => 'local',
+            'path' => 'products/card-source.webp',
+            'original_name' => 'card-source.webp',
+            'mime_type' => 'image/webp',
+            'size' => 14,
+            'sort_order' => 0,
+        ]);
+        $cardPath = app(ProductMediaService::class)->derivativePath($media, 'card');
+        Storage::disk('local')->put($media->path, 'original-bytes');
+        Storage::disk('local')->put($cardPath, 'card-derivative-bytes');
+        app(TenantContext::class)->forget();
+
+        $item = collect($this->getJson('http://derivative-store.example.com/store/v1/products')->assertOk()->json('data'))
+            ->firstWhere('id', $product->id);
+        $cardUrl = "/store/v1/media/{$media->id}/derivatives/card";
+
+        $this->assertSame($cardUrl, $item['card_url']);
+        $this->assertSame($cardUrl, $this->getJson("http://derivative-store.example.com/store/v1/products/{$product->id}")
+            ->json('data.media.0.card_url'));
+        $this->assertSame('card-derivative-bytes', $this->get("http://derivative-store.example.com{$cardUrl}")
+            ->assertOk()->assertHeader('Content-Type', 'image/webp')->streamedContent());
+    }
+
+    /** @test */
+    public function legacy_storefront_media_card_url_falls_back_to_the_original_without_a_storage_probe_in_catalog_serialization(): void
+    {
+        Storage::fake('local');
+        ['tenant' => $tenant, 'channel' => $channel] = $this->seedDomainStore('legacy-derivative-store.example.com');
+        $product = $this->publishedProduct($tenant, $channel);
+
+        app(TenantContext::class)->set($tenant->id);
+        $media = ProductMedia::create([
+            'product_id' => $product->id,
+            'disk' => 'local',
+            'path' => 'products/legacy-card.webp',
+            'original_name' => 'legacy-card.webp',
+            'mime_type' => 'image/webp',
+            'size' => 13,
+            'sort_order' => 0,
+        ]);
+        Storage::disk('local')->put($media->path, 'legacy-original-bytes');
+        app(TenantContext::class)->forget();
+
+        $cardUrl = "/store/v1/media/{$media->id}/derivatives/card";
+        $item = collect($this->getJson('http://legacy-derivative-store.example.com/store/v1/products')->assertOk()->json('data'))
+            ->firstWhere('id', $product->id);
+
+        $this->assertSame($cardUrl, $item['card_url']);
+        $this->assertSame('legacy-original-bytes', $this->get("http://legacy-derivative-store.example.com{$cardUrl}")
+            ->assertOk()->assertHeader('Content-Type', 'image/webp')->streamedContent());
+    }
+
+    /** @test */
     public function storefront_product_detail_media_is_also_host_relative_and_serves_r2_bytes(): void
     {
         $client = $this->mockR2();
@@ -179,6 +242,7 @@ class StorefrontDomainMediaVisibilityTest extends TestCase
 
         // معرّفٌ صحيح لصورةٍ فعلية — لكن منتجها غير منشور على هذه القناة.
         $this->getJson("http://r2-store-3.example.com/store/v1/media/{$media->id}")->assertStatus(404);
+        $this->getJson("http://r2-store-3.example.com/store/v1/media/{$media->id}/derivatives/card")->assertStatus(404);
     }
 
     /** @test */
@@ -195,10 +259,34 @@ class StorefrontDomainMediaVisibilityTest extends TestCase
         // مستأجرٍ آخر تماماً. حراسة `StorefrontMediaController::show()` تتحقق
         // من نشر المنتج على قناة النطاق المحلول لا من وجود الصفّ فقط.
         $this->getJson("http://r2-store-a.example.com/store/v1/media/{$mediaB->id}")->assertStatus(404);
+        $this->getJson("http://r2-store-a.example.com/store/v1/media/{$mediaB->id}/derivatives/card")->assertStatus(404);
 
         // وعلى نطاقه الصحيح، يبقى متاحاً.
         $this->getJson("http://r2-store-b.example.com/store/v1/media/{$mediaB->id}")
             ->assertOk()->assertHeader('Content-Type', 'image/webp');
+    }
+
+    /** @test */
+    public function storefront_derivative_route_rejects_malformed_ids_and_never_accepts_a_storage_path_parameter(): void
+    {
+        ['tenant' => $tenant, 'channel' => $channel] = $this->seedDomainStore('derivative-route-store.example.com');
+        $product = $this->publishedProduct($tenant, $channel);
+
+        app(TenantContext::class)->set($tenant->id);
+        $media = ProductMedia::create([
+            'product_id' => $product->id,
+            'disk' => 'local',
+            'path' => 'products/safe.webp',
+            'original_name' => 'safe.webp',
+            'mime_type' => 'image/webp',
+            'size' => 4,
+            'sort_order' => 0,
+        ]);
+        app(TenantContext::class)->forget();
+
+        $this->getJson('http://derivative-route-store.example.com/store/v1/media/not-a-uuid/derivatives/card')->assertStatus(404);
+        $this->getJson("http://derivative-route-store.example.com/store/v1/media/{$media->id}/derivatives/not-a-derivative")->assertStatus(404);
+        $this->getJson("http://derivative-route-store.example.com/store/v1/media/{$media->id}/derivatives/card?path=/etc/passwd")->assertStatus(404);
     }
 
     /** @test */
