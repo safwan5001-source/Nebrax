@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Models\CommerceProductContentBlock;
 use App\Models\Product;
 use App\Services\Commerce\ProductContentService;
+use App\Services\Commerce\StaleRevisionException;
 use DomainException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -21,7 +22,9 @@ final class CommerceProductContentController extends ApiController
         $this->denySelfService($request);
         $product = Product::query()->findOrFail($id);
 
-        return response()->json(['data' => ['blocks' => $content->blocks($product)]]);
+        $blocks = $content->blocks($product);
+
+        return response()->json(['data' => ['blocks' => $blocks, 'revision' => $content->revisionFor($blocks)]]);
     }
 
     public function replace(Request $request, ProductContentService $content, string $id): JsonResponse
@@ -29,6 +32,8 @@ final class CommerceProductContentController extends ApiController
         $this->denySelfService($request);
         $data = $request->validate([
             'blocks' => ['present', 'array', 'max:'.count(CommerceProductContentBlock::TYPES)],
+            // اختياري: بصمة الكتل كما قرأها العميل؛ إن لم تعد تطابق الحالية داخل القفل ⇒ 409 بلا كتابة.
+            'expected_revision' => ['sometimes', 'nullable', 'string', 'max:64'],
             'blocks.*.block_type' => ['required', 'string', Rule::in(CommerceProductContentBlock::TYPES)],
             'blocks.*.body' => ['required', 'string', 'max:'.(CommerceProductContentBlock::MAX_BODY_LENGTH * 2), 'regex:/\S/'],
             'blocks.*.body_en' => ['sometimes', 'nullable', 'string', 'max:'.(CommerceProductContentBlock::MAX_BODY_LENGTH * 2)],
@@ -37,12 +42,14 @@ final class CommerceProductContentController extends ApiController
         $product = Product::query()->findOrFail($id);
 
         try {
-            $blocks = $content->replace($product, array_values($data['blocks']));
+            $blocks = $content->replace($product, array_values($data['blocks']), $data['expected_revision'] ?? null);
+        } catch (StaleRevisionException $e) {
+            abort(409, $e->getMessage());
         } catch (DomainException $e) {
             abort(422, $e->getMessage());
         }
 
-        return response()->json(['data' => ['blocks' => $blocks]]);
+        return response()->json(['data' => ['blocks' => $blocks, 'revision' => $content->revisionFor($blocks)]]);
     }
 
     private function denySelfService(Request $request): void
