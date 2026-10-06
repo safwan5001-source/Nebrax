@@ -1,5 +1,7 @@
 "use client";
 
+import { AnnouncementsPanel } from "./AnnouncementsPanel";
+import { DEFAULT_TENANT_TIMEZONE } from "@/lib/timezone";
 import type { ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -76,6 +78,7 @@ export type CustomizerPanel =
   | "contact"
   | "whatsapp"
   | "social"
+  | "announcements"
   | "verification"
   | "apps"
   | "pages";
@@ -91,6 +94,7 @@ export const CUSTOMIZER_NAV_GROUPS: Array<{
   },
   {
     items: [
+      { id: "announcements", label: "announcements" },
       { id: "header", label: "header" },
       { id: "homepage", label: "homepage" },
       { id: "product", label: "productRegionsPanelLabel" },
@@ -186,6 +190,8 @@ interface PanelsProps {
   onRetryOffers?: () => void;
   /** CUST-H4-7b — merchant CRUD actions over the configured Offers catalog. */
   offerManagement?: OfferManagement;
+  /** CUST-HV V3 — the store's authoritative IANA zone (`/me` → `company.timezone`); announcement windows are entered in it. */
+  timezone?: string;
 }
 
 export function ControlPanels({
@@ -210,6 +216,7 @@ export function ControlPanels({
   offersState = "idle",
   onRetryOffers,
   offerManagement,
+  timezone = DEFAULT_TENANT_TIMEZONE,
 }: PanelsProps) {
   const t = (key: CustomizerMessageKey) => customizerMessage(locale, key);
   const patch = (partial: Partial<StorefrontPresentationConfig>) =>
@@ -261,6 +268,15 @@ export function ControlPanels({
       return <WhatsAppPanel config={config} t={t} patch={patch} />;
     case "social":
       return <SocialPanel config={config} t={t} patch={patch} />;
+    case "announcements":
+      return (
+        <AnnouncementsPanel
+          doc={config.announcements}
+          locale={locale}
+          timezone={timezone}
+          onChange={(announcements) => patch({ announcements })}
+        />
+      );
     case "verification":
       return (
         <VerificationPanel
@@ -303,7 +319,7 @@ export function Field({
   );
 }
 
-function Section({
+export function Section({
   title,
   hint,
   children,
@@ -331,7 +347,7 @@ function Section({
   );
 }
 
-function Segmented<T extends string>({
+export function Segmented<T extends string>({
   value,
   options,
   onChange,
@@ -363,7 +379,7 @@ function Segmented<T extends string>({
 export const inputClass =
   "h-10 w-full border border-neutral-300 bg-white px-3 text-sm text-neutral-900 outline-none focus:border-primary focus-visible:ring-2 focus-visible:ring-primary/40";
 export const selectClass = inputClass;
-const btnClass =
+export const btnClass =
   "inline-flex h-8 items-center border border-neutral-300 bg-white px-2.5 text-xs font-medium text-neutral-800 hover:bg-neutral-50";
 export const iconBtnClass =
   "inline-flex size-7 items-center justify-center text-xs text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900 disabled:text-neutral-300 disabled:hover:bg-transparent";

@@ -1,5 +1,6 @@
 "use client";
 
+import { describePublishIssues } from "./announcement-status";
 import type { ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 import { ScrollIndicator } from "./ScrollIndicator";
@@ -1709,7 +1710,10 @@ export function ExperienceBuilder({
       if (storefrontIdRef.current !== originStorefrontId || !isLatestWrite) return;
       setNoticeKind("status");
       setNotice(
-        result.reason === "scheduled_conflict"
+        (result.reason === "validation" && result.issues
+          ? describePublishIssues(result.issues, t)
+          : null) ??
+        (result.reason === "scheduled_conflict"
           ? t("versionPublishScheduledConflict")
           : result.reason === "unsupported_schema"
             ? t("versionPublishUnsupportedSchema")
@@ -1719,7 +1723,7 @@ export function ExperienceBuilder({
                 ? t("versionPublishNotFound")
                 : result.reason === "stale"
                   ? t("versionPublishStaleConflict")
-                  : t("versionPublishFailed"),
+                  : t("versionPublishFailed")),
       );
       return;
     }
@@ -1816,7 +1820,10 @@ export function ExperienceBuilder({
       if (storefrontIdRef.current !== originStorefrontId || !isLatestWrite) return;
       setNoticeKind("status");
       setNotice(
-        result.reason === "stale_token"
+        (result.reason === "validation" && result.issues
+          ? describePublishIssues(result.issues, t)
+          : null) ??
+        (result.reason === "stale_token"
           ? t("versionScheduleStaleToken")
           : result.reason === "active_conflict"
             ? t("versionScheduleActiveConflict")
@@ -1826,7 +1833,7 @@ export function ExperienceBuilder({
                 ? t("versionScheduleNotFound")
                 : result.reason === "stale_revision"
                   ? t("versionScheduleStaleRevision")
-                  : t("versionScheduleFailed"),
+                  : t("versionScheduleFailed")),
       );
       return;
     }
@@ -2124,6 +2131,7 @@ export function ExperienceBuilder({
           liveStoreName={liveStoreName}
           businessIdentity={businessIdentity}
           onChange={updateDraft}
+          timezone={tenantTimezone}
           selectedSection={selectedSection}
           onSelectSection={(id) => handleSelectSection(id, "sidebar")}
           isMobileViewport={isMobileViewport}
@@ -2202,6 +2210,7 @@ export function ExperienceBuilder({
         liveStoreName={liveStoreName}
         businessIdentity={businessIdentity}
         onChange={updateDraft}
+        timezone={tenantTimezone}
         selectedSection={selectedSection}
         onSelectSection={(id) => handleSelectSection(id, "sidebar")}
         isMobileViewport={isMobileViewport}
@@ -3255,6 +3264,12 @@ function NavIcon({ panel }: { panel: CustomizerPanel }) {
         <circle cx="6" cy="6" r="2.25" />
         <circle cx="11" cy="5.5" r="1.75" />
         <circle cx="9.5" cy="11" r="2" />
+      </svg>
+    ),
+    announcements: (
+      <svg {...common}>
+        <rect x="2.5" y="3" width="11" height="3.5" />
+        <path d="M2.5 9.5h11M2.5 12.5h7" />
       </svg>
     ),
     branding: (
