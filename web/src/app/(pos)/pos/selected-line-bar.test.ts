@@ -24,7 +24,7 @@ describe('POS-FINAL-1 شريط السطر المحدد', () => {
     expect(lineRegion).toContain('PosCartQtyControls');
     expect(lineRegion).toContain('setQty(line.key, -1)');
     expect(lineRegion).toContain('setQty(line.key, 1)');
-    expect(page).toContain('data-testid="pos-cart-discount"');
+    expect(page).not.toContain('data-testid="pos-cart-discount"');
     expect(page).not.toContain('<select');
   });
 

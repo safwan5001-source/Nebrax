@@ -22,6 +22,9 @@ export interface PosTender { payment_method_id: string; amount: number }
 
 /** شاشة الدفع: وسائل مهيأة للمؤسسة + آجل محكوم بإعداد POS. */
 export function PosPayment({
+  subMinor = 0,
+  discMinor = 0,
+  taxMinor = 0,
   totalMinor,
   items,
   customerName,
@@ -44,6 +47,9 @@ export function PosPayment({
   externalOrderReference = '',
   onExternalOrderReference,
 }: {
+  subMinor?: number;
+  discMinor?: number;
+  taxMinor?: number;
   totalMinor: number;
   items: PaymentSummaryItem[];
   customerName: string;
@@ -210,6 +216,17 @@ export function PosPayment({
               <User className="h-3.5 w-3.5 shrink-0 text-muted" strokeWidth={1.7} />
               <span className="truncate">{customerName}</span>
               <span className="text-muted">{t('cart')} ({items.length})</span>
+            </div>
+          </section>
+
+          <section className="rounded-md border border-border bg-surface p-3" data-testid="pos-payment-summary">
+            <div className="space-y-1.5 text-sm">
+              <div className="flex justify-between" data-testid="pos-payment-subtotal"><span className="text-muted">{t('subtotal')}</span><span className="num font-semibold text-text">{formatRiyal(subMinor / 100)}</span></div>
+              {discMinor > 0 && (
+                <div className="flex justify-between" data-testid="pos-payment-discount"><span className="text-muted">{t('discount')}</span><span className="num font-semibold text-positive">−{formatRiyal(discMinor / 100)}</span></div>
+              )}
+              <div className="flex justify-between" data-testid="pos-payment-tax"><span className="text-muted">{t('tax')}</span><span className="num font-semibold text-text">{formatRiyal(taxMinor / 100)}</span></div>
+              <div className="flex justify-between border-t border-border pt-1.5 font-semibold text-text" data-testid="pos-payment-total"><span>{t('total')}</span><span className="num">{formatRiyal(totalMinor / 100)}</span></div>
             </div>
           </section>
 

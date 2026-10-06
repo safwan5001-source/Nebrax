@@ -155,6 +155,11 @@ test.describe('Floor (POS)', () => {
     await page.getByTestId('pos-cart-pay').click();
     const screen = page.getByTestId('pos-payment-screen');
     await expect(screen).toBeVisible();
+    const summary = screen.getByTestId('pos-payment-summary');
+    await expect(summary).toBeVisible();
+    await expect(summary.getByTestId('pos-payment-subtotal')).toBeVisible();
+    await expect(summary.getByTestId('pos-payment-tax')).toBeVisible();
+    await expect(summary.getByTestId('pos-payment-total')).toBeVisible();
     await expect(screen.locator('[data-awj-surface="outcome"]')).toHaveCount(2);
     expect(await bg(page, '[data-awj-floor-change]')).toBe(INK);
     expect(await bg(page, 'aside [data-awj-floor-outcome]')).toBe(INK);
