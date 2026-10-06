@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { useLocale } from 'next-intl';
 import {
+  Gift,
   Globe,
   Layers3,
   LayoutDashboard,
@@ -39,6 +40,7 @@ const ICONS: Record<string, typeof Store> = {
   '/commerce/appearance': Paintbrush,
   '/commerce/domains': Globe,
   '/commerce/delivery': Truck,
+  '/commerce/gifting': Gift,
   '/commerce/integrations': Plug,
 };
 

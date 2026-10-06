@@ -43,7 +43,7 @@ export const SETUP_DESTINATIONS: Record<string, string | null> = {
   merchandising: '/commerce/merchandising',
   store_builder: '/commerce/appearance',
   products: '/products',
-  gift_settings: null,
+  gift_settings: '/commerce/gifting',
   delivery_schedule: null,
 };
 
