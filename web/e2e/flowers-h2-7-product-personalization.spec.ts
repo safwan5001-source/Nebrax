@@ -42,7 +42,7 @@ function server(state: { fields: Row[]; fail?: 'save' | 'load' }) {
 }
 
 const TAB = { ar: 'الهدايا والتخصيص', en: 'Gifting' } as const;
-const PERS = { ar: 'تخصيص المنتج', en: 'Product personalization' } as const;
+const PERS = { ar: /^التخصيص/, en: /^Personalization/ } as const;
 
 test.describe('FLOWERS-H2-7 — product personalization', () => {
   test.beforeEach(() => {

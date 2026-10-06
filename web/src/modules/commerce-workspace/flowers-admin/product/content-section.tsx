@@ -69,7 +69,7 @@ type DialogState = { kind: 'add' } | { kind: 'edit'; index: number } | null;
  * (لا HTML)، مرتّبة وقابلة للإيقاف. نختار النوع من القائمة المغلقة (لا اختراع أنواع)، وتُحفظ المجموعة كاملةً دفعة
  * واحدة مع فحص التغيّر على الخادم. المحتوى يُقرأ في صفحة المنتج بالمتجر؛ لا أثر على السعر أو المخزون.
  */
-export function ContentSection({ productId, locale, canManage }: { productId: string; locale: string | undefined; canManage: boolean }) {
+export function ContentSection({ productId, locale, canManage, onCount }: { productId: string; locale: string | undefined; canManage: boolean; onCount?: (count: number | null) => void }) {
   const t = useMemo(() => flowersAdminT(locale), [locale]);
   const { success: toastSuccess } = useToast();
   const [phase, setPhase] = useState<Phase>({ kind: 'loading' });
@@ -98,6 +98,8 @@ export function ContentSection({ productId, locale, canManage }: { productId: st
   }, [productId, attempt]);
 
   const saved = phase.kind === 'ready' ? phase.saved : [];
+  const savedCount = phase.kind === 'ready' ? phase.saved.length : null;
+  useEffect(() => onCount?.(savedCount), [savedCount, onCount]);
   const dirty = phase.kind === 'ready' && contentSignature(draft) !== contentSignature(saved);
   useUnsavedGuard(dirty);
 
