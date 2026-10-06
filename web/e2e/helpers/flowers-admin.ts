@@ -76,3 +76,27 @@ export const VIEWPORTS = [
   [1024, 800],
   [1440, 960],
 ] as const;
+
+/** منتج بحمولة عقد `GET /products/{id}` المطلوبة لصفحة ملف المنتج. */
+export const PRODUCT = {
+  id: 'p1', sku: 'ROSE-RED', barcode: null, name: 'باقة ورد جوري أحمر فاخرة', name_en: 'Luxury red rose bouquet', type: 'good', unit: 'قطعة',
+  description: null, category: null, brand: null, category_id: null, brand_id: null, unit_template_id: null, default_sales_unit: null,
+  default_purchase_unit: null, reorder_level: null, min_sale_price: null, discount: null, discount_type: null, profit_margin: null,
+  tags: null, internal_notes: null, sales_account_id: null, cogs_account_id: null, sale_price: '250.00', purchase_price: '120.00',
+  tax_rate: 15, track_inventory: true, quantity_on_hand: 12, avg_cost: '120.00', is_active: true, units: [],
+};
+
+/** يخدم صفحة ملف المنتج الأساسية (المنتج + النشاط)، ويترك ما عداها للمعالج المُمرَّر. */
+export function productPageHandler(next: Handler): Handler {
+  return async (url, route) => {
+    if (/\/products\/p1\/activity/.test(url)) {
+      await route.fulfill({ json: { data: [] } });
+      return true;
+    }
+    if (/\/products\/p1(\?|$)/.test(url) && route.request().method() === 'GET') {
+      await route.fulfill({ json: { data: PRODUCT } });
+      return true;
+    }
+    return next(url, route);
+  };
+}

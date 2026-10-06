@@ -18,6 +18,8 @@ import { Tabs, TabPanel, type TabDef } from '@/components/ui/tabs';
 import { useToast } from '@/components/ui/toast';
 import { type Product as ProductFormProduct } from '@/components/products/product-dialog';
 import { ProductWorkspace } from '@/components/products/product-workspace';
+import { ProductGiftingTab } from '@/modules/commerce-workspace/flowers-admin/product/gifting-tab';
+import { useFlowersCapability } from '@/modules/commerce-workspace/flowers-admin/product/use-flowers-capability';
 
 type Product = ProductFormProduct & {
   units: Array<{ name: string; factor: number }>;
@@ -43,6 +45,8 @@ export default function ProductProfilePage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState(false);
+  // تبويب «الهدايا والتخصيص» لمستأجرٍ لديه متجر بملف «ورد وهدايا» فقط — لا إزعاج لغيره.
+  const giftingCapability = useFlowersCapability(!isEditMode);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -74,7 +78,8 @@ export default function ProductProfilePage() {
     { id: 'movements', label: t('inventory_movements') },
     { id: 'timeline', label: t('timeline') },
     { id: 'activity', label: t('activity'), count: activities.length },
-  ], [activities.length, t]);
+    ...(giftingCapability === 'enabled' ? [{ id: 'gifting', label: t('gifting_tab') }] : []),
+  ], [activities.length, giftingCapability, t]);
 
   async function copyProduct() {
     if (!product) return;
@@ -206,6 +211,12 @@ export default function ProductProfilePage() {
       {activeTab === 'timeline' && (
         <TabPanel id="timeline">
           <Card><CardHeader><CardTitle>{t('timeline')}</CardTitle></CardHeader><CardContent><p className="text-sm text-muted">{t('timeline_next_stage')}</p></CardContent></Card>
+        </TabPanel>
+      )}
+
+      {activeTab === 'gifting' && giftingCapability === 'enabled' && (
+        <TabPanel id="gifting">
+          <ProductGiftingTab productId={id} />
         </TabPanel>
       )}
 
