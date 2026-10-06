@@ -46,7 +46,7 @@ type Pending =
  * في «التسويق»)، ولا يُرسَل ولا يُخزَّن أي سعر: السعر المعروض قراءةٌ فقط من المنتج. متعدد الخيارات يُلزَم بمتغيّر قبل
  * الإضافة؛ المنتج غير النشط لا يُضاف. التعديلات تُجمَّع محلياً وتُحفظ بـPUT كامل مع فحص التغيّر على الخادم.
  */
-export function AddonsSection({ productId, locale, canManage }: { productId: string; locale: string | undefined; canManage: boolean }) {
+export function AddonsSection({ productId, locale, canManage, onCount }: { productId: string; locale: string | undefined; canManage: boolean; onCount?: (count: number | null) => void }) {
   const t = useMemo(() => flowersAdminT(locale), [locale]);
   const tm = useMemo(() => (key: Parameters<typeof commerceWorkspaceMessage>[1]) => commerceWorkspaceMessage(locale, key), [locale]);
   const { success: toastSuccess } = useToast();
@@ -97,6 +97,8 @@ export function AddonsSection({ productId, locale, canManage }: { productId: str
   }, [contextKey]);
 
   const saved = phase.kind === 'ready' ? phase.saved : [];
+  const savedCount = phase.kind === 'ready' ? phase.saved.length : null;
+  useEffect(() => onCount?.(savedCount), [savedCount, onCount]);
   const dirty = phase.kind === 'ready' && addonsSignature(draft) !== addonsSignature(saved);
   useUnsavedGuard(dirty);
 

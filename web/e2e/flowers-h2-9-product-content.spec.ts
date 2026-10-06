@@ -38,7 +38,7 @@ function server(state: { blocks: Row[]; failSave?: boolean }) {
 }
 
 const TAB = { ar: 'الهدايا والتخصيص', en: 'Gifting' } as const;
-const SECTION = { ar: 'محتوى المنتج', en: 'Product content' } as const;
+const SECTION = { ar: /^المحتوى/, en: /^Content/ } as const;
 
 async function open(page: import('@playwright/test').Page, locale: 'ar' | 'en') {
   await page.goto('/products/p1');
