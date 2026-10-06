@@ -150,7 +150,7 @@ export function AddonsSection({ productId, locale, canManage }: { productId: str
     setNotice(null);
     // الاستبدال كامل ⇒ التحقق من «لم يتغيّر شيء» داخل قفل الخادم (`expected_revision` ⇒ 409). الفحص المسبق احتياطٌ لخادمٍ بلا
     // بصمة، وفشل قراءته يُوقف الحفظ بدل أن يكتب من نسخة قد تكون قديمة.
-    const revision = phase.kind === 'ready' ? phase.revision : null;
+    let revision = phase.kind === 'ready' ? phase.revision : null;
     if (revision === null) {
       const fresh = await loadAddons(productId);
       if (!fresh.ok) {
@@ -165,6 +165,8 @@ export function AddonsSection({ productId, locale, canManage }: { productId: str
         setNotice({ tone: 'warning', text: t('addonStale') });
         return;
       }
+      // الفحص المسبق قد يعيد بصمة (نشرٌ تدريجي للخادم): نحملها إلى الـPUT فيرفض الخادم أي تعديل متزامن بعد القراءة.
+      revision = fresh.data.revision;
     }
     const result = await saveAddons(productId, draft, revision);
     if (!result.ok && result.kind === 'conflict') {
