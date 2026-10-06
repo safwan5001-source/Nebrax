@@ -5,7 +5,7 @@
 - Base SHA: `b0c3574225531ed907991bd9c5f23a7e8f5d66bb` (`origin/main` at implementation start).
 - Implementation head SHA: `5a32eb47bd19ca6075b3c0f947bbf24fea6817e0`.
 - Local implementation commit: `8a6698b19b096412bc5b8a79d6d45199dafe65eb`.
-- Follow-up implementation head: `9bea4cca4dafba456de8573247d54d19aba2545c`.
+- Follow-up implementation head: `0f6d8bcfa2f15b709eabeb878d0d7cb7c9fc4b92`.
 - Branch: `feat/awj-product-media-3-derivatives`.
 - PR: [#1235 — AWJ-PRODUCT-MEDIA-3 — Add secure product image derivatives](https://github.com/safwan5001-source/Nebrax/pull/1235).
 
@@ -120,7 +120,13 @@ Commands/results:
   matching v4 encoder difference: `Image::toJpeg()` is unavailable. The
   derivative service now uses `encodeUsingMediaType()` with the same JPEG/WebP
   quality values and the existing PNG default behavior.
-- A new CI run is required for the latest follow-up head; its live result will be recorded
+- CI run `8087` reached the full suite and confirmed transformation execution.
+  Its remaining failures were two test defects (selecting the first media after
+  a second upload, and retaining an auth header in an unauthenticated check)
+  plus one manually constructed `ProductLifecycleService` test double that
+  needed the service's existing `ProductMediaService` dependency.
+- A new CI run is required for follow-up head
+  `0f6d8bcfa2f15b709eabeb878d0d7cb7c9fc4b92`; its live result will be recorded
   on PR #1235. The SQLite result above is not treated as passing.
 
 ## Performance
@@ -145,6 +151,7 @@ Commands/results:
 - `app/Services/ProductMediaService.php`
 - `routes/api.php`
 - `tests/Feature/ProductMediaDerivativeTest.php`
+- `tests/Feature/ProductImportV2Test.php`
 - `tests/Feature/ProductMediaR2BulkCleanupSemanticsTest.php`
 - `tests/Feature/ProductMediaR2DeleteTest.php`
 - `tests/Feature/ProductMediaR2WriteTest.php`
