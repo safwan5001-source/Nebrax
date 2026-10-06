@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { cleanup, renderHook, waitFor } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const apiMock = vi.fn();
 vi.mock('@/lib/api', async (importOriginal) => ({
@@ -10,9 +10,14 @@ vi.mock('@/lib/api', async (importOriginal) => ({
 
 import { useFlowersCapability } from './use-flowers-capability';
 
+const signIn = (permissions: string[], role = 'owner') =>
+  localStorage.setItem('user', JSON.stringify({ id: 'u', name: 'x', email: 'x@x', role, permissions, tenant_id: 't' }));
+
+beforeEach(() => signIn(['*']));
 afterEach(() => {
   cleanup();
   apiMock.mockReset();
+  localStorage.clear();
 });
 
 const store = (vertical: string) => ({ id: 's1', name: 'x', sales_channel_id: 'c', is_active: true, business_vertical: vertical });
@@ -37,6 +42,13 @@ describe('useFlowersCapability', () => {
     apiMock.mockReset();
     const off = renderHook(() => useFlowersCapability(false));
     await waitFor(() => expect(off.result.current).toBe('disabled'));
+    expect(apiMock).not.toHaveBeenCalled();
+  });
+
+  it('issues no request and stays disabled without commerce.manage (store list needs it)', async () => {
+    signIn(['products.view', 'products.manage'], 'accountant');
+    const { result } = renderHook(() => useFlowersCapability());
+    await waitFor(() => expect(result.current).toBe('disabled'));
     expect(apiMock).not.toHaveBeenCalled();
   });
 });

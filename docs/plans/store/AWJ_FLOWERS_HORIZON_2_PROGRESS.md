@@ -1,6 +1,6 @@
 # AWJ Flowers & Gifts — Horizon 2 Progress
 
-**Status:** IN PROGRESS — H2-1…H2-4 merged; H2-5 in review  
+**Status:** IN PROGRESS — H2-1…H2-5 merged; H2-6 in review  
 **Date:** 2026-10-04  
 **Planning Base:** `main` @ `6ded662bfada8f72f5ebf321dcf27b08be7939c1`  
 **Execution Base (H2-1):** `main` @ `afe223cb654154fa55234ff2e360233bbc933ec3`  
@@ -30,8 +30,8 @@ Horizon 1 is complete.
 | H2-2 | Delivery Schedule Admin | MERGED | #1238 | `37d462f` |
 | H2-3 | Delivery Windows & Capacity | MERGED | #1239 | `5ff339b` |
 | H2-4 | Blocked Dates & Exceptions | MERGED | #1240 | `323c5f5` |
-| H2-5 | Fulfillment Warehouse Setup | PR OPEN | (see log) | — |
-| H2-6 | Product Preparation Time | NOT STARTED | — | — |
+| H2-5 | Fulfillment Warehouse Setup | MERGED | #1241 | `a53bcd0` |
+| H2-6 | Product Preparation Time | PR OPEN | (see log) | — |
 | H2-7 | Product Personalization Admin | NOT STARTED | — | — |
 | H2-8 | Product Add-ons Admin | NOT STARTED | — | — |
 | H2-9 | Structured Product Content Admin | NOT STARTED | — | — |
@@ -244,16 +244,21 @@ A UI slice is not complete until its progress entry records:
 
 ### H2-5 — Fulfilment Warehouse Setup
 
-**Status:** PR OPEN  
+**Status:** MERGED  
 **Base SHA:** `323c5f58d6e7ad9cc9d2591d9b049f07936ee873` (H2-4 merged)  
 **Branch:** `flowers/h2-5-fulfillment-warehouse`  
-**PR / Head / Merge SHA:** recorded in the next slice's ledger update after merge
+**PR:** #1241  
+**Head SHA:** `ba7bfb1` (first head `7452c8b`)  
+**Merge SHA:** `a53bcd0ab3a5b6e9e9bffcc7e6be588ddbf64c7a` (squash)
 
 #### Contract / scope
 - **One thin new backend route pair over the existing `FulfillmentPolicyService`** (no new table, no new authority): `GET|PUT /commerce/workspace/storefronts/{id}/fulfillment` (`commerce.manage`). `GET` returns the channel's current warehouse (or null) and the tenant's warehouses (restricted to the user's allowed warehouses when the account is branch-limited); `PUT {warehouse_id}` assigns one active warehouse via `setFixedWarehouse` (single row replaced, never duplicated). Foreign/unknown/disallowed warehouse ⇒ one non-revealing 422; inactive ⇒ 422; foreign store ⇒ 404; self-service ⇒ 403. No journal entry and no stock movement is created.
 
 #### UI / information architecture
 - "Fulfilment" tab in the delivery workspace: states plainly that same-day availability needs a warehouse to compute stock/lead from, shows the current assignment, offers only active warehouses (an inactive current one is shown, flagged, and cannot be re-chosen), links to "Create warehouse" when none exist, and the readiness strip gains the warehouse prerequisite. The H2-11 checklist deep-links `same_day_delivery` here when the warehouse is the gap. Unsaved choice registers with the unsaved guard.
+
+#### Review / CI
+- Codex out of quota (no automated findings). **CI caught one real miss:** `CommerceModuleBoundaryTest` pins the registered Commerce route URIs and lacked the new `…/storefronts/{id}/fulfillment` route; fixed by adding it to the allowlist (the first push ran only filtered suites locally — lesson: backend slices add their routes to that allowlist, and CI is the full-suite gate). Merged on a fully green head (sqlite, pgsql, web; both runs).
 
 #### Tests
 - Backend `CommerceFulfillmentAdminApiTest` (7): listing isolation, assign/replace keeps one row, invalid inputs, tenant isolation, RBAC, no accounting/stock effect, the setup checklist flips `same_day_delivery` to configured only after assignment. Web `fulfillment.test.ts`, `fulfillment-panel.test.tsx` (11 incl. unsaved guard); Playwright `flowers-h2-5-fulfillment-warehouse.spec.ts` (AR/EN × 390/430/1024/1440, dark, empty).
@@ -265,10 +270,41 @@ A UI slice is not complete until its progress entry records:
 - Additive routes; the same-day promise logic is untouched (it already read this policy).
 
 #### Deployment observation
-- Manual deploy: NOT PERFORMED; production verification: NOT PERFORMED.
+- Manual deploy: NOT PERFORMED; automatic CI/CD: not observable from GitHub; production verification: NOT PERFORMED.
 
 #### Next
 - H2-6 — Product Preparation Time.
+
+---
+
+### H2-6 — Product Preparation Time
+
+**Status:** PR OPEN  
+**Base SHA:** `a53bcd0ab3a5b6e9e9bffcc7e6be588ddbf64c7a` (H2-5 merged)  
+**Branch:** `flowers/h2-6-product-preparation`  
+**PR / Head / Merge SHA:** recorded in the next slice's ledger update after merge
+
+#### Contract / scope
+- Existing contract: `GET|PUT /commerce/workspace/products/{id}/preparation` (`products.view` read / `products.manage` write): `{ preparation_minutes }`. Effective lead time = the larger of the channel lead time (H2-2) and this product's preparation time (ADR-20); the server computes any promise — no date is computed on the client.
+- No backend change.
+
+#### UI / information architecture
+- New **Gifting** tab on the existing product page (`/products/{id}?tab=gifting`), shown **only** when the tenant has a Flowers & Gifts store **and** the user holds `commerce.manage` (the capability read needs the store list); otherwise the tab is absent and no request is issued. First section: "Preparation time" — number + unit (minutes/hours/days) with the current state in words ("No product-specific lead time" / duration), the effect explained, read-only without `products.manage`.
+
+#### Tests
+- `preparation.test.ts`, `preparation-section.test.tsx`, `use-flowers-capability.test.tsx` (incl. no request without `commerce.manage`); Playwright `flowers-h2-6-product-preparation.spec.ts` (AR/EN × 390/430/1024/1440, dark, errors, read-only).
+
+#### Tenant Isolation / RBAC
+- Product ownership is `TenantScope` (non-revealing 404); write requires `products.manage`; tab hidden and zero requests for users without `commerce.manage` (an accountant with `products.manage` but no `commerce.manage` does not see the tab — deliberately conservative).
+
+#### Backward compatibility
+- Additive tab; general-retail tenants and unaffected stores see no change.
+
+#### Deployment observation
+- Manual deploy: NOT PERFORMED; production verification: NOT PERFORMED.
+
+#### Next
+- H2-7 — Product Personalization Admin.
 
 ---
 
