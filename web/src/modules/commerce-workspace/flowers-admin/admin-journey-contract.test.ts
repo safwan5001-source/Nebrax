@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const apiMock = vi.fn();
 vi.mock('@/lib/api', async (importOriginal) => ({
@@ -100,6 +100,19 @@ const RUN: Record<(typeof STEPS)[number], () => Promise<unknown>> = {
 };
 
 describe('merchant admin journey contract', () => {
+  // التوليد يبدأ من خريطة فارغة (لا دمج مع القديمة): خطوةٌ حُذفت أو أُعيدت تسميتها لا تبقى طلباً يتيماً يُعاد تشغيله.
+  beforeAll(() => {
+    if (WRITE) {
+      mkdirSync(DIR, { recursive: true });
+      writeFileSync(resolve(DIR, 'requests.json'), '{}\n');
+    }
+  });
+
+  it('the stored request map holds exactly the journey steps (no stale or missing operation)', () => {
+    if (WRITE) return;
+    expect(Object.keys(readJson('requests.json')).sort()).toEqual([...STEPS].sort());
+  });
+
   for (const step of STEPS) {
     it(`${step}: client request matches the shared contract and the real response parses`, async () => {
       current = step;

@@ -628,10 +628,10 @@ A UI slice is not complete until its progress entry records:
 - Regenerate deliberately: `FLOWERS_ADMIN_WRITE_CONTRACT=1 npx vitest run admin-journey-contract` (requests) then `FLOWERS_WRITE_CONTRACT=1 php artisan test --filter=FlowersMerchantAdminJourneyTest` (responses). CI wiring: `ci.yml` / `setup.sh` copy the contract into the generated Laravel app; `web-ci.yml` triggers on contract changes.
 
 #### Tests
-- PHP: 1 test / 53 assertions (sqlite + pgsql in CI); web: 14 tests (one per journey step + round trip + checklist).
+- PHP: 1 test / 73 assertions (sqlite + pgsql in CI); web: 15 tests (one per journey step + round trip + checklist).
 
 #### Review
-- Codex (available again for this PR) raised two valid P2s, both fixed: the contract omitted every `expected_revision` although the real panels always send one (now chained with live-revision substitution at replay, plus a 409 check), and the PHP comparison used loose `assertEquals` (now strict `assertSame`).
+- Codex (available again for this PR) raised four valid P2s over two rounds, all fixed with tests: the contract omitted every `expected_revision` although the real panels always send one (now chained with live-revision substitution at replay, plus a 409 check), the PHP comparison used loose `assertEquals` (now strict `assertSame`); normalising every revision to one placeholder would hide a save that returns the *pre-save* revision (the replay now asserts each revision-bearing save returns a revision that differs from the pre-save one and equals the document's current revision on a fresh read); and generation merged into the old `requests.json` (now rebuilt from an empty map, with a test that the stored keys equal exactly the journey steps).
 
 #### Tenant Isolation / RBAC
 - The replay uses the owner of a fresh tenant; isolation and role matrices are covered by H2-13.

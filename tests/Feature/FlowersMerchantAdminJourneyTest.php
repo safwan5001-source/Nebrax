@@ -53,21 +53,28 @@ class FlowersMerchantAdminJourneyTest extends TestCase
      * الواجهة تمرّر بصمة المستند الذي قرأته (`expected_revision`)؛ العقد يحمل رمزاً نائباً، وهنا يُستبدل بالبصمة الحيّة
      * من قراءة المستند نفسه قبل الحفظ (كما تفعل اللوحة عند التحميل) — فيمرّ الطلب الحاوي للبصمة على الخادم الفعلي.
      */
-    private function bindRevision(string $token, string $path, array $body): array
+    /** @return array{0: string, 1: string} [مسار قراءة المستند، مفتاح بصمته في الاستجابة] */
+    private function revisionTarget(string $path): array
     {
-        if (($body['expected_revision'] ?? null) !== self::REVISION_TOKEN) {
-            return $body;
-        }
-        [$read, $key] = match (true) {
+        return match (true) {
             str_ends_with($path, '/delivery-schedule/slots') => [dirname($path), 'slots_revision'],
             str_ends_with($path, '/delivery-schedule/blocked-dates') => [dirname($path), 'blocked_dates_revision'],
             default => [$path, 'revision'],
         };
+    }
+
+    /** @return array{0: array, 1: ?string} [الجسم بعد الاستبدال، البصمة الحيّة قبل الحفظ (أو null إن لم يحمل الطلب بصمة)] */
+    private function bindRevision(string $token, string $path, array $body): array
+    {
+        if (($body['expected_revision'] ?? null) !== self::REVISION_TOKEN) {
+            return [$body, null];
+        }
+        [$read, $key] = $this->revisionTarget($path);
         $revision = $this->withToken($token)->getJson('/api'.$read)->assertOk()->json('data.'.$key);
         $this->assertIsString($revision, "لا بصمة حيّة في قراءة {$read}");
         $body['expected_revision'] = $revision;
 
-        return $body;
+        return [$body, $revision];
     }
 
     /** يستبدل المعرّفات (UUID) بمعرّفات نائبة ثابتة بترتيب الظهور فيبقى العقد ثابتاً بين التشغيلات. */
@@ -118,10 +125,20 @@ class FlowersMerchantAdminJourneyTest extends TestCase
         $captured = [];
         foreach ($requests as $name => $request) {
             $path = strtr($request['path'], $tokens);
-            $body = $request['body'] === null ? [] : $this->bindRevision($token, $path, $this->bind($request['body'], $tokens));
+            [$body, $before] = $request['body'] === null ? [[], null] : $this->bindRevision($token, $path, $this->bind($request['body'], $tokens));
             $response = $this->withToken($token)->json($request['method'], '/api'.$path, $body);
             $response->assertSuccessful("الطلب «{$name}» الذي تبنيه الواجهة رفضه الخادم: ".$response->getContent());
             $captured[$name] = $response->json();
+
+            if ($before !== null) {
+                // اللوحة تحتفظ بالبصمة التي يعيدها الحفظ وترسلها في التعديل التالي: يجب أن تكون بصمة المستند **بعد** الحفظ
+                // (تطابق قراءته الآن) وأن تختلف عن بصمة ما قبله (المحتوى تغيّر). التطبيع في العقد يوحّد القيم فلا يلتقط هذا.
+                [$read, $key] = $this->revisionTarget($path);
+                $after = $response->json('data.'.$key);
+                $this->assertIsString($after, "«{$name}» لم يُعد بصمة بعد الحفظ");
+                $this->assertNotSame($before, $after, "«{$name}»: تغيّر المحتوى لكن البصمة المعادة هي بصمة ما قبل الحفظ");
+                $this->assertSame($this->withToken($token)->getJson('/api'.$read)->assertOk()->json('data.'.$key), $after, "«{$name}»: البصمة المعادة ليست البصمة الحالية للمستند");
+            }
         }
 
         // بصمةٌ قديمة تُرفض بـ409 ولا يُكتب شيء (التزامن بين تاجرين) — على المسار الحقيقي نفسه الذي حفظته الرحلة.
