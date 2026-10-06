@@ -85,6 +85,49 @@ final class StorefrontMediaReferenceScanner
     }
 
     /**
+     * كل `MediaRef` كاملاً (العقدة نفسها لا المعرّف وحده) داخل وثيقة واحدة —
+     * بوابة النشر تحتاج الحقول المجاورة (`alt`, `decorative`, `crop`…).
+     *
+     * @param  array<mixed>  $config
+     * @return list<array{path:string,ref:array<string,mixed>}>
+     */
+    public function extractRefs(array $config): array
+    {
+        return $this->walkNodes($config);
+    }
+
+    /**
+     * هويّات الاستخدام (`usage_key`) الحيّة لكل وسيط في **كل** وثائق المستأجر
+     * (مسودة/نسخ/منشور) — يعتمدها المصالِح لإزالة مشتقّاتٍ لم يعد يشير إليها شيء.
+     * مرجعٌ بتحويلٍ غير صالح لا يحمي شيئاً (لا مفتاح له) فيُتجاوز.
+     *
+     * @return array<string, array<string,true>> mediaId ⇒ [usageKey ⇒ true]
+     */
+    public function liveUsageKeys(): array
+    {
+        $live = [];
+        foreach ($this->containers(null) as $container) {
+            foreach ($this->walkNodes($container['config']) as ['ref' => $ref]) {
+                try {
+                    $transform = StorefrontMediaTransform::fromInput([
+                        'crop' => $ref['crop'] ?? null,
+                        'rotate' => $ref['rotate'] ?? 0,
+                        'focal' => $ref['focal'] ?? null,
+                        'fit' => $ref['fit'] ?? 'cover',
+                    ]);
+                } catch (\InvalidArgumentException) {
+                    continue;
+                }
+                if (! $transform->isDefault()) {
+                    $live[$ref['mediaId']][$transform->usageKey($ref['mediaId'])] = true;
+                }
+            }
+        }
+
+        return $live;
+    }
+
+    /**
      * @param  list<string>|null  $needles  null = كل الصفوف
      * @return iterable<array{container:string,id:string,storefront_id:string,config:array<mixed>}>
      */
@@ -124,6 +167,28 @@ final class StorefrontMediaReferenceScanner
                 ];
             }
         }
+    }
+
+    /**
+     * @param  array<mixed>  $node
+     * @return list<array{path:string,ref:array<string,mixed>}>
+     */
+    private function walkNodes(array $node, string $path = ''): array
+    {
+        $hits = [];
+
+        if (isset($node['mediaId']) && is_string($node['mediaId']) && $node['mediaId'] !== '') {
+            $hits[] = ['path' => $path === '' ? '$' : $path, 'ref' => $node];
+        }
+
+        foreach ($node as $key => $value) {
+            if (is_array($value)) {
+                $child = $path === '' ? (string) $key : $path.'.'.$key;
+                array_push($hits, ...$this->walkNodes($value, $child));
+            }
+        }
+
+        return $hits;
     }
 
     /**

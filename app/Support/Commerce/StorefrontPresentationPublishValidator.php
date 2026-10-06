@@ -3,6 +3,7 @@
 namespace App\Support\Commerce;
 
 use App\Services\Commerce\PresentationPublishValidationException;
+use App\Services\Commerce\StorefrontMediaPublishGate;
 use Carbon\CarbonImmutable;
 use Throwable;
 
@@ -43,7 +44,25 @@ final class StorefrontPresentationPublishValidator
      */
     public function errors(array $normalized): array
     {
-        return $this->announcementErrors($normalized['announcements'] ?? null);
+        return $this->announcementErrors($normalized['announcements'] ?? null)
+            + $this->mediaErrors($normalized);
+    }
+
+    /**
+     * CUST-HV V2c — مراجع الوسائط: قراءة قاعدة البيانات فقط حين تحمل الوثيقة
+     * `mediaId` (وثيقةٌ بلا وسائط لا تلمس القاعدة ولا تتغيّر نتيجتها). لا توليد
+     * أبداً — انظر `StorefrontMediaPublishGate`.
+     *
+     * @param  array<string, mixed>  $normalized
+     * @return array<string, array{code: string, message: string}>
+     */
+    private function mediaErrors(array $normalized): array
+    {
+        if (! str_contains((string) json_encode($normalized), '"mediaId"')) {
+            return [];
+        }
+
+        return app(StorefrontMediaPublishGate::class)->errors($normalized);
     }
 
     /** @return array<string, array{code: string, message: string}> */

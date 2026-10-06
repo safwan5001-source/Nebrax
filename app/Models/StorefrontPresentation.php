@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\Commerce\StorefrontPublishedMediaIndex;
 use App\Tenancy\CompanyWide;
 use App\Tenancy\TenantContext;
 use App\Tenancy\TenantScope;
@@ -72,6 +73,14 @@ class StorefrontPresentation extends BaseModel implements CompanyWide
 
             if ($storefront === null || $storefront->tenant_id !== $tenantId) {
                 throw new RuntimeException('المتجر غير موجود لهذا المستأجر.');
+            }
+        });
+
+        // CUST-HV V2c — مجموعة الوسائط المنشورة تتبع `published_config` دائماً،
+        // أياً كان مسار الكتابة (V0 §7.8). نقطة اختناقٍ واحدة لا نداءٌ في كل خدمة.
+        static::saved(function (self $presentation) {
+            if ($presentation->wasRecentlyCreated || $presentation->wasChanged('published_config')) {
+                app(StorefrontPublishedMediaIndex::class)->rebuild($presentation);
             }
         });
     }
