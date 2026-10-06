@@ -5,7 +5,7 @@
 - Base SHA: `b0c3574225531ed907991bd9c5f23a7e8f5d66bb` (`origin/main` at implementation start).
 - Implementation head SHA: `5a32eb47bd19ca6075b3c0f947bbf24fea6817e0`.
 - Local implementation commit: `8a6698b19b096412bc5b8a79d6d45199dafe65eb`.
-- Follow-up implementation head: `0f6d8bcfa2f15b709eabeb878d0d7cb7c9fc4b92`.
+- Follow-up implementation head: `71a9e4f1ec06a594b1f16849ef7a38cbb3f97291`.
 - Branch: `feat/awj-product-media-3-derivatives`.
 - PR: [#1235 — AWJ-PRODUCT-MEDIA-3 — Add secure product image derivatives](https://github.com/safwan5001-source/Nebrax/pull/1235).
 
@@ -125,9 +125,14 @@ Commands/results:
   a second upload, and retaining an auth header in an unauthenticated check)
   plus one manually constructed `ProductLifecycleService` test double that
   needed the service's existing `ProductMediaService` dependency.
+- CI run `8093` left one relevant failure: its unauthenticated derivative URL
+  assertion used a non-JSON request after flushing headers, so Laravel attempted
+  to redirect to the unavailable `login` route. The regression test now uses
+  `getJson()`, exercising the intended API 401 behavior without changing routes
+  or authorization semantics.
 - A new CI run is required for follow-up head
-  `0f6d8bcfa2f15b709eabeb878d0d7cb7c9fc4b92`; its live result will be recorded
-  on PR #1235. The SQLite result above is not treated as passing.
+  `71a9e4f1ec06a594b1f16849ef7a38cbb3f97291`; its live result will be recorded
+  on PR #1235. The prior SQLite result is not treated as passing.
 
 ## Performance
 
