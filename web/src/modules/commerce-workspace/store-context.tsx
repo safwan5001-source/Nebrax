@@ -84,3 +84,11 @@ export function useCommerceStoreContext(): CommerceStoreContextValue {
   }
   return value;
 }
+
+/**
+ * نسخة متسامحة: `null` خارج `CommerceStoreProvider`. لصفحات تعمل بلا مزوّد (مثل نظرة التجارة العامة في الاختبارات)
+ * وتُغني نفسها حين يتوفّر سياق المتجر، دون أن ترمي.
+ */
+export function useOptionalCommerceStoreContext(): CommerceStoreContextValue | null {
+  return useContext(CommerceStoreContext);
+}
