@@ -53,7 +53,7 @@ test.describe('postures are declared per workspace root', () => {
 });
 
 test.describe('gate OFF keeps today’s workspaces', () => {
-  test('POS cart totals are NOT an ink surface and the wrapper generates no box', async ({ page }) => {
+  test('POS has no separate cart totals row and the wrapper generates no box', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 720 });
     await enterDemo(page);
     await go(page, '/pos', false);
@@ -62,7 +62,7 @@ test.describe('gate OFF keeps today’s workspaces', () => {
     });
     const outcome = page.locator('[data-awj-floor-outcome]').first();
     expect(await outcome.evaluate((el) => getComputedStyle(el).display)).toBe('contents');
-    expect(await bg(page, '[data-testid="pos-cart-totals"]')).not.toBe(INK);
+    await expect(page.locator('[data-testid="pos-cart-totals"]')).toHaveCount(0);
     await expect(page.locator('html')).not.toHaveAttribute('data-awj-ui', '3');
   });
 
@@ -75,34 +75,28 @@ test.describe('gate OFF keeps today’s workspaces', () => {
 });
 
 test.describe('Floor (POS)', () => {
-  test('1280×720: cart, total, pay and search stay on screen with a populated cart', async ({ page }) => {
+  test('1280×720: cart, pay and search stay on screen with a populated cart', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 720 });
     await enterDemo(page);
     await go(page, '/pos', true);
     await fillCart(page);
     const scrolls = await page.evaluate(() => document.documentElement.scrollHeight > window.innerHeight + 1);
     expect(scrolls).toBe(false);
-    for (const selector of ['[data-awj-floor-total]', '[data-testid="pos-cart-pay"]', 'input[type="search"], input[placeholder]']) {
+    for (const selector of ['[data-testid="pos-cart-pay"]', 'input[type="search"], input[placeholder]']) {
       const box = await page.locator(selector).first().boundingBox();
       expect(box, selector).not.toBeNull();
       expect(box!.y + box!.height).toBeLessThanOrEqual(721);
     }
   });
 
-  test('totals + pay are ONE Outcome Surface with display money, Ledger Rule and outcome action', async ({ page }) => {
+  test('pay is the only persistent POS total display in the Outcome Surface', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await enterDemo(page);
     await go(page, '/pos', true);
     await fillCart(page);
     expect(await bg(page, '[data-awj-floor-outcome]')).toBe(INK);
-    const total = page.locator('[data-awj-floor-total] > .num');
-    const style = await total.evaluate((el) => {
-      const cs = getComputedStyle(el);
-      return { size: parseFloat(cs.fontSize), rule: cs.borderBottomStyle, width: parseFloat(cs.borderBottomWidth) };
-    });
-    expect(style.size).toBeGreaterThanOrEqual(28);
-    expect(style.rule).toBe('double');
-    expect(style.width).toBeGreaterThanOrEqual(3);
+    await expect(page.locator('[data-awj-floor-total]')).toHaveCount(0);
+    await expect(page.getByTestId('pos-cart-totals')).toHaveCount(0);
     const pay = page.getByTestId('pos-cart-pay');
     expect(await pay.evaluate((el) => getComputedStyle(el).backgroundColor)).toBe('rgb(127, 168, 255)');
     const payBox = await pay.boundingBox();
