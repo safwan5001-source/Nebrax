@@ -285,7 +285,7 @@ class ProductMediaDerivativeTest extends TestCase
         $url = "/api/products/{$product['id']}/media/{$mediaId}/derivatives/card";
 
         $this->flushHeaders();
-        $this->get($url)->assertUnauthorized();
+        $this->getJson($url)->assertUnauthorized();
         $selfServiceToken = $this->tokenForRole($auth['tenant_id'], 'self_service', 'self-service@derivative-authorized.test');
         $this->withToken($selfServiceToken)->get($url)->assertForbidden();
         $this->withToken($selfServiceToken)->postJson("/api/products/{$product['id']}/media", [
