@@ -25,7 +25,7 @@ export async function seedAdmin(
   page: Page,
   locale: 'ar' | 'en',
   handler: Handler,
-  opts: { permissions?: string[]; role?: string; dark?: boolean } = {},
+  opts: { permissions?: string[]; role?: string; dark?: boolean; stores?: unknown[] } = {},
 ) {
   await page.context().addCookies([{ name: 'locale', value: locale, url: BASE }]);
   if (opts.dark) await page.emulateMedia({ colorScheme: 'dark' });
@@ -43,7 +43,7 @@ export async function seedAdmin(
   await page.route('**/api/**', async (route) => {
     const url = route.request().url();
     if (/\/commerce\/workspace\/storefronts(\?|$)/.test(url) && route.request().method() === 'GET') {
-      return route.fulfill({ json: { data: { stores: [STORE] } } });
+      return route.fulfill({ json: { data: { stores: opts.stores ?? [STORE] } } });
     }
     const handled = await handler(url, route);
     if (handled === true) return;

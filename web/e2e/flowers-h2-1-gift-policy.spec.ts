@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import path from 'node:path';
-import { assertNoOverflow, evidenceDir, seedAdmin, VIEWPORTS } from './helpers/flowers-admin';
+import { assertNoOverflow, evidenceDir, seedAdmin, STORE, VIEWPORTS } from './helpers/flowers-admin';
 
 /**
  * FLOWERS-H2-1 — التحقق البصري لشاشة «الإهداء» (سياسة الإهداء). الخادم مُعترَض بحمولات تطابق
@@ -137,6 +137,28 @@ test.describe('FLOWERS-H2-1 — gift policy admin', () => {
     await expect(page.getByText('لا تملك صلاحية')).toBeVisible();
     expect(giftCalls).toBe(0);
     await page.screenshot({ path: path.join(dir, 'ar-390-no-permission.png') });
+  });
+
+  test('AR 390 — the target store is visible and switchable on mobile (multi-store)', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    const state = { current: policy({ enabled: true }) };
+    await seedAdmin(page, 'ar', gifts(state), { stores: [STORE, { ...STORE, id: 's2', name: 'ركن الهدايا' }] });
+    await page.goto('/commerce/gifting');
+    const bar = page.locator('[data-store-context]');
+    await expect(bar).toBeVisible();
+    await expect(bar.getByRole('combobox')).toHaveValue('s1');
+    await page.screenshot({ path: path.join(dir, 'ar-390-store-context.png') });
+    await bar.getByRole('combobox').selectOption('s2');
+    await expect(page.getByRole('heading', { name: 'سياسة الإهداء' })).toBeVisible();
+    await assertNoOverflow(page);
+  });
+
+  test('EN 1440 — the in-page store bar is hidden because the shell already shows the store', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 960 });
+    await seedAdmin(page, 'en', gifts({ current: policy() }));
+    await page.goto('/commerce/gifting');
+    await expect(page.getByRole('heading', { name: 'Gift policy' })).toBeVisible();
+    await expect(page.locator('[data-store-context]')).toBeHidden();
   });
 
   test('EN 390 dark — populated form stays legible', async ({ page }) => {
