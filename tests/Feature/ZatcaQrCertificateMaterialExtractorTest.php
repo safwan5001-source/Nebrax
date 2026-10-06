@@ -18,7 +18,11 @@ class ZatcaQrCertificateMaterialExtractorTest extends TestCase
         $leafKey = openssl_pkey_get_public($leafCertificate);
         $details = $leafKey === false ? false : openssl_pkey_get_details($leafKey);
         $this->assertIsArray($details);
-        $this->assertSame("\x04".$details['ec']['x'].$details['ec']['y'], $material['public_key']);
+        // openssl_pkey_get_details يُسقط الأصفار البادئة من الإحداثيات (≈1/128 من المفاتيح العشوائية): نُتمّها إلى 32 بايتاً
+        // كما في تمثيل SEC1 غير المضغوط، وإلا يفشل الاختبار عشوائياً.
+        $x = str_pad($details['ec']['x'], 32, "\0", STR_PAD_LEFT);
+        $y = str_pad($details['ec']['y'], 32, "\0", STR_PAD_LEFT);
+        $this->assertSame("\x04".$x.$y, $material['public_key']);
         $this->assertSame(65, strlen($material['public_key']));
 
         $caPublicKey = openssl_pkey_get_public($caCertificate);
