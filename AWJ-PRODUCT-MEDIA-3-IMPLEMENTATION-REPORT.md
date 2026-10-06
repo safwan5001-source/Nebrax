@@ -130,9 +130,9 @@ Commands/results:
   to redirect to the unavailable `login` route. The regression test now uses
   `getJson()`, exercising the intended API 401 behavior without changing routes
   or authorization semantics.
-- A new CI run is required for follow-up head
-  `71a9e4f1ec06a594b1f16849ef7a38cbb3f97291`; its live result will be recorded
-  on PR #1235. The prior SQLite result is not treated as passing.
+- CI run `8101` passed both full Laravel test jobs (`sqlite` and `pgsql`) for
+  the updated PR branch, including the save-failure cleanup and protected
+  derivative URL regression coverage.
 
 ## Performance
 
