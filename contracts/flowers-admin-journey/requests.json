@@ -25,6 +25,7 @@
     "method": "PUT",
     "path": "/commerce/workspace/storefronts/STORE/delivery-schedule/slots",
     "body": {
+      "expected_revision": "<REVISION>",
       "slots": [
         {
           "method": "delivery",
@@ -69,6 +70,7 @@
     "method": "PUT",
     "path": "/commerce/workspace/storefronts/STORE/delivery-schedule/blocked-dates",
     "body": {
+      "expected_revision": "<REVISION>",
       "blocked_dates": [
         {
           "date": "2030-02-14",
@@ -101,6 +103,7 @@
     "method": "PUT",
     "path": "/commerce/workspace/products/PRODUCT/personalization",
     "body": {
+      "expected_revision": "<REVISION>",
       "fields": [
         {
           "key": "cake-text",
@@ -142,6 +145,7 @@
     "method": "PUT",
     "path": "/commerce/workspace/products/PRODUCT/addons",
     "body": {
+      "expected_revision": "<REVISION>",
       "addons": [
         {
           "addon_product_id": "ADDON",
@@ -156,6 +160,7 @@
     "method": "PUT",
     "path": "/commerce/workspace/products/PRODUCT/content",
     "body": {
+      "expected_revision": "<REVISION>",
       "blocks": [
         {
           "block_type": "composition",

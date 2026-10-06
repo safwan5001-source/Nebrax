@@ -74,19 +74,26 @@ const BLOCKS: ContentBlock[] = [
   { type: 'care', body: 'تُحفظ في ماء بارد', bodyEn: '', isActive: false },
 ];
 
+/**
+ * الألواح الفعلية تمرّر دائماً بصمة المستند التي قرأته عند التحميل (`expected_revision`). العقد يسجّل هذا الحقل برمز نائب،
+ * ويستبدله اختبار PHP وقت التشغيل بالبصمة الحيّة من قراءة المستند نفسه قبل الحفظ — فيُختبر الطلب الحاوي للبصمة كما تبنيه
+ * الواجهة (اسم الحقل وشكله) لا نسخةٌ بلا بصمة.
+ */
+const REVISION = '<REVISION>';
+
 const RUN: Record<(typeof STEPS)[number], () => Promise<unknown>> = {
   '01-gift-settings': () => saveGiftPolicy('STORE', { enabled: true, messageMaxLength: 180, allowHideSender: true, recipientPhoneRequired: false }),
   '02-schedule-settings': () => saveSettings('STORE', { enabled: true, required: true, timezone: 'Asia/Riyadh', leadTimeMinutes: 90, cutoffTime: '18:00', maxDaysAhead: 30 }),
   '03-schedule-slots': () => saveSlots('STORE', [
     { id: null, method: 'delivery', label: 'صباحاً', labelEn: 'Morning', startTime: '09:00', endTime: '12:00', weekdays: [0, 1, 2, 3, 4], capacity: 20, shippingZoneId: null, isActive: true },
     { id: null, method: 'pickup', label: 'مساءً', labelEn: null, startTime: '16:00', endTime: '20:00', weekdays: [0, 1, 2, 3, 4, 5, 6], capacity: null, shippingZoneId: null, isActive: false },
-  ]),
-  '04-schedule-blocked-dates': () => saveBlockedDates('STORE', [{ date: '2030-02-14', method: 'all', reason: 'عطلة' }, { date: '2030-03-01', method: 'pickup', reason: null }]),
+  ], REVISION),
+  '04-schedule-blocked-dates': () => saveBlockedDates('STORE', [{ date: '2030-02-14', method: 'all', reason: 'عطلة' }, { date: '2030-03-01', method: 'pickup', reason: null }], REVISION),
   '05-fulfillment': () => saveFulfillment('STORE', 'WAREHOUSE'),
   '06-preparation': () => savePreparation('PRODUCT', 180),
-  '07-personalization': () => savePersonalization('PRODUCT', FIELDS),
-  '08-addons': () => saveAddons('PRODUCT', ADDONS),
-  '09-content': () => saveContent('PRODUCT', BLOCKS),
+  '07-personalization': () => savePersonalization('PRODUCT', FIELDS, REVISION),
+  '08-addons': () => saveAddons('PRODUCT', ADDONS, REVISION),
+  '09-content': () => saveContent('PRODUCT', BLOCKS, REVISION),
   '10-read-gift-settings': () => loadGiftPolicy('STORE'),
   '11-read-delivery-schedule': () => loadSchedule('STORE'),
   '12-vertical-setup': () => loadVerticalSetup('STORE'),

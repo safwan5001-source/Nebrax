@@ -47,6 +47,29 @@ class FlowersMerchantAdminJourneyTest extends TestCase
         return $value;
     }
 
+    private const REVISION_TOKEN = '<REVISION>';
+
+    /**
+     * الواجهة تمرّر بصمة المستند الذي قرأته (`expected_revision`)؛ العقد يحمل رمزاً نائباً، وهنا يُستبدل بالبصمة الحيّة
+     * من قراءة المستند نفسه قبل الحفظ (كما تفعل اللوحة عند التحميل) — فيمرّ الطلب الحاوي للبصمة على الخادم الفعلي.
+     */
+    private function bindRevision(string $token, string $path, array $body): array
+    {
+        if (($body['expected_revision'] ?? null) !== self::REVISION_TOKEN) {
+            return $body;
+        }
+        [$read, $key] = match (true) {
+            str_ends_with($path, '/delivery-schedule/slots') => [dirname($path), 'slots_revision'],
+            str_ends_with($path, '/delivery-schedule/blocked-dates') => [dirname($path), 'blocked_dates_revision'],
+            default => [$path, 'revision'],
+        };
+        $revision = $this->withToken($token)->getJson('/api'.$read)->assertOk()->json('data.'.$key);
+        $this->assertIsString($revision, "لا بصمة حيّة في قراءة {$read}");
+        $body['expected_revision'] = $revision;
+
+        return $body;
+    }
+
     /** يستبدل المعرّفات (UUID) بمعرّفات نائبة ثابتة بترتيب الظهور فيبقى العقد ثابتاً بين التشغيلات. */
     private function normalize(mixed $value): mixed
     {
@@ -94,14 +117,17 @@ class FlowersMerchantAdminJourneyTest extends TestCase
 
         $captured = [];
         foreach ($requests as $name => $request) {
-            $response = $this->withToken($token)->json(
-                $request['method'],
-                '/api'.strtr($request['path'], $tokens),
-                $request['body'] === null ? [] : $this->bind($request['body'], $tokens),
-            );
+            $path = strtr($request['path'], $tokens);
+            $body = $request['body'] === null ? [] : $this->bindRevision($token, $path, $this->bind($request['body'], $tokens));
+            $response = $this->withToken($token)->json($request['method'], '/api'.$path, $body);
             $response->assertSuccessful("الطلب «{$name}» الذي تبنيه الواجهة رفضه الخادم: ".$response->getContent());
             $captured[$name] = $response->json();
         }
+
+        // بصمةٌ قديمة تُرفض بـ409 ولا يُكتب شيء (التزامن بين تاجرين) — على المسار الحقيقي نفسه الذي حفظته الرحلة.
+        $personalization = '/api/commerce/workspace/products/'.$product->id.'/personalization';
+        $this->withToken($token)->putJson($personalization, ['expected_revision' => str_repeat('0', 40), 'fields' => []])->assertStatus(409);
+        $this->withToken($token)->getJson($personalization)->assertOk()->assertJsonCount(2, 'data.fields');
 
         $this->assertMatchesContract($captured);
     }
@@ -125,7 +151,8 @@ class FlowersMerchantAdminJourneyTest extends TestCase
             }
 
             $this->assertFileExists($file, "عقد الخطوة «{$name}» غير موجود — شغّل الاختبار مع FLOWERS_WRITE_CONTRACT=1 وراجع الفرق.");
-            $this->assertEquals(
+            // مقارنة صارمة (النوع والترتيب): `true` ⇒ `1` تغيّر نوع تكسره محلّلات الواجهة الصارمة وقد يمرّ بمقارنةٍ فضفاضة.
+            $this->assertSame(
                 json_decode((string) file_get_contents($file), true),
                 json_decode(json_encode($normalized), true),
                 "استجابة «{$name}» انحرفت عن العقد المشترك مع واجهة الإدارة — إن كان التغيير مقصوداً حدّث العقد ومحلّلات الواجهة معاً.",
