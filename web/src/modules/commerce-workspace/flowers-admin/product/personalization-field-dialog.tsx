@@ -32,7 +32,7 @@ function errorText(error: FieldError, t: FlowersAdminT): string {
     case 'label': return error.code === 'required' ? t('winErrRequired') : t('winErrTooLong');
     case 'labelEn': case 'helpText': return t('winErrTooLong');
     case 'maxLength': return t('persErrLength', { max: MAX_LENGTH_CEILING });
-    case 'options': return error.code === 'none' ? t('persErrNoOptions') : t('persErrTooManyOptions', { max: MAX_OPTIONS });
+    case 'options': return error.code === 'none' ? t('persErrNoOptions') : error.code === 'noneActive' ? t('persErrNoActiveOption') : t('persErrTooManyOptions', { max: MAX_OPTIONS });
     case 'optionKey': return error.code === 'format' ? t('persErrKeyFormat') : t('persErrKeyDuplicate');
     case 'optionLabel': return error.code === 'required' ? t('winErrRequired') : t('winErrTooLong');
     case 'optionLabelEn': return t('winErrTooLong');

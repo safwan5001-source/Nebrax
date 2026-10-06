@@ -121,8 +121,13 @@ class CommerceProductPersonalizationApiTest extends TestCase
         $put([['key' => 'a', 'type' => 'text', 'label' => 'x', 'options' => [['value_key' => 'v', 'label' => 'V']]]])->assertStatus(422);
         $put([['key' => 'a', 'type' => 'select', 'label' => 'x', 'options' => [['value_key' => 'v', 'label' => 'V'], ['value_key' => 'v', 'label' => 'W']]]])->assertStatus(422);
         $put(array_map(fn ($i) => ['key' => "f{$i}", 'type' => 'text', 'label' => 'x'], range(1, ProductPersonalizationService::MAX_FIELDS + 1)))->assertStatus(422);
-
         $this->assertSame(0, CommerceProductPersonalizationField::withoutGlobalScopes()->count());
+
+        // اختيارٌ فعّال وإلزامي بلا خيار فعّال يجعل المنتج غير قابل للشراء ⇒ يُرفض؛ ويُقبل إن كان اختيارياً أو معطّلاً.
+        $inactiveOnly = [['value_key' => 'v', 'label' => 'V', 'is_active' => false]];
+        $put([['key' => 'a', 'type' => 'select', 'label' => 'x', 'is_required' => true, 'options' => $inactiveOnly]])->assertStatus(422);
+        $put([['key' => 'a', 'type' => 'select', 'label' => 'x', 'is_required' => false, 'options' => $inactiveOnly]])->assertOk();
+        $put([['key' => 'a', 'type' => 'select', 'label' => 'x', 'is_required' => true, 'is_active' => false, 'options' => $inactiveOnly]])->assertOk();
     }
 
     /** @test */
