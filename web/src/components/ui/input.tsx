@@ -178,7 +178,7 @@ const GregorianDateInput = React.forwardRef<HTMLInputElement, GregorianDateInput
           type="button"
           aria-label="فتح التقويم الميلادي"
           aria-expanded={open}
-          aria-controls={calendarId}
+          aria-controls={open ? calendarId : undefined}
           disabled={disabled}
           onClick={() => {
             setViewDate(selectedDate ?? new Date());

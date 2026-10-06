@@ -4,7 +4,6 @@ import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { ArrowDown, ArrowUp, FileText, Pencil, Plus, Trash2 } from 'lucide-react';
 import { EmptyState, FormActions, FormAlert } from '@/components/nebrax';
 import { Button } from '@/components/ui/button';
-import { Dialog } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
@@ -32,6 +31,7 @@ import {
 } from './content';
 import { move } from './personalization';
 import { SectionState } from './section-state';
+import { FlowersDialog } from '../flowers-dialog';
 
 const TYPE_LABEL: Record<ContentType, FlowersAdminMessageKey> = {
   composition: 'ctTypeComposition',
@@ -267,7 +267,7 @@ export function ContentSection({ productId, locale, canManage, onCount }: { prod
 
 function BlockDeleteConfirm({ label, t, onClose, onConfirm }: { label: string; t: FlowersAdminT; onClose: () => void; onConfirm: () => void }) {
   return (
-    <Dialog open onClose={onClose} title={t('ctDeleteTitle')}>
+    <FlowersDialog open onClose={onClose} title={t('ctDeleteTitle')}>
       <div className="space-y-4">
         <p className="text-sm leading-6 text-text">{t('ctDeleteMessage', { label })}</p>
         <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
@@ -275,7 +275,7 @@ function BlockDeleteConfirm({ label, t, onClose, onConfirm }: { label: string; t
           <Button type="button" variant="danger" onClick={onConfirm}>{t('winDelete')}</Button>
         </div>
       </div>
-    </Dialog>
+    </FlowersDialog>
   );
 }
 
@@ -317,7 +317,7 @@ function BlockDialog({
   const types: ContentType[] = mode === 'add' ? [...freeTypes] : [draft.type];
 
   return (
-    <Dialog open onClose={onClose} title={mode === 'add' ? t('ctAdd') : readOnly ? t('persView') : t('ctEditTitle')} className="max-w-xl">
+    <FlowersDialog open onClose={onClose} title={mode === 'add' ? t('ctAdd') : readOnly ? t('persView') : t('ctEditTitle')} className="max-w-xl">
       <form onSubmit={submit} noValidate className="space-y-4" data-content-form>
         <div className="space-y-1.5">
           <Label htmlFor={id('type')}>{t('ctType')}</Label>
@@ -366,6 +366,6 @@ function BlockDialog({
           {!readOnly ? <Button type="submit">{t('persApply')}</Button> : null}
         </div>
       </form>
-    </Dialog>
+    </FlowersDialog>
   );
 }
