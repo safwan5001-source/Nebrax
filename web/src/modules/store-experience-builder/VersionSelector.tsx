@@ -47,7 +47,7 @@ export function VersionSelector({
       align="start"
       menuLabel={t("versionManagerTitle")}
       triggerLabel={t("versionSelectorLabel")}
-      triggerClassName="h-9 min-w-0 max-w-[84px] gap-1.5 border-s border-border ps-3 text-xs text-text hover:bg-primary-soft hover:text-primary md:text-sm lg:max-w-[220px]"
+      triggerClassName="h-9 min-w-0 max-w-[84px] gap-1.5 border-s border-border ps-3 text-xs text-text hover:bg-primary-soft hover:text-primary md:max-w-[148px] md:text-sm lg:max-w-[220px]"
       // `mobilePopover` يُثبَّت هنا رغم أن هذا المكوّن سطح مكتب فقط (الجوال
       // الحقيقي يستخدم Bottom Sheet منفصلاً): بلا هذا، اللوحة تتموضع بـ
       // `absolute` مطلقة العرض (حتى 24rem) بلا احتواء داخل الشاشة، فتُفيض

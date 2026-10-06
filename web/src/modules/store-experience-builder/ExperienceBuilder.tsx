@@ -3,6 +3,8 @@
 import { describePublishIssues } from "./announcement-status";
 import type { ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
+import { CalendarClock, ExternalLink, MoreHorizontal, RotateCcw } from "lucide-react";
+import { Dropdown, DropdownItem } from "@/components/ui/dropdown";
 import { ScrollIndicator } from "./ScrollIndicator";
 import {
   type CategoryPageRegionKey,
@@ -2230,6 +2232,84 @@ export function ExperienceBuilder({
     );
   }
 
+  // ── Toolbar actions (CUST-HV V1A, DEF-11) ─────────────────────────────────
+  // Save / Publish / Schedule each appear twice at some widths — inline in the
+  // toolbar and inside the «More» menu — so their eligibility and explanation
+  // are computed once here. A second copy of this logic is how the two would
+  // drift apart.
+  const hasConflict = versionConflict?.versionId === selectedVersion?.id;
+  const saveDisabled =
+    busy !== null ||
+    !selectedVersion ||
+    isPublishedReadOnly ||
+    hasConflict;
+  const saveTitle = isPublishedReadOnly
+    ? t("versionPublishedReadOnlyTitle")
+    : !storefrontId
+      ? t("noStoreSelected")
+      : !selectedVersion
+        ? t("versionNoVersionSelected")
+        : hasConflict
+          ? t("versionStaleConflict")
+          : undefined;
+  const publishDisabled =
+    !storefrontId ||
+    !selectedVersion ||
+    selectedVersion.state !== "draft" ||
+    dirty ||
+    hasConflict ||
+    busy !== null ||
+    versionBusy !== null ||
+    versionCreating;
+  const publishTitle = !storefrontId
+    ? t("noStoreSelected")
+    : !selectedVersion
+      ? t("versionNoVersionSelected")
+      : selectedVersion.state === "published"
+        ? t("versionPublishGatedPublished")
+        : selectedVersion.state === "scheduled"
+          ? t("versionPublishGatedScheduled")
+          : hasConflict
+            ? t("versionStaleConflict")
+            : dirty
+              ? t("versionPublishSaveFirst")
+              : undefined;
+  // نفس أهلية النشر الفوري تماماً، بشرطٍ إضافي واحد: بوابة تشغيل الإنتاج
+  // (`schedulingRuntimeActive`) — Schedule وPublish إجراءان منفصلان ظاهرياً
+  // دوماً، لكن كلاهما يحتاج مسودة محفوظة غير متعارضة أصلاً.
+  const scheduleDisabled = publishDisabled || !selectedVersion?.schedulingRuntimeActive;
+  const scheduleTitle = !storefrontId
+    ? t("noStoreSelected")
+    : !selectedVersion
+      ? t("versionNoVersionSelected")
+      : selectedVersion.state === "published"
+        ? t("versionPublishGatedPublished")
+        : selectedVersion.state === "scheduled"
+          ? t("versionScheduleGatedScheduled")
+          : hasConflict
+            ? t("versionStaleConflict")
+            : dirty
+              ? t("versionPublishSaveFirst")
+              : !selectedVersion.schedulingRuntimeActive
+                ? t("versionSchedulingGatedBody")
+                : undefined;
+  const handlePublishClick = () => {
+    if (!selectedVersion) return;
+    handleOpenPublishConfirm(toSummary(selectedVersion));
+  };
+  const handleScheduleClick = () => {
+    if (!selectedVersion) return;
+    handleOpenScheduleDialog(toSummary(selectedVersion));
+  };
+  // The «More» trigger carries the draft state when the inline status chip is
+  // not on screen (< md), so unsaved / conflict never becomes invisible.
+  const toolbarStatusText = hasConflict ? t("versionStaleConflict") : statusLabel;
+  const toolbarStatusTone: "conflict" | "dirty" | "clean" = hasConflict
+    ? "conflict"
+    : dirty
+      ? "dirty"
+      : "clean";
+
   return (
     <div
       dir={locale === "ar" ? "rtl" : "ltr"}
@@ -2247,18 +2327,33 @@ export function ExperienceBuilder({
       data-builder-navigation-collapsed={builderSidebarCollapsed ? "true" : "false"}
       className="relative flex h-full min-h-0 flex-col bg-background text-text"
     >
-      <header className="z-20 flex min-h-14 shrink-0 items-center gap-2 border-b border-border bg-surface px-3 shadow-sm md:gap-3 md:px-5">
+      <header
+        data-builder-toolbar=""
+        className="z-20 flex min-h-14 shrink-0 items-center gap-2 border-b border-border bg-surface px-3 shadow-sm md:gap-3 md:px-5"
+      >
+        {/*
+          CUST-HV V1A / DEF-11 — primary-action reachability.
+          Exit, Save draft and Publish are `shrink-0` and never move into the
+          overflow: every width from 390 to 1440, in AR and EN, keeps them on
+          screen. The flexible middle (title, page, version) is the part that
+          gives way — it is `min-w-0` and truncates — and the secondary
+          controls (Open store, device mode, Schedule, Restore default, status)
+          step into the «More» menu as the toolbar narrows. No horizontal
+          scrolling toolbar, no re-ordering of Save/Publish semantics.
+        */}
         <button
           type="button"
+          data-builder-exit=""
           aria-label={t("exit")}
+          title={t("exit")}
           onClick={() => { window.location.href = "/commerce"; }}
           className="inline-flex min-h-10 shrink-0 items-center gap-2 rounded-md border border-border px-2.5 text-xs font-medium text-text hover:bg-primary-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 md:px-3 md:text-sm"
         >
-          <span aria-hidden="true">←</span>
-          <span className="hidden sm:inline">{t("exit")}</span>
+          <span aria-hidden="true" className="rtl:-scale-x-100">←</span>
+          <span className="hidden xl:inline">{t("exit")}</span>
         </button>
-        <div className="min-w-0 border-s border-border ps-3">
-          <p className="truncate text-[13px] font-semibold leading-none md:text-sm">
+        <div className="hidden min-w-0 border-s border-border ps-3 sm:block">
+          <p title={t("title")} className="truncate text-[13px] font-semibold leading-none md:text-sm">
             {t("title")}
           </p>
           <div className="mt-1 hidden items-center gap-1 md:flex">
@@ -2319,9 +2414,9 @@ export function ExperienceBuilder({
               type="button"
               data-version-selector-mobile=""
               onClick={() => setMobileSheet("versions")}
-              className="flex min-w-0 items-center gap-1 border-s border-border px-2 py-1 ps-3 text-[11px] font-medium text-text"
+              className="flex min-h-10 min-w-0 items-center gap-1 border-s border-border px-2 py-1 ps-3 text-[11px] font-medium text-text sm:ms-0"
             >
-              <bdi className="max-w-[92px] truncate">
+              <bdi className="max-w-[min(150px,34vw)] truncate">
                 {selectedVersion?.name ?? t("versionsLabel")}
               </bdi>
             </button>
@@ -2337,23 +2432,23 @@ export function ExperienceBuilder({
         ) : null}
         <span
           data-draft-status=""
-          className={`hidden shrink-0 rounded-full px-2 py-1 text-[11px] sm:inline ${dirty ? "bg-warning-soft text-warning" : "bg-positive-soft text-positive"}`}
+          className={`hidden shrink-0 rounded-full px-2 py-1 text-[11px] md:inline ${dirty ? "bg-warning-soft text-warning" : "bg-positive-soft text-positive"}`}
         >
           {statusLabel}
         </span>
-        <div className="ms-auto flex min-w-0 items-center gap-1.5 md:gap-2">
+        <div className="ms-auto flex shrink-0 items-center gap-1.5 md:gap-2">
           {resolvedStorefrontUrl ? (
             <a
               data-open-store=""
               href={resolvedStorefrontUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex h-9 shrink-0 items-center gap-1 rounded-md border border-border px-2 text-xs font-medium text-primary hover:bg-primary-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 md:px-2.5"
+              className="hidden h-9 shrink-0 items-center gap-1 rounded-md border border-border px-2.5 text-xs font-medium text-primary hover:bg-primary-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 xl:inline-flex"
             >
               {t("openStore")}
             </a>
           ) : null}
-          <div className="hidden items-center gap-1 rounded-md border border-border p-1 md:flex">
+          <div className="hidden items-center gap-1 rounded-md border border-border p-1 lg:flex">
             {(["desktop", "tablet", "mobile"] as const).map((item) => (
               <button
                 key={item}
@@ -2369,123 +2464,128 @@ export function ExperienceBuilder({
           </div>
           <button
             type="button"
-            onClick={handleRestore}
-            disabled={isPublishedReadOnly}
-            className="hidden h-9 shrink-0 px-2 text-xs text-muted hover:text-text disabled:opacity-40 lg:inline"
-          >
-            {t("restore")}
-          </button>
-          <button
-            type="button"
             data-save=""
             onClick={handleSave}
-            disabled={
-              busy !== null ||
-              !selectedVersion ||
-              isPublishedReadOnly ||
-              versionConflict?.versionId === selectedVersion?.id
-            }
-            title={
-              isPublishedReadOnly
-                ? t("versionPublishedReadOnlyTitle")
-                : !storefrontId
-                  ? t("noStoreSelected")
-                  : !selectedVersion
-                    ? t("versionNoVersionSelected")
-                    : versionConflict?.versionId === selectedVersion?.id
-                      ? t("versionStaleConflict")
-                      : undefined
-            }
-            className="h-9 shrink-0 rounded-md border border-border bg-surface px-2.5 text-xs font-medium text-text hover:bg-primary-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:opacity-50 md:px-3 md:text-sm"
+            disabled={saveDisabled}
+            title={saveTitle}
+            className="h-10 shrink-0 rounded-md border border-border bg-surface px-2.5 text-xs font-medium text-text hover:bg-primary-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:opacity-50 md:h-9 md:px-3 md:text-sm"
           >
             {t("save")}
           </button>
           <button
             type="button"
             data-publish=""
-            onClick={() => {
-              if (!selectedVersion) return;
-              handleOpenPublishConfirm(toSummary(selectedVersion));
-            }}
-            disabled={
-              !storefrontId ||
-              !selectedVersion ||
-              selectedVersion.state !== "draft" ||
-              dirty ||
-              versionConflict?.versionId === selectedVersion?.id ||
-              busy !== null ||
-              versionBusy !== null ||
-              versionCreating
-            }
-            title={
-              !storefrontId
-                ? t("noStoreSelected")
-                : !selectedVersion
-                  ? t("versionNoVersionSelected")
-                  : selectedVersion.state === "published"
-                    ? t("versionPublishGatedPublished")
-                    : selectedVersion.state === "scheduled"
-                      ? t("versionPublishGatedScheduled")
-                      : versionConflict?.versionId === selectedVersion?.id
-                        ? t("versionStaleConflict")
-                        : dirty
-                          ? t("versionPublishSaveFirst")
-                          : undefined
-            }
-            className="h-9 shrink-0 rounded-md bg-primary px-2.5 text-xs font-semibold text-primary-foreground shadow-sm disabled:opacity-40 md:px-3 md:text-sm"
+            onClick={handlePublishClick}
+            disabled={publishDisabled}
+            title={publishTitle}
+            className="h-10 shrink-0 rounded-md bg-primary px-2.5 text-xs font-semibold text-primary-foreground shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:opacity-40 md:h-9 md:px-3 md:text-sm"
           >
             {t("publish")}
           </button>
           <button
             type="button"
             data-schedule=""
-            // نفس أهلية النشر الفوري تماماً، بشرطٍ إضافي واحد: بوابة تشغيل
-            // الإنتاج (`schedulingRuntimeActive`) — Schedule وPublish إجراءان
-            // منفصلان ظاهرياً دوماً (لا إخفاء الجدولة لمجرَّد وجود نشر فوري)،
-            // لكن كلاهما يحتاج مسودة محفوظة غير متعارضة أصلاً.
-            onClick={() => {
-              if (!selectedVersion) return;
-              handleOpenScheduleDialog(toSummary(selectedVersion));
-            }}
-            disabled={
-              !storefrontId ||
-              !selectedVersion ||
-              selectedVersion.state !== "draft" ||
-              dirty ||
-              versionConflict?.versionId === selectedVersion?.id ||
-              busy !== null ||
-              versionBusy !== null ||
-              versionCreating ||
-              !selectedVersion.schedulingRuntimeActive
-            }
-            title={
-              !storefrontId
-                ? t("noStoreSelected")
-                : !selectedVersion
-                  ? t("versionNoVersionSelected")
-                  : selectedVersion.state === "published"
-                    ? t("versionPublishGatedPublished")
-                    : selectedVersion.state === "scheduled"
-                      ? t("versionScheduleGatedScheduled")
-                      : versionConflict?.versionId === selectedVersion?.id
-                        ? t("versionStaleConflict")
-                        : dirty
-                          ? t("versionPublishSaveFirst")
-                          : !selectedVersion.schedulingRuntimeActive
-                            ? t("versionSchedulingGatedBody")
-                            : undefined
-            }
-            // الشريط العلوي عند 768px مكتظّ بالفعل (منتقي النسخة + مبدِّل
-            // الجهاز + حفظ + نشر) — عنصرٌ رابع دائم الظهور هنا يُفيض أفقياً
-            // (مُتحقَّقٌ فعلياً: Playwright كشف الفيضان عند 768 و390px). نفس
-            // معالجة زرّ «استعادة الافتراضي» (`hidden ... lg:inline`) بالضبط:
-            // مخفيٌّ حتى سطح المكتب (lg+)، ومتاحٌ دوماً من إدارة النسخ على أي
-            // مقاس — لا فقدان قدرة، فقط نقل «إجراء أقل تواتراً» عن الشريط
-            // الضيّق تماشياً مع مرجع الأفق (§Toolbar: "Do not overload").
-            className="hidden h-9 shrink-0 rounded-md border border-border bg-surface px-2.5 text-xs font-medium text-text hover:bg-primary-soft disabled:opacity-40 lg:inline lg:px-3 lg:text-sm"
+            onClick={handleScheduleClick}
+            disabled={scheduleDisabled}
+            title={scheduleTitle}
+            // Inline only where the toolbar has room (xl+). Below that, the same
+            // action — with the same eligibility — lives in the «More» menu, so
+            // nothing is lost by it leaving the bar (CUST-H1-5 ruled the same
+            // for «Restore default»: rare actions do not crowd the primary ones).
+            className="hidden h-9 shrink-0 rounded-md border border-border bg-surface px-3 text-sm font-medium text-text hover:bg-primary-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:opacity-40 xl:inline"
           >
             {t("versionSchedule")}
           </button>
+          <Dropdown
+            // `align="end"` + plain absolute placement: «More» always sits on the
+            // toolbar's end edge, so the menu opens inward and logically (RTL-safe).
+            // `mobilePopover` is deliberately not used — its fixed positioning
+            // cancels the logical `end-0` in RTL at lg+.
+            align="end"
+            popupRole="menu"
+            menuLabel={t("moreActions")}
+            triggerLabel={
+              toolbarStatusTone === "clean"
+                ? t("moreActions")
+                : `${t("moreActions")} — ${toolbarStatusText}`
+            }
+            triggerClassName="relative size-10 shrink-0 justify-center rounded-md border border-border text-text hover:bg-primary-soft md:size-9"
+            menuClassName="w-64 max-w-[calc(100vw-1.5rem)]"
+            trigger={
+              <>
+                <MoreHorizontal className="size-4" strokeWidth={1.8} aria-hidden="true" />
+                {toolbarStatusTone !== "clean" ? (
+                  <span
+                    aria-hidden="true"
+                    data-builder-more-dot={toolbarStatusTone}
+                    className={`absolute end-1.5 top-1.5 size-2 rounded-full ring-2 ring-surface md:hidden ${toolbarStatusTone === "conflict" ? "bg-negative" : "bg-warning"}`}
+                  />
+                ) : null}
+              </>
+            }
+          >
+            {({ open }) => (
+              <>
+                {/* Mounted only while open: the chip is the one resting copy of the status text. */}
+                {open ? (
+                  <div
+                    role="presentation"
+                    data-builder-more-status={toolbarStatusTone}
+                    className="flex items-center gap-2 border-b border-border px-2.5 py-2 text-xs text-muted"
+                  >
+                    <span
+                      aria-hidden="true"
+                      className={`size-2 shrink-0 rounded-full ${toolbarStatusTone === "conflict" ? "bg-negative" : toolbarStatusTone === "dirty" ? "bg-warning" : "bg-positive"}`}
+                    />
+                    <span className="min-w-0 truncate">{toolbarStatusText}</span>
+                  </div>
+                ) : null}
+                {resolvedStorefrontUrl ? (
+                  <div className="xl:hidden">
+                    <DropdownItem
+                      href={resolvedStorefrontUrl}
+                      external
+                      icon={ExternalLink}
+                      dataAttrs={{ "data-more-open-store": "" }}
+                    >
+                      {t("openStore")}
+                    </DropdownItem>
+                  </div>
+                ) : null}
+                <div role="group" aria-label={t("previewDevice")} className="lg:hidden">
+                  {(["desktop", "tablet", "mobile"] as const).map((item) => (
+                    <DropdownItem
+                      key={item}
+                      checked={device === item}
+                      onClick={() => setDevice(item)}
+                      dataAttrs={{ "data-more-device-option": item }}
+                    >
+                      {t(item)}
+                    </DropdownItem>
+                  ))}
+                </div>
+                <div className="xl:hidden">
+                  <DropdownItem
+                    icon={CalendarClock}
+                    onClick={handleScheduleClick}
+                    disabled={scheduleDisabled}
+                    title={scheduleTitle}
+                    dataAttrs={{ "data-more-schedule": "" }}
+                  >
+                    {t("versionSchedule")}
+                  </DropdownItem>
+                </div>
+                <DropdownItem
+                  icon={RotateCcw}
+                  onClick={handleRestore}
+                  disabled={isPublishedReadOnly}
+                  dataAttrs={{ "data-more-restore": "" }}
+                >
+                  {t("restore")}
+                </DropdownItem>
+              </>
+            )}
+          </Dropdown>
         </div>
       </header>
 

@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { FormAlert } from '@/components/nebrax';
 import { Button } from '@/components/ui/button';
-import { Dialog } from '@/components/ui/dialog';
+import { FlowersDialog } from './flowers-dialog';
 
 /**
  * تأكيد فعلٍ متلف بصياغة واحدة: يشرح الأثر، يمنع الإرسال المزدوج، يعرض فشل الخادم داخل الحوار ولا يُغلق
@@ -40,7 +40,7 @@ export function ConfirmDialog({
   }
 
   return (
-    <Dialog open onClose={busy ? () => undefined : onClose} title={title}>
+    <FlowersDialog open onClose={busy ? () => undefined : onClose} title={title}>
       <div className="space-y-4">
         <div className="text-sm leading-6 text-text">{message}</div>
         {error ? <FormAlert tone="error">{error}</FormAlert> : null}
@@ -53,6 +53,6 @@ export function ConfirmDialog({
           </Button>
         </div>
       </div>
-    </Dialog>
+    </FlowersDialog>
   );
 }

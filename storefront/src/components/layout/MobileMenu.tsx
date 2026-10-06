@@ -17,6 +17,12 @@ import {
 } from "@/components/ui/sheet";
 import { localeDirection } from "@/i18n/locales";
 
+export interface StoreExtraNavLink {
+  id: string;
+  label: string;
+  href: string;
+}
+
 type PanelType = { kind: "main" } | { kind: "category"; category: Category };
 
 interface MobileMenuProps {
@@ -24,12 +30,19 @@ interface MobileMenuProps {
   basePath: string;
   /** Whether the wholesale addon is enabled — gates the trade portal link. */
   wholesaleEnabled: boolean;
+  /**
+   * Merchant-published header links. The desktop header shows them from `lg`;
+   * this menu is the only place a phone or tablet can reach them, so every
+   * enabled link must appear here (CUST-HV V0 parity rule, DEF-1).
+   */
+  extraLinks?: StoreExtraNavLink[];
 }
 
 export function MobileMenu({
   rootCategories,
   basePath,
   wholesaleEnabled,
+  extraLinks = [],
 }: MobileMenuProps) {
   const t = useTranslations("header");
   // القائمة تُفتَح دائماً من حافة «البداية» بلا اعتماد على جانب فيزيائي ثابت
@@ -242,6 +255,17 @@ export function MobileMenu({
                   </Link>
                 ),
               )}
+              {extraLinks.map((link) => (
+                <Link
+                  key={link.id}
+                  href={link.href}
+                  data-mobile-extra-nav=""
+                  onClick={() => setOpen(false)}
+                  className={linkClass}
+                >
+                  {link.label}
+                </Link>
+              ))}
               <Link
                 href={`${basePath}/#contact`}
                 onClick={() => setOpen(false)}

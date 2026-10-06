@@ -112,11 +112,18 @@ async function StorefrontMobileNavigation({
   basePath,
   country,
   locale,
-}: StorefrontNavigationProps) {
+  extraLinks,
+}: StorefrontNavigationProps & {
+  extraLinks: { id: string; label: string; href: string }[];
+}) {
   const rootCategories = await getRootCategories(country, locale);
 
   return (
-    <HeaderMobileMenu rootCategories={rootCategories} basePath={basePath} />
+    <HeaderMobileMenu
+      rootCategories={rootCategories}
+      basePath={basePath}
+      extraLinks={extraLinks}
+    />
   );
 }
 
@@ -242,6 +249,7 @@ export default async function StorefrontLayout({
               basePath={basePath}
               country={country}
               locale={locale}
+              extraLinks={extraLinks}
             />
           </Suspense>
         }
