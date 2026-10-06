@@ -97,6 +97,16 @@ describe('PersonalizationSection', () => {
     expect(document.querySelector('[data-personalization-row="field"]')?.textContent).not.toContain('new');
   });
 
+  it('warns about open carts when the first field added is active and required (existing carts would be revalidated)', async () => {
+    server([]);
+    await userEvent.click((await screen.findAllByRole('button', { name: 'Add input' }))[0]);
+    const dialog = screen.getByRole('dialog');
+    await userEvent.type(within(dialog).getByLabelText('Input title'), 'الاسم');
+    await userEvent.click(within(dialog).getByRole('switch', { name: /Required/ }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Apply to list' }));
+    expect(screen.getByText(/can send that cart back for review/)).toBeTruthy();
+  });
+
   it('builds a select with options; refuses an invalid key and requires at least one option', async () => {
     const srv = server([]);
     await userEvent.click((await screen.findAllByRole('button', { name: 'Add input' }))[0]);

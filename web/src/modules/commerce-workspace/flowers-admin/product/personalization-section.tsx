@@ -195,7 +195,7 @@ export function PersonalizationSection({ productId, locale, canManage }: { produ
         </ul>
       )}
 
-      {dirty && saved.length > 0 ? <FormAlert tone="warning">{t('persCartWarning')}</FormAlert> : null}
+      {dirty && (saved.length > 0 || draft.some((f) => f.isActive && f.isRequired)) ? <FormAlert tone="warning">{t('persCartWarning')}</FormAlert> : null}
       {notice ? <FormAlert tone={notice.tone}>{notice.text}</FormAlert> : null}
 
       {canManage ? (
