@@ -27,6 +27,17 @@ final class ProductContentService
         return $this->query($product->id, activeOnly: false)->map(fn ($b) => $this->present($b, true))->values()->all();
     }
 
+    /**
+     * بصمة الكتل الإدارية الحالية (تتغيّر مع أي تعديل). يقرؤها العميل ويعيدها (`expected_revision`) فيُرفض الاستبدال
+     * المبني على نسخة قديمة **داخل قفل المنتج**.
+     *
+     * @param  list<array<string, mixed>>  $blocks
+     */
+    public function revisionFor(array $blocks): string
+    {
+        return sha1((string) json_encode($blocks));
+    }
+
     /** @return list<array<string, mixed>> الكتل **النشطة** فقط (عامة) */
     public function publicBlocks(string $productId): array
     {
@@ -37,7 +48,7 @@ final class ProductContentService
      * @param  list<array{block_type: string, body: string, body_en?: ?string, is_active?: bool}>  $blocks
      * @return list<array<string, mixed>>
      */
-    public function replace(Product $product, array $blocks): array
+    public function replace(Product $product, array $blocks, ?string $expectedRevision = null): array
     {
         $this->assertProductTenant($product);
 
@@ -61,10 +72,15 @@ final class ProductContentService
             $normalized[] = ['block_type' => $block['block_type'], 'body' => $body, 'body_en' => $bodyEn, 'is_active' => (bool) ($block['is_active'] ?? true)];
         }
 
-        return DB::transaction(function () use ($product, $normalized) {
+        return DB::transaction(function () use ($product, $normalized, $expectedRevision) {
             // BranchScope وحده يُرفع (المحتوى على مستوى المؤسسة)؛ TenantScope وSoftDeletes يبقيان، فمنتجٌ
             // حُذف بين تحميل المتحكّم وهذا القفل يُرفض بـ404 بدل 200 فارغ أو 500 من قيد المفتاح الأجنبي.
             Product::withoutGlobalScope(BranchScope::class)->whereKey($product->id)->lockForUpdate()->firstOrFail();
+
+            if ($expectedRevision !== null && ! hash_equals($this->revisionFor($this->blocks($product)), $expectedRevision)) {
+                throw new StaleRevisionException('تغيّرت كتل المحتوى على الخادم منذ قرأتها. حدّث الصفحة وراجعها ثم أعد المحاولة.');
+            }
+
             CommerceProductContentBlock::query()->where('product_id', $product->id)->delete();
 
             foreach ($normalized as $position => $row) {

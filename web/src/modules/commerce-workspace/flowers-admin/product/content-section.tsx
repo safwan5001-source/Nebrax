@@ -61,7 +61,7 @@ const TYPE_HINT: Record<ContentType, FlowersAdminMessageKey> = {
 const problemText = (problem: BodyProblem, t: FlowersAdminT) =>
   problem === 'required' ? t('winErrRequired') : problem === 'tooLong' ? t('ctErrTooLong', { max: MAX_BODY_LENGTH }) : t('ctErrTooManyLines', { max: MAX_LINES });
 
-type Phase = { kind: 'loading' } | { kind: 'failed'; failure: AdminFailure } | { kind: 'ready'; saved: ContentBlock[] };
+type Phase = { kind: 'loading' } | { kind: 'failed'; failure: AdminFailure } | { kind: 'ready'; saved: ContentBlock[]; revision: string | null };
 type DialogState = { kind: 'add' } | { kind: 'edit'; index: number } | null;
 
 /**
@@ -89,8 +89,8 @@ export function ContentSection({ productId, locale, canManage }: { productId: st
         setPhase({ kind: 'failed', failure: result });
         return;
       }
-      setDraft(result.data);
-      setPhase({ kind: 'ready', saved: result.data });
+      setDraft(result.data.blocks);
+      setPhase({ kind: 'ready', saved: result.data.blocks, revision: result.data.revision });
     });
     return () => {
       current = false;
@@ -109,22 +109,42 @@ export function ContentSection({ productId, locale, canManage }: { productId: st
     if (saving || !dirty || !canManage) return;
     setSaving(true);
     setNotice(null);
-    const fresh = await loadContent(productId);
-    if (fresh.ok && contentSignature(fresh.data) !== contentSignature(saved)) {
+    // الاستبدال كامل ⇒ التحقق من «لم يتغيّر شيء» داخل قفل الخادم (`expected_revision` ⇒ 409). الفحص المسبق احتياطٌ لخادمٍ بلا
+    // بصمة، وفشل قراءته يُوقف الحفظ بدل أن يكتب من نسخة قد تكون قديمة.
+    const revision = phase.kind === 'ready' ? phase.revision : null;
+    if (revision === null) {
+      const fresh = await loadContent(productId);
+      if (!fresh.ok) {
+        setSaving(false);
+        setNotice({ tone: 'error', text: failureText(fresh, t) });
+        return;
+      }
+      if (contentSignature(fresh.data.blocks) !== contentSignature(saved)) {
+        setSaving(false);
+        setDraft(fresh.data.blocks);
+        setPhase({ kind: 'ready', saved: fresh.data.blocks, revision: fresh.data.revision });
+        setNotice({ tone: 'warning', text: t('ctStale') });
+        return;
+      }
+    }
+    const result = await saveContent(productId, draft, revision);
+    if (!result.ok && result.kind === 'conflict') {
+      const fresh = await loadContent(productId);
       setSaving(false);
-      setDraft(fresh.data);
-      setPhase({ kind: 'ready', saved: fresh.data });
+      if (fresh.ok) {
+        setDraft(fresh.data.blocks);
+        setPhase({ kind: 'ready', saved: fresh.data.blocks, revision: fresh.data.revision });
+      }
       setNotice({ tone: 'warning', text: t('ctStale') });
       return;
     }
-    const result = await saveContent(productId, draft);
     setSaving(false);
     if (!result.ok) {
       setNotice({ tone: 'error', text: failureText(result, t) });
       return;
     }
-    setDraft(result.data);
-    setPhase({ kind: 'ready', saved: result.data });
+    setDraft(result.data.blocks);
+    setPhase({ kind: 'ready', saved: result.data.blocks, revision: result.data.revision });
     toastSuccess(t('ctSaved'));
   }
 
