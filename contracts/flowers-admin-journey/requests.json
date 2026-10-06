@@ -1,0 +1,195 @@
+{
+  "01-gift-settings": {
+    "method": "PUT",
+    "path": "/commerce/workspace/storefronts/STORE/gift-settings",
+    "body": {
+      "is_enabled": true,
+      "message_max_length": 180,
+      "allow_hide_sender": true,
+      "recipient_phone_required": false
+    }
+  },
+  "02-schedule-settings": {
+    "method": "PUT",
+    "path": "/commerce/workspace/storefronts/STORE/delivery-schedule/settings",
+    "body": {
+      "is_enabled": true,
+      "is_required": true,
+      "timezone": "Asia/Riyadh",
+      "lead_time_minutes": 90,
+      "cutoff_time": "18:00",
+      "max_days_ahead": 30
+    }
+  },
+  "03-schedule-slots": {
+    "method": "PUT",
+    "path": "/commerce/workspace/storefronts/STORE/delivery-schedule/slots",
+    "body": {
+      "expected_revision": "<REVISION>",
+      "slots": [
+        {
+          "method": "delivery",
+          "label": "صباحاً",
+          "label_en": "Morning",
+          "start_time": "09:00",
+          "end_time": "12:00",
+          "weekdays": [
+            0,
+            1,
+            2,
+            3,
+            4
+          ],
+          "capacity": 20,
+          "shipping_zone_id": null,
+          "is_active": true
+        },
+        {
+          "method": "pickup",
+          "label": "مساءً",
+          "label_en": null,
+          "start_time": "16:00",
+          "end_time": "20:00",
+          "weekdays": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6
+          ],
+          "capacity": null,
+          "shipping_zone_id": null,
+          "is_active": false
+        }
+      ]
+    }
+  },
+  "04-schedule-blocked-dates": {
+    "method": "PUT",
+    "path": "/commerce/workspace/storefronts/STORE/delivery-schedule/blocked-dates",
+    "body": {
+      "expected_revision": "<REVISION>",
+      "blocked_dates": [
+        {
+          "date": "2030-02-14",
+          "method": "all",
+          "reason": "عطلة"
+        },
+        {
+          "date": "2030-03-01",
+          "method": "pickup",
+          "reason": null
+        }
+      ]
+    }
+  },
+  "05-fulfillment": {
+    "method": "PUT",
+    "path": "/commerce/workspace/storefronts/STORE/fulfillment",
+    "body": {
+      "warehouse_id": "WAREHOUSE"
+    }
+  },
+  "06-preparation": {
+    "method": "PUT",
+    "path": "/commerce/workspace/products/PRODUCT/preparation",
+    "body": {
+      "preparation_minutes": 180
+    }
+  },
+  "07-personalization": {
+    "method": "PUT",
+    "path": "/commerce/workspace/products/PRODUCT/personalization",
+    "body": {
+      "expected_revision": "<REVISION>",
+      "fields": [
+        {
+          "key": "cake-text",
+          "type": "text",
+          "label": "الكتابة على الكيكة",
+          "label_en": "Cake text",
+          "help_text": null,
+          "is_required": true,
+          "max_length": 20,
+          "is_active": true
+        },
+        {
+          "key": "ribbon",
+          "type": "select",
+          "label": "لون الشريط",
+          "label_en": null,
+          "help_text": null,
+          "is_required": false,
+          "is_active": true,
+          "options": [
+            {
+              "value_key": "red",
+              "label": "أحمر",
+              "label_en": "Red",
+              "is_active": true
+            },
+            {
+              "value_key": "gold",
+              "label": "ذهبي",
+              "label_en": null,
+              "is_active": false
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "08-addons": {
+    "method": "PUT",
+    "path": "/commerce/workspace/products/PRODUCT/addons",
+    "body": {
+      "expected_revision": "<REVISION>",
+      "addons": [
+        {
+          "addon_product_id": "ADDON",
+          "addon_variant_id": null,
+          "max_quantity": 3,
+          "is_active": true
+        }
+      ]
+    }
+  },
+  "09-content": {
+    "method": "PUT",
+    "path": "/commerce/workspace/products/PRODUCT/content",
+    "body": {
+      "expected_revision": "<REVISION>",
+      "blocks": [
+        {
+          "block_type": "composition",
+          "body": "٢٤ وردة جوري",
+          "body_en": "24 roses",
+          "is_active": true
+        },
+        {
+          "block_type": "care",
+          "body": "تُحفظ في ماء بارد",
+          "body_en": null,
+          "is_active": false
+        }
+      ]
+    }
+  },
+  "10-read-gift-settings": {
+    "method": "GET",
+    "path": "/commerce/workspace/storefronts/STORE/gift-settings",
+    "body": null
+  },
+  "11-read-delivery-schedule": {
+    "method": "GET",
+    "path": "/commerce/workspace/storefronts/STORE/delivery-schedule",
+    "body": null
+  },
+  "12-vertical-setup": {
+    "method": "GET",
+    "path": "/commerce/workspace/storefronts/STORE/vertical-setup",
+    "body": null
+  }
+}

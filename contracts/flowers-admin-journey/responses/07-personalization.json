@@ -1,0 +1,42 @@
+{
+    "data": {
+        "fields": [
+            {
+                "key": "cake-text",
+                "type": "text",
+                "label": "الكتابة على الكيكة",
+                "label_en": "Cake text",
+                "help_text": null,
+                "is_required": true,
+                "max_length": 20,
+                "options": [],
+                "is_active": true
+            },
+            {
+                "key": "ribbon",
+                "type": "select",
+                "label": "لون الشريط",
+                "label_en": null,
+                "help_text": null,
+                "is_required": false,
+                "max_length": null,
+                "options": [
+                    {
+                        "value_key": "red",
+                        "label": "أحمر",
+                        "label_en": "Red",
+                        "is_active": true
+                    },
+                    {
+                        "value_key": "gold",
+                        "label": "ذهبي",
+                        "label_en": null,
+                        "is_active": false
+                    }
+                ],
+                "is_active": true
+            }
+        ],
+        "revision": "<sha1-revision>"
+    }
+}

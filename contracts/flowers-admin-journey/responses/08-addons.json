@@ -1,0 +1,17 @@
+{
+    "data": {
+        "addons": [
+            {
+                "addon_product_id": "00000000-0000-4000-8000-000000000005",
+                "addon_variant_id": null,
+                "name": "شوكولاتة",
+                "name_en": null,
+                "sku": null,
+                "product_is_active": true,
+                "max_quantity": 3,
+                "is_active": true
+            }
+        ],
+        "revision": "<sha1-revision>"
+    }
+}

@@ -1,0 +1,19 @@
+{
+    "data": {
+        "blocks": [
+            {
+                "block_type": "composition",
+                "body": "٢٤ وردة جوري",
+                "body_en": "24 roses",
+                "is_active": true
+            },
+            {
+                "block_type": "care",
+                "body": "تُحفظ في ماء بارد",
+                "body_en": null,
+                "is_active": false
+            }
+        ],
+        "revision": "<sha1-revision>"
+    }
+}
