@@ -180,7 +180,8 @@ export type FieldError =
   | { field: 'maxLength'; code: 'range' }
   | { field: 'options'; code: 'none' | 'tooMany' }
   | { field: 'optionKey'; code: 'format' | 'duplicate'; index: number }
-  | { field: 'optionLabel'; code: 'required' | 'tooLong'; index: number };
+  | { field: 'optionLabel'; code: 'required' | 'tooLong'; index: number }
+  | { field: 'optionLabelEn'; code: 'tooLong'; index: number };
 
 /** كل أخطاء حقلٍ واحد، بالنظر إلى بقية حقول المنتج (تفرّد المفتاح). */
 export function validateField(field: PersonalizationField, others: readonly PersonalizationField[]): FieldError[] {
@@ -206,6 +207,7 @@ export function validateField(field: PersonalizationField, others: readonly Pers
       const optionLabel = option.label.trim();
       if (optionLabel === '') errors.push({ field: 'optionLabel', code: 'required', index });
       else if (optionLabel.length > MAX_LABEL_LENGTH) errors.push({ field: 'optionLabel', code: 'tooLong', index });
+      if (option.labelEn.trim().length > MAX_LABEL_LENGTH) errors.push({ field: 'optionLabelEn', code: 'tooLong', index });
     });
   }
 

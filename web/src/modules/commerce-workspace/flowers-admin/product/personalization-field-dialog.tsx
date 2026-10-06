@@ -37,6 +37,7 @@ function errorText(error: FieldError, t: FlowersAdminT): string {
     case 'options': return error.code === 'none' ? t('persErrNoOptions') : t('persErrTooManyOptions', { max: MAX_OPTIONS });
     case 'optionKey': return error.code === 'format' ? t('persErrKeyFormat') : t('persErrKeyDuplicate');
     case 'optionLabel': return error.code === 'required' ? t('winErrRequired') : t('winErrTooLong');
+    case 'optionLabelEn': return t('winErrTooLong');
   }
 }
 
@@ -71,7 +72,7 @@ export function PersonalizationFieldDialog({
   const errors = useMemo(() => validateField(draft, others), [draft, others]);
   const patch = (next: Partial<PersonalizationField>) => setDraft((current) => ({ ...current, ...next }));
   const fieldError = (field: FieldError['field']) => (submitted ? errors.find((e) => e.field === field) : undefined);
-  const optionError = (field: 'optionKey' | 'optionLabel', index: number) =>
+  const optionError = (field: 'optionKey' | 'optionLabel' | 'optionLabelEn', index: number) =>
     submitted ? errors.find((e): e is Extract<FieldError, { index: number }> => e.field === field && 'index' in e && e.index === index) : undefined;
 
   function submit(event: React.FormEvent) {
@@ -176,6 +177,7 @@ export function PersonalizationFieldDialog({
               {draft.options.map((option, index) => {
                 const keyErr = optionError('optionKey', index);
                 const labelErr = optionError('optionLabel', index);
+                const labelEnErr = optionError('optionLabelEn', index);
                 return (
                   <li key={index} className="space-y-2 rounded border border-border p-2.5">
                     <div className="flex items-start gap-2">
@@ -189,13 +191,17 @@ export function PersonalizationFieldDialog({
                           />
                           {labelErr ? <p role="alert" className="text-xs text-negative">{errorText(labelErr, t)}</p> : null}
                         </div>
-                        <Input
-                          dir="ltr"
-                          aria-label={`${t('persOptionLabelEn')} ${index + 1}`}
-                          placeholder={t('persOptionLabelEn')}
-                          value={option.labelEn}
-                          onChange={(e) => patch({ options: draft.options.map((o, i) => (i === index ? { ...o, labelEn: e.target.value } : o)) })}
-                        />
+                        <div className="space-y-1">
+                          <Input
+                            dir="ltr"
+                            aria-label={`${t('persOptionLabelEn')} ${index + 1}`}
+                            placeholder={t('persOptionLabelEn')}
+                            value={option.labelEn}
+                            aria-invalid={labelEnErr !== undefined}
+                            onChange={(e) => patch({ options: draft.options.map((o, i) => (i === index ? { ...o, labelEn: e.target.value } : o)) })}
+                          />
+                          {labelEnErr ? <p role="alert" className="text-xs text-negative">{errorText(labelEnErr, t)}</p> : null}
+                        </div>
                       </div>
                       <div className="flex shrink-0 items-center">
                         <Button type="button" variant="ghost" size="icon" aria-label={`${t('winMoveUp')}: ${option.label || index + 1}`} disabled={index === 0} onClick={() => patch({ options: move(draft.options, index, -1) })}>

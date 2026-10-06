@@ -108,6 +108,13 @@ describe('personalization draft logic', () => {
     expect(validateField(name, [])).toEqual([]);
   });
 
+  it('an option English label over the server limit is a field error on that option (not a late 422)', () => {
+    const [, ribbon] = fields();
+    const long = { ...ribbon, options: [{ ...ribbon.options[0], labelEn: 'x'.repeat(121) }] };
+    expect(validateField(long, [])).toEqual([{ field: 'optionLabelEn', code: 'tooLong', index: 0 }]);
+    expect(validateField({ ...ribbon, options: [{ ...ribbon.options[0], labelEn: 'x'.repeat(120) }] }, [])).toEqual([]);
+  });
+
   it('a select needs at least one valid option with a unique key and a label', () => {
     const [, ribbon] = fields();
     expect(validateField({ ...ribbon, options: [] }, [])).toContainEqual({ field: 'options', code: 'none' });

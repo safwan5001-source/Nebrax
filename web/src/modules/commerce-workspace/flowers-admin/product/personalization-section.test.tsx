@@ -26,12 +26,18 @@ const select = (over: Row = {}): Row => ({
   options: [{ value_key: 'red', label: 'أحمر', label_en: 'Red', is_active: true }], ...over,
 });
 
-function server(initial: Row[], opts: { rejectSave?: ApiError; canManage?: boolean; noRevision?: boolean } = {}) {
+function server(initial: Row[], opts: { rejectSave?: ApiError; canManage?: boolean; noRevision?: boolean; revisionFromSecondRead?: boolean } = {}) {
   let current = initial;
+  let reads = 0;
   let readFails = false;
   const writes: { fields: Row[]; expected_revision?: string }[] = [];
   const revisionOf = (rows: Row[]) => JSON.stringify(rows);
-  const doc = () => ({ data: { fields: current, ...(opts.noRevision ? {} : { revision: revisionOf(current) }) } });
+  const doc = () => {
+    reads += 1;
+    const hidden = opts.noRevision || (opts.revisionFromSecondRead && reads === 1);
+
+    return { data: { fields: current, ...(hidden ? {} : { revision: revisionOf(current) }) } };
+  };
   apiMock.mockImplementation(async (_path: string, options?: { method?: string; body?: { fields: Row[]; expected_revision?: string } }) => {
     if (options?.method === 'PUT') {
       if (opts.rejectSave) throw opts.rejectSave;
@@ -183,6 +189,15 @@ describe('PersonalizationSection', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Save' }));
     await waitFor(() => expect(document.querySelector('[role="alert"]')).not.toBeNull());
     expect(srv.writes).toHaveLength(0);
+  });
+
+  it('carries the revision returned by the fallback pre-read into the PUT (rolling backend deploy)', async () => {
+    const srv = server([text()], { revisionFromSecondRead: true });
+    await userEvent.click(await screen.findByRole('button', { name: 'Delete: الاسم على البطاقة' }));
+    await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Delete' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(srv.writes).toHaveLength(1));
+    expect(srv.writes[0].expected_revision).toBe(JSON.stringify([text()]));
   });
 
   it('is read-only without products.manage: view only, no add/save/reorder/delete', async () => {
