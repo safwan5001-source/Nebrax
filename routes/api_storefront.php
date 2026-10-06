@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\StorefrontCollectionController;
 use App\Http\Controllers\Api\StorefrontCheckoutController;
 use App\Http\Controllers\Api\StorefrontConfigController;
 use App\Http\Controllers\Api\StorefrontDeliveryScheduleController;
+use App\Http\Controllers\Api\StorefrontCustomizerMediaController;
 use App\Http\Controllers\Api\StorefrontMediaController;
 use App\Http\Controllers\Api\StorefrontOfferController;
 use App\Http\Controllers\Api\StorefrontProductController;
@@ -51,6 +52,11 @@ Route::middleware([
 
     Route::get('products', [StorefrontProductController::class, 'index'])->name('products.index');
     Route::get('products/{id}', [StorefrontProductController::class, 'show'])->whereUuid('id')->name('products.show');
+
+    // CUST-HV V2c — وسائط المُخصِّص (بوابة المرجع المنشور؛ الأصل `private, no-store`).
+    // مقطعان ثابتان بعد `media/customizer` فلا يتقاطع مع `media/{id}/derivatives/{x}`.
+    Route::get('media/customizer/{id}/{file}', [StorefrontCustomizerMediaController::class, 'show'])
+        ->where('id', '[0-9a-fA-F-]{32,36}')->where('file', '[A-Za-z0-9._-]{1,40}')->name('media.customizer.show');
 
     Route::get('media/categories/{id}', [StorefrontMediaController::class, 'showCategory'])->whereUuid('id')->name('media.category.show');
     Route::get('media/{id}/derivatives/{derivative}', [StorefrontMediaController::class, 'showDerivative'])

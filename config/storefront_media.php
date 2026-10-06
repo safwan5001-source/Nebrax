@@ -66,6 +66,9 @@ return [
 
     // Soft-delete retention before the reconciler may purge (V0 §7.9).
     'purge_after_days' => 30,
+    // Derivatives of a framing that no document references any more are removed
+    // only after this grace, so a framing being edited right now is never reaped.
+    'derivative_orphan_grace_hours' => 24,
 
     // Workspace signed read link lifetime (V0 §7.3).
     'signed_url_minutes' => 20,

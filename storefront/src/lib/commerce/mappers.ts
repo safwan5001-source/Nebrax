@@ -5,6 +5,7 @@ import type {
   Price,
   Variant,
 } from "@spree/sdk";
+import { toRenderableCustomizerMediaUrl } from "./customizer-media";
 import { parseProductGifting } from "./pdp-gifting";
 import type {
   AwjCategory,
@@ -162,6 +163,13 @@ export const AWJ_CATEGORY_MEDIA_PROXY_PATH_PREFIX =
  */
 export function toRenderableMediaUrl(url: string | null): string | null {
   if (!url) return null;
+
+  // CUST-HV V2c: Customizer media never reaches a browser as the raw
+  // host-resolved origin path — it is rewritten to the same-origin proxy path,
+  // or dropped when it is outside the contract (never guessed).
+  if (/\/store\/v1\/media\/customizer\//.test(url)) {
+    return toRenderableCustomizerMediaUrl(url);
+  }
 
   try {
     const parsed = new URL(url, "http://awj.invalid");
