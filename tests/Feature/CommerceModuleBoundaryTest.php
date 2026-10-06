@@ -90,6 +90,12 @@ class CommerceModuleBoundaryTest extends TestCase
         // COM-MOBILE-SHIPPING-1 — مناطق شحن مُهيَّأة من التاجر (ADR-10).
         'api/commerce/workspace/shipping-zones',
         'api/commerce/workspace/shipping-zones/{id}',
+        // CUST-HV V2a — مكتبة وسائط المُخصِّص على مستوى المستأجر (+ قراءة المتغيّرات الموقَّعة).
+        'api/commerce/workspace/storefront-media',
+        'api/commerce/workspace/storefront-media/{mediaId}',
+        'api/commerce/workspace/storefront-media/{mediaId}/retry',
+        'api/commerce/workspace/storefront-media/{mediaId}/usage',
+        'api/commerce/workspace/storefront-media/{media}/variants/{file}',
         'api/commerce/workspace/storefronts',
         'api/commerce/workspace/storefronts/create',
         'api/commerce/workspace/storefronts/{id}',
