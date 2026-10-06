@@ -5,7 +5,7 @@
 - Base SHA: `b0c3574225531ed907991bd9c5f23a7e8f5d66bb` (`origin/main` at implementation start).
 - Implementation head SHA: `5a32eb47bd19ca6075b3c0f947bbf24fea6817e0`.
 - Local implementation commit: `8a6698b19b096412bc5b8a79d6d45199dafe65eb`.
-- Follow-up implementation head: `152a041868f8d8814ddb5410099e761c61008686`.
+- Follow-up implementation head: `9bea4cca4dafba456de8573247d54d19aba2545c`.
 - Branch: `feat/awj-product-media-3-derivatives`.
 - PR: [#1235 — AWJ-PRODUCT-MEDIA-3 — Add secure product image derivatives](https://github.com/safwan5001-source/Nebrax/pull/1235).
 
@@ -20,7 +20,8 @@ slice was verified to be identical between that base and the fetched
   `ProductMediaService::attachToProduct()`.
 - Derivative class: `ProductMediaDerivativeService` owns decode, EXIF-safe
   orientation, scale-down, encoding, and per-derivative duration collection.
-  It uses Intervention v4's verified `decodePath()` API.
+  It uses Intervention v4's verified `decodePath()` and
+  `encodeUsingMediaType()` APIs.
 - Timing: generation is synchronous inside the established upload path. No
   queue was added.
 - Storage flow: `ProductMediaService` writes original, thumbnail, and card
@@ -115,8 +116,11 @@ Commands/results:
   runtime, and the existing R2 contract expects an explicit
   `$disk = 'document'` default. The follow-up changes `read()` to
   `decodePath()` and restores that behavior-neutral default.
-- A new CI run is required for follow-up head
-  `152a041868f8d8814ddb5410099e761c61008686`; its live result will be recorded
+- Follow-up CI run `8065` confirmed the decoder correction, then exposed the
+  matching v4 encoder difference: `Image::toJpeg()` is unavailable. The
+  derivative service now uses `encodeUsingMediaType()` with the same JPEG/WebP
+  quality values and the existing PNG default behavior.
+- A new CI run is required for the latest follow-up head; its live result will be recorded
   on PR #1235. The SQLite result above is not treated as passing.
 
 ## Performance
