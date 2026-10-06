@@ -1,6 +1,6 @@
 # AWJ Flowers & Gifts — Horizon 2 Progress
 
-**Status:** IN PROGRESS — H2-1 merged; H2-2 in review  
+**Status:** IN PROGRESS — H2-1, H2-2 merged; H2-3 in review  
 **Date:** 2026-10-04  
 **Planning Base:** `main` @ `6ded662bfada8f72f5ebf321dcf27b08be7939c1`  
 **Execution Base (H2-1):** `main` @ `afe223cb654154fa55234ff2e360233bbc933ec3`  
@@ -27,8 +27,8 @@ Horizon 1 is complete.
 | Slice | Scope | Status | PR | Merge SHA |
 |---|---|---|---|---|
 | H2-1 | Gift Policy Admin | MERGED | #1237 | `cfc16aa` |
-| H2-2 | Delivery Schedule Admin | PR OPEN | (see log) | — |
-| H2-3 | Delivery Windows & Capacity | NOT STARTED | — | — |
+| H2-2 | Delivery Schedule Admin | MERGED | #1238 | `37d462f` |
+| H2-3 | Delivery Windows & Capacity | PR OPEN | (see log) | — |
 | H2-4 | Blocked Dates & Exceptions | NOT STARTED | — | — |
 | H2-5 | Fulfillment Warehouse Setup | NOT STARTED | — | — |
 | H2-6 | Product Preparation Time | NOT STARTED | — | — |
@@ -121,10 +121,12 @@ A UI slice is not complete until its progress entry records:
 
 ### H2-2 — Delivery Schedule Admin
 
-**Status:** PR OPEN  
+**Status:** MERGED  
 **Base SHA:** `cfc16aa93527c3e2f11aab418355354499ef27b3`  
 **Branch:** `flowers/h2-2-delivery-schedule-admin`  
-**PR / Head / Merge SHA:** recorded in the next slice's ledger update after merge
+**PR:** #1238  
+**Head SHA:** `830b77d` (first head `01c5913`)  
+**Merge SHA:** `37d462f54e091a4ba630b41ec3210b90e00e3b21` (squash)
 
 #### Contract / scope
 - Existing contract only: `GET /commerce/workspace/storefronts/{id}/delivery-schedule` and `PUT …/delivery-schedule/settings` (`commerce.manage`): `is_enabled`, `is_required`, `timezone` (any IANA id the server accepts), `lead_time_minutes` (0–43 200), `cutoff_time` (`HH:MM` or null), `max_days_ahead` (1–90). The whole document (settings + windows + blocked dates) is read once and shared by the tabs; every save returns it in full.
@@ -134,6 +136,13 @@ A UI slice is not complete until its progress entry records:
 - `/commerce/delivery` (previously a placeholder) now hosts the delivery workspace. Top: a **readiness strip** with the prerequisites that are true on the server today (scheduling on, ≥1 active window) — explicitly labelled as basic prerequisites, not an availability promise. Below: the "Availability rules" settings surface.
 - Timezone is prominent: a picker (common GCC/MENA zones first, then all IANA zones; an unusual saved zone stays selectable), plus a live "Time now in the store" clock computed in that zone so the effect of the choice is concrete. Lead time is entered with a unit (minutes/hours/days, best unit chosen on load, converted to minutes), cut-off is a time input with an explicit "no cut-off" state, booking horizon 1–90 days.
 - Switching the schedule off keeps the saved rules (note shown). Deep links: `?tab=` selects a tab; the H14 checklist now links `delivery_schedule` → `/commerce/delivery`.
+
+#### Review findings (Codex, six P2 findings over four rounds — all verified valid, fixed, answered, resolved)
+- Timezone choices came from the browser ICU list (aliases such as `Asia/Calcutta` the API rejects) → then from a too-small curated list → finally the **complete** `DateTimeZone::listIdentifiers()` set (419 ids) pinned by test; labels memoized and `Intl` formatters cached (perf).
+- Orphan `role=tabpanel` with no tab bar → plain container until the tab bar ships.
+- Unsaved drafts were lost on store switch and on in-app navigation (neither fires `beforeunload`) → workspace-level unsaved registry: store switch and any in-app link now ask first (browser Back remains unguarded — App Router has no reliable hook).
+- Process note: `date-formatting-guardrail` (no direct `Intl.DateTimeFormat` outside `lib/`) failed the first web build; fixed by routing through `lib/timezone`.
+- CI: duplicate push/PR runs; one PR-run sqlite job failed on an unrelated random-key ZATCA certificate test (`ZatcaQrCertificateMaterialExtractorTest`, leading-zero EC coordinate) and passed on the identical commit in the push run; merged on a fully green head.
 
 #### Tests
 - `delivery-schedule.test.ts` (mapping, limits, unit conversion, payload field names), `timezones.test.ts`, `delivery-workspace.test.tsx` (8 cases: load/units/clock, readiness honesty, save payload, local validation with aria, clear cut-off, server 422, retry + unusual zone, 403 + stale-store response).
@@ -148,10 +157,43 @@ A UI slice is not complete until its progress entry records:
 - Replaces a placeholder page; no behaviour change for existing stores.
 
 #### Deployment observation
-- Manual deploy: NOT PERFORMED; automatic CI/CD and production verification: see the final report.
+- Manual deploy: NOT PERFORMED; automatic CI/CD: not observable from GitHub (no Railway status on the PR); production verification: NOT PERFORMED.
 
 #### Next
 - H2-3 — Delivery Windows & Capacity.
+
+---
+
+### H2-3 — Delivery Windows & Capacity
+
+**Status:** PR OPEN  
+**Base SHA:** `37d462f54e091a4ba630b41ec3210b90e00e3b21` (H2-2 merged)  
+**Branch:** `flowers/h2-3-delivery-windows`  
+**PR / Head / Merge SHA:** recorded in the next slice's ledger update after merge
+
+#### Contract / scope
+- Existing contract: `PUT …/delivery-schedule/slots` (full-set, id-stable replace; `sort_order` = presentation order) and read-only `GET commerce/workspace/shipping-zones` (zone restriction for delivery windows).
+- **One backend fix (found by driving the real API, not by mocks):** `slots.*.weekdays.*` used Laravel `distinct`, which compares values across *all* windows, so two windows on the same weekdays (morning + evening — the commonest setup) were rejected with "duplicate value". Uniqueness is now checked per window; regression test added. Strictly more permissive; no response shape change; no migration.
+
+#### UI / information architecture
+- New "Windows" tab in the delivery workspace: windows grouped by method (delivery / pickup), each row showing label (AR/EN), time range, weekdays, capacity, zone, active state; add/edit in a dialog, reorder, activate/deactivate, delete behind a destructive confirmation (open checkouts keep their windows' ids — replace is id-stable). Capacity is entered as a number or "unlimited"; remaining capacity is never computed on the client (server authority).
+- Tabs `?tab=rules|windows`; the H2-11 checklist deep-links `delivery_scheduling` here.
+
+#### Tests
+- `slot-editor.test.ts`, `weekday-names.test.ts`, `windows-panel.test.tsx`; backend `CommerceDeliveryScheduleTest` (30 tests incl. the new shared-weekday case) green locally.
+- Playwright `flowers-h2-3-delivery-windows.spec.ts`: AR/EN × 390/430/1024/1440, dialog validation, delete confirmation, server rejection, dark mode.
+
+#### Tenant Isolation / RBAC
+- No tenant/channel id from the client; `commerce.manage` read+write; zone ids validated server-side per tenant.
+
+#### Backward compatibility
+- Additive UI; the validation change only accepts input that was wrongly rejected before.
+
+#### Deployment observation
+- Manual deploy: NOT PERFORMED; production verification: NOT PERFORMED.
+
+#### Next
+- H2-4 — Blocked Dates & Exceptions.
 
 ---
 
