@@ -46,8 +46,19 @@ export function mapAddons(payload: unknown): AddonRow[] | null {
   return list(rows).map(mapRow).filter((r): r is AddonRow => r !== null);
 }
 
-export const loadAddons = (productId: string): Promise<AdminResult<AddonRow[]>> =>
-  adminCall(async () => mapAddons(await api<unknown>(productPath(productId, 'addons'))));
+/** العلاقات + بصمتها (`revision`) كما أعادهما الخادم؛ تُعاد عند الحفظ فيرفض الخادم الاستبدال القديم داخل القفل. */
+export type AddonsDocument = { rows: AddonRow[]; revision: string | null };
+
+export function mapAddonsDocument(payload: unknown): AddonsDocument | null {
+  const rows = mapAddons(payload);
+  if (!rows) return null;
+  const revision = obj(obj(payload)?.data)?.revision;
+
+  return { rows, revision: typeof revision === 'string' && revision !== '' ? revision : null };
+}
+
+export const loadAddons = (productId: string): Promise<AdminResult<AddonsDocument>> =>
+  adminCall(async () => mapAddonsDocument(await api<unknown>(productPath(productId, 'addons'))));
 
 export const addonsPayload = (rows: readonly AddonRow[]) => ({
   addons: rows.map((r) => ({
@@ -58,8 +69,15 @@ export const addonsPayload = (rows: readonly AddonRow[]) => ({
   })),
 });
 
-export const saveAddons = (productId: string, rows: readonly AddonRow[]): Promise<AdminResult<AddonRow[]>> =>
-  adminCall(async () => mapAddons(await api<unknown>(productPath(productId, 'addons'), { method: 'PUT', body: addonsPayload(rows) })));
+export const saveAddons = (productId: string, rows: readonly AddonRow[], expectedRevision: string | null = null): Promise<AdminResult<AddonsDocument>> =>
+  adminCall(async () =>
+    mapAddonsDocument(
+      await api<unknown>(productPath(productId, 'addons'), {
+        method: 'PUT',
+        body: { ...(expectedRevision ? { expected_revision: expectedRevision } : {}), ...addonsPayload(rows) },
+      }),
+    ),
+  );
 
 export const addonsSignature = (rows: readonly AddonRow[]): string => JSON.stringify(addonsPayload(rows));
 

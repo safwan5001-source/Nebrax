@@ -33,7 +33,7 @@ import {
 import { move } from './personalization';
 import { SectionState } from './section-state';
 
-type Phase = { kind: 'loading' } | { kind: 'failed'; failure: AdminFailure } | { kind: 'ready'; saved: AddonRow[] };
+type Phase = { kind: 'loading' } | { kind: 'failed'; failure: AdminFailure } | { kind: 'ready'; saved: AddonRow[]; revision: string | null };
 type Context = { price: string | null; variantLabel: string | null };
 type Pending =
   | { kind: 'loading'; product: PickerProduct }
@@ -68,8 +68,8 @@ export function AddonsSection({ productId, locale, canManage }: { productId: str
         setPhase({ kind: 'failed', failure: result });
         return;
       }
-      setDraft(result.data);
-      setPhase({ kind: 'ready', saved: result.data });
+      setDraft(result.data.rows);
+      setPhase({ kind: 'ready', saved: result.data.rows, revision: result.data.revision });
     });
     return () => {
       current = false;
@@ -148,22 +148,42 @@ export function AddonsSection({ productId, locale, canManage }: { productId: str
     }
     setSaving(true);
     setNotice(null);
-    const fresh = await loadAddons(productId);
-    if (fresh.ok && addonsSignature(fresh.data) !== addonsSignature(saved)) {
+    // الاستبدال كامل ⇒ التحقق من «لم يتغيّر شيء» داخل قفل الخادم (`expected_revision` ⇒ 409). الفحص المسبق احتياطٌ لخادمٍ بلا
+    // بصمة، وفشل قراءته يُوقف الحفظ بدل أن يكتب من نسخة قد تكون قديمة.
+    const revision = phase.kind === 'ready' ? phase.revision : null;
+    if (revision === null) {
+      const fresh = await loadAddons(productId);
+      if (!fresh.ok) {
+        setSaving(false);
+        setNotice({ tone: 'error', text: failureText(fresh, t) });
+        return;
+      }
+      if (addonsSignature(fresh.data.rows) !== addonsSignature(saved)) {
+        setSaving(false);
+        setDraft(fresh.data.rows);
+        setPhase({ kind: 'ready', saved: fresh.data.rows, revision: fresh.data.revision });
+        setNotice({ tone: 'warning', text: t('addonStale') });
+        return;
+      }
+    }
+    const result = await saveAddons(productId, draft, revision);
+    if (!result.ok && result.kind === 'conflict') {
+      const fresh = await loadAddons(productId);
       setSaving(false);
-      setDraft(fresh.data);
-      setPhase({ kind: 'ready', saved: fresh.data });
+      if (fresh.ok) {
+        setDraft(fresh.data.rows);
+        setPhase({ kind: 'ready', saved: fresh.data.rows, revision: fresh.data.revision });
+      }
       setNotice({ tone: 'warning', text: t('addonStale') });
       return;
     }
-    const result = await saveAddons(productId, draft);
     setSaving(false);
     if (!result.ok) {
       setNotice({ tone: 'error', text: failureText(result, t) });
       return;
     }
-    setDraft(result.data);
-    setPhase({ kind: 'ready', saved: result.data });
+    setDraft(result.data.rows);
+    setPhase({ kind: 'ready', saved: result.data.rows, revision: result.data.revision });
     toastSuccess(t('addonSaved'));
   }
 

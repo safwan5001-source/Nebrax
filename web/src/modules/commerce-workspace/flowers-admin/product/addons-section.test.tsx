@@ -27,10 +27,12 @@ const catalog: Record<string, Row> = {
   off: { id: 'off', name: 'منتج موقوف', sku: 'OFF', is_active: false, sale_price: '5.00', variant_state: 'simple' },
 };
 
-function server(initial: Row[], opts: { rejectSave?: ApiError; canManage?: boolean } = {}) {
+function server(initial: Row[], opts: { rejectSave?: ApiError; canManage?: boolean; noRevision?: boolean } = {}) {
   let current = initial;
-  const writes: { addons: Row[] }[] = [];
-  apiMock.mockImplementation(async (path: string, options?: { method?: string; body?: { addons: Row[] } }) => {
+  let readFails = false;
+  const writes: { addons: Row[]; expected_revision?: string }[] = [];
+  const revisionOf = (rows: Row[]) => JSON.stringify(rows);
+  apiMock.mockImplementation(async (path: string, options?: { method?: string; body?: { addons: Row[]; expected_revision?: string } }) => {
     if (path.includes('/products/publication')) {
       return { data: Object.values(catalog).map((p) => ({ id: p.id, sku: p.sku, name: p.name, name_en: null, is_active: p.is_active, is_published: true, stores: [] })), meta: { current_page: 1, last_page: 1, per_page: 10, total: 3 } };
     }
@@ -38,10 +40,13 @@ function server(initial: Row[], opts: { rejectSave?: ApiError; canManage?: boole
     if (path.includes('/commerce/workspace/products/p1/addons')) {
       if (options?.method === 'PUT') {
         if (opts.rejectSave) throw opts.rejectSave;
+        if (options.body!.expected_revision !== undefined && options.body!.expected_revision !== revisionOf(current)) throw new ApiError(409, 'stale', {});
         writes.push(options.body!);
         current = options.body!.addons.map((a) => ({ name: `منتج ${a.addon_product_id}`, name_en: null, sku: null, product_is_active: true, ...a }));
+      } else if (readFails) {
+        throw new ApiError(500, 'boom', {});
       }
-      return { data: { addons: current } };
+      return { data: { addons: current, ...(opts.noRevision ? {} : { revision: revisionOf(current) }) } };
     }
     const match = path.match(/^\/products\/([^/]+)$/);
     if (match && catalog[match[1]]) return { data: catalog[match[1]] };
@@ -54,7 +59,7 @@ function server(initial: Row[], opts: { rejectSave?: ApiError; canManage?: boole
     'en',
   );
 
-  return { writes, setRemote: (next: Row[]) => { current = next; } };
+  return { writes, setRemote: (next: Row[]) => { current = next; }, failRead: () => { readFails = true; } };
 }
 
 async function searchAndPick(query: string, productName: string) {
@@ -154,6 +159,25 @@ describe('AddonsSection', () => {
     expect(await screen.findByText(/changed on the server since you opened this page/)).toBeTruthy();
     expect(srv.writes).toHaveLength(0);
     expect(screen.getByText('منتج z')).toBeTruthy();
+  });
+
+  it('sends the revision it read so the server rejects a stale replacement under its lock', async () => {
+    const srv = server([addon('a')]);
+    await screen.findByText('منتج a');
+    await userEvent.click(screen.getByRole('button', { name: 'Remove: منتج a' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(srv.writes).toHaveLength(1));
+    expect(srv.writes[0].expected_revision).toBe(JSON.stringify([addon('a')]));
+  });
+
+  it('without a server revision it falls back to the pre-read and never writes when that read fails', async () => {
+    const srv = server([addon('a')], { noRevision: true });
+    await screen.findByText('منتج a');
+    await userEvent.click(screen.getByRole('button', { name: 'Remove: منتج a' }));
+    srv.failRead();
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(document.querySelector('[role="alert"]')).not.toBeNull());
+    expect(srv.writes).toHaveLength(0);
   });
 
   it('is read-only without products.manage', async () => {

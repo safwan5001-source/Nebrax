@@ -53,10 +53,28 @@ final class ProductAddonService
     }
 
     /**
+     * بصمة العلاقات الحالية (المنتج الهدف والمتغيّر والكمية والتفعيل)، دون حقول القراءة المشتقّة من المنتج الهدف (الاسم/نشاطه)
+     * فلا يُرفض حفظٌ مشروع لأن اسم منتج إضافة تغيّر. يقرؤها العميل ويعيدها (`expected_revision`) فيُرفض الاستبدال القديم داخل القفل.
+     *
+     * @param  list<array<string, mixed>>  $definitions
+     */
+    public function revisionFor(array $definitions): string
+    {
+        $relations = array_map(fn (array $d) => [
+            'addon_product_id' => $d['addon_product_id'],
+            'addon_variant_id' => $d['addon_variant_id'],
+            'max_quantity' => $d['max_quantity'],
+            'is_active' => $d['is_active'],
+        ], $definitions);
+
+        return sha1((string) json_encode($relations));
+    }
+
+    /**
      * @param  list<array{addon_product_id: string, addon_variant_id?: ?string, max_quantity?: int, is_active?: bool}>  $addons
      * @return list<array<string, mixed>>
      */
-    public function replace(Product $product, array $addons): array
+    public function replace(Product $product, array $addons, ?string $expectedRevision = null): array
     {
         $this->assertProductTenant($product);
 
@@ -71,7 +89,7 @@ final class ProductAddonService
             throw new DomainException('لا يمكن ربط المنتج بنفسه كإضافة.');
         }
 
-        return DB::transaction(function () use ($product, $addons, $ids) {
+        return DB::transaction(function () use ($product, $addons, $ids, $expectedRevision) {
             // قفلٌ واحد لاتحاد (الأب + منتجات الإضافة) بترتيب المعرّف الشامل: مديران يضبطان علاقتين متبادلتين
             // (أ→ب وب→أ) يطلبان الأقفال بنفس الترتيب فلا دورة انتظار ولا deadlock. BranchScope وحده يُرفع؛
             // TenantScope وSoftDeletes يبقيان، فمنتجٌ حُذف بين تحميل المتحكّم وهذا القفل (الأب أو الهدف) لا يُقفل
@@ -85,6 +103,10 @@ final class ProductAddonService
                 ->keyBy('id');
             if (! $locked->has($product->id)) {
                 throw (new ModelNotFoundException)->setModel(Product::class, [$product->id]);
+            }
+
+            if ($expectedRevision !== null && ! hash_equals($this->revisionFor($this->definitions($product)), $expectedRevision)) {
+                throw new StaleRevisionException('تغيّرت الإضافات على الخادم منذ قرأتها. حدّث الصفحة وراجعها ثم أعد المحاولة.');
             }
 
             // الأهداف تُحلّ بعد القفل عبر Product::query() (TenantScope + نطاق الفرع للمستخدم الإداري).
