@@ -3,13 +3,13 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { ArrowDown, ArrowUp, Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Dialog } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import type { FlowersAdminMessageKey, FlowersAdminT } from '../messages';
+import { FlowersDialog } from '../flowers-dialog';
 import {
   FIELD_TYPES,
   MAX_LENGTH_CEILING,
@@ -88,7 +88,7 @@ export function PersonalizationFieldDialog({
   const previewLabel = draft.label.trim() || t('persPreviewLabel');
 
   return (
-    <Dialog open onClose={onClose} title={title} className="max-w-xl">
+    <FlowersDialog open onClose={onClose} title={title} className="max-w-xl">
       <form onSubmit={submit} noValidate className="space-y-4" data-personalization-form>
         <fieldset className="space-y-1.5" disabled={readOnly}>
           <legend className="text-sm font-medium text-text">{t('persType')}</legend>
@@ -295,6 +295,6 @@ export function PersonalizationFieldDialog({
           {!readOnly ? <Button type="submit">{t('persApply')}</Button> : null}
         </div>
       </form>
-    </Dialog>
+    </FlowersDialog>
   );
 }

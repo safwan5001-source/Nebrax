@@ -10,9 +10,11 @@ interface DialogProps {
   title: string;
   children: React.ReactNode;
   className?: string;
+  /** تسمية زر الإغلاق (افتراضياً العربية كما كانت)؛ تمرّر الواجهات الإنجليزية نصّها. */
+  closeLabel?: string;
 }
 
-export function Dialog({ open, onClose, title, children, className }: DialogProps) {
+export function Dialog({ open, onClose, title, children, className, closeLabel = 'إغلاق' }: DialogProps) {
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
@@ -36,7 +38,7 @@ export function Dialog({ open, onClose, title, children, className }: DialogProp
       >
         <div className="flex shrink-0 items-center justify-between border-b border-border px-4 py-3">
           <h2 className="min-w-0 truncate text-base font-semibold text-text">{title}</h2>
-          <button type="button" onClick={onClose} className="shrink-0 rounded text-muted hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40" aria-label="إغلاق">
+          <button type="button" onClick={onClose} className="-m-1 shrink-0 rounded p-1 text-muted hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40" aria-label={closeLabel}>
             <X className="h-4 w-4" strokeWidth={1.7} />
           </button>
         </div>
