@@ -107,7 +107,13 @@ export function ScheduleRulesPanel({
   useUnsavedGuard(dirty);
 
   const clock = useClock(draft.timezone);
-  const groups = useMemo(() => timezoneGroups(draft.timezone), [draft.timezone]);
+  // 419 خياراً: التسمية (وفيها مُنسِّق Intl) تُحسب عند تغيّر المنطقة فقط لا عند كل ضغطة مفتاح أو نبضة ساعة.
+  const zoneOptions = useMemo(() => {
+    const groups = timezoneGroups(draft.timezone);
+    const label = (zone: string) => ({ zone, label: zoneLabel(zone) });
+
+    return { common: groups.common.map(label), other: groups.other.map(label) };
+  }, [draft.timezone]);
   const patch = (next: Partial<Draft>) => {
     setServerError(null);
     setDraft((current) => ({ ...current, ...next }));
@@ -181,16 +187,16 @@ export function ScheduleRulesPanel({
               onChange={(event) => patch({ timezone: event.target.value })}
             >
               <optgroup label={t('schedTimezoneCommon')}>
-                {groups.common.map((zone) => (
-                  <option key={zone} value={zone}>
-                    {zoneLabel(zone)}
+                {zoneOptions.common.map((option) => (
+                  <option key={option.zone} value={option.zone}>
+                    {option.label}
                   </option>
                 ))}
               </optgroup>
               <optgroup label={t('schedTimezoneOther')}>
-                {groups.other.map((zone) => (
-                  <option key={zone} value={zone}>
-                    {zoneLabel(zone)}
+                {zoneOptions.other.map((option) => (
+                  <option key={option.zone} value={option.zone}>
+                    {option.label}
                   </option>
                 ))}
               </optgroup>
