@@ -795,4 +795,27 @@ class CommerceDeliveryScheduleTest extends TestCase
         // بلا بصمة: السلوك السابق (استبدال غير مشروط) يبقى.
         $this->withToken($store['token'])->putJson($this->url($store, '/slots'), ['slots' => [$slot('Only')]])->assertOk();
     }
+
+    /** @test */
+    public function blocked_dates_replacement_on_a_stale_revision_is_rejected_under_the_lock_without_writing(): void
+    {
+        $store = $this->store('ds-blocked-revision');
+        $put = fn (array $rows, ?string $revision = null) => $this->withToken($store['token'])->putJson(
+            $this->url($store, '/blocked-dates'),
+            ['blocked_dates' => $rows] + ($revision === null ? [] : ['expected_revision' => $revision]),
+        );
+
+        $first = $put([['date' => '2030-02-14']])->assertOk();
+        $revision = $first->json('data.blocked_dates_revision');
+        $this->assertSame(40, strlen($revision));
+        $this->assertSame($revision, $this->withToken($store['token'])->getJson($this->url($store))->json('data.blocked_dates_revision'));
+
+        $second = $put([['date' => '2030-02-14'], ['date' => '2030-03-01']], $revision)->assertOk();
+        $this->assertNotSame($revision, $second->json('data.blocked_dates_revision'));
+
+        $put([['date' => '2031-01-01']], $revision)->assertStatus(409);
+        $this->assertSame(['2030-02-14', '2030-03-01'], array_column($this->withToken($store['token'])->getJson($this->url($store))->json('data.blocked_dates'), 'date'));
+
+        $put([['date' => '2032-01-01']])->assertOk(); // بلا بصمة: السلوك السابق
+    }
 }

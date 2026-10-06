@@ -15,14 +15,20 @@ import { renderIntl } from '@/test-utils/intl';
 import { DeliveryWorkspace } from './delivery-workspace';
 
 afterEach(() => {
+  withRevision = true;
+  readFails = false;
   cleanup();
   apiMock.mockReset();
   window.history.replaceState(null, '', '/');
 });
 
 type Row = { date: string; method: string; reason: string | null };
+let withRevision = true;
+let readFails = false;
+const revisionOf = (rows: Row[]) => JSON.stringify(rows);
 const doc = (blocked: Row[]) => ({
   data: {
+    ...(withRevision ? { blocked_dates_revision: revisionOf(blocked) } : {}),
     settings: { enabled: true, required: true, timezone: 'Asia/Riyadh', lead_time_minutes: 0, cutoff_time: null, max_days_ahead: 30 },
     slots: [],
     blocked_dates: blocked,
@@ -35,12 +41,15 @@ function server(initial: Row[], opts: { rejectSave?: ApiError } = {}) {
   apiMock.mockImplementation(async (path: string, options?: { method?: string; body?: { blocked_dates: Row[] } }) => {
     if (options?.method === 'PUT' && path.endsWith('/blocked-dates')) {
       if (opts.rejectSave) throw opts.rejectSave;
+      const expected = (options.body as { expected_revision?: string }).expected_revision;
+      if (expected !== undefined && expected !== revisionOf(current)) throw new ApiError(409, 'stale', {});
       writes.push(options.body!.blocked_dates);
       current = [...options.body!.blocked_dates].sort((a, b) => a.date.localeCompare(b.date));
     }
+    if (readFails && options?.method !== 'PUT') throw new ApiError(500, 'boom', {});
     return doc(current);
   });
-  return { writes, setRemote: (next: Row[]) => { current = next; } };
+  return { writes, failRead: () => { readFails = true; }, setRemote: (next: Row[]) => { current = next; } };
 }
 
 async function openBlocked(initial: Row[], opts: { rejectSave?: ApiError } = {}) {
@@ -146,5 +155,34 @@ describe('BlockedDatesPanel', () => {
     expect(await screen.findByText(/changed on the server since you opened this page/)).toBeTruthy();
     expect(srv.writes).toHaveLength(0);
     expect(await screen.findByText('Added elsewhere')).toBeTruthy();
+  });
+
+  it('sends the revision it read so the server rejects a stale replacement under its lock', async () => {
+    const srv = await openBlocked([{ date: FUTURE, method: 'all', reason: null }]);
+    await userEvent.click(screen.getByRole('button', { name: /^Remove/ }));
+    await waitFor(() => expect(srv.writes).toHaveLength(1));
+  });
+
+  it('without a server revision it falls back to the pre-read and never writes when that read fails', async () => {
+    withRevision = false;
+    const srv = await openBlocked([{ date: FUTURE, method: 'all', reason: null }]);
+    srv.failRead();
+    await userEvent.click(screen.getByRole('button', { name: /^Remove/ }));
+    await waitFor(() => expect(document.querySelector('[role="alert"]')).not.toBeNull());
+    expect(srv.writes).toHaveLength(0);
+  });
+
+  it('registers a half-filled add form as unsaved until it is saved or cleared', async () => {
+    await openBlocked([]);
+    const leave = () => {
+      const event = new Event('beforeunload', { cancelable: true });
+      window.dispatchEvent(event);
+      return event.defaultPrevented;
+    };
+    expect(leave()).toBe(false);
+    fireEvent.change(screen.getByLabelText('Date'), { target: { value: FUTURE } });
+    expect(leave()).toBe(true);
+    fireEvent.change(screen.getByLabelText('Date'), { target: { value: '' } });
+    expect(leave()).toBe(false);
   });
 });

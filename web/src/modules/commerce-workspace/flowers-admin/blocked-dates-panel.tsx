@@ -29,6 +29,7 @@ import {
 } from './delivery-schedule';
 import { failureText } from './failure-text';
 import { flowersAdminT, type FlowersAdminMessageKey } from './messages';
+import { useUnsavedGuard } from './use-unsaved-guard';
 import { weekdayName } from './weekday-names';
 
 const INPUT_ERROR: Record<BlockedInputError, FlowersAdminMessageKey> = {
@@ -79,17 +80,35 @@ export function BlockedDatesPanel({
   const [showPast, setShowPast] = useState(false);
   const [confirmPast, setConfirmPast] = useState(false);
 
+  // ما كُتب في نموذج الإضافة ولم يُحفظ يُسجَّل (تحذير المتصفّح + سؤال التنقّل/تبديل التبويب/المتجر).
+  useUnsavedGuard(date !== '' || reason.trim() !== '');
+
   const inputError = submitted ? validateBlockedInput({ date, method, reason }, rows) : null;
   const methodLabel = (m: BlockedMethod) => (m === 'all' ? t('blkMethodAll') : m === 'delivery' ? t('winMethodDelivery') : t('winMethodPickup'));
 
   async function persist(next: BlockedDate[]): Promise<string | null> {
-    const fresh = await loadSchedule(storeId);
-    if (fresh.ok && blockedSignature(fresh.data.blockedDates) !== blockedSignature(rows)) {
-      onDocument(fresh.data);
-      return t('blkStale');
+    // الاستبدال كامل ⇒ التحقق من «لم يتغيّر شيء» داخل قفل الخادم (`expected_revision` ⇒ 409). الفحص المسبق احتياطٌ لخادمٍ
+    // بلا بصمة، وفشل قراءته يُوقف الكتابة بدل أن يكتب من نسخة قد تكون قديمة.
+    const revision = document.blockedRevision ?? null;
+    if (revision === null) {
+      const fresh = await loadSchedule(storeId);
+      if (!fresh.ok) return failureText(fresh, t);
+      if (blockedSignature(fresh.data.blockedDates) !== blockedSignature(rows)) {
+        onDocument(fresh.data);
+        return t('blkStale');
+      }
     }
-    const saved = await saveBlockedDates(storeId, next);
-    if (!saved.ok) return failureText(saved, t);
+    const saved = await saveBlockedDates(storeId, next, revision);
+    if (!saved.ok) {
+      if (saved.kind === 'conflict') {
+        const fresh = await loadSchedule(storeId);
+        if (fresh.ok) onDocument(fresh.data);
+
+        return t('blkStale');
+      }
+
+      return failureText(saved, t);
+    }
     onDocument(saved.data);
 
     return null;
