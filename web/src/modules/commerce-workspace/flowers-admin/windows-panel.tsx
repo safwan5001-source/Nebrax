@@ -110,11 +110,11 @@ export function WindowsPanel({
     const assigned = dialog.kind === 'edit' ? (slots[dialog.index]?.shippingZoneId ?? null) : null;
     if (draft.shippingZoneId !== '' && draft.shippingZoneId !== assigned) {
       const latest = await loadShippingZones();
-      if (latest.ok) {
-        setZones({ kind: 'ready', zones: latest.data });
-        const zone = latest.data.find((z) => z.id === draft.shippingZoneId);
-        if (!zone || !zone.isActive) return t('winZoneUnavailable');
-      }
+      // تعذّر إثبات أن الوجهة ما زالت فعّالة ⇒ لا حفظ (الخادم يتحقق من وجودها لا من فعاليتها).
+      if (!latest.ok) return failureText(latest, t);
+      setZones({ kind: 'ready', zones: latest.data });
+      const zone = latest.data.find((z) => z.id === draft.shippingZoneId);
+      if (!zone || !zone.isActive) return t('winZoneUnavailable');
     }
     const next =
       dialog.kind === 'add'

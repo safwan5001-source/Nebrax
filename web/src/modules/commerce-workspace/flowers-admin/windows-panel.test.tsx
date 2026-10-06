@@ -16,6 +16,7 @@ import { DeliveryWorkspace } from './delivery-workspace';
 
 afterEach(() => {
   withRevision = true;
+  zonesFail = false;
   cleanup();
   apiMock.mockReset();
   window.history.replaceState(null, '', '/');
@@ -26,6 +27,7 @@ const slot = (over: Record<string, unknown> = {}) => ({
   weekdays: [0, 1, 2, 3, 4, 5, 6], capacity: null, shipping_zone_id: null, sort_order: 0, is_active: true, ...over,
 });
 let withRevision = true;
+let zonesFail = false;
 const revisionOf = (slots: unknown[]) => JSON.stringify(slots);
 const doc = (slots: unknown[]) => ({
   data: {
@@ -43,7 +45,10 @@ function server(initial: unknown[], opts: { rejectSave?: ApiError } = {}) {
   let readFails = false;
   const writes: unknown[] = [];
   apiMock.mockImplementation(async (path: string, options?: { method?: string; body?: { slots: Record<string, unknown>[] } }) => {
-    if (path.includes('shipping-zones')) return zones;
+    if (path.includes('shipping-zones')) {
+      if (zonesFail) throw new ApiError(500, 'boom', {});
+      return zones;
+    }
     if (options?.method === 'PUT' && path.endsWith('/slots')) {
       if (opts.rejectSave) throw opts.rejectSave;
       const expected = (options.body as { expected_revision?: string }).expected_revision;
@@ -96,6 +101,38 @@ describe('WindowsPanel', () => {
     expect(await within(dialog).findByText(/no longer available/)).toBeTruthy();
     expect(srv.writes).toHaveLength(0);
     zones = { data: [{ id: 'z1', name: 'الرياض', is_active: true }] };
+  });
+
+  it('does not save a newly chosen zone when its revalidation read fails', async () => {
+    zones = { data: [{ id: 'z1', name: 'الرياض', is_active: true }] };
+    const srv = await openWindows([slot({ id: 'a', label: 'A' })]);
+    await userEvent.click(screen.getByRole('button', { name: 'Edit: A' }));
+    const dialog = screen.getByRole('dialog');
+    const select = await within(dialog).findByLabelText('Delivery destination', { selector: 'select' });
+    await waitFor(() => expect((select as HTMLSelectElement).options.length).toBeGreaterThan(1));
+    await userEvent.selectOptions(select, 'z1');
+    zonesFail = true;
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
+
+    await waitFor(() => expect(within(dialog).getByRole('alert')).toBeTruthy());
+    expect(srv.writes).toHaveLength(0);
+    zonesFail = false;
+  });
+
+  it('registers an edited window draft as unsaved (browser warning) until saved or closed', async () => {
+    await openWindows([slot({ id: 'a', label: 'A' })]);
+    const leave = () => {
+      const event = new Event('beforeunload', { cancelable: true });
+      window.dispatchEvent(event);
+      return event.defaultPrevented;
+    };
+    await userEvent.click(screen.getByRole('button', { name: 'Edit: A' }));
+    const dialog = screen.getByRole('dialog');
+    expect(leave()).toBe(false);
+    await userEvent.type(within(dialog).getByLabelText('Window name'), 'x');
+    expect(leave()).toBe(true);
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+    expect(leave()).toBe(false);
   });
 
   it('does not offer inactive shipping zones for new selection but keeps an already assigned one', async () => {

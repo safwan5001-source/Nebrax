@@ -159,3 +159,23 @@ describe('DeliveryWorkspace — availability rules', () => {
     expect(screen.getByRole('switch', { name: 'Enable delivery date selection' }).getAttribute('aria-checked')).toBe('true');
   });
 });
+
+describe('DeliveryWorkspace — tab switching with an unsaved draft', () => {
+  it('asks before dropping unsaved rules: declining stays on the tab with the draft, confirming switches', async () => {
+    apiMock.mockImplementation(async () => doc({}, [slot()]));
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    renderWorkspace();
+    const days = (await screen.findByLabelText('Maximum booking horizon')) as HTMLInputElement;
+    await userEvent.clear(days);
+    await userEvent.type(days, '21');
+
+    await userEvent.click(screen.getByRole('tab', { name: /Delivery windows/ }));
+    expect(confirm).toHaveBeenCalledTimes(1);
+    expect((screen.getByLabelText('Maximum booking horizon') as HTMLInputElement).value).toBe('21');
+
+    confirm.mockReturnValue(true);
+    await userEvent.click(screen.getByRole('tab', { name: /Delivery windows/ }));
+    expect(await screen.findByRole('region', { name: 'Delivery windows' })).toBeTruthy();
+    confirm.mockRestore();
+  });
+});

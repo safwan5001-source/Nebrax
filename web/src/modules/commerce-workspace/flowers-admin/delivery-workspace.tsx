@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Truck } from 'lucide-react';
 import { EmptyState, ErrorState, LoadingState } from '@/components/nebrax';
 import { TabPanel, Tabs } from '@/components/ui/tabs';
+import { confirmDiscardUnsaved } from '../unsaved-registry';
 import { loadSchedule, type ScheduleDocument } from './delivery-schedule';
 import type { AdminFailure } from './admin-http';
 import { failureText } from './failure-text';
@@ -40,6 +41,9 @@ export function DeliveryWorkspace({ storeId, locale }: { storeId: string; locale
   const [tab, setTabState] = useState<DeliveryTabId>('rules');
   useEffect(() => setTabState(initialTab()), []);
   const setTab = (next: DeliveryTabId) => {
+    if (next === tab) return;
+    // الأزرار ليست روابط فلا يمرّ بها حارس التنقّل: نسأل قبل أن يُفكَّك تبويبٌ فيه مسوّدة غير محفوظة.
+    if (!confirmDiscardUnsaved()) return;
     setTabState(next);
     const url = new URL(window.location.href);
     url.searchParams.set('tab', next);

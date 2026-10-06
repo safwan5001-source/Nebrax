@@ -14,6 +14,7 @@ import { ALL_WEEKDAYS, hasErrors, validateSlotDraft, type SlotDraft, type SlotEr
 import type { ShippingZoneOption } from './shipping-zones';
 import { weekdayName, weekdayOrder } from './weekday-names';
 import { cn } from '@/lib/utils';
+import { useUnsavedGuard } from './use-unsaved-guard';
 
 export type ZoneState = { kind: 'loading' } | { kind: 'failed' } | { kind: 'ready'; zones: ShippingZoneOption[] };
 
@@ -57,6 +58,8 @@ export function SlotDialog({
   // المنطقة المعيَّنة وقت الفتح: تبقى ظاهرةً ولو عُطّلت بعدها، أما المناطق المعطّلة الأخرى فلا تُعرض للاختيار (لا وجهة تتطابق معها).
   const [assignedZoneId] = useState(initial.shippingZoneId);
   const [saving, setSaving] = useState(false);
+  // المسوّدة غير المحفوظة تُسجَّل (تحذير المتصفّح + سؤال التنقّل داخل التطبيق) حتى تُحفَظ أو يُغلق الحوار.
+  useUnsavedGuard(JSON.stringify(draft) !== JSON.stringify(initial));
   const [serverError, setServerError] = useState<string | null>(null);
   const errors = useMemo(() => validateSlotDraft(draft), [draft]);
   const show = (field: keyof SlotErrors) => (submitted ? errors[field] : undefined);
