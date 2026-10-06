@@ -9,6 +9,8 @@
             "max_days_ahead": 30
         },
         "slots": [],
-        "blocked_dates": []
+        "slots_revision": "<sha1-revision>",
+        "blocked_dates": [],
+        "blocked_dates_revision": "<sha1-revision>"
     }
 }

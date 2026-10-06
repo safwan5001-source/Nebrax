@@ -36,6 +36,7 @@
                 ],
                 "is_active": true
             }
-        ]
+        ],
+        "revision": "<sha1-revision>"
     }
 }
