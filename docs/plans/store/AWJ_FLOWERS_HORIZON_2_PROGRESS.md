@@ -1,6 +1,6 @@
 # AWJ Flowers & Gifts — Horizon 2 Progress
 
-**Status:** IN PROGRESS — H2-1…H2-6 merged; H2-7 in review  
+**Status:** IN PROGRESS — H2-1…H2-7 merged; H2-8 in review  
 **Date:** 2026-10-04  
 **Planning Base:** `main` @ `6ded662bfada8f72f5ebf321dcf27b08be7939c1`  
 **Execution Base (H2-1):** `main` @ `afe223cb654154fa55234ff2e360233bbc933ec3`  
@@ -32,8 +32,8 @@ Horizon 1 is complete.
 | H2-4 | Blocked Dates & Exceptions | MERGED | #1240 | `323c5f5` |
 | H2-5 | Fulfillment Warehouse Setup | MERGED | #1241 | `a53bcd0` |
 | H2-6 | Product Preparation Time | MERGED | #1243 | `a10359d` |
-| H2-7 | Product Personalization Admin | PR OPEN | (see log) | — |
-| H2-8 | Product Add-ons Admin | NOT STARTED | — | — |
+| H2-7 | Product Personalization Admin | MERGED | #1246 | `f294c2d` |
+| H2-8 | Product Add-ons Admin | PR OPEN | (see log) | — |
 | H2-9 | Structured Product Content Admin | NOT STARTED | — | — |
 | H2-10 | Unified Product Gifting Workspace | NOT STARTED | — | — |
 | H2-11 | Vertical Setup Center V2 | NOT STARTED | — | — |
@@ -315,10 +315,12 @@ A UI slice is not complete until its progress entry records:
 
 ### H2-7 — Product Personalization Admin
 
-**Status:** PR OPEN  
+**Status:** MERGED  
 **Base SHA:** `a10359d5f9de12a972c728f5dcc71397e4e45319` (H2-6 merged)  
 **Branch:** `flowers/h2-7-product-personalization`  
-**PR / Head / Merge SHA:** recorded in the next slice's ledger update after merge
+**PR:** #1246  
+**Head SHA:** `135e737` (earlier heads `04abbd4`, `524bd00`, `d5d9e15`, `b6229a8`, `74dc7ff`)  
+**Merge SHA:** `f294c2d11da7b4f15a04895c3801684dd776580e` (squash)
 
 #### Contract / scope
 - Existing contract: `GET|PUT /commerce/workspace/products/{id}/personalization` (`products.view` read / `products.manage` write) — a full-set replace of the product's personalization field definitions. The server stays the authority on validation and on what a shopper may enter.
@@ -336,11 +338,52 @@ A UI slice is not complete until its progress entry records:
 #### Backward compatibility
 - `expected_revision` optional; response gains `revision` additively.
 
+#### Review / CI
+- Codex review was available again for this PR (6 rounds, all valid, all fixed with a test, replied and resolved):
+  1. validate option English labels (field-level); carry the fallback pre-read revision into the PUT;
+  2. fail the document load on any row the client cannot parse (a whole-set save would otherwise delete it server-side); Unicode-aware length counting, no UTF-16 `maxLength` caps;
+  3. **P1** — an active + required select with no active option makes the product unpurchasable: rejected on the **server** (`assertOptions`, 422, nothing written) and in the client;
+  4. cart-impact warning also for a first active required field;
+  5. a failed refresh after a 409 is reported (not claimed) and the stale revision dropped; leaving the Gifting tab (and sidebar links on the product page) now confirms before discarding a draft — this also closes the same gap for the H2-6 preparation draft.
+- The same lessons (fallback revision carried; fail-closed mapping; failed-refresh handling) were applied proactively to add-ons (H2-8) and content (H2-9).
+- One transient `next build` failure (Google Fonts fetch in an untouched module) was re-run once; both web runs on the final head green. Merged on a fully green head (sqlite, pgsql, web; both runs).
+
+#### Deployment observation
+- Manual deploy: NOT PERFORMED; automatic CI/CD: not observable from GitHub; production verification: NOT PERFORMED.
+
+#### Next
+- H2-8 — Product Add-ons Admin.
+
+---
+
+### H2-8 — Product Add-ons Admin
+
+**Status:** PR OPEN  
+**Base SHA:** `f294c2d11da7b4f15a04895c3801684dd776580e` (H2-7 merged)  
+**Branch:** `flowers/h2-8-product-addons`  
+**PR / Head / Merge SHA:** recorded in the next slice's ledger update after merge
+
+#### Contract / scope
+- Existing contract: `GET|PUT /commerce/workspace/products/{id}/addons` (`products.view` read / `products.manage` write) — a full-set replace of the product's add-on relations (target product + optional variant + max quantity + active). Add-on prices/availability stay with the target product/variant; the admin never sends or computes a price.
+- **Small additive backend change** (same pattern as H2-7): the document carries a `revision` (projects only `addon_product_id`, `addon_variant_id`, `max_quantity`, `is_active`); `PUT` accepts an optional `expected_revision` compared inside the product + target locks — 409 and nothing written on mismatch. Optional, so the legacy behaviour is preserved.
+
+#### UI / information architecture
+- "Add-ons" section in the product Gifting tab: search/choose a product (and variant), quantity 1–10, active toggle, list with inactive-target-product flags, remove, one explicit Save. States: loading, empty, populated, saving, success, validation, server error, 409 (reload + warning, or a reported failed refresh), read-only without `products.manage`. Unreadable rows fail the load instead of being dropped; the fallback pre-read's revision is carried into the PUT.
+
+#### Tests
+- Backend `CommerceProductAddonApiTest` (stale-revision 409 case); web `addons.test.ts`, `addons-section.test.tsx`; Playwright `flowers-h2-8-product-addons.spec.ts`.
+
+#### Tenant Isolation / RBAC
+- Product and target ownership via `TenantScope`; write requires `products.manage`; no accounting, stock or invoice effect.
+
+#### Backward compatibility
+- `expected_revision` optional; response gains `revision` additively.
+
 #### Deployment observation
 - Manual deploy: NOT PERFORMED; production verification: NOT PERFORMED.
 
 #### Next
-- H2-8 — Product Add-ons Admin.
+- H2-9 — Structured Product Content Admin.
 
 ---
 

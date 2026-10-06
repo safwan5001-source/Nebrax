@@ -417,4 +417,27 @@ class CommerceProductAddonApiTest extends TestCase
         $this->assertStringContainsString('order by "id"', $locks[0]['sql']);
         $this->assertEqualsCanonicalizing([$bouquet->id, $a->id, $b->id], array_values(array_intersect($locks[0]['bindings'], [$bouquet->id, $a->id, $b->id])));
     }
+
+    /** @test */
+    public function a_replacement_built_on_a_stale_revision_is_rejected_under_the_locks_without_writing(): void
+    {
+        $auth = $this->registerTenant('ad-revision', 'owner@ad-revision.test');
+        $bouquet = $this->makeProduct($auth['tenant_id']);
+        $a = $this->makeProduct($auth['tenant_id'], 'أ');
+        $b = $this->makeProduct($auth['tenant_id'], 'ب');
+        $token = $auth['token'];
+
+        $first = $this->withToken($token)->putJson($this->url($bouquet), ['addons' => [['addon_product_id' => $a->id]]])->assertOk();
+        $revision = $first->json('data.revision');
+        $this->assertSame(40, strlen($revision));
+        $this->assertSame($revision, $this->withToken($token)->getJson($this->url($bouquet))->json('data.revision'));
+
+        $second = $this->withToken($token)->putJson($this->url($bouquet), ['expected_revision' => $revision, 'addons' => [['addon_product_id' => $a->id], ['addon_product_id' => $b->id]]])->assertOk();
+        $this->assertNotSame($revision, $second->json('data.revision'));
+
+        $this->withToken($token)->putJson($this->url($bouquet), ['expected_revision' => $revision, 'addons' => [['addon_product_id' => $b->id]]])->assertStatus(409);
+        $this->assertSame([$a->id, $b->id], array_column($this->withToken($token)->getJson($this->url($bouquet))->json('data.addons'), 'addon_product_id'));
+
+        $this->withToken($token)->putJson($this->url($bouquet), ['addons' => [['addon_product_id' => $b->id]]])->assertOk(); // بلا بصمة: السلوك السابق
+    }
 }
