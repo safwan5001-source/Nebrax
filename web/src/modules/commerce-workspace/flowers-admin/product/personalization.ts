@@ -38,6 +38,9 @@ export type PersonalizationField = {
   persisted: boolean;
 };
 
+/** عدد المحارف كما يعدّها الخادم (Unicode لا وحدات UTF-16)، فلا يُرفض عنوانٌ من رموز تعبيرية وهو ضمن الحد. */
+export const charCount = (value: string): number => Array.from(value).length;
+
 const isType = (v: unknown): v is FieldType => (FIELD_TYPES as readonly unknown[]).includes(v);
 
 function mapOption(raw: unknown): PersonalizationOption | null {
@@ -52,6 +55,8 @@ function mapField(raw: unknown): PersonalizationField | null {
   const row = obj(raw);
   const key = str(row?.key);
   if (!row || !key || !isType(row.type) || str(row.label) === null) return null;
+  const options = list(row.options).map(mapOption);
+  if (!options.every((o): o is PersonalizationOption => o !== null)) return null;
 
   return {
     key,
@@ -62,7 +67,7 @@ function mapField(raw: unknown): PersonalizationField | null {
     isRequired: bool(row.is_required),
     maxLength: row.type === 'select' ? null : typeof row.max_length === 'number' ? row.max_length : row.type === 'text' ? DEFAULT_TEXT_LENGTH : DEFAULT_TEXTAREA_LENGTH,
     isActive: bool(row.is_active, true),
-    options: list(row.options).map(mapOption).filter((o): o is PersonalizationOption => o !== null),
+    options,
     persisted: true,
   };
 }
@@ -71,7 +76,10 @@ export function mapPersonalization(payload: unknown): PersonalizationField[] | n
   const fields = obj(obj(payload)?.data)?.fields;
   if (!Array.isArray(fields)) return null;
 
-  return fields.map(mapField).filter((f): f is PersonalizationField => f !== null);
+  // صفٌّ لا نفهمه (نوعٌ جديد من خادم أحدث مثلاً) يُفشل التحميل: حذفه بصمت ثم حفظ المجموعة كاملةً يمحوه من الخادم.
+  const mapped = fields.map(mapField);
+
+  return mapped.every((f): f is PersonalizationField => f !== null) ? mapped : null;
 }
 
 /** القائمة + بصمتها (`revision`) كما أعادهما الخادم؛ البصمة تُعاد عند الحفظ فيرفض الخادم الاستبدال القديم داخل القفل. */
@@ -191,9 +199,9 @@ export function validateField(field: PersonalizationField, others: readonly Pers
 
   const label = field.label.trim();
   if (label === '') errors.push({ field: 'label', code: 'required' });
-  else if (label.length > MAX_LABEL_LENGTH) errors.push({ field: 'label', code: 'tooLong' });
-  if (field.labelEn.trim().length > MAX_LABEL_LENGTH) errors.push({ field: 'labelEn', code: 'tooLong' });
-  if (field.helpText.trim().length > MAX_HELP_LENGTH) errors.push({ field: 'helpText', code: 'tooLong' });
+  else if (charCount(label) > MAX_LABEL_LENGTH) errors.push({ field: 'label', code: 'tooLong' });
+  if (charCount(field.labelEn.trim()) > MAX_LABEL_LENGTH) errors.push({ field: 'labelEn', code: 'tooLong' });
+  if (charCount(field.helpText.trim()) > MAX_HELP_LENGTH) errors.push({ field: 'helpText', code: 'tooLong' });
 
   if (field.type !== 'select') {
     const max = field.maxLength;
@@ -206,8 +214,8 @@ export function validateField(field: PersonalizationField, others: readonly Pers
       else if (field.options.findIndex((o) => o.valueKey === option.valueKey) !== index) errors.push({ field: 'optionKey', code: 'duplicate', index });
       const optionLabel = option.label.trim();
       if (optionLabel === '') errors.push({ field: 'optionLabel', code: 'required', index });
-      else if (optionLabel.length > MAX_LABEL_LENGTH) errors.push({ field: 'optionLabel', code: 'tooLong', index });
-      if (option.labelEn.trim().length > MAX_LABEL_LENGTH) errors.push({ field: 'optionLabelEn', code: 'tooLong', index });
+      else if (charCount(optionLabel) > MAX_LABEL_LENGTH) errors.push({ field: 'optionLabel', code: 'tooLong', index });
+      if (charCount(option.labelEn.trim()) > MAX_LABEL_LENGTH) errors.push({ field: 'optionLabelEn', code: 'tooLong', index });
     });
   }
 

@@ -47,10 +47,21 @@ describe('personalization client', () => {
     expect(ribbon.options.map((o) => [o.valueKey, o.isActive, o.labelEn])).toEqual([['red', true, 'Red'], ['gold', false, '']]);
   });
 
-  it('drops rows with unknown types instead of inventing support (e.g. an upload field)', () => {
+  it('fails the load on a row it does not understand instead of dropping it (a whole-set save would delete it server-side)', () => {
     const body = { data: { fields: [{ key: 'photo', type: 'file', label: 'x' }, { key: 'ok', type: 'text', label: 'ok' }] } };
-    expect(mapPersonalization(body)!.map((f) => f.key)).toEqual(['ok']);
+    expect(mapPersonalization(body)).toBeNull();
+    const badOption = { data: { fields: [{ key: 'r', type: 'select', label: 'r', options: [{ value_key: 'a', label: 'A' }, { nope: true }] }] } };
+    expect(mapPersonalization(badOption)).toBeNull();
     expect(mapPersonalization({ data: {} })).toBeNull();
+    expect(mapPersonalization({ data: { fields: [{ key: 'ok', type: 'text', label: 'ok' }] } })!.map((f) => f.key)).toEqual(['ok']);
+  });
+
+  it('counts Unicode characters like the server: 61 emoji is 61 characters, not 122 UTF-16 units', () => {
+    const [name, ribbon] = fields();
+    const emoji = (n: number) => '🌹'.repeat(n);
+    expect(validateField({ ...name, label: emoji(61), labelEn: emoji(120), helpText: emoji(200) }, [])).toEqual([]);
+    expect(validateField({ ...name, label: emoji(121) }, [])).toContainEqual({ field: 'label', code: 'tooLong' });
+    expect(validateField({ ...ribbon, options: [{ ...ribbon.options[0], label: emoji(120), labelEn: emoji(120) }] }, [])).toEqual([]);
   });
 
   it('builds the payload: select has options and no max_length, text has max_length and no options, blanks → null', () => {

@@ -12,8 +12,6 @@ import { cn } from '@/lib/utils';
 import type { FlowersAdminMessageKey, FlowersAdminT } from '../messages';
 import {
   FIELD_TYPES,
-  MAX_HELP_LENGTH,
-  MAX_LABEL_LENGTH,
   MAX_LENGTH_CEILING,
   MAX_OPTIONS,
   changeType,
@@ -121,7 +119,6 @@ export function PersonalizationFieldDialog({
             ref={firstField}
             value={draft.label}
             disabled={readOnly}
-            maxLength={MAX_LABEL_LENGTH + 20}
             aria-required
             aria-invalid={err('label') !== null}
             aria-describedby={err('label') ? id('label-error') : id('label-hint')}
@@ -144,7 +141,6 @@ export function PersonalizationFieldDialog({
             rows={2}
             value={draft.helpText}
             disabled={readOnly}
-            maxLength={MAX_HELP_LENGTH + 40}
             aria-invalid={err('helpText') !== null}
             aria-describedby={id('help-hint')}
             onChange={(e) => patch({ helpText: e.target.value })}
