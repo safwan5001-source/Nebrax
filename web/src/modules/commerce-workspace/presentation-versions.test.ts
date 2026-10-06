@@ -282,6 +282,24 @@ describe('commerce workspace presentation-versions API client', () => {
     });
   });
 
+  it('carries the publish-gate path ⇒ code map from a 422 (CUST-HV V3), and nothing from other statuses', async () => {
+    const body = {
+      code: 'publish_validation_failed',
+      error_codes: { 'announcements.items[0].window.endsAt': 'window_end_not_after_start', bad: 7 },
+    };
+    apiMock.mockRejectedValueOnce(new ApiError(422, 'تعذّر نشر التصميم', body));
+    expect(await publishPresentationVersion('store-1', 'v1', 1, null, null)).toEqual({
+      ok: false,
+      reason: 'validation',
+      message: 'تعذّر نشر التصميم',
+      issues: { 'announcements.items[0].window.endsAt': 'window_end_not_after_start' },
+    });
+
+    apiMock.mockRejectedValueOnce(new ApiError(422, 'x', { error_codes: ['a'] }));
+    const plain = await publishPresentationVersion('store-1', 'v1', 1, null, null);
+    expect(plain).toEqual({ ok: false, reason: 'validation', message: 'x' });
+  });
+
   it('classifies publish 409s by the server message: forward-schema, scheduled, and stale', async () => {
     apiMock.mockRejectedValueOnce(new ApiError(409, 'إصدار المستند أحدث مما يدعمه الخادم الحالي.', {}));
     expect(await publishPresentationVersion('store-1', 'v1', 1, null, null)).toEqual({

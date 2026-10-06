@@ -88,9 +88,16 @@ export type PresentationVersionDetail = PresentationVersionSummary & {
   config: StorefrontPresentationConfig;
 };
 
+/**
+ * CUST-HV V3 — path ⇒ stable code of every publish-gate rejection
+ * (`announcements.items[2].window.endsAt` ⇒ `window_end_not_after_start`), read
+ * from a 422 `error_codes` map. Present only when the server sent one.
+ */
+export type PublishValidationIssues = Record<string, string>;
+
 type Failure<TReason extends string> =
-  | { ok: false; reason: TReason; message: string }
-  | { ok: false; reason: 'forbidden' | 'failed'; message: string };
+  | { ok: false; reason: TReason; message: string; issues?: PublishValidationIssues }
+  | { ok: false; reason: 'forbidden' | 'failed'; message: string; issues?: PublishValidationIssues };
 
 export type VersionListOutcome =
   | { ok: true; data: PresentationVersionSummary[] }
@@ -262,7 +269,7 @@ export async function publishPresentationVersion(
     if (data === null) return { ok: false, reason: 'failed', message: 'invalid_payload' };
     return { ok: true, data };
   } catch (error) {
-    return { ok: false, reason: classifyPublishFailure(error), message: errorMessage(error, 'publish_failed') };
+    return { ok: false, reason: classifyPublishFailure(error), message: errorMessage(error, 'publish_failed'), ...issuesOf(error) };
   }
 }
 
@@ -298,7 +305,7 @@ export async function schedulePresentationVersion(
     if (data === null) return { ok: false, reason: 'failed', message: 'invalid_payload' };
     return { ok: true, data };
   } catch (error) {
-    return { ok: false, reason: classifyScheduleFailure(error), message: errorMessage(error, 'schedule_failed') };
+    return { ok: false, reason: classifyScheduleFailure(error), message: errorMessage(error, 'schedule_failed'), ...issuesOf(error) };
   }
 }
 
@@ -506,6 +513,19 @@ function classifyCancelScheduleFailure(
   if (hasApiStatus(error, 403)) return 'forbidden';
   if (hasApiStatus(error, 404)) return 'not_found';
   return 'failed';
+}
+
+function issuesOf(error: unknown): { issues?: PublishValidationIssues } {
+  if (!hasApiStatus(error, 422)) return {};
+  const body = (error as { body?: unknown }).body;
+  const codes =
+    typeof body === 'object' && body !== null ? (body as { error_codes?: unknown }).error_codes : undefined;
+  if (typeof codes !== 'object' || codes === null || Array.isArray(codes)) return {};
+  const issues: PublishValidationIssues = {};
+  for (const [path, code] of Object.entries(codes)) {
+    if (typeof code === 'string') issues[path] = code;
+  }
+  return Object.keys(issues).length > 0 ? { issues } : {};
 }
 
 function errorMessage(error: unknown, fallback: string): string {

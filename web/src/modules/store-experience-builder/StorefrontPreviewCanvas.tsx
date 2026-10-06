@@ -1,5 +1,10 @@
 "use client";
 
+import {
+  ANNOUNCEMENT_PREVIEW_HEIGHT,
+  AnnouncementPreview,
+  announcementBarVisible,
+} from "./AnnouncementPreview";
 import { Eye, Home, LayoutGrid, Search, ShoppingBag, User } from "lucide-react";
 import type { CSSProperties, ReactNode } from "react";
 import { OfficialStoreBadge } from "./OfficialStoreBadge";
@@ -201,7 +206,8 @@ export type PreviewChromeTarget =
   | "branding"
   | "footer"
   | "whatsapp"
-  | "social";
+  | "social"
+  | "announcements";
 
 export function StorefrontPreviewCanvas({
   config,
@@ -381,7 +387,23 @@ export function StorefrontPreviewCanvas({
     >
       <p className="sr-only">{t("fixtureCatalogHint")}</p>
 
+      <AnnouncementPreview
+        doc={config.announcements}
+        page={page}
+        locale={locale}
+        selected={selectedChrome === "announcements"}
+        onSelect={
+          onSelectChrome ? () => onSelectChrome("announcements") : undefined
+        }
+      />
+
       <header
+        style={
+          config.announcements?.behaviour?.sticky &&
+          announcementBarVisible(config.announcements)
+            ? { top: ANNOUNCEMENT_PREVIEW_HEIGHT }
+            : undefined
+        }
         className={cn(
           "sticky top-0 z-20 bg-store-surface",
           onSelectChrome && "awj-preview-section",

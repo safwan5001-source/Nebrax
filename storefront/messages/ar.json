@@ -55,6 +55,15 @@
     "skipToContent": "تخطي إلى المحتوى",
     "submitSearch": "بحث"
   },
+  "announcements": {
+    "region": "الإعلانات",
+    "previous": "الإعلان السابق",
+    "next": "الإعلان التالي",
+    "pause": "إيقاف الإعلانات مؤقتاً",
+    "play": "استئناف الإعلانات",
+    "dismiss": "إغلاق الإعلان",
+    "position": "الإعلان {current} من {total}"
+  },
   "regionPreferences": {
     "title": "المنطقة واللغة",
     "description": "اختر منطقتك ولغتك. تُحدَّد العملة تبعاً للمنطقة المختارة.",

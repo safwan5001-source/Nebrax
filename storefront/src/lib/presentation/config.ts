@@ -1,3 +1,4 @@
+import { type AnnouncementsDoc, normalizeAnnouncements } from "./announcements";
 import {
   normalizePagePresentation,
   type PagePresentation,
@@ -164,6 +165,11 @@ export interface StorefrontPresentationConfig {
    * Version normalizes without this key, byte-identically to before.
    */
   pagePresentation?: PagePresentation;
+  /**
+   * CUST-HV V3 — additive, optional announcement bar (contract §12). Absent =
+   * no bar; pre-V3 documents normalize without this key, byte-identically.
+   */
+  announcements?: AnnouncementsDoc;
 }
 
 const NAV_KINDS: NavLinkKind[] = [
@@ -473,6 +479,7 @@ export function normalizePresentationConfig(
   const iosUrl = asString(appsRaw.iosUrl);
   const androidUrl = asString(appsRaw.androidUrl);
   const pagePresentation = normalizePagePresentation(raw.pagePresentation);
+  const announcements = normalizeAnnouncements(raw.announcements);
 
   return {
     version: PRESENTATION_CONFIG_VERSION,
@@ -572,6 +579,7 @@ export function normalizePresentationConfig(
           .filter((page): page is PresentationContentPage => Boolean(page))
       : DEFAULT_PRESENTATION_CONFIG.pages.map((page) => ({ ...page })),
     ...(pagePresentation ? { pagePresentation } : {}),
+    ...(announcements ? { announcements } : {}),
   };
 }
 

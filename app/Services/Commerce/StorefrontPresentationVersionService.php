@@ -7,6 +7,7 @@ use App\Models\StorefrontPresentation;
 use App\Models\StorefrontPresentationVersion;
 use App\Support\Commerce\SchedulePublicationTokenCodec;
 use App\Support\Commerce\StorefrontPresentationNormalizer;
+use App\Support\Commerce\StorefrontPresentationPublishValidator;
 use App\Tenancy\TenantContext;
 use App\Tenancy\TenantScope;
 use Illuminate\Database\QueryException;
@@ -47,10 +48,22 @@ final class StorefrontPresentationVersionService
     /** CUST-H1-4 — مخطط الهدف أحدث مما يدعمه الخادم الحالي — فشلٌ آمن قابل للتشخيص/إعادة المحاولة. */
     public const OUTCOME_FORWARD_SCHEMA_REJECTED = 'forward_schema_rejected';
 
+    /**
+     * CUST-HV V3 — الوثيقة لا تجتاز بوابة النشر (نافذة إعلان مشوَّهة، تباين…).
+     * فشلٌ مغلق: النشر السابق يبقى كما هو، والجدولة تبقى قائمة قابلة للتشخيص
+     * (نفس ضمانة H1 لـ`OUTCOME_FORWARD_SCHEMA_REJECTED`).
+     */
+    public const OUTCOME_VALIDATION_REJECTED = 'validation_rejected';
+
+    private readonly StorefrontPresentationPublishValidator $publishValidator;
+
     public function __construct(
         private readonly StorefrontPresentationNormalizer $normalizer,
         private readonly SchedulePublicationTokenCodec $tokenCodec,
-    ) {}
+        ?StorefrontPresentationPublishValidator $publishValidator = null,
+    ) {
+        $this->publishValidator = $publishValidator ?? new StorefrontPresentationPublishValidator;
+    }
 
     /** @return list<array<string, mixed>>|null */
     public function listForCurrentTenant(string $storefrontId): ?array
@@ -299,6 +312,7 @@ final class StorefrontPresentationVersionService
 
             $normalized = $this->normalizer->normalize($version->config, (int) $version->schema_version);
             $this->assertStoredSize($normalized);
+            $this->publishValidator->assertPublishable($normalized);
 
             // بنية Version لا تعرف كاتباً قديماً يتجاوز هذا المسار (خلافاً
             // للرأس المتوافق) — عمود `schema_version` يعكس المستند المخزَّن
@@ -429,6 +443,14 @@ final class StorefrontPresentationVersionService
             }
 
             $scheduledFor = $this->parseFutureScheduleTime($scheduledForIso);
+
+            // تحقّق وقت الجدولة (CUST-HV V3): لا تُجدوَل وثيقةٌ سيرفضها النشر لاحقاً
+            // — يعرف التاجر الآن لا بعد منتصف الليل. (المخطط الأحدث يُترك لفحصه عند التنفيذ.)
+            if ((int) $version->schema_version <= StorefrontPresentationNormalizer::VERSION) {
+                $this->publishValidator->assertPublishable(
+                    $this->normalizer->normalize($version->config, (int) $version->schema_version),
+                );
+            }
 
             if ($previous !== null) {
                 $previous->forceFill([
@@ -573,6 +595,11 @@ final class StorefrontPresentationVersionService
 
                 $normalized = $this->normalizer->normalize($version->config, (int) $version->schema_version);
                 $this->assertStoredSize($normalized);
+
+                // فشلٌ مغلق (V3): وثيقةٌ لا تجتاز بوابة النشر لا تحلّ محلّ المنشور.
+                if ($this->publishValidator->errors($normalized) !== []) {
+                    return self::OUTCOME_VALIDATION_REJECTED;
+                }
 
                 if (
                     (int) $version->schema_version !== StorefrontPresentationNormalizer::VERSION

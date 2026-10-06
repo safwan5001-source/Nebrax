@@ -1,5 +1,6 @@
 "use client";
 
+import { describePublishIssues } from "./announcement-status";
 import type { ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 import { CalendarClock, ExternalLink, MoreHorizontal, RotateCcw } from "lucide-react";
@@ -1711,7 +1712,10 @@ export function ExperienceBuilder({
       if (storefrontIdRef.current !== originStorefrontId || !isLatestWrite) return;
       setNoticeKind("status");
       setNotice(
-        result.reason === "scheduled_conflict"
+        (result.reason === "validation" && result.issues
+          ? describePublishIssues(result.issues, t)
+          : null) ??
+        (result.reason === "scheduled_conflict"
           ? t("versionPublishScheduledConflict")
           : result.reason === "unsupported_schema"
             ? t("versionPublishUnsupportedSchema")
@@ -1721,7 +1725,7 @@ export function ExperienceBuilder({
                 ? t("versionPublishNotFound")
                 : result.reason === "stale"
                   ? t("versionPublishStaleConflict")
-                  : t("versionPublishFailed"),
+                  : t("versionPublishFailed")),
       );
       return;
     }
@@ -1818,7 +1822,10 @@ export function ExperienceBuilder({
       if (storefrontIdRef.current !== originStorefrontId || !isLatestWrite) return;
       setNoticeKind("status");
       setNotice(
-        result.reason === "stale_token"
+        (result.reason === "validation" && result.issues
+          ? describePublishIssues(result.issues, t)
+          : null) ??
+        (result.reason === "stale_token"
           ? t("versionScheduleStaleToken")
           : result.reason === "active_conflict"
             ? t("versionScheduleActiveConflict")
@@ -1828,7 +1835,7 @@ export function ExperienceBuilder({
                 ? t("versionScheduleNotFound")
                 : result.reason === "stale_revision"
                   ? t("versionScheduleStaleRevision")
-                  : t("versionScheduleFailed"),
+                  : t("versionScheduleFailed")),
       );
       return;
     }
@@ -2126,6 +2133,7 @@ export function ExperienceBuilder({
           liveStoreName={liveStoreName}
           businessIdentity={businessIdentity}
           onChange={updateDraft}
+          timezone={tenantTimezone}
           selectedSection={selectedSection}
           onSelectSection={(id) => handleSelectSection(id, "sidebar")}
           isMobileViewport={isMobileViewport}
@@ -2198,12 +2206,16 @@ export function ExperienceBuilder({
     }
     return (
       <ControlPanels
+        // A different version is a different document: panel-local state (window
+        // inputs, open accordion) must never carry over from the previous one.
+        key={selectedVersion.id}
         panel={panelForSlot}
         config={draft}
         locale={locale}
         liveStoreName={liveStoreName}
         businessIdentity={businessIdentity}
         onChange={updateDraft}
+        timezone={tenantTimezone}
         selectedSection={selectedSection}
         onSelectSection={(id) => handleSelectSection(id, "sidebar")}
         isMobileViewport={isMobileViewport}
@@ -3068,8 +3080,32 @@ export function ExperienceBuilder({
                 renderInspectorBody(
                   currentPage === "product" ? "product" : currentPage === "category" ? "category" : "homepage",
                 )
+              ) : mobileSheet === "design" ? (
+                <div className="space-y-4">
+                  {/* CUST-HV V3 — the phone "Design" sheet used to be the Theme
+                      panel and nothing else, so every other panel (including
+                      Announcements, which has no Canvas element to tap until it
+                      is switched on) was unreachable below 768px. Same select
+                      the dormant edit pane already carries — no new IA. */}
+                  <select
+                    aria-label={t("controls")}
+                    data-design-panel-select=""
+                    value={panel}
+                    onChange={(event) =>
+                      setPanel(event.target.value as CustomizerPanel)
+                    }
+                    className="h-11 w-full border border-border bg-surface px-3 text-sm font-medium text-text outline-none focus:border-primary"
+                  >
+                    {visiblePanels.map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {t(item.label)}
+                      </option>
+                    ))}
+                  </select>
+                  {renderInspectorBody(panel)}
+                </div>
               ) : (
-                renderInspectorBody(mobileSheet === "design" ? "theme" : panel)
+                renderInspectorBody(panel)
               )}
             </div>
           </section>
@@ -3355,6 +3391,12 @@ function NavIcon({ panel }: { panel: CustomizerPanel }) {
         <circle cx="6" cy="6" r="2.25" />
         <circle cx="11" cy="5.5" r="1.75" />
         <circle cx="9.5" cy="11" r="2" />
+      </svg>
+    ),
+    announcements: (
+      <svg {...common}>
+        <rect x="2.5" y="3" width="11" height="3.5" />
+        <path d="M2.5 9.5h11M2.5 12.5h7" />
       </svg>
     ),
     branding: (

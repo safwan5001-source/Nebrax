@@ -128,6 +128,31 @@ final class StorefrontPresentationNormalizer
 
     public const NAV_KINDS = ['home', 'category', 'product', 'content', 'external'];
 
+    /**
+     * CUST-HV V3 — شريط الإعلانات (`announcements`, العقد §12). مفتاح اختياري
+     * إضافي بحت: الغياب = لا شريط، ولا يُكتب كياناً فارغاً (نفس قاعدة
+     * `pagePresentation`). الإصدار يبقى 3.
+     *
+     * سجلّ الأيقونات هنا **أصل** السجلّ المنتقى المشترك (V0 §11.4) — V7 يوسّعه،
+     * ولا يغيّر مفتاحاً موجوداً. الألوان: `{hex}` صلبة فقط الآن؛ أدوار اللوحة
+     * والتدرّجات تأتي مع V5 (محرّك التباين العام) فتُسقط هنا fail-closed.
+     */
+    public const ANNOUNCEMENT_MAX_ITEMS = 5;
+
+    public const ANNOUNCEMENT_TEXT_MAX = 120;
+
+    public const ANNOUNCEMENT_ICONS = [
+        'megaphone', 'bell', 'info', 'tag', 'percent', 'truck', 'gift', 'clock', 'star', 'heart', 'sparkles', 'shield-check',
+    ];
+
+    public const ANNOUNCEMENT_PAGES = ['home', 'product', 'category', 'all'];
+
+    public const ANNOUNCEMENT_ROTATE_INTERVALS = [6, 8, 10];
+
+    public const ANNOUNCEMENT_DEFAULT_ROTATE_INTERVAL = 8;
+
+    public const ANNOUNCEMENT_TICKER_SPEEDS = ['slow', 'normal', 'fast'];
+
     public const WHATSAPP_PLACEMENTS = ['floating', 'footer', 'both'];
 
     public const SOCIAL_NETWORKS = [
@@ -358,6 +383,7 @@ final class StorefrontPresentationNormalizer
         $iosUrl = $this->asString($appsRaw['iosUrl'] ?? null);
         $androidUrl = $this->asString($appsRaw['androidUrl'] ?? null);
         $pagePresentation = $this->normalizePagePresentation($input['pagePresentation'] ?? null);
+        $announcements = $this->normalizeAnnouncements($input['announcements'] ?? null);
 
         $config = [
             'version' => self::VERSION,
@@ -433,6 +459,10 @@ final class StorefrontPresentationNormalizer
 
         if ($pagePresentation !== null) {
             $config['pagePresentation'] = $pagePresentation;
+        }
+
+        if ($announcements !== null) {
+            $config['announcements'] = $announcements;
         }
 
         return $config;
@@ -935,6 +965,192 @@ final class StorefrontPresentationNormalizer
         }
 
         return $pages;
+    }
+
+    /**
+     * CUST-HV V3 — يطبّع `announcements` (العقد §12.1). `null` = غياب: لا شريط
+     * ولا كيان فارغ. كل حقل غير صالح يُسقط إلى «غير مضبوط» (لا إلى قيمة ظاهرة)،
+     * **عدا `window`**: التاريخ المشوَّه يُحفظ حرفياً كما أدخله التاجر
+     * (AMEND-7 — لا يُحوَّل أبداً إلى «بلا نافذة» فيصير الإعلان أكثر ظهوراً)،
+     * ويُرفض عند النشر (`StorefrontPresentationPublishValidator`).
+     *
+     * @return array<string, mixed>|null
+     */
+    private function normalizeAnnouncements(mixed $raw): ?array
+    {
+        if (! is_array($raw) || $this->isList($raw)) {
+            return null;
+        }
+
+        $items = [];
+        $seen = [];
+        $index = 0;
+        foreach (is_array($raw['items'] ?? null) ? array_values($raw['items']) : [] as $rawItem) {
+            if (! is_array($rawItem) || array_is_list($rawItem)) {
+                continue;
+            }
+            $item = $this->normalizeAnnouncementItem($rawItem, $index);
+            $index++;
+            if (isset($seen[$item['id']])) {
+                continue; // أول ورود يكسب عند تكرار المعرّف.
+            }
+            $seen[$item['id']] = true;
+            $items[] = $item;
+            if (count($items) >= self::ANNOUNCEMENT_MAX_ITEMS) {
+                break;
+            }
+        }
+
+        $behaviour = $this->normalizeAnnouncementBehaviour($this->object($raw['behaviour'] ?? null));
+        $enabled = $this->asBoolean($raw['enabled'] ?? null, false);
+
+        if (! $enabled && $items === [] && $behaviour === []) {
+            return null;
+        }
+
+        $out = ['enabled' => $enabled, 'items' => $items];
+        if ($behaviour !== []) {
+            $out['behaviour'] = $behaviour;
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param  array<string, mixed>  $raw
+     * @return array<string, mixed>
+     */
+    private function normalizeAnnouncementItem(array $raw, int $index): array
+    {
+        $text = preg_replace('/\p{Cc}+/u', ' ', $this->asString($raw['text'] ?? null)) ?? '';
+        $item = [
+            'id' => $this->safeId($raw['id'] ?? null, 'ann-'.$index),
+            'text' => mb_substr(trim($text), 0, self::ANNOUNCEMENT_TEXT_MAX),
+            'enabled' => $this->asBoolean($raw['enabled'] ?? null, true),
+        ];
+
+        $icon = $raw['icon'] ?? null;
+        if (is_string($icon) && in_array($icon, self::ANNOUNCEMENT_ICONS, true)) {
+            $item['icon'] = $icon;
+        }
+
+        $href = $this->announcementHref($this->asString($raw['href'] ?? null));
+        if ($href !== null) {
+            $item['href'] = $href;
+        }
+
+        $surface = $this->normalizeAnnouncementSurface($this->object($raw['surface'] ?? null));
+        if ($surface !== []) {
+            $item['surface'] = $surface;
+        }
+
+        $window = $this->object($raw['window'] ?? null);
+        $keptWindow = [];
+        foreach (['startsAt', 'endsAt'] as $edge) {
+            $value = is_string($window[$edge] ?? null) ? mb_substr(trim($window[$edge]), 0, 40) : '';
+            if ($value !== '') {
+                $keptWindow[$edge] = $value;
+            }
+        }
+        if ($keptWindow !== []) {
+            $item['window'] = $keptWindow;
+        }
+
+        $pages = [];
+        foreach (is_array($raw['pages'] ?? null) ? array_values($raw['pages']) : [] as $page) {
+            if (is_string($page) && in_array($page, self::ANNOUNCEMENT_PAGES, true) && ! in_array($page, $pages, true)) {
+                $pages[] = $page;
+            }
+        }
+        if ($pages !== []) {
+            // «الكل» يغني عن غيره؛ الغياب يعني الكل أيضاً فلا يُخزَّن.
+            $pages = in_array('all', $pages, true) ? ['all'] : array_values(array_intersect(self::ANNOUNCEMENT_PAGES, $pages));
+            if ($pages !== ['all']) {
+                $item['pages'] = $pages;
+            }
+        }
+
+        return $item;
+    }
+
+    /** رابط داخلي (`/path`) أو https خارجي آمن؛ غير ذلك يُسقط. */
+    private function announcementHref(string $value): ?string
+    {
+        $value = trim($value);
+        if ($value === '' || mb_strlen($value) > 240) {
+            return null;
+        }
+        if (str_starts_with($value, '/')) {
+            return preg_match('#^/(?!/)[A-Za-z0-9\-._~!$&()*+,;=:@%/?\#\[\]]*$#', $value) === 1 ? $value : null;
+        }
+
+        return $this->sanitizeExternalUrl($value);
+    }
+
+    /**
+     * ألوان صلبة فقط (`{hex}`). النص/الرابط لا يُحفظان بلا خلفية مخصَّصة: اللون
+     * الأمامي حينها «تلقائي» (يُحسب أسود/أبيض بأعلى تباين) فلا يُنتَج زوج
+     * غير مُثبَت التباين على سطح الثيم.
+     *
+     * @param  array<string, mixed>  $raw
+     * @return array<string, array{hex: string}>
+     */
+    private function normalizeAnnouncementSurface(array $raw): array
+    {
+        $colour = function (mixed $value): ?array {
+            $hex = is_array($value) && is_string($value['hex'] ?? null) ? trim($value['hex']) : '';
+
+            return $this->isSafeHexColor($hex) ? ['hex' => strtolower($hex)] : null;
+        };
+
+        $background = $colour($raw['background'] ?? null);
+        if ($background === null) {
+            return [];
+        }
+        $surface = ['background' => $background];
+        foreach (['text', 'link'] as $role) {
+            $value = $colour($raw[$role] ?? null);
+            if ($value !== null) {
+                $surface[$role] = $value;
+            }
+        }
+
+        return $surface;
+    }
+
+    /**
+     * @param  array<string, mixed>  $raw
+     * @return array<string, mixed>
+     */
+    private function normalizeAnnouncementBehaviour(array $raw): array
+    {
+        $out = [];
+        $ticker = $this->asBoolean($raw['ticker'] ?? null, false);
+        // الشريط المتحرك يستبعد التدوير (سطرٌ يجري لا يُدوَّر) — مصدر وحيد للقاعدة.
+        $rotate = ! $ticker && $this->asBoolean($raw['rotate'] ?? null, false);
+
+        if ($rotate) {
+            $out['rotate'] = true;
+            $interval = $raw['rotateInterval'] ?? null;
+            if (is_int($interval) && in_array($interval, self::ANNOUNCEMENT_ROTATE_INTERVALS, true)
+                && $interval !== self::ANNOUNCEMENT_DEFAULT_ROTATE_INTERVAL) {
+                $out['rotateInterval'] = $interval;
+            }
+        }
+        if ($ticker) {
+            $out['ticker'] = true;
+            $speed = $raw['tickerSpeed'] ?? null;
+            if (is_string($speed) && in_array($speed, self::ANNOUNCEMENT_TICKER_SPEEDS, true) && $speed !== 'normal') {
+                $out['tickerSpeed'] = $speed;
+            }
+        }
+        foreach (['sticky', 'dismissible'] as $flag) {
+            if ($this->asBoolean($raw[$flag] ?? null, false)) {
+                $out[$flag] = true;
+            }
+        }
+
+        return $out;
     }
 
     /**
