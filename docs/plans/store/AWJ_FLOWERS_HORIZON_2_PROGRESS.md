@@ -1,6 +1,6 @@
 # AWJ Flowers & Gifts — Horizon 2 Progress
 
-**Status:** IN PROGRESS — H2-1…H2-11 merged; H2-12 in review  
+**Status:** IN PROGRESS — H2-1…H2-12 merged; H2-13 in review  
 **Date:** 2026-10-04  
 **Planning Base:** `main` @ `6ded662bfada8f72f5ebf321dcf27b08be7939c1`  
 **Execution Base (H2-1):** `main` @ `afe223cb654154fa55234ff2e360233bbc933ec3`  
@@ -37,8 +37,8 @@ Horizon 1 is complete.
 | H2-9 | Structured Product Content Admin | MERGED | #1249 | `f8ec475` |
 | H2-10 | Unified Product Gifting Workspace | MERGED | #1250 | `4a22e81` |
 | H2-11 | Vertical Setup Center V2 | MERGED | #1251 | `df85e5a` |
-| H2-12 | Merchant Onboarding Flow | PR OPEN | (see log) | — |
-| H2-13 | Permissions / RBAC / Tenant Isolation Pass | NOT STARTED | — | — |
+| H2-12 | Merchant Onboarding Flow | MERGED | #1253 | `95bc96d` |
+| H2-13 | Permissions / RBAC / Tenant Isolation Pass | PR OPEN | (see log) | — |
 | H2-14 | Admin UX / RTL / Mobile Polish | NOT STARTED | — | — |
 | H2-15 | Real Merchant Journey Contract | NOT STARTED | — | — |
 | H2-16 | Cross-Horizon Integration & Final Report | NOT STARTED | — | — |
@@ -501,10 +501,12 @@ A UI slice is not complete until its progress entry records:
 
 ### H2-12 — Merchant Onboarding Flow
 
-**Status:** PR OPEN  
+**Status:** MERGED  
 **Base SHA:** `df85e5a75af37bce171388b2f554b9cf670630fd` (H2-11 merged)  
 **Branch:** `flowers/h2-12-merchant-onboarding`  
-**PR / Head / Merge SHA:** recorded in the next slice's ledger update after merge
+**PR:** #1253  
+**Head SHA:** `9977090`  
+**Merge SHA:** `95bc96d9837537b74b0354195942f0afeed9cb2b` (squash)
 
 #### Contract / scope
 - Frontend-only. A guided, resumable walk through the same capabilities and order as the setup center. **No stored state**: steps and their status are derived from the real configuration (`useSetupState`, shared with H2-11); the position lives in the URL (`?step=`), so coming back from another screen — or tomorrow — resumes from the actual state (first incomplete step when no step is requested). Skipping is always allowed: a skipped step stays "not configured" and nothing is enabled automatically.
@@ -521,11 +523,48 @@ A UI slice is not complete until its progress entry records:
 #### Backward compatibility
 - Additive page; nothing existing changes besides the entry link in the setup center.
 
+#### Review / CI
+- Codex had reached its usage limit, so CI was the only automated gate (self-review of the diff: direction-aware chevrons verified for RTL/LTR; position is URL-only state). Merged on a fully green head (sqlite, pgsql, web; both runs).
+
 #### Deployment observation
 - Manual deploy: NOT PERFORMED; production verification: NOT PERFORMED.
 
 #### Next
 - H2-13 — Permissions / RBAC / Tenant Isolation Pass.
+
+---
+
+### H2-13 — Permissions / RBAC / Tenant Isolation Pass
+
+**Status:** PR OPEN  
+**Base SHA:** `95bc96d9837537b74b0354195942f0afeed9cb2b` (H2-12 merged)  
+**Branch:** `flowers/h2-13-access-isolation-pass`  
+**PR / Head / Merge SHA:** recorded in the next slice's ledger update after merge
+
+#### Contract / scope
+- Test-only (no product code change): one unified access matrix — `tests/Feature/FlowersMerchantAdminAccessMatrixTest.php` — over **every** admin route the Horizon 2 screens consume. The UI-side half of this pass (the capability read is gated on `commerce.manage`; no request and no tab without it) already shipped with H2-6 and is exercised by its tests.
+
+#### What the matrix proves
+- **Store routes** (`storefronts/{id}/…`: gift settings, delivery schedule settings/slots/blocked dates, fulfilment, vertical setup + starters — 11 method/path pairs): `commerce.manage` for read **and** write; every non-owner role without it (accountant, staff, self-service) ⇒ 403; guest ⇒ 401.
+- **Product routes** (`products/{id}/…`: preparation, personalization, add-ons, content): `products.view` reads, `products.manage` writes — staff reads but cannot write (403); accountant (holds `products.manage`) can; self-service and guests denied.
+- **Tenant isolation**: a foreign tenant's store or product answers a **non-revealing 404** on every route and method, writes nothing, and the other tenant's own data is untouched; a non-UUID id is also 404.
+- **Add-ons cross-tenant**: referencing another tenant's product is rejected (422) and the rejected save writes nothing.
+- **Route-inventory guard**: `every_registered_admin_route_is_covered_by_the_matrix` fails the build if a Flowers admin route is added or removed without updating the matrix — so a new route cannot ship without a permission guard and an isolation check.
+
+#### Tests
+- 6 tests / 108 assertions (sqlite and pgsql in CI).
+
+#### Tenant Isolation / RBAC
+- This slice *is* the verification; no gaps were found, so no product code changed.
+
+#### Backward compatibility
+- None affected (test-only).
+
+#### Deployment observation
+- Manual deploy: NOT PERFORMED; production verification: NOT PERFORMED.
+
+#### Next
+- H2-14 — Admin UX / RTL / Mobile Polish.
 
 ---
 
