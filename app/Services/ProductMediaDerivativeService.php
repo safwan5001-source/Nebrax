@@ -80,9 +80,9 @@ final class ProductMediaDerivativeService
             $image->orient()->scaleDown(width: $maxDimension, height: $maxDimension);
 
             $encoded = match ($format['mime_type']) {
-                'image/jpeg' => $image->toJpeg(quality: 85),
-                'image/png' => $image->toPng(),
-                'image/webp' => $image->toWebp(quality: 82),
+                'image/jpeg' => $image->encodeUsingMediaType('image/jpeg', 85),
+                'image/png' => $image->encodeUsingMediaType('image/png'),
+                'image/webp' => $image->encodeUsingMediaType('image/webp', 82),
             };
 
             $store($name, (string) $encoded, $format['mime_type']);
