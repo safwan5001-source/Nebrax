@@ -1,6 +1,6 @@
 # AWJ Flowers & Gifts — Horizon 2 Progress
 
-**Status:** COMPLETE — H2-1…H2-15 merged; H2-16 final report in review  
+**Status:** COMPLETE — H2-1…H2-16 merged (Horizon 2 closed)  
 **Date:** 2026-10-04  
 **Planning Base:** `main` @ `6ded662bfada8f72f5ebf321dcf27b08be7939c1`  
 **Execution Base (H2-1):** `main` @ `afe223cb654154fa55234ff2e360233bbc933ec3`  
@@ -41,7 +41,7 @@ Horizon 1 is complete.
 | H2-13 | Permissions / RBAC / Tenant Isolation Pass | MERGED | #1254 | `ed5ce4e` |
 | H2-14 | Admin UX / RTL / Mobile Polish | MERGED | #1257 | `db8df63` |
 | H2-15 | Real Merchant Journey Contract | MERGED | #1258 | `37a0a53` |
-| H2-16 | Cross-Horizon Integration & Final Report | PR OPEN | (see final report) | — |
+| H2-16 | Cross-Horizon Integration & Final Report | MERGED | #1260 | `e6e7af3` |
 
 ---
 
@@ -651,10 +651,12 @@ A UI slice is not complete until its progress entry records:
 
 ### H2-16 — Cross-Horizon Integration & Final Report
 
-**Status:** PR OPEN  
+**Status:** MERGED  
 **Base SHA:** `37a0a53316b5abdcef0ac70a7639955fe663d37f` (H2-15 merged)  
 **Branch:** `flowers/h2-16-final-report`  
-**PR / Head / Merge SHA:** recorded in the PR and the final report footer
+**PR:** #1260  
+**Head SHA:** `267e021b6ae6622f10d48c957dc009c2a1e4defa`  
+**Merge SHA:** `e6e7af368539380e8c178fbe1dde45086f44cc78`
 
 #### Scope
 - Docs only: `AWJ_FLOWERS_HORIZON_2_FINAL_REPORT.md` and this ledger. No product code changed.
