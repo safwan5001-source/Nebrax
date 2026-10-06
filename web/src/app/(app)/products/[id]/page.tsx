@@ -18,6 +18,7 @@ import { Tabs, TabPanel, type TabDef } from '@/components/ui/tabs';
 import { useToast } from '@/components/ui/toast';
 import { type Product as ProductFormProduct } from '@/components/products/product-dialog';
 import { ProductWorkspace } from '@/components/products/product-workspace';
+import { confirmDiscardUnsaved } from '@/modules/commerce-workspace/unsaved-registry';
 import { ProductGiftingTab } from '@/modules/commerce-workspace/flowers-admin/product/gifting-tab';
 import { useFlowersCapability } from '@/modules/commerce-workspace/flowers-admin/product/use-flowers-capability';
 
@@ -189,7 +190,15 @@ export default function ProductProfilePage() {
         </Card>
       </section>
 
-      <Tabs tabs={tabs} value={activeTab} onChange={setActiveTab} />
+      <Tabs
+        tabs={tabs}
+        value={activeTab}
+        onChange={(next) => {
+          // تبويب «الهدايا» يُفكَّك عند مغادرته فتضيع مسوّدته: نسأل أولاً (السجلّ فارغ لأي تبويب آخر ⇒ لا سؤال).
+          if (next !== activeTab && !confirmDiscardUnsaved()) return;
+          setActiveTab(next);
+        }}
+      />
 
       {activeTab === 'info' && (
         <TabPanel id="info">

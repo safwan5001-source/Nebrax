@@ -39,6 +39,17 @@ final class ProductPersonalizationService
         return $this->fieldsQuery($product->id, activeOnly: false)->map(fn ($f) => $this->present($f, includeInactive: true))->values()->all();
     }
 
+    /**
+     * بصمة التعريفات الإدارية الحالية (تتغيّر مع أي تعديل). يقرؤها العميل مع القائمة ويعيدها عند الاستبدال
+     * (`expected_revision`) فيُرفض الاستبدال المبني على نسخة قديمة **داخل قفل المنتج**.
+     *
+     * @param  list<array<string, mixed>>  $definitions
+     */
+    public function revisionFor(array $definitions): string
+    {
+        return sha1((string) json_encode($definitions));
+    }
+
     /** @return list<array<string, mixed>> الحقول **النشطة** فقط (عامة) */
     public function publicFields(string $productId): array
     {
@@ -49,7 +60,7 @@ final class ProductPersonalizationService
      * @param  list<array<string, mixed>>  $fields
      * @return list<array<string, mixed>>
      */
-    public function replaceDefinitions(Product $product, array $fields): array
+    public function replaceDefinitions(Product $product, array $fields, ?string $expectedRevision = null): array
     {
         $this->assertProductTenant($product);
 
@@ -61,10 +72,14 @@ final class ProductPersonalizationService
             throw new DomainException('مفاتيح مُدخَلات التخصيص يجب أن تكون فريدة.');
         }
 
-        return DB::transaction(function () use ($product, $fields) {
+        return DB::transaction(function () use ($product, $fields, $expectedRevision) {
             // BranchScope وحده يُرفع؛ TenantScope وSoftDeletes يبقيان، فمنتجٌ حُذف بين تحميل المتحكّم
             // وهذا القفل يُرفض بـ404 بدل نجاحٍ فارغ أو 500 من قيد المفتاح الأجنبي.
             Product::withoutGlobalScope(BranchScope::class)->whereKey($product->id)->lockForUpdate()->firstOrFail();
+
+            if ($expectedRevision !== null && ! hash_equals($this->revisionFor($this->definitions($product)), $expectedRevision)) {
+                throw new StaleRevisionException('تغيّرت مُدخَلات التخصيص على الخادم منذ قرأتها. حدّث الصفحة وراجعها ثم أعد المحاولة.');
+            }
 
             CommerceProductPersonalizationField::query()->where('product_id', $product->id)->delete();
 
@@ -73,7 +88,7 @@ final class ProductPersonalizationService
                 $options = $data['options'] ?? [];
 
                 if ($type === CommerceProductPersonalizationField::TYPE_SELECT) {
-                    $this->assertOptions($data['key'], $options);
+                    $this->assertOptions($data['key'], $options, (bool) ($data['is_active'] ?? true) && (bool) ($data['is_required'] ?? false));
                 } elseif ($options !== []) {
                     throw new DomainException("المُدخَل «{$data['key']}» ليس اختياراً فلا يقبل خيارات.");
                 }
@@ -240,7 +255,7 @@ final class ProductPersonalizationService
     }
 
     /** @param list<array<string, mixed>> $options */
-    private function assertOptions(string $fieldKey, array $options): void
+    private function assertOptions(string $fieldKey, array $options, bool $activeAndRequired = false): void
     {
         if ($options === []) {
             throw new DomainException("المُدخَل «{$fieldKey}» من نوع اختيار ويحتاج خياراً واحداً على الأقل.");
@@ -251,6 +266,10 @@ final class ProductPersonalizationService
         $values = array_column($options, 'value_key');
         if (count($values) !== count(array_unique($values))) {
             throw new DomainException("مفاتيح خيارات المُدخَل «{$fieldKey}» يجب أن تكون فريدة.");
+        }
+        // اختيارٌ فعّال وإلزامي بلا أي خيار فعّال لا يستوفيه أي طلب سلة ⇒ يصير المنتج غير قابل للشراء.
+        if ($activeAndRequired && ! array_filter($options, fn ($o) => (bool) ($o['is_active'] ?? true))) {
+            throw new DomainException("المُدخَل «{$fieldKey}» فعّال وإلزامي ويحتاج خياراً فعّالاً واحداً على الأقل (وإلا لا يمكن شراء المنتج).");
         }
     }
 

@@ -121,8 +121,13 @@ class CommerceProductPersonalizationApiTest extends TestCase
         $put([['key' => 'a', 'type' => 'text', 'label' => 'x', 'options' => [['value_key' => 'v', 'label' => 'V']]]])->assertStatus(422);
         $put([['key' => 'a', 'type' => 'select', 'label' => 'x', 'options' => [['value_key' => 'v', 'label' => 'V'], ['value_key' => 'v', 'label' => 'W']]]])->assertStatus(422);
         $put(array_map(fn ($i) => ['key' => "f{$i}", 'type' => 'text', 'label' => 'x'], range(1, ProductPersonalizationService::MAX_FIELDS + 1)))->assertStatus(422);
-
         $this->assertSame(0, CommerceProductPersonalizationField::withoutGlobalScopes()->count());
+
+        // اختيارٌ فعّال وإلزامي بلا خيار فعّال يجعل المنتج غير قابل للشراء ⇒ يُرفض؛ ويُقبل إن كان اختيارياً أو معطّلاً.
+        $inactiveOnly = [['value_key' => 'v', 'label' => 'V', 'is_active' => false]];
+        $put([['key' => 'a', 'type' => 'select', 'label' => 'x', 'is_required' => true, 'options' => $inactiveOnly]])->assertStatus(422);
+        $put([['key' => 'a', 'type' => 'select', 'label' => 'x', 'is_required' => false, 'options' => $inactiveOnly]])->assertOk();
+        $put([['key' => 'a', 'type' => 'select', 'label' => 'x', 'is_required' => true, 'is_active' => false, 'options' => $inactiveOnly]])->assertOk();
     }
 
     /** @test */
@@ -258,5 +263,27 @@ class CommerceProductPersonalizationApiTest extends TestCase
         $res = $this->getJson("/commerce/v1/products/{$cake->id}", $headers)->assertOk();
         $this->assertSame(['cake-text', 'card', 'flavor'], array_column($res->json('data.personalization.fields'), 'key'));
         $this->assertTrue($res->json('data.personalization.fields.0.is_required'));
+    }
+
+    /** @test */
+    public function a_replacement_built_on_a_stale_revision_is_rejected_under_the_product_lock_without_writing(): void
+    {
+        $auth = $this->registerTenant('pz-revision', 'owner@pz-revision.test');
+        $product = $this->makeProduct($auth['tenant_id']);
+        $token = $auth['token'];
+        $field = fn (string $key, string $label) => ['key' => $key, 'type' => 'text', 'label' => $label];
+
+        $first = $this->withToken($token)->putJson($this->url($product), ['fields' => [$field('a', 'أ')]])->assertOk();
+        $revision = $first->json('data.revision');
+        $this->assertSame(40, strlen($revision));
+        $this->assertSame($revision, $this->withToken($token)->getJson($this->url($product))->json('data.revision'));
+
+        $second = $this->withToken($token)->putJson($this->url($product), ['expected_revision' => $revision, 'fields' => [$field('a', 'أ'), $field('b', 'ب')]])->assertOk();
+        $this->assertNotSame($revision, $second->json('data.revision'));
+
+        $this->withToken($token)->putJson($this->url($product), ['expected_revision' => $revision, 'fields' => [$field('mine', 'لي')]])->assertStatus(409);
+        $this->assertSame(['a', 'b'], array_column($this->withToken($token)->getJson($this->url($product))->json('data.fields'), 'key'));
+
+        $this->withToken($token)->putJson($this->url($product), ['fields' => [$field('only', 'وحيد')]])->assertOk(); // بلا بصمة: السلوك السابق
     }
 }
