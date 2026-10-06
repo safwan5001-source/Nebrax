@@ -107,7 +107,7 @@ test.describe('FLOWERS-H2-9 — structured product content', () => {
 
   test('EN 390 read-only; dark empty', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
-    await seedAdmin(page, 'en', server({ blocks: BLOCKS }), { permissions: ['products.view'], role: 'staff' });
+    await seedAdmin(page, 'en', server({ blocks: BLOCKS }), { permissions: ['products.view', 'commerce.manage'], role: 'staff' });
     await open(page, 'en');
     await expect(page.getByRole('button', { name: 'Add content' })).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Save' })).toHaveCount(0);
