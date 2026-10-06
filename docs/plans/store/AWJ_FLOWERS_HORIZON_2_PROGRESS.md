@@ -368,7 +368,7 @@ A UI slice is not complete until its progress entry records:
 - **Small additive backend change** (same pattern as H2-7): the document carries a `revision` (projects only `addon_product_id`, `addon_variant_id`, `max_quantity`, `is_active`); `PUT` accepts an optional `expected_revision` compared inside the product + target locks — 409 and nothing written on mismatch. Optional, so the legacy behaviour is preserved.
 
 #### UI / information architecture
-- "Add-ons" section in the product Gifting tab: search/choose a product (and variant), quantity 1–10, active toggle, reorder-free list with inactive-target-product flags, remove, one explicit Save. States: loading, empty, populated, saving, success, validation, server error, 409 (reload + warning, or a reported failed refresh), read-only without `products.manage`. Unreadable rows fail the load instead of being dropped; the fallback pre-read's revision is carried into the PUT.
+- "Add-ons" section in the product Gifting tab: search/choose a product (and variant), quantity 1–10, active toggle, list with inactive-target-product flags, remove, one explicit Save. States: loading, empty, populated, saving, success, validation, server error, 409 (reload + warning, or a reported failed refresh), read-only without `products.manage`. Unreadable rows fail the load instead of being dropped; the fallback pre-read's revision is carried into the PUT.
 
 #### Tests
 - Backend `CommerceProductAddonApiTest` (stale-revision 409 case); web `addons.test.ts`, `addons-section.test.tsx`; Playwright `flowers-h2-8-product-addons.spec.ts`.
