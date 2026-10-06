@@ -1,0 +1,73 @@
+{
+    "data": {
+        "setup": {
+            "vertical": "flowers_gifts",
+            "items": [
+                {
+                    "key": "occasions",
+                    "available": true,
+                    "state": "configured",
+                    "count": 12,
+                    "manage_in": "merchandising"
+                },
+                {
+                    "key": "recipients",
+                    "available": true,
+                    "state": "configured",
+                    "count": 10,
+                    "manage_in": "merchandising"
+                },
+                {
+                    "key": "gift_message",
+                    "available": true,
+                    "state": "configured",
+                    "count": 1,
+                    "manage_in": "gift_settings"
+                },
+                {
+                    "key": "personalization",
+                    "available": true,
+                    "state": "configured",
+                    "count": 1,
+                    "manage_in": "products"
+                },
+                {
+                    "key": "add_ons",
+                    "available": true,
+                    "state": "configured",
+                    "count": 1,
+                    "manage_in": "products"
+                },
+                {
+                    "key": "delivery_scheduling",
+                    "available": true,
+                    "state": "configured",
+                    "count": 1,
+                    "manage_in": "delivery_schedule"
+                },
+                {
+                    "key": "same_day_delivery",
+                    "available": true,
+                    "state": "configured",
+                    "count": 1,
+                    "manage_in": "delivery_schedule"
+                },
+                {
+                    "key": "structured_content",
+                    "available": true,
+                    "state": "configured",
+                    "count": 1,
+                    "manage_in": "products"
+                },
+                {
+                    "key": "vertical_sections",
+                    "available": true,
+                    "state": "not_configured",
+                    "count": 0,
+                    "manage_in": "store_builder",
+                    "published_count": 0
+                }
+            ]
+        }
+    }
+}
