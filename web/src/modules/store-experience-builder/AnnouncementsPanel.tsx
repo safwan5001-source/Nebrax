@@ -29,7 +29,6 @@ import {
   Segmented,
   Toggle,
   btnClass,
-  iconBtnClass,
   inputClass,
   selectClass,
 } from "./ControlPanels";
@@ -55,6 +54,9 @@ import {
 } from "./presentation/announcements";
 import { contrastRatio, isSafeHexColor } from "./presentation/tokens";
 
+/** Row actions: 44 px touch targets on phones, 36 px where a pointer is the norm. */
+const rowBtnClass =
+  "inline-flex size-11 shrink-0 items-center justify-center text-muted hover:bg-background hover:text-text disabled:text-border disabled:hover:bg-transparent md:size-9";
 const EMPTY_DOC: AnnouncementsDoc = { enabled: false, items: [] };
 const PAGE_OPTIONS = ["home", "product", "category"] as const;
 
@@ -182,7 +184,7 @@ export function AnnouncementsPanel({
                     </button>
                     <button
                       type="button"
-                      className={iconBtnClass}
+                      className={rowBtnClass}
                       aria-label={t("annMoveUp")}
                       disabled={index === 0}
                       onClick={() =>
@@ -193,7 +195,7 @@ export function AnnouncementsPanel({
                     </button>
                     <button
                       type="button"
-                      className={iconBtnClass}
+                      className={rowBtnClass}
                       aria-label={t("annMoveDown")}
                       disabled={index === current.items.length - 1}
                       onClick={() =>
@@ -204,7 +206,7 @@ export function AnnouncementsPanel({
                     </button>
                     <button
                       type="button"
-                      className={iconBtnClass}
+                      className={rowBtnClass}
                       aria-label={t("annRemove")}
                       onClick={() => {
                         commit({
