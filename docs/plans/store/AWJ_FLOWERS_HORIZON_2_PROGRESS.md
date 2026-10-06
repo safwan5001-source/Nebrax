@@ -1,6 +1,6 @@
 # AWJ Flowers & Gifts — Horizon 2 Progress
 
-**Status:** IN PROGRESS — H2-1…H2-8 merged; H2-9 in review  
+**Status:** IN PROGRESS — H2-1…H2-9 merged; H2-10 in review  
 **Date:** 2026-10-04  
 **Planning Base:** `main` @ `6ded662bfada8f72f5ebf321dcf27b08be7939c1`  
 **Execution Base (H2-1):** `main` @ `afe223cb654154fa55234ff2e360233bbc933ec3`  
@@ -34,8 +34,8 @@ Horizon 1 is complete.
 | H2-6 | Product Preparation Time | MERGED | #1243 | `a10359d` |
 | H2-7 | Product Personalization Admin | MERGED | #1246 | `f294c2d` |
 | H2-8 | Product Add-ons Admin | MERGED | #1248 | `bb03b69` |
-| H2-9 | Structured Product Content Admin | PR OPEN | (see log) | — |
-| H2-10 | Unified Product Gifting Workspace | NOT STARTED | — | — |
+| H2-9 | Structured Product Content Admin | MERGED | #1249 | `f8ec475` |
+| H2-10 | Unified Product Gifting Workspace | PR OPEN | (see log) | — |
 | H2-11 | Vertical Setup Center V2 | NOT STARTED | — | — |
 | H2-12 | Merchant Onboarding Flow | NOT STARTED | — | — |
 | H2-13 | Permissions / RBAC / Tenant Isolation Pass | NOT STARTED | — | — |
@@ -395,10 +395,12 @@ A UI slice is not complete until its progress entry records:
 
 ### H2-9 — Structured Product Content Admin
 
-**Status:** PR OPEN  
+**Status:** MERGED  
 **Base SHA:** `bb03b6974023f71568c39070721863430fd64574` (H2-8 merged)  
 **Branch:** `flowers/h2-9-product-content`  
-**PR / Head / Merge SHA:** recorded in the next slice's ledger update after merge
+**PR:** #1249  
+**Head SHA:** `4314efd`  
+**Merge SHA:** `f8ec4757f932da6ff350a24fbdf5998f2ca82f64` (squash)
 
 #### Contract / scope
 - Existing contract: `GET|PUT /commerce/workspace/products/{id}/content` (`products.view` read / `products.manage` write) — a full-set replace of the product's structured content blocks, from a closed list of 10 block types (composition, care, natural variation, included items, dimensions, materials, allergens, storage, preparation notes, personalization instructions), one block per type, plain text (≤ 2000 characters counted as Unicode characters, ≤ 40 lines), optional English text, active toggle. No HTML/rich text.
@@ -416,11 +418,44 @@ A UI slice is not complete until its progress entry records:
 #### Backward compatibility
 - `expected_revision` optional; response gains `revision` additively.
 
+#### Review / CI
+- Codex had reached its usage limit before reviewing this PR, so CI was the only automated gate; the lessons from the H2-7/H2-8 reviews had been applied up front (see above). Merged on a fully green head (sqlite, pgsql, web; both runs).
+
 #### Deployment observation
 - Manual deploy: NOT PERFORMED; production verification: NOT PERFORMED.
 
 #### Next
 - H2-10 — Unified Product Gifting Workspace.
+
+---
+
+### H2-10 — Unified Product Gifting Workspace
+
+**Status:** PR OPEN  
+**Base SHA:** `f8ec4757f932da6ff350a24fbdf5998f2ca82f64` (H2-9 merged)  
+**Branch:** `flowers/h2-10-product-gifting-workspace`  
+**PR / Head / Merge SHA:** recorded in the next slice's ledger update after merge
+
+#### Contract / scope
+- Frontend-only composition: no new API, no new persistence. The four product-level sections (preparation time, personalization, add-ons, structured content) keep their own independent endpoints, validation, revisions and Save bars; the workspace only unifies navigation and context.
+
+#### UI / information architecture
+- The product page's **Gifting** tab is now one workspace with a sub-tab bar (Preparation · Personalization · Add-ons · Content), each showing the number of saved items reported by the server (not a client guess). One section visible at a time; all four stay mounted (hidden when inactive) so a section's unsaved draft survives sub-tab changes, and each section loads once when the tab opens. Deep links via `?section=` (unknown values fall back to the first section) kept in sync with `history.replaceState`. Sub-tabs are a real ARIA tablist/tabpanel set. A failure in one section does not block the others. The outer-tab and sidebar-link unsaved guards (H2-7) cover every section.
+
+#### Tests
+- `gifting-workspace.test.tsx` (sub-tab navigation, counts, deep link, draft survives a sub-tab change, read-only), updated section tests, Playwright `flowers-h2-10-product-gifting-workspace.spec.ts`.
+
+#### Tenant Isolation / RBAC
+- No change: each section's own routes enforce `products.view` / `products.manage` and tenant scoping; the tab stays hidden (and zero requests) without `commerce.manage`.
+
+#### Backward compatibility
+- Additive; the H2-6 `?tab=gifting` deep link and every earlier section behave as before.
+
+#### Deployment observation
+- Manual deploy: NOT PERFORMED; production verification: NOT PERFORMED.
+
+#### Next
+- H2-11 — Vertical Setup Center V2.
 
 ---
 
