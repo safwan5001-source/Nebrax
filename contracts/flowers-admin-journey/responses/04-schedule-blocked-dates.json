@@ -50,6 +50,7 @@
                 "is_active": false
             }
         ],
+        "slots_revision": "<sha1-revision>",
         "blocked_dates": [
             {
                 "date": "2030-02-14",
@@ -61,6 +62,7 @@
                 "method": "pickup",
                 "reason": null
             }
-        ]
+        ],
+        "blocked_dates_revision": "<sha1-revision>"
     }
 }

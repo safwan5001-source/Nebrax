@@ -137,19 +137,24 @@ describe('merchant admin journey contract', () => {
 
     current = '07-personalization';
     const personalization = await savePersonalization('PRODUCT', FIELDS);
-    expect(personalization.ok && personalization.data.map((f) => ({ ...f, persisted: false }))).toEqual(
+    expect(personalization.ok && personalization.data.fields.map((f) => ({ ...f, persisted: false }))).toEqual(
       FIELDS.map((f) => ({ ...f, persisted: false, maxLength: f.type === 'select' ? null : f.maxLength })),
     );
+    // البصمة تعود مع المستند: عليها يقوم رفض الاستبدال القديم داخل القفل.
+    expect(personalization.ok && personalization.data.revision).toBe('<sha1-revision>');
 
     current = '09-content';
-    expect(await saveContent('PRODUCT', BLOCKS)).toEqual({ ok: true, data: BLOCKS });
+    const content = await saveContent('PRODUCT', BLOCKS);
+    expect(content.ok && content.data.blocks).toEqual(BLOCKS);
+    expect(content.ok && content.data.revision).toBe('<sha1-revision>');
 
     current = '08-addons';
     const addons = await saveAddons('PRODUCT', ADDONS);
     // المعرّف رمز نائب في العقد (يستبدله PHP بمعرّف حقيقي ثم يُطبَّع)؛ المهم أن الخادم أعاد المنتج الهدف نفسه نشطاً.
-    expect(addons.ok && addons.data.map((a) => ({ hasProduct: /^[0-9a-f-]{36}$/.test(a.addonProductId), name: a.name, qty: a.maxQuantity, active: a.isActive, productActive: a.productIsActive }))).toEqual([
+    expect(addons.ok && addons.data.rows.map((a) => ({ hasProduct: /^[0-9a-f-]{36}$/.test(a.addonProductId), name: a.name, qty: a.maxQuantity, active: a.isActive, productActive: a.productIsActive }))).toEqual([
       { hasProduct: true, name: 'شوكولاتة', qty: 3, active: true, productActive: true },
     ]);
+    expect(addons.ok && addons.data.revision).toBe('<sha1-revision>');
   });
 
   it('the checklist after the journey marks every capability the journey configured', async () => {

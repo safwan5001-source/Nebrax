@@ -51,7 +51,15 @@ class FlowersMerchantAdminJourneyTest extends TestCase
     private function normalize(mixed $value): mixed
     {
         if (is_array($value)) {
-            return array_map(fn ($v) => $this->normalize($v), $value);
+            $out = [];
+            foreach ($value as $key => $v) {
+                // البصمات (`revision`/`*_revision`) تُشتقّ من محتوى يضمّ معرّفات عشوائية؛ نثبت أنها sha1 صالحة ونعيّن لها قيمة نائبة.
+                $out[$key] = is_string($key) && ($key === 'revision' || str_ends_with($key, '_revision')) && is_string($v)
+                    ? (preg_match('/^[0-9a-f]{40}$/', $v) === 1 ? '<sha1-revision>' : '<invalid-revision>')
+                    : $this->normalize($v);
+            }
+
+            return $out;
         }
         if (is_string($value) && preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $value) === 1) {
             return $this->ids[$value] ??= sprintf('00000000-0000-4000-8000-%012d', count($this->ids) + 1);

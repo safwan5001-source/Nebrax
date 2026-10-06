@@ -11,6 +11,7 @@
                 "max_quantity": 3,
                 "is_active": true
             }
-        ]
+        ],
+        "revision": "<sha1-revision>"
     }
 }

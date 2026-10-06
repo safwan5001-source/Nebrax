@@ -50,6 +50,8 @@
                 "is_active": false
             }
         ],
-        "blocked_dates": []
+        "slots_revision": "<sha1-revision>",
+        "blocked_dates": [],
+        "blocked_dates_revision": "<sha1-revision>"
     }
 }

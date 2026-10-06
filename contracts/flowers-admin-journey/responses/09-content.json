@@ -13,6 +13,7 @@
                 "body_en": null,
                 "is_active": false
             }
-        ]
+        ],
+        "revision": "<sha1-revision>"
     }
 }
