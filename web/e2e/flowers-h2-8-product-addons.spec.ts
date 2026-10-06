@@ -125,7 +125,7 @@ test.describe('FLOWERS-H2-8 — product add-ons', () => {
 
   test('EN 390 read-only and dark empty', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
-    await seedAdmin(page, 'en', server({ addons: INITIAL }), { permissions: ['products.view'], role: 'staff' });
+    await seedAdmin(page, 'en', server({ addons: INITIAL }), { permissions: ['products.view', 'commerce.manage'], role: 'staff' });
     await page.goto('/products/p1');
     await page.getByRole('tab', { name: 'Gifting' }).click();
     await page.getByRole('tab', { name: ADDONS.en }).click();
