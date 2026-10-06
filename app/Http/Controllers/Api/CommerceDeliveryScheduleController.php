@@ -8,11 +8,13 @@ use App\Models\CommerceDeliverySlot;
 use App\Models\Storefront;
 use App\Services\Commerce\CommerceDeliveryScheduleService;
 use App\Services\Commerce\MobileSalesChannelResolver;
+use App\Services\Commerce\StaleRevisionException;
 use App\Tenancy\TenantContext;
 use DomainException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use PDOException;
 use RuntimeException;
 
@@ -60,6 +62,8 @@ final class CommerceDeliveryScheduleController extends ApiController
         $this->denySelfService($request);
         $data = $request->validate([
             'slots' => ['present', 'array', 'max:'.CommerceDeliverySlot::MAX_PER_CHANNEL],
+            // اختياري: بصمة النوافذ كما قرأها العميل (`slots_revision`)؛ إن لم تعد تطابق الحالية داخل القفل ⇒ 409 بلا كتابة.
+            'expected_revision' => ['sometimes', 'nullable', 'string', 'max:64'],
             // معرّف نافذة موجودة يُحدَّث في مكانه (يُحفظ معرّفها واختيارات Checkout وعدّ السعة)؛ بلا معرّف تُنشأ.
             'slots.*.id' => ['sometimes', 'nullable', 'uuid'],
             'slots.*.method' => ['required', Rule::in(CommerceDeliverySlot::METHODS)],
@@ -68,15 +72,25 @@ final class CommerceDeliveryScheduleController extends ApiController
             'slots.*.start_time' => ['required', 'string', 'regex:'.CommerceDeliveryScheduleSetting::TIME_PATTERN],
             'slots.*.end_time' => ['required', 'string', 'regex:'.CommerceDeliveryScheduleSetting::TIME_PATTERN],
             'slots.*.weekdays' => ['sometimes', 'nullable', 'array', 'max:7'],
-            'slots.*.weekdays.*' => ['integer', 'between:0,6', 'distinct'],
+            // `distinct` على نمط متداخل (`slots.*.weekdays.*`) يقارن القيم **عبر كل النوافذ** فيرفض نافذتين تشتركان في أي يوم
+            // (صباحية/مسائية في الأيام نفسها — الإعداد الأشيع). التفرّد مطلوب داخل النافذة الواحدة فقط، ويُفحص أدناه.
+            'slots.*.weekdays.*' => ['integer', 'between:0,6'],
             'slots.*.capacity' => ['sometimes', 'nullable', 'integer', 'min:1', 'max:'.CommerceDeliverySlot::MAX_CAPACITY],
             'slots.*.shipping_zone_id' => ['sometimes', 'nullable', 'uuid'],
             'slots.*.is_active' => ['sometimes', 'boolean'],
         ]);
+        foreach (array_values($data['slots']) as $position => $slot) {
+            $days = $slot['weekdays'] ?? [];
+            if (count($days) !== count(array_unique($days))) {
+                throw ValidationException::withMessages(["slots.{$position}.weekdays" => ['أيام الأسبوع في النافذة الواحدة يجب ألّا تتكرّر.']]);
+            }
+        }
         $channelId = $this->ownedChannelId($request, $id);
 
         try {
-            $schedule->replaceSlots($channelId, array_values($data['slots']));
+            $schedule->replaceSlots($channelId, array_values($data['slots']), $data['expected_revision'] ?? null);
+        } catch (StaleRevisionException $e) {
+            abort(409, $e->getMessage());
         } catch (DomainException $e) {
             abort(422, $e->getMessage());
         }
@@ -107,9 +121,11 @@ final class CommerceDeliveryScheduleController extends ApiController
     /** @return array<string, mixed> */
     private function document(CommerceDeliveryScheduleService $schedule, string $channelId): array
     {
+        $slots = $schedule->slots($channelId); // قراءة واحدة: القائمة وبصمتها من اللقطة نفسها
         return [
             'settings' => $schedule->settings($channelId),
-            'slots' => $schedule->slots($channelId),
+            'slots' => $slots,
+            'slots_revision' => $schedule->revisionFor($slots),
             'blocked_dates' => $schedule->blockedDates($channelId),
         ];
     }

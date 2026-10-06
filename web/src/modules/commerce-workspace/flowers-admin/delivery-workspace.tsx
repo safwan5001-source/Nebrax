@@ -3,16 +3,30 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Truck } from 'lucide-react';
 import { EmptyState, ErrorState, LoadingState } from '@/components/nebrax';
+import { TabPanel, Tabs } from '@/components/ui/tabs';
+import { confirmDiscardUnsaved } from '../unsaved-registry';
 import { loadSchedule, type ScheduleDocument } from './delivery-schedule';
 import type { AdminFailure } from './admin-http';
 import { failureText } from './failure-text';
 import { flowersAdminT } from './messages';
 import { ReadinessList } from './readiness-list';
 import { ScheduleRulesPanel } from './schedule-rules-panel';
+import { WindowsPanel } from './windows-panel';
 
 type Phase = { kind: 'loading' } | { kind: 'failed'; failure: AdminFailure } | { kind: 'ready'; document: ScheduleDocument };
 
-export type DeliveryTabId = 'rules';
+export const DELIVERY_TABS = ['rules', 'windows'] as const;
+export type DeliveryTabId = (typeof DELIVERY_TABS)[number];
+
+const isTab = (value: string | null): value is DeliveryTabId => (DELIVERY_TABS as readonly (string | null)[]).includes(value);
+
+/** التبويب من `?tab=` (روابط عميقة من مركز الإعداد)؛ غير المعروف يسقط على القواعد. */
+function initialTab(): DeliveryTabId {
+  if (typeof window === 'undefined') return 'rules';
+  const requested = new URLSearchParams(window.location.search).get('tab');
+
+  return isTab(requested) ? requested : 'rules';
+}
 
 /**
  * FLOWERS-H2-2 — مساحة التوصيل لمتجرٍ واحد: تحمّل مستند الجدولة (قواعد + فترات + تواريخ محجوبة) مرةً واحدة
@@ -24,7 +38,17 @@ export function DeliveryWorkspace({ storeId, locale }: { storeId: string; locale
   const t = useMemo(() => flowersAdminT(locale), [locale]);
   const [phase, setPhase] = useState<Phase>({ kind: 'loading' });
   const [attempt, setAttempt] = useState(0);
-  const [tab, setTab] = useState<DeliveryTabId>('rules');
+  const [tab, setTabState] = useState<DeliveryTabId>('rules');
+  useEffect(() => setTabState(initialTab()), []);
+  const setTab = (next: DeliveryTabId) => {
+    if (next === tab) return;
+    // الأزرار ليست روابط فلا يمرّ بها حارس التنقّل: نسأل قبل أن يُفكَّك تبويبٌ فيه مسوّدة غير محفوظة.
+    if (!confirmDiscardUnsaved()) return;
+    setTabState(next);
+    const url = new URL(window.location.href);
+    url.searchParams.set('tab', next);
+    window.history.replaceState(null, '', url.toString());
+  };
 
   useEffect(() => {
     let current = true;
@@ -61,17 +85,38 @@ export function DeliveryWorkspace({ storeId, locale }: { storeId: string; locale
           statusLabels={{ done: t('schedReadyDone'), missing: t('schedReadyMissing') }}
           items={[
             { key: 'enabled', done: document.settings.enabled, label: t('schedReadyEnabled') },
-            { key: 'windows', done: activeWindows > 0, label: t('schedReadyWindows', { n: activeWindows }) },
+            {
+              key: 'windows',
+              done: activeWindows > 0,
+              label: t('schedReadyWindows', { n: activeWindows }),
+              action:
+                activeWindows === 0 ? (
+                  <button type="button" className="text-accent hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40" onClick={() => setTab('windows')}>
+                    {t('schedReadyWindowsAdd')}
+                  </button>
+                ) : undefined,
+            },
           ]}
         />
         <p className="text-xs leading-5 text-muted">{t('schedReadyNote')}</p>
       </section>
 
       <div className="space-y-4">
-        {/* تبويب واحد في هذه الخطوة: لا شريط تبويبات يوحي بما لم يُبنَ بعد، فلا دلالات tabpanel يتيمة. */}
-        <div data-delivery-panel={tab}>
-          <ScheduleRulesPanel storeId={storeId} locale={locale} settings={document.settings} onSaved={setDocument} />
-        </div>
+        <Tabs
+          tabs={[
+            { id: 'rules', label: t('schedTabRules') },
+            { id: 'windows', label: t('winTab'), count: document.slots.length },
+          ]}
+          value={tab}
+          onChange={(id) => setTab(id as DeliveryTabId)}
+        />
+        <TabPanel id={tab}>
+          {tab === 'rules' ? (
+            <ScheduleRulesPanel storeId={storeId} locale={locale} settings={document.settings} onSaved={setDocument} />
+          ) : (
+            <WindowsPanel storeId={storeId} locale={locale} document={document} onDocument={setDocument} />
+          )}
+        </TabPanel>
       </div>
     </div>
   );

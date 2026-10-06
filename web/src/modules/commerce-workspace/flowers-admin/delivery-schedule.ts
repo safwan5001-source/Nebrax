@@ -48,7 +48,13 @@ export type DeliverySlot = {
 
 export type BlockedDate = { date: string; method: BlockedMethod; reason: string | null };
 
-export type ScheduleDocument = { settings: ScheduleSettings; slots: DeliverySlot[]; blockedDates: BlockedDate[] };
+export type ScheduleDocument = {
+  settings: ScheduleSettings;
+  slots: DeliverySlot[];
+  blockedDates: BlockedDate[];
+  /** بصمة النوافذ كما قرأها العميل؛ تُعاد عند الاستبدال فيرفضه الخادم (409) إن غيّرها غيرنا داخل القفل. */
+  slotsRevision?: string | null;
+};
 
 const isMethod = (value: unknown): value is DeliveryMethod => (DELIVERY_METHODS as readonly unknown[]).includes(value);
 
@@ -107,6 +113,7 @@ export function mapScheduleDocument(payload: unknown): ScheduleDocument | null {
     settings,
     slots: data.slots.map(mapSlot).filter((s): s is DeliverySlot => s !== null),
     blockedDates: data.blocked_dates.map(mapBlockedDate).filter((b): b is BlockedDate => b !== null),
+    slotsRevision: typeof data.slots_revision === 'string' && data.slots_revision !== '' ? data.slots_revision : null,
   };
 }
 
@@ -135,12 +142,13 @@ export function saveSettings(storeId: string, settings: ScheduleSettings): Promi
 }
 
 /** الخادم يستبدل المجموعة كاملةً بالمعرّف: ما غاب من الطلب يُحذف. لذلك تُرسَل كل النوافذ دائماً. */
-export function saveSlots(storeId: string, slots: DeliverySlot[]): Promise<AdminResult<ScheduleDocument>> {
+export function saveSlots(storeId: string, slots: DeliverySlot[], expectedRevision: string | null = null): Promise<AdminResult<ScheduleDocument>> {
   return adminCall(async () =>
     mapScheduleDocument(
       await api<unknown>(path(storeId, '/slots'), {
         method: 'PUT',
         body: {
+          ...(expectedRevision ? { expected_revision: expectedRevision } : {}),
           slots: slots.map((slot) => ({
             ...(slot.id ? { id: slot.id } : {}),
             method: slot.method,

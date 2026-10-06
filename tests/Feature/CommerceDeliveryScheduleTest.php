@@ -459,6 +459,28 @@ class CommerceDeliveryScheduleTest extends TestCase
     }
 
     /** @test */
+    public function windows_may_share_weekdays_but_a_single_window_may_not_repeat_a_day(): void
+    {
+        $store = $this->store('ds-share-days');
+        $week = [0, 1, 2, 3, 4, 5, 6];
+        $slot = fn (string $label, string $from, string $to, array $days) => ['method' => 'delivery', 'label' => $label, 'start_time' => $from, 'end_time' => $to, 'weekdays' => $days];
+
+        // صباحية ومسائية في الأيام نفسها (وفي كل الأيام) — الإعداد الأشيع — يجب أن تُقبلا معاً (Laravel `distinct` المتداخل كان يرفضهما).
+        $this->withToken($store['token'])->putJson($this->url($store, '/slots'), ['slots' => [
+            $slot('صباحاً', '09:00', '12:00', [0, 1, 2, 3, 4]),
+            $slot('مساءً', '16:00', '20:00', [0, 1, 2, 3, 4]),
+            $slot('ليلاً', '21:00', '23:00', $week),
+            $slot('فجراً', '04:00', '06:00', $week),
+        ]])->assertOk();
+
+        // التكرار داخل النافذة الواحدة ما زال مرفوضاً، ويُسمّي الحقل.
+        $this->withToken($store['token'])->putJson($this->url($store, '/slots'), ['slots' => [
+            $slot('صباحاً', '09:00', '12:00', [0, 1]),
+            $slot('مساءً', '16:00', '20:00', [2, 2]),
+        ]])->assertStatus(422)->assertJsonValidationErrors(['slots.1.weekdays']);
+    }
+
+    /** @test */
     public function every_channel_lock_is_taken_inside_a_transaction(): void
     {
         $store = $this->store('ds-lock-tx');
@@ -746,5 +768,31 @@ class CommerceDeliveryScheduleTest extends TestCase
         $this->assertTrue($res->json('data.enabled'));
         $this->assertNotEmpty($res->json('data.dates'));
         $this->getJson('/commerce/v1/delivery-schedule?method=courier', $headers)->assertStatus(422);
+    }
+
+    /** @test */
+    public function a_replacement_built_on_a_stale_revision_is_rejected_under_the_lock_without_writing(): void
+    {
+        $store = $this->store('ds-revision');
+        $slot = fn (string $label, array $extra = []) => ['method' => 'delivery', 'label' => $label, 'start_time' => '09:00', 'end_time' => '12:00'] + $extra;
+
+        $first = $this->withToken($store['token'])->putJson($this->url($store, '/slots'), ['slots' => [$slot('A')]])->assertOk();
+        $revision = $first->json('data.slots_revision');
+        $this->assertSame(40, strlen($revision));
+        $this->assertSame($revision, $this->withToken($store['token'])->getJson($this->url($store))->json('data.slots_revision'));
+
+        // مدير ثانٍ يحفظ بالبصمة نفسها: ينجح، وتتغيّر البصمة.
+        $second = $this->withToken($store['token'])->putJson($this->url($store, '/slots'), ['expected_revision' => $revision, 'slots' => [
+            $slot('A', ['id' => $first->json('data.slots.0.id')]), $slot('B'),
+        ]])->assertOk();
+        $this->assertNotSame($revision, $second->json('data.slots_revision'));
+
+        // الأول (ما زال يحمل البصمة القديمة) يُرفض 409 ولا يمسح نافذة B.
+        $this->withToken($store['token'])->putJson($this->url($store, '/slots'), ['expected_revision' => $revision, 'slots' => [$slot('Mine')]])
+            ->assertStatus(409);
+        $this->assertSame(['A', 'B'], array_column($this->withToken($store['token'])->getJson($this->url($store))->json('data.slots'), 'label'));
+
+        // بلا بصمة: السلوك السابق (استبدال غير مشروط) يبقى.
+        $this->withToken($store['token'])->putJson($this->url($store, '/slots'), ['slots' => [$slot('Only')]])->assertOk();
     }
 }
