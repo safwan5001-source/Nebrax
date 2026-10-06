@@ -43,7 +43,10 @@ export function mapAddons(payload: unknown): AddonRow[] | null {
   const rows = obj(obj(payload)?.data)?.addons;
   if (!Array.isArray(rows)) return null;
 
-  return list(rows).map(mapRow).filter((r): r is AddonRow => r !== null);
+  // صفٌّ لا نفهمه يُفشل التحميل: حذفه بصمت ثم حفظ المجموعة كاملةً يمحو العلاقة من الخادم.
+  const mapped = list(rows).map(mapRow);
+
+  return mapped.every((r): r is AddonRow => r !== null) ? mapped : null;
 }
 
 /** العلاقات + بصمتها (`revision`) كما أعادهما الخادم؛ تُعاد عند الحفظ فيرفض الخادم الاستبدال القديم داخل القفل. */
