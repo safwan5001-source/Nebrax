@@ -156,6 +156,18 @@ describe('ContentSection', () => {
     expect(srv.writes[0].expected_revision).toBe(JSON.stringify([block('care')]));
   });
 
+  it('after a 409 whose refresh read fails it reports the failure and never writes with the stale revision', async () => {
+    const srv = server([block('care')]);
+    await userEvent.click(await screen.findByRole('switch', { name: 'Care: Active (visible to shoppers)' }));
+    srv.setRemote([block('care'), block('composition')]);
+    srv.failRead();
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(document.querySelector('[role="alert"]')).not.toBeNull());
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(document.querySelector('[role="alert"]')).not.toBeNull());
+    expect(srv.writes).toHaveLength(0);
+  });
+
   it('without a server revision it falls back to the pre-read and never writes when that read fails', async () => {
     const srv = server([block('care')], { noRevision: true });
     await userEvent.click(await screen.findByRole('switch', { name: 'Care: Active (visible to shoppers)' }));

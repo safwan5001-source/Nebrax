@@ -133,10 +133,14 @@ export function ContentSection({ productId, locale, canManage }: { productId: st
     if (!result.ok && result.kind === 'conflict') {
       const fresh = await loadContent(productId);
       setSaving(false);
-      if (fresh.ok) {
-        setDraft(fresh.data.blocks);
-        setPhase({ kind: 'ready', saved: fresh.data.blocks, revision: fresh.data.revision });
+      if (!fresh.ok) {
+        // لم نستطع التحديث: لا ندّعي ذلك، ونُسقط البصمة القديمة كي لا يتكرر التعارض نفسه؛ الحفظ التالي يمرّ بالفحص المسبق (يفشل مغلقاً).
+        setPhase({ kind: 'ready', saved, revision: null });
+        setNotice({ tone: 'error', text: failureText(fresh, t) });
+        return;
       }
+      setDraft(fresh.data.blocks);
+      setPhase({ kind: 'ready', saved: fresh.data.blocks, revision: fresh.data.revision });
       setNotice({ tone: 'warning', text: t('ctStale') });
       return;
     }
