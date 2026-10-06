@@ -62,15 +62,17 @@ class ProductMediaR2WriteTest extends TestCase
         $client = $this->mockR2();
         $auth = $this->registerTenant('r2-write');
         $product = $this->product($auth['token']);
+        $writtenKeys = [];
 
         $client->shouldNotReceive('putObjectAcl');
         $client->shouldNotReceive('getObjectAcl');
         $client->shouldNotReceive('listObjects');
         $client->shouldNotReceive('listObjectsV2');
         $client->shouldNotReceive('putBucketAcl');
-        $client->shouldReceive('putObject')->once()->with(Mockery::on(
-            function (array $args) use ($auth, $product): bool {
+        $client->shouldReceive('putObject')->times(3)->with(Mockery::on(
+            function (array $args) use ($auth, $product, &$writtenKeys): bool {
                 $expected = "tenant/{$auth['tenant_id']}/product-media/{$product['id']}/";
+                $writtenKeys[] = $args['Key'];
 
                 return $args['Bucket'] === 'awj-product-media-test'
                     && str_starts_with($args['Key'], $expected)
@@ -88,6 +90,8 @@ class ProductMediaR2WriteTest extends TestCase
         $stored = ProductMedia::findOrFail($media['id']);
         $this->assertSame('r2', $stored->disk);
         $this->assertStringStartsWith("tenant/{$auth['tenant_id']}/product-media/{$product['id']}/", $stored->path);
+        $this->assertContains("tenant/{$auth['tenant_id']}/product-media/{$product['id']}/{$stored->id}-thumbnail.jpg", $writtenKeys);
+        $this->assertContains("tenant/{$auth['tenant_id']}/product-media/{$product['id']}/{$stored->id}-card.jpg", $writtenKeys);
     }
 
     /** @test */
@@ -97,7 +101,7 @@ class ProductMediaR2WriteTest extends TestCase
         $auth = $this->registerTenant('r2-traversal');
         $product = $this->product($auth['token']);
 
-        $client->shouldReceive('putObject')->once()->with(Mockery::on(
+        $client->shouldReceive('putObject')->times(3)->with(Mockery::on(
             fn (array $args): bool => ! str_contains($args['Key'], '..') && ! str_contains($args['Key'], '/etc/')
         ))->andReturn([]);
 

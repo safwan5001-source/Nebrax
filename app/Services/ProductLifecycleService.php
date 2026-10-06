@@ -14,13 +14,11 @@ use App\Models\Product;
 use App\Models\ProductActivity;
 use App\Models\SkuRegistryEntry;
 use App\Models\StorefrontOffer;
-use App\Services\DocumentCenter\DocumentStorageService;
 use App\Support\ProductReferenceRegistry;
 use App\Tenancy\BranchScope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Storage;
 use RuntimeException;
 
 /**
@@ -31,7 +29,7 @@ use RuntimeException;
  */
 class ProductLifecycleService
 {
-    public function __construct(private readonly DocumentStorageService $documentStorage)
+    public function __construct(private readonly ProductMediaService $media)
     {
     }
 
@@ -126,14 +124,13 @@ class ProductLifecycleService
             // VAR-MEDIA-1: `allMedia()` لا `media()` — يشمل وسائط قيم الخيارات
             // أيضاً (لا متغيّر يمكن أن يبقى هنا، `assertNoBlockingReferences()`
             // يمنع ذلك أعلاه، لكن قيمة خيارٍ غير مستعملة أصلاً ممكنة).
-            $media = $product->allMedia()->get(['disk', 'path'])->all();
+            $media = $this->media->collectAndQueueDeletion($product->allMedia());
             // فضاء الباركود الموحّد أولاً: حذف العلاقة أدناه استعلامٌ مجمّع
             // لا يُطلق حدث Eloquent لكل صفّ، فتحرير التسجيل هنا صراحةً هو
             // الوحيد. مسارٌ لا يُكمِل أصلاً إلا بلا مراجع تاريخية — تحريره
             // آمنٌ دائماً هنا.
             BarcodeRegistryEntry::releaseAllForProduct($product->id);
             $product->alternateBarcodes()->delete();
-            $product->allMedia()->delete();
             // VAR-CORE-1: `ProductVariant` مصنَّف `COMMERCIAL_LIVE` فيمنع هذا
             // المسار من المتابعة أصلاً ما دام للمنتج أي متغيّر — فبهذه اللحظة
             // لا يوجد أي متغيّر، ولا سجلّ SKU مملوكٍ لمتغيّرٍ يخصّه. يبقى تحرير
@@ -179,19 +176,7 @@ class ProductLifecycleService
             $this->assertNoBlockingReferences($product);
         });
 
-        foreach ($media as $item) {
-            if ($item->disk === 'document') {
-                try {
-                    $this->documentStorage->delete($this->documentStorage->profile(), $item->path);
-                } catch (RuntimeException $exception) {
-                    report($exception);
-                }
-
-                continue;
-            }
-
-            Storage::disk($item->disk)->delete($item->path);
-        }
+        $this->media->deleteFiles($media);
     }
 
     /** @return array<int, ProductActivity> */
