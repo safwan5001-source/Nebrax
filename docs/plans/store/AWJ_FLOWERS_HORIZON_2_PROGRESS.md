@@ -1,6 +1,6 @@
 # AWJ Flowers & Gifts — Horizon 2 Progress
 
-**Status:** IN PROGRESS — H2-1…H2-3 merged; H2-4 in review  
+**Status:** IN PROGRESS — H2-1…H2-4 merged; H2-5 in review  
 **Date:** 2026-10-04  
 **Planning Base:** `main` @ `6ded662bfada8f72f5ebf321dcf27b08be7939c1`  
 **Execution Base (H2-1):** `main` @ `afe223cb654154fa55234ff2e360233bbc933ec3`  
@@ -29,8 +29,8 @@ Horizon 1 is complete.
 | H2-1 | Gift Policy Admin | MERGED | #1237 | `cfc16aa` |
 | H2-2 | Delivery Schedule Admin | MERGED | #1238 | `37d462f` |
 | H2-3 | Delivery Windows & Capacity | MERGED | #1239 | `5ff339b` |
-| H2-4 | Blocked Dates & Exceptions | PR OPEN | (see log) | — |
-| H2-5 | Fulfillment Warehouse Setup | NOT STARTED | — | — |
+| H2-4 | Blocked Dates & Exceptions | MERGED | #1240 | `323c5f5` |
+| H2-5 | Fulfillment Warehouse Setup | PR OPEN | (see log) | — |
 | H2-6 | Product Preparation Time | NOT STARTED | — | — |
 | H2-7 | Product Personalization Admin | NOT STARTED | — | — |
 | H2-8 | Product Add-ons Admin | NOT STARTED | — | — |
@@ -207,10 +207,12 @@ A UI slice is not complete until its progress entry records:
 
 ### H2-4 — Blocked Dates & Exceptions
 
-**Status:** PR OPEN  
+**Status:** MERGED  
 **Base SHA:** `5ff339b7581be46891766d7361edb6446f8d1057` (H2-3 merged)  
 **Branch:** `flowers/h2-4-blocked-dates`  
-**PR / Head / Merge SHA:** recorded in the next slice's ledger update after merge
+**PR:** #1240  
+**Head SHA:** `3f9f538`  
+**Merge SHA:** `323c5f58d6e7ad9cc9d2591d9b049f07936ee873` (squash)
 
 #### Contract / scope
 - Existing contract: `PUT …/delivery-schedule/blocked-dates` (full-set replace of `{date Y-m-d, method all|delivery|pickup, reason}`; dates are calendar days in the store time zone).
@@ -219,6 +221,9 @@ A UI slice is not complete until its progress entry records:
 #### UI / information architecture
 - "Blocked dates" tab: an add form (date, applies to all/delivery/pickup, optional reason) and the list with upcoming dates first (weekday + day/month/year, Latin digits) and past dates folded away with a confirmed bulk removal. Duplicate / overlapping-with-"all" / over-limit entries are refused locally with described errors; the server's rejection is always shown.
 - The half-filled form registers with the unsaved guard (browser warning, in-app navigation and tab/store switch confirmations); a failed freshness read aborts the write; a stale list refreshes the view and stops the action.
+
+#### Review / CI
+- Codex had reached its usage limit before this PR opened, so no automated findings were posted; the slice was self-reviewed against the H2-3 findings (all applied up front, see above). CI: pull_request and push runs both green (sqlite, pgsql, web) on the merged head.
 
 #### Tests
 - `blocked-dates.test.ts`, `blocked-dates-panel.test.tsx` (revision sent, stale ⇒ refresh without write, pre-read fallback aborts on failure, unsaved guard); backend `CommerceDeliveryScheduleTest` (32 tests incl. the blocked-dates revision case); Playwright `flowers-h2-4-blocked-dates.spec.ts` (11 cases, AR/EN × 390/430/1024/1440, dark).
@@ -230,10 +235,40 @@ A UI slice is not complete until its progress entry records:
 - Additive; omitting `expected_revision` keeps the previous unconditional replace.
 
 #### Deployment observation
-- Manual deploy: NOT PERFORMED; production verification: NOT PERFORMED.
+- Manual deploy: NOT PERFORMED; automatic CI/CD: not observable from GitHub; production verification: NOT PERFORMED.
 
 #### Next
 - H2-5 — Fulfilment Warehouse Setup.
+
+---
+
+### H2-5 — Fulfilment Warehouse Setup
+
+**Status:** PR OPEN  
+**Base SHA:** `323c5f58d6e7ad9cc9d2591d9b049f07936ee873` (H2-4 merged)  
+**Branch:** `flowers/h2-5-fulfillment-warehouse`  
+**PR / Head / Merge SHA:** recorded in the next slice's ledger update after merge
+
+#### Contract / scope
+- **One thin new backend route pair over the existing `FulfillmentPolicyService`** (no new table, no new authority): `GET|PUT /commerce/workspace/storefronts/{id}/fulfillment` (`commerce.manage`). `GET` returns the channel's current warehouse (or null) and the tenant's warehouses (restricted to the user's allowed warehouses when the account is branch-limited); `PUT {warehouse_id}` assigns one active warehouse via `setFixedWarehouse` (single row replaced, never duplicated). Foreign/unknown/disallowed warehouse ⇒ one non-revealing 422; inactive ⇒ 422; foreign store ⇒ 404; self-service ⇒ 403. No journal entry and no stock movement is created.
+
+#### UI / information architecture
+- "Fulfilment" tab in the delivery workspace: states plainly that same-day availability needs a warehouse to compute stock/lead from, shows the current assignment, offers only active warehouses (an inactive current one is shown, flagged, and cannot be re-chosen), links to "Create warehouse" when none exist, and the readiness strip gains the warehouse prerequisite. The H2-11 checklist deep-links `same_day_delivery` here when the warehouse is the gap. Unsaved choice registers with the unsaved guard.
+
+#### Tests
+- Backend `CommerceFulfillmentAdminApiTest` (7): listing isolation, assign/replace keeps one row, invalid inputs, tenant isolation, RBAC, no accounting/stock effect, the setup checklist flips `same_day_delivery` to configured only after assignment. Web `fulfillment.test.ts`, `fulfillment-panel.test.tsx` (11 incl. unsaved guard); Playwright `flowers-h2-5-fulfillment-warehouse.spec.ts` (AR/EN × 390/430/1024/1440, dark, empty).
+
+#### Tenant Isolation / RBAC
+- Store ownership from `TenantContext`; warehouse ids resolved through tenant-scoped queries and the user's allowed set; covered again by the H2-13 access matrix.
+
+#### Backward compatibility
+- Additive routes; the same-day promise logic is untouched (it already read this policy).
+
+#### Deployment observation
+- Manual deploy: NOT PERFORMED; production verification: NOT PERFORMED.
+
+#### Next
+- H2-6 — Product Preparation Time.
 
 ---
 
