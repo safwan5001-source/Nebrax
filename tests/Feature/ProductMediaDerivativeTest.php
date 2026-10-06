@@ -111,9 +111,11 @@ class ProductMediaDerivativeTest extends TestCase
             ['portrait.png', 'png', 300, 900, [67, 200], [267, 800], 'image/png'],
             ['landscape.webp', 'webp', 1200, 600, [200, 100], [800, 400], 'image/webp'],
         ] as [$filename, $format, $width, $height, $thumbnailDimensions, $cardDimensions, $mimeType]) {
-            $mediaId = $this->withToken($auth['token'])->postJson("/api/products/{$product['id']}/media", [
+            $response = $this->withToken($auth['token'])->postJson("/api/products/{$product['id']}/media", [
                 'media' => [$this->image($filename, $format, $width, $height)],
-            ])->assertCreated()->json('data.0.id');
+            ])->assertCreated();
+            $rows = $response->json('data');
+            $mediaId = $rows[array_key_last($rows)]['id'];
 
             $media = ProductMedia::findOrFail($mediaId);
             $thumbnail = $service->derivativePath($media, ProductMediaDerivativeService::THUMBNAIL);
@@ -282,6 +284,7 @@ class ProductMediaDerivativeTest extends TestCase
         ])->assertCreated()->json('data.0.id');
         $url = "/api/products/{$product['id']}/media/{$mediaId}/derivatives/card";
 
+        $this->flushHeaders();
         $this->get($url)->assertUnauthorized();
         $selfServiceToken = $this->tokenForRole($auth['tenant_id'], 'self_service', 'self-service@derivative-authorized.test');
         $this->withToken($selfServiceToken)->get($url)->assertForbidden();
