@@ -18,6 +18,7 @@ import {
 import { IdentityDetail } from "@/components/store/IdentityDetail";
 import { OfficialStoreBadge } from "@/components/store/OfficialStoreBadge";
 import { POLICY_LINKS } from "@/lib/constants/policies";
+import type { MediaRef, ResolvedMedia } from "@/lib/presentation/media-ref";
 import { isSafeAppStoreUrl, isSafePlayStoreUrl } from "@/lib/presentation/urls";
 import { isWholesaleEnabled } from "@/lib/spree";
 
@@ -34,6 +35,8 @@ interface FooterProps {
   showSbc?: boolean;
   sbcSealToken?: string;
   logoUrl?: string | null;
+  /** CUST-HV V4a — resolved media-library logo (see `StoreBrand`). */
+  logoMedia?: { ref: MediaRef; media: ResolvedMedia } | null;
   showLogo?: boolean;
   tagline?: string;
   copyright?: string;
@@ -146,6 +149,7 @@ export async function Footer({
   showSbc = false,
   sbcSealToken = "",
   logoUrl = null,
+  logoMedia = null,
   showLogo = true,
   tagline = "",
   copyright = "",
@@ -218,6 +222,8 @@ export async function Footer({
             tone="dark"
             size="md"
             logoUrl={logoUrl}
+            logoMedia={logoMedia}
+            locale={locale}
             className="focus-visible:outline-store-footer-foreground"
           />
         ) : (

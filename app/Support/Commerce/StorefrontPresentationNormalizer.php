@@ -399,7 +399,7 @@ final class StorefrontPresentationNormalizer
                 'logoDataUrl' => $this->cappedLogo($this->sanitizeLogoUrl($this->asString($brandingRaw['logoDataUrl'] ?? null))),
                 'compactLogoDataUrl' => $this->cappedLogo($this->sanitizeLogoUrl($this->asString($brandingRaw['compactLogoDataUrl'] ?? null))),
                 'faviconDataUrl' => $this->cappedLogo($this->sanitizeLogoUrl($this->asString($brandingRaw['faviconDataUrl'] ?? null))),
-            ],
+            ] + $this->brandingMedia($brandingRaw),
             'header' => [
                 'style' => $this->inList($headerRaw['style'] ?? null, self::HEADER_STYLES, 'standard'),
                 'showSearch' => $this->asBoolean($headerRaw['showSearch'] ?? null, true),
@@ -525,6 +525,29 @@ final class StorefrontPresentationNormalizer
         }
 
         return $rebuilt;
+    }
+
+    /**
+     * CUST-HV V4a — شعار/شعار مصغّر/أيقونة المتصفح كـ`MediaRef` (يحلّ DEF-5: لا Base64
+     * مكرّراً في كل نسخة). مفاتيح **إضافية اختيارية** تُصدَر فقط عند وجود مرجعٍ صالح؛
+     * وإن وُجد المرجع والحقل القديم معاً فالمرجع هو الأسبق عرضاً. الحقول القديمة
+     * (data-URL/https) تُقرأ وتُعرض إلى الأبد؛ الترحيل كسول عند الحفظ التالي لا
+     * إعادة كتابة جماعية.
+     *
+     * @param  array<string,mixed>  $brandingRaw
+     * @return array<string,array<string,mixed>>
+     */
+    private function brandingMedia(array $brandingRaw): array
+    {
+        $out = [];
+        foreach (['logoMedia', 'compactLogoMedia', 'faviconMedia'] as $key) {
+            $ref = StorefrontMediaRefNormalizer::normalize($brandingRaw[$key] ?? null);
+            if ($ref !== null) {
+                $out[$key] = $ref;
+            }
+        }
+
+        return $out;
     }
 
     public function sanitizeLogoUrl(?string $value): ?string

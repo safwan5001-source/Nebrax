@@ -10,6 +10,7 @@ import { StoreBrand } from "@/components/layout/StoreBrand";
 import { StoreContainer } from "@/components/layout/StoreContainer";
 import { StoreSearch } from "@/components/layout/StoreSearch";
 import { Button } from "@/components/ui/button";
+import type { MediaRef, ResolvedMedia } from "@/lib/presentation/media-ref";
 import { isWholesaleEnabled } from "@/lib/spree";
 
 const LazyMobileMenu = dynamic(
@@ -41,6 +42,8 @@ interface HeaderProps {
   categoryNavigation: ReactNode;
   storeName: string | null;
   logoUrl?: string | null;
+  /** CUST-HV V4a — resolved media-library logo (see `StoreBrand`). */
+  logoMedia?: { ref: MediaRef; media: ResolvedMedia } | null;
   showSearch?: boolean;
   showAccount?: boolean;
   showCart?: boolean;
@@ -99,6 +102,7 @@ export async function Header({
   categoryNavigation,
   storeName,
   logoUrl = null,
+  logoMedia = null,
   showSearch = true,
   showAccount = true,
   showCart = true,
@@ -148,6 +152,8 @@ export async function Header({
               name={displayName}
               size="md"
               logoUrl={logoUrl}
+              logoMedia={logoMedia}
+              locale={locale}
               className="justify-self-center md:justify-self-start"
             />
 

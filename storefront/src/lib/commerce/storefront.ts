@@ -1,6 +1,8 @@
 import { cache } from "react";
 import type { StorefrontPresentationConfig } from "@/lib/presentation/config";
+import type { ResolvedMediaMap } from "@/lib/presentation/media-ref";
 import { readPublishedPresentation } from "@/lib/presentation/public";
+import { readResolvedMedia } from "@/lib/presentation/resolved-media";
 import { storefrontFetch } from "./config";
 
 export interface AwjStorefrontConfig {
@@ -13,6 +15,12 @@ export interface AwjStorefrontConfig {
    * Draft is never present on this payload.
    */
   presentation: StorefrontPresentationConfig | null;
+  /**
+   * CUST-HV V4a — every published `MediaRef` joined with the media library,
+   * keyed by its JSON path in `presentation`. Empty when the document carries no
+   * media. Entries that do not match the contract are dropped on read.
+   */
+  presentationMedia?: ResolvedMediaMap;
 }
 
 export interface AwjBusinessIdentity {
@@ -27,6 +35,7 @@ interface AwjStorefrontConfigResponse {
     default_locale?: string | null;
     business_identity?: unknown;
     presentation?: unknown;
+    presentation_media?: unknown;
   };
 }
 
@@ -117,6 +126,9 @@ export const fetchStorefrontConfig = cache(
       business_identity: readBusinessIdentity(response.data.business_identity),
       presentation: readPublishedPresentation(
         response.data.presentation ?? null,
+      ),
+      presentationMedia: readResolvedMedia(
+        response.data.presentation_media ?? null,
       ),
     };
   },

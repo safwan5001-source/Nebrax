@@ -1,6 +1,7 @@
 export * from "./announcements";
 export * from "./capabilities";
 export * from "./config";
+export * from "./media-ref";
 export * from "./flowers-pack";
 export * from "./page-region-registry";
 export * from "./page-regions";

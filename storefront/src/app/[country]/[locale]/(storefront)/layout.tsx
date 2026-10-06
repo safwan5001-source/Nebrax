@@ -21,6 +21,7 @@ import {
   publishedThemeStyle,
   publishedWhatsAppHref,
 } from "@/lib/presentation/public";
+import { publishedLogoMedia } from "@/lib/presentation/resolved-media";
 import {
   isSafeAppStoreUrl,
   isSafePlayStoreUrl,
@@ -182,6 +183,11 @@ export default async function StorefrontLayout({
   const themeStyle = publishedThemeStyle(presentation);
   const compact = presentation?.header.style === "compact";
   const logoUrl = publishedLogoUrl(presentation, compact);
+  const logoMedia = publishedLogoMedia(
+    presentation,
+    identity?.presentationMedia ?? {},
+    compact,
+  );
   const extraLinks = publishedExtraNav(presentation, basePath);
   const showCategoryNav = presentation
     ? presentation.header.showCategoryNav
@@ -238,6 +244,7 @@ export default async function StorefrontLayout({
         locale={locale as Locale}
         storeName={displayName}
         logoUrl={logoUrl}
+        logoMedia={logoMedia}
         showSearch={presentation ? presentation.header.showSearch : true}
         showAccount={presentation ? presentation.header.showAccount : true}
         showCart={presentation ? presentation.header.showCart : true}
@@ -294,6 +301,7 @@ export default async function StorefrontLayout({
         showSbc={presentation?.sbc.show_in_storefront ?? false}
         sbcSealToken={presentation?.sbc.seal_token ?? ""}
         logoUrl={logoUrl}
+        logoMedia={logoMedia}
         showLogo={presentation ? presentation.footer.showLogo : true}
         tagline={presentation?.footer.tagline ?? ""}
         copyright={presentation?.footer.copyright ?? ""}

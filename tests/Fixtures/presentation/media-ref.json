@@ -1,0 +1,454 @@
+{
+    "cases": [
+        {
+            "name": "id canonicalised to lowercase and trimmed",
+            "input": {
+                "mediaId": "  0B8F6C2E-3D3A-4A53-9C7E-8F1A2B3C4D5E  "
+            },
+            "expected": {
+                "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            }
+        },
+        {
+            "name": "non-uuid id drops the whole ref",
+            "input": {
+                "mediaId": "not-a-uuid"
+            },
+            "expected": null
+        },
+        {
+            "name": "missing id",
+            "input": {
+                "fit": "contain"
+            },
+            "expected": null
+        },
+        {
+            "name": "non-object",
+            "input": "x",
+            "expected": null
+        },
+        {
+            "name": "list instead of object",
+            "input": [
+                {
+                    "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                }
+            ],
+            "expected": null
+        },
+        {
+            "name": "numeric id",
+            "input": {
+                "mediaId": 123
+            },
+            "expected": null
+        },
+        {
+            "name": "urls paths dimensions and luminance never survive",
+            "input": {
+                "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+                "url": "https://x/y.jpg",
+                "src": "/a",
+                "path": "p",
+                "width": 10,
+                "height": 5,
+                "avg_luminance": 9,
+                "style": "x"
+            },
+            "expected": {
+                "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            }
+        },
+        {
+            "name": "fit contain kept, cover omitted, unknown omitted",
+            "input": {
+                "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+                "fit": "contain"
+            },
+            "expected": {
+                "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+                "fit": "contain"
+            }
+        },
+        {
+            "name": "fit cover is the default",
+            "input": {
+                "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+                "fit": "cover"
+            },
+            "expected": {
+                "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            }
+        },
+        {
+            "name": "fit unknown",
+            "input": {
+                "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+                "fit": "stretch"
+            },
+            "expected": {
+                "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            }
+        },
+        {
+            "name": "focal rounds to integers",
+            "input": {
+                "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+                "focal": {
+                    "x": 33.4,
+                    "y": 70.6
+                }
+            },
+            "expected": {
+                "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+                "focal": {
+                    "x": 33,
+                    "y": 71
+                }
+            }
+        },
+        {
+            "name": "focal at centre is the default",
+            "input": {
+                "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+                "focal": {
+                    "x": 50,
+                    "y": 50
+                }
+            },
+            "expected": {
+                "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            }
+        },
+        {
+            "name": "focal out of range dropped",
+            "input": {
+                "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+                "focal": {
+                    "x": 101,
+                    "y": 5
+                }
+            },
+            "expected": {
+                "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            }
+        },
+        {
+            "name": "focal with extra key dropped",
+            "input": {
+                "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+                "focal": {
+                    "x": 1,
+                    "y": 2,
+                    "z": 3
+                }
+            },
+            "expected": {
+                "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            }
+        },
+        {
+            "name": "crop kept with explicit zoom normalised to 2 dp",
+            "input": {
+                "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+                "crop": {
+                    "x": 0.25,
+                    "y": 0.1,
+                    "w": 0.5,
+                    "h": 0.5,
+                    "aspect": "16:9",
+                    "zoom": 2.004
+                }
+            },
+            "expected": {
+                "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+                "crop": {
+                    "x": 0.25,
+                    "y": 0.1,
+                    "w": 0.5,
+                    "h": 0.5,
+                    "aspect": "16:9",
+                    "zoom": 2
+                }
+            }
+        },
+        {
+            "name": "crop zoom 1 omitted",
+            "input": {
+                "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+                "crop": {
+                    "x": 0.25,
+                    "y": 0.1,
+                    "w": 0.5,
+                    "h": 0.5,
+                    "aspect": "16:9",
+                    "zoom": 1
+                }
+            },
+            "expected": {
+                "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+                "crop": {
+                    "x": 0.25,
+                    "y": 0.1,
+                    "w": 0.5,
+                    "h": 0.5,
+                    "aspect": "16:9"
+                }
+            }
+        },
+        {
+            "name": "crop float noise collapses to 4 dp",
+            "input": {
+                "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+                "crop": {
+                    "x": 0.25000001,
+                    "y": 0.10000002,
+                    "w": 0.49999999,
+                    "h": 0.5,
+                    "aspect": "16:9"
+                }
+            },
+            "expected": {
+                "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+                "crop": {
+                    "x": 0.25,
+                    "y": 0.1,
+                    "w": 0.5,
+                    "h": 0.5,
+                    "aspect": "16:9"
+                }
+            }
+        },
+        {
+            "name": "invalid crop dropped, valid rotate kept",
+            "input": {
+                "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+                "crop": {
+                    "x": 0.8,
+                    "y": 0,
+                    "w": 0.5,
+                    "h": 1,
+                    "aspect": "1:1"
+                },
+                "rotate": 90
+            },
+            "expected": {
+                "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+                "rotate": 90
+            }
+        },
+        {
+            "name": "unknown crop aspect dropped",
+            "input": {
+                "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+                "crop": {
+                    "aspect": "2:1",
+                    "x": 0.25,
+                    "y": 0.1,
+                    "w": 0.5,
+                    "h": 0.5
+                }
+            },
+            "expected": {
+                "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            }
+        },
+        {
+            "name": "zoom above 4 drops the crop",
+            "input": {
+                "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+                "crop": {
+                    "x": 0.25,
+                    "y": 0.1,
+                    "w": 0.5,
+                    "h": 0.5,
+                    "aspect": "16:9",
+                    "zoom": 9
+                }
+            },
+            "expected": {
+                "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            }
+        },
+        {
+            "name": "rotate 180 kept",
+            "input": {
+                "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+                "rotate": 180
+            },
+            "expected": {
+                "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+                "rotate": 180
+            }
+        },
+        {
+            "name": "rotate 0 omitted",
+            "input": {
+                "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+                "rotate": 0
+            },
+            "expected": {
+                "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            }
+        },
+        {
+            "name": "rotate 45 dropped",
+            "input": {
+                "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+                "rotate": 45
+            },
+            "expected": {
+                "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            }
+        },
+        {
+            "name": "rotate as string dropped",
+            "input": {
+                "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+                "rotate": "90"
+            },
+            "expected": {
+                "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            }
+        },
+        {
+            "name": "alt trimmed, control chars flattened, per locale",
+            "input": {
+                "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+                "alt": {
+                    "ar": "  شعار\n المتجر  ",
+                    "en": "Store\tlogo"
+                }
+            },
+            "expected": {
+                "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+                "alt": {
+                    "ar": "شعار  المتجر",
+                    "en": "Store logo"
+                }
+            }
+        },
+        {
+            "name": "alt empty and non-string omitted",
+            "input": {
+                "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+                "alt": {
+                    "ar": "   ",
+                    "en": 5
+                }
+            },
+            "expected": {
+                "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            }
+        },
+        {
+            "name": "alt capped at 150 code points",
+            "input": {
+                "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+                "alt": {
+                    "ar": "صصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصص"
+                }
+            },
+            "expected": {
+                "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+                "alt": {
+                    "ar": "صصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصص"
+                }
+            }
+        },
+        {
+            "name": "alt is never cross-substituted",
+            "input": {
+                "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+                "alt": {
+                    "ar": "نص"
+                }
+            },
+            "expected": {
+                "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+                "alt": {
+                    "ar": "نص"
+                }
+            }
+        },
+        {
+            "name": "alt of the wrong shape dropped",
+            "input": {
+                "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+                "alt": "plain string"
+            },
+            "expected": {
+                "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            }
+        },
+        {
+            "name": "decorative true kept",
+            "input": {
+                "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+                "decorative": true
+            },
+            "expected": {
+                "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+                "decorative": true
+            }
+        },
+        {
+            "name": "decorative must be a real boolean",
+            "input": {
+                "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+                "decorative": "true"
+            },
+            "expected": {
+                "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            }
+        },
+        {
+            "name": "full ref keeps a fixed key order",
+            "input": {
+                "decorative": true,
+                "alt": {
+                    "en": "e",
+                    "ar": "ع"
+                },
+                "rotate": 270,
+                "crop": {
+                    "x": 0.25,
+                    "y": 0.1,
+                    "w": 0.5,
+                    "h": 0.5,
+                    "aspect": "16:9",
+                    "zoom": 1.5
+                },
+                "focal": {
+                    "x": 10,
+                    "y": 90
+                },
+                "fit": "contain",
+                "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            },
+            "expected": {
+                "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+                "fit": "contain",
+                "focal": {
+                    "x": 10,
+                    "y": 90
+                },
+                "crop": {
+                    "x": 0.25,
+                    "y": 0.1,
+                    "w": 0.5,
+                    "h": 0.5,
+                    "aspect": "16:9",
+                    "zoom": 1.5
+                },
+                "rotate": 270,
+                "alt": {
+                    "ar": "ع",
+                    "en": "e"
+                },
+                "decorative": true
+            }
+        }
+    ]
+}
