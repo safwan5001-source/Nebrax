@@ -22,8 +22,9 @@ afterEach(() => {
 type Row = Record<string, unknown>;
 const block = (type: string, over: Row = {}): Row => ({ block_type: type, body: `نص ${type}`, body_en: null, is_active: true, ...over });
 
-function server(initial: Row[], opts: { rejectSave?: ApiError; canManage?: boolean; noRevision?: boolean } = {}) {
+function server(initial: Row[], opts: { rejectSave?: ApiError; canManage?: boolean; noRevision?: boolean; revisionFromSecondRead?: boolean } = {}) {
   let current = initial;
+  let reads = 0;
   let readFails = false;
   const writes: { blocks: Row[]; expected_revision?: string }[] = [];
   const revisionOf = (rows: Row[]) => JSON.stringify(rows);
@@ -36,7 +37,10 @@ function server(initial: Row[], opts: { rejectSave?: ApiError; canManage?: boole
     } else if (readFails) {
       throw new ApiError(500, 'boom', {});
     }
-    return { data: { blocks: current, ...(opts.noRevision ? {} : { revision: revisionOf(current) }) } };
+    reads += 1;
+    const hidden = opts.noRevision || (opts.revisionFromSecondRead && reads === 1);
+
+    return { data: { blocks: current, ...(hidden ? {} : { revision: revisionOf(current) }) } };
   });
   renderIntl(
     <ToastProvider>
@@ -159,6 +163,14 @@ describe('ContentSection', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Save' }));
     await waitFor(() => expect(document.querySelector('[role="alert"]')).not.toBeNull());
     expect(srv.writes).toHaveLength(0);
+  });
+
+  it('carries the revision returned by the fallback pre-read into the PUT (rolling backend deploy)', async () => {
+    const srv = server([block('care')], { revisionFromSecondRead: true });
+    await userEvent.click(await screen.findByRole('switch', { name: 'Care: Active (visible to shoppers)' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(srv.writes).toHaveLength(1));
+    expect(srv.writes[0].expected_revision).toBe(JSON.stringify([block('care')]));
   });
 
   it('is read-only without products.manage', async () => {
