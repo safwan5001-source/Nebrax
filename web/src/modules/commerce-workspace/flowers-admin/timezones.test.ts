@@ -6,10 +6,14 @@ describe('timezones', () => {
     const aliases = ['Asia/Calcutta', 'Asia/Saigon', 'Asia/Katmandu', 'Asia/Rangoon', 'Asia/Istanbul', 'Europe/Kiev', 'America/Buenos_Aires', 'Pacific/Samoa', 'US/Eastern', 'GMT'];
     for (const zone of [...COMMON_TIMEZONES, ...WORLD_TIMEZONES]) {
       expect(aliases, zone).not.toContain(zone);
-      expect(zone, zone).toMatch(/^([A-Za-z_]+\/[A-Za-z_]+|UTC)$/);
+      expect(zone, zone).toMatch(/^([A-Za-z_-]+(\/[A-Za-z_-]+){1,2}|UTC)$/);
     }
     expect(new Set(WORLD_TIMEZONES).size).toBe(WORLD_TIMEZONES.length);
     expect(WORLD_TIMEZONES).toContain('Asia/Kolkata');
+    // كل ما يقبله الخادم متاح (قائمة PHP كاملة) — لا منطقة مقبولة تُخفى عن التاجر (مراجعة Codex على H2-2).
+    expect(WORLD_TIMEZONES.length).toBeGreaterThanOrEqual(400);
+    for (const zone of ['Europe/Zurich', 'America/Phoenix', 'Africa/Accra', 'Pacific/Fiji', 'UTC']) expect(WORLD_TIMEZONES).toContain(zone);
+    for (const zone of COMMON_TIMEZONES) expect(WORLD_TIMEZONES).toContain(zone);
   });
 
   it('lists common markets first and never duplicates them in the rest', () => {
