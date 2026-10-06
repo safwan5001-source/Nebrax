@@ -43,6 +43,11 @@ describe('add-ons client', () => {
     expect(mapAddons({ data: {} })).toBeNull();
   });
 
+  it('fails the load on a row it cannot read instead of dropping it (a whole-set save would delete it server-side)', () => {
+    expect(mapAddons({ data: { addons: [{ addon_product_id: 'a', max_quantity: 1 }, { nope: true }] } })).toBeNull();
+    expect(mapAddons({ data: { addons: [{ addon_product_id: 'a', max_quantity: 1 }] } })).toHaveLength(1);
+  });
+
   it('sends only ids, variant, quantity and active — never a price or name', () => {
     const payload = addonsPayload(rows());
     expect(payload.addons[0]).toEqual({ addon_product_id: 'a', addon_variant_id: null, max_quantity: 3, is_active: true });
