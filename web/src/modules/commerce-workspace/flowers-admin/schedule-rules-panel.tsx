@@ -183,14 +183,14 @@ export function ScheduleRulesPanel({
               <optgroup label={t('schedTimezoneCommon')}>
                 {groups.common.map((zone) => (
                   <option key={zone} value={zone}>
-                    {zoneLabel(zone, locale)}
+                    {zoneLabel(zone)}
                   </option>
                 ))}
               </optgroup>
               <optgroup label={t('schedTimezoneOther')}>
                 {groups.other.map((zone) => (
                   <option key={zone} value={zone}>
-                    {zone.replace(/_/g, ' ')} ({zoneLabel(zone, locale).split('(').pop()?.replace(')', '') || ''})
+                    {zoneLabel(zone)}
                   </option>
                 ))}
               </optgroup>

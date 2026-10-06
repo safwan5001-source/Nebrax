@@ -4,6 +4,8 @@
  * يعود برفضٍ صريح (422) ولا يُخفى.
  */
 
+import { safeTimeZone, timeZoneOffsetLabel, utcIsoToZonedWallTime } from '@/lib/timezone';
+
 export const COMMON_TIMEZONES = [
   'Asia/Riyadh',
   'Asia/Dubai',
@@ -42,32 +44,22 @@ export function timezoneGroups(current: string): TimezoneGroups {
   return { common, other };
 }
 
-/** «GMT+3» لمنطقة؛ فارغ إن لم تُدعم. */
-export function zoneOffsetLabel(timeZone: string, locale: string | undefined, at: Date = new Date()): string {
-  try {
-    const part = new Intl.DateTimeFormat(locale?.startsWith('en') ? 'en-GB' : 'en-GB', { timeZone, timeZoneName: 'shortOffset' })
-      .formatToParts(at)
-      .find((p) => p.type === 'timeZoneName');
-
-    return part?.value ?? '';
-  } catch {
-    return '';
-  }
-}
-
-/** اسم مقروء: «Riyadh (GMT+3)» — المدينة من المعرّف نفسه فتتطابق مع ما يعرفه التاجر من لوحات الشحن. */
-export function zoneLabel(timeZone: string, locale: string | undefined, at: Date = new Date()): string {
+/** «Riyadh (GMT+03:00)»: المدينة من المعرّف نفسه فتتطابق مع ما يعرفه التاجر من لوحات الشحن. */
+export function zoneLabel(timeZone: string): string {
   const city = (timeZone.split('/').pop() ?? timeZone).replace(/_/g, ' ');
-  const offset = zoneOffsetLabel(timeZone, locale, at);
 
-  return offset ? `${city} (${offset})` : city;
+  return `${city} (${timeZoneOffsetLabel(timeZone)})`;
 }
 
-/** الساعة الحالية بصيغة HH:mm في المنطقة (أرقام لاتينية، 24 ساعة)؛ `null` إن كانت المنطقة غير مفهومة للمتصفّح. */
+/** معرّف IANA يفهمه المتصفّح؟ (`safeTimeZone` يسقط على الافتراضي لغير المفهوم، فلا نقبل ذلك السقوط الصامت هنا). */
+export const isKnownZone = (timeZone: string): boolean => safeTimeZone(timeZone) === timeZone.trim();
+
+/** الساعة الحالية `HH:mm` في المنطقة (24 ساعة، أرقام لاتينية)؛ `null` إن لم يفهم المتصفّح المنطقة. */
 export function currentTimeIn(timeZone: string, at: Date = new Date()): string | null {
-  try {
-    return new Intl.DateTimeFormat('en-GB', { timeZone, hour: '2-digit', minute: '2-digit', hour12: false }).format(at);
-  } catch {
-    return null;
-  }
+  return isKnownZone(timeZone) ? (utcIsoToZonedWallTime(at.toISOString(), timeZone)?.time ?? null) : null;
+}
+
+/** تاريخ اليوم `YYYY-MM-DD` في المنطقة (لا في منطقة الجهاز)؛ `null` إن لم تُفهم. */
+export function currentDateIn(timeZone: string, at: Date = new Date()): string | null {
+  return isKnownZone(timeZone) ? (utcIsoToZonedWallTime(at.toISOString(), timeZone)?.date ?? null) : null;
 }

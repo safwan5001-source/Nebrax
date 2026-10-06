@@ -122,7 +122,8 @@ export function timeZoneDisplayLabel(timeZone: string, locale: "ar" | "en"): str
   return locale === "ar" ? `بتوقيت ${zone} (${offset})` : `${zone} time (${offset})`;
 }
 
-function timeZoneOffsetLabel(timeZone: string): string {
+/** «GMT+03:00» لمنطقة (الآن)؛ «UTC» إن لم تُفهم. */
+export function timeZoneOffsetLabel(timeZone: string): string {
   try {
     const part = new Intl.DateTimeFormat("en-US", {
       timeZone,
