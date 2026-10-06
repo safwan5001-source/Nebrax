@@ -4,10 +4,11 @@ import { useMemo, useState } from 'react';
 import { Tabs } from '@/components/ui/tabs';
 import { flowersAdminT } from '../messages';
 import { AddonsSection } from './addons-section';
+import { ContentSection } from './content-section';
 import { PersonalizationSection } from './personalization-section';
 import { PreparationSection } from './preparation-section';
 
-export const GIFTING_SECTIONS = ['preparation', 'personalization', 'addons'] as const;
+export const GIFTING_SECTIONS = ['preparation', 'personalization', 'addons', 'content'] as const;
 export type GiftingSectionId = (typeof GIFTING_SECTIONS)[number];
 
 /**
@@ -29,6 +30,7 @@ export function ProductGiftingWorkspace({ productId, locale, canManage }: { prod
     preparation: { label: t('prepTitle'), node: <PreparationSection productId={productId} locale={locale} canManage={canManage} /> },
     personalization: { label: t('persTitle'), node: <PersonalizationSection productId={productId} locale={locale} canManage={canManage} /> },
     addons: { label: t('addonTitle'), node: <AddonsSection productId={productId} locale={locale} canManage={canManage} /> },
+    content: { label: t('ctTitle'), node: <ContentSection productId={productId} locale={locale} canManage={canManage} /> },
   };
 
   return (
