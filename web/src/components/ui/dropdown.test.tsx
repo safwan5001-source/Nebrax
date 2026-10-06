@@ -29,6 +29,12 @@ describe('DropdownItem — choice and external-link items', () => {
 
     expect(screen.getByRole('menuitemradio', { name: 'Tablet' }).getAttribute('aria-checked')).toBe('true');
     expect(screen.getByRole('menuitemradio', { name: 'Mobile' }).getAttribute('aria-checked')).toBe('false');
+    // The choice is visible, not only announced: a check mark on the active
+    // item, reserved (invisible) on the others so labels do not jump.
+    const checkOf = (name: string) =>
+      screen.getByRole('menuitemradio', { name }).querySelector('svg');
+    expect(checkOf('Tablet')?.getAttribute('class')).not.toContain('invisible');
+    expect(checkOf('Mobile')?.getAttribute('class')).toContain('invisible');
     // An item that never opts in stays a plain menuitem — nothing existing changes role.
     expect(screen.getByRole('menuitem', { name: 'Plain' }).getAttribute('aria-checked')).toBeNull();
 

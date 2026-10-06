@@ -154,6 +154,7 @@ test.describe('CUST-HV V1A — toolbar primary-action reachability (DEF-11)', ()
     const box = (await menu.boundingBox())!;
     expect(box.x).toBeGreaterThanOrEqual(0);
     expect(box.x + box.width).toBeLessThanOrEqual(390.5);
+    await page.waitForTimeout(300); // the menu fades in over 150ms
     await page.screenshot({ path: path.join(evidenceDir, 'en-390-more-open.png') });
 
     await page.keyboard.press('Tab');
@@ -173,6 +174,7 @@ test.describe('CUST-HV V1A — toolbar primary-action reachability (DEF-11)', ()
     expect(box.x + box.width).toBeLessThanOrEqual(390.5);
     await expect(menu.getByRole('menuitem', { name: /فتح المتجر/ })).toBeVisible();
     await expect(menu.getByRole('menuitem', { name: 'استعادة الافتراضي' })).toBeVisible();
+    await page.waitForTimeout(300);
     await page.screenshot({ path: path.join(evidenceDir, 'ar-390-more-open.png') });
   });
 
@@ -181,6 +183,8 @@ test.describe('CUST-HV V1A — toolbar primary-action reachability (DEF-11)', ()
     await expect(page.locator('[data-device-option]').first()).toBeHidden();
     await page.getByRole('button', { name: MORE.ar }).click();
     const menu = page.getByRole('menu', { name: MORE.ar });
+    await page.waitForTimeout(300);
+    await page.screenshot({ path: path.join(evidenceDir, 'ar-768-more-open.png') });
     await menu.getByRole('menuitemradio', { name: 'جهاز لوحي' }).click();
     await expect(page.locator('[data-experience-builder]')).toHaveAttribute('data-device', 'tablet');
 
@@ -204,6 +208,7 @@ test.describe('CUST-HV V1A — toolbar primary-action reachability (DEF-11)', ()
     // where the same switch is inline.
     await expect(menu.locator('[data-more-device-option]')).toHaveCount(3);
     await expect(menu.locator('[data-more-device-option]').first()).toBeHidden();
+    await page.waitForTimeout(300);
     await page.screenshot({ path: path.join(evidenceDir, 'en-1024-more-open.png') });
   });
 
@@ -215,6 +220,7 @@ test.describe('CUST-HV V1A — toolbar primary-action reachability (DEF-11)', ()
     const menu = page.getByRole('menu', { name: MORE.en });
     await expect(menu.getByRole('menuitem', { name: 'Restore default' })).toBeVisible();
     await expect(menu.getByRole('menuitem', { name: 'Schedule' })).toBeHidden();
+    await page.waitForTimeout(300);
     await page.screenshot({ path: path.join(evidenceDir, 'en-1440-more-open.png') });
   });
 });

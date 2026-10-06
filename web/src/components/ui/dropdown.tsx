@@ -2,7 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import type { LucideIcon } from 'lucide-react';
+import { Check, type LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 /**
@@ -203,7 +203,15 @@ export function DropdownItem({
   const inner = (
     <>
       {Icon && <Icon className="h-4 w-4 shrink-0" strokeWidth={1.7} />}
-      <span className="truncate">{children}</span>
+      <span className={cn('truncate', checked && 'font-medium text-primary')}>{children}</span>
+      {/* خيار اختيار واحد: العلامة تُحجز دوماً لئلا تقفز العناوين عند التبديل. */}
+      {checked !== undefined && (
+        <Check
+          aria-hidden="true"
+          strokeWidth={2}
+          className={cn('ms-auto h-4 w-4 shrink-0 text-primary', !checked && 'invisible')}
+        />
+      )}
     </>
   );
 
