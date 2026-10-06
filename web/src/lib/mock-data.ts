@@ -2839,6 +2839,19 @@ const MOCK_WORKSPACE_CATEGORIES = [
   },
 ];
 
+/**
+ * Dev/visual-QA only (CUST-HV V1A) — advances a seeded Version's server-side
+ * revision, as a second editing session would. The next save from this one is
+ * then rejected with 409, which puts the builder in its version-conflict state
+ * without any network. Returns false when the Version is unknown.
+ */
+export function bumpMockPresentationVersionRevision(storefrontId: string, versionId: string): boolean {
+  const row = mockPresentationVersionsByStore.get(storefrontId)?.find((candidate) => candidate.id === versionId);
+  if (!row) return false;
+  row.revision += 1;
+  return true;
+}
+
 export function seedMockPresentationVersions(
   storefrontId: string,
   versions: Array<{
@@ -3731,7 +3744,13 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
       return resolve({ data: mockVersionDetail(storefrontId, row) });
     }
 
-    return resolve({ data: { id: 'demo-new' } });
+    // CUST-HV V1A — Version *save* (PUT). Its handler (with the revision check
+    // that yields the real 409 conflict) lives with the other version routes
+    // below and was unreachable for any non-GET verb, so a demo save always
+    // "succeeded" with an empty body and failed to parse. Let that one verb
+    // through; create/rename/delete keep their existing demo defaults.
+    const versionSavePath = /^\/commerce\/workspace\/storefronts\/[^/]+\/presentation\/versions\/[^/]+$/.test(clean);
+    if (!(m === 'PUT' && versionSavePath)) return resolve({ data: { id: 'demo-new' } });
   }
 
   if (clean === '/print-templates') return resolve({ data: mockPrintTemplates });

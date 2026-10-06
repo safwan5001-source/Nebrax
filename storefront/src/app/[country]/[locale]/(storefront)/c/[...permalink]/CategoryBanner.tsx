@@ -35,13 +35,19 @@ const BANNER_REGION_KEYS = [
 /**
  * The category header.
  *
- * It used to reserve a 350px cover band keyed on `category.image_url`. AWJ's
- * category resource exposes no image at all, so that band was an empty grey
- * rectangle above every category on the store — a third of the first viewport
- * spent saying nothing. There is no photograph to put there and inventing one
- * is exactly what the storefront must not do, so the band is gone rather than
- * filled: breadcrumbs, the name, the merchant's own description when there is
- * one, and the real subcategories.
+ * It used to reserve a 350px cover band keyed on `category.image_url` for
+ * every category. Back then the category resource exposed no image, so the band
+ * was an empty grey rectangle above every category on the store — a third of
+ * the first viewport spent saying nothing — and it was removed rather than
+ * filled with an invented photograph.
+ *
+ * The category resource carries the merchant's image now (since #1110; the
+ * Home categories section already renders it), but this header deliberately
+ * still renders none: a cover must appear only when the category actually has
+ * an image, never as a reserved band or a placeholder. That optional `cover`
+ * region is CUST-HV V9 (DEF-3b). Until then the header is breadcrumbs, the
+ * name, the merchant's own description when there is one, and the real
+ * subcategories.
  */
 export async function CategoryBanner({
   category,

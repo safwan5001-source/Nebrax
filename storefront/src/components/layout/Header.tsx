@@ -5,6 +5,7 @@ import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import type { ReactNode } from "react";
 import { CartButton } from "@/components/layout/CartButton";
+import type { StoreExtraNavLink } from "@/components/layout/MobileMenu";
 import { StoreBrand } from "@/components/layout/StoreBrand";
 import { StoreContainer } from "@/components/layout/StoreContainer";
 import { StoreSearch } from "@/components/layout/StoreSearch";
@@ -44,22 +45,25 @@ interface HeaderProps {
   showAccount?: boolean;
   showCart?: boolean;
   compact?: boolean;
-  extraLinks?: { id: string; label: string; href: string }[];
+  extraLinks?: StoreExtraNavLink[];
 }
 
 interface HeaderMobileMenuProps {
   rootCategories: Category[];
   basePath: string;
+  extraLinks?: StoreExtraNavLink[];
 }
 
 export function HeaderMobileMenu({
   rootCategories,
   basePath,
+  extraLinks = [],
 }: HeaderMobileMenuProps) {
   return (
     <LazyMobileMenu
       rootCategories={rootCategories}
       basePath={basePath}
+      extraLinks={extraLinks}
       wholesaleEnabled={isWholesaleEnabled()}
     />
   );
