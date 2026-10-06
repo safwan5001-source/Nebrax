@@ -78,6 +78,13 @@ final class ScheduledPresentationDispatcher
                 return 'published';
             }
 
+            if ($outcome === StorefrontPresentationVersionService::OUTCOME_VALIDATION_REJECTED) {
+                // يحتاج تصحيحاً من التاجر — نُظهره في السجلّ بمستوى تحذير لا معلومة عابرة.
+                Log::warning('storefront_presentations.schedule.validation_rejected', $context);
+
+                return 'skipped';
+            }
+
             Log::info('storefront_presentations.schedule.skipped', $context + ['outcome' => $outcome]);
 
             return 'skipped';

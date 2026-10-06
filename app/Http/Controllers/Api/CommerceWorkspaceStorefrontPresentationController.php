@@ -7,6 +7,7 @@ use App\Http\Requests\SaveStorefrontPresentationRequest;
 use App\Services\Commerce\ForwardSchemaVersionException;
 use App\Services\Commerce\NothingToPublishException;
 use App\Services\Commerce\PresentationDocumentTooLargeException;
+use App\Services\Commerce\PresentationPublishValidationException;
 use App\Services\Commerce\StaleDraftRevisionException;
 use App\Services\Commerce\StorefrontPresentationService;
 use App\Support\Commerce\StorefrontPresentationNormalizer;
@@ -83,6 +84,8 @@ class CommerceWorkspaceStorefrontPresentationController extends ApiController
             );
         } catch (StaleDraftRevisionException|ForwardSchemaVersionException $e) {
             abort(409, $e->getMessage());
+        } catch (PresentationPublishValidationException $e) {
+            return response()->json($e->toPayload(), 422);
         } catch (NothingToPublishException|PresentationDocumentTooLargeException $e) {
             abort(422, $e->getMessage());
         }

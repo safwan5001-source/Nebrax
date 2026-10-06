@@ -1,0 +1,1127 @@
+{
+ "_comment": "CUST-HV V3 — shared parity cases for the announcements contract (V0 §12). Read by StorefrontPresentationAnnouncementsTest (PHP) and the announcements tests of web and storefront; the three normalizers, the contrast maths and the window evaluation cannot drift silently. `input` is the value of the top-level `announcements` key; `expected` is its normalized value (null = key absent).",
+ "cases": [
+  {
+   "name": "absent value is absent (no empty entity)",
+   "input": null,
+   "expected": null
+  },
+  {
+   "name": "a list is not an object",
+   "input": [
+    "x"
+   ],
+   "expected": null
+  },
+  {
+   "name": "empty object",
+   "input": {},
+   "expected": null
+  },
+  {
+   "name": "disabled with no items collapses to absent",
+   "input": {
+    "enabled": false,
+    "items": []
+   },
+   "expected": null
+  },
+  {
+   "name": "disabled with items is kept for the editor",
+   "input": {
+    "enabled": false,
+    "items": [
+     {
+      "id": "a",
+      "text": "خصم"
+     }
+    ]
+   },
+   "expected": {
+    "enabled": false,
+    "items": [
+     {
+      "id": "a",
+      "text": "خصم",
+      "enabled": true
+     }
+    ]
+   }
+  },
+  {
+   "name": "minimal enabled item gets a positional id and defaults",
+   "input": {
+    "enabled": true,
+    "items": [
+     {
+      "text": "شحن مجاني"
+     }
+    ]
+   },
+   "expected": {
+    "enabled": true,
+    "items": [
+     {
+      "id": "ann-0",
+      "text": "شحن مجاني",
+      "enabled": true
+     }
+    ]
+   }
+  },
+  {
+   "name": "string booleans are not booleans",
+   "input": {
+    "enabled": "true",
+    "items": [
+     {
+      "text": "x",
+      "enabled": "false"
+     }
+    ]
+   },
+   "expected": {
+    "enabled": false,
+    "items": [
+     {
+      "id": "ann-0",
+      "text": "x",
+      "enabled": true
+     }
+    ]
+   }
+  },
+  {
+   "name": "control characters collapse to one space and text is trimmed",
+   "input": {
+    "enabled": true,
+    "items": [
+     {
+      "id": "a",
+      "text": "  أهلاً\r\n\tبكم  "
+     }
+    ]
+   },
+   "expected": {
+    "enabled": true,
+    "items": [
+     {
+      "id": "a",
+      "text": "أهلاً بكم",
+      "enabled": true
+     }
+    ]
+   }
+  },
+  {
+   "name": "text is capped at 120 code points",
+   "input": {
+    "enabled": true,
+    "items": [
+     {
+      "id": "a",
+      "text": "اااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااا"
+     }
+    ]
+   },
+   "expected": {
+    "enabled": true,
+    "items": [
+     {
+      "id": "a",
+      "text": "اااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااااا",
+      "enabled": true
+     }
+    ]
+   }
+  },
+  {
+   "name": "ZWNJ and RLM survive (they are letters in Arabic-script text)",
+   "input": {
+    "enabled": true,
+    "items": [
+     {
+      "id": "a",
+      "text": "می‌خواهم‏"
+     }
+    ]
+   },
+   "expected": {
+    "enabled": true,
+    "items": [
+     {
+      "id": "a",
+      "text": "می‌خواهم‏",
+      "enabled": true
+     }
+    ]
+   }
+  },
+  {
+   "name": "icon: registry key kept, unknown dropped",
+   "input": {
+    "enabled": true,
+    "items": [
+     {
+      "id": "a",
+      "text": "x",
+      "icon": "truck"
+     },
+     {
+      "id": "b",
+      "text": "y",
+      "icon": "<script>"
+     }
+    ]
+   },
+   "expected": {
+    "enabled": true,
+    "items": [
+     {
+      "id": "a",
+      "text": "x",
+      "enabled": true,
+      "icon": "truck"
+     },
+     {
+      "id": "b",
+      "text": "y",
+      "enabled": true
+     }
+    ]
+   }
+  },
+  {
+   "name": "href: internal path and https kept",
+   "input": {
+    "enabled": true,
+    "items": [
+     {
+      "id": "a",
+      "text": "x",
+      "href": "/offers?x=1"
+     },
+     {
+      "id": "b",
+      "text": "y",
+      "href": "https://example.com/a?b=1"
+     }
+    ]
+   },
+   "expected": {
+    "enabled": true,
+    "items": [
+     {
+      "id": "a",
+      "text": "x",
+      "enabled": true,
+      "href": "/offers?x=1"
+     },
+     {
+      "id": "b",
+      "text": "y",
+      "enabled": true,
+      "href": "https://example.com/a?b=1"
+     }
+    ]
+   }
+  },
+  {
+   "name": "href: unsafe or ambiguous values dropped",
+   "input": {
+    "enabled": true,
+    "items": [
+     {
+      "id": "a",
+      "text": "x",
+      "href": "//evil.example"
+     },
+     {
+      "id": "b",
+      "text": "x",
+      "href": "javascript:alert(1)"
+     },
+     {
+      "id": "c",
+      "text": "x",
+      "href": "http://plain.example"
+     },
+     {
+      "id": "d",
+      "text": "x",
+      "href": "offers"
+     },
+     {
+      "id": "e",
+      "text": "x",
+      "href": "/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+     }
+    ]
+   },
+   "expected": {
+    "enabled": true,
+    "items": [
+     {
+      "id": "a",
+      "text": "x",
+      "enabled": true
+     },
+     {
+      "id": "b",
+      "text": "x",
+      "enabled": true
+     },
+     {
+      "id": "c",
+      "text": "x",
+      "enabled": true
+     },
+     {
+      "id": "d",
+      "text": "x",
+      "enabled": true
+     },
+     {
+      "id": "e",
+      "text": "x",
+      "enabled": true
+     }
+    ]
+   }
+  },
+  {
+   "name": "surface: solid colours kept lower-cased",
+   "input": {
+    "enabled": true,
+    "items": [
+     {
+      "id": "a",
+      "text": "x",
+      "surface": {
+       "background": {
+        "hex": "#1E3A5F"
+       },
+       "text": {
+        "hex": "#FFFFFF"
+       },
+       "link": {
+        "hex": "#FDE68A"
+       }
+      }
+     }
+    ]
+   },
+   "expected": {
+    "enabled": true,
+    "items": [
+     {
+      "id": "a",
+      "text": "x",
+      "enabled": true,
+      "surface": {
+       "background": {
+        "hex": "#1e3a5f"
+       },
+       "text": {
+        "hex": "#ffffff"
+       },
+       "link": {
+        "hex": "#fde68a"
+       }
+      }
+     }
+    ]
+   }
+  },
+  {
+   "name": "surface: text and link need a custom background (otherwise automatic)",
+   "input": {
+    "enabled": true,
+    "items": [
+     {
+      "id": "a",
+      "text": "x",
+      "surface": {
+       "text": {
+        "hex": "#ffffff"
+       },
+       "link": {
+        "hex": "#ffffff"
+       }
+      }
+     }
+    ]
+   },
+   "expected": {
+    "enabled": true,
+    "items": [
+     {
+      "id": "a",
+      "text": "x",
+      "enabled": true
+     }
+    ]
+   }
+  },
+  {
+   "name": "surface: roles, gradients, bare strings and bad hex are dropped (V5 owns them)",
+   "input": {
+    "enabled": true,
+    "items": [
+     {
+      "id": "a",
+      "text": "x",
+      "surface": {
+       "background": {
+        "role": "brand"
+       }
+      }
+     },
+     {
+      "id": "b",
+      "text": "x",
+      "surface": {
+       "background": {
+        "kind": "gradient",
+        "from": {
+         "hex": "#000000"
+        },
+        "to": {
+         "hex": "#ffffff"
+        },
+        "direction": "to-end"
+       }
+      }
+     },
+     {
+      "id": "c",
+      "text": "x",
+      "surface": {
+       "background": "#112233"
+      }
+     },
+     {
+      "id": "d",
+      "text": "x",
+      "surface": {
+       "background": {
+        "hex": "#12345"
+       }
+      }
+     },
+     {
+      "id": "e",
+      "text": "x",
+      "surface": {
+       "background": {
+        "hex": "#112233"
+       },
+       "text": {
+        "hex": "red"
+       },
+       "link": {
+        "role": "link"
+       }
+      }
+     }
+    ]
+   },
+   "expected": {
+    "enabled": true,
+    "items": [
+     {
+      "id": "a",
+      "text": "x",
+      "enabled": true
+     },
+     {
+      "id": "b",
+      "text": "x",
+      "enabled": true
+     },
+     {
+      "id": "c",
+      "text": "x",
+      "enabled": true
+     },
+     {
+      "id": "d",
+      "text": "x",
+      "enabled": true
+     },
+     {
+      "id": "e",
+      "text": "x",
+      "enabled": true,
+      "surface": {
+       "background": {
+        "hex": "#112233"
+       }
+      }
+     }
+    ]
+   }
+  },
+  {
+   "name": "window: values kept verbatim, even malformed — never normalised to no-window",
+   "input": {
+    "enabled": true,
+    "items": [
+     {
+      "id": "a",
+      "text": "x",
+      "window": {
+       "startsAt": "2026-12-01T00:00:00Z",
+       "endsAt": "2026-12-31T20:59:00Z"
+      }
+     },
+     {
+      "id": "b",
+      "text": "x",
+      "window": {
+       "startsAt": "  غداً  ",
+       "endsAt": "2026-13-45"
+      }
+     },
+     {
+      "id": "c",
+      "text": "x",
+      "window": {
+       "startsAt": "",
+       "endsAt": "   "
+      }
+     },
+     {
+      "id": "d",
+      "text": "x",
+      "window": {
+       "startsAt": 7
+      }
+     }
+    ]
+   },
+   "expected": {
+    "enabled": true,
+    "items": [
+     {
+      "id": "a",
+      "text": "x",
+      "enabled": true,
+      "window": {
+       "startsAt": "2026-12-01T00:00:00Z",
+       "endsAt": "2026-12-31T20:59:00Z"
+      }
+     },
+     {
+      "id": "b",
+      "text": "x",
+      "enabled": true,
+      "window": {
+       "startsAt": "غداً",
+       "endsAt": "2026-13-45"
+      }
+     },
+     {
+      "id": "c",
+      "text": "x",
+      "enabled": true
+     },
+     {
+      "id": "d",
+      "text": "x",
+      "enabled": true
+     }
+    ]
+   }
+  },
+  {
+   "name": "pages: canonical order, 'all' implies the default, invalid ignored",
+   "input": {
+    "enabled": true,
+    "items": [
+     {
+      "id": "a",
+      "text": "x",
+      "pages": [
+       "product",
+       "home",
+       "product"
+      ]
+     },
+     {
+      "id": "b",
+      "text": "x",
+      "pages": [
+       "category",
+       "all"
+      ]
+     },
+     {
+      "id": "c",
+      "text": "x",
+      "pages": [
+       "checkout",
+       "cart"
+      ]
+     },
+     {
+      "id": "d",
+      "text": "x",
+      "pages": [
+       "category"
+      ]
+     },
+     {
+      "id": "e",
+      "text": "x",
+      "pages": "home"
+     }
+    ]
+   },
+   "expected": {
+    "enabled": true,
+    "items": [
+     {
+      "id": "a",
+      "text": "x",
+      "enabled": true,
+      "pages": [
+       "home",
+       "product"
+      ]
+     },
+     {
+      "id": "b",
+      "text": "x",
+      "enabled": true
+     },
+     {
+      "id": "c",
+      "text": "x",
+      "enabled": true
+     },
+     {
+      "id": "d",
+      "text": "x",
+      "enabled": true,
+      "pages": [
+       "category"
+      ]
+     },
+     {
+      "id": "e",
+      "text": "x",
+      "enabled": true
+     }
+    ]
+   }
+  },
+  {
+   "name": "items: capped at 5, duplicate ids first-wins, non-objects skipped, id fallback is positional",
+   "input": {
+    "enabled": true,
+    "items": [
+     {
+      "id": "x",
+      "text": "1"
+     },
+     "junk",
+     {
+      "id": "x",
+      "text": "2"
+     },
+     {
+      "text": "3"
+     },
+     {
+      "id": "bad id!",
+      "text": "4"
+     },
+     {
+      "id": "e",
+      "text": "5"
+     },
+     {
+      "id": "f",
+      "text": "6"
+     },
+     {
+      "id": "g",
+      "text": "7"
+     }
+    ]
+   },
+   "expected": {
+    "enabled": true,
+    "items": [
+     {
+      "id": "x",
+      "text": "1",
+      "enabled": true
+     },
+     {
+      "id": "ann-2",
+      "text": "3",
+      "enabled": true
+     },
+     {
+      "id": "ann-3",
+      "text": "4",
+      "enabled": true
+     },
+     {
+      "id": "e",
+      "text": "5",
+      "enabled": true
+     },
+     {
+      "id": "f",
+      "text": "6",
+      "enabled": true
+     }
+    ]
+   }
+  },
+  {
+   "name": "behaviour: only non-default values are stored",
+   "input": {
+    "enabled": true,
+    "items": [
+     {
+      "id": "a",
+      "text": "x"
+     }
+    ],
+    "behaviour": {
+     "rotate": true,
+     "rotateInterval": 10,
+     "sticky": true,
+     "dismissible": true
+    }
+   },
+   "expected": {
+    "enabled": true,
+    "items": [
+     {
+      "id": "a",
+      "text": "x",
+      "enabled": true
+     }
+    ],
+    "behaviour": {
+     "rotate": true,
+     "rotateInterval": 10,
+     "sticky": true,
+     "dismissible": true
+    }
+   }
+  },
+  {
+   "name": "behaviour: default interval and invalid values are omitted",
+   "input": {
+    "enabled": true,
+    "items": [
+     {
+      "id": "a",
+      "text": "x"
+     }
+    ],
+    "behaviour": {
+     "rotate": true,
+     "rotateInterval": 8,
+     "ticker": false,
+     "tickerSpeed": "fast",
+     "sticky": "yes"
+    }
+   },
+   "expected": {
+    "enabled": true,
+    "items": [
+     {
+      "id": "a",
+      "text": "x",
+      "enabled": true
+     }
+    ],
+    "behaviour": {
+     "rotate": true
+    }
+   }
+  },
+  {
+   "name": "behaviour: a ticker excludes rotation",
+   "input": {
+    "enabled": true,
+    "items": [
+     {
+      "id": "a",
+      "text": "x"
+     }
+    ],
+    "behaviour": {
+     "rotate": true,
+     "rotateInterval": 6,
+     "ticker": true,
+     "tickerSpeed": "fast"
+    }
+   },
+   "expected": {
+    "enabled": true,
+    "items": [
+     {
+      "id": "a",
+      "text": "x",
+      "enabled": true
+     }
+    ],
+    "behaviour": {
+     "ticker": true,
+     "tickerSpeed": "fast"
+    }
+   }
+  },
+  {
+   "name": "behaviour: rotation interval outside 6/8/10 is dropped",
+   "input": {
+    "enabled": true,
+    "items": [
+     {
+      "id": "a",
+      "text": "x"
+     }
+    ],
+    "behaviour": {
+     "rotate": true,
+     "rotateInterval": 3,
+     "ticker": true,
+     "tickerSpeed": "normal"
+    }
+   },
+   "expected": {
+    "enabled": true,
+    "items": [
+     {
+      "id": "a",
+      "text": "x",
+      "enabled": true
+     }
+    ],
+    "behaviour": {
+     "ticker": true
+    }
+   }
+  },
+  {
+   "name": "behaviour alone keeps the document (editor state)",
+   "input": {
+    "enabled": false,
+    "items": [],
+    "behaviour": {
+     "sticky": true
+    }
+   },
+   "expected": {
+    "enabled": false,
+    "items": [],
+    "behaviour": {
+     "sticky": true
+    }
+   }
+  },
+  {
+   "name": "unknown keys are dropped at every level",
+   "input": {
+    "enabled": true,
+    "bar": 1,
+    "items": [
+     {
+      "id": "a",
+      "text": "x",
+      "color": "red",
+      "surface": {
+       "background": {
+        "hex": "#112233",
+        "alpha": 5
+       },
+       "shadow": "x"
+      },
+      "window": {
+       "startsAt": "2026-01-01T00:00:00Z",
+       "tz": "x"
+      }
+     }
+    ],
+    "behaviour": {
+     "sticky": true,
+     "blink": true
+    }
+   },
+   "expected": {
+    "enabled": true,
+    "items": [
+     {
+      "id": "a",
+      "text": "x",
+      "enabled": true,
+      "surface": {
+       "background": {
+        "hex": "#112233"
+       }
+      },
+      "window": {
+       "startsAt": "2026-01-01T00:00:00Z"
+      }
+     }
+    ],
+    "behaviour": {
+     "sticky": true
+    }
+   }
+  },
+  {
+   "name": "href: whitespace and data URIs dropped",
+   "input": {
+    "enabled": true,
+    "items": [
+     {
+      "id": "a",
+      "text": "x",
+      "href": "/has space"
+     },
+     {
+      "id": "b",
+      "text": "x",
+      "href": "data:text/html,x"
+     }
+    ]
+   },
+   "expected": {
+    "enabled": true,
+    "items": [
+     {
+      "id": "a",
+      "text": "x",
+      "enabled": true
+     },
+     {
+      "id": "b",
+      "text": "x",
+      "enabled": true
+     }
+    ]
+   }
+  }
+ ],
+ "contrast": [
+  {
+   "fg": "#000000",
+   "bg": "#ffffff",
+   "ratio": 21.0,
+   "passesNormalText": true
+  },
+  {
+   "fg": "#ffffff",
+   "bg": "#ffffff",
+   "ratio": 1.0,
+   "passesNormalText": false
+  },
+  {
+   "fg": "#777777",
+   "bg": "#ffffff",
+   "ratio": 4.48,
+   "passesNormalText": false
+  },
+  {
+   "fg": "#767676",
+   "bg": "#ffffff",
+   "ratio": 4.54,
+   "passesNormalText": true
+  },
+  {
+   "fg": "#1e3a5f",
+   "bg": "#ffffff",
+   "ratio": 11.5,
+   "passesNormalText": true
+  },
+  {
+   "fg": "#fde68a",
+   "bg": "#1e3a5f",
+   "ratio": 9.24,
+   "passesNormalText": true
+  },
+  {
+   "fg": "#d1456a",
+   "bg": "#ffffff",
+   "ratio": 4.4,
+   "passesNormalText": false
+  },
+  {
+   "fg": "#12372a",
+   "bg": "#ffffff",
+   "ratio": 13.08,
+   "passesNormalText": true
+  },
+  {
+   "fg": "#ff0000",
+   "bg": "#00ff00",
+   "ratio": 2.91,
+   "passesNormalText": false
+  },
+  {
+   "fg": "#595959",
+   "bg": "#f2f2f2",
+   "ratio": 6.26,
+   "passesNormalText": true
+  }
+ ],
+ "autoForeground": [
+  {
+   "background": "#ffffff",
+   "foreground": "#111827"
+  },
+  {
+   "background": "#000000",
+   "foreground": "#ffffff"
+  },
+  {
+   "background": "#1e3a5f",
+   "foreground": "#ffffff"
+  },
+  {
+   "background": "#fde68a",
+   "foreground": "#111827"
+  },
+  {
+   "background": "#777777",
+   "foreground": "#ffffff"
+  },
+  {
+   "background": "#767676",
+   "foreground": "#ffffff"
+  },
+  {
+   "background": "#9d2449",
+   "foreground": "#ffffff"
+  },
+  {
+   "background": "#0f766e",
+   "foreground": "#ffffff"
+  },
+  {
+   "background": "#ff9900",
+   "foreground": "#111827"
+  },
+  {
+   "background": "#e5e7eb",
+   "foreground": "#111827"
+  }
+ ],
+ "windows": [
+  {
+   "name": "no window is always eligible",
+   "window": null,
+   "now": "2026-10-06T12:00:00Z",
+   "eligible": true
+  },
+  {
+   "name": "startsAt is inclusive",
+   "window": {
+    "startsAt": "2026-10-06T12:00:00Z"
+   },
+   "now": "2026-10-06T12:00:00Z",
+   "eligible": true
+  },
+  {
+   "name": "before startsAt is not eligible",
+   "window": {
+    "startsAt": "2026-10-06T12:00:01Z"
+   },
+   "now": "2026-10-06T12:00:00Z",
+   "eligible": false
+  },
+  {
+   "name": "endsAt is exclusive",
+   "window": {
+    "endsAt": "2026-10-06T12:00:00Z"
+   },
+   "now": "2026-10-06T12:00:00Z",
+   "eligible": false
+  },
+  {
+   "name": "one millisecond before endsAt is eligible",
+   "window": {
+    "endsAt": "2026-10-06T12:00:00Z"
+   },
+   "now": "2026-10-06T11:59:59.999Z",
+   "eligible": true
+  },
+  {
+   "name": "offsets are honoured (Riyadh)",
+   "window": {
+    "startsAt": "2026-10-06T15:00:00+03:00",
+    "endsAt": "2026-10-06T16:00:00+03:00"
+   },
+   "now": "2026-10-06T12:30:00Z",
+   "eligible": true
+  },
+  {
+   "name": "offsets are honoured — outside",
+   "window": {
+    "startsAt": "2026-10-06T15:00:00+03:00",
+    "endsAt": "2026-10-06T16:00:00+03:00"
+   },
+   "now": "2026-10-06T13:00:00Z",
+   "eligible": false
+  },
+  {
+   "name": "malformed startsAt fails closed (never unrestricted)",
+   "window": {
+    "startsAt": "غداً"
+   },
+   "now": "2026-10-06T12:00:00Z",
+   "eligible": false
+  },
+  {
+   "name": "malformed endsAt fails closed",
+   "window": {
+    "endsAt": "2026-13-45T00:00:00Z"
+   },
+   "now": "2026-10-06T12:00:00Z",
+   "eligible": false
+  },
+  {
+   "name": "end not after start fails closed",
+   "window": {
+    "startsAt": "2026-10-07T00:00:00Z",
+    "endsAt": "2026-10-06T00:00:00Z"
+   },
+   "now": "2026-10-06T12:00:00Z",
+   "eligible": false
+  },
+  {
+   "name": "equal start and end fails closed",
+   "window": {
+    "startsAt": "2026-10-06T10:00:00Z",
+    "endsAt": "2026-10-06T10:00:00Z"
+   },
+   "now": "2026-10-06T10:00:00Z",
+   "eligible": false
+  },
+  {
+   "name": "non-existent calendar day fails closed",
+   "window": {
+    "startsAt": "2026-02-31T00:00:00Z"
+   },
+   "now": "2026-10-06T12:00:00Z",
+   "eligible": false
+  },
+  {
+   "name": "missing timezone designator is malformed",
+   "window": {
+    "startsAt": "2026-10-06T10:00:00"
+   },
+   "now": "2026-10-06T12:00:00Z",
+   "eligible": false
+  }
+ ]
+}

@@ -12,6 +12,7 @@ use App\Services\Commerce\ActiveVersionImmutableException;
 use App\Services\Commerce\ForwardSchemaVersionException;
 use App\Services\Commerce\InvalidScheduleTimeException;
 use App\Services\Commerce\PresentationDocumentTooLargeException;
+use App\Services\Commerce\PresentationPublishValidationException;
 use App\Services\Commerce\SourceVersionNotFoundException;
 use App\Services\Commerce\StalePublicationHeadException;
 use App\Services\Commerce\StaleScheduleTokenException;
@@ -169,6 +170,8 @@ class CommerceWorkspaceStorefrontPresentationVersionController extends ApiContro
             );
         } catch (StaleVersionRevisionException|StalePublicationHeadException|ForwardSchemaVersionException|VersionLifecycleConflictException $e) {
             abort(409, $e->getMessage());
+        } catch (PresentationPublishValidationException $e) {
+            return response()->json($e->toPayload(), 422);
         } catch (PresentationDocumentTooLargeException $e) {
             abort(422, $e->getMessage());
         }
@@ -198,6 +201,8 @@ class CommerceWorkspaceStorefrontPresentationVersionController extends ApiContro
             );
         } catch (StaleVersionRevisionException|StaleScheduleTokenException|VersionLifecycleConflictException $e) {
             abort(409, $e->getMessage());
+        } catch (PresentationPublishValidationException $e) {
+            return response()->json($e->toPayload(), 422);
         } catch (InvalidScheduleTimeException $e) {
             abort(422, $e->getMessage());
         }
