@@ -44,7 +44,7 @@ export const SETUP_DESTINATIONS: Record<string, string | null> = {
   store_builder: '/commerce/appearance',
   products: '/products',
   gift_settings: '/commerce/gifting',
-  delivery_schedule: null,
+  delivery_schedule: '/commerce/delivery',
 };
 
 const obj = (value: unknown): Record<string, unknown> | null =>
