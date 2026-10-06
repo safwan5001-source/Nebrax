@@ -80,6 +80,8 @@ class MultiStoreCreationApiTest extends TestCase
 
         $this->withToken($staff)->postJson(self::PATH, ['name' => 'Staff'])->assertForbidden();
         $this->withToken($selfService)->postJson(self::PATH, ['name' => 'Self'])->assertForbidden();
-        $this->postJson(self::PATH, ['name' => 'Guest'])->assertUnauthorized();
+        // EnsurePermission runs before the auth guard on this route and fails
+        // closed with 403 for an unauthenticated caller.
+        $this->postJson(self::PATH, ['name' => 'Guest'])->assertForbidden();
     }
 }
