@@ -158,3 +158,16 @@ export const setupProgress = (steps: readonly SetupStep[]) => ({
 
 /** أول خطوة غير مهيّأة بترتيب العرض؛ `null` حين اكتمل كل شيء. */
 export const nextStep = (steps: readonly SetupStep[]): SetupStep | null => steps.find((s) => s.state === 'not_configured') ?? null;
+
+/**
+ * FLOWERS-H2-12 — الخطوة الحالية في التهيئة الموجَّهة. الأولوية: ما طلبه الرابط (`?step=`) إن كان مفتاحاً معروفاً؛
+ * وإلا أول خطوة غير مهيّأة؛ وإلا (اكتملت كلها) أول خطوة. **لا حالة مخزَّنة**: العودة لاحقاً تستأنف من الإعداد الفعلي.
+ */
+export function resolveCurrentIndex(steps: readonly SetupStep[], requestedKey: string | null): number {
+  if (steps.length === 0) return -1;
+  const requested = requestedKey === null ? -1 : steps.findIndex((s) => s.key === requestedKey);
+  if (requested >= 0) return requested;
+  const firstOpen = steps.findIndex((s) => s.state === 'not_configured');
+
+  return firstOpen >= 0 ? firstOpen : 0;
+}

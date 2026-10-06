@@ -3,7 +3,7 @@ import type { ScheduleDocument } from '../delivery-schedule';
 import type { FulfillmentDocument } from '../fulfillment';
 import type { GiftPolicy } from '../gift-settings';
 import type { VerticalSetup } from '@/modules/commerce-workspace/vertical-setup';
-import { deriveSetupSteps, groupSteps, nextStep, setupProgress, type SetupInputs } from './derive';
+import { deriveSetupSteps, groupSteps, nextStep, resolveCurrentIndex, setupProgress, type SetupInputs } from './derive';
 
 const KEYS = ['occasions', 'recipients', 'gift_message', 'personalization', 'add_ons', 'delivery_scheduling', 'same_day_delivery', 'structured_content', 'vertical_sections'];
 const setup = (configured: string[] = [], extra: VerticalSetup['items'] = []): VerticalSetup => ({
@@ -79,5 +79,24 @@ describe('setup derivation', () => {
     const all = deriveSetupSteps(inputs({ gift: gift(false), schedule: schedule(false, 0), fulfillment: fulfil(null) }));
     const known = ['/commerce/merchandising', '/commerce/gifting', '/commerce/delivery', '/products', '/commerce/appearance'];
     for (const s of all) expect(known.some((k) => s.href === k || s.href.startsWith(`${k}?tab=`)), s.href).toBe(true);
+  });
+});
+
+describe('resolveCurrentIndex (H2-12)', () => {
+  const steps = deriveSetupSteps({ setup: setup(['occasions', 'recipients']), gift: null, schedule: null, fulfillment: null });
+
+  it('honours a known requested step', () => {
+    expect(steps[resolveCurrentIndex(steps, 'add_ons')].key).toBe('add_ons');
+  });
+
+  it('falls back to the first unconfigured step for a missing or unknown key', () => {
+    expect(steps[resolveCurrentIndex(steps, null)].key).toBe('gift_message');
+    expect(steps[resolveCurrentIndex(steps, 'nope')].key).toBe('gift_message');
+  });
+
+  it('starts at the first step when everything is configured, and is -1 for no steps', () => {
+    const all = deriveSetupSteps({ setup: setup(KEYS), gift: null, schedule: null, fulfillment: null });
+    expect(resolveCurrentIndex(all, null)).toBe(0);
+    expect(resolveCurrentIndex([], null)).toBe(-1);
   });
 });
