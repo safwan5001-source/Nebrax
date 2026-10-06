@@ -12,6 +12,7 @@ import { Dropdown, DropdownItem } from '@/components/ui/dropdown';
 import { useCompany } from '@/lib/company';
 import { commerceWorkspaceMessage } from '@/modules/commerce-workspace/messages';
 import { useCommerceStoreContext } from '@/modules/commerce-workspace/store-context';
+import { installUnsavedNavigationGuard } from '@/modules/commerce-workspace/unsaved-registry';
 import { CommerceWorkspaceNav } from './commerce-workspace-nav';
 
 export function CommerceWorkspaceShell({ children }: { children: React.ReactNode }) {
@@ -26,6 +27,9 @@ export function CommerceWorkspaceShell({ children }: { children: React.ReactNode
   const [sidebarPreferenceLoaded, setSidebarPreferenceLoaded] = useState(false);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
+
+  // مسوّدات غير محفوظة: اسأل قبل أي تنقّل بين صفحات مساحة التجارة (لا يُطلق Next.js `beforeunload`).
+  useEffect(() => installUnsavedNavigationGuard(), []);
 
   useEffect(() => {
     try {

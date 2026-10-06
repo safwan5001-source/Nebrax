@@ -7,6 +7,7 @@ import {
   selectStoreId,
   type CommerceStoreCatalog,
 } from './stores';
+import { confirmDiscardUnsaved } from './unsaved-registry';
 
 type CommerceStoreContextValue = {
   catalog: CommerceStoreCatalog;
@@ -51,6 +52,14 @@ export function CommerceStoreProvider({ children }: { children: ReactNode }) {
   );
 
   const selectedStoreId = selectStoreId(catalog, requestedId);
+  // مبدِّل المتجر يسأل قبل إسقاط مسوّدة غير محفوظة (تُسجَّل في `unsaved-registry` من `useUnsavedGuard`).
+  const selectStore = useCallback(
+    (id: string) => {
+      if (id !== selectedStoreId && !confirmDiscardUnsaved()) return;
+      setRequestedId(id);
+    },
+    [selectedStoreId],
+  );
   const viewStoreUrl = resolveViewStoreUrl(catalog, selectedStoreId);
 
   return (
@@ -58,7 +67,7 @@ export function CommerceStoreProvider({ children }: { children: ReactNode }) {
       value={{
         catalog,
         selectedStoreId,
-        setSelectedStoreId: setRequestedId,
+        setSelectedStoreId: selectStore,
         viewStoreUrl,
         refresh,
       }}
