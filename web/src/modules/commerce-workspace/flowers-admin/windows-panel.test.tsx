@@ -31,11 +31,12 @@ const doc = (slots: unknown[]) => ({
     blocked_dates: [],
   },
 });
-const zones = { data: [{ id: 'z1', name: 'الرياض', match_type: 'city', match_value: 'riyadh', rate_amount_minor: 1000, is_active: true }] };
+let zones = { data: [{ id: 'z1', name: 'الرياض', match_type: 'city', match_value: 'riyadh', rate_amount_minor: 1000, is_active: true }] };
 
 /** يوجّه كل مسار لجوابه: الكتابة تعيد مستنداً مبنياً من الجسم المرسَل (كما يفعل الخادم). */
 function server(initial: unknown[], opts: { rejectSave?: ApiError } = {}) {
   let current = initial;
+  let readFails = false;
   const writes: unknown[] = [];
   apiMock.mockImplementation(async (path: string, options?: { method?: string; body?: { slots: Record<string, unknown>[] } }) => {
     if (path.includes('shipping-zones')) return zones;
@@ -48,9 +49,10 @@ function server(initial: unknown[], opts: { rejectSave?: ApiError } = {}) {
       }));
       return doc(current);
     }
+    if (readFails) throw new ApiError(500, 'boom', {});
     return doc(current);
   });
-  return { writes, setRemote: (next: unknown[]) => { current = next; } };
+  return { writes, setRemote: (next: unknown[]) => { current = next; }, failRead: () => { readFails = true; } };
 }
 
 async function openWindows(slots: unknown[], opts: { rejectSave?: ApiError } = {}) {
@@ -67,6 +69,23 @@ async function openWindows(slots: unknown[], opts: { rejectSave?: ApiError } = {
 }
 
 describe('WindowsPanel', () => {
+  it('does not offer inactive shipping zones for new selection but keeps an already assigned one', async () => {
+    zones = { data: [
+      { id: 'z1', name: 'الرياض', is_active: true },
+      { id: 'z2', name: 'منطقة قديمة', is_active: false },
+      { id: 'z3', name: 'منطقة معيّنة معطّلة', is_active: false },
+    ] };
+    await openWindows([slot({ id: 'a', label: 'A', shipping_zone_id: 'z3' })]);
+    await userEvent.click(screen.getByRole('button', { name: 'Edit: A' }));
+    const select = await screen.findByLabelText('Delivery destination', { selector: 'select' });
+    await waitFor(() => expect(Array.from((select as HTMLSelectElement).options).length).toBeGreaterThan(2));
+    const names = Array.from((select as HTMLSelectElement).options).map((o) => o.textContent ?? '');
+    expect(names.some((n) => n.includes('الرياض'))).toBe(true);
+    expect(names.some((n) => n.includes('منطقة قديمة'))).toBe(false);
+    expect(names.some((n) => n.includes('منطقة معيّنة معطّلة'))).toBe(true);
+    zones = { data: [{ id: 'z1', name: 'الرياض', is_active: true }] };
+  });
+
   it('opens on the deep-linked tab and lists windows grouped by method with real values', async () => {
     await openWindows([slot(), slot({ id: 'p1', method: 'pickup', label: 'من الفرع', start_time: '10:00', end_time: '20:00', capacity: 15, weekdays: [0, 1, 5], is_active: false })]);
     const delivery = document.querySelector('[data-window-group="delivery"]') as HTMLElement;
@@ -177,6 +196,31 @@ describe('WindowsPanel', () => {
     await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Delete' }));
 
     expect(await screen.findByText(/changed on the server since you opened this page/)).toBeTruthy();
+    expect(srv.writes).toHaveLength(0);
+    expect(screen.queryByRole('dialog')).toBeNull(); // الحوار أُغلق: لا مسوّدة قديمة تبقى لإعادة المحاولة
+  });
+
+  it('closes the edit dialog when the list went stale so a retry cannot write the old draft over the concurrent edit', async () => {
+    const srv = await openWindows([slot({ id: 'a', label: 'A' })]);
+    srv.setRemote([slot({ id: 'a', label: 'A changed elsewhere' })]);
+    await userEvent.click(screen.getByRole('button', { name: 'Edit: A' }));
+    const dialog = screen.getByRole('dialog');
+    await userEvent.clear(within(dialog).getByLabelText('Window name'));
+    await userEvent.type(within(dialog).getByLabelText('Window name'), 'My edit');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
+
+    expect(await screen.findByText(/changed on the server since you opened this page/)).toBeTruthy();
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(srv.writes).toHaveLength(0);
+  });
+
+  it('never writes when the preflight read fails', async () => {
+    const srv = await openWindows([slot({ id: 'a', label: 'A' })]);
+    srv.failRead();
+    await userEvent.click(screen.getByRole('button', { name: 'Delete: A' }));
+    await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Delete' }));
+
+    await waitFor(() => expect(within(screen.getByRole('dialog')).getByRole('alert')).toBeTruthy());
     expect(srv.writes).toHaveLength(0);
   });
 });

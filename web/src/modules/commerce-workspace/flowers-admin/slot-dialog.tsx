@@ -54,6 +54,8 @@ export function SlotDialog({
   useEffect(() => firstField.current?.focus({ preventScroll: true }), []);
   const [draft, setDraft] = useState<SlotDraft>(initial);
   const [submitted, setSubmitted] = useState(false);
+  // المنطقة المعيَّنة وقت الفتح: تبقى ظاهرةً ولو عُطّلت بعدها، أما المناطق المعطّلة الأخرى فلا تُعرض للاختيار (لا وجهة تتطابق معها).
+  const [assignedZoneId] = useState(initial.shippingZoneId);
   const [saving, setSaving] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
   const errors = useMemo(() => validateSlotDraft(draft), [draft]);
@@ -233,12 +235,14 @@ export function SlotDialog({
             >
               <option value="">{t('winZoneAny')}</option>
               {zones.kind === 'ready'
-                ? zones.zones.map((zone) => (
-                    <option key={zone.id} value={zone.id}>
-                      {zone.name}
-                      {zone.isActive ? '' : ` — ${t('winZoneInactive')}`}
-                    </option>
-                  ))
+                ? zones.zones
+                    .filter((zone) => zone.isActive || zone.id === assignedZoneId)
+                    .map((zone) => (
+                      <option key={zone.id} value={zone.id}>
+                        {zone.name}
+                        {zone.isActive ? '' : ` — ${t('winZoneInactive')}`}
+                      </option>
+                    ))
                 : null}
               {/* منطقة محفوظة لم تُحمَّل قائمتها تبقى خياراً قائماً فلا تُمسح بصمت. */}
               {draft.shippingZoneId !== '' && !(zones.kind === 'ready' && zones.zones.some((z) => z.id === draft.shippingZoneId)) ? (

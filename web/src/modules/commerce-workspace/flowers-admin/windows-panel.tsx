@@ -56,7 +56,9 @@ export function WindowsPanel({
 
   async function persist(next: DeliverySlot[]): Promise<string | null> {
     const fresh = await loadSchedule(storeId);
-    if (fresh.ok && slotsSignature(fresh.data.slots) !== slotsSignature(slots)) {
+    // الفحص المسبق جزء من سلامة الكتابة: إن تعذّر إثبات أن القائمة لم تتغيّر فلا نكتب استبدالاً كاملاً من نسخةٍ قديمة.
+    if (!fresh.ok) return failureText(fresh, t);
+    if (slotsSignature(fresh.data.slots) !== slotsSignature(slots)) {
       onDocument(fresh.data);
       return t('winStale');
     }
@@ -93,6 +95,13 @@ export function WindowsPanel({
         ? [...slots, draftToSlot(draft, null)]
         : slots.map((slot, index) => (index === dialog.index ? draftToSlot(draft, slot.id) : slot));
     const failure = await persist(next);
+    if (failure === t('winStale')) {
+      // المسوّدة بُنيت على قائمة قديمة: نُغلق الحوار ونعرض التحذير، فلا تُعاد كتابتها فوق ما غيّره المستخدم الآخر.
+      setDialog(null);
+      setNotice({ tone: 'warning', text: failure });
+
+      return null;
+    }
     if (failure) return failure;
     toastSuccess(dialog.kind === 'add' ? t('winAdded') : t('winUpdated'));
     setDialog(null);
@@ -103,6 +112,12 @@ export function WindowsPanel({
   async function confirmDelete(): Promise<string | null> {
     if (deleteIndex === null) return null;
     const failure = await persist(slots.filter((_, index) => index !== deleteIndex));
+    if (failure === t('winStale')) {
+      setDeleteIndex(null);
+      setNotice({ tone: 'warning', text: failure });
+
+      return null;
+    }
     if (failure) return failure;
     toastSuccess(t('winDeleted'));
     setDeleteIndex(null);
