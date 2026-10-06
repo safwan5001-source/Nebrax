@@ -16,6 +16,7 @@ import {
   mapAddons,
   mapCandidate,
   mapVariants,
+  addonVisibility,
   rowProblem,
   saveAddons,
   type AddonRow,
@@ -32,6 +33,23 @@ const body = {
   },
 };
 const rows = (): AddonRow[] => mapAddons(body)!;
+
+describe('add-on storefront visibility hint', () => {
+  const store = (id: string, isPublished: boolean) => ({ id, isPublished });
+
+  it('is unpublished when the target is published nowhere, no_shared_store when the published stores are disjoint, ok otherwise', () => {
+    expect(addonVisibility([store('s1', true)], [store('s1', false)])).toBe('unpublished');
+    expect(addonVisibility([store('s1', true)], [])).toBe('unpublished');
+    expect(addonVisibility([store('s1', true)], [store('s2', true)])).toBe('no_shared_store');
+    expect(addonVisibility([store('s1', true), store('s2', true)], [store('s2', true)])).toBe('ok');
+  });
+
+  it('never warns without evidence: unknown target, or a parent that is not published anywhere itself', () => {
+    expect(addonVisibility([store('s1', true)], null)).toBe('ok');
+    expect(addonVisibility(null, [store('s2', true)])).toBe('ok');
+    expect(addonVisibility([store('s1', false)], [store('s2', true)])).toBe('ok');
+  });
+});
 
 describe('add-ons client', () => {
   it('maps rows, clamps quantity to 1–10 and flags inactive target products', () => {

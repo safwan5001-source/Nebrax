@@ -11,6 +11,7 @@ import { useToast } from '@/components/ui/toast';
 import { formatRiyal } from '@/lib/money';
 import { cn } from '@/lib/utils';
 import { commerceWorkspaceMessage } from '@/modules/commerce-workspace/messages';
+import { loadProductPublication, type ProductPublicationStore } from '@/modules/products/publication';
 import { ProductPicker, type PickerProduct } from '@/modules/commerce-workspace/merchandising/product-picker';
 import type { AdminFailure } from '../admin-http';
 import { failureText } from '../failure-text';
@@ -19,6 +20,7 @@ import { useUnsavedGuard } from '../use-unsaved-guard';
 import {
   MAX_ADDONS,
   MAX_ADDON_QUANTITY,
+  addonVisibility,
   addonsSignature,
   canAdd,
   loadAddons,
@@ -34,10 +36,10 @@ import { move } from './personalization';
 import { SectionState } from './section-state';
 
 type Phase = { kind: 'loading' } | { kind: 'failed'; failure: AdminFailure } | { kind: 'ready'; saved: AddonRow[]; revision: string | null };
-type Context = { price: string | null; variantLabel: string | null };
+type Context = { price: string | null; variantLabel: string | null; stores: ProductPublicationStore[] | null };
 type Pending =
   | { kind: 'loading'; product: PickerProduct }
-  | { kind: 'ready'; candidate: AddonCandidate; variants: AddonVariantOption[] | null; variantId: string }
+  | { kind: 'ready'; candidate: AddonCandidate; variants: AddonVariantOption[] | null; variantId: string; stores: ProductPublicationStore[] | null }
   | { kind: 'failed' }
   | null;
 
@@ -57,6 +59,7 @@ export function AddonsSection({ productId, locale, canManage }: { productId: str
   const [adding, setAdding] = useState(false);
   const [pending, setPending] = useState<Pending>(null);
   const [saving, setSaving] = useState(false);
+  const [parentStores, setParentStores] = useState<ProductPublicationStore[] | null>(null);
   const [notice, setNotice] = useState<{ tone: 'error' | 'warning'; text: string } | null>(null);
 
   useEffect(() => {
@@ -76,6 +79,16 @@ export function AddonsSection({ productId, locale, canManage }: { productId: str
     };
   }, [productId, attempt]);
 
+  // نشر المنتج الأصلي (للتنبيه إن لم يشاركه المنتج المضاف متجراً منشوراً)؛ فشله ⇒ لا تنبيه.
+  useEffect(() => {
+    let current = true;
+    setParentStores(null);
+    void loadProductPublication(productId).then((stores) => current && setParentStores(stores), () => undefined);
+    return () => {
+      current = false;
+    };
+  }, [productId]);
+
   // سياق القراءة (السعر + اسم المتغيّر) للصفوف الحالية؛ فشله يعرض «—» ولا يمنع شيئاً.
   const contextKey = draft.map((r) => `${r.addonProductId}:${r.addonVariantId ?? ''}`).join('|');
   useEffect(() => {
@@ -84,10 +97,14 @@ export function AddonsSection({ productId, locale, canManage }: { productId: str
       const key = `${row.addonProductId}:${row.addonVariantId ?? ''}`;
       if (context[key]) continue;
       void (async () => {
-        const [candidate, variants] = await Promise.all([loadCandidate(row.addonProductId), row.addonVariantId ? loadVariants(row.addonProductId) : Promise.resolve(null)]);
+        const [candidate, variants, stores] = await Promise.all([
+          loadCandidate(row.addonProductId),
+          row.addonVariantId ? loadVariants(row.addonProductId) : Promise.resolve(null),
+          loadProductPublication(row.addonProductId).catch(() => null),
+        ]);
         if (!current) return;
         const variantLabel = variants && variants.ok ? (variants.data.find((v) => v.id === row.addonVariantId)?.label ?? null) : null;
-        setContext((existing) => ({ ...existing, [key]: { price: candidate.ok ? candidate.data.price : null, variantLabel } }));
+        setContext((existing) => ({ ...existing, [key]: { price: candidate.ok ? candidate.data.price : null, variantLabel, stores } }));
       })();
     }
     return () => {
@@ -102,6 +119,7 @@ export function AddonsSection({ productId, locale, canManage }: { productId: str
 
   if (phase.kind !== 'ready') return <SectionState phase={phase} t={t} onRetry={() => setAttempt((n) => n + 1)} />;
 
+  const visibilityNote = (visibility: ReturnType<typeof addonVisibility>) => (visibility === 'unpublished' ? t('addonNotVisibleUnpublished') : visibility === 'no_shared_store' ? t('addonNotVisibleNoShared') : null);
   const blocked = draft.filter((row) => rowProblem(row) !== null).length;
   const limitReached = draft.length >= MAX_ADDONS;
   const patchRow = (index: number, next: Partial<AddonRow>) => setDraft(draft.map((row, i) => (i === index ? { ...row, ...next } : row)));
@@ -119,6 +137,7 @@ export function AddonsSection({ productId, locale, canManage }: { productId: str
       setPending({ kind: 'failed' });
       return;
     }
+    const stores = await loadProductPublication(product.id).catch(() => null);
     let variants: AddonVariantOption[] | null = null;
     if (candidate.data.variantManaged) {
       const loaded = await loadVariants(product.id);
@@ -128,7 +147,7 @@ export function AddonsSection({ productId, locale, canManage }: { productId: str
       }
       variants = loaded.data.filter((v) => v.isActive);
     }
-    setPending({ kind: 'ready', candidate: candidate.data, variants, variantId: '' });
+    setPending({ kind: 'ready', candidate: candidate.data, variants, variantId: '', stores });
   }
 
   function confirmPending() {
@@ -213,7 +232,7 @@ export function AddonsSection({ productId, locale, canManage }: { productId: str
       {adding && canManage ? (
         <div className="space-y-3 rounded border border-border bg-surface p-4" data-addon-picker>
           <h3 className="text-sm font-medium text-text">{t('addonPickTitle')}</h3>
-          <ProductPicker t={tm} idPrefix="addon-picker" actionLabel={t('addonChoose')} excludeIds={[productId, ...draft.map((r) => r.addonProductId)]} disabled={pending?.kind === 'loading'} onPick={(product) => void pick(product)} />
+          <ProductPicker t={tm} idPrefix="addon-picker" actionLabel={t('addonChoose')} excludeIds={[productId, ...draft.map((r) => r.addonProductId)]} disabled={saving || pending?.kind === 'loading'} onPick={(product) => void pick(product)} />
           {pending?.kind === 'loading' ? <p role="status" className="text-xs text-muted">{t('loading')}</p> : null}
           {pending?.kind === 'failed' ? <FormAlert tone="error">{t('addonCandidateFailed')}</FormAlert> : null}
           {pending?.kind === 'ready' ? (
@@ -225,10 +244,11 @@ export function AddonsSection({ productId, locale, canManage }: { productId: str
               </p>
               <p className="text-xs text-muted">{t('addonPriceNote')}</p>
               {!pending.candidate.isActive ? <FormAlert tone="warning">{t('addonErrInactive')}</FormAlert> : null}
+              {visibilityNote(addonVisibility(parentStores, pending.stores)) ? <FormAlert tone="warning">{visibilityNote(addonVisibility(parentStores, pending.stores))}</FormAlert> : null}
               {pending.variants !== null ? (
                 <div className="space-y-1.5">
                   <Label htmlFor="addon-variant">{t('addonVariant')}</Label>
-                  <Select id="addon-variant" value={pending.variantId} onChange={(e) => setPending({ ...pending, variantId: e.target.value })}>
+                  <Select id="addon-variant" value={pending.variantId} disabled={saving} onChange={(e) => setPending({ ...pending, variantId: e.target.value })}>
                     <option value="">{t('addonVariantPlaceholder')}</option>
                     {pending.variants.map((v) => (
                       <option key={v.id} value={v.id}>{v.label}</option>
@@ -238,8 +258,8 @@ export function AddonsSection({ productId, locale, canManage }: { productId: str
                 </div>
               ) : null}
               <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-                <Button type="button" variant="outline" onClick={() => setPending(null)}>{t('cancel')}</Button>
-                <Button type="button" disabled={!pending.candidate.isActive || (pending.variants !== null && pending.variantId === '')} onClick={confirmPending}>{t('addonConfirm')}</Button>
+                <Button type="button" variant="outline" disabled={saving} onClick={() => setPending(null)}>{t('cancel')}</Button>
+                <Button type="button" disabled={saving || !pending.candidate.isActive || (pending.variants !== null && pending.variantId === '')} onClick={confirmPending}>{t('addonConfirm')}</Button>
               </div>
             </div>
           ) : null}
@@ -263,6 +283,7 @@ export function AddonsSection({ productId, locale, canManage }: { productId: str
                     {problem ? <span className="text-xs text-negative">· {t('addonProductInactive')}</span> : null}
                     {!row.isActive ? <span className="text-xs">· {t('winStatusOff')}</span> : null}
                   </p>
+                  {visibilityNote(addonVisibility(parentStores, info?.stores ?? null)) ? <p className="text-xs text-warning">{visibilityNote(addonVisibility(parentStores, info?.stores ?? null))}</p> : null}
                   <p className="text-xs text-muted">
                     {row.sku ? <bdi className="me-2 font-mono">{row.sku}</bdi> : null}
                     {t('addonPrice')}: {info?.price != null ? <bdi className="num">{formatRiyal(info.price)}</bdi> : '—'}

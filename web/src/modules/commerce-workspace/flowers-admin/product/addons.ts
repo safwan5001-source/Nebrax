@@ -151,3 +151,17 @@ export const loadCandidate = (productId: string): Promise<AdminResult<AddonCandi
 
 export const loadVariants = (productId: string): Promise<AdminResult<AddonVariantOption[]>> =>
   adminCall(async () => mapVariants(await api<unknown>(`/products/${encodeURIComponent(productId)}/variants`)));
+
+/** مقدار ما يراه المتسوّق: منشور على متجرٍ واحد على الأقل، وفي متجرٍ منشورٍ فيه المنتج الأصلي أيضاً (الخادم يفلتر الإضافات بقناة البيع). */
+export type AddonVisibility = 'ok' | 'unpublished' | 'no_shared_store';
+
+export function addonVisibility(parent: readonly { id: string; isPublished: boolean }[] | null, target: readonly { id: string; isPublished: boolean }[] | null): AddonVisibility {
+  if (target === null) return 'ok'; // غير معروف ⇒ لا نحذّر بلا دليل
+  const targetStores = new Set(target.filter((s) => s.isPublished).map((s) => s.id));
+  if (targetStores.size === 0) return 'unpublished';
+  const parentStores = (parent ?? []).filter((s) => s.isPublished);
+  // المنتج الأصلي نفسه غير منشور ⇒ لا يظهر شيءٌ للمتسوّق أصلاً، وليس هذا موضع التحذير.
+  if (parentStores.length === 0) return 'ok';
+
+  return parentStores.some((s) => targetStores.has(s.id)) ? 'ok' : 'no_shared_store';
+}

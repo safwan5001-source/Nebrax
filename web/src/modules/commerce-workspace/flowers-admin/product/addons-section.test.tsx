@@ -27,7 +27,7 @@ const catalog: Record<string, Row> = {
   off: { id: 'off', name: 'منتج موقوف', sku: 'OFF', is_active: false, sale_price: '5.00', variant_state: 'simple' },
 };
 
-function server(initial: Row[], opts: { rejectSave?: ApiError; canManage?: boolean; noRevision?: boolean; revisionFromSecondRead?: boolean } = {}) {
+function server(initial: Row[], opts: { rejectSave?: ApiError; canManage?: boolean; noRevision?: boolean; revisionFromSecondRead?: boolean; publication?: Record<string, { id: string; name: string; is_published: boolean }[]>; holdSave?: Promise<void> } = {}) {
   let current = initial;
   let addonReads = 0;
   let readFails = false;
@@ -37,10 +37,17 @@ function server(initial: Row[], opts: { rejectSave?: ApiError; canManage?: boole
     if (path.includes('/products/publication')) {
       return { data: Object.values(catalog).map((p) => ({ id: p.id, sku: p.sku, name: p.name, name_en: null, is_active: p.is_active, is_published: true, stores: [] })), meta: { current_page: 1, last_page: 1, per_page: 10, total: 3 } };
     }
+    const publication = path.match(/\/commerce\/workspace\/products\/([^/]+)\/publication$/);
+    if (publication) {
+      const stores = opts.publication?.[publication[1]];
+      if (!stores) throw new ApiError(404, 'x', {});
+      return { data: { stores } };
+    }
     if (path.endsWith('/variants')) return { data: [{ id: 'var-a', display_name: 'أحمر', sku: 'BAL-R', is_active: true }, { id: 'var-b', display_name: 'ذهبي', sku: 'BAL-G', is_active: true }] };
     if (path.includes('/commerce/workspace/products/p1/addons')) {
       if (options?.method === 'PUT') {
         if (opts.rejectSave) throw opts.rejectSave;
+        if (opts.holdSave) await opts.holdSave;
         if (options.body!.expected_revision !== undefined && options.body!.expected_revision !== revisionOf(current)) throw new ApiError(409, 'stale', {});
         writes.push(options.body!);
         current = options.body!.addons.map((a) => ({ name: `منتج ${a.addon_product_id}`, name_en: null, sku: null, product_is_active: true, ...a }));
@@ -204,6 +211,44 @@ describe('AddonsSection', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Save' }));
     await waitFor(() => expect(srv.writes).toHaveLength(1));
     expect(srv.writes[0].expected_revision).toBe(JSON.stringify([addon('a')]));
+  });
+
+  it('warns (non-blocking) when the chosen add-on is published on no store, or shares no published store with the parent', async () => {
+    const S1 = { id: 's1', name: 'Main', is_published: true };
+    const publication = { p1: [S1], c1: [{ ...S1, is_published: false }] };
+    server([], { publication });
+    await searchAndPick('choc', 'شوكولاتة بلجيكية');
+    expect(await screen.findByText(/not published on any store/)).toBeTruthy();
+    expect((screen.getByRole('button', { name: 'Add to list' }) as HTMLButtonElement).disabled).toBe(false); // تنبيه لا منع
+    cleanup();
+    apiMock.mockReset();
+
+    server([addon('c1')], { publication: { p1: [S1], c1: [{ id: 's2', name: 'Other', is_published: true }] } });
+    await screen.findByText('منتج c1');
+    expect(await screen.findByText(/does not share a published store/)).toBeTruthy();
+    cleanup();
+    apiMock.mockReset();
+
+    server([addon('c1')], { publication: { p1: [S1], c1: [S1] } });
+    await screen.findByText('منتج c1');
+    await waitFor(() => expect(document.querySelector('[data-addon-row]')?.textContent).toContain('SKU-c1'));
+    expect(screen.queryByText(/not published on any store|does not share a published store/)).toBeNull();
+  });
+
+  it('locks the picker and candidate controls for the whole save, so nothing added mid-save is silently dropped', async () => {
+    let release: () => void = () => undefined;
+    const hold = new Promise<void>((resolve) => { release = resolve; });
+    const srv = server([addon('a')], { holdSave: hold });
+    await screen.findByText('منتج a');
+    await userEvent.click(screen.getByRole('button', { name: 'Remove: منتج a' }));
+    await searchAndPick('choc', 'شوكولاتة بلجيكية');
+    const confirm = (await screen.findByRole('button', { name: 'Add to list' })) as HTMLButtonElement;
+    expect(confirm.disabled).toBe(false);
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(confirm.disabled).toBe(true));
+    expect((screen.getByRole('button', { name: 'Cancel' }) as HTMLButtonElement).disabled).toBe(true);
+    release();
+    await waitFor(() => expect(srv.writes).toHaveLength(1));
   });
 
   it('is read-only without products.manage', async () => {
