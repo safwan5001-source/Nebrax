@@ -74,4 +74,100 @@ describe("MobileMenu", () => {
       within(menu).getByRole("link", { name: "My Account" }),
     ).toHaveAttribute("href", "/us/en/account");
   });
+  // CUST-HV V1A / DEF-1 — merchant-published header links used to be rendered
+  // only from `lg` up, and `MobileMenu` received none, so below 1024px they were
+  // unreachable on the published store.
+  describe("merchant-published header links (DEF-1)", () => {
+    const extraLinks = [
+      { id: "nav-about", label: "About us", href: "/us/en/about" },
+      { id: "nav-ig", label: "Instagram", href: "https://instagram.com/awj" },
+    ];
+
+    it("lists every published link, in order, with its resolved href", async () => {
+      const user = userEvent.setup();
+      render(
+        <MobileMenu
+          rootCategories={[]}
+          basePath="/us/en"
+          wholesaleEnabled={false}
+          extraLinks={extraLinks}
+        />,
+      );
+      await user.click(screen.getByRole("button", { name: "Open menu" }));
+
+      const menu = screen.getByRole("dialog", { name: "Menu" });
+      const links = menu.querySelectorAll("[data-mobile-extra-nav]");
+      expect(Array.from(links, (link) => link.textContent)).toEqual([
+        "About us",
+        "Instagram",
+      ]);
+      expect(
+        within(menu).getByRole("link", { name: "About us" }),
+      ).toHaveAttribute("href", "/us/en/about");
+      expect(
+        within(menu).getByRole("link", { name: "Instagram" }),
+      ).toHaveAttribute("href", "https://instagram.com/awj");
+    });
+
+    it("places them with the main navigation, ahead of Contact and the account group", async () => {
+      const user = userEvent.setup();
+      render(
+        <MobileMenu
+          rootCategories={[]}
+          basePath="/us/en"
+          wholesaleEnabled
+          extraLinks={extraLinks}
+        />,
+      );
+      await user.click(screen.getByRole("button", { name: "Open menu" }));
+
+      const menu = screen.getByRole("dialog", { name: "Menu" });
+      const order = within(menu)
+        .getAllByRole("link")
+        .map((link) => link.textContent);
+      expect(order.indexOf("About us")).toBeGreaterThan(
+        order.indexOf("All Products"),
+      );
+      expect(order.indexOf("About us")).toBeLessThan(order.indexOf("Contact"));
+      expect(order.indexOf("Instagram")).toBeLessThan(
+        order.indexOf("Wholesale"),
+      );
+      expect(order.indexOf("Instagram")).toBeLessThan(
+        order.indexOf("My Account"),
+      );
+    });
+
+    it("closes the menu when a link is followed", async () => {
+      const user = userEvent.setup();
+      render(
+        <MobileMenu
+          rootCategories={[]}
+          basePath="/us/en"
+          wholesaleEnabled={false}
+          extraLinks={extraLinks}
+        />,
+      );
+      await user.click(screen.getByRole("button", { name: "Open menu" }));
+      await user.click(screen.getByRole("link", { name: "About us" }));
+
+      expect(
+        screen.queryByRole("dialog", { name: "Menu" }),
+      ).not.toBeInTheDocument();
+    });
+
+    it("renders nothing extra when the merchant published no links", async () => {
+      const user = userEvent.setup();
+      render(
+        <MobileMenu
+          rootCategories={[]}
+          basePath="/us/en"
+          wholesaleEnabled={false}
+        />,
+      );
+      await user.click(screen.getByRole("button", { name: "Open menu" }));
+
+      const menu = screen.getByRole("dialog", { name: "Menu" });
+      expect(menu.querySelectorAll("[data-mobile-extra-nav]")).toHaveLength(0);
+    });
+  });
 });

@@ -5,6 +5,7 @@ import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+const storeContext = vi.hoisted(() => ({ viewStoreUrl: 'https://store.example.test' as string | null }));
 const pushMock = vi.fn();
 const createMock = vi.fn();
 const saveMock = vi.fn();
@@ -33,7 +34,7 @@ vi.mock('@/lib/permissions', () => ({ hasPermission: () => true }));
 vi.mock('@/modules/commerce-workspace/store-context', () => ({
   useCommerceStoreContext: () => ({
     selectedStoreId: 'store-1',
-    viewStoreUrl: 'https://store.example.test',
+    viewStoreUrl: storeContext.viewStoreUrl,
   }),
 }));
 
@@ -49,6 +50,7 @@ import CommerceThemesPage from './page';
 describe('Theme Gallery draft handoff', () => {
   afterEach(() => {
     cleanup();
+    storeContext.viewStoreUrl = 'https://store.example.test';
     pushMock.mockReset();
     createMock.mockReset();
     saveMock.mockReset();
@@ -290,6 +292,49 @@ describe('Theme Gallery draft handoff', () => {
       await waitFor(() => expect(saveMock).toHaveBeenCalled());
       expect(loadFacetsMock).not.toHaveBeenCalled();
       expect(loadSetupMock).not.toHaveBeenCalled();
+    });
+  });
+  // CUST-HV V1A / DEF-4 — "Preview" used to open the live store from every
+  // theme card, which a merchant reads as "this is what the theme looks like".
+  // It never was. The gallery now offers one honest link, to the published
+  // store, and says plainly what applying a theme does.
+  describe('honest store link (DEF-4)', () => {
+    it('offers no per-theme "Preview" link — the cards carry only apply / customize actions', () => {
+      render(<CommerceThemesPage />);
+
+      expect(screen.queryByText('معاينة المتجر')).toBeNull();
+      expect(screen.queryByRole('link', { name: /معاينة/ })).toBeNull();
+      const cards = screen.getAllByRole('article');
+      expect(cards.length).toBeGreaterThan(0);
+      for (const card of cards) {
+        expect(card.querySelector('a[href^="http"]')).toBeNull();
+      }
+    });
+
+    it('shows a single "View published store" link to the live store, opened safely in a new tab', () => {
+      render(<CommerceThemesPage />);
+
+      const links = screen.getAllByRole('link', { name: 'عرض المتجر المنشور' });
+      expect(links).toHaveLength(1);
+      expect(links[0].getAttribute('href')).toBe('https://store.example.test');
+      expect(links[0].getAttribute('target')).toBe('_blank');
+      expect(links[0].getAttribute('rel')).toContain('noreferrer');
+    });
+
+    it('explains that using a theme creates a new draft and leaves the published store untouched', () => {
+      render(<CommerceThemesPage />);
+
+      expect(
+        screen.getByText(/استخدام ثيم ينشئ مسودة جديدة، ولا يتغير متجرك المنشور حتى تنشرها/),
+      ).toBeTruthy();
+    });
+
+    it('replaces the link with an explanation while the store domain is not provisioned', () => {
+      storeContext.viewStoreUrl = null;
+      render(<CommerceThemesPage />);
+
+      expect(screen.queryByRole('link', { name: 'عرض المتجر المنشور' })).toBeNull();
+      expect(screen.getByText('يظهر رابط المتجر المنشور بعد تجهيز نطاق المتجر.')).toBeTruthy();
     });
   });
 });

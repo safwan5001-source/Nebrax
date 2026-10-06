@@ -172,15 +172,24 @@ export function DropdownItem({
   tone = 'default',
   disabled = false,
   title,
+  checked,
+  dataAttrs,
+  external = false,
 }: {
   children: React.ReactNode;
   icon?: LucideIcon;
   href?: string;
+  /** رابط خارجي يُفتح في تبويب جديد (`<a>` عادي لا `next/link`). */
+  external?: boolean;
   onClick?: () => void;
   tone?: 'default' | 'danger';
   disabled?: boolean;
   /** سببُ التعطيل خاصةً — عنصرٌ معطَّل بلا تفسير يبدو عطلاً لا قاعدة عمل. */
   title?: string;
+  /** يحوّل العنصر إلى `menuitemradio` — لخيارات اختيار واحد (مثل وضع المعاينة). */
+  checked?: boolean;
+  /** سمات `data-*` للاختبار والتتبّع. */
+  dataAttrs?: Record<`data-${string}`, string>;
 }) {
   const { open, close } = useContext(DropdownCtx);
   const tabIndex = open ? 0 : -1; // خارج ترتيب التنقّل عند الإغلاق
@@ -198,6 +207,23 @@ export function DropdownItem({
     </>
   );
 
+  if (href && external) {
+    return (
+      <a
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        role="menuitem"
+        tabIndex={tabIndex}
+        onClick={close}
+        className={className}
+        title={title}
+        {...dataAttrs}
+      >
+        {inner}
+      </a>
+    );
+  }
   if (href) {
     return (
       <Link href={href} role="menuitem" tabIndex={tabIndex} onClick={close} className={className} title={title}>
@@ -208,7 +234,9 @@ export function DropdownItem({
   return (
     <button
       type="button"
-      role="menuitem"
+      role={checked === undefined ? 'menuitem' : 'menuitemradio'}
+      aria-checked={checked}
+      {...dataAttrs}
       tabIndex={tabIndex}
               disabled={disabled}
         title={title}

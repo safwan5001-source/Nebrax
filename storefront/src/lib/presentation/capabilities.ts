@@ -4,9 +4,13 @@ import type { CapabilityState } from "@/lib/commerce/capabilities";
  * STORE-BACKEND-1 presentation capabilities.
  *
  * Persistence is live for the closed token set, homepage implemented keys,
- * chrome fields, draft GET/PUT, in-workspace preview, and publish. Branding
- * still round-trips data URLs only (no media object). Verification and
- * informational pages stay GATED. Version history stays DEFERRED.
+ * chrome fields, draft GET/PUT, in-workspace preview, and publish. Named
+ * Theme Versions (create / duplicate / publish / schedule) are live since
+ * CUST-H1; `VERSION_HISTORY_CAPABILITY` below does NOT describe them. It
+ * tracks point-in-time history — browsing earlier published states and
+ * restoring one, plus Undo/Redo — which stays DEFERRED until CUST-H5.
+ * Branding still round-trips data URLs only (no media object). Verification
+ * and informational pages stay GATED.
  *
  * Merchant-entered CR / license / URL / requestedVerifiedLabel MUST NOT mint
  * a Verified badge. Preview remains the authenticated in-workspace canvas —

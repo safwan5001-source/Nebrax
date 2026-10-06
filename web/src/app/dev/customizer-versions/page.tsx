@@ -5,6 +5,7 @@ import { Suspense } from "react";
 import { ExperienceBuilder } from "@/modules/store-experience-builder/ExperienceBuilder";
 import { enableDemo } from "@/lib/demo";
 import {
+  bumpMockPresentationVersionRevision,
   seedMockPresentationVersions,
   setMockOffersMode,
   setMockSchedulingRuntimeActive,
@@ -29,7 +30,8 @@ type Scenario =
   | "draft-and-published"
   | "schedule-eligible"
   | "scheduled"
-  | "scheduling-gated";
+  | "scheduling-gated"
+  | "conflict";
 
 function scenarioOf(value: string | null): Scenario {
   if (
@@ -41,7 +43,8 @@ function scenarioOf(value: string | null): Scenario {
     value === "draft-and-published" ||
     value === "schedule-eligible" ||
     value === "scheduled" ||
-    value === "scheduling-gated"
+    value === "scheduling-gated" ||
+    value === "conflict"
   ) {
     return value;
   }
@@ -56,7 +59,7 @@ function seedFor(scenario: Scenario) {
     seedMockPresentationVersions(STORE_ID, []);
     return;
   }
-  if (scenario === "single-draft") {
+  if (scenario === "single-draft" || scenario === "conflict") {
     seedMockPresentationVersions(STORE_ID, [
       { id: "v-draft-1", name: "التصميم الحالي", state: "draft", revision: 3 },
     ]);
@@ -154,6 +157,12 @@ function Fixture() {
   if (typeof window !== "undefined") {
     enableDemo();
     seedFor(scenario);
+    if (scenario === "conflict") {
+      // CUST-HV V1A — lets a visual test play "someone else saved first": call
+      // this, then Save, and the builder lands in its real version-conflict state.
+      (window as unknown as { __awjDevBumpRevision?: () => boolean }).__awjDevBumpRevision = () =>
+        bumpMockPresentationVersionRevision(STORE_ID, "v-draft-1");
+    }
     setMockOffersMode(
       offersParam === "empty" || offersParam === "error" ? offersParam : "list",
     );
@@ -166,7 +175,9 @@ function Fixture() {
         liveStoreName={locale === "ar" ? "متجر النور" : "Al Noor"}
         businessIdentity={{ legal_name: "شركة النور", cr_number: "7050247977", vat_number: null }}
         initialLocale={locale}
-        storefrontUrl={null}
+        // `?openStore=1` renders the toolbar's "Open store" link — the worst case
+        // for header width, which the real merchant workspace always has.
+        storefrontUrl={params.get("openStore") === "1" ? "https://a.h48.test/" : null}
       />
     </div>
   );
