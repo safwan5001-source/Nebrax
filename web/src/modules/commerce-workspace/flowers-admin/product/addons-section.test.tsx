@@ -27,8 +27,9 @@ const catalog: Record<string, Row> = {
   off: { id: 'off', name: 'منتج موقوف', sku: 'OFF', is_active: false, sale_price: '5.00', variant_state: 'simple' },
 };
 
-function server(initial: Row[], opts: { rejectSave?: ApiError; canManage?: boolean; noRevision?: boolean } = {}) {
+function server(initial: Row[], opts: { rejectSave?: ApiError; canManage?: boolean; noRevision?: boolean; revisionFromSecondRead?: boolean } = {}) {
   let current = initial;
+  let addonReads = 0;
   let readFails = false;
   const writes: { addons: Row[]; expected_revision?: string }[] = [];
   const revisionOf = (rows: Row[]) => JSON.stringify(rows);
@@ -46,7 +47,10 @@ function server(initial: Row[], opts: { rejectSave?: ApiError; canManage?: boole
       } else if (readFails) {
         throw new ApiError(500, 'boom', {});
       }
-      return { data: { addons: current, ...(opts.noRevision ? {} : { revision: revisionOf(current) }) } };
+      addonReads += 1;
+      const hidden = opts.noRevision || (opts.revisionFromSecondRead && addonReads === 1);
+
+      return { data: { addons: current, ...(hidden ? {} : { revision: revisionOf(current) }) } };
     }
     const match = path.match(/^\/products\/([^/]+)$/);
     if (match && catalog[match[1]]) return { data: catalog[match[1]] };
@@ -178,6 +182,15 @@ describe('AddonsSection', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Save' }));
     await waitFor(() => expect(document.querySelector('[role="alert"]')).not.toBeNull());
     expect(srv.writes).toHaveLength(0);
+  });
+
+  it('carries the revision returned by the fallback pre-read into the PUT (rolling backend deploy)', async () => {
+    const srv = server([addon('a')], { revisionFromSecondRead: true });
+    await screen.findByText('منتج a');
+    await userEvent.click(screen.getByRole('button', { name: 'Remove: منتج a' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(srv.writes).toHaveLength(1));
+    expect(srv.writes[0].expected_revision).toBe(JSON.stringify([addon('a')]));
   });
 
   it('is read-only without products.manage', async () => {
