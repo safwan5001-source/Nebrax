@@ -459,6 +459,28 @@ class CommerceDeliveryScheduleTest extends TestCase
     }
 
     /** @test */
+    public function windows_may_share_weekdays_but_a_single_window_may_not_repeat_a_day(): void
+    {
+        $store = $this->store('ds-share-days');
+        $week = [0, 1, 2, 3, 4, 5, 6];
+        $slot = fn (string $label, string $from, string $to, array $days) => ['method' => 'delivery', 'label' => $label, 'start_time' => $from, 'end_time' => $to, 'weekdays' => $days];
+
+        // صباحية ومسائية في الأيام نفسها (وفي كل الأيام) — الإعداد الأشيع — يجب أن تُقبلا معاً (Laravel `distinct` المتداخل كان يرفضهما).
+        $this->withToken($store['token'])->putJson($this->url($store, '/slots'), ['slots' => [
+            $slot('صباحاً', '09:00', '12:00', [0, 1, 2, 3, 4]),
+            $slot('مساءً', '16:00', '20:00', [0, 1, 2, 3, 4]),
+            $slot('ليلاً', '21:00', '23:00', $week),
+            $slot('فجراً', '04:00', '06:00', $week),
+        ]])->assertOk();
+
+        // التكرار داخل النافذة الواحدة ما زال مرفوضاً، ويُسمّي الحقل.
+        $this->withToken($store['token'])->putJson($this->url($store, '/slots'), ['slots' => [
+            $slot('صباحاً', '09:00', '12:00', [0, 1]),
+            $slot('مساءً', '16:00', '20:00', [2, 2]),
+        ]])->assertStatus(422)->assertJsonValidationErrors(['slots.1.weekdays']);
+    }
+
+    /** @test */
     public function every_channel_lock_is_taken_inside_a_transaction(): void
     {
         $store = $this->store('ds-lock-tx');

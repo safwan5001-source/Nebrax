@@ -13,6 +13,7 @@ use DomainException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use PDOException;
 use RuntimeException;
 
@@ -68,11 +69,19 @@ final class CommerceDeliveryScheduleController extends ApiController
             'slots.*.start_time' => ['required', 'string', 'regex:'.CommerceDeliveryScheduleSetting::TIME_PATTERN],
             'slots.*.end_time' => ['required', 'string', 'regex:'.CommerceDeliveryScheduleSetting::TIME_PATTERN],
             'slots.*.weekdays' => ['sometimes', 'nullable', 'array', 'max:7'],
-            'slots.*.weekdays.*' => ['integer', 'between:0,6', 'distinct'],
+            // `distinct` على نمط متداخل (`slots.*.weekdays.*`) يقارن القيم **عبر كل النوافذ** فيرفض نافذتين تشتركان في أي يوم
+            // (صباحية/مسائية في الأيام نفسها — الإعداد الأشيع). التفرّد مطلوب داخل النافذة الواحدة فقط، ويُفحص أدناه.
+            'slots.*.weekdays.*' => ['integer', 'between:0,6'],
             'slots.*.capacity' => ['sometimes', 'nullable', 'integer', 'min:1', 'max:'.CommerceDeliverySlot::MAX_CAPACITY],
             'slots.*.shipping_zone_id' => ['sometimes', 'nullable', 'uuid'],
             'slots.*.is_active' => ['sometimes', 'boolean'],
         ]);
+        foreach (array_values($data['slots']) as $position => $slot) {
+            $days = $slot['weekdays'] ?? [];
+            if (count($days) !== count(array_unique($days))) {
+                throw ValidationException::withMessages(["slots.{$position}.weekdays" => ['أيام الأسبوع في النافذة الواحدة يجب ألّا تتكرّر.']]);
+            }
+        }
         $channelId = $this->ownedChannelId($request, $id);
 
         try {
