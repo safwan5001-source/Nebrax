@@ -8,7 +8,7 @@
 | **Slice** | **V4a** — first half of V4 (V4b = the merchant MediaPicker / Image Editor UI and logo-migration UX) |
 | **Branch** | `cust-hv/v4a-mediaref-contract` |
 | **PR** | see PR description (opened with this report) |
-| **Base SHA** | `origin/main` after V2c (#1263) merged |
+| **Base SHA** | `2c8fdbb8` — `origin/main` after V2c (#1263) merged |
 | **Authority** | V0 §3.2 (`MediaRef`, AMEND-10/14), §7.5–§7.8, §1 DEF-5; Master Execution §6 (V4) |
 | **Depends on** | V2 (V2a #1255, V2b #1262, V2c #1263) |
 
@@ -69,7 +69,7 @@ Brand stays above the fold and shift-free (explicit dimensions, eager); AR RTL /
 | Backend | `StorefrontMediaRefTest` **7** (fixture parity + idempotence + key order; additive branding; public config sources/alt/no-leak; derivative sources at real sizes; unresolvable omitted; zero-query for media-less documents; path keying) + presentation/identity/runtime suites = 20 passed |
 | Storefront | resolved-media **7** · `MediaImage` **5** · `StoreBrand` **+3** · icon route **+4** · fixture parity (web + storefront) · biome ✓ · tsc ✓ · full vitest ✓ |
 | Web | fixture parity (34) ✓; typed branding keys on the web twin |
-| Full backend | see PR description; PostgreSQL by CI |
+| Full backend (sqlite, local) | 5735 passed · 57 skipped · **28 failed — all environment-only and identical to `main`** (`ext-bcmath` absent: Fuel* suites; mail view not compiled: `ResendMailTransportTest`, `UserInvitationTest`); none touches this slice · PostgreSQL by CI |
 
 ## Risks / deferred
 - **No merchant can create a `MediaRef` yet** — V4b ships the picker/editor/logo UX; until then this slice is inert in Production by construction.
