@@ -12,7 +12,7 @@
 Horizon 1 shipped the Flowers & Gifts capabilities end to end, but a merchant could only switch most of them on through the API. Horizon 2 closes that adoption gap: **every in-scope capability now has a real AWJ dashboard surface** — gift policy, delivery schedule, delivery windows and capacity, blocked dates, fulfilment warehouse, and, per product, preparation time, personalization, add-ons and structured content — plus a setup centre and a guided onboarding that tell the merchant what is missing and take them to the screen that fixes it.
 
 - **16 slices, 15 feature/test PRs merged, one report PR (this one).** H2-1…H2-15 are merged on `main` (PRs #1237, #1238, #1239, #1240, #1241, #1243, #1246, #1248, #1249, #1250, #1251, #1253, #1254, #1257, #1258), strictly one dependent PR at a time.
-- **Almost entirely frontend.** The server stayed the single authority: no price, promise, capacity or availability is computed on the client, no accounting / stock / invoice / ZATCA path was touched, and every new write goes through an existing, permission-scoped, tenant-scoped endpoint. The backend changes are small and additive (§4).
+- **Almost entirely frontend.** The server stayed the single authority: no price, promise, capacity or availability is computed on the client, no accounting / stock / invoice / ZATCA path was touched, and every new write goes through an existing, permission-scoped, tenant-scoped endpoint. The backend changes are small; all are additive except one deliberate validation tightening (§4, item 4; §9).
 - **Quality gates were real.** Codex review ran on six PRs and raised **32 findings, every one verified valid and fixed with a test** (one was a P1 purchasability bug, now enforced on the server too); CI (sqlite + PostgreSQL + web build, on both the PR and push events) was green on every merged head; a unified RBAC / tenant-isolation matrix and a client-to-real-server journey contract now guard the whole surface against drift.
 - **No financial, accounting, VAT, ZATCA, inventory-valuation or payment code changed.** No migration was added. No Horizon-2 deferred domain was implemented.
 - **Deployment:** manual deploy **not performed**; automatic CI/CD **not observable from GitHub**; production verification **not performed** (§17).
@@ -66,7 +66,7 @@ Information architecture: the four product capabilities live in **one** Gifting 
 
 ---
 
-## 4. Backend changes (all additive, none breaking)
+## 4. Backend changes (additive, plus one deliberate validation tightening)
 
 Horizon 2 is a frontend Horizon; the server changes are the minimum needed for correct concurrent editing and one safety invariant.
 
@@ -119,7 +119,7 @@ Labelled controls and `aria-invalid`/described errors on every field; tablist/ta
 ## 8. Tenant Isolation, RBAC and security review
 
 - **Tenant isolation is by construction** (`TenantContext` / `TenantScope`); no tenant or channel id is ever taken from the client. A foreign store or product answers a **non-revealing 404** on every method; a rejected save writes nothing.
-- **Unified access matrix** (`FlowersMerchantAdminAccessMatrixTest`, H2-13): store routes need `commerce.manage` for read **and** write (accountant / staff / self-service → 403, guest → 401); product routes split `products.view` (read) from `products.manage` (write) (staff reads but cannot write; self-service and guests denied); cross-tenant add-on references are rejected (422) and write nothing; a **route-inventory guard** fails the build if a Flowers admin route is added or removed without updating the matrix.
+- **Unified access matrix** (`FlowersMerchantAdminAccessMatrixTest`, H2-13): store routes need `commerce.manage` for read **and** write (accountant / staff / self-service → 403, guest → 401); product routes split `products.view` (read) from `products.manage` (write) (staff reads but cannot write; self-service and guests denied); cross-tenant add-on references are rejected (422) and write nothing; a **route-inventory guard** fails the build if a route **matching the guarded patterns** is added or removed without updating the matrix. Scope: store routes whose first suffix is `gift-settings`, `delivery-schedule`, `fulfillment` or `vertical-setup`, and product routes `preparation`, `personalization`, `addons`, `content`. A new sibling capability under a different name is **not** detected; the predicate must be extended when such a capability is added (listed as a risk in §13).
 - **UI hiding is not the guard.** The Gifting tab and the setup centre are hidden without `commerce.manage` and issue **no request**, but the routes enforce permission independently.
 - **Plain text only** for merchant content (no HTML/rich text); Unicode-aware length limits match the server; no file upload.
 - **Idempotent/optimistic writes** (revisions) prevent lost updates between merchants.
@@ -129,7 +129,7 @@ Labelled controls and `aria-invalid`/described errors on every field; tablist/ta
 
 ## 9. Backward compatibility
 
-- All server changes are additive; `expected_revision` is optional; responses gain `revision` fields additively.
+- Server changes are additive (`expected_revision` is optional; responses gain `revision` fields additively; no migration) **with one deliberate behavioural tightening**: an API client that previously saved an *active + required* personalization choice with no active option now receives **422** (§4 item 4). It protects purchasability (such a product could never be added to a cart), needs no migration, and affects only a configuration that was already unusable — but it is a compatibility change for any direct API client and is recorded as such.
 - **Non-Flowers tenants/stores are unchanged:** the product-page Gifting tab appears only for a tenant with a Flowers & Gifts store **and** a user holding `commerce.manage` (otherwise no tab and zero requests — covered by the capability-hook and H2-6 tests); the `/commerce` overview and `/commerce/onboarding` fall back to the unchanged overview / an explicit empty state for other stores; general retail, POS, invoicing, accounting and ZATCA flows were not touched.
 - The shared `Dialog` default label/behaviour is unchanged for every other module (`closeLabel` is opt-in); the product page's outer-tab guard only prompts when a Flowers draft exists (the registry is empty otherwise).
 - The one behavioural tightening — rejecting an active + required choice with no active option — applies to **new writes only** (existing stored data is not rewritten) and protects purchasability; see risks.
@@ -168,7 +168,7 @@ Per-slice focused tests are listed in the ledger (client mapping tests, section/
 
 ## 11. CI and review per PR
 
-Every PR merged only on a head where **all** checks were green on the `pull_request` run (`web build`, `php artisan test` on sqlite, `php artisan test` on PostgreSQL), with the duplicate `push` run also green or finished. After each merge the push run on `main` was observed: **`ci.yml` completed `success` for 14 of 15 Horizon 2 merge commits at the time of writing; the run for the H2-15 merge commit (`37a0a53`) was still in progress** (its PR-event run had passed all checks).
+Every PR merged only on a head where **every check that ran** was green on the `pull_request` run (`php artisan test` on sqlite and on PostgreSQL for all; `web build` where the PR touched its path filter — `web/**`, the journey contract or the workflow — so it did **not** run on test/docs-only slices such as H2-13), with the duplicate `push` run also green or finished. After each merge the push run on `main` was observed: **`ci.yml` completed `success` for 14 of 15 Horizon 2 merge commits at the time of writing; the run for the H2-15 merge commit (`37a0a53`) was still in progress** (its PR-event run had passed all checks).
 
 CI notes:
 - `CommerceModuleBoundaryTest` (H2-5) caught a real miss — the new fulfilment route was not in the pinned route allowlist; fixed in the same PR. Lesson recorded: backend slices must update that allowlist; filtered local runs are not enough.
@@ -209,6 +209,7 @@ The lessons from each round were applied proactively to the later sibling sectio
 4. **Automated accessibility audit is a regression guard**, not a substitute for assistive-technology testing by a human.
 5. **Local dev environment** quirks (stale local app, port reuse) are tooling issues, not product issues; CI is the full-suite gate.
 6. **Codex quota**: several slices were self-reviewed rather than bot-reviewed; their risk is mitigated by the rules derived from the 32 earlier findings, the access matrix and the journey contract.
+7. **Route-inventory guard scope**: the access-matrix guard only detects routes matching its patterns (§8). A new sibling Flowers capability under a different name would not fail the build until the predicate in `FlowersMerchantAdminAccessMatrixTest` is extended — add the pattern when adding the capability.
 
 ---
 
