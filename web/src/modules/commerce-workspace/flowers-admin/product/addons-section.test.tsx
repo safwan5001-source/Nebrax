@@ -174,6 +174,19 @@ describe('AddonsSection', () => {
     expect(srv.writes[0].expected_revision).toBe(JSON.stringify([addon('a')]));
   });
 
+  it('after a 409 whose refresh read fails it reports the failure and never writes with the stale revision', async () => {
+    const srv = server([addon('a')]);
+    await screen.findByText('منتج a');
+    await userEvent.click(screen.getByRole('button', { name: 'Remove: منتج a' }));
+    srv.setRemote([addon('a'), addon('z')]);
+    srv.failRead();
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(document.querySelector('[role="alert"]')).not.toBeNull());
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(document.querySelector('[role="alert"]')).not.toBeNull());
+    expect(srv.writes).toHaveLength(0);
+  });
+
   it('without a server revision it falls back to the pre-read and never writes when that read fails', async () => {
     const srv = server([addon('a')], { noRevision: true });
     await screen.findByText('منتج a');

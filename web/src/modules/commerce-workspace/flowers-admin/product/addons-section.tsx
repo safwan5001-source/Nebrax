@@ -172,10 +172,14 @@ export function AddonsSection({ productId, locale, canManage }: { productId: str
     if (!result.ok && result.kind === 'conflict') {
       const fresh = await loadAddons(productId);
       setSaving(false);
-      if (fresh.ok) {
-        setDraft(fresh.data.rows);
-        setPhase({ kind: 'ready', saved: fresh.data.rows, revision: fresh.data.revision });
+      if (!fresh.ok) {
+        // لم نستطع التحديث: لا ندّعي ذلك، ونُسقط البصمة القديمة كي لا يتكرر التعارض نفسه؛ الحفظ التالي يمرّ بالفحص المسبق (يفشل مغلقاً).
+        setPhase({ kind: 'ready', saved, revision: null });
+        setNotice({ tone: 'error', text: failureText(fresh, t) });
+        return;
       }
+      setDraft(fresh.data.rows);
+      setPhase({ kind: 'ready', saved: fresh.data.rows, revision: fresh.data.revision });
       setNotice({ tone: 'warning', text: t('addonStale') });
       return;
     }
