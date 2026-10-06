@@ -274,6 +274,7 @@ export function ControlPanels({
           doc={config.announcements}
           locale={locale}
           timezone={timezone}
+          defaultBackground={config.primaryColor}
           onChange={(announcements) => patch({ announcements })}
         />
       );

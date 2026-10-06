@@ -56,7 +56,6 @@ import {
 import { contrastRatio, isSafeHexColor } from "./presentation/tokens";
 
 const EMPTY_DOC: AnnouncementsDoc = { enabled: false, items: [] };
-const DEFAULT_BACKGROUND = "#0f766e";
 const PAGE_OPTIONS = ["home", "product", "category"] as const;
 
 const STATUS_KEY: Record<AnnouncementEditorStatus, CustomizerMessageKey> = {
@@ -68,12 +67,12 @@ const STATUS_KEY: Record<AnnouncementEditorStatus, CustomizerMessageKey> = {
   invalid: "annStatusInvalid",
 };
 const STATUS_TONE: Record<AnnouncementEditorStatus, string> = {
-  live: "bg-emerald-50 text-emerald-800",
-  disabled: "bg-neutral-100 text-neutral-600",
-  empty: "bg-neutral-100 text-neutral-600",
-  scheduled: "bg-sky-50 text-sky-800",
-  expired: "bg-neutral-100 text-neutral-600",
-  invalid: "bg-red-50 text-red-700",
+  live: "bg-primary-soft text-positive",
+  disabled: "bg-background text-muted",
+  empty: "bg-background text-muted",
+  scheduled: "bg-primary-soft text-primary",
+  expired: "bg-background text-muted",
+  invalid: "bg-background text-negative",
 };
 
 function newItemId(existing: readonly Announcement[]): string {
@@ -96,11 +95,14 @@ export function AnnouncementsPanel({
   doc,
   locale,
   timezone,
+  defaultBackground,
   onChange,
 }: {
   doc: AnnouncementsDoc | undefined;
   locale: CustomizerLocale;
   timezone: string;
+  /** Starting colour for a custom surface — the store's own primary, so the first click is already on-brand. */
+  defaultBackground: string;
   onChange: (next: AnnouncementsDoc) => void;
 }) {
   const t = (key: CustomizerMessageKey) => customizerMessage(locale, key);
@@ -134,8 +136,8 @@ export function AnnouncementsPanel({
 
   return (
     <div className="space-y-6" data-announcements-panel="">
-      <p className="text-[12px] leading-5 text-neutral-500">{t("annIntro")}</p>
-      <div className="border-y border-neutral-200">
+      <p className="text-[12px] leading-5 text-muted">{t("annIntro")}</p>
+      <div className="border-y border-border">
         <Toggle
           label={t("annEnable")}
           checked={current.enabled}
@@ -145,7 +147,7 @@ export function AnnouncementsPanel({
 
       <Section title={t("annItems")}>
         {current.items.length === 0 ? (
-          <p className="text-[12px] leading-5 text-neutral-500">
+          <p className="text-[12px] leading-5 text-muted">
             {t("annEmptyList")}
           </p>
         ) : (
@@ -156,7 +158,7 @@ export function AnnouncementsPanel({
               return (
                 <li
                   key={item.id}
-                  className="border border-neutral-200 bg-white"
+                  className="border border-border bg-surface"
                   data-announcement-item={item.id}
                 >
                   <div className="flex items-center gap-1 ps-3 pe-1">
@@ -167,7 +169,7 @@ export function AnnouncementsPanel({
                       onClick={() => setOpenId(open ? null : item.id)}
                       className="flex min-h-11 min-w-0 flex-1 items-center gap-2 text-start"
                     >
-                      <span className="min-w-0 flex-1 truncate text-[13px] text-neutral-900">
+                      <span className="min-w-0 flex-1 truncate text-[13px] text-text">
                         {item.text.trim() === ""
                           ? t("annTextEmptyPreview")
                           : item.text}
@@ -219,6 +221,7 @@ export function AnnouncementsPanel({
                       item={item}
                       locale={locale}
                       timezone={timezone}
+                      defaultBackground={defaultBackground}
                       nowMs={nowMs}
                       t={t}
                       onChange={(partial) => setItem(index, partial)}
@@ -249,13 +252,13 @@ export function AnnouncementsPanel({
             {t("annAdd")}
           </button>
           {atLimit ? (
-            <p className="text-[12px] text-neutral-500">{t("annLimit")}</p>
+            <p className="text-[12px] text-muted">{t("annLimit")}</p>
           ) : null}
         </div>
       </Section>
 
       <Section title={t("annBehaviour")}>
-        <div className="border-y border-neutral-200">
+        <div className="border-y border-border">
           <Toggle
             label={t("annRotate")}
             checked={Boolean(behaviour.rotate)}
@@ -304,7 +307,7 @@ export function AnnouncementsPanel({
               })
             }
           />
-          <p className="pb-2 text-[12px] leading-5 text-neutral-500">
+          <p className="pb-2 text-[12px] leading-5 text-muted">
             {t("annTickerHint")}
           </p>
           {behaviour.ticker ? (
@@ -359,6 +362,7 @@ function ItemEditor({
   item,
   locale,
   timezone,
+  defaultBackground,
   nowMs,
   t,
   onChange,
@@ -366,6 +370,7 @@ function ItemEditor({
   item: Announcement;
   locale: CustomizerLocale;
   timezone: string;
+  defaultBackground: string;
   nowMs: number;
   t: (key: CustomizerMessageKey) => string;
   onChange: (partial: Partial<Announcement>) => void;
@@ -391,7 +396,7 @@ function ItemEditor({
     onChange({ surface: next });
 
   return (
-    <div className="space-y-4 border-t border-neutral-200 p-3">
+    <div className="space-y-4 border-t border-border p-3">
       <Toggle
         label={t("annItemEnabled")}
         checked={item.enabled}
@@ -410,8 +415,8 @@ function ItemEditor({
         <span
           className={`block text-end text-[11px] tabular-nums ${
             codePoints > ANNOUNCEMENT_TEXT_MAX
-              ? "text-red-700"
-              : "text-neutral-500"
+              ? "text-negative"
+              : "text-muted"
           }`}
         >
           {codePoints}/{ANNOUNCEMENT_TEXT_MAX}
@@ -459,7 +464,7 @@ function ItemEditor({
       </Field>
 
       <div className="space-y-2">
-        <span className="block text-[12px] font-medium text-neutral-600">
+        <span className="block text-[12px] font-medium text-muted">
           {t("annSurface")}
         </span>
         <Segmented
@@ -468,7 +473,7 @@ function ItemEditor({
             setSurface(
               mode === "theme"
                 ? undefined
-                : { background: { hex: DEFAULT_BACKGROUND } },
+                : { background: { hex: defaultBackground.toLowerCase() } },
             )
           }
           options={[
@@ -486,7 +491,7 @@ function ItemEditor({
               }
             />
             <div className="space-y-1.5">
-              <span className="block text-[12px] font-medium text-neutral-600">
+              <span className="block text-[12px] font-medium text-muted">
                 {t("annTextColour")}
               </span>
               <Segmented
@@ -520,7 +525,7 @@ function ItemEditor({
                 data-announcement-contrast=""
                 role="status"
                 className={`text-[12px] leading-5 ${
-                  customTextFails ? "text-red-700" : "text-neutral-600"
+                  customTextFails ? "text-negative" : "text-muted"
                 }`}
               >
                 {t("annContrast")}:{" "}
@@ -547,18 +552,18 @@ function ItemEditor({
       />
 
       <fieldset className="space-y-1.5">
-        <legend className="text-[12px] font-medium text-neutral-600">
+        <legend className="text-[12px] font-medium text-muted">
           {t("annPages")}
         </legend>
         <div className="flex flex-wrap gap-x-4">
           {PAGE_OPTIONS.map((page) => (
             <label
               key={page}
-              className="flex min-h-11 items-center gap-2 text-[13px] text-neutral-800"
+              className="flex min-h-11 items-center gap-2 text-[13px] text-text"
             >
               <input
                 type="checkbox"
-                className="size-4 accent-[var(--color-primary,theme(colors.neutral.900))]"
+                className="size-4 accent-primary"
                 checked={pages.includes(page)}
                 onChange={(event) => {
                   const chosen = new Set(pages);
@@ -584,7 +589,7 @@ function ItemEditor({
             </label>
           ))}
         </div>
-        <p className="text-[12px] leading-5 text-neutral-500">
+        <p className="text-[12px] leading-5 text-muted">
           {t("annPagesAllHint")}
         </p>
       </fieldset>
@@ -610,7 +615,7 @@ function ColourField({
       {hideLabel ? null : (
         <label
           htmlFor={id}
-          className="block text-[12px] font-medium text-neutral-600"
+          className="block text-[12px] font-medium text-muted"
         >
           {label}
         </label>
@@ -619,7 +624,7 @@ function ColourField({
         <input
           type="color"
           aria-label={label}
-          className="size-10 shrink-0 cursor-pointer border border-neutral-300 bg-white p-0.5"
+          className="size-10 shrink-0 cursor-pointer border border-border bg-surface p-0.5"
           value={hex}
           onChange={(event) => {
             setDraft(null);
@@ -682,10 +687,10 @@ function WindowFields({
   };
   return (
     <fieldset className="space-y-2">
-      <legend className="text-[12px] font-medium text-neutral-600">
+      <legend className="text-[12px] font-medium text-muted">
         {t("annWindow")}
       </legend>
-      <p className="text-[12px] text-neutral-500">
+      <p className="text-[12px] text-muted">
         {timeZoneDisplayLabel(zone, locale)}
       </p>
       <WindowEdge
@@ -705,7 +710,7 @@ function WindowFields({
         onCommit={(iso) => write("endsAt", iso)}
       />
       {invalid ? (
-        <p role="alert" className="text-[12px] leading-5 text-red-700">
+        <p role="alert" className="text-[12px] leading-5 text-negative">
           {t("annWindowInvalid")}
         </p>
       ) : null}
@@ -746,38 +751,40 @@ function WindowEdge({
 
   return (
     <div className="space-y-1">
-      <span className="block text-[12px] text-neutral-600">{label}</span>
-      <div className="flex items-center gap-2">
+      <span className="block text-[12px] text-muted">{label}</span>
+      <div className="space-y-2">
         <input
           type="date"
           dir="ltr"
           aria-label={`${label} — ${t("annDate")}`}
-          className={inputClass}
+          className={`${inputClass} min-w-0`}
           value={date}
           onChange={(event) => update(event.target.value, time)}
         />
-        <input
-          type="time"
-          dir="ltr"
-          aria-label={`${label} — ${t("annTime")}`}
-          className={`${inputClass} w-32 shrink-0`}
-          value={time}
-          onChange={(event) => update(date, event.target.value)}
-        />
-        <button
-          type="button"
-          className={btnClass}
-          disabled={date === "" && time === "" && stored === undefined}
-          onClick={() => update("", "")}
-        >
-          {t("annClear")}
-        </button>
+        <div className="flex items-center gap-2">
+          <input
+            type="time"
+            dir="ltr"
+            aria-label={`${label} — ${t("annTime")}`}
+            className={`${inputClass} min-w-0 flex-1`}
+            value={time}
+            onChange={(event) => update(date, event.target.value)}
+          />
+          <button
+            type="button"
+            className={`${btnClass} h-10 shrink-0`}
+            disabled={date === "" && time === "" && stored === undefined}
+            onClick={() => update("", "")}
+          >
+            {t("annClear")}
+          </button>
+        </div>
       </div>
       {partial ? (
-        <p className="text-[12px] text-amber-700">{t("annWindowPartial")}</p>
+        <p className="text-[12px] text-warning">{t("annWindowPartial")}</p>
       ) : null}
       {unreadable ? (
-        <p className="text-[12px] text-red-700">{t("annWindowUnreadable")}</p>
+        <p className="text-[12px] text-negative">{t("annWindowUnreadable")}</p>
       ) : null}
     </div>
   );

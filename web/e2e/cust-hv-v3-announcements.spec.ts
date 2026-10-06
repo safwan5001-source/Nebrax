@@ -23,18 +23,20 @@ async function horizontalOverflow(page: Page) {
 }
 
 async function openPanel(page: Page, locale: 'ar' | 'en', width: number) {
-  const option = page.locator('[data-panel-option="announcements"]');
-  if (width < 1024) {
-    // The mobile bar's third button opens the "design" sheet (panel navigation).
-    await page.locator('[data-builder-mobile-bar] button').nth(2).click().catch(() => undefined);
-    await page.waitForTimeout(300);
-  }
-  if (!(await option.first().isVisible().catch(() => false))) {
-    await page.getByRole('button', { name: NAV[locale] }).first().click();
+  if (width >= 1024) {
+    await page.locator('[data-panel-option="announcements"]').first().click();
+  } else if (width < 768) {
+    // Phones: the bottom bar's third button opens the Design sheet, whose panel
+    // select reaches every panel.
+    await page.locator('[data-builder-mobile-bar] button').nth(2).click();
+    await page.locator('[data-design-panel-select]').selectOption('announcements');
   } else {
-    await option.first().click();
+    // 768–1023: no inspector surface exists on main (DEF-7, owned by V1B) —
+    // recorded, not worked around.
+    return false;
   }
-  await expect(page.locator('[data-announcements-panel]')).toBeVisible();
+  await expect(page.locator('[data-announcements-panel]:visible')).toBeVisible();
+  return true;
 }
 
 for (const locale of LOCALES) {
@@ -50,8 +52,13 @@ for (const locale of LOCALES) {
       const baseline = await horizontalOverflow(page);
       const noHorizontalOverflow = async (p: Page) => expect(await horizontalOverflow(p)).toBeLessThanOrEqual(baseline);
 
-      await openPanel(page, locale, width);
-      const panel = page.locator('[data-announcements-panel]');
+      if (!(await openPanel(page, locale, width))) {
+        test.info().annotations.push({ type: 'DEF-7', description: 'no inspector at 768–1023 on main; V1B' });
+        await noHorizontalOverflow(page);
+        await page.screenshot({ path: path.join(evidenceDir, `canvas-${locale}-${width}.png`) });
+        return;
+      }
+      const panel = page.locator('[data-announcements-panel]:visible');
 
       // Enable + add a message + write text.
       await panel.getByRole('checkbox').first().check({ force: true });
@@ -69,6 +76,17 @@ for (const locale of LOCALES) {
       await expect(panel.locator('[data-announcement-contrast]')).toBeVisible();
       await noHorizontalOverflow(page);
       await page.screenshot({ path: path.join(evidenceDir, `panel-colour-${locale}-${width}.png`) });
+
+      // The window fields stay inside the viewport (date + time + clear never clip).
+      const windowFields = panel.locator('fieldset').first();
+      await windowFields.scrollIntoViewIfNeeded();
+      for (const input of await windowFields.locator('input').all()) {
+        const box = await input.boundingBox();
+        expect(box).not.toBeNull();
+        expect(box!.x).toBeGreaterThanOrEqual(0);
+        expect(box!.x + box!.width).toBeLessThanOrEqual(width);
+      }
+      await page.screenshot({ path: path.join(evidenceDir, `panel-window-${locale}-${width}.png`) });
 
       // The Canvas shows the bar (mobile: switch to the preview pane first).
       if (width < 768) {

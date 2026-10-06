@@ -499,7 +499,7 @@ describe("AnnouncementBar (CUST-HV V3)", () => {
       expect(
         (
           rtl.container.querySelector(".awj-ann-viewport") as HTMLElement
-        ).style.getPropertyValue("--awj-ann-dir"),
+        ).style.getPropertyValue("--ann-dir"),
       ).toBe("-1");
       rtl.unmount();
 
@@ -508,7 +508,7 @@ describe("AnnouncementBar (CUST-HV V3)", () => {
       expect(
         (
           ltr.container.querySelector(".awj-ann-viewport") as HTMLElement
-        ).style.getPropertyValue("--awj-ann-dir"),
+        ).style.getPropertyValue("--ann-dir"),
       ).toBe("1");
     });
 
@@ -517,12 +517,12 @@ describe("AnnouncementBar (CUST-HV V3)", () => {
       const slow = mountBar(ticker({ tickerSpeed: "slow" }));
       const slowDuration = (
         slow.container.querySelector(".awj-ann-viewport") as HTMLElement
-      ).style.getPropertyValue("--awj-ann-duration");
+      ).style.getPropertyValue("--ann-duration");
       slow.unmount();
       const fast = mountBar(ticker({ tickerSpeed: "fast" }));
       const fastDuration = (
         fast.container.querySelector(".awj-ann-viewport") as HTMLElement
-      ).style.getPropertyValue("--awj-ann-duration");
+      ).style.getPropertyValue("--ann-duration");
       expect(Number.parseInt(slowDuration)).toBeGreaterThan(
         Number.parseInt(fastDuration),
       );

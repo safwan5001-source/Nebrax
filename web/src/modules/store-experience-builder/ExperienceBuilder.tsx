@@ -3077,8 +3077,32 @@ export function ExperienceBuilder({
                 renderInspectorBody(
                   currentPage === "product" ? "product" : currentPage === "category" ? "category" : "homepage",
                 )
+              ) : mobileSheet === "design" ? (
+                <div className="space-y-4">
+                  {/* CUST-HV V3 — the phone "Design" sheet used to be the Theme
+                      panel and nothing else, so every other panel (including
+                      Announcements, which has no Canvas element to tap until it
+                      is switched on) was unreachable below 768px. Same select
+                      the dormant edit pane already carries — no new IA. */}
+                  <select
+                    aria-label={t("controls")}
+                    data-design-panel-select=""
+                    value={panel}
+                    onChange={(event) =>
+                      setPanel(event.target.value as CustomizerPanel)
+                    }
+                    className="h-11 w-full border border-border bg-surface px-3 text-sm font-medium text-text outline-none focus:border-primary"
+                  >
+                    {visiblePanels.map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {t(item.label)}
+                      </option>
+                    ))}
+                  </select>
+                  {renderInspectorBody(panel)}
+                </div>
               ) : (
-                renderInspectorBody(mobileSheet === "design" ? "theme" : panel)
+                renderInspectorBody(panel)
               )}
             </div>
           </section>

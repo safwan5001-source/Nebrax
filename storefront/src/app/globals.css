@@ -520,8 +520,8 @@ input[type="search"]::-webkit-search-cancel-button {
     transform: translateX(0);
   }
   to {
-    /* --awj-ann-dir is -1 in RTL so the line travels the way the text reads. */
-    transform: translateX(calc(-50% * var(--awj-ann-dir, 1)));
+    /* --ann-dir is -1 in RTL so the line travels the way the text reads. */
+    transform: translateX(calc(-50% * var(--ann-dir, 1)));
   }
 }
 
@@ -533,7 +533,7 @@ input[type="search"]::-webkit-search-cancel-button {
   display: inline-flex;
   width: max-content;
   white-space: nowrap;
-  animation: awj-ann-marquee var(--awj-ann-duration, 40s) linear infinite;
+  animation: awj-ann-marquee var(--ann-duration, 40s) linear infinite;
   will-change: transform;
 }
 

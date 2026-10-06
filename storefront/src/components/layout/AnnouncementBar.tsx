@@ -343,8 +343,8 @@ export function AnnouncementBar({
   );
   const timing = TICKER_TIMING[behaviour.tickerSpeed ?? "normal"];
   const tickerStyle = {
-    "--awj-ann-duration": `${Math.max(timing.min, Math.round(totalChars * timing.perChar))}s`,
-    "--awj-ann-dir": rtl ? -1 : 1,
+    "--ann-duration": `${Math.max(timing.min, Math.round(totalChars * timing.perChar))}s`,
+    "--ann-dir": rtl ? -1 : 1,
   } as CSSProperties;
 
   return (
