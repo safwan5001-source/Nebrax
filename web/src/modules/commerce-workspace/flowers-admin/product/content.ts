@@ -32,14 +32,15 @@ export function mapBlocks(payload: unknown): ContentBlock[] | null {
   const rows = obj(obj(payload)?.data)?.blocks;
   if (!Array.isArray(rows)) return null;
 
-  return list(rows)
-    .map((raw): ContentBlock | null => {
-      const row = obj(raw);
-      const body = str(row?.body);
+  // صفٌّ لا نفهمه (نوع كتلة جديد مثلاً) يُفشل التحميل: حذفه بصمت ثم حفظ المجموعة كاملةً يمحوه من الخادم.
+  const mapped = list(rows).map((raw): ContentBlock | null => {
+    const row = obj(raw);
+    const body = str(row?.body);
 
-      return row && isType(row.block_type) && body !== null ? { type: row.block_type, body, bodyEn: str(row.body_en) ?? '', isActive: bool(row.is_active, true) } : null;
-    })
-    .filter((b): b is ContentBlock => b !== null);
+    return row && isType(row.block_type) && body !== null ? { type: row.block_type, body, bodyEn: str(row.body_en) ?? '', isActive: bool(row.is_active, true) } : null;
+  });
+
+  return mapped.every((b): b is ContentBlock => b !== null) ? mapped : null;
 }
 
 /** الكتل + بصمتها (`revision`) كما أعادهما الخادم؛ تُعاد عند الحفظ فيرفض الخادم الاستبدال القديم داخل القفل. */

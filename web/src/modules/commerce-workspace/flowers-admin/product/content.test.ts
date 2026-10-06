@@ -34,10 +34,11 @@ describe('structured content client', () => {
     expect([...CONTENT_TYPES]).toEqual(['composition', 'care', 'natural_variation', 'included_items', 'dimensions', 'materials', 'allergens', 'storage', 'preparation_notes', 'personalization_instructions']);
   });
 
-  it('maps ordered blocks and drops unknown types instead of inventing support', () => {
+  it('maps ordered blocks and fails the load on an unknown type (a whole-set save would delete it server-side)', () => {
     const blocks = mapBlocks(body)!;
     expect(blocks.map((b) => [b.type, b.isActive, b.bodyEn])).toEqual([['composition', true, '24 red roses'], ['care', false, '']]);
-    expect(mapBlocks({ data: { blocks: [{ block_type: 'video', body: 'x' }, { block_type: 'care', body: 'ok' }] } })!.map((b) => b.type)).toEqual(['care']);
+    expect(mapBlocks({ data: { blocks: [{ block_type: 'video', body: 'x' }, { block_type: 'care', body: 'ok' }] } })).toBeNull();
+    expect(mapBlocks({ data: { blocks: [{ block_type: 'care', body: 'ok' }] } })!.map((b) => b.type)).toEqual(['care']);
     expect(mapBlocks({ data: {} })).toBeNull();
   });
 
