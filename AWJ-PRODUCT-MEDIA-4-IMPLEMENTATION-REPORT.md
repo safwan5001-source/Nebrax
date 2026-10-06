@@ -4,8 +4,9 @@
 
 - Base SHA: `37d462f54e091a4ba630b41ec3210b90e00e3b21` (`origin/main` at start).
 - Implementation head SHA: `adf6cccae14a02b93265dd856be1747e7f4109cd`.
+- Published branch head at PR creation: `24bc08facd3497fb85c3a1393d95580720a7e4de`.
 - Branch: `feat/awj-product-media-4-consumer-wiring`.
-- PR: pending publication.
+- PR: [#1247 — AWJ-PRODUCT-MEDIA-4 — Wire image derivatives to Storefront and POS](https://github.com/safwan5001-source/Nebrax/pull/1247).
 
 ## Consumer map
 
