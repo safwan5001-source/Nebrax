@@ -30,6 +30,24 @@ const slot = (over: Record<string, unknown> = {}) => ({
   id: 'w1', method: 'delivery', label: 'صباحاً', label_en: null, start_time: '09:00', end_time: '12:00', weekdays: [0, 1, 2, 3, 4, 5, 6], capacity: null, shipping_zone_id: null, sort_order: 0, is_active: true, ...over,
 });
 
+
+const settingsCalls = () => apiMock.mock.calls.filter((call) => String(call[0]).endsWith('/settings'));
+
+const fulfillmentDoc = (current: unknown = null) => ({
+  data: { fulfillment: { warehouse: current }, warehouses: [{ id: 'wh1', code: '00001', name: 'المخزن الرئيسي', city: null, is_active: true }] },
+});
+
+/** الجدولة تُجاب بالتسلسل المُعطى؛ مخزن التنفيذ يُجاب دائماً بوثيقته (لا يستهلك من الطابور). */
+function queue(...responses: unknown[]) {
+  const pending = [...responses];
+  apiMock.mockImplementation(async (path: string) => {
+    if (path.includes('/fulfillment')) return fulfillmentDoc();
+    const next = pending.shift();
+    if (next instanceof Error) throw next;
+    return next;
+  });
+}
+
 function renderWorkspace(storeId = 's1') {
   return renderIntl(
     <ToastProvider>
@@ -41,7 +59,7 @@ function renderWorkspace(storeId = 's1') {
 
 describe('DeliveryWorkspace — availability rules', () => {
   it('loads persisted rules, shows the lead time in the best unit and the channel clock', async () => {
-    apiMock.mockResolvedValueOnce(doc({ lead_time_minutes: 180, cutoff_time: '15:30', max_days_ahead: 14 }, [slot()]));
+    queue(doc({ lead_time_minutes: 180, cutoff_time: '15:30', max_days_ahead: 14 }, [slot()]));
     renderWorkspace();
 
     expect(await screen.findByRole('switch', { name: 'Enable delivery date selection' })).toBeTruthy();
@@ -54,7 +72,7 @@ describe('DeliveryWorkspace — availability rules', () => {
   });
 
   it('shows honest readiness: enabled and active windows are separate prerequisites', async () => {
-    apiMock.mockResolvedValueOnce(doc({ enabled: true }, [slot({ is_active: false })]));
+    queue(doc({ enabled: true }, [slot({ is_active: false })]));
     renderWorkspace();
     await screen.findByRole('switch', { name: 'Enable delivery date selection' });
 
@@ -65,9 +83,7 @@ describe('DeliveryWorkspace — availability rules', () => {
   });
 
   it('saves all six fields, converts units to minutes and re-renders what the server returned', async () => {
-    apiMock
-      .mockResolvedValueOnce(doc({ enabled: false }, [slot()]))
-      .mockResolvedValueOnce(doc({ enabled: true, lead_time_minutes: 2880, cutoff_time: '14:00', max_days_ahead: 45 }, [slot()]));
+    queue(doc({ enabled: false }, [slot()]), doc({ enabled: true, lead_time_minutes: 2880, cutoff_time: '14:00', max_days_ahead: 45 }, [slot()]));
     renderWorkspace();
     await userEvent.click(await screen.findByRole('switch', { name: 'Enable delivery date selection' }));
     const lead = screen.getByLabelText('Lead time before delivery');
@@ -90,7 +106,7 @@ describe('DeliveryWorkspace — availability rules', () => {
   });
 
   it('refuses invalid inputs locally with described errors and never calls the server', async () => {
-    apiMock.mockResolvedValueOnce(doc({}, [slot()]));
+    queue(doc({}, [slot()]));
     renderWorkspace();
     const lead = await screen.findByLabelText('Lead time before delivery');
     await userEvent.clear(lead);
@@ -107,21 +123,21 @@ describe('DeliveryWorkspace — availability rules', () => {
     expect(days.getAttribute('aria-describedby')).toContain('sched-days-error');
     expect(screen.getByText('Enter a whole number between 1 and 90.')).toBeTruthy();
     await userEvent.click(screen.getByRole('button', { name: 'Save' }));
-    expect(apiMock).toHaveBeenCalledTimes(1);
+    expect(settingsCalls()).toHaveLength(0);
   });
 
   it('clears the cut-off and sends null', async () => {
-    apiMock.mockResolvedValueOnce(doc({ cutoff_time: '15:30' }, [slot()])).mockResolvedValueOnce(doc({ cutoff_time: null }, [slot()]));
+    queue(doc({ cutoff_time: '15:30' }, [slot()]), doc({ cutoff_time: null }, [slot()]));
     renderWorkspace();
     await userEvent.click(await screen.findByRole('button', { name: 'Clear' }));
     expect(screen.getByText('No cut-off')).toBeTruthy();
     await userEvent.click(screen.getByRole('button', { name: 'Save' }));
-    await waitFor(() => expect(apiMock).toHaveBeenCalledTimes(2));
-    expect((apiMock.mock.calls[1][1] as { body: Record<string, unknown> }).body.cutoff_time).toBeNull();
+    await waitFor(() => expect(settingsCalls()).toHaveLength(1));
+    expect((settingsCalls()[0][1] as { body: Record<string, unknown> }).body.cutoff_time).toBeNull();
   });
 
   it('surfaces the server validation message and keeps the draft', async () => {
-    apiMock.mockResolvedValueOnce(doc({ enabled: false }, [slot()])).mockRejectedValueOnce(new ApiError(422, 'المنطقة الزمنية غير صالحة', {}));
+    queue(doc({ enabled: false }, [slot()]), new ApiError(422, 'المنطقة الزمنية غير صالحة', {}));
     renderWorkspace();
     await userEvent.click(await screen.findByRole('switch', { name: 'Enable delivery date selection' }));
     await userEvent.click(screen.getByRole('button', { name: 'Save' }));
@@ -131,7 +147,7 @@ describe('DeliveryWorkspace — availability rules', () => {
   });
 
   it('keeps an unusual saved zone selected and retries a failed load', async () => {
-    apiMock.mockRejectedValueOnce(new Error('x')).mockResolvedValueOnce(doc({ timezone: 'Pacific/Honolulu' }, [slot()]));
+    queue(new Error('x'), doc({ timezone: 'Pacific/Honolulu' }, [slot()]));
     renderWorkspace();
     await userEvent.click(await screen.findByRole('button', { name: 'Try again' }));
     const select = (await screen.findByLabelText('Store time zone')) as HTMLSelectElement;
@@ -139,14 +155,14 @@ describe('DeliveryWorkspace — availability rules', () => {
   });
 
   it('shows a permission state on 403 and ignores a late response from a previous store', async () => {
-    apiMock.mockRejectedValueOnce(new ApiError(403, 'no', {}));
+    queue(new ApiError(403, 'no', {}));
     renderWorkspace();
     expect(await screen.findByText(/do not have permission/)).toBeTruthy();
 
     cleanup();
     apiMock.mockReset();
     let resolveFirst: (v: unknown) => void = () => undefined;
-    apiMock.mockReturnValueOnce(new Promise((resolve) => { resolveFirst = resolve; })).mockResolvedValueOnce(doc({ enabled: true }, [slot()]));
+    queue(new Promise((resolve) => { resolveFirst = resolve; }), doc({ enabled: true }, [slot()]));
     const view = renderWorkspace('s1');
     view.rerender(
       <ToastProvider>

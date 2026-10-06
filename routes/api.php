@@ -38,6 +38,7 @@ use App\Http\Controllers\Api\PreviewExchangeReferenceController;
 use App\Http\Controllers\Api\CommercePaymentIntentController;
 use App\Http\Controllers\Api\CommerceShippingZoneController;
 use App\Http\Controllers\Api\CommerceDeliveryScheduleController;
+use App\Http\Controllers\Api\CommerceFulfillmentController;
 use App\Http\Controllers\Api\CommerceGiftSettingsController;
 use App\Http\Controllers\Api\CommerceVerticalSetupController;
 use App\Http\Controllers\Api\CommerceWorkspaceStorefrontsController;
@@ -914,6 +915,10 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         Route::put('commerce/workspace/storefronts/{id}/delivery-schedule/settings', [CommerceDeliveryScheduleController::class, 'updateSettings'])->whereUuid('id')->middleware($perm('commerce.manage'));
         Route::put('commerce/workspace/storefronts/{id}/delivery-schedule/slots', [CommerceDeliveryScheduleController::class, 'replaceSlots'])->whereUuid('id')->middleware($perm('commerce.manage'));
         Route::put('commerce/workspace/storefronts/{id}/delivery-schedule/blocked-dates', [CommerceDeliveryScheduleController::class, 'replaceBlockedDates'])->whereUuid('id')->middleware($perm('commerce.manage'));
+
+        // FLOWERS-H2-5 / ADR-27: مخزن تنفيذ قناة المتجر (شرط «يصل اليوم») — واجهة رفيعة فوق FulfillmentPolicyService، commerce.manage.
+        Route::get('commerce/workspace/storefronts/{id}/fulfillment', [CommerceFulfillmentController::class, 'show'])->whereUuid('id')->middleware($perm('commerce.manage'));
+        Route::put('commerce/workspace/storefronts/{id}/fulfillment', [CommerceFulfillmentController::class, 'update'])->whereUuid('id')->middleware($perm('commerce.manage'));
 
         // نفس السياسة لقناة الجوال المعتمدة للمستأجر (الأقدم نشاطاً، كما تخدمها /commerce/v1) — بلا معرّف ولا Storefront.
         Route::get('commerce/workspace/mobile-channel/delivery-schedule', [CommerceDeliveryScheduleController::class, 'show'])->defaults('channel', 'mobile')->middleware($perm('commerce.manage'));

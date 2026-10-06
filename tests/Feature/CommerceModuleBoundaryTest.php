@@ -109,6 +109,7 @@ class CommerceModuleBoundaryTest extends TestCase
         'api/commerce/workspace/storefronts/{id}/domains/{domainId}/make-primary',
         'api/commerce/workspace/storefronts/{id}/domains/{domainId}/refresh-edge',
         'api/commerce/workspace/storefronts/{id}/domains/{domainId}/verify',
+        'api/commerce/workspace/storefronts/{id}/fulfillment',
         // FLOWERS-H3 / ADR-15 — سياسة الإهداء.
         'api/commerce/workspace/storefronts/{id}/gift-settings',
         // CUST-H4-8b — وسائط مساحة عمل Canvas الموقَّعة (بلا auth:sanctum —

@@ -40,6 +40,14 @@ export async function seedAdmin(
     },
     [permissions, opts.role ?? 'owner'] as const,
   );
+  // شارة أدوات التطوير في Next تغطي أسفل الشاشة وتعترض النقر؛ ليست جزءاً من المنتج.
+  await page.addInitScript(() => {
+    document.addEventListener('DOMContentLoaded', () => {
+      const style = document.createElement('style');
+      style.textContent = 'nextjs-portal{display:none !important}';
+      document.head.appendChild(style);
+    });
+  });
   await page.route('**/api/**', async (route) => {
     const url = route.request().url();
     if (/\/commerce\/workspace\/storefronts(\?|$)/.test(url) && route.request().method() === 'GET') {
