@@ -20,11 +20,21 @@ The Horizon is **not** one giant PR.
 
 It is one coherent product Horizon executed **slice by slice**, with an independent implementation/review/verification loop for each slice.
 
-The implementation sequence is:
+Execution starts with **V1A**, then proceeds according to the **dependency graph defined in the Horizon Roadmap**, not as a rigid linear sequence.
 
-`V1A → V1B → V2 → V3 → V4 → V5 → V6 → V7 → V8 → V9 → V10 → V11`
+The dependency graph is authoritative. In particular:
 
-A later slice may start only when its actual dependency gates are satisfied.
+- V2, V3 and V5 depend directly on V0 and may become the next dependency-safe work after V1A;
+- V4 depends on V2;
+- V6 depends on V2 + V4 + V5;
+- V7 depends on V5 and on V6 for overlay-on-Hero behavior;
+- V8 depends on V2 + V4 + V5;
+- V9 depends on V4 + V5;
+- V10 depends on V5–V9;
+- V11 depends on all required prior slices;
+- **V1B is contract-dependent and must be co-designed and closed in coordination with V5**, especially for the 768 px editing surface and Inspector/IA-related behavior.
+
+A later slice may start only when its actual dependency gates are satisfied. Do not force an arbitrary sequential order that contradicts the Roadmap.
 
 ---
 
@@ -93,6 +103,8 @@ For every slice:
    - next slice / next action.
 
 10. **Continue automatically to the next dependency-safe slice**
+    - choose the next slice from the Roadmap dependency graph, not from a fixed numeric sequence;
+    - keep V1B coordinated with V5 rather than treating it as a mandatory blocker before V2/V3/V5;
     - unless a STOP condition in §7 applies.
 
 ---
@@ -600,6 +612,8 @@ Name the next dependency-safe slice or the exact Owner decision required.
 When this document is supplied to Claude Code, use the following operating instruction:
 
 > Execute CUST-HV from V1A through V11 using this Master Horizon Execution Plan, the merged V0 contract and the Horizon Roadmap as authority.
+>
+> Start with V1A, then follow the Roadmap's dependency graph rather than a rigid numeric order. V1B is contract-dependent and must be co-designed/closed with V5; it is not a mandatory blocker before all other slices.
 >
 > Work autonomously slice by slice. Do not repeatedly ask for permission to continue normal implementation.
 >
