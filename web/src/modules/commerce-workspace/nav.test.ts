@@ -19,6 +19,7 @@ describe('commerce workspace navigation', () => {
       '/app-builder',
       '/commerce/domains',
       '/commerce/delivery',
+      '/commerce/gifting',
       '/commerce/integrations',
     ]);
   });

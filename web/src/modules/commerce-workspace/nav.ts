@@ -36,6 +36,7 @@ export const COMMERCE_WORKSPACE_NAV_GROUPS: CommerceWorkspaceNavGroup[] = [
     items: [
       { href: '/commerce/domains', labelKey: 'domains' },
       { href: '/commerce/delivery', labelKey: 'delivery' },
+      { href: '/commerce/gifting', labelKey: 'gifting', permission: 'commerce.manage' },
       { href: '/commerce/integrations', labelKey: 'integrations' },
     ],
   },
