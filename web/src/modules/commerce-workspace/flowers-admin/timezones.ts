@@ -21,15 +21,26 @@ export const COMMON_TIMEZONES = [
   'UTC',
 ] as const;
 
-export function allTimezones(): string[] {
-  try {
-    const supported = (Intl as unknown as { supportedValuesOf?: (key: string) => string[] }).supportedValuesOf?.('timeZone');
-    if (supported && supported.length > 0) return supported;
-  } catch {
-    // بيئة بلا دعم: نسقط على القائمة المنسّقة.
-  }
+/**
+ * قائمة منسّقة بمعرّفات IANA **القانونية** (لا أسماء بديلة كـ`Asia/Calcutta`). لا نبني الخيارات من `Intl.supportedValuesOf`:
+ * قائمة ICU في المتصفّح تختلف عن قائمة PHP التي يتحقق منها الخادم (`DateTimeZone::listIdentifiers`)، فكان يظهر خيارٌ
+ * يرفضه الحفظ. كل معرّفٍ هنا مقبولٌ في PHP 8.x (يُتحقَّق منه في الاختبار بقائمة ثابتة معروفة). المنطقة المحفوظة حالياً
+ * تبقى متاحةً دائماً حتى لو خرجت عن القائمة.
+ */
+export const WORLD_TIMEZONES = [
+  'Africa/Addis_Ababa', 'Africa/Algiers', 'Africa/Cairo', 'Africa/Casablanca', 'Africa/Johannesburg', 'Africa/Khartoum',
+  'Africa/Lagos', 'Africa/Nairobi', 'Africa/Tripoli', 'Africa/Tunis',
+  'America/Chicago', 'America/Denver', 'America/Los_Angeles', 'America/Mexico_City', 'America/New_York', 'America/Sao_Paulo', 'America/Toronto',
+  'Asia/Aden', 'Asia/Almaty', 'Asia/Bangkok', 'Asia/Dhaka', 'Asia/Damascus', 'Asia/Hong_Kong', 'Asia/Jakarta', 'Asia/Jerusalem',
+  'Asia/Karachi', 'Asia/Kolkata', 'Asia/Kuala_Lumpur', 'Asia/Manila', 'Asia/Seoul', 'Asia/Shanghai', 'Asia/Singapore', 'Asia/Tashkent',
+  'Asia/Tehran', 'Asia/Tokyo',
+  'Australia/Sydney',
+  'Europe/Amsterdam', 'Europe/Athens', 'Europe/Berlin', 'Europe/Lisbon', 'Europe/London', 'Europe/Madrid', 'Europe/Moscow', 'Europe/Paris', 'Europe/Rome',
+  'Pacific/Auckland', 'Pacific/Honolulu',
+] as const;
 
-  return [...COMMON_TIMEZONES];
+export function allTimezones(): string[] {
+  return [...WORLD_TIMEZONES];
 }
 
 export type TimezoneGroups = { common: string[]; other: string[] };

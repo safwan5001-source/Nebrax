@@ -1,7 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import { COMMON_TIMEZONES, currentDateIn, currentTimeIn, isKnownZone, timezoneGroups, zoneLabel } from './timezones';
+import { COMMON_TIMEZONES, WORLD_TIMEZONES, currentDateIn, currentTimeIn, isKnownZone, timezoneGroups, zoneLabel } from './timezones';
 
 describe('timezones', () => {
+  it('offers only canonical identifiers, never the browser ICU list or legacy aliases the server may reject', () => {
+    const aliases = ['Asia/Calcutta', 'Asia/Saigon', 'Asia/Katmandu', 'Asia/Rangoon', 'Asia/Istanbul', 'Europe/Kiev', 'America/Buenos_Aires', 'Pacific/Samoa', 'US/Eastern', 'GMT'];
+    for (const zone of [...COMMON_TIMEZONES, ...WORLD_TIMEZONES]) {
+      expect(aliases, zone).not.toContain(zone);
+      expect(zone, zone).toMatch(/^([A-Za-z_]+\/[A-Za-z_]+|UTC)$/);
+    }
+    expect(new Set(WORLD_TIMEZONES).size).toBe(WORLD_TIMEZONES.length);
+    expect(WORLD_TIMEZONES).toContain('Asia/Kolkata');
+  });
+
   it('lists common markets first and never duplicates them in the rest', () => {
     const { common, other } = timezoneGroups('Asia/Riyadh');
     expect(common[0]).toBe('Asia/Riyadh');

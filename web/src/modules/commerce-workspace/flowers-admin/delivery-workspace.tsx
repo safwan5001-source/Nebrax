@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Truck } from 'lucide-react';
 import { EmptyState, ErrorState, LoadingState } from '@/components/nebrax';
-import { TabPanel } from '@/components/ui/tabs';
 import { loadSchedule, type ScheduleDocument } from './delivery-schedule';
 import type { AdminFailure } from './admin-http';
 import { failureText } from './failure-text';
@@ -69,10 +68,10 @@ export function DeliveryWorkspace({ storeId, locale }: { storeId: string; locale
       </section>
 
       <div className="space-y-4">
-        {/* تبويب واحد في هذه الخطوة: لا شريط تبويبات يوحي بما لم يُبنَ بعد. */}
-        <TabPanel id={tab}>
+        {/* تبويب واحد في هذه الخطوة: لا شريط تبويبات يوحي بما لم يُبنَ بعد، فلا دلالات tabpanel يتيمة. */}
+        <div data-delivery-panel={tab}>
           <ScheduleRulesPanel storeId={storeId} locale={locale} settings={document.settings} onSaved={setDocument} />
-        </TabPanel>
+        </div>
       </div>
     </div>
   );
