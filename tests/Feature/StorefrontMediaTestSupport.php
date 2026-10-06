@@ -36,6 +36,9 @@ trait StorefrontMediaTestSupport
 
     protected int $r2PutCount = 0;
 
+    /** يرفض كل `deleteObject` (لمحاكاة انقطاع التخزين أثناء التطهير). */
+    protected bool $r2FailDeletes = false;
+
     protected function fakeStorefrontMediaR2(bool $enabled = true): MockInterface
     {
         config()->set('filesystems.disks.r2', [
@@ -83,6 +86,9 @@ trait StorefrontMediaTestSupport
         });
         $client->shouldReceive('deleteObject')->andReturnUsing(function (array $args): Result {
             $this->r2Calls[] = 'delete:'.$args['Key'];
+            if ($this->r2FailDeletes) {
+                throw new RuntimeException('simulated R2 outage');
+            }
             unset($this->r2Objects[$args['Key']]);
 
             return new Result([]);

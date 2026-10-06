@@ -56,10 +56,13 @@ class StorefrontMediaDeliveryTest extends TestCase
     }
 
     /** @return array<string,mixed> */
-    private function upload(array $auth, int $w = 1600, int $h = 900): array
+    private int $uploads = 0;
+
+    private function uploadMedia(array $auth, int $w = 1600, int $h = 900): array
     {
+        $w += $this->uploads++; // same bytes in a tenant dedupe — every call must be a distinct image
         $json = $this->withToken($auth['token'])
-            ->post(self::BASE, ['files' => [parent::upload($this->jpegBytes($w, $h))]], ['Accept' => 'application/json'])
+            ->post(self::BASE, ['files' => [$this->upload($this->jpegBytes($w, $h))]], ['Accept' => 'application/json'])
             ->json();
         $this->assertSame('created', $json['data'][0]['status'], json_encode($json));
 
@@ -104,8 +107,8 @@ class StorefrontMediaDeliveryTest extends TestCase
     {
         $this->fakeStorefrontMediaR2();
         $store = $this->store('sfp-index');
-        $a = $this->upload($store['auth']);
-        $b = $this->upload($store['auth']);
+        $a = $this->uploadMedia($store['auth']);
+        $b = $this->uploadMedia($store['auth']);
 
         $row = $this->publish($store, $this->ref($a['id']));
         $this->assertSame([$a['id']], StorefrontPublishedMedia::query()->pluck('media_id')->all());
@@ -132,7 +135,7 @@ class StorefrontMediaDeliveryTest extends TestCase
     {
         $this->fakeStorefrontMediaR2();
         $store = $this->store('sfp-base');
-        $media = $this->upload($store['auth']);
+        $media = $this->uploadMedia($store['auth']);
         $this->publish($store, $this->ref($media['id']));
 
         $response = $this->get($this->url($store, "{$media['id']}/768w.webp"))->assertOk();
@@ -166,8 +169,8 @@ class StorefrontMediaDeliveryTest extends TestCase
         $this->fakeStorefrontMediaR2();
         $store = $this->store('sfp-404');
         $other = $this->store('sfp-404-b');
-        $media = $this->upload($store['auth']);
-        $foreign = $this->upload($other['auth']);
+        $media = $this->uploadMedia($store['auth']);
+        $foreign = $this->uploadMedia($other['auth']);
         $this->publish($store, $this->ref($media['id']));
         $this->publish($other, $this->ref($foreign['id']));
 
@@ -182,12 +185,14 @@ class StorefrontMediaDeliveryTest extends TestCase
             'foreign tenant media' => "{$foreign['id']}/480w.webp",
         ] as $label => $path) {
             $response = $this->get($this->url($store, $path))->assertNotFound();
-            $uniform[$label] = $response->getContent();
+            $body = $response->json();
+            unset($body['meta']['request_id']); // the only per-request field
+            $uniform[$label] = json_encode($body);
         }
-        $this->assertCount(1, array_unique($uniform), 'no response distinguishes why: '.json_encode(array_keys($uniform)));
+        $this->assertCount(1, array_unique($uniform), 'no response distinguishes why: '.json_encode($uniform));
 
         // مرجعٌ في المسودة وحدها لا يكفي.
-        $draftOnly = $this->upload($store['auth']);
+        $draftOnly = $this->uploadMedia($store['auth']);
         app(TenantContext::class)->set($store['auth']['tenant_id']);
         StorefrontPresentation::query()->where('storefront_id', $store['storefront']->id)->first()
             ->forceFill(['draft_config' => $this->ref($draftOnly['id'])])->save();
@@ -209,7 +214,7 @@ class StorefrontMediaDeliveryTest extends TestCase
     {
         $this->fakeStorefrontMediaR2();
         $store = $this->store('sfp-deriv');
-        $media = $this->upload($store['auth']);
+        $media = $this->uploadMedia($store['auth']);
         $transform = ['crop' => ['x' => 0.1, 'y' => 0.1, 'w' => 0.6, 'h' => 0.6, 'aspect' => 'free-locked', 'zoom' => 1.5]];
         $this->withToken($store['auth']['token'])->postJson(self::BASE.'/'.$media['id'].'/derivatives', ['transform' => $transform])
             ->assertOk()->assertJsonPath('data.state', 'ready');
@@ -241,8 +246,8 @@ class StorefrontMediaDeliveryTest extends TestCase
     {
         $this->fakeStorefrontMediaR2();
         $store = $this->store('sfp-gate');
-        $ready = $this->upload($store['auth']);
-        $unaltered = $this->upload($store['auth']);
+        $ready = $this->uploadMedia($store['auth']);
+        $unaltered = $this->uploadMedia($store['auth']);
         app(TenantContext::class)->set($store['auth']['tenant_id']);
         StorefrontMedia::query()->whereKey($ready['id'])->update(['alt_ar' => 'صورة', 'alt_en' => 'Photo']);
         $failedBase = StorefrontMedia::query()->whereKey($unaltered['id'])->firstOrFail();
@@ -281,7 +286,7 @@ class StorefrontMediaDeliveryTest extends TestCase
     {
         $this->fakeStorefrontMediaR2();
         $store = $this->store('sfp-alt');
-        $media = $this->upload($store['auth']);
+        $media = $this->uploadMedia($store['auth']);
         app(TenantContext::class)->set($store['auth']['tenant_id']);
         $validator = new StorefrontPresentationPublishValidator;
         $errorsFor = fn (array $ref): array => array_map(static fn (array $e): string => $e['code'], $validator->errors(['m' => $ref]));
@@ -302,7 +307,7 @@ class StorefrontMediaDeliveryTest extends TestCase
     {
         $this->fakeStorefrontMediaR2();
         $store = $this->store('sfp-gate-d');
-        $media = $this->upload($store['auth']);
+        $media = $this->uploadMedia($store['auth']);
         $transform = ['crop' => ['x' => 0.1, 'y' => 0.1, 'w' => 0.5, 'h' => 0.5, 'aspect' => '1:1', 'zoom' => 1]];
         $this->withToken($store['auth']['token'])->postJson(self::BASE.'/'.$media['id'].'/derivatives', ['transform' => $transform])->assertOk();
 
@@ -345,10 +350,10 @@ class StorefrontMediaDeliveryTest extends TestCase
         $this->fakeStorefrontMediaR2();
         $store = $this->store('sfp-rec');
         $other = $this->store('sfp-rec-b');
-        $due = $this->upload($store['auth']);
-        $notDue = $this->upload($store['auth']);
-        $live = $this->upload($store['auth']);
-        $foreignDue = $this->upload($other['auth']);
+        $due = $this->uploadMedia($store['auth']);
+        $notDue = $this->uploadMedia($store['auth']);
+        $live = $this->uploadMedia($store['auth']);
+        $foreignDue = $this->uploadMedia($other['auth']);
         $this->withToken($store['auth']['token'])->postJson(self::BASE.'/'.$due['id'].'/derivatives', ['transform' => ['rotate' => 180]])->assertOk();
 
         foreach ([[$due, 5], [$notDue, -5], [$foreignDue, 5]] as [$m, $days]) {
@@ -385,17 +390,18 @@ class StorefrontMediaDeliveryTest extends TestCase
     {
         $this->fakeStorefrontMediaR2();
         $store = $this->store('sfp-rec-fail');
-        $media = $this->upload($store['auth']);
+        $media = $this->uploadMedia($store['auth']);
         StorefrontMedia::withoutGlobalScopes()->whereKey($media['id'])->update(['state' => 'deleted', 'deleted_at' => now(), 'purge_after' => now()->subDay()]);
 
-        $client = app(\App\Services\R2StorageService::class);
-        $this->app->instance(\App\Services\R2StorageService::class, Mockery::mock($client)->makePartial()
-            ->shouldReceive('delete')->andThrow(new \RuntimeException('outage'))->getMock());
+        $this->r2FailDeletes = true;
 
         $failed = app(StorefrontMediaReconciler::class)->run($store['auth']['tenant_id']);
         $this->assertSame(1, $failed['failed_assets']);
         $this->assertSame(0, $failed['purged_assets']);
         $this->assertSame('deleted', StorefrontMedia::withoutGlobalScopes()->findOrFail($media['id'])->state);
+
+        $this->r2FailDeletes = false;
+        $this->assertSame(1, app(StorefrontMediaReconciler::class)->run($store['auth']['tenant_id'])['purged_assets'], 'the next run finishes the job');
     }
 
     /** @test */
@@ -403,7 +409,7 @@ class StorefrontMediaDeliveryTest extends TestCase
     {
         $this->fakeStorefrontMediaR2();
         $store = $this->store('sfp-orphan');
-        $media = $this->upload($store['auth']);
+        $media = $this->uploadMedia($store['auth']);
         $framing = static fn (float $x): array => ['crop' => ['x' => $x, 'y' => 0.1, 'w' => 0.5, 'h' => 0.5, 'aspect' => '1:1', 'zoom' => 1]];
         foreach ([0.1, 0.2, 0.3, 0.4] as $x) {
             $this->withToken($store['auth']['token'])->postJson(self::BASE.'/'.$media['id'].'/derivatives', ['transform' => $framing($x)])->assertOk();
