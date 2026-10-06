@@ -1,6 +1,6 @@
 # AWJ Flowers & Gifts — Horizon 2 Progress
 
-**Status:** IN PROGRESS — H2-1…H2-5 merged; H2-6 in review  
+**Status:** IN PROGRESS — H2-1…H2-6 merged; H2-7 in review  
 **Date:** 2026-10-04  
 **Planning Base:** `main` @ `6ded662bfada8f72f5ebf321dcf27b08be7939c1`  
 **Execution Base (H2-1):** `main` @ `afe223cb654154fa55234ff2e360233bbc933ec3`  
@@ -31,8 +31,8 @@ Horizon 1 is complete.
 | H2-3 | Delivery Windows & Capacity | MERGED | #1239 | `5ff339b` |
 | H2-4 | Blocked Dates & Exceptions | MERGED | #1240 | `323c5f5` |
 | H2-5 | Fulfillment Warehouse Setup | MERGED | #1241 | `a53bcd0` |
-| H2-6 | Product Preparation Time | PR OPEN | (see log) | — |
-| H2-7 | Product Personalization Admin | NOT STARTED | — | — |
+| H2-6 | Product Preparation Time | MERGED | #1243 | `a10359d` |
+| H2-7 | Product Personalization Admin | PR OPEN | (see log) | — |
 | H2-8 | Product Add-ons Admin | NOT STARTED | — | — |
 | H2-9 | Structured Product Content Admin | NOT STARTED | — | — |
 | H2-10 | Unified Product Gifting Workspace | NOT STARTED | — | — |
@@ -279,10 +279,12 @@ A UI slice is not complete until its progress entry records:
 
 ### H2-6 — Product Preparation Time
 
-**Status:** PR OPEN  
+**Status:** MERGED  
 **Base SHA:** `a53bcd0ab3a5b6e9e9bffcc7e6be588ddbf64c7a` (H2-5 merged)  
 **Branch:** `flowers/h2-6-product-preparation`  
-**PR / Head / Merge SHA:** recorded in the next slice's ledger update after merge
+**PR:** #1243  
+**Head SHA:** `8d9a15c` (earlier heads `5ba1d5f`, `396279d`)  
+**Merge SHA:** `a10359d5f9de12a972c728f5dcc71397e4e45319` (squash)
 
 #### Contract / scope
 - Existing contract: `GET|PUT /commerce/workspace/products/{id}/preparation` (`products.view` read / `products.manage` write): `{ preparation_minutes }`. Effective lead time = the larger of the channel lead time (H2-2) and this product's preparation time (ADR-20); the server computes any promise — no date is computed on the client.
@@ -300,11 +302,45 @@ A UI slice is not complete until its progress entry records:
 #### Backward compatibility
 - Additive tab; general-retail tenants and unaffected stores see no change.
 
+#### Review / CI
+- Codex out of quota (no automated findings). The capability read was gated on `commerce.manage` (no 403 per product page) and the read-only e2e case seeds both permissions. One transient `next build` failure (Google Fonts fetch) on an earlier head; later builds green. Merged on a fully green head (sqlite, pgsql, web; both runs).
+
+#### Deployment observation
+- Manual deploy: NOT PERFORMED; automatic CI/CD: not observable from GitHub; production verification: NOT PERFORMED.
+
+#### Next
+- H2-7 — Product Personalization Admin.
+
+---
+
+### H2-7 — Product Personalization Admin
+
+**Status:** PR OPEN  
+**Base SHA:** `a10359d5f9de12a972c728f5dcc71397e4e45319` (H2-6 merged)  
+**Branch:** `flowers/h2-7-product-personalization`  
+**PR / Head / Merge SHA:** recorded in the next slice's ledger update after merge
+
+#### Contract / scope
+- Existing contract: `GET|PUT /commerce/workspace/products/{id}/personalization` (`products.view` read / `products.manage` write) — a full-set replace of the product's personalization field definitions. The server stays the authority on validation and on what a shopper may enter.
+- **Small additive backend change:** the document carries a `revision` (sha1 of the stored definitions); `PUT` accepts an optional `expected_revision`, compared **inside the product lock** — a mismatch returns 409 and writes nothing (no lost update between two merchants). Omitting it keeps the legacy behaviour (backward compatible). Revision and returned data come from the same snapshot.
+
+#### UI / information architecture
+- "Personalization" section in the product Gifting tab: list of fields (label, type, required, limits) with add/edit dialog (focus-trapped), reorder, remove, and one explicit Save. States: loading, empty, populated, saving, success, validation (field-level, `aria-invalid`), server error, 409 (reload + warning), read-only without `products.manage`. Unsaved edits register with the unsaved guard. When the server returns no revision, the client falls back to a pre-read and fails closed if that read fails.
+
+#### Tests
+- Backend `CommerceProductPersonalizationApiTest` (adds the stale-revision 409 case); web `personalization.test.ts`, `personalization-section.test.tsx`; Playwright `flowers-h2-7-product-personalization.spec.ts`.
+
+#### Tenant Isolation / RBAC
+- Product ownership via `TenantScope` (non-revealing 404); write requires `products.manage`; no accounting, stock or invoice effect.
+
+#### Backward compatibility
+- `expected_revision` optional; response gains `revision` additively.
+
 #### Deployment observation
 - Manual deploy: NOT PERFORMED; production verification: NOT PERFORMED.
 
 #### Next
-- H2-7 — Product Personalization Admin.
+- H2-8 — Product Add-ons Admin.
 
 ---
 
