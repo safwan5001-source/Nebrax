@@ -12,6 +12,7 @@
         },
         "in_stock": true,
         "thumbnail_url": null,
+        "card_url": null,
         "media": [],
         "is_variant_managed": false,
         "content_blocks": [
