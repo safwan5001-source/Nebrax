@@ -14,10 +14,12 @@ import { ScheduleRulesPanel } from './schedule-rules-panel';
 import { WindowsPanel } from './windows-panel';
 import { BlockedDatesPanel } from './blocked-dates-panel';
 import { todayInZone, groupBlocked } from './blocked-dates';
+import { FulfillmentPanel } from './fulfillment-panel';
+import { loadFulfillment, type FulfillmentDocument } from './fulfillment';
 
 type Phase = { kind: 'loading' } | { kind: 'failed'; failure: AdminFailure } | { kind: 'ready'; document: ScheduleDocument };
 
-export const DELIVERY_TABS = ['rules', 'windows', 'blocked'] as const;
+export const DELIVERY_TABS = ['rules', 'windows', 'blocked', 'fulfilment'] as const;
 export type DeliveryTabId = (typeof DELIVERY_TABS)[number];
 
 const isTab = (value: string | null): value is DeliveryTabId => (DELIVERY_TABS as readonly (string | null)[]).includes(value);
@@ -40,6 +42,8 @@ export function DeliveryWorkspace({ storeId, locale }: { storeId: string; locale
   const t = useMemo(() => flowersAdminT(locale), [locale]);
   const [phase, setPhase] = useState<Phase>({ kind: 'loading' });
   const [attempt, setAttempt] = useState(0);
+  // مخزن التنفيذ يُحمَّل بالتوازي وفشله لا يحجب الجدولة: يُعرض ناقصاً بدل أن يُخفي الشاشة.
+  const [fulfillment, setFulfillment] = useState<FulfillmentDocument | null | 'loading'>('loading');
   const [tab, setTabState] = useState<DeliveryTabId>('rules');
   useEffect(() => setTabState(initialTab()), []);
   const setTab = (next: DeliveryTabId) => {
@@ -58,6 +62,17 @@ export function DeliveryWorkspace({ storeId, locale }: { storeId: string; locale
     void loadSchedule(storeId).then((result) => {
       if (!current) return;
       setPhase(result.ok ? { kind: 'ready', document: result.data } : { kind: 'failed', failure: result });
+    });
+    return () => {
+      current = false;
+    };
+  }, [storeId, attempt]);
+
+  useEffect(() => {
+    let current = true;
+    setFulfillment('loading');
+    void loadFulfillment(storeId).then((result) => {
+      if (current) setFulfillment(result.ok ? result.data : null);
     });
     return () => {
       current = false;
@@ -99,6 +114,21 @@ export function DeliveryWorkspace({ storeId, locale }: { storeId: string; locale
                   </button>
                 ) : undefined,
             },
+            ...(fulfillment !== 'loading' && fulfillment !== null
+              ? [
+                  {
+                    key: 'warehouse',
+                    done: fulfillment.current !== null && fulfillment.current.isActive,
+                    label: t('schedReadyWarehouse'),
+                    action:
+                      fulfillment.current === null || !fulfillment.current.isActive ? (
+                        <button type="button" className="text-accent hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40" onClick={() => setTab('fulfilment')}>
+                          {t('schedReadyWarehouseAdd')}
+                        </button>
+                      ) : undefined,
+                  },
+                ]
+              : []),
           ]}
         />
         <p className="text-xs leading-5 text-muted">{t('schedReadyNote')}</p>
@@ -110,6 +140,7 @@ export function DeliveryWorkspace({ storeId, locale }: { storeId: string; locale
             { id: 'rules', label: t('schedTabRules') },
             { id: 'windows', label: t('winTab'), count: document.slots.length },
             { id: 'blocked', label: t('blkTab'), count: upcomingBlocked },
+            { id: 'fulfilment', label: t('fulTab') },
           ]}
           value={tab}
           onChange={(id) => setTab(id as DeliveryTabId)}
@@ -119,8 +150,14 @@ export function DeliveryWorkspace({ storeId, locale }: { storeId: string; locale
             <ScheduleRulesPanel storeId={storeId} locale={locale} settings={document.settings} onSaved={setDocument} />
           ) : tab === 'windows' ? (
             <WindowsPanel storeId={storeId} locale={locale} document={document} onDocument={setDocument} />
-          ) : (
+          ) : tab === 'blocked' ? (
             <BlockedDatesPanel storeId={storeId} locale={locale} document={document} onDocument={setDocument} />
+          ) : fulfillment === 'loading' ? (
+            <LoadingState variant="table" rows={3} label={t('loading')} />
+          ) : fulfillment === null ? (
+            <ErrorState message={t('loadFailed')} retryLabel={t('retry')} onRetry={() => setAttempt((n) => n + 1)} />
+          ) : (
+            <FulfillmentPanel storeId={storeId} locale={locale} document={fulfillment} onDocument={setFulfillment} />
           )}
         </TabPanel>
       </div>
