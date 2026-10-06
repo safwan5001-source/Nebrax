@@ -1,0 +1,55 @@
+{
+    "data": {
+        "settings": {
+            "enabled": true,
+            "required": true,
+            "timezone": "Asia/Riyadh",
+            "lead_time_minutes": 90,
+            "cutoff_time": "18:00",
+            "max_days_ahead": 30
+        },
+        "slots": [
+            {
+                "id": "00000000-0000-4000-8000-000000000001",
+                "method": "delivery",
+                "label": "صباحاً",
+                "label_en": "Morning",
+                "start_time": "09:00",
+                "end_time": "12:00",
+                "weekdays": [
+                    0,
+                    1,
+                    2,
+                    3,
+                    4
+                ],
+                "capacity": 20,
+                "shipping_zone_id": null,
+                "sort_order": 0,
+                "is_active": true
+            },
+            {
+                "id": "00000000-0000-4000-8000-000000000002",
+                "method": "pickup",
+                "label": "مساءً",
+                "label_en": null,
+                "start_time": "16:00",
+                "end_time": "20:00",
+                "weekdays": [
+                    0,
+                    1,
+                    2,
+                    3,
+                    4,
+                    5,
+                    6
+                ],
+                "capacity": null,
+                "shipping_zone_id": null,
+                "sort_order": 1,
+                "is_active": false
+            }
+        ],
+        "blocked_dates": []
+    }
+}

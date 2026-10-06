@@ -1,0 +1,14 @@
+{
+    "data": {
+        "settings": {
+            "enabled": true,
+            "required": true,
+            "timezone": "Asia/Riyadh",
+            "lead_time_minutes": 90,
+            "cutoff_time": "18:00",
+            "max_days_ahead": 30
+        },
+        "slots": [],
+        "blocked_dates": []
+    }
+}

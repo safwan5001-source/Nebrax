@@ -38,7 +38,7 @@ cp -r "$CORE_DIR/app/Models/"*.php        app/Models/
 # (كلاهما ينسخ من نفس النواة بمنطق مستقل) — نسيان مجلد هنا لا يظهر في CI فيمر بصمت.
 mkdir -p app/Contracts app/Models/Concerns app/Jobs/Accounting app/Jobs/DocumentCenter app/Services app/Services/Accounting app/Services/Commerce app/Services/Commerce/Edge app/Services/Commerce/Otp app/Services/DocumentCenter app/Services/AppBuilder app/Services/DeliveryHub app/Services/Pos app/Services/Pos/Hardware app/Services/Reporting app/Services/PrintTemplates app/Support app/Support/Inventory app/Support/Dns app/Support/Commerce \
          app/Tenancy app/Http/Middleware app/Http/Controllers/Api config \
-         app/Http/Requests app/Http/Resources app/Console/Commands tests/Feature tests/Fixtures/presentation routes docs/openapi contracts/app-builder contracts/flowers-journey
+         app/Http/Requests app/Http/Resources app/Console/Commands tests/Feature tests/Fixtures/presentation routes docs/openapi contracts/app-builder contracts/flowers-journey contracts/flowers-admin-journey/responses
 cp -r "$CORE_DIR/app/Contracts/"*.php app/Contracts/
 cp -r "$CORE_DIR/app/Jobs/DocumentCenter/"*.php app/Jobs/DocumentCenter/
 cp -r "$CORE_DIR/app/Jobs/Accounting/"*.php app/Jobs/Accounting/
@@ -84,6 +84,9 @@ cp -r "$CORE_DIR/docs/openapi/"*.yaml            docs/openapi/
 cp -r "$CORE_DIR/contracts/app-builder/"*.json   contracts/app-builder/
 # عقد رحلة الورود والهدايا (FLOWERS-H16) — يقارنه FlowersEndToEndJourneyTest ويقرؤه اختبار واجهة المتجر.
 cp -r "$CORE_DIR/contracts/flowers-journey/"*.json contracts/flowers-journey/
+# عقد رحلة التاجر الإدارية (FLOWERS-H2-15) — يقارنه FlowersMerchantAdminJourneyTest وتقرؤه واجهة الإدارة.
+cp "$CORE_DIR/contracts/flowers-admin-journey/requests.json" contracts/flowers-admin-journey/
+cp -r "$CORE_DIR/contracts/flowers-admin-journey/responses/"*.json contracts/flowers-admin-journey/responses/
 
 # تسجيل TenancyServiceProvider (حاسم للعزل) إن لم يكن مسجلاً
 if ! grep -q "TenancyServiceProvider" bootstrap/providers.php; then

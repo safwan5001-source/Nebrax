@@ -1,0 +1,10 @@
+{
+    "data": {
+        "gift_settings": {
+            "enabled": true,
+            "message_max_length": 180,
+            "allow_hide_sender": true,
+            "recipient_phone_required": false
+        }
+    }
+}
