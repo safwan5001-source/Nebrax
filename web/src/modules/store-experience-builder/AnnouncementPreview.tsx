@@ -10,8 +10,8 @@
  * the Canvas must stay still while the merchant edits, and the real motion is
  * proven in the storefront component.
  */
-import { useEffect, useState } from "react";
 import { ANNOUNCEMENT_ICON_COMPONENTS } from "./announcement-icons";
+import { useAnnouncementClock } from "./use-announcement-clock";
 import {
   type CustomizerLocale,
   type CustomizerMessageKey,
@@ -21,12 +21,9 @@ import {
   type AnnouncementPageKind,
   type AnnouncementsDoc,
   eligibleAnnouncements,
-  nextAnnouncementBoundary,
   resolveAnnouncementSurface,
 } from "./presentation/announcements";
 import type { PageType } from "./presentation/page-regions";
-
-const MAX_TIMER_MS = 24 * 60 * 60 * 1000;
 
 /** Fixed bar height in the preview — the sticky header offsets by exactly this. */
 export const ANNOUNCEMENT_PREVIEW_HEIGHT = 36;
@@ -58,26 +55,7 @@ export function AnnouncementPreview({
   onSelect?: () => void;
 }) {
   const t = (key: CustomizerMessageKey) => customizerMessage(locale, key);
-  // `Date.now()` after mount only — the Canvas is rendered on the server too
-  // and must not bake the server clock into the markup.
-  const [nowMs, setNowMs] = useState<number | null>(null);
-  // biome-ignore lint/correctness/useExhaustiveDependencies: re-evaluate windows whenever the document itself changes
-  useEffect(() => {
-    setNowMs(Date.now());
-  }, [doc]);
-
-  // A builder left open across a window boundary must keep matching what the
-  // storefront will show: re-evaluate at the next `startsAt`/`endsAt`, the same
-  // way the published bar does (one timer, clamped so a far-future date can
-  // never overflow `setTimeout`).
-  useEffect(() => {
-    if (nowMs === null) return;
-    const boundary = nextAnnouncementBoundary(doc, nowMs);
-    if (boundary === null) return;
-    const wait = Math.min(Math.max(boundary - nowMs, 0) + 50, MAX_TIMER_MS);
-    const timer = setTimeout(() => setNowMs(Date.now()), wait);
-    return () => clearTimeout(timer);
-  }, [doc, nowMs]);
+  const nowMs = useAnnouncementClock(doc);
 
   if (!doc || !announcementBarVisible(doc) || nowMs === null) return null;
 

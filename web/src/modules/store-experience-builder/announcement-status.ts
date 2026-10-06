@@ -6,6 +6,7 @@ import {
 
 export type AnnouncementEditorStatus =
   | "live"
+  | "bar_off"
   | "disabled"
   | "empty"
   | "scheduled"
@@ -20,11 +21,15 @@ export type AnnouncementEditorStatus =
 export function announcementEditorStatus(
   item: Announcement,
   nowMs: number,
+  barEnabled = true,
 ): AnnouncementEditorStatus {
   if (!item.enabled) return "disabled";
   if (item.text.trim() === "") return "empty";
   const window = announcementWindowState(item.window, nowMs);
-  return window === "open" ? "live" : window;
+  if (window !== "open") return window;
+  // The storefront shows nothing while the master switch is off, so a message
+  // that would otherwise be live must not claim to be.
+  return barEnabled ? "live" : "bar_off";
 }
 
 const ISSUE_KEY: Record<string, CustomizerMessageKey> = {

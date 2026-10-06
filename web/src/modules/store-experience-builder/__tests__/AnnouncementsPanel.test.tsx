@@ -161,6 +161,44 @@ describe("Announcements panel (CUST-HV V3)", () => {
     expect(lastDoc(onChange).items[0].surface?.link?.hex).toBe("#ffffff");
   });
 
+  it("a message that would be live says the bar is off while the master switch is off", () => {
+    renderPanel({ enabled: false, items: [{ id: "a", text: "x", enabled: true }] });
+    expect(screen.getByText("Bar is off")).toBeTruthy();
+    expect(screen.queryByText("Live now")).toBeNull();
+  });
+
+  it("window inputs follow the stored value when the document underneath changes (version switch, restore default)", () => {
+    const base = { enabled: true, items: [{ id: "a", text: "x", enabled: true, window: { startsAt: "2026-07-01T06:30:00.000Z" } }] } satisfies AnnouncementsDoc;
+    const { rerender } = render(
+      <ControlPanels panel="announcements" config={{ ...DEFAULT_PRESENTATION_CONFIG, announcements: base }} locale="en" liveStoreName={null} timezone="Asia/Riyadh" onChange={() => {}} />,
+    );
+    expect((screen.getByLabelText("Starts — Date") as HTMLInputElement).value).toBe("2026-07-01");
+    expect((screen.getByLabelText("Starts — Time") as HTMLInputElement).value).toBe("09:30");
+
+    const other: AnnouncementsDoc = { ...base, items: [{ ...base.items[0], window: { startsAt: "2026-08-15T09:00:00.000Z" } }] };
+    rerender(
+      <ControlPanels panel="announcements" config={{ ...DEFAULT_PRESENTATION_CONFIG, announcements: other }} locale="en" liveStoreName={null} timezone="Asia/Riyadh" onChange={() => {}} />,
+    );
+    expect((screen.getByLabelText("Starts — Date") as HTMLInputElement).value).toBe("2026-08-15");
+    expect((screen.getByLabelText("Starts — Time") as HTMLInputElement).value).toBe("12:00");
+
+    const cleared: AnnouncementsDoc = { ...base, items: [{ id: "a", text: "x", enabled: true }] };
+    rerender(
+      <ControlPanels panel="announcements" config={{ ...DEFAULT_PRESENTATION_CONFIG, announcements: cleared }} locale="en" liveStoreName={null} timezone="Asia/Riyadh" onChange={() => {}} />,
+    );
+    expect((screen.getByLabelText("Starts — Date") as HTMLInputElement).value).toBe("");
+  });
+
+  it("the status chip leaves Scheduled by itself when the window opens while the panel stays open", async () => {
+    vi.useFakeTimers({ toFake: ["Date", "setTimeout", "clearTimeout"] });
+    vi.setSystemTime(Date.parse("2026-06-15T12:00:00Z"));
+    renderPanel({ enabled: true, items: [{ id: "a", text: "x", enabled: true, window: { startsAt: "2026-06-15T12:10:00.000Z" } }] });
+    await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+    expect(screen.getByText("Scheduled")).toBeTruthy();
+    await act(async () => { await vi.advanceTimersByTimeAsync(10 * 60_000 + 200); });
+    expect(screen.getByText("Live now")).toBeTruthy();
+  });
+
   it("window edges are entered in store time and stored as a UTC instant; clearing removes them", () => {
     const onChange = renderPanel({ enabled: true, items: [{ id: "a", text: "x", enabled: true }] });
     fireEvent.change(screen.getByLabelText("Starts — Date"), { target: { value: "2026-07-01" } });

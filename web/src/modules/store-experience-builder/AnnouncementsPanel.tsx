@@ -19,6 +19,7 @@ import {
   zonedWallTimeToUtcIso,
 } from "@/lib/timezone";
 import { ANNOUNCEMENT_ICON_COMPONENTS } from "./announcement-icons";
+import { useAnnouncementClock } from "./use-announcement-clock";
 import {
   type AnnouncementEditorStatus,
   announcementEditorStatus,
@@ -62,6 +63,7 @@ const PAGE_OPTIONS = ["home", "product", "category"] as const;
 
 const STATUS_KEY: Record<AnnouncementEditorStatus, CustomizerMessageKey> = {
   live: "annStatusLive",
+  bar_off: "annStatusBarOff",
   disabled: "annStatusDisabled",
   empty: "annStatusEmpty",
   scheduled: "annStatusScheduled",
@@ -70,6 +72,7 @@ const STATUS_KEY: Record<AnnouncementEditorStatus, CustomizerMessageKey> = {
 };
 const STATUS_TONE: Record<AnnouncementEditorStatus, string> = {
   live: "bg-primary-soft text-positive",
+  bar_off: "bg-background text-muted",
   disabled: "bg-background text-muted",
   empty: "bg-background text-muted",
   scheduled: "bg-primary-soft text-primary",
@@ -112,9 +115,8 @@ export function AnnouncementsPanel({
   const [openId, setOpenId] = useState<string | null>(
     current.items[0]?.id ?? null,
   );
-  // Evaluated per render on purpose: a status chip must not go stale while the
-  // panel is open, and the panel only renders client-side.
-  const nowMs = Date.now();
+  // Chips must not go stale while the panel stays open across a window boundary.
+  const nowMs = useAnnouncementClock(doc) ?? Date.now();
 
   const commit = (next: Partial<AnnouncementsDoc>) =>
     onChange({ ...current, ...next });
@@ -155,7 +157,7 @@ export function AnnouncementsPanel({
         ) : (
           <ul className="space-y-2">
             {current.items.map((item, index) => {
-              const status = announcementEditorStatus(item, nowMs);
+              const status = announcementEditorStatus(item, nowMs, current.enabled);
               const open = openId === item.id;
               return (
                 <li
@@ -753,7 +755,7 @@ function WindowFields({
         {timeZoneDisplayLabel(zone, locale)}
       </p>
       <WindowEdge
-        key={`${item.id}-start`}
+        key={`${item.id}-start-${item.window?.startsAt ?? ""}-${zone}`}
         label={t("annStarts")}
         stored={item.window?.startsAt}
         zone={zone}
@@ -761,7 +763,7 @@ function WindowFields({
         onCommit={(iso) => write("startsAt", iso)}
       />
       <WindowEdge
-        key={`${item.id}-end`}
+        key={`${item.id}-end-${item.window?.endsAt ?? ""}-${zone}`}
         label={t("annEnds")}
         stored={item.window?.endsAt}
         zone={zone}

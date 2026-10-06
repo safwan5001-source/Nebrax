@@ -69,7 +69,7 @@
 | PHP focused | `StorefrontPresentationAnnouncementsTest` **41** (normaliser, fixture parity, contrast, windows, API draft-preserve, publish 422, legacy publish, schedule 422, scheduled-dispatch fail-closed) + every `StorefrontPresentation*` suite green |
 | PHP full | local `php artisan test`: 5 641 passed, 67 failed. **28** are container-environmental (`ext-bcmath` missing → 24+ fuel tests; 2 mail-view tests; same set as V2a). The other **39** were `StorefrontMediaApiTest`, caused by running the assembled project with V2a's tests but a pre-merge route table — re-synced after merging main and re-run: `StorefrontMedia* + StorefrontPresentation* + CommerceModuleBoundary` = **315 passed, 1 skipped, 0 failed**. PostgreSQL is verified by CI only. |
 | Storefront | biome ✓ · `tsc` ✓ · `pnpm check:locales` ✓ · vitest (AnnouncementBar **32**, normaliser parity, layout) ✓ · `pnpm build` ✓ |
-| Web | vitest full run (drift ratchet and boundary tests included) ✓ · `next build` (incl. TS) ✓ · panel/preview/issue tests (**23**) + `presentation-versions` 422 test |
+| Web | vitest full run (drift ratchet and boundary tests included) ✓ · `next build` (incl. TS) ✓ · panel/preview/issue tests (**26**) + `presentation-versions` 422 test |
 | Playwright | `cust-hv-v3-announcements.spec.ts` — **12/12** (6 widths × AR/EN) |
 | CI | see PR checks |
 
@@ -100,6 +100,7 @@
 2. **Drift ratchet** (`design/__tests__/drift-ratchet`): the first panel used fixed-palette classes and a raw hex default → rewritten on semantic tokens; the custom-colour default is the store's own primary.
 3. **Admin ↔ Storefront boundary** (`postures` test): the storefront CSS custom properties were named `--awj-ann-*`, inside the Admin namespace the storefront package must not own → renamed `--ann-*`.
 4. **Codex review (3 × P2, all verified and fixed):** (a) the ticker marked its whole track `aria-hidden` while the first copy's links stayed focusable → only the loop duplicate is now `aria-hidden` + `inert`, the first copy is the real accessible list, and the off-screen text duplicate was removed; (b) the Canvas preview froze `now` until the document changed → one timer re-evaluates at the next window boundary (clamped to 24 h, as in the storefront); (c) the panel showed contrast for text only while the publish gate also checks `surface.link` → auto/custom link-colour control and a separate link/background readout. Tests added for each.
+   **Second Codex pass (3 × P2, fixed):** status chips now share the preview's boundary clock (`useAnnouncementClock`) instead of reading `Date.now()` once per render; a message that would be live shows *Bar is off* while the master switch is off (matching the storefront predicate); window inputs are keyed by the stored value (and the version-bound inspector by version id) so a version switch or *Restore default* can never write a stale local date into another draft.
 5. **GD/JPEG, Intervention and Biome** items from earlier in the slice (hook dependencies, control-character regex → `\p{Cc}`, rotation resume after Play via tri-state user choice, per-speed minimum ticker durations) are covered by tests.
 
 ## External evidence

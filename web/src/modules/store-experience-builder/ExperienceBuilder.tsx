@@ -2206,6 +2206,9 @@ export function ExperienceBuilder({
     }
     return (
       <ControlPanels
+        // A different version is a different document: panel-local state (window
+        // inputs, open accordion) must never carry over from the previous one.
+        key={selectedVersion.id}
         panel={panelForSlot}
         config={draft}
         locale={locale}
