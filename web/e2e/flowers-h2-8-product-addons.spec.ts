@@ -54,7 +54,7 @@ function server(state: { addons: Row[]; failSave?: boolean }) {
 }
 
 const TAB = { ar: 'الهدايا والتخصيص', en: 'Gifting' } as const;
-const ADDONS = { ar: 'إضافات المنتج', en: 'Product add-ons' } as const;
+const ADDONS = { ar: /^الإضافات/, en: /^Add-ons/ } as const;
 const INITIAL = [addon('choc', { name: 'شوكولاتة بلجيكية فاخرة', sku: 'CHOC-1', max_quantity: 3 }), addon('balloon', { name: 'بالون هيليوم', addon_variant_id: 'va', is_active: false, max_quantity: 2 })];
 
 test.describe('FLOWERS-H2-8 — product add-ons', () => {

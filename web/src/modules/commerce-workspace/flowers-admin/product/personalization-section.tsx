@@ -33,7 +33,7 @@ type DialogState = { kind: 'add'; field: PersonalizationField } | { kind: 'edit'
  * تُجمَّع محلياً وتُحفظ دفعة واحدة (الخادم يستبدل المجموعة كاملةً بالمفتاح)، وقبل الحفظ نتأكد أن ما على الخادم لم
  * يتغيّر منذ عرضناه. لا أثر سعري ولا رفع ملفات ولا HTML: نصٌّ عادي فقط.
  */
-export function PersonalizationSection({ productId, locale, canManage }: { productId: string; locale: string | undefined; canManage: boolean }) {
+export function PersonalizationSection({ productId, locale, canManage, onCount }: { productId: string; locale: string | undefined; canManage: boolean; onCount?: (count: number | null) => void }) {
   const t = useMemo(() => flowersAdminT(locale), [locale]);
   const { success: toastSuccess } = useToast();
   const [phase, setPhase] = useState<Phase>({ kind: 'loading' });
@@ -62,6 +62,8 @@ export function PersonalizationSection({ productId, locale, canManage }: { produ
   }, [productId, attempt]);
 
   const saved = phase.kind === 'ready' ? phase.saved : [];
+  const savedCount = phase.kind === 'ready' ? phase.saved.length : null;
+  useEffect(() => onCount?.(savedCount), [savedCount, onCount]);
   const dirty = phase.kind === 'ready' && signature(draft) !== signature(saved);
   useUnsavedGuard(dirty);
 

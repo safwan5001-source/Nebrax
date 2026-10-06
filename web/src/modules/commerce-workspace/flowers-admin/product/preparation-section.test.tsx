@@ -107,7 +107,7 @@ describe('PreparationSection', () => {
     apiMock.mockReset();
     apiMock.mockRejectedValue(new ApiError(404, 'x', {}));
     renderIntl(<ToastProvider><ProductGiftingWorkspace productId="gone" locale="en" canManage /></ToastProvider>, 'en');
-    expect(await screen.findByText('This product is not available.')).toBeTruthy();
+    expect((await screen.findAllByText('This product is not available.')).length).toBeGreaterThan(0);
   });
 
   it('does not apply a late response from the previously opened product', async () => {

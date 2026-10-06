@@ -67,6 +67,10 @@ export default function ProductProfilePage() {
   }, [id, t]);
 
   useEffect(() => { void load(); }, [load]);
+  // رابط عميق `?tab=gifting` (من مركز الإعداد وغيره) يفتح تبويب الهدايا إن كان متاحاً.
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('tab') === 'gifting') setActiveTab('gifting');
+  }, []);
   useEffect(() => {
     if (activeTab !== 'movements' || movements !== null) return;
     api<{ data: Movement[] }>(`/inventory/${id}/movements`)
