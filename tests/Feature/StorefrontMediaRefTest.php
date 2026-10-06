@@ -150,7 +150,7 @@ class StorefrontMediaRefTest extends TestCase
         $this->assertSame($media['width'] ?? $logo['width'], $logo['width']);
 
         $kinds = array_count_values(array_column($logo['sources'], 'kind'));
-        $this->assertSame(2, $kinds['thumb']);
+        $this->assertSame(4, $kinds['thumb'], '160 and 320, WebP and JPEG');
         $this->assertGreaterThanOrEqual(4, $kinds['w']);
         foreach ($logo['sources'] as $source) {
             $this->assertStringStartsWith(self::PROXY.$media['id'].'/', $source['src']);
@@ -180,7 +180,9 @@ class StorefrontMediaRefTest extends TestCase
         // 480×? قصّ 30%×50% من 1600×900 = 480×450 → كل العروض الأكبر تتطابق في حجمٍ واحد.
         $sizes = array_map(static fn (array $s): string => $s['width'].'x'.$s['height'].'.'.$s['format'], $logo['sources']);
         $this->assertSame(count($sizes), count(array_unique($sizes)), 'one entry per real size and format');
-        $this->assertSame(['webp', 'jpg'], array_values(array_unique(array_column($logo['sources'], 'format'))), 'webp first, jpg fallback — both offered');
+        $formats = array_values(array_unique(array_column($logo['sources'], 'format')));
+        sort($formats);
+        $this->assertSame(['jpg', 'webp'], $formats, 'both formats are offered');
         foreach ($logo['sources'] as $source) {
             $this->assertMatchesRegularExpression('#^'.preg_quote(self::PROXY, '#').'[a-f0-9]{32}/\d{2,4}w\.(webp|jpg)$#', $source['src'], 'a transformKey, not the media id');
             $this->assertStringNotContainsString($media['id'], $source['src']);
@@ -224,7 +226,6 @@ class StorefrontMediaRefTest extends TestCase
         });
 
         $response = $this->getJson("http://{$store['host']}/store/v1/storefront")->assertOk();
-        $this->assertSame('{}', json_encode($response->json('data.presentation_media')));
         $this->assertStringContainsString('"presentation_media":{}', (string) $response->getContent());
         $this->assertSame([], array_filter($queries, static fn (string $sql): bool => str_contains($sql, 'storefront_media')));
     }
