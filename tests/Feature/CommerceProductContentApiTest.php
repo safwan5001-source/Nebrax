@@ -257,4 +257,26 @@ class CommerceProductContentApiTest extends TestCase
         $res = $this->getJson("/commerce/v1/products/{$pm->id}", $headers)->assertOk();
         $this->assertSame(['composition', 'care'], array_column($res->json('data.content_blocks'), 'type'));
     }
+
+    /** @test */
+    public function a_replacement_built_on_a_stale_revision_is_rejected_under_the_product_lock_without_writing(): void
+    {
+        $auth = $this->registerTenant('ct-revision', 'owner@ct-revision.test');
+        $product = $this->makeProduct($auth['tenant_id']);
+        $token = $auth['token'];
+        $block = fn (string $type, string $body) => ['block_type' => $type, 'body' => $body];
+
+        $first = $this->withToken($token)->putJson($this->url($product), ['blocks' => [$block('care', 'ماء بارد')]])->assertOk();
+        $revision = $first->json('data.revision');
+        $this->assertSame(40, strlen($revision));
+        $this->assertSame($revision, $this->withToken($token)->getJson($this->url($product))->json('data.revision'));
+
+        $second = $this->withToken($token)->putJson($this->url($product), ['expected_revision' => $revision, 'blocks' => [$block('care', 'ماء بارد'), $block('storage', 'مكان بارد')]])->assertOk();
+        $this->assertNotSame($revision, $second->json('data.revision'));
+
+        $this->withToken($token)->putJson($this->url($product), ['expected_revision' => $revision, 'blocks' => [$block('care', 'غير ذلك')]])->assertStatus(409);
+        $this->assertSame(['care', 'storage'], array_column($this->withToken($token)->getJson($this->url($product))->json('data.blocks'), 'block_type'));
+
+        $this->withToken($token)->putJson($this->url($product), ['blocks' => [$block('care', 'وحيد')]])->assertOk(); // بلا بصمة: السلوك السابق
+    }
 }

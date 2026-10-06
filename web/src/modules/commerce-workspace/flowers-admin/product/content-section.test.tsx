@@ -22,16 +22,21 @@ afterEach(() => {
 type Row = Record<string, unknown>;
 const block = (type: string, over: Row = {}): Row => ({ block_type: type, body: `نص ${type}`, body_en: null, is_active: true, ...over });
 
-function server(initial: Row[], opts: { rejectSave?: ApiError; canManage?: boolean } = {}) {
+function server(initial: Row[], opts: { rejectSave?: ApiError; canManage?: boolean; noRevision?: boolean } = {}) {
   let current = initial;
-  const writes: { blocks: Row[] }[] = [];
-  apiMock.mockImplementation(async (_path: string, options?: { method?: string; body?: { blocks: Row[] } }) => {
+  let readFails = false;
+  const writes: { blocks: Row[]; expected_revision?: string }[] = [];
+  const revisionOf = (rows: Row[]) => JSON.stringify(rows);
+  apiMock.mockImplementation(async (_path: string, options?: { method?: string; body?: { blocks: Row[]; expected_revision?: string } }) => {
     if (options?.method === 'PUT') {
       if (opts.rejectSave) throw opts.rejectSave;
+      if (options.body!.expected_revision !== undefined && options.body!.expected_revision !== revisionOf(current)) throw new ApiError(409, 'stale', {});
       writes.push(options.body!);
       current = options.body!.blocks.map((b) => ({ body_en: null, ...b }));
+    } else if (readFails) {
+      throw new ApiError(500, 'boom', {});
     }
-    return { data: { blocks: current } };
+    return { data: { blocks: current, ...(opts.noRevision ? {} : { revision: revisionOf(current) }) } };
   });
   renderIntl(
     <ToastProvider>
@@ -40,7 +45,7 @@ function server(initial: Row[], opts: { rejectSave?: ApiError; canManage?: boole
     'en',
   );
 
-  return { writes, setRemote: (next: Row[]) => { current = next; } };
+  return { writes, setRemote: (next: Row[]) => { current = next; }, failRead: () => { readFails = true; } };
 }
 
 const types = () => Array.from(document.querySelectorAll('[data-content-row]')).map((r) => r.getAttribute('data-content-row'));
@@ -137,6 +142,23 @@ describe('ContentSection', () => {
     expect(await screen.findByText(/changed on the server since you opened this page/)).toBeTruthy();
     expect(srv.writes).toHaveLength(0);
     expect(types()).toEqual(['care', 'storage']);
+  });
+
+  it('sends the revision it read so the server rejects a stale replacement under its lock', async () => {
+    const srv = server([block('care')]);
+    await userEvent.click(await screen.findByRole('switch', { name: 'Care: Active (visible to shoppers)' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(srv.writes).toHaveLength(1));
+    expect(srv.writes[0].expected_revision).toBe(JSON.stringify([block('care')]));
+  });
+
+  it('without a server revision it falls back to the pre-read and never writes when that read fails', async () => {
+    const srv = server([block('care')], { noRevision: true });
+    await userEvent.click(await screen.findByRole('switch', { name: 'Care: Active (visible to shoppers)' }));
+    srv.failRead();
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(document.querySelector('[role="alert"]')).not.toBeNull());
+    expect(srv.writes).toHaveLength(0);
   });
 
   it('is read-only without products.manage', async () => {

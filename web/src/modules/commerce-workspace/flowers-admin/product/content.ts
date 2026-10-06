@@ -42,15 +42,33 @@ export function mapBlocks(payload: unknown): ContentBlock[] | null {
     .filter((b): b is ContentBlock => b !== null);
 }
 
-export const loadContent = (productId: string): Promise<AdminResult<ContentBlock[]>> =>
-  adminCall(async () => mapBlocks(await api<unknown>(productPath(productId, 'content'))));
+/** الكتل + بصمتها (`revision`) كما أعادهما الخادم؛ تُعاد عند الحفظ فيرفض الخادم الاستبدال القديم داخل القفل. */
+export type ContentDocument = { blocks: ContentBlock[]; revision: string | null };
+
+export function mapContentDocument(payload: unknown): ContentDocument | null {
+  const blocks = mapBlocks(payload);
+  if (!blocks) return null;
+  const revision = obj(obj(payload)?.data)?.revision;
+
+  return { blocks, revision: typeof revision === 'string' && revision !== '' ? revision : null };
+}
+
+export const loadContent = (productId: string): Promise<AdminResult<ContentDocument>> =>
+  adminCall(async () => mapContentDocument(await api<unknown>(productPath(productId, 'content'))));
 
 export const contentPayload = (blocks: readonly ContentBlock[]) => ({
   blocks: blocks.map((b) => ({ block_type: b.type, body: b.body.trim(), body_en: b.bodyEn.trim() === '' ? null : b.bodyEn.trim(), is_active: b.isActive })),
 });
 
-export const saveContent = (productId: string, blocks: readonly ContentBlock[]): Promise<AdminResult<ContentBlock[]>> =>
-  adminCall(async () => mapBlocks(await api<unknown>(productPath(productId, 'content'), { method: 'PUT', body: contentPayload(blocks) })));
+export const saveContent = (productId: string, blocks: readonly ContentBlock[], expectedRevision: string | null = null): Promise<AdminResult<ContentDocument>> =>
+  adminCall(async () =>
+    mapContentDocument(
+      await api<unknown>(productPath(productId, 'content'), {
+        method: 'PUT',
+        body: { ...(expectedRevision ? { expected_revision: expectedRevision } : {}), ...contentPayload(blocks) },
+      }),
+    ),
+  );
 
 export const contentSignature = (blocks: readonly ContentBlock[]): string => JSON.stringify(contentPayload(blocks));
 
