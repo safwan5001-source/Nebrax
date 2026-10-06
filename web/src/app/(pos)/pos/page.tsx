@@ -2115,11 +2115,8 @@ export default function PosPage() {
       {/* Floor posture (H4): totals + pay form ONE Outcome Surface under the v3 gate. `contents`
           keeps gate-off layout identical (the wrapper generates no box). */}
       <div data-awj-floor-outcome="" data-awj-surface="outcome" className="contents">
-      <div className="space-y-1.5 border-t border-border bg-background p-3" data-testid="pos-cart-totals">
-        <div className="flex justify-between text-sm"><span className="text-muted">{t('subtotal')}</span><span className="num font-semibold text-text">{formatRiyal(subMinor / 100)}</span></div>
-        <div className="flex justify-between text-sm" data-testid="pos-cart-discount"><span className="text-muted">{t('discount')}</span><span className={'num font-semibold ' + (discMinor > 0 ? 'text-positive' : 'text-text')}>{discMinor > 0 ? '−' : ''}{formatRiyal(discMinor / 100)}</span></div>
-        <div className="flex justify-between text-sm"><span className="text-muted">{t('tax')}</span><span className="num font-semibold text-text">{formatRiyal(taxMinor / 100)}</span></div>
-        <div data-awj-floor-total="" className="flex items-baseline justify-between border-t border-border pt-2"><span className="text-sm font-semibold text-text">{t('total')}</span><span className="num text-xl font-bold text-text">{formatRiyal(totalMinor / 100)}</span></div>
+      <div className="border-t border-border bg-background px-3 py-2" data-testid="pos-cart-totals">
+        <div data-awj-floor-total="" className="flex items-baseline justify-between"><span className="text-sm font-semibold text-text">{t('total')}</span><span className="num text-xl font-bold text-text">{formatRiyal(totalMinor / 100)}</span></div>
       </div>
 
       <div className={POS_CART_PAY_FOOTER_CLASS}>
@@ -2212,6 +2209,9 @@ export default function PosPage() {
 
       {step === 'payment' ? (
         <PosPayment
+          subMinor={subMinor}
+          discMinor={discMinor}
+          taxMinor={taxMinor}
           totalMinor={totalMinor}
           items={summaryItems}
           customerName={customerName}

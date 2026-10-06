@@ -15,6 +15,44 @@ const paymentMethods = [
 
 describe('PosPayment', () => {
   afterEach(() => cleanup());
+
+  it('يعرض ملخص subtotal وtax وtotal والخصم الموجب فقط دون تغيير حالات التحصيل', () => {
+    const onConfirm = vi.fn();
+    const props = {
+      allowDeferredPayment: false,
+      customerName: 'Walk-in',
+      defaultPaymentMethodId: 'cash',
+      error: null,
+      items: [],
+      onBack: vi.fn(),
+      onConfirm,
+      paying: false,
+      paymentMethods,
+      paymentMethodsLoadError: null,
+      paymentMethodsLoading: false,
+      subMinor: 10000,
+      discMinor: 1000,
+      taxMinor: 1350,
+      totalMinor: 10350,
+    };
+    const { rerender } = render(<PosPayment {...props} />);
+
+    const summary = screen.getByTestId('pos-payment-summary');
+    expect(summary.textContent).toContain('subtotal');
+    expect(summary.textContent).toContain('tax');
+    expect(summary.textContent).toContain('total');
+    expect(screen.getByTestId('pos-payment-discount').textContent).toContain('10.00');
+    expect(screen.getByTestId('pos-payment-paid').textContent).toContain('0.00');
+    expect(screen.getByTestId('pos-payment-remaining').textContent).toContain('103.50');
+    expect(screen.getByTestId('pos-payment-change').textContent).toContain('0.00');
+
+    rerender(<PosPayment {...props} discMinor={0} />);
+    expect(screen.queryByTestId('pos-payment-discount')).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'exact_amount' }));
+    fireEvent.click(screen.getByTestId('pos-confirm-payment'));
+    expect(onConfirm).toHaveBeenCalledWith([{ payment_method_id: 'cash', amount: 10350 }]);
+  });
   it('يبقي إدخال مبلغ الدفع العشري مستقلاً عن لوحة أرقام تحرير السلة', () => {
     const onConfirm = vi.fn();
     render(
