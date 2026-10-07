@@ -44,7 +44,7 @@ class CommerceWorkspaceStorefrontMediaDerivativeController extends ApiController
             return response()->json(['message' => $e->getMessage(), 'code' => $e->errorCode] + $e->context, $e->status);
         }
 
-        return response()->json(['data' => StorefrontMediaDerivativeResource::usage($status, $derivatives, $contrast->boundsForUsage($asset, $transform))]);
+        return response()->json(['data' => StorefrontMediaDerivativeResource::usage($status, $derivatives, $this->contrastOf($contrast, $asset, $transform, $status))]);
     }
 
     public function status(Request $request, StorefrontMediaDerivativeService $derivatives, StorefrontMediaContrastEvidence $contrast, string $mediaId): JsonResponse
@@ -62,13 +62,30 @@ class CommerceWorkspaceStorefrontMediaDerivativeController extends ApiController
         $out = [];
         foreach ((array) $request->input('transforms') as $index => $raw) {
             $transform = $this->transform($raw, "transforms.{$index}");
-            $out[] = StorefrontMediaDerivativeResource::usage($derivatives->status($asset, $transform), $derivatives, $contrast->boundsForUsage($asset, $transform));
+            $out[] = StorefrontMediaDerivativeResource::usage($status = $derivatives->status($asset, $transform), $derivatives, $this->contrastOf($contrast, $asset, $transform, $status));
         }
 
         return response()->json(['data' => $out]);
     }
 
     // ─────────────────────────────── helpers ───────────────────────────────
+
+    /**
+     * حدود التباين تُعرض لاستخدامٍ **مكتمل** فقط: استخدامٌ مؤطَّر لم تكتمل صفوفه (`processing`/`failed`/`absent`)
+     * لا يصلح دليلاً حتى لو كانت الصفوف الموجودة منه جاهزة — بوابة النشر ترفضه `derivative_not_ready`، ولا يجوز
+     * أن يُظهر المحرّر موافقةً عليه (Codex P2 على #1280). الإطار الافتراضي لا مشتقّات له: دليله من الأصل.
+     *
+     * @param  array<string,mixed>  $status
+     * @return array{min:list<int>,max:list<int>}|null
+     */
+    private function contrastOf(StorefrontMediaContrastEvidence $contrast, StorefrontMedia $asset, StorefrontMediaTransform $transform, array $status): ?array
+    {
+        if (! $transform->isDefault() && ($status['state'] ?? null) !== StorefrontMediaDerivativeService::USAGE_READY) {
+            return null;
+        }
+
+        return $contrast->boundsForUsage($asset, $transform);
+    }
 
     private function transform(mixed $raw, string $prefix = 'transform'): StorefrontMediaTransform
     {

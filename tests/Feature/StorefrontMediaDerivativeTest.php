@@ -345,6 +345,13 @@ class StorefrontMediaDerivativeTest extends TestCase
         $this->assertSame(3, count($ready['contrast']['min'] ?? []));
         $this->assertSame($ready['contrast'], $status($this->transform())['contrast']);
 
+        // صفوفٌ موجودة جاهزة لكن ناقصة العدد (استخدامٌ لم يكتمل): `processing` ⇒ لا حدود تُعرض (Codex P2 على #1280).
+        \App\Models\StorefrontMediaDerivative::query()->where('media_id', $media['id'])->limit(1)->get()->each->delete();
+        $partial = $status($this->transform());
+        $this->assertSame('processing', $partial['state']);
+        $this->assertNull($partial['contrast'], 'an incomplete framed usage is not evidence');
+        $this->ensure($auth, $media['id'], $this->transform())->assertOk();
+
         // دليلٌ غير صالح ⇒ null؛ والخام لا يخرج أبداً.
         \App\Models\StorefrontMedia::query()->whereKey($media['id'])->update(['region_luminance' => null]);
         $nulled = $status([]);

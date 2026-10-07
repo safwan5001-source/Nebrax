@@ -117,6 +117,29 @@ describe("useBackgroundMediaBounds (CUST-HV V6b-4a)", () => {
     expect(status).toHaveBeenCalledTimes(3);
   });
 
+  it("a framed usage still 'processing' is not evidence even if it carries bounds", async () => {
+    vi.useFakeTimers();
+    status
+      .mockResolvedValueOnce(usage({ state: "processing", contrast: { min: [0, 0, 0], max: [10, 10, 10] } }))
+      .mockResolvedValueOnce(usage({ state: "ready", contrast: { min: [2, 2, 2], max: [12, 12, 12] } }));
+    const framed: SectionDesign = {
+      background: { kind: "media", media: { mediaId: MEDIA_ID, decorative: true, rotate: 90 } },
+    };
+    const sections = [section(framed)];
+    const { result } = renderHook(() => useBackgroundMediaBounds(sections));
+    const background = sections[0].design?.background;
+    if (background?.kind !== "media") throw new Error("fixture");
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(result.current.lookup(background.media)).toBeNull();
+    expect(result.current.stateOf(background.media)).toBe("loading");
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2100);
+    });
+    expect(result.current.lookup(background.media)).toEqual({ min: [2, 2, 2], max: [12, 12, 12] });
+  });
+
   it("an unframed picture without evidence is final at once ('absent' is normal for it)", async () => {
     status.mockResolvedValue(usage({ state: "absent", files: [], contrast: null }));
     const sections = [section(bg(MEDIA_ID))];

@@ -78,16 +78,17 @@ export function useBackgroundMediaBounds(
         try {
           const status = await usageStatus(ref.mediaId, mediaRefTransform(ref));
           if (!current()) return;
-          // `absent` is "not generated yet" only for a framed usage; an unframed picture has no
-          // derivative rows by design, so `absent` + no contrast there is final (no evidence).
-          const pending =
-            status.contrast === null &&
-            (status.state === "processing" || (status.state === "absent" && usageNeedsDerivatives(ref)));
+          // A framed usage is evidence only once complete (`ready`); `absent` ("not generated yet") and
+          // `processing` stay pending whatever `contrast` says. An unframed picture has no derivative
+          // rows by design, so there `absent` + no contrast is final (the asset has no evidence).
+          const framed = usageNeedsDerivatives(ref);
+          const bounds = status.contrast !== null && (!framed || status.state === "ready") ? status.contrast : null;
+          const pending = bounds === null && (status.state === "processing" || (status.state === "absent" && framed));
           const settled = !pending || attempt === MAX_POLLS;
           setEntries((prev) => ({
             ...prev,
-            [key]: status.contrast
-              ? { state: "ready", bounds: status.contrast }
+            [key]: bounds
+              ? { state: "ready", bounds }
               : { state: settled ? "unavailable" : "loading", bounds: null },
           }));
           if (settled) return;
