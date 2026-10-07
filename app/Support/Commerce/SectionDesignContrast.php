@@ -90,11 +90,54 @@ final class SectionDesignContrast
     }
 
     /**
+     * V6b-2 — مدى لمعان خلفية صورة: اتحاد حدود كل صورةٍ قد تُعرض (الافتراضية + الجوال)
+     * مطبَّقاً عليه التراكب. أي صورةٍ بلا دليل (أو دليلها غير صالح) ⇒ `null` = غير مُثبَت.
+     * الحدود تُرجَع من `$media` (مغلَق يجيب بحدود قنوات مشفّرة موسَّعة بهامش الترميز، أو
+     * `null`)؛ بلا مغلَقٍ لا يُثبَت شيء (fail-closed).
+     *
+     * @param  array<string,mixed>  $bg
+     * @param  array<string,mixed>  $config
+     * @return array{min:float,max:float}|null
+     */
+    private static function mediaInterval(array $bg, array $config, ?\Closure $media): ?array
+    {
+        if ($media === null || ! is_array($bg['media'] ?? null)) {
+            return null;
+        }
+        $min = [255, 255, 255];
+        $max = [0, 0, 0];
+        foreach ([$bg['media'], $bg['mobile'] ?? null] as $ref) {
+            if ($ref === null) {
+                continue;
+            }
+            $bounds = $media($ref);
+            if (! is_array($bounds) || count($bounds['min'] ?? []) !== 3 || count($bounds['max'] ?? []) !== 3) {
+                return null;
+            }
+            for ($i = 0; $i < 3; $i++) {
+                $min[$i] = min($min[$i], $bounds['min'][$i]);
+                $max[$i] = max($max[$i], $bounds['max'][$i]);
+            }
+        }
+        $overlay = null;
+        if (is_array($bg['overlay'] ?? null)) {
+            $rgb = ContrastEngine::parseHex((string) self::colour($bg['overlay']['color'] ?? null, $config));
+            $alpha = $bg['overlay']['alpha'] ?? null;
+            if ($rgb === null || ! is_int($alpha)) {
+                return null;
+            }
+            $overlay = ['rgb' => $rgb, 'alpha' => $alpha / 100];
+        }
+
+        return ContrastEngine::channelBoundsInterval($min, $max, $overlay);
+    }
+
+    /**
      * @param  array<string,mixed>  $design
      * @param  array<string,mixed>  $config
      * @return array{min:float,max:float}|null
      */
-    private static function backgroundInterval(array $design, array $config): ?array
+    private static function backgroundInterval(array $design, array $config, ?\Closure $media = null): ?array
     {
         $bg = $design['background'] ?? null;
         if (! is_array($bg)) {
@@ -111,6 +154,9 @@ final class SectionDesignContrast
 
             return $a === null || $b === null ? null : ContrastEngine::gradientInterval($a, $b);
         }
+        if (($bg['kind'] ?? null) === 'media') {
+            return self::mediaInterval($bg, $config, $media);
+        }
 
         return null;
     }
@@ -122,9 +168,9 @@ final class SectionDesignContrast
      * @param  array<string,mixed>  $config
      * @return array{body:?string,heading:?string,link:?string,background:?array{min:float,max:float},judged:?array{min:float,max:float}}
      */
-    public static function effectiveText(array $design, array $config, ?string $type = null): array
+    public static function effectiveText(array $design, array $config, ?string $type = null, ?\Closure $media = null): array
     {
-        $background = self::backgroundInterval($design, $config);
+        $background = self::backgroundInterval($design, $config, $media);
         if ($background === null && $type !== null && in_array($type, self::SURFACE_OWNING_TYPES, true)) {
             return ['body' => null, 'heading' => null, 'link' => null, 'background' => null, 'judged' => null];
         }
@@ -154,9 +200,14 @@ final class SectionDesignContrast
      * @param  array<string,mixed>  $config
      * @return list<array{field:string,code:string,ratio:float}>
      */
-    public static function issues(array $design, array $config, ?string $type = null): array
+    public static function issues(array $design, array $config, ?string $type = null, ?\Closure $media = null): array
     {
-        $text = self::effectiveText($design, $config, $type);
+        // V6b-2 — صورةٌ لا يُثبَت لمعانها (دليل غائب/قيد المعالجة/فاشل/ألفا) لا تُنشَر أيّاً كان النص:
+        // الحكم «غير مُثبَت = غير مطابق»، ويُصلَح بالخلفية نفسها.
+        if (($design['background']['kind'] ?? null) === 'media' && self::backgroundInterval($design, $config, $media) === null) {
+            return [['field' => 'background', 'code' => 'contrast_unprovable', 'ratio' => 1.0]];
+        }
+        $text = self::effectiveText($design, $config, $type, $media);
         if ($text['judged'] === null) {
             return [];
         }
@@ -189,9 +240,10 @@ final class SectionDesignContrast
 
     /**
      * @param  array<string,mixed>  $normalized  وثيقة معيّرة
+     * @param  \Closure(array<string,mixed>):(array{min:array<int,int>,max:array<int,int>}|null)|null  $media  حدود لمعان مرجع صورة
      * @return array<string, array{code:string,message:string}>
      */
-    public static function errors(array $normalized): array
+    public static function errors(array $normalized, ?\Closure $media = null): array
     {
         $sections = $normalized['homepage']['sections'] ?? null;
         if (! is_array($sections)) {
@@ -207,14 +259,16 @@ final class SectionDesignContrast
             if (! is_array($section) || ($section['visible'] ?? false) !== true || ! is_array($section['design'] ?? null)) {
                 continue; // قسمٌ مخفي لا يُنشر فلا يُحجَب به النشر.
             }
-            foreach (self::issues($section['design'], $config, is_string($section['type'] ?? null) ? $section['type'] : null) as $issue) {
+            foreach (self::issues($section['design'], $config, is_string($section['type'] ?? null) ? $section['type'] : null, $media) as $issue) {
                 $path = $issue['field'] === 'background'
                     ? "homepage.sections[{$i}].design.background"
                     : "homepage.sections[{$i}].design.text.{$issue['field']}";
                 $errors[$path] = [
                     'code' => $issue['code'],
                     'message' => $issue['code'] === 'contrast_unprovable'
-                        ? 'لا يمكن إثبات وضوح النص على هذه الخلفية بأيٍّ من الأبيض أو الأسود — غيّر الخلفية.'
+                        ? (($section['design']['background']['kind'] ?? null) === 'media'
+                            ? 'لا يمكن إثبات وضوح النص فوق هذه الصورة — أضف تراكباً أغمق أو اختر صورة أخرى.'
+                            : 'لا يمكن إثبات وضوح النص على هذه الخلفية بأيٍّ من الأبيض أو الأسود — غيّر الخلفية.')
                         : 'التباين بين لون النص وخلفية القسم أقل من 4.5:1 ولا يمكن نشره.',
                 ];
             }

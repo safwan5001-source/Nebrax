@@ -2,7 +2,11 @@
     "_note": "CUST-HV V5b — typed section design. Shared by PHP StorefrontSectionDesignNormalizer and both TS twins. expected=null means the design key is absent.",
     "capabilities": {
         "hero": {
-            "background": true,
+            "background": [
+                "solid",
+                "gradient",
+                "media"
+            ],
             "text": [
                 "heading",
                 "body",
@@ -28,7 +32,11 @@
             ]
         },
         "banner": {
-            "background": true,
+            "background": [
+                "solid",
+                "gradient",
+                "media"
+            ],
             "text": [
                 "heading",
                 "body",
@@ -54,7 +62,10 @@
             ]
         },
         "categories": {
-            "background": true,
+            "background": [
+                "solid",
+                "gradient"
+            ],
             "text": [
                 "heading"
             ],
@@ -68,7 +79,10 @@
             "separator": true
         },
         "newArrivals": {
-            "background": true,
+            "background": [
+                "solid",
+                "gradient"
+            ],
             "text": [
                 "heading"
             ],
@@ -80,7 +94,10 @@
             "separator": true
         },
         "featured": {
-            "background": true,
+            "background": [
+                "solid",
+                "gradient"
+            ],
             "text": [
                 "heading"
             ],
@@ -92,7 +109,10 @@
             "separator": true
         },
         "offers": {
-            "background": true,
+            "background": [
+                "solid",
+                "gradient"
+            ],
             "text": [
                 "heading"
             ],
@@ -104,7 +124,10 @@
             "separator": true
         },
         "productShelf": {
-            "background": true,
+            "background": [
+                "solid",
+                "gradient"
+            ],
             "text": [
                 "heading"
             ],
@@ -116,7 +139,10 @@
             "separator": true
         },
         "discovery": {
-            "background": true,
+            "background": [
+                "solid",
+                "gradient"
+            ],
             "text": [
                 "heading"
             ],
@@ -124,7 +150,10 @@
             "separator": true
         },
         "benefits": {
-            "background": true,
+            "background": [
+                "solid",
+                "gradient"
+            ],
             "text": [
                 "heading",
                 "body",
@@ -146,7 +175,10 @@
             "separator": true
         },
         "customContent": {
-            "background": true,
+            "background": [
+                "solid",
+                "gradient"
+            ],
             "text": [
                 "heading",
                 "body",
@@ -168,7 +200,10 @@
             "separator": true
         },
         "appPromo": {
-            "background": true,
+            "background": [
+                "solid",
+                "gradient"
+            ],
             "text": [
                 "heading",
                 "body",
@@ -181,12 +216,18 @@
             "separator": true
         },
         "deliveryPromise": {
-            "background": true,
+            "background": [
+                "solid",
+                "gradient"
+            ],
             "spacing": true,
             "separator": true
         },
         "wholesale": {
-            "background": true,
+            "background": [
+                "solid",
+                "gradient"
+            ],
             "spacing": true,
             "separator": true
         }
@@ -1123,26 +1164,6 @@
             "expected": null
         },
         {
-            "name": "media background is not accepted yet (V6) — fail-closed",
-            "type": "hero",
-            "input": {
-                "background": {
-                    "kind": "media",
-                    "media": {
-                        "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
-                    }
-                },
-                "spacing": {
-                    "top": "md"
-                }
-            },
-            "expected": {
-                "spacing": {
-                    "top": "md"
-                }
-            }
-        },
-        {
             "name": "css strings never survive",
             "type": "hero",
             "input": {
@@ -1554,6 +1575,622 @@
                 }
             },
             "expected": null
+        },
+        {
+            "name": "media background: default picture only; forced decorative, no alt, no fit",
+            "type": "hero",
+            "input": {
+                "background": {
+                    "kind": "media",
+                    "media": {
+                        "mediaId": "0B8F6C2E-3D3A-4A53-9C7E-8F1A2B3C4D5E",
+                        "fit": "contain",
+                        "alt": {
+                            "ar": "x",
+                            "en": "y"
+                        }
+                    }
+                }
+            },
+            "expected": {
+                "background": {
+                    "kind": "media",
+                    "media": {
+                        "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+                        "decorative": true
+                    }
+                }
+            }
+        },
+        {
+            "name": "media background: keeps focal/crop/rotate, canonical key order",
+            "type": "banner",
+            "input": {
+                "background": {
+                    "kind": "media",
+                    "overlay": {
+                        "alpha": 40,
+                        "color": {
+                            "role": "brand"
+                        }
+                    },
+                    "mobile": {
+                        "mediaId": "1c9a7d3f-4e4b-4b64-8d8f-9a2b3c4d5e6f",
+                        "rotate": 90
+                    },
+                    "media": {
+                        "decorative": false,
+                        "crop": {
+                            "x": 0.25,
+                            "y": 0.1,
+                            "w": 0.5,
+                            "h": 0.5,
+                            "aspect": "16:9"
+                        },
+                        "focal": {
+                            "x": 20,
+                            "y": 80
+                        },
+                        "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                    }
+                }
+            },
+            "expected": {
+                "background": {
+                    "kind": "media",
+                    "media": {
+                        "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+                        "focal": {
+                            "x": 20,
+                            "y": 80
+                        },
+                        "crop": {
+                            "x": 0.25,
+                            "y": 0.1,
+                            "w": 0.5,
+                            "h": 0.5,
+                            "aspect": "16:9"
+                        },
+                        "decorative": true
+                    },
+                    "mobile": {
+                        "mediaId": "1c9a7d3f-4e4b-4b64-8d8f-9a2b3c4d5e6f",
+                        "rotate": 90,
+                        "decorative": true
+                    },
+                    "overlay": {
+                        "color": {
+                            "role": "brand"
+                        },
+                        "alpha": 40
+                    }
+                }
+            }
+        },
+        {
+            "name": "media background: overlay without a colour defaults to the overlay role",
+            "type": "hero",
+            "input": {
+                "background": {
+                    "kind": "media",
+                    "media": {
+                        "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                    },
+                    "overlay": {
+                        "alpha": 35
+                    }
+                }
+            },
+            "expected": {
+                "background": {
+                    "kind": "media",
+                    "media": {
+                        "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+                        "decorative": true
+                    },
+                    "overlay": {
+                        "color": {
+                            "role": "overlay"
+                        },
+                        "alpha": 35
+                    }
+                }
+            }
+        },
+        {
+            "name": "media background: overlay alpha 0 is dropped on its own",
+            "type": "hero",
+            "input": {
+                "background": {
+                    "kind": "media",
+                    "media": {
+                        "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                    },
+                    "overlay": {
+                        "color": {
+                            "hex": "#000000"
+                        },
+                        "alpha": 0
+                    }
+                }
+            },
+            "expected": {
+                "background": {
+                    "kind": "media",
+                    "media": {
+                        "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+                        "decorative": true
+                    }
+                }
+            }
+        },
+        {
+            "name": "media background: overlay alpha 7 is dropped on its own",
+            "type": "hero",
+            "input": {
+                "background": {
+                    "kind": "media",
+                    "media": {
+                        "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                    },
+                    "overlay": {
+                        "color": {
+                            "hex": "#000000"
+                        },
+                        "alpha": 7
+                    }
+                }
+            },
+            "expected": {
+                "background": {
+                    "kind": "media",
+                    "media": {
+                        "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+                        "decorative": true
+                    }
+                }
+            }
+        },
+        {
+            "name": "media background: overlay alpha 95 is dropped on its own",
+            "type": "hero",
+            "input": {
+                "background": {
+                    "kind": "media",
+                    "media": {
+                        "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                    },
+                    "overlay": {
+                        "color": {
+                            "hex": "#000000"
+                        },
+                        "alpha": 95
+                    }
+                }
+            },
+            "expected": {
+                "background": {
+                    "kind": "media",
+                    "media": {
+                        "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+                        "decorative": true
+                    }
+                }
+            }
+        },
+        {
+            "name": "media background: overlay alpha 100 is dropped on its own",
+            "type": "hero",
+            "input": {
+                "background": {
+                    "kind": "media",
+                    "media": {
+                        "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                    },
+                    "overlay": {
+                        "color": {
+                            "hex": "#000000"
+                        },
+                        "alpha": 100
+                    }
+                }
+            },
+            "expected": {
+                "background": {
+                    "kind": "media",
+                    "media": {
+                        "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+                        "decorative": true
+                    }
+                }
+            }
+        },
+        {
+            "name": "media background: overlay alpha -5 is dropped on its own",
+            "type": "hero",
+            "input": {
+                "background": {
+                    "kind": "media",
+                    "media": {
+                        "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                    },
+                    "overlay": {
+                        "color": {
+                            "hex": "#000000"
+                        },
+                        "alpha": -5
+                    }
+                }
+            },
+            "expected": {
+                "background": {
+                    "kind": "media",
+                    "media": {
+                        "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+                        "decorative": true
+                    }
+                }
+            }
+        },
+        {
+            "name": "media background: overlay alpha \"40\" is dropped on its own",
+            "type": "hero",
+            "input": {
+                "background": {
+                    "kind": "media",
+                    "media": {
+                        "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                    },
+                    "overlay": {
+                        "color": {
+                            "hex": "#000000"
+                        },
+                        "alpha": "40"
+                    }
+                }
+            },
+            "expected": {
+                "background": {
+                    "kind": "media",
+                    "media": {
+                        "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+                        "decorative": true
+                    }
+                }
+            }
+        },
+        {
+            "name": "media background: overlay alpha null is dropped on its own",
+            "type": "hero",
+            "input": {
+                "background": {
+                    "kind": "media",
+                    "media": {
+                        "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                    },
+                    "overlay": {
+                        "color": {
+                            "hex": "#000000"
+                        },
+                        "alpha": null
+                    }
+                }
+            },
+            "expected": {
+                "background": {
+                    "kind": "media",
+                    "media": {
+                        "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+                        "decorative": true
+                    }
+                }
+            }
+        },
+        {
+            "name": "media background: overlay alpha true is dropped on its own",
+            "type": "hero",
+            "input": {
+                "background": {
+                    "kind": "media",
+                    "media": {
+                        "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                    },
+                    "overlay": {
+                        "color": {
+                            "hex": "#000000"
+                        },
+                        "alpha": true
+                    }
+                }
+            },
+            "expected": {
+                "background": {
+                    "kind": "media",
+                    "media": {
+                        "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+                        "decorative": true
+                    }
+                }
+            }
+        },
+        {
+            "name": "media background: overlay with an unsafe colour keeps the alpha on the overlay role",
+            "type": "hero",
+            "input": {
+                "background": {
+                    "kind": "media",
+                    "media": {
+                        "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                    },
+                    "overlay": {
+                        "color": {
+                            "hex": "red"
+                        },
+                        "alpha": 50
+                    }
+                }
+            },
+            "expected": {
+                "background": {
+                    "kind": "media",
+                    "media": {
+                        "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+                        "decorative": true
+                    },
+                    "overlay": {
+                        "color": {
+                            "role": "overlay"
+                        },
+                        "alpha": 50
+                    }
+                }
+            }
+        },
+        {
+            "name": "media background: a missing or malformed picture drops the whole background",
+            "type": "hero",
+            "input": {
+                "background": {
+                    "kind": "media",
+                    "media": {
+                        "mediaId": "not-a-uuid"
+                    },
+                    "mobile": {
+                        "mediaId": "1c9a7d3f-4e4b-4b64-8d8f-9a2b3c4d5e6f"
+                    }
+                },
+                "spacing": {
+                    "top": "md"
+                }
+            },
+            "expected": {
+                "spacing": {
+                    "top": "md"
+                }
+            }
+        },
+        {
+            "name": "media background: no picture, only a mobile one, drops the whole background",
+            "type": "hero",
+            "input": {
+                "background": {
+                    "kind": "media",
+                    "mobile": {
+                        "mediaId": "1c9a7d3f-4e4b-4b64-8d8f-9a2b3c4d5e6f"
+                    }
+                }
+            },
+            "expected": null
+        },
+        {
+            "name": "media background: a malformed phone picture is dropped on its own",
+            "type": "hero",
+            "input": {
+                "background": {
+                    "kind": "media",
+                    "media": {
+                        "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                    },
+                    "mobile": {
+                        "url": "https://x/y.png"
+                    }
+                }
+            },
+            "expected": {
+                "background": {
+                    "kind": "media",
+                    "media": {
+                        "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+                        "decorative": true
+                    }
+                }
+            }
+        },
+        {
+            "name": "media background: urls and styles on the reference never survive",
+            "type": "hero",
+            "input": {
+                "background": {
+                    "kind": "media",
+                    "media": {
+                        "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+                        "url": "https://evil/x.png",
+                        "src": "/x",
+                        "style": "position:fixed"
+                    },
+                    "style": "x",
+                    "url": "y"
+                }
+            },
+            "expected": {
+                "background": {
+                    "kind": "media",
+                    "media": {
+                        "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+                        "decorative": true
+                    }
+                }
+            }
+        },
+        {
+            "name": "media background is hero/banner only: benefits drops it",
+            "type": "benefits",
+            "input": {
+                "background": {
+                    "kind": "media",
+                    "media": {
+                        "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                    }
+                },
+                "spacing": {
+                    "top": "md"
+                }
+            },
+            "expected": {
+                "spacing": {
+                    "top": "md"
+                }
+            }
+        },
+        {
+            "name": "media background is hero/banner only: categories drops it",
+            "type": "categories",
+            "input": {
+                "background": {
+                    "kind": "media",
+                    "media": {
+                        "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                    }
+                },
+                "spacing": {
+                    "top": "md"
+                }
+            },
+            "expected": {
+                "spacing": {
+                    "top": "md"
+                }
+            }
+        },
+        {
+            "name": "media background is hero/banner only: customContent drops it",
+            "type": "customContent",
+            "input": {
+                "background": {
+                    "kind": "media",
+                    "media": {
+                        "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                    }
+                },
+                "spacing": {
+                    "top": "md"
+                }
+            },
+            "expected": {
+                "spacing": {
+                    "top": "md"
+                }
+            }
+        },
+        {
+            "name": "media background is hero/banner only: appPromo drops it",
+            "type": "appPromo",
+            "input": {
+                "background": {
+                    "kind": "media",
+                    "media": {
+                        "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                    }
+                },
+                "spacing": {
+                    "top": "md"
+                }
+            },
+            "expected": {
+                "spacing": {
+                    "top": "md"
+                }
+            }
+        },
+        {
+            "name": "media background is hero/banner only: deliveryPromise drops it",
+            "type": "deliveryPromise",
+            "input": {
+                "background": {
+                    "kind": "media",
+                    "media": {
+                        "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                    }
+                },
+                "spacing": {
+                    "top": "md"
+                }
+            },
+            "expected": {
+                "spacing": {
+                    "top": "md"
+                }
+            }
+        },
+        {
+            "name": "media background is hero/banner only: wholesale drops it",
+            "type": "wholesale",
+            "input": {
+                "background": {
+                    "kind": "media",
+                    "media": {
+                        "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                    }
+                },
+                "spacing": {
+                    "top": "md"
+                }
+            },
+            "expected": {
+                "spacing": {
+                    "top": "md"
+                }
+            }
+        },
+        {
+            "name": "media background is hero/banner only: featured drops it",
+            "type": "featured",
+            "input": {
+                "background": {
+                    "kind": "media",
+                    "media": {
+                        "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                    }
+                },
+                "spacing": {
+                    "top": "md"
+                }
+            },
+            "expected": {
+                "spacing": {
+                    "top": "md"
+                }
+            }
+        },
+        {
+            "name": "media background is hero/banner only: discovery drops it",
+            "type": "discovery",
+            "input": {
+                "background": {
+                    "kind": "media",
+                    "media": {
+                        "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                    }
+                },
+                "spacing": {
+                    "top": "md"
+                }
+            },
+            "expected": {
+                "spacing": {
+                    "top": "md"
+                }
+            }
         }
     ]
 }

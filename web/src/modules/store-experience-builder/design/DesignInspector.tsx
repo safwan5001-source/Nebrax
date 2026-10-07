@@ -192,7 +192,8 @@ export function DesignInspector({
     onChange(setGroup(type, design, group, value));
 
   // ── background ────────────────────────────────────────────────────────────
-  const bgKind = current.background?.kind ?? "none";
+  // V6b-4 adds the image kind to this control; until then an image background (API-authored) reads as "none" here.
+  const bgKind = current.background?.kind === "media" ? "none" : (current.background?.kind ?? "none");
   const setBgKind = (kind: "none" | "solid" | "gradient") => {
     if (kind === "none") return set("background", undefined);
     if (kind === "solid")

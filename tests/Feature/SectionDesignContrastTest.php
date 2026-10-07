@@ -42,7 +42,13 @@ class SectionDesignContrastTest extends TestCase
      */
     public function the_gate_matches_the_shared_cases(array $case): void
     {
-        $actual = SectionDesignContrast::issues($case['design'], $case['config'], $case['type']);
+        $media = $case['media'] ?? [];
+        $actual = SectionDesignContrast::issues(
+            $case['design'],
+            $case['config'],
+            $case['type'],
+            static fn (array $ref): ?array => $media[$ref['mediaId']] ?? null,
+        );
 
         $this->assertSame(
             array_map(static fn (array $i): array => [$i['field'], $i['code']], $case['expected']),

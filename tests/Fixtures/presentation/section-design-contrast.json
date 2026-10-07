@@ -1,5 +1,5 @@
 {
-    "_note": "CUST-HV V5d — section design publish contrast gate. Shared by PHP SectionDesignContrast and both TS twins (ratios compared at 1e-4).",
+    "_note": "CUST-HV V5d — section design publish contrast gate. Shared by PHP SectionDesignContrast and both TS twins (ratios compared at 1e-4). V6b-2: cases may carry `media` — mediaId → {min,max} encoded-channel bounds (already widened by the encoding margin) or null; an id missing from the map has no evidence.",
     "cases": [
         {
             "name": "no design content => nothing to judge",
@@ -547,6 +547,622 @@
                 }
             },
             "expected": []
+        },
+        {
+            "name": "media: a dark picture proves the automatic white",
+            "type": "hero",
+            "config": {
+                "primaryColor": "#12372a",
+                "accentColor": null,
+                "palette": []
+            },
+            "design": {
+                "background": {
+                    "kind": "media",
+                    "media": {
+                        "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+                        "decorative": true
+                    }
+                }
+            },
+            "media": {
+                "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e": {
+                    "min": [
+                        0,
+                        0,
+                        0
+                    ],
+                    "max": [
+                        40,
+                        50,
+                        60
+                    ]
+                }
+            },
+            "expected": []
+        },
+        {
+            "name": "media: a light picture proves the automatic black",
+            "type": "banner",
+            "config": {
+                "primaryColor": "#12372a",
+                "accentColor": null,
+                "palette": []
+            },
+            "design": {
+                "background": {
+                    "kind": "media",
+                    "media": {
+                        "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+                        "decorative": true
+                    }
+                }
+            },
+            "media": {
+                "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e": {
+                    "min": [
+                        200,
+                        210,
+                        220
+                    ],
+                    "max": [
+                        255,
+                        255,
+                        255
+                    ]
+                }
+            },
+            "expected": []
+        },
+        {
+            "name": "media: a full-range picture cannot be proven without an overlay",
+            "type": "hero",
+            "config": {
+                "primaryColor": "#12372a",
+                "accentColor": null,
+                "palette": []
+            },
+            "design": {
+                "background": {
+                    "kind": "media",
+                    "media": {
+                        "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+                        "decorative": true
+                    }
+                }
+            },
+            "media": {
+                "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e": {
+                    "min": [
+                        0,
+                        0,
+                        0
+                    ],
+                    "max": [
+                        255,
+                        255,
+                        255
+                    ]
+                }
+            },
+            "expected": [
+                {
+                    "field": "background",
+                    "code": "contrast_unprovable",
+                    "ratio": 1
+                }
+            ]
+        },
+        {
+            "name": "media: a 60% black overlay makes the same full-range picture provable",
+            "type": "hero",
+            "config": {
+                "primaryColor": "#12372a",
+                "accentColor": null,
+                "palette": []
+            },
+            "design": {
+                "background": {
+                    "kind": "media",
+                    "media": {
+                        "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+                        "decorative": true
+                    },
+                    "overlay": {
+                        "color": {
+                            "hex": "#000000"
+                        },
+                        "alpha": 60
+                    }
+                }
+            },
+            "media": {
+                "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e": {
+                    "min": [
+                        0,
+                        0,
+                        0
+                    ],
+                    "max": [
+                        255,
+                        255,
+                        255
+                    ]
+                }
+            },
+            "expected": []
+        },
+        {
+            "name": "media: a weak 20% overlay is not enough",
+            "type": "hero",
+            "config": {
+                "primaryColor": "#12372a",
+                "accentColor": null,
+                "palette": []
+            },
+            "design": {
+                "background": {
+                    "kind": "media",
+                    "media": {
+                        "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+                        "decorative": true
+                    },
+                    "overlay": {
+                        "color": {
+                            "hex": "#000000"
+                        },
+                        "alpha": 20
+                    }
+                }
+            },
+            "media": {
+                "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e": {
+                    "min": [
+                        0,
+                        0,
+                        0
+                    ],
+                    "max": [
+                        255,
+                        255,
+                        255
+                    ]
+                }
+            },
+            "expected": [
+                {
+                    "field": "background",
+                    "code": "contrast_unprovable",
+                    "ratio": 1.5897
+                }
+            ]
+        },
+        {
+            "name": "media: the overlay colour resolves through the palette role",
+            "type": "hero",
+            "config": {
+                "primaryColor": "#12372a",
+                "accentColor": null,
+                "palette": []
+            },
+            "design": {
+                "background": {
+                    "kind": "media",
+                    "media": {
+                        "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+                        "decorative": true
+                    },
+                    "overlay": {
+                        "color": {
+                            "role": "overlay"
+                        },
+                        "alpha": 70
+                    }
+                }
+            },
+            "media": {
+                "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e": {
+                    "min": [
+                        0,
+                        0,
+                        0
+                    ],
+                    "max": [
+                        255,
+                        255,
+                        255
+                    ]
+                }
+            },
+            "expected": []
+        },
+        {
+            "name": "media: no evidence for the picture is unprovable whatever the text",
+            "type": "hero",
+            "config": {
+                "primaryColor": "#12372a",
+                "accentColor": null,
+                "palette": []
+            },
+            "design": {
+                "background": {
+                    "kind": "media",
+                    "media": {
+                        "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+                        "decorative": true
+                    }
+                },
+                "text": {
+                    "body": {
+                        "hex": "#ffffff"
+                    }
+                }
+            },
+            "media": {
+                "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e": null
+            },
+            "expected": [
+                {
+                    "field": "background",
+                    "code": "contrast_unprovable",
+                    "ratio": 1
+                }
+            ]
+        },
+        {
+            "name": "media: an id with no entry at all has no evidence",
+            "type": "hero",
+            "config": {
+                "primaryColor": "#12372a",
+                "accentColor": null,
+                "palette": []
+            },
+            "design": {
+                "background": {
+                    "kind": "media",
+                    "media": {
+                        "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+                        "decorative": true
+                    }
+                }
+            },
+            "media": [],
+            "expected": [
+                {
+                    "field": "background",
+                    "code": "contrast_unprovable",
+                    "ratio": 1
+                }
+            ]
+        },
+        {
+            "name": "media: the phone picture without evidence blocks the publish",
+            "type": "hero",
+            "config": {
+                "primaryColor": "#12372a",
+                "accentColor": null,
+                "palette": []
+            },
+            "design": {
+                "background": {
+                    "kind": "media",
+                    "media": {
+                        "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+                        "decorative": true
+                    },
+                    "mobile": {
+                        "mediaId": "1c9a7d3f-4e4b-4b64-8d8f-9a2b3c4d5e6f",
+                        "decorative": true
+                    }
+                }
+            },
+            "media": {
+                "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e": {
+                    "min": [
+                        0,
+                        0,
+                        0
+                    ],
+                    "max": [
+                        40,
+                        50,
+                        60
+                    ]
+                },
+                "1c9a7d3f-4e4b-4b64-8d8f-9a2b3c4d5e6f": null
+            },
+            "expected": [
+                {
+                    "field": "background",
+                    "code": "contrast_unprovable",
+                    "ratio": 1
+                }
+            ]
+        },
+        {
+            "name": "media: the phone picture is judged as well — a light one widens the range",
+            "type": "hero",
+            "config": {
+                "primaryColor": "#12372a",
+                "accentColor": null,
+                "palette": []
+            },
+            "design": {
+                "background": {
+                    "kind": "media",
+                    "media": {
+                        "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+                        "decorative": true
+                    },
+                    "mobile": {
+                        "mediaId": "1c9a7d3f-4e4b-4b64-8d8f-9a2b3c4d5e6f",
+                        "decorative": true
+                    }
+                }
+            },
+            "media": {
+                "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e": {
+                    "min": [
+                        0,
+                        0,
+                        0
+                    ],
+                    "max": [
+                        40,
+                        50,
+                        60
+                    ]
+                },
+                "1c9a7d3f-4e4b-4b64-8d8f-9a2b3c4d5e6f": {
+                    "min": [
+                        200,
+                        210,
+                        220
+                    ],
+                    "max": [
+                        255,
+                        255,
+                        255
+                    ]
+                }
+            },
+            "expected": [
+                {
+                    "field": "background",
+                    "code": "contrast_unprovable",
+                    "ratio": 1
+                }
+            ]
+        },
+        {
+            "name": "media: two dark pictures stay provable",
+            "type": "banner",
+            "config": {
+                "primaryColor": "#12372a",
+                "accentColor": null,
+                "palette": []
+            },
+            "design": {
+                "background": {
+                    "kind": "media",
+                    "media": {
+                        "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+                        "decorative": true
+                    },
+                    "mobile": {
+                        "mediaId": "1c9a7d3f-4e4b-4b64-8d8f-9a2b3c4d5e6f",
+                        "decorative": true
+                    }
+                }
+            },
+            "media": {
+                "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e": {
+                    "min": [
+                        0,
+                        0,
+                        0
+                    ],
+                    "max": [
+                        40,
+                        50,
+                        60
+                    ]
+                },
+                "1c9a7d3f-4e4b-4b64-8d8f-9a2b3c4d5e6f": {
+                    "min": [
+                        5,
+                        5,
+                        5
+                    ],
+                    "max": [
+                        60,
+                        60,
+                        60
+                    ]
+                }
+            },
+            "expected": []
+        },
+        {
+            "name": "media: explicit white text on a dark picture passes",
+            "type": "hero",
+            "config": {
+                "primaryColor": "#12372a",
+                "accentColor": null,
+                "palette": []
+            },
+            "design": {
+                "background": {
+                    "kind": "media",
+                    "media": {
+                        "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+                        "decorative": true
+                    }
+                },
+                "text": {
+                    "body": {
+                        "hex": "#ffffff"
+                    },
+                    "heading": {
+                        "hex": "#ffffff"
+                    }
+                }
+            },
+            "media": {
+                "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e": {
+                    "min": [
+                        0,
+                        0,
+                        0
+                    ],
+                    "max": [
+                        40,
+                        50,
+                        60
+                    ]
+                }
+            },
+            "expected": []
+        },
+        {
+            "name": "media: explicit dark text on a dark picture fails (body)",
+            "type": "hero",
+            "config": {
+                "primaryColor": "#12372a",
+                "accentColor": null,
+                "palette": []
+            },
+            "design": {
+                "background": {
+                    "kind": "media",
+                    "media": {
+                        "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+                        "decorative": true
+                    }
+                },
+                "text": {
+                    "body": {
+                        "hex": "#111111"
+                    }
+                }
+            },
+            "media": {
+                "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e": {
+                    "min": [
+                        0,
+                        0,
+                        0
+                    ],
+                    "max": [
+                        40,
+                        50,
+                        60
+                    ]
+                }
+            },
+            "expected": [
+                {
+                    "field": "body",
+                    "code": "contrast_insufficient",
+                    "ratio": 1
+                }
+            ]
+        },
+        {
+            "name": "media: explicit heading and link are judged against the picture",
+            "type": "banner",
+            "config": {
+                "primaryColor": "#12372a",
+                "accentColor": null,
+                "palette": []
+            },
+            "design": {
+                "background": {
+                    "kind": "media",
+                    "media": {
+                        "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+                        "decorative": true
+                    }
+                },
+                "text": {
+                    "heading": {
+                        "hex": "#000000"
+                    },
+                    "link": {
+                        "hex": "#222222"
+                    }
+                }
+            },
+            "media": {
+                "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e": {
+                    "min": [
+                        0,
+                        0,
+                        0
+                    ],
+                    "max": [
+                        40,
+                        50,
+                        60
+                    ]
+                }
+            },
+            "expected": [
+                {
+                    "field": "heading",
+                    "code": "contrast_insufficient",
+                    "ratio": 1
+                },
+                {
+                    "field": "link",
+                    "code": "contrast_insufficient",
+                    "ratio": 1
+                }
+            ]
+        },
+        {
+            "name": "media: the whole picture range is judged, not its average (explicit black, light picture with a dark corner)",
+            "type": "banner",
+            "config": {
+                "primaryColor": "#12372a",
+                "accentColor": null,
+                "palette": []
+            },
+            "design": {
+                "background": {
+                    "kind": "media",
+                    "media": {
+                        "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+                        "decorative": true
+                    }
+                },
+                "text": {
+                    "body": {
+                        "hex": "#000000"
+                    }
+                }
+            },
+            "media": {
+                "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e": {
+                    "min": [
+                        10,
+                        10,
+                        10
+                    ],
+                    "max": [
+                        250,
+                        250,
+                        250
+                    ]
+                }
+            },
+            "expected": [
+                {
+                    "field": "body",
+                    "code": "contrast_insufficient",
+                    "ratio": 1.0607
+                }
+            ]
         }
     ]
 }

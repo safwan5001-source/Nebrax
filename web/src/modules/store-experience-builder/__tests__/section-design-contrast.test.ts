@@ -26,6 +26,7 @@ const fixture = JSON.parse(
       palette: DesignContext["palette"];
     };
     design: Record<string, unknown>;
+    media?: Record<string, { min: [number, number, number]; max: [number, number, number] } | null>;
     expected: Array<{ field: string; code: string; ratio: number }>;
   }>;
 };
@@ -39,6 +40,7 @@ describe("section design publish contrast — shared fixture with the PHP gate (
         accentColor: c.config.accentColor,
         palette: c.config.palette,
         dir: "ltr",
+        mediaBounds: (ref) => c.media?.[ref.mediaId] ?? null,
       };
       const actual = sectionContrastIssues(design, ctx, c.type);
       expect(actual.map((i) => [i.field, i.code])).toEqual(
