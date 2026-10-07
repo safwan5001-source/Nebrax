@@ -57,7 +57,7 @@ Wraps a section only when it has a design. Storefront: `publishedNodes` was spli
 
 ---
 
-## Review round (Codex, 16 findings — all valid, all fixed)
+## Review round (Codex, 33 findings — all valid, all fixed)
 
 | Finding | Fix |
 |---|---|
@@ -83,6 +83,30 @@ Wraps a section only when it has a design. Storefront: `publishedNodes` was spli
 | **P2** the hover-surface reset also fired on `:focus-visible`, though the components paint those fills on hover only (keyboard focus then lost the proven foreground) | Reset limited to `:hover`; asserted that keyboard focus keeps the designed foreground. |
 | **P2** `design.align` (content *block* position) and `text.align` were folded into one `text-align` | Two independent outputs: `--sec-align` (copy) and `--sec-bms` / `--sec-bme` (block margins). Asserted: a centred block with start-aligned copy. |
 
+| **P2** the inner-padding reset zeroed *every* padded grandchild (an accordion card lost its padding) | Reset limited to content boxes the components **mark** (`data-section-content` on the banner's and hero's inner box, storefront + Canvas); asserted: the accordion card keeps `16px`. |
+| **P2** block alignment targeted only the full-width root, so a hero's `max-w-2xl` content never moved | The same marker is positioned too (root **and** marked content box); asserted on a hero fixture. |
+
+| **P2** block alignment had no visible effect on a banner (its content row is full-width) | The marked content box shrinks to its content (`inline-size: fit-content`) before the auto margins position it. Asserted on the compiled storefront CSS: narrower than the section and centred (|left − right| < 2 px). |
+
+| **P2** Canvas benefits cards had no surface class (transparent, section foreground) while the published `BenefitsBand` cards are `bg-store-surface` (white, original text) | Canvas cards now carry the same surface classes as `BenefitsBand` (`bg-store-surface px-4 py-4`) — one card treatment in preview and publish. |
+| **P2** Canvas "View all" is a `span`, so the section link colour never reached it | `data-section-action` marks heading actions that are not anchors; the same rule colours them from `--sec-link` (both stylesheets). |
+| **P2** benefits has no constrained block, so `align` had no visible effect | `data-section-block` marks a component whose *root* is the content block (benefits, storefront + Canvas); it shrink-wraps under `balign` and is positioned like the marked content boxes. Asserted on the compiled CSS (narrower than the frame, centred). |
+
+| **P2** the hero CTA's focus ring (drawn in the primary-foreground token, restored to white for the button) was white-on-pale on a light designed background | `focus-visible:outline-store-primary-foreground` elements inside a designed section redraw the ring in the section's proven foreground; asserted on the compiled storefront CSS. |
+| **P2** the Canvas rendered Market's multi-question content flat while the storefront renders accordion cards | The Canvas mirrors the accordion structure and surfaces (`awj-market`, ≥ 2 headings), so preview and publish agree. |
+
+| **P2** other section-level focus rings (a category card's `outline-store-primary`) vanish on a designed background close to the primary colour | Generalised: **every** `focus-visible:outline-store-*` indicator that is not inside a nested surface is redrawn in the section's proven foreground (the ring is drawn outside the element, on the designed background). Asserted: a card link on a primary-coloured band gets a white ring. |
+
+| **P2** a design that resolves to nothing (only default steps) still swapped the legacy `<div>` for a Fragment, changing the parent's flow | The wrapper is dropped only when `resolveSectionDesign` actually returns a frame; otherwise the legacy div is kept byte-for-byte (unit-tested). |
+| **P2** the full-bleed `clip-path` on the frame clipped all descendant painting at its top/bottom edges (focus outlines of edge content) | The band is now drawn by a `::before` pseudo-element behind the content; the clip applies to the pseudo only. Asserted: frame `clip-path: none`, pseudo clipped, no page overflow. |
+
+| **P2** a background painted on the square frame while the child's surface was cleared, so hero / banner / promo bands lost their `rounded-store` corners | The frame inherits the radius token when its direct child carries `rounded-store` (unless the design sets its own radius or bleeds); a shelf with no legacy corners stays square. Asserted on the compiled storefront CSS. |
+| **P2** `overflow: clip` on a radius frame cut the offset focus outlines of links/buttons at its edges | the frame no longer clips anything: the radius rounds what it paints (fill, border, shadow) and the section root inherits it (`[data-sd~="radius"][data-sd] > * { border-radius: inherit }`); cascade spec asserts `overflow: visible` and matching radii |
+| **P2** the legacy-corner fallback only ran for `bg`: a border-only / shadow-only frame around a rounded banner/hero/promo drew a square border/shadow | the fallback now applies to `bg`, `border` and `shadow` frames (not radius / bleed); cascade spec covers border-only, shadow-only and a square shelf |
+| **P2** the Canvas's empty-banner placeholder kept its own `px-5 py-6` under designed inner spacing (the content-box marker existed only on the authored branch) | the placeholder carries `data-section-content` like the authored box, so `none` removes it and a step replaces it; jsdom test pins both branches |
+| **P2** the published `BannerBand` / `HeroSection` / `BenefitsBand` emitted their design markers even with no design, breaking "absent design ⇒ byte-identical" | the markers are emitted only while a frame is active (`designed` prop; the hero is cloned with it by `published-nodes` when its design resolves to a frame); a unit test pins plain / designed / inert-design output |
+| **P2** the Canvas benefits cards (and Market accordion mirror) changed for sections with **no** design, contradicting "absent design ⇒ unchanged" in the editor | the published card surface, the block marker and the accordion mirror apply only while the section's design resolves to a frame; an undesigned section keeps its legacy `px-3 py-3` preview. The pre-existing Canvas↔storefront drift for undesigned sections (cards without a surface; flat Market accordion) is deliberately **not** touched here — a separate parity fix |
+
 The browser proof now also asserts, at all six widths in RTL and LTR, that **no designed section's root still paints its own fill** and that a heading colour reaches the Canvas heading; a mutation run (rule removed) fails it for banner / appPromo / deliveryPromise / shelf / discovery, so the check is not vacuous. The scenario gained `hero` and `wholesale` designs (the two dark surface-owners) and a distinct heading colour on benefits. 13/13 green.
 
 ## Invariants
@@ -102,7 +126,7 @@ The browser proof now also asserts, at all six widths in RTL and LTR, that **no 
 |---|---|
 | Web | `section-design-resolve.test.tsx` **17** (resolver, frame, byte-identical twins, stylesheet parity) · full vitest **427 files / 3702** (drift ratchet ✓) |
 | Storefront | `section-design-resolve.test.tsx` **12** · full vitest **142 files / 1284** · `tsc` ✓ · `biome check` ✓ |
-| Real browser | `cust-hv-v5c-design-render-proof.spec.ts` **13/13** (Canvas) + `cust-hv-v5c-storefront-cascade.spec.ts` **5/5** (the real compiled storefront stylesheet — local evidence gate, as V3/V4b/V5a) |
+| Real browser | `cust-hv-v5c-design-render-proof.spec.ts` **13/13** (Canvas) + `cust-hv-v5c-storefront-cascade.spec.ts` **13/13** (the real compiled storefront stylesheet — local evidence gate, as V3/V4b/V5a) |
 | Backend | **no backend file changed** (`git diff origin/main` touches no `app/` `routes/` `database/` `tests/` `config/`); the full run on the identical backend is V5b's (5751 passed, 28 env-only failures) · PostgreSQL by CI |
 
 Evidence: `docs/plans/store/cust-hv-v5c/*.jpg`.
