@@ -227,6 +227,12 @@
   --store-footer-muted: var(--store-footer-muted-base);
   --store-footer-link: var(--store-footer-link-base);
 }
+/* The hero's CTA keeps its legacy surface, so its focus ring (drawn in the primary
+   foreground token, restored to white for the button) is redrawn in the section's proven
+   foreground — it sits on the designed background, where that colour has contrast. */
+.awj-store-preview [data-sd~="fg"] [class*="focus-visible:outline-store-primary-foreground"]:focus-visible {
+  outline-color: var(--sec-fg);
+}
 /* A translucent fill nested in a designed section would composite over an arbitrary
    background, which no contrast proof can see: it becomes its opaque equivalent. */
 .awj-store-preview [data-sd~="fg"] :is([class^="bg-store-surface/"], [class*=" bg-store-surface/"]) {

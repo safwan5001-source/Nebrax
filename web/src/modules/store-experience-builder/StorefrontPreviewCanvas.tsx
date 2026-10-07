@@ -880,6 +880,40 @@ export function StorefrontPreviewCanvas({
 
             if (section.type === "customContent") {
               const blocks = customContentOf(section).blocks.filter((block) => block.text.trim());
+              // AWJ Market presents multi-question content as an accordion (published
+              // `CustomContentBand`): mirror its cards so the preview shows the same surfaces.
+              const groups: Array<{ heading: (typeof blocks)[number] | null; body: typeof blocks }> = [];
+              for (const block of blocks) {
+                if (block.kind === "heading") groups.push({ heading: block, body: [] });
+                else if (groups.length === 0) groups.push({ heading: null, body: [block] });
+                else groups[groups.length - 1].body.push(block);
+              }
+              if (config.themePreset === "awj-market" && groups.filter((group) => group.heading).length >= 2) {
+                return (
+                  <section key={section.id} className="min-w-0 max-w-3xl space-y-2 break-words">
+                    {groups.map((group, index) =>
+                      group.heading ? (
+                        <details key={group.heading.id} className="group rounded-store border border-store-border bg-store-surface px-4 open:pb-4">
+                          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 py-3.5 text-sm font-bold text-store-foreground marker:content-none">
+                            <span className="break-words">{group.heading.text}</span>
+                          </summary>
+                          <div className="space-y-2">
+                            {group.body.map((block) => (
+                              <p key={block.id} className="break-words text-sm leading-relaxed text-store-muted-foreground">{block.text}</p>
+                            ))}
+                          </div>
+                        </details>
+                      ) : (
+                        <div key={`preamble-${index}`} className="space-y-2">
+                          {group.body.map((block) => (
+                            <p key={block.id} className="break-words text-sm text-store-muted-foreground">{block.text}</p>
+                          ))}
+                        </div>
+                      ),
+                    )}
+                  </section>
+                );
+              }
               return (
                 <section key={section.id} className="min-w-0 max-w-3xl space-y-2 break-words">
                   {blocks.length === 0 ? (

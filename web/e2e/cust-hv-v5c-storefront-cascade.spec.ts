@@ -206,3 +206,22 @@ test('benefits: its root is the block that gets positioned (shrink-wrapped), and
   expect((await style(page, '#act')).color).toBe('rgb(255, 255, 255)');
 });
 
+test('hero CTA focus ring is drawn in the designed foreground, not the restored white', async ({ page }) => {
+  await mount(
+    page,
+    frame(
+      'hero',
+      'bg fg heading link',
+      '--sec-bg:#fde68a;--sec-fg:#000000;--sec-heading:#000000;--sec-link:#000000',
+      `<section class="flex items-center rounded-store text-store-primary-foreground">
+         <a id="herocta" href="#" class="inline-flex bg-store-primary-foreground px-4 text-store-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-store-primary-foreground">Shop now</a>
+       </section>`,
+    ),
+  );
+  await page.locator('#herocta').focus();
+  await page.keyboard.press('Tab');
+  await page.keyboard.press('Shift+Tab');
+  const outline = await page.locator('#herocta').evaluate((el) => getComputedStyle(el).outlineColor);
+  expect(outline).toBe('rgb(0, 0, 0)');
+});
+
