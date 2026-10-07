@@ -254,9 +254,9 @@ describe("the Canvas and the storefront share ONE resolver (V0 §3.5)", () => {
 });
 
 describe("surface matcher in the stylesheet (CUST-HV V5c review)", () => {
-  it("treats only opaque `bg-store-*` / `bg-white` class tokens as surfaces — never variants or alpha fills", () => {
+  it("treats class tokens that start with `bg-store-*` / `bg-white` as surfaces — never variants like hover:bg-store-*", () => {
     const css = readFileSync(resolve(__dirname, "../store-preview.css"), "utf8");
-    const rule = css.match(/:where\([^\n]*?\[data-sd~="fg"\] (:is\([^{]*?\):not\([^{]*?\)):not\(\[data-sd\] > \*\)\)/);
+    const rule = css.match(/:where\([^\n]*?\[data-sd~="fg"\] (:is\([^{]*?\)):not\(\[data-sd\] > \*\)\)/);
     expect(rule, "the nested-surface reset rule").not.toBeNull();
     const selector = rule![1];
     const probe = (className: string) => {
@@ -267,10 +267,12 @@ describe("surface matcher in the stylesheet (CUST-HV V5c review)", () => {
     expect(probe("bg-store-surface p-4")).toBe(true);
     expect(probe("p-2 bg-store-footer text-xs")).toBe(true);
     expect(probe("rounded bg-white")).toBe(true);
+    // translucent fills are surfaces too (made opaque inside a designed section)
+    expect(probe("bg-white/80")).toBe(true);
+    expect(probe("bg-store-surface/90")).toBe(true);
+    expect(probe("bg-store-footer-border/40")).toBe(true);
+    // variants are not
     expect(probe("bg-transparent hover:bg-store-footer-border")).toBe(false);
     expect(probe("hover:bg-white/10 px-2")).toBe(false);
-    expect(probe("bg-white/80")).toBe(false);
-    expect(probe("bg-store-surface/90")).toBe(false);
-    expect(probe("bg-store-footer-border/40")).toBe(false);
   });
 });

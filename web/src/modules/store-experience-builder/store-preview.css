@@ -168,8 +168,9 @@
  * white card or dark-on-dark on a dark one. The section's own root element (the
  * frame's direct child) is **not** a nested surface: its legacy fill is replaced
  * when the design paints a background, and its text follows the design.
- * A "surface" is a class token that *starts* with `bg-store-` / `bg-white` and is opaque —
- * variants (`hover:bg-store-*`, `bg-transparent`) and alpha fills (`bg-white/80`) are not.
+ * A "surface" is a class token that *starts* with `bg-store-` / `bg-white` — variants
+ * (`hover:bg-store-*`, `bg-transparent`) are not. Translucent fills inside a designed section
+ * are made opaque (see below), so a foreground can always be proven against them.
  * Muted copy uses the proven foreground itself (never a translucent mix: opacity
  * would lower a ratio that was only just proven).
  */
@@ -182,7 +183,7 @@
   --store-footer-muted: var(--sec-fg);
   --store-footer-link: var(--sec-fg);
 }
-:where(.awj-store-preview [data-sd~="fg"] :is([class^="bg-store-"], [class*=" bg-store-"], [class^="bg-white"], [class*=" bg-white"]):not([class*="bg-store-surface/"], [class*="bg-store-footer-border/"], [class*="bg-white/"]):not([data-sd] > *)) {
+:where(.awj-store-preview [data-sd~="fg"] :is([class^="bg-store-"], [class*=" bg-store-"], [class^="bg-white"], [class*=" bg-white"]):not([data-sd] > *)) {
   color: var(--store-foreground-base);
   --store-foreground: var(--store-foreground-base);
   --store-muted-foreground: var(--store-muted-foreground-base);
@@ -203,18 +204,29 @@
   --store-footer-muted: var(--store-footer-muted-base);
   --store-footer-link: var(--store-footer-link-base);
 }
+/* A translucent fill nested in a designed section would composite over an arbitrary
+   background, which no contrast proof can see: it becomes its opaque equivalent. */
+.awj-store-preview [data-sd~="fg"] :is([class^="bg-store-surface/"], [class*=" bg-store-surface/"]) {
+  background-color: var(--store-surface);
+}
+.awj-store-preview [data-sd~="fg"] :is([class^="bg-store-footer-border/"], [class*=" bg-store-footer-border/"]) {
+  background-color: var(--store-footer-border);
+}
+.awj-store-preview [data-sd~="fg"] :is([class^="bg-white/"], [class*=" bg-white/"]) {
+  background-color: #ffffff;
+}
 /* A design background replaces the section's own legacy fill (banner card, hero
    gradient, dark promo bands) instead of hiding behind it. */
 .awj-store-preview [data-sd~="bg"][data-sd] > * {
   background: none;
 }
 /* Section-level text only — never inside a surface nested in the section. */
-.awj-store-preview [data-sd~="heading"] :is(h1, h2, h3):not([data-sd] > * :is([class^="bg-store-"], [class*=" bg-store-"], [class^="bg-white"], [class*=" bg-white"]):not([class*="bg-store-surface/"], [class*="bg-store-footer-border/"], [class*="bg-white/"]) *, :is([class^="bg-store-"], [class*=" bg-store-"], [class^="bg-white"], [class*=" bg-white"]):not([class*="bg-store-surface/"], [class*="bg-store-footer-border/"], [class*="bg-white/"])) {
+.awj-store-preview [data-sd~="heading"] :is(h1, h2, h3):not([data-sd] > * :is([class^="bg-store-"], [class*=" bg-store-"], [class^="bg-white"], [class*=" bg-white"]) *, :is([class^="bg-store-"], [class*=" bg-store-"], [class^="bg-white"], [class*=" bg-white"])) {
   color: var(--sec-heading);
 }
-.awj-store-preview [data-sd~="fg"] p:not([data-sd] > * :is([class^="bg-store-"], [class*=" bg-store-"], [class^="bg-white"], [class*=" bg-white"]):not([class*="bg-store-surface/"], [class*="bg-store-footer-border/"], [class*="bg-white/"]) *, :is([class^="bg-store-"], [class*=" bg-store-"], [class^="bg-white"], [class*=" bg-white"]):not([class*="bg-store-surface/"], [class*="bg-store-footer-border/"], [class*="bg-white/"])) {
+.awj-store-preview [data-sd~="fg"] p:not([data-sd] > * :is([class^="bg-store-"], [class*=" bg-store-"], [class^="bg-white"], [class*=" bg-white"]) *, :is([class^="bg-store-"], [class*=" bg-store-"], [class^="bg-white"], [class*=" bg-white"])) {
   color: var(--sec-fg);
 }
-.awj-store-preview [data-sd~="link"] a:not([data-sd] > * :is([class^="bg-store-"], [class*=" bg-store-"], [class^="bg-white"], [class*=" bg-white"]):not([class*="bg-store-surface/"], [class*="bg-store-footer-border/"], [class*="bg-white/"]) *, :is([class^="bg-store-"], [class*=" bg-store-"], [class^="bg-white"], [class*=" bg-white"]):not([class*="bg-store-surface/"], [class*="bg-store-footer-border/"], [class*="bg-white/"]), [class*="hover:bg-store-"], [class*="hover:bg-white"]:not([class*="hover:bg-white/"])) {
+.awj-store-preview [data-sd~="link"] a:not([data-sd] > * :is([class^="bg-store-"], [class*=" bg-store-"], [class^="bg-white"], [class*=" bg-white"]) *, :is([class^="bg-store-"], [class*=" bg-store-"], [class^="bg-white"], [class*=" bg-white"]), [class*="hover:bg-store-"], [class*="hover:bg-white"]:not([class*="hover:bg-white/"])) {
   color: var(--sec-link);
 }

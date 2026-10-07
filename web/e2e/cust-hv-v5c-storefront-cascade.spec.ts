@@ -77,3 +77,33 @@ test('links default to the proven foreground; a transparent CTA that turns dark 
   expect(hovered.bg).toBe('rgb(31, 41, 55)'); // hover:bg-store-footer-border
   expect(hovered.color).toBe('rgb(255, 255, 255)'); // hover:text-store-footer-foreground, original token
 });
+
+test('translucent nested fills become opaque surfaces with their own proven foreground (mid-tone design background)', async ({ page }) => {
+  await mount(
+    page,
+    frame(
+      'wholesale',
+      'bg fg heading link',
+      '--sec-bg:#757575;--sec-fg:#000000;--sec-heading:#000000;--sec-link:#000000',
+      `<section class="rounded-store bg-store-footer px-5 py-10 text-store-footer-link">
+         <div id="card" class="rounded-store bg-store-footer-border/40 p-4"><p id="cardp" class="text-store-footer-foreground">Card copy</p></div>
+       </section>`,
+    ),
+  );
+  const card = await style(page, '#card');
+  expect(card.bg).toBe('rgb(31, 41, 55)'); // opaque footer-border, not a 40 % blend over #757575
+  expect((await style(page, '#cardp')).color).toBe('rgb(255, 255, 255)'); // original light token on the dark card
+});
+
+test('the themed primary foreground survives on a nested CTA (light primary colour)', async ({ page }) => {
+  // publishedThemeStyle puts the themed value AND its base on the theme wrapper
+  await page.setContent(`<!doctype html><html><head><style>${css}</style></head><body>
+    <div style="--store-primary:#f5e6a8;--store-primary-foreground:#111827;--store-primary-foreground-base:#111827">
+      <div data-sd="bg fg" data-design-type="banner" style="--sec-bg:#101820;--sec-fg:#ffffff">
+        <section class="bg-store-surface"><a id="cta" href="#" class="bg-store-primary text-store-primary-foreground px-3">CTA</a></section>
+      </div></div></body></html>`);
+  const cta = await style(page, '#cta');
+  expect(cta.bg).toBe('rgb(245, 230, 168)');
+  expect(cta.color).toBe('rgb(17, 24, 39)'); // dark on the light primary, not the :root default white
+});
+
