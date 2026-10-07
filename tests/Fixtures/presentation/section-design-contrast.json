@@ -479,7 +479,7 @@
             "expected": []
         },
         {
-            "name": "a light-surface section (banner) still judges explicit text on the page background",
+            "name": "a light-surface section (banner) judges explicit text on its own white surface",
             "type": "banner",
             "config": {
                 "primaryColor": "#12372a",
@@ -497,7 +497,7 @@
                 {
                     "field": "body",
                     "code": "contrast_insufficient",
-                    "ratio": 1.0541
+                    "ratio": 1
                 }
             ]
         },

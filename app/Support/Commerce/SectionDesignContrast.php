@@ -20,6 +20,9 @@ final class SectionDesignContrast
     /** لون خلفية الصفحة اليوم (`--store-background`) — ما خلف قسمٍ بلا خلفية. */
     public const PAGE_BACKGROUND = '#f8f9fa';
 
+    /** أقسامٌ فاتحة ترسم سطحاً خاصاً بها: أين يقع نصٌّ بلا خلفية في التصميم (توأم `LEGACY_SURFACE_HEX`). */
+    public const LEGACY_SURFACE = ['banner' => '#ffffff', 'deliveryPromise' => '#ffffff'];
+
     /**
      * أقسامٌ ترسم سطحاً داكناً خاصاً بها (تدرّج العلامة، شريط الذيل). بلا خلفية في
      * التصميم لا يُطبَّق لون النص عليها إطلاقاً (التوأم: `SURFACE_OWNING_TYPES`).
@@ -134,7 +137,7 @@ final class SectionDesignContrast
         $heading = $explicitHeading ?? $body;
 
         // خلف النص الصريح في قسمٍ بلا خلفية: خلفية الصفحة.
-        $page = ContrastEngine::parseHex(self::PAGE_BACKGROUND);
+        $page = ContrastEngine::parseHex(self::LEGACY_SURFACE[$type ?? ''] ?? self::PAGE_BACKGROUND);
         $judged = $background ?? (($explicitBody ?? $explicitHeading ?? $link) !== null && $page !== null
             ? ContrastEngine::solidInterval($page)
             : null);

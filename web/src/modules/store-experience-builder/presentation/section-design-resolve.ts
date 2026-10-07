@@ -145,6 +145,18 @@ export const SURFACE_OWNING_TYPES: ReadonlySet<string> = new Set([
   "wholesale",
 ]);
 
+/** `--store-background` today: what is behind a section that paints no surface of its own. */
+export const PAGE_BACKGROUND = "#f8f9fa";
+
+/**
+ * Light sections that paint a surface of their own (`bg-store-surface`): where a
+ * text-only design (explicit colours, no design background) actually lands.
+ */
+const LEGACY_SURFACE_HEX: Readonly<Record<string, string>> = {
+  banner: "#ffffff",
+  deliveryPromise: "#ffffff",
+};
+
 export interface EffectiveText {
   /** Foreground applied to body copy (explicit, else automatic over a background). */
   body: string | null;
@@ -154,15 +166,12 @@ export interface EffectiveText {
   /** Interval of the section background, when it has one. */
   background: LuminanceInterval | null;
   /**
-   * What the publish gate proves the text against: the section background, else —
-   * for a section with an explicit text colour but no background — the page
-   * background it will actually be drawn on.
+   * What the text is proven against: the design background, else — for explicit
+   * colours with no design background — the surface they will actually be drawn on
+   * (the section's own legacy surface, or the page background).
    */
   judged: LuminanceInterval | null;
 }
-
-/** `--store-background` today: what is behind a section that paints no background. */
-export const PAGE_BACKGROUND = "#f8f9fa";
 
 /**
  * The colours a section's text will actually be drawn in. Shared by the renderer
@@ -203,7 +212,10 @@ export function effectiveText(
   const judged =
     background ??
     ((explicitBody ?? explicitHeading ?? link) !== null
-      ? backgroundInterval(PAGE_BACKGROUND, null)
+      ? backgroundInterval(
+          (type !== undefined && LEGACY_SURFACE_HEX[type]) || PAGE_BACKGROUND,
+          null,
+        )
       : null);
   return {
     body,
@@ -212,6 +224,14 @@ export function effectiveText(
     background,
     judged,
   };
+}
+
+/** Worst contrast of a foreground against what it is drawn on; `null` = nothing to judge. */
+export function worstTextRatio(
+  foreground: string,
+  text: EffectiveText,
+): number | null {
+  return text.judged ? worstRatioForHex(foreground, text.judged) : null;
 }
 
 export interface SectionContrastIssue {
@@ -251,14 +271,6 @@ export function sectionContrastIssues(
     });
   }
   return [...out.values()];
-}
-
-/** Worst contrast of a foreground against the section's background; `null` = no background to judge. */
-export function worstTextRatio(
-  foreground: string,
-  text: EffectiveText,
-): number | null {
-  return text.background ? worstRatioForHex(foreground, text.background) : null;
 }
 
 export function resolveSectionDesign(
