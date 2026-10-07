@@ -92,7 +92,7 @@ describe("section background media (CUST-HV V6b-3)", () => {
     const section = hero("a", {
       kind: "media",
       media: { mediaId: A, decorative: true, focal: { x: 20, y: 70 } },
-      mobile: { mediaId: B, decorative: true },
+      mobile: { mediaId: B, decorative: true, focal: { x: 70, y: 10 } },
       overlay: { color: { role: "overlay" }, alpha: 40 },
     });
     const data = sectionBackdrop(section, 0, {
@@ -102,6 +102,7 @@ describe("section background media (CUST-HV V6b-3)", () => {
     expect(data?.media.width).toBe(1600);
     expect(data?.mobile?.width).toBe(700);
     expect(data?.focal).toEqual({ x: 20, y: 70 });
+    expect(data?.mobileFocal).toEqual({ x: 70, y: 10 });
     expect(data?.overlay).toBe(true);
   });
 

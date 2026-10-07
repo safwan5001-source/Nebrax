@@ -86,10 +86,37 @@ describe("SectionBackdrop (CUST-HV V6b-3)", () => {
     expect(sourcesEls[0].getAttribute("srcset")).toContain("/m-");
     expect(sourcesEls[2].getAttribute("srcset")).toContain("/d-");
     expect(container.querySelectorAll("img")).toHaveLength(1);
-    expect(
-      (container.querySelector("img") as HTMLImageElement).style.objectPosition,
-    ).toBe("25% 75%");
+    // each picture is framed by its own focal point: the default one's and the phone one's (centred when
+    // it has none) are published as variables the backdrop CSS switches at the phone breakpoint
+    const backdropStyle = (container.firstElementChild as HTMLElement).style;
+    expect(backdropStyle.getPropertyValue("--sd-pos")).toBe("25% 75%");
+    expect(backdropStyle.getPropertyValue("--sd-pos-m")).toBe("50% 50%");
     expect(container.querySelector("[data-sd-overlay]")).toBeTruthy();
+  });
+
+  it("the phone picture carries its own focal point; without a phone picture no phone variable is set", () => {
+    const { container } = render(
+      <SectionBackdrop
+        data={{
+          media: media("d"),
+          mobile: media("m"),
+          focal: { x: 10, y: 20 },
+          mobileFocal: { x: 80, y: 30 },
+          overlay: false,
+        }}
+      />,
+    );
+    const style = (container.firstElementChild as HTMLElement).style;
+    expect(style.getPropertyValue("--sd-pos")).toBe("10% 20%");
+    expect(style.getPropertyValue("--sd-pos-m")).toBe("80% 30%");
+    cleanup();
+    const plain = render(
+      <SectionBackdrop
+        data={{ media: media("d"), focal: { x: 10, y: 20 }, overlay: false }}
+      />,
+    ).container.firstElementChild as HTMLElement;
+    expect(plain.style.getPropertyValue("--sd-pos")).toBe("10% 20%");
+    expect(plain.style.getPropertyValue("--sd-pos-m")).toBe("");
   });
 
   it("only the page's first hero loads eagerly with high priority; the rest are lazy", () => {

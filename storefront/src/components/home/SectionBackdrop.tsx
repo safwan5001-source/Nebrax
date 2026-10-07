@@ -35,15 +35,20 @@ export function SectionBackdrop({
     widths.filter((s) => s.format === "jpg").at(-1) ??
     widths.at(-1) ??
     media.sources[0];
-  const style: CSSProperties = data.focal
-    ? { objectPosition: `${data.focal.x}% ${data.focal.y}%` }
-    : {};
+  // Each picture is framed by its own focal point, switched at the same breakpoint as the sources
+  // (the `object-position` rules live with the backdrop CSS; only validated integers are written).
+  const position = (focal?: { x: number; y: number }) =>
+    focal ? `${focal.x}% ${focal.y}%` : "50% 50%";
+  const style = {
+    "--sd-pos": position(data.focal),
+    ...(mobile ? { "--sd-pos-m": position(data.mobileFocal) } : {}),
+  } as CSSProperties;
   const mobileWebp = mobile ? srcSet(mobile, "webp") : "";
   const mobileJpg = mobile ? srcSet(mobile, "jpg") : "";
   const webp = srcSet(media, "webp");
 
   return (
-    <div data-sd-backdrop="" aria-hidden="true">
+    <div data-sd-backdrop="" aria-hidden="true" style={style}>
       <picture>
         {mobileWebp ? (
           <source
@@ -72,7 +77,6 @@ export function SectionBackdrop({
           loading={priority ? "eager" : "lazy"}
           fetchPriority={priority ? "high" : undefined}
           decoding="async"
-          style={style}
         />
       </picture>
       {data.overlay ? <div data-sd-overlay="" /> : null}

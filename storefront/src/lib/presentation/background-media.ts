@@ -51,6 +51,8 @@ export interface SectionBackdropData {
   media: ResolvedMedia;
   focal?: { x: number; y: number };
   mobile?: ResolvedMedia;
+  /** The phone picture's OWN focal point (absent ⇒ centred): each picture is framed by its own reference. */
+  mobileFocal?: { x: number; y: number };
   overlay: boolean;
 }
 
@@ -71,6 +73,7 @@ export function sectionBackdrop(
     media,
     ...(bg.media.focal ? { focal: bg.media.focal } : {}),
     ...(mobile ? { mobile } : {}),
+    ...(mobile && bg.mobile?.focal ? { mobileFocal: bg.mobile.focal } : {}),
     overlay: bg.overlay !== undefined,
   };
 }

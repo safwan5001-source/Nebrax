@@ -248,6 +248,32 @@ class StorefrontMediaRefTest extends TestCase
     }
 
     /** @test */
+    public function repeated_background_references_cost_one_media_query_and_no_derivative_query_for_default_usages(): void
+    {
+        $this->fakeStorefrontMediaR2();
+        $store = $this->store('mr-queries');
+        $media = $this->uploadMedia($store['auth']);
+        app(TenantContext::class)->set($store['auth']['tenant_id']);
+        $section = static fn (string $id): array => ['id' => $id, 'design' => ['background' => ['kind' => 'media', 'media' => ['mediaId' => $media['id']], 'mobile' => ['mediaId' => $media['id']]]]];
+        $doc = ['homepage' => ['sections' => [$section('a'), $section('b'), $section('c')]]];
+
+        $queries = [];
+        \DB::listen(static function ($q) use (&$queries): void {
+            $queries[] = $q->sql;
+        });
+        $resolved = app(StorefrontPublishedMediaResolver::class)->resolve($doc);
+
+        $this->assertCount(6, $resolved, 'three sections × (main + phone)');
+        foreach ($resolved as $entry) {
+            $this->assertArrayHasKey('contrast', $entry);
+        }
+        $mediaQueries = array_filter($queries, static fn (string $sql): bool => str_contains($sql, '"storefront_media"') || str_contains($sql, '`storefront_media`'));
+        $this->assertCount(1, $mediaQueries, 'the asset is loaded once for the whole document — the bounds reuse it');
+        $this->assertSame([], array_filter($queries, static fn (string $sql): bool => str_contains($sql, 'storefront_media_derivatives')), 'a default usage never reads derivative rows');
+        app(TenantContext::class)->forget();
+    }
+
+    /** @test */
     public function only_section_background_pictures_carry_contrast_bounds_and_only_when_the_evidence_is_valid(): void
     {
         $this->fakeStorefrontMediaR2();

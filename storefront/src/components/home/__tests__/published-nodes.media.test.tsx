@@ -8,6 +8,8 @@ import type { PresentationHomeSection } from "@/lib/presentation/config";
 import type { ResolvedMedia } from "@/lib/presentation/media-ref";
 import { publishedNodes } from "../published-nodes";
 
+type ResolvedContrast = NonNullable<ResolvedMedia["contrast"]>;
+
 afterEach(cleanup);
 
 const ID = "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e";
@@ -39,14 +41,8 @@ function resolved(contrast?: ResolvedMedia["contrast"]): ResolvedMedia {
   };
 }
 
-const DARK = { min: [0, 0, 0], max: [40, 50, 60] } as [
-  number,
-  number,
-  number,
-][] extends never
-  ? never
-  : { min: [number, number, number]; max: [number, number, number] };
-const WIDE = { min: [0, 0, 0], max: [255, 255, 255] } as typeof DARK;
+const DARK: ResolvedContrast = { min: [0, 0, 0], max: [40, 50, 60] };
+const WIDE: ResolvedContrast = { min: [0, 0, 0], max: [255, 255, 255] };
 
 const renderHero = ({
   section,

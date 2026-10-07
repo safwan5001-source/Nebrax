@@ -37,11 +37,12 @@
 
 | Gate | Result |
 |---|---|
-| PHP | `StorefrontMediaRefTest` +1: only section-background pictures carry bounds, logos never; nulled evidence ⇒ no bounds; raw `region_luminance` never in the payload |
+| PHP | `StorefrontMediaRefTest` +2 (one asset query for a whole document of repeated references and no derivative query for default usages — Codex P2):  only section-background pictures carry bounds, logos never; nulled evidence ⇒ no bounds; raw `region_luminance` never in the payload |
 | Resolver (twins) | +4 per twin: proven picture ⇒ `mbg`/`ovl`/vars/proven `fg`, never the solid-fill token; overlay-less; **no bounds / empty range / un-clearable range ⇒ nothing painted and no foreground chosen**; overlay makes a wide range provable |
 | Stack | `published-nodes.media` 8: backdrop first child + tokens + eager first hero; unproven ⇒ legacy; wide range ⇒ legacy; phone picture must be proven too; index counts hidden sections; only first hero eager; banner; older payload without media |
 | Units | `SectionBackdrop` 3 (decorative, art direction order, priority) · `background-media` 5 · `resolved-media` contrast parsing |
 | Real browser (Chromium, real `publishedNodes` output + the compiled storefront CSS) | AR RTL + EN LTR × **390 / 768 / 1280**: no horizontal overflow; backdrop exactly covers the hero root; **phone picture chosen at 390, default at 768/1280**; heading is the element on top at its own centre; overlay colour/opacity as authored; backdrop radius = root radius, `overflow:hidden`, `pointer-events:none`; the unproven third section keeps the legacy gradient (mirrored in RTL) and no backdrop; automatic text: white over the dark picture, black over the pale one |
+| **Per-picture framing** | with distinct focal points on the two references, the computed `object-position` is the phone picture's at 390 px and the default picture's at 1280 px (SectionBackdrop test pins the variables; the browser run pins the switch) |
 | **Pixel contrast** | with the text hidden, the real rendered pixels behind each text block were read back: **worst WCAG ratio 7.41 (hero, 390 RTL) … 20.1**, never below 4.5 (`cust-hv-v6b3/pixel-contrast.json`) |
 | Full suites | storefront vitest 1533 ✔ · web `store-experience-builder` 1098 ✔ · tsc + biome clean — PHP/web full numbers in the PR |
 
@@ -62,7 +63,7 @@ Checked at 390 / 768 / 1280, EN LTR and AR RTL: heading, supporting line and CTA
 
 ## Limitations / next
 - **V6b-4** — Canvas paints the same DOM (`useMediaRefPreview` for default + phone) and the merchant inspector gets the picture kind (reusing `MediaRefField`), overlay colour/alpha, AR/EN copy, and a read-only bounds field so the live verdict matches the gate. Until then a picture background can only be authored through the API.
-- The phone picture's own focal point is not applied (CSS `object-position` is per `<img>`); a phone-specific framing is a crop on the phone `MediaRef`, which is a derivative with its own evidence.
+- Each picture is framed by **its own** focal point (Codex P2): the default picture's and the phone picture's (centred when it has none) are published as `--sd-pos` / `--sd-pos-m` on the backdrop and switched by CSS at the same `max-width: 767px` breakpoint as the sources. Measured in Chromium: `object-position` is `15% 85%` at 390 px and `80% 20%` at 1280 px.
 - Text over a picture whose evidence was cleared *after* publish falls back to the legacy surface (by design) rather than breaking.
 
 ---

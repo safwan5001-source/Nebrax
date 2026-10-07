@@ -54,6 +54,10 @@ final class StorefrontPublishedMediaResolver
             ->get()
             ->keyBy('id');
 
+        $evidence = app(StorefrontMediaContrastEvidence::class);
+        /** @var array<string, array{min:list<int>,max:list<int>}|null> $bounds بحسب (أصل + مفتاح استخدام): استخدامٌ مكرَّر يُقاس مرةً واحدة في الطلب */
+        $bounds = [];
+
         $resolved = [];
         foreach ($refs as ['path' => $path, 'ref' => $ref]) {
             $asset = $assets->get($ref['mediaId']);
@@ -65,9 +69,9 @@ final class StorefrontPublishedMediaResolver
             if ($entry !== null) {
                 // V6b-3 — حدود التباين لصور خلفيات الأقسام فقط؛ غيابها (دليلٌ غير صالح) = «غير مُثبَت» فلا لون نص تلقائي.
                 if (str_contains($path, '.design.background.')) {
-                    $bounds = app(StorefrontMediaContrastEvidence::class)->boundsFor($ref);
-                    if ($bounds !== null) {
-                        $entry['contrast'] = $bounds;
+                    $contrast = $this->contrastFor($evidence, $asset, $ref, $bounds);
+                    if ($contrast !== null) {
+                        $entry['contrast'] = $contrast;
                     }
                 }
                 $resolved[$path] = $entry;
@@ -75,6 +79,31 @@ final class StorefrontPublishedMediaResolver
         }
 
         return $resolved;
+    }
+
+    /**
+     * حدود تباين استخدامٍ، مُخزَّنة مؤقتاً داخل الطلب بمفتاح (أصل + استخدام) وتعيد استعمال الأصل المحمَّل أصلاً
+     * (لا إعادة استعلامٍ عنه، ولا استعلام مشتقّاتٍ للإطار الافتراضي) — Codex P2 على #1279.
+     *
+     * @param  array<string,mixed>  $ref
+     * @param  array<string, array{min:list<int>,max:list<int>}|null>  $cache
+     * @return array{min:list<int>,max:list<int>}|null
+     */
+    private function contrastFor(StorefrontMediaContrastEvidence $evidence, StorefrontMedia $asset, array $ref, array &$cache): ?array
+    {
+        try {
+            $transform = StorefrontMediaTransform::fromInput([
+                'crop' => $ref['crop'] ?? null,
+                'rotate' => $ref['rotate'] ?? 0,
+                'focal' => $ref['focal'] ?? null,
+                'fit' => $ref['fit'] ?? 'cover',
+            ]);
+        } catch (InvalidArgumentException) {
+            return null;
+        }
+        $key = $transform->usageKey($asset->id);
+
+        return array_key_exists($key, $cache) ? $cache[$key] : ($cache[$key] = $evidence->boundsForUsage($asset, $transform));
     }
 
     /**

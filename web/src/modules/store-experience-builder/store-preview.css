@@ -307,6 +307,12 @@
 }
 .awj-store-preview [data-sd-backdrop] img {
   object-fit: cover;
+  object-position: var(--sd-pos, 50% 50%);
+}
+@media (max-width: 767px) {
+  .awj-store-preview [data-sd-backdrop] img {
+    object-position: var(--sd-pos-m, var(--sd-pos, 50% 50%));
+  }
 }
 .awj-store-preview [data-sd-backdrop] ~ * {
   position: relative;
