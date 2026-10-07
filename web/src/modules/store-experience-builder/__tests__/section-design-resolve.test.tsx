@@ -67,6 +67,13 @@ describe("resolveSectionDesign (CUST-HV V5c)", () => {
     expect(frame.childNodes.length).toBe(0); // `:empty` ⇒ `display: none` in the stylesheet
   });
 
+  it("border: an explicit none is a decision (it removes a legacy border) — emitted as a zero-width transparent frame", () => {
+    const r = resolveSectionDesign("banner", { border: { width: "none" } }, ctx)!;
+    expect(r.attrs["data-sd"]).toBe("border");
+    expect(r.style["--sec-bw"]).toBe("0px");
+    expect(r.style["--sec-bc"]).toBe("transparent");
+  });
+
   it("a section that paints its own dark surface ignores text colours until the design paints a background", () => {
     const textOnly: SectionDesign = { text: { body: { hex: "#ffffff" } } };
     for (const type of ["hero", "appPromo", "wholesale"]) {
@@ -240,5 +247,27 @@ describe("the Canvas and the storefront share ONE resolver (V0 §3.5)", () => {
     const block = (css: string) => css.slice(css.indexOf("CUST-HV V5c — section design"));
     const norm = (css: string) => block(css).replace(/\.awj-store-preview /g, "").replace(/\s+/g, " ").trim();
     expect(norm(pv)).toBe(norm(sf));
+  });
+});
+
+describe("surface matcher in the stylesheet (CUST-HV V5c review)", () => {
+  it("treats only opaque `bg-store-*` / `bg-white` class tokens as surfaces — never variants or alpha fills", () => {
+    const css = readFileSync(resolve(__dirname, "../store-preview.css"), "utf8");
+    const rule = css.match(/:where\([^\n]*?\[data-sd~="fg"\] (:is\([^{]*?\):not\([^{]*?\)):not\(\[data-sd\] > \*\)\)/);
+    expect(rule, "the nested-surface reset rule").not.toBeNull();
+    const selector = rule![1];
+    const probe = (className: string) => {
+      const el = document.createElement("div");
+      el.className = className;
+      return el.matches(selector);
+    };
+    expect(probe("bg-store-surface p-4")).toBe(true);
+    expect(probe("p-2 bg-store-footer text-xs")).toBe(true);
+    expect(probe("rounded bg-white")).toBe(true);
+    expect(probe("bg-transparent hover:bg-store-footer-border")).toBe(false);
+    expect(probe("hover:bg-white/10 px-2")).toBe(false);
+    expect(probe("bg-white/80")).toBe(false);
+    expect(probe("bg-store-surface/90")).toBe(false);
+    expect(probe("bg-store-footer-border/40")).toBe(false);
   });
 });

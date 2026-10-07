@@ -1,6 +1,8 @@
 /**
  * @vitest-environment jsdom
  */
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { cleanup, render } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import { SectionDesignFrame } from "@/components/home/SectionDesignFrame";
@@ -88,6 +90,17 @@ describe("resolveSectionDesign (CUST-HV V5c)", () => {
     const frame = container.querySelector("[data-sd]") as HTMLElement;
     expect(frame).not.toBeNull();
     expect(frame.childNodes.length).toBe(0); // `:empty` ⇒ `display: none` in the stylesheet
+  });
+
+  it("border: an explicit none is a decision (it removes a legacy border) — emitted as a zero-width transparent frame", () => {
+    const r = resolveSectionDesign(
+      "banner",
+      { border: { width: "none" } },
+      ctx,
+    )!;
+    expect(r.attrs["data-sd"]).toBe("border");
+    expect(r.style["--sec-bw"]).toBe("0px");
+    expect(r.style["--sec-bc"]).toBe("transparent");
   });
 
   it("a section that paints its own dark surface ignores text colours until the design paints a background", () => {
@@ -328,5 +341,32 @@ describe("SectionDesignFrame (CUST-HV V5c)", () => {
     expect(el.getAttribute("data-design-type")).toBe("benefits");
     expect(el.style.getPropertyValue("--sec-bg")).toBe("#ffffff");
     expect(el.querySelector("p")!.textContent).toBe("hi");
+  });
+});
+
+describe("surface matcher in the stylesheet (CUST-HV V5c review)", () => {
+  it("treats only opaque `bg-store-*` / `bg-white` class tokens as surfaces — never variants or alpha fills", () => {
+    const css = readFileSync(
+      resolve(__dirname, "../../../app/globals.css"),
+      "utf8",
+    );
+    const rule = css.match(
+      /:where\([^\n]*?\[data-sd~="fg"\] (:is\([^{]*?\):not\([^{]*?\)):not\(\[data-sd\] > \*\)\)/,
+    );
+    expect(rule, "the nested-surface reset rule").not.toBeNull();
+    const selector = rule![1];
+    const probe = (className: string) => {
+      const el = document.createElement("div");
+      el.className = className;
+      return el.matches(selector);
+    };
+    expect(probe("bg-store-surface p-4")).toBe(true);
+    expect(probe("p-2 bg-store-footer text-xs")).toBe(true);
+    expect(probe("rounded bg-white")).toBe(true);
+    expect(probe("bg-transparent hover:bg-store-footer-border")).toBe(false);
+    expect(probe("hover:bg-white/10 px-2")).toBe(false);
+    expect(probe("bg-white/80")).toBe(false);
+    expect(probe("bg-store-surface/90")).toBe(false);
+    expect(probe("bg-store-footer-border/40")).toBe(false);
   });
 });
