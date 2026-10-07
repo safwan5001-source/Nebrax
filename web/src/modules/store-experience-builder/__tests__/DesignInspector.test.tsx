@@ -188,6 +188,31 @@ describe("DesignInspector (CUST-HV V5d)", () => {
     expect(out()).toEqual({ text: { align: "start" }, align: "center" });
   });
 
+  it("typography offers named steps only, per the type's allowance, and stores real numbers for weights", () => {
+    const { unmount } = render(<Harness type="benefits" />);
+    const select = (label: string) => screen.getByLabelText(label) as HTMLSelectElement;
+    fireEvent.change(select("Heading size"), { target: { value: "xl" } });
+    fireEvent.change(select("Text size"), { target: { value: "lg" } });
+    fireEvent.change(select("Heading weight"), { target: { value: "700" } });
+    fireEvent.change(select("Line spacing"), { target: { value: "relaxed" } });
+    fireEvent.change(select("Heading style"), { target: { value: "underline" } });
+    expect(out().typography).toEqual({
+      headingScale: "xl",
+      bodyScale: "lg",
+      headingWeight: 700,
+      lineHeight: "relaxed",
+      headingStyle: "underline",
+    });
+    fireEvent.change(select("Heading weight"), { target: { value: "" } });
+    expect(out().typography.headingWeight).toBeUndefined();
+    unmount();
+
+    // a shelf declares only the heading style
+    render(<Harness type="featured" />);
+    expect(screen.queryByLabelText("Heading size")).toBeNull();
+    expect(screen.getByLabelText("Heading style")).toBeTruthy();
+  });
+
   it("copy then paste moves only what the target type can render; reset is two-step", () => {
     const rich: SectionDesign = {
       background: { kind: "solid", color: { role: "surfaceAlt" } },

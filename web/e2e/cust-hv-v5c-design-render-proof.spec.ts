@@ -106,6 +106,20 @@ for (const locale of LOCALES) {
             }
           }
         }
+        // Typography steps reach the rendered headings.
+        for (const frame of document.querySelectorAll('[data-sd~="hstyle-underline"]')) {
+          const h = frame.querySelector('h1, h2, h3');
+          if (h && parseFloat(getComputedStyle(h).borderBottomWidth) < 1) failures.push('underline heading has no underline');
+          if (h && parseFloat(getComputedStyle(h).fontSize) < 22) failures.push(`xl heading is only ${getComputedStyle(h).fontSize}`);
+          if (h && getComputedStyle(h).fontWeight !== '700') failures.push(`heading weight ${getComputedStyle(h).fontWeight}`);
+        }
+        for (const frame of document.querySelectorAll('[data-sd~="hstyle-centered"]')) {
+          const h = frame.querySelector('h1, h2, h3');
+          if (h && getComputedStyle(h).textAlign !== 'center') failures.push('centered heading is not centered');
+        }
+        for (const bar of document.querySelectorAll('[data-sd~="hstyle-plain"] [data-heading-bar]')) {
+          if (getComputedStyle(bar).display !== 'none') failures.push('plain heading still shows its bar');
+        }
         // Inner spacing replaces the legacy padding of the content box inside the root.
         for (const frame of document.querySelectorAll('[data-sd~="pi"]')) {
           for (const child of frame.children) {

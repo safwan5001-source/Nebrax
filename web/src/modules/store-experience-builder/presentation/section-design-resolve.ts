@@ -13,8 +13,8 @@
  * design ⇒ the caller renders the section exactly as before (no wrapper at all).
  *
  * What this slice renders: background (solid / gradient), text colours + align,
- * width (`mode: full` solid bleed, `max`), spacing, align, border, radius, shadow.
- * `typography` is accepted by the contract but rendered by V5e; `wide` is treated
+ * width (`mode: full` solid bleed, `max`), spacing, align, border, radius, shadow,
+ * and (V5e) typography steps; `wide` is treated
  * as `contained` until the page container is restructured (V5d / V1B).
  */
 import {
@@ -81,6 +81,20 @@ const MAX_WIDTH: Record<string, string> = {
   standard: "85rem",
   wide: "100rem",
 };
+/** Heading steps; `md` is today's size (no output). Fluid on phones, never a pixel input. */
+const HEADING_SIZE: Record<string, string> = {
+  sm: "clamp(0.875rem, 2.2vw, 1rem)",
+  lg: "clamp(1.25rem, 3vw, 1.625rem)",
+  xl: "clamp(1.5rem, 4vw, 2.125rem)",
+};
+/** Body copy steps; `md` is today's mix (no output). */
+const BODY_SIZE: Record<string, string> = { sm: "0.8125rem", lg: "1rem" };
+const LINE_HEIGHT: Record<string, string> = {
+  tight: "1.25",
+  normal: "1.5",
+  relaxed: "1.75",
+};
+
 const ALIGN: Record<string, string> = {
   start: "start",
   center: "center",
@@ -322,6 +336,26 @@ export function resolveSectionDesign(
     style["--sec-bme"] = design.align === "end" ? "0" : "auto";
     sd.push("balign");
   }
+
+  // Typography (V0 §5.2): named steps resolved here, never pixel inputs.
+  const ty = design.typography;
+  if (ty?.headingScale && ty.headingScale !== "md") {
+    style["--sec-hs"] = HEADING_SIZE[ty.headingScale];
+    sd.push("hs");
+  }
+  if (ty?.bodyScale && ty.bodyScale !== "md") {
+    style["--sec-bs"] = BODY_SIZE[ty.bodyScale];
+    sd.push("bs");
+  }
+  if (ty?.headingWeight) {
+    style["--sec-hw"] = String(ty.headingWeight);
+    sd.push("hw");
+  }
+  if (ty?.lineHeight) {
+    style["--sec-lh"] = LINE_HEIGHT[ty.lineHeight];
+    sd.push("lh");
+  }
+  if (ty?.headingStyle) sd.push(`hstyle-${ty.headingStyle}`);
 
   const sp = design.spacing;
   if (sp?.top) {
