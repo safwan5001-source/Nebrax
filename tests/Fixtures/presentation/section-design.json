@@ -1,0 +1,1329 @@
+{
+    "_note": "CUST-HV V5b — typed section design. Shared by PHP StorefrontSectionDesignNormalizer and both TS twins. expected=null means the design key is absent.",
+    "capabilities": {
+        "hero": {
+            "background": true,
+            "text": [
+                "heading",
+                "body",
+                "link",
+                "align"
+            ],
+            "typography": [
+                "headingScale",
+                "bodyScale",
+                "headingWeight",
+                "lineHeight",
+                "headingStyle"
+            ],
+            "width": true,
+            "spacing": true,
+            "align": true,
+            "border": true,
+            "radius": true,
+            "shadow": true
+        },
+        "banner": {
+            "background": true,
+            "text": [
+                "heading",
+                "body",
+                "link",
+                "align"
+            ],
+            "typography": [
+                "headingScale",
+                "bodyScale",
+                "headingWeight",
+                "lineHeight",
+                "headingStyle"
+            ],
+            "width": true,
+            "spacing": true,
+            "align": true,
+            "border": true,
+            "radius": true,
+            "shadow": true
+        },
+        "categories": {
+            "background": true,
+            "text": [
+                "heading"
+            ],
+            "typography": [
+                "headingStyle"
+            ],
+            "width": true,
+            "spacing": true,
+            "border": true,
+            "radius": true
+        },
+        "newArrivals": {
+            "background": true,
+            "text": [
+                "heading"
+            ],
+            "typography": [
+                "headingStyle"
+            ],
+            "width": true,
+            "spacing": true
+        },
+        "featured": {
+            "background": true,
+            "text": [
+                "heading"
+            ],
+            "typography": [
+                "headingStyle"
+            ],
+            "width": true,
+            "spacing": true
+        },
+        "offers": {
+            "background": true,
+            "text": [
+                "heading"
+            ],
+            "typography": [
+                "headingStyle"
+            ],
+            "width": true,
+            "spacing": true
+        },
+        "productShelf": {
+            "background": true,
+            "text": [
+                "heading"
+            ],
+            "typography": [
+                "headingStyle"
+            ],
+            "width": true,
+            "spacing": true
+        },
+        "discovery": {
+            "background": true,
+            "text": [
+                "heading"
+            ],
+            "spacing": true
+        },
+        "benefits": {
+            "background": true,
+            "text": [
+                "heading",
+                "body",
+                "link",
+                "align"
+            ],
+            "typography": [
+                "headingScale",
+                "bodyScale",
+                "headingWeight",
+                "lineHeight",
+                "headingStyle"
+            ],
+            "spacing": true,
+            "align": true,
+            "border": true,
+            "radius": true,
+            "shadow": true
+        },
+        "customContent": {
+            "background": true,
+            "text": [
+                "heading",
+                "body",
+                "link",
+                "align"
+            ],
+            "typography": [
+                "headingScale",
+                "bodyScale",
+                "headingWeight",
+                "lineHeight",
+                "headingStyle"
+            ],
+            "width": [
+                "max"
+            ],
+            "spacing": true,
+            "align": true
+        },
+        "appPromo": {
+            "background": true,
+            "text": [
+                "heading",
+                "body",
+                "link",
+                "align"
+            ],
+            "spacing": true,
+            "border": true,
+            "radius": true
+        },
+        "deliveryPromise": {
+            "background": true,
+            "spacing": true
+        },
+        "wholesale": {
+            "background": true,
+            "spacing": true
+        }
+    },
+    "cases": [
+        {
+            "name": "absent",
+            "type": "hero",
+            "input": null,
+            "expected": null
+        },
+        {
+            "name": "not an object",
+            "type": "hero",
+            "input": "dark",
+            "expected": null
+        },
+        {
+            "name": "a list is not an object",
+            "type": "hero",
+            "input": [
+                [
+                    "background"
+                ]
+            ],
+            "expected": null
+        },
+        {
+            "name": "empty object",
+            "type": "hero",
+            "input": [],
+            "expected": null
+        },
+        {
+            "name": "every group on a rich type, fixed key order",
+            "type": "hero",
+            "input": {
+                "shadow": "soft",
+                "radius": "md",
+                "border": {
+                    "width": "hairline",
+                    "color": {
+                        "role": "border"
+                    }
+                },
+                "align": "start",
+                "spacing": {
+                    "top": "lg",
+                    "bottom": "md",
+                    "inner": "sm"
+                },
+                "width": {
+                    "mode": "wide",
+                    "max": "standard"
+                },
+                "typography": {
+                    "headingScale": "lg",
+                    "bodyScale": "md",
+                    "headingWeight": 700,
+                    "lineHeight": "relaxed",
+                    "headingStyle": "underline"
+                },
+                "text": {
+                    "heading": {
+                        "hex": "#111827"
+                    },
+                    "body": {
+                        "role": "text"
+                    },
+                    "link": {
+                        "role": "link"
+                    },
+                    "align": "center"
+                },
+                "background": {
+                    "kind": "solid",
+                    "color": {
+                        "role": "surfaceAlt"
+                    }
+                }
+            },
+            "expected": {
+                "background": {
+                    "kind": "solid",
+                    "color": {
+                        "role": "surfaceAlt"
+                    }
+                },
+                "text": {
+                    "heading": {
+                        "hex": "#111827"
+                    },
+                    "body": {
+                        "role": "text"
+                    },
+                    "link": {
+                        "role": "link"
+                    },
+                    "align": "center"
+                },
+                "typography": {
+                    "headingScale": "lg",
+                    "bodyScale": "md",
+                    "headingWeight": 700,
+                    "lineHeight": "relaxed",
+                    "headingStyle": "underline"
+                },
+                "width": {
+                    "mode": "wide",
+                    "max": "standard"
+                },
+                "spacing": {
+                    "top": "lg",
+                    "bottom": "md",
+                    "inner": "sm"
+                },
+                "align": "start",
+                "border": {
+                    "width": "hairline",
+                    "color": {
+                        "role": "border"
+                    }
+                },
+                "radius": "md",
+                "shadow": "soft"
+            }
+        },
+        {
+            "name": "same document on banner",
+            "type": "banner",
+            "input": {
+                "background": {
+                    "kind": "solid",
+                    "color": {
+                        "role": "surfaceAlt"
+                    }
+                },
+                "text": {
+                    "heading": {
+                        "hex": "#111827"
+                    },
+                    "body": {
+                        "role": "text"
+                    },
+                    "link": {
+                        "role": "link"
+                    },
+                    "align": "center"
+                },
+                "typography": {
+                    "headingScale": "lg",
+                    "bodyScale": "md",
+                    "headingWeight": 700,
+                    "lineHeight": "relaxed",
+                    "headingStyle": "underline"
+                },
+                "width": {
+                    "mode": "wide",
+                    "max": "standard"
+                },
+                "spacing": {
+                    "top": "lg",
+                    "bottom": "md",
+                    "inner": "sm"
+                },
+                "align": "start",
+                "border": {
+                    "width": "hairline",
+                    "color": {
+                        "role": "border"
+                    }
+                },
+                "radius": "md",
+                "shadow": "soft"
+            },
+            "expected": {
+                "background": {
+                    "kind": "solid",
+                    "color": {
+                        "role": "surfaceAlt"
+                    }
+                },
+                "text": {
+                    "heading": {
+                        "hex": "#111827"
+                    },
+                    "body": {
+                        "role": "text"
+                    },
+                    "link": {
+                        "role": "link"
+                    },
+                    "align": "center"
+                },
+                "typography": {
+                    "headingScale": "lg",
+                    "bodyScale": "md",
+                    "headingWeight": 700,
+                    "lineHeight": "relaxed",
+                    "headingStyle": "underline"
+                },
+                "width": {
+                    "mode": "wide",
+                    "max": "standard"
+                },
+                "spacing": {
+                    "top": "lg",
+                    "bottom": "md",
+                    "inner": "sm"
+                },
+                "align": "start",
+                "border": {
+                    "width": "hairline",
+                    "color": {
+                        "role": "border"
+                    }
+                },
+                "radius": "md",
+                "shadow": "soft"
+            }
+        },
+        {
+            "name": "benefits keeps everything it declares (no width)",
+            "type": "benefits",
+            "input": {
+                "background": {
+                    "kind": "solid",
+                    "color": {
+                        "role": "surfaceAlt"
+                    }
+                },
+                "text": {
+                    "heading": {
+                        "hex": "#111827"
+                    },
+                    "body": {
+                        "role": "text"
+                    },
+                    "link": {
+                        "role": "link"
+                    },
+                    "align": "center"
+                },
+                "typography": {
+                    "headingScale": "lg",
+                    "bodyScale": "md",
+                    "headingWeight": 700,
+                    "lineHeight": "relaxed",
+                    "headingStyle": "underline"
+                },
+                "width": {
+                    "mode": "wide",
+                    "max": "standard"
+                },
+                "spacing": {
+                    "top": "lg",
+                    "bottom": "md",
+                    "inner": "sm"
+                },
+                "align": "start",
+                "border": {
+                    "width": "hairline",
+                    "color": {
+                        "role": "border"
+                    }
+                },
+                "radius": "md",
+                "shadow": "soft"
+            },
+            "expected": {
+                "background": {
+                    "kind": "solid",
+                    "color": {
+                        "role": "surfaceAlt"
+                    }
+                },
+                "text": {
+                    "heading": {
+                        "hex": "#111827"
+                    },
+                    "body": {
+                        "role": "text"
+                    },
+                    "link": {
+                        "role": "link"
+                    },
+                    "align": "center"
+                },
+                "typography": {
+                    "headingScale": "lg",
+                    "bodyScale": "md",
+                    "headingWeight": 700,
+                    "lineHeight": "relaxed",
+                    "headingStyle": "underline"
+                },
+                "spacing": {
+                    "top": "lg",
+                    "bottom": "md",
+                    "inner": "sm"
+                },
+                "align": "start",
+                "border": {
+                    "width": "hairline",
+                    "color": {
+                        "role": "border"
+                    }
+                },
+                "radius": "md",
+                "shadow": "soft"
+            }
+        },
+        {
+            "name": "customContent: only width.max, no radius/border/shadow",
+            "type": "customContent",
+            "input": {
+                "background": {
+                    "kind": "solid",
+                    "color": {
+                        "role": "surfaceAlt"
+                    }
+                },
+                "text": {
+                    "heading": {
+                        "hex": "#111827"
+                    },
+                    "body": {
+                        "role": "text"
+                    },
+                    "link": {
+                        "role": "link"
+                    },
+                    "align": "center"
+                },
+                "typography": {
+                    "headingScale": "lg",
+                    "bodyScale": "md",
+                    "headingWeight": 700,
+                    "lineHeight": "relaxed",
+                    "headingStyle": "underline"
+                },
+                "width": {
+                    "mode": "wide",
+                    "max": "standard"
+                },
+                "spacing": {
+                    "top": "lg",
+                    "bottom": "md",
+                    "inner": "sm"
+                },
+                "align": "start",
+                "border": {
+                    "width": "hairline",
+                    "color": {
+                        "role": "border"
+                    }
+                },
+                "radius": "md",
+                "shadow": "soft"
+            },
+            "expected": {
+                "background": {
+                    "kind": "solid",
+                    "color": {
+                        "role": "surfaceAlt"
+                    }
+                },
+                "text": {
+                    "heading": {
+                        "hex": "#111827"
+                    },
+                    "body": {
+                        "role": "text"
+                    },
+                    "link": {
+                        "role": "link"
+                    },
+                    "align": "center"
+                },
+                "typography": {
+                    "headingScale": "lg",
+                    "bodyScale": "md",
+                    "headingWeight": 700,
+                    "lineHeight": "relaxed",
+                    "headingStyle": "underline"
+                },
+                "width": {
+                    "max": "standard"
+                },
+                "spacing": {
+                    "top": "lg",
+                    "bottom": "md",
+                    "inner": "sm"
+                },
+                "align": "start"
+            }
+        },
+        {
+            "name": "a shelf: heading colour + headingStyle only",
+            "type": "featured",
+            "input": {
+                "background": {
+                    "kind": "solid",
+                    "color": {
+                        "role": "surfaceAlt"
+                    }
+                },
+                "text": {
+                    "heading": {
+                        "hex": "#111827"
+                    },
+                    "body": {
+                        "role": "text"
+                    },
+                    "link": {
+                        "role": "link"
+                    },
+                    "align": "center"
+                },
+                "typography": {
+                    "headingScale": "lg",
+                    "bodyScale": "md",
+                    "headingWeight": 700,
+                    "lineHeight": "relaxed",
+                    "headingStyle": "underline"
+                },
+                "width": {
+                    "mode": "wide",
+                    "max": "standard"
+                },
+                "spacing": {
+                    "top": "lg",
+                    "bottom": "md",
+                    "inner": "sm"
+                },
+                "align": "start",
+                "border": {
+                    "width": "hairline",
+                    "color": {
+                        "role": "border"
+                    }
+                },
+                "radius": "md",
+                "shadow": "soft"
+            },
+            "expected": {
+                "background": {
+                    "kind": "solid",
+                    "color": {
+                        "role": "surfaceAlt"
+                    }
+                },
+                "text": {
+                    "heading": {
+                        "hex": "#111827"
+                    }
+                },
+                "typography": {
+                    "headingStyle": "underline"
+                },
+                "width": {
+                    "mode": "wide",
+                    "max": "standard"
+                },
+                "spacing": {
+                    "top": "lg",
+                    "bottom": "md",
+                    "inner": "sm"
+                }
+            }
+        },
+        {
+            "name": "categories declares border and radius, not align/shadow",
+            "type": "categories",
+            "input": {
+                "background": {
+                    "kind": "solid",
+                    "color": {
+                        "role": "surfaceAlt"
+                    }
+                },
+                "text": {
+                    "heading": {
+                        "hex": "#111827"
+                    },
+                    "body": {
+                        "role": "text"
+                    },
+                    "link": {
+                        "role": "link"
+                    },
+                    "align": "center"
+                },
+                "typography": {
+                    "headingScale": "lg",
+                    "bodyScale": "md",
+                    "headingWeight": 700,
+                    "lineHeight": "relaxed",
+                    "headingStyle": "underline"
+                },
+                "width": {
+                    "mode": "wide",
+                    "max": "standard"
+                },
+                "spacing": {
+                    "top": "lg",
+                    "bottom": "md",
+                    "inner": "sm"
+                },
+                "align": "start",
+                "border": {
+                    "width": "hairline",
+                    "color": {
+                        "role": "border"
+                    }
+                },
+                "radius": "md",
+                "shadow": "soft"
+            },
+            "expected": {
+                "background": {
+                    "kind": "solid",
+                    "color": {
+                        "role": "surfaceAlt"
+                    }
+                },
+                "text": {
+                    "heading": {
+                        "hex": "#111827"
+                    }
+                },
+                "typography": {
+                    "headingStyle": "underline"
+                },
+                "width": {
+                    "mode": "wide",
+                    "max": "standard"
+                },
+                "spacing": {
+                    "top": "lg",
+                    "bottom": "md",
+                    "inner": "sm"
+                },
+                "border": {
+                    "width": "hairline",
+                    "color": {
+                        "role": "border"
+                    }
+                },
+                "radius": "md"
+            }
+        },
+        {
+            "name": "discovery: heading, spacing, background only",
+            "type": "discovery",
+            "input": {
+                "background": {
+                    "kind": "solid",
+                    "color": {
+                        "role": "surfaceAlt"
+                    }
+                },
+                "text": {
+                    "heading": {
+                        "hex": "#111827"
+                    },
+                    "body": {
+                        "role": "text"
+                    },
+                    "link": {
+                        "role": "link"
+                    },
+                    "align": "center"
+                },
+                "typography": {
+                    "headingScale": "lg",
+                    "bodyScale": "md",
+                    "headingWeight": 700,
+                    "lineHeight": "relaxed",
+                    "headingStyle": "underline"
+                },
+                "width": {
+                    "mode": "wide",
+                    "max": "standard"
+                },
+                "spacing": {
+                    "top": "lg",
+                    "bottom": "md",
+                    "inner": "sm"
+                },
+                "align": "start",
+                "border": {
+                    "width": "hairline",
+                    "color": {
+                        "role": "border"
+                    }
+                },
+                "radius": "md",
+                "shadow": "soft"
+            },
+            "expected": {
+                "background": {
+                    "kind": "solid",
+                    "color": {
+                        "role": "surfaceAlt"
+                    }
+                },
+                "text": {
+                    "heading": {
+                        "hex": "#111827"
+                    }
+                },
+                "spacing": {
+                    "top": "lg",
+                    "bottom": "md",
+                    "inner": "sm"
+                }
+            }
+        },
+        {
+            "name": "appPromo: no typography/width/align/shadow",
+            "type": "appPromo",
+            "input": {
+                "background": {
+                    "kind": "solid",
+                    "color": {
+                        "role": "surfaceAlt"
+                    }
+                },
+                "text": {
+                    "heading": {
+                        "hex": "#111827"
+                    },
+                    "body": {
+                        "role": "text"
+                    },
+                    "link": {
+                        "role": "link"
+                    },
+                    "align": "center"
+                },
+                "typography": {
+                    "headingScale": "lg",
+                    "bodyScale": "md",
+                    "headingWeight": 700,
+                    "lineHeight": "relaxed",
+                    "headingStyle": "underline"
+                },
+                "width": {
+                    "mode": "wide",
+                    "max": "standard"
+                },
+                "spacing": {
+                    "top": "lg",
+                    "bottom": "md",
+                    "inner": "sm"
+                },
+                "align": "start",
+                "border": {
+                    "width": "hairline",
+                    "color": {
+                        "role": "border"
+                    }
+                },
+                "radius": "md",
+                "shadow": "soft"
+            },
+            "expected": {
+                "background": {
+                    "kind": "solid",
+                    "color": {
+                        "role": "surfaceAlt"
+                    }
+                },
+                "text": {
+                    "heading": {
+                        "hex": "#111827"
+                    },
+                    "body": {
+                        "role": "text"
+                    },
+                    "link": {
+                        "role": "link"
+                    },
+                    "align": "center"
+                },
+                "spacing": {
+                    "top": "lg",
+                    "bottom": "md",
+                    "inner": "sm"
+                },
+                "border": {
+                    "width": "hairline",
+                    "color": {
+                        "role": "border"
+                    }
+                },
+                "radius": "md"
+            }
+        },
+        {
+            "name": "wholesale: background + spacing only",
+            "type": "wholesale",
+            "input": {
+                "background": {
+                    "kind": "solid",
+                    "color": {
+                        "role": "surfaceAlt"
+                    }
+                },
+                "text": {
+                    "heading": {
+                        "hex": "#111827"
+                    },
+                    "body": {
+                        "role": "text"
+                    },
+                    "link": {
+                        "role": "link"
+                    },
+                    "align": "center"
+                },
+                "typography": {
+                    "headingScale": "lg",
+                    "bodyScale": "md",
+                    "headingWeight": 700,
+                    "lineHeight": "relaxed",
+                    "headingStyle": "underline"
+                },
+                "width": {
+                    "mode": "wide",
+                    "max": "standard"
+                },
+                "spacing": {
+                    "top": "lg",
+                    "bottom": "md",
+                    "inner": "sm"
+                },
+                "align": "start",
+                "border": {
+                    "width": "hairline",
+                    "color": {
+                        "role": "border"
+                    }
+                },
+                "radius": "md",
+                "shadow": "soft"
+            },
+            "expected": {
+                "background": {
+                    "kind": "solid",
+                    "color": {
+                        "role": "surfaceAlt"
+                    }
+                },
+                "spacing": {
+                    "top": "lg",
+                    "bottom": "md",
+                    "inner": "sm"
+                }
+            }
+        },
+        {
+            "name": "deliveryPromise: background + spacing only",
+            "type": "deliveryPromise",
+            "input": {
+                "background": {
+                    "kind": "solid",
+                    "color": {
+                        "role": "surfaceAlt"
+                    }
+                },
+                "text": {
+                    "heading": {
+                        "hex": "#111827"
+                    },
+                    "body": {
+                        "role": "text"
+                    },
+                    "link": {
+                        "role": "link"
+                    },
+                    "align": "center"
+                },
+                "typography": {
+                    "headingScale": "lg",
+                    "bodyScale": "md",
+                    "headingWeight": 700,
+                    "lineHeight": "relaxed",
+                    "headingStyle": "underline"
+                },
+                "width": {
+                    "mode": "wide",
+                    "max": "standard"
+                },
+                "spacing": {
+                    "top": "lg",
+                    "bottom": "md",
+                    "inner": "sm"
+                },
+                "align": "start",
+                "border": {
+                    "width": "hairline",
+                    "color": {
+                        "role": "border"
+                    }
+                },
+                "radius": "md",
+                "shadow": "soft"
+            },
+            "expected": {
+                "background": {
+                    "kind": "solid",
+                    "color": {
+                        "role": "surfaceAlt"
+                    }
+                },
+                "spacing": {
+                    "top": "lg",
+                    "bottom": "md",
+                    "inner": "sm"
+                }
+            }
+        },
+        {
+            "name": "unknown type has no design",
+            "type": "mystery",
+            "input": {
+                "background": {
+                    "kind": "solid",
+                    "color": {
+                        "role": "surfaceAlt"
+                    }
+                },
+                "text": {
+                    "heading": {
+                        "hex": "#111827"
+                    },
+                    "body": {
+                        "role": "text"
+                    },
+                    "link": {
+                        "role": "link"
+                    },
+                    "align": "center"
+                },
+                "typography": {
+                    "headingScale": "lg",
+                    "bodyScale": "md",
+                    "headingWeight": 700,
+                    "lineHeight": "relaxed",
+                    "headingStyle": "underline"
+                },
+                "width": {
+                    "mode": "wide",
+                    "max": "standard"
+                },
+                "spacing": {
+                    "top": "lg",
+                    "bottom": "md",
+                    "inner": "sm"
+                },
+                "align": "start",
+                "border": {
+                    "width": "hairline",
+                    "color": {
+                        "role": "border"
+                    }
+                },
+                "radius": "md",
+                "shadow": "soft"
+            },
+            "expected": null
+        },
+        {
+            "name": "gradient with roles and a direction",
+            "type": "hero",
+            "input": {
+                "background": {
+                    "kind": "gradient",
+                    "from": {
+                        "role": "brand"
+                    },
+                    "to": {
+                        "hex": "#1C2A6B"
+                    },
+                    "direction": "to-bottom-start"
+                }
+            },
+            "expected": {
+                "background": {
+                    "kind": "gradient",
+                    "from": {
+                        "role": "brand"
+                    },
+                    "to": {
+                        "hex": "#1c2a6b"
+                    },
+                    "direction": "to-bottom-start"
+                }
+            }
+        },
+        {
+            "name": "gradient missing a stop is dropped whole",
+            "type": "hero",
+            "input": {
+                "background": {
+                    "kind": "gradient",
+                    "from": {
+                        "role": "brand"
+                    },
+                    "direction": "to-end"
+                },
+                "radius": "lg"
+            },
+            "expected": {
+                "radius": "lg"
+            }
+        },
+        {
+            "name": "gradient with a free-form angle is dropped",
+            "type": "hero",
+            "input": {
+                "background": {
+                    "kind": "gradient",
+                    "from": {
+                        "role": "brand"
+                    },
+                    "to": {
+                        "role": "accent"
+                    },
+                    "direction": "45deg"
+                }
+            },
+            "expected": null
+        },
+        {
+            "name": "media background is not accepted yet (V6) — fail-closed",
+            "type": "hero",
+            "input": {
+                "background": {
+                    "kind": "media",
+                    "media": {
+                        "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                    }
+                },
+                "spacing": {
+                    "top": "md"
+                }
+            },
+            "expected": {
+                "spacing": {
+                    "top": "md"
+                }
+            }
+        },
+        {
+            "name": "css strings never survive",
+            "type": "hero",
+            "input": {
+                "background": "url(javascript:alert(1))",
+                "text": {
+                    "heading": "red"
+                },
+                "style": "position:absolute",
+                "className": "x"
+            },
+            "expected": null
+        },
+        {
+            "name": "role wins over hex when both are present",
+            "type": "hero",
+            "input": {
+                "background": {
+                    "kind": "solid",
+                    "color": {
+                        "role": "accent",
+                        "hex": "#ffffff"
+                    }
+                }
+            },
+            "expected": {
+                "background": {
+                    "kind": "solid",
+                    "color": {
+                        "role": "accent"
+                    }
+                }
+            }
+        },
+        {
+            "name": "hex is canonical lower-case, trimmed",
+            "type": "hero",
+            "input": {
+                "background": {
+                    "kind": "solid",
+                    "color": {
+                        "hex": "  #ABCDEF "
+                    }
+                }
+            },
+            "expected": {
+                "background": {
+                    "kind": "solid",
+                    "color": {
+                        "hex": "#abcdef"
+                    }
+                }
+            }
+        },
+        {
+            "name": "an unknown role and an unsafe hex are dropped",
+            "type": "hero",
+            "input": {
+                "background": {
+                    "kind": "solid",
+                    "color": {
+                        "role": "primary"
+                    }
+                },
+                "text": {
+                    "heading": {
+                        "hex": "#fff"
+                    },
+                    "body": {
+                        "role": "text"
+                    }
+                }
+            },
+            "expected": {
+                "text": {
+                    "body": {
+                        "role": "text"
+                    }
+                }
+            }
+        },
+        {
+            "name": "invalid values drop on their own",
+            "type": "hero",
+            "input": {
+                "spacing": {
+                    "top": "huge",
+                    "bottom": "lg",
+                    "inner": 7
+                },
+                "align": "justify",
+                "radius": "pill",
+                "shadow": "glow"
+            },
+            "expected": {
+                "spacing": {
+                    "bottom": "lg"
+                },
+                "radius": "pill"
+            }
+        },
+        {
+            "name": "heading weight must be a real weight",
+            "type": "hero",
+            "input": {
+                "typography": {
+                    "headingWeight": "700",
+                    "headingScale": "xxl",
+                    "lineHeight": "tight"
+                }
+            },
+            "expected": {
+                "typography": {
+                    "lineHeight": "tight"
+                }
+            }
+        },
+        {
+            "name": "an integral float weight is accepted",
+            "type": "hero",
+            "input": {
+                "typography": {
+                    "headingWeight": 800
+                }
+            },
+            "expected": {
+                "typography": {
+                    "headingWeight": 800
+                }
+            }
+        },
+        {
+            "name": "border none carries no colour",
+            "type": "hero",
+            "input": {
+                "border": {
+                    "width": "none",
+                    "color": {
+                        "role": "border"
+                    }
+                }
+            },
+            "expected": {
+                "border": {
+                    "width": "none"
+                }
+            }
+        },
+        {
+            "name": "border needs a valid width",
+            "type": "hero",
+            "input": {
+                "border": {
+                    "width": "thick",
+                    "color": {
+                        "role": "border"
+                    }
+                }
+            },
+            "expected": null
+        },
+        {
+            "name": "explicit none values are meaningful and kept",
+            "type": "hero",
+            "input": {
+                "spacing": {
+                    "top": "none",
+                    "bottom": "none"
+                },
+                "radius": "none",
+                "shadow": "none"
+            },
+            "expected": {
+                "spacing": {
+                    "top": "none",
+                    "bottom": "none"
+                },
+                "radius": "none",
+                "shadow": "none"
+            }
+        },
+        {
+            "name": "separator overlap motion layout are not accepted yet",
+            "type": "hero",
+            "input": {
+                "separator": {
+                    "top": "wave"
+                },
+                "overlap": "sm",
+                "motion": {
+                    "reveal": "fade-up"
+                },
+                "layout": "split",
+                "mediaTreatment": {
+                    "aspect": "16:9"
+                },
+                "radius": "sm"
+            },
+            "expected": {
+                "radius": "sm"
+            }
+        }
+    ]
+}

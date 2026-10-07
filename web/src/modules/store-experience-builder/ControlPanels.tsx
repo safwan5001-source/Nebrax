@@ -1009,8 +1009,9 @@ function HomepagePanel({
     onSelectSection?.(id);
   };
 
-  // Duplicate: ينسخ type/visible فقط (لا content payload في العقد)، بمعرّف
-  // جديد، ويوضع مباشرة بعد الأصل ويصبح selected.
+  // Duplicate: ينسخ type/visible والمحتوى (و`design` — V5b: التصميم البصري جزءٌ مما
+  // يراه التاجر في القسم فلا يضيع بالنسخ)، بمعرّف جديد، ويوضع مباشرة بعد الأصل
+  // ويصبح selected.
   const duplicateSection = (index: number) => {
     const source = sections[index];
     if (!source || !canDuplicateSection(sections, source)) return;
@@ -1019,6 +1020,7 @@ function HomepagePanel({
       type: source.type,
       visible: source.visible,
       ...(source.content ? { content: structuredClone(source.content) } : {}),
+      ...(source.design ? { design: structuredClone(source.design) } : {}),
     };
     const next = [...sections];
     next.splice(index + 1, 0, copy);

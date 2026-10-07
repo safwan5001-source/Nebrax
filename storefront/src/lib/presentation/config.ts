@@ -9,6 +9,7 @@ import {
   normalizeOptionalSectionContent,
   type SectionContent,
 } from "./section-content";
+import { normalizeSectionDesign, type SectionDesign } from "./section-design";
 import {
   CONTENT_PAGE_SLUGS,
   type ContentPageSlug,
@@ -70,6 +71,11 @@ export interface PresentationHomeSection {
   visible: boolean;
   /** Present only when this instance has non-empty authored content. */
   content?: SectionContent;
+  /**
+   * CUST-HV V5b — typed visual design (contract §3). Absent ⇒ the section renders
+   * exactly as before; only groups the section type declares can be present.
+   */
+  design?: SectionDesign;
 }
 
 /**
@@ -363,6 +369,9 @@ function resolveHomeBuilderSections(
     };
     const content = normalizeOptionalSectionContent(type, entry.content);
     if (content) section.content = content;
+    // CUST-HV V5b — typed section design (contract §3). Absent = no key ⇒ unchanged.
+    const design = normalizeSectionDesign(type, entry.design);
+    if (design) section.design = design;
     out.push(section);
     if (out.length >= MAX_HOME_SECTIONS) break;
   }

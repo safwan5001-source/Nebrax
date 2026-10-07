@@ -699,6 +699,11 @@ final class StorefrontPresentationNormalizer
             if ($content !== null) {
                 $instance['content'] = $content;
             }
+            // CUST-HV V5b — تصميم القسم المكتوب (V0 §3). الغياب = بلا مفتاح ⇒ بلا تغيير.
+            $design = StorefrontSectionDesignNormalizer::normalize($type, $section['design'] ?? null);
+            if ($design !== null) {
+                $instance['design'] = $design;
+            }
             $out[] = $instance;
             if (count($out) >= self::MAX_HOME_SECTIONS) {
                 break;
