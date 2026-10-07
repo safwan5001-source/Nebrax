@@ -936,4 +936,38 @@ input[type="search"]::-webkit-search-cancel-button {
     box-shadow: none;
   }
 }
+
+/*
+ * CUST-HV V5e-3 — section-edge separators and the one-time reveal.
+ * A separator is a background layer of the frame (resolved into `--sec-bg` / `--sec-sep`), so it
+ * can never cover or clip content; the edge's height is reserved as extra padding.
+ */
+[data-sd~="sep"]:not([data-sd~="bg"]) {
+  background: var(--sec-sep);
+}
+[data-sd~="sept"] {
+  padding-block-start: calc(var(--sec-pt, 0px) + var(--sec-sept));
+}
+[data-sd~="sepb"] {
+  padding-block-end: calc(var(--sec-pb, 0px) + var(--sec-sepb));
+}
+/* One-time reveal: the published page's observer sets `data-reveal="wait"` only on a section that
+   starts below the fold, then `"in"` once when it scrolls into view. Absent the attribute (no JS,
+   above the fold, reduced motion, the editor) the section is simply visible. */
+[data-sd~="reveal"][data-reveal="wait"] {
+  opacity: 0;
+  transform: translateY(0.75rem);
+}
+[data-sd~="reveal"][data-reveal="in"] {
+  transition:
+    opacity 360ms cubic-bezier(0.4, 0, 0.2, 1),
+    transform 360ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-sd~="reveal"][data-reveal] {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+}
 }

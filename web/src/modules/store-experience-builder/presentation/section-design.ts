@@ -16,7 +16,7 @@
  *  - `background.kind = "media"` (+ overlay, mobile override) → V6, together with the
  *    region-luminance evidence the contrast gate needs (V0 §3.2.1);
  *  - `layout` variants → the slices that add variants (V6/V8/V9);
- *  - `separator` / `overlap` / `mediaTreatment` / `motion` → V5e / V6 / V8.
+ *  - `overlap` / `mediaTreatment` → V6 / V8 (V5e-3 added `separator` and `motion.reveal`).
  * Until then they are dropped fail-closed, so a hand-written document can never
  * smuggle an unproven background past the publish gate.
  */
@@ -56,6 +56,17 @@ export const WIDTH_MAXES = ["narrow", "standard", "wide"] as const;
 export const BORDER_WIDTHS = ["none", "hairline", "medium"] as const;
 export const RADII = ["none", "sm", "md", "lg", "pill"] as const;
 export const SHADOWS = ["none", "soft", "medium", "strong"] as const;
+/** V5e-3 — section-edge separators (V0 §6.4) and the one-time reveal (V0 §6.6). */
+export const SEPARATOR_KINDS = [
+  "none",
+  "line",
+  "band",
+  "wave",
+  "angle",
+  "curve",
+] as const;
+export const SEPARATOR_HEIGHTS = ["sm", "md", "lg"] as const;
+export const REVEALS = ["none", "fade-up"] as const;
 
 export type Step = (typeof STEPS)[number];
 export type Direction = (typeof DIRECTIONS)[number];
@@ -93,6 +104,16 @@ export interface SectionBorder {
   color?: ColorRef;
 }
 
+export interface SectionSeparator {
+  top?: (typeof SEPARATOR_KINDS)[number];
+  bottom?: (typeof SEPARATOR_KINDS)[number];
+  color?: ColorRef;
+  height?: (typeof SEPARATOR_HEIGHTS)[number];
+}
+export interface SectionMotion {
+  reveal?: (typeof REVEALS)[number];
+}
+
 export interface SectionDesign {
   background?: SectionBackground;
   text?: SectionText;
@@ -103,6 +124,8 @@ export interface SectionDesign {
   border?: SectionBorder;
   radius?: (typeof RADII)[number];
   shadow?: (typeof SHADOWS)[number];
+  separator?: SectionSeparator;
+  motion?: SectionMotion;
 }
 
 export type DesignGroup = keyof SectionDesign;
@@ -135,6 +158,8 @@ export const SECTION_DESIGN_CAPABILITIES: Record<string, DesignCapability> = {
     border: true,
     radius: true,
     shadow: true,
+    separator: true,
+    motion: ["reveal"],
   },
   banner: {
     background: true,
@@ -146,6 +171,8 @@ export const SECTION_DESIGN_CAPABILITIES: Record<string, DesignCapability> = {
     border: true,
     radius: true,
     shadow: true,
+    separator: true,
+    motion: ["reveal"],
   },
   categories: {
     background: true,
@@ -155,6 +182,7 @@ export const SECTION_DESIGN_CAPABILITIES: Record<string, DesignCapability> = {
     spacing: true,
     border: true,
     radius: true,
+    separator: true,
   },
   newArrivals: {
     background: true,
@@ -162,6 +190,7 @@ export const SECTION_DESIGN_CAPABILITIES: Record<string, DesignCapability> = {
     typography: ["headingStyle"],
     width: true,
     spacing: true,
+    separator: true,
   },
   featured: {
     background: true,
@@ -169,6 +198,7 @@ export const SECTION_DESIGN_CAPABILITIES: Record<string, DesignCapability> = {
     typography: ["headingStyle"],
     width: true,
     spacing: true,
+    separator: true,
   },
   offers: {
     background: true,
@@ -176,6 +206,7 @@ export const SECTION_DESIGN_CAPABILITIES: Record<string, DesignCapability> = {
     typography: ["headingStyle"],
     width: true,
     spacing: true,
+    separator: true,
   },
   productShelf: {
     background: true,
@@ -183,8 +214,14 @@ export const SECTION_DESIGN_CAPABILITIES: Record<string, DesignCapability> = {
     typography: ["headingStyle"],
     width: true,
     spacing: true,
+    separator: true,
   },
-  discovery: { background: true, text: ["heading"], spacing: true },
+  discovery: {
+    background: true,
+    text: ["heading"],
+    spacing: true,
+    separator: true,
+  },
   benefits: {
     background: true,
     text: FULL_TEXT,
@@ -194,6 +231,7 @@ export const SECTION_DESIGN_CAPABILITIES: Record<string, DesignCapability> = {
     border: true,
     radius: true,
     shadow: true,
+    separator: true,
   },
   customContent: {
     background: true,
@@ -202,6 +240,7 @@ export const SECTION_DESIGN_CAPABILITIES: Record<string, DesignCapability> = {
     width: ["max"],
     spacing: true,
     align: true,
+    separator: true,
   },
   appPromo: {
     background: true,
@@ -209,9 +248,18 @@ export const SECTION_DESIGN_CAPABILITIES: Record<string, DesignCapability> = {
     spacing: true,
     border: true,
     radius: true,
+    separator: true,
   },
-  deliveryPromise: { background: true, spacing: true },
-  wholesale: { background: true, spacing: true },
+  deliveryPromise: {
+    background: true,
+    spacing: true,
+    separator: true,
+  },
+  wholesale: {
+    background: true,
+    spacing: true,
+    separator: true,
+  },
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -347,6 +395,20 @@ function normalizeBorder(raw: unknown): SectionBorder | undefined {
   return out;
 }
 
+function normalizeSeparator(raw: unknown): SectionSeparator | undefined {
+  if (!isRecord(raw)) return undefined;
+  const out: SectionSeparator = {};
+  for (const edge of ["top", "bottom"] as const) {
+    const kind = pick(raw[edge], SEPARATOR_KINDS);
+    if (kind) out[edge] = kind;
+  }
+  const color = normalizeColorRef(raw.color);
+  if (color) out.color = color;
+  const height = pick(raw.height, SEPARATOR_HEIGHTS);
+  if (height) out.height = height;
+  return Object.keys(out).length > 0 ? out : undefined;
+}
+
 /**
  * Lenient + deterministic. `undefined` = no design (the key is then omitted from the
  * section, so documents without design stay byte-identical).
@@ -400,6 +462,14 @@ export function normalizeSectionDesign(
   if (capability.shadow) {
     const shadow = pick(raw.shadow, SHADOWS);
     if (shadow) out.shadow = shadow;
+  }
+  if (capability.separator) {
+    const separator = normalizeSeparator(raw.separator);
+    if (separator) out.separator = separator;
+  }
+  if (capability.motion && isRecord(raw.motion)) {
+    const reveal = pick(raw.motion.reveal, REVEALS);
+    if (reveal) out.motion = { reveal };
   }
 
   return Object.keys(out).length > 0 ? out : undefined;

@@ -246,6 +246,55 @@ describe("DesignInspector (CUST-HV V5d)", () => {
   });
 });
 
+describe("DesignInspector — separators and reveal (CUST-HV V5e-3)", () => {
+  const field = (name: string) => document.querySelector(`[data-design-field="${name}"]`) as HTMLSelectElement;
+
+  it("every designable type offers a separator; only hero and banner offer the reveal", () => {
+    for (const type of ["hero", "banner", "categories", "newArrivals", "featured", "offers", "productShelf", "discovery", "benefits", "customContent", "appPromo", "deliveryPromise", "wholesale"]) {
+      render(<Harness type={type} />);
+      expect(field("separator.top"), type).not.toBeNull();
+      expect(field("motion.reveal") !== null, type).toBe(type === "hero" || type === "banner");
+      cleanup();
+    }
+  });
+
+  it("an edge's kind writes the enumerated value; colour and height appear only once an edge is set", () => {
+    render(<Harness type="benefits" />);
+    expect(document.querySelector('[data-colour-field="separator-color"]')).toBeNull();
+    expect(field("separator.height")).toBeNull();
+    fireEvent.change(field("separator.bottom"), { target: { value: "wave" } });
+    expect(out()).toEqual({ separator: { bottom: "wave" } });
+    expect(document.querySelector('[data-colour-field="separator-color"]')).not.toBeNull();
+    fireEvent.change(field("separator.height"), { target: { value: "lg" } });
+    fireEvent.change(field("separator.top"), { target: { value: "line" } });
+    expect(out()).toEqual({ separator: { top: "line", bottom: "wave", height: "lg" } });
+  });
+
+  it("clearing both edges removes the whole group", () => {
+    render(<Harness type="benefits" initial={{ separator: { bottom: "curve" } }} />);
+    fireEvent.change(field("separator.bottom"), { target: { value: "" } });
+    expect(out()).toBeNull();
+  });
+
+  it("a full-width band explains that it carries no separator", () => {
+    render(
+      <Harness
+        type="featured"
+        initial={{ background: { kind: "solid", color: { hex: "#101820" } }, width: { mode: "full" }, separator: { bottom: "wave" } }}
+      />,
+    );
+    expect(document.querySelector("[data-design-sep-bleed]")).not.toBeNull();
+  });
+
+  it("the reveal stores only the named value; the default removes the group", () => {
+    render(<Harness type="banner" />);
+    fireEvent.change(field("motion.reveal"), { target: { value: "fade-up" } });
+    expect(out()).toEqual({ motion: { reveal: "fade-up" } });
+    fireEvent.change(field("motion.reveal"), { target: { value: "" } });
+    expect(out()).toBeNull();
+  });
+});
+
 describe("PaletteEditor (CUST-HV V5d)", () => {
   it("sets and clears a role; an unset role shows today's token as the value in use", () => {
     const onChange = vi.fn();

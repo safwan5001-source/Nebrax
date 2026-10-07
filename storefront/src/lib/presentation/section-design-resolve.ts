@@ -291,6 +291,88 @@ export function sectionContrastIssues(
   return [...out.values()];
 }
 
+/**
+ * V5e-3 — section-edge separators (V0 §6.4): painted as background layers of the frame (so they
+ * can never cover content, are not focusable, and clip with the frame's own radius), with the
+ * edge's height reserved as extra padding. A shape is an inline SVG built here from validated
+ * tokens and a validated hex — nothing from the document is interpolated as CSS.
+ */
+const LINE_THICKNESS: Record<string, string> = {
+  sm: "1px",
+  md: "2px",
+  lg: "4px",
+};
+const BAND_HEIGHT: Record<string, string> = {
+  sm: "0.5rem",
+  md: "1rem",
+  lg: "1.5rem",
+};
+const SHAPE_HEIGHT: Record<string, string> = {
+  sm: "1.5rem",
+  md: "2.5rem",
+  lg: "4rem",
+};
+/** The shape's fill when the merchant picks no colour: the page behind the section (today's token). */
+const SHAPE_DEFAULT_HEX = "#f8f9fa";
+/** Path of the area *below* the edge line, for a bottom edge (1200 × 100 box, stretched to fit). */
+const SHAPE_PATH: Record<string, string> = {
+  wave: "M0 55 C200 5 400 105 600 55 C800 5 1000 105 1200 55 V100 H0 Z",
+  angle: "M0 100 L1200 20 V100 Z",
+  curve: "M0 100 Q600 -60 1200 100 Z",
+};
+
+function shapeLayer(
+  kind: string,
+  edge: "top" | "bottom",
+  hex: string,
+  height: string,
+  dir: "ltr" | "rtl",
+): string {
+  // a top edge is the bottom shape flipped vertically; RTL mirrors the shape horizontally
+  const flip = [
+    edge === "top" ? "translate(0 100) scale(1 -1)" : "",
+    dir === "rtl" ? "translate(1200 0) scale(-1 1)" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+  const svg =
+    `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 100' preserveAspectRatio='none'>` +
+    `<path fill='${hex}'${flip ? ` transform='${flip}'` : ""} d='${SHAPE_PATH[kind]}'/></svg>`;
+  return `url("data:image/svg+xml,${encodeURIComponent(svg)}") ${edge} / 100% ${height} no-repeat`;
+}
+
+/** The background layers + reserved heights of a section's separators (`null` = none). */
+function separatorLayers(
+  design: SectionDesign,
+  ctx: DesignContext,
+): { layers: string[]; reserve: { top?: string; bottom?: string } } | null {
+  const sep = design.separator;
+  if (!sep) return null;
+  const size = sep.height ?? "md";
+  const layers: string[] = [];
+  const reserve: { top?: string; bottom?: string } = {};
+  for (const edge of ["top", "bottom"] as const) {
+    const kind = sep[edge];
+    if (!kind || kind === "none") continue;
+    const explicit = sep.color ? colour(sep.color, ctx) : null;
+    if (kind === "line" || kind === "band") {
+      const c =
+        explicit ??
+        (kind === "line"
+          ? resolveRoleHex("border", ctx)
+          : resolveRoleHex("brand", ctx));
+      const h = kind === "line" ? LINE_THICKNESS[size] : BAND_HEIGHT[size];
+      layers.push(`linear-gradient(${c}, ${c}) ${edge} / 100% ${h} no-repeat`);
+      reserve[edge] = h;
+    } else if (SHAPE_PATH[kind]) {
+      const c = explicit ?? SHAPE_DEFAULT_HEX;
+      layers.push(shapeLayer(kind, edge, c, SHAPE_HEIGHT[size], ctx.dir));
+      reserve[edge] = SHAPE_HEIGHT[size];
+    }
+  }
+  return layers.length > 0 ? { layers, reserve } : null;
+}
+
 export function resolveSectionDesign(
   type: string,
   design: SectionDesign | undefined,
@@ -408,6 +490,29 @@ export function resolveSectionDesign(
       sd.push("shadow");
     }
   }
+
+  // Separators paint onto the frame's own background; a full-bleed band has no shape edges (it
+  // extends past the container), so it skips them like it skips radius and shadow.
+  const separators = bleeds ? null : separatorLayers(design, ctx);
+  if (separators) {
+    if (style["--sec-bg"]) {
+      style["--sec-bg"] = [...separators.layers, style["--sec-bg"]].join(", ");
+    } else {
+      style["--sec-sep"] = separators.layers.join(", ");
+    }
+    sd.push("sep");
+    if (separators.reserve.top) {
+      style["--sec-sept"] = separators.reserve.top;
+      sd.push("sept");
+    }
+    if (separators.reserve.bottom) {
+      style["--sec-sepb"] = separators.reserve.bottom;
+      sd.push("sepb");
+    }
+  }
+
+  // One-time reveal (V5e-3): only an attribute — the published page's observer plays it.
+  if (design.motion?.reveal === "fade-up") sd.push("reveal");
 
   if (sd.length === 0) return null;
   return {
