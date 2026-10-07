@@ -31,10 +31,11 @@ describe("resolveSectionDesign (CUST-HV V5c)", () => {
 
   it("a solid background resolves roles to concrete colours and picks a provable foreground automatically", () => {
     const r = resolveSectionDesign("hero", { background: { kind: "solid", color: { role: "brand" } } }, ctx)!;
-    expect(r.attrs).toEqual({ "data-sd": "bg fg heading", "data-design-type": "hero" });
+    expect(r.attrs).toEqual({ "data-sd": "bg fg heading link", "data-design-type": "hero" });
     expect(r.style["--sec-bg"]).toBe("#12372a");
     expect(r.style["--sec-fg"]).toBe("#ffffff"); // dark brand → white
     expect(r.style["--sec-heading"]).toBe("#ffffff");
+    expect(r.style["--sec-link"]).toBe("#ffffff"); // links default to the proven foreground
     const light = resolveSectionDesign("hero", { background: { kind: "solid", color: { hex: "#fff3cd" } } }, ctx)!;
     expect(light.style["--sec-fg"]).toBe("#000000");
   });
@@ -223,7 +224,7 @@ describe("SectionDesignFrame (CUST-HV V5c)", () => {
       </SectionDesignFrame>,
     );
     const el = container.firstElementChild as HTMLElement;
-    expect(el.getAttribute("data-sd")).toBe("bg fg heading pt");
+    expect(el.getAttribute("data-sd")).toBe("bg fg heading link pt");
     expect(el.getAttribute("data-design-type")).toBe("benefits");
     expect(el.style.getPropertyValue("--sec-bg")).toBe("#ffffff");
     expect(el.querySelector("p")!.textContent).toBe("hi");
@@ -246,7 +247,9 @@ describe("the Canvas and the storefront share ONE resolver (V0 §3.5)", () => {
     expect(pv).toContain("[data-sd]:empty");
     const block = (css: string) => css.slice(css.indexOf("CUST-HV V5c — section design"));
     const norm = (css: string) => block(css).replace(/\.awj-store-preview /g, "").replace(/\s+/g, " ").trim();
-    expect(norm(pv)).toBe(norm(sf));
+    // the storefront block sits inside `@layer utilities { … }` (same layer as Tailwind's utilities)
+    expect(sf).toMatch(/@layer utilities \{\s*\/\*\s*\* CUST-HV V5c — section design/);
+    expect(norm(pv)).toBe(norm(sf).replace(/\}$/, "").trim());
   });
 });
 

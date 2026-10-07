@@ -565,6 +565,14 @@ input[type="search"]::-webkit-search-cancel-button {
 }
 
 /*
+ * The whole section-design block lives in the `utilities` layer, the same layer as
+ * Tailwind's utilities: inside it ordering is specificity, so a utility on an element
+ * (`text-store-primary-foreground` on a CTA) beats the zero-specificity `:where()` reset,
+ * exactly as in the (unlayered) Canvas — an unlayered block would outrank *every*
+ * layered utility regardless of specificity.
+ */
+@layer utilities {
+/*
  * CUST-HV V5c — section design (contract §3.5). Every rule keys off a validated
  * `--sec-*` custom property the resolver set (`section-design-resolve.ts`); no
  * value in this block ever comes from the document. A section with no design has
@@ -652,6 +660,18 @@ input[type="search"]::-webkit-search-cancel-button {
   --store-footer-muted: var(--store-footer-muted-base);
   --store-footer-link: var(--store-footer-link-base);
 }
+/* An element that only gains an opaque surface on hover (a transparent secondary CTA
+   that turns dark) is a surface *while hovered*: its text tokens go back to the originals
+   for that state, so the hover colour utilities keep contrasting with the hover fill. */
+:where([data-sd~="fg"] :is([class*="hover:bg-store-"], [class*="hover:bg-white"]:not([class*="hover:bg-white/"])):is(:hover, :focus-visible):not([data-sd] > *)) {
+  color: var(--store-foreground-base);
+  --store-foreground: var(--store-foreground-base);
+  --store-muted-foreground: var(--store-muted-foreground-base);
+  --store-primary-foreground: var(--store-primary-foreground-base);
+  --store-footer-foreground: var(--store-footer-foreground-base);
+  --store-footer-muted: var(--store-footer-muted-base);
+  --store-footer-link: var(--store-footer-link-base);
+}
 /* A design background replaces the section's own legacy fill (banner card, hero
    gradient, dark promo bands) instead of hiding behind it. */
 [data-sd~="bg"][data-sd] > * {
@@ -664,6 +684,7 @@ input[type="search"]::-webkit-search-cancel-button {
 [data-sd~="fg"] p:not([data-sd] > * :is([class^="bg-store-"], [class*=" bg-store-"], [class^="bg-white"], [class*=" bg-white"]):not([class*="bg-store-surface/"], [class*="bg-store-footer-border/"], [class*="bg-white/"]) *, :is([class^="bg-store-"], [class*=" bg-store-"], [class^="bg-white"], [class*=" bg-white"]):not([class*="bg-store-surface/"], [class*="bg-store-footer-border/"], [class*="bg-white/"])) {
   color: var(--sec-fg);
 }
-[data-sd~="link"] a:not([data-sd] > * :is([class^="bg-store-"], [class*=" bg-store-"], [class^="bg-white"], [class*=" bg-white"]):not([class*="bg-store-surface/"], [class*="bg-store-footer-border/"], [class*="bg-white/"]) *, :is([class^="bg-store-"], [class*=" bg-store-"], [class^="bg-white"], [class*=" bg-white"]):not([class*="bg-store-surface/"], [class*="bg-store-footer-border/"], [class*="bg-white/"])) {
+[data-sd~="link"] a:not([data-sd] > * :is([class^="bg-store-"], [class*=" bg-store-"], [class^="bg-white"], [class*=" bg-white"]):not([class*="bg-store-surface/"], [class*="bg-store-footer-border/"], [class*="bg-white/"]) *, :is([class^="bg-store-"], [class*=" bg-store-"], [class^="bg-white"], [class*=" bg-white"]):not([class*="bg-store-surface/"], [class*="bg-store-footer-border/"], [class*="bg-white/"]), [class*="hover:bg-store-"], [class*="hover:bg-white"]:not([class*="hover:bg-white/"])) {
   color: var(--sec-link);
+}
 }

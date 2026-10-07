@@ -42,12 +42,13 @@ describe("resolveSectionDesign (CUST-HV V5c)", () => {
       ctx,
     )!;
     expect(r.attrs).toEqual({
-      "data-sd": "bg fg heading",
+      "data-sd": "bg fg heading link",
       "data-design-type": "hero",
     });
     expect(r.style["--sec-bg"]).toBe("#12372a");
     expect(r.style["--sec-fg"]).toBe("#ffffff"); // dark brand → white
     expect(r.style["--sec-heading"]).toBe("#ffffff");
+    expect(r.style["--sec-link"]).toBe("#ffffff"); // links default to the proven foreground
     const light = resolveSectionDesign(
       "hero",
       { background: { kind: "solid", color: { hex: "#fff3cd" } } },
@@ -337,7 +338,7 @@ describe("SectionDesignFrame (CUST-HV V5c)", () => {
       </SectionDesignFrame>,
     );
     const el = container.firstElementChild as HTMLElement;
-    expect(el.getAttribute("data-sd")).toBe("bg fg heading pt");
+    expect(el.getAttribute("data-sd")).toBe("bg fg heading link pt");
     expect(el.getAttribute("data-design-type")).toBe("benefits");
     expect(el.style.getPropertyValue("--sec-bg")).toBe("#ffffff");
     expect(el.querySelector("p")!.textContent).toBe("hi");
