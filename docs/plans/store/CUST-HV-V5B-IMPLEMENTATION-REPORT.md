@@ -8,7 +8,7 @@
 | **Slice** | **V5b** — second slice of V5 (V5a engine+palette → **V5b contract** → V5c renderers → V5d inspector/ColourField/publish gate + V1B → V5e typography/buttons/surfaces/separators/motion) |
 | **Branch** | `cust-hv/v5b-section-design-contract` |
 | **PR** | see PR description (opened with this report) |
-| **Base SHA** | `origin/main` after V5a (#1266) merged |
+| **Base SHA** | `329c4c0a` — `origin/main` after V5a (#1266) merged |
 | **Authority** | V0 §3.1–§3.4 (Contract A: typed capability groups, primitives, per-type registry), §3.5 (resolution — V5c), §18 |
 | **Depends on** | V5a (palette roles) |
 
@@ -68,7 +68,7 @@ Dropped for now, each entering with the slice that can render **and prove** it:
 | PHP | `StorefrontSectionDesignTest` **5** (fixture + key order + idempotence; registry snapshot; every known section type declared; absent ⇒ identical; group filtering in a document) |
 | Web | `section-design.test.ts` **36** · `ControlPanels.design.test.tsx` **1** (duplicate keeps design) · builder suite 56 files / 832 ✓ |
 | Storefront | `section-design.test.ts` **36** · presentation suite 15 files / 325 ✓ · `tsc` ✓ · **`biome check` ✓** |
-| Full suites | see PR description · PostgreSQL by CI |
+| Full suites (local) | backend sqlite: 5751 passed · 57 skipped · **28 failed — all environment-only and identical to `main`** (`ext-bcmath` Fuel*, mail views) · web vitest 426 files / 3685 ✓ · storefront vitest 141 files / 1272 ✓ · PostgreSQL by CI |
 
 **Process note.** V5a's first CI run failed on the storefront job: CI runs `biome check` (formatting), not just `lint`; my local pre-push step ran lint only. Fixed by formatting the V5a files (commit `81b22474`) and — from here on — running `pnpm exec biome check src` before every storefront push.
 
