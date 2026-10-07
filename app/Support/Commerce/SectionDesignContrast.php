@@ -20,6 +20,12 @@ final class SectionDesignContrast
     /** لون خلفية الصفحة اليوم (`--store-background`) — ما خلف قسمٍ بلا خلفية. */
     public const PAGE_BACKGROUND = '#f8f9fa';
 
+    /**
+     * أقسامٌ ترسم سطحاً داكناً خاصاً بها (تدرّج العلامة، شريط الذيل). بلا خلفية في
+     * التصميم لا يُطبَّق لون النص عليها إطلاقاً (التوأم: `SURFACE_OWNING_TYPES`).
+     */
+    public const SURFACE_OWNING_TYPES = ['hero', 'appPromo', 'wholesale'];
+
     /** رموز اليوم الثابتة لدورٍ لم يضبطه التاجر (توأم `ROLE_FALLBACK_HEX`). */
     public const ROLE_FALLBACK = [
         'surface' => '#ffffff',
@@ -113,9 +119,12 @@ final class SectionDesignContrast
      * @param  array<string,mixed>  $config
      * @return array{body:?string,heading:?string,link:?string,background:?array{min:float,max:float},judged:?array{min:float,max:float}}
      */
-    public static function effectiveText(array $design, array $config): array
+    public static function effectiveText(array $design, array $config, ?string $type = null): array
     {
         $background = self::backgroundInterval($design, $config);
+        if ($background === null && $type !== null && in_array($type, self::SURFACE_OWNING_TYPES, true)) {
+            return ['body' => null, 'heading' => null, 'link' => null, 'background' => null, 'judged' => null];
+        }
         $auto = $background !== null ? ContrastEngine::autoForeground($background) : null;
         $text = is_array($design['text'] ?? null) ? $design['text'] : [];
         $explicitBody = self::colour($text['body'] ?? null, $config);
@@ -140,9 +149,9 @@ final class SectionDesignContrast
      * @param  array<string,mixed>  $config
      * @return list<array{field:string,code:string,ratio:float}>
      */
-    public static function issues(array $design, array $config): array
+    public static function issues(array $design, array $config, ?string $type = null): array
     {
-        $text = self::effectiveText($design, $config);
+        $text = self::effectiveText($design, $config, $type);
         if ($text['judged'] === null) {
             return [];
         }
@@ -193,7 +202,7 @@ final class SectionDesignContrast
             if (! is_array($section) || ($section['visible'] ?? false) !== true || ! is_array($section['design'] ?? null)) {
                 continue; // قسمٌ مخفي لا يُنشر فلا يُحجَب به النشر.
             }
-            foreach (self::issues($section['design'], $config) as $issue) {
+            foreach (self::issues($section['design'], $config, is_string($section['type'] ?? null) ? $section['type'] : null) as $issue) {
                 $path = $issue['field'] === 'background'
                     ? "homepage.sections[{$i}].design.background"
                     : "homepage.sections[{$i}].design.text.{$issue['field']}";

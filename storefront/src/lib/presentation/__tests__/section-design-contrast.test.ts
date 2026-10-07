@@ -19,6 +19,7 @@ const fixture = JSON.parse(
 ) as {
   cases: Array<{
     name: string;
+    type: string;
     config: {
       primaryColor: string;
       accentColor: string | null;
@@ -32,14 +33,14 @@ const fixture = JSON.parse(
 describe("section design publish contrast — shared fixture with the PHP gate (V5d)", () => {
   for (const c of fixture.cases) {
     it(c.name, () => {
-      const design = normalizeSectionDesign("hero", c.design) ?? {};
+      const design = normalizeSectionDesign(c.type, c.design) ?? {};
       const ctx: DesignContext = {
         primaryColor: c.config.primaryColor,
         accentColor: c.config.accentColor,
         palette: c.config.palette,
         dir: "ltr",
       };
-      const actual = sectionContrastIssues(design, ctx);
+      const actual = sectionContrastIssues(design, ctx, c.type);
       expect(actual.map((i) => [i.field, i.code])).toEqual(
         c.expected.map((i) => [i.field, i.code]),
       );

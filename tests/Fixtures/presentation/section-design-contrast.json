@@ -13,6 +13,7 @@
                     "top": "md"
                 }
             },
+            "type": "benefits",
             "expected": []
         },
         {
@@ -30,6 +31,7 @@
                     }
                 }
             },
+            "type": "benefits",
             "expected": []
         },
         {
@@ -47,6 +49,7 @@
                     }
                 }
             },
+            "type": "benefits",
             "expected": []
         },
         {
@@ -69,6 +72,7 @@
                     }
                 }
             },
+            "type": "benefits",
             "expected": [
                 {
                     "field": "body",
@@ -97,6 +101,7 @@
                     }
                 }
             },
+            "type": "benefits",
             "expected": [
                 {
                     "field": "heading",
@@ -125,6 +130,7 @@
                     }
                 }
             },
+            "type": "benefits",
             "expected": [
                 {
                     "field": "link",
@@ -159,6 +165,7 @@
                     }
                 }
             },
+            "type": "benefits",
             "expected": [
                 {
                     "field": "body",
@@ -191,6 +198,7 @@
                     }
                 }
             },
+            "type": "benefits",
             "expected": [
                 {
                     "field": "body",
@@ -213,6 +221,7 @@
                     }
                 }
             },
+            "type": "benefits",
             "expected": []
         },
         {
@@ -234,6 +243,7 @@
                     "direction": "to-end"
                 }
             },
+            "type": "benefits",
             "expected": [
                 {
                     "field": "background",
@@ -261,6 +271,7 @@
                     "direction": "to-bottom"
                 }
             },
+            "type": "benefits",
             "expected": []
         },
         {
@@ -287,6 +298,7 @@
                     }
                 }
             },
+            "type": "benefits",
             "expected": [
                 {
                     "field": "body",
@@ -323,6 +335,7 @@
                     }
                 }
             },
+            "type": "benefits",
             "expected": []
         },
         {
@@ -350,6 +363,7 @@
                     }
                 }
             },
+            "type": "benefits",
             "expected": [
                 {
                     "field": "link",
@@ -378,6 +392,7 @@
                     }
                 }
             },
+            "type": "benefits",
             "expected": []
         },
         {
@@ -394,6 +409,7 @@
                     }
                 }
             },
+            "type": "benefits",
             "expected": [
                 {
                     "field": "heading",
@@ -419,6 +435,114 @@
                 "text": {
                     "body": {
                         "role": "overlay"
+                    }
+                }
+            },
+            "type": "benefits",
+            "expected": []
+        },
+        {
+            "name": "a dark-surface section (hero) ignores explicit text without a design background",
+            "type": "hero",
+            "config": {
+                "primaryColor": "#12372a",
+                "accentColor": null,
+                "palette": []
+            },
+            "design": {
+                "text": {
+                    "body": {
+                        "hex": "#ffffff"
+                    }
+                }
+            },
+            "expected": []
+        },
+        {
+            "name": "appPromo and wholesale behave the same (nothing is judged)",
+            "type": "appPromo",
+            "config": {
+                "primaryColor": "#12372a",
+                "accentColor": null,
+                "palette": []
+            },
+            "design": {
+                "text": {
+                    "heading": {
+                        "hex": "#ffffff"
+                    },
+                    "link": {
+                        "hex": "#ffffff"
+                    }
+                }
+            },
+            "expected": []
+        },
+        {
+            "name": "a light-surface section (banner) still judges explicit text on the page background",
+            "type": "banner",
+            "config": {
+                "primaryColor": "#12372a",
+                "accentColor": null,
+                "palette": []
+            },
+            "design": {
+                "text": {
+                    "body": {
+                        "hex": "#ffffff"
+                    }
+                }
+            },
+            "expected": [
+                {
+                    "field": "body",
+                    "code": "contrast_insufficient",
+                    "ratio": 1.0541
+                }
+            ]
+        },
+        {
+            "name": "hero with a design background judges its text normally (fails)",
+            "type": "hero",
+            "config": {
+                "primaryColor": "#12372a",
+                "accentColor": null,
+                "palette": []
+            },
+            "design": {
+                "background": {
+                    "kind": "solid",
+                    "color": {
+                        "hex": "#102030"
+                    }
+                },
+                "text": {
+                    "body": {
+                        "hex": "#222222"
+                    }
+                }
+            },
+            "expected": [
+                {
+                    "field": "body",
+                    "code": "contrast_insufficient",
+                    "ratio": 1.0382
+                }
+            ]
+        },
+        {
+            "name": "hero with a design background and automatic text passes",
+            "type": "hero",
+            "config": {
+                "primaryColor": "#12372a",
+                "accentColor": null,
+                "palette": []
+            },
+            "design": {
+                "background": {
+                    "kind": "solid",
+                    "color": {
+                        "hex": "#fde68a"
                     }
                 }
             },

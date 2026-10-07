@@ -27,6 +27,7 @@ The single place every publish path already calls (immediate, legacy head, sched
 - **Codes and paths (stable, per field the merchant fixes):**
   - `homepage.sections[i].design.text.<body|heading|link>` → `contrast_insufficient` (an explicit colour below 4.5:1);
   - `homepage.sections[i].design.background` → `contrast_unprovable` (an *automatic* foreground cannot be proven on that gradient — V5c's documented limitation: e.g. `#d1456a → #1e8b9a`; the background is what to change).
+- **Surface-owning sections** (`hero`, `appPromo`, `wholesale` — they paint a dark surface of their own) **do not apply text colours without a design background** (V5c review): nothing is judged there, and nothing unproven can be drawn. With a design background they are judged like any other section.
 - **Hidden sections never block publishing** (they render nothing). A document with no `design` is untouched (no extra work, same errors as before).
 - Any **solid** background with the automatic foreground is always publishable (tested over black, white, mid-grey and brand colours) — a merchant is never forced to pick a text colour.
 
@@ -34,7 +35,7 @@ The single place every publish path already calls (immediate, legacy head, sched
 `effectiveText` gained `judged`; new `sectionContrastIssues(design, ctx)` and `PAGE_BACKGROUND`. Same algorithm, same codes, so V5d-2's inspector can show the verdict live and the server will agree.
 
 ### One shared fixture
-`tests/Fixtures/presentation/section-design-contrast.json` (17 cases generated from the PHP authority) asserted by PHP and **both** TS apps (ratios at 1e-4): auto fg on dark/mid solid, explicit fail on body/heading/link, all three failing, page-background judging, the unprovable gradient, the **gradient-interior counter-example** (explicit black passes both endpoints, fails the interior), palette-resolved roles, fallback tokens, derived accent.
+`tests/Fixtures/presentation/section-design-contrast.json` (22 cases generated from the PHP authority) asserted by PHP and **both** TS apps (ratios at 1e-4): auto fg on dark/mid solid, explicit fail on body/heading/link, all three failing, page-background judging, the unprovable gradient, the **gradient-interior counter-example** (explicit black passes both endpoints, fails the interior), palette-resolved roles, fallback tokens, derived accent.
 
 ---
 

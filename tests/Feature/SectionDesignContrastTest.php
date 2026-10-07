@@ -42,7 +42,7 @@ class SectionDesignContrastTest extends TestCase
      */
     public function the_gate_matches_the_shared_cases(array $case): void
     {
-        $actual = SectionDesignContrast::issues($case['design'], $case['config']);
+        $actual = SectionDesignContrast::issues($case['design'], $case['config'], $case['type']);
 
         $this->assertSame(
             array_map(static fn (array $i): array => [$i['field'], $i['code']], $case['expected']),
@@ -87,12 +87,24 @@ class SectionDesignContrastTest extends TestCase
     }
 
     /** @test */
+    public function a_dark_surface_section_without_a_design_background_ignores_text_colours_and_is_not_blocked(): void
+    {
+        $bad = ['text' => ['body' => ['hex' => '#ffffff']]];
+        foreach (['hero', 'appPromo', 'wholesale'] as $type) {
+            $doc = $this->document($bad, type: $type);
+            $this->assertSame([], (new StorefrontPresentationPublishValidator)->errors($doc), $type);
+        }
+        // the same colour on a light-surface section is judged on the page background
+        $this->assertNotSame([], (new StorefrontPresentationPublishValidator)->errors($this->document($bad, type: 'banner')));
+    }
+
+    /** @test */
     public function a_hidden_section_never_blocks_publishing_and_a_design_free_document_is_unaffected(): void
     {
         $bad = ['text' => ['body' => ['hex' => '#ffffff']]];
 
-        $this->assertNotSame([], (new StorefrontPresentationPublishValidator)->errors($this->document($bad)));
-        $this->assertSame([], (new StorefrontPresentationPublishValidator)->errors($this->document($bad, visible: false)));
+        $this->assertNotSame([], (new StorefrontPresentationPublishValidator)->errors($this->document($bad, type: 'banner')));
+        $this->assertSame([], (new StorefrontPresentationPublishValidator)->errors($this->document($bad, visible: false, type: 'banner')));
         $this->assertSame([], (new StorefrontPresentationPublishValidator)->errors((new StorefrontPresentationNormalizer)->normalize([])));
     }
 

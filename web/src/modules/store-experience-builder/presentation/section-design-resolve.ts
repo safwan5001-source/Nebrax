@@ -184,7 +184,13 @@ export function effectiveText(
   // a design background a text colour would land on that legacy surface — which the
   // contrast proof cannot see — so it is not applied at all (fail-closed).
   if (!background && type !== undefined && SURFACE_OWNING_TYPES.has(type)) {
-    return { body: null, heading: null, link: null, background: null };
+    return {
+      body: null,
+      heading: null,
+      link: null,
+      background: null,
+      judged: null,
+    };
   }
 
   const auto = background ? autoForeground(background) : null;
@@ -224,8 +230,9 @@ export interface SectionContrastIssue {
 export function sectionContrastIssues(
   design: SectionDesign,
   ctx: DesignContext,
+  type?: string,
 ): SectionContrastIssue[] {
-  const text = effectiveText(design, ctx);
+  const text = effectiveText(design, ctx, type);
   if (!text.judged) return [];
   const out = new Map<string, SectionContrastIssue>();
   for (const field of ["body", "heading", "link"] as const) {
