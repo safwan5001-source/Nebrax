@@ -45,6 +45,7 @@ final class StorefrontPresentationPublishValidator
     public function errors(array $normalized): array
     {
         return $this->announcementErrors($normalized['announcements'] ?? null)
+            + SectionDesignContrast::errors($normalized)
             + $this->mediaErrors($normalized);
     }
 

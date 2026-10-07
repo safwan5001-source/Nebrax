@@ -24,6 +24,7 @@ import {
   parseHex,
   type Rgb,
   solidInterval,
+  TEXT_NORMAL,
   worstRatioForHex,
 } from "./contrast-engine";
 import { type PresentationPalette, resolveRoleHex } from "./palette";
@@ -143,9 +144,18 @@ export interface EffectiveText {
   /** Section-heading colour (explicit, else the body foreground over a background). */
   heading: string | null;
   link: string | null;
-  /** Interval of the section background, when it has one — what the publish gate proves against. */
+  /** Interval of the section background, when it has one. */
   background: LuminanceInterval | null;
+  /**
+   * What the publish gate proves the text against: the section background, else —
+   * for a section with an explicit text colour but no background — the page
+   * background it will actually be drawn on.
+   */
+  judged: LuminanceInterval | null;
 }
+
+/** `--store-background` today: what is behind a section that paints no background. */
+export const PAGE_BACKGROUND = "#f8f9fa";
 
 /**
  * The colours a section's text will actually be drawn in. Shared by the renderer
@@ -168,12 +178,57 @@ export function effectiveText(
     ? colour(design.text.heading, ctx)
     : null;
   const body = explicitBody ?? auto;
+  const link = design.text?.link ? colour(design.text.link, ctx) : null;
+  const judged =
+    background ??
+    ((explicitBody ?? explicitHeading ?? link) !== null
+      ? backgroundInterval(PAGE_BACKGROUND, null)
+      : null);
   return {
     body,
     heading: explicitHeading ?? body,
-    link: design.text?.link ? colour(design.text.link, ctx) : null,
+    link,
     background,
+    judged,
   };
+}
+
+export interface SectionContrastIssue {
+  /** The field the merchant fixes: a text colour, or the background itself. */
+  field: "body" | "heading" | "link" | "background";
+  code: "contrast_insufficient" | "contrast_unprovable";
+  ratio: number;
+}
+
+/**
+ * Twin of PHP `SectionDesignContrast::issues` — the same verdict the publish gate
+ * returns as a 422, shown live in the editor. An explicit colour that fails is
+ * `contrast_insufficient`; an automatic foreground that cannot be proven on a
+ * gradient is `contrast_unprovable` and the *background* is what to change.
+ */
+export function sectionContrastIssues(
+  design: SectionDesign,
+  ctx: DesignContext,
+): SectionContrastIssue[] {
+  const text = effectiveText(design, ctx);
+  if (!text.judged) return [];
+  const out = new Map<string, SectionContrastIssue>();
+  for (const field of ["body", "heading", "link"] as const) {
+    const colourHex = text[field];
+    if (colourHex === null) continue;
+    const worst = worstRatioForHex(colourHex, text.judged);
+    if (worst >= TEXT_NORMAL) continue;
+    const isExplicit = design.text?.[field] !== undefined;
+    if (!isExplicit && field !== "body") continue;
+    const code = isExplicit ? "contrast_insufficient" : "contrast_unprovable";
+    const outField = isExplicit ? field : "background";
+    out.set(`${outField}|${code}`, {
+      field: outField,
+      code,
+      ratio: Math.round(worst * 10000) / 10000,
+    });
+  }
+  return [...out.values()];
 }
 
 /** Worst contrast of a foreground against the section's background; `null` = no background to judge. */
