@@ -1,0 +1,17 @@
+{
+  "_note": "CUST-HV V5e-2b — publish gate for the global button label colour. Shared by PHP ButtonTokensContrast and both TS twins (buttonContrastIssues). Only outline / link styles are proven here (their label is the role colour over the page backdrops #f8f9fa, #ffffff and a custom palette.surface); solid / soft compute their own label over their fill and pass by construction. `expected` = the issues; `ratio` is the worst ratio rounded to 2 decimals.",
+  "cases": [
+    { "name": "no buttons key", "config": { "primaryColor": "#fde68a" }, "expected": [] },
+    { "name": "solid is never an issue, even with a pale brand", "config": { "buttons": { "style": "solid" }, "primaryColor": "#fde68a" }, "expected": [] },
+    { "name": "soft is never an issue", "config": { "buttons": { "style": "soft" }, "primaryColor": "#fde68a" }, "expected": [] },
+    { "name": "outline with a dark brand passes", "config": { "buttons": { "style": "outline" }, "primaryColor": "#12372a" }, "expected": [] },
+    { "name": "outline with a pale brand fails", "config": { "buttons": { "style": "outline" }, "primaryColor": "#fde68a" }, "expected": [{ "field": "colour", "code": "contrast_insufficient", "ratio": 1.18 }] },
+    { "name": "link with a navy brand passes", "config": { "buttons": { "style": "link" }, "primaryColor": "#1e3a5f" }, "expected": [] },
+    { "name": "link with a mid teal passes", "config": { "buttons": { "style": "link" }, "primaryColor": "#0f766e" }, "expected": [] },
+    { "name": "the page backdrop is #f8f9fa, not white: #757575 passes on white but not on the page", "config": { "buttons": { "style": "outline" }, "primaryColor": "#757575" }, "expected": [{ "field": "colour", "code": "contrast_insufficient", "ratio": 4.37 }] },
+    { "name": "the derived accent (a tint of the brand) fails on the page", "config": { "buttons": { "style": "outline", "colour": "accent" }, "primaryColor": "#12372a" }, "expected": [{ "field": "colour", "code": "contrast_insufficient", "ratio": 4.2 }] },
+    { "name": "an explicit accent that is dark enough passes", "config": { "buttons": { "style": "outline", "colour": "accent" }, "primaryColor": "#12372a", "accentColor": "#0b5fff" }, "expected": [] },
+    { "name": "the text role is always provable", "config": { "buttons": { "style": "outline", "colour": "text" }, "primaryColor": "#fde68a" }, "expected": [] },
+    { "name": "a custom dark palette surface is a backdrop too", "config": { "buttons": { "style": "outline" }, "primaryColor": "#12372a", "palette": { "surface": "#101820" } }, "expected": [{ "field": "colour", "code": "contrast_insufficient", "ratio": 1.37 }] }
+  ]
+}

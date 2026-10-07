@@ -70,7 +70,7 @@ export function publishedThemeStyle(
       presentation.accentColor,
     ),
     // CUST-HV V5e-2a — document-level global tokens (absent ⇒ nothing is added).
-    ...(resolveGlobalTokens(presentation)?.style ?? {}),
+    ...(resolveGlobalTokens(presentation, presentation)?.style ?? {}),
     fontFamily: fontPresetFamilyStack(presentation.fontPreset),
   };
 }
@@ -82,7 +82,9 @@ export function publishedThemeStyle(
 export function publishedThemeAttrs(
   presentation: StorefrontPresentationConfig | null,
 ): Record<string, string> | undefined {
-  const attrs = resolveGlobalTokens(presentation ?? undefined)?.attrs;
+  const attrs = presentation
+    ? resolveGlobalTokens(presentation, presentation)?.attrs
+    : undefined;
   return attrs && Object.keys(attrs).length > 0 ? attrs : undefined;
 }
 

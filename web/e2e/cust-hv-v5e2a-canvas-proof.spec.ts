@@ -58,6 +58,27 @@ for (const locale of ['ar', 'en'] as const) {
           if (parseFloat(c.borderTopWidth) !== 2) failures.push(`card border ${c.borderTopWidth}`);
           if (c.boxShadow === 'none') failures.push('card has no shadow');
         }
+        // buttons (V5e-2b): the banner CTA is a soft pill, large, heavy, uppercase; its label is readable
+        for (const token of ['b-sz', 'b-rad', 'b-fw', 'b-up', 'b-pri', 'b-hv-lift']) {
+          if (!gt.split(' ').includes(token)) failures.push(`missing data-gt token ${token}`);
+        }
+        const cta = root.querySelector('.rounded-store.bg-store-primary.font-bold') as HTMLElement | null;
+        if (!cta) failures.push('no solid CTA found');
+        else {
+          const b = getComputedStyle(cta);
+          if (parseFloat(b.borderTopLeftRadius) < 1000) failures.push(`button radius ${b.borderTopLeftRadius}`);
+          if (b.fontWeight !== '800') failures.push(`button weight ${b.fontWeight}`);
+          if (b.textTransform !== 'uppercase') failures.push(`button case ${b.textTransform}`);
+          if (parseFloat(b.paddingTop) < 13) failures.push(`button size ${b.paddingTop}`);
+          const rgb = (c: string) => (c.match(/\d+(\.\d+)?/g) ?? []).slice(0, 3).map(Number);
+          const lin = (v: number) => (v / 255 <= 0.03928 ? v / 255 / 12.92 : ((v / 255 + 0.055) / 1.055) ** 2.4);
+          const lum = (c: number[]) => 0.2126 * lin(c[0]) + 0.7152 * lin(c[1]) + 0.0722 * lin(c[2]);
+          const fill = rgb(b.backgroundColor);
+          const label = rgb(b.color);
+          const ratio = (Math.max(lum(fill), lum(label)) + 0.05) / (Math.min(lum(fill), lum(label)) + 0.05);
+          if (b.backgroundColor === 'rgb(18, 55, 42)') failures.push('soft button still has the solid brand fill');
+          if (ratio < 4.5) failures.push(`button label contrast ${ratio.toFixed(2)}`);
+        }
         // layout: the container is narrow
         const container = root.querySelector('.max-w-store') as HTMLElement | null;
         if (container) {

@@ -259,7 +259,7 @@ export function StorefrontPreviewCanvas({
   );
   // CUST-HV V5e-2a — document-level global tokens: the same pure resolver the published
   // theme wrapper uses (absent ⇒ nothing is added).
-  const globalTokens = resolveGlobalTokens(config);
+  const globalTokens = resolveGlobalTokens(config, config);
   const vars = {
     ...presentationCssVars(config.primaryColor, config.radius, config.accentColor),
     ...(globalTokens?.style ?? {}),

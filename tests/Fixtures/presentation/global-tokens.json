@@ -1,5 +1,5 @@
 {
-  "_note": "CUST-HV V5e-2a — document-level global tokens (typography / surfaces / layout / motion). Shared by PHP StorefrontGlobalTokensNormalizer and both TS twins. `input` is the raw document subset; `expected` is exactly the normalised keys that survive (an empty object = none of the four keys are present).",
+  "_note": "CUST-HV V5e-2a — document-level global tokens (typography / buttons / surfaces / layout / motion). Shared by PHP StorefrontGlobalTokensNormalizer and both TS twins. `input` is the raw document subset; `expected` is exactly the normalised keys that survive (an empty object = none of the four keys are present).",
   "cases": [
     { "name": "absent", "input": {}, "expected": {} },
     { "name": "non-object groups are ignored", "input": { "typography": "lg", "surfaces": ["soft"], "layout": 3, "motion": null }, "expected": {} },
@@ -20,9 +20,49 @@
       "expected": {}
     },
     {
-      "name": "font families and button text are not accepted yet (V5e-2b/c)",
-      "input": { "typography": { "headingFamily": "cairo", "bodyFamily": "tajawal", "buttonText": { "weight": 700, "case": "upper" }, "headingScale": "lg" } },
+      "name": "font families are not accepted yet (V5e-2c)",
+      "input": { "typography": { "headingFamily": "cairo", "bodyFamily": "tajawal", "headingScale": "lg" } },
       "expected": { "typography": { "headingScale": "lg" } }
+    },
+    {
+      "name": "button text: weight and case, canonical order, after the other typography fields",
+      "input": { "typography": { "buttonText": { "case": "upper", "weight": 800 }, "lineHeight": "tight" } },
+      "expected": { "typography": { "lineHeight": "tight", "buttonText": { "weight": 800, "case": "upper" } } }
+    },
+    {
+      "name": "button text alone creates the typography group",
+      "input": { "typography": { "buttonText": { "weight": 500 } } },
+      "expected": { "typography": { "buttonText": { "weight": 500 } } }
+    },
+    {
+      "name": "button text: invalid weight/case are dropped on their own; strings and lists are not objects",
+      "input": { "typography": { "buttonText": { "weight": 600, "case": "lower" } } },
+      "expected": {}
+    },
+    {
+      "name": "button text must be an object",
+      "input": { "typography": { "buttonText": "upper", "headingWeight": 700 } },
+      "expected": { "typography": { "headingWeight": 700 } }
+    },
+    {
+      "name": "buttons: every field, canonical order",
+      "input": { "buttons": { "hover": "lift", "colour": "accent", "radius": "pill", "size": "lg", "style": "outline" } },
+      "expected": { "buttons": { "style": "outline", "size": "lg", "radius": "pill", "colour": "accent", "hover": "lift" } }
+    },
+    {
+      "name": "buttons: invalid values are dropped on their own",
+      "input": { "buttons": { "style": "ghost", "size": "md", "radius": "round", "colour": "text", "hover": "glow" } },
+      "expected": { "buttons": { "size": "md", "colour": "text" } }
+    },
+    {
+      "name": "buttons: colours are palette roles only — never a hex or CSS",
+      "input": { "buttons": { "colour": "#ff0000" } },
+      "expected": {}
+    },
+    {
+      "name": "buttons: an icon and per-state overrides are not accepted",
+      "input": { "buttons": { "icon": { "key": "cart", "placement": "start" }, "style": "soft" } },
+      "expected": { "buttons": { "style": "soft" } }
     },
     {
       "name": "surfaces: radius, border width and shadow, canonical order",
@@ -65,9 +105,9 @@
       "expected": {}
     },
     {
-      "name": "all four groups together keep a fixed key order",
-      "input": { "motion": { "duration": "fast" }, "layout": { "contentWidth": "narrow" }, "surfaces": { "radius": "none" }, "typography": { "lineHeight": "tight" } },
-      "expected": { "typography": { "lineHeight": "tight" }, "surfaces": { "radius": "none" }, "layout": { "contentWidth": "narrow" }, "motion": { "duration": "fast" } }
+      "name": "all five groups together keep a fixed key order",
+      "input": { "motion": { "duration": "fast" }, "layout": { "contentWidth": "narrow" }, "buttons": { "style": "soft" }, "surfaces": { "radius": "none" }, "typography": { "lineHeight": "tight" } },
+      "expected": { "typography": { "lineHeight": "tight" }, "buttons": { "style": "soft" }, "surfaces": { "radius": "none" }, "layout": { "contentWidth": "narrow" }, "motion": { "duration": "fast" } }
     },
     {
       "name": "css strings and injected content never survive",

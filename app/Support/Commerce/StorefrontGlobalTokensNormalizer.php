@@ -10,9 +10,9 @@ namespace App\Support\Commerce;
  * مفاتيح اختيارية إضافية بحتة: `typography` · `surfaces` · `layout` · `motion`. الغياب
  * (أو كل الحقول غير صالحة) = لا مفتاح، فتبقى مخرجات الوثيقة القديمة **بلا أي تغيير**.
  * قيمة خارج المجموعة المعدودة تُسقط وحدها (لا قيمة افتراضية مرئية)، والمجموعة الفارغة
- * تُحذف، والترتيب قانوني ثابت. خارج هذه الشريحة عمداً: عائلات الخطوط (V5e-2c: كتالوج
- * مستضاف ذاتياً) و`buttons`/`buttonText` (V5e-2b: يحتاج إثبات تباين التسمية) ولون حدّ
- * الأسطح؛ كلها تُسقط الآن fail-closed.
+ * تُحذف، والترتيب قانوني ثابت. V5e-2b يضيف `buttons` و`typography.buttonText` (إثبات تباين
+ * التسمية في `ButtonTokensContrast`). خارج النطاق عمداً: عائلات الخطوط (V5e-2c: كتالوج
+ * مستضاف ذاتياً) ولون حدّ الأسطح؛ تُسقط الآن fail-closed.
  */
 final class StorefrontGlobalTokensNormalizer
 {
@@ -27,6 +27,18 @@ final class StorefrontGlobalTokensNormalizer
     public const LINE_HEIGHTS = ['tight', 'normal', 'relaxed'];
 
     public const SECTION_HEADINGS = ['bar', 'plain', 'centered', 'underline'];
+
+    public const BUTTON_STYLES = ['solid', 'soft', 'outline', 'link'];
+
+    public const BUTTON_SIZES = ['sm', 'md', 'lg'];
+
+    public const BUTTON_COLOURS = ['brand', 'accent', 'text'];
+
+    public const BUTTON_HOVERS = ['darken', 'lift', 'underline', 'none'];
+
+    public const BUTTON_TEXT_WEIGHTS = [500, 700, 800];
+
+    public const BUTTON_TEXT_CASES = ['normal', 'upper'];
 
     public const RADII = ['none', 'sm', 'md', 'lg', 'pill'];
 
@@ -56,8 +68,29 @@ final class StorefrontGlobalTokensNormalizer
             'lineHeight' => self::LINE_HEIGHTS,
             'sectionHeading' => self::SECTION_HEADINGS,
         ]);
+        // `buttonText` (V5e-2b): كائنٌ متداخل — وزن + حالة أحرف.
+        $buttonText = self::isObject($input['typography'] ?? null)
+            ? self::pickFields($input['typography']['buttonText'] ?? null, [
+                'weight' => self::BUTTON_TEXT_WEIGHTS,
+                'case' => self::BUTTON_TEXT_CASES,
+            ])
+            : null;
+        if ($buttonText !== null) {
+            $typography = ($typography ?? []) + ['buttonText' => $buttonText];
+        }
         if ($typography !== null) {
             $out['typography'] = $typography;
+        }
+
+        $buttons = self::pickFields($input['buttons'] ?? null, [
+            'style' => self::BUTTON_STYLES,
+            'size' => self::BUTTON_SIZES,
+            'radius' => self::RADII,
+            'colour' => self::BUTTON_COLOURS,
+            'hover' => self::BUTTON_HOVERS,
+        ]);
+        if ($buttons !== null) {
+            $out['buttons'] = $buttons;
         }
 
         $surfaces = self::pickFields($input['surfaces'] ?? null, [

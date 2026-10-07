@@ -865,4 +865,68 @@ input[type="search"]::-webkit-search-cancel-button {
     scroll-behavior: auto !important;
   }
 }
+
+/*
+ * CUST-HV V5e-2b — global button tokens. "A primary button" = the store's solid CTA
+ * (`bg-store-primary` + `rounded-store` + `font-bold`: banner, product card, quick view) or the
+ * shared `Button` in its default variant; sizes / radius / text also reach its outline and
+ * secondary variants. Icon-only buttons are never touched. Keyed on tokens present only when set.
+ */
+/* every button: size step, corner, label weight and case (case is Latin-only: Arabic has no case) */
+[data-gt~="b-sz"] :where([class~="bg-store-primary"][class~="rounded-store"][class~="font-bold"], [data-slot="button"]:is([data-variant="default"], [data-variant="outline"], [data-variant="secondary"]):not([data-size^="icon"])) {
+  height: auto;
+  padding-block: var(--gt-bpy);
+  padding-inline: var(--gt-bpx);
+  font-size: var(--gt-bfs);
+}
+[data-gt~="b-rad"] :where([class~="bg-store-primary"][class~="rounded-store"][class~="font-bold"], [data-slot="button"]:is([data-variant="default"], [data-variant="outline"], [data-variant="secondary"]):not([data-size^="icon"])) {
+  border-radius: var(--gt-brad);
+}
+[data-gt~="b-fw"] :where([class~="bg-store-primary"][class~="rounded-store"][class~="font-bold"], [data-slot="button"]:is([data-variant="default"], [data-variant="outline"], [data-variant="secondary"]):not([data-size^="icon"])) {
+  font-weight: var(--gt-bfw);
+}
+[data-gt~="b-up"] :where([class~="bg-store-primary"][class~="rounded-store"][class~="font-bold"], [data-slot="button"]:is([data-variant="default"], [data-variant="outline"], [data-variant="secondary"]):not([data-size^="icon"])) {
+  text-transform: uppercase;
+}
+/* primary buttons: style / colour / hover (fill, label and border come from validated colours) */
+[data-gt~="b-pri"] :where([class~="bg-store-primary"][class~="rounded-store"][class~="font-bold"], [data-slot="button"][data-variant="default"]:not([data-size^="icon"])) {
+  background-color: var(--gt-bf);
+  color: var(--gt-bl);
+  border-color: var(--gt-bb);
+}
+[data-gt~="b-sty-outline"] :where([class~="bg-store-primary"][class~="rounded-store"][class~="font-bold"], [data-slot="button"][data-variant="default"]:not([data-size^="icon"])) {
+  border-width: 2px;
+  border-style: solid;
+}
+[data-gt~="b-sty-link"] :where([class~="bg-store-primary"][class~="rounded-store"][class~="font-bold"], [data-slot="button"][data-variant="default"]:not([data-size^="icon"])) {
+  text-decoration: underline;
+  text-underline-offset: 0.25em;
+}
+[data-gt~="b-pri"] :where([class~="bg-store-primary"][class~="rounded-store"][class~="font-bold"], [data-slot="button"][data-variant="default"]:not([data-size^="icon"])):hover:not(:disabled, [aria-disabled="true"]) {
+  background-color: var(--gt-bhf);
+  color: var(--gt-bhl);
+  border-color: var(--gt-bhb);
+}
+[data-gt~="b-hv-lift"] :where([class~="bg-store-primary"][class~="rounded-store"][class~="font-bold"], [data-slot="button"][data-variant="default"]:not([data-size^="icon"])):hover:not(:disabled, [aria-disabled="true"]) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(17, 24, 39, 0.18);
+}
+[data-gt~="b-hv-underline"] :where([class~="bg-store-primary"][class~="rounded-store"][class~="font-bold"], [data-slot="button"][data-variant="default"]:not([data-size^="icon"])):hover:not(:disabled, [aria-disabled="true"]) {
+  text-decoration: underline;
+}
+/* inside a section with a designed background an outline / link button follows the section's own
+   proven foreground (the colour judged at publish is for the page backdrops only) */
+[data-gt~="b-sty-outline"] [data-sd~="link"] :where([class~="bg-store-primary"][class~="rounded-store"][class~="font-bold"], [data-slot="button"][data-variant="default"]:not([data-size^="icon"])),
+[data-gt~="b-sty-link"] [data-sd~="link"] :where([class~="bg-store-primary"][class~="rounded-store"][class~="font-bold"], [data-slot="button"][data-variant="default"]:not([data-size^="icon"])),
+[data-gt~="b-sty-outline"] [data-sd~="link"] :where([class~="bg-store-primary"][class~="rounded-store"][class~="font-bold"], [data-slot="button"][data-variant="default"]:not([data-size^="icon"])):hover:not(:disabled),
+[data-gt~="b-sty-link"] [data-sd~="link"] :where([class~="bg-store-primary"][class~="rounded-store"][class~="font-bold"], [data-slot="button"][data-variant="default"]:not([data-size^="icon"])):hover:not(:disabled) {
+  color: var(--sec-link);
+  border-color: var(--sec-link);
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-gt~="b-hv-lift"] :where([class~="bg-store-primary"][class~="rounded-store"][class~="font-bold"], [data-slot="button"][data-variant="default"]:not([data-size^="icon"])):hover:not(:disabled, [aria-disabled="true"]) {
+    transform: none;
+    box-shadow: none;
+  }
+}
 }

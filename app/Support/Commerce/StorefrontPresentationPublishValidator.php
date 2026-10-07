@@ -46,6 +46,7 @@ final class StorefrontPresentationPublishValidator
     {
         return $this->announcementErrors($normalized['announcements'] ?? null)
             + SectionDesignContrast::errors($normalized)
+            + ButtonTokensContrast::errors($normalized)
             + $this->mediaErrors($normalized);
     }
 
