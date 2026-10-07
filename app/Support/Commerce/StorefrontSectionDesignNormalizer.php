@@ -350,6 +350,12 @@ final class StorefrontSectionDesignNormalizer
                 $out[$edge] = $kind;
             }
         }
+        // Colour and height only style an edge: without a top or bottom edge that renders, they
+        // are inert, invisible and uneditable metadata — the group is dropped altogether.
+        $active = array_filter($out, static fn (string $kind): bool => $kind !== 'none');
+        if ($active === []) {
+            return null;
+        }
         $color = self::colorRef($raw['color'] ?? null);
         if ($color !== null) {
             $out['color'] = $color;
@@ -359,7 +365,7 @@ final class StorefrontSectionDesignNormalizer
             $out['height'] = $height;
         }
 
-        return $out === [] ? null : $out;
+        return $out;
     }
 
     /** @param true|list<string>|null $allowance */

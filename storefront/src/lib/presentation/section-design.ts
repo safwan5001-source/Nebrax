@@ -402,11 +402,19 @@ function normalizeSeparator(raw: unknown): SectionSeparator | undefined {
     const kind = pick(raw[edge], SEPARATOR_KINDS);
     if (kind) out[edge] = kind;
   }
+  // Colour and height only style an edge: without a top or bottom edge that renders they are inert,
+  // invisible and uneditable metadata — the group is dropped altogether.
+  if (
+    !(out.top && out.top !== "none") &&
+    !(out.bottom && out.bottom !== "none")
+  ) {
+    return undefined;
+  }
   const color = normalizeColorRef(raw.color);
   if (color) out.color = color;
   const height = pick(raw.height, SEPARATOR_HEIGHTS);
   if (height) out.height = height;
-  return Object.keys(out).length > 0 ? out : undefined;
+  return out;
 }
 
 /**

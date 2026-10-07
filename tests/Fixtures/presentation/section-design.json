@@ -1440,6 +1440,37 @@
             }
         },
         {
+            "name": "separator: a colour or height without an active edge is inert metadata and is dropped",
+            "type": "hero",
+            "input": {
+                "separator": {
+                    "color": {
+                        "hex": "#fde68a"
+                    },
+                    "height": "lg"
+                },
+                "radius": "sm"
+            },
+            "expected": {
+                "radius": "sm"
+            }
+        },
+        {
+            "name": "separator: only none edges are not active — the whole group goes, colour and height with it",
+            "type": "banner",
+            "input": {
+                "separator": {
+                    "top": "none",
+                    "bottom": "none",
+                    "color": {
+                        "role": "border"
+                    },
+                    "height": "md"
+                }
+            },
+            "expected": null
+        },
+        {
             "name": "separator: css strings and injected content never survive",
             "type": "hero",
             "input": {
