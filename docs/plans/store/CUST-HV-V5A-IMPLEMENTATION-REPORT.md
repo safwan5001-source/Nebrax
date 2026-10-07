@@ -69,7 +69,7 @@ Automatic foreground (white or pure black, whichever is provably better) exists 
 
 - Lenient + deterministic (PHP authority `normalizePalette` + `palette.ts` twins, pinned by `tests/Fixtures/presentation/palette.json`, 11 cases): each role is kept or dropped on its own; **hex only**, lower-cased (one canonical form), fixed role order; CSS strings/functions/`url(...)`, non-strings, unknown roles and `brand`/`accent` keys never survive. Absent ⇒ the key is not emitted.
 - `PRESENTATION_CONFIG_VERSION` stays **3**; a document without `palette` normalises **byte-identically** (asserted in PHP and both TS apps).
-- `resolvePalette` returns `null` for a role the merchant did not set — meaning "keep today's fixed token". That is what makes *absent palette ⇒ unchanged* a property of the resolver, not a hope; and it keeps legacy `accentColor: null` documents rendering unchanged. `suggestAccent(brand)` is an editor-only swatch suggestion (never stored, never rendered unless chosen).
+- `resolvePalette`: **brand** = `primaryColor`; **accent** = `accentColor ?? derive(brand)` (V0 §4.1) — always a colour, so an explicit `{role: "accent"}` reference always resolves — with `accentIsDerived` so existing accent *chrome* (badges, highlights) keeps today's colour for legacy `accentColor: null` documents; every other role is `null` when unset, meaning "keep today's fixed token" — that is what makes *absent palette ⇒ unchanged* a property of the resolver, not a hope. `suggestAccent(brand)` (a 35 % brand→white tint) is the single derivation, deterministic and never stored. *(Review round: the first cut returned `null` for an unset accent; Codex correctly pointed at §4.1 — fixed in this PR.)*
 
 ---
 

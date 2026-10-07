@@ -48,8 +48,17 @@ export function normalizePalette(
 
 export interface ResolvedPalette {
   brand: string;
-  /** `null` = the merchant set no accent: keep today's colour at every accent site. */
-  accent: string | null;
+  /**
+   * The accent ROLE value (V0 §4.1): `accentColor ?? derive(brand)` — always a colour,
+   * so an explicit `{ role: "accent" }` reference in a design always resolves.
+   */
+  accent: string;
+  /**
+   * `true` when `accent` was derived because the merchant set no `accentColor`.
+   * Existing accent *chrome* (badges, highlights…) must then keep today's colour —
+   * legacy `accentColor: null` documents render unchanged (V0 §4.1).
+   */
+  accentIsDerived: boolean;
   surface: string | null;
   surfaceAlt: string | null;
   text: string | null;
@@ -60,8 +69,10 @@ export interface ResolvedPalette {
 }
 
 /**
- * `null` never means "black" — it means *no merchant choice*; the renderer then
- * uses the fixed token it uses today. That is what makes absent palette ⇒ unchanged.
+ * Brand and accent always resolve (accent per V0 §4.1: `accentColor ?? derive(brand)`).
+ * For the other roles `null` never means "black" — it means *no merchant choice*; the
+ * renderer then uses the fixed token it uses today. That is what makes absent palette
+ * ⇒ unchanged.
  */
 export function resolvePalette(config: {
   primaryColor: string;
@@ -69,12 +80,14 @@ export function resolvePalette(config: {
   palette?: PresentationPalette;
 }): ResolvedPalette {
   const p = config.palette ?? {};
+  const explicitAccent =
+    config.accentColor && isSafeHexColor(config.accentColor)
+      ? config.accentColor
+      : null;
   return {
     brand: config.primaryColor,
-    accent:
-      config.accentColor && isSafeHexColor(config.accentColor)
-        ? config.accentColor
-        : null,
+    accent: explicitAccent ?? suggestAccent(config.primaryColor),
+    accentIsDerived: explicitAccent === null,
     surface: p.surface ?? null,
     surfaceAlt: p.surfaceAlt ?? null,
     text: p.text ?? null,

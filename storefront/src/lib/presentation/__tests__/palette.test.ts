@@ -81,11 +81,28 @@ describe("resolvePalette (V5a)", () => {
   it("an unset role is null — the renderer keeps today's token (absent ⇒ unchanged)", () => {
     const r = resolvePalette({ primaryColor: "#12372a", accentColor: null });
     expect(r.brand).toBe("#12372a");
-    expect(r.accent).toBeNull();
     for (const role of PALETTE_ROLES) expect(r[role]).toBeNull();
   });
 
-  it("brand is primaryColor, accent is accentColor, the rest come from palette", () => {
+  it("accent is always a colour: accentColor ?? derive(brand) (V0 §4.1), and says when it was derived", () => {
+    const none = resolvePalette({ primaryColor: "#12372a", accentColor: null });
+    expect(none.accent).toBe(suggestAccent("#12372a"));
+    expect(none.accentIsDerived).toBe(true);
+    const set = resolvePalette({
+      primaryColor: "#12372a",
+      accentColor: "#c8a24a",
+    });
+    expect(set.accent).toBe("#c8a24a");
+    expect(set.accentIsDerived).toBe(false);
+  });
+
+  it("an unsafe accent never resolves as the merchant's choice — it is derived instead", () => {
+    const r = resolvePalette({ primaryColor: "#12372a", accentColor: "red" });
+    expect(r.accentIsDerived).toBe(true);
+    expect(r.accent).toBe(suggestAccent("#12372a"));
+  });
+
+  it("brand is primaryColor and the other roles come from palette", () => {
     const r = resolvePalette({
       primaryColor: "#12372a",
       accentColor: "#c8a24a",
@@ -100,15 +117,10 @@ describe("resolvePalette (V5a)", () => {
     });
   });
 
-  it("an unsafe accent never resolves", () => {
-    expect(
-      resolvePalette({ primaryColor: "#12372a", accentColor: "red" }).accent,
-    ).toBeNull();
-  });
-
-  it("the accent suggestion is editor-only, a valid hex, and not the brand itself", () => {
+  it("the accent suggestion is a valid hex, deterministic, and not the brand itself", () => {
     const s = suggestAccent("#12372a");
     expect(s).toMatch(/^#[0-9a-f]{6}$/);
     expect(s).not.toBe("#12372a");
+    expect(suggestAccent("#12372a")).toBe(s);
   });
 });
