@@ -109,7 +109,31 @@ export interface DeliveryPromiseContent {
   body: string;
 }
 
+/** CUST-HV V6a (V0 §8.2) — one call to action of a hero instance. */
+export interface HeroCta {
+  label: string;
+  href: string;
+}
+
+/**
+ * CUST-HV V6a — a hero instance's own content. Absent ⇒ the legacy global
+ * `homepage.heroHeadline/heroSubheadline` (V0 §8.1.4); `{ headline: "" }` is explicit empty
+ * content (store name + the default CTA).
+ */
+export interface HeroContent {
+  headline: string;
+  subheadline?: string;
+  /** At most {@link MAX_HERO_CTAS}; the model never needs a later migration for a second CTA. */
+  ctas?: HeroCta[];
+}
+
+export const MAX_HERO_HEADLINE_LENGTH = 120;
+export const MAX_HERO_SUBHEADLINE_LENGTH = 200;
+export const MAX_HERO_CTAS = 2;
+export const MAX_HERO_CTA_LABEL_LENGTH = 80;
+
 export type SectionContent =
+  | HeroContent
   | BannerContent
   | BenefitsContent
   | CustomContent
@@ -118,6 +142,17 @@ export type SectionContent =
   | ProductShelfContent
   | DiscoveryContent
   | DeliveryPromiseContent;
+
+/** The hero instance's own content, or `undefined` while it still reads the legacy globals. */
+export function heroContentOf(section: {
+  type: string;
+  content?: SectionContent;
+}): HeroContent | undefined {
+  return section.type === "hero" && section.content && "headline" in section.content
+    ? section.content
+    : undefined;
+}
+
 
 export function emptyBannerContent(): BannerContent {
   return {
@@ -226,6 +261,9 @@ export function normalizeOptionalSectionContent(
       ? (raw as Record<string, unknown>)
       : {};
 
+  if (type === "hero") {
+    return normalizeHero(raw);
+  }
   if (type === "banner") {
     const content = normalizeBanner(source);
     return isEmptyBanner(content) ? undefined : content;
@@ -281,6 +319,46 @@ export function sanitizeContentHref(value: string): string {
   }
   return sanitizeExternalUrl(trimmed) ?? "";
 }
+
+/**
+ * Hero text is kept as written, only code-point truncated (the editor re-normalizes the whole
+ * config on every keystroke, so trimming would swallow the space typed between two words; the
+ * renderers trim). Whitespace alone collapses to "".
+ */
+function heroText(value: unknown, max: number): string {
+  const text = asString(value);
+  return text.trim() === "" ? "" : truncateToCodePoints(text, max);
+}
+
+function normalizeHero(raw: unknown): HeroContent | undefined {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return undefined;
+  const source = raw as Record<string, unknown>;
+  const headline = heroText(source.headline, MAX_HERO_HEADLINE_LENGTH);
+  const subheadline = heroText(source.subheadline, MAX_HERO_SUBHEADLINE_LENGTH);
+  const ctas: HeroCta[] = [];
+  const rawCtas = Array.isArray(source.ctas) ? source.ctas : [];
+  for (const item of rawCtas) {
+    if (!item || typeof item !== "object" || Array.isArray(item)) continue;
+    const entry = item as Record<string, unknown>;
+    const label = heroText(entry.label, MAX_HERO_CTA_LABEL_LENGTH);
+    const href = sanitizeContentHref(asString(entry.href));
+    // a draft keeps what the merchant typed (a label without a link or the reverse); only the
+    // complete CTA renders. A wholly empty one is dropped.
+    if (label === "" && href === "") continue;
+    ctas.push({ label, href });
+    if (ctas.length >= MAX_HERO_CTAS) break;
+  }
+  // explicit content only when something was written: a string `headline` key (even empty),
+  // a subheadline, or a CTA
+  if (typeof source.headline !== "string" && subheadline === "" && ctas.length === 0) {
+    return undefined;
+  }
+  const content: HeroContent = { headline };
+  if (subheadline !== "") content.subheadline = subheadline;
+  if (ctas.length > 0) content.ctas = ctas;
+  return content;
+}
+
 
 function normalizeBanner(source: Record<string, unknown>): BannerContent {
   const image = sanitizeExternalUrl(asString(source.imageUrl));

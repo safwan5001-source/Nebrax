@@ -31,6 +31,17 @@ final class StorefrontPresentationNormalizer
 
     public const MAX_HOME_SECTIONS = 30;
 
+    /** CUST-HV V6a (V0 §8.1) — بطل لكل instance، محدود: Banner/Slider تغطيان الأشرطة الإضافية. */
+    public const MAX_HERO_INSTANCES = 3;
+
+    private const MAX_HERO_HEADLINE_LENGTH = 120;
+
+    private const MAX_HERO_SUBHEADLINE_LENGTH = 200;
+
+    private const MAX_HERO_CTAS = 2;
+
+    private const MAX_HERO_CTA_LABEL_LENGTH = 80;
+
     public const MAX_DOCUMENT_BYTES = 1572864; // 1.5 MiB
 
     public const MAX_LOGO_BYTES = 524288; // 512 KiB
@@ -671,6 +682,7 @@ final class StorefrontPresentationNormalizer
         $out = [];
         $seenIds = [];
         $seenTypes = [];
+        $heroCount = [];
         foreach ($configured as $section) {
             if (! is_array($section)) {
                 continue;
@@ -694,8 +706,14 @@ final class StorefrontPresentationNormalizer
                 continue;
             }
 
+            // CUST-HV V6a — سقف نسخ البطل (V0 §8.1.1): الزائد يُسقَط بعد أول ثلاث بالترتيب.
+            if ($type === 'hero' && ($heroCount[$type] ?? 0) >= self::MAX_HERO_INSTANCES) {
+                continue;
+            }
+
             $seenIds[$id] = true;
             $seenTypes[$type] = true;
+            $heroCount[$type] = ($heroCount[$type] ?? 0) + 1;
             $instance = [
                 'id' => $id,
                 'type' => $type,
@@ -737,6 +755,10 @@ final class StorefrontPresentationNormalizer
     private function normalizeOptionalSectionContent(string $type, mixed $raw): ?array
     {
         $source = $this->object($raw);
+
+        if ($type === 'hero') {
+            return $this->normalizeHeroContent($raw);
+        }
 
         if ($type === 'banner') {
             $content = [
@@ -918,6 +940,65 @@ final class StorefrontPresentationNormalizer
         }
 
         return null;
+    }
+
+    /**
+     * CUST-HV V6a (V0 §8.2) — محتوى البطل لكل instance: عنوان ≤120 وعنوان فرعي ≤200 (بنقاط ترميز)
+     * و≤2 CTA ({label ≤80, href} بقواعد `sanitizeContentHref`؛ المسودة الناقصة تُحفظ ولا تُعرض). الغياب يعني «اقرأ النص القديم
+     * homepage.heroHeadline/heroSubheadline» (V0 §8.1.4)، أما `{headline: ""}` فهو محتوى صريح فارغ
+     * (اسم المتجر + CTA الافتراضي) ويبقى. الترتيب القانوني: headline، subheadline، ctas.
+     *
+     * @return array{headline: string, subheadline?: string, ctas?: list<array{label: string, href: string}>}|null
+     */
+    private function normalizeHeroContent(mixed $raw): ?array
+    {
+        if (! is_array($raw) || ($raw !== [] && array_is_list($raw))) {
+            return null;
+        }
+
+        // النص يُحفظ كما كُتب (المحرّر يعيد التطبيع عند كل ضغطة، فالقصّ يبتلع المسافة بين الكلمات؛ والعرض
+        // يقصّ دائماً) — الفراغ وحده يُختزل إلى ''.
+        $headline = $this->heroText($raw['headline'] ?? null, self::MAX_HERO_HEADLINE_LENGTH);
+        $subheadline = $this->heroText($raw['subheadline'] ?? null, self::MAX_HERO_SUBHEADLINE_LENGTH);
+
+        $ctas = [];
+        foreach (array_values(is_array($raw['ctas'] ?? null) ? $raw['ctas'] : []) as $item) {
+            if (! is_array($item) || array_is_list($item)) {
+                continue;
+            }
+            $label = $this->heroText($item['label'] ?? null, self::MAX_HERO_CTA_LABEL_LENGTH);
+            $href = $this->sanitizeContentHref($this->asString($item['href'] ?? null));
+            // مسودة: يُحفظ ما كتبه التاجر (تسمية بلا رابط أو العكس) ولا يُعرض إلا الـCTA المكتمل؛ الفارغ كلياً يسقط.
+            if ($label === '' && $href === '') {
+                continue;
+            }
+            $ctas[] = ['label' => $label, 'href' => $href];
+            if (count($ctas) >= self::MAX_HERO_CTAS) {
+                break;
+            }
+        }
+
+        // محتوى صريح فقط إن كُتب شيء: مفتاح headline نصّي (حتى الفارغ)، أو عنوان فرعي، أو CTA.
+        if (! (array_key_exists('headline', $raw) && is_string($raw['headline'])) && $subheadline === '' && $ctas === []) {
+            return null;
+        }
+
+        $content = ['headline' => $headline];
+        if ($subheadline !== '') {
+            $content['subheadline'] = $subheadline;
+        }
+        if ($ctas !== []) {
+            $content['ctas'] = $ctas;
+        }
+
+        return $content;
+    }
+
+    private function heroText(mixed $value, int $max): string
+    {
+        $text = $this->asString($value);
+
+        return trim($text) === '' ? '' : mb_substr($text, 0, $max);
     }
 
     private function sanitizeContentHref(string $value): string

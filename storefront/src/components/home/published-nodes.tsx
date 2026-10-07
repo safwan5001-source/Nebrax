@@ -29,6 +29,17 @@ import {
 import type { ThemePresetId } from "@/lib/presentation/tokens";
 
 /**
+ * CUST-HV V6a (V0 §8.1.3) — whether the page has a visible hero to carry its one `<h1>`. A
+ * published document may hold none (hero is deletable); the page then names the store in a
+ * visually-hidden `<h1>` instead.
+ */
+export function hasVisibleHero(
+  sections: readonly PresentationHomeSection[],
+): boolean {
+  return sections.some((section) => section.visible && section.type === "hero");
+}
+
+/**
  * The published homepage's section stack (moved out of `page.tsx`, which may only export
  * a page, so it can be tested). Behaviour is unchanged except that a *designed* section
  * is not wrapped in an intermediary div — its `SectionDesignFrame` is the wrapper.
@@ -37,6 +48,17 @@ export async function publishedNodes(
   sections: readonly PresentationHomeSection[],
   ctx: {
     implemented: Record<HomeSectionKey, React.ReactNode>;
+    /**
+     * CUST-HV V6a (V0 §8.1) — renders ONE hero instance from its own content (or the legacy
+     * globals while it has none). `headingLevel` is 1 for the first visible hero and 2 for any
+     * further one, so the page keeps exactly one `<h1>`. Absent ⇒ the hero is the shared,
+     * type-keyed `implemented.hero` node, as before.
+     */
+    renderHero?: (args: {
+      section: PresentationHomeSection;
+      headingLevel: 1 | 2;
+      designed: boolean;
+    }) => React.ReactNode;
     basePath: string;
     locale: string;
     currency?: string;
@@ -56,10 +78,13 @@ export async function publishedNodes(
   },
 ): Promise<React.ReactNode[]> {
   const nodes: React.ReactNode[] = [];
+  const firstHeroId = sections.find(
+    (section) => section.visible && section.type === "hero",
+  )?.id;
   for (const section of sections) {
     if (!section.visible) continue;
     const before = nodes.length;
-    await pushSectionNode(nodes, section, ctx);
+    await pushSectionNode(nodes, section, ctx, firstHeroId);
     // CUST-HV V5c — wrap only a section that carries a design; any other section is
     // exactly the node it always was.
     if (section.design && nodes.length === before + 1) {
@@ -89,7 +114,28 @@ async function pushSectionNode(
   nodes: React.ReactNode[],
   section: PresentationHomeSection,
   ctx: Parameters<typeof publishedNodes>[1],
+  firstHeroId: string | undefined,
 ): Promise<void> {
+  if (section.type === "hero" && ctx.renderHero) {
+    // Instance-keyed (V6a): each hero renders its own content. The same wrapper rules apply as for
+    // every other built-in — a designed hero is wrapped by its frame alone, an undesigned one keeps
+    // the legacy div, so a content-less default hero is byte-identical to before.
+    const framed =
+      resolveSectionDesign(section.type, section.design, ctx.design) !== null;
+    const node = ctx.renderHero({
+      section,
+      headingLevel: section.id === firstHeroId ? 1 : 2,
+      designed: framed,
+    });
+    nodes.push(
+      framed ? (
+        <Fragment key={section.id}>{node}</Fragment>
+      ) : (
+        <div key={section.id}>{node}</div>
+      ),
+    );
+    return;
+  }
   if (
     section.type === "hero" ||
     section.type === "categories" ||

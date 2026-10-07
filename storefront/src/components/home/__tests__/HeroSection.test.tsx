@@ -74,4 +74,85 @@ describe("HeroSection (COM-7-P3A)", () => {
       "min-h-[11rem]",
     );
   });
+
+  describe("per-instance hero (CUST-HV V6a)", () => {
+    it("keeps today's markup: an <h1 id=home-hero> and the one default CTA", async () => {
+      const { HeroSection } = await import("../HeroSection");
+      const { container } = render(
+        await HeroSection({
+          basePath: "/sa/en",
+          locale: "en",
+          storeName: "Shop",
+        }),
+      );
+      const h1 = container.querySelector("h1#home-hero");
+      expect(h1).toBeTruthy();
+      expect(
+        container.querySelector("section")?.getAttribute("aria-labelledby"),
+      ).toBe("home-hero");
+      expect(container.querySelectorAll("a")).toHaveLength(1);
+      expect(container.querySelector("[data-hero-cta]")).toBeNull();
+    });
+
+    it("a further hero is an <h2> with its own id (one <h1> per page)", async () => {
+      const { HeroSection } = await import("../HeroSection");
+      const { container } = render(
+        await HeroSection({
+          basePath: "/sa/en",
+          locale: "en",
+          storeName: "Shop",
+          headline: "Second",
+          headingId: "home-hero-two",
+          headingLevel: 2,
+        }),
+      );
+      expect(container.querySelector("h1")).toBeNull();
+      const h2 = container.querySelector("h2#home-hero-two");
+      expect(h2?.textContent).toBe("Second");
+      expect(
+        container.querySelector("section")?.getAttribute("aria-labelledby"),
+      ).toBe("home-hero-two");
+    });
+
+    it("authored CTAs replace the default one: primary then secondary, store-path hrefs prefixed", async () => {
+      const { HeroSection } = await import("../HeroSection");
+      const { container } = render(
+        await HeroSection({
+          basePath: "/sa/en",
+          locale: "en",
+          storeName: "Shop",
+          ctas: [
+            { label: "New in", href: "/collections/new" },
+            { label: "Our story", href: "https://example.com/about" },
+          ],
+        }),
+      );
+      const links = [...container.querySelectorAll("a")];
+      expect(
+        links.map((a) => [
+          a.textContent,
+          a.getAttribute("href"),
+          a.getAttribute("data-hero-cta"),
+        ]),
+      ).toEqual([
+        ["New in", "/sa/en/collections/new", "primary"],
+        ["Our story", "https://example.com/about", "secondary"],
+      ]);
+      expect(container.querySelector('a[href="/sa/en/products"]')).toBeNull();
+    });
+
+    it("CTAs whose destination cannot be resolved fall back to the default CTA", async () => {
+      const { HeroSection } = await import("../HeroSection");
+      const { container } = render(
+        await HeroSection({
+          basePath: "/sa/en",
+          locale: "en",
+          storeName: "Shop",
+          ctas: [{ label: "Bad", href: "javascript:alert(1)" }],
+        }),
+      );
+      expect(container.querySelector('a[href="/sa/en/products"]')).toBeTruthy();
+      expect(container.textContent).not.toContain("Bad");
+    });
+  });
 });

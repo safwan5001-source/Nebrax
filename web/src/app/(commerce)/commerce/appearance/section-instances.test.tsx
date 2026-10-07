@@ -159,11 +159,12 @@ describe('commerce appearance — STORE-CUSTOMIZER-V2-2 section instances', () =
     expect(offersOption.textContent).not.toContain('غير مفعّل');
     expect(offersOption.textContent).not.toContain('العروض قادمة');
     expect(picker.textContent).not.toContain('غير مفعّل');
-    // Existing singletons are disabled; multi-instance types are not.
+    // Existing singletons are disabled; multi-instance types are not — and a hero is bounded
+    // per-instance (V6a), so with one of its three allowed instances it can still be added.
     expect(
       (picker.querySelector('[data-picker-option="hero"]') as HTMLButtonElement)
         .disabled,
-    ).toBe(true);
+    ).toBe(false);
     expect(
       (picker.querySelector('[data-picker-option="appPromo"]') as HTMLButtonElement)
         .disabled,
@@ -318,22 +319,27 @@ describe('commerce appearance — STORE-CUSTOMIZER-V2-2 section instances', () =
     ).toEqual([first, second]);
   });
 
-  it('does not offer delete for hero while hero content remains global', async () => {
+  it('a hero is a normal instance: it can be duplicated and deleted, and the page may end up with none (V6a)', async () => {
     const user = userEvent.setup();
     render(<CommerceAppearancePage />);
     await waitFor(() => expect(showMock).toHaveBeenCalled());
     await openHomepage(user);
 
-    const heroRow = document.querySelector(
-      '[data-section-id="hero"]',
-    ) as HTMLElement;
+    const heroRow = () =>
+      document.querySelector('[data-section-id="hero"]') as HTMLElement | null;
 
-    expect(
-      heroRow.querySelector('button[aria-label="حذف القسم"]'),
-    ).toBeNull();
-    expect(
-      heroRow.querySelector('input[type="checkbox"]'),
-    ).toBeTruthy();
+    expect(heroRow()!.querySelector('button[aria-label="حذف القسم"]')).toBeTruthy();
+    expect(heroRow()!.querySelector('button[aria-label="تكرار القسم"]')).toBeTruthy();
+    expect(heroRow()!.querySelector('input[type="checkbox"]')).toBeTruthy();
+
+    // duplicate → a second hero row with its own id, immediately selected
+    await user.click(heroRow()!.querySelector('button[aria-label="تكرار القسم"]') as HTMLElement);
+    expect(document.querySelectorAll('[data-composer-section="hero"]')).toHaveLength(2);
+
+    // delete the original (a hero that still reads the legacy text is not "authored": no confirm)
+    await user.click(heroRow()!.querySelector('button[aria-label="حذف القسم"]') as HTMLElement);
+    expect(heroRow()).toBeNull();
+    expect(document.querySelectorAll('[data-composer-section="hero"]')).toHaveLength(1);
   });
 
   it('delete removes the instance from the list (not a hide) and moves selection to the next sibling', async () => {

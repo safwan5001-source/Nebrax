@@ -42,6 +42,7 @@ import {
 import { PREVIEW_FONT_VARIABLES } from "./presentation/fonts";
 import {
   bannerContentOf,
+  heroContentOf,
   benefitsContentOf,
   customContentOf,
   featuredContentOf,
@@ -258,6 +259,10 @@ export function StorefrontPreviewCanvas({
     liveStoreName,
     PREVIEW_STORE_NAME[locale],
   );
+  // CUST-HV V6a — the first visible hero carries the page's one <h1>.
+  const firstHeroId = config.homepage.sections.find(
+    (section) => section.visible && section.type === "hero",
+  )?.id;
   // CUST-HV V5e-2a — document-level global tokens: the same pure resolver the published
   // theme wrapper uses (absent ⇒ nothing is added).
   const globalTokens = resolveGlobalTokens(config, config);
@@ -618,26 +623,62 @@ export function StorefrontPreviewCanvas({
           .map((section) => {
             const content = ((): ReactNode => {
             if (section.type === "hero") {
-              const title = config.homepage.heroHeadline.trim() || storeName;
-              const sub = config.homepage.heroSubheadline.trim();
+              // Each hero reads its OWN content; without any it keeps reading the legacy globals.
+              const own = heroContentOf(section);
+              const title =
+                (own ? own.headline.trim() : config.homepage.heroHeadline.trim()) || storeName;
+              const sub = own
+                ? (own.subheadline ?? "").trim()
+                : config.homepage.heroSubheadline.trim();
+              // only a COMPLETE call to action renders (a draft with a label but no link — or the
+              // reverse — is kept in the document but shown as the default CTA, like the storefront)
+              const ctas = (own?.ctas ?? []).filter(
+                (cta) =>
+                  cta.label.trim() !== "" &&
+                  (cta.href.startsWith("/") || cta.href.startsWith("https://")),
+              );
+              // exactly one <h1> per page: the first visible hero; any further one is an <h2>
+              const Heading = section.id === firstHeroId ? "h1" : "h2";
               return (
                 <section
-                  key="hero"
+                  key={section.id}
                   aria-label={t("sectionHero")}
                   className="flex min-h-[11rem] items-center rounded-store bg-gradient-to-r from-primary-700 via-primary-600 to-primary-500 text-store-primary-foreground md:min-h-[16rem]"
                 >
                   <div data-section-content="" className="max-w-2xl p-5 md:p-10">
-                    <h1 className="text-xl font-black leading-tight sm:text-2xl lg:text-4xl">
+                    <Heading
+                      data-preview-hero-heading=""
+                      className="text-xl font-black leading-tight sm:text-2xl lg:text-4xl"
+                    >
                       <bdi>{title}</bdi>
-                    </h1>
+                    </Heading>
                     {sub ? (
                       <p className="mt-2 line-clamp-2 text-xs text-store-primary-foreground/80 md:mt-3 md:text-sm">
                         {sub}
                       </p>
                     ) : null}
-                    <span className="mt-4 inline-flex h-9 items-center rounded-store bg-store-primary-foreground px-4 text-xs font-bold text-store-primary md:mt-5 md:h-11 md:px-6 md:text-sm">
-                      {t("shopNow")}
-                    </span>
+                    {ctas.length === 0 ? (
+                      <span className="mt-4 inline-flex h-9 items-center rounded-store bg-store-primary-foreground px-4 text-xs font-bold text-store-primary md:mt-5 md:h-11 md:px-6 md:text-sm">
+                        {t("shopNow")}
+                      </span>
+                    ) : (
+                      <div className="mt-4 flex flex-wrap items-center gap-2 md:mt-5 md:gap-3">
+                        {ctas.map((cta, index) => (
+                          <span
+                            key={`${index}-${cta.href}`}
+                            data-preview-hero-cta={index === 0 ? "primary" : "secondary"}
+                            className={cn(
+                              "inline-flex h-9 items-center rounded-store px-4 text-xs font-bold md:h-11 md:px-6 md:text-sm",
+                              index === 0
+                                ? "bg-store-primary-foreground text-store-primary"
+                                : "border-2 border-store-primary-foreground/70 text-store-primary-foreground",
+                            )}
+                          >
+                            {cta.label}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </section>
               );
@@ -1275,6 +1316,14 @@ export function StorefrontPreviewCanvas({
               </SelectablePreviewSection>
             );
           })}
+        {firstHeroId === undefined ? (
+          // CUST-HV V6a (V0 §8.1.3) — the page always has one <h1>: with no visible hero the store
+          // is named in a visually-hidden one, exactly as the published storefront does (last in the
+          // stack, so the stack's vertical rhythm is unaffected).
+          <h1 className="sr-only" data-preview-store-heading="">
+            <bdi>{storeName}</bdi>
+          </h1>
+        ) : null}
       </div>
       )}
 

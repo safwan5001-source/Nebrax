@@ -35,10 +35,11 @@ describe("section capabilities (STORE-CUSTOMIZER-V2-2)", () => {
     );
   });
 
-  it("marks hero as singleton and non-duplicable", () => {
+  it("marks hero as a bounded, duplicable and deletable per-instance section (CUST-HV V6a)", () => {
     expect(SECTION_CAPABILITIES.hero).toMatchObject({
-      maxInstances: 1,
-      canDuplicate: false,
+      maxInstances: 3,
+      canDuplicate: true,
+      canDelete: true,
     });
   });
 
@@ -69,11 +70,21 @@ describe("section capabilities (STORE-CUSTOMIZER-V2-2)", () => {
 
   it("rejects adding a singleton type that already exists", () => {
     const sections = DEFAULT_PRESENTATION_CONFIG.homepage.sections;
-    // Defaults already contain hero/categories/newArrivals/wholesale.
-    expect(canAddSectionType(sections, "hero")).toBe(false);
+    // Defaults already contain categories/newArrivals/wholesale (a hero is no longer a singleton).
     expect(canAddSectionType(sections, "categories")).toBe(false);
     expect(canAddSectionType(sections, "newArrivals")).toBe(false);
     expect(canAddSectionType(sections, "wholesale")).toBe(false);
+  });
+
+  it("a hero can be added until the bound of three is reached, then no further (V6a)", () => {
+    const withHeroes = (count: number) => [
+      ...DEFAULT_PRESENTATION_CONFIG.homepage.sections.filter((s) => s.type !== "hero"),
+      ...Array.from({ length: count }, (_, i) => section(`hero-${i}`, "hero")),
+    ];
+    expect(canAddSectionType(withHeroes(0), "hero")).toBe(true); // zero heroes is allowed
+    expect(canAddSectionType(withHeroes(1), "hero")).toBe(true);
+    expect(canAddSectionType(withHeroes(2), "hero")).toBe(true);
+    expect(canAddSectionType(withHeroes(3), "hero")).toBe(false);
   });
 
   it("allows adding a singleton type that is absent", () => {
@@ -105,8 +116,18 @@ describe("section capabilities (STORE-CUSTOMIZER-V2-2)", () => {
     const hero = section("hero", "hero");
     const banner = section("b1", "banner", false);
     const sections = [hero, banner];
-    expect(canDuplicateSection(sections, hero)).toBe(false);
+    expect(canDuplicateSection(sections, hero)).toBe(true);
     expect(canDuplicateSection(sections, banner)).toBe(true);
+    // a singleton type never duplicates
+    const categories = section("c1", "categories");
+    expect(canDuplicateSection([categories], categories)).toBe(false);
+  });
+
+  it("a duplicate is one more instance, so it respects the type's own bound (hero ≤ 3, V6a)", () => {
+    const heroes = [section("h1", "hero"), section("h2", "hero")];
+    expect(canDuplicateSection(heroes, heroes[0])).toBe(true);
+    const full = [...heroes, section("h3", "hero")];
+    expect(canDuplicateSection(full, full[0])).toBe(false);
   });
 
   it("blocks duplicate at the section cap", () => {

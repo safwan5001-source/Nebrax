@@ -3,7 +3,10 @@ import { getTranslations } from "next-intl/server";
 import { CategoriesSection } from "@/components/home/CategoriesSection";
 import { HeroSection } from "@/components/home/HeroSection";
 import { NewArrivalsSection } from "@/components/home/NewArrivalsSection";
-import { publishedNodes } from "@/components/home/published-nodes";
+import {
+  hasVisibleHero,
+  publishedNodes,
+} from "@/components/home/published-nodes";
 import { WholesaleSection } from "@/components/home/WholesaleSection";
 import { StoreContainer } from "@/components/layout/StoreContainer";
 import { localeDirection } from "@/i18n/locales";
@@ -13,6 +16,7 @@ import { type HomeSectionKey, resolveHomeSections } from "@/lib/home/sections";
 import { generateHomeMetadata } from "@/lib/metadata/home";
 import { publishedStoreName } from "@/lib/presentation/public";
 import { publishedHomeStackClass } from "@/lib/presentation/public-rhythm";
+import { heroContentOf } from "@/lib/presentation/section-content";
 
 interface HomePageProps {
   params: Promise<{
@@ -43,6 +47,10 @@ export default async function HomePage({ params }: HomePageProps) {
   const homeCopy = await getTranslations({
     locale: locale as Locale,
     namespace: "home",
+  });
+  const footerCopy = await getTranslations({
+    locale: locale as Locale,
+    namespace: "footer",
   });
 
   const implemented: Record<HomeSectionKey, React.ReactNode> = {
@@ -83,6 +91,27 @@ export default async function HomePage({ params }: HomePageProps) {
   const nodes: React.ReactNode[] = presentation
     ? await publishedNodes(presentation.homepage.sections, {
         implemented,
+        // CUST-HV V6a — each hero instance renders its own content; a hero without any keeps
+        // reading the legacy `homepage.heroHeadline/heroSubheadline` (V0 §8.1.4).
+        renderHero: ({ section, headingLevel, designed }) => {
+          const own = heroContentOf(section);
+          return (
+            <HeroSection
+              basePath={basePath}
+              locale={locale}
+              storeName={storeName || null}
+              headline={own ? own.headline : heroHeadline}
+              subheadline={own ? (own.subheadline ?? null) : heroSubheadline}
+              ctas={own?.ctas ?? null}
+              headingId={
+                section.id === "hero" ? "home-hero" : `home-hero-${section.id}`
+              }
+              headingLevel={headingLevel}
+              themePreset={presentation.themePreset}
+              designed={designed}
+            />
+          );
+        },
         basePath,
         locale,
         currency,
@@ -107,9 +136,21 @@ export default async function HomePage({ params }: HomePageProps) {
           <div key={section.key}>{implemented[section.key]}</div>
         ));
 
+  // CUST-HV V6a (V0 §8.1.3) — a home page always has exactly one <h1>: with no visible hero, a
+  // visually-hidden one names the store.
+  const showsHero = presentation
+    ? hasVisibleHero(presentation.homepage.sections)
+    : true;
+
   return (
     <StoreContainer className={publishedHomeStackClass(presentation?.density)}>
       {nodes}
+      {showsHero ? null : (
+        // last in the stack so its (absolutely positioned) box never alters the vertical rhythm
+        <h1 className="sr-only">
+          <bdi>{storeName || footerCopy("shop")}</bdi>
+        </h1>
+      )}
     </StoreContainer>
   );
 }
