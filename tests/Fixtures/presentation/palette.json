@@ -1,0 +1,16 @@
+{
+  "_note": "CUST-HV V5a — palette roles. Shared by PHP StorefrontPresentationNormalizer and both TS twins. `expected` is the normalised `palette` key of the config (null = key absent).",
+  "cases": [
+    { "name": "absent", "input": null, "expected": null },
+    { "name": "not an object", "input": "#ffffff", "expected": null },
+    { "name": "a list is not an object", "input": ["#ffffff"], "expected": null },
+    { "name": "empty object", "input": {}, "expected": null },
+    { "name": "all roles, canonical lower-case, fixed order", "input": { "overlay": "#000000", "border": "#E5E7EB", "link": "#0B5FFF", "heading": "#111111", "text": "#222222", "surfaceAlt": "#F5F5F5", "surface": "#FFFFFF" }, "expected": { "surface": "#ffffff", "surfaceAlt": "#f5f5f5", "text": "#222222", "heading": "#111111", "link": "#0b5fff", "border": "#e5e7eb", "overlay": "#000000" } },
+    { "name": "an invalid role is dropped on its own", "input": { "surface": "#ffffff", "text": "red", "link": "#fff", "border": "#12345g" }, "expected": { "surface": "#ffffff" } },
+    { "name": "css strings and functions never survive", "input": { "surface": "rgb(0,0,0)", "text": "url(javascript:alert(1))", "heading": "#111111; background:red" }, "expected": null },
+    { "name": "non-string values are dropped", "input": { "surface": 16777215, "text": null, "link": true, "border": { "hex": "#ffffff" } }, "expected": null },
+    { "name": "surrounding whitespace is trimmed", "input": { "surface": "  #ABCDEF  " }, "expected": { "surface": "#abcdef" } },
+    { "name": "brand and accent are not palette roles (they keep primaryColor/accentColor)", "input": { "brand": "#112233", "accent": "#445566", "surface": "#ffffff" }, "expected": { "surface": "#ffffff" } },
+    { "name": "unknown roles never survive", "input": { "background": "#ffffff", "foreground": "#000000", "text": "#101010" }, "expected": { "text": "#101010" } }
+  ]
+}
