@@ -329,6 +329,8 @@ input[type="search"]::-webkit-search-cancel-button {
   --store-surface: #ffffff;
   --store-surface-muted: #f3f4f6;
   --store-foreground: #111827;
+  /* CUST-HV V5c — the originals, restored on nested surfaces inside a recoloured section. */
+  --store-foreground-base: var(--store-foreground);
   --store-muted: #f3f4f6;
   /*
    * One step darker than the reference's #6b7280, which measures 4.39:1 on
@@ -337,6 +339,7 @@ input[type="search"]::-webkit-search-cancel-button {
    * there, 5.44:1 on white.
    */
   --store-muted-foreground: #636a78;
+  --store-muted-foreground-base: var(--store-muted-foreground);
   --store-border: #e5e7eb;
   --store-border-strong: #d1d5db;
 
@@ -554,4 +557,75 @@ input[type="search"]::-webkit-search-cancel-button {
   .awj-ann-track {
     animation: none;
   }
+}
+
+/*
+ * CUST-HV V5c — section design (contract §3.5). Every rule keys off a validated
+ * `--sec-*` custom property the resolver set (`section-design-resolve.ts`); no
+ * value in this block ever comes from the document. A section with no design has
+ * no `data-sd` wrapper, so none of this applies and its output is unchanged.
+ * Twin of the block at the end of `web/.../store-preview.css`.
+ */
+[data-sd] {
+  position: relative;
+}
+[data-sd~="bg"] {
+  background: var(--sec-bg);
+}
+[data-sd~="pt"] {
+  padding-block-start: var(--sec-pt);
+}
+[data-sd~="pb"] {
+  padding-block-end: var(--sec-pb);
+}
+[data-sd~="pi"] {
+  padding-inline: var(--sec-pi);
+}
+[data-sd~="align"] {
+  text-align: var(--sec-align);
+}
+[data-sd~="max"] {
+  max-inline-size: var(--sec-max);
+  margin-inline: auto;
+}
+[data-sd~="border"] {
+  border: var(--sec-bw) solid var(--sec-bc);
+}
+[data-sd~="radius"] {
+  border-radius: var(--sec-radius);
+  overflow: clip;
+}
+[data-sd~="shadow"] {
+  box-shadow: var(--sec-shadow);
+}
+/* A solid band that extends past the page container to the viewport edges. A
+   box-shadow adds no scrollable overflow; the clip keeps it horizontal-only. */
+[data-sd~="bleed"] {
+  box-shadow: var(--sec-bleed);
+  clip-path: inset(0 -100vmax);
+}
+/*
+ * Text colours. The store's own text tokens are re-pointed inside the section, so
+ * every component that reads them follows. Anything that paints its own surface
+ * (cards, chips, buttons: `bg-store-*`, `bg-white`) gets the original tokens back
+ * — through `:where()`, i.e. at zero specificity, so a utility such as
+ * `text-store-primary-foreground` on that very element still wins — and a dark band
+ * never produces white-on-white inside a white card or dark-on-dark on a dark one.
+ */
+[data-sd~="fg"] {
+  color: var(--sec-fg);
+  --store-foreground: var(--sec-fg);
+  --store-muted-foreground: color-mix(in srgb, var(--sec-fg) 78%, transparent);
+}
+:where([data-sd~="fg"] :is([class*="bg-store-"], [class*="bg-white"])) {
+  color: var(--store-foreground-base);
+  --store-foreground: var(--store-foreground-base);
+  --store-muted-foreground: var(--store-muted-foreground-base);
+}
+/* Section-level headings and links only — never text inside a nested surface. */
+[data-sd~="heading"] :is(h1, h2, h3)[id]:not([data-sd] :is([class*="bg-store-"], [class*="bg-white"]) *) {
+  color: var(--sec-heading);
+}
+[data-sd~="link"] a:not([class*="bg-store-"], [class*="bg-white"], [data-sd] :is([class*="bg-store-"], [class*="bg-white"]) *) {
+  color: var(--sec-link);
 }

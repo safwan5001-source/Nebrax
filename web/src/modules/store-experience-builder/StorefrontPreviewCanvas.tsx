@@ -64,6 +64,8 @@ import {
   type CustomizerMessageKey,
 } from "./messages";
 import { useMediaRefPreview } from "./media/use-media-ref-preview";
+import { SectionDesignFrame } from "./SectionDesignFrame";
+import type { DesignContext } from "./presentation/section-design-resolve";
 import {
   PREVIEW_CATEGORIES,
   PREVIEW_STORE_NAME,
@@ -276,6 +278,12 @@ export function StorefrontPreviewCanvas({
       ? config.branding.compactLogoMedia
       : config.branding.logoMedia) ?? null;
   const logoMediaUrl = useMediaRefPreview(logoMediaRef);
+  const designContext: DesignContext = {
+    primaryColor: config.primaryColor,
+    accentColor: config.accentColor,
+    palette: config.palette,
+    dir: locale === "ar" ? "rtl" : "ltr",
+  };
   const logo =
     logoMediaUrl ??
     (headerStyleCompact && config.branding.compactLogoDataUrl
@@ -1210,7 +1218,9 @@ export function StorefrontPreviewCanvas({
                 selected={selectedSection === section.id}
                 onSelect={onSelectSection}
               >
-                {content}
+                <SectionDesignFrame section={section} context={designContext}>
+                  {content}
+                </SectionDesignFrame>
               </SelectablePreviewSection>
             );
           })}
