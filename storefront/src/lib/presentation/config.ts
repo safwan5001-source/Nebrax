@@ -85,6 +85,9 @@ export interface PresentationHomeSection {
  */
 export const MAX_HOME_SECTIONS = 30;
 
+/** CUST-HV V6a (V0 §8.1.1) — hero is per-instance but bounded; Banner/Slider cover further bands. */
+export const MAX_HERO_INSTANCES = 3;
+
 export interface PresentationSocialLink {
   id: string;
   network: SocialNetwork;
@@ -347,6 +350,7 @@ function resolveHomeBuilderSections(
   const out: PresentationHomeSection[] = [];
   const seenIds = new Set<string>();
   const seenTypes = new Set<string>();
+  const heroCount = new Map<string, number>();
 
   for (const raw of configured) {
     if (!raw || typeof raw !== "object" || Array.isArray(raw)) continue;
@@ -371,6 +375,12 @@ function resolveHomeBuilderSections(
     }
     if (seenIds.has(id)) continue;
 
+    // CUST-HV V6a — instances beyond the third hero are dropped, in order.
+    if (type === "hero" && (heroCount.get(type) ?? 0) >= MAX_HERO_INSTANCES) {
+      continue;
+    }
+
+    heroCount.set(type, (heroCount.get(type) ?? 0) + 1);
     seenIds.add(id);
     seenTypes.add(type);
     const section: PresentationHomeSection = {

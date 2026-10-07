@@ -34,6 +34,8 @@ import { SectionLibraryContent, SectionLibraryDialog } from "./SectionLibrary";
 import { buildWhatsAppUrl } from "./presentation/urls";
 import {
   bannerContentOf,
+  type HeroContent,
+  heroContentOf,
   benefitsContentOf,
   customContentOf,
   deliveryPromiseContentOf,
@@ -1037,7 +1039,13 @@ function HomepagePanel({
   const addSection = (type: HomeBuilderSectionKey) => {
     if (!canAddSectionType(sections, type)) return;
     const id = newHomeSectionId();
-    setSections([...sections, { id, type, visible: true }]);
+    // A hero added by the merchant never inherits the legacy global text (V0 §8.1.4): it starts
+    // with its own, explicitly empty content — the store name and the default CTA until edited.
+    const content = type === "hero" ? { headline: "" } : undefined;
+    setSections([
+      ...sections,
+      { id, type, visible: true, ...(content ? { content } : {}) },
+    ]);
     setPickerOpen(false);
     onSelectSection?.(id);
   };
@@ -1055,6 +1063,11 @@ function HomepagePanel({
       ...(source.content ? { content: structuredClone(source.content) } : {}),
       ...(source.design ? { design: structuredClone(source.design) } : {}),
     };
+    // A hero still reading the legacy globals is copied with that text made explicit, so the
+    // duplicate is a real instance and does not depend on the globals the original still reads.
+    if (source.type === "hero" && !source.content) {
+      copy.content = legacyHeroContent(config.homepage);
+    }
     const next = [...sections];
     next.splice(index + 1, 0, copy);
     setSections(next);
@@ -1071,7 +1084,10 @@ function HomepagePanel({
     const target = sections[index];
     if (!target) return;
     const authored =
-      (target.content && Object.keys(target.content).length > 0) ||
+      (target.content &&
+        (target.type === "hero"
+          ? isHeroAuthored(heroContentOf(target))
+          : Object.keys(target.content).length > 0)) ||
       (target.design && Object.keys(target.design).length > 0);
     if (authored) setPendingDelete(target.id);
     else deleteSection(index);
@@ -1087,39 +1103,6 @@ function HomepagePanel({
       onSelectSection?.(fallback ? fallback.id : null);
     }
   };
-
-  const heroFields = (
-    <>
-      <Field label={t("heroHeadline")}>
-        <input
-          className={inputClass}
-          value={config.homepage.heroHeadline}
-          onChange={(event) =>
-            patch({
-              homepage: {
-                ...config.homepage,
-                heroHeadline: event.target.value,
-              },
-            })
-          }
-        />
-      </Field>
-      <Field label={t("heroSubheadline")}>
-        <input
-          className={inputClass}
-          value={config.homepage.heroSubheadline}
-          onChange={(event) =>
-            patch({
-              homepage: {
-                ...config.homepage,
-                heroSubheadline: event.target.value,
-              },
-            })
-          }
-        />
-      </Field>
-    </>
-  );
 
   const selectedIndex = selectedSection
     ? sections.findIndex((section) => section.id === selectedSection)
@@ -1209,7 +1192,18 @@ function HomepagePanel({
                 }
               />
             ) : selected.type === "hero" ? (
-              heroFields
+              <HeroFields
+                key={selected.id}
+                content={heroContentOf(selected)}
+                legacy={{
+                  headline: config.homepage.heroHeadline,
+                  subheadline: config.homepage.heroSubheadline,
+                }}
+                t={t}
+                onChange={(content) =>
+                  updateSection(selectedIndex, { ...selected, content })
+                }
+              />
             ) : selected.type === "banner" ? (
               <BannerFields
                 content={bannerContentOf(selected)}
@@ -1320,9 +1314,7 @@ function HomepagePanel({
             )}
           </div>
         </Section>
-      ) : (
-        <Section title={t("heroContent")}>{heroFields}</Section>
-      )}
+      ) : null}
       <Section title={t("composerTitle")} hint={t("composerHint")}>
         <div className="mb-2">
           <button
@@ -2002,6 +1994,115 @@ function isBannerEmpty(content: BannerContent): boolean {
   );
 }
 
+/** The legacy global hero text as the explicit content of an instance (V0 §8.1.4). */
+function legacyHeroContent(homepage: {
+  heroHeadline: string;
+  heroSubheadline: string;
+}): HeroContent {
+  const subheadline = homepage.heroSubheadline.trim();
+  return {
+    headline: homepage.heroHeadline.trim(),
+    ...(subheadline ? { subheadline } : {}),
+  };
+}
+
+/** A hero is "authored" once it says something — an explicit empty headline is not content to lose. */
+function isHeroAuthored(content: HeroContent | undefined): boolean {
+  if (!content) return false;
+  return (
+    content.headline.trim() !== "" ||
+    (content.subheadline ?? "").trim() !== "" ||
+    (content.ctas?.length ?? 0) > 0
+  );
+}
+
+/**
+ * CUST-HV V6a — one hero instance's own content: headline, supporting line and up to two
+ * buttons. A hero that still has no content shows the legacy global text as its starting values;
+ * the first edit writes explicit content and the globals are no longer read for that instance.
+ */
+function HeroFields({
+  content,
+  legacy,
+  t,
+  onChange,
+}: {
+  content: HeroContent | undefined;
+  legacy: { headline: string; subheadline: string };
+  t: (key: CustomizerMessageKey) => string;
+  onChange: (content: HeroContent) => void;
+}) {
+  const value: HeroContent = content ?? legacyHeroContent({
+    heroHeadline: legacy.headline,
+    heroSubheadline: legacy.subheadline,
+  });
+  const ctas = [0, 1].map((index) => value.ctas?.[index] ?? { label: "", href: "" });
+  const commit = (next: {
+    headline: string;
+    subheadline: string;
+    ctas: { label: string; href: string }[];
+  }) => {
+    // an empty slot is not stored; the remaining buttons keep their order
+    const kept = next.ctas.filter((cta) => cta.label !== "" || cta.href !== "");
+    onChange({
+      headline: next.headline,
+      ...(next.subheadline !== "" ? { subheadline: next.subheadline } : {}),
+      ...(kept.length > 0 ? { ctas: kept } : {}),
+    });
+  };
+  const state = {
+    headline: value.headline,
+    subheadline: value.subheadline ?? "",
+    ctas,
+  };
+  const setCta = (index: number, partial: Partial<{ label: string; href: string }>) =>
+    commit({
+      ...state,
+      ctas: state.ctas.map((cta, i) => (i === index ? { ...cta, ...partial } : cta)),
+    });
+  return (
+    <div className="space-y-3" data-hero-fields="">
+      <Field label={t("heroHeadline")}>
+        <input
+          className={inputClass}
+          value={state.headline}
+          onChange={(event) => commit({ ...state, headline: event.target.value })}
+        />
+      </Field>
+      <Field label={t("heroSubheadline")}>
+        <input
+          className={inputClass}
+          value={state.subheadline}
+          onChange={(event) => commit({ ...state, subheadline: event.target.value })}
+        />
+      </Field>
+      {ctas.map((cta, index) => (
+        <fieldset key={index} className="min-w-0 space-y-2" data-hero-cta-slot={index}>
+          <legend className="mb-1 text-[12px] font-semibold tracking-wide text-muted">
+            {t(index === 0 ? "heroCtaPrimary" : "heroCtaSecondary")}
+          </legend>
+          <Field label={t("heroCtaLabel")}>
+            <input
+              className={inputClass}
+              value={cta.label}
+              onChange={(event) => setCta(index, { label: event.target.value })}
+            />
+          </Field>
+          {/* the link is sanitized on every commit (a half-typed `https://…` becomes ""), so it is edited
+              locally and committed on blur — the same deferred field the app-store URLs use */}
+          <DeferredCommitField
+            label={t("heroCtaHref")}
+            value={cta.href}
+            dir="ltr"
+            onCommit={(href) => setCta(index, { href })}
+          />
+        </fieldset>
+      ))}
+      <p className="text-[12px] leading-5 text-muted">{t("heroCtaHint")}</p>
+    </div>
+  );
+}
+
 function BannerFields({
   content,
   t,
@@ -2521,12 +2622,15 @@ function DeferredCommitField({
   hint,
   placeholder,
   value,
+  dir,
   onCommit,
 }: {
   label: string;
   hint?: string;
   placeholder?: string;
   value: string;
+  /** Pin the text direction (URLs are always left-to-right). */
+  dir?: "ltr";
   onCommit: (value: string) => void;
 }) {
   const [draft, setDraft] = useState(value);
@@ -2544,6 +2648,7 @@ function DeferredCommitField({
         className={inputClass}
         value={draft}
         placeholder={placeholder}
+        dir={dir}
         onFocus={() => setIsEditing(true)}
         onChange={(event) => {
           draftRef.current = event.target.value;

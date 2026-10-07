@@ -1,13 +1,6 @@
 import Link from "next/link";
+import { destination } from "@/lib/home/destination";
 import type { BannerContent } from "@/lib/presentation/section-content";
-
-function destination(basePath: string, href: string): string | null {
-  if (!href) return null;
-  if (href.startsWith("https://")) return href;
-  if (!href.startsWith("/")) return null;
-  if (href === basePath || href.startsWith(`${basePath}/`)) return href;
-  return `${basePath}${href}`;
-}
 
 export function BannerBand({
   content,

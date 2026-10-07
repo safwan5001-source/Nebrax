@@ -11,9 +11,11 @@ import type { CustomizerMessageKey } from "../messages";
  * CONTRACT-2 يسمح تقنيًا بأي (id, type) فريدة الـid، لكن الـUI لا يسمح
  * بالعمليات إلا ضمن هذه القواعد المركزية:
  *
- * - hero / categories / newArrivals / wholesale / appPromo: singleton
- *   (maxInstances = 1). السبب في hero: heroHeadline/heroSubheadline ما زالا
- *   global داخل homepage وليسا per-instance — لا Duplicate له أبدًا.
+ * - categories / newArrivals / wholesale / appPromo: singleton
+ *   (maxInstances = 1).
+ * - hero: لكل instance منذ CUST-HV V6a (V0 §8.1): قابل للحذف والتكرار حتى
+ *   `maxInstances = 3` (Banner/Slider تغطيان الأشرطة الإضافية)؛ محتواه على الـinstance
+ *   وبلا محتوى يقرأ النص القديم heroHeadline/heroSubheadline.
  * - banner / featured / offers / benefits / customContent: تعدد مسموح
  *   (maxInstances = null) بشرط id مستقل لكل instance.
  *
@@ -75,7 +77,7 @@ export interface SectionCapability {
   /** null = بلا حد عددي للنوع (يبقى خاضعًا لـ MAX_HOME_SECTIONS). */
   maxInstances: number | null;
   canDuplicate: boolean;
-  /** Hero content is global today, so deleting its instance would misleadingly preserve that content. */
+  /** Whether the instance can be removed from the Customizer (every type, hero included since V6a). */
   canDelete: boolean;
   /** Truth state per CUST-H4-ARCH-1 §5 — never flattened to "live". */
   state: SectionCapabilityState;
@@ -101,9 +103,10 @@ export const SECTION_CAPABILITIES: Record<
 > = {
   hero: {
     type: "hero",
-    maxInstances: 1,
-    canDuplicate: false,
-    canDelete: false,
+    // CUST-HV V6a (V0 §8.1.1) — per-instance, bounded.
+    maxInstances: 3,
+    canDuplicate: true,
+    canDelete: true,
     state: "live",
     category: "mediaVideo",
     merchantAddable: true,
@@ -304,7 +307,14 @@ export function canDuplicateSection(
   section: PresentationHomeSection,
 ): boolean {
   if (sections.length >= MAX_HOME_SECTIONS) return false;
-  return SECTION_CAPABILITIES[section.type].canDuplicate;
+  const cap = SECTION_CAPABILITIES[section.type];
+  if (!cap.canDuplicate) return false;
+  // A duplicate is one more instance: it must respect the type's own bound too (hero ≤ 3).
+  if (cap.maxInstances === null) return true;
+  return (
+    sections.filter((entry) => entry.type === section.type).length <
+    cap.maxInstances
+  );
 }
 
 /** هل يمكن حذف هذا الـinstance من واجهة الـCustomizer؟ */

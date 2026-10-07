@@ -1,0 +1,363 @@
+{
+    "_note": "CUST-HV V6a — per-instance hero content (V0 §8.2). Shared by PHP StorefrontPresentationNormalizer and both TS section-content twins. expected=null means the content key is absent (hero then reads the legacy homepage.heroHeadline/heroSubheadline).",
+    "cases": [
+        {
+            "name": "hero: every field, canonical order (headline, subheadline, ctas); text is kept as written, links are trimmed",
+            "type": "hero",
+            "input": {
+                "ctas": [
+                    {
+                        "href": " /collections/new ",
+                        "label": " Shop new "
+                    },
+                    {
+                        "label": "Our story",
+                        "href": "https://example.com/about"
+                    }
+                ],
+                "subheadline": "  Fresh every day  ",
+                "headline": "  Welcome  "
+            },
+            "expected": {
+                "headline": "  Welcome  ",
+                "subheadline": "  Fresh every day  ",
+                "ctas": [
+                    {
+                        "label": " Shop new ",
+                        "href": "/collections/new"
+                    },
+                    {
+                        "label": "Our story",
+                        "href": "https://example.com/about"
+                    }
+                ]
+            }
+        },
+        {
+            "name": "hero: an explicit empty headline is kept (store name + default CTA) — it is NOT the absent legacy case",
+            "type": "hero",
+            "input": {
+                "headline": ""
+            },
+            "expected": {
+                "headline": ""
+            }
+        },
+        {
+            "name": "hero: a whitespace-only headline collapses to the explicit empty content",
+            "type": "hero",
+            "input": {
+                "headline": "   "
+            },
+            "expected": {
+                "headline": ""
+            }
+        },
+        {
+            "name": "hero: a subheadline alone keeps an empty headline",
+            "type": "hero",
+            "input": {
+                "subheadline": "Only a line"
+            },
+            "expected": {
+                "headline": "",
+                "subheadline": "Only a line"
+            }
+        },
+        {
+            "name": "hero: CTAs alone keep an empty headline",
+            "type": "hero",
+            "input": {
+                "ctas": [
+                    {
+                        "label": "Go",
+                        "href": "/products"
+                    }
+                ]
+            },
+            "expected": {
+                "headline": "",
+                "ctas": [
+                    {
+                        "label": "Go",
+                        "href": "/products"
+                    }
+                ]
+            }
+        },
+        {
+            "name": "hero: at most two CTAs, in order",
+            "type": "hero",
+            "input": {
+                "headline": "H",
+                "ctas": [
+                    {
+                        "label": "A",
+                        "href": "/a"
+                    },
+                    {
+                        "label": "B",
+                        "href": "/b"
+                    },
+                    {
+                        "label": "C",
+                        "href": "/c"
+                    }
+                ]
+            },
+            "expected": {
+                "headline": "H",
+                "ctas": [
+                    {
+                        "label": "A",
+                        "href": "/a"
+                    },
+                    {
+                        "label": "B",
+                        "href": "/b"
+                    }
+                ]
+            }
+        },
+        {
+            "name": "hero: an incomplete CTA is kept as a draft (label without a link, link without a label) — only a complete one renders",
+            "type": "hero",
+            "input": {
+                "headline": "H",
+                "ctas": [
+                    {
+                        "label": "Only label"
+                    },
+                    {
+                        "href": "/only-href"
+                    }
+                ]
+            },
+            "expected": {
+                "headline": "H",
+                "ctas": [
+                    {
+                        "label": "Only label",
+                        "href": ""
+                    },
+                    {
+                        "label": "",
+                        "href": "/only-href"
+                    }
+                ]
+            }
+        },
+        {
+            "name": "hero: an unsafe href is emptied on its own — the label stays as a draft",
+            "type": "hero",
+            "input": {
+                "headline": "H",
+                "ctas": [
+                    {
+                        "label": "Bad",
+                        "href": "javascript:alert(1)"
+                    },
+                    {
+                        "label": "Proto",
+                        "href": "//evil.example"
+                    },
+                    {
+                        "label": "Spaces",
+                        "href": "/a b"
+                    }
+                ]
+            },
+            "expected": {
+                "headline": "H",
+                "ctas": [
+                    {
+                        "label": "Bad",
+                        "href": ""
+                    },
+                    {
+                        "label": "Proto",
+                        "href": ""
+                    }
+                ]
+            }
+        },
+        {
+            "name": "hero: a wholly empty CTA is dropped and does not consume a slot",
+            "type": "hero",
+            "input": {
+                "headline": "H",
+                "ctas": [
+                    {},
+                    {
+                        "label": "",
+                        "href": ""
+                    },
+                    {
+                        "label": "A",
+                        "href": "/a"
+                    },
+                    {
+                        "label": "B",
+                        "href": "/b"
+                    },
+                    {
+                        "label": "C",
+                        "href": "/c"
+                    }
+                ]
+            },
+            "expected": {
+                "headline": "H",
+                "ctas": [
+                    {
+                        "label": "A",
+                        "href": "/a"
+                    },
+                    {
+                        "label": "B",
+                        "href": "/b"
+                    }
+                ]
+            }
+        },
+        {
+            "name": "hero: lengths are counted in Unicode code points (headline 120, subheadline 200, CTA label 80)",
+            "type": "hero",
+            "input": {
+                "headline": "😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀",
+                "subheadline": "😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀",
+                "ctas": [
+                    {
+                        "label": "😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀",
+                        "href": "/a"
+                    }
+                ]
+            },
+            "expected": {
+                "headline": "😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀",
+                "subheadline": "😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀",
+                "ctas": [
+                    {
+                        "label": "😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀",
+                        "href": "/a"
+                    }
+                ]
+            }
+        },
+        {
+            "name": "hero: unknown and banner-only keys never survive",
+            "type": "hero",
+            "input": {
+                "headline": "H",
+                "title": "T",
+                "ctaLabel": "L",
+                "ctaHref": "/x",
+                "imageUrl": "https://example.com/i.png",
+                "media": {
+                    "mediaId": "m"
+                }
+            },
+            "expected": {
+                "headline": "H"
+            }
+        },
+        {
+            "name": "hero: a non-string headline with nothing else is not explicit content",
+            "type": "hero",
+            "input": {
+                "headline": 123
+            },
+            "expected": null
+        },
+        {
+            "name": "hero: a non-string headline next to valid CTAs keeps an empty headline",
+            "type": "hero",
+            "input": {
+                "headline": 123,
+                "ctas": [
+                    {
+                        "label": "Go",
+                        "href": "/go"
+                    }
+                ]
+            },
+            "expected": {
+                "headline": "",
+                "ctas": [
+                    {
+                        "label": "Go",
+                        "href": "/go"
+                    }
+                ]
+            }
+        },
+        {
+            "name": "hero: a plain object with nothing recognisable is absent content",
+            "type": "hero",
+            "input": {
+                "unrelated": true
+            },
+            "expected": null
+        },
+        {
+            "name": "hero: a string is not content",
+            "type": "hero",
+            "input": "headline",
+            "expected": null
+        },
+        {
+            "name": "hero: a list is not content",
+            "type": "hero",
+            "input": [
+                {
+                    "headline": "H"
+                }
+            ],
+            "expected": null
+        },
+        {
+            "name": "hero: null is not content",
+            "type": "hero",
+            "input": null,
+            "expected": null
+        },
+        {
+            "name": "hero: ctas that is not a list is ignored",
+            "type": "hero",
+            "input": {
+                "headline": "H",
+                "ctas": {
+                    "label": "A",
+                    "href": "/a"
+                }
+            },
+            "expected": {
+                "headline": "H"
+            }
+        },
+        {
+            "name": "hero: a trailing space survives (the editor re-normalizes on every keystroke, so a space between two words must not be swallowed)",
+            "type": "hero",
+            "input": {
+                "headline": "Summer ",
+                "subheadline": "Fresh ",
+                "ctas": [
+                    {
+                        "label": "Shop ",
+                        "href": "/shop"
+                    }
+                ]
+            },
+            "expected": {
+                "headline": "Summer ",
+                "subheadline": "Fresh ",
+                "ctas": [
+                    {
+                        "label": "Shop ",
+                        "href": "/shop"
+                    }
+                ]
+            }
+        }
+    ]
+}

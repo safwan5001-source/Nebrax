@@ -96,14 +96,15 @@ describe('commerce appearance — STORE-CUSTOMIZER-V2-2 section editing', () => 
     vi.restoreAllMocks();
   });
 
-  it('shows the default hero content section when nothing is selected', async () => {
+  it('offers no global hero fields while nothing is selected — a hero edits its own content (V6a)', async () => {
     const user = userEvent.setup();
     render(<CommerceAppearancePage />);
     await waitFor(() => expect(showMock).toHaveBeenCalled());
     await openHomepage(user);
 
     expect(selectedSettings()).toBeNull();
-    expect(screen.getByText('محتوى البطل')).toBeTruthy();
+    expect(screen.queryByText('محتوى البطل')).toBeNull();
+    expect(document.querySelector('[data-hero-fields]')).toBeNull();
   });
 
   it('shows only the selected section settings for hero, with its content fields', async () => {
@@ -119,7 +120,8 @@ describe('commerce appearance — STORE-CUSTOMIZER-V2-2 section editing', () => 
     expect(block?.getAttribute('data-selected-section-settings')).toBe('hero');
     expect(within(block as HTMLElement).getByText('عنوان البطل')).toBeTruthy();
     expect(within(block as HTMLElement).getByText('سطر داعم')).toBeTruthy();
-    // The default standalone hero section is replaced while editing.
+    // two buttons, each with its own text and link
+    expect(block?.querySelectorAll('[data-hero-cta-slot]')).toHaveLength(2);
     expect(screen.queryByText('محتوى البطل')).toBeNull();
   });
 
@@ -225,7 +227,7 @@ describe('commerce appearance — STORE-CUSTOMIZER-V2-2 section editing', () => 
     expect(builderRoot().dataset.selectedSection).toBe('newArrivals');
   });
 
-  it('offers duplicate only for multi-instance types, never for singletons', async () => {
+  it('offers duplicate for multi-instance types and the bounded hero, never for singletons', async () => {
     const user = userEvent.setup();
     render(<CommerceAppearancePage />);
     await waitFor(() => expect(showMock).toHaveBeenCalled());
@@ -234,8 +236,9 @@ describe('commerce appearance — STORE-CUSTOMIZER-V2-2 section editing', () => 
       document.querySelector('[data-section-option="wholesale"]') as HTMLElement,
     );
 
-    // Singleton rows (hero/categories/newArrivals/wholesale): no duplicate.
-    for (const type of ['hero', 'categories', 'newArrivals', 'wholesale']) {
+    // Singleton rows (categories/newArrivals/wholesale): no duplicate. A hero is a bounded
+    // per-instance section (V6a) and does offer one.
+    for (const type of ['categories', 'newArrivals', 'wholesale']) {
       const row = document.querySelector(
         `[data-composer-section="${type}"]`,
       ) as HTMLElement;
@@ -243,15 +246,22 @@ describe('commerce appearance — STORE-CUSTOMIZER-V2-2 section editing', () => 
         row.querySelector('button[aria-label="تكرار القسم"]'),
       ).toBeNull();
     }
-    // The picker exists, but existing singletons are not offered again.
+    const heroRow = document.querySelector(
+      '[data-composer-section="hero"]',
+    ) as HTMLElement;
+    expect(heroRow.querySelector('button[aria-label="تكرار القسم"]')).toBeTruthy();
+    // The picker exists; existing singletons are not offered again, a hero still is (1 of 3).
     await user.click(screen.getByRole('button', { name: /إضافة قسم/ }));
     const picker = document.querySelector('[data-section-picker]') as HTMLElement;
     expect(picker).toBeTruthy();
-    for (const type of ['hero', 'categories', 'newArrivals', 'wholesale']) {
+    for (const type of ['categories', 'newArrivals', 'wholesale']) {
       const option = picker.querySelector(
         `[data-picker-option="${type}"]`,
       ) as HTMLButtonElement;
       expect(option.disabled).toBe(true);
     }
+    expect(
+      (picker.querySelector('[data-picker-option="hero"]') as HTMLButtonElement).disabled,
+    ).toBe(false);
   });
 });

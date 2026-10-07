@@ -4,7 +4,7 @@
 import { cleanup, render } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import type { PresentationHomeSection } from "@/lib/presentation/config";
-import { publishedNodes } from "../published-nodes";
+import { hasVisibleHero, publishedNodes } from "../published-nodes";
 
 afterEach(cleanup);
 
@@ -168,5 +168,92 @@ describe("published homepage stack (CUST-HV V5c review)", () => {
         ),
       ),
     ).toBe(false);
+  });
+});
+
+describe("per-instance heroes (CUST-HV V6a)", () => {
+  const renderHero = ({
+    section,
+    headingLevel,
+    designed,
+  }: {
+    section: PresentationHomeSection;
+    headingLevel: 1 | 2;
+    designed: boolean;
+  }) => {
+    const Heading = headingLevel === 1 ? "h1" : "h2";
+    return (
+      <section
+        data-testid={`hero-${section.id}`}
+        data-designed={designed ? "" : undefined}
+      >
+        <Heading>{section.id}</Heading>
+      </section>
+    );
+  };
+
+  async function mountHeroes(sections: PresentationHomeSection[]) {
+    const nodes = await publishedNodes(sections, {
+      ...ctx,
+      renderHero,
+    } as never);
+    return render(<div>{nodes}</div>).container;
+  }
+
+  it("renders each hero from its own instance; the FIRST visible one is the <h1>, the rest <h2>", async () => {
+    const container = await mountHeroes([
+      { id: "hero-off", type: "hero", visible: false },
+      { id: "hero-a", type: "hero", visible: true },
+      { id: "cats", type: "categories", visible: true },
+      { id: "hero-b", type: "hero", visible: true },
+    ]);
+    expect(container.querySelectorAll("h1")).toHaveLength(1);
+    expect(container.querySelector("h1")?.textContent).toBe("hero-a");
+    expect(container.querySelector("h2")?.textContent).toBe("hero-b");
+    expect(container.querySelector('[data-testid="hero-hero-off"]')).toBeNull();
+  });
+
+  it("an undesigned hero keeps the legacy wrapper div; a designed one is wrapped by its frame alone", async () => {
+    const plain = await mountHeroes([
+      { id: "hero", type: "hero", visible: true },
+    ]);
+    const plainNode = plain.firstElementChild?.firstElementChild;
+    expect(plainNode?.tagName).toBe("DIV");
+    expect(plainNode?.getAttribute("data-sd")).toBeNull();
+    cleanup();
+    const framed = await mountHeroes([
+      {
+        id: "hero",
+        type: "hero",
+        visible: true,
+        design: { background: { kind: "solid", color: { hex: "#101820" } } },
+      },
+    ]);
+    const frame = framed.firstElementChild?.firstElementChild as HTMLElement;
+    expect(frame.getAttribute("data-sd")).toContain("bg");
+    expect(frame.firstElementChild?.getAttribute("data-testid")).toBe(
+      "hero-hero",
+    );
+    expect(frame.firstElementChild?.hasAttribute("data-designed")).toBe(true);
+  });
+
+  it("without renderHero a hero is still the shared type-keyed node (nothing changes for callers that do not opt in)", async () => {
+    const container = await mount([
+      { id: "hero", type: "hero", visible: true },
+    ]);
+    expect(container.querySelector('[data-testid="hero-root"]')).toBeTruthy();
+  });
+
+  it("hasVisibleHero is true only while a visible hero exists (else the page names the store in a hidden <h1>)", () => {
+    expect(hasVisibleHero([{ id: "hero", type: "hero", visible: true }])).toBe(
+      true,
+    );
+    expect(hasVisibleHero([{ id: "hero", type: "hero", visible: false }])).toBe(
+      false,
+    );
+    expect(
+      hasVisibleHero([{ id: "cats", type: "categories", visible: true }]),
+    ).toBe(false);
+    expect(hasVisibleHero([])).toBe(false);
   });
 });

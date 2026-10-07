@@ -107,9 +107,11 @@ describe("CUST-H4-2 — Section Library UX", () => {
 
   it("a singleton section already present is disabled with an 'already added' reason, not silently unclickable", async () => {
     renderLibrary();
-    const hero = card("hero");
-    expect(hero.disabled).toBe(true);
-    expect(within(hero).getByText("أُضيف بالفعل")).toBeTruthy();
+    const categories = card("categories");
+    expect(categories.disabled).toBe(true);
+    expect(within(categories).getByText("أُضيف بالفعل")).toBeTruthy();
+    // a hero is bounded per-instance (V6a): with one of its three it is still addable
+    expect(card("hero").disabled).toBe(false);
   });
 
   it("a repeatable section can be added, calling onAdd with its type", async () => {
@@ -135,7 +137,7 @@ describe("CUST-H4-2 — Section Library UX", () => {
   it("disabled controls cannot mutate state — clicking a maxed-out card never calls onAdd", async () => {
     const user = userEvent.setup();
     const { onAdd } = renderLibrary();
-    await user.click(card("hero"));
+    await user.click(card("categories"));
     expect(onAdd).not.toHaveBeenCalled();
   });
 
@@ -172,7 +174,7 @@ describe("CUST-H4-2 — Section Library UX", () => {
     cleanup();
     renderLibrary({ locale: "en" });
     expect(screen.getByText("Section Library")).toBeTruthy();
-    expect(within(card("hero")).getByText("Already added")).toBeTruthy();
+    expect(within(card("categories")).getByText("Already added")).toBeTruthy();
   });
 
   it("Escape closes the dialog once focus is inside it (search is auto-focused on open)", async () => {

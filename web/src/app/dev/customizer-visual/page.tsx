@@ -29,7 +29,8 @@ type Scenario =
   | "missing-product"
   | "data-sections"
   | "design"
-  | "global";
+  | "global"
+  | "heroes";
 type PreviewViewport = "mobile" | "tablet" | "desktop";
 
 function scenarioOf(value: string | null): Scenario {
@@ -40,7 +41,8 @@ function scenarioOf(value: string | null): Scenario {
     value === "missing-product" ||
     value === "data-sections" ||
     value === "design" ||
-    value === "global"
+    value === "global" ||
+    value === "heroes"
   ) {
     return value;
   }
@@ -143,6 +145,34 @@ function configFor(locale: "ar" | "en", scenario: Scenario): StorefrontPresentat
       surfaces: { radius: "pill", border: { width: "medium" }, shadow: "medium" },
       layout: { contentWidth: "narrow" },
       motion: { duration: "slow", easing: "emphasized" },
+    });
+  }
+  if (scenario === "heroes") {
+    // CUST-HV V6a — two per-instance heroes (the first with a supporting line and two buttons, the
+    // second explicitly empty so it shows the store name and the default CTA) above the catalogue.
+    const ar = locale === "ar";
+    return normalizePresentationConfig({
+      ...configFor(locale, "populated"),
+      homepage: {
+        ...configFor(locale, "populated").homepage,
+        sections: [
+          {
+            id: "hero",
+            type: "hero",
+            visible: true,
+            content: {
+              headline: ar ? "مرحباً بكم في متجر الأزهار الطازجة" : "Welcome to the fresh flower shop",
+              subheadline: ar ? "توصيل في نفس اليوم إلى كل أحياء المدينة" : "Same-day delivery across the whole city",
+              ctas: [
+                { label: ar ? "تسوّق الوصول الجديد" : "Shop new arrivals", href: "/collections/new" },
+                { label: ar ? "قصتنا" : "Our story", href: "https://example.com/about" },
+              ],
+            },
+          },
+          { id: "hero-2", type: "hero", visible: true, content: { headline: "" } },
+          { id: "categories", type: "categories", visible: true },
+        ],
+      },
     });
   }
   if (scenario === "design") return designConfig(configFor(locale, "populated"), dataSectionsConfig(locale));

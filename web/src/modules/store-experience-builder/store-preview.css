@@ -51,6 +51,17 @@
 .awj-store-preview .from-primary-700 { --tw-gradient-from: var(--store-primary-700, #0f2e23); }
 .awj-store-preview .via-primary-600 { --tw-gradient-via: var(--store-primary); }
 .awj-store-preview .to-primary-500 { --tw-gradient-to: var(--store-primary-500, #2a6a50); }
+/* CUST-HV V6a — the merchant app's Tailwind theme has no `primary-500/600/700` scale, so the stops
+   above were never assembled and the hero's gradient did not paint (white text on the page colour).
+   Compose the gradient explicitly, in the reading direction, exactly as the storefront's
+   `bg-linear-to-r rtl:bg-linear-to-l` hero does. */
+.awj-store-preview .bg-gradient-to-r.from-primary-700 {
+  background-image: linear-gradient(to right, var(--tw-gradient-from), var(--tw-gradient-via), var(--tw-gradient-to));
+}
+[dir="rtl"] .awj-store-preview .bg-gradient-to-r.from-primary-700,
+.awj-store-preview[dir="rtl"] .bg-gradient-to-r.from-primary-700 {
+  background-image: linear-gradient(to left, var(--tw-gradient-from), var(--tw-gradient-via), var(--tw-gradient-to));
+}
 
 /* STORE-CUSTOMIZER-V2-1 — section selection + scroll model.
    Uses the store token sheet; selection is not color-only (outline offset

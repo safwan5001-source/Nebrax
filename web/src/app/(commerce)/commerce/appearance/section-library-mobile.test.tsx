@@ -253,7 +253,7 @@ describe('CUST-H4-2 review fix — Section Library follows the mobile Bottom She
     ).toHaveLength(2);
   });
 
-  it('an already-added singleton (hero) stays disabled with its reason in the mobile Library', async () => {
+  it('an already-added singleton (categories) stays disabled with its reason in the mobile Library', async () => {
     const user = userEvent.setup();
     render(<CommerceAppearancePage />);
     await waitFor(() => expect(showMock).toHaveBeenCalled());
@@ -263,8 +263,8 @@ describe('CUST-H4-2 review fix — Section Library follows the mobile Bottom She
       within(mobileSheet()).getByRole('button', { name: /إضافة قسم/ }),
     );
     const library = mobileSheet().querySelector('[data-section-picker]') as HTMLElement;
-    const hero = library.querySelector('[data-picker-option="hero"]') as HTMLButtonElement;
-    expect(hero.disabled).toBe(true);
-    expect(within(hero).getByText('أُضيف بالفعل')).toBeTruthy();
+    const categories = library.querySelector('[data-picker-option="categories"]') as HTMLButtonElement;
+    expect(categories.disabled).toBe(true);
+    expect(within(categories).getByText('أُضيف بالفعل')).toBeTruthy();
   });
 });
