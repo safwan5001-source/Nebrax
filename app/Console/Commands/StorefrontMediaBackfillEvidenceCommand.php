@@ -45,10 +45,22 @@ final class StorefrontMediaBackfillEvidenceCommand extends Command
             return self::INVALID;
         }
 
-        $after = [
-            'assets' => is_string($this->option('after-assets')) && $this->option('after-assets') !== '' ? $this->option('after-assets') : null,
-            'derivatives' => is_string($this->option('after-derivatives')) && $this->option('after-derivatives') !== '' ? $this->option('after-derivatives') : null,
-        ];
+        // مؤشّرات المتابعة معرّفاتٌ UUID: تُتحقَّق قبل الاستعلام (على PostgreSQL قيمةٌ مثل `nope` في عمود uuid استثناءٌ لا خطأ مُدخَل).
+        $after = [];
+        foreach (['assets', 'derivatives'] as $kind) {
+            $cursor = $this->option("after-{$kind}");
+            if ($cursor === null || $cursor === '') {
+                $after[$kind] = null;
+
+                continue;
+            }
+            if (! is_string($cursor) || ! Str::isUuid($cursor)) {
+                $this->error("The --after-{$kind} option must be a UUID.");
+
+                return self::INVALID;
+            }
+            $after[$kind] = $cursor;
+        }
         $stats = $backfiller->run($tenantId, $limit, (bool) $this->option('dry-run'), $after);
         foreach (['assets', 'derivatives', 'failed'] as $key) {
             $this->line($key.': '.$stats[$key]);

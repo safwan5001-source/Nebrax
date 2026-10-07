@@ -199,6 +199,9 @@ class StorefrontMediaEvidenceBackfillTest extends TestCase
         $this->artisan('storefront-media:backfill-evidence', ['--tenant' => 'nope'])->assertExitCode(Command::INVALID);
         $this->artisan('storefront-media:backfill-evidence', ['--tenant' => (string) Str::uuid()])->assertExitCode(Command::FAILURE);
         $this->artisan('storefront-media:backfill-evidence', ['--tenant' => $auth['tenant_id'], '--limit' => 5000])->assertExitCode(Command::INVALID);
+        $this->artisan('storefront-media:backfill-evidence', ['--tenant' => $auth['tenant_id'], '--after-assets' => 'nope'])->assertExitCode(Command::INVALID);
+        $this->artisan('storefront-media:backfill-evidence', ['--tenant' => $auth['tenant_id'], '--after-derivatives' => '123'])->assertExitCode(Command::INVALID);
+        $this->artisan('storefront-media:backfill-evidence', ['--tenant' => $auth['tenant_id'], '--after-assets' => (string) Str::uuid(), '--dry-run' => true])->assertExitCode(Command::SUCCESS);
         $this->artisan('storefront-media:backfill-evidence', ['--tenant' => $auth['tenant_id'], '--dry-run' => true])->assertExitCode(Command::SUCCESS);
     }
 }
