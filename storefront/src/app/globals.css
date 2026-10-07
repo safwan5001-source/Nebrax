@@ -617,8 +617,12 @@ input[type="search"]::-webkit-search-cancel-button {
 }
 /* a block can only be positioned if it is narrower than its container: the marked content
    box (a banner's image + copy row) shrinks to its content */
-[data-sd~="balign"][data-sd] > * > [data-section-content] {
+[data-sd~="balign"][data-sd] > * > [data-section-content],
+[data-sd~="balign"][data-sd] > [data-section-block] {
   inline-size: fit-content;
+}
+[data-sd~="balign"][data-sd] > [data-section-block] {
+  max-inline-size: 100%;
 }
 [data-sd~="max"] {
   max-inline-size: var(--sec-max);
@@ -716,6 +720,12 @@ input[type="search"]::-webkit-search-cancel-button {
   color: var(--sec-fg);
 }
 [data-sd~="link"] a:not([data-sd] > * :is([class^="bg-store-"], [class*=" bg-store-"], [class^="bg-white"], [class*=" bg-white"]) *, :is([class^="bg-store-"], [class*=" bg-store-"], [class^="bg-white"], [class*=" bg-white"]), [class*="hover:bg-store-"], [class*="hover:bg-white"]:not([class*="hover:bg-white/"])) {
+  color: var(--sec-link);
+}
+
+/* Heading actions that are not anchors (the Canvas draws "View all" as a label) follow the
+   section link colour exactly like the published anchor does. */
+[data-sd~="link"] [data-section-action]:not([data-sd] > * :is([class^="bg-store-"], [class*=" bg-store-"], [class^="bg-white"], [class*=" bg-white"]) *, :is([class^="bg-store-"], [class*=" bg-store-"], [class^="bg-white"], [class*=" bg-white"])) {
   color: var(--sec-link);
 }
 }

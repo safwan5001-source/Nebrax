@@ -860,14 +860,14 @@ export function StorefrontPreviewCanvas({
             if (section.type === "benefits") {
               const items = benefitsContentOf(section).items.filter((item) => item.title || item.body);
               return (
-                <section key={section.id}>
+                <section key={section.id} data-section-block="">
                   <h2 className="text-base font-extrabold">{t("sectionBenefits")}</h2>
                   {items.length === 0 ? (
                     <p className="mt-2 text-sm text-store-muted-foreground">{t("sectionBenefits")}</p>
                   ) : (
                     <ul className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
                       {items.map((item) => (
-                        <li key={item.id} className="min-w-0 break-words rounded-store border border-store-border px-3 py-3">
+                        <li key={item.id} className="min-w-0 break-words rounded-store border border-store-border bg-store-surface px-4 py-4">
                           {item.title ? <p className="break-words text-sm font-bold">{item.title}</p> : null}
                           {item.body ? <p className="break-words text-sm text-store-muted-foreground">{item.body}</p> : null}
                         </li>
@@ -2136,7 +2136,7 @@ function SectionRule({ title, action }: { title: string; action: string }) {
           {title}
         </h2>
       </div>
-      <span className="text-xs font-bold text-store-primary md:text-sm">{action}</span>
+      <span data-section-action="" className="text-xs font-bold text-store-primary md:text-sm">{action}</span>
     </div>
   );
 }

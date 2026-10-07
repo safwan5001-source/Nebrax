@@ -10,7 +10,7 @@ export function BenefitsBand({
   title: string;
 }) {
   return (
-    <section aria-labelledby={headingId}>
+    <section aria-labelledby={headingId} data-section-block="">
       <h2
         id={headingId}
         className="text-base font-extrabold text-store-foreground md:text-lg"

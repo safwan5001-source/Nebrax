@@ -182,3 +182,27 @@ test('block alignment really positions a banner\'s content group (it shrinks to 
   expect(Math.abs(geo.left - geo.right)).toBeLessThan(2); // …and centred in it
 });
 
+test('benefits: its root is the block that gets positioned (shrink-wrapped), and a label action follows the link colour', async ({ page }) => {
+  await mount(
+    page,
+    frame(
+      'benefits',
+      'bg fg heading link balign',
+      '--sec-bg:#101820;--sec-fg:#ffffff;--sec-heading:#ffffff;--sec-link:#ffffff;--sec-bms:auto;--sec-bme:auto',
+      `<section id="ben" data-section-block="" class="min-w-0">
+         <h2 class="text-lg">Benefits</h2>
+         <span id="act" data-section-action="" class="text-store-primary">View all</span>
+         <ul class="mt-4 grid gap-3 sm:grid-cols-2"><li class="rounded-store border bg-store-surface px-4 py-4">One</li></ul>
+       </section>`,
+    ),
+  );
+  const geo = await page.evaluate(() => {
+    const frame = document.querySelector('[data-sd]')!.getBoundingClientRect();
+    const box = document.getElementById('ben')!.getBoundingClientRect();
+    return { frameW: frame.width, boxW: box.width, left: box.left - frame.left, right: frame.right - box.right };
+  });
+  expect(geo.boxW).toBeLessThan(geo.frameW - 40);
+  expect(Math.abs(geo.left - geo.right)).toBeLessThan(2);
+  expect((await style(page, '#act')).color).toBe('rgb(255, 255, 255)');
+});
+
