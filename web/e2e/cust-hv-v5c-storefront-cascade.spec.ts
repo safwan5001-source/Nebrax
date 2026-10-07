@@ -280,3 +280,43 @@ test('a designed background keeps the corners of the surface it replaced', async
   expect(radii[1]).toBe('0px'); // a shelf had none
 });
 
+
+test('a border-only or shadow-only frame keeps the corners of the surface it outlines', async ({ page }) => {
+  const card = `<section class="overflow-hidden rounded-store border border-store-border bg-store-surface"><p>x</p></section>`;
+  await mount(
+    page,
+    frame('banner', 'border', '--sec-bw:2px;--sec-bc:#101820', card) +
+      frame('banner', 'shadow', '--sec-shadow:0 6px 16px rgba(0,0,0,.12)', card) +
+      frame('featured', 'border', '--sec-bw:2px;--sec-bc:#101820', `<section><p>y</p></section>`),
+  );
+  const radii = await page.evaluate(() =>
+    [...document.querySelectorAll('[data-sd]')].map((f) => getComputedStyle(f).borderTopLeftRadius),
+  );
+  expect(parseFloat(radii[0])).toBeGreaterThan(0);
+  expect(parseFloat(radii[1])).toBeGreaterThan(0);
+  expect(radii[2]).toBe('0px');
+});
+
+test('a radius rounds the frame and the section root but never clips an edge focus outline', async ({ page }) => {
+  await mount(
+    page,
+    frame(
+      'categories',
+      'bg radius',
+      '--sec-bg:#e0f2fe;--sec-radius:1.25rem',
+      `<section id="r" class="rounded-store"><a id="edge" href="#" style="display:block;outline:2px solid #1d4ed8;outline-offset:2px">go</a></section>`,
+    ),
+  );
+  const info = await page.evaluate(() => {
+    const f = document.querySelector('[data-sd]') as HTMLElement;
+    const root = document.getElementById('r') as HTMLElement;
+    return {
+      frameRadius: getComputedStyle(f).borderTopLeftRadius,
+      rootRadius: getComputedStyle(root).borderTopLeftRadius,
+      overflow: getComputedStyle(f).overflow,
+    };
+  });
+  expect(parseFloat(info.frameRadius)).toBeCloseTo(20, 0);
+  expect(info.rootRadius).toBe(info.frameRadius);
+  expect(info.overflow).toBe('visible'); // nothing clips the outline
+});

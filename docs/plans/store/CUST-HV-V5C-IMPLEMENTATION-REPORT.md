@@ -57,7 +57,7 @@ Wraps a section only when it has a design. Storefront: `publishedNodes` was spli
 
 ---
 
-## Review round (Codex, 28 findings — all valid, all fixed)
+## Review round (Codex, 30 findings — all valid, all fixed)
 
 | Finding | Fix |
 |---|---|
@@ -101,6 +101,8 @@ Wraps a section only when it has a design. Storefront: `publishedNodes` was spli
 | **P2** the full-bleed `clip-path` on the frame clipped all descendant painting at its top/bottom edges (focus outlines of edge content) | The band is now drawn by a `::before` pseudo-element behind the content; the clip applies to the pseudo only. Asserted: frame `clip-path: none`, pseudo clipped, no page overflow. |
 
 | **P2** a background painted on the square frame while the child's surface was cleared, so hero / banner / promo bands lost their `rounded-store` corners | The frame inherits the radius token when its direct child carries `rounded-store` (unless the design sets its own radius or bleeds); a shelf with no legacy corners stays square. Asserted on the compiled storefront CSS. |
+| **P2** `overflow: clip` on a radius frame cut the offset focus outlines of links/buttons at its edges | the frame no longer clips anything: the radius rounds what it paints (fill, border, shadow) and the section root inherits it (`[data-sd~="radius"][data-sd] > * { border-radius: inherit }`); cascade spec asserts `overflow: visible` and matching radii |
+| **P2** the legacy-corner fallback only ran for `bg`: a border-only / shadow-only frame around a rounded banner/hero/promo drew a square border/shadow | the fallback now applies to `bg`, `border` and `shadow` frames (not radius / bleed); cascade spec covers border-only, shadow-only and a square shelf |
 
 The browser proof now also asserts, at all six widths in RTL and LTR, that **no designed section's root still paints its own fill** and that a heading colour reaches the Canvas heading; a mutation run (rule removed) fails it for banner / appPromo / deliveryPromise / shelf / discovery, so the check is not vacuous. The scenario gained `hero` and `wholesale` designs (the two dark surface-owners) and a distinct heading colour on benefits. 13/13 green.
 
@@ -121,7 +123,7 @@ The browser proof now also asserts, at all six widths in RTL and LTR, that **no 
 |---|---|
 | Web | `section-design-resolve.test.tsx` **17** (resolver, frame, byte-identical twins, stylesheet parity) · full vitest **427 files / 3702** (drift ratchet ✓) |
 | Storefront | `section-design-resolve.test.tsx` **12** · full vitest **142 files / 1284** · `tsc` ✓ · `biome check` ✓ |
-| Real browser | `cust-hv-v5c-design-render-proof.spec.ts` **13/13** (Canvas) + `cust-hv-v5c-storefront-cascade.spec.ts` **11/11** (the real compiled storefront stylesheet — local evidence gate, as V3/V4b/V5a) |
+| Real browser | `cust-hv-v5c-design-render-proof.spec.ts` **13/13** (Canvas) + `cust-hv-v5c-storefront-cascade.spec.ts` **13/13** (the real compiled storefront stylesheet — local evidence gate, as V3/V4b/V5a) |
 | Backend | **no backend file changed** (`git diff origin/main` touches no `app/` `routes/` `database/` `tests/` `config/`); the full run on the identical backend is V5b's (5751 passed, 28 env-only failures) · PostgreSQL by CI |
 
 Evidence: `docs/plans/store/cust-hv-v5c/*.jpg`.

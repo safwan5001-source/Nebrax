@@ -166,14 +166,20 @@
 .awj-store-preview [data-sd~="border"][data-sd] > * {
   border: none;
 }
-/* A background replaces the section's own surface, so the frame inherits the rounded corners
-   that surface had (hero, banner, promo bands…) unless the design sets its own radius or bleeds. */
-.awj-store-preview [data-sd~="bg"]:not([data-sd~="radius"], [data-sd~="bleed"]):has(> :is([class^="rounded-store"], [class*=" rounded-store"])) {
+/* A background, border or shadow on the frame replaces / outlines the section's own surface,
+   so the frame inherits the rounded corners that surface had (hero, banner, promo bands…)
+   unless the design sets its own radius or bleeds. */
+.awj-store-preview :is([data-sd~="bg"], [data-sd~="border"], [data-sd~="shadow"]):not([data-sd~="radius"], [data-sd~="bleed"]):has(> :is([class^="rounded-store"], [class*=" rounded-store"])) {
   border-radius: var(--store-radius);
 }
+/* The radius rounds what the frame paints (fill, border, shadow) and the section's own root.
+   Nothing is clipped: an `overflow` clip on the frame would cut the offset focus outlines of
+   links and buttons that sit at its edges. */
 .awj-store-preview [data-sd~="radius"] {
   border-radius: var(--sec-radius);
-  overflow: clip;
+}
+.awj-store-preview [data-sd~="radius"][data-sd] > * {
+  border-radius: inherit;
 }
 .awj-store-preview [data-sd~="shadow"] {
   box-shadow: var(--sec-shadow);
