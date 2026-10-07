@@ -211,6 +211,7 @@ describe("DesignInspector (CUST-HV V5d)", () => {
     render(<Harness type="featured" />);
     expect(screen.queryByLabelText("Heading size")).toBeNull();
     expect(screen.getByLabelText("Heading style")).toBeTruthy();
+  });
 
   it("copy then paste moves only what the target type can render; reset is two-step", () => {
     const rich: SectionDesign = {
