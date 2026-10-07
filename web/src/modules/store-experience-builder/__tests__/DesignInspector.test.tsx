@@ -202,6 +202,13 @@ describe("DesignInspector (CUST-HV V5d)", () => {
     render(<Harness type="featured" />);
     expect(screen.queryByLabelText("Heading size")).toBeNull();
     expect(screen.getByLabelText("Heading style")).toBeTruthy();
+  it("text alignment and content position are separate controls writing separate fields", () => {
+    render(<Harness type="customContent" />);
+    const text = screen.getByText("Text alignment").closest("label") as HTMLElement;
+    const block = screen.getByText("Content position").closest("label") as HTMLElement;
+    fireEvent.click(within(block).getByRole("button", { name: "Centre" }));
+    fireEvent.click(within(text).getByRole("button", { name: "Start" }));
+    expect(out()).toEqual({ text: { align: "start" }, align: "center" });
   });
 
   it("copy then paste moves only what the target type can render; reset is two-step", () => {

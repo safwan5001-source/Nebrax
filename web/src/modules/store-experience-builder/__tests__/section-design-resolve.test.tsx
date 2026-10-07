@@ -179,11 +179,27 @@ describe("resolveSectionDesign (CUST-HV V5c)", () => {
       "--sec-pb": "0px",
       "--sec-pi": STEP_SPACE.sm,
       "--sec-max": "64rem",
-      "--sec-align": "center",
+      "--sec-bms": "auto",
+      "--sec-bme": "auto",
       "--sec-bw": "1px",
       "--sec-bc": "#e5e7eb",
     });
-    expect(r.attrs["data-sd"]).toBe("align pt pb pi max border");
+    expect(r.attrs["data-sd"]).toBe("balign pt pb pi max border");
+  });
+
+  it("text alignment and content-block alignment are independent controls", () => {
+    const both = resolveSectionDesign(
+      "customContent",
+      { align: "center", text: { align: "start" } },
+      ctx,
+    )!;
+    expect(both.attrs["data-sd"]).toBe("align balign");
+    expect(both.style["--sec-align"]).toBe("start"); // the copy
+    expect(both.style["--sec-bms"]).toBe("auto"); // the block is centred
+    expect(both.style["--sec-bme"]).toBe("auto");
+    const end = resolveSectionDesign("customContent", { align: "end" }, ctx)!;
+    expect(end.style).toEqual({ "--sec-bms": "auto", "--sec-bme": "0" });
+    expect(end.attrs["data-sd"]).toBe("balign");
   });
 
   it("full-bleed is a solid band: it drops radius/shadow, and a gradient never bleeds", () => {

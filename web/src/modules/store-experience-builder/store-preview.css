@@ -130,11 +130,22 @@
 .awj-store-preview [data-sd~="pb"] {
   padding-block-end: var(--sec-pb);
 }
-.awj-store-preview [data-sd~="pi"] {
-  padding-inline: var(--sec-pi);
+/* Inner spacing REPLACES the section's own padding (so `none` removes it and a step is
+   not doubled): the root element takes the designed padding on every side, and the
+   padded element directly inside it (a banner's / hero's content box) gives its own up. */
+.awj-store-preview [data-sd~="pi"][data-sd] > * {
+  padding: var(--sec-pi);
+}
+.awj-store-preview [data-sd~="pi"][data-sd] > * > :is([class^="p-"], [class*=" p-"], [class^="px-"], [class*=" px-"], [class^="py-"], [class*=" py-"], [class*=":p-"], [class*=":px-"], [class*=":py-"]) {
+  padding: 0;
 }
 .awj-store-preview [data-sd~="align"] {
   text-align: var(--sec-align);
+}
+/* content-block position (independent of text alignment) */
+.awj-store-preview [data-sd~="balign"][data-sd] > * {
+  margin-inline-start: var(--sec-bms);
+  margin-inline-end: var(--sec-bme);
 }
 .awj-store-preview [data-sd~="max"] {
   max-inline-size: var(--sec-max);
@@ -195,10 +206,11 @@
   --store-footer-muted: var(--store-footer-muted-base);
   --store-footer-link: var(--store-footer-link-base);
 }
-/* An element that only gains an opaque surface on hover (a transparent secondary CTA
+/* An element that only gains an opaque surface on `:hover` (a transparent secondary CTA
    that turns dark) is a surface *while hovered*: its text tokens go back to the originals
-   for that state, so the hover colour utilities keep contrasting with the hover fill. */
-:where(.awj-store-preview [data-sd~="fg"] :is([class*="hover:bg-store-"], [class*="hover:bg-white"]:not([class*="hover:bg-white/"])):is(:hover, :focus-visible):not([data-sd] > *)) {
+   for that state, so the hover colour utilities keep contrasting with the hover fill.
+   `:hover` only — the components paint these fills on hover, not on focus. */
+:where(.awj-store-preview [data-sd~="fg"] :is([class*="hover:bg-store-"], [class*="hover:bg-white"]:not([class*="hover:bg-white/"])):hover:not([data-sd] > *)) {
   color: var(--store-foreground-base);
   --store-foreground: var(--store-foreground-base);
   --store-muted-foreground: var(--store-muted-foreground-base);

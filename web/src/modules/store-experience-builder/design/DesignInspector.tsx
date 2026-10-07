@@ -213,13 +213,6 @@ export function DesignInspector({
     );
   };
 
-  const alignAllowedInText = allows(capability.text, "align");
-  const alignValue = alignAllowedInText ? current.text?.align : current.align;
-  const setAlign = (value: (typeof ALIGNS)[number] | undefined) =>
-    alignAllowedInText
-      ? set("text", { ...current.text, align: value })
-      : set("align", value);
-
   const unsetOption = <option value="">{t("designUnset")}</option>;
   const stepSelect = (key: "top" | "bottom" | "inner", label: CustomizerMessageKey) => (
     <Field label={t(label)}>
@@ -439,11 +432,26 @@ export function DesignInspector({
         </fieldset>
       ) : null}
 
-      {capability.text || capability.align ? (
+      {allows(capability.text, "align") ? (
         <Field label={t("designAlign")}>
           <Segmented
-            value={alignValue ?? "unset"}
-            onChange={(id) => setAlign(id === "unset" ? undefined : id)}
+            value={current.text?.align ?? "unset"}
+            onChange={(id) =>
+              set("text", { ...current.text, align: id === "unset" ? undefined : id })
+            }
+            options={[
+              { id: "unset", label: t("designUnset") },
+              ...ALIGNS.map((a) => ({ id: a, label: t(ALIGN_LABEL[a]) })),
+            ]}
+          />
+        </Field>
+      ) : null}
+
+      {capability.align ? (
+        <Field label={t("designBlockAlign")}>
+          <Segmented
+            value={current.align ?? "unset"}
+            onChange={(id) => set("align", id === "unset" ? undefined : id)}
             options={[
               { id: "unset", label: t("designUnset") },
               ...ALIGNS.map((a) => ({ id: a, label: t(ALIGN_LABEL[a]) })),
