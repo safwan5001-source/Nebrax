@@ -224,4 +224,9 @@ describe('web presentation contract', () => {
     });
     expect(config.homepage.sections[1].content).toBeUndefined();
   });
+
+  it('CUST-HV V5c review: the themed primary foreground is captured on the SAME element as its base', () => {
+    const light = presentationCssVars('#f5e6a8', 'subtle');
+    expect(light['--store-primary-foreground-base']).toBe(light['--store-primary-foreground']);
+  });
 });

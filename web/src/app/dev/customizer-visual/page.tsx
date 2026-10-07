@@ -3,7 +3,11 @@
 import { notFound, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { StorefrontPreviewCanvas } from "@/modules/store-experience-builder/StorefrontPreviewCanvas";
-import { normalizePresentationConfig } from "@/modules/store-experience-builder/presentation/config";
+import {
+  type StorefrontPresentationConfig,
+  normalizePresentationConfig,
+} from "@/modules/store-experience-builder/presentation/config";
+import { designConfig } from "./design-scenario";
 
 /**
  * Development-only visual fixture for the merchant preview canvas.
@@ -23,7 +27,8 @@ type Scenario =
   | "long"
   | "missing-media"
   | "missing-product"
-  | "data-sections";
+  | "data-sections"
+  | "design";
 type PreviewViewport = "mobile" | "tablet" | "desktop";
 
 function scenarioOf(value: string | null): Scenario {
@@ -32,7 +37,8 @@ function scenarioOf(value: string | null): Scenario {
     value === "long" ||
     value === "missing-media" ||
     value === "missing-product" ||
-    value === "data-sections"
+    value === "data-sections" ||
+    value === "design"
   ) {
     return value;
   }
@@ -120,7 +126,8 @@ function dataSectionsConfig(locale: "ar" | "en") {
   });
 }
 
-function configFor(locale: "ar" | "en", scenario: Scenario) {
+function configFor(locale: "ar" | "en", scenario: Scenario): StorefrontPresentationConfig {
+  if (scenario === "design") return designConfig(configFor(locale, "populated"), dataSectionsConfig(locale));
   if (scenario === "data-sections") return dataSectionsConfig(locale);
   const text = copy(locale, scenario);
   const empty = scenario === "empty";

@@ -3,7 +3,9 @@
   --store-surface: #ffffff;
   --store-surface-muted: #f3f4f6;
   --store-foreground: #111827;
+  --store-foreground-base: var(--store-foreground);
   --store-muted-foreground: #636a78;
+  --store-muted-foreground-base: var(--store-muted-foreground);
   --store-border: #e5e7eb;
   --store-border-strong: #d1d5db;
   --store-primary: #12372a;
@@ -14,6 +16,10 @@
   --store-footer-muted: #9ca3af;
   --store-footer-link: #d1d5db;
   --store-footer-border: #1f2937;
+  --store-primary-foreground-base: var(--store-primary-foreground);
+  --store-footer-foreground-base: var(--store-footer-foreground);
+  --store-footer-muted-base: var(--store-footer-muted);
+  --store-footer-link-base: var(--store-footer-link);
   --store-radius: 0.75rem;
   --store-content-max: 85rem;
   background: var(--store-background);
@@ -95,4 +101,188 @@
 
 [data-customizer-scroll]::-webkit-scrollbar-corner {
   background: transparent;
+}
+
+/*
+ * CUST-HV V5c — section design (contract §3.5). Every rule keys off a validated
+ * `--sec-*` custom property the resolver set (`section-design-resolve.ts`); no
+ * value in this block ever comes from the document. A section with no design has
+ * no `data-sd` wrapper, so none of this applies and its output is unchanged.
+ * Twin of the block at the end of `web/.../store-preview.css`.
+ */
+.awj-store-preview [data-sd] {
+  position: relative;
+}
+/* A section that rendered nothing (no products, no live offers, a failed fetch)
+   must not leave an empty padded / bordered band behind. */
+.awj-store-preview [data-sd]:empty {
+  display: none;
+}
+.awj-store-preview [data-sd~="bg"] {
+  background: var(--sec-bg);
+}
+.awj-store-preview [data-sd~="pt"] {
+  padding-block-start: var(--sec-pt);
+}
+.awj-store-preview [data-sd~="pb"] {
+  padding-block-end: var(--sec-pb);
+}
+/* Inner spacing REPLACES the section's own padding (so `none` removes it and a step is
+   not doubled): the root element takes the designed padding on every side, and the
+   content box marked `data-section-content` (a banner's / hero's inner box) gives its own up —
+   only those, never an arbitrary padded descendant (an accordion card keeps its padding). */
+.awj-store-preview [data-sd~="pi"][data-sd] > * {
+  padding: var(--sec-pi);
+}
+.awj-store-preview [data-sd~="pi"][data-sd] > * > [data-section-content] {
+  padding: 0;
+}
+.awj-store-preview [data-sd~="align"] {
+  text-align: var(--sec-align);
+}
+/* content-block position (independent of text alignment) */
+.awj-store-preview [data-sd~="balign"][data-sd] > *,
+.awj-store-preview [data-sd~="balign"][data-sd] > * > [data-section-content] {
+  margin-inline-start: var(--sec-bms);
+  margin-inline-end: var(--sec-bme);
+}
+/* a block can only be positioned if it is narrower than its container: the marked content
+   box (a banner's image + copy row) shrinks to its content */
+.awj-store-preview [data-sd~="balign"][data-sd] > * > [data-section-content],
+.awj-store-preview [data-sd~="balign"][data-sd] > [data-section-block] {
+  inline-size: fit-content;
+}
+.awj-store-preview [data-sd~="balign"][data-sd] > [data-section-block] {
+  max-inline-size: 100%;
+}
+.awj-store-preview [data-sd~="max"] {
+  max-inline-size: var(--sec-max);
+  margin-inline: auto;
+}
+.awj-store-preview [data-sd~="border"] {
+  border: var(--sec-bw) solid var(--sec-bc);
+}
+/* the design owns the border: the section's own legacy border steps aside */
+.awj-store-preview [data-sd~="border"][data-sd] > * {
+  border: none;
+}
+/* A background, border or shadow on the frame replaces / outlines the section's own surface,
+   so the frame inherits the rounded corners that surface had (hero, banner, promo bands…)
+   unless the design sets its own radius or bleeds. */
+.awj-store-preview :is([data-sd~="bg"], [data-sd~="border"], [data-sd~="shadow"]):not([data-sd~="radius"], [data-sd~="bleed"]):has(> :is([class^="rounded-store"], [class*=" rounded-store"])) {
+  border-radius: var(--store-radius);
+}
+/* The radius rounds what the frame paints (fill, border, shadow) and the section's own root.
+   Nothing is clipped: an `overflow` clip on the frame would cut the offset focus outlines of
+   links and buttons that sit at its edges. */
+.awj-store-preview [data-sd~="radius"] {
+  border-radius: var(--sec-radius);
+}
+.awj-store-preview [data-sd~="radius"][data-sd] > * {
+  border-radius: inherit;
+}
+.awj-store-preview [data-sd~="shadow"] {
+  box-shadow: var(--sec-shadow);
+}
+/* A solid band that extends past the page container to the viewport edges. A
+   box-shadow adds no scrollable overflow; the clip keeps it horizontal-only. */
+.awj-store-preview [data-sd~="bleed"] {
+  isolation: isolate;
+}
+/* The band is drawn by a pseudo-element behind the content, so the clip only ever touches
+   the band — never the section's own content (focus rings at its edges stay whole). */
+.awj-store-preview [data-sd~="bleed"]::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  box-shadow: var(--sec-bleed);
+  clip-path: inset(0 -100vmax);
+}
+/*
+ * Text colours. The store's own text tokens are re-pointed inside the section, so
+ * every component that reads them follows — including the footer and primary
+ * foreground tokens that dark bands (hero, app promo, wholesale) are built from.
+ * Anything that paints its own surface *inside* the section (cards, chips, buttons:
+ * `bg-store-*`, `bg-white`) gets the original tokens back — through `:where()`, i.e.
+ * at zero specificity, so a utility such as `text-store-primary-foreground` on that
+ * very element still wins — and a dark band never produces white-on-white inside a
+ * white card or dark-on-dark on a dark one. The section's own root element (the
+ * frame's direct child) is **not** a nested surface: its legacy fill is replaced
+ * when the design paints a background, and its text follows the design.
+ * A "surface" is a class token that *starts* with `bg-store-` / `bg-white` — variants
+ * (`hover:bg-store-*`, `bg-transparent`) are not. Translucent fills inside a designed section
+ * are made opaque (see below), so a foreground can always be proven against them.
+ * Muted copy uses the proven foreground itself (never a translucent mix: opacity
+ * would lower a ratio that was only just proven).
+ */
+.awj-store-preview [data-sd~="fg"] {
+  color: var(--sec-fg);
+  --store-foreground: var(--sec-fg);
+  --store-muted-foreground: var(--sec-fg);
+  --store-primary-foreground: var(--sec-fg);
+  --store-footer-foreground: var(--sec-fg);
+  --store-footer-muted: var(--sec-fg);
+  --store-footer-link: var(--sec-fg);
+}
+:where(.awj-store-preview [data-sd~="fg"] :is([class^="bg-store-"], [class*=" bg-store-"], [class^="bg-white"], [class*=" bg-white"]):not([data-sd] > *)) {
+  color: var(--store-foreground-base);
+  --store-foreground: var(--store-foreground-base);
+  --store-muted-foreground: var(--store-muted-foreground-base);
+  --store-primary-foreground: var(--store-primary-foreground-base);
+  --store-footer-foreground: var(--store-footer-foreground-base);
+  --store-footer-muted: var(--store-footer-muted-base);
+  --store-footer-link: var(--store-footer-link-base);
+}
+/* An element that only gains an opaque surface on `:hover` (a transparent secondary CTA
+   that turns dark) is a surface *while hovered*: its text tokens go back to the originals
+   for that state, so the hover colour utilities keep contrasting with the hover fill.
+   `:hover` only — the components paint these fills on hover, not on focus. */
+:where(.awj-store-preview [data-sd~="fg"] :is([class*="hover:bg-store-"], [class*="hover:bg-white"]:not([class*="hover:bg-white/"])):hover:not([data-sd] > *)) {
+  color: var(--store-foreground-base);
+  --store-foreground: var(--store-foreground-base);
+  --store-muted-foreground: var(--store-muted-foreground-base);
+  --store-primary-foreground: var(--store-primary-foreground-base);
+  --store-footer-foreground: var(--store-footer-foreground-base);
+  --store-footer-muted: var(--store-footer-muted-base);
+  --store-footer-link: var(--store-footer-link-base);
+}
+/* Focus rings are drawn outside the focused element, i.e. on the designed background:
+   every `focus-visible:outline-store-*` indicator that is not itself inside a nested surface
+   (a category card, the hero CTA…) is redrawn in the section's proven foreground. */
+.awj-store-preview [data-sd~="fg"] [class*="focus-visible:outline-store-"]:focus-visible:not([data-sd] > * :is([class^="bg-store-"], [class*=" bg-store-"], [class^="bg-white"], [class*=" bg-white"]) *) {
+  outline-color: var(--sec-fg);
+}
+/* A translucent fill nested in a designed section would composite over an arbitrary
+   background, which no contrast proof can see: it becomes its opaque equivalent. */
+.awj-store-preview [data-sd~="fg"] :is([class^="bg-store-surface/"], [class*=" bg-store-surface/"]) {
+  background-color: var(--store-surface);
+}
+.awj-store-preview [data-sd~="fg"] :is([class^="bg-store-footer-border/"], [class*=" bg-store-footer-border/"]) {
+  background-color: var(--store-footer-border);
+}
+.awj-store-preview [data-sd~="fg"] :is([class^="bg-white/"], [class*=" bg-white/"]) {
+  background-color: #ffffff;
+}
+/* A design background replaces the section's own legacy fill (banner card, hero
+   gradient, dark promo bands) instead of hiding behind it. */
+.awj-store-preview [data-sd~="bg"][data-sd] > * {
+  background: none;
+}
+/* Section-level text only — never inside a surface nested in the section. */
+.awj-store-preview [data-sd~="heading"] :is(h1, h2, h3):not([data-sd] > * :is([class^="bg-store-"], [class*=" bg-store-"], [class^="bg-white"], [class*=" bg-white"]) *, :is([class^="bg-store-"], [class*=" bg-store-"], [class^="bg-white"], [class*=" bg-white"])) {
+  color: var(--sec-heading);
+}
+.awj-store-preview [data-sd~="fg"] p:not([data-sd] > * :is([class^="bg-store-"], [class*=" bg-store-"], [class^="bg-white"], [class*=" bg-white"]) *, :is([class^="bg-store-"], [class*=" bg-store-"], [class^="bg-white"], [class*=" bg-white"])) {
+  color: var(--sec-fg);
+}
+.awj-store-preview [data-sd~="link"] a:not([data-sd] > * :is([class^="bg-store-"], [class*=" bg-store-"], [class^="bg-white"], [class*=" bg-white"]) *, :is([class^="bg-store-"], [class*=" bg-store-"], [class^="bg-white"], [class*=" bg-white"]), [class*="hover:bg-store-"], [class*="hover:bg-white"]:not([class*="hover:bg-white/"])) {
+  color: var(--sec-link);
+}
+
+/* Heading actions that are not anchors (the Canvas draws "View all" as a label) follow the
+   section link colour exactly like the published anchor does. */
+.awj-store-preview [data-sd~="link"] [data-section-action]:not([data-sd] > * :is([class^="bg-store-"], [class*=" bg-store-"], [class^="bg-white"], [class*=" bg-white"]) *, :is([class^="bg-store-"], [class*=" bg-store-"], [class^="bg-white"], [class*=" bg-white"])) {
+  color: var(--sec-link);
 }

@@ -1,37 +1,18 @@
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
-import { AppPromoBand } from "@/components/home/AppPromoBand";
-import { BannerBand } from "@/components/home/BannerBand";
-import { BenefitsBand } from "@/components/home/BenefitsBand";
 import { CategoriesSection } from "@/components/home/CategoriesSection";
-import { CustomContentBand } from "@/components/home/CustomContentBand";
-import { DeliveryPromiseBand } from "@/components/home/DeliveryPromiseBand";
-import { DiscoverySection } from "@/components/home/DiscoverySection";
-import { FeaturedShelf } from "@/components/home/FeaturedShelf";
 import { HeroSection } from "@/components/home/HeroSection";
 import { NewArrivalsSection } from "@/components/home/NewArrivalsSection";
-import { OffersShelf } from "@/components/home/OffersShelf";
-import { ProductShelfSection } from "@/components/home/ProductShelfSection";
+import { publishedNodes } from "@/components/home/published-nodes";
 import { WholesaleSection } from "@/components/home/WholesaleSection";
 import { StoreContainer } from "@/components/layout/StoreContainer";
+import { localeDirection } from "@/i18n/locales";
 import { fetchStorefrontConfig } from "@/lib/commerce/storefront";
 import { resolveCurrency } from "@/lib/data/markets";
 import { type HomeSectionKey, resolveHomeSections } from "@/lib/home/sections";
 import { generateHomeMetadata } from "@/lib/metadata/home";
-import type { PresentationHomeSection } from "@/lib/presentation/config";
 import { publishedStoreName } from "@/lib/presentation/public";
 import { publishedHomeStackClass } from "@/lib/presentation/public-rhythm";
-import {
-  bannerContentOf,
-  benefitsContentOf,
-  customContentOf,
-  deliveryPromiseContentOf,
-  discoveryContentOf,
-  featuredContentOf,
-  offersContentOf,
-  productShelfContentOf,
-} from "@/lib/presentation/section-content";
-import type { ThemePresetId } from "@/lib/presentation/tokens";
 
 interface HomePageProps {
   params: Promise<{
@@ -113,6 +94,12 @@ export default async function HomePage({ params }: HomePageProps) {
         appTitle: homeCopy("appPromo"),
         appStoreLabel: homeCopy("appStore"),
         playStoreLabel: homeCopy("playStore"),
+        design: {
+          primaryColor: presentation.primaryColor,
+          accentColor: presentation.accentColor,
+          palette: presentation.palette,
+          dir: localeDirection(locale),
+        },
       })
     : resolveHomeSections()
         .filter((section) => section.visible)
@@ -125,183 +112,4 @@ export default async function HomePage({ params }: HomePageProps) {
       {nodes}
     </StoreContainer>
   );
-}
-
-async function publishedNodes(
-  sections: readonly PresentationHomeSection[],
-  ctx: {
-    implemented: Record<HomeSectionKey, React.ReactNode>;
-    basePath: string;
-    locale: string;
-    currency?: string;
-    themePreset?: ThemePresetId;
-    apps: {
-      iosUrl: string;
-      androidUrl: string;
-      appName: string;
-    };
-    benefitsTitle: string;
-    featuredTitle: string;
-    offersTitle: string;
-    appTitle: string;
-    appStoreLabel: string;
-    playStoreLabel: string;
-  },
-): Promise<React.ReactNode[]> {
-  const nodes: React.ReactNode[] = [];
-  for (const section of sections) {
-    if (!section.visible) continue;
-    if (
-      section.type === "hero" ||
-      section.type === "categories" ||
-      section.type === "newArrivals" ||
-      section.type === "wholesale"
-    ) {
-      nodes.push(<div key={section.id}>{ctx.implemented[section.type]}</div>);
-      continue;
-    }
-    if (section.type === "banner") {
-      const content = bannerContentOf(section);
-      if (
-        !content.title &&
-        !content.subtitle &&
-        !content.imageUrl &&
-        !content.ctaLabel
-      ) {
-        continue;
-      }
-      nodes.push(
-        <BannerBand
-          key={section.id}
-          content={content}
-          basePath={ctx.basePath}
-          headingId={`banner-${section.id}`}
-        />,
-      );
-      continue;
-    }
-    if (section.type === "benefits") {
-      const content = benefitsContentOf(section);
-      if (!content.items.some((item) => item.title || item.body)) continue;
-      nodes.push(
-        <BenefitsBand
-          key={section.id}
-          content={content}
-          headingId={`benefits-${section.id}`}
-          title={ctx.benefitsTitle}
-        />,
-      );
-      continue;
-    }
-    if (section.type === "customContent") {
-      const content = customContentOf(section);
-      if (!content.blocks.some((block) => block.text.trim())) continue;
-      nodes.push(
-        <CustomContentBand
-          key={section.id}
-          sectionId={section.id}
-          content={content}
-          themePreset={ctx.themePreset}
-        />,
-      );
-      continue;
-    }
-    if (section.type === "featured") {
-      const content = featuredContentOf(section);
-      const productIds = content.productIds.filter((id) =>
-        /^[a-zA-Z0-9_-]{1,64}$/.test(id),
-      );
-      if (productIds.length === 0) continue;
-      nodes.push(
-        <FeaturedShelf
-          key={section.id}
-          productIds={productIds}
-          basePath={ctx.basePath}
-          locale={ctx.locale}
-          currency={ctx.currency}
-          title={ctx.featuredTitle}
-          headingId={`featured-${section.id}`}
-          themePreset={ctx.themePreset}
-        />,
-      );
-      continue;
-    }
-    if (section.type === "offers") {
-      // CUST-H4-7 — real Offers. The stored ids are references to
-      // `storefront_offers`; liveness, prices and the discount come from the
-      // Host-resolved `GET /store/v1/offers` inside `OffersShelf`.
-      const offerIds = offersContentOf(section).offerIds.filter((id) =>
-        /^[a-zA-Z0-9_-]{1,64}$/.test(id),
-      );
-      if (offerIds.length === 0) continue;
-      nodes.push(
-        <OffersShelf
-          key={section.id}
-          offerIds={offerIds}
-          basePath={ctx.basePath}
-          title={ctx.offersTitle}
-          headingId={`offers-${section.id}`}
-        />,
-      );
-      continue;
-    }
-    if (section.type === "productShelf") {
-      // FLOWERS-H9b / ADR-21 — a source reference and/or deliver-today only;
-      // products, prices and availability are read live inside the section.
-      const content = productShelfContentOf(section);
-      if (!content.source && !content.deliverToday) continue;
-      nodes.push(
-        <ProductShelfSection
-          key={section.id}
-          content={content}
-          basePath={ctx.basePath}
-          locale={ctx.locale}
-          currency={ctx.currency}
-          headingId={`shelf-${section.id}`}
-          themePreset={ctx.themePreset}
-        />,
-      );
-      continue;
-    }
-    if (section.type === "discovery") {
-      const content = discoveryContentOf(section);
-      if (content.axis === "facet" && !content.dimension) continue;
-      nodes.push(
-        <DiscoverySection
-          key={section.id}
-          content={content}
-          basePath={ctx.basePath}
-          locale={ctx.locale}
-          headingId={`discovery-${section.id}`}
-        />,
-      );
-      continue;
-    }
-    if (section.type === "deliveryPromise") {
-      nodes.push(
-        <DeliveryPromiseBand
-          key={section.id}
-          content={deliveryPromiseContentOf(section)}
-          locale={ctx.locale}
-          headingId={`delivery-promise-${section.id}`}
-        />,
-      );
-      continue;
-    }
-    if (section.type === "appPromo") {
-      nodes.push(
-        <AppPromoBand
-          key={section.id}
-          appName={ctx.apps.appName}
-          iosUrl={ctx.apps.iosUrl}
-          androidUrl={ctx.apps.androidUrl}
-          title={ctx.appTitle}
-          appStoreLabel={ctx.appStoreLabel}
-          playStoreLabel={ctx.playStoreLabel}
-          locale={ctx.locale}
-        />,
-      );
-    }
-  }
-  return nodes;
 }

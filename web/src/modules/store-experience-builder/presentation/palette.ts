@@ -106,3 +106,39 @@ export function resolvePalette(config: {
 export function suggestAccent(brand: string): string {
   return mixHex(brand, "#ffffff", 0.35);
 }
+
+/**
+ * Today's fixed storefront tokens — what an unset palette role renders as now
+ * (`storefront/src/app/globals.css`). A section `design` that *references* a role
+ * the merchant never set resolves to these, so it is deterministic and provable.
+ */
+export const ROLE_FALLBACK_HEX = {
+  surface: "#ffffff",
+  surfaceAlt: "#f3f4f6",
+  text: "#111827",
+  heading: "#111827",
+  border: "#e5e7eb",
+  overlay: "#000000",
+} as const;
+
+/** Always a concrete `#rrggbb`: the merchant's value, else the fixed token / derived value. */
+export function resolveRoleHex(
+  role: PaletteRole,
+  config: {
+    primaryColor: string;
+    accentColor: string | null;
+    palette?: PresentationPalette;
+  },
+): string {
+  const resolved = resolvePalette(config);
+  switch (role) {
+    case "brand":
+      return resolved.brand;
+    case "accent":
+      return resolved.accent;
+    case "link":
+      return resolved.link ?? resolved.brand;
+    default:
+      return resolved[role] ?? ROLE_FALLBACK_HEX[role];
+  }
+}
