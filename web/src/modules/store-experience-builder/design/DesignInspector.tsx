@@ -165,8 +165,25 @@ export function DesignInspector({
   const text = effectiveText(current, ctx, type);
   const hasBackground = !!current.background;
   const ownsSurface = SURFACE_OWNING_TYPES.has(type) && !hasBackground;
-  const hasSeparator =
-    [current.separator?.top, current.separator?.bottom].some((kind) => kind && kind !== "none");
+  const activeSeparatorKinds = [current.separator?.top, current.separator?.bottom].filter(
+    (kind): kind is Exclude<(typeof SEPARATOR_KINDS)[number], "none"> => !!kind && kind !== "none",
+  );
+  const hasSeparator = activeSeparatorKinds.length > 0;
+  // The colour a separator takes when the merchant picks none — exactly the resolver's defaults:
+  // a line follows the border role, a band the brand, a shape the page behind. Mixed edges
+  // (e.g. a line above and a wave below) have different defaults, so the field says so rather
+  // than showing one swatch for both.
+  const separatorDefaults = new Set(
+    activeSeparatorKinds.map((kind) => (kind === "line" ? "border" : kind === "band" ? "brand" : "page")),
+  );
+  const separatorAutomatic =
+    separatorDefaults.size === 1 && separatorDefaults.has("border")
+      ? { hex: resolveRoleHex("border", ctx), label: t("designRoleBorder") }
+      : separatorDefaults.size === 1 && separatorDefaults.has("brand")
+        ? { hex: resolveRoleHex("brand", ctx), label: t("designRoleBrand") }
+        : separatorDefaults.size === 1
+          ? { hex: PAGE_BACKGROUND, label: t("designSepAutoColour") }
+          : { label: t("designSepAutoMixed") };
   const bleedsBand = current.width?.mode === "full" && current.background?.kind === "solid";
   const set = <K extends DesignGroup>(group: K, value: SectionDesign[K] | undefined) =>
     onChange(setGroup(type, design, group, value));
@@ -632,12 +649,16 @@ export function DesignInspector({
                 data-design-field={`separator.${edge}`}
                 className={selectClass}
                 value={current.separator?.[edge] ?? ""}
-                onChange={(event) =>
-                  set("separator", {
+                onChange={(event) => {
+                  const next = {
                     ...current.separator,
                     [edge]: (event.target.value || undefined) as (typeof SEPARATOR_KINDS)[number] | undefined,
-                  })
-                }
+                  };
+                  // no active edge left ⇒ drop the whole group: a stranded colour / height would
+                  // stay in the saved document, render nothing and have no control to clear it
+                  const active = [next.top, next.bottom].some((kind) => kind && kind !== "none");
+                  set("separator", active ? next : undefined);
+                }}
               >
                 {unsetOption}
                 {SEPARATOR_KINDS.map((kind) => (
@@ -656,7 +677,7 @@ export function DesignInspector({
                 value={current.separator?.color}
                 ctx={ctx}
                 t={t}
-                automatic={{ hex: PAGE_BACKGROUND, label: t("designSepAutoColour") }}
+                automatic={separatorAutomatic}
                 onChange={(color) => set("separator", { ...current.separator, color })}
               />
               <Field label={t("designSepHeight")}>

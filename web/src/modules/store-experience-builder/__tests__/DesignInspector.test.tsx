@@ -276,6 +276,32 @@ describe("DesignInspector — separators and reveal (CUST-HV V5e-3)", () => {
     expect(out()).toBeNull();
   });
 
+  it("clearing the last edge drops a chosen colour and height too — nothing is stranded in the document (review)", () => {
+    render(
+      <Harness
+        type="benefits"
+        initial={{ separator: { bottom: "wave", color: { hex: "#112233" }, height: "lg" } }}
+      />,
+    );
+    fireEvent.change(field("separator.bottom"), { target: { value: "none" } });
+    expect(out()).toBeNull();
+  });
+
+  it("the automatic colour shown is the one the resolver uses for the chosen kind (review)", () => {
+    const shown = () => document.querySelector('[data-colour-field="separator-color"] [data-colour-current]')?.textContent;
+    const { unmount } = render(<Harness type="benefits" initial={{ separator: { bottom: "line" } }} />);
+    expect(shown()).toBe("Border"); // a line follows the border role
+    unmount();
+    const band = render(<Harness type="benefits" initial={{ separator: { bottom: "band" } }} />);
+    expect(shown()).toBe("Brand"); // a band follows the brand
+    band.unmount();
+    const wave = render(<Harness type="benefits" initial={{ separator: { top: "wave" } }} />);
+    expect(shown()).toBe("Page colour"); // a shape sits on the page behind
+    wave.unmount();
+    render(<Harness type="benefits" initial={{ separator: { top: "line", bottom: "wave" } }} />);
+    expect(shown()).toBe("Automatic (per shape)"); // mixed defaults are not summarised by one swatch
+  });
+
   it("a full-width band explains that it carries no separator", () => {
     render(
       <Harness
