@@ -30,10 +30,11 @@ class StorefrontMediaEvidenceBackfiller
     /**
      * `$limit` يحدّ ما **يُفحَص** لكل نوعٍ في التشغيل (مكتوباً أو فاشلاً) فيبقى العمل محدوداً حتى مع تخزينٍ
      * متدهور (Codex P2 على #1277)؛ و`next` مؤشّر المتابعة (آخر معرّفٍ فُحص) حين بقي ما لم يُفحَص، يُمرَّر
-     * إلى التشغيل التالي في `$after` فيتجاوز البادئة الفاشلة بدل إعادتها. `null` = اكتمل النوع.
+     * إلى التشغيل التالي في `$after` فيتجاوز البادئة الفاشلة بدل إعادتها. `done[kind]` = استُنفد النوع، ويبقى `next[kind]`
+     * آخر معرّفٍ فُحص (لا `null`) فلا يعود النوع المكتمل إلى البداية حين يستمر نوعٌ آخر (Codex P2).
      *
      * @param  array{assets?:?string, derivatives?:?string}  $after
-     * @return array{assets:int, derivatives:int, failed:int, dry_run:bool, next:array{assets:?string, derivatives:?string}}
+     * @return array{assets:int, derivatives:int, failed:int, dry_run:bool, done:array{assets:bool, derivatives:bool}, next:array{assets:?string, derivatives:?string}}
      */
     public function run(string $tenantId, int $limit = 200, bool $dryRun = false, array $after = []): array
     {
@@ -41,7 +42,7 @@ class StorefrontMediaEvidenceBackfiller
         $this->tenant->set($tenantId);
 
         try {
-            $stats = ['assets' => 0, 'derivatives' => 0, 'failed' => 0, 'dry_run' => $dryRun, 'next' => ['assets' => null, 'derivatives' => null]];
+            $stats = ['assets' => 0, 'derivatives' => 0, 'failed' => 0, 'dry_run' => $dryRun, 'done' => ['assets' => false, 'derivatives' => false], 'next' => ['assets' => $after['assets'] ?? null, 'derivatives' => $after['derivatives'] ?? null]];
 
             $assetQuery = StorefrontMedia::query()
                 ->where('state', StorefrontMedia::STATE_ACTIVE)
@@ -83,7 +84,7 @@ class StorefrontMediaEvidenceBackfiller
      * التالي يبدأ بعد آخر ما فُحص (`next`)، و`$limit` يحدّ المفحوص فيبقى العمل محدوداً. الفاشل يُعدّ في `failed`.
      *
      * @param  \Illuminate\Database\Eloquent\Builder<\Illuminate\Database\Eloquent\Model>  $query
-     * @param  array{assets:int, derivatives:int, failed:int, dry_run:bool, next:array{assets:?string, derivatives:?string}}  $stats
+     * @param  array{assets:int, derivatives:int, failed:int, dry_run:bool, done:array{assets:bool, derivatives:bool}, next:array{assets:?string, derivatives:?string}}  $stats
      * @param  callable(\Illuminate\Database\Eloquent\Model): bool  $measure  true = قيس
      */
     private function eachCandidate($query, int $limit, ?string $after, array &$stats, string $counter, callable $measure): void
@@ -107,7 +108,7 @@ class StorefrontMediaEvidenceBackfiller
                 $stats['failed']++;
             }
         }
-        $stats['next'][$counter] = null; // استُنفد النوع
+        $stats['done'][$counter] = true; // استُنفد النوع؛ `next` يبقى آخر مفحوص
     }
 
     /**

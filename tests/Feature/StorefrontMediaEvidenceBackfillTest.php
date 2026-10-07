@@ -73,6 +73,17 @@ class StorefrontMediaEvidenceBackfillTest extends TestCase
         return ['auth' => $auth, 'id' => $media['id'], 'original' => $original];
     }
 
+    /**
+     * @param  array<string,mixed>  $stats
+     * @return array<string,mixed>
+     */
+    private function counts(array $stats): array
+    {
+        $this->assertSame(['assets' => true, 'derivatives' => true], $stats['done'], 'a run that examined everything is done');
+
+        return array_diff_key($stats, ['next' => 1, 'done' => 1]);
+    }
+
     /** @test */
     public function it_measures_the_served_files_for_assets_and_derivatives_and_only_inside_the_given_tenant(): void
     {
@@ -89,10 +100,10 @@ class StorefrontMediaEvidenceBackfillTest extends TestCase
         $backfiller = app(StorefrontMediaEvidenceBackfiller::class);
 
         // dry-run: counts, writes nothing
-        $this->assertSame(['assets' => 1, 'derivatives' => 8, 'failed' => 0, 'dry_run' => true, 'next' => ['assets' => null, 'derivatives' => null]], $backfiller->run($a['auth']['tenant_id'], 50, true));
+        $this->assertSame(['assets' => 1, 'derivatives' => 8, 'failed' => 0, 'dry_run' => true], $this->counts($backfiller->run($a['auth']['tenant_id'], 50, true)));
         $this->assertNull($this->asTenant($a['auth']['tenant_id'], fn () => StorefrontMedia::findOrFail($a['id'])->region_luminance));
 
-        $this->assertSame(['assets' => 1, 'derivatives' => 8, 'failed' => 0, 'dry_run' => false, 'next' => ['assets' => null, 'derivatives' => null]], $backfiller->run($a['auth']['tenant_id'], 50));
+        $this->assertSame(['assets' => 1, 'derivatives' => 8, 'failed' => 0, 'dry_run' => false], $this->counts($backfiller->run($a['auth']['tenant_id'], 50)));
 
         $asset = $this->asTenant($a['auth']['tenant_id'], fn () => StorefrontMedia::findOrFail($a['id'])->region_luminance);
         $this->assertSame('frame', $asset['basis']);
@@ -109,7 +120,7 @@ class StorefrontMediaEvidenceBackfillTest extends TestCase
         }
 
         // idempotent: nothing left to do
-        $this->assertSame(['assets' => 0, 'derivatives' => 0, 'failed' => 0, 'dry_run' => false, 'next' => ['assets' => null, 'derivatives' => null]], $backfiller->run($a['auth']['tenant_id'], 50));
+        $this->assertSame(['assets' => 0, 'derivatives' => 0, 'failed' => 0, 'dry_run' => false], $this->counts($backfiller->run($a['auth']['tenant_id'], 50)));
 
         // tenant isolation: the other tenant's asset was never touched
         $this->assertNull($this->asTenant($b['auth']['tenant_id'], fn () => StorefrontMedia::findOrFail($b['id'])->region_luminance));
@@ -170,7 +181,10 @@ class StorefrontMediaEvidenceBackfillTest extends TestCase
 
         $third = $backfiller->run($auth['tenant_id'], 1, false, ['assets' => $second['next']['assets']]);
         $this->assertSame(1, $third['assets']);
-        $this->assertNull($third['next']['assets'], 'exhausted');
+        $this->assertTrue($third['done']['assets'], 'exhausted');
+        $this->assertSame($last, $third['next']['assets'], 'a finished kind keeps its last cursor so it never restarts while the other kind continues');
+        $resumed = $backfiller->run($auth['tenant_id'], 1, false, ['assets' => $third['next']['assets']]);
+        $this->assertSame(0, $resumed['assets'] + $resumed['failed'], 'nothing is re-examined behind the cursor');
         $this->assertNotNull($this->asTenant($auth['tenant_id'], fn () => StorefrontMedia::findOrFail($last)->region_luminance));
         $this->assertNull($this->asTenant($auth['tenant_id'], fn () => StorefrontMedia::findOrFail($stuck)->region_luminance));
     }

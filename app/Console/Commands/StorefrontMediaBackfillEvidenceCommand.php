@@ -54,9 +54,21 @@ final class StorefrontMediaBackfillEvidenceCommand extends Command
             $this->line($key.': '.$stats[$key]);
         }
         $this->line('dry_run: '.($stats['dry_run'] ? 'yes' : 'no'));
-        foreach ($stats['next'] as $kind => $cursor) {
-            if ($cursor !== null) {
-                $this->line("more {$kind}: re-run with --after-{$kind}={$cursor}");
+        // أمر متابعة واحد كامل بمؤشّري النوعين (النوع المكتمل يبقى بمؤشّره فلا يعود للبداية). وفي dry-run
+        // لا يُقترح إلا dry-run: مؤشّر معاينةٍ لم تكتب شيئاً يتخطّى صفوفاً لم تُكتب إن اتُّبع في تشغيلٍ فعلي.
+        if (! $stats['done']['assets'] || ! $stats['done']['derivatives']) {
+            $parts = ["--tenant={$tenantId}", "--limit={$limit}"];
+            if ($stats['dry_run']) {
+                $parts[] = '--dry-run';
+            }
+            foreach (['assets', 'derivatives'] as $kind) {
+                if ($stats['next'][$kind] !== null) {
+                    $parts[] = "--after-{$kind}={$stats['next'][$kind]}";
+                }
+            }
+            $this->line('more remain — continue with: php artisan storefront-media:backfill-evidence '.implode(' ', $parts));
+            if ($stats['dry_run']) {
+                $this->line('(dry-run cursors only skip rows that a dry-run examined; do not reuse them for a real run)');
             }
         }
 
