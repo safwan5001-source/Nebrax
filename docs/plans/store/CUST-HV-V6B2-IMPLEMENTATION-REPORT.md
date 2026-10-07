@@ -6,7 +6,7 @@
 |---|---|
 | **Horizon** | CUST-HV — Visual Design, Media & Merchant UX Completion |
 | **Slice** | **V6b-2** — second part of V6b (V6b-1 evidence ✔ → **V6b-2 contract + publish gate** → V6b-3 rendering → V6b-4 inspector → V6b-5 real-pixel proof) |
-| **Branch** | `cust-hv/v6b2-media-contract` (stacked on V6b-1 until #1277 merges; rebuilt on `main` afterwards) |
+| **Branch** | `cust-hv/v6b2-media-contract` (from `main` after V6b-1 #1277) |
 | **Authority** | V0 §3.2.1 (media background proof) · §4.5 (contrast) · §8.1 (hero media) · §2.2 (additive, three normalizers in lock-step) · AMEND-8 / AMEND-9 |
 | **Depends on** | V6b-1 (`region_luminance` pixel evidence) |
 
@@ -54,7 +54,7 @@ background = { kind: "media",
 | Normalizer parity | `section-design.json` +~22 cases (default/mobile/overlay, canonical order, every bad alpha, unsafe colour, malformed pictures, url/style stripping, 8 non-hero types) — PHP `StorefrontSectionDesignTest` 5/5, web 72/72, storefront 72/72 |
 | Contrast parity | `section-design-contrast.json` +15 media cases (dark/light proven, full-range unprovable, weak vs strong overlay, palette overlay role, no/absent evidence, phone picture without evidence, phone widening, explicit white/dark text, heading+link, range-not-average) — PHP / web / storefront each 39/39 on identical expected values |
 | Integration (real uploads, real derivatives) | `StorefrontMediaBackgroundContrastTest` 8: dark publishes; black→white unprovable until a 70 % overlay; phone picture judged; 7 kinds of bad/old evidence never proof; stored slack cannot narrow; unknown/deleted/unready asset; **cropped derivative proven on its own evidence** (a crop that includes one white column is correctly *not* provable) and a derivative row without evidence ⇒ unprovable; hidden sections never block, other types cannot carry a picture |
-| Suites | storefront vitest 1513 ✔ · web `store-experience-builder` + appearance 1135 ✔ · tsc clean (changed files) · biome clean on changed files · PHP subset (Presentation / SectionDesign / Storefront / Commerce) — see PR |
+| Suites | full PHP: 5833 passed, 28 failed — all known container-only suites (Fuel* need bcmath; Resend mail transport; user-invitation mail views), none touched · storefront vitest 1513 ✔ · web vitest 3946 ✔ (437 files) · tsc clean (changed files) · biome clean on changed files |
 
 ## Design Quality Pass
 No pixel is painted by this slice (the renderers ignore a picture background until V6b-3), so there is no visual surface to evaluate. The merchant-facing text added is the unprovable-picture message (AR; EN is carried by the V6b-4 inspector keys). Responsive / RTL / state evidence for the picture itself belongs to V6b-5.
