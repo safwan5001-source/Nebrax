@@ -4,6 +4,7 @@ import {
   normalizePagePresentation,
   type PagePresentation,
 } from "./page-regions";
+import { normalizePalette, type PresentationPalette } from "./palette";
 import {
   normalizeOptionalSectionContent,
   type SectionContent,
@@ -175,6 +176,12 @@ export interface StorefrontPresentationConfig {
    * no bar; pre-V3 documents normalize without this key, byte-identically.
    */
   announcements?: AnnouncementsDoc;
+  /**
+   * CUST-HV V5a — additive, optional palette roles beyond brand (= `primaryColor`)
+   * and accent (= `accentColor`) (contract §4.1). Absent = every role keeps its
+   * fixed token today; pre-V5 documents normalize without this key, byte-identically.
+   */
+  palette?: PresentationPalette;
 }
 
 const NAV_KINDS: NavLinkKind[] = [
@@ -510,6 +517,7 @@ export function normalizePresentationConfig(
   const androidUrl = asString(appsRaw.androidUrl);
   const pagePresentation = normalizePagePresentation(raw.pagePresentation);
   const announcements = normalizeAnnouncements(raw.announcements);
+  const palette = normalizePalette(raw.palette);
 
   return {
     version: PRESENTATION_CONFIG_VERSION,
@@ -611,6 +619,7 @@ export function normalizePresentationConfig(
       : DEFAULT_PRESENTATION_CONFIG.pages.map((page) => ({ ...page })),
     ...(pagePresentation ? { pagePresentation } : {}),
     ...(announcements ? { announcements } : {}),
+    ...(palette ? { palette } : {}),
   };
 }
 

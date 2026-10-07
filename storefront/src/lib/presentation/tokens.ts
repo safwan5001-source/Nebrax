@@ -180,7 +180,7 @@ function rgbToHex(r: number, g: number, b: number): string {
     .join("")}`;
 }
 
-function mixHex(hex: string, other: string, amount: number): string {
+export function mixHex(hex: string, other: string, amount: number): string {
   const a = hexToRgb(hex);
   const b = hexToRgb(other);
   if (!a || !b) return hex;

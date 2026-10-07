@@ -137,6 +137,14 @@ final class StorefrontPresentationNormalizer
      * ولا يغيّر مفتاحاً موجوداً. الألوان: `{hex}` صلبة فقط الآن؛ أدوار اللوحة
      * والتدرّجات تأتي مع V5 (محرّك التباين العام) فتُسقط هنا fail-closed.
      */
+    /**
+     * CUST-HV V5a — أدوار اللوحة الإضافية (V0 §4.1). `brand` = `primaryColor` و`accent`
+     * = `accentColor` يبقيان مفتاحَيهما (لا مصدرَي حقيقة)؛ هنا ما عداهما فقط.
+     * مفتاح اختياري إضافي بحت: الغياب (أو كل الأدوار غير صالحة) = لا مفتاح، فكل دورٍ
+     * غائب يسقط إلى رمزه الثابت اليوم (غياب `palette` ⇒ مخرجات بلا تغيير).
+     */
+    public const PALETTE_ROLES = ['surface', 'surfaceAlt', 'text', 'heading', 'link', 'border', 'overlay'];
+
     public const ANNOUNCEMENT_MAX_ITEMS = 5;
 
     public const ANNOUNCEMENT_TEXT_MAX = 120;
@@ -384,6 +392,7 @@ final class StorefrontPresentationNormalizer
         $androidUrl = $this->asString($appsRaw['androidUrl'] ?? null);
         $pagePresentation = $this->normalizePagePresentation($input['pagePresentation'] ?? null);
         $announcements = $this->normalizeAnnouncements($input['announcements'] ?? null);
+        $palette = $this->normalizePalette($input['palette'] ?? null);
 
         $config = [
             'version' => self::VERSION,
@@ -463,6 +472,10 @@ final class StorefrontPresentationNormalizer
 
         if ($announcements !== null) {
             $config['announcements'] = $announcements;
+        }
+
+        if ($palette !== null) {
+            $config['palette'] = $palette;
         }
 
         return $config;
@@ -567,6 +580,26 @@ final class StorefrontPresentationNormalizer
         }
 
         return $trimmed;
+    }
+
+    /**
+     * CUST-HV V5a — يطبّع `palette` (V0 §4.1): أدوار hex آمنة فقط، بحروف صغيرة (شكل
+     * قانوني واحد)، بترتيب الأدوار الثابت؛ ما عداها يُسقط بمفرده. `null` = غياب.
+     *
+     * @return array<string,string>|null
+     */
+    private function normalizePalette(mixed $raw): ?array
+    {
+        $object = $this->object($raw);
+        $palette = [];
+        foreach (self::PALETTE_ROLES as $role) {
+            $value = trim($this->asString($object[$role] ?? null));
+            if ($this->isSafeHexColor($value)) {
+                $palette[$role] = strtolower($value);
+            }
+        }
+
+        return $palette === [] ? null : $palette;
     }
 
     public function isSafeHexColor(string $value): bool
