@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\StorefrontMedia;
 use App\Models\StorefrontPresentation;
+use App\Services\Commerce\StorefrontMediaPixelEvidence;
 use App\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Mockery;
@@ -120,6 +121,16 @@ class StorefrontMediaApiTest extends TestCase
         }
         $this->assertNotNull($row->avg_luminance);
         $this->assertMatchesRegularExpression('/^#[0-9a-f]{6}$/', $row->dominant_colour);
+
+        // CUST-HV V6b-1 — دليل البكسل (حدّا القنوات) يُكتب مع المتغيّرات على أعرض إطار، لا متوسطاً.
+        $evidence = $row->region_luminance;
+        $this->assertSame(StorefrontMediaPixelEvidence::VERSION, $evidence['v']);
+        $this->assertSame('frame', $evidence['basis']);
+        $widest = max(array_column($row->variantList(), 'width'));
+        $this->assertSame($widest, $evidence['width']);
+        $this->assertFalse($evidence['alpha']);
+        $this->assertCount(3, $evidence['min']);
+        $this->assertNotNull(StorefrontMediaPixelEvidence::bounds($evidence));
     }
 
     /** @test */

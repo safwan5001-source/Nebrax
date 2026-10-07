@@ -76,7 +76,7 @@ final class StorefrontMediaVariantGenerator
     /**
      * @param  callable(string $file, string $bytes, string $mime): void  $store  يخزّن الناتج فوراً
      * @return array{
-     *   width:int, height:int, avg_luminance:int, dominant_colour:string,
+     *   width:int, height:int, avg_luminance:int, dominant_colour:string, region_luminance:array<string,mixed>,
      *   variants:list<array{kind:string,width:int,height:int,format:string,file:string,bytes:int}>
      * }
      */
@@ -91,11 +91,15 @@ final class StorefrontMediaVariantGenerator
 
         $rungs = $this->rungs($sourceWidth);
         $variants = [];
+        $evidence = null;
 
         foreach ($rungs as [$kind, $width]) {
             if ($image->width() > $width) {
                 $image->scaleDown(width: $width);
             }
+
+            // CUST-HV V6b-1 — دليل البكسل على أكبر إطارٍ يمكن عرضه (الدرجة الأولى = الأعرض)، مرةً واحدة.
+            $evidence ??= StorefrontMediaPixelEvidence::scan($image);
 
             foreach ([self::FORMAT_WEBP, self::FORMAT_JPG] as $format) {
                 $quality = (int) config("storefront_media.quality.{$format}", 85);
@@ -129,6 +133,7 @@ final class StorefrontMediaVariantGenerator
             'height' => $sourceHeight,
             'avg_luminance' => $luminance,
             'dominant_colour' => $colour,
+            'region_luminance' => $evidence ?? StorefrontMediaPixelEvidence::scan($image),
             'variants' => $variants,
         ];
     }
@@ -145,7 +150,7 @@ final class StorefrontMediaVariantGenerator
      *
      * @param  list<int>  $widths  العروض الاسمية (مفاتيح المشتقّات)
      * @param  callable(int $width, string $format, string $bytes, string $mime, int $renderedWidth, int $renderedHeight): void  $store
-     * @return array{avg_luminance:int, dominant_colour:string, frame:array{width:int,height:int}}
+     * @return array{avg_luminance:int, dominant_colour:string, region_luminance:array<string,mixed>, frame:array{width:int,height:int}}
      */
     public function renderTransform(string $sourcePath, StorefrontMediaTransform $transform, array $widths, callable $store): array
     {
@@ -171,11 +176,14 @@ final class StorefrontMediaVariantGenerator
 
         /** @var array<string,string> $encoded مفتاحه "{renderedWidth}.{format}" — يُرمَّز مرةً لكل عرضٍ فعليّ */
         $encoded = [];
+        $evidence = null;
         foreach ($widths as $nominal) {
             $target = min($nominal, $image->width());
             if ($image->width() > $target) {
                 $image->scaleDown(width: $target);
             }
+            // CUST-HV V6b-1 (AMEND-8) — الدليل على بكسلات الإطار **المحوَّل** كما يُعرَض (أعرض عرضٍ مُصيَّر).
+            $evidence ??= StorefrontMediaPixelEvidence::scan($image, 'transform');
             foreach ([self::FORMAT_WEBP, self::FORMAT_JPG] as $format) {
                 $cacheKey = $image->width().'.'.$format;
                 if (! isset($encoded[$cacheKey])) {
@@ -190,7 +198,12 @@ final class StorefrontMediaVariantGenerator
 
         [$luminance, $colour] = $this->sampleStatistics($image);
 
-        return ['avg_luminance' => $luminance, 'dominant_colour' => $colour, 'frame' => $frame];
+        return [
+            'avg_luminance' => $luminance,
+            'dominant_colour' => $colour,
+            'region_luminance' => $evidence ?? StorefrontMediaPixelEvidence::scan($image, 'transform'),
+            'frame' => $frame,
+        ];
     }
 
     /**

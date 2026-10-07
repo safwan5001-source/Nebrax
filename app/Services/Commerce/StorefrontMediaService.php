@@ -378,6 +378,7 @@ class StorefrontMediaService
                 'height' => $result['height'],
                 'avg_luminance' => $result['avg_luminance'],
                 'dominant_colour' => $result['dominant_colour'],
+                'region_luminance' => $result['region_luminance'],
                 'variants' => $result['variants'],
                 'variants_state' => StorefrontMedia::VARIANTS_READY,
                 'variants_error' => null,
