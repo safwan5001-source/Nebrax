@@ -6,7 +6,7 @@
 |---|---|
 | **Horizon** | CUST-HV — Visual Design, Media & Merchant UX Completion |
 | **Slice** | **V5e-3** — closes V5e (V5e-1 section typography ✓ → V5e-2 global tokens / buttons / fonts ✓ → **V5e-3 separators + reveal**) |
-| **Branch** | `cust-hv/v5e3-separators-reveal` (stacked on V5e-2c) |
+| **Branch** | `cust-hv/v5e3-separators-reveal` (on main after V5e-2c) |
 | **Authority** | V0 §3.3 (`separator`, `motion`), §3.4 (per-type registry), §6.4 (separators), §6.6 (motion: one-time subtle reveal, never on LCP / above-the-fold, reduced motion ⇒ static), §2.2 (additive, three normalizers) |
 | **Depends on** | V5b (contract) · V5c (frame/resolver/stylesheet) · V5d (inspector) · V5e-2a (`--gt-*`/`data-gt`, reduced-motion discipline) |
 
