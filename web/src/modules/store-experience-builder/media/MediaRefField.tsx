@@ -45,6 +45,7 @@ export function MediaRefField({
   t,
   slot,
   locale,
+  decorativeOnly = false,
 }: {
   label: string;
   hint?: string;
@@ -54,6 +55,11 @@ export function MediaRefField({
   /** Stable id for tests / evidence (`logo`, `compactLogo`, `favicon`, …). */
   slot: string;
   locale: "ar" | "en";
+  /**
+   * CUST-HV V6b-4b — a section-background picture is decoration by contract (the normaliser makes it
+   * `decorative`, drops its alt): the decorative toggle and the alt fields are not offered.
+   */
+  decorativeOnly?: boolean;
 }) {
   const [picking, setPicking] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -173,6 +179,7 @@ export function MediaRefField({
             </button>
           </div>
 
+          {decorativeOnly ? null : (
           <label className="flex min-h-11 cursor-pointer items-start gap-2 text-[13px] text-text md:min-h-9" htmlFor={`${id}-deco`}>
             <input
               id={`${id}-deco`}
@@ -188,8 +195,9 @@ export function MediaRefField({
               ) : null}
             </span>
           </label>
+          )}
 
-          {value.decorative ? null : (
+          {decorativeOnly || value.decorative ? null : (
             <div className="space-y-3">
               {(["ar", "en"] as const).map((locale) => (
                 <AltField

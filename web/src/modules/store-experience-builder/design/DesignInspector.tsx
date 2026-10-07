@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { Field, Segmented, btnClass, selectClass } from "../ControlPanels";
+import { MediaRefField } from "../media/MediaRefField";
+import type { BackgroundMediaBounds } from "../media/use-background-media-bounds";
 import type { CustomizerMessageKey } from "../messages";
 import { autoForeground } from "../presentation/contrast-engine";
 import {
@@ -13,6 +15,7 @@ import {
   HEADING_STYLES,
   HEADING_WEIGHTS,
   LINE_HEIGHTS,
+  OVERLAY_ALPHAS,
   RADII,
   REVEALS,
   SECTION_DESIGN_CAPABILITIES,
@@ -23,8 +26,11 @@ import {
   WIDTH_MAXES,
   type ColorRef,
   type DesignGroup,
+  type MediaOverlay,
+  type SectionBackground,
   type SectionDesign,
 } from "../presentation/section-design";
+import type { MediaRef } from "../presentation/media-ref";
 import {
   type DesignContext,
   PAGE_BACKGROUND,
@@ -140,17 +146,25 @@ export function DesignInspector({
   ctx,
   t,
   onChange,
+  locale = "ar",
+  bounds,
 }: {
   type: string;
   design: SectionDesign | undefined;
   ctx: DesignContext;
   t: T;
   onChange: (next: SectionDesign | undefined) => void;
+  locale?: "ar" | "en";
+  /** V6b-4b — why a picture is (not yet) provable: still measuring vs. no valid measurement. */
+  bounds?: BackgroundMediaBounds;
 }) {
   const capability = SECTION_DESIGN_CAPABILITIES[type];
   const clipboard = useDesignClipboard();
   const [confirmReset, setConfirmReset] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  // "Picture" was chosen but none is picked yet: a picture background without a picture does not
+  // exist in the document (the contract drops it), so the choice lives here until one is selected.
+  const [pendingImage, setPendingImage] = useState(false);
   const current = design ?? {};
 
   if (!capability) {
@@ -192,9 +206,15 @@ export function DesignInspector({
     onChange(setGroup(type, design, group, value));
 
   // ── background ────────────────────────────────────────────────────────────
-  // V6b-4 adds the image kind to this control; until then an image background (API-authored) reads as "none" here.
-  const bgKind = current.background?.kind === "media" ? "none" : (current.background?.kind ?? "none");
-  const setBgKind = (kind: "none" | "solid" | "gradient") => {
+  const bgKind: "none" | "solid" | "gradient" | "media" =
+    current.background?.kind ?? (pendingImage ? "media" : "none");
+  const setBgKind = (kind: "none" | "solid" | "gradient" | "media") => {
+    if (kind === "media") {
+      if (current.background?.kind === "media") return;
+      setPendingImage(true);
+      return set("background", undefined);
+    }
+    setPendingImage(false);
     if (kind === "none") return set("background", undefined);
     if (kind === "solid")
       return set("background", {
@@ -208,6 +228,36 @@ export function DesignInspector({
       direction: current.background?.kind === "gradient" ? current.background.direction : "to-end",
     });
   };
+  const mediaBg = current.background?.kind === "media" ? current.background : null;
+  const setMediaBg = (next: { media?: MediaRef | null; mobile?: MediaRef | null; overlay?: MediaOverlay | null }) => {
+    const media = next.media === undefined ? mediaBg?.media : next.media;
+    if (!media) {
+      setPendingImage(true);
+      return set("background", undefined);
+    }
+    const mobile = next.mobile === undefined ? mediaBg?.mobile : next.mobile;
+    const overlay = next.overlay === undefined ? mediaBg?.overlay : next.overlay;
+    const background: SectionBackground = {
+      kind: "media",
+      media,
+      ...(mobile ? { mobile } : {}),
+      ...(overlay ? { overlay } : {}),
+    };
+    setPendingImage(false);
+    set("background", background);
+  };
+  const pictureStates = mediaBg
+    ? [mediaBg.media, mediaBg.mobile].filter((ref): ref is MediaRef => !!ref).map((ref) => bounds?.stateOf(ref) ?? "unavailable")
+    : [];
+  const pictureStatus: "checking" | "noEvidence" | "unprovable" | "ok" | null = !mediaBg
+    ? null
+    : pictureStates.includes("loading")
+      ? "checking"
+      : pictureStates.includes("unavailable")
+        ? "noEvidence"
+        : issues.some((issue) => issue.field === "background")
+          ? "unprovable"
+          : "ok";
 
   // ── text ──────────────────────────────────────────────────────────────────
   const textField = (field: TextField, label: string) => {
@@ -387,6 +437,7 @@ export function DesignInspector({
               { id: "none", label: t("designBgNone") },
               { id: "solid", label: t("designBgSolid") },
               { id: "gradient", label: t("designBgGradient") },
+              ...(allows(capability.background, "media") ? [{ id: "media" as const, label: t("designBgImage") }] : []),
             ]}
           />
           {current.background?.kind === "solid" ? (
@@ -453,6 +504,103 @@ export function DesignInspector({
                 </select>
               </Field>
             </>
+          ) : null}
+          {bgKind === "media" ? (
+            <div data-design-picture="" className="space-y-3">
+              <MediaRefField
+                slot="section-background"
+                label={t("designBgImageDefault")}
+                value={mediaBg?.media ?? null}
+                onChange={(media) => setMediaBg({ media })}
+                t={t}
+                locale={locale}
+                decorativeOnly
+              />
+              {mediaBg ? (
+                <>
+                  <MediaRefField
+                    slot="section-background-phone"
+                    label={t("designBgImagePhone")}
+                    hint={t("designBgImagePhoneHint")}
+                    value={mediaBg.mobile ?? null}
+                    onChange={(mobile) => setMediaBg({ mobile })}
+                    t={t}
+                    locale={locale}
+                    decorativeOnly
+                  />
+                  <Field label={t("designOverlayStrength")}>
+                    <select
+                      className={selectClass}
+                      data-design-overlay-alpha=""
+                      value={mediaBg.overlay?.alpha ?? 0}
+                      onChange={(event) => {
+                        const alpha = Number(event.target.value);
+                        setMediaBg({
+                          overlay:
+                            alpha === 0
+                              ? null
+                              : { color: mediaBg.overlay?.color ?? { role: "overlay" }, alpha: alpha as MediaOverlay["alpha"] },
+                        });
+                      }}
+                    >
+                      <option value={0}>{t("designOverlayNone")}</option>
+                      {OVERLAY_ALPHAS.map((alpha) => (
+                        <option key={alpha} value={alpha}>
+                          {alpha}%
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                  {mediaBg.overlay ? (
+                    <ColourField
+                      dataName="overlay-color"
+                      label={t("designOverlayColour")}
+                      value={mediaBg.overlay.color}
+                      ctx={ctx}
+                      t={t}
+                      clearable={false}
+                      onChange={(color) =>
+                        color && mediaBg.overlay && setMediaBg({ overlay: { color, alpha: mediaBg.overlay.alpha } })
+                      }
+                    />
+                  ) : null}
+                  <p
+                    data-picture-status={pictureStatus ?? undefined}
+                    role={pictureStatus === "ok" || pictureStatus === "checking" ? "status" : "alert"}
+                    className={`flex flex-wrap items-center gap-2 text-[12px] leading-5 ${
+                      pictureStatus === "ok" ? "text-positive" : pictureStatus === "checking" ? "text-muted" : "text-negative"
+                    }`}
+                  >
+                    <span>
+                      {pictureStatus === "ok"
+                        ? t("designPictureOk")
+                        : pictureStatus === "checking"
+                          ? t("designPictureChecking")
+                          : pictureStatus === "noEvidence"
+                            ? t("designPictureNoEvidence")
+                            : t("designPictureUnprovable")}
+                    </span>
+                    {pictureStatus === "unprovable" && (mediaBg.overlay?.alpha ?? 0) < 90 ? (
+                      <button
+                        type="button"
+                        data-design-overlay-darker=""
+                        className="border border-border bg-surface px-2 py-0.5 text-[12px] font-medium text-text hover:bg-background"
+                        onClick={() =>
+                          setMediaBg({
+                            overlay: {
+                              color: mediaBg.overlay?.color ?? { role: "overlay" },
+                              alpha: Math.min(90, (mediaBg.overlay?.alpha ?? 20) + 20) as MediaOverlay["alpha"],
+                            },
+                          })
+                        }
+                      >
+                        {t("designPictureDarker")}
+                      </button>
+                    ) : null}
+                  </p>
+                </>
+              ) : null}
+            </div>
           ) : null}
         </fieldset>
       ) : null}
