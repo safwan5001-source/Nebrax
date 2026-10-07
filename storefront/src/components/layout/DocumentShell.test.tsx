@@ -28,6 +28,23 @@ vi.mock("next/font/google", () => ({
     fontOptions.tajawal = options;
     return { variable: options.variable };
   },
+  // The catalogue families (CUST-HV V5e-2c) — only their `variable` matters here.
+  Amiri: (options: Record<string, unknown>) => ({ variable: options.variable }),
+  El_Messiri: (options: Record<string, unknown>) => ({
+    variable: options.variable,
+  }),
+  IBM_Plex_Sans_Arabic: (options: Record<string, unknown>) => ({
+    variable: options.variable,
+  }),
+  Inter: (options: Record<string, unknown>) => ({ variable: options.variable }),
+  Lora: (options: Record<string, unknown>) => ({ variable: options.variable }),
+  Noto_Sans_Arabic: (options: Record<string, unknown>) => ({
+    variable: options.variable,
+  }),
+  Readex_Pro: (options: Record<string, unknown>) => ({
+    variable: options.variable,
+  }),
+  Rubik: (options: Record<string, unknown>) => ({ variable: options.variable }),
 }));
 
 vi.mock("@next/third-parties/google", () => ({
