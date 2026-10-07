@@ -90,6 +90,23 @@ describe("Canvas heroes (CUST-HV V6a)", () => {
     ]);
   });
 
+  it("incomplete buttons are not shown and do NOT bring the default CTA back (that is for a hero with no buttons)", () => {
+    const c = canvas([
+      {
+        id: "hero",
+        type: "hero",
+        visible: true,
+        content: { headline: "H", ctas: [{ label: "Cleared link", href: "" }] },
+      },
+    ]);
+    expect(c.querySelector("[data-preview-hero-cta]")).toBeNull();
+    expect(c.textContent).not.toContain("Shop all");
+    expect(c.textContent).not.toContain("Cleared link");
+    cleanup();
+    const none = canvas([{ id: "hero", type: "hero", visible: true, content: { headline: "H" } }]);
+    expect(none.textContent).toContain("Shop all");
+  });
+
   it("with no visible hero the store is named in a visually-hidden <h1> (exactly one <h1>)", () => {
     const c = canvas([
       { id: "hero", type: "hero", visible: false },

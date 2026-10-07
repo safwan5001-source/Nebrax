@@ -141,18 +141,35 @@ describe("HeroSection (COM-7-P3A)", () => {
       expect(container.querySelector('a[href="/sa/en/products"]')).toBeNull();
     });
 
-    it("CTAs whose destination cannot be resolved fall back to the default CTA", async () => {
+    it("authored buttons that cannot render (no resolvable link) show NO button — the default link only belongs to a hero with no buttons", async () => {
       const { HeroSection } = await import("../HeroSection");
       const { container } = render(
         await HeroSection({
           basePath: "/sa/en",
           locale: "en",
           storeName: "Shop",
-          ctas: [{ label: "Bad", href: "javascript:alert(1)" }],
+          ctas: [
+            { label: "Bad", href: "javascript:alert(1)" },
+            { label: "Cleared link", href: "" },
+          ],
+        }),
+      );
+      expect(container.querySelector("a")).toBeNull();
+      expect(container.querySelector('a[href="/sa/en/products"]')).toBeNull();
+      expect(container.textContent).not.toContain("Bad");
+    });
+
+    it("an empty ctas list is the same as none: the default CTA", async () => {
+      const { HeroSection } = await import("../HeroSection");
+      const { container } = render(
+        await HeroSection({
+          basePath: "/sa/en",
+          locale: "en",
+          storeName: "Shop",
+          ctas: [],
         }),
       );
       expect(container.querySelector('a[href="/sa/en/products"]')).toBeTruthy();
-      expect(container.textContent).not.toContain("Bad");
     });
   });
 });

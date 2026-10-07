@@ -631,7 +631,9 @@ export function StorefrontPreviewCanvas({
                 ? (own.subheadline ?? "").trim()
                 : config.homepage.heroSubheadline.trim();
               // only a COMPLETE call to action renders (a draft with a label but no link — or the
-              // reverse — is kept in the document but shown as the default CTA, like the storefront)
+              // reverse — is kept in the document but not shown, and never brings the default CTA
+              // back: that is for a hero with NO authored buttons — exactly as the storefront)
+              const hasAuthoredCtas = (own?.ctas?.length ?? 0) > 0;
               const ctas = (own?.ctas ?? []).filter(
                 (cta) =>
                   cta.label.trim() !== "" &&
@@ -657,11 +659,11 @@ export function StorefrontPreviewCanvas({
                         {sub}
                       </p>
                     ) : null}
-                    {ctas.length === 0 ? (
+                    {!hasAuthoredCtas ? (
                       <span className="mt-4 inline-flex h-9 items-center rounded-store bg-store-primary-foreground px-4 text-xs font-bold text-store-primary md:mt-5 md:h-11 md:px-6 md:text-sm">
                         {t("shopNow")}
                       </span>
-                    ) : (
+                    ) : ctas.length === 0 ? null : (
                       <div className="mt-4 flex flex-wrap items-center gap-2 md:mt-5 md:gap-3">
                         {ctas.map((cta, index) => (
                           <span

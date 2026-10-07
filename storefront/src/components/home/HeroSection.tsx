@@ -87,6 +87,9 @@ export async function HeroSection({
   const title = headline?.trim() || displayName;
   const isMarket = themePreset === "awj-market";
   const Heading = headingLevel === 1 ? "h1" : "h2";
+  // The default CTA is for a hero that authored NO buttons. Buttons that exist but are incomplete
+  // (a draft with a cleared link) are not shown — and must not bring the default link back.
+  const hasAuthoredCtas = (ctas?.length ?? 0) > 0;
   const authored = (ctas ?? [])
     .map((cta) => ({
       label: cta.label.trim(),
@@ -125,7 +128,7 @@ export async function HeroSection({
             {subheadline}
           </p>
         )}
-        {authored.length === 0 ? (
+        {!hasAuthoredCtas ? (
           <Link
             href={`${basePath}/products`}
             className="mt-4 inline-flex h-9 items-center gap-1.5 rounded-store bg-store-primary-foreground px-4 text-xs font-bold text-store-primary shadow-md transition-opacity hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-store-primary-foreground md:mt-5 md:h-11 md:px-6 md:text-sm"
@@ -145,7 +148,7 @@ export async function HeroSection({
               />
             </svg>
           </Link>
-        ) : (
+        ) : authored.length === 0 ? null : (
           <div className="mt-4 flex flex-wrap items-center gap-2 md:mt-5 md:gap-3">
             {authored.map((cta, index) => (
               <Link
