@@ -132,20 +132,31 @@
 }
 /* Inner spacing REPLACES the section's own padding (so `none` removes it and a step is
    not doubled): the root element takes the designed padding on every side, and the
-   padded element directly inside it (a banner's / hero's content box) gives its own up. */
+   content box marked `data-section-content` (a banner's / hero's inner box) gives its own up —
+   only those, never an arbitrary padded descendant (an accordion card keeps its padding). */
 .awj-store-preview [data-sd~="pi"][data-sd] > * {
   padding: var(--sec-pi);
 }
-.awj-store-preview [data-sd~="pi"][data-sd] > * > :is([class^="p-"], [class*=" p-"], [class^="px-"], [class*=" px-"], [class^="py-"], [class*=" py-"], [class*=":p-"], [class*=":px-"], [class*=":py-"]) {
+.awj-store-preview [data-sd~="pi"][data-sd] > * > [data-section-content] {
   padding: 0;
 }
 .awj-store-preview [data-sd~="align"] {
   text-align: var(--sec-align);
 }
 /* content-block position (independent of text alignment) */
-.awj-store-preview [data-sd~="balign"][data-sd] > * {
+.awj-store-preview [data-sd~="balign"][data-sd] > *,
+.awj-store-preview [data-sd~="balign"][data-sd] > * > [data-section-content] {
   margin-inline-start: var(--sec-bms);
   margin-inline-end: var(--sec-bme);
+}
+/* a block can only be positioned if it is narrower than its container: the marked content
+   box (a banner's image + copy row) shrinks to its content */
+.awj-store-preview [data-sd~="balign"][data-sd] > * > [data-section-content],
+.awj-store-preview [data-sd~="balign"][data-sd] > [data-section-block] {
+  inline-size: fit-content;
+}
+.awj-store-preview [data-sd~="balign"][data-sd] > [data-section-block] {
+  max-inline-size: 100%;
 }
 .awj-store-preview [data-sd~="max"] {
   max-inline-size: var(--sec-max);
@@ -158,9 +169,20 @@
 .awj-store-preview [data-sd~="border"][data-sd] > * {
   border: none;
 }
+/* A background, border or shadow on the frame replaces / outlines the section's own surface,
+   so the frame inherits the rounded corners that surface had (hero, banner, promo bands…)
+   unless the design sets its own radius or bleeds. */
+.awj-store-preview :is([data-sd~="bg"], [data-sd~="border"], [data-sd~="shadow"]):not([data-sd~="radius"], [data-sd~="bleed"]):has(> :is([class^="rounded-store"], [class*=" rounded-store"])) {
+  border-radius: var(--store-radius);
+}
+/* The radius rounds what the frame paints (fill, border, shadow) and the section's own root.
+   Nothing is clipped: an `overflow` clip on the frame would cut the offset focus outlines of
+   links and buttons that sit at its edges. */
 .awj-store-preview [data-sd~="radius"] {
   border-radius: var(--sec-radius);
-  overflow: clip;
+}
+.awj-store-preview [data-sd~="radius"][data-sd] > * {
+  border-radius: inherit;
 }
 .awj-store-preview [data-sd~="shadow"] {
   box-shadow: var(--sec-shadow);
@@ -168,6 +190,16 @@
 /* A solid band that extends past the page container to the viewport edges. A
    box-shadow adds no scrollable overflow; the clip keeps it horizontal-only. */
 .awj-store-preview [data-sd~="bleed"] {
+  isolation: isolate;
+}
+/* The band is drawn by a pseudo-element behind the content, so the clip only ever touches
+   the band — never the section's own content (focus rings at its edges stay whole). */
+.awj-store-preview [data-sd~="bleed"]::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
   box-shadow: var(--sec-bleed);
   clip-path: inset(0 -100vmax);
 }
@@ -219,6 +251,12 @@
   --store-footer-muted: var(--store-footer-muted-base);
   --store-footer-link: var(--store-footer-link-base);
 }
+/* Focus rings are drawn outside the focused element, i.e. on the designed background:
+   every `focus-visible:outline-store-*` indicator that is not itself inside a nested surface
+   (a category card, the hero CTA…) is redrawn in the section's proven foreground. */
+.awj-store-preview [data-sd~="fg"] [class*="focus-visible:outline-store-"]:focus-visible:not([data-sd] > * :is([class^="bg-store-"], [class*=" bg-store-"], [class^="bg-white"], [class*=" bg-white"]) *) {
+  outline-color: var(--sec-fg);
+}
 /* A translucent fill nested in a designed section would composite over an arbitrary
    background, which no contrast proof can see: it becomes its opaque equivalent. */
 .awj-store-preview [data-sd~="fg"] :is([class^="bg-store-surface/"], [class*=" bg-store-surface/"]) {
@@ -246,20 +284,25 @@
   color: var(--sec-link);
 }
 
+/* Heading actions that are not anchors (the Canvas draws "View all" as a label) follow the
+   section link colour exactly like the published anchor does. */
+.awj-store-preview [data-sd~="link"] [data-section-action]:not([data-sd] > * :is([class^="bg-store-"], [class*=" bg-store-"], [class^="bg-white"], [class*=" bg-white"]) *, :is([class^="bg-store-"], [class*=" bg-store-"], [class^="bg-white"], [class*=" bg-white"])) {
+  color: var(--sec-link);
+}
 /*
  * Typography steps (V0 §5.2) — named steps resolved by the resolver, never pixel
  * inputs. Section-level text only: nothing inside a surface nested in the section.
  */
-.awj-store-preview [data-sd~="hs"] :is(h1, h2, h3):not([data-sd] > * :is([class^="bg-store-"], [class*=" bg-store-"], [class^="bg-white"], [class*=" bg-white"]):not([class*="bg-store-surface/"], [class*="bg-store-footer-border/"], [class*="bg-white/"]) *, :is([class^="bg-store-"], [class*=" bg-store-"], [class^="bg-white"], [class*=" bg-white"]):not([class*="bg-store-surface/"], [class*="bg-store-footer-border/"], [class*="bg-white/"])) {
+.awj-store-preview [data-sd~="hs"] :is(h1, h2, h3):not([data-sd] > * :is([class^="bg-store-"], [class*=" bg-store-"], [class^="bg-white"], [class*=" bg-white"]) *, :is([class^="bg-store-"], [class*=" bg-store-"], [class^="bg-white"], [class*=" bg-white"])) {
   font-size: var(--sec-hs);
 }
-.awj-store-preview [data-sd~="hw"] :is(h1, h2, h3):not([data-sd] > * :is([class^="bg-store-"], [class*=" bg-store-"], [class^="bg-white"], [class*=" bg-white"]):not([class*="bg-store-surface/"], [class*="bg-store-footer-border/"], [class*="bg-white/"]) *, :is([class^="bg-store-"], [class*=" bg-store-"], [class^="bg-white"], [class*=" bg-white"]):not([class*="bg-store-surface/"], [class*="bg-store-footer-border/"], [class*="bg-white/"])) {
+.awj-store-preview [data-sd~="hw"] :is(h1, h2, h3):not([data-sd] > * :is([class^="bg-store-"], [class*=" bg-store-"], [class^="bg-white"], [class*=" bg-white"]) *, :is([class^="bg-store-"], [class*=" bg-store-"], [class^="bg-white"], [class*=" bg-white"])) {
   font-weight: var(--sec-hw);
 }
-.awj-store-preview [data-sd~="bs"] p:not([data-sd] > * :is([class^="bg-store-"], [class*=" bg-store-"], [class^="bg-white"], [class*=" bg-white"]):not([class*="bg-store-surface/"], [class*="bg-store-footer-border/"], [class*="bg-white/"]) *, :is([class^="bg-store-"], [class*=" bg-store-"], [class^="bg-white"], [class*=" bg-white"]):not([class*="bg-store-surface/"], [class*="bg-store-footer-border/"], [class*="bg-white/"])) {
+.awj-store-preview [data-sd~="bs"] p:not([data-sd] > * :is([class^="bg-store-"], [class*=" bg-store-"], [class^="bg-white"], [class*=" bg-white"]) *, :is([class^="bg-store-"], [class*=" bg-store-"], [class^="bg-white"], [class*=" bg-white"])) {
   font-size: var(--sec-bs);
 }
-.awj-store-preview [data-sd~="lh"] :is(:is(h1, h2, h3):not([data-sd] > * :is([class^="bg-store-"], [class*=" bg-store-"], [class^="bg-white"], [class*=" bg-white"]):not([class*="bg-store-surface/"], [class*="bg-store-footer-border/"], [class*="bg-white/"]) *, :is([class^="bg-store-"], [class*=" bg-store-"], [class^="bg-white"], [class*=" bg-white"]):not([class*="bg-store-surface/"], [class*="bg-store-footer-border/"], [class*="bg-white/"])), p:not([data-sd] > * :is([class^="bg-store-"], [class*=" bg-store-"], [class^="bg-white"], [class*=" bg-white"]):not([class*="bg-store-surface/"], [class*="bg-store-footer-border/"], [class*="bg-white/"]) *, :is([class^="bg-store-"], [class*=" bg-store-"], [class^="bg-white"], [class*=" bg-white"]):not([class*="bg-store-surface/"], [class*="bg-store-footer-border/"], [class*="bg-white/"]))) {
+.awj-store-preview [data-sd~="lh"] :is(:is(h1, h2, h3):not([data-sd] > * :is([class^="bg-store-"], [class*=" bg-store-"], [class^="bg-white"], [class*=" bg-white"]) *, :is([class^="bg-store-"], [class*=" bg-store-"], [class^="bg-white"], [class*=" bg-white"])), p:not([data-sd] > * :is([class^="bg-store-"], [class*=" bg-store-"], [class^="bg-white"], [class*=" bg-white"]) *, :is([class^="bg-store-"], [class*=" bg-store-"], [class^="bg-white"], [class*=" bg-white"]))) {
   line-height: var(--sec-lh);
 }
 /* Section-heading styles. The rule bar is the default look of the shared heading;
@@ -269,19 +312,19 @@
 .awj-store-preview [data-sd~="hstyle-underline"] [data-heading-bar] {
   display: none;
 }
-.awj-store-preview [data-sd~="hstyle-centered"] :is(h1, h2, h3):not([data-sd] > * :is([class^="bg-store-"], [class*=" bg-store-"], [class^="bg-white"], [class*=" bg-white"]):not([class*="bg-store-surface/"], [class*="bg-store-footer-border/"], [class*="bg-white/"]) *, :is([class^="bg-store-"], [class*=" bg-store-"], [class^="bg-white"], [class*=" bg-white"]):not([class*="bg-store-surface/"], [class*="bg-store-footer-border/"], [class*="bg-white/"])) {
+.awj-store-preview [data-sd~="hstyle-centered"] :is(h1, h2, h3):not([data-sd] > * :is([class^="bg-store-"], [class*=" bg-store-"], [class^="bg-white"], [class*=" bg-white"]) *, :is([class^="bg-store-"], [class*=" bg-store-"], [class^="bg-white"], [class*=" bg-white"])) {
   text-align: center;
 }
 .awj-store-preview [data-sd~="hstyle-centered"] [data-section-heading] {
   justify-content: center;
   text-align: center;
 }
-.awj-store-preview [data-sd~="hstyle-underline"] :is(h1, h2, h3):not([data-sd] > * :is([class^="bg-store-"], [class*=" bg-store-"], [class^="bg-white"], [class*=" bg-white"]):not([class*="bg-store-surface/"], [class*="bg-store-footer-border/"], [class*="bg-white/"]) *, :is([class^="bg-store-"], [class*=" bg-store-"], [class^="bg-white"], [class*=" bg-white"]):not([class*="bg-store-surface/"], [class*="bg-store-footer-border/"], [class*="bg-white/"])) {
+.awj-store-preview [data-sd~="hstyle-underline"] :is(h1, h2, h3):not([data-sd] > * :is([class^="bg-store-"], [class*=" bg-store-"], [class^="bg-white"], [class*=" bg-white"]) *, :is([class^="bg-store-"], [class*=" bg-store-"], [class^="bg-white"], [class*=" bg-white"])) {
   display: block;
   padding-block-end: 0.5rem;
   border-block-end: 2px solid var(--store-primary);
 }
-.awj-store-preview [data-sd~="hstyle-bar"] :is(h1, h2, h3):not([data-sd] > * :is([class^="bg-store-"], [class*=" bg-store-"], [class^="bg-white"], [class*=" bg-white"]):not([class*="bg-store-surface/"], [class*="bg-store-footer-border/"], [class*="bg-white/"]) *, :is([class^="bg-store-"], [class*=" bg-store-"], [class^="bg-white"], [class*=" bg-white"]):not([class*="bg-store-surface/"], [class*="bg-store-footer-border/"], [class*="bg-white/"]), [data-section-heading] *)::before {
+.awj-store-preview [data-sd~="hstyle-bar"] :is(h1, h2, h3):not([data-sd] > * :is([class^="bg-store-"], [class*=" bg-store-"], [class^="bg-white"], [class*=" bg-white"]) *, :is([class^="bg-store-"], [class*=" bg-store-"], [class^="bg-white"], [class*=" bg-white"]), [data-section-heading] *)::before {
   content: "";
   display: inline-block;
   inline-size: 0.375rem;

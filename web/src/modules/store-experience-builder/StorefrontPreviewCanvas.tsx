@@ -64,6 +64,7 @@ import {
   type CustomizerMessageKey,
 } from "./messages";
 import { useMediaRefPreview } from "./media/use-media-ref-preview";
+import { resolveSectionDesign } from "./presentation/section-design-resolve";
 import { SectionDesignFrame } from "./SectionDesignFrame";
 import type { DesignContext } from "./presentation/section-design-resolve";
 import {
@@ -616,7 +617,7 @@ export function StorefrontPreviewCanvas({
                   aria-label={t("sectionHero")}
                   className="flex min-h-[11rem] items-center rounded-store bg-gradient-to-r from-primary-700 via-primary-600 to-primary-500 text-store-primary-foreground md:min-h-[16rem]"
                 >
-                  <div className="max-w-2xl p-5 md:p-10">
+                  <div data-section-content="" className="max-w-2xl p-5 md:p-10">
                     <h1 className="text-xl font-black leading-tight sm:text-2xl lg:text-4xl">
                       <bdi>{title}</bdi>
                     </h1>
@@ -828,9 +829,9 @@ export function StorefrontPreviewCanvas({
               return (
                 <section key={section.id} className="overflow-hidden rounded-store border border-store-border bg-store-surface">
                   {empty ? (
-                    <p className="px-5 py-6 text-sm text-store-muted-foreground">{t("sectionBanner")}</p>
+                    <p data-section-content="" className="px-5 py-6 text-sm text-store-muted-foreground">{t("sectionBanner")}</p>
                   ) : (
-                    <div className="flex min-w-0 flex-col gap-4 p-5 md:flex-row md:items-center md:p-8">
+                    <div data-section-content="" className="flex min-w-0 flex-col gap-4 p-5 md:flex-row md:items-center md:p-8">
                       {banner.imageUrl ? (
                         <img
                           src={banner.imageUrl}
@@ -859,15 +860,19 @@ export function StorefrontPreviewCanvas({
 
             if (section.type === "benefits") {
               const items = benefitsContentOf(section).items.filter((item) => item.title || item.body);
+              // A section without a design keeps its legacy preview exactly; the published
+              // card surface (and the block marker its design rules address) apply only
+              // while a design frame wraps it.
+              const designed = resolveSectionDesign(section.type, section.design, designContext) !== null;
               return (
-                <section key={section.id}>
+                <section key={section.id} data-section-block={designed ? "" : undefined}>
                   <h2 className="text-base font-extrabold">{t("sectionBenefits")}</h2>
                   {items.length === 0 ? (
                     <p className="mt-2 text-sm text-store-muted-foreground">{t("sectionBenefits")}</p>
                   ) : (
                     <ul className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
                       {items.map((item) => (
-                        <li key={item.id} className="min-w-0 break-words rounded-store border border-store-border px-3 py-3">
+                        <li key={item.id} className={cn("min-w-0 break-words rounded-store border border-store-border", designed ? "bg-store-surface px-4 py-4" : "px-3 py-3")}>
                           {item.title ? <p className="break-words text-sm font-bold">{item.title}</p> : null}
                           {item.body ? <p className="break-words text-sm text-store-muted-foreground">{item.body}</p> : null}
                         </li>
@@ -880,6 +885,43 @@ export function StorefrontPreviewCanvas({
 
             if (section.type === "customContent") {
               const blocks = customContentOf(section).blocks.filter((block) => block.text.trim());
+              // AWJ Market presents multi-question content as an accordion (published
+              // `CustomContentBand`): mirror its cards so the preview shows the same surfaces.
+              const groups: Array<{ heading: (typeof blocks)[number] | null; body: typeof blocks }> = [];
+              for (const block of blocks) {
+                if (block.kind === "heading") groups.push({ heading: block, body: [] });
+                else if (groups.length === 0) groups.push({ heading: null, body: [block] });
+                else groups[groups.length - 1].body.push(block);
+              }
+              // The accordion mirror belongs to a designed section (its card surfaces are what the
+              // design rules reason about); an undesigned one keeps its flat legacy preview.
+              const designedContent = resolveSectionDesign(section.type, section.design, designContext) !== null;
+              if (designedContent && config.themePreset === "awj-market" && groups.filter((group) => group.heading).length >= 2) {
+                return (
+                  <section key={section.id} className="min-w-0 max-w-3xl space-y-2 break-words">
+                    {groups.map((group, index) =>
+                      group.heading ? (
+                        <details key={group.heading.id} className="group rounded-store border border-store-border bg-store-surface px-4 open:pb-4">
+                          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 py-3.5 text-sm font-bold text-store-foreground marker:content-none">
+                            <span className="break-words">{group.heading.text}</span>
+                          </summary>
+                          <div className="space-y-2">
+                            {group.body.map((block) => (
+                              <p key={block.id} className="break-words text-sm leading-relaxed text-store-muted-foreground">{block.text}</p>
+                            ))}
+                          </div>
+                        </details>
+                      ) : (
+                        <div key={`preamble-${index}`} className="space-y-2">
+                          {group.body.map((block) => (
+                            <p key={block.id} className="break-words text-sm text-store-muted-foreground">{block.text}</p>
+                          ))}
+                        </div>
+                      ),
+                    )}
+                  </section>
+                );
+              }
               return (
                 <section key={section.id} className="min-w-0 max-w-3xl space-y-2 break-words">
                   {blocks.length === 0 ? (
@@ -2137,7 +2179,7 @@ function SectionRule({ title, action }: { title: string; action: string }) {
           {title}
         </h2>
       </div>
-      <span className="text-xs font-bold text-store-primary md:text-sm">{action}</span>
+      <span data-section-action="" className="text-xs font-bold text-store-primary md:text-sm">{action}</span>
     </div>
   );
 }
