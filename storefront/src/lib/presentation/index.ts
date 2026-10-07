@@ -4,5 +4,6 @@ export * from "./config";
 export * from "./media-ref";
 export * from "./page-regions";
 export * from "./palette";
+export * from "./section-design";
 export * from "./tokens";
 export * from "./urls";
