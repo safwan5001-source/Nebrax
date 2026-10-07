@@ -208,10 +208,14 @@ export function effectiveText(
     ? colour(design.text.heading, ctx)
     : null;
   const body = explicitBody ?? auto;
-  const link = design.text?.link ? colour(design.text.link, ctx) : null;
+  const explicitLink = design.text?.link ? colour(design.text.link, ctx) : null;
+  // Links default to the proven foreground over a design background — a shared
+  // heading's "View all" action would otherwise keep `text-store-primary`, which no
+  // contrast proof covers on an arbitrary background.
+  const link = explicitLink ?? auto;
   const judged =
     background ??
-    ((explicitBody ?? explicitHeading ?? link) !== null
+    ((explicitBody ?? explicitHeading ?? explicitLink) !== null
       ? backgroundInterval(
           (type !== undefined && LEGACY_SURFACE_HEX[type]) || PAGE_BACKGROUND,
           null,

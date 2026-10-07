@@ -194,6 +194,18 @@
   --store-footer-muted: var(--store-footer-muted-base);
   --store-footer-link: var(--store-footer-link-base);
 }
+/* An element that only gains an opaque surface on hover (a transparent secondary CTA
+   that turns dark) is a surface *while hovered*: its text tokens go back to the originals
+   for that state, so the hover colour utilities keep contrasting with the hover fill. */
+:where(.awj-store-preview [data-sd~="fg"] :is([class*="hover:bg-store-"], [class*="hover:bg-white"]:not([class*="hover:bg-white/"])):is(:hover, :focus-visible):not([data-sd] > *)) {
+  color: var(--store-foreground-base);
+  --store-foreground: var(--store-foreground-base);
+  --store-muted-foreground: var(--store-muted-foreground-base);
+  --store-primary-foreground: var(--store-primary-foreground-base);
+  --store-footer-foreground: var(--store-footer-foreground-base);
+  --store-footer-muted: var(--store-footer-muted-base);
+  --store-footer-link: var(--store-footer-link-base);
+}
 /* A design background replaces the section's own legacy fill (banner card, hero
    gradient, dark promo bands) instead of hiding behind it. */
 .awj-store-preview [data-sd~="bg"][data-sd] > * {
@@ -206,6 +218,6 @@
 .awj-store-preview [data-sd~="fg"] p:not([data-sd] > * :is([class^="bg-store-"], [class*=" bg-store-"], [class^="bg-white"], [class*=" bg-white"]):not([class*="bg-store-surface/"], [class*="bg-store-footer-border/"], [class*="bg-white/"]) *, :is([class^="bg-store-"], [class*=" bg-store-"], [class^="bg-white"], [class*=" bg-white"]):not([class*="bg-store-surface/"], [class*="bg-store-footer-border/"], [class*="bg-white/"])) {
   color: var(--sec-fg);
 }
-.awj-store-preview [data-sd~="link"] a:not([data-sd] > * :is([class^="bg-store-"], [class*=" bg-store-"], [class^="bg-white"], [class*=" bg-white"]):not([class*="bg-store-surface/"], [class*="bg-store-footer-border/"], [class*="bg-white/"]) *, :is([class^="bg-store-"], [class*=" bg-store-"], [class^="bg-white"], [class*=" bg-white"]):not([class*="bg-store-surface/"], [class*="bg-store-footer-border/"], [class*="bg-white/"])) {
+.awj-store-preview [data-sd~="link"] a:not([data-sd] > * :is([class^="bg-store-"], [class*=" bg-store-"], [class^="bg-white"], [class*=" bg-white"]):not([class*="bg-store-surface/"], [class*="bg-store-footer-border/"], [class*="bg-white/"]) *, :is([class^="bg-store-"], [class*=" bg-store-"], [class^="bg-white"], [class*=" bg-white"]):not([class*="bg-store-surface/"], [class*="bg-store-footer-border/"], [class*="bg-white/"]), [class*="hover:bg-store-"], [class*="hover:bg-white"]:not([class*="hover:bg-white/"])) {
   color: var(--sec-link);
 }
