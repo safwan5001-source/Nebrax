@@ -161,3 +161,24 @@ test('inner spacing replaces legacy padding; block alignment is separate from te
   expect(focused.color).toBe('rgb(0, 0, 0)'); // …so the proven foreground stays
 });
 
+test('block alignment really positions a banner\'s content group (it shrinks to its content first)', async ({ page }) => {
+  await mount(
+    page,
+    frame(
+      'banner',
+      'bg fg balign',
+      '--sec-bg:#101820;--sec-fg:#ffffff;--sec-bms:auto;--sec-bme:auto',
+      `<section id="broot" class="overflow-hidden rounded-store border border-store-border bg-store-surface">
+         <div id="bbox" data-section-content="" class="flex min-w-0 flex-col gap-4 p-5 md:flex-row md:items-center md:p-8"><p>short copy</p></div>
+       </section>`,
+    ),
+  );
+  const geo = await page.evaluate(() => {
+    const root = document.getElementById('broot')!.getBoundingClientRect();
+    const box = document.getElementById('bbox')!.getBoundingClientRect();
+    return { rootW: root.width, boxW: box.width, left: box.left - root.left, right: root.right - box.right };
+  });
+  expect(geo.boxW).toBeLessThan(geo.rootW - 40); // narrower than the section…
+  expect(Math.abs(geo.left - geo.right)).toBeLessThan(2); // …and centred in it
+});
+

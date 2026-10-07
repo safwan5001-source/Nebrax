@@ -57,7 +57,7 @@ Wraps a section only when it has a design. Storefront: `publishedNodes` was spli
 
 ---
 
-## Review round (Codex, 18 findings — all valid, all fixed)
+## Review round (Codex, 19 findings — all valid, all fixed)
 
 | Finding | Fix |
 |---|---|
@@ -86,6 +86,8 @@ Wraps a section only when it has a design. Storefront: `publishedNodes` was spli
 | **P2** the inner-padding reset zeroed *every* padded grandchild (an accordion card lost its padding) | Reset limited to content boxes the components **mark** (`data-section-content` on the banner's and hero's inner box, storefront + Canvas); asserted: the accordion card keeps `16px`. |
 | **P2** block alignment targeted only the full-width root, so a hero's `max-w-2xl` content never moved | The same marker is positioned too (root **and** marked content box); asserted on a hero fixture. |
 
+| **P2** block alignment had no visible effect on a banner (its content row is full-width) | The marked content box shrinks to its content (`inline-size: fit-content`) before the auto margins position it. Asserted on the compiled storefront CSS: narrower than the section and centred (|left − right| < 2 px). |
+
 The browser proof now also asserts, at all six widths in RTL and LTR, that **no designed section's root still paints its own fill** and that a heading colour reaches the Canvas heading; a mutation run (rule removed) fails it for banner / appPromo / deliveryPromise / shelf / discovery, so the check is not vacuous. The scenario gained `hero` and `wholesale` designs (the two dark surface-owners) and a distinct heading colour on benefits. 13/13 green.
 
 ## Invariants
@@ -105,7 +107,7 @@ The browser proof now also asserts, at all six widths in RTL and LTR, that **no 
 |---|---|
 | Web | `section-design-resolve.test.tsx` **17** (resolver, frame, byte-identical twins, stylesheet parity) · full vitest **427 files / 3702** (drift ratchet ✓) |
 | Storefront | `section-design-resolve.test.tsx` **12** · full vitest **142 files / 1284** · `tsc` ✓ · `biome check` ✓ |
-| Real browser | `cust-hv-v5c-design-render-proof.spec.ts` **13/13** (Canvas) + `cust-hv-v5c-storefront-cascade.spec.ts` **5/5** (the real compiled storefront stylesheet — local evidence gate, as V3/V4b/V5a) |
+| Real browser | `cust-hv-v5c-design-render-proof.spec.ts` **13/13** (Canvas) + `cust-hv-v5c-storefront-cascade.spec.ts` **6/6** (the real compiled storefront stylesheet — local evidence gate, as V3/V4b/V5a) |
 | Backend | **no backend file changed** (`git diff origin/main` touches no `app/` `routes/` `database/` `tests/` `config/`); the full run on the identical backend is V5b's (5751 passed, 28 env-only failures) · PostgreSQL by CI |
 
 Evidence: `docs/plans/store/cust-hv-v5c/*.jpg`.

@@ -146,6 +146,11 @@
   margin-inline-start: var(--sec-bms);
   margin-inline-end: var(--sec-bme);
 }
+/* a block can only be positioned if it is narrower than its container: the marked content
+   box (a banner's image + copy row) shrinks to its content */
+.awj-store-preview [data-sd~="balign"][data-sd] > * > [data-section-content] {
+  inline-size: fit-content;
+}
 .awj-store-preview [data-sd~="max"] {
   max-inline-size: var(--sec-max);
   margin-inline: auto;
