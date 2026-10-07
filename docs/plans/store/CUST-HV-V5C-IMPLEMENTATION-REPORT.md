@@ -57,7 +57,7 @@ Wraps a section only when it has a design. Storefront: `publishedNodes` was spli
 
 ---
 
-## Review round (Codex, 30 findings — all valid, all fixed)
+## Review round (Codex, 31 findings — all valid, all fixed)
 
 | Finding | Fix |
 |---|---|
@@ -103,6 +103,7 @@ Wraps a section only when it has a design. Storefront: `publishedNodes` was spli
 | **P2** a background painted on the square frame while the child's surface was cleared, so hero / banner / promo bands lost their `rounded-store` corners | The frame inherits the radius token when its direct child carries `rounded-store` (unless the design sets its own radius or bleeds); a shelf with no legacy corners stays square. Asserted on the compiled storefront CSS. |
 | **P2** `overflow: clip` on a radius frame cut the offset focus outlines of links/buttons at its edges | the frame no longer clips anything: the radius rounds what it paints (fill, border, shadow) and the section root inherits it (`[data-sd~="radius"][data-sd] > * { border-radius: inherit }`); cascade spec asserts `overflow: visible` and matching radii |
 | **P2** the legacy-corner fallback only ran for `bg`: a border-only / shadow-only frame around a rounded banner/hero/promo drew a square border/shadow | the fallback now applies to `bg`, `border` and `shadow` frames (not radius / bleed); cascade spec covers border-only, shadow-only and a square shelf |
+| **P2** the Canvas's empty-banner placeholder kept its own `px-5 py-6` under designed inner spacing (the content-box marker existed only on the authored branch) | the placeholder carries `data-section-content` like the authored box, so `none` removes it and a step replaces it; jsdom test pins both branches |
 
 The browser proof now also asserts, at all six widths in RTL and LTR, that **no designed section's root still paints its own fill** and that a heading colour reaches the Canvas heading; a mutation run (rule removed) fails it for banner / appPromo / deliveryPromise / shelf / discovery, so the check is not vacuous. The scenario gained `hero` and `wholesale` designs (the two dark surface-owners) and a distinct heading colour on benefits. 13/13 green.
 

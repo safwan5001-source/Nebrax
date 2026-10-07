@@ -828,7 +828,7 @@ export function StorefrontPreviewCanvas({
               return (
                 <section key={section.id} className="overflow-hidden rounded-store border border-store-border bg-store-surface">
                   {empty ? (
-                    <p className="px-5 py-6 text-sm text-store-muted-foreground">{t("sectionBanner")}</p>
+                    <p data-section-content="" className="px-5 py-6 text-sm text-store-muted-foreground">{t("sectionBanner")}</p>
                   ) : (
                     <div data-section-content="" className="flex min-w-0 flex-col gap-4 p-5 md:flex-row md:items-center md:p-8">
                       {banner.imageUrl ? (
