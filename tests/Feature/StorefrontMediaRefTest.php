@@ -246,4 +246,38 @@ class StorefrontMediaRefTest extends TestCase
         $this->assertSame(['branding.logoMedia', 'homepage.sections.0.design.background.media'], array_keys($resolved));
         app(TenantContext::class)->forget();
     }
+
+    /** @test */
+    public function only_section_background_pictures_carry_contrast_bounds_and_only_when_the_evidence_is_valid(): void
+    {
+        $this->fakeStorefrontMediaR2();
+        $store = $this->store('mr-contrast');
+        $media = $this->uploadMedia($store['auth']);
+        app(TenantContext::class)->set($store['auth']['tenant_id']);
+        $doc = [
+            'branding' => ['logoMedia' => ['mediaId' => $media['id']]],
+            'homepage' => ['sections' => [['id' => 'a', 'design' => ['background' => ['kind' => 'media', 'media' => ['mediaId' => $media['id']], 'mobile' => ['mediaId' => $media['id']]]]]]],
+        ];
+        $resolver = app(StorefrontPublishedMediaResolver::class);
+
+        $resolved = $resolver->resolve($doc);
+        $this->assertArrayNotHasKey('contrast', $resolved['branding.logoMedia'], 'a logo never carries bounds');
+        foreach (['homepage.sections.0.design.background.media', 'homepage.sections.0.design.background.mobile'] as $path) {
+            $bounds = $resolved[$path]['contrast'] ?? null;
+            $this->assertIsArray($bounds, $path);
+            $this->assertCount(3, $bounds['min']);
+            $this->assertCount(3, $bounds['max']);
+            foreach (range(0, 2) as $i) {
+                $this->assertLessThanOrEqual($bounds['max'][$i], $bounds['min'][$i]);
+                $this->assertGreaterThanOrEqual(0, $bounds['min'][$i]);
+                $this->assertLessThanOrEqual(255, $bounds['max'][$i]);
+            }
+        }
+        $this->assertArrayNotHasKey('region_luminance', $resolved['homepage.sections.0.design.background.media'], 'raw evidence never leaves');
+
+        StorefrontMedia::query()->whereKey($media['id'])->update(['region_luminance' => null]);
+        $resolved = app(StorefrontPublishedMediaResolver::class)->resolve($doc);
+        $this->assertArrayNotHasKey('contrast', $resolved['homepage.sections.0.design.background.media'], 'no valid evidence ⇒ nothing is claimed');
+        app(TenantContext::class)->forget();
+    }
 }

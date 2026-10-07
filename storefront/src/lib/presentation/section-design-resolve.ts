@@ -442,9 +442,21 @@ export function resolveSectionDesign(
   if (!design || Object.keys(design).length === 0) return null;
   const sd: string[] = [];
   const style: Record<string, string> = {};
-  const text = effectiveText(design, ctx, type);
-
   const bg = design.background;
+  // V6b-3 — a picture background counts only when its contrast is *proven* right here (every picture
+  // that can show has valid evidence AND the text passes over the whole range). Anything else is
+  // treated as no background at all — the section keeps its legacy surface AND its legacy text
+  // colours — so a stale or hand-built document can never put text on an unproven picture, nor pick
+  // a colour for a surface that is not there.
+  const mediaProven =
+    bg?.kind === "media" &&
+    effectiveText(design, ctx, type).background !== null &&
+    sectionContrastIssues(design, ctx, type).length === 0;
+  const text =
+    bg?.kind === "media" && !mediaProven
+      ? effectiveText({ ...design, background: undefined }, ctx, type)
+      : effectiveText(design, ctx, type);
+
   let solidBg: string | null = null;
   if (bg?.kind === "solid") {
     solidBg = colour(bg.color, ctx);
@@ -454,6 +466,15 @@ export function resolveSectionDesign(
     style["--sec-bg"] =
       `linear-gradient(${cssGradientDirection(bg.direction, ctx.dir)}, ${colour(bg.from, ctx)}, ${colour(bg.to, ctx)})`;
     sd.push("bg");
+  } else if (bg?.kind === "media" && mediaProven) {
+    // The picture and its overlay are DOM layers the section renders (`data-sd-backdrop` /
+    // `data-sd-overlay`); this only sets the validated tokens that style them.
+    sd.push("mbg");
+    if (bg.overlay) {
+      style["--sec-ovl"] = colour(bg.overlay.color, ctx);
+      style["--sec-ovl-a"] = String(bg.overlay.alpha / 100);
+      sd.push("ovl");
+    }
   }
 
   if (text.body) {

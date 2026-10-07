@@ -8,10 +8,16 @@ import { DiscoverySection } from "@/components/home/DiscoverySection";
 import { FeaturedShelf } from "@/components/home/FeaturedShelf";
 import { OffersShelf } from "@/components/home/OffersShelf";
 import { ProductShelfSection } from "@/components/home/ProductShelfSection";
+import { SectionBackdrop } from "@/components/home/SectionBackdrop";
 import { SectionDesignFrame } from "@/components/home/SectionDesignFrame";
 import { SectionReveal } from "@/components/home/SectionReveal";
 import type { HomeSectionKey } from "@/lib/home/sections";
+import {
+  mediaBoundsLookup,
+  sectionBackdrop,
+} from "@/lib/presentation/background-media";
 import type { PresentationHomeSection } from "@/lib/presentation/config";
+import type { ResolvedMediaMap } from "@/lib/presentation/media-ref";
 import {
   bannerContentOf,
   benefitsContentOf,
@@ -58,7 +64,15 @@ export async function publishedNodes(
       section: PresentationHomeSection;
       headingLevel: 1 | 2;
       designed: boolean;
+      /** V6b-3 — the picture layer of a media background, when this hero has a provable one. */
+      backdrop?: React.ReactNode;
     }) => React.ReactNode;
+    /**
+     * CUST-HV V6b-3 — what the server resolved for every published `MediaRef` (keyed by JSON path),
+     * including the proven contrast bounds of section-background pictures. Absent ⇒ no picture
+     * background can render and every section keeps its legacy surface.
+     */
+    media?: ResolvedMediaMap;
     basePath: string;
     locale: string;
     currency?: string;
@@ -81,19 +95,22 @@ export async function publishedNodes(
   const firstHeroId = sections.find(
     (section) => section.visible && section.type === "hero",
   )?.id;
-  for (const section of sections) {
+  // V6b-3 — the design resolver learns the proven bounds of each picture background from the
+  // server's resolved media, so the automatic text colour is the publish gate's own decision.
+  const design: DesignContext = {
+    ...ctx.design,
+    mediaBounds: mediaBoundsLookup(sections, ctx.media ?? {}),
+  };
+  const sectionCtx = { ...ctx, design };
+  for (const [index, section] of sections.entries()) {
     if (!section.visible) continue;
     const before = nodes.length;
-    await pushSectionNode(nodes, section, ctx, firstHeroId);
+    await pushSectionNode(nodes, section, sectionCtx, firstHeroId, index);
     // CUST-HV V5c — wrap only a section that carries a design; any other section is
     // exactly the node it always was.
     if (section.design && nodes.length === before + 1) {
       nodes[before] = (
-        <SectionDesignFrame
-          key={section.id}
-          section={section}
-          context={ctx.design}
-        >
+        <SectionDesignFrame key={section.id} section={section} context={design}>
           {nodes[before]}
         </SectionDesignFrame>
       );
@@ -104,10 +121,31 @@ export async function publishedNodes(
     (section) =>
       section.visible &&
       section.design?.motion?.reveal === "fade-up" &&
-      resolveSectionDesign(section.type, section.design, ctx.design) !== null,
+      resolveSectionDesign(section.type, section.design, design) !== null,
   );
   if (reveals) nodes.push(<SectionReveal key="section-reveal" />);
   return nodes;
+}
+
+/**
+ * CUST-HV V6b-3 — the picture layer of a section whose design resolves a *provable* media
+ * background (the resolver emits the `mbg` token only then), else nothing: the section keeps its
+ * legacy surface. The first hero is the page's LCP, so it loads eagerly.
+ */
+function backdropNode(
+  section: PresentationHomeSection,
+  index: number,
+  ctx: Parameters<typeof publishedNodes>[1],
+  priority: boolean,
+): React.ReactNode {
+  const resolved = resolveSectionDesign(
+    section.type,
+    section.design,
+    ctx.design,
+  );
+  if (!resolved?.attrs["data-sd"]?.split(" ").includes("mbg")) return null;
+  const data = sectionBackdrop(section, index, ctx.media ?? {});
+  return data ? <SectionBackdrop data={data} priority={priority} /> : null;
 }
 
 async function pushSectionNode(
@@ -115,6 +153,7 @@ async function pushSectionNode(
   section: PresentationHomeSection,
   ctx: Parameters<typeof publishedNodes>[1],
   firstHeroId: string | undefined,
+  index: number,
 ): Promise<void> {
   if (section.type === "hero" && ctx.renderHero) {
     // Instance-keyed (V6a): each hero renders its own content. The same wrapper rules apply as for
@@ -122,10 +161,12 @@ async function pushSectionNode(
     // the legacy div, so a content-less default hero is byte-identical to before.
     const framed =
       resolveSectionDesign(section.type, section.design, ctx.design) !== null;
+    const isFirstHero = section.id === firstHeroId;
     const node = ctx.renderHero({
       section,
-      headingLevel: section.id === firstHeroId ? 1 : 2,
+      headingLevel: isFirstHero ? 1 : 2,
       designed: framed,
+      backdrop: backdropNode(section, index, ctx, isFirstHero),
     });
     nodes.push(
       framed ? (
@@ -187,6 +228,7 @@ async function pushSectionNode(
           resolveSectionDesign(section.type, section.design, ctx.design) !==
           null
         }
+        backdrop={backdropNode(section, index, ctx, false)}
       />,
     );
     return;

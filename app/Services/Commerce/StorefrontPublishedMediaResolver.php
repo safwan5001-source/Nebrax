@@ -13,7 +13,11 @@ use InvalidArgumentException;
  * المُصيِّر إلى حساب مفاتيح التحويل (لا توأم TS لتجزئة `transformKey`) ولا إلى
  * معرفة أي موضع بعينه — يعمل لكل حقلٍ تضيفه شرائح V5–V9.
  *
- * **ما لا يخرج أبداً:** مسار/دلو/مفتاح تخزين، sha256، اسم الملف الأصلي، سطوع،
+ * **استثناء مقصود (V6b-3):** مرجعٌ تحت `design.background` (صورة خلفية قسم) يحمل `contrast` — حدّا قنوات
+ * مشفّرة (min/max، موسَّعان بهامش الترميز) تُطابق ما أُثبت عند النشر — لأن المتجر العام يختار منهما لون
+ * النص التلقائي بالخوارزمية ذاتها. هي أرقامٌ مشتقّة من صورةٍ عامة أصلاً (لا سرّ فيها) ولا تخرج لغير هذا الموضع.
+ *
+ * **ما لا يخرج أبداً:** مسار/دلو/مفتاح تخزين، sha256، اسم الملف الأصلي، متوسط السطوع/اللون الغالب،
  * رابط الأصل المضيفي `/store/v1/media/customizer/...` (المتصفح لا يبلغه؛ البروكسي
  * الوحيد: `/api/storefront/media/customizer/{id}/{file}`، AMEND-1).
  *
@@ -32,7 +36,8 @@ final class StorefrontPublishedMediaResolver
      * @return array<string, array{
      *   width:int, height:int, decorative:bool,
      *   alt:array{ar:string|null,en:string|null},
-     *   sources:list<array{kind:string,width:int,height:int,format:string,src:string}>
+     *   sources:list<array{kind:string,width:int,height:int,format:string,src:string}>,
+     *   contrast?:array{min:list<int>,max:list<int>}
      * }>
      */
     public function resolve(array $published): array
@@ -58,6 +63,13 @@ final class StorefrontPublishedMediaResolver
 
             $entry = $this->entry($asset, $ref);
             if ($entry !== null) {
+                // V6b-3 — حدود التباين لصور خلفيات الأقسام فقط؛ غيابها (دليلٌ غير صالح) = «غير مُثبَت» فلا لون نص تلقائي.
+                if (str_contains($path, '.design.background.')) {
+                    $bounds = app(StorefrontMediaContrastEvidence::class)->boundsFor($ref);
+                    if ($bounds !== null) {
+                        $entry['contrast'] = $bounds;
+                    }
+                }
                 $resolved[$path] = $entry;
             }
         }

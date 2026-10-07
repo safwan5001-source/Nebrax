@@ -742,6 +742,40 @@ input[type="search"]::-webkit-search-cancel-button {
 [data-sd~="bg"][data-sd] > * {
   background: none;
 }
+/* V6b-3 — a picture background: the section's own fill steps aside, the section becomes the
+   positioning context of its backdrop (picture + overlay layers, rendered by the section itself),
+   and everything after the backdrop paints above it. The layers never take pointer events. */
+[data-sd~="mbg"][data-sd] > * {
+  position: relative;
+  background: none;
+}
+[data-sd-backdrop] {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  border-radius: inherit;
+  pointer-events: none;
+}
+[data-sd-backdrop] picture,
+[data-sd-backdrop] img {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+[data-sd-backdrop] img {
+  object-fit: cover;
+}
+[data-sd-backdrop] ~ * {
+  position: relative;
+  z-index: 1;
+}
+[data-sd~="ovl"] [data-sd-overlay] {
+  position: absolute;
+  inset: 0;
+  background: var(--sec-ovl);
+  opacity: var(--sec-ovl-a);
+}
 /* Section-level text only — never inside a surface nested in the section. */
 [data-sd~="heading"] :is(h1, h2, h3):not([data-sd] > * :is([class^="bg-store-"], [class*=" bg-store-"], [class^="bg-white"], [class*=" bg-white"]) *, :is([class^="bg-store-"], [class*=" bg-store-"], [class^="bg-white"], [class*=" bg-white"])) {
   color: var(--sec-heading);
