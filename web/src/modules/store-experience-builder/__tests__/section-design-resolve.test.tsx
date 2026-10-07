@@ -25,8 +25,10 @@ describe("resolveSectionDesign (CUST-HV V5c)", () => {
   it("absent or empty design ⇒ null (the caller renders the section untouched)", () => {
     expect(resolveSectionDesign("hero", undefined, ctx)).toBeNull();
     expect(resolveSectionDesign("hero", {}, ctx)).toBeNull();
-    // groups the renderer defers (typography) produce no wrapper on their own
-    expect(resolveSectionDesign("hero", { typography: { headingScale: "lg" } }, ctx)).toBeNull();
+    // the default steps change nothing: no wrapper
+    expect(
+      resolveSectionDesign("hero", { typography: { headingScale: "md", bodyScale: "md" } }, ctx),
+    ).toBeNull();
   });
 
   it("a solid background resolves roles to concrete colours and picks a provable foreground automatically", () => {
@@ -65,6 +67,28 @@ describe("resolveSectionDesign (CUST-HV V5c)", () => {
     const frame = container.querySelector("[data-sd]") as HTMLElement;
     expect(frame).not.toBeNull();
     expect(frame.childNodes.length).toBe(0); // `:empty` ⇒ `display: none` in the stylesheet
+  });
+
+  it("typography resolves named steps to validated tokens — never a pixel input", () => {
+    const r = resolveSectionDesign(
+      "benefits",
+      {
+        typography: {
+          headingScale: "xl",
+          bodyScale: "lg",
+          headingWeight: 700,
+          lineHeight: "relaxed",
+          headingStyle: "underline",
+        },
+      },
+      ctx,
+    )!;
+    expect(r.attrs["data-sd"]).toBe("hs bs hw lh hstyle-underline");
+    expect(r.style["--sec-hs"]).toBe("clamp(1.5rem, 4vw, 2.125rem)");
+    expect(r.style["--sec-bs"]).toBe("1rem");
+    expect(r.style["--sec-hw"]).toBe("700");
+    expect(r.style["--sec-lh"]).toBe("1.75");
+    expect(Object.values(r.style).join(" ")).not.toMatch(/url|expression|;|\{|\}/);
   });
 
   it("border: an explicit none is a decision (it removes a legacy border) — emitted as a zero-width transparent frame", () => {

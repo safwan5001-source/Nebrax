@@ -2126,10 +2126,11 @@ function SelectablePreviewSection({
 
 function SectionRule({ title, action }: { title: string; action: string }) {
   return (
-    <div className="flex items-start justify-between gap-4">
+    <div data-section-heading="" className="flex items-start justify-between gap-4">
       <div className="flex min-w-0 items-start gap-2">
         <span
           aria-hidden
+          data-heading-bar=""
           className="mt-1 h-4 w-1.5 shrink-0 rounded-full bg-store-primary md:h-5"
         />
         <h2 className="text-base font-extrabold leading-tight text-store-foreground md:text-lg">

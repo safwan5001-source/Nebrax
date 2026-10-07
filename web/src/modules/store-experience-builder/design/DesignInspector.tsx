@@ -6,8 +6,13 @@ import type { CustomizerMessageKey } from "../messages";
 import { autoForeground } from "../presentation/contrast-engine";
 import {
   ALIGNS,
+  BODY_SCALES,
   BORDER_WIDTHS,
   DIRECTIONS,
+  HEADING_SCALES,
+  HEADING_STYLES,
+  HEADING_WEIGHTS,
+  LINE_HEIGHTS,
   RADII,
   SECTION_DESIGN_CAPABILITIES,
   SHADOWS,
@@ -76,6 +81,30 @@ const ALIGN_LABEL: Record<(typeof ALIGNS)[number], CustomizerMessageKey> = {
   start: "designAlignStart",
   center: "designAlignCenter",
   end: "designAlignEnd",
+};
+
+const SCALE_LABEL: Record<string, CustomizerMessageKey> = {
+  sm: "designScaleSm",
+  md: "designScaleMd",
+  lg: "designScaleLg",
+  xl: "designScaleXl",
+};
+const WEIGHT_LABEL: Record<number, CustomizerMessageKey> = {
+  400: "designWeight400",
+  500: "designWeight500",
+  700: "designWeight700",
+  800: "designWeight800",
+};
+const LH_LABEL: Record<string, CustomizerMessageKey> = {
+  tight: "designLhTight",
+  normal: "designLhNormal",
+  relaxed: "designLhRelaxed",
+};
+const HSTYLE_LABEL: Record<string, CustomizerMessageKey> = {
+  bar: "designHsBar",
+  plain: "designHsPlain",
+  centered: "designHsCentered",
+  underline: "designHsUnderline",
 };
 
 function allows(allowance: true | readonly string[] | undefined, field: string): boolean {
@@ -213,6 +242,37 @@ export function DesignInspector({
       </select>
     </Field>
   );
+
+  // ── typography (named steps only) ───────────────────────────────────────────
+  const typoSelect = <V extends string | number>(
+    field: keyof NonNullable<SectionDesign["typography"]>,
+    label: CustomizerMessageKey,
+    options: readonly V[],
+    optionLabel: (value: V) => string,
+  ) => {
+    if (!allows(capability.typography, field)) return null;
+    const value = current.typography?.[field] as V | undefined;
+    return (
+      <Field key={field} label={t(label)}>
+        <select
+          className={selectClass}
+          value={value === undefined ? "" : String(value)}
+          onChange={(event) => {
+            const raw = event.target.value;
+            const next = raw === "" ? undefined : (options.find((o) => String(o) === raw) as V);
+            set("typography", { ...current.typography, [field]: next });
+          }}
+        >
+          {unsetOption}
+          {options.map((option) => (
+            <option key={String(option)} value={String(option)}>
+              {optionLabel(option)}
+            </option>
+          ))}
+        </select>
+      </Field>
+    );
+  };
 
   const backgroundIssue = issues.find((i) => i.field === "background");
   const canBleed = !!capability.width && current.background?.kind === "solid";
@@ -390,6 +450,19 @@ export function DesignInspector({
             ]}
           />
         </Field>
+      ) : null}
+
+      {capability.typography ? (
+        <fieldset className="min-w-0 space-y-3">
+          <legend className="mb-1 text-[12px] font-semibold tracking-wide text-muted">
+            {t("designTypography")}
+          </legend>
+          {typoSelect("headingScale", "designHeadingScale", HEADING_SCALES, (v) => t(SCALE_LABEL[v]))}
+          {typoSelect("bodyScale", "designBodyScale", BODY_SCALES, (v) => t(SCALE_LABEL[v]))}
+          {typoSelect("headingWeight", "designHeadingWeight", HEADING_WEIGHTS, (v) => t(WEIGHT_LABEL[v]))}
+          {typoSelect("lineHeight", "designLineHeight", LINE_HEIGHTS, (v) => t(LH_LABEL[v]))}
+          {typoSelect("headingStyle", "designHeadingStyle", HEADING_STYLES, (v) => t(HSTYLE_LABEL[v]))}
+        </fieldset>
       ) : null}
 
       {capability.spacing ? (

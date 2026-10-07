@@ -209,3 +209,49 @@
 .awj-store-preview [data-sd~="link"] a:not([data-sd] > * :is([class^="bg-store-"], [class*=" bg-store-"], [class^="bg-white"], [class*=" bg-white"]):not([class*="bg-store-surface/"], [class*="bg-store-footer-border/"], [class*="bg-white/"]) *, :is([class^="bg-store-"], [class*=" bg-store-"], [class^="bg-white"], [class*=" bg-white"]):not([class*="bg-store-surface/"], [class*="bg-store-footer-border/"], [class*="bg-white/"])) {
   color: var(--sec-link);
 }
+
+/*
+ * Typography steps (V0 §5.2) — named steps resolved by the resolver, never pixel
+ * inputs. Section-level text only: nothing inside a surface nested in the section.
+ */
+.awj-store-preview [data-sd~="hs"] :is(h1, h2, h3):not([data-sd] > * :is([class^="bg-store-"], [class*=" bg-store-"], [class^="bg-white"], [class*=" bg-white"]):not([class*="bg-store-surface/"], [class*="bg-store-footer-border/"], [class*="bg-white/"]) *, :is([class^="bg-store-"], [class*=" bg-store-"], [class^="bg-white"], [class*=" bg-white"]):not([class*="bg-store-surface/"], [class*="bg-store-footer-border/"], [class*="bg-white/"])) {
+  font-size: var(--sec-hs);
+}
+.awj-store-preview [data-sd~="hw"] :is(h1, h2, h3):not([data-sd] > * :is([class^="bg-store-"], [class*=" bg-store-"], [class^="bg-white"], [class*=" bg-white"]):not([class*="bg-store-surface/"], [class*="bg-store-footer-border/"], [class*="bg-white/"]) *, :is([class^="bg-store-"], [class*=" bg-store-"], [class^="bg-white"], [class*=" bg-white"]):not([class*="bg-store-surface/"], [class*="bg-store-footer-border/"], [class*="bg-white/"])) {
+  font-weight: var(--sec-hw);
+}
+.awj-store-preview [data-sd~="bs"] p:not([data-sd] > * :is([class^="bg-store-"], [class*=" bg-store-"], [class^="bg-white"], [class*=" bg-white"]):not([class*="bg-store-surface/"], [class*="bg-store-footer-border/"], [class*="bg-white/"]) *, :is([class^="bg-store-"], [class*=" bg-store-"], [class^="bg-white"], [class*=" bg-white"]):not([class*="bg-store-surface/"], [class*="bg-store-footer-border/"], [class*="bg-white/"])) {
+  font-size: var(--sec-bs);
+}
+.awj-store-preview [data-sd~="lh"] :is(:is(h1, h2, h3):not([data-sd] > * :is([class^="bg-store-"], [class*=" bg-store-"], [class^="bg-white"], [class*=" bg-white"]):not([class*="bg-store-surface/"], [class*="bg-store-footer-border/"], [class*="bg-white/"]) *, :is([class^="bg-store-"], [class*=" bg-store-"], [class^="bg-white"], [class*=" bg-white"]):not([class*="bg-store-surface/"], [class*="bg-store-footer-border/"], [class*="bg-white/"])), p:not([data-sd] > * :is([class^="bg-store-"], [class*=" bg-store-"], [class^="bg-white"], [class*=" bg-white"]):not([class*="bg-store-surface/"], [class*="bg-store-footer-border/"], [class*="bg-white/"]) *, :is([class^="bg-store-"], [class*=" bg-store-"], [class^="bg-white"], [class*=" bg-white"]):not([class*="bg-store-surface/"], [class*="bg-store-footer-border/"], [class*="bg-white/"]))) {
+  line-height: var(--sec-lh);
+}
+/* Section-heading styles. The rule bar is the default look of the shared heading;
+   every other style steps it aside, and `bar` gives headings that lack one the same bar. */
+.awj-store-preview [data-sd~="hstyle-plain"] [data-heading-bar],
+.awj-store-preview [data-sd~="hstyle-centered"] [data-heading-bar],
+.awj-store-preview [data-sd~="hstyle-underline"] [data-heading-bar] {
+  display: none;
+}
+.awj-store-preview [data-sd~="hstyle-centered"] :is(h1, h2, h3):not([data-sd] > * :is([class^="bg-store-"], [class*=" bg-store-"], [class^="bg-white"], [class*=" bg-white"]):not([class*="bg-store-surface/"], [class*="bg-store-footer-border/"], [class*="bg-white/"]) *, :is([class^="bg-store-"], [class*=" bg-store-"], [class^="bg-white"], [class*=" bg-white"]):not([class*="bg-store-surface/"], [class*="bg-store-footer-border/"], [class*="bg-white/"])) {
+  text-align: center;
+}
+.awj-store-preview [data-sd~="hstyle-centered"] [data-section-heading] {
+  justify-content: center;
+  text-align: center;
+}
+.awj-store-preview [data-sd~="hstyle-underline"] :is(h1, h2, h3):not([data-sd] > * :is([class^="bg-store-"], [class*=" bg-store-"], [class^="bg-white"], [class*=" bg-white"]):not([class*="bg-store-surface/"], [class*="bg-store-footer-border/"], [class*="bg-white/"]) *, :is([class^="bg-store-"], [class*=" bg-store-"], [class^="bg-white"], [class*=" bg-white"]):not([class*="bg-store-surface/"], [class*="bg-store-footer-border/"], [class*="bg-white/"])) {
+  display: block;
+  padding-block-end: 0.5rem;
+  border-block-end: 2px solid var(--store-primary);
+}
+.awj-store-preview [data-sd~="hstyle-bar"] :is(h1, h2, h3):not([data-sd] > * :is([class^="bg-store-"], [class*=" bg-store-"], [class^="bg-white"], [class*=" bg-white"]):not([class*="bg-store-surface/"], [class*="bg-store-footer-border/"], [class*="bg-white/"]) *, :is([class^="bg-store-"], [class*=" bg-store-"], [class^="bg-white"], [class*=" bg-white"]):not([class*="bg-store-surface/"], [class*="bg-store-footer-border/"], [class*="bg-white/"]), [data-section-heading] *)::before {
+  content: "";
+  display: inline-block;
+  inline-size: 0.375rem;
+  block-size: 1em;
+  margin-inline-end: 0.5rem;
+  border-radius: 9999px;
+  background: var(--store-primary);
+  vertical-align: -0.1em;
+}

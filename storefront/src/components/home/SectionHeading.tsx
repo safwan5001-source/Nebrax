@@ -25,10 +25,14 @@ export function SectionHeading({
   action,
 }: SectionHeadingProps) {
   return (
-    <div className="flex items-start justify-between gap-4">
+    <div
+      data-section-heading=""
+      className="flex items-start justify-between gap-4"
+    >
       <div className="flex min-w-0 items-start gap-2">
         <span
           aria-hidden="true"
+          data-heading-bar=""
           className="mt-1 h-4 w-1.5 shrink-0 rounded-full bg-store-primary md:mt-1.5 md:h-5"
         />
         <div className="min-w-0">
