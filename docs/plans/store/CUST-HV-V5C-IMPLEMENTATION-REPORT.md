@@ -57,7 +57,7 @@ Wraps a section only when it has a design. Storefront: `publishedNodes` was spli
 
 ---
 
-## Review round (Codex, 24 findings — all valid, all fixed)
+## Review round (Codex, 25 findings — all valid, all fixed)
 
 | Finding | Fix |
 |---|---|
@@ -95,6 +95,8 @@ Wraps a section only when it has a design. Storefront: `publishedNodes` was spli
 | **P2** the hero CTA's focus ring (drawn in the primary-foreground token, restored to white for the button) was white-on-pale on a light designed background | `focus-visible:outline-store-primary-foreground` elements inside a designed section redraw the ring in the section's proven foreground; asserted on the compiled storefront CSS. |
 | **P2** the Canvas rendered Market's multi-question content flat while the storefront renders accordion cards | The Canvas mirrors the accordion structure and surfaces (`awj-market`, ≥ 2 headings), so preview and publish agree. |
 
+| **P2** other section-level focus rings (a category card's `outline-store-primary`) vanish on a designed background close to the primary colour | Generalised: **every** `focus-visible:outline-store-*` indicator that is not inside a nested surface is redrawn in the section's proven foreground (the ring is drawn outside the element, on the designed background). Asserted: a card link on a primary-coloured band gets a white ring. |
+
 The browser proof now also asserts, at all six widths in RTL and LTR, that **no designed section's root still paints its own fill** and that a heading colour reaches the Canvas heading; a mutation run (rule removed) fails it for banner / appPromo / deliveryPromise / shelf / discovery, so the check is not vacuous. The scenario gained `hero` and `wholesale` designs (the two dark surface-owners) and a distinct heading colour on benefits. 13/13 green.
 
 ## Invariants
@@ -114,7 +116,7 @@ The browser proof now also asserts, at all six widths in RTL and LTR, that **no 
 |---|---|
 | Web | `section-design-resolve.test.tsx` **17** (resolver, frame, byte-identical twins, stylesheet parity) · full vitest **427 files / 3702** (drift ratchet ✓) |
 | Storefront | `section-design-resolve.test.tsx` **12** · full vitest **142 files / 1284** · `tsc` ✓ · `biome check` ✓ |
-| Real browser | `cust-hv-v5c-design-render-proof.spec.ts` **13/13** (Canvas) + `cust-hv-v5c-storefront-cascade.spec.ts` **8/8** (the real compiled storefront stylesheet — local evidence gate, as V3/V4b/V5a) |
+| Real browser | `cust-hv-v5c-design-render-proof.spec.ts` **13/13** (Canvas) + `cust-hv-v5c-storefront-cascade.spec.ts` **9/9** (the real compiled storefront stylesheet — local evidence gate, as V3/V4b/V5a) |
 | Backend | **no backend file changed** (`git diff origin/main` touches no `app/` `routes/` `database/` `tests/` `config/`); the full run on the identical backend is V5b's (5751 passed, 28 env-only failures) · PostgreSQL by CI |
 
 Evidence: `docs/plans/store/cust-hv-v5c/*.jpg`.

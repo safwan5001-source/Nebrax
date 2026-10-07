@@ -225,3 +225,19 @@ test('hero CTA focus ring is drawn in the designed foreground, not the restored 
   expect(outline).toBe('rgb(0, 0, 0)');
 });
 
+test('a category card link\'s focus ring (outline-store-primary) is redrawn against a primary-coloured designed background', async ({ page }) => {
+  await mount(
+    page,
+    frame(
+      'categories',
+      'bg fg heading link',
+      '--sec-bg:#12372a;--sec-fg:#ffffff;--sec-heading:#ffffff;--sec-link:#ffffff',
+      `<section><a id="catcard" href="#" class="block rounded-store border bg-store-surface p-3 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-store-primary">Card</a></section>`,
+    ),
+  );
+  await page.locator('#catcard').focus();
+  await page.keyboard.press('Tab');
+  await page.keyboard.press('Shift+Tab');
+  expect(await page.locator('#catcard').evaluate((el) => getComputedStyle(el).outlineColor)).toBe('rgb(255, 255, 255)');
+});
+

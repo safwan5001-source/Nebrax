@@ -227,10 +227,10 @@
   --store-footer-muted: var(--store-footer-muted-base);
   --store-footer-link: var(--store-footer-link-base);
 }
-/* The hero's CTA keeps its legacy surface, so its focus ring (drawn in the primary
-   foreground token, restored to white for the button) is redrawn in the section's proven
-   foreground — it sits on the designed background, where that colour has contrast. */
-.awj-store-preview [data-sd~="fg"] [class*="focus-visible:outline-store-primary-foreground"]:focus-visible {
+/* Focus rings are drawn outside the focused element, i.e. on the designed background:
+   every `focus-visible:outline-store-*` indicator that is not itself inside a nested surface
+   (a category card, the hero CTA…) is redrawn in the section's proven foreground. */
+.awj-store-preview [data-sd~="fg"] [class*="focus-visible:outline-store-"]:focus-visible:not([data-sd] > * :is([class^="bg-store-"], [class*=" bg-store-"], [class^="bg-white"], [class*=" bg-white"]) *) {
   outline-color: var(--sec-fg);
 }
 /* A translucent fill nested in a designed section would composite over an arbitrary
