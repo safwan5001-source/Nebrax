@@ -18,6 +18,7 @@ import {
 import type { StorefrontPresentationConfig } from "./config";
 import type {
   MediaRef,
+  ResolvedContrastBounds,
   ResolvedMedia,
   ResolvedMediaMap,
   ResolvedMediaSource,
@@ -70,6 +71,33 @@ function readSource(raw: unknown): ResolvedMediaSource | null {
   };
 }
 
+function channelTriple(raw: unknown): [number, number, number] | null {
+  if (!Array.isArray(raw) || raw.length !== 3) return null;
+  const out: number[] = [];
+  for (const value of raw) {
+    if (
+      typeof value !== "number" ||
+      !Number.isInteger(value) ||
+      value < 0 ||
+      value > 255
+    ) {
+      return null;
+    }
+    out.push(value);
+  }
+  return [out[0], out[1], out[2]];
+}
+
+/** Bounds that do not form a valid, ordered range are dropped — "unproven", never repaired. */
+function readContrast(raw: unknown): ResolvedContrastBounds | undefined {
+  if (!isRecord(raw)) return undefined;
+  const min = channelTriple(raw.min);
+  const max = channelTriple(raw.max);
+  if (!min || !max) return undefined;
+  for (let i = 0; i < 3; i++) if (min[i] > max[i]) return undefined;
+  return { min, max };
+}
+
 export function readResolvedMedia(raw: unknown): ResolvedMediaMap {
   if (!isRecord(raw)) return {};
 
@@ -86,12 +114,14 @@ export function readResolvedMedia(raw: unknown): ResolvedMediaMap {
     if (sources.length === 0) continue;
 
     const alt = isRecord(value.alt) ? value.alt : {};
+    const contrast = readContrast(value.contrast);
     out[path] = {
       width,
       height,
       decorative: value.decorative === true,
       alt: { ar: nullableText(alt.ar), en: nullableText(alt.en) },
       sources,
+      ...(contrast ? { contrast } : {}),
     };
   }
   return out;

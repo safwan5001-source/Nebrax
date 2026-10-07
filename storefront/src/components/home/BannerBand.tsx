@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { destination } from "@/lib/home/destination";
 import type { BannerContent } from "@/lib/presentation/section-content";
 
@@ -7,12 +8,15 @@ export function BannerBand({
   basePath,
   headingId,
   designed = false,
+  backdrop,
 }: {
   content: BannerContent;
   basePath: string;
   headingId: string;
   /** A section design frame wraps this band: expose the content-box marker its rules address. */
   designed?: boolean;
+  /** CUST-HV V6b-3 — the picture layer of a media background; absent ⇒ unchanged output. */
+  backdrop?: ReactNode;
 }) {
   const href = destination(basePath, content.ctaHref);
   const showCta = Boolean(href && content.ctaLabel);
@@ -21,6 +25,7 @@ export function BannerBand({
       aria-labelledby={headingId}
       className="overflow-hidden rounded-store border border-store-border bg-store-surface"
     >
+      {backdrop}
       <div
         data-section-content={designed ? "" : undefined}
         className="flex min-w-0 flex-col gap-4 p-5 md:flex-row md:items-center md:p-8"

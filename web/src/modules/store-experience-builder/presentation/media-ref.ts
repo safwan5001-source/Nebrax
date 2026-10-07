@@ -182,12 +182,23 @@ export interface ResolvedMediaSource {
   src: string;
 }
 
+/**
+ * CUST-HV V6b-3 — encoded-channel bounds (already widened by the encoding margin) the server proved
+ * for a section-background picture: the one thing the storefront needs to pick the automatic text
+ * colour with the same algorithm the publish gate ran. Present only under `design.background`.
+ */
+export interface ResolvedContrastBounds {
+  min: [number, number, number];
+  max: [number, number, number];
+}
+
 export interface ResolvedMedia {
   width: number;
   height: number;
   decorative: boolean;
   alt: { ar: string | null; en: string | null };
   sources: ResolvedMediaSource[];
+  contrast?: ResolvedContrastBounds;
 }
 
 /** Resolved media keyed by the JSON path of the `MediaRef` inside the published document. */

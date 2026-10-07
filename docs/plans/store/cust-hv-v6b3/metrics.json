@@ -1,0 +1,482 @@
+[
+ {
+  "dir": "ltr",
+  "width": 390,
+  "overflow": false,
+  "sections": [
+   {
+    "sd": "mbg ovl fg heading link",
+    "rootRect": {
+     "x": 16,
+     "y": 16,
+     "w": 358,
+     "h": 176
+    },
+    "backRect": {
+     "x": 16,
+     "y": 16,
+     "w": 358,
+     "h": 176
+    },
+    "rootBg": "none",
+    "imgSrcTag": "#3a0b1f",
+    "headingColor": "rgb(255, 255, 255)",
+    "subColor": "rgb(255, 255, 255)",
+    "headingOnTop": true,
+    "overlayOpacity": "0.55",
+    "overlayBg": "rgb(0, 0, 0)",
+    "backRadius": "14px",
+    "rootRadius": "14px",
+    "backOverflow": "hidden",
+    "ptrEvents": "none"
+   },
+   {
+    "sd": "mbg ovl fg heading link",
+    "rootRect": {
+     "x": 16,
+     "y": 216,
+     "w": 358,
+     "h": 148.5
+    },
+    "backRect": {
+     "x": 17,
+     "y": 217,
+     "w": 356,
+     "h": 146.5
+    },
+    "rootBg": "none",
+    "imgSrcTag": "#f4f1ea",
+    "headingColor": "rgb(0, 0, 0)",
+    "subColor": "rgb(0, 0, 0)",
+    "headingOnTop": true,
+    "overlayOpacity": "0.5",
+    "overlayBg": "rgb(255, 255, 255)",
+    "backRadius": "14px",
+    "rootRadius": "14px",
+    "backOverflow": "hidden",
+    "ptrEvents": "none"
+   },
+   {
+    "sd": null,
+    "rootRect": {
+     "x": 16,
+     "y": 388.5,
+     "w": 358,
+     "h": 176
+    },
+    "backRect": null,
+    "rootBg": "linear-gradient(to right in oklab, rgb(1",
+    "imgSrcTag": null,
+    "headingColor": "rgb(255, 255, 255)",
+    "subColor": "oklab(0.999994 0.0000455677 0.0000200868 / 0.8)",
+    "headingOnTop": true,
+    "overlayOpacity": null,
+    "overlayBg": null,
+    "backRadius": null,
+    "rootRadius": "14px",
+    "backOverflow": null,
+    "ptrEvents": null
+   }
+  ]
+ },
+ {
+  "dir": "ltr",
+  "width": 768,
+  "overflow": false,
+  "sections": [
+   {
+    "sd": "mbg ovl fg heading link",
+    "rootRect": {
+     "x": 16,
+     "y": 16,
+     "w": 736,
+     "h": 256
+    },
+    "backRect": {
+     "x": 16,
+     "y": 16,
+     "w": 736,
+     "h": 256
+    },
+    "rootBg": "none",
+    "imgSrcTag": "#0b1f3a",
+    "headingColor": "rgb(255, 255, 255)",
+    "subColor": "rgb(255, 255, 255)",
+    "headingOnTop": true,
+    "overlayOpacity": "0.55",
+    "overlayBg": "rgb(0, 0, 0)",
+    "backRadius": "14px",
+    "rootRadius": "14px",
+    "backOverflow": "hidden",
+    "ptrEvents": "none"
+   },
+   {
+    "sd": "mbg ovl fg heading link",
+    "rootRect": {
+     "x": 16,
+     "y": 296,
+     "w": 736,
+     "h": 180
+    },
+    "backRect": {
+     "x": 17,
+     "y": 297,
+     "w": 734,
+     "h": 178
+    },
+    "rootBg": "none",
+    "imgSrcTag": "#f4f1ea",
+    "headingColor": "rgb(0, 0, 0)",
+    "subColor": "rgb(0, 0, 0)",
+    "headingOnTop": true,
+    "overlayOpacity": "0.5",
+    "overlayBg": "rgb(255, 255, 255)",
+    "backRadius": "14px",
+    "rootRadius": "14px",
+    "backOverflow": "hidden",
+    "ptrEvents": "none"
+   },
+   {
+    "sd": null,
+    "rootRect": {
+     "x": 16,
+     "y": 500,
+     "w": 736,
+     "h": 256
+    },
+    "backRect": null,
+    "rootBg": "linear-gradient(to right in oklab, rgb(1",
+    "imgSrcTag": null,
+    "headingColor": "rgb(255, 255, 255)",
+    "subColor": "oklab(0.999994 0.0000455677 0.0000200868 / 0.8)",
+    "headingOnTop": true,
+    "overlayOpacity": null,
+    "overlayBg": null,
+    "backRadius": null,
+    "rootRadius": "14px",
+    "backOverflow": null,
+    "ptrEvents": null
+   }
+  ]
+ },
+ {
+  "dir": "ltr",
+  "width": 1280,
+  "overflow": false,
+  "sections": [
+   {
+    "sd": "mbg ovl fg heading link",
+    "rootRect": {
+     "x": 16,
+     "y": 16,
+     "w": 1248,
+     "h": 288
+    },
+    "backRect": {
+     "x": 16,
+     "y": 16,
+     "w": 1248,
+     "h": 288
+    },
+    "rootBg": "none",
+    "imgSrcTag": "#0b1f3a",
+    "headingColor": "rgb(255, 255, 255)",
+    "subColor": "rgb(255, 255, 255)",
+    "headingOnTop": true,
+    "overlayOpacity": "0.55",
+    "overlayBg": "rgb(0, 0, 0)",
+    "backRadius": "14px",
+    "rootRadius": "14px",
+    "backOverflow": "hidden",
+    "ptrEvents": "none"
+   },
+   {
+    "sd": "mbg ovl fg heading link",
+    "rootRect": {
+     "x": 16,
+     "y": 328,
+     "w": 1248,
+     "h": 180
+    },
+    "backRect": {
+     "x": 17,
+     "y": 329,
+     "w": 1246,
+     "h": 178
+    },
+    "rootBg": "none",
+    "imgSrcTag": "#f4f1ea",
+    "headingColor": "rgb(0, 0, 0)",
+    "subColor": "rgb(0, 0, 0)",
+    "headingOnTop": true,
+    "overlayOpacity": "0.5",
+    "overlayBg": "rgb(255, 255, 255)",
+    "backRadius": "14px",
+    "rootRadius": "14px",
+    "backOverflow": "hidden",
+    "ptrEvents": "none"
+   },
+   {
+    "sd": null,
+    "rootRect": {
+     "x": 16,
+     "y": 532,
+     "w": 1248,
+     "h": 298
+    },
+    "backRect": null,
+    "rootBg": "linear-gradient(to right in oklab, rgb(1",
+    "imgSrcTag": null,
+    "headingColor": "rgb(255, 255, 255)",
+    "subColor": "oklab(0.999994 0.0000455677 0.0000200868 / 0.8)",
+    "headingOnTop": true,
+    "overlayOpacity": null,
+    "overlayBg": null,
+    "backRadius": null,
+    "rootRadius": "14px",
+    "backOverflow": null,
+    "ptrEvents": null
+   }
+  ]
+ },
+ {
+  "dir": "rtl",
+  "width": 390,
+  "overflow": false,
+  "sections": [
+   {
+    "sd": "mbg ovl fg heading link",
+    "rootRect": {
+     "x": 16,
+     "y": 16,
+     "w": 358,
+     "h": 176
+    },
+    "backRect": {
+     "x": 16,
+     "y": 16,
+     "w": 358,
+     "h": 176
+    },
+    "rootBg": "none",
+    "imgSrcTag": "#3a0b1f",
+    "headingColor": "rgb(255, 255, 255)",
+    "subColor": "rgb(255, 255, 255)",
+    "headingOnTop": true,
+    "overlayOpacity": "0.55",
+    "overlayBg": "rgb(0, 0, 0)",
+    "backRadius": "14px",
+    "rootRadius": "14px",
+    "backOverflow": "hidden",
+    "ptrEvents": "none"
+   },
+   {
+    "sd": "mbg ovl fg heading link",
+    "rootRect": {
+     "x": 16,
+     "y": 216,
+     "w": 358,
+     "h": 148.5
+    },
+    "backRect": {
+     "x": 17,
+     "y": 217,
+     "w": 356,
+     "h": 146.5
+    },
+    "rootBg": "none",
+    "imgSrcTag": "#f4f1ea",
+    "headingColor": "rgb(0, 0, 0)",
+    "subColor": "rgb(0, 0, 0)",
+    "headingOnTop": true,
+    "overlayOpacity": "0.5",
+    "overlayBg": "rgb(255, 255, 255)",
+    "backRadius": "14px",
+    "rootRadius": "14px",
+    "backOverflow": "hidden",
+    "ptrEvents": "none"
+   },
+   {
+    "sd": null,
+    "rootRect": {
+     "x": 16,
+     "y": 388.5,
+     "w": 358,
+     "h": 176
+    },
+    "backRect": null,
+    "rootBg": "linear-gradient(to left in oklab, rgb(15",
+    "imgSrcTag": null,
+    "headingColor": "rgb(255, 255, 255)",
+    "subColor": "oklab(0.999994 0.0000455677 0.0000200868 / 0.8)",
+    "headingOnTop": true,
+    "overlayOpacity": null,
+    "overlayBg": null,
+    "backRadius": null,
+    "rootRadius": "14px",
+    "backOverflow": null,
+    "ptrEvents": null
+   }
+  ]
+ },
+ {
+  "dir": "rtl",
+  "width": 768,
+  "overflow": false,
+  "sections": [
+   {
+    "sd": "mbg ovl fg heading link",
+    "rootRect": {
+     "x": 16,
+     "y": 16,
+     "w": 736,
+     "h": 256
+    },
+    "backRect": {
+     "x": 16,
+     "y": 16,
+     "w": 736,
+     "h": 256
+    },
+    "rootBg": "none",
+    "imgSrcTag": "#0b1f3a",
+    "headingColor": "rgb(255, 255, 255)",
+    "subColor": "rgb(255, 255, 255)",
+    "headingOnTop": true,
+    "overlayOpacity": "0.55",
+    "overlayBg": "rgb(0, 0, 0)",
+    "backRadius": "14px",
+    "rootRadius": "14px",
+    "backOverflow": "hidden",
+    "ptrEvents": "none"
+   },
+   {
+    "sd": "mbg ovl fg heading link",
+    "rootRect": {
+     "x": 16,
+     "y": 296,
+     "w": 736,
+     "h": 180
+    },
+    "backRect": {
+     "x": 17,
+     "y": 297,
+     "w": 734,
+     "h": 178
+    },
+    "rootBg": "none",
+    "imgSrcTag": "#f4f1ea",
+    "headingColor": "rgb(0, 0, 0)",
+    "subColor": "rgb(0, 0, 0)",
+    "headingOnTop": true,
+    "overlayOpacity": "0.5",
+    "overlayBg": "rgb(255, 255, 255)",
+    "backRadius": "14px",
+    "rootRadius": "14px",
+    "backOverflow": "hidden",
+    "ptrEvents": "none"
+   },
+   {
+    "sd": null,
+    "rootRect": {
+     "x": 16,
+     "y": 500,
+     "w": 736,
+     "h": 256
+    },
+    "backRect": null,
+    "rootBg": "linear-gradient(to left in oklab, rgb(15",
+    "imgSrcTag": null,
+    "headingColor": "rgb(255, 255, 255)",
+    "subColor": "oklab(0.999994 0.0000455677 0.0000200868 / 0.8)",
+    "headingOnTop": true,
+    "overlayOpacity": null,
+    "overlayBg": null,
+    "backRadius": null,
+    "rootRadius": "14px",
+    "backOverflow": null,
+    "ptrEvents": null
+   }
+  ]
+ },
+ {
+  "dir": "rtl",
+  "width": 1280,
+  "overflow": false,
+  "sections": [
+   {
+    "sd": "mbg ovl fg heading link",
+    "rootRect": {
+     "x": 16,
+     "y": 16,
+     "w": 1248,
+     "h": 288
+    },
+    "backRect": {
+     "x": 16,
+     "y": 16,
+     "w": 1248,
+     "h": 288
+    },
+    "rootBg": "none",
+    "imgSrcTag": "#0b1f3a",
+    "headingColor": "rgb(255, 255, 255)",
+    "subColor": "rgb(255, 255, 255)",
+    "headingOnTop": true,
+    "overlayOpacity": "0.55",
+    "overlayBg": "rgb(0, 0, 0)",
+    "backRadius": "14px",
+    "rootRadius": "14px",
+    "backOverflow": "hidden",
+    "ptrEvents": "none"
+   },
+   {
+    "sd": "mbg ovl fg heading link",
+    "rootRect": {
+     "x": 16,
+     "y": 328,
+     "w": 1248,
+     "h": 180
+    },
+    "backRect": {
+     "x": 17,
+     "y": 329,
+     "w": 1246,
+     "h": 178
+    },
+    "rootBg": "none",
+    "imgSrcTag": "#f4f1ea",
+    "headingColor": "rgb(0, 0, 0)",
+    "subColor": "rgb(0, 0, 0)",
+    "headingOnTop": true,
+    "overlayOpacity": "0.5",
+    "overlayBg": "rgb(255, 255, 255)",
+    "backRadius": "14px",
+    "rootRadius": "14px",
+    "backOverflow": "hidden",
+    "ptrEvents": "none"
+   },
+   {
+    "sd": null,
+    "rootRect": {
+     "x": 16,
+     "y": 532,
+     "w": 1248,
+     "h": 298
+    },
+    "backRect": null,
+    "rootBg": "linear-gradient(to left in oklab, rgb(15",
+    "imgSrcTag": null,
+    "headingColor": "rgb(255, 255, 255)",
+    "subColor": "oklab(0.999994 0.0000455677 0.0000200868 / 0.8)",
+    "headingOnTop": true,
+    "overlayOpacity": null,
+    "overlayBg": null,
+    "backRadius": null,
+    "rootRadius": "14px",
+    "backOverflow": null,
+    "ptrEvents": null
+   }
+  ]
+ }
+]

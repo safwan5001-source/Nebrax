@@ -1,0 +1,218 @@
+[
+ {
+  "dir": "ltr",
+  "width": 390,
+  "section": 0,
+  "fg": "rgb(255, 255, 255)",
+  "region": "213x101",
+  "worstRatio": 7.44,
+  "min": [
+   23,
+   6,
+   15
+  ],
+  "max": [
+   42,
+   95,
+   69
+  ]
+ },
+ {
+  "dir": "ltr",
+  "width": 390,
+  "section": 1,
+  "fg": "rgb(0, 0, 0)",
+  "region": "316x107",
+  "worstRatio": 18.14,
+  "min": [
+   242,
+   238,
+   229
+  ],
+  "max": [
+   255,
+   254,
+   254
+  ]
+ },
+ {
+  "dir": "ltr",
+  "width": 768,
+  "section": 0,
+  "fg": "rgb(255, 255, 255)",
+  "region": "256x126",
+  "worstRatio": 17.98,
+  "min": [
+   5,
+   16,
+   29
+  ],
+  "max": [
+   9,
+   24,
+   36
+  ]
+ },
+ {
+  "dir": "ltr",
+  "width": 768,
+  "section": 1,
+  "fg": "rgb(0, 0, 0)",
+  "region": "240x114",
+  "worstRatio": 20,
+  "min": [
+   251,
+   249,
+   247
+  ],
+  "max": [
+   253,
+   252,
+   250
+  ]
+ },
+ {
+  "dir": "ltr",
+  "width": 1280,
+  "section": 0,
+  "fg": "rgb(255, 255, 255)",
+  "region": "384x141",
+  "worstRatio": 18.29,
+  "min": [
+   5,
+   16,
+   29
+  ],
+  "max": [
+   8,
+   22,
+   34
+  ]
+ },
+ {
+  "dir": "ltr",
+  "width": 1280,
+  "section": 1,
+  "fg": "rgb(0, 0, 0)",
+  "region": "240x114",
+  "worstRatio": 20.12,
+  "min": [
+   251,
+   250,
+   247
+  ],
+  "max": [
+   252,
+   251,
+   249
+  ]
+ },
+ {
+  "dir": "rtl",
+  "width": 390,
+  "section": 0,
+  "fg": "rgb(255, 255, 255)",
+  "region": "213x101",
+  "worstRatio": 7.41,
+  "min": [
+   23,
+   7,
+   17
+  ],
+  "max": [
+   45,
+   95,
+   69
+  ]
+ },
+ {
+  "dir": "rtl",
+  "width": 390,
+  "section": 1,
+  "fg": "rgb(0, 0, 0)",
+  "region": "316x107",
+  "worstRatio": 18.14,
+  "min": [
+   242,
+   238,
+   229
+  ],
+  "max": [
+   255,
+   254,
+   254
+  ]
+ },
+ {
+  "dir": "rtl",
+  "width": 768,
+  "section": 0,
+  "fg": "rgb(255, 255, 255)",
+  "region": "256x126",
+  "worstRatio": 11.18,
+  "min": [
+   8,
+   22,
+   35
+  ],
+  "max": [
+   26,
+   58,
+   111
+  ]
+ },
+ {
+  "dir": "rtl",
+  "width": 768,
+  "section": 1,
+  "fg": "rgb(0, 0, 0)",
+  "region": "240x114",
+  "worstRatio": 18.14,
+  "min": [
+   242,
+   238,
+   229
+  ],
+  "max": [
+   254,
+   254,
+   253
+  ]
+ },
+ {
+  "dir": "rtl",
+  "width": 1280,
+  "section": 0,
+  "fg": "rgb(255, 255, 255)",
+  "region": "384x141",
+  "worstRatio": 11.18,
+  "min": [
+   9,
+   25,
+   38
+  ],
+  "max": [
+   26,
+   58,
+   111
+  ]
+ },
+ {
+  "dir": "rtl",
+  "width": 1280,
+  "section": 1,
+  "fg": "rgb(0, 0, 0)",
+  "region": "240x114",
+  "worstRatio": 18.14,
+  "min": [
+   242,
+   238,
+   229
+  ],
+  "max": [
+   254,
+   254,
+   253
+  ]
+ }
+]

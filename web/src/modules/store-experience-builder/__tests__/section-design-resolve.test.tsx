@@ -316,3 +316,53 @@ describe("surface matcher in the stylesheet (CUST-HV V5c review)", () => {
     expect(probe("hover:bg-white/10 px-2")).toBe(false);
   });
 });
+
+describe("resolveSectionDesign — picture backgrounds (CUST-HV V6b-3)", () => {
+  const A = "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e";
+  const dark = { min: [0, 0, 0], max: [40, 50, 60] } as const;
+  const wide = { min: [0, 0, 0], max: [255, 255, 255] } as const;
+  const withBounds = (bounds: typeof dark | typeof wide | null): DesignContext => ({
+    ...ctx,
+    mediaBounds: () => (bounds ? { min: bounds.min, max: bounds.max } : null),
+  });
+  const picture = (overlay?: { alpha: number }): SectionDesign => ({
+    background: {
+      kind: "media",
+      media: { mediaId: A, decorative: true },
+      ...(overlay
+        ? { overlay: { color: { hex: "#000000" }, alpha: overlay.alpha as 40 } }
+        : {}),
+    },
+  });
+
+  it("a proven picture sets the picture tokens, the overlay vars and a proven automatic foreground — never the solid-fill token", () => {
+    const r = resolveSectionDesign("hero", picture({ alpha: 40 }), withBounds(dark));
+    const tokens = r?.attrs["data-sd"].split(" ") ?? [];
+    expect(tokens).toEqual(expect.arrayContaining(["mbg", "ovl", "fg"]));
+    expect(tokens).not.toContain("bg");
+    expect(r?.style["--sec-ovl"]).toBe("#000000");
+    expect(r?.style["--sec-ovl-a"]).toBe("0.4");
+    expect(r?.style["--sec-bg"]).toBeUndefined();
+    expect(r?.style["--sec-fg"]).toBe("#ffffff");
+  });
+
+  it("an overlay-less picture has no overlay vars", () => {
+    const r = resolveSectionDesign("hero", picture(), withBounds(dark));
+    expect(r?.attrs["data-sd"]).toContain("mbg");
+    expect(r?.attrs["data-sd"]).not.toContain("ovl");
+    expect(r?.style["--sec-ovl-a"]).toBeUndefined();
+  });
+
+  it("no bounds, no evidence-backed range, or a range the text cannot clear ⇒ nothing is painted and no foreground is chosen", () => {
+    for (const c of [ctx, withBounds(null), withBounds(wide)]) {
+      const r = resolveSectionDesign("hero", picture(), c);
+      expect(r?.attrs["data-sd"] ?? "").not.toContain("mbg");
+      expect(r?.style["--sec-fg"]).toBeUndefined();
+    }
+  });
+
+  it("the overlay is what makes a wide-range picture provable", () => {
+    const r = resolveSectionDesign("hero", picture({ alpha: 80 }), withBounds(wide));
+    expect(r?.attrs["data-sd"]).toContain("mbg");
+  });
+});

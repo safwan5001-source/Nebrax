@@ -13,7 +13,11 @@ use InvalidArgumentException;
  * المُصيِّر إلى حساب مفاتيح التحويل (لا توأم TS لتجزئة `transformKey`) ولا إلى
  * معرفة أي موضع بعينه — يعمل لكل حقلٍ تضيفه شرائح V5–V9.
  *
- * **ما لا يخرج أبداً:** مسار/دلو/مفتاح تخزين، sha256، اسم الملف الأصلي، سطوع،
+ * **استثناء مقصود (V6b-3):** مرجعٌ تحت `design.background` (صورة خلفية قسم) يحمل `contrast` — حدّا قنوات
+ * مشفّرة (min/max، موسَّعان بهامش الترميز) تُطابق ما أُثبت عند النشر — لأن المتجر العام يختار منهما لون
+ * النص التلقائي بالخوارزمية ذاتها. هي أرقامٌ مشتقّة من صورةٍ عامة أصلاً (لا سرّ فيها) ولا تخرج لغير هذا الموضع.
+ *
+ * **ما لا يخرج أبداً:** مسار/دلو/مفتاح تخزين، sha256، اسم الملف الأصلي، متوسط السطوع/اللون الغالب،
  * رابط الأصل المضيفي `/store/v1/media/customizer/...` (المتصفح لا يبلغه؛ البروكسي
  * الوحيد: `/api/storefront/media/customizer/{id}/{file}`، AMEND-1).
  *
@@ -32,7 +36,8 @@ final class StorefrontPublishedMediaResolver
      * @return array<string, array{
      *   width:int, height:int, decorative:bool,
      *   alt:array{ar:string|null,en:string|null},
-     *   sources:list<array{kind:string,width:int,height:int,format:string,src:string}>
+     *   sources:list<array{kind:string,width:int,height:int,format:string,src:string}>,
+     *   contrast?:array{min:list<int>,max:list<int>}
      * }>
      */
     public function resolve(array $published): array
@@ -49,6 +54,10 @@ final class StorefrontPublishedMediaResolver
             ->get()
             ->keyBy('id');
 
+        $evidence = app(StorefrontMediaContrastEvidence::class);
+        /** @var array<string, array{min:list<int>,max:list<int>}|null> $bounds بحسب (أصل + مفتاح استخدام): استخدامٌ مكرَّر يُقاس مرةً واحدة في الطلب */
+        $bounds = [];
+
         $resolved = [];
         foreach ($refs as ['path' => $path, 'ref' => $ref]) {
             $asset = $assets->get($ref['mediaId']);
@@ -58,11 +67,43 @@ final class StorefrontPublishedMediaResolver
 
             $entry = $this->entry($asset, $ref);
             if ($entry !== null) {
+                // V6b-3 — حدود التباين لصور خلفيات الأقسام فقط؛ غيابها (دليلٌ غير صالح) = «غير مُثبَت» فلا لون نص تلقائي.
+                if (str_contains($path, '.design.background.')) {
+                    $contrast = $this->contrastFor($evidence, $asset, $ref, $bounds);
+                    if ($contrast !== null) {
+                        $entry['contrast'] = $contrast;
+                    }
+                }
                 $resolved[$path] = $entry;
             }
         }
 
         return $resolved;
+    }
+
+    /**
+     * حدود تباين استخدامٍ، مُخزَّنة مؤقتاً داخل الطلب بمفتاح (أصل + استخدام) وتعيد استعمال الأصل المحمَّل أصلاً
+     * (لا إعادة استعلامٍ عنه، ولا استعلام مشتقّاتٍ للإطار الافتراضي) — Codex P2 على #1279.
+     *
+     * @param  array<string,mixed>  $ref
+     * @param  array<string, array{min:list<int>,max:list<int>}|null>  $cache
+     * @return array{min:list<int>,max:list<int>}|null
+     */
+    private function contrastFor(StorefrontMediaContrastEvidence $evidence, StorefrontMedia $asset, array $ref, array &$cache): ?array
+    {
+        try {
+            $transform = StorefrontMediaTransform::fromInput([
+                'crop' => $ref['crop'] ?? null,
+                'rotate' => $ref['rotate'] ?? 0,
+                'focal' => $ref['focal'] ?? null,
+                'fit' => $ref['fit'] ?? 'cover',
+            ]);
+        } catch (InvalidArgumentException) {
+            return null;
+        }
+        $key = $transform->usageKey($asset->id);
+
+        return array_key_exists($key, $cache) ? $cache[$key] : ($cache[$key] = $evidence->boundsForUsage($asset, $transform));
     }
 
     /**

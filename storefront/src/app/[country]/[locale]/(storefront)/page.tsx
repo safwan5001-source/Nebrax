@@ -93,7 +93,7 @@ export default async function HomePage({ params }: HomePageProps) {
         implemented,
         // CUST-HV V6a — each hero instance renders its own content; a hero without any keeps
         // reading the legacy `homepage.heroHeadline/heroSubheadline` (V0 §8.1.4).
-        renderHero: ({ section, headingLevel, designed }) => {
+        renderHero: ({ section, headingLevel, designed, backdrop }) => {
           const own = heroContentOf(section);
           return (
             <HeroSection
@@ -109,9 +109,11 @@ export default async function HomePage({ params }: HomePageProps) {
               headingLevel={headingLevel}
               themePreset={presentation.themePreset}
               designed={designed}
+              backdrop={backdrop}
             />
           );
         },
+        media: identity?.presentationMedia ?? {},
         basePath,
         locale,
         currency,

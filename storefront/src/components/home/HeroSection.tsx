@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
+import type { ReactNode } from "react";
 import { destination } from "@/lib/home/destination";
 import type { HeroCta } from "@/lib/presentation/section-content";
 import type { ThemePresetId } from "@/lib/presentation/tokens";
@@ -38,6 +39,11 @@ interface HeroSectionProps {
    * `1`, any further hero `2`.
    */
   headingLevel?: 1 | 2;
+  /**
+   * CUST-HV V6b-3 — the picture layer of a media background (`SectionBackdrop`), rendered first so
+   * the hero's content paints above it. Absent ⇒ the hero is byte-identical to before.
+   */
+  backdrop?: ReactNode;
 }
 
 /**
@@ -74,6 +80,7 @@ export async function HeroSection({
   ctas,
   headingId = "home-hero",
   headingLevel = 1,
+  backdrop,
 }: HeroSectionProps) {
   const t = await getTranslations({
     locale: locale as Locale,
@@ -110,6 +117,7 @@ export async function HeroSection({
           : "min-h-[11rem] md:min-h-[16rem] lg:min-h-[18rem]",
       )}
     >
+      {backdrop}
       <div
         data-section-content={designed ? "" : undefined}
         className={cn(

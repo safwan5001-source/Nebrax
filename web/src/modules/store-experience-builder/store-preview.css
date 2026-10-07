@@ -284,6 +284,46 @@
 .awj-store-preview [data-sd~="bg"][data-sd] > * {
   background: none;
 }
+/* V6b-3 — a picture background: the section's own fill steps aside, the section becomes the
+   positioning context of its backdrop (picture + overlay layers, rendered by the section itself),
+   and everything after the backdrop paints above it. The layers never take pointer events. */
+.awj-store-preview [data-sd~="mbg"][data-sd] > * {
+  position: relative;
+  background: none;
+}
+.awj-store-preview [data-sd-backdrop] {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  border-radius: inherit;
+  pointer-events: none;
+}
+.awj-store-preview [data-sd-backdrop] picture,
+.awj-store-preview [data-sd-backdrop] img {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.awj-store-preview [data-sd-backdrop] img {
+  object-fit: cover;
+  object-position: var(--sd-pos, 50% 50%);
+}
+@media (max-width: 767px) {
+  .awj-store-preview [data-sd-backdrop] img {
+    object-position: var(--sd-pos-m, var(--sd-pos, 50% 50%));
+  }
+}
+.awj-store-preview [data-sd-backdrop] ~ * {
+  position: relative;
+  z-index: 1;
+}
+.awj-store-preview [data-sd~="ovl"] [data-sd-overlay] {
+  position: absolute;
+  inset: 0;
+  background: var(--sec-ovl);
+  opacity: var(--sec-ovl-a);
+}
 /* Section-level text only — never inside a surface nested in the section. */
 .awj-store-preview [data-sd~="heading"] :is(h1, h2, h3):not([data-sd] > * :is([class^="bg-store-"], [class*=" bg-store-"], [class^="bg-white"], [class*=" bg-white"]) *, :is([class^="bg-store-"], [class*=" bg-store-"], [class^="bg-white"], [class*=" bg-white"])) {
   color: var(--sec-heading);
