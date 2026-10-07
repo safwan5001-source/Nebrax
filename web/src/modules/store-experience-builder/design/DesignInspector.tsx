@@ -169,12 +169,15 @@ export function DesignInspector({
     (kind): kind is Exclude<(typeof SEPARATOR_KINDS)[number], "none"> => !!kind && kind !== "none",
   );
   const hasSeparator = activeSeparatorKinds.length > 0;
+  const hasDesignBackground = current.background?.kind === "solid" || current.background?.kind === "gradient";
   // The colour a separator takes when the merchant picks none — exactly the resolver's defaults:
-  // a line follows the border role, a band the brand, a shape the page behind. Mixed edges
+  // a line follows the border role, a band the brand, a shape the page behind it (brand when the section has no designed background, so it is visible). Mixed edges
   // (e.g. a line above and a wave below) have different defaults, so the field says so rather
   // than showing one swatch for both.
   const separatorDefaults = new Set(
-    activeSeparatorKinds.map((kind) => (kind === "line" ? "border" : kind === "band" ? "brand" : "page")),
+    activeSeparatorKinds.map((kind) =>
+      kind === "line" ? "border" : kind === "band" || !hasDesignBackground ? "brand" : "page",
+    ),
   );
   const separatorAutomatic =
     separatorDefaults.size === 1 && separatorDefaults.has("border")

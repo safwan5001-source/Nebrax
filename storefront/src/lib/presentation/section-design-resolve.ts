@@ -312,7 +312,12 @@ const SHAPE_HEIGHT: Record<string, string> = {
   md: "2.5rem",
   lg: "4rem",
 };
-/** The shape's fill when the merchant picks no colour: the page behind the section (today's token). */
+/**
+ * The shape's fill when the merchant picks no colour. On a section with a designed background the
+ * shape cuts into that surface with the page behind it (today's token). On a section without one
+ * the frame is transparent, so a page-coloured shape would be invisible next to the page itself and
+ * would only add a blank gap — there the default is the brand role, so the control always shows.
+ */
 const SHAPE_DEFAULT_HEX = "#f8f9fa";
 /** Path of the area *below* the edge line, for a bottom edge (1200 × 100 box, stretched to fit). */
 const SHAPE_PATH: Record<string, string> = {
@@ -345,6 +350,7 @@ function shapeLayer(
 function separatorLayers(
   design: SectionDesign,
   ctx: DesignContext,
+  hasBackground: boolean,
 ): { layers: string[]; reserve: { top?: string; bottom?: string } } | null {
   const sep = design.separator;
   if (!sep) return null;
@@ -365,7 +371,7 @@ function separatorLayers(
       layers.push(`linear-gradient(${c}, ${c}) ${edge} / 100% ${h} no-repeat`);
       reserve[edge] = h;
     } else if (SHAPE_PATH[kind]) {
-      const c = explicit ?? SHAPE_DEFAULT_HEX;
+      const c = explicit ?? (hasBackground ? SHAPE_DEFAULT_HEX : resolveRoleHex("brand", ctx));
       layers.push(shapeLayer(kind, edge, c, SHAPE_HEIGHT[size], ctx.dir));
       reserve[edge] = SHAPE_HEIGHT[size];
     }
@@ -493,7 +499,7 @@ export function resolveSectionDesign(
 
   // Separators paint onto the frame's own background; a full-bleed band has no shape edges (it
   // extends past the container), so it skips them like it skips radius and shadow.
-  const separators = bleeds ? null : separatorLayers(design, ctx);
+  const separators = bleeds ? null : separatorLayers(design, ctx, style["--sec-bg"] !== undefined);
   if (separators) {
     if (style["--sec-bg"]) {
       style["--sec-bg"] = [...separators.layers, style["--sec-bg"]].join(", ");

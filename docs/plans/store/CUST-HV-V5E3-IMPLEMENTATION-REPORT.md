@@ -24,7 +24,7 @@
 ### Resolver — one pure function, no CSS from the document
 A separator is a **background layer of the frame**, built in the resolver from validated tokens and a validated hex:
 - **line / band** — a one-colour `linear-gradient` strip on the edge (line 1 · 2 · 4 px; band 0.5 · 1 · 1.5 rem; default colours: the border role / the brand);
-- **wave / angle / curve** — an inline SVG data URI (`preserveAspectRatio='none'`, 1.5 · 2.5 · 4 rem; default fill: the page behind, `#f8f9fa`), a top edge is the bottom shape flipped, and **RTL mirrors the shape horizontally**;
+- **wave / angle / curve** — an inline SVG data URI (`preserveAspectRatio='none'`, 1.5 · 2.5 · 4 rem; default fill: the page behind, `#f8f9fa`, **when the section has a designed background to cut into; with none the default is the brand role** — a page-coloured shape on a transparent frame would be invisible and only add a gap (Codex P2 on #1275)), a top edge is the bottom shape flipped, and **RTL mirrors the shape horizontally**;
 - the edge's height is **reserved as extra padding** (`--sec-sept` / `--sec-sepb`, added to the designed spacing), so no content can ever reach into a separator;
 - with a background the layers are prepended to `--sec-bg` (one `background` value); without one they are the whole background (`--sec-sep`);
 - a **full-bleed band skips separators** (it extends past the container, like it skips radius and shadow — the inspector says so).

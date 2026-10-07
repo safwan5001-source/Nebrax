@@ -61,10 +61,21 @@ describe("separators — resolver (V5e-3)", () => {
     const layer = out.style["--sec-sep"];
     expect(layer).toMatch(/bottom \/ 100% 4rem no-repeat$/);
     const svg = decode(layer)!;
-    expect(svg).toContain("fill='#f8f9fa'"); // the page behind, by default
+    // no designed background: a page-coloured shape would be invisible, so it defaults to the brand
+    expect(svg).toContain("fill='#12372a'");
     expect(svg).toContain("preserveAspectRatio='none'");
     expect(svg).not.toContain("transform"); // bottom edge, LTR: neither flipped nor mirrored
     expect(out.style["--sec-sepb"]).toBe("4rem");
+  });
+
+  it("on a designed background a shape defaults to the page behind it; an explicit colour still wins (review)", () => {
+    const withBg = resolve({
+      background: { kind: "solid", color: { hex: "#101820" } },
+      separator: { bottom: "wave" },
+    });
+    expect(decode(withBg.style["--sec-bg"])!).toContain("fill='#f8f9fa'");
+    const explicit = resolve({ separator: { bottom: "wave", color: { hex: "#fde68a" } } });
+    expect(decode(explicit.style["--sec-sep"])!).toContain("fill='#fde68a'");
   });
 
   it("a top edge flips the shape vertically; RTL mirrors it horizontally", () => {

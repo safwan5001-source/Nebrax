@@ -295,10 +295,15 @@ describe("DesignInspector — separators and reveal (CUST-HV V5e-3)", () => {
     const band = render(<Harness type="benefits" initial={{ separator: { bottom: "band" } }} />);
     expect(shown()).toBe("Brand"); // a band follows the brand
     band.unmount();
-    const wave = render(<Harness type="benefits" initial={{ separator: { top: "wave" } }} />);
-    expect(shown()).toBe("Page colour"); // a shape sits on the page behind
+    const wave = render(
+      <Harness type="benefits" initial={{ background: { kind: "solid", color: { hex: "#101820" } }, separator: { top: "wave" } }} />,
+    );
+    expect(shown()).toBe("Page colour"); // on a designed background a shape cuts in with the page behind it
     wave.unmount();
-    render(<Harness type="benefits" initial={{ separator: { top: "line", bottom: "wave" } }} />);
+    const bare = render(<Harness type="benefits" initial={{ separator: { top: "wave" } }} />);
+    expect(shown()).toBe("Brand"); // with no designed background a page-coloured shape would be invisible
+    bare.unmount();
+    render(<Harness type="benefits" initial={{ separator: { top: "line", bottom: "band" } }} />);
     expect(shown()).toBe("Automatic (per shape)"); // mixed defaults are not summarised by one swatch
   });
 
