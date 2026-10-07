@@ -1,5 +1,6 @@
 "use client";
 
+import type { CSSProperties } from "react";
 import type { SectionBackground } from "../presentation/section-design";
 import { useMediaRefPreview } from "./use-media-ref-preview";
 
@@ -19,18 +20,21 @@ export function CanvasBackdrop({
 }) {
   const defaultUrl = useMediaRefPreview(background.media);
   const phoneUrl = useMediaRefPreview(background.mobile ?? null);
-  const src = viewport === "mobile" && phoneUrl ? phoneUrl : defaultUrl;
+  const usePhone = viewport === "mobile" && !!phoneUrl && !!background.mobile;
+  const src = usePhone ? phoneUrl : defaultUrl;
   if (!src) return null;
-  const focal = background.media.focal;
+  // each picture is framed by its own focal point (centred when it has none) — the same
+  // `--sd-pos` variable the storefront's backdrop CSS reads
+  const focal = usePhone ? background.mobile?.focal : background.media.focal;
+  const style = { "--sd-pos": focal ? `${focal.x}% ${focal.y}%` : "50% 50%" } as CSSProperties;
   return (
-    <div data-sd-backdrop="" aria-hidden="true">
+    <div data-sd-backdrop="" aria-hidden="true" style={style}>
       <picture>
         {/* biome-ignore lint/performance/noImgElement: editor-only signed preview URL, not a static import */}
         <img
           src={src}
           alt=""
           decoding="async"
-          style={focal ? { objectPosition: `${focal.x}% ${focal.y}%` } : undefined}
         />
       </picture>
       {background.overlay ? <div data-sd-overlay="" /> : null}

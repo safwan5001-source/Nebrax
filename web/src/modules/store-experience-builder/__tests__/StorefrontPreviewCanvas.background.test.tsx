@@ -105,6 +105,22 @@ describe("Canvas picture backgrounds (CUST-HV V6b-4a)", () => {
     await waitFor(() => expect(desktop.querySelector("[data-sd-backdrop] img")?.getAttribute("src")).toBe("https://signed.example/default.webp"));
   });
 
+  it("each picture is framed by its own focal point: the phone viewport uses the phone picture's", async () => {
+    status.mockResolvedValue(usage({ contrast: DARK }));
+    const framed = {
+      ...picture,
+      media: { mediaId: MEDIA_ID, decorative: true, focal: { x: 80, y: 20 } },
+      mobile: { mediaId: MEDIA_ID_2, decorative: true, focal: { x: 15, y: 85 } },
+    };
+    const phone = mount([hero(framed)], "mobile");
+    await waitFor(() => expect(phone.querySelector("[data-sd-backdrop]")).toBeTruthy());
+    expect((phone.querySelector("[data-sd-backdrop]") as HTMLElement).style.getPropertyValue("--sd-pos")).toBe("15% 85%");
+    cleanup();
+    const desktop = mount([hero(framed)], "desktop");
+    await waitFor(() => expect(desktop.querySelector("[data-sd-backdrop]")).toBeTruthy());
+    expect((desktop.querySelector("[data-sd-backdrop]") as HTMLElement).style.getPropertyValue("--sd-pos")).toBe("80% 20%");
+  });
+
   it("a hero without a picture background never reads the media status (no network, no change)", async () => {
     const c = mount([{ id: "hero", type: "hero", visible: true }]);
     expect(c.querySelector("[data-sd-backdrop]")).toBeNull();
