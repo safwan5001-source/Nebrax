@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
-import { fetchPublishedPresentation } from "@/lib/commerce/storefront";
+import { fetchStorefrontConfig } from "@/lib/commerce/storefront";
 import { publishedFaviconUrl } from "@/lib/presentation/public";
+import { publishedFaviconSource } from "@/lib/presentation/resolved-media";
 
 const FALLBACK_ICON = "/favicon.ico";
 const DATA_IMAGE = /^data:image\/(png|jpeg|jpg|webp);base64,([a-z0-9+/]+=*)$/i;
@@ -11,7 +12,13 @@ function fallback(request: Request): NextResponse {
 
 export async function GET(request: Request): Promise<Response> {
   try {
-    const presentation = await fetchPublishedPresentation();
+    const { presentation, presentationMedia } = await fetchStorefrontConfig();
+
+    // CUST-HV V4a: a media-library favicon (or logo) wins over the legacy value.
+    // It is a same-origin proxy path, so the redirect stays on this origin.
+    const media = publishedFaviconSource(presentation, presentationMedia ?? {});
+    if (media) return NextResponse.redirect(new URL(media, request.url), 307);
+
     const favicon = publishedFaviconUrl(presentation);
     if (!favicon) return fallback(request);
 

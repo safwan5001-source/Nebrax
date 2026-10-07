@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { MediaImage } from "@/components/ui/media-image";
+import type { MediaRef, ResolvedMedia } from "@/lib/presentation/media-ref";
 import { sanitizeLogoUrl } from "@/lib/presentation/urls";
 import { cn } from "@/lib/utils";
 
@@ -18,6 +20,13 @@ interface StoreBrandProps {
    * fallback — AWJ corporate branding is never substituted.
    */
   logoUrl?: string | null;
+  /**
+   * CUST-HV V4a — the logo as a media-library reference, already resolved by
+   * the server. Wins over `logoUrl` when present; the legacy value stays the
+   * fallback so an unresolved reference never leaves the header empty.
+   */
+  logoMedia?: { ref: MediaRef; media: ResolvedMedia } | null;
+  locale?: string;
 }
 
 /**
@@ -38,6 +47,8 @@ export function StoreBrand({
   size = "sm",
   tone = "default",
   logoUrl,
+  logoMedia = null,
+  locale = "en",
 }: StoreBrandProps) {
   const safeLogo = sanitizeLogoUrl(logoUrl ?? null);
 
@@ -50,7 +61,23 @@ export function StoreBrand({
         className,
       )}
     >
-      {safeLogo ? (
+      {logoMedia ? (
+        <MediaImage
+          media={logoMedia.media}
+          locale={locale}
+          alt={logoMedia.ref.alt}
+          fallbackAlt={name}
+          fit={logoMedia.ref.fit}
+          focal={logoMedia.ref.focal}
+          // The brand is above the fold on every page: never lazy.
+          loading="eager"
+          sizes="(min-width: 768px) 144px, 112px"
+          className={cn(
+            "w-auto max-w-[9rem]",
+            size === "md" ? "h-8 md:h-9" : "h-7",
+          )}
+        />
+      ) : safeLogo ? (
         // biome-ignore lint/performance/noImgElement: merchant logo is a runtime URL, not a static import
         <img
           src={safeLogo}

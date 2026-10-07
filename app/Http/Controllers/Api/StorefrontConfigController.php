@@ -6,6 +6,7 @@ use App\Models\Storefront;
 use App\Models\StorefrontBusinessProfile;
 use App\Models\Tenant;
 use App\Services\Commerce\StorefrontPresentationService;
+use App\Services\Commerce\StorefrontPublishedMediaResolver;
 use App\Support\Commerce\BusinessVertical;
 use App\Support\PublicApiResponse;
 use App\Tenancy\StorefrontContext;
@@ -27,7 +28,7 @@ use Illuminate\Http\Request;
  */
 class StorefrontConfigController extends PublicApiController
 {
-    public function show(Request $request, StorefrontPresentationService $presentations): JsonResponse
+    public function show(Request $request, StorefrontPresentationService $presentations, StorefrontPublishedMediaResolver $mediaResolver): JsonResponse
     {
         $context = app(StorefrontContext::class);
 
@@ -77,6 +78,12 @@ class StorefrontConfigController extends PublicApiController
             ];
         }
 
+        // CUST-HV V4a — مراجع الوسائط المنشورة محلولةً (مسارات بروكسي + بدائل لكل لغة)،
+        // بمفتاح مسار المرجع داخل الوثيقة. تُحسب فقط حين تحمل الوثيقة `mediaId`.
+        $presentationMedia = is_array($presentation) && str_contains((string) json_encode($presentation), '"mediaId"')
+            ? $mediaResolver->resolve($presentation)
+            : [];
+
         return new JsonResponse([
             'data' => [
                 'name' => $name,
@@ -84,6 +91,7 @@ class StorefrontConfigController extends PublicApiController
                 'business_vertical' => $businessVertical->value,
                 'business_identity' => $businessIdentity,
                 'presentation' => $presentation,
+                'presentation_media' => (object) $presentationMedia,
             ],
             'meta' => ['request_id' => PublicApiResponse::requestId($request)],
         ]);

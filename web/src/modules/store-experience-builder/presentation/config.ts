@@ -1,3 +1,4 @@
+import { type MediaRef, normalizeMediaRef } from "./media-ref";
 import {
   type AnnouncementsDoc,
   normalizeAnnouncements,
@@ -98,6 +99,10 @@ export interface StorefrontPresentationConfig {
     logoDataUrl: string | null;
     compactLogoDataUrl: string | null;
     faviconDataUrl: string | null;
+    /** CUST-HV V4a — media-library references; win over the legacy fields above when present. */
+    logoMedia?: MediaRef;
+    compactLogoMedia?: MediaRef;
+    faviconMedia?: MediaRef;
   };
   header: {
     style: HeaderStyleId;
@@ -406,6 +411,17 @@ function normalizePage(
  * tokens fail closed. Verification flags are stored but never authorize a
  * badge.
  */
+function brandingMedia(
+  raw: Record<string, unknown>,
+): Partial<Pick<StorefrontPresentationConfig["branding"], "logoMedia" | "compactLogoMedia" | "faviconMedia">> {
+  const out: Partial<Pick<StorefrontPresentationConfig["branding"], "logoMedia" | "compactLogoMedia" | "faviconMedia">> = {};
+  for (const key of ["logoMedia", "compactLogoMedia", "faviconMedia"] as const) {
+    const ref = normalizeMediaRef(raw[key]);
+    if (ref) out[key] = ref;
+  }
+  return out;
+}
+
 export function normalizePresentationConfig(
   input?: unknown,
 ): StorefrontPresentationConfig {
@@ -477,6 +493,7 @@ export function normalizePresentationConfig(
       logoDataUrl: sanitizeLogoUrl(asString(brandingRaw.logoDataUrl)),
       compactLogoDataUrl: sanitizeLogoUrl(asString(brandingRaw.compactLogoDataUrl)),
       faviconDataUrl: sanitizeLogoUrl(asString(brandingRaw.faviconDataUrl)),
+      ...brandingMedia(brandingRaw),
     },
     header: {
       style: inList(headerRaw.style, HEADER_STYLES, "standard"),
