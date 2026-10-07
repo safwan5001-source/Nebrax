@@ -377,6 +377,11 @@ input[type="search"]::-webkit-search-cancel-button {
   --store-footer-muted: #9ca3af;
   --store-footer-link: #d1d5db;
   --store-footer-border: #1f2937;
+  /* CUST-HV V5c — originals, restored on nested surfaces inside a recoloured section. */
+  --store-primary-foreground-base: var(--store-primary-foreground);
+  --store-footer-foreground-base: var(--store-footer-foreground);
+  --store-footer-muted-base: var(--store-footer-muted);
+  --store-footer-link-base: var(--store-footer-link);
 
   /* Shell metrics */
   --store-content-max: 85rem;
@@ -606,26 +611,48 @@ input[type="search"]::-webkit-search-cancel-button {
 }
 /*
  * Text colours. The store's own text tokens are re-pointed inside the section, so
- * every component that reads them follows. Anything that paints its own surface
- * (cards, chips, buttons: `bg-store-*`, `bg-white`) gets the original tokens back
- * — through `:where()`, i.e. at zero specificity, so a utility such as
- * `text-store-primary-foreground` on that very element still wins — and a dark band
- * never produces white-on-white inside a white card or dark-on-dark on a dark one.
+ * every component that reads them follows — including the footer and primary
+ * foreground tokens that dark bands (hero, app promo, wholesale) are built from.
+ * Anything that paints its own surface *inside* the section (cards, chips, buttons:
+ * `bg-store-*`, `bg-white`) gets the original tokens back — through `:where()`, i.e.
+ * at zero specificity, so a utility such as `text-store-primary-foreground` on that
+ * very element still wins — and a dark band never produces white-on-white inside a
+ * white card or dark-on-dark on a dark one. The section's own root element (the
+ * frame's direct child) is **not** a nested surface: its legacy fill is replaced
+ * when the design paints a background, and its text follows the design.
+ * Muted copy uses the proven foreground itself (never a translucent mix: opacity
+ * would lower a ratio that was only just proven).
  */
 [data-sd~="fg"] {
   color: var(--sec-fg);
   --store-foreground: var(--sec-fg);
-  --store-muted-foreground: color-mix(in srgb, var(--sec-fg) 78%, transparent);
+  --store-muted-foreground: var(--sec-fg);
+  --store-primary-foreground: var(--sec-fg);
+  --store-footer-foreground: var(--sec-fg);
+  --store-footer-muted: var(--sec-fg);
+  --store-footer-link: var(--sec-fg);
 }
-:where([data-sd~="fg"] :is([class*="bg-store-"], [class*="bg-white"])) {
+:where([data-sd~="fg"] :is([class*="bg-store-"], [class*="bg-white"]):not([data-sd] > *)) {
   color: var(--store-foreground-base);
   --store-foreground: var(--store-foreground-base);
   --store-muted-foreground: var(--store-muted-foreground-base);
+  --store-primary-foreground: var(--store-primary-foreground-base);
+  --store-footer-foreground: var(--store-footer-foreground-base);
+  --store-footer-muted: var(--store-footer-muted-base);
+  --store-footer-link: var(--store-footer-link-base);
 }
-/* Section-level headings and links only — never text inside a nested surface. */
-[data-sd~="heading"] :is(h1, h2, h3)[id]:not([data-sd] :is([class*="bg-store-"], [class*="bg-white"]) *) {
+/* A design background replaces the section's own legacy fill (banner card, hero
+   gradient, dark promo bands) instead of hiding behind it. */
+[data-sd~="bg"][data-sd] > * {
+  background: none;
+}
+/* Section-level text only — never inside a surface nested in the section. */
+[data-sd~="heading"] :is(h1, h2, h3):not([data-sd] > * :is([class*="bg-store-"], [class*="bg-white"]) *, [class*="bg-store-"], [class*="bg-white"]) {
   color: var(--sec-heading);
 }
-[data-sd~="link"] a:not([class*="bg-store-"], [class*="bg-white"], [data-sd] :is([class*="bg-store-"], [class*="bg-white"]) *) {
+[data-sd~="fg"] p:not([data-sd] > * :is([class*="bg-store-"], [class*="bg-white"]) *, [class*="bg-store-"], [class*="bg-white"]) {
+  color: var(--sec-fg);
+}
+[data-sd~="link"] a:not([data-sd] > * :is([class*="bg-store-"], [class*="bg-white"]) *, [class*="bg-store-"], [class*="bg-white"]) {
   color: var(--sec-link);
 }

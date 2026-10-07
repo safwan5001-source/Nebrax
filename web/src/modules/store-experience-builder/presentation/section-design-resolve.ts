@@ -137,6 +137,13 @@ function backgroundInterval(
   return interval;
 }
 
+/** Section types whose own markup paints an opaque dark surface of its own. */
+export const SURFACE_OWNING_TYPES: ReadonlySet<string> = new Set([
+  "hero",
+  "appPromo",
+  "wholesale",
+]);
+
 export interface EffectiveText {
   /** Foreground applied to body copy (explicit, else automatic over a background). */
   body: string | null;
@@ -154,6 +161,7 @@ export interface EffectiveText {
 export function effectiveText(
   design: SectionDesign,
   ctx: DesignContext,
+  type?: string,
 ): EffectiveText {
   const bg = design.background;
   let background: LuminanceInterval | null = null;
@@ -161,6 +169,13 @@ export function effectiveText(
     background = backgroundInterval(colour(bg.color, ctx), null);
   if (bg?.kind === "gradient")
     background = backgroundInterval(colour(bg.from, ctx), colour(bg.to, ctx));
+
+  // These sections paint their own dark surface (brand gradient, footer band). Without
+  // a design background a text colour would land on that legacy surface — which the
+  // contrast proof cannot see — so it is not applied at all (fail-closed).
+  if (!background && type !== undefined && SURFACE_OWNING_TYPES.has(type)) {
+    return { body: null, heading: null, link: null, background: null };
+  }
 
   const auto = background ? autoForeground(background) : null;
   const explicitBody = design.text?.body ? colour(design.text.body, ctx) : null;
@@ -192,7 +207,7 @@ export function resolveSectionDesign(
   if (!design || Object.keys(design).length === 0) return null;
   const sd: string[] = [];
   const style: Record<string, string> = {};
-  const text = effectiveText(design, ctx);
+  const text = effectiveText(design, ctx, type);
 
   const bg = design.background;
   let solidBg: string | null = null;

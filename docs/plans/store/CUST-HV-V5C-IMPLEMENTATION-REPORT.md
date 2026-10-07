@@ -57,6 +57,16 @@ Wraps a section only when it has a design. Storefront: `publishedNodes` was spli
 
 ---
 
+## Review round (Codex, 3 findings — all valid, all fixed)
+
+| Finding | Fix |
+|---|---|
+| **P1** a design background sat *behind* the section's own opaque root (banner card, hero gradient, dark promo bands) and was hidden | `[data-sd~="bg"] > *` clears the legacy fill so the design **replaces** it; the root is no longer treated as a "nested surface" (its text follows the design). Footer/primary-foreground tokens (what dark bands are built from) are re-pointed too, with `-base` originals restored inside real nested surfaces. A section that **owns a dark surface** (`hero`, `appPromo`, `wholesale`) **ignores text colours unless the design paints a background** (they would land on a surface the contrast proof cannot see — fail-closed). |
+| **P2** muted copy at 78 % opacity broke a just-passing ratio (`#757575` + black = 4.56 → 3.79) | Muted text now uses the **proven foreground itself** (no translucency); `<p>` copy follows it so utility `/80` alphas cannot lower a proven ratio. |
+| **P2** headings without `id` (Canvas preview) were not recoloured | Section headings are identified structurally (any `h1–h3` not inside a surface nested in the section), not by `[id]`. |
+
+The browser proof now also asserts, at all six widths in RTL and LTR, that **no designed section's root still paints its own fill** and that a heading colour reaches the Canvas heading; a mutation run (rule removed) fails it for banner / appPromo / deliveryPromise / shelf / discovery, so the check is not vacuous. The scenario gained `hero` and `wholesale` designs (the two dark surface-owners) and a distinct heading colour on benefits. 13/13 green.
+
 ## Invariants
 
 | Invariant | Status |
@@ -85,7 +95,7 @@ Evidence: `docs/plans/store/cust-hv-v5c/*.jpg`.
 - **A gradient does not bleed.** Only a solid band can extend past the container without adding scrollable overflow; a full-width gradient waits for the same restructuring.
 - **`typography` is accepted by the contract but not rendered** — scales and heading styles need integration inside each component; that is V5e.
 - **Some gradients cannot be made readable.** V0 promised an automatic foreground for every *opaque colour*; for a *gradient* neither white nor black may reach 4.5:1 across its whole range (the documented `#d1456a → #1e8b9a` pair reaches ≈ 4.0 either way). The resolver still picks the better one and the V5d publish gate will **block** such a design — the fail-closed rule, not a bug.
-- **Headings recolour only when they carry an `id`** (every `SectionHeading` and section title does). A title without one keeps following the body foreground, which is still provable.
+- **A design background replaces the section's own surface** (hero gradient, banner card, dark promo bands); text colours on `hero`/`appPromo`/`wholesale` are not applied without one.
 - **Canvas vs storefront parity** is structural (same resolver, same stylesheet block, test-enforced); I did not run the storefront in a browser against a live backend — the Canvas browser proof exercises the identical resolver and stylesheet.
 - **`accentColor` is still not consumed by storefront chrome** (badges, highlights, link hover) — DEF-2 / V1B, with the inspector.
 

@@ -86,6 +86,26 @@ for (const locale of LOCALES) {
 
         const failures: string[] = [];
         let checked = 0;
+
+        // A design background must *replace* the section's own legacy fill, not sit
+        // behind it (banner card, hero gradient, dark promo bands).
+        for (const frame of document.querySelectorAll('[data-sd~="bg"]')) {
+          for (const child of frame.children) {
+            const cs = getComputedStyle(child);
+            const bg = parse(cs.backgroundColor);
+            if ((bg && bg.a > 0) || cs.backgroundImage !== 'none') {
+              failures.push(`${frame.getAttribute('data-design-type')} root still paints ${cs.backgroundColor} ${cs.backgroundImage}`);
+            }
+          }
+        }
+        // A heading colour must reach headings that carry no id (Canvas preview).
+        for (const frame of document.querySelectorAll('[data-sd~="heading"]')) {
+          const h = frame.querySelector('h1, h2, h3');
+          const want = getComputedStyle(frame).getPropertyValue('--sec-heading').trim();
+          if (h && want && !getComputedStyle(h).color.includes(String(parseInt(want.slice(1, 3), 16)))) {
+            failures.push(`${frame.getAttribute('data-design-type')} heading ignored ${want}`);
+          }
+        }
         const walker = document.createTreeWalker(document.querySelector('[data-visual-root]')!, NodeFilter.SHOW_TEXT);
         const seen = new Set<Element>();
         for (let n = walker.nextNode(); n; n = walker.nextNode()) {
