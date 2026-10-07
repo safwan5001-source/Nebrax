@@ -33,11 +33,14 @@
 .awj-store-preview .bg-store-primary { background-color: var(--store-primary); }
 .awj-store-preview .bg-store-primary-foreground { background-color: var(--store-primary-foreground); }
 .awj-store-preview .bg-store-footer { background-color: var(--store-footer); }
+/* CUST-HV V5d-3 (DEF-2) — accent role; today's badge colours when the merchant set none. */
+.awj-store-preview .bg-store-accent { background-color: var(--store-accent, var(--store-foreground)); }
 .awj-store-preview .text-store-foreground { color: var(--store-foreground); }
 .awj-store-preview .text-store-muted-foreground { color: var(--store-muted-foreground); }
 .awj-store-preview .text-store-primary { color: var(--store-primary); }
 .awj-store-preview .text-store-primary-foreground { color: var(--store-primary-foreground); }
 .awj-store-preview .text-store-footer-foreground { color: var(--store-footer-foreground); }
+.awj-store-preview .text-store-accent-foreground { color: var(--store-accent-foreground, var(--store-surface)); }
 .awj-store-preview .text-store-footer-muted { color: var(--store-footer-muted); }
 .awj-store-preview .text-store-footer-link { color: var(--store-footer-link); }
 .awj-store-preview .border-store-border { border-color: var(--store-border); }

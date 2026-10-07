@@ -155,6 +155,16 @@ export function ExperienceBuilder({
   const [mobilePane, setMobilePane] = useState<"edit" | "preview">("preview");
   const [mobileSheet, setMobileSheet] = useState<MobileSheet>(null);
   const [isMobileViewport, setIsMobileViewport] = useState(false);
+  // CUST-HV V1B (DEF-7 / BL-3 / BL-4) — the editing surface per width band:
+  //   < 768     bottom sheets (unchanged)
+  //   768–1023  the inspector is a side drawer over the Canvas (it has none on main)
+  //   1024–1279 the navigation rail collapses to icons so the Canvas keeps its width
+  //   ≥ 1280    unchanged
+  const [isTabletViewport, setIsTabletViewport] = useState(false);
+  const [isCompactDesktop, setIsCompactDesktop] = useState(false);
+  const [tabletDrawerOpen, setTabletDrawerOpen] = useState(false);
+  const drawerToggleRef = useRef<HTMLButtonElement | null>(null);
+  const drawerSelectRef = useRef<HTMLSelectElement | null>(null);
   const [builderSidebarCollapsed, setBuilderSidebarCollapsed] = useState(false);
   const [sidebarPreferenceLoaded, setSidebarPreferenceLoaded] = useState(false);
   const [selectedSection, setSelectedSection] = useState<string | null>(null);
@@ -401,11 +411,36 @@ export function ExperienceBuilder({
     versionSwitchingId === null;
 
   useEffect(() => {
-    const updateViewport = () => setIsMobileViewport(window.innerWidth < 768);
+    const updateViewport = () => {
+      const width = window.innerWidth;
+      setIsMobileViewport(width < 768);
+      setIsTabletViewport(width >= 768 && width < 1024);
+      setIsCompactDesktop(width >= 1024 && width < 1280);
+    };
     updateViewport();
     window.addEventListener("resize", updateViewport);
     return () => window.removeEventListener("resize", updateViewport);
   }, []);
+
+  // Escape closes the tablet drawer from anywhere (unless a popover already used it).
+  const drawerOpenNow = isTabletViewport && tabletDrawerOpen;
+  useEffect(() => {
+    if (!drawerOpenNow) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || event.defaultPrevented) return;
+      setTabletDrawerOpen(false);
+      drawerToggleRef.current?.focus();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [drawerOpenNow]);
+
+  // Tapping a section (or chrome) in the Canvas at 768–1023 opens its inspector.
+  useEffect(() => {
+    if (isTabletViewport && (selectedSection || selectedChrome)) {
+      setTabletDrawerOpen(true);
+    }
+  }, [isTabletViewport, selectedSection, selectedChrome]);
 
   useEffect(() => {
     try {
@@ -2013,6 +2048,10 @@ export function ExperienceBuilder({
   // device mode (390), never the desktop 1280 canvas — the device switcher is
   // a desktop/tablet-only control.
   const effectiveDevice: PreviewDevice = isMobileViewport ? "mobile" : device;
+  // The stored preference is the merchant's; at 1024–1279 the rail is icons-only
+  // regardless (V0 §IA: the Canvas keeps a usable width), without touching it.
+  const railCollapsed = builderSidebarCollapsed || isCompactDesktop;
+  const drawerOpen = isTabletViewport && tabletDrawerOpen;
   const width = PREVIEW_WIDTHS[effectiveDevice];
   const canvasScrollRef = useRef<HTMLDivElement | null>(null);
   const inspectorScrollRef = useRef<HTMLDivElement | null>(null);
@@ -2327,7 +2366,7 @@ export function ExperienceBuilder({
       data-selected-section={selectedSection ?? ""}
       data-selected-chrome={selectedChrome ?? ""}
       data-current-page={currentPage}
-      data-builder-navigation-collapsed={builderSidebarCollapsed ? "true" : "false"}
+      data-builder-navigation-collapsed={railCollapsed ? "true" : "false"}
       className="relative flex h-full min-h-0 flex-col bg-background text-text"
     >
       <header
@@ -2624,32 +2663,33 @@ export function ExperienceBuilder({
         </div>
       ) : null}
 
-      <div className="flex min-h-0 flex-1">
+      <div className="relative flex min-h-0 flex-1">
         <nav
           aria-label={t("controls")}
           data-customizer-scroll=""
           className={`${
             mobilePane === "preview" ? "hidden lg:flex" : "hidden md:flex"
-          } ${builderSidebarCollapsed ? "lg:w-16" : "w-[196px]"} shrink-0 flex-col overflow-y-auto border-e border-neutral-200 bg-white`}
+          } ${railCollapsed ? "lg:w-16" : "w-[196px]"} shrink-0 flex-col overflow-y-auto border-e border-neutral-200 bg-white`}
         >
-          <div className={`flex h-12 shrink-0 items-center border-b border-neutral-200 px-2 ${builderSidebarCollapsed ? "justify-center" : "justify-end"}`}>
+          <div className={`flex h-12 shrink-0 items-center border-b border-neutral-200 px-2 ${railCollapsed ? "justify-center" : "justify-end"}`}>
             <button
               type="button"
               aria-label={t(
-                builderSidebarCollapsed
+                railCollapsed
                   ? "expandBuilderNavigation"
                   : "collapseBuilderNavigation",
               )}
-              aria-expanded={!builderSidebarCollapsed}
+              aria-expanded={!railCollapsed}
               title={t(
-                builderSidebarCollapsed
+                railCollapsed
                   ? "expandBuilderNavigation"
                   : "collapseBuilderNavigation",
               )}
+              disabled={isCompactDesktop}
               onClick={() => setBuilderSidebarCollapsed((collapsed) => !collapsed)}
-              className="inline-flex size-9 items-center justify-center rounded-md text-neutral-600 hover:bg-neutral-50 hover:text-neutral-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+              className="inline-flex size-9 items-center justify-center rounded-md text-neutral-600 hover:bg-neutral-50 hover:text-neutral-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:opacity-40"
             >
-              <SidebarToggleIcon locale={locale} collapsed={builderSidebarCollapsed} />
+              <SidebarToggleIcon locale={locale} collapsed={railCollapsed} />
             </button>
           </div>
           <div className="flex flex-col py-2">
@@ -2673,7 +2713,7 @@ export function ExperienceBuilder({
                       aria-current={selected ? "page" : undefined}
                       onClick={() => setPanel(item.id)}
                       className={`flex h-9 w-full items-center text-start text-[13px] ${
-                        builderSidebarCollapsed
+                        railCollapsed
                           ? "justify-center px-0"
                           : "gap-2.5 px-3"
                       } ${
@@ -2683,7 +2723,7 @@ export function ExperienceBuilder({
                       }`}
                     >
                       <NavIcon panel={item.id} />
-                      <span className={builderSidebarCollapsed ? "sr-only" : "min-w-0 truncate"}>
+                      <span className={railCollapsed ? "sr-only" : "min-w-0 truncate"}>
                         {t(item.label)}
                       </span>
                     </button>
@@ -2696,21 +2736,27 @@ export function ExperienceBuilder({
 
         <aside
           data-builder-controls=""
+          data-builder-drawer={drawerOpen ? "open" : isTabletViewport ? "closed" : undefined}
           className={`${
             mobilePane === "edit" ? "flex" : "hidden"
-          } w-full min-w-0 flex-col border-neutral-200 bg-white md:flex-1 lg:flex lg:w-[300px] lg:flex-none lg:border-e xl:w-[320px]`}
+          } w-full min-w-0 flex-col border-neutral-200 bg-white md:flex-1 lg:flex lg:w-[300px] lg:flex-none lg:border-e xl:w-[320px] ${
+            drawerOpen
+              ? "!flex absolute inset-y-0 start-0 z-30 !w-[360px] max-w-[92%] md:!flex-none border-e shadow-xl"
+              : ""
+          }`}
         >
-          <div className="shrink-0 border-b border-neutral-200 px-3 py-2 md:hidden">
+          <div className="flex shrink-0 items-center gap-2 border-b border-neutral-200 px-3 py-2 lg:hidden">
             <label className="sr-only" htmlFor="customizer-panel-select">
               {t("controls")}
             </label>
             <select
               id="customizer-panel-select"
+              ref={drawerSelectRef}
               value={panel}
               onChange={(event) =>
                 setPanel(event.target.value as CustomizerPanel)
               }
-              className="h-11 w-full border border-neutral-300 bg-white px-3 text-sm font-medium text-neutral-900 outline-none focus:border-neutral-800"
+              className="h-11 min-w-0 flex-1 border border-neutral-300 bg-white px-3 text-sm font-medium text-neutral-900 outline-none focus:border-neutral-800"
             >
               {visiblePanels.map((item) => (
                 <option key={item.id} value={item.id}>
@@ -2718,8 +2764,23 @@ export function ExperienceBuilder({
                 </option>
               ))}
             </select>
+            {drawerOpen ? (
+              <button
+                type="button"
+                data-builder-drawer-close=""
+                aria-label={t("builderDrawerClose")}
+                title={t("builderDrawerClose")}
+                onClick={() => {
+                  setTabletDrawerOpen(false);
+                  drawerToggleRef.current?.focus();
+                }}
+                className="inline-flex size-11 shrink-0 items-center justify-center border border-border bg-surface text-base text-text hover:bg-primary-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+              >
+                <span aria-hidden="true">×</span>
+              </button>
+            ) : null}
           </div>
-          <div className="hidden shrink-0 border-b border-neutral-200 px-4 py-3 md:block">
+          <div className="hidden shrink-0 border-b border-neutral-200 px-4 py-3 lg:block">
             <h2 className="text-[15px] font-semibold leading-tight">
               {activePanel ? t(activePanel.label) : t("theme")}
             </h2>
@@ -2782,6 +2843,23 @@ export function ExperienceBuilder({
               ) : null}
             </div>
             <div className="flex shrink-0 items-center gap-2">
+              {isTabletViewport ? (
+                <button
+                  type="button"
+                  ref={drawerToggleRef}
+                  data-builder-edit-toggle=""
+                  aria-expanded={drawerOpen}
+                  aria-controls="customizer-panel-select"
+                  onClick={() => {
+                    const next = !tabletDrawerOpen;
+                    setTabletDrawerOpen(next);
+                    if (next) requestAnimationFrame(() => drawerSelectRef.current?.focus());
+                  }}
+                  className="inline-flex h-7 items-center rounded-md border border-border bg-surface px-2.5 text-[12px] font-medium text-text hover:bg-primary-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                >
+                  {t("edit")}
+                </button>
+              ) : null}
               <span className="tabular-nums">
                 {t("deviceWidth")} · {width}
               </span>

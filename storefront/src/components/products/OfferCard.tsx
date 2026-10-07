@@ -55,7 +55,7 @@ export function OfferCard({ offer, basePath = "" }: OfferCardProps) {
         {showBadge && (
           <span
             data-offer-badge=""
-            className="absolute start-2 top-2 z-10 rounded-md bg-store-foreground px-2 py-0.5 text-[0.625rem] font-bold text-store-surface"
+            className="absolute start-2 top-2 z-10 rounded-md bg-store-accent px-2 py-0.5 text-[0.625rem] font-bold text-store-accent-foreground"
           >
             {t("offerDiscount", { percent: offer.discountPercent })}
           </span>

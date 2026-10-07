@@ -218,6 +218,22 @@ describe("PaletteEditor (CUST-HV V5d)", () => {
   });
 });
 
+describe("accent role (CUST-HV V5d-3 / DEF-2)", () => {
+  it("the palette editor sets and clears the accent (the existing accentColor key)", () => {
+    const onAccent = vi.fn();
+    const { rerender } = render(
+      <PaletteEditor palette={undefined} ctx={ctx} t={t} onChange={vi.fn()} onAccentChange={onAccent} />,
+    );
+    setHex("palette-accent", "#d1456a");
+    expect(onAccent).toHaveBeenLastCalledWith("#d1456a");
+    rerender(
+      <PaletteEditor palette={undefined} ctx={{ ...ctx, accentColor: "#d1456a" }} t={t} onChange={vi.fn()} onAccentChange={onAccent} />,
+    );
+    fireEvent.click(field("palette-accent").getByRole("button", { name: "Clear" }));
+    expect(onAccent).toHaveBeenLastCalledWith(null);
+  });
+});
+
 describe("Design tab in the section inspector (CUST-HV V5d)", () => {
   const config = (type: "hero" | "banner"): StorefrontPresentationConfig => ({
     ...DEFAULT_PRESENTATION_CONFIG,

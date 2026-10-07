@@ -45,8 +45,13 @@ function versionDetail(overrides: Record<string, unknown> = {}) {
   return { ...versionSummary(rest), config: config ?? DEFAULT_PRESENTATION_CONFIG };
 }
 
+function setViewport(width: number) {
+  Object.defineProperty(window, 'innerWidth', { configurable: true, writable: true, value: width });
+}
+
 describe('ExperienceBuilder persistence wiring — CUST-H1-2 version APIs', () => {
   afterEach(() => {
+    setViewport(1024);
     cleanup();
     window.localStorage.clear();
     listMock.mockReset();
@@ -142,6 +147,7 @@ describe('ExperienceBuilder persistence wiring — CUST-H1-2 version APIs', () =
   });
 
   it('defaults to an expanded builder navigation and reclaims its width when collapsed', async () => {
+    setViewport(1440);
     const user = userEvent.setup();
     render(<ExperienceBuilder initialLocale="en" />);
 
@@ -168,6 +174,7 @@ describe('ExperienceBuilder persistence wiring — CUST-H1-2 version APIs', () =
   });
 
   it('restores only valid persisted collapsed state and can expand again', async () => {
+    setViewport(1440);
     window.localStorage.setItem('awj-store-builder-sidebar-collapsed', 'true');
     const user = userEvent.setup();
     const { unmount } = render(<ExperienceBuilder initialLocale="en" />);
@@ -198,6 +205,42 @@ describe('ExperienceBuilder persistence wiring — CUST-H1-2 version APIs', () =
     await waitFor(() =>
       expect(screen.getByRole('button', { name: 'Collapse Store Builder navigation' })).toBeTruthy(),
     );
+  });
+
+  it('V1B: at 1024–1279 the rail is icons-only without touching the stored preference (BL-4)', async () => {
+    setViewport(1100);
+    render(<ExperienceBuilder initialLocale="en" />);
+    await waitFor(() =>
+      expect(document.querySelector('[data-experience-builder]')?.getAttribute('data-builder-navigation-collapsed')).toBe('true'),
+    );
+    expect((screen.getByRole('button', { name: 'Expand Store Builder navigation' }) as HTMLButtonElement).disabled).toBe(true);
+    expect(window.localStorage.getItem('awj-store-builder-sidebar-collapsed')).not.toBe('true');
+  });
+
+  it('V1B: at 768–1023 the inspector is an Edit drawer over the Canvas that Escape closes (DEF-7)', async () => {
+    setViewport(800);
+    const user = userEvent.setup();
+    render(<ExperienceBuilder initialLocale="en" />);
+    const controls = () => document.querySelector('[data-builder-controls]') as HTMLElement;
+    await waitFor(() => expect(document.querySelector('[data-builder-edit-toggle]')).toBeTruthy());
+    expect(controls().getAttribute('data-builder-drawer')).toBe('closed');
+
+    const toggle = document.querySelector('[data-builder-edit-toggle]') as HTMLButtonElement;
+    await user.click(toggle);
+    expect(controls().getAttribute('data-builder-drawer')).toBe('open');
+    expect(toggle.getAttribute('aria-expanded')).toBe('true');
+    expect(controls().className).toContain('absolute');
+
+    await user.keyboard('{Escape}');
+    expect(controls().getAttribute('data-builder-drawer')).toBe('closed');
+  });
+
+  it('V1B: outside 768–1023 there is no drawer machinery', async () => {
+    setViewport(1440);
+    render(<ExperienceBuilder initialLocale="en" />);
+    await waitFor(() => expect(document.querySelector('[data-builder-preview]')).toBeTruthy());
+    expect(document.querySelector('[data-builder-edit-toggle]')).toBeNull();
+    expect(document.querySelector('[data-builder-controls]')?.hasAttribute('data-builder-drawer')).toBe(false);
   });
 
   it('keeps mobile navigation independent from the desktop collapsed preference', async () => {

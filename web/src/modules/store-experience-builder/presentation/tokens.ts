@@ -216,10 +216,17 @@ export function radiusToken(id: RadiusId): string {
  * CSS custom properties applied to the preview (and, later, the published
  * storefront). Unknown or unreadable colours fall back to AWJ Modern.
  */
-export function presentationCssVars(primary: string, radius: RadiusId): Record<string, string> {
+export function presentationCssVars(primary: string, radius: RadiusId, accent?: string | null): Record<string, string> {
   const color = isSafeHexColor(primary) ? primary.trim() : "#12372a";
   const foreground = primaryForeground(color);
+  // CUST-HV V5d-3 (DEF-2) — live only when the merchant set an accent; otherwise nothing
+  // is emitted and every utility reading it falls back to today's token.
+  const accentVars: Record<string, string> =
+    typeof accent === "string" && isSafeHexColor(accent)
+      ? { "--store-accent": accent.trim(), "--store-accent-foreground": primaryForeground(accent.trim()) }
+      : {};
   return {
+    ...accentVars,
     "--store-primary": color,
     "--store-primary-600": color,
     "--store-primary-500": mixHex(color, "#ffffff", 0.18),

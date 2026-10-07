@@ -6,7 +6,7 @@ import path from 'node:path';
  * CUST-HV V5d — the Design tab of a section (ColourField, backgrounds, text colours with
  * the live contrast verdict, copy / paste / reset) is usable and nothing overflows at
  * 390 · 430 · 768 · 1024 · 1280 · 1440, in Arabic RTL and English LTR. 768–1023 has no
- * inspector on main (DEF-7 — V1B's item).
+ * inspector on main (DEF-7) — the Edit drawer (V5d-3) carries it.
  */
 const evidenceDir = path.resolve(process.cwd(), 'test-results/cust-hv-v5d-design-inspector');
 const WIDTHS = [390, 430, 768, 1024, 1280, 1440] as const;
@@ -39,9 +39,9 @@ for (const locale of LOCALES) {
         await page.locator('[data-builder-mobile-bar] button').nth(2).click();
         await page.locator('[data-design-panel-select]').selectOption('homepage');
       } else {
-        test.info().annotations.push({ type: 'DEF-7', description: 'no inspector at 768–1023 on main; V1B' });
-        expect(await overflow(page)).toBeLessThanOrEqual(baseline);
-        return;
+        // 768–1023: the inspector is the Edit drawer (V1B / DEF-7)
+        await page.locator('[data-builder-edit-toggle]').click();
+        await page.locator('[data-builder-controls] #customizer-panel-select').selectOption('homepage');
       }
 
       // the seeded draft has no sections: add a hero (it is selected on creation)

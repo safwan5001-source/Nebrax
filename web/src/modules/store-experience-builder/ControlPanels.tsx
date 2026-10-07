@@ -558,6 +558,7 @@ function ThemePanel({
             }}
             t={t}
             onChange={(palette) => patch({ palette })}
+            onAccentChange={(accentColor) => patch({ accentColor })}
           />
         </Section>
       </div>
@@ -1050,9 +1051,22 @@ function HomepagePanel({
   // Delete: في عقد v2 إزالة الـinstance من homepage.sections هي الحذف
   // الحقيقي (لا resurrection). لا تُستخدم visible=false كبديل. الـselection
   // ينتقل deterministic: next sibling، وإلا previous، وإلا null.
+  // CUST-HV V1B (DEF-6) — a section with authored content or design asks first;
+  // an empty one is removed immediately, as before.
+  const [pendingDelete, setPendingDelete] = useState<string | null>(null);
+  const requestDelete = (index: number) => {
+    const target = sections[index];
+    if (!target) return;
+    const authored =
+      (target.content && Object.keys(target.content).length > 0) ||
+      (target.design && Object.keys(target.design).length > 0);
+    if (authored) setPendingDelete(target.id);
+    else deleteSection(index);
+  };
   const deleteSection = (index: number) => {
     const removed = sections[index];
     if (!removed) return;
+    setPendingDelete(null);
     const next = sections.filter((_, i) => i !== index);
     setSections(next);
     if (selectedSection === removed.id) {
@@ -1397,7 +1411,7 @@ function HomepagePanel({
                   aria-label={t("deleteSection")}
                   title={t("deleteSection")}
                   className={iconBtnClass}
-                  onClick={() => deleteSection(index)}
+                  onClick={() => requestDelete(index)}
                 >
                   ✕
                 </button>
@@ -1414,6 +1428,48 @@ function HomepagePanel({
             );
           })}
         </ul>
+        {pendingDelete ? (
+          <div
+            data-delete-confirm=""
+            role="alertdialog"
+            aria-labelledby="delete-section-title"
+            aria-describedby="delete-section-body"
+            onKeyDown={(event) => {
+              if (event.key === "Escape") setPendingDelete(null);
+            }}
+            className="mt-2 space-y-2 border border-negative bg-surface p-3"
+          >
+            <p id="delete-section-title" className="text-[13px] font-semibold text-text">
+              {t("deleteSectionConfirmTitle")}
+            </p>
+            <p id="delete-section-body" className="text-[12px] leading-5 text-muted">
+              {t("deleteSectionConfirmBody")}
+            </p>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                data-delete-confirm-yes=""
+                onClick={() => {
+                  const index = sections.findIndex((item) => item.id === pendingDelete);
+                  if (index >= 0) deleteSection(index);
+                  else setPendingDelete(null);
+                }}
+                className={`${btnClass} border-negative text-negative`}
+              >
+                {t("deleteSectionConfirm")}
+              </button>
+              <button
+                type="button"
+                data-delete-confirm-cancel=""
+                autoFocus
+                onClick={() => setPendingDelete(null)}
+                className={btnClass}
+              >
+                {t("deleteSectionCancel")}
+              </button>
+            </div>
+          </div>
+        ) : null}
       </Section>
     </div>
   );

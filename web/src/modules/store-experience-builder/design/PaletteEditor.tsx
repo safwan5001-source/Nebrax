@@ -31,14 +31,29 @@ export function PaletteEditor({
   ctx,
   t,
   onChange,
+  onAccentChange,
 }: {
   palette: PresentationPalette | undefined;
   ctx: DesignContext;
   t: (key: CustomizerMessageKey) => string;
   onChange: (next: PresentationPalette | undefined) => void;
+  /** The accent role is the existing `accentColor` key (V0 §4.1) — null = none (legacy look). */
+  onAccentChange?: (next: string | null) => void;
 }) {
   return (
     <div data-palette-editor="" className="space-y-4">
+      {onAccentChange ? (
+        <ColourField
+          dataName="palette-accent"
+          label={t("designRoleAccent")}
+          hexOnly
+          value={ctx.accentColor ? { hex: ctx.accentColor } : undefined}
+          ctx={ctx}
+          t={t}
+          automatic={{ hex: resolveRoleHex("accent", { ...ctx, accentColor: null }), label: t("paletteAccentNone") }}
+          onChange={(next) => onAccentChange(next && "hex" in next ? next.hex : null)}
+        />
+      ) : null}
       {PALETTE_ROLES.map((role) => (
         <ColourField
           key={role}
