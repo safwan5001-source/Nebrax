@@ -168,6 +168,13 @@ describe("DesignInspector (CUST-HV V5d)", () => {
     fireEvent.change(select("Shadow"), { target: { value: "soft" } });
     fireEvent.click(screen.getByRole("button", { name: "Thin" }));
     expect(out()).toEqual({ spacing: { top: "lg" }, border: { width: "hairline" }, radius: "pill", shadow: "soft" });
+    // "None" is a decision (it removes a legacy border); "Default" returns to the section's own look
+    const borderGroup = screen.getByText("Border", { selector: "legend" }).closest("fieldset") as HTMLElement;
+    fireEvent.click(within(borderGroup).getByRole("button", { name: "None" }));
+    expect(out().border).toEqual({ width: "none" });
+    fireEvent.click(within(borderGroup).getByRole("button", { name: "Default" }));
+    expect(out().border).toBeUndefined();
+    fireEvent.click(screen.getByRole("button", { name: "Thin" }));
     fireEvent.change(select("Top"), { target: { value: "" } });
     expect(out().spacing).toBeUndefined();
   });
