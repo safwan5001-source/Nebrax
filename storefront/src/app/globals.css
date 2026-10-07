@@ -601,20 +601,31 @@ input[type="search"]::-webkit-search-cancel-button {
 }
 /* Inner spacing REPLACES the section's own padding (so `none` removes it and a step is
    not doubled): the root element takes the designed padding on every side, and the
-   padded element directly inside it (a banner's / hero's content box) gives its own up. */
+   content box marked `data-section-content` (a banner's / hero's inner box) gives its own up —
+   only those, never an arbitrary padded descendant (an accordion card keeps its padding). */
 [data-sd~="pi"][data-sd] > * {
   padding: var(--sec-pi);
 }
-[data-sd~="pi"][data-sd] > * > :is([class^="p-"], [class*=" p-"], [class^="px-"], [class*=" px-"], [class^="py-"], [class*=" py-"], [class*=":p-"], [class*=":px-"], [class*=":py-"]) {
+[data-sd~="pi"][data-sd] > * > [data-section-content] {
   padding: 0;
 }
 [data-sd~="align"] {
   text-align: var(--sec-align);
 }
 /* content-block position (independent of text alignment) */
-[data-sd~="balign"][data-sd] > * {
+[data-sd~="balign"][data-sd] > *,
+[data-sd~="balign"][data-sd] > * > [data-section-content] {
   margin-inline-start: var(--sec-bms);
   margin-inline-end: var(--sec-bme);
+}
+/* a block can only be positioned if it is narrower than its container: the marked content
+   box (a banner's image + copy row) shrinks to its content */
+[data-sd~="balign"][data-sd] > * > [data-section-content],
+[data-sd~="balign"][data-sd] > [data-section-block] {
+  inline-size: fit-content;
+}
+[data-sd~="balign"][data-sd] > [data-section-block] {
+  max-inline-size: 100%;
 }
 [data-sd~="max"] {
   max-inline-size: var(--sec-max);
@@ -627,9 +638,20 @@ input[type="search"]::-webkit-search-cancel-button {
 [data-sd~="border"][data-sd] > * {
   border: none;
 }
+/* A background, border or shadow on the frame replaces / outlines the section's own surface,
+   so the frame inherits the rounded corners that surface had (hero, banner, promo bands…)
+   unless the design sets its own radius or bleeds. */
+:is([data-sd~="bg"], [data-sd~="border"], [data-sd~="shadow"]):not([data-sd~="radius"], [data-sd~="bleed"]):has(> :is([class^="rounded-store"], [class*=" rounded-store"])) {
+  border-radius: var(--store-radius);
+}
+/* The radius rounds what the frame paints (fill, border, shadow) and the section's own root.
+   Nothing is clipped: an `overflow` clip on the frame would cut the offset focus outlines of
+   links and buttons that sit at its edges. */
 [data-sd~="radius"] {
   border-radius: var(--sec-radius);
-  overflow: clip;
+}
+[data-sd~="radius"][data-sd] > * {
+  border-radius: inherit;
 }
 [data-sd~="shadow"] {
   box-shadow: var(--sec-shadow);
@@ -637,6 +659,16 @@ input[type="search"]::-webkit-search-cancel-button {
 /* A solid band that extends past the page container to the viewport edges. A
    box-shadow adds no scrollable overflow; the clip keeps it horizontal-only. */
 [data-sd~="bleed"] {
+  isolation: isolate;
+}
+/* The band is drawn by a pseudo-element behind the content, so the clip only ever touches
+   the band — never the section's own content (focus rings at its edges stay whole). */
+[data-sd~="bleed"]::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
   box-shadow: var(--sec-bleed);
   clip-path: inset(0 -100vmax);
 }
@@ -688,6 +720,12 @@ input[type="search"]::-webkit-search-cancel-button {
   --store-footer-muted: var(--store-footer-muted-base);
   --store-footer-link: var(--store-footer-link-base);
 }
+/* Focus rings are drawn outside the focused element, i.e. on the designed background:
+   every `focus-visible:outline-store-*` indicator that is not itself inside a nested surface
+   (a category card, the hero CTA…) is redrawn in the section's proven foreground. */
+[data-sd~="fg"] [class*="focus-visible:outline-store-"]:focus-visible:not([data-sd] > * :is([class^="bg-store-"], [class*=" bg-store-"], [class^="bg-white"], [class*=" bg-white"]) *) {
+  outline-color: var(--sec-fg);
+}
 /* A translucent fill nested in a designed section would composite over an arbitrary
    background, which no contrast proof can see: it becomes its opaque equivalent. */
 [data-sd~="fg"] :is([class^="bg-store-surface/"], [class*=" bg-store-surface/"]) {
@@ -712,6 +750,12 @@ input[type="search"]::-webkit-search-cancel-button {
   color: var(--sec-fg);
 }
 [data-sd~="link"] a:not([data-sd] > * :is([class^="bg-store-"], [class*=" bg-store-"], [class^="bg-white"], [class*=" bg-white"]) *, :is([class^="bg-store-"], [class*=" bg-store-"], [class^="bg-white"], [class*=" bg-white"]), [class*="hover:bg-store-"], [class*="hover:bg-white"]:not([class*="hover:bg-white/"])) {
+  color: var(--sec-link);
+}
+
+/* Heading actions that are not anchors (the Canvas draws "View all" as a label) follow the
+   section link colour exactly like the published anchor does. */
+[data-sd~="link"] [data-section-action]:not([data-sd] > * :is([class^="bg-store-"], [class*=" bg-store-"], [class^="bg-white"], [class*=" bg-white"]) *, :is([class^="bg-store-"], [class*=" bg-store-"], [class^="bg-white"], [class*=" bg-white"])) {
   color: var(--sec-link);
 }
 }
