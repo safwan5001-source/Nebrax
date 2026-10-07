@@ -8,7 +8,7 @@
 | **Slice** | **V4b** — second half of V4 (V4a = `MediaRef` contract, resolution, rendering) |
 | **Branch** | `cust-hv/v4b-media-picker-editor` |
 | **PR** | see PR description (opened with this report) |
-| **Base** | `origin/main` after V4a (#1264) merged |
+| **Base SHA** | `d740fb89` — `origin/main` after V4a (#1264) merged |
 | **Authority** | V0 §7.6 (image editing), §7.7 (mobile override — see Deferred), §7.8 (Legacy), §7.10 (MediaPicker UX, AMEND-5/9/10/14); Master Execution §6 (V4) |
 | **Depends on** | V2a/V2b/V2c (merged) · V4a |
 
