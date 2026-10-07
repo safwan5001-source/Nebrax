@@ -91,8 +91,8 @@ Evidence: `docs/plans/store/cust-hv-v4b/*.jpg` (12 files); the full 6 widths × 
 | Web builder suites | 52 files / 756 tests ✓ · **full web vitest 422 files / 3607 ✓** (governance: drift ratchet, Admin↔Storefront boundary) |
 | e2e evidence | `cust-hv-v4b-media.spec.ts` **12/12** (also asserts the Canvas shows the media logo ≥1024) |
 | Backend | `StorefrontMediaApiTest` **+2** (single read: shape/usage/safe fields; uniform 404, role-gated) · `CommerceModuleBoundaryTest` ✓ |
-| Full backend | see PR description; PostgreSQL by CI |
-| Build | see PR description (`next build`) |
+| Full backend (sqlite, local) | 5737 passed · 57 skipped · **28 failed — all environment-only and identical to `main`** (`ext-bcmath` Fuel* suites; mail view `ResendMailTransportTest`/`UserInvitationTest`) · PostgreSQL by CI |
+| Build | `next build` ✓ (compiled, lint + types) |
 
 ## Risks / deferred (stated, not hidden)
 
