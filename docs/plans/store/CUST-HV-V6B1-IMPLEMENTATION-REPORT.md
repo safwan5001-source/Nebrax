@@ -26,6 +26,7 @@ Stored in the **existing** `region_luminance` JSON columns on assets and derivat
   "slack": { "abs": 12, "ringing": 20 } }
 ```
 
+- **Encoded files, not just the raw frame** (Codex P1): JPEG/WebP chroma subsampling and edge ringing create channel values the raw frame never had (a 1-px red/yellow checker has blue = 0 in the source, yet its quality-85 JPEG decodes with blue ≈ 80). So every file the generator produces (each rung, both formats; each derivative width/format) is decoded and measured, and the stored evidence is the union of the frame and all served files. The backfill measures every served width file likewise. The proportional margin then only has to cover *browser-decoder and resampling* differences.
 - **What is measured:** the per-channel *encoded* minimum and maximum over every pixel of the widest served frame (≤ 1920 px). Whole-frame extrema bound *any* crop, `object-fit: cover`, `object-position` or viewport, because any displayed pixel is a convex combination of frame pixels — so the proof does not depend on where text lands.
 - **Derivatives** (crop/rotate/etc.) are measured on the **rendered transformed frame** (`basis: transform`), never inherited from the source asset (AMEND-8).
 - **Indexed images** are resolved through their palette (`imagecolorsforindex`), never by raw index (Codex P1); palette transparency raises the alpha flag.
@@ -50,6 +51,7 @@ Stored in the **existing** `region_luminance` JSON columns on assets and derivat
 | `StorefrontMediaPixelEvidenceTest` | 10 — extrema exactness, alpha ⇒ unprovable, version/shape rejection, margin clamp, margin never narrowed by stored slack, real JPEG/WebP ringing within margin |
 | `StorefrontMediaApiTest` / `StorefrontMediaDerivativeTest` | evidence stored on upload and on derivative render (`frame` / `transform`), absent from API responses |
 | `StorefrontMediaEvidenceBackfillTest` | 3 — measures assets + derivatives and writes only null evidence; unreadable file stays null and is reported; command validates tenant and limit |
+| Codec bleed | red/yellow 1-px checker: stored evidence ≥ what the served files decode to (raw frame has blue 0) |
 | Review fixes | palette-image test (fails without the fix) · stuck-prefix backfill test (limit=1) |
 | All `StorefrontMedia*` tests | 127 passed |
 | Full `php artisan test` | see PR (28 known container-only failures: Fuel* need bcmath, Resend mail transport, user-invitation mail views — none touched) |

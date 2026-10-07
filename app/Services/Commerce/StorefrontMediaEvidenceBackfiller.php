@@ -108,29 +108,24 @@ class StorefrontMediaEvidenceBackfiller
         }
     }
 
-    /** @return array<string,mixed>|null */
+    /**
+     * اتحاد قياس **كل** ملفات السلّم المُقدَّمة (كل درجة، WebP وJPEG): كل ملفٍّ يحمل تشوّه ترميزه هو
+     * (Codex P1 على #1277)، والمولِّد يفعل الشيء نفسه عند الرفع.
+     *
+     * @return array<string,mixed>|null
+     */
     private function assetEvidence(StorefrontMedia $media): ?array
     {
-        $widest = 0;
-        foreach ($media->variantList() as $variant) {
-            if (($variant['kind'] ?? null) === StorefrontMediaVariantGenerator::KIND_WIDTH) {
-                $widest = max($widest, (int) $variant['width']);
-            }
-        }
-        if ($widest === 0) {
-            return null;
-        }
-
         $union = null;
         foreach ($media->variantList() as $variant) {
-            if (($variant['kind'] ?? null) !== StorefrontMediaVariantGenerator::KIND_WIDTH || (int) $variant['width'] !== $widest) {
+            if (($variant['kind'] ?? null) !== StorefrontMediaVariantGenerator::KIND_WIDTH) {
                 continue;
             }
             $one = $this->scanFile($media->id, (string) $variant['file'], 'frame');
             if ($one === null) {
-                return null; // أحد الملفين تعذّر قياسه: لا ندّعي دليلاً ناقصاً.
+                return null; // أحد الملفات تعذّر قياسه: لا ندّعي دليلاً ناقصاً.
             }
-            $union = $union === null ? $one : $this->union($union, $one);
+            $union = $union === null ? $one : StorefrontMediaPixelEvidence::union($union, $one);
         }
 
         return $union;
@@ -149,21 +144,5 @@ class StorefrontMediaEvidenceBackfiller
         } catch (Throwable) {
             return null;
         }
-    }
-
-    /**
-     * اتحاد قياسَين: أدنى الأدنيات وأقصى الأقصيات، والشفافية إن وُجدت في أيٍّ منهما.
-     *
-     * @param  array<string,mixed>  $a
-     * @param  array<string,mixed>  $b
-     * @return array<string,mixed>
-     */
-    private function union(array $a, array $b): array
-    {
-        $a['min'] = [min($a['min'][0], $b['min'][0]), min($a['min'][1], $b['min'][1]), min($a['min'][2], $b['min'][2])];
-        $a['max'] = [max($a['max'][0], $b['max'][0]), max($a['max'][1], $b['max'][1]), max($a['max'][2], $b['max'][2])];
-        $a['alpha'] = $a['alpha'] || $b['alpha'];
-
-        return $a;
     }
 }

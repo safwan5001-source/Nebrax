@@ -64,13 +64,23 @@ class StorefrontMediaPixelEvidenceTest extends TestCase
     {
         $dark = $this->solid(640, 400, [20, 22, 24]);
         $evidence = $this->evidenceOfSource($this->png($dark));
-        $this->assertSame([20, 22, 24], $evidence['min']);
-        $this->assertSame([20, 22, 24], $evidence['max']);
+        // المقيس ملفات الترميز كما تُقدَّم: قد تنزاح القيم بضعة مستويات عن المصدر لكنها لا تضيّق عنه.
+        foreach ([20, 22, 24] as $i => $source) {
+            $this->assertLessThanOrEqual($source, $evidence['min'][$i]);
+            $this->assertGreaterThanOrEqual($source - 8, $evidence['min'][$i]);
+            $this->assertGreaterThanOrEqual($source, $evidence['max'][$i]);
+            $this->assertLessThanOrEqual($source + 8, $evidence['max'][$i]);
+        }
 
         imagesetpixel($dark, 317, 201, imagecolorallocate($dark, 250, 240, 30));
-        $evidence = $this->evidenceOfSource($this->png($dark));
-        $this->assertSame([20, 22, 24], $evidence['min']);
-        $this->assertSame([250, 240, 30], $evidence['max'], 'one bright pixel is enough: an average would have hidden it');
+        $hot = $this->evidenceOfSource($this->png($dark));
+        foreach ([250, 240, 30] as $i => $source) {
+            $this->assertGreaterThanOrEqual($source, $hot['max'][$i], 'one bright pixel is enough: an average would have hidden it');
+        }
+        foreach ([20, 22, 24] as $i => $source) {
+            $this->assertLessThanOrEqual($source, $hot['min'][$i]);
+        }
+        $evidence = $hot;
         $this->assertSame(StorefrontMediaPixelEvidence::VERSION, $evidence['v']);
         $this->assertSame('frame', $evidence['basis']);
         $this->assertSame(['abs' => StorefrontMediaPixelEvidence::SLACK_ABS, 'ringing' => StorefrontMediaPixelEvidence::SLACK_RINGING_PERCENT], $evidence['slack']);
@@ -125,6 +135,40 @@ class StorefrontMediaPixelEvidenceTest extends TestCase
         $evidence = $this->evidenceOfSource($this->png($image));
         $this->assertTrue($evidence['alpha'], 'what shows through is unknown here — never claimed as proven');
         $this->assertNull(StorefrontMediaPixelEvidence::bounds($evidence));
+    }
+
+    /** @test */
+    public function evidence_includes_the_codec_distortion_of_the_encoded_files_not_just_the_raw_frame(): void
+    {
+        // رقعة شطرنج 1px أحمر/أصفر: القناة الزرقاء 0 في المصدر كله، لكن تقليل دقة اللون في JPEG/WebP ينزف زرقةً
+        // (≈ 80) لا يغطيها أي هامش ثابت — الدليل يُقاس على الملفات المرمَّزة (Codex P1 على #1277).
+        $image = imagecreatetruecolor(640, 400);
+        $red = imagecolorallocate($image, 255, 0, 0);
+        $yellow = imagecolorallocate($image, 255, 255, 0);
+        for ($y = 0; $y < 400; $y++) {
+            for ($x = 0; $x < 640; $x++) {
+                imagesetpixel($image, $x, $y, ($x + $y) % 2 === 0 ? $red : $yellow);
+            }
+        }
+        $path = $this->png($image);
+        $raw = StorefrontMediaPixelEvidence::scanGd($image);
+        $this->assertSame(0, $raw['max'][2], 'the raw frame has no blue at all');
+
+        $files = [];
+        $result = $this->generator()->generate($path, function (string $file, string $bytes) use (&$files): void {
+            $files[$file] = $bytes;
+        });
+        $evidence = $result['region_luminance'];
+        $this->assertNotNull($evidence);
+
+        $decodedBlueMax = 0;
+        foreach ($files as $bytes) {
+            $decoded = app(ImageManagerInterface::class)->decodeBinary($bytes);
+            $decodedBlueMax = max($decodedBlueMax, StorefrontMediaPixelEvidence::scan($decoded)['max'][2]);
+        }
+        $this->assertGreaterThan(StorefrontMediaPixelEvidence::SLACK_ABS, $decodedBlueMax, 'the codec really does bleed blue here');
+        $this->assertGreaterThanOrEqual($decodedBlueMax, $evidence['max'][2], 'the stored evidence covers what the served files decode to');
+        $this->assertGreaterThanOrEqual($decodedBlueMax, StorefrontMediaPixelEvidence::bounds($evidence)['max'][2]);
     }
 
     /** @test */

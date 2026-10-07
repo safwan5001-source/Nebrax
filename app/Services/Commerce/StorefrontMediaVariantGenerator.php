@@ -76,7 +76,7 @@ final class StorefrontMediaVariantGenerator
     /**
      * @param  callable(string $file, string $bytes, string $mime): void  $store  يخزّن الناتج فوراً
      * @return array{
-     *   width:int, height:int, avg_luminance:int, dominant_colour:string, region_luminance:array<string,mixed>,
+     *   width:int, height:int, avg_luminance:int, dominant_colour:string, region_luminance:array<string,mixed>|null,
      *   variants:list<array{kind:string,width:int,height:int,format:string,file:string,bytes:int}>
      * }
      */
@@ -92,6 +92,7 @@ final class StorefrontMediaVariantGenerator
         $rungs = $this->rungs($sourceWidth);
         $variants = [];
         $evidence = null;
+        $evidenceBroken = false;
 
         foreach ($rungs as [$kind, $width]) {
             if ($image->width() > $width) {
@@ -108,6 +109,7 @@ final class StorefrontMediaVariantGenerator
                     : $image->encodeUsingMediaType('image/jpeg', $quality);
                 $bytes = (string) $encoded;
                 $file = self::fileName($kind, $width, $format);
+                $this->foldEncodedEvidence($evidence, $evidenceBroken, $bytes, 'frame');
 
                 $store($file, $bytes, self::MIME[$format]);
 
@@ -133,9 +135,30 @@ final class StorefrontMediaVariantGenerator
             'height' => $sourceHeight,
             'avg_luminance' => $luminance,
             'dominant_colour' => $colour,
-            'region_luminance' => $evidence ?? StorefrontMediaPixelEvidence::scan($image),
+            'region_luminance' => $evidenceBroken ? null : ($evidence ?? StorefrontMediaPixelEvidence::scan($image)),
             'variants' => $variants,
         ];
+    }
+
+    /**
+     * CUST-HV V6b-1 (Codex P1 على #1277) — الدليل يشمل **الملفات المرمَّزة كما تُقدَّم**: ترميز JPEG/WebP
+     * (تقليل دقة اللون chroma subsampling، رنين الحواف) يُنتج قنواتٍ لا وجود لها في بكسلات الإطار الخام
+     * (مثلاً رقعة شطرنج أحمر/أصفر بقناة زرقاء 0 تُفكّ بزرقةٍ ≈ 80)، فيُفكّ كل ملفٍّ مُنتَج ويُقاس ويُوحَّد مع
+     * قياس الإطار. تعذّر فكّ ملفٍ أنتجناه ⇒ لا دليل (null) = غير قابل للإثبات (fail-closed).
+     *
+     * @param  array<string,mixed>|null  $evidence
+     */
+    private function foldEncodedEvidence(?array &$evidence, bool &$broken, string $bytes, string $basis): void
+    {
+        if ($broken || $evidence === null) {
+            return;
+        }
+        try {
+            $measured = StorefrontMediaPixelEvidence::scan($this->images->decodeBinary($bytes), $basis);
+            $evidence = StorefrontMediaPixelEvidence::union($evidence, $measured);
+        } catch (\Throwable) {
+            $broken = true;
+        }
     }
 
     /**
@@ -150,7 +173,7 @@ final class StorefrontMediaVariantGenerator
      *
      * @param  list<int>  $widths  العروض الاسمية (مفاتيح المشتقّات)
      * @param  callable(int $width, string $format, string $bytes, string $mime, int $renderedWidth, int $renderedHeight): void  $store
-     * @return array{avg_luminance:int, dominant_colour:string, region_luminance:array<string,mixed>, frame:array{width:int,height:int}}
+     * @return array{avg_luminance:int, dominant_colour:string, region_luminance:array<string,mixed>|null, frame:array{width:int,height:int}}
      */
     public function renderTransform(string $sourcePath, StorefrontMediaTransform $transform, array $widths, callable $store): array
     {
@@ -177,6 +200,7 @@ final class StorefrontMediaVariantGenerator
         /** @var array<string,string> $encoded مفتاحه "{renderedWidth}.{format}" — يُرمَّز مرةً لكل عرضٍ فعليّ */
         $encoded = [];
         $evidence = null;
+        $evidenceBroken = false;
         foreach ($widths as $nominal) {
             $target = min($nominal, $image->width());
             if ($image->width() > $target) {
@@ -191,6 +215,7 @@ final class StorefrontMediaVariantGenerator
                     $encoded[$cacheKey] = (string) ($format === self::FORMAT_WEBP
                         ? $image->encodeUsingMediaType('image/webp', $quality)
                         : $image->encodeUsingMediaType('image/jpeg', $quality));
+                    $this->foldEncodedEvidence($evidence, $evidenceBroken, $encoded[$cacheKey], 'transform');
                 }
                 $store($nominal, $format, $encoded[$cacheKey], self::MIME[$format], $image->width(), $image->height());
             }
@@ -201,7 +226,7 @@ final class StorefrontMediaVariantGenerator
         return [
             'avg_luminance' => $luminance,
             'dominant_colour' => $colour,
-            'region_luminance' => $evidence ?? StorefrontMediaPixelEvidence::scan($image, 'transform'),
+            'region_luminance' => $evidenceBroken ? null : ($evidence ?? StorefrontMediaPixelEvidence::scan($image, 'transform')),
             'frame' => $frame,
         ];
     }

@@ -54,6 +54,23 @@ final class StorefrontMediaPixelEvidence
     }
 
     /**
+     * اتحاد قياسَين لمجموعةٍ واحدة من الملفات: أدنى الأدنيات وأقصى الأقصيات، والشفافية إن وُجدت في أيٍّ منهما.
+     * (أبعاد الناتج وأساسه من الأول — هما وصفٌ لا يدخل في الإثبات.)
+     *
+     * @param  array<string,mixed>  $a
+     * @param  array<string,mixed>  $b
+     * @return array<string,mixed>
+     */
+    public static function union(array $a, array $b): array
+    {
+        $a['min'] = [min($a['min'][0], $b['min'][0]), min($a['min'][1], $b['min'][1]), min($a['min'][2], $b['min'][2])];
+        $a['max'] = [max($a['max'][0], $b['max'][0]), max($a['max'][1], $b['max'][1]), max($a['max'][2], $b['max'][2])];
+        $a['alpha'] = $a['alpha'] || $b['alpha'];
+
+        return $a;
+    }
+
+    /**
      * @return array{v:int, basis:string, width:int, height:int, min:list<int>, max:list<int>, alpha:bool, slack:array{abs:int, ringing:int}}
      */
     public static function scanGd(GdImage $gd, string $basis = 'frame'): array
