@@ -132,6 +132,16 @@ class CommerceWorkspaceStorefrontMediaController extends ApiController
         return response()->json(['data' => $results], $created > 0 ? 201 : 200);
     }
 
+    public function show(Request $request, StorefrontMediaService $media, StorefrontMediaReferenceScanner $references, string $mediaId): JsonResponse
+    {
+        $this->denySelfService($request);
+        $asset = $this->activeOr404($mediaId);
+
+        $rows = $references->referencesFor([$asset->id])[$asset->id] ?? [];
+
+        return response()->json(['data' => StorefrontMediaResource::workspace($asset, $media, $this->containerCount($rows))]);
+    }
+
     public function update(Request $request, StorefrontMediaService $media, string $mediaId): JsonResponse
     {
         $this->denySelfService($request);

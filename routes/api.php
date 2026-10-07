@@ -992,6 +992,11 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
             ->middleware($perm('commerce.manage'));
         Route::post('commerce/workspace/storefront-media', [CommerceWorkspaceStorefrontMediaController::class, 'store'])
             ->middleware([$perm('commerce.manage'), 'throttle:30,1']);
+        // CUST-HV V4b: قراءة أصلٍ واحد (يحتاجها حقل المرجع لعرض بطاقة الوسيط المختار
+        // وبدائله دون تصفّح المكتبة). المحذوف/الأجنبي = 404 موحّد (حالة «محذوف في مكان آخر»).
+        Route::get('commerce/workspace/storefront-media/{mediaId}', [CommerceWorkspaceStorefrontMediaController::class, 'show'])
+            ->whereUuid('mediaId')
+            ->middleware($perm('commerce.manage'));
         Route::patch('commerce/workspace/storefront-media/{mediaId}', [CommerceWorkspaceStorefrontMediaController::class, 'update'])
             ->whereUuid('mediaId')
             ->middleware($perm('commerce.manage'));

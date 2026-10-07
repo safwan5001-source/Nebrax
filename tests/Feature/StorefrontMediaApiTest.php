@@ -632,6 +632,55 @@ class StorefrontMediaApiTest extends TestCase
         $this->assertSame([$free['id']], array_column($unused, 'id'));
     }
 
+    /** @test */
+    public function a_single_asset_can_be_read_with_its_usage_count_and_the_same_safe_shape_as_the_list(): void
+    {
+        $this->fakeStorefrontMediaR2();
+        $auth = $this->registerTenant('sfm-show');
+        $seed = $this->seedMediaStorefront($auth['tenant_id']);
+        $used = $this->createReady($auth, 800, 500, 'used.jpg');
+        $this->seedVersionWithConfig($auth['tenant_id'], $seed['storefront']->id, $this->configReferencing($used['id']));
+
+        $json = $this->withToken($auth['token'])->getJson(self::BASE.'/'.$used['id'])->assertOk()->json('data');
+
+        $this->assertSame($used['id'], $json['id']);
+        $this->assertSame('used.jpg', $json['name']);
+        $this->assertSame(1, $json['usage_count']);
+        $this->assertSame('ready', $json['variants_state']);
+        $this->assertNotNull($json['preview_url']);
+        $this->assertSame(
+            array_keys($used),
+            array_keys($json),
+            'القراءة المفردة بنفس قائمة السماح الضيقة للقائمة.',
+        );
+        $this->assertStringNotContainsString('storage_key', json_encode($json));
+        $this->assertStringNotContainsString('sha256', json_encode($json));
+    }
+
+    /** @test */
+    public function reading_a_single_asset_is_a_uniform_404_for_foreign_deleted_or_unknown_ids_and_is_role_gated(): void
+    {
+        $this->fakeStorefrontMediaR2();
+        $a = $this->registerTenant('sfm-show-a', 'a@sfm-show.test');
+        $b = $this->registerTenant('sfm-show-b', 'b@sfm-show.test');
+        $media = $this->createReady($a);
+        $gone = $this->createReady($a, 801, 500, 'gone.jpg');
+        $this->withToken($a['token'])->deleteJson(self::BASE.'/'.$gone['id'])->assertOk();
+
+        $foreign = $this->withToken($b['token'])->getJson(self::BASE.'/'.$media['id'])->assertNotFound();
+        $deleted = $this->withToken($a['token'])->getJson(self::BASE.'/'.$gone['id'])->assertNotFound();
+        $unknown = $this->withToken($a['token'])->getJson(self::BASE.'/00000000-0000-4000-8000-000000000000')->assertNotFound();
+        $this->assertSame($foreign->json('message'), $deleted->json('message'));
+        $this->assertSame($foreign->json('message'), $unknown->json('message'));
+
+        $this->withToken($a['token'])->getJson(self::BASE.'/not-a-uuid')->assertNotFound();
+        $cashier = $this->tokenForRole($a['tenant_id'], 'cashier', 'cashier@sfm-show.test');
+        $this->withToken($cashier)->getJson(self::BASE.'/'.$media['id'])->assertForbidden();
+        // `withToken` يثبّت الترويسة لبقية الاختبار — نزيلها قبل فحص «بلا مصادقة».
+        $this->flushHeaders();
+        $this->getJson(self::BASE.'/'.$media['id'])->assertUnauthorized();
+    }
+
     // ───────────────────────── signed workspace reads ─────────────────────────
 
     /** @test */

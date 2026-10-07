@@ -4,6 +4,7 @@
 import { DEMO_USER } from './demo';
 import { handleDocumentReviewDemo } from './document-review-demo';
 import { handleDocumentOperationsDemo } from './document-operations-demo';
+import { handleStorefrontMediaDemo } from './storefront-media-demo';
 import {
   deleteDemoProductMedia,
   demoId,
@@ -3023,6 +3024,12 @@ function handleMockOffers(method: string, offerId: string | null, body: unknown)
 }
 
 export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknown): Promise<T> {
+  const mediaResponse = handleStorefrontMediaDemo(path, method.toUpperCase(), body);
+  if (mediaResponse.handled) {
+    return 'error' in mediaResponse
+      ? Promise.reject(Object.assign(new Error(mediaResponse.error.message), { status: mediaResponse.error.status, body: mediaResponse.error.body }))
+      : resolve(mediaResponse.response as T);
+  }
   const operationsResponse = handleDocumentOperationsDemo(path, method.toUpperCase(), body);
   if (operationsResponse.handled) {
     return 'error' in operationsResponse && operationsResponse.error
