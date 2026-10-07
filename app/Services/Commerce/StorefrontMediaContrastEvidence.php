@@ -60,6 +60,21 @@ class StorefrontMediaContrastEvidence
             return null;
         }
 
+        return $this->boundsForUsage($asset, $transform);
+    }
+
+    /**
+     * حدود لمعان استخدامٍ (أصل + تحويل) — للقراءة فقط. تُستعمل أيضاً من مساحة العمل (V6b-4a) لتعرض نتيجة
+     * التباين الحيّة بالقيم ذاتها التي تحكم بها بوّابة النشر.
+     *
+     * @return array{min:list<int>,max:list<int>}|null
+     */
+    public function boundsForUsage(StorefrontMedia $asset, StorefrontMediaTransform $transform): ?array
+    {
+        if ($asset->state !== StorefrontMedia::STATE_ACTIVE || ! $asset->isReady()) {
+            return null;
+        }
+
         if ($transform->isDefault()) {
             return StorefrontMediaPixelEvidence::bounds(is_array($asset->region_luminance) ? $asset->region_luminance : []);
         }
