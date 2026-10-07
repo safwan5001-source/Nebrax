@@ -261,3 +261,22 @@ test('the full-bleed band is clipped on its own pseudo-element — content (focu
   expect(overflow).toBeLessThanOrEqual(1);
 });
 
+test('a designed background keeps the corners of the surface it replaced', async ({ page }) => {
+  await mount(
+    page,
+    frame(
+      'banner',
+      'bg fg',
+      '--sec-bg:#101820;--sec-fg:#ffffff',
+      `<section id="rr" class="overflow-hidden rounded-store border border-store-border bg-store-surface"><p>x</p></section>`,
+    ) +
+      frame('featured', 'bg fg', '--sec-bg:#101820;--sec-fg:#ffffff', `<section id="sq"><p>y</p></section>`),
+  );
+  const radii = await page.evaluate(() => {
+    const frames = document.querySelectorAll('[data-sd]');
+    return [...frames].map((f) => getComputedStyle(f).borderTopLeftRadius);
+  });
+  expect(parseFloat(radii[0])).toBeGreaterThan(0); // the banner card's rounded corners survive
+  expect(radii[1]).toBe('0px'); // a shelf had none
+});
+

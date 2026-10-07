@@ -635,6 +635,11 @@ input[type="search"]::-webkit-search-cancel-button {
 [data-sd~="border"][data-sd] > * {
   border: none;
 }
+/* A background replaces the section's own surface, so the frame inherits the rounded corners
+   that surface had (hero, banner, promo bands…) unless the design sets its own radius or bleeds. */
+[data-sd~="bg"]:not([data-sd~="radius"], [data-sd~="bleed"]):has(> :is([class^="rounded-store"], [class*=" rounded-store"])) {
+  border-radius: var(--store-radius);
+}
 [data-sd~="radius"] {
   border-radius: var(--sec-radius);
   overflow: clip;
