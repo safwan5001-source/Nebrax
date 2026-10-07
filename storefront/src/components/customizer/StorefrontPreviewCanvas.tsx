@@ -279,7 +279,10 @@ export function StorefrontPreviewCanvas({
                   aria-label={t("sectionHero")}
                   className="flex min-h-[11rem] items-center rounded-store bg-linear-to-r from-primary-700 via-primary-600 to-primary-500 text-store-primary-foreground md:min-h-[16rem]"
                 >
-                  <div data-section-content="" className="max-w-2xl p-5 md:p-10">
+                  <div
+                    data-section-content=""
+                    className="max-w-2xl p-5 md:p-10"
+                  >
                     <h1 className="text-xl font-black leading-tight sm:text-2xl lg:text-4xl">
                       <bdi>{title}</bdi>
                     </h1>
