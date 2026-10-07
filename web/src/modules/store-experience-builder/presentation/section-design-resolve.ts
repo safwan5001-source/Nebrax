@@ -271,10 +271,16 @@ export function resolveSectionDesign(
     style["--sec-link"] = text.link;
     sd.push("link");
   }
-  const textAlign = design.text?.align ?? design.align;
-  if (textAlign) {
-    style["--sec-align"] = ALIGN[textAlign];
+  // Two independent controls (V0 §3.3): `text.align` aligns the copy; top-level `align`
+  // positions the content *block* inside the section.
+  if (design.text?.align) {
+    style["--sec-align"] = ALIGN[design.text.align];
     sd.push("align");
+  }
+  if (design.align) {
+    style["--sec-bms"] = design.align === "start" ? "0" : "auto";
+    style["--sec-bme"] = design.align === "end" ? "0" : "auto";
+    sd.push("balign");
   }
 
   const sp = design.spacing;
