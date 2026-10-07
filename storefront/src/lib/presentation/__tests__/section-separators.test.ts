@@ -74,7 +74,9 @@ describe("separators — resolver (V5e-3)", () => {
       separator: { bottom: "wave" },
     });
     expect(decode(withBg.style["--sec-bg"])!).toContain("fill='#f8f9fa'");
-    const explicit = resolve({ separator: { bottom: "wave", color: { hex: "#fde68a" } } });
+    const explicit = resolve({
+      separator: { bottom: "wave", color: { hex: "#fde68a" } },
+    });
     expect(decode(explicit.style["--sec-sep"])!).toContain("fill='#fde68a'");
   });
 

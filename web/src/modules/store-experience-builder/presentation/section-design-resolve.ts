@@ -371,7 +371,9 @@ function separatorLayers(
       layers.push(`linear-gradient(${c}, ${c}) ${edge} / 100% ${h} no-repeat`);
       reserve[edge] = h;
     } else if (SHAPE_PATH[kind]) {
-      const c = explicit ?? (hasBackground ? SHAPE_DEFAULT_HEX : resolveRoleHex("brand", ctx));
+      const c =
+        explicit ??
+        (hasBackground ? SHAPE_DEFAULT_HEX : resolveRoleHex("brand", ctx));
       layers.push(shapeLayer(kind, edge, c, SHAPE_HEIGHT[size], ctx.dir));
       reserve[edge] = SHAPE_HEIGHT[size];
     }
@@ -499,7 +501,9 @@ export function resolveSectionDesign(
 
   // Separators paint onto the frame's own background; a full-bleed band has no shape edges (it
   // extends past the container), so it skips them like it skips radius and shadow.
-  const separators = bleeds ? null : separatorLayers(design, ctx, style["--sec-bg"] !== undefined);
+  const separators = bleeds
+    ? null
+    : separatorLayers(design, ctx, style["--sec-bg"] !== undefined);
   if (separators) {
     if (style["--sec-bg"]) {
       style["--sec-bg"] = [...separators.layers, style["--sec-bg"]].join(", ");
