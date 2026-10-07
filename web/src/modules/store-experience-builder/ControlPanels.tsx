@@ -563,7 +563,16 @@ function ThemePanel({
           />
         </Section>
         <Section title={t("gtTitle")} hint={t("gtHint")}>
-          <GlobalTokensEditor config={config} t={t} patch={patch} />
+          <GlobalTokensEditor
+            config={config}
+            t={t}
+            patch={patch}
+            colours={{
+              primaryColor: config.primaryColor,
+              accentColor: config.accentColor,
+              palette: config.palette,
+            }}
+          />
         </Section>
       </div>
     </div>

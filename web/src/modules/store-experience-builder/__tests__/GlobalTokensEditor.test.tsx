@@ -12,9 +12,9 @@ afterEach(cleanup);
 const tAr = (key: Parameters<typeof customizerMessage>[1]) => customizerMessage("ar", key);
 const tEn = (key: Parameters<typeof customizerMessage>[1]) => customizerMessage("en", key);
 
-function mount(config: GlobalTokensDoc = {}, t = tEn) {
+function mount(config: GlobalTokensDoc = {}, t = tEn, colours?: { primaryColor: string; accentColor: string | null }) {
   const patch = vi.fn();
-  const view = render(<GlobalTokensEditor config={config} t={t} patch={patch} />);
+  const view = render(<GlobalTokensEditor config={config} t={t} patch={patch} colours={colours} />);
   const field = (name: string) => view.container.querySelector(`[data-gt-field="${name}"]`) as HTMLSelectElement;
   return { patch, field, container: view.container };
 }
@@ -30,6 +30,13 @@ describe("GlobalTokensEditor (CUST-HV V5e-2a)", () => {
       "typography.bodyWeight",
       "typography.lineHeight",
       "typography.sectionHeading",
+      "buttons.style",
+      "buttons.colour",
+      "buttons.size",
+      "buttons.radius",
+      "buttons.hover",
+      "typography.buttonText.weight",
+      "typography.buttonText.case",
       "surfaces.radius",
       "surfaces.border",
       "surfaces.shadow",
@@ -81,9 +88,41 @@ describe("GlobalTokensEditor (CUST-HV V5e-2a)", () => {
     for (const t of [tAr, tEn]) {
       const { container } = mount({}, t);
       expect(container.textContent).toContain(t("gtTypography"));
+      expect(container.textContent).toContain(t("gtButtons"));
+      expect(container.textContent).toContain(t("gtButtonsNote"));
       expect(container.textContent).toContain(t("gtMotionNote"));
       cleanup();
     }
     expect(tAr("gtTitle")).not.toBe(tEn("gtTitle"));
+  });
+
+  it("button fields write the buttons group; button text writes the nested typography object", () => {
+    const { field, patch } = mount({ typography: { headingScale: "lg" } });
+    fireEvent.change(field("buttons.style"), { target: { value: "soft" } });
+    expect(patch).toHaveBeenLastCalledWith({ buttons: { style: "soft" } });
+    fireEvent.change(field("typography.buttonText.weight"), { target: { value: "800" } });
+    expect(patch).toHaveBeenLastCalledWith({ typography: { headingScale: "lg", buttonText: { weight: 800 } } });
+    fireEvent.change(field("typography.buttonText.case"), { target: { value: "upper" } });
+    expect(patch).toHaveBeenLastCalledWith({ typography: { headingScale: "lg", buttonText: { case: "upper" } } });
+  });
+
+  it("clearing the last button text field removes buttonText, and an emptied typography group goes with it", () => {
+    const { field, patch } = mount({ typography: { buttonText: { weight: 500 } } });
+    fireEvent.change(field("typography.buttonText.weight"), { target: { value: "" } });
+    expect(patch).toHaveBeenLastCalledWith({ typography: undefined });
+  });
+
+  it("warns — live, in the editor — when an outline/link button colour cannot be proven on the page", () => {
+    const pale = mount({ buttons: { style: "outline" } }, tEn, { primaryColor: "#fde68a", accentColor: null });
+    expect(pale.container.querySelector("[data-gt-button-contrast]")).not.toBeNull();
+    cleanup();
+    const solid = mount({ buttons: { style: "solid" } }, tEn, { primaryColor: "#fde68a", accentColor: null });
+    expect(solid.container.querySelector("[data-gt-button-contrast]")).toBeNull();
+    cleanup();
+    const dark = mount({ buttons: { style: "outline" } }, tEn, { primaryColor: "#12372a", accentColor: null });
+    expect(dark.container.querySelector("[data-gt-button-contrast]")).toBeNull();
+    cleanup();
+    // no colour context ⇒ no guess
+    expect(mount({ buttons: { style: "outline" } }).container.querySelector("[data-gt-button-contrast]")).toBeNull();
   });
 });

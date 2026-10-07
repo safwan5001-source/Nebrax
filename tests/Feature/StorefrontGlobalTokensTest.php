@@ -28,7 +28,7 @@ class StorefrontGlobalTokensTest extends TestCase
 
             // والوثيقة الكاملة تحمل المفاتيح نفسها (وأي مفتاح غائب لا يظهر).
             $config = $this->normalize($case['input']);
-            foreach (['typography', 'surfaces', 'layout', 'motion'] as $key) {
+            foreach (['typography', 'buttons', 'surfaces', 'layout', 'motion'] as $key) {
                 if (array_key_exists($key, $case['expected'])) {
                     $this->assertSame($case['expected'][$key], $config[$key], $case['name'].' → '.$key);
                 } else {
@@ -42,11 +42,11 @@ class StorefrontGlobalTokensTest extends TestCase
     public function a_document_without_global_tokens_is_byte_identical_and_the_version_stays_three(): void
     {
         $plain = $this->normalize([]);
-        foreach (['typography', 'surfaces', 'layout', 'motion'] as $key) {
+        foreach (['typography', 'buttons', 'surfaces', 'layout', 'motion'] as $key) {
             $this->assertArrayNotHasKey($key, $plain);
         }
         $this->assertSame(3, $plain['version']);
-        $this->assertSame($plain, $this->normalize(['typography' => [], 'surfaces' => 'x', 'layout' => ['contentWidth' => 'huge'], 'motion' => ['duration' => 5]]));
+        $this->assertSame($plain, $this->normalize(['typography' => [], 'surfaces' => 'x', 'layout' => ['contentWidth' => 'huge'], 'motion' => ['duration' => 5], 'buttons' => ['colour' => '#fff']]));
     }
 
     /** @test */
@@ -59,6 +59,7 @@ class StorefrontGlobalTokensTest extends TestCase
             'layout' => ['contentWidth' => 'narrow'],
             'typography' => ['headingScale' => 'lg', 'headingWeight' => 700],
             'motion' => ['duration' => 'base', 'easing' => 'standard'],
+            'buttons' => ['style' => 'soft', 'size' => 'lg', 'radius' => 'pill', 'colour' => 'accent', 'hover' => 'lift'],
         ]);
         $this->assertSame('subtle', $once['radius']);
         $this->assertSame('compact', $once['density']);
