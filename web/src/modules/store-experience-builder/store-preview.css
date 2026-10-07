@@ -113,6 +113,11 @@
 .awj-store-preview [data-sd] {
   position: relative;
 }
+/* A section that rendered nothing (no products, no live offers, a failed fetch)
+   must not leave an empty padded / bordered band behind. */
+.awj-store-preview [data-sd]:empty {
+  display: none;
+}
 .awj-store-preview [data-sd~="bg"] {
   background: var(--sec-bg);
 }
