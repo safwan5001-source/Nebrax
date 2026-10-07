@@ -106,6 +106,16 @@ for (const locale of LOCALES) {
             }
           }
         }
+        // Inner spacing replaces the legacy padding of the content box inside the root.
+        for (const frame of document.querySelectorAll('[data-sd~="pi"]')) {
+          for (const child of frame.children) {
+            for (const inner of child.children) {
+              if (/(^| )(md:|lg:)?p[xy]?-\d/.test(inner.getAttribute('class') ?? '') && parseFloat(getComputedStyle(inner).paddingTop) > 0) {
+                failures.push(`${frame.getAttribute('data-design-type')} keeps legacy padding next to a designed inner spacing`);
+              }
+            }
+          }
+        }
         // A heading colour must reach headings that carry no id (Canvas preview).
         for (const frame of document.querySelectorAll('[data-sd~="heading"]')) {
           const h = frame.querySelector('h1, h2, h3');
