@@ -57,7 +57,7 @@ Wraps a section only when it has a design. Storefront: `publishedNodes` was spli
 
 ---
 
-## Review round (Codex, 7 findings — all valid, all fixed)
+## Review round (Codex, 10 findings — all valid, all fixed)
 
 | Finding | Fix |
 |---|---|
@@ -70,6 +70,10 @@ Wraps a section only when it has a design. Storefront: `publishedNodes` was spli
 
 | **P2** the "nested surface" matcher (`[class*="bg-store-"]`) also matched `bg-transparent hover:bg-store-footer-border`, restoring light-on-light tokens in the wholesale secondary CTA | A *surface* is now a class **token that starts with** `bg-store-` / `bg-white` and is opaque (`^=` / `*=" …"`, minus the alpha fills used in the codebase). Variants (`hover:bg-store-*`), `bg-transparent` and alpha fills (`bg-white/80`, `bg-store-surface/90`) are not surfaces. Unit-tested by evaluating the stylesheet's own selector against real class strings. |
 | **P2** `border` design left the section's legacy border in place (two borders), and an explicit `none` emitted nothing | The design **owns** the border: any `border` group (including `none`) is emitted (`none` ⇒ 0 px transparent) and `[data-sd~="border"] > * { border: none }` removes the child's legacy border. Asserted in the browser (no designed root keeps a border) and unit-tested. |
+
+| **P1** the block was *unlayered* in the storefront, where Tailwind v4 utilities live in `@layer utilities`: an unlayered rule outranks every layered utility regardless of specificity, so the zero-specificity `:where()` reset overrode `text-store-primary-foreground` on a designed banner's CTA (dark text on dark green) — invisible to the Canvas proof, whose utilities are unlayered | The whole block now lives **inside `@layer utilities`** (same layer as the utilities; inside it ordering is specificity, so a utility on the element beats the reset exactly as in the Canvas). **New proof on the real thing:** `cust-hv-v5c-storefront-cascade.spec.ts` compiles the actual storefront `globals.css` (Tailwind v4, native layers) and renders representative markup in Chromium; with the layer wrapper removed it reproduces the reviewer's failure (CTA text `rgb(17,24,39)` on dark green), with it the CTA keeps `rgb(255,255,255)`. |
+| **P2** links over a design background kept `text-store-primary` ("View all" on a dark band) | Links default to the **proven foreground** when a background exists (explicit `link` still wins); the contract's `judged` rule is unchanged for explicit colours. |
+| **P2** a transparent CTA that gains an opaque surface on hover (`hover:bg-store-footer-border`) rendered designed-foreground-on-dark | Elements that gain an opaque store surface on `:hover` / `:focus-visible` restore the original text tokens for that state (zero-specificity), and the section-link rule steps aside for them. Asserted in the real-stylesheet spec (black at rest, white on the dark hover fill). |
 
 The browser proof now also asserts, at all six widths in RTL and LTR, that **no designed section's root still paints its own fill** and that a heading colour reaches the Canvas heading; a mutation run (rule removed) fails it for banner / appPromo / deliveryPromise / shelf / discovery, so the check is not vacuous. The scenario gained `hero` and `wholesale` designs (the two dark surface-owners) and a distinct heading colour on benefits. 13/13 green.
 
@@ -90,7 +94,7 @@ The browser proof now also asserts, at all six widths in RTL and LTR, that **no 
 |---|---|
 | Web | `section-design-resolve.test.tsx` **17** (resolver, frame, byte-identical twins, stylesheet parity) · full vitest **427 files / 3702** (drift ratchet ✓) |
 | Storefront | `section-design-resolve.test.tsx` **12** · full vitest **142 files / 1284** · `tsc` ✓ · `biome check` ✓ |
-| Real browser | `cust-hv-v5c-design-render-proof.spec.ts` **13/13** (local evidence gate, as V3/V4b/V5a) |
+| Real browser | `cust-hv-v5c-design-render-proof.spec.ts` **13/13** (Canvas) + `cust-hv-v5c-storefront-cascade.spec.ts` **2/2** (the real compiled storefront stylesheet — local evidence gate, as V3/V4b/V5a) |
 | Backend | **no backend file changed** (`git diff origin/main` touches no `app/` `routes/` `database/` `tests/` `config/`); the full run on the identical backend is V5b's (5751 passed, 28 env-only failures) · PostgreSQL by CI |
 
 Evidence: `docs/plans/store/cust-hv-v5c/*.jpg`.
