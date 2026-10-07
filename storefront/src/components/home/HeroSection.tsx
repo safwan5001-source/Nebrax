@@ -74,6 +74,7 @@ export async function HeroSection({
       )}
     >
       <div
+        data-section-content=""
         className={cn(
           "max-w-2xl",
           isMarket ? "p-4 md:p-6 lg:p-8" : "p-5 md:p-10 lg:p-14",

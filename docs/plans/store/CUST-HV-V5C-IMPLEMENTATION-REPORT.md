@@ -57,7 +57,7 @@ Wraps a section only when it has a design. Storefront: `publishedNodes` was spli
 
 ---
 
-## Review round (Codex, 16 findings — all valid, all fixed)
+## Review round (Codex, 18 findings — all valid, all fixed)
 
 | Finding | Fix |
 |---|---|
@@ -82,6 +82,9 @@ Wraps a section only when it has a design. Storefront: `publishedNodes` was spli
 | **P2** `spacing.inner` added padding on the frame while the section's own padding stayed (so `none` removed nothing and a step doubled) | Inner spacing **replaces** it: the root takes the designed padding on every side and the padded content box directly inside (banner / hero `p-5 md:p-8…`) gives its own up. Asserted on the compiled storefront CSS (`none` ⇒ 0 px) and in the Canvas proof. |
 | **P2** the hover-surface reset also fired on `:focus-visible`, though the components paint those fills on hover only (keyboard focus then lost the proven foreground) | Reset limited to `:hover`; asserted that keyboard focus keeps the designed foreground. |
 | **P2** `design.align` (content *block* position) and `text.align` were folded into one `text-align` | Two independent outputs: `--sec-align` (copy) and `--sec-bms` / `--sec-bme` (block margins). Asserted: a centred block with start-aligned copy. |
+
+| **P2** the inner-padding reset zeroed *every* padded grandchild (an accordion card lost its padding) | Reset limited to content boxes the components **mark** (`data-section-content` on the banner's and hero's inner box, storefront + Canvas); asserted: the accordion card keeps `16px`. |
+| **P2** block alignment targeted only the full-width root, so a hero's `max-w-2xl` content never moved | The same marker is positioned too (root **and** marked content box); asserted on a hero fixture. |
 
 The browser proof now also asserts, at all six widths in RTL and LTR, that **no designed section's root still paints its own fill** and that a heading colour reaches the Canvas heading; a mutation run (rule removed) fails it for banner / appPromo / deliveryPromise / shelf / discovery, so the check is not vacuous. The scenario gained `hero` and `wholesale` designs (the two dark surface-owners) and a distinct heading colour on benefits. 13/13 green.
 

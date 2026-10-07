@@ -25,7 +25,10 @@ export function BannerBand({
       aria-labelledby={headingId}
       className="overflow-hidden rounded-store border border-store-border bg-store-surface"
     >
-      <div className="flex min-w-0 flex-col gap-4 p-5 md:flex-row md:items-center md:p-8">
+      <div
+        data-section-content=""
+        className="flex min-w-0 flex-col gap-4 p-5 md:flex-row md:items-center md:p-8"
+      >
         {content.imageUrl ? (
           // biome-ignore lint/performance/noImgElement: merchant banner is a runtime https URL, not a static import
           <img

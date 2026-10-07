@@ -616,7 +616,7 @@ export function StorefrontPreviewCanvas({
                   aria-label={t("sectionHero")}
                   className="flex min-h-[11rem] items-center rounded-store bg-gradient-to-r from-primary-700 via-primary-600 to-primary-500 text-store-primary-foreground md:min-h-[16rem]"
                 >
-                  <div className="max-w-2xl p-5 md:p-10">
+                  <div data-section-content="" className="max-w-2xl p-5 md:p-10">
                     <h1 className="text-xl font-black leading-tight sm:text-2xl lg:text-4xl">
                       <bdi>{title}</bdi>
                     </h1>
@@ -830,7 +830,7 @@ export function StorefrontPreviewCanvas({
                   {empty ? (
                     <p className="px-5 py-6 text-sm text-store-muted-foreground">{t("sectionBanner")}</p>
                   ) : (
-                    <div className="flex min-w-0 flex-col gap-4 p-5 md:flex-row md:items-center md:p-8">
+                    <div data-section-content="" className="flex min-w-0 flex-col gap-4 p-5 md:flex-row md:items-center md:p-8">
                       {banner.imageUrl ? (
                         <img
                           src={banner.imageUrl}

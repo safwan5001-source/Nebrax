@@ -115,9 +115,18 @@ test('inner spacing replaces legacy padding; block alignment is separate from te
       'bg fg heading link pi',
       '--sec-bg:#101820;--sec-fg:#ffffff;--sec-heading:#ffffff;--sec-link:#ffffff;--sec-pi:0px',
       `<section id="root" class="overflow-hidden rounded-store border border-store-border bg-store-surface">
-         <div id="inner" class="flex flex-col gap-4 p-5 md:p-8"><p>copy</p></div>
+         <div id="inner" data-section-content="" class="flex flex-col gap-4 p-5 md:p-8"><p>copy</p></div>
+         <details id="acc" class="rounded-store border px-4 open:pb-4"><summary>q</summary>a</details>
        </section>`,
     ) +
+      frame(
+        'hero',
+        'bg fg heading link balign',
+        '--sec-bg:#fde68a;--sec-fg:#000000;--sec-heading:#000000;--sec-link:#000000;--sec-bms:auto;--sec-bme:auto',
+        `<section class="flex items-center rounded-store bg-linear-to-r from-primary-700 to-primary-500 text-store-primary-foreground">
+           <div id="herobox" data-section-content="" class="max-w-xs p-5"><h1>Hero</h1></div>
+         </section>`,
+      ) +
       frame(
         'customContent',
         'balign align',
@@ -135,6 +144,11 @@ test('inner spacing replaces legacy padding; block alignment is separate from te
   );
   expect(await page.locator('#inner').evaluate((el) => getComputedStyle(el).paddingTop)).toBe('0px'); // `none` removes the legacy p-5 / md:p-8
   expect(await page.locator('#root').evaluate((el) => getComputedStyle(el).paddingTop)).toBe('0px');
+  // an accordion card inside the section keeps its own padding (only marked content boxes are reset)
+  expect(await page.locator('#acc').evaluate((el) => getComputedStyle(el).paddingLeft)).toBe('16px');
+  // the hero's actual constrained content box is what gets positioned
+  const hero = await page.locator('#herobox').evaluate((el) => getComputedStyle(el).marginLeft);
+  expect(hero).not.toBe('0px');
   const margins = await page.locator('#block').evaluate((el) => { const cs = getComputedStyle(el); return [cs.marginLeft, cs.marginRight]; });
   expect(margins[0]).not.toBe('0px'); // centred block…
   expect(margins[0]).toBe(margins[1]);
