@@ -14,7 +14,10 @@ import {
   HEADING_WEIGHTS,
   LINE_HEIGHTS,
   RADII,
+  REVEALS,
   SECTION_DESIGN_CAPABILITIES,
+  SEPARATOR_HEIGHTS,
+  SEPARATOR_KINDS,
   SHADOWS,
   STEPS,
   WIDTH_MAXES,
@@ -24,6 +27,7 @@ import {
 } from "../presentation/section-design";
 import {
   type DesignContext,
+  PAGE_BACKGROUND,
   SURFACE_OWNING_TYPES,
   effectiveText,
   sectionContrastIssues,
@@ -76,6 +80,19 @@ const SHADOW_LABEL: Record<(typeof SHADOWS)[number], CustomizerMessageKey> = {
   soft: "designShadowSoft",
   medium: "designShadowMedium",
   strong: "designShadowStrong",
+};
+const SEPARATOR_LABEL: Record<(typeof SEPARATOR_KINDS)[number], CustomizerMessageKey> = {
+  none: "designStepNone",
+  line: "designSepLine",
+  band: "designSepBand",
+  wave: "designSepWave",
+  angle: "designSepAngle",
+  curve: "designSepCurve",
+};
+const SEPARATOR_HEIGHT_LABEL: Record<(typeof SEPARATOR_HEIGHTS)[number], CustomizerMessageKey> = {
+  sm: "designStepSm",
+  md: "designStepMd",
+  lg: "designStepLg",
 };
 const ALIGN_LABEL: Record<(typeof ALIGNS)[number], CustomizerMessageKey> = {
   start: "designAlignStart",
@@ -148,6 +165,29 @@ export function DesignInspector({
   const text = effectiveText(current, ctx, type);
   const hasBackground = !!current.background;
   const ownsSurface = SURFACE_OWNING_TYPES.has(type) && !hasBackground;
+  const activeSeparatorKinds = [current.separator?.top, current.separator?.bottom].filter(
+    (kind): kind is Exclude<(typeof SEPARATOR_KINDS)[number], "none"> => !!kind && kind !== "none",
+  );
+  const hasSeparator = activeSeparatorKinds.length > 0;
+  const hasDesignBackground = current.background?.kind === "solid" || current.background?.kind === "gradient";
+  // The colour a separator takes when the merchant picks none — exactly the resolver's defaults:
+  // a line follows the border role, a band the brand, a shape the page behind it (brand when the section has no designed background, so it is visible). Mixed edges
+  // (e.g. a line above and a wave below) have different defaults, so the field says so rather
+  // than showing one swatch for both.
+  const separatorDefaults = new Set(
+    activeSeparatorKinds.map((kind) =>
+      kind === "line" ? "border" : kind === "band" || !hasDesignBackground ? "brand" : "page",
+    ),
+  );
+  const separatorAutomatic =
+    separatorDefaults.size === 1 && separatorDefaults.has("border")
+      ? { hex: resolveRoleHex("border", ctx), label: t("designRoleBorder") }
+      : separatorDefaults.size === 1 && separatorDefaults.has("brand")
+        ? { hex: resolveRoleHex("brand", ctx), label: t("designRoleBrand") }
+        : separatorDefaults.size === 1
+          ? { hex: PAGE_BACKGROUND, label: t("designSepAutoColour") }
+          : { label: t("designSepAutoMixed") };
+  const bleedsBand = current.width?.mode === "full" && current.background?.kind === "solid";
   const set = <K extends DesignGroup>(group: K, value: SectionDesign[K] | undefined) =>
     onChange(setGroup(type, design, group, value));
 
@@ -598,6 +638,100 @@ export function DesignInspector({
               </option>
             ))}
           </select>
+        </Field>
+      ) : null}
+
+      {capability.separator ? (
+        <fieldset className="min-w-0 space-y-3" data-design-group="separator">
+          <legend className="mb-1 text-[12px] font-semibold tracking-wide text-muted">
+            {t("designSeparator")}
+          </legend>
+          {(["top", "bottom"] as const).map((edge) => (
+            <Field key={edge} label={t(edge === "top" ? "designSepTop" : "designSepBottom")}>
+              <select
+                data-design-field={`separator.${edge}`}
+                className={selectClass}
+                value={current.separator?.[edge] ?? ""}
+                onChange={(event) => {
+                  const next = {
+                    ...current.separator,
+                    [edge]: (event.target.value || undefined) as (typeof SEPARATOR_KINDS)[number] | undefined,
+                  };
+                  // no active edge left ⇒ drop the whole group: a stranded colour / height would
+                  // stay in the saved document, render nothing and have no control to clear it
+                  const active = [next.top, next.bottom].some((kind) => kind && kind !== "none");
+                  set("separator", active ? next : undefined);
+                }}
+              >
+                {unsetOption}
+                {SEPARATOR_KINDS.map((kind) => (
+                  <option key={kind} value={kind}>
+                    {t(SEPARATOR_LABEL[kind])}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          ))}
+          {hasSeparator ? (
+            <>
+              <ColourField
+                dataName="separator-color"
+                label={t("designColour")}
+                value={current.separator?.color}
+                ctx={ctx}
+                t={t}
+                automatic={separatorAutomatic}
+                onChange={(color) => set("separator", { ...current.separator, color })}
+              />
+              <Field label={t("designSepHeight")}>
+                <select
+                  data-design-field="separator.height"
+                  className={selectClass}
+                  value={current.separator?.height ?? ""}
+                  onChange={(event) =>
+                    set("separator", {
+                      ...current.separator,
+                      height: (event.target.value || undefined) as (typeof SEPARATOR_HEIGHTS)[number] | undefined,
+                    })
+                  }
+                >
+                  {unsetOption}
+                  {SEPARATOR_HEIGHTS.map((size) => (
+                    <option key={size} value={size}>
+                      {t(SEPARATOR_HEIGHT_LABEL[size])}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+            </>
+          ) : null}
+          {bleedsBand && hasSeparator ? (
+            <p data-design-sep-bleed="" className="text-[12px] leading-5 text-muted">
+              {t("designSepBleedNote")}
+            </p>
+          ) : null}
+        </fieldset>
+      ) : null}
+
+      {allows(capability.motion, "reveal") ? (
+        <Field label={t("designReveal")}>
+          <select
+            data-design-field="motion.reveal"
+            className={selectClass}
+            value={current.motion?.reveal ?? ""}
+            onChange={(event) => {
+              const reveal = (event.target.value || undefined) as (typeof REVEALS)[number] | undefined;
+              set("motion", reveal ? { reveal } : undefined);
+            }}
+          >
+            {unsetOption}
+            {REVEALS.map((value) => (
+              <option key={value} value={value}>
+                {t(value === "none" ? "designStepNone" : "designRevealFadeUp")}
+              </option>
+            ))}
+          </select>
+          <p className="mt-1 text-[12px] leading-5 text-muted">{t("designRevealNote")}</p>
         </Field>
       ) : null}
     </div>

@@ -246,6 +246,86 @@ describe("DesignInspector (CUST-HV V5d)", () => {
   });
 });
 
+describe("DesignInspector — separators and reveal (CUST-HV V5e-3)", () => {
+  const field = (name: string) => document.querySelector(`[data-design-field="${name}"]`) as HTMLSelectElement;
+
+  it("every designable type offers a separator; only hero and banner offer the reveal", () => {
+    for (const type of ["hero", "banner", "categories", "newArrivals", "featured", "offers", "productShelf", "discovery", "benefits", "customContent", "appPromo", "deliveryPromise", "wholesale"]) {
+      render(<Harness type={type} />);
+      expect(field("separator.top"), type).not.toBeNull();
+      expect(field("motion.reveal") !== null, type).toBe(type === "hero" || type === "banner");
+      cleanup();
+    }
+  });
+
+  it("an edge's kind writes the enumerated value; colour and height appear only once an edge is set", () => {
+    render(<Harness type="benefits" />);
+    expect(document.querySelector('[data-colour-field="separator-color"]')).toBeNull();
+    expect(field("separator.height")).toBeNull();
+    fireEvent.change(field("separator.bottom"), { target: { value: "wave" } });
+    expect(out()).toEqual({ separator: { bottom: "wave" } });
+    expect(document.querySelector('[data-colour-field="separator-color"]')).not.toBeNull();
+    fireEvent.change(field("separator.height"), { target: { value: "lg" } });
+    fireEvent.change(field("separator.top"), { target: { value: "line" } });
+    expect(out()).toEqual({ separator: { top: "line", bottom: "wave", height: "lg" } });
+  });
+
+  it("clearing both edges removes the whole group", () => {
+    render(<Harness type="benefits" initial={{ separator: { bottom: "curve" } }} />);
+    fireEvent.change(field("separator.bottom"), { target: { value: "" } });
+    expect(out()).toBeNull();
+  });
+
+  it("clearing the last edge drops a chosen colour and height too — nothing is stranded in the document (review)", () => {
+    render(
+      <Harness
+        type="benefits"
+        initial={{ separator: { bottom: "wave", color: { hex: "#112233" }, height: "lg" } }}
+      />,
+    );
+    fireEvent.change(field("separator.bottom"), { target: { value: "none" } });
+    expect(out()).toBeNull();
+  });
+
+  it("the automatic colour shown is the one the resolver uses for the chosen kind (review)", () => {
+    const shown = () => document.querySelector('[data-colour-field="separator-color"] [data-colour-current]')?.textContent;
+    const { unmount } = render(<Harness type="benefits" initial={{ separator: { bottom: "line" } }} />);
+    expect(shown()).toBe("Border"); // a line follows the border role
+    unmount();
+    const band = render(<Harness type="benefits" initial={{ separator: { bottom: "band" } }} />);
+    expect(shown()).toBe("Brand"); // a band follows the brand
+    band.unmount();
+    const wave = render(
+      <Harness type="benefits" initial={{ background: { kind: "solid", color: { hex: "#101820" } }, separator: { top: "wave" } }} />,
+    );
+    expect(shown()).toBe("Page colour"); // on a designed background a shape cuts in with the page behind it
+    wave.unmount();
+    const bare = render(<Harness type="benefits" initial={{ separator: { top: "wave" } }} />);
+    expect(shown()).toBe("Brand"); // with no designed background a page-coloured shape would be invisible
+    bare.unmount();
+    render(<Harness type="benefits" initial={{ separator: { top: "line", bottom: "band" } }} />);
+    expect(shown()).toBe("Automatic (per shape)"); // mixed defaults are not summarised by one swatch
+  });
+
+  it("a full-width band explains that it carries no separator", () => {
+    render(
+      <Harness
+        type="featured"
+        initial={{ background: { kind: "solid", color: { hex: "#101820" } }, width: { mode: "full" }, separator: { bottom: "wave" } }}
+      />,
+    );
+    expect(document.querySelector("[data-design-sep-bleed]")).not.toBeNull();
+  });
+
+  it("the reveal stores only the named value; the default removes the group", () => {
+    render(<Harness type="banner" />);
+    fireEvent.change(field("motion.reveal"), { target: { value: "fade-up" } });
+    expect(out()).toEqual({ motion: { reveal: "fade-up" } });
+    fireEvent.change(field("motion.reveal"), { target: { value: "" } });
+    expect(out()).toBeNull();
+  });
+});
+
 describe("PaletteEditor (CUST-HV V5d)", () => {
   it("sets and clears a role; an unset role shows today's token as the value in use", () => {
     const onChange = vi.fn();

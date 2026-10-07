@@ -61,8 +61,25 @@ for (const locale of LOCALES) {
         const backgroundsBehind = (el: Element): number[] | null => {
           for (let node: Element | null = el; node; node = node.parentElement) {
             const cs = getComputedStyle(node);
-            if (cs.backgroundImage && cs.backgroundImage.includes('gradient')) {
-              const stops = [...cs.backgroundImage.matchAll(/rgba?\([^)]+\)/g)].map((m) => parse(m[0])!).filter(Boolean);
+            // Only a layer that covers the whole box is "what is behind the text": the separators
+            // (V5e-3) are partial edge layers (`100% <height>`) that content never overlaps.
+            const layers: string[] = [];
+            let depth = 0;
+            let start = 0;
+            for (let i = 0; i < cs.backgroundImage.length; i += 1) {
+              const ch = cs.backgroundImage[i];
+              if (ch === '(') depth += 1;
+              else if (ch === ')') depth -= 1;
+              else if (ch === ',' && depth === 0) {
+                layers.push(cs.backgroundImage.slice(start, i).trim());
+                start = i + 1;
+              }
+            }
+            layers.push(cs.backgroundImage.slice(start).trim());
+            const sizes = cs.backgroundSize.split(/,\s*(?![^(]*\))/).map((v) => v.trim());
+            const covering = layers.find((layer, i) => layer.includes('gradient') && (sizes[i] ?? 'auto') === 'auto');
+            if (covering) {
+              const stops = [...covering.matchAll(/rgba?\([^)]+\)/g)].map((m) => parse(m[0])!).filter(Boolean);
               if (stops.length >= 2) {
                 const out: number[] = [];
                 for (let i = 0; i <= 64; i += 1) {
@@ -136,6 +153,24 @@ for (const locale of LOCALES) {
           const want = getComputedStyle(frame).getPropertyValue('--sec-heading').trim();
           if (h && want && !getComputedStyle(h).color.includes(String(parseInt(want.slice(1, 3), 16)))) {
             failures.push(`${frame.getAttribute('data-design-type')} heading ignored ${want}`);
+          }
+        }
+        // Separators (V5e-3): the shape/line is a background layer of the frame and its height is
+        // reserved as padding, so no content may reach into the reserved band, and nothing clips.
+        for (const frame of document.querySelectorAll<HTMLElement>('[data-sd~="sep"]')) {
+          const fcs = getComputedStyle(frame);
+          const type = frame.getAttribute('data-design-type');
+          if (!/data:image\/svg\+xml|linear-gradient/.test(fcs.backgroundImage)) failures.push(`${type} separator paints nothing`);
+          if (fcs.overflow !== 'visible' || fcs.clipPath !== 'none') failures.push(`${type} separator frame clips`);
+          const frect = frame.getBoundingClientRect();
+          const reserve = (v: string) => parseFloat(frame.style.getPropertyValue(v)) * (frame.style.getPropertyValue(v).endsWith('rem') ? 16 : 1);
+          const top = frame.getAttribute('data-sd')!.split(' ').includes('sept') ? reserve('--sec-sept') : 0;
+          const bottom = frame.getAttribute('data-sd')!.split(' ').includes('sepb') ? reserve('--sec-sepb') : 0;
+          for (const el of frame.querySelectorAll<HTMLElement>('h1,h2,h3,p,a,span,li,button')) {
+            const r = el.getBoundingClientRect();
+            if (r.width === 0 || r.height === 0) continue;
+            if (top && r.top < frect.top + top - 1) failures.push(`${type}: <${el.tagName.toLowerCase()}> reaches into the top separator`);
+            if (bottom && r.bottom > frect.bottom - bottom + 1) failures.push(`${type}: <${el.tagName.toLowerCase()}> reaches into the bottom separator`);
           }
         }
         const walker = document.createTreeWalker(document.querySelector('[data-visual-root]')!, NodeFilter.SHOW_TEXT);

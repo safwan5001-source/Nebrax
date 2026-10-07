@@ -16,12 +16,12 @@ export function designConfig(
     // Sections whose own markup paints a dark surface: the design must *replace* it.
     hero: { background: { kind: "solid", color: { hex: "#fde68a" } }, spacing: { top: "sm", bottom: "sm", inner: "sm" } },
     wholesale: { background: { kind: "solid", color: { hex: "#e0f2fe" } }, spacing: { top: "sm", bottom: "sm", inner: "sm" } },
-    "banner-1": { background: { kind: "solid", color: { role: "brand" } }, border: { width: "none" }, spacing: { top: "md", bottom: "md", inner: "md" }, radius: "lg" },
-    "benefits-1": { background: { kind: "solid", color: { role: "surfaceAlt" } }, text: { heading: { hex: "#1e1b4b" } }, typography: { headingScale: "xl", headingWeight: 700, lineHeight: "relaxed", headingStyle: "underline" }, border: { width: "hairline" }, radius: "md", shadow: "soft", spacing: { top: "sm", bottom: "sm", inner: "sm" } },
+    "banner-1": { background: { kind: "solid", color: { role: "brand" } }, border: { width: "none" }, spacing: { top: "md", bottom: "md", inner: "md" }, radius: "lg", separator: { bottom: "angle", height: "sm" }, motion: { reveal: "fade-up" } },
+    "benefits-1": { separator: { top: "curve", bottom: "band", height: "lg" }, background: { kind: "solid", color: { role: "surfaceAlt" } }, text: { heading: { hex: "#1e1b4b" } }, typography: { headingScale: "xl", headingWeight: 700, lineHeight: "relaxed", headingStyle: "underline" }, border: { width: "hairline" }, radius: "md", shadow: "soft", spacing: { top: "sm", bottom: "sm", inner: "sm" } },
     "custom-1": { background: { kind: "gradient", from: { hex: "#0b3d2e" }, to: { hex: "#1c2a6b" }, direction: "to-end" }, typography: { bodyScale: "lg", headingStyle: "centered" }, width: { max: "narrow" }, align: "center", spacing: { top: "lg", bottom: "lg", inner: "md" } },
     "featured-1": { background: { kind: "solid", color: { hex: "#101820" } }, typography: { headingStyle: "plain" }, width: { mode: "full" }, spacing: { top: "md", bottom: "md" } },
     "app-1": { background: { kind: "solid", color: { hex: "#fff3cd" } }, border: { width: "medium", color: { role: "brand" } }, radius: "pill", spacing: { top: "sm", bottom: "sm", inner: "md" } },
-    "promise-1": { background: { kind: "solid", color: { hex: "#1e3a5f" } }, spacing: { top: "sm", bottom: "sm", inner: "sm" } },
+    "promise-1": { background: { kind: "solid", color: { hex: "#1e3a5f" } }, spacing: { top: "sm", bottom: "sm", inner: "sm" }, separator: { top: "line", bottom: "wave", height: "md", color: { hex: "#fde68a" } } },
     "shelf-1": { background: { kind: "solid", color: { hex: "#14532d" } }, spacing: { top: "md", bottom: "md", inner: "sm" } },
     "discovery-1": { background: { kind: "gradient", from: { hex: "#312e81" }, to: { hex: "#4c1d95" }, direction: "to-bottom" }, spacing: { top: "md", bottom: "md", inner: "sm" } },
   };

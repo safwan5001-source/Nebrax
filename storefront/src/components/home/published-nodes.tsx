@@ -9,6 +9,7 @@ import { FeaturedShelf } from "@/components/home/FeaturedShelf";
 import { OffersShelf } from "@/components/home/OffersShelf";
 import { ProductShelfSection } from "@/components/home/ProductShelfSection";
 import { SectionDesignFrame } from "@/components/home/SectionDesignFrame";
+import { SectionReveal } from "@/components/home/SectionReveal";
 import type { HomeSectionKey } from "@/lib/home/sections";
 import type { PresentationHomeSection } from "@/lib/presentation/config";
 import {
@@ -73,6 +74,14 @@ export async function publishedNodes(
       );
     }
   }
+  // One observer for the whole stack, mounted only when a visible section opted into the reveal.
+  const reveals = sections.some(
+    (section) =>
+      section.visible &&
+      section.design?.motion?.reveal === "fade-up" &&
+      resolveSectionDesign(section.type, section.design, ctx.design) !== null,
+  );
+  if (reveals) nodes.push(<SectionReveal key="section-reveal" />);
   return nodes;
 }
 

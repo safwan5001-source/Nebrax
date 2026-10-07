@@ -21,7 +21,11 @@
             "align": true,
             "border": true,
             "radius": true,
-            "shadow": true
+            "shadow": true,
+            "separator": true,
+            "motion": [
+                "reveal"
+            ]
         },
         "banner": {
             "background": true,
@@ -43,7 +47,11 @@
             "align": true,
             "border": true,
             "radius": true,
-            "shadow": true
+            "shadow": true,
+            "separator": true,
+            "motion": [
+                "reveal"
+            ]
         },
         "categories": {
             "background": true,
@@ -56,7 +64,8 @@
             "width": true,
             "spacing": true,
             "border": true,
-            "radius": true
+            "radius": true,
+            "separator": true
         },
         "newArrivals": {
             "background": true,
@@ -67,7 +76,8 @@
                 "headingStyle"
             ],
             "width": true,
-            "spacing": true
+            "spacing": true,
+            "separator": true
         },
         "featured": {
             "background": true,
@@ -78,7 +88,8 @@
                 "headingStyle"
             ],
             "width": true,
-            "spacing": true
+            "spacing": true,
+            "separator": true
         },
         "offers": {
             "background": true,
@@ -89,7 +100,8 @@
                 "headingStyle"
             ],
             "width": true,
-            "spacing": true
+            "spacing": true,
+            "separator": true
         },
         "productShelf": {
             "background": true,
@@ -100,14 +112,16 @@
                 "headingStyle"
             ],
             "width": true,
-            "spacing": true
+            "spacing": true,
+            "separator": true
         },
         "discovery": {
             "background": true,
             "text": [
                 "heading"
             ],
-            "spacing": true
+            "spacing": true,
+            "separator": true
         },
         "benefits": {
             "background": true,
@@ -128,7 +142,8 @@
             "align": true,
             "border": true,
             "radius": true,
-            "shadow": true
+            "shadow": true,
+            "separator": true
         },
         "customContent": {
             "background": true,
@@ -149,7 +164,8 @@
                 "max"
             ],
             "spacing": true,
-            "align": true
+            "align": true,
+            "separator": true
         },
         "appPromo": {
             "background": true,
@@ -161,15 +177,18 @@
             ],
             "spacing": true,
             "border": true,
-            "radius": true
+            "radius": true,
+            "separator": true
         },
         "deliveryPromise": {
             "background": true,
-            "spacing": true
+            "spacing": true,
+            "separator": true
         },
         "wholesale": {
             "background": true,
-            "spacing": true
+            "spacing": true,
+            "separator": true
         }
     },
     "cases": [
@@ -1305,16 +1324,10 @@
             }
         },
         {
-            "name": "separator overlap motion layout are not accepted yet",
+            "name": "overlap layout mediaTreatment are not accepted yet (V6/V8)",
             "type": "hero",
             "input": {
-                "separator": {
-                    "top": "wave"
-                },
                 "overlap": "sm",
-                "motion": {
-                    "reveal": "fade-up"
-                },
                 "layout": "split",
                 "mediaTreatment": {
                     "aspect": "16:9"
@@ -1324,6 +1337,223 @@
             "expected": {
                 "radius": "sm"
             }
+        },
+        {
+            "name": "separator: every field on a rich type, canonical order (top, bottom, color, height)",
+            "type": "hero",
+            "input": {
+                "separator": {
+                    "height": "lg",
+                    "color": {
+                        "hex": "#FDE68A"
+                    },
+                    "bottom": "curve",
+                    "top": "wave"
+                }
+            },
+            "expected": {
+                "separator": {
+                    "top": "wave",
+                    "bottom": "curve",
+                    "color": {
+                        "hex": "#fde68a"
+                    },
+                    "height": "lg"
+                }
+            }
+        },
+        {
+            "name": "separator: a colour role is kept as a role; none is a meaningful value",
+            "type": "banner",
+            "input": {
+                "separator": {
+                    "top": "none",
+                    "bottom": "line",
+                    "color": {
+                        "role": "border"
+                    }
+                }
+            },
+            "expected": {
+                "separator": {
+                    "top": "none",
+                    "bottom": "line",
+                    "color": {
+                        "role": "border"
+                    }
+                }
+            }
+        },
+        {
+            "name": "separator is allowed on every designable type",
+            "type": "wholesale",
+            "input": {
+                "separator": {
+                    "bottom": "angle"
+                }
+            },
+            "expected": {
+                "separator": {
+                    "bottom": "angle"
+                }
+            }
+        },
+        {
+            "name": "separator on a shelf next to its heading style",
+            "type": "featured",
+            "input": {
+                "separator": {
+                    "top": "band",
+                    "height": "sm"
+                },
+                "typography": {
+                    "headingStyle": "plain"
+                }
+            },
+            "expected": {
+                "typography": {
+                    "headingStyle": "plain"
+                },
+                "separator": {
+                    "top": "band",
+                    "height": "sm"
+                }
+            }
+        },
+        {
+            "name": "separator: invalid kinds/heights/colours are dropped on their own",
+            "type": "hero",
+            "input": {
+                "separator": {
+                    "top": "zigzag",
+                    "bottom": "wave",
+                    "color": {
+                        "hex": "red"
+                    },
+                    "height": "xl"
+                }
+            },
+            "expected": {
+                "separator": {
+                    "bottom": "wave"
+                }
+            }
+        },
+        {
+            "name": "separator: a colour or height without an active edge is inert metadata and is dropped",
+            "type": "hero",
+            "input": {
+                "separator": {
+                    "color": {
+                        "hex": "#fde68a"
+                    },
+                    "height": "lg"
+                },
+                "radius": "sm"
+            },
+            "expected": {
+                "radius": "sm"
+            }
+        },
+        {
+            "name": "separator: only none edges are not active — the whole group goes, colour and height with it",
+            "type": "banner",
+            "input": {
+                "separator": {
+                    "top": "none",
+                    "bottom": "none",
+                    "color": {
+                        "role": "border"
+                    },
+                    "height": "md"
+                }
+            },
+            "expected": null
+        },
+        {
+            "name": "separator: css strings and injected content never survive",
+            "type": "hero",
+            "input": {
+                "separator": {
+                    "top": "url(javascript:alert(1))",
+                    "bottom": "wave;}body{display:none",
+                    "color": {
+                        "hex": "#fff;background:red"
+                    },
+                    "height": "calc(9999px)"
+                }
+            },
+            "expected": null
+        },
+        {
+            "name": "separator must be an object",
+            "type": "hero",
+            "input": {
+                "separator": "wave",
+                "radius": "sm"
+            },
+            "expected": {
+                "radius": "sm"
+            }
+        },
+        {
+            "name": "motion.reveal: fade-up and none on a hero",
+            "type": "hero",
+            "input": {
+                "motion": {
+                    "reveal": "fade-up"
+                }
+            },
+            "expected": {
+                "motion": {
+                    "reveal": "fade-up"
+                }
+            }
+        },
+        {
+            "name": "motion.reveal on a banner, after separator in canonical order",
+            "type": "banner",
+            "input": {
+                "motion": {
+                    "reveal": "none"
+                },
+                "separator": {
+                    "bottom": "wave"
+                }
+            },
+            "expected": {
+                "separator": {
+                    "bottom": "wave"
+                },
+                "motion": {
+                    "reveal": "none"
+                }
+            }
+        },
+        {
+            "name": "motion is not offered on a type outside hero/banner",
+            "type": "benefits",
+            "input": {
+                "motion": {
+                    "reveal": "fade-up"
+                },
+                "radius": "sm"
+            },
+            "expected": {
+                "radius": "sm"
+            }
+        },
+        {
+            "name": "motion: only the named reveal; arbitrary durations / keyframes are dropped",
+            "type": "hero",
+            "input": {
+                "motion": {
+                    "reveal": "slide-left",
+                    "duration": "2000ms",
+                    "keyframes": "x"
+                }
+            },
+            "expected": null
         }
     ]
 }

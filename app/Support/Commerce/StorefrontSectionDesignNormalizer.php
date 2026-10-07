@@ -13,8 +13,8 @@ namespace App\Support\Commerce;
  * بلا أي تغيير** (§3.1).
  *
  * خارج هذا الملف عمداً (كلٌّ يدخل مع الشريحة التي تستطيع رسمه وإثباته): خلفية `media`
- * (+ تراكب/تجاوز جوال) في V6 مع دليل لمعان المنطقة، و`layout`، و`separator`/`overlap`/
- * `mediaTreatment`/`motion`. تُسقط الآن fail-closed فلا يتسلل خلفية غير مُثبتة.
+ * (+ تراكب/تجاوز جوال) في V6 مع دليل لمعان المنطقة، و`layout`، و`overlap`/`mediaTreatment`.
+ * تُسقط الآن fail-closed فلا يتسلل خلفية غير مُثبتة. (V5e-3 أضاف `separator` و`motion.reveal`.)
  */
 final class StorefrontSectionDesignNormalizer
 {
@@ -46,6 +46,14 @@ final class StorefrontSectionDesignNormalizer
 
     public const SHADOWS = ['none', 'soft', 'medium', 'strong'];
 
+    /** V5e-3 — فاصل حافّة القسم (V0 §6.4). */
+    public const SEPARATOR_KINDS = ['none', 'line', 'band', 'wave', 'angle', 'curve'];
+
+    public const SEPARATOR_HEIGHTS = ['sm', 'md', 'lg'];
+
+    /** V5e-3 — كشف لمرّة واحدة (V0 §6.6): `fade-up` فقط، اختياري لكل قسم. */
+    public const REVEALS = ['none', 'fade-up'];
+
     private const FULL_TEXT = ['heading', 'body', 'link', 'align'];
 
     private const FULL_TYPO = ['headingScale', 'bodyScale', 'headingWeight', 'lineHeight', 'headingStyle'];
@@ -57,23 +65,25 @@ final class StorefrontSectionDesignNormalizer
      */
     public static function capabilities(): array
     {
-        $rich = ['background' => true, 'text' => self::FULL_TEXT, 'typography' => self::FULL_TYPO, 'width' => true, 'spacing' => true, 'align' => true, 'border' => true, 'radius' => true, 'shadow' => true];
-        $shelf = ['background' => true, 'text' => ['heading'], 'typography' => ['headingStyle'], 'width' => true, 'spacing' => true];
+        // V5e-3 — `separator` لكل الأنواع القابلة للتصميم؛ `motion.reveal` للبطل واللافتة فقط (V0 §3.4).
+        $rich = ['background' => true, 'text' => self::FULL_TEXT, 'typography' => self::FULL_TYPO, 'width' => true, 'spacing' => true, 'align' => true, 'border' => true, 'radius' => true, 'shadow' => true, 'separator' => true];
+        $hero = $rich + ['motion' => ['reveal']];
+        $shelf = ['background' => true, 'text' => ['heading'], 'typography' => ['headingStyle'], 'width' => true, 'spacing' => true, 'separator' => true];
 
         return [
-            'hero' => $rich,
-            'banner' => $rich,
-            'categories' => ['background' => true, 'text' => ['heading'], 'typography' => ['headingStyle'], 'width' => true, 'spacing' => true, 'border' => true, 'radius' => true],
+            'hero' => $hero,
+            'banner' => $hero,
+            'categories' => ['background' => true, 'text' => ['heading'], 'typography' => ['headingStyle'], 'width' => true, 'spacing' => true, 'border' => true, 'radius' => true, 'separator' => true],
             'newArrivals' => $shelf,
             'featured' => $shelf,
             'offers' => $shelf,
             'productShelf' => $shelf,
-            'discovery' => ['background' => true, 'text' => ['heading'], 'spacing' => true],
-            'benefits' => ['background' => true, 'text' => self::FULL_TEXT, 'typography' => self::FULL_TYPO, 'spacing' => true, 'align' => true, 'border' => true, 'radius' => true, 'shadow' => true],
-            'customContent' => ['background' => true, 'text' => self::FULL_TEXT, 'typography' => self::FULL_TYPO, 'width' => ['max'], 'spacing' => true, 'align' => true],
-            'appPromo' => ['background' => true, 'text' => self::FULL_TEXT, 'spacing' => true, 'border' => true, 'radius' => true],
-            'deliveryPromise' => ['background' => true, 'spacing' => true],
-            'wholesale' => ['background' => true, 'spacing' => true],
+            'discovery' => ['background' => true, 'text' => ['heading'], 'spacing' => true, 'separator' => true],
+            'benefits' => ['background' => true, 'text' => self::FULL_TEXT, 'typography' => self::FULL_TYPO, 'spacing' => true, 'align' => true, 'border' => true, 'radius' => true, 'shadow' => true, 'separator' => true],
+            'customContent' => ['background' => true, 'text' => self::FULL_TEXT, 'typography' => self::FULL_TYPO, 'width' => ['max'], 'spacing' => true, 'align' => true, 'separator' => true],
+            'appPromo' => ['background' => true, 'text' => self::FULL_TEXT, 'spacing' => true, 'border' => true, 'radius' => true, 'separator' => true],
+            'deliveryPromise' => ['background' => true, 'spacing' => true, 'separator' => true],
+            'wholesale' => ['background' => true, 'spacing' => true, 'separator' => true],
         ];
     }
 
@@ -140,6 +150,18 @@ final class StorefrontSectionDesignNormalizer
             $shadow = self::pick($raw['shadow'] ?? null, self::SHADOWS);
             if ($shadow !== null) {
                 $out['shadow'] = $shadow;
+            }
+        }
+        if (isset($capability['separator'])) {
+            $separator = self::separator($raw['separator'] ?? null);
+            if ($separator !== null) {
+                $out['separator'] = $separator;
+            }
+        }
+        if (isset($capability['motion'])) {
+            $reveal = self::isObject($raw['motion'] ?? null) ? self::pick($raw['motion']['reveal'] ?? null, self::REVEALS) : null;
+            if ($reveal !== null) {
+                $out['motion'] = ['reveal' => $reveal];
             }
         }
 
@@ -310,6 +332,37 @@ final class StorefrontSectionDesignNormalizer
         $color = self::colorRef($raw['color'] ?? null);
         if ($color !== null && $width !== 'none') {
             $out['color'] = $color;
+        }
+
+        return $out;
+    }
+
+    /** فاصل حافّتَي القسم: النوع لكل حافّة، واللون (دور/hex) والارتفاع مشتركان. */
+    private static function separator(mixed $raw): ?array
+    {
+        if (! self::isObject($raw)) {
+            return null;
+        }
+        $out = [];
+        foreach (['top', 'bottom'] as $edge) {
+            $kind = self::pick($raw[$edge] ?? null, self::SEPARATOR_KINDS);
+            if ($kind !== null) {
+                $out[$edge] = $kind;
+            }
+        }
+        // Colour and height only style an edge: without a top or bottom edge that renders, they
+        // are inert, invisible and uneditable metadata — the group is dropped altogether.
+        $active = array_filter($out, static fn (string $kind): bool => $kind !== 'none');
+        if ($active === []) {
+            return null;
+        }
+        $color = self::colorRef($raw['color'] ?? null);
+        if ($color !== null) {
+            $out['color'] = $color;
+        }
+        $height = self::pick($raw['height'] ?? null, self::SEPARATOR_HEIGHTS);
+        if ($height !== null) {
+            $out['height'] = $height;
         }
 
         return $out;

@@ -125,4 +125,48 @@ describe("published homepage stack (CUST-HV V5c review)", () => {
     expect(inert.querySelector("[data-section-content]")).toBeNull();
     expect(inert.querySelector("[data-section-block]")).toBeNull();
   });
+
+  it("mounts the reveal observer only when a visible section opted into the reveal", async () => {
+    const hasObserver = (nodes: React.ReactNode[]) =>
+      nodes.some(
+        (node) =>
+          typeof node === "object" &&
+          node !== null &&
+          "key" in node &&
+          (node as { key: string }).key === "section-reveal",
+      );
+    const banner = (reveal: unknown, visible = true) =>
+      ({
+        id: "ban",
+        type: "banner",
+        visible,
+        content: {
+          title: "T",
+          subtitle: "",
+          ctaLabel: "",
+          ctaHref: "",
+          imageUrl: "",
+        },
+        design: { motion: { reveal } },
+      }) as PresentationHomeSection;
+    expect(
+      hasObserver(await publishedNodes([banner("fade-up")], ctx as never)),
+    ).toBe(true);
+    expect(
+      hasObserver(await publishedNodes([banner("none")], ctx as never)),
+    ).toBe(false);
+    expect(
+      hasObserver(
+        await publishedNodes([banner("fade-up", false)], ctx as never),
+      ),
+    ).toBe(false);
+    expect(
+      hasObserver(
+        await publishedNodes(
+          [{ id: "hero", type: "hero", visible: true }],
+          ctx as never,
+        ),
+      ),
+    ).toBe(false);
+  });
 });

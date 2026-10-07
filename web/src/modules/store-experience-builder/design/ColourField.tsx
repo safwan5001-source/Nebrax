@@ -33,7 +33,7 @@ export interface ColourFieldProps {
   ctx: DesignContext;
   t: (key: CustomizerMessageKey) => string;
   /** Shown as the value when nothing is set (e.g. the automatic foreground). */
-  automatic?: { hex: string; label: string };
+  automatic?: { hex?: string; label: string };
   /** Allow removing the colour (back to automatic / none). */
   clearable?: boolean;
   disabled?: boolean;
