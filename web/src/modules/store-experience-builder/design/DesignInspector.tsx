@@ -452,11 +452,19 @@ export function DesignInspector({
             {t("designBorder")}
           </legend>
           <Segmented
-            value={current.border?.width ?? "none"}
+            value={current.border?.width ?? "unset"}
             onChange={(width) =>
-              set("border", width === "none" ? undefined : { ...current.border, width })
+              set(
+                "border",
+                width === "unset"
+                  ? undefined
+                  : { ...current.border, width, ...(width === "none" ? { color: undefined } : {}) },
+              )
             }
-            options={BORDER_WIDTHS.map((w) => ({ id: w, label: t(BORDER_LABEL[w]) }))}
+            options={[
+              { id: "unset", label: t("designUnset") },
+              ...BORDER_WIDTHS.map((w) => ({ id: w, label: t(BORDER_LABEL[w]) })),
+            ]}
           />
           {current.border && current.border.width !== "none" ? (
             <ColourField
