@@ -1,4 +1,4 @@
-import { Fragment } from "react";
+import { cloneElement, Fragment, isValidElement } from "react";
 import { AppPromoBand } from "@/components/home/AppPromoBand";
 import { BannerBand } from "@/components/home/BannerBand";
 import { BenefitsBand } from "@/components/home/BenefitsBand";
@@ -94,9 +94,18 @@ async function pushSectionNode(
     // nothing (e.g. only default steps) keeps the legacy wrapper byte-for-byte.
     const framed =
       resolveSectionDesign(section.type, section.design, ctx.design) !== null;
+    const node = ctx.implemented[section.type];
+    // The hero's content-box marker is emitted only while a design frame is active, so an
+    // undesigned hero stays byte-identical to its legacy output.
+    const rendered =
+      framed && section.type === "hero" && isValidElement(node)
+        ? cloneElement(node as React.ReactElement<{ designed?: boolean }>, {
+            designed: true,
+          })
+        : node;
     nodes.push(
       framed ? (
-        <Fragment key={section.id}>{ctx.implemented[section.type]}</Fragment>
+        <Fragment key={section.id}>{rendered}</Fragment>
       ) : (
         <div key={section.id}>{ctx.implemented[section.type]}</div>
       ),
@@ -119,6 +128,10 @@ async function pushSectionNode(
         content={content}
         basePath={ctx.basePath}
         headingId={`banner-${section.id}`}
+        designed={
+          resolveSectionDesign(section.type, section.design, ctx.design) !==
+          null
+        }
       />,
     );
     return;
@@ -132,6 +145,10 @@ async function pushSectionNode(
         content={content}
         headingId={`benefits-${section.id}`}
         title={ctx.benefitsTitle}
+        designed={
+          resolveSectionDesign(section.type, section.design, ctx.design) !==
+          null
+        }
       />,
     );
     return;

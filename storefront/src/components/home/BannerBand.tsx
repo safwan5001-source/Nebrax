@@ -13,10 +13,13 @@ export function BannerBand({
   content,
   basePath,
   headingId,
+  designed = false,
 }: {
   content: BannerContent;
   basePath: string;
   headingId: string;
+  /** A section design frame wraps this band: expose the content-box marker its rules address. */
+  designed?: boolean;
 }) {
   const href = destination(basePath, content.ctaHref);
   const showCta = Boolean(href && content.ctaLabel);
@@ -26,7 +29,7 @@ export function BannerBand({
       className="overflow-hidden rounded-store border border-store-border bg-store-surface"
     >
       <div
-        data-section-content=""
+        data-section-content={designed ? "" : undefined}
         className="flex min-w-0 flex-col gap-4 p-5 md:flex-row md:items-center md:p-8"
       >
         {content.imageUrl ? (

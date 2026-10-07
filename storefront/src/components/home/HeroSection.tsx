@@ -18,6 +18,8 @@ interface HeroSectionProps {
   subheadline?: string | null;
   /** See `CategoriesSection`'s identical prop doc for why this is explicit. */
   themePreset?: ThemePresetId;
+  /** A section design frame wraps the hero: expose the content-box marker its rules address. */
+  designed?: boolean;
 }
 
 /**
@@ -50,6 +52,7 @@ export async function HeroSection({
   headline,
   subheadline,
   themePreset,
+  designed = false,
 }: HeroSectionProps) {
   const t = await getTranslations({
     locale: locale as Locale,
@@ -74,7 +77,7 @@ export async function HeroSection({
       )}
     >
       <div
-        data-section-content=""
+        data-section-content={designed ? "" : undefined}
         className={cn(
           "max-w-2xl",
           isMarket ? "p-4 md:p-6 lg:p-8" : "p-5 md:p-10 lg:p-14",

@@ -4,13 +4,19 @@ export function BenefitsBand({
   content,
   headingId,
   title,
+  designed = false,
 }: {
   content: BenefitsContent;
   headingId: string;
   title: string;
+  /** A section design frame wraps this band: expose the block marker its rules address. */
+  designed?: boolean;
 }) {
   return (
-    <section aria-labelledby={headingId} data-section-block="">
+    <section
+      aria-labelledby={headingId}
+      data-section-block={designed ? "" : undefined}
+    >
       <h2
         id={headingId}
         className="text-base font-extrabold text-store-foreground md:text-lg"

@@ -8,9 +8,17 @@ import { publishedNodes } from "../published-nodes";
 
 afterEach(cleanup);
 
+function HeroStub({ designed }: { designed?: boolean }) {
+  return (
+    <section data-testid="hero-root">
+      <div data-section-content={designed ? "" : undefined}>hero</div>
+    </section>
+  );
+}
+
 const ctx = {
   implemented: {
-    hero: <section data-testid="hero-root">hero</section>,
+    hero: <HeroStub />,
     categories: <section data-testid="cat-root">cat</section>,
     newArrivals: <section data-testid="new-root">new</section>,
     wholesale: <section data-testid="wh-root">wh</section>,
@@ -62,7 +70,7 @@ describe("published homepage stack (CUST-HV V5c review)", () => {
       { id: "hero", type: "hero", visible: true },
     ]);
     expect(container.firstElementChild?.innerHTML).toBe(
-      '<div><section data-testid="hero-root">hero</section></div>',
+      '<div><section data-testid="hero-root"><div>hero</div></section></div>',
     );
   });
 
@@ -76,7 +84,45 @@ describe("published homepage stack (CUST-HV V5c review)", () => {
       },
     ]);
     expect(container.firstElementChild?.innerHTML).toBe(
-      '<div><section data-testid="hero-root">hero</section></div>',
+      '<div><section data-testid="hero-root"><div>hero</div></section></div>',
     );
+  });
+
+  it("design markers appear only while a design frame is active (absent design ⇒ byte-identical)", async () => {
+    const content = {
+      title: "T",
+      subtitle: "",
+      ctaLabel: "",
+      ctaHref: "",
+      imageUrl: "",
+    };
+    const benefits = { items: [{ id: "i", title: "A", body: "b" }] };
+    const sections = (design: PresentationHomeSection["design"]) =>
+      [
+        { id: "hero", type: "hero", visible: true, design },
+        { id: "ban", type: "banner", visible: true, content, design },
+        {
+          id: "ben",
+          type: "benefits",
+          visible: true,
+          content: benefits,
+          design,
+        },
+      ] as PresentationHomeSection[];
+
+    const plain = await mount(sections(undefined));
+    expect(plain.querySelector("[data-section-content]")).toBeNull();
+    expect(plain.querySelector("[data-section-block]")).toBeNull();
+
+    const designed = await mount(
+      sections({ background: { kind: "solid", color: { hex: "#fde68a" } } }),
+    );
+    expect(designed.querySelectorAll("[data-section-content]")).toHaveLength(2);
+    expect(designed.querySelectorAll("[data-section-block]")).toHaveLength(1);
+
+    // a design that resolves to nothing is the legacy output too
+    const inert = await mount(sections({ typography: { headingScale: "md" } }));
+    expect(inert.querySelector("[data-section-content]")).toBeNull();
+    expect(inert.querySelector("[data-section-block]")).toBeNull();
   });
 });
