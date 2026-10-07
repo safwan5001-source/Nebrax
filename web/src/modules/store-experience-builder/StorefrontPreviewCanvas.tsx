@@ -64,6 +64,8 @@ import {
   type CustomizerLocale,
   type CustomizerMessageKey,
 } from "./messages";
+import { CanvasBackdrop } from "./media/CanvasBackdrop";
+import { useBackgroundMediaBounds } from "./media/use-background-media-bounds";
 import { useMediaRefPreview } from "./media/use-media-ref-preview";
 import { fontFamilyStack } from "./presentation/font-catalogue";
 import { resolveGlobalTokens } from "./presentation/global-tokens";
@@ -292,11 +294,23 @@ export function StorefrontPreviewCanvas({
       ? config.branding.compactLogoMedia
       : config.branding.logoMedia) ?? null;
   const logoMediaUrl = useMediaRefPreview(logoMediaRef);
+  // CUST-HV V6b-4a — the proven bounds of every picture background (read-only, from the server), so
+  // the Canvas decides exactly like the publish gate and the published storefront.
+  const backgroundBounds = useBackgroundMediaBounds(config.homepage.sections);
   const designContext: DesignContext = {
     primaryColor: config.primaryColor,
     accentColor: config.accentColor,
     palette: config.palette,
     dir: locale === "ar" ? "rtl" : "ltr",
+    mediaBounds: backgroundBounds.lookup,
+  };
+  /** The picture layer of a section whose design resolves a *proven* picture background, else nothing. */
+  const backdropFor = (section: (typeof config.homepage.sections)[number]): ReactNode => {
+    const bg = section.design?.background;
+    if (bg?.kind !== "media") return null;
+    const resolved = resolveSectionDesign(section.type, section.design, designContext);
+    if (!resolved?.attrs["data-sd"]?.split(" ").includes("mbg")) return null;
+    return <CanvasBackdrop background={bg} viewport={viewport} />;
   };
   const logo =
     logoMediaUrl ??
@@ -647,6 +661,7 @@ export function StorefrontPreviewCanvas({
                   aria-label={t("sectionHero")}
                   className="flex min-h-[11rem] items-center rounded-store bg-gradient-to-r from-primary-700 via-primary-600 to-primary-500 text-store-primary-foreground md:min-h-[16rem]"
                 >
+                  {backdropFor(section)}
                   <div data-section-content="" className="max-w-2xl p-5 md:p-10">
                     <Heading
                       data-preview-hero-heading=""
@@ -880,6 +895,7 @@ export function StorefrontPreviewCanvas({
                 banner.ctaHref.startsWith("https://") || banner.ctaHref.startsWith("/");
               return (
                 <section key={section.id} className="overflow-hidden rounded-store border border-store-border bg-store-surface">
+                  {backdropFor(section)}
                   {empty ? (
                     <p data-section-content="" className="px-5 py-6 text-sm text-store-muted-foreground">{t("sectionBanner")}</p>
                   ) : (

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Resources\StorefrontMediaDerivativeResource;
 use App\Models\StorefrontMedia;
+use App\Services\Commerce\StorefrontMediaContrastEvidence;
 use App\Services\Commerce\StorefrontMediaDerivativeService;
 use App\Services\Commerce\StorefrontMediaException;
 use App\Services\Commerce\StorefrontMediaTransform;
@@ -24,7 +25,7 @@ use InvalidArgumentException;
  */
 class CommerceWorkspaceStorefrontMediaDerivativeController extends ApiController
 {
-    public function ensure(Request $request, StorefrontMediaDerivativeService $derivatives, string $mediaId): JsonResponse
+    public function ensure(Request $request, StorefrontMediaDerivativeService $derivatives, StorefrontMediaContrastEvidence $contrast, string $mediaId): JsonResponse
     {
         $this->denySelfService($request);
         $asset = $this->activeOr404($mediaId);
@@ -43,10 +44,10 @@ class CommerceWorkspaceStorefrontMediaDerivativeController extends ApiController
             return response()->json(['message' => $e->getMessage(), 'code' => $e->errorCode] + $e->context, $e->status);
         }
 
-        return response()->json(['data' => StorefrontMediaDerivativeResource::usage($status, $derivatives)]);
+        return response()->json(['data' => StorefrontMediaDerivativeResource::usage($status, $derivatives, $contrast->boundsForUsage($asset, $transform))]);
     }
 
-    public function status(Request $request, StorefrontMediaDerivativeService $derivatives, string $mediaId): JsonResponse
+    public function status(Request $request, StorefrontMediaDerivativeService $derivatives, StorefrontMediaContrastEvidence $contrast, string $mediaId): JsonResponse
     {
         $this->denySelfService($request);
         $asset = $this->activeOr404($mediaId);
@@ -61,7 +62,7 @@ class CommerceWorkspaceStorefrontMediaDerivativeController extends ApiController
         $out = [];
         foreach ((array) $request->input('transforms') as $index => $raw) {
             $transform = $this->transform($raw, "transforms.{$index}");
-            $out[] = StorefrontMediaDerivativeResource::usage($derivatives->status($asset, $transform), $derivatives);
+            $out[] = StorefrontMediaDerivativeResource::usage($derivatives->status($asset, $transform), $derivatives, $contrast->boundsForUsage($asset, $transform));
         }
 
         return response()->json(['data' => $out]);

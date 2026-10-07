@@ -198,6 +198,16 @@ export interface UsageFile {
   renderedHeight: number | null;
 }
 
+/**
+ * CUST-HV V6b-4a — the encoded-channel bounds (already widened by the encoding margin) the server
+ * would prove a usage with at publish time; `null` while there is no valid evidence (a framed usage
+ * still processing, an asset predating evidence, a translucent picture). Read-only.
+ */
+export interface UsageContrast {
+  min: [number, number, number];
+  max: [number, number, number];
+}
+
 export interface UsageStatus {
   mediaId: string;
   usageKey: string;
@@ -205,6 +215,7 @@ export interface UsageStatus {
   retryable: boolean;
   errorCode: string | null;
   files: UsageFile[];
+  contrast: UsageContrast | null;
 }
 
 /** The framing fields of a `MediaRef` — exactly `StorefrontMediaTransform`'s input. */
@@ -233,6 +244,24 @@ export function usageNeedsDerivatives(ref: MediaRef): boolean {
   return Object.keys(mediaRefTransform(ref)).length > 0;
 }
 
+function channelTriple(raw: unknown): [number, number, number] | null {
+  if (!Array.isArray(raw) || raw.length !== 3) return null;
+  const out: number[] = [];
+  for (const v of raw) {
+    if (typeof v !== 'number' || !Number.isInteger(v) || v < 0 || v > 255) return null;
+    out.push(v);
+  }
+  return [out[0], out[1], out[2]];
+}
+
+function mapContrast(raw: unknown): UsageContrast | null {
+  if (typeof raw !== 'object' || raw === null) return null;
+  const min = channelTriple((raw as Record<string, unknown>).min);
+  const max = channelTriple((raw as Record<string, unknown>).max);
+  if (!min || !max || min.some((v, i) => v > max[i])) return null;
+  return { min, max };
+}
+
 function mapUsage(raw: Record<string, unknown>): UsageStatus {
   const state = raw.state;
   const files = Array.isArray(raw.files) ? (raw.files as Array<Record<string, unknown>>) : [];
@@ -250,6 +279,7 @@ function mapUsage(raw: Record<string, unknown>): UsageStatus {
       renderedWidth: typeof f.rendered_width === 'number' ? f.rendered_width : null,
       renderedHeight: typeof f.rendered_height === 'number' ? f.rendered_height : null,
     })),
+    contrast: mapContrast(raw.contrast),
   };
 }
 
