@@ -17,7 +17,9 @@ final class StorefrontMediaBackfillEvidenceCommand extends Command
 
     protected $signature = 'storefront-media:backfill-evidence
         {--tenant= : Tenant UUID (required) — exact tenant scope, never crosses tenants}
-        {--limit=200 : Bounded batch size per kind for this run (max 1000)}
+        {--limit=200 : Rows examined per kind in this run (max 1000)}
+        {--after-assets= : Continue after this asset id (the next cursor printed by the previous run)}
+        {--after-derivatives= : Continue after this derivative id (the next cursor printed by the previous run)}
         {--dry-run : Report what would be measured; write nothing}';
 
     protected $description = 'إكمال دليل بكسل التباين (حدّا القنوات) لوسائط المُخصِّص ومشتقّاتها السابقة — يدوي، محصور بمستأجر، idempotent';
@@ -43,9 +45,19 @@ final class StorefrontMediaBackfillEvidenceCommand extends Command
             return self::INVALID;
         }
 
-        $stats = $backfiller->run($tenantId, $limit, (bool) $this->option('dry-run'));
-        foreach ($stats as $key => $value) {
-            $this->line($key.': '.(is_bool($value) ? ($value ? 'yes' : 'no') : $value));
+        $after = [
+            'assets' => is_string($this->option('after-assets')) && $this->option('after-assets') !== '' ? $this->option('after-assets') : null,
+            'derivatives' => is_string($this->option('after-derivatives')) && $this->option('after-derivatives') !== '' ? $this->option('after-derivatives') : null,
+        ];
+        $stats = $backfiller->run($tenantId, $limit, (bool) $this->option('dry-run'), $after);
+        foreach (['assets', 'derivatives', 'failed'] as $key) {
+            $this->line($key.': '.$stats[$key]);
+        }
+        $this->line('dry_run: '.($stats['dry_run'] ? 'yes' : 'no'));
+        foreach ($stats['next'] as $kind => $cursor) {
+            if ($cursor !== null) {
+                $this->line("more {$kind}: re-run with --after-{$kind}={$cursor}");
+            }
         }
 
         return $stats['failed'] > 0 ? self::FAILURE : self::SUCCESS;

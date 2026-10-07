@@ -28,21 +28,26 @@ class StorefrontMediaEvidenceBackfiller
     ) {}
 
     /**
-     * @return array{assets:int, derivatives:int, failed:int, dry_run:bool}
+     * `$limit` يحدّ ما **يُفحَص** لكل نوعٍ في التشغيل (مكتوباً أو فاشلاً) فيبقى العمل محدوداً حتى مع تخزينٍ
+     * متدهور (Codex P2 على #1277)؛ و`next` مؤشّر المتابعة (آخر معرّفٍ فُحص) حين بقي ما لم يُفحَص، يُمرَّر
+     * إلى التشغيل التالي في `$after` فيتجاوز البادئة الفاشلة بدل إعادتها. `null` = اكتمل النوع.
+     *
+     * @param  array{assets?:?string, derivatives?:?string}  $after
+     * @return array{assets:int, derivatives:int, failed:int, dry_run:bool, next:array{assets:?string, derivatives:?string}}
      */
-    public function run(string $tenantId, int $limit = 200, bool $dryRun = false): array
+    public function run(string $tenantId, int $limit = 200, bool $dryRun = false, array $after = []): array
     {
         $previous = $this->tenant->id();
         $this->tenant->set($tenantId);
 
         try {
-            $stats = ['assets' => 0, 'derivatives' => 0, 'failed' => 0, 'dry_run' => $dryRun];
+            $stats = ['assets' => 0, 'derivatives' => 0, 'failed' => 0, 'dry_run' => $dryRun, 'next' => ['assets' => null, 'derivatives' => null]];
 
             $assetQuery = StorefrontMedia::query()
                 ->where('state', StorefrontMedia::STATE_ACTIVE)
                 ->where('variants_state', StorefrontMedia::VARIANTS_READY)
                 ->whereNull('region_luminance');
-            $this->eachCandidate($assetQuery, $limit, $stats, 'assets', function (StorefrontMedia $media) use ($dryRun): bool {
+            $this->eachCandidate($assetQuery, $limit, $after['assets'] ?? null, $stats, 'assets', function (StorefrontMedia $media) use ($dryRun): bool {
                 $evidence = $this->assetEvidence($media);
                 if ($evidence !== null && ! $dryRun) {
                     $media->forceFill(['region_luminance' => $evidence])->save();
@@ -54,7 +59,7 @@ class StorefrontMediaEvidenceBackfiller
             $derivativeQuery = StorefrontMediaDerivative::query()
                 ->where('state', StorefrontMediaDerivative::STATE_READY)
                 ->whereNull('region_luminance');
-            $this->eachCandidate($derivativeQuery, $limit, $stats, 'derivatives', function (StorefrontMediaDerivative $row) use ($dryRun): bool {
+            $this->eachCandidate($derivativeQuery, $limit, $after['derivatives'] ?? null, $stats, 'derivatives', function (StorefrontMediaDerivative $row) use ($dryRun): bool {
                 $evidence = $this->scanFile($row->media_id, (string) $row->storage_key, 'transform');
                 if ($evidence !== null && ! $dryRun) {
                     $row->forceFill(['region_luminance' => $evidence])->save();
@@ -74,38 +79,35 @@ class StorefrontMediaEvidenceBackfiller
     }
 
     /**
-     * يمرّ على المرشّحين بمؤشّر `id` (لا بـ`limit` على نفس الصفوف): `$limit` يحدّ **ما يُكتَب** لا ما يُفحَص،
-     * فصفوفٌ تعذّر قياسها نهائياً (ملف مفقود/تالف) لا تحجب ما بعدها فلا يتعطّل الإكمال أبداً (Codex P2 على #1277).
-     * الفاشل يُعاد محاولته في كل تشغيل بلا حالة محفوظة ويُعدّ في `failed`.
+     * يمرّ على المرشّحين بمؤشّر `id`: صفوفٌ تعذّر قياسها نهائياً (ملف مفقود/تالف) لا تحجب ما بعدها لأن التشغيل
+     * التالي يبدأ بعد آخر ما فُحص (`next`)، و`$limit` يحدّ المفحوص فيبقى العمل محدوداً. الفاشل يُعدّ في `failed`.
      *
      * @param  \Illuminate\Database\Eloquent\Builder<\Illuminate\Database\Eloquent\Model>  $query
-     * @param  array{assets:int, derivatives:int, failed:int, dry_run:bool}  $stats
+     * @param  array{assets:int, derivatives:int, failed:int, dry_run:bool, next:array{assets:?string, derivatives:?string}}  $stats
      * @param  callable(\Illuminate\Database\Eloquent\Model): bool  $measure  true = قيس
      */
-    private function eachCandidate($query, int $limit, array &$stats, string $counter, callable $measure): void
+    private function eachCandidate($query, int $limit, ?string $after, array &$stats, string $counter, callable $measure): void
     {
-        $last = null;
-        while ($stats[$counter] < $limit) {
-            $batch = (clone $query)
-                ->when($last !== null, static fn ($q) => $q->where('id', '>', $last))
-                ->orderBy('id')
-                ->limit(50)
-                ->get();
-            if ($batch->isEmpty()) {
-                return;
+        $rows = (clone $query)
+            ->when($after !== null && $after !== '', static fn ($q) => $q->where('id', '>', $after))
+            ->orderBy('id')
+            ->limit($limit + 1) // الصفّ الزائد يكشف أن هناك ما بعد الدفعة دون عدٍّ إضافي
+            ->get();
+
+        $examined = 0;
+        foreach ($rows as $row) {
+            if ($examined >= $limit) {
+                return; // بقي ما لم يُفحَص: `next` يشير إلى آخر مفحوص
             }
-            foreach ($batch as $row) {
-                $last = $row->id;
-                if ($measure($row)) {
-                    $stats[$counter]++;
-                } else {
-                    $stats['failed']++;
-                }
-                if ($stats[$counter] >= $limit) {
-                    return;
-                }
+            $examined++;
+            $stats['next'][$counter] = $row->id;
+            if ($measure($row)) {
+                $stats[$counter]++;
+            } else {
+                $stats['failed']++;
             }
         }
+        $stats['next'][$counter] = null; // استُنفد النوع
     }
 
     /**

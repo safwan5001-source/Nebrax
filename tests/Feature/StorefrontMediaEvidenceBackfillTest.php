@@ -89,10 +89,10 @@ class StorefrontMediaEvidenceBackfillTest extends TestCase
         $backfiller = app(StorefrontMediaEvidenceBackfiller::class);
 
         // dry-run: counts, writes nothing
-        $this->assertSame(['assets' => 1, 'derivatives' => 8, 'failed' => 0, 'dry_run' => true], $backfiller->run($a['auth']['tenant_id'], 50, true));
+        $this->assertSame(['assets' => 1, 'derivatives' => 8, 'failed' => 0, 'dry_run' => true, 'next' => ['assets' => null, 'derivatives' => null]], $backfiller->run($a['auth']['tenant_id'], 50, true));
         $this->assertNull($this->asTenant($a['auth']['tenant_id'], fn () => StorefrontMedia::findOrFail($a['id'])->region_luminance));
 
-        $this->assertSame(['assets' => 1, 'derivatives' => 8, 'failed' => 0, 'dry_run' => false], $backfiller->run($a['auth']['tenant_id'], 50));
+        $this->assertSame(['assets' => 1, 'derivatives' => 8, 'failed' => 0, 'dry_run' => false, 'next' => ['assets' => null, 'derivatives' => null]], $backfiller->run($a['auth']['tenant_id'], 50));
 
         $asset = $this->asTenant($a['auth']['tenant_id'], fn () => StorefrontMedia::findOrFail($a['id'])->region_luminance);
         $this->assertSame('frame', $asset['basis']);
@@ -109,7 +109,7 @@ class StorefrontMediaEvidenceBackfillTest extends TestCase
         }
 
         // idempotent: nothing left to do
-        $this->assertSame(['assets' => 0, 'derivatives' => 0, 'failed' => 0, 'dry_run' => false], $backfiller->run($a['auth']['tenant_id'], 50));
+        $this->assertSame(['assets' => 0, 'derivatives' => 0, 'failed' => 0, 'dry_run' => false, 'next' => ['assets' => null, 'derivatives' => null]], $backfiller->run($a['auth']['tenant_id'], 50));
 
         // tenant isolation: the other tenant's asset was never touched
         $this->assertNull($this->asTenant($b['auth']['tenant_id'], fn () => StorefrontMedia::findOrFail($b['id'])->region_luminance));
@@ -139,13 +139,13 @@ class StorefrontMediaEvidenceBackfillTest extends TestCase
     }
 
     /** @test */
-    public function a_permanently_unreadable_prefix_never_blocks_later_recoverable_rows(): void
+    public function a_permanently_unreadable_prefix_is_skipped_by_the_cursor_and_work_stays_bounded(): void
     {
         $this->fakeStorefrontMediaR2();
         $auth = $this->registerTenant('sfev-stuck', 'owner@sfev-stuck.test');
-        $ids = [$this->uploadMedia($auth)['id'], $this->uploadMedia($auth)['id']];
+        $ids = [$this->uploadMedia($auth)['id'], $this->uploadMedia($auth)['id'], $this->uploadMedia($auth)['id']];
         sort($ids); // المؤشّر بالمعرّف: الأول فيها هو «البادئة» العالقة
-        [$stuck, $fine] = $ids;
+        [$stuck, $fine, $last] = $ids;
 
         $this->asTenant($auth['tenant_id'], function () use ($ids, $stuck, $auth): void {
             StorefrontMedia::query()->whereIn('id', $ids)->update(['region_luminance' => null]);
@@ -153,12 +153,25 @@ class StorefrontMediaEvidenceBackfillTest extends TestCase
                 unset($this->r2Objects[$key]);
             }
         });
+        $backfiller = app(StorefrontMediaEvidenceBackfiller::class);
 
-        $stats = app(StorefrontMediaEvidenceBackfiller::class)->run($auth['tenant_id'], 1);
+        // الدفعة تفحص صفاً واحداً فقط (محدودة حتى لو كان الباقي كله تالفاً): الفاشل وحده، والمؤشّر يتقدّم.
+        $first = $backfiller->run($auth['tenant_id'], 1);
+        $this->assertSame(0, $first['assets']);
+        $this->assertSame(1, $first['failed']);
+        $this->assertSame($stuck, $first['next']['assets'], 'resume point is the last row examined');
+        $this->assertNull($this->asTenant($auth['tenant_id'], fn () => StorefrontMedia::findOrFail($fine)->region_luminance));
 
-        $this->assertSame(1, $stats['assets'], 'the healthy row behind the stuck one was reached with limit=1');
-        $this->assertSame(1, $stats['failed']);
+        // التشغيل التالي يبدأ بعده فيصل إلى السليم.
+        $second = $backfiller->run($auth['tenant_id'], 1, false, ['assets' => $first['next']['assets']]);
+        $this->assertSame(1, $second['assets']);
+        $this->assertSame($fine, $second['next']['assets']);
         $this->assertNotNull($this->asTenant($auth['tenant_id'], fn () => StorefrontMedia::findOrFail($fine)->region_luminance));
+
+        $third = $backfiller->run($auth['tenant_id'], 1, false, ['assets' => $second['next']['assets']]);
+        $this->assertSame(1, $third['assets']);
+        $this->assertNull($third['next']['assets'], 'exhausted');
+        $this->assertNotNull($this->asTenant($auth['tenant_id'], fn () => StorefrontMedia::findOrFail($last)->region_luminance));
         $this->assertNull($this->asTenant($auth['tenant_id'], fn () => StorefrontMedia::findOrFail($stuck)->region_luminance));
     }
 

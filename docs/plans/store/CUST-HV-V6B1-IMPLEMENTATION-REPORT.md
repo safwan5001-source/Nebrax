@@ -41,7 +41,7 @@ Stored in the **existing** `region_luminance` JSON columns on assets and derivat
 `StorefrontMediaEvidenceBackfiller` + `storefront-media:backfill-evidence {--tenant=} {--limit=200} {--dry-run}`:
 - Targets active assets with ready variants and ready derivatives whose evidence is null; reads the widest served variants from R2 in both formats and unions the extremes (an asset is only as safe as its darkest/lightest served file).
 - Tenant-scoped (tenant context set explicitly), bounded by `--limit`, idempotent, `--dry-run` writes nothing.
-- Candidates are walked by an `id` cursor and `--limit` bounds what is *written*, so permanently unreadable rows never block later recoverable ones (Codex P2); failed rows are retried each run and counted.
+- Candidates are walked by an `id` cursor. `--limit` bounds the rows *examined* per kind (so work stays bounded even when storage is degraded), and the run prints a resume cursor (`--after-assets` / `--after-derivatives`) so a permanently unreadable prefix is skipped rather than retried forever (Codex P2 ×2). Failures are counted; nothing is persisted.
 - A file that cannot be read or decoded leaves evidence **null** and is reported as `failed` — it never produces optimistic evidence.
 
 ## Proof
