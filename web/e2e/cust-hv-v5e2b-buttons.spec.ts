@@ -27,6 +27,9 @@ const BUTTONS = `
   <button id="uiGhost" data-slot="button" data-variant="ghost" data-size="default" class="inline-flex h-11 px-2.5 text-sm hover:bg-muted">ghost</button>
   <button id="uiDisabled" disabled data-slot="button" data-variant="default" data-size="default" class="inline-flex h-11 px-2.5 text-sm bg-primary text-primary-foreground disabled:opacity-50">disabled</button>
   <a id="hero" href="#" class="mt-4 inline-flex h-9 items-center gap-1.5 rounded-store bg-store-primary-foreground px-4 text-xs font-bold text-store-primary shadow-md">Hero CTA</a>
+  <section id="band" class="rounded-store bg-store-footer px-5 py-10 text-store-footer-link">
+    <a id="inverse" data-slot="button" data-variant="default" data-size="lg" href="#" class="inline-flex items-center justify-center rounded-md bg-store-surface text-store-foreground hover:bg-store-surface-muted h-13 px-6">Wholesale CTA</a>
+  </section>
   <div id="sec" data-sd="bg fg link" data-design-type="benefits" style="--sec-link:#ffffff;--sec-fg:#ffffff;--sec-bg:#101820">
     <div><a id="inSec" href="#" class="inline-flex h-10 items-center rounded-store bg-store-primary px-4 text-sm font-bold text-store-primary-foreground">In section</a></div>
   </div>`;
@@ -50,7 +53,7 @@ const read = (page: Page, selector: string, props: Props) =>
   );
 
 const PROPS: Props = ['backgroundColor', 'color', 'borderTopColor', 'borderTopWidth', 'borderTopLeftRadius', 'paddingTop', 'paddingLeft', 'fontSize', 'fontWeight', 'textTransform', 'textDecorationLine', 'height'];
-const IDS = ['banner', 'card', 'ui', 'uiOutline', 'uiIcon', 'uiGhost', 'hero', 'inSec'];
+const IDS = ['banner', 'card', 'ui', 'uiOutline', 'uiIcon', 'uiGhost', 'hero', 'inverse', 'inSec'];
 async function snapshot(page: Page) {
   const out: Record<string, unknown> = {};
   for (const id of IDS) out[id] = await read(page, `#${id}`, PROPS);
@@ -78,7 +81,7 @@ test('primary colours: only the solid CTAs and the shared default Button follow;
     expect(styled[id].borderTopColor, id).toBe('rgb(231, 238, 235)');
   }
   // never reached: the inverted hero CTA, the outline variant, the icon button, the ghost variant
-  for (const id of ['hero', 'uiOutline', 'uiIcon', 'uiGhost']) expect(styled[id], id).toEqual((bare as Record<string, unknown>)[id]);
+  for (const id of ['hero', 'uiOutline', 'uiIcon', 'uiGhost', 'inverse']) expect(styled[id], id).toEqual((bare as Record<string, unknown>)[id]);
 });
 
 test('hover: the hover fill/label replace the component hover — but never on a disabled button', async ({ page }) => {
@@ -138,4 +141,26 @@ test('link: no fill, underlined; lift and underline hovers; lift is static under
   await mount(page, 'data-gt="b-pri b-hv-lift"', COLOURS);
   await page.locator('#banner').hover();
   expect((await read(page, '#banner', ['transform']) as unknown as { transform: string }).transform).toBe('none');
+});
+
+test('review: the inverse CTA on a dark footer-coloured band keeps its own colours under outline / link, on rest and hover', async ({ page }) => {
+  await mount(page, '', '');
+  const bare = await read(page, '#inverse', PROPS);
+  await mount(page, 'data-gt="b-pri b-sty-outline"', '--gt-bf:transparent;--gt-bl:rgb(18, 55, 42);--gt-bb:rgb(18, 55, 42);--gt-bhf:rgb(231, 238, 235);--gt-bhl:rgb(18, 55, 42);--gt-bhb:rgb(18, 55, 42)');
+  expect(await read(page, '#inverse', PROPS)).toEqual(bare);
+  await page.locator('#inverse').hover();
+  await expect.poll(async () => (await read(page, '#inverse', ['backgroundColor'])).backgroundColor).not.toBe('rgb(231, 238, 235)');
+  // size / radius / text are not colour-dependent: they still reach it
+  await mount(page, 'data-gt="b-sz b-rad"', '--gt-bpy:0.375rem;--gt-bpx:0.75rem;--gt-bfs:0.75rem;--gt-brad:0px');
+  expect((await read(page, '#inverse', ['paddingTop'])).paddingTop).toBe('6px');
+});
+
+test('review: inside a designed section an outline button keeps a transparent hover and the section label — never a tint under a forced white label', async ({ page }) => {
+  await mount(page, 'data-gt="b-pri b-sty-outline"', '--gt-bf:transparent;--gt-bl:rgb(18, 55, 42);--gt-bb:rgb(18, 55, 42);--gt-bhf:rgb(231, 238, 235);--gt-bhl:rgb(18, 55, 42);--gt-bhb:rgb(18, 55, 42)');
+  await page.locator('#inSec').hover();
+  await page.waitForTimeout(250);
+  const hovered = await read(page, '#inSec', ['backgroundColor', 'color', 'borderTopColor']);
+  expect(hovered.backgroundColor).toBe('rgba(0, 0, 0, 0)');
+  expect(hovered.color).toBe('rgb(255, 255, 255)');
+  expect(hovered.borderTopColor).toBe('rgb(255, 255, 255)');
 });

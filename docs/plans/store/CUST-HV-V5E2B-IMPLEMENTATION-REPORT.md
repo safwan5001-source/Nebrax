@@ -58,6 +58,16 @@ ThemePanel → *Global design* → **Buttons**: style, colour, size, corners, ho
 ## Design Quality Pass
 Evidence `docs/plans/store/cust-hv-v5e2b/` (Canvas, soft · large · pill · uppercase · lift on top of the V5e-2a surface tokens, EN 768 and AR 390). Checked: the CTA keeps its position and the card's content flow at both widths; the uppercase label never affects Arabic text; soft tint + dark label reads clearly; no overflow. Not re-proved visually here: published-storefront pages other than the compiled-CSS spec's representative markup (checkout / account use the shared `Button`, covered by the default-variant selector and its contract test).
 
+## Review round (Codex on #1272 — 3 findings, all valid, fixed in the follow-up PR)
+
+#1272 was merged on green CI **before** its review threads were read — the three findings below were posted on the head it merged. They are real, so they are fixed in a follow-up PR (`cust-hv/v5e2b-review-fixes`) and the process error is recorded here: a PR is not merged until its review threads, not only its checks, are read.
+
+| Finding | Fix |
+|---|---|
+| **P1** the global `outline` / `link` style reached the *default-variant* `Button` of the wholesale section — an inverse CTA (`bg-store-surface text-store-foreground`) on the dark footer-coloured band, whose backdrop the publish gate does not test (brand `#12372a` on `#111827` ≈ 1.36:1) | A primary button **inside a footer-coloured band** (`bg-store-footer`: wholesale, app promo, footer) is excluded from the colour / style / hover rules (`:not([class~="bg-store-footer"] *)`); its size / radius / text still follow. Chromium: the inverse CTA is unchanged at rest and on hover under outline tokens (fails on the pre-fix CSS) |
+| **P1** inside a designed dark section an outline button's *hover* took the near-white hover tint while the section override forced the (white) section link colour as its label → ≈ 1.2:1 although both gates pass | The section override now also pins `background-color: transparent`, so the hover keeps the section's proven foreground on the section's own background; Chromium asserts transparent hover + white label + white border (fails on the pre-fix CSS) |
+| **P2** Radix overlays portal to `document.body`, outside the `data-gt` / theme wrapper — a quick view, the cart drawer or a menu lost the global button tokens (and, in fact, **every theme variable the wrapper carries**: brand colours, radius, fonts) the moment it opened | A tiny client hook `useThemePortalContainer()` resolves `[data-published-theme]` after mount and the Dialog / Sheet / AlertDialog / Popover / DropdownMenu portals use it as their `container`; with no wrapper it is `undefined` (today's behaviour). jsdom tests: every overlay's content lives inside the wrapper when there is one and on `body` when there is not |
+
 ## Invariants
 | Invariant | Status |
 |---|---|
