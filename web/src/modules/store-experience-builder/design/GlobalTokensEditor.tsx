@@ -2,6 +2,7 @@
 
 import { Field, btnClass, selectClass } from "../ControlPanels";
 import type { CustomizerMessageKey } from "../messages";
+import { FONT_CATALOGUE, FONT_FAMILY_KEYS } from "../presentation/font-catalogue";
 import {
   type ButtonContext,
   GLOBAL_BODY_SCALES,
@@ -173,6 +174,16 @@ export function GlobalTokensEditor({
     setField("typography", "buttonText", Object.keys(next).length > 0 ? next : undefined);
   };
 
+  const KIND: Record<string, CustomizerMessageKey> = {
+    sans: "gtFontKindSans",
+    display: "gtFontKindDisplay",
+    serif: "gtFontKindSerif",
+  };
+  const fontLabel = (key: string) => {
+    const entry = FONT_CATALOGUE.find((candidate) => candidate.key === key);
+    return entry ? `${entry.name} — ${t(KIND[entry.kind])}` : key;
+  };
+
   const ty = config.typography;
   const bt = config.buttons;
   const su = config.surfaces;
@@ -190,6 +201,9 @@ export function GlobalTokensEditor({
         {select("typography", "bodyWeight", "gtBodyWeight", GLOBAL_BODY_WEIGHTS, (v) => t(WEIGHT[v]), ty?.bodyWeight, Number)}
         {select("typography", "lineHeight", "designLineHeight", GLOBAL_LINE_HEIGHTS, (v) => t(LINE_HEIGHT[v]), ty?.lineHeight)}
         {select("typography", "sectionHeading", "gtSectionHeading", GLOBAL_SECTION_HEADINGS, (v) => t(HEADING_STYLE[v]), ty?.sectionHeading)}
+        {select("typography", "headingFamily", "gtHeadingFamily", FONT_FAMILY_KEYS, fontLabel, ty?.headingFamily)}
+        {select("typography", "bodyFamily", "gtBodyFamily", FONT_FAMILY_KEYS, fontLabel, ty?.bodyFamily)}
+        <p className="text-[12px] leading-5 text-muted">{t("gtFontsNote")}</p>
       </fieldset>
 
       <fieldset className="min-w-0 space-y-4">

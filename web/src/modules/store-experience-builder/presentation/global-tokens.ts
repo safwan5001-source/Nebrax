@@ -16,7 +16,10 @@
  * construction (solid / soft compute the label over their own fill) or gated at publish
  * (`buttonContrastIssues` for outline / link — twin of PHP `ButtonTokensContrast`).
  *
- * Deliberately NOT here yet: font families (V5e-2c, a self-hosted catalogue), a surface
+ * V5e-2c adds `typography.headingFamily` / `bodyFamily` from the curated, self-hosted
+ * catalogue (`font-catalogue.ts`).
+ *
+ * Deliberately NOT here yet: a merchant font upload (`custom:<mediaId>`, V0 §5.4), a surface
  * border colour, an icon on the button and per-CTA overrides (they belong to the slices that
  * own those CTAs — V6 hero/banner, V8 slider, V7 header). Dropped fail-closed until then.
  *
@@ -33,6 +36,11 @@ import {
   solidInterval,
   worstRatioForHex,
 } from "./contrast-engine";
+import {
+  FONT_FAMILY_KEYS,
+  type FontFamilyKey,
+  fontFamilyStack,
+} from "./font-catalogue";
 import { type PresentationPalette, resolveRoleHex } from "./palette";
 import { mixHex } from "./tokens";
 
@@ -77,6 +85,9 @@ export interface GlobalTypography {
   bodyWeight?: (typeof GLOBAL_BODY_WEIGHTS)[number];
   lineHeight?: (typeof GLOBAL_LINE_HEIGHTS)[number];
   sectionHeading?: (typeof GLOBAL_SECTION_HEADINGS)[number];
+  /** Catalogue keys (`font-catalogue.ts`) — never a family name or CSS. */
+  headingFamily?: FontFamilyKey;
+  bodyFamily?: FontFamilyKey;
   buttonText?: {
     weight?: (typeof GLOBAL_BUTTON_TEXT_WEIGHTS)[number];
     case?: (typeof GLOBAL_BUTTON_TEXT_CASES)[number];
@@ -154,6 +165,8 @@ export function normalizeGlobalTokens(
     ["bodyWeight", GLOBAL_BODY_WEIGHTS],
     ["lineHeight", GLOBAL_LINE_HEIGHTS],
     ["sectionHeading", GLOBAL_SECTION_HEADINGS],
+    ["headingFamily", FONT_FAMILY_KEYS],
+    ["bodyFamily", FONT_FAMILY_KEYS],
   ]);
   const buttonText = isRecord(raw.typography)
     ? pickFields(raw.typography.buttonText, [
@@ -412,6 +425,15 @@ export function resolveGlobalTokens(
     if (ty.lineHeight) {
       style["--gt-lh"] = LINE_HEIGHT[ty.lineHeight];
       gt.push("lh");
+    }
+    // A catalogue family for headings (`hf`); the body family is the wrapper's own `font-family`
+    // (`publishedThemeStyle` / the Canvas root), which this resolver does not touch.
+    if (ty.headingFamily) {
+      const stack = fontFamilyStack(ty.headingFamily);
+      if (stack) {
+        style["--gt-hf"] = stack;
+        gt.push("hf");
+      }
     }
     // `bar` is the shared section heading's own look today, so it emits nothing.
     if (ty.sectionHeading && ty.sectionHeading !== "bar") {

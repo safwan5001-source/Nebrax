@@ -58,6 +58,15 @@ for (const locale of ['ar', 'en'] as const) {
           if (parseFloat(c.borderTopWidth) !== 2) failures.push(`card border ${c.borderTopWidth}`);
           if (c.boxShadow === 'none') failures.push('card has no shadow');
         }
+        // fonts (V5e-2c): headings use the serif pair, the body the Readex family — both resolved to the
+        // real next/font faces (their hashed names carry the family name), not a fallback
+        const bodyFont = cs.fontFamily;
+        if (!/Readex/i.test(bodyFont)) failures.push(`body font ${bodyFont.slice(0, 80)}`);
+        const h = root.querySelector('[data-section-heading] h2') as HTMLElement | null;
+        if (h && !/Lora/i.test(getComputedStyle(h).fontFamily)) failures.push(`heading font ${getComputedStyle(h).fontFamily.slice(0, 80)}`);
+        for (const token of ['hf']) {
+          if (!gt.split(' ').includes(token)) failures.push(`missing data-gt token ${token}`);
+        }
         // buttons (V5e-2b): the banner CTA is a soft pill, large, heavy, uppercase; its label is readable
         for (const token of ['b-sz', 'b-rad', 'b-fw', 'b-up', 'b-pri', 'b-hv-lift']) {
           if (!gt.split(' ').includes(token)) failures.push(`missing data-gt token ${token}`);
@@ -110,4 +119,32 @@ test('without any global token the Canvas carries no data-gt and no --gt variabl
   });
   expect(state.gt).toBe(false);
   expect(state.style).not.toContain('--gt-');
+});
+
+test('catalogue fonts are loaded only when selected: the chosen faces load, the other six never do', async ({ page }) => {
+  const loadedFamilies = () =>
+    page.evaluate(async () => {
+      await document.fonts.ready;
+      return [...document.fonts].filter((face) => face.status === 'loaded').map((face) => face.family);
+    });
+  await page.setViewportSize({ width: 1280, height: 900 });
+
+  await page.goto('/dev/customizer-visual?locale=en&scenario=global&viewport=desktop');
+  await page.waitForLoadState('networkidle');
+  await page.waitForSelector('[data-visual-root]');
+  const chosen = await loadedFamilies();
+  expect(chosen.some((family) => /Readex/i.test(family)), `loaded: ${chosen.join(', ')}`).toBe(true);
+  expect(chosen.some((family) => /Lora/i.test(family)), `loaded: ${chosen.join(', ')}`).toBe(true);
+  for (const unused of [/Rubik/i, /Plex/i, /El_Messiri|El Messiri/i, /Noto_Sans_Arabic|Noto Sans Arabic/i, /Tajawal/i]) {
+    expect(chosen.some((family) => unused.test(family)), `${unused} should not load: ${chosen.join(', ')}`).toBe(false);
+  }
+
+  // without any font token the catalogue faces never load at all
+  await page.goto('/dev/customizer-visual?locale=en&scenario=populated&viewport=desktop');
+  await page.waitForLoadState('networkidle');
+  await page.waitForSelector('[data-visual-root]');
+  const plain = await loadedFamilies();
+  for (const unused of [/Readex/i, /Lora/i, /Rubik/i, /Plex/i, /El_Messiri|El Messiri/i, /Noto_Sans_Arabic|Noto Sans Arabic/i]) {
+    expect(plain.some((family) => unused.test(family)), `${unused} should not load: ${plain.join(', ')}`).toBe(false);
+  }
 });

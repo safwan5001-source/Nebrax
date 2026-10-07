@@ -20,9 +20,29 @@
       "expected": {}
     },
     {
-      "name": "font families are not accepted yet (V5e-2c)",
-      "input": { "typography": { "headingFamily": "cairo", "bodyFamily": "tajawal", "headingScale": "lg" } },
-      "expected": { "typography": { "headingScale": "lg" } }
+      "name": "font families: catalogue keys only, canonical order after sectionHeading",
+      "input": { "typography": { "bodyFamily": "readex", "headingFamily": "amiri-lora", "headingScale": "lg" } },
+      "expected": { "typography": { "headingScale": "lg", "headingFamily": "amiri-lora", "bodyFamily": "readex" } }
+    },
+    {
+      "name": "every catalogue key is accepted for both slots (the first two are the legacy fontPreset values)",
+      "input": { "typography": { "headingFamily": "cairo-geist", "bodyFamily": "tajawal-geist" } },
+      "expected": { "typography": { "headingFamily": "cairo-geist", "bodyFamily": "tajawal-geist" } }
+    },
+    {
+      "name": "font families: a family name, a CSS stack, a custom upload or a non-string is never a key",
+      "input": { "typography": { "headingFamily": "Cairo", "bodyFamily": "custom:0a1b2c3d" } },
+      "expected": {}
+    },
+    {
+      "name": "font families: CSS never survives",
+      "input": { "typography": { "headingFamily": "readex; background:red", "bodyFamily": "url(x)" } },
+      "expected": {}
+    },
+    {
+      "name": "font families: a list or an object is not a key",
+      "input": { "typography": { "headingFamily": ["readex"], "bodyFamily": { "key": "readex" }, "lineHeight": "tight" } },
+      "expected": { "typography": { "lineHeight": "tight" } }
     },
     {
       "name": "button text: weight and case, canonical order, after the other typography fields",

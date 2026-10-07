@@ -64,6 +64,7 @@ import {
   type CustomizerMessageKey,
 } from "./messages";
 import { useMediaRefPreview } from "./media/use-media-ref-preview";
+import { fontFamilyStack } from "./presentation/font-catalogue";
 import { resolveGlobalTokens } from "./presentation/global-tokens";
 import { resolveSectionDesign } from "./presentation/section-design-resolve";
 import { SectionDesignFrame } from "./SectionDesignFrame";
@@ -410,7 +411,7 @@ export function StorefrontPreviewCanvas({
       )}
       style={{
         ...vars,
-        fontFamily: fontPresetFamilyStack(config.fontPreset),
+        fontFamily: fontFamilyStack(config.typography?.bodyFamily) ?? fontPresetFamilyStack(config.fontPreset),
       }}
     >
       <p className="sr-only">{t("fixtureCatalogHint")}</p>
