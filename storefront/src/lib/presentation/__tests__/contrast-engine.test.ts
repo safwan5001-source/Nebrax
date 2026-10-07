@@ -2,16 +2,16 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
-  type LuminanceInterval,
-  type Overlay,
-  type Rgb,
   autoForeground,
   channelBoundsInterval,
   composite,
   gradientInterval,
+  type LuminanceInterval,
   luminance,
+  type Overlay,
   parseHex,
   passes,
+  type Rgb,
   ratio,
   solidInterval,
   worstRatio,
@@ -28,20 +28,36 @@ interface Case {
   max?: Rgb;
   overlay?: [string, number];
   fg: string;
-  expected: { min: number; max: number; worst: number; passesNormal: boolean; passesLarge: boolean; auto: string };
+  expected: {
+    min: number;
+    max: number;
+    worst: number;
+    passesNormal: boolean;
+    passesLarge: boolean;
+    auto: string;
+  };
 }
 
 const fixture = JSON.parse(
-  readFileSync(resolve(__dirname, "../../../../../tests/Fixtures/presentation/contrast.json"), "utf8"),
+  readFileSync(
+    resolve(
+      __dirname,
+      "../../../../../tests/Fixtures/presentation/contrast.json",
+    ),
+    "utf8",
+  ),
 ) as { cases: Case[] };
 
 function overlayOf(c: Case): Overlay | null {
-  return c.overlay ? { rgb: parseHex(c.overlay[0])!, alpha: c.overlay[1] } : null;
+  return c.overlay
+    ? { rgb: parseHex(c.overlay[0])!, alpha: c.overlay[1] }
+    : null;
 }
 function intervalOf(c: Case): LuminanceInterval {
   const ov = overlayOf(c);
   if (c.kind === "solid") return solidInterval(parseHex(c.color!)!, ov);
-  if (c.kind === "gradient") return gradientInterval(parseHex(c.from!)!, parseHex(c.to!)!, ov);
+  if (c.kind === "gradient")
+    return gradientInterval(parseHex(c.from!)!, parseHex(c.to!)!, ov);
   return channelBoundsInterval(c.min!, c.max!, ov);
 }
 
@@ -61,13 +77,23 @@ describe("contrast engine — fixture parity with the PHP authority (V5a)", () =
 });
 
 /** Dense brute force over the real interpolation — the thing the engine must bound. */
-function bruteWorst(from: Rgb, to: Rgb, fgL: number, overlay: Overlay | null, steps = 4096): number {
+function bruteWorst(
+  from: Rgb,
+  to: Rgb,
+  fgL: number,
+  overlay: Overlay | null,
+  steps = 4096,
+): number {
   const a = overlay ? composite(overlay.rgb, overlay.alpha, from) : from;
   const b = overlay ? composite(overlay.rgb, overlay.alpha, to) : to;
   let worst = Number.POSITIVE_INFINITY;
   for (let i = 0; i <= steps; i += 1) {
     const t = i / steps;
-    const l = luminance(a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t);
+    const l = luminance(
+      a[0] + (b[0] - a[0]) * t,
+      a[1] + (b[1] - a[1]) * t,
+      a[2] + (b[2] - a[2]) * t,
+    );
     worst = Math.min(worst, ratio(fgL, l));
   }
   return worst;
@@ -84,19 +110,25 @@ function rng(seed: number) {
 describe("contrast engine — soundness against brute force (V5a)", () => {
   it("never overstates compliance (conservative) and stays tight, over 400 random gradients, with and without overlays", () => {
     const next = rng(20261007);
-    const color = (): Rgb => [Math.floor(next() * 256), Math.floor(next() * 256), Math.floor(next() * 256)];
+    const color = (): Rgb => [
+      Math.floor(next() * 256),
+      Math.floor(next() * 256),
+      Math.floor(next() * 256),
+    ];
     let worstOverstatement = 0;
     let loosest = 0;
     for (let i = 0; i < 400; i += 1) {
       const from = color();
       const to = color();
-      const overlay: Overlay | null = i % 2 ? { rgb: color(), alpha: Math.round(next() * 18) * 0.05 } : null;
+      const overlay: Overlay | null =
+        i % 2 ? { rgb: color(), alpha: Math.round(next() * 18) * 0.05 } : null;
       const fg: Rgb = i % 4 < 2 ? [255, 255, 255] : [0, 0, 0];
       const fgL = luminance(fg[0], fg[1], fg[2]);
       const engine = worstRatio(fgL, gradientInterval(from, to, overlay));
       const truth = bruteWorst(from, to, fgL, overlay);
       worstOverstatement = Math.max(worstOverstatement, engine - truth);
-      if (truth >= 2 && truth <= 8) loosest = Math.max(loosest, (truth - engine) / truth);
+      if (truth >= 2 && truth <= 8)
+        loosest = Math.max(loosest, (truth - engine) / truth);
     }
     // The engine must never claim more contrast than the real range provides…
     expect(worstOverstatement).toBeLessThanOrEqual(1e-9);
@@ -149,7 +181,11 @@ describe("contrast engine — soundness against brute force (V5a)", () => {
   it("an automatic foreground exists for every opaque background (no colour is rejected)", () => {
     const next = rng(7);
     for (let i = 0; i < 500; i += 1) {
-      const c: Rgb = [Math.floor(next() * 256), Math.floor(next() * 256), Math.floor(next() * 256)];
+      const c: Rgb = [
+        Math.floor(next() * 256),
+        Math.floor(next() * 256),
+        Math.floor(next() * 256),
+      ];
       const iv = solidInterval(c);
       const fg = autoForeground(iv);
       expect(worstRatioForHex(fg, iv)).toBeGreaterThanOrEqual(4.5);

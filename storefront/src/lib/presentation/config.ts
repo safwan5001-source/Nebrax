@@ -1,10 +1,10 @@
 import { type AnnouncementsDoc, normalizeAnnouncements } from "./announcements";
 import { type MediaRef, normalizeMediaRef } from "./media-ref";
-import { type PresentationPalette, normalizePalette } from "./palette";
 import {
   normalizePagePresentation,
   type PagePresentation,
 } from "./page-regions";
+import { normalizePalette, type PresentationPalette } from "./palette";
 import {
   normalizeOptionalSectionContent,
   type SectionContent,

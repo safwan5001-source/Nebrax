@@ -32,12 +32,15 @@ export type PaletteRole = "brand" | "accent" | PaletteRoleKey;
  * Lenient + deterministic: each role is kept or dropped on its own, hex only,
  * lower-cased (one canonical form), fixed role order. `undefined` = absent.
  */
-export function normalizePalette(raw: unknown): PresentationPalette | undefined {
+export function normalizePalette(
+  raw: unknown,
+): PresentationPalette | undefined {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return undefined;
   const source = raw as Record<string, unknown>;
   const out: PresentationPalette = {};
   for (const role of PALETTE_ROLES) {
-    const value = typeof source[role] === "string" ? (source[role] as string).trim() : "";
+    const value =
+      typeof source[role] === "string" ? (source[role] as string).trim() : "";
     if (isSafeHexColor(value)) out[role] = value.toLowerCase();
   }
   return Object.keys(out).length > 0 ? out : undefined;
@@ -68,7 +71,10 @@ export function resolvePalette(config: {
   const p = config.palette ?? {};
   return {
     brand: config.primaryColor,
-    accent: config.accentColor && isSafeHexColor(config.accentColor) ? config.accentColor : null,
+    accent:
+      config.accentColor && isSafeHexColor(config.accentColor)
+        ? config.accentColor
+        : null,
     surface: p.surface ?? null,
     surfaceAlt: p.surfaceAlt ?? null,
     text: p.text ?? null,

@@ -66,7 +66,9 @@ export function parseHex(hex: string): [number, number, number] | null {
 /** local d lin(c)/dc on c ∈ [0, 1]; increasing in c, so the upper end bounds a range. */
 function slopeAt(c: number): number {
   const x = Math.max(0, Math.min(1, c));
-  return x <= 0.03928 ? 1 / 12.92 : (2.4 / 1.055) * ((x + 0.055) / 1.055) ** 1.4;
+  return x <= 0.03928
+    ? 1 / 12.92
+    : (2.4 / 1.055) * ((x + 0.055) / 1.055) ** 1.4;
 }
 
 /** 8-bit rounding slack for a colour range whose per-channel upper bound is `hi` (0–255). */
@@ -93,7 +95,11 @@ export function ratio(a: number, b: number): number {
 }
 
 /** Alpha-composite `fg` over an opaque `bg`, on encoded channels. */
-export function composite(fg: Rgb, alpha: number, bg: Rgb): [number, number, number] {
+export function composite(
+  fg: Rgb,
+  alpha: number,
+  bg: Rgb,
+): [number, number, number] {
   const a = Math.max(0, Math.min(1, alpha));
   return [
     a * fg[0] + (1 - a) * bg[0],
@@ -106,15 +112,24 @@ function clampInterval(min: number, max: number): LuminanceInterval {
   return { min: Math.max(0, min), max: Math.min(1, max) };
 }
 
-export function solidInterval(color: Rgb, overlay: Overlay | null = null): LuminanceInterval {
-  const c = overlay === null ? color : composite(overlay.rgb, overlay.alpha, color);
+export function solidInterval(
+  color: Rgb,
+  overlay: Overlay | null = null,
+): LuminanceInterval {
+  const c =
+    overlay === null ? color : composite(overlay.rgb, overlay.alpha, color);
   const l = luminance(c[0], c[1], c[2]);
   const slack = overlay === null ? 0 : roundSlack(c);
   return clampInterval(l - slack, l + slack);
 }
 
-export function gradientInterval(from: Rgb, to: Rgb, overlay: Overlay | null = null): LuminanceInterval {
-  const a = overlay === null ? from : composite(overlay.rgb, overlay.alpha, from);
+export function gradientInterval(
+  from: Rgb,
+  to: Rgb,
+  overlay: Overlay | null = null,
+): LuminanceInterval {
+  const a =
+    overlay === null ? from : composite(overlay.rgb, overlay.alpha, from);
   const b = overlay === null ? to : composite(overlay.rgb, overlay.alpha, to);
   let min = Number.POSITIVE_INFINITY;
   let max = Number.NEGATIVE_INFINITY;
@@ -128,7 +143,11 @@ export function gradientInterval(from: Rgb, to: Rgb, overlay: Overlay | null = n
     min = Math.min(min, l);
     max = Math.max(max, l);
   }
-  const hi: Rgb = [Math.max(a[0], b[0]), Math.max(a[1], b[1]), Math.max(a[2], b[2])];
+  const hi: Rgb = [
+    Math.max(a[0], b[0]),
+    Math.max(a[1], b[1]),
+    Math.max(a[2], b[2]),
+  ];
   const k =
     (W_R * slopeAt(hi[0] / 255) * Math.abs(b[0] - a[0]) +
       W_G * slopeAt(hi[1] / 255) * Math.abs(b[1] - a[1]) +
@@ -138,31 +157,55 @@ export function gradientInterval(from: Rgb, to: Rgb, overlay: Overlay | null = n
   return clampInterval(min - slack, max + slack);
 }
 
-export function channelBoundsInterval(minRgb: Rgb, maxRgb: Rgb, overlay: Overlay | null = null): LuminanceInterval {
-  const lo = overlay === null ? minRgb : composite(overlay.rgb, overlay.alpha, minRgb);
-  const hi = overlay === null ? maxRgb : composite(overlay.rgb, overlay.alpha, maxRgb);
+export function channelBoundsInterval(
+  minRgb: Rgb,
+  maxRgb: Rgb,
+  overlay: Overlay | null = null,
+): LuminanceInterval {
+  const lo =
+    overlay === null ? minRgb : composite(overlay.rgb, overlay.alpha, minRgb);
+  const hi =
+    overlay === null ? maxRgb : composite(overlay.rgb, overlay.alpha, maxRgb);
   const slack = overlay === null ? 0 : roundSlack(hi);
-  return clampInterval(luminance(lo[0], lo[1], lo[2]) - slack, luminance(hi[0], hi[1], hi[2]) + slack);
+  return clampInterval(
+    luminance(lo[0], lo[1], lo[2]) - slack,
+    luminance(hi[0], hi[1], hi[2]) + slack,
+  );
 }
 
-export function worstRatio(fgLuminance: number, interval: LuminanceInterval): number {
-  if (fgLuminance >= interval.max) return (fgLuminance + 0.05) / (interval.max + 0.05);
-  if (fgLuminance <= interval.min) return (interval.min + 0.05) / (fgLuminance + 0.05);
+export function worstRatio(
+  fgLuminance: number,
+  interval: LuminanceInterval,
+): number {
+  if (fgLuminance >= interval.max)
+    return (fgLuminance + 0.05) / (interval.max + 0.05);
+  if (fgLuminance <= interval.min)
+    return (interval.min + 0.05) / (fgLuminance + 0.05);
   return 1;
 }
 
 /** Invalid colour ⇒ 1 (unproven = non-compliant). */
-export function worstRatioForHex(foreground: string, interval: LuminanceInterval): number {
+export function worstRatioForHex(
+  foreground: string,
+  interval: LuminanceInterval,
+): number {
   const rgb = parseHex(foreground);
   if (!rgb) return 1;
   return worstRatio(luminance(rgb[0], rgb[1], rgb[2]), interval);
 }
 
 /** Only an established ratio passes — never "no violation found". */
-export function passes(worst: number, threshold: number = TEXT_NORMAL): boolean {
+export function passes(
+  worst: number,
+  threshold: number = TEXT_NORMAL,
+): boolean {
   return worst >= threshold;
 }
 
-export function autoForeground(interval: LuminanceInterval): "#ffffff" | "#000000" {
-  return worstRatio(1, interval) >= worstRatio(0, interval) ? "#ffffff" : "#000000";
+export function autoForeground(
+  interval: LuminanceInterval,
+): "#ffffff" | "#000000" {
+  return worstRatio(1, interval) >= worstRatio(0, interval)
+    ? "#ffffff"
+    : "#000000";
 }
