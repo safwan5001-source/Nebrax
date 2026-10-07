@@ -64,6 +64,7 @@ import {
   type CustomizerMessageKey,
 } from "./messages";
 import { useMediaRefPreview } from "./media/use-media-ref-preview";
+import { resolveSectionDesign } from "./presentation/section-design-resolve";
 import { SectionDesignFrame } from "./SectionDesignFrame";
 import type { DesignContext } from "./presentation/section-design-resolve";
 import {
@@ -859,15 +860,19 @@ export function StorefrontPreviewCanvas({
 
             if (section.type === "benefits") {
               const items = benefitsContentOf(section).items.filter((item) => item.title || item.body);
+              // A section without a design keeps its legacy preview exactly; the published
+              // card surface (and the block marker its design rules address) apply only
+              // while a design frame wraps it.
+              const designed = resolveSectionDesign(section.type, section.design, designContext) !== null;
               return (
-                <section key={section.id} data-section-block="">
+                <section key={section.id} data-section-block={designed ? "" : undefined}>
                   <h2 className="text-base font-extrabold">{t("sectionBenefits")}</h2>
                   {items.length === 0 ? (
                     <p className="mt-2 text-sm text-store-muted-foreground">{t("sectionBenefits")}</p>
                   ) : (
                     <ul className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
                       {items.map((item) => (
-                        <li key={item.id} className="min-w-0 break-words rounded-store border border-store-border bg-store-surface px-4 py-4">
+                        <li key={item.id} className={cn("min-w-0 break-words rounded-store border border-store-border", designed ? "bg-store-surface px-4 py-4" : "px-3 py-3")}>
                           {item.title ? <p className="break-words text-sm font-bold">{item.title}</p> : null}
                           {item.body ? <p className="break-words text-sm text-store-muted-foreground">{item.body}</p> : null}
                         </li>
@@ -888,7 +893,10 @@ export function StorefrontPreviewCanvas({
                 else if (groups.length === 0) groups.push({ heading: null, body: [block] });
                 else groups[groups.length - 1].body.push(block);
               }
-              if (config.themePreset === "awj-market" && groups.filter((group) => group.heading).length >= 2) {
+              // The accordion mirror belongs to a designed section (its card surfaces are what the
+              // design rules reason about); an undesigned one keeps its flat legacy preview.
+              const designedContent = resolveSectionDesign(section.type, section.design, designContext) !== null;
+              if (designedContent && config.themePreset === "awj-market" && groups.filter((group) => group.heading).length >= 2) {
                 return (
                   <section key={section.id} className="min-w-0 max-w-3xl space-y-2 break-words">
                     {groups.map((group, index) =>

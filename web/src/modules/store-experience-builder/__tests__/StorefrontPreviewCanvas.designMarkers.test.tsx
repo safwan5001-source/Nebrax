@@ -46,4 +46,42 @@ describe("Canvas banner content-box marker", () => {
     );
     expect(container.querySelector("[data-sd] > section > [data-section-content]")).not.toBeNull();
   });
+
+  it("benefits cards: legacy classes without a design, the published surface only with one", () => {
+    const make = (design: unknown) =>
+      ({
+        ...DEFAULT_PRESENTATION_CONFIG,
+        homepage: {
+          ...DEFAULT_PRESENTATION_CONFIG.homepage,
+          sections: [
+            {
+              id: "ben",
+              type: "benefits",
+              visible: true,
+              design,
+              content: { items: [{ id: "i", title: "A", body: "b" }] },
+            },
+          ],
+        },
+      }) as StorefrontPresentationConfig;
+    const plain = render(
+      <StorefrontPreviewCanvas config={make(undefined)} locale="en" viewport="desktop" onSelectSection={() => {}} />,
+    ).container;
+    const plainCard = plain.querySelector("li") as HTMLElement;
+    expect(plainCard.className).toContain("px-3 py-3");
+    expect(plainCard.className).not.toContain("bg-store-surface");
+    expect(plain.querySelector("[data-section-block]")).toBeNull();
+    cleanup();
+    const designed = render(
+      <StorefrontPreviewCanvas
+        config={make({ background: { kind: "solid", color: { hex: "#fde68a" } } })}
+        locale="en"
+        viewport="desktop"
+        onSelectSection={() => {}}
+      />,
+    ).container;
+    const card = designed.querySelector("li") as HTMLElement;
+    expect(card.className).toContain("bg-store-surface px-4 py-4");
+    expect(designed.querySelector("[data-section-block]")).not.toBeNull();
+  });
 });

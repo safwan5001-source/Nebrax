@@ -57,7 +57,7 @@ Wraps a section only when it has a design. Storefront: `publishedNodes` was spli
 
 ---
 
-## Review round (Codex, 32 findings — all valid, all fixed)
+## Review round (Codex, 33 findings — all valid, all fixed)
 
 | Finding | Fix |
 |---|---|
@@ -105,6 +105,7 @@ Wraps a section only when it has a design. Storefront: `publishedNodes` was spli
 | **P2** the legacy-corner fallback only ran for `bg`: a border-only / shadow-only frame around a rounded banner/hero/promo drew a square border/shadow | the fallback now applies to `bg`, `border` and `shadow` frames (not radius / bleed); cascade spec covers border-only, shadow-only and a square shelf |
 | **P2** the Canvas's empty-banner placeholder kept its own `px-5 py-6` under designed inner spacing (the content-box marker existed only on the authored branch) | the placeholder carries `data-section-content` like the authored box, so `none` removes it and a step replaces it; jsdom test pins both branches |
 | **P2** the published `BannerBand` / `HeroSection` / `BenefitsBand` emitted their design markers even with no design, breaking "absent design ⇒ byte-identical" | the markers are emitted only while a frame is active (`designed` prop; the hero is cloned with it by `published-nodes` when its design resolves to a frame); a unit test pins plain / designed / inert-design output |
+| **P2** the Canvas benefits cards (and Market accordion mirror) changed for sections with **no** design, contradicting "absent design ⇒ unchanged" in the editor | the published card surface, the block marker and the accordion mirror apply only while the section's design resolves to a frame; an undesigned section keeps its legacy `px-3 py-3` preview. The pre-existing Canvas↔storefront drift for undesigned sections (cards without a surface; flat Market accordion) is deliberately **not** touched here — a separate parity fix |
 
 The browser proof now also asserts, at all six widths in RTL and LTR, that **no designed section's root still paints its own fill** and that a heading colour reaches the Canvas heading; a mutation run (rule removed) fails it for banner / appPromo / deliveryPromise / shelf / discovery, so the check is not vacuous. The scenario gained `hero` and `wholesale` designs (the two dark surface-owners) and a distinct heading colour on benefits. 13/13 green.
 
