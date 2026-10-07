@@ -65,4 +65,18 @@ describe("published homepage stack (CUST-HV V5c review)", () => {
       '<div><section data-testid="hero-root">hero</section></div>',
     );
   });
+
+  it("a design that resolves to nothing keeps the legacy wrapper (no layout change)", async () => {
+    const container = await mount([
+      {
+        id: "hero",
+        type: "hero",
+        visible: true,
+        design: { typography: { headingScale: "md" } },
+      },
+    ]);
+    expect(container.firstElementChild?.innerHTML).toBe(
+      '<div><section data-testid="hero-root">hero</section></div>',
+    );
+  });
 });

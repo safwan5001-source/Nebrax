@@ -241,3 +241,23 @@ test('a category card link\'s focus ring (outline-store-primary) is redrawn agai
   expect(await page.locator('#catcard').evaluate((el) => getComputedStyle(el).outlineColor)).toBe('rgb(255, 255, 255)');
 });
 
+test('the full-bleed band is clipped on its own pseudo-element — content (focus rings) is never clipped', async ({ page }) => {
+  await mount(
+    page,
+    frame(
+      'featured',
+      'bg fg heading link bleed',
+      '--sec-bg:#101820;--sec-fg:#ffffff;--sec-heading:#ffffff;--sec-link:#ffffff;--sec-bleed:0 0 0 100vmax #101820',
+      `<section><a id="edge" href="#" class="inline-block p-1">Edge link</a></section>`,
+    ),
+  );
+  const info = await page.evaluate(() => {
+    const frame = document.querySelector('[data-sd]') as HTMLElement;
+    return { frame: getComputedStyle(frame).clipPath, band: getComputedStyle(frame, '::before').clipPath };
+  });
+  expect(info.frame).toBe('none');
+  expect(info.band).not.toBe('none');
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+  expect(overflow).toBeLessThanOrEqual(1);
+});
+

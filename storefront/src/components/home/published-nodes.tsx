@@ -21,7 +21,10 @@ import {
   offersContentOf,
   productShelfContentOf,
 } from "@/lib/presentation/section-content";
-import type { DesignContext } from "@/lib/presentation/section-design-resolve";
+import {
+  type DesignContext,
+  resolveSectionDesign,
+} from "@/lib/presentation/section-design-resolve";
 import type { ThemePresetId } from "@/lib/presentation/tokens";
 
 /**
@@ -87,8 +90,12 @@ async function pushSectionNode(
     // A designed section is wrapped by its `SectionDesignFrame` (a div in the same flow
     // position), and the design rules address the frame's *direct child* as the section's
     // own surface — so no intermediary div may sit between them.
+    // ...but only when the design actually resolves to a frame: a design that renders
+    // nothing (e.g. only default steps) keeps the legacy wrapper byte-for-byte.
+    const framed =
+      resolveSectionDesign(section.type, section.design, ctx.design) !== null;
     nodes.push(
-      section.design ? (
+      framed ? (
         <Fragment key={section.id}>{ctx.implemented[section.type]}</Fragment>
       ) : (
         <div key={section.id}>{ctx.implemented[section.type]}</div>

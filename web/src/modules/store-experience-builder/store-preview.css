@@ -176,6 +176,16 @@
 /* A solid band that extends past the page container to the viewport edges. A
    box-shadow adds no scrollable overflow; the clip keeps it horizontal-only. */
 .awj-store-preview [data-sd~="bleed"] {
+  isolation: isolate;
+}
+/* The band is drawn by a pseudo-element behind the content, so the clip only ever touches
+   the band — never the section's own content (focus rings at its edges stay whole). */
+.awj-store-preview [data-sd~="bleed"]::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
   box-shadow: var(--sec-bleed);
   clip-path: inset(0 -100vmax);
 }
