@@ -55,6 +55,7 @@ import {
   type CustomizerMessageKey,
   customizerMessage,
 } from "./messages";
+import { LogoMediaSlot } from "./media/LogoMediaSlot";
 import type { WorkspaceProductSummary } from "@/modules/commerce-workspace/workspace-products";
 import type { WorkspaceOffer } from "@/modules/commerce-workspace/workspace-offers";
 import {
@@ -232,6 +233,7 @@ export function ControlPanels({
           t={t}
           liveStoreName={liveStoreName}
           patch={patch}
+          locale={locale === "en" ? "en" : "ar"}
         />
       );
     case "header":
@@ -558,16 +560,24 @@ export function matchPreset(hex: string, current: ThemePresetId): ThemePresetId 
   );
 }
 
+const BRANDING_LOGO_SLOTS = [
+  { slot: "logo", label: "logo", hint: "logoHint", legacyKey: "logoDataUrl", mediaKey: "logoMedia" },
+  { slot: "compactLogo", label: "compactLogo", hint: null, legacyKey: "compactLogoDataUrl", mediaKey: "compactLogoMedia" },
+  { slot: "favicon", label: "favicon", hint: null, legacyKey: "faviconDataUrl", mediaKey: "faviconMedia" },
+] as const;
+
 function BrandingPanel({
   config,
   t,
   liveStoreName,
   patch,
+  locale,
 }: {
   config: StorefrontPresentationConfig;
   t: (key: CustomizerMessageKey) => string;
   liveStoreName: string | null;
   patch: (partial: Partial<StorefrontPresentationConfig>) => void;
+  locale: "ar" | "en";
 }) {
   // CUST-H3-1 — one Store Identity surface: display name, logo, compact logo
   // and favicon were already a single `branding.*` persistence group (no
@@ -596,31 +606,40 @@ function BrandingPanel({
             {t("liveName")}: {liveStoreName}
           </p>
         ) : null}
-        <LogoField
-          label={t("logo")}
-          hint={t("logoHint")}
-          value={config.branding.logoDataUrl}
-          t={t}
-          onChange={(logoDataUrl) =>
-            patch({ branding: { ...config.branding, logoDataUrl } })
-          }
-        />
-        <LogoField
-          label={t("compactLogo")}
-          value={config.branding.compactLogoDataUrl}
-          t={t}
-          onChange={(compactLogoDataUrl) =>
-            patch({ branding: { ...config.branding, compactLogoDataUrl } })
-          }
-        />
-        <LogoField
-          label={t("favicon")}
-          value={config.branding.faviconDataUrl}
-          t={t}
-          onChange={(faviconDataUrl) =>
-            patch({ branding: { ...config.branding, faviconDataUrl } })
-          }
-        />
+        {BRANDING_LOGO_SLOTS.map((slot) => {
+          const legacyValue = config.branding[slot.legacyKey];
+          const media = config.branding[slot.mediaKey] ?? null;
+          return (
+            <LogoMediaSlot
+              key={slot.slot}
+              slot={slot.slot}
+              label={t(slot.label)}
+              hint={slot.hint ? t(slot.hint) : undefined}
+              media={media}
+              hasLegacy={Boolean(legacyValue)}
+              t={t}
+              locale={locale}
+              legacyControl={
+                <LogoField
+                  label={t(slot.label)}
+                  hint={slot.hint ? t(slot.hint) : undefined}
+                  value={legacyValue}
+                  t={t}
+                  onChange={(next) =>
+                    patch({ branding: { ...config.branding, [slot.legacyKey]: next } })
+                  }
+                />
+              }
+              onMediaChange={(next, { clearLegacy }) => {
+                const branding = { ...config.branding };
+                if (next) branding[slot.mediaKey] = next;
+                else delete branding[slot.mediaKey];
+                if (clearLegacy) branding[slot.legacyKey] = null;
+                patch({ branding });
+              }}
+            />
+          );
+        })}
       </Section>
     </div>
   );

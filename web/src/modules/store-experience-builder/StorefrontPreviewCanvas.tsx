@@ -63,6 +63,7 @@ import {
   type CustomizerLocale,
   type CustomizerMessageKey,
 } from "./messages";
+import { useMediaRefPreview } from "./media/use-media-ref-preview";
 import {
   PREVIEW_CATEGORIES,
   PREVIEW_STORE_NAME,
@@ -266,10 +267,20 @@ export function StorefrontPreviewCanvas({
   const mobileViewport = viewport === "mobile";
   const headerStyleCompact = config.header.style === "compact";
   const compact = mobileViewport || headerStyleCompact;
+  // CUST-HV V4b — a media reference wins over the legacy embedded image (same
+  // precedence as the published storefront). The preview URL is a signed,
+  // editor-only workspace URL resolved read-only; absent a reference nothing
+  // is fetched and the legacy value renders exactly as before.
+  const logoMediaRef =
+    (headerStyleCompact && config.branding.compactLogoMedia
+      ? config.branding.compactLogoMedia
+      : config.branding.logoMedia) ?? null;
+  const logoMediaUrl = useMediaRefPreview(logoMediaRef);
   const logo =
-    headerStyleCompact && config.branding.compactLogoDataUrl
+    logoMediaUrl ??
+    (headerStyleCompact && config.branding.compactLogoDataUrl
       ? config.branding.compactLogoDataUrl
-      : config.branding.logoDataUrl;
+      : config.branding.logoDataUrl);
   const whatsappHref =
     config.whatsapp.enabled &&
     (config.whatsapp.placement === "floating" ||
