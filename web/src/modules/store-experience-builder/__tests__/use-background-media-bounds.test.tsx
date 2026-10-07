@@ -8,6 +8,7 @@ import {
   backgroundPictureRefs,
   useBackgroundMediaBounds,
 } from "../media/use-background-media-bounds";
+import { notifyUsageGenerated, usageKey } from "../media/use-usage-readiness";
 import type { SectionDesign } from "../presentation/section-design";
 import { MEDIA_ID, MEDIA_ID_2, usage } from "./media-fixtures";
 
@@ -90,6 +91,59 @@ describe("useBackgroundMediaBounds (CUST-HV V6b-4a)", () => {
     });
     expect(result.current.lookup(background.media)).toEqual({ min: [9, 9, 9], max: [20, 20, 20] });
     expect(status).toHaveBeenCalledTimes(2);
+  });
+
+  it("a framed usage that is still 'absent' (generation not started) keeps being watched until bounds arrive", async () => {
+    vi.useFakeTimers();
+    status
+      .mockResolvedValueOnce(usage({ state: "absent", files: [], contrast: null }))
+      .mockResolvedValueOnce(usage({ state: "processing", contrast: null }))
+      .mockResolvedValueOnce(usage({ state: "ready", contrast: { min: [5, 5, 5], max: [30, 30, 30] } }));
+    const framed: SectionDesign = {
+      background: { kind: "media", media: { mediaId: MEDIA_ID, decorative: true, rotate: 90 } },
+    };
+    const sections = [section(framed)];
+    const { result } = renderHook(() => useBackgroundMediaBounds(sections));
+    const background = sections[0].design?.background;
+    if (background?.kind !== "media") throw new Error("fixture");
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(result.current.stateOf(background.media)).toBe("loading");
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(4200);
+    });
+    expect(result.current.lookup(background.media)).toEqual({ min: [5, 5, 5], max: [30, 30, 30] });
+    expect(status).toHaveBeenCalledTimes(3);
+  });
+
+  it("an unframed picture without evidence is final at once ('absent' is normal for it)", async () => {
+    status.mockResolvedValue(usage({ state: "absent", files: [], contrast: null }));
+    const sections = [section(bg(MEDIA_ID))];
+    const { result } = renderHook(() => useBackgroundMediaBounds(sections));
+    const background = sections[0].design?.background;
+    if (background?.kind !== "media") throw new Error("fixture");
+    await waitFor(() => expect(result.current.stateOf(background.media)).toBe("unavailable"));
+    expect(status).toHaveBeenCalledTimes(1);
+  });
+
+  it("a usage generated (or retried) by this editor is re-read at once, replacing a stale 'unavailable'", async () => {
+    status.mockResolvedValueOnce(usage({ state: "failed", contrast: null }));
+    const framed: SectionDesign = {
+      background: { kind: "media", media: { mediaId: MEDIA_ID, decorative: true, rotate: 90 } },
+    };
+    const sections = [section(framed)];
+    const { result } = renderHook(() => useBackgroundMediaBounds(sections));
+    const background = sections[0].design?.background;
+    if (background?.kind !== "media") throw new Error("fixture");
+    await waitFor(() => expect(result.current.stateOf(background.media)).toBe("unavailable"));
+
+    status.mockResolvedValueOnce(usage({ state: "ready", contrast: { min: [1, 1, 1], max: [9, 9, 9] } }));
+    await act(async () => {
+      notifyUsageGenerated(usageKey(background.media));
+    });
+    await waitFor(() => expect(result.current.lookup(background.media)).toEqual({ min: [1, 1, 1], max: [9, 9, 9] }));
+    expect(result.current.stateOf(background.media)).toBe("ready");
   });
 
   it("does nothing for a document without picture backgrounds", () => {

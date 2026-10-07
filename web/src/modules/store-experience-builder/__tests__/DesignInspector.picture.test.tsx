@@ -165,6 +165,16 @@ describe("DesignInspector — picture background (CUST-HV V6b-4b)", () => {
     expect(out().background.overlay.alpha).toBe(60);
   });
 
+  it("an explicit text colour that fails over a provable picture never reads as legible", () => {
+    // the picture is provable (dark range) but a dark body colour on it fails: the text field carries
+    // the failure, and the picture verdict neither says "ok" nor "unprovable"/"unmeasured"
+    const initial = { ...picture(), text: { body: { hex: "#111111" } } } as SectionDesign;
+    render(<Harness initial={initial} bounds={makeBounds("ready", DARK)} />);
+    expect(document.querySelector("[data-picture-status]")).toBeNull();
+    expect(screen.queryByText(t("designPictureOk"))).toBeNull();
+    expect(screen.getAllByText(new RegExp(t("designContrastFail"))).length).toBeGreaterThan(0);
+  });
+
   it("a strong enough overlay makes the same wide range provable (the verdict is the engine's, live)", () => {
     render(<Harness initial={picture({ overlay: { color: { hex: "#000000" }, alpha: 80 } })} bounds={makeBounds("ready", WIDE)} />);
     expect(document.querySelector("[data-picture-status]")?.getAttribute("data-picture-status")).toBe("ok");

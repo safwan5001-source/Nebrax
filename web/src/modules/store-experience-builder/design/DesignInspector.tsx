@@ -249,7 +249,9 @@ export function DesignInspector({
   const pictureStates = mediaBg
     ? [mediaBg.media, mediaBg.mobile].filter((ref): ref is MediaRef => !!ref).map((ref) => bounds?.stateOf(ref) ?? "unavailable")
     : [];
-  const pictureStatus: "checking" | "noEvidence" | "unprovable" | "ok" | null = !mediaBg
+  // "textIssue": the picture itself is provable but an explicit text colour fails over it. The text
+  // field carries that failure; the picture verdict must not claim legibility (nor "unprovable").
+  const pictureStatus: "checking" | "noEvidence" | "unprovable" | "textIssue" | "ok" | null = !mediaBg
     ? null
     : pictureStates.includes("loading")
       ? "checking"
@@ -257,7 +259,9 @@ export function DesignInspector({
         ? "noEvidence"
         : issues.some((issue) => issue.field === "background")
           ? "unprovable"
-          : "ok";
+          : issues.length > 0
+            ? "textIssue"
+            : "ok";
 
   // ── text ──────────────────────────────────────────────────────────────────
   const textField = (field: TextField, label: string) => {
@@ -564,6 +568,7 @@ export function DesignInspector({
                       }
                     />
                   ) : null}
+                  {pictureStatus === "textIssue" ? null : (
                   <p
                     data-picture-status={pictureStatus ?? undefined}
                     role={pictureStatus === "ok" || pictureStatus === "checking" ? "status" : "alert"}
@@ -598,6 +603,7 @@ export function DesignInspector({
                       </button>
                     ) : null}
                   </p>
+                  )}
                 </>
               ) : null}
             </div>

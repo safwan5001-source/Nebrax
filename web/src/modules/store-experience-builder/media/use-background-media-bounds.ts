@@ -8,18 +8,23 @@
  * `lookup` is what `DesignContext.mediaBounds` expects (sync; `null` = unproven). `stateOf` tells the
  * inspector *why* it is unproven: still `loading`, or `unavailable` (no valid evidence — a picture
  * that predates evidence, a translucent one, or a framed usage that failed).
- * A framed usage that is still being generated is polled (bounded) until it settles; a stale
- * response never overwrites a newer one.
+ *
+ * A framed usage that is `processing` — or still `absent` because generation has not started yet (the
+ * field waits a debounce before asking for it) — is polled (bounded) until it settles. A usage that
+ * a generation/retry in this editor has just made ready is re-read at once (`onUsageGenerated`), so a
+ * status fetched before generation never sticks. A stale response never overwrites a newer one.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   mediaRefTransform,
+  usageNeedsDerivatives,
   usageStatus,
   type UsageContrast,
 } from "@/modules/commerce-workspace/storefront-media";
 import type { MediaRef } from "../presentation/media-ref";
 import type { SectionDesign } from "../presentation/section-design";
 import type { MediaBounds } from "../presentation/section-design-resolve";
+import { onUsageGenerated, usageKey } from "./use-usage-readiness";
 
 export type BoundsState = "loading" | "ready" | "unavailable";
 
@@ -32,10 +37,6 @@ type Entry = { state: BoundsState; bounds: UsageContrast | null };
 
 const POLL_MS = 2000;
 const MAX_POLLS = 30;
-
-function usageKey(ref: MediaRef): string {
-  return JSON.stringify([ref.mediaId, mediaRefTransform(ref)]);
-}
 
 /** Every picture of every visible picture background (a hidden section never blocks publishing). */
 export function backgroundPictureRefs(
@@ -55,7 +56,7 @@ export function useBackgroundMediaBounds(
   sections: ReadonlyArray<{ visible: boolean; design?: SectionDesign }>,
 ): BackgroundMediaBounds {
   const refs = backgroundPictureRefs(sections);
-  const signature = refs.map(usageKey).join("|");
+  const signature = refs.map((ref) => usageKey(ref)).join("|");
   const [entries, setEntries] = useState<Record<string, Entry>>({});
   const generation = useRef(0);
   const refsRef = useRef(refs);
@@ -65,33 +66,49 @@ export function useBackgroundMediaBounds(
     const token = ++generation.current;
     const wanted = new Map<string, MediaRef>();
     for (const ref of refsRef.current) wanted.set(usageKey(ref), ref);
+    const cycles = new Map<string, number>();
     let live = true;
 
-    for (const [key, ref] of wanted) {
-      void (async () => {
-        for (let attempt = 0; attempt <= MAX_POLLS; attempt += 1) {
-          try {
-            const status = await usageStatus(ref.mediaId, mediaRefTransform(ref));
-            if (!live || token !== generation.current) return;
-            const settled = status.contrast !== null || status.state !== "processing";
-            setEntries((prev) => ({
-              ...prev,
-              [key]: status.contrast
-                ? { state: "ready", bounds: status.contrast }
-                : { state: settled ? "unavailable" : "loading", bounds: null },
-            }));
-            if (settled) return;
-          } catch {
-            if (!live || token !== generation.current) return;
-            setEntries((prev) => ({ ...prev, [key]: { state: "unavailable", bounds: null } }));
-            return;
-          }
-          await new Promise((resolve) => setTimeout(resolve, POLL_MS));
+    /** One read-and-poll cycle for a usage; a newer cycle for the same usage supersedes it. */
+    const read = async (key: string, ref: MediaRef) => {
+      const mine = (cycles.get(key) ?? 0) + 1;
+      cycles.set(key, mine);
+      const current = () => live && token === generation.current && cycles.get(key) === mine;
+      for (let attempt = 0; attempt <= MAX_POLLS; attempt += 1) {
+        try {
+          const status = await usageStatus(ref.mediaId, mediaRefTransform(ref));
+          if (!current()) return;
+          // `absent` is "not generated yet" only for a framed usage; an unframed picture has no
+          // derivative rows by design, so `absent` + no contrast there is final (no evidence).
+          const pending =
+            status.contrast === null &&
+            (status.state === "processing" || (status.state === "absent" && usageNeedsDerivatives(ref)));
+          const settled = !pending || attempt === MAX_POLLS;
+          setEntries((prev) => ({
+            ...prev,
+            [key]: status.contrast
+              ? { state: "ready", bounds: status.contrast }
+              : { state: settled ? "unavailable" : "loading", bounds: null },
+          }));
+          if (settled) return;
+        } catch {
+          if (!current()) return;
+          setEntries((prev) => ({ ...prev, [key]: { state: "unavailable", bounds: null } }));
+          return;
         }
-      })();
-    }
+        await new Promise((resolve) => setTimeout(resolve, POLL_MS));
+        if (!current()) return;
+      }
+    };
+
+    for (const [key, ref] of wanted) void read(key, ref);
+    const stopListening = onUsageGenerated((key) => {
+      const ref = wanted.get(key);
+      if (ref && live) void read(key, ref);
+    });
     return () => {
       live = false;
+      stopListening();
     };
   }, [signature]);
 
