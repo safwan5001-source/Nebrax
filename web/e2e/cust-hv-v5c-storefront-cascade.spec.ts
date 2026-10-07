@@ -115,9 +115,18 @@ test('inner spacing replaces legacy padding; block alignment is separate from te
       'bg fg heading link pi',
       '--sec-bg:#101820;--sec-fg:#ffffff;--sec-heading:#ffffff;--sec-link:#ffffff;--sec-pi:0px',
       `<section id="root" class="overflow-hidden rounded-store border border-store-border bg-store-surface">
-         <div id="inner" class="flex flex-col gap-4 p-5 md:p-8"><p>copy</p></div>
+         <div id="inner" data-section-content="" class="flex flex-col gap-4 p-5 md:p-8"><p>copy</p></div>
+         <details id="acc" class="rounded-store border px-4 open:pb-4"><summary>q</summary>a</details>
        </section>`,
     ) +
+      frame(
+        'hero',
+        'bg fg heading link balign',
+        '--sec-bg:#fde68a;--sec-fg:#000000;--sec-heading:#000000;--sec-link:#000000;--sec-bms:auto;--sec-bme:auto',
+        `<section class="flex items-center rounded-store bg-linear-to-r from-primary-700 to-primary-500 text-store-primary-foreground">
+           <div id="herobox" data-section-content="" class="max-w-xs p-5"><h1>Hero</h1></div>
+         </section>`,
+      ) +
       frame(
         'customContent',
         'balign align',
@@ -135,6 +144,11 @@ test('inner spacing replaces legacy padding; block alignment is separate from te
   );
   expect(await page.locator('#inner').evaluate((el) => getComputedStyle(el).paddingTop)).toBe('0px'); // `none` removes the legacy p-5 / md:p-8
   expect(await page.locator('#root').evaluate((el) => getComputedStyle(el).paddingTop)).toBe('0px');
+  // an accordion card inside the section keeps its own padding (only marked content boxes are reset)
+  expect(await page.locator('#acc').evaluate((el) => getComputedStyle(el).paddingLeft)).toBe('16px');
+  // the hero's actual constrained content box is what gets positioned
+  const hero = await page.locator('#herobox').evaluate((el) => getComputedStyle(el).marginLeft);
+  expect(hero).not.toBe('0px');
   const margins = await page.locator('#block').evaluate((el) => { const cs = getComputedStyle(el); return [cs.marginLeft, cs.marginRight]; });
   expect(margins[0]).not.toBe('0px'); // centred block…
   expect(margins[0]).toBe(margins[1]);
@@ -147,3 +161,162 @@ test('inner spacing replaces legacy padding; block alignment is separate from te
   expect(focused.color).toBe('rgb(0, 0, 0)'); // …so the proven foreground stays
 });
 
+test('block alignment really positions a banner\'s content group (it shrinks to its content first)', async ({ page }) => {
+  await mount(
+    page,
+    frame(
+      'banner',
+      'bg fg balign',
+      '--sec-bg:#101820;--sec-fg:#ffffff;--sec-bms:auto;--sec-bme:auto',
+      `<section id="broot" class="overflow-hidden rounded-store border border-store-border bg-store-surface">
+         <div id="bbox" data-section-content="" class="flex min-w-0 flex-col gap-4 p-5 md:flex-row md:items-center md:p-8"><p>short copy</p></div>
+       </section>`,
+    ),
+  );
+  const geo = await page.evaluate(() => {
+    const root = document.getElementById('broot')!.getBoundingClientRect();
+    const box = document.getElementById('bbox')!.getBoundingClientRect();
+    return { rootW: root.width, boxW: box.width, left: box.left - root.left, right: root.right - box.right };
+  });
+  expect(geo.boxW).toBeLessThan(geo.rootW - 40); // narrower than the section…
+  expect(Math.abs(geo.left - geo.right)).toBeLessThan(2); // …and centred in it
+});
+
+test('benefits: its root is the block that gets positioned (shrink-wrapped), and a label action follows the link colour', async ({ page }) => {
+  await mount(
+    page,
+    frame(
+      'benefits',
+      'bg fg heading link balign',
+      '--sec-bg:#101820;--sec-fg:#ffffff;--sec-heading:#ffffff;--sec-link:#ffffff;--sec-bms:auto;--sec-bme:auto',
+      `<section id="ben" data-section-block="" class="min-w-0">
+         <h2 class="text-lg">Benefits</h2>
+         <span id="act" data-section-action="" class="text-store-primary">View all</span>
+         <ul class="mt-4 grid gap-3 sm:grid-cols-2"><li class="rounded-store border bg-store-surface px-4 py-4">One</li></ul>
+       </section>`,
+    ),
+  );
+  const geo = await page.evaluate(() => {
+    const frame = document.querySelector('[data-sd]')!.getBoundingClientRect();
+    const box = document.getElementById('ben')!.getBoundingClientRect();
+    return { frameW: frame.width, boxW: box.width, left: box.left - frame.left, right: frame.right - box.right };
+  });
+  expect(geo.boxW).toBeLessThan(geo.frameW - 40);
+  expect(Math.abs(geo.left - geo.right)).toBeLessThan(2);
+  expect((await style(page, '#act')).color).toBe('rgb(255, 255, 255)');
+});
+
+test('hero CTA focus ring is drawn in the designed foreground, not the restored white', async ({ page }) => {
+  await mount(
+    page,
+    frame(
+      'hero',
+      'bg fg heading link',
+      '--sec-bg:#fde68a;--sec-fg:#000000;--sec-heading:#000000;--sec-link:#000000',
+      `<section class="flex items-center rounded-store text-store-primary-foreground">
+         <a id="herocta" href="#" class="inline-flex bg-store-primary-foreground px-4 text-store-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-store-primary-foreground">Shop now</a>
+       </section>`,
+    ),
+  );
+  await page.locator('#herocta').focus();
+  await page.keyboard.press('Tab');
+  await page.keyboard.press('Shift+Tab');
+  const outline = await page.locator('#herocta').evaluate((el) => getComputedStyle(el).outlineColor);
+  expect(outline).toBe('rgb(0, 0, 0)');
+});
+
+test('a category card link\'s focus ring (outline-store-primary) is redrawn against a primary-coloured designed background', async ({ page }) => {
+  await mount(
+    page,
+    frame(
+      'categories',
+      'bg fg heading link',
+      '--sec-bg:#12372a;--sec-fg:#ffffff;--sec-heading:#ffffff;--sec-link:#ffffff',
+      `<section><a id="catcard" href="#" class="block rounded-store border bg-store-surface p-3 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-store-primary">Card</a></section>`,
+    ),
+  );
+  await page.locator('#catcard').focus();
+  await page.keyboard.press('Tab');
+  await page.keyboard.press('Shift+Tab');
+  expect(await page.locator('#catcard').evaluate((el) => getComputedStyle(el).outlineColor)).toBe('rgb(255, 255, 255)');
+});
+
+test('the full-bleed band is clipped on its own pseudo-element — content (focus rings) is never clipped', async ({ page }) => {
+  await mount(
+    page,
+    frame(
+      'featured',
+      'bg fg heading link bleed',
+      '--sec-bg:#101820;--sec-fg:#ffffff;--sec-heading:#ffffff;--sec-link:#ffffff;--sec-bleed:0 0 0 100vmax #101820',
+      `<section><a id="edge" href="#" class="inline-block p-1">Edge link</a></section>`,
+    ),
+  );
+  const info = await page.evaluate(() => {
+    const frame = document.querySelector('[data-sd]') as HTMLElement;
+    return { frame: getComputedStyle(frame).clipPath, band: getComputedStyle(frame, '::before').clipPath };
+  });
+  expect(info.frame).toBe('none');
+  expect(info.band).not.toBe('none');
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+  expect(overflow).toBeLessThanOrEqual(1);
+});
+
+test('a designed background keeps the corners of the surface it replaced', async ({ page }) => {
+  await mount(
+    page,
+    frame(
+      'banner',
+      'bg fg',
+      '--sec-bg:#101820;--sec-fg:#ffffff',
+      `<section id="rr" class="overflow-hidden rounded-store border border-store-border bg-store-surface"><p>x</p></section>`,
+    ) +
+      frame('featured', 'bg fg', '--sec-bg:#101820;--sec-fg:#ffffff', `<section id="sq"><p>y</p></section>`),
+  );
+  const radii = await page.evaluate(() => {
+    const frames = document.querySelectorAll('[data-sd]');
+    return [...frames].map((f) => getComputedStyle(f).borderTopLeftRadius);
+  });
+  expect(parseFloat(radii[0])).toBeGreaterThan(0); // the banner card's rounded corners survive
+  expect(radii[1]).toBe('0px'); // a shelf had none
+});
+
+
+test('a border-only or shadow-only frame keeps the corners of the surface it outlines', async ({ page }) => {
+  const card = `<section class="overflow-hidden rounded-store border border-store-border bg-store-surface"><p>x</p></section>`;
+  await mount(
+    page,
+    frame('banner', 'border', '--sec-bw:2px;--sec-bc:#101820', card) +
+      frame('banner', 'shadow', '--sec-shadow:0 6px 16px rgba(0,0,0,.12)', card) +
+      frame('featured', 'border', '--sec-bw:2px;--sec-bc:#101820', `<section><p>y</p></section>`),
+  );
+  const radii = await page.evaluate(() =>
+    [...document.querySelectorAll('[data-sd]')].map((f) => getComputedStyle(f).borderTopLeftRadius),
+  );
+  expect(parseFloat(radii[0])).toBeGreaterThan(0);
+  expect(parseFloat(radii[1])).toBeGreaterThan(0);
+  expect(radii[2]).toBe('0px');
+});
+
+test('a radius rounds the frame and the section root but never clips an edge focus outline', async ({ page }) => {
+  await mount(
+    page,
+    frame(
+      'categories',
+      'bg radius',
+      '--sec-bg:#e0f2fe;--sec-radius:1.25rem',
+      `<section id="r" class="rounded-store"><a id="edge" href="#" style="display:block;outline:2px solid #1d4ed8;outline-offset:2px">go</a></section>`,
+    ),
+  );
+  const info = await page.evaluate(() => {
+    const f = document.querySelector('[data-sd]') as HTMLElement;
+    const root = document.getElementById('r') as HTMLElement;
+    return {
+      frameRadius: getComputedStyle(f).borderTopLeftRadius,
+      rootRadius: getComputedStyle(root).borderTopLeftRadius,
+      overflow: getComputedStyle(f).overflow,
+    };
+  });
+  expect(parseFloat(info.frameRadius)).toBeCloseTo(20, 0);
+  expect(info.rootRadius).toBe(info.frameRadius);
+  expect(info.overflow).toBe('visible'); // nothing clips the outline
+});
