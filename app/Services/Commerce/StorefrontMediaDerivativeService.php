@@ -410,6 +410,7 @@ class StorefrontMediaDerivativeService
                 $row->forceFill([
                     'avg_luminance' => $stats['avg_luminance'],
                     'dominant_colour' => $stats['dominant_colour'],
+                    'region_luminance' => $stats['region_luminance'],
                     'state' => StorefrontMediaDerivative::STATE_READY,
                     'error_code' => null,
                     'claimed_at' => null,

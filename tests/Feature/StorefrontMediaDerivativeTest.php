@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\StorefrontMedia;
 use App\Models\StorefrontMediaDerivative;
 use App\Services\Commerce\StorefrontMediaDerivativeService;
+use App\Services\Commerce\StorefrontMediaPixelEvidence;
 use App\Services\Commerce\StorefrontMediaTransform;
 use App\Services\Commerce\StorefrontMediaVariantGenerator;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -273,6 +274,12 @@ class StorefrontMediaDerivativeTest extends TestCase
         }
 
         $this->assertSame(8, StorefrontMediaDerivative::query()->where('state', 'ready')->count());
+
+        // CUST-HV V6b-1 (AMEND-8) — كل صفّ مشتقٍّ يحمل دليل البكسل للإطار المحوَّل (لا للأصل).
+        foreach (StorefrontMediaDerivative::query()->get() as $row) {
+            $this->assertSame('transform', $row->region_luminance['basis']);
+            $this->assertNotNull(StorefrontMediaPixelEvidence::bounds($row->region_luminance));
+        }
     }
 
     /** @test */
