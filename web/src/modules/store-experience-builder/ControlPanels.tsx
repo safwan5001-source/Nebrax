@@ -64,6 +64,10 @@ import {
   ProductShelfFields,
 } from "./DataSectionFields";
 import { OfferCatalog } from "./OfferCatalog";
+import { DesignInspector } from "./design/DesignInspector";
+import { PaletteEditor } from "./design/PaletteEditor";
+import { SECTION_DESIGN_CAPABILITIES } from "./presentation/section-design";
+import type { DesignContext } from "./presentation/section-design-resolve";
 import { OfferSummary, OfferThumb } from "./OfferParts";
 import { offerDisplayName } from "./offers-display";
 import type { OfferManagement } from "./offers-management";
@@ -225,7 +229,7 @@ export function ControlPanels({
 
   switch (panel) {
     case "theme":
-      return <ThemePanel config={config} t={t} patch={patch} />;
+      return <ThemePanel config={config} t={t} patch={patch} locale={locale} />;
     case "branding":
       return (
         <BrandingPanel
@@ -400,10 +404,12 @@ function ThemePanel({
   config,
   t,
   patch,
+  locale = "ar",
 }: {
   config: StorefrontPresentationConfig;
   t: (key: CustomizerMessageKey) => string;
   patch: (partial: Partial<StorefrontPresentationConfig>) => void;
+  locale?: CustomizerLocale;
 }) {
   const contrast = contrastRatio(config.primaryColor, "#ffffff");
   // Typing a hex that happens to equal a bundled preset's exact swatch (e.g.
@@ -541,6 +547,19 @@ function ThemePanel({
             }))}
           />
         </Field>
+        <Section title={t("paletteTitle")} hint={t("paletteHint")}>
+          <PaletteEditor
+            palette={config.palette}
+            ctx={{
+              primaryColor: config.primaryColor,
+              accentColor: config.accentColor,
+              palette: config.palette,
+              dir: locale === "en" ? "ltr" : "rtl",
+            }}
+            t={t}
+            onChange={(palette) => patch({ palette })}
+          />
+        </Section>
       </div>
     </div>
   );
@@ -1079,6 +1098,24 @@ function HomepagePanel({
     ? sections.findIndex((section) => section.id === selectedSection)
     : -1;
   const selected = selectedIndex >= 0 ? sections[selectedIndex] : null;
+  // Content | Design for the selected section. Keyed by section id so a new
+  // selection always opens on Content; sections with no design capability have no tab.
+  const [tabState, setTabState] = useState<{
+    id: string | null;
+    tab: "content" | "design";
+  }>({ id: null, tab: "content" });
+  const designTab =
+    selected &&
+    SECTION_DESIGN_CAPABILITIES[selected.type] &&
+    tabState.id === selected.id
+      ? tabState.tab
+      : "content";
+  const designContext: DesignContext = {
+    primaryColor: config.primaryColor,
+    accentColor: config.accentColor,
+    palette: config.palette,
+    dir: locale === "en" ? "ltr" : "rtl",
+  };
 
   // CUST-H4-2 mobile fix — on mobile the Library *replaces* this panel's
   // whole body in place, inside the same "sections" Bottom Sheet
@@ -1120,7 +1157,31 @@ function HomepagePanel({
               checked={selected.visible}
               onChange={(visible) => setVisible(selectedIndex, visible)}
             />
-            {selected.type === "hero" ? (
+            {SECTION_DESIGN_CAPABILITIES[selected.type] ? (
+              <Segmented
+                value={designTab}
+                onChange={(tab) => setTabState({ id: selected.id, tab })}
+                options={[
+                  { id: "content", label: t("contentTab") },
+                  { id: "design", label: t("designTab") },
+                ]}
+              />
+            ) : null}
+            {designTab === "design" ? (
+              <DesignInspector
+                key={selected.id}
+                type={selected.type}
+                design={selected.design}
+                ctx={designContext}
+                t={t}
+                onChange={(design) =>
+                  updateSection(selectedIndex, {
+                    ...selected,
+                    design,
+                  })
+                }
+              />
+            ) : selected.type === "hero" ? (
               heroFields
             ) : selected.type === "banner" ? (
               <BannerFields
