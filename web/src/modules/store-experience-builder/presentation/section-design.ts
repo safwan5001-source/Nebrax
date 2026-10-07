@@ -13,14 +13,13 @@
  * all three are pinned by `tests/Fixtures/presentation/section-design.json`.
  *
  * Deliberately NOT here yet (each enters with the slice that can render and prove it):
- *  - `background.kind = "media"` (+ overlay, mobile override) → V6, together with the
- *    region-luminance evidence the contrast gate needs (V0 §3.2.1);
  *  - `layout` variants → the slices that add variants (V6/V8/V9);
  *  - `overlap` / `mediaTreatment` → V6 / V8 (V5e-3 added `separator` and `motion.reveal`).
  * Until then they are dropped fail-closed, so a hand-written document can never
  * smuggle an unproven background past the publish gate.
  */
 
+import { type MediaRef, normalizeMediaRef } from "./media-ref";
 import { PALETTE_ROLES, type PaletteRole } from "./palette";
 import { isSafeHexColor } from "./tokens";
 
@@ -67,15 +66,32 @@ export const SEPARATOR_KINDS = [
 ] as const;
 export const SEPARATOR_HEIGHTS = ["sm", "md", "lg"] as const;
 export const REVEALS = ["none", "fade-up"] as const;
+/** V6b-2 — background kinds every section may use; `media` is hero/banner only. */
+export const BACKGROUND_KINDS = ["solid", "gradient"] as const;
+/** V6b-2 — media overlay opacity: percent in steps of 5, capped at 90 (the picture never vanishes). */
+export const OVERLAY_ALPHAS = [
+  5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90,
+] as const;
 
 export type Step = (typeof STEPS)[number];
 export type Direction = (typeof DIRECTIONS)[number];
 export type Align = (typeof ALIGNS)[number];
 export type ColorRef = { role: PaletteRole } | { hex: string };
 
+export interface MediaOverlay {
+  color: ColorRef;
+  alpha: (typeof OVERLAY_ALPHAS)[number];
+}
+
 export type SectionBackground =
   | { kind: "solid"; color: ColorRef }
-  | { kind: "gradient"; from: ColorRef; to: ColorRef; direction: Direction };
+  | { kind: "gradient"; from: ColorRef; to: ColorRef; direction: Direction }
+  | {
+      kind: "media";
+      media: MediaRef;
+      mobile?: MediaRef;
+      overlay?: MediaOverlay;
+    };
 
 export interface SectionText {
   heading?: ColorRef;
@@ -138,6 +154,7 @@ export type DesignGroup = keyof SectionDesign;
 type GroupAllowance = true | readonly string[];
 export type DesignCapability = Partial<Record<DesignGroup, GroupAllowance>>;
 
+const MEDIA_BACKGROUND = [...BACKGROUND_KINDS, "media"] as const;
 const FULL_TEXT = ["heading", "body", "link", "align"] as const;
 const FULL_TYPO = [
   "headingScale",
@@ -149,7 +166,7 @@ const FULL_TYPO = [
 
 export const SECTION_DESIGN_CAPABILITIES: Record<string, DesignCapability> = {
   hero: {
-    background: true,
+    background: MEDIA_BACKGROUND,
     text: FULL_TEXT,
     typography: FULL_TYPO,
     width: true,
@@ -162,7 +179,7 @@ export const SECTION_DESIGN_CAPABILITIES: Record<string, DesignCapability> = {
     motion: ["reveal"],
   },
   banner: {
-    background: true,
+    background: MEDIA_BACKGROUND,
     text: FULL_TEXT,
     typography: FULL_TYPO,
     width: true,
@@ -175,7 +192,7 @@ export const SECTION_DESIGN_CAPABILITIES: Record<string, DesignCapability> = {
     motion: ["reveal"],
   },
   categories: {
-    background: true,
+    background: BACKGROUND_KINDS,
     text: ["heading"],
     typography: ["headingStyle"],
     width: true,
@@ -185,7 +202,7 @@ export const SECTION_DESIGN_CAPABILITIES: Record<string, DesignCapability> = {
     separator: true,
   },
   newArrivals: {
-    background: true,
+    background: BACKGROUND_KINDS,
     text: ["heading"],
     typography: ["headingStyle"],
     width: true,
@@ -193,7 +210,7 @@ export const SECTION_DESIGN_CAPABILITIES: Record<string, DesignCapability> = {
     separator: true,
   },
   featured: {
-    background: true,
+    background: BACKGROUND_KINDS,
     text: ["heading"],
     typography: ["headingStyle"],
     width: true,
@@ -201,7 +218,7 @@ export const SECTION_DESIGN_CAPABILITIES: Record<string, DesignCapability> = {
     separator: true,
   },
   offers: {
-    background: true,
+    background: BACKGROUND_KINDS,
     text: ["heading"],
     typography: ["headingStyle"],
     width: true,
@@ -209,7 +226,7 @@ export const SECTION_DESIGN_CAPABILITIES: Record<string, DesignCapability> = {
     separator: true,
   },
   productShelf: {
-    background: true,
+    background: BACKGROUND_KINDS,
     text: ["heading"],
     typography: ["headingStyle"],
     width: true,
@@ -217,13 +234,13 @@ export const SECTION_DESIGN_CAPABILITIES: Record<string, DesignCapability> = {
     separator: true,
   },
   discovery: {
-    background: true,
+    background: BACKGROUND_KINDS,
     text: ["heading"],
     spacing: true,
     separator: true,
   },
   benefits: {
-    background: true,
+    background: BACKGROUND_KINDS,
     text: FULL_TEXT,
     typography: FULL_TYPO,
     spacing: true,
@@ -234,7 +251,7 @@ export const SECTION_DESIGN_CAPABILITIES: Record<string, DesignCapability> = {
     separator: true,
   },
   customContent: {
-    background: true,
+    background: BACKGROUND_KINDS,
     text: FULL_TEXT,
     typography: FULL_TYPO,
     width: ["max"],
@@ -243,7 +260,7 @@ export const SECTION_DESIGN_CAPABILITIES: Record<string, DesignCapability> = {
     separator: true,
   },
   appPromo: {
-    background: true,
+    background: BACKGROUND_KINDS,
     text: FULL_TEXT,
     spacing: true,
     border: true,
@@ -251,12 +268,12 @@ export const SECTION_DESIGN_CAPABILITIES: Record<string, DesignCapability> = {
     separator: true,
   },
   deliveryPromise: {
-    background: true,
+    background: BACKGROUND_KINDS,
     spacing: true,
     separator: true,
   },
   wholesale: {
-    background: true,
+    background: BACKGROUND_KINDS,
     spacing: true,
     separator: true,
   },
@@ -294,13 +311,20 @@ function allowsField(
   return allowance === true || allowance.includes(field);
 }
 
-function normalizeBackground(raw: unknown): SectionBackground | undefined {
+function normalizeBackground(
+  raw: unknown,
+  allowance: GroupAllowance | undefined,
+): SectionBackground | undefined {
   if (!isRecord(raw)) return undefined;
-  if (raw.kind === "solid") {
+  const kind = raw.kind;
+  if (typeof kind !== "string" || !allowsField(allowance, kind)) {
+    return undefined; // unknown or not allowed for this section — fail-closed
+  }
+  if (kind === "solid") {
     const color = normalizeColorRef(raw.color);
     return color ? { kind: "solid", color } : undefined;
   }
-  if (raw.kind === "gradient") {
+  if (kind === "gradient") {
     const from = normalizeColorRef(raw.from);
     const to = normalizeColorRef(raw.to);
     const direction = pick(raw.direction, DIRECTIONS);
@@ -308,7 +332,41 @@ function normalizeBackground(raw: unknown): SectionBackground | undefined {
       ? { kind: "gradient", from, to, direction }
       : undefined;
   }
-  return undefined; // `media` (and anything else) enters with V6 — fail-closed
+  if (kind === "media") return normalizeMediaBackground(raw);
+  return undefined;
+}
+
+/**
+ * V6b-2 — an image background: `media` is required (else the whole background drops),
+ * `mobile` is an optional phone-width alternative, `overlay` an optional colour wash.
+ * The picture is decorative by definition (no alt) and always `cover`: a frame that does
+ * not fill the box would reveal a surface the contrast evidence does not cover.
+ */
+function normalizeBackgroundRef(raw: unknown): MediaRef | undefined {
+  const ref = normalizeMediaRef(raw);
+  if (!ref) return undefined;
+  const { fit: _fit, alt: _alt, ...rest } = ref;
+  return { ...rest, decorative: true };
+}
+
+function normalizeMediaOverlay(raw: unknown): MediaOverlay | undefined {
+  if (!isRecord(raw)) return undefined;
+  const alpha = pick(raw.alpha, OVERLAY_ALPHAS);
+  if (alpha === undefined) return undefined;
+  return { color: normalizeColorRef(raw.color) ?? { role: "overlay" }, alpha };
+}
+
+function normalizeMediaBackground(
+  raw: Record<string, unknown>,
+): SectionBackground | undefined {
+  const media = normalizeBackgroundRef(raw.media);
+  if (!media) return undefined;
+  const out: SectionBackground = { kind: "media", media };
+  const mobile = normalizeBackgroundRef(raw.mobile);
+  if (mobile) out.mobile = mobile;
+  const overlay = normalizeMediaOverlay(raw.overlay);
+  if (overlay) out.overlay = overlay;
+  return out;
 }
 
 function normalizeText(
@@ -430,7 +488,10 @@ export function normalizeSectionDesign(
   const out: SectionDesign = {};
 
   if (capability.background) {
-    const background = normalizeBackground(raw.background);
+    const background = normalizeBackground(
+      raw.background,
+      capability.background,
+    );
     if (background) out.background = background;
   }
   if (capability.text) {

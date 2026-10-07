@@ -3,6 +3,7 @@
 namespace App\Support\Commerce;
 
 use App\Services\Commerce\PresentationPublishValidationException;
+use App\Services\Commerce\StorefrontMediaContrastEvidence;
 use App\Services\Commerce\StorefrontMediaPublishGate;
 use Carbon\CarbonImmutable;
 use Throwable;
@@ -45,9 +46,24 @@ final class StorefrontPresentationPublishValidator
     public function errors(array $normalized): array
     {
         return $this->announcementErrors($normalized['announcements'] ?? null)
-            + SectionDesignContrast::errors($normalized)
+            + SectionDesignContrast::errors($normalized, $this->mediaBounds())
             + ButtonTokensContrast::errors($normalized)
             + $this->mediaErrors($normalized);
+    }
+
+    /**
+     * CUST-HV V6b-2 — حدود لمعان صور الخلفيات لبوّابة التباين. المغلَق كسول: وثيقةٌ بلا خلفية
+     * صورة لا تستدعيه فلا تلمس القاعدة. يعيد `null` (= غير مُثبَت) حين يغيب الدليل.
+     */
+    private function mediaBounds(): \Closure
+    {
+        $evidence = null;
+
+        return static function (array $ref) use (&$evidence): ?array {
+            $evidence ??= app(StorefrontMediaContrastEvidence::class);
+
+            return $evidence->boundsFor($ref);
+        };
     }
 
     /**

@@ -19,6 +19,7 @@
  */
 import {
   autoForeground,
+  channelBoundsInterval,
   gradientInterval,
   type LuminanceInterval,
   parseHex,
@@ -27,6 +28,7 @@ import {
   TEXT_NORMAL,
   worstRatioForHex,
 } from "./contrast-engine";
+import type { MediaRef } from "./media-ref";
 import { type PresentationPalette, resolveRoleHex } from "./palette";
 import type {
   ColorRef,
@@ -41,6 +43,18 @@ export interface DesignContext {
   palette?: PresentationPalette;
   /** Page direction: logical gradient directions mirror under RTL. */
   dir: "ltr" | "rtl";
+  /**
+   * V6b-2 — proven encoded-channel bounds (already widened by the encoding margin) of the
+   * pixels a media background can show, per `MediaRef`; `null` = no usable evidence. Absent
+   * ⇒ nothing about a picture can be proven (fail-closed), exactly like the publish gate
+   * without evidence.
+   */
+  mediaBounds?: (ref: MediaRef) => MediaBounds | null;
+}
+
+export interface MediaBounds {
+  min: Rgb;
+  max: Rgb;
 }
 
 export interface ResolvedDesign {
@@ -152,6 +166,36 @@ function backgroundInterval(
   return interval;
 }
 
+/**
+ * V6b-2 — luminance interval of an image background: the union of the bounds of every
+ * picture that can be shown (default + phone) under the overlay. Any picture without
+ * evidence ⇒ `null` = unprovable. Twin of PHP `SectionDesignContrast::mediaInterval`.
+ */
+function mediaInterval(
+  bg: Extract<NonNullable<SectionDesign["background"]>, { kind: "media" }>,
+  ctx: DesignContext,
+): LuminanceInterval | null {
+  if (!ctx.mediaBounds) return null;
+  const min: [number, number, number] = [255, 255, 255];
+  const max: [number, number, number] = [0, 0, 0];
+  for (const ref of [bg.media, bg.mobile]) {
+    if (!ref) continue;
+    const bounds = ctx.mediaBounds(ref);
+    if (!bounds) return null;
+    for (let i = 0; i < 3; i++) {
+      min[i] = Math.min(min[i], bounds.min[i]);
+      max[i] = Math.max(max[i], bounds.max[i]);
+    }
+  }
+  let overlay: { rgb: Rgb; alpha: number } | null = null;
+  if (bg.overlay) {
+    const rgb = parseHex(colour(bg.overlay.color, ctx));
+    if (!rgb) return null;
+    overlay = { rgb, alpha: bg.overlay.alpha / 100 };
+  }
+  return channelBoundsInterval(min, max, overlay);
+}
+
 /** Section types whose own markup paints an opaque dark surface of its own. */
 export const SURFACE_OWNING_TYPES: ReadonlySet<string> = new Set([
   "hero",
@@ -202,6 +246,7 @@ export function effectiveText(
     background = backgroundInterval(colour(bg.color, ctx), null);
   if (bg?.kind === "gradient")
     background = backgroundInterval(colour(bg.from, ctx), colour(bg.to, ctx));
+  if (bg?.kind === "media") background = mediaInterval(bg, ctx);
 
   // These sections paint their own dark surface (brand gradient, footer band). Without
   // a design background a text colour would land on that legacy surface — which the
@@ -270,6 +315,14 @@ export function sectionContrastIssues(
   ctx: DesignContext,
   type?: string,
 ): SectionContrastIssue[] {
+  // V6b-2 — a picture whose luminance cannot be proven is never publishable, whatever the
+  // text colours are: "unprovable = non-conforming", fixed on the background itself.
+  if (
+    design.background?.kind === "media" &&
+    !mediaInterval(design.background, ctx)
+  ) {
+    return [{ field: "background", code: "contrast_unprovable", ratio: 1 }];
+  }
   const text = effectiveText(design, ctx, type);
   if (!text.judged) return [];
   const out = new Map<string, SectionContrastIssue>();

@@ -12,8 +12,7 @@ namespace App\Support\Commerce;
  * غير الصالحة تُسقط وحدها، والنتيجة الفارغة تُحذف. **غياب `design` ⇒ مخرجات القسم
  * بلا أي تغيير** (§3.1).
  *
- * خارج هذا الملف عمداً (كلٌّ يدخل مع الشريحة التي تستطيع رسمه وإثباته): خلفية `media`
- * (+ تراكب/تجاوز جوال) في V6 مع دليل لمعان المنطقة، و`layout`، و`overlap`/`mediaTreatment`.
+ * خارج هذا الملف عمداً (كلٌّ يدخل مع الشريحة التي تستطيع رسمه وإثباته): `layout`، و`overlap`/`mediaTreatment`.
  * تُسقط الآن fail-closed فلا يتسلل خلفية غير مُثبتة. (V5e-3 أضاف `separator` و`motion.reveal`.)
  */
 final class StorefrontSectionDesignNormalizer
@@ -54,6 +53,12 @@ final class StorefrontSectionDesignNormalizer
     /** V5e-3 — كشف لمرّة واحدة (V0 §6.6): `fade-up` فقط، اختياري لكل قسم. */
     public const REVEALS = ['none', 'fade-up'];
 
+    /** V6b-2 — أنواع الخلفية المتاحة لكل الأقسام؛ `media` للبطل واللافتة وحدهما. */
+    public const BACKGROUND_KINDS = ['solid', 'gradient'];
+
+    /** V6b-2 — تعتيم تراكب الصورة: نسبة مئوية بخطوات 5، حدّها 90 (V0 §8.1) فلا تُخفى الصورة كلياً. */
+    public const OVERLAY_ALPHAS = [5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90];
+
     private const FULL_TEXT = ['heading', 'body', 'link', 'align'];
 
     private const FULL_TYPO = ['headingScale', 'bodyScale', 'headingWeight', 'lineHeight', 'headingStyle'];
@@ -66,24 +71,25 @@ final class StorefrontSectionDesignNormalizer
     public static function capabilities(): array
     {
         // V5e-3 — `separator` لكل الأنواع القابلة للتصميم؛ `motion.reveal` للبطل واللافتة فقط (V0 §3.4).
-        $rich = ['background' => true, 'text' => self::FULL_TEXT, 'typography' => self::FULL_TYPO, 'width' => true, 'spacing' => true, 'align' => true, 'border' => true, 'radius' => true, 'shadow' => true, 'separator' => true];
-        $hero = $rich + ['motion' => ['reveal']];
-        $shelf = ['background' => true, 'text' => ['heading'], 'typography' => ['headingStyle'], 'width' => true, 'spacing' => true, 'separator' => true];
+        $rich = ['background' => self::BACKGROUND_KINDS, 'text' => self::FULL_TEXT, 'typography' => self::FULL_TYPO, 'width' => true, 'spacing' => true, 'align' => true, 'border' => true, 'radius' => true, 'shadow' => true, 'separator' => true];
+        // V6b-2 — خلفية الوسائط للبطل واللافتة وحدهما (V0 §8.1)؛ كل نوعٍ آخر `solid|gradient` فقط.
+        $hero = ['background' => [...self::BACKGROUND_KINDS, 'media']] + $rich + ['motion' => ['reveal']];
+        $shelf = ['background' => self::BACKGROUND_KINDS, 'text' => ['heading'], 'typography' => ['headingStyle'], 'width' => true, 'spacing' => true, 'separator' => true];
 
         return [
             'hero' => $hero,
             'banner' => $hero,
-            'categories' => ['background' => true, 'text' => ['heading'], 'typography' => ['headingStyle'], 'width' => true, 'spacing' => true, 'border' => true, 'radius' => true, 'separator' => true],
+            'categories' => ['background' => self::BACKGROUND_KINDS, 'text' => ['heading'], 'typography' => ['headingStyle'], 'width' => true, 'spacing' => true, 'border' => true, 'radius' => true, 'separator' => true],
             'newArrivals' => $shelf,
             'featured' => $shelf,
             'offers' => $shelf,
             'productShelf' => $shelf,
-            'discovery' => ['background' => true, 'text' => ['heading'], 'spacing' => true, 'separator' => true],
-            'benefits' => ['background' => true, 'text' => self::FULL_TEXT, 'typography' => self::FULL_TYPO, 'spacing' => true, 'align' => true, 'border' => true, 'radius' => true, 'shadow' => true, 'separator' => true],
-            'customContent' => ['background' => true, 'text' => self::FULL_TEXT, 'typography' => self::FULL_TYPO, 'width' => ['max'], 'spacing' => true, 'align' => true, 'separator' => true],
-            'appPromo' => ['background' => true, 'text' => self::FULL_TEXT, 'spacing' => true, 'border' => true, 'radius' => true, 'separator' => true],
-            'deliveryPromise' => ['background' => true, 'spacing' => true, 'separator' => true],
-            'wholesale' => ['background' => true, 'spacing' => true, 'separator' => true],
+            'discovery' => ['background' => self::BACKGROUND_KINDS, 'text' => ['heading'], 'spacing' => true, 'separator' => true],
+            'benefits' => ['background' => self::BACKGROUND_KINDS, 'text' => self::FULL_TEXT, 'typography' => self::FULL_TYPO, 'spacing' => true, 'align' => true, 'border' => true, 'radius' => true, 'shadow' => true, 'separator' => true],
+            'customContent' => ['background' => self::BACKGROUND_KINDS, 'text' => self::FULL_TEXT, 'typography' => self::FULL_TYPO, 'width' => ['max'], 'spacing' => true, 'align' => true, 'separator' => true],
+            'appPromo' => ['background' => self::BACKGROUND_KINDS, 'text' => self::FULL_TEXT, 'spacing' => true, 'border' => true, 'radius' => true, 'separator' => true],
+            'deliveryPromise' => ['background' => self::BACKGROUND_KINDS, 'spacing' => true, 'separator' => true],
+            'wholesale' => ['background' => self::BACKGROUND_KINDS, 'spacing' => true, 'separator' => true],
         ];
     }
 
@@ -99,7 +105,7 @@ final class StorefrontSectionDesignNormalizer
 
         $out = [];
         if (isset($capability['background'])) {
-            $background = self::background($raw['background'] ?? null);
+            $background = self::background($raw['background'] ?? null, $capability['background']);
             if ($background !== null) {
                 $out['background'] = $background;
             }
@@ -204,17 +210,22 @@ final class StorefrontSectionDesignNormalizer
         return is_array($value) && ($value === [] || ! array_is_list($value));
     }
 
-    private static function background(mixed $raw): ?array
+    /** @param true|list<string> $allowance */
+    private static function background(mixed $raw, array|bool $allowance): ?array
     {
         if (! self::isObject($raw)) {
             return null;
         }
-        if (($raw['kind'] ?? null) === 'solid') {
+        $kind = $raw['kind'] ?? null;
+        if (! is_string($kind) || ! self::allows($allowance, $kind)) {
+            return null; // نوعٌ غير معروف أو غير مسموح لهذا القسم — fail-closed
+        }
+        if ($kind === 'solid') {
             $color = self::colorRef($raw['color'] ?? null);
 
             return $color === null ? null : ['kind' => 'solid', 'color' => $color];
         }
-        if (($raw['kind'] ?? null) === 'gradient') {
+        if ($kind === 'gradient') {
             $from = self::colorRef($raw['from'] ?? null);
             $to = self::colorRef($raw['to'] ?? null);
             $direction = self::pick($raw['direction'] ?? null, self::DIRECTIONS);
@@ -223,8 +234,65 @@ final class StorefrontSectionDesignNormalizer
                 ? ['kind' => 'gradient', 'from' => $from, 'to' => $to, 'direction' => $direction]
                 : null;
         }
+        if ($kind === 'media') {
+            return self::mediaBackground($raw);
+        }
 
-        return null; // `media` وما عداه يدخل مع V6 — fail-closed
+        return null;
+    }
+
+    /**
+     * V6b-2 — خلفية صورة: `media` إلزامية (وإلا سقطت الخلفية كلها)، و`mobile` بديلٌ اختياري
+     * لشاشات الجوال، و`overlay` تراكب لونٍ اختياري. الصورة خلفيةٌ زخرفية دائماً فلا alt لها،
+     * و`cover` دائماً (إطارٌ لا يغطّي كل المساحة يكشف خلفيةً لا يشملها دليل التباين).
+     *
+     * @param  array<string,mixed>  $raw
+     * @return array<string,mixed>|null
+     */
+    private static function mediaBackground(array $raw): ?array
+    {
+        $media = self::backgroundRef($raw['media'] ?? null);
+        if ($media === null) {
+            return null;
+        }
+        $out = ['kind' => 'media', 'media' => $media];
+        $mobile = self::backgroundRef($raw['mobile'] ?? null);
+        if ($mobile !== null) {
+            $out['mobile'] = $mobile;
+        }
+        $overlay = self::overlay($raw['overlay'] ?? null);
+        if ($overlay !== null) {
+            $out['overlay'] = $overlay;
+        }
+
+        return $out;
+    }
+
+    /** @return array<string,mixed>|null */
+    private static function backgroundRef(mixed $raw): ?array
+    {
+        $ref = StorefrontMediaRefNormalizer::normalize($raw);
+        if ($ref === null) {
+            return null;
+        }
+        unset($ref['fit'], $ref['alt']);
+        $ref['decorative'] = true;
+
+        return $ref;
+    }
+
+    /** @return array{color:array<string,string>,alpha:int}|null */
+    private static function overlay(mixed $raw): ?array
+    {
+        if (! self::isObject($raw)) {
+            return null;
+        }
+        $alpha = self::pick($raw['alpha'] ?? null, self::OVERLAY_ALPHAS);
+        if (! is_int($alpha)) {
+            return null;
+        }
+
+        return ['color' => self::colorRef($raw['color'] ?? null) ?? ['role' => 'overlay'], 'alpha' => $alpha];
     }
 
     /** @param true|list<string> $allowance */
