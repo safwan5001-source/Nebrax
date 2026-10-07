@@ -8,7 +8,7 @@
 | **Slice** | **V5c** — third slice of V5 (V5a engine+palette ✓ → V5b contract ✓ → **V5c renderers** → V5d inspector/ColourField/publish gate + V1B → V5e typography/buttons/surfaces/separators/motion) |
 | **Branch** | `cust-hv/v5c-design-renderers` |
 | **PR** | see PR description (opened with this report) |
-| **Base SHA** | `origin/main` after V5b (#1267) merged |
+| **Base SHA** | `169ad076` — `origin/main` after V5b (#1267) merged |
 | **Authority** | V0 §3.1 (absent ⇒ legacy), §3.5 (one pure resolver per runtime, parity by structure), §4.5 (auto foreground first), §6.3 (width) |
 | **Depends on** | V5a (engine, palette) · V5b (contract) |
 
@@ -75,7 +75,7 @@ Wraps a section only when it has a design. Storefront: `publishedNodes` was spli
 | Web | `section-design-resolve.test.tsx` **17** (resolver, frame, byte-identical twins, stylesheet parity) · full vitest **427 files / 3702** (drift ratchet ✓) |
 | Storefront | `section-design-resolve.test.tsx` **12** · full vitest **142 files / 1284** · `tsc` ✓ · `biome check` ✓ |
 | Real browser | `cust-hv-v5c-design-render-proof.spec.ts` **13/13** (local evidence gate, as V3/V4b/V5a) |
-| Backend | no backend change (V5b's full run stands) · PostgreSQL by CI |
+| Backend | **no backend file changed** (`git diff origin/main` touches no `app/` `routes/` `database/` `tests/` `config/`); the full run on the identical backend is V5b's (5751 passed, 28 env-only failures) · PostgreSQL by CI |
 
 Evidence: `docs/plans/store/cust-hv-v5c/*.jpg`.
 
