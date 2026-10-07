@@ -292,12 +292,18 @@ export function resolveSectionDesign(
     sd.push("max");
   }
 
+  // The design *owns* the section's border: an explicit `none` removes a legacy
+  // border (banner card, delivery band) just as a width replaces it — see the
+  // `[data-sd~="border"] > *` rule.
   const border = design.border;
-  if (border && border.width !== "none") {
+  if (border) {
     style["--sec-bw"] = BORDER_WIDTH[border.width];
-    style["--sec-bc"] = border.color
-      ? colour(border.color, ctx)
-      : resolveRoleHex("border", ctx);
+    style["--sec-bc"] =
+      border.width === "none"
+        ? "transparent"
+        : border.color
+          ? colour(border.color, ctx)
+          : resolveRoleHex("border", ctx);
     sd.push("border");
   }
 

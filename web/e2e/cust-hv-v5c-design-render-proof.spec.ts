@@ -98,6 +98,14 @@ for (const locale of LOCALES) {
             }
           }
         }
+        // The design owns the border: a legacy child border steps aside (explicit `none` too).
+        for (const frame of document.querySelectorAll('[data-sd~="border"]')) {
+          for (const child of frame.children) {
+            if (parseFloat(getComputedStyle(child).borderTopWidth) > 0) {
+              failures.push(`${frame.getAttribute('data-design-type')} root keeps its own border`);
+            }
+          }
+        }
         // A heading colour must reach headings that carry no id (Canvas preview).
         for (const frame of document.querySelectorAll('[data-sd~="heading"]')) {
           const h = frame.querySelector('h1, h2, h3');

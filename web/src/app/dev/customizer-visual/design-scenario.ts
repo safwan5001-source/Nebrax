@@ -16,7 +16,7 @@ export function designConfig(
     // Sections whose own markup paints a dark surface: the design must *replace* it.
     hero: { background: { kind: "solid", color: { hex: "#fde68a" } }, spacing: { top: "sm", bottom: "sm", inner: "sm" } },
     wholesale: { background: { kind: "solid", color: { hex: "#e0f2fe" } }, spacing: { top: "sm", bottom: "sm", inner: "sm" } },
-    "banner-1": { background: { kind: "solid", color: { role: "brand" } }, spacing: { top: "md", bottom: "md", inner: "md" }, radius: "lg" },
+    "banner-1": { background: { kind: "solid", color: { role: "brand" } }, border: { width: "none" }, spacing: { top: "md", bottom: "md", inner: "md" }, radius: "lg" },
     "benefits-1": { background: { kind: "solid", color: { role: "surfaceAlt" } }, text: { heading: { hex: "#1e1b4b" } }, border: { width: "hairline" }, radius: "md", shadow: "soft", spacing: { top: "sm", bottom: "sm", inner: "sm" } },
     "custom-1": { background: { kind: "gradient", from: { hex: "#0b3d2e" }, to: { hex: "#1c2a6b" }, direction: "to-end" }, width: { max: "narrow" }, align: "center", spacing: { top: "lg", bottom: "lg", inner: "md" } },
     "featured-1": { background: { kind: "solid", color: { hex: "#101820" } }, width: { mode: "full" }, spacing: { top: "md", bottom: "md" } },

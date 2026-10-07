@@ -57,7 +57,7 @@ Wraps a section only when it has a design. Storefront: `publishedNodes` was spli
 
 ---
 
-## Review round (Codex, 5 findings — all valid, all fixed)
+## Review round (Codex, 7 findings — all valid, all fixed)
 
 | Finding | Fix |
 |---|---|
@@ -67,6 +67,9 @@ Wraps a section only when it has a design. Storefront: `publishedNodes` was spli
 
 | **P2** a frame stayed (padded / bordered / coloured band) when its section rendered nothing (unresolved shelf, no live offers, failed fetch) | `[data-sd]:empty { display: none }` — the frame is a transparent wrapper whose emptiness is decided by what the section actually rendered; unit-tested (`childNodes.length === 0`) and asserted in both stylesheets. |
 | **P2** text-only design on a light section still returned colours with nothing to judge them against | `effectiveText` now carries `judged`: the design background, else the surface the colours really land on — the section's own legacy surface (`banner`, `deliveryPromise` → white) or the page background; `worstTextRatio` uses it. (The dark surface-owners already ignored text-only colours.) |
+
+| **P2** the "nested surface" matcher (`[class*="bg-store-"]`) also matched `bg-transparent hover:bg-store-footer-border`, restoring light-on-light tokens in the wholesale secondary CTA | A *surface* is now a class **token that starts with** `bg-store-` / `bg-white` and is opaque (`^=` / `*=" …"`, minus the alpha fills used in the codebase). Variants (`hover:bg-store-*`), `bg-transparent` and alpha fills (`bg-white/80`, `bg-store-surface/90`) are not surfaces. Unit-tested by evaluating the stylesheet's own selector against real class strings. |
+| **P2** `border` design left the section's legacy border in place (two borders), and an explicit `none` emitted nothing | The design **owns** the border: any `border` group (including `none`) is emitted (`none` ⇒ 0 px transparent) and `[data-sd~="border"] > * { border: none }` removes the child's legacy border. Asserted in the browser (no designed root keeps a border) and unit-tested. |
 
 The browser proof now also asserts, at all six widths in RTL and LTR, that **no designed section's root still paints its own fill** and that a heading colour reaches the Canvas heading; a mutation run (rule removed) fails it for banner / appPromo / deliveryPromise / shelf / discovery, so the check is not vacuous. The scenario gained `hero` and `wholesale` designs (the two dark surface-owners) and a distinct heading colour on benefits. 13/13 green.
 
