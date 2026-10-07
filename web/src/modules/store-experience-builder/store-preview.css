@@ -352,6 +352,10 @@
 .awj-store-preview[data-gt~="hw"] :where(h1, h2, h3) {
   font-weight: var(--gt-hw);
 }
+/* a catalogue family for headings (the body family is the wrapper's own font-family) */
+.awj-store-preview[data-gt~="hf"] :where(h1, h2, h3) {
+  font-family: var(--gt-hf);
+}
 .awj-store-preview[data-gt~="bw"] {
   font-weight: var(--gt-bw);
 }

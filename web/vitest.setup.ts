@@ -21,5 +21,13 @@ vi.mock('next/font/google', () => {
     Tajawal: loader,
     IBM_Plex_Sans_Arabic: loader,
     IBM_Plex_Mono: loader,
+    // CUST-HV V5e-2c — the curated font catalogue (`presentation/fonts.ts`)
+    Amiri: loader,
+    El_Messiri: loader,
+    Inter: loader,
+    Lora: loader,
+    Noto_Sans_Arabic: loader,
+    Readex_Pro: loader,
+    Rubik: loader,
   };
 });

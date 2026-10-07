@@ -138,7 +138,7 @@ function configFor(locale: "ar" | "en", scenario: Scenario): StorefrontPresentat
     return normalizePresentationConfig({
       ...base,
       homepage: { ...base.homepage, sections: [...shelves, ...base.homepage.sections] },
-      typography: { headingScale: "lg", bodyScale: "lg", headingWeight: 800, bodyWeight: 500, lineHeight: "relaxed", sectionHeading: "underline", buttonText: { weight: 800, case: "upper" } },
+      typography: { headingScale: "lg", bodyScale: "lg", headingWeight: 800, bodyWeight: 500, lineHeight: "relaxed", sectionHeading: "underline", headingFamily: "amiri-lora", bodyFamily: "readex", buttonText: { weight: 800, case: "upper" } },
       buttons: { style: "soft", size: "lg", radius: "pill", colour: "brand", hover: "lift" },
       surfaces: { radius: "pill", border: { width: "medium" }, shadow: "medium" },
       layout: { contentWidth: "narrow" },

@@ -11,8 +11,9 @@ namespace App\Support\Commerce;
  * (أو كل الحقول غير صالحة) = لا مفتاح، فتبقى مخرجات الوثيقة القديمة **بلا أي تغيير**.
  * قيمة خارج المجموعة المعدودة تُسقط وحدها (لا قيمة افتراضية مرئية)، والمجموعة الفارغة
  * تُحذف، والترتيب قانوني ثابت. V5e-2b يضيف `buttons` و`typography.buttonText` (إثبات تباين
- * التسمية في `ButtonTokensContrast`). خارج النطاق عمداً: عائلات الخطوط (V5e-2c: كتالوج
- * مستضاف ذاتياً) ولون حدّ الأسطح؛ تُسقط الآن fail-closed.
+ * التسمية في `ButtonTokensContrast`)، وV5e-2c يضيف `typography.headingFamily/bodyFamily`
+ * من كتالوج مستضاف ذاتياً. خارج النطاق عمداً: لون حدّ الأسطح ورفع خطٍّ خاص
+ * (`custom:<mediaId>`)؛ تُسقط fail-closed.
  */
 final class StorefrontGlobalTokensNormalizer
 {
@@ -27,6 +28,13 @@ final class StorefrontGlobalTokensNormalizer
     public const LINE_HEIGHTS = ['tight', 'normal', 'relaxed'];
 
     public const SECTION_HEADINGS = ['bar', 'plain', 'centered', 'underline'];
+
+    /**
+     * كتالوج الخطوط المنتقى (V0 §5.2 / N-5) — مفاتيح فقط، توأم `FONT_FAMILY_KEYS` في
+     * `font-catalogue.ts`. الأولان هما قيمتا `fontPreset` القديمتان. `custom:<mediaId>`
+     * محجوز (§5.4) وغير مُفعَّل فيُسقط. كلها OFL ومستضافة ذاتياً (`next/font`).
+     */
+    public const FONT_FAMILIES = ['cairo-geist', 'tajawal-geist', 'plex-arabic', 'noto-inter', 'readex', 'rubik', 'el-messiri', 'amiri-lora'];
 
     public const BUTTON_STYLES = ['solid', 'soft', 'outline', 'link'];
 
@@ -67,6 +75,8 @@ final class StorefrontGlobalTokensNormalizer
             'bodyWeight' => self::BODY_WEIGHTS,
             'lineHeight' => self::LINE_HEIGHTS,
             'sectionHeading' => self::SECTION_HEADINGS,
+            'headingFamily' => self::FONT_FAMILIES,
+            'bodyFamily' => self::FONT_FAMILIES,
         ]);
         // `buttonText` (V5e-2b): كائنٌ متداخل — وزن + حالة أحرف.
         $buttonText = self::isObject($input['typography'] ?? null)

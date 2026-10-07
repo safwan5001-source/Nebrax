@@ -274,7 +274,7 @@ describe("SectionDesignFrame (CUST-HV V5c)", () => {
 describe("the Canvas and the storefront share ONE resolver (V0 §3.5)", () => {
   const web = resolve(__dirname, "../presentation");
   const storefront = resolve(__dirname, "../../../../../storefront/src/lib/presentation");
-  for (const file of ["section-design-resolve.ts", "section-design.ts", "palette.ts", "contrast-engine.ts", "global-tokens.ts"]) {
+  for (const file of ["section-design-resolve.ts", "section-design.ts", "palette.ts", "contrast-engine.ts", "global-tokens.ts", "font-catalogue.ts"]) {
     it(`${file} is byte-identical in web and storefront`, () => {
       expect(readFileSync(resolve(web, file), "utf8")).toBe(readFileSync(resolve(storefront, file), "utf8"));
     });

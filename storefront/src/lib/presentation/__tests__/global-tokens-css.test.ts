@@ -29,6 +29,8 @@ const EVERYTHING = resolveGlobalTokens(
       bodyWeight: 500,
       lineHeight: "relaxed",
       sectionHeading: "underline",
+      headingFamily: "amiri-lora",
+      bodyFamily: "readex",
       buttonText: { weight: 800, case: "upper" },
     },
     buttons: {

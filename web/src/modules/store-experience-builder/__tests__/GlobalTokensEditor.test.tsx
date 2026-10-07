@@ -30,6 +30,8 @@ describe("GlobalTokensEditor (CUST-HV V5e-2a)", () => {
       "typography.bodyWeight",
       "typography.lineHeight",
       "typography.sectionHeading",
+      "typography.headingFamily",
+      "typography.bodyFamily",
       "buttons.style",
       "buttons.colour",
       "buttons.size",
@@ -124,5 +126,17 @@ describe("GlobalTokensEditor (CUST-HV V5e-2a)", () => {
     cleanup();
     // no colour context ⇒ no guess
     expect(mount({ buttons: { style: "outline" } }).container.querySelector("[data-gt-button-contrast]")).toBeNull();
+  });
+
+  it("fonts: every catalogue family is offered by name and kind, and choosing one writes its key", () => {
+    const { field, patch } = mount();
+    const options = [...field("typography.bodyFamily").querySelectorAll("option")].map((o) => o.value);
+    expect(options).toEqual(["", "cairo-geist", "tajawal-geist", "plex-arabic", "noto-inter", "readex", "rubik", "el-messiri", "amiri-lora"]);
+    expect(field("typography.headingFamily").textContent).toContain("Amiri · Lora");
+    expect(field("typography.headingFamily").textContent).toContain(tEn("gtFontKindSerif"));
+    fireEvent.change(field("typography.headingFamily"), { target: { value: "amiri-lora" } });
+    expect(patch).toHaveBeenLastCalledWith({ typography: { headingFamily: "amiri-lora" } });
+    fireEvent.change(field("typography.bodyFamily"), { target: { value: "" } });
+    expect(patch).toHaveBeenLastCalledWith({ typography: undefined });
   });
 });

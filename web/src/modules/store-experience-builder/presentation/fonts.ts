@@ -1,4 +1,16 @@
-import { Cairo, Geist, Tajawal } from "next/font/google";
+import {
+  Amiri,
+  Cairo,
+  El_Messiri,
+  Geist,
+  IBM_Plex_Sans_Arabic,
+  Inter,
+  Lora,
+  Noto_Sans_Arabic,
+  Readex_Pro,
+  Rubik,
+  Tajawal,
+} from "next/font/google";
 
 /**
  * CUST-H3-2 — self-hosted next/font faces for the Customizer Canvas preview,
@@ -62,4 +74,82 @@ const tajawal = Tajawal({
  * reference — `--font-geist`, `--font-geist-tajawal`, `--font-cairo`,
  * `--font-tajawal` — actually resolves.
  */
-export const PREVIEW_FONT_VARIABLES = `${geist.variable} ${geistTajawalFallback.variable} ${cairo.variable} ${tajawal.variable}`;
+
+/**
+ * CUST-HV V5e-2c — the curated font catalogue (`lib/presentation/font-catalogue.ts`): every face
+ * is self-hosted by `next/font` (fetched at build time, served from the store's own origin),
+ * subsetted to Arabic + Latin, `display: swap`, OFL-licensed (verified against each family's
+ * upstream METADATA at slice time), and declared with `preload: false` — no preload link is
+ * emitted for any of them, and the browser requests a face's file only when the resolved
+ * `font-family` is used by rendered text. A Latin face paired with a separate Arabic face names
+ * that Arabic family as its `fallback` (see the Geist/Cairo note above) so Arabic never falls to
+ * a local Arial.
+ */
+const plexArabic = IBM_Plex_Sans_Arabic({
+  variable: "--font-plex-arabic",
+  subsets: ["arabic", "latin"],
+  weight: ["400", "500", "700"],
+  display: "swap",
+  preload: false,
+});
+const inter = Inter({
+  variable: "--font-inter",
+  subsets: ["latin"],
+  display: "swap",
+  preload: false,
+  fallback: ["Noto Sans Arabic"],
+});
+const notoArabic = Noto_Sans_Arabic({
+  variable: "--font-noto-arabic",
+  subsets: ["arabic"],
+  display: "swap",
+  preload: false,
+});
+const readex = Readex_Pro({
+  variable: "--font-readex",
+  subsets: ["arabic", "latin"],
+  display: "swap",
+  preload: false,
+});
+const rubik = Rubik({
+  variable: "--font-rubik",
+  subsets: ["arabic", "latin"],
+  display: "swap",
+  preload: false,
+});
+const elMessiri = El_Messiri({
+  variable: "--font-el-messiri",
+  subsets: ["arabic", "latin"],
+  display: "swap",
+  preload: false,
+});
+const lora = Lora({
+  variable: "--font-lora",
+  subsets: ["latin"],
+  display: "swap",
+  preload: false,
+  fallback: ["Amiri"],
+});
+const amiri = Amiri({
+  variable: "--font-amiri",
+  subsets: ["arabic"],
+  weight: ["400", "700"],
+  display: "swap",
+  preload: false,
+});
+
+/** The CSS variable classes of the catalogue faces, applied once on the document root. */
+const CATALOGUE_FONT_VARIABLES = [
+  plexArabic,
+  inter,
+  notoArabic,
+  readex,
+  rubik,
+  elMessiri,
+  lora,
+  amiri,
+]
+  .map((font) => font.variable)
+  .join(" ");
+
+export const PREVIEW_FONT_VARIABLES = `${geist.variable} ${geistTajawalFallback.variable} ${cairo.variable} ${tajawal.variable} ${CATALOGUE_FONT_VARIABLES}`;

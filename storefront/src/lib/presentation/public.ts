@@ -8,6 +8,7 @@ import type {
   StorefrontPresentationConfig,
 } from "./config";
 import { normalizePresentationConfig, previewStoreName } from "./config";
+import { fontFamilyStack } from "./font-catalogue";
 import { resolveGlobalTokens } from "./global-tokens";
 import { fontPresetFamilyStack, presentationCssVars } from "./tokens";
 import { buildWhatsAppUrl, sanitizeExternalUrl, sanitizeLogoUrl } from "./urls";
@@ -71,7 +72,11 @@ export function publishedThemeStyle(
     ),
     // CUST-HV V5e-2a — document-level global tokens (absent ⇒ nothing is added).
     ...(resolveGlobalTokens(presentation, presentation)?.style ?? {}),
-    fontFamily: fontPresetFamilyStack(presentation.fontPreset),
+    // CUST-HV V5e-2c — a catalogue body family wins over the legacy `fontPreset` (which maps
+    // onto the catalogue's first two keys); absent ⇒ the preset's stack exactly as before.
+    fontFamily:
+      fontFamilyStack(presentation.typography?.bodyFamily) ??
+      fontPresetFamilyStack(presentation.fontPreset),
   };
 }
 
