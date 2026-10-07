@@ -54,6 +54,25 @@ describe("resolveSectionDesign (CUST-HV V5c)", () => {
     expect(light.style["--sec-fg"]).toBe("#000000");
   });
 
+  it("a section that paints its own dark surface ignores text colours until the design paints a background", () => {
+    const textOnly: SectionDesign = { text: { body: { hex: "#ffffff" } } };
+    for (const type of ["hero", "appPromo", "wholesale"]) {
+      expect(resolveSectionDesign(type, textOnly, ctx)).toBeNull();
+    }
+    // a light-surface section keeps it (judged against the page background)
+    expect(
+      resolveSectionDesign("banner", textOnly, ctx)!.style["--sec-fg"],
+    ).toBe("#ffffff");
+    // with a design background the colours apply again
+    const withBg: SectionDesign = {
+      ...textOnly,
+      background: { kind: "solid", color: { hex: "#101820" } },
+    };
+    expect(resolveSectionDesign("hero", withBg, ctx)!.style["--sec-fg"]).toBe(
+      "#ffffff",
+    );
+  });
+
   it("explicit text colours win over the automatic foreground; link only when asked", () => {
     const r = resolveSectionDesign(
       "banner",
