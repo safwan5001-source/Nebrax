@@ -50,15 +50,30 @@ final class StorefrontMediaPixelEvidence
         /** @var GdImage $gd */
         $gd = $image->core()->native();
 
+        return self::scanGd($gd, $basis);
+    }
+
+    /**
+     * @return array{v:int, basis:string, width:int, height:int, min:list<int>, max:list<int>, alpha:bool, slack:array{abs:int, ringing:int}}
+     */
+    public static function scanGd(GdImage $gd, string $basis = 'frame'): array
+    {
         $width = imagesx($gd);
         $height = imagesy($gd);
         $minR = $minG = $minB = 255;
         $maxR = $maxG = $maxB = 0;
         $alpha = false;
+        // صورة بلوحة ألوان (PNG مفهرس): `imagecolorat` يعيد فهرس اللوحة لا ARGB — تُحلّ كل قيمةٍ عبر اللوحة
+        // وإلا سُجِّلت قنواتٌ كاذبة (مثلاً [0,0,1]) وفاتت الشفافية، فيصير الدليل متفائلاً.
+        $indexed = ! imageistruecolor($gd);
 
         for ($y = 0; $y < $height; $y++) {
             for ($x = 0; $x < $width; $x++) {
                 $c = imagecolorat($gd, $x, $y);
+                if ($indexed) {
+                    $entry = imagecolorsforindex($gd, $c);
+                    $c = ($entry['alpha'] << 24) | ($entry['red'] << 16) | ($entry['green'] << 8) | $entry['blue'];
+                }
                 if ((($c >> 24) & 0x7F) > self::ALPHA_TOLERANCE) {
                     $alpha = true;
                 }

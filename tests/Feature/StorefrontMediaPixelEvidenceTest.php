@@ -128,6 +128,30 @@ class StorefrontMediaPixelEvidenceTest extends TestCase
     }
 
     /** @test */
+    public function an_indexed_png_is_measured_through_its_palette_not_by_raw_index(): void
+    {
+        $indexed = imagecreate(640, 400);
+        imagecolorallocate($indexed, 200, 210, 220); // فهرس 0 = الخلفية
+        $hot = imagecolorallocate($indexed, 250, 240, 230);
+        imagefilledrectangle($indexed, 0, 0, 319, 399, $hot);
+        $this->assertFalse(imageistruecolor($indexed));
+
+        $evidence = StorefrontMediaPixelEvidence::scanGd($indexed);
+        $this->assertSame([200, 210, 220], $evidence['min'], 'palette values, not the indexes 0/1');
+        $this->assertSame([250, 240, 230], $evidence['max']);
+        $this->assertFalse($evidence['alpha']);
+
+        $transparent = imagecreate(640, 400);
+        $key = imagecolorallocate($transparent, 10, 10, 10);
+        imagecolorallocate($transparent, 30, 30, 30);
+        imagecolortransparent($transparent, $key);
+        imagefilledrectangle($transparent, 0, 0, 100, 100, imagecolorallocate($transparent, 40, 40, 40));
+        $viaFile = $this->evidenceOfSource($this->png($transparent));
+        $this->assertTrue($viaFile['alpha'], 'palette transparency is never proof');
+        $this->assertNull(StorefrontMediaPixelEvidence::bounds($viaFile));
+    }
+
+    /** @test */
     public function bounds_add_a_margin_that_grows_with_the_channel_range_clamp_to_0_255_and_reject_anything_malformed(): void
     {
         $base = ['v' => 1, 'basis' => 'frame', 'width' => 10, 'height' => 10, 'min' => [0, 100, 250], 'max' => [10, 200, 255], 'alpha' => false, 'slack' => ['abs' => 12, 'ringing' => 20]];

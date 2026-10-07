@@ -38,44 +38,30 @@ class StorefrontMediaEvidenceBackfiller
         try {
             $stats = ['assets' => 0, 'derivatives' => 0, 'failed' => 0, 'dry_run' => $dryRun];
 
-            $assets = StorefrontMedia::query()
+            $assetQuery = StorefrontMedia::query()
                 ->where('state', StorefrontMedia::STATE_ACTIVE)
                 ->where('variants_state', StorefrontMedia::VARIANTS_READY)
-                ->whereNull('region_luminance')
-                ->orderBy('created_at')
-                ->limit($limit)
-                ->get();
-            foreach ($assets as $media) {
+                ->whereNull('region_luminance');
+            $this->eachCandidate($assetQuery, $limit, $stats, 'assets', function (StorefrontMedia $media) use ($dryRun): bool {
                 $evidence = $this->assetEvidence($media);
-                if ($evidence === null) {
-                    $stats['failed']++;
-
-                    continue;
-                }
-                if (! $dryRun) {
+                if ($evidence !== null && ! $dryRun) {
                     $media->forceFill(['region_luminance' => $evidence])->save();
                 }
-                $stats['assets']++;
-            }
 
-            $derivatives = StorefrontMediaDerivative::query()
+                return $evidence !== null;
+            });
+
+            $derivativeQuery = StorefrontMediaDerivative::query()
                 ->where('state', StorefrontMediaDerivative::STATE_READY)
-                ->whereNull('region_luminance')
-                ->orderBy('created_at')
-                ->limit($limit)
-                ->get();
-            foreach ($derivatives as $row) {
+                ->whereNull('region_luminance');
+            $this->eachCandidate($derivativeQuery, $limit, $stats, 'derivatives', function (StorefrontMediaDerivative $row) use ($dryRun): bool {
                 $evidence = $this->scanFile($row->media_id, (string) $row->storage_key, 'transform');
-                if ($evidence === null) {
-                    $stats['failed']++;
-
-                    continue;
-                }
-                if (! $dryRun) {
+                if ($evidence !== null && ! $dryRun) {
                     $row->forceFill(['region_luminance' => $evidence])->save();
                 }
-                $stats['derivatives']++;
-            }
+
+                return $evidence !== null;
+            });
 
             return $stats;
         } finally {
@@ -83,6 +69,41 @@ class StorefrontMediaEvidenceBackfiller
                 $this->tenant->forget();
             } else {
                 $this->tenant->set($previous);
+            }
+        }
+    }
+
+    /**
+     * يمرّ على المرشّحين بمؤشّر `id` (لا بـ`limit` على نفس الصفوف): `$limit` يحدّ **ما يُكتَب** لا ما يُفحَص،
+     * فصفوفٌ تعذّر قياسها نهائياً (ملف مفقود/تالف) لا تحجب ما بعدها فلا يتعطّل الإكمال أبداً (Codex P2 على #1277).
+     * الفاشل يُعاد محاولته في كل تشغيل بلا حالة محفوظة ويُعدّ في `failed`.
+     *
+     * @param  \Illuminate\Database\Eloquent\Builder<\Illuminate\Database\Eloquent\Model>  $query
+     * @param  array{assets:int, derivatives:int, failed:int, dry_run:bool}  $stats
+     * @param  callable(\Illuminate\Database\Eloquent\Model): bool  $measure  true = قيس
+     */
+    private function eachCandidate($query, int $limit, array &$stats, string $counter, callable $measure): void
+    {
+        $last = null;
+        while ($stats[$counter] < $limit) {
+            $batch = (clone $query)
+                ->when($last !== null, static fn ($q) => $q->where('id', '>', $last))
+                ->orderBy('id')
+                ->limit(50)
+                ->get();
+            if ($batch->isEmpty()) {
+                return;
+            }
+            foreach ($batch as $row) {
+                $last = $row->id;
+                if ($measure($row)) {
+                    $stats[$counter]++;
+                } else {
+                    $stats['failed']++;
+                }
+                if ($stats[$counter] >= $limit) {
+                    return;
+                }
             }
         }
     }

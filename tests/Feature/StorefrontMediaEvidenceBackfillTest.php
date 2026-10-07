@@ -139,6 +139,30 @@ class StorefrontMediaEvidenceBackfillTest extends TestCase
     }
 
     /** @test */
+    public function a_permanently_unreadable_prefix_never_blocks_later_recoverable_rows(): void
+    {
+        $this->fakeStorefrontMediaR2();
+        $auth = $this->registerTenant('sfev-stuck', 'owner@sfev-stuck.test');
+        $ids = [$this->uploadMedia($auth)['id'], $this->uploadMedia($auth)['id']];
+        sort($ids); // المؤشّر بالمعرّف: الأول فيها هو «البادئة» العالقة
+        [$stuck, $fine] = $ids;
+
+        $this->asTenant($auth['tenant_id'], function () use ($ids, $stuck, $auth): void {
+            StorefrontMedia::query()->whereIn('id', $ids)->update(['region_luminance' => null]);
+            foreach ($this->r2KeysFor($auth['tenant_id'], $stuck) as $key) {
+                unset($this->r2Objects[$key]);
+            }
+        });
+
+        $stats = app(StorefrontMediaEvidenceBackfiller::class)->run($auth['tenant_id'], 1);
+
+        $this->assertSame(1, $stats['assets'], 'the healthy row behind the stuck one was reached with limit=1');
+        $this->assertSame(1, $stats['failed']);
+        $this->assertNotNull($this->asTenant($auth['tenant_id'], fn () => StorefrontMedia::findOrFail($fine)->region_luminance));
+        $this->assertNull($this->asTenant($auth['tenant_id'], fn () => StorefrontMedia::findOrFail($stuck)->region_luminance));
+    }
+
+    /** @test */
     public function the_command_requires_one_valid_tenant_and_a_bounded_limit(): void
     {
         $this->fakeStorefrontMediaR2();
