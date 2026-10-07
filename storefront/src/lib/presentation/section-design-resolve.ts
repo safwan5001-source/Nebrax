@@ -144,14 +144,32 @@ export const SURFACE_OWNING_TYPES: ReadonlySet<string> = new Set([
   "wholesale",
 ]);
 
+/** `--store-background` today: what is behind a section that paints no surface of its own. */
+export const PAGE_BACKGROUND = "#f8f9fa";
+
+/**
+ * Light sections that paint a surface of their own (`bg-store-surface`): where a
+ * text-only design (explicit colours, no design background) actually lands.
+ */
+const LEGACY_SURFACE_HEX: Readonly<Record<string, string>> = {
+  banner: "#ffffff",
+  deliveryPromise: "#ffffff",
+};
+
 export interface EffectiveText {
   /** Foreground applied to body copy (explicit, else automatic over a background). */
   body: string | null;
   /** Section-heading colour (explicit, else the body foreground over a background). */
   heading: string | null;
   link: string | null;
-  /** Interval of the section background, when it has one — what the publish gate proves against. */
+  /** Interval of the section background, when it has one. */
   background: LuminanceInterval | null;
+  /**
+   * What the text is proven against: the design background, else — for explicit
+   * colours with no design background — the surface they will actually be drawn on
+   * (the section's own legacy surface, or the page background).
+   */
+  judged: LuminanceInterval | null;
 }
 
 /**
@@ -174,7 +192,13 @@ export function effectiveText(
   // a design background a text colour would land on that legacy surface — which the
   // contrast proof cannot see — so it is not applied at all (fail-closed).
   if (!background && type !== undefined && SURFACE_OWNING_TYPES.has(type)) {
-    return { body: null, heading: null, link: null, background: null };
+    return {
+      body: null,
+      heading: null,
+      link: null,
+      background: null,
+      judged: null,
+    };
   }
 
   const auto = background ? autoForeground(background) : null;
@@ -183,20 +207,30 @@ export function effectiveText(
     ? colour(design.text.heading, ctx)
     : null;
   const body = explicitBody ?? auto;
+  const link = design.text?.link ? colour(design.text.link, ctx) : null;
+  const judged =
+    background ??
+    ((explicitBody ?? explicitHeading ?? link) !== null
+      ? backgroundInterval(
+          (type !== undefined && LEGACY_SURFACE_HEX[type]) || PAGE_BACKGROUND,
+          null,
+        )
+      : null);
   return {
     body,
     heading: explicitHeading ?? body,
-    link: design.text?.link ? colour(design.text.link, ctx) : null,
+    link,
     background,
+    judged,
   };
 }
 
-/** Worst contrast of a foreground against the section's background; `null` = no background to judge. */
+/** Worst contrast of a foreground against what it is drawn on; `null` = nothing to judge. */
 export function worstTextRatio(
   foreground: string,
   text: EffectiveText,
 ): number | null {
-  return text.background ? worstRatioForHex(foreground, text.background) : null;
+  return text.judged ? worstRatioForHex(foreground, text.judged) : null;
 }
 
 export function resolveSectionDesign(

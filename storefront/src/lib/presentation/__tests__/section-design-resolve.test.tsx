@@ -54,6 +54,42 @@ describe("resolveSectionDesign (CUST-HV V5c)", () => {
     expect(light.style["--sec-fg"]).toBe("#000000");
   });
 
+  it("explicit text with no design background is judged on the surface it really lands on", () => {
+    const textOnly: SectionDesign = { text: { body: { hex: "#ffffff" } } };
+    // banner paints its own white card; a shelf sits on the page background
+    for (const type of ["banner", "benefits"]) {
+      const text = effectiveText(textOnly, ctx, type);
+      expect(text.background).toBeNull();
+      expect(text.judged).not.toBeNull();
+      expect(worstTextRatio("#ffffff", text)!).toBeLessThan(1.2);
+      expect(worstTextRatio("#111827", text)!).toBeGreaterThan(4.5);
+    }
+    // nothing set ⇒ nothing to judge
+    expect(
+      effectiveText({ spacing: { top: "md" } }, ctx, "banner").judged,
+    ).toBeNull();
+  });
+
+  it("a frame whose section rendered nothing collapses (no empty band)", () => {
+    const { container } = render(
+      <SectionDesignFrame
+        section={{
+          type: "featured",
+          design: {
+            background: { kind: "solid", color: { hex: "#101820" } },
+            spacing: { top: "lg" },
+          },
+        }}
+        context={ctx}
+      >
+        {null}
+      </SectionDesignFrame>,
+    );
+    const frame = container.querySelector("[data-sd]") as HTMLElement;
+    expect(frame).not.toBeNull();
+    expect(frame.childNodes.length).toBe(0); // `:empty` ⇒ `display: none` in the stylesheet
+  });
+
   it("a section that paints its own dark surface ignores text colours until the design paints a background", () => {
     const textOnly: SectionDesign = { text: { body: { hex: "#ffffff" } } };
     for (const type of ["hero", "appPromo", "wholesale"]) {
