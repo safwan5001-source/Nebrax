@@ -228,6 +228,9 @@ export function presentationCssVars(primary: string, radius: RadiusId): Record<s
     "--store-primary-50": mixHex(color, "#ffffff", 0.92),
     "--store-primary-hover": mixHex(color, "#000000", 0.32),
     "--store-primary-foreground": foreground,
+    // The original, restored inside surfaces nested in a recoloured section: it must be
+    // captured on the same element as the themed value (a `:root` copy would be stale).
+    "--store-primary-foreground-base": foreground,
     "--store-primary-soft": mixHex(color, "#ffffff", 0.92),
     "--store-radius": radiusToken(radius),
     "--primary": color,

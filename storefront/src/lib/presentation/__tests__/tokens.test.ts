@@ -85,4 +85,12 @@ describe("presentation tokens", () => {
     expect(vars["--store-radius"]).toBe("0.5rem");
     expect(vars).not.toHaveProperty("--store-font-arabic");
   });
+
+  it("CUST-HV V5c review: the themed primary foreground is captured on the SAME element as its base", () => {
+    const light = presentationCssVars("#f5e6a8", "subtle");
+    expect(light["--store-primary-foreground"]).toBe("#111827");
+    expect(light["--store-primary-foreground-base"]).toBe(
+      light["--store-primary-foreground"],
+    );
+  });
 });

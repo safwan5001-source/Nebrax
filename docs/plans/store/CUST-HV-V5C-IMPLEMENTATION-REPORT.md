@@ -57,7 +57,7 @@ Wraps a section only when it has a design. Storefront: `publishedNodes` was spli
 
 ---
 
-## Review round (Codex, 10 findings — all valid, all fixed)
+## Review round (Codex, 13 findings — all valid, all fixed)
 
 | Finding | Fix |
 |---|---|
@@ -74,6 +74,10 @@ Wraps a section only when it has a design. Storefront: `publishedNodes` was spli
 | **P1** the block was *unlayered* in the storefront, where Tailwind v4 utilities live in `@layer utilities`: an unlayered rule outranks every layered utility regardless of specificity, so the zero-specificity `:where()` reset overrode `text-store-primary-foreground` on a designed banner's CTA (dark text on dark green) — invisible to the Canvas proof, whose utilities are unlayered | The whole block now lives **inside `@layer utilities`** (same layer as the utilities; inside it ordering is specificity, so a utility on the element beats the reset exactly as in the Canvas). **New proof on the real thing:** `cust-hv-v5c-storefront-cascade.spec.ts` compiles the actual storefront `globals.css` (Tailwind v4, native layers) and renders representative markup in Chromium; with the layer wrapper removed it reproduces the reviewer's failure (CTA text `rgb(17,24,39)` on dark green), with it the CTA keeps `rgb(255,255,255)`. |
 | **P2** links over a design background kept `text-store-primary` ("View all" on a dark band) | Links default to the **proven foreground** when a background exists (explicit `link` still wins); the contract's `judged` rule is unchanged for explicit colours. |
 | **P2** a transparent CTA that gains an opaque surface on hover (`hover:bg-store-footer-border`) rendered designed-foreground-on-dark | Elements that gain an opaque store surface on `:hover` / `:focus-visible` restore the original text tokens for that state (zero-specificity), and the section-link rule steps aside for them. Asserted in the real-stylesheet spec (black at rest, white on the dark hover fill). |
+
+| **P1** the published path wrapped hero / categories / newArrivals / wholesale in an extra `<div>`, so `[data-sd] > *` cleared that empty wrapper instead of the section's own surface (the Canvas passes the root directly — a published-only divergence) | A *designed* built-in section is no longer wrapped (its frame is the wrapper); an undesigned one keeps its div byte-for-byte. The stack moved to `components/home/published-nodes.tsx` (a page file may export only a page) so it is unit-tested: the frame's only child is the section root; the undesigned output is unchanged. |
+| **P1** `--store-primary-foreground-base` was captured on `:root`, but `publishedThemeStyle` overrides the foreground on the theme wrapper — a light primary colour then reset a nested CTA to the `:root` white | `presentationCssVars` emits the base **on the same element** as the themed value (both twins; tested). Asserted in Chromium: light primary `#f5e6a8` keeps `#111827` CTA text inside a designed section. |
+| **P2** translucent nested fills (`bg-store-footer-border/40`) composite over an arbitrary design background, which the gate cannot see (black on the mid-tone composite ≈ 2.9:1) | Translucent store fills inside a designed section become their **opaque equivalents** (`--store-surface`, `--store-footer-border`, white) and count as surfaces, so their own original foreground is proven against a known fill. Asserted on `#757575` in the compiled storefront CSS. |
 
 The browser proof now also asserts, at all six widths in RTL and LTR, that **no designed section's root still paints its own fill** and that a heading colour reaches the Canvas heading; a mutation run (rule removed) fails it for banner / appPromo / deliveryPromise / shelf / discovery, so the check is not vacuous. The scenario gained `hero` and `wholesale` designs (the two dark surface-owners) and a distinct heading colour on benefits. 13/13 green.
 
@@ -94,7 +98,7 @@ The browser proof now also asserts, at all six widths in RTL and LTR, that **no 
 |---|---|
 | Web | `section-design-resolve.test.tsx` **17** (resolver, frame, byte-identical twins, stylesheet parity) · full vitest **427 files / 3702** (drift ratchet ✓) |
 | Storefront | `section-design-resolve.test.tsx` **12** · full vitest **142 files / 1284** · `tsc` ✓ · `biome check` ✓ |
-| Real browser | `cust-hv-v5c-design-render-proof.spec.ts` **13/13** (Canvas) + `cust-hv-v5c-storefront-cascade.spec.ts` **2/2** (the real compiled storefront stylesheet — local evidence gate, as V3/V4b/V5a) |
+| Real browser | `cust-hv-v5c-design-render-proof.spec.ts` **13/13** (Canvas) + `cust-hv-v5c-storefront-cascade.spec.ts` **4/4** (the real compiled storefront stylesheet — local evidence gate, as V3/V4b/V5a) |
 | Backend | **no backend file changed** (`git diff origin/main` touches no `app/` `routes/` `database/` `tests/` `config/`); the full run on the identical backend is V5b's (5751 passed, 28 env-only failures) · PostgreSQL by CI |
 
 Evidence: `docs/plans/store/cust-hv-v5c/*.jpg`.
