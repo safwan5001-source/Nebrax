@@ -57,7 +57,7 @@ Wraps a section only when it has a design. Storefront: `publishedNodes` was spli
 
 ---
 
-## Review round (Codex, 13 findings — all valid, all fixed)
+## Review round (Codex, 16 findings — all valid, all fixed)
 
 | Finding | Fix |
 |---|---|
@@ -79,6 +79,10 @@ Wraps a section only when it has a design. Storefront: `publishedNodes` was spli
 | **P1** `--store-primary-foreground-base` was captured on `:root`, but `publishedThemeStyle` overrides the foreground on the theme wrapper — a light primary colour then reset a nested CTA to the `:root` white | `presentationCssVars` emits the base **on the same element** as the themed value (both twins; tested). Asserted in Chromium: light primary `#f5e6a8` keeps `#111827` CTA text inside a designed section. |
 | **P2** translucent nested fills (`bg-store-footer-border/40`) composite over an arbitrary design background, which the gate cannot see (black on the mid-tone composite ≈ 2.9:1) | Translucent store fills inside a designed section become their **opaque equivalents** (`--store-surface`, `--store-footer-border`, white) and count as surfaces, so their own original foreground is proven against a known fill. Asserted on `#757575` in the compiled storefront CSS. |
 
+| **P2** `spacing.inner` added padding on the frame while the section's own padding stayed (so `none` removed nothing and a step doubled) | Inner spacing **replaces** it: the root takes the designed padding on every side and the padded content box directly inside (banner / hero `p-5 md:p-8…`) gives its own up. Asserted on the compiled storefront CSS (`none` ⇒ 0 px) and in the Canvas proof. |
+| **P2** the hover-surface reset also fired on `:focus-visible`, though the components paint those fills on hover only (keyboard focus then lost the proven foreground) | Reset limited to `:hover`; asserted that keyboard focus keeps the designed foreground. |
+| **P2** `design.align` (content *block* position) and `text.align` were folded into one `text-align` | Two independent outputs: `--sec-align` (copy) and `--sec-bms` / `--sec-bme` (block margins). Asserted: a centred block with start-aligned copy. |
+
 The browser proof now also asserts, at all six widths in RTL and LTR, that **no designed section's root still paints its own fill** and that a heading colour reaches the Canvas heading; a mutation run (rule removed) fails it for banner / appPromo / deliveryPromise / shelf / discovery, so the check is not vacuous. The scenario gained `hero` and `wholesale` designs (the two dark surface-owners) and a distinct heading colour on benefits. 13/13 green.
 
 ## Invariants
@@ -98,7 +102,7 @@ The browser proof now also asserts, at all six widths in RTL and LTR, that **no 
 |---|---|
 | Web | `section-design-resolve.test.tsx` **17** (resolver, frame, byte-identical twins, stylesheet parity) · full vitest **427 files / 3702** (drift ratchet ✓) |
 | Storefront | `section-design-resolve.test.tsx` **12** · full vitest **142 files / 1284** · `tsc` ✓ · `biome check` ✓ |
-| Real browser | `cust-hv-v5c-design-render-proof.spec.ts` **13/13** (Canvas) + `cust-hv-v5c-storefront-cascade.spec.ts` **4/4** (the real compiled storefront stylesheet — local evidence gate, as V3/V4b/V5a) |
+| Real browser | `cust-hv-v5c-design-render-proof.spec.ts` **13/13** (Canvas) + `cust-hv-v5c-storefront-cascade.spec.ts` **5/5** (the real compiled storefront stylesheet — local evidence gate, as V3/V4b/V5a) |
 | Backend | **no backend file changed** (`git diff origin/main` touches no `app/` `routes/` `database/` `tests/` `config/`); the full run on the identical backend is V5b's (5751 passed, 28 env-only failures) · PostgreSQL by CI |
 
 Evidence: `docs/plans/store/cust-hv-v5c/*.jpg`.
