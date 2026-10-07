@@ -18,6 +18,7 @@ import {
   publishedLogoUrl,
   publishedSocialLinks,
   publishedStoreName,
+  publishedThemeAttrs,
   publishedThemeStyle,
   publishedWhatsAppHref,
 } from "@/lib/presentation/public";
@@ -181,6 +182,7 @@ export default async function StorefrontLayout({
     footerMessages("shop"),
   );
   const themeStyle = publishedThemeStyle(presentation);
+  const themeAttrs = publishedThemeAttrs(presentation);
   const compact = presentation?.header.style === "compact";
   const logoUrl = publishedLogoUrl(presentation, compact);
   const logoMedia = publishedLogoMedia(
@@ -342,6 +344,7 @@ export default async function StorefrontLayout({
   return (
     <div
       data-published-theme=""
+      {...themeAttrs}
       className="flex min-h-screen flex-1 flex-col"
       style={themeStyle}
     >

@@ -274,7 +274,7 @@ describe("SectionDesignFrame (CUST-HV V5c)", () => {
 describe("the Canvas and the storefront share ONE resolver (V0 §3.5)", () => {
   const web = resolve(__dirname, "../presentation");
   const storefront = resolve(__dirname, "../../../../../storefront/src/lib/presentation");
-  for (const file of ["section-design-resolve.ts", "section-design.ts", "palette.ts", "contrast-engine.ts"]) {
+  for (const file of ["section-design-resolve.ts", "section-design.ts", "palette.ts", "contrast-engine.ts", "global-tokens.ts"]) {
     it(`${file} is byte-identical in web and storefront`, () => {
       expect(readFileSync(resolve(web, file), "utf8")).toBe(readFileSync(resolve(storefront, file), "utf8"));
     });
@@ -286,7 +286,7 @@ describe("the Canvas and the storefront share ONE resolver (V0 §3.5)", () => {
     expect(sf).toContain("[data-sd]:empty");
     expect(pv).toContain("[data-sd]:empty");
     const block = (css: string) => css.slice(css.indexOf("CUST-HV V5c — section design"));
-    const norm = (css: string) => block(css).replace(/\.awj-store-preview /g, "").replace(/\s+/g, " ").trim();
+    const norm = (css: string) => block(css).replace(/\.awj-store-preview(?=\[)/g, "").replace(/\.awj-store-preview /g, "").replace(/\s+/g, " ").trim();
     // the storefront block sits inside `@layer utilities { … }` (same layer as Tailwind's utilities)
     expect(sf).toMatch(/@layer utilities \{\s*\/\*\s*\* CUST-HV V5c — section design/);
     expect(norm(pv)).toBe(norm(sf).replace(/\}$/, "").trim());

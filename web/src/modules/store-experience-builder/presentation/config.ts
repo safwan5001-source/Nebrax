@@ -1,5 +1,6 @@
 import { type MediaRef, normalizeMediaRef } from "./media-ref";
 import { type PresentationPalette, normalizePalette } from "./palette";
+import { type GlobalTokensDoc, normalizeGlobalTokens } from "./global-tokens";
 import { type SectionDesign, normalizeSectionDesign } from "./section-design";
 import {
   type AnnouncementsDoc,
@@ -182,6 +183,16 @@ export interface StorefrontPresentationConfig {
    * fixed token today; pre-V5 documents normalize without this key, byte-identically.
    */
   palette?: PresentationPalette;
+  /**
+   * CUST-HV V5e-2a — additive, optional document-level global tokens (contract §5.1,
+   * §6.2, §6.3, §6.6): `typography` · `surfaces` · `layout` · `motion`. Absent = every
+   * token keeps today's value; pre-V5e documents normalize without these keys,
+   * byte-identically.
+   */
+  typography?: GlobalTokensDoc["typography"];
+  surfaces?: GlobalTokensDoc["surfaces"];
+  layout?: GlobalTokensDoc["layout"];
+  motion?: GlobalTokensDoc["motion"];
 }
 
 const NAV_KINDS: NavLinkKind[] = [
@@ -495,6 +506,7 @@ export function normalizePresentationConfig(
   const pagePresentation = normalizePagePresentation(raw.pagePresentation);
   const announcements = normalizeAnnouncements(raw.announcements);
   const palette = normalizePalette(raw.palette);
+  const globalTokens = normalizeGlobalTokens(raw);
 
   return {
     version: PRESENTATION_CONFIG_VERSION,
@@ -585,6 +597,7 @@ export function normalizePresentationConfig(
     ...(pagePresentation ? { pagePresentation } : {}),
     ...(announcements ? { announcements } : {}),
     ...(palette ? { palette } : {}),
+    ...globalTokens,
   };
 }
 

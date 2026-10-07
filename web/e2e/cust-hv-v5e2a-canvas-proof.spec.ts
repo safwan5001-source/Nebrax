@@ -1,0 +1,92 @@
+import { expect, test, type Page } from '@playwright/test';
+import { mkdir } from 'node:fs/promises';
+import path from 'node:path';
+
+/**
+ * CUST-HV V5e-2a — the Canvas wears the global tokens exactly as the storefront does (same
+ * resolver, same stylesheet block): a populated page at the boldest step of every token,
+ * AR RTL + EN LTR at six widths. Asserts the tokens are really applied (not merely present
+ * as attributes) and that nothing overflows the page or collapses the layout.
+ */
+const evidenceDir = path.resolve(process.cwd(), 'test-results/cust-hv-v5e2a');
+const WIDTHS = [390, 430, 768, 1024, 1280, 1440] as const;
+
+async function hideDevOverlay(page: Page) {
+  await page.addStyleTag({ content: 'nextjs-portal{display:none!important}' });
+}
+
+for (const locale of ['ar', 'en'] as const) {
+  for (const width of WIDTHS) {
+    test(`global tokens ${locale} @ ${width}`, async ({ page }) => {
+      await mkdir(evidenceDir, { recursive: true });
+      await page.setViewportSize({ width, height: 900 });
+      await page.goto(`/dev/customizer-visual?locale=${locale}&scenario=global&viewport=desktop`);
+      await page.waitForLoadState('networkidle');
+      await page.waitForSelector('[data-visual-root]');
+      await hideDevOverlay(page);
+      await page.waitForTimeout(300);
+
+      const result = await page.evaluate(() => {
+        const root = document.querySelector('.awj-store-preview') as HTMLElement;
+        const cs = getComputedStyle(root);
+        const failures: string[] = [];
+        const gt = root.getAttribute('data-gt') ?? '';
+        for (const token of ['hz', 'bz', 'hw', 'bw', 'lh', 'hs-underline', 'sbw', 'shd', 'mo-d', 'mo-e']) {
+          if (!gt.split(' ').includes(token)) failures.push(`missing data-gt token ${token}`);
+        }
+        if (cs.fontWeight !== '500') failures.push(`body weight ${cs.fontWeight}`);
+        // headings: scaled once, heavy, underlined section headings
+        const heading = root.querySelector('[data-section-heading] h2, [data-section-heading] h1') as HTMLElement | null;
+        if (!heading) failures.push('no section heading found');
+        else {
+          const h = getComputedStyle(heading);
+          if (Math.abs(parseFloat(h.zoom) - 1.125) > 0.001) failures.push(`heading zoom ${h.zoom}`);
+          if (h.fontWeight !== '800') failures.push(`heading weight ${h.fontWeight}`);
+          // computed lengths are reported in the zoomed element's own space: 2px / 1.125
+          if (parseFloat(h.borderBottomWidth) * parseFloat(h.zoom) < 1.9) failures.push(`section heading has no underline (${h.borderBottomWidth})`);
+        }
+        const bar = root.querySelector('[data-section-heading] [data-heading-bar]') as HTMLElement | null;
+        if (bar && getComputedStyle(bar).display !== 'none') failures.push('underline style still shows the bar');
+        // cards: pill-step radius, medium border, shadow
+        const card = [...root.querySelectorAll('.rounded-store.border.bg-store-surface')].find(
+          (el) => el.getBoundingClientRect().width > 0,
+        ) as HTMLElement | undefined;
+        if (!card) failures.push('no card found');
+        else {
+          const c = getComputedStyle(card);
+          if (Math.abs(parseFloat(c.borderTopLeftRadius) - 28) > 1) failures.push(`card radius ${c.borderTopLeftRadius}`);
+          if (parseFloat(c.borderTopWidth) !== 2) failures.push(`card border ${c.borderTopWidth}`);
+          if (c.boxShadow === 'none') failures.push('card has no shadow');
+        }
+        // layout: the container is narrow
+        const container = root.querySelector('.max-w-store') as HTMLElement | null;
+        if (container) {
+          const w = container.getBoundingClientRect().width;
+          if (w > 1024 + 1) failures.push(`content width ${w}`);
+        }
+        // motion: a transitioning element uses the slow duration
+        const moving = root.querySelector('[class*="transition"]') as HTMLElement | null;
+        if (moving && getComputedStyle(moving).transitionDuration.split(',')[0].trim() !== '0.5s') {
+          failures.push(`transition ${getComputedStyle(moving).transitionDuration}`);
+        }
+        return { failures, overflow: document.documentElement.scrollWidth - window.innerWidth };
+      });
+
+      expect(result.failures, result.failures.join('\n')).toEqual([]);
+      expect(result.overflow).toBeLessThanOrEqual(1);
+      await page.screenshot({ path: path.join(evidenceDir, `global-${locale}-${width}.png`), fullPage: true });
+    });
+  }
+}
+
+test('without any global token the Canvas carries no data-gt and no --gt variable', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto('/dev/customizer-visual?locale=en&scenario=populated&viewport=desktop');
+  await page.waitForSelector('[data-visual-root]');
+  const state = await page.evaluate(() => {
+    const root = document.querySelector('.awj-store-preview') as HTMLElement;
+    return { gt: root.hasAttribute('data-gt'), style: root.getAttribute('style') ?? '' };
+  });
+  expect(state.gt).toBe(false);
+  expect(state.style).not.toContain('--gt-');
+});

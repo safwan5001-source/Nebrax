@@ -334,3 +334,65 @@
   background: var(--store-primary);
   vertical-align: -0.1em;
 }
+
+/*
+ * CUST-HV V5e-2a — document-level global tokens (`data-gt` on the theme wrapper, `--gt-*`
+ * variables). Every rule is keyed on a token that is present ONLY when the merchant set the
+ * matching value, so an absent token changes nothing. `:where()` keeps specificity at a
+ * utility's level: these rules (later in the same layer) win over a component's own utility,
+ * while a section design's own rules (higher specificity) win over them.
+ */
+/* typography — named steps; the heading scale keeps the hierarchy (it multiplies, not replaces) */
+.awj-store-preview[data-gt~="hz"] :where(h1, h2, h3) {
+  zoom: var(--gt-hz);
+}
+.awj-store-preview[data-gt~="bz"] :where(p) {
+  zoom: var(--gt-bz);
+}
+.awj-store-preview[data-gt~="hw"] :where(h1, h2, h3) {
+  font-weight: var(--gt-hw);
+}
+.awj-store-preview[data-gt~="bw"] {
+  font-weight: var(--gt-bw);
+}
+.awj-store-preview[data-gt~="lh"] :where(p, li) {
+  line-height: var(--gt-lh);
+}
+/* the default section-heading style — only for headings whose section chose no style of its own */
+.awj-store-preview[data-gt~="hs-plain"] [data-section-heading]:not([data-sd*="hstyle-"] [data-section-heading]) [data-heading-bar],
+.awj-store-preview[data-gt~="hs-centered"] [data-section-heading]:not([data-sd*="hstyle-"] [data-section-heading]) [data-heading-bar],
+.awj-store-preview[data-gt~="hs-underline"] [data-section-heading]:not([data-sd*="hstyle-"] [data-section-heading]) [data-heading-bar] {
+  display: none;
+}
+.awj-store-preview[data-gt~="hs-centered"] [data-section-heading]:not([data-sd*="hstyle-"] [data-section-heading]) {
+  justify-content: center;
+  text-align: center;
+}
+.awj-store-preview[data-gt~="hs-underline"] [data-section-heading]:not([data-sd*="hstyle-"] [data-section-heading]) :is(h1, h2, h3) {
+  display: block;
+  padding-block-end: 0.5rem;
+  border-block-end: 2px solid var(--store-primary);
+}
+/* surfaces — the card surface is the element that carries the store's radius and card fill */
+.awj-store-preview[data-gt~="sbw"] :where([class~="rounded-store"][class~="border"][class~="border-store-border"]) {
+  border-width: var(--gt-sbw);
+}
+.awj-store-preview[data-gt~="shd"] :where([class~="rounded-store"][class~="bg-store-surface"]) {
+  box-shadow: var(--gt-shd);
+}
+/* motion — duration / easing of the components' own transitions; static under reduced motion */
+.awj-store-preview[data-gt~="mo-d"] :where([class*="transition"]) {
+  transition-duration: var(--gt-md);
+}
+.awj-store-preview[data-gt~="mo-e"] :where([class*="transition"]) {
+  transition-timing-function: var(--gt-me);
+}
+@media (prefers-reduced-motion: reduce) {
+  .awj-store-preview[data-gt~="mo-d"] *,
+  .awj-store-preview[data-gt~="mo-e"] * {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+  }
+}

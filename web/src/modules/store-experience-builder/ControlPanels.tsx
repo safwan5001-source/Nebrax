@@ -65,6 +65,7 @@ import {
 } from "./DataSectionFields";
 import { OfferCatalog } from "./OfferCatalog";
 import { DesignInspector } from "./design/DesignInspector";
+import { GlobalTokensEditor } from "./design/GlobalTokensEditor";
 import { PaletteEditor } from "./design/PaletteEditor";
 import { SECTION_DESIGN_CAPABILITIES } from "./presentation/section-design";
 import type { DesignContext } from "./presentation/section-design-resolve";
@@ -560,6 +561,9 @@ function ThemePanel({
             onChange={(palette) => patch({ palette })}
             onAccentChange={(accentColor) => patch({ accentColor })}
           />
+        </Section>
+        <Section title={t("gtTitle")} hint={t("gtHint")}>
+          <GlobalTokensEditor config={config} t={t} patch={patch} />
         </Section>
       </div>
     </div>

@@ -28,7 +28,8 @@ type Scenario =
   | "missing-media"
   | "missing-product"
   | "data-sections"
-  | "design";
+  | "design"
+  | "global";
 type PreviewViewport = "mobile" | "tablet" | "desktop";
 
 function scenarioOf(value: string | null): Scenario {
@@ -38,7 +39,8 @@ function scenarioOf(value: string | null): Scenario {
     value === "missing-media" ||
     value === "missing-product" ||
     value === "data-sections" ||
-    value === "design"
+    value === "design" ||
+    value === "global"
   ) {
     return value;
   }
@@ -127,6 +129,21 @@ function dataSectionsConfig(locale: "ar" | "en") {
 }
 
 function configFor(locale: "ar" | "en", scenario: Scenario): StorefrontPresentationConfig {
+  if (scenario === "global") {
+    // CUST-HV V5e-2a — the populated page wearing every global token at its boldest step.
+    const base = configFor(locale, "populated");
+    const shelves = (["categories", "newArrivals"] as const)
+      .filter((type) => !base.homepage.sections.some((section) => section.type === type))
+      .map((type) => ({ id: type, type, visible: true }));
+    return normalizePresentationConfig({
+      ...base,
+      homepage: { ...base.homepage, sections: [...shelves, ...base.homepage.sections] },
+      typography: { headingScale: "lg", bodyScale: "lg", headingWeight: 800, bodyWeight: 500, lineHeight: "relaxed", sectionHeading: "underline" },
+      surfaces: { radius: "pill", border: { width: "medium" }, shadow: "medium" },
+      layout: { contentWidth: "narrow" },
+      motion: { duration: "slow", easing: "emphasized" },
+    });
+  }
   if (scenario === "design") return designConfig(configFor(locale, "populated"), dataSectionsConfig(locale));
   if (scenario === "data-sections") return dataSectionsConfig(locale);
   const text = copy(locale, scenario);

@@ -8,6 +8,7 @@ import type {
   StorefrontPresentationConfig,
 } from "./config";
 import { normalizePresentationConfig, previewStoreName } from "./config";
+import { resolveGlobalTokens } from "./global-tokens";
 import { fontPresetFamilyStack, presentationCssVars } from "./tokens";
 import { buildWhatsAppUrl, sanitizeExternalUrl, sanitizeLogoUrl } from "./urls";
 
@@ -68,8 +69,21 @@ export function publishedThemeStyle(
       presentation.radius,
       presentation.accentColor,
     ),
+    // CUST-HV V5e-2a — document-level global tokens (absent ⇒ nothing is added).
+    ...(resolveGlobalTokens(presentation)?.style ?? {}),
     fontFamily: fontPresetFamilyStack(presentation.fontPreset),
   };
+}
+
+/**
+ * CUST-HV V5e-2a — the `data-gt` token list for the same wrapper `publishedThemeStyle`
+ * styles; `undefined` when no global token is set (the wrapper is exactly as before).
+ */
+export function publishedThemeAttrs(
+  presentation: StorefrontPresentationConfig | null,
+): Record<string, string> | undefined {
+  const attrs = resolveGlobalTokens(presentation ?? undefined)?.attrs;
+  return attrs && Object.keys(attrs).length > 0 ? attrs : undefined;
 }
 
 export function publishedLogoUrl(
