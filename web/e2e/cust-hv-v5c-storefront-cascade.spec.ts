@@ -107,3 +107,43 @@ test('the themed primary foreground survives on a nested CTA (light primary colo
   expect(cta.color).toBe('rgb(17, 24, 39)'); // dark on the light primary, not the :root default white
 });
 
+test('inner spacing replaces legacy padding; block alignment is separate from text alignment; focus never paints the hover surface', async ({ page }) => {
+  await mount(
+    page,
+    frame(
+      'banner',
+      'bg fg heading link pi',
+      '--sec-bg:#101820;--sec-fg:#ffffff;--sec-heading:#ffffff;--sec-link:#ffffff;--sec-pi:0px',
+      `<section id="root" class="overflow-hidden rounded-store border border-store-border bg-store-surface">
+         <div id="inner" class="flex flex-col gap-4 p-5 md:p-8"><p>copy</p></div>
+       </section>`,
+    ) +
+      frame(
+        'customContent',
+        'balign align',
+        '--sec-bms:auto;--sec-bme:auto;--sec-align:start',
+        `<section id="block" class="max-w-md min-w-0 space-y-3"><p id="blockp">text</p></section>`,
+      ) +
+      frame(
+        'wholesale',
+        'bg fg heading link',
+        '--sec-bg:#e0f2fe;--sec-fg:#000000;--sec-heading:#000000;--sec-link:#000000',
+        `<section class="rounded-store bg-store-footer px-5 py-10 text-store-footer-link">
+           <a id="cta3" href="#" class="inline-block border bg-transparent px-4 py-2 text-store-footer-link hover:bg-store-footer-border hover:text-store-footer-foreground">Secondary</a>
+         </section>`,
+      ),
+  );
+  expect(await page.locator('#inner').evaluate((el) => getComputedStyle(el).paddingTop)).toBe('0px'); // `none` removes the legacy p-5 / md:p-8
+  expect(await page.locator('#root').evaluate((el) => getComputedStyle(el).paddingTop)).toBe('0px');
+  const margins = await page.locator('#block').evaluate((el) => { const cs = getComputedStyle(el); return [cs.marginLeft, cs.marginRight]; });
+  expect(margins[0]).not.toBe('0px'); // centred block…
+  expect(margins[0]).toBe(margins[1]);
+  expect(await page.locator('#blockp').evaluate((el) => getComputedStyle(el).textAlign)).toBe('start'); // …with start-aligned copy
+  await page.locator('#cta3').focus();
+  await page.keyboard.press('Tab'); // leave, then come back by keyboard
+  await page.keyboard.press('Shift+Tab');
+  const focused = await style(page, '#cta3');
+  expect(focused.bg).toBe('rgba(0, 0, 0, 0)'); // focus paints no surface…
+  expect(focused.color).toBe('rgb(0, 0, 0)'); // …so the proven foreground stays
+});
+
