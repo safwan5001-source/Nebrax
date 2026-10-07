@@ -30,6 +30,11 @@ const BUTTONS = `
   <section id="band" class="rounded-store bg-store-footer px-5 py-10 text-store-footer-link">
     <a id="inverse" data-slot="button" data-variant="default" data-size="lg" href="#" class="inline-flex items-center justify-center rounded-md bg-store-surface text-store-foreground hover:bg-store-surface-muted h-13 px-6">Wholesale CTA</a>
   </section>
+  <div id="secBand" data-sd="bg fg link" data-design-type="wholesale" style="--sec-link:#ffffff;--sec-fg:#ffffff;--sec-bg:#101820">
+    <section class="rounded-store bg-store-footer px-5 py-10 text-store-footer-link">
+      <a id="inverseDesigned" data-slot="button" data-variant="default" data-size="lg" href="#" class="inline-flex items-center justify-center rounded-md bg-store-surface text-store-foreground hover:bg-store-surface-muted h-13 px-6">Wholesale CTA (designed)</a>
+    </section>
+  </div>
   <div id="sec" data-sd="bg fg link" data-design-type="benefits" style="--sec-link:#ffffff;--sec-fg:#ffffff;--sec-bg:#101820">
     <div><a id="inSec" href="#" class="inline-flex h-10 items-center rounded-store bg-store-primary px-4 text-sm font-bold text-store-primary-foreground">In section</a></div>
   </div>`;
@@ -163,4 +168,16 @@ test('review: inside a designed section an outline button keeps a transparent ho
   expect(hovered.backgroundColor).toBe('rgba(0, 0, 0, 0)');
   expect(hovered.color).toBe('rgb(255, 255, 255)');
   expect(hovered.borderTopColor).toBe('rgb(255, 255, 255)');
+});
+
+test('review round 2: a wholesale band whose design background replaced the footer fill is no longer "footer-coloured" — its CTA follows the global style and the section label', async ({ page }) => {
+  await mount(page, 'data-gt="b-pri b-sty-outline"', '--gt-bf:transparent;--gt-bl:rgb(18, 55, 42);--gt-bb:rgb(18, 55, 42);--gt-bhf:rgb(231, 238, 235);--gt-bhl:rgb(18, 55, 42);--gt-bhb:rgb(18, 55, 42)');
+  const designed = await read(page, '#inverseDesigned', ['backgroundColor', 'color', 'borderTopWidth', 'borderTopColor']);
+  expect(designed.backgroundColor).toBe('rgba(0, 0, 0, 0)');
+  expect(designed.borderTopWidth).toBe('2px');
+  expect(designed.color).toBe('rgb(255, 255, 255)'); // the section's proven link colour on the design background
+  expect(designed.borderTopColor).toBe('rgb(255, 255, 255)');
+  // …while the same CTA on an UNdesigned footer-coloured band is still left alone (previous test)
+  const plain = await read(page, '#inverse', ['backgroundColor', 'borderTopWidth']);
+  expect(plain.borderTopWidth).toBe('0px');
 });

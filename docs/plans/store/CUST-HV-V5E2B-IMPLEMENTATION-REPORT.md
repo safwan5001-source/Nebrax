@@ -70,6 +70,8 @@ Evidence `docs/plans/store/cust-hv-v5e2b/` (Canvas, soft · large · pill · upp
 
 **Round 2 (Codex on #1273, P1 — valid, fixed in the same PR).** The overlay container was resolved once on mount, but the cart drawer lives in the shared `[country]/[locale]` layout and stays mounted while the route-group layouts — and the `[data-published-theme]` wrapper — are replaced (storefront ⇄ checkout). A drawer first mounted on checkout kept portalling to `body`; one first mounted in the store kept a detached node. `useThemePortalContainer()` now re-resolves on every route change (`usePathname()` is the effect dependency). Test: a persistent dialog across storefront → checkout (no wrapper ⇒ `body`) → storefront (new wrapper ⇒ inside it); mutation-checked (fails with the pre-fix `[]` dependency).
 
+**Round 3 (Codex on #1273, P2 — valid, same PR).** The footer-band exclusion keyed off the legacy `bg-store-footer` class even when a section *design background* had replaced that fill (`[data-sd~="bg"] > * { background: none }`), so a designed wholesale band kept an opaque inverse CTA that ignored the global style and the section's proven label. The exclusion now reads `:not([class~="bg-store-footer"]:not([data-sd~="bg"] > *) *)` — only a genuinely footer-coloured band (not one whose fill a design replaced) is excluded — in both stylesheets. Chromium: the designed band's CTA is an outline button with the section's white label and border, and the undesigned band's CTA is still untouched (10/10; the new test fails on the previous CSS).
+
 ## Invariants
 | Invariant | Status |
 |---|---|

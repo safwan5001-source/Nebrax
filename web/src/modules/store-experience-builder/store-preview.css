@@ -422,43 +422,43 @@
 /* A primary button inside the dark footer-coloured bands (wholesale, app promo, footer) keeps its own inverse
    treatment: its backdrop is not the page, so the page-judged colours must not reach it. */
 /* primary buttons: style / colour / hover (fill, label and border come from validated colours) */
-.awj-store-preview[data-gt~="b-pri"] :where([class~="bg-store-primary"][class~="rounded-store"][class~="font-bold"], [data-slot="button"][data-variant="default"]:not([data-size^="icon"])):not([class~="bg-store-footer"] *) {
+.awj-store-preview[data-gt~="b-pri"] :where([class~="bg-store-primary"][class~="rounded-store"][class~="font-bold"], [data-slot="button"][data-variant="default"]:not([data-size^="icon"])):not([class~="bg-store-footer"]:not([data-sd~="bg"] > *) *) {
   background-color: var(--gt-bf);
   color: var(--gt-bl);
   border-color: var(--gt-bb);
 }
-.awj-store-preview[data-gt~="b-sty-outline"] :where([class~="bg-store-primary"][class~="rounded-store"][class~="font-bold"], [data-slot="button"][data-variant="default"]:not([data-size^="icon"])):not([class~="bg-store-footer"] *) {
+.awj-store-preview[data-gt~="b-sty-outline"] :where([class~="bg-store-primary"][class~="rounded-store"][class~="font-bold"], [data-slot="button"][data-variant="default"]:not([data-size^="icon"])):not([class~="bg-store-footer"]:not([data-sd~="bg"] > *) *) {
   border-width: 2px;
   border-style: solid;
 }
-.awj-store-preview[data-gt~="b-sty-link"] :where([class~="bg-store-primary"][class~="rounded-store"][class~="font-bold"], [data-slot="button"][data-variant="default"]:not([data-size^="icon"])):not([class~="bg-store-footer"] *) {
+.awj-store-preview[data-gt~="b-sty-link"] :where([class~="bg-store-primary"][class~="rounded-store"][class~="font-bold"], [data-slot="button"][data-variant="default"]:not([data-size^="icon"])):not([class~="bg-store-footer"]:not([data-sd~="bg"] > *) *) {
   text-decoration: underline;
   text-underline-offset: 0.25em;
 }
-.awj-store-preview[data-gt~="b-pri"] :where([class~="bg-store-primary"][class~="rounded-store"][class~="font-bold"], [data-slot="button"][data-variant="default"]:not([data-size^="icon"])):not([class~="bg-store-footer"] *):hover:not(:disabled, [aria-disabled="true"]) {
+.awj-store-preview[data-gt~="b-pri"] :where([class~="bg-store-primary"][class~="rounded-store"][class~="font-bold"], [data-slot="button"][data-variant="default"]:not([data-size^="icon"])):not([class~="bg-store-footer"]:not([data-sd~="bg"] > *) *):hover:not(:disabled, [aria-disabled="true"]) {
   background-color: var(--gt-bhf);
   color: var(--gt-bhl);
   border-color: var(--gt-bhb);
 }
-.awj-store-preview[data-gt~="b-hv-lift"] :where([class~="bg-store-primary"][class~="rounded-store"][class~="font-bold"], [data-slot="button"][data-variant="default"]:not([data-size^="icon"])):not([class~="bg-store-footer"] *):hover:not(:disabled, [aria-disabled="true"]) {
+.awj-store-preview[data-gt~="b-hv-lift"] :where([class~="bg-store-primary"][class~="rounded-store"][class~="font-bold"], [data-slot="button"][data-variant="default"]:not([data-size^="icon"])):not([class~="bg-store-footer"]:not([data-sd~="bg"] > *) *):hover:not(:disabled, [aria-disabled="true"]) {
   transform: translateY(-1px);
   box-shadow: 0 4px 10px rgba(17, 24, 39, 0.18);
 }
-.awj-store-preview[data-gt~="b-hv-underline"] :where([class~="bg-store-primary"][class~="rounded-store"][class~="font-bold"], [data-slot="button"][data-variant="default"]:not([data-size^="icon"])):not([class~="bg-store-footer"] *):hover:not(:disabled, [aria-disabled="true"]) {
+.awj-store-preview[data-gt~="b-hv-underline"] :where([class~="bg-store-primary"][class~="rounded-store"][class~="font-bold"], [data-slot="button"][data-variant="default"]:not([data-size^="icon"])):not([class~="bg-store-footer"]:not([data-sd~="bg"] > *) *):hover:not(:disabled, [aria-disabled="true"]) {
   text-decoration: underline;
 }
 /* inside a section with a designed background an outline / link button follows the section's own
    proven foreground (the colour judged at publish is for the page backdrops only) */
-.awj-store-preview[data-gt~="b-sty-outline"] [data-sd~="link"] :where([class~="bg-store-primary"][class~="rounded-store"][class~="font-bold"], [data-slot="button"][data-variant="default"]:not([data-size^="icon"])):not([class~="bg-store-footer"] *),
-.awj-store-preview[data-gt~="b-sty-link"] [data-sd~="link"] :where([class~="bg-store-primary"][class~="rounded-store"][class~="font-bold"], [data-slot="button"][data-variant="default"]:not([data-size^="icon"])):not([class~="bg-store-footer"] *),
-.awj-store-preview[data-gt~="b-sty-outline"] [data-sd~="link"] :where([class~="bg-store-primary"][class~="rounded-store"][class~="font-bold"], [data-slot="button"][data-variant="default"]:not([data-size^="icon"])):not([class~="bg-store-footer"] *):hover:not(:disabled),
-.awj-store-preview[data-gt~="b-sty-link"] [data-sd~="link"] :where([class~="bg-store-primary"][class~="rounded-store"][class~="font-bold"], [data-slot="button"][data-variant="default"]:not([data-size^="icon"])):not([class~="bg-store-footer"] *):hover:not(:disabled) {
+.awj-store-preview[data-gt~="b-sty-outline"] [data-sd~="link"] :where([class~="bg-store-primary"][class~="rounded-store"][class~="font-bold"], [data-slot="button"][data-variant="default"]:not([data-size^="icon"])):not([class~="bg-store-footer"]:not([data-sd~="bg"] > *) *),
+.awj-store-preview[data-gt~="b-sty-link"] [data-sd~="link"] :where([class~="bg-store-primary"][class~="rounded-store"][class~="font-bold"], [data-slot="button"][data-variant="default"]:not([data-size^="icon"])):not([class~="bg-store-footer"]:not([data-sd~="bg"] > *) *),
+.awj-store-preview[data-gt~="b-sty-outline"] [data-sd~="link"] :where([class~="bg-store-primary"][class~="rounded-store"][class~="font-bold"], [data-slot="button"][data-variant="default"]:not([data-size^="icon"])):not([class~="bg-store-footer"]:not([data-sd~="bg"] > *) *):hover:not(:disabled),
+.awj-store-preview[data-gt~="b-sty-link"] [data-sd~="link"] :where([class~="bg-store-primary"][class~="rounded-store"][class~="font-bold"], [data-slot="button"][data-variant="default"]:not([data-size^="icon"])):not([class~="bg-store-footer"]:not([data-sd~="bg"] > *) *):hover:not(:disabled) {
   background-color: transparent;
   color: var(--sec-link);
   border-color: var(--sec-link);
 }
 @media (prefers-reduced-motion: reduce) {
-  .awj-store-preview[data-gt~="b-hv-lift"] :where([class~="bg-store-primary"][class~="rounded-store"][class~="font-bold"], [data-slot="button"][data-variant="default"]:not([data-size^="icon"])):not([class~="bg-store-footer"] *):hover:not(:disabled, [aria-disabled="true"]) {
+  .awj-store-preview[data-gt~="b-hv-lift"] :where([class~="bg-store-primary"][class~="rounded-store"][class~="font-bold"], [data-slot="button"][data-variant="default"]:not([data-size^="icon"])):not([class~="bg-store-footer"]:not([data-sd~="bg"] > *) *):hover:not(:disabled, [aria-disabled="true"]) {
     transform: none;
     box-shadow: none;
   }
