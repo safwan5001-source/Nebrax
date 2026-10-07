@@ -132,13 +132,15 @@ final class SectionDesignContrast
         $text = is_array($design['text'] ?? null) ? $design['text'] : [];
         $explicitBody = self::colour($text['body'] ?? null, $config);
         $explicitHeading = self::colour($text['heading'] ?? null, $config);
-        $link = self::colour($text['link'] ?? null, $config);
+        $explicitLink = self::colour($text['link'] ?? null, $config);
+        // الروابط تتبع المقدّمة المُثبَتة فوق خلفية التصميم ما لم يحدَّد لونٌ صريح (توأم TS).
+        $link = $explicitLink ?? $auto;
         $body = $explicitBody ?? $auto;
         $heading = $explicitHeading ?? $body;
 
         // خلف النص الصريح في قسمٍ بلا خلفية: خلفية الصفحة.
         $page = ContrastEngine::parseHex(self::LEGACY_SURFACE[$type ?? ''] ?? self::PAGE_BACKGROUND);
-        $judged = $background ?? (($explicitBody ?? $explicitHeading ?? $link) !== null && $page !== null
+        $judged = $background ?? (($explicitBody ?? $explicitHeading ?? $explicitLink) !== null && $page !== null
             ? ContrastEngine::solidInterval($page)
             : null);
 
