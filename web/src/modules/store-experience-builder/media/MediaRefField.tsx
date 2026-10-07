@@ -233,6 +233,7 @@ export function MediaRefField({
           }}
           t={t}
           locale={locale}
+          coverOnly={decorativeOnly}
         />
       ) : null}
     </div>
