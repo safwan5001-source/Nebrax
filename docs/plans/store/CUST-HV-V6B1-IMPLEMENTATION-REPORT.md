@@ -28,6 +28,7 @@ Stored in the **existing** `region_luminance` JSON columns on assets and derivat
 
 - **What is measured:** the per-channel *encoded* minimum and maximum over every pixel of the widest served frame (≤ 1920 px). Whole-frame extrema bound *any* crop, `object-fit: cover`, `object-position` or viewport, because any displayed pixel is a convex combination of frame pixels — so the proof does not depend on where text lands.
 - **Derivatives** (crop/rotate/etc.) are measured on the **rendered transformed frame** (`basis: transform`), never inherited from the source asset (AMEND-8).
+- **Indexed images** are resolved through their palette (`imagecolorsforindex`), never by raw index (Codex P1); palette transparency raises the alpha flag.
 - **Alpha ⇒ unprovable.** Any pixel with alpha beyond tolerance sets `alpha: true`; `bounds()` then returns `null` and the gate treats the media as unprovable.
 - **Lossy-codec margin:** `bounds()` widens each channel by `12 + ceil(20 % of the channel range)` per side, clamped to 0–255. The stored `slack` is informational; the margin is always recomputed from the code, so a tampered or older value cannot narrow it. A wrong version, malformed shape or alpha ⇒ `null`.
 - **Validated empirically** on real JPEG/WebP files produced from hostile images (hard 25|235 and 100|180 edges, noise): the observed ringing used ≤ 75 % of the margin.
@@ -39,6 +40,7 @@ Stored in the **existing** `region_luminance` JSON columns on assets and derivat
 `StorefrontMediaEvidenceBackfiller` + `storefront-media:backfill-evidence {--tenant=} {--limit=200} {--dry-run}`:
 - Targets active assets with ready variants and ready derivatives whose evidence is null; reads the widest served variants from R2 in both formats and unions the extremes (an asset is only as safe as its darkest/lightest served file).
 - Tenant-scoped (tenant context set explicitly), bounded by `--limit`, idempotent, `--dry-run` writes nothing.
+- Candidates are walked by an `id` cursor and `--limit` bounds what is *written*, so permanently unreadable rows never block later recoverable ones (Codex P2); failed rows are retried each run and counted.
 - A file that cannot be read or decoded leaves evidence **null** and is reported as `failed` — it never produces optimistic evidence.
 
 ## Proof
@@ -48,6 +50,7 @@ Stored in the **existing** `region_luminance` JSON columns on assets and derivat
 | `StorefrontMediaPixelEvidenceTest` | 10 — extrema exactness, alpha ⇒ unprovable, version/shape rejection, margin clamp, margin never narrowed by stored slack, real JPEG/WebP ringing within margin |
 | `StorefrontMediaApiTest` / `StorefrontMediaDerivativeTest` | evidence stored on upload and on derivative render (`frame` / `transform`), absent from API responses |
 | `StorefrontMediaEvidenceBackfillTest` | 3 — measures assets + derivatives and writes only null evidence; unreadable file stays null and is reported; command validates tenant and limit |
+| Review fixes | palette-image test (fails without the fix) · stuck-prefix backfill test (limit=1) |
 | All `StorefrontMedia*` tests | 127 passed |
 | Full `php artisan test` | see PR (28 known container-only failures: Fuel* need bcmath, Resend mail transport, user-invitation mail views — none touched) |
 
