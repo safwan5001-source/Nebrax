@@ -152,7 +152,7 @@ describe('ExperienceBuilder — CUST-H2-3 Product page structured editing', () =
 
     // Open the toolbar picker and switch to the second product.
     await user.click(screen.getByLabelText('Preview product'));
-    await user.click(screen.getByRole('option', { name: /B/ }));
+    await user.click(screen.getByRole('option', { name: 'B' }));
     await waitFor(() => expect(showProductMock).toHaveBeenCalledWith('store-1', 'prod-2'));
 
     // Still clean — the picker never dirtied the draft.

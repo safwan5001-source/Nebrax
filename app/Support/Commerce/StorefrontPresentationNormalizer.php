@@ -478,6 +478,12 @@ final class StorefrontPresentationNormalizer
             $config['palette'] = $palette;
         }
 
+        // CUST-HV V5e-2a — الرموز العامة (typography/surfaces/layout/motion): مفاتيح اختيارية
+        // إضافية، الغياب = لا مفتاح (V0 §2.2).
+        foreach (StorefrontGlobalTokensNormalizer::normalize($input) as $key => $tokens) {
+            $config[$key] = $tokens;
+        }
+
         return $config;
     }
 

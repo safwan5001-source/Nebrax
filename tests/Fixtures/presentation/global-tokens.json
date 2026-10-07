@@ -1,0 +1,78 @@
+{
+  "_note": "CUST-HV V5e-2a — document-level global tokens (typography / surfaces / layout / motion). Shared by PHP StorefrontGlobalTokensNormalizer and both TS twins. `input` is the raw document subset; `expected` is exactly the normalised keys that survive (an empty object = none of the four keys are present).",
+  "cases": [
+    { "name": "absent", "input": {}, "expected": {} },
+    { "name": "non-object groups are ignored", "input": { "typography": "lg", "surfaces": ["soft"], "layout": 3, "motion": null }, "expected": {} },
+    { "name": "empty groups are dropped", "input": { "typography": {}, "surfaces": {}, "layout": {}, "motion": {} }, "expected": {} },
+    {
+      "name": "every typography field, canonical order",
+      "input": { "typography": { "sectionHeading": "underline", "lineHeight": "relaxed", "bodyWeight": 500, "headingWeight": 800, "bodyScale": "lg", "headingScale": "sm" } },
+      "expected": { "typography": { "headingScale": "sm", "bodyScale": "lg", "headingWeight": 800, "bodyWeight": 500, "lineHeight": "relaxed", "sectionHeading": "underline" } }
+    },
+    {
+      "name": "an invalid typography value is dropped on its own",
+      "input": { "typography": { "headingScale": "xl", "bodyScale": "md", "headingWeight": 600, "bodyWeight": 800, "lineHeight": "loose", "sectionHeading": "bar" } },
+      "expected": { "typography": { "bodyScale": "md", "sectionHeading": "bar" } }
+    },
+    {
+      "name": "weights must be real numbers, never strings",
+      "input": { "typography": { "headingWeight": "700", "bodyWeight": "400" } },
+      "expected": {}
+    },
+    {
+      "name": "font families and button text are not accepted yet (V5e-2b/c)",
+      "input": { "typography": { "headingFamily": "cairo", "bodyFamily": "tajawal", "buttonText": { "weight": 700, "case": "upper" }, "headingScale": "lg" } },
+      "expected": { "typography": { "headingScale": "lg" } }
+    },
+    {
+      "name": "surfaces: radius, border width and shadow, canonical order",
+      "input": { "surfaces": { "shadow": "medium", "border": { "width": "medium" }, "radius": "pill" } },
+      "expected": { "surfaces": { "radius": "pill", "border": { "width": "medium" }, "shadow": "medium" } }
+    },
+    {
+      "name": "surfaces: a border colour is not accepted yet",
+      "input": { "surfaces": { "border": { "width": "hairline", "color": { "hex": "#ff0000" } } } },
+      "expected": { "surfaces": { "border": { "width": "hairline" } } }
+    },
+    {
+      "name": "surfaces: border must be an object with a valid width",
+      "input": { "surfaces": { "border": "medium", "radius": "sm" } },
+      "expected": { "surfaces": { "radius": "sm" } }
+    },
+    {
+      "name": "surfaces: unknown values never survive",
+      "input": { "surfaces": { "radius": "huge", "shadow": "glow", "border": { "width": "thick" } } },
+      "expected": {}
+    },
+    {
+      "name": "layout content width",
+      "input": { "layout": { "contentWidth": "wide", "other": "x" } },
+      "expected": { "layout": { "contentWidth": "wide" } }
+    },
+    {
+      "name": "layout content width: arbitrary lengths are rejected",
+      "input": { "layout": { "contentWidth": "120rem" } },
+      "expected": {}
+    },
+    {
+      "name": "motion duration and easing",
+      "input": { "motion": { "easing": "emphasized", "duration": "slow" } },
+      "expected": { "motion": { "duration": "slow", "easing": "emphasized" } }
+    },
+    {
+      "name": "motion: arbitrary durations/keyframes are rejected",
+      "input": { "motion": { "duration": "2000ms", "easing": "cubic-bezier(0,0,0,0)", "keyframes": "x" } },
+      "expected": {}
+    },
+    {
+      "name": "all four groups together keep a fixed key order",
+      "input": { "motion": { "duration": "fast" }, "layout": { "contentWidth": "narrow" }, "surfaces": { "radius": "none" }, "typography": { "lineHeight": "tight" } },
+      "expected": { "typography": { "lineHeight": "tight" }, "surfaces": { "radius": "none" }, "layout": { "contentWidth": "narrow" }, "motion": { "duration": "fast" } }
+    },
+    {
+      "name": "css strings and injected content never survive",
+      "input": { "typography": { "headingScale": "lg; background:red", "lineHeight": "url(javascript:alert(1))" }, "surfaces": { "radius": "0.75rem" } },
+      "expected": {}
+    }
+  ]
+}

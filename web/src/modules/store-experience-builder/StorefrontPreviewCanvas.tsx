@@ -64,6 +64,7 @@ import {
   type CustomizerMessageKey,
 } from "./messages";
 import { useMediaRefPreview } from "./media/use-media-ref-preview";
+import { resolveGlobalTokens } from "./presentation/global-tokens";
 import { resolveSectionDesign } from "./presentation/section-design-resolve";
 import { SectionDesignFrame } from "./SectionDesignFrame";
 import type { DesignContext } from "./presentation/section-design-resolve";
@@ -256,7 +257,13 @@ export function StorefrontPreviewCanvas({
     liveStoreName,
     PREVIEW_STORE_NAME[locale],
   );
-  const vars = presentationCssVars(config.primaryColor, config.radius, config.accentColor) as CSSProperties;
+  // CUST-HV V5e-2a — document-level global tokens: the same pure resolver the published
+  // theme wrapper uses (absent ⇒ nothing is added).
+  const globalTokens = resolveGlobalTokens(config);
+  const vars = {
+    ...presentationCssVars(config.primaryColor, config.radius, config.accentColor),
+    ...(globalTokens?.style ?? {}),
+  } as CSSProperties;
   // The published Header only ties `header.style === "compact"` to two things:
   // which logo variant renders, and whether the utility strip shows at all
   // (`(storefront)/layout.tsx`, `Header.tsx`). Every other difference below —
@@ -395,6 +402,7 @@ export function StorefrontPreviewCanvas({
       data-preview-canvas=""
       data-preview-viewport={viewport}
       data-preview-page={page}
+      {...(globalTokens?.attrs ?? {})}
       dir={locale === "ar" ? "rtl" : "ltr"}
       className={cn(
         "awj-store-preview relative min-h-full bg-store-background text-store-foreground",

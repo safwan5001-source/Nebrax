@@ -160,7 +160,7 @@ describe('ExperienceBuilder — CUST-H2-4 Category page structured editing', () 
     expect(builderRoot().getAttribute('data-lifecycle')).toBe('clean');
 
     await user.click(screen.getByLabelText('Preview category'));
-    await user.click(screen.getByRole('option', { name: /B/ }));
+    await user.click(screen.getByRole('option', { name: 'B' }));
     await waitFor(() => expect(showCategoryMock).toHaveBeenCalledWith('store-1', 'cat-2'));
 
     expect(builderRoot().getAttribute('data-lifecycle')).toBe('clean');
