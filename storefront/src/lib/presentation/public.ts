@@ -63,7 +63,11 @@ export function publishedThemeStyle(
 ): Record<string, string> | undefined {
   if (!presentation) return undefined;
   return {
-    ...presentationCssVars(presentation.primaryColor, presentation.radius),
+    ...presentationCssVars(
+      presentation.primaryColor,
+      presentation.radius,
+      presentation.accentColor,
+    ),
     fontFamily: fontPresetFamilyStack(presentation.fontPreset),
   };
 }

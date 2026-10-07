@@ -101,6 +101,9 @@
   --color-store-surface: var(--store-surface);
   --color-store-surface-muted: var(--store-surface-muted);
   --color-store-foreground: var(--store-foreground);
+  /* CUST-HV V5d-3 (DEF-2) — the accent role; falls back to today's badge colours when the merchant set none. */
+  --color-store-accent: var(--store-accent, var(--store-foreground));
+  --color-store-accent-foreground: var(--store-accent-foreground, var(--store-surface));
   --color-store-muted: var(--store-muted);
   --color-store-muted-foreground: var(--store-muted-foreground);
   --color-store-border: var(--store-border);

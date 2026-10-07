@@ -1,0 +1,552 @@
+{
+    "_note": "CUST-HV V5d — section design publish contrast gate. Shared by PHP SectionDesignContrast and both TS twins (ratios compared at 1e-4).",
+    "cases": [
+        {
+            "name": "no design content => nothing to judge",
+            "config": {
+                "primaryColor": "#12372a",
+                "accentColor": null,
+                "palette": []
+            },
+            "design": {
+                "spacing": {
+                    "top": "md"
+                }
+            },
+            "type": "benefits",
+            "expected": []
+        },
+        {
+            "name": "auto foreground over a dark solid passes",
+            "config": {
+                "primaryColor": "#12372a",
+                "accentColor": null,
+                "palette": []
+            },
+            "design": {
+                "background": {
+                    "kind": "solid",
+                    "color": {
+                        "hex": "#102030"
+                    }
+                }
+            },
+            "type": "benefits",
+            "expected": []
+        },
+        {
+            "name": "auto foreground over a mid solid passes",
+            "config": {
+                "primaryColor": "#12372a",
+                "accentColor": null,
+                "palette": []
+            },
+            "design": {
+                "background": {
+                    "kind": "solid",
+                    "color": {
+                        "hex": "#777777"
+                    }
+                }
+            },
+            "type": "benefits",
+            "expected": []
+        },
+        {
+            "name": "explicit dark text on a dark solid fails (body)",
+            "config": {
+                "primaryColor": "#12372a",
+                "accentColor": null,
+                "palette": []
+            },
+            "design": {
+                "background": {
+                    "kind": "solid",
+                    "color": {
+                        "hex": "#102030"
+                    }
+                },
+                "text": {
+                    "body": {
+                        "hex": "#222222"
+                    }
+                }
+            },
+            "type": "benefits",
+            "expected": [
+                {
+                    "field": "body",
+                    "code": "contrast_insufficient",
+                    "ratio": 1.0382
+                }
+            ]
+        },
+        {
+            "name": "explicit heading fails, body auto passes",
+            "config": {
+                "primaryColor": "#12372a",
+                "accentColor": null,
+                "palette": []
+            },
+            "design": {
+                "background": {
+                    "kind": "solid",
+                    "color": {
+                        "hex": "#102030"
+                    }
+                },
+                "text": {
+                    "heading": {
+                        "hex": "#1a2a3a"
+                    }
+                }
+            },
+            "type": "benefits",
+            "expected": [
+                {
+                    "field": "heading",
+                    "code": "contrast_insufficient",
+                    "ratio": 1.1297
+                }
+            ]
+        },
+        {
+            "name": "explicit link fails on its background",
+            "config": {
+                "primaryColor": "#12372a",
+                "accentColor": null,
+                "palette": []
+            },
+            "design": {
+                "background": {
+                    "kind": "solid",
+                    "color": {
+                        "hex": "#ffffff"
+                    }
+                },
+                "text": {
+                    "link": {
+                        "hex": "#ffff00"
+                    }
+                }
+            },
+            "type": "benefits",
+            "expected": [
+                {
+                    "field": "link",
+                    "code": "contrast_insufficient",
+                    "ratio": 1.0738
+                }
+            ]
+        },
+        {
+            "name": "all three explicit fail: three issues",
+            "config": {
+                "primaryColor": "#12372a",
+                "accentColor": null,
+                "palette": []
+            },
+            "design": {
+                "background": {
+                    "kind": "solid",
+                    "color": {
+                        "hex": "#ffffff"
+                    }
+                },
+                "text": {
+                    "body": {
+                        "hex": "#eeeeee"
+                    },
+                    "heading": {
+                        "hex": "#dddddd"
+                    },
+                    "link": {
+                        "hex": "#cccccc"
+                    }
+                }
+            },
+            "type": "benefits",
+            "expected": [
+                {
+                    "field": "body",
+                    "code": "contrast_insufficient",
+                    "ratio": 1.1602
+                },
+                {
+                    "field": "heading",
+                    "code": "contrast_insufficient",
+                    "ratio": 1.3582
+                },
+                {
+                    "field": "link",
+                    "code": "contrast_insufficient",
+                    "ratio": 1.6059
+                }
+            ]
+        },
+        {
+            "name": "explicit text with no background is judged on the page background (fails)",
+            "config": {
+                "primaryColor": "#12372a",
+                "accentColor": null,
+                "palette": []
+            },
+            "design": {
+                "text": {
+                    "body": {
+                        "hex": "#ffffff"
+                    }
+                }
+            },
+            "type": "benefits",
+            "expected": [
+                {
+                    "field": "body",
+                    "code": "contrast_insufficient",
+                    "ratio": 1.0541
+                }
+            ]
+        },
+        {
+            "name": "explicit text with no background passes on the page background",
+            "config": {
+                "primaryColor": "#12372a",
+                "accentColor": null,
+                "palette": []
+            },
+            "design": {
+                "text": {
+                    "body": {
+                        "hex": "#111827"
+                    }
+                }
+            },
+            "type": "benefits",
+            "expected": []
+        },
+        {
+            "name": "the documented gradient cannot be proven for either neutral",
+            "config": {
+                "primaryColor": "#12372a",
+                "accentColor": null,
+                "palette": []
+            },
+            "design": {
+                "background": {
+                    "kind": "gradient",
+                    "from": {
+                        "hex": "#d1456a"
+                    },
+                    "to": {
+                        "hex": "#1e8b9a"
+                    },
+                    "direction": "to-end"
+                }
+            },
+            "type": "benefits",
+            "expected": [
+                {
+                    "field": "background",
+                    "code": "contrast_unprovable",
+                    "ratio": 3.9755
+                }
+            ]
+        },
+        {
+            "name": "a dark gradient is provable",
+            "config": {
+                "primaryColor": "#12372a",
+                "accentColor": null,
+                "palette": []
+            },
+            "design": {
+                "background": {
+                    "kind": "gradient",
+                    "from": {
+                        "hex": "#0b1b3a"
+                    },
+                    "to": {
+                        "hex": "#12372a"
+                    },
+                    "direction": "to-bottom"
+                }
+            },
+            "type": "benefits",
+            "expected": []
+        },
+        {
+            "name": "gradient interior defeats an endpoints-only check (explicit black)",
+            "config": {
+                "primaryColor": "#12372a",
+                "accentColor": null,
+                "palette": []
+            },
+            "design": {
+                "background": {
+                    "kind": "gradient",
+                    "from": {
+                        "hex": "#d1456a"
+                    },
+                    "to": {
+                        "hex": "#1e8b9a"
+                    },
+                    "direction": "to-end"
+                },
+                "text": {
+                    "body": {
+                        "hex": "#000000"
+                    }
+                }
+            },
+            "type": "benefits",
+            "expected": [
+                {
+                    "field": "body",
+                    "code": "contrast_insufficient",
+                    "ratio": 3.9755
+                }
+            ]
+        },
+        {
+            "name": "roles resolve through the palette (light text on dark surface passes)",
+            "config": {
+                "primaryColor": "#d1456a",
+                "accentColor": "#1e8b9a",
+                "palette": {
+                    "surface": "#101820",
+                    "text": "#f5f5f5",
+                    "link": "#0b5cff",
+                    "heading": "#222222"
+                }
+            },
+            "design": {
+                "background": {
+                    "kind": "solid",
+                    "color": {
+                        "role": "surface"
+                    }
+                },
+                "text": {
+                    "body": {
+                        "role": "text"
+                    },
+                    "link": {
+                        "hex": "#9ec1ff"
+                    }
+                }
+            },
+            "type": "benefits",
+            "expected": []
+        },
+        {
+            "name": "palette link on dark surface fails",
+            "config": {
+                "primaryColor": "#d1456a",
+                "accentColor": "#1e8b9a",
+                "palette": {
+                    "surface": "#101820",
+                    "text": "#f5f5f5",
+                    "link": "#0b5cff",
+                    "heading": "#222222"
+                }
+            },
+            "design": {
+                "background": {
+                    "kind": "solid",
+                    "color": {
+                        "role": "surface"
+                    }
+                },
+                "text": {
+                    "link": {
+                        "role": "link"
+                    }
+                }
+            },
+            "type": "benefits",
+            "expected": [
+                {
+                    "field": "link",
+                    "code": "contrast_insufficient",
+                    "ratio": 3.3992
+                }
+            ]
+        },
+        {
+            "name": "unset roles fall back to today tokens (surfaceAlt + text)",
+            "config": {
+                "primaryColor": "#12372a",
+                "accentColor": null,
+                "palette": []
+            },
+            "design": {
+                "background": {
+                    "kind": "solid",
+                    "color": {
+                        "role": "surfaceAlt"
+                    }
+                },
+                "text": {
+                    "body": {
+                        "role": "text"
+                    }
+                }
+            },
+            "type": "benefits",
+            "expected": []
+        },
+        {
+            "name": "brand/accent roles (derived accent) judged on page background",
+            "config": {
+                "primaryColor": "#12372a",
+                "accentColor": null,
+                "palette": []
+            },
+            "design": {
+                "text": {
+                    "heading": {
+                        "role": "accent"
+                    }
+                }
+            },
+            "type": "benefits",
+            "expected": [
+                {
+                    "field": "heading",
+                    "code": "contrast_insufficient",
+                    "ratio": 4.1997
+                }
+            ]
+        },
+        {
+            "name": "border and overlay roles resolve to their tokens",
+            "config": {
+                "primaryColor": "#12372a",
+                "accentColor": null,
+                "palette": []
+            },
+            "design": {
+                "background": {
+                    "kind": "solid",
+                    "color": {
+                        "role": "border"
+                    }
+                },
+                "text": {
+                    "body": {
+                        "role": "overlay"
+                    }
+                }
+            },
+            "type": "benefits",
+            "expected": []
+        },
+        {
+            "name": "a dark-surface section (hero) ignores explicit text without a design background",
+            "type": "hero",
+            "config": {
+                "primaryColor": "#12372a",
+                "accentColor": null,
+                "palette": []
+            },
+            "design": {
+                "text": {
+                    "body": {
+                        "hex": "#ffffff"
+                    }
+                }
+            },
+            "expected": []
+        },
+        {
+            "name": "appPromo and wholesale behave the same (nothing is judged)",
+            "type": "appPromo",
+            "config": {
+                "primaryColor": "#12372a",
+                "accentColor": null,
+                "palette": []
+            },
+            "design": {
+                "text": {
+                    "heading": {
+                        "hex": "#ffffff"
+                    },
+                    "link": {
+                        "hex": "#ffffff"
+                    }
+                }
+            },
+            "expected": []
+        },
+        {
+            "name": "a light-surface section (banner) judges explicit text on its own white surface",
+            "type": "banner",
+            "config": {
+                "primaryColor": "#12372a",
+                "accentColor": null,
+                "palette": []
+            },
+            "design": {
+                "text": {
+                    "body": {
+                        "hex": "#ffffff"
+                    }
+                }
+            },
+            "expected": [
+                {
+                    "field": "body",
+                    "code": "contrast_insufficient",
+                    "ratio": 1
+                }
+            ]
+        },
+        {
+            "name": "hero with a design background judges its text normally (fails)",
+            "type": "hero",
+            "config": {
+                "primaryColor": "#12372a",
+                "accentColor": null,
+                "palette": []
+            },
+            "design": {
+                "background": {
+                    "kind": "solid",
+                    "color": {
+                        "hex": "#102030"
+                    }
+                },
+                "text": {
+                    "body": {
+                        "hex": "#222222"
+                    }
+                }
+            },
+            "expected": [
+                {
+                    "field": "body",
+                    "code": "contrast_insufficient",
+                    "ratio": 1.0382
+                }
+            ]
+        },
+        {
+            "name": "hero with a design background and automatic text passes",
+            "type": "hero",
+            "config": {
+                "primaryColor": "#12372a",
+                "accentColor": null,
+                "palette": []
+            },
+            "design": {
+                "background": {
+                    "kind": "solid",
+                    "color": {
+                        "hex": "#fde68a"
+                    }
+                }
+            },
+            "expected": []
+        }
+    ]
+}

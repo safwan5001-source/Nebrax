@@ -24,6 +24,7 @@ import {
   parseHex,
   type Rgb,
   solidInterval,
+  TEXT_NORMAL,
   worstRatioForHex,
 } from "./contrast-engine";
 import { type PresentationPalette, resolveRoleHex } from "./palette";
@@ -235,6 +236,45 @@ export function worstTextRatio(
   text: EffectiveText,
 ): number | null {
   return text.judged ? worstRatioForHex(foreground, text.judged) : null;
+}
+
+export interface SectionContrastIssue {
+  /** The field the merchant fixes: a text colour, or the background itself. */
+  field: "body" | "heading" | "link" | "background";
+  code: "contrast_insufficient" | "contrast_unprovable";
+  ratio: number;
+}
+
+/**
+ * Twin of PHP `SectionDesignContrast::issues` — the same verdict the publish gate
+ * returns as a 422, shown live in the editor. An explicit colour that fails is
+ * `contrast_insufficient`; an automatic foreground that cannot be proven on a
+ * gradient is `contrast_unprovable` and the *background* is what to change.
+ */
+export function sectionContrastIssues(
+  design: SectionDesign,
+  ctx: DesignContext,
+  type?: string,
+): SectionContrastIssue[] {
+  const text = effectiveText(design, ctx, type);
+  if (!text.judged) return [];
+  const out = new Map<string, SectionContrastIssue>();
+  for (const field of ["body", "heading", "link"] as const) {
+    const colourHex = text[field];
+    if (colourHex === null) continue;
+    const worst = worstRatioForHex(colourHex, text.judged);
+    if (worst >= TEXT_NORMAL) continue;
+    const isExplicit = design.text?.[field] !== undefined;
+    if (!isExplicit && field !== "body") continue;
+    const code = isExplicit ? "contrast_insufficient" : "contrast_unprovable";
+    const outField = isExplicit ? field : "background";
+    out.set(`${outField}|${code}`, {
+      field: outField,
+      code,
+      ratio: Math.round(worst * 10000) / 10000,
+    });
+  }
+  return [...out.values()];
 }
 
 export function resolveSectionDesign(

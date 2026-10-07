@@ -256,7 +256,7 @@ export function StorefrontPreviewCanvas({
     liveStoreName,
     PREVIEW_STORE_NAME[locale],
   );
-  const vars = presentationCssVars(config.primaryColor, config.radius) as CSSProperties;
+  const vars = presentationCssVars(config.primaryColor, config.radius, config.accentColor) as CSSProperties;
   // The published Header only ties `header.style === "compact"` to two things:
   // which logo variant renders, and whether the utility strip shows at all
   // (`(storefront)/layout.tsx`, `Header.tsx`). Every other difference below —
@@ -1110,7 +1110,7 @@ export function StorefrontPreviewCanvas({
                             {isDiscountBadgeVisible(offer.discountPercent) ? (
                               <span
                                 data-home-offer-badge=""
-                                className="absolute start-2 top-2 rounded-md bg-store-foreground px-2 py-0.5 text-[0.625rem] font-bold text-store-surface"
+                                className="absolute start-2 top-2 rounded-md bg-store-accent px-2 py-0.5 text-[0.625rem] font-bold text-store-accent-foreground"
                               >
                                 <bdi>{offerDiscountBadgeText(offer.discountPercent, locale)}</bdi>
                               </span>

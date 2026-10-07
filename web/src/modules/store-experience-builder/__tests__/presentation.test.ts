@@ -225,6 +225,16 @@ describe('web presentation contract', () => {
     expect(config.homepage.sections[1].content).toBeUndefined();
   });
 
+  it('CUST-HV V5d-3 (DEF-2): the accent role is emitted only when the merchant set one', () => {
+    const legacy = presentationCssVars('#1e3a5f', 'subtle', null);
+    expect(legacy).toEqual(presentationCssVars('#1e3a5f', 'subtle'));
+    expect(legacy).not.toHaveProperty('--store-accent');
+    const live = presentationCssVars('#1e3a5f', 'subtle', '#d1456a');
+    expect(live['--store-accent']).toBe('#d1456a');
+    expect(live).toHaveProperty('--store-accent-foreground');
+    expect(presentationCssVars('#1e3a5f', 'subtle', 'url(x)')).not.toHaveProperty('--store-accent');
+  });
+
   it('CUST-HV V5c review: the themed primary foreground is captured on the SAME element as its base', () => {
     const light = presentationCssVars('#f5e6a8', 'subtle');
     expect(light['--store-primary-foreground-base']).toBe(light['--store-primary-foreground']);
