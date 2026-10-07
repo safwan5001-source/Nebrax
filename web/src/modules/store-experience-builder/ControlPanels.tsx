@@ -2088,14 +2088,14 @@ function HeroFields({
               onChange={(event) => setCta(index, { label: event.target.value })}
             />
           </Field>
-          <Field label={t("heroCtaHref")}>
-            <input
-              className={inputClass}
-              dir="ltr"
-              value={cta.href}
-              onChange={(event) => setCta(index, { href: event.target.value })}
-            />
-          </Field>
+          {/* the link is sanitized on every commit (a half-typed `https://…` becomes ""), so it is edited
+              locally and committed on blur — the same deferred field the app-store URLs use */}
+          <DeferredCommitField
+            label={t("heroCtaHref")}
+            value={cta.href}
+            dir="ltr"
+            onCommit={(href) => setCta(index, { href })}
+          />
         </fieldset>
       ))}
       <p className="text-[12px] leading-5 text-muted">{t("heroCtaHint")}</p>
@@ -2622,12 +2622,15 @@ function DeferredCommitField({
   hint,
   placeholder,
   value,
+  dir,
   onCommit,
 }: {
   label: string;
   hint?: string;
   placeholder?: string;
   value: string;
+  /** Pin the text direction (URLs are always left-to-right). */
+  dir?: "ltr";
   onCommit: (value: string) => void;
 }) {
   const [draft, setDraft] = useState(value);
@@ -2645,6 +2648,7 @@ function DeferredCommitField({
         className={inputClass}
         value={draft}
         placeholder={placeholder}
+        dir={dir}
         onFocus={() => setIsEditing(true)}
         onChange={(event) => {
           draftRef.current = event.target.value;

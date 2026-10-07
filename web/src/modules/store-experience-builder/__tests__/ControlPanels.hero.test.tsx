@@ -102,9 +102,29 @@ describe("hero editor (CUST-HV V6a)", () => {
       ctas: [{ label: "Shop ", href: "" }],
     });
     fireEvent.change(input("Link", 1), { target: { value: "/about" } });
+    fireEvent.blur(input("Link", 1)); // the link commits on blur (see the next test)
     expect(sectionsOf(onChange)[0].content).toEqual({
       headline: "H",
       ctas: [{ label: "", href: "/about" }], // the empty first slot is not stored
+    });
+  });
+
+  it("a link is edited locally and committed on blur, so an https:// URL can be typed character by character", () => {
+    const onChange = mount(
+      config([{ id: "hero", type: "hero", visible: true, content: { headline: "H" } }]),
+    );
+    const link = input("Link", 0);
+    fireEvent.focus(link);
+    onChange.mockClear();
+    for (const partial of ["h", "ht", "https://", "https://exa", "https://example.com/about"]) {
+      fireEvent.change(link, { target: { value: partial } });
+      expect(link.value).toBe(partial); // never reset to "" by the sanitizer while typing
+    }
+    expect(onChange).not.toHaveBeenCalled(); // nothing is persisted mid-typing
+    fireEvent.blur(link);
+    expect(sectionsOf(onChange)[0].content).toEqual({
+      headline: "H",
+      ctas: [{ label: "", href: "https://example.com/about" }],
     });
   });
 

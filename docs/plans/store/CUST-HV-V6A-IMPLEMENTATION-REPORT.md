@@ -79,6 +79,7 @@ Evidence `docs/plans/store/cust-hv-v6a/` (EN/AR × 390 and 1280). Checked: the g
 ## Limitations / next
 - **V6b** — hero media (default + mobile), overlay, content placement grid, height presets, layout variants, and the contrast proof against the *rendered region* (not a whole-image average). `Cta.style` / `Cta.colour` / `Cta.icon` are not accepted yet: per-CTA overrides (style + colour) belong with the button-token integration in V6b/V6c, icons with the registry (V7).
 - **V6c** — Banner window (D-15), CTAs, placement, overlap presets.
+- The hero button **link** is edited locally and committed on blur (the builder re-normalizes the whole config on every keystroke and `sanitizeContentHref` empties a half-typed `https://…`; Codex P2 on #1276). The Banner's existing CTA link field is a plain input with the same latent limitation; it is revisited with the Banner CTA model in V6c.
 - The legacy dev-only customizer copy under `storefront/src/components/customizer/` is intentionally left alone.
 - There is no page-level test of `page.tsx`; the hidden-`<h1>` condition is the exported, unit-tested `hasVisibleHero`.
 
