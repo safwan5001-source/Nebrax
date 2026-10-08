@@ -46,7 +46,7 @@ node scripts/pixel-proof/measure.mjs $P [--control] [--shots <dir>]             
 
 1. **Decision parity** — the storefront paints a picture **iff** the publish gate called the configuration provable. When painted, the `<picture>` must have **chosen the right file for the viewport** (phone picture at ≤ 767 px, default above — asserted from `currentSrc`). When rejected, the section must restore **both the legacy surface and the legacy text colours**: no `mbg`/`ovl` tokens, the legacy gradient still present, heading colour back to the legacy white, and the legacy heading/supporting line measured on real pixels (≥ 4.5 : 1).
 2. **Readability on real pixels** — glyphs hidden, every pixel under the heading and the supporting line is read back; the WCAG ratio of the text colour against **that pixel** (alpha-composited) must be ≥ 4.5.
-3. **Evidence brackets the pixels** — the min/max of the backdrop as Chromium composites it (decoded WebP/JPEG + overlay) must lie inside the interval the bounds + overlay predict — the interval the gate reasoned over.
+3. **Evidence brackets the pixels** — the min/max of the backdrop as Chromium composites it (decoded WebP/JPEG + overlay) must lie inside the interval the bounds + overlay predict. The expected overlay (colour, strength) is taken from the **configuration the gate judged**, not from the DOM under test; the rendered overlay's computed colour, opacity and `--sec-ovl-a` are then compared against it, so a renderer painting a different overlay than the one judged is itself a violation.
 4. **Layout** — no horizontal overflow; heading is the topmost element at its centre; backdrop covers its section; image actually loaded.
 
 ## Result

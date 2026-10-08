@@ -64,6 +64,8 @@ const parseColour = (s) => {
   return { r, g, b, a };
 };
 
+// colour roles that resolve without a palette (the proof renders with no palette set): `overlay` → black
+const ROLE_HEX = { overlay: "#000000" };
 const hexRgb = (hex) => [1, 3, 5].map((i) => Number.parseInt(hex.slice(i, i + 2), 16));
 
 /** The interval the gate reasons over: union of the pictures that can show, composited under the overlay. */
@@ -225,9 +227,24 @@ for (const c of cases) {
         const inset = 18;
         const inner = { x: info.backRect.x + inset, y: info.backRect.y + inset, w: info.backRect.w - 2 * inset, h: info.backRect.h - 2 * inset };
         const all = await read(inner, null);
-        const overlayRgb = info.ovlBg ? parseColour(info.ovlBg) : null;
-        const ovlRgb = overlayRgb ? [overlayRgb.r, overlayRgb.g, overlayRgb.b] : null;
-        const alpha = info.ovlOpacity ? Number.parseFloat(info.ovlOpacity) : 0;
+        // The EXPECTED overlay comes from the configuration the gate judged (`normalized`), never from the DOM under test;
+        // the DOM's computed styles are then compared against it, so a renderer that paints a different strength or colour
+        // than the one the gate reasoned over is a violation of its own (and cannot leak into the prediction).
+        const cfg = c.normalized.overlay ?? null;
+        let ovlRgb = null;
+        let alpha = 0;
+        if (cfg) {
+          const hex = cfg.color.hex ?? ROLE_HEX[cfg.color.role];
+          if (!hex) throw new Error(`no expected colour for overlay colour ${JSON.stringify(cfg.color)}`);
+          ovlRgb = hexRgb(hex.toLowerCase());
+          alpha = cfg.alpha / 100;
+          const domBg = info.ovlBg ? parseColour(info.ovlBg) : null;
+          if (!domBg || [domBg.r, domBg.g, domBg.b].some((v, k) => Math.abs(v - ovlRgb[k]) > 1)) fail(`overlay colour rendered as ${info.ovlBg}, the gate judged ${hex}`);
+          if (Math.abs(Number.parseFloat(info.ovlOpacity) - alpha) > 0.005) fail(`overlay strength rendered as ${info.ovlOpacity}, the gate judged ${alpha}`);
+          if (info.ovlA !== String(alpha)) fail(`--sec-ovl-a is ${info.ovlA}, the gate judged ${alpha}`);
+        } else if (info.ovlBg !== null) {
+          fail("an overlay is rendered although the judged configuration has none");
+        }
         const pred = predicted(c, ovlRgb, alpha);
         row.rendered = { min: all.min, max: all.max };
         row.predicted = { min: pred.min.map((v) => +v.toFixed(1)), max: pred.max.map((v) => +v.toFixed(1)) };
