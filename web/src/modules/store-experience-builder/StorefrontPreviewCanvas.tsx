@@ -69,6 +69,7 @@ import { useBackgroundMediaBounds } from "./media/use-background-media-bounds";
 import { useMediaRefPreview } from "./media/use-media-ref-preview";
 import { fontFamilyStack } from "./presentation/font-catalogue";
 import { resolveGlobalTokens } from "./presentation/global-tokens";
+import type { SectionDesign } from "./presentation/section-design";
 import { resolveSectionDesign } from "./presentation/section-design-resolve";
 import { SectionDesignFrame } from "./SectionDesignFrame";
 import type { DesignContext } from "./presentation/section-design-resolve";
@@ -218,6 +219,9 @@ export type PreviewChromeTarget =
   | "social"
   | "announcements";
 
+/** Stable empty list: no homepage sections to read picture bounds for. */
+const NO_SECTIONS: ReadonlyArray<{ visible: boolean; design?: SectionDesign }> = [];
+
 export function StorefrontPreviewCanvas({
   config,
   locale,
@@ -296,7 +300,8 @@ export function StorefrontPreviewCanvas({
   const logoMediaUrl = useMediaRefPreview(logoMediaRef);
   // CUST-HV V6b-4a — the proven bounds of every picture background (read-only, from the server), so
   // the Canvas decides exactly like the publish gate and the published storefront.
-  const backgroundBounds = useBackgroundMediaBounds(config.homepage.sections);
+  // Only the home preview renders these sections: another page must not read their statuses.
+  const backgroundBounds = useBackgroundMediaBounds(page === "home" ? config.homepage.sections : NO_SECTIONS);
   const designContext: DesignContext = {
     primaryColor: config.primaryColor,
     accentColor: config.accentColor,

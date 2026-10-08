@@ -40,6 +40,25 @@ describe("useMediaRefPreview (CUST-HV V6b-4)", () => {
     await waitFor(() => expect(result.current).toBe("https://signed.example/f768.webp"));
   });
 
+  it("a usage another tab is generating ('processing') is followed to its framed rendition", async () => {
+    vi.useFakeTimers();
+    fetchAsset.mockResolvedValue(asset());
+    status
+      .mockResolvedValueOnce(usage({ state: "processing", files: [] }))
+      .mockResolvedValueOnce(usage({ state: "ready" }));
+    const { result } = renderHook(() => useMediaRefPreview(framed));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(result.current).toBe(asset().previewUrl ?? asset().thumbnailUrl);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2100);
+    });
+    expect(result.current).toBe("https://signed.example/f768.webp");
+    expect(status).toHaveBeenCalledTimes(2);
+    vi.useRealTimers();
+  });
+
   it("ignores a generation signal for another usage", async () => {
     fetchAsset.mockResolvedValue(asset());
     status.mockResolvedValue(usage({ state: "absent", files: [] }));

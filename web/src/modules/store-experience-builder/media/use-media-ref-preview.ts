@@ -23,6 +23,9 @@ import {
 import type { MediaRef } from "../presentation/media-ref";
 import { onUsageGenerated, pickPreviewUrl, usageKey } from "./use-usage-readiness";
 
+const POLL_MS = 2000;
+const MAX_POLLS = 30;
+
 export function useMediaRefPreview(ref: MediaRef | null): string | null {
   const key = ref ? JSON.stringify([ref.mediaId, mediaRefTransform(ref)]) : "";
   const [url, setUrl] = useState<string | null>(null);
@@ -41,10 +44,17 @@ export function useMediaRefPreview(ref: MediaRef | null): string | null {
         const base = asset?.previewUrl ?? asset?.thumbnailUrl ?? null;
         setUrl(base);
         if (asset && usageNeedsDerivatives(ref)) {
-          const status = await usageStatus(ref.mediaId, mediaRefTransform(ref));
-          if (!live) return;
-          const framed = status.state === "ready" ? pickPreviewUrl(status) : null;
-          if (framed) setUrl(framed);
+          // A usage another tab/user is generating (`processing`) is followed to completion (bounded);
+          // `absent` is picked up by the in-page `onUsageGenerated` signal below.
+          for (let attempt = 0; attempt <= MAX_POLLS; attempt += 1) {
+            const status = await usageStatus(ref.mediaId, mediaRefTransform(ref));
+            if (!live) return;
+            const framed = status.state === "ready" ? pickPreviewUrl(status) : null;
+            if (framed) setUrl(framed);
+            if (status.state !== "processing") break;
+            await new Promise((resolve) => setTimeout(resolve, POLL_MS));
+            if (!live) return;
+          }
         }
       } catch {
         if (live) setUrl(null);

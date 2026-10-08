@@ -126,4 +126,25 @@ describe("Canvas picture backgrounds (CUST-HV V6b-4a)", () => {
     expect(c.querySelector("[data-sd-backdrop]")).toBeNull();
     expect(status).not.toHaveBeenCalled();
   });
+
+  it("another page's preview never reads the homepage pictures' statuses", async () => {
+    status.mockResolvedValue(usage({ contrast: DARK }));
+    for (const page of ["product", "category"] as const) {
+      render(
+        <StorefrontPreviewCanvas
+          config={{
+            ...DEFAULT_PRESENTATION_CONFIG,
+            homepage: { ...DEFAULT_PRESENTATION_CONFIG.homepage, sections: [hero(picture)] },
+          }}
+          locale="en"
+          viewport="desktop"
+          liveStoreName="Daisy Shop"
+          onSelectSection={() => {}}
+          page={page}
+        />,
+      );
+    }
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(status).not.toHaveBeenCalled();
+  });
 });
