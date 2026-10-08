@@ -1,0 +1,378 @@
+{
+ "summary": {
+  "cases": 28,
+  "checks": 336,
+  "painted": 156,
+  "fellBack": 180,
+  "worstHeading": 7.47,
+  "worstSub": 7.54,
+  "violations": 0,
+  "worstLegacyFallbackHeading": 6.78
+ },
+ "cases": [
+  {
+   "case": "dusk/none",
+   "gateProvable": false,
+   "storefrontPainted": [
+    false
+   ],
+   "checks": 12,
+   "worstHeadingPixelRatio": null,
+   "worstSupportingPixelRatio": null,
+   "legacyFallbackWorstHeadingRatio": 6.78,
+   "pictureChosen": []
+  },
+  {
+   "case": "dusk/black-40",
+   "gateProvable": false,
+   "storefrontPainted": [
+    false
+   ],
+   "checks": 12,
+   "worstHeadingPixelRatio": null,
+   "worstSupportingPixelRatio": null,
+   "legacyFallbackWorstHeadingRatio": 6.78,
+   "pictureChosen": []
+  },
+  {
+   "case": "dusk/black-70",
+   "gateProvable": true,
+   "storefrontPainted": [
+    true
+   ],
+   "checks": 12,
+   "worstHeadingPixelRatio": 13.48,
+   "worstSupportingPixelRatio": 13.23,
+   "legacyFallbackWorstHeadingRatio": null,
+   "pictureChosen": [
+    "default"
+   ]
+  },
+  {
+   "case": "dusk/white-60",
+   "gateProvable": true,
+   "storefrontPainted": [
+    true
+   ],
+   "checks": 12,
+   "worstHeadingPixelRatio": 7.69,
+   "worstSupportingPixelRatio": 7.94,
+   "legacyFallbackWorstHeadingRatio": null,
+   "pictureChosen": [
+    "default"
+   ]
+  },
+  {
+   "case": "dusk/role-50",
+   "gateProvable": false,
+   "storefrontPainted": [
+    false
+   ],
+   "checks": 12,
+   "worstHeadingPixelRatio": null,
+   "worstSupportingPixelRatio": null,
+   "legacyFallbackWorstHeadingRatio": 6.78,
+   "pictureChosen": []
+  },
+  {
+   "case": "snow/none",
+   "gateProvable": false,
+   "storefrontPainted": [
+    false
+   ],
+   "checks": 12,
+   "worstHeadingPixelRatio": null,
+   "worstSupportingPixelRatio": null,
+   "legacyFallbackWorstHeadingRatio": 6.78,
+   "pictureChosen": []
+  },
+  {
+   "case": "snow/black-40",
+   "gateProvable": false,
+   "storefrontPainted": [
+    false
+   ],
+   "checks": 12,
+   "worstHeadingPixelRatio": null,
+   "worstSupportingPixelRatio": null,
+   "legacyFallbackWorstHeadingRatio": 6.78,
+   "pictureChosen": []
+  },
+  {
+   "case": "snow/black-70",
+   "gateProvable": true,
+   "storefrontPainted": [
+    true
+   ],
+   "checks": 12,
+   "worstHeadingPixelRatio": 8.78,
+   "worstSupportingPixelRatio": 8.75,
+   "legacyFallbackWorstHeadingRatio": null,
+   "pictureChosen": [
+    "default"
+   ]
+  },
+  {
+   "case": "snow/white-60",
+   "gateProvable": true,
+   "storefrontPainted": [
+    true
+   ],
+   "checks": 12,
+   "worstHeadingPixelRatio": 8.35,
+   "worstSupportingPixelRatio": 8.24,
+   "legacyFallbackWorstHeadingRatio": null,
+   "pictureChosen": [
+    "default"
+   ]
+  },
+  {
+   "case": "snow/role-50",
+   "gateProvable": false,
+   "storefrontPainted": [
+    false
+   ],
+   "checks": 12,
+   "worstHeadingPixelRatio": null,
+   "worstSupportingPixelRatio": null,
+   "legacyFallbackWorstHeadingRatio": 6.78,
+   "pictureChosen": []
+  },
+  {
+   "case": "street/none",
+   "gateProvable": false,
+   "storefrontPainted": [
+    false
+   ],
+   "checks": 12,
+   "worstHeadingPixelRatio": null,
+   "worstSupportingPixelRatio": null,
+   "legacyFallbackWorstHeadingRatio": 6.78,
+   "pictureChosen": []
+  },
+  {
+   "case": "street/black-40",
+   "gateProvable": false,
+   "storefrontPainted": [
+    false
+   ],
+   "checks": 12,
+   "worstHeadingPixelRatio": null,
+   "worstSupportingPixelRatio": null,
+   "legacyFallbackWorstHeadingRatio": 6.78,
+   "pictureChosen": []
+  },
+  {
+   "case": "street/black-70",
+   "gateProvable": true,
+   "storefrontPainted": [
+    true
+   ],
+   "checks": 12,
+   "worstHeadingPixelRatio": 9.24,
+   "worstSupportingPixelRatio": 9.68,
+   "legacyFallbackWorstHeadingRatio": null,
+   "pictureChosen": [
+    "default"
+   ]
+  },
+  {
+   "case": "street/white-60",
+   "gateProvable": true,
+   "storefrontPainted": [
+    true
+   ],
+   "checks": 12,
+   "worstHeadingPixelRatio": 7.56,
+   "worstSupportingPixelRatio": 7.54,
+   "legacyFallbackWorstHeadingRatio": null,
+   "pictureChosen": [
+    "default"
+   ]
+  },
+  {
+   "case": "street/role-50",
+   "gateProvable": false,
+   "storefrontPainted": [
+    false
+   ],
+   "checks": 12,
+   "worstHeadingPixelRatio": null,
+   "worstSupportingPixelRatio": null,
+   "legacyFallbackWorstHeadingRatio": 6.78,
+   "pictureChosen": []
+  },
+  {
+   "case": "split/none",
+   "gateProvable": false,
+   "storefrontPainted": [
+    false
+   ],
+   "checks": 12,
+   "worstHeadingPixelRatio": null,
+   "worstSupportingPixelRatio": null,
+   "legacyFallbackWorstHeadingRatio": 6.78,
+   "pictureChosen": []
+  },
+  {
+   "case": "split/black-40",
+   "gateProvable": false,
+   "storefrontPainted": [
+    false
+   ],
+   "checks": 12,
+   "worstHeadingPixelRatio": null,
+   "worstSupportingPixelRatio": null,
+   "legacyFallbackWorstHeadingRatio": 6.78,
+   "pictureChosen": []
+  },
+  {
+   "case": "split/black-70",
+   "gateProvable": true,
+   "storefrontPainted": [
+    true
+   ],
+   "checks": 12,
+   "worstHeadingPixelRatio": 8.6,
+   "worstSupportingPixelRatio": 8.6,
+   "legacyFallbackWorstHeadingRatio": null,
+   "pictureChosen": [
+    "default"
+   ]
+  },
+  {
+   "case": "split/white-60",
+   "gateProvable": true,
+   "storefrontPainted": [
+    true
+   ],
+   "checks": 12,
+   "worstHeadingPixelRatio": 7.47,
+   "worstSupportingPixelRatio": 7.56,
+   "legacyFallbackWorstHeadingRatio": null,
+   "pictureChosen": [
+    "default"
+   ]
+  },
+  {
+   "case": "split/role-50",
+   "gateProvable": false,
+   "storefrontPainted": [
+    false
+   ],
+   "checks": 12,
+   "worstHeadingPixelRatio": null,
+   "worstSupportingPixelRatio": null,
+   "legacyFallbackWorstHeadingRatio": 6.78,
+   "pictureChosen": []
+  },
+  {
+   "case": "dusk+portrait/black-70",
+   "gateProvable": true,
+   "storefrontPainted": [
+    true
+   ],
+   "checks": 12,
+   "worstHeadingPixelRatio": 13.48,
+   "worstSupportingPixelRatio": 13.23,
+   "legacyFallbackWorstHeadingRatio": null,
+   "pictureChosen": [
+    "default",
+    "phone"
+   ]
+  },
+  {
+   "case": "split+portrait/black-70",
+   "gateProvable": true,
+   "storefrontPainted": [
+    true
+   ],
+   "checks": 12,
+   "worstHeadingPixelRatio": 8.6,
+   "worstSupportingPixelRatio": 8.6,
+   "legacyFallbackWorstHeadingRatio": null,
+   "pictureChosen": [
+    "default",
+    "phone"
+   ]
+  },
+  {
+   "case": "nodata/black-70",
+   "gateProvable": false,
+   "storefrontPainted": [
+    false
+   ],
+   "checks": 12,
+   "worstHeadingPixelRatio": null,
+   "worstSupportingPixelRatio": null,
+   "legacyFallbackWorstHeadingRatio": 6.78,
+   "pictureChosen": []
+  },
+  {
+   "case": "dusk+nodata/black-70",
+   "gateProvable": false,
+   "storefrontPainted": [
+    false
+   ],
+   "checks": 12,
+   "worstHeadingPixelRatio": null,
+   "worstSupportingPixelRatio": null,
+   "legacyFallbackWorstHeadingRatio": 6.78,
+   "pictureChosen": []
+  },
+  {
+   "case": "split-left/none",
+   "gateProvable": true,
+   "storefrontPainted": [
+    true
+   ],
+   "checks": 12,
+   "worstHeadingPixelRatio": 20.01,
+   "worstSupportingPixelRatio": 20.01,
+   "legacyFallbackWorstHeadingRatio": null,
+   "pictureChosen": [
+    "default"
+   ]
+  },
+  {
+   "case": "split-left/black-70",
+   "gateProvable": true,
+   "storefrontPainted": [
+    true
+   ],
+   "checks": 12,
+   "worstHeadingPixelRatio": 20.74,
+   "worstSupportingPixelRatio": 20.74,
+   "legacyFallbackWorstHeadingRatio": null,
+   "pictureChosen": [
+    "default"
+   ]
+  },
+  {
+   "case": "dusk-mid/none",
+   "gateProvable": false,
+   "storefrontPainted": [
+    false
+   ],
+   "checks": 12,
+   "worstHeadingPixelRatio": null,
+   "worstSupportingPixelRatio": null,
+   "legacyFallbackWorstHeadingRatio": 6.78,
+   "pictureChosen": []
+  },
+  {
+   "case": "dusk-mid/black-70",
+   "gateProvable": true,
+   "storefrontPainted": [
+    true
+   ],
+   "checks": 12,
+   "worstHeadingPixelRatio": 13.79,
+   "worstSupportingPixelRatio": 13.92,
+   "legacyFallbackWorstHeadingRatio": null,
+   "pictureChosen": [
+    "default"
+   ]
+  }
+ ]
+}
