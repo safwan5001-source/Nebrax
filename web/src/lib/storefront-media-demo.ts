@@ -184,6 +184,7 @@ export function handleStorefrontMediaDemo(path: string, method: string, body: un
         { width: 768, format: 'webp', state: 'ready', url: asset.src, rendered_width: 768, rendered_height: 432 },
         { width: 768, format: 'jpg', state: 'ready', url: asset.src, rendered_width: 768, rendered_height: 432 },
       ],
+      contrast: { min: [8, 14, 24], max: [64, 96, 140] },
     });
     if (rest[2] === 'status') return { handled: true, response: { data: [ready(true)] } };
     return { handled: true, response: { data: ready(true) } };

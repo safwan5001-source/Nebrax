@@ -87,6 +87,32 @@ describe("MediaFramingEditor (CUST-HV V4b)", () => {
     });
   });
 
+  it("a background picture (coverOnly) offers no Contain choice and never stores a fit", async () => {
+    const onApply = vi.fn();
+    render(
+      <MediaFramingEditor
+        open
+        onClose={vi.fn()}
+        value={{ mediaId: MEDIA_ID, decorative: true }}
+        asset={asset()}
+        onApply={onApply}
+        t={t}
+        locale="en"
+        coverOnly
+      />,
+    );
+    expect(screen.queryByRole("button", { name: t("mediaFitContain") })).toBeNull();
+    expect(screen.queryByRole("button", { name: t("mediaFitCover") })).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: "16:9" }));
+    await userEvent.click(screen.getByRole("button", { name: t("mediaApply") }));
+    expect(applied(onApply).fit).toBeUndefined();
+  });
+
+  it("the generic editor still offers Contain", () => {
+    open();
+    expect(screen.getByRole("button", { name: t("mediaFitContain") })).toBeTruthy();
+  });
+
   it("rotation recomputes a locked crop in the rotated frame", async () => {
     const { onApply } = open();
     await userEvent.click(screen.getByRole("button", { name: "16:9" }));

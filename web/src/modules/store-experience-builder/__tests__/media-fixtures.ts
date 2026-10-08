@@ -54,6 +54,7 @@ export function usage(over: Partial<UsageStatus> = {}): UsageStatus {
     files: [
       { width: 768, format: "webp", state: "ready", url: "https://signed.example/f768.webp", renderedWidth: 768, renderedHeight: 432 },
     ],
+    contrast: null,
     ...over,
   };
 }

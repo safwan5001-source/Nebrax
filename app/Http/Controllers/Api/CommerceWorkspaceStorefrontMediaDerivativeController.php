@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Resources\StorefrontMediaDerivativeResource;
 use App\Models\StorefrontMedia;
+use App\Services\Commerce\StorefrontMediaContrastEvidence;
 use App\Services\Commerce\StorefrontMediaDerivativeService;
 use App\Services\Commerce\StorefrontMediaException;
 use App\Services\Commerce\StorefrontMediaTransform;
@@ -24,7 +25,7 @@ use InvalidArgumentException;
  */
 class CommerceWorkspaceStorefrontMediaDerivativeController extends ApiController
 {
-    public function ensure(Request $request, StorefrontMediaDerivativeService $derivatives, string $mediaId): JsonResponse
+    public function ensure(Request $request, StorefrontMediaDerivativeService $derivatives, StorefrontMediaContrastEvidence $contrast, string $mediaId): JsonResponse
     {
         $this->denySelfService($request);
         $asset = $this->activeOr404($mediaId);
@@ -43,10 +44,10 @@ class CommerceWorkspaceStorefrontMediaDerivativeController extends ApiController
             return response()->json(['message' => $e->getMessage(), 'code' => $e->errorCode] + $e->context, $e->status);
         }
 
-        return response()->json(['data' => StorefrontMediaDerivativeResource::usage($status, $derivatives)]);
+        return response()->json(['data' => StorefrontMediaDerivativeResource::usage($status, $derivatives, $this->contrastOf($contrast, $asset, $transform, $status))]);
     }
 
-    public function status(Request $request, StorefrontMediaDerivativeService $derivatives, string $mediaId): JsonResponse
+    public function status(Request $request, StorefrontMediaDerivativeService $derivatives, StorefrontMediaContrastEvidence $contrast, string $mediaId): JsonResponse
     {
         $this->denySelfService($request);
         $asset = $this->activeOr404($mediaId);
@@ -61,13 +62,30 @@ class CommerceWorkspaceStorefrontMediaDerivativeController extends ApiController
         $out = [];
         foreach ((array) $request->input('transforms') as $index => $raw) {
             $transform = $this->transform($raw, "transforms.{$index}");
-            $out[] = StorefrontMediaDerivativeResource::usage($derivatives->status($asset, $transform), $derivatives);
+            $out[] = StorefrontMediaDerivativeResource::usage($status = $derivatives->status($asset, $transform), $derivatives, $this->contrastOf($contrast, $asset, $transform, $status));
         }
 
         return response()->json(['data' => $out]);
     }
 
     // ─────────────────────────────── helpers ───────────────────────────────
+
+    /**
+     * حدود التباين تُعرض لاستخدامٍ **مكتمل** فقط: استخدامٌ مؤطَّر لم تكتمل صفوفه (`processing`/`failed`/`absent`)
+     * لا يصلح دليلاً حتى لو كانت الصفوف الموجودة منه جاهزة — بوابة النشر ترفضه `derivative_not_ready`، ولا يجوز
+     * أن يُظهر المحرّر موافقةً عليه (Codex P2 على #1280). الإطار الافتراضي لا مشتقّات له: دليله من الأصل.
+     *
+     * @param  array<string,mixed>  $status
+     * @return array{min:list<int>,max:list<int>}|null
+     */
+    private function contrastOf(StorefrontMediaContrastEvidence $contrast, StorefrontMedia $asset, StorefrontMediaTransform $transform, array $status): ?array
+    {
+        if (! $transform->isDefault() && ($status['state'] ?? null) !== StorefrontMediaDerivativeService::USAGE_READY) {
+            return null;
+        }
+
+        return $contrast->boundsForUsage($asset, $transform);
+    }
 
     private function transform(mixed $raw, string $prefix = 'transform'): StorefrontMediaTransform
     {

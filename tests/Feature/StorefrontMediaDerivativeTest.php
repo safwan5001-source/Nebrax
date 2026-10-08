@@ -320,6 +320,47 @@ class StorefrontMediaDerivativeTest extends TestCase
     }
 
     /** @test */
+    public function the_editor_reads_the_same_contrast_bounds_the_publish_gate_uses_for_a_default_and_a_framed_usage(): void
+    {
+        $this->fakeStorefrontMediaR2();
+        $auth = $this->registerTenant('sfd-contrast');
+        $media = $this->createReady($auth);
+        $status = fn (array $t) => $this->withToken($auth['token'])->postJson(self::BASE.'/'.$media['id'].'/derivatives/status', ['transforms' => [$t]])->assertOk()->json('data.0');
+
+        // الاستخدام الافتراضي (بلا تحويل): حدود الأصل.
+        $default = $status([]);
+        $this->assertSame(3, count($default['contrast']['min'] ?? []));
+        $this->assertSame(3, count($default['contrast']['max'] ?? []));
+        app(\App\Tenancy\TenantContext::class)->set($auth['tenant_id']);
+        $expected = app(\App\Services\Commerce\StorefrontMediaContrastEvidence::class)->boundsFor(['mediaId' => $media['id']]);
+        app(\App\Tenancy\TenantContext::class)->forget();
+        $this->assertSame($expected, $default['contrast'], 'the very bounds the gate computes');
+
+        // استخدامٌ مؤطَّر لم يُجهَّز: لا دليل ⇒ null (غير مُثبَت) — ولا توليد.
+        $this->assertNull($status($this->transform())['contrast']);
+
+        // بعد التجهيز: حدود المشتقّ نفسه.
+        $ready = $this->ensure($auth, $media['id'], $this->transform())->assertOk()->json('data');
+        $this->assertSame('ready', $ready['state']);
+        $this->assertSame(3, count($ready['contrast']['min'] ?? []));
+        $this->assertSame($ready['contrast'], $status($this->transform())['contrast']);
+
+        // صفوفٌ موجودة جاهزة لكن ناقصة العدد (استخدامٌ لم يكتمل): `processing` ⇒ لا حدود تُعرض (Codex P2 على #1280).
+        \App\Models\StorefrontMediaDerivative::query()->where('media_id', $media['id'])->limit(1)->get()->each->delete();
+        $partial = $status($this->transform());
+        $this->assertSame('processing', $partial['state']);
+        $this->assertNull($partial['contrast'], 'an incomplete framed usage is not evidence');
+        $this->ensure($auth, $media['id'], $this->transform())->assertOk();
+
+        // دليلٌ غير صالح ⇒ null؛ والخام لا يخرج أبداً.
+        \App\Models\StorefrontMedia::query()->whereKey($media['id'])->update(['region_luminance' => null]);
+        $nulled = $status([]);
+        $this->assertNull($nulled['contrast']);
+        $this->assertArrayNotHasKey('region_luminance', $nulled);
+        $this->assertStringNotContainsString('region_luminance', (string) json_encode($ready));
+    }
+
+    /** @test */
     public function status_is_a_pure_read_and_never_generates_even_for_a_missing_or_failed_usage(): void
     {
         $this->fakeStorefrontMediaR2();

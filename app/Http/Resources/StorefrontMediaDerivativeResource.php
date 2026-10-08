@@ -7,16 +7,19 @@ use App\Services\Commerce\StorefrontMediaDerivativeService;
 
 /**
  * CUST-HV V2b — حالة استخدام (تحويل) وسائط لمساحة العمل. قائمة سماح ضيقة:
- * **لا** `storage_key` ولا مسار/دلو ولا `transform` الخام ولا أدلة التباين.
+ * **لا** `storage_key` ولا مسار/دلو ولا `transform` الخام ولا أدلة التباين الخام. (V6b-4a: حقل `contrast`
+ * الوحيد حدّا قنوات مشفّرة موسَّعان بهامش الترميز — نفس ما تحكم به بوّابة النشر — لتطابق نتيجة المحرّر الحيّة
+ * نتيجة النشر؛ وهو `null` ما لم يكتمل دليلٌ صالح.)
  * الرابط الموقَّع يُصدَر لكل ملفٍ جاهز فقط، قصير الأجل ويُعاد إصداره مع كل قراءة.
  */
 final class StorefrontMediaDerivativeResource
 {
     /**
      * @param  array<string,mixed>  $status ناتج `StorefrontMediaDerivativeService::status()`
+     * @param  array{min:list<int>,max:list<int>}|null  $contrast
      * @return array<string,mixed>
      */
-    public static function usage(array $status, StorefrontMediaDerivativeService $service): array
+    public static function usage(array $status, StorefrontMediaDerivativeService $service, ?array $contrast = null): array
     {
         $rows = $status['state'] === StorefrontMediaDerivativeService::USAGE_ABSENT
             ? collect()
@@ -40,6 +43,7 @@ final class StorefrontMediaDerivativeResource
             'retryable' => $status['retryable'],
             'error_code' => $status['error_code'],
             'files' => $files,
+            'contrast' => $contrast,
         ];
     }
 }

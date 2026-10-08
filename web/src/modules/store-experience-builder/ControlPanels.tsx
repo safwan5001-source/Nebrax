@@ -67,6 +67,7 @@ import {
 } from "./DataSectionFields";
 import { OfferCatalog } from "./OfferCatalog";
 import { DesignInspector } from "./design/DesignInspector";
+import { useBackgroundMediaBounds } from "./media/use-background-media-bounds";
 import { GlobalTokensEditor } from "./design/GlobalTokensEditor";
 import { PaletteEditor } from "./design/PaletteEditor";
 import { SECTION_DESIGN_CAPABILITIES } from "./presentation/section-design";
@@ -1120,11 +1121,15 @@ function HomepagePanel({
     tabState.id === selected.id
       ? tabState.tab
       : "content";
+  // CUST-HV V6b-4b — the server's proven bounds of every picture background, so the inspector's
+  // verdict is the publish gate's own (read-only; a document without pictures fetches nothing).
+  const backgroundBounds = useBackgroundMediaBounds(sections);
   const designContext: DesignContext = {
     primaryColor: config.primaryColor,
     accentColor: config.accentColor,
     palette: config.palette,
     dir: locale === "en" ? "ltr" : "rtl",
+    mediaBounds: backgroundBounds.lookup,
   };
 
   // CUST-H4-2 mobile fix — on mobile the Library *replaces* this panel's
@@ -1184,6 +1189,8 @@ function HomepagePanel({
                 design={selected.design}
                 ctx={designContext}
                 t={t}
+                locale={locale === "en" ? "en" : "ar"}
+                bounds={backgroundBounds}
                 onChange={(design) =>
                   updateSection(selectedIndex, {
                     ...selected,

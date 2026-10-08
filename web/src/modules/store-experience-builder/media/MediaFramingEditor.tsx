@@ -56,6 +56,7 @@ export function MediaFramingEditor({
   onApply,
   t,
   locale,
+  coverOnly = false,
 }: {
   open: boolean;
   onClose: () => void;
@@ -64,8 +65,13 @@ export function MediaFramingEditor({
   onApply: (next: MediaRef) => void;
   t: T;
   locale: "ar" | "en";
+  /** A background picture is always painted `cover` (letterboxing would reveal an unproven surface): no Contain choice. */
+  coverOnly?: boolean;
 }) {
-  const [framing, setFraming] = useState<Framing>(() => framingOf(value));
+  const [framing, setFraming] = useState<Framing>(() => ({
+    ...framingOf(value),
+    ...(coverOnly ? { fit: "cover" as const } : {}),
+  }));
   const natural = useMemo(() => ({ w: asset.width, h: asset.height }), [asset.width, asset.height]);
   const rotated = rotatedDims(natural, framing.rotate);
   const aspect: EditorAspect | null =
@@ -351,6 +357,7 @@ export function MediaFramingEditor({
             </fieldset>
 
             <div className="min-w-0 flex-1 basis-40 space-y-3">
+              {coverOnly ? null : (
               <fieldset className="space-y-1.5">
                 <legend className="mb-1 text-[12px] font-medium text-muted">{t("mediaFit")}</legend>
                 <div className="flex gap-1.5">
@@ -367,6 +374,7 @@ export function MediaFramingEditor({
                   ))}
                 </div>
               </fieldset>
+              )}
               <button type="button" className={mediaBtnClass} onClick={rotate} data-media-rotate="">
                 <RotateCw aria-hidden="true" className="size-4" />
                 {t("mediaRotate")}

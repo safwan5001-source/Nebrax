@@ -59,8 +59,24 @@ export function pickPreviewUrl(status: UsageStatus): string | null {
   return (sorted.find((f) => f.width >= 768) ?? sorted[sorted.length - 1]).url;
 }
 
-function usageKey(ref: MediaRef | null): string {
+export function usageKey(ref: MediaRef | null): string {
   return ref ? JSON.stringify([ref.mediaId, mediaRefTransform(ref)]) : "";
+}
+
+/**
+ * CUST-HV V6b-4 — a generation (or retry) that this hook ran has just made a usage ready. Other
+ * readers of the same usage's server state (the background contrast bounds) subscribe so they re-read
+ * instead of staying on a status they fetched before generation started.
+ */
+const usageListeners = new Set<(key: string) => void>();
+export function notifyUsageGenerated(key: string): void {
+  for (const listener of usageListeners) listener(key);
+}
+export function onUsageGenerated(listener: (key: string) => void): () => void {
+  usageListeners.add(listener);
+  return () => {
+    usageListeners.delete(listener);
+  };
 }
 
 export function useUsageReadiness(ref: MediaRef | null): UsageReadiness {
@@ -108,7 +124,9 @@ export function useUsageReadiness(ref: MediaRef | null): UsageReadiness {
           if (token !== run.current) return;
           status = await usageStatus(current.mediaId, mediaRefTransform(current));
         }
-        apply(status, token);
+        if (apply(status, token) && status.state === "ready") {
+          notifyUsageGenerated(usageKey(current));
+        }
       } catch {
         if (token !== run.current) return;
         setState("failed");
