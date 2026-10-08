@@ -27,9 +27,20 @@ on the **real chain**: upload → real ladder (WebP + JPEG) → real evidence �
 | `storefront/src/lib/presentation/pixel-proof.render.test.tsx` (`PIXEL_PROOF_DIR`) | Renders each case through the real `publishedNodes` (LTR + RTL), with the server's files and bounds. Also renders the **negative control** (below). |
 | `storefront/scripts/pixel-proof/measure.mjs` | Chromium measurement; exit 1 on any violation. `--control` runs the negative control; `--shots <dir>` saves evidence screenshots. |
 
-Run (`PIXEL_PROOF_CHROMIUM=<path>` selects a Chromium binary when the installed Playwright revision differs from the browser cache; the script imports the declared `@playwright/test`): `STOREFRONT_PIXEL_PROOF_DIR=/tmp/p php artisan test --filter=StorefrontMediaPixelProofExportTest` →
-`node storefront/scripts/pixel-proof/build-css.mjs /tmp/p` → `PIXEL_PROOF_DIR=/tmp/p npx vitest run src/lib/presentation/pixel-proof.render.test.tsx` →
-`node storefront/scripts/pixel-proof/measure.mjs /tmp/p [--control]`.
+Run (each step in its own directory; `PIXEL_PROOF_CHROMIUM=<path>` selects a Chromium binary when the installed Playwright revision differs from the browser cache — the script imports the declared `@playwright/test`):
+
+```bash
+P=/tmp/pixel-proof                      # scratch output directory
+
+# 1. export the real-pipeline evidence — in the built Laravel project (setup.sh / CI layout)
+STOREFRONT_PIXEL_PROOF_DIR=$P php artisan test --filter=StorefrontMediaPixelProofExportTest
+
+# 2-4. in the storefront workspace
+cd storefront
+node scripts/pixel-proof/build-css.mjs $P                                               # compile the real storefront CSS
+PIXEL_PROOF_DIR=$P npx vitest run src/lib/presentation/pixel-proof.render.test.tsx      # render LTR/RTL pages (+ control pages)
+node scripts/pixel-proof/measure.mjs $P [--control] [--shots <dir>]                     # Chromium measurement; exit 1 on any violation
+```
 
 ## What is asserted — per case × 6 widths (390 · 430 · 768 · 1024 · 1280 · 1440) × AR RTL + EN LTR
 
