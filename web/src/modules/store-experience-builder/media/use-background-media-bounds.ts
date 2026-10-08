@@ -37,6 +37,8 @@ type Entry = { state: BoundsState; bounds: UsageContrast | null };
 
 const POLL_MS = 2000;
 const MAX_POLLS = 30;
+/** Consecutive failed reads tolerated (a transient network/5xx) before the usage is called unavailable. */
+const MAX_READ_FAILURES = 4;
 
 /** Every picture of every visible picture background (a hidden section never blocks publishing). */
 export function backgroundPictureRefs(
@@ -74,10 +76,12 @@ export function useBackgroundMediaBounds(
       const mine = (cycles.get(key) ?? 0) + 1;
       cycles.set(key, mine);
       const current = () => live && token === generation.current && cycles.get(key) === mine;
+      let failures = 0;
       for (let attempt = 0; attempt <= MAX_POLLS; attempt += 1) {
         try {
           const status = await usageStatus(ref.mediaId, mediaRefTransform(ref));
           if (!current()) return;
+          failures = 0;
           // A framed usage is evidence only once complete (`ready`); `absent` ("not generated yet") and
           // `processing` stay pending whatever `contrast` says. An unframed picture has no derivative
           // rows by design, so there `absent` + no contrast is final (the asset has no evidence).
@@ -94,8 +98,13 @@ export function useBackgroundMediaBounds(
           if (settled) return;
         } catch {
           if (!current()) return;
-          setEntries((prev) => ({ ...prev, [key]: { state: "unavailable", bounds: null } }));
-          return;
+          // A failed read is not evidence of anything: retry (bounded) before giving up, so one blip
+          // does not hide a valid picture until the editor remounts.
+          failures += 1;
+          if (failures > MAX_READ_FAILURES || attempt === MAX_POLLS) {
+            setEntries((prev) => ({ ...prev, [key]: { state: "unavailable", bounds: null } }));
+            return;
+          }
         }
         await new Promise((resolve) => setTimeout(resolve, POLL_MS));
         if (!current()) return;

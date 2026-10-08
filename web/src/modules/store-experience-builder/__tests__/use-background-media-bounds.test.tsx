@@ -61,16 +61,34 @@ describe("useBackgroundMediaBounds (CUST-HV V6b-4a)", () => {
     expect(result.current.lookup({ mediaId: "other" })).toBeNull();
   });
 
-  it("no valid evidence on a settled usage is 'unavailable'; a network error too", async () => {
-    status.mockResolvedValueOnce(usage({ state: "ready", contrast: null }));
-    status.mockRejectedValueOnce(new Error("offline"));
-    const sections = [section(bg(MEDIA_ID, MEDIA_ID_2))];
+  it("no valid evidence on a settled usage is 'unavailable'", async () => {
+    status.mockResolvedValue(usage({ state: "ready", contrast: null }));
+    const sections = [section(bg(MEDIA_ID))];
     const { result } = renderHook(() => useBackgroundMediaBounds(sections));
     const background = sections[0].design?.background;
-    if (background?.kind !== "media" || !background.mobile) throw new Error("fixture");
+    if (background?.kind !== "media") throw new Error("fixture");
     await waitFor(() => expect(result.current.stateOf(background.media)).toBe("unavailable"));
-    await waitFor(() => expect(result.current.stateOf(background.mobile as never)).toBe("unavailable"));
     expect(result.current.lookup(background.media)).toBeNull();
+    expect(status).toHaveBeenCalledTimes(1);
+  });
+
+  it("a transient read failure is retried (never 'unavailable' on the first blip) and recovers", async () => {
+    vi.useFakeTimers();
+    status
+      .mockRejectedValueOnce(new Error("offline"))
+      .mockResolvedValueOnce(usage({ contrast: { min: [3, 3, 3], max: [8, 8, 8] } }));
+    const sections = [section(bg(MEDIA_ID))];
+    const { result } = renderHook(() => useBackgroundMediaBounds(sections));
+    const background = sections[0].design?.background;
+    if (background?.kind !== "media") throw new Error("fixture");
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(result.current.stateOf(background.media)).toBe("loading");
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2100);
+    });
+    expect(result.current.lookup(background.media)).toEqual({ min: [3, 3, 3], max: [8, 8, 8] });
   });
 
   it("a usage still processing is polled until its bounds arrive", async () => {
