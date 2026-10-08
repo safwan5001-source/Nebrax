@@ -91,7 +91,9 @@ if (process.argv.includes("--control")) {
       await page.waitForLoadState("load");
       await page.evaluate(async () => { await Promise.all([...document.images].map((i) => (i.complete ? null : i.decode().catch(() => null)))); });
       const info = await page.evaluate(() => {
-        const frame = document.querySelector("[data-sd]") ?? document.body.firstElementChild;
+        // the production hero section, and the design frame that wraps it (absent when the design resolved to nothing)
+        const hero = document.querySelector('section[aria-labelledby^="home-hero"]');
+        const frame = hero.closest("[data-sd]") ?? hero.parentElement;
         const h = frame.querySelector("h1,h2"); const r = h.getBoundingClientRect();
         return { painted: !!frame.querySelector("[data-sd-backdrop]"), rect: { x: r.x, y: r.y + scrollY, w: r.width, h: r.height }, colour: (() => { const c = document.createElement("canvas"); c.width = c.height = 1; const g = c.getContext("2d", { willReadFrequently: true }); g.fillStyle = getComputedStyle(h).color; g.fillRect(0, 0, 1, 1); const d = g.getImageData(0, 0, 1, 1).data; return `rgba(${d[0]}, ${d[1]}, ${d[2]}, ${+(d[3] / 255).toFixed(3)})`; })() };
       });
@@ -125,8 +127,10 @@ for (const c of cases) {
       await page.waitForTimeout(60);
 
       const info = await page.evaluate(() => {
-        const frame = document.querySelector("[data-sd]") ?? document.body.firstElementChild;
-        const root = frame.firstElementChild?.matches?.("section") ? frame.firstElementChild : frame;
+        // the production hero section, and the design frame that wraps it (absent when the design resolved to nothing)
+        const hero = document.querySelector('section[aria-labelledby^="home-hero"]');
+        const frame = hero.closest("[data-sd]") ?? hero.parentElement;
+        const root = hero;
         const backdrop = frame.querySelector("[data-sd-backdrop]");
         const img = backdrop?.querySelector("img");
         const heading = frame.querySelector("h1,h2");

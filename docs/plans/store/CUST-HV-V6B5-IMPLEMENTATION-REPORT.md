@@ -24,7 +24,7 @@ on the **real chain**: upload → real ladder (WebP + JPEG) → real evidence �
 |---|---|
 | `tests/Feature/StorefrontMediaPixelProofExportTest.php` (`STOREFRONT_PIXEL_PROOF_DIR`) | Generates photograph-like images (gradient + film grain + hard edges, bright specks, windows, tree silhouettes, a hard black\|white split, a portrait), uploads them through the **real API pipeline**, creates **real crop derivatives**, and exports the files the server actually serves, the widened bounds (`StorefrontMediaContrastEvidence`) and the **publish-validator verdict** for 28 configurations. |
 | `storefront/scripts/pixel-proof/build-css.mjs` | Compiles `globals.css` exactly as the app does (Tailwind v4 / PostCSS). |
-| `storefront/src/lib/presentation/pixel-proof.render.test.tsx` (`PIXEL_PROOF_DIR`) | Renders each case through the real `publishedNodes` **and the production `HeroSection`** (LTR + RTL; only `next-intl/server` is answered from the real `messages/*.json`, and the page's own prop mapping feeds the component), with the server's files and bounds. Also renders the **negative control** (below). |
+| `storefront/src/lib/presentation/pixel-proof.render.test.tsx` (`PIXEL_PROOF_DIR`) | Renders each case through the real `publishedNodes` **and the production `HeroSection`** (LTR + RTL, inside the production `<main>` + `StoreContainer` + home stack class so the hero has its published width and the `object-fit: cover` crop is the published one; only `next-intl/server` is answered from the real `messages/*.json`, and the page's own prop mapping feeds the component), with the server's files and bounds. Also renders the **negative control** (below). |
 | `storefront/scripts/pixel-proof/measure.mjs` | Chromium measurement; exit 1 on any violation. `--control` runs the negative control; `--shots <dir>` saves evidence screenshots. |
 
 Run (each step in its own directory; `PIXEL_PROOF_CHROMIUM=<path>` selects a Chromium binary when the installed Playwright revision differs from the browser cache — the script imports the declared `@playwright/test`):
@@ -55,7 +55,7 @@ node scripts/pixel-proof/measure.mjs $P [--control] [--shots <dir>]             
 |---|---|
 | Configurations | **28** (4 photographs × 5 overlays, picture + phone picture, two crop derivatives, an asset with no evidence, a provable default with an unprovable phone picture) |
 | Checks | **336** (28 × 6 widths × 2 directions) |
-| Painted (gate: provable) | 156 — worst pixel contrast **heading 7.47 : 1, supporting line 7.56 : 1** (≥ 4.5 required); the 180 fallbacks keep a legacy heading at ≥ 6.78 : 1 |
+| Painted (gate: provable) | 156 — worst pixel contrast **heading 7.47 : 1, supporting line 7.54 : 1** (≥ 4.5 required); the 180 fallbacks keep a legacy heading at ≥ 6.78 : 1 |
 | Fell back (gate: rejected) | 180 — all with the legacy surface, none painted |
 | Decision-parity violations | **0** |
 | Readability violations | **0** |

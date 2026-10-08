@@ -5,7 +5,7 @@
   "painted": 156,
   "fellBack": 180,
   "worstHeading": 7.47,
-  "worstSub": 7.56,
+  "worstSub": 7.54,
   "violations": 0,
   "worstLegacyFallbackHeading": 6.78
  },
@@ -41,8 +41,8 @@
     true
    ],
    "checks": 12,
-   "worstHeadingPixelRatio": 13.3,
-   "worstSupportingPixelRatio": 13.42,
+   "worstHeadingPixelRatio": 13.48,
+   "worstSupportingPixelRatio": 13.23,
    "legacyFallbackWorstHeadingRatio": null,
    "pictureChosen": [
     "default"
@@ -56,7 +56,7 @@
    ],
    "checks": 12,
    "worstHeadingPixelRatio": 7.69,
-   "worstSupportingPixelRatio": 8.12,
+   "worstSupportingPixelRatio": 7.94,
    "legacyFallbackWorstHeadingRatio": null,
    "pictureChosen": [
     "default"
@@ -105,8 +105,8 @@
     true
    ],
    "checks": 12,
-   "worstHeadingPixelRatio": 8.74,
-   "worstSupportingPixelRatio": 8.77,
+   "worstHeadingPixelRatio": 8.78,
+   "worstSupportingPixelRatio": 8.75,
    "legacyFallbackWorstHeadingRatio": null,
    "pictureChosen": [
     "default"
@@ -120,7 +120,7 @@
    ],
    "checks": 12,
    "worstHeadingPixelRatio": 8.35,
-   "worstSupportingPixelRatio": 8.3,
+   "worstSupportingPixelRatio": 8.24,
    "legacyFallbackWorstHeadingRatio": null,
    "pictureChosen": [
     "default"
@@ -169,7 +169,7 @@
     true
    ],
    "checks": 12,
-   "worstHeadingPixelRatio": 9.36,
+   "worstHeadingPixelRatio": 9.24,
    "worstSupportingPixelRatio": 9.68,
    "legacyFallbackWorstHeadingRatio": null,
    "pictureChosen": [
@@ -184,7 +184,7 @@
    ],
    "checks": 12,
    "worstHeadingPixelRatio": 7.56,
-   "worstSupportingPixelRatio": 7.57,
+   "worstSupportingPixelRatio": 7.54,
    "legacyFallbackWorstHeadingRatio": null,
    "pictureChosen": [
     "default"
@@ -273,8 +273,8 @@
     true
    ],
    "checks": 12,
-   "worstHeadingPixelRatio": 13.3,
-   "worstSupportingPixelRatio": 13.42,
+   "worstHeadingPixelRatio": 13.48,
+   "worstSupportingPixelRatio": 13.23,
    "legacyFallbackWorstHeadingRatio": null,
    "pictureChosen": [
     "default",
@@ -367,8 +367,8 @@
     true
    ],
    "checks": 12,
-   "worstHeadingPixelRatio": 13.74,
-   "worstSupportingPixelRatio": 13.73,
+   "worstHeadingPixelRatio": 13.79,
+   "worstSupportingPixelRatio": 13.92,
    "legacyFallbackWorstHeadingRatio": null,
    "pictureChosen": [
     "default"

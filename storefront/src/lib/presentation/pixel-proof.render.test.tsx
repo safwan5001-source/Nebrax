@@ -12,9 +12,11 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { HeroSection } from "@/components/home/HeroSection";
 import { publishedNodes } from "@/components/home/published-nodes";
+import { StoreContainer } from "@/components/layout/StoreContainer";
 import { backgroundMediaPath } from "@/lib/presentation/background-media";
 import type { PresentationHomeSection } from "@/lib/presentation/config";
 import type { ResolvedMedia } from "@/lib/presentation/media-ref";
+import { publishedHomeStackClass } from "@/lib/presentation/public-rhythm";
 import { heroContentOf } from "@/lib/presentation/section-content";
 import ar from "../../../messages/ar.json";
 import en from "../../../messages/en.json";
@@ -175,7 +177,13 @@ describe.skipIf(!DIR)("V6b-5 pixel-proof pages", () => {
           ...base,
           renderHero: (a: Record<string, any>) => resolved.get(a.section.id),
         } as never);
-        const html = `<!doctype html><html lang="${dir === "rtl" ? "ar" : "en"}" dir="${dir}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}</style><style>:root{--store-primary:#12372a;--store-primary-foreground:#ffffff;--store-foreground:#111827;--store-muted-foreground:#4b5563;--store-border:#e5e7eb;--store-surface:#ffffff;--store-radius:14px}body{background:#f8f9fa;margin:0;padding:16px;font-family:system-ui,sans-serif}</style></head><body>${renderToStaticMarkup(<>{nodes}</>)}</body></html>`;
+        const html = `<!doctype html><html lang="${dir === "rtl" ? "ar" : "en"}" dir="${dir}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}</style><style>:root{--store-primary:#12372a;--store-primary-foreground:#ffffff;--store-foreground:#111827;--store-muted-foreground:#4b5563;--store-border:#e5e7eb;--store-surface:#ffffff;--store-radius:14px}body{background:#f8f9fa;margin:0;font-family:system-ui,sans-serif}</style></head><body>${renderToStaticMarkup(
+          <main id="main-content">
+            <StoreContainer className={publishedHomeStackClass(undefined)}>
+              {nodes}
+            </StoreContainer>
+          </main>,
+        )}</body></html>`;
         writeFileSync(
           join(
             DIR,
