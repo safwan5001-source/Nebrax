@@ -1,6 +1,6 @@
 /**
- * CUST-HV V6b-5 — renders the REAL published hero (`publishedNodes`, `SectionBackdrop`, the validated design
- * tokens) for every configuration the PHP exporter wrote (`StorefrontMediaPixelProofExportTest`), pointing
+ * CUST-HV V6b-5 — renders the REAL published hero (`publishedNodes`, the production `HeroSection`, `SectionBackdrop`,
+ * the validated design tokens; only `next-intl/server` is answered from the real `messages/*.json`) for every configuration the PHP exporter wrote (`StorefrontMediaPixelProofExportTest`), pointing
  * the picture at the files the server actually produced and carrying the server's own widened bounds.
  * Output: `<dir>/pages/<case>.<ltr|rtl>.html`, measured by `scripts/pixel-proof/measure.mjs` in Chromium.
  *
@@ -9,11 +9,40 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import { HeroSection } from "@/components/home/HeroSection";
 import { publishedNodes } from "@/components/home/published-nodes";
 import { backgroundMediaPath } from "@/lib/presentation/background-media";
 import type { PresentationHomeSection } from "@/lib/presentation/config";
 import type { ResolvedMedia } from "@/lib/presentation/media-ref";
+import { heroContentOf } from "@/lib/presentation/section-content";
+import ar from "../../../messages/ar.json";
+import en from "../../../messages/en.json";
+
+// `getTranslations` needs Next's request scope; answer it from the real message files so the production
+// component renders its real copy (no test-local strings, no test-local markup).
+vi.mock("next-intl/server", () => ({
+  getTranslations: async ({
+    locale,
+    namespace,
+  }: {
+    locale: string;
+    namespace: string;
+  }) => {
+    const table =
+      (
+        (locale === "ar" ? ar : en) as unknown as Record<
+          string,
+          Record<string, string>
+        >
+      )[namespace] ?? {};
+    return (key: string, values?: Record<string, string>) =>
+      (table[key] ?? key).replace(
+        /\{(\w+)\}/g,
+        (_, k: string) => values?.[k] ?? "",
+      );
+  },
+}));
 
 const DIR = process.env.PIXEL_PROOF_DIR ?? "";
 
@@ -49,43 +78,6 @@ const resolvedOf = (files: FileRow[], bounds: Bounds): ResolvedMedia => {
   };
 };
 
-const renderHero = ({
-  section,
-  headingLevel,
-  designed,
-  backdrop,
-}: Record<string, any>) => {
-  const H = headingLevel === 1 ? "h1" : "h2";
-  return (
-    <section
-      aria-labelledby={`h-${section.id}`}
-      className="flex items-center rounded-store bg-linear-to-r rtl:bg-linear-to-l from-primary-700 via-primary-600 to-primary-500 text-store-primary-foreground min-h-[11rem] md:min-h-[16rem] lg:min-h-[18rem]"
-    >
-      {backdrop}
-      <div
-        data-section-content={designed ? "" : undefined}
-        className="max-w-2xl p-5 md:p-10 lg:p-14"
-      >
-        <H
-          id={`h-${section.id}`}
-          className="text-xl font-black leading-tight sm:text-2xl lg:text-4xl"
-        >
-          <bdi>Picture hero headline for the proof</bdi>
-        </H>
-        <p className="mt-2 line-clamp-2 text-xs text-store-primary-foreground/80 md:mt-3 md:text-sm">
-          A supporting line that sits over the photograph
-        </p>
-        <a
-          href="/products"
-          className="mt-4 inline-flex h-9 items-center gap-1.5 rounded-store bg-store-primary-foreground px-4 text-xs font-bold text-store-primary shadow-md md:mt-5 md:h-11 md:px-6 md:text-sm"
-        >
-          Shop now
-        </a>
-      </div>
-    </section>
-  );
-};
-
 describe.skipIf(!DIR)("V6b-5 pixel-proof pages", () => {
   it("renders one page per case and direction", async () => {
     const css = readFileSync(join(DIR, "storefront.css"), "utf8");
@@ -111,6 +103,11 @@ describe.skipIf(!DIR)("V6b-5 pixel-proof pages", () => {
           id: "hero",
           type: "hero",
           visible: true,
+          content: {
+            headline: "Picture hero headline for the proof",
+            subheadline: "A supporting line that sits over the photograph",
+            ctas: [{ label: "Shop now", href: "/products" }],
+          },
           design: { background: c.normalized },
         },
       ] as unknown as PresentationHomeSection[];
@@ -126,9 +123,11 @@ describe.skipIf(!DIR)("V6b-5 pixel-proof pages", () => {
           c.bounds.mobile,
         );
       for (const dir of ["ltr", "rtl"] as const) {
-        const nodes = await publishedNodes(sections, {
+        // The page's own prop mapping (`app/[country]/[locale]/(storefront)/page.tsx`) feeds the PRODUCTION hero.
+        // `HeroSection` is an async server component, so pass 1 collects the arguments `publishedNodes` hands the
+        // renderer, the component is awaited, and pass 2 renders the very same tree with the resolved elements.
+        const base = {
           implemented: {} as never,
-          renderHero,
           media,
           basePath: "/sa/en",
           locale: dir === "rtl" ? "ar" : "en",
@@ -140,6 +139,41 @@ describe.skipIf(!DIR)("V6b-5 pixel-proof pages", () => {
           appStoreLabel: "",
           playStoreLabel: "",
           design: { primaryColor: "#12372a", accentColor: null, dir },
+        };
+        const calls: Record<string, any>[] = [];
+        await publishedNodes(sections, {
+          ...base,
+          renderHero: (a: Record<string, any>) => {
+            calls.push(a);
+            return null;
+          },
+        } as never);
+        const resolved = new Map<string, unknown>();
+        for (const a of calls) {
+          const own = heroContentOf(a.section);
+          resolved.set(
+            a.section.id,
+            await HeroSection({
+              basePath: "/sa/en",
+              locale: dir === "rtl" ? "ar" : "en",
+              storeName: "Daisy Shop",
+              headline: own ? own.headline : "",
+              subheadline: own ? (own.subheadline ?? null) : "",
+              ctas: own?.ctas ?? null,
+              headingId:
+                a.section.id === "hero"
+                  ? "home-hero"
+                  : `home-hero-${a.section.id}`,
+              headingLevel: a.headingLevel,
+              themePreset: "awj-market",
+              designed: a.designed,
+              backdrop: a.backdrop,
+            }),
+          );
+        }
+        const nodes = await publishedNodes(sections, {
+          ...base,
+          renderHero: (a: Record<string, any>) => resolved.get(a.section.id),
         } as never);
         const html = `<!doctype html><html lang="${dir === "rtl" ? "ar" : "en"}" dir="${dir}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}</style><style>:root{--store-primary:#12372a;--store-primary-foreground:#ffffff;--store-foreground:#111827;--store-muted-foreground:#4b5563;--store-border:#e5e7eb;--store-surface:#ffffff;--store-radius:14px}body{background:#f8f9fa;margin:0;padding:16px;font-family:system-ui,sans-serif}</style></head><body>${renderToStaticMarkup(<>{nodes}</>)}</body></html>`;
         writeFileSync(

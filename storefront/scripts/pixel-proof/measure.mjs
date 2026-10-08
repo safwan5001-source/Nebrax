@@ -159,6 +159,9 @@ for (const c of cases) {
         };
       });
 
+      if (shotsAt && SHOT_CASES.has(slug(c.id)) && ((d === "ltr" && width === 1280) || (d === "rtl" && width === 390))) {
+        await page.screenshot({ path: join(shotsAt, `${slug(c.id)}.${d}.${width}.png`), clip: { x: 0, y: 0, width, height: Math.min(900, Math.ceil(info.rootRect.y + info.rootRect.h + 16)) } });
+      }
       const row = { id: c.id, dir: d, width, gateProvable: c.provable, painted: info.painted, imgSrc: info.imgSrc, tokens: info.tokens };
       const fail = (why) => violations.push({ id: c.id, dir: d, width, why });
 
@@ -196,9 +199,6 @@ for (const c of cases) {
         }
       }
 
-      if (shotsAt && SHOT_CASES.has(slug(c.id)) && ((d === "ltr" && width === 1280) || (d === "rtl" && width === 390))) {
-        await page.screenshot({ path: join(shotsAt, `${slug(c.id)}.${d}.${width}.png`), clip: { x: 0, y: 0, width, height: Math.min(900, Math.ceil(info.rootRect.y + info.rootRect.h + 16)) } });
-      }
       if (info.painted) {
         if (!info.imgLoaded) fail("backdrop image did not load");
         const b = info.backRect, r = info.rootRect;
