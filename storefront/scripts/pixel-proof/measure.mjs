@@ -17,7 +17,8 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
-const { chromium } = createRequire(join(root, "package.json"))("playwright");
+// `@playwright/test` is the declared dependency (pnpm does not expose a bare `playwright`)
+const { chromium } = createRequire(join(root, "package.json"))("@playwright/test");
 
 const dir = resolve(process.argv[2] ?? ".");
 const shotsAt = process.argv.includes("--shots") ? resolve(process.argv[process.argv.indexOf("--shots") + 1]) : null;
@@ -54,9 +55,11 @@ async function pixelStats({ b64, fg }) {
   return { min, max, worst: fg ? worst : null, pixels: d.length / 4 };
 }
 
+// Tailwind v4 emits modern colour syntax (e.g. `color(srgb 1 1 1 / 0.8)`); the page normalises every text colour to rgba
+// through a canvas, so the node side only ever parses `rgba(r, g, b, a)`.
 const parseColour = (s) => {
   const m = s.match(/rgba?\(([^)]+)\)/);
-  if (!m) return null;
+  if (!m) throw new Error(`unparseable colour: ${s}`);
   const [r, g, b, a = 1] = m[1].split(",").map((x) => Number.parseFloat(x));
   return { r, g, b, a };
 };
@@ -73,7 +76,8 @@ function predicted(c, overlayRgb, overlayAlpha) {
   return { min: min.map((v, k) => mix(v, overlayRgb[k])), max: max.map((v, k) => mix(v, overlayRgb[k])) };
 }
 
-const browser = await chromium.launch();
+// PIXEL_PROOF_CHROMIUM: path to a Chromium binary when the installed Playwright revision differs from the browser cache
+const browser = await chromium.launch(process.env.PIXEL_PROOF_CHROMIUM ? { executablePath: process.env.PIXEL_PROOF_CHROMIUM } : {});
 
 // ── negative control (--control): the same measurement must FAIL on deliberately false evidence ───────────────
 if (process.argv.includes("--control")) {
@@ -87,7 +91,7 @@ if (process.argv.includes("--control")) {
       const info = await page.evaluate(() => {
         const frame = document.querySelector("[data-sd]") ?? document.body.firstElementChild;
         const h = frame.querySelector("h1,h2"); const r = h.getBoundingClientRect();
-        return { painted: !!frame.querySelector("[data-sd-backdrop]"), rect: { x: r.x, y: r.y + scrollY, w: r.width, h: r.height }, colour: getComputedStyle(h).color };
+        return { painted: !!frame.querySelector("[data-sd-backdrop]"), rect: { x: r.x, y: r.y + scrollY, w: r.width, h: r.height }, colour: (() => { const c = document.createElement("canvas"); c.width = c.height = 1; const g = c.getContext("2d", { willReadFrequently: true }); g.fillStyle = getComputedStyle(h).color; g.fillRect(0, 0, 1, 1); const d = g.getImageData(0, 0, 1, 1).data; return `rgba(${d[0]}, ${d[1]}, ${d[2]}, ${+(d[3] / 255).toFixed(3)})`; })() };
       });
       total += 1;
       if (!info.painted) { console.log("CONTROL", c.id, d, "not painted (bounds lie was not trusted?)"); await page.close(); continue; }
@@ -126,20 +130,28 @@ for (const c of cases) {
         const heading = frame.querySelector("h1,h2");
         const sub = frame.querySelector("p");
         const rect = (e) => { const r = e.getBoundingClientRect(); return { x: r.x, y: r.y + scrollY, w: r.width, h: r.height }; };
+        const rgba = (css) => {
+          const c = document.createElement("canvas"); c.width = c.height = 1;
+          const g = c.getContext("2d", { willReadFrequently: true });
+          g.clearRect(0, 0, 1, 1); g.fillStyle = css; g.fillRect(0, 0, 1, 1);
+          const d = g.getImageData(0, 0, 1, 1).data;
+          return `rgba(${d[0]}, ${d[1]}, ${d[2]}, ${+(d[3] / 255).toFixed(3)})`;
+        };
         const hr = heading.getBoundingClientRect();
         const top = document.elementFromPoint(hr.x + hr.width / 2, hr.y + hr.height / 2);
         const cs = getComputedStyle(frame);
         return {
           overflow: document.documentElement.scrollWidth > document.documentElement.clientWidth,
           painted: !!backdrop,
+          rootBg: getComputedStyle(root).backgroundImage,
           tokens: frame.getAttribute("data-sd"),
           rootRect: rect(root),
           backRect: backdrop ? rect(backdrop) : null,
           imgSrc: img ? img.currentSrc.split("/").slice(-2).join("/") : null,
           imgLoaded: img ? img.complete && img.naturalWidth > 0 : null,
           headingOnTop: !!top && (heading.contains(top) || top === heading),
-          heading: { rect: rect(heading), colour: getComputedStyle(heading).color },
-          sub: sub ? { rect: rect(sub), colour: getComputedStyle(sub).color } : null,
+          heading: { rect: rect(heading), colour: rgba(getComputedStyle(heading).color) },
+          sub: sub ? { rect: rect(sub), colour: rgba(getComputedStyle(sub).color) } : null,
           ovlRgb: cs.getPropertyValue("--sec-ovl").trim(),
           ovlA: cs.getPropertyValue("--sec-ovl-a").trim(),
           ovlBg: backdrop?.querySelector("[data-sd-overlay]") ? getComputedStyle(backdrop.querySelector("[data-sd-overlay]")).backgroundColor : null,
@@ -155,6 +167,34 @@ for (const c of cases) {
       if (!info.headingOnTop) fail("heading is not the topmost element at its centre");
       // 1. decision parity
       if (info.painted !== c.provable) fail(`storefront painted=${info.painted} but the publish gate said provable=${c.provable}`);
+
+      // 1b. the picture actually painted is the right one for this viewport (phone picture below 768px, else the default)
+      if (info.painted) {
+        const phone = width <= 767 && c.files.mobile;
+        const expected = (phone ? c.files.mobile : c.files.media).map((f) => f.path);
+        const shown = info.imgSrc ?? "";
+        if (!expected.some((p) => p.endsWith(shown))) fail(`<picture> chose ${shown}, expected one of the ${phone ? "phone" : "default"} picture's files`);
+        row.chose = phone ? "phone" : "default";
+      } else {
+        // 1c. a rejected configuration restores BOTH the legacy surface and the legacy text colours (no media-derived tokens)
+        const tokens = (info.tokens ?? "").split(" ");
+        if (tokens.includes("mbg") || tokens.includes("ovl")) fail(`rejected configuration still carries media tokens: ${info.tokens}`);
+        if (!info.rootBg.includes("gradient")) fail(`rejected configuration lost the legacy surface (background-image: ${info.rootBg.slice(0, 40)})`);
+        if (info.heading.colour !== "rgba(255, 255, 255, 1)") fail(`rejected configuration changed the legacy heading colour: ${info.heading.colour}`);
+        await page.addStyleTag({ content: "h1,h2,p,a,bdi{color:transparent!important}a{background:transparent!important;box-shadow:none!important;border-color:transparent!important}" });
+        const legacy = async (rc, fg) => {
+          const buf = await page.screenshot({ clip: { x: Math.max(0, Math.floor(rc.x)), y: Math.max(0, Math.floor(rc.y)), width: Math.max(1, Math.ceil(rc.w)), height: Math.max(1, Math.ceil(rc.h)) }, fullPage: true });
+          return page.evaluate(pixelStats, { b64: buf.toString("base64"), fg });
+        };
+        const lh = await legacy(info.heading.rect, parseColour(info.heading.colour));
+        row.legacyWorstHeading = +lh.worst.toFixed(2);
+        if (lh.worst < MIN_RATIO) fail(`legacy surface heading contrast ${lh.worst.toFixed(2)} < ${MIN_RATIO}`);
+        if (info.sub) {
+          const ls = await legacy(info.sub.rect, parseColour(info.sub.colour));
+          row.legacyWorstSub = +ls.worst.toFixed(2);
+          if (ls.worst < MIN_RATIO) fail(`legacy surface supporting-line contrast ${ls.worst.toFixed(2)} < ${MIN_RATIO}`);
+        }
+      }
 
       if (shotsAt && SHOT_CASES.has(slug(c.id)) && ((d === "ltr" && width === 1280) || (d === "rtl" && width === 390))) {
         await page.screenshot({ path: join(shotsAt, `${slug(c.id)}.${d}.${width}.png`), clip: { x: 0, y: 0, width, height: Math.min(900, Math.ceil(info.rootRect.y + info.rootRect.h + 16)) } });
