@@ -95,8 +95,9 @@ export function zonedWallTimeToUtcIso(
     .filter((utc) => offsetMinutesAt(utc, zone) === (naiveUtc - utc) / 60000)
     .sort((a, b) => a - b);
   const date = new Date(valid[0] ?? naiveUtc - before * 60000);
-  // A positive offset can push year-1 wall time into year 0, which the server's gate does not accept.
-  if (Number.isNaN(date.getTime()) || date.getUTCFullYear() < 1) return null;
+  // An offset can push year-1 / year-9999 wall time out of 0001–9999, the only years the server's
+  // gate (and a four-digit ISO instant) accepts.
+  if (Number.isNaN(date.getTime()) || date.getUTCFullYear() < 1 || date.getUTCFullYear() > 9999) return null;
   return date.toISOString();
 }
 
