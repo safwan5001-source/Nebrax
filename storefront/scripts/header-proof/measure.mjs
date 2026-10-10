@@ -11,6 +11,9 @@
 //   colour   : a designed background paints the header AND its identity row, the wordmark / links / menu / account icon take the proven
 //              (automatic or explicit) colours and clear 4.5:1 against that row; an explicit icon colour reaches every plain icon but not
 //              the cart pill (it paints its own surface); text-only / icon-only designs leave the background untouched;
+//   on-scroll-up : with the production controller mounted, scrolling down past the header slides it fully out of view, the first upward
+//              scroll brings it back, it never leaves while focus is inside it (a Tab into the hidden header reveals it first), it is
+//              visible at the top, and the slide has no transition under prefers-reduced-motion;
 //   ALL      : no horizontal overflow, no overlap among menu / brand / search / actions, explicit defaults == absent design.
 // 6 viewports x AR RTL / EN LTR x wordmark / image logo. `--strip` removes the `[data-hd]` rules from the stylesheet and `--control`
 // measures the absent design against every design's expectations (negative controls: both must fail).
@@ -25,6 +28,12 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const req = createRequire(join(root, "package.json"));
 const { chromium } = req("@playwright/test");
 const postcss = createRequire(req.resolve("@tailwindcss/postcss"))("postcss");
+const esbuild = createRequire(join(root, "node_modules/.pnpm/esbuild@0.28.1/node_modules/esbuild/"))("esbuild");
+// the production scroll controller, bundled once for the pages that use it
+const controller = esbuild.buildSync({
+  entryPoints: [join(root, "scripts/header-proof/mount-scroll-up.tsx")], bundle: true, write: false, format: "iife", platform: "browser",
+  jsx: "automatic", alias: { "@": join(root, "src") }, define: { "process.env.NODE_ENV": '"production"' }, absWorkingDir: root,
+}).outputFiles[0].text;
 const dir = resolve(process.argv[2]);
 const strip = process.argv.includes("--strip");
 const control = process.argv.includes("--control");
@@ -109,6 +118,8 @@ for (const file of files) {
     if (stripped) html = html.replace(/<style>[\s\S]*?<\/style>/, `<style>${stripped}</style>`);
     await page.setContent(html, { waitUntil: "load" });
     await page.evaluate(() => document.fonts.ready);
+    const upDesign = designs[name]?.sticky === "on-scroll-up";
+    if (upDesign) await page.addScriptTag({ content: controller });
     const m = await measure(page);
     const tag = `${name}.${logo}.${rtlOrLtr}@${w}`;
     const desktop = w >= 768;
@@ -168,14 +179,47 @@ for (const file of files) {
     if (name === "none") ok(m.hd === "", `${tag} data-hd on an untouched header`);
 
     // sticky + offset
-    await page.evaluate(() => window.scrollTo(0, 800));
-    const after = await page.evaluate(() => { const hd = document.querySelector("header").getBoundingClientRect(); return { t: hd.top, b: hd.bottom }; });
     const design = designs[name];
     const stickyOff = design?.sticky === "off";
-    if (stickyOff) {
+    const stickyUp = design?.sticky === "on-scroll-up";
+    if (!stickyUp) await page.evaluate(() => window.scrollTo(0, 800));
+    const after = await page.evaluate(() => { const hd = document.querySelector("header").getBoundingClientRect(); return { t: hd.top, b: hd.bottom }; });
+    if (stickyUp) {
+      const state = () => page.evaluate(() => { const h = document.querySelector("header"); const r = h.getBoundingClientRect(); return { t: r.top, b: r.bottom, hidden: h.hasAttribute("data-header-hidden"), tr: getComputedStyle(h).transitionDuration }; });
+      const settle = () => page.waitForTimeout(320);
+      ok(m.headerPos === "sticky", `${tag} on-scroll-up header is ${m.headerPos}, want sticky`);
+      ok(m.scrollMargin >= m.header.h - 0.5 && m.scrollMargin <= m.header.h + 80, `${tag} offset ${m.scrollMargin} vs header ${m.header.h}`);
+      await page.evaluate(() => window.scrollTo(0, 0)); await settle();
+      let st = await state();
+      ok(near(st.t, 0, 0.5) && !st.hidden, `${tag} header not visible at the top (${st.t})`);
+      await page.evaluate(() => window.scrollTo(0, 1200)); await settle();
+      st = await state();
+      ok(st.hidden && st.b <= 0.5, `${tag} header still on screen after scrolling down (${st.b})`);
+      await page.evaluate(() => window.scrollBy(0, -30)); await settle();
+      st = await state();
+      ok(!st.hidden && near(st.t, 0, 0.5), `${tag} header did not return on the first upward scroll (${st.t})`);
+      await page.evaluate(() => window.scrollTo(0, 1500)); await settle();
+      st = await state();
+      ok(st.hidden, `${tag} header did not hide again`);
+      // a keyboard user tabbing into the hidden header reveals it first, and it then stays while they work inside it
+      await page.evaluate(() => document.querySelector("[data-search-input]").focus()); await settle();
+      st = await state();
+      ok(!st.hidden && near(st.t, 0, 0.5), `${tag} focus inside did not reveal the header`);
+      await page.evaluate(() => window.scrollTo(0, 1800)); await settle();
+      st = await state();
+      ok(!st.hidden && near(st.t, 0, 0.5), `${tag} header left while focus is inside it`);
+      await page.evaluate(() => document.activeElement.blur()); await page.evaluate(() => window.scrollTo(0, 2100)); await settle();
+      st = await state();
+      ok(st.hidden, `${tag} header did not hide after focus left`);
+      ok(parseFloat(st.tr) > 0, `${tag} no slide transition (${st.tr})`);
+      await page.emulateMedia({ reducedMotion: "reduce" });
+      st = await state();
+      ok(parseFloat(st.tr) === 0, `${tag} transition under prefers-reduced-motion (${st.tr})`);
+      await page.emulateMedia({ reducedMotion: "no-preference" });
+    } else if (stickyOff) {
       ok(after.b <= 0, `${tag} header still on screen after scrolling (sticky off)`);
       ok(m.scrollMargin <= 0.5, `${tag} sticky-off offset ${m.scrollMargin}, want 0`);
-    } else {
+    } else if (!stickyUp) {
       ok(near(after.t, 0, 0.5), `${tag} header left the top (${after.t})`);
       ok(m.scrollMargin >= m.header.h - 0.5, `${tag} offset ${m.scrollMargin} does not clear the header (${m.header.h})`);
       ok(m.scrollMargin <= m.header.h + 80, `${tag} offset ${m.scrollMargin} is absurdly larger than the header (${m.header.h})`);

@@ -1,0 +1,8 @@
+{
+  "pages": 112,
+  "viewports": [[390, 844], [430, 932], [768, 1024], [1024, 768], [1280, 800], [1440, 900]],
+  "checks": 12052,
+  "violations": [],
+  "scrollUp": "production HeaderScrollUp bundled into the production Header pages; hide / return / focus-pin / reduced-motion proven at every viewport, AR+EN, wordmark+image",
+  "negativeControls": { "strip (all [data-hd] rules removed)": { "checks": 12052, "violations": 1660 } }
+}

@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  */
-import { cleanup, render, screen } from "@testing-library/react";
+import { act, cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -102,6 +102,42 @@ describe("Canvas header design (V7a)", () => {
     const row = header.querySelector("[style*='min-height']") as HTMLElement;
     expect(row.style.minHeight).toBe("5rem");
     expect(header.querySelector(".text-4xl")).not.toBeNull();
+  });
+});
+
+describe("Canvas on-scroll-up simulator (V7c-1)", () => {
+  it("hides on a downward scroll of the preview pane and returns on an upward one", () => {
+    const { container } = render(
+      <div data-pane="" style={{ overflowY: "auto", height: 300 }}>
+        <StorefrontPreviewCanvas
+          config={withDesign({ sticky: "on-scroll-up" })}
+          locale="en"
+          viewport="desktop"
+        />
+      </div>,
+    );
+    const pane = container.querySelector("[data-pane]") as HTMLElement;
+    const header = container.querySelector("header") as HTMLElement;
+    expect(container.querySelector("[data-preview-canvas]")?.getAttribute("data-hd")).toBe("hs-u");
+    const scroll = (y: number) => {
+      pane.scrollTop = y;
+      act(() => {
+        pane.dispatchEvent(new Event("scroll"));
+      });
+    };
+    scroll(500);
+    expect(header.hasAttribute("data-header-hidden")).toBe(true);
+    scroll(480);
+    expect(header.hasAttribute("data-header-hidden")).toBe(false);
+  });
+
+  it("always / off mount no simulator", () => {
+    for (const sticky of ["always", "off"] as const) {
+      const { header, container } = canvas(withDesign({ sticky }));
+      expect(header.querySelector("[data-header-scroll]")).toBeNull();
+      cleanup();
+      void container;
+    }
   });
 });
 

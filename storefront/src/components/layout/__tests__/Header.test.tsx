@@ -118,6 +118,20 @@ describe("Header", () => {
       expect(header.className).toBe("relative z-40 bg-store-surface");
     });
 
+    it("on-scroll-up stays sticky and mounts its controller; always / off mount none", async () => {
+      const up = await renderHeader({ design: { sticky: "on-scroll-up" } });
+      expect(up.container.querySelector("header")?.className).toContain(
+        "sticky",
+      );
+      expect(up.container.querySelector("[data-header-scroll]")).not.toBeNull();
+      up.unmount();
+      for (const sticky of ["always", "off"] as const) {
+        const view = await renderHeader({ design: { sticky } });
+        expect(view.container.querySelector("[data-header-scroll]")).toBeNull();
+        view.unmount();
+      }
+    });
+
     it("centered places the menu, search, brand and actions on explicit desktop columns", async () => {
       const { container } = await renderHeader({
         design: { layout: "centered" },

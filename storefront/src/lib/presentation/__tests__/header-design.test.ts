@@ -8,6 +8,8 @@ import {
   headerIsCompact,
   normalizeHeaderDesign,
   resolveHeaderDesign,
+  SCROLL_UP_JITTER_PX,
+  stepScrollUp,
 } from "../header-design";
 
 const fixture = JSON.parse(
@@ -48,7 +50,7 @@ describe("header design — config integration (V7a)", () => {
     expect(plain.version).toBe(3);
     expect(
       normalizePresentationConfig({
-        header: { design: { layout: "mega", sticky: "on-scroll-up" } },
+        header: { design: { layout: "mega", sticky: "hover" } },
       }),
     ).toEqual(plain);
   });
@@ -271,5 +273,84 @@ describe("header colours — resolution (V7b)", () => {
         ctx,
       ).attrs,
     ).toEqual({ "data-hd": "hbg htx hic hh-t hx-s" });
+  });
+});
+
+describe("sticky on-scroll-up (V7c-1)", () => {
+  it("emits its own token and keeps the in-page offset (the header comes back on the first upward scroll)", () => {
+    expect(resolveHeaderDesign({ sticky: "on-scroll-up" }).attrs).toEqual({
+      "data-hd": "hs-u",
+    });
+    expect(resolveHeaderDesign({ sticky: "on-scroll-up" }).sticky).toBe(
+      "on-scroll-up",
+    );
+  });
+
+  const H = 100;
+  const at = (y: number, prev = { hidden: false, lastY: 0 }, pinned = false) =>
+    stepScrollUp(prev, y, H, pinned);
+
+  it("never hides within the header's own height of the top", () => {
+    expect(at(H, { hidden: true, lastY: 500 })).toEqual({
+      hidden: false,
+      lastY: H,
+    });
+    expect(at(40)).toEqual({ hidden: false, lastY: 40 });
+  });
+
+  it("overscroll above the top counts as the top", () => {
+    expect(at(-60, { hidden: true, lastY: 300 })).toEqual({
+      hidden: false,
+      lastY: 0,
+    });
+  });
+
+  it("hides on a downward movement past the header, shows on the first upward one", () => {
+    const down = at(300, { hidden: false, lastY: 200 });
+    expect(down).toEqual({ hidden: true, lastY: 300 });
+    const up = at(290, down);
+    expect(up).toEqual({ hidden: false, lastY: 290 });
+    expect(at(700, up).hidden).toBe(true);
+  });
+
+  it("jitter below the threshold changes nothing", () => {
+    const state = { hidden: true, lastY: 400 };
+    expect(at(400 - (SCROLL_UP_JITTER_PX - 1), state)).toBe(state);
+    expect(
+      at(400 + (SCROLL_UP_JITTER_PX - 1), { hidden: false, lastY: 400 }),
+    ).toEqual({ hidden: false, lastY: 400 });
+  });
+
+  it("never hides while the shopper is working inside the header", () => {
+    expect(at(900, { hidden: true, lastY: 800 }, true)).toEqual({
+      hidden: false,
+      lastY: 900,
+    });
+    expect(at(900, { hidden: false, lastY: 800 }, true).hidden).toBe(false);
+  });
+
+  it("a long scroll replays deterministically", () => {
+    const path = [0, 50, 120, 220, 400, 396, 380, 600, 640, 639, 200, 90, 0];
+    const hidden: boolean[] = [];
+    let state = { hidden: false, lastY: 0 };
+    for (const y of path) {
+      state = at(y, state);
+      hidden.push(state.hidden);
+    }
+    expect(hidden).toEqual([
+      false,
+      false,
+      true,
+      true,
+      true,
+      false,
+      false,
+      true,
+      true,
+      true,
+      false,
+      false,
+      false,
+    ]);
   });
 });
