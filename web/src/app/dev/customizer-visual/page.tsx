@@ -176,7 +176,8 @@ function configFor(locale: "ar" | "en", scenario: Scenario): StorefrontPresentat
               },
             },
           },
-          { id: "categories", type: "categories", visible: true },
+          // the populated catalogue below the hero, so the page is tall enough to scroll
+          ...configFor(locale, "populated").homepage.sections.filter((section) => section.type !== "hero"),
         ],
       },
     });

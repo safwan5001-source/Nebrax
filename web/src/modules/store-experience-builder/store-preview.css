@@ -279,12 +279,16 @@
 /* V7a-chrome:end */
 
 /*
- * V7c-2 — Canvas-only half of overlay-on-hero. The preview frame is not the editor window, so the picture bleeds by the
- * container's own gutter (the frame clips it, see `overflow-x: clip` in the shared block) instead of by viewport units, and
+ * V7c-2 — Canvas-only half of overlay-on-hero. The preview frame is not the editor window, so the picture bleeds to the frame's
+ * own edges with container-query units (the root becomes an inline-size container only while an overlay is active) instead of
+ * viewport units, and
  * the padded container sits one wrapper above the hero (`.awj-preview-section`) when sections are selectable.
  */
+.awj-store-preview[data-hd~="hmo"]:has([data-ho~="on"]) {
+  container-type: inline-size;
+}
 .awj-store-preview [data-ho~="on"] [data-sd-backdrop] {
-  inset-inline: -2rem;
+  inset-inline: calc(50% - 50cqw);
 }
 .awj-store-preview[data-hd~="hmo"] :has(> .awj-preview-section > [data-ho~="on"]) {
   padding-block-start: 0;
