@@ -14,6 +14,7 @@ import {
   HEADING_SCALES,
   HEADING_STYLES,
   HEADING_WEIGHTS,
+  HEIGHT_PRESETS,
   LINE_HEIGHTS,
   OVERLAY_ALPHAS,
   RADII,
@@ -40,6 +41,7 @@ import {
 } from "../presentation/section-design-resolve";
 import { resolveRoleHex } from "../presentation/palette";
 import { ColourField } from "./ColourField";
+import { PlacementGrid } from "./PlacementGrid";
 import { copyDesign, pasteDesign, useDesignClipboard } from "./design-clipboard";
 import { commitDesign, setGroup } from "./design-edit";
 
@@ -99,6 +101,12 @@ const SEPARATOR_HEIGHT_LABEL: Record<(typeof SEPARATOR_HEIGHTS)[number], Customi
   sm: "designStepSm",
   md: "designStepMd",
   lg: "designStepLg",
+};
+const HEIGHT_LABEL: Record<(typeof HEIGHT_PRESETS)[number], CustomizerMessageKey> = {
+  compact: "designHeightCompact",
+  standard: "designHeightStandard",
+  tall: "designHeightTall",
+  screen: "designHeightScreen",
 };
 const ALIGN_LABEL: Record<(typeof ALIGNS)[number], CustomizerMessageKey> = {
   start: "designAlignStart",
@@ -642,7 +650,15 @@ export function DesignInspector({
         </Field>
       ) : null}
 
-      {capability.align ? (
+      {capability.valign ? (
+        // hero / banner: the inline (`align`) and block (`valign`) halves of the 3×3 content position are one control
+        <PlacementGrid
+          align={current.align}
+          valign={current.valign}
+          t={t}
+          onChange={(next) => onChange(commitDesign(type, { ...current, align: next.align, valign: next.valign }))}
+        />
+      ) : capability.align ? (
         <Field label={t("designBlockAlign")}>
           <Segmented
             value={current.align ?? "unset"}
@@ -653,6 +669,34 @@ export function DesignInspector({
             ]}
           />
         </Field>
+      ) : null}
+
+      {allows(capability.mediaTreatment, "height") ? (
+        <div className="space-y-1">
+          <Field label={t("designHeight")}>
+            <select
+              className={selectClass}
+              data-design-height=""
+              value={current.mediaTreatment?.height ?? ""}
+              onChange={(event) =>
+                set(
+                  "mediaTreatment",
+                  event.target.value
+                    ? { ...current.mediaTreatment, height: event.target.value as (typeof HEIGHT_PRESETS)[number] }
+                    : undefined,
+                )
+              }
+            >
+              {unsetOption}
+              {HEIGHT_PRESETS.map((height) => (
+                <option key={height} value={height}>
+                  {t(HEIGHT_LABEL[height])}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <p className="text-[12px] leading-5 text-muted">{t("designHeightHint")}</p>
+        </div>
       ) : null}
 
       {capability.typography ? (

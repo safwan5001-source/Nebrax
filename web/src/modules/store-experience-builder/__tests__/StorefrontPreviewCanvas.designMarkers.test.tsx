@@ -85,3 +85,63 @@ describe("Canvas banner content-box marker", () => {
     expect(designed.querySelector("[data-section-block]")).not.toBeNull();
   });
 });
+
+describe("Canvas hero / banner placement and height (CUST-HV V6c-3)", () => {
+  afterEach(() => cleanup());
+
+  const withDesign = (type: "hero" | "banner"): StorefrontPresentationConfig =>
+    ({
+      ...DEFAULT_PRESENTATION_CONFIG,
+      homepage: {
+        ...DEFAULT_PRESENTATION_CONFIG.homepage,
+        sections: [
+          {
+            id: "s1",
+            type,
+            visible: true,
+            design: { align: "end", valign: "end", mediaTreatment: { height: "tall" } },
+            ...(type === "banner"
+              ? { content: { title: "Hi", subtitle: "", ctaLabel: "", ctaHref: "", imageUrl: null } }
+              : { content: { headline: "Hi" } }),
+          },
+        ],
+      },
+    }) as StorefrontPresentationConfig;
+
+  for (const type of ["hero", "banner"] as const) {
+    it(`${type}: the frame carries the same tokens as the storefront, and the content box is the section's direct child`, () => {
+      const { container } = render(
+        <StorefrontPreviewCanvas config={withDesign(type)} locale="en" viewport="desktop" onSelectSection={() => {}} />,
+      );
+      const frame = container.querySelector("[data-sd]") as HTMLElement;
+      expect(frame.getAttribute("data-sd")).toBe("balign valign hgt");
+      expect(frame.style.getPropertyValue("--sec-vj")).toBe("flex-end");
+      expect(frame.style.getPropertyValue("--sec-minh")).toBe("28rem");
+      // the stylesheet's `[data-sd] > *` rules address the section root and its marked content box
+      expect(frame.querySelector(":scope > section > [data-section-content]")).not.toBeNull();
+    });
+  }
+
+  it("`screen` follows the simulated device height, not the editor window", () => {
+    const config = withDesign("hero");
+    (config.homepage.sections[0] as { design?: unknown }).design = { mediaTreatment: { height: "screen" } };
+    const heights = (["mobile", "tablet", "desktop"] as const).map((viewport) => {
+      const { container, unmount } = render(
+        <StorefrontPreviewCanvas config={config} locale="en" viewport={viewport} onSelectSection={() => {}} />,
+      );
+      const value = (container.querySelector("[data-sd]") as HTMLElement).style.getPropertyValue("--sec-minh");
+      unmount();
+      return value;
+    });
+    expect(heights).toEqual(["clamp(24rem, 844px, 56rem)", "clamp(24rem, 1024px, 56rem)", "clamp(24rem, 800px, 56rem)"]);
+  });
+
+  it("a hero or banner with no design is untouched: no frame, no attribute", () => {
+    const config = withDesign("hero");
+    (config.homepage.sections[0] as { design?: unknown }).design = undefined;
+    const { container } = render(
+      <StorefrontPreviewCanvas config={config} locale="en" viewport="desktop" onSelectSection={() => {}} />,
+    );
+    expect(container.querySelector("[data-sd]")).toBeNull();
+  });
+});

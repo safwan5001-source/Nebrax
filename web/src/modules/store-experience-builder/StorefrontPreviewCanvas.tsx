@@ -320,6 +320,8 @@ export function StorefrontPreviewCanvas({
     palette: config.palette,
     dir: locale === "ar" ? "rtl" : "ltr",
     mediaBounds: backgroundBounds.lookup,
+    // V6c-3 — "screen height" means the SIMULATED device's height here, not the editor window's.
+    screenHeightPx: viewport === "mobile" ? 844 : viewport === "tablet" ? 1024 : 800,
   };
   /** The picture layer of a section whose design resolves a *proven* picture background, else nothing. */
   const backdropFor = (section: (typeof config.homepage.sections)[number]): ReactNode => {

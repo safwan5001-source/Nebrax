@@ -23,10 +23,14 @@
             "width": true,
             "spacing": true,
             "align": true,
+            "valign": true,
             "border": true,
             "radius": true,
             "shadow": true,
             "separator": true,
+            "mediaTreatment": [
+                "height"
+            ],
             "motion": [
                 "reveal"
             ]
@@ -53,10 +57,14 @@
             "width": true,
             "spacing": true,
             "align": true,
+            "valign": true,
             "border": true,
             "radius": true,
             "shadow": true,
             "separator": true,
+            "mediaTreatment": [
+                "height"
+            ],
             "motion": [
                 "reveal"
             ]
@@ -2191,6 +2199,348 @@
                     "top": "md"
                 }
             }
+        },
+        {
+            "name": "V6c-3 valign 'start' is kept on hero",
+            "type": "hero",
+            "input": {
+                "valign": "start"
+            },
+            "expected": {
+                "valign": "start"
+            }
+        },
+        {
+            "name": "V6c-3 valign 'center' is kept on hero",
+            "type": "hero",
+            "input": {
+                "valign": "center"
+            },
+            "expected": {
+                "valign": "center"
+            }
+        },
+        {
+            "name": "V6c-3 valign 'end' is kept on hero",
+            "type": "hero",
+            "input": {
+                "valign": "end"
+            },
+            "expected": {
+                "valign": "end"
+            }
+        },
+        {
+            "name": "V6c-3 height preset 'compact' is kept on hero",
+            "type": "hero",
+            "input": {
+                "mediaTreatment": {
+                    "height": "compact"
+                }
+            },
+            "expected": {
+                "mediaTreatment": {
+                    "height": "compact"
+                }
+            }
+        },
+        {
+            "name": "V6c-3 height preset 'standard' is kept on hero",
+            "type": "hero",
+            "input": {
+                "mediaTreatment": {
+                    "height": "standard"
+                }
+            },
+            "expected": {
+                "mediaTreatment": {
+                    "height": "standard"
+                }
+            }
+        },
+        {
+            "name": "V6c-3 height preset 'tall' is kept on hero",
+            "type": "hero",
+            "input": {
+                "mediaTreatment": {
+                    "height": "tall"
+                }
+            },
+            "expected": {
+                "mediaTreatment": {
+                    "height": "tall"
+                }
+            }
+        },
+        {
+            "name": "V6c-3 height preset 'screen' is kept on hero",
+            "type": "hero",
+            "input": {
+                "mediaTreatment": {
+                    "height": "screen"
+                }
+            },
+            "expected": {
+                "mediaTreatment": {
+                    "height": "screen"
+                }
+            }
+        },
+        {
+            "name": "V6c-3 valign 'start' is kept on banner",
+            "type": "banner",
+            "input": {
+                "valign": "start"
+            },
+            "expected": {
+                "valign": "start"
+            }
+        },
+        {
+            "name": "V6c-3 valign 'center' is kept on banner",
+            "type": "banner",
+            "input": {
+                "valign": "center"
+            },
+            "expected": {
+                "valign": "center"
+            }
+        },
+        {
+            "name": "V6c-3 valign 'end' is kept on banner",
+            "type": "banner",
+            "input": {
+                "valign": "end"
+            },
+            "expected": {
+                "valign": "end"
+            }
+        },
+        {
+            "name": "V6c-3 height preset 'compact' is kept on banner",
+            "type": "banner",
+            "input": {
+                "mediaTreatment": {
+                    "height": "compact"
+                }
+            },
+            "expected": {
+                "mediaTreatment": {
+                    "height": "compact"
+                }
+            }
+        },
+        {
+            "name": "V6c-3 height preset 'standard' is kept on banner",
+            "type": "banner",
+            "input": {
+                "mediaTreatment": {
+                    "height": "standard"
+                }
+            },
+            "expected": {
+                "mediaTreatment": {
+                    "height": "standard"
+                }
+            }
+        },
+        {
+            "name": "V6c-3 height preset 'tall' is kept on banner",
+            "type": "banner",
+            "input": {
+                "mediaTreatment": {
+                    "height": "tall"
+                }
+            },
+            "expected": {
+                "mediaTreatment": {
+                    "height": "tall"
+                }
+            }
+        },
+        {
+            "name": "V6c-3 height preset 'screen' is kept on banner",
+            "type": "banner",
+            "input": {
+                "mediaTreatment": {
+                    "height": "screen"
+                }
+            },
+            "expected": {
+                "mediaTreatment": {
+                    "height": "screen"
+                }
+            }
+        },
+        {
+            "name": "V6c-3 an unknown valign / height is dropped on its own (the rest stays)",
+            "type": "hero",
+            "input": {
+                "valign": "middle",
+                "align": "center",
+                "mediaTreatment": {
+                    "height": "huge"
+                }
+            },
+            "expected": {
+                "align": "center"
+            }
+        },
+        {
+            "name": "V6c-3 numeric or raw CSS heights are never accepted",
+            "type": "banner",
+            "input": {
+                "mediaTreatment": {
+                    "height": "600px"
+                },
+                "valign": "top"
+            },
+            "expected": null
+        },
+        {
+            "name": "V6c-3 aspect / fit are not accepted yet (V8): only height survives",
+            "type": "hero",
+            "input": {
+                "mediaTreatment": {
+                    "height": "tall",
+                    "aspect": "16:9",
+                    "fit": "cover"
+                }
+            },
+            "expected": {
+                "mediaTreatment": {
+                    "height": "tall"
+                }
+            }
+        },
+        {
+            "name": "V6c-3 a non-object mediaTreatment is dropped",
+            "type": "banner",
+            "input": {
+                "mediaTreatment": "tall",
+                "align": "end"
+            },
+            "expected": {
+                "align": "end"
+            }
+        },
+        {
+            "name": "V6c-3 canonical order: align, valign, ..., separator, mediaTreatment, motion",
+            "type": "hero",
+            "input": {
+                "motion": {
+                    "reveal": "fade-up"
+                },
+                "mediaTreatment": {
+                    "height": "tall"
+                },
+                "separator": {
+                    "top": "line"
+                },
+                "valign": "end",
+                "align": "center"
+            },
+            "expected": {
+                "align": "center",
+                "valign": "end",
+                "separator": {
+                    "top": "line"
+                },
+                "mediaTreatment": {
+                    "height": "tall"
+                },
+                "motion": {
+                    "reveal": "fade-up"
+                }
+            }
+        },
+        {
+            "name": "V6c-3 valign and height are hero/banner only: benefits drops them",
+            "type": "benefits",
+            "input": {
+                "valign": "end",
+                "mediaTreatment": {
+                    "height": "tall"
+                }
+            },
+            "expected": null
+        },
+        {
+            "name": "V6c-3 valign and height are hero/banner only: customContent drops them",
+            "type": "customContent",
+            "input": {
+                "valign": "end",
+                "mediaTreatment": {
+                    "height": "tall"
+                }
+            },
+            "expected": null
+        },
+        {
+            "name": "V6c-3 valign and height are hero/banner only: appPromo drops them",
+            "type": "appPromo",
+            "input": {
+                "valign": "end",
+                "mediaTreatment": {
+                    "height": "tall"
+                }
+            },
+            "expected": null
+        },
+        {
+            "name": "V6c-3 valign and height are hero/banner only: categories drops them",
+            "type": "categories",
+            "input": {
+                "valign": "end",
+                "mediaTreatment": {
+                    "height": "tall"
+                }
+            },
+            "expected": null
+        },
+        {
+            "name": "V6c-3 valign and height are hero/banner only: featured drops them",
+            "type": "featured",
+            "input": {
+                "valign": "end",
+                "mediaTreatment": {
+                    "height": "tall"
+                }
+            },
+            "expected": null
+        },
+        {
+            "name": "V6c-3 valign and height are hero/banner only: discovery drops them",
+            "type": "discovery",
+            "input": {
+                "valign": "end",
+                "mediaTreatment": {
+                    "height": "tall"
+                }
+            },
+            "expected": null
+        },
+        {
+            "name": "V6c-3 valign and height are hero/banner only: deliveryPromise drops them",
+            "type": "deliveryPromise",
+            "input": {
+                "valign": "end",
+                "mediaTreatment": {
+                    "height": "tall"
+                }
+            },
+            "expected": null
+        },
+        {
+            "name": "V6c-3 valign and height are hero/banner only: wholesale drops them",
+            "type": "wholesale",
+            "input": {
+                "valign": "end",
+                "mediaTreatment": {
+                    "height": "tall"
+                }
+            },
+            "expected": null
         }
     ]
 }

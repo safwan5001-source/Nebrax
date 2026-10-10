@@ -6,7 +6,7 @@ import { resolve } from "node:path";
 import { cleanup, render } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import { SectionDesignFrame } from "../SectionDesignFrame";
-import type { SectionDesign } from "../presentation/section-design";
+import { type SectionDesign, normalizeSectionDesign } from "../presentation/section-design";
 import {
   type DesignContext,
   STEP_SPACE,
@@ -364,5 +364,58 @@ describe("resolveSectionDesign — picture backgrounds (CUST-HV V6b-3)", () => {
   it("the overlay is what makes a wide-range picture provable", () => {
     const r = resolveSectionDesign("hero", picture({ alpha: 80 }), withBounds(wide));
     expect(r?.attrs["data-sd"]).toContain("mbg");
+  });
+});
+
+describe("resolveSectionDesign — placement and height (CUST-HV V6c-3)", () => {
+  it("valign sets the block-axis token (start = top, end = bottom) beside the inline half", () => {
+    const r = resolveSectionDesign("hero", { align: "end", valign: "end" }, ctx)!;
+    expect(r.style).toEqual({ "--sec-bms": "auto", "--sec-bme": "0", "--sec-vj": "flex-end" });
+    expect(r.attrs["data-sd"]).toBe("balign valign");
+    expect(resolveSectionDesign("banner", { valign: "start" }, ctx)!.style["--sec-vj"]).toBe("flex-start");
+    expect(resolveSectionDesign("banner", { valign: "center" }, ctx)!.style["--sec-vj"]).toBe("center");
+  });
+
+  it("each height preset resolves to a bounded minimum; only `screen` follows the viewport, clamped", () => {
+    const values = (["compact", "standard", "tall", "screen"] as const).map(
+      (height) => resolveSectionDesign("hero", { mediaTreatment: { height } }, ctx)!.style["--sec-minh"],
+    );
+    expect(values).toEqual(["10rem", "18rem", "28rem", "clamp(24rem, 100svh, 56rem)"]);
+    const r = resolveSectionDesign("banner", { mediaTreatment: { height: "tall" } }, ctx)!;
+    expect(r.attrs["data-sd"]).toBe("hgt");
+    expect(Object.keys(r.style)).toEqual(["--sec-minh"]); // a height emits no raw CSS besides its token
+  });
+
+  it("`screen` follows the simulated device when the context says so (the Canvas), else the real viewport", () => {
+    const canvas = resolveSectionDesign("hero", { mediaTreatment: { height: "screen" } }, { ...ctx, screenHeightPx: 844 })!;
+    expect(canvas.style["--sec-minh"]).toBe("clamp(24rem, 844px, 56rem)");
+    expect(resolveSectionDesign("hero", { mediaTreatment: { height: "screen" } }, ctx)!.style["--sec-minh"]).toBe(
+      "clamp(24rem, 100svh, 56rem)",
+    );
+    // other presets ignore it
+    expect(
+      resolveSectionDesign("hero", { mediaTreatment: { height: "tall" } }, { ...ctx, screenHeightPx: 844 })!.style["--sec-minh"],
+    ).toBe("28rem");
+  });
+
+  it("only hero and banner carry them: the contract drops them elsewhere, so nothing resolves", () => {
+    for (const type of ["benefits", "customContent", "appPromo", "categories", "featured"]) {
+      const normalised = normalizeSectionDesign(type, { valign: "end", mediaTreatment: { height: "tall" } });
+      expect(normalised).toBeUndefined();
+      expect(resolveSectionDesign(type, normalised, ctx)).toBeNull();
+    }
+  });
+
+  it("an absent valign / height leaves the resolved output exactly as it was", () => {
+    const before = resolveSectionDesign("hero", { align: "center" }, ctx)!;
+    expect(before.attrs["data-sd"]).toBe("balign");
+    expect(Object.keys(before.style)).toEqual(["--sec-bms", "--sec-bme"]);
+  });
+
+  it("the stylesheet owns the layout: a height replaces the section minimum, the root becomes a column flex box", () => {
+    const sf = readFileSync(resolve(__dirname, "../../../../../storefront/src/app/globals.css"), "utf8");
+    expect(sf).toContain('[data-sd~="hgt"][data-sd] > * {');
+    expect(sf).toMatch(/min-block-size:\s*var\(--sec-minh\)/);
+    expect(sf).toMatch(/\[data-sd~="valign"\]\)\[data-sd\] > \* \{\s*display:\s*flex;\s*flex-direction:\s*column;[^}]*justify-content:\s*var\(--sec-vj, center\)/);
   });
 });

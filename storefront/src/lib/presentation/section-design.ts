@@ -14,7 +14,7 @@
  *
  * Deliberately NOT here yet (each enters with the slice that can render and prove it):
  *  - `layout` variants → the slices that add variants (V6/V8/V9);
- *  - `overlap` / `mediaTreatment` → V6 / V8 (V5e-3 added `separator` and `motion.reveal`).
+ *  - `overlap` → V6c-4; `mediaTreatment.aspect` / `fit` → V8 (V6c-3 added `valign` and `mediaTreatment.height`).
  * Until then they are dropped fail-closed, so a hand-written document can never
  * smuggle an unproven background past the publish gate.
  */
@@ -66,6 +66,13 @@ export const SEPARATOR_KINDS = [
 ] as const;
 export const SEPARATOR_HEIGHTS = ["sm", "md", "lg"] as const;
 export const REVEALS = ["none", "fade-up"] as const;
+/** V6c-3 (V0 §8.3) — hero / banner section height presets: a bounded minimum, content is never clipped. */
+export const HEIGHT_PRESETS = [
+  "compact",
+  "standard",
+  "tall",
+  "screen",
+] as const;
 /** V6b-2 — background kinds every section may use; `media` is hero/banner only. */
 export const BACKGROUND_KINDS = ["solid", "gradient"] as const;
 /** V6b-2 — media overlay opacity: percent in steps of 5, capped at 90 (the picture never vanishes). */
@@ -130,6 +137,10 @@ export interface SectionMotion {
   reveal?: (typeof REVEALS)[number];
 }
 
+export interface SectionMediaTreatment {
+  height?: (typeof HEIGHT_PRESETS)[number];
+}
+
 export interface SectionDesign {
   background?: SectionBackground;
   text?: SectionText;
@@ -137,10 +148,13 @@ export interface SectionDesign {
   width?: SectionWidth;
   spacing?: SectionSpacing;
   align?: Align;
+  /** V6c-3 — the block-axis half of the 3×3 content position (`align` is the inline half). */
+  valign?: Align;
   border?: SectionBorder;
   radius?: (typeof RADII)[number];
   shadow?: (typeof SHADOWS)[number];
   separator?: SectionSeparator;
+  mediaTreatment?: SectionMediaTreatment;
   motion?: SectionMotion;
 }
 
@@ -172,10 +186,12 @@ export const SECTION_DESIGN_CAPABILITIES: Record<string, DesignCapability> = {
     width: true,
     spacing: true,
     align: true,
+    valign: true,
     border: true,
     radius: true,
     shadow: true,
     separator: true,
+    mediaTreatment: ["height"],
     motion: ["reveal"],
   },
   banner: {
@@ -185,10 +201,12 @@ export const SECTION_DESIGN_CAPABILITIES: Record<string, DesignCapability> = {
     width: true,
     spacing: true,
     align: true,
+    valign: true,
     border: true,
     radius: true,
     shadow: true,
     separator: true,
+    mediaTreatment: ["height"],
     motion: ["reveal"],
   },
   categories: {
@@ -520,6 +538,10 @@ export function normalizeSectionDesign(
     const align = pick(raw.align, ALIGNS);
     if (align) out.align = align;
   }
+  if (capability.valign) {
+    const valign = pick(raw.valign, ALIGNS);
+    if (valign) out.valign = valign;
+  }
   if (capability.border) {
     const border = normalizeBorder(raw.border);
     if (border) out.border = border;
@@ -535,6 +557,14 @@ export function normalizeSectionDesign(
   if (capability.separator) {
     const separator = normalizeSeparator(raw.separator);
     if (separator) out.separator = separator;
+  }
+  if (
+    capability.mediaTreatment &&
+    isRecord(raw.mediaTreatment) &&
+    allowsField(capability.mediaTreatment, "height")
+  ) {
+    const height = pick(raw.mediaTreatment.height, HEIGHT_PRESETS);
+    if (height) out.mediaTreatment = { height };
   }
   if (capability.motion && isRecord(raw.motion)) {
     const reveal = pick(raw.motion.reveal, REVEALS);

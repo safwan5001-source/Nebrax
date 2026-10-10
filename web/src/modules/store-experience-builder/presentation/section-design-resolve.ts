@@ -50,6 +50,12 @@ export interface DesignContext {
    * without evidence.
    */
   mediaBounds?: (ref: MediaRef) => MediaBounds | null;
+  /**
+   * V6c-3 — the viewport height, in px, that the `screen` height preset follows. Absent ⇒ the real viewport
+   * (`100svh`, the published storefront). The editor Canvas is a fixed-size frame inside a larger window, so it
+   * passes the simulated device's height instead.
+   */
+  screenHeightPx?: number;
 }
 
 export interface MediaBounds {
@@ -113,6 +119,25 @@ const ALIGN: Record<string, string> = {
   start: "start",
   center: "center",
   end: "end",
+};
+
+/** V6c-3 — the block-axis half of the 3×3 content position: `start` is the top edge, `end` the bottom. */
+const VALIGN: Record<string, string> = {
+  start: "flex-start",
+  center: "center",
+  end: "flex-end",
+};
+
+/**
+ * V6c-3 (V0 §8.3) — section height presets: a **minimum** block size, so content is never clipped. Every value is
+ * bounded; only `screen` follows the viewport, clamped to 24–56rem (and, on an engine without `svh`, the invalid
+ * value simply leaves the section at its content height).
+ */
+const MIN_HEIGHT: Record<string, string> = {
+  compact: "10rem",
+  standard: "18rem",
+  tall: "28rem",
+  screen: "clamp(24rem, 100svh, 56rem)",
 };
 
 /** `to-end` etc. are logical: they mirror under RTL. */
@@ -499,6 +524,17 @@ export function resolveSectionDesign(
     style["--sec-bms"] = design.align === "start" ? "0" : "auto";
     style["--sec-bme"] = design.align === "end" ? "0" : "auto";
     sd.push("balign");
+  }
+  if (design.valign) {
+    style["--sec-vj"] = VALIGN[design.valign];
+    sd.push("valign");
+  }
+  if (design.mediaTreatment?.height) {
+    style["--sec-minh"] =
+      design.mediaTreatment.height === "screen" && ctx.screenHeightPx
+        ? `clamp(24rem, ${Math.round(ctx.screenHeightPx)}px, 56rem)`
+        : MIN_HEIGHT[design.mediaTreatment.height];
+    sd.push("hgt");
   }
 
   // Typography (V0 §5.2): named steps resolved here, never pixel inputs.
