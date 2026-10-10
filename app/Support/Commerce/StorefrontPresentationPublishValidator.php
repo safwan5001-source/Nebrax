@@ -46,6 +46,7 @@ final class StorefrontPresentationPublishValidator
     public function errors(array $normalized): array
     {
         return $this->announcementErrors($normalized['announcements'] ?? null)
+            + $this->bannerWindowErrors($normalized['homepage']['sections'] ?? null)
             + SectionDesignContrast::errors($normalized, $this->mediaBounds())
             + ButtonTokensContrast::errors($normalized)
             + $this->mediaErrors($normalized);
@@ -64,6 +65,42 @@ final class StorefrontPresentationPublishValidator
 
             return $evidence->boundsFor($ref);
         };
+    }
+
+    /**
+     * CUST-HV V6c-1 (V0 §8.4, AMEND-7) — نافذة البانر: لكل بانرٍ **ظاهر** تحمل محتواه نافذةً، كل حافةٍ ISO-8601 صالحة
+     * و`endsAt > startsAt`. المسودة تحفظ المشوَّه حرفياً؛ النشر يرفضه بمسارٍ محدَّد ولا «يُصحِّحه» إلى بلا نافذة.
+     * بانرٌ مخفي لا يحجب النشر (لا يُعرض). نفس قواعد الإعلانات (`parseInstant`) فلا مُجدوِل ثانٍ ولا تفسير ثانٍ.
+     *
+     * @return array<string, array{code: string, message: string}>
+     */
+    private function bannerWindowErrors(mixed $sections): array
+    {
+        if (! is_array($sections)) {
+            return [];
+        }
+
+        $errors = [];
+        foreach (array_values($sections) as $i => $section) {
+            if (! is_array($section) || ($section['type'] ?? null) !== 'banner' || ($section['visible'] ?? true) !== true) {
+                continue;
+            }
+            $window = $section['content']['window'] ?? null;
+            if (! is_array($window)) {
+                continue;
+            }
+            $base = "homepage.sections[{$i}].content.window";
+            $starts = $this->parseInstant($window['startsAt'] ?? null, "{$base}.startsAt", $errors);
+            $ends = $this->parseInstant($window['endsAt'] ?? null, "{$base}.endsAt", $errors);
+            if ($starts !== null && $ends !== null && $ends->lessThanOrEqualTo($starts)) {
+                $errors["{$base}.endsAt"] = [
+                    'code' => 'window_end_not_after_start',
+                    'message' => 'يجب أن يكون تاريخ الانتهاء بعد تاريخ البدء.',
+                ];
+            }
+        }
+
+        return $errors;
     }
 
     /**

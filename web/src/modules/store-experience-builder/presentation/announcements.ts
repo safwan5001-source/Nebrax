@@ -117,6 +117,29 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+/**
+ * CUST-HV V6c-1 — the optional visibility window shared by announcement items and banners (D-15: one window
+ * semantic, no second scheduler). Each edge is kept exactly as the merchant typed it (PHP `trim`, ≤ 40 code
+ * points); an edge that is empty or not a string is absent; no edge ⇒ no window. A malformed value is NEVER
+ * repaired or dropped here — it is rejected at publish and never read as "no window" (V0 AMEND-7).
+ */
+export function normalizeWindowEdges(
+  raw: unknown,
+): { startsAt?: string; endsAt?: string } | undefined {
+  if (!isRecord(raw)) return undefined;
+  const kept: { startsAt?: string; endsAt?: string } = {};
+  for (const edge of ["startsAt", "endsAt"] as const) {
+    const value =
+      typeof raw[edge] === "string"
+        ? capCodePoints(phpTrim(raw[edge] as string), 40)
+        : "";
+    if (value !== "") kept[edge] = value;
+  }
+  return kept.startsAt !== undefined || kept.endsAt !== undefined
+    ? kept
+    : undefined;
+}
+
 function safeId(value: unknown, fallback: string): string {
   const text = phpTrim(typeof value === "string" ? value : fallback);
   return /^[a-zA-Z0-9_-]{1,64}$/.test(text) ? text : fallback;
@@ -180,18 +203,8 @@ function normalizeItem(
   const surface = normalizeSurface(raw.surface);
   if (surface) item.surface = surface;
 
-  if (isRecord(raw.window)) {
-    const kept: NonNullable<Announcement["window"]> = {};
-    for (const edge of ["startsAt", "endsAt"] as const) {
-      const value =
-        typeof raw.window[edge] === "string"
-          ? capCodePoints(phpTrim(raw.window[edge] as string), 40)
-          : "";
-      if (value !== "") kept[edge] = value;
-    }
-    if (kept.startsAt !== undefined || kept.endsAt !== undefined)
-      item.window = kept;
-  }
+  const window = normalizeWindowEdges(raw.window);
+  if (window) item.window = window;
 
   if (Array.isArray(raw.pages)) {
     const chosen = new Set<string>();

@@ -1,3 +1,4 @@
+import { normalizeWindowEdges } from "./announcements";
 import { sanitizeExternalUrl } from "./urls";
 
 /**
@@ -32,6 +33,12 @@ export interface BannerContent {
    * every document stored before this field existed.
    */
   imageAlt?: string;
+  /**
+   * CUST-HV V6c-1 (V0 §8.4, D-15) — optional visibility window: `startsAt` inclusive, `endsAt` exclusive, both
+   * optional UTC ISO instants. Kept exactly as typed in a Draft; rejected at publish when malformed or inverted;
+   * the published storefront omits a not-yet-started / expired / invalid banner.
+   */
+  window?: { startsAt?: string; endsAt?: string };
 }
 
 export interface BenefitItem {
@@ -373,7 +380,7 @@ function normalizeHero(raw: unknown): HeroContent | undefined {
 
 function normalizeBanner(source: Record<string, unknown>): BannerContent {
   const image = sanitizeExternalUrl(asString(source.imageUrl));
-  return {
+  const content: BannerContent = {
     title: asString(source.title).trim().slice(0, 120),
     subtitle: asString(source.subtitle).trim().slice(0, 200),
     ctaLabel: asString(source.ctaLabel).trim().slice(0, 80),
@@ -384,6 +391,10 @@ function normalizeBanner(source: Record<string, unknown>): BannerContent {
       MAX_BANNER_IMAGE_ALT_LENGTH,
     ),
   };
+  // Last key, like PHP. A window alone does not revive an empty banner (see isEmptyBanner).
+  const window = normalizeWindowEdges(source.window);
+  if (window) content.window = window;
+  return content;
 }
 
 function isEmptyBanner(content: BannerContent): boolean {
