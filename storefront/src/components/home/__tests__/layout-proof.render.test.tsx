@@ -70,8 +70,11 @@ describe("layout proof", () => {
       for (const kind of ["plain", "picture"])
         for (const layout of HERO_LAYOUTS)
           jobs.push({ type: "hero", kind, layout });
-      for (const layout of BANNER_LAYOUTS)
-        jobs.push({ type: "banner", kind: "plain", layout });
+      // banner kinds: plain (picture + copy) · noimage (copy only) · imageonly (a picture and nothing else) ·
+      // inner (explicit inner spacing `none`)
+      for (const kind of ["plain", "noimage", "imageonly", "inner"])
+        for (const layout of BANNER_LAYOUTS)
+          jobs.push({ type: "banner", kind, layout });
       for (const { type, kind, layout } of jobs) {
         const design: Record<string, unknown> = {};
         if (kind === "picture") {
@@ -82,6 +85,7 @@ describe("layout proof", () => {
           };
         }
         if (layout) design.layout = layout;
+        if (kind === "inner") design.spacing = { inner: "none" };
         const ctas = [
           { label: "Shop now", href: "/products" },
           { label: "Learn more", href: "/about" },
@@ -98,12 +102,18 @@ describe("layout proof", () => {
                   ctas,
                 }
               : {
-                  title: "Layout proof banner",
-                  subtitle: "A supporting line that explains the offer",
-                  ctas,
+                  title: kind === "imageonly" ? "" : "Layout proof banner",
+                  subtitle:
+                    kind === "imageonly"
+                      ? ""
+                      : "A supporting line that explains the offer",
+                  ctas: kind === "imageonly" ? [] : ctas,
                   ctaLabel: "",
                   ctaHref: "",
-                  imageUrl: "https://example.invalid/banner.svg",
+                  imageUrl:
+                    kind === "noimage"
+                      ? null
+                      : "https://example.invalid/banner.svg",
                   imageAlt: "Banner picture",
                 },
           ...(Object.keys(design).length ? { design } : {}),

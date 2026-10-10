@@ -54,6 +54,7 @@ const measure = (page) =>
       sub: sub ? { rect: r(sub), display: getComputedStyle(sub).display } : null,
       overlay: r(overlay), img: img ? { rect: r(img), display: getComputedStyle(img).display } : null,
       copy: r(copy), links: links.map(r), textAlign: getComputedStyle(content).textAlign,
+      copyPad: copy ? getComputedStyle(copy).padding : null, contentDisplay: getComputedStyle(content).display,
       frameTokens: section.parentElement?.getAttribute("data-sd") ?? "",
     };
   });
@@ -121,7 +122,22 @@ for (const pass of [0, 1]) { // pass 0: default-layout baselines, pass 1: the va
           for (const l of m.links) if (end(l) < m.s.w / 2 - TOL) violations.push(`${tag}: a button crosses the middle`);
         } else if (Math.abs(m.overlay.w - m.s.w) > TOL) violations.push(`${tag}: on a phone the overlay must stay full width (${m.overlay.w.toFixed(1)} of ${m.s.w.toFixed(1)})`);
       }
-      if (type === "banner" && layout === "text-band") {
+      if (type === "banner" && kind === "noimage" && layout === "split") {
+        // nothing to split: the banner stays exactly as the default (no stray padding, same layout box)
+        if (base && m.copyPad !== base.copyPad) violations.push(`${tag}: a banner with no picture gained padding (${m.copyPad} vs ${base.copyPad})`);
+        if (base && m.contentDisplay !== base.contentDisplay) violations.push(`${tag}: a banner with no picture changed its layout box (${m.contentDisplay})`);
+      }
+      if (type === "banner" && kind === "imageonly" && layout === "text-band") {
+        if (!m.img || m.img.display === "none") violations.push(`${tag}: a picture-only banner lost its only content`);
+        else if (m.img.rect.h < 30) violations.push(`${tag}: the picture-only banner collapsed (${m.img.rect.h.toFixed(0)}px)`);
+      }
+      if (type === "banner" && kind === "inner" && layout === "split" && wide) {
+        // the explicit inner spacing replaces the preset's padding on the copy; a gutter between the halves remains
+        if (!/^0px( 0px){0,3}$/.test(m.copyPad ?? "")) violations.push(`${tag}: explicit inner spacing none left padding on the copy (${m.copyPad})`);
+        const gap = rtl ? m.copy.l - (m.img.rect.r) : m.img.rect.l - m.copy.r;
+        if (m.img && m.copy && gap < 12) violations.push(`${tag}: no gutter between the copy and the picture (${gap.toFixed(1)}px)`);
+      }
+      if (type === "banner" && kind === "plain" && layout === "text-band") {
         if (m.img && m.img.display !== "none") violations.push(`${tag}: the picture is not hidden`);
         if (base && !(m.s.h < base.s.h - 4)) violations.push(`${tag}: band (${m.s.h.toFixed(0)}px) is not slimmer than the card (${base.s.h.toFixed(0)}px)`);
         if (wide && m.copy) {
@@ -133,7 +149,7 @@ for (const pass of [0, 1]) { // pass 0: default-layout baselines, pass 1: the va
           if (end(lastLink) > 40) violations.push(`${tag}: the buttons are not at the inline end of the band (gap ${end(lastLink).toFixed(1)})`);
         }
       }
-      if (type === "banner" && layout === "split") {
+      if (type === "banner" && kind === "plain" && layout === "split") {
         if (wide && m.img) {
           if (m.img.display === "none") violations.push(`${tag}: picture hidden`);
           if (Math.abs(m.img.rect.w - m.s.w / 2) > 4) violations.push(`${tag}: picture ${m.img.rect.w.toFixed(1)}px is not half of ${m.s.w.toFixed(1)}px`);

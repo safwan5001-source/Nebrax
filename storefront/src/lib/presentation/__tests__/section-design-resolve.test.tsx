@@ -863,5 +863,16 @@ describe("resolveSectionDesign — hero / banner layout variants (CUST-HV V6c-7)
     expect(block).toMatch(
       /\[data-sd~="lsplit"\]\[data-sd~="ovl"\] \[data-sd-overlay\] \{\s*inset-inline-end: 50%;/,
     );
+    // review fixes: the split copy styling needs a picture; a picture-only banner keeps its picture under text-band;
+    // an explicit inner spacing replaces the split's own padding
+    expect(block).toContain(
+      '[data-sd~="lbsplit"][data-sd] > * > [data-section-content]:has(> img) > div {',
+    );
+    expect(block).toContain(
+      '[data-sd~="lband"][data-sd] > * > [data-section-content]:has(> div > :is(h2:not(.sr-only), p, a, div)) > img {',
+    );
+    expect(block).toMatch(
+      /\[data-sd~="lbsplit"\]\[data-sd~="pi"\]\[data-sd\] > \* > \[data-section-content\]:has\(> img\) > div \{\s*padding: 0;/,
+    );
   });
 });

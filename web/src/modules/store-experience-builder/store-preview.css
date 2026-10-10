@@ -198,7 +198,8 @@
   }
 }
 /* banner · text-band: no picture, a slim band; from md the copy and the buttons share one row */
-.awj-store-preview [data-sd~="lband"][data-sd] > * > [data-section-content] > img {
+/* ...but never the only content: a picture-only banner keeps its picture (the copy box holds only the sr-only heading) */
+.awj-store-preview [data-sd~="lband"][data-sd] > * > [data-section-content]:has(> div > :is(h2:not(.sr-only), p, a, div)) > img {
   display: none;
 }
 .awj-store-preview [data-sd~="lband"][data-sd] > * > [data-section-content] {
@@ -236,11 +237,18 @@
     max-inline-size: none;
     border-radius: 0;
   }
-  .awj-store-preview [data-sd~="lbsplit"][data-sd] > * > [data-section-content] > div {
+  .awj-store-preview [data-sd~="lbsplit"][data-sd] > * > [data-section-content]:has(> img) > div {
     grid-column: 1;
     grid-row: 1;
     align-self: center;
     padding: 1.5rem 2rem;
+  }
+  /* an explicit inner spacing REPLACES the preset's own (the root carries it); a gutter between the halves stays */
+  .awj-store-preview [data-sd~="lbsplit"][data-sd~="pi"][data-sd] > * > [data-section-content]:has(> img) {
+    column-gap: 1rem;
+  }
+  .awj-store-preview [data-sd~="lbsplit"][data-sd~="pi"][data-sd] > * > [data-section-content]:has(> img) > div {
+    padding: 0;
   }
 }
 .awj-store-preview [data-sd~="bg"] {
