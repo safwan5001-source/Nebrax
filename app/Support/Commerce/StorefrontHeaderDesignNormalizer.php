@@ -10,10 +10,12 @@ namespace App\Support\Commerce;
  * مفتاح، فتبقى مخرجات الوثيقة القديمة **بلا أي تغيير** (V0 §2.2) و`PRESENTATION_CONFIG_VERSION` = 3.
  * قيمة خارج المجموعة المعدودة تُسقط وحدها، والمجموعات الفارغة تُحذف، والترتيب قانوني ثابت.
  *
- * V7a بنيوي فقط — لا ألوان (فلا تباين يُثبَت هنا): `layout` · `mobileLayout` · `height` ·
- * `logo.size` · `sticky` (always|off) · `border.width` · `shadow`. مؤجَّل صراحةً إلى شرائح V7
- * اللاحقة وتُسقط fail-closed حتى ذلك الحين: `surface/text/icon` (V7b، بحارس تباين)،
- * `sticky: on-scroll-up` و`mode` (V7c)، `search/categoryNav` الصريحان، `logo.align/treatment`.
+ * V7a بنيوي: `layout` · `mobileLayout` · `height` · `logo.size` · `sticky` (always|off) ·
+ * `border.width` · `shadow`. V7b يضيف الألوان: `surface.background` (ColorRef: دور لوحة أو hex)
+ * و`text` و`icon` (ColorRef)؛ تباين الصريح منها يحرسه `HeaderDesignContrast` عند النشر، ولون النص
+ * التلقائي فوق خلفية مصمَّمة (الأبيض/الأسود الأفضل إثباتاً) يمرّ بالبناء. مؤجَّل صراحةً إلى V7c
+ * وتُسقط fail-closed حتى ذلك الحين: `surface.alpha`/التدرّج، `sticky: on-scroll-up` و`mode`،
+ * و`search/categoryNav` الصريحان، و`logo.align/treatment`.
  */
 final class StorefrontHeaderDesignNormalizer
 {
@@ -50,6 +52,21 @@ final class StorefrontHeaderDesignNormalizer
             if ($size !== null) {
                 $out['logo'] = ['size' => $size];
             }
+        }
+
+        if (self::isObject($raw['surface'] ?? null)) {
+            $background = StorefrontSectionDesignNormalizer::colorRef($raw['surface']['background'] ?? null);
+            if ($background !== null) {
+                $out['surface'] = ['background' => $background];
+            }
+        }
+        $text = StorefrontSectionDesignNormalizer::colorRef($raw['text'] ?? null);
+        if ($text !== null) {
+            $out['text'] = $text;
+        }
+        $icon = StorefrontSectionDesignNormalizer::colorRef($raw['icon'] ?? null);
+        if ($icon !== null) {
+            $out['icon'] = $icon;
         }
 
         self::put($out, 'sticky', $raw['sticky'] ?? null, self::STICKY);

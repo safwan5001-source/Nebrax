@@ -8,6 +8,9 @@
 //   sticky   : `always` stays at the top after scrolling, `off` scrolls away AND the in-page offset collapses; otherwise the offset
 //              always clears the real header height (skip link / sticky product gallery land clear of it);
 //   border / shadow : none / hairline / medium widths on every band; soft < medium shadows;
+//   colour   : a designed background paints the header AND its identity row, the wordmark / links / menu / account icon take the proven
+//              (automatic or explicit) colours and clear 4.5:1 against that row; an explicit icon colour reaches every plain icon but not
+//              the cart pill (it paints its own surface); text-only / icon-only designs leave the background untouched;
 //   ALL      : no horizontal overflow, no overlap among menu / brand / search / actions, explicit defaults == absent design.
 // 6 viewports x AR RTL / EN LTR x wordmark / image logo. `--strip` removes the `[data-hd]` rules from the stylesheet and `--control`
 // measures the absent design against every design's expectations (negative controls: both must fail).
@@ -33,6 +36,7 @@ if (strip) {
   parsed.walkRules((r) => { if (/\[data-hd/.test(r.selector)) r.remove(); });
   stripped = parsed.toString();
 }
+const designs = JSON.parse(readFileSync(join(dir, "designs.json"), "utf8"));
 const files = readdirSync(join(dir, "pages")).filter((f) => f.endsWith(".html")).sort((a, b) => (b.startsWith("none.") ? 1 : 0) - (a.startsWith("none.") ? 1 : 0) || a.localeCompare(b));
 const violations = [];
 let checks = 0;
@@ -56,7 +60,22 @@ const measure = (page) =>
     const word = brand.querySelector("span");
     const main = document.querySelector("main");
     const bw = (e) => (e && vis(e) ? parseFloat(getComputedStyle(e).borderBottomWidth) : null);
+    const col = (e) => (e && vis(e) ? getComputedStyle(e).color : null);
+    const visFirst = (list) => [...list].find(vis) ?? null;
+    const account = visFirst(header.querySelectorAll('a[href$="/account"] svg'));
+    const pill = visFirst(header.querySelectorAll("[data-cart-pill]"));
+    const cartIcon = visFirst(header.querySelectorAll("[data-cart-icon] svg"));
+    const extra = visFirst(header.querySelectorAll("[data-extra-nav]"));
+    const menuBtn = visFirst(header.querySelectorAll("[data-menu]"));
+    const wrapperStyle = getComputedStyle(document.querySelector("[data-published-theme]"));
     return {
+      colour: {
+        rowBg: getComputedStyle(identity).backgroundColor, headerBg: getComputedStyle(header).backgroundColor,
+        wordmark: word ? col(word) : null, extra: col(extra), menu: col(menuBtn), account: col(account),
+        pillSvg: col(pill?.querySelector("svg")), pill: col(pill), cartIcon: col(cartIcon),
+        railBg: rail ? getComputedStyle(rail).backgroundColor : null,
+        muted: wrapperStyle.getPropertyValue("--hd-muted").trim(),
+      },
       overflowX: document.documentElement.scrollWidth - document.documentElement.clientWidth,
       header: r(header), headerPos: getComputedStyle(header).position, shadow: getComputedStyle(header).boxShadow,
       grid: r(grid), menu: r(header.querySelector("[data-menu]")), brand: r(brand), search: r(header.querySelector("[data-search]")), actions: r(actions),
@@ -67,6 +86,16 @@ const measure = (page) =>
     };
   });
 
+const COLOUR = {
+  colBgDark: { bg: "#12372a", fg: "#ffffff" },
+  colBgPale: { bg: "#fde68a", fg: "#000000" },
+  colBgGrey: { bg: "#777777", fg: "#000000" },
+  colRoleBrand: { bg: "#12372a", fg: "#ffffff" },
+  colTextIcon: { bg: "#12372a", fg: "#fde68a", icon: "#ffffff" },
+  colTextOnly: { bg: null, fg: "#111827" },
+  colIconOnly: { bg: null, fg: null, icon: "#b91c1c" },
+  colTwoRow: { bg: "#12372a", fg: "#ffffff" },
+};
 const overlap = (a, b) => a && b && Math.min(a.r, b.r) - Math.max(a.l, b.l) > 1 && Math.min(a.b, b.b) - Math.max(a.t, b.t) > 1;
 
 for (const file of files) {
@@ -141,7 +170,8 @@ for (const file of files) {
     // sticky + offset
     await page.evaluate(() => window.scrollTo(0, 800));
     const after = await page.evaluate(() => { const hd = document.querySelector("header").getBoundingClientRect(); return { t: hd.top, b: hd.bottom }; });
-    const stickyOff = name === "stickyOff" || name === "everything";
+    const design = designs[name];
+    const stickyOff = design?.sticky === "off";
     if (stickyOff) {
       ok(after.b <= 0, `${tag} header still on screen after scrolling (sticky off)`);
       ok(m.scrollMargin <= 0.5, `${tag} sticky-off offset ${m.scrollMargin}, want 0`);
@@ -152,18 +182,59 @@ for (const file of files) {
     }
 
     // borders + shadow
-    const wantBorder = name === "borderNone" ? 0 : name === "borderMedium" || name === "everything" ? 2 : 1;
+    const wantBorder = { none: 0, medium: 2 }[design?.border?.width] ?? 1;
     for (const [band, v] of [["identity", m.bIdentity], ["rail", m.bRail], ["utility", m.bUtility]]) {
       if (v === null) continue;
       ok(near(v, wantBorder, 0.01), `${tag} ${band} border ${v}px, want ${wantBorder}px`);
     }
-    if (name === "shadowSoft" || name === "shadowMedium" || name === "everything") {
+    if (design?.shadow === "soft" || design?.shadow === "medium") {
       ok(m.shadow !== "none", `${tag} no shadow`);
       const blurs = [...m.shadow.matchAll(/(-?\d+(?:\.\d+)?)px\s+(-?\d+(?:\.\d+)?)px\s+(\d+(?:\.\d+)?)px/g)].map((x) => parseFloat(x[3]));
       const max = Math.max(0, ...blurs);
-      if (name === "shadowSoft") ok(max > 0 && max <= 4, `${tag} soft shadow blur ${max}`);
+      if (design.shadow === "soft") ok(max > 0 && max <= 4, `${tag} soft shadow blur ${max}`);
       else ok(max >= 20, `${tag} medium shadow blur ${max}`);
     } else ok(m.shadow === "none", `${tag} unexpected shadow ${m.shadow}`);
+
+    // colour
+    const c = m.colour;
+    const rgb = (str) => { const x = /rgba?\((\d+),\s*(\d+),\s*(\d+)/.exec(str ?? ""); return x ? [+x[1], +x[2], +x[3]] : null; };
+    const lum = ([r, g, b]) => { const f = (v) => { v /= 255; return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }; return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b); };
+    const cr = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05); };
+    const hex = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+    const same = (got, want) => { const g = rgb(got); return !!g && g.every((v, i) => v === want[i]); };
+    const spec = COLOUR[name];
+    const themeBg = [255, 255, 255];
+    const themePrimary = hex("#12372a");
+    if (spec) {
+      const bg = spec.bg ? hex(spec.bg) : null;
+      if (bg) {
+        ok(same(c.rowBg, bg), `${tag} identity row background ${c.rowBg}, want ${spec.bg}`);
+        ok(same(c.headerBg, bg), `${tag} header background ${c.headerBg}, want ${spec.bg}`);
+      } else {
+        ok(!rgb(c.rowBg) || c.rowBg === "rgba(0, 0, 0, 0)", `${tag} background changed without a designed one: ${c.rowBg}`);
+      }
+      const surface = bg ?? themeBg;
+      const wantFg = spec.fg ? hex(spec.fg) : null;
+      const plain = [["extra link", c.extra], ["menu", c.menu]];
+      if (logo === "word") plain.push(["wordmark", c.wordmark]);
+      for (const [label, got] of plain) {
+        if (got === null) continue;
+        if (wantFg) ok(label === "extra link" || same(got, wantFg), `${tag} ${label} colour ${got}, want ${spec.fg}`);
+        if (spec.fg || spec.bg) ok(cr(rgb(got), surface) >= 4.5, `${tag} ${label} ${got} on the row is ${cr(rgb(got), surface).toFixed(2)}:1`);
+      }
+      if (c.extra && c.muted) ok(same(c.extra, hex(c.muted)), `${tag} secondary text ${c.extra}, want ${c.muted}`);
+      const wantIcon = spec.icon ? hex(spec.icon) : wantFg;
+      if (c.account && wantIcon) {
+        ok(same(c.account, wantIcon), `${tag} account icon ${c.account}, want ${spec.icon ?? spec.fg}`);
+        ok(cr(rgb(c.account), surface) >= 4.5, `${tag} account icon on the row is ${cr(rgb(c.account), surface).toFixed(2)}:1`);
+      }
+      if (c.cartIcon && wantIcon) ok(same(c.cartIcon, wantIcon), `${tag} cart icon ${c.cartIcon}, want ${spec.icon ?? spec.fg}`);
+      // the cart pill paints its own soft surface: neither a header text nor an icon colour may reach it
+      if (c.pillSvg && c.pill) ok(c.pillSvg === c.pill && same(c.pill, themePrimary), `${tag} cart pill icon ${c.pillSvg} / text ${c.pill} were recoloured`);
+    } else if (!design?.surface && !design?.text && !design?.icon) {
+      ok(c.rowBg === "rgba(0, 0, 0, 0)" || same(c.rowBg, themeBg), `${tag} row background ${c.rowBg} on a design without colours`);
+      if (logo === "word" && c.wordmark) ok(same(c.wordmark, themePrimary), `${tag} wordmark recoloured without a colour design: ${c.wordmark}`);
+    }
     await ctx.close();
   }
 }

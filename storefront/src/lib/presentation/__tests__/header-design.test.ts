@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { normalizePresentationConfig } from "../config";
 import {
+  headerContrastIssues,
   headerDesktopLayout,
   headerIsCompact,
   normalizeHeaderDesign,
@@ -136,5 +137,139 @@ describe("header design — resolution (V7a)", () => {
     expect(
       headerIsCompact({ style: "standard", design: { layout: "compact" } }),
     ).toBe(true);
+  });
+});
+
+const contrastFixture = JSON.parse(
+  readFileSync(
+    resolve(
+      __dirname,
+      "../../../../../tests/Fixtures/presentation/header-contrast.json",
+    ),
+    "utf8",
+  ),
+) as {
+  cases: Array<{
+    name: string;
+    config: {
+      primaryColor: string;
+      accentColor?: string | null;
+      palette?: Record<string, string>;
+      design: unknown;
+    };
+    expected: Array<{ field: string; code: string; ratio: number }>;
+  }>;
+};
+
+describe("header contrast gate — shared fixture (V7b)", () => {
+  for (const c of contrastFixture.cases) {
+    it(c.name, () => {
+      const design = normalizeHeaderDesign(c.config.design);
+      const issues = headerContrastIssues(design, {
+        primaryColor: c.config.primaryColor,
+        accentColor: c.config.accentColor ?? null,
+        palette: c.config.palette,
+      });
+      expect(issues.map((i) => [i.field, i.code])).toEqual(
+        c.expected.map((e) => [e.field, e.code]),
+      );
+      issues.forEach((issue, index) => {
+        expect(issue.ratio).toBeCloseTo(c.expected[index].ratio, 1);
+      });
+    });
+  }
+});
+
+describe("header colours — resolution (V7b)", () => {
+  const ctx = { primaryColor: "#12372a", accentColor: null };
+
+  it("without a colour context or colour fields nothing colour-related is emitted", () => {
+    expect(
+      resolveHeaderDesign({ layout: "centered" }, ctx).style,
+    ).toBeUndefined();
+    expect(
+      resolveHeaderDesign({ surface: { background: { hex: "#000000" } } })
+        .style,
+    ).toBeUndefined();
+    expect(resolveHeaderDesign({ layout: "centered" }, ctx).coloured).toBe(
+      false,
+    );
+  });
+
+  it("a designed background brings the proven automatic text colour", () => {
+    const dark = resolveHeaderDesign(
+      { surface: { background: { hex: "#12372a" } } },
+      ctx,
+    );
+    expect(dark.attrs).toEqual({ "data-hd": "hbg htx" });
+    expect(dark.style?.["--hd-bg"]).toBe("#12372a");
+    expect(dark.style?.["--hd-fg"]).toBe("#ffffff");
+    expect(dark.coloured).toBe(true);
+    const pale = resolveHeaderDesign(
+      { surface: { background: { hex: "#fde68a" } } },
+      ctx,
+    );
+    expect(pale.style?.["--hd-fg"]).toBe("#000000");
+  });
+
+  it("the automatic colour clears 4.5:1 on every solid background (by construction)", () => {
+    for (let v = 0; v <= 255; v += 5) {
+      const hex = `#${[v, (v * 3) % 256, (v * 7) % 256].map((n) => n.toString(16).padStart(2, "0")).join("")}`;
+      const r = resolveHeaderDesign({ surface: { background: { hex } } }, ctx);
+      expect(
+        headerContrastIssues(
+          {
+            surface: { background: { hex } },
+            text: { hex: r.style?.["--hd-fg"] as string },
+          },
+          ctx,
+        ),
+      ).toEqual([]);
+    }
+  });
+
+  it("an explicit text wins; secondary text only softens when it still clears 4.5:1", () => {
+    const r = resolveHeaderDesign(
+      { surface: { background: { hex: "#12372a" } }, text: { hex: "#fde68a" } },
+      ctx,
+    );
+    expect(r.style?.["--hd-fg"]).toBe("#fde68a");
+    const muted = r.style?.["--hd-muted"] as string;
+    expect(
+      headerContrastIssues(
+        { surface: { background: { hex: "#12372a" } }, text: { hex: muted } },
+        ctx,
+      ),
+    ).toEqual([]);
+    // mid-grey background: a softened colour would fall under 4.5:1, so the full foreground is kept
+    const grey = resolveHeaderDesign(
+      { surface: { background: { hex: "#6b7280" } }, text: { hex: "#ffffff" } },
+      ctx,
+    );
+    expect(grey.style?.["--hd-muted"]).toBe("#ffffff");
+  });
+
+  it("an icon colour is its own token and a role follows the palette", () => {
+    const r = resolveHeaderDesign(
+      { icon: { role: "brand" } },
+      { ...ctx, primaryColor: "#0b5fff" },
+    );
+    expect(r.attrs).toEqual({ "data-hd": "hic" });
+    expect(r.style).toEqual({ "--hd-icon": "#0b5fff" });
+    expect(r.coloured).toBe(false);
+  });
+
+  it("colour tokens come first and compose with the structural ones", () => {
+    expect(
+      resolveHeaderDesign(
+        {
+          surface: { background: { hex: "#000000" } },
+          icon: { hex: "#ffffff" },
+          height: "tall",
+          shadow: "soft",
+        },
+        ctx,
+      ).attrs,
+    ).toEqual({ "data-hd": "hbg htx hic hh-t hx-s" });
   });
 });

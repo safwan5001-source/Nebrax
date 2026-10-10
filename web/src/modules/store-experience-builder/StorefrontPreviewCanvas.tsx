@@ -324,7 +324,7 @@ export function StorefrontPreviewCanvas({
   const mobileViewport = viewport === "mobile";
   const headerStyleCompact = headerIsCompact(config.header);
   // CUST-HV V7a — structural header design (absent ⇒ every branch below is the old markup).
-  const headerResolved = resolveHeaderDesign(config.header.design);
+  const headerResolved = resolveHeaderDesign(config.header.design, config);
   const headerDesign = config.header.design;
   const headerRowMinHeight = headerDesign?.height
     ? mobileViewport
@@ -493,6 +493,7 @@ export function StorefrontPreviewCanvas({
       )}
       style={{
         ...vars,
+        ...(headerResolved.style ?? {}),
         fontFamily: fontFamilyStack(config.typography?.bodyFamily) ?? fontPresetFamilyStack(config.fontPreset),
       }}
     >
@@ -560,7 +561,10 @@ export function StorefrontPreviewCanvas({
           </div>
         )}
 
-        <div className="border-b border-store-border">
+        <div
+          className="border-b border-store-border"
+          {...(headerResolved.designed ? { "data-header-row": "" } : {})}
+        >
           <div
             style={headerRowMinHeight ? { minHeight: headerRowMinHeight } : undefined}
             className={cn(
@@ -615,6 +619,7 @@ export function StorefrontPreviewCanvas({
                 linked={!onSelectChrome}
                 scale={headerResolved.logoSize}
                 mobile={mobileViewport}
+                headerBrand={headerResolved.designed}
               />
             </button>
             {config.header.showSearch && !mobileViewport && (

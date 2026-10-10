@@ -170,6 +170,26 @@
     0 2px 6px color-mix(in oklab, var(--store-foreground) 10%, transparent),
     0 10px 24px color-mix(in oklab, var(--store-foreground) 12%, transparent);
 }
+.awj-store-preview[data-hd~="hbg"] > header,
+.awj-store-preview[data-hd~="hbg"] > header [data-header-row] {
+  background-color: var(--hd-bg);
+}
+.awj-store-preview[data-hd~="hbg"] > header [data-header-row] {
+  --store-surface: var(--hd-bg);
+}
+.awj-store-preview[data-hd~="htx"] > header [data-header-row] {
+  color: var(--hd-fg);
+  --store-foreground: var(--hd-fg);
+  --store-muted-foreground: var(--hd-muted);
+  --ring: var(--hd-fg);
+}
+.awj-store-preview[data-hd~="htx"] > header [data-header-row] [data-header-brand] {
+  color: var(--hd-fg);
+}
+/* The cart pill paints its own soft surface, so an icon colour judged against the header does not reach it. */
+.awj-store-preview[data-hd~="hic"] > header [data-header-row] svg:not(.bg-store-primary-soft svg) {
+  color: var(--hd-icon);
+}
 /* V7a-chrome:end */
 
 /*

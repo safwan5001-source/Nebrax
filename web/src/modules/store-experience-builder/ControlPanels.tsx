@@ -255,7 +255,7 @@ export function ControlPanels({
         />
       );
     case "header":
-      return <HeaderPanel config={config} t={t} patch={patch} />;
+      return <HeaderPanel config={config} t={t} patch={patch} locale={locale} />;
     case "homepage":
       return (
         <HomepagePanel
@@ -772,10 +772,12 @@ function HeaderPanel({
   config,
   t,
   patch,
+  locale,
 }: {
   config: StorefrontPresentationConfig;
   t: (key: CustomizerMessageKey) => string;
   patch: (partial: Partial<StorefrontPresentationConfig>) => void;
+  locale: string;
 }) {
   return (
     <div className="space-y-6">
@@ -800,6 +802,12 @@ function HeaderPanel({
       ) : null}
       <HeaderDesignPanel
         design={config.header.design}
+        ctx={{
+          primaryColor: config.primaryColor,
+          accentColor: config.accentColor,
+          palette: config.palette,
+          dir: locale === "en" ? "ltr" : "rtl",
+        }}
         t={t}
         onChange={(design) => {
           const { design: _previous, ...rest } = config.header;

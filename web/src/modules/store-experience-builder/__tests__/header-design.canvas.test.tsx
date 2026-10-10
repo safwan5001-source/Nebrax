@@ -105,6 +105,68 @@ describe("Canvas header design (V7a)", () => {
   });
 });
 
+describe("Canvas header colours (V7b)", () => {
+  it("a designed background puts the tokens and validated custom properties on the Canvas root", () => {
+    const { root, header } = canvas(withDesign({ surface: { background: { hex: "#12372a" } } }));
+    expect(root.getAttribute("data-hd")).toBe("hbg htx");
+    expect(root.style.getPropertyValue("--hd-bg")).toBe("#12372a");
+    expect(root.style.getPropertyValue("--hd-fg")).toBe("#ffffff");
+    expect(header.querySelector("[data-header-row]")).not.toBeNull();
+    expect(header.querySelector("[data-header-brand]")).not.toBeNull();
+  });
+
+  it("an absent colour design adds no marker the old markup lacked", () => {
+    const { root, header } = canvas(DEFAULT_PRESENTATION_CONFIG);
+    expect(root.style.getPropertyValue("--hd-bg")).toBe("");
+    expect(header.querySelector("[data-header-row]")).toBeNull();
+    expect(header.querySelector("[data-header-brand]")).toBeNull();
+  });
+
+  it("a role follows the palette; an icon colour is its own token", () => {
+    const config = {
+      ...withDesign({ icon: { role: "brand" } }),
+      primaryColor: "#0b5fff",
+    };
+    const { root } = canvas(config);
+    expect(root.getAttribute("data-hd")).toBe("hic");
+    expect(root.style.getPropertyValue("--hd-icon")).toBe("#0b5fff");
+  });
+});
+
+describe("Header colour controls (V7b)", () => {
+  function setup(config: StorefrontPresentationConfig, onChange = vi.fn()) {
+    render(
+      <ControlPanels panel="header" config={config} locale="en" liveStoreName={null} onChange={onChange} />,
+    );
+    return onChange;
+  }
+
+  it("shows the three colour fields, with the automatic text colour as the value over a designed background", () => {
+    setup(withDesign({ surface: { background: { hex: "#12372a" } } }));
+    for (const name of ["header-bg", "header-text", "header-icon"]) {
+      expect(document.querySelector(`[data-colour-field="${name}"]`)).not.toBeNull();
+    }
+  });
+
+  it("flags an explicit text colour that cannot be read and offers the automatic colour", async () => {
+    const user = userEvent.setup();
+    const onChange = setup(
+      withDesign({ surface: { background: { hex: "#12372a" } }, text: { hex: "#1f2937" } }),
+    );
+    expect(screen.getByText(/Contrast is too low/)).toBeTruthy();
+    await user.click(screen.getByRole("button", { name: "Use the automatic colour" }));
+    const next = onChange.mock.calls.at(-1)?.[0] as StorefrontPresentationConfig;
+    expect(next.header.design?.text).toBeUndefined();
+    expect(next.header.design?.surface).toEqual({ background: { hex: "#12372a" } });
+  });
+
+  it("an acceptable explicit colour shows the sufficient verdict and no warning", () => {
+    setup(withDesign({ surface: { background: { hex: "#12372a" } }, text: { hex: "#ffffff" } }));
+    expect(screen.queryByText(/Contrast is too low/)).toBeNull();
+    expect(screen.getByText("Contrast is sufficient")).toBeTruthy();
+  });
+});
+
 describe("Header design panel (V7a)", () => {
   function setup(config: StorefrontPresentationConfig, onChange = vi.fn()) {
     render(
