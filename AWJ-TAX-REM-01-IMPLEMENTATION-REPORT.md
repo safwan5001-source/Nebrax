@@ -6,8 +6,8 @@
 | **Branch** | `fix/awj-tax-rem-01-return-vat-accuracy` |
 | **PR** | [#1291](https://github.com/safwan5001-source/Nebrax/pull/1291) — open, ready for review, mergeable (clean) |
 | **Base SHA** | `b3ff6654911b1fdda2ad4c938266271538a87122` (`origin/main`) |
-| **Head SHA (code)** | `638582f61e5a84a840c1013a8736cc169742bfc3` (2 code commits: `fa91714`, `638582f`). CI results below are for this SHA. A third, docs-only commit adds this report; it changes no code. |
-| **Status** | Implemented, CI green on SQLite + PostgreSQL + web. **Not merged, not deployed. Waiting for owner approval.** |
+| **Head SHA (code)** | `9175e7418eb20059fa1036a7285743a872af599a` (3 code commits: `fa91714`, `638582f`, `9175e74`). CI results below are for this SHA. Docs-only commits (this report) change no code. |
+| **Status** | Implemented incl. the owner-approved mixed POS/API fix (§10). CI green on SQLite + PostgreSQL + web. **Not merged, not deployed.** |
 
 ---
 
@@ -107,7 +107,7 @@ Codex review: 1 finding (P2, historical report replay), **valid and fixed** in `
 1. **Posted amounts of *future* returns change** (that is the fix). Historical rows are not migrated. Run `returns:vat-discrepancies --tenant=<uuid>` for Finance review of past returns; any correction is a Finance decision with its own entries.
 2. **Draft totals are estimates**: a draft is re-derived at post and can differ by a few halalas if other returns posted in between.
 3. **Historical over-reversal on a line** makes the next return on that line smaller (down to 0 VAT) — conservative by design, never an over-refund.
-4. **Mixed POS + API partial returns** on one invoice (different allocation conventions) can leave a residual of a few halalas unreturned on the final API return — never over-refunds.
+4. ~~Mixed POS + API partial returns could leave 1–7 halalas stranded~~ — **fixed in `9175e74`** (§10). Residual risk: a reduced-price return earlier on a line intentionally keeps its hold-back (not refunded with the final part).
 5. **Lock ordering**: follows the lock-the-document-then-post-to-ledger pattern; POS excluded to avoid inversion. A deadlock, if it ever occurred, is detected by PostgreSQL and aborts one transaction (no corruption), but I could not exhaustively enumerate every flow that locks an invoice.
 6. **Behavioural change visible to API clients**: a source-linked return's `tax_rate` and `tax_inclusive` now come from the source, and a larger `unit_price` than the sale price was already rejected.
 
@@ -116,7 +116,7 @@ Codex review: 1 finding (P2, historical report replay), **valid and fixed** in `
 * **REM-02** credit notes (same root cause, VAT-02/ACC-06), **REM-18** e-invoicing of returns, other remediation tasks — untouched. Credit notes and returns do not yet share a cumulative cap on the same invoice.
 * **Shipping / document adjustment** are not line items, so their VAT/amounts are not returnable through a line return (conservative).
 * **POS returns on POS invoices with a header discount** are unchanged; POS invoices currently carry line discounts only.
-* **Concurrent POS return vs API return on the same invoice** are not mutually serialized (pre-existing; mitigated by the cap clamp at post).
+* **Concurrent POS return vs API return on the same invoice** are not mutually serialized (pre-existing; POS posts take no source lock to keep lock order consistent). The cap clamp at post prevents any over-refund, but under that race the last halala could still be left for a follow-up return.
 * **Pre-existing SQLite-only quirk found**: the local `return_documents (tenant_id, number)` branch-less unique index lost its `WHERE branch_id IS NULL` predicate after a table rebuild, so two branches cannot issue the same return number on SQLite (PostgreSQL is fine). Same class of defect as migrations 85/91/93 repair for invoices; my branch test passes explicit numbers to stay independent of it. Worth a separate small fix.
 * This report was added to the PR in a final docs-only commit (CI re-runs on it; no code differs from `638582f`).
 
@@ -125,5 +125,50 @@ Codex review: 1 finding (P2, historical report replay), **valid and fixed** in `
 1. Owner review of PR #1291 (focus: `ReturnSourceAllocator`, `ReturnService::deriveFromSource/rederiveSourceAmounts`, lock placement in `post()`).
 2. On approval: merge, then run `returns:vat-discrepancies` per production tenant (read-only) and hand the output to Finance.
 3. Proceed to **REM-02** (credit notes inherit the source VAT basis and are capped), which depends on this change and can reuse `ReturnSourceAllocator`.
+
+**Stopped before merge. Owner approval requested.**
+
+---
+
+## 10. Addendum — mixed POS / API returns (owner-approved fix, `9175e74`)
+
+**Finding.** POS returns round every part down independently and give the remainder to the *last* part; API returns use the cumulative share `F(c+q) − F(c)`. After partial POS returns, a final API return left base and VAT that no later return could recover.
+
+| | |
+|---|---|
+| Smallest reproduction (real HTTP stack) | POS invoice 3 × 0.10 (VAT 0.05): POS 0.01 + POS 0.01 + API 0.02 = **0.04 returned**; `2120` kept **0.01** credit; invoice `fully_returned=true`, further returns refused |
+| Simulation (≈430 k random mixed cases, 5 runs) | residual only when the **final** return is API; **never** an over-refund; max **net 5 / VAT 6 / total 7 halalas** per line, growing ≈ (k−1) with k prior POS partials |
+| Direction | under-refund → output VAT over-declared and customer short-credited (conservative) |
+| Required for reconciliation? | yes → fixed inside REM-01 (same defect class: full return must zero `2120`/`4110`) |
+
+**Fix (smallest scope).** `ReturnSourceAllocator::allocate()`: the part that exhausts the remaining quantity **at full price** takes `max(0, charged − already returned)` for net, VAT and discount — unless an earlier return on that line used a **reduced price** (the hold-back stays held), in which case the cumulative share is used as before. `returned()` exposes `MIN(unit_price)` to detect that; `deriveFromSource()` carries it for in-request items; the `returnable` endpoint adds `reduced_price_returned`; the web preview mirrors the rule. Amounts are never negative and never exceed the charged net / VAT (explicit clamps). **POS code path unchanged**; no migration; no accounting-rule change.
+
+Also fixed while verifying: the historical report now counts POS returns as priors (not judged), so it no longer flags the API return that follows a POS partial.
+
+**Reference numbers (3 × 0.10, POS → POS → API):** returns net 0.10/0.10/0.10, VAT 0.01/0.01/**0.03** → Σ net 0.30, VAT **0.05**, total **0.35** = invoice; `2120` = 0, `4110` = 0, books balanced.
+
+**New permanent tests**
+| Test | What it proves |
+|---|---|
+| `ReturnPosApiMixedReturnsTest` (9, real POS HTTP flow) | POS→POS→API (3×0.10); POS→API→POS; inclusive 4×1.00 with line discount (POS,POS,API,API); exclusive 5×1.01 with discount (POS,API,POS,API); reduced-price hold-back not refunded with the final part (net 25,000 / VAT 3,750 of 30,000 / 4,500, hold-back exactly 5,000 / 750); tracked-goods inventory + COGS return exactly to their starting balances; 60 seeded random sequences using the real `PosReturnService` derivation rules (Σ = invoice net/VAT/total, no prefix ever exceeds, `2120`/`4110` = 0, books balanced); 30 sequences containing a reduced-price return (never exceed, never negative); over-return refused; historical report reports no false positives |
+| `ReturnSourceVatPostgresConcurrencyTest` (+1, now 4, PostgreSQL) | POS-style partials followed by two **concurrent** API posts: all succeed, Σ net 40 / VAT 6 / total 46 exactly |
+| `source-line-amounts.test.ts` (7, +2) | web preview mirrors the final-part and reduced-price rules |
+
+**Evidence the tests bite.** Against the pre-fix allocator: 6 of the 9 mixed tests fail (the other 3 are deliberate regression guards: POS-final path, no-exceed bounds, exhausted-return refusal); the new PostgreSQL concurrency test fails; with the fix: all pass. Simulation with the fix: **0 residual / 0 over-refund** on ≈180 k mixed cases (≤ 9 and ≤ 40 units).
+
+**Runs on the final code**
+| Run | Result |
+|---|---|
+| Related set, SQLite (returns, POS returns/exchange/checkout, credit/debit notes, customer/supplier refunds, conversions, ledger, invoice, purchase, report) | **396 passed, 4 skipped, 0 failed** |
+| Same set, PostgreSQL 16 (local) | 395 passed; the 5 `ApiInvoiceTest` failures were a *migration DDL deadlock between harness sessions* — class re-run alone: **9/9 pass** |
+| PostgreSQL concurrency classes | 4/4 pass |
+| **CI on `9175e74`** | `sqlite` ✅ · `pgsql` ✅ · `web build` ✅ (push and PR runs; full suites) |
+| Web | vitest 7/7; no type errors in touched files |
+
+**Local-environment notes (not code defects).** Under broad `--filter` runs the sandbox's known-failing harness classes (Fuel/`bcmath`, R2, storefront media) leave a reference-number sequence transaction open, making a later `registerTenant()` wait; this does not occur in CI. Not caused by this PR.
+
+**Not changed:** POS return path, credit notes (REM-02), ledger / inventory engines, any migration.
+
+**Status:** the mixed-return finding is closed; I am not aware of any remaining item that prevents full financial reconciliation after full-quantity returns at the original value.
 
 **Stopped before merge. Owner approval requested.**
