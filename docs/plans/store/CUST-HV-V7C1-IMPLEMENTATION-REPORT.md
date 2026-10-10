@@ -35,7 +35,7 @@ An additive enum value. `always` / `off` / absent render byte-identically (no co
 
 ## Design Quality Pass — real Chromium, the production controller
 
-The proof bundles the **production** `HeaderScrollUp` (esbuild) into the rendered production-`Header` pages and drives real scrolling at 390 / 430 / 768 / 1024 / 1280 / 1440, AR RTL / EN LTR, wordmark / image logo: header visible at the top → slides fully out of view after scrolling down → returns on the first upward scroll → hides again → **focusing the search field inside the hidden header reveals it and it then stays through further downward scrolling** → hides once focus leaves → the slide has a transition normally and none under `prefers-reduced-motion`. All earlier V7a/V7b proofs still hold (same run). Results: see the PR; evidence in `docs/plans/store/cust-hv-v7c1/`.
+The proof bundles the **production** `HeaderScrollUp` (esbuild) into the rendered production-`Header` pages and drives real scrolling at 390 / 430 / 768 / 1024 / 1280 / 1440, AR RTL / EN LTR, wordmark / image logo: header visible at the top → slides fully out of view after scrolling down → returns on the first upward scroll → hides again → **focusing the search field inside the hidden header reveals it and it then stays through further downward scrolling** → hides once focus leaves → the slide has a transition normally and none under `prefers-reduced-motion`. All earlier V7a/V7b proofs still hold (same run). **12 052 checks, 0 violations** (112 pages × 6 viewports); negative control (stylesheet stripped) fails with 1 660 violations. Evidence in `docs/plans/store/cust-hv-v7c1/`.
 
 ## Tests
 
