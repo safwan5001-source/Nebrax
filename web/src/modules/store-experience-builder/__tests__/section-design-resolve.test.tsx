@@ -490,14 +490,14 @@ describe("resolveSectionDesign — hero overlap (CUST-HV V6c-4)", () => {
     expect(at).toBeGreaterThan(0);
     const block = sf.slice(at, sf.indexOf("\n}\n", at) + 3);
     expect(block).toContain("@media (min-width: 48rem) {");
-    expect(block).toMatch(/\[data-sd~="ovlp"\]\[data-sd\] \{\s*padding-block-end: 0;\s*margin-block-end: calc\(-1 \* var\(--sec-ovlp\)\);/);
-    expect(block).toMatch(/\[data-sd~="ovlp"\]\[data-sd\] > \* \{\s*padding-block-end: calc\(var\(--sec-pi, 0px\) \+ var\(--sec-ovlp\)\);/);
-    expect(block).toMatch(/\[data-sd~="ovlp"\]\[data-sd\] \+ \* \{[^}]*position: relative;\s*z-index: 2;/);
+    expect(block).toMatch(/\[data-sd~="ovlp"\]\[data-sd\]:has\(\+ :not\(:empty\)\) \{\s*padding-block-end: 0;\s*margin-block-end: calc\(-1 \* var\(--sec-ovlp\)\);/);
+    expect(block).toMatch(/\[data-sd~="ovlp"\]\[data-sd\]:has\(\+ :not\(:empty\)\) > \* \{\s*padding-block-end: calc\(var\(--sec-pi, 0px\) \+ var\(--sec-ovlp\)\);/);
+    expect(block).toMatch(/\[data-sd~="ovlp"\]\[data-sd\] \+ :not\(:empty\) \{[^}]*position: relative;\s*z-index: 2;/);
     // a height preset stays the hero's VISIBLE height: its minimum grows by the overlap the sheet covers
     expect(block).toMatch(
-      /\[data-sd~="ovlp"\]\[data-sd~="hgt"\]\[data-sd\] > \* \{\s*min-block-size: calc\(var\(--sec-minh\) \+ var\(--sec-ovlp\)\);/,
+      /\[data-sd~="ovlp"\]\[data-sd~="hgt"\]\[data-sd\]:has\(\+ :not\(:empty\)\) > \* \{\s*min-block-size: calc\(var\(--sec-minh\) \+ var\(--sec-ovlp\)\);/,
     );
     // zero specificity: a designed background / radius / surface class on the next section always wins
-    expect(block).toMatch(/:where\(\[data-sd~="ovlp"\]\[data-sd\] \+ \*\) \{\s*background-color: var\(--store-background\);/);
+    expect(block).toMatch(/:where\(\[data-sd~="ovlp"\]\[data-sd\] \+ :not\(:empty\)\) \{\s*background-color: var\(--store-background\);/);
   });
 });

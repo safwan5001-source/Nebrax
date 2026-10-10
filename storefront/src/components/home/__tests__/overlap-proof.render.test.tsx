@@ -43,7 +43,9 @@ const MEDIA_ID = "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e";
 const OVERLAPS = [undefined, "sm", "md"] as const;
 const HEIGHTS = [undefined, "tall"] as const;
 // picture: the proven picture hero · separator: same + a bottom separator · nomedia: no picture to prove
-const KINDS = ["picture", "separator", "nomedia"] as const;
+// last: the hero is the only section (nothing follows but the footer) · emptynext: only an empty wrapper (a section that
+// rendered nothing, e.g. an empty catalogue) sits between the hero and the next section
+const KINDS = ["picture", "separator", "nomedia", "last", "emptynext"] as const;
 
 const RESOLVED = {
   "homepage.sections.0.design.background.media": {
@@ -96,6 +98,11 @@ describe("overlap proof", () => {
               },
               design,
             } as unknown as PresentationHomeSection;
+            const empty = {
+              id: "empty",
+              type: "categories",
+              visible: true,
+            } as unknown as PresentationHomeSection;
             const next = {
               id: "next",
               type: "banner",
@@ -109,9 +116,15 @@ describe("overlap proof", () => {
                 imageUrl: null,
               },
             } as unknown as PresentationHomeSection;
+            const sections =
+              kind === "last"
+                ? [hero]
+                : kind === "emptynext"
+                  ? [hero, empty, next]
+                  : [hero, next];
             for (const dir of ["ltr", "rtl"] as const) {
               const base = {
-                implemented: {} as never,
+                implemented: { categories: null } as never,
                 basePath: "/sa/en",
                 locale: dir === "rtl" ? "ar" : "en",
                 apps: { iosUrl: "", androidUrl: "", appName: "" },
@@ -125,7 +138,7 @@ describe("overlap proof", () => {
                 design: { primaryColor: "#12372a", accentColor: null, dir },
               };
               const calls: Record<string, any>[] = [];
-              await publishedNodes([hero, next], {
+              await publishedNodes(sections, {
                 ...base,
                 renderHero: (a: Record<string, any>) => {
                   calls.push(a);
@@ -152,7 +165,7 @@ describe("overlap proof", () => {
                   }),
                 );
               }
-              const nodes = await publishedNodes([hero, next], {
+              const nodes = await publishedNodes(sections, {
                 ...base,
                 renderHero: (a: Record<string, any>) =>
                   resolved.get(a.section.id),
@@ -165,7 +178,7 @@ describe("overlap proof", () => {
                     {nodes}
                   </StoreContainer>
                 </main>,
-              )}</body></html>`;
+              )}<footer id="page-footer" style="height:80px;background:#12372a"></footer></body></html>`;
               writeFileSync(
                 join(
                   DIR,
