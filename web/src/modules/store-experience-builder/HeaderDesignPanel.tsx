@@ -102,10 +102,10 @@ export function HeaderDesignPanel({
   return (
     <div className="space-y-4" data-header-design-panel="">
       <div className="space-y-1">
-        <h3 className="text-[12px] font-semibold tracking-wide text-neutral-500">
+        <h3 className="text-[12px] font-semibold tracking-wide text-muted">
           {t("headerDesignTitle")}
         </h3>
-        <p className="text-[12px] leading-5 text-neutral-500">
+        <p className="text-[12px] leading-5 text-muted">
           {t("headerDesignHint")}
         </p>
       </div>

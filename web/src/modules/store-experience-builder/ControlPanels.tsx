@@ -793,7 +793,7 @@ function HeaderPanel({
         <p
           role="status"
           data-header-style-overridden=""
-          className="text-[12px] leading-5 text-neutral-500"
+          className="text-[12px] leading-5 text-muted"
         >
           {t("headerLayoutOverridesStyle")}
         </p>
