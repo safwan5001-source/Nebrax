@@ -44,18 +44,18 @@ Absent `layout` ⇒ identical normalised output, identical resolved attributes a
 
 ## Design Quality Pass — real Chromium, the published hero (production `HeroSection`) and banner (`BannerBand`)
 
-hero × {default surface, proven picture} × {default, centered, minimal, split} + banner × {picture + copy, copy only, picture only, explicit inner spacing `none`} × {default, split, text-band} (the banner kinds also include *title + subtitle with no button* and *a single button*) × 2 directions = **52 pages**, each at 6 real device viewports (390×844 · 430×932 · 768×1024 · 1024×768 · 1280×800 · 1440×900):
+hero × {default surface, proven picture} × {default, centered, minimal, split} + banner × {picture + copy, copy only, picture only, explicit inner spacing `none`} × {default, split, text-band} (the banner kinds also include *title + subtitle with no button* and *a single button*) + a picture hero with an explicit inline position (`align` centre / end) × {default, split} × 2 directions = **60 pages**, each at 6 real device viewports (390×844 · 430×932 · 768×1024 · 1024×768 · 1280×800 · 1440×900):
 
 | | |
 |---|---|
-| Checks | **312** page×viewport · **152** pixel checks |
+| Checks | **360** page×viewport · **312** pixel checks |
 | Violations | **0** |
 | Asserted | **centered**: content box centred (±2 px), `text-align: center`, button row centred in its box · **minimal**: subheadline not displayed, hero shorter than the default · **hero split (≥ 768)**: the overlay is exactly half the section and on the **inline-start** edge (the right edge under RTL), the text column and every button stay inside that half, the other half's picture is **brighter** (bare); on a phone the overlay stays full width · **banner split (≥ 768)**: the picture is half the card, on the inline-end edge, fills the card height, the copy stays in the other half; stacked exactly as the default on a phone · **text-band**: the picture is hidden, the band is slimmer than the card, from md the buttons share the row with the copy and sit at the inline end · tap heights · no horizontal overflow · **contrast on the real pixels:** for every picture-hero layout × viewport × direction, the heading's colour is measured against the pixels that really sit behind it (text and borders hidden, the background photographed) — ≥ 4.5:1 |
-| **Negative control** | the five layout rule sets stripped from the stylesheet: **208 violations** — the measurement can fail |
+| **Negative control** | the five layout rule sets stripped from the stylesheet: **272 violations** — the measurement can fail |
 
 Evidence: `docs/plans/store/cust-hv-v6c7/layout-proof-summary.json` and screenshots (hero split LTR 1280 and RTL 1024; banner split RTL 1024; banner text-band LTR 1280 and RTL 390; hero centred 390; hero minimal 1280). Tooling is env-gated and inert in CI: `storefront/src/components/home/__tests__/layout-proof.render.test.tsx` (`LAYOUT_PROOF_DIR`) + `storefront/scripts/layout-proof/measure.mjs`.
 
-## Review findings resolved (Codex) — all five real
+## Review findings resolved (Codex) — all six real
 
 | Finding | Verdict | Fix |
 |---|---|---|
@@ -65,6 +65,8 @@ Evidence: `docs/plans/store/cust-hv-v6c7/layout-proof-summary.json` and screensh
 
 | *(round 2)* The Canvas draws a lone banner button as a `<span>`, so the `text-band` rule's copy predicate (`a`, `div`, …) missed it and the preview kept the picture while the storefront hid it | **Real** (preview ↔ storefront disagreement) | the predicate also matches `[data-cta-style]`, which both the published anchor and the Canvas span carry; a Canvas test pins the marker on the lone span, a stylesheet test pins the selector |
 | *(round 2)* A `text-band` banner with a title and subtitle but **no** button auto-placed the `<p>` in the second grid column, beside the heading, squeezing it | **Real** (reproduced: subtitle not under the heading, not in its column) | `h2` and `p` are explicitly placed in column 1; the second column is reserved for the actions. Proof kinds *no button* and *single button* added |
+
+| *(round 3, P1 — contrast safety)* With a picture hero on `split`, an explicit `align: center` / `end` (the 3×3 grid's inline half) moved the copy out of the inline-start half, while the overlay stays confined to that half: the copy could land on the **bare** picture, which the contrast proof (computed under the overlay) never covered | **Real and important** (reproduced: 30 violations — the text column and buttons crossing the middle) | at ≥ md the split hero's content box ignores the inline position (`margin-inline: 0 auto`, `inline-size: auto`, a higher-specificity rule than the `balign` rules): the text column stays in the overlaid half whatever `align` says, so the proof still covers it. The inline half of the 3×3 grid is documented as not applying to a split hero at ≥ md (the block half, `valign`, still does). Proof kinds *picture + align centre / end* added |
 
 The browser proof gained the banner kinds above; against the pre-fix stylesheets it reports violations in exactly those categories (a copy-only banner gaining padding · a picture-only banner losing its picture · inner spacing `none` leaving padding / no gutter · the subtitle beside the heading) and 0 with the fixes. The stylesheet tests pin the three selectors in both runtimes.
 
@@ -84,6 +86,7 @@ The browser proof gained the banner kinds above; against the pre-fix stylesheets
 | Full `php artisan test` | 5868 passed, 58 skipped, **28 failed — exactly the known container-only set** (26 `Fuel*` needing bcmath, `ResendMailTransportTest`, `UserInvitationTest`); CI runs them with the extensions |
 
 ## Limitations (stated)
+- A split hero's **inline** position is the layout's: the 3×3 grid's inline half (`align`) is ignored at ≥ md while `split` is active (the block half, `valign`, and every phone width keep working).
 - `layout` for the other section types arrives with their slices (V8 slider/gallery, V9 cards/categories/benefits/app promo): they drop it fail-closed until then (test-pinned).
 - The hero `split` is a text-column + bare-picture arrangement on **one** picture; a second, separate side image is not part of the contract.
 - A banner `text-band` hides the banner's picture rather than moving it; choosing it is the merchant's statement that this band is text.

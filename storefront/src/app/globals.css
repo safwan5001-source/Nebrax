@@ -621,6 +621,13 @@ input[type="search"]::-webkit-search-cancel-button {
   [data-sd~="lsplit"][data-sd~="ovl"] [data-sd-overlay] {
     inset-inline-end: 50%;
   }
+  /* the text column stays in the overlaid half WHATEVER the explicit inline position says: the contrast proof covers the
+     copy only under that overlay, so the inline half of the 3×3 grid does not apply to a split hero (≥ md) */
+  [data-sd~="lsplit"][data-sd~="balign"][data-sd] > * > [data-section-content] {
+    margin-inline-start: 0;
+    margin-inline-end: auto;
+    inline-size: auto;
+  }
 }
 /* banner · text-band: no picture, a slim band; from md the copy and the buttons share one row */
 /* ...but never the only content: a picture-only banner keeps its picture (the copy box holds only the sr-only heading) */

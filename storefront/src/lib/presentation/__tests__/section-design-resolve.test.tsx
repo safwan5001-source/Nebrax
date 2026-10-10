@@ -874,6 +874,10 @@ describe("resolveSectionDesign — hero / banner layout variants (CUST-HV V6c-7)
     expect(block).toMatch(
       /\[data-sd~="lbsplit"\]\[data-sd~="pi"\]\[data-sd\] > \* > \[data-section-content\]:has\(> img\) > div \{\s*padding: 0;/,
     );
+    // review fix (round 3, P1): the split hero's copy stays in the overlaid half whatever the explicit inline position says
+    expect(block).toMatch(
+      /\[data-sd~="lsplit"\]\[data-sd~="balign"\]\[data-sd\] > \* > \[data-section-content\] \{\s*margin-inline-start: 0;\s*margin-inline-end: auto;\s*inline-size: auto;/,
+    );
     // review fixes (round 2): a lone preview CTA (a span) counts as copy through its `data-cta-style` marker; with no button the
     // title and the subtitle both stay in the first grid column
     expect(block).toMatch(

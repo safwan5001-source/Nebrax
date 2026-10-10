@@ -70,6 +70,10 @@ describe("layout proof", () => {
       for (const kind of ["plain", "picture"])
         for (const layout of HERO_LAYOUTS)
           jobs.push({ type: "hero", kind, layout });
+      // a picture hero whose explicit inline position (the 3×3 grid's inline half) points away from the text half
+      for (const kind of ["picture-center", "picture-end"])
+        for (const layout of [undefined, "split"] as const)
+          jobs.push({ type: "hero", kind, layout });
       // banner kinds: plain (picture + copy) · noimage (copy only) · imageonly (a picture and nothing else) ·
       // inner (explicit inner spacing `none`) · nocta (title and subtitle, no button) · lone (a single button)
       for (const kind of [
@@ -84,7 +88,7 @@ describe("layout proof", () => {
           jobs.push({ type: "banner", kind, layout });
       for (const { type, kind, layout } of jobs) {
         const design: Record<string, unknown> = {};
-        if (kind === "picture") {
+        if (kind.startsWith("picture")) {
           design.background = {
             kind: "media",
             media: { mediaId: MEDIA_ID, decorative: true },
@@ -92,6 +96,8 @@ describe("layout proof", () => {
           };
         }
         if (layout) design.layout = layout;
+        if (kind === "picture-center") design.align = "center";
+        if (kind === "picture-end") design.align = "end";
         if (kind === "inner") design.spacing = { inner: "none" };
         const ctas = [
           { label: "Shop now", href: "/products" },

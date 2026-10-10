@@ -1,8 +1,8 @@
 {
- "pages": 52,
- "checks": 312,
- "layoutChecks": 312,
- "pixelChecks": 152,
+ "pages": 60,
+ "checks": 360,
+ "layoutChecks": 360,
+ "pixelChecks": 312,
  "strip": false,
  "violations": [],
  "sample": []

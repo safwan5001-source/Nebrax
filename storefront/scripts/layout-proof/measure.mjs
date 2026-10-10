@@ -113,7 +113,7 @@ for (const pass of [0, 1]) { // pass 0: default-layout baselines, pass 1: the va
         if (m.sub && m.sub.display !== "none") violations.push(`${tag}: the subheadline is still shown`);
         if (base && !(m.s.h < base.s.h - 4)) violations.push(`${tag}: minimal hero (${m.s.h.toFixed(0)}px) is not shorter than the default (${base.s.h.toFixed(0)}px)`);
       }
-      if (type === "hero" && layout === "split" && kind === "picture") {
+      if (type === "hero" && layout === "split" && kind.startsWith("picture")) {
         if (!m.overlay) violations.push(`${tag}: no overlay element`);
         else if (wide) {
           if (Math.abs(m.overlay.w - m.s.w / 2) > TOL) violations.push(`${tag}: overlay ${m.overlay.w.toFixed(1)}px is not half of ${m.s.w.toFixed(1)}px`);
@@ -172,7 +172,7 @@ for (const pass of [0, 1]) { // pass 0: default-layout baselines, pass 1: the va
         if (l.h < min - 0.5) violations.push(`${tag}: a button is ${l.h.toFixed(1)}px < ${min}px`);
       }
       // the contrast proof on a picture hero: pixels really behind the heading and the buttons
-      if (type === "hero" && kind === "picture") {
+      if (type === "hero" && kind.startsWith("picture")) {
         const fg = parseRgb(m.headingColor);
         const boxes = [m.heading, ...m.links];
         for (let i = 0; i < boxes.length; i++) {
