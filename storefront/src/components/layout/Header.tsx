@@ -10,6 +10,10 @@ import { StoreBrand } from "@/components/layout/StoreBrand";
 import { StoreContainer } from "@/components/layout/StoreContainer";
 import { StoreSearch } from "@/components/layout/StoreSearch";
 import { Button } from "@/components/ui/button";
+import {
+  type HeaderDesign,
+  resolveHeaderDesign,
+} from "@/lib/presentation/header-design";
 import type { MediaRef, ResolvedMedia } from "@/lib/presentation/media-ref";
 import { isWholesaleEnabled } from "@/lib/spree";
 
@@ -49,6 +53,67 @@ interface HeaderProps {
   showCart?: boolean;
   compact?: boolean;
   extraLinks?: StoreExtraNavLink[];
+  /** CUST-HV V7a — structural design; absent ⇒ the header renders exactly as before. */
+  design?: HeaderDesign;
+}
+
+/**
+ * CUST-HV V7a — the class strings that differ per layout, as literals so Tailwind sees them.
+ * `null` design resolves to the strings the header has always used.
+ */
+function layoutClasses(design: ReturnType<typeof resolveHeaderDesign>) {
+  const { layout, mobileLayout, designed } = design;
+  const startLogo = mobileLayout === "logo-start";
+
+  const mobileGrid = startLogo
+    ? "grid-cols-[auto_minmax(0,1fr)_auto]"
+    : "grid-cols-[1fr_minmax(0,1fr)_1fr]";
+  const mobileRows = designed
+    ? "grid-rows-[minmax(var(--store-header-height),auto)_auto]"
+    : "grid-rows-[var(--store-header-height)_auto]";
+  const base = `grid ${mobileGrid} ${mobileRows} items-center gap-x-2 gap-y-1`;
+  const rowHeight = designed
+    ? "md:min-h-store-header-lg"
+    : "md:h-store-header-lg";
+
+  const brandMobile = startLogo ? "justify-self-start" : "justify-self-center";
+
+  if (layout === "centered") {
+    return {
+      row: `${base} md:grid-cols-[2.5rem_minmax(0,1fr)_auto_minmax(0,1fr)_2.5rem] md:grid-rows-none md:gap-x-6 lg:grid-cols-[0_minmax(0,1fr)_auto_minmax(0,1fr)_0] ${rowHeight}`,
+      menu: "-ms-2 justify-self-start md:col-start-1 md:row-start-1 lg:hidden",
+      brand: `${brandMobile} md:col-start-3 md:row-start-1 md:justify-self-center`,
+      search:
+        "order-last col-span-3 min-w-0 pb-2.5 md:order-none md:col-span-1 md:col-start-2 md:row-start-1 md:pb-0",
+      searchEmpty:
+        "order-last col-span-3 min-w-0 md:order-none md:col-span-1 md:col-start-2 md:row-start-1",
+      searchInput: "md:max-w-2xl",
+      actions:
+        "flex items-center justify-self-end gap-1 md:col-start-4 md:row-start-1 md:gap-2",
+    };
+  }
+  if (layout === "two-row") {
+    return {
+      row: `${base} md:grid-cols-[auto_minmax(0,1fr)_auto] md:grid-rows-[minmax(var(--store-header-height-lg),auto)_auto] md:gap-x-6 md:gap-y-0 lg:grid-cols-[minmax(0,1fr)_auto]`,
+      menu: "-ms-2 justify-self-start lg:hidden",
+      brand: `${brandMobile} md:justify-self-start`,
+      search: "order-last col-span-3 min-w-0 pb-2.5 md:pb-3 lg:col-span-2",
+      searchEmpty: "order-last col-span-3 min-w-0 lg:col-span-2",
+      searchInput: "md:max-w-none",
+      actions: "flex items-center justify-self-end gap-1 md:gap-2",
+    };
+  }
+  return {
+    row: `${base} md:flex ${rowHeight} md:grid-rows-none md:gap-6`,
+    menu: "-ms-2 justify-self-start lg:hidden",
+    brand: `${brandMobile} md:justify-self-start`,
+    search:
+      "order-last col-span-3 min-w-0 pb-2.5 md:order-none md:col-span-1 md:flex-1 md:pb-0",
+    searchEmpty:
+      "order-last col-span-3 min-w-0 md:order-none md:col-span-1 md:flex-1",
+    searchInput: "md:max-w-2xl",
+    actions: "flex items-center justify-self-end gap-1 md:ms-auto md:gap-2",
+  };
 }
 
 interface HeaderMobileMenuProps {
@@ -108,15 +173,24 @@ export async function Header({
   showCart = true,
   compact = false,
   extraLinks = [],
+  design,
 }: HeaderProps) {
   const t = await getTranslations({ locale, namespace: "header" });
   const footer = await getTranslations({ locale, namespace: "footer" });
   const wholesaleEnabled = isWholesaleEnabled();
   const displayName = storeName?.trim() || footer("shop");
   const homeHref = basePath || "/";
+  const resolved = resolveHeaderDesign(design);
+  const classes = layoutClasses(resolved);
 
   return (
-    <header className="sticky top-(--store-announcement-height) z-40 bg-store-surface">
+    <header
+      className={
+        resolved.sticky === "off"
+          ? "relative z-40 bg-store-surface"
+          : "sticky top-(--store-announcement-height) z-40 bg-store-surface"
+      }
+    >
       <a
         href="#main-content"
         className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:start-4 focus:z-50 focus:rounded-store focus:border focus:border-store-border focus:bg-store-surface focus:px-3 focus:py-2 focus:shadow-sm focus:text-sm focus:font-medium focus:text-store-foreground"
@@ -142,10 +216,8 @@ export async function Header({
             RTL. Search sits on a second grid line there and moves into the row
             itself from `md`, where the same children lay out as a flex line.
           */}
-          <div className="grid grid-cols-[1fr_minmax(0,1fr)_1fr] grid-rows-[var(--store-header-height)_auto] items-center gap-x-2 gap-y-1 md:flex md:h-store-header-lg md:grid-rows-none md:gap-6">
-            <div className="-ms-2 justify-self-start lg:hidden">
-              {mobileNavigation}
-            </div>
+          <div className={classes.row}>
+            <div className={classes.menu}>{mobileNavigation}</div>
 
             <StoreBrand
               href={homeHref}
@@ -154,22 +226,23 @@ export async function Header({
               logoUrl={logoUrl}
               logoMedia={logoMedia}
               locale={locale}
-              className="justify-self-center md:justify-self-start"
+              scale={resolved.logoSize}
+              className={classes.brand}
             />
 
             {showSearch ? (
-              <div className="order-last col-span-3 min-w-0 pb-2.5 md:order-none md:col-span-1 md:flex-1 md:pb-0">
+              <div className={classes.search}>
                 <StoreSearch
                   basePath={basePath}
-                  className="md:max-w-2xl"
+                  className={classes.searchInput}
                   withSubmit
                 />
               </div>
             ) : (
-              <div className="order-last col-span-3 min-w-0 md:order-none md:col-span-1 md:flex-1" />
+              <div className={classes.searchEmpty} />
             )}
 
-            <div className="flex items-center justify-self-end gap-1 md:ms-auto md:gap-2">
+            <div className={classes.actions}>
               {wholesaleEnabled && (
                 <Link
                   href={`${basePath}/wholesale`}

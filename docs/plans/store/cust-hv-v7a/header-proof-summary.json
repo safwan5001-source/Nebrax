@@ -1,0 +1,10 @@
+{
+  "pages": 72,
+  "viewports": [[390, 844], [430, 932], [768, 1024], [1024, 768], [1280, 800], [1440, 900]],
+  "checks": 6328,
+  "violations": [],
+  "negativeControls": {
+    "strip (all [data-hd] rules removed)": { "checks": 6328, "violations": 440 },
+    "control (absent design measured against every design's expectations)": { "checks": 6344, "violations": 712 }
+  }
+}

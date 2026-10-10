@@ -21,6 +21,7 @@ import {
   previewStoreName,
   type StorefrontPresentationConfig,
 } from "./presentation/config";
+import { headerIsCompact, resolveHeaderDesign } from "./presentation/header-design";
 import type { CategoryPageRegionKey, PageRegionInstance, PageType, ProductPageRegionKey } from "./presentation/page-regions";
 import type { WorkspaceProductDetail } from "@/modules/commerce-workspace/workspace-products";
 import type { WorkspaceCategoryDetail } from "@/modules/commerce-workspace/workspace-categories";
@@ -321,7 +322,17 @@ export function StorefrontPreviewCanvas({
   // if it were mobile, since Market's starting bundle sets header.style to
   // compact by default.
   const mobileViewport = viewport === "mobile";
-  const headerStyleCompact = config.header.style === "compact";
+  const headerStyleCompact = headerIsCompact(config.header);
+  // CUST-HV V7a — structural header design (absent ⇒ every branch below is the old markup).
+  const headerResolved = resolveHeaderDesign(config.header.design);
+  const headerDesign = config.header.design;
+  const headerRowMinHeight = headerDesign?.height
+    ? mobileViewport
+      ? { compact: "2.875rem", standard: "3.375rem", tall: "3.875rem" }[headerDesign.height]
+      : { compact: "3.25rem", standard: "4rem", tall: "5rem" }[headerDesign.height]
+    : undefined;
+  const headerLogoStart = mobileViewport && headerResolved.mobileLayout === "logo-start";
+  const desktopLayout = mobileViewport ? "standard" : headerResolved.layout;
   const compact = mobileViewport || headerStyleCompact;
   // CUST-HV V4b — a media reference wins over the legacy embedded image (same
   // precedence as the published storefront). The preview URL is a signed,
@@ -474,6 +485,7 @@ export function StorefrontPreviewCanvas({
       data-preview-viewport={viewport}
       data-preview-page={page}
       {...(globalTokens?.attrs ?? {})}
+      {...(headerResolved.attrs ?? {})}
       dir={locale === "ar" ? "rtl" : "ltr"}
       className={cn(
         "awj-store-preview relative min-h-full bg-store-background text-store-foreground",
@@ -504,7 +516,8 @@ export function StorefrontPreviewCanvas({
             : undefined
         }
         className={cn(
-          "sticky top-0 z-20 bg-store-surface",
+          headerResolved.sticky === "off" ? "relative z-20" : "sticky top-0 z-20",
+          "bg-store-surface",
           onSelectChrome && "awj-preview-section",
           selectedChrome === "header" && "awj-preview-section-selected",
         )}
@@ -549,11 +562,21 @@ export function StorefrontPreviewCanvas({
 
         <div className="border-b border-store-border">
           <div
+            style={headerRowMinHeight ? { minHeight: headerRowMinHeight } : undefined}
             className={cn(
               storeContainerClassName,
               mobileViewport
-                ? "grid grid-cols-[1fr_minmax(0,1fr)_1fr] items-center gap-2 py-2"
-                : "flex items-center gap-6 py-3",
+                ? cn(
+                    "grid items-center gap-2 py-2",
+                    headerLogoStart
+                      ? "grid-cols-[auto_minmax(0,1fr)_auto]"
+                      : "grid-cols-[1fr_minmax(0,1fr)_1fr]",
+                  )
+                : desktopLayout === "centered"
+                  ? "grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-6 py-3"
+                  : desktopLayout === "two-row"
+                    ? "grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-6 gap-y-3 py-3"
+                    : "flex items-center gap-6 py-3",
             )}
           >
             {mobileViewport && (
@@ -580,7 +603,8 @@ export function StorefrontPreviewCanvas({
                 "inline-flex min-w-0 max-w-full",
                 onSelectChrome && "awj-preview-section",
                 selectedChrome === "branding" && "awj-preview-section-selected",
-                mobileViewport && "justify-self-center",
+                mobileViewport && (headerLogoStart ? "justify-self-start" : "justify-self-center"),
+                desktopLayout === "centered" && "col-start-2 row-start-1 justify-self-center",
               )}
             >
               <StoreBrand
@@ -589,15 +613,31 @@ export function StorefrontPreviewCanvas({
                 size="md"
                 logoUrl={logo}
                 linked={!onSelectChrome}
+                scale={headerResolved.logoSize}
+                mobile={mobileViewport}
               />
             </button>
             {config.header.showSearch && !mobileViewport && (
-              <div className="flex min-h-10 flex-1 items-center gap-2 rounded-store border border-store-border bg-store-surface px-3 text-sm text-store-muted-foreground">
+              <div
+                className={cn(
+                  "flex min-h-10 items-center gap-2 rounded-store border border-store-border bg-store-surface px-3 text-sm text-store-muted-foreground",
+                  desktopLayout === "centered" && "col-start-1 row-start-1 max-w-2xl",
+                  desktopLayout === "two-row" && "order-last col-span-2",
+                  desktopLayout === "standard" && "flex-1",
+                )}
+              >
                 <Search className="size-4" aria-hidden />
                 {t("search")}
               </div>
             )}
-            <div className={cn("flex items-center gap-1", mobileViewport && "justify-self-end")}>
+            <div
+              className={cn(
+                "flex items-center gap-1",
+                mobileViewport && "justify-self-end",
+                desktopLayout === "centered" && "col-start-3 row-start-1 justify-self-end",
+                desktopLayout === "two-row" && "justify-self-end",
+              )}
+            >
               {config.header.showAccount && !mobileViewport && (
                 <span className="inline-flex size-9 items-center justify-center text-store-foreground">
                   <User className="size-5" aria-hidden />

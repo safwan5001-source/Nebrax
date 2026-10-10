@@ -13,6 +13,7 @@ import { PublishedThemeMarkerProvider } from "@/components/layout/PublishedTheme
 import { StoreWhatsApp } from "@/components/layout/StoreWhatsApp";
 import { fetchStorefrontConfig } from "@/lib/commerce/storefront";
 import { getCategories } from "@/lib/data/categories";
+import { headerIsCompact } from "@/lib/presentation/header-design";
 import {
   publishedExtraNav,
   publishedLogoUrl,
@@ -183,7 +184,7 @@ export default async function StorefrontLayout({
   );
   const themeStyle = publishedThemeStyle(presentation);
   const themeAttrs = publishedThemeAttrs(presentation);
-  const compact = presentation?.header.style === "compact";
+  const compact = presentation ? headerIsCompact(presentation.header) : false;
   const logoUrl = publishedLogoUrl(presentation, compact);
   const logoMedia = publishedLogoMedia(
     presentation,
@@ -251,6 +252,7 @@ export default async function StorefrontLayout({
         showAccount={presentation ? presentation.header.showAccount : true}
         showCart={presentation ? presentation.header.showCart : true}
         compact={compact}
+        design={presentation?.header.design}
         extraLinks={extraLinks}
         mobileNavigation={
           <Suspense fallback={<MobileNavigationFallback />}>

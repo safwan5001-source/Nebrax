@@ -411,6 +411,8 @@ final class StorefrontPresentationNormalizer
         $pagePresentation = $this->normalizePagePresentation($input['pagePresentation'] ?? null);
         $announcements = $this->normalizeAnnouncements($input['announcements'] ?? null);
         $palette = $this->normalizePalette($input['palette'] ?? null);
+        // CUST-HV V7a — تصميم الترويسة البنيوي: مفتاح اختياري داخل `header`، الغياب = لا مفتاح.
+        $headerDesign = StorefrontHeaderDesignNormalizer::normalize($headerRaw['design'] ?? null);
 
         $config = [
             'version' => self::VERSION,
@@ -483,6 +485,10 @@ final class StorefrontPresentationNormalizer
             ],
             'pages' => $this->normalizePages($input['pages'] ?? null, $defaults['pages']),
         ];
+
+        if ($headerDesign !== null) {
+            $config['header']['design'] = $headerDesign;
+        }
 
         if ($pagePresentation !== null) {
             $config['pagePresentation'] = $pagePresentation;

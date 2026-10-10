@@ -492,6 +492,64 @@ input[type="search"]::-webkit-search-cancel-button {
   }
 }
 
+/*
+ * CUST-HV V7a — header design. Tokens come from `resolveHeaderDesign` (`data-hd` on the theme
+ * wrapper, which only exists when a token is set — an untouched header never matches a rule
+ * here). Heights live on the wrapper so the spacing aliases AND the sticky offset the page below
+ * relies on (`main` scroll margin, the product gallery's sticky top) follow the chosen height;
+ * custom properties resolve where they are declared, so every dependent is restated here.
+ * The header is always a direct child of the wrapper (`> header`), never a section's header.
+ */
+[data-hd] {
+  --hd-extra: 0px;
+  --spacing-store-header: var(--store-header-height);
+  --spacing-store-header-lg: var(--store-header-height-lg);
+  --store-header-offset: calc(
+    var(--store-announcement-height) + var(--store-header-height) + 3.875rem
+  );
+}
+[data-hd~="hh-c"] {
+  --store-header-height: 2.875rem;
+  --store-header-height-lg: 3.25rem;
+}
+[data-hd~="hh-t"] {
+  --store-header-height: 3.875rem;
+  --store-header-height-lg: 5rem;
+}
+[data-hd~="hl-2"] {
+  /* The second row (search) is part of the sticky band from `md`. */
+  --hd-extra: 3.5rem;
+}
+@media (min-width: 48rem) {
+  [data-hd] {
+    --store-header-offset: calc(
+      var(--store-announcement-height) + var(--store-utility-height) +
+        var(--store-header-height-lg) + var(--store-nav-height) + 0.5rem +
+        var(--hd-extra)
+    );
+  }
+}
+/* A header that scrolls away leaves only the announcement bar to clear. */
+[data-hd~="hs-o"] {
+  --store-header-offset: var(--store-announcement-height);
+}
+/* V7a-chrome:start */
+[data-hd~="hb-n"] > header > :is(div, nav) {
+  border-bottom-width: 0;
+}
+[data-hd~="hb-m"] > header > :is(div, nav) {
+  border-bottom-width: 2px;
+}
+[data-hd~="hx-s"] > header {
+  box-shadow: 0 1px 3px color-mix(in oklab, var(--store-foreground) 10%, transparent);
+}
+[data-hd~="hx-m"] > header {
+  box-shadow:
+    0 2px 6px color-mix(in oklab, var(--store-foreground) 10%, transparent),
+    0 10px 24px color-mix(in oklab, var(--store-foreground) 12%, transparent);
+}
+/* V7a-chrome:end */
+
 @layer base {
   * {
     @apply border-border;

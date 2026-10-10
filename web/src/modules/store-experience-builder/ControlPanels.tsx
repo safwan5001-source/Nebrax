@@ -30,6 +30,7 @@ import {
   THEME_PRESETS,
   type ThemePresetId,
 } from "./presentation";
+import { HeaderDesignPanel } from "./HeaderDesignPanel";
 import { SectionLibraryContent, SectionLibraryDialog } from "./SectionLibrary";
 import { buildWhatsAppUrl } from "./presentation/urls";
 import {
@@ -788,6 +789,23 @@ function HeaderPanel({
           ]}
         />
       </Field>
+      {config.header.design?.layout ? (
+        <p
+          role="status"
+          data-header-style-overridden=""
+          className="text-[12px] leading-5 text-neutral-500"
+        >
+          {t("headerLayoutOverridesStyle")}
+        </p>
+      ) : null}
+      <HeaderDesignPanel
+        design={config.header.design}
+        t={t}
+        onChange={(design) => {
+          const { design: _previous, ...rest } = config.header;
+          patch({ header: design ? { ...rest, design } : rest });
+        }}
+      />
       <div className="divide-y divide-neutral-200 border-y border-neutral-200">
         <Toggle
           label={t("showSearch")}
