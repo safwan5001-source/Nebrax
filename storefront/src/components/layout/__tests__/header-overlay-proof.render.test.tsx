@@ -147,7 +147,7 @@ interface Scenario {
   expectFg?: "#ffffff" | "#000000";
 }
 const OV = { mode: "overlay-hero" };
-export const SCENARIOS: Record<string, Scenario> = {
+const SCENARIOS: Record<string, Scenario> = {
   ovDark: {
     picture: "dark",
     header: OV,

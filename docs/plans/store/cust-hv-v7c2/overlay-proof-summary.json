@@ -1,0 +1,4 @@
+{
+  "storefront": { "pages": 36, "viewports": [[390,844],[430,932],[768,1024],[1024,768],[1280,800],[1440,900]], "checks": 4532, "pixelProofs": 120, "violations": [], "negativeControls": { "strip (overlay rules removed)": { "violations": 2002 }, "ovLie (evidence the picture does not honour)": "caught by the pixel proof at every viewport" } },
+  "canvas": { "spec": "web/e2e/cust-hv-v7c2-canvas-overlay.spec.ts", "tests": 12, "passed": 12 }
+}
