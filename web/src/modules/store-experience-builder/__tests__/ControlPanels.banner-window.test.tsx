@@ -63,6 +63,7 @@ describe("Banner window editor (CUST-HV V6c-1)", () => {
       "bannerWindowExpired",
       "bannerWindowInvalid",
       "bannerLabel",
+      "bannerPublishBlocked",
     ] as const) {
       expect(CUSTOMIZER_MESSAGES.ar[key]).toBeTruthy();
       expect(CUSTOMIZER_MESSAGES.en[key]).toBeTruthy();
@@ -155,14 +156,36 @@ describe("Canvas banner window chip (CUST-HV V6c-1)", () => {
 describe("Publish-gate copy for banner windows (CUST-HV V6c-1)", () => {
   const t = (key: Parameters<typeof customizerMessage>[1]) => customizerMessage("en", key);
 
-  it("names the banner and the problem; unknown codes never leak", () => {
-    expect(
-      describePublishIssues({ "homepage.sections[2].content.window.endsAt": "window_end_not_after_start" }, t),
-    ).toContain(`${t("bannerLabel")}: ${t("annIssueWindowOrder")}`);
-    expect(
-      describePublishIssues({ "homepage.sections[0].content.window.startsAt": "window_invalid_timestamp" }, t),
-    ).toContain(t("annIssueWindowInvalid"));
+  it("uses a banner heading — never the announcement-bar one — and names the banner and the problem", () => {
+    const text = describePublishIssues(
+      { "homepage.sections[2].content.window.endsAt": "window_end_not_after_start" },
+      t,
+    ) as string;
+    expect(text).toContain(t("bannerPublishBlocked"));
+    expect(text).toContain(`${t("bannerLabel")} 3: ${t("annIssueWindowOrder")}`);
+    expect(text).not.toContain(t("annPublishBlocked"));
+    const invalid = describePublishIssues(
+      { "homepage.sections[0].content.window.startsAt": "window_invalid_timestamp" },
+      t,
+    );
+    expect(invalid).toContain(t("annIssueWindowInvalid"));
+  });
+
+  it("keeps announcement and banner problems under their own headings when both block", () => {
+    const text = describePublishIssues(
+      {
+        "announcements.items[0].window.endsAt": "window_end_not_after_start",
+        "homepage.sections[1].content.window.startsAt": "window_invalid_timestamp",
+      },
+      t,
+    ) as string;
+    expect(text).toContain(t("annPublishBlocked"));
+    expect(text).toContain(t("bannerPublishBlocked"));
+  });
+
+  it("unknown codes never leak", () => {
     const unknown = describePublishIssues({ "homepage.sections[0].content.window.startsAt": "something_new" }, t);
     expect(unknown).not.toContain("something_new");
+    expect(unknown).toContain(t("bannerPublishBlocked"));
   });
 });

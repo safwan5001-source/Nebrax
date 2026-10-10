@@ -149,3 +149,15 @@ describe('zonedWallTimeToUtcIso — DST transitions (CUST-HV V6c-1)', () => {
     expect(zonedWallTimeToUtcIso('2026-12-01', '09:30', 'Asia/Riyadh')).toBe('2026-12-01T06:30:00.000Z');
   });
 });
+
+describe('low years (CUST-HV V6c-1)', () => {
+  it('keeps years 0001–0099 as typed instead of remapping them to 19xx', () => {
+    expect(zonedWallTimeToUtcIso('0001-01-01', '09:30', 'UTC')).toBe('0001-01-01T09:30:00.000Z');
+    expect(zonedWallTimeToUtcIso('0099-12-31', '23:00', 'UTC')).toBe('0099-12-31T23:00:00.000Z');
+  });
+
+  it('round-trips them and zero-pads the year so a date input can read it back', () => {
+    const iso = zonedWallTimeToUtcIso('0001-01-01', '09:30', 'UTC') as string;
+    expect(utcIsoToZonedWallTime(iso, 'UTC')).toEqual({ date: '0001-01-01', time: '09:30' });
+  });
+});

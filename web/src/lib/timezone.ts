@@ -32,6 +32,17 @@ export function safeTimeZone(timeZone: string | null | undefined): string {
   }
 }
 
+/**
+ * Epoch ms of a UTC calendar value. `Date.UTC` remaps years 0–99 to 1900–1999, which would silently
+ * store a different instant than the merchant typed; `setUTCFullYear` does not.
+ */
+function utcMillisOf(year: number, month: number, day: number, hour = 0, minute = 0, second = 0): number {
+  const date = new Date(0);
+  date.setUTCFullYear(year, month, day);
+  date.setUTCHours(hour, minute, second, 0);
+  return date.getTime();
+}
+
 function offsetMinutesAt(utcMillis: number, timeZone: string): number {
   const parts = new Intl.DateTimeFormat("en-US", {
     timeZone,
@@ -44,7 +55,7 @@ function offsetMinutesAt(utcMillis: number, timeZone: string): number {
     second: "2-digit",
   }).formatToParts(new Date(utcMillis));
   const get = (type: string) => Number(parts.find((p) => p.type === type)?.value ?? "0");
-  const asIfUtc = Date.UTC(get("year"), get("month") - 1, get("day"), get("hour"), get("minute"), get("second"));
+  const asIfUtc = utcMillisOf(get("year"), get("month") - 1, get("day"), get("hour"), get("minute"), get("second"));
   return (asIfUtc - utcMillis) / 60000;
 }
 
@@ -68,7 +79,7 @@ export function zonedWallTimeToUtcIso(
   if (month < 1 || month > 12 || day < 1 || day > 31 || hour > 23 || minute > 59) return null;
 
   const zone = safeTimeZone(timeZone);
-  const naiveUtc = Date.UTC(year, month - 1, day, hour, minute, 0);
+  const naiveUtc = utcMillisOf(year, month - 1, day, hour, minute);
   if (Number.isNaN(naiveUtc)) return null;
   // Resolve the zone's offset *at the resulting instant*, not at the wall time read as UTC (which is
   // an hour off inside a DST transition window). The offsets in force a day either side bracket any
@@ -109,7 +120,8 @@ export function utcIsoToZonedWallTime(
     minute: "2-digit",
   }).formatToParts(instant);
   const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "";
-  return { date: `${get("year")}-${get("month")}-${get("day")}`, time: `${get("hour")}:${get("minute")}` };
+  // Intl does not zero-pad the year (`1`, not `0001`), which a date input cannot read back.
+  return { date: `${get("year").padStart(4, "0")}-${get("month")}-${get("day")}`, time: `${get("hour")}:${get("minute")}` };
 }
 
 /** `{ date, time }` for "now, rounded up to the next 30-minute mark" in `timeZone` — the schedule dialog's default suggestion (same rounding Shopify's own future-publishing picker defaults to). */
