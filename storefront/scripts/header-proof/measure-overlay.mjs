@@ -17,7 +17,7 @@
 //   HEADER_OVERLAY_PROOF_DIR=<dir> npx vitest run src/components/layout/__tests__/header-overlay-proof.render.test.tsx
 //   node scripts/header-proof/measure-overlay.mjs <dir> [--strip]   (PIXEL_PROOF_CHROMIUM=<path> selects a Chromium binary)
 import { createRequire } from "node:module";
-import { readdirSync, readFileSync } from "node:fs";
+import { mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
@@ -118,9 +118,14 @@ for (const file of files.filter((f) => f.endsWith(".html"))) {
     const load = async (withJs) => {
       const ctx = await browser.newContext({ viewport: { width: w, height: h } });
       const page = await ctx.newPage();
-      let html = readFileSync(join(dir, "pages", file), "utf8");
-      if (stripped) html = html.replace(/<style>[\s\S]*?<\/style>/, `<style>${stripped}</style>`);
-      await page.setContent(html.replace(/\.\.\/pic-/g, `file://${dir}/pic-`), { waitUntil: "load" });
+      // a real file URL (not setContent): the pictures are sibling files and about:blank may not load them
+      let target = join(dir, "pages", file);
+      if (stripped) {
+        mkdirSync(join(dir, "pages-strip"), { recursive: true });
+        target = join(dir, "pages-strip", file);
+        writeFileSync(target, readFileSync(join(dir, "pages", file), "utf8").replace(/<style>[\s\S]*?<\/style>/, `<style>${stripped}</style>`));
+      }
+      await page.goto(`file://${target}`, { waitUntil: "load" });
       await page.evaluate(() => document.fonts.ready);
       if (withJs) {
         await page.addScriptTag({ content: `window.__PROOF=${JSON.stringify({ sticky: stickyOn, up })};` });
