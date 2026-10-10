@@ -90,6 +90,13 @@ class StorefrontPresentationBannerWindowTest extends TestCase
         $e = $this->errorsFor($this->banner(['window' => ['startsAt' => '2026-10-06T10:00:00Z', 'endsAt' => '2026-10-06T10:00:00Z']]));
         $this->assertSame('window_end_not_after_start', $e['homepage.sections[0].content.window.endsAt']['code'], 'endsAt is exclusive: equal edges are an empty window');
 
+        // الدقّة: المتصفّح يقتطع إلى الميلي ثانية، فحافتان متساويتان عندها نافذةٌ فارغة ولو اختلفتا بالميكرو.
+        $e = $this->errorsFor($this->banner(['window' => ['startsAt' => '2026-10-06T10:00:00.000001Z', 'endsAt' => '2026-10-06T10:00:00.000002Z']]));
+        $this->assertSame('window_end_not_after_start', $e['homepage.sections[0].content.window.endsAt']['code']);
+        $e = $this->errorsFor($this->banner(['window' => ['startsAt' => '2026-10-06T10:00:00.0005Z', 'endsAt' => '2026-10-06T10:00:00.0009Z']]));
+        $this->assertArrayHasKey('homepage.sections[0].content.window.endsAt', $e);
+        $this->assertSame([], $this->errorsFor($this->banner(['window' => ['startsAt' => '2026-10-06T10:00:00.001Z', 'endsAt' => '2026-10-06T10:00:00.002Z']])));
+
         // صالحة: فرق المناطق الزمنية يُقارَن بالتوقيت المطلق، حافةٌ واحدة مقبولة، وبلا نافذة لا خطأ.
         $this->assertSame([], $this->errorsFor($this->banner(['window' => ['startsAt' => '2026-10-06T15:00:00+03:00', 'endsAt' => '2026-10-06T12:00:01Z']])));
         $this->assertSame([], $this->errorsFor($this->banner(['window' => ['startsAt' => '2026-10-06T00:00:00Z']])));

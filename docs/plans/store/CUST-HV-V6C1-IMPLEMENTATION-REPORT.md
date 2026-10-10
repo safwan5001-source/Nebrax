@@ -28,6 +28,13 @@ The announcement bar already owns the only display-window semantic in the produc
 | **Canvas** | The banner stays **visible and selectable**; an editor-only chip (`data-banner-window-status` = scheduled / expired / invalid) states what the storefront will do. One clock (`useWindowsClock`) re-evaluates at the next edge, so an editor left open across a boundary stays truthful. Home page only. |
 | **Publish feedback** | `describePublishIssues` now reads banner window paths: "Cannot publish: … Banner: the end must be after the start". Unknown codes never leak. AR + EN copy added (`bannerWindow*`, `bannerLabel`). |
 
+## Review findings resolved (Codex, P2 ×2)
+
+| Finding | Verdict | Fix |
+|---|---|---|
+| `zonedWallTimeToUtcIso` read the offset at the wall time *as UTC*, so a DST-zone merchant entering `2026-03-08 03:30` in `America/New_York` stored `08:30Z` (04:30 local) | **Real**, pre-existing in the shared helper (also used by version scheduling); invisible in `Asia/Riyadh` | Offset is now resolved at the resulting instant with a round-trip check (candidates from the offsets a day either side). Repeated hour ⇒ first occurrence; skipped hour ⇒ just after the gap. Non-DST zones unchanged. Tests: both 2026 NY transitions, a half-hour round-trip sweep, Riyadh unchanged. |
+| PHP gate compared Carbon instants at µs precision while the runtime (JS `Date`) truncates to ms, so `.000001Z → .000002Z` passed publish but hid the banner forever | **Real** (also latent for announcements) | `parseInstant` truncates to ms like the runtime, so equal-at-ms edges are rejected with `window_end_not_after_start`. Tests added for µs and sub-ms edges; valid 1 ms window still passes. |
+
 ## Invariants
 
 | Invariant | Status |

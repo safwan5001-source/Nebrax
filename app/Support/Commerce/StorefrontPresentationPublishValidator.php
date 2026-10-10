@@ -180,7 +180,10 @@ final class StorefrontPresentationPublishValidator
             return null;
         }
         try {
-            $instant = CarbonImmutable::parse($value)->utc();
+            // بدقّة الميلي ثانية كما يقيّم المتصفّح والواجهة (`Date` في JS يقتطع ما بعدها): حافتان تتساويان عند
+            // الميلي ثانية نافذةٌ فارغة، فلا يمرّ بالنشر ما سيُخفي البانر دائماً.
+            $parsed = CarbonImmutable::parse($value)->utc();
+            $instant = $parsed->setMicrosecond(intdiv($parsed->microsecond, 1000) * 1000);
         } catch (Throwable) {
             $errors[$path] = ['code' => 'window_invalid_timestamp', 'message' => 'صيغة التاريخ غير صالحة.'];
 

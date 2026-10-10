@@ -109,3 +109,43 @@ describe('timeZoneDisplayLabel', () => {
     expect(label).toMatch(/GMT[+-]\d{2}:\d{2}/);
   });
 });
+
+describe('zonedWallTimeToUtcIso — DST transitions (CUST-HV V6c-1)', () => {
+  const ny = 'America/New_York';
+
+  it('is exact on either side of spring-forward (2026-03-08 02:00 → 03:00)', () => {
+    expect(zonedWallTimeToUtcIso('2026-03-08', '01:30', ny)).toBe('2026-03-08T06:30:00.000Z'); // EST
+    expect(zonedWallTimeToUtcIso('2026-03-08', '03:30', ny)).toBe('2026-03-08T07:30:00.000Z'); // EDT
+    expect(zonedWallTimeToUtcIso('2026-03-08', '12:00', ny)).toBe('2026-03-08T16:00:00.000Z');
+  });
+
+  it('reads a skipped wall time just after the gap', () => {
+    expect(zonedWallTimeToUtcIso('2026-03-08', '02:30', ny)).toBe('2026-03-08T07:30:00.000Z'); // = 03:30 EDT
+  });
+
+  it('is exact around fall-back (2026-11-01 02:00 → 01:00) and takes the first of a repeated hour', () => {
+    expect(zonedWallTimeToUtcIso('2026-11-01', '00:30', ny)).toBe('2026-11-01T04:30:00.000Z'); // EDT
+    expect(zonedWallTimeToUtcIso('2026-11-01', '01:30', ny)).toBe('2026-11-01T05:30:00.000Z'); // first 01:30 (EDT)
+    expect(zonedWallTimeToUtcIso('2026-11-01', '02:30', ny)).toBe('2026-11-01T07:30:00.000Z'); // EST
+  });
+
+  it('round-trips every half hour of a transition day', () => {
+    for (const day of ['2026-03-08', '2026-11-01']) {
+      for (let h = 0; h < 24; h++) {
+        for (const m of ['00', '30']) {
+          const time = `${String(h).padStart(2, '0')}:${m}`;
+          const iso = zonedWallTimeToUtcIso(day, time, ny);
+          expect(iso).not.toBeNull();
+          const back = utcIsoToZonedWallTime(iso as string, ny);
+          // A skipped wall time (02:xx on spring-forward day) comes back as the later, real one.
+          if (!(day === '2026-03-08' && h === 2)) expect(back).toEqual({ date: day, time });
+        }
+      }
+    }
+  });
+
+  it('leaves non-DST zones exactly as before (Asia/Riyadh = UTC+3)', () => {
+    expect(zonedWallTimeToUtcIso('2026-03-08', '03:30', 'Asia/Riyadh')).toBe('2026-03-08T00:30:00.000Z');
+    expect(zonedWallTimeToUtcIso('2026-12-01', '09:30', 'Asia/Riyadh')).toBe('2026-12-01T06:30:00.000Z');
+  });
+});

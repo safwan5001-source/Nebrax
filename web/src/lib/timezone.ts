@@ -52,7 +52,8 @@ function offsetMinutesAt(utcMillis: number, timeZone: string): number {
  * Converts a `YYYY-MM-DD` date + `HH:mm` time, understood as wall-clock time
  * in `timeZone`, to a canonical UTC ISO-8601 string (explicit `Z` offset —
  * satisfies the backend's `scheduled_for` contract). Returns `null` for a
- * malformed date/time instead of guessing.
+ * malformed date/time instead of guessing. DST-aware: a repeated wall time
+ * resolves to its first occurrence, a skipped one to just after the gap.
  */
 export function zonedWallTimeToUtcIso(
   dateValue: string,
@@ -67,14 +68,22 @@ export function zonedWallTimeToUtcIso(
   if (month < 1 || month > 12 || day < 1 || day > 31 || hour > 23 || minute > 59) return null;
 
   const zone = safeTimeZone(timeZone);
-  // First pass: treat the wall-clock values as if they were already UTC,
-  // then correct by the target zone's actual offset at that instant. Exact
-  // for zones without DST (Asia/Riyadh among them); correct everywhere
-  // except the rare one-hour DST-transition window in a zone that observes it.
   const naiveUtc = Date.UTC(year, month - 1, day, hour, minute, 0);
   if (Number.isNaN(naiveUtc)) return null;
-  const offset = offsetMinutesAt(naiveUtc, zone);
-  const date = new Date(naiveUtc - offset * 60000);
+  // Resolve the zone's offset *at the resulting instant*, not at the wall time read as UTC (which is
+  // an hour off inside a DST transition window). The offsets in force a day either side bracket any
+  // single transition; a candidate is valid only if the zone really has that offset at the instant
+  // it yields (round-trip). Two valid candidates = the clock repeats (fall back): take the earlier,
+  // first occurrence. None = the wall time was skipped (spring forward): read it with the offset in
+  // force before the gap, which lands just after it — the usual "compatible" resolution.
+  const DAY = 86_400_000;
+  const before = offsetMinutesAt(naiveUtc - DAY, zone);
+  const after = offsetMinutesAt(naiveUtc + DAY, zone);
+  const valid = [...new Set([before, after])]
+    .map((offset) => naiveUtc - offset * 60000)
+    .filter((utc) => offsetMinutesAt(utc, zone) === (naiveUtc - utc) / 60000)
+    .sort((a, b) => a - b);
+  const date = new Date(valid[0] ?? naiveUtc - before * 60000);
   return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }
 
