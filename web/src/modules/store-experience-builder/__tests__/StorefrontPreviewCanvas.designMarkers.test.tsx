@@ -167,3 +167,84 @@ describe("Canvas hero overlap (CUST-HV V6c-4)", () => {
     }
   });
 });
+
+describe("Canvas hero / banner layout variants (CUST-HV V6c-7)", () => {
+  afterEach(() => cleanup());
+
+  const config = (type: "hero" | "banner", layout: string): StorefrontPresentationConfig =>
+    ({
+      ...DEFAULT_PRESENTATION_CONFIG,
+      homepage: {
+        ...DEFAULT_PRESENTATION_CONFIG.homepage,
+        sections: [
+          {
+            id: "s1",
+            type,
+            visible: true,
+            design: { layout },
+            ...(type === "banner"
+              ? { content: { title: "Hi", subtitle: "", ctaLabel: "", ctaHref: "", imageUrl: null } }
+              : { content: { headline: "Hi" } }),
+          },
+        ],
+      },
+    }) as StorefrontPresentationConfig;
+  const tokens = (c: StorefrontPresentationConfig, viewport: "mobile" | "tablet" | "desktop") => {
+    const { container, unmount } = render(
+      <StorefrontPreviewCanvas config={c} locale="en" viewport={viewport} onSelectSection={() => {}} />,
+    );
+    const value = container.querySelector("[data-sd]")?.getAttribute("data-sd") ?? "";
+    unmount();
+    return value;
+  };
+
+  it("the always-on variants carry the same token as the storefront in every device frame", () => {
+    for (const viewport of ["mobile", "tablet", "desktop"] as const) {
+      expect(tokens(config("hero", "centered"), viewport)).toBe("lctr");
+      expect(tokens(config("hero", "minimal"), viewport)).toBe("lmin");
+      expect(tokens(config("banner", "text-band"), viewport)).toBe("lband");
+    }
+  });
+
+  it("the ≥ md banner split is absent in the phone frame and present on tablet and desktop", () => {
+    expect(tokens(config("banner", "split"), "mobile")).toBe("");
+    expect(tokens(config("banner", "split"), "tablet")).toBe("lbsplit");
+    expect(tokens(config("banner", "split"), "desktop")).toBe("lbsplit");
+  });
+
+  it("a hero split with no proven picture emits nothing in any frame", () => {
+    for (const viewport of ["mobile", "tablet", "desktop"] as const) {
+      expect(tokens(config("hero", "split"), viewport)).toBe("");
+    }
+  });
+});
+
+describe("Canvas lone banner button carries the marker the stylesheet reads (CUST-HV V6c-7 review)", () => {
+  afterEach(() => cleanup());
+
+  it("a single CTA is a span with data-cta-style, so a text-band over a picture hides the picture exactly as the storefront's anchor does", () => {
+    const config = {
+      ...DEFAULT_PRESENTATION_CONFIG,
+      homepage: {
+        ...DEFAULT_PRESENTATION_CONFIG.homepage,
+        sections: [
+          {
+            id: "b1",
+            type: "banner",
+            visible: true,
+            design: { layout: "text-band" },
+            content: { title: "", subtitle: "", ctaLabel: "", ctaHref: "", imageUrl: "https://example.com/x.png", ctas: [{ label: "Go", href: "/go" }] },
+          },
+        ],
+      },
+    } as StorefrontPresentationConfig;
+    const { container } = render(
+      <StorefrontPreviewCanvas config={config} locale="en" viewport="desktop" onSelectSection={() => {}} />,
+    );
+    const cta = container.querySelector("[data-banner-cta]") as HTMLElement;
+    expect(cta.tagName).toBe("SPAN");
+    expect(cta.getAttribute("data-cta-style")).toBe("solid");
+    // a direct child of the copy box, which is a direct child of the content box next to the picture
+    expect(cta.parentElement?.parentElement?.querySelector(":scope > img")).not.toBeNull();
+  });
+});

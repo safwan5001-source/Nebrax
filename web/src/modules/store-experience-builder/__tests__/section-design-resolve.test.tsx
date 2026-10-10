@@ -501,3 +501,85 @@ describe("resolveSectionDesign — hero overlap (CUST-HV V6c-4)", () => {
     expect(block).toMatch(/:where\(\[data-sd~="ovlp"\]\[data-sd\] \+ :not\(:empty\)\) \{\s*background-color: var\(--store-background\);/);
   });
 });
+
+describe("resolveSectionDesign — hero / banner layout variants (CUST-HV V6c-7)", () => {
+  const A = "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e";
+  const dark = { min: [0, 0, 0] as [number, number, number], max: [40, 50, 60] as [number, number, number] };
+  const withBounds = (extra: Partial<DesignContext> = {}): DesignContext => ({
+    ...ctx,
+    ...extra,
+    mediaBounds: () => ({ min: dark.min, max: dark.max }),
+  });
+  const picture: SectionDesign = {
+    background: { kind: "media", media: { mediaId: A, decorative: true }, overlay: { color: { hex: "#000000" }, alpha: 40 } },
+  };
+  const tokens = (type: string, design: SectionDesign, c: DesignContext = withBounds()) =>
+    (resolveSectionDesign(type, design, c)?.attrs["data-sd"] ?? "").split(" ").filter(Boolean);
+
+  it("hero: centered and minimal are tokens on any hero; the default emits nothing", () => {
+    expect(tokens("hero", { layout: "centered" })).toEqual(["lctr"]);
+    expect(tokens("hero", { layout: "minimal" })).toEqual(["lmin"]);
+    expect(resolveSectionDesign("hero", {}, ctx)).toBeNull();
+  });
+
+  it("hero: split needs a proven picture and a width of at least 768 (a simulated phone or a bare hero gets none)", () => {
+    expect(tokens("hero", { ...picture, layout: "split" })).toContain("lsplit");
+    expect(tokens("hero", { layout: "split" })).not.toContain("lsplit");
+    expect(tokens("hero", { layout: "split", background: { kind: "solid", color: { hex: "#101820" } } })).not.toContain("lsplit");
+    expect(tokens("hero", { ...picture, layout: "split" }, withBounds({ simulatedWidthPx: 390 }))).not.toContain("lsplit");
+    expect(tokens("hero", { ...picture, layout: "split" }, withBounds({ simulatedWidthPx: 767 }))).not.toContain("lsplit");
+    expect(tokens("hero", { ...picture, layout: "split" }, withBounds({ simulatedWidthPx: 768 }))).toContain("lsplit");
+    // an unprovable picture is treated as no background at all
+    expect(
+      tokens("hero", { ...picture, layout: "split" }, { ...ctx, mediaBounds: () => null }),
+    ).not.toContain("lsplit");
+  });
+
+  it("banner: text-band always, split from 768 (the banner's own picture is content, not a backdrop)", () => {
+    expect(tokens("banner", { layout: "text-band" })).toEqual(["lband"]);
+    expect(tokens("banner", { layout: "split" })).toEqual(["lbsplit"]);
+    expect(tokens("banner", { layout: "split" }, withBounds({ simulatedWidthPx: 390 }))).toEqual([]);
+    expect(tokens("banner", { layout: "split" }, withBounds({ simulatedWidthPx: 1024 }))).toEqual(["lbsplit"]);
+  });
+
+  it("a variant of the other type never emits (the resolver trusts normalised input, but a hand-built design must not leak)", () => {
+    expect(tokens("hero", { layout: "text-band" } as SectionDesign)).toEqual([]);
+    expect(tokens("banner", { layout: "centered" } as SectionDesign)).toEqual([]);
+    expect(tokens("categories", { layout: "split" } as SectionDesign)).toEqual([]);
+  });
+
+  it("the stylesheet carries a rule for every token, the split rules are ≥ md, and the overlay is narrowed on the split hero only", () => {
+    const css = readFileSync(resolve(__dirname, "../../../../../storefront/src/app/globals.css"), "utf8");
+    const at = css.indexOf("CUST-HV V5c — section design");
+    const block = css.slice(at);
+    for (const token of ["lctr", "lmin", "lsplit", "lband", "lbsplit"]) expect(block).toContain(`[data-sd~="${token}"]`);
+    expect(block).toMatch(/@media \(min-width: 48rem\) \{\s*\[data-sd~="lsplit"\]/);
+    expect(block).toMatch(/\[data-sd~="lsplit"\]\[data-sd~="ovl"\] \[data-sd-overlay\] \{\s*inset-inline-end: 50%;/);
+    // review fixes: the split copy styling needs a picture; a picture-only banner keeps its picture under text-band;
+    // an explicit inner spacing replaces the split's own padding
+    expect(block).toContain(
+      '[data-sd~="lbsplit"][data-sd] > * > [data-section-content]:has(> img) > div {',
+    );
+    expect(block).toContain(
+      '[data-sd~="lband"][data-sd] > * > [data-section-content]:has(> div > :is(h2:not(.sr-only), p, a, div, [data-cta-style])) > img {',
+    );
+    expect(block).toMatch(
+      /\[data-sd~="lbsplit"\]\[data-sd~="pi"\]\[data-sd\] > \* > \[data-section-content\]:has\(> img\) > div \{\s*padding: 0;/,
+    );
+    // review fix (round 4, P1): long unbroken words wrap (and a split hero's copy is clipped at its half), never painting past
+    // what the contrast proof covered
+    expect(block).toMatch(/\[data-sd~="mbg"\]\[data-sd\] \[data-section-content\] \{\s*overflow-wrap: anywhere;/);
+    expect(block).toMatch(
+      /\[data-sd~="lsplit"\]\[data-sd\] > \* > \[data-section-content\] \{\s*max-inline-size: 50%;[\s\S]*?overflow-wrap: anywhere;\s*overflow-x: clip;/,
+    );
+    // review fix (round 3, P1): the split hero's copy stays in the overlaid half whatever the explicit inline position says
+    expect(block).toMatch(
+      /\[data-sd~="lsplit"\]\[data-sd~="balign"\]\[data-sd\] > \* > \[data-section-content\] \{\s*margin-inline-start: 0;\s*margin-inline-end: auto;\s*inline-size: auto;/,
+    );
+    // review fixes (round 2): a lone preview CTA (a span) counts as copy through its `data-cta-style` marker; with no button the
+    // title and the subtitle both stay in the first grid column
+    expect(block).toMatch(
+      /\[data-sd~="lband"\]\[data-sd\] > \* > \[data-section-content\] > div > :is\(h2, p\) \{\s*grid-column: 1;/,
+    );
+  });
+});

@@ -24,6 +24,11 @@
             "spacing": true,
             "align": true,
             "valign": true,
+            "layout": [
+                "centered",
+                "split",
+                "minimal"
+            ],
             "border": true,
             "radius": true,
             "shadow": true,
@@ -59,6 +64,10 @@
             "spacing": true,
             "align": true,
             "valign": true,
+            "layout": [
+                "split",
+                "text-band"
+            ],
             "border": true,
             "radius": true,
             "shadow": true,
@@ -1354,7 +1363,7 @@
             }
         },
         {
-            "name": "layout and mediaTreatment.aspect are not accepted yet (V8/V9); overlap and height are covered by the V6c cases",
+            "name": "mediaTreatment.aspect is not accepted yet (V8); layout, overlap and height are covered by the V6c cases",
             "type": "hero",
             "input": {
                 "layout": "split",
@@ -1364,6 +1373,7 @@
                 "radius": "sm"
             },
             "expected": {
+                "layout": "split",
                 "radius": "sm"
             }
         },
@@ -2699,6 +2709,199 @@
                 "overlap": "md"
             },
             "expected": null
+        },
+        {
+            "name": "V6c-7: hero layout `centered` is kept",
+            "type": "hero",
+            "input": {
+                "layout": "centered"
+            },
+            "expected": {
+                "layout": "centered"
+            }
+        },
+        {
+            "name": "V6c-7: hero layout `split` is kept",
+            "type": "hero",
+            "input": {
+                "layout": "split"
+            },
+            "expected": {
+                "layout": "split"
+            }
+        },
+        {
+            "name": "V6c-7: hero layout `minimal` is kept",
+            "type": "hero",
+            "input": {
+                "layout": "minimal"
+            },
+            "expected": {
+                "layout": "minimal"
+            }
+        },
+        {
+            "name": "V6c-7: banner layout `split` is kept",
+            "type": "banner",
+            "input": {
+                "layout": "split"
+            },
+            "expected": {
+                "layout": "split"
+            }
+        },
+        {
+            "name": "V6c-7: banner layout `text-band` is kept",
+            "type": "banner",
+            "input": {
+                "layout": "text-band"
+            },
+            "expected": {
+                "layout": "text-band"
+            }
+        },
+        {
+            "name": "V6c-7: each type keeps only ITS variants (hero: no text-band; banner: no centered/minimal)",
+            "type": "hero",
+            "input": {
+                "layout": "text-band",
+                "radius": "sm"
+            },
+            "expected": {
+                "radius": "sm"
+            }
+        },
+        {
+            "name": "V6c-7: banner drops a hero-only variant",
+            "type": "banner",
+            "input": {
+                "layout": "centered",
+                "radius": "sm"
+            },
+            "expected": {
+                "radius": "sm"
+            }
+        },
+        {
+            "name": "V6c-7: the default layouts are the absence of the field (never stored); unknown, wrong-case and non-string values are dropped",
+            "type": "hero",
+            "input": {
+                "layout": "text-over-image",
+                "radius": "sm"
+            },
+            "expected": {
+                "radius": "sm"
+            }
+        },
+        {
+            "name": "V6c-7: wrong case is dropped",
+            "type": "banner",
+            "input": {
+                "layout": "Split",
+                "radius": "sm"
+            },
+            "expected": {
+                "radius": "sm"
+            }
+        },
+        {
+            "name": "V6c-7: a non-string layout is dropped",
+            "type": "hero",
+            "input": {
+                "layout": [
+                    "split"
+                ],
+                "radius": "sm"
+            },
+            "expected": {
+                "radius": "sm"
+            }
+        },
+        {
+            "name": "V6c-7: `categories` has no layout variants yet (V8/V9): dropped",
+            "type": "categories",
+            "input": {
+                "layout": "split",
+                "spacing": {
+                    "top": "md"
+                }
+            },
+            "expected": {
+                "spacing": {
+                    "top": "md"
+                }
+            }
+        },
+        {
+            "name": "V6c-7: `benefits` has no layout variants yet (V8/V9): dropped",
+            "type": "benefits",
+            "input": {
+                "layout": "split",
+                "spacing": {
+                    "top": "md"
+                }
+            },
+            "expected": {
+                "spacing": {
+                    "top": "md"
+                }
+            }
+        },
+        {
+            "name": "V6c-7: `featured` has no layout variants yet (V8/V9): dropped",
+            "type": "featured",
+            "input": {
+                "layout": "split",
+                "spacing": {
+                    "top": "md"
+                }
+            },
+            "expected": {
+                "spacing": {
+                    "top": "md"
+                }
+            }
+        },
+        {
+            "name": "V6c-7: `customContent` has no layout variants yet (V8/V9): dropped",
+            "type": "customContent",
+            "input": {
+                "layout": "split",
+                "spacing": {
+                    "top": "md"
+                }
+            },
+            "expected": {
+                "spacing": {
+                    "top": "md"
+                }
+            }
+        },
+        {
+            "name": "V6c-7: canonical order puts layout after valign and before border",
+            "type": "hero",
+            "input": {
+                "motion": {
+                    "reveal": "fade-up"
+                },
+                "border": {
+                    "width": "hairline"
+                },
+                "layout": "minimal",
+                "valign": "end",
+                "align": "center"
+            },
+            "expected": {
+                "align": "center",
+                "valign": "end",
+                "layout": "minimal",
+                "border": {
+                    "width": "hairline"
+                },
+                "motion": {
+                    "reveal": "fade-up"
+                }
+            }
         }
     ]
 }
