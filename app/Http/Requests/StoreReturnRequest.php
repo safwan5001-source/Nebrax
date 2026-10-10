@@ -29,6 +29,9 @@ class StoreReturnRequest extends FormRequest
             'original_id'         => ['nullable', 'uuid'],
             // هل تعود البضاعة للمخزون؟ الغياب = اتبع سياسة المستأجر.
             'restock'             => ['nullable', 'boolean'],
+            // REM-01: يخصّ المرتجع **الحرّ** وحده (أسعاره متضمّنة الضريبة أم لا).
+            // المرتجع المرتبط بمصدر يرث وضع مصدره ولا يُصدَّق ما يُرسَل.
+            'tax_inclusive'       => ['nullable', 'boolean'],
             'items.*.source_line_id' => ['nullable', 'uuid'],
             'notes'               => ['nullable', 'string'],
             'items'               => ['required', 'array', 'min:1'],
