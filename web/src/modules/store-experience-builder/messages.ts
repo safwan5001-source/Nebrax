@@ -308,6 +308,16 @@ export const CUSTOMIZER_MESSAGES = {
       "يصعد القسم التالي فوق الحافة السفلى للبطل على الأجهزة اللوحية والحاسوب فقط؛ وتبقى الهواتف متتالية. المحتوى لا يُغطّى أبداً.",
     designOverlapInactive:
       "غير مفعّل الآن: يحتاج خلفية صورة تجتاز فحص الوضوح وألّا يكون للبطل فاصل سفلي.",
+    designLayout: "التخطيط",
+    designLayoutDefault: "تلقائي",
+    designLayoutCentered: "متمركز",
+    designLayoutSplit: "مقسوم (نص وصورة)",
+    designLayoutMinimal: "مبسّط",
+    designLayoutTextBand: "شريط نصّي",
+    designLayoutHint:
+      "نمطٌ جاهز؛ موضع المحتوى والمسافات التي تضبطها بنفسك تبقى لها الأولوية. «مقسوم» لا يعمل إلا على الأجهزة اللوحية والحاسوب.",
+    designLayoutSplitInactive:
+      "غير مفعّل الآن: يحتاج خلفية صورة تجتاز فحص الوضوح، وعرضاً لوحياً أو أكبر.",
     designAlignStart: "البداية",
     designAlignCenter: "الوسط",
     designAlignEnd: "النهاية",
@@ -1396,6 +1406,16 @@ export const CUSTOMIZER_MESSAGES = {
       "The next section slides up over the hero's bottom edge on tablets and desktop only; phones stay stacked. Content is never covered.",
     designOverlapInactive:
       "Inactive right now: it needs a picture background that passes the legibility check, and no bottom separator on the hero.",
+    designLayout: "Layout",
+    designLayoutDefault: "Automatic",
+    designLayoutCentered: "Centred",
+    designLayoutSplit: "Split (text and picture)",
+    designLayoutMinimal: "Minimal",
+    designLayoutTextBand: "Text band",
+    designLayoutHint:
+      "A ready-made arrangement; the content position and spacing you set yourself still win. “Split” only applies on tablets and desktop.",
+    designLayoutSplitInactive:
+      "Inactive right now: it needs a picture background that passes the legibility check, and a tablet-or-wider screen.",
     designAlignStart: "Start",
     designAlignCenter: "Centre",
     designAlignEnd: "End",

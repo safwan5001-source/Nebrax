@@ -590,6 +590,84 @@ input[type="search"]::-webkit-search-cancel-button {
 [data-sd]:empty {
   display: none;
 }
+/* V6c-7 (V0 §3.4) — hero / banner layout variants. Each is a PRESET on top of the section's own markup; every rule keys on
+   a token the resolver emitted for a validated `layout`. They sit BEFORE the designed inner spacing, the 3×3 content
+   position and the height preset, so an explicit choice there always wins over a layout's default. None moves text onto
+   a surface its contrast proof did not cover: `split` keeps the text on the picture under the SAME overlay, only
+   confined to the text half (a subset of the proven whole-frame range) and leaves the other half's picture bare. */
+/* hero · centered: the content box and its text sit in the middle; the button row follows */
+[data-sd~="lctr"][data-sd] > * > [data-section-content] {
+  margin-inline: auto;
+  text-align: center;
+}
+[data-sd~="lctr"][data-sd] > * > [data-section-content] > div {
+  justify-content: center;
+}
+/* hero · minimal: headline and buttons only, compact */
+[data-sd~="lmin"][data-sd] > * {
+  min-block-size: 7rem;
+}
+[data-sd~="lmin"][data-sd] > * > [data-section-content] {
+  padding-block: 1rem;
+}
+[data-sd~="lmin"][data-sd] > * > [data-section-content] > p {
+  display: none;
+}
+/* hero · split (≥ md, proven picture only): the text column is the inline-start half, the overlay covers that half only */
+@media (min-width: 48rem) {
+  [data-sd~="lsplit"][data-sd] > * > [data-section-content] {
+    max-inline-size: 50%;
+  }
+  [data-sd~="lsplit"][data-sd~="ovl"] [data-sd-overlay] {
+    inset-inline-end: 50%;
+  }
+}
+/* banner · text-band: no picture, a slim band; from md the copy and the buttons share one row */
+[data-sd~="lband"][data-sd] > * > [data-section-content] > img {
+  display: none;
+}
+[data-sd~="lband"][data-sd] > * > [data-section-content] {
+  padding-block: 0.875rem;
+  gap: 0;
+}
+@media (min-width: 48rem) {
+  [data-sd~="lband"][data-sd] > * > [data-section-content] > div {
+    display: grid;
+    flex: 1 1 auto;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    column-gap: 1.5rem;
+  }
+  [data-sd~="lband"][data-sd] > * > [data-section-content] > div > :not(h2, p) {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    justify-self: end;
+    margin-block-start: 0;
+  }
+  /* banner · split: the picture fills the inline-end half, the copy the other (≥ md) */
+  [data-sd~="lbsplit"][data-sd] > * > [data-section-content]:has(> img) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 0;
+    padding: 0;
+    align-items: stretch;
+  }
+  [data-sd~="lbsplit"][data-sd] > * > [data-section-content] > img {
+    grid-column: 2;
+    grid-row: 1;
+    inline-size: 100%;
+    block-size: 100%;
+    min-block-size: 12rem;
+    max-inline-size: none;
+    border-radius: 0;
+  }
+  [data-sd~="lbsplit"][data-sd] > * > [data-section-content] > div {
+    grid-column: 1;
+    grid-row: 1;
+    align-self: center;
+    padding: 1.5rem 2rem;
+  }
+}
 [data-sd~="bg"] {
   background: var(--sec-bg);
 }

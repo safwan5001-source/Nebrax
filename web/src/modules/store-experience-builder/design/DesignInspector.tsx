@@ -110,6 +110,12 @@ const HEIGHT_LABEL: Record<(typeof HEIGHT_PRESETS)[number], CustomizerMessageKey
   tall: "designHeightTall",
   screen: "designHeightScreen",
 };
+const LAYOUT_LABEL: Record<string, CustomizerMessageKey> = {
+  centered: "designLayoutCentered",
+  split: "designLayoutSplit",
+  minimal: "designLayoutMinimal",
+  "text-band": "designLayoutTextBand",
+};
 const OVERLAP_LABEL: Record<(typeof OVERLAPS)[number], CustomizerMessageKey> = {
   none: "designUnset",
   sm: "designOverlapSm",
@@ -200,6 +206,11 @@ export function DesignInspector({
   const hasSeparator = activeSeparatorKinds.length > 0;
   // V6c-4 — overlap needs a hero that really paints a picture (the resolver's own test) and no bottom separator.
   const overlapInactive = resolveSectionDesign(type, current, ctx)?.attrs["data-sd"]?.split(" ").includes("ovlp") !== true;
+  // V6c-7 — a hero's split needs a picture that really paints (and ≥ md); say so rather than do nothing
+  const layoutInactive =
+    type === "hero" &&
+    current.layout === "split" &&
+    resolveSectionDesign(type, current, ctx)?.attrs["data-sd"]?.split(" ").includes("lsplit") !== true;
   const hasDesignBackground = current.background?.kind === "solid" || current.background?.kind === "gradient";
   // The colour a separator takes when the merchant picks none — exactly the resolver's defaults:
   // a line follows the border role, a band the brand, a shape the page behind it (brand when the section has no designed background, so it is visible). Mixed edges
@@ -678,6 +689,32 @@ export function DesignInspector({
             ]}
           />
         </Field>
+      ) : null}
+
+      {Array.isArray(capability.layout) ? (
+        <div className="space-y-1" data-design-layout-group="">
+          <Field label={t("designLayout")}>
+            <select
+              className={selectClass}
+              data-design-layout=""
+              value={current.layout ?? ""}
+              onChange={(event) => set("layout", (event.target.value || undefined) as SectionDesign["layout"])}
+            >
+              <option value="">{t("designLayoutDefault")}</option>
+              {(capability.layout as readonly string[]).map((layout) => (
+                <option key={layout} value={layout}>
+                  {t(LAYOUT_LABEL[layout])}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <p className="text-[12px] leading-5 text-muted">{t("designLayoutHint")}</p>
+          {layoutInactive ? (
+            <p data-design-layout-inactive="" role="status" className="text-[12px] leading-5 text-warning">
+              {t("designLayoutSplitInactive")}
+            </p>
+          ) : null}
+        </div>
       ) : null}
 
       {capability.overlap ? (

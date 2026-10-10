@@ -12,8 +12,8 @@ namespace App\Support\Commerce;
  * غير الصالحة تُسقط وحدها، والنتيجة الفارغة تُحذف. **غياب `design` ⇒ مخرجات القسم
  * بلا أي تغيير** (§3.1).
  *
- * خارج هذا الملف عمداً (كلٌّ يدخل مع الشريحة التي تستطيع رسمه وإثباته): `layout`، و`overlap`/`mediaTreatment`.
- * تُسقط الآن fail-closed فلا يتسلل خلفية غير مُثبتة. (V5e-3 أضاف `separator` و`motion.reveal`.)
+ * خارج هذا الملف عمداً (كلٌّ يدخل مع الشريحة التي تستطيع رسمه وإثباته): `layout` للأنواع غير البطل واللافتة (V8/V9)، و`mediaTreatment.aspect/fit`.
+ * تُسقط الآن fail-closed فلا يتسلل خلفية غير مُثبتة. (V5e-3 أضاف `separator` و`motion.reveal`؛ V6c-7 أضاف `layout` للبطل واللافتة.)
  */
 final class StorefrontSectionDesignNormalizer
 {
@@ -56,6 +56,15 @@ final class StorefrontSectionDesignNormalizer
     /** V6c-4 (V0 §6.5، D-13) — تداخل البطل مع القسم التالي: إعدادات مسبقة فقط (`none` = غياب، لا يُخزَّن أبداً). */
     public const OVERLAPS = ['none', 'sm', 'md'];
 
+    /**
+     * V6c-7 (V0 §3.4) — أنماط التخطيط (`layout`) لكل نوع: قائمة مغلقة، والغياب هو النمط الافتراضي (البطل: نص فوق الصورة؛ اللافتة: بطاقة)
+     * فلا يُخزَّن أبداً. `full-bleed` للافتة لا يُضاف: `width.mode = full` (V5) يؤدّي المعنى نفسه.
+     */
+    public const LAYOUTS = [
+        'hero' => ['centered', 'split', 'minimal'],
+        'banner' => ['split', 'text-band'],
+    ];
+
     /** V6c-3 (V0 §8.3) — ارتفاع القسم المُعدّ مسبقاً للبطل واللافتة (حدّ أدنى فقط؛ المحتوى لا يُقصّ أبداً). */
     public const HEIGHT_PRESETS = ['compact', 'standard', 'tall', 'screen'];
 
@@ -97,9 +106,16 @@ final class StorefrontSectionDesignNormalizer
             'motion' => ['reveal'],
         ];
         // V6c-4 — `overlap` للبطل وحده (V0 §6.5: «hero→next only»)؛ الترتيب القانوني: separator، overlap، mediaTreatment، motion.
+        // V6c-7 — `layout` (قائمة أنماط كل نوع) بعد `valign` (V0 §3.3: … align، layout، border …).
         $heroOnly = [];
+        $banner = [];
         foreach ($hero as $group => $allowance) {
             $heroOnly[$group] = $allowance;
+            $banner[$group] = $allowance;
+            if ($group === 'valign') {
+                $heroOnly['layout'] = self::LAYOUTS['hero'];
+                $banner['layout'] = self::LAYOUTS['banner'];
+            }
             if ($group === 'separator') {
                 $heroOnly['overlap'] = true;
             }
@@ -108,7 +124,7 @@ final class StorefrontSectionDesignNormalizer
 
         return [
             'hero' => $heroOnly,
-            'banner' => $hero,
+            'banner' => $banner,
             'categories' => ['background' => self::BACKGROUND_KINDS, 'text' => ['heading'], 'typography' => ['headingStyle'], 'width' => true, 'spacing' => true, 'border' => true, 'radius' => true, 'separator' => true],
             'newArrivals' => $shelf,
             'featured' => $shelf,
@@ -174,6 +190,12 @@ final class StorefrontSectionDesignNormalizer
             $valign = self::pick($raw['valign'] ?? null, self::ALIGNS);
             if ($valign !== null) {
                 $out['valign'] = $valign;
+            }
+        }
+        if (isset($capability['layout'])) {
+            $layout = self::pick($raw['layout'] ?? null, $capability['layout']);
+            if ($layout !== null) {
+                $out['layout'] = $layout;
             }
         }
         if (isset($capability['border'])) {

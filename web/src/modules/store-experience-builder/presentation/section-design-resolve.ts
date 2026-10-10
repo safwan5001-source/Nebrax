@@ -654,6 +654,24 @@ export function resolveSectionDesign(
     sd.push("ovlp");
   }
 
+  // Layout variants (V6c-7, V0 §3.4): a token per variant, the rules live in the stylesheet. `split` is a ≥ md effect (the
+  // stylesheet repeats the check for the real storefront; the Canvas says which device it simulates), and a hero's split
+  // additionally needs a picture that really paints (a proven "media hero"): the overlay it narrows is that picture's.
+  // The default layouts (text over the image / card) are the absence of the field and emit nothing.
+  if (design.layout) {
+    const wide =
+      ctx.simulatedWidthPx === undefined || ctx.simulatedWidthPx >= 768;
+    if (type === "hero") {
+      if (design.layout === "centered") sd.push("lctr");
+      else if (design.layout === "minimal") sd.push("lmin");
+      else if (design.layout === "split" && wide && mediaProven)
+        sd.push("lsplit");
+    } else if (type === "banner") {
+      if (design.layout === "text-band") sd.push("lband");
+      else if (design.layout === "split" && wide) sd.push("lbsplit");
+    }
+  }
+
   // One-time reveal (V5e-3): only an attribute — the published page's observer plays it.
   if (design.motion?.reveal === "fade-up") sd.push("reveal");
 

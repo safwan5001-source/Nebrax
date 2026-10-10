@@ -13,7 +13,7 @@
  * all three are pinned by `tests/Fixtures/presentation/section-design.json`.
  *
  * Deliberately NOT here yet (each enters with the slice that can render and prove it):
- *  - `layout` variants → the slices that add variants (V6/V8/V9);
+ *  - `layout` variants of the other types → the slices that add them (V8/V9; V6c-7 added hero and banner);
  *  - `mediaTreatment.aspect` / `fit` → V8 (V6c-3 added `valign` and `mediaTreatment.height`).
  * Until then they are dropped fail-closed, so a hand-written document can never
  * smuggle an unproven background past the publish gate.
@@ -66,6 +66,17 @@ export const SEPARATOR_KINDS = [
 ] as const;
 export const SEPARATOR_HEIGHTS = ["sm", "md", "lg"] as const;
 export const REVEALS = ["none", "fade-up"] as const;
+/**
+ * V6c-7 (V0 §3.4) — layout variants per type: a closed list, the default (hero: text over the image; banner: card) is the
+ * ABSENCE of the field and is never stored. A banner's `full-bleed` is not a variant: `width.mode = full` (V5) says the same.
+ */
+export const LAYOUTS = {
+  hero: ["centered", "split", "minimal"],
+  banner: ["split", "text-band"],
+} as const;
+export type HeroLayout = (typeof LAYOUTS.hero)[number];
+export type BannerLayout = (typeof LAYOUTS.banner)[number];
+
 /** V6c-4 (V0 §6.5, D-13) — hero overlap presets; `none` is the absence of the field and is never stored. */
 export const OVERLAPS = ["none", "sm", "md"] as const;
 /** V6c-3 (V0 §8.3) — hero / banner section height presets: a bounded minimum, content is never clipped. */
@@ -152,6 +163,8 @@ export interface SectionDesign {
   align?: Align;
   /** V6c-3 — the block-axis half of the 3×3 content position (`align` is the inline half). */
   valign?: Align;
+  /** V6c-7 — hero: `centered` | `split` | `minimal`; banner: `split` | `text-band`. Absent = the default layout. */
+  layout?: HeroLayout | BannerLayout;
   border?: SectionBorder;
   radius?: (typeof RADII)[number];
   shadow?: (typeof SHADOWS)[number];
@@ -191,6 +204,7 @@ export const SECTION_DESIGN_CAPABILITIES: Record<string, DesignCapability> = {
     spacing: true,
     align: true,
     valign: true,
+    layout: LAYOUTS.hero,
     border: true,
     radius: true,
     shadow: true,
@@ -207,6 +221,7 @@ export const SECTION_DESIGN_CAPABILITIES: Record<string, DesignCapability> = {
     spacing: true,
     align: true,
     valign: true,
+    layout: LAYOUTS.banner,
     border: true,
     radius: true,
     shadow: true,
@@ -546,6 +561,10 @@ export function normalizeSectionDesign(
   if (capability.valign) {
     const valign = pick(raw.valign, ALIGNS);
     if (valign) out.valign = valign;
+  }
+  if (Array.isArray(capability.layout)) {
+    const layout = pick(raw.layout, capability.layout as readonly string[]);
+    if (layout) out.layout = layout as HeroLayout | BannerLayout;
   }
   if (capability.border) {
     const border = normalizeBorder(raw.border);

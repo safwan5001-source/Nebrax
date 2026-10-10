@@ -167,3 +167,54 @@ describe("Canvas hero overlap (CUST-HV V6c-4)", () => {
     }
   });
 });
+
+describe("Canvas hero / banner layout variants (CUST-HV V6c-7)", () => {
+  afterEach(() => cleanup());
+
+  const config = (type: "hero" | "banner", layout: string): StorefrontPresentationConfig =>
+    ({
+      ...DEFAULT_PRESENTATION_CONFIG,
+      homepage: {
+        ...DEFAULT_PRESENTATION_CONFIG.homepage,
+        sections: [
+          {
+            id: "s1",
+            type,
+            visible: true,
+            design: { layout },
+            ...(type === "banner"
+              ? { content: { title: "Hi", subtitle: "", ctaLabel: "", ctaHref: "", imageUrl: null } }
+              : { content: { headline: "Hi" } }),
+          },
+        ],
+      },
+    }) as StorefrontPresentationConfig;
+  const tokens = (c: StorefrontPresentationConfig, viewport: "mobile" | "tablet" | "desktop") => {
+    const { container, unmount } = render(
+      <StorefrontPreviewCanvas config={c} locale="en" viewport={viewport} onSelectSection={() => {}} />,
+    );
+    const value = container.querySelector("[data-sd]")?.getAttribute("data-sd") ?? "";
+    unmount();
+    return value;
+  };
+
+  it("the always-on variants carry the same token as the storefront in every device frame", () => {
+    for (const viewport of ["mobile", "tablet", "desktop"] as const) {
+      expect(tokens(config("hero", "centered"), viewport)).toBe("lctr");
+      expect(tokens(config("hero", "minimal"), viewport)).toBe("lmin");
+      expect(tokens(config("banner", "text-band"), viewport)).toBe("lband");
+    }
+  });
+
+  it("the ≥ md banner split is absent in the phone frame and present on tablet and desktop", () => {
+    expect(tokens(config("banner", "split"), "mobile")).toBe("");
+    expect(tokens(config("banner", "split"), "tablet")).toBe("lbsplit");
+    expect(tokens(config("banner", "split"), "desktop")).toBe("lbsplit");
+  });
+
+  it("a hero split with no proven picture emits nothing in any frame", () => {
+    for (const viewport of ["mobile", "tablet", "desktop"] as const) {
+      expect(tokens(config("hero", "split"), viewport)).toBe("");
+    }
+  });
+});
