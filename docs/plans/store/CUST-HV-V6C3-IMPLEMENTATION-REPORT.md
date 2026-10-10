@@ -22,7 +22,7 @@ V0 §8.3 lists a **3×3 logical content-position grid** as a Hero/Banner capabil
 |---|---|
 | **Contract (PHP authority + 2 TS twins, byte-identical)** | `valign` (after `align`) and `mediaTreatment {height}` (after `separator`, before `motion`) on `hero` and `banner` only; anything else — an unknown value, a CSS length such as `600px`, `top` instead of `start`, a non-object `mediaTreatment`, `aspect` / `fit`, any other section type — is dropped on its own. Shared fixture `section-design.json`: capability registry + **27 new cases** read by PHP, web and storefront. |
 | **Resolver (twins, byte-identical)** | `valign` → `--sec-vj` (`flex-start`/`center`/`flex-end`), `data-sd` token `valign`. `height` → `--sec-minh` = `10rem` · `18rem` · `28rem` · `clamp(24rem, 100svh, 56rem)`, token `hgt`. Validated tokens only; no raw CSS. `DesignContext.screenHeightPx` (optional): the **Canvas** passes its simulated device's height (844 / 1024 / 800) so "Screen height" there means the previewed device, not the editor window; absent ⇒ the real `100svh`. |
-| **Stylesheet (storefront `globals.css` + Canvas `store-preview.css`, parity-tested)** | A preset is a **minimum** (`min-block-size`, content is never clipped) that **replaces** the section's own default minimum. The section root becomes a column flex box so the marked content box sits at the top / middle / bottom; with a height but no explicit position the content stays vertically centred, as a hero always was. Backdrop and overlay are absolutely positioned and take no part in the flow. |
+| **Stylesheet (storefront `globals.css` + Canvas `store-preview.css`, parity-tested)** | A preset is a **minimum** (`min-block-size`, content is never clipped) that **replaces** the section's own default minimum. The section root becomes a column flex box so the marked content box sits at the top / middle / bottom; with a height but no explicit position the content stays where the section always put it — **vertically centred for a hero, at the top for a banner** (type-specific fallback; a review finding, see below). Backdrop and overlay are absolutely positioned and take no part in the flow. |
 | **Merchant UI** | `PlacementGrid`: one 3×3 control (nine real buttons, `aria-pressed`, accessible names such as "top Start", 44 px targets on phones / 36 px on desktop, the first column is the reading-start side so it mirrors under RTL) that writes **both halves in one commit**; "Default" clears both. It replaces the three-way "Content position" control for hero/banner only — other types keep it. Section height is a select (Default / Compact / Standard / Tall / Screen height), with a hint that explains presets are minimums. AR + EN copy. |
 | **Canvas** | Same frame, same tokens, same stylesheet rules (the Canvas hero/banner roots and content boxes have the identical structure the rules address — tested). |
 
@@ -37,7 +37,7 @@ Absent `valign` / `mediaTreatment` ⇒ identical normalised output, identical re
 |---|---|
 | Checks | **480** page×viewport · **664** placement checks · **304** exact-preset checks |
 | Violations | **0** |
-| Asserted | no horizontal overflow · content never clipped · section ≥ its preset (`screen` = clamp(24rem, viewport height, 56rem) at each device) and, where the preset exceeds the content, **exactly** the preset (so it is the preset, not the content, that sets the height) · content box on the chosen block edge/centre · on the chosen inline edge/centre, **logically** (`start` = the right edge under RTL) whenever the box is narrower than the section · automatic position stays vertically centred |
+| Asserted | no horizontal overflow · content never clipped · section ≥ its preset (`screen` = clamp(24rem, viewport height, 56rem) at each device) and, where the preset exceeds the content, **exactly** the preset (so it is the preset, not the content, that sets the height) · content box on the chosen block edge/centre · on the chosen inline edge/centre, **logically** (`start` = the right edge under RTL) whenever the box is narrower than the section · automatic position keeps today's layout once a height is set (hero centred, **banner at the top**) |
 | **Negative control** | the same 80 pages with the two new stylesheet rules removed: **320 violations** — the measurement can fail |
 
 Evidence: `docs/plans/store/cust-hv-v6c3/placement-proof-summary.json` and six screenshots (hero tall bottom-end RTL at 390 and 1280; banner screen top-start LTR 1280; banner tall middle-centre RTL 390; hero compact and standard). Tooling is env-gated and inert in CI: `storefront/src/components/home/__tests__/placement-proof.render.test.tsx` (`PLACEMENT_PROOF_DIR`) + `storefront/scripts/placement-proof/measure.mjs`.
@@ -56,6 +56,12 @@ Legibility over a picture background needs nothing new: the V6b proof is whole-f
 | Storefront full | 1615 passed (+3 env-gated skipped) · `tsc` (tests included) and biome clean |
 | Web `store-experience-builder` + commerce/appearance + `src/lib` | 1744 passed |
 | Full `php artisan test` | see PR |
+
+## Review findings resolved (Codex)
+
+| Finding | Verdict | Fix |
+|---|---|---|
+| A banner with a height preset but no `valign` was vertically centred, although banners have always started at the top — so "Automatic" did not preserve a banner's layout | **Real** (my fallback was a single `center` for both types, contradicting the "Automatic keeps today's layout" claim) | Type-specific fallback in the stylesheet (both sheets, parity-tested): `center` for a hero, `flex-start` for a banner, keyed on the frame's existing `data-design-type`. The browser proof now asserts it (automatic banner within 2 px of the top; 664 placement checks, 0 violations; negative control still 320). |
 
 ## Limitations (stated)
 - `screen` follows the **small** viewport (`svh`), so it never jumps with the mobile URL bar; an engine without `svh` ignores the preset and the section keeps its content height.

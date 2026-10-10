@@ -4,7 +4,7 @@
 //   * the content is never clipped and nothing overflows horizontally;
 //   * the content box sits on the chosen block-axis edge/centre and the chosen inline-axis edge/centre
 //     (logical: `start` is the right edge under RTL), whenever the box is narrower than the section;
-//   * an automatic position keeps today's layout (hero centred, banner at the top).
+//   * an automatic position keeps today's layout once a height is set (hero centred, banner at the top).
 // 6 viewports x AR RTL / EN LTR.
 //   node scripts/pixel-proof/build-css.mjs <dir>
 //   PLACEMENT_PROOF_DIR=<dir> npx vitest run src/components/home/__tests__/placement-proof.render.test.tsx
@@ -75,11 +75,12 @@ for (const f of files) {
       if (align === "end" && endGap > TOL) violations.push(`${tag}: not at the inline end (gap ${endGap.toFixed(1)})`);
       if (align === "center" && Math.abs(startGap - endGap) > TOL) violations.push(`${tag}: not centred inline (${startGap.toFixed(1)} vs ${endGap.toFixed(1)})`);
     }
-    // automatic position keeps today's layout once a height is set: the content is vertically centred
+    // automatic position keeps today's layout once a height is set: a hero is vertically centred, a banner sits at the top
     if (pid === "auto" && height !== "none" && roomy) {
       placementChecks++;
       const top = r.b.t - r.s.t, bottom = r.s.b - r.b.b;
-      if (Math.abs(top - bottom) > TOL) violations.push(`${tag}: automatic position is not centred (${top.toFixed(1)} vs ${bottom.toFixed(1)})`);
+      if (type === "hero" && Math.abs(top - bottom) > TOL) violations.push(`${tag}: automatic hero is not centred (${top.toFixed(1)} vs ${bottom.toFixed(1)})`);
+      if (type === "banner" && top > TOL) violations.push(`${tag}: automatic banner is not at the top (gap ${top.toFixed(1)})`);
     }
     await page.close();
   }

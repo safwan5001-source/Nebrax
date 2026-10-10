@@ -580,5 +580,9 @@ describe("resolveSectionDesign — placement and height (CUST-HV V6c-3)", () => 
     expect(sf).toMatch(
       /\[data-sd~="valign"\]\)\[data-sd\] > \* \{\s*display:\s*flex;\s*flex-direction:\s*column;[^}]*justify-content:\s*var\(--sec-vj, center\)/,
     );
+    // with a height but no explicit position: a hero stays centred, a banner stays at the top (what each always did)
+    expect(sf).toMatch(
+      /\[data-design-type="banner"\]:is\(\[data-sd~="hgt"\], \[data-sd~="valign"\]\) > \* \{\s*justify-content:\s*var\(--sec-vj, flex-start\)/,
+    );
   });
 });
