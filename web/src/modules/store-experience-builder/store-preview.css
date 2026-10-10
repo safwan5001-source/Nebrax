@@ -151,6 +151,28 @@
 }
 
 /*
+ * CUST-HV V7a — header chrome (border + shadow). The same rules as the storefront stylesheet
+ * (parity test); heights, layout and stickiness are chosen in JS here because the preview frame
+ * simulates a viewport instead of having one.
+ */
+/* V7a-chrome:start */
+.awj-store-preview[data-hd~="hb-n"] > header > :is(div, nav) {
+  border-bottom-width: 0;
+}
+.awj-store-preview[data-hd~="hb-m"] > header > :is(div, nav) {
+  border-bottom-width: 2px;
+}
+.awj-store-preview[data-hd~="hx-s"] > header {
+  box-shadow: 0 1px 3px color-mix(in oklab, var(--store-foreground) 10%, transparent);
+}
+.awj-store-preview[data-hd~="hx-m"] > header {
+  box-shadow:
+    0 2px 6px color-mix(in oklab, var(--store-foreground) 10%, transparent),
+    0 10px 24px color-mix(in oklab, var(--store-foreground) 12%, transparent);
+}
+/* V7a-chrome:end */
+
+/*
  * CUST-HV V5c — section design (contract §3.5). Every rule keys off a validated
  * `--sec-*` custom property the resolver set (`section-design-resolve.ts`); no
  * value in this block ever comes from the document. A section with no design has

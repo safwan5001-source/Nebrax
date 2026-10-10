@@ -115,4 +115,42 @@ describe("StoreBrand", () => {
       );
     });
   });
+
+  describe("scale (V7a)", () => {
+    it("absent scale keeps the size preset's classes exactly", () => {
+      render(
+        <StoreBrand
+          href="/sa/ar"
+          name="X"
+          size="md"
+          logoUrl="data:image/png;base64,iVBORw0KGgo="
+        />,
+      );
+      expect(screen.getByRole("img").className).toBe(
+        "w-auto max-w-[9rem] object-contain h-8 md:h-9",
+      );
+    });
+
+    it("a scale replaces the logo height and the width cap", () => {
+      render(
+        <StoreBrand
+          href="/sa/ar"
+          name="X"
+          size="md"
+          scale="xl"
+          logoUrl="data:image/png;base64,iVBORw0KGgo="
+        />,
+      );
+      expect(screen.getByRole("img").className).toBe(
+        "w-auto max-w-[14rem] object-contain h-12 md:h-16",
+      );
+    });
+
+    it("a scale sizes the wordmark too", () => {
+      render(<StoreBrand href="/sa/ar" name="Shop" size="md" scale="sm" />);
+      expect(screen.getByText("Shop").parentElement?.className).toContain(
+        "text-lg",
+      );
+    });
+  });
 });

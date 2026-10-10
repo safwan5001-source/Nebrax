@@ -1,5 +1,6 @@
 import { type AnnouncementsDoc, normalizeAnnouncements } from "./announcements";
 import { type GlobalTokensDoc, normalizeGlobalTokens } from "./global-tokens";
+import { type HeaderDesign, normalizeHeaderDesign } from "./header-design";
 import { type MediaRef, normalizeMediaRef } from "./media-ref";
 import {
   normalizePagePresentation,
@@ -128,6 +129,8 @@ export interface StorefrontPresentationConfig {
     showCart: boolean;
     showCategoryNav: boolean;
     links: PresentationNavLink[];
+    /** CUST-HV V7a — structural header design; absent ⇒ the header renders exactly as before. */
+    design?: HeaderDesign;
   };
   homepage: {
     sections: PresentationHomeSection[];
@@ -549,6 +552,7 @@ export function normalizePresentationConfig(
   const announcements = normalizeAnnouncements(raw.announcements);
   const palette = normalizePalette(raw.palette);
   const globalTokens = normalizeGlobalTokens(raw);
+  const headerDesign = normalizeHeaderDesign(headerRaw.design);
 
   return {
     version: PRESENTATION_CONFIG_VERSION,
@@ -588,6 +592,7 @@ export function normalizePresentationConfig(
             .filter((link): link is PresentationNavLink => Boolean(link))
             .slice(0, 12)
         : DEFAULT_PRESENTATION_CONFIG.header.links.map((link) => ({ ...link })),
+      ...(headerDesign ? { design: headerDesign } : {}),
     },
     homepage: {
       sections: resolveHomeBuilderSections(

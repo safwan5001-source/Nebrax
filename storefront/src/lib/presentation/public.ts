@@ -10,6 +10,7 @@ import type {
 import { normalizePresentationConfig, previewStoreName } from "./config";
 import { fontFamilyStack } from "./font-catalogue";
 import { resolveGlobalTokens } from "./global-tokens";
+import { resolveHeaderDesign } from "./header-design";
 import { fontPresetFamilyStack, presentationCssVars } from "./tokens";
 import { buildWhatsAppUrl, sanitizeExternalUrl, sanitizeLogoUrl } from "./urls";
 
@@ -81,16 +82,19 @@ export function publishedThemeStyle(
 }
 
 /**
- * CUST-HV V5e-2a — the `data-gt` token list for the same wrapper `publishedThemeStyle`
- * styles; `undefined` when no global token is set (the wrapper is exactly as before).
+ * The attributes for the theme wrapper `publishedThemeStyle` styles: CUST-HV V5e-2a's `data-gt`
+ * global-token list and CUST-HV V7a's `data-hd` header-design list. `undefined` when neither is
+ * set (the wrapper is exactly as before).
  */
 export function publishedThemeAttrs(
   presentation: StorefrontPresentationConfig | null,
 ): Record<string, string> | undefined {
-  const attrs = presentation
-    ? resolveGlobalTokens(presentation, presentation)?.attrs
-    : undefined;
-  return attrs && Object.keys(attrs).length > 0 ? attrs : undefined;
+  if (!presentation) return undefined;
+  const attrs = {
+    ...(resolveGlobalTokens(presentation, presentation)?.attrs ?? {}),
+    ...(resolveHeaderDesign(presentation.header.design).attrs ?? {}),
+  };
+  return Object.keys(attrs).length > 0 ? attrs : undefined;
 }
 
 export function publishedLogoUrl(

@@ -1,0 +1,44 @@
+{
+  "_note": "CUST-HV V7a — structural header design (header.design). Shared by PHP StorefrontHeaderDesignNormalizer and both TS twins. `input` is the raw `header.design` value; `expected` is the normalised object, or null when nothing survives (the key is then absent from the document).",
+  "cases": [
+    { "name": "absent", "input": null, "expected": null },
+    { "name": "non-object is ignored", "input": "compact", "expected": null },
+    { "name": "a list is not an object", "input": ["compact"], "expected": null },
+    { "name": "empty object drops", "input": {}, "expected": null },
+    {
+      "name": "every field, canonical order",
+      "input": { "shadow": "soft", "border": { "width": "medium" }, "sticky": "off", "logo": { "size": "xl" }, "height": "tall", "mobileLayout": "logo-start", "layout": "two-row" },
+      "expected": { "layout": "two-row", "mobileLayout": "logo-start", "height": "tall", "logo": { "size": "xl" }, "sticky": "off", "border": { "width": "medium" }, "shadow": "soft" }
+    },
+    {
+      "name": "an invalid value is dropped on its own",
+      "input": { "layout": "mega", "mobileLayout": "logo-start", "height": "huge", "sticky": "always", "shadow": "strong" },
+      "expected": { "mobileLayout": "logo-start", "sticky": "always" }
+    },
+    {
+      "name": "deferred vocabulary fails closed",
+      "input": { "sticky": "on-scroll-up", "mode": "overlay-hero", "search": "icon-expand", "categoryNav": "tabs", "surface": { "background": "#000" }, "logo": { "align": "center", "treatment": "mono-light" } },
+      "expected": null
+    },
+    {
+      "name": "nested groups need their own valid field",
+      "input": { "logo": { "size": "xxl" }, "border": { "width": "thick", "color": "#fff" } },
+      "expected": null
+    },
+    {
+      "name": "non-object nested groups are ignored",
+      "input": { "logo": "lg", "border": ["none"], "layout": "centered" },
+      "expected": { "layout": "centered" }
+    },
+    {
+      "name": "non-string values never coerce",
+      "input": { "layout": 1, "height": true, "shadow": { "x": 1 }, "sticky": ["off"] },
+      "expected": null
+    },
+    {
+      "name": "none border is a real choice",
+      "input": { "border": { "width": "none" }, "shadow": "none" },
+      "expected": { "border": { "width": "none" }, "shadow": "none" }
+    }
+  ]
+}
