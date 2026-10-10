@@ -1,0 +1,10 @@
+{
+ "pages": 36,
+ "checks": 216,
+ "activeOverlapChecks": 32,
+ "inactiveChecks": 184,
+ "hitTestChecks": 216,
+ "strip": false,
+ "violations": [],
+ "sample": []
+}

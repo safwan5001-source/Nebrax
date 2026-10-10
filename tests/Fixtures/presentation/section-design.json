@@ -28,6 +28,7 @@
             "radius": true,
             "shadow": true,
             "separator": true,
+            "overlap": true,
             "mediaTreatment": [
                 "height"
             ],
@@ -1353,10 +1354,9 @@
             }
         },
         {
-            "name": "overlap layout mediaTreatment are not accepted yet (V6/V8)",
+            "name": "layout and mediaTreatment.aspect are not accepted yet (V8/V9); overlap and height are covered by the V6c cases",
             "type": "hero",
             "input": {
-                "overlap": "sm",
                 "layout": "split",
                 "mediaTreatment": {
                     "aspect": "16:9"
@@ -2539,6 +2539,164 @@
                 "mediaTreatment": {
                     "height": "tall"
                 }
+            },
+            "expected": null
+        },
+        {
+            "name": "V6c-4 overlap 'sm' is kept on hero",
+            "type": "hero",
+            "input": {
+                "overlap": "sm"
+            },
+            "expected": {
+                "overlap": "sm"
+            }
+        },
+        {
+            "name": "V6c-4 overlap 'md' is kept on hero",
+            "type": "hero",
+            "input": {
+                "overlap": "md"
+            },
+            "expected": {
+                "overlap": "md"
+            }
+        },
+        {
+            "name": "V6c-4 overlap 'none' is the default: it is never stored",
+            "type": "hero",
+            "input": {
+                "overlap": "none"
+            },
+            "expected": null
+        },
+        {
+            "name": "V6c-4 'none' beside other fields leaves only the others",
+            "type": "hero",
+            "input": {
+                "overlap": "none",
+                "align": "center"
+            },
+            "expected": {
+                "align": "center"
+            }
+        },
+        {
+            "name": "V6c-4 unknown overlap values and raw lengths are dropped on their own",
+            "type": "hero",
+            "input": {
+                "overlap": "lg",
+                "align": "end"
+            },
+            "expected": {
+                "align": "end"
+            }
+        },
+        {
+            "name": "V6c-4 a numeric / CSS overlap is never accepted",
+            "type": "hero",
+            "input": {
+                "overlap": "3rem"
+            },
+            "expected": null
+        },
+        {
+            "name": "V6c-4 canonical order: separator, overlap, mediaTreatment, motion",
+            "type": "hero",
+            "input": {
+                "motion": {
+                    "reveal": "fade-up"
+                },
+                "mediaTreatment": {
+                    "height": "tall"
+                },
+                "overlap": "md",
+                "separator": {
+                    "top": "line"
+                }
+            },
+            "expected": {
+                "separator": {
+                    "top": "line"
+                },
+                "overlap": "md",
+                "mediaTreatment": {
+                    "height": "tall"
+                },
+                "motion": {
+                    "reveal": "fade-up"
+                }
+            }
+        },
+        {
+            "name": "V6c-4 overlap is hero only: banner drops it",
+            "type": "banner",
+            "input": {
+                "overlap": "md"
+            },
+            "expected": null
+        },
+        {
+            "name": "V6c-4 overlap is hero only: benefits drops it",
+            "type": "benefits",
+            "input": {
+                "overlap": "md"
+            },
+            "expected": null
+        },
+        {
+            "name": "V6c-4 overlap is hero only: customContent drops it",
+            "type": "customContent",
+            "input": {
+                "overlap": "md"
+            },
+            "expected": null
+        },
+        {
+            "name": "V6c-4 overlap is hero only: appPromo drops it",
+            "type": "appPromo",
+            "input": {
+                "overlap": "md"
+            },
+            "expected": null
+        },
+        {
+            "name": "V6c-4 overlap is hero only: categories drops it",
+            "type": "categories",
+            "input": {
+                "overlap": "md"
+            },
+            "expected": null
+        },
+        {
+            "name": "V6c-4 overlap is hero only: featured drops it",
+            "type": "featured",
+            "input": {
+                "overlap": "md"
+            },
+            "expected": null
+        },
+        {
+            "name": "V6c-4 overlap is hero only: discovery drops it",
+            "type": "discovery",
+            "input": {
+                "overlap": "md"
+            },
+            "expected": null
+        },
+        {
+            "name": "V6c-4 overlap is hero only: deliveryPromise drops it",
+            "type": "deliveryPromise",
+            "input": {
+                "overlap": "md"
+            },
+            "expected": null
+        },
+        {
+            "name": "V6c-4 overlap is hero only: wholesale drops it",
+            "type": "wholesale",
+            "input": {
+                "overlap": "md"
             },
             "expected": null
         }

@@ -645,6 +645,36 @@ input[type="search"]::-webkit-search-cancel-button {
 [data-design-type="banner"]:is([data-sd~="hgt"], [data-sd~="valign"]) > * {
   justify-content: var(--sec-vj, flex-start);
 }
+/* V6c-4 (V0 §6.5, D-13) — hero overlap preset: the section AFTER a picture hero slides up over its bottom edge.
+   Preset-only (`--sec-ovlp` = 2 / 4 rem) and ≥ md only: below it the media query is simply false, so phones
+   stay stacked. The resolver emits the token only for a hero that really paints a proven picture and has no
+   bottom separator. The hero reserves the same amount as bottom padding, so none of its content or focus rings
+   can sit under the next section, and its own bottom spacing is replaced by the overlap. The next section is an
+   opaque sheet above the hero (z-index 2) with rounded top corners: the page colour, unless its own design or
+   classes paint a surface (the zero-specificity `:where()` yields to any of them). A height preset stays the hero's
+   VISIBLE height: its minimum grows by the overlap, which the sheet then covers. */
+@media (min-width: 48rem) {
+  [data-sd~="ovlp"][data-sd] {
+    padding-block-end: 0;
+    margin-block-end: calc(-1 * var(--sec-ovlp));
+  }
+  [data-sd~="ovlp"][data-sd] > * {
+    padding-block-end: calc(var(--sec-pi, 0px) + var(--sec-ovlp));
+  }
+  [data-sd~="ovlp"][data-sd~="hgt"][data-sd] > * {
+    min-block-size: calc(var(--sec-minh) + var(--sec-ovlp));
+  }
+  [data-sd~="ovlp"][data-sd] + * {
+    margin-block-start: 0;
+    position: relative;
+    z-index: 2;
+  }
+  :where([data-sd~="ovlp"][data-sd] + *) {
+    background-color: var(--store-background);
+    border-start-start-radius: var(--store-radius);
+    border-start-end-radius: var(--store-radius);
+  }
+}
 [data-sd~="max"] {
   max-inline-size: var(--sec-max);
   margin-inline: auto;

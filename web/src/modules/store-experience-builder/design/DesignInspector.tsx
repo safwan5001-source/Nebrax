@@ -16,6 +16,7 @@ import {
   HEADING_WEIGHTS,
   HEIGHT_PRESETS,
   LINE_HEIGHTS,
+  OVERLAPS,
   OVERLAY_ALPHAS,
   RADII,
   REVEALS,
@@ -37,6 +38,7 @@ import {
   PAGE_BACKGROUND,
   SURFACE_OWNING_TYPES,
   effectiveText,
+  resolveSectionDesign,
   sectionContrastIssues,
 } from "../presentation/section-design-resolve";
 import { resolveRoleHex } from "../presentation/palette";
@@ -107,6 +109,11 @@ const HEIGHT_LABEL: Record<(typeof HEIGHT_PRESETS)[number], CustomizerMessageKey
   standard: "designHeightStandard",
   tall: "designHeightTall",
   screen: "designHeightScreen",
+};
+const OVERLAP_LABEL: Record<(typeof OVERLAPS)[number], CustomizerMessageKey> = {
+  none: "designUnset",
+  sm: "designOverlapSm",
+  md: "designOverlapMd",
 };
 const ALIGN_LABEL: Record<(typeof ALIGNS)[number], CustomizerMessageKey> = {
   start: "designAlignStart",
@@ -191,6 +198,8 @@ export function DesignInspector({
     (kind): kind is Exclude<(typeof SEPARATOR_KINDS)[number], "none"> => !!kind && kind !== "none",
   );
   const hasSeparator = activeSeparatorKinds.length > 0;
+  // V6c-4 — overlap needs a hero that really paints a picture (the resolver's own test) and no bottom separator.
+  const overlapInactive = resolveSectionDesign(type, current, ctx)?.attrs["data-sd"]?.split(" ").includes("ovlp") !== true;
   const hasDesignBackground = current.background?.kind === "solid" || current.background?.kind === "gradient";
   // The colour a separator takes when the merchant picks none — exactly the resolver's defaults:
   // a line follows the border role, a band the brand, a shape the page behind it (brand when the section has no designed background, so it is visible). Mixed edges
@@ -669,6 +678,33 @@ export function DesignInspector({
             ]}
           />
         </Field>
+      ) : null}
+
+      {capability.overlap ? (
+        <div className="space-y-1" data-design-overlap-group="">
+          <Field label={t("designOverlap")}>
+            <select
+              className={selectClass}
+              data-design-overlap=""
+              value={current.overlap ?? ""}
+              onChange={(event) =>
+                set("overlap", (event.target.value || undefined) as SectionDesign["overlap"])
+              }
+            >
+              {OVERLAPS.map((overlap) => (
+                <option key={overlap} value={overlap === "none" ? "" : overlap}>
+                  {t(OVERLAP_LABEL[overlap])}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <p className="text-[12px] leading-5 text-muted">{t("designOverlapHint")}</p>
+          {current.overlap && overlapInactive ? (
+            <p data-design-overlap-inactive="" role="status" className="text-[12px] leading-5 text-warning">
+              {t("designOverlapInactive")}
+            </p>
+          ) : null}
+        </div>
       ) : null}
 
       {allows(capability.mediaTreatment, "height") ? (

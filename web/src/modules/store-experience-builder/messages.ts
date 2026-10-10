@@ -301,6 +301,13 @@ export const CUSTOMIZER_MESSAGES = {
     designHeightScreen: "بطول الشاشة",
     designHeightHint:
       "حدّ أدنى للارتفاع: لا يُقصّ المحتوى أبداً، ولا يتجاوز «بطول الشاشة» ٥٦ rem. بلا اختيار يبقى ارتفاع القسم كما كان.",
+    designOverlap: "تداخل القسم التالي",
+    designOverlapSm: "خفيف",
+    designOverlapMd: "متوسط",
+    designOverlapHint:
+      "يصعد القسم التالي فوق الحافة السفلى للبطل على الأجهزة اللوحية والحاسوب فقط؛ وتبقى الهواتف متتالية. المحتوى لا يُغطّى أبداً.",
+    designOverlapInactive:
+      "غير مفعّل الآن: يحتاج خلفية صورة تجتاز فحص الوضوح وألّا يكون للبطل فاصل سفلي.",
     designAlignStart: "البداية",
     designAlignCenter: "الوسط",
     designAlignEnd: "النهاية",
@@ -1367,6 +1374,13 @@ export const CUSTOMIZER_MESSAGES = {
     designHeightScreen: "Screen height",
     designHeightHint:
       "A minimum height: content is never clipped, and “Screen height” never exceeds 56 rem. With no choice the section keeps its height as before.",
+    designOverlap: "Next-section overlap",
+    designOverlapSm: "Small",
+    designOverlapMd: "Medium",
+    designOverlapHint:
+      "The next section slides up over the hero's bottom edge on tablets and desktop only; phones stay stacked. Content is never covered.",
+    designOverlapInactive:
+      "Inactive right now: it needs a picture background that passes the legibility check, and no bottom separator on the hero.",
     designAlignStart: "Start",
     designAlignCenter: "Centre",
     designAlignEnd: "End",

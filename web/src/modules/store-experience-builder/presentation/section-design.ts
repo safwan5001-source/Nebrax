@@ -14,7 +14,7 @@
  *
  * Deliberately NOT here yet (each enters with the slice that can render and prove it):
  *  - `layout` variants → the slices that add variants (V6/V8/V9);
- *  - `overlap` → V6c-4; `mediaTreatment.aspect` / `fit` → V8 (V6c-3 added `valign` and `mediaTreatment.height`).
+ *  - `mediaTreatment.aspect` / `fit` → V8 (V6c-3 added `valign` and `mediaTreatment.height`).
  * Until then they are dropped fail-closed, so a hand-written document can never
  * smuggle an unproven background past the publish gate.
  */
@@ -66,6 +66,8 @@ export const SEPARATOR_KINDS = [
 ] as const;
 export const SEPARATOR_HEIGHTS = ["sm", "md", "lg"] as const;
 export const REVEALS = ["none", "fade-up"] as const;
+/** V6c-4 (V0 §6.5, D-13) — hero overlap presets; `none` is the absence of the field and is never stored. */
+export const OVERLAPS = ["none", "sm", "md"] as const;
 /** V6c-3 (V0 §8.3) — hero / banner section height presets: a bounded minimum, content is never clipped. */
 export const HEIGHT_PRESETS = [
   "compact",
@@ -154,6 +156,8 @@ export interface SectionDesign {
   radius?: (typeof RADII)[number];
   shadow?: (typeof SHADOWS)[number];
   separator?: SectionSeparator;
+  /** V6c-4 — hero only: the FOLLOWING section slides up over the hero's bottom edge (≥ md, picture heroes). */
+  overlap?: Exclude<(typeof OVERLAPS)[number], "none">;
   mediaTreatment?: SectionMediaTreatment;
   motion?: SectionMotion;
 }
@@ -191,6 +195,7 @@ export const SECTION_DESIGN_CAPABILITIES: Record<string, DesignCapability> = {
     radius: true,
     shadow: true,
     separator: true,
+    overlap: true,
     mediaTreatment: ["height"],
     motion: ["reveal"],
   },
@@ -557,6 +562,11 @@ export function normalizeSectionDesign(
   if (capability.separator) {
     const separator = normalizeSeparator(raw.separator);
     if (separator) out.separator = separator;
+  }
+  if (capability.overlap) {
+    const overlap = pick(raw.overlap, OVERLAPS);
+    // `none` is the same as absent: the default is never stored.
+    if (overlap && overlap !== "none") out.overlap = overlap;
   }
   if (
     capability.mediaTreatment &&

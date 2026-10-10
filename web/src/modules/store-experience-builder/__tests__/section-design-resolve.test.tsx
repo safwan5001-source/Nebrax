@@ -423,3 +423,81 @@ describe("resolveSectionDesign — placement and height (CUST-HV V6c-3)", () => 
     );
   });
 });
+
+describe("resolveSectionDesign — hero overlap (CUST-HV V6c-4)", () => {
+  const A = "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e";
+  const dark = { min: [0, 0, 0] as [number, number, number], max: [40, 50, 60] as [number, number, number] };
+  const wide = { min: [0, 0, 0] as [number, number, number], max: [255, 255, 255] as [number, number, number] };
+  const withBounds = (bounds: typeof dark | null, extra: Partial<DesignContext> = {}): DesignContext => ({
+    ...ctx,
+    ...extra,
+    mediaBounds: () => (bounds ? { min: bounds.min, max: bounds.max } : null),
+  });
+  const heroDesign = (extra: Partial<SectionDesign> = {}): SectionDesign => ({
+    background: { kind: "media", media: { mediaId: A, decorative: true }, overlay: { color: { hex: "#000000" }, alpha: 40 } },
+    overlap: "md",
+    ...extra,
+  });
+
+  it("a proven picture hero emits the preset token (sm 2rem, md 4rem) and the `ovlp` marker", () => {
+    const md = resolveSectionDesign("hero", heroDesign(), withBounds(dark))!;
+    expect(md.style["--sec-ovlp"]).toBe("4rem");
+    expect(md.attrs["data-sd"]).toContain("ovlp");
+    const sm = resolveSectionDesign("hero", heroDesign({ overlap: "sm" }), withBounds(dark))!;
+    expect(sm.style["--sec-ovlp"]).toBe("2rem");
+  });
+
+  it("is disabled automatically when the hero is not a media hero that really paints", () => {
+    // solid / gradient background, no background, an unprovable picture, a picture with no evidence
+    for (const design of [
+      { overlap: "md" as const, background: { kind: "solid" as const, color: { hex: "#101820" } } },
+      { overlap: "md" as const, radius: "lg" as const },
+    ]) {
+      const r = resolveSectionDesign("hero", design, withBounds(dark));
+      expect(r?.attrs["data-sd"] ?? "").not.toContain("ovlp");
+      expect(r?.style["--sec-ovlp"]).toBeUndefined();
+    }
+    const unprovable = resolveSectionDesign("hero", heroDesign(), withBounds(wide, {}));
+    expect(unprovable?.attrs["data-sd"] ?? "").not.toContain("ovlp");
+    const noEvidence = resolveSectionDesign("hero", heroDesign(), withBounds(null));
+    expect(noEvidence?.attrs["data-sd"] ?? "").not.toContain("ovlp");
+  });
+
+  it("a bottom separator disables it (the next section would cover the edge); a top one does not", () => {
+    const bottom = resolveSectionDesign("hero", heroDesign({ separator: { bottom: "wave" } }), withBounds(dark))!;
+    expect(bottom.attrs["data-sd"]).not.toContain("ovlp");
+    const top = resolveSectionDesign("hero", heroDesign({ separator: { top: "wave" } }), withBounds(dark))!;
+    expect(top.attrs["data-sd"]).toContain("ovlp");
+    const none = resolveSectionDesign("hero", heroDesign({ separator: { bottom: "none" } }), withBounds(dark))!;
+    expect(none.attrs["data-sd"]).toContain("ovlp");
+  });
+
+  it("a simulated phone (Canvas) gets none; a simulated tablet or desktop gets it", () => {
+    expect(resolveSectionDesign("hero", heroDesign(), withBounds(dark, { simulatedWidthPx: 390 }))!.attrs["data-sd"]).not.toContain("ovlp");
+    expect(resolveSectionDesign("hero", heroDesign(), withBounds(dark, { simulatedWidthPx: 767 }))!.attrs["data-sd"]).not.toContain("ovlp");
+    expect(resolveSectionDesign("hero", heroDesign(), withBounds(dark, { simulatedWidthPx: 768 }))!.attrs["data-sd"]).toContain("ovlp");
+    expect(resolveSectionDesign("hero", heroDesign(), withBounds(dark, { simulatedWidthPx: 1280 }))!.attrs["data-sd"]).toContain("ovlp");
+  });
+
+  it("hero only: a banner never overlaps, even with a hand-built design", () => {
+    const banner = resolveSectionDesign("banner", heroDesign(), withBounds(dark))!;
+    expect(banner.attrs["data-sd"]).not.toContain("ovlp");
+  });
+
+  it("the stylesheet: ≥ md only, the hero reserves the amount, the next section is an opaque sheet that yields to its own surface", () => {
+    const sf = readFileSync(resolve(__dirname, "../../../../../storefront/src/app/globals.css"), "utf8");
+    const at = sf.indexOf("V6c-4 (V0 §6.5, D-13)");
+    expect(at).toBeGreaterThan(0);
+    const block = sf.slice(at, sf.indexOf("\n}\n", at) + 3);
+    expect(block).toContain("@media (min-width: 48rem) {");
+    expect(block).toMatch(/\[data-sd~="ovlp"\]\[data-sd\] \{\s*padding-block-end: 0;\s*margin-block-end: calc\(-1 \* var\(--sec-ovlp\)\);/);
+    expect(block).toMatch(/\[data-sd~="ovlp"\]\[data-sd\] > \* \{\s*padding-block-end: calc\(var\(--sec-pi, 0px\) \+ var\(--sec-ovlp\)\);/);
+    expect(block).toMatch(/\[data-sd~="ovlp"\]\[data-sd\] \+ \* \{[^}]*position: relative;\s*z-index: 2;/);
+    // a height preset stays the hero's VISIBLE height: its minimum grows by the overlap the sheet covers
+    expect(block).toMatch(
+      /\[data-sd~="ovlp"\]\[data-sd~="hgt"\]\[data-sd\] > \* \{\s*min-block-size: calc\(var\(--sec-minh\) \+ var\(--sec-ovlp\)\);/,
+    );
+    // zero specificity: a designed background / radius / surface class on the next section always wins
+    expect(block).toMatch(/:where\(\[data-sd~="ovlp"\]\[data-sd\] \+ \*\) \{\s*background-color: var\(--store-background\);/);
+  });
+});
