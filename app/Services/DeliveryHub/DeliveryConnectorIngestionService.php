@@ -441,13 +441,16 @@ class DeliveryConnectorIngestionService
 
     private function actor(DeliveryConnectorAccount $account): ?User
     {
-        if ($account->configured_by === null) {
+        // اللقطة المقفولة: operated_by إن وُجد، وإلا المنشئ. لا رجوع إلى المنشئ
+        // إذا كان المشغّل المعيَّن غائباً أو موقوفاً.
+        $userId = $account->operated_by ?? $account->configured_by;
+        if ($userId === null) {
             return null;
         }
 
         $user = User::query()
             ->where('tenant_id', $account->tenant_id)
-            ->whereKey($account->configured_by)
+            ->whereKey($userId)
             ->first();
 
         if ($user === null || ! $user->is_active) {

@@ -32,6 +32,7 @@ class DeliveryConnectorAccount extends BaseModel implements CompanyWide
         'external_store_id',
         'branch_id',
         'configured_by',
+        'operated_by',
         'secret',
         'secret_prefix',
         'secret_version',
@@ -68,6 +69,10 @@ class DeliveryConnectorAccount extends BaseModel implements CompanyWide
 
             if (! in_array($account->status, self::STATUSES, true)) {
                 throw new DomainException('Delivery connector status is operational only.');
+            }
+
+            if ($account->exists && $account->isDirty('configured_by')) {
+                throw new DomainException('Delivery connector creator is immutable.');
             }
 
             if ($account->exists && $account->isDirty(['platform_key', 'external_store_id', 'delivery_platform_profile_id', 'branch_id'])) {

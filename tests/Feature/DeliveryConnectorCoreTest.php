@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\CommerceOrder;
 use App\Models\DeliveryConnectorAccount;
 use App\Models\DeliveryConnectorAttempt;
+use App\Models\DeliveryConnectorOperatorEvent;
 use App\Models\DeliveryHubOrder;
 use App\Models\DeliveryInvoiceContext;
 use App\Models\DeliveryPlatformProfile;
@@ -15,13 +16,16 @@ use App\Models\Payment;
 use App\Models\StockMovement;
 use App\Models\Tenant;
 use App\Models\TenantApplicationState;
+use App\Models\User;
 use App\Services\DeliveryHub\DeliveryConnectorAccountService;
 use App\Services\DeliveryHub\DeliveryConnectorIngestionService;
 use App\Support\Rbac;
 use App\Support\WebhookSignature;
 use App\Tenancy\TenantContext;
+use DomainException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use LogicException;
 use Tests\TestCase;
 
 /**
@@ -71,6 +75,12 @@ class DeliveryConnectorCoreTest extends TestCase
         $this->assertTrue(DeliveryPlatformProfile::query()->findOrFail($profile)->is_active);
         $this->assertNotContains('delivery_connector.manage', Rbac::MATRIX['accountant']);
         $this->assertNotContains('delivery_connector.view', Rbac::MATRIX['staff']);
+        $this->assertContains('delivery_connector.reassign', Rbac::PERMISSIONS);
+        $this->assertNotContains('delivery_connector.reassign', Rbac::MATRIX['accountant']);
+        $this->assertNotContains('delivery_connector.reassign', Rbac::MATRIX['staff']);
+        $this->assertNotContains('delivery_connector.reassign', Rbac::MATRIX['self_service']);
+        $this->assertNull($account['data']['operated_by']);
+        $this->assertNotEmpty($account['data']['configured_by']);
     }
 
     /** @test */
@@ -914,6 +924,527 @@ class DeliveryConnectorCoreTest extends TestCase
         $this->assertSame($before, $this->financialCounts());
     }
 
+    /** @test */
+    public function a_deleted_creator_fails_closed_until_an_explicit_reassignment(): void
+    {
+        [$auth, $branch, $profile] = $this->tenantWithPlatform('recover');
+        $before = $this->financialCounts();
+        $operator = $this->user($auth, 'operator@recover.test');
+        $successor = $this->user($auth, 'next@recover.test');
+        $account = $this->connector($operator['token'], $profile, 'store-recover', $branch);
+        $id = $account['data']['id'];
+        $this->assertSame($operator['id'], $account['data']['configured_by']);
+        $this->assertNull($account['data']['operated_by']);
+
+        $historical = $this->postEvent($id, $this->event('P-hist', ['sku' => 'old']), $account['secret'])->assertCreated();
+        $historicalOrder = DeliveryHubOrder::query()->findOrFail($historical['data']['delivery_hub_order_id']);
+        $this->assertSame($operator['id'], (string) $historicalOrder->created_by);
+
+        $manual = $this->withToken($auth['token'])->postJson('/api/delivery-hub/orders', [
+            'delivery_platform_profile_id' => $profile,
+            'provider_order_id' => 'MANUAL-KEEP',
+            'branch_id' => $branch,
+        ])->assertCreated();
+
+        $this->withToken($auth['token'])->deleteJson('/api/users/'.$operator['id'])->assertOk();
+        $storedSecret = DB::table('delivery_connector_accounts')->where('id', $id)->value('secret');
+        $retry = $this->event('P-retry', ['sku' => 'new']);
+        $this->postEvent($id, $retry, $account['secret'])
+            ->assertStatus(422)
+            ->assertJsonPath('error_code', 'actor_unavailable');
+        $this->assertSame(1, DeliveryConnectorAttempt::withoutGlobalScopes()->count());
+        $this->assertSame(1, DeliveryHubOrder::withoutGlobalScopes()->where('provider_order_id', 'P-hist')->count());
+        $this->assertSame(0, DeliveryHubOrder::withoutGlobalScopes()->where('provider_order_id', 'P-retry')->count());
+
+        $reassigned = $this->withToken($auth['token'])->postJson('/api/delivery-connectors/'.$id.'/reassign', [
+            'user_id' => $successor['id'],
+        ])->assertOk();
+        $this->assertSame($operator['id'], $reassigned['data']['configured_by']);
+        $this->assertSame($successor['id'], $reassigned['data']['operated_by']);
+        $this->assertSame(DeliveryConnectorAccount::STATUS_CONFIGURED, $reassigned['data']['status']);
+        $this->assertSame(1, $reassigned['data']['secret_version']);
+        $this->assertArrayNotHasKey('secret', $reassigned->json());
+        $this->assertArrayNotHasKey('secret', $reassigned['data']);
+        $this->assertStringNotContainsString($account['secret'], $reassigned->getContent());
+        $this->assertSame($storedSecret, DB::table('delivery_connector_accounts')->where('id', $id)->value('secret'));
+
+        $created = $this->postEvent($id, $retry, $account['secret'])->assertCreated();
+        $this->assertFalse($created['data']['idempotent_replay']);
+        $retryOrder = DeliveryHubOrder::query()->findOrFail($created['data']['delivery_hub_order_id']);
+        $this->assertSame($successor['id'], (string) $retryOrder->created_by);
+        $this->assertSame($operator['id'], (string) DeliveryHubOrder::query()->findOrFail($historicalOrder->id)->created_by);
+
+        $follow = $this->postEvent($id, $this->event('P-hist', ['sku' => 'old'], 'accept'), $account['secret'])->assertCreated();
+        $kept = DeliveryHubOrder::query()->findOrFail($historicalOrder->id);
+        $this->assertSame($historicalOrder->id, $follow['data']['delivery_hub_order_id']);
+        $this->assertSame($operator['id'], (string) $kept->created_by);
+        $this->assertSame($successor['id'], (string) $kept->updated_by);
+        $this->assertSame(DeliveryHubOrder::ACCEPTED, $kept->state);
+
+        $ownerId = (string) User::query()->where('email', 'owner@recover.test')->value('id');
+        $manualOrder = DeliveryHubOrder::query()->where('provider_order_id', 'MANUAL-KEEP')->firstOrFail();
+        $this->assertSame($manual['data']['id'], $manualOrder->id);
+        $this->assertSame($ownerId, (string) $manualOrder->created_by);
+        $this->assertSame(DeliveryHubOrder::RECEIVED, $manualOrder->state);
+
+        $events = DeliveryConnectorOperatorEvent::withoutGlobalScopes()->get();
+        $this->assertCount(1, $events);
+        $this->assertSame($auth['tenant_id'], (string) $events[0]->tenant_id);
+        $this->assertSame($id, (string) $events[0]->delivery_connector_account_id);
+        $this->assertSame($operator['id'], (string) $events[0]->from_user_id);
+        $this->assertSame($successor['id'], (string) $events[0]->to_user_id);
+        $this->assertSame($ownerId, (string) $events[0]->actor_user_id);
+        $this->assertNotNull($events[0]->created_at);
+        $this->assertNotNull(User::withTrashed()->find($operator['id'])->deleted_at);
+
+        $again = $this->withToken($auth['token'])->postJson('/api/delivery-connectors/'.$id.'/reassign', [
+            'user_id' => $successor['id'],
+        ])->assertOk();
+        $this->assertSame($successor['id'], $again['data']['operated_by']);
+        $this->assertSame($operator['id'], $again['data']['configured_by']);
+        $this->assertCount(1, DeliveryConnectorOperatorEvent::withoutGlobalScopes()->get());
+        $this->assertSame(1, DeliveryHubOrder::withoutGlobalScopes()->where('provider_order_id', 'P-hist')->count());
+        $this->assertSame(1, DeliveryHubOrder::withoutGlobalScopes()->where('provider_order_id', 'P-retry')->count());
+        $this->assertSame(1, (int) DeliveryConnectorAttempt::query()->where('provider_order_id', 'P-retry')->firstOrFail()->secret_version);
+        $this->assertSame($before, $this->financialCounts());
+        $this->assertSame(0, CommerceOrder::withoutGlobalScopes()->count());
+    }
+
+    /** @test */
+    public function a_suspended_creator_is_not_replaced_until_reassignment_and_an_ineligible_operator_does_not_fall_back(): void
+    {
+        [$auth, $branch, $profile] = $this->tenantWithPlatform('suspend');
+        $before = $this->financialCounts();
+        $operator = $this->user($auth, 'operator@suspend.test');
+        $successor = $this->user($auth, 'next@suspend.test');
+        $account = $this->connector($operator['token'], $profile, 'store-suspend', $branch);
+        $id = $account['data']['id'];
+        $secret = $account['secret'];
+
+        User::query()->whereKey($operator['id'])->update(['is_active' => false]);
+        $paused = $this->event('P-pause', ['sku' => 'a']);
+        $this->postEvent($id, $paused, $secret)->assertStatus(422)->assertJsonPath('error_code', 'actor_unavailable');
+        $this->assertSame(0, DeliveryConnectorAttempt::withoutGlobalScopes()->count());
+        $this->assertNull(DeliveryConnectorAccount::withoutGlobalScopes()->findOrFail($id)->operated_by);
+
+        User::query()->whereKey($operator['id'])->update(['is_active' => true]);
+        $resumed = $this->postEvent($id, $paused, $secret)->assertCreated();
+        $this->assertSame($operator['id'], (string) DeliveryHubOrder::query()->findOrFail($resumed['data']['delivery_hub_order_id'])->created_by);
+
+        User::query()->whereKey($operator['id'])->update(['is_active' => false]);
+        $moved = $this->event('P-move', ['sku' => 'b']);
+        $this->postEvent($id, $moved, $secret)->assertStatus(422)->assertJsonPath('error_code', 'actor_unavailable');
+        $this->assertSame(1, DeliveryConnectorAttempt::withoutGlobalScopes()->count());
+
+        $this->withToken($auth['token'])->postJson('/api/delivery-connectors/'.$id.'/reassign', [
+            'user_id' => $successor['id'],
+        ])->assertOk()->assertJsonPath('data.operated_by', $successor['id']);
+        $movedOrder = $this->postEvent($id, $moved, $secret)->assertCreated();
+        $this->assertSame($successor['id'], (string) DeliveryHubOrder::query()->findOrFail($movedOrder['data']['delivery_hub_order_id'])->created_by);
+        $this->assertSame($operator['id'], (string) DeliveryConnectorAccount::withoutGlobalScopes()->findOrFail($id)->configured_by);
+
+        User::query()->whereKey($successor['id'])->update(['is_active' => false]);
+        $blocked = $this->event('P-block', ['sku' => 'c']);
+        $this->postEvent($id, $blocked, $secret)->assertStatus(422)->assertJsonPath('error_code', 'actor_unavailable');
+        $this->assertSame(0, DeliveryHubOrder::withoutGlobalScopes()->where('provider_order_id', 'P-block')->count());
+        $this->assertSame(2, DeliveryConnectorAttempt::withoutGlobalScopes()->count());
+
+        User::query()->whereKey($successor['id'])->update(['is_active' => true]);
+        $this->postEvent($id, $blocked, $secret)->assertCreated();
+        $this->assertSame($successor['id'], (string) DeliveryHubOrder::query()->where('provider_order_id', 'P-block')->firstOrFail()->created_by);
+        $this->assertSame($before, $this->financialCounts());
+    }
+
+    /** @test */
+    public function ineligible_targets_and_weaker_permissions_cannot_reassign(): void
+    {
+        [$auth, $branch, $profile] = $this->tenantWithPlatform('elig');
+        [$first, $second] = $this->twoBranches($auth['token']);
+        $before = $this->financialCounts();
+        $successor = $this->user($auth, 'next@elig.test');
+        $account = $this->connector($auth['token'], $profile, 'store-elig', $first);
+        $id = $account['data']['id'];
+        $storedSecret = DB::table('delivery_connector_accounts')->where('id', $id)->value('secret');
+
+        $other = $this->registerTenant('elig-other', 'owner@elig-other.test');
+        $foreignId = (string) User::query()->where('email', 'owner@elig-other.test')->value('id');
+        $this->withToken($auth['token'])->postJson('/api/delivery-connectors/'.$id.'/reassign', [
+            'user_id' => $foreignId,
+        ])->assertStatus(422)->assertJsonPath('error_code', 'operator_ineligible');
+
+        $inactive = $this->user($auth, 'inactive@elig.test');
+        User::query()->whereKey($inactive['id'])->update(['is_active' => false]);
+        $this->withToken($auth['token'])->postJson('/api/delivery-connectors/'.$id.'/reassign', [
+            'user_id' => $inactive['id'],
+        ])->assertStatus(422)->assertJsonPath('error_code', 'operator_ineligible');
+
+        $removed = $this->user($auth, 'removed@elig.test');
+        $this->withToken($auth['token'])->deleteJson('/api/users/'.$removed['id'])->assertOk();
+        $this->withToken($auth['token'])->postJson('/api/delivery-connectors/'.$id.'/reassign', [
+            'user_id' => $removed['id'],
+        ])->assertStatus(422)->assertJsonPath('error_code', 'operator_ineligible');
+
+        $offBranch = $this->user($auth, 'off@elig.test', 'admin', [$second]);
+        $this->withToken($auth['token'])->postJson('/api/delivery-connectors/'.$id.'/reassign', [
+            'user_id' => $offBranch['id'],
+        ])->assertStatus(422)->assertJsonPath('error_code', 'operator_ineligible');
+
+        $unscoped = $this->connector($auth['token'], $profile, 'store-open', null);
+        $this->withToken($auth['token'])->postJson('/api/delivery-connectors/'.$unscoped['data']['id'].'/reassign', [
+            'user_id' => $offBranch['id'],
+        ])->assertStatus(422)->assertJsonPath('error_code', 'operator_ineligible');
+
+        $onBranch = $this->user($auth, 'on@elig.test', 'admin', [$first]);
+        $this->withToken($auth['token'])->postJson('/api/delivery-connectors/'.$id.'/reassign', [
+            'user_id' => $onBranch['id'],
+        ])->assertOk()->assertJsonPath('data.operated_by', $onBranch['id']);
+        $this->assertSame($account['data']['configured_by'], DeliveryConnectorAccount::withoutGlobalScopes()->findOrFail($id)->configured_by);
+        $this->withToken($auth['token'])->postJson('/api/delivery-connectors/'.$id.'/reassign', [
+            'user_id' => $successor['id'],
+        ])->assertOk();
+
+        $limited = $this->user($auth, 'limited@elig.test', 'admin', [$second]);
+        $this->withToken($limited['token'])->postJson('/api/delivery-connectors/'.$id.'/reassign', [
+            'user_id' => $successor['id'],
+        ])->assertNotFound();
+        $this->withToken($limited['token'])->postJson('/api/delivery-connectors/'.$unscoped['data']['id'].'/reassign', [
+            'user_id' => $successor['id'],
+        ])->assertNotFound();
+
+        $staff = $this->tokenForRole($auth['tenant_id'], 'staff', 'staff@elig.test');
+        $accountant = $this->tokenForRole($auth['tenant_id'], 'accountant', 'accountant@elig.test');
+        $this->withToken($staff)->postJson('/api/delivery-connectors/'.$id.'/reassign', [
+            'user_id' => $successor['id'],
+        ])->assertForbidden();
+        $this->withToken($accountant)->postJson('/api/delivery-connectors/'.$id.'/reassign', [
+            'user_id' => $successor['id'],
+        ])->assertForbidden();
+
+        $role = $this->withToken($auth['token'])->postJson('/api/roles', [
+            'name' => 'إدارة الربط',
+            'permissions' => ['delivery_connector.view', 'delivery_connector.manage'],
+        ])->assertCreated();
+        $manager = $this->user($auth, 'manager@elig.test', $role['data']['slug']);
+        $managed = $this->connector($auth['token'], $profile, 'store-managed', $first);
+        $rotated = $this->withToken($manager['token'])->postJson('/api/delivery-connectors/'.$managed['data']['id'].'/rotate-secret')->assertOk();
+        $this->assertArrayHasKey('secret', $rotated->json());
+        $this->withToken($manager['token'])->postJson('/api/delivery-connectors/'.$managed['data']['id'].'/reassign', [
+            'user_id' => $successor['id'],
+        ])->assertForbidden();
+        $this->assertNull(DeliveryConnectorAccount::withoutGlobalScopes()->findOrFail($managed['data']['id'])->operated_by);
+        $this->assertSame(2, (int) DeliveryConnectorAccount::withoutGlobalScopes()->findOrFail($managed['data']['id'])->secret_version);
+
+        $this->withToken($auth['token'])->postJson('/api/delivery-connectors/'.$id.'/reassign', [])->assertStatus(422);
+        $this->assertSame($storedSecret, DB::table('delivery_connector_accounts')->where('id', $id)->value('secret'));
+        $this->assertNull(DeliveryConnectorAccount::withoutGlobalScopes()->findOrFail($unscoped['data']['id'])->operated_by);
+        $this->assertSame($successor['id'], (string) DeliveryConnectorAccount::withoutGlobalScopes()->findOrFail($id)->operated_by);
+        $this->assertSame($first, (string) DeliveryConnectorAccount::withoutGlobalScopes()->findOrFail($id)->branch_id);
+        $this->assertNotSame($other['tenant_id'], $auth['tenant_id']);
+        $this->assertSame($before, $this->financialCounts());
+        $this->assertStringNotContainsString($account['secret'], $this->withToken($auth['token'])->getJson('/api/delivery-connectors/'.$id)->getContent());
+    }
+
+    /** @test */
+    public function reassignment_does_not_enable_or_rotate_a_disabled_connector(): void
+    {
+        [$auth, $branch, $profile] = $this->tenantWithPlatform('stayoff');
+        $before = $this->financialCounts();
+        $successor = $this->user($auth, 'next@stayoff.test');
+        $account = $this->connector($auth['token'], $profile, 'store-off', $branch);
+        $id = $account['data']['id'];
+        $this->withToken($auth['token'])->postJson('/api/delivery-connectors/'.$id.'/disable')->assertOk();
+        $storedSecret = DB::table('delivery_connector_accounts')->where('id', $id)->value('secret');
+        $version = (int) DeliveryConnectorAccount::withoutGlobalScopes()->findOrFail($id)->secret_version;
+
+        $response = $this->withToken($auth['token'])->postJson('/api/delivery-connectors/'.$id.'/reassign', [
+            'user_id' => $successor['id'],
+        ])->assertOk();
+        $this->assertSame(DeliveryConnectorAccount::STATUS_DISABLED, $response['data']['status']);
+        $this->assertNotNull($response['data']['disabled_at']);
+        $this->assertSame($successor['id'], $response['data']['operated_by']);
+        $this->assertSame($account['data']['configured_by'], $response['data']['configured_by']);
+        $this->assertSame($version, $response['data']['secret_version']);
+        $this->assertArrayNotHasKey('secret', $response->json());
+        $this->assertSame($storedSecret, DB::table('delivery_connector_accounts')->where('id', $id)->value('secret'));
+        $this->assertSame($branch, $response['data']['branch_id']);
+        $this->assertSame('jahez', $response['data']['platform_key']);
+
+        $event = $this->event('P-off', ['sku' => 'a']);
+        $this->postEvent($id, $event, $account['secret'])
+            ->assertForbidden()
+            ->assertJsonPath('error_code', 'connector_disabled');
+        $this->assertSame(0, DeliveryConnectorAttempt::withoutGlobalScopes()->count());
+        $this->assertSame(0, DeliveryHubOrder::withoutGlobalScopes()->count());
+        $this->assertSame($before, $this->financialCounts());
+    }
+
+    /** @test */
+    public function application_and_subscription_gates_block_reassignment_without_burning_the_event(): void
+    {
+        [$auth, $branch, $profile] = $this->tenantWithPlatform('gates');
+        $before = $this->financialCounts();
+        $successor = $this->user($auth, 'next@gates.test');
+        $account = $this->connector($auth['token'], $profile, 'store-gates', $branch);
+        $id = $account['data']['id'];
+        $event = $this->event('P-gate', ['sku' => 'a']);
+
+        foreach (['disabled', 'suspended'] as $status) {
+            $this->setApplicationStatus($auth['tenant_id'], $status);
+            $this->withToken($auth['token'])->postJson('/api/delivery-connectors/'.$id.'/reassign', [
+                'user_id' => $successor['id'],
+            ])->assertForbidden();
+            $this->postEvent($id, $event, $account['secret'])
+                ->assertForbidden()
+                ->assertJsonPath('error_code', 'application_inactive');
+            $this->assertNull(DeliveryConnectorAccount::withoutGlobalScopes()->findOrFail($id)->operated_by);
+            $this->assertSame(0, DeliveryConnectorAttempt::withoutGlobalScopes()->count());
+        }
+
+        $this->setApplicationStatus($auth['tenant_id'], 'enabled');
+        Tenant::query()->whereKey($auth['tenant_id'])->update([
+            'trial_ends_at' => now()->subDay(),
+            'subscription_ends_at' => now()->subDay(),
+        ]);
+        $this->withToken($auth['token'])->postJson('/api/delivery-connectors/'.$id.'/reassign', [
+            'user_id' => $successor['id'],
+        ])->assertForbidden();
+        $this->postEvent($id, $event, $account['secret'])
+            ->assertForbidden()
+            ->assertJsonPath('error_code', 'subscription_inactive');
+        $this->assertNull(DeliveryConnectorAccount::withoutGlobalScopes()->findOrFail($id)->operated_by);
+        $this->assertSame(0, DeliveryConnectorAttempt::withoutGlobalScopes()->count());
+        $this->assertSame(0, DeliveryHubOrder::withoutGlobalScopes()->count());
+
+        Tenant::query()->whereKey($auth['tenant_id'])->update([
+            'trial_ends_at' => now()->addDay(),
+            'subscription_ends_at' => null,
+        ]);
+        $this->withToken($auth['token'])->postJson('/api/delivery-connectors/'.$id.'/reassign', [
+            'user_id' => $successor['id'],
+        ])->assertOk()->assertJsonPath('data.operated_by', $successor['id']);
+        $created = $this->postEvent($id, $event, $account['secret'])->assertCreated();
+        $this->assertSame($successor['id'], (string) DeliveryHubOrder::query()->findOrFail($created['data']['delivery_hub_order_id'])->created_by);
+        $this->assertSame(1, (int) DeliveryConnectorAccount::withoutGlobalScopes()->findOrFail($id)->secret_version);
+        $this->assertSame($before, $this->financialCounts());
+    }
+
+    /** @test */
+    public function stale_reassignments_commit_distinct_operators_under_the_account_lock(): void
+    {
+        [$auth, $branch, $profile] = $this->tenantWithPlatform('locks');
+        $before = $this->financialCounts();
+        $firstUser = $this->user($auth, 'first@locks.test');
+        $secondUser = $this->user($auth, 'second@locks.test');
+        $account = $this->connector($auth['token'], $profile, 'store-locks', $branch);
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $owner = User::query()->where('email', 'owner@locks.test')->firstOrFail();
+        $staleA = DeliveryConnectorAccount::query()->findOrFail($account['data']['id']);
+        $staleB = DeliveryConnectorAccount::query()->findOrFail($account['data']['id']);
+        $this->assertNull($staleA->operated_by);
+        $this->assertNull($staleB->operated_by);
+        $storedSecret = DB::table('delivery_connector_accounts')->where('id', $account['data']['id'])->value('secret');
+
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+        $service = app(DeliveryConnectorAccountService::class);
+        $afterA = $service->reassign($staleA, $owner, $firstUser['id']);
+        $afterB = $service->reassign($staleB, $owner, $secondUser['id']);
+        if (DB::connection()->getDriverName() === 'pgsql') {
+            $sql = strtolower(implode("\n", array_column(DB::getQueryLog(), 'query')));
+            $this->assertStringContainsString('for update', $sql);
+        }
+
+        $this->assertSame($firstUser['id'], (string) $afterA->operated_by);
+        $this->assertSame($secondUser['id'], (string) $afterB->operated_by);
+        $stored = DeliveryConnectorAccount::query()->findOrFail($account['data']['id']);
+        $this->assertSame($secondUser['id'], (string) $stored->operated_by);
+        $this->assertSame($account['data']['configured_by'], (string) $stored->configured_by);
+        $this->assertSame(1, (int) $stored->secret_version);
+        $this->assertSame($storedSecret, DB::table('delivery_connector_accounts')->where('id', $account['data']['id'])->value('secret'));
+
+        $events = DeliveryConnectorOperatorEvent::withoutGlobalScopes()->get();
+        $this->assertCount(2, $events);
+        $this->assertTrue($events->contains(fn ($event) => (string) $event->from_user_id === (string) $account['data']['configured_by']
+            && (string) $event->to_user_id === $firstUser['id']
+            && (string) $event->actor_user_id === (string) $owner->id));
+        $this->assertTrue($events->contains(fn ($event) => (string) $event->from_user_id === $firstUser['id']
+            && (string) $event->to_user_id === $secondUser['id']
+            && (string) $event->actor_user_id === (string) $owner->id));
+
+        $created = $this->postEvent($account['data']['id'], $this->event('P-lock', ['sku' => 'a']), $account['secret'])->assertCreated();
+        $this->assertSame($secondUser['id'], (string) DeliveryHubOrder::query()->findOrFail($created['data']['delivery_hub_order_id'])->created_by);
+        $this->assertSame($before, $this->financialCounts());
+    }
+
+    /** @test */
+    public function a_target_deleted_after_the_account_lock_is_rejected(): void
+    {
+        [$auth, $branch, $profile] = $this->tenantWithPlatform('stale');
+        $before = $this->financialCounts();
+        $target = $this->user($auth, 'target@stale.test');
+        $account = $this->connector($auth['token'], $profile, 'store-stale', $branch);
+        $id = $account['data']['id'];
+        $row = User::query()->findOrFail($target['id']);
+        $selects = 0;
+        $armed = true;
+        DB::listen(function ($query) use (&$armed, &$selects, $row): void {
+            if (! $armed || ! str_contains($query->sql, 'delivery_connector_accounts')) {
+                return;
+            }
+            $sql = strtolower($query->sql);
+            if (! str_contains($sql, 'select')) {
+                return;
+            }
+            $selects++;
+            if ($selects < 2 && ! str_contains($sql, 'for update')) {
+                return;
+            }
+            $armed = false;
+            $row->delete();
+        });
+
+        $this->withToken($auth['token'])->postJson('/api/delivery-connectors/'.$id.'/reassign', [
+            'user_id' => $target['id'],
+        ])->assertStatus(422)->assertJsonPath('error_code', 'operator_ineligible');
+
+        $this->assertNull(DeliveryConnectorAccount::withoutGlobalScopes()->findOrFail($id)->operated_by);
+        $this->assertSame(0, DeliveryConnectorOperatorEvent::withoutGlobalScopes()->count());
+        $this->assertNull(User::withTrashed()->findOrFail($target['id'])->deleted_at);
+        $this->assertSame(0, DeliveryHubOrder::withoutGlobalScopes()->count());
+        $this->assertSame($before, $this->financialCounts());
+    }
+
+    /** @test */
+    public function an_in_flight_ingest_keeps_the_locked_actor_snapshot(): void
+    {
+        [$auth, $branch, $profile] = $this->tenantWithPlatform('inflight');
+        $before = $this->financialCounts();
+        $successor = $this->user($auth, 'next@inflight.test');
+        $account = $this->connector($auth['token'], $profile, 'store-inflight', $branch);
+        $id = $account['data']['id'];
+        $selects = 0;
+        $armed = true;
+        DB::listen(function ($query) use (&$armed, &$selects, $id, $successor): void {
+            if (! $armed || ! str_contains($query->sql, 'delivery_connector_accounts')) {
+                return;
+            }
+            $sql = strtolower($query->sql);
+            if (! str_contains($sql, 'select')) {
+                return;
+            }
+            $selects++;
+            if (! str_contains($sql, 'for update') && $selects < 2) {
+                return;
+            }
+            $armed = false;
+            DB::table('delivery_connector_accounts')->where('id', $id)->update([
+                'operated_by' => $successor['id'],
+            ]);
+        });
+
+        $first = $this->postEvent($id, $this->event('P-snap', ['sku' => 'a']), $account['secret'])->assertCreated();
+        $this->assertSame(
+            $account['data']['configured_by'],
+            (string) DeliveryHubOrder::query()->findOrFail($first['data']['delivery_hub_order_id'])->created_by,
+        );
+        $this->assertSame($successor['id'], (string) DeliveryConnectorAccount::withoutGlobalScopes()->findOrFail($id)->operated_by);
+
+        $second = $this->postEvent($id, $this->event('P-next', ['sku' => 'b']), $account['secret'])->assertCreated();
+        $this->assertSame($successor['id'], (string) DeliveryHubOrder::query()->findOrFail($second['data']['delivery_hub_order_id'])->created_by);
+        $this->assertSame(
+            $account['data']['configured_by'],
+            (string) DeliveryHubOrder::query()->findOrFail($first['data']['delivery_hub_order_id'])->created_by,
+        );
+        $this->assertSame(1, (int) DeliveryConnectorAccount::withoutGlobalScopes()->findOrFail($id)->secret_version);
+        $this->assertSame($before, $this->financialCounts());
+    }
+
+    /** @test */
+    public function reassignment_committed_before_the_row_lock_is_the_ingest_actor(): void
+    {
+        [$auth, $branch, $profile] = $this->tenantWithPlatform('beforelock');
+        $before = $this->financialCounts();
+        $successor = $this->user($auth, 'next@beforelock.test');
+        $account = $this->connector($auth['token'], $profile, 'store-before', $branch);
+        $armed = true;
+        DB::listen(function ($query) use (&$armed, $auth, $account, $successor): void {
+            if (! $armed || ! str_contains($query->sql, 'delivery_connector_accounts')) {
+                return;
+            }
+            $sql = strtolower(ltrim($query->sql));
+            if (! str_starts_with($sql, 'select') || str_contains($sql, 'for update')) {
+                return;
+            }
+            $armed = false;
+            app(TenantContext::class)->set($auth['tenant_id']);
+            $owner = User::query()->where('email', 'owner@beforelock.test')->firstOrFail();
+            $fresh = DeliveryConnectorAccount::query()->findOrFail($account['data']['id']);
+            app(DeliveryConnectorAccountService::class)->reassign($fresh, $owner, $successor['id']);
+        });
+
+        $created = $this->postEvent($account['data']['id'], $this->event('P-before', ['sku' => 'a']), $account['secret'])->assertCreated();
+        $this->assertSame($successor['id'], (string) DeliveryHubOrder::query()->findOrFail($created['data']['delivery_hub_order_id'])->created_by);
+        $stored = DeliveryConnectorAccount::withoutGlobalScopes()->findOrFail($account['data']['id']);
+        $this->assertSame($account['data']['configured_by'], (string) $stored->configured_by);
+        $this->assertSame($successor['id'], (string) $stored->operated_by);
+        $this->assertSame(1, (int) $stored->secret_version);
+        $this->assertCount(1, DeliveryConnectorOperatorEvent::withoutGlobalScopes()->get());
+        $this->assertSame($before, $this->financialCounts());
+    }
+
+    /** @test */
+    public function naming_the_creator_is_audited_once_and_history_cannot_be_rewritten(): void
+    {
+        [$auth, $branch, $profile] = $this->tenantWithPlatform('audit');
+        $before = $this->financialCounts();
+        $account = $this->connector($auth['token'], $profile, 'store-audit', $branch);
+        $id = $account['data']['id'];
+        $creator = $account['data']['configured_by'];
+        $other = $this->user($auth, 'other@audit.test');
+
+        $named = $this->withToken($auth['token'])->postJson('/api/delivery-connectors/'.$id.'/reassign', [
+            'user_id' => $creator,
+        ])->assertOk();
+        $this->assertSame($creator, $named['data']['operated_by']);
+        $this->assertSame($creator, $named['data']['configured_by']);
+        $this->assertCount(1, DeliveryConnectorOperatorEvent::withoutGlobalScopes()->get());
+        $event = DeliveryConnectorOperatorEvent::withoutGlobalScopes()->firstOrFail();
+        $this->assertSame($creator, (string) $event->from_user_id);
+        $this->assertSame($creator, (string) $event->to_user_id);
+
+        $this->withToken($auth['token'])->postJson('/api/delivery-connectors/'.$id.'/reassign', [
+            'user_id' => $creator,
+        ])->assertOk();
+        $this->assertCount(1, DeliveryConnectorOperatorEvent::withoutGlobalScopes()->get());
+
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $row = DeliveryConnectorAccount::query()->findOrFail($id);
+        try {
+            $row->forceFill(['configured_by' => $other['id']])->save();
+            $this->fail('configured_by was rewritten');
+        } catch (DomainException $e) {
+            $this->assertStringContainsString('immutable', $e->getMessage());
+        }
+        $this->assertSame($creator, (string) DeliveryConnectorAccount::query()->findOrFail($id)->configured_by);
+
+        try {
+            $event->forceFill(['to_user_id' => $other['id']])->save();
+            $this->fail('operator event was updated');
+        } catch (LogicException) {
+            $this->assertSame($creator, (string) DeliveryConnectorOperatorEvent::withoutGlobalScopes()->findOrFail($event->id)->to_user_id);
+        }
+        try {
+            $event->delete();
+            $this->fail('operator event was deleted');
+        } catch (LogicException) {
+            $this->assertSame(1, DeliveryConnectorOperatorEvent::withoutGlobalScopes()->count());
+        }
+
+        $this->assertSame(1, (int) DeliveryConnectorAccount::query()->findOrFail($id)->secret_version);
+        $this->assertSame($before, $this->financialCounts());
+        $this->assertSame(0, Invoice::withoutGlobalScopes()->count());
+    }
+
     /** @return array<string, string> */
     private function jsonHeaders(string $token): array
     {
@@ -1055,5 +1586,36 @@ class DeliveryConnectorCoreTest extends TestCase
             'contexts' => DeliveryInvoiceContext::withoutGlobalScopes()->count(),
             'commerce' => CommerceOrder::withoutGlobalScopes()->count(),
         ];
+    }
+
+    private function raiseUserLimit(string $tenantId): void
+    {
+        $tenant = Tenant::findOrFail($tenantId);
+        $limits = $tenant->plan_limits ?? [];
+        $limits['users'] = null;
+        $tenant->plan_limits = $limits;
+        $tenant->save();
+    }
+
+    /** @param  array<int, string>|null  $branchIds
+     * @return array{id: string, token: string}
+     */
+    private function user(array $auth, string $email, string $role = 'admin', ?array $branchIds = null): array
+    {
+        $this->raiseUserLimit($auth['tenant_id']);
+        $payload = [
+            'name' => 'مستخدم تشغيلي',
+            'email' => $email,
+            'password' => 'password123',
+            'role' => $role,
+        ];
+        if ($branchIds !== null) {
+            $payload['branch_ids'] = $branchIds;
+        }
+        $created = $this->withToken($auth['token'])->postJson('/api/users', $payload)->assertCreated();
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $user = User::query()->findOrFail($created['data']['id']);
+
+        return ['id' => (string) $user->id, 'token' => $user->createToken('api')->plainTextToken];
     }
 }

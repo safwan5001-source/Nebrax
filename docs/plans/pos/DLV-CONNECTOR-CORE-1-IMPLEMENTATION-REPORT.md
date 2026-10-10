@@ -63,7 +63,7 @@ A branch-restricted user cannot create an unrouted account (`branch_required`) a
 - Tenant-scoped. Another tenant receives 404 on show/rotate.
 - Status is only `configured` or `disabled`. There is no Connected, Live, or Synced status.
 - Creating an account does not activate a catalog platform and does not insert HungerStation, Keeta, Jahez, Mrsool, Ninja, or The Chefz profiles by itself. Tests that need a profile use the existing manual platform API.
-- Permissions `delivery_connector.view` and `delivery_connector.manage` are owner/admin via `*`. They are not on accountant or staff. They are not a posting permission.
+- Permissions `delivery_connector.view` and `delivery_connector.manage` are owner/admin via `*`. They are not on accountant or staff. They are not a posting permission. `delivery_connector.reassign` is a third permission with the same audience. Manage does not include it.
 - Ingestion logs do not include the secret or the signature header. The service does not write application logs of the raw body.
 
 ## Authentication abstraction
@@ -102,7 +102,7 @@ Transient configuration failures (inactive actor, inactive profile, inactive or 
 
 `DeliveryHubOrderService::intake` and `::transition` are the only projection writes. CommerceOrder is not created. There is no second delivery-order model.
 
-The actor is the user who configured the account (`configured_by`), and only if that user is still active and allowed to see the destination branch. The provider does not choose the actor.
+The actor is the current operational user: `operated_by` when set, otherwise the historical creator `configured_by`. That user must still be active, non-deleted, in the account tenant, and allowed to see the destination branch. An ineligible `operated_by` does not fall back to the creator. The provider does not choose the actor. See DLV-CONNECTOR-OWNERSHIP-1 below.
 
 ## Raw payload boundary
 
@@ -246,7 +246,7 @@ Codex left five open findings on `3b40442` (2 P1, 3 P2). All five are fixed in t
 | P2 payload limit before HMAC (follow-up on `35541a3`) | `strlen($rawBody) > MAX_RAW_BYTES` (65536) returns `422 invalid_payload` before the account row is loaded and before `WebhookSignature::verify`. A body at the limit still reaches signature verification. |
 | P1 cross-branch order reuse (follow-up on `1465de0`) | A manual order is adopted only when its `branch_id` equals the connector mapping. A different branch returns `422 branch_unavailable` before adoption or `hub_action`, and the attempt is not attached to that order. |
 | P1 baseline owned by another connector (follow-up on `c5ca844`) | A non-null authoritative baseline whose `delivery_connector_account_id` is not this connector is `422 branch_unavailable` even when both accounts share a branch. No `hub_action` runs, and the attempt is not attached and stores no checksum. The originating connector can still transition its own order, including after a manual route of an unrouted order. |
-| P2 deleted configurator (follow-up on `35541a3`) | Not implemented. See Decision Packet `DLV-CONNECTOR-OWNERSHIP-1`. |
+| P2 deleted configurator (follow-up on `35541a3`) | Implemented as approved Option B. See DLV-CONNECTOR-OWNERSHIP-1. `configured_by` is not rewritten. `operated_by` is the living actor. Ingestion stays `actor_unavailable` until an explicit reassignment. |
 | P1 follow-up after routing (follow-up on `68342bc`) | If the authoritative baseline belongs to this connector, a later manual `route` does not make the next event `branch_unavailable`. `accept` still applies to the same Hub order. A different connector, and a manual order already on another branch, stay rejected. |
 
 The Hub row still stores a plain PHP array, so an empty object becomes an empty list in the Hub hash. Connector-to-connector comparison uses the authoritative checksum, which keeps `{}` and `[]` apart. Manual adoption rejects a collapsing object and any JSON number that cannot be represented as a PHP integer or an exactly re-encoded float. Those attempts are `payload_conflict` and do not store an authoritative checksum. Hub's own payload hash still uses default `json_encode`, so `1` and `1.0` compare equal there, the same as two manual orders. The connector checksum still distinguishes those tokens once a connector baseline exists.
@@ -328,33 +328,75 @@ PostgreSQL was not started in this sandbox. `useradd` succeeded, but `chown`, `s
 | Manual string adopted from an unrepresentable number | `payload_conflict`. No authoritative checksum. |
 | Financial or inventory side effect | Counts unchanged in the new tests. |
 | Provider enablement or DG-3 evidence | Not introduced. |
-| Deleted configurator permanently blocks the mapping | Open. Decision Packet below. Not fixed in this diff. |
+| Deleted configurator permanently blocks the mapping | Closed in code by explicit reassignment. The thread stays open until CI on this implementation SHA is green. |
 
-Unresolved P1/P2 that this diff fixes stay open on GitHub until CI on this SHA is green and the threads are resolved. The ownership finding stays open on purpose.
+The ownership finding is implemented in the next section. Its GitHub thread stays unresolved until CI on this implementation SHA is green. PRE_MERGE_REVIEW: PASS is not claimed in this file.
 
-## Decision Packet — DLV-CONNECTOR-OWNERSHIP-1
+## DLV-CONNECTOR-OWNERSHIP-1
 
-Status: **blocked**. No code change.
+Status: **implemented** on PR #1287 after explicit owner approval of Option B. No merge, deploy, or release.
 
-Codex P2 on `35541a3` (`PRRT_kwDOS52FT86rGOhy`): after an administrator soft-deletes the user in `configured_by`, `actor()` returns null, every later signed event is `422 actor_unavailable`, and the unique `(platform_key, external_store_id)` mapping cannot be recreated. The connector API can rotate or disable the secret, not reassign it.
+Decision record: `docs/plans/pos/DLV-CONNECTOR-OWNERSHIP-1-DECISION-PACKET.md`.
 
-Evidence already in the core:
+Codex P2 `PRRT_kwDOS52FT86rGOhy`: soft-deleting `configured_by` made every later signed event `422 actor_unavailable`, and the unique store mapping could not be recreated. Rotation and disable still worked. There was no reassignment route.
 
-- `User` uses `SoftDeletes`. `UserController::destroy` deletes any other user, including another owner. There is no restore route.
-- `actor()` uses the default user query, so a soft-deleted configurator is invisible. The failure is intentional for a missing actor and does not burn `event_id`.
-- `DeliveryConnectorAccountService::create` turns a unique violation into `mapping_ambiguous`.
+### Architecture
 
-The two remedies in the finding are product decisions, not a local defect fix:
+`configured_by` remains the historical creator. The model rejects a later change. Nullable `operated_by` is the current operational actor and is null on existing rows, so those rows keep using the creator. `actor()` reads the id already loaded on the locked account: `operated_by` if set, otherwise `configured_by`. The user must be active, not soft-deleted, and in the account tenant. If `operated_by` is set and that user is ineligible, ingestion does not fall back to the creator. Branch checks are unchanged.
 
-| Option | What it decides | Why it is out of scope here |
-|---|---|---|
-| A. Reassignment API | Who may change `configured_by`, which branch scope the new user must have, and whether the secret stays | New management contract and audit rule |
-| B. Durable operational principal | Hub `created_by` and branch checks stop being a human user | New identity type |
-| C. Restore the deleted user | Ingestion waits until that login exists again | User restore is already deferred in `UserController` ("تُعالَج لاحقاً") |
+There is no synthetic user, no grace period, and no automatic successor.
 
-A silent fallback to "any active owner" would also pick an actor and a branch scope. That is option B by another name and was not chosen.
+### API and RBAC
 
-This packet does not authorize an adapter, a financial write, or a schema change. The thread stays unresolved. **PRE_MERGE_REVIEW: PASS is not available while it is open.**
+`POST /api/delivery-connectors/{id}/reassign` accepts `{ "user_id": "<uuid>" }`. Middleware is `delivery_connector.reassign`, `EnsureApplicationActive:sales.pos`, and the existing `EnsureActiveSubscription` group. The resource adds `configured_by` and `operated_by` and still omits the secret.
+
+`delivery_connector.reassign` is only in `Rbac::PERMISSIONS`. It is not in the accountant, staff, or self-service matrix. Owner and admin already hold `*`, including tenants whose system role row was seeded with `*`, so no permission backfill is required. A custom role with view and manage can still rotate a secret and cannot reassign.
+
+The caller must pass `visibleTo` or the route returns 404. The target must be active, not soft-deleted, in the same tenant, and eligible for the mapped branch. A branchless connector accepts only a successor whose `allowedBranchIds()` is null. Failure is `422 operator_ineligible`. Disabled connectors can be reassigned and remain `disabled`.
+
+### Concurrency
+
+Reassignment and ingestion both lock `delivery_connector_accounts` first. Reassignment then re-reads the acting admin and the target without `FOR UPDATE` on `users`, updates `operated_by`, and inserts the audit row. It does not lock attempts or Hub orders. That keeps the ingest order (account, attempt, hub order) free of an inverted user lock.
+
+An in-flight ingest uses the actor on the account snapshot taken under its lock. A reassignment that commits before that lock is the actor for that event. The next event sees the committed `operated_by`. SQLite tests do not prove a cross-connection `FOR UPDATE` wait. The query log asserts `for update` only when the driver is PostgreSQL. Local PostgreSQL cannot be started in this sandbox (`chown` / `su` / `runuser` / `setuid` are rejected). The CI `pgsql` job on this commit is the PostgreSQL proof.
+
+A target deleted after the account lock is re-read and rejected. The savepoint rolls the deletion back with the failed reassignment, and `operated_by` stays unchanged.
+
+Repeating reassignment to the current `operated_by` does not write a second audit row. Setting `operated_by` from null to the historical creator does write one row.
+
+### Audit
+
+`delivery_connector_operator_events` is append-only (`updated_at` absent; update and delete throw). Columns: tenant, connector, `from_user_id`, `to_user_id`, `actor_user_id`, `created_at`. The user columns are uuids without foreign keys, so a later soft or hard delete does not erase them. `from_user_id` is the previous `operated_by`, or `configured_by` when `operated_by` was null. Existing Hub `created_by` is not rewritten. A later transition may set `updated_by` to the new actor. New Hub rows use the new actor. Manual Hub intake is unchanged.
+
+### Credentials
+
+Reassignment does not change `secret`, `secret_version`, `status`, `disabled_at`, platform, store id, profile, or branch. The response has no secret. If the previous operator may still hold the signing secret, rotate it with the existing manage route. Those are two calls so a failed reassignment cannot rotate by accident.
+
+### Migration and rollback
+
+`2026_11_03_010000_add_delivery_connector_operated_by` adds nullable `operated_by` (`nullOnDelete` on `users`) and creates the event table. No backfill. SQLite does not get an `after()` column position.
+
+Rollback of behavior: stop calling the route and ignore `operated_by` in `actor()` before dropping the column. Do not drop the event table after a transfer exists. Dropping the column while the new code is still deployed will break reads.
+
+### Local execution
+
+SQLite, `php artisan test tests/Feature/DeliveryConnectorCoreTest.php`:
+
+- 35 passed, 706 assertions (the previous 25 plus deleted creator, suspended creator with no fallback, ineligible targets and permissions, disabled connector, application and subscription gates, sequential stale reassignments, target deleted inside the lock, in-flight snapshot, reassignment committed before the lock, and append-only creator immutability).
+
+SQLite, related suites (`DeliveryHubProjectionTest`, `BranchIsolationGuardTest`, `WebhookSignatureTest`, `DeliveryPlatformApiTest`, `DeliveryFinancialRoleGateTest`, `DeliveryPlatformProfileDomainTest`, `RoleTest`):
+
+- 82 passed, 801 assertions.
+
+PostgreSQL was not started locally. Do not treat the pgsql job as passed until it is green on this commit's SHA. A full local `php artisan test` is not cited here; the cited SQLite results are the connector suite and the related suites above.
+
+### Reviews (ownership)
+
+Implementer: `configured_by` cannot be dirtied after create. `actor()` does not use `withTrashed`. Reassignment writes only `operated_by` plus one audit row. Application and subscription middleware still run before the controller. No invoice, payment, journal, stock, commerce, or provider-enablement call was added.
+
+Reviewer: view and manage do not grant reassign. A branch-restricted caller gets 404 for a connector they cannot see, including an unscoped connector. A successor restricted off the mapped branch, or any restricted successor of an unscoped connector, is `operator_ineligible`. A same-branch restricted successor is accepted. Idempotent replay does not append history. The same `event_id` that failed `actor_unavailable` succeeds after reassignment.
+
+Guardian: no silent grant to another user, no fabricated attribution, no secret in the reassignment response, no status or `secret_version` change, historical `created_by` kept, new Hub rows named for the successor, financial counts unchanged. The old secret remains valid until a separate rotation. SQLite does not prove PostgreSQL row-lock waits.
 
 ## Next candidate
 

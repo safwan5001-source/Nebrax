@@ -4,6 +4,7 @@ namespace App\Services\DeliveryHub;
 
 use App\Models\Branch;
 use App\Models\DeliveryConnectorAccount;
+use App\Models\DeliveryConnectorOperatorEvent;
 use App\Models\DeliveryPlatformProfile;
 use App\Models\User;
 use App\Tenancy\TenantContext;
@@ -92,6 +93,86 @@ class DeliveryConnectorAccountService
         ])->save();
 
         return $account;
+    }
+
+    /**
+     * يعيّن المشغّل الحالي دون المساس بالمنشئ أو بالسر أو بحالة الربط.
+     * قفل صف الربط أولاً، ثم إعادة قراءة المستخدمين بلا FOR UPDATE،
+     * حتى يبقى ترتيب الأقفال هو صف الربط قبل أي صف آخر (كما في الإدخال).
+     */
+    public function reassign(DeliveryConnectorAccount $account, User $actor, string $userId): DeliveryConnectorAccount
+    {
+        $this->assertTenant();
+
+        return DB::transaction(function () use ($account, $actor, $userId) {
+            $locked = DeliveryConnectorAccount::query()->whereKey($account->id)->lockForUpdate()->first();
+            if ($locked === null || (string) $locked->tenant_id !== (string) app(TenantContext::class)->id()) {
+                throw new DeliveryConnectorException('connector_unavailable', 'الربط غير متاح.', 404);
+            }
+
+            $admin = User::query()
+                ->where('tenant_id', $locked->tenant_id)
+                ->whereKey($actor->id)
+                ->first();
+            if ($admin === null || ! $locked->visibleTo($admin)) {
+                throw new DeliveryConnectorException('connector_unavailable', 'الربط غير متاح.', 404);
+            }
+            if (! $admin->is_active) {
+                throw new DeliveryConnectorException('operator_ineligible', 'المستخدم التشغيلي غير مؤهل.', 422);
+            }
+
+            $target = $this->eligibleOperator($locked, $userId);
+            if ((string) $locked->operated_by === (string) $target->id) {
+                return $locked;
+            }
+
+            $previous = $locked->operated_by ?? $locked->configured_by;
+            if ($previous === null) {
+                throw new DeliveryConnectorException('operator_ineligible', 'المستخدم التشغيلي غير مؤهل.', 422);
+            }
+
+            $locked->forceFill([
+                'operated_by' => $target->id,
+            ])->save();
+
+            $event = new DeliveryConnectorOperatorEvent();
+            $event->forceFill([
+                'tenant_id' => $locked->tenant_id,
+                'delivery_connector_account_id' => $locked->id,
+                'from_user_id' => $previous,
+                'to_user_id' => $target->id,
+                'actor_user_id' => $admin->id,
+            ])->save();
+
+            return $locked;
+        });
+    }
+
+    private function eligibleOperator(DeliveryConnectorAccount $account, string $userId): User
+    {
+        $user = User::query()
+            ->where('tenant_id', $account->tenant_id)
+            ->whereKey($userId)
+            ->first();
+        if ($user === null || ! $user->is_active || ! $this->successorCanOperate($account, $user)) {
+            throw new DeliveryConnectorException('operator_ineligible', 'المستخدم التشغيلي غير مؤهل.', 422);
+        }
+
+        return $user;
+    }
+
+    private function successorCanOperate(DeliveryConnectorAccount $account, User $user): bool
+    {
+        if ($account->branch_id === null) {
+            return $user->allowedBranchIds() === null;
+        }
+
+        $branch = Branch::query()->whereKey($account->branch_id)->first();
+        if ($branch === null || ! $branch->is_active || ! $user->canAccessBranch((string) $branch->id)) {
+            return false;
+        }
+
+        return true;
     }
 
     private function profileOrFail(string $profileId): DeliveryPlatformProfile

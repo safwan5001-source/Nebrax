@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Requests\ReassignDeliveryConnectorOperatorRequest;
 use App\Http\Requests\StoreDeliveryConnectorAccountRequest;
 use App\Http\Resources\DeliveryConnectorAccountResource;
 use App\Models\DeliveryConnectorAccount;
@@ -80,6 +81,22 @@ class DeliveryConnectorAccountController extends ApiController
 
         try {
             $account = $this->accounts->disable($account);
+        } catch (DeliveryConnectorException $e) {
+            return $this->failure($e);
+        }
+
+        return (new DeliveryConnectorAccountResource($account))->response();
+    }
+
+    public function reassign(ReassignDeliveryConnectorOperatorRequest $request, string $id): JsonResponse
+    {
+        $account = $this->visibleAccount($request, $id);
+        if ($account === null) {
+            abort(404);
+        }
+
+        try {
+            $account = $this->accounts->reassign($account, $request->user(), (string) $request->validated('user_id'));
         } catch (DeliveryConnectorException $e) {
             return $this->failure($e);
         }

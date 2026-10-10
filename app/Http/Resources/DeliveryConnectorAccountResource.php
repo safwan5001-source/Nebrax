@@ -16,6 +16,8 @@ class DeliveryConnectorAccountResource extends JsonResource
             'platform_key' => $this->platform_key,
             'external_store_id' => $this->external_store_id,
             'branch_id' => $this->branch_id,
+            'configured_by' => $this->configured_by,
+            'operated_by' => $this->operated_by,
             'status' => $this->status,
             'secret_prefix' => $this->secret_prefix,
             'secret_version' => $this->secret_version,

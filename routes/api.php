@@ -890,6 +890,7 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         Route::get('delivery-connectors/{id}', [DeliveryConnectorAccountController::class, 'show'])->whereUuid('id')->middleware([$perm('delivery_connector.view'), $app('sales.pos')]);
         Route::post('delivery-connectors/{id}/rotate-secret', [DeliveryConnectorAccountController::class, 'rotateSecret'])->whereUuid('id')->middleware([$perm('delivery_connector.manage'), $app('sales.pos')]);
         Route::post('delivery-connectors/{id}/disable', [DeliveryConnectorAccountController::class, 'disable'])->whereUuid('id')->middleware([$perm('delivery_connector.manage'), $app('sales.pos')]);
+        Route::post('delivery-connectors/{id}/reassign', [DeliveryConnectorAccountController::class, 'reassign'])->whereUuid('id')->middleware([$perm('delivery_connector.reassign'), $app('sales.pos')]);
 
 
         // طرق الدفع: بيان مالي مشترك يحدد وجهة السند ورسومه.
