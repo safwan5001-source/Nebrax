@@ -93,6 +93,9 @@ class StorefrontPresentationBannerWindowTest extends TestCase
         // السنوات المنخفضة: `Date.UTC` في JS كان يحوّل 0001 إلى 1901 فتُخفى النافذة؛ التوأمان يقرآنها الآن كما كُتبت.
         $this->assertSame([], $this->errorsFor($this->banner(['window' => ['startsAt' => '0001-01-01T00:00:00Z', 'endsAt' => '2999-01-01T00:00:00Z']])));
 
+        $e = $this->errorsFor($this->banner(['window' => ['startsAt' => '0000-01-01T00:00:00Z']]));
+        $this->assertSame('window_invalid_timestamp', $e['homepage.sections[0].content.window.startsAt']['code'], 'there is no year 0');
+
         // الدقّة: المتصفّح يقتطع إلى الميلي ثانية، فحافتان متساويتان عندها نافذةٌ فارغة ولو اختلفتا بالميكرو.
         $e = $this->errorsFor($this->banner(['window' => ['startsAt' => '2026-10-06T10:00:00.000001Z', 'endsAt' => '2026-10-06T10:00:00.000002Z']]));
         $this->assertSame('window_end_not_after_start', $e['homepage.sections[0].content.window.endsAt']['code']);

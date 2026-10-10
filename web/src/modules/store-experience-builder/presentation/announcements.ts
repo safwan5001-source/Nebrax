@@ -327,6 +327,7 @@ export function parseAnnouncementInstant(value: string): number | null {
     Number,
   );
   const second = m[6] === undefined ? 0 : Number(m[6]);
+  if (year < 1) return null; // the server gate (`checkdate`) has no year 0 either
   if (hour > 23 || minute > 59 || second > 59) return null;
   if (m[9] !== undefined && (Number(m[9]) > 23 || Number(m[10]) > 59))
     return null;

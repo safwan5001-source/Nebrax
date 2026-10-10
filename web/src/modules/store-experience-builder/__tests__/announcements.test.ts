@@ -256,6 +256,8 @@ describe("announcements — low years and sub-ms precision (CUST-HV V6c-1)", () 
     expect(parseAnnouncementInstant("0001-01-01T00:00:00Z")).toBe(-62135596800000);
     expect(parseAnnouncementInstant("0099-12-31T23:59:59Z")).toBe(-59011459201000);
     expect(parseAnnouncementInstant("0001-02-29T00:00:00Z")).toBeNull(); // year 1 is not a leap year
+    expect(parseAnnouncementInstant("0000-01-01T00:00:00Z")).toBeNull(); // no year 0, as in the server gate
+    expect(announcementWindowState({ startsAt: "0000-01-01T00:00:00Z", endsAt: "9999-01-01T00:00:00Z" }, Date.parse("2026-10-10T00:00:00Z"))).toBe("invalid");
     const now = Date.parse("2026-10-10T00:00:00Z");
     expect(announcementWindowState({ startsAt: "0001-01-01T00:00:00Z", endsAt: "2999-01-01T00:00:00Z" }, now)).toBe("open");
   });
