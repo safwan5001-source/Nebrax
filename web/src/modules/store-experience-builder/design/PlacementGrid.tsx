@@ -1,7 +1,7 @@
 "use client";
 
 import { RotateCcw } from "lucide-react";
-import { Field, btnClass } from "../ControlPanels";
+import { btnClass } from "../ControlPanels";
 import type { CustomizerMessageKey } from "../messages";
 import { ALIGNS, type Align } from "../presentation/section-design";
 
@@ -31,15 +31,13 @@ export function PlacementGrid({
 }) {
   const automatic = align === undefined && valign === undefined;
   return (
-    <Field label={t("designBlockAlign")}>
+    // A fieldset, not `Field`: that renders a <label>, and a label around nine buttons would forward a click on its
+    // caption or hint to the first one (top-start) and give the group invalid labelling semantics.
+    <fieldset className="min-w-0 space-y-1.5" data-design-placement-group="">
+      <legend className="mb-1.5 text-[12px] font-medium text-muted">{t("designBlockAlign")}</legend>
       <div className="space-y-2">
         <div className="flex items-start gap-3">
-          <div
-            role="group"
-            aria-label={t("designBlockAlign")}
-            className="grid w-fit grid-cols-3 gap-1"
-            data-design-placement=""
-          >
+          <div className="grid w-fit grid-cols-3 gap-1" data-design-placement="">
             {ALIGNS.flatMap((row, r) =>
               ALIGNS.map((col, c) => {
                 const active = align === col && valign === row;
@@ -74,6 +72,6 @@ export function PlacementGrid({
         </div>
         <p className="text-[12px] leading-5 text-muted">{t("designPlacementHint")}</p>
       </div>
-    </Field>
+    </fieldset>
   );
 }

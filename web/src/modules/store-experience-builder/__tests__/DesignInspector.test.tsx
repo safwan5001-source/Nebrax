@@ -406,6 +406,18 @@ describe("hero / banner placement grid and height (CUST-HV V6c-3)", () => {
     expect(out()).toEqual({ align: "center", valign: "center" });
   });
 
+  it("the grid is a labelled group, not inside a <label>: clicking the caption or hint selects nothing", () => {
+    render(<Harness type="hero" />);
+    const group = screen.getByRole("group", { name: "Content position" });
+    expect(group.tagName).toBe("FIELDSET");
+    expect(cell("start", "start").closest("label")).toBeNull();
+    // a click on the caption / hint must not be forwarded to the first cell
+    fireEvent.click(screen.getByText("Content position"));
+    fireEvent.click(group.querySelector("p") as HTMLElement);
+    expect(out()).toBeNull();
+    expect(document.querySelectorAll('[data-placement-cell][aria-pressed="true"]')).toHaveLength(0);
+  });
+
   it("every cell has an accessible name that says where it is", () => {
     render(<Harness type="hero" />);
     expect(cell("start", "start").getAttribute("aria-label")).toBe("top Start");

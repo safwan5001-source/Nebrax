@@ -62,6 +62,7 @@ Legibility over a picture background needs nothing new: the V6b proof is whole-f
 | Finding | Verdict | Fix |
 |---|---|---|
 | A banner with a height preset but no `valign` was vertically centred, although banners have always started at the top — so "Automatic" did not preserve a banner's layout | **Real** (my fallback was a single `center` for both types, contradicting the "Automatic keeps today's layout" claim) | Type-specific fallback in the stylesheet (both sheets, parity-tested): `center` for a hero, `flex-start` for a banner, keyed on the frame's existing `data-design-type`. The browser proof now asserts it (automatic banner within 2 px of the top; 664 placement checks, 0 violations; negative control still 320). |
+| The placement grid sat inside the shared `Field`, which renders a `<label>`: a click on its caption or hint was forwarded to the first cell (top-start) and the group had invalid labelling | **Real** | `PlacementGrid` is a `fieldset` with a `legend` (the media focal grid's pattern); a test asserts it is a named group, outside any `<label>`, and that clicking the caption or hint selects nothing. |
 
 ## Limitations (stated)
 - `screen` follows the **small** viewport (`svh`), so it never jumps with the mobile URL bar; an engine without `svh` ignores the preset and the section keeps its content height.
