@@ -141,6 +141,44 @@ describe("HeroSection (COM-7-P3A)", () => {
       expect(container.querySelector('a[href="/sa/en/products"]')).toBeNull();
     });
 
+    it("CUST-HV V6c-5: absent style ⇒ by position; an explicit style wins per button, in the section's own colours", async () => {
+      const { HeroSection } = await import("../HeroSection");
+      const render2 = async (ctas: Array<Record<string, string>>) =>
+        render(
+          await HeroSection({
+            basePath: "/sa/en",
+            locale: "en",
+            storeName: "Shop",
+            ctas: ctas as never,
+          }),
+        ).container;
+      const a = await render2([
+        { label: "A", href: "/a" },
+        { label: "B", href: "/b" },
+      ]);
+      expect(
+        [...a.querySelectorAll("a")].map((e) =>
+          e.getAttribute("data-cta-style"),
+        ),
+      ).toEqual(["solid", "outline"]);
+      const [solid, outline] = [...a.querySelectorAll("a")];
+      expect(solid.className).toContain("bg-store-primary-foreground");
+      expect(outline.className).toContain("border-store-primary-foreground/70");
+      const b = await render2([
+        { label: "A", href: "/a", style: "link" },
+        { label: "B", href: "/b", style: "solid" },
+      ]);
+      const [link, second] = [...b.querySelectorAll("a")];
+      expect(link.getAttribute("data-cta-style")).toBe("link");
+      expect(link.className).toContain("underline");
+      expect(link.className).toContain("text-store-primary-foreground");
+      expect(link.className).not.toContain("bg-store-primary-foreground");
+      expect(link.className).toContain("md:h-11"); // the tap height stays
+      expect(second.className).toContain("bg-store-primary-foreground");
+      // the data hook keeps its positional meaning (primary / secondary), the look does not
+      expect(link.getAttribute("data-hero-cta")).toBe("primary");
+    });
+
     it("authored buttons that cannot render (no resolvable link) show NO button — the default link only belongs to a hero with no buttons", async () => {
       const { HeroSection } = await import("../HeroSection");
       const { container } = render(

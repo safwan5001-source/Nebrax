@@ -132,7 +132,16 @@ export interface DeliveryPromiseContent {
 export interface HeroCta {
   label: string;
   href: string;
+  /**
+   * CUST-HV V6c-5 (V0 §6.1) — per-CTA look override: `solid` (the section's primary button), `outline`, or `link`
+   * (text only). Absent ⇒ by position (first solid, second outline), exactly as before. Every style paints with
+   * colours the section already proves against its own backdrop, so this adds no new contrast surface.
+   */
+  style?: CtaStyle;
 }
+
+export const CTA_STYLES = ["solid", "outline", "link"] as const;
+export type CtaStyle = (typeof CTA_STYLES)[number];
 
 /**
  * CUST-HV V6a — a hero instance's own content. Absent ⇒ the legacy global
@@ -377,7 +386,15 @@ function normalizeCtaList(raw: unknown, max: number): HeroCta[] {
     const label = heroText(entry.label, MAX_HERO_CTA_LABEL_LENGTH);
     const href = sanitizeContentHref(asString(entry.href));
     if (label === "" && href === "") continue;
-    ctas.push({ label, href });
+    const cta: HeroCta = { label, href };
+    const style = entry.style;
+    if (
+      typeof style === "string" &&
+      (CTA_STYLES as readonly string[]).includes(style)
+    ) {
+      cta.style = style as CtaStyle;
+    }
+    ctas.push(cta);
     if (ctas.length >= max) break;
   }
   return ctas;

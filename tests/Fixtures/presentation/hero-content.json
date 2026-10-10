@@ -358,6 +358,58 @@
                     }
                 ]
             }
+        },
+        {
+            "name": "hero V6c-5: per-CTA style is kept in canonical order; an unknown style / colour / icon is dropped",
+            "type": "hero",
+            "input": {
+                "headline": "H",
+                "ctas": [
+                    {
+                        "style": "link",
+                        "href": "/a",
+                        "label": "A",
+                        "colour": "accent"
+                    },
+                    {
+                        "label": "B",
+                        "href": "/b",
+                        "style": "soft",
+                        "icon": {
+                            "key": "arrow"
+                        }
+                    }
+                ]
+            },
+            "expected": {
+                "headline": "H",
+                "ctas": [
+                    {
+                        "label": "A",
+                        "href": "/a",
+                        "style": "link"
+                    },
+                    {
+                        "label": "B",
+                        "href": "/b"
+                    }
+                ]
+            }
+        },
+        {
+            "name": "hero V6c-5: a style alone is not a button",
+            "type": "hero",
+            "input": {
+                "headline": "H",
+                "ctas": [
+                    {
+                        "style": "solid"
+                    }
+                ]
+            },
+            "expected": {
+                "headline": "H"
+            }
         }
     ]
 }

@@ -41,6 +41,7 @@ import {
 } from "./presentation/tokens";
 import { PREVIEW_FONT_VARIABLES } from "./presentation/fonts";
 import {
+  type CtaStyle,
   bannerContentOf,
   bannerCtasOf,
   heroContentOf,
@@ -225,6 +226,21 @@ export type PreviewChromeTarget =
 /** Stable empty list: no homepage sections to read picture bounds for. */
 const NO_SECTIONS: ReadonlyArray<{ visible: boolean; design?: SectionDesign }> = [];
 const NO_WINDOWS: ReadonlyArray<undefined> = [];
+
+// CUST-HV V6c-5 — the looks of a hero / banner button, the same as the storefront's `HeroSection` / `BannerBand`
+// (one source of colour: the section's own foreground, so a style adds no contrast surface).
+const HERO_CTA_LOOK: Record<CtaStyle, string> = {
+  solid: "bg-store-primary-foreground text-store-primary",
+  outline: "border-2 border-store-primary-foreground/70 text-store-primary-foreground",
+  link: "px-1 text-store-primary-foreground underline decoration-2 underline-offset-4 md:px-2",
+};
+const BANNER_CTA_CLASS: Record<CtaStyle, string> = {
+  solid:
+    "inline-flex h-10 max-w-full items-center rounded-store bg-store-primary px-4 text-sm font-bold text-store-primary-foreground",
+  outline:
+    "inline-flex h-10 max-w-full items-center rounded-store border-2 border-store-foreground/60 px-4 text-sm font-bold text-store-foreground",
+  link: "inline-flex h-10 max-w-full items-center px-1 text-sm font-bold text-store-foreground underline decoration-2 underline-offset-4",
+};
 
 export function StorefrontPreviewCanvas({
   config,
@@ -705,11 +721,10 @@ export function StorefrontPreviewCanvas({
                           <span
                             key={`${index}-${cta.href}`}
                             data-preview-hero-cta={index === 0 ? "primary" : "secondary"}
+                            data-cta-style={cta.style ?? (index === 0 ? "solid" : "outline")}
                             className={cn(
                               "inline-flex h-9 items-center rounded-store px-4 text-xs font-bold md:h-11 md:px-6 md:text-sm",
-                              index === 0
-                                ? "bg-store-primary-foreground text-store-primary"
-                                : "border-2 border-store-primary-foreground/70 text-store-primary-foreground",
+                              HERO_CTA_LOOK[cta.style ?? (index === 0 ? "solid" : "outline")],
                             )}
                           >
                             {cta.label}
@@ -915,7 +930,7 @@ export function StorefrontPreviewCanvas({
                 !bannerCtas.some((cta) => cta.label.trim() !== "") &&
                 !banner.imageUrl;
               const completeCtas = bannerCtas
-                .map((cta) => ({ label: cta.label.trim(), href: cta.href }))
+                .map((cta) => ({ label: cta.label.trim(), href: cta.href, style: cta.style }))
                 .filter((cta) => cta.label !== "" && (cta.href.startsWith("https://") || cta.href.startsWith("/")));
               const windowState =
                 bannerWindowsNow === null || !banner.window ? null : announcementWindowState(banner.window, bannerWindowsNow);
@@ -952,7 +967,9 @@ export function StorefrontPreviewCanvas({
                         {completeCtas.length === 1 ? (
                           <span
                             data-banner-cta=""
-                            className="mt-4 inline-flex h-10 max-w-full items-center rounded-store bg-store-primary px-4 text-sm font-bold text-store-primary-foreground"
+                            data-cta-style={completeCtas[0].style ?? "solid"}
+                            {...(completeCtas[0].style === "outline" ? { "data-slot": "button", "data-variant": "outline" } : {})}
+                            className={`mt-4 ${BANNER_CTA_CLASS[completeCtas[0].style ?? "solid"]}`}
                           >
                             <span className="min-w-0 truncate">{completeCtas[0].label}</span>
                           </span>
@@ -962,13 +979,12 @@ export function StorefrontPreviewCanvas({
                               <span
                                 key={`${index}-${cta.href}`}
                                 data-banner-cta=""
-                                // the second button is the shared Button's outline variant for the global button tokens
-                                {...(index > 0 ? { "data-slot": "button", "data-variant": "outline" } : {})}
-                                className={
-                                  index === 0
-                                    ? "inline-flex h-10 max-w-full items-center rounded-store bg-store-primary px-4 text-sm font-bold text-store-primary-foreground"
-                                    : "inline-flex h-10 max-w-full items-center rounded-store border-2 border-store-foreground/60 px-4 text-sm font-bold text-store-foreground"
-                                }
+                                data-cta-style={cta.style ?? (index === 0 ? "solid" : "outline")}
+                                // an outline button is the shared Button's outline variant for the global button tokens
+                                {...((cta.style ?? (index === 0 ? "solid" : "outline")) === "outline"
+                                  ? { "data-slot": "button", "data-variant": "outline" }
+                                  : {})}
+                                className={BANNER_CTA_CLASS[cta.style ?? (index === 0 ? "solid" : "outline")]}
                               >
                                 <span className="min-w-0 truncate">{cta.label}</span>
                               </span>

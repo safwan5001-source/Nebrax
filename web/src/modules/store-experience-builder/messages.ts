@@ -537,6 +537,11 @@ export const CUSTOMIZER_MESSAGES = {
     heroCtaSecondary: "الزر الثاني",
     heroCtaLabel: "نص الزر",
     heroCtaHref: "الرابط",
+    ctaStyle: "شكل الزر",
+    ctaStyleDefault: "تلقائي (الأول مملوء، والثاني بإطار)",
+    ctaStyleSolid: "مملوء",
+    ctaStyleOutline: "بإطار",
+    ctaStyleLink: "رابط نصّي",
     heroCtaHint:
       "بلا أزرار تظهر «تسوّق الآن» تلقائياً. الرابط مسار داخل المتجر يبدأ بـ / أو عنوان https://؛ والزر الناقص لا يظهر.",
     bannerCtaHint:
@@ -1607,6 +1612,11 @@ export const CUSTOMIZER_MESSAGES = {
     heroCtaSecondary: "Second button",
     heroCtaLabel: "Button text",
     heroCtaHref: "Link",
+    ctaStyle: "Button style",
+    ctaStyleDefault: "Automatic (first filled, second outlined)",
+    ctaStyleSolid: "Filled",
+    ctaStyleOutline: "Outlined",
+    ctaStyleLink: "Text link",
     heroCtaHint:
       "With no buttons the default “Shop now” appears. A link is a store path starting with / or an https:// address; an incomplete button is not shown.",
     bannerCtaHint:

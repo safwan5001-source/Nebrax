@@ -10,6 +10,7 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ControlPanels } from "../ControlPanels";
+import { CUSTOMIZER_MESSAGES } from "../messages";
 import {
   DEFAULT_PRESENTATION_CONFIG,
   type PresentationHomeSection,
@@ -210,5 +211,69 @@ describe("Canvas banner CTAs (CUST-HV V6c-2)", () => {
   it("a banner with only a labelled button is not 'empty'", () => {
     const c = canvas({ title: "", ctas: [{ label: "Shop", href: "/p" }] });
     expect(buttons(c)).toEqual(["Shop"]);
+  });
+});
+
+describe("CTA style select (CUST-HV V6c-5)", () => {
+  const styleSelect = (index: number) =>
+    slot(index).querySelector("[data-cta-style-select]") as HTMLSelectElement;
+
+  it("offers Automatic / Filled / Outlined / Text link, and is disabled while the slot is empty", () => {
+    panel(banner({ ctas: [{ label: "Shop", href: "/products" }], ctaLabel: "Shop", ctaHref: "/products" }));
+    expect([...styleSelect(0).options].map((o) => o.value)).toEqual(["", "solid", "outline", "link"]);
+    expect(styleSelect(0).disabled).toBe(false);
+    expect(styleSelect(1).disabled).toBe(true); // nothing to style until the button exists
+  });
+
+  it("writes the style onto that button only, keeps the legacy mirror on label/href, and Automatic removes the key", () => {
+    const onChange = panel(
+      banner({
+        ctas: [
+          { label: "Shop", href: "/products" },
+          { label: "More", href: "/about" },
+        ],
+        ctaLabel: "Shop",
+        ctaHref: "/products",
+      }),
+    );
+    fireEvent.change(styleSelect(1), { target: { value: "link" } });
+    expect(lastBanner(onChange).ctas).toEqual([
+      { label: "Shop", href: "/products" },
+      { label: "More", href: "/about", style: "link" },
+    ]);
+    fireEvent.change(styleSelect(0), { target: { value: "outline" } });
+    const content = lastBanner(onChange);
+    expect(content.ctas?.[0]).toEqual({ label: "Shop", href: "/products", style: "outline" });
+    expect(content.ctaLabel).toBe("Shop");
+    fireEvent.change(styleSelect(1), { target: { value: "" } });
+    expect(lastBanner(onChange).ctas?.[1]).toEqual({ label: "More", href: "/about" });
+    expect("style" in (lastBanner(onChange).ctas?.[1] ?? {})).toBe(false);
+  });
+
+  it("the Hero editor has the same control per slot", () => {
+    const onChange = vi.fn();
+    render(
+      <ControlPanels
+        panel="homepage"
+        config={withSections([
+          { id: "hero", type: "hero", visible: true, content: { headline: "H", ctas: [{ label: "Go", href: "/go" }] } },
+        ])}
+        locale="en"
+        liveStoreName={null}
+        onChange={onChange}
+        selectedSection="hero"
+      />,
+    );
+    const select = document.querySelector('[data-hero-cta-slot="0"] [data-cta-style-select]') as HTMLSelectElement;
+    fireEvent.change(select, { target: { value: "outline" } });
+    const sections = onChange.mock.calls.at(-1)?.[0].homepage.sections;
+    expect(sections[0].content.ctas).toEqual([{ label: "Go", href: "/go", style: "outline" }]);
+  });
+
+  it("has AR and EN copy for every new key", () => {
+    for (const key of ["ctaStyle", "ctaStyleDefault", "ctaStyleSolid", "ctaStyleOutline", "ctaStyleLink"] as const) {
+      expect(CUSTOMIZER_MESSAGES.ar[key]).toBeTruthy();
+      expect(CUSTOMIZER_MESSAGES.en[key]).toBeTruthy();
+    }
   });
 });
