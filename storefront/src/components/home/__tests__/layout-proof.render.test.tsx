@@ -71,7 +71,8 @@ describe("layout proof", () => {
         for (const layout of HERO_LAYOUTS)
           jobs.push({ type: "hero", kind, layout });
       // a picture hero whose explicit inline position (the 3×3 grid's inline half) points away from the text half
-      for (const kind of ["picture-center", "picture-end"])
+      // ...and one whose copy holds permitted long unbroken words (they must wrap, never paint past the middle)
+      for (const kind of ["picture-center", "picture-end", "picture-longword"])
         for (const layout of [undefined, "split"] as const)
           jobs.push({ type: "hero", kind, layout });
       // banner kinds: plain (picture + copy) · noimage (copy only) · imageonly (a picture and nothing else) ·
@@ -110,9 +111,21 @@ describe("layout proof", () => {
           content:
             type === "hero"
               ? {
-                  headline: "Layout proof headline",
+                  headline:
+                    kind === "picture-longword"
+                      ? `Headline${"x".repeat(100)}`
+                      : "Layout proof headline",
                   subheadline: "A supporting line that explains the offer",
-                  ctas,
+                  ctas:
+                    kind === "picture-longword"
+                      ? [
+                          {
+                            label: `Button${"y".repeat(70)}`,
+                            href: "/products",
+                          },
+                          { label: "Learn more", href: "/about" },
+                        ]
+                      : ctas,
                 }
               : {
                   title: kind === "imageonly" ? "" : "Layout proof banner",

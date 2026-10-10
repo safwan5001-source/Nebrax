@@ -44,18 +44,18 @@ Absent `layout` ⇒ identical normalised output, identical resolved attributes a
 
 ## Design Quality Pass — real Chromium, the published hero (production `HeroSection`) and banner (`BannerBand`)
 
-hero × {default surface, proven picture} × {default, centered, minimal, split} + banner × {picture + copy, copy only, picture only, explicit inner spacing `none`} × {default, split, text-band} (the banner kinds also include *title + subtitle with no button* and *a single button*) + a picture hero with an explicit inline position (`align` centre / end) × {default, split} × 2 directions = **60 pages**, each at 6 real device viewports (390×844 · 430×932 · 768×1024 · 1024×768 · 1280×800 · 1440×900):
+hero × {default surface, proven picture} × {default, centered, minimal, split} + banner × {picture + copy, copy only, picture only, explicit inner spacing `none`} × {default, split, text-band} (the banner kinds also include *title + subtitle with no button* and *a single button*) + a picture hero with an explicit inline position (`align` centre / end) × {default, split} × 2 directions + a picture hero whose headline and button label hold permitted long unbroken words × {default, split} = **64 pages**, each at 6 real device viewports (390×844 · 430×932 · 768×1024 · 1024×768 · 1280×800 · 1440×900):
 
 | | |
 |---|---|
-| Checks | **360** page×viewport · **312** pixel checks |
+| Checks | **384** page×viewport · **392** pixel checks |
 | Violations | **0** |
 | Asserted | **centered**: content box centred (±2 px), `text-align: center`, button row centred in its box · **minimal**: subheadline not displayed, hero shorter than the default · **hero split (≥ 768)**: the overlay is exactly half the section and on the **inline-start** edge (the right edge under RTL), the text column and every button stay inside that half, the other half's picture is **brighter** (bare); on a phone the overlay stays full width · **banner split (≥ 768)**: the picture is half the card, on the inline-end edge, fills the card height, the copy stays in the other half; stacked exactly as the default on a phone · **text-band**: the picture is hidden, the band is slimmer than the card, from md the buttons share the row with the copy and sit at the inline end · tap heights · no horizontal overflow · **contrast on the real pixels:** for every picture-hero layout × viewport × direction, the heading's colour is measured against the pixels that really sit behind it (text and borders hidden, the background photographed) — ≥ 4.5:1 |
-| **Negative control** | the five layout rule sets stripped from the stylesheet: **272 violations** — the measurement can fail |
+| **Negative control** | the five layout rule sets stripped from the stylesheet: **378 violations** — the measurement can fail |
 
 Evidence: `docs/plans/store/cust-hv-v6c7/layout-proof-summary.json` and screenshots (hero split LTR 1280 and RTL 1024; banner split RTL 1024; banner text-band LTR 1280 and RTL 390; hero centred 390; hero minimal 1280). Tooling is env-gated and inert in CI: `storefront/src/components/home/__tests__/layout-proof.render.test.tsx` (`LAYOUT_PROOF_DIR`) + `storefront/scripts/layout-proof/measure.mjs`.
 
-## Review findings resolved (Codex) — all six real
+## Review findings resolved (Codex) — all seven real
 
 | Finding | Verdict | Fix |
 |---|---|---|
@@ -67,6 +67,8 @@ Evidence: `docs/plans/store/cust-hv-v6c7/layout-proof-summary.json` and screensh
 | *(round 2)* A `text-band` banner with a title and subtitle but **no** button auto-placed the `<p>` in the second grid column, beside the heading, squeezing it | **Real** (reproduced: subtitle not under the heading, not in its column) | `h2` and `p` are explicitly placed in column 1; the second column is reserved for the actions. Proof kinds *no button* and *single button* added |
 
 | *(round 3, P1 — contrast safety)* With a picture hero on `split`, an explicit `align: center` / `end` (the 3×3 grid's inline half) moved the copy out of the inline-start half, while the overlay stays confined to that half: the copy could land on the **bare** picture, which the contrast proof (computed under the overlay) never covered | **Real and important** (reproduced: 30 violations — the text column and buttons crossing the middle) | at ≥ md the split hero's content box ignores the inline position (`margin-inline: 0 auto`, `inline-size: auto`, a higher-specificity rule than the `balign` rules): the text column stays in the overlaid half whatever `align` says, so the proof still covers it. The inline half of the 3×3 grid is documented as not applying to a split hero at ≥ md (the block half, `valign`, still does). Proof kinds *picture + align centre / end* added |
+
+| *(round 4, P1)* A permitted long unbroken word in a split hero's headline or button label (up to 120 / 80 code points) painted past the middle, onto the bare picture — outside the contrast proof — and could overflow the page | **Real** (reproduced; the same defect existed for ANY designed picture hero, split or not, at every viewport: text ink leaving the section, page overflow up to 1394 px, the heading photographed over the page background at 1.05:1) | (1) inside a picture hero (`mbg`) the copy box wraps long words (`overflow-wrap: anywhere`) and its buttons are `max-inline-size: 100%`; (2) the split hero's copy box additionally wraps, clips its inline overflow at the half's edge (`overflow-x: clip` — the padding box, so focus rings inside the padding survive) and lets its buttons grow in height. A pre-existing defect of picture heroes is thereby closed too. Proof: kind *picture + long words* × {default, split} measures the **text ink** (per line box) — never outside the section, never past the middle on a split — plus the real-pixel contrast and the no-overflow check |
 
 The browser proof gained the banner kinds above; against the pre-fix stylesheets it reports violations in exactly those categories (a copy-only banner gaining padding · a picture-only banner losing its picture · inner spacing `none` leaving padding / no gutter · the subtitle beside the heading) and 0 with the fixes. The stylesheet tests pin the three selectors in both runtimes.
 

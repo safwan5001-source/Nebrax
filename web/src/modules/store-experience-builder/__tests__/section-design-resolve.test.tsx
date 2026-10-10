@@ -566,6 +566,12 @@ describe("resolveSectionDesign — hero / banner layout variants (CUST-HV V6c-7)
     expect(block).toMatch(
       /\[data-sd~="lbsplit"\]\[data-sd~="pi"\]\[data-sd\] > \* > \[data-section-content\]:has\(> img\) > div \{\s*padding: 0;/,
     );
+    // review fix (round 4, P1): long unbroken words wrap (and a split hero's copy is clipped at its half), never painting past
+    // what the contrast proof covered
+    expect(block).toMatch(/\[data-sd~="mbg"\]\[data-sd\] \[data-section-content\] \{\s*overflow-wrap: anywhere;/);
+    expect(block).toMatch(
+      /\[data-sd~="lsplit"\]\[data-sd\] > \* > \[data-section-content\] \{\s*max-inline-size: 50%;[\s\S]*?overflow-wrap: anywhere;\s*overflow-x: clip;/,
+    );
     // review fix (round 3, P1): the split hero's copy stays in the overlaid half whatever the explicit inline position says
     expect(block).toMatch(
       /\[data-sd~="lsplit"\]\[data-sd~="balign"\]\[data-sd\] > \* > \[data-section-content\] \{\s*margin-inline-start: 0;\s*margin-inline-end: auto;\s*inline-size: auto;/,

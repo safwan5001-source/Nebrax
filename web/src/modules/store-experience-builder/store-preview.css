@@ -192,6 +192,17 @@
 @media (min-width: 48rem) {
   .awj-store-preview [data-sd~="lsplit"][data-sd] > * > [data-section-content] {
     max-inline-size: 50%;
+    /* the copy must never paint past the middle (that half of the picture is bare, outside the contrast proof): long
+       unbroken words wrap instead of overflowing, and whatever still tries to leave is clipped at the half's edge
+       (the padding box, so focus rings and shadows inside the padding survive) */
+    overflow-wrap: anywhere;
+    overflow-x: clip;
+  }
+  .awj-store-preview [data-sd~="lsplit"][data-sd] > * > [data-section-content] a {
+    max-inline-size: 100%;
+    block-size: auto;
+    min-block-size: 2.75rem;
+    padding-block: 0.25rem;
   }
   .awj-store-preview [data-sd~="lsplit"][data-sd~="ovl"] [data-sd-overlay] {
     inset-inline-end: 50%;
@@ -470,6 +481,14 @@
 .awj-store-preview [data-sd~="mbg"][data-sd] > * {
   position: relative;
   background: none;
+}
+/* Copy over a picture is proven legible ON that picture only: a long unbroken word (permitted in a headline or a button
+   label) must wrap, never paint past the section onto what the proof did not cover. */
+.awj-store-preview [data-sd~="mbg"][data-sd] [data-section-content] {
+  overflow-wrap: anywhere;
+}
+.awj-store-preview [data-sd~="mbg"][data-sd] [data-section-content] a {
+  max-inline-size: 100%;
 }
 .awj-store-preview [data-sd-backdrop] {
   position: absolute;

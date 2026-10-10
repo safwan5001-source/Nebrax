@@ -166,6 +166,27 @@ for (const pass of [0, 1]) { // pass 0: default-layout baselines, pass 1: the va
           if (m.img.rect.h < m.s.h - 4) violations.push(`${tag}: picture does not fill the card height (${m.img.rect.h.toFixed(0)} of ${m.s.h.toFixed(0)})`);
         } else if (m.img && base?.img && Math.abs(m.img.rect.w - base.img.rect.w) > 2) violations.push(`${tag}: on a phone the banner must stay stacked as the default`);
       }
+      // the copy of a picture hero never paints outside the section — and a split hero's never past the middle — even with long
+      // unbroken words (text ink measured per line box)
+      if (type === "hero" && kind.startsWith("picture")) {
+        const ink = await page.evaluate(() => {
+          const section = document.querySelector("main section");
+          const out = [];
+          const walker = document.createTreeWalker(section.querySelector("[data-section-content]"), NodeFilter.SHOW_TEXT);
+          for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+            if (!n.textContent.trim()) continue;
+            const range = document.createRange(); range.selectNodeContents(n);
+            for (const rect of range.getClientRects()) out.push({ l: rect.left, r: rect.right });
+          }
+          return out;
+        });
+        for (const rect of ink) {
+          const e = rtl ? rect.l - m.s.l : m.s.r - rect.r; // distance from the inline-end edge
+          const sIn = rtl ? m.s.r - rect.r : rect.l - m.s.l; // ...and from the inline-start edge
+          if (sIn < -TOL || e < -TOL) violations.push(`${tag}: text ink leaves the section (${sIn.toFixed(1)} / ${e.toFixed(1)})`);
+          if (layout === "split" && wide && e < m.s.w / 2 - TOL) violations.push(`${tag}: text ink crosses the middle (${e.toFixed(1)} < ${(m.s.w / 2).toFixed(1)})`);
+        }
+      }
       // tap height of the buttons
       for (const l of m.links) {
         const min = type === "banner" ? 40 : w >= 768 ? 44 : 36;

@@ -617,6 +617,17 @@ input[type="search"]::-webkit-search-cancel-button {
 @media (min-width: 48rem) {
   [data-sd~="lsplit"][data-sd] > * > [data-section-content] {
     max-inline-size: 50%;
+    /* the copy must never paint past the middle (that half of the picture is bare, outside the contrast proof): long
+       unbroken words wrap instead of overflowing, and whatever still tries to leave is clipped at the half's edge
+       (the padding box, so focus rings and shadows inside the padding survive) */
+    overflow-wrap: anywhere;
+    overflow-x: clip;
+  }
+  [data-sd~="lsplit"][data-sd] > * > [data-section-content] a {
+    max-inline-size: 100%;
+    block-size: auto;
+    min-block-size: 2.75rem;
+    padding-block: 0.25rem;
   }
   [data-sd~="lsplit"][data-sd~="ovl"] [data-sd-overlay] {
     inset-inline-end: 50%;
@@ -895,6 +906,14 @@ input[type="search"]::-webkit-search-cancel-button {
 [data-sd~="mbg"][data-sd] > * {
   position: relative;
   background: none;
+}
+/* Copy over a picture is proven legible ON that picture only: a long unbroken word (permitted in a headline or a button
+   label) must wrap, never paint past the section onto what the proof did not cover. */
+[data-sd~="mbg"][data-sd] [data-section-content] {
+  overflow-wrap: anywhere;
+}
+[data-sd~="mbg"][data-sd] [data-section-content] a {
+  max-inline-size: 100%;
 }
 [data-sd-backdrop] {
   position: absolute;
