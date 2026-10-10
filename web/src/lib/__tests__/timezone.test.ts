@@ -156,6 +156,11 @@ describe('low years (CUST-HV V6c-1)', () => {
     expect(zonedWallTimeToUtcIso('0099-12-31', '23:00', 'UTC')).toBe('0099-12-31T23:00:00.000Z');
   });
 
+  it('refuses a wall time whose UTC instant would fall in year 0 (positive-offset zones)', () => {
+    expect(zonedWallTimeToUtcIso('0001-01-01', '00:00', 'Etc/GMT-3')).toBeNull();
+    expect(zonedWallTimeToUtcIso('0001-01-01', '03:00', 'Etc/GMT-3')).toBe('0001-01-01T00:00:00.000Z');
+  });
+
   it('round-trips them and zero-pads the year so a date input can read it back', () => {
     const iso = zonedWallTimeToUtcIso('0001-01-01', '09:30', 'UTC') as string;
     expect(utcIsoToZonedWallTime(iso, 'UTC')).toEqual({ date: '0001-01-01', time: '09:30' });

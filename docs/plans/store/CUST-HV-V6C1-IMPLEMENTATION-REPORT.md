@@ -37,6 +37,7 @@ The announcement bar already owns the only display-window semantic in the produc
 | Years `0001`–`0099` accepted by the PHP gate but read by `Date.UTC` as 19xx, so `0001-01-01 → 2999-01-01` was classified invalid and hid the banner | **Real** (and pre-existing for announcements) | `parseAnnouncementInstant` builds the instant with `setUTCFullYear` (both twins, still byte-identical), so low years mean what the gate means. Year `0000` is rejected in both twins, as `checkdate` does in the gate. Tests in both twins + PHP parity cases. |
 | Banner publish errors were headed "announcement bar problem" | **Real** (UX) | Own heading `bannerPublishBlocked`, banner numbered by section position; announcement and banner problems keep separate headings when both block. |
 | The editor's wall-time → UTC conversion still remapped years 0–99 (`Date.UTC`) and Intl's unpadded year broke the round-trip | **Real** | `utcMillisOf` via `setUTCFullYear` in `timezone.ts` (also inside the offset probe), year zero-padded on the way back. |
+| Year-1 wall time in a positive-offset zone converts to year 0, which the gate rejects | Real but far-fetched (pre-dawn, year 0001, e.g. `Etc/GMT-3`) | One-line guard: the conversion returns `null` (edge not committed) for a year-0 instant, so the editor can never store what the gate would refuse. |
 
 ## Invariants
 
