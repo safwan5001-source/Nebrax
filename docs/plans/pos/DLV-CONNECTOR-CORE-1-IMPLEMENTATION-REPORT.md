@@ -241,8 +241,11 @@ Codex left five open findings on `3b40442` (2 P1, 3 P2). All five are fixed in t
 | P2 decimal literals (follow-up) | Every JSON number token is canonicalized as its original literal, not as an IEEE float. `1.0000000000000001`, `1.0`, `1`, `1e2`, and `100` stay distinct. A float that still survives decoding rejects the envelope. |
 | P2 manual Hub numeric type (follow-up) | `plainValue()` returns a PHP integer, or a float when `json_encode(..., JSON_PRESERVE_ZERO_FRACTION)` reproduces the literal. A connector number `5000` adopts a manual numeric payload, `1.0` adopts a manual `1.0`, and both conflict with the same digits in a string. Lossy literals stay strings so they do not collapse. |
 | P2 duplicate JSON members (follow-up) | Duplicate object keys, including escaped duplicates and nested objects, are rejected as `invalid_payload` before `json_decode()` keeps only the last value. |
+| P2 manual object shape (follow-up on `35541a3`) | When a Hub order has no connector baseline, an object that would become a PHP list (`{}`, `{"0":"a"}`, or a nested empty object) is `payload_conflict`. No authoritative checksum is stored. Objects and lists Hub can represent, including `{"keep":"yes"}` and `["a"]`, still adopt. |
+| P2 payload limit before HMAC (follow-up on `35541a3`) | `strlen($rawBody) > MAX_RAW_BYTES` (65536) returns `422 invalid_payload` before the account row is loaded and before `WebhookSignature::verify`. A body at the limit still reaches signature verification. |
+| P2 deleted configurator (follow-up on `35541a3`) | Not implemented. See Decision Packet `DLV-CONNECTOR-OWNERSHIP-1`. |
 
-The Hub row still stores a plain PHP array, so an empty object becomes an empty list in the Hub hash. The connector authoritative checksum is what rejects the second shape before a second intake, and the Hub row is not mutated. Authoritative checksums keep every JSON number token as its original literal. Hub adoption uses a PHP integer, or a float when `json_encode` with `JSON_PRESERVE_ZERO_FRACTION` reproduces the literal; every other literal stays a string. Hub's own payload hash still uses default `json_encode`, so `1` and `1.0` compare equal there, the same as two manual orders. The connector checksum still distinguishes those tokens once a connector baseline exists.
+The Hub row still stores a plain PHP array, so an empty object becomes an empty list in the Hub hash. Connector-to-connector comparison uses the authoritative checksum, which keeps `{}` and `[]` apart. Manual adoption no longer treats a collapsing object as that list: the event is `payload_conflict` and the Hub row is not given a connector baseline. Authoritative checksums keep every JSON number token as its original literal. Hub adoption uses a PHP integer, or a float when `json_encode` with `JSON_PRESERVE_ZERO_FRACTION` reproduces the literal; every other literal stays a string. Hub's own payload hash still uses default `json_encode`, so `1` and `1.0` compare equal there, the same as two manual orders. The connector checksum still distinguishes those tokens once a connector baseline exists.
 
 ### Tests added
 
@@ -256,16 +259,18 @@ The Hub row still stores a plain PHP array, so an empty object becomes an empty 
 6. `{"01":"a","1":"b"}` and `{"1":"b","01":"a"}` share one Hub order.
 7. `1.0000000000000001`, `1.0`, `1`, `1e2`, and `100` stay distinct. The second shape is `payload_conflict`.
 8. A manual numeric `amount` of `5000` is adopted by the connector number `5000`. A manual string `"5000"` conflicts with that number. A raw manual `1.0` is adopted by the connector literal `1.0` and conflicts with the string `"1.0"`. Duplicate members `{"n":1,"n":2}`, `{"a":1,"\u0061":2}`, nested `{"o":{"a":1,"a":2}}`, and a duplicate inside an array are `invalid_payload` and do not create a Hub row.
+9. Manual adoption of `{"keep":"yes"}` and `["a"]` succeeds. Manual `[]` versus connector `{}`, manual `["a"]` versus `{"0":"a"}`, and manual `{"a":[]}` versus `{"a":{}}` are `payload_conflict`. Those attempts store no authoritative checksum. One Hub row remains for each provider order.
+10. A body of `MAX_RAW_BYTES + 1` with a syntactically valid but wrong signature is `422 invalid_payload` and writes no attempt. A body of exactly `MAX_RAW_BYTES` with the same wrong signature is `401 invalid_signature`, proving the limit is applied before HMAC and the boundary still verifies.
 
 ### Local execution
 
 SQLite, `php artisan test --filter=DeliveryConnectorCoreTest`:
 
-- 19 passed, 332 assertions (includes subscription expiry, numeric object keys, lossless decimals, manual numeric adoption including `1.0`, and duplicate JSON members)
+- 21 passed, 367 assertions (includes subscription expiry, numeric object keys, lossless decimals, manual numeric adoption including `1.0`, duplicate JSON members, lossy manual shapes, and the payload-size gate)
 
 SQLite, related suites (`DeliveryHubProjectionTest`, `BranchIsolationGuardTest`, `WebhookSignatureTest`, `DeliveryPlatformApiTest`, `DeliveryFinancialRoleGateTest`, `DeliveryPlatformProfileDomainTest`):
 
-- 70 passed, 752 assertions, re-run after the manual-type and duplicate-member fix. Those changes stay inside connector ingestion.
+- 70 passed, 752 assertions, re-run with the shape and size fixes. Those suites do not touch connector ingestion.
 
 PostgreSQL was not started in this sandbox. `useradd` succeeded, but `chown`, `su`, `runuser`, and `setuid` are rejected, so `pg_ctl` cannot drop root. The CI `pgsql` job on this commit is the PostgreSQL proof. Do not treat it as passed until that job is green on the exact head.
 
@@ -277,6 +282,8 @@ PostgreSQL was not started in this sandbox. `useradd` succeeded, but `chown`, `s
 - Rotation versions come from the locked row, not the caller's stale attribute.
 - No invoice, payment, journal, stock, commerce, or provider-enablement call was added.
 - Representable connector numbers stay integers or exact floats in the Hub comparison. Duplicate object members never reach `json_decode()`.
+- A collapsing object is refused only on the baseline-null adoption path. Connector-to-connector `{}` versus `[]` is still the authoritative checksum.
+- Oversized bodies return before the encrypted account is loaded.
 
 ### Reviewer review (fix pass)
 
@@ -284,6 +291,8 @@ PostgreSQL was not started in this sandbox. `useradd` succeeded, but `chown`, `s
 - Rejection for an inactive application does not insert an attempt, so the event id can succeed after re-enable.
 - The global store-uniqueness oracle and the encrypted secret cast are unchanged.
 - SQLite cannot prove a cross-connection lock wait. The stale-version result is asserted on both drivers; `FOR UPDATE` is asserted when the driver is PostgreSQL.
+- A list the Hub can store still adopts. Only objects that `array_is_list` would erase are conflicts, and they do not become the connector baseline.
+- The size check uses the raw byte length, not `Content-Length`. A body at 65536 bytes is still authenticated.
 
 ### AWJ Guardian review (fix pass)
 
@@ -297,10 +306,37 @@ PostgreSQL was not started in this sandbox. `useradd` succeeded, but `chown`, `s
 | Decimal, exponent, or oversized literals collapsing | Original literals stay distinct in the authoritative checksum. |
 | Manual number rejected, or a numeric string adopted | PHP integer and exact float types are preserved for the Hub comparison. |
 | Duplicate object members kept as the last value | Rejected as `invalid_payload` before decode. No Hub row. |
+| Manual adoption of `{}` or `{"0":"a"}` | `payload_conflict`. No authoritative checksum. Hub row unchanged. |
+| Oversized body hashed before the limit | Rejected before account load and HMAC. No attempt. |
 | Financial or inventory side effect | Counts unchanged in the new tests. |
 | Provider enablement or DG-3 evidence | Not introduced. |
+| Deleted configurator permanently blocks the mapping | Open. Decision Packet below. Not fixed in this diff. |
 
-Unresolved P1/P2 in this fix pass: none in the diff. They stay open on GitHub until the threads are resolved after CI on this SHA is green.
+Unresolved P1/P2 that this diff fixes stay open on GitHub until CI on this SHA is green and the threads are resolved. The ownership finding stays open on purpose.
+
+## Decision Packet — DLV-CONNECTOR-OWNERSHIP-1
+
+Status: **blocked**. No code change.
+
+Codex P2 on `35541a3` (`PRRT_kwDOS52FT86rGOhy`): after an administrator soft-deletes the user in `configured_by`, `actor()` returns null, every later signed event is `422 actor_unavailable`, and the unique `(platform_key, external_store_id)` mapping cannot be recreated. The connector API can rotate or disable the secret, not reassign it.
+
+Evidence already in the core:
+
+- `User` uses `SoftDeletes`. `UserController::destroy` deletes any other user, including another owner. There is no restore route.
+- `actor()` uses the default user query, so a soft-deleted configurator is invisible. The failure is intentional for a missing actor and does not burn `event_id`.
+- `DeliveryConnectorAccountService::create` turns a unique violation into `mapping_ambiguous`.
+
+The two remedies in the finding are product decisions, not a local defect fix:
+
+| Option | What it decides | Why it is out of scope here |
+|---|---|---|
+| A. Reassignment API | Who may change `configured_by`, which branch scope the new user must have, and whether the secret stays | New management contract and audit rule |
+| B. Durable operational principal | Hub `created_by` and branch checks stop being a human user | New identity type |
+| C. Restore the deleted user | Ingestion waits until that login exists again | User restore is already deferred in `UserController` ("تُعالَج لاحقاً") |
+
+A silent fallback to "any active owner" would also pick an actor and a branch scope. That is option B by another name and was not chosen.
+
+This packet does not authorize an adapter, a financial write, or a schema change. The thread stays unresolved. **PRE_MERGE_REVIEW: PASS is not available while it is open.**
 
 ## Next candidate
 

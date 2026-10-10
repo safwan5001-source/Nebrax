@@ -76,6 +76,11 @@ class DeliveryConnectorIngestionService
      */
     private function receive(string $accountId, string $rawBody, ?string $signatureHeader): array
     {
+        // قبل فك السر وHMAC: جسم أكبر من الحد لا يُهشّم ولا يُفك تشفيره.
+        if (strlen($rawBody) > self::MAX_RAW_BYTES) {
+            return $this->error(422, 'invalid_payload', 'الحمولة غير صالحة.');
+        }
+
         $account = DeliveryConnectorAccount::withoutGlobalScope(TenantScope::class)
             ->whereKey($accountId)
             ->first();
@@ -104,10 +109,6 @@ class DeliveryConnectorIngestionService
         }
         if (($subscription = $this->subscriptionFailure()) !== null) {
             return $subscription;
-        }
-
-        if (strlen($rawBody) > self::MAX_RAW_BYTES) {
-            return $this->error(422, 'invalid_payload', 'الحمولة غير صالحة.');
         }
 
         $envelope = $this->decodeEnvelope($rawBody);
@@ -207,6 +208,9 @@ class DeliveryConnectorIngestionService
                 }
 
                 if ($baseline === null) {
+                    if ($this->hubShapeCollapses($envelope['intake_payload'])) {
+                        return $this->persist($account, $envelope, $rawChecksum, $existing->id, null, 'payload_conflict', 409, 'payload_conflict');
+                    }
                     try {
                         [$order] = $this->hub->intake($this->intakeInput($account, $envelope), $actor);
                     } catch (DeliveryHubConflictException) {
@@ -588,6 +592,34 @@ class DeliveryConnectorIngestionService
         }
 
         return $value;
+    }
+
+    /**
+     * مقارنة Hub تمر على مصفوفة PHP. الكائن الذي يصبح قائمة بعد التحويل
+     * (`{}` أو `{"0":"a"}`) لا يُطابق طلباً يدوياً دون انهيار الشكل.
+     */
+    private function hubShapeCollapses(mixed $value): bool
+    {
+        if ($value instanceof \stdClass) {
+            $converted = [];
+            foreach (get_object_vars($value) as $key => $item) {
+                if ($this->hubShapeCollapses($item)) {
+                    return true;
+                }
+                $converted[$key] = 0;
+            }
+
+            return array_is_list($converted);
+        }
+        if (is_array($value)) {
+            foreach ($value as $item) {
+                if ($this->hubShapeCollapses($item)) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     /** @return array{timestamp: int, signature: string}|null */
