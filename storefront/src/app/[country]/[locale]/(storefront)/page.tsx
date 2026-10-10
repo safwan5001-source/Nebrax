@@ -15,6 +15,7 @@ import { resolveCurrency } from "@/lib/data/markets";
 import { type HomeSectionKey, resolveHomeSections } from "@/lib/home/sections";
 import { generateHomeMetadata } from "@/lib/metadata/home";
 import { publishedStoreName } from "@/lib/presentation/public";
+import { publishedHeaderOverlay } from "@/lib/presentation/public-overlay";
 import { publishedHomeStackClass } from "@/lib/presentation/public-rhythm";
 import { heroContentOf } from "@/lib/presentation/section-content";
 
@@ -96,6 +97,11 @@ export default async function HomePage({ params }: HomePageProps) {
         dir: localeDirection(locale),
       }
     : undefined;
+  const headerOverlay = publishedHeaderOverlay(
+    presentation,
+    identity?.presentationMedia ?? {},
+    designContext,
+  );
   const nodes: React.ReactNode[] =
     presentation && designContext
       ? await publishedNodes(presentation.homepage.sections, {
@@ -126,6 +132,7 @@ export default async function HomePage({ params }: HomePageProps) {
             );
           },
           media: identity?.presentationMedia ?? {},
+          headerOverlay,
           basePath,
           locale,
           currency,

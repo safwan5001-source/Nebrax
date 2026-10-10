@@ -5,6 +5,7 @@ import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import type { ReactNode } from "react";
 import { CartButton } from "@/components/layout/CartButton";
+import { HeaderOverlay } from "@/components/layout/HeaderOverlay";
 import { HeaderScrollUp } from "@/components/layout/HeaderScrollUp";
 import type { StoreExtraNavLink } from "@/components/layout/MobileMenu";
 import { StoreBrand } from "@/components/layout/StoreBrand";
@@ -193,6 +194,9 @@ export async function Header({
       }
     >
       {resolved.sticky === "on-scroll-up" ? <HeaderScrollUp /> : null}
+      {resolved.overlay ? (
+        <HeaderOverlay sticky={resolved.sticky !== "off"} />
+      ) : null}
       <a
         href="#main-content"
         className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:start-4 focus:z-50 focus:rounded-store focus:border focus:border-store-border focus:bg-store-surface focus:px-3 focus:py-2 focus:shadow-sm focus:text-sm focus:font-medium focus:text-store-foreground"

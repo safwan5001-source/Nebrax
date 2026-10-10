@@ -18,6 +18,10 @@ import {
   sectionBackdrop,
 } from "@/lib/presentation/background-media";
 import type { PresentationHomeSection } from "@/lib/presentation/config";
+import {
+  type HeaderOverlay,
+  overlayMarker,
+} from "@/lib/presentation/header-overlay";
 import type { ResolvedMediaMap } from "@/lib/presentation/media-ref";
 import {
   bannerContentOf,
@@ -81,6 +85,12 @@ export async function publishedNodes(
      * a window is evaluated per request with no second scheduler. Injected only by tests.
      */
     nowMs?: number;
+    /**
+     * CUST-HV V7c-2 — the overlay-on-hero decision (`publishedHeaderOverlay`): the hero it names carries the `data-ho`
+     * marker the stylesheet reads to turn the header transparent over it, bleed its picture and reserve the header's
+     * height. Absent / `null` ⇒ the header stays solid and nothing changes.
+     */
+    headerOverlay?: HeaderOverlay | null;
     basePath: string;
     locale: string;
     currency?: string;
@@ -118,7 +128,16 @@ export async function publishedNodes(
     // exactly the node it always was.
     if (section.design && nodes.length === before + 1) {
       nodes[before] = (
-        <SectionDesignFrame key={section.id} section={section} context={design}>
+        <SectionDesignFrame
+          key={section.id}
+          section={section}
+          context={design}
+          extraAttrs={
+            ctx.headerOverlay?.sectionId === section.id
+              ? { "data-ho": overlayMarker(ctx.headerOverlay) }
+              : undefined
+          }
+        >
           {nodes[before]}
         </SectionDesignFrame>
       );

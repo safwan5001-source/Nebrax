@@ -201,6 +201,93 @@
     transition: none;
   }
 }
+/*
+ * V7c-2 — overlay-on-hero. Active only on a page whose hero carries the `data-ho` marker the server set
+ * (the proof passed), for a document that opted in (`hmo`). The header then takes no height — its bands
+ * paint over the hero — and is transparent at the top, solid once `data-header-solid` is set. Without the
+ * controller (`data-header-live`) it is not sticky, so it can only ever sit over the hero.
+ */
+.awj-store-preview[data-hd~="hmo"]:has([data-ho~="on"]) {
+  overflow-x: clip;
+}
+.awj-store-preview[data-hd~="hmo"]:has([data-ho~="on"]) > header {
+  height: 0;
+  overflow: visible;
+  z-index: 40;
+}
+.awj-store-preview[data-hd~="hmo"]:has([data-ho~="on"]) > header:not([data-header-live]) {
+  position: relative;
+}
+.awj-store-preview[data-hd~="hmo"]:has([data-ho~="on"][data-ho~="l"]) > header {
+  --ov-fg: #ffffff;
+  --ov-rgb: 0 0 0;
+}
+.awj-store-preview[data-hd~="hmo"]:has([data-ho~="on"][data-ho~="d"]) > header {
+  --ov-fg: #000000;
+  --ov-rgb: 255 255 255;
+}
+.awj-store-preview[data-hd~="hmo"]:has([data-ho~="on"][data-ho~="s2"]) > header {
+  --ov-scrim: rgb(var(--ov-rgb) / 0.2);
+}
+.awj-store-preview[data-hd~="hmo"]:has([data-ho~="on"][data-ho~="s3"]) > header {
+  --ov-scrim: rgb(var(--ov-rgb) / 0.3);
+}
+.awj-store-preview[data-hd~="hmo"]:has([data-ho~="on"][data-ho~="s4"]) > header {
+  --ov-scrim: rgb(var(--ov-rgb) / 0.4);
+}
+/* solid state: the bands carry the surface the zero-height header cannot */
+.awj-store-preview[data-hd~="hmo"]:has([data-ho~="on"]) > header > [data-header-row] {
+  background-color: var(--hd-bg, var(--store-surface));
+}
+.awj-store-preview[data-hd~="hmo"]:has([data-ho~="on"]) > header > :is(div, nav) {
+  transition:
+    background-color 200ms ease,
+    color 200ms ease,
+    border-color 200ms ease;
+}
+@media (prefers-reduced-motion: reduce) {
+  .awj-store-preview[data-hd~="hmo"]:has([data-ho~="on"]) > header > :is(div, nav) {
+    transition: none;
+  }
+}
+/* transparent state: text and icons in the proven colour, a constant-alpha scrim when the proof needed one */
+.awj-store-preview[data-hd~="hmo"]:has([data-ho~="on"]) > header:not([data-header-solid]) > :is(div, nav) {
+  background-color: var(--ov-scrim, transparent);
+  border-color: transparent;
+  color: var(--ov-fg);
+  --store-foreground: var(--ov-fg);
+  --store-muted-foreground: var(--ov-fg);
+  --store-surface-muted: transparent;
+  --store-surface: transparent;
+  --store-border: color-mix(in srgb, var(--ov-fg) 45%, transparent);
+  --ring: var(--ov-fg);
+}
+.awj-store-preview[data-hd~="hmo"]:has([data-ho~="on"]) > header:not([data-header-solid]) [data-header-brand],
+.awj-store-preview[data-hd~="hmo"]:has([data-ho~="on"]) > header:not([data-header-solid]) [data-header-row] svg:not(.bg-store-primary-soft svg) {
+  color: var(--ov-fg);
+}
+.awj-store-preview[data-hd~="hmo"]:has([data-ho~="on"]):is([data-hd~="hx-s"]) > header[data-header-solid] {
+  filter: drop-shadow(0 1px 2px color-mix(in oklab, var(--store-foreground) 14%, transparent));
+}
+.awj-store-preview[data-hd~="hmo"]:has([data-ho~="on"]):is([data-hd~="hx-m"]) > header[data-header-solid] {
+  filter: drop-shadow(0 6px 12px color-mix(in oklab, var(--store-foreground) 16%, transparent));
+}
+/* a hidden (on-scroll-up) zero-height header slides by the measured height of its bands, not its own 0 */
+.awj-store-preview[data-hd~="hmo"]:has([data-ho~="on"]) > header[data-header-hidden] {
+  transform: translateY(calc(-1 * var(--hd-block, 12rem) - var(--store-announcement-height, 0px)));
+}
+/* the hero: first in the page, flush to the top, its picture to both viewport edges, its content below the header */
+.awj-store-preview[data-hd~="hmo"] :has(> [data-ho~="on"]) {
+  padding-block-start: 0;
+}
+[data-ho~="on"] > section {
+  border-radius: 0;
+  padding-block-start: var(--hd-block, calc(var(--store-header-offset, 8.5rem) - var(--store-announcement-height, 0px)));
+}
+[data-ho~="on"] [data-sd-backdrop] {
+  inset-inline: calc(50% - 50vw);
+  border-radius: 0;
+}
 /* V7a-chrome:end */
 
 /*

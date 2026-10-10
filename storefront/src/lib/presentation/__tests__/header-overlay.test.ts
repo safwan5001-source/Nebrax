@@ -1,0 +1,252 @@
+import { describe, expect, it } from "vitest";
+import { OVERLAY_SOLID_AT_PX, overlayIsSolid } from "../header-design";
+import {
+  overlayHeroCandidate,
+  overlayMarker,
+  resolveHeaderOverlay,
+} from "../header-overlay";
+import type { DesignContext } from "../section-design-resolve";
+
+const MEDIA = "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e";
+const picture = (extra: Record<string, unknown> = {}) => ({
+  background: {
+    kind: "media",
+    media: { mediaId: MEDIA, decorative: true },
+    ...extra,
+  },
+});
+const hero = (design: unknown = picture(), id = "hero") => ({
+  id,
+  type: "hero",
+  visible: true,
+  design: design as never,
+});
+function ctx(
+  bounds: {
+    min: [number, number, number];
+    max: [number, number, number];
+  } | null,
+): DesignContext {
+  return {
+    primaryColor: "#12372a",
+    accentColor: null,
+    dir: "ltr",
+    mediaBounds: () => bounds,
+  };
+}
+const ON = { mode: "overlay-hero" as const };
+const dark = {
+  min: [10, 20, 30] as [number, number, number],
+  max: [60, 70, 80] as [number, number, number],
+};
+
+describe("overlayHeroCandidate (V7c-2)", () => {
+  it("needs the FIRST visible section to be a hero", () => {
+    expect(overlayHeroCandidate([])).toEqual({ ok: false, reason: "no-hero" });
+    expect(
+      overlayHeroCandidate([
+        { id: "b", type: "banner", visible: true },
+        hero(),
+      ]),
+    ).toEqual({ ok: false, reason: "no-hero" });
+    // a hidden section does not count as first
+    expect(
+      overlayHeroCandidate([
+        { id: "b", type: "banner", visible: false },
+        hero(),
+      ]),
+    ).toMatchObject({ ok: true });
+  });
+
+  it("needs a picture background, and not a split layout", () => {
+    expect(
+      overlayHeroCandidate([{ id: "hero", type: "hero", visible: true }]),
+    ).toEqual({
+      ok: false,
+      reason: "not-picture",
+    });
+    expect(
+      overlayHeroCandidate([
+        hero({ background: { kind: "solid", color: { hex: "#000000" } } }),
+      ]),
+    ).toEqual({ ok: false, reason: "not-picture" });
+    expect(
+      overlayHeroCandidate([hero({ ...picture(), layout: "split" })]),
+    ).toEqual({
+      ok: false,
+      reason: "split-layout",
+    });
+    expect(
+      overlayHeroCandidate([hero({ ...picture(), layout: "centered" })]),
+    ).toMatchObject({ ok: true });
+  });
+});
+
+describe("resolveHeaderOverlay (V7c-2)", () => {
+  it("is null unless the document opted in", () => {
+    expect(resolveHeaderOverlay(undefined, [hero()], ctx(dark))).toBeNull();
+    expect(
+      resolveHeaderOverlay({ mode: "solid" }, [hero()], ctx(dark)),
+    ).toBeNull();
+    expect(
+      resolveHeaderOverlay({ layout: "centered" }, [hero()], ctx(dark)),
+    ).toBeNull();
+  });
+
+  it("explains a structural fallback", () => {
+    expect(resolveHeaderOverlay(ON, [], ctx(dark))).toEqual({
+      reason: "no-hero",
+    });
+    expect(
+      resolveHeaderOverlay(
+        ON,
+        [{ id: "hero", type: "hero", visible: true }],
+        ctx(dark),
+      ),
+    ).toEqual({
+      reason: "not-picture",
+    });
+  });
+
+  it("falls back to solid when the picture has no proven bounds", () => {
+    expect(resolveHeaderOverlay(ON, [hero()], ctx(null))).toEqual({
+      reason: "unprovable",
+    });
+    expect(
+      resolveHeaderOverlay(ON, [hero()], {
+        primaryColor: "#12372a",
+        accentColor: null,
+        dir: "ltr",
+      }),
+    ).toEqual({ reason: "unprovable" });
+  });
+
+  it("a dark picture gets white text with no scrim", () => {
+    const r = resolveHeaderOverlay(ON, [hero()], ctx(dark));
+    expect(r).toEqual({
+      overlay: { sectionId: "hero", tone: "light", fg: "#ffffff", scrim: 0 },
+    });
+  });
+
+  it("a bright picture gets black text with no scrim", () => {
+    const r = resolveHeaderOverlay(
+      ON,
+      [hero()],
+      ctx({ min: [200, 210, 220], max: [250, 250, 250] }),
+    );
+    expect(r).toMatchObject({
+      overlay: { tone: "dark", fg: "#000000", scrim: 0 },
+    });
+  });
+
+  it("the hero's own overlay is part of what is proven", () => {
+    // a bright picture under a 70 % black overlay is dark enough for white text
+    const r = resolveHeaderOverlay(
+      ON,
+      [hero(picture({ overlay: { color: { hex: "#000000" }, alpha: 70 } }))],
+      ctx({ min: [180, 180, 180], max: [250, 250, 250] }),
+    );
+    expect(r).toMatchObject({
+      overlay: { tone: "light", fg: "#ffffff", scrim: 0 },
+    });
+  });
+
+  it("a mid-tone picture needs the smallest scrim that proves it", () => {
+    const r = resolveHeaderOverlay(
+      ON,
+      [hero()],
+      ctx({ min: [100, 100, 100], max: [160, 160, 160] }),
+    );
+    expect(r).toMatchObject({ overlay: { scrim: 20 } });
+  });
+
+  it("a picture spanning black to white cannot be proven at ≤ 40 % — solid", () => {
+    expect(
+      resolveHeaderOverlay(
+        ON,
+        [hero()],
+        ctx({ min: [0, 0, 0], max: [255, 255, 255] }),
+      ),
+    ).toEqual({
+      reason: "unprovable",
+    });
+  });
+
+  it("never exceeds the 40 % ceiling", () => {
+    for (let lo = 0; lo <= 200; lo += 20) {
+      for (let span = 0; span <= 120; span += 20) {
+        const r = resolveHeaderOverlay(
+          ON,
+          [hero()],
+          ctx({ min: [lo, lo, lo], max: [lo + span, lo + span, lo + span] }),
+        );
+        if (r && "overlay" in r)
+          expect(r.overlay.scrim).toBeLessThanOrEqual(40);
+      }
+    }
+  });
+
+  it("every outcome it accepts really clears 4.5:1 over the whole bounds, scrim included", () => {
+    const wash = (fg: string) => (fg === "#ffffff" ? 0 : 255);
+    const lum = (v: number) => {
+      const c = v / 255;
+      return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+    };
+    for (let lo = 0; lo <= 220; lo += 11) {
+      for (let span = 0; span <= 140; span += 14) {
+        const hi = Math.min(255, lo + span);
+        const r = resolveHeaderOverlay(
+          ON,
+          [hero()],
+          ctx({ min: [lo, lo, lo], max: [hi, hi, hi] }),
+        );
+        if (!r || !("overlay" in r)) continue;
+        const a = r.overlay.scrim / 100;
+        const w = wash(r.overlay.fg);
+        const l0 = lum(lo * (1 - a) + w * a);
+        const l1 = lum(hi * (1 - a) + w * a);
+        const fgL = r.overlay.fg === "#ffffff" ? 1 : 0;
+        const worst =
+          fgL === 1 ? (fgL + 0.05) / (l1 + 0.05) : (l0 + 0.05) / (fgL + 0.05);
+        expect(worst).toBeGreaterThanOrEqual(4.5);
+      }
+    }
+  });
+
+  it("the marker tokens enumerate tone and scrim", () => {
+    expect(
+      overlayMarker({
+        sectionId: "hero",
+        tone: "light",
+        fg: "#ffffff",
+        scrim: 0,
+      }),
+    ).toBe("on l");
+    expect(
+      overlayMarker({
+        sectionId: "hero",
+        tone: "dark",
+        fg: "#000000",
+        scrim: 30,
+      }),
+    ).toBe("on d s3");
+    expect(
+      overlayMarker({
+        sectionId: "hero",
+        tone: "light",
+        fg: "#ffffff",
+        scrim: 40,
+      }),
+    ).toBe("on l s4");
+  });
+});
+
+describe("overlayIsSolid (V7c-2)", () => {
+  it("is transparent at the top, solid past the threshold or while the shopper works inside", () => {
+    expect(overlayIsSolid(0, false)).toBe(false);
+    expect(overlayIsSolid(OVERLAY_SOLID_AT_PX, false)).toBe(false);
+    expect(overlayIsSolid(OVERLAY_SOLID_AT_PX + 1, false)).toBe(true);
+    expect(overlayIsSolid(0, true)).toBe(true);
+    expect(overlayIsSolid(-80, false)).toBe(false);
+  });
+});
