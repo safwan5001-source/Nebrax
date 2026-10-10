@@ -196,18 +196,22 @@ class DeliveryConnectorIngestionService
                 ->first();
 
             if ($existing !== null) {
-                $orderBranch = $existing->branch_id === null ? null : (string) $existing->branch_id;
-                $mappedBranch = $account->branch_id === null ? null : (string) $account->branch_id;
-                if ($orderBranch !== $mappedBranch) {
-                    return $this->persist($account, $envelope, $rawChecksum, null, null, 'branch_unavailable', 422, 'branch_unavailable');
-                }
-
                 $baseline = DeliveryConnectorAttempt::query()
                     ->where('delivery_hub_order_id', $existing->id)
                     ->whereNotNull('authoritative_checksum')
                     ->orderBy('created_at')
                     ->lockForUpdate()
                     ->first();
+
+                $orderBranch = $existing->branch_id === null ? null : (string) $existing->branch_id;
+                $mappedBranch = $account->branch_id === null ? null : (string) $account->branch_id;
+                // التوجيه اليدوي لطلب أنشأه هذا الربط لا يقطعه عن أحداثه التالية.
+                // طلب فرع آخر، أو طلب يدوي بلا خط أساس لهذا الربط، يُرفض.
+                $originatedHere = $baseline !== null
+                    && (string) $baseline->delivery_connector_account_id === (string) $account->id;
+                if (! $originatedHere && $orderBranch !== $mappedBranch) {
+                    return $this->persist($account, $envelope, $rawChecksum, null, null, 'branch_unavailable', 422, 'branch_unavailable');
+                }
 
                 if ($baseline !== null && ! hash_equals((string) $baseline->authoritative_checksum, $authoritative)) {
                     return $this->persist($account, $envelope, $rawChecksum, $existing->id, null, 'payload_conflict', 409, 'payload_conflict');

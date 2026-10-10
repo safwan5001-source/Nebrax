@@ -781,6 +781,60 @@ class DeliveryConnectorCoreTest extends TestCase
         $this->assertSame($before, $this->financialCounts());
     }
 
+    /** @test */
+    public function the_originating_connector_can_follow_up_after_an_unrouted_order_is_routed(): void
+    {
+        [$auth, $branch, $profile] = $this->tenantWithPlatform('follow');
+        $account = $this->connector($auth['token'], $profile, 'store-follow', null);
+        $before = $this->financialCounts();
+        $payload = ['sku' => 'follow'];
+
+        $created = $this->postEvent($account['data']['id'], $this->event('P-follow', $payload), $account['secret'])->assertCreated();
+        $orderId = $created['data']['delivery_hub_order_id'];
+        $this->assertSame(DeliveryHubOrder::UNROUTED, $created['data']['state']);
+
+        $this->withToken($auth['token'])->postJson('/api/delivery-hub/orders/'.$orderId.'/transition', [
+            'action' => 'route',
+            'branch_id' => $branch,
+        ])->assertOk();
+
+        $accepted = $this->postEvent($account['data']['id'], $this->event('P-follow', $payload, 'accept'), $account['secret'])->assertCreated();
+        $this->assertSame($orderId, $accepted['data']['delivery_hub_order_id']);
+        $this->assertSame(DeliveryHubOrder::ACCEPTED, DeliveryHubOrder::withoutGlobalScopes()->findOrFail($orderId)->state);
+        $this->assertSame(2, DeliveryConnectorAttempt::withoutGlobalScopes()
+            ->where('delivery_connector_account_id', $account['data']['id'])
+            ->where('outcome', 'accepted')
+            ->count());
+        $this->assertSame(0, DeliveryConnectorAttempt::withoutGlobalScopes()
+            ->where('delivery_connector_account_id', $account['data']['id'])
+            ->where('error_code', 'branch_unavailable')
+            ->count());
+
+        $other = $this->withToken($auth['token'])->postJson('/api/branches', ['name' => 'فرع بعيد'])->assertCreated()['data']['id'];
+        $foreign = $this->connector($auth['token'], $profile, 'store-far', $other);
+        $this->postEvent($foreign['data']['id'], $this->event('P-follow', $payload, 'cancel'), $foreign['secret'])
+            ->assertStatus(422)
+            ->assertJsonPath('error_code', 'branch_unavailable');
+        $this->assertSame(DeliveryHubOrder::ACCEPTED, DeliveryHubOrder::withoutGlobalScopes()->findOrFail($orderId)->state);
+
+        $this->withToken($auth['token'])->postJson('/api/delivery-hub/orders', [
+            'delivery_platform_profile_id' => $profile,
+            'provider_order_id' => 'P-manual-branched',
+            'branch_id' => $branch,
+            'intake_payload' => ['sku' => 'manual'],
+        ])->assertCreated();
+        $this->postEvent($account['data']['id'], $this->event('P-manual-branched', ['sku' => 'manual']), $account['secret'])
+            ->assertStatus(422)
+            ->assertJsonPath('error_code', 'branch_unavailable');
+        $this->assertSame(0, DeliveryConnectorAttempt::withoutGlobalScopes()
+            ->where('provider_order_id', 'P-manual-branched')
+            ->whereNotNull('authoritative_checksum')
+            ->count());
+
+        $this->assertSame(1, DeliveryHubOrder::withoutGlobalScopes()->where('provider_order_id', 'P-follow')->count());
+        $this->assertSame($before, $this->financialCounts());
+    }
+
     /** @return array<string, string> */
     private function jsonHeaders(string $token): array
     {
