@@ -90,8 +90,8 @@ describe("banner cta proof", () => {
         } as never);
         const body = renderToStaticMarkup(
           <main>
-            <StoreContainer>
-              <div className={publishedHomeStackClass}>{nodes}</div>
+            <StoreContainer className={publishedHomeStackClass(undefined)}>
+              {nodes}
             </StoreContainer>
           </main>,
         );
