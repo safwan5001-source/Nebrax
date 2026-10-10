@@ -58,7 +58,10 @@ describe("banner window (shared fixture)", () => {
   });
 
   it("only a banner accepts a window; other types drop it", () => {
-    const content = { headline: "H", window: { startsAt: "2026-12-01T00:00:00Z" } };
+    const content = {
+      headline: "H",
+      window: { startsAt: "2026-12-01T00:00:00Z" },
+    };
     expect(
       normalizeOptionalSectionContent("categories", content),
     ).toBeUndefined();
