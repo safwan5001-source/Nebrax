@@ -34,6 +34,7 @@ import { SectionLibraryContent, SectionLibraryDialog } from "./SectionLibrary";
 import { buildWhatsAppUrl } from "./presentation/urls";
 import {
   bannerContentOf,
+  bannerCtasOf,
   type HeroContent,
   heroContentOf,
   benefitsContentOf,
@@ -2007,7 +2008,8 @@ function isBannerEmpty(content: BannerContent): boolean {
     !content.subtitle &&
     !content.ctaLabel &&
     !content.ctaHref &&
-    !content.imageUrl
+    !content.imageUrl &&
+    !content.ctas?.length
   );
 }
 
@@ -2038,6 +2040,52 @@ function isHeroAuthored(content: HeroContent | undefined): boolean {
  * buttons. A hero that still has no content shows the legacy global text as its starting values;
  * the first edit writes explicit content and the globals are no longer read for that instance.
  */
+/**
+ * CUST-HV V6a/V6c-2 — the two call-to-action slots shared by Hero and Banner (V0 §8.2: ≤ 2, label + link). The
+ * caller owns what an empty slot means. The link is sanitised on every commit (a half-typed `https://…` becomes
+ * ""), so it is edited locally and committed on blur — the same deferred field the app-store URLs use.
+ */
+type CtaSlot = { label: string; href: string };
+
+function CtaSlots({
+  slots,
+  slotAttr,
+  t,
+  onChange,
+}: {
+  slots: CtaSlot[];
+  slotAttr: "data-hero-cta-slot" | "data-banner-cta-slot";
+  t: (key: CustomizerMessageKey) => string;
+  onChange: (next: CtaSlot[]) => void;
+}) {
+  const setSlot = (index: number, partial: Partial<CtaSlot>) =>
+    onChange(slots.map((slot, i) => (i === index ? { ...slot, ...partial } : slot)));
+  return (
+    <>
+      {slots.map((cta, index) => (
+        <fieldset key={index} className="min-w-0 space-y-2" {...{ [slotAttr]: index }}>
+          <legend className="mb-1 text-[12px] font-semibold tracking-wide text-muted">
+            {t(index === 0 ? "heroCtaPrimary" : "heroCtaSecondary")}
+          </legend>
+          <Field label={t("heroCtaLabel")}>
+            <input
+              className={inputClass}
+              value={cta.label}
+              onChange={(event) => setSlot(index, { label: event.target.value })}
+            />
+          </Field>
+          <DeferredCommitField
+            label={t("heroCtaHref")}
+            value={cta.href}
+            dir="ltr"
+            onCommit={(href) => setSlot(index, { href })}
+          />
+        </fieldset>
+      ))}
+    </>
+  );
+}
+
 function HeroFields({
   content,
   legacy,
@@ -2072,11 +2120,6 @@ function HeroFields({
     subheadline: value.subheadline ?? "",
     ctas,
   };
-  const setCta = (index: number, partial: Partial<{ label: string; href: string }>) =>
-    commit({
-      ...state,
-      ctas: state.ctas.map((cta, i) => (i === index ? { ...cta, ...partial } : cta)),
-    });
   return (
     <div className="space-y-3" data-hero-fields="">
       <Field label={t("heroHeadline")}>
@@ -2093,28 +2136,12 @@ function HeroFields({
           onChange={(event) => commit({ ...state, subheadline: event.target.value })}
         />
       </Field>
-      {ctas.map((cta, index) => (
-        <fieldset key={index} className="min-w-0 space-y-2" data-hero-cta-slot={index}>
-          <legend className="mb-1 text-[12px] font-semibold tracking-wide text-muted">
-            {t(index === 0 ? "heroCtaPrimary" : "heroCtaSecondary")}
-          </legend>
-          <Field label={t("heroCtaLabel")}>
-            <input
-              className={inputClass}
-              value={cta.label}
-              onChange={(event) => setCta(index, { label: event.target.value })}
-            />
-          </Field>
-          {/* the link is sanitized on every commit (a half-typed `https://…` becomes ""), so it is edited
-              locally and committed on blur — the same deferred field the app-store URLs use */}
-          <DeferredCommitField
-            label={t("heroCtaHref")}
-            value={cta.href}
-            dir="ltr"
-            onCommit={(href) => setCta(index, { href })}
-          />
-        </fieldset>
-      ))}
+      <CtaSlots
+        slots={ctas}
+        slotAttr="data-hero-cta-slot"
+        t={t}
+        onChange={(next) => commit({ ...state, ctas: next })}
+      />
       <p className="text-[12px] leading-5 text-muted">{t("heroCtaHint")}</p>
     </div>
   );
@@ -2137,6 +2164,21 @@ function BannerFields({
 }) {
   const value = content ?? emptyBannerContent();
   const set = (partial: Partial<BannerContent>) => onChange({ ...value, ...partial });
+  // CUST-HV V6c-2 — `ctas` when authored, else the legacy pair (= ctas[0]); two slots always shown.
+  const effective = bannerCtasOf(value);
+  const bannerSlots = [0, 1].map((index) => effective[index] ?? { label: "", href: "" });
+  const commitBannerCtas = (next: { label: string; href: string }[]) => {
+    // an empty slot is not stored; the remaining buttons keep their order. `ctas[0]` is mirrored into the legacy
+    // pair so an older reader (which ignores `ctas`) still shows the first button.
+    const kept = next.filter((cta) => cta.label !== "" || cta.href !== "");
+    const { ctas: _previous, ...rest } = value;
+    onChange({
+      ...rest,
+      ctaLabel: kept[0]?.label ?? "",
+      ctaHref: kept[0]?.href ?? "",
+      ...(kept.length > 0 ? { ctas: kept } : {}),
+    });
+  };
   return (
     <div className="space-y-3">
       <Field label={t("bannerTitle")}>
@@ -2145,12 +2187,13 @@ function BannerFields({
       <Field label={t("bannerSubtitle")}>
         <textarea className={`${inputClass} h-20 py-2`} value={value.subtitle} onChange={(event) => set({ subtitle: event.target.value })} />
       </Field>
-      <Field label={t("bannerCtaLabel")}>
-        <input className={inputClass} value={value.ctaLabel} onChange={(event) => set({ ctaLabel: event.target.value })} />
-      </Field>
-      <Field label={t("bannerCtaHref")}>
-        <input className={inputClass} value={value.ctaHref} onChange={(event) => set({ ctaHref: event.target.value })} />
-      </Field>
+      <CtaSlots
+        slots={bannerSlots}
+        slotAttr="data-banner-cta-slot"
+        t={t}
+        onChange={commitBannerCtas}
+      />
+      <p className="text-[12px] leading-5 text-muted">{t("bannerCtaHint")}</p>
       <Field label={t("bannerImageUrl")}>
         <input className={inputClass} value={value.imageUrl ?? ""} onChange={(event) => set({ imageUrl: event.target.value || null })} />
       </Field>

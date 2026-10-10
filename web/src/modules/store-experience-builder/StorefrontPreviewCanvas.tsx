@@ -42,6 +42,7 @@ import {
 import { PREVIEW_FONT_VARIABLES } from "./presentation/fonts";
 import {
   bannerContentOf,
+  bannerCtasOf,
   heroContentOf,
   benefitsContentOf,
   customContentOf,
@@ -902,13 +903,16 @@ export function StorefrontPreviewCanvas({
 
             if (section.type === "banner") {
               const banner = bannerContentOf(section);
+              // CUST-HV V6c-2 — `ctas` when authored, else the legacy pair (= ctas[0]); only a complete button renders.
+              const bannerCtas = bannerCtasOf(banner);
               const empty =
                 !banner.title &&
                 !banner.subtitle &&
-                !banner.ctaLabel &&
+                !bannerCtas.some((cta) => cta.label.trim() !== "") &&
                 !banner.imageUrl;
-              const ctaHrefOk =
-                banner.ctaHref.startsWith("https://") || banner.ctaHref.startsWith("/");
+              const completeCtas = bannerCtas
+                .map((cta) => ({ label: cta.label.trim(), href: cta.href }))
+                .filter((cta) => cta.label !== "" && (cta.href.startsWith("https://") || cta.href.startsWith("/")));
               const windowState =
                 bannerWindowsNow === null || !banner.window ? null : announcementWindowState(banner.window, bannerWindowsNow);
               return (
@@ -941,10 +945,31 @@ export function StorefrontPreviewCanvas({
                         {banner.subtitle ? (
                           <p className="mt-2 max-w-2xl break-words text-sm text-store-muted-foreground">{banner.subtitle}</p>
                         ) : null}
-                        {banner.ctaLabel && ctaHrefOk ? (
-                          <span className="mt-4 inline-flex h-10 items-center rounded-store bg-store-primary px-4 text-sm font-bold text-store-primary-foreground">
-                            {banner.ctaLabel}
+                        {completeCtas.length === 1 ? (
+                          <span
+                            data-banner-cta=""
+                            className="mt-4 inline-flex h-10 max-w-full items-center rounded-store bg-store-primary px-4 text-sm font-bold text-store-primary-foreground"
+                          >
+                            <span className="min-w-0 truncate">{completeCtas[0].label}</span>
                           </span>
+                        ) : completeCtas.length > 1 ? (
+                          <div className="mt-4 flex flex-wrap items-center gap-3">
+                            {completeCtas.map((cta, index) => (
+                              <span
+                                key={`${index}-${cta.href}`}
+                                data-banner-cta=""
+                                // the second button is the shared Button's outline variant for the global button tokens
+                                {...(index > 0 ? { "data-slot": "button", "data-variant": "outline" } : {})}
+                                className={
+                                  index === 0
+                                    ? "inline-flex h-10 max-w-full items-center rounded-store bg-store-primary px-4 text-sm font-bold text-store-primary-foreground"
+                                    : "inline-flex h-10 max-w-full items-center rounded-store border-2 border-store-foreground/60 px-4 text-sm font-bold text-store-foreground"
+                                }
+                              >
+                                <span className="min-w-0 truncate">{cta.label}</span>
+                              </span>
+                            ))}
+                          </div>
                         ) : null}
                       </div>
                     </div>

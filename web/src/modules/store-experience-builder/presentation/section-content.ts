@@ -28,6 +28,12 @@ export interface BannerContent {
    */
   imageAlt?: string;
   /**
+   * CUST-HV V6c-2 (V0 §8.2) — up to {@link MAX_BANNER_CTAS} call-to-action buttons. The legacy
+   * `ctaLabel` / `ctaHref` stay valid and ARE `ctas[0]` while this is absent; when present it wins, and the
+   * builder mirrors `ctas[0]` back into the legacy pair so an older reader still shows the first button.
+   */
+  ctas?: HeroCta[];
+  /**
    * CUST-HV V6c-1 (V0 §8.4, D-15) — optional visibility window: `startsAt` inclusive, `endsAt` exclusive, both
    * optional UTC ISO instants. Kept exactly as typed in a Draft; rejected at publish when malformed or inverted;
    * the published storefront omits a not-yet-started / expired / invalid banner.
@@ -138,6 +144,7 @@ export const MAX_HERO_HEADLINE_LENGTH = 120;
 export const MAX_HERO_SUBHEADLINE_LENGTH = 200;
 export const MAX_HERO_CTAS = 2;
 export const MAX_HERO_CTA_LABEL_LENGTH = 80;
+export const MAX_BANNER_CTAS = 2;
 
 export type SectionContent =
   | HeroContent
@@ -180,6 +187,18 @@ export function bannerContentOf(section: {
     "ctaLabel" in section.content
     ? section.content
     : emptyBannerContent();
+}
+
+/**
+ * CUST-HV V6c-2 — the buttons a banner actually carries: its `ctas` when authored, else the legacy single
+ * `ctaLabel` / `ctaHref` pair (V0 §8.2: the legacy pair maps to `ctas[0]`). Incomplete entries are included —
+ * callers decide what renders (only label AND link).
+ */
+export function bannerCtasOf(content: BannerContent): HeroCta[] {
+  if (content.ctas && content.ctas.length > 0) return content.ctas;
+  return content.ctaLabel !== "" || content.ctaHref !== ""
+    ? [{ label: content.ctaLabel, href: content.ctaHref }]
+    : [];
 }
 
 export function benefitsContentOf(section: {
@@ -337,24 +356,31 @@ function heroText(value: unknown, max: number): string {
   return text.trim() === "" ? "" : truncateToCodePoints(text, max);
 }
 
+/**
+ * CUST-HV V6a/V6c-2 — the call-to-action list shared by Hero and Banner: at most `max` entries, label kept as
+ * written (code-point truncated; renderers trim), link through {@link sanitizeContentHref}. A draft keeps what the
+ * merchant typed (a label without a link or the reverse) and only a complete CTA renders; a wholly empty one is dropped.
+ */
+function normalizeCtaList(raw: unknown, max: number): HeroCta[] {
+  const ctas: HeroCta[] = [];
+  for (const item of Array.isArray(raw) ? raw : []) {
+    if (!item || typeof item !== "object" || Array.isArray(item)) continue;
+    const entry = item as Record<string, unknown>;
+    const label = heroText(entry.label, MAX_HERO_CTA_LABEL_LENGTH);
+    const href = sanitizeContentHref(asString(entry.href));
+    if (label === "" && href === "") continue;
+    ctas.push({ label, href });
+    if (ctas.length >= max) break;
+  }
+  return ctas;
+}
+
 function normalizeHero(raw: unknown): HeroContent | undefined {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return undefined;
   const source = raw as Record<string, unknown>;
   const headline = heroText(source.headline, MAX_HERO_HEADLINE_LENGTH);
   const subheadline = heroText(source.subheadline, MAX_HERO_SUBHEADLINE_LENGTH);
-  const ctas: HeroCta[] = [];
-  const rawCtas = Array.isArray(source.ctas) ? source.ctas : [];
-  for (const item of rawCtas) {
-    if (!item || typeof item !== "object" || Array.isArray(item)) continue;
-    const entry = item as Record<string, unknown>;
-    const label = heroText(entry.label, MAX_HERO_CTA_LABEL_LENGTH);
-    const href = sanitizeContentHref(asString(entry.href));
-    // a draft keeps what the merchant typed (a label without a link or the reverse); only the
-    // complete CTA renders. A wholly empty one is dropped.
-    if (label === "" && href === "") continue;
-    ctas.push({ label, href });
-    if (ctas.length >= MAX_HERO_CTAS) break;
-  }
+  const ctas = normalizeCtaList(source.ctas, MAX_HERO_CTAS);
   // explicit content only when something was written: a string `headline` key (even empty),
   // a subheadline, or a CTA
   if (typeof source.headline !== "string" && subheadline === "" && ctas.length === 0) {
@@ -377,6 +403,9 @@ function normalizeBanner(source: Record<string, unknown>): BannerContent {
     imageUrl: image,
     imageAlt: truncateToCodePoints(asString(source.imageAlt).trim(), MAX_BANNER_IMAGE_ALT_LENGTH),
   };
+  // CUST-HV V6c-2 — optional CTA list, before `window` (canonical order, like PHP).
+  const ctas = normalizeCtaList(source.ctas, MAX_BANNER_CTAS);
+  if (ctas.length > 0) content.ctas = ctas;
   // Last key, like PHP. A window alone does not revive an empty banner (see isEmptyBanner).
   const window = normalizeWindowEdges(source.window);
   if (window) content.window = window;
@@ -389,7 +418,8 @@ function isEmptyBanner(content: BannerContent): boolean {
     content.subtitle === "" &&
     content.ctaLabel === "" &&
     content.ctaHref === "" &&
-    content.imageUrl === null
+    content.imageUrl === null &&
+    content.ctas === undefined
   );
 }
 

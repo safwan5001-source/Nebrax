@@ -41,6 +41,7 @@ final class StorefrontPresentationNormalizer
     private const MAX_HERO_CTAS = 2;
 
     private const MAX_HERO_CTA_LABEL_LENGTH = 80;
+    private const MAX_BANNER_CTAS = 2;
 
     public const MAX_DOCUMENT_BYTES = 1572864; // 1.5 MiB
 
@@ -796,11 +797,18 @@ final class StorefrontPresentationNormalizer
             // exactly as typed (AMEND-7): it is rejected at publish, never read as «no window» (which would make a
             // restricted banner more visible). Like `imageAlt`, a window alone does not revive an empty banner.
             $window = $this->normalizeBannerWindow($source['window'] ?? null);
+            // CUST-HV V6c-2 (V0 §8.2) — ≤2 أزرار، قبل `window` في الترتيب القانوني. الزرّ المكتوب محتوىً: يُبقي البانر غير فارغ.
+            // الحقلان القديمان `ctaLabel/ctaHref` يظلان صالحَين ويعنيان `ctas[0]` ما دامت `ctas` غائبة.
+            $ctas = $this->normalizeCtaList($source['ctas'] ?? null, self::MAX_BANNER_CTAS);
             $empty = $content['title'] === ''
                 && $content['subtitle'] === ''
                 && $content['ctaLabel'] === ''
                 && $content['ctaHref'] === ''
-                && $content['imageUrl'] === null;
+                && $content['imageUrl'] === null
+                && $ctas === [];
+            if ($ctas !== []) {
+                $content['ctas'] = $ctas;
+            }
             if ($window !== []) {
                 $content['window'] = $window;
             }
@@ -988,22 +996,7 @@ final class StorefrontPresentationNormalizer
         $headline = $this->heroText($raw['headline'] ?? null, self::MAX_HERO_HEADLINE_LENGTH);
         $subheadline = $this->heroText($raw['subheadline'] ?? null, self::MAX_HERO_SUBHEADLINE_LENGTH);
 
-        $ctas = [];
-        foreach (array_values(is_array($raw['ctas'] ?? null) ? $raw['ctas'] : []) as $item) {
-            if (! is_array($item) || array_is_list($item)) {
-                continue;
-            }
-            $label = $this->heroText($item['label'] ?? null, self::MAX_HERO_CTA_LABEL_LENGTH);
-            $href = $this->sanitizeContentHref($this->asString($item['href'] ?? null));
-            // مسودة: يُحفظ ما كتبه التاجر (تسمية بلا رابط أو العكس) ولا يُعرض إلا الـCTA المكتمل؛ الفارغ كلياً يسقط.
-            if ($label === '' && $href === '') {
-                continue;
-            }
-            $ctas[] = ['label' => $label, 'href' => $href];
-            if (count($ctas) >= self::MAX_HERO_CTAS) {
-                break;
-            }
-        }
+        $ctas = $this->normalizeCtaList($raw['ctas'] ?? null, self::MAX_HERO_CTAS);
 
         // محتوى صريح فقط إن كُتب شيء: مفتاح headline نصّي (حتى الفارغ)، أو عنوان فرعي، أو CTA.
         if (! (array_key_exists('headline', $raw) && is_string($raw['headline'])) && $subheadline === '' && $ctas === []) {
@@ -1019,6 +1012,34 @@ final class StorefrontPresentationNormalizer
         }
 
         return $content;
+    }
+
+    /**
+     * CUST-HV V6a/V6c-2 — قائمة الأزرار المشتركة بين البطل والبانر: ≤ $max عنصراً، التسمية كما كُتبت (مقصوصة بنقاط
+     * الترميز؛ العرض يقصّ) والرابط بقواعد `sanitizeContentHref`. المسودة الناقصة (تسمية بلا رابط أو العكس) تُحفظ ولا يُعرض
+     * إلا الـCTA المكتمل؛ الفارغ كلياً يسقط.
+     *
+     * @return list<array{label: string, href: string}>
+     */
+    private function normalizeCtaList(mixed $raw, int $max): array
+    {
+        $ctas = [];
+        foreach (array_values(is_array($raw) ? $raw : []) as $item) {
+            if (! is_array($item) || array_is_list($item)) {
+                continue;
+            }
+            $label = $this->heroText($item['label'] ?? null, self::MAX_HERO_CTA_LABEL_LENGTH);
+            $href = $this->sanitizeContentHref($this->asString($item['href'] ?? null));
+            if ($label === '' && $href === '') {
+                continue;
+            }
+            $ctas[] = ['label' => $label, 'href' => $href];
+            if (count($ctas) >= $max) {
+                break;
+            }
+        }
+
+        return $ctas;
     }
 
     private function heroText(mixed $value, int $max): string

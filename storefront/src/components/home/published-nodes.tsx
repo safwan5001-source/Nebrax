@@ -21,6 +21,7 @@ import type { PresentationHomeSection } from "@/lib/presentation/config";
 import type { ResolvedMediaMap } from "@/lib/presentation/media-ref";
 import {
   bannerContentOf,
+  bannerCtasOf,
   benefitsContentOf,
   customContentOf,
   deliveryPromiseContentOf,
@@ -230,7 +231,7 @@ async function pushSectionNode(
       !content.title &&
       !content.subtitle &&
       !content.imageUrl &&
-      !content.ctaLabel
+      !bannerCtasOf(content).some((cta) => cta.label.trim() !== "")
     ) {
       return;
     }
