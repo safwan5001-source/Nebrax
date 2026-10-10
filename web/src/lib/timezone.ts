@@ -32,6 +32,17 @@ export function safeTimeZone(timeZone: string | null | undefined): string {
   }
 }
 
+/**
+ * Epoch ms of a UTC calendar value. `Date.UTC` remaps years 0–99 to 1900–1999, which would silently
+ * store a different instant than the merchant typed; `setUTCFullYear` does not.
+ */
+function utcMillisOf(year: number, month: number, day: number, hour = 0, minute = 0, second = 0): number {
+  const date = new Date(0);
+  date.setUTCFullYear(year, month, day);
+  date.setUTCHours(hour, minute, second, 0);
+  return date.getTime();
+}
+
 function offsetMinutesAt(utcMillis: number, timeZone: string): number {
   const parts = new Intl.DateTimeFormat("en-US", {
     timeZone,
@@ -44,7 +55,7 @@ function offsetMinutesAt(utcMillis: number, timeZone: string): number {
     second: "2-digit",
   }).formatToParts(new Date(utcMillis));
   const get = (type: string) => Number(parts.find((p) => p.type === type)?.value ?? "0");
-  const asIfUtc = Date.UTC(get("year"), get("month") - 1, get("day"), get("hour"), get("minute"), get("second"));
+  const asIfUtc = utcMillisOf(get("year"), get("month") - 1, get("day"), get("hour"), get("minute"), get("second"));
   return (asIfUtc - utcMillis) / 60000;
 }
 
@@ -52,7 +63,8 @@ function offsetMinutesAt(utcMillis: number, timeZone: string): number {
  * Converts a `YYYY-MM-DD` date + `HH:mm` time, understood as wall-clock time
  * in `timeZone`, to a canonical UTC ISO-8601 string (explicit `Z` offset —
  * satisfies the backend's `scheduled_for` contract). Returns `null` for a
- * malformed date/time instead of guessing.
+ * malformed date/time instead of guessing. DST-aware: a repeated wall time
+ * resolves to its first occurrence, a skipped one to just after the gap.
  */
 export function zonedWallTimeToUtcIso(
   dateValue: string,
@@ -67,15 +79,26 @@ export function zonedWallTimeToUtcIso(
   if (month < 1 || month > 12 || day < 1 || day > 31 || hour > 23 || minute > 59) return null;
 
   const zone = safeTimeZone(timeZone);
-  // First pass: treat the wall-clock values as if they were already UTC,
-  // then correct by the target zone's actual offset at that instant. Exact
-  // for zones without DST (Asia/Riyadh among them); correct everywhere
-  // except the rare one-hour DST-transition window in a zone that observes it.
-  const naiveUtc = Date.UTC(year, month - 1, day, hour, minute, 0);
+  const naiveUtc = utcMillisOf(year, month - 1, day, hour, minute);
   if (Number.isNaN(naiveUtc)) return null;
-  const offset = offsetMinutesAt(naiveUtc, zone);
-  const date = new Date(naiveUtc - offset * 60000);
-  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+  // Resolve the zone's offset *at the resulting instant*, not at the wall time read as UTC (which is
+  // an hour off inside a DST transition window). The offsets in force a day either side bracket any
+  // single transition; a candidate is valid only if the zone really has that offset at the instant
+  // it yields (round-trip). Two valid candidates = the clock repeats (fall back): take the earlier,
+  // first occurrence. None = the wall time was skipped (spring forward): read it with the offset in
+  // force before the gap, which lands just after it — the usual "compatible" resolution.
+  const DAY = 86_400_000;
+  const before = offsetMinutesAt(naiveUtc - DAY, zone);
+  const after = offsetMinutesAt(naiveUtc + DAY, zone);
+  const valid = [...new Set([before, after])]
+    .map((offset) => naiveUtc - offset * 60000)
+    .filter((utc) => offsetMinutesAt(utc, zone) === (naiveUtc - utc) / 60000)
+    .sort((a, b) => a - b);
+  const date = new Date(valid[0] ?? naiveUtc - before * 60000);
+  // An offset can push year-1 / year-9999 wall time out of 0001–9999, the only years the server's
+  // gate (and a four-digit ISO instant) accepts.
+  if (Number.isNaN(date.getTime()) || date.getUTCFullYear() < 1 || date.getUTCFullYear() > 9999) return null;
+  return date.toISOString();
 }
 
 /**
@@ -100,7 +123,8 @@ export function utcIsoToZonedWallTime(
     minute: "2-digit",
   }).formatToParts(instant);
   const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "";
-  return { date: `${get("year")}-${get("month")}-${get("day")}`, time: `${get("hour")}:${get("minute")}` };
+  // Intl does not zero-pad the year (`1`, not `0001`), which a date input cannot read back.
+  return { date: `${get("year").padStart(4, "0")}-${get("month")}-${get("day")}`, time: `${get("hour")}:${get("minute")}` };
 }
 
 /** `{ date, time }` for "now, rounded up to the next 30-minute mark" in `timeZone` — the schedule dialog's default suggestion (same rounding Shopify's own future-publishing picker defaults to). */

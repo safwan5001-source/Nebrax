@@ -117,6 +117,29 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+/**
+ * CUST-HV V6c-1 — the optional visibility window shared by announcement items and banners (D-15: one window
+ * semantic, no second scheduler). Each edge is kept exactly as the merchant typed it (PHP `trim`, ≤ 40 code
+ * points); an edge that is empty or not a string is absent; no edge ⇒ no window. A malformed value is NEVER
+ * repaired or dropped here — it is rejected at publish and never read as "no window" (V0 AMEND-7).
+ */
+export function normalizeWindowEdges(
+  raw: unknown,
+): { startsAt?: string; endsAt?: string } | undefined {
+  if (!isRecord(raw)) return undefined;
+  const kept: { startsAt?: string; endsAt?: string } = {};
+  for (const edge of ["startsAt", "endsAt"] as const) {
+    const value =
+      typeof raw[edge] === "string"
+        ? capCodePoints(phpTrim(raw[edge] as string), 40)
+        : "";
+    if (value !== "") kept[edge] = value;
+  }
+  return kept.startsAt !== undefined || kept.endsAt !== undefined
+    ? kept
+    : undefined;
+}
+
 function safeId(value: unknown, fallback: string): string {
   const text = phpTrim(typeof value === "string" ? value : fallback);
   return /^[a-zA-Z0-9_-]{1,64}$/.test(text) ? text : fallback;
@@ -180,18 +203,8 @@ function normalizeItem(
   const surface = normalizeSurface(raw.surface);
   if (surface) item.surface = surface;
 
-  if (isRecord(raw.window)) {
-    const kept: NonNullable<Announcement["window"]> = {};
-    for (const edge of ["startsAt", "endsAt"] as const) {
-      const value =
-        typeof raw.window[edge] === "string"
-          ? capCodePoints(phpTrim(raw.window[edge] as string), 40)
-          : "";
-      if (value !== "") kept[edge] = value;
-    }
-    if (kept.startsAt !== undefined || kept.endsAt !== undefined)
-      item.window = kept;
-  }
+  const window = normalizeWindowEdges(raw.window);
+  if (window) item.window = window;
 
   if (Array.isArray(raw.pages)) {
     const chosen = new Set<string>();
@@ -284,6 +297,25 @@ const ISO_INSTANT =
   /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.(\d{1,6}))?)?(Z|[+-](\d{2}):(\d{2}))$/;
 
 /**
+ * `Date.UTC` remaps years 0–99 to 1900–1999, so `0001-01-01` would read as 1901. Build the
+ * instant with `setUTCFullYear` instead, so low years mean what the server gate means.
+ */
+function utcMillis(
+  year: number,
+  month: number,
+  day: number,
+  hour = 0,
+  minute = 0,
+  second = 0,
+  millis = 0,
+): number {
+  const date = new Date(0);
+  date.setUTCFullYear(year, month - 1, day);
+  date.setUTCHours(hour, minute, second, millis);
+  return date.getTime();
+}
+
+/**
  * Strict ISO-8601 instant → epoch ms, or `null` when malformed or when any
  * field would be silently rolled over (`2026-02-31`, `T24:00`, `+25:00`).
  * Same rules as `StorefrontPresentationPublishValidator`.
@@ -295,11 +327,12 @@ export function parseAnnouncementInstant(value: string): number | null {
     Number,
   );
   const second = m[6] === undefined ? 0 : Number(m[6]);
+  if (year < 1) return null; // the server gate (`checkdate`) has no year 0 either
   if (hour > 23 || minute > 59 || second > 59) return null;
   if (m[9] !== undefined && (Number(m[9]) > 23 || Number(m[10]) > 59))
     return null;
 
-  const calendar = new Date(Date.UTC(year, month - 1, day));
+  const calendar = new Date(utcMillis(year, month, day));
   if (
     calendar.getUTCFullYear() !== year ||
     calendar.getUTCMonth() !== month - 1 ||
@@ -310,7 +343,7 @@ export function parseAnnouncementInstant(value: string): number | null {
 
   const millis =
     m[7] === undefined ? 0 : Number(m[7].padEnd(3, "0").slice(0, 3));
-  let utc = Date.UTC(year, month - 1, day, hour, minute, second, millis);
+  let utc = utcMillis(year, month, day, hour, minute, second, millis);
   if (m[8] !== "Z") {
     const sign = m[8].startsWith("-") ? -1 : 1;
     utc -= sign * (Number(m[9]) * 60 + Number(m[10])) * 60_000;

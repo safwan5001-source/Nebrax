@@ -1,0 +1,182 @@
+{
+    "_note": "CUST-HV V6c-1 — optional Banner visibility window (V0 §8.4, D-15, AMEND-7). Shared by PHP StorefrontPresentationNormalizer and both TS section-content twins. Draft normalization PRESERVES whatever was typed; malformed/inverted windows are rejected at publish (StorefrontPresentationPublishValidator), never normalised to 'no window'. expected=null means the content key is absent.",
+    "cases": [
+        {
+            "name": "banner: both edges kept, trimmed, as the LAST key (after imageAlt)",
+            "type": "banner",
+            "input": {
+                "window": {
+                    "endsAt": "  2026-12-31T20:59:59Z ",
+                    "startsAt": " 2026-12-01T00:00:00+03:00\n"
+                },
+                "title": "Sale"
+            },
+            "expected": {
+                "title": "Sale",
+                "subtitle": "",
+                "ctaLabel": "",
+                "ctaHref": "",
+                "imageUrl": null,
+                "imageAlt": "",
+                "window": {
+                    "startsAt": "2026-12-01T00:00:00+03:00",
+                    "endsAt": "2026-12-31T20:59:59Z"
+                }
+            }
+        },
+        {
+            "name": "banner: only startsAt",
+            "type": "banner",
+            "input": {
+                "title": "Sale",
+                "window": {
+                    "startsAt": "2026-12-01T00:00:00Z"
+                }
+            },
+            "expected": {
+                "title": "Sale",
+                "subtitle": "",
+                "ctaLabel": "",
+                "ctaHref": "",
+                "imageUrl": null,
+                "imageAlt": "",
+                "window": {
+                    "startsAt": "2026-12-01T00:00:00Z"
+                }
+            }
+        },
+        {
+            "name": "banner: only endsAt",
+            "type": "banner",
+            "input": {
+                "title": "Sale",
+                "window": {
+                    "endsAt": "2026-12-31T00:00:00Z"
+                }
+            },
+            "expected": {
+                "title": "Sale",
+                "subtitle": "",
+                "ctaLabel": "",
+                "ctaHref": "",
+                "imageUrl": null,
+                "imageAlt": "",
+                "window": {
+                    "endsAt": "2026-12-31T00:00:00Z"
+                }
+            }
+        },
+        {
+            "name": "banner: a malformed edge is kept exactly as typed (AMEND-7) — never dropped, never read as 'no window'",
+            "type": "banner",
+            "input": {
+                "title": "Sale",
+                "window": {
+                    "startsAt": "next tuesday",
+                    "endsAt": "2026-02-31T00:00:00Z"
+                }
+            },
+            "expected": {
+                "title": "Sale",
+                "subtitle": "",
+                "ctaLabel": "",
+                "ctaHref": "",
+                "imageUrl": null,
+                "imageAlt": "",
+                "window": {
+                    "startsAt": "next tuesday",
+                    "endsAt": "2026-02-31T00:00:00Z"
+                }
+            }
+        },
+        {
+            "name": "banner: an inverted window is kept as typed (rejected at publish, not here)",
+            "type": "banner",
+            "input": {
+                "title": "Sale",
+                "window": {
+                    "startsAt": "2026-12-31T00:00:00Z",
+                    "endsAt": "2026-12-01T00:00:00Z"
+                }
+            },
+            "expected": {
+                "title": "Sale",
+                "subtitle": "",
+                "ctaLabel": "",
+                "ctaHref": "",
+                "imageUrl": null,
+                "imageAlt": "",
+                "window": {
+                    "startsAt": "2026-12-31T00:00:00Z",
+                    "endsAt": "2026-12-01T00:00:00Z"
+                }
+            }
+        },
+        {
+            "name": "banner: empty, blank and non-string edges are absent; no edge left ⇒ no window key",
+            "type": "banner",
+            "input": {
+                "title": "Sale",
+                "window": {
+                    "startsAt": "   ",
+                    "endsAt": 123
+                }
+            },
+            "expected": {
+                "title": "Sale",
+                "subtitle": "",
+                "ctaLabel": "",
+                "ctaHref": "",
+                "imageUrl": null,
+                "imageAlt": ""
+            }
+        },
+        {
+            "name": "banner: a window that is not an object is ignored",
+            "type": "banner",
+            "input": {
+                "title": "Sale",
+                "window": "2026-12-01T00:00:00Z"
+            },
+            "expected": {
+                "title": "Sale",
+                "subtitle": "",
+                "ctaLabel": "",
+                "ctaHref": "",
+                "imageUrl": null,
+                "imageAlt": ""
+            }
+        },
+        {
+            "name": "banner: an edge is capped at 40 code points",
+            "type": "banner",
+            "input": {
+                "title": "Sale",
+                "window": {
+                    "startsAt": "2026-12-01T00:00:00Zxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                }
+            },
+            "expected": {
+                "title": "Sale",
+                "subtitle": "",
+                "ctaLabel": "",
+                "ctaHref": "",
+                "imageUrl": null,
+                "imageAlt": "",
+                "window": {
+                    "startsAt": "2026-12-01T00:00:00Zxxxxxxxxxxxxxxxxxxxx"
+                }
+            }
+        },
+        {
+            "name": "banner: a window alone does not revive an empty banner (content is absent)",
+            "type": "banner",
+            "input": {
+                "window": {
+                    "startsAt": "2026-12-01T00:00:00Z"
+                }
+            },
+            "expected": null
+        }
+    ]
+}

@@ -746,6 +746,26 @@ final class StorefrontPresentationNormalizer
     }
 
     /**
+     * CUST-HV V6c-1 — نافذة ظهور البانر: حافتان اختياريتان (`startsAt` شاملة و`endsAt` حصرية) تُحفظان كما أدخلهما
+     * التاجر (مقصوصتين بـ40 محرفاً كنافذة الإعلانات). لا يُصحَّح مشوَّهٌ ولا يُسقَط: الحكم عند النشر.
+     *
+     * @return array<string, string>
+     */
+    private function normalizeBannerWindow(mixed $raw): array
+    {
+        $window = $this->object($raw);
+        $kept = [];
+        foreach (['startsAt', 'endsAt'] as $edge) {
+            $value = is_string($window[$edge] ?? null) ? mb_substr(trim($window[$edge]), 0, 40) : '';
+            if ($value !== '') {
+                $kept[$edge] = $value;
+            }
+        }
+
+        return $kept;
+    }
+
+    /**
      * محتوى اختياري لكل instance. الغياب يعني فارغاً، والمحتوى الفارغ
      * لا يُكتب حتى تبقى وثائق {id,type,visible} كما هي. الأنواع التي
      * لا تحمل محتوى تُسقِط أي content يُهرَّب (offers صار يحمل `offerIds` منذ CUST-H4-7).
@@ -772,11 +792,18 @@ final class StorefrontPresentationNormalizer
                 // subtitle, CTA, or image is still an empty banner.
                 'imageAlt' => mb_substr(trim($this->asString($source['imageAlt'] ?? null)), 0, self::MAX_BANNER_IMAGE_ALT_LENGTH),
             ];
+            // CUST-HV V6c-1 (V0 §8.4, D-15) — optional visibility window, kept LAST. A malformed value is preserved
+            // exactly as typed (AMEND-7): it is rejected at publish, never read as «no window» (which would make a
+            // restricted banner more visible). Like `imageAlt`, a window alone does not revive an empty banner.
+            $window = $this->normalizeBannerWindow($source['window'] ?? null);
             $empty = $content['title'] === ''
                 && $content['subtitle'] === ''
                 && $content['ctaLabel'] === ''
                 && $content['ctaHref'] === ''
                 && $content['imageUrl'] === null;
+            if ($window !== []) {
+                $content['window'] = $window;
+            }
 
             return $empty ? null : $content;
         }

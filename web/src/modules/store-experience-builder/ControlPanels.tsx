@@ -58,6 +58,8 @@ import {
   customizerMessage,
 } from "./messages";
 import { LogoMediaSlot } from "./media/LogoMediaSlot";
+import { announcementWindowState } from "./presentation/announcements";
+import { WindowFields } from "./WindowFields";
 import type { WorkspaceProductSummary } from "@/modules/commerce-workspace/workspace-products";
 import type { WorkspaceOffer } from "@/modules/commerce-workspace/workspace-offers";
 import {
@@ -264,6 +266,7 @@ export function ControlPanels({
           featuredResolvedState={featuredResolvedState}
           onRetryFeaturedResolution={onRetryFeaturedResolution}
           locale={locale}
+          timezone={timezone}
           offers={offers}
           offersState={offersState}
           onRetryOffers={onRetryOffers}
@@ -975,6 +978,7 @@ function HomepagePanel({
   featuredResolvedState = {},
   onRetryFeaturedResolution,
   locale = "ar",
+  timezone = DEFAULT_TENANT_TIMEZONE,
   offers = [],
   offersState = "idle",
   onRetryOffers,
@@ -995,6 +999,8 @@ function HomepagePanel({
   featuredResolvedState?: Record<string, "idle" | "loading" | "error" | "ready">;
   onRetryFeaturedResolution?: (sectionId: string) => void;
   locale?: CustomizerLocale;
+  /** CUST-HV V6c-1 — the store's IANA zone; the Banner display window is entered in it. */
+  timezone?: string;
   offers?: WorkspaceOffer[];
   offersState?: "idle" | "loading" | "error" | "ready";
   onRetryOffers?: () => void;
@@ -1213,7 +1219,11 @@ function HomepagePanel({
               />
             ) : selected.type === "banner" ? (
               <BannerFields
+                key={selected.id}
+                sectionId={selected.id}
                 content={bannerContentOf(selected)}
+                locale={locale}
+                timezone={timezone}
                 t={t}
                 onChange={(content) =>
                   updateSection(selectedIndex, {
@@ -2111,11 +2121,17 @@ function HeroFields({
 }
 
 function BannerFields({
+  sectionId,
   content,
+  locale,
+  timezone,
   t,
   onChange,
 }: {
+  sectionId: string;
   content: BannerContent;
+  locale: CustomizerLocale;
+  timezone: string;
   t: (key: CustomizerMessageKey) => string;
   onChange: (content: BannerContent) => void;
 }) {
@@ -2144,6 +2160,28 @@ function BannerFields({
         value={value.imageAlt ?? ""}
         onCommit={(imageAlt) => set({ imageAlt })}
       />
+      {isBannerEmpty(value) ? (
+        // The normaliser never keeps a window on a banner with nothing to show,
+        // so the editor would silently lose it — say so instead of offering it.
+        <p className="text-[12px] leading-5 text-muted">{t("bannerWindowNeedsContent")}</p>
+      ) : (
+        <>
+          <WindowFields
+            scope={sectionId}
+            window={value.window}
+            locale={locale}
+            timezone={timezone}
+            // Invalidity is structural (malformed / end ≤ start), never clock-dependent.
+            invalid={announcementWindowState(value.window, 0) === "invalid"}
+            t={t}
+            onChange={(window) => {
+              const { window: _previous, ...rest } = value;
+              onChange(window ? { ...rest, window } : rest);
+            }}
+          />
+          <p className="text-[12px] leading-5 text-muted">{t("bannerWindowHint")}</p>
+        </>
+      )}
     </div>
   );
 }

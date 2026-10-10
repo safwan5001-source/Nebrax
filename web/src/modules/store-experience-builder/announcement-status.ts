@@ -71,6 +71,7 @@ export function describePublishIssues(
   t: (key: CustomizerMessageKey) => string,
 ): string | null {
   const lines: string[] = [];
+  const bannerLines: string[] = [];
   const mediaLines: string[] = [];
   for (const [path, code] of Object.entries(issues)) {
     if (path.startsWith("announcements")) {
@@ -78,6 +79,14 @@ export function describePublishIssues(
       const index = /items\[(\d+)\]/.exec(path)?.[1];
       lines.push(
         `${index === undefined ? "" : `${t("annMessageLabel")} ${Number(index) + 1}: `}${key ? t(key) : t("annPublishBlocked")}`,
+      );
+      continue;
+    }
+    if (/^homepage\.sections\[\d+\]\.content\.window\./.test(path)) {
+      const key = ISSUE_KEY[code];
+      const index = /sections\[(\d+)\]/.exec(path)?.[1];
+      bannerLines.push(
+        `${t("bannerLabel")}${index === undefined ? "" : ` ${Number(index) + 1}`}: ${key ? t(key) : t("bannerPublishBlocked")}`,
       );
       continue;
     }
@@ -93,6 +102,11 @@ export function describePublishIssues(
     const shown = lines.slice(0, MAX_LISTED_ISSUES).join(" · ");
     const more = lines.length - MAX_LISTED_ISSUES;
     parts.push(`${t("annPublishBlocked")}. ${shown}${more > 0 ? ` (+${more})` : ""}`);
+  }
+  if (bannerLines.length > 0) {
+    const shown = bannerLines.slice(0, MAX_LISTED_ISSUES).join(" · ");
+    const more = bannerLines.length - MAX_LISTED_ISSUES;
+    parts.push(`${t("bannerPublishBlocked")}. ${shown}${more > 0 ? ` (+${more})` : ""}`);
   }
   if (mediaLines.length > 0) {
     const shown = mediaLines.slice(0, MAX_LISTED_ISSUES).join(" · ");
