@@ -121,22 +121,20 @@ describe("resolveHeaderOverlay (V7c-2)", () => {
     ).toEqual({ reason: "unprovable" });
   });
 
-  it("a dark picture gets white text with no scrim", () => {
+  it("a dark picture gets white text", () => {
     const r = resolveHeaderOverlay(ON, [hero()], ctx(dark));
     expect(r).toEqual({
-      overlay: { sectionId: "hero", tone: "light", fg: "#ffffff", scrim: 0 },
+      overlay: { sectionId: "hero", tone: "light", fg: "#ffffff" },
     });
   });
 
-  it("a bright picture gets black text with no scrim", () => {
+  it("a bright picture gets black text", () => {
     const r = resolveHeaderOverlay(
       ON,
       [hero()],
       ctx({ min: [200, 210, 220], max: [250, 250, 250] }),
     );
-    expect(r).toMatchObject({
-      overlay: { tone: "dark", fg: "#000000", scrim: 0 },
-    });
+    expect(r).toMatchObject({ overlay: { tone: "dark", fg: "#000000" } });
   });
 
   it("the hero's own overlay is part of what is proven", () => {
@@ -146,54 +144,34 @@ describe("resolveHeaderOverlay (V7c-2)", () => {
       [hero(picture({ overlay: { color: { hex: "#000000" }, alpha: 70 } }))],
       ctx({ min: [180, 180, 180], max: [250, 250, 250] }),
     );
-    expect(r).toMatchObject({
-      overlay: { tone: "light", fg: "#ffffff", scrim: 0 },
-    });
+    expect(r).toMatchObject({ overlay: { tone: "light", fg: "#ffffff" } });
   });
 
-  it("a mid-tone picture needs the smallest scrim that proves it", () => {
-    const r = resolveHeaderOverlay(
-      ON,
-      [hero()],
-      ctx({ min: [100, 100, 100], max: [160, 160, 160] }),
-    );
-    expect(r).toMatchObject({ overlay: { scrim: 20 } });
-  });
-
-  it("a picture spanning black to white cannot be proven at ≤ 40 % — solid", () => {
+  it("a mid-tone or full-range picture is not provable — solid, never rescued by a wash", () => {
+    expect(
+      resolveHeaderOverlay(
+        ON,
+        [hero()],
+        ctx({ min: [100, 100, 100], max: [160, 160, 160] }),
+      ),
+    ).toEqual({ reason: "unprovable" });
     expect(
       resolveHeaderOverlay(
         ON,
         [hero()],
         ctx({ min: [0, 0, 0], max: [255, 255, 255] }),
       ),
-    ).toEqual({
-      reason: "unprovable",
-    });
+    ).toEqual({ reason: "unprovable" });
   });
 
-  it("never exceeds the 40 % ceiling", () => {
-    for (let lo = 0; lo <= 200; lo += 20) {
-      for (let span = 0; span <= 120; span += 20) {
-        const r = resolveHeaderOverlay(
-          ON,
-          [hero()],
-          ctx({ min: [lo, lo, lo], max: [lo + span, lo + span, lo + span] }),
-        );
-        if (r && "overlay" in r)
-          expect(r.overlay.scrim).toBeLessThanOrEqual(40);
-      }
-    }
-  });
-
-  it("every outcome it accepts really clears 4.5:1 over the whole bounds, scrim included", () => {
-    const wash = (fg: string) => (fg === "#ffffff" ? 0 : 255);
+  it("every outcome it accepts really clears 4.5:1 over the whole bounds", () => {
     const lum = (v: number) => {
       const c = v / 255;
       return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
     };
-    for (let lo = 0; lo <= 220; lo += 11) {
-      for (let span = 0; span <= 140; span += 14) {
+    let accepted = 0;
+    for (let lo = 0; lo <= 240; lo += 8) {
+      for (let span = 0; span <= 200; span += 10) {
         const hi = Math.min(255, lo + span);
         const r = resolveHeaderOverlay(
           ON,
@@ -201,43 +179,22 @@ describe("resolveHeaderOverlay (V7c-2)", () => {
           ctx({ min: [lo, lo, lo], max: [hi, hi, hi] }),
         );
         if (!r || !("overlay" in r)) continue;
-        const a = r.overlay.scrim / 100;
-        const w = wash(r.overlay.fg);
-        const l0 = lum(lo * (1 - a) + w * a);
-        const l1 = lum(hi * (1 - a) + w * a);
-        const fgL = r.overlay.fg === "#ffffff" ? 1 : 0;
-        const worst =
-          fgL === 1 ? (fgL + 0.05) / (l1 + 0.05) : (l0 + 0.05) / (fgL + 0.05);
+        accepted++;
+        const white = r.overlay.fg === "#ffffff";
+        const worst = white ? 1.05 / (lum(hi) + 0.05) : (lum(lo) + 0.05) / 0.05;
         expect(worst).toBeGreaterThanOrEqual(4.5);
       }
     }
+    expect(accepted).toBeGreaterThan(50);
   });
 
-  it("the marker tokens enumerate tone and scrim", () => {
+  it("the marker tokens enumerate the tone", () => {
     expect(
-      overlayMarker({
-        sectionId: "hero",
-        tone: "light",
-        fg: "#ffffff",
-        scrim: 0,
-      }),
+      overlayMarker({ sectionId: "hero", tone: "light", fg: "#ffffff" }),
     ).toBe("on l");
     expect(
-      overlayMarker({
-        sectionId: "hero",
-        tone: "dark",
-        fg: "#000000",
-        scrim: 30,
-      }),
-    ).toBe("on d s3");
-    expect(
-      overlayMarker({
-        sectionId: "hero",
-        tone: "light",
-        fg: "#ffffff",
-        scrim: 40,
-      }),
-    ).toBe("on l s4");
+      overlayMarker({ sectionId: "hero", tone: "dark", fg: "#000000" }),
+    ).toBe("on d");
   });
 });
 

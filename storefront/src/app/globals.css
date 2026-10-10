@@ -598,20 +598,9 @@ input[type="search"]::-webkit-search-cancel-button {
 }
 [data-hd~="hmo"]:has([data-ho~="on"][data-ho~="l"]) > header {
   --ov-fg: #ffffff;
-  --ov-rgb: 0 0 0;
 }
 [data-hd~="hmo"]:has([data-ho~="on"][data-ho~="d"]) > header {
   --ov-fg: #000000;
-  --ov-rgb: 255 255 255;
-}
-[data-hd~="hmo"]:has([data-ho~="on"][data-ho~="s2"]) > header {
-  --ov-scrim: rgb(var(--ov-rgb) / 0.2);
-}
-[data-hd~="hmo"]:has([data-ho~="on"][data-ho~="s3"]) > header {
-  --ov-scrim: rgb(var(--ov-rgb) / 0.3);
-}
-[data-hd~="hmo"]:has([data-ho~="on"][data-ho~="s4"]) > header {
-  --ov-scrim: rgb(var(--ov-rgb) / 0.4);
 }
 /* solid state: the bands carry the surface the zero-height header cannot */
 [data-hd~="hmo"]:has([data-ho~="on"]) > header > [data-header-row] {
@@ -628,9 +617,9 @@ input[type="search"]::-webkit-search-cancel-button {
     transition: none;
   }
 }
-/* transparent state: text and icons in the proven colour, a constant-alpha scrim when the proof needed one */
+/* transparent state: text and icons in the proven colour, (no scrim: see header-overlay.ts) */
 [data-hd~="hmo"]:has([data-ho~="on"]) > header:not([data-header-solid]) > :is(div, nav) {
-  background-color: var(--ov-scrim, transparent);
+  background-color: transparent;
   border-color: transparent;
   color: var(--ov-fg);
   --store-foreground: var(--ov-fg);
