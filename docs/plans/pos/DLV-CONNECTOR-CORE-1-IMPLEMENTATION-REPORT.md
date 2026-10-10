@@ -239,15 +239,17 @@ Codex left five open findings on `3b40442` (2 P1, 3 P2). All five are fixed in t
 | P1 subscription status (follow-up on the fix commit) | After the tenant context is set, and again inside the locked transaction, `PlanGate::subscriptionActive()` must pass. An expired trial/subscription returns `403 subscription_inactive` and does not consume `event_id`. Same gate as `EnsureActiveSubscription` on the management and Hub routes. |
 | P2 numeric object keys (follow-up) | Object keys are ordered with `ksort(..., SORT_STRING)`. `"01"` and `"1"` are not treated as equal, so opposite insertion orders share one authoritative checksum. |
 | P2 decimal literals (follow-up) | Every JSON number token is canonicalized as its original literal, not as an IEEE float. `1.0000000000000001`, `1.0`, `1`, `1e2`, and `100` stay distinct. A float that still survives decoding rejects the envelope. |
-| P2 manual Hub numeric type (follow-up) | `plainValue()` returns a PHP integer, or a float when `json_encode(..., JSON_PRESERVE_ZERO_FRACTION)` reproduces the literal. A connector number `5000` adopts a manual numeric payload, `1.0` adopts a manual `1.0`, and both conflict with the same digits in a string. Lossy literals stay strings so they do not collapse. |
+| P2 manual Hub numeric type (follow-up) | `plainValue()` returns a PHP integer, or a float when `json_encode(..., JSON_PRESERVE_ZERO_FRACTION)` reproduces the literal. A connector number `5000` adopts a manual numeric payload, `1.0` adopts a manual `1.0`, and both conflict with the same digits in a string. |
+| P2 unrepresentable manual adoption (follow-up on `c5ca844`) | On the baseline-null path, a JSON number that is not a PHP integer or an exactly re-encoded float (`9223372036854775808`, `1.00`) is `payload_conflict`. It is not stringified into the Hub comparison and no authoritative checksum is stored. Representable numbers still adopt. |
 | P2 duplicate JSON members (follow-up) | Duplicate object keys, including escaped duplicates and nested objects, are rejected as `invalid_payload` before `json_decode()` keeps only the last value. |
 | P2 manual object shape (follow-up on `35541a3`) | When a Hub order has no connector baseline, an object that would become a PHP list (`{}`, `{"0":"a"}`, or a nested empty object) is `payload_conflict`. No authoritative checksum is stored. Objects and lists Hub can represent, including `{"keep":"yes"}` and `["a"]`, still adopt. |
 | P2 payload limit before HMAC (follow-up on `35541a3`) | `strlen($rawBody) > MAX_RAW_BYTES` (65536) returns `422 invalid_payload` before the account row is loaded and before `WebhookSignature::verify`. A body at the limit still reaches signature verification. |
-| P1 cross-branch order reuse (follow-up on `1465de0`) | An existing Hub order is used by another connector, or adopted from a manual order, only when its `branch_id` equals that connector's mapping. A different branch returns `422 branch_unavailable` before baseline adoption or `hub_action`, and the attempt is not attached to the other order. |
+| P1 cross-branch order reuse (follow-up on `1465de0`) | A manual order is adopted only when its `branch_id` equals the connector mapping. A different branch returns `422 branch_unavailable` before adoption or `hub_action`, and the attempt is not attached to that order. |
+| P1 baseline owned by another connector (follow-up on `c5ca844`) | A non-null authoritative baseline whose `delivery_connector_account_id` is not this connector is `422 branch_unavailable` even when both accounts share a branch. No `hub_action` runs, and the attempt is not attached and stores no checksum. The originating connector can still transition its own order, including after a manual route of an unrouted order. |
 | P2 deleted configurator (follow-up on `35541a3`) | Not implemented. See Decision Packet `DLV-CONNECTOR-OWNERSHIP-1`. |
 | P1 follow-up after routing (follow-up on `68342bc`) | If the authoritative baseline belongs to this connector, a later manual `route` does not make the next event `branch_unavailable`. `accept` still applies to the same Hub order. A different connector, and a manual order already on another branch, stay rejected. |
 
-The Hub row still stores a plain PHP array, so an empty object becomes an empty list in the Hub hash. Connector-to-connector comparison uses the authoritative checksum, which keeps `{}` and `[]` apart. Manual adoption no longer treats a collapsing object as that list: the event is `payload_conflict` and the Hub row is not given a connector baseline. Authoritative checksums keep every JSON number token as its original literal. Hub adoption uses a PHP integer, or a float when `json_encode` with `JSON_PRESERVE_ZERO_FRACTION` reproduces the literal; every other literal stays a string. Hub's own payload hash still uses default `json_encode`, so `1` and `1.0` compare equal there, the same as two manual orders. The connector checksum still distinguishes those tokens once a connector baseline exists.
+The Hub row still stores a plain PHP array, so an empty object becomes an empty list in the Hub hash. Connector-to-connector comparison uses the authoritative checksum, which keeps `{}` and `[]` apart. Manual adoption rejects a collapsing object and any JSON number that cannot be represented as a PHP integer or an exactly re-encoded float. Those attempts are `payload_conflict` and do not store an authoritative checksum. Hub's own payload hash still uses default `json_encode`, so `1` and `1.0` compare equal there, the same as two manual orders. The connector checksum still distinguishes those tokens once a connector baseline exists.
 
 ### Tests added
 
@@ -265,16 +267,18 @@ The Hub row still stores a plain PHP array, so an empty object becomes an empty 
 10. A body of `MAX_RAW_BYTES + 1` with a syntactically valid but wrong signature is `422 invalid_payload` and writes no attempt. A body of exactly `MAX_RAW_BYTES` with the same wrong signature is `401 invalid_signature`, proving the limit is applied before HMAC and the boundary still verifies.
 11. A second connector on another branch cannot cancel or adopt `provider_order_id` already stored on the first branch. The attempt has no Hub order id and no authoritative checksum. The original connector can still cancel its own order.
 12. A connector with no branch creates an `unrouted` order. After the manual `route` transition, the same connector's `accept` lands on that order and moves it to `accepted`. A connector mapped to another branch cannot cancel it. A manual order already on a branch is not adopted by the unscoped connector. One Hub row. No financial rows.
+13. Two connectors on the same branch: the second cannot cancel the first's order. The foreign attempt has no Hub order id and no authoritative checksum. The originating connector can still cancel. One Hub row.
+14. Manual string `"9223372036854775808"` and `"1.00"` are not adopted by the same unquoted connector numbers. Both are `payload_conflict` with no authoritative checksum. Manual integer `5000` is still adopted.
 
 ### Local execution
 
 SQLite, `php artisan test --filter=DeliveryConnectorCoreTest`:
 
-- 23 passed, 412 assertions (includes subscription expiry, canonical numbers and shapes, manual adoption, duplicate members, the payload-size gate, cross-branch rejection, and follow-up after routing)
+- 25 passed, 444 assertions (includes subscription expiry, canonical numbers and shapes, manual adoption, duplicate members, the payload-size gate, cross-branch and same-branch baseline rejection, follow-up after routing, and unrepresentable-number adoption)
 
 SQLite, related suites (`DeliveryHubProjectionTest`, `BranchIsolationGuardTest`, `WebhookSignatureTest`, `DeliveryPlatformApiTest`, `DeliveryFinancialRoleGateTest`, `DeliveryPlatformProfileDomainTest`):
 
-- 70 passed, 752 assertions, re-run after the route follow-up. Those suites do not touch connector ingestion.
+- 70 passed, 752 assertions, re-run after the same-branch baseline and unrepresentable-number fixes. Those suites do not touch connector ingestion.
 
 PostgreSQL was not started in this sandbox. `useradd` succeeded, but `chown`, `su`, `runuser`, and `setuid` are rejected, so `pg_ctl` cannot drop root. The CI `pgsql` job on this commit is the PostgreSQL proof. Do not treat it as passed until that job is green on the exact head.
 
@@ -288,7 +292,8 @@ PostgreSQL was not started in this sandbox. `useradd` succeeded, but `chown`, `s
 - Representable connector numbers stay integers or exact floats in the Hub comparison. Duplicate object members never reach `json_decode()`.
 - A collapsing object is refused only on the baseline-null adoption path. Connector-to-connector `{}` versus `[]` is still the authoritative checksum.
 - Oversized bodies return before the encrypted account is loaded.
-- A follow-up event is tied to the connector that wrote the authoritative baseline, not to the branch staying null. Another connector still cannot cross branches.
+- A follow-up event is tied to the connector that wrote the authoritative baseline, not to the branch staying null. Another connector cannot reuse that baseline, even on the same branch.
+- Manual adoption does not stringify an unrepresentable JSON number. The event conflicts and does not become the baseline.
 
 ### Reviewer review (fix pass)
 
@@ -300,6 +305,8 @@ PostgreSQL was not started in this sandbox. `useradd` succeeded, but `chown`, `s
 - The size check uses the raw byte length, not `Content-Length`. A body at 65536 bytes is still authenticated.
 - A connector mapped to branch B cannot attach an attempt, adopt, or apply `hub_action` to an order already stored on branch A. The same connector still can.
 - Routing an unrouted order does not burn the originating connector's next event id. The foreign connector still gets `branch_unavailable` and the order state does not move.
+- A second connector on the same branch cannot apply `cancel` to an order whose baseline belongs to the first connector. The originating connector still can.
+- An unrepresentable connector number does not adopt a manual string of the same digits. A representable integer still does.
 
 ### AWJ Guardian review (fix pass)
 
@@ -317,6 +324,8 @@ PostgreSQL was not started in this sandbox. `useradd` succeeded, but `chown`, `s
 | Oversized body hashed before the limit | Rejected before account load and HMAC. No attempt. |
 | Cross-branch reuse of a provider order | `branch_unavailable` before adoption or `hub_action`. The other order is not linked or moved. |
 | Follow-up after a manual route of this connector's unrouted order | Same Hub order moves to `accepted`. A foreign connector still cannot cancel it. |
+| Same-branch connector reuses another connector's baseline | `branch_unavailable`. Order state unchanged. No attached attempt checksum. |
+| Manual string adopted from an unrepresentable number | `payload_conflict`. No authoritative checksum. |
 | Financial or inventory side effect | Counts unchanged in the new tests. |
 | Provider enablement or DG-3 evidence | Not introduced. |
 | Deleted configurator permanently blocks the mapping | Open. Decision Packet below. Not fixed in this diff. |

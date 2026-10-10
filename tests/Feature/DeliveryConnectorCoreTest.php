@@ -835,6 +835,85 @@ class DeliveryConnectorCoreTest extends TestCase
         $this->assertSame($before, $this->financialCounts());
     }
 
+    /** @test */
+    public function another_connector_on_the_same_branch_cannot_use_the_originating_baseline(): void
+    {
+        [$auth, $branch, $profile] = $this->tenantWithPlatform('xsame');
+        $first = $this->connector($auth['token'], $profile, 'store-same-a', $branch);
+        $second = $this->connector($auth['token'], $profile, 'store-same-b', $branch);
+        $before = $this->financialCounts();
+
+        $created = $this->postEvent($first['data']['id'], $this->event('P-same', ['sku' => 'a']), $first['secret'])->assertCreated();
+        $orderId = $created['data']['delivery_hub_order_id'];
+        $this->postEvent($second['data']['id'], $this->event('P-same', ['sku' => 'a'], 'cancel'), $second['secret'])
+            ->assertStatus(422)
+            ->assertJsonPath('error_code', 'branch_unavailable');
+
+        $order = DeliveryHubOrder::withoutGlobalScopes()->findOrFail($orderId);
+        $this->assertSame(DeliveryHubOrder::RECEIVED, $order->state);
+        $foreign = DeliveryConnectorAttempt::withoutGlobalScopes()
+            ->where('delivery_connector_account_id', $second['data']['id'])
+            ->firstOrFail();
+        $this->assertNull($foreign->delivery_hub_order_id);
+        $this->assertNull($foreign->authoritative_checksum);
+
+        $this->postEvent($first['data']['id'], $this->event('P-same', ['sku' => 'a'], 'cancel'), $first['secret'])->assertCreated();
+        $this->assertSame(DeliveryHubOrder::CANCELLED, DeliveryHubOrder::withoutGlobalScopes()->findOrFail($orderId)->state);
+        $this->assertSame(1, DeliveryHubOrder::withoutGlobalScopes()->where('provider_order_id', 'P-same')->count());
+        $this->assertSame($before, $this->financialCounts());
+    }
+
+    /** @test */
+    public function manual_adoption_rejects_numbers_that_would_become_strings(): void
+    {
+        [$auth, $branch, $profile] = $this->tenantWithPlatform('lossy-adopt');
+        $account = $this->connector($auth['token'], $profile, 'store-lossy-adopt', $branch);
+        $before = $this->financialCounts();
+        $id = $account['data']['id'];
+        $secret = $account['secret'];
+
+        $this->withToken($auth['token'])->postJson('/api/delivery-hub/orders', [
+            'delivery_platform_profile_id' => $profile,
+            'provider_order_id' => 'P-big-str',
+            'branch_id' => $branch,
+            'intake_payload' => ['n' => '9223372036854775808'],
+        ])->assertCreated();
+        $this->postRaw($id, '{"event_id":"'.Str::uuid().'","provider_order_id":"P-big-str","intake_payload":{"n":9223372036854775808}}', $secret)
+            ->assertStatus(409)
+            ->assertJsonPath('error_code', 'payload_conflict');
+
+        $this->withToken($auth['token'])->postJson('/api/delivery-hub/orders', [
+            'delivery_platform_profile_id' => $profile,
+            'provider_order_id' => 'P-trail',
+            'branch_id' => $branch,
+            'intake_payload' => ['n' => '1.00'],
+        ])->assertCreated();
+        $this->postRaw($id, '{"event_id":"'.Str::uuid().'","provider_order_id":"P-trail","intake_payload":{"n":1.00}}', $secret)
+            ->assertStatus(409)
+            ->assertJsonPath('error_code', 'payload_conflict');
+
+        $kept = $this->withToken($auth['token'])->postJson('/api/delivery-hub/orders', [
+            'delivery_platform_profile_id' => $profile,
+            'provider_order_id' => 'P-exact',
+            'branch_id' => $branch,
+            'intake_payload' => ['n' => 5000],
+        ])->assertCreated();
+        $adopted = $this->postEvent($id, [
+            'event_id' => (string) Str::uuid(),
+            'provider_order_id' => 'P-exact',
+            'intake_payload' => ['n' => 5000],
+        ], $secret)->assertCreated();
+        $this->assertSame($kept['data']['id'], $adopted['data']['delivery_hub_order_id']);
+
+        $this->assertSame(1, DeliveryHubOrder::withoutGlobalScopes()->where('provider_order_id', 'P-big-str')->count());
+        $this->assertSame(1, DeliveryHubOrder::withoutGlobalScopes()->where('provider_order_id', 'P-trail')->count());
+        $this->assertSame(0, DeliveryConnectorAttempt::withoutGlobalScopes()
+            ->whereIn('provider_order_id', ['P-big-str', 'P-trail'])
+            ->whereNotNull('authoritative_checksum')
+            ->count());
+        $this->assertSame($before, $this->financialCounts());
+    }
+
     /** @return array<string, string> */
     private function jsonHeaders(string $token): array
     {

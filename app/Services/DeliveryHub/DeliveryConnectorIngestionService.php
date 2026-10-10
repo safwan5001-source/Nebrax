@@ -205,11 +205,12 @@ class DeliveryConnectorIngestionService
 
                 $orderBranch = $existing->branch_id === null ? null : (string) $existing->branch_id;
                 $mappedBranch = $account->branch_id === null ? null : (string) $account->branch_id;
+                // خط أساس لربط آخر لا يُستخدم حتى لو تطابق الفرع.
                 // التوجيه اليدوي لطلب أنشأه هذا الربط لا يقطعه عن أحداثه التالية.
-                // طلب فرع آخر، أو طلب يدوي بلا خط أساس لهذا الربط، يُرفض.
-                $originatedHere = $baseline !== null
-                    && (string) $baseline->delivery_connector_account_id === (string) $account->id;
-                if (! $originatedHere && $orderBranch !== $mappedBranch) {
+                // طلب يدوي على فرع آخر يُرفض قبل التبنّي.
+                $ownedByOther = $baseline !== null
+                    && (string) $baseline->delivery_connector_account_id !== (string) $account->id;
+                if ($ownedByOther || ($baseline === null && $orderBranch !== $mappedBranch)) {
                     return $this->persist($account, $envelope, $rawChecksum, null, null, 'branch_unavailable', 422, 'branch_unavailable');
                 }
 
@@ -218,7 +219,7 @@ class DeliveryConnectorIngestionService
                 }
 
                 if ($baseline === null) {
-                    if ($this->hubShapeCollapses($envelope['intake_payload'])) {
+                    if ($this->hubShapeCollapses($envelope['intake_payload']) || $this->containsUnrepresentableNumber($envelope['intake_payload'])) {
                         return $this->persist($account, $envelope, $rawChecksum, $existing->id, null, 'payload_conflict', 409, 'payload_conflict');
                     }
                     try {
@@ -574,20 +575,7 @@ class DeliveryConnectorIngestionService
     private function plainValue(mixed $value): mixed
     {
         if ($value instanceof DeliveryConnectorJsonNumber) {
-            $integer = $this->platformInteger($value->literal);
-            if ($integer !== null) {
-                return $integer;
-            }
-            try {
-                $decoded = json_decode($value->literal, false, 1, JSON_THROW_ON_ERROR);
-            } catch (\JsonException) {
-                return $value->literal;
-            }
-            if (is_float($decoded) && is_finite($decoded) && json_encode($decoded, JSON_PRESERVE_ZERO_FRACTION | JSON_THROW_ON_ERROR) === $value->literal) {
-                return $decoded;
-            }
-
-            return $value->literal;
+            return $this->representableNumber($value) ?? $value->literal;
         }
         if ($value instanceof \stdClass) {
             $object = [];
@@ -630,6 +618,50 @@ class DeliveryConnectorIngestionService
         }
 
         return false;
+    }
+
+    /**
+     * رقم لا يُعاد كعدد PHP يُرفض عند تبنّي طلب يدوي بدل تحويله إلى نص يطابق النص اليدوي.
+     */
+    private function containsUnrepresentableNumber(mixed $value): bool
+    {
+        if ($value instanceof DeliveryConnectorJsonNumber) {
+            return $this->representableNumber($value) === null;
+        }
+        if ($value instanceof \stdClass) {
+            foreach (get_object_vars($value) as $item) {
+                if ($this->containsUnrepresentableNumber($item)) {
+                    return true;
+                }
+            }
+        }
+        if (is_array($value)) {
+            foreach ($value as $item) {
+                if ($this->containsUnrepresentableNumber($item)) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private function representableNumber(DeliveryConnectorJsonNumber $value): int|float|null
+    {
+        $integer = $this->platformInteger($value->literal);
+        if ($integer !== null) {
+            return $integer;
+        }
+        try {
+            $decoded = json_decode($value->literal, false, 1, JSON_THROW_ON_ERROR);
+        } catch (\JsonException) {
+            return null;
+        }
+        if (is_float($decoded) && is_finite($decoded) && json_encode($decoded, JSON_PRESERVE_ZERO_FRACTION | JSON_THROW_ON_ERROR) === $value->literal) {
+            return $decoded;
+        }
+
+        return null;
     }
 
     /** @return array{timestamp: int, signature: string}|null */
