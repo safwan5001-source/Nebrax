@@ -83,9 +83,18 @@ class ReturnVatDiscrepancyReportTest extends TestCase
         );
         app(ReturnService::class)->post($ret);
 
+        // مرتجعٌ صحيح لاحق على الفاتورة التاريخية نفسها: يقيّده المرحَّل الزائد
+        // قبله (8500/1275)، فلا يجوز أن يُبلَّغ هو الآخر فرقاً.
+        $later = app(ReturnService::class)->create(
+            ['type' => 'sales', 'partner_id' => $customer->id, 'payment_type' => 'credit', 'original_id' => $invoice->id, 'return_date' => '2026-02-01'],
+            [['product_id' => $product->id, 'source_line_id' => $line->id, 'quantity' => 1, 'unit_price' => 11500]]
+        );
+        $later = app(ReturnService::class)->post($later);
+        $this->assertSame([8500, 1275], [(int) $later->subtotal, (int) $later->tax_amount]);
+
         $rows = app(ReturnVatDiscrepancyReport::class)->forCurrentTenant();
 
-        $this->assertCount(1, $rows);
+        $this->assertCount(1, $rows, 'المرتجع التاريخي وحده — لا اللاحق المقيَّد به.');
         $this->assertSame('SRET-HIST-1', $rows[0]['return_number']);
         $this->assertSame(1725, $rows[0]['recorded_tax']);
         $this->assertSame(1500, $rows[0]['expected_tax']);

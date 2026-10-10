@@ -18,7 +18,7 @@ use App\Tenancy\BranchScope;
  *
  *  المنهج: لكل مصدر، تُعاد قراءة مرتجعاته المرحَّلة بترتيب التاريخ ثم الإنشاء
  *  (ترتيب الترحيل الفعلي غير مخزَّن، فهذا تقريب) ويُحتسب لكلٍّ ما كانت القاعدة
- *  ستنتجه، ثم يُقارن بالمرحَّل. لا كتابة ولا قيد ولا تعديل لأي سجل.
+ *  ستنتجه بالنظر إلى **المرحَّل فعلاً** قبله (كالمحرك وقت ترحيله)، ثم يُقارن بالمرحَّل. لا كتابة ولا قيد ولا تعديل لأي سجل.
  *
  *  مستثنى: مرتجعات POS (لم يغيّرها الإصلاح) والمرتجعات الحرّة (لا مصدر لها).
  *  النطاق: المستأجر الحالي في `TenantContext`، عبر كل فروعه — فالسقف تراكمي
@@ -80,11 +80,14 @@ class ReturnVatDiscrepancyReport
                         (int) $line->unit_price
                     );
 
+                    // ما رُحِّل فعلاً هو ما استهلك السقف للمرتجع التالي — لا ما كانت
+                    // القاعدة ستنتجه: مرتجعٌ تاريخي زائد يقيّد لاحقه الصحيح، فلا يُبلَّغ
+                    // اللاحقُ فرقاً كاذباً.
                     $prior = $running[$lineId] ?? ['quantity' => 0, 'net' => 0, 'tax' => 0];
                     $running[$lineId] = [
                         'quantity' => $prior['quantity'] + (int) $line->quantity,
-                        'net'      => $prior['net'] + $alloc['net'],
-                        'tax'      => $prior['tax'] + $alloc['tax'],
+                        'net'      => $prior['net'] + (int) $line->line_subtotal - (int) $line->line_discount,
+                        'tax'      => $prior['tax'] + (int) $line->line_tax,
                     ];
                     $expectedNet += $alloc['net'];
                     $expectedTax += $alloc['tax'];
