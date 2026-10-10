@@ -126,19 +126,27 @@ before any imported financial transition. PASS-8 freezes the evidence contract,
 version vocabulary, posting-prerequisite matrix, and accounting-
 representability boundary; it does not implement those prerequisites.
 
-`DLV-CLOSE-1` is implemented on its focused PR and awaits the ordinary review/
-merge gates. It remains bounded to POS close/Z-report presentation and
-channel-total separation, using existing manual-POS session attribution only; it
-does not require imported-order VAT recognition. `DLV-COMMISSION-1`,
-`DLV-SETTLEMENT-1`, `DLV-RECON-1`, `DLV-REFUND-1`, `DLV-CONNECTOR-CORE-1`, and
-all imported financial-transition work remain blocked by their respective
-evidence, provider, DG-3, or owner gates. Manual POS remains independent and
-unchanged.
+`DLV-CLOSE-1` is merged (PR #1236, merge SHA
+`afe223cb654154fa55234ff2e360233bbc933ec3`). It remains bounded to POS
+close/Z-report presentation and channel-total separation, using existing
+manual-POS session attribution only. It does not require imported-order VAT
+recognition.
 
-After `DLV-CLOSE-1` merges, no further delivery financial implementation task is
-promoted as ready. `DLV-CONNECTOR-CORE-1` is only a candidate for a separately
-authorized projection/intake-security scope; it is not authorization for
-imported-order financial behavior.
+`DLV-CONNECTOR-CORE-1` is implemented on its focused PR as an operational
+ingestion and security foundation only. It is not merged by this horizon
+update. It reuses the Delivery Hub projection, the existing encrypted-cast
+secret pattern, and `WebhookSignature` HMAC verification. It does not enable a
+provider, does not implement provider-specific authentication, and does not
+implement the PASS-8 financial/tax evidence contract. `DLV-COMMISSION-1`,
+`DLV-SETTLEMENT-1`, `DLV-RECON-1`, `DLV-REFUND-1`, and all imported
+financial-transition work remain blocked by their respective evidence,
+provider, DG-3, or owner gates. Manual POS remains independent and unchanged.
+
+No further delivery financial implementation task is promoted as ready.
+`DLV-CONNECTOR-CORE-1` does not authorize imported-order financial behavior.
+After it merges, the next candidate is an evidence-only
+`DLV-PROVIDER-READINESS-1` packet. Native connectors stay blocked until an
+official contract and test path exist.
 
 ## 6. Task acceptance highlights
 
@@ -198,14 +206,14 @@ imported-order financial behavior.
 - retries cannot duplicate financial or stock effects.
 
 ### DLV-CONNECTOR-CORE-1
-- secrets encrypted and server-side;
-- provider-specific webhook authentication;
-- trusted tenant/store/branch mapping before tenant-owned lookup;
-- replay protection + idempotency;
-- safe retry/dead-letter/manual recovery;
-- no PII/token leakage in diagnostics;
-- duplicate/out-of-order event tests;
-- foreign tenant/store/vendor IDs fail closed.
+- operational ingestion only; no invoice, payment, journal, VAT, clearing, COGS, stock, settlement, or commission;
+- secrets encrypted with the existing server-side `encrypted` cast and never returned after create/rotate;
+- provider-neutral AWJ HMAC verification (`WebhookSignature`); no provider authentication scheme is claimed;
+- trusted account → tenant/profile/branch mapping before any tenant-owned lookup;
+- replay protection, idempotency, and conflict on authoritative payload mismatch;
+- permanent Hub identity `tenant + profile + provider_order_id`;
+- out-of-order Hub actions do not regress state;
+- no provider is enabled and no Connected/Live/Synced status exists.
 
 ### Native provider tasks
 Each connector needs an evidence appendix frozen at implementation time:

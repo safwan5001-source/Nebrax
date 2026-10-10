@@ -64,6 +64,11 @@ class Rbac
         // صندوق التوصيل التشغيلي (OD-DG-9-HUB): owner/admin عبر `*` فقط.
         // لا يُمنح للمحاسب ولا للموظف ولا للخدمة الذاتية. ليس صلاحية ترحيل.
         'delivery_hub.view', 'delivery_hub.operate',
+        // DLV-CONNECTOR-CORE-1: إدارة ربط الإدخال التشغيلي. ليست صلاحية ترحيل
+        // ولا تُفعّل مزوّداً. owner/admin عبر `*` فقط.
+        // DLV-CONNECTOR-OWNERSHIP-1: إعادة الإسناد مستقلة عن العرض والإدارة.
+        // لا تُمنح للمحاسب ولا للموظف ولا للخدمة الذاتية.
+        'delivery_connector.view', 'delivery_connector.manage', 'delivery_connector.reassign',
         'payments.view', 'payments.manage',
         'purchases.view', 'purchases.manage',
         'returns.view', 'returns.manage',
