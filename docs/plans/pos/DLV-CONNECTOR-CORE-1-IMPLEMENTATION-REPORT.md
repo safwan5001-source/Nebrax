@@ -46,6 +46,8 @@ Missing account id and invalid signature return the same `invalid_signature` res
 
 The store mapping is globally unique on `(platform_key, external_store_id)`. A second tenant cannot claim a store id already mapped for that platform key (`mapping_ambiguous`). The mapping columns are immutable after create. Disable does not release the store id.
 
+A duplicate insert is rejected inside a savepoint. On PostgreSQL a unique violation aborts the surrounding transaction unless it is rolled back to that savepoint. `RefreshDatabase` wraps each test in one transaction, so the rejection must not poison the next request.
+
 ## Branch routing
 
 Destination branch is the branch stored on the account, or null for the accepted unrouted state. It is not taken from the payload, the clock, the cashier, or an open POS session.

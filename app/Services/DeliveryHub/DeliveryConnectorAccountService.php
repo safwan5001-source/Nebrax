@@ -8,6 +8,7 @@ use App\Models\DeliveryPlatformProfile;
 use App\Models\User;
 use App\Tenancy\TenantContext;
 use Illuminate\Database\UniqueConstraintViolationException;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 /**
@@ -31,18 +32,24 @@ class DeliveryConnectorAccountService
         [$secret, $prefix] = $this->generateSecret();
 
         try {
-            $account = new DeliveryConnectorAccount();
-            $account->forceFill([
-                'delivery_platform_profile_id' => $profile->id,
-                'platform_key' => $profile->platform_key,
-                'external_store_id' => $storeId,
-                'branch_id' => $branchId,
-                'configured_by' => $actor->id,
-                'secret' => $secret,
-                'secret_prefix' => $prefix,
-                'secret_version' => 1,
-                'status' => DeliveryConnectorAccount::STATUS_CONFIGURED,
-            ])->save();
+            // نقطة حفظ: انتهاك الفريد في PostgreSQL يُجهض المعاملة كلها إن لم يُرجع
+            // إلى نقطة الحفظ. اختبارات RefreshDatabase وطلبات لاحقة تعتمد على ذلك.
+            $account = DB::transaction(function () use ($profile, $storeId, $branchId, $actor, $secret, $prefix) {
+                $account = new DeliveryConnectorAccount();
+                $account->forceFill([
+                    'delivery_platform_profile_id' => $profile->id,
+                    'platform_key' => $profile->platform_key,
+                    'external_store_id' => $storeId,
+                    'branch_id' => $branchId,
+                    'configured_by' => $actor->id,
+                    'secret' => $secret,
+                    'secret_prefix' => $prefix,
+                    'secret_version' => 1,
+                    'status' => DeliveryConnectorAccount::STATUS_CONFIGURED,
+                ])->save();
+
+                return $account;
+            });
         } catch (UniqueConstraintViolationException) {
             throw new DeliveryConnectorException(
                 'mapping_ambiguous',
