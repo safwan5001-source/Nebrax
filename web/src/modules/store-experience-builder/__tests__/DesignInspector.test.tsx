@@ -382,3 +382,92 @@ describe("design messages (CUST-HV V5d)", () => {
     expect(keys(CUSTOMIZER_MESSAGES.en).length).toBeGreaterThan(50);
   });
 });
+
+describe("hero / banner placement grid and height (CUST-HV V6c-3)", () => {
+  const cell = (row: string, col: string) =>
+    document.querySelector(`[data-placement-cell="${row}-${col}"]`) as HTMLButtonElement;
+
+  it("offers the 3×3 grid for hero and banner, and the old three-way control for other types", () => {
+    const { unmount } = render(<Harness type="hero" />);
+    expect(document.querySelectorAll("[data-placement-cell]")).toHaveLength(9);
+    unmount();
+    render(<Harness type="benefits" />);
+    expect(document.querySelectorAll("[data-placement-cell]")).toHaveLength(0);
+    expect(screen.getByText("Content position")).toBeTruthy();
+  });
+
+  it("a cell writes BOTH halves in one commit: align (inline) and valign (block); the pressed cell is exposed", () => {
+    render(<Harness type="banner" />);
+    fireEvent.click(cell("end", "start"));
+    expect(out()).toEqual({ align: "start", valign: "end" });
+    expect(cell("end", "start").getAttribute("aria-pressed")).toBe("true");
+    expect(cell("start", "start").getAttribute("aria-pressed")).toBe("false");
+    fireEvent.click(cell("center", "center"));
+    expect(out()).toEqual({ align: "center", valign: "center" });
+  });
+
+  it("the grid is a labelled group, not inside a <label>: clicking the caption or hint selects nothing", () => {
+    render(<Harness type="hero" />);
+    const group = screen.getByRole("group", { name: "Content position" });
+    expect(group.tagName).toBe("FIELDSET");
+    expect(cell("start", "start").closest("label")).toBeNull();
+    // a click on the caption / hint must not be forwarded to the first cell
+    fireEvent.click(screen.getByText("Content position"));
+    fireEvent.click(group.querySelector("p") as HTMLElement);
+    expect(out()).toBeNull();
+    expect(document.querySelectorAll('[data-placement-cell][aria-pressed="true"]')).toHaveLength(0);
+  });
+
+  it("every cell has an accessible name that says where it is", () => {
+    render(<Harness type="hero" />);
+    expect(cell("start", "start").getAttribute("aria-label")).toBe("top Start");
+    expect(cell("center", "center").getAttribute("aria-label")).toBe("middle Centre");
+    expect(cell("end", "end").getAttribute("aria-label")).toBe("bottom End");
+  });
+
+  it("Automatic clears both halves and is disabled while nothing is chosen", () => {
+    render(<Harness type="hero" initial={{ align: "end", valign: "start", radius: "lg" }} />);
+    const reset = document.querySelector("[data-placement-reset]") as HTMLButtonElement;
+    expect(reset.disabled).toBe(false);
+    fireEvent.click(reset);
+    expect(out()).toEqual({ radius: "lg" });
+    expect(reset.disabled).toBe(true);
+    expect(document.querySelectorAll('[data-placement-cell][aria-pressed="true"]')).toHaveLength(0);
+  });
+
+  it("an existing align alone (no valign) shows no pressed cell and keeps its value until a cell is chosen", () => {
+    render(<Harness type="banner" initial={{ align: "center" }} />);
+    expect(document.querySelectorAll('[data-placement-cell][aria-pressed="true"]')).toHaveLength(0);
+    expect(out()).toEqual({ align: "center" });
+  });
+
+  it("height presets are named steps in a select; Default removes the group; hero and banner only", () => {
+    const { unmount } = render(<Harness type="hero" />);
+    const height = () => screen.getByLabelText("Section height") as HTMLSelectElement;
+    expect([...height().options].map((o) => o.value)).toEqual(["", "compact", "standard", "tall", "screen"]);
+    fireEvent.change(height(), { target: { value: "tall" } });
+    expect(out()).toEqual({ mediaTreatment: { height: "tall" } });
+    fireEvent.change(height(), { target: { value: "screen" } });
+    expect(out()).toEqual({ mediaTreatment: { height: "screen" } });
+    fireEvent.change(height(), { target: { value: "" } });
+    expect(out()).toBeNull();
+    unmount();
+    render(<Harness type="categories" />);
+    expect(screen.queryByText("Section height")).toBeNull();
+  });
+
+  it("has AR and EN copy for every new key", () => {
+    for (const key of [
+      "designPlacementHint",
+      "designHeight",
+      "designHeightCompact",
+      "designHeightStandard",
+      "designHeightTall",
+      "designHeightScreen",
+      "designHeightHint",
+    ] as const) {
+      expect(CUSTOMIZER_MESSAGES.ar[key]).toBeTruthy();
+      expect(CUSTOMIZER_MESSAGES.en[key]).toBeTruthy();
+    }
+  });
+});

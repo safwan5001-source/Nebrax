@@ -53,6 +53,9 @@ final class StorefrontSectionDesignNormalizer
     /** V5e-3 — كشف لمرّة واحدة (V0 §6.6): `fade-up` فقط، اختياري لكل قسم. */
     public const REVEALS = ['none', 'fade-up'];
 
+    /** V6c-3 (V0 §8.3) — ارتفاع القسم المُعدّ مسبقاً للبطل واللافتة (حدّ أدنى فقط؛ المحتوى لا يُقصّ أبداً). */
+    public const HEIGHT_PRESETS = ['compact', 'standard', 'tall', 'screen'];
+
     /** V6b-2 — أنواع الخلفية المتاحة لكل الأقسام؛ `media` للبطل واللافتة وحدهما. */
     public const BACKGROUND_KINDS = ['solid', 'gradient'];
 
@@ -71,9 +74,25 @@ final class StorefrontSectionDesignNormalizer
     public static function capabilities(): array
     {
         // V5e-3 — `separator` لكل الأنواع القابلة للتصميم؛ `motion.reveal` للبطل واللافتة فقط (V0 §3.4).
-        $rich = ['background' => self::BACKGROUND_KINDS, 'text' => self::FULL_TEXT, 'typography' => self::FULL_TYPO, 'width' => true, 'spacing' => true, 'align' => true, 'border' => true, 'radius' => true, 'shadow' => true, 'separator' => true];
+        // V6c-3 (V0 §8.3) — موضع المحتوى الرأسي (`valign`، نصف شبكة 3×3 التي نصفها الأفقي `align`) وارتفاع القسم
+        // (`mediaTreatment.height`) للبطل واللافتة وحدهما. الترتيب القانوني: … align، valign، border … separator، mediaTreatment، motion.
         // V6b-2 — خلفية الوسائط للبطل واللافتة وحدهما (V0 §8.1)؛ كل نوعٍ آخر `solid|gradient` فقط.
-        $hero = ['background' => [...self::BACKGROUND_KINDS, 'media']] + $rich + ['motion' => ['reveal']];
+        $hero = [
+            'background' => [...self::BACKGROUND_KINDS, 'media'],
+            'text' => self::FULL_TEXT,
+            'typography' => self::FULL_TYPO,
+            'width' => true,
+            'spacing' => true,
+            'align' => true,
+            'valign' => true,
+            'border' => true,
+            'radius' => true,
+            'shadow' => true,
+            // V5e-3 — `separator` لكل الأنواع القابلة للتصميم؛ `motion.reveal` للبطل واللافتة فقط (V0 §3.4).
+            'separator' => true,
+            'mediaTreatment' => ['height'],
+            'motion' => ['reveal'],
+        ];
         $shelf = ['background' => self::BACKGROUND_KINDS, 'text' => ['heading'], 'typography' => ['headingStyle'], 'width' => true, 'spacing' => true, 'separator' => true];
 
         return [
@@ -140,6 +159,12 @@ final class StorefrontSectionDesignNormalizer
                 $out['align'] = $align;
             }
         }
+        if (isset($capability['valign'])) {
+            $valign = self::pick($raw['valign'] ?? null, self::ALIGNS);
+            if ($valign !== null) {
+                $out['valign'] = $valign;
+            }
+        }
         if (isset($capability['border'])) {
             $border = self::border($raw['border'] ?? null);
             if ($border !== null) {
@@ -162,6 +187,13 @@ final class StorefrontSectionDesignNormalizer
             $separator = self::separator($raw['separator'] ?? null);
             if ($separator !== null) {
                 $out['separator'] = $separator;
+            }
+        }
+        if (isset($capability['mediaTreatment']) && self::isObject($raw['mediaTreatment'] ?? null)
+            && self::allows($capability['mediaTreatment'], 'height')) {
+            $height = self::pick($raw['mediaTreatment']['height'] ?? null, self::HEIGHT_PRESETS);
+            if ($height !== null) {
+                $out['mediaTreatment'] = ['height' => $height];
             }
         }
         if (isset($capability['motion'])) {

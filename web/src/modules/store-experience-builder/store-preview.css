@@ -169,6 +169,24 @@
 .awj-store-preview [data-sd~="balign"][data-sd] > [data-section-block] {
   max-inline-size: 100%;
 }
+/* V6c-3 (V0 §8.3) — hero / banner height preset and the block-axis half of the 3×3 content position.
+   The preset is a MINIMUM (content is never clipped) and replaces the section's own default minimum.
+   The section root becomes a column flex box so the marked content box can sit at the top, middle or
+   bottom (`start` / `center` / `end` on the block axis); with a height but no explicit position the
+   content stays where the section always put it — vertically centred for a hero, at the top for a
+   banner. The picture and overlay layers are absolutely positioned and take no part in the flow. */
+.awj-store-preview [data-sd~="hgt"][data-sd] > * {
+  min-block-size: var(--sec-minh);
+}
+.awj-store-preview :is([data-sd~="hgt"], [data-sd~="valign"])[data-sd] > * {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: var(--sec-vj, center);
+}
+.awj-store-preview [data-design-type="banner"]:is([data-sd~="hgt"], [data-sd~="valign"]) > * {
+  justify-content: var(--sec-vj, flex-start);
+}
 .awj-store-preview [data-sd~="max"] {
   max-inline-size: var(--sec-max);
   margin-inline: auto;

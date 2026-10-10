@@ -292,6 +292,15 @@ export const CUSTOMIZER_MESSAGES = {
     designTextNeedsBackground: "تُطبَّق ألوان النص بعد أن تضيف خلفية لهذا القسم.",
     designAlign: "محاذاة النص",
     designBlockAlign: "موضع المحتوى",
+    designPlacementHint:
+      "اختر موضع المحتوى داخل القسم: الأفقي يتبع اتجاه القراءة، والرأسي يظهر حين يكون القسم أطول من محتواه (اختر ارتفاعاً).",
+    designHeight: "ارتفاع القسم",
+    designHeightCompact: "مضغوط",
+    designHeightStandard: "قياسي",
+    designHeightTall: "طويل",
+    designHeightScreen: "بطول الشاشة",
+    designHeightHint:
+      "حدّ أدنى للارتفاع: لا يُقصّ المحتوى أبداً، ولا يتجاوز «بطول الشاشة» ٥٦ rem. بلا اختيار يبقى ارتفاع القسم كما كان.",
     designAlignStart: "البداية",
     designAlignCenter: "الوسط",
     designAlignEnd: "النهاية",
@@ -1349,6 +1358,15 @@ export const CUSTOMIZER_MESSAGES = {
     designTextNeedsBackground: "Text colours apply once this section has a background.",
     designAlign: "Text alignment",
     designBlockAlign: "Content position",
+    designPlacementHint:
+      "Pick where the content sits in the section: the horizontal position follows the reading direction; the vertical position shows once the section is taller than its content (choose a height).",
+    designHeight: "Section height",
+    designHeightCompact: "Compact",
+    designHeightStandard: "Standard",
+    designHeightTall: "Tall",
+    designHeightScreen: "Screen height",
+    designHeightHint:
+      "A minimum height: content is never clipped, and “Screen height” never exceeds 56 rem. With no choice the section keeps its height as before.",
     designAlignStart: "Start",
     designAlignCenter: "Centre",
     designAlignEnd: "End",
