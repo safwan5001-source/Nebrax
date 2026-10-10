@@ -1,7 +1,10 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { destination } from "@/lib/home/destination";
-import type { BannerContent } from "@/lib/presentation/section-content";
+import {
+  type BannerContent,
+  bannerCtasOf,
+} from "@/lib/presentation/section-content";
 
 export function BannerBand({
   content,
@@ -18,8 +21,22 @@ export function BannerBand({
   /** CUST-HV V6b-3 — the picture layer of a media background; absent ⇒ unchanged output. */
   backdrop?: ReactNode;
 }) {
-  const href = destination(basePath, content.ctaHref);
-  const showCta = Boolean(href && content.ctaLabel);
+  // CUST-HV V6c-2 — `ctas` when authored, else the legacy pair (= ctas[0]). Only a complete button renders;
+  // an incomplete draft (label without link, or the reverse) is skipped and never borrows another's link.
+  const ctas = bannerCtasOf(content)
+    .map((cta) => ({
+      label: cta.label.trim(),
+      href: destination(basePath, cta.href),
+    }))
+    .filter(
+      (cta): cta is { label: string; href: string } =>
+        cta.label !== "" && cta.href !== null,
+    );
+  const headingFallback =
+    content.subtitle ||
+    bannerCtasOf(content)
+      .map((cta) => cta.label.trim())
+      .find((label) => label !== "");
   return (
     <section
       aria-labelledby={headingId}
@@ -50,7 +67,7 @@ export function BannerBand({
             </h2>
           ) : (
             <h2 id={headingId} className="sr-only">
-              {content.subtitle || content.ctaLabel}
+              {headingFallback}
             </h2>
           )}
           {content.subtitle ? (
@@ -58,25 +75,60 @@ export function BannerBand({
               {content.subtitle}
             </p>
           ) : null}
-          {showCta && href ? (
-            href.startsWith("https://") ? (
-              <a
-                href={href}
-                className="mt-4 inline-flex h-10 items-center rounded-store bg-store-primary px-4 text-sm font-bold text-store-primary-foreground"
-              >
-                {content.ctaLabel}
-              </a>
-            ) : (
-              <Link
-                href={href}
-                className="mt-4 inline-flex h-10 items-center rounded-store bg-store-primary px-4 text-sm font-bold text-store-primary-foreground"
-              >
-                {content.ctaLabel}
-              </Link>
-            )
+          {ctas.length === 1 ? (
+            <BannerCtaLink
+              cta={ctas[0]}
+              className="mt-4 inline-flex h-10 max-w-full items-center rounded-store bg-store-primary px-4 text-sm font-bold text-store-primary-foreground"
+            />
+          ) : ctas.length > 1 ? (
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              {ctas.map((cta, index) => (
+                <BannerCtaLink
+                  key={`${index}-${cta.href}`}
+                  cta={cta}
+                  secondary={index > 0}
+                  // The second button is an outline in the heading colour (not the brand colour), so it is
+                  // legible on the section surface for exactly the reason the title is.
+                  className={
+                    index === 0
+                      ? "inline-flex h-10 max-w-full items-center rounded-store bg-store-primary px-4 text-sm font-bold text-store-primary-foreground"
+                      : "inline-flex h-10 max-w-full items-center rounded-store border-2 border-store-foreground/60 px-4 text-sm font-bold text-store-foreground"
+                  }
+                />
+              ))}
+            </div>
           ) : null}
         </div>
       </div>
     </section>
+  );
+}
+
+// The second button is the shared Button's outline variant as far as the global button tokens are concerned
+// (size step, corner, weight and case follow the store's setting like every other button; its fill and colour
+// stay its own). The first is the store's solid CTA, which the tokens already reach by its class.
+const OUTLINE_BUTTON = {
+  "data-slot": "button",
+  "data-variant": "outline",
+} as const;
+
+function BannerCtaLink({
+  cta,
+  className,
+  secondary = false,
+}: {
+  cta: { label: string; href: string };
+  className: string;
+  secondary?: boolean;
+}) {
+  const extra = secondary ? OUTLINE_BUTTON : {};
+  return cta.href.startsWith("https://") ? (
+    <a href={cta.href} className={className} {...extra}>
+      <span className="min-w-0 truncate">{cta.label}</span>
+    </a>
+  ) : (
+    <Link href={cta.href} className={className} {...extra}>
+      <span className="min-w-0 truncate">{cta.label}</span>
+    </Link>
   );
 }

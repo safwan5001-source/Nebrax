@@ -1,0 +1,461 @@
+{
+    "_note": "CUST-HV V6c-2 — Banner `ctas` (≤2) next to the legacy ctaLabel/ctaHref (V0 §8.2). Shared by PHP StorefrontPresentationNormalizer and both TS section-content twins. ctas sit after imageAlt and before window. Per-CTA style/colour/icon are NOT accepted yet. expected=null means the content key is absent.",
+    "cases": [
+        {
+            "name": "legacy single CTA only: output is exactly as before (no ctas key)",
+            "type": "banner",
+            "input": {
+                "title": "Sale",
+                "ctaLabel": "Shop",
+                "ctaHref": "/products"
+            },
+            "expected": {
+                "title": "Sale",
+                "subtitle": "",
+                "ctaLabel": "Shop",
+                "ctaHref": "/products",
+                "imageUrl": null,
+                "imageAlt": ""
+            }
+        },
+        {
+            "name": "ctas alone are content: the banner is not empty, ctas sit after imageAlt",
+            "type": "banner",
+            "input": {
+                "ctas": [
+                    {
+                        "label": "Shop now",
+                        "href": "/products"
+                    }
+                ]
+            },
+            "expected": {
+                "title": "",
+                "subtitle": "",
+                "ctaLabel": "",
+                "ctaHref": "",
+                "imageUrl": null,
+                "imageAlt": "",
+                "ctas": [
+                    {
+                        "label": "Shop now",
+                        "href": "/products"
+                    }
+                ]
+            }
+        },
+        {
+            "name": "two CTAs kept in order; a third is dropped",
+            "type": "banner",
+            "input": {
+                "title": "Sale",
+                "ctas": [
+                    {
+                        "label": "A",
+                        "href": "/a"
+                    },
+                    {
+                        "label": "B",
+                        "href": "https://example.com/b"
+                    },
+                    {
+                        "label": "C",
+                        "href": "/c"
+                    }
+                ]
+            },
+            "expected": {
+                "title": "Sale",
+                "subtitle": "",
+                "ctaLabel": "",
+                "ctaHref": "",
+                "imageUrl": null,
+                "imageAlt": "",
+                "ctas": [
+                    {
+                        "label": "A",
+                        "href": "/a"
+                    },
+                    {
+                        "label": "B",
+                        "href": "https://example.com/b"
+                    }
+                ]
+            }
+        },
+        {
+            "name": "legacy pair and ctas coexist untouched (ctas wins at render, the pair is the older-reader mirror)",
+            "type": "banner",
+            "input": {
+                "title": "Sale",
+                "ctaLabel": "Shop",
+                "ctaHref": "/products",
+                "ctas": [
+                    {
+                        "label": "Shop",
+                        "href": "/products"
+                    },
+                    {
+                        "label": "More",
+                        "href": "/about"
+                    }
+                ]
+            },
+            "expected": {
+                "title": "Sale",
+                "subtitle": "",
+                "ctaLabel": "Shop",
+                "ctaHref": "/products",
+                "imageUrl": null,
+                "imageAlt": "",
+                "ctas": [
+                    {
+                        "label": "Shop",
+                        "href": "/products"
+                    },
+                    {
+                        "label": "More",
+                        "href": "/about"
+                    }
+                ]
+            }
+        },
+        {
+            "name": "a draft keeps a label without a link and a link without a label; wholly empty entries are dropped",
+            "type": "banner",
+            "input": {
+                "title": "Sale",
+                "ctas": [
+                    {
+                        "label": "Only label",
+                        "href": ""
+                    },
+                    {
+                        "label": "",
+                        "href": ""
+                    },
+                    {
+                        "label": "",
+                        "href": "/x"
+                    }
+                ]
+            },
+            "expected": {
+                "title": "Sale",
+                "subtitle": "",
+                "ctaLabel": "",
+                "ctaHref": "",
+                "imageUrl": null,
+                "imageAlt": "",
+                "ctas": [
+                    {
+                        "label": "Only label",
+                        "href": ""
+                    },
+                    {
+                        "label": "",
+                        "href": "/x"
+                    }
+                ]
+            }
+        },
+        {
+            "name": "unsafe links are emptied (1/3): javascript: and protocol-relative",
+            "type": "banner",
+            "input": {
+                "title": "Sale",
+                "ctas": [
+                    {
+                        "label": "a",
+                        "href": "javascript:alert(1)"
+                    },
+                    {
+                        "label": "b",
+                        "href": "//evil.example"
+                    }
+                ]
+            },
+            "expected": {
+                "title": "Sale",
+                "subtitle": "",
+                "ctaLabel": "",
+                "ctaHref": "",
+                "imageUrl": null,
+                "imageAlt": "",
+                "ctas": [
+                    {
+                        "label": "a",
+                        "href": ""
+                    },
+                    {
+                        "label": "b",
+                        "href": ""
+                    }
+                ]
+            }
+        },
+        {
+            "name": "unsafe links are emptied (2/3): plain http and whitespace in a path",
+            "type": "banner",
+            "input": {
+                "title": "Sale",
+                "ctas": [
+                    {
+                        "label": "c",
+                        "href": "http://example.com"
+                    },
+                    {
+                        "label": "d",
+                        "href": "/has space"
+                    }
+                ]
+            },
+            "expected": {
+                "title": "Sale",
+                "subtitle": "",
+                "ctaLabel": "",
+                "ctaHref": "",
+                "imageUrl": null,
+                "imageAlt": "",
+                "ctas": [
+                    {
+                        "label": "c",
+                        "href": ""
+                    },
+                    {
+                        "label": "d",
+                        "href": ""
+                    }
+                ]
+            }
+        },
+        {
+            "name": "unsafe links are emptied (3/3): data: and a quote in a path",
+            "type": "banner",
+            "input": {
+                "title": "Sale",
+                "ctas": [
+                    {
+                        "label": "e",
+                        "href": "data:text/html,<b>x</b>"
+                    },
+                    {
+                        "label": "f",
+                        "href": "/a\"b"
+                    }
+                ]
+            },
+            "expected": {
+                "title": "Sale",
+                "subtitle": "",
+                "ctaLabel": "",
+                "ctaHref": "",
+                "imageUrl": null,
+                "imageAlt": "",
+                "ctas": [
+                    {
+                        "label": "e",
+                        "href": ""
+                    },
+                    {
+                        "label": "f",
+                        "href": ""
+                    }
+                ]
+            }
+        },
+        {
+            "name": "label is kept as written (inner and trailing spaces survive the live re-normalisation), only code-point truncated to 80",
+            "type": "banner",
+            "input": {
+                "title": "Sale",
+                "ctas": [
+                    {
+                        "label": "Shop  now ",
+                        "href": "/p"
+                    },
+                    {
+                        "label": "صصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصص",
+                        "href": "/q"
+                    }
+                ]
+            },
+            "expected": {
+                "title": "Sale",
+                "subtitle": "",
+                "ctaLabel": "",
+                "ctaHref": "",
+                "imageUrl": null,
+                "imageAlt": "",
+                "ctas": [
+                    {
+                        "label": "Shop  now ",
+                        "href": "/p"
+                    },
+                    {
+                        "label": "صصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصصص",
+                        "href": "/q"
+                    }
+                ]
+            }
+        },
+        {
+            "name": "whitespace-only label collapses to empty",
+            "type": "banner",
+            "input": {
+                "title": "Sale",
+                "ctas": [
+                    {
+                        "label": "   ",
+                        "href": "/p"
+                    }
+                ]
+            },
+            "expected": {
+                "title": "Sale",
+                "subtitle": "",
+                "ctaLabel": "",
+                "ctaHref": "",
+                "imageUrl": null,
+                "imageAlt": "",
+                "ctas": [
+                    {
+                        "label": "",
+                        "href": "/p"
+                    }
+                ]
+            }
+        },
+        {
+            "name": "non-list or malformed ctas are ignored; non-object entries are skipped",
+            "type": "banner",
+            "input": {
+                "title": "Sale",
+                "ctas": "nope"
+            },
+            "expected": {
+                "title": "Sale",
+                "subtitle": "",
+                "ctaLabel": "",
+                "ctaHref": "",
+                "imageUrl": null,
+                "imageAlt": ""
+            }
+        },
+        {
+            "name": "entries that are not objects are skipped",
+            "type": "banner",
+            "input": {
+                "title": "Sale",
+                "ctas": [
+                    "x",
+                    7,
+                    null,
+                    [
+                        1,
+                        2
+                    ],
+                    {
+                        "label": "ok",
+                        "href": "/ok"
+                    }
+                ]
+            },
+            "expected": {
+                "title": "Sale",
+                "subtitle": "",
+                "ctaLabel": "",
+                "ctaHref": "",
+                "imageUrl": null,
+                "imageAlt": "",
+                "ctas": [
+                    {
+                        "label": "ok",
+                        "href": "/ok"
+                    }
+                ]
+            }
+        },
+        {
+            "name": "ctas then window, in canonical order",
+            "type": "banner",
+            "input": {
+                "title": "Sale",
+                "window": {
+                    "startsAt": "2026-12-01T00:00:00Z"
+                },
+                "ctas": [
+                    {
+                        "label": "Go",
+                        "href": "/go"
+                    }
+                ]
+            },
+            "expected": {
+                "title": "Sale",
+                "subtitle": "",
+                "ctaLabel": "",
+                "ctaHref": "",
+                "imageUrl": null,
+                "imageAlt": "",
+                "ctas": [
+                    {
+                        "label": "Go",
+                        "href": "/go"
+                    }
+                ],
+                "window": {
+                    "startsAt": "2026-12-01T00:00:00Z"
+                }
+            }
+        },
+        {
+            "name": "a window with no content still does not revive an empty banner, with or without empty ctas",
+            "type": "banner",
+            "input": {
+                "ctas": [
+                    {
+                        "label": "",
+                        "href": ""
+                    }
+                ],
+                "window": {
+                    "startsAt": "2026-12-01T00:00:00Z"
+                }
+            },
+            "expected": null
+        },
+        {
+            "name": "extra keys on a CTA (style, colour, icon) are not accepted yet",
+            "type": "banner",
+            "input": {
+                "title": "Sale",
+                "ctas": [
+                    {
+                        "label": "Go",
+                        "href": "/go",
+                        "style": "outline",
+                        "colour": "primary",
+                        "icon": {
+                            "key": "arrow"
+                        }
+                    }
+                ]
+            },
+            "expected": {
+                "title": "Sale",
+                "subtitle": "",
+                "ctaLabel": "",
+                "ctaHref": "",
+                "imageUrl": null,
+                "imageAlt": "",
+                "ctas": [
+                    {
+                        "label": "Go",
+                        "href": "/go"
+                    }
+                ]
+            }
+        }
+    ]
+}

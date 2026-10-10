@@ -16,8 +16,11 @@ const src = (rel: string) =>
 const SOLID_CTA =
   '[class~="bg-store-primary"][class~="rounded-store"][class~="font-bold"]';
 
+// Every quoted string, not only a literal `className="…"`: a component may choose its classes in a ternary (the
+// Banner's first-vs-second button, V6c-2). Only a string that really matches the three-class selector is counted,
+// so unrelated strings cannot inflate the number.
 function classStrings(file: string): string[] {
-  return [...src(file).matchAll(/className="([^"]+)"/g)].map((m) => m[1]);
+  return [...src(file).matchAll(/"([^"\n]+)"/g)].map((m) => m[1]);
 }
 
 describe("global button selector ↔ real components (V5e-2b)", () => {
