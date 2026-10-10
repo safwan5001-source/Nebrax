@@ -236,6 +236,8 @@ Codex left five open findings on `3b40442` (2 P1, 3 P2). All five are fixed in t
 | P2 large JSON integers | Integer tokens outside the int64 range are preserved as literals (`DeliveryConnectorJsonInteger`) before decoding. They are not coerced to float. The authoritative checksum emits the literal unquoted, so it does not collapse with a JSON string of the same digits. |
 | P2 object versus list | Decoding keeps JSON objects as `stdClass` and JSON arrays as lists. The canonical encoder writes `{}` and `[]` differently, including nested values. Object key order is still sorted, so reordering keys is not a conflict. |
 | P2 concurrent rotations | `rotateSecret` reloads the account with `lockForUpdate` inside a transaction before incrementing `secret_version`. Two callers that both observed version 1 commit versions 2 and 3. Only the latest secret verifies. |
+| P1 subscription status (follow-up on the fix commit) | After the tenant context is set, and again inside the locked transaction, `PlanGate::subscriptionActive()` must pass. An expired trial/subscription returns `403 subscription_inactive` and does not consume `event_id`. Same gate as `EnsureActiveSubscription` on the management and Hub routes. |
+| P2 numeric object keys (follow-up) | Object keys are ordered with `ksort(..., SORT_STRING)`. `"01"` and `"1"` are not treated as equal, so opposite insertion orders share one authoritative checksum. |
 
 The Hub row still stores a plain PHP array, so an empty object becomes an empty list in the Hub hash. The connector authoritative checksum is what rejects the second shape before a second intake, and the Hub row is not mutated. Scientific-notation JSON numbers remain IEEE floats; the preserved case is integer tokens outside int64.
 
@@ -247,16 +249,18 @@ The Hub row still stores a plain PHP array, so an empty object becomes an empty 
 2. `sales.pos` `disabled` and `suspended`: no Hub row and no attempt; re-enable does not treat the rejected event as burned; a later suspend blocks a new event without forking the existing order.
 3. `{}` versus `[]`, nested `{"items":{}}` versus `{"items":[]}`, integers `9223372036854775808` versus `9223372036854775809` and versus the same digits in a string, and the negative pair past int64. Same literal replays onto the same Hub order. Key reorder is not a conflict. One Hub row per provider order id. Financial and commerce counts unchanged.
 4. Two stale version-1 models rotate to versions 2 and 3. Secrets differ. Only version 3 verifies. The attempt records version 3. On PostgreSQL the test also asserts `FOR UPDATE` in the query log. SQLite has no row lock; the same-connection reload is what that driver can prove.
+5. Expired trial and subscription: `subscription_inactive`, no attempt, no Hub row; restoring the trial lets the same event id succeed.
+6. `{"01":"a","1":"b"}` and `{"1":"b","01":"a"}` share one Hub order.
 
 ### Local execution
 
 SQLite, `php artisan test --filter=DeliveryConnectorCoreTest`:
 
-- 15 passed, 261 assertions
+- 17 passed, 282 assertions (includes the subscription-expiry and numeric-key regressions)
 
 SQLite, related suites (`DeliveryHubProjectionTest`, `BranchIsolationGuardTest`, `WebhookSignatureTest`, `DeliveryPlatformApiTest`, `DeliveryFinancialRoleGateTest`, `DeliveryPlatformProfileDomainTest`):
 
-- 70 passed, 752 assertions
+- 70 passed, 752 assertions, executed before the subscription/key-sort follow-up. Those two changes do not touch Hub, branch, webhook, or platform-profile code.
 
 PostgreSQL was not started in this sandbox. `useradd` succeeded, but `chown`, `su`, `runuser`, and `setuid` are rejected, so `pg_ctl` cannot drop root. The CI `pgsql` job on this commit is the PostgreSQL proof. Do not treat it as passed until that job is green on the exact head.
 

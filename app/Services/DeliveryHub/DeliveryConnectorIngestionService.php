@@ -10,6 +10,7 @@ use App\Models\DeliveryPlatformProfile;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Services\TenantApplicationService;
+use App\Support\PlanGate;
 use App\Support\WebhookSignature;
 use App\Tenancy\TenantContext;
 use App\Tenancy\TenantScope;
@@ -101,6 +102,9 @@ class DeliveryConnectorIngestionService
         if (($inactive = $this->applicationFailure()) !== null) {
             return $inactive;
         }
+        if (($subscription = $this->subscriptionFailure()) !== null) {
+            return $subscription;
+        }
 
         if (strlen($rawBody) > self::MAX_RAW_BYTES) {
             return $this->error(422, 'invalid_payload', 'الحمولة غير صالحة.');
@@ -125,6 +129,9 @@ class DeliveryConnectorIngestionService
             }
             if (($inactive = $this->applicationFailure()) !== null) {
                 return $inactive;
+            }
+            if (($subscription = $this->subscriptionFailure()) !== null) {
+                return $subscription;
             }
 
             $checksum = hash('sha256', $rawBody);
@@ -490,11 +497,27 @@ class DeliveryConnectorIngestionService
         return $this->error(403, 'application_inactive', 'هذه القدرة غير متاحة للكتابة.');
     }
 
+    /**
+     * @return array{status: int, body: array<string, mixed>}|null
+     */
+    private function subscriptionFailure(): ?array
+    {
+        $tenant = Tenant::query()->whereKey($this->tenant->id())->first();
+        if ($tenant === null || ! $tenant->is_active) {
+            return $this->error(403, 'tenant_unavailable', 'المستأجر غير متاح.');
+        }
+        if (! PlanGate::subscriptionActive($tenant)) {
+            return $this->error(403, 'subscription_inactive', 'اشتراك المؤسسة غير نشط أو منتهٍ.');
+        }
+
+        return null;
+    }
+
     private function canonicalize(mixed $value): mixed
     {
         if ($value instanceof \stdClass) {
             $props = get_object_vars($value);
-            ksort($props);
+            ksort($props, SORT_STRING);
             $object = new \stdClass();
             foreach ($props as $key => $item) {
                 $object->{$key} = $this->canonicalize($item);

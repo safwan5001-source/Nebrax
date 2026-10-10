@@ -478,6 +478,51 @@ class DeliveryConnectorCoreTest extends TestCase
         $this->assertSame($before, $this->financialCounts());
     }
 
+    /** @test */
+    public function an_expired_subscription_rejects_ingestion_without_burning_the_event(): void
+    {
+        [$auth, $branch, $profile] = $this->tenantWithPlatform('subexp');
+        $account = $this->connector($auth['token'], $profile, 'store-sub', $branch);
+        $before = $this->financialCounts();
+        $event = $this->event('P-sub', ['sku' => 'a']);
+
+        Tenant::query()->whereKey($auth['tenant_id'])->update([
+            'trial_ends_at' => now()->subDay(),
+            'subscription_ends_at' => now()->subDay(),
+        ]);
+
+        $this->postEvent($account['data']['id'], $event, $account['secret'])
+            ->assertForbidden()
+            ->assertJsonPath('error_code', 'subscription_inactive');
+        $this->assertSame(0, DeliveryHubOrder::withoutGlobalScopes()->count());
+        $this->assertSame(0, DeliveryConnectorAttempt::withoutGlobalScopes()->count());
+        $this->assertSame($before, $this->financialCounts());
+
+        Tenant::query()->whereKey($auth['tenant_id'])->update([
+            'trial_ends_at' => now()->addDay(),
+            'subscription_ends_at' => null,
+        ]);
+        $this->postEvent($account['data']['id'], $event, $account['secret'])->assertCreated();
+        $this->assertSame(1, DeliveryHubOrder::withoutGlobalScopes()->count());
+        $this->assertSame(1, DeliveryConnectorAttempt::withoutGlobalScopes()->count());
+    }
+
+    /** @test */
+    public function numeric_looking_object_keys_keep_one_string_order(): void
+    {
+        [$auth, $branch, $profile] = $this->tenantWithPlatform('keysort');
+        $account = $this->connector($auth['token'], $profile, 'store-keys', $branch);
+        $before = $this->financialCounts();
+        $id = $account['data']['id'];
+        $secret = $account['secret'];
+
+        $first = $this->postRaw($id, $this->rawEnvelope('P-numkeys', '{"01":"a","1":"b"}'), $secret)->assertCreated();
+        $second = $this->postRaw($id, $this->rawEnvelope('P-numkeys', '{"1":"b","01":"a"}'), $secret)->assertCreated();
+        $this->assertSame($first['data']['delivery_hub_order_id'], $second['data']['delivery_hub_order_id']);
+        $this->assertSame(1, DeliveryHubOrder::withoutGlobalScopes()->where('provider_order_id', 'P-numkeys')->count());
+        $this->assertSame($before, $this->financialCounts());
+    }
+
     /** @return array{0: array{token: string, tenant_id: string}, 1: string, 2: string} */
     private function tenantWithPlatform(string $slug): array
     {
