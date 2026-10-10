@@ -17,7 +17,7 @@
     },
     {
       "name": "deferred vocabulary fails closed",
-      "input": { "sticky": "on-scroll-up", "mode": "overlay-hero", "search": "icon-expand", "categoryNav": "tabs", "surface": { "background": "#000" }, "logo": { "align": "center", "treatment": "mono-light" } },
+      "input": { "sticky": "sticky-bottom", "mode": "overlay-hero", "search": "icon-expand", "categoryNav": "tabs", "surface": { "background": "#000" }, "logo": { "align": "center", "treatment": "mono-light" } },
       "expected": null
     },
     {
@@ -44,6 +44,7 @@
     {"name": "colours: a role wins over a hex, a hex is lower-cased", "input": {"text": {"role": "text", "hex": "#123456"}, "icon": {"hex": "#ABCDEF"}}, "expected": {"text": {"role": "text"}, "icon": {"hex": "#abcdef"}}},
     {"name": "colours: invalid references drop on their own", "input": {"surface": {"background": {"hex": "red"}}, "text": {"role": "neon"}, "icon": "#fff", "sticky": "off"}, "expected": {"sticky": "off"}},
     {"name": "colours: only the background is accepted inside surface (alpha and gradient wait for V7c)", "input": {"surface": {"alpha": 50, "background": {"kind": "gradient"}, "text": {"hex": "#000000"}}}, "expected": null},
-    {"name": "colours: non-object surface is ignored", "input": {"surface": "#000000", "text": {"hex": "#111111"}}, "expected": {"text": {"hex": "#111111"}}}
+    {"name": "colours: non-object surface is ignored", "input": {"surface": "#000000", "text": {"hex": "#111111"}}, "expected": {"text": {"hex": "#111111"}}},
+    {"name": "sticky: on-scroll-up is a valid choice (V7c-1)", "input": {"sticky": "on-scroll-up", "height": "compact"}, "expected": {"height": "compact", "sticky": "on-scroll-up"}}
   ]
 }

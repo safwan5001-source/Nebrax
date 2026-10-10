@@ -21,6 +21,7 @@ import {
   previewStoreName,
   type StorefrontPresentationConfig,
 } from "./presentation/config";
+import { HeaderScrollUpPreview } from "./HeaderScrollUpPreview";
 import { headerIsCompact, resolveHeaderDesign } from "./presentation/header-design";
 import type { CategoryPageRegionKey, PageRegionInstance, PageType, ProductPageRegionKey } from "./presentation/page-regions";
 import type { WorkspaceProductDetail } from "@/modules/commerce-workspace/workspace-products";
@@ -538,6 +539,7 @@ export function StorefrontPreviewCanvas({
             : undefined
         }
       >
+        {headerResolved.sticky === "on-scroll-up" ? <HeaderScrollUpPreview /> : null}
         {onSelectChrome ? (
           <button
             type="button"

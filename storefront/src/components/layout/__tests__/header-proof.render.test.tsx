@@ -42,7 +42,13 @@ vi.mock("@/components/layout/StoreSearch", () => ({
       data-search=""
       className={className}
       style={{ height: "2.5rem", border: "1px solid #9ca3af", borderRadius: 8 }}
-    />
+    >
+      <input
+        aria-label="search"
+        data-search-input=""
+        style={{ width: "100%", height: "100%", border: 0, background: "transparent" }}
+      />
+    </div>
   ),
 }));
 vi.mock("@/components/layout/CartButton", () => ({
@@ -102,6 +108,8 @@ const DESIGNS: Record<string, Record<string, unknown> | undefined> = {
   logoXl: { logo: { size: "xl" } },
   logoSm: { logo: { size: "sm" } },
   stickyOff: { sticky: "off" },
+  stickyUp: { sticky: "on-scroll-up" },
+  stickyUpTall: { sticky: "on-scroll-up", height: "tall", shadow: "soft" },
   borderNone: { border: { width: "none" } },
   borderMedium: { border: { width: "medium" } },
   shadowSoft: { shadow: "soft" },

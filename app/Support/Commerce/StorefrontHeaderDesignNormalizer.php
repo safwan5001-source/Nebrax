@@ -14,8 +14,8 @@ namespace App\Support\Commerce;
  * `border.width` · `shadow`. V7b يضيف الألوان: `surface.background` (ColorRef: دور لوحة أو hex)
  * و`text` و`icon` (ColorRef)؛ تباين الصريح منها يحرسه `HeaderDesignContrast` عند النشر، ولون النص
  * التلقائي فوق خلفية مصمَّمة (الأبيض/الأسود الأفضل إثباتاً) يمرّ بالبناء. مؤجَّل صراحةً إلى V7c
- * وتُسقط fail-closed حتى ذلك الحين: `surface.alpha`/التدرّج، `sticky: on-scroll-up` و`mode`،
- * و`search/categoryNav` الصريحان، و`logo.align/treatment`.
+ * وتُسقط fail-closed حتى ذلك الحين: `surface.alpha`/التدرّج، `mode`، و`search/categoryNav`
+ * الصريحان، و`logo.align/treatment`. V7c-1 يضيف `sticky: on-scroll-up` (تظهر الترويسة عند التمرير للأعلى).
  */
 final class StorefrontHeaderDesignNormalizer
 {
@@ -27,7 +27,7 @@ final class StorefrontHeaderDesignNormalizer
 
     public const LOGO_SIZES = ['sm', 'md', 'lg', 'xl'];
 
-    public const STICKY = ['always', 'off'];
+    public const STICKY = ['always', 'on-scroll-up', 'off'];
 
     public const BORDER_WIDTHS = ['none', 'hairline', 'medium'];
 

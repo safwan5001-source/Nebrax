@@ -42,6 +42,7 @@ const LOGO_LABEL: Record<(typeof HEADER_LOGO_SIZES)[number], CustomizerMessageKe
 };
 const STICKY_LABEL: Record<(typeof HEADER_STICKY)[number], CustomizerMessageKey> = {
   always: "headerStickyAlways",
+  "on-scroll-up": "headerStickyOnScrollUp",
   off: "headerStickyOff",
 };
 const BORDER_LABEL: Record<(typeof HEADER_BORDER_WIDTHS)[number], CustomizerMessageKey> = {

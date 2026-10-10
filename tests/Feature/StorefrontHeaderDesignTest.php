@@ -40,7 +40,7 @@ class StorefrontHeaderDesignTest extends TestCase
         $plain = $this->normalize([]);
         $this->assertArrayNotHasKey('design', $plain['header']);
         $this->assertSame(3, $plain['version']);
-        $this->assertSame($plain, $this->normalize(['header' => ['design' => ['layout' => 'mega', 'sticky' => 'on-scroll-up']]]));
+        $this->assertSame($plain, $this->normalize(['header' => ['design' => ['layout' => 'mega', 'sticky' => 'hover']]]));
     }
 
     /** @test */

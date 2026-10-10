@@ -17,9 +17,12 @@
  * really behind it at publish (`headerContrastIssues`, twin of PHP `HeaderDesignContrast`, pinned
  * by `tests/Fixtures/presentation/header-contrast.json`).
  *
+ * V7c-1 adds `sticky: on-scroll-up`: the header stays reachable but leaves the way while the shopper
+ * reads downward and returns on the first upward scroll (`stepScrollUp`, one pure rule shared by the
+ * storefront and the Canvas simulator).
+ *
  * Deliberately NOT here yet (dropped fail-closed until their slice): `surface.alpha` / gradients and
- * `sticky: on-scroll-up` / `mode` (V7c), explicit `search` / `categoryNav` presentation,
- * `logo.align` / `logo.treatment`.
+ * `mode` (V7c-2), explicit `search` / `categoryNav` presentation, `logo.align` / `logo.treatment`.
  *
  * `resolveHeaderDesign` is the one pure function from the document to what a renderer needs: a
  * `data-hd` token list plus validated `--hd-*` custom properties for the theme wrapper (heights,
@@ -48,7 +51,7 @@ export const HEADER_LAYOUTS = [
 export const HEADER_MOBILE_LAYOUTS = ["logo-centre", "logo-start"] as const;
 export const HEADER_HEIGHTS = ["compact", "standard", "tall"] as const;
 export const HEADER_LOGO_SIZES = ["sm", "md", "lg", "xl"] as const;
-export const HEADER_STICKY = ["always", "off"] as const;
+export const HEADER_STICKY = ["always", "on-scroll-up", "off"] as const;
 export const HEADER_BORDER_WIDTHS = ["none", "hairline", "medium"] as const;
 export const HEADER_SHADOWS = ["none", "soft", "medium"] as const;
 
@@ -236,7 +239,7 @@ export interface ResolvedHeaderDesign {
 /**
  * Token legend (the CSS lives in `globals.css`, block "CUST-HV V7a — header design"):
  * `hh-c` / `hh-t` compact / tall height · `hl-2` two-row (taller sticky offset) ·
- * `hs-o` sticky off (offset collapses to the announcement bar) · `hb-n` / `hb-m` no / medium
+ * `hs-o` sticky off (offset collapses to the announcement bar) · `hs-u` sticky on-scroll-up · `hb-n` / `hb-m` no / medium
  * border · `hx-s` / `hx-m` soft / medium shadow · `hbg` designed background · `htx` chosen text
  * colour · `hic` explicit icon colour. Defaults (`standard`, `always`, `hairline`, `none`) emit no
  * token — they are the rendering that already exists.
@@ -285,6 +288,7 @@ export function resolveHeaderDesign(
   if (design?.height === "tall") tokens.push("hh-t");
   if (design?.layout === "two-row") tokens.push("hl-2");
   if (design?.sticky === "off") tokens.push("hs-o");
+  if (design?.sticky === "on-scroll-up") tokens.push("hs-u");
   if (design?.border?.width === "none") tokens.push("hb-n");
   if (design?.border?.width === "medium") tokens.push("hb-m");
   if (design?.shadow === "soft") tokens.push("hx-s");
@@ -300,4 +304,33 @@ export function resolveHeaderDesign(
     designed: design !== undefined,
     coloured,
   };
+}
+
+/** Upward / downward movement (px) below which a scroll event is treated as jitter and ignored. */
+export const SCROLL_UP_JITTER_PX = 4;
+
+export interface ScrollUpState {
+  hidden: boolean;
+  /** The scroll position the last real movement was measured from. */
+  lastY: number;
+}
+
+/**
+ * The `on-scroll-up` rule (V0 §9.2), pure so the storefront (window scroll) and the Canvas simulator
+ * (the preview pane's scroll) cannot disagree: the header is **never hidden** within its own height of
+ * the top, nor while the shopper is working inside it (`pinned`: focus within, an open menu / search);
+ * past that it hides on a downward movement and returns on the first upward one. Movements under
+ * `SCROLL_UP_JITTER_PX` change nothing, and overscroll (negative `y`) counts as the top.
+ */
+export function stepScrollUp(
+  prev: ScrollUpState,
+  y: number,
+  headerHeight: number,
+  pinned: boolean,
+): ScrollUpState {
+  const at = Math.max(0, y);
+  if (pinned || at <= headerHeight) return { hidden: false, lastY: at };
+  const delta = at - prev.lastY;
+  if (Math.abs(delta) < SCROLL_UP_JITTER_PX) return prev;
+  return { hidden: delta > 0, lastY: at };
 }

@@ -190,6 +190,17 @@
 .awj-store-preview[data-hd~="hic"] > header [data-header-row] svg:not(.bg-store-primary-soft svg) {
   color: var(--hd-icon);
 }
+.awj-store-preview[data-hd~="hs-u"] > header {
+  transition: transform 200ms ease;
+}
+.awj-store-preview[data-hd~="hs-u"] > header[data-header-hidden] {
+  transform: translateY(calc(-100% - var(--store-announcement-height, 0px)));
+}
+@media (prefers-reduced-motion: reduce) {
+  .awj-store-preview[data-hd~="hs-u"] > header {
+    transition: none;
+  }
+}
 /* V7a-chrome:end */
 
 /*
