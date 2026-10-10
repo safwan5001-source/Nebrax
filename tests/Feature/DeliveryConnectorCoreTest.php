@@ -555,6 +555,57 @@ class DeliveryConnectorCoreTest extends TestCase
         $this->assertSame(0, CommerceOrder::withoutGlobalScopes()->count());
     }
 
+    /** @test */
+    public function manual_numbers_keep_their_type_and_duplicate_members_are_rejected(): void
+    {
+        [$auth, $branch, $profile] = $this->tenantWithPlatform('adopt');
+        $account = $this->connector($auth['token'], $profile, 'store-adopt', $branch);
+        $before = $this->financialCounts();
+        $id = $account['data']['id'];
+        $secret = $account['secret'];
+
+        $manual = $this->withToken($auth['token'])->postJson('/api/delivery-hub/orders', [
+            'delivery_platform_profile_id' => $profile,
+            'provider_order_id' => 'P-manual-num',
+            'branch_id' => $branch,
+            'intake_payload' => ['amount' => 5000],
+        ])->assertCreated();
+        $adopted = $this->postEvent($id, [
+            'event_id' => (string) Str::uuid(),
+            'provider_order_id' => 'P-manual-num',
+            'intake_payload' => ['amount' => 5000],
+        ], $secret)->assertCreated();
+        $this->assertSame($manual['data']['id'], $adopted['data']['delivery_hub_order_id']);
+
+        $this->withToken($auth['token'])->postJson('/api/delivery-hub/orders', [
+            'delivery_platform_profile_id' => $profile,
+            'provider_order_id' => 'P-manual-str',
+            'branch_id' => $branch,
+            'intake_payload' => ['amount' => '5000'],
+        ])->assertCreated();
+        $this->postEvent($id, [
+            'event_id' => (string) Str::uuid(),
+            'provider_order_id' => 'P-manual-str',
+            'intake_payload' => ['amount' => 5000],
+        ], $secret)->assertStatus(409)->assertJsonPath('error_code', 'payload_conflict');
+
+        $this->postRaw($id, $this->rawEnvelope('P-dup', '{"n":2}'), $secret)->assertCreated();
+        $this->postRaw($id, $this->rawEnvelope('P-dup', '{"n":1,"n":2}'), $secret)
+            ->assertStatus(422)
+            ->assertJsonPath('error_code', 'invalid_payload');
+        $this->postRaw($id, $this->rawEnvelope('P-esc', '{"a":1,"\u0061":2}'), $secret)
+            ->assertStatus(422)
+            ->assertJsonPath('error_code', 'invalid_payload');
+        $this->postRaw($id, $this->rawEnvelope('P-nest', '{"o":{"a":1,"a":2}}'), $secret)
+            ->assertStatus(422)
+            ->assertJsonPath('error_code', 'invalid_payload');
+
+        $this->assertSame(1, DeliveryHubOrder::withoutGlobalScopes()->where('provider_order_id', 'P-manual-num')->count());
+        $this->assertSame(1, DeliveryHubOrder::withoutGlobalScopes()->where('provider_order_id', 'P-dup')->count());
+        $this->assertSame(0, DeliveryHubOrder::withoutGlobalScopes()->where('provider_order_id', 'P-esc')->count());
+        $this->assertSame($before, $this->financialCounts());
+    }
+
     /** @return array{0: array{token: string, tenant_id: string}, 1: string, 2: string} */
     private function tenantWithPlatform(string $slug): array
     {

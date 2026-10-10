@@ -233,14 +233,16 @@ Codex left five open findings on `3b40442` (2 P1, 3 P2). All five are fixed in t
 |---|---|
 | P1 secret rotation race | After `lockForUpdate`, the signature is verified again against `$locked->secret`. A secret that rotated after the unlocked read is rejected as `invalid_signature` and does not write an attempt or a Hub order. The attempt's `secret_version` is the locked row's version. |
 | P1 application state | After `TenantContext` is set, and again inside the locked transaction before any write, `TenantApplicationService::statusFor('sales.pos')` must be `enabled`. `disabled` and `suspended` return `403 application_inactive` and do not consume `event_id`. This is the same capability the management routes already guard with `EnsureApplicationActive`. |
-| P2 large JSON integers | Integer tokens outside the int64 range are preserved as literals (`DeliveryConnectorJsonInteger`) before decoding. They are not coerced to float. The authoritative checksum emits the literal unquoted, so it does not collapse with a JSON string of the same digits. |
+| P2 large JSON integers | Integer tokens outside the int64 range are preserved as `DeliveryConnectorJsonNumber` literals before decoding. They are not coerced to float. The authoritative checksum emits the literal unquoted, so it does not collapse with a JSON string of the same digits. The same wrapper later covers every JSON number. |
 | P2 object versus list | Decoding keeps JSON objects as `stdClass` and JSON arrays as lists. The canonical encoder writes `{}` and `[]` differently, including nested values. Object key order is still sorted, so reordering keys is not a conflict. |
 | P2 concurrent rotations | `rotateSecret` reloads the account with `lockForUpdate` inside a transaction before incrementing `secret_version`. Two callers that both observed version 1 commit versions 2 and 3. Only the latest secret verifies. |
 | P1 subscription status (follow-up on the fix commit) | After the tenant context is set, and again inside the locked transaction, `PlanGate::subscriptionActive()` must pass. An expired trial/subscription returns `403 subscription_inactive` and does not consume `event_id`. Same gate as `EnsureActiveSubscription` on the management and Hub routes. |
 | P2 numeric object keys (follow-up) | Object keys are ordered with `ksort(..., SORT_STRING)`. `"01"` and `"1"` are not treated as equal, so opposite insertion orders share one authoritative checksum. |
 | P2 decimal literals (follow-up) | Every JSON number token is canonicalized as its original literal, not as an IEEE float. `1.0000000000000001`, `1.0`, `1`, `1e2`, and `100` stay distinct. A float that still survives decoding rejects the envelope. |
+| P2 manual Hub numeric type (follow-up) | `plainValue()` returns a PHP integer or an exactly round-tripping float for the Hub comparison. A connector number `5000` adopts a manual numeric payload and conflicts with a manual string `"5000"`. Lossy literals stay strings so they do not collapse. |
+| P2 duplicate JSON members (follow-up) | Duplicate object keys, including escaped duplicates and nested objects, are rejected as `invalid_payload` before `json_decode()` keeps only the last value. |
 
-The Hub row still stores a plain PHP array, so an empty object becomes an empty list in the Hub hash. The connector authoritative checksum is what rejects the second shape before a second intake, and the Hub row is not mutated. Scientific-notation JSON numbers remain IEEE floats; the preserved case is integer tokens outside int64.
+The Hub row still stores a plain PHP array, so an empty object becomes an empty list in the Hub hash. The connector authoritative checksum is what rejects the second shape before a second intake, and the Hub row is not mutated. Authoritative checksums keep every JSON number token as its original literal. Hub adoption uses a PHP integer, or a float only when `json_encode` of that float reproduces the literal; every other literal stays a string so distinct tokens do not collapse.
 
 ### Tests added
 
@@ -252,16 +254,18 @@ The Hub row still stores a plain PHP array, so an empty object becomes an empty 
 4. Two stale version-1 models rotate to versions 2 and 3. Secrets differ. Only version 3 verifies. The attempt records version 3. On PostgreSQL the test also asserts `FOR UPDATE` in the query log. SQLite has no row lock; the same-connection reload is what that driver can prove.
 5. Expired trial and subscription: `subscription_inactive`, no attempt, no Hub row; restoring the trial lets the same event id succeed.
 6. `{"01":"a","1":"b"}` and `{"1":"b","01":"a"}` share one Hub order.
+7. `1.0000000000000001`, `1.0`, `1`, `1e2`, and `100` stay distinct. The second shape is `payload_conflict`.
+8. A manual numeric `amount` of `5000` is adopted by the connector number `5000`. A manual string `"5000"` conflicts with that number. Duplicate members `{"n":1,"n":2}`, `{"a":1,"\u0061":2}`, and nested `{"o":{"a":1,"a":2}}` are `invalid_payload` and do not create a Hub row.
 
 ### Local execution
 
 SQLite, `php artisan test --filter=DeliveryConnectorCoreTest`:
 
-- 18 passed, 302 assertions (includes subscription expiry, numeric object keys, and lossless decimal literals)
+- 19 passed, 323 assertions (includes subscription expiry, numeric object keys, lossless decimals, manual numeric adoption, and duplicate JSON members)
 
 SQLite, related suites (`DeliveryHubProjectionTest`, `BranchIsolationGuardTest`, `WebhookSignatureTest`, `DeliveryPlatformApiTest`, `DeliveryFinancialRoleGateTest`, `DeliveryPlatformProfileDomainTest`):
 
-- 70 passed, 752 assertions, executed before the subscription/key-sort follow-up. Those two changes do not touch Hub, branch, webhook, or platform-profile code.
+- 70 passed, 752 assertions, re-run after the manual-type and duplicate-member fix. Those changes stay inside connector ingestion.
 
 PostgreSQL was not started in this sandbox. `useradd` succeeded, but `chown`, `su`, `runuser`, and `setuid` are rejected, so `pg_ctl` cannot drop root. The CI `pgsql` job on this commit is the PostgreSQL proof. Do not treat it as passed until that job is green on the exact head.
 
@@ -272,6 +276,7 @@ PostgreSQL was not started in this sandbox. `useradd` succeeded, but `chown`, `s
 - Canonical checksum distinguishes object/list and oversized integers without accepting a numeric string as the same integer.
 - Rotation versions come from the locked row, not the caller's stale attribute.
 - No invoice, payment, journal, stock, commerce, or provider-enablement call was added.
+- Representable connector numbers stay integers or exact floats in the Hub comparison. Duplicate object members never reach `json_decode()`.
 
 ### Reviewer review (fix pass)
 
@@ -288,6 +293,10 @@ PostgreSQL was not started in this sandbox. `useradd` succeeded, but `chown`, `s
 | Ingestion while `sales.pos` is suspended or disabled | Rejected. No Hub write. |
 | Checksum collapse of distinct integers or `{}`/`[]` | Rejected as `payload_conflict`. One Hub row. |
 | Two rotations sharing one version | Locked reload assigns 2 then 3. Only the committed secret verifies. |
+| Expired subscription still ingesting | Rejected. No attempt and no Hub write. |
+| Decimal, exponent, or oversized literals collapsing | Original literals stay distinct in the authoritative checksum. |
+| Manual number rejected, or a numeric string adopted | PHP integer and exact float types are preserved for the Hub comparison. |
+| Duplicate object members kept as the last value | Rejected as `invalid_payload` before decode. No Hub row. |
 | Financial or inventory side effect | Counts unchanged in the new tests. |
 | Provider enablement or DG-3 evidence | Not introduced. |
 

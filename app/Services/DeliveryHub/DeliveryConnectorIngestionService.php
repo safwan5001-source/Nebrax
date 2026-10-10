@@ -560,6 +560,19 @@ class DeliveryConnectorIngestionService
     private function plainValue(mixed $value): mixed
     {
         if ($value instanceof DeliveryConnectorJsonNumber) {
+            $integer = $this->platformInteger($value->literal);
+            if ($integer !== null) {
+                return $integer;
+            }
+            try {
+                $decoded = json_decode($value->literal, false, 1, JSON_THROW_ON_ERROR);
+            } catch (\JsonException) {
+                return $value->literal;
+            }
+            if (is_float($decoded) && is_finite($decoded) && json_encode($decoded, JSON_THROW_ON_ERROR) === $value->literal) {
+                return $decoded;
+            }
+
             return $value->literal;
         }
         if ($value instanceof \stdClass) {
@@ -597,6 +610,9 @@ class DeliveryConnectorIngestionService
      */
     private function decodeEnvelope(string $rawBody): ?array
     {
+        if ($this->hasDuplicateObjectMembers($rawBody)) {
+            return null;
+        }
         try {
             [$prepared, $marker] = $this->tagNumericLiterals($rawBody);
             $decoded = json_decode($prepared, false, 32, JSON_THROW_ON_ERROR);
@@ -828,5 +844,262 @@ class DeliveryConnectorIngestionService
         }
 
         return $trimmed;
+    }
+
+    private function platformInteger(string $literal): ?int
+    {
+        if (preg_match('/^-?(0|[1-9][0-9]*)$/', $literal) !== 1) {
+            return null;
+        }
+        $negative = str_starts_with($literal, '-');
+        $digits = ltrim($negative ? substr($literal, 1) : $literal, '0');
+        if ($digits === '') {
+            $digits = '0';
+        }
+        $limit = $negative ? '9223372036854775808' : '9223372036854775807';
+        if (strlen($digits) > strlen($limit) || (strlen($digits) === strlen($limit) && strcmp($digits, $limit) > 0)) {
+            return null;
+        }
+
+        return (int) $literal;
+    }
+
+    private function hasDuplicateObjectMembers(string $json): bool
+    {
+        $duplicate = false;
+        $index = 0;
+        try {
+            $this->skipJsonWhitespace($json, $index);
+            $this->scanJsonValue($json, $index, 0, $duplicate);
+            if ($duplicate) {
+                return true;
+            }
+            $this->skipJsonWhitespace($json, $index);
+
+            return $index !== strlen($json);
+        } catch (\RuntimeException) {
+            return false;
+        }
+    }
+
+    private function scanJsonValue(string $json, int &$index, int $depth, bool &$duplicate): void
+    {
+        if ($duplicate || $depth > 32 || $index >= strlen($json)) {
+            throw new \RuntimeException('json');
+        }
+        $char = $json[$index];
+        if ($char === '{') {
+            $this->scanJsonObject($json, $index, $depth, $duplicate);
+
+            return;
+        }
+        if ($char === '[') {
+            $this->scanJsonArray($json, $index, $depth, $duplicate);
+
+            return;
+        }
+        if ($char === '"') {
+            $this->parseJsonString($json, $index);
+
+            return;
+        }
+        if ($char === '-' || ctype_digit($char)) {
+            $this->skipJsonNumber($json, $index);
+
+            return;
+        }
+        foreach (['true', 'false', 'null'] as $literal) {
+            if (substr($json, $index, strlen($literal)) === $literal) {
+                $index += strlen($literal);
+
+                return;
+            }
+        }
+        throw new \RuntimeException('json');
+    }
+
+    private function scanJsonObject(string $json, int &$index, int $depth, bool &$duplicate): void
+    {
+        $index++;
+        $this->skipJsonWhitespace($json, $index);
+        if (($json[$index] ?? '') === '}') {
+            $index++;
+
+            return;
+        }
+        $seen = [];
+        while (! $duplicate) {
+            $this->skipJsonWhitespace($json, $index);
+            $key = $this->parseJsonString($json, $index);
+            if (isset($seen[$key])) {
+                $duplicate = true;
+
+                return;
+            }
+            $seen[$key] = true;
+            $this->skipJsonWhitespace($json, $index);
+            if (($json[$index] ?? '') !== ':') {
+                throw new \RuntimeException('json');
+            }
+            $index++;
+            $this->skipJsonWhitespace($json, $index);
+            $this->scanJsonValue($json, $index, $depth + 1, $duplicate);
+            if ($duplicate) {
+                return;
+            }
+            $this->skipJsonWhitespace($json, $index);
+            $char = $json[$index] ?? '';
+            if ($char === ',') {
+                $index++;
+
+                continue;
+            }
+            if ($char === '}') {
+                $index++;
+
+                return;
+            }
+            throw new \RuntimeException('json');
+        }
+    }
+
+    private function scanJsonArray(string $json, int &$index, int $depth, bool &$duplicate): void
+    {
+        $index++;
+        $this->skipJsonWhitespace($json, $index);
+        if (($json[$index] ?? '') === ']') {
+            $index++;
+
+            return;
+        }
+        while (! $duplicate) {
+            $this->skipJsonWhitespace($json, $index);
+            $this->scanJsonValue($json, $index, $depth + 1, $duplicate);
+            if ($duplicate) {
+                return;
+            }
+            $this->skipJsonWhitespace($json, $index);
+            $char = $json[$index] ?? '';
+            if ($char === ',') {
+                $index++;
+
+                continue;
+            }
+            if ($char === ']') {
+                $index++;
+
+                return;
+            }
+            throw new \RuntimeException('json');
+        }
+    }
+
+    private function parseJsonString(string $json, int &$index): string
+    {
+        if (($json[$index] ?? '') !== '"') {
+            throw new \RuntimeException('json');
+        }
+        $index++;
+        $out = '';
+        $length = strlen($json);
+        while ($index < $length) {
+            $char = $json[$index];
+            if ($char === '"') {
+                $index++;
+
+                return $out;
+            }
+            if ($char === '\\') {
+                $index++;
+                $escape = $json[$index] ?? '';
+                $index++;
+                $out .= match ($escape) {
+                    '"', '\\', '/' => $escape,
+                    'b' => "\u{0008}",
+                    'f' => "\u{000C}",
+                    'n' => "\n",
+                    'r' => "\r",
+                    't' => "\t",
+                    'u' => $this->parseJsonUnicode($json, $index),
+                    default => throw new \RuntimeException('json'),
+                };
+
+                continue;
+            }
+            if (ord($char) < 0x20) {
+                throw new \RuntimeException('json');
+            }
+            $out .= $char;
+            $index++;
+        }
+        throw new \RuntimeException('json');
+    }
+
+    private function parseJsonUnicode(string $json, int &$index): string
+    {
+        $unit = $this->readJsonHex($json, $index);
+        if ($unit >= 0xD800 && $unit <= 0xDBFF) {
+            if (substr($json, $index, 2) !== '\\u') {
+                throw new \RuntimeException('json');
+            }
+            $index += 2;
+            $low = $this->readJsonHex($json, $index);
+            if ($low < 0xDC00 || $low > 0xDFFF) {
+                throw new \RuntimeException('json');
+            }
+            $codepoint = 0x10000 + (($unit - 0xD800) << 10) + ($low - 0xDC00);
+
+            return mb_chr($codepoint, 'UTF-8');
+        }
+        if ($unit >= 0xDC00 && $unit <= 0xDFFF) {
+            throw new \RuntimeException('json');
+        }
+
+        return mb_chr($unit, 'UTF-8');
+    }
+
+    private function readJsonHex(string $json, int &$index): int
+    {
+        $hex = substr($json, $index, 4);
+        if (strlen($hex) !== 4 || preg_match('/^[0-9a-fA-F]{4}$/', $hex) !== 1) {
+            throw new \RuntimeException('json');
+        }
+        $index += 4;
+
+        return hexdec($hex);
+    }
+
+    private function skipJsonNumber(string $json, int &$index): void
+    {
+        $length = strlen($json);
+        if (($json[$index] ?? '') === '-') {
+            $index++;
+        }
+        while ($index < $length && ctype_digit($json[$index])) {
+            $index++;
+        }
+        if ($index < $length && $json[$index] === '.') {
+            $index++;
+            while ($index < $length && ctype_digit($json[$index])) {
+                $index++;
+            }
+        }
+        if ($index < $length && ($json[$index] === 'e' || $json[$index] === 'E')) {
+            $index++;
+            if ($index < $length && ($json[$index] === '+' || $json[$index] === '-')) {
+                $index++;
+            }
+            while ($index < $length && ctype_digit($json[$index])) {
+                $index++;
+            }
+        }
+    }
+
+    private function skipJsonWhitespace(string $json, int &$index): void
+    {
+        $length = strlen($json);
+        while ($index < $length && ($json[$index] === ' ' || $json[$index] === "\n" || $json[$index] === "\r" || $json[$index] === "\t")) {
+            $index++;
+        }
     }
 }
