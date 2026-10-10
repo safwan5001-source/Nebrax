@@ -115,6 +115,8 @@ use App\Http\Controllers\Api\PosInvestigationCaseController;
 use App\Http\Controllers\Api\PosLpDigestController;
 use App\Http\Controllers\Api\PosController;
 use App\Http\Controllers\Api\DeliveryPlatformController;
+use App\Http\Controllers\Api\DeliveryConnectorAccountController;
+use App\Http\Controllers\Api\DeliveryConnectorIngestionController;
 use App\Http\Controllers\Api\DeliveryHubOrderController;
 use App\Http\Controllers\Api\PosDeviceController;
 use App\Http\Controllers\Api\PosSessionController;
@@ -203,6 +205,11 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
 
     // فحص صحّة للنشر (بلا مصادقة) — تستخدمه منصّة الاستضافة
     Route::get('health', HealthController::class);
+
+    // DLV-CONNECTOR-CORE-1 — إدخال موقَّع. المستأجر من الربط لا من الجسم. بلا جلسة.
+    Route::post('delivery-connectors/{connector}/events', [DeliveryConnectorIngestionController::class, 'store'])
+        ->whereUuid('connector')
+        ->middleware('throttle:600,1');
 
     // عام (بلا مصادقة)
     Route::post('register', [AuthController::class, 'register'])
@@ -876,6 +883,13 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         Route::post('delivery-hub/orders', [DeliveryHubOrderController::class, 'store'])->middleware($perm('delivery_hub.operate'));
         Route::get('delivery-hub/orders/{id}', [DeliveryHubOrderController::class, 'show'])->whereUuid('id')->middleware($perm('delivery_hub.view'));
         Route::post('delivery-hub/orders/{id}/transition', [DeliveryHubOrderController::class, 'transition'])->whereUuid('id')->middleware($perm('delivery_hub.operate'));
+
+        // DLV-CONNECTOR-CORE-1 — ربط متجر موثوق. السر لا يُعاد بعد الإنشاء/التدوير.
+        Route::get('delivery-connectors', [DeliveryConnectorAccountController::class, 'index'])->middleware([$perm('delivery_connector.view'), $app('sales.pos')]);
+        Route::post('delivery-connectors', [DeliveryConnectorAccountController::class, 'store'])->middleware([$perm('delivery_connector.manage'), $app('sales.pos')]);
+        Route::get('delivery-connectors/{id}', [DeliveryConnectorAccountController::class, 'show'])->whereUuid('id')->middleware([$perm('delivery_connector.view'), $app('sales.pos')]);
+        Route::post('delivery-connectors/{id}/rotate-secret', [DeliveryConnectorAccountController::class, 'rotateSecret'])->whereUuid('id')->middleware([$perm('delivery_connector.manage'), $app('sales.pos')]);
+        Route::post('delivery-connectors/{id}/disable', [DeliveryConnectorAccountController::class, 'disable'])->whereUuid('id')->middleware([$perm('delivery_connector.manage'), $app('sales.pos')]);
 
 
         // طرق الدفع: بيان مالي مشترك يحدد وجهة السند ورسومه.
