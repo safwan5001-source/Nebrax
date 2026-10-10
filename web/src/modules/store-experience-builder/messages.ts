@@ -542,6 +542,16 @@ export const CUSTOMIZER_MESSAGES = {
     ctaStyleSolid: "مملوء",
     ctaStyleOutline: "بإطار",
     ctaStyleLink: "رابط نصّي",
+    ctaStyleSoft: "ناعم (درجة فاتحة)",
+    ctaColour: "لون الزرّ",
+    ctaColourDefault: "تلقائي (ألوان القسم)",
+    ctaColourBrand: "لون العلامة",
+    ctaColourAccent: "اللون المميّز",
+    ctaColourText: "لون النص",
+    ctaColourInsufficient:
+      "لا يمكن نشر هذا اللون: تباينه مع خلفية القسم أقل من 4.5:1 لهذا النمط. اختر لوناً آخر أو نمط «مملوء» أو «ناعم».",
+    ctaColourUnprovable:
+      "لا يمكن إثبات وضوح هذا اللون فوق خلفية القسم الحالية. غيّر الخلفية أو اختر نمط «مملوء» أو «ناعم».",
     heroCtaHint:
       "بلا أزرار تظهر «تسوّق الآن» تلقائياً. الرابط مسار داخل المتجر يبدأ بـ / أو عنوان https://؛ والزر الناقص لا يظهر.",
     bannerCtaHint:
@@ -1617,6 +1627,16 @@ export const CUSTOMIZER_MESSAGES = {
     ctaStyleSolid: "Filled",
     ctaStyleOutline: "Outlined",
     ctaStyleLink: "Text link",
+    ctaStyleSoft: "Soft (light tint)",
+    ctaColour: "Button colour",
+    ctaColourDefault: "Automatic (section colours)",
+    ctaColourBrand: "Brand colour",
+    ctaColourAccent: "Accent colour",
+    ctaColourText: "Text colour",
+    ctaColourInsufficient:
+      "This colour cannot be published: its contrast with the section background is under 4.5:1 for this style. Pick another colour, or the Filled or Soft style.",
+    ctaColourUnprovable:
+      "This colour cannot be proven legible over the section's current background. Change the background, or use the Filled or Soft style.",
     heroCtaHint:
       "With no buttons the default “Shop now” appears. A link is a store path starting with / or an https:// address; an incomplete button is not shown.",
     bannerCtaHint:

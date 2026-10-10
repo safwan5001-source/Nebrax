@@ -246,6 +246,7 @@ async function pushSectionNode(
           null
         }
         backdrop={backdropNode(section, index, ctx, false)}
+        designCtx={ctx.design}
       />,
     );
     return;

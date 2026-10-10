@@ -1,0 +1,12 @@
+{
+ "pages": 180,
+ "checks": 1080,
+ "buttons": 2160,
+ "paintChecks": 2160,
+ "pixelChecks": 1560,
+ "gatePassedColourPages": 24,
+ "gateRejectedColourPages": 30,
+ "blind": false,
+ "violations": [],
+ "sample": []
+}

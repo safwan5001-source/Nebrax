@@ -133,15 +133,23 @@ export interface HeroCta {
   label: string;
   href: string;
   /**
-   * CUST-HV V6c-5 (V0 §6.1) — per-CTA look override: `solid` (the section's primary button), `outline`, or `link`
-   * (text only). Absent ⇒ by position (first solid, second outline), exactly as before. Every style paints with
-   * colours the section already proves against its own backdrop, so this adds no new contrast surface.
+   * CUST-HV V6c-5/6 (V0 §6.1) — per-CTA look override: `solid` (the section's primary button), `soft`, `outline`, or
+   * `link` (text only). Absent ⇒ by position (first solid, second outline), exactly as before. With no `colour`
+   * every style paints with colours the section already proves against its own backdrop.
    */
   style?: CtaStyle;
+  /**
+   * CUST-HV V6c-6 (V0 §6.1) — per-CTA colour role. `solid` / `soft` compute their label over their own fill (they pass
+   * by construction); `outline` / `link` label with the role colour itself, which the publish gate proves against the
+   * section's backdrop (`ctaColourIssues`). Absent ⇒ the section's own colours.
+   */
+  colour?: CtaColour;
 }
 
-export const CTA_STYLES = ["solid", "outline", "link"] as const;
+export const CTA_STYLES = ["solid", "soft", "outline", "link"] as const;
 export type CtaStyle = (typeof CTA_STYLES)[number];
+export const CTA_COLOURS = ["brand", "accent", "text"] as const;
+export type CtaColour = (typeof CTA_COLOURS)[number];
 
 /**
  * CUST-HV V6a — a hero instance's own content. Absent ⇒ the legacy global
@@ -393,6 +401,13 @@ function normalizeCtaList(raw: unknown, max: number): HeroCta[] {
       (CTA_STYLES as readonly string[]).includes(style)
     ) {
       cta.style = style as CtaStyle;
+    }
+    const colour = entry.colour;
+    if (
+      typeof colour === "string" &&
+      (CTA_COLOURS as readonly string[]).includes(colour)
+    ) {
+      cta.colour = colour as CtaColour;
     }
     ctas.push(cta);
     if (ctas.length >= max) break;
