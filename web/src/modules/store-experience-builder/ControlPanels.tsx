@@ -45,6 +45,7 @@ import {
   featuredContentOf,
   offersContentOf,
   productShelfContentOf,
+  CTA_COLOURS,
   CTA_STYLES,
   MAX_BENEFIT_ITEMS,
   MAX_CUSTOM_BLOCKS,
@@ -52,9 +53,11 @@ import {
   MAX_OFFERS,
   type BannerContent,
   type BenefitItem,
+  type CtaColour,
   type CtaStyle,
   type CustomBlock,
 } from "./presentation/section-content";
+import { type CtaColourIssue, ctaColourIssues } from "./presentation/cta-colour";
 import {
   type CustomizerLocale,
   type CustomizerMessageKey,
@@ -76,6 +79,7 @@ import { useBackgroundMediaBounds } from "./media/use-background-media-bounds";
 import { GlobalTokensEditor } from "./design/GlobalTokensEditor";
 import { PaletteEditor } from "./design/PaletteEditor";
 import { SECTION_DESIGN_CAPABILITIES } from "./presentation/section-design";
+import type { SectionDesign } from "./presentation/section-design";
 import type { DesignContext } from "./presentation/section-design-resolve";
 import { OfferSummary, OfferThumb } from "./OfferParts";
 import { offerDisplayName } from "./offers-display";
@@ -1215,6 +1219,8 @@ function HomepagePanel({
                   headline: config.homepage.heroHeadline,
                   subheadline: config.homepage.heroSubheadline,
                 }}
+                design={selected.design}
+                ctx={designContext}
                 t={t}
                 onChange={(content) =>
                   updateSection(selectedIndex, { ...selected, content })
@@ -1225,6 +1231,8 @@ function HomepagePanel({
                 key={selected.id}
                 sectionId={selected.id}
                 content={bannerContentOf(selected)}
+                design={selected.design}
+                ctx={designContext}
                 locale={locale}
                 timezone={timezone}
                 t={t}
@@ -2047,25 +2055,43 @@ function isHeroAuthored(content: HeroContent | undefined): boolean {
  * caller owns what an empty slot means. The link is sanitised on every commit (a half-typed `https://…` becomes
  * ""), so it is edited locally and committed on blur — the same deferred field the app-store URLs use.
  */
-type CtaSlot = { label: string; href: string; style?: CtaStyle };
+type CtaSlot = { label: string; href: string; style?: CtaStyle; colour?: CtaColour };
 
 const CTA_STYLE_LABEL = {
   solid: "ctaStyleSolid",
+  soft: "ctaStyleSoft",
   outline: "ctaStyleOutline",
   link: "ctaStyleLink",
 } as const satisfies Record<CtaStyle, CustomizerMessageKey>;
+
+const CTA_COLOUR_LABEL = {
+  brand: "ctaColourBrand",
+  accent: "ctaColourAccent",
+  text: "ctaColourText",
+} as const satisfies Record<CtaColour, CustomizerMessageKey>;
+
+/** What the publish gate would say about the buttons of a section (for the editor's live advisory). */
+type CtaJudge = (ctas: CtaSlot[]) => CtaColourIssue[];
 
 function CtaSlots({
   slots,
   slotAttr,
   t,
   onChange,
+  judge,
 }: {
   slots: CtaSlot[];
   slotAttr: "data-hero-cta-slot" | "data-banner-cta-slot";
   t: (key: CustomizerMessageKey) => string;
   onChange: (next: CtaSlot[]) => void;
+  judge?: CtaJudge;
 }) {
+  // The gate numbers the STORED buttons (empty slots are not stored): map its verdict back onto the slots.
+  const stored = slots.map((slot, slotIndex) => ({ slot, slotIndex })).filter(({ slot }) => slot.label !== "" || slot.href !== "");
+  const verdict = new Map<number, CtaColourIssue["code"]>();
+  if (judge) {
+    for (const issue of judge(stored.map(({ slot }) => slot))) verdict.set(stored[issue.index].slotIndex, issue.code);
+  }
   const setSlot = (index: number, partial: Partial<CtaSlot>) =>
     onChange(slots.map((slot, i) => (i === index ? { ...slot, ...partial } : slot)));
   // Default = by position (first solid, second outline): the key is removed, never stored as undefined.
@@ -2074,7 +2100,17 @@ function CtaSlots({
       slots.map((slot, i) => {
         if (i !== index) return slot;
         const { style: _previous, ...rest } = slot;
-        return style === "" ? rest : { ...rest, style };
+        if (style === "") return rest;
+        // `soft` is a tint of a role colour: choosing it without one picks the brand colour (never a silent no-op)
+        return { ...rest, style, ...(style === "soft" && !rest.colour ? { colour: "brand" as const } : {}) };
+      }),
+    );
+  const setColour = (index: number, colour: CtaColour | "") =>
+    onChange(
+      slots.map((slot, i) => {
+        if (i !== index) return slot;
+        const { colour: _previous, ...rest } = slot;
+        return colour === "" ? rest : { ...rest, colour };
       }),
     );
   return (
@@ -2114,6 +2150,27 @@ function CtaSlots({
               ))}
             </select>
           </Field>
+          <Field label={t("ctaColour")}>
+            <select
+              className={selectClass}
+              data-cta-colour-select=""
+              value={cta.colour ?? ""}
+              disabled={cta.label === "" && cta.href === ""}
+              onChange={(event) => setColour(index, event.target.value as CtaColour | "")}
+            >
+              <option value="">{t("ctaColourDefault")}</option>
+              {CTA_COLOURS.map((colour) => (
+                <option key={colour} value={colour}>
+                  {t(CTA_COLOUR_LABEL[colour])}
+                </option>
+              ))}
+            </select>
+          </Field>
+          {verdict.has(index) ? (
+            <p data-cta-colour-issue={verdict.get(index)} role="status" className="text-[12px] leading-5 text-warning">
+              {t(verdict.get(index) === "contrast_unprovable" ? "ctaColourUnprovable" : "ctaColourInsufficient")}
+            </p>
+          ) : null}
         </fieldset>
       ))}
     </>
@@ -2123,11 +2180,15 @@ function CtaSlots({
 function HeroFields({
   content,
   legacy,
+  design,
+  ctx,
   t,
   onChange,
 }: {
   content: HeroContent | undefined;
   legacy: { headline: string; subheadline: string };
+  design?: SectionDesign;
+  ctx: DesignContext;
   t: (key: CustomizerMessageKey) => string;
   onChange: (content: HeroContent) => void;
 }) {
@@ -2174,6 +2235,7 @@ function HeroFields({
         slots={ctas}
         slotAttr="data-hero-cta-slot"
         t={t}
+        judge={(list) => ctaColourIssues("hero", list, design, ctx)}
         onChange={(next) => commit({ ...state, ctas: next })}
       />
       <p className="text-[12px] leading-5 text-muted">{t("heroCtaHint")}</p>
@@ -2184,6 +2246,8 @@ function HeroFields({
 function BannerFields({
   sectionId,
   content,
+  design,
+  ctx,
   locale,
   timezone,
   t,
@@ -2191,6 +2255,8 @@ function BannerFields({
 }: {
   sectionId: string;
   content: BannerContent;
+  design?: SectionDesign;
+  ctx: DesignContext;
   locale: CustomizerLocale;
   timezone: string;
   t: (key: CustomizerMessageKey) => string;
@@ -2225,6 +2291,7 @@ function BannerFields({
         slots={bannerSlots}
         slotAttr="data-banner-cta-slot"
         t={t}
+        judge={(list) => ctaColourIssues("banner", list, design, ctx)}
         onChange={commitBannerCtas}
       />
       <p className="text-[12px] leading-5 text-muted">{t("bannerCtaHint")}</p>

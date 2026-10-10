@@ -88,55 +88,62 @@ export default async function HomePage({ params }: HomePageProps) {
   // document is already normalized: absence is deletion, and empty authored
   // sections (including an Offers section whose selected offers are not live)
   // render nothing.
-  const nodes: React.ReactNode[] = presentation
-    ? await publishedNodes(presentation.homepage.sections, {
-        implemented,
-        // CUST-HV V6a — each hero instance renders its own content; a hero without any keeps
-        // reading the legacy `homepage.heroHeadline/heroSubheadline` (V0 §8.1.4).
-        renderHero: ({ section, headingLevel, designed, backdrop }) => {
-          const own = heroContentOf(section);
-          return (
-            <HeroSection
-              basePath={basePath}
-              locale={locale}
-              storeName={storeName || null}
-              headline={own ? own.headline : heroHeadline}
-              subheadline={own ? (own.subheadline ?? null) : heroSubheadline}
-              ctas={own?.ctas ?? null}
-              headingId={
-                section.id === "hero" ? "home-hero" : `home-hero-${section.id}`
-              }
-              headingLevel={headingLevel}
-              themePreset={presentation.themePreset}
-              designed={designed}
-              backdrop={backdrop}
-            />
-          );
-        },
-        media: identity?.presentationMedia ?? {},
-        basePath,
-        locale,
-        currency,
-        themePreset: presentation.themePreset,
-        apps: presentation.apps,
-        benefitsTitle: homeCopy("benefits"),
-        featuredTitle: homeCopy("featured"),
-        offersTitle: homeCopy("offers"),
-        appTitle: homeCopy("appPromo"),
-        appStoreLabel: homeCopy("appStore"),
-        playStoreLabel: homeCopy("playStore"),
-        design: {
-          primaryColor: presentation.primaryColor,
-          accentColor: presentation.accentColor,
-          palette: presentation.palette,
-          dir: localeDirection(locale),
-        },
-      })
-    : resolveHomeSections()
-        .filter((section) => section.visible)
-        .map((section) => (
-          <div key={section.key}>{implemented[section.key]}</div>
-        ));
+  const designContext = presentation
+    ? {
+        primaryColor: presentation.primaryColor,
+        accentColor: presentation.accentColor,
+        palette: presentation.palette,
+        dir: localeDirection(locale),
+      }
+    : undefined;
+  const nodes: React.ReactNode[] =
+    presentation && designContext
+      ? await publishedNodes(presentation.homepage.sections, {
+          implemented,
+          // CUST-HV V6a — each hero instance renders its own content; a hero without any keeps
+          // reading the legacy `homepage.heroHeadline/heroSubheadline` (V0 §8.1.4).
+          renderHero: ({ section, headingLevel, designed, backdrop }) => {
+            const own = heroContentOf(section);
+            return (
+              <HeroSection
+                basePath={basePath}
+                locale={locale}
+                storeName={storeName || null}
+                headline={own ? own.headline : heroHeadline}
+                subheadline={own ? (own.subheadline ?? null) : heroSubheadline}
+                ctas={own?.ctas ?? null}
+                headingId={
+                  section.id === "hero"
+                    ? "home-hero"
+                    : `home-hero-${section.id}`
+                }
+                headingLevel={headingLevel}
+                themePreset={presentation.themePreset}
+                designed={designed}
+                backdrop={backdrop}
+                designCtx={designContext}
+              />
+            );
+          },
+          media: identity?.presentationMedia ?? {},
+          basePath,
+          locale,
+          currency,
+          themePreset: presentation.themePreset,
+          apps: presentation.apps,
+          benefitsTitle: homeCopy("benefits"),
+          featuredTitle: homeCopy("featured"),
+          offersTitle: homeCopy("offers"),
+          appTitle: homeCopy("appPromo"),
+          appStoreLabel: homeCopy("appStore"),
+          playStoreLabel: homeCopy("playStore"),
+          design: designContext,
+        })
+      : resolveHomeSections()
+          .filter((section) => section.visible)
+          .map((section) => (
+            <div key={section.key}>{implemented[section.key]}</div>
+          ));
 
   // CUST-HV V6a (V0 §8.1.3) — a home page always has exactly one <h1>: with no visible hero, a
   // visually-hidden one names the store.

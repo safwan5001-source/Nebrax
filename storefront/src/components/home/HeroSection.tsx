@@ -1,8 +1,14 @@
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { destination } from "@/lib/home/destination";
-import type { CtaStyle, HeroCta } from "@/lib/presentation/section-content";
+import { ctaPaint, effectiveCtaStyle } from "@/lib/presentation/cta-colour";
+import type {
+  CtaColour,
+  CtaStyle,
+  HeroCta,
+} from "@/lib/presentation/section-content";
+import type { DesignContext } from "@/lib/presentation/section-design-resolve";
 import type { ThemePresetId } from "@/lib/presentation/tokens";
 import { cn } from "@/lib/utils";
 
@@ -14,7 +20,15 @@ const HERO_CTA_LOOK: Record<CtaStyle, string> = {
   outline:
     "border-2 border-store-primary-foreground/70 text-store-primary-foreground",
   link: "px-1 text-store-primary-foreground underline decoration-2 underline-offset-4 md:px-2",
+  // `soft` only exists with a colour (its tint is a role colour's); without one it keeps the section's primary look.
+  soft: "bg-store-primary-foreground text-store-primary shadow-md",
 };
+
+// CUST-HV V6c-6 — a button with an explicit `colour` is painted from three validated custom properties (hex values
+// computed from the palette role, never from the document); `outline` / `link` colours are proven by the publish gate.
+const COLOURED_CTA =
+  "border-2 border-(color:--cta-border) bg-(color:--cta-fill) text-(color:--cta-label)";
+const COLOURED_LINK = "px-1 underline decoration-2 underline-offset-4 md:px-2";
 
 interface HeroSectionProps {
   basePath: string;
@@ -54,6 +68,11 @@ interface HeroSectionProps {
    * the hero's content paints above it. Absent ⇒ the hero is byte-identical to before.
    */
   backdrop?: ReactNode;
+  /**
+   * CUST-HV V6c-6 — the palette the per-CTA `colour` roles resolve in (primary / accent / palette). Absent ⇒ a `colour`
+   * is not painted and the button keeps its style's look.
+   */
+  designCtx?: DesignContext;
 }
 
 /**
@@ -91,6 +110,7 @@ export async function HeroSection({
   headingId = "home-hero",
   headingLevel = 1,
   backdrop,
+  designCtx,
 }: HeroSectionProps) {
   const t = await getTranslations({
     locale: locale as Locale,
@@ -112,12 +132,17 @@ export async function HeroSection({
       label: cta.label.trim(),
       href: destination(basePath, cta.href),
       style: cta.style,
+      colour: cta.colour,
     }))
     .filter(
       (
         cta,
-      ): cta is { label: string; href: string; style: CtaStyle | undefined } =>
-        cta.label !== "" && cta.href !== null,
+      ): cta is {
+        label: string;
+        href: string;
+        style: CtaStyle | undefined;
+        colour: CtaColour | undefined;
+      } => cta.label !== "" && cta.href !== null,
     );
 
   return (
@@ -173,16 +198,33 @@ export async function HeroSection({
           <div className="mt-4 flex flex-wrap items-center gap-2 md:mt-5 md:gap-3">
             {authored.map((cta, index) => {
               // CUST-HV V6c-5 — absent style ⇒ by position (first solid, second outline), exactly as before.
-              const style = cta.style ?? (index === 0 ? "solid" : "outline");
+              const style = effectiveCtaStyle(cta.style, index);
+              // CUST-HV V6c-6 — an explicit colour paints the button from validated custom properties.
+              const paint =
+                cta.colour && designCtx
+                  ? ctaPaint(style, cta.colour, designCtx)
+                  : null;
               return (
                 <Link
                   key={`${index}-${cta.href}`}
                   href={cta.href}
                   data-hero-cta={index === 0 ? "primary" : "secondary"}
                   data-cta-style={style}
+                  data-cta-colour={paint ? cta.colour : undefined}
+                  style={
+                    paint
+                      ? ({
+                          "--cta-fill": paint.fill,
+                          "--cta-label": paint.label,
+                          "--cta-border": paint.border,
+                        } as CSSProperties)
+                      : undefined
+                  }
                   className={cn(
                     "inline-flex h-9 items-center gap-1.5 rounded-store px-4 text-xs font-bold transition-opacity hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-store-primary-foreground md:h-11 md:px-6 md:text-sm",
-                    HERO_CTA_LOOK[style],
+                    paint
+                      ? [COLOURED_CTA, style === "link" && COLOURED_LINK]
+                      : HERO_CTA_LOOK[style],
                   )}
                 >
                   <span>{cta.label}</span>
