@@ -20,7 +20,11 @@ Audited commit: `0534ef16543b01c69b416b58897337e012a9d1ab`. Audit-only: nothing 
 | `working-papers/` | The six domain working papers (streams A–F): scope and files read, positive controls, findings with evidence, NOT VERIFIED lists, cross-stream notes, appendices (coverage matrix, route/permission tables, state machine). Unedited — see the banner in each |
 | `verification-log.md` | The lead's independent re-reads and re-runs of the P0/P1 findings, re-ratings and calibrations |
 | `gap-matrix-review-notes.md` | Conflicts found while mapping findings to register rows |
-| `test-results.md` | Existing-test results per class on SQLite and PostgreSQL |
+| `test-results.md` | Existing PHP test results: the targeted runs per class on SQLite and PostgreSQL, and the full-suite runs with the controlled, per-test attribution of the 124 first-run failures |
+| `web-test-results.md` | Vitest (whole suite) and Playwright (selected specs) results for `web/`: per-topic file list, per-spec results, the failures with their proximate errors and what was established |
+| `web-test-mapping.md` | Every web-dependent finding mapped to the Vitest/Playwright tests that touch it (pins, contradictions, no coverage), `file:line` for each; used to correct four sentences and to plan REM-15/24/34/38 |
+| `official-documents-used.md` | The inventories of official documents (regulatory and technical) that §10.1–10.2 of the report carried in its first revision |
+| `repository-files-cited.md` | The grouped list of repository paths cited as evidence (Appendix A of the report in its first revision) |
 | `sdk-validation-extracts.md` | Validator output for AWJ-generated documents and for the rounding/arithmetic experiments |
 | `probe-outputs.md` | Outputs of the purpose-written probes cited in the findings |
 

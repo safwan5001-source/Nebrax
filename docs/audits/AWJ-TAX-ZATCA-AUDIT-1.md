@@ -7,7 +7,7 @@
 | Audit | AWJ-TAX-ZATCA-AUDIT-1 |
 | Subject | أَوْج / AWJ ERP — VAT engine, accounting integration, e-invoicing, ZATCA Phase 1 and Phase 2, production readiness, security and multi-tenancy |
 | Repository | `safwan5001-source/Nebrax` |
-| Audited commit (base = head) | `0534ef16543b01c69b416b58897337e012a9d1ab` — origin/main when the audit started on 2026-10-10 ("CUST-HV V6c-4: hero overlap preset … (#1285)"). origin/main has since advanced to `b3ff6654911b1fdda2ad4c938266271538a87122` (two commits, #1286 and #1288, storefront hero/banner call-to-action presentation and its tests — `git diff --name-only` lists 43 files, none in the tax, accounting, ZATCA, API, database or deployment surfaces); the audit branch is based on that tip and every finding was verified at `0534ef1…` |
+| Audited commit | `0534ef16543b01c69b416b58897337e012a9d1ab` — origin/main when the audit started on 2026-10-10 ("CUST-HV V6c-4: hero overlap preset … (#1285)"). origin/main has since advanced. The audit branch is based on `b3ff6654911b1fdda2ad4c938266271538a87122` (two commits, #1286 and #1288, storefront hero/banner call-to-action presentation and its tests — `git diff --name-only` lists 43 files); during the review round main moved again to `301eaf2195bd25d569cce9600dfdd484c83f05c7` (#1289, hero/banner layout variants — 25 files, the only PHP file being `app/Support/Commerce/StorefrontSectionDesignNormalizer.php`). No file of these commits is in the tax, accounting, e-invoicing/ZATCA, database or deployment code, and every finding was verified at `0534ef1…` |
 | Audit branch | `audit/awj-tax-zatca-audit-1` — Markdown documents only |
 | Audit date | 2026-10-10 |
 | Mode | **AUDIT ONLY** — no application code, accounting behaviour, schema, test, configuration or credential was changed; no production migration; no real customer data; no live ZATCA submission; nothing merged, deployed or released |
@@ -54,7 +54,7 @@ Under the owner-approved Pre-Production Data Policy (`docs/audits/AWJ_PRE_PRODUC
 | Observations (verified-implemented design notes, not counted above) | 4 |
 | Root-cause groups | 24 |
 | Requirements traced (Gap Matrix) | 295 register rows — R1 229 + R2 66: 10 verified implemented, 28 verified defect, 126 partially implemented, 79 not implemented, 4 not verified, 48 not applicable |
-| Existing tests executed | Targeted: 119 classes · 1 363 tests per database · SQLite 1 346 passed / 7 failed / 10 skipped · PostgreSQL 16 1 356 passed / 7 failed / 0 skipped — all 7 failures are `FuelSaleServiceTest` (sandbox lacked PHP `bcmath`, declared in `Dockerfile` and `ci.yml`). Full suite (SQLite): run 1 5 930 tests, 5 748 passed / 124 failed / 58 skipped — the failures are harness gaps outside the tax/ZATCA surface; after repairing the harness (not the repository) the failing classes pass (228 of 228) and a clean run 2 gives 5 872 passed / 0 failed / 58 skipped (§9.3b) |
+| Existing tests executed | **CI reference at the audited commit (green):** PHP SQLite 5 872 passed · 58 skipped, PostgreSQL 16 5 929 passed · 1 skipped; Web CI: Vitest 445 files / 4 117 tests, then the production build. **Sandbox:** targeted 119 classes × 2 databases (7 failures, all `FuelSaleServiceTest`); full PHP suite on SQLite — first run 124 failures, reproduced identically and attributed to three missing harness dependencies by adding and removing them one at a time (`bcmath` 26 · mail classes 12 · AWS SDK 86), repaired run 5 872 passed · 58 skipped · 0 failed, identical to CI; Vitest 445 files / 4 117 tests passed; Playwright 216 tests from 17 of the 66 specs (194 passed · 15 failed, i.e. 10 distinct tests on the desktop and mobile projects · 7 skipped on the first run; each failing test was re-run alone and 14 of the 15 failures reproduced; cause evidenced for 8 of the 10 tests, none concerns tax or ZATCA) (§9) |
 | Purpose-written probes | 26 probe classes and 9 helper scripts on production code paths with synthetic data (SQLite and PostgreSQL), plus offline runs of the official ZATCA SDK 238-R3.4.8 |
 | Changes made to the repository | **None** to code, schema, tests or configuration — Markdown audit documents only |
 
@@ -193,11 +193,12 @@ While the tasks above are built: keep `ZATCA_SUBMISSION_DISPATCH_ENABLED=false`;
 
 ### 8) نتائج الاختبارات
 
-- **اختبارات المستودع الحالية**: 119 صنفًا، 1363 اختبارًا لكل قاعدة بيانات. SQLite: 1346 نجح / 7 فشل / 10 تخطّي. PostgreSQL 16: 1356 نجح / 7 فشل / 0 تخطّي. الإخفاقات السبعة كلها في `FuelSaleServiceTest` بسبب غياب امتداد `bcmath` في بيئة التدقيق (مُعلن في `Dockerfile` وCI) — قيد بيئي لا عيب في المنتج. التخطّيات العشرة اختبارات PostgreSQL-فقط ونجحت على PostgreSQL.
-- **المجموعة الكاملة (SQLite فقط)**: التشغيل الأول 5 930 اختبارًا: 5 748 نجح / 124 فشل / 58 تخطّي. الإخفاقات الـ124 في 24 صنفًا خارج نطاق الضريبة وZATCA والمحاسبة، وسببها فجوات في بيئة الاختبار المُجمَّعة (غياب `bcmath`، وعدم نسخ `app/Mail` وقوالب البريد، وعدم تثبيت محوّل S3 الذي يثبّته CI) لا في المستودع؛ بعد إصلاح بيئة الاختبار (دون أي تعديل في المستودع) نجحت هذه الأصناف (228 من 228) وأعطى تشغيل ثانٍ نظيف للمجموعة كاملة 5 930 اختبارًا: 5 872 نجح / 0 فشل / 58 تخطّي. لم تُشغَّل المجموعة الكاملة على PostgreSQL، وما نجح تحت بديل `bcmath` (مكتبة PHP صرفة) لا يغني عن الامتداد الحقيقي (NV-13).
+- **مرجع CI عند الالتزام المُدقَّق (أخضر)**: SQLite: 5872 نجح / 58 تخطّي؛ PostgreSQL 16: 5929 نجح / 1 تخطّي؛ Web CI: Vitest ‏445 ملفًا / 4 117 اختبارًا ثم بناء الإنتاج.
+- **اختبارات المستودع الحالية (مستهدفة في بيئة التدقيق)**: 119 صنفًا، 1363 اختبارًا لكل قاعدة بيانات. SQLite: 1346 نجح / 7 فشل / 10 تخطّي. PostgreSQL 16: 1356 نجح / 7 فشل / 0 تخطّي. الإخفاقات السبعة كلها في `FuelSaleServiceTest` لغياب امتداد `bcmath` في بيئة التدقيق، وقد ثبت ذلك بالتجربة (البند التالي) ويمرّر CI هذه الاختبارات بالامتداد الحقيقي. التخطّيات العشرة اختبارات PostgreSQL-فقط ونجحت على PostgreSQL.
+- **المجموعة الكاملة في بيئة التدقيق (SQLite فقط)**: التشغيل الأول 5 930 اختبارًا: 5 748 نجح / 124 فشل / 58 تخطّي. أُعيد بناء الحالة نفسها فتكرّر الإخفاق نفسه بالتطابق (124 اختبارًا بالمعرّفات ذاتها)، ثم أُضيفت التبعيات الثلاث الناقصة في بيئة الاختبار وأُزيلت واحدةً واحدة — `bcmath` ← 26 اختبارًا، صنف `app/Mail` وقوالبه ← 12، حزمة AWS SDK ← 86 — فاختفى كل إخفاق بإضافة تبعية واحدة بعينها وعاد بإزالتها (124 = 26 + 12 + 86، بلا باقٍ غير مُفسَّر؛ وثلاثة اختبارات `database is locked` لا تظهر إلا في تشغيل المجموعة كاملة فنُسبت إلى الحزمة بتشغيل كامل دونها). بعد الإصلاح: 5 872 نجح / 0 فشل / 58 تخطّي، مطابقًا لنتيجة CI على SQLite. لم تُشغَّل المجموعة الكاملة على PostgreSQL في بيئة التدقيق (شغّلها CI).
+- **اختبارات الواجهة (`web/`)**: **توجد** مجموعة اختبارات آلية — Vitest: 445 ملفًا / 4 117 اختبارًا نجحت كلها (في CI وفي بيئة التدقيق)؛ وPlaywright: 216 اختبارًا من 17 مواصفة (الفواتير والمشتريات ومساحة عمل الفاتورة ومراجعة المستندات ونقطة البيع والتقارير): 194 نجح / 15 إخفاقًا (موزّعة على 10 من الاختبارات المختلفة بين مشروعَي سطح المكتب والجوال) / 7 تخطّي في التشغيل الأول، وأُعيد تشغيل كل اختبار فاشل منفردًا فتكرّر 14 من هذه الإخفاقات الـ15؛ وسبب الفشل موثَّق بالأدلة في 8 من أصل 10 من هذه الاختبارات، ولا يتعلق أي منها بالضريبة أو ZATCA، وتعمل على بيانات تجريبية بلا خادم. العبارة السابقة «لا توجد اختبارات للواجهة» كانت خاطئة (استندت إلى سطر قديم في CLAUDE.md).
 - **تجارب مُعدّة للتدقيق**: 26 صنف تجربة و9 سكربتات مساعدة على مسارات الإنتاج ببيانات اصطناعية، وتشغيل محلي لأداة الهيئة الرسمية.
-- **تنبيه**: اجتياز الاختبارات وحده لا يُثبت الامتثال التنظيمي؛ اختبارات ZATCA الحالية تقارن أَوْج بنفسه وتُثبّت بعض الانحرافات (PH2-14).
-- الواجهة (`web/`): لا توجد اختبارات آلية لها (مؤجَّلة بحسب CLAUDE.md)، ولم يُنفَّذ `npm run build` لأن التدقيق لا يغيّر أي كود؛ نتائج الواجهة على مستوى قراءة المصدر.
+- **تنبيه**: اجتياز الاختبارات وحده لا يُثبت الامتثال التنظيمي؛ اختبارات ZATCA الحالية تقارن أَوْج بنفسه وتُثبّت بعض الانحرافات (PH2-14)، واختبارات الواجهة تُثبّت بعضها أيضًا (مثل عقد الطباعة المتساهل CON-06 والتسميات الإنجليزية فقط PH1-15).
 
 ### 9) أهم 5 أولويات للمعالجة
 
@@ -217,10 +218,10 @@ While the tasks above are built: keep `ZATCA_SUBMISSION_DISPATCH_ENABLED=false`;
 |---|---|
 | المستودع | `safwan5001-source/Nebrax` |
 | فرع التدقيق | `audit/awj-tax-zatca-audit-1` (ملفات Markdown فقط) |
-| الالتزام المُدقَّق (Base = Head) | `0534ef16543b01c69b416b58897337e012a9d1ab` |
+| الالتزام المُدقَّق | `0534ef16543b01c69b416b58897337e012a9d1ab` |
 | الملفات المفحوصة | 141 مسار مرجعي من المستودع مذكور كدليل في أوراق العمل، إضافة إلى مسوح بحث على كامل `app/` (القائمة في الملحق A) |
-| الاختبارات المنفَّذة | 119 صنفًا × قاعدتين (SQLite وPostgreSQL) + المجموعة الكاملة على SQLite (تشغيلان) + 26 تجربة + تشغيل SDK محلي |
-| نتيجة الاختبارات/البناء | كما في البند (8)؛ لا بناء للواجهة ولا اختبارات واجهة (لا تغييرات كود، ولا اختبارات آلية للواجهة أصلًا) |
+| الاختبارات المنفَّذة | مرجع CI (PHP على قاعدتين + Vitest + البناء) · 119 صنفًا × قاعدتين (SQLite وPostgreSQL) · المجموعة الكاملة على SQLite (تشغيلان + إعادة بناء الحالة الأولى + تجارب العزل) · Vitest كاملة · Playwright مختارة · 26 تجربة + تشغيل SDK محلي |
+| نتيجة الاختبارات/البناء | كما في البند (8): CI أخضر؛ إخفاقات التشغيل الأول (124) مُسندة بالتجربة إلى تبعيات ناقصة في بيئة الاختبار؛ Vitest 4 117/4 117؛ Playwright: 15 إخفاقًا من أصل 216 اختبارًا (لا علاقة لها بالضريبة)؛ بناء الإنتاج نجح في Web CI (لم يُشغَّل محليًا) |
 | عدد النتائج بحسب الخطورة | P0: 8 · P1: 25 · P2: 49 · P3: 23 (المجموع 105) + 4 ملاحظات تصميم |
 | ما جرى تغييره | **لا شيء** في الكود أو المخطط أو الاختبارات أو الإعدادات؛ أُضيفت مستندات Markdown فقط على فرع التدقيق |
 | ما بقي غير مؤكَّد | سجل NOT VERIFIED (21 بندًا) — أبرزها: إعدادات الإنتاج، منطقة الاستضافة، قبول الواجهة الحيّة لعقد الطلب، وتطبيق الهيئة لاستمرارية PIH بين البيئات |
@@ -262,8 +263,8 @@ Audit only. **Not done:** no change to application code, accounting behaviour, s
 
 * **No production access.** Every production-configuration question is `NOT VERIFIED` (§12). The repository's deployment artefacts show intent, not state.
 * **No live ZATCA interaction.** Acceptance of AWJ's request contract, exact live response schemas, platform enforcement of PIH/ICV continuity across environments, and CSID lifecycle behaviour are unverified; where the SDK disagrees with AWJ the finding says "SDK-verified divergence", not "ZATCA rejected".
-* **Environment gap.** PHP `bcmath` was unavailable in the sandbox (7 `FuelSaleServiceTest` failures in the targeted runs, environment only; the extension is declared in `Dockerfile:13` and `.github/workflows/ci.yml:80`). A later full-suite run on a repaired harness used a pure-PHP `bcmath` polyfill and passed all fuel classes — corroboration, not a substitute for the real extension (NV-13). The assembled harness also lacked `app/Mail`, the mail views and the S3 adapter until it was repaired after the first full run (§9.3b). Ten PostgreSQL-only concurrency tests are skipped on SQLite by design and passed on PostgreSQL; the full suite was not run on PostgreSQL.
-* **Web UI not rendered in a browser.** Findings about rendering (PH1-10, PH1-11, PH1-13, PH1-15) are source-level unless stated.
+* **Test-environment dependencies (resolved and proven).** The sandbox harness first lacked three dependencies that CI installs — PHP `bcmath`, `app/Mail` with its mail views, and `league/flysystem-aws-s3-v3`. They account for all 124 first-run failures (26 + 12 + 86) and for the 7 failures of the targeted runs, shown by reproducing the failing state and adding or removing one dependency at a time (§9.3b). The repaired harness uses a pure-PHP `bcmath` polyfill; CI uses the real extension. Ten PostgreSQL-only concurrency tests skip on SQLite by design and passed on PostgreSQL; the full suite was not run on PostgreSQL in the sandbox (CI ran it).
+* **Web UI: jsdom and a Demo-Mode mock, not a real browser against a backend.** The Vitest suite (445 files / 4 117 tests, all passing) renders the A4 compositions in jsdom and was mapped to the web-dependent findings (§9.3d, §9.4b). The Playwright specs (216 tests run) use an in-bundle mock API; 15 failed on the first run for reasons unrelated to tax (§9.3d). No test renders the thermal receipt, the invoice detail page or the credit-note print, so findings about printing, thermal output, QR scanning and backend-driven UI states (PH1-03, PH1-10, PH1-11, PH1-13) rest on source reading plus the jsdom evidence named in each finding.
 * **English ZATCA translations are unofficial**; the Arabic text prevails. Where only the English text was read, the register row says so.
 * **Not legal or tax advice.** Policy questions (back-dating, rounding policy, tax point for online sales, residency) are listed for the owner and a tax adviser, not decided here.
 * **Time-bound.** ZATCA publishes frequently; the evidence reflects documents retrieved on 2026-10-10 (latest e-invoicing wave found: Wave 25, 24 Jul 2026).
@@ -285,6 +286,13 @@ Audit only. **Not done:** no change to application code, accounting behaviour, s
 | **P1** | Serious compliance gap or reliability/security risk with a realistic trigger; limited blast radius or a workaround exists |
 | **P2** | Moderate correctness, robustness or observability gap; low likelihood/impact or unusual precondition |
 | **P3** | Minor hygiene, documentation or UX |
+
+### 2.6 Revision history
+
+| Revision | Commit | What changed |
+|---|---|---|
+| 1 | `01d09e5` (first pull-request head) | First issue of A, B, C and the evidence folder. |
+| 2 | review round on PR #1290 | **Web tests (P1).** The report no longer says that `web/` has no automated UI tests: Vitest (445 files / 4 117 tests) and Playwright (66 specs) exist. The whole Vitest suite and 216 Playwright tests from 17 specs were run (failing tests re-run alone), every web-dependent finding was mapped to the tests that touch it, four statements were corrected (CON-09 and PC-C9 on the PDF path, PH1-15 on title subtitles, PH1-03 on the settings entry point, NV-18 on password inputs), evidence was added to CON-06, PH1-10, PH1-11, PH1-13, PH1-15, SEC-03, VAT-09 and PC-C1/C5/C8/C9/C12/C13, NV-12 and NV-18 were partly closed, and REM-15, REM-24, REM-34 and REM-38 now list the existing tests that pin today's behaviour (§9.3d, §9.4b, `web-test-results.md`, `web-test-mapping.md`). **Failure attribution (P2).** The 124 first-run PHP failures are no longer ascribed to the environment because a later run passed: the failing state was reproduced, decomposed one harness dependency at a time (26 + 12 + 86) and cross-checked against CI (§9.3b, `test-results.md`). No finding changed severity or status label. Citations that pointed past the end of a file or used an abbreviated path were corrected. |
 
 
 ## 3. How tax and e-invoicing work in AWJ today (system map)
@@ -691,6 +699,8 @@ Each finding follows the template: severity · status · business process · **o
 **Regression tests required.** POS checkout ignores/validates the flag against the tenant setting.
 
 **Dependencies.** none.
+
+**Lead calibration (Gap Matrix review).** Web: `getSystemTaxInclusive()` swallows every error and returns `false` (`web/src/lib/tax.ts:10-18`), so a failed `/sales-config/taxes` request silently puts the POS and the forms in exclusive mode; the per-cart flag is client state that Vitest persists and restores (`use-pos-active-carts.test.ts:20`) but no test covers server authority.
 
 #### VAT-10 — Hard-coded default rate `?? 15` in six services ignores the tenant's `default_tax_rate`
 
@@ -1346,7 +1356,7 @@ Each finding follows the template: severity · status · business process · **o
 
 **Dependencies.** none.
 
-**Lead calibration (Gap Matrix review).** Calibration (R1-021, R1-022): the QR is mandatory on simplified invoices in every phase, but optional on tax (standard) invoices in Phase 1 and required on them only from the tenant's integration date — so the exposure of a missing QR is primarily for simplified documents. For a Phase-1-only tenant the missing A4 QR is a breach only for simplified invoices printed on A4 (POS receipts are unaffected); P1 holds because simplified invoices are also printed on A4 outside POS and essentially every tenant is already in a Phase-2 wave (R1-010, R1-016).
+**Lead calibration (Gap Matrix review).** Calibration (R1-021, R1-022): the QR is mandatory on simplified invoices in every phase, but optional on tax (standard) invoices in Phase 1 and required on them only from the tenant's integration date — so the exposure of a missing QR is primarily for simplified documents. For a Phase-1-only tenant the missing A4 QR is a breach only for simplified invoices printed on A4 (POS receipts are unaffected); P1 holds because simplified invoices are also printed on A4 outside POS and essentially every tenant is already in a Phase-2 wave (R1-010, R1-016). Correction to the Impact sentence "the sidebar also hides the e-invoice settings so the tenant has no cue": the entry sits in the Sales-Settings hub (`web/src/app/(app)/sales-settings/page.tsx:31`, `appKey: 'compliance.zatca'`), hidden while the capability is disabled; opened directly, the settings page says that the application is inactive and links to `/applications` (`einvoice/page.tsx:187-193`); what the tenant lacks is a cue on the invoice page, which shows a blank QR area. POS wiring: `fetchQr` is `Promise.resolve({ qr: created.data.zatca?.qr ?? null })` (`web/src/app/(pos)/pos/page.tsx:1433`) and never rejects, so the "QR unavailable" path (`onQrUnavailable`, `:1448`) cannot fire in production: a sale whose response carries no `zatca.qr` prints a receipt without QR and without a warning. No test exercises the disabled-application case (the three page tests stub `nav-state` as enabled).
 
 #### PH1-04 — Seller VAT number is neither format-validated nor required at issuance; invoices are issued with an empty or malformed VAT number in QR, XML and print
 
@@ -1545,7 +1555,7 @@ Each finding follows the template: severity · status · business process · **o
 
 **Dependencies.** PH1-12, PH1-13.
 
-**Lead calibration (Gap Matrix review).** Anchoring (register): R1-064 (draft/approval workflows must not generate the ZATCA document before finalisation) and R1-102 (a tax invoice is issued only once; reprints must not alter number or date). Partial anchor R1-028 (invoices cannot be cancelled) and Detailed Guidelines §5.6, which extends the prohibition to invoices generated by the system or outside it: a numbered draft titled "فاتورة ضريبية" that is later deleted (and its number reused) is a document presented as a tax invoice that vanishes without a credit note.
+**Lead calibration (Gap Matrix review).** Anchoring (register): R1-064 (draft/approval workflows must not generate the ZATCA document before finalisation) and R1-102 (a tax invoice is issued only once; reprints must not alter number or date). Partial anchor R1-028 (invoices cannot be cancelled) and Detailed Guidelines §5.6, which extends the prohibition to invoices generated by the system or outside it: a numbered draft titled "فاتورة ضريبية" that is later deleted (and its number reused) is a document presented as a tax invoice that vanishes without a credit note. Web tests: `document-modern.test.tsx:289-317` renders a `status: 'draft'` model and requires the ZATCA caption and the compliance footer, so it pins the behaviour (fixing the finding changes it); the invoice page and its print menu are exercised only by Playwright in Demo Mode (`invoice-detail-interactions.spec.ts`: posted menu 7 items, draft 8).
 
 #### PH1-11 — POS thermal receipt is titled "فاتورة ضريبية" (standard) for simplified invoices and shows date only (no issue time)
 
@@ -1574,7 +1584,7 @@ Each finding follows the template: severity · status · business process · **o
 
 **Dependencies.** PH1-01.
 
-**Lead calibration (Gap Matrix review).** Calibration (R1-099; Annex 2 row 3.2): the issue time is mandatory in the data but "Not required" on the printout, so the "date only" part is not a defect; the wrong document title (R1-101) remains.
+**Lead calibration (Gap Matrix review).** Calibration (R1-099; Annex 2 row 3.2): the issue time is mandatory in the data but "Not required" on the printout, so the "date only" part is not a defect; the wrong document title (R1-101) remains. Web tests: no test renders `ThermalReceipt`; `from-invoice.test.ts:79` asserts `model.type === 'tax_invoice'` when no `type` is passed (the POS path), and `document-output-template.test.ts:36-40` shows that the catalogue mapping for simplified invoices exists but is not used by the POS builder. The fix needs `zatca_document_type` on the POS receipt resource (`web/src/lib/pos-receipt.ts:20-30` has none) as well as a builder input.
 
 #### PH1-12 — Invoice numbers are allocated at draft, reused/gapped by draft deletion, restarted by mid-year prefix/suffix edits and per branch, and callers may inject arbitrary numbers at service level
 
@@ -1634,7 +1644,7 @@ Each finding follows the template: severity · status · business process · **o
 
 **Dependencies.** PH1-03, PH1-10.
 
-**Lead calibration (Gap Matrix review).** Official anchor (R1-035): no certification is required and compliance may be self-certified, but ZATCA may verify it — a public "compliant" claim therefore acts as a self-certification that this audit's evidence contradicts.
+**Lead calibration (Gap Matrix review).** Official anchor (R1-035): no certification is required and compliance may be self-certified, but ZATCA may verify it — a public "compliant" claim therefore acts as a self-certification that this audit's evidence contradicts. Web: the compliance-footer sentence is the default footer for every document type whenever `footerText` is null — quotations and purchase orders included (`doc-footer.tsx:21-24`; `from-quote.ts:84`, `from-purchase-order.ts:92`); `document-modern.test.tsx:289-317` requires it on a draft model, so making it conditional on a posted document with a QR must update that test.
 
 #### PH1-14 — QR timestamp offset follows the server timezone (`+00:00`/`+03:00` form) and ignores `tenants.timezone`; inconsistent with the Phase-2 encoder (`Z`)
 
@@ -1670,7 +1680,7 @@ Each finding follows the template: severity · status · business process · **o
 | | |
 |---|---|
 | Severity | **P2** |
-| Status | VERIFIED DEFECT — VERIFIED DEFECT (code-level; not rendered in this sandbox) |
+| Status | VERIFIED DEFECT (code-level, and pinned by jsdom render tests of the v2 compositions; not rendered in a real browser) |
 | Root-cause group · task | `RC-OTHER` · REM-34 |
 | Official sources (register rows) | `R1-034` [DG-EN]; [TIG-EN] [DG] 5.7 p.28, 6.6 p.36, FAQ pp.60, 63; [TIG] 4.2.1 pp.16-17; `R1-082` [IR] Art. 53(5) chapeau, p.51; Art. 66(2), p.61; `R1-190` [IR] Art. 66(2), p.61; `R1-208` [VCG] table row 1, p.4; `R2-036` D4 FAQ p.59; D5 FAQ p.78 |
 
@@ -1692,7 +1702,7 @@ Each finding follows the template: severity · status · business process · **o
 
 **Dependencies.** none.
 
-**Lead calibration (Gap Matrix review).** Citation correction (R1-082, R1-190): the Arabic-language rule is IR Art. 53(5) chapeau and Art. 66(2); Art. 53(1) defines when a tax invoice is required. Substance and rating unchanged.
+**Lead calibration (Gap Matrix review).** Citation correction (R1-082, R1-190): the Arabic-language rule is IR Art. 53(5) chapeau and Art. 66(2); Art. 53(1) defines when a tax invoice is required. Substance and rating unchanged. Web tests (Vitest, jsdom — all passing): the v2 compositions render English-only labels when `model.language = 'en'`, and six tests pin that output for a `tax_invoice` model (`use-document-label-mode.test.tsx:38`, `document-modern.test.tsx:436`, `document-classic-v2.test.tsx:164`, `document-erp-v2.test.tsx:163`, `document-minimal-v2.test.tsx:174`, `document-retail-v2.test.tsx:178`), so the fix must update them. Correction to the sentence "titles do include the alternate-language subtitle (`dtAlt`)": it holds for the legacy compositions; in the v2 compositions the title goes through `ModernDocumentTitle` → `ModernBilingualLabel`, which prints the English string only in `en` mode (`modern-bilingual-label.tsx:36`), so the title is English-only there as well.
 
 #### PH1-16 — Retention/preservation: 365-day governed purge of Document-Center files, local disk storage, no archive/bulk export of XML/QR, single-invoice retrieval only
 
@@ -2315,7 +2325,7 @@ Each finding follows the template: severity · status · business process · **o
 
 **Official requirement.** "Taxpayers must submit the Simplified Tax Invoices in XML format … to FATOORA Platform for 'Reporting' within 24 hours of generation using APIs" (`E-Invoicing_Detailed__Guideline.txt:554-558`, also `:2075-2077`); Technical Guideline 4.3.1 (`E-invoicing-Detailed-Technical-Guideline.txt:1612-1626`); if not shared within 24 h the seller must notify ZATCA via a dedicated form (`E-Invoicing_Detailed__Guideline.txt:1630-1636`).
 
-**Actual behaviour.** The only entry points are `POST /invoices/{id}/zatca/submissions` (needs an `Idempotency-Key` header, throttled 10/min) and `POST …/{attemptId}/dispatch` (`routes/api.php:681-684`; `ZatcaSubmissionController.php:34-100`). Nothing calls them automatically: no observer/event on posting (`InvoiceService::post` has no submission hook), no scheduler entry (`routes/console.php:1-72` has no ZATCA command), `source='automatic'` is allowed by the model (`ZatcaSubmissionAttempt.php:63`) but never produced, and the `submission_mode` setting is stored only ("عقدان محفوظان لطبقة orchestration القادمة", `ZatcaSettingsController.php:16-18`; `Settings.php:241-243`; grep: no reader). **No web/mobile UI calls the submission endpoints** (grep `zatca/submissions` in `web/src`, `mobile/`: none); the settings UI even offers "automatic" and says "Automatic mode will still allow a manual retry" (`web/src/messages/en.json:5987-5991`) although nothing implements it. No deadline column, no backlog query, no alert before breach (probe P08: 3-day-old pending attempt, no listing route).
+**Actual behaviour.** The only entry points are `POST /invoices/{id}/zatca/submissions` (needs an `Idempotency-Key` header, throttled 10/min) and `POST …/{attemptId}/dispatch` (`routes/api.php:681-684`; `ZatcaSubmissionController.php:34-100`). Nothing calls them automatically: no observer/event on posting (`InvoiceService::post` has no submission hook), no scheduler entry (`routes/console.php:1-71` has no ZATCA command), `source='automatic'` is allowed by the model (`ZatcaSubmissionAttempt.php:63`) but never produced, and the `submission_mode` setting is stored only ("عقدان محفوظان لطبقة orchestration القادمة", `ZatcaSettingsController.php:16-18`; `Settings.php:241-243`; grep: no reader). **No web/mobile UI calls the submission endpoints** (grep `zatca/submissions` in `web/src`, `mobile/`: none); the settings UI even offers "automatic" and says "Automatic mode will still allow a manual retry" (`web/src/messages/en.json:5987-5991`) although nothing implements it. No deadline column, no backlog query, no alert before breach (probe P08: 3-day-old pending attempt, no listing route).
 
 **Expected behaviour.** Posting a simplified invoice (and POS checkout) must enqueue reporting automatically (or at least schedule it) with a per-invoice deadline (`issued_at + 24h`), a sweep that retries/escalates before the deadline, and an operator backlog view.
 
@@ -2545,7 +2555,7 @@ Each finding follows the template: severity · status · business process · **o
 
 **Official requirement.** n/a — internal invariant (audit trail must say which ZATCA environment accepted a document).
 
-**Actual behaviour.** `zatca_submission_attempts` has no `environment` column (migration `000130:11-36`; probe P09 asserts absence). The dispatcher resolves credentials/endpoint from the *current* `active_environment` (`ZatcaSubmissionDispatcher.php:33`, `ZatcaTransportCredentialResolver.php:22`): probe P09 shows an attempt created under simulation being POSTed to `…/core/…` after the switch. After a simulation acceptance, `requestManual` refuses any new attempt (409 "مقبولة لدى ZATCA", `ZatcaSubmissionService.php:52-54`; probe P09). The UI only warns on switching (`web/.../einvoice/page.tsx:240-241`).
+**Actual behaviour.** `zatca_submission_attempts` has no `environment` column (migration `000130:11-36`; probe P09 asserts absence). The dispatcher resolves credentials/endpoint from the *current* `active_environment` (`ZatcaSubmissionDispatcher.php:33`, `ZatcaTransportCredentialResolver.php:22`): probe P09 shows an attempt created under simulation being POSTed to `…/core/…` after the switch. After a simulation acceptance, `requestManual` refuses any new attempt (409 "مقبولة لدى ZATCA", `ZatcaSubmissionService.php:52-54`; probe P09). The UI only warns on switching (`web/src/app/(app)/sales-settings/einvoice/page.tsx:240-241`).
 
 **Expected behaviour.** Persist `environment` (and credential fingerprint) on each attempt; `assertSnapshot` must refuse dispatch when the active environment differs from the attempt's; "already accepted" must be evaluated per environment; invoices signed under simulation should be flagged as non-production.
 
@@ -2653,7 +2663,7 @@ Each finding follows the template: severity · status · business process · **o
 
 **Official requirement.** n/a — internal availability invariant.
 
-**Actual behaviour.** `UpdateZatcaSettingsRequest` validates `active_environment` only against the enum (`UpdateZatcaSettingsRequest.php:22`); the UI disables options without credentials (`web/.../einvoice/page.tsx:240`) but the server accepts them (probe P11: owner PUT `active_environment=production` without a production credential ⇒ 200). Because a credential row exists for another environment, `ZatcaService::buildFor` takes the signing path and throws (`ZatcaService.php:89-105`; probe P11 "بيانات اعتماد ZATCA لبيئة production غير مهيأة"), so every subsequent posting/POS checkout rolls back until the setting is reverted.
+**Actual behaviour.** `UpdateZatcaSettingsRequest` validates `active_environment` only against the enum (`UpdateZatcaSettingsRequest.php:22`); the UI disables options without credentials (`web/src/app/(app)/sales-settings/einvoice/page.tsx:240`) but the server accepts them (probe P11: owner PUT `active_environment=production` without a production credential ⇒ 200). Because a credential row exists for another environment, `ZatcaService::buildFor` takes the signing path and throws (`ZatcaService.php:89-105`; probe P11 "بيانات اعتماد ZATCA لبيئة production غير مهيأة"), so every subsequent posting/POS checkout rolls back until the setting is reverted.
 
 **Expected behaviour.** Server-side validation that the target environment has a `configured`, unexpired credential (and, for production, a production-stage CSID), plus a confirmation step; expose the blocker in readiness.
 
@@ -2850,7 +2860,7 @@ Each finding follows the template: severity · status · business process · **o
 
 **Expected behaviour.** Consistent lock ordering (anchor first) or no partner `FOR UPDATE` before the anchor; posting transactions retry on `DeadlockException`.
 
-**Evidence.** Lock sites: `InvoiceService.php:889` (invoice), `:1150` (partner `lockForUpdate`, reached before `:1004` ledger post for unpaid credit invoices; early returns `:1137-1146` only for cash / is_paid), `LedgerService.php:59` → `AccountingDateGuard.php:112-115` (tenant), `GeneratesDocumentNumbers.php:153-170` (tenant anchor when no branch / CompanyWide), `ZatcaService.php:62-64` (tenant). FK: `2025_01_01_000005_create_payments.php:19` (`partner_id … constrained('partners')`). PG server log `/var/log/postgresql/postgresql-16-main.log` lines 309-315 & 345-363: `Process 22764: select * from "tenants" … for update` ⟷ `Process 22771: insert into "payments" (…)`, and `select * from "partners" … for update` waiters; race logs `<audit-workspace>/logs/F-pg-chain.log` (first run: 2 deadlocks) and `F-pg-race2.log` (unsigned+payment: 5 failures; signed+payment: 4 failures; invoice-only: 0 failures ×3).
+**Evidence.** Lock sites: `InvoiceService.php:889` (invoice), `:1150` (partner `lockForUpdate`, reached before `:1004` ledger post for unpaid credit invoices; early returns `:1137-1146` only for cash / is_paid), `LedgerService.php:59` → `AccountingDateGuard.php:112-115` (tenant), `GeneratesDocumentNumbers.php:153-167` (tenant anchor when no branch / CompanyWide), `ZatcaService.php:62-64` (tenant). FK: `2025_01_01_000005_create_payments.php:19` (`partner_id … constrained('partners')`). PG server log `/var/log/postgresql/postgresql-16-main.log` lines 309-315 & 345-363: `Process 22764: select * from "tenants" … for update` ⟷ `Process 22771: insert into "payments" (…)`, and `select * from "partners" … for update` waiters; race logs `<audit-workspace>/logs/F-pg-chain.log` (first run: 2 deadlocks) and `F-pg-race2.log` (unsigned+payment: 5 failures; signed+payment: 4 failures; invoice-only: 0 failures ×3).
 
 **Impact.** Operational/financial — intermittent 500s on invoice posting / POS checkout under concurrency; users retry and may double-submit; throughput collapses as victims serialize. Production triggers (not individually reproduced): any transaction holding the tenant anchor before inserting/updating partner-referencing rows — e.g. `DeliveryNoteSalesInvoiceDraftBuilder::assertInvoicePlanAvailable` (`:239-241` locks tenant, then `:216` creates the draft invoice referencing the partner), CLI/queue/scheduler contexts without `BranchContext` (tenant-anchored numbering for every `BelongsToBranch` document), and the symmetric `InventoryState` ordering (`InventoryService.php:496` locks stock state rows before ledger posting while invoice posting locks them after the anchor).
 
@@ -2887,7 +2897,7 @@ Each finding follows the template: severity · status · business process · **o
 
 **Dependencies.** SEC-06 (environment switch semantics).
 
-**Lead calibration (Gap Matrix review).** Calibration (R1-041, R1-061, R1-063): "revert to Phase 1 signing" is not a permitted fallback for a tenant after its integration date — unsigned output would be non-compliant. The compliant recovery path is the contingency procedure (notify ZATCA, issue manually, regenerate when fixed — CON-05); the credential repair path, expiry warnings and readiness gate in the recommendation stand.
+**Lead calibration (Gap Matrix review).** Calibration (R1-041, R1-061, R1-063): "revert to Phase 1 signing" is not a permitted fallback for a tenant after its integration date — unsigned output would be non-compliant. The compliant recovery path is the contingency procedure (notify ZATCA, issue manually, regenerate when fixed — CON-05); the credential repair path, expiry warnings and readiness gate in the recommendation stand. Web (source level, untested): the e-invoice settings page loads settings and credentials with one `Promise.all` (`einvoice/page.tsx:104-108`), so if `GET /zatca-credentials` fails — for example after an `APP_KEY` rotation — only the error alert renders and the credential form, the owner's only recovery path from the UI, is unreachable. The page offers no credential delete or disable (two PUTs only).
 
 #### SEC-04 — Deactivated user (`is_active = false`) keeps full API access with existing tokens
 
@@ -3061,7 +3071,7 @@ Each finding follows the template: severity · status · business process · **o
 
 **Expected behaviour.** A dedicated per-tenant ICV anchor (e.g. `zatca_counters`) so unrelated postings do not queue behind signing; keep the chain serialised.
 
-**Evidence.** `ZatcaService.php:62-64`; `AccountingDateGuard.php:112-115`; `GeneratesDocumentNumbers.php:153-170`; `F-pg-race2.log` timings.
+**Evidence.** `ZatcaService.php:62-64`; `AccountingDateGuard.php:112-115`; `GeneratesDocumentNumbers.php:153-167`; `F-pg-race2.log` timings.
 
 **Impact.** Operational (latency, DoS amplification by large invoices).
 
@@ -3329,19 +3339,21 @@ Each finding follows the template: severity · status · business process · **o
 
 **Official requirement.** VAT Implementing Regulations Art. 53(5)(f),(h),(i),(j) — quantity and nature, taxable amount per rate, unit price excluding VAT, discounts, applicable rate, VAT amount in riyals [R1-083]; Implementation Resolution (19 May 2023) Annex 2 rows 7.1–7.15 (quantity, unit price, line discount, VAT rate and amount — visible) [R1-095] and rows 8.1–8.9 (taxable amount per rate, VAT total in SAR, total including VAT) [R1-096]; narration of the tax treatment where not standard-rated [R1-098]; VAT shown after discount, tax per item when rates differ (TIG FAQ 8–9, p.55) [R1-106]; credit notes must carry all Art. 53 details of the related invoice (IR Art. 54(4)-(5), Annex 2 13.1) [R1-113].
 
-**Actual behaviour.** `app/Support/PrintTemplateContract.php:72-83` allows the item columns number, description, product_code, barcode, quantity, price_before_tax, unit_price, tax, total but requires only `description` and `total` (`REQUIRED_ITEM_COLUMNS`; mirrored in `web/src/modules/documents/registry/document-types.ts:145`), so a published template can drop quantity and unit price; no VAT-rate or line-discount column exists. The VAT label is the constant "ضريبة القيمة المضافة (15%)" (`web/src/messages/ar.json:1524,2184,6291`; `MODERN_TOTAL_LABELS.vat` in `presentation/visual-v2.ts`) and is shown on zero-rated and mixed-rate invoices. The thermal receipt prints subtotal and VAT rows only (`web/src/modules/documents/templates/thermal-receipt.tsx:111-112`) — no discount, shipping or adjustment — so the printed subtotal plus VAT differs from the total whenever those exist; the per-rate taxable amount is not printed. The credit-note builder passes seller name, VAT and CR number but no address (`web/src/modules/documents/builder/from-credit-note.ts:48-56`).
+**Actual behaviour.** `app/Support/PrintTemplateContract.php:72-83` allows the item columns number, description, product_code, barcode, quantity, price_before_tax, unit_price, tax, total but requires only `description` and `total` (`REQUIRED_ITEM_COLUMNS`; mirrored in `web/src/modules/documents/registry/document-types.ts:145`), so a published template can drop quantity and unit price; no VAT-rate or line-discount column exists. The VAT label is the constant "ضريبة القيمة المضافة (15%)" (`web/src/messages/ar.json:1524,2184,6291`; `MODERN_TOTAL_LABELS.vat` in `presentation/visual-v2.ts`) and is shown on zero-rated and mixed-rate invoices. The thermal receipt prints subtotal and VAT rows only (`web/src/modules/documents/templates/thermal-receipt.tsx:111-112`) — no discount, shipping or adjustment — so the printed subtotal plus VAT differs from the total whenever those exist; the per-rate taxable amount is not printed. The thermal template also truncates every line description to one CSS line (`thermal-receipt.tsx:100`), and the POS receipt invoice shape carries only `subtotal`, `tax_amount` and `total` (`web/src/lib/pos-receipt.ts:20-30`), so discount, shipping or adjustment could not be printed even if the template had rows for them. The credit-note builder passes seller name, VAT and CR number but no address (`web/src/modules/documents/builder/from-credit-note.ts:48-56`).
 
 **Expected behaviour.** For tax and simplified documents the required item columns include quantity, unit price, rate and VAT amount, plus a discount column or row whenever a discount exists; the VAT label is derived from the line rates (or neutral); thermal totals reconcile with discount, shipping and adjustment; credit notes print the seller address like the invoices they reference.
 
-**Evidence.** Code read at the cited lines (stream C PC-8 is narrower than it reads: the template cannot hide QR or totals, but it can hide line quantity, price and VAT); Gap Matrix rows R1-083/095/096/098/106/113 (slice GM2 review); no browser rendering (NV-12).
+**Evidence.** Code read at the cited lines (stream C PC-8 is narrower than it reads: the template cannot hide QR or totals, but it can hide line quantity, price and VAT); Gap Matrix rows R1-083/095/096/098/106/113 (slice GM2 review). Existing Vitest suite (445 files / 4 117 tests, all passing at the audited commit): `web/src/modules/documents/registry/document-types.test.ts:68-91` asserts that a `tax_invoice` items block with the columns `description, product_code, barcode, price_before_tax, total` (no quantity, unit price or tax) is `{ valid: true, errors: [] }` — it pins the permissive contract; no test renders `thermal-receipt.tsx` (imported by the registry, never rendered) or the credit-note print; no real-browser rendering (NV-12).
 
 **Impact.** Regulatory (invoice content visible to the buyer) and customer-facing misstatement ("15%" printed on zero-rated or mixed invoices).
 
 **Recommendation.** Deliver with REM-34: enforce the Annex 2 visible fields per document type in the contract, remove the constant from labels, reconcile the thermal totals, pass the seller address into the credit-note model.
 
-**Regression tests required.** Template validation rejects a tax-document template without quantity, unit price, rate and VAT amount; label follows line rates on 0 %/mixed invoices; thermal totals reconcile with discount, shipping and adjustment; credit-note print contains the seller address.
+**Regression tests required.** Template validation rejects a tax-document template without quantity, unit price, rate and VAT amount (update `document-types.test.ts:68-99,130-138`, which currently accept the permissive layout and pin the column catalog); label follows line rates on 0 %/mixed invoices (the `MODERN_TOTAL_LABELS.vat` key is read by `document-modern.test.tsx:385-395` and `visual-v2.test.ts:91`); thermal totals reconcile with discount, shipping and adjustment (add the first `ThermalReceipt` render test); credit-note print contains the seller address.
 
 **Dependencies.** VAT-03, PH1-13.
+
+**Lead calibration (Gap Matrix review).** Web tests (Vitest, jsdom — all passing): the A4 compositions are rendered (`document-modern.test.tsx` and the other v2 suites) and renderers do not recompute money, but `registry/document-types.test.ts:68-91` accepts a tax-invoice items block without quantity, unit price or tax as valid, so the permissive contract is pinned; `thermal-receipt.tsx` is imported by the registry and never rendered by any test, and the credit-note print is untested.
 
 #### CON-07 — No supply-date / tax-point model: no capture of the date of supply, no earliest-of(supply, invoice, payment) derivation, no invoice-issuance deadline control (15th of the following month), no due-date or payment-order triggers for continuous supplies
 
@@ -3410,11 +3422,11 @@ Each finding follows the template: severity · status · business process · **o
 
 **Official requirement.** From the Integration phase, documents must be generated in XML or PDF/A-3 with embedded XML; transmission to ZATCA is XML only [R1-038]; cleared tax invoices are shared with customers in XML or PDF/A-3 [R1-042]; e-invoices must be generated and stored as XML or PDF/A-3 [R1-070, R2-037]; failure to share in the required format is violation #17 [R1-222]; e-invoice file naming (XML Standard §14) [R2-035].
 
-**Actual behaviour.** No PDF/A-3 generation exists: the PDF is produced client-side from the page (`web/src/modules/invoices/services/invoice-pdf.ts`); `grep -i "pdf/a|pdfa|EmbeddedFile"` over `app/` and `web/src` finds only unrelated identifiers; the cleared XML is stored but never served (SUB-04); files are not named per the standard.
+**Actual behaviour.** No PDF/A-3 generation exists: the invoice PDF is produced client-side by rasterising the on-screen document with html2canvas and jsPDF (`documentExporter` = `html2canvasExporter`, `web/src/modules/documents/services/export/index.ts:36`; `web/src/lib/pdf.ts`), so it is an image-only PDF with no text layer and no embedded file — the invoice page does not use `invoice-pdf.ts` (`web/src/app/(app)/invoices/[id]/page.tsx:39,502,518`; Vitest `template-export-contract.test.ts:16-22` asserts that the document pages use `documentExporter` and not the legacy vector exporters); `grep -i "pdf/a|pdfa|EmbeddedFile"` over `app/` and `web/src` finds only unrelated identifiers; the cleared XML is stored but never served (SUB-04); files are not named per the standard.
 
 **Expected behaviour.** After clearance/reporting the system serves the cleared XML and, where a PDF is shared, a PDF/A-3 with the XML embedded, named per the standard, and archives that artefact.
 
-**Evidence.** Gap Matrix rows R1-038/042/070/222, R2-035/037 (slices GM1, GM2, GM5 reviews); lead grep.
+**Evidence.** Gap Matrix rows R1-038/042/070/222, R2-035/037 (slices GM1, GM2, GM5 reviews); lead grep; PDF path re-read after the web-test mapping (the earlier text named `invoice-pdf.ts`, which the invoice page does not import).
 
 **Impact.** Regulatory (sharing format) once Phase 2 is live; compounds SUB-01/SUB-04.
 
@@ -3581,25 +3593,25 @@ What actually works, with evidence. These are the basis for every `VERIFIED IMPL
 
 | # | Control | Evidence |
 |---|---|---|
-| PC-C1 | **Phase-1 QR is computed once at posting and stored** (`invoices.zatca_qr`); it is never recomputed on render. `qrFor()` has a single caller (`buildFor`, `ZatcaService.php:82`); the API (`InvoiceController::zatca` `:341-359`, `InvoiceResource.php:128-139`) and all renderers (`invoices/[id]/page.tsx:626,673,685`; `pos/page.tsx:1468,1726`; `doc-qr.tsx:20,37`) read the stored value. | Probe 1 `stored_qr_and_xml_survive_tenant_rename…`: stored QR/XML unchanged after tenant/partner rename; Probe 3: `/zatca` returns stored QR after company rename. |
+| PC-C1 | **Phase-1 QR is computed once at posting and stored** (`invoices.zatca_qr`); it is never recomputed on render. `qrFor()` has a single caller (`buildFor`, `ZatcaService.php:82`); the API (`InvoiceController::zatca` `:341-359`, `InvoiceResource.php:128-139`) and all renderers (`invoices/[id]/page.tsx:626,673,685`; `pos/page.tsx:1468,1726`; `doc-qr.tsx:20,37`) read the stored value. | Probe 1 `stored_qr_and_xml_survive_tenant_rename…`: stored QR/XML unchanged after tenant/partner rename; Probe 3: `/zatca` returns stored QR after company rename; Vitest `from-invoice.test.ts:82-104` (the stored QR string is passed through verbatim). |
 | PC-C2 | TLV encoding uses **UTF-8 byte length** (`strlen`), amounts are formatted from integer halalas without float (`ZatcaService.php:181-195`), 5 tags in order 1..5. | `ZatcaTest` (10 passed: `tlv_encodes_tag_length_and_value`, `amount_is_formatted…`, `qr_decodes_to_the_five_mandatory_tlv_fields`). Probe 1 zero-tax: tag5 `0.02`, tag4 `3000000.12`. |
 | PC-C3 | **Invoice totals are derived from lines before QR/XML/ledger** (`InvoiceService.php:894-916`, `:1023-1026`); header tampering cannot reach the QR. | `InvoiceTest::totals_are_derived_from_lines_even_if_the_header_is_tampered` passed. |
 | PC-C4 | **Service + API immutability after posting**: `update()` `:163-165`, `deleteDraft()` `:462-464`, controller `update/destroy` route through the service (`InvoiceController.php:289,326`); re-posting blocked by `lockForUpdate` + re-check (`:889-892`). | `InvoiceTest::a_posted_invoice_cannot_be_edited/_deleted` passed; Probe 3: PUT/DELETE/classification/post-again all 422. |
-| PC-C5 | `zatca_document_type` is a **stored snapshot** decided at draft, re-derived only when null (`InvoiceService.php:429-447`, `:1020`); request validation restricts it to `standard\|simplified` (`StoreInvoiceRequest.php:19`); the printed title follows it (`PrintTemplateContract::invoiceDocumentType` `:158-161` → `documentTypes.tax_invoice` = "فاتورة ضريبية" / `simplified_tax_invoice` = "فاتورة ضريبية مبسطة", `ar.json`); the A4 page passes `documentType={catalogType}` (`invoices/[id]/page.tsx:485,640`). | `ZatcaTest` classification tests; `PrintTemplateTest::invoice_document_type_maps_zatca_simplified_independently`. |
+| PC-C5 | `zatca_document_type` is a **stored snapshot** decided at draft, re-derived only when null (`InvoiceService.php:429-447`, `:1020`); request validation restricts it to `standard\|simplified` (`StoreInvoiceRequest.php:19`); the printed title follows it (`PrintTemplateContract::invoiceDocumentType` `:158-161` → `documentTypes.tax_invoice` = "فاتورة ضريبية" / `simplified_tax_invoice` = "فاتورة ضريبية مبسطة", `ar.json`); the A4 page passes `documentType={catalogType}` (`invoices/[id]/page.tsx:485,640`). | `ZatcaTest` classification tests; `PrintTemplateTest::invoice_document_type_maps_zatca_simplified_independently`; Vitest `document-output-template.test.ts:36,40` (simplified maps to `simplified_tax_invoice`). |
 | PC-C6 | **Numbering is DB-guarded and serialised**: unique `(tenant_id, branch_id, number)` + partial unique `(tenant_id, number) WHERE branch_id IS NULL` + unique `(tenant_id, zatca_icv)` (migration `000053:57-70,105-114`); allocation locks the tenant/branch anchor row (`GeneratesDocumentNumbers.php:153-166`); `max()+1` with length-aware ordering (`:95-107`). Number printed == `cbc:ID` in XML (`ZatcaService.php:268`). | PG: `DocumentNumberingTest` 11 passed incl. real concurrency; Probe 2 listed the three unique indexes on PG and confirmed the rival connection blocks on the anchor. Probe 1: `XML cbc:ID == number: true`. |
 | PC-C7 | **ICV is tenant-wide and locked** (`ZatcaService.php:59-75`), separate from document numbering, with a runtime guard preventing per-branch ICV until `branches.vat_number` + a branch-aware unique index exist (`ZatcaIcvScope.php:54-103`; `UpdateZatcaSettingsRequest::withValidator`). | `DocumentNumberingTest::the_zatca_counter_stays_tenant_wide_while_numbers_split_by_branch` passed on PG. |
-| PC-C8 | **Print-template revisions are frozen at posting** for print/pdf/thermal (`InvoiceService::freezeOutputRevisionIds` `:395-422`, `:1038-1040`; `CreditNoteService.php:159-167`); a template cannot hide QR/totals: web `sections` only carries `{logo}` (`document-view.tsx:37`), QR lives inside the `summary` block (`doc-summary.tsx:20`, `document-body.tsx:73`) and `summary`/`header`/`parties`/`items`/`footer` are server-required for invoices (`PrintTemplateContract::layoutContract` `:374-388`). | `InvoiceTest::posting_an_invoice_freezes_the_published_print_template_revision`; `PrintTemplateTest::template_layout_rejects_unsupported_duplicate_and_hidden_required_blocks` passed. |
-| PC-C9 | **Renderers do not recompute money**: `from-invoice.ts:185-192` maps the API's stored strings with `riyalToMinor`; totals/lines are stored values (`doc-totals.tsx:104-133`); the jsPDF generator prints `input.invoice.*` and rasterises the on-page QR SVG (`invoice-pdf.ts:62-63,479-487`); POS receipt reads only server values (`pos-receipt.ts:42-67`). | Code reading; `InvoiceDetail` comment "قراءة فقط" (`pos-invoice-details.tsx:27-32`). |
+| PC-C8 | **Print-template revisions are frozen at posting** for print/pdf/thermal (`InvoiceService::freezeOutputRevisionIds` `:395-422`, `:1038-1040`; `CreditNoteService.php:159-167`); a template cannot hide QR/totals: web `sections` only carries `{logo}` (`document-view.tsx:37`), QR lives inside the `summary` block (`doc-summary.tsx:20`, `document-body.tsx:73`) and `summary`/`header`/`parties`/`items`/`footer` are server-required for invoices (`PrintTemplateContract::layoutContract` `:374-388`). | `InvoiceTest::posting_an_invoice_freezes_the_published_print_template_revision`; `PrintTemplateTest::template_layout_rejects_unsupported_duplicate_and_hidden_required_blocks` passed; Vitest `document-output-template.test.ts:103,133` (frozen revisions ignore later live mappings), `registry/document-types.test.ts:57` (core blocks cannot be hidden). |
+| PC-C9 | **Renderers do not recompute money**: `from-invoice.ts:185-192` maps the API's stored strings with `riyalToMinor`; totals/lines are stored values (`doc-totals.tsx:104-133`); the exported PDF rasterises the on-screen document (`lib/pdf.ts`, html2canvas + jsPDF) — the invoice page does not use `invoice-pdf.ts` (`invoices/[id]/page.tsx:39,502,518`); POS receipt reads only server values (`pos-receipt.ts:42-67`). | Code reading; `InvoiceDetail` comment "قراءة فقط" (`pos-invoice-details.tsx:27-32`); Vitest `from-invoice.test.ts:125`, `pos-receipt.test.ts:40`, `document-quotation-proposal.test.tsx:197`, `document-purchase-order-formal.test.tsx:212`. |
 | PC-C10 | The Public API cannot post, cannot set `number`/`status`/`zatca_*` (`PublicStoreInvoiceRequest.php:7-16`, `PublicInvoiceController.php:96-146`); the internal API strips `number`/`status`/`zatca_qr` (`StoreInvoiceRequest` whitelist). | Probe 3: `POST /invoices` with `number=HACK-1,status=posted,zatca_qr=X` → `INV-2020-00001`, `draft`, `null`. |
 | PC-C11 | **POS checkout is atomic and idempotent**, invoices are created+posted in one transaction (`PosService.php:242-253`), QR is in the checkout response (`InvoiceResource`), replays don't duplicate ZATCA fields. | `PosCheckoutIdempotencyTest` 7 passed. |
-| PC-C12 | Changing the e-invoice settings never transmits anything (`ZatcaSettingsController::update` only writes settings); readiness blockers are shown honestly in the UI (`einvoice/page.tsx:198-202,272-283`). | Code reading. |
-| PC-C13 | The web renderer exposes seller VAT/CRN/national address and buyer VAT on A4 (`doc-parties.tsx:39-43,66`, `doc-header.tsx:110-112`) and seller VAT/CRN/address + title + number + date + buyer + lines + totals + QR on thermal (`thermal-receipt.tsx:38-125`), across all ten `tax-invoice-*` templates (identical `DocumentBody` wrappers). | Code reading. |
+| PC-C12 | Changing the e-invoice settings never transmits anything (`ZatcaSettingsController::update` only writes settings); readiness blockers are shown honestly in the UI (`einvoice/page.tsx:198-202,272-283`). | Code reading; Vitest `einvoice/page.test.tsx:76` (blockers shown, automatic mode disabled), `:88` (no secret pre-filled, minimal PUT body), `:115` (production save needs explicit confirmation). |
+| PC-C13 | The web renderer exposes seller VAT/CRN/national address and buyer VAT on A4 (`doc-parties.tsx:39-43,66`, `doc-header.tsx:110-112`) and seller VAT/CRN/address + title + number + date + buyer + lines + totals + QR on thermal (`thermal-receipt.tsx:38-125`), across all ten `tax-invoice-*` templates (identical `DocumentBody` wrappers). | Code reading; Vitest `from-invoice.test.ts:43` (national-address string built), `document-modern.test.tsx:346-356` (seller VAT/address values and labels present in the modern-v2 composition); the thermal receipt is not rendered by any test. |
 
 ### 7.4 ZATCA Phase 2 generation (stream D)
 
 **PC-D1 — Invoice hash transform and canonicalisation are exactly ZATCA's.** `ZatcaInvoiceHasher::canonicalize()` removes `ext:UBLExtensions`, `cac:Signature`, the QR `cac:AdditionalDocumentReference` and comments (`ZatcaInvoiceHasher.php:37-57`), then `ZatcaXmlCanonicalizer` runs `xmllint --nonet --c14n11` (`ZatcaXmlCanonicalizer.php:35-37`), SHA-256, base64 (`:24-27`). The SDK does the same via `invoice.xsl` + Santuario C14N 1.1 (`HashingGenerationServiceImpl`). Evidence: P1 + S1: **19/19 official samples** give identical hashes (e.g. `Simplified_Invoice.xml` → `z5F9qsS6oWyDhehD8u8S0DaxV+2CUiUz9Y+UsR61JgQ=` = embedded DigestValue = SDK); S2: 10/10 mutation cases (CRLF, attribute whitespace, comment, XML-declaration removal → unchanged; namespace-prefix rename, indentation, non-ASCII, empty-element → changed identically on both sides). Also every generated invoice's stored `zatca_hash` equals a re-hash of its stored XML (P2 manifest `hash`/`rehash`; `ZatcaTest::stored_hash_is_the_zatca_c14n11_sha256_of_the_stored_xml`). Independently confirmed by the lead on AWJ's own unsigned standard + simplified outputs (`run-lead/awj-*.hash` == SDK `-generateHash`).
 
-**PC-D2 — ICV allocation is serialised and gap-free on PostgreSQL.** `ZatcaService::buildFor()` takes `lockForUpdate()` on the tenant row (`ZatcaService.php:62-64`) inside the posting transaction (`InvoiceService.php:886`), reads `max(zatca_icv)` among hashed invoices (`:69-74`), and the unique index `(tenant_id, zatca_icv)` (`000053_...php:69`) backstops it. Evidence P3: six forked processes posting concurrently → ICVs exactly `[1,2,3,4,5,6]`, PIH chain verified link by link, per-process durations 101→489 ms (serialisation visible); a post that hits the unique index fails and the invoice stays `draft` with `zatca_icv=null`, `journal_entry_id=null` (full rollback); two tenants in parallel each get ICV 1. SQLite results (T1 `ZatcaPhase2Test`, `ZatcaIcvScopeTest`) agree.
+**PC-D2 — ICV allocation is serialised and gap-free on PostgreSQL.** `ZatcaService::buildFor()` takes `lockForUpdate()` on the tenant row (`ZatcaService.php:62-64`) inside the posting transaction (`InvoiceService.php:886`), reads `max(zatca_icv)` among hashed invoices (`:69-74`), and the unique index `(tenant_id, zatca_icv)` (`database/migrations/2025_01_01_000053_branch_scoped_document_numbering.php:69`) backstops it. Evidence P3: six forked processes posting concurrently → ICVs exactly `[1,2,3,4,5,6]`, PIH chain verified link by link, per-process durations 101→489 ms (serialisation visible); a post that hits the unique index fails and the invoice stays `draft` with `zatca_icv=null`, `journal_entry_id=null` (full rollback); two tenants in parallel each get ICV 1. SQLite results (T1 `ZatcaPhase2Test`, `ZatcaIcvScopeTest`) agree.
 
 **PC-D3 — PIH is derived from the stored previous XML, not from a stored column.** `previousInvoiceHash()` re-hashes `$last->zatca_xml` (`ZatcaService.php:140-151`), so a legacy raw hash is re-canonicalised at the chain boundary (`ZatcaPhase2Test::legacy_raw_hash_is_recanonicalized_at_the_chain_boundary`), and the hash is invariant to the later QR/signature insertion (transform excludes them; `ZatcaSignedInvoiceFinalizer.php:63-68` re-verifies). Missing previous XML fails closed (`:146-148`).
 
@@ -3632,7 +3644,7 @@ What actually works, with evidence. These are the basis for every `VERIFIED IMPL
 | PC-E11 | **Notification bridge** (PR-NOTIF-4): rejected/failed only, `DB::afterCommit`, delivery failure isolated, `dedupe_key` per attempt, recipients = active users with `invoices.manage` ∩ branch visibility, only `response_code` surfaced. | `ZatcaNotificationBridge.php:36-55,57-109,118-127`; `ZatcaNotificationBridgeTest` (9 tests green) |
 | PC-E12 | **Dispatch is opt-in and fail-closed at the queue boundary.** `ZATCA_SUBMISSION_DISPATCH_ENABLED` defaults `false`; readiness blocks `sync`/`null` queue connections, missing credential, missing endpoint; `afterCommit()` dispatch; `ShouldBeUnique` (300 s) + 5-minute re-queue cooldown; **real `database` queue round-trip verified with `queue:work --once`** (stale duplicate job ⇒ no second send). | `config/zatca.php:58`; `ZatcaTransportReadiness.php:22-60`; `ZatcaSubmissionQueue.php:17-56`; `SendZatcaSubmission.php:17-35`; `ZatcaSubmissionRecoveryTest` (4); probes P07, P13, P14 |
 | PC-E13 | **RBAC & application gate.** `zatca.view` (read), `invoices.manage` (create/dispatch), `company.manage` (settings/credentials), `EnsureApplicationActive:compliance.zatca`, throttles; staff cannot submit; accountant cannot change settings/credentials. | `routes/api.php:678-684,1585-1590`; `Rbac.php:36,43`; probe P11 |
-| PC-E14 | **Credential save hardening.** Password re-auth, application state re-check under tenant lock, CSID chain must validate to the configured per-environment CA bundle, derived public key/chain stored with the secret, production save requires UI confirmation. | `ZatcaCredentialService.php:31-33,43-50,88-117`; `ZatcaCredentialMaterialValidator.php:55-73`; `ZatcaCredentialTest`; `web/.../einvoice/page.tsx:228-231` |
+| PC-E14 | **Credential save hardening.** Password re-auth, application state re-check under tenant lock, CSID chain must validate to the configured per-environment CA bundle, derived public key/chain stored with the secret, production save requires UI confirmation. | `ZatcaCredentialService.php:31-33,43-50,88-117`; `ZatcaCredentialMaterialValidator.php:55-73`; `ZatcaCredentialTest`; `web/src/app/(app)/sales-settings/einvoice/page.tsx:228-231` |
 | PC-E15 | **Fail-closed signing.** Once any credential row exists, posting with an active environment lacking a credential/policy rolls back the whole posting transaction. | `ZatcaService.php:85-105`; `ZatcaSignedInvoicePostingTest:62-100`; probe P11 |
 | PC-E16 | **Infra bits that are present**: `xmllint` (required by `ZatcaXmlCanonicalizer.php:16,35`) is installed by `Dockerfile:8` (`libxml2-utils`) and `ci.yml:93`; `jobs`/`failed_jobs`/`job_batches` tables come from the Laravel 11 skeleton migration `0001_01_01_000002_create_jobs_table.php`, which `deploy/assemble.sh:103-105` does not delete; CI runs the suite on sqlite **and** PostgreSQL 16 (`ci.yml:22,28-41`). | as cited |
 
@@ -3733,12 +3745,14 @@ Calibration: structural errors (XSD, BR-CO-04/18, BR-KSA-39/52/53/68) fail every
 
 ## 9. Test evidence
 
-> **A passing test suite alone does not establish regulatory compliance.** The results below show that the existing suites pass on the audited commit (apart from an environment gap) and what they assert. They are not evidence of ZATCA conformance: the ZATCA unit tests compare AWJ with AWJ (PH2-14).
+> **A passing test suite alone does not establish regulatory compliance.** The results below show what the existing suites do on the audited commit and what they assert. They are not evidence of ZATCA conformance: the ZATCA unit tests compare AWJ with AWJ (PH2-14), and the web tests run against a jsdom or a Demo-Mode mock, not against a live backend.
 
 ### 9.1 What was run
 
-* **Existing repository tests, targeted:** 119 test classes selected for the tax, accounting, e-invoicing, POS, storefront/commerce, reporting, period-lock, tenancy and numbering surfaces, in nine groups (G1–G9), each group on **SQLite** (isolated file per group) and on **PostgreSQL 16.15** (local cluster, database `audit_main`). No test was modified, skipped or re-written to pass. Transport tests use `Http::fake`; nothing left the sandbox.
-* **Existing repository tests, full suite (SQLite only):** run 1 (first full run on the assembled harness) — 5 930 tests in 550 classes: 5 748 passed · 124 failed · 58 skipped; the 124 failures are in 24 classes outside the tax, ZATCA and accounting surfaces and trace to gaps in the harness (§9.3b), which was then repaired — the repository was not touched; re-run of those 24 classes: 228 tests, 228 passed · 0 failed; run 2 (clean full run on the repaired harness) — 5 930 tests — 5 872 passed · 0 failed · 58 skipped. The full suite was not run on PostgreSQL.
+* **CI reference (the repository's own workflows) at the audited commit — all green.** `CI` (PHP full suite): SQLite 5 872 passed · 58 skipped, PostgreSQL 16 5 929 passed · 1 skipped; `Web CI`: `npm ci`, Vitest 445 files / 4 117 tests, production build. The same two PHP jobs were green again at the pull-request head (§9.3c). CI is the reference environment against which the sandbox runs below are judged.
+* **Existing PHP tests, targeted (sandbox):** 119 test classes selected for the tax, accounting, e-invoicing, POS, storefront/commerce, reporting, period-lock, tenancy and numbering surfaces, in nine groups (G1–G9), each group on **SQLite** (isolated file per group) and on **PostgreSQL 16.15** (local cluster, database `audit_main`). No test was modified, skipped or re-written to pass. Transport tests use `Http::fake`; nothing left the sandbox.
+* **Existing PHP tests, full suite (sandbox, SQLite only):** run 1 on the assembled harness — 5 930 tests, 124 failed; a reconstruction of the same state reproduced the identical 124 failures; adding the three missing harness dependencies one at a time attributes every failure to exactly one of them; run 2 on the repaired harness — 5 872 passed · 58 skipped · 0 failed, identical to CI on SQLite (§9.3b). The full suite was not run on PostgreSQL in the sandbox.
+* **Existing web tests (sandbox):** Vitest, the whole suite (`npm run test`) — 445 files / 4 117 tests, 0 failed; Playwright — 216 tests from 17 of the 66 specs in `web/e2e` (invoice and purchase detail, the AWJ v3 invoice workspace, document QA / operations / review, delivery notes, POS, reports, dashboard): 194 passed · 15 failed · 7 skipped on the first run; each failing test was re-run alone (14 failed again, 1 passed) (§9.3d).
 * **Purpose-written probes (not committed to the repository):** 26 PHPUnit probe classes and 9 helper scripts exercising production code paths with synthetic tenants (streams A–F and the lead), including multi-process PostgreSQL concurrency races. The probe sources are described in the stream working papers (evidence folder).
 * **Official SDK runs, offline:** ZATCA E-Invoice Java SDK 238-R3.4.8 on JDK 11 (`-Dfile.encoding=UTF-8`): 19 bundled official samples, 10 mutations, AWJ-generated documents, and arithmetic/rounding perturbations of an official sample.
 
@@ -3746,11 +3760,13 @@ Calibration: structural errors (XSD, BR-CO-04/18, BR-KSA-39/52/53/68) fail every
 
 | Item | Value |
 |---|---|
-| Code | `0534ef16543b01c69b416b58897337e012a9d1ab` (read-only), executed through an assembled Laravel 11 harness. `diff -r` of `app/`, `config/`, `database/`, `routes/` and `tests/` against the repository showed only skeleton files — and, until the repair after run 1, the missing `app/Mail` and `resources/views/emails` (§9.3b) |
-| PHP | 8.3.6 (NTS) — extensions present: dom, intl, openssl, pdo_pgsql, pdo_sqlite, sodium, zip; **bcmath absent** (a pure-PHP polyfill, `phpseclib/bcmath_compat`, was added to the harness for the post-repair runs only) |
+| Code | `0534ef16543b01c69b416b58897337e012a9d1ab` (read-only). PHP tests ran through an assembled Laravel 11 harness outside the repository (`diff -r` of `app/`, `config/`, `database/`, `routes/` and `tests/` against the repository showed only skeleton files and, until it was repaired, the missing `app/Mail` and `resources/views/emails` — §9.3b). Web tests ran in a detached `git worktree` of the audited commit created for the purpose; the audited checkout itself was never written to |
+| PHP | 8.3.6 (NTS) — extensions present: dom, intl, openssl, pdo_pgsql, pdo_sqlite, sodium, zip; **`bcmath` absent** in the original harness (a pure-PHP polyfill, `phpseclib/bcmath_compat`, is part of the repaired harness) |
+| Node / browser | Node v22.22.0, npm 10.9.4 (`npm ci` from `web/package-lock.json`: 294 packages); Vitest 2.1.9 with jsdom; Playwright 1.62.1 with the sandbox Chromium (`PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/opt/pw-browsers/chromium`) against `next dev -p 3001` |
 | Databases | SQLite (one file per run); PostgreSQL 16.15 local cluster (separate databases per stream) |
 | Tools | libxml2 `xmllint` 2.9.14; JDK 11.0.32 (SDK) and JDK 21 (comparison); Python 3.13 |
-| Network | Outbound access used only to download public documents, the public SDK and Composer packages for the test harness; no ZATCA gateway call |
+| CI reference | GitHub Actions `ubuntu-latest`; PHP 8.4 with `bcmath` and the S3 flysystem adapter (`ci.yml:80,106`), Laravel 11 assembled by `ci.yml`, PostgreSQL 16.15 service container; Node 22 for Web CI |
+| Network | Outbound access used only to download public documents, the public SDK and Composer/npm packages for the test harnesses; no ZATCA gateway call |
 
 ### 9.3 Results by group (existing tests)
 
@@ -3769,19 +3785,73 @@ Calibration: structural errors (XSD, BR-CO-04/18, BR-KSA-39/52/53/68) fail every
 
 Group figures overlap where a class matched two filters; the union row is the per-class deduplicated total (`test-results.md` in the evidence folder lists every class).
 
-**The 7 failures** are all `Tests\Feature\FuelSaleServiceTest` on both databases: `Call to undefined function App\Services\bcmul()` at `app/Services/FuelCostBasisService.php:380`. The sandbox PHP has no `bcmath`; the extension is installed by `Dockerfile:13` and listed in `.github/workflows/ci.yml:80`, and `FuelCostBasisService` is the only consumer of `bc*` functions (`grep` over `app/`). Classified as an **environment limitation, not a product defect**. For the targeted runs the fuel arithmetic was therefore verified by code reading only (stream A); the later full-suite re-run with a pure-PHP `bcmath` polyfill passed all fuel classes (§9.3b), which is corroboration, not a substitute for the real extension (NV-13).
+**The 7 failures** are all `Tests\Feature\FuelSaleServiceTest` on both databases: `Call to undefined function App\Services\bcmul()` at `app/Services/FuelCostBasisService.php:380`. The cause is proven in §9.3b: adding `bcmath` to the pre-repair harness makes these tests pass, removing it from the repaired harness brings back exactly the fuel failures, and CI — which installs the real extension (`Dockerfile:13`, `ci.yml:80`) — passes them at the audited commit on both databases. They are a test-environment dependency, not a product defect.
 
 **The 10 SQLite skips** are PostgreSQL-only concurrency tests (`AccountingPeriodLockConcurrencyTest` 3, `FiscalYearConcurrencyTest` 4, `PreviewExchangePostgresConcurrencyTest` 2, `DocumentNumberingTest` 1) — they ran and passed on PostgreSQL.
 
-### 9.3b Full-suite runs (SQLite)
+### 9.3b Full PHP suite in the sandbox (SQLite): runs and proven classification of the first-run failures
 
-| Run | Harness | Tests | Passed | Failed | Skipped |
-|---|---|---:|---:|---:|---:|
-| 1 — whole suite | as assembled (no `bcmath`, no `app/Mail`, no S3 adapter) | 5 930 | 5 748 | 124 | 58 |
-| Re-run of the 24 failing classes | repaired | 228 | 228 | 0 | 0 |
-| 2 — whole suite | repaired | 5 930 | 5 872 | 0 | 58 |
+The first full run reported failures in 24 classes. Their cause was established by reproducing the failing state and changing one harness dependency at a time — not by the fact that a later run passed.
 
-The 124 failures of run 1 were in 24 classes: the fuel-station classes and a few others (`bcmul()` undefined: PHP `bcmath` absent — declared in `Dockerfile:13` and `ci.yml:80`), the mail and invitation classes (`Class "App\Mail\AuthActionMail" not found`: `app/Mail` and `resources/views/emails` had not been copied into the harness), the R2/media-storage classes (`Class "Aws\Exception\AwsException" not found`: `league/flysystem-aws-s3-v3` is installed by `ci.yml:106` but not by `setup.sh:27`), and storefront-media and SQLite `database is locked` failures whose individual cause was not isolated but which pass on the repaired harness. None of them is in the targeted tax, ZATCA, accounting, POS, commerce, reporting, period-lock, tenancy or numbering surface except `FuelSaleServiceTest`. The repair touched the harness only (copying two directories from the repository unchanged, installing two Composer packages); the audited repository was not modified. The per-class table is in `test-results.md` (evidence folder). The 58 skipped tests of run 2 are in 30 classes: most are PostgreSQL-only concurrency tests that skip on SQLite by design (`*PostgresConcurrencyTest`, `FiscalYearConcurrencyTest`, `AccountingPeriodLockConcurrencyTest`, `DocumentNumberingTest`); the remainder (a few Commerce add-on, delivery-schedule and shipping-zone tests and four import-job tests) skip for reasons the JUnit file does not record. A full-suite pass remains a statement about the sandbox harness on SQLite, not about CI or PostgreSQL.
+| # | Harness state (Mail = `app/Mail` + mail views · SDK = `league/flysystem-aws-s3-v3` · bcmath = polyfill) | Scope | Tests | Passed | Failed | Skipped |
+|---:|---|---|---:|---:|---:|---:|
+| 1 | **R0** as assembled: no Mail, no SDK, no bcmath | whole suite | 5 930 | 5 748 | **124** | 58 |
+| 2 | R0 rebuilt from the repaired harness by removing the three pieces | whole suite (reproduction) | 5 930 | 5 748 | **124** | 58 |
+| 3 | R0 + Mail | the 24 failing classes | 228 | 116 | 112 | 0 |
+| 4 | R0 + SDK | the 24 failing classes | 228 | 190 | 38 | 0 |
+| 5 | R0 + bcmath | the 24 failing classes | 228 | 130 | 98 | 0 |
+| 6 | repaired − Mail (SDK + bcmath) | the 24 failing classes | 228 | 216 | 12 | 0 |
+| 7 | repaired − bcmath (Mail + SDK) | the 24 failing classes | 228 | 202 | 26 | 0 |
+| 8 | repaired − SDK (Mail + bcmath) | whole suite | 5 930 | 5 786 | 86 | 58 |
+| 9 | repaired (Mail + SDK + bcmath) | the 24 failing classes | 228 | 228 | 0 | 0 |
+| 10 | repaired | whole suite | 5 930 | 5 872 | 0 | 58 |
+
+**Reproducible:** the whole-suite run on the reconstructed R0 failed the **same 124 tests** as run 1 (set equality: yes; assertions 37 805 in both), so the failures are deterministic in that state, not flaky.
+**Causal and exhaustive:** the failures decompose without remainder — Mail 12 + bcmath 26 + SDK 86 = 124. For 121 of the 124 tests the piece whose **addition** to R0 fixes the test (rows 3–5) is also the piece whose **removal** from the repaired harness brings it back (rows 6–8); no test disagrees (0). The other 3 are the order-dependent `database is locked` tests below, which pass in every 24-class subset run whatever is added, so for them only the whole-suite removal (row 8 against row 10) is informative. Unattributed: 0.
+**Independent:** CI runs the same 5 930 tests at the same commit and passes them — SQLite 5 872 passed · 58 skipped · 39 114 assertions, identical to row 10 (5 872 · 58 · 39 114); PostgreSQL 5 929 passed · 1 skipped (§9.3c).
+
+| Missing in R0 | Observed error (first line) | Tests | Classes (failed tests) |
+|---|---|---:|---|
+| `bcmath` extension (declared in `Dockerfile:13`, `ci.yml:80`) | `Call to undefined function App\Services\bcmul()` at `FuelCostBasisService.php:380` | 26 | FuelAviRfidServiceTest 3, FuelReconciliationTest 8, FuelSaleApiTest 1, FuelSaleServiceTest 7, FuelSupplyReceivingApiTest 2, FuelSupplyReceivingTest 5 |
+| `app/Mail` + `resources/views/emails` (present in the repository, not copied into the harness) | `Class "App\Mail\AuthActionMail" not found` | 12 | AuthRecoveryTest 8, ResendMailTransportTest 1, UserInvitationTest 3 |
+| AWS SDK `league/flysystem-aws-s3-v3` (installed by `ci.yml:106`, not by `setup.sh:27`) | `Class "Aws\Exception\AwsException" not found` (test code); `Class "Aws\Result" not found` at `tests/Feature/StorefrontMediaTestSupport.php:77` (surfacing as `Undefined array key "data"` or HTTP 500/503); `database is locked` (secondary, below) | 86 | ProductMediaR2BackfillTest 7, ProductMediaR2BulkCleanupSemanticsTest 2, ProductMediaR2CommerceStorefrontReadTest 1, ProductMediaR2DeleteTest 1, ProductMediaR2ReadTest 2, ProductMediaR2WriteTest 1, ProductOptionValueVisualTest 1, R2SmokeTestCommandTest 2, R2StorageServiceTest 1, StorefrontMediaApiTest 24, StorefrontMediaBackgroundContrastTest 8, StorefrontMediaDeliveryTest 10, StorefrontMediaDerivativeTest 17, StorefrontMediaEvidenceBackfillTest 3, StorefrontMediaRefTest 6 |
+
+**Why `database is locked`.** In the pre-repair state `ProductMediaR2ReadTest` run on its own passes its first test, fails the second with `Class "Aws\Exception\AwsException" not found` and the third with `SQLSTATE[HY000]: General error: 5 database is locked` on `insert into "tenants"`; that third test passes when run alone. That sequence is consistent with an uncaught `Error` leaving the file-based SQLite write lock held for the next test of the same process. 7 failures carry this symptom. 4 of them also fail in the subset runs without the SDK; 3 (`ProductMediaR2BackfillTest` ×2, `ProductMediaR2CommerceStorefrontReadTest` ×1) failed in the whole-suite runs of rows 1 and 2, passed in every subset run (rows 3–5, 6, 7, 9), and **failed again in row 8** — the whole suite with only the SDK removed — and pass in row 10, so removing the SDK is a necessary condition for them in the whole-suite context. That the lock is left behind by an earlier test that died on the missing class is the mechanism the error text points to; it was shown for `ProductMediaR2ReadTest` (above) and inferred, not isolated test by test, for these three. With the SDK present none occurred: row 10, the repaired subset runs and CI.
+
+**Reading.** None of the 124 failures (nor the 7 of the targeted runs) is attributable to the audited product code: each disappears when exactly one missing harness dependency is added and returns, in the same set, when it is removed again, and the repository's own CI is green on both databases. The repair touched the harness only (two directories copied unchanged from the repository, two Composer packages installed); the audited repository was not modified. A sandbox pass remains a statement about the sandbox on SQLite; CI is the reference. The per-class and per-test table is in `test-results.md` (evidence folder).
+
+The 58 skipped tests of row 10 are in 30 classes: most are PostgreSQL-only concurrency tests that skip on SQLite by design (`*PostgresConcurrencyTest`, `FiscalYearConcurrencyTest`, `AccountingPeriodLockConcurrencyTest`, `DocumentNumberingTest`); the remainder (a few Commerce add-on, delivery-schedule and shipping-zone tests and four import-job tests) skip for reasons the JUnit file does not record; CI shows the same count of 58 on SQLite and 1 on PostgreSQL.
+
+### 9.3c CI reference (GitHub Actions)
+
+| Workflow · job | Commit | Result |
+|---|---|---|
+| `CI` · php artisan test (L11, sqlite) — run 38049588297 | audited `0534ef1` | green · 5 872 passed · 58 skipped · 39 114 assertions · 695.7 s |
+| `CI` · php artisan test (L11, pgsql) — run 38049588297 | audited `0534ef1` | green · 5 929 passed · 1 skipped · 39 441 assertions · 1 060.2 s |
+| `Web CI` · web build (Next.js): `npm ci` → `npm run test` (Vitest) → `npm run build` — run 38049588265 | audited `0534ef1` | green · Vitest 445 files / 4 117 tests passed · 150.9 s · production build succeeded |
+| `CI` · sqlite / pgsql — runs 38077021700 (push) and 38077051454 (pull request) | first audit PR head `01d09e5` = `main` `b3ff665` + Markdown | green · SQLite 5 896 passed · 58 skipped · 39 206 assertions; PostgreSQL 5 953 passed · 1 skipped · 39 533 assertions (24 more tests than at the audited commit: the two later storefront commits) |
+
+`Web CI`, `Storefront CI` and `Mobile CI` are path-filtered and did not run for the documentation-only pull request. `Playwright` specs are not part of the default workflows (only `store-brand-qa.spec.ts`, in a path-filtered workflow).
+
+### 9.3d Web UI tests (Vitest and Playwright)
+
+`web/` has an automated UI test suite: `web/package.json` defines `test` (`vitest run`) and `test:e2e` (`playwright test`), and `Web CI` runs Vitest and the production build on every change under `web/`. (`CLAUDE.md` still lists the web tests as deferred; that line is stale — REM-38.)
+
+* **Vitest — the whole suite:** 445 files / 4 117 tests, 0 failed, 184.26 s in the sandbox (CI: 150.9 s, same counts). The 56 files / 534 tests most relevant to the audit — sales-invoice form and template picker (80), A4 tax-document render tests in jsdom (112), labels and language (46), registry/contract/model builders (48), export/PDF/print (55), print-template platform and frozen revisions (77), POS receipt and checkout (47), e-invoice settings page and notifications (26), tax arithmetic, purchases and reports (43) — all passed. Per-topic file list: `web-test-results.md` (evidence folder).
+* **What they do not cover:** `thermal-receipt.tsx` (imported by the registry, never rendered), the invoice detail page, the credit-note print and form, the return dialog, the tax-settings card, the expense create form and the landing page have no test reaching them; the POS page has a mount smoke test only.
+* **Playwright — 216 tests from 17 selected specs** (the specs that show or produce invoices and purchases, the AWJ v3 invoice workspace, document QA, POS, reports and the dashboard): first run 194 passed · 15 failed · 7 skipped (the skips are the specs' own `test.skip` for the mobile project). The AWJ v3 invoice-workspace specs (`awj-v3-*`, which include the posted-invoice lifecycle rail of SUB-01) ran on the desktop project only, and `p47-baseline.spec.ts` was started and stopped after 12 of its 15 desktop tests (not counted; see `web-test-results.md` §3.4). All 66 specs run in Demo Mode (an in-bundle mock API, `localStorage.demo`), so they cannot reproduce backend-driven defects (the 403 of PH1-03, SUB-01, PH2-07…). Each failing test was re-run alone with a fresh dev server: 14 failed again, 1 passed. Failures are reported as failures; the table in `web-test-results.md` §3.3 gives, for each, the proximate error, what was examined and whether the cause is established:
+  * `e2e/document-qa.spec.ts:89` (desktop, mobile) — the orthogonal-matrix test fails on `expect(metrics.rootHeight).toBeGreaterThan(2_000)` (`:113`); only `delivery_note` × ERP × `multipage` misses the threshold (1 853 px); the 54 combinations before it pass. **Failing combination identified from the trace; why the delivery note is 147 px short of the threshold was not investigated, so the cause is not established (no tax content is involved).**
+  * `e2e/document-review.spec.ts:26` (desktop, mobile) — desktop: `getByRole('button', { name: 'إكمال المراجعة' })` not found within 5 s (`:54`); mobile: `p:visible` containing the supplier name not found (`:35`); Desktop: an unresolved line-item match keeps «إكمال المراجعة» hidden and the spec resolves only the supplier match; mobile: the fields are in a tab the spec has not opened. **Cause evidenced by the failure snapshot and the source (spec out of step with the Demo fixture and the mobile tab layout); the spec was not modified to confirm.**
+  * `e2e/document-review.spec.ts:88` (desktop, mobile) — `getByRole('dialog', { name: 'إنشاء مسودة مصروف' })` not visible within 5 s (`:99`); the button now opens a «معاينة المسودة» preview dialog first; the spec waits for the dialog that follows it. **Cause evidenced by the failure snapshot and the source (spec out of step with the draft-preview step); the spec was not modified to confirm.**
+  * `e2e/pos-checkout-reliability.spec.ts:18` (desktop) — 7-minute test timeout waiting for the customer button `/مؤسسة الخليج|Gulf/` in the customer dialog (`:233`); the Demo customer list is empty: the picker filters on `is_active`, which the mock partners do not carry (`customer-picker.tsx:44`, `mock-data.ts:18-40`). **Cause evidenced by the failure screenshot and the source (a Demo-fixture defect); the code was not modified to confirm.**
+  * `e2e/pos-interaction-mode.spec.ts:17` (desktop) — the console-clean assertion failed on the next-intl `INVALID_KEY` message (six message keys that contain a dot, listed in the failure text); dev-mode-only next-intl `INVALID_KEY` for six dotted message keys in `ar.json`/`en.json`. **Cause evidenced by the failure text and the library source (a product-side message-key defect visible only in dev mode).**
+  * `e2e/pos-session-cart-recovery.spec.ts:19` (desktop) — 7-minute test timeout waiting for the customer button `/مؤسسة الخليج|Gulf/` in the customer dialog (`:217`); same Demo customer-list defect as `pos-checkout-reliability.spec.ts:18`. **Cause evidenced by the failure screenshot and the source (a Demo-fixture defect); the code was not modified to confirm.**
+  * `e2e/reports.spec.ts:75` (desktop, mobile) — `selectOption('a4110')` on `#ledger-account` finds no such option for the 120 s test timeout (`:78`); the Demo `GET /accounts` returns only two expense accounts (the document-review demo handler runs first), so `a4110` is never offered. **Cause evidenced by the failure snapshot and the source (a Demo-fixture defect); the code was not modified to confirm.**
+  * `e2e/reports.spec.ts:86` (desktop, mobile) — `getByText('تفاصيل التقرير', { exact: true })` not found within 5 s on `/reports/sales/by-customer` (`:90`); the report page titles its card «ملخص» when the view supports presentation modes; the spec expects «تفاصيل التقرير». **Cause evidenced by the failure snapshot and the source (spec out of step with the report layout); the spec was not modified to confirm.**
+  * `e2e/document-review.spec.ts:74` (mobile) — mobile only: `getByRole('button', { name: 'تعديل' }).first()` not found for the 120 s test timeout (`:78`); mobile tab layout: the edit buttons are in the «التفاصيل» tab, which the spec does not open. **Cause evidenced by the failure snapshot (spec out of step with the mobile layout); the spec was not modified to confirm.**
+  * `e2e/awj-v3-h5-hardening.spec.ts:51` (desktop) — the notification-menu contrast scan found six text pairs below 4.5:1 (3.9–4.48 on white: the «تنبيهات»/«تحديثات» tabs, two badges, a muted date and a muted sentence) (`:51`); intermittent: failed in the batch run, passed alone and in sequence. **Not reproduced on two re-runs, so the failure is intermittent and its cause is not established (no tax content is involved).**
+  None of these specs asserts tax, VAT or ZATCA behaviour, none runs against the backend, and the sandbox environment was not found responsible for any of them. The Playwright suite is not part of the default CI.
+* **Incidental observation (not a tax finding):** `next dev` reports `INVALID_KEY` for six message keys that contain a dot (`appBuilder.builder.visibility.signalOption.cart.itemCount`, `…customer.isAuthenticated`, `…product.inStock`, `developer.events.partner.created`, `…product.created`, `…invoice.created`, in `ar.json` and `en.json`); specs that assert a console-clean page fail because of it, while the production build (Web CI) is unaffected.
 
 ### 9.4 What the existing ZATCA tests assert — and what they do not
 
@@ -3797,10 +3867,27 @@ The 124 failures of run 1 were in 24 classes: the fuel-station classes and a few
 | `ZatcaIcvScopeTest` (10) | tenant default, branch scope blocked server-side, unique index on `(tenant_id, zatca_icv)` | environment scoping |
 | `ZatcaHttpTransportTest` (5) | the **two-field** request body (`invoiceHash`, `invoice`), endpoint pinning, no credential leak | the official three-field body (SUB-03) |
 
+### 9.4b What the existing web tests say about the web-dependent findings
+
+Every web-dependent finding was compared with the tests that touch the same behaviour (full mapping with `file:line` in `web-test-mapping.md`, evidence folder). All cited Vitest tests passed. No finding changed severity or status; four sentences were corrected and several findings gained evidence.
+
+| Relation | Findings | Tests |
+|---|---|---|
+| **Pins the current behaviour** (a fix as recommended must update the test) | CON-06 | `registry/document-types.test.ts:68-91,130-138` — a tax-invoice items layout without quantity, unit price or tax is `valid: true`; the column catalog is pinned |
+| | PH1-15 | six tests assert English-only labels for a `tax_invoice` in `en` mode (`use-document-label-mode.test.tsx:38`; `document-modern.test.tsx:436`; `document-classic-v2.test.tsx:164`; `document-erp-v2.test.tsx:163`; `document-minimal-v2.test.tsx:174`; `document-retail-v2.test.tsx:178`) |
+| | PH1-10, PH1-13 | `document-modern.test.tsx:289-317` — a `draft` model must show the ZATCA caption and the compliance footer |
+| | SUB-01 | Playwright `awj-v3-h2-workspaces.spec.ts:71-75` pins a two-state lifecycle (source level) |
+| **Corroborates** | PH1-01 (date only), PH1-05, PH1-06, PH1-18, VAT-09 (the inclusive flag is client state), VAT-12, OPS-02, OPS-03, SUB-04/05, CON-13(5) | e.g. `from-invoice.test.ts:79,82-104`, `invoice-form.test.tsx:302,550`, `einvoice/page.test.tsx:76`, `lib/__tests__/money.test.ts:64-81` |
+| **Supports positive controls** | PC-C1, C5, C8, C9, C12, C13, E14 | stored QR passed through verbatim; frozen template revisions; renderers do not recompute money; no secret pre-filled and production save needs confirmation |
+| **No test reaches the behaviour** | PH1-02, PH1-03, PH1-11, PH1-16, PH1-17, PH2-07, PH2-12, SEC-03, SEC-08, VAT-01/02 (return dialog, credit-note form), VAT-11/14/15/16, CON-12, ACC-03/04 | the thermal receipt, the invoice detail page, the credit-note print, the tax-settings card and the expense form are never rendered |
+| **Text corrected** | CON-09 and PC-C9 (the invoice PDF is a raster export through `documentExporter`, not `invoice-pdf.ts`); PH1-15 (v2 titles are English-only in `en` mode); PH1-03 (the e-invoice entry is in the Sales-Settings hub and the settings page explains when the application is inactive); NV-18 (only the HMAC secret and the current password are password inputs; the CSID token and the private key are unmasked textareas) | `template-export-contract.test.ts:16-22`; `modern-bilingual-label.tsx:36`; `einvoice/page.tsx:187-193,220,225` |
+| **Partly closes** | NV-12, NV-18 | jsdom renders the A4 compositions and the e-invoice settings page; still open: the thermal receipt, the draft badge in legacy compositions, real-browser printing and QR scanning |
+
 ### 9.5 Not run
 
-* **Web (`web/`)** — the repository has no automated UI test suite (listed as deferred in `CLAUDE.md`), and `npm run build` was not executed because the audit changes no web code; web-related findings are source-level (NV-12).
-* **The complete PHP suite on PostgreSQL** — not run: the PostgreSQL runs were the 119 targeted classes (tax, accounting, e-invoicing, POS, storefront/commerce, reporting, period-lock, tenancy, numbering); the whole suite ran on SQLite only (§9.3b).
+* **The complete PHP suite on PostgreSQL in the sandbox** — not run there; the sandbox PostgreSQL runs were the 119 targeted classes. CI ran the whole suite on PostgreSQL 16 at the audited commit (5 929 passed · 1 skipped, §9.3c).
+* **`npm run build` in the sandbox** — not run; Web CI built the audited commit successfully (§9.3c).
+* **Playwright specs outside the selection** (48 of 66, mostly storefront-customizer and flowers-commerce visual proofs), the mobile project of the AWJ v3 specs, `p47-baseline.spec.ts` (stopped after 12 of its 15 desktop tests, §9.3d), and the `storefront/` and `mobile/` suites — outside the tax/ZATCA scope.
 * **Live ZATCA calls, production migrations, production database access** — forbidden by the audit brief and not attempted.
 
 ### 9.6 Probe and SDK outcomes that drive the findings
@@ -3812,68 +3899,9 @@ See §8 (numerical, SDK and concurrency experiments). Every P0/P1 finding was re
 
 Every requirement in the Gap Matrix points to an official document, section, version and date; the findings above list the register rows that substantiate them. The registers were compiled from documents retrieved from `zatca.gov.sa` on 2026-10-10 (Arabic prevails over the unofficial English translations); `RECALLED-UNVERIFIED` rows are marked as such and are not relied on for any finding.
 
-### 10.1 Documents used (regulatory register R1)
+### 10.1–10.2 Documents used (registers R1 and R2)
 
-| Key | Document | Version / date | Status |
-|---|---|---|---|
-| [REG-AR] | E-Invoicing Regulation / لائحة الفوترة الإلكترونية — Board of Directors Decision No. 2-6-20 dated 4 Rabi II 1442H | Issued 4/4/1442H (=19 Nov 2020); published Umm Al-Qura 4 Dec 2020 (per [REG-EN] header and [SG-EN] p.6); 6 pp. | Current (no amendment listed on ZATCA Laws page) |
-| [REG-EN] | E-invoicing Regulation (unofficial English) | Header "December 4th 2020"; PDF created 18 May 2026 (re-typeset); 7 pp. | Current translation |
-| [RES-EN] | Controls, Requirements, Technical Specifications and Procedural Rules for Implementing the Provisions of the E-Invoicing Regulation ("Implementation Resolution") — based on Governor Decision No. 62738 dated 23/11/1443H (22 Jun 2022) | File dated 2023-05-19 (ZATCA Laws page: "updated decision ... May 2023"); body carries no May-2023 date; 35 pp. | Current (supersedes 28 May 2021 and 24 Jun 2022 versions) |
-| [RES-AR] | الضوابط والمتطلبات والمواصفات الفنية والقواعد الإجرائية اللازمة لتنفيذ أحكام لائحة الفوترة الإلكترونية — قرار المحافظ رقم 62738 وتاريخ 23/11/1443هـ | 2023-05-19 file; 61 pp. | Current |
-| [RES-AR-2] | Same resolution, second copy linked from Arabic Laws page ("E-invoicing Resolution.pdf") | 57 pp.; text identical to [RES-AR] at every line I diffed (whitespace only) | Duplicate copy |
-| [DG-EN] | Detailed Guidelines for E-Invoicing, Version 2 | May 2023; 66 pp. | Current |
-| [DG-AR] | الدليل الإرشادي التفصيلي للفوترة الإلكترونية — النسخة الثانية | مايو 2023; 67 pp. | Current |
-| [DTG] | E-invoicing Detailed Technical Guidelines, Version 2 | Nov 2022; 81 pp. | Current (listed on Guidelines page 2026) |
-| [SG-EN] | Simplified Guide — E-invoicing Requirements, Version 1 | 29 Jun 2022; 23 pp. | Current (awareness only) |
-| [SG-AR] | الدليل المبسط لمتطلبات الفوترة الإلكترونية — نسخة 1 | 23 pp. | Current |
-| [FAQ-21] | Frequently Asked Questions — E-invoicing (FATOORAH) Phase One Requirements | 10 Jun 2021; 14 pp. | Current on site, but pre-Phase-2 content (older) |
-| [XML] | Electronic Invoice XML Implementation Standard to the E-Invoicing resolution dated 2023-05-19, Version 1.2 | v1.2, 2023-05-19 (v1.0 2021-05-28; v1.1 2022-06-24); 72 pp. | Current (R2 owns technical detail; cited here only for legal-level data rules) |
-| [SEC] | Security Features Implementation Standards to the E-Invoicing resolution dated 2023-05-19, Version 1.2 | v1.2, 2023-05-19; 27 pp. | Current |
-| [VATL] | نظام ضريبة القيمة المضافة — المرسوم الملكي م/113 (2/11/1438هـ) المعدل بـ م/52 (28/4/1441هـ) والأمر الملكي أ/638 (15/10/1441هـ) (ZATCA copy) | Consolidated incl. A/638 (15% rate); footnote cites Royal Order 25711 (8/4/1445H) committee rules; 16 pp. | Current |
-| [IR] | اللائحة التنفيذية لنظام ضريبة القيمة المضافة — قرار مجلس الإدارة 3839 (14/12/1438هـ) وتعديلاته حتى قرار مجلس الإدارة بالتمرير 24-06-01 (17/5/1446هـ = 19 Nov 2024) | Consolidated edition dated شوال 1446هـ / April 2025 (cover p.ii); 160 pp. (main text ≈ pp.1-75 + amendment-comparison annex) | Current (latest amendment 24-06-01; its Gazette/effective date of 18 Apr 2025 is RECALLED-UNVERIFIED — not stated in the PDF) |
-| [TIG-EN] | VAT Guideline for Tax Invoicing and Records under VAT Provisions, Version 3 | May 2026; 72 pp.; amendment log cites Board Res. 23-2-6, 01-06-24, 23-4-1 and the 19 May 2023 e-invoicing resolution | Current |
-| [TIG-AR] | الدليل الإرشادي للفواتير الضريبية وحفظ السجلات — النسخة الثالثة | مايو 2026; 61 pp. | Current |
-| [RSG-EN] | VAT Guideline for the Retail Sector under VAT Provisions, Issue 3 | May 2026; 67 pp. | Current |
-| [RSG-AR] | الدليل الإرشادي لقطاع البيع بالتجزئة — الإصدار الثالث | مايو 2026; 63 pp. | Current |
-| [IEG-EN] | VAT Guideline on Imports and Exports under VAT Provision, Second Edition | May 2026; 72 pp. | Current |
-| [VCG] | الدليل الإرشادي المبسط لتصنيف المخالفات العامة لضريبة القيمة المضافة (incl. e-invoicing violations table) — الإصدار الثاني | مايو 2024; 20 pp. | Current (linked from the e-invoicing Guidelines page) |
-| [SFG] | الدليل المبسط لرفع إقرار ضريبة القيمة المضافة | Undated (examples 2023); 15 pp. | Current on site |
-| [VRUG] | دليل المستخدم لتقديم إقرار ضريبة القيمة المضافة على موقعنا الإلكتروني | Undated; 10 pp. (screenshots; little text) | Current on site |
-| [WEB-ROLLOUT] | Roll-out phases page (EN) / مراحل التطبيق (AR) | Last update 1 Sep 2026 (EN), 9 Aug 2026 (AR) | Current |
-| [WEB-PEN] | Taxation Violation Fines / العقوبات والغرامات المالية (VAT) | Last update 30 Aug 2026 (EN), 2 Mar 2026 (AR) | Current |
-| [WEB-W1] | News: "ZATCA starts E-Invoicing Phase 2 Integration" (Wave 1 criteria) | 24 Jun 2022 | Current |
-| [WEB-W6] | News: Wave 6 criteria | 16 Jun 2023 | Current |
-| [WEB-W13] | News: "ZATCA sets criteria for Wave 13 of E-invoicing" | 28 Jun 2024 | Current |
-| [WEB-W20] | News: Wave 20 | 31 Jan 2025 | Current |
-| [WEB-W21] | News: Wave 21 | 28 Feb 2025 | Current |
-| [WEB-W22] | News: Wave 22 | 21 Mar 2025 | Current |
-| [WEB-W23] | News (AR): المجموعة 23 | 27 Jun 2025 | Current |
-| [WEB-W24] | News: "Criteria set for taxpayers in Wave 24 of E-invoicing" | 26 Sep 2025 | Current |
-| [WEB-W25] | News: Wave 25 criteria | 24 Jul 2026 | Current (latest wave as of 2026-10-10; no Wave 26 found) |
-| [WEB-LAWS] | E-invoicing Laws & Regulations page (EN/AR) | lists only [REG] and the 20230519 resolution | Current |
-| — | **Not obtained:** laws.boe.gov.sa record of the VAT Law (f98f4238-0289-4891-8a22-a9a700f1f538) — HTTP 503 / connection reset on 3 attempts; ZATCA's bilingual IR PDF (`Value-Added-Tax-Approved-Implementing-Regulations-Bilingual.pdf`) and `VAT_Manual_English_16_Nov.pdf` — both URLs return the ZATCA HTML error page; the Data Dictionary (xlsx) — no live URL found; Arabic FAQ PDF — 404; the Unified GCC VAT Agreement text; the Royal Order on the State bearing VAT for citizens' private education/health. |  |  |
-
-### 10.2 Documents used (technical register R2)
-
-| Key | Document | Version / date | Status |
-|---|---|---|---|
-| D1 | Electronic Invoice XML Implementation Standard (vF) | v1.2, 2023-05-19 (PDF created 2023-05-18), 72 pp | **CURRENT** (linked from zatca.gov.sa E-Invoice-specifications page, page updated 12 Jan 2026) |
-| D1t | same, track-changes (vTrack) | 2023-05-19, 75 pp | reference only |
-| D1old | XML Implementation Standard 20220624 "vF" (as still hosted and hard-linked by the Developer Portal SPA) | file is byte-identical to D1t | SUPERSEDED (v1.1) |
-| D2 | Electronic Invoice Data Dictionary (vF, xlsx) | v1.2, 2023-05-19 | **CURRENT** |
-| D2t | Data Dictionary vTrack | 2023-05-19 | reference only |
-| D2old | EInvoice_Data_Dictionary.xlsx (Developer-Portal hard link) | 2022 (v1.1) | SUPERSEDED |
-| D3 | Security Features Implementation Standards (vF) | v1.2, 2023-05-19, 27 pp | **CURRENT** (Security-Requirements page, updated 10 Aug 2026) |
-| D3old | Security Features … 20220624 | v1.1, 27 pp | SUPERSEDED (only change in v1.2: "Elaborated on QR code Tag 5 VAT total") |
-| D4 | E-Invoicing Detailed Guidelines | Version 2, May 2023, 66 pp | CURRENT (Guidelines page, updated 10 Aug 2026) |
-| D5 | E-invoicing Detailed Technical Guideline | Version 2, Nov 2022, 81 pp | CURRENT |
-| D6 | Developer Portal Manual | Version 3, Nov 2022, 96 pp | CURRENT |
-| D7 | Fatoora Portal User Manual | Version 3, May 2023, 32 pp | CURRENT |
-| D8 | Simplified Guideline for E-Invoicing | Version 1, 29 Jun 2022, 23 pp | background |
-| S1 | ZATCA E-Invoicing Java SDK | **238-R3.4.8** (`Apps/global.json`; jar classes dated 2025-03-11; KSA Schematron file `20210819_ZATCA_E-invoice_Validation_Rules.xsl`, EN file `CEN-EN16931-UBL.xsl`) | **CURRENT** (latest in portal version history) |
-| S2 | SDK version history / release notes 3.3.8→3.4.8 | embedded in Developer Portal bundle | CURRENT |
-| S3 | Developer Portal runtime config (API gateway URLs, SDK links) | — | CURRENT |
-| X1 | Fatoora/Developer Portal **Swagger (OpenAPI) files** | — | gap → API JSON schemas marked RECALLED-UNVERIFIED |
+The 36 regulatory documents of register R1 and the 17 technical documents of register R2 that this audit relied on are listed — key, document, version or date, status, source URL and SHA-256 prefix — in the document inventories of `R1-regulatory-register.md` §1 and `R2-technical-register.md` §1, and in the compact form earlier revisions carried here in `official-documents-used.md` (evidence folder). Source keys such as `[IR]`, `[REG-EN]` and `D1` resolve there.
 
 ### 10.3 Conflicts and unresolved items in the official sources
 
@@ -3998,13 +4026,13 @@ Everything below could not be settled with the evidence available to this audit.
 | NV-09 | Production PostgreSQL settings (`idle_in_transaction_session_timeout`, connection drops during the in-transaction HTTP call) and deadlock exposure in the exact production request interleavings | No production database; deadlock reproduced at service level | DBA review; PostgreSQL-only CI job (REM-04) | SUB-09, SEC-02 |
 | NV-10 | Queue/Redis/cache lock behaviour with more than one worker; log shipping and retention; `zend.exception_ignore_args` | Not in repository | Production configuration | OPS-01, SEC-09 |
 | NV-11 | Policy interpretations reserved for the owner and a tax adviser: back-dating of `invoice_date` versus the e-invoice issue date; document-level rounding; tax point for online sales; whether deposits are in scope | Legal/policy questions | ADR-A, ADR-B, ADR-F, ADR-G | PH2-08, VAT-04, ACC-08, CON-03 |
-| NV-12 | Browser rendering of the web UI (draft watermark, English-only tax documents, POS receipt title, thermal printer truncation of QR/Arabic) | Source-level review only | Render tests / manual run | PH1-10, PH1-11, PH1-15 |
-| NV-13 | Fuel-station sale arithmetic with the real `bcmath` extension, and purchase returns against tax-inclusive purchases | `bcmath` is absent in the sandbox. After the audit, a pure-PHP polyfill (`phpseclib/bcmath_compat`, installed in the test harness only) let the 24 fuel test classes run and pass, but the polyfill is not the extension CI uses; the purchase-return path was read, not probed | Re-run the fuel tests with the real extension (CI does); add the purchase-return probe | VAT-01 (purchase side) |
+| NV-12 | Real-browser rendering of the web UI: print layout, thermal-printer truncation of QR/Arabic, QR scanning, the draft badge in the legacy compositions, the POS receipt title | The Vitest suite renders the A4 v2 compositions in jsdom (all passing) but no test renders `ThermalReceipt`, the invoice detail page or the credit-note print; Playwright specs run on a Demo mock; nothing was printed or scanned | A `ThermalReceipt` render test and legacy-composition tests; a manual print and QR-scan run | PH1-10, PH1-11, PH1-15, CON-06 |
+| NV-13 | Purchase returns against tax-inclusive purchases (the fuel-station arithmetic part is closed: CI, with the real `bcmath`, passes the fuel test classes at the audited commit on both databases) | The purchase-return path was read, not probed | Add the purchase-return probe | VAT-01 (purchase side) |
 | NV-14 | Branch leak through `GET /revisions` for document types other than invoices | Proven for invoices only | Probe per type | SEC-01 |
 | NV-15 | Tenant hard-deletion paths (artisan/tinker) and the cascade to invoices | Not enumerable from code | Ops procedure review | PH1-16 |
 | NV-16 | PostgreSQL behaviour for `tenants.vat_number string(15)` with request validation `max:20` | Not probed on PostgreSQL | API probe on PostgreSQL | PH1-04 |
 | NV-17 | Distribution of CA trust anchors per ZATCA environment | Only the AIA pointer of a sample certificate was found | ZATCA publication / onboarding | PH2-09 |
-| NV-18 | Web secret handling in the e-invoice settings page at runtime | Static read only (secrets held in React state, password inputs) | Browser test | SEC-03 |
+| NV-18 | Web secret handling in the e-invoice settings page at runtime | Source reading plus `einvoice/page.test.tsx:88` (jsdom: no secret is pre-filled from credential metadata and only changed fields are submitted). Only the HMAC `secret` and `current_password` are password inputs; the CSID token and the private key are unmasked textareas (`einvoice/page.tsx:219-221,258-260`). Browser-level behaviour (autofill, DevTools, screen sharing) was not tested | Browser test | SEC-03 |
 | NV-19 | Queue-retry duplicate ledger posting | No accounting job posts to the ledger today (`app/Jobs/Accounting` contains only `SendZatcaSubmission`) | Re-verify when background posting (bulk import) is introduced | — |
 | NV-20 | `TenantScope` no-op without context in third-party, queued or document-centre entry points | Not exhaustively traced; none found in `app/Console` | Entry-point inventory | ACC-07 |
 | NV-21 | How ZATCA verifies the prohibited-function list (user session management, log modification or deletion, password reset on first use) in practice, and the penalty exposure it creates | Published only as Resolution Annex 1, Detailed Guidelines §5.6 and the violations guide; no inspection practice is documented | ZATCA position or a solution-compliance review | CON-13, ACC-10 |
@@ -4045,339 +4073,121 @@ The cumulative go-live gates G1–G8 are in the Remediation Plan §6. Until they
 
 ## Appendix A — Repository files cited as evidence
 
-141 tracked repository paths are cited in the stream working papers (each opened and read by an auditor; the streams also ran whole-`app/` search sweeps recorded in their scope sections). Grouped by area:
-
-**(root)** (4)
-
-<details><summary>show</summary>
-
-- `CLAUDE.md`
-- `Dockerfile`
-- `HOW_TO_RUN.md`
-- `render.yaml`
-
-</details>
-
-**.github** (1)
-
-<details><summary>show</summary>
-
-- `.github/workflows/ci.yml`
-
-</details>
-
-**app** (92)
-
-<details><summary>show</summary>
-
-- `app/Console/Commands/GrantLegacyReachableZatcaCommand.php`
-- `app/Console/Commands/RunDocumentRetentionCommand.php`
-- `app/Http/Controllers/Api/CreditNoteController.php`
-- `app/Http/Controllers/Api/InvoiceController.php`
-- `app/Http/Controllers/Api/PosController.php`
-- `app/Http/Controllers/Api/SalesConfigController.php`
-- `app/Http/Controllers/Api/ZatcaCredentialController.php`
-- `app/Http/Controllers/Api/ZatcaSettingsController.php`
-- `app/Http/Controllers/Api/ZatcaSubmissionController.php`
-- `app/Http/Middleware/EnsureApplicationActive.php`
-- `app/Http/Requests/StoreCreditNoteRequest.php`
-- `app/Http/Requests/StoreInvoiceRequest.php`
-- `app/Http/Requests/UpdateZatcaCredentialRequest.php`
-- `app/Http/Requests/UpdateZatcaSettingsRequest.php`
-- `app/Http/Resources/InvoiceResource.php`
-- `app/Jobs/Accounting/SendZatcaSubmission.php`
-- `app/Models/BaseModel.php`
-- `app/Models/CreditNote.php`
-- `app/Models/Invoice.php`
-- `app/Models/JournalEntry.php`
-- `app/Models/Tenant.php`
-- `app/Models/User.php`
-- `app/Models/ZatcaCredential.php`
-- `app/Models/ZatcaSubmissionAttempt.php`
-- `app/Services/Accounting/AccountRoutingService.php`
-- `app/Services/Accounting/ComputesLineTax.php`
-- `app/Services/Accounting/CreditNoteService.php`
-- `app/Services/Accounting/DeliveryNoteSalesInvoiceDraftBuilder.php`
-- `app/Services/Accounting/ExpenseService.php`
-- `app/Services/Accounting/InvoiceLinePrecision.php`
-- `app/Services/Accounting/InvoiceService.php`
-- `app/Services/Accounting/LedgerService.php`
-- `app/Services/Accounting/PosExchangeService.php`
-- `app/Services/Accounting/PosReturnService.php`
-- `app/Services/Accounting/PosService.php`
-- `app/Services/Accounting/ProcurementService.php`
-- `app/Services/Accounting/PurchaseService.php`
-- `app/Services/Accounting/QuoteService.php`
-- `app/Services/Accounting/RecurringInvoiceService.php`
-- `app/Services/Accounting/ReturnService.php`
-- `app/Services/Accounting/ZatcaCredentialMaterialValidator.php`
-- `app/Services/Accounting/ZatcaCredentialService.php`
-- `app/Services/Accounting/ZatcaHttpTransport.php`
-- `app/Services/Accounting/ZatcaInvoiceHasher.php`
-- `app/Services/Accounting/ZatcaInvoiceSigner.php`
-- `app/Services/Accounting/ZatcaNotificationBridge.php`
-- `app/Services/Accounting/ZatcaPhaseTwoQrEncoder.php`
-- `app/Services/Accounting/ZatcaQrCertificateMaterialExtractor.php`
-- `app/Services/Accounting/ZatcaService.php`
-- `app/Services/Accounting/ZatcaSignaturePolicy.php`
-- `app/Services/Accounting/ZatcaSignaturePolicyResolver.php`
-- `app/Services/Accounting/ZatcaSignedInvoiceFinalizer.php`
-- `app/Services/Accounting/ZatcaSignedInvoiceQrMaterialExtractor.php`
-- `app/Services/Accounting/ZatcaSigningCredentialResolver.php`
-- `app/Services/Accounting/ZatcaSigningReadiness.php`
-- `app/Services/Accounting/ZatcaSubmissionDispatcher.php`
-- `app/Services/Accounting/ZatcaSubmissionEndpointResolver.php`
-- `app/Services/Accounting/ZatcaSubmissionQueue.php`
-- `app/Services/Accounting/ZatcaSubmissionService.php`
-- `app/Services/Accounting/ZatcaTransportCredential.php`
-- `app/Services/Accounting/ZatcaTransportCredentialResolver.php`
-- `app/Services/Accounting/ZatcaTransportReadiness.php`
-- `app/Services/Accounting/ZatcaTransportResult.php`
-- `app/Services/Accounting/ZatcaXadesSignatureAssembler.php`
-- `app/Services/Accounting/ZatcaXadesSignedPropertiesBuilder.php`
-- `app/Services/Accounting/ZatcaXmlCanonicalizer.php`
-- `app/Services/Accounting/ZatcaXmlDsigSignedInfoBuilder.php`
-- `app/Services/Accounting/ZatcaXmlEcdsaSigner.php`
-- `app/Services/Commerce/CommerceCheckoutService.php`
-- `app/Services/DocumentCenter/DocumentFinancialValidator.php`
-- `app/Services/DocumentCenter/DocumentRetentionRunner.php`
-- `app/Services/DocumentCenter/ExpenseDocumentDraftBuilder.php`
-- `app/Services/DocumentCenter/PurchaseDocumentDraftBuilder.php`
-- `app/Services/FuelSaleService.php`
-- `app/Services/FuelStationSettingsService.php`
-- `app/Services/PrintTemplates/PrintTemplateService.php`
-- `app/Services/Reporting/ReportService.php`
-- `app/Services/TenantApplicationService.php`
-- `app/Support/AccountingRoles.php`
-- `app/Support/ApplicationCatalog.php`
-- `app/Support/GeneratesDocumentNumbers.php`
-- `app/Support/Money.php`
-- `app/Support/NotificationActions.php`
-- `app/Support/PrintTemplateContract.php`
-- `app/Support/Rbac.php`
-- `app/Support/RecordsRevisions.php`
-- `app/Support/Settings.php`
-- `app/Support/WebhookEventCatalog.php`
-- `app/Support/ZatcaIcvScope.php`
-- `app/Support/ZatcaSubmissionConflict.php`
-- `app/Tenancy/TenantContext.php`
-- `app/Tenancy/TenantScope.php`
-
-</details>
-
-**config** (2)
-
-<details><summary>show</summary>
-
-- `config/document_center.php`
-- `config/zatca.php`
-
-</details>
-
-**database** (3)
-
-<details><summary>show</summary>
-
-- `database/migrations/2025_01_01_000002_create_accounting_core.php`
-- `database/migrations/2025_01_01_000004_create_invoices.php`
-- `database/migrations/2025_01_01_000131_create_zatca_credentials_table.php`
-
-</details>
-
-**deploy** (4)
-
-<details><summary>show</summary>
-
-- `deploy/DEPLOY.md`
-- `deploy/assemble.sh`
-- `deploy/cors.php`
-- `deploy/entrypoint.sh`
-
-</details>
-
-**docs** (4)
-
-<details><summary>show</summary>
-
-- `docs/PRINT_TEMPLATE_PLATFORM.md`
-- `docs/agent-workspace/DECISIONS.md`
-- `docs/plans/alerts-notifications/AWJ_NOTIFICATIONS_PR_NOTIF_4_IMPLEMENTATION_REPORT.md`
-- `docs/plans/pos/DELIVERY-DECISION-PASS-7-DG-3-TAX-POINT-REPORT.md`
-
-</details>
-
-**routes** (3)
-
-<details><summary>show</summary>
-
-- `routes/api.php`
-- `routes/api_public.php`
-- `routes/console.php`
-
-</details>
-
-**storefront** (3)
-
-<details><summary>show</summary>
-
-- `storefront/src/components/checkout/awj/Confirmation.tsx`
-- `storefront/src/lib/commerce/capabilities.ts`
-- `storefront/src/lib/data/markets.ts`
-
-</details>
-
-**tests** (5)
-
-<details><summary>show</summary>
-
-- `tests/Feature/InteractsWithApi.php`
-- `tests/Feature/InventoryStatePostgresConcurrencyTest.php`
-- `tests/Feature/InvoiceLinePrecisionTest.php`
-- `tests/Feature/PosCheckoutTest.php`
-- `tests/Feature/ZatcaTest.php`
-
-</details>
-
-**web** (20)
-
-<details><summary>show</summary>
-
-- `web/src/app/(app)/invoices/[id]/page.tsx`
-- `web/src/app/(app)/sales-settings/einvoice/page.tsx`
-- `web/src/app/(pos)/pos/page.tsx`
-- `web/src/app/page.tsx`
-- `web/src/components/credit-notes/credit-note-form.tsx`
-- `web/src/components/documents/tax-document.tsx`
-- `web/src/components/invoices/invoice-form.tsx`
-- `web/src/components/pos/pos-invoice-details.tsx`
-- `web/src/components/reports/general-advanced-reports-workspace.tsx`
-- `web/src/components/returns/create-return-dialog.tsx`
-- `web/src/components/settings/tax-settings-card.tsx`
-- `web/src/lib/notifications.ts`
-- `web/src/lib/pos-receipt.ts`
-- `web/src/lib/tax.ts`
-- `web/src/messages/ar.json`
-- `web/src/messages/en.json`
-- `web/src/modules/documents/builder/from-invoice.ts`
-- `web/src/modules/documents/components/document-body.tsx`
-- `web/src/modules/documents/components/sections/doc-qr.tsx`
-- `web/src/modules/invoices/services/invoice-pdf.ts`
-
-</details>
+141 tracked repository paths are cited in the stream working papers (each opened and read by an auditor; the streams also ran whole-`app/` search sweeps recorded in their scope sections). The list, grouped by area, is in `repository-files-cited.md` (evidence folder); it was moved out of this report to keep it within the size the platform renders.
 
 ## Appendix B — Findings index
 
 | ID | Stream | Filed severity | Final severity | Status | Group | Task | Title |
 |---|---|---|---|---|---|---|---|
-| VAT-01 | A | P0 | P0 | VERIFIED DEFECT | `RC-RETURNS-VAT` | REM-01 | Generic sales returns recompute VAT from the gross unit price: tax-inclusive and header-discounted sales are reversed at the wrong VAT (o… |
-| VAT-02 | A | P1 | P1 | VERIFIED DEFECT | `RC-RETURNS-VAT` | REM-02 | Credit notes do not inherit the original invoice's VAT basis: exclusive-only, hard-coded 15 %, no cap vs the referenced invoice |
-| VAT-03 | A | P1 | P1 | NOT IMPLEMENTED | `RC-TAX-CATEGORY` | REM-12 | No VAT category / exemption-reason model: `tax_rate = 0` conflates zero-rated, exempt and out-of-scope supplies; VAT report is GL-only |
-| VAT-04 | A | P1 | P3 | VERIFIED DEFECT | `RC-VAT-ARITHMETIC` | REM-16 | Document VAT = Σ rounded line VAT; the XML standard requires the category VAT to be rounded once at document level |
-| VAT-05 | A | P2 | P2 | VERIFIED DEFECT | `RC-OVERFLOW` | REM-09 | 64-bit overflow: invoices/purchases above ≈ 78.4 M SAR (single line) or ≈ 30–43 M SAR (multi-line, at post) crash with `TypeError` |
-| VAT-06 | A | P1 | P1 | VERIFIED DEFECT | `RC-UBL-BUILDER` | REM-16 | ZATCA XML monetary fields violate the standard's arithmetic rules as soon as a discount, shipping, adjustment or inclusive price exists |
-| VAT-07 | A | P2 | P2 | VERIFIED DEFECT | `RC-VAT-ARITHMETIC` | REM-10 | Header-discount VAT is truncated (`intdiv`), not rounded half-up; `line_tax` snapshots stay pre-discount; inclusive-mode header discount … |
-| VAT-08 | A | P2 | P2 | VERIFIED DEFECT | `RC-VAT-ARITHMETIC` | REM-10 | Shipping VAT: hard-coded 15 % on sales (even on 0 %-only invoices, and treated as exclusive inside inclusive invoices) vs blended line ra… |
-| VAT-09 | A | P2 | P2 | VERIFIED DEFECT | `RC-VAT-ARITHMETIC` | REM-10 | `tax_inclusive` is client-supplied on POS checkout (and POS exchange / delivery-note drafts) while prices and rates are server-authoritative |
+| VAT-01 | A | P0 | P0 | VERIFIED DEFECT | `RC-RETURNS-VAT` | REM-01 | Generic sales returns recompute VAT from the gross unit price: tax-inclusive and header-discounte… |
+| VAT-02 | A | P1 | P1 | VERIFIED DEFECT | `RC-RETURNS-VAT` | REM-02 | Credit notes do not inherit the original invoice's VAT basis: exclusive-only, hard-coded 15 %, no… |
+| VAT-03 | A | P1 | P1 | NOT IMPLEMENTED | `RC-TAX-CATEGORY` | REM-12 | No VAT category / exemption-reason model: `tax_rate = 0` conflates zero-rated, exempt and out-of-… |
+| VAT-04 | A | P1 | P3 | VERIFIED DEFECT | `RC-VAT-ARITHMETIC` | REM-16 | Document VAT = Σ rounded line VAT; the XML standard requires the category VAT to be rounded once … |
+| VAT-05 | A | P2 | P2 | VERIFIED DEFECT | `RC-OVERFLOW` | REM-09 | 64-bit overflow: invoices/purchases above ≈ 78.4 M SAR (single line) or ≈ 30–43 M SAR (multi-line… |
+| VAT-06 | A | P1 | P1 | VERIFIED DEFECT | `RC-UBL-BUILDER` | REM-16 | ZATCA XML monetary fields violate the standard's arithmetic rules as soon as a discount, shipping… |
+| VAT-07 | A | P2 | P2 | VERIFIED DEFECT | `RC-VAT-ARITHMETIC` | REM-10 | Header-discount VAT is truncated (`intdiv`), not rounded half-up; `line_tax` snapshots stay pre-d… |
+| VAT-08 | A | P2 | P2 | VERIFIED DEFECT | `RC-VAT-ARITHMETIC` | REM-10 | Shipping VAT: hard-coded 15 % on sales (even on 0 %-only invoices, and treated as exclusive insid… |
+| VAT-09 | A | P2 | P2 | VERIFIED DEFECT | `RC-VAT-ARITHMETIC` | REM-10 | `tax_inclusive` is client-supplied on POS checkout (and POS exchange / delivery-note drafts) whil… |
 | VAT-10 | A | P3 | P3 | VERIFIED DEFECT | `RC-VAT-ARITHMETIC` | REM-10 | Hard-coded default rate `?? 15` in six services ignores the tenant's `default_tax_rate` |
-| VAT-11 | A | P3 | P3 | NOT IMPLEMENTED | `RC-TAX-CATEGORY` | REM-12 | No effective-dated rate table or rate history; a future rate change has no safe path for credit notes against old invoices |
-| VAT-12 | A | P3 | P3 | PARTIALLY IMPLEMENTED | `RC-VAT-ARITHMETIC` | REM-10 | Tax formulas duplicated 8× (`calcTax`) / 3× (`extractTax`) plus web mirrors; `InvoiceService` does not use the shared trait it is documen… |
+| VAT-11 | A | P3 | P3 | NOT IMPLEMENTED | `RC-TAX-CATEGORY` | REM-12 | No effective-dated rate table or rate history; a future rate change has no safe path for credit n… |
+| VAT-12 | A | P3 | P3 | PARTIALLY IMPLEMENTED | `RC-VAT-ARITHMETIC` | REM-10 | Tax formulas duplicated 8× (`calcTax`) / 3× (`extractTax`) plus web mirrors; `InvoiceService` doe… |
 | VAT-13 | A | P2 | P2 | VERIFIED DEFECT | `RC-RETURNS-VAT` | REM-01 | Partial API returns accumulate per-return rounding: Σ credited VAT ≠ original VAT |
 | VAT-14 | A | P3 | P3 | PARTIALLY IMPLEMENTED | `RC-VAT-ARITHMETIC` | REM-10 | Expenses and assets are exclusive-only; a VAT-inclusive receipt must be manually netted |
 | VAT-15 | A | P3 | P3 | PARTIALLY IMPLEMENTED | `RC-TAX-CATEGORY` | REM-12 | `sales-config/taxes` definitions are unvalidated free-form JSON that only drive a UI default |
 | VAT-16 | A | P3 | P3 | NOT IMPLEMENTED | `RC-COMMERCE-VAT` | REM-30 | Commerce / storefront orders carry no VAT at all |
-| VAT-17 | A | P3 | P3 | PARTIALLY IMPLEMENTED | `RC-VAT-ARITHMETIC` | REM-38 | Fractional quantities with non-decimal denominators are accepted at draft but fail at post (fail-closed), no draft-time validation |
-| ACC-01 | B | P1 | P1 | VERIFIED DEFECT | `RC-ROUTING` | REM-05 | VAT roles can be routed into any posting account; the tax report reads fixed codes, so VAT silently vanishes from the return |
-| ACC-02 | B | P1 | P1 | PARTIALLY IMPLEMENTED | `RC-ROUTING` | REM-06 | Semantic routing adopted only partially: credit notes, sales returns, expenses, assets and POS exchanges still post to hard-coded VAT/AR … |
-| ACC-03 | B | P1 | P1 | NOT IMPLEMENTED | `RC-VAT-RETURN` | REM-28 | No Saudi VAT return: the "tax report" is three numbers from two account codes, with no boxes, classification, drill-down, reconciliation,… |
-| ACC-04 | B | P1 | P1 | NOT IMPLEMENTED | `RC-VAT-RETURN` | REM-28 | No VAT-period freeze: filed figures drift through back-dated documents; the only barrier is the manual company-wide accounting lock; futu… |
-| ACC-05 | B | P2 | P2 | VERIFIED DEFECT | `RC-IMMUTABILITY` | REM-07 | Immutability of posted documents and journals is enforced only by service convention; model and database allow edits/deletes and leave ba… |
-| ACC-06 | B | P2 | P2 | VERIFIED DEFECT | `RC-RETURNS-VAT` | REM-02 | Credit notes are unbounded and unanchored: amount may exceed the original invoice, the "original" may be a never-issued draft, the partne… |
-| ACC-07 | B | P2 | P2 | VERIFIED DEFECT | `RC-OTHER` | REM-33 | `TenantScope` is a silent no-op without a tenant context and the report layer does not assert one: non-HTTP callers get cross-tenant or a… |
-| ACC-08 | B | P2 | P2 | NOT IMPLEMENTED | `RC-COMMERCE-VAT` | REM-30 | Storefront/commerce sales never reach VAT recognition: no order→invoice path exists, so online sales are untaxed in the ledger and absent… |
+| VAT-17 | A | P3 | P3 | PARTIALLY IMPLEMENTED | `RC-VAT-ARITHMETIC` | REM-38 | Fractional quantities with non-decimal denominators are accepted at draft but fail at post (fail-… |
+| ACC-01 | B | P1 | P1 | VERIFIED DEFECT | `RC-ROUTING` | REM-05 | VAT roles can be routed into any posting account; the tax report reads fixed codes, so VAT silent… |
+| ACC-02 | B | P1 | P1 | PARTIALLY IMPLEMENTED | `RC-ROUTING` | REM-06 | Semantic routing adopted only partially: credit notes, sales returns, expenses, assets and POS ex… |
+| ACC-03 | B | P1 | P1 | NOT IMPLEMENTED | `RC-VAT-RETURN` | REM-28 | No Saudi VAT return: the "tax report" is three numbers from two account codes, with no boxes, cla… |
+| ACC-04 | B | P1 | P1 | NOT IMPLEMENTED | `RC-VAT-RETURN` | REM-28 | No VAT-period freeze: filed figures drift through back-dated documents; the only barrier is the m… |
+| ACC-05 | B | P2 | P2 | VERIFIED DEFECT | `RC-IMMUTABILITY` | REM-07 | Immutability of posted documents and journals is enforced only by service convention; model and d… |
+| ACC-06 | B | P2 | P2 | VERIFIED DEFECT | `RC-RETURNS-VAT` | REM-02 | Credit notes are unbounded and unanchored: amount may exceed the original invoice, the "original"… |
+| ACC-07 | B | P2 | P2 | VERIFIED DEFECT | `RC-OTHER` | REM-33 | `TenantScope` is a silent no-op without a tenant context and the report layer does not assert one… |
+| ACC-08 | B | P2 | P2 | NOT IMPLEMENTED | `RC-COMMERCE-VAT` | REM-30 | Storefront/commerce sales never reach VAT recognition: no order→invoice path exists, so online sa… |
 | ACC-09 | B | P3 | P3 | PARTIALLY IMPLEMENTED | `RC-OTHER` | REM-33 | Reversal journals carry no `source_type/source_id` |
 | ACC-10 | B | P3 | P2 | PARTIALLY IMPLEMENTED | `RC-AUDIT-TRAIL` | REM-33 | Document change log pruned after 2 years and does not cover VAT adjustment documents |
 | ACC-11 | B | P3 | P3 | PARTIALLY IMPLEMENTED | `RC-VAT-RETURN` | REM-28 | Manual journals can adjust VAT control accounts without any tax classification or reason code |
 | ACC-12 | B | P3 | P3 | PARTIALLY IMPLEMENTED | `RC-VAT-RETURN` | REM-28 | Branch-filtered VAT report silently drops company-wide (null-branch) VAT lines |
-| PH1-01 | C | P1 | P1 | VERIFIED DEFECT | `RC-ISSUE-TIME` | REM-13 | Invoice issue date/time in QR and XML is the draft-creation timestamp, not the invoice date shown to the customer nor the posting time |
-| PH1-02 | C | P1 | P1 | VERIFIED DEFECT | `RC-MASTER-DATA` | REM-14 | Seller and buyer identity printed on issued invoices is read live; reprints change after a company/partner edit while the stored QR keeps… |
-| PH1-03 | C | P1 | P1 | VERIFIED DEFECT | `RC-OTHER` | REM-20 | E-invoicing is an optional "application"; fresh tenants start with it disabled, the QR endpoint returns 403, and A4/PDF invoices are rend… |
-| PH1-04 | C | P1 | P1 | VERIFIED DEFECT | `RC-MASTER-DATA` | REM-14 | Seller VAT number is neither format-validated nor required at issuance; invoices are issued with an empty or malformed VAT number in QR, … |
-| PH1-05 | C | P1 | P1 | PARTIALLY IMPLEMENTED | `RC-MASTER-DATA` | REM-15 | Standard vs simplified classification is advisory only: standard invoices can be issued without buyer VAT/address, simplified invoices to… |
-| PH1-06 | C | P1 | P1 | NOT IMPLEMENTED | `RC-NOTES-EDOC` | REM-18 | Credit notes and sales returns are issued without QR, without a mandatory reference to the original invoice and without a mandatory reason |
-| PH1-07 | C | P2 | P2 | VERIFIED DEFECT | `RC-STAMP-QR` | REM-17 | TLV length byte silently overflows for values > 255 bytes (seller names ≥ 128 Arabic characters), producing an unreadable QR |
-| PH1-08 | C | P2 | P2 | VERIFIED DEFECT | `RC-OVERFLOW` | REM-09 | Posting a multi-line invoice whose subtotal exceeds ≈ 30.4 million SAR fails with a TypeError (integer overflow in revenue proration) |
-| PH1-09 | C | P2 | P2 | PARTIALLY IMPLEMENTED | `RC-IMMUTABILITY` | REM-07 | Immutability of issued invoices is enforced only in `InvoiceService`/API: the model accepts direct updates and hard deletes, there is no … |
-| PH1-10 | C | P2 | P2 | VERIFIED DEFECT | `RC-OTHER` | REM-34 | Drafts can be printed/exported as "فاتورة ضريبية" with an allocated legal number, the ZATCA compliance footer, and no draft marking in th… |
-| PH1-11 | C | P2 | P2 | VERIFIED DEFECT | `RC-OTHER` | REM-34 | POS thermal receipt is titled "فاتورة ضريبية" (standard) for simplified invoices and shows date only (no issue time) |
-| PH1-12 | C | P2 | P3 | PARTIALLY IMPLEMENTED | `RC-OTHER` | REM-35 | Invoice numbers are allocated at draft, reused/gapped by draft deletion, restarted by mid-year prefix/suffix edits and per branch, and ca… |
-| PH1-13 | C | P2 | P2 | VERIFIED DEFECT | `RC-OTHER` | REM-34 | Compliance over-claims in product copy: landing page "متوافقة مع المرحلتين" and a ZATCA footer printed on every document |
-| PH1-14 | C | P3 | P3 | VERIFIED DEFECT | `RC-ISSUE-TIME` | REM-13 | QR timestamp offset follows the server timezone (`+00:00`/`+03:00` form) and ignores `tenants.timezone`; inconsistent with the Phase-2 en… |
+| PH1-01 | C | P1 | P1 | VERIFIED DEFECT | `RC-ISSUE-TIME` | REM-13 | Invoice issue date/time in QR and XML is the draft-creation timestamp, not the invoice date shown… |
+| PH1-02 | C | P1 | P1 | VERIFIED DEFECT | `RC-MASTER-DATA` | REM-14 | Seller and buyer identity printed on issued invoices is read live; reprints change after a compan… |
+| PH1-03 | C | P1 | P1 | VERIFIED DEFECT | `RC-OTHER` | REM-20 | E-invoicing is an optional "application"; fresh tenants start with it disabled, the QR endpoint r… |
+| PH1-04 | C | P1 | P1 | VERIFIED DEFECT | `RC-MASTER-DATA` | REM-14 | Seller VAT number is neither format-validated nor required at issuance; invoices are issued with … |
+| PH1-05 | C | P1 | P1 | PARTIALLY IMPLEMENTED | `RC-MASTER-DATA` | REM-15 | Standard vs simplified classification is advisory only: standard invoices can be issued without b… |
+| PH1-06 | C | P1 | P1 | NOT IMPLEMENTED | `RC-NOTES-EDOC` | REM-18 | Credit notes and sales returns are issued without QR, without a mandatory reference to the origin… |
+| PH1-07 | C | P2 | P2 | VERIFIED DEFECT | `RC-STAMP-QR` | REM-17 | TLV length byte silently overflows for values > 255 bytes (seller names ≥ 128 Arabic characters),… |
+| PH1-08 | C | P2 | P2 | VERIFIED DEFECT | `RC-OVERFLOW` | REM-09 | Posting a multi-line invoice whose subtotal exceeds ≈ 30.4 million SAR fails with a TypeError (in… |
+| PH1-09 | C | P2 | P2 | PARTIALLY IMPLEMENTED | `RC-IMMUTABILITY` | REM-07 | Immutability of issued invoices is enforced only in `InvoiceService`/API: the model accepts direc… |
+| PH1-10 | C | P2 | P2 | VERIFIED DEFECT | `RC-OTHER` | REM-34 | Drafts can be printed/exported as "فاتورة ضريبية" with an allocated legal number, the ZATCA compl… |
+| PH1-11 | C | P2 | P2 | VERIFIED DEFECT | `RC-OTHER` | REM-34 | POS thermal receipt is titled "فاتورة ضريبية" (standard) for simplified invoices and shows date o… |
+| PH1-12 | C | P2 | P3 | PARTIALLY IMPLEMENTED | `RC-OTHER` | REM-35 | Invoice numbers are allocated at draft, reused/gapped by draft deletion, restarted by mid-year pr… |
+| PH1-13 | C | P2 | P2 | VERIFIED DEFECT | `RC-OTHER` | REM-34 | Compliance over-claims in product copy: landing page "متوافقة مع المرحلتين" and a ZATCA footer pr… |
+| PH1-14 | C | P3 | P3 | VERIFIED DEFECT | `RC-ISSUE-TIME` | REM-13 | QR timestamp offset follows the server timezone (`+00:00`/`+03:00` form) and ignores `tenants.tim… |
 | PH1-15 | C | P2 | P2 | VERIFIED DEFECT | `RC-OTHER` | REM-34 | Document language `en` produces an English-only tax invoice (Arabic dropped) |
-| PH1-16 | C | P2 | P2 | PARTIALLY IMPLEMENTED | `RC-OTHER` | REM-36 | Retention/preservation: 365-day governed purge of Document-Center files, local disk storage, no archive/bulk export of XML/QR, single-inv… |
-| PH1-17 | C | P2 | P2 | PARTIALLY IMPLEMENTED | `RC-UBL-BUILDER` | REM-16 | Phase-1-only XML is a structural stub (no XSD validation; missing tax breakdown, seller address/CRN, buyer VAT/address, delivery date, pa… |
+| PH1-16 | C | P2 | P2 | PARTIALLY IMPLEMENTED | `RC-OTHER` | REM-36 | Retention/preservation: 365-day governed purge of Document-Center files, local disk storage, no a… |
+| PH1-17 | C | P2 | P2 | PARTIALLY IMPLEMENTED | `RC-UBL-BUILDER` | REM-16 | Phase-1-only XML is a structural stub (no XSD validation; missing tax breakdown, seller address/C… |
 | PH1-18 | C | P3 | P3 | VERIFIED DEFECT | `RC-MASTER-DATA` | REM-14 | Currency: QR/XML assume SAR regardless of tenant currency |
 | PH1-19 | C | P3 | P3 (obs.) | VERIFIED IMPLEMENTED | `RC-OTHER` | REM-38 | Phase-1-only tenants: what is actually produced (documentation finding) |
-| PH2-01 | D | P0 | P0 | VERIFIED DEFECT | `RC-STAMP-QR` | REM-17 | ECDSA signature is computed over the wrong bytes and encoded in the wrong form (SDK: "wrong signature Value") |
-| PH2-02 | D | P0 | P0 | VERIFIED DEFECT | `RC-STAMP-QR` | REM-17 | XAdES `SignedProperties` uses the wrong element set and digest encodings (SDK: XSD failure + wrong SignedProperties/certificate digests +… |
-| PH2-03 | D | P0 | P0 | VERIFIED DEFECT | `RC-STAMP-QR` | REM-17 | Phase-2 QR tags 3, 6, 7, 8 use the wrong encodings (SDK: QR FAILED — hashedXml, digital signature, publicKey, timeStamp) |
-| PH2-04 | D | P0 | P0 | VERIFIED DEFECT | `RC-UBL-BUILDER` | REM-16 | The UBL document body is a non-compliant skeleton: XSD, EN16931 and BR-KSA failures on every invoice shape |
-| PH2-05 | D | P0 | P0 | NOT IMPLEMENTED | `RC-NOTES-EDOC` | REM-18 | Credit notes and debit notes are not e-invoiced at all (no XML, QR, hash, ICV/PIH, signature, submission) |
-| PH2-06 | D | P1 | P2 | VERIFIED DEFECT | `RC-STAMP-QR` | REM-17 | A mandatory `SignaturePolicyIdentifier` that ZATCA's profile does not have; signing is impossible in default configuration and forces a f… |
-| PH2-07 | D | P1 | P1 | VERIFIED DEFECT | `RC-FAIL-CLOSED` | REM-26 | Any credential row (any environment/stage) switches the whole tenant to fail-closed signing; an environment mismatch blocks all invoicing… |
-| PH2-08 | D | P1 | P1 | VERIFIED DEFECT | `RC-ISSUE-TIME` | REM-13 | `IssueDate`/`IssueTime` (and QR tag 3) come from the draft's `created_at` in the app time zone, not from the invoice's issue date/posting… |
-| PH2-09 | D | P1 | P1 | NOT IMPLEMENTED | `RC-OTHER` | REM-19 | No onboarding lifecycle (CSR, OTP, compliance CSID, compliance checks, production CSID, renewal, revocation); validator does not bind the… |
+| PH2-01 | D | P0 | P0 | VERIFIED DEFECT | `RC-STAMP-QR` | REM-17 | ECDSA signature is computed over the wrong bytes and encoded in the wrong form (SDK: "wrong signa… |
+| PH2-02 | D | P0 | P0 | VERIFIED DEFECT | `RC-STAMP-QR` | REM-17 | XAdES `SignedProperties` uses the wrong element set and digest encodings (SDK: XSD failure + wron… |
+| PH2-03 | D | P0 | P0 | VERIFIED DEFECT | `RC-STAMP-QR` | REM-17 | Phase-2 QR tags 3, 6, 7, 8 use the wrong encodings (SDK: QR FAILED — hashedXml, digital signature… |
+| PH2-04 | D | P0 | P0 | VERIFIED DEFECT | `RC-UBL-BUILDER` | REM-16 | The UBL document body is a non-compliant skeleton: XSD, EN16931 and BR-KSA failures on every invo… |
+| PH2-05 | D | P0 | P0 | NOT IMPLEMENTED | `RC-NOTES-EDOC` | REM-18 | Credit notes and debit notes are not e-invoiced at all (no XML, QR, hash, ICV/PIH, signature, sub… |
+| PH2-06 | D | P1 | P2 | VERIFIED DEFECT | `RC-STAMP-QR` | REM-17 | A mandatory `SignaturePolicyIdentifier` that ZATCA's profile does not have; signing is impossible… |
+| PH2-07 | D | P1 | P1 | VERIFIED DEFECT | `RC-FAIL-CLOSED` | REM-26 | Any credential row (any environment/stage) switches the whole tenant to fail-closed signing; an e… |
+| PH2-08 | D | P1 | P1 | VERIFIED DEFECT | `RC-ISSUE-TIME` | REM-13 | `IssueDate`/`IssueTime` (and QR tag 3) come from the draft's `created_at` in the app time zone, n… |
+| PH2-09 | D | P1 | P1 | NOT IMPLEMENTED | `RC-OTHER` | REM-19 | No onboarding lifecycle (CSR, OTP, compliance CSID, compliance checks, production CSID, renewal, … |
 | PH2-10 | D | P2 | P2 | VERIFIED DEFECT | `RC-ENV-CHAIN` | REM-25 | One ICV/PIH chain per tenant spans developer, simulation and production environments and stages |
 | PH2-11 | D | P2 | P2 | VERIFIED DEFECT | `RC-STAMP-QR` | REM-17 | Genesis PIH encoding differs from ZATCA's samples/SDK |
 | PH2-12 | D | P2 | P2 | VERIFIED DEFECT | `RC-STAMP-QR` | REM-17 | Phase-1 QR TLV length byte wraps silently for values ≥ 256 bytes |
-| PH2-13 | D | P2 | P2 | NOT IMPLEMENTED | `RC-UBL-BUILDER` | REM-16 | Unsupported invoice-type transaction flags, foreign currency and tax-inclusive/allowance representation |
+| PH2-13 | D | P2 | P2 | NOT IMPLEMENTED | `RC-UBL-BUILDER` | REM-16 | Unsupported invoice-type transaction flags, foreign currency and tax-inclusive/allowance represen… |
 | PH2-14 | D | P2 | P2 | PARTIALLY IMPLEMENTED | `RC-OTHER` | REM-11 | Test suite proves AWJ-vs-AWJ consistency only and encodes the deviations as expectations |
-| PH2-15 | D | P3 | P3 (obs.) | VERIFIED IMPLEMENTED | `RC-OTHER` | REM-38 | Serialised stamp carries redundant namespace declarations and the hasher spawns an external process per canonicalisation |
+| PH2-15 | D | P3 | P3 (obs.) | VERIFIED IMPLEMENTED | `RC-OTHER` | REM-38 | Serialised stamp carries redundant namespace declarations and the hasher spawns an external proce… |
 | PH2-16 | D | P3 | P3 | VERIFIED DEFECT | `RC-MASTER-DATA` | REM-14 | Missing tenant/VAT data degrades silently in the phase-1 path |
-| SUB-01 | E | P0 | P0 | VERIFIED DEFECT | `RC-RELEASE-GATE` | REM-24 | Standard (B2B) invoices are issued, printed and shared before — and independently of — Clearance; no lifecycle state distinguishes "poste… |
-| SUB-05 | E | P0 | P0 | NOT IMPLEMENTED | `RC-ORCHESTRATION` | REM-23 | No automatic/scheduled submission, no UI, no 24-hour deadline tracking: simplified (B2C/POS) invoices can only be reported by hand-crafte… |
-| SUB-02 | E | P1 | P2 | VERIFIED DEFECT | `RC-OUTCOME-HANDLING` | REM-21 | Acceptance is inferred from HTTP status alone (200/202 ⇒ `accepted`), the response status field is never checked, and redirects are follo… |
-| SUB-03 | E | P1 | P1 | VERIFIED DEFECT | `RC-OUTCOME-HANDLING` | REM-21 | Request contract diverges from the official SDK-generated request: no `uuid` in the body and no `Clearance-Status` header for clearance |
-| SUB-04 | E | P1 | P1 | PARTIALLY IMPLEMENTED | `RC-RELEASE-GATE` | REM-24 | The ZATCA-returned cleared XML (stamp + QR) is stored but never used: customers always receive the locally generated QR; credit/debit not… |
-| SUB-07 | E | P1 | P1 | NOT IMPLEMENTED | `RC-RELEASE-GATE` | REM-24 | A rejected invoice cannot be corrected: resubmission resends the identical rejected XML; no "re-issue after rectification" flow exists |
-| OPS-01 | E | P1 | P1 | VERIFIED DEFECT | `RC-ORCHESTRATION` | REM-23 | Production deployment has no queue worker or scheduler and pins `QUEUE_CONNECTION=sync`; readiness cannot detect an absent worker, so ena… |
-| OPS-02 | E | P1 | P1 | NOT IMPLEMENTED | `RC-ORCHESTRATION` | REM-27 | No operator observability: no tenant-wide attempt list/counts, no dispatch/result logging, no metrics, no UI; failures reach operators on… |
-| SUB-06 | E | P2 | P3 | PARTIALLY IMPLEMENTED | `RC-OUTCOME-HANDLING` | REM-22 | No "in-doubt" state after a timeout/transport failure; the retry re-sends the identical document with no reconciliation; a 400 on the dup… |
-| SUB-08 | E | P2 | P2 | VERIFIED DEFECT | `RC-ENV-CHAIN` | REM-25 | Submission attempts carry no environment; an acceptance obtained in `simulation` blocks production submission, and a pending attempt foll… |
-| SUB-09 | E | P2 | P2 | VERIFIED DEFECT | `RC-OUTCOME-HANDLING` | REM-22 | HTTP call executed inside an open DB transaction holding a row lock (up to 35 s); a DB disconnect during the call loses an acceptance tha… |
-| SUB-10 | E | P2 | P2 | NOT VERIFIED | `RC-ENV-CHAIN` | REM-25 | One ICV/PIH chain per tenant regardless of environment: simulation (test) invoices are chained into the production sequence |
-| SUB-11 | E | P2 | P2 | VERIFIED DEFECT | `RC-OUTCOME-HANDLING` | REM-21 | Non-rejection HTTP statuses (401/403/404/409/413/422/303) are recorded as `rejected` and notified as "ZATCA rejected this invoice" |
-| SUB-12 | E | P2 | P2 | VERIFIED DEFECT | `RC-ENV-CHAIN` | REM-25 | An owner/admin can set `active_environment` to an environment without credentials; all invoice posting (including POS) then fails closed … |
-| OPS-03 | E | P2 | P2 | PARTIALLY IMPLEMENTED | `RC-FAIL-CLOSED` | REM-26 | Readiness checks are shallow: no trust-anchor presence, certificate-expiry window, outbound-connectivity, worker-liveness, clock-skew or … |
-| OPS-04 | E | P2 | P2 | PARTIALLY IMPLEMENTED | `RC-ORCHESTRATION` | REM-27 | Job failures outside the dispatcher leave the attempt `pending` with no notification; recovery relies on an operator noticing `failed_job… |
-| SUB-13 | E | P3 | P3 | PARTIALLY IMPLEMENTED | `RC-OUTCOME-HANDLING` | REM-22 | "One open attempt per invoice" and "no new attempt after acceptance" are enforced only by the service's row lock, not by the schema |
-| SUB-14 | E | P3 | P3 | VERIFIED DEFECT | `RC-ORCHESTRATION` | REM-27 | Failure notifications fan out one critical alert per failed attempt to every `invoices.manage` user; at POS volumes this is an alert stor… |
+| SUB-01 | E | P0 | P0 | VERIFIED DEFECT | `RC-RELEASE-GATE` | REM-24 | Standard (B2B) invoices are issued, printed and shared before — and independently of — Clearance;… |
+| SUB-05 | E | P0 | P0 | NOT IMPLEMENTED | `RC-ORCHESTRATION` | REM-23 | No automatic/scheduled submission, no UI, no 24-hour deadline tracking: simplified (B2C/POS) invo… |
+| SUB-02 | E | P1 | P2 | VERIFIED DEFECT | `RC-OUTCOME-HANDLING` | REM-21 | Acceptance is inferred from HTTP status alone (200/202 ⇒ `accepted`), the response status field i… |
+| SUB-03 | E | P1 | P1 | VERIFIED DEFECT | `RC-OUTCOME-HANDLING` | REM-21 | Request contract diverges from the official SDK-generated request: no `uuid` in the body and no `… |
+| SUB-04 | E | P1 | P1 | PARTIALLY IMPLEMENTED | `RC-RELEASE-GATE` | REM-24 | The ZATCA-returned cleared XML (stamp + QR) is stored but never used: customers always receive th… |
+| SUB-07 | E | P1 | P1 | NOT IMPLEMENTED | `RC-RELEASE-GATE` | REM-24 | A rejected invoice cannot be corrected: resubmission resends the identical rejected XML; no "re-i… |
+| OPS-01 | E | P1 | P1 | VERIFIED DEFECT | `RC-ORCHESTRATION` | REM-23 | Production deployment has no queue worker or scheduler and pins `QUEUE_CONNECTION=sync`; readines… |
+| OPS-02 | E | P1 | P1 | NOT IMPLEMENTED | `RC-ORCHESTRATION` | REM-27 | No operator observability: no tenant-wide attempt list/counts, no dispatch/result logging, no met… |
+| SUB-06 | E | P2 | P3 | PARTIALLY IMPLEMENTED | `RC-OUTCOME-HANDLING` | REM-22 | No "in-doubt" state after a timeout/transport failure; the retry re-sends the identical document … |
+| SUB-08 | E | P2 | P2 | VERIFIED DEFECT | `RC-ENV-CHAIN` | REM-25 | Submission attempts carry no environment; an acceptance obtained in `simulation` blocks productio… |
+| SUB-09 | E | P2 | P2 | VERIFIED DEFECT | `RC-OUTCOME-HANDLING` | REM-22 | HTTP call executed inside an open DB transaction holding a row lock (up to 35 s); a DB disconnect… |
+| SUB-10 | E | P2 | P2 | NOT VERIFIED | `RC-ENV-CHAIN` | REM-25 | One ICV/PIH chain per tenant regardless of environment: simulation (test) invoices are chained in… |
+| SUB-11 | E | P2 | P2 | VERIFIED DEFECT | `RC-OUTCOME-HANDLING` | REM-21 | Non-rejection HTTP statuses (401/403/404/409/413/422/303) are recorded as `rejected` and notified… |
+| SUB-12 | E | P2 | P2 | VERIFIED DEFECT | `RC-ENV-CHAIN` | REM-25 | An owner/admin can set `active_environment` to an environment without credentials; all invoice po… |
+| OPS-03 | E | P2 | P2 | PARTIALLY IMPLEMENTED | `RC-FAIL-CLOSED` | REM-26 | Readiness checks are shallow: no trust-anchor presence, certificate-expiry window, outbound-conne… |
+| OPS-04 | E | P2 | P2 | PARTIALLY IMPLEMENTED | `RC-ORCHESTRATION` | REM-27 | Job failures outside the dispatcher leave the attempt `pending` with no notification; recovery re… |
+| SUB-13 | E | P3 | P3 | PARTIALLY IMPLEMENTED | `RC-OUTCOME-HANDLING` | REM-22 | "One open attempt per invoice" and "no new attempt after acceptance" are enforced only by the ser… |
+| SUB-14 | E | P3 | P3 | VERIFIED DEFECT | `RC-ORCHESTRATION` | REM-27 | Failure notifications fan out one critical alert per failed attempt to every `invoices.manage` us… |
 | SUB-15 | E | P3 | P3 | VERIFIED DEFECT | `RC-OUTCOME-HANDLING` | REM-21 | Minor contract/hygiene items |
-| SEC-01 | F | P1 | P1 | VERIFIED DEFECT | `RC-BRANCH-AUTHZ` | REM-03 | Branch-restricted user can edit, delete and **issue** (post → ICV/QR/XML) invoices of branches outside their assignment; the revisions fe… |
-| SEC-02 | F | P1 | P1 | VERIFIED DEFECT | `RC-LOCK-ORDER` | REM-04 | PostgreSQL deadlocks during concurrent invoice posting (lock-order inversion partner-row → tenant-anchor vs tenant-anchor → FK on partner) |
-| SEC-03 | F | P1 | P1 | VERIFIED DEFECT | `RC-FAIL-CLOSED` | REM-26 | Phase-2 fail-closed design halts **all** invoicing of the tenant on CSID expiry / environment switch / key rotation / chain gap, with no … |
+| SEC-01 | F | P1 | P1 | VERIFIED DEFECT | `RC-BRANCH-AUTHZ` | REM-03 | Branch-restricted user can edit, delete and **issue** (post → ICV/QR/XML) invoices of branches ou… |
+| SEC-02 | F | P1 | P1 | VERIFIED DEFECT | `RC-LOCK-ORDER` | REM-04 | PostgreSQL deadlocks during concurrent invoice posting (lock-order inversion partner-row → tenant… |
+| SEC-03 | F | P1 | P1 | VERIFIED DEFECT | `RC-FAIL-CLOSED` | REM-26 | Phase-2 fail-closed design halts **all** invoicing of the tenant on CSID expiry / environment swi… |
 | SEC-04 | F | P2 | P2 | VERIFIED DEFECT | `RC-OTHER` | REM-08 | Deactivated user (`is_active = false`) keeps full API access with existing tokens |
-| SEC-05 | F | P2 | P2 | PARTIALLY IMPLEMENTED | `RC-IMMUTABILITY` | REM-07 | Issued-document snapshot is not protected at model/DB level; stored XML/hash can diverge from live data undetected |
-| SEC-06 | F | P2 | P2 | PARTIALLY IMPLEMENTED | `RC-ENV-CHAIN` | REM-25 | Environment of a submission is not recorded; simulation and production share one ICV/PIH chain and the same `zatca_*` columns |
-| SEC-07 | F | P2 | P2 | PARTIALLY IMPLEMENTED | `RC-OTHER` | REM-37 | Separation of duties: ZATCA transmission is granted by `invoices.manage` alone; settings metadata readable by every `invoices.view` holder |
-| SEC-08 | F | P3 | P3 | PARTIALLY IMPLEMENTED | `RC-OTHER` | REM-20 | Application gating of `compliance.zatca` is inconsistent (artifacts still generated/exposed while "disabled"; signing/transmission ignore… |
-| SEC-09 | F | P3 | P3 (obs.) | VERIFIED IMPLEMENTED | `RC-LOCK-ORDER` | REM-38 | Tenant anchor row is held across external processes (xmllint/openssl) for every post, serialising all ledger postings of the tenant |
-| SEC-10 | F | P3 | P3 (obs.) | VERIFIED IMPLEMENTED | `RC-OTHER` | REM-38 | Re-queue window and job uniqueness expire together (5 min), allowing a duplicate job for one pending attempt |
+| SEC-05 | F | P2 | P2 | PARTIALLY IMPLEMENTED | `RC-IMMUTABILITY` | REM-07 | Issued-document snapshot is not protected at model/DB level; stored XML/hash can diverge from liv… |
+| SEC-06 | F | P2 | P2 | PARTIALLY IMPLEMENTED | `RC-ENV-CHAIN` | REM-25 | Environment of a submission is not recorded; simulation and production share one ICV/PIH chain an… |
+| SEC-07 | F | P2 | P2 | PARTIALLY IMPLEMENTED | `RC-OTHER` | REM-37 | Separation of duties: ZATCA transmission is granted by `invoices.manage` alone; settings metadata… |
+| SEC-08 | F | P3 | P3 | PARTIALLY IMPLEMENTED | `RC-OTHER` | REM-20 | Application gating of `compliance.zatca` is inconsistent (artifacts still generated/exposed while… |
+| SEC-09 | F | P3 | P3 (obs.) | VERIFIED IMPLEMENTED | `RC-LOCK-ORDER` | REM-38 | Tenant anchor row is held across external processes (xmllint/openssl) for every post, serialising… |
+| SEC-10 | F | P3 | P3 (obs.) | VERIFIED IMPLEMENTED | `RC-OTHER` | REM-38 | Re-queue window and job uniqueness expire together (5 min), allowing a duplicate job for one pend… |
 | SEC-11 | F | P3 | P3 | PARTIALLY IMPLEMENTED | `RC-OTHER` | REM-38 | Cleared-XML parser does not reject DOCTYPE; cleared XML never integrity-checked |
 | SEC-12 | F | P3 | P3 | NOT VERIFIED | `RC-OTHER` | REM-38 | CORS allows any origin when `FRONTEND_URL` is unset |
 | SEC-13 | F | P3 | P3 | VERIFIED DEFECT | `RC-FAIL-CLOSED` | REM-26 | Raw exception text (temp paths, decrypt errors) returned in 422 bodies |
-| CON-01 | L | P1 | P1 | NOT VERIFIED | `RC-GOVERNANCE` | REM-00A/REM-36 | Records location: IR Art. 66(3) requires records kept in the Kingdom (terminal access) and TIG v3 states residents' servers must be in KS… |
-| CON-02 | L | P2 | P2 | NOT IMPLEMENTED | `RC-VAT-RETURN` | REM-31 | No control for the credit/debit-note issuance deadline (15th of the month after the triggering event) nor for the adjustment period of ou… |
-| CON-03 | L | P2 | P2 | NOT IMPLEMENTED | `RC-VAT-RETURN` | REM-29 | Advance payments / prepayment invoices (type 386) and tax point at receipt of consideration are not modelled; receipts post to AR only |
-| CON-04 | L | P2 | P2 | NOT IMPLEMENTED | `RC-VAT-RETURN` | REM-32 | No support for reverse charge / imports (boxes 8-9), restricted-expense input VAT (IR Art.50), proportional deduction (Art.51), bad-debt … |
-| CON-05 | L | P2 | P2 | NOT IMPLEMENTED | `RC-ORCHESTRATION` | REM-27 | No incident-notification / contingency workflow (ZATCA failure-notification form, uncleared-invoice handling, manual-invoice regeneration… |
-| CON-06 | L | P2 | P2 | VERIFIED DEFECT | `RC-PRINT-CONTENT` | REM-34 | Print contract lets templates drop visible fields required by IR Art. 53(5) / Annex 2; hard-coded "(15%)" label; thermal totals omit disc… |
+| CON-01 | L | P1 | P1 | NOT VERIFIED | `RC-GOVERNANCE` | REM-00A/REM-36 | Records location: IR Art. 66(3) requires records kept in the Kingdom (terminal access) and TIG v3… |
+| CON-02 | L | P2 | P2 | NOT IMPLEMENTED | `RC-VAT-RETURN` | REM-31 | No control for the credit/debit-note issuance deadline (15th of the month after the triggering ev… |
+| CON-03 | L | P2 | P2 | NOT IMPLEMENTED | `RC-VAT-RETURN` | REM-29 | Advance payments / prepayment invoices (type 386) and tax point at receipt of consideration are n… |
+| CON-04 | L | P2 | P2 | NOT IMPLEMENTED | `RC-VAT-RETURN` | REM-32 | No support for reverse charge / imports (boxes 8-9), restricted-expense input VAT (IR Art.50), pr… |
+| CON-05 | L | P2 | P2 | NOT IMPLEMENTED | `RC-ORCHESTRATION` | REM-27 | No incident-notification / contingency workflow (ZATCA failure-notification form, uncleared-invoi… |
+| CON-06 | L | P2 | P2 | VERIFIED DEFECT | `RC-PRINT-CONTENT` | REM-34 | Print contract lets templates drop visible fields required by IR Art. 53(5) / Annex 2; hard-coded… |
 | CON-07 | L | P2 | P2 | NOT IMPLEMENTED | `RC-VAT-RETURN` | REM-29 | No supply-date / tax-point model and no invoice-issuance deadline control |
-| CON-08 | L | P2 | P2 | NOT IMPLEMENTED | `RC-VAT-RETURN` | REM-32 | Other VAT scenarios not modelled: deemed supplies, margin scheme, export evidence, capital assets, lost goods, input-tax evidence |
+| CON-08 | L | P2 | P2 | NOT IMPLEMENTED | `RC-VAT-RETURN` | REM-32 | Other VAT scenarios not modelled: deemed supplies, margin scheme, export evidence, capital assets… |
 | CON-09 | L | P2 | P2 | NOT IMPLEMENTED | `RC-RELEASE-GATE` | REM-24 | No PDF/A-3 (embedded XML) output or e-invoice file naming |
 | CON-10 | L | P2 | P2 | NOT IMPLEMENTED | `RC-FAIL-CLOSED` | REM-26 | No certificate revocation (CRL/OCSP) check before stamping |
-| CON-11 | L | P2 | P2 | PARTIALLY IMPLEMENTED | `RC-FAIL-CLOSED` | REM-19/REM-26 | Stamping-key custody: user-supplied exportable private key under a single APP_KEY envelope, not renewed with the CSID, temporary APP_KEY … |
-| CON-12 | L | P2 | P2 | VERIFIED DEFECT | `RC-VAT-ARITHMETIC` | REM-10 | A positive invoice adjustment is non-taxable consideration: unbounded (±SAR 1 billion at the API), outside the VAT base, credited to expe… |
-| CON-13 | L | P2 | P2 | PARTIALLY IMPLEMENTED | `RC-AUDIT-TRAIL` | REM-33 | User-session management and activity logging do not meet Detailed Guidelines 5.6: no login trail, no forced password change on first use,… |
+| CON-11 | L | P2 | P2 | PARTIALLY IMPLEMENTED | `RC-FAIL-CLOSED` | REM-19/REM-26 | Stamping-key custody: user-supplied exportable private key under a single APP_KEY envelope, not r… |
+| CON-12 | L | P2 | P2 | VERIFIED DEFECT | `RC-VAT-ARITHMETIC` | REM-10 | A positive invoice adjustment is non-taxable consideration: unbounded (±SAR 1 billion at the API)… |
+| CON-13 | L | P2 | P2 | PARTIALLY IMPLEMENTED | `RC-AUDIT-TRAIL` | REM-33 | User-session management and activity logging do not meet Detailed Guidelines 5.6: no login trail,… |
 
 ## Appendix C — Changes made by the audit
 

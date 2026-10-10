@@ -16,7 +16,7 @@
 2. **Sequence = risk.** Tier 1 critical financial/security defects → Tier 2 critical ZATCA blockers → Tier 3 submission reliability & recovery → Tier 4 VAT reporting/reconciliation gaps → Tier 5 UX/operational. Tier 0 (evidence and decisions) runs in parallel from day one because several later tasks cannot start without it.
 3. **The official validator is the oracle.** For every ZATCA-facing task the acceptance test is the ZATCA SDK validator run offline in CI (REM-11), not an AWJ-vs-AWJ comparison. A passing test suite alone does not establish regulatory compliance; neither does this plan.
 4. **Repository invariants stay untouched** (CLAUDE.md): money in halalas as `bigint`; every ledger effect through `LedgerService::post`; tenant/branch isolation by construction; posted journals immutable; policy that has more than one defensible answer is a setting with a safe default (rule 6) — hence the ADR tasks.
-5. **Pre-PR protocol per task (CLAUDE.md):** run the complete `php artisan test` on SQLite and PostgreSQL; for any financial operation the PR description carries the resulting journal entry as a table (accounts, debit, credit); web changes pass `npm run build`.
+5. **Pre-PR protocol per task (CLAUDE.md):** run the complete `php artisan test` on SQLite and PostgreSQL; for any financial operation the PR description carries the resulting journal entry as a table (accounts, debit, credit); web changes pass `npm run test` (Vitest — 445 files / 4 117 tests at the audited commit, run by Web CI) and `npm run build`, and the Playwright specs of the touched screens are run locally because they are not part of the default CI.
 6. **Tests that currently enshrine a defect** (e.g. the two-field transport body, the genesis PIH, the 64-byte signature) are replaced in the same PR with an explicit justification and a Compliance reviewer — they are not deleted silently and no unrelated test is touched.
 7. **No production data, no live ZATCA traffic, no credential changes** in any task unless a separate, explicit approval is recorded for that step (REM-19 and the go-live gates).
 8. **Pre-production policy.** `docs/audits/AWJ_PRE_PRODUCTION_DATA_POLICY.md` (owner-approved 2026-09-06) treats every current tenant and document as test data: tasks choose the correct invariant or default rather than a compatibility shim for that data, and migrations may re-flag or reset it deliberately. Intended code and API contracts, tenant isolation, accounting accuracy, security and idempotency are not relaxed. Whether any real taxpayer data already exists in production is NOT VERIFIED (REM-00A).
@@ -166,7 +166,7 @@ These reduce exposure while the tasks above are built. They are recommendations 
 ## 7. Definition of done (every task)
 
 - [ ] Code and tests merged through a normal reviewed PR; acceptance criteria below demonstrated.
-- [ ] Complete `php artisan test` green on SQLite and PostgreSQL (CLAUDE.md pre-PR protocol); `npm run build` for web changes.
+- [ ] Complete `php artisan test` green on SQLite and PostgreSQL (CLAUDE.md pre-PR protocol); `npm run test` and `npm run build` for web changes, plus the Playwright specs of the touched screens.
 - [ ] Financial operations: PR description lists the resulting journal entry per operation (account, debit, credit) for review before merge.
 - [ ] ADRs referenced; settings introduced have a default that preserves existing tenant behaviour (rule 6).
 - [ ] Migrations are additive and tested on a PostgreSQL copy; no destructive change to posted data.
@@ -687,6 +687,7 @@ These reduce exposure while the tasks above are built. They are recommendations 
 
 **Regression tests.**
 - Standard without buyer data rejected; XML buyer block; print snapshot includes the address.
+- Existing web test to extend, not to weaken: `components/invoices/invoice-form.test.tsx:550-559` selects `simplified` and saves with no confirmation step.
 
 **Risk and rollout.** Low.
 
@@ -944,6 +945,7 @@ These reduce exposure while the tasks above are built. They are recommendations 
 
 **Regression tests.**
 - Gate matrix by type/state; cleared QR extraction; correction flow chain continuity.
+- Existing Playwright spec that pins the two-state document lifecycle and must be updated with the new states (not reverted): `e2e/awj-v3-h2-workspaces.spec.ts:71-75` (Demo Mode, so it does not exercise the backend gate — a Feature test is still needed).
 
 **Risk and rollout.** High product impact: changes when customers receive documents — needs the ADR and a feature flag.
 
@@ -1204,13 +1206,15 @@ These reduce exposure while the tasks above are built. They are recommendations 
 **Scope.** `DocumentBody` templates, POS receipt builder, landing copy, document language rules.
 
 **Approach.**
-- Watermark non-posted documents; simplified title on thermal; enforce the Annex 2 visible item columns for tax documents, derive the VAT label from the line rates, reconcile thermal totals with discount/shipping/adjustment, pass the seller address into credit-note prints; footer only when `status = posted` and a QR exists; reword the landing claim; treat `en` as bilingual for tax documents.
+- Watermark non-posted documents; simplified title on thermal; enforce the Annex 2 visible item columns for tax documents, derive the VAT label from the line rates, reconcile thermal totals with discount/shipping/adjustment and wrap (not truncate) item descriptions on the 58/80 mm receipt, pass the seller address into credit-note prints; footer only when `status = posted` and a QR exists; reword the landing claim; treat `en` as bilingual for tax documents.
 
 **Acceptance criteria.**
 - [ ] Render tests for each template: draft watermark, simplified title, no compliance footer without QR, Arabic present on tax documents.
 
 **Regression tests.**
 - Web render tests per template and language.
+- Existing web tests that pin today's behaviour and must be changed in the same PR, with a justification rather than a silent edit (they are the reason the change is visible): `modules/documents/registry/document-types.test.ts:68-99` (a valid tax-invoice layout without quantity or unit price) and `:130-138` (`toEqual` on the column catalog); `use-document-label-mode.test.tsx:38` and the six `document-*-v2.test.tsx`/`document-modern.test.tsx` cases that assert English-only labels for a `tax_invoice` (PH1-15); `document-modern.test.tsx:289-317` (a draft asserted to carry `zatca_note` and `footer`, PH1-10/PH1-13); `e2e/invoice-detail-interactions.spec.ts:90` if printing is restricted to posted documents. Two further tests read `MODERN_TOTAL_LABELS.vat` by key (`document-modern.test.tsx:385-395`, `visual-v2.test.ts:91`): keep or migrate that key when the VAT label becomes rate-aware.
+- Run the whole Vitest suite (`npm run test`) and the Playwright specs of the touched screens, not only the new tests.
 
 **Risk and rollout.** Low.
 
@@ -1301,18 +1305,19 @@ These reduce exposure while the tasks above are built. They are recommendations 
 | Decisions (ADR) | — |
 | Effort · owner | S–M (2–4 d) · Backend |
 
-**Why.** Fractional quantities with non-decimal denominators pass draft validation but fail at posting (VAT-17); the cleared-XML parser does not reject DOCTYPE or check the UUID (SEC-11); CORS is open when `FRONTEND_URL` is unset (SEC-12); observations PH1-19, PH2-15, SEC-09, SEC-10 are documentation/optimisation notes.
+**Why.** Fractional quantities with non-decimal denominators pass draft validation but fail at posting (VAT-17); the cleared-XML parser does not reject DOCTYPE or check the UUID (SEC-11); CORS is open when `FRONTEND_URL` is unset (SEC-12); observations PH1-19, PH2-15, SEC-09, SEC-10 are documentation/optimisation notes. Two housekeeping items noted while the web tests were run belong here although they are not findings: `CLAUDE.md` still says the web app has no automated tests (Vitest and Playwright exist; Web CI runs Vitest), and `next dev` reports `INVALID_KEY` for six message keys that contain a dot.
 
 **Scope.** `InvoiceLinePrecision`, cleared-XML parser reuse of `parseSecurely`, production config validation, documentation of the phase-1-only output, optional C14N optimisation.
 
 **Approach.**
-- Validate representability at draft; reuse the secure parser and check `cbc:UUID`; make `FRONTEND_URL` mandatory in production; expose `zatca_mode` on the resource.
+- Validate representability at draft; reuse the secure parser and check `cbc:UUID`; make `FRONTEND_URL` mandatory in production; expose `zatca_mode` on the resource; correct the stale test statement in `CLAUDE.md` (documentation only); rename the six dotted message keys (`appBuilder.builder.visibility.signalOption.cart.itemCount`, `…customer.isAuthenticated`, `…product.inStock`, `developer.events.partner.created`, `…product.created`, `…invoice.created` in `ar.json` and `en.json`) or flatten them to nested objects.
 
 **Acceptance criteria.**
 - [ ] Draft with 1/3 quantity is rejected; DOCTYPE in cleared XML rejected; production boot fails without `FRONTEND_URL`.
 
 **Regression tests.**
 - Draft validation; DOCTYPE rejection; config validation.
+- `npm run test` and the console-clean Playwright specs pass without `INVALID_KEY` messages.
 
 **Risk and rollout.** Low.
 
