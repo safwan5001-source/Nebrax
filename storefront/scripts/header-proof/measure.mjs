@@ -198,17 +198,17 @@ for (const file of files) {
       await page.evaluate(() => window.scrollBy(0, -30)); await settle();
       st = await state();
       ok(!st.hidden && near(st.t, 0, 0.5), `${tag} header did not return on the first upward scroll (${st.t})`);
-      await page.evaluate(() => window.scrollTo(0, 1600)); await settle();
+      await page.evaluate(() => window.scrollTo(0, 1500)); await settle();
       st = await state();
       ok(st.hidden, `${tag} header did not hide again`);
       // a keyboard user tabbing into the hidden header reveals it first, and it then stays while they work inside it
       await page.evaluate(() => document.querySelector("[data-search-input]").focus()); await settle();
       st = await state();
       ok(!st.hidden && near(st.t, 0, 0.5), `${tag} focus inside did not reveal the header`);
-      await page.evaluate(() => window.scrollTo(0, 2400)); await settle();
+      await page.evaluate(() => window.scrollTo(0, 1800)); await settle();
       st = await state();
       ok(!st.hidden && near(st.t, 0, 0.5), `${tag} header left while focus is inside it`);
-      await page.evaluate(() => document.activeElement.blur()); await page.evaluate(() => window.scrollTo(0, 2800)); await settle();
+      await page.evaluate(() => document.activeElement.blur()); await page.evaluate(() => window.scrollTo(0, 2100)); await settle();
       st = await state();
       ok(st.hidden, `${tag} header did not hide after focus left`);
       ok(parseFloat(st.tr) > 0, `${tag} no slide transition (${st.tr})`);
