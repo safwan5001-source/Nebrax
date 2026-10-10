@@ -74,6 +74,7 @@ const measure = (page) => page.evaluate(() => {
   return {
     overflowX: document.documentElement.scrollWidth - document.documentElement.clientWidth,
     vw: document.documentElement.clientWidth,
+    headerBg: getComputedStyle(header).backgroundColor,
     header: r(header), headerPos: getComputedStyle(header).position, live: header.hasAttribute("data-header-live"), solid: header.hasAttribute("data-header-solid"),
     block: rects.length ? { t: Math.min(...rects.map((x) => x.top)), b: Math.max(...rects.map((x) => x.bottom)) } : null,
     hdBlock: parseFloat(wrapper.style.getPropertyValue("--hd-block")) || null,
@@ -158,10 +159,11 @@ for (const file of files.filter((f) => f.endsWith(".html"))) {
       if (m.colour.pill) ok(same(m.colour.pill, hex("#12372a")), `${tag} cart pill recoloured ${m.colour.pill}`);
 
       // PIXEL proof — the real pixels behind the bands, text/borders/own-surface elements hidden, against the proven colour
-      await page.addStyleTag({ content: `header *{color:transparent!important;-webkit-text-fill-color:transparent!important;border-color:transparent!important;caret-color:transparent!important}header svg,header [data-cart-pill],header img{visibility:hidden!important}header input::placeholder{color:transparent!important}` });
+      const hider = await page.addStyleTag({ content: `header *{color:transparent!important;-webkit-text-fill-color:transparent!important;border-color:transparent!important;caret-color:transparent!important}header svg,header [data-cart-pill],header img{visibility:hidden!important}header input::placeholder{color:transparent!important}` });
       const shot = await page.screenshot({ clip: { x: 0, y: Math.max(0, m.block.t), width: m.vw, height: Math.max(1, Math.min(m.block.b - m.block.t, h - m.block.t)) } });
       const worst = await worstAgainst(page, `data:image/png;base64,${shot.toString("base64")}`, fg);
       pixelChecks++;
+      await hider.evaluate((e) => e.remove());
       if (name === "ovLie") ok(worst < 4.5, `${tag} the negative control was NOT caught by the pixel proof (worst ${worst.toFixed(2)})`);
       else ok(worst >= 4.5, `${tag} pixels behind the header give only ${worst.toFixed(2)}:1 against ${fg}`);
 
@@ -189,7 +191,7 @@ for (const file of files.filter((f) => f.endsWith(".html"))) {
     } else {
       ok(m.marker === null, `${tag} marker on an ineligible page (${m.marker})`);
       ok(m.header.h > 20, `${tag} ineligible page lost its header height (${m.header.h})`);
-      if (m.bg.row) ok(rgb(m.bg.row)[3] === 1, `${tag} header row not opaque: ${m.bg.row}`);
+      ok(rgb(m.headerBg)[3] === 1, `${tag} header not opaque on an ineligible page: ${m.headerBg}`);
       ok(!m.solid, `${tag} stray solid flag`);
       if (m.backdrop) ok(m.backdrop.l > 0.5 || m.vw <= 0, `${tag} picture bleeds on an ineligible page (${m.backdrop.l})`);
       ok(m.sectionPad === 0 || m.sectionPad === null, `${tag} hero padded on an ineligible page (${m.sectionPad})`);
@@ -211,6 +213,6 @@ for (const file of files.filter((f) => f.endsWith(".html"))) {
 }
 await browser.close();
 console.log(`${strip ? "STRIPPED (negative control)" : "production"}: ${files.filter((f) => f.endsWith(".html")).length} pages x ${viewports.length} viewports, ${checks} checks (${pixelChecks} pixel proofs), ${violations.length} violations`);
-for (const v of violations.slice(0, 40)) console.log("  ✗", v);
-if (violations.length > 40) console.log(`  … ${violations.length - 40} more`);
+for (const v of violations.slice(0, 120)) console.log("  ✗", v);
+if (violations.length > 120) console.log(`  … ${violations.length - 120} more`);
 process.exit(strip ? (violations.length > 0 ? 0 : 1) : violations.length > 0 ? 1 : 0);
