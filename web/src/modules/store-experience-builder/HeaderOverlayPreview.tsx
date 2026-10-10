@@ -1,16 +1,8 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { watchScroll } from "./canvas-scroll";
 import { overlayIsSolid } from "./presentation/header-design";
-
-/** The nearest ancestor that actually scrolls (the preview pane), else the window. */
-function scrollHost(from: HTMLElement): HTMLElement | Window {
-  for (let el = from.parentElement; el; el = el.parentElement) {
-    const { overflowY } = getComputedStyle(el);
-    if (overflowY === "auto" || overflowY === "scroll") return el;
-  }
-  return window;
-}
 
 /**
  * CUST-HV V7c-2 — the Canvas's scroll-position simulator for overlay-on-hero (V0 §9.3 point 6): the same pure rule
@@ -24,8 +16,7 @@ export function HeaderOverlayPreview({ sticky }: { sticky: boolean }) {
     const header = marker.current?.closest("header");
     const root = header?.parentElement;
     if (!header || !root) return;
-    const host = scrollHost(header);
-    const top = () => (host instanceof Window ? host.scrollY : host.scrollTop);
+    let y = 0;
     const bands = () =>
       Array.from(header.children).filter((el): el is HTMLElement => el.matches("div, nav"));
     const measure = () => {
@@ -35,7 +26,7 @@ export function HeaderOverlayPreview({ sticky }: { sticky: boolean }) {
     const update = () =>
       header.toggleAttribute(
         "data-header-solid",
-        overlayIsSolid(top(), header.contains(document.activeElement) || header.querySelector('[aria-expanded="true"]') !== null),
+        overlayIsSolid(y, header.contains(document.activeElement) || header.querySelector('[aria-expanded="true"]') !== null),
       );
 
     if (sticky) header.setAttribute("data-header-live", "");
@@ -43,11 +34,14 @@ export function HeaderOverlayPreview({ sticky }: { sticky: boolean }) {
     update();
     const resize = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(measure);
     for (const band of bands()) resize?.observe(band);
-    host.addEventListener("scroll", update, { passive: true });
+    const unwatch = watchScroll(header, (next) => {
+      y = next;
+      update();
+    });
     header.addEventListener("focusin", update);
     header.addEventListener("focusout", update);
     return () => {
-      host.removeEventListener("scroll", update);
+      unwatch();
       header.removeEventListener("focusin", update);
       header.removeEventListener("focusout", update);
       resize?.disconnect();
