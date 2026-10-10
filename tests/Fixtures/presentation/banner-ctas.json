@@ -1,5 +1,5 @@
 {
-    "_note": "CUST-HV V6c-2 — Banner `ctas` (≤2) next to the legacy ctaLabel/ctaHref (V0 §8.2). Shared by PHP StorefrontPresentationNormalizer and both TS section-content twins. ctas sit after imageAlt and before window. Per-CTA `style` (solid|outline|link, V6c-5) is accepted and sits after href; colour/icon/soft are NOT accepted yet. expected=null means the content key is absent.",
+    "_note": "CUST-HV V6c-2 — Banner `ctas` (≤2) next to the legacy ctaLabel/ctaHref (V0 §8.2). Shared by PHP StorefrontPresentationNormalizer and both TS section-content twins. ctas sit after imageAlt and before window. Per-CTA `style` (solid|soft|outline|link, V6c-5/6) and `colour` (brand|accent|text, V6c-6) are accepted and sit after href in that order; `icon` is NOT accepted yet. expected=null means the content key is absent.",
     "cases": [
         {
             "name": "legacy single CTA only: output is exactly as before (no ctas key)",
@@ -426,7 +426,7 @@
             "expected": null
         },
         {
-            "name": "colour and icon on a CTA are not accepted yet (style is, V6c-5); an unknown or `soft` style is dropped on its own",
+            "name": "icon on a CTA is not accepted yet; an unknown colour role is dropped on its own (style and a valid colour are kept)",
             "type": "banner",
             "input": {
                 "title": "Sale",
@@ -443,7 +443,8 @@
                     {
                         "label": "More",
                         "href": "/more",
-                        "style": "soft"
+                        "style": "soft",
+                        "colour": "accent"
                     }
                 ]
             },
@@ -462,7 +463,9 @@
                     },
                     {
                         "label": "More",
-                        "href": "/more"
+                        "href": "/more",
+                        "style": "soft",
+                        "colour": "accent"
                     }
                 ]
             }
@@ -544,7 +547,7 @@
             }
         },
         {
-            "name": "V6c-5: a wrong-case, non-string or unknown style is dropped, the button stays",
+            "name": "V6c-5: a wrong-case, non-string or unknown style (e.g. `fancy`) is dropped, the button stays",
             "type": "banner",
             "input": {
                 "title": "Sale",
@@ -557,7 +560,7 @@
                     {
                         "label": "B",
                         "href": "/b",
-                        "style": 7
+                        "style": "fancy"
                     }
                 ]
             },
@@ -588,6 +591,114 @@
                 "ctas": [
                     {
                         "style": "outline"
+                    },
+                    {
+                        "label": "B",
+                        "href": "/b"
+                    }
+                ]
+            },
+            "expected": {
+                "title": "Sale",
+                "subtitle": "",
+                "ctaLabel": "",
+                "ctaHref": "",
+                "imageUrl": null,
+                "imageAlt": "",
+                "ctas": [
+                    {
+                        "label": "B",
+                        "href": "/b"
+                    }
+                ]
+            }
+        },
+        {
+            "name": "V6c-6: colour is kept after style (key order label, href, style, colour); each role is accepted",
+            "type": "banner",
+            "input": {
+                "title": "Sale",
+                "ctas": [
+                    {
+                        "colour": "text",
+                        "style": "link",
+                        "href": "/a",
+                        "label": "A"
+                    },
+                    {
+                        "colour": "brand",
+                        "href": "/b",
+                        "label": "B"
+                    }
+                ]
+            },
+            "expected": {
+                "title": "Sale",
+                "subtitle": "",
+                "ctaLabel": "",
+                "ctaHref": "",
+                "imageUrl": null,
+                "imageAlt": "",
+                "ctas": [
+                    {
+                        "label": "A",
+                        "href": "/a",
+                        "style": "link",
+                        "colour": "text"
+                    },
+                    {
+                        "label": "B",
+                        "href": "/b",
+                        "colour": "brand"
+                    }
+                ]
+            }
+        },
+        {
+            "name": "V6c-6: a wrong-case, non-string or unknown colour is dropped, the button stays",
+            "type": "banner",
+            "input": {
+                "title": "Sale",
+                "ctas": [
+                    {
+                        "label": "A",
+                        "href": "/a",
+                        "colour": "Brand"
+                    },
+                    {
+                        "label": "B",
+                        "href": "/b",
+                        "colour": 3
+                    }
+                ]
+            },
+            "expected": {
+                "title": "Sale",
+                "subtitle": "",
+                "ctaLabel": "",
+                "ctaHref": "",
+                "imageUrl": null,
+                "imageAlt": "",
+                "ctas": [
+                    {
+                        "label": "A",
+                        "href": "/a"
+                    },
+                    {
+                        "label": "B",
+                        "href": "/b"
+                    }
+                ]
+            }
+        },
+        {
+            "name": "V6c-6: a colour alone is not a button (the empty CTA is dropped)",
+            "type": "banner",
+            "input": {
+                "title": "Sale",
+                "ctas": [
+                    {
+                        "colour": "accent"
                     },
                     {
                         "label": "B",

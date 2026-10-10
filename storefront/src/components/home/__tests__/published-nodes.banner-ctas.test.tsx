@@ -226,3 +226,57 @@ describe("Banner CTA styles (CUST-HV V6c-5)", () => {
     expect(cls).toMatch(/^mt-4 /);
   });
 });
+
+describe("Banner CTA colour (CUST-HV V6c-6)", () => {
+  const cctx = {
+    ...ctx,
+    design: {
+      primaryColor: "#12372a",
+      accentColor: "#ffd166",
+      dir: "ltr" as const,
+    },
+  };
+  const mountWith = async (ctas: Array<Record<string, string>>) => {
+    const nodes = await publishedNodes([banner({ ctas })], cctx as never);
+    return render(<div>{nodes}</div>).container;
+  };
+
+  it("paints an explicit colour from validated custom properties and makes the button an outline variant for the global tokens", async () => {
+    const c = await mountWith([
+      { label: "Shop", href: "/products", style: "solid", colour: "accent" },
+      { label: "More", href: "/about", style: "outline", colour: "brand" },
+    ]);
+    const [a, b] = [...c.querySelectorAll("section a")] as HTMLElement[];
+    expect(a.getAttribute("data-cta-colour")).toBe("accent");
+    expect(a.style.getPropertyValue("--cta-fill")).toBe("#ffd166");
+    expect(a.style.getPropertyValue("--cta-label")).toBe("#000000");
+    expect(a.getAttribute("data-slot")).toBe("button");
+    expect(a.getAttribute("data-variant")).toBe("outline");
+    expect(a.className).not.toContain("bg-store-primary"); // the store's solid CTA class is not borrowed
+    expect(b.style.getPropertyValue("--cta-fill")).toBe("transparent");
+    expect(b.style.getPropertyValue("--cta-border")).toBe("#12372a");
+  });
+
+  it("soft is an opaque light tint with a label proven over it; a link has no fill or border", async () => {
+    const c = await mountWith([
+      { label: "Shop", href: "/products", style: "soft", colour: "brand" },
+      { label: "More", href: "/about", style: "link", colour: "brand" },
+    ]);
+    const [a, b] = [...c.querySelectorAll("section a")] as HTMLElement[];
+    expect(a.style.getPropertyValue("--cta-fill")).toMatch(/^#[0-9a-f]{6}$/);
+    expect(a.style.getPropertyValue("--cta-fill")).not.toBe("#12372a");
+    expect(b.style.getPropertyValue("--cta-fill")).toBe("transparent");
+    expect(b.style.getPropertyValue("--cta-border")).toBe("transparent");
+    expect(b.className).toContain("underline");
+  });
+
+  it("the position among the DRAWN buttons decides the default style: an incomplete first draft does not demote the second", async () => {
+    const c = await mountWith([
+      { label: "Draft", href: "" },
+      { label: "Real", href: "/real" },
+    ]);
+    const links = [...c.querySelectorAll("section a")];
+    expect(links).toHaveLength(1);
+    expect(links[0].getAttribute("data-cta-style")).toBe("solid");
+  });
+});

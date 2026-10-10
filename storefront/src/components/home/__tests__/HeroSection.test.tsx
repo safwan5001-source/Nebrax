@@ -179,6 +179,50 @@ describe("HeroSection (COM-7-P3A)", () => {
       expect(link.getAttribute("data-hero-cta")).toBe("primary");
     });
 
+    it("CUST-HV V6c-6: an explicit colour paints the button from validated custom properties (role colour → hex), only with a palette context", async () => {
+      const { HeroSection } = await import("../HeroSection");
+      const design = {
+        primaryColor: "#12372a",
+        accentColor: "#ffd166",
+        dir: "ltr" as const,
+      };
+      const ctas = [
+        { label: "A", href: "/a", style: "solid", colour: "accent" },
+        { label: "B", href: "/b", style: "link", colour: "text" },
+        { label: "C", href: "/c", style: "outline", colour: "brand" },
+      ];
+      const painted = render(
+        await HeroSection({
+          basePath: "/sa/en",
+          locale: "en",
+          storeName: "Shop",
+          ctas: ctas.slice(0, 2) as never,
+          designCtx: design,
+        }),
+      ).container;
+      const [a, b] = [...painted.querySelectorAll("a")] as HTMLElement[];
+      expect(a.getAttribute("data-cta-colour")).toBe("accent");
+      expect(a.style.getPropertyValue("--cta-fill")).toBe("#ffd166");
+      expect(a.style.getPropertyValue("--cta-label")).toBe("#000000"); // computed over its own fill
+      expect(a.className).toContain("bg-(color:--cta-fill)");
+      expect(a.className).not.toContain("bg-store-primary-foreground");
+      expect(b.style.getPropertyValue("--cta-fill")).toBe("transparent");
+      expect(b.style.getPropertyValue("--cta-label")).toBe("#111827");
+      expect(b.className).toContain("underline");
+      // without the palette context the colour is not painted: the style's own look stays
+      const plain = render(
+        await HeroSection({
+          basePath: "/sa/en",
+          locale: "en",
+          storeName: "Shop",
+          ctas: ctas.slice(2) as never,
+        }),
+      ).container;
+      const c = plain.querySelector("a") as HTMLElement;
+      expect(c.getAttribute("data-cta-colour")).toBeNull();
+      expect(c.getAttribute("style")).toBeNull();
+    });
+
     it("authored buttons that cannot render (no resolvable link) show NO button — the default link only belongs to a hero with no buttons", async () => {
       const { HeroSection } = await import("../HeroSection");
       const { container } = render(

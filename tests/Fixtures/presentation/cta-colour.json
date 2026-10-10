@@ -1,0 +1,598 @@
+{
+    "_note": "CUST-HV V6c-6 — per-CTA colour publish contrast gate. Shared by PHP CtaColourContrast and both TS twins (ratios compared at 1e-4). `ctas` are the section's normalised content.ctas; `design` its normalised design; `media` maps mediaId → {min,max} encoded-channel bounds (already widened) or null. expected = [{index, code, ratio}] in button order.",
+    "cases": [
+        {
+            "name": "hero without a design: an outline in the brand colour is lost on the brand gradient",
+            "type": "hero",
+            "config": {
+                "primaryColor": "#12372a",
+                "accentColor": null,
+                "palette": []
+            },
+            "ctas": [
+                {
+                    "label": "Go",
+                    "href": "/go",
+                    "style": "outline",
+                    "colour": "brand"
+                }
+            ],
+            "expected": [
+                {
+                    "index": 0,
+                    "code": "contrast_insufficient",
+                    "ratio": 1
+                }
+            ]
+        },
+        {
+            "name": "hero without a design: a link in the text colour is lost on the brand gradient",
+            "type": "hero",
+            "config": {
+                "primaryColor": "#12372a",
+                "accentColor": null,
+                "palette": []
+            },
+            "ctas": [
+                {
+                    "label": "Go",
+                    "href": "/go",
+                    "style": "link",
+                    "colour": "text"
+                }
+            ],
+            "expected": [
+                {
+                    "index": 0,
+                    "code": "contrast_insufficient",
+                    "ratio": 1.1791
+                }
+            ]
+        },
+        {
+            "name": "hero without a design: a light accent link passes on the brand gradient",
+            "type": "hero",
+            "config": {
+                "primaryColor": "#12372a",
+                "accentColor": "#ffd166",
+                "palette": []
+            },
+            "ctas": [
+                {
+                    "label": "Go",
+                    "href": "/go",
+                    "style": "link",
+                    "colour": "accent"
+                }
+            ],
+            "expected": []
+        },
+        {
+            "name": "hero without a design: solid and soft are never judged (their label is computed over their own fill)",
+            "type": "hero",
+            "config": {
+                "primaryColor": "#12372a",
+                "accentColor": null,
+                "palette": []
+            },
+            "ctas": [
+                {
+                    "label": "Go",
+                    "href": "/go",
+                    "style": "solid",
+                    "colour": "text"
+                },
+                {
+                    "label": "Go",
+                    "href": "/go",
+                    "style": "soft",
+                    "colour": "brand"
+                }
+            ],
+            "expected": []
+        },
+        {
+            "name": "position decides the effective style: first (solid) is not judged, second (outline) is",
+            "type": "hero",
+            "config": {
+                "primaryColor": "#12372a",
+                "accentColor": null,
+                "palette": []
+            },
+            "ctas": [
+                {
+                    "label": "Go",
+                    "href": "/go",
+                    "colour": "text"
+                },
+                {
+                    "label": "More",
+                    "href": "/more",
+                    "colour": "text"
+                }
+            ],
+            "expected": [
+                {
+                    "index": 1,
+                    "code": "contrast_insufficient",
+                    "ratio": 1.1791
+                }
+            ]
+        },
+        {
+            "name": "a button without a colour is never judged (it follows the section's own proven colours)",
+            "type": "hero",
+            "config": {
+                "primaryColor": "#12372a",
+                "accentColor": null,
+                "palette": []
+            },
+            "ctas": [
+                {
+                    "label": "Go",
+                    "href": "/go",
+                    "style": "outline"
+                },
+                {
+                    "label": "More",
+                    "href": "/more",
+                    "style": "link"
+                }
+            ],
+            "expected": []
+        },
+        {
+            "name": "an incomplete draft (no link, or no label) is not drawn, so it is not judged",
+            "type": "hero",
+            "config": {
+                "primaryColor": "#12372a",
+                "accentColor": null,
+                "palette": []
+            },
+            "ctas": [
+                {
+                    "label": "Go",
+                    "href": "",
+                    "style": "outline",
+                    "colour": "brand"
+                },
+                {
+                    "label": " ",
+                    "href": "/go",
+                    "style": "link",
+                    "colour": "brand"
+                }
+            ],
+            "expected": []
+        },
+        {
+            "name": "hero over a dark solid background: the light accent passes, the dark text role fails",
+            "type": "hero",
+            "config": {
+                "primaryColor": "#12372a",
+                "accentColor": "#ffd166",
+                "palette": []
+            },
+            "ctas": [
+                {
+                    "label": "Go",
+                    "href": "/go",
+                    "style": "outline",
+                    "colour": "accent"
+                },
+                {
+                    "label": "B",
+                    "href": "/b",
+                    "style": "link",
+                    "colour": "text"
+                }
+            ],
+            "design": {
+                "background": {
+                    "kind": "solid",
+                    "color": {
+                        "hex": "#102030"
+                    }
+                }
+            },
+            "expected": [
+                {
+                    "index": 1,
+                    "code": "contrast_insufficient",
+                    "ratio": 1.0739
+                }
+            ]
+        },
+        {
+            "name": "hero over a light solid background: the text role passes",
+            "type": "hero",
+            "config": {
+                "primaryColor": "#12372a",
+                "accentColor": null,
+                "palette": []
+            },
+            "ctas": [
+                {
+                    "label": "Go",
+                    "href": "/go",
+                    "style": "link",
+                    "colour": "text"
+                }
+            ],
+            "design": {
+                "background": {
+                    "kind": "solid",
+                    "color": {
+                        "hex": "#f3f4f6"
+                    }
+                }
+            },
+            "expected": []
+        },
+        {
+            "name": "hero over a gradient is judged across the whole gradient, not its ends",
+            "type": "hero",
+            "config": {
+                "primaryColor": "#12372a",
+                "accentColor": "#808080",
+                "palette": []
+            },
+            "ctas": [
+                {
+                    "label": "Go",
+                    "href": "/go",
+                    "style": "outline",
+                    "colour": "accent"
+                }
+            ],
+            "design": {
+                "background": {
+                    "kind": "gradient",
+                    "from": {
+                        "hex": "#102030"
+                    },
+                    "to": {
+                        "hex": "#e8e8e8"
+                    },
+                    "direction": "to-end"
+                }
+            },
+            "expected": [
+                {
+                    "index": 0,
+                    "code": "contrast_insufficient",
+                    "ratio": 1
+                }
+            ]
+        },
+        {
+            "name": "hero over a proven dark picture: a light accent passes",
+            "type": "hero",
+            "config": {
+                "primaryColor": "#12372a",
+                "accentColor": "#ffd166",
+                "palette": []
+            },
+            "ctas": [
+                {
+                    "label": "Go",
+                    "href": "/go",
+                    "style": "link",
+                    "colour": "accent"
+                }
+            ],
+            "design": {
+                "background": {
+                    "kind": "media",
+                    "media": {
+                        "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+                        "decorative": true
+                    }
+                }
+            },
+            "media": {
+                "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e": {
+                    "min": [
+                        0,
+                        0,
+                        0
+                    ],
+                    "max": [
+                        40,
+                        50,
+                        60
+                    ]
+                }
+            },
+            "expected": []
+        },
+        {
+            "name": "hero over a proven dark picture: the brand colour fails",
+            "type": "hero",
+            "config": {
+                "primaryColor": "#12372a",
+                "accentColor": null,
+                "palette": []
+            },
+            "ctas": [
+                {
+                    "label": "Go",
+                    "href": "/go",
+                    "style": "outline",
+                    "colour": "brand"
+                }
+            ],
+            "design": {
+                "background": {
+                    "kind": "media",
+                    "media": {
+                        "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+                        "decorative": true
+                    }
+                }
+            },
+            "media": {
+                "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e": {
+                    "min": [
+                        0,
+                        0,
+                        0
+                    ],
+                    "max": [
+                        40,
+                        50,
+                        60
+                    ]
+                }
+            },
+            "expected": [
+                {
+                    "index": 0,
+                    "code": "contrast_insufficient",
+                    "ratio": 1
+                }
+            ]
+        },
+        {
+            "name": "hero over a picture with no luminance evidence: unprovable, never silently allowed",
+            "type": "hero",
+            "config": {
+                "primaryColor": "#12372a",
+                "accentColor": null,
+                "palette": []
+            },
+            "ctas": [
+                {
+                    "label": "Go",
+                    "href": "/go",
+                    "style": "link",
+                    "colour": "accent"
+                }
+            ],
+            "design": {
+                "background": {
+                    "kind": "media",
+                    "media": {
+                        "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+                        "decorative": true
+                    }
+                }
+            },
+            "media": [],
+            "expected": [
+                {
+                    "index": 0,
+                    "code": "contrast_unprovable",
+                    "ratio": 1
+                }
+            ]
+        },
+        {
+            "name": "banner without a design: the brand colour passes on white; the suggested accent (a lighter tint of the brand) is a hair under 4.5:1 and is rejected",
+            "type": "banner",
+            "config": {
+                "primaryColor": "#12372a",
+                "accentColor": null,
+                "palette": []
+            },
+            "ctas": [
+                {
+                    "label": "Go",
+                    "href": "/go",
+                    "style": "outline",
+                    "colour": "brand"
+                },
+                {
+                    "label": "B",
+                    "href": "/b",
+                    "style": "link",
+                    "colour": "accent"
+                }
+            ],
+            "expected": [
+                {
+                    "index": 1,
+                    "code": "contrast_insufficient",
+                    "ratio": 4.427
+                }
+            ]
+        },
+        {
+            "name": "banner without a design: a light accent on white fails",
+            "type": "banner",
+            "config": {
+                "primaryColor": "#12372a",
+                "accentColor": "#ffd166",
+                "palette": []
+            },
+            "ctas": [
+                {
+                    "label": "Go",
+                    "href": "/go",
+                    "style": "link",
+                    "colour": "accent"
+                }
+            ],
+            "expected": [
+                {
+                    "index": 0,
+                    "code": "contrast_insufficient",
+                    "ratio": 1.4419
+                }
+            ]
+        },
+        {
+            "name": "banner with a dark palette surface is judged against that surface as well as white",
+            "type": "banner",
+            "config": {
+                "primaryColor": "#12372a",
+                "accentColor": null,
+                "palette": {
+                    "surface": "#101820"
+                }
+            },
+            "ctas": [
+                {
+                    "label": "Go",
+                    "href": "/go",
+                    "style": "outline",
+                    "colour": "brand"
+                }
+            ],
+            "expected": [
+                {
+                    "index": 0,
+                    "code": "contrast_insufficient",
+                    "ratio": 1.3682
+                }
+            ]
+        },
+        {
+            "name": "banner over a dark solid design background",
+            "type": "banner",
+            "config": {
+                "primaryColor": "#12372a",
+                "accentColor": "#ffd166",
+                "palette": []
+            },
+            "ctas": [
+                {
+                    "label": "Go",
+                    "href": "/go",
+                    "style": "outline",
+                    "colour": "text"
+                },
+                {
+                    "label": "B",
+                    "href": "/b",
+                    "style": "link",
+                    "colour": "accent"
+                }
+            ],
+            "design": {
+                "background": {
+                    "kind": "solid",
+                    "color": {
+                        "hex": "#0b1d2a"
+                    }
+                }
+            },
+            "expected": [
+                {
+                    "index": 0,
+                    "code": "contrast_insufficient",
+                    "ratio": 1.0335
+                }
+            ]
+        },
+        {
+            "name": "a design without a background judges against the type's own surface (hero gradient / banner white)",
+            "type": "banner",
+            "config": {
+                "primaryColor": "#12372a",
+                "accentColor": null,
+                "palette": []
+            },
+            "ctas": [
+                {
+                    "label": "Go",
+                    "href": "/go",
+                    "style": "link",
+                    "colour": "text"
+                }
+            ],
+            "design": {
+                "spacing": {
+                    "top": "md"
+                }
+            },
+            "expected": []
+        },
+        {
+            "name": "other section types are never judged",
+            "type": "benefits",
+            "config": {
+                "primaryColor": "#12372a",
+                "accentColor": null,
+                "palette": []
+            },
+            "ctas": [
+                {
+                    "label": "Go",
+                    "href": "/go",
+                    "style": "outline",
+                    "colour": "text"
+                }
+            ],
+            "expected": []
+        },
+        {
+            "name": "the default style follows the DRAWN position: an incomplete first draft does not make the second button an outline",
+            "type": "hero",
+            "config": {
+                "primaryColor": "#12372a",
+                "accentColor": null,
+                "palette": []
+            },
+            "ctas": [
+                {
+                    "label": "Draft",
+                    "href": ""
+                },
+                {
+                    "label": "Real",
+                    "href": "/real",
+                    "colour": "text"
+                }
+            ],
+            "expected": []
+        },
+        {
+            "name": "…and the same buttons with the draft complete: the second is an outline and is judged (stored index 1)",
+            "type": "hero",
+            "config": {
+                "primaryColor": "#12372a",
+                "accentColor": null,
+                "palette": []
+            },
+            "ctas": [
+                {
+                    "label": "First",
+                    "href": "/first"
+                },
+                {
+                    "label": "Real",
+                    "href": "/real",
+                    "colour": "text"
+                }
+            ],
+            "expected": [
+                {
+                    "index": 1,
+                    "code": "contrast_insufficient",
+                    "ratio": 1.1791
+                }
+            ]
+        }
+    ]
+}

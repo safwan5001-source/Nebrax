@@ -218,9 +218,9 @@ describe("CTA style select (CUST-HV V6c-5)", () => {
   const styleSelect = (index: number) =>
     slot(index).querySelector("[data-cta-style-select]") as HTMLSelectElement;
 
-  it("offers Automatic / Filled / Outlined / Text link, and is disabled while the slot is empty", () => {
+  it("offers Automatic / Filled / Soft / Outlined / Text link, and is disabled while the slot is empty", () => {
     panel(banner({ ctas: [{ label: "Shop", href: "/products" }], ctaLabel: "Shop", ctaHref: "/products" }));
-    expect([...styleSelect(0).options].map((o) => o.value)).toEqual(["", "solid", "outline", "link"]);
+    expect([...styleSelect(0).options].map((o) => o.value)).toEqual(["", "solid", "soft", "outline", "link"]);
     expect(styleSelect(0).disabled).toBe(false);
     expect(styleSelect(1).disabled).toBe(true); // nothing to style until the button exists
   });
@@ -272,6 +272,63 @@ describe("CTA style select (CUST-HV V6c-5)", () => {
 
   it("has AR and EN copy for every new key", () => {
     for (const key of ["ctaStyle", "ctaStyleDefault", "ctaStyleSolid", "ctaStyleOutline", "ctaStyleLink"] as const) {
+      expect(CUSTOMIZER_MESSAGES.ar[key]).toBeTruthy();
+      expect(CUSTOMIZER_MESSAGES.en[key]).toBeTruthy();
+    }
+  });
+});
+
+describe("CTA colour select and live contrast advisory (CUST-HV V6c-6)", () => {
+  const colourSelect = (index: number) => slot(index).querySelector("[data-cta-colour-select]") as HTMLSelectElement;
+  const styleSelect = (index: number) => slot(index).querySelector("[data-cta-style-select]") as HTMLSelectElement;
+  const issue = (index: number) => slot(index).querySelector("[data-cta-colour-issue]");
+  const two = {
+    ctas: [
+      { label: "Shop", href: "/products" },
+      { label: "More", href: "/about" },
+    ],
+    ctaLabel: "Shop",
+    ctaHref: "/products",
+  };
+
+  it("offers Automatic / Brand / Accent / Text, disabled while the slot is empty; Automatic removes the key", () => {
+    const onChange = panel(banner(two));
+    expect([...colourSelect(0).options].map((o) => o.value)).toEqual(["", "brand", "accent", "text"]);
+    fireEvent.change(colourSelect(1), { target: { value: "brand" } });
+    expect(lastBanner(onChange).ctas?.[1]).toEqual({ label: "More", href: "/about", colour: "brand" });
+    fireEvent.change(colourSelect(1), { target: { value: "" } });
+    expect("colour" in (lastBanner(onChange).ctas?.[1] ?? {})).toBe(false);
+  });
+
+  it("Soft without a colour picks the brand colour (never a silent no-op)", () => {
+    const onChange = panel(banner(two));
+    fireEvent.change(styleSelect(0), { target: { value: "soft" } });
+    expect(lastBanner(onChange).ctas?.[0]).toEqual({ label: "Shop", href: "/products", style: "soft", colour: "brand" });
+  });
+
+  it("an outline or link whose colour the gate would reject says so on that button; filled and soft never do", () => {
+    // a banner on its own white surface: the brand colour passes, the light accent tint does not
+    panel(banner({ ctas: [{ label: "A", href: "/a", style: "link", colour: "accent" }, { label: "B", href: "/b", style: "solid", colour: "text" }] }));
+    expect(issue(0)?.getAttribute("data-cta-colour-issue")).toBe("contrast_insufficient");
+    expect(issue(1)).toBeNull();
+  });
+
+  it("a passing colour shows no advisory", () => {
+    panel(banner({ ctas: [{ label: "A", href: "/a", style: "outline", colour: "brand" }] }));
+    expect(issue(0)).toBeNull();
+  });
+
+  it("has AR and EN copy for every new key", () => {
+    for (const key of [
+      "ctaStyleSoft",
+      "ctaColour",
+      "ctaColourDefault",
+      "ctaColourBrand",
+      "ctaColourAccent",
+      "ctaColourText",
+      "ctaColourInsufficient",
+      "ctaColourUnprovable",
+    ] as const) {
       expect(CUSTOMIZER_MESSAGES.ar[key]).toBeTruthy();
       expect(CUSTOMIZER_MESSAGES.en[key]).toBeTruthy();
     }

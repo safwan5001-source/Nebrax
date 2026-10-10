@@ -360,7 +360,7 @@
             }
         },
         {
-            "name": "hero V6c-5: per-CTA style is kept in canonical order; an unknown style / colour / icon is dropped",
+            "name": "hero V6c-5/6: per-CTA style and colour are kept in canonical order; an unknown style / colour and any icon are dropped",
             "type": "hero",
             "input": {
                 "headline": "H",
@@ -374,7 +374,8 @@
                     {
                         "label": "B",
                         "href": "/b",
-                        "style": "soft",
+                        "style": "fancy",
+                        "colour": "pink",
                         "icon": {
                             "key": "arrow"
                         }
@@ -387,7 +388,8 @@
                     {
                         "label": "A",
                         "href": "/a",
-                        "style": "link"
+                        "style": "link",
+                        "colour": "accent"
                     },
                     {
                         "label": "B",
@@ -409,6 +411,33 @@
             },
             "expected": {
                 "headline": "H"
+            }
+        },
+        {
+            "name": "hero V6c-6: soft is a style; a colour alone is not a button",
+            "type": "hero",
+            "input": {
+                "headline": "H",
+                "ctas": [
+                    {
+                        "colour": "brand"
+                    },
+                    {
+                        "label": "S",
+                        "href": "/s",
+                        "style": "soft"
+                    }
+                ]
+            },
+            "expected": {
+                "headline": "H",
+                "ctas": [
+                    {
+                        "label": "S",
+                        "href": "/s",
+                        "style": "soft"
+                    }
+                ]
             }
         }
     ]

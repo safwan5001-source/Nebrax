@@ -40,8 +40,11 @@ final class StorefrontPresentationNormalizer
 
     private const MAX_HERO_CTAS = 2;
 
-    /** CUST-HV V6c-5 — أنماط الزرّ لكل CTA (V0 §6.1: `soft` تحتاج بوّابة تباين على المنطقة المرسومة، لاحقاً). */
-    public const CTA_STYLES = ['solid', 'outline', 'link'];
+    /** CUST-HV V6c-5/6 — أنماط الزرّ لكل CTA (V0 §6.1). */
+    public const CTA_STYLES = ['solid', 'soft', 'outline', 'link'];
+
+    /** CUST-HV V6c-6 — أدوار لون الزرّ لكل CTA (توأم `GLOBAL_BUTTON_COLOURS`). */
+    public const CTA_COLOURS = ['brand', 'accent', 'text'];
 
     private const MAX_HERO_CTA_LABEL_LENGTH = 80;
     private const MAX_BANNER_CTAS = 2;
@@ -1022,7 +1025,7 @@ final class StorefrontPresentationNormalizer
      * الترميز؛ العرض يقصّ) والرابط بقواعد `sanitizeContentHref`. المسودة الناقصة (تسمية بلا رابط أو العكس) تُحفظ ولا يُعرض
      * إلا الـCTA المكتمل؛ الفارغ كلياً يسقط.
      *
-     * @return list<array{label: string, href: string, style?: string}>
+     * @return list<array{label: string, href: string, style?: string, colour?: string}>
      */
     private function normalizeCtaList(mixed $raw, int $max): array
     {
@@ -1037,10 +1040,13 @@ final class StorefrontPresentationNormalizer
                 continue;
             }
             $cta = ['label' => $label, 'href' => $href];
-            // CUST-HV V6c-5 — per-CTA `style` override (V0 §6.1), اسمٌ من القائمة المغلقة فقط؛ الغائب = موضع الزرّ كما كان.
-            // `style` وحده لا يُبقي زرّاً (يسقط الزرّ الفارغ). `colour`/`icon`/`soft` غير مقبولة بعد.
+            // CUST-HV V6c-5/6 — per-CTA `style` و`colour` (V0 §6.1)، اسمٌ من القائمة المغلقة فقط؛ الغائب = كما كان.
+            // وحدهما لا يُبقيان زرّاً (يسقط الزرّ الفارغ). تباين `colour` يُحكَم عند النشر (`CtaColourContrast`). `icon` غير مقبولة بعد.
             if (is_string($item['style'] ?? null) && in_array($item['style'], self::CTA_STYLES, true)) {
                 $cta['style'] = $item['style'];
+            }
+            if (is_string($item['colour'] ?? null) && in_array($item['colour'], self::CTA_COLOURS, true)) {
+                $cta['colour'] = $item['colour'];
             }
             $ctas[] = $cta;
             if (count($ctas) >= $max) {

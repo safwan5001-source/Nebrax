@@ -179,3 +179,40 @@ describe("Canvas CTA styles (CUST-HV V6c-5)", () => {
     expect(b.className).toContain("underline");
   });
 });
+
+describe("Canvas CTA colour (CUST-HV V6c-6)", () => {
+  it("hero and banner paint a coloured button from validated custom properties, as the storefront does", () => {
+    const c = canvas([
+      {
+        id: "hero",
+        type: "hero",
+        visible: true,
+        content: { headline: "H", ctas: [{ label: "A", href: "/a", style: "solid", colour: "accent" }, { label: "B", href: "/b", style: "link", colour: "text" }] },
+      },
+      {
+        id: "ban",
+        type: "banner",
+        visible: true,
+        content: { title: "T", subtitle: "", ctaLabel: "", ctaHref: "", imageUrl: null, ctas: [{ label: "C", href: "/c", style: "outline", colour: "brand" }] },
+      },
+    ]);
+    const [a, b] = [...c.querySelectorAll("[data-preview-hero-cta]")] as HTMLElement[];
+    expect(a.getAttribute("data-cta-colour")).toBe("accent");
+    expect(a.style.getPropertyValue("--cta-fill")).toMatch(/^#[0-9a-f]{6}$/);
+    expect(["#ffffff", "#000000"]).toContain(a.style.getPropertyValue("--cta-label")); // label computed over its own fill
+    expect(a.className).toContain("bg-(color:--cta-fill)");
+    expect(b.style.getPropertyValue("--cta-fill")).toBe("transparent");
+    expect(b.className).toContain("underline");
+    const banner = c.querySelector("[data-banner-cta]") as HTMLElement;
+    expect(banner.getAttribute("data-cta-colour")).toBe("brand");
+    expect(banner.getAttribute("data-slot")).toBe("button"); // a coloured button is an outline variant for the global tokens
+    expect(banner.style.getPropertyValue("--cta-border")).toMatch(/^#[0-9a-f]{6}$/);
+  });
+
+  it("a button without a colour paints no custom properties", () => {
+    const c = canvas([{ id: "hero", type: "hero", visible: true, content: { headline: "H", ctas: [{ label: "A", href: "/a" }] } }]);
+    const a = c.querySelector("[data-preview-hero-cta]") as HTMLElement;
+    expect(a.getAttribute("data-cta-colour")).toBeNull();
+    expect(a.getAttribute("style")).toBeNull();
+  });
+});
