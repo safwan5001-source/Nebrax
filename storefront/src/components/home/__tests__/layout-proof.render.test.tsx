@@ -71,8 +71,15 @@ describe("layout proof", () => {
         for (const layout of HERO_LAYOUTS)
           jobs.push({ type: "hero", kind, layout });
       // banner kinds: plain (picture + copy) · noimage (copy only) · imageonly (a picture and nothing else) ·
-      // inner (explicit inner spacing `none`)
-      for (const kind of ["plain", "noimage", "imageonly", "inner"])
+      // inner (explicit inner spacing `none`) · nocta (title and subtitle, no button) · lone (a single button)
+      for (const kind of [
+        "plain",
+        "noimage",
+        "imageonly",
+        "inner",
+        "nocta",
+        "lone",
+      ])
         for (const layout of BANNER_LAYOUTS)
           jobs.push({ type: "banner", kind, layout });
       for (const { type, kind, layout } of jobs) {
@@ -107,7 +114,12 @@ describe("layout proof", () => {
                     kind === "imageonly"
                       ? ""
                       : "A supporting line that explains the offer",
-                  ctas: kind === "imageonly" ? [] : ctas,
+                  ctas:
+                    kind === "imageonly" || kind === "nocta"
+                      ? []
+                      : kind === "lone"
+                        ? ctas.slice(0, 1)
+                        : ctas,
                   ctaLabel: "",
                   ctaHref: "",
                   imageUrl:

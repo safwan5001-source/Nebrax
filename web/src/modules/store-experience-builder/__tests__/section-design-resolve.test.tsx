@@ -561,10 +561,15 @@ describe("resolveSectionDesign — hero / banner layout variants (CUST-HV V6c-7)
       '[data-sd~="lbsplit"][data-sd] > * > [data-section-content]:has(> img) > div {',
     );
     expect(block).toContain(
-      '[data-sd~="lband"][data-sd] > * > [data-section-content]:has(> div > :is(h2:not(.sr-only), p, a, div)) > img {',
+      '[data-sd~="lband"][data-sd] > * > [data-section-content]:has(> div > :is(h2:not(.sr-only), p, a, div, [data-cta-style])) > img {',
     );
     expect(block).toMatch(
       /\[data-sd~="lbsplit"\]\[data-sd~="pi"\]\[data-sd\] > \* > \[data-section-content\]:has\(> img\) > div \{\s*padding: 0;/,
+    );
+    // review fixes (round 2): a lone preview CTA (a span) counts as copy through its `data-cta-style` marker; with no button the
+    // title and the subtitle both stay in the first grid column
+    expect(block).toMatch(
+      /\[data-sd~="lband"\]\[data-sd\] > \* > \[data-section-content\] > div > :is\(h2, p\) \{\s*grid-column: 1;/,
     );
   });
 });

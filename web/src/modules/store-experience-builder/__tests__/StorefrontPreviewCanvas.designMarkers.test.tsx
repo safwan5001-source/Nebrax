@@ -218,3 +218,33 @@ describe("Canvas hero / banner layout variants (CUST-HV V6c-7)", () => {
     }
   });
 });
+
+describe("Canvas lone banner button carries the marker the stylesheet reads (CUST-HV V6c-7 review)", () => {
+  afterEach(() => cleanup());
+
+  it("a single CTA is a span with data-cta-style, so a text-band over a picture hides the picture exactly as the storefront's anchor does", () => {
+    const config = {
+      ...DEFAULT_PRESENTATION_CONFIG,
+      homepage: {
+        ...DEFAULT_PRESENTATION_CONFIG.homepage,
+        sections: [
+          {
+            id: "b1",
+            type: "banner",
+            visible: true,
+            design: { layout: "text-band" },
+            content: { title: "", subtitle: "", ctaLabel: "", ctaHref: "", imageUrl: "https://example.com/x.png", ctas: [{ label: "Go", href: "/go" }] },
+          },
+        ],
+      },
+    } as StorefrontPresentationConfig;
+    const { container } = render(
+      <StorefrontPreviewCanvas config={config} locale="en" viewport="desktop" onSelectSection={() => {}} />,
+    );
+    const cta = container.querySelector("[data-banner-cta]") as HTMLElement;
+    expect(cta.tagName).toBe("SPAN");
+    expect(cta.getAttribute("data-cta-style")).toBe("solid");
+    // a direct child of the copy box, which is a direct child of the content box next to the picture
+    expect(cta.parentElement?.parentElement?.querySelector(":scope > img")).not.toBeNull();
+  });
+});

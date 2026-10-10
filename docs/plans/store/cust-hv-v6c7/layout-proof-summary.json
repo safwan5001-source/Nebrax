@@ -1,7 +1,7 @@
 {
- "pages": 40,
- "checks": 240,
- "layoutChecks": 240,
+ "pages": 52,
+ "checks": 312,
+ "layoutChecks": 312,
  "pixelChecks": 152,
  "strip": false,
  "violations": [],

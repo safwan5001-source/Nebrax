@@ -624,7 +624,7 @@ input[type="search"]::-webkit-search-cancel-button {
 }
 /* banner · text-band: no picture, a slim band; from md the copy and the buttons share one row */
 /* ...but never the only content: a picture-only banner keeps its picture (the copy box holds only the sr-only heading) */
-[data-sd~="lband"][data-sd] > * > [data-section-content]:has(> div > :is(h2:not(.sr-only), p, a, div)) > img {
+[data-sd~="lband"][data-sd] > * > [data-section-content]:has(> div > :is(h2:not(.sr-only), p, a, div, [data-cta-style])) > img {
   display: none;
 }
 [data-sd~="lband"][data-sd] > * > [data-section-content] {
@@ -638,6 +638,9 @@ input[type="search"]::-webkit-search-cancel-button {
     grid-template-columns: minmax(0, 1fr) auto;
     align-items: center;
     column-gap: 1.5rem;
+  }
+  [data-sd~="lband"][data-sd] > * > [data-section-content] > div > :is(h2, p) {
+    grid-column: 1;
   }
   [data-sd~="lband"][data-sd] > * > [data-section-content] > div > :not(h2, p) {
     grid-column: 2;

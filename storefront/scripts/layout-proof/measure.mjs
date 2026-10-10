@@ -137,6 +137,14 @@ for (const pass of [0, 1]) { // pass 0: default-layout baselines, pass 1: the va
         const gap = rtl ? m.copy.l - (m.img.rect.r) : m.img.rect.l - m.copy.r;
         if (m.img && m.copy && gap < 12) violations.push(`${tag}: no gutter between the copy and the picture (${gap.toFixed(1)}px)`);
       }
+      if (type === "banner" && kind === "nocta" && layout === "text-band" && wide && m.sub && m.heading) {
+        // no button: the subtitle stays stacked under the heading in the same column (never beside it)
+        if (!(m.sub.rect.t >= m.heading.b - 2)) violations.push(`${tag}: the subtitle is not under the heading (${m.sub.rect.t.toFixed(0)} < ${m.heading.b.toFixed(0)})`);
+        if (Math.abs(start(m.sub.rect) - start(m.heading)) > 2) violations.push(`${tag}: the subtitle is not in the heading's column`);
+      }
+      if (type === "banner" && kind === "lone" && layout === "text-band") {
+        if (m.img && m.img.display !== "none") violations.push(`${tag}: a banner with a single button keeps its picture under text-band`);
+      }
       if (type === "banner" && kind === "plain" && layout === "text-band") {
         if (m.img && m.img.display !== "none") violations.push(`${tag}: the picture is not hidden`);
         if (base && !(m.s.h < base.s.h - 4)) violations.push(`${tag}: band (${m.s.h.toFixed(0)}px) is not slimmer than the card (${base.s.h.toFixed(0)}px)`);

@@ -44,18 +44,18 @@ Absent `layout` ⇒ identical normalised output, identical resolved attributes a
 
 ## Design Quality Pass — real Chromium, the published hero (production `HeroSection`) and banner (`BannerBand`)
 
-hero × {default surface, proven picture} × {default, centered, minimal, split} + banner × {picture + copy, copy only, picture only, explicit inner spacing `none`} × {default, split, text-band} × 2 directions = **40 pages**, each at 6 real device viewports (390×844 · 430×932 · 768×1024 · 1024×768 · 1280×800 · 1440×900):
+hero × {default surface, proven picture} × {default, centered, minimal, split} + banner × {picture + copy, copy only, picture only, explicit inner spacing `none`} × {default, split, text-band} (the banner kinds also include *title + subtitle with no button* and *a single button*) × 2 directions = **52 pages**, each at 6 real device viewports (390×844 · 430×932 · 768×1024 · 1024×768 · 1280×800 · 1440×900):
 
 | | |
 |---|---|
-| Checks | **240** page×viewport · **152** pixel checks |
+| Checks | **312** page×viewport · **152** pixel checks |
 | Violations | **0** |
 | Asserted | **centered**: content box centred (±2 px), `text-align: center`, button row centred in its box · **minimal**: subheadline not displayed, hero shorter than the default · **hero split (≥ 768)**: the overlay is exactly half the section and on the **inline-start** edge (the right edge under RTL), the text column and every button stay inside that half, the other half's picture is **brighter** (bare); on a phone the overlay stays full width · **banner split (≥ 768)**: the picture is half the card, on the inline-end edge, fills the card height, the copy stays in the other half; stacked exactly as the default on a phone · **text-band**: the picture is hidden, the band is slimmer than the card, from md the buttons share the row with the copy and sit at the inline end · tap heights · no horizontal overflow · **contrast on the real pixels:** for every picture-hero layout × viewport × direction, the heading's colour is measured against the pixels that really sit behind it (text and borders hidden, the background photographed) — ≥ 4.5:1 |
-| **Negative control** | the five layout rule sets stripped from the stylesheet: **196 violations** — the measurement can fail |
+| **Negative control** | the five layout rule sets stripped from the stylesheet: **208 violations** — the measurement can fail |
 
 Evidence: `docs/plans/store/cust-hv-v6c7/layout-proof-summary.json` and screenshots (hero split LTR 1280 and RTL 1024; banner split RTL 1024; banner text-band LTR 1280 and RTL 390; hero centred 390; hero minimal 1280). Tooling is env-gated and inert in CI: `storefront/src/components/home/__tests__/layout-proof.render.test.tsx` (`LAYOUT_PROOF_DIR`) + `storefront/scripts/layout-proof/measure.mjs`.
 
-## Review findings resolved (Codex) — all three real
+## Review findings resolved (Codex) — all five real
 
 | Finding | Verdict | Fix |
 |---|---|---|
@@ -63,7 +63,10 @@ Evidence: `docs/plans/store/cust-hv-v6c7/layout-proof-summary.json` and screensh
 | `text-band` hid the picture of a **picture-only** banner — its only content — leaving an empty bordered band (the emptiness check counts the picture as content) | **Real** (reproduced: the picture's display was `none`) | the picture is hidden only when the copy box holds visible copy (a non-`sr-only` heading, a subtitle or a button); a picture-only banner keeps its picture |
 | With `layout: split` + an explicit `spacing.inner`, the later inner-spacing rules moved the spacing to the section root and cleared the content box, but the split's fixed copy padding stayed: `none` could not remove it and every step was added on top | **Real** (reproduced: padding `24px 32px` left under `inner: none`) | an explicit inner spacing replaces the preset's copy padding (`padding: 0`); only a small gutter (`column-gap: 1rem`) stays between the two halves, which adjacency requires |
 
-The browser proof gained the four banner kinds above; against the pre-fix stylesheet it reports **36 violations** in exactly those three categories (a copy-only banner gaining padding · a picture-only banner losing its picture · inner spacing `none` leaving padding / no gutter), and 0 with the fixes. The stylesheet tests pin the three selectors in both runtimes.
+| *(round 2)* The Canvas draws a lone banner button as a `<span>`, so the `text-band` rule's copy predicate (`a`, `div`, …) missed it and the preview kept the picture while the storefront hid it | **Real** (preview ↔ storefront disagreement) | the predicate also matches `[data-cta-style]`, which both the published anchor and the Canvas span carry; a Canvas test pins the marker on the lone span, a stylesheet test pins the selector |
+| *(round 2)* A `text-band` banner with a title and subtitle but **no** button auto-placed the `<p>` in the second grid column, beside the heading, squeezing it | **Real** (reproduced: subtitle not under the heading, not in its column) | `h2` and `p` are explicitly placed in column 1; the second column is reserved for the actions. Proof kinds *no button* and *single button* added |
+
+The browser proof gained the banner kinds above; against the pre-fix stylesheets it reports violations in exactly those categories (a copy-only banner gaining padding · a picture-only banner losing its picture · inner spacing `none` leaving padding / no gutter · the subtitle beside the heading) and 0 with the fixes. The stylesheet tests pin the three selectors in both runtimes.
 
 **Visual finding fixed during the pass:** the first text-band left the buttons hugging the title instead of at the band's end (the copy box did not grow). It now fills the band and pushes the buttons to the inline end; the proof asserts it.
 

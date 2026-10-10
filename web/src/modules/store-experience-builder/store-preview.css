@@ -199,7 +199,7 @@
 }
 /* banner · text-band: no picture, a slim band; from md the copy and the buttons share one row */
 /* ...but never the only content: a picture-only banner keeps its picture (the copy box holds only the sr-only heading) */
-.awj-store-preview [data-sd~="lband"][data-sd] > * > [data-section-content]:has(> div > :is(h2:not(.sr-only), p, a, div)) > img {
+.awj-store-preview [data-sd~="lband"][data-sd] > * > [data-section-content]:has(> div > :is(h2:not(.sr-only), p, a, div, [data-cta-style])) > img {
   display: none;
 }
 .awj-store-preview [data-sd~="lband"][data-sd] > * > [data-section-content] {
@@ -213,6 +213,9 @@
     grid-template-columns: minmax(0, 1fr) auto;
     align-items: center;
     column-gap: 1.5rem;
+  }
+  .awj-store-preview [data-sd~="lband"][data-sd] > * > [data-section-content] > div > :is(h2, p) {
+    grid-column: 1;
   }
   .awj-store-preview [data-sd~="lband"][data-sd] > * > [data-section-content] > div > :not(h2, p) {
     grid-column: 2;
