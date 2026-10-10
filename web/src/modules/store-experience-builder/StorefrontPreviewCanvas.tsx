@@ -322,6 +322,8 @@ export function StorefrontPreviewCanvas({
     mediaBounds: backgroundBounds.lookup,
     // V6c-3 — "screen height" means the SIMULATED device's height here, not the editor window's.
     screenHeightPx: viewport === "mobile" ? 844 : viewport === "tablet" ? 1024 : 800,
+    // V6c-4 — overlap is a ≥ md effect: a simulated phone shows none, whatever the editor window's width.
+    simulatedWidthPx: viewport === "mobile" ? 390 : viewport === "tablet" ? 768 : 1280,
   };
   /** The picture layer of a section whose design resolves a *proven* picture background, else nothing. */
   const backdropFor = (section: (typeof config.homepage.sections)[number]): ReactNode => {

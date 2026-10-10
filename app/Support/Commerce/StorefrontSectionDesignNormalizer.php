@@ -53,6 +53,9 @@ final class StorefrontSectionDesignNormalizer
     /** V5e-3 — كشف لمرّة واحدة (V0 §6.6): `fade-up` فقط، اختياري لكل قسم. */
     public const REVEALS = ['none', 'fade-up'];
 
+    /** V6c-4 (V0 §6.5، D-13) — تداخل البطل مع القسم التالي: إعدادات مسبقة فقط (`none` = غياب، لا يُخزَّن أبداً). */
+    public const OVERLAPS = ['none', 'sm', 'md'];
+
     /** V6c-3 (V0 §8.3) — ارتفاع القسم المُعدّ مسبقاً للبطل واللافتة (حدّ أدنى فقط؛ المحتوى لا يُقصّ أبداً). */
     public const HEIGHT_PRESETS = ['compact', 'standard', 'tall', 'screen'];
 
@@ -93,10 +96,18 @@ final class StorefrontSectionDesignNormalizer
             'mediaTreatment' => ['height'],
             'motion' => ['reveal'],
         ];
+        // V6c-4 — `overlap` للبطل وحده (V0 §6.5: «hero→next only»)؛ الترتيب القانوني: separator، overlap، mediaTreatment، motion.
+        $heroOnly = [];
+        foreach ($hero as $group => $allowance) {
+            $heroOnly[$group] = $allowance;
+            if ($group === 'separator') {
+                $heroOnly['overlap'] = true;
+            }
+        }
         $shelf = ['background' => self::BACKGROUND_KINDS, 'text' => ['heading'], 'typography' => ['headingStyle'], 'width' => true, 'spacing' => true, 'separator' => true];
 
         return [
-            'hero' => $hero,
+            'hero' => $heroOnly,
             'banner' => $hero,
             'categories' => ['background' => self::BACKGROUND_KINDS, 'text' => ['heading'], 'typography' => ['headingStyle'], 'width' => true, 'spacing' => true, 'border' => true, 'radius' => true, 'separator' => true],
             'newArrivals' => $shelf,
@@ -187,6 +198,13 @@ final class StorefrontSectionDesignNormalizer
             $separator = self::separator($raw['separator'] ?? null);
             if ($separator !== null) {
                 $out['separator'] = $separator;
+            }
+        }
+        if (isset($capability['overlap'])) {
+            $overlap = self::pick($raw['overlap'] ?? null, self::OVERLAPS);
+            // `none` يساوي الغياب: القيمة الافتراضية لا تُخزَّن (وثيقة بلا الحقل = وثيقة `none`).
+            if ($overlap !== null && $overlap !== 'none') {
+                $out['overlap'] = $overlap;
             }
         }
         if (isset($capability['mediaTreatment']) && self::isObject($raw['mediaTreatment'] ?? null)

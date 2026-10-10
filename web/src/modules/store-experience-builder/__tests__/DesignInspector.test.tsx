@@ -471,3 +471,69 @@ describe("hero / banner placement grid and height (CUST-HV V6c-3)", () => {
     }
   });
 });
+
+describe("hero overlap (CUST-HV V6c-4)", () => {
+  const MEDIA = "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e";
+  const dark = { min: [0, 0, 0] as [number, number, number], max: [40, 50, 60] as [number, number, number] };
+  const provenCtx: DesignContext = { ...ctx, mediaBounds: () => dark };
+  const picture: SectionDesign = {
+    background: { kind: "media", media: { mediaId: MEDIA, decorative: true }, overlay: { color: { hex: "#000000" }, alpha: 40 } },
+  };
+  const select = () => document.querySelector("[data-design-overlap]") as HTMLSelectElement;
+
+  function Proven({ initial }: { initial: SectionDesign }) {
+    const [design, setDesign] = useState<SectionDesign | undefined>(initial);
+    return (
+      <>
+        <DesignInspector type="hero" design={design} ctx={provenCtx} t={t} onChange={setDesign} />
+        <output data-testid="design">{JSON.stringify(design ?? null)}</output>
+      </>
+    );
+  }
+
+  it("is a hero-only select of named presets; Default removes the field", () => {
+    const { unmount } = render(<Harness type="hero" />);
+    expect([...select().options].map((o) => o.value)).toEqual(["", "sm", "md"]);
+    fireEvent.change(select(), { target: { value: "md" } });
+    expect(out()).toEqual({ overlap: "md" });
+    fireEvent.change(select(), { target: { value: "sm" } });
+    expect(out()).toEqual({ overlap: "sm" });
+    fireEvent.change(select(), { target: { value: "" } });
+    expect(out()).toBeNull();
+    unmount();
+    for (const type of ["banner", "categories", "benefits"]) {
+      const view = render(<Harness type={type} />);
+      expect(document.querySelector("[data-design-overlap]")).toBeNull();
+      view.unmount();
+    }
+  });
+
+  it("says so when a chosen overlap cannot apply (no proven picture, or a bottom separator)", () => {
+    const { unmount } = render(<Harness type="hero" initial={{ overlap: "md" }} />);
+    expect(document.querySelector("[data-design-overlap-inactive]")).not.toBeNull();
+    unmount();
+    const proven = render(<Proven initial={{ ...picture, overlap: "md" }} />);
+    expect(document.querySelector("[data-design-overlap-inactive]")).toBeNull();
+    proven.unmount();
+    render(<Proven initial={{ ...picture, overlap: "md", separator: { bottom: "wave" } }} />);
+    expect(document.querySelector("[data-design-overlap-inactive]")).not.toBeNull();
+  });
+
+  it("no warning while nothing is chosen", () => {
+    render(<Harness type="hero" />);
+    expect(document.querySelector("[data-design-overlap-inactive]")).toBeNull();
+  });
+
+  it("has AR and EN copy for every new key", () => {
+    for (const key of [
+      "designOverlap",
+      "designOverlapSm",
+      "designOverlapMd",
+      "designOverlapHint",
+      "designOverlapInactive",
+    ] as const) {
+      expect(CUSTOMIZER_MESSAGES.ar[key]).toBeTruthy();
+      expect(CUSTOMIZER_MESSAGES.en[key]).toBeTruthy();
+    }
+  });
+});

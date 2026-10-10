@@ -56,6 +56,12 @@ export interface DesignContext {
    * passes the simulated device's height instead.
    */
   screenHeightPx?: number;
+  /**
+   * V6c-4 — the viewport width, in px, the editor Canvas is simulating. Overlap is a ≥ md (768 px) effect; the real
+   * storefront enforces that with a media query, but the Canvas runs in a larger window, so it says which device it
+   * shows and the resolver emits no overlap for a phone. Absent ⇒ the stylesheet alone decides.
+   */
+  simulatedWidthPx?: number;
 }
 
 export interface MediaBounds {
@@ -127,6 +133,9 @@ const VALIGN: Record<string, string> = {
   center: "center",
   end: "flex-end",
 };
+
+/** V6c-4 (V0 §6.5) — hero overlap presets: how far the next section slides up over the hero's bottom edge. */
+const OVERLAP: Record<string, string> = { sm: "2rem", md: "4rem" };
 
 /**
  * V6c-3 (V0 §8.3) — section height presets: a **minimum** block size, so content is never clipped. Every value is
@@ -629,6 +638,20 @@ export function resolveSectionDesign(
       style["--sec-sepb"] = separators.reserve.bottom;
       sd.push("sepb");
     }
+  }
+
+  // Hero overlap (V6c-4, V0 §6.5): preset-only, and only where it is safe — the hero must really paint a proven
+  // picture (a "media hero"), must not carry a bottom separator (the next section would cover it), and the
+  // viewport must be ≥ md (the stylesheet repeats that check for the real storefront).
+  if (
+    design.overlap &&
+    type === "hero" &&
+    mediaProven &&
+    (!design.separator?.bottom || design.separator.bottom === "none") &&
+    (ctx.simulatedWidthPx === undefined || ctx.simulatedWidthPx >= 768)
+  ) {
+    style["--sec-ovlp"] = OVERLAP[design.overlap];
+    sd.push("ovlp");
   }
 
   // One-time reveal (V5e-3): only an attribute — the published page's observer plays it.

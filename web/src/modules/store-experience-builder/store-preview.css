@@ -118,6 +118,39 @@
 }
 
 /*
+ * CUST-HV V6c-4 — Canvas-only half of the hero overlap (the shared half is in the V5c block below, identical to the
+ * storefront's). In the editor every section sits in a selection wrapper, so the stack's children are the WRAPPERS and
+ * the hero's frame has no next sibling, so the hero-side rules are restated against the wrapper that has a next wrapper: the wrapper that holds an overlapping hero drops the stack's own bottom
+ * spacing (so the frame's negative margin collapses through it to exactly the preset), and the wrapper after it
+ * becomes the opaque sheet. Without a wrapper (a read-only preview) the shared rules apply directly.
+ */
+@media (min-width: 48rem) {
+  .awj-store-preview .awj-preview-section:has(> [data-sd~="ovlp"]):has(+ .awj-preview-section) {
+    margin-block-end: 0;
+  }
+  .awj-store-preview .awj-preview-section:has(+ .awj-preview-section) > [data-sd~="ovlp"][data-sd] {
+    padding-block-end: 0;
+    margin-block-end: calc(-1 * var(--sec-ovlp));
+  }
+  .awj-store-preview .awj-preview-section:has(+ .awj-preview-section) > [data-sd~="ovlp"][data-sd] > * {
+    padding-block-end: calc(var(--sec-pi, 0px) + var(--sec-ovlp));
+  }
+  .awj-store-preview .awj-preview-section:has(+ .awj-preview-section) > [data-sd~="ovlp"][data-sd~="hgt"][data-sd] > * {
+    min-block-size: calc(var(--sec-minh) + var(--sec-ovlp));
+  }
+  .awj-store-preview .awj-preview-section:has(> [data-sd~="ovlp"]) + .awj-preview-section {
+    margin-block-start: 0;
+    position: relative;
+    z-index: 2;
+  }
+  .awj-store-preview :where(.awj-preview-section:has(> [data-sd~="ovlp"]) + .awj-preview-section) {
+    background-color: var(--store-background);
+    border-start-start-radius: var(--store-radius);
+    border-start-end-radius: var(--store-radius);
+  }
+}
+
+/*
  * CUST-HV V5c — section design (contract §3.5). Every rule keys off a validated
  * `--sec-*` custom property the resolver set (`section-design-resolve.ts`); no
  * value in this block ever comes from the document. A section with no design has
@@ -186,6 +219,39 @@
 }
 .awj-store-preview [data-design-type="banner"]:is([data-sd~="hgt"], [data-sd~="valign"]) > * {
   justify-content: var(--sec-vj, flex-start);
+}
+/* V6c-4 (V0 §6.5, D-13) — hero overlap preset: the section AFTER a picture hero slides up over its bottom edge.
+   Preset-only (`--sec-ovlp` = 2 / 4 rem) and ≥ md only: below it the media query is simply false, so phones
+   stay stacked. The resolver emits the token only for a hero that really paints a proven picture and has no
+   bottom separator. The hero reserves the same amount as bottom padding, so none of its content or focus rings
+   can sit under the next section, and its own bottom spacing is replaced by the overlap. The next section is an
+   opaque sheet above the hero (z-index 2) with rounded top corners: the page colour, unless its own design or
+   classes paint a surface (the zero-specificity `:where()` yields to any of them). A height preset stays the hero's
+   VISIBLE height: its minimum grows by the overlap, which the sheet then covers. The whole effect is gated on a
+   following sibling that actually rendered something (`:has(+ :not(:empty))`): a hero that is last, or is followed only
+   by an empty wrapper (a section that rendered nothing, e.g. an empty catalogue), stays an ordinary hero — nothing
+   is pulled under the footer and no empty box is promoted to a sheet. */
+@media (min-width: 48rem) {
+  .awj-store-preview [data-sd~="ovlp"][data-sd]:has(+ :not(:empty)) {
+    padding-block-end: 0;
+    margin-block-end: calc(-1 * var(--sec-ovlp));
+  }
+  .awj-store-preview [data-sd~="ovlp"][data-sd]:has(+ :not(:empty)) > * {
+    padding-block-end: calc(var(--sec-pi, 0px) + var(--sec-ovlp));
+  }
+  .awj-store-preview [data-sd~="ovlp"][data-sd~="hgt"][data-sd]:has(+ :not(:empty)) > * {
+    min-block-size: calc(var(--sec-minh) + var(--sec-ovlp));
+  }
+  .awj-store-preview [data-sd~="ovlp"][data-sd] + :not(:empty) {
+    margin-block-start: 0;
+    position: relative;
+    z-index: 2;
+  }
+  .awj-store-preview :where([data-sd~="ovlp"][data-sd] + :not(:empty)) {
+    background-color: var(--store-background);
+    border-start-start-radius: var(--store-radius);
+    border-start-end-radius: var(--store-radius);
+  }
 }
 .awj-store-preview [data-sd~="max"] {
   max-inline-size: var(--sec-max);

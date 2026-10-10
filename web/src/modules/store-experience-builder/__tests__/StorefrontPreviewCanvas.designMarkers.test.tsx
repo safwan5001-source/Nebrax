@@ -145,3 +145,25 @@ describe("Canvas hero / banner placement and height (CUST-HV V6c-3)", () => {
     expect(container.querySelector("[data-sd]")).toBeNull();
   });
 });
+
+describe("Canvas hero overlap (CUST-HV V6c-4)", () => {
+  afterEach(() => cleanup());
+
+  it("never emits the overlap marker without a proven picture, and the phone frame is told its width", () => {
+    const config = {
+      ...DEFAULT_PRESENTATION_CONFIG,
+      homepage: {
+        ...DEFAULT_PRESENTATION_CONFIG.homepage,
+        sections: [{ id: "h1", type: "hero", visible: true, design: { overlap: "md" }, content: { headline: "Hi" } }],
+      },
+    } as StorefrontPresentationConfig;
+    for (const viewport of ["mobile", "tablet", "desktop"] as const) {
+      const { container, unmount } = render(
+        <StorefrontPreviewCanvas config={config} locale="en" viewport={viewport} onSelectSection={() => {}} />,
+      );
+      // no picture to prove ⇒ no overlap, in any frame
+      expect(container.querySelector("[data-sd~='ovlp']")).toBeNull();
+      unmount();
+    }
+  });
+});

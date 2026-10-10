@@ -1,0 +1,11 @@
+{
+ "ungated": false,
+ "pages": 60,
+ "checks": 360,
+ "activeOverlapChecks": 32,
+ "inactiveChecks": 328,
+ "hitTestChecks": 360,
+ "strip": false,
+ "violations": [],
+ "sample": []
+}
