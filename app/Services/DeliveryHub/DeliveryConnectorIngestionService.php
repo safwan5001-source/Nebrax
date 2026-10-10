@@ -196,6 +196,12 @@ class DeliveryConnectorIngestionService
                 ->first();
 
             if ($existing !== null) {
+                $orderBranch = $existing->branch_id === null ? null : (string) $existing->branch_id;
+                $mappedBranch = $account->branch_id === null ? null : (string) $account->branch_id;
+                if ($orderBranch !== $mappedBranch) {
+                    return $this->persist($account, $envelope, $rawChecksum, null, null, 'branch_unavailable', 422, 'branch_unavailable');
+                }
+
                 $baseline = DeliveryConnectorAttempt::query()
                     ->where('delivery_hub_order_id', $existing->id)
                     ->whereNotNull('authoritative_checksum')

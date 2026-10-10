@@ -243,6 +243,7 @@ Codex left five open findings on `3b40442` (2 P1, 3 P2). All five are fixed in t
 | P2 duplicate JSON members (follow-up) | Duplicate object keys, including escaped duplicates and nested objects, are rejected as `invalid_payload` before `json_decode()` keeps only the last value. |
 | P2 manual object shape (follow-up on `35541a3`) | When a Hub order has no connector baseline, an object that would become a PHP list (`{}`, `{"0":"a"}`, or a nested empty object) is `payload_conflict`. No authoritative checksum is stored. Objects and lists Hub can represent, including `{"keep":"yes"}` and `["a"]`, still adopt. |
 | P2 payload limit before HMAC (follow-up on `35541a3`) | `strlen($rawBody) > MAX_RAW_BYTES` (65536) returns `422 invalid_payload` before the account row is loaded and before `WebhookSignature::verify`. A body at the limit still reaches signature verification. |
+| P1 cross-branch order reuse (follow-up on `1465de0`) | An existing Hub order is used only when its `branch_id` equals the connector mapping, including both null. A different branch returns `422 branch_unavailable` before baseline adoption or `hub_action`, and the attempt is not attached to the other order. |
 | P2 deleted configurator (follow-up on `35541a3`) | Not implemented. See Decision Packet `DLV-CONNECTOR-OWNERSHIP-1`. |
 
 The Hub row still stores a plain PHP array, so an empty object becomes an empty list in the Hub hash. Connector-to-connector comparison uses the authoritative checksum, which keeps `{}` and `[]` apart. Manual adoption no longer treats a collapsing object as that list: the event is `payload_conflict` and the Hub row is not given a connector baseline. Authoritative checksums keep every JSON number token as its original literal. Hub adoption uses a PHP integer, or a float when `json_encode` with `JSON_PRESERVE_ZERO_FRACTION` reproduces the literal; every other literal stays a string. Hub's own payload hash still uses default `json_encode`, so `1` and `1.0` compare equal there, the same as two manual orders. The connector checksum still distinguishes those tokens once a connector baseline exists.
@@ -261,12 +262,13 @@ The Hub row still stores a plain PHP array, so an empty object becomes an empty 
 8. A manual numeric `amount` of `5000` is adopted by the connector number `5000`. A manual string `"5000"` conflicts with that number. A raw manual `1.0` is adopted by the connector literal `1.0` and conflicts with the string `"1.0"`. Duplicate members `{"n":1,"n":2}`, `{"a":1,"\u0061":2}`, nested `{"o":{"a":1,"a":2}}`, and a duplicate inside an array are `invalid_payload` and do not create a Hub row.
 9. Manual adoption of `{"keep":"yes"}` and `["a"]` succeeds. Manual `[]` versus connector `{}`, manual `["a"]` versus `{"0":"a"}`, and manual `{"a":[]}` versus `{"a":{}}` are `payload_conflict`. Those attempts store no authoritative checksum. One Hub row remains for each provider order.
 10. A body of `MAX_RAW_BYTES + 1` with a syntactically valid but wrong signature is `422 invalid_payload` and writes no attempt. A body of exactly `MAX_RAW_BYTES` with the same wrong signature is `401 invalid_signature`, proving the limit is applied before HMAC and the boundary still verifies.
+11. A second connector on another branch cannot cancel or adopt `provider_order_id` already stored on the first branch. The attempt has no Hub order id and no authoritative checksum. The original connector can still cancel its own order.
 
 ### Local execution
 
 SQLite, `php artisan test --filter=DeliveryConnectorCoreTest`:
 
-- 21 passed, 367 assertions (includes subscription expiry, numeric object keys, lossless decimals, manual numeric adoption including `1.0`, duplicate JSON members, lossy manual shapes, and the payload-size gate)
+- 22 passed, 389 assertions (includes subscription expiry, canonical numbers and shapes, manual adoption, duplicate members, the payload-size gate, and cross-branch rejection)
 
 SQLite, related suites (`DeliveryHubProjectionTest`, `BranchIsolationGuardTest`, `WebhookSignatureTest`, `DeliveryPlatformApiTest`, `DeliveryFinancialRoleGateTest`, `DeliveryPlatformProfileDomainTest`):
 
@@ -293,6 +295,7 @@ PostgreSQL was not started in this sandbox. `useradd` succeeded, but `chown`, `s
 - SQLite cannot prove a cross-connection lock wait. The stale-version result is asserted on both drivers; `FOR UPDATE` is asserted when the driver is PostgreSQL.
 - A list the Hub can store still adopts. Only objects that `array_is_list` would erase are conflicts, and they do not become the connector baseline.
 - The size check uses the raw byte length, not `Content-Length`. A body at 65536 bytes is still authenticated.
+- A connector mapped to branch B cannot attach an attempt, adopt, or apply `hub_action` to an order already stored on branch A. The same connector still can.
 
 ### AWJ Guardian review (fix pass)
 
@@ -308,6 +311,7 @@ PostgreSQL was not started in this sandbox. `useradd` succeeded, but `chown`, `s
 | Duplicate object members kept as the last value | Rejected as `invalid_payload` before decode. No Hub row. |
 | Manual adoption of `{}` or `{"0":"a"}` | `payload_conflict`. No authoritative checksum. Hub row unchanged. |
 | Oversized body hashed before the limit | Rejected before account load and HMAC. No attempt. |
+| Cross-branch reuse of a provider order | `branch_unavailable` before adoption or `hub_action`. The other order is not linked or moved. |
 | Financial or inventory side effect | Counts unchanged in the new tests. |
 | Provider enablement or DG-3 evidence | Not introduced. |
 | Deleted configurator permanently blocks the mapping | Open. Decision Packet below. Not fixed in this diff. |

@@ -736,6 +736,51 @@ class DeliveryConnectorCoreTest extends TestCase
         $this->assertSame($before, $this->financialCounts());
     }
 
+    /** @test */
+    public function a_connector_cannot_act_on_an_order_mapped_to_another_branch(): void
+    {
+        [$auth, $first, $profile] = $this->tenantWithPlatform('xbranch');
+        $second = $this->withToken($auth['token'])->postJson('/api/branches', ['name' => 'فرع آخر'])->assertCreated()['data']['id'];
+        $home = $this->connector($auth['token'], $profile, 'store-home-branch', $first);
+        $other = $this->connector($auth['token'], $profile, 'store-other-branch', $second);
+        $before = $this->financialCounts();
+
+        $created = $this->postEvent($home['data']['id'], $this->event('P-xbranch', ['sku' => 'a']), $home['secret'])->assertCreated();
+        $orderId = $created['data']['delivery_hub_order_id'];
+        $this->postEvent($other['data']['id'], $this->event('P-xbranch', ['sku' => 'a'], 'cancel'), $other['secret'])
+            ->assertStatus(422)
+            ->assertJsonPath('error_code', 'branch_unavailable');
+
+        $order = DeliveryHubOrder::withoutGlobalScopes()->findOrFail($orderId);
+        $this->assertSame(DeliveryHubOrder::RECEIVED, $order->state);
+        $this->assertSame($first, (string) $order->branch_id);
+        $this->assertSame(1, DeliveryHubOrder::withoutGlobalScopes()->where('provider_order_id', 'P-xbranch')->count());
+        $foreign = DeliveryConnectorAttempt::withoutGlobalScopes()
+            ->where('delivery_connector_account_id', $other['data']['id'])
+            ->firstOrFail();
+        $this->assertNull($foreign->delivery_hub_order_id);
+        $this->assertNull($foreign->authoritative_checksum);
+
+        $this->withToken($auth['token'])->postJson('/api/delivery-hub/orders', [
+            'delivery_platform_profile_id' => $profile,
+            'provider_order_id' => 'P-xmanual',
+            'branch_id' => $first,
+            'intake_payload' => ['sku' => 'm'],
+        ])->assertCreated();
+        $this->postEvent($other['data']['id'], $this->event('P-xmanual', ['sku' => 'm']), $other['secret'])
+            ->assertStatus(422)
+            ->assertJsonPath('error_code', 'branch_unavailable');
+        $this->assertSame(1, DeliveryHubOrder::withoutGlobalScopes()->where('provider_order_id', 'P-xmanual')->count());
+        $this->assertSame(0, DeliveryConnectorAttempt::withoutGlobalScopes()
+            ->where('provider_order_id', 'P-xmanual')
+            ->whereNotNull('authoritative_checksum')
+            ->count());
+
+        $this->postEvent($home['data']['id'], $this->event('P-xbranch', ['sku' => 'a'], 'cancel'), $home['secret'])->assertCreated();
+        $this->assertSame(DeliveryHubOrder::CANCELLED, DeliveryHubOrder::withoutGlobalScopes()->findOrFail($orderId)->state);
+        $this->assertSame($before, $this->financialCounts());
+    }
+
     /** @return array<string, string> */
     private function jsonHeaders(string $token): array
     {
