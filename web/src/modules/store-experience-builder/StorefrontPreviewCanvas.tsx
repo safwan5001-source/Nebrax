@@ -66,6 +66,8 @@ import {
 } from "./messages";
 import { CanvasBackdrop } from "./media/CanvasBackdrop";
 import { useBackgroundMediaBounds } from "./media/use-background-media-bounds";
+import { announcementWindowState } from "./presentation/announcements";
+import { useWindowsClock } from "./use-announcement-clock";
 import { useMediaRefPreview } from "./media/use-media-ref-preview";
 import { fontFamilyStack } from "./presentation/font-catalogue";
 import { resolveGlobalTokens } from "./presentation/global-tokens";
@@ -221,6 +223,7 @@ export type PreviewChromeTarget =
 
 /** Stable empty list: no homepage sections to read picture bounds for. */
 const NO_SECTIONS: ReadonlyArray<{ visible: boolean; design?: SectionDesign }> = [];
+const NO_WINDOWS: ReadonlyArray<undefined> = [];
 
 export function StorefrontPreviewCanvas({
   config,
@@ -302,6 +305,14 @@ export function StorefrontPreviewCanvas({
   // the Canvas decides exactly like the publish gate and the published storefront.
   // Only the home preview renders these sections: another page must not read their statuses.
   const backgroundBounds = useBackgroundMediaBounds(page === "home" ? config.homepage.sections : NO_SECTIONS);
+  // CUST-HV V6c-1 — Banner display windows. The storefront omits a banner outside its window; the
+  // Canvas keeps it visible and editable and says so instead (the merchant must always be able to
+  // select what they are scheduling). Same predicate as the storefront, one clock, home page only.
+  const bannerWindowsNow = useWindowsClock(
+    page === "home"
+      ? config.homepage.sections.map((section) => (section.type === "banner" ? bannerContentOf(section).window : undefined))
+      : NO_WINDOWS,
+  );
   const designContext: DesignContext = {
     primaryColor: config.primaryColor,
     accentColor: config.accentColor,
@@ -898,9 +909,20 @@ export function StorefrontPreviewCanvas({
                 !banner.imageUrl;
               const ctaHrefOk =
                 banner.ctaHref.startsWith("https://") || banner.ctaHref.startsWith("/");
+              const windowState =
+                bannerWindowsNow === null || !banner.window ? null : announcementWindowState(banner.window, bannerWindowsNow);
               return (
                 <section key={section.id} className="overflow-hidden rounded-store border border-store-border bg-store-surface">
                   {backdropFor(section)}
+                  {windowState !== "open" && windowState !== null ? (
+                    <p
+                      data-banner-window-status={windowState}
+                      role="status"
+                      className="relative z-10 border-b border-store-border bg-store-background px-5 py-1.5 text-xs font-medium text-store-muted-foreground"
+                    >
+                      {t(windowState === "scheduled" ? "bannerWindowScheduled" : windowState === "expired" ? "bannerWindowExpired" : "bannerWindowInvalid")}
+                    </p>
+                  ) : null}
                   {empty ? (
                     <p data-section-content="" className="px-5 py-6 text-sm text-store-muted-foreground">{t("sectionBanner")}</p>
                   ) : (

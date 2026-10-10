@@ -12,6 +12,7 @@ import { SectionBackdrop } from "@/components/home/SectionBackdrop";
 import { SectionDesignFrame } from "@/components/home/SectionDesignFrame";
 import { SectionReveal } from "@/components/home/SectionReveal";
 import type { HomeSectionKey } from "@/lib/home/sections";
+import { announcementWindowState } from "@/lib/presentation/announcements";
 import {
   mediaBoundsLookup,
   sectionBackdrop,
@@ -73,6 +74,12 @@ export async function publishedNodes(
      * background can render and every section keeps its legacy surface.
      */
     media?: ResolvedMediaMap;
+    /**
+     * CUST-HV V6c-1 (V0 §8.4, D-15) — the instant a banner's visibility window is judged against. Absent ⇒ the
+     * request time (`Date.now()`): the page is request-time dynamic (`fetchStorefrontConfig` is `no-store`), so
+     * a window is evaluated per request with no second scheduler. Injected only by tests.
+     */
+    nowMs?: number;
     basePath: string;
     locale: string;
     currency?: string;
@@ -210,6 +217,15 @@ async function pushSectionNode(
   }
   if (section.type === "banner") {
     const content = bannerContentOf(section);
+    // V6c-1 — a banner outside its window is omitted outright (no wrapper, no empty band). Fail-closed: a
+    // malformed or inverted window ("invalid") never reads as "no window" — it is rejected at publish, and a
+    // hand-built or stale document that still carries one hides the banner rather than showing it everywhere.
+    if (
+      announcementWindowState(content.window, ctx.nowMs ?? Date.now()) !==
+      "open"
+    ) {
+      return;
+    }
     if (
       !content.title &&
       !content.subtitle &&

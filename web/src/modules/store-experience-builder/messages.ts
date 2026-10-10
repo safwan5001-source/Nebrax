@@ -531,6 +531,13 @@ export const CUSTOMIZER_MESSAGES = {
     bannerImageAlt: "النص البديل للصورة (اختياري)",
     bannerImageAltHint:
       "يصف الصورة لمستخدمي قارئ الشاشة. اتركه فارغاً إن كانت الصورة زخرفية فقط.",
+    bannerWindowHint:
+      "خارج هذه الفترة يختفي البانر من المتجر تلقائياً دون أي تعديل منك. اترك الحقلين فارغين ليظهر دائماً.",
+    bannerWindowNeedsContent: "أضف عنواناً أو نصاً أو صورة أولاً لتحدّد فترة عرض البانر.",
+    bannerWindowScheduled: "مجدول — لا يظهر في المتجر قبل موعد البدء",
+    bannerWindowExpired: "منتهٍ — لا يظهر في المتجر بعد موعد الانتهاء",
+    bannerWindowInvalid: "فترة عرض غير صالحة — لن يظهر في المتجر ولن يُنشر",
+    bannerLabel: "البانر",
     benefitTitle: "عنوان الميزة",
     benefitBody: "وصف الميزة",
     addBenefit: "إضافة ميزة",
@@ -1575,6 +1582,13 @@ export const CUSTOMIZER_MESSAGES = {
     bannerImageAlt: "Image alt text (optional)",
     bannerImageAltHint:
       "Describes the image for screen-reader users. Leave empty if the image is purely decorative.",
+    bannerWindowHint:
+      "Outside this window the banner disappears from the store on its own — no edit needed. Leave both empty to show it always.",
+    bannerWindowNeedsContent: "Add a title, text or image first to set a display window for the banner.",
+    bannerWindowScheduled: "Scheduled — hidden in the store until the start time",
+    bannerWindowExpired: "Expired — hidden in the store after the end time",
+    bannerWindowInvalid: "Invalid display window — hidden in the store and blocks publishing",
+    bannerLabel: "Banner",
     benefitTitle: "Benefit title",
     benefitBody: "Benefit text",
     addBenefit: "Add benefit",

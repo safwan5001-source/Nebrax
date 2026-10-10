@@ -81,6 +81,11 @@ export function describePublishIssues(
       );
       continue;
     }
+    if (/^homepage\.sections\[\d+\]\.content\.window\./.test(path)) {
+      const key = ISSUE_KEY[code];
+      lines.push(`${t("bannerLabel")}: ${key ? t(key) : t("annPublishBlocked")}`);
+      continue;
+    }
     const mediaKey = MEDIA_ISSUE_KEY[code];
     if (mediaKey) {
       const slot = mediaSlotLabel(path, t);
