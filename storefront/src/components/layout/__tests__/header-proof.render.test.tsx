@@ -46,7 +46,12 @@ vi.mock("@/components/layout/StoreSearch", () => ({
       <input
         aria-label="search"
         data-search-input=""
-        style={{ width: "100%", height: "100%", border: 0, background: "transparent" }}
+        style={{
+          width: "100%",
+          height: "100%",
+          border: 0,
+          background: "transparent",
+        }}
       />
     </div>
   ),
