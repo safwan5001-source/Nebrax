@@ -534,7 +534,7 @@ class DeliveryConnectorIngestionService
 
     private function encodeCanonical(mixed $value): string
     {
-        if ($value instanceof DeliveryConnectorJsonInteger) {
+        if ($value instanceof DeliveryConnectorJsonNumber) {
             return $value->literal;
         }
         if ($value instanceof \stdClass) {
@@ -559,7 +559,7 @@ class DeliveryConnectorIngestionService
 
     private function plainValue(mixed $value): mixed
     {
-        if ($value instanceof DeliveryConnectorJsonInteger) {
+        if ($value instanceof DeliveryConnectorJsonNumber) {
             return $value->literal;
         }
         if ($value instanceof \stdClass) {
@@ -598,7 +598,7 @@ class DeliveryConnectorIngestionService
     private function decodeEnvelope(string $rawBody): ?array
     {
         try {
-            [$prepared, $marker] = $this->tagOversizedIntegers($rawBody);
+            [$prepared, $marker] = $this->tagNumericLiterals($rawBody);
             $decoded = json_decode($prepared, false, 32, JSON_THROW_ON_ERROR);
             $decoded = $this->restoreTaggedIntegers($decoded, $marker);
         } catch (\JsonException) {
@@ -644,7 +644,7 @@ class DeliveryConnectorIngestionService
         if (is_array($payload) && count($payload) > 50) {
             return null;
         }
-        if ($this->containsNonFinite($payload)) {
+        if ($this->containsUnpreservedNumber($payload)) {
             return null;
         }
 
@@ -676,7 +676,7 @@ class DeliveryConnectorIngestionService
     }
 
     /** @return array{0: string, 1: string} */
-    private function tagOversizedIntegers(string $json): array
+    private function tagNumericLiterals(string $json): array
     {
         $marker = $this->freshMarker($json);
         $length = strlen($json);
@@ -726,18 +726,14 @@ class DeliveryConnectorIngestionService
             while ($i < $length && ctype_digit($json[$i])) {
                 $i++;
             }
-            $integerLiteral = substr($json, $start, $i - $start);
             $cursor = $i;
-            $floating = false;
             if ($cursor < $length && $json[$cursor] === '.') {
-                $floating = true;
                 $cursor++;
                 while ($cursor < $length && ctype_digit($json[$cursor])) {
                     $cursor++;
                 }
             }
             if ($cursor < $length && ($json[$cursor] === 'e' || $json[$cursor] === 'E')) {
-                $floating = true;
                 $cursor++;
                 if ($cursor < $length && ($json[$cursor] === '+' || $json[$cursor] === '-')) {
                     $cursor++;
@@ -747,8 +743,8 @@ class DeliveryConnectorIngestionService
                 }
             }
             $token = substr($json, $start, $cursor - $start);
-            if (! $floating && $this->integerExceedsPlatform($integerLiteral)) {
-                $out .= '"' . $marker . $integerLiteral . '"';
+            if ($this->isJsonNumber($token)) {
+                $out .= '"' . $marker . $token . '"';
             } else {
                 $out .= $token;
             }
@@ -767,19 +763,9 @@ class DeliveryConnectorIngestionService
         return $marker;
     }
 
-    private function integerExceedsPlatform(string $literal): bool
+    private function isJsonNumber(string $literal): bool
     {
-        $negative = str_starts_with($literal, '-');
-        $digits = ltrim($negative ? substr($literal, 1) : $literal, '0');
-        if ($digits === '') {
-            return false;
-        }
-        $limit = $negative ? '9223372036854775808' : '9223372036854775807';
-        if (strlen($digits) !== strlen($limit)) {
-            return strlen($digits) > strlen($limit);
-        }
-
-        return strcmp($digits, $limit) > 0;
+        return preg_match('/^-?(0|[1-9][0-9]*)(\.[0-9]+)?([eE][+-]?[0-9]+)?$/', $literal) === 1;
     }
 
     private function restoreTaggedIntegers(mixed $value, string $marker): mixed
@@ -796,29 +782,29 @@ class DeliveryConnectorIngestionService
         }
         if (is_string($value) && str_starts_with($value, $marker)) {
             $literal = substr($value, strlen($marker));
-            if (preg_match('/^-?(0|[1-9][0-9]*)$/', $literal) === 1) {
-                return new DeliveryConnectorJsonInteger($literal);
+            if (preg_match('/^-?(0|[1-9][0-9]*)(\.[0-9]+)?([eE][+-]?[0-9]+)?$/', $literal) === 1) {
+                return new DeliveryConnectorJsonNumber($literal);
             }
         }
 
         return $value;
     }
 
-    private function containsNonFinite(mixed $value): bool
+    private function containsUnpreservedNumber(mixed $value): bool
     {
         if (is_float($value)) {
-            return ! is_finite($value);
+            return true;
         }
         if ($value instanceof \stdClass) {
             foreach (get_object_vars($value) as $item) {
-                if ($this->containsNonFinite($item)) {
+                if ($this->containsUnpreservedNumber($item)) {
                     return true;
                 }
             }
         }
         if (is_array($value)) {
             foreach ($value as $item) {
-                if ($this->containsNonFinite($item)) {
+                if ($this->containsUnpreservedNumber($item)) {
                     return true;
                 }
             }

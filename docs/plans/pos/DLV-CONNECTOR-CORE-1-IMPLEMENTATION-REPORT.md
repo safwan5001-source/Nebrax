@@ -238,6 +238,7 @@ Codex left five open findings on `3b40442` (2 P1, 3 P2). All five are fixed in t
 | P2 concurrent rotations | `rotateSecret` reloads the account with `lockForUpdate` inside a transaction before incrementing `secret_version`. Two callers that both observed version 1 commit versions 2 and 3. Only the latest secret verifies. |
 | P1 subscription status (follow-up on the fix commit) | After the tenant context is set, and again inside the locked transaction, `PlanGate::subscriptionActive()` must pass. An expired trial/subscription returns `403 subscription_inactive` and does not consume `event_id`. Same gate as `EnsureActiveSubscription` on the management and Hub routes. |
 | P2 numeric object keys (follow-up) | Object keys are ordered with `ksort(..., SORT_STRING)`. `"01"` and `"1"` are not treated as equal, so opposite insertion orders share one authoritative checksum. |
+| P2 decimal literals (follow-up) | Every JSON number token is canonicalized as its original literal, not as an IEEE float. `1.0000000000000001`, `1.0`, `1`, `1e2`, and `100` stay distinct. A float that still survives decoding rejects the envelope. |
 
 The Hub row still stores a plain PHP array, so an empty object becomes an empty list in the Hub hash. The connector authoritative checksum is what rejects the second shape before a second intake, and the Hub row is not mutated. Scientific-notation JSON numbers remain IEEE floats; the preserved case is integer tokens outside int64.
 
@@ -256,7 +257,7 @@ The Hub row still stores a plain PHP array, so an empty object becomes an empty 
 
 SQLite, `php artisan test --filter=DeliveryConnectorCoreTest`:
 
-- 17 passed, 282 assertions (includes the subscription-expiry and numeric-key regressions)
+- 18 passed, 302 assertions (includes subscription expiry, numeric object keys, and lossless decimal literals)
 
 SQLite, related suites (`DeliveryHubProjectionTest`, `BranchIsolationGuardTest`, `WebhookSignatureTest`, `DeliveryPlatformApiTest`, `DeliveryFinancialRoleGateTest`, `DeliveryPlatformProfileDomainTest`):
 

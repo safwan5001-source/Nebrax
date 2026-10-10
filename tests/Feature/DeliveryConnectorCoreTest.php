@@ -523,6 +523,38 @@ class DeliveryConnectorCoreTest extends TestCase
         $this->assertSame($before, $this->financialCounts());
     }
 
+    /** @test */
+    public function lossy_decimal_literals_do_not_collapse(): void
+    {
+        [$auth, $branch, $profile] = $this->tenantWithPlatform('decimals');
+        $account = $this->connector($auth['token'], $profile, 'store-dec', $branch);
+        $before = $this->financialCounts();
+        $id = $account['data']['id'];
+        $secret = $account['secret'];
+
+        $created = $this->postRaw($id, $this->rawEnvelope('P-dec', '{"n":1.0000000000000001}'), $secret)->assertCreated();
+        $this->postRaw($id, $this->rawEnvelope('P-dec', '{"n":1.0}'), $secret)
+            ->assertStatus(409)
+            ->assertJsonPath('error_code', 'payload_conflict');
+        $same = $this->postRaw($id, $this->rawEnvelope('P-dec', '{"n":1.0000000000000001}'), $secret)->assertCreated();
+        $this->assertSame($created['data']['delivery_hub_order_id'], $same['data']['delivery_hub_order_id']);
+
+        $this->postRaw($id, $this->rawEnvelope('P-exp', '{"n":1e2}'), $secret)->assertCreated();
+        $this->postRaw($id, $this->rawEnvelope('P-exp', '{"n":100}'), $secret)
+            ->assertStatus(409)
+            ->assertJsonPath('error_code', 'payload_conflict');
+        $this->postRaw($id, $this->rawEnvelope('P-one', '{"n":1}'), $secret)->assertCreated();
+        $this->postRaw($id, $this->rawEnvelope('P-one', '{"n":1.0}'), $secret)
+            ->assertStatus(409)
+            ->assertJsonPath('error_code', 'payload_conflict');
+
+        $this->assertSame(1, DeliveryHubOrder::withoutGlobalScopes()->where('provider_order_id', 'P-dec')->count());
+        $this->assertSame(1, DeliveryHubOrder::withoutGlobalScopes()->where('provider_order_id', 'P-exp')->count());
+        $this->assertSame(1, DeliveryHubOrder::withoutGlobalScopes()->where('provider_order_id', 'P-one')->count());
+        $this->assertSame($before, $this->financialCounts());
+        $this->assertSame(0, CommerceOrder::withoutGlobalScopes()->count());
+    }
+
     /** @return array{0: array{token: string, tenant_id: string}, 1: string, 2: string} */
     private function tenantWithPlatform(string $slug): array
     {
