@@ -652,10 +652,13 @@ input[type="search"]::-webkit-search-cancel-button {
   padding-block-start: var(--hd-block, calc(var(--store-header-offset, 8.5rem) - var(--store-announcement-height, 0px)));
 }
 [data-ho~="on"] [data-sd-backdrop] {
-  inset-inline: calc(50% - 50vw);
   border-radius: 0;
 }
 /* V7a-chrome:end */
+/* V7c-2 — the overlay hero's picture reaches both viewport edges (the page is the frame here). */
+[data-ho~="on"] [data-sd-backdrop] {
+  inset-inline: calc(50% - 50vw);
+}
 
 @layer base {
   * {

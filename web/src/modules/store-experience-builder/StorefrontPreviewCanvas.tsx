@@ -21,7 +21,9 @@ import {
   previewStoreName,
   type StorefrontPresentationConfig,
 } from "./presentation/config";
+import { HeaderOverlayPreview } from "./HeaderOverlayPreview";
 import { HeaderScrollUpPreview } from "./HeaderScrollUpPreview";
+import { overlayMarker, resolveHeaderOverlay } from "./presentation/header-overlay";
 import { headerIsCompact, resolveHeaderDesign } from "./presentation/header-design";
 import type { CategoryPageRegionKey, PageRegionInstance, PageType, ProductPageRegionKey } from "./presentation/page-regions";
 import type { WorkspaceProductDetail } from "@/modules/commerce-workspace/workspace-products";
@@ -375,6 +377,16 @@ export function StorefrontPreviewCanvas({
     if (!resolved?.attrs["data-sd"]?.split(" ").includes("mbg")) return null;
     return <CanvasBackdrop background={bg} viewport={viewport} />;
   };
+  // CUST-HV V7c-2 — the same decision the published Home makes: opted in, first visible section a proven full-picture
+  // hero, picture really rendered (the resolver emitted `mbg`) — else the header stays solid.
+  const overlayDecision = resolveHeaderOverlay(config.header.design, config.homepage.sections, designContext);
+  const overlayHero =
+    page === "home" && overlayDecision && "overlay" in overlayDecision
+      ? (() => {
+          const section = config.homepage.sections.find((s) => s.id === overlayDecision.overlay.sectionId);
+          return section && backdropFor(section) ? overlayDecision.overlay : null;
+        })()
+      : null;
   const logo =
     logoMediaUrl ??
     (headerStyleCompact && config.branding.compactLogoDataUrl
@@ -540,6 +552,7 @@ export function StorefrontPreviewCanvas({
         }
       >
         {headerResolved.sticky === "on-scroll-up" ? <HeaderScrollUpPreview /> : null}
+        {headerResolved.overlay ? <HeaderOverlayPreview sticky={headerResolved.sticky !== "off"} /> : null}
         {onSelectChrome ? (
           <button
             type="button"
@@ -1482,7 +1495,11 @@ export function StorefrontPreviewCanvas({
                 selected={selectedSection === section.id}
                 onSelect={onSelectSection}
               >
-                <SectionDesignFrame section={section} context={designContext}>
+                <SectionDesignFrame
+                  section={section}
+                  context={designContext}
+                  extraAttrs={overlayHero?.sectionId === section.id ? { "data-ho": overlayMarker(overlayHero) } : undefined}
+                >
                   {content}
                 </SectionDesignFrame>
               </SelectablePreviewSection>

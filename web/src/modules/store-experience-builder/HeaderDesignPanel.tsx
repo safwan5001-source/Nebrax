@@ -8,6 +8,7 @@ import {
   HEADER_HEIGHTS,
   HEADER_LAYOUTS,
   HEADER_LOGO_SIZES,
+  HEADER_MODES,
   HEADER_MOBILE_LAYOUTS,
   HEADER_SHADOWS,
   HEADER_STICKY,
@@ -16,6 +17,7 @@ import {
   normalizeHeaderDesign,
   resolveHeaderDesign,
 } from "./presentation/header-design";
+import { type OverlayCandidateSection, overlayHeroCandidate } from "./presentation/header-overlay";
 import type { ColorRef } from "./presentation/section-design";
 import type { DesignContext } from "./presentation/section-design-resolve";
 
@@ -39,6 +41,10 @@ const LOGO_LABEL: Record<(typeof HEADER_LOGO_SIZES)[number], CustomizerMessageKe
   md: "headerLogoMd",
   lg: "headerLogoLg",
   xl: "headerLogoXl",
+};
+const MODE_LABEL: Record<(typeof HEADER_MODES)[number], CustomizerMessageKey> = {
+  solid: "headerModeSolid",
+  "overlay-hero": "headerModeOverlay",
 };
 const STICKY_LABEL: Record<(typeof HEADER_STICKY)[number], CustomizerMessageKey> = {
   always: "headerStickyAlways",
@@ -65,11 +71,14 @@ const SHADOW_LABEL: Record<(typeof HEADER_SHADOWS)[number], CustomizerMessageKey
 export function HeaderDesignPanel({
   design,
   ctx,
+  sections,
   t,
   onChange,
 }: {
   design: HeaderDesign | undefined;
   ctx: DesignContext;
+  /** The home sections, to explain why an opted-in overlay is not active. */
+  sections: readonly OverlayCandidateSection[];
   t: (key: CustomizerMessageKey) => string;
   onChange: (next: HeaderDesign | undefined) => void;
 }) {
@@ -182,6 +191,26 @@ export function HeaderDesignPanel({
         }
         onChange={(next) => setColour("icon", next)}
       />
+      {select("mode", "headerMode", current.mode, HEADER_MODES, MODE_LABEL, "mode")}
+      {current.mode === "overlay-hero" ? (
+        <div className="space-y-1" data-header-mode-note="">
+          <p className="text-[12px] leading-5 text-muted">{t("headerModeHint")}</p>
+          {(() => {
+            const candidate = overlayHeroCandidate(sections);
+            if (candidate.ok) return null;
+            const reason = {
+              "no-hero": "headerModeInactiveNoHero",
+              "not-picture": "headerModeInactiveNotPicture",
+              "split-layout": "headerModeInactiveSplit",
+            } as const;
+            return (
+              <p role="status" data-header-mode-inactive="" className="text-[12px] leading-5 text-warning">
+                {t(reason[candidate.reason])}
+              </p>
+            );
+          })()}
+        </div>
+      ) : null}
       {select("sticky", "headerSticky", current.sticky, HEADER_STICKY, STICKY_LABEL, "sticky")}
       {select("border", "headerBorder", current.border?.width, HEADER_BORDER_WIDTHS, BORDER_LABEL, "border", "width")}
       {select("shadow", "headerShadow", current.shadow, HEADER_SHADOWS, SHADOW_LABEL, "shadow")}

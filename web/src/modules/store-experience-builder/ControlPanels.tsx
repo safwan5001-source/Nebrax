@@ -802,6 +802,7 @@ function HeaderPanel({
       ) : null}
       <HeaderDesignPanel
         design={config.header.design}
+        sections={config.homepage.sections}
         ctx={{
           primaryColor: config.primaryColor,
           accentColor: config.accentColor,

@@ -14,16 +14,19 @@ import {
 export function SectionDesignFrame({
   section,
   context,
+  extraAttrs,
   children,
 }: {
   section: Pick<PresentationHomeSection, "type" | "design">;
   context: DesignContext;
+  /** V7c-2 — the overlay-on-hero marker (`data-ho`) of the hero the header sits over. */
+  extraAttrs?: Record<string, string>;
   children: ReactNode;
 }) {
   const resolved = resolveSectionDesign(section.type, section.design, context);
   if (!resolved) return <>{children}</>;
   return (
-    <div {...resolved.attrs} style={resolved.style as CSSProperties}>
+    <div {...resolved.attrs} {...extraAttrs} style={resolved.style as CSSProperties}>
       {children}
     </div>
   );

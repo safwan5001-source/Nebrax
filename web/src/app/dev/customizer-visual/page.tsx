@@ -30,7 +30,8 @@ type Scenario =
   | "data-sections"
   | "design"
   | "global"
-  | "heroes";
+  | "heroes"
+  | "overlay";
 type PreviewViewport = "mobile" | "tablet" | "desktop";
 
 function scenarioOf(value: string | null): Scenario {
@@ -42,7 +43,8 @@ function scenarioOf(value: string | null): Scenario {
     value === "data-sections" ||
     value === "design" ||
     value === "global" ||
-    value === "heroes"
+    value === "heroes" ||
+    value === "overlay"
   ) {
     return value;
   }
@@ -145,6 +147,38 @@ function configFor(locale: "ar" | "en", scenario: Scenario): StorefrontPresentat
       surfaces: { radius: "pill", border: { width: "medium" }, shadow: "medium" },
       layout: { contentWidth: "narrow" },
       motion: { duration: "slow", easing: "emphasized" },
+    });
+  }
+  if (scenario === "overlay") {
+    // CUST-HV V7c-2 — a header that overlays a full-picture hero (the e2e spec mocks the media endpoints with a
+    // dark picture, so the proof passes) above the catalogue.
+    const ar = locale === "ar";
+    return normalizePresentationConfig({
+      ...configFor(locale, "populated"),
+      header: { design: { mode: "overlay-hero" } },
+      homepage: {
+        ...configFor(locale, "populated").homepage,
+        sections: [
+          {
+            id: "hero",
+            type: "hero",
+            visible: true,
+            content: {
+              headline: ar ? "مرحباً بكم في متجر الأزهار الطازجة" : "Welcome to the fresh flower shop",
+              subheadline: ar ? "توصيل في نفس اليوم إلى كل أحياء المدينة" : "Same-day delivery across the whole city",
+              ctas: [{ label: ar ? "تسوّق الوصول الجديد" : "Shop new arrivals", href: "/collections/new" }],
+            },
+            design: {
+              background: {
+                kind: "media",
+                media: { mediaId: "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e", decorative: true },
+                overlay: { color: { hex: "#000000" }, alpha: 40 },
+              },
+            },
+          },
+          { id: "categories", type: "categories", visible: true },
+        ],
+      },
     });
   }
   if (scenario === "heroes") {

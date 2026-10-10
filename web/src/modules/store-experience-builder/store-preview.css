@@ -274,10 +274,21 @@
   padding-block-start: var(--hd-block, calc(var(--store-header-offset, 8.5rem) - var(--store-announcement-height, 0px)));
 }
 [data-ho~="on"] [data-sd-backdrop] {
-  inset-inline: calc(50% - 50vw);
   border-radius: 0;
 }
 /* V7a-chrome:end */
+
+/*
+ * V7c-2 — Canvas-only half of overlay-on-hero. The preview frame is not the editor window, so the picture bleeds by the
+ * container's own gutter (the frame clips it, see `overflow-x: clip` in the shared block) instead of by viewport units, and
+ * the padded container sits one wrapper above the hero (`.awj-preview-section`) when sections are selectable.
+ */
+[data-ho~="on"] [data-sd-backdrop] {
+  inset-inline: -2rem;
+}
+.awj-store-preview[data-hd~="hmo"] :has(> .awj-preview-section > [data-ho~="on"]) {
+  padding-block-start: 0;
+}
 
 /*
  * CUST-HV V5c — section design (contract §3.5). Every rule keys off a validated
