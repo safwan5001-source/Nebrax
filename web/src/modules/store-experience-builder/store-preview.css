@@ -283,7 +283,7 @@
  * container's own gutter (the frame clips it, see `overflow-x: clip` in the shared block) instead of by viewport units, and
  * the padded container sits one wrapper above the hero (`.awj-preview-section`) when sections are selectable.
  */
-[data-ho~="on"] [data-sd-backdrop] {
+.awj-store-preview [data-ho~="on"] [data-sd-backdrop] {
   inset-inline: -2rem;
 }
 .awj-store-preview[data-hd~="hmo"] :has(> .awj-preview-section > [data-ho~="on"]) {
