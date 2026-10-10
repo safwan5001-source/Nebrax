@@ -569,7 +569,7 @@ class DeliveryConnectorIngestionService
             } catch (\JsonException) {
                 return $value->literal;
             }
-            if (is_float($decoded) && is_finite($decoded) && json_encode($decoded, JSON_THROW_ON_ERROR) === $value->literal) {
+            if (is_float($decoded) && is_finite($decoded) && json_encode($decoded, JSON_PRESERVE_ZERO_FRACTION | JSON_THROW_ON_ERROR) === $value->literal) {
                 return $decoded;
             }
 

@@ -599,11 +599,39 @@ class DeliveryConnectorCoreTest extends TestCase
         $this->postRaw($id, $this->rawEnvelope('P-nest', '{"o":{"a":1,"a":2}}'), $secret)
             ->assertStatus(422)
             ->assertJsonPath('error_code', 'invalid_payload');
+        $this->postRaw($id, $this->rawEnvelope('P-arr', '{"a":[{"n":1,"n":2}]}'), $secret)
+            ->assertStatus(422)
+            ->assertJsonPath('error_code', 'invalid_payload');
+
+        $manualDot = '{"delivery_platform_profile_id":"'.$profile.'","provider_order_id":"P-manual-dot","branch_id":"'.$branch.'","intake_payload":{"amount":1.0}}';
+        $this->call('POST', '/api/delivery-hub/orders', [], [], [], $this->jsonHeaders($auth['token']), $manualDot)->assertCreated();
+        $dot = '{"event_id":"'.Str::uuid().'","provider_order_id":"P-manual-dot","intake_payload":{"amount":1.0}}';
+        $this->postRaw($id, $dot, $secret)->assertCreated();
+        $this->withToken($auth['token'])->postJson('/api/delivery-hub/orders', [
+            'delivery_platform_profile_id' => $profile,
+            'provider_order_id' => 'P-manual-dot-str',
+            'branch_id' => $branch,
+            'intake_payload' => ['amount' => '1.0'],
+        ])->assertCreated();
+        $dotString = '{"event_id":"'.Str::uuid().'","provider_order_id":"P-manual-dot-str","intake_payload":{"amount":1.0}}';
+        $this->postRaw($id, $dotString, $secret)->assertStatus(409)->assertJsonPath('error_code', 'payload_conflict');
 
         $this->assertSame(1, DeliveryHubOrder::withoutGlobalScopes()->where('provider_order_id', 'P-manual-num')->count());
+        $this->assertSame(1, DeliveryHubOrder::withoutGlobalScopes()->where('provider_order_id', 'P-manual-dot')->count());
         $this->assertSame(1, DeliveryHubOrder::withoutGlobalScopes()->where('provider_order_id', 'P-dup')->count());
         $this->assertSame(0, DeliveryHubOrder::withoutGlobalScopes()->where('provider_order_id', 'P-esc')->count());
+        $this->assertSame(0, DeliveryHubOrder::withoutGlobalScopes()->where('provider_order_id', 'P-arr')->count());
         $this->assertSame($before, $this->financialCounts());
+    }
+
+    /** @return array<string, string> */
+    private function jsonHeaders(string $token): array
+    {
+        return [
+            'CONTENT_TYPE' => 'application/json',
+            'HTTP_ACCEPT' => 'application/json',
+            'HTTP_AUTHORIZATION' => 'Bearer '.$token,
+        ];
     }
 
     /** @return array{0: array{token: string, tenant_id: string}, 1: string, 2: string} */

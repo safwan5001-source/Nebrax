@@ -239,10 +239,10 @@ Codex left five open findings on `3b40442` (2 P1, 3 P2). All five are fixed in t
 | P1 subscription status (follow-up on the fix commit) | After the tenant context is set, and again inside the locked transaction, `PlanGate::subscriptionActive()` must pass. An expired trial/subscription returns `403 subscription_inactive` and does not consume `event_id`. Same gate as `EnsureActiveSubscription` on the management and Hub routes. |
 | P2 numeric object keys (follow-up) | Object keys are ordered with `ksort(..., SORT_STRING)`. `"01"` and `"1"` are not treated as equal, so opposite insertion orders share one authoritative checksum. |
 | P2 decimal literals (follow-up) | Every JSON number token is canonicalized as its original literal, not as an IEEE float. `1.0000000000000001`, `1.0`, `1`, `1e2`, and `100` stay distinct. A float that still survives decoding rejects the envelope. |
-| P2 manual Hub numeric type (follow-up) | `plainValue()` returns a PHP integer or an exactly round-tripping float for the Hub comparison. A connector number `5000` adopts a manual numeric payload and conflicts with a manual string `"5000"`. Lossy literals stay strings so they do not collapse. |
+| P2 manual Hub numeric type (follow-up) | `plainValue()` returns a PHP integer, or a float when `json_encode(..., JSON_PRESERVE_ZERO_FRACTION)` reproduces the literal. A connector number `5000` adopts a manual numeric payload, `1.0` adopts a manual `1.0`, and both conflict with the same digits in a string. Lossy literals stay strings so they do not collapse. |
 | P2 duplicate JSON members (follow-up) | Duplicate object keys, including escaped duplicates and nested objects, are rejected as `invalid_payload` before `json_decode()` keeps only the last value. |
 
-The Hub row still stores a plain PHP array, so an empty object becomes an empty list in the Hub hash. The connector authoritative checksum is what rejects the second shape before a second intake, and the Hub row is not mutated. Authoritative checksums keep every JSON number token as its original literal. Hub adoption uses a PHP integer, or a float only when `json_encode` of that float reproduces the literal; every other literal stays a string so distinct tokens do not collapse.
+The Hub row still stores a plain PHP array, so an empty object becomes an empty list in the Hub hash. The connector authoritative checksum is what rejects the second shape before a second intake, and the Hub row is not mutated. Authoritative checksums keep every JSON number token as its original literal. Hub adoption uses a PHP integer, or a float when `json_encode` with `JSON_PRESERVE_ZERO_FRACTION` reproduces the literal; every other literal stays a string. Hub's own payload hash still uses default `json_encode`, so `1` and `1.0` compare equal there, the same as two manual orders. The connector checksum still distinguishes those tokens once a connector baseline exists.
 
 ### Tests added
 
@@ -255,13 +255,13 @@ The Hub row still stores a plain PHP array, so an empty object becomes an empty 
 5. Expired trial and subscription: `subscription_inactive`, no attempt, no Hub row; restoring the trial lets the same event id succeed.
 6. `{"01":"a","1":"b"}` and `{"1":"b","01":"a"}` share one Hub order.
 7. `1.0000000000000001`, `1.0`, `1`, `1e2`, and `100` stay distinct. The second shape is `payload_conflict`.
-8. A manual numeric `amount` of `5000` is adopted by the connector number `5000`. A manual string `"5000"` conflicts with that number. Duplicate members `{"n":1,"n":2}`, `{"a":1,"\u0061":2}`, and nested `{"o":{"a":1,"a":2}}` are `invalid_payload` and do not create a Hub row.
+8. A manual numeric `amount` of `5000` is adopted by the connector number `5000`. A manual string `"5000"` conflicts with that number. A raw manual `1.0` is adopted by the connector literal `1.0` and conflicts with the string `"1.0"`. Duplicate members `{"n":1,"n":2}`, `{"a":1,"\u0061":2}`, nested `{"o":{"a":1,"a":2}}`, and a duplicate inside an array are `invalid_payload` and do not create a Hub row.
 
 ### Local execution
 
 SQLite, `php artisan test --filter=DeliveryConnectorCoreTest`:
 
-- 19 passed, 323 assertions (includes subscription expiry, numeric object keys, lossless decimals, manual numeric adoption, and duplicate JSON members)
+- 19 passed, 332 assertions (includes subscription expiry, numeric object keys, lossless decimals, manual numeric adoption including `1.0`, and duplicate JSON members)
 
 SQLite, related suites (`DeliveryHubProjectionTest`, `BranchIsolationGuardTest`, `WebhookSignatureTest`, `DeliveryPlatformApiTest`, `DeliveryFinancialRoleGateTest`, `DeliveryPlatformProfileDomainTest`):
 
