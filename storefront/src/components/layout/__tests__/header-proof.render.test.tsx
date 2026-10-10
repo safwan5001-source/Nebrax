@@ -46,16 +46,40 @@ vi.mock("@/components/layout/StoreSearch", () => ({
   ),
 }));
 vi.mock("@/components/layout/CartButton", () => ({
-  CartButton: ({ className }: { className?: string }) => (
-    <button
-      type="button"
-      data-cart=""
-      className={className}
-      style={{ height: "2.5rem", minWidth: "2.5rem" }}
-    >
-      cart
-    </button>
-  ),
+  // The real "action" variant paints its own soft surface; the icon variant is a bare ghost button.
+  CartButton: ({
+    className,
+    variant,
+  }: {
+    className?: string;
+    variant?: string;
+  }) =>
+    variant === "action" ? (
+      <button
+        type="button"
+        data-cart=""
+        data-cart-pill=""
+        className={`bg-store-primary-soft text-store-primary ${className ?? ""}`}
+        style={{ height: "2.5rem", minWidth: "2.5rem" }}
+      >
+        <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true">
+          <circle cx="10" cy="10" r="8" fill="none" stroke="currentColor" />
+        </svg>
+        cart
+      </button>
+    ) : (
+      <button
+        type="button"
+        data-cart=""
+        data-cart-icon=""
+        className={className}
+        style={{ height: "2.5rem", minWidth: "2.5rem" }}
+      >
+        <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true">
+          <circle cx="10" cy="10" r="8" fill="none" stroke="currentColor" />
+        </svg>
+      </button>
+    ),
 }));
 
 import { Header } from "@/components/layout/Header";
@@ -83,6 +107,23 @@ const DESIGNS: Record<string, Record<string, unknown> | undefined> = {
   shadowSoft: { shadow: "soft" },
   shadowMedium: { shadow: "medium" },
   twoRowTall: { layout: "two-row", height: "tall", logo: { size: "lg" } },
+  colBgDark: { surface: { background: { hex: "#12372a" } } },
+  colBgPale: { surface: { background: { hex: "#fde68a" } } },
+  colBgGrey: { surface: { background: { hex: "#777777" } } },
+  colRoleBrand: { surface: { background: { role: "brand" } } },
+  colTextIcon: {
+    surface: { background: { hex: "#12372a" } },
+    text: { hex: "#fde68a" },
+    icon: { hex: "#ffffff" },
+  },
+  colTextOnly: { text: { hex: "#111827" } },
+  colIconOnly: { icon: { hex: "#b91c1c" } },
+  colTwoRow: {
+    layout: "two-row",
+    surface: { background: { hex: "#12372a" } },
+    border: { width: "none" },
+    shadow: "soft",
+  },
   everything: {
     layout: "centered",
     mobileLayout: "logo-start",
@@ -98,6 +139,7 @@ describe("header proof", () => {
   it.skipIf(!DIR)("renders every design × direction × logo kind", async () => {
     mkdirSync(join(DIR, "pages"), { recursive: true });
     const css = readFileSync(join(DIR, "storefront.css"), "utf8");
+    writeFileSync(join(DIR, "designs.json"), JSON.stringify(DESIGNS));
     for (const [name, design] of Object.entries(DESIGNS)) {
       for (const dir of ["ltr", "rtl"] as const) {
         for (const logo of ["word", "image"] as const) {

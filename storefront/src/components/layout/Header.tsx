@@ -208,7 +208,10 @@ export async function Header({
         </div>
       )}
 
-      <div className="border-b border-store-border">
+      <div
+        className="border-b border-store-border"
+        {...(resolved.designed ? { "data-header-row": "" } : {})}
+      >
         <StoreContainer>
           {/*
             A three-column grid centres the brand between the menu and the cart
@@ -227,6 +230,7 @@ export async function Header({
               logoMedia={logoMedia}
               locale={locale}
               scale={resolved.logoSize}
+              headerBrand={resolved.designed}
               className={classes.brand}
             />
 

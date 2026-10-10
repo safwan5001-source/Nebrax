@@ -22,6 +22,7 @@ export function StoreBrand({
   linked = true,
   scale,
   mobile = false,
+  headerBrand = false,
 }: {
   href: string;
   name: string;
@@ -35,6 +36,8 @@ export function StoreBrand({
   scale?: 'sm' | 'md' | 'lg' | 'xl';
   /** Which half of a scale's `md:` pair to use. */
   mobile?: boolean;
+  /** V7b — marks the header brand so a chosen header text colour reaches the wordmark. */
+  headerBrand?: boolean;
 }) {
   const safeLogo = sanitizeLogoUrl(logoUrl ?? null);
   const color = tone === 'dark' ? 'text-store-footer-foreground' : 'text-store-primary';
@@ -61,9 +64,10 @@ export function StoreBrand({
       <bdi>{name}</bdi>
     </span>
   );
-  if (!linked) return <span className={classNameForBrand}>{inner}</span>;
+  const marker = headerBrand ? { 'data-header-brand': '' } : {};
+  if (!linked) return <span className={classNameForBrand} {...marker}>{inner}</span>;
   return (
-    <a href={href} className={classNameForBrand}>
+    <a href={href} className={classNameForBrand} {...marker}>
       {inner}
     </a>
   );

@@ -1,6 +1,7 @@
 "use client";
 
 import { Field, selectClass, btnClass } from "./ControlPanels";
+import { ColourField } from "./design/ColourField";
 import type { CustomizerMessageKey } from "./messages";
 import {
   HEADER_BORDER_WIDTHS,
@@ -11,8 +12,12 @@ import {
   HEADER_SHADOWS,
   HEADER_STICKY,
   type HeaderDesign,
+  headerContrastIssues,
   normalizeHeaderDesign,
+  resolveHeaderDesign,
 } from "./presentation/header-design";
+import type { ColorRef } from "./presentation/section-design";
+import type { DesignContext } from "./presentation/section-design-resolve";
 
 const LAYOUT_LABEL: Record<(typeof HEADER_LAYOUTS)[number], CustomizerMessageKey> = {
   standard: "headerLayoutStandard",
@@ -58,14 +63,29 @@ const SHADOW_LABEL: Record<(typeof HEADER_SHADOWS)[number], CustomizerMessageKey
  */
 export function HeaderDesignPanel({
   design,
+  ctx,
   t,
   onChange,
 }: {
   design: HeaderDesign | undefined;
+  ctx: DesignContext;
   t: (key: CustomizerMessageKey) => string;
   onChange: (next: HeaderDesign | undefined) => void;
 }) {
   const current = design ?? {};
+  const issues = headerContrastIssues(design, ctx);
+  const resolved = resolveHeaderDesign(design, ctx);
+  const setColour = (key: "text" | "icon", value: ColorRef | undefined) =>
+    onChange(normalizeHeaderDesign({ ...current, [key]: value }));
+  const colourStatus = (field: "text" | "icon") => {
+    const issue = issues.find((i) => i.field === field);
+    if (issue)
+      return {
+        tone: "bad" as const,
+        text: `${t("designContrastFail")} ${issue.ratio.toFixed(1)}:1`,
+      };
+    return current[field] ? { tone: "ok" as const, text: t("designContrastOk") } : null;
+  };
   const set = (key: string, value: string | undefined, sub?: string) => {
     const draft: Record<string, unknown> = { ...current };
     if (sub) draft[key] = value ? { [sub]: value } : undefined;
@@ -113,6 +133,54 @@ export function HeaderDesignPanel({
       {select("mobile-layout", "headerMobileLayout", current.mobileLayout, HEADER_MOBILE_LAYOUTS, MOBILE_LABEL, "mobileLayout")}
       {select("height", "headerHeight", current.height, HEADER_HEIGHTS, HEIGHT_LABEL, "height")}
       {select("logo-size", "headerLogoSize", current.logo?.size, HEADER_LOGO_SIZES, LOGO_LABEL, "logo", "size")}
+      <ColourField
+        dataName="header-bg"
+        label={t("headerSurfaceBackground")}
+        value={current.surface?.background}
+        ctx={ctx}
+        t={t}
+        onChange={(background) =>
+          onChange(
+            normalizeHeaderDesign({
+              ...current,
+              surface: background ? { background } : undefined,
+            }),
+          )
+        }
+      />
+      <ColourField
+        dataName="header-text"
+        label={t("headerTextColour")}
+        value={current.text}
+        ctx={ctx}
+        t={t}
+        automatic={
+          !current.text && resolved.style?.["--hd-fg"]
+            ? { hex: resolved.style["--hd-fg"], label: t("designTextAuto") }
+            : undefined
+        }
+        status={colourStatus("text")}
+        suggestion={
+          issues.some((i) => i.field === "text")
+            ? { label: t("headerColourUseDefault"), onApply: () => setColour("text", undefined) }
+            : null
+        }
+        onChange={(next) => setColour("text", next)}
+      />
+      <ColourField
+        dataName="header-icon"
+        label={t("headerIconColour")}
+        value={current.icon}
+        ctx={ctx}
+        t={t}
+        status={colourStatus("icon")}
+        suggestion={
+          issues.some((i) => i.field === "icon")
+            ? { label: t("headerColourUseDefault"), onApply: () => setColour("icon", undefined) }
+            : null
+        }
+        onChange={(next) => setColour("icon", next)}
+      />
       {select("sticky", "headerSticky", current.sticky, HEADER_STICKY, STICKY_LABEL, "sticky")}
       {select("border", "headerBorder", current.border?.width, HEADER_BORDER_WIDTHS, BORDER_LABEL, "border", "width")}
       {select("shadow", "headerShadow", current.shadow, HEADER_SHADOWS, SHADOW_LABEL, "shadow")}

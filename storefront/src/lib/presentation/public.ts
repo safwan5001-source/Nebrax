@@ -73,6 +73,9 @@ export function publishedThemeStyle(
     ),
     // CUST-HV V5e-2a — document-level global tokens (absent ⇒ nothing is added).
     ...(resolveGlobalTokens(presentation, presentation)?.style ?? {}),
+    // CUST-HV V7b — header colour custom properties (absent ⇒ nothing is added).
+    ...(resolveHeaderDesign(presentation.header.design, presentation).style ??
+      {}),
     // CUST-HV V5e-2c — a catalogue body family wins over the legacy `fontPreset` (which maps
     // onto the catalogue's first two keys); absent ⇒ the preset's stack exactly as before.
     fontFamily:
@@ -92,7 +95,8 @@ export function publishedThemeAttrs(
   if (!presentation) return undefined;
   const attrs = {
     ...(resolveGlobalTokens(presentation, presentation)?.attrs ?? {}),
-    ...(resolveHeaderDesign(presentation.header.design).attrs ?? {}),
+    ...(resolveHeaderDesign(presentation.header.design, presentation).attrs ??
+      {}),
   };
   return Object.keys(attrs).length > 0 ? attrs : undefined;
 }

@@ -1,0 +1,17 @@
+{
+  "_note": "CUST-HV V7b — publish gate for explicit header text / icon colours. Shared by PHP HeaderDesignContrast and both TS twins (headerContrastIssues). Only the explicit `text` / `icon` are proven here, against the designed header background if there is one, else the default surface #ffffff plus a custom palette.surface; the automatic text over a designed background is the best of pure white / black and passes by construction. `ratio` is the worst ratio rounded to 2 decimals.",
+  "cases": [
+    {"name": "no colours", "config": {"primaryColor": "#12372a", "design": {"layout": "centered"}}, "expected": []},
+    {"name": "a background alone is fine — its text is automatic and proven by construction", "config": {"primaryColor": "#12372a", "design": {"surface": {"background": {"hex": "#12372a"}}}}, "expected": []},
+    {"name": "explicit white text on the default surface fails", "config": {"primaryColor": "#12372a", "design": {"text": {"hex": "#ffffff"}}}, "expected": [{"field": "text", "code": "contrast_insufficient", "ratio": 1}]},
+    {"name": "explicit dark text on the default surface passes", "config": {"primaryColor": "#12372a", "design": {"text": {"hex": "#111827"}}}, "expected": []},
+    {"name": "dark text on a dark designed background fails", "config": {"primaryColor": "#12372a", "design": {"surface": {"background": {"hex": "#12372a"}}, "text": {"hex": "#1f2937"}}}, "expected": [{"field": "text", "code": "contrast_insufficient", "ratio": 1.12}]},
+    {"name": "white text on a dark designed background passes", "config": {"primaryColor": "#12372a", "design": {"surface": {"background": {"hex": "#12372a"}}, "text": {"hex": "#ffffff"}}}, "expected": []},
+    {"name": "a role resolves through the palette: brand text on a brand background fails", "config": {"primaryColor": "#12372a", "design": {"surface": {"background": {"role": "brand"}}, "text": {"role": "brand"}}}, "expected": [{"field": "text", "code": "contrast_insufficient", "ratio": 1}]},
+    {"name": "a pale icon on the default surface fails on its own", "config": {"primaryColor": "#12372a", "design": {"text": {"hex": "#111827"}, "icon": {"hex": "#cccccc"}}}, "expected": [{"field": "icon", "code": "contrast_insufficient", "ratio": 1.61}]},
+    {"name": "icon and text can both fail, in field order", "config": {"primaryColor": "#12372a", "design": {"text": {"hex": "#eeeeee"}, "icon": {"hex": "#dddddd"}}}, "expected": [{"field": "text", "code": "contrast_insufficient", "ratio": 1.16}, {"field": "icon", "code": "contrast_insufficient", "ratio": 1.36}]},
+    {"name": "a dark palette surface is a backdrop when the header has no background of its own", "config": {"primaryColor": "#12372a", "palette": {"surface": "#101820"}, "design": {"text": {"hex": "#111827"}}}, "expected": [{"field": "text", "code": "contrast_insufficient", "ratio": 1.01}]},
+    {"name": "a designed background replaces the palette surface as the judged backdrop", "config": {"primaryColor": "#12372a", "palette": {"surface": "#101820"}, "design": {"surface": {"background": {"hex": "#ffffff"}}, "text": {"hex": "#111827"}}}, "expected": []},
+    {"name": "a mid grey background is judged exactly, not by luminance class", "config": {"primaryColor": "#12372a", "design": {"surface": {"background": {"hex": "#777777"}}, "text": {"hex": "#ffffff"}}}, "expected": [{"field": "text", "code": "contrast_insufficient", "ratio": 4.48}]}
+  ]
+}

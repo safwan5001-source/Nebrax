@@ -32,6 +32,8 @@ interface StoreBrandProps {
    * `size` preset exactly as before; present it replaces the logo height / wordmark size.
    */
   scale?: "sm" | "md" | "lg" | "xl";
+  /** CUST-HV V7b — marks the header's brand link so a chosen header text colour can reach its wordmark. */
+  headerBrand?: boolean;
 }
 
 /** Logo image height / wordmark size / image width cap per `scale` (literal for Tailwind). */
@@ -71,6 +73,7 @@ export function StoreBrand({
   logoMedia = null,
   locale = "en",
   scale,
+  headerBrand = false,
 }: StoreBrandProps) {
   const safeLogo = sanitizeLogoUrl(logoUrl ?? null);
   const picked = scale ? SCALE[scale] : null;
@@ -84,6 +87,7 @@ export function StoreBrand({
   return (
     <Link
       href={href}
+      {...(headerBrand ? { "data-header-brand": "" } : {})}
       className={cn(
         "inline-flex min-w-0 max-w-full items-center",
         tone === "dark" ? "text-store-footer-foreground" : "text-store-primary",

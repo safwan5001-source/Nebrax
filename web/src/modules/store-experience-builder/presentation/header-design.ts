@@ -10,17 +10,34 @@
  * `App\Support\Commerce\StorefrontHeaderDesignNormalizer` (the authority); all three are pinned
  * by `tests/Fixtures/presentation/header-design.json`.
  *
- * V7a is structural only — no colours, so there is no contrast to prove here: `layout`,
- * `mobileLayout`, `height`, `logo.size`, `sticky` (`always | off`), `border.width`, `shadow`.
- * Deliberately NOT here yet (dropped fail-closed until their slice): `surface` / `text` / `icon`
- * colours (V7b, behind a contrast gate), `sticky: on-scroll-up` and `mode` (V7c), explicit
- * `search` / `categoryNav` presentation, `logo.align` / `logo.treatment`.
+ * V7a is structural: `layout`, `mobileLayout`, `height`, `logo.size`, `sticky` (`always | off`),
+ * `border.width`, `shadow`. V7b adds colour — `surface.background`, `text`, `icon` (a `ColorRef`: a
+ * palette role or a hex). The text colour over a designed background defaults to the best of pure
+ * white / black (proven by construction); an **explicit** `text` / `icon` is judged against what is
+ * really behind it at publish (`headerContrastIssues`, twin of PHP `HeaderDesignContrast`, pinned
+ * by `tests/Fixtures/presentation/header-contrast.json`).
+ *
+ * Deliberately NOT here yet (dropped fail-closed until their slice): `surface.alpha` / gradients and
+ * `sticky: on-scroll-up` / `mode` (V7c), explicit `search` / `categoryNav` presentation,
+ * `logo.align` / `logo.treatment`.
  *
  * `resolveHeaderDesign` is the one pure function from the document to what a renderer needs: a
- * `data-hd` token list for the theme wrapper (heights, sticky offset, borders, shadow — CSS in
- * `globals.css`) and the validated structural choices the `Header` component maps onto literal
- * class names. No string from the document is ever interpolated into CSS or a class.
+ * `data-hd` token list plus validated `--hd-*` custom properties for the theme wrapper (heights,
+ * sticky offset, borders, shadow, colours — CSS in `globals.css`) and the validated structural
+ * choices the `Header` component maps onto literal class names. No string from the document is
+ * ever interpolated into CSS or a class.
  */
+
+import {
+  autoForeground,
+  parseHex,
+  passes,
+  solidInterval,
+  worstRatioForHex,
+} from "./contrast-engine";
+import { type PresentationPalette, resolveRoleHex } from "./palette";
+import { type ColorRef, normalizeColorRef } from "./section-design";
+import { mixHex } from "./tokens";
 
 export const HEADER_LAYOUTS = [
   "standard",
@@ -48,6 +65,12 @@ export interface HeaderDesign {
   mobileLayout?: HeaderMobileLayout;
   height?: HeaderHeight;
   logo?: { size: HeaderLogoSize };
+  /** V7b — the identity row's background (and the header's own). */
+  surface?: { background: ColorRef };
+  /** V7b — the identity row's text colour; absent over a designed background ⇒ the proven auto colour. */
+  text?: ColorRef;
+  /** V7b — the identity row's icon colour; absent ⇒ the text colour. */
+  icon?: ColorRef;
   sticky?: HeaderSticky;
   border?: { width: HeaderBorderWidth };
   shadow?: HeaderShadow;
@@ -83,6 +106,15 @@ export function normalizeHeaderDesign(raw: unknown): HeaderDesign | undefined {
     const size = pick(raw.logo.size, HEADER_LOGO_SIZES);
     if (size) out.logo = { size };
   }
+
+  if (isObject(raw.surface)) {
+    const background = normalizeColorRef(raw.surface.background);
+    if (background) out.surface = { background };
+  }
+  const text = normalizeColorRef(raw.text);
+  if (text) out.text = text;
+  const icon = normalizeColorRef(raw.icon);
+  if (icon) out.icon = icon;
 
   const sticky = pick(raw.sticky, HEADER_STICKY);
   if (sticky) out.sticky = sticky;
@@ -120,28 +152,135 @@ export function headerDesktopLayout(
   return layout === "centered" || layout === "two-row" ? layout : "standard";
 }
 
+/** What a colour reference needs to become a hex: the brand / accent and the palette. */
+export interface HeaderColourContext {
+  primaryColor: string;
+  accentColor: string | null;
+  palette?: PresentationPalette;
+}
+
+/** The default header surface a header without a designed background sits on. */
+export const HEADER_DEFAULT_BACKDROP = "#ffffff";
+
+function colourHex(ref: ColorRef, ctx: HeaderColourContext): string {
+  return "role" in ref ? resolveRoleHex(ref.role, ctx) : ref.hex;
+}
+
+/** What is really drawn behind the header's text: the designed background, else the store surface(s). */
+function backdropHexes(
+  design: HeaderDesign,
+  ctx: HeaderColourContext,
+): string[] {
+  if (design.surface) return [colourHex(design.surface.background, ctx)];
+  const list = [HEADER_DEFAULT_BACKDROP];
+  const surface = ctx.palette?.surface;
+  if (surface && parseHex(surface)) list.push(surface);
+  return list;
+}
+
+export interface HeaderContrastIssue {
+  field: "text" | "icon";
+  code: "contrast_insufficient";
+  ratio: number;
+}
+
+/**
+ * Twin of PHP `HeaderDesignContrast::issues` — the verdict the publish gate returns as a 422,
+ * shown live in the editor. Only an **explicit** `text` / `icon` is judged (≥ 4.5:1 against every
+ * possible backdrop); the automatic colour over a designed background passes by construction.
+ */
+export function headerContrastIssues(
+  design: HeaderDesign | undefined,
+  ctx: HeaderColourContext,
+): HeaderContrastIssue[] {
+  if (!design) return [];
+  const backdrops = backdropHexes(design, ctx);
+  const issues: HeaderContrastIssue[] = [];
+  for (const field of ["text", "icon"] as const) {
+    const ref = design[field];
+    if (!ref) continue;
+    const hex = colourHex(ref, ctx);
+    let worst: number | null = null;
+    for (const backdrop of backdrops) {
+      const rgb = parseHex(backdrop);
+      if (!rgb) continue;
+      const ratio = worstRatioForHex(hex, solidInterval(rgb));
+      worst = worst === null ? ratio : Math.min(worst, ratio);
+    }
+    if (worst !== null && !passes(worst)) {
+      issues.push({
+        field,
+        code: "contrast_insufficient",
+        ratio: Math.round(worst * 10000) / 10000,
+      });
+    }
+  }
+  return issues;
+}
+
 export interface ResolvedHeaderDesign {
   /** `data-hd` token list for the theme wrapper; undefined ⇒ no attribute at all. */
   attrs?: { "data-hd": string };
+  /** Validated `--hd-*` custom properties for the same element; undefined ⇒ none. */
+  style?: Record<string, string>;
   layout: "standard" | "centered" | "two-row";
   mobileLayout: HeaderMobileLayout;
   logoSize: HeaderLogoSize | undefined;
   sticky: HeaderSticky;
   /** True when any structural choice is set — the identity row then sizes with `min-h`. */
   designed: boolean;
+  /** True when the identity row's text colour is chosen (explicitly, or automatically over a designed background). */
+  coloured: boolean;
 }
 
 /**
  * Token legend (the CSS lives in `globals.css`, block "CUST-HV V7a — header design"):
  * `hh-c` / `hh-t` compact / tall height · `hl-2` two-row (taller sticky offset) ·
  * `hs-o` sticky off (offset collapses to the announcement bar) · `hb-n` / `hb-m` no / medium
- * border · `hx-s` / `hx-m` soft / medium shadow. Defaults (`standard`, `always`, `hairline`,
- * `none`) emit no token — they are the rendering that already exists.
+ * border · `hx-s` / `hx-m` soft / medium shadow · `hbg` designed background · `htx` chosen text
+ * colour · `hic` explicit icon colour. Defaults (`standard`, `always`, `hairline`, `none`) emit no
+ * token — they are the rendering that already exists.
  */
 export function resolveHeaderDesign(
   design: HeaderDesign | undefined,
+  ctx?: HeaderColourContext,
 ): ResolvedHeaderDesign {
   const tokens: string[] = [];
+  const style: Record<string, string> = {};
+  let coloured = false;
+
+  if (design && ctx && (design.surface || design.text || design.icon)) {
+    const bg = design.surface
+      ? colourHex(design.surface.background, ctx)
+      : null;
+    const bgRgb = bg ? parseHex(bg) : null;
+    const explicitText = design.text ? colourHex(design.text, ctx) : null;
+    const fg =
+      explicitText ?? (bgRgb ? autoForeground(solidInterval(bgRgb)) : null);
+    if (bg && bgRgb) {
+      tokens.push("hbg");
+      style["--hd-bg"] = bg;
+    }
+    if (fg && parseHex(fg)) {
+      tokens.push("htx");
+      coloured = true;
+      style["--hd-fg"] = fg;
+      // Secondary text (nav links, the region line): a step toward the background, only when that
+      // still clears 4.5:1 against it; otherwise the full foreground.
+      let muted = fg;
+      if (bgRgb) {
+        const mixed = mixHex(fg, bg as string, 0.22);
+        if (passes(worstRatioForHex(mixed, solidInterval(bgRgb))))
+          muted = mixed;
+      }
+      style["--hd-muted"] = muted;
+    }
+    if (design.icon) {
+      tokens.push("hic");
+      style["--hd-icon"] = colourHex(design.icon, ctx);
+    }
+  }
+
   if (design?.height === "compact") tokens.push("hh-c");
   if (design?.height === "tall") tokens.push("hh-t");
   if (design?.layout === "two-row") tokens.push("hl-2");
@@ -153,10 +292,12 @@ export function resolveHeaderDesign(
 
   return {
     ...(tokens.length > 0 ? { attrs: { "data-hd": tokens.join(" ") } } : {}),
+    ...(Object.keys(style).length > 0 ? { style } : {}),
     layout: headerDesktopLayout(design),
     mobileLayout: design?.mobileLayout ?? "logo-centre",
     logoSize: design?.logo?.size,
     sticky: design?.sticky ?? "always",
     designed: design !== undefined,
+    coloured,
   };
 }
