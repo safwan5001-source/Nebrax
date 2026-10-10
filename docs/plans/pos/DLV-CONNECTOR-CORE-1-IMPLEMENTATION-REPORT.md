@@ -1,6 +1,6 @@
 # DLV-CONNECTOR-CORE-1 — Operational connector ingestion
 
-**Status:** IMPLEMENTED — PR pending review. Not merged. No deploy.
+**Status:** IMPLEMENTED — review fixes pushed on the same PR. Not merged. No deploy. PRE_MERGE_REVIEW is not asserted by this file; it is PASS only after both CI jobs on the commit SHA are green and the five review threads are resolved.
 **Base:** `origin/main` at the time of the branch (`d787dfb56739464a5ff36f97fe883fc2838a18bd` unless the PR records a newer base).
 **Scope:** Operational ingestion and security only. No imported financial posting.
 
@@ -224,6 +224,69 @@ Still open, and not closed by this PR:
 | The Chefz | not enabled |
 
 No Connected / Live / Synced status is written.
+
+## Review fixes (same PR, after `3b40442`)
+
+Codex left five open findings on `3b40442` (2 P1, 3 P2). All five are fixed in this commit. No new architecture, vault, provider adapter, or financial path was added.
+
+| Finding | Fix |
+|---|---|
+| P1 secret rotation race | After `lockForUpdate`, the signature is verified again against `$locked->secret`. A secret that rotated after the unlocked read is rejected as `invalid_signature` and does not write an attempt or a Hub order. The attempt's `secret_version` is the locked row's version. |
+| P1 application state | After `TenantContext` is set, and again inside the locked transaction before any write, `TenantApplicationService::statusFor('sales.pos')` must be `enabled`. `disabled` and `suspended` return `403 application_inactive` and do not consume `event_id`. This is the same capability the management routes already guard with `EnsureApplicationActive`. |
+| P2 large JSON integers | Integer tokens outside the int64 range are preserved as literals (`DeliveryConnectorJsonInteger`) before decoding. They are not coerced to float. The authoritative checksum emits the literal unquoted, so it does not collapse with a JSON string of the same digits. |
+| P2 object versus list | Decoding keeps JSON objects as `stdClass` and JSON arrays as lists. The canonical encoder writes `{}` and `[]` differently, including nested values. Object key order is still sorted, so reordering keys is not a conflict. |
+| P2 concurrent rotations | `rotateSecret` reloads the account with `lockForUpdate` inside a transaction before incrementing `secret_version`. Two callers that both observed version 1 commit versions 2 and 3. Only the latest secret verifies. |
+
+The Hub row still stores a plain PHP array, so an empty object becomes an empty list in the Hub hash. The connector authoritative checksum is what rejects the second shape before a second intake, and the Hub row is not mutated. Scientific-notation JSON numbers remain IEEE floats; the preserved case is integer tokens outside int64.
+
+### Tests added
+
+`DeliveryConnectorCoreTest` now covers:
+
+1. Rotation committed between the unlocked read and the row lock: old secret is `invalid_signature`, no attempt, no Hub row, no financial rows; the new secret ingests once and the attempt records version 2.
+2. `sales.pos` `disabled` and `suspended`: no Hub row and no attempt; re-enable does not treat the rejected event as burned; a later suspend blocks a new event without forking the existing order.
+3. `{}` versus `[]`, nested `{"items":{}}` versus `{"items":[]}`, integers `9223372036854775808` versus `9223372036854775809` and versus the same digits in a string, and the negative pair past int64. Same literal replays onto the same Hub order. Key reorder is not a conflict. One Hub row per provider order id. Financial and commerce counts unchanged.
+4. Two stale version-1 models rotate to versions 2 and 3. Secrets differ. Only version 3 verifies. The attempt records version 3. On PostgreSQL the test also asserts `FOR UPDATE` in the query log. SQLite has no row lock; the same-connection reload is what that driver can prove.
+
+### Local execution
+
+SQLite, `php artisan test --filter=DeliveryConnectorCoreTest`:
+
+- 15 passed, 261 assertions
+
+SQLite, related suites (`DeliveryHubProjectionTest`, `BranchIsolationGuardTest`, `WebhookSignatureTest`, `DeliveryPlatformApiTest`, `DeliveryFinancialRoleGateTest`, `DeliveryPlatformProfileDomainTest`):
+
+- 70 passed, 752 assertions
+
+PostgreSQL was not started in this sandbox. `useradd` succeeded, but `chown`, `su`, `runuser`, and `setuid` are rejected, so `pg_ctl` cannot drop root. The CI `pgsql` job on this commit is the PostgreSQL proof. Do not treat it as passed until that job is green on the exact head.
+
+### Implementer self-review (fix pass)
+
+- Retired credential cannot pass the locked re-check, including when the unlocked read still holds the old secret.
+- Application write gate runs only after the tenant is the account tenant, and again after the row lock, before attempt or Hub writes.
+- Canonical checksum distinguishes object/list and oversized integers without accepting a numeric string as the same integer.
+- Rotation versions come from the locked row, not the caller's stale attribute.
+- No invoice, payment, journal, stock, commerce, or provider-enablement call was added.
+
+### Reviewer review (fix pass)
+
+- A valid signature on a disabled connector still returns `connector_disabled` before the application check, so the existing disable contract is unchanged.
+- Rejection for an inactive application does not insert an attempt, so the event id can succeed after re-enable.
+- The global store-uniqueness oracle and the encrypted secret cast are unchanged.
+- SQLite cannot prove a cross-connection lock wait. The stale-version result is asserted on both drivers; `FOR UPDATE` is asserted when the driver is PostgreSQL.
+
+### AWJ Guardian review (fix pass)
+
+| Risk | Result |
+|---|---|
+| Accepting a rotated-out secret | Rejected after the row lock. No attempt row. |
+| Ingestion while `sales.pos` is suspended or disabled | Rejected. No Hub write. |
+| Checksum collapse of distinct integers or `{}`/`[]` | Rejected as `payload_conflict`. One Hub row. |
+| Two rotations sharing one version | Locked reload assigns 2 then 3. Only the committed secret verifies. |
+| Financial or inventory side effect | Counts unchanged in the new tests. |
+| Provider enablement or DG-3 evidence | Not introduced. |
+
+Unresolved P1/P2 in this fix pass: none in the diff. They stay open on GitHub until the threads are resolved after CI on this SHA is green.
 
 ## Next candidate
 

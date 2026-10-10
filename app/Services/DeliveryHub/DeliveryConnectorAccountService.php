@@ -65,14 +65,22 @@ class DeliveryConnectorAccountService
     public function rotateSecret(DeliveryConnectorAccount $account): array
     {
         $this->assertTenant();
-        [$secret, $prefix] = $this->generateSecret();
-        $account->forceFill([
-            'secret' => $secret,
-            'secret_prefix' => $prefix,
-            'secret_version' => ((int) $account->secret_version) + 1,
-        ])->save();
 
-        return [$account, $secret];
+        return DB::transaction(function () use ($account) {
+            $locked = DeliveryConnectorAccount::query()->whereKey($account->id)->lockForUpdate()->first();
+            if ($locked === null || (string) $locked->tenant_id !== (string) app(TenantContext::class)->id()) {
+                throw new DeliveryConnectorException('connector_unavailable', 'الربط غير متاح.', 404);
+            }
+
+            [$secret, $prefix] = $this->generateSecret();
+            $locked->forceFill([
+                'secret' => $secret,
+                'secret_prefix' => $prefix,
+                'secret_version' => ((int) $locked->secret_version) + 1,
+            ])->save();
+
+            return [$locked, $secret];
+        });
     }
 
     public function disable(DeliveryConnectorAccount $account): DeliveryConnectorAccount

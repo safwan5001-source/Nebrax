@@ -14,8 +14,11 @@ use App\Models\JournalEntry;
 use App\Models\Payment;
 use App\Models\StockMovement;
 use App\Models\Tenant;
+use App\Models\TenantApplicationState;
+use App\Services\DeliveryHub\DeliveryConnectorAccountService;
 use App\Support\Rbac;
 use App\Support\WebhookSignature;
+use App\Tenancy\TenantContext;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Tests\TestCase;
@@ -303,6 +306,178 @@ class DeliveryConnectorCoreTest extends TestCase
         $this->assertSame(0, Invoice::withoutGlobalScopes()->count());
     }
 
+    /** @test */
+    public function a_secret_rotated_during_verification_is_rejected_after_the_row_lock(): void
+    {
+        [$auth, $branch, $profile] = $this->tenantWithPlatform('relock');
+        $account = $this->connector($auth['token'], $profile, 'store-relock', $branch);
+        $before = $this->financialCounts();
+        $issued = null;
+        $armed = true;
+        DB::listen(function ($query) use (&$armed, &$issued, $auth, $account): void {
+            if (! $armed || ! str_contains($query->sql, 'delivery_connector_accounts')) {
+                return;
+            }
+            $sql = strtolower(ltrim($query->sql));
+            if (str_contains($sql, 'for update') || str_starts_with($sql, 'update') || str_starts_with($sql, 'insert')) {
+                return;
+            }
+            $armed = false;
+            app(TenantContext::class)->set($auth['tenant_id']);
+            $fresh = DeliveryConnectorAccount::query()->findOrFail($account['data']['id']);
+            [, $issued] = app(DeliveryConnectorAccountService::class)->rotateSecret($fresh);
+        });
+
+        $event = $this->event('P-relock', ['sku' => 'locked']);
+        $this->postEvent($account['data']['id'], $event, $account['secret'])
+            ->assertUnauthorized()
+            ->assertJsonPath('error_code', 'invalid_signature');
+        $this->assertIsString($issued);
+        $this->assertNotSame($account['secret'], $issued);
+        $this->assertSame(0, DeliveryHubOrder::withoutGlobalScopes()->count());
+        $this->assertSame(0, DeliveryConnectorAttempt::withoutGlobalScopes()->count());
+        $this->assertSame($before, $this->financialCounts());
+        $this->assertSame(2, (int) DeliveryConnectorAccount::withoutGlobalScopes()->findOrFail($account['data']['id'])->secret_version);
+
+        $created = $this->postEvent($account['data']['id'], $event, $issued)->assertCreated();
+        $this->assertFalse($created['data']['idempotent_replay']);
+        $this->assertSame(2, (int) DeliveryConnectorAttempt::query()->firstOrFail()->secret_version);
+        $this->assertSame(1, DeliveryHubOrder::withoutGlobalScopes()->count());
+        $this->assertSame($before, $this->financialCounts());
+    }
+
+    /** @test */
+    public function disabled_or_suspended_sales_pos_rejects_connector_writes(): void
+    {
+        [$auth, $branch, $profile] = $this->tenantWithPlatform('appstate');
+        $account = $this->connector($auth['token'], $profile, 'store-app', $branch);
+        $before = $this->financialCounts();
+        $event = $this->event('P-app', ['sku' => 'a']);
+
+        foreach (['disabled', 'suspended'] as $status) {
+            $this->setApplicationStatus($auth['tenant_id'], $status);
+            $this->postEvent($account['data']['id'], $event, $account['secret'])
+                ->assertForbidden()
+                ->assertJsonPath('error_code', 'application_inactive');
+            $this->assertSame(0, DeliveryHubOrder::withoutGlobalScopes()->count());
+            $this->assertSame(0, DeliveryConnectorAttempt::withoutGlobalScopes()->count());
+        }
+
+        $this->setApplicationStatus($auth['tenant_id'], 'enabled');
+        $created = $this->postEvent($account['data']['id'], $event, $account['secret'])->assertCreated();
+        $this->assertFalse($created['data']['idempotent_replay']);
+
+        $this->setApplicationStatus($auth['tenant_id'], 'suspended');
+        $later = $this->event('P-app', ['sku' => 'a']);
+        $this->postEvent($account['data']['id'], $later, $account['secret'])
+            ->assertForbidden()
+            ->assertJsonPath('error_code', 'application_inactive');
+        $this->assertSame(1, DeliveryHubOrder::withoutGlobalScopes()->count());
+        $this->assertSame(1, DeliveryConnectorAttempt::withoutGlobalScopes()->count());
+        $this->assertSame($before, $this->financialCounts());
+
+        $this->setApplicationStatus($auth['tenant_id'], 'enabled');
+        $this->postEvent($account['data']['id'], $later, $account['secret'])->assertCreated();
+        $this->assertSame(1, DeliveryHubOrder::withoutGlobalScopes()->where('provider_order_id', 'P-app')->count());
+    }
+
+    /** @test */
+    public function oversized_integers_and_object_list_shapes_do_not_collapse(): void
+    {
+        [$auth, $branch, $profile] = $this->tenantWithPlatform('json');
+        $account = $this->connector($auth['token'], $profile, 'store-json', $branch);
+        $before = $this->financialCounts();
+        $id = $account['data']['id'];
+        $secret = $account['secret'];
+
+        $object = $this->event('P-shape');
+        $object['intake_payload'] = new \stdClass();
+        $created = $this->postEvent($id, $object, $secret)->assertCreated();
+
+        $list = $object;
+        $list['event_id'] = (string) Str::uuid();
+        $list['intake_payload'] = [];
+        $this->postEvent($id, $list, $secret)
+            ->assertStatus(409)
+            ->assertJsonPath('error_code', 'payload_conflict');
+
+        $this->postRaw($id, $this->rawEnvelope('P-nested', '{"items":{}}'), $secret)->assertCreated();
+        $this->postRaw($id, $this->rawEnvelope('P-nested', '{"items":[]}'), $secret)
+            ->assertStatus(409)
+            ->assertJsonPath('error_code', 'payload_conflict');
+
+        $reordered = $this->event('P-keys');
+        $reordered['intake_payload'] = ['b' => 1, 'a' => 2];
+        $firstKeys = $this->postEvent($id, $reordered, $secret)->assertCreated();
+        $reordered['event_id'] = (string) Str::uuid();
+        $reordered['intake_payload'] = ['a' => 2, 'b' => 1];
+        $secondKeys = $this->postEvent($id, $reordered, $secret)->assertCreated();
+        $this->assertSame($firstKeys['data']['delivery_hub_order_id'], $secondKeys['data']['delivery_hub_order_id']);
+
+        $bigCreated = $this->postRaw($id, $this->rawEnvelope('P-big', '{"n":9223372036854775808}'), $secret)->assertCreated();
+        $this->postRaw($id, $this->rawEnvelope('P-big', '{"n":9223372036854775809}'), $secret)
+            ->assertStatus(409)
+            ->assertJsonPath('error_code', 'payload_conflict');
+        $this->postRaw($id, $this->rawEnvelope('P-big', '{"n":"9223372036854775808"}'), $secret)
+            ->assertStatus(409)
+            ->assertJsonPath('error_code', 'payload_conflict');
+        $replayedBig = $this->postRaw($id, $this->rawEnvelope('P-big', '{"n":9223372036854775808}'), $secret)->assertCreated();
+        $this->assertSame($bigCreated['data']['delivery_hub_order_id'], $replayedBig['data']['delivery_hub_order_id']);
+
+        $this->postRaw($id, $this->rawEnvelope('P-neg', '{"n":-9223372036854775809}'), $secret)->assertCreated();
+        $this->postRaw($id, $this->rawEnvelope('P-neg', '{"n":-9223372036854775810}'), $secret)
+            ->assertStatus(409)
+            ->assertJsonPath('error_code', 'payload_conflict');
+
+        $this->assertSame(1, DeliveryHubOrder::withoutGlobalScopes()->where('provider_order_id', 'P-shape')->count());
+        $this->assertSame(1, DeliveryHubOrder::withoutGlobalScopes()->where('provider_order_id', 'P-big')->count());
+        $this->assertSame(1, DeliveryHubOrder::withoutGlobalScopes()->where('provider_order_id', 'P-nested')->count());
+        $this->assertSame(1, DeliveryHubOrder::withoutGlobalScopes()->where('provider_order_id', 'P-neg')->count());
+        $this->assertSame($created['data']['delivery_hub_order_id'], DeliveryHubOrder::query()->where('provider_order_id', 'P-shape')->firstOrFail()->id);
+        $this->assertSame($before, $this->financialCounts());
+        $this->assertSame(0, CommerceOrder::withoutGlobalScopes()->count());
+    }
+
+    /** @test */
+    public function stale_secret_rotations_commit_distinct_versions(): void
+    {
+        [$auth, $branch, $profile] = $this->tenantWithPlatform('versions');
+        $account = $this->connector($auth['token'], $profile, 'store-ver', $branch);
+        $before = $this->financialCounts();
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $first = DeliveryConnectorAccount::query()->findOrFail($account['data']['id']);
+        $second = DeliveryConnectorAccount::query()->findOrFail($account['data']['id']);
+        $this->assertSame(1, (int) $first->secret_version);
+        $this->assertSame(1, (int) $second->secret_version);
+
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+        $service = app(DeliveryConnectorAccountService::class);
+        [$rotatedA, $secretA] = $service->rotateSecret($first);
+        [$rotatedB, $secretB] = $service->rotateSecret($second);
+        if (DB::connection()->getDriverName() === 'pgsql') {
+            $sql = strtolower(implode("\n", array_column(DB::getQueryLog(), 'query')));
+            $this->assertStringContainsString('for update', $sql);
+        }
+
+        $this->assertSame(2, (int) $rotatedA->secret_version);
+        $this->assertSame(3, (int) $rotatedB->secret_version);
+        $this->assertNotSame($secretA, $secretB);
+        $this->assertNotSame($account['secret'], $secretA);
+        $stored = DeliveryConnectorAccount::query()->findOrFail($account['data']['id']);
+        $this->assertSame(3, (int) $stored->secret_version);
+        $this->assertSame($secretB, $stored->secret);
+
+        $event = $this->event('P-ver', ['sku' => 'a']);
+        $this->postEvent($account['data']['id'], $event, $account['secret'])->assertUnauthorized();
+        $this->postEvent($account['data']['id'], $event, $secretA)->assertUnauthorized();
+        $created = $this->postEvent($account['data']['id'], $event, $secretB)->assertCreated();
+        $this->assertSame(3, (int) DeliveryConnectorAttempt::query()->firstOrFail()->secret_version);
+        $this->assertSame(1, DeliveryHubOrder::withoutGlobalScopes()->count());
+        $this->assertSame($created['data']['delivery_hub_order_id'], DeliveryHubOrder::query()->where('provider_order_id', 'P-ver')->firstOrFail()->id);
+        $this->assertSame($before, $this->financialCounts());
+    }
+
     /** @return array{0: array{token: string, tenant_id: string}, 1: string, 2: string} */
     private function tenantWithPlatform(string $slug): array
     {
@@ -369,6 +544,23 @@ class DeliveryConnectorCoreTest extends TestCase
         }
 
         return $this->call('POST', '/api/delivery-connectors/'.$accountId.'/events', [], [], [], $server, $body);
+    }
+
+    private function postRaw(string $accountId, string $body, string $secret): \Illuminate\Testing\TestResponse
+    {
+        return $this->call('POST', '/api/delivery-connectors/'.$accountId.'/events', [], [], [], $this->headers($body, $secret), $body);
+    }
+
+    private function rawEnvelope(string $providerOrderId, string $payloadJson): string
+    {
+        return '{"event_id":"' . Str::uuid() . '","provider_order_id":"' . $providerOrderId . '","external_order_reference":"REF","provider_status":"provider-said-ready","intake_payload":' . $payloadJson . '}';
+    }
+
+    private function setApplicationStatus(string $tenantId, string $status): void
+    {
+        app(TenantContext::class)->set($tenantId);
+        TenantApplicationState::query()->where('application_key', 'sales.pos')->update(['status' => $status]);
+        app(TenantContext::class)->forget();
     }
 
     /** @return array<string, string> */

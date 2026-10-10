@@ -9,6 +9,7 @@ use App\Models\DeliveryHubOrder;
 use App\Models\DeliveryPlatformProfile;
 use App\Models\Tenant;
 use App\Models\User;
+use App\Services\TenantApplicationService;
 use App\Support\WebhookSignature;
 use App\Tenancy\TenantContext;
 use App\Tenancy\TenantScope;
@@ -30,6 +31,8 @@ class DeliveryConnectorIngestionService
 
     public const MAX_RAW_BYTES = 65536;
 
+    public const APPLICATION_KEY = 'sales.pos';
+
     /** @var list<string> */
     public const HUB_ACTIONS = ['accept', 'preparing', 'ready', 'handoff', 'reject', 'cancel'];
 
@@ -50,6 +53,7 @@ class DeliveryConnectorIngestionService
     public function __construct(
         private readonly DeliveryHubOrderService $hub,
         private readonly TenantContext $tenant,
+        private readonly TenantApplicationService $applications,
     ) {}
 
     /**
@@ -94,6 +98,10 @@ class DeliveryConnectorIngestionService
             return $this->error(403, 'connector_disabled', 'الربط معطّل.');
         }
 
+        if (($inactive = $this->applicationFailure()) !== null) {
+            return $inactive;
+        }
+
         if (strlen($rawBody) > self::MAX_RAW_BYTES) {
             return $this->error(422, 'invalid_payload', 'الحمولة غير صالحة.');
         }
@@ -105,10 +113,18 @@ class DeliveryConnectorIngestionService
 
         $timestampExpired = ! $this->timestampFresh($parsed['timestamp']);
 
-        return DB::transaction(function () use ($account, $rawBody, $envelope, $timestampExpired) {
+        return DB::transaction(function () use ($account, $rawBody, $envelope, $timestampExpired, $parsed) {
             $locked = DeliveryConnectorAccount::query()->whereKey($account->id)->lockForUpdate()->first();
-            if ($locked === null || ! $locked->isConfigured()) {
+            // السر الذي فُحص قبل القفل قد يكون تقاعد أثناء التدوير. لا يُقبل
+            // التوقيع إلا على السر المقفول المُودَع.
+            if ($locked === null || ! WebhookSignature::verify($locked->secret, $parsed['timestamp'], $rawBody, $parsed['signature'])) {
+                return $this->error(401, 'invalid_signature', 'تعذّر التحقق من الربط.');
+            }
+            if (! $locked->isConfigured()) {
                 return $this->error(403, 'connector_disabled', 'الربط معطّل.');
+            }
+            if (($inactive = $this->applicationFailure()) !== null) {
+                return $inactive;
             }
 
             $checksum = hash('sha256', $rawBody);
@@ -449,7 +465,7 @@ class DeliveryConnectorIngestionService
             'external_order_reference' => $envelope['external_order_reference'],
             'branch_id' => $account->branch_id,
             'provider_status' => $envelope['provider_status'],
-            'intake_payload' => $envelope['intake_payload'],
+            'intake_payload' => $this->plainValue($envelope['intake_payload']),
         ];
     }
 
@@ -462,20 +478,77 @@ class DeliveryConnectorIngestionService
             'provider_order_id' => $envelope['provider_order_id'],
         ]);
 
-        return hash('sha256', json_encode($canonical, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR));
+        return hash('sha256', $this->encodeCanonical($canonical));
+    }
+
+    private function applicationFailure(): ?array
+    {
+        if ($this->applications->statusFor(self::APPLICATION_KEY) === 'enabled') {
+            return null;
+        }
+
+        return $this->error(403, 'application_inactive', 'هذه القدرة غير متاحة للكتابة.');
     }
 
     private function canonicalize(mixed $value): mixed
     {
-        if (! is_array($value)) {
-            return $value;
+        if ($value instanceof \stdClass) {
+            $props = get_object_vars($value);
+            ksort($props);
+            $object = new \stdClass();
+            foreach ($props as $key => $item) {
+                $object->{$key} = $this->canonicalize($item);
+            }
+
+            return $object;
         }
-        if (array_is_list($value)) {
+        if (is_array($value)) {
             return array_map($this->canonicalize(...), $value);
         }
-        ksort($value);
-        foreach ($value as $key => $item) {
-            $value[$key] = $this->canonicalize($item);
+
+        return $value;
+    }
+
+    private function encodeCanonical(mixed $value): string
+    {
+        if ($value instanceof DeliveryConnectorJsonInteger) {
+            return $value->literal;
+        }
+        if ($value instanceof \stdClass) {
+            $parts = [];
+            foreach (get_object_vars($value) as $key => $item) {
+                $parts[] = json_encode((string) $key, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR)
+                    . ':'
+                    . $this->encodeCanonical($item);
+            }
+
+            return '{' . implode(',', $parts) . '}';
+        }
+        if (is_array($value)) {
+            return '[' . implode(',', array_map($this->encodeCanonical(...), $value)) . ']';
+        }
+        if (is_float($value) && ! is_finite($value)) {
+            throw new \JsonException('non-finite number');
+        }
+
+        return json_encode($value, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
+    }
+
+    private function plainValue(mixed $value): mixed
+    {
+        if ($value instanceof DeliveryConnectorJsonInteger) {
+            return $value->literal;
+        }
+        if ($value instanceof \stdClass) {
+            $object = [];
+            foreach (get_object_vars($value) as $key => $item) {
+                $object[$key] = $this->plainValue($item);
+            }
+
+            return $object;
+        }
+        if (is_array($value)) {
+            return array_map($this->plainValue(...), $value);
         }
 
         return $value;
@@ -502,28 +575,30 @@ class DeliveryConnectorIngestionService
     private function decodeEnvelope(string $rawBody): ?array
     {
         try {
-            $decoded = json_decode($rawBody, true, 32, JSON_THROW_ON_ERROR);
+            [$prepared, $marker] = $this->tagOversizedIntegers($rawBody);
+            $decoded = json_decode($prepared, false, 32, JSON_THROW_ON_ERROR);
+            $decoded = $this->restoreTaggedIntegers($decoded, $marker);
         } catch (\JsonException) {
             return null;
         }
-        if (! is_array($decoded) || array_is_list($decoded)) {
+        if (! $decoded instanceof \stdClass) {
             return null;
         }
-        foreach (array_keys($decoded) as $key) {
+        foreach (array_keys(get_object_vars($decoded)) as $key) {
             if (! in_array($key, self::ENVELOPE_KEYS, true)) {
                 return null;
             }
         }
-        if (! isset($decoded['event_id']) || ! is_string($decoded['event_id']) || ! Str::isUuid($decoded['event_id'])) {
+        if (! isset($decoded->event_id) || ! is_string($decoded->event_id) || ! Str::isUuid($decoded->event_id)) {
             return null;
         }
 
-        $providerOrderId = $this->optionalString($decoded['provider_order_id'] ?? null, 191);
-        $reference = $this->optionalString($decoded['external_order_reference'] ?? null, 191);
-        $status = $this->optionalString($decoded['provider_status'] ?? null, 255);
-        $occurredAt = $this->optionalString($decoded['occurred_at'] ?? null, 64);
-        $storeId = $this->optionalString($decoded['external_store_id'] ?? null, 191);
-        $tenantId = $this->optionalString($decoded['tenant_id'] ?? null, 64);
+        $providerOrderId = $this->optionalString($decoded->provider_order_id ?? null, 191);
+        $reference = $this->optionalString($decoded->external_order_reference ?? null, 191);
+        $status = $this->optionalString($decoded->provider_status ?? null, 255);
+        $occurredAt = $this->optionalString($decoded->occurred_at ?? null, 64);
+        $storeId = $this->optionalString($decoded->external_store_id ?? null, 191);
+        $tenantId = $this->optionalString($decoded->tenant_id ?? null, 64);
         if ($providerOrderId === false || $reference === false || $status === false || $occurredAt === false || $storeId === false || $tenantId === false) {
             return null;
         }
@@ -531,23 +606,32 @@ class DeliveryConnectorIngestionService
             $reference = preg_replace('/\s+/u', ' ', $reference);
         }
 
-        $action = $decoded['hub_action'] ?? null;
+        $action = $decoded->hub_action ?? null;
         if ($action !== null && (! is_string($action) || ! in_array($action, self::HUB_ACTIONS, true))) {
             return null;
         }
 
-        $payload = $decoded['intake_payload'] ?? null;
-        if ($payload !== null && (! is_array($payload) || count($payload) > 50)) {
+        $payload = property_exists($decoded, 'intake_payload') ? $decoded->intake_payload : null;
+        if ($payload !== null && ! $payload instanceof \stdClass && ! is_array($payload)) {
+            return null;
+        }
+        if ($payload instanceof \stdClass && count(get_object_vars($payload)) > 50) {
+            return null;
+        }
+        if (is_array($payload) && count($payload) > 50) {
+            return null;
+        }
+        if ($this->containsNonFinite($payload)) {
             return null;
         }
 
-        $assertsBranch = array_key_exists('branch_id', $decoded);
+        $assertsBranch = property_exists($decoded, 'branch_id');
         $branchId = null;
         if ($assertsBranch) {
-            if ($decoded['branch_id'] !== null && (! is_string($decoded['branch_id']) || ! Str::isUuid($decoded['branch_id']))) {
+            if ($decoded->branch_id !== null && (! is_string($decoded->branch_id) || ! Str::isUuid($decoded->branch_id))) {
                 return null;
             }
-            $branchId = $decoded['branch_id'];
+            $branchId = $decoded->branch_id;
         }
         if ($tenantId !== null && ! Str::isUuid($tenantId)) {
             return null;
@@ -555,7 +639,7 @@ class DeliveryConnectorIngestionService
 
         return [
             'raw' => $rawBody,
-            'event_id' => $decoded['event_id'],
+            'event_id' => $decoded->event_id,
             'provider_order_id' => $providerOrderId,
             'external_order_reference' => $reference,
             'provider_status' => $status,
@@ -566,6 +650,158 @@ class DeliveryConnectorIngestionService
             'asserts_branch' => $assertsBranch,
             'branch_id' => is_string($branchId) ? $branchId : null,
         ];
+    }
+
+    /** @return array{0: string, 1: string} */
+    private function tagOversizedIntegers(string $json): array
+    {
+        $marker = $this->freshMarker($json);
+        $length = strlen($json);
+        $out = '';
+        $inString = false;
+        $escaped = false;
+
+        for ($i = 0; $i < $length; $i++) {
+            $char = $json[$i];
+            if ($inString) {
+                $out .= $char;
+                if ($escaped) {
+                    $escaped = false;
+
+                    continue;
+                }
+                if ($char === '\\') {
+                    $escaped = true;
+
+                    continue;
+                }
+                if ($char === '"') {
+                    $inString = false;
+                }
+
+                continue;
+            }
+
+            if ($char === '"') {
+                $inString = true;
+                $out .= $char;
+
+                continue;
+            }
+
+            $startsNumber = ctype_digit($char) || ($char === '-' && $i + 1 < $length && ctype_digit($json[$i + 1]));
+            if (! $startsNumber) {
+                $out .= $char;
+
+                continue;
+            }
+
+            $start = $i;
+            if ($char === '-') {
+                $i++;
+            }
+            while ($i < $length && ctype_digit($json[$i])) {
+                $i++;
+            }
+            $integerLiteral = substr($json, $start, $i - $start);
+            $cursor = $i;
+            $floating = false;
+            if ($cursor < $length && $json[$cursor] === '.') {
+                $floating = true;
+                $cursor++;
+                while ($cursor < $length && ctype_digit($json[$cursor])) {
+                    $cursor++;
+                }
+            }
+            if ($cursor < $length && ($json[$cursor] === 'e' || $json[$cursor] === 'E')) {
+                $floating = true;
+                $cursor++;
+                if ($cursor < $length && ($json[$cursor] === '+' || $json[$cursor] === '-')) {
+                    $cursor++;
+                }
+                while ($cursor < $length && ctype_digit($json[$cursor])) {
+                    $cursor++;
+                }
+            }
+            $token = substr($json, $start, $cursor - $start);
+            if (! $floating && $this->integerExceedsPlatform($integerLiteral)) {
+                $out .= '"' . $marker . $integerLiteral . '"';
+            } else {
+                $out .= $token;
+            }
+            $i = $cursor - 1;
+        }
+
+        return [$out, $marker];
+    }
+
+    private function freshMarker(string $json): string
+    {
+        do {
+            $marker = 'AWJBI' . bin2hex(random_bytes(8)) . ':';
+        } while (str_contains($json, $marker));
+
+        return $marker;
+    }
+
+    private function integerExceedsPlatform(string $literal): bool
+    {
+        $negative = str_starts_with($literal, '-');
+        $digits = ltrim($negative ? substr($literal, 1) : $literal, '0');
+        if ($digits === '') {
+            return false;
+        }
+        $limit = $negative ? '9223372036854775808' : '9223372036854775807';
+        if (strlen($digits) !== strlen($limit)) {
+            return strlen($digits) > strlen($limit);
+        }
+
+        return strcmp($digits, $limit) > 0;
+    }
+
+    private function restoreTaggedIntegers(mixed $value, string $marker): mixed
+    {
+        if ($value instanceof \stdClass) {
+            foreach (get_object_vars($value) as $key => $item) {
+                $value->{$key} = $this->restoreTaggedIntegers($item, $marker);
+            }
+
+            return $value;
+        }
+        if (is_array($value)) {
+            return array_map(fn (mixed $item): mixed => $this->restoreTaggedIntegers($item, $marker), $value);
+        }
+        if (is_string($value) && str_starts_with($value, $marker)) {
+            $literal = substr($value, strlen($marker));
+            if (preg_match('/^-?(0|[1-9][0-9]*)$/', $literal) === 1) {
+                return new DeliveryConnectorJsonInteger($literal);
+            }
+        }
+
+        return $value;
+    }
+
+    private function containsNonFinite(mixed $value): bool
+    {
+        if (is_float($value)) {
+            return ! is_finite($value);
+        }
+        if ($value instanceof \stdClass) {
+            foreach (get_object_vars($value) as $item) {
+                if ($this->containsNonFinite($item)) {
+                    return true;
+                }
+            }
+        }
+        if (is_array($value)) {
+            foreach ($value as $item) {
+                if ($this->containsNonFinite($item)) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     /** @return string|null|false */
