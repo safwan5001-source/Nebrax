@@ -1,5 +1,5 @@
 {
-    "_note": "CUST-HV V6c-2 — Banner `ctas` (≤2) next to the legacy ctaLabel/ctaHref (V0 §8.2). Shared by PHP StorefrontPresentationNormalizer and both TS section-content twins. ctas sit after imageAlt and before window. Per-CTA style/colour/icon are NOT accepted yet. expected=null means the content key is absent.",
+    "_note": "CUST-HV V6c-2 — Banner `ctas` (≤2) next to the legacy ctaLabel/ctaHref (V0 §8.2). Shared by PHP StorefrontPresentationNormalizer and both TS section-content twins. ctas sit after imageAlt and before window. Per-CTA `style` (solid|outline|link, V6c-5) is accepted and sits after href; colour/icon/soft are NOT accepted yet. expected=null means the content key is absent.",
     "cases": [
         {
             "name": "legacy single CTA only: output is exactly as before (no ctas key)",
@@ -426,7 +426,7 @@
             "expected": null
         },
         {
-            "name": "extra keys on a CTA (style, colour, icon) are not accepted yet",
+            "name": "colour and icon on a CTA are not accepted yet (style is, V6c-5); an unknown or `soft` style is dropped on its own",
             "type": "banner",
             "input": {
                 "title": "Sale",
@@ -439,6 +439,11 @@
                         "icon": {
                             "key": "arrow"
                         }
+                    },
+                    {
+                        "label": "More",
+                        "href": "/more",
+                        "style": "soft"
                     }
                 ]
             },
@@ -452,7 +457,155 @@
                 "ctas": [
                     {
                         "label": "Go",
-                        "href": "/go"
+                        "href": "/go",
+                        "style": "outline"
+                    },
+                    {
+                        "label": "More",
+                        "href": "/more"
+                    }
+                ]
+            }
+        },
+        {
+            "name": "V6c-5: every style is kept (solid, outline, link); key order label, href, style",
+            "type": "banner",
+            "input": {
+                "title": "Sale",
+                "ctas": [
+                    {
+                        "style": "link",
+                        "href": "/a",
+                        "label": "A"
+                    },
+                    {
+                        "style": "solid",
+                        "href": "/b",
+                        "label": "B"
+                    }
+                ]
+            },
+            "expected": {
+                "title": "Sale",
+                "subtitle": "",
+                "ctaLabel": "",
+                "ctaHref": "",
+                "imageUrl": null,
+                "imageAlt": "",
+                "ctas": [
+                    {
+                        "label": "A",
+                        "href": "/a",
+                        "style": "link"
+                    },
+                    {
+                        "label": "B",
+                        "href": "/b",
+                        "style": "solid"
+                    }
+                ]
+            }
+        },
+        {
+            "name": "V6c-5: the explicit default is stored (a second CTA may be `solid`); absent stays absent",
+            "type": "banner",
+            "input": {
+                "title": "Sale",
+                "ctas": [
+                    {
+                        "label": "A",
+                        "href": "/a"
+                    },
+                    {
+                        "label": "B",
+                        "href": "/b",
+                        "style": "solid"
+                    }
+                ]
+            },
+            "expected": {
+                "title": "Sale",
+                "subtitle": "",
+                "ctaLabel": "",
+                "ctaHref": "",
+                "imageUrl": null,
+                "imageAlt": "",
+                "ctas": [
+                    {
+                        "label": "A",
+                        "href": "/a"
+                    },
+                    {
+                        "label": "B",
+                        "href": "/b",
+                        "style": "solid"
+                    }
+                ]
+            }
+        },
+        {
+            "name": "V6c-5: a wrong-case, non-string or unknown style is dropped, the button stays",
+            "type": "banner",
+            "input": {
+                "title": "Sale",
+                "ctas": [
+                    {
+                        "label": "A",
+                        "href": "/a",
+                        "style": "Outline"
+                    },
+                    {
+                        "label": "B",
+                        "href": "/b",
+                        "style": 7
+                    }
+                ]
+            },
+            "expected": {
+                "title": "Sale",
+                "subtitle": "",
+                "ctaLabel": "",
+                "ctaHref": "",
+                "imageUrl": null,
+                "imageAlt": "",
+                "ctas": [
+                    {
+                        "label": "A",
+                        "href": "/a"
+                    },
+                    {
+                        "label": "B",
+                        "href": "/b"
+                    }
+                ]
+            }
+        },
+        {
+            "name": "V6c-5: a style alone is not a button (the empty CTA is dropped)",
+            "type": "banner",
+            "input": {
+                "title": "Sale",
+                "ctas": [
+                    {
+                        "style": "outline"
+                    },
+                    {
+                        "label": "B",
+                        "href": "/b"
+                    }
+                ]
+            },
+            "expected": {
+                "title": "Sale",
+                "subtitle": "",
+                "ctaLabel": "",
+                "ctaHref": "",
+                "imageUrl": null,
+                "imageAlt": "",
+                "ctas": [
+                    {
+                        "label": "B",
+                        "href": "/b"
                     }
                 ]
             }

@@ -172,3 +172,57 @@ describe("Banner CTAs (CUST-HV V6c-2)", () => {
     expect(c.querySelector("section")).toBeNull();
   });
 });
+
+describe("Banner CTA styles (CUST-HV V6c-5)", () => {
+  const two = (a?: string, b?: string) =>
+    banner({
+      ctas: [
+        { label: "Shop", href: "/products", ...(a ? { style: a } : {}) },
+        { label: "More", href: "/about", ...(b ? { style: b } : {}) },
+      ],
+    });
+  const styles = (c: HTMLElement) =>
+    [...c.querySelectorAll("section a")].map((a) =>
+      a.getAttribute("data-cta-style"),
+    );
+
+  it("absent style ⇒ by position: first solid, second outline (exactly the classes they always had)", async () => {
+    const c = await mount(two());
+    expect(styles(c)).toEqual(["solid", "outline"]);
+    const [first, second] = [...c.querySelectorAll("section a")];
+    expect(first.getAttribute("class")).toContain("bg-store-primary");
+    expect(second.getAttribute("class")).toContain(
+      "border-store-foreground/60",
+    );
+    expect(second.getAttribute("data-slot")).toBe("button");
+    expect(second.getAttribute("data-variant")).toBe("outline");
+  });
+
+  it("an explicit style wins over position, per button", async () => {
+    const c = await mount(two("link", "solid"));
+    expect(styles(c)).toEqual(["link", "solid"]);
+    const [first, second] = [...c.querySelectorAll("section a")];
+    expect(first.getAttribute("class")).toContain("underline");
+    expect(first.getAttribute("class")).not.toContain("bg-store-primary");
+    expect(first.getAttribute("data-slot")).toBeNull(); // a text link is not a global-token button
+    expect(second.getAttribute("class")).toContain("bg-store-primary");
+    expect(second.getAttribute("data-slot")).toBeNull();
+  });
+
+  it("a single button can be outline or link; link keeps the 40px tap height and colours itself in the heading colour", async () => {
+    const outline = await mount(
+      banner({ ctas: [{ label: "Go", href: "/go", style: "outline" }] }),
+    );
+    expect(styles(outline)).toEqual(["outline"]);
+    expect(outline.querySelector("section a")?.getAttribute("class")).toMatch(
+      /^mt-4 /,
+    );
+    const link = await mount(
+      banner({ ctas: [{ label: "Go", href: "/go", style: "link" }] }),
+    );
+    const cls = link.querySelector("section a")?.getAttribute("class") ?? "";
+    expect(cls).toContain("h-10");
+    expect(cls).toContain("text-store-foreground");
+    expect(cls).toMatch(/^mt-4 /);
+  });
+});

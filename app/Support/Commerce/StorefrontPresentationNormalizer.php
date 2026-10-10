@@ -40,6 +40,9 @@ final class StorefrontPresentationNormalizer
 
     private const MAX_HERO_CTAS = 2;
 
+    /** CUST-HV V6c-5 — أنماط الزرّ لكل CTA (V0 §6.1: `soft` تحتاج بوّابة تباين على المنطقة المرسومة، لاحقاً). */
+    public const CTA_STYLES = ['solid', 'outline', 'link'];
+
     private const MAX_HERO_CTA_LABEL_LENGTH = 80;
     private const MAX_BANNER_CTAS = 2;
 
@@ -1019,7 +1022,7 @@ final class StorefrontPresentationNormalizer
      * الترميز؛ العرض يقصّ) والرابط بقواعد `sanitizeContentHref`. المسودة الناقصة (تسمية بلا رابط أو العكس) تُحفظ ولا يُعرض
      * إلا الـCTA المكتمل؛ الفارغ كلياً يسقط.
      *
-     * @return list<array{label: string, href: string}>
+     * @return list<array{label: string, href: string, style?: string}>
      */
     private function normalizeCtaList(mixed $raw, int $max): array
     {
@@ -1033,7 +1036,13 @@ final class StorefrontPresentationNormalizer
             if ($label === '' && $href === '') {
                 continue;
             }
-            $ctas[] = ['label' => $label, 'href' => $href];
+            $cta = ['label' => $label, 'href' => $href];
+            // CUST-HV V6c-5 — per-CTA `style` override (V0 §6.1), اسمٌ من القائمة المغلقة فقط؛ الغائب = موضع الزرّ كما كان.
+            // `style` وحده لا يُبقي زرّاً (يسقط الزرّ الفارغ). `colour`/`icon`/`soft` غير مقبولة بعد.
+            if (is_string($item['style'] ?? null) && in_array($item['style'], self::CTA_STYLES, true)) {
+                $cta['style'] = $item['style'];
+            }
+            $ctas[] = $cta;
             if (count($ctas) >= $max) {
                 break;
             }

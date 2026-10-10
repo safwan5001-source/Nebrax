@@ -25,7 +25,8 @@ function classStrings(file: string): string[] {
 
 describe("global button selector ↔ real components (V5e-2b)", () => {
   const expected: Array<[string, number]> = [
-    ["components/home/BannerBand.tsx", 2],
+    // the first button is one class string (V6c-5 selects it by style); the outline and link looks are not global buttons
+    ["components/home/BannerBand.tsx", 1],
     ["components/products/ProductCard.tsx", 1],
     ["components/products/QuickView.tsx", 2],
   ];

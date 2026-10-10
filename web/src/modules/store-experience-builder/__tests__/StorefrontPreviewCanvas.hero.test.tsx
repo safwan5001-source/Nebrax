@@ -127,3 +127,55 @@ describe("Canvas heroes (CUST-HV V6a)", () => {
     expect(homeH1(c)).toHaveLength(1);
   });
 });
+
+describe("Canvas CTA styles (CUST-HV V6c-5)", () => {
+  it("hero: absent style ⇒ by position; an explicit style wins per button (same looks as the storefront)", () => {
+    const c = canvas([
+      {
+        id: "hero",
+        type: "hero",
+        visible: true,
+        content: {
+          headline: "H",
+          ctas: [
+            { label: "A", href: "/a", style: "link" },
+            { label: "B", href: "/b" },
+          ],
+        },
+      },
+    ]);
+    const [a, b] = [...c.querySelectorAll("[data-preview-hero-cta]")];
+    expect(a.getAttribute("data-cta-style")).toBe("link");
+    expect(a.className).toContain("underline");
+    expect(a.className).not.toContain("bg-store-primary-foreground");
+    expect(b.getAttribute("data-cta-style")).toBe("outline");
+    expect(b.className).toContain("border-store-primary-foreground/70");
+  });
+
+  it("banner: styles map to the same looks, and only the outline look is the shared Button's outline variant", () => {
+    const c = canvas([
+      {
+        id: "ban",
+        type: "banner",
+        visible: true,
+        content: {
+          title: "T",
+          subtitle: "",
+          ctaLabel: "",
+          ctaHref: "",
+          imageUrl: null,
+          ctas: [
+            { label: "A", href: "/a", style: "outline" },
+            { label: "B", href: "/b", style: "link" },
+          ],
+        },
+      },
+    ]);
+    const [a, b] = [...c.querySelectorAll("[data-banner-cta]")];
+    expect(a.getAttribute("data-cta-style")).toBe("outline");
+    expect(a.getAttribute("data-slot")).toBe("button");
+    expect(b.getAttribute("data-cta-style")).toBe("link");
+    expect(b.getAttribute("data-slot")).toBeNull();
+    expect(b.className).toContain("underline");
+  });
+});

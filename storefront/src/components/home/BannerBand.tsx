@@ -4,7 +4,22 @@ import { destination } from "@/lib/home/destination";
 import {
   type BannerContent,
   bannerCtasOf,
+  type CtaStyle,
 } from "@/lib/presentation/section-content";
+
+// CUST-HV V6c-5 — the three looks of a banner button, painted with the section's own colours (the brand fill the
+// store's solid CTA always had; the heading colour for outline and link, legible for exactly the reason the title
+// is), so a style adds no contrast surface. Absent style ⇒ by position: the first button solid, the second outline.
+// Only `solid` carries the three classes the global button tokens address (a pinned selector).
+const BANNER_CTA_CLASS: Record<CtaStyle, string> = {
+  solid:
+    "inline-flex h-10 max-w-full items-center rounded-store bg-store-primary px-4 text-sm font-bold text-store-primary-foreground",
+  // The second button is an outline in the heading colour (not the brand colour), so it is legible on the section
+  // surface for exactly the reason the title is.
+  outline:
+    "inline-flex h-10 max-w-full items-center rounded-store border-2 border-store-foreground/60 px-4 text-sm font-bold text-store-foreground",
+  link: "inline-flex h-10 max-w-full items-center px-1 text-sm font-bold text-store-foreground underline decoration-2 underline-offset-4",
+};
 
 export function BannerBand({
   content,
@@ -27,9 +42,12 @@ export function BannerBand({
     .map((cta) => ({
       label: cta.label.trim(),
       href: destination(basePath, cta.href),
+      style: cta.style,
     }))
     .filter(
-      (cta): cta is { label: string; href: string } =>
+      (
+        cta,
+      ): cta is { label: string; href: string; style: CtaStyle | undefined } =>
         cta.label !== "" && cta.href !== null,
     );
   const headingFallback =
@@ -78,7 +96,8 @@ export function BannerBand({
           {ctas.length === 1 ? (
             <BannerCtaLink
               cta={ctas[0]}
-              className="mt-4 inline-flex h-10 max-w-full items-center rounded-store bg-store-primary px-4 text-sm font-bold text-store-primary-foreground"
+              style={ctas[0].style ?? "solid"}
+              className="mt-4"
             />
           ) : ctas.length > 1 ? (
             <div className="mt-4 flex flex-wrap items-center gap-3">
@@ -86,14 +105,7 @@ export function BannerBand({
                 <BannerCtaLink
                   key={`${index}-${cta.href}`}
                   cta={cta}
-                  secondary={index > 0}
-                  // The second button is an outline in the heading colour (not the brand colour), so it is
-                  // legible on the section surface for exactly the reason the title is.
-                  className={
-                    index === 0
-                      ? "inline-flex h-10 max-w-full items-center rounded-store bg-store-primary px-4 text-sm font-bold text-store-primary-foreground"
-                      : "inline-flex h-10 max-w-full items-center rounded-store border-2 border-store-foreground/60 px-4 text-sm font-bold text-store-foreground"
-                  }
+                  style={cta.style ?? (index === 0 ? "solid" : "outline")}
                 />
               ))}
             </div>
@@ -114,20 +126,23 @@ const OUTLINE_BUTTON = {
 
 function BannerCtaLink({
   cta,
+  style,
   className,
-  secondary = false,
 }: {
   cta: { label: string; href: string };
-  className: string;
-  secondary?: boolean;
+  style: CtaStyle;
+  className?: string;
 }) {
-  const extra = secondary ? OUTLINE_BUTTON : {};
+  const extra = style === "outline" ? OUTLINE_BUTTON : {};
+  const classes = className
+    ? `${className} ${BANNER_CTA_CLASS[style]}`
+    : BANNER_CTA_CLASS[style];
   return cta.href.startsWith("https://") ? (
-    <a href={cta.href} className={className} {...extra}>
+    <a href={cta.href} className={classes} data-cta-style={style} {...extra}>
       <span className="min-w-0 truncate">{cta.label}</span>
     </a>
   ) : (
-    <Link href={cta.href} className={className} {...extra}>
+    <Link href={cta.href} className={classes} data-cta-style={style} {...extra}>
       <span className="min-w-0 truncate">{cta.label}</span>
     </Link>
   );

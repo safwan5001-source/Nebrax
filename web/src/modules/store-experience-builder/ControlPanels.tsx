@@ -45,12 +45,14 @@ import {
   featuredContentOf,
   offersContentOf,
   productShelfContentOf,
+  CTA_STYLES,
   MAX_BENEFIT_ITEMS,
   MAX_CUSTOM_BLOCKS,
   MAX_FEATURED_PRODUCTS,
   MAX_OFFERS,
   type BannerContent,
   type BenefitItem,
+  type CtaStyle,
   type CustomBlock,
 } from "./presentation/section-content";
 import {
@@ -2045,7 +2047,13 @@ function isHeroAuthored(content: HeroContent | undefined): boolean {
  * caller owns what an empty slot means. The link is sanitised on every commit (a half-typed `https://…` becomes
  * ""), so it is edited locally and committed on blur — the same deferred field the app-store URLs use.
  */
-type CtaSlot = { label: string; href: string };
+type CtaSlot = { label: string; href: string; style?: CtaStyle };
+
+const CTA_STYLE_LABEL = {
+  solid: "ctaStyleSolid",
+  outline: "ctaStyleOutline",
+  link: "ctaStyleLink",
+} as const satisfies Record<CtaStyle, CustomizerMessageKey>;
 
 function CtaSlots({
   slots,
@@ -2060,6 +2068,15 @@ function CtaSlots({
 }) {
   const setSlot = (index: number, partial: Partial<CtaSlot>) =>
     onChange(slots.map((slot, i) => (i === index ? { ...slot, ...partial } : slot)));
+  // Default = by position (first solid, second outline): the key is removed, never stored as undefined.
+  const setStyle = (index: number, style: CtaStyle | "") =>
+    onChange(
+      slots.map((slot, i) => {
+        if (i !== index) return slot;
+        const { style: _previous, ...rest } = slot;
+        return style === "" ? rest : { ...rest, style };
+      }),
+    );
   return (
     <>
       {slots.map((cta, index) => (
@@ -2080,6 +2097,23 @@ function CtaSlots({
             dir="ltr"
             onCommit={(href) => setSlot(index, { href })}
           />
+          <Field label={t("ctaStyle")}>
+            <select
+              className={selectClass}
+              data-cta-style-select=""
+              value={cta.style ?? ""}
+              // an empty slot is not stored, so a look chosen for it would vanish: offer it once the button exists
+              disabled={cta.label === "" && cta.href === ""}
+              onChange={(event) => setStyle(index, event.target.value as CtaStyle | "")}
+            >
+              <option value="">{t("ctaStyleDefault")}</option>
+              {CTA_STYLES.map((style) => (
+                <option key={style} value={style}>
+                  {t(CTA_STYLE_LABEL[style])}
+                </option>
+              ))}
+            </select>
+          </Field>
         </fieldset>
       ))}
     </>
@@ -2101,11 +2135,11 @@ function HeroFields({
     heroHeadline: legacy.headline,
     heroSubheadline: legacy.subheadline,
   });
-  const ctas = [0, 1].map((index) => value.ctas?.[index] ?? { label: "", href: "" });
+  const ctas: CtaSlot[] = [0, 1].map((index) => value.ctas?.[index] ?? { label: "", href: "" });
   const commit = (next: {
     headline: string;
     subheadline: string;
-    ctas: { label: string; href: string }[];
+    ctas: CtaSlot[];
   }) => {
     // an empty slot is not stored; the remaining buttons keep their order
     const kept = next.ctas.filter((cta) => cta.label !== "" || cta.href !== "");
@@ -2166,8 +2200,8 @@ function BannerFields({
   const set = (partial: Partial<BannerContent>) => onChange({ ...value, ...partial });
   // CUST-HV V6c-2 — `ctas` when authored, else the legacy pair (= ctas[0]); two slots always shown.
   const effective = bannerCtasOf(value);
-  const bannerSlots = [0, 1].map((index) => effective[index] ?? { label: "", href: "" });
-  const commitBannerCtas = (next: { label: string; href: string }[]) => {
+  const bannerSlots: CtaSlot[] = [0, 1].map((index) => effective[index] ?? { label: "", href: "" });
+  const commitBannerCtas = (next: CtaSlot[]) => {
     // an empty slot is not stored; the remaining buttons keep their order. `ctas[0]` is mirrored into the legacy
     // pair so an older reader (which ignores `ctas`) still shows the first button.
     const kept = next.filter((cta) => cta.label !== "" || cta.href !== "");
