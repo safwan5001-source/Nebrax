@@ -7,6 +7,8 @@
 export interface SourceCharge {
   soldQty: number; returnedQty: number; unitPrice: number;
   net: number; tax: number; remainingNet: number; remainingTax: number;
+  /** سبق على السطر ردٌّ بسعر مخفَّض — فالجزء الأخير لا يأخذ «المتبقي». */
+  reducedBefore?: boolean;
 }
 /** floor(a × b ÷ c) بلا فقد دقّة (BigInt): الأنصبة بالهللة لا تقبل تقريب float. */
 function mulDiv(a: number, b: number, c: number): number {
@@ -17,7 +19,8 @@ function mulDiv(a: number, b: number, c: number): number {
 /**
  * مبلغ المرتجع كما سيشتقّه الخادم من سطر المصدر (`ReturnSourceAllocator`):
  * نصيب الوحدات المردودة = F(مردود + الآن) − F(مردود) مع F(n) = floor(المحصَّل × n ÷ المباع)،
- * يخفَّض تناسبياً إن نقص السعر عن سعر البيع، ويُقيَّد بالمتبقي. للمعاينة فقط —
+ * والجزء الأخير بسعر كامل يأخذ المتبقي الفعلي (ما لم يسبق ردٌّ بسعر مخفَّض)،
+ * ويخفَّض تناسبياً إن نقص السعر عن سعر البيع، ويُقيَّد بالمتبقي. للمعاينة فقط —
  * الخادم هو الحَكَم عند الترحيل.
  */
 export function sourceLineAmounts(c: SourceCharge, quantity: number, priceMinor: number): { net: number; tax: number } {
@@ -27,7 +30,12 @@ export function sourceLineAmounts(c: SourceCharge, quantity: number, priceMinor:
   };
   let net = share(c.net);
   let tax = share(c.tax);
-  if (c.unitPrice > 0 && priceMinor < c.unitPrice) {
+  const fullPrice = c.unitPrice <= 0 || priceMinor >= c.unitPrice;
+  if (c.returnedQty + quantity >= c.soldQty && fullPrice && !c.reducedBefore) {
+    // الجزء الأخير بسعر كامل: المتبقي الفعلي (يُغلق هللات مرتجعات POS السابقة).
+    net = c.remainingNet;
+    tax = c.remainingTax;
+  } else if (c.unitPrice > 0 && priceMinor < c.unitPrice) {
     net = mulDiv(net, Math.max(0, priceMinor), c.unitPrice);
     tax = mulDiv(tax, Math.max(0, priceMinor), c.unitPrice);
   }

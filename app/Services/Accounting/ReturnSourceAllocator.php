@@ -96,7 +96,7 @@ class ReturnSourceAllocator
      * ما رُدَّ سابقاً على كل سطر مصدر — من المرتجعات **المرحَّلة** وحدها.
      *
      * @param  array<int, string>  $sourceLineIds
-     * @return array<string, array{quantity:int, subtotal:int, discount:int, net:int, tax:int}>
+     * @return array<string, array{quantity:int, subtotal:int, discount:int, net:int, tax:int, min_price:int}>
      */
     public function returned(array $sourceLineIds, ?string $exceptReturnId = null): array
     {
@@ -115,7 +115,7 @@ class ReturnSourceAllocator
             ->groupBy('source_line_id')
             ->selectRaw(
                 'source_line_id, SUM(quantity) as qty, SUM(line_subtotal) as subtotal, '
-                . 'SUM(line_discount) as discount, SUM(line_tax) as tax'
+                . 'SUM(line_discount) as discount, SUM(line_tax) as tax, MIN(unit_price) as min_price'
             )
             ->get();
 
@@ -127,6 +127,8 @@ class ReturnSourceAllocator
                 'discount' => (int) $row->discount,
                 'net'      => (int) $row->subtotal - (int) $row->discount,
                 'tax'      => (int) $row->tax,
+                // أدنى سعر ردٍّ سابق على السطر — يكشف الاسترداد بسعر مخفَّض.
+                'min_price' => (int) $row->min_price,
             ];
         }
 
@@ -145,8 +147,14 @@ class ReturnSourceAllocator
      * جزئي مشروع، فيُخفَّض المشتقّ تناسبياً؛ والمساوي (أو الأعلى، ويرفضه
      * الحارس) يأخذ الاشتقاق الكامل.
      *
+     * **الجزء الأخير:** المرتجع الذي يستنفد الكمية المتبقية بسعر كامل يأخذ
+     * **المتبقي الفعلي** (`المحصَّل − المرتَدّ`) لا نصيب التوزيع، فتُغلق أي هللات
+     * خلّفتها مرتجعات سابقة بقاعدة توزيع أخرى (مرتجعات POS تقرّب كل جزء لأسفل
+     * بمعزل عن سابقه). ويُستثنى حين سبق على السطر ردٌّ بسعر مخفَّض: الفرق
+     * المحتجَز عندئذ (رسوم إعادة تخزين مثلاً) قرارٌ تجاري لا يُردّ مع الجزء الأخير.
+     *
      * @param  array{quantity:int, unit_price:int, subtotal:int, discount:int, net:int, tax:int}  $charged
-     * @param  array{quantity?:int, subtotal?:int, discount?:int, net?:int, tax?:int}  $returned
+     * @param  array{quantity?:int, subtotal?:int, discount?:int, net?:int, tax?:int, min_price?:int}  $returned
      * @return array{subtotal:int, discount:int, net:int, tax:int}
      */
     public function allocate(array $charged, array $returned, int $quantity, int $unitPrice): array
@@ -162,7 +170,17 @@ class ReturnSourceAllocator
         $discount = $part('discount');
 
         $sourcePrice = $charged['unit_price'];
-        if ($sourcePrice > 0 && $unitPrice < $sourcePrice) {
+        $isFinal = $before + $quantity >= $sold;
+        $reducedBefore = $sourcePrice > 0
+            && isset($returned['min_price'])
+            && (int) $returned['min_price'] < $sourcePrice;
+
+        if ($isFinal && ! $reducedBefore && ($sourcePrice <= 0 || $unitPrice >= $sourcePrice)) {
+            // المتبقي الفعلي — غير سالب أبداً، فمرتجعٌ سابق زائد (تاريخي) يترك صفراً.
+            $net = max(0, $charged['net'] - (int) ($returned['net'] ?? 0));
+            $tax = max(0, $charged['tax'] - (int) ($returned['tax'] ?? 0));
+            $discount = max(0, $charged['discount'] - (int) ($returned['discount'] ?? 0));
+        } elseif ($sourcePrice > 0 && $unitPrice < $sourcePrice) {
             $unitPrice = max(0, $unitPrice);
             $net = $this->mulDiv($net, $unitPrice, $sourcePrice)[0];
             $tax = $this->mulDiv($tax, $unitPrice, $sourcePrice)[0];

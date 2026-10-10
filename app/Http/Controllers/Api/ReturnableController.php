@@ -55,6 +55,9 @@ class ReturnableController extends ApiController
             $remaining = max(0, (int) $line->quantity - $already);
             $chargedLine  = $charged[$line->id];
             $returnedLine = $amounts[$line->id] ?? ['net' => 0, 'tax' => 0];
+            // سبق على السطر ردٌّ بسعر مخفَّض؟ عندها لا يأخذ الجزء الأخير «المتبقي».
+            $reducedBefore = isset($returnedLine['min_price']) && $chargedLine['unit_price'] > 0
+                && $returnedLine['min_price'] < $chargedLine['unit_price'];
             $remainingNet = max(0, $chargedLine['net'] - $returnedLine['net']);
             $remainingTax = max(0, $chargedLine['tax'] - $returnedLine['tax']);
 
@@ -78,6 +81,7 @@ class ReturnableController extends ApiController
                 'returned_tax'   => Money::toRiyal($returnedLine['tax']),
                 'remaining_net'  => Money::toRiyal($remainingNet),
                 'remaining_tax'  => Money::toRiyal($remainingTax),
+                'reduced_price_returned' => $reducedBefore,
             ];
         })->values();
 

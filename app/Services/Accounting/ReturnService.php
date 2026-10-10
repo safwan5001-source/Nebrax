@@ -461,12 +461,14 @@ class ReturnService
             $alloc = $allocator->allocate($charged[$lineId], $running[$lineId] ?? [], $qty, (int) ($item['unit_price'] ?? 0));
 
             $prior = $running[$lineId] ?? ['quantity' => 0, 'subtotal' => 0, 'discount' => 0, 'net' => 0, 'tax' => 0];
+            $price = (int) ($item['unit_price'] ?? 0);
             $running[$lineId] = [
                 'quantity' => $prior['quantity'] + $qty,
                 'subtotal' => $prior['subtotal'] + $alloc['subtotal'],
                 'discount' => $prior['discount'] + $alloc['discount'],
                 'net'      => $prior['net'] + $alloc['net'],
                 'tax'      => $prior['tax'] + $alloc['tax'],
+                'min_price' => isset($prior['min_price']) ? min($prior['min_price'], $price) : $price,
             ];
 
             $out[$index] = [

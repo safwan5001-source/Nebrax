@@ -9,13 +9,30 @@ const charge = (over: Partial<SourceCharge> = {}): SourceCharge => ({
 
 describe('sourceLineAmounts (mirrors ReturnSourceAllocator)', () => {
   it('splits an inclusive line so the parts sum to the charged net and VAT', () => {
-    const parts = [0, 1, 2].map((returnedQty) =>
-      sourceLineAmounts(charge({ returnedQty }), 1, 10001),
-    );
-    expect(parts.map((p) => p.net)).toEqual([8696, 8697, 8697]);
-    expect(parts.map((p) => p.tax)).toEqual([1304, 1304, 1305]);
-    expect(parts.reduce((s, p) => s + p.net, 0)).toBe(26090);
-    expect(parts.reduce((s, p) => s + p.tax, 0)).toBe(3913);
+    // الجزء الأخير = المتبقي الفعلي بعد ما رُدَّ فعلاً (هنا: نصيبا الوحدتين الأوليين).
+    const first = sourceLineAmounts(charge({ returnedQty: 0 }), 1, 10001);
+    const second = sourceLineAmounts(
+      charge({ returnedQty: 1, remainingNet: 26090 - first.net, remainingTax: 3913 - first.tax }), 1, 10001);
+    const third = sourceLineAmounts(
+      charge({ returnedQty: 2, remainingNet: 26090 - first.net - second.net, remainingTax: 3913 - first.tax - second.tax }), 1, 10001);
+    expect([first.net, second.net, third.net]).toEqual([8696, 8697, 8697]);
+    expect([first.tax, second.tax, third.tax]).toEqual([1304, 1304, 1305]);
+    expect(first.net + second.net + third.net).toBe(26090);
+    expect(first.tax + second.tax + third.tax).toBe(3913);
+  });
+
+  it('closes the halalas left by earlier POS-style returns on the final part', () => {
+    // 3 × 0.10: ضريبة 0.05؛ POS رقّم 0.01 + 0.01 فبقي 0.03 للأخير (لا 0.02).
+    const c = charge({ soldQty: 3, unitPrice: 10, net: 30, tax: 5, returnedQty: 2, remainingNet: 10, remainingTax: 3 });
+    expect(sourceLineAmounts(c, 1, 10)).toEqual({ net: 10, tax: 3 });
+  });
+
+  it('does not hand back a reduced-price hold-back on the final part', () => {
+    const c = charge({
+      soldQty: 3, unitPrice: 10000, net: 30000, tax: 4500, returnedQty: 2,
+      remainingNet: 15000, remainingTax: 2250, reducedBefore: true,
+    });
+    expect(sourceLineAmounts(c, 1, 10000)).toEqual({ net: 10000, tax: 1500 });
   });
 
   it('returns the whole charged amount for the full quantity', () => {

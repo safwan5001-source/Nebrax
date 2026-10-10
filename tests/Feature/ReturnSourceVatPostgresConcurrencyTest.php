@@ -4,17 +4,20 @@ namespace Tests\Feature;
 
 use App\Models\Invoice;
 use App\Models\Partner;
+use App\Models\PosSession;
 use App\Models\Product;
 use App\Models\Purchase;
 use App\Models\ReturnDocument;
 use App\Models\Tenant;
 use App\Services\Accounting\ChartOfAccountsSeeder;
 use App\Services\Accounting\InvoiceService;
+use App\Services\Accounting\PosReturnService;
 use App\Services\Accounting\PurchaseService;
 use App\Services\Accounting\ReturnService;
 use App\Tenancy\TenantContext;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
+use ReflectionMethod;
 use Tests\TestCase;
 
 /**
@@ -264,6 +267,65 @@ class ReturnSourceVatPostgresConcurrencyTest extends TestCase
         $this->assertSame(26090, (int) $posted->sum('subtotal'));
         $this->assertSame(3913, (int) $posted->sum('tax_amount'));
         $this->assertSame(30003, (int) $posted->sum('total'));
+    }
+
+    /**
+     * مرتجع POS جزئي كما تنشئه `PosReturnService` (سطور مشتقة بقاعدة POS) على
+     * فاتورة POS، قبل أن تتسابق مرتجعات API على ما بقي.
+     */
+    private function posStylePartial(Invoice $invoice, PosSession $session, int $qty): ReturnDocument
+    {
+        $service = app(PosReturnService::class);
+        $method = new ReflectionMethod($service, 'buildSourceItems');
+        $method->setAccessible(true);
+        $items = $method->invoke($service, $invoice->fresh('lines'), [
+            ['source_line_id' => $invoice->lines->first()->id, 'quantity' => $qty],
+        ]);
+
+        $return = app(ReturnService::class)->create([
+            'type' => 'sales', 'partner_id' => $invoice->partner_id, 'pos_session_id' => $session->id,
+            'payment_type' => 'credit', 'tax_inclusive' => $invoice->tax_inclusive,
+            'original_id' => $invoice->id, 'original_type' => Invoice::class,
+        ], $items);
+
+        return app(ReturnService::class)->post($return);
+    }
+
+    /** @test */
+    public function concurrent_api_posts_after_pos_style_partials_close_the_invoice_exactly(): void
+    {
+        // 3 × 0.10: ضريبة 0.05. POS يرحّل 0.01 و0.01 (تقريب لأسفل لكل جزء)، ثم
+        // يتسابق مرتجعان من الـAPI: مجموع الأربعة = الفاتورة بالضبط مهما كان الفائز.
+        $svc = app(InvoiceService::class);
+        $session = PosSession::create([
+            'number' => 'T-'.uniqid(), 'status' => 'open', 'opening_balance' => 0, 'opened_at' => now(),
+        ]);
+        $invoice = $svc->post($svc->create(
+            ['partner_id' => $this->customer->id, 'payment_type' => 'credit', 'pos_session_id' => $session->id],
+            [['product_id' => $this->service->id, 'quantity' => 4, 'unit_price' => 10, 'tax_rate' => 15]]
+        ));
+        $line = $invoice->lines->first();
+        $this->assertSame([40, 6], [(int) $invoice->subtotal, (int) $invoice->tax_amount]);
+
+        $this->posStylePartial($invoice, $session, 1);
+        $this->posStylePartial($invoice, $session, 1);
+
+        $drafts = [
+            $this->draft($invoice, $line->id, 1, 'sales'),
+            $this->draft($invoice, $line->id, 1, 'sales'),
+        ];
+        $results = $this->postConcurrently($drafts);
+
+        foreach ($results as $result) {
+            $this->assertTrue($result['ok'], json_encode($result, JSON_UNESCAPED_UNICODE));
+        }
+
+        app(TenantContext::class)->set($this->tenant->id);
+        $posted = ReturnDocument::where('status', 'posted')->get();
+        $this->assertCount(4, $posted);
+        $this->assertSame(40, (int) $posted->sum('subtotal'));
+        $this->assertSame(6, (int) $posted->sum('tax_amount'), 'الجزء الأخير يغلق المتبقي مهما كان ترتيب الفائز.');
+        $this->assertSame(46, (int) $posted->sum('total'));
     }
 
     /** @test */

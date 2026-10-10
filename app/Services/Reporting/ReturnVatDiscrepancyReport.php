@@ -20,7 +20,8 @@ use App\Tenancy\BranchScope;
  *  (ترتيب الترحيل الفعلي غير مخزَّن، فهذا تقريب) ويُحتسب لكلٍّ ما كانت القاعدة
  *  ستنتجه بالنظر إلى **المرحَّل فعلاً** قبله (كالمحرك وقت ترحيله)، ثم يُقارن بالمرحَّل. لا كتابة ولا قيد ولا تعديل لأي سجل.
  *
- *  مستثنى: مرتجعات POS (لم يغيّرها الإصلاح) والمرتجعات الحرّة (لا مصدر لها).
+ *  مستثنى من الحكم: مرتجعات POS (لم يغيّرها الإصلاح — لكنها تدخل المتراكم بما رُحِّل)
+ *  والمرتجعات الحرّة (لا مصدر لها).
  *  النطاق: المستأجر الحالي في `TenantContext`، عبر كل فروعه — فالسقف تراكمي
  *  على المصدر لا على الفرع.
  */
@@ -42,7 +43,6 @@ class ReturnVatDiscrepancyReport
         $groups = ReturnDocument::query()
             ->where('status', 'posted')
             ->whereNotNull('original_id')
-            ->whereNull('pos_session_id')
             ->whereIn('original_type', self::SOURCE_TYPES)
             ->with('lines')
             ->orderBy('return_date')->orderBy('created_at')->orderBy('id')
@@ -62,6 +62,19 @@ class ReturnVatDiscrepancyReport
             $running = [];
 
             foreach ($returns as $return) {
+                // مرتجع POS لا يُحكَم عليه (لم يغيّره الإصلاح) لكنه يستهلك من السقف
+                // فيدخل المتراكم بما رُحِّل، كي لا يُبلَّغ لاحقُه من الـAPI فرقاً كاذباً.
+                if ($return->pos_session_id !== null) {
+                    foreach ($return->lines as $line) {
+                        $lineId = $line->source_line_id;
+                        if (! $lineId) {
+                            continue;
+                        }
+                        $running[$lineId] = $this->advance($running[$lineId] ?? null, $line);
+                    }
+                    continue;
+                }
+
                 $expectedNet = $expectedTax = 0;
 
                 foreach ($return->lines->sortBy('id') as $line) {
@@ -83,12 +96,7 @@ class ReturnVatDiscrepancyReport
                     // ما رُحِّل فعلاً هو ما استهلك السقف للمرتجع التالي — لا ما كانت
                     // القاعدة ستنتجه: مرتجعٌ تاريخي زائد يقيّد لاحقه الصحيح، فلا يُبلَّغ
                     // اللاحقُ فرقاً كاذباً.
-                    $prior = $running[$lineId] ?? ['quantity' => 0, 'net' => 0, 'tax' => 0];
-                    $running[$lineId] = [
-                        'quantity' => $prior['quantity'] + (int) $line->quantity,
-                        'net'      => $prior['net'] + (int) $line->line_subtotal - (int) $line->line_discount,
-                        'tax'      => $prior['tax'] + (int) $line->line_tax,
-                    ];
+                    $running[$lineId] = $this->advance($running[$lineId] ?? null, $line);
                     $expectedNet += $alloc['net'];
                     $expectedTax += $alloc['tax'];
                 }
@@ -118,5 +126,26 @@ class ReturnVatDiscrepancyReport
         }
 
         return $rows;
+    }
+
+    /**
+     * يضيف سطراً مرحَّلاً إلى المتراكم على سطر المصدر بمبالغه المسجَّلة.
+     *
+     * @param  array{quantity:int, net:int, tax:int, discount:int, min_price?:int}|null  $prior
+     * @return array{quantity:int, net:int, tax:int, discount:int, min_price:int}
+     */
+    private function advance(?array $prior, \App\Models\ReturnLine $line): array
+    {
+        $prior ??= ['quantity' => 0, 'net' => 0, 'tax' => 0, 'discount' => 0];
+
+        return [
+            'quantity'  => $prior['quantity'] + (int) $line->quantity,
+            'net'       => $prior['net'] + (int) $line->line_subtotal - (int) $line->line_discount,
+            'tax'       => $prior['tax'] + (int) $line->line_tax,
+            'discount'  => $prior['discount'] + (int) $line->line_discount,
+            'min_price' => isset($prior['min_price'])
+                ? min($prior['min_price'], (int) $line->unit_price)
+                : (int) $line->unit_price,
+        ];
     }
 }

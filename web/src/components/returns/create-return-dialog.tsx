@@ -46,6 +46,7 @@ interface ReturnableLine {
   quantity: number; returned: number; remaining: number; unit_price: string; tax_rate: number;
   /** REM-01 — اختيارية: خادمٌ أقدم لا يرسلها فتبقى المعاينة على الحساب القديم. */
   charged_net?: string; charged_tax?: string; remaining_net?: string; remaining_tax?: string;
+  reduced_price_returned?: boolean;
 }
 
 const emptyLine = (): Line => ({
@@ -229,6 +230,7 @@ export function CreateReturnDialog({
                 soldQty: l.quantity, returnedQty: l.returned, unitPrice: riyalToMinor(l.unit_price),
                 net: riyalToMinor(l.charged_net), tax: riyalToMinor(l.charged_tax),
                 remainingNet: riyalToMinor(l.remaining_net), remainingTax: riyalToMinor(l.remaining_tax),
+                reducedBefore: !!l.reduced_price_returned,
               }
             : null,
         }));
