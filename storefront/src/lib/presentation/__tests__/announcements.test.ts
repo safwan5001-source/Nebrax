@@ -349,3 +349,31 @@ describe("announcements — dismissal identity", () => {
     expect(announcementDismissKey(item())).not.toMatch(/tenant|user|store/i);
   });
 });
+
+describe("announcements — low years and sub-ms precision (CUST-HV V6c-1)", () => {
+  it("reads years 0001–0099 as written (Date.UTC would remap them to 19xx) and keeps the window open", () => {
+    expect(parseAnnouncementInstant("0001-01-01T00:00:00Z")).toBe(
+      -62135596800000,
+    );
+    expect(parseAnnouncementInstant("0099-12-31T23:59:59Z")).toBe(
+      -59011459201000,
+    );
+    expect(parseAnnouncementInstant("0001-02-29T00:00:00Z")).toBeNull(); // year 1 is not a leap year
+    const now = Date.parse("2026-10-10T00:00:00Z");
+    expect(
+      announcementWindowState(
+        { startsAt: "0001-01-01T00:00:00Z", endsAt: "2999-01-01T00:00:00Z" },
+        now,
+      ),
+    ).toBe("open");
+  });
+
+  it("truncates fractional digits to milliseconds, as the server gate does", () => {
+    expect(parseAnnouncementInstant("2026-10-06T10:00:00.0009Z")).toBe(
+      parseAnnouncementInstant("2026-10-06T10:00:00.000Z"),
+    );
+    expect(parseAnnouncementInstant("2026-10-06T10:00:00.123456Z")).toBe(
+      Date.UTC(2026, 9, 6, 10, 0, 0, 123),
+    );
+  });
+});

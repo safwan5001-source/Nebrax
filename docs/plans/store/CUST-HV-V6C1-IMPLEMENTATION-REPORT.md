@@ -34,6 +34,7 @@ The announcement bar already owns the only display-window semantic in the produc
 |---|---|---|
 | `zonedWallTimeToUtcIso` read the offset at the wall time *as UTC*, so a DST-zone merchant entering `2026-03-08 03:30` in `America/New_York` stored `08:30Z` (04:30 local) | **Real**, pre-existing in the shared helper (also used by version scheduling); invisible in `Asia/Riyadh` | Offset is now resolved at the resulting instant with a round-trip check (candidates from the offsets a day either side). Repeated hour ⇒ first occurrence; skipped hour ⇒ just after the gap. Non-DST zones unchanged. Tests: both 2026 NY transitions, a half-hour round-trip sweep, Riyadh unchanged. |
 | PHP gate compared Carbon instants at µs precision while the runtime (JS `Date`) truncates to ms, so `.000001Z → .000002Z` passed publish but hid the banner forever | **Real** (also latent for announcements) | `parseInstant` truncates to ms like the runtime, so equal-at-ms edges are rejected with `window_end_not_after_start`. Tests added for µs and sub-ms edges; valid 1 ms window still passes. |
+| Years `0001`–`0099` accepted by the PHP gate but read by `Date.UTC` as 19xx, so `0001-01-01 → 2999-01-01` was classified invalid and hid the banner | **Real** (and pre-existing for announcements) | `parseAnnouncementInstant` builds the instant with `setUTCFullYear` (both twins, still byte-identical), so low years mean what the gate means. Tests in both twins + a PHP parity case. |
 
 ## Invariants
 
