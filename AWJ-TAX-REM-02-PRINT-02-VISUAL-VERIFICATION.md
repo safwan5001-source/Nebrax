@@ -158,7 +158,7 @@ A saved layout that omits a necessary financial column therefore **can** show a 
 
 ## 11. Final recommendation: **READY — conditional**
 
-**#1315 is READY to merge after #1304**, on these conditions: **(a)** CI is green on `b3adda1` ([CI-1315]); **(b)** the owner accepts that A5 is unsupported and that physical-thermal-printer behaviour is NOT VERIFIED; **(c)** the owner accepts F1's effect on invoice thermal receipts with a header discount (or asks for it to be gated). It is **not** safe to merge #1315 at `1287f51` (the thermal defect). This report does not approve #1304's accounting — that is covered by its own report/review.
+**#1315 is READY to merge after #1304**, on these conditions: **(a)** CI is green on `b3adda1` (web: success; PHP sqlite/pgsql must finish green — re-check before merging); **(b)** the owner accepts that A5 is unsupported and that physical-thermal-printer behaviour is NOT VERIFIED; **(c)** the owner accepts F1's effect on invoice thermal receipts with a header discount (or asks for it to be gated). It is **not** safe to merge #1315 at `1287f51` (the thermal defect). This report does not approve #1304's accounting — that is covered by its own report/review.
 
 **Exact merge order and prerequisites**
 
