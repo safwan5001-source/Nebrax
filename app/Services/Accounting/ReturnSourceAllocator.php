@@ -4,6 +4,7 @@ namespace App\Services\Accounting;
 
 use App\Models\CreditNoteLine;
 use App\Models\Invoice;
+use App\Models\InvoiceLine;
 use App\Models\Purchase;
 use App\Models\ReturnLine;
 
@@ -138,7 +139,7 @@ class ReturnSourceAllocator
             ->get();
 
         $out = [];
-        foreach ($rows->concat($noteRows) as $row) {
+        foreach ($rows->concat($noteRows)->concat($this->legacyCreditRows($sourceLineIds)) as $row) {
             $prior = $out[$row->source_line_id] ?? null;
             $subtotal = (int) $row->subtotal + ($prior['subtotal'] ?? 0);
             $discount = (int) $row->discount + ($prior['discount'] ?? 0);
@@ -154,6 +155,60 @@ class ReturnSourceAllocator
         }
 
         return $out;
+    }
+
+    /**
+     * إشعارات دائنة **مرحَّلة سبقت REM-02** وأسطرها بلا `source_line_id`: تُنسب عند
+     * القراءة إلى سطر الفاتورة الوحيد الذي يحمل منتجها (والمتغيّر إن وُجد) — دون أي
+     * تعديل على صف مرحَّل. سطرٌ لا يُحسم نسبُه (بلا منتج، أو منتجه يتكرر في
+     * الفاتورة) لا يُحسب هنا لأن توزيعه تخمين؛ ويُسجَّل عدّه عند هجرة التقييد
+     * لمراجعة المالية. بلا هذا النسب كان إشعارٌ تاريخي كامل يُخفي استهلاكه فيُردّ
+     * الشيء نفسه مرةً ثانية.
+     *
+     * @param  array<int, string>  $sourceLineIds
+     * @return \Illuminate\Support\Collection<int, object>  صفوف بشكل صفوف التجميع في `returned()`
+     */
+    private function legacyCreditRows(array $sourceLineIds): \Illuminate\Support\Collection
+    {
+        $invoiceIds = InvoiceLine::query()->whereIn('id', $sourceLineIds)->pluck('invoice_id')->unique()->values();
+        if ($invoiceIds->isEmpty()) {
+            return collect();
+        }
+
+        $invoiceLines = InvoiceLine::query()->whereIn('invoice_id', $invoiceIds)
+            ->get(['id', 'invoice_id', 'product_id', 'product_variant_id']);
+
+        $legacy = CreditNoteLine::query()
+            ->whereNull('source_line_id')
+            ->whereNotNull('product_id')
+            ->whereHas('creditNote', fn ($q) => $q->where('status', 'posted')->whereIn('original_invoice_id', $invoiceIds))
+            ->with('creditNote:id,original_invoice_id')
+            ->get();
+
+        $acc = [];
+        foreach ($legacy as $line) {
+            $matches = $invoiceLines->filter(
+                fn ($l) => $l->invoice_id === $line->creditNote->original_invoice_id
+                    && $l->product_id === $line->product_id
+                    && ($line->product_variant_id === null || $l->product_variant_id === $line->product_variant_id)
+            );
+            if ($matches->count() !== 1) {
+                continue;
+            }
+
+            $target = (string) $matches->first()->id;
+            $acc[$target] ??= (object) [
+                'source_line_id' => $target, 'qty' => 0, 'subtotal' => 0, 'discount' => 0, 'tax' => 0,
+                'min_price' => (int) $line->unit_price,
+            ];
+            $acc[$target]->qty += (int) $line->quantity;
+            $acc[$target]->subtotal += (int) $line->line_subtotal;
+            $acc[$target]->discount += (int) $line->line_discount;
+            $acc[$target]->tax += (int) $line->line_tax;
+            $acc[$target]->min_price = min($acc[$target]->min_price, (int) $line->unit_price);
+        }
+
+        return collect(array_values($acc))->filter(fn ($row) => in_array($row->source_line_id, $sourceLineIds, true));
     }
 
     /**

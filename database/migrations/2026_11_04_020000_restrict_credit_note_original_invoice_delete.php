@@ -76,13 +76,21 @@ return new class extends Migration
         // مسوّدات تشير إلى فاتورة بلا ربط سطري: يُعاد ربطها بالمنتج عند الترحيل أو
         // يُرفض ترحيلها برسالة واضحة إن التبس المنتج (انظر CreditNoteService::rederiveLines).
         $legacyDrafts = $base()->where('c.status', 'draft')->count();
+        // إشعارات مرحَّلة بأسطر بلا ربط سطري: يُنسب منها عند القراءة ما له سطر فاتورة وحيد
+        // بمنتجه (انظر ReturnSourceAllocator::legacyCreditRows)؛ الباقي (بلا منتج/ملتبس) لا يُحسب
+        // في السقف التراكمي فيحتاج مراجعة المالية.
+        $legacyPostedLines = DB::table('credit_note_lines as l')
+            ->join('credit_notes as c', 'c.id', '=', 'l.credit_note_id')
+            ->where('c.status', 'posted')->whereNotNull('c.original_invoice_id')
+            ->whereNull('l.product_id')->count();
 
-        if ($crossTenant + $otherCustomer + $draftSource + $legacyDrafts > 0) {
+        if ($crossTenant + $otherCustomer + $draftSource + $legacyDrafts + $legacyPostedLines > 0) {
             Log::warning('REM-02: historical credit notes reference questionable invoices (left untouched).', [
                 'cross_tenant' => $crossTenant,
                 'other_customer' => $otherCustomer,
                 'non_posted_source' => $draftSource,
                 'draft_notes_without_line_links' => $legacyDrafts,
+                'posted_invoice_note_lines_without_product' => $legacyPostedLines,
             ]);
         }
     }

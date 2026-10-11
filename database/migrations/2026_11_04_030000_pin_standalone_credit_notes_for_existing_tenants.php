@@ -5,6 +5,8 @@ use Illuminate\Support\Facades\DB;
 
 return new class extends Migration
 {
+    private const MARKER = '_allow_standalone_credit_notes_pinned_by_rem02';
+
     /**
      * ═══════════════════════════════════════════════════════════════
      *  AWJ-TAX-REM-02 / ADR-E (الخيار A) — سياسة الإشعار الدائن المستقل
@@ -21,6 +23,7 @@ return new class extends Migration
      *    أم لا: نتجنّب التخمين من الاستعمال التاريخي لأن غياب الاستعمال اليوم
      *    لا يعني غياب الحاجة غداً.
      *  - المستأجر المنشأ بعد هذه الهجرة لا يحمل مفتاحاً فيأخذ الافتراض `false`.
+     *  - `down()` يزيل المثبَّت بهذه الهجرة وحده (علامة مرافقة)، فلا يضيع قرارٌ سابق.
      *  - الإشعارات المرحَّلة سابقاً لا تُمسّ إطلاقاً (immutable).
      *  - لا يُجرى إلا تحديث JSON لعمود `settings`؛ لا مسّ لأي جدول محاسبي.
      */
@@ -33,24 +36,29 @@ return new class extends Migration
             }
 
             $settings['sales']['allow_standalone_credit_notes'] = true;
+            // علامة «ثبّتتها هذه الهجرة»: تمكّن `down()` من إزالة ما أضافته وحده دون مسّ قرارٍ
+            // سابق. `Settings` يُهمل المفاتيح المجهولة عند القراءة، ويسقطها أول حفظٍ لإعدادات
+            // المبيعات — فيصير الثابت عندها قرار المستأجر نفسه ولا يُمسّ عند التراجع.
+            $settings['sales'][self::MARKER] = true;
             DB::table('tenants')->where('id', $tenant->id)
                 ->update(['settings' => json_encode($settings, JSON_UNESCAPED_UNICODE)]);
         }
     }
 
     /**
-     * يزيل المفتاح المثبَّت من كل مستأجر. مخصَّص للتراجع عن الحزمة كاملةً (الكود
-     * الذي يقرأ الإعداد يُسحب معها)؛ لا يُستعمل لتشديد السياسة على مستأجرٍ حيّ.
+     * يزيل ما ثبّتته هذه الهجرة وحدها (المعلَّم بالعلامة)، ولا يمسّ قراراً سابقاً —
+     * صريحاً كان (`false`/`true`) أو محفوظاً بعد الهجرة من شاشة الإعدادات. فتراجُعٌ
+     * ثم إعادة نشر لا يقلب سياسة مستأجر. مخصَّص للتراجع عن الحزمة كاملةً.
      */
     public function down(): void
     {
         foreach (DB::table('tenants')->get(['id', 'settings']) as $tenant) {
             $settings = $this->decode($tenant->settings);
-            if (! array_key_exists('allow_standalone_credit_notes', $settings['sales'] ?? [])) {
+            if (empty($settings['sales'][self::MARKER])) {
                 continue;
             }
 
-            unset($settings['sales']['allow_standalone_credit_notes']);
+            unset($settings['sales']['allow_standalone_credit_notes'], $settings['sales'][self::MARKER]);
             if ($settings['sales'] === []) {
                 unset($settings['sales']);
             }

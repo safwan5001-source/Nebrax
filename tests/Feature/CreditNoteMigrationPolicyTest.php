@@ -123,16 +123,31 @@ class CreditNoteMigrationPolicyTest extends TestCase
     }
 
     /** @test */
-    public function rolling_the_policy_back_removes_only_that_key(): void
+    public function rolling_the_policy_back_removes_only_what_the_migration_pinned(): void
     {
-        $tenant = $this->tenantWith('policy-rollback', ['sales' => ['default_tax_rate' => 5]]);
-        $solo   = $this->tenantWith('policy-rollback-solo', null);
-        $this->migration(self::POLICY)->up();
+        $pinned    = $this->tenantWith('policy-rollback', ['sales' => ['default_tax_rate' => 5]]);
+        $solo      = $this->tenantWith('policy-rollback-solo', null);
+        $explicitF = $this->tenantWith('policy-rollback-false', ['sales' => ['allow_standalone_credit_notes' => false]]);
+        $explicitT = $this->tenantWith('policy-rollback-true', ['sales' => ['allow_standalone_credit_notes' => true]]);
+        $saved     = $this->tenantWith('policy-rollback-saved', null);
 
-        $this->migration(self::POLICY)->down();
+        $migration = $this->migration(self::POLICY);
+        $migration->up();
 
-        $this->assertSame(['sales' => ['default_tax_rate' => 5]], $this->stored($tenant));
+        // المستأجر حفظ إعدادات المبيعات بعد الهجرة ⇒ القيمة صارت قراره.
+        Settings::put('sales', ['default_tax_rate' => 15], $saved->fresh());
+
+        $migration->down();
+
+        $this->assertSame(['sales' => ['default_tax_rate' => 5]], $this->stored($pinned));
         $this->assertSame([], $this->stored($solo), 'مجموعة sales التي أنشأتها الهجرة وحدها تُزال كاملة.');
+        $this->assertFalse($this->stored($explicitF)['sales']['allow_standalone_credit_notes'], 'قرار سابق صريح لا يضيع بالتراجع.');
+        $this->assertTrue($this->stored($explicitT)['sales']['allow_standalone_credit_notes']);
+        $this->assertTrue($this->stored($saved)['sales']['allow_standalone_credit_notes'], 'قيمة حُفظت من الإعدادات بعد الهجرة لا تُزال.');
+
+        // تراجُع ثم إعادة نشر: قرار `false` الصريح لا ينقلب إلى `true`.
+        $migration->up();
+        $this->assertFalse($this->stored($explicitF)['sales']['allow_standalone_credit_notes']);
     }
 
     // ── هجرة الأعمدة: إضافية وقابلة للتراجع ────────────────────────

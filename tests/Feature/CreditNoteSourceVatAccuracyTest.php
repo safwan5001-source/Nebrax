@@ -504,6 +504,38 @@ class CreditNoteSourceVatAccuracyTest extends TestCase
     }
 
     /** @test */
+    public function a_legacy_posted_note_without_line_links_still_consumes_the_cap_when_attributable(): void
+    {
+        // إشعار مرحَّل سبق REM-02: بلا source_line_id لكن منتجه سطرٌ وحيد في الفاتورة.
+        $invoice = $this->sale([$this->item(1, 10000)]);
+        $line = $invoice->lines->first();
+
+        $legacy = CreditNote::create([
+            'number' => 'CN-LEGACY-2', 'type' => 'sales', 'partner_id' => $invoice->partner_id,
+            'refund_type' => 'credit', 'note_date' => now()->toDateString(), 'status' => 'posted',
+            'original_invoice_id' => $invoice->id,
+        ]);
+        CreditNoteLine::create([
+            'credit_note_id' => $legacy->id, 'product_id' => $line->product_id,
+            'quantity' => 1, 'unit_price' => 10000, 'tax_rate' => 15,
+            'line_subtotal' => 10000, 'line_tax' => 1500, 'line_total' => 11500,
+        ]);
+
+        // لا إشعار جديد ولا مرتجع يعيدان خصم الوحدة نفسها.
+        $this->noteResponse($invoice, [[$line, 1]])->assertStatus(422)
+            ->assertJsonFragment(['message' => 'الكمية (1) تتجاوز المتبقي (0) من سطر الفاتورة بعد المرتجعات والإشعارات السابقة.']);
+        $this->postJson('/api/returns', [
+            'type' => 'sales', 'partner_id' => $invoice->partner_id, 'payment_type' => 'credit',
+            'original_id' => $invoice->id,
+            'items' => [['product_id' => $line->product_id, 'source_line_id' => $line->id, 'quantity' => 1, 'unit_price' => 10000]],
+        ])->assertStatus(422);
+
+        $row = $this->getJson("/api/returns/returnable/sales/{$invoice->id}")->assertOk()->json('data.lines.0');
+        $this->assertSame(0, $row['remaining']);
+        $this->assertSame('100.00', $row['returned_net']);
+    }
+
+    /** @test */
     public function drafts_do_not_reserve_quantity_but_the_second_post_is_rejected_under_the_cap(): void
     {
         $invoice = $this->sale([$this->item(2, 10000)]);
