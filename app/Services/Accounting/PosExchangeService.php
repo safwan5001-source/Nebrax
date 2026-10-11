@@ -83,6 +83,9 @@ class PosExchangeService
 
         try {
             return DB::transaction(function () use ($data, $actor, $idempotencyKey, $checksum) {
+                // REM-02: فاتورة المصدر **قبل** صف الفرع (الترتيب الموحّد — `SourceInvoiceLock`).
+                SourceInvoiceLock::acquire($data['original_invoice_id'] ?? null);
+
                 // مرساة ثابتة لكل فرع: تمنع سباق المفتاح نفسه حتى مع جلسات متوازية.
                 $branchId = app(BranchContext::class)->id();
                 if (! is_string($branchId) || $branchId === '') {

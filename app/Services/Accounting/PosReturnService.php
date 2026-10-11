@@ -79,7 +79,12 @@ class PosReturnService
     {
         $idempotencyKey = $data['idempotency_key'] ?? null;
         if (! is_string($idempotencyKey) || $idempotencyKey === '') {
-            return DB::transaction(fn () => $this->buildAndPostReturn($data, $actor));
+            return DB::transaction(function () use ($data, $actor) {
+                // REM-02: فاتورة المصدر أولاً (قبل أي قفل فرع) — انظر `SourceInvoiceLock`.
+                SourceInvoiceLock::acquire($data['original_invoice_id'] ?? null);
+
+                return $this->buildAndPostReturn($data, $actor);
+            });
         }
 
         $idempotencyKey = $this->requireIdempotencyKey($idempotencyKey);
@@ -87,6 +92,10 @@ class PosReturnService
 
         try {
             return DB::transaction(function () use ($data, $actor, $idempotencyKey, $checksum) {
+                // REM-02: فاتورة المصدر **قبل** صف الفرع: إشعارٌ دائن أو مرتجع API على السطر نفسه
+                // يأخذ الفاتورة ثم الفرع، فبقاء الترتيب واحداً يمنع الانسداد ويُسلسل الاستهلاك.
+                SourceInvoiceLock::acquire($data['original_invoice_id'] ?? null);
+
                 // مرساة ثابتة لكل فرع: تمنع سباق المفتاح نفسه حتى مع جلسات متوازية.
                 $branchId = app(BranchContext::class)->id();
                 if (! is_string($branchId) || $branchId === '') {
