@@ -20,10 +20,11 @@ use App\Models\StockMovement;
 use App\Support\Money;
 use App\Services\Accounting\InvoiceRelationsService;
 use App\Services\Accounting\InvoiceService;
+use App\Services\AttachmentStorage;
 use App\Services\ClassificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class InvoiceController extends ApiController
@@ -32,6 +33,7 @@ class InvoiceController extends ApiController
         protected InvoiceService $invoices,
         protected InvoiceRelationsService $relations,
         protected ClassificationService $classifications,
+        protected AttachmentStorage $attachmentStorage,
     ) {}
 
     public function index(Request $request): JsonResponse
@@ -228,22 +230,33 @@ class InvoiceController extends ApiController
     {
         $invoice = $this->visibleInvoice($request, $id);
         $data = $request->validated();
-        $note = $invoice->notesLog()->create([
-            'recorded_at' => $data['recorded_at'] ?? now(),
-            'body'        => $data['body'] ?? null,
-            'created_by'  => $request->user()?->id,
-        ]);
 
-        foreach ($request->file('attachments', []) as $file) {
-            $path = $file->store("invoices/{$invoice->id}/notes/{$note->id}", 'local');
-            $note->attachments()->create([
-                'disk'          => 'local',
-                'path'          => $path,
-                'original_name' => $file->getClientOriginalName(),
-                'mime_type'     => $file->getMimeType(),
-                'size'          => $file->getSize(),
-                'uploaded_by'   => $request->user()?->id,
-            ]);
+        // ذرّية الطلب (Q12): الملفات أولاً خارج المعاملة، ثم الملاحظة وصفوف مرفقاتها معاً.
+        // فشل أي ملف لا يُبقي ملاحظةً ولا صفاً ولا كائناً، فإعادة المحاولة لا تُكرّر ملاحظة.
+        $resourceId = $this->attachmentStorage->newResourceId();
+        $stored = $this->attachmentStorage->putMany(
+            AttachmentStorage::DOMAIN_INVOICE_NOTE,
+            $resourceId,
+            $request->file('attachments', []),
+            "invoices/{$invoice->id}/notes/{$resourceId}",
+        );
+
+        try {
+            $note = DB::transaction(function () use ($invoice, $data, $request, $stored) {
+                $note = $invoice->notesLog()->create([
+                    'recorded_at' => $data['recorded_at'] ?? now(),
+                    'body'        => $data['body'] ?? null,
+                    'created_by'  => $request->user()?->id,
+                ]);
+                foreach ($stored as $file) {
+                    $note->attachments()->create($file + ['uploaded_by' => $request->user()?->id]);
+                }
+
+                return $note;
+            });
+        } catch (\Throwable $e) {
+            $this->attachmentStorage->discard($stored);
+            throw $e;
         }
 
         return (new InvoiceNoteResource($note->load('attachments')))->response()->setStatusCode(201);
@@ -255,15 +268,10 @@ class InvoiceController extends ApiController
         $invoice = $this->visibleInvoice($request, $id);
         $note = $invoice->notesLog()->whereKey($noteId)->firstOrFail();
         $attachment = $note->attachments()->whereKey($attachmentId)->firstOrFail();
-        $disk = Storage::disk($attachment->disk);
 
-        if (! $disk->exists($attachment->path)) {
-            abort(404, 'ملف المرفق غير موجود.');
-        }
-
-        return $disk->download($attachment->path, $attachment->original_name, [
-            'Content-Type' => $attachment->mime_type ?? 'application/octet-stream',
-        ]);
+        return $this->attachmentStorage->download(
+            $attachment->disk, $attachment->path, $attachment->original_name, $attachment->mime_type,
+        );
     }
 
     /**

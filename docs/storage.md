@@ -103,6 +103,38 @@ bytes were already lost during a previous ephemeral-container replacement cannot
 be reconstructed by this change and must be uploaded once more after cutover.
 
 
+## Attachments R2 durability (AWJ-HORIZON-MEDIA-STORAGE S1)
+
+Expense, payment, purchase and invoice-note attachments, plus employee
+attachments and employee photos, are written through
+`App\Services\AttachmentStorage` (a thin wrapper over `R2StorageService`,
+which is unchanged). New writes go to R2 only when `AWJ_ATTACHMENTS_R2_ENABLED`
+(`config/attachments.php`) is on; it defaults to **off**, which keeps today's
+local-disk behaviour. The container disk is ephemeral (no Railway Volume), so
+**the flag must be turned on in Production for new attachments to be durable.**
+
+- The row's `disk` column (`employees.photo_disk` for the photo) is the only
+  source of truth for reads and deletes — never the flag. Closing the flag
+  stops new R2 writes but every row already on R2 stays readable. `photo_disk`
+  `null` means a legacy local photo.
+- Keys: `tenant/{tenant_id}/{domain}/{resource_id}/{uuid}.{ext}` with domains
+  `expense-attachments`, `payment-attachments`, `purchase-attachments`,
+  `invoice-note-attachments`, `employee-attachments`, `employee-photo`. For
+  create flows the parent does not exist yet, so `resource_id` is a server
+  generated grouping uuid.
+- `AttachmentStorage::put` always throws on failure (a local `->store()` can
+  return `false` silently); a failed upload answers `503 storage_unavailable`.
+- Request atomicity: files are written first (outside the transaction), then the
+  parent record and its attachment rows commit in one `DB::transaction` in the
+  controller. Any failure rolls the parent back and deletes the written
+  objects, so retrying the request is a clean first attempt (no duplicate
+  expense/payment). No financial service was changed.
+- Private files stay behind Laravel permission checks: no presigned URL, no
+  redirect, no public bucket. Downloads carry `X-Content-Type-Options: nosniff`.
+- Deleting: accounting attachments delete the row first and log an object
+  deletion failure; employee (personal) files erase the object **before** the
+  row so a failure leaves a retryable row instead of an orphan.
+
 ## Product Media R2 migration (AWJ-R2-4)
 
 Product Media (`app/Models/ProductMedia.php`) is the first real consumer of
