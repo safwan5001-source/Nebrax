@@ -5,6 +5,7 @@ namespace App\Services\Commerce;
 use App\Models\StorefrontMedia;
 use App\Models\StorefrontMediaDerivative;
 use App\Services\R2StorageService;
+use App\Support\EdgeScheme;
 use App\Tenancy\TenantContext;
 use Aws\Exception\AwsException;
 use Illuminate\Database\QueryException;
@@ -175,7 +176,7 @@ class StorefrontMediaDerivativeService
             return null;
         }
 
-        return URL::temporarySignedRoute(
+        return EdgeScheme::forBrowser(URL::temporarySignedRoute(
             'commerce.workspace.storefront-media.derivative',
             now()->addMinutes((int) config('storefront_media.signed_url_minutes', 20)),
             [
@@ -183,7 +184,7 @@ class StorefrontMediaDerivativeService
                 'tenant' => $tenantId,
                 'file' => StorefrontMediaDerivative::fileName($derivative->transform_key, $derivative->format),
             ],
-        );
+        ));
     }
 
     /**

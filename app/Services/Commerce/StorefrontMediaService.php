@@ -4,6 +4,7 @@ namespace App\Services\Commerce;
 
 use App\Models\StorefrontMedia;
 use App\Services\R2StorageService;
+use App\Support\EdgeScheme;
 use App\Tenancy\TenantContext;
 use Aws\Exception\AwsException;
 use Illuminate\Http\UploadedFile;
@@ -182,11 +183,11 @@ class StorefrontMediaService
             return null;
         }
 
-        return URL::temporarySignedRoute(
+        return EdgeScheme::forBrowser(URL::temporarySignedRoute(
             'commerce.workspace.storefront-media.file',
             now()->addMinutes((int) config('storefront_media.signed_url_minutes', 20)),
             ['media' => $media->id, 'tenant' => $tenantId, 'file' => $file],
-        );
+        ));
     }
 
     /**
