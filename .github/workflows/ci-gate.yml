@@ -1,0 +1,52 @@
+name: CI Gate
+
+# AWJ-HORIZON-V2-1A — بوابة CI موحّدة تُبلِّغ دائماً على كل Pull Request.
+# لا تشغّل اختبارات بنفسها: تحسب من تغييرات الـPR ومن ملفات الـworkflows أيّ فحوص
+# يجب أن تكون قد عملت، وتنتظر نجاحها (completed/success) على SHA رأس الـPR.
+# معلوماتية الآن (لا Required Check). التصميم والتفعيل: docs/autonomous-engineering/AWJ-HORIZON-V2-1A-CI-GATE-REPORT.md
+# المصدر الوحيد لقائمة الفحوص: .github/ci-gate/required-checks.json
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+# تحديث الـPR يلغي بوابة الـSHA القديم فقط؛ الإلغاء لا يُعدّ نجاحاً لأن الحالة مرتبطة بالـSHA.
+concurrency:
+  group: ci-gate-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  checks: read
+  actions: read
+  pull-requests: read
+
+jobs:
+  gate:
+    name: CI Gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 80
+    steps:
+      - name: Checkout (merge ref)
+        uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install PyYAML
+        run: python -m pip install --quiet pyyaml==6.0.2
+
+      - name: Gate self-tests
+        run: python -m unittest discover -s scripts/ci-gate -v
+
+      - name: Validate manifest against workflows
+        run: python scripts/ci-gate/ci_gate.py validate
+
+      - name: Wait for required checks on the PR head SHA
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: >
+          python scripts/ci-gate/ci_gate.py gate
+          --pr "${{ github.event.pull_request.number }}"
+          --sha "${{ github.event.pull_request.head.sha }}"
