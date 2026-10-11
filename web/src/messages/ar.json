@@ -446,6 +446,8 @@
     "allPlans": "كل الخطط",
     "filterByStatus": "تصفية بالحالة",
     "allStatuses": "كل الحالات",
+    "pageFilterNote": "التصفية على هذه الصفحة فقط",
+    "refresh": "تحديث",
     "trialEndsAt": "نهاية التجربة",
     "usersCount": "المستخدمون",
     "active": "نشط",
