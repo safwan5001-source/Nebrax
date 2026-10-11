@@ -25,7 +25,7 @@ class DocumentStorageService
             throw new RuntimeException('Document storage requires a readable stream.');
         }
 
-        $written = $this->filesystem($profile)->put($objectKey, $stream, ['visibility' => 'private']);
+        $written = $this->filesystem($profile)->put($objectKey, $stream, $this->writeOptions());
         if (! $written) {
             throw new RuntimeException('Document storage write failed.');
         }
@@ -60,7 +60,7 @@ class DocumentStorageService
         $key = 'healthchecks/'.Str::uuid().'.txt';
         $filesystem = $this->filesystem($this->profile());
         try {
-            if (! $filesystem->put($key, 'nebrax-storage-health', ['visibility' => 'private'])) {
+            if (! $filesystem->put($key, 'nebrax-storage-health', $this->writeOptions())) {
                 return false;
             }
 
@@ -90,7 +90,7 @@ class DocumentStorageService
             }
         }
 
-        return Storage::build([
+        $config = [
             'driver' => 's3',
             'key' => $settings['key'],
             'secret' => $settings['secret'],
@@ -100,8 +100,35 @@ class DocumentStorageService
             'url' => $settings['url'],
             'use_path_style_endpoint' => $settings['use_path_style_endpoint'],
             'throw' => true,
-            'visibility' => 'private',
-        ]);
+        ];
+        if (! $this->isCloudflareR2($settings)) {
+            $config['visibility'] = 'private';
+        }
+
+        return Storage::build($config);
+    }
+
+    /**
+     * خيارات الكتابة. `visibility` تُترجمها Flysystem-S3 إلى ترويسة `x-amz-acl`، وCloudflare R2 تُصنّفها
+     * غير مدعومة في PutObject (ولا تحدّد إن كانت تتجاهلها أم ترفضها). الخصوصية على R2 يحكمها الدلو
+     * الخاص والاعتماد المحدود لا ACL الكائن، فلا نرسلها هناك. سائر السائقين (local وS3 العادي) كما كانت.
+     *
+     * @return array<string, mixed>
+     */
+    private function writeOptions(): array
+    {
+        return $this->isCloudflareR2($this->settings()) ? [] : ['visibility' => 'private'];
+    }
+
+    /** @param array<string, mixed> $settings */
+    private function isCloudflareR2(array $settings): bool
+    {
+        if (($settings['driver'] ?? null) !== 's3') {
+            return false;
+        }
+        $host = strtolower((string) parse_url((string) ($settings['endpoint'] ?? ''), PHP_URL_HOST));
+
+        return $host === 'r2.cloudflarestorage.com' || str_ends_with($host, '.r2.cloudflarestorage.com');
     }
 
     /** @return array<string, mixed> */
