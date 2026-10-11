@@ -258,10 +258,16 @@ export function HomeSlider({
     event.preventDefault();
   };
 
+  // The first touch anywhere on the carousel — a slide, an arrow, a dot — pauses autoplay for good (the visitor presses Play to
+  // resume). The Pause / Play button is exempt: its own click decides.
+  const onTouchPause = (event: PointerEvent<HTMLElement>) => {
+    if (event.pointerType === "mouse" || !autoplay) return;
+    if ((event.target as HTMLElement).closest("[data-slider-pause]")) return;
+    setPaused(true);
+  };
+
   const onPointerDown = (event: PointerEvent<HTMLDivElement>) => {
     if (event.pointerType === "mouse") return;
-    // The first touch pauses autoplay for good (the visitor presses Play to resume).
-    if (autoplay) setPaused(true);
     swipe.current = { x: event.clientX, y: event.clientY, id: event.pointerId };
   };
   const onPointerUp = (event: PointerEvent<HTMLDivElement>) => {
@@ -294,6 +300,7 @@ export function HomeSlider({
       aria-roledescription="carousel"
       aria-label={labels.label}
       onKeyDown={onKeyDown}
+      onPointerDown={onTouchPause}
       onMouseEnter={() => setHovering(true)}
       onMouseLeave={() => setHovering(false)}
       onFocus={(event) => {

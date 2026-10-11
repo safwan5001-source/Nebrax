@@ -639,6 +639,33 @@ describe("HomeSlider — autoplay (D-16)", () => {
     expect(screen.getByRole("button", { name: "Play slides" })).toBeTruthy();
   });
 
+  it("a touch on an arrow or a dot pauses it for good; a touch on the Pause / Play button leaves the decision to its click (Codex P2)", () => {
+    vi.useFakeTimers();
+    const { unmount } = mount(view(3, auto({ loop: true })));
+    fireEvent.pointerDown(
+      screen.getByRole("button", { name: "Go to slide 2" }),
+      { pointerId: 3, pointerType: "touch" },
+    );
+    expect(screen.getByRole("button", { name: "Play slides" })).toBeTruthy();
+    act(() => {
+      vi.advanceTimersByTime(60_000);
+    });
+    expect(activeIndex()).toBe(0);
+    unmount();
+
+    mount(view(3, auto({ loop: true })));
+    const pause = screen.getByRole("button", { name: "Pause slides" });
+    fireEvent.pointerDown(pause, { pointerId: 4, pointerType: "touch" });
+    expect(screen.getByRole("button", { name: "Pause slides" })).toBeTruthy(); // not flipped by the touch itself
+    fireEvent.click(pause);
+    expect(screen.getByRole("button", { name: "Play slides" })).toBeTruthy();
+    fireEvent.pointerDown(screen.getByRole("button", { name: "Next slide" }), {
+      pointerId: 5,
+      pointerType: "mouse",
+    });
+    expect(screen.getByRole("button", { name: "Play slides" })).toBeTruthy();
+  });
+
   it("pauses while the tab is hidden", () => {
     vi.useFakeTimers();
     mount(view(3, auto({ loop: true })));
