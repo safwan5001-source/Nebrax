@@ -1,9 +1,10 @@
 // AWJ-TAX-REM-02-PRINT-02 — visual verification driver (standalone; not part of the Playwright test run).
 //
+//   Needs the QA page: copy credit-note-qa-page.tsx.txt to src/app/document-qa/credit-note/page.tsx (temporary, not committed) — see README.md
 //   cd web && npm run dev -- -p 3001      # in another shell
 //   node e2e/credit-note-visual/capture.mjs [outDir]
 //
-// Renders the real <CreditNoteDocument> through /document-qa/credit-note in Chromium, screenshots #print-root at the
+// Renders the real <CreditNoteDocument> through that temporary /document-qa/credit-note page in Chromium, screenshots #print-root at the
 // document's natural size, runs DOM checks (clipping, overlap, equations), and produces browser-print PDFs and the
 // app's own html2canvas/jsPDF PDF for a subset. Writes results.json next to the images.
 import { chromium } from 'playwright-core';

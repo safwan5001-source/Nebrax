@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Scope** | Real-browser verification of credit-note print/PDF (PR #1315, stacked on #1304) before the merge sequence. Not a repeat of the implementation audit. |
+| **Scope** | Real-browser verification of credit-note print/PDF (PR #1315, now merged; originally stacked on #1304). Not a repeat of the implementation audit. This file is the deliverable of PR #1320, which now carries **only** this report and its QA evidence/tooling (§12). |
 | **Method** | Real **Chromium 141 (Playwright)** rendering the actual `<CreditNoteDocument>` → `DocumentView` → templates, with the real Arabic web font (IBM Plex Sans Arabic, loaded in all 122 cases), real cookie-driven `ar`/`en` locale, browser print-to-PDF with the same `@page` injection as `printDocument`, and the app's own `documentExporter.download` (html2canvas + jsPDF) for PDF. 122 cases × screenshot + DOM checks (clipping, overflow, cell overlap, mid-word header breaks) + an independent equation oracle over the rendered text. |
 | **Result** | **1 blocking defect found in #1315 (thermal), fixed in #1315 and re-verified.** All 122 cases now reconcile to the halala. A5 is **not a supported AWJ paper** (§3). **Recommendation: READY — conditional** (§11). |
 | **Not done** | No merge, no deploy, no migration, no accounting/tax/posted-value change, no change to #1304, no Codex re-review requested. |
@@ -27,7 +27,7 @@ Reports/notes read: `AWJ-TAX-REM-02-IMPLEMENTATION-REPORT.md`, `AWJ-TAX-REM-02-P
 
 ## 2. How the rendering was produced (reproducible)
 
-* QA route (new, isolated, no business data, not in navigation): `web/src/app/document-qa/credit-note/page.tsx` — renders the **real** `CreditNoteDocument` with no scaler so `#print-root` is captured at natural size. Fixtures: `web/src/modules/documents/qa/credit-note-qa-fixtures.ts` (API-shaped payloads from stored halala amounts; the 10 requested scenarios + long names + 28 lines).
+* QA page (isolated, fixtures only): a template at `web/e2e/credit-note-visual/credit-note-qa-page.tsx.txt` — renders the **real** `CreditNoteDocument` with no scaler so `#print-root` is captured at natural size. **It is deliberately not a route in the repo** (a page under `src/app` would be shipped to production); to reproduce, copy it temporarily to `src/app/document-qa/credit-note/page.tsx` as described in `web/e2e/credit-note-visual/README.md`. The recorded run used a byte-identical copy of this file (`git mv`, 100 % rename). Fixtures: `web/src/modules/documents/qa/credit-note-qa-fixtures.ts` (API-shaped payloads from stored halala amounts; the 10 requested scenarios + long names + 28 lines).
 * Driver: `web/e2e/credit-note-visual/capture.mjs` (`cd web && npm run dev -- -p 3001`, then `node e2e/credit-note-visual/capture.mjs <outDir>`); A5 informational: `capture-a5.mjs`.
 * Oracle: `docs/audits/evidence/AWJ-TAX-REM-02-PRINT-02/oracle.py` (reads `results.json`/`texts.json`; checks every row `net + VAT = total`, Σ rows = grand total, totals identity `subtotal − discount + VAT = total`, thermal totals parsed from rendered text, saved-layout note presence, header-word overflow).
 * Evidence: `docs/audits/evidence/AWJ-TAX-REM-02-PRINT-02/` — **137 curated screenshots (8 MB)**; `results.json` covers all 122 cases (images are a curated subset: all A4 default, A4 compositions for the discount case, all saved-layout, all thermal, app-PDF pages, A5, before-fix). Browser-print/app PDFs (85 MB) are not committed; page counts are in `results.json`.
@@ -146,7 +146,7 @@ A saved layout that omits a necessary financial column therefore **can** show a 
 ## 9. Changes made in this task
 
 * **#1315 (commit `b3adda1`, presentation only):** `templates/thermal-receipt.tsx`, `components/sections/doc-items-table.tsx`, widths in `presentation/{minimal-v2,quotation-proposal,retail-v2,purchase-order-formal}.ts`, 1 message key (ar/en), `qa/credit-note-qa-fixtures.ts` (test fixtures), `document-credit-note-print02.test.tsx`.
-* **Evidence PR (docs/QA only, stacked on #1315):** this report, `docs/audits/evidence/AWJ-TAX-REM-02-PRINT-02/`, the QA route, and the capture scripts.
+* **Evidence PR #1320 (docs/QA only, base `main`):** this report, `docs/audits/evidence/AWJ-TAX-REM-02-PRINT-02/`, and the QA tooling under `web/e2e/credit-note-visual/` (capture scripts, README, page template). See §12 for the exact inventory and scope proof.
 * **Not touched:** #1304, any PHP, migrations, tax/ledger/return/POS/invoice-posting code, ZATCA, `PrintTemplateContract.php`, posted values.
 
 ## 10. Remaining risks
@@ -158,7 +158,7 @@ A saved layout that omits a necessary financial column therefore **can** show a 
 5. `minimal-v2` header splits (F5) and the blank trailing PDF page (F6) are pre-existing and shared with invoices.
 6. #1304's `mergeable_state` reads `unknown` until GitHub recomputes; local `merge-tree` against current `main` shows no conflicts.
 
-## 11. Final recommendation: **READY — conditional**
+## 11. Final recommendation for #1315 (historical — #1315 has since merged) : **READY — conditional**
 
 **#1315 is READY to merge after #1304**, on these conditions: **(a)** CI stays green on `b3adda1` — **verified 6/6 success**; re-check after retargeting to `main`; **(b)** the owner accepts that A5 is unsupported and that physical-thermal-printer behaviour is NOT VERIFIED; **(c)** the owner accepts F1's effect on invoice thermal receipts with a header discount (or asks for it to be gated). It is **not** safe to merge #1315 at `1287f51` (the thermal defect). This report does not approve #1304's accounting — that is covered by its own report/review.
 
@@ -166,7 +166,48 @@ A saved layout that omits a necessary financial column therefore **can** show a 
 
 1. **#1304** — owner approval of its accounting changes (its 5 still-open review threads include the 3 print ones that #1315 resolves). CI is green. Confirm GitHub shows it mergeable after `main` moved (local check: clean).
 2. **Retarget #1315 to `main`** (`gh`/UI: change base) → CI re-runs → confirm green on the final head → merge.
-3. **Evidence PR** (docs/QA only) — optional, any time after #1315; merging it adds the QA route, scripts and screenshots to the repo.
+3. **Evidence PR #1320** (docs/QA only) — optional, any time after #1315; merging it adds the report, screenshots and QA tooling to the repo (no application code).
 4. Follow-ups (owner decisions, not blockers): F7 credit-note footer/labels; selectable discount columns in saved layouts (shared contract); A5 scope; real thermal-printer test; the shared exporter's blank trailing page.
+
+**Stopped before merging either PR.**
+
+---
+
+## 12. PR #1320 — post-squash branch cleanup, scope and status
+
+**Why this section exists.** After #1304 (`56fcac62`) and #1315 (`3209fcb77cc4e02b729bb74c34adf7e131869a1b`) were squash-merged, this PR's branch still carried their original commits, so GitHub's three-dot diff (merge-base = the pre-#1304 `main`) showed **221 files** and `mergeable=false`.
+
+**Fix — no history rewrite, no force-push.** `main` was merged into the branch (fast-forward push). One conflict: `AWJ-TAX-REM-02-PRINT-01-IMPLEMENTATION-REPORT.md` (add/add) — `main` carries #1315's final copy (blob `eeec852…`, identical to #1315's last head), so `main`'s was kept. Independent cross-check: replaying this PR's three own evidence commits onto a clean `main` produced a tree **byte-identical** to the merge result (`533b8fc…`). Nothing from #1304/#1315 was reintroduced — those changes are already on `main`, so they do not appear in the diff.
+
+**Scope correction (this commit).** The first cleanup left one file under `web/src/app/` — the isolated QA page. Although fixtures-only and not in navigation, a page under `src/app` is compiled into the production bundle and reachable by URL, so "no production code change" was not strictly true. It was **moved out of `src/app`** into `web/e2e/credit-note-visual/credit-note-qa-page.tsx.txt` (a non-compiled template; `git mv`, 100 % rename) with a README on how to reproduce. The PR now contains **no file under `web/src/`**.
+
+**Scope proof** (`git diff --name-only origin/main` after the change, checked against an allowlist):
+
+| Check | Result |
+|---|---|
+| Files changed vs `main` | **146** (137 `.jpg`, 3 `.json`, 2 `.md`, 2 `.mjs`, 1 `.py`, 1 `.txt`) |
+| Outside `docs/audits/evidence/AWJ-TAX-REM-02-PRINT-02/`, `AWJ-TAX-REM-02-PRINT-02-VISUAL-VERIFICATION.md`, `web/e2e/credit-note-visual/` | **none** |
+| Any `app/`, `database/`, `routes/`, `config/`, `tests/`, `.github/`, `web/src/`, `*.php`, `*.ts`, `*.tsx`, `*.js` | **none** — no accounting, tax, POS, database or production code |
+| Can the tooling be run/compiled by the project? | No: `tsconfig` includes only `**/*.ts(x)`; vitest only `src/**/*.test.ts(x)`; Playwright's default `testMatch` needs `*.spec/test.*` — the `.mjs`/`.txt`/`.md` files match none |
+
+**Changed files (inventory):** `AWJ-TAX-REM-02-PRINT-02-VISUAL-VERIFICATION.md` · `docs/audits/evidence/AWJ-TAX-REM-02-PRINT-02/` (137 screenshots in `a4/`, `a4-compositions/`, `saved-layout/`, `thermal-80/`, `thermal-58/`, `app-pdf/`, `a5-informational/`, `before-fix/`; `results.json`, `results-before-fix.json`, `texts.json`, `oracle.py`) · `web/e2e/credit-note-visual/` (`capture.mjs`, `capture-a5.mjs`, `credit-note-qa-page.tsx.txt`, `README.md`).
+
+**Checks on this tree (local):**
+
+| Check | Result |
+|---|---|
+| Focused vitest: `modules/documents`, `design`, `components/credit-notes`, `modules/invoices`, `modules/print-templates` | 58 files / 585 tests pass (no `src` change vs `main`, so this confirms `main`'s state) |
+| Evidence integrity | 137 images; `results.json` / `results-before-fix.json` / `texts.json` valid JSON, 122 entries each |
+| `oracle.py` reproduces from the committed evidence | 122 cases checked; 4 residual cosmetic flags (`minimal-v2` Qty header, F5) — as recorded in §5 |
+| `tsc` / full suite / build | unaffected by construction (no `.ts/.tsx/.js` in the diff); CI runs them — see below |
+
+**Base / Head / CI / mergeability:** *pending at this commit* — CI is re-running after the scope-correction push; the verified result, final Base/Head SHAs and `mergeable_state` are recorded in the report-only follow-up commit and in the PR description.
+
+**Remaining risks (specific to this PR):**
+1. Merging adds ≈8 MB of screenshots to the repo history (can be closed unmerged instead; no shipped fix depends on it).
+2. Reproducing the run needs the page template copied into `src/app` temporarily (documented); if someone commits that copy, it would ship to production — the README says not to, and this PR deliberately does not.
+3. The evidence documents the state of the code at verification time (`b3adda1`, later squash-merged as `3209fcb`); later changes to the document templates are not covered.
+4. The report's earlier sections still quote verification-time SHAs and the (historical) merge order; the post-merge note at the top and this section are authoritative for current status.
+5. Open product items from §5/§10 remain owner decisions: A5 (unsupported), physical thermal printer (not verified), selectable discount columns in saved layouts, ZATCA footer / "Invoice no." wording on credit notes.
 
 **Stopped before merging either PR.**
