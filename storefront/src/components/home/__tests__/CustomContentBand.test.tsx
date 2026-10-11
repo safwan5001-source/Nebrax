@@ -81,8 +81,8 @@ describe("CustomContentBand — a text-only sub-heading is a real h3 (V9c review
     );
     expect(container.querySelector("h2")?.textContent).toBe("Main");
     expect(container.querySelector("h3")?.textContent).toBe("Sub");
-    expect(container.querySelector("section")?.getAttribute("aria-labelledby")).toBe(
-      container.querySelector("h2")?.id,
-    );
+    expect(
+      container.querySelector("section")?.getAttribute("aria-labelledby"),
+    ).toBe(container.querySelector("h2")?.id);
   });
 });
