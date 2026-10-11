@@ -214,7 +214,7 @@ describe("Header design panel (V7a)", () => {
   it("every select starts on Default and nothing is written until the merchant chooses", async () => {
     const onChange = setup(DEFAULT_PRESENTATION_CONFIG);
     const selects = document.querySelectorAll<HTMLSelectElement>("[data-header-design]");
-    expect(selects.length).toBe(7);
+    expect(selects.length).toBe(8);
     for (const select of selects) expect(select.value).toBe("");
     expect(onChange).not.toHaveBeenCalled();
     expect(document.querySelector("[data-header-design-reset]")).toBeNull();

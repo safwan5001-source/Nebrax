@@ -132,6 +132,25 @@ describe("Header", () => {
       }
     });
 
+    it("mounts the overlay controller only for an opted-in header", async () => {
+      const on = await renderHeader({ design: { mode: "overlay-hero" } });
+      expect(
+        on.container.querySelector("[data-header-overlay-controller]"),
+      ).not.toBeNull();
+      on.unmount();
+      for (const design of [
+        undefined,
+        { mode: "solid" as const },
+        { sticky: "off" as const },
+      ]) {
+        const view = await renderHeader({ design });
+        expect(
+          view.container.querySelector("[data-header-overlay-controller]"),
+        ).toBeNull();
+        view.unmount();
+      }
+    });
+
     it("centered places the menu, search, brand and actions on explicit desktop columns", async () => {
       const { container } = await renderHeader({
         design: { layout: "centered" },

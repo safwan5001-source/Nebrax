@@ -17,7 +17,7 @@
     },
     {
       "name": "deferred vocabulary fails closed",
-      "input": { "sticky": "sticky-bottom", "mode": "overlay-hero", "search": "icon-expand", "categoryNav": "tabs", "surface": { "background": "#000" }, "logo": { "align": "center", "treatment": "mono-light" } },
+      "input": { "sticky": "sticky-bottom", "mode": "transparent", "search": "icon-expand", "categoryNav": "tabs", "surface": { "background": "#000" }, "logo": { "align": "center", "treatment": "mono-light" } },
       "expected": null
     },
     {
@@ -45,6 +45,9 @@
     {"name": "colours: invalid references drop on their own", "input": {"surface": {"background": {"hex": "red"}}, "text": {"role": "neon"}, "icon": "#fff", "sticky": "off"}, "expected": {"sticky": "off"}},
     {"name": "colours: only the background is accepted inside surface (alpha and gradient wait for V7c)", "input": {"surface": {"alpha": 50, "background": {"kind": "gradient"}, "text": {"hex": "#000000"}}}, "expected": null},
     {"name": "colours: non-object surface is ignored", "input": {"surface": "#000000", "text": {"hex": "#111111"}}, "expected": {"text": {"hex": "#111111"}}},
-    {"name": "sticky: on-scroll-up is a valid choice (V7c-1)", "input": {"sticky": "on-scroll-up", "height": "compact"}, "expected": {"height": "compact", "sticky": "on-scroll-up"}}
+    {"name": "sticky: on-scroll-up is a valid choice (V7c-1)", "input": {"sticky": "on-scroll-up", "height": "compact"}, "expected": {"height": "compact", "sticky": "on-scroll-up"}},
+    {"name": "mode: overlay-hero and solid are the only modes (V7c-2); transparent stays rejected", "input": {"mode": "overlay-hero", "sticky": "off"}, "expected": {"mode": "overlay-hero", "sticky": "off"}},
+    {"name": "mode: solid is a real choice", "input": {"mode": "solid"}, "expected": {"mode": "solid"}},
+    {"name": "mode: transparent is dropped on its own", "input": {"mode": "transparent", "shadow": "soft"}, "expected": {"shadow": "soft"}}
   ]
 }

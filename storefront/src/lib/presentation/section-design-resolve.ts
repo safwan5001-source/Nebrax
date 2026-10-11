@@ -201,14 +201,18 @@ function backgroundInterval(
 }
 
 /**
- * V6b-2 — luminance interval of an image background: the union of the bounds of every
- * picture that can be shown (default + phone) under the overlay. Any picture without
- * evidence ⇒ `null` = unprovable. Twin of PHP `SectionDesignContrast::mediaInterval`.
+ * V7c-2 — what a picture background is proven to show, before and after its own overlay: the union of the
+ * channel bounds of every picture that can be shown (default + phone) and the overlay stacked on it. Any
+ * picture without evidence ⇒ `null` = unprovable. The header-over-hero proof stacks its scrim on this.
  */
-function mediaInterval(
+export function mediaBackgroundBounds(
   bg: Extract<NonNullable<SectionDesign["background"]>, { kind: "media" }>,
   ctx: DesignContext,
-): LuminanceInterval | null {
+): {
+  min: [number, number, number];
+  max: [number, number, number];
+  overlay: { rgb: Rgb; alpha: number } | null;
+} | null {
   if (!ctx.mediaBounds) return null;
   const min: [number, number, number] = [255, 255, 255];
   const max: [number, number, number] = [0, 0, 0];
@@ -227,7 +231,21 @@ function mediaInterval(
     if (!rgb) return null;
     overlay = { rgb, alpha: bg.overlay.alpha / 100 };
   }
-  return channelBoundsInterval(min, max, overlay);
+  return { min, max, overlay };
+}
+
+/**
+ * V6b-2 — luminance interval of an image background: the union of the bounds of every
+ * picture that can be shown (default + phone) under the overlay. Any picture without
+ * evidence ⇒ `null` = unprovable. Twin of PHP `SectionDesignContrast::mediaInterval`.
+ */
+function mediaInterval(
+  bg: Extract<NonNullable<SectionDesign["background"]>, { kind: "media" }>,
+  ctx: DesignContext,
+): LuminanceInterval | null {
+  const bounds = mediaBackgroundBounds(bg, ctx);
+  if (!bounds) return null;
+  return channelBoundsInterval(bounds.min, bounds.max, bounds.overlay);
 }
 
 /** Section types whose own markup paints an opaque dark surface of its own. */

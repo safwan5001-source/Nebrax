@@ -1,16 +1,8 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { watchScroll } from "./canvas-scroll";
 import { stepScrollUp } from "./presentation/header-design";
-
-/** The nearest ancestor that actually scrolls (the preview pane), else the window. */
-function scrollHost(from: HTMLElement): HTMLElement | Window {
-  for (let el = from.parentElement; el; el = el.parentElement) {
-    const { overflowY } = getComputedStyle(el);
-    if (overflowY === "auto" || overflowY === "scroll") return el;
-  }
-  return window;
-}
 
 /**
  * CUST-HV V7c-1 — the Canvas's scroll-position simulator for `sticky: on-scroll-up` (V0 §9.3 point 6):
@@ -23,31 +15,28 @@ export function HeaderScrollUpPreview() {
   useEffect(() => {
     const header = marker.current?.closest("header");
     if (!header) return;
-    const host = scrollHost(header);
-    const top = () => (host instanceof Window ? host.scrollY : host.scrollTop);
-
-    let state = { hidden: false, lastY: Math.max(0, top()) };
+    let state = { hidden: false, lastY: 0 };
     const apply = (hidden: boolean) => {
       if (hidden) header.setAttribute("data-header-hidden", "");
       else header.removeAttribute("data-header-hidden");
     };
-    const onScroll = () => {
+    const onScroll = (y: number) => {
       state = stepScrollUp(
         state,
-        top(),
+        y,
         header.offsetHeight,
         header.contains(document.activeElement),
       );
       apply(state.hidden);
     };
     const reveal = () => {
-      state = { hidden: false, lastY: Math.max(0, top()) };
+      state = { hidden: false, lastY: state.lastY };
       apply(false);
     };
-    host.addEventListener("scroll", onScroll, { passive: true });
+    const unwatch = watchScroll(header, onScroll);
     header.addEventListener("focusin", reveal);
     return () => {
-      host.removeEventListener("scroll", onScroll);
+      unwatch();
       header.removeEventListener("focusin", reveal);
       apply(false);
     };

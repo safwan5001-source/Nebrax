@@ -233,3 +233,53 @@ describe("picture backgrounds on the published stack (CUST-HV V6b-3)", () => {
     expect(container.querySelector("[data-sd-backdrop]")).toBeNull();
   });
 });
+
+describe("overlay-on-hero marker on the published stack (CUST-HV V7c-2)", () => {
+  const media = { [backgroundMediaPath(0, "media")]: resolved(DARK) };
+  const overlay = {
+    sectionId: "hero",
+    tone: "light" as const,
+    fg: "#ffffff" as const,
+  };
+
+  it("puts the data-ho marker on the frame of the hero the decision names", async () => {
+    const nodes = await publishedNodes([heroWith("hero", picture)], {
+      ...base,
+      media,
+      headerOverlay: overlay,
+    } as never);
+    const { container } = render(<div>{nodes}</div>);
+    expect(container.querySelector("[data-sd]")?.getAttribute("data-ho")).toBe(
+      "on l",
+    );
+  });
+
+  it("a dark-text decision writes the d token", async () => {
+    const nodes = await publishedNodes([heroWith("hero", picture)], {
+      ...base,
+      media,
+      headerOverlay: { ...overlay, tone: "dark", fg: "#000000" },
+    } as never);
+    const { container } = render(<div>{nodes}</div>);
+    expect(container.querySelector("[data-sd]")?.getAttribute("data-ho")).toBe(
+      "on d",
+    );
+  });
+
+  it("no decision, or one naming another section, leaves the markup untouched", async () => {
+    for (const headerOverlay of [
+      undefined,
+      null,
+      { ...overlay, sectionId: "other" },
+    ]) {
+      const nodes = await publishedNodes([heroWith("hero", picture)], {
+        ...base,
+        media,
+        headerOverlay,
+      } as never);
+      const { container, unmount } = render(<div>{nodes}</div>);
+      expect(container.querySelector("[data-ho]")).toBeNull();
+      unmount();
+    }
+  });
+});

@@ -21,8 +21,10 @@
  * reads downward and returns on the first upward scroll (`stepScrollUp`, one pure rule shared by the
  * storefront and the Canvas simulator).
  *
- * Deliberately NOT here yet (dropped fail-closed until their slice): `surface.alpha` / gradients and
- * `mode` (V7c-2), explicit `search` / `categoryNav` presentation, `logo.align` / `logo.treatment`.
+ * V7c-2 adds `mode: overlay-hero` (the contract's `transparent` stays rejected: a transparent header is only
+ * ever safe over a backdrop the proof knows, and that is exactly `overlay-hero`).
+ *
+ * Deliberately NOT here yet (dropped fail-closed until their slice): `surface.alpha` / gradients, explicit `search` / `categoryNav` presentation, `logo.align` / `logo.treatment`.
  *
  * `resolveHeaderDesign` is the one pure function from the document to what a renderer needs: a
  * `data-hd` token list plus validated `--hd-*` custom properties for the theme wrapper (heights,
@@ -51,6 +53,7 @@ export const HEADER_LAYOUTS = [
 export const HEADER_MOBILE_LAYOUTS = ["logo-centre", "logo-start"] as const;
 export const HEADER_HEIGHTS = ["compact", "standard", "tall"] as const;
 export const HEADER_LOGO_SIZES = ["sm", "md", "lg", "xl"] as const;
+export const HEADER_MODES = ["solid", "overlay-hero"] as const;
 export const HEADER_STICKY = ["always", "on-scroll-up", "off"] as const;
 export const HEADER_BORDER_WIDTHS = ["none", "hairline", "medium"] as const;
 export const HEADER_SHADOWS = ["none", "soft", "medium"] as const;
@@ -59,6 +62,7 @@ export type HeaderLayout = (typeof HEADER_LAYOUTS)[number];
 export type HeaderMobileLayout = (typeof HEADER_MOBILE_LAYOUTS)[number];
 export type HeaderHeight = (typeof HEADER_HEIGHTS)[number];
 export type HeaderLogoSize = (typeof HEADER_LOGO_SIZES)[number];
+export type HeaderMode = (typeof HEADER_MODES)[number];
 export type HeaderSticky = (typeof HEADER_STICKY)[number];
 export type HeaderBorderWidth = (typeof HEADER_BORDER_WIDTHS)[number];
 export type HeaderShadow = (typeof HEADER_SHADOWS)[number];
@@ -74,6 +78,8 @@ export interface HeaderDesign {
   text?: ColorRef;
   /** V7b — the identity row's icon colour; absent ⇒ the text colour. */
   icon?: ColorRef;
+  /** V7c-2 — `overlay-hero`: transparent over a proven full-bleed picture hero on Home (see `header-overlay.ts`). */
+  mode?: HeaderMode;
   sticky?: HeaderSticky;
   border?: { width: HeaderBorderWidth };
   shadow?: HeaderShadow;
@@ -118,6 +124,9 @@ export function normalizeHeaderDesign(raw: unknown): HeaderDesign | undefined {
   if (text) out.text = text;
   const icon = normalizeColorRef(raw.icon);
   if (icon) out.icon = icon;
+
+  const mode = pick(raw.mode, HEADER_MODES);
+  if (mode) out.mode = mode;
 
   const sticky = pick(raw.sticky, HEADER_STICKY);
   if (sticky) out.sticky = sticky;
@@ -232,6 +241,8 @@ export interface ResolvedHeaderDesign {
   sticky: HeaderSticky;
   /** True when any structural choice is set — the identity row then sizes with `min-h`. */
   designed: boolean;
+  /** V7c-2 — the document opted into overlay-on-hero (whether a page honours it is decided per page, in the stylesheet). */
+  overlay: boolean;
   /** True when the identity row's text colour is chosen (explicitly, or automatically over a designed background). */
   coloured: boolean;
 }
@@ -239,7 +250,8 @@ export interface ResolvedHeaderDesign {
 /**
  * Token legend (the CSS lives in `globals.css`, block "CUST-HV V7a — header design"):
  * `hh-c` / `hh-t` compact / tall height · `hl-2` two-row (taller sticky offset) ·
- * `hs-o` sticky off (offset collapses to the announcement bar) · `hs-u` sticky on-scroll-up · `hb-n` / `hb-m` no / medium
+ * `hs-o` sticky off (offset collapses to the announcement bar) · `hs-u` sticky on-scroll-up · `hmo` opted into
+ * overlay-on-hero (active only on a page whose hero carries the overlay marker — `header-overlay.ts`) · `hb-n` / `hb-m` no / medium
  * border · `hx-s` / `hx-m` soft / medium shadow · `hbg` designed background · `htx` chosen text
  * colour · `hic` explicit icon colour. Defaults (`standard`, `always`, `hairline`, `none`) emit no
  * token — they are the rendering that already exists.
@@ -289,6 +301,7 @@ export function resolveHeaderDesign(
   if (design?.layout === "two-row") tokens.push("hl-2");
   if (design?.sticky === "off") tokens.push("hs-o");
   if (design?.sticky === "on-scroll-up") tokens.push("hs-u");
+  if (design?.mode === "overlay-hero") tokens.push("hmo");
   if (design?.border?.width === "none") tokens.push("hb-n");
   if (design?.border?.width === "medium") tokens.push("hb-m");
   if (design?.shadow === "soft") tokens.push("hx-s");
@@ -302,6 +315,7 @@ export function resolveHeaderDesign(
     logoSize: design?.logo?.size,
     sticky: design?.sticky ?? "always",
     designed: design !== undefined,
+    overlay: design?.mode === "overlay-hero",
     coloured,
   };
 }
@@ -333,4 +347,16 @@ export function stepScrollUp(
   const delta = at - prev.lastY;
   if (Math.abs(delta) < SCROLL_UP_JITTER_PX) return prev;
   return { hidden: delta > 0, lastY: at };
+}
+
+/** A page scrolled further than this (px) has left the hero's top edge: the overlay header turns solid. */
+export const OVERLAY_SOLID_AT_PX = 24;
+
+/**
+ * V7c-2 (V0 §9.3 point 2) — whether the overlay header is solid right now: past a small scroll threshold, or at
+ * once while the shopper works inside it (focus within, an expanded menu / search, a dialog locking the page).
+ * Pure so the storefront controller and the Canvas simulator share one rule.
+ */
+export function overlayIsSolid(y: number, pinned: boolean): boolean {
+  return pinned || Math.max(0, y) > OVERLAY_SOLID_AT_PX;
 }
