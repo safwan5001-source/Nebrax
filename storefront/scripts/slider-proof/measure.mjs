@@ -213,6 +213,16 @@ async function run() {
           s = await snap(page);
         }
 
+        // hover on the slide button changes neither its fill nor its opacity (the proven pair is untouched)
+        if (name === "basic" && w >= 1024) {
+          const before = await page.evaluate(() => { const a = document.querySelector("[data-slider-slide][data-active] [data-slider-cta]"); const cs = getComputedStyle(a); return { bg: cs.backgroundColor, color: cs.color, opacity: cs.opacity }; });
+          await page.hover("[data-slider-slide][data-active] [data-slider-cta]");
+          await page.waitForTimeout(250);
+          const after = await page.evaluate(() => { const a = document.querySelector("[data-slider-slide][data-active] [data-slider-cta]"); const cs = getComputedStyle(a); return { bg: cs.backgroundColor, color: cs.color, opacity: cs.opacity }; });
+          ok(after.opacity === "1" && after.bg === before.bg && after.color === before.color, `${tag}: hover changed the proven button pair (${JSON.stringify(after)})`);
+          await page.mouse.move(0, 0);
+        }
+
         // ── no-JS ──
         {
           const nojs = await browser.newContext({ viewport: { width: w, height: h }, javaScriptEnabled: false });
@@ -356,6 +366,16 @@ async function run() {
           const autoPage = await load(ctx, name, d);
           const first = await snap(autoPage);
           ok(!!first.pause && first.pause.label === (rtl ? "إيقاف الشرائح مؤقتاً" : "Pause slides"), `${tag}[auto]: pause label`);
+          // a wrap is a cut: right after Next on the last slide no other slide is sweeping through the viewport
+          await autoPage.click("[data-slider-pause]");
+          await autoPage.keyboard.press("End");
+          await autoPage.waitForTimeout(450);
+          await autoPage.click('[data-slider-arrow="next"]');
+          await autoPage.waitForTimeout(40);
+          const wrapped = await snap(autoPage);
+          ok(activeOf(wrapped) === 0, `${tag}[auto]: wrap landed on slide ${activeOf(wrapped) + 1}`);
+          for (const x of wrapped.slides.slice(1)) ok(x.rect.l >= wrapped.root.r - 1 || x.rect.r <= wrapped.root.l + 1, `${tag}[auto]: slide ${x.i + 1} sweeps through the viewport on a wrap`);
+          await autoPage.click("[data-slider-pause]"); // play again from slide 1
           await autoPage.mouse.move(0, 0);
           await autoPage.waitForTimeout(5600);
           ok(activeOf(await snap(autoPage)) === 1, `${tag}[auto]: did not advance after 5 s`);

@@ -187,12 +187,38 @@ export function HomeSlider({
   const canPrev = loop || !atStart;
   const canNext = loop || !atEnd;
 
+  // A wrap moves the track across every slide at once; with the sliding transition that would sweep them all through
+  // the viewport, so a wrap is a cut: `data-snap` suppresses the transition for the one render that changes the slide.
+  const [snap, setSnap] = useState(false);
+  const isSliding = behaviour.transition === "slide";
+  const go = useCallback(
+    (to: number, wraps: boolean) => {
+      if (wraps && isSliding) setSnap(true);
+      setActive(to);
+    },
+    [isSliding],
+  );
+  useEffect(() => {
+    if (!snap) return;
+    // two frames: the cut must be painted before the transition comes back
+    let second = 0;
+    const first = window.requestAnimationFrame(() => {
+      second = window.requestAnimationFrame(() => setSnap(false));
+    });
+    return () => {
+      window.cancelAnimationFrame(first);
+      window.cancelAnimationFrame(second);
+    };
+  }, [snap]);
+
   const next = useCallback(() => {
-    setActive((a) => (a + 1 < total ? a + 1 : loop ? 0 : a));
-  }, [total, loop]);
+    if (active + 1 < total) go(active + 1, false);
+    else if (loop) go(0, true);
+  }, [active, total, loop, go]);
   const previous = useCallback(() => {
-    setActive((a) => (a > 0 ? a - 1 : loop ? total - 1 : a));
-  }, [total, loop]);
+    if (active > 0) go(active - 1, false);
+    else if (loop) go(total - 1, true);
+  }, [active, total, loop, go]);
 
   const autoplay = behaviour.autoplay && !reduced && total > 1;
   const running = autoplay && !paused && !hovering && !focused && !tabHidden;
@@ -214,7 +240,7 @@ export function HomeSlider({
   // Play at the end of a non-looping show starts it again from the first slide; otherwise the next tick would find
   // itself on the last slide again and pause without ever playing.
   const togglePlay = () => {
-    if (paused && !loop && active === total - 1) setActive(0);
+    if (paused && !loop && active === total - 1) go(0, true);
     setPaused((p) => !p);
   };
 
@@ -262,6 +288,7 @@ export function HomeSlider({
       data-transition={behaviour.transition}
       data-duration={behaviour.duration}
       data-motion={reduced ? "reduced" : undefined}
+      data-snap={snap ? "" : undefined}
       dir={dir}
       aria-roledescription="carousel"
       aria-label={labels.label}

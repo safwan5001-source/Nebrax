@@ -957,7 +957,9 @@
   opacity: 0;
   visibility: hidden;
 }
-.awj-store-preview [data-slider][data-transition="none"] [data-slider-slide] {
+/* a wrap (last → first, or Play from the end) is a cut: the track must not sweep every slide through the viewport */
+.awj-store-preview [data-slider][data-transition="none"] [data-slider-slide],
+.awj-store-preview [data-slider][data-snap] [data-slider-slide] {
   transition: none;
 }
 .awj-store-preview [data-slider][data-transition="none"] [data-slider-slide]:not([data-active]) {
@@ -1060,10 +1062,14 @@
   font-size: 0.875rem;
   font-weight: 700;
   box-shadow: 0 4px 10px rgb(0 0 0 / 0.18);
-  transition: opacity 150ms;
+  transition: box-shadow 150ms;
 }
+/* hover keeps the proven fill / label pair untouched (no opacity: it would blend both over the picture and void the
+   contrast guarantee) — it underlines the label and deepens the shadow instead */
 .awj-store-preview [data-slider-cta]:hover {
-  opacity: 0.9;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  box-shadow: 0 6px 14px rgb(0 0 0 / 0.28);
 }
 .awj-store-preview [data-slider-cta]:focus-visible {
   outline: 2px solid var(--sl-fg);

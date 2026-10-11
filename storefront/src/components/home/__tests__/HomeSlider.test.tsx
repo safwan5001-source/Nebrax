@@ -551,6 +551,43 @@ describe("HomeSlider — autoplay (D-16)", () => {
     expect(activeIndex()).toBe(1);
   });
 
+  it("a wrap is a cut under the sliding transition (data-snap for two frames), but not under fade and not on an ordinary step", () => {
+    vi.useFakeTimers();
+    const raf: FrameRequestCallback[] = [];
+    vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) =>
+      raf.push(cb),
+    );
+    vi.stubGlobal("cancelAnimationFrame", () => {});
+    const flush = () => {
+      act(() => {
+        const run = raf.splice(0);
+        for (const cb of run) cb(0);
+      });
+    };
+    const { container, unmount } = mount(view(3, { loop: true }));
+    const root = () => container.querySelector("[data-slider]")!;
+    fireEvent.click(screen.getByRole("button", { name: "Next slide" })); // 1 → 2: a normal step
+    expect(root().hasAttribute("data-snap")).toBe(false);
+    fireEvent.click(screen.getByRole("button", { name: "Go to slide 3" }));
+    fireEvent.click(screen.getByRole("button", { name: "Next slide" })); // 3 → 1: a wrap
+    expect(activeIndex()).toBe(0);
+    expect(root().hasAttribute("data-snap")).toBe(true);
+    flush();
+    expect(root().hasAttribute("data-snap")).toBe(true);
+    flush();
+    expect(root().hasAttribute("data-snap")).toBe(false);
+    fireEvent.click(screen.getByRole("button", { name: "Previous slide" })); // 1 → 3: a wrap backwards
+    expect(root().hasAttribute("data-snap")).toBe(true);
+    unmount();
+
+    const fade = mount(view(3, { loop: true, transition: "fade" }));
+    fireEvent.click(screen.getByRole("button", { name: "Go to slide 3" }));
+    fireEvent.click(screen.getByRole("button", { name: "Next slide" }));
+    expect(
+      fade.container.querySelector("[data-slider]")!.hasAttribute("data-snap"),
+    ).toBe(false);
+  });
+
   it("the first touch pauses it for good until Play is pressed", () => {
     vi.useFakeTimers();
     const { container } = mount(view(3, auto({ loop: true })));
