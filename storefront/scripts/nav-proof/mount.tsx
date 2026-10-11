@@ -18,7 +18,9 @@ for (const host of document.querySelectorAll<HTMLElement>("[data-nav-mount]")) {
     </NextIntlClientProvider>,
   );
 }
-for (const host of document.querySelectorAll<HTMLElement>("[data-mobile-mount]")) {
+for (const host of document.querySelectorAll<HTMLElement>(
+  "[data-mobile-mount]",
+)) {
   const items = JSON.parse(host.dataset.items ?? "[]");
   createRoot(host).render(
     <NextIntlClientProvider locale={locale} messages={messages}>
