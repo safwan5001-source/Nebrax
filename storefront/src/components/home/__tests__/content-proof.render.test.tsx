@@ -43,8 +43,19 @@ const PAGES: Record<string, Page> = {
       { id: "h", kind: "heading", text: TITLE[l] },
       { id: "p", kind: "paragraph", text: `${SHORT[l]}\n${SHORT[l]}` },
       { id: "i", kind: "image", media: { mediaId: ID(1) }, caption: SHORT[l] },
-      { id: "k", kind: "callout", text: SHORT[l], tone: "success", icon: "gift" },
-      { id: "b", kind: "button", label: l === "ar" ? "تسوّق الآن" : "Shop now", href: "/products" },
+      {
+        id: "k",
+        kind: "callout",
+        text: SHORT[l],
+        tone: "success",
+        icon: "gift",
+      },
+      {
+        id: "b",
+        kind: "button",
+        label: l === "ar" ? "تسوّق الآن" : "Shop now",
+        href: "/products",
+      },
       { id: "d", kind: "divider" },
       { id: "s", kind: "spacer", size: "lg" },
       { id: "w", kind: "paragraph", text: LONG[l] },
@@ -60,10 +71,21 @@ const PAGES: Record<string, Page> = {
           [
             { id: "c1h", kind: "heading", text: TITLE[l], level: 3 },
             { id: "c1p", kind: "paragraph", text: LONG[l] },
-            { id: "c1b", kind: "button", label: l === "ar" ? "اعرف المزيد" : "Learn more", href: "/about", style: "outline" },
+            {
+              id: "c1b",
+              kind: "button",
+              label: l === "ar" ? "اعرف المزيد" : "Learn more",
+              href: "/about",
+              style: "outline",
+            },
           ],
           [
-            { id: "c2i", kind: "image", media: { mediaId: ID(2) }, caption: SHORT[l] },
+            {
+              id: "c2i",
+              kind: "image",
+              media: { mediaId: ID(2) },
+              caption: SHORT[l],
+            },
             { id: "c2k", kind: "callout", text: SHORT[l], tone: "warning" },
           ],
         ],
@@ -89,8 +111,20 @@ const PAGES: Record<string, Page> = {
     blocks: (l) => [
       { id: "h", kind: "heading", text: TITLE[l] },
       { id: "p", kind: "paragraph", text: SHORT[l] },
-      { id: "k", kind: "callout", text: SHORT[l], tone: "success", icon: "badge-check" },
-      { id: "b", kind: "button", label: l === "ar" ? "تسوّق الآن" : "Shop now", href: "/products", style: "outline" },
+      {
+        id: "k",
+        kind: "callout",
+        text: SHORT[l],
+        tone: "success",
+        icon: "badge-check",
+      },
+      {
+        id: "b",
+        kind: "button",
+        label: l === "ar" ? "تسوّق الآن" : "Shop now",
+        href: "/products",
+        style: "outline",
+      },
     ],
     pics: [],
     design: {

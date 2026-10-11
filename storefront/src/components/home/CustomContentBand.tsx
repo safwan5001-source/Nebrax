@@ -257,12 +257,7 @@ function Columns({
   return (
     <div data-content-columns="" className="grid min-w-0 gap-6 md:grid-cols-2">
       {block.columns.map((column, index) => (
-        <div
-          // biome-ignore lint/suspicious/noArrayIndexKey: a column is its position
-          key={index}
-          data-content-column=""
-          className="min-w-0 space-y-3"
-        >
+        <div key={index} data-content-column="" className="min-w-0 space-y-3">
           {column.map((leaf) => (
             <Leaf
               key={leaf.id}
