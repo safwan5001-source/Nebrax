@@ -1,7 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, useRef } from 'react';
+import { createIdempotencyGuard } from '@/lib/idempotency';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { FileInput, Paperclip, Plus, X } from 'lucide-react';
@@ -50,6 +51,7 @@ export default function NewExpensePage() {
   const [files, setFiles] = useState<File[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const idempotency = useRef(createIdempotencyGuard());
   const [newSupplierOpen, setNewSupplierOpen] = useState(false);
   const [newCategoryOpen, setNewCategoryOpen] = useState(false);
   const [categoryName, setCategoryName] = useState('');
@@ -169,7 +171,13 @@ export default function NewExpensePage() {
       const target = editId ? `/expenses/${editId}` : '/expenses';
       // PHP لا يضمن تحليل multipart في PUT؛ التمويه يحافظ على Route::put ويتيح رفع المرفقات.
       if (editId) body.append('_method', 'PUT');
-      await api(target, { method: 'POST', body });
+      await api(target, {
+        method: 'POST',
+        body,
+        // الإنشاء فقط: إعادة المحاولة بعد انقطاع الاستجابة لا تُنشئ مصروفاً ثانياً. التعديل idempotent أصلاً.
+        ...(editId ? {} : { headers: { 'Idempotency-Key': idempotency.current.keyFor(body) } }),
+      });
+      idempotency.current.done();
       success(editId ? t('draft_updated') : t('draft_saved'));
       router.push(editId ? `/expenses/${editId}` : '/expenses');
     } catch (err) {

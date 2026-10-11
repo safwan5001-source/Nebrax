@@ -1,7 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, useRef } from 'react';
+import { createIdempotencyGuard } from '@/lib/idempotency';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { ArrowRight, FileText, Paperclip, X } from 'lucide-react';
@@ -94,6 +95,7 @@ export function DocumentPaymentForm({ documentId, documentKind }: DocumentPaymen
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<SubmitMode | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const idempotency = useRef(createIdempotencyGuard());
 
   const selectedMethod = methods.find((method) => method.id === paymentMethodId) ?? null;
   const compatibleAccounts = useMemo(
@@ -186,13 +188,19 @@ export function DocumentPaymentForm({ documentId, documentKind }: DocumentPaymen
     files.forEach((file) => body.append('attachments[]', file));
 
     try {
-      const created = await api<{ data: { id: string } }>('/payments', { method: 'POST', body });
+      const created = await api<{ data: { id: string } }>('/payments', {
+        method: 'POST',
+        body,
+        headers: { 'Idempotency-Key': idempotency.current.keyFor(body) },
+      });
       if (mode === 'post') {
         await api(`/payments/${created.data.id}/post`, { method: 'POST' });
         success(t('confirm_document_payment_success'));
+        idempotency.current.done();
         router.push(config.detailPath(document.id));
       } else {
         success(t('save_draft_success'));
+        idempotency.current.done();
         router.push(config.draftPath(created.data.id));
       }
     } catch (requestError) {

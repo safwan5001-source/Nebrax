@@ -159,6 +159,7 @@ use App\Http\Controllers\Api\ZatcaCredentialController;
 use App\Http\Controllers\Api\ZatcaSettingsController;
 use App\Http\Controllers\Api\ZatcaSubmissionController;
 use App\Http\Middleware\EnforcePlanLimit;
+use App\Http\Middleware\EnforceUserIdempotency;
 use App\Http\Middleware\EnsureActiveSubscription;
 use App\Http\Middleware\EnsureApplicationActive;
 use App\Http\Middleware\EnsureApplicationOperationActive;
@@ -595,7 +596,7 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         Route::get('expenses', [ExpenseController::class, 'index'])->middleware([$perm('expenses.view'), $app('finance.operations')]);
         Route::get('expenses/{id}/attachments/{attachmentId}', [ExpenseController::class, 'downloadAttachment'])->middleware([$perm('expenses.view'), $app('finance.operations')]);
         Route::get('expenses/{id}', [ExpenseController::class, 'show'])->middleware([$perm('expenses.view'), $app('finance.operations')]);
-        Route::post('expenses', [ExpenseController::class, 'store'])->middleware([$perm('expenses.manage'), $app('finance.operations')]);
+        Route::post('expenses', [ExpenseController::class, 'store'])->middleware([$perm('expenses.manage'), $app('finance.operations'), EnforceUserIdempotency::class]);
         Route::put('expenses/{id}', [ExpenseController::class, 'update'])->middleware([$perm('expenses.manage'), $app('finance.operations')]);
         Route::post('expenses/{id}/duplicate', [ExpenseController::class, 'duplicate'])->middleware([$perm('expenses.manage'), $app('finance.operations')]);
         Route::delete('expenses/{id}', [ExpenseController::class, 'destroy'])->middleware([$perm('expenses.manage'), $app('finance.operations')]);
@@ -1343,7 +1344,7 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         Route::get('payments', [PaymentController::class, 'index'])->middleware($perm('payments.view'));
         Route::get('payments/{id}/attachments/{attachmentId}', [PaymentController::class, 'downloadAttachment'])->middleware($perm('payments.view'));
         Route::get('payments/{id}', [PaymentController::class, 'show'])->middleware($perm('payments.view'));
-        Route::post('payments', [PaymentController::class, 'store'])->middleware($perm('payments.manage'));
+        Route::post('payments', [PaymentController::class, 'store'])->middleware([$perm('payments.manage'), EnforceUserIdempotency::class]);
         Route::put('payments/{id}/classification', [PaymentController::class, 'updateClassification'])->middleware($perm('payments.manage'));
         Route::put('payments/{id}', [PaymentController::class, 'update'])->middleware($perm('payments.manage'));
         Route::post('payments/{id}/duplicate', [PaymentController::class, 'duplicate'])->middleware($perm('payments.manage'));
