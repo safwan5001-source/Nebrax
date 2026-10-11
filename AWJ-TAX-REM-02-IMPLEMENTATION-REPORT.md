@@ -4,9 +4,9 @@
 |---|---|
 | **Task** | REM-02 from the audit/remediation plan (PR #1290) — closes **VAT-02** (P1) and **ACC-06** (P2) |
 | **Branch** | `claude/awj-tax-rem-02-credit-note-vat` |
-| **PR** | _filled in after opening_ |
+| **PR** | [#1304](https://github.com/safwan5001-source/Nebrax/pull/1304) — open, ready for review, not merged |
 | **Base SHA** | `999e06c52cd9e7dba3d8e16b3be00fc8d9ad9fa0` (`origin/main`, includes merged #1291 / REM-01) |
-| **Head SHA (code)** | _filled in after the final code commit_ |
+| **Head SHA (code)** | `1f1c5bae54968eb277c9d5d27a08a5ad433a8e19` — last code commit; later commits on the branch are docs-only (this report). Check the PR for the exact head. |
 | **Owner decisions applied** | **ADR-E → Option A** (source invoice required by default; standalone only by setting). **Migrations → both** (`source_line_id` + `restrictOnDelete`), additive only. |
 | **Status** | Implemented. Test results below. **Not merged, not deployed. Awaiting owner approval.** |
 
@@ -93,7 +93,7 @@ _See the PR file list; summary below._
 | `web/src/app/(app)/sales-settings/invoices/page.tsx`, `web/src/messages/{ar,en}.json` | the opt-in toggle for standalone credit notes (so new tenants can enable the policy from the UI) |
 | `web/src/modules/documents/builder/from-credit-note.ts` (+ test) | the printed credit note uses the pre-tax unit price so unit price, tax and total reconcile for inclusive invoices (2 vitest cases) |
 | `database/migrations/2026_11_04_01…/02…/03…` | see §4 |
-| `tests/Feature/CreditNoteSourceVatAccuracyTest.php` | **new** — 35 tests |
+| `tests/Feature/CreditNoteSourceVatAccuracyTest.php` | **new** — 41 tests |
 | `tests/Feature/CreditNoteMigrationPolicyTest.php` | **new** — 7 tests (existing/new tenants, rollback, historical references) |
 | `tests/Feature/CreditNoteSourcePostgresTest.php` | **new** — 7 tests (PostgreSQL: restrict rule, rollback, real forked concurrency) |
 | existing credit-note tests (`CreditNoteTest`, `…SourceOwnershipTest`, `…PostingOwnershipTest`, `CustomerRefundTest`, `DebitNoteTest`, `DocumentHttpVariantsTest`, `InteractsWithApi`) | mechanical: standalone-note tests opt in to the policy; invoice-source tests now use a *posted* invoice and a source line |
@@ -143,7 +143,7 @@ No change to `LedgerService`, `InventoryService`, `PaymentService`, ZATCA, or an
 | Full suite, SQLite | 5 897 passed · 69 skipped · 125 failed — all in classes unrelated to this change: Fuel (`bcmul()` missing, no `bcmath`), StorefrontMedia/ProductMedia/R2 (AWS SDK missing), AuthRecovery/UserInvitation/ResendMail (mail transport), plus 5 "database is locked" from running two suites at once. None touches credit notes, returns, invoices or the ledger. |
 | Full suite, PostgreSQL (same unrelated families excluded; R2 tests hang on network here) | 5 780 passed · 1 skipped · 5 failed: `AccountManagementTest` (1 DDL deadlock + 2 cascaded) and `CashDrawerBridgeTest` ×2 — both classes **pass alone (14/14)** |
 
-**CI on the head commit** — _see the PR checks; recorded in the PR description once complete._
+**CI on the head commit** — see the PR checks. At the time of writing: `web build` ✅ on `5d1e2aa`; the PHP jobs (SQLite, PostgreSQL) were still queued on the runner. The final result is recorded in a PR comment.
 
 ## 9. Risks / not done on purpose
 
