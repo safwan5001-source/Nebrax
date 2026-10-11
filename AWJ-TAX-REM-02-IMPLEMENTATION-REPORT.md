@@ -143,7 +143,7 @@ No change to `LedgerService`, `InventoryService`, `PaymentService`, ZATCA, or an
 | Full suite, SQLite | 5 897 passed · 69 skipped · 125 failed — all in classes unrelated to this change: Fuel (`bcmul()` missing, no `bcmath`), StorefrontMedia/ProductMedia/R2 (AWS SDK missing), AuthRecovery/UserInvitation/ResendMail (mail transport), plus 5 "database is locked" from running two suites at once. None touches credit notes, returns, invoices or the ledger. |
 | Full suite, PostgreSQL (same unrelated families excluded; R2 tests hang on network here) | 5 780 passed · 1 skipped · 5 failed: `AccountManagementTest` (1 DDL deadlock + 2 cascaded) and `CashDrawerBridgeTest` ×2 — both classes **pass alone (14/14)** |
 
-**CI on the head commit** — see the PR checks. At the time of writing: `web build` ✅ on `5d1e2aa`; the PHP jobs (SQLite, PostgreSQL) were still queued on the runner. The final result is recorded in a PR comment.
+**CI on the head commit** — `6aca2887b473098bb76f2c7f76baa5239a4a6b47` (code identical to `1f1c5ba`): `php artisan test (L11, sqlite)` ✅ · `php artisan test (L11, pgsql)` ✅ · `web build (Next.js)` ✅ — full suites, both the push and the pull-request runs.
 
 ## 9. Risks / not done on purpose
 
