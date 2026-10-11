@@ -400,14 +400,14 @@ class CreditNoteSourceVatAccuracyTest extends TestCase
     //  السقف التراكمي مع المرتجعات
     // ═══════════════════════════════════════════════════════════
 
-    private function returnOf(Invoice $invoice, $line, int $qty, bool $post = true): ReturnDocument
+    private function returnOf(Invoice $invoice, $line, int $qty, bool $post = true, ?int $price = null): ReturnDocument
     {
         $id = $this->postJson('/api/returns', [
             'type' => 'sales', 'partner_id' => $invoice->partner_id, 'payment_type' => 'credit',
             'original_id' => $invoice->id,
             'items' => [[
                 'product_id' => $line->product_id, 'source_line_id' => $line->id,
-                'quantity' => $qty, 'unit_price' => (int) $line->unit_price,
+                'quantity' => $qty, 'unit_price' => $price ?? (int) $line->unit_price,
             ]],
         ])->assertCreated()->json('data.id');
 
@@ -545,6 +545,127 @@ class CreditNoteSourceVatAccuracyTest extends TestCase
 
         $this->assertSame(10000, $item['line_subtotal_override'] - $item['line_discount']);
         $this->assertSame(1500, $item['line_tax_override']);
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    //  المبلغ المحتجَز بعد سعر مخفَّض لا يُسترد مع الجزء الأخير — في كل المسارات
+    // ═══════════════════════════════════════════════════════════
+
+    /** 2 × 100.00: الوحدة الأولى بنصف السعر (محتجَز 50.00 + 7.50 ضريبة)، ثم الوحدة الأخيرة بسعر كامل. */
+    private function assertWithheldStaysWithheld(array $last, string $path): void
+    {
+        $this->assertSame([10000, 1500], $last, "{$path}: الجزء الأخير 100.00 + 15.00 فقط — المحتجَز (50.00 + 7.50) لا يعود معه.");
+    }
+
+    /** @test */
+    public function after_a_reduced_note_the_api_return_does_not_sweep_the_withheld_amount(): void
+    {
+        $invoice = $this->sale([$this->item(2, 10000)]);
+        $line = $invoice->lines->first();
+        $this->note($invoice, [[$line, 1, 5000]]);
+
+        $r = $this->returnOf($invoice, $line, 1);
+
+        $this->assertWithheldStaysWithheld([(int) $r->subtotal, (int) $r->tax_amount], 'مرتجع API بعد إشعار مخفَّض');
+    }
+
+    /** @test */
+    public function after_a_reduced_api_return_the_note_does_not_sweep_the_withheld_amount(): void
+    {
+        $invoice = $this->sale([$this->item(2, 10000)]);
+        $line = $invoice->lines->first();
+        $this->returnOf($invoice, $line, 1, true, 5000);
+
+        $n = $this->note($invoice, [[$line, 1]]);
+
+        $this->assertWithheldStaysWithheld([(int) $n->subtotal, (int) $n->tax_amount], 'إشعار بعد مرتجع مخفَّض');
+    }
+
+    /** @test */
+    public function after_a_reduced_note_the_next_note_does_not_sweep_the_withheld_amount(): void
+    {
+        $invoice = $this->sale([$this->item(2, 10000)]);
+        $line = $invoice->lines->first();
+        $this->note($invoice, [[$line, 1, 5000]]);
+
+        $n = $this->note($invoice, [[$line, 1]]);
+
+        $this->assertWithheldStaysWithheld([(int) $n->subtotal, (int) $n->tax_amount], 'إشعار بعد إشعار مخفَّض');
+    }
+
+    /** @test */
+    public function after_a_reduced_api_return_the_pos_final_part_does_not_sweep_the_withheld_amount(): void
+    {
+        $invoice = $this->sale([$this->item(2, 10000)]);
+        $line = $invoice->lines->first();
+        $this->returnOf($invoice, $line, 1, true, 5000);
+
+        $service = app(\App\Services\Accounting\PosReturnService::class);
+        $derive = new \ReflectionMethod($service, 'buildSourceItems');
+        $derive->setAccessible(true);
+        $item = $derive->invoke($service, $invoice->fresh('lines'), [['source_line_id' => $line->id, 'quantity' => 1]])[0];
+
+        $this->assertWithheldStaysWithheld([$item['line_subtotal_override'] - $item['line_discount'], $item['line_tax_override']], 'POS بعد مرتجع API مخفَّض');
+    }
+
+    /** @test */
+    public function the_returnable_screen_flags_a_reduced_credit_so_the_preview_withholds_it(): void
+    {
+        $invoice = $this->sale([$this->item(2, 10000)]);
+        $line = $invoice->lines->first();
+        $this->note($invoice, [[$line, 1, 5000]]);
+
+        $row = $this->getJson("/api/returns/returnable/sales/{$invoice->id}")->assertOk()->json('data.lines.0');
+
+        $this->assertTrue($row['reduced_price_returned']);
+        $this->assertSame(1, $row['returned']);
+    }
+
+    /** @test */
+    public function random_mixed_note_and_return_sequences_never_exceed_the_invoice_and_close_it_exactly_at_full_price(): void
+    {
+        mt_srand(20261011);
+        $svc = app(\App\Services\Accounting\CreditNoteService::class);
+
+        for ($case = 0; $case < 10; $case++) {
+            $units = mt_rand(2, 8);
+            $inclusive = (bool) mt_rand(0, 1);
+            $price = mt_rand(10, 20000);
+            $head = ['tax_inclusive' => $inclusive];
+            if (mt_rand(0, 1)) {
+                $head['discount'] = mt_rand(0, intdiv($units * $price, 4));
+            }
+            $invoice = $this->sale([$this->item($units, $price, 15, mt_rand(0, 1) ? mt_rand(0, intdiv($units * $price, 5)) : 0)], $head);
+            $line = $invoice->lines->first();
+            $net = (int) $invoice->subtotal - (int) $invoice->discount;
+            $reduced = (bool) mt_rand(0, 1);
+            $net_c = $tax_c = 0;
+
+            $left = $units;
+            while ($left > 0) {
+                $qty = mt_rand(1, $left);
+                $left -= $qty;
+                $lowered = $reduced && mt_rand(0, 2) === 0 ? max(1, intdiv((int) $line->unit_price, 2)) : null;
+
+                if (mt_rand(0, 1)) {
+                    $n = $this->note($invoice, [[$line, $qty, ...($lowered ? [$lowered] : [])]]);
+                    $net_c += (int) $n->subtotal;
+                    $tax_c += (int) $n->tax_amount;
+                } else {
+                    $r = $this->returnOf($invoice, $line, $qty, true, $lowered);
+                    $net_c += (int) $r->subtotal; // مخزَّن صافياً بعد الخصم
+                    $tax_c += (int) $r->tax_amount;
+                }
+
+                $this->assertLessThanOrEqual($net, $net_c, "الحالة {$case}: الأساس المعكوس ≤ المحصَّل");
+                $this->assertLessThanOrEqual((int) $invoice->tax_amount, $tax_c, "الحالة {$case}: الضريبة المعكوسة ≤ المحصَّلة");
+            }
+
+            if (! $reduced) {
+                $this->assertSame([$net, (int) $invoice->tax_amount], [$net_c, $tax_c], "الحالة {$case}: بسعر كامل Σ = الفاتورة بالهللة");
+            }
+        }
+        $this->assertBooksBalanced();
     }
 
     /** @test */
