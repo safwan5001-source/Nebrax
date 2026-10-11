@@ -107,18 +107,22 @@ Shipping and adjustment are not discounts. They stay visible so the identity can
 
 ### 3.3 Metric rules
 
-Date basis for invoices is `invoices.invoice_date`, matching `SalesReportService`. A return uses `return_documents.return_date`. A credit note uses `credit_notes.note_date`. These are period activity dates, not an invoice cohort. A return in a later range still reduces that later range and is still attributed to the source invoice's platform.
+Date basis for sales is `invoices.invoice_date`, matching `SalesReportService`. That filter defines the **sales population** only. Returns and credit notes do not use it.
+
+The **attribution set** is the same invoice rule as §3.1 with no `invoice_date` predicate: posted `type=sale`, non-null `pos_session_id`, one matching delivery context, same tenant, same branch on the context and the invoice, plus the requested platform and `ReportBranchScope`. A source invoice stays in that set when its invoice date is outside the report range.
+
+A return uses `return_documents.return_date`. A credit note uses `credit_notes.note_date`. Both dates are period activity, not an invoice cohort. The source invoice is taken from the attribution set, then the document's own date decides whether it falls in the range. A return or credit note in a later range is still attributed to the source invoice's platform and does not change the earlier range's sales totals.
 
 | # | Metric | Rule | Tax basis |
 |---|---|---|---|
-| 1 | Gross sales | `SUM(invoice_lines.line_subtotal)` for population invoices | tax-exclusive, before line and header discounts |
+| 1 | Gross sales | `SUM(invoice_lines.line_subtotal)` for the sales population | tax-exclusive, before line and header discounts |
 | 2 | Discounts | `SUM(invoice_lines.line_discount) + SUM(invoices.discount)` | tax-exclusive |
 | 3 | Net sales before VAT | `SUM(subtotal - discount + shipping + adjustment)` | tax-exclusive |
 | 4 | VAT | `SUM(invoices.tax_amount)` | VAT only |
 | 5 | Total including VAT | `SUM(invoices.total)` | tax-inclusive |
-| 6 | Posted invoices | `COUNT(*)` of the population | not money |
-| 7 | Credit notes | posted `credit_notes` with `type = sales` whose `original_invoice_id` is a population invoice. Count and `SUM(total)` | credit-note total as stored |
-| 8 | POS returns | posted `return_documents` with `type = sales`, `original_type = Invoice`, `original_id` in the delivery POS invoice set (not limited to the invoice date range). `SUM(total)`, `SUM(subtotal)`, `SUM(tax_amount)`, count | `total` is tax-inclusive; `subtotal` is tax-exclusive |
+| 6 | Posted invoices | `COUNT(*)` of the sales population | not money |
+| 7 | Credit notes | posted `credit_notes` with `type = sales` whose `original_invoice_id` is in the attribution set, and whose `note_date` is inside the range. The source invoice's `invoice_date` is not a predicate. Count distinct `credit_notes.id` and `SUM(total)` | credit-note total as stored |
+| 8 | POS returns | posted `return_documents` with `type = sales`, `original_type = Invoice`, `original_id` in the attribution set, and `return_date` inside the range. `SUM(total)`, `SUM(subtotal)`, `SUM(tax_amount)`, count | `total` is tax-inclusive; `subtotal` is tax-exclusive |
 | 9 | Net after POS returns | metric 5 − metric 8 `total` for the same filters | tax-inclusive |
 | 10 | Operational Hub orders | `COUNT(*)` of `delivery_hub_orders` in the created-at range | not money; never added to 5, 6, or 9 |
 
@@ -130,7 +134,9 @@ Identity check that must be tested: metric 3 + metric 4 = metric 5 for the same 
 
 POS checkout returns create a `ReturnDocument`, not a `CreditNote` (`PosReturnService::buildAndPostReturn`). The return copies `tax_inclusive` from the invoice and sets `original_id` / `original_type`. On this base, `ReturnService::rederiveSourceAmounts` rebuilds the return from the source lines and stores `subtotal`, `tax_amount`, and `total = subtotal + tax_amount`. The report sums those stored headers. It does not derive a new rate.
 
-`CreditNote.original_invoice_id` is optional. A sales credit note counts in metric 7 only when that id points at a population invoice. Unlinked credit notes are not platform sales and are not allocated by partner, date, or amount.
+`CreditNote.original_invoice_id` is optional. Metric 7 includes a sales credit note only when that id is in the attribution set and `note_date` is inside the range. Unlinked credit notes are not platform sales and are not allocated by partner, date, or amount. A note whose source invoice is outside the sales-population dates is still included when the note's own date is in range. A note whose own date is outside the range is excluded even when the source invoice date is inside it.
+
+Tenant and branch authorization apply to both sides. The note, the source invoice, and the context must share the current tenant. `credit_notes.branch_id` and the source `invoices.branch_id` must each pass `ReportBranchScope`. If either branch is outside the caller's allowed set, the note is excluded. That stops a visible note from publishing another branch's platform activity. `delivery_invoice_contexts.invoice_id` is unique, so one note joins at most one context and is not multiplied into the sum. The total counts distinct note ids. The same note is not also subtracted from metric 5 or metric 9, including when both the invoice date and the note date fall in the range.
 
 Nothing in the inspected services forbids both a posted sales return and a posted sales credit note against the same invoice. Adding them into one net would be an estimate. Metric 9 therefore subtracts POS returns only. A combined net is BLOCKED.
 
@@ -175,16 +181,24 @@ Comparison rows group by `delivery_platform_profile_id`. The stable label is `pl
 
 | Filter | Rule |
 |---|---|
-| Date range | `invoice_date` for sales; `return_date` for returns; `note_date` for credit notes; `created_at` for Hub, labeled separately |
-| Platform | `delivery_platform_profile_id` inside the tenant. Empty means every population invoice, not every POS sale |
-| Branch | `ReportBranchScope` on `invoices.branch_id` for sales, and the same allowed set on return and credit-note `branch_id` |
-| Invoice status | locked to `posted` for every KPI. Draft and cancelled are not a toggle |
+| Date range | `invoice_date` for the sales population only; `return_date` for returns; `note_date` for credit notes; `created_at` for Hub. Returns and credit notes attribute through the attribution set, which has no invoice-date filter |
+| Platform | `delivery_platform_profile_id` inside the tenant. Empty means every attribution-set invoice, not every POS sale. Credit notes inherit the platform from the source invoice |
+| Branch | `ReportBranchScope` on `invoices.branch_id` for sales. A return or credit note is included only when its own `branch_id` and the source invoice's `branch_id` are both inside that scope |
+| Invoice status | locked to `posted` for every KPI and for the attribution set. Draft and cancelled are not a toggle |
 
-Drill-down columns, one row per population invoice: number, `invoice_date`, branch, `platform_key`, pinned display name, `collection_mode`, external reference (label only), gross, discounts, shipping, adjustment, net before VAT, VAT, total, `pos_session_id`. A return drill-down is separate: return number, `return_date`, source invoice number, platform of that invoice, subtotal, VAT, total.
+Drill-down columns, one row per sales-population invoice: number, `invoice_date`, branch, `platform_key`, pinned display name, `collection_mode`, external reference (label only), gross, discounts, shipping, adjustment, net before VAT, VAT, total, `pos_session_id`. A return drill-down is separate: return number, `return_date`, source invoice number, platform of that invoice, subtotal, VAT, total. A credit-note drill-down is separate and uses `note_date` plus the source invoice's platform. It is not a second copy of a sales row.
 
 Platform comparison is one row per profile: metrics 1–6 and 8–9, plus the collection-mode split of metric 5. Credit notes are a second table. Hub is a third count with no money column.
 
-CSV reuses `toCsv` / `downloadCsv`. That is the existing Excel-compatible export. A new XLSX library is out of scope. The CSV is built from the same payload as the screen, after branch scope, and contains no other tenant.
+CSV is Excel-compatible and is built from the same scoped payload as the screen. A new XLSX library is out of scope. The current shared helper is not a sufficient sanitizer. `web/src/lib/export.ts` `toCsv` writes a UTF-8 BOM and escapes a cell only when it contains `"`, a comma, or a newline. `PosService::normalizeDeliveryReference` only trims; a cashier reference that starts with `=`, `+`, `-`, or `@` is stored as-is on `delivery_invoice_contexts.external_order_reference`.
+
+The UI slice must neutralize spreadsheet formulas at export time and must not pass raw user-controlled strings through that helper. This design pass does not change `export.ts` or the stored reference. For every exported string cell, including `external_order_reference`, pinned `display_name` / `display_name_en`, branch name, and document numbers:
+
+- if the value, ignoring leading spaces only for the test, starts with `=`, `+`, `-`, `@`, a tab, or a carriage return, prefix one apostrophe
+- then apply the existing quote and delimiter escaping to the prefixed text
+- do not strip or rewrite the database value
+
+A cell that is only an optional minus, digits, and one decimal point stays numeric, so a negative money amount is not turned into text. A value such as `-2+3` or `=1+1` does not match that numeric pattern and is prefixed. Headers are escaped the same way when they are user-controlled labels. The export still contains no other tenant.
 
 ## 6. API reuse
 
@@ -231,7 +245,8 @@ States: loading skeleton already used by report workspaces; empty when the popul
 - collection-mode parts are a partition of metric 5, not an addition on top of it
 - no write, no post, no VAT math, no ledger line, no stock movement
 - external reference is displayed and never used as a join or an authority
-- CSV uses the scoped payload only
+- CSV uses the scoped payload only, and every user-controlled string cell is formula-neutralized before delimiter escaping
+- a credit note is one row in metric 7, never a second reduction of metric 5 or 9
 
 ## 9. Tests the implementation must include
 
@@ -243,13 +258,15 @@ SQLite and PostgreSQL, read-only:
 4. `platform_collected` and `merchant_collected` split metric 5 and do not increase it.
 5. A sales return whose `original_id` is a delivery POS invoice reduces metric 9 and does not reduce metric 6. Its date is `return_date`.
 6. A return of a non-delivery invoice is excluded.
-7. A posted sales credit note linked to a population invoice appears only in the credit-note block. Metric 9 is unchanged.
-8. A credit note with no `original_invoice_id` is absent.
-9. A Hub row, including one that shares `external_order_reference` text with an invoice, does not change any money metric or the invoice count.
-10. Another tenant's invoice and context are invisible.
-11. A branch-restricted user does not see another branch, and omitting `branch_id` still limits them to allowed branches.
-12. Context branch ≠ invoice branch: excluded from sums, present in the exception count.
-13. Amounts in the service are halalas. The HTTP edge converts money fields only.
+7. A posted sales credit note whose `note_date` is inside the range and whose source invoice is in the attribution set appears only in the credit-note block. Metric 9 is unchanged. This includes a source invoice whose `invoice_date` is before the range.
+8. A credit note with no `original_invoice_id`, or whose source is not a posted POS delivery invoice, is absent. A note whose `note_date` is outside the range is absent even when the source `invoice_date` is inside the range. When both dates are inside the range, the note id is counted once.
+9. A credit note is excluded when the note's branch or the source invoice's branch fails `ReportBranchScope`, or when the note, invoice, and context are not the same tenant.
+10. A Hub row, including one that shares `external_order_reference` text with an invoice, does not change any money metric or the invoice count.
+11. Another tenant's invoice and context are invisible.
+12. A branch-restricted user does not see another branch, and omitting `branch_id` still limits them to allowed branches.
+13. Context branch ≠ invoice branch: excluded from sums, present in the exception count.
+14. Amounts in the service are halalas. The HTTP edge converts money fields only.
+15. Export neutralization, in the UI slice: `=1+1`, `+1`, `-2+3`, `@SUM(A1)`, and the same prefixes on a pinned display name are written with a leading apostrophe after delimiter escaping. A money cell `-10.50` stays an unprefixed number. The stored `external_order_reference` is unchanged.
 
 No test may call `InvoiceService::post` through a new report path. Fixtures post through the existing POS/return services, or insert posted rows the same way current report tests do, without a new posting rule.
 
@@ -258,7 +275,7 @@ No test may call `InvoiceService::post` through a new report path. Fixtures post
 | Slice | Scope | State after this document merges |
 |---|---|---|
 | `DLV-CHANNEL-REPORT-API-1` | read-only service and `GET /api/reports/delivery-channel`: metrics 1–9, comparison, drill-down, exception count. No Hub join. No writes | next implementation candidate |
-| `DLV-CHANNEL-REPORT-UI-1` | RTL screen, states, CSV, reuse of report components. Depends on the API | not ready until the API slice is merged |
+| `DLV-CHANNEL-REPORT-UI-1` | RTL screen, states, CSV with formula neutralization before `toCsv`, reuse of report components. Depends on the API | not ready until the API slice is merged |
 | `DLV-CHANNEL-REPORT-HUB-COUNT-1` | operational count only, `delivery_hub.view`, no amounts, no invoice join | not ready until the API slice exists; not a financial task |
 
 `DLV-COMMISSION-1`, `DLV-SETTLEMENT-1`, `DLV-RECON-1`, `DLV-REFUND-1`, imported posting, and native connectors stay blocked. This report does not unblock them.
@@ -270,6 +287,8 @@ No test may call `InvoiceService::post` through a new report path. Fixtures post
 - Population is posted POS invoices with a matching context, not Hub rows and not drafts.
 - Gross and discounts match stored line and header fields. VAT is `tax_amount`, not a new rate.
 - Metric 9 subtracts POS return totals only. Credit notes stay separate because overlap is not disproven.
+- Metric 7 uses the attribution set, then `note_date`. It does not require the source `invoice_date` to sit in the range, and it does not count one note twice.
+- CSV neutralization is an export requirement. `toCsv` as it exists does not implement it, and this pass does not patch it.
 - Session report behavior is cited and not reused as a date-range engine.
 - No provider is enabled. No tax point is selected.
 
@@ -278,6 +297,7 @@ No test may call `InvoiceService::post` through a new report path. Fixtures post
 - Rules are taken from current `origin/main` services and migrations, not from the older connector branch.
 - `AWJ-TAX-REM-01` is on this base, so return headers after post are the source-derived amounts.
 - Hub absence of `invoice_id` was read from the create migration, not inferred.
+- `web/src/lib/export.ts` escapes delimiters only. `normalizeDeliveryReference` does not strip formula prefixes. Both were read on this base.
 
 ### AWJ Guardian review
 
@@ -287,12 +307,15 @@ No test may call `InvoiceService::post` through a new report path. Fixtures post
 | Draft counted as a sale | Status locked to `posted` |
 | VAT added twice | UI shows net and VAT and inclusive total as stored parts of one identity |
 | Return and credit note added together | Combined net BLOCKED |
-| Cross-tenant or cross-branch context | Query matches tenant and branch; `ReportBranchScope` applies |
+| Credit note dated outside the source invoice period dropped | Attribution set has no invoice-date filter; `note_date` is the period |
+| One credit note counted as a sale reduction and as metric 7 | Metric 7 is separate; metric 9 subtracts returns only |
+| CSV formula in an external reference | Export prefixes formula-leading string cells; stored value unchanged |
+| Cross-tenant or cross-branch context | Query matches tenant and branch; `ReportBranchScope` applies to the note and the source invoice |
 | New posting or VAT rule | Out of scope |
 | Historical platform name rewritten | Comparison uses `platform_key`; version name stays on the pinned drill-down |
 | Commission invented from the invoice total | Not in the contract |
 
-No P1 or P2 implementation finding exists, because this pass does not change code.
+The two documentation P2 threads on credit-note dating and CSV formula prefixes are corrected in this revision. No runtime code changes, so there is no new implementation finding.
 
 ## 12. Next task
 
