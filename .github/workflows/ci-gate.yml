@@ -1,0 +1,69 @@
+name: CI Gate
+
+# AWJ-HORIZON-V2-1A — بوابة CI موحّدة تُبلِّغ دائماً على كل Pull Request.
+# لا تشغّل اختبارات بنفسها: تحسب من تغييرات الـPR ومن ملفات الـworkflows أيّ فحوص
+# يجب أن تكون قد عملت، وتنتظر نجاحها (completed/success) على SHA رأس الـPR.
+# معلوماتية الآن (لا Required Check). التصميم والتفعيل: docs/autonomous-engineering/AWJ-HORIZON-V2-1A-CI-GATE-REPORT.md
+# المصدر الوحيد لقائمة الفحوص: .github/ci-gate/required-checks.json
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+# تحديث الـPR يلغي بوابة الـSHA القديم فقط؛ الإلغاء لا يُعدّ نجاحاً لأن الحالة مرتبطة بالـSHA.
+concurrency:
+  group: ci-gate-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  checks: read
+  actions: read
+  pull-requests: read
+
+jobs:
+  gate:
+    name: CI Gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 80
+    env:
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - name: Checkout PR merge ref (workflows + manifest under test)
+        uses: actions/checkout@v4
+
+      # نسخة موثوقة من القاعدة: منها يُنفَّذ سكربت البوابة الحاكم ومنها خط الأساس
+      # لمنع إضعاف الفحوص المطلوبة بتعديل المانيفست/الـpaths داخل الـPR نفسه.
+      - name: Checkout base commit (trusted gate logic + baseline)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: .base
+          sparse-checkout: |
+            .github
+            scripts/ci-gate
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install PyYAML
+        run: python -m pip install --quiet pyyaml==6.0.2
+
+      - name: Gate self-tests (PR copy)
+        run: python -m unittest discover -s scripts/ci-gate -v
+
+      - name: Wait for required checks on the PR head SHA
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          if [ -f .base/scripts/ci-gate/ci_gate.py ]; then
+            echo "Using TRUSTED gate script from base $(git -C .base rev-parse HEAD)"
+            python .base/scripts/ci-gate/ci_gate.py gate --root . --base-root .base --pr "$PR_NUMBER" --sha "$HEAD_SHA"
+          else
+            echo "Bootstrap: base has no gate yet; using the PR copy"
+            python scripts/ci-gate/ci_gate.py gate --root . --pr "$PR_NUMBER" --sha "$HEAD_SHA"
+          fi

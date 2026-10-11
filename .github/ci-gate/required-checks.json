@@ -1,0 +1,32 @@
+{
+  "version": 1,
+  "gate_check_name": "CI Gate",
+  "comment": "Single source of truth for the CI Gate (AWJ-HORIZON-V2-1A). `tier`: always = must run on every PR (no path filter allowed); paths = required only when the workflow's own pull_request.paths match the PR diff; advisory = reported, never blocking. Names must equal the check-run names GitHub shows. Path filters are NOT duplicated here: they are read from the workflow file.",
+  "grace_minutes_no_run": 10,
+  "checks": [
+    {
+      "name": "php artisan test (L11, sqlite)",
+      "workflow": ".github/workflows/ci.yml",
+      "job": "test",
+      "tier": "always",
+      "covers": ["financial", "security", "tenant-isolation", "api", "sqlite"],
+      "guard": {"step_run_contains": "php artisan test", "require": ["set -o pipefail"], "forbidden": ["--filter", "--group", "--exclude-group", "--testsuite", "--stop-on", "|| true"]}
+    },
+    {
+      "name": "php artisan test (L11, pgsql)",
+      "workflow": ".github/workflows/ci.yml",
+      "job": "test",
+      "tier": "always",
+      "covers": ["financial", "security", "tenant-isolation", "api", "postgres"],
+      "guard": {"step_run_contains": "php artisan test", "require": ["set -o pipefail"], "forbidden": ["--filter", "--group", "--exclude-group", "--testsuite", "--stop-on", "|| true"]}
+    },
+    {"name": "web build (Next.js)", "workflow": ".github/workflows/web-ci.yml", "job": "build", "tier": "paths", "covers": ["web"]},
+    {"name": "storefront (lint + typecheck + test)", "workflow": ".github/workflows/storefront-ci.yml", "job": "check", "tier": "paths", "covers": ["storefront"]},
+    {"name": "mobile (analyze + test)", "workflow": ".github/workflows/mobile-ci.yml", "job": "check", "tier": "paths", "covers": ["mobile"]},
+    {"name": "mobile (Android release build proof)", "workflow": ".github/workflows/mobile-ci.yml", "job": "android-release-build", "tier": "paths", "covers": ["mobile"]},
+    {"name": "mobile (iOS release build proof)", "workflow": ".github/workflows/mobile-ci.yml", "job": "ios-release-build", "tier": "paths", "covers": ["mobile"]},
+    {"name": "Docker runtime smoke", "workflow": ".github/workflows/runtime-smoke.yml", "job": "docker-runtime-smoke", "tier": "paths", "covers": ["runtime", "deploy"]},
+    {"name": "merchant preview visual QA", "workflow": ".github/workflows/store-brand-qa.yml", "job": "merchant-preview", "tier": "advisory", "covers": ["storefront-visual"]},
+    {"name": "published footer visual QA", "workflow": ".github/workflows/store-brand-qa.yml", "job": "published-footer", "tier": "advisory", "covers": ["storefront-visual"]}
+  ]
+}
