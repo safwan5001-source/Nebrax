@@ -86,6 +86,42 @@ jobs:
             exit 1
           fi
 
+      - name: Verify PHP upload limits (Apache mod_php and CLI)
+        run: |
+          set -euo pipefail
+          # AWJ-UPLOAD-PHP-LIMITS-1: الصورة الرسمية بلا php.ini، وكان الافتراضي 2M/8M يُسقط
+          # أي رفع فوق 2MB. نتحقق هنا من السلوك الحقيقي تحت Apache (لا CLI فقط).
+
+          # 1) CLI: ملف الـini محمَّل والقيم مطابقة.
+          docker exec awj-api-smoke php --ini | grep -q 'zz-awj-uploads.ini'
+          docker exec awj-api-smoke php -r 'echo json_encode(["u"=>ini_get("upload_max_filesize"),"p"=>ini_get("post_max_size"),"m"=>ini_get("memory_limit"),"f"=>ini_get("max_file_uploads")]);' \
+            | jq -e '.u=="20M" and .p=="128M" and .m=="256M" and .f=="20"'
+
+          # 2) Apache SAPI: مسبار يُحقن في الحاوية الحية فقط.
+          docker cp deploy/php/upload-probe.php awj-api-smoke:/app/public/awj-upload-probe.php
+          docker exec awj-api-smoke chmod 644 /app/public/awj-upload-probe.php
+          probe() { curl -sS --max-time 180 "$@" http://127.0.0.1:18080/awj-upload-probe.php | tail -n 1; }
+
+          probe | jq -e '.sapi=="apache2handler" and .ini.upload_max_filesize=="20M" and .ini.post_max_size=="128M" and .ini.memory_limit=="256M" and .ini.max_file_uploads=="20" and .ini.file_uploads=="1"'
+
+          mkdir -p /tmp/upl
+          head -c $((6 * 1024 * 1024))   /dev/zero > /tmp/upl/6m      # صورة iPhone نموذجية: كانت ترفضها 2M
+          head -c $((20 * 1024 * 1024))  /dev/zero > /tmp/upl/20m     # حدّ مركز المستندات (20480KB)
+          head -c $((20 * 1024 * 1024 + 1)) /dev/zero > /tmp/upl/20m1 # فوق السقف ببايت
+          head -c $((10 * 1024 * 1024))  /dev/zero > /tmp/upl/10m     # أقصى مرفق (10240KB)
+
+          probe -F 'media[]=@/tmp/upl/6m'   | jq -e '.files[0].error==0 and .files[0].size==6291456'
+          probe -F 'file=@/tmp/upl/20m'     | jq -e '.files[0].error==0 and .files[0].size==20971520'
+          probe -F 'file=@/tmp/upl/20m1'    | jq -e '.files[0].error==1'   # UPLOAD_ERR_INI_SIZE: السقف ما زال مفروضاً
+
+          args=(); for _ in $(seq 1 10); do args+=(-F 'attachments[]=@/tmp/upl/10m'); done
+          probe "${args[@]}" | jq -e '(.files|length)==10 and ([.files[].error]|all(.==0))'   # 10×10MiB = 100MiB مرفقات
+
+          args=(); for _ in $(seq 1 13); do args+=(-F 'attachments[]=@/tmp/upl/10m'); done
+          probe "${args[@]}" | jq -e '(.files|length)==0'                                       # 130MiB > post_max_size
+
+          docker exec awj-api-smoke rm -f /app/public/awj-upload-probe.php
+
       - name: Container logs
         if: always()
         run: docker logs awj-api-smoke || true
