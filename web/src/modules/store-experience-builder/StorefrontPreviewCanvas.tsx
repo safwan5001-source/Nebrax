@@ -133,6 +133,9 @@ interface StorefrontPreviewCanvasProps {
    */
   selectedSection?: string | null;
   onSelectSection?: (id: string) => void;
+  /** CUST-HV V8c — the slide each slider section shows (the editor's selection), by section id; browsing in the Canvas reports back. */
+  activeSlides?: Record<string, string>;
+  onActiveSlideChange?: (sectionId: string, slideId: string) => void;
   /**
    * Click-to-edit for fixed chrome (UX V2 §3.2). Not presentation data.
    * Header, logo, footer, WhatsApp and social links route to existing panels.
@@ -274,6 +277,8 @@ export function StorefrontPreviewCanvas({
   businessIdentity = { legal_name: null, cr_number: null, vat_number: null },
   selectedSection = null,
   onSelectSection,
+  activeSlides,
+  onActiveSlideChange,
   selectedChrome = null,
   onSelectChrome,
   productPreviewState = "idle",
@@ -1019,6 +1024,8 @@ export function StorefrontPreviewCanvas({
                   behaviour={slider.behaviour}
                   context={designContext}
                   viewport={viewport}
+                  activeSlideId={activeSlides?.[section.id] ?? null}
+                  onActiveSlideChange={(slideId) => onActiveSlideChange?.(section.id, slideId)}
                   labels={{
                     label: t("canvasSliderLabel"),
                     slide: t("canvasSliderSlide"),

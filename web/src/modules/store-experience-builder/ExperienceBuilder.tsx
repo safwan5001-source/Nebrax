@@ -2,7 +2,7 @@
 
 import { describePublishIssues } from "./announcement-status";
 import type { ReactNode } from "react";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { CalendarClock, ExternalLink, MoreHorizontal, RotateCcw } from "lucide-react";
 import { Dropdown, DropdownItem } from "@/components/ui/dropdown";
 import { ScrollIndicator } from "./ScrollIndicator";
@@ -168,6 +168,11 @@ export function ExperienceBuilder({
   const [builderSidebarCollapsed, setBuilderSidebarCollapsed] = useState(false);
   const [sidebarPreferenceLoaded, setSidebarPreferenceLoaded] = useState(false);
   const [selectedSection, setSelectedSection] = useState<string | null>(null);
+  // CUST-HV V8c — the slide each slider section shows: one value read by the editor panel and the Canvas.
+  const [activeSlides, setActiveSlides] = useState<Record<string, string>>({});
+  const handleActiveSlideChange = useCallback((sectionId: string, slideId: string) => {
+    setActiveSlides((current) => (current[sectionId] === slideId ? current : { ...current, [sectionId]: slideId }));
+  }, []);
   const [selectedChrome, setSelectedChrome] =
     useState<PreviewChromeTarget | null>(null);
   // CUST-H2-2 — أي صفحة متجر (رئيسية/منتج/تصنيف) يُعايِنها المحرِّر الآن.
@@ -2176,6 +2181,8 @@ export function ExperienceBuilder({
           storefrontId={storefrontId}
           selectedSection={selectedSection}
           onSelectSection={(id) => handleSelectSection(id, "sidebar")}
+          activeSlides={activeSlides}
+          onActiveSlideChange={handleActiveSlideChange}
           isMobileViewport={isMobileViewport}
           featuredPickerSearch={featuredPickerSearch}
           featuredPickerListState={featuredPickerListState}
@@ -2259,6 +2266,8 @@ export function ExperienceBuilder({
         storefrontId={storefrontId}
         selectedSection={selectedSection}
         onSelectSection={(id) => handleSelectSection(id, "sidebar")}
+        activeSlides={activeSlides}
+        onActiveSlideChange={handleActiveSlideChange}
         isMobileViewport={isMobileViewport}
         featuredPickerSearch={featuredPickerSearch}
         featuredPickerListState={featuredPickerListState}
@@ -2903,6 +2912,8 @@ export function ExperienceBuilder({
                   businessIdentity={businessIdentity}
                   selectedSection={selectedSection}
                   onSelectSection={(key) => handleSelectSection(key, "preview")}
+                  activeSlides={activeSlides}
+                  onActiveSlideChange={handleActiveSlideChange}
                   selectedChrome={selectedChrome}
                   onSelectChrome={handleSelectChrome}
                   productPreviewState={previewProductState}
