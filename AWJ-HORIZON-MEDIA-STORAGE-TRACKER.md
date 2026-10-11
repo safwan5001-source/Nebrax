@@ -47,6 +47,9 @@
 |---|---|---|---|---|---|---|---|---|
 | G-0 | إغلاق الجرد + هذا الـTracker (docs) | `horizon/media-storage-g0-tracker` | #1325 | `b151191` | ✅ 4/4 (sqlite+pgsql) | ✅ squash `e0e5160` | لا نشر (docs) | — |
 | S1 | `AttachmentStorage` + 6 عائلات + ذرّية الطلب المالي + `photo_disk` (العلم مغلق افتراضياً) | `horizon/media-storage-s1-attachments` | #1326 | `68db6bd` | ✅ 4/4 (sqlite+pgsql) · محلياً 6298 نجاح + 38 إخفاقاً بيئياً غير مرتبطة | ✅ squash `981663a` | ⏳ **غير مُتحقَّق منه** — لا وصول لي إلى Railway؛ الـmigration `2026_11_06_010000` تُشغَّل تلقائياً عند الإقلاع (`entrypoint.sh`) | ⏳ معلّق على المالك (§6) |
+| S1b | أمر التحقق اليدوي `awj:attachments-verify` | `horizon/media-storage-s1b-verify-command` | #1335 | `0dc8e55` | ✅ 4/4 | ✅ squash `06781e9` | ✅ منشور | انظر E5–E7 |
+| S2 | `DocumentStorageService`: لا `visibility`/ACL على endpoint من R2 (التفعيل الإنتاجي **غير منفَّذ**) | `horizon/media-storage-s2-r2-no-acl` | #1332 | `e6e20c0` | ✅ 4/4 (pgsql فشل مرة واحدة وأُعيد تشغيله فنجح؛ التشغيل الموازي للـSHA نفسه أخضر) | ✅ squash `46eabaf` | ✅ `87f2f175` SUCCESS | لا (لم يُفعَّل شيء) |
+| S3 | `Idempotency-Key` اختياري للمصروف والدفعة | `horizon/media-storage-s3-idempotency` | #1333 | `306dff2` | ✅ 6/6 (sqlite+pgsql+web build) | ✅ squash `8332822` | ✅ `6fc22469` SUCCESS · migration `DONE` · health 200 | ⏳ اختبار واجهة (§7) |
 
 ## 4. الشرائح المخطَّطة بعد S1 (تُثبَّت بعد جرد المسارات)
 
@@ -78,10 +81,14 @@
 | E2 | `awj:r2-smoke-test` من Production Console: PASS (write/exists/read/delete/cleanup) | **المالك** (تنفيذ يدوي) | ✅ مُتحقَّق (تقرير المالك) |
 | E3 | تفعيل `AWJ_ATTACHMENTS_R2_ENABLED=true` على `nibras-api` بتفويض المالك؛ نشر `d9c1f379` SUCCESS؛ `/api/health` = 200 | `set-variables` + `list-deployments` + `get-logs` | ✅ مُتحقَّق. **التراجع:** `AWJ_ATTACHMENTS_R2_ENABLED=false` (القراءة تتبع عمود `disk` فلا تضيع صفوف R2) |
 | E4 | رفض نظام الأذونات (Production Deploy): إنشاء خدمة مؤقتة لـsmoke test، وقراءة سجلات HTTP | محاولات Claude | ❌ لم تُنفَّذ ولم يُلتفّ عليها |
+| E5 | `awj:attachments-verify --put` من Production Console: العلم ON · `put: PASS (disk=r2)` · عزل المستأجر: B لا يرى الكائن ✅ ولا يحذفه ✅ والكائن سليم بعد محاولات B ✅ | **المالك** (تنفيذ يدوي) | ✅ مُتحقَّق (تقرير المالك) |
+| E6 | استبدال حاوية بعد `--put`: النشر `279551d0` (commit `1be3735`) SUCCESS عند 21:50:45 و`/api/health` = 200؛ النشر السابق `3143ccbd` (redeploy بأمري) صار REMOVED | `list-deployments` + `get-logs` (Railway MCP) | ✅ مُتحقَّق |
+| E7 | `awj:attachments-verify --check=<path> --cleanup` بعد الاستبدال: `write disk: r2` · `exists after redeploy: PASS` · `content intact: PASS` · `cleanup: PASS` | **المالك** (تنفيذ يدوي) | ✅ **دليل Production على استمرارية R2 بعد استبدال الحاوية** (مستأجرون وهميون عبر مسار `AttachmentStorage` الفعلي) |
+| E8 | S3 على Production: migration `2026_11_06_020000_create_user_request_idempotency_keys_table` `DONE` · health 200 | `get-logs` | ✅ مُتحقَّق |
 
 ## 7. حالة التحقق الإنتاجي لـS1
 
-**S1 = DEPLOYED · FLAG ON · لم تصبح PRODUCTION VERIFIED.** ينقص:
+**S1 = DEPLOYED · FLAG ON · الاستمرارية على R2 مُثبَتة (E5–E7) · لم تُعلَن PRODUCTION VERIFIED بالكامل** — ينقص اختبار مسار الواجهة/الـAPI الفعلي (صف `disk='r2'` لمرفق مصروف حقيقي بمستأجر اختبار + تنزيله بعد نشر لاحق + الصلاحيات). المتبقي:
 1. رفع مرفق فعلي (مستأجر اختبار) ⇒ صف `disk='r2'` ⇒ تنزيله.
 2. إعادة نشر ثم تنزيله مجدداً (الاستمرارية).
 3. إثبات العزل وعدم كشف ملف خاص عبر الـAPI.
