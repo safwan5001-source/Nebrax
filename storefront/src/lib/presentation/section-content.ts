@@ -557,11 +557,16 @@ function normalizeCustom(source: Record<string, unknown>): CustomContent {
   return normalizeContentBlocks(source, sanitizeContentHref) ?? { blocks: [] };
 }
 
+/** PHP's default `trim` set: ASCII whitespace and NUL only (JS `trim()` would also strip NBSP and other Unicode spaces, diverging from the authority). */
+function phpTrim(value: string): string {
+  return value.replace(/^[ \t\n\r\0\v]+|[ \t\n\r\0\v]+$/g, "");
+}
+
 /** Twin of PHP `shelfTitleFields`: a title (≤ 80 code points, blank = absent) and `showTitle`, stored only as `false`. */
 function shelfTitleFields(source: Record<string, unknown>): ShelfTitle {
   const out: ShelfTitle = {};
   const title = truncateToCodePoints(
-    asString(source.title).trim(),
+    phpTrim(asString(source.title)),
     MAX_SECTION_TITLE_LENGTH,
   );
   if (title !== "") out.title = title;
@@ -638,7 +643,7 @@ function normalizeProductShelf(
       : SHELF_LIMIT_DEFAULT;
   const content: ProductShelfContent = {
     title: truncateToCodePoints(
-      asString(source.title).trim(),
+      phpTrim(asString(source.title)),
       MAX_SECTION_TITLE_LENGTH,
     ),
     deliverToday,
@@ -660,7 +665,7 @@ function normalizeDiscovery(
   );
   return {
     title: truncateToCodePoints(
-      asString(source.title).trim(),
+      phpTrim(asString(source.title)),
       MAX_SECTION_TITLE_LENGTH,
     ),
     axis,
@@ -673,7 +678,7 @@ function normalizeDeliveryPromise(
   source: Record<string, unknown>,
 ): DeliveryPromiseContent | undefined {
   const title = truncateToCodePoints(
-    asString(source.title).trim(),
+    phpTrim(asString(source.title)),
     MAX_SECTION_TITLE_LENGTH,
   );
   const body = truncateToCodePoints(
