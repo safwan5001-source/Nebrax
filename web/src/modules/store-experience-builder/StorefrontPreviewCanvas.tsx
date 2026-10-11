@@ -928,7 +928,7 @@ export function StorefrontPreviewCanvas({
                           className="overflow-hidden rounded-store border border-store-border bg-store-surface"
                         >
                           <div className={cn(cardImageHeight, "animate-pulse bg-store-surface-muted")} />
-                          <div className={cardPad}>
+                          <div data-card-body="" className={cardPad}>
                             <div className="h-3 w-3/4 animate-pulse rounded-store bg-store-surface-muted" />
                           </div>
                         </li>
@@ -962,9 +962,11 @@ export function StorefrontPreviewCanvas({
                       {homeNewArrivals.map((product) => (
                         <li
                           key={product.id}
+                          data-card=""
                           className="overflow-hidden rounded-store border border-store-border bg-store-surface"
                         >
                           <div
+                            data-card-image=""
                             className={cn(
                               cardImageHeight,
                               "relative bg-store-surface-muted",
@@ -990,7 +992,7 @@ export function StorefrontPreviewCanvas({
                               </span>
                             )}
                           </div>
-                          <div className={cardPad}>
+                          <div data-card-body="" className={cardPad}>
                             <p className="line-clamp-2 text-sm font-semibold text-store-foreground">
                               <bdi>{product.name}</bdi>
                             </p>
@@ -1319,7 +1321,7 @@ export function StorefrontPreviewCanvas({
                           className="overflow-hidden rounded-store border border-store-border bg-store-surface"
                         >
                           <div className={cn(cardImageHeight, "animate-pulse bg-store-surface-muted")} />
-                          <div className={cardPad}>
+                          <div data-card-body="" className={cardPad}>
                             <div className="h-3 w-3/4 animate-pulse rounded-store bg-store-surface-muted" />
                           </div>
                         </li>
@@ -1354,9 +1356,10 @@ export function StorefrontPreviewCanvas({
                         .map((product) => (
                           <li
                             key={product.id}
-                            className="overflow-hidden rounded-store border border-store-border bg-store-surface"
+                            data-card=""
+                          className="overflow-hidden rounded-store border border-store-border bg-store-surface"
                           >
-                            <div className={cn(cardImageHeight, "bg-store-surface-muted")}>
+                            <div data-card-image="" className={cn(cardImageHeight, "bg-store-surface-muted")}>
                               {product.thumbnailUrl ? (
                                 // eslint-disable-next-line @next/next/no-img-element -- tenant media URL, not a static asset
                                 <img
@@ -1366,7 +1369,7 @@ export function StorefrontPreviewCanvas({
                                 />
                               ) : null}
                             </div>
-                            <div className={cardPad}>
+                            <div data-card-body="" className={cardPad}>
                               <p className="line-clamp-2 text-sm font-semibold text-store-foreground">
                                 <bdi>{product.name}</bdi>
                               </p>
@@ -1410,7 +1413,7 @@ export function StorefrontPreviewCanvas({
                           className="overflow-hidden rounded-store border border-store-border bg-store-surface"
                         >
                           <div className={cn(cardImageHeight, "animate-pulse bg-store-surface-muted")} />
-                          <div className={cardPad}>
+                          <div data-card-body="" className={cardPad}>
                             <div className="h-3 w-3/4 animate-pulse rounded-store bg-store-surface-muted" />
                           </div>
                         </li>
@@ -1453,9 +1456,10 @@ export function StorefrontPreviewCanvas({
                           // `relative` contains the card's sr-only price labels: an absolutely
                           // positioned sr-only span otherwise escapes the clipped preview
                           // scroller and widens the document (horizontal page scroll).
+                          data-card=""
                           className="relative min-w-0 overflow-hidden rounded-store border border-store-border bg-store-surface"
                         >
-                          <div className={cn(cardImageHeight, "relative bg-store-surface-muted")}>
+                          <div data-card-image="" className={cn(cardImageHeight, "relative bg-store-surface-muted")}>
                             {offer.product.thumbnailUrl ? (
                               // eslint-disable-next-line @next/next/no-img-element -- tenant media URL, not a static asset
                               <img
@@ -1473,11 +1477,11 @@ export function StorefrontPreviewCanvas({
                               </span>
                             ) : null}
                           </div>
-                          <div className={cardPad}>
+                          <div data-card-body="" className={cardPad}>
                             <p className="line-clamp-2 break-words text-sm font-semibold text-store-foreground">
                               <bdi>{offerDisplayName(offer, locale)}</bdi>
                             </p>
-                            <p className="mt-1.5 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                            <p data-card-price="" className="mt-1.5 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
                               {offer.offerPrice ? (
                                 <span className="text-sm font-black text-store-primary">
                                   <span className="sr-only">{t("offersOfferPrice")}: </span>

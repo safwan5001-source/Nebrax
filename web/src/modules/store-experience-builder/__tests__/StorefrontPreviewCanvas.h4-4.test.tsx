@@ -284,3 +284,30 @@ describe("Canvas — text-only sub-headings follow the simulated device (V9c rev
     expect(`${sizeOn("mobile")} ${sizeOn("desktop")}`).not.toContain("md:");
   });
 });
+
+describe("Canvas — card hooks and tokens (CUST-HV V9d-1)", () => {
+  afterEach(() => cleanup());
+
+  const offers = withSections([{ id: "new-1", type: "newArrivals", visible: true }] as never);
+
+  it("the Canvas root carries the same card-token attributes and variables the storefront wrapper does", () => {
+    const config = { ...offers, cards: { align: "center", imageRatio: "4:3", hover: "zoom" } } as never;
+    const { container } = render(
+      <StorefrontPreviewCanvas config={config} locale="en" viewport="desktop" onSelectSection={() => {}} homeNewArrivalsState="ready" homeNewArrivals={[{ id: "p1", name: "Rose", thumbnailUrl: null }]} />,
+    );
+    const root = container.querySelector("[data-gt]") as HTMLElement;
+    expect(root.getAttribute("data-gt")?.split(" ")).toEqual(expect.arrayContaining(["cd-al", "cd-ir", "cd-hv"]));
+    expect(root.style.getPropertyValue("--cd-ir")).toBe("4 / 3");
+    const card = container.querySelector("[data-card]") as HTMLElement;
+    expect(card.querySelector("[data-card-image]")).not.toBeNull();
+    expect(card.querySelector("[data-card-body]")).not.toBeNull();
+  });
+
+  it("a document without card tokens renders no card attributes at all", () => {
+    const { container } = render(
+      <StorefrontPreviewCanvas config={offers} locale="en" viewport="desktop" onSelectSection={() => {}} homeNewArrivalsState="ready" homeNewArrivals={[{ id: "p1", name: "Rose", thumbnailUrl: null }]} />,
+    );
+    expect(container.querySelector('[data-gt~="cd-al"], [data-gt~="cd-ir"], [data-gt~="cd-hv"], [data-gt~="cd-if"]')).toBeNull();
+  });
+});
+

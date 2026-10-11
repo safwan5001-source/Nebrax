@@ -87,13 +87,17 @@ export const ProductCard = memo(function ProductCard({
   };
 
   return (
-    <div className="group relative flex h-full flex-col overflow-hidden rounded-store border border-store-border bg-store-surface transition-shadow duration-150 hover:shadow-md focus-within:shadow-md motion-reduce:transition-none">
+    <div
+      data-card=""
+      className="group relative flex h-full flex-col overflow-hidden rounded-store border border-store-border bg-store-surface transition-shadow duration-150 hover:shadow-md focus-within:shadow-md motion-reduce:transition-none"
+    >
       {/* Image. Bounded by height rather than aspect ratio: a square tile grows
           with the column and, at desktop widths, turns an eight-product shelf
           into a wall of photography with the catalogue text pushed out of the
           fold. It sits flush inside the card rather than inset in a rounded
           tile of its own — one frame per product, not a frame inside a frame. */}
       <div
+        data-card-image=""
         className={cn(
           "relative shrink-0 bg-store-surface-muted",
           // AWJ Market trades image size for a denser, more scannable shelf
@@ -163,7 +167,10 @@ export const ProductCard = memo(function ProductCard({
           </Link>
         </h3>
 
-        <div className="mt-2 flex flex-wrap items-baseline gap-x-2 gap-y-1">
+        <div
+          data-card-price=""
+          className="mt-2 flex flex-wrap items-baseline gap-x-2 gap-y-1"
+        >
           {displayPrice ? (
             <span className="text-sm font-black text-store-primary md:text-base">
               {displayPrice}

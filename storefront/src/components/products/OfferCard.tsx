@@ -40,9 +40,13 @@ export function OfferCard({ offer, basePath = "" }: OfferCardProps) {
   return (
     <div
       data-offer-card=""
+      data-card=""
       className="group relative flex h-full min-w-0 flex-col overflow-hidden rounded-store border border-store-border bg-store-surface transition-shadow duration-150 hover:shadow-md focus-within:shadow-md motion-reduce:transition-none"
     >
-      <div className="relative h-36 shrink-0 bg-store-surface-muted sm:h-44 md:h-52">
+      <div
+        data-card-image=""
+        className="relative h-36 shrink-0 bg-store-surface-muted sm:h-44 md:h-52"
+      >
         {/* Decorative: the product name directly below is the accessible name. */}
         <ProductImage
           src={offer.thumbnailUrl}
@@ -77,7 +81,10 @@ export function OfferCard({ offer, basePath = "" }: OfferCardProps) {
           </Link>
         </h3>
 
-        <p className="mt-2 flex flex-wrap items-baseline gap-x-2 gap-y-1">
+        <p
+          data-card-price=""
+          className="mt-2 flex flex-wrap items-baseline gap-x-2 gap-y-1"
+        >
           <span className="text-sm font-black text-store-primary md:text-base">
             <span className="sr-only">{t("offerPrice")}: </span>
             <bdi data-offer-price="">{offer.offerPrice.display}</bdi>

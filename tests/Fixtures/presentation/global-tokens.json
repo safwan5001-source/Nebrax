@@ -1,5 +1,5 @@
 {
-  "_note": "CUST-HV V5e-2a — document-level global tokens (typography / buttons / surfaces / layout / motion). Shared by PHP StorefrontGlobalTokensNormalizer and both TS twins. `input` is the raw document subset; `expected` is exactly the normalised keys that survive (an empty object = none of the four keys are present).",
+  "_note": "CUST-HV V5e-2a — document-level global tokens (typography / buttons / surfaces / cards / layout / motion). Shared by PHP StorefrontGlobalTokensNormalizer and both TS twins. `input` is the raw document subset; `expected` is exactly the normalised keys that survive (an empty object = none of the four keys are present).",
   "cases": [
     { "name": "absent", "input": {}, "expected": {} },
     { "name": "non-object groups are ignored", "input": { "typography": "lg", "surfaces": ["soft"], "layout": 3, "motion": null }, "expected": {} },
@@ -133,6 +133,61 @@
       "name": "css strings and injected content never survive",
       "input": { "typography": { "headingScale": "lg; background:red", "lineHeight": "url(javascript:alert(1))" }, "surfaces": { "radius": "0.75rem" } },
       "expected": {}
+    },
+    {
+      "name": "cards: every field, canonical order",
+      "input": { "cards": { "hover": "lift", "imageFit": "contain", "imageRatio": "4:3", "align": "center" } },
+      "expected": { "cards": { "align": "center", "imageRatio": "4:3", "imageFit": "contain", "hover": "lift" } }
+    },
+    {
+      "name": "cards: start and cover are valid values (stored as written)",
+      "input": { "cards": { "align": "start", "imageFit": "cover" } },
+      "expected": { "cards": { "align": "start", "imageFit": "cover" } }
+    },
+    {
+      "name": "cards: each ratio and hover is accepted",
+      "input": { "cards": { "imageRatio": "3:4", "hover": "zoom" } },
+      "expected": { "cards": { "imageRatio": "3:4", "hover": "zoom" } }
+    },
+    {
+      "name": "cards: unknown values are dropped one by one",
+      "input": { "cards": { "align": "end", "imageRatio": "16:9", "imageFit": "fill", "hover": "shake" } },
+      "expected": {}
+    },
+    {
+      "name": "cards: one invalid field leaves the valid ones",
+      "input": { "cards": { "align": "center", "imageRatio": "2:1", "hover": "none" } },
+      "expected": { "cards": { "align": "center", "hover": "none" } }
+    },
+    {
+      "name": "cards: non-object and empty groups are dropped",
+      "input": { "cards": "center" },
+      "expected": {}
+    },
+    {
+      "name": "cards: a list is not an object",
+      "input": { "cards": ["center"] },
+      "expected": {}
+    },
+    {
+      "name": "cards: density, radius, border, shadow and background belong to other tokens and never survive here",
+      "input": { "cards": { "align": "center", "density": "compact", "radius": "lg", "border": { "width": "medium" }, "shadow": "strong", "background": "#ff0000", "padding": "lg", "badgePosition": "end-top" } },
+      "expected": { "cards": { "align": "center" } }
+    },
+    {
+      "name": "cards: css strings and injected content never survive",
+      "input": { "cards": { "align": "center; color:red", "imageRatio": "1:1;}body{display:none", "imageFit": "contain<script>", "hover": "lift\" onload=\"x" } },
+      "expected": {}
+    },
+    {
+      "name": "cards: wrong case is dropped",
+      "input": { "cards": { "align": "Center", "hover": "None" } },
+      "expected": {}
+    },
+    {
+      "name": "all six groups together keep a fixed key order",
+      "input": { "motion": { "duration": "fast" }, "layout": { "contentWidth": "wide" }, "cards": { "hover": "none" }, "surfaces": { "radius": "lg" }, "buttons": { "style": "outline" }, "typography": { "headingScale": "lg" } },
+      "expected": { "typography": { "headingScale": "lg" }, "buttons": { "style": "outline" }, "surfaces": { "radius": "lg" }, "cards": { "hover": "none" }, "layout": { "contentWidth": "wide" }, "motion": { "duration": "fast" } }
     }
   ]
 }
