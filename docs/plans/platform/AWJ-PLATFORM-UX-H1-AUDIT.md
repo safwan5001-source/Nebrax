@@ -1,7 +1,7 @@
 # AWJ-PLATFORM-UX-H1-AUDIT — H1-0
 
-Status: **H1-0 COMPLETE AS EVIDENCE / DESIGN_GATE OPEN**  
-No product UI code. No merge. No deploy.  
+Status: **H1-0 COMPLETE AS EVIDENCE**  
+Owner decision 2026-10-11: **option A approved** with three amendments. The detailed spec is [AWJ-PLATFORM-UX-H1-1-UX-SPEC.md](./AWJ-PLATFORM-UX-H1-1-UX-SPEC.md). Shell implementation (H1-2) stays blocked until that spec is explicitly approved. No product UI code in this decision.  
 Owner: Safwan | Implementer: Grok | Date: 2026-10-11  
 Repository: `safwan5001-source/Nebrax`
 
@@ -312,4 +312,4 @@ C. Move platform into the tenant ERP shell. Rejected. It mixes principals.
 
 ## Next
 
-Wait for an explicit design decision on packet A, B, or an amendment. After approval, the first product slice is H1-2 shell, then the dark danger contrast if it was not included there. Do not merge this PR and do not deploy.
+Option A was approved on 2026-10-11 with amendments. Follow [AWJ-PLATFORM-UX-H1-1-UX-SPEC.md](./AWJ-PLATFORM-UX-H1-1-UX-SPEC.md). Do not start H1-2 until that spec is explicitly approved. The first code slices after that approval are the tenant pagination PR and the separate danger-contrast PR, not the shell. Do not merge this PR and do not deploy.

@@ -1,10 +1,13 @@
 # AWJ-PLATFORM-UX-H1 — Platform Administration UX Horizon
 
-Status: **H1-0 AUDIT WRITTEN / DESIGN_GATE OPEN**  
+Status: **H1-1 UX SPEC WRITTEN / DESIGN_GATE OPEN BEFORE H1-2**  
 Owner: Safwan | Implementer: **Grok** | Date: 2026-10-11  
 Repository: `safwan5001-source/Nebrax`  
 Execution protocol: [AWJ Horizon System](../../autonomous-engineering/AWJ-HORIZON-SYSTEM.md)  
-H1-0 evidence: [AWJ-PLATFORM-UX-H1-AUDIT.md](./AWJ-PLATFORM-UX-H1-AUDIT.md)
+H1-0 evidence: [AWJ-PLATFORM-UX-H1-AUDIT.md](./AWJ-PLATFORM-UX-H1-AUDIT.md)  
+H1-1 spec: [AWJ-PLATFORM-UX-H1-1-UX-SPEC.md](./AWJ-PLATFORM-UX-H1-1-UX-SPEC.md)  
+
+Owner decision 2026-10-11: option A approved. Amendments: write this detailed spec before any major UI change; danger-button contrast is its own PR; tenant pagination is the highest-priority code slice. H1-2 remains blocked on explicit approval of the H1-1 spec.
 
 ## Purpose
 
@@ -67,12 +70,14 @@ Verify viewports **320 / 375 / 390 / 430 / 768 / 1024 / 1440 / 1920px**, portrai
 
 | Slice | Depends on | Output | Approval boundary |
 |---|---|---|---|
-| H1-0 audit | latest main + Horizon references | audit / factual inventory / decision packet | no product UI code |
-| H1-1 UX spec | H1-0 findings | IA, desktop/tablet/mobile design, acceptance matrix | **DESIGN_GATE** for material redesign |
-| H1-2 shell | approved UX decisions | focused UI PR + tests + CI | **MERGE_GATE** |
-| H1-3 overview | shell merged and post-merge verified, or otherwise confirmed independent | focused UI PR | **MERGE_GATE** |
-| H1-4 management | relevant prior dependencies fulfilled | small per-page PRs | **MERGE_GATE per PR** |
-| H1-5 closure | relevant approved changes integrated | QA report and durable handoff | no deploy without permission |
+| H1-0 audit | latest main + Horizon references | audit / factual inventory | done, no product UI code |
+| H1-1 UX spec | approved option A | detailed IA, shell, states, acceptance matrix | **DESIGN_GATE before H1-2** |
+| H1-PAGINATION | H1-1 spec approved, latest main | tenants list uses existing `page` metadata. No new API | **MERGE_GATE**. Highest-priority code slice. Independent of the shell |
+| H1-CONTRAST | latest main. No shared files with pagination | gate-off dark danger text contrast. Sizes unchanged | **MERGE_GATE**. Separate PR. Not bundled with the shell or ERP restyle |
+| H1-2 shell | H1-1 spec approved, and it does not edit the pagination or contrast files in the same PR | platform console shell only | **MERGE_GATE**. Do not start before H1-1 approval |
+| H1-3 overview | shell merged and post-merge verified, or an explicit independence note | focused UI PR | **MERGE_GATE** |
+| H1-4 management | relevant prior dependencies | small per-page PRs | **MERGE_GATE per PR** |
+| H1-5 closure | approved changes on main | QA report | no deploy without permission |
 
 No default stacked dependent PRs. Before every merge: final diff, independent-style reviewer, AWJ Guardian, relevant tests, CI on **exact final Head SHA**, record PRE_MERGE_REVIEW. Owner approves each merge. After approved merge: inspect merge SHA, checks, post-merge proof before starting dependent slices.
 
