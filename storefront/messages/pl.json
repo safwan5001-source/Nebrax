@@ -166,6 +166,18 @@
       "pause": "Zatrzymaj slajdy",
       "play": "Odtwórz slajdy",
       "choose": "Wybierz slajd"
+    },
+    "gallery": {
+      "label": "Galeria",
+      "item": "Zdjęcie {number}",
+      "previous": "Poprzednie zdjęcia",
+      "next": "Następne zdjęcia",
+      "open": "Powiększ zdjęcie {number}",
+      "viewer": "Przeglądarka zdjęć",
+      "close": "Zamknij przeglądarkę",
+      "viewerPrevious": "Poprzednie zdjęcie",
+      "viewerNext": "Następne zdjęcie",
+      "counter": "{current} z {total}"
     }
   },
   "cart": {

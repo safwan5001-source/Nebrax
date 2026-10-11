@@ -1634,4 +1634,261 @@ input[type="search"]::-webkit-search-cancel-button {
     transition: none !important;
   }
 }
+
+/* ───────────────────────────── CUST-HV V8e — the published gallery (V0 §13.2) ─────────────────────────────
+   The grid and the carousel are the same list. The visible column count `--ga-n` is chosen here by viewport (phones show 2;
+   tablets cap 4 → 3 and 6 → 4; desktops show the authored count) — script plays no part in the layout. The strip is a native
+   scroll-snap scroller (direction, touch, wheel and keyboard scrolling are the browser's). Nothing from the document reaches
+   CSS as text: the renderer writes closed-list attributes only. Reduced motion removes the hover zoom. */
+[data-gallery] {
+  --ga-gap: 1rem;
+  --ga-ar: 1 / 1;
+  --ga-cols-d: 3;
+  --ga-cols-t: 3;
+  --ga-cols-p: 2;
+  --ga-n: var(--ga-cols-p);
+  position: relative;
+}
+[data-gallery][data-gap="none"] {
+  --ga-gap: 0px;
+}
+[data-gallery][data-gap="xs"] {
+  --ga-gap: 0.25rem;
+}
+[data-gallery][data-gap="sm"] {
+  --ga-gap: 0.5rem;
+}
+[data-gallery][data-gap="lg"] {
+  --ga-gap: 1.5rem;
+}
+[data-gallery][data-gap="xl"] {
+  --ga-gap: 2rem;
+}
+[data-gallery][data-aspect="4-3"] {
+  --ga-ar: 4 / 3;
+}
+[data-gallery][data-aspect="16-9"] {
+  --ga-ar: 16 / 9;
+}
+[data-gallery][data-aspect="4-5"] {
+  --ga-ar: 4 / 5;
+}
+[data-gallery][data-cols="2"] {
+  --ga-cols-d: 2;
+  --ga-cols-t: 2;
+}
+[data-gallery][data-cols="4"] {
+  --ga-cols-d: 4;
+  --ga-cols-t: 3;
+}
+[data-gallery][data-cols="6"] {
+  --ga-cols-d: 6;
+  --ga-cols-t: 4;
+}
+@media (min-width: 640px) {
+  [data-gallery] {
+    --ga-n: var(--ga-cols-t);
+  }
+}
+@media (min-width: 1024px) {
+  [data-gallery] {
+    --ga-n: var(--ga-cols-d);
+  }
+}
+[data-gallery-root] {
+  position: relative;
+}
+[data-gallery-list] {
+  display: grid;
+  grid-template-columns: repeat(var(--ga-n), minmax(0, 1fr));
+  gap: var(--ga-gap);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+[data-gallery-item] {
+  min-inline-size: 0;
+}
+[data-gallery-item] figure {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin: 0;
+  min-inline-size: 0;
+}
+[data-gallery-item] a {
+  display: block;
+  border-radius: var(--store-radius, 0.5rem);
+  color: inherit;
+}
+[data-gallery-frame] {
+  position: relative;
+  display: block;
+  aspect-ratio: var(--ga-ar);
+  overflow: hidden;
+  border-radius: var(--store-radius, 0.5rem);
+  background: color-mix(in srgb, currentColor 8%, transparent);
+}
+[data-gallery-picture] {
+  display: block;
+  inline-size: 100%;
+  block-size: 100%;
+}
+[data-gallery-picture] img {
+  display: block;
+  inline-size: 100%;
+  block-size: 100%;
+  object-fit: cover;
+  transition: transform 200ms ease;
+}
+[data-gallery-frame][data-fit="contain"] [data-gallery-picture] img {
+  object-fit: contain;
+}
+[data-gallery-item] a:hover [data-gallery-picture] img {
+  transform: scale(1.03);
+}
+[data-gallery-item] a:focus-visible {
+  outline: 2px solid var(--store-primary, currentColor);
+  outline-offset: 2px;
+}
+[data-gallery-caption] {
+  font-size: 0.875rem;
+  line-height: 1.4;
+  color: var(--store-muted-foreground, inherit);
+  overflow-wrap: anywhere;
+  text-align: start;
+}
+/* carousel: one native scroll-snap strip */
+[data-gallery][data-layout="carousel"] [data-gallery-list] {
+  display: flex;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: thin;
+  padding-block-end: 0.25rem;
+}
+[data-gallery][data-layout="carousel"] [data-gallery-item] {
+  flex: 0 0
+    calc((100% - (var(--ga-n) - 1) * var(--ga-gap)) / var(--ga-n));
+  scroll-snap-align: start;
+}
+[data-gallery-arrow] {
+  position: absolute;
+  inset-block-start: calc(50% - 1.375rem);
+  display: grid;
+  place-items: center;
+  inline-size: 2.75rem;
+  block-size: 2.75rem;
+  border-radius: 9999px;
+  background: rgb(0 0 0 / 0.55);
+  color: #fff;
+}
+[data-gallery-arrow="previous"] {
+  inset-inline-start: 0.5rem;
+}
+[data-gallery-arrow="next"] {
+  inset-inline-end: 0.5rem;
+}
+[data-gallery-arrow="previous"] svg {
+  transform: scaleX(-1);
+}
+[data-gallery][dir="rtl"] [data-gallery-arrow="previous"] svg {
+  transform: none;
+}
+[data-gallery][dir="rtl"] [data-gallery-arrow="next"] svg {
+  transform: scaleX(-1);
+}
+[data-gallery-arrow][aria-disabled="true"] {
+  opacity: 0.4;
+  cursor: default;
+}
+[data-gallery-arrow]:focus-visible,
+[data-gallery-viewer] button:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+  box-shadow: 0 0 0 2px #000;
+}
+/* the modal viewer */
+[data-gallery-viewer] {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: 4rem 1rem 3rem;
+  background: rgb(0 0 0 / 0.92);
+  color: #fff;
+}
+[data-gallery-viewer-figure] {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 0;
+  max-inline-size: 100%;
+  min-block-size: 0;
+}
+[data-gallery-viewer-figure] img {
+  inline-size: auto;
+  block-size: auto;
+  max-inline-size: 100%;
+  max-block-size: calc(100dvh - 10rem);
+  object-fit: contain;
+}
+[data-gallery-viewer-figure] figcaption {
+  max-inline-size: 40rem;
+  font-size: 0.9375rem;
+  line-height: 1.5;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+[data-gallery-viewer-close],
+[data-gallery-viewer-nav] {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  inline-size: 2.75rem;
+  block-size: 2.75rem;
+  border-radius: 9999px;
+  background: rgb(255 255 255 / 0.14);
+  color: #fff;
+}
+[data-gallery-viewer-close] {
+  inset-block-start: 0.75rem;
+  inset-inline-end: 0.75rem;
+}
+[data-gallery-viewer-nav] {
+  inset-block-start: calc(50% - 1.375rem);
+}
+[data-gallery-viewer-nav="previous"] {
+  inset-inline-start: 0.75rem;
+}
+[data-gallery-viewer-nav="next"] {
+  inset-inline-end: 0.75rem;
+}
+[data-gallery-viewer-nav="previous"] svg {
+  transform: scaleX(-1);
+}
+[data-gallery-viewer][dir="rtl"] [data-gallery-viewer-nav="previous"] svg {
+  transform: none;
+}
+[data-gallery-viewer][dir="rtl"] [data-gallery-viewer-nav="next"] svg {
+  transform: scaleX(-1);
+}
+[data-gallery-viewer-count] {
+  position: absolute;
+  inset-block-end: 0.75rem;
+  inset-inline: 0;
+  margin: 0;
+  font-size: 0.875rem;
+  text-align: center;
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-gallery-picture] img {
+    transition: none;
+  }
+  [data-gallery-item] a:hover [data-gallery-picture] img {
+    transform: none;
+  }
+}
 }
