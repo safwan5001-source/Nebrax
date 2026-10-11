@@ -50,6 +50,9 @@
 | لا اعتماد على أسماء غير موثّقة | `validate` يفشل عند أي انجراف اسم/مهمة/نوع trigger، وعند إضافة `paths` لفحص `always`؛ ويحذّر من أي فحص PR غير مصنَّف | `test_job_rename_is_drift`, `test_path_filter_on_always…`, `test_new_unclassified…` |
 | لا إخفاء لفشل سابق بإعادة التشغيل | الحكم على **آخر محاولة** (مثل GitHub نفسه)، وإعادة قيد التشغيل بعد فشل تُنتظر؛ والنجاح بعد فشل سابق يظهر **تحذيراً** في الملخص والـannotations | `test_rerun_uses_latest_attempt_and_warns`, `test_rerun_in_progress…` |
 | فحوص من تطبيق آخر | تُهمل غير `github-actions` (لا انتحال اسم) | `test_spoofed_check…` |
+| **ربط الفحوص بمحاولة الـPR الحالية** (إصلاح جولة المراجعة 1) | `push` و`pull_request` يُنتجان check runs **بنفس الأسماء على نفس الـSHA** (مُشاهَد على هذا الـPR: run `38171911599` push وrun `38171914689` pull_request). لا يُقبل check run إلا إن كان `check_suite.id` له يطابق `check_suite_id` لـworkflow run حدثه `pull_request` و`head_sha` = رأس الـPR. إعادة تشغيل run الـpush (ids أعلى، أخضر) لا تُخفي فشل run الـPR | `Binding.*` (5), `EndToEnd.test_pr_failure_not_hidden_by_green_push_twin` |
+| SHA قديم | قبل الانتظار وبعد كل دورة وقبل الحكم: `GET pulls/{n}` يجب أن يكون `open` وhead = الـSHA المقيَّم، وإلا `stale gate` فشل. وأي check run لـSHA آخر يُهمل | `EndToEnd.test_stale_head_fails_closed`, `Binding.test_runs_of_other_sha…` |
+| تعديل البوابة/المانيفست داخل الـPR | (1) منطق البوابة الحاكم يُنفَّذ من **نسخة القاعدة الموثوقة** (`.base/`) لا من الـPR؛ (2) `compare_baseline` يرفض أي إضعاف مقابل `main`: حذف فحص مطلوب، خفض tier، تغيير workflow/job، تقليص `guard`، أو **حذف نمط من `pull_request.paths`** (كان يسمح بتجاوز `web build` بتضييق المسارات)؛ (3) أي PR يمسّ ملفات البوابة يحمل تحذيراً/لافتة `GATE SELF-CHANGE`. الإضافة والتشديد مسموحان | `Baseline.*` (8) |
 | عمل صحيح عند تحديث PR / تغيّر main | الحالة مرتبطة بـSHA؛ push جديد يلغي بوابة القديم (`concurrency`)؛ تغيّر main يُعالَج بخيار «up to date» في §7 | — |
 | فحص قدّم لكن لم يُشغَّل قط | بلا أي run للـworkflow بعد 10 دقائق ⇒ فشل صريح؛ `action_required` ⇒ فشل؛ workflow انتهى دون الإبلاغ عن المهمة ⇒ فشل | `test_workflow_never_triggered…`, `test_action_required…` |
 
@@ -83,14 +86,15 @@ Fail-closed: خطأ API بعد 5 محاولات، بنية workflow غير مد�
 | `.github/workflows/ci-gate.yml` | البوابة (جديد، لا يمس workflows أخرى) |
 | `.github/ci-gate/required-checks.json` | المصدر الوحيد لتصنيف الفحوص (always / paths / advisory) |
 | `scripts/ci-gate/ci_gate.py` | `validate` + `gate` |
-| `scripts/ci-gate/test_ci_gate.py` | 29 اختباراً بلا شبكة |
+| `scripts/ci-gate/test_ci_gate.py` | 46 اختباراً بلا شبكة (يشمل Regression للجولة 1) |
+| `.gitignore` | منع `__pycache__/` و`*.pyc` (بعد أن دخل `.pyc` الـcommit الأول خطأً؛ أُزيل) + اختبار `Hygiene` يفشل إن تُتبّع bytecode |
 | هذا التقرير | |
 
 لا تغيير في `app/`, `database/`, `routes/`, `web/`, `storefront/`, `mobile/`. المجلد `scripts/` ليس ضمن قوائم النسخ في `ci.yml`/`deploy/assemble.sh` فلا يصل لبناء Laravel (حارس قائمة النسخ يفحص `app/` فقط).
 
 ## 6. الاختبارات
 
-- محلياً: `python3 -m unittest discover -s scripts/ci-gate` ⇒ 29/29 ✅؛ `ci_gate.py validate` ⇒ OK بلا تحذيرات.
+- محلياً: `python3 -m unittest discover -s scripts/ci-gate` ⇒ 46/46 ✅؛ `ci_gate.py validate` ⇒ OK بلا تحذيرات.
 - اختبارات طفرة (mutation) تثبت أن البوابة ترفض: `paths` على `ci.yml`، إعادة تسمية مهمة، `if:`، `continue-on-error`، `--filter`، فقد `pipefail`، `paths-ignore`، workflow جديد غير مصنَّف (تحذير).
 - `php artisan test`: لم يُشغَّل محلياً — لم يُمس أي كود PHP؛ يعمل في CI. لا عمليات مالية جديدة ⇒ **لا قيود محاسبية ناتجة** (لا حاجة لجدول قيود).
 - مسار `gate` الشبكي يُثبت لأول مرة على CI هذا الـPR نفسه (انظر §10).
