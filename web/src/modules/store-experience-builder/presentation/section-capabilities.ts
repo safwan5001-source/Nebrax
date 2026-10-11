@@ -275,6 +275,21 @@ export const SECTION_CAPABILITIES: Record<
     titleKey: "sectionSlider",
     descriptionKey: "sectionSliderDescription",
   },
+  // CUST-HV V8d — the content model and the Publish rule exist (an API-authored gallery is stored and gated), but
+  // neither the Canvas nor the storefront draws it and the editor is not built yet (V8e–V8f). Visible and disabled in
+  // the Library, never hidden, until it is honest to add (V8f flips it).
+  gallery: {
+    type: "gallery",
+    maxInstances: null,
+    canDuplicate: true,
+    canDelete: true,
+    state: "deferred",
+    category: "mediaVideo",
+    merchantAddable: false,
+    titleKey: "sectionGallery",
+    descriptionKey: "sectionGalleryDescription",
+    reasonKey: "sectionGalleryReason",
+  },
 };
 
 export function sectionCapability(

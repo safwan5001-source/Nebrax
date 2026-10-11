@@ -50,6 +50,7 @@ final class StorefrontPresentationPublishValidator
             + SectionDesignContrast::errors($normalized, $this->mediaBounds())
             + CtaColourContrast::errors($normalized, $this->mediaBounds())
             + SliderPublishRules::errors($normalized, $this->mediaBounds())
+            + GalleryPublishRules::errors($normalized)
             + ButtonTokensContrast::errors($normalized)
             + HeaderDesignContrast::errors($normalized)
             + FooterDesignContrast::errors($normalized)

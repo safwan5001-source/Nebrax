@@ -138,12 +138,13 @@ final class StorefrontPresentationNormalizer
     ];
 
     /**
-     * CUST-HV V8 — أقسام الوسائط (V0 §13): `slider` الآن (و`gallery` في شريحةٍ لاحقة). مقبولة للتخزين (المحتوى مُطبَّع
+     * CUST-HV V8 — أقسام الوسائط (V0 §13): `slider` (V8a) و`gallery` (V8d). مقبولة للتخزين (المحتوى مُطبَّع
      * fail-closed) لكنها خارج القائمة الافتراضية للوثيقة كأقسام البيانات، فلا تتغيّر الوثيقة الافتراضية ولا توأماها.
      * مجموعةٌ منفصلة عن `HOME_DATA_SECTION_KEYS` عمداً: تلك تُحصى في إعداد القطاع كـ«أقسام بيانات».
      */
     public const HOME_MEDIA_SECTION_KEYS = [
         'slider',
+        'gallery',
     ];
 
     public const IMPLEMENTED_HOME_SECTION_KEYS = [
@@ -849,6 +850,10 @@ final class StorefrontPresentationNormalizer
 
         if ($type === 'slider') {
             return StorefrontSliderNormalizer::normalize($raw, fn (string $href): string => $this->sanitizeContentHref($href));
+        }
+
+        if ($type === 'gallery') {
+            return StorefrontGalleryNormalizer::normalize($raw, fn (string $href): string => $this->sanitizeContentHref($href));
         }
 
         if ($type === 'benefits') {

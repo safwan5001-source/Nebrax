@@ -146,6 +146,7 @@ describe('commerce appearance — STORE-CUSTOMIZER-V2-2 section instances', () =
       'hero',
       'banner',
       'slider',
+      'gallery',
       'customContent',
       'benefits',
       'deliveryPromise',
@@ -181,6 +182,10 @@ describe('commerce appearance — STORE-CUSTOMIZER-V2-2 section instances', () =
     const sliderOption = picker.querySelector('[data-picker-option="slider"]') as HTMLButtonElement;
     expect(sliderOption.disabled).toBe(false);
     expect(sliderOption.textContent).not.toContain('قيد الإعداد');
+    // CUST-HV V8d — the gallery is listed but not addable yet, and says why.
+    const galleryOption = picker.querySelector('[data-picker-option="gallery"]') as HTMLButtonElement;
+    expect(galleryOption.disabled).toBe(true);
+    expect(galleryOption.textContent).toContain('محرّر المعرض قيد الإعداد');
   });
 
   it('add creates a new instance with a safe unique id and selects it', async () => {

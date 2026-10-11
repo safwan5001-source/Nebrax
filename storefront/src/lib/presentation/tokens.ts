@@ -97,10 +97,10 @@ export const HOME_DATA_SECTION_KEYS = [
 export type HomeDataSectionKey = (typeof HOME_DATA_SECTION_KEYS)[number];
 
 /**
- * CUST-HV V8 — media sections (twin of PHP `HOME_MEDIA_SECTION_KEYS`): `slider` now,
- * `gallery` with its own slice. Stored fail-closed but outside the default document.
+ * CUST-HV V8 — media sections (twin of PHP `HOME_MEDIA_SECTION_KEYS`): `slider` (V8a) and
+ * `gallery` (V8d). Stored fail-closed but outside the default document.
  */
-export const HOME_MEDIA_SECTION_KEYS = ["slider"] as const;
+export const HOME_MEDIA_SECTION_KEYS = ["slider", "gallery"] as const;
 
 export type HomeMediaSectionKey = (typeof HOME_MEDIA_SECTION_KEYS)[number];
 

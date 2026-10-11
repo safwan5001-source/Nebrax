@@ -111,6 +111,21 @@
                 "height"
             ]
         },
+        "gallery": {
+            "background": [
+                "solid",
+                "gradient"
+            ],
+            "width": true,
+            "spacing": true,
+            "layout": [
+                "carousel"
+            ],
+            "border": true,
+            "radius": true,
+            "shadow": true,
+            "separator": true
+        },
         "newArrivals": {
             "background": [
                 "solid",
