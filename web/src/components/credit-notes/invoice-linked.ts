@@ -32,6 +32,8 @@ export interface ReturnableInvoice {
   tax_inclusive: boolean;
   date: string | null;
   fully_returned: boolean;
+  /** سببُ منعٍ يعيده تفصيلُ الفاتورة نفسه (يغطّي ما لم تُحمَّله قائمة المصادر). */
+  blocked_reason?: string | null;
   lines: ReturnableLine[];
 }
 

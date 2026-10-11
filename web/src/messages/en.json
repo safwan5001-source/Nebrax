@@ -5967,6 +5967,7 @@
     "create": "Create",
     "blocked_returned": "Fully returned",
     "blocked_window": "Outside the return window",
+    "blocked_legacy_credit_review": "Older credit notes pending finance review",
     "purchase_supplier_credit_note": "A purchase return only reverses the supplier liability and moves no cash. Money coming back is recorded as a separate Supplier Refund document after the return is posted."
   },
   "returns": {

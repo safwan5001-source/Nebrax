@@ -88,7 +88,7 @@ export function CreditNoteLinkedForm({ initialInvoiceId }: { initialInvoiceId?: 
 
   const summary = useMemo(() => summarize(invoice?.lines ?? [], inputs), [invoice, inputs]);
   const selectedSource = sources.find((s) => s.id === invoiceId);
-  const blockedKey = noteBlockedReasonKey(selectedSource?.blocked_reason);
+  const blockedKey = noteBlockedReasonKey(selectedSource?.blocked_reason ?? invoice?.blocked_reason);
 
   const setInput = (lineId: string, patch: Partial<LineInput>) =>
     setInputs((cur) => ({ ...cur, [lineId]: { ...emptyInput(), ...cur[lineId], ...patch } }));
