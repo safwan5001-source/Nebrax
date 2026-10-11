@@ -45,10 +45,13 @@ function denies(key: string): boolean {
     .filter(Boolean)
     .map((word) => word.toLowerCase());
   // commerce CONTENT (product names / images, invented badges, urgency copy) is denied by word combination, whatever the value type
-  if (
-    fixture.forbiddenWordSets.some((set) => set.every((word) => words.includes(word)))
-  )
-    return true;
+  if (fixture.forbiddenWordSets.some((set) => set.every((word) => words.includes(word)))) {
+    // ...unless it only positions / colours / sizes a REAL one (badgeTextColor, saleBadgePosition), and nothing hides or scales it
+    return (
+      words.some((word) => fixture.hidingVerbs.includes(word)) ||
+      !fixture.presentationSuffixes.includes(words[words.length - 1])
+    );
+  }
   if (!words.some((word) => fixture.commerceWords.includes(word))) return false;
   // a hiding / scaling verb anywhere in the key denies it, whatever its suffix (hidePricePosition, hideStockPlacement…)
   return (

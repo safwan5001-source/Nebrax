@@ -76,7 +76,8 @@ class StorefrontCommerceFirewallTest extends TestCase
         // commerce CONTENT (product names / images, invented badges, urgency copy) is denied by word combination, whatever the value type
         foreach ($fixture['forbiddenWordSets'] as $set) {
             if (array_diff($set, $words) === []) {
-                return true;
+                // ...unless it only positions / colours / sizes a REAL one (badgeTextColor, saleBadgePosition), and nothing hides or scales it
+                return array_intersect($words, $fixture['hidingVerbs']) !== [] || ! in_array(end($words), $fixture['presentationSuffixes'], true);
             }
         }
 
@@ -328,18 +329,25 @@ class StorefrontCommerceFirewallTest extends TestCase
             'StorefrontMediaReferenceScanner', 'StorefrontPresentationService', 'StorefrontPresentationVersionBackfillService',
             'StorefrontPresentationVersionService', 'StorefrontPublishedMediaIndex', 'StorefrontVerticalSetupService',
         ];
-        // scanned for qualified presentation dependencies only: its bare `$presentation` parameter is the listing's title / description copy
-        $bareWordExempt = ['CommerceListingService'];
+        // scanned for qualified presentation dependencies only: CommerceListingService's bare `$presentation` parameter is the listing's title /
+        // description copy, and PosSettings' CATEGORY_PRESENTATION_* constants are the POS tile display modes (neither is the storefront document)
+        $bareWordExempt = ['CommerceListingService', 'PosSettings'];
         $files = [$app.'/Services/PriceListService.php', $app.'/Services/ProductPricingService.php'];
         // ...and every service / support class the price and offer resolvers import (e.g. the partner price-list resolver, unit conversion):
         // a presentation lookup there would change the resolved price just as surely as one in the resolver itself
-        foreach (['CommercePriceResolver', 'StorefrontOfferResolver'] as $resolver) {
-            preg_match_all('/^use (App\\\\(?:Services|Support)\\\\[A-Za-z0-9_\\\\]+);/m', (string) file_get_contents($app.'/Services/Commerce/'.$resolver.'.php'), $imports);
+        $queue = [$app.'/Services/Commerce/CommercePriceResolver.php', $app.'/Services/Commerce/StorefrontOfferResolver.php', $app.'/Services/PriceListService.php', $app.'/Services/ProductPricingService.php'];
+        $visited = [];
+        while ($queue !== []) {
+            $current = array_shift($queue);
+            if (isset($visited[$current]) || ! is_file($current)) {
+                continue;
+            }
+            $visited[$current] = true;
+            $files[] = $current;
+            // fixed point: follow the service / support imports of every file reached, not just the two roots
+            preg_match_all('/^use (App\\\\(?:Services|Support)\\\\[A-Za-z0-9_\\\\]+);/m', (string) file_get_contents($current), $imports);
             foreach ($imports[1] as $import) {
-                $path = $app.'/'.str_replace('\\', '/', substr($import, 4)).'.php';
-                if (is_file($path)) {
-                    $files[] = $path;
-                }
+                $queue[] = $app.'/'.str_replace('\\', '/', substr($import, 4)).'.php';
             }
         }
         $files = array_values(array_unique($files));
@@ -365,7 +373,7 @@ class StorefrontCommerceFirewallTest extends TestCase
             }
         }
         $this->assertGreaterThan(60, $checked, 'the scan must cover the commerce services broadly (sub-namespaces included), not a handful');
-        foreach (['ShippingRateService', 'CommerceDeliveryPromiseService', 'InventoryReservationService', 'FulfillmentPolicyService', 'CommercePriceResolver', 'StorefrontOfferResolver', 'PosCustomerPriceListResolver', 'UnitConversion'] as $named) {
+        foreach (['ShippingRateService', 'CommerceDeliveryPromiseService', 'InventoryReservationService', 'FulfillmentPolicyService', 'CommercePriceResolver', 'StorefrontOfferResolver', 'PosCustomerPriceListResolver', 'UnitConversion', 'PosSettings'] as $named) {
             $this->assertContains($named, array_map(static fn (string $f): string => basename($f, '.php'), $files), "{$named} must be in the scan");
         }
     }

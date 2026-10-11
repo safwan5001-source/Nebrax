@@ -2,10 +2,8 @@
 
 namespace Tests\Feature;
 
-use App\Models\StorefrontPresentation;
 use App\Services\Commerce\CommercePriceResolver;
 use App\Services\Commerce\StorefrontOfferResolver;
-use App\Support\Commerce\StorefrontPresentationNormalizer;
 use App\Tenancy\TenantContext;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -92,21 +90,6 @@ class StorefrontCommerceFirewallRuntimeTest extends TestCase
         return compact('tenantId', 'token', 'channel', 'storefront', 'host', 'product', 'offer');
     }
 
-    /** @param  array<string,mixed>  $s */
-    private function storePresentation(array $s, array $draft, ?array $published): void
-    {
-        app(TenantContext::class)->set($s['tenantId']);
-        try {
-            StorefrontPresentation::create([
-                'storefront_id' => $s['storefront']->id,
-                'draft_config' => $draft,
-                'published_config' => $published,
-            ]);
-        } finally {
-            app(TenantContext::class)->forget();
-        }
-    }
-
     /** @test */
     public function a_hostile_presentation_changes_no_price_or_offer_value_in_draft_or_published(): void
     {
@@ -119,12 +102,29 @@ class StorefrontCommerceFirewallRuntimeTest extends TestCase
         $this->assertCount(1, $before['workspace']);
 
         $hostile = $this->hostileDocument();
-        $normalized = (new StorefrontPresentationNormalizer)->normalize($hostile);
+        $presentation = "/api/commerce/workspace/storefronts/{$s['storefront']->id}/presentation";
 
-        // مسوّدة خام عدائية (كما قد تصل إلى القاعدة) + منشور مطبَّع (كما يُنشر فعلاً): الحالتان معاً، والمتسوق يقرأ المنشور والـCanvas يقرأ المسوّدة
-        $this->storePresentation($s, $hostile, $normalized);
-        $after = $this->commerceTruth($s);
+        // 1) the real draft path (what the Canvas edits): the whole hostile document, saved through the production controller → service
+        $draft = $this->withToken($s['token'])->putJson($presentation, ['config' => $hostile, 'draft_revision' => 0])->assertOk();
+        $this->assertSame($before, $this->commerceTruth($s), 'saving a hostile DRAFT changed a commerce value');
 
-        $this->assertSame($before, $after);
+        // 2) the real publish path (what the shopper reads): the same document minus what a publish legitimately gates on real media
+        // (a slider / gallery / image block must reference an owned picture), saved as the draft and then published through the production path
+        $publishable = $hostile;
+        $publishable['homepage']['sections'] = array_values(array_filter(
+            $publishable['homepage']['sections'],
+            static fn (array $section): bool => ! in_array($section['type'], ['slider', 'gallery'], true),
+        ));
+        foreach ($publishable['homepage']['sections'] as &$section) {
+            if ($section['type'] === 'customContent') {
+                $section['content']['blocks'] = array_values(array_filter($section['content']['blocks'], static fn (array $block): bool => $block['kind'] !== 'image'));
+            }
+        }
+        unset($section);
+        $saved = $this->withToken($s['token'])->putJson($presentation, ['config' => $publishable, 'draft_revision' => $draft->json('data.draft_revision')])->assertOk();
+        $this->withToken($s['token'])->postJson("{$presentation}/publish", ['draft_revision' => $saved->json('data.draft_revision')])->assertOk();
+
+        $this->assertNotNull($this->withToken($s['token'])->getJson($presentation)->json('data.published'), 'the hostile document must really be published');
+        $this->assertSame($before, $this->commerceTruth($s), 'publishing a hostile document changed a commerce value');
     }
 }
