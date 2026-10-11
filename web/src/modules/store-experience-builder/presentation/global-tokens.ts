@@ -168,6 +168,20 @@ function pickFields(
 }
 
 /**
+ * CUST-HV V9d-1/2 — the card tokens of a raw value: a closed list per field, one invalid field never costs the valid ones, an empty
+ * group is `undefined`. Used for the document's `cards` and for a section's own override (`design.cards`).
+ */
+export function normalizeGlobalCards(raw: unknown): GlobalCards | undefined {
+  const cards = pickFields(raw, [
+    ["align", GLOBAL_CARD_ALIGNS],
+    ["imageRatio", GLOBAL_CARD_IMAGE_RATIOS],
+    ["imageFit", GLOBAL_CARD_IMAGE_FITS],
+    ["hover", GLOBAL_CARD_HOVERS],
+  ]);
+  return cards ? (cards as GlobalCards) : undefined;
+}
+
+/**
  * Normalises the four global-token keys of a raw presentation document. Returns only the
  * keys that survive, in a fixed canonical order (typography, buttons, surfaces, cards, layout, motion).
  */
@@ -227,13 +241,8 @@ export function normalizeGlobalTokens(
     out.surfaces = surfaces;
   }
 
-  const cards = pickFields(raw.cards, [
-    ["align", GLOBAL_CARD_ALIGNS],
-    ["imageRatio", GLOBAL_CARD_IMAGE_RATIOS],
-    ["imageFit", GLOBAL_CARD_IMAGE_FITS],
-    ["hover", GLOBAL_CARD_HOVERS],
-  ]);
-  if (cards) out.cards = cards as GlobalCards;
+  const cards = normalizeGlobalCards(raw.cards);
+  if (cards) out.cards = cards;
 
   const layout = pickFields(raw.layout, [
     ["contentWidth", GLOBAL_CONTENT_WIDTHS],
@@ -436,24 +445,26 @@ const CARD_HOVER: Record<
 /**
  * CUST-HV V9d-1 — the card tokens as the stylesheet's inputs: a token list (`cd-al` …) and validated `--cd-*` custom properties, written onto
  * `style` and returned as tokens. Shared by the document-level resolver and (V9d-2) a section's own override, so the nearest scope wins by
- * plain custom-property inheritance. `start` alignment and `cover` fit are today's behaviour and emit nothing.
+ * plain custom-property inheritance. At the document level `start` alignment and `cover` fit are today's behaviour and emit nothing;
+ * in a SECTION's own override they are written out, because there they must win over a store-wide `center` / `contain`.
  */
 export function resolveCardTokens(
   cards: GlobalCards | undefined,
   style: Record<string, string>,
+  scope: "document" | "section" = "document",
 ): string[] {
   const tokens: string[] = [];
   if (!cards) return tokens;
-  if (cards.align === "center") {
-    style["--cd-al"] = "center";
+  if (cards.align && (cards.align === "center" || scope === "section")) {
+    style["--cd-al"] = cards.align;
     tokens.push("cd-al");
   }
   if (cards.imageRatio && CARD_RATIO[cards.imageRatio]) {
     style["--cd-ir"] = CARD_RATIO[cards.imageRatio];
     tokens.push("cd-ir");
   }
-  if (cards.imageFit === "contain") {
-    style["--cd-if"] = "contain";
+  if (cards.imageFit && (cards.imageFit === "contain" || scope === "section")) {
+    style["--cd-if"] = cards.imageFit;
     tokens.push("cd-if");
   }
   if (cards.hover && CARD_HOVER[cards.hover]) {

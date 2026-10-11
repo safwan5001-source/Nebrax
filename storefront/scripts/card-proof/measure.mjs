@@ -11,7 +11,7 @@
 //              card looks, never what it says (V0 §14.3)
 //   LAYOUT     no horizontal overflow; every card stays inside the viewport
 // Negative controls (each must make this script FAIL): --noratio (ratio rule removed) · --nohover (hover rules removed) · --noalign (alignment
-// rule removed) · --leak (a rule that hides every price).
+// rule removed) · --nosection (the section-scope rules removed) · --leak (a rule that hides every price).
 //   node scripts/pixel-proof/build-css.mjs <dir>; node scripts/slider-proof/make-pictures.mjs <dir>
 //   CARD_PROOF_DIR=<dir> npx vitest run src/components/products/__tests__/card-proof.render.test.tsx
 //   node scripts/card-proof/measure.mjs <dir> [--noratio|--nohover|--noalign|--leak] [--shots <outDir>]   (PIXEL_PROOF_CHROMIUM=<path>)
@@ -39,6 +39,7 @@ if (flag("--nohover")) {
   strip(/\[data-gt~="cd-hv"\] \[data-card\]:hover \[data-card-image\] img\s*\{[^}]*\}/g);
 }
 if (flag("--noalign")) strip(/\[data-gt~="cd-al"\] \[data-card-body\]\s*\{[^}]*\}/g);
+if (flag("--nosection")) css = css.replaceAll('[data-sd~="cd-', '[data-xx~="cd-');
 if (flag("--leak")) css += "\n[data-card-price]{visibility:hidden}";
 const inlineCss = (html) => html.replace(/<style>[\s\S]*?<\/style>/, `<style>${css}</style>`);
 
@@ -155,6 +156,67 @@ for (const variant of VARIANTS) {
       if (shotsAt && w !== 768 && (variant === "base" || variant === "all" || variant === "center")) await page.screenshot({ path: join(shotsAt, `${tag}.png`), fullPage: true });
       await context.close();
     }
+  }
+}
+
+// ── V9d-2: a shelf's own column count (the production grid class) ──
+const SHELF_COLS = { shelfauto: { 390: 2, 768: 3, 1280: 4 }, shelf2: { 390: 2, 768: 2, 1280: 2 }, shelf3: { 390: 2, 768: 3, 1280: 3 }, shelf4: { 390: 2, 768: 3, 1280: 4 } };
+for (const [name, want] of Object.entries(SHELF_COLS)) {
+  for (const d of ["ltr", "rtl"]) {
+    const path = join(dir, "pages", `${name}.${d}.html`);
+    writeFileSync(path, inlineCss(readFileSync(path, "utf8")));
+    for (const [w, h] of VIEWPORTS) {
+      const tag = `${name}.${d}@${w}`;
+      const context = await browser.newContext({ viewport: { width: w, height: h } });
+      const page = await context.newPage();
+      await page.goto(`file://${path}`);
+      await page.waitForSelector("[data-card]");
+      const info = await page.evaluate(() => {
+        const ul = document.querySelector("ul");
+        const cols = getComputedStyle(ul).gridTemplateColumns.split(" ").length;
+        const boxes = [...ul.children].map((li) => li.getBoundingClientRect());
+        const inRow = boxes.filter((r) => Math.abs(r.top - boxes[0].top) < 2).length;
+        return { cols, inRow, overflowX: document.documentElement.scrollWidth - document.documentElement.clientWidth };
+      });
+      ok(info.cols === want[w], `${tag}: ${info.cols} columns (want ${want[w]})`);
+      ok(info.inRow === want[w], `${tag}: ${info.inRow} cards in the first row (want ${want[w]})`);
+      ok(info.overflowX <= 1, `${tag}: horizontal overflow ${info.overflowX}px`);
+      await context.close();
+    }
+  }
+}
+
+// ── V9d-2: a section's own card tokens win over the document's, by proximity; a sibling section keeps the document's ──
+for (const d of ["ltr", "rtl"]) {
+  const path = join(dir, "pages", `override.${d}.html`);
+  writeFileSync(path, inlineCss(readFileSync(path, "utf8")));
+  for (const [w, h] of [[1280, 800], [390, 844]]) {
+    const tag = `override.${d}@${w}`;
+    const context = await browser.newContext({ viewport: { width: w, height: h } });
+    const page = await context.newPage();
+    await page.goto(`file://${path}`);
+    await page.waitForSelector("[data-card]");
+    const read = (sel) => page.evaluate((s) => {
+      const card = document.querySelector(`${s} [data-card]`);
+      const box = card.querySelector("[data-card-image]").getBoundingClientRect();
+      return { align: getComputedStyle(card.querySelector("[data-card-body]")).textAlign, fit: getComputedStyle(card.querySelector("[data-card-image] img")).objectFit, ratio: box.width / box.height };
+    }, sel);
+    const plain = await read("#plain");
+    const own = await read("#own");
+    ok(plain.align === "center" && plain.fit === "cover" && plain.ratio > 1.15, `${tag}: the sibling section changed (${JSON.stringify(plain)})`);
+    ok((own.align === "start" || own.align === "left" || own.align === "right") && own.fit === "contain" && near(own.ratio, 1, 0.03), `${tag}: the section's own tokens did not apply / win (${JSON.stringify(own)})`);
+    for (const [sel, wantShadow, wantLift] of [["#plain", false, 0], ["#own", true, -4]]) {
+      const ctx2 = await browser.newContext({ viewport: { width: w, height: h }, reducedMotion: "no-preference" });
+      const p2 = await ctx2.newPage();
+      await p2.goto(`file://${path}`);
+      await p2.waitForSelector("[data-card]");
+      await p2.locator(`${sel} [data-card]`).first().hover();
+      await p2.waitForTimeout(700);
+      const hov = await p2.evaluate((s) => { const c = document.querySelector(`${s} [data-card]`); const t = getComputedStyle(c).translate; return { shadow: getComputedStyle(c).boxShadow !== "none", ty: t === "none" ? 0 : parseFloat(t.split(" ")[1] ?? "0") }; }, sel);
+      ok(hov.shadow === wantShadow && near(hov.ty, wantLift, 0.6), `${tag}: hover in ${sel} was ${JSON.stringify(hov)}`);
+      await ctx2.close();
+    }
+    await context.close();
   }
 }
 await browser.close();

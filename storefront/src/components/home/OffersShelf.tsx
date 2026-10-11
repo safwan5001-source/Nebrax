@@ -1,5 +1,6 @@
 import { OfferCard } from "@/components/products/OfferCard";
 import { fetchOffers } from "@/lib/commerce/offers";
+import { type ShelfColumns, shelfGridClass } from "@/lib/home/shelf-layout";
 
 /**
  * CUST-H4-7 — the published "offers" section.
@@ -24,11 +25,14 @@ export async function OffersShelf({
   basePath,
   title,
   headingId,
+  columns,
 }: {
   offerIds: readonly string[];
   basePath: string;
   title: string;
   headingId: string;
+  /** CUST-HV V9d-2 — the section design's `columns`; absent = today's. Offers have no rail. */
+  columns?: ShelfColumns;
 }) {
   const live = await fetchOffers().catch((error) => {
     console.error("OffersShelf: failed to load offers", error);
@@ -48,7 +52,7 @@ export async function OffersShelf({
       >
         {title}
       </h2>
-      <ul className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 md:gap-5">
+      <ul className={`mt-4 grid gap-3 md:gap-5 ${shelfGridClass(columns)}`}>
         {offers.map((offer) => (
           <li key={offer.id} className="min-w-0">
             <OfferCard offer={offer} basePath={basePath} />

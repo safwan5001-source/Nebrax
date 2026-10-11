@@ -334,6 +334,49 @@
   --bn: 4;
 }
 
+/* ── CUST-HV V9d-2 — product / offer shelves in the Canvas once the merchant chose a layout or a column count. The storefront resolves them
+   with `sm:` / `lg:` utilities and Swiper breakpoints against the HOST window; the Canvas takes the SIMULATED device (`data-vp`) and the same
+   numbers: phones 2, tablets 3 (2 when the merchant asked for 2), desktops the chosen count (a rail without one: 5, as Market's rail). A rail
+   is a native scroll-snap strip here (no Swiper in the editor). A shelf without a choice carries no attributes and keeps its legacy classes. ── */
+.awj-store-preview [data-shelf][data-vp="mobile"] {
+  --sh-n: 2;
+}
+.awj-store-preview [data-shelf][data-vp="tablet"] {
+  --sh-n: 3;
+}
+.awj-store-preview [data-shelf][data-vp="desktop"] {
+  --sh-n: 4;
+}
+.awj-store-preview [data-shelf="rail"][data-vp="desktop"] {
+  --sh-n: 5;
+}
+.awj-store-preview [data-shelf][data-vp="tablet"][data-cols="2"] {
+  --sh-n: 2;
+}
+.awj-store-preview [data-shelf][data-vp="desktop"][data-cols="2"] {
+  --sh-n: 2;
+}
+.awj-store-preview [data-shelf][data-vp="desktop"][data-cols="3"] {
+  --sh-n: 3;
+}
+.awj-store-preview [data-shelf][data-vp="desktop"][data-cols="4"] {
+  --sh-n: 4;
+}
+.awj-store-preview [data-shelf="grid"][data-cols] {
+  grid-template-columns: repeat(var(--sh-n), minmax(0, 1fr));
+}
+.awj-store-preview [data-shelf="rail"] {
+  display: flex;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  gap: 0.75rem;
+}
+.awj-store-preview [data-shelf="rail"] > li {
+  flex: 0 0 calc((100% - (var(--sh-n) - 1) * 0.75rem) / var(--sh-n));
+  min-width: 0;
+  scroll-snap-align: start;
+}
+
 /* ── CUST-HV V9c-2 — the Custom Content blocks in the Canvas. The storefront stacks its two columns below `md` with a media query against the
    HOST window; the Canvas takes the SIMULATED device instead (`data-vp`): one column on phones, two from tablet. The block the editor has selected
    is ringed (the ring never changes the layout). ── */
@@ -876,32 +919,41 @@
 /* CUST-HV V9d-1 — card tokens (V0 §14.1). Product and offer cards carry stable hooks (`data-card`, `data-card-image`, `data-card-body`,
    `data-card-price`); a token is a validated custom property, so the nearest scope's value wins by inheritance. Defaults emit nothing:
    without these tokens a card is exactly what it was (start-aligned body, a height-sized cover image, a soft shadow and a 3 % image zoom). */
-.awj-store-preview[data-gt~="cd-al"] [data-card-body] {
+.awj-store-preview[data-gt~="cd-al"] [data-card-body],
+.awj-store-preview [data-sd~="cd-al"] [data-card-body] {
   text-align: var(--cd-al);
 }
-.awj-store-preview[data-gt~="cd-al"] [data-card-price] {
+.awj-store-preview[data-gt~="cd-al"] [data-card-price],
+.awj-store-preview [data-sd~="cd-al"] [data-card-price] {
   justify-content: var(--cd-al);
 }
-.awj-store-preview[data-gt~="cd-ir"] [data-card-image] {
+.awj-store-preview[data-gt~="cd-ir"] [data-card-image],
+.awj-store-preview [data-sd~="cd-ir"] [data-card-image] {
   height: auto;
   aspect-ratio: var(--cd-ir);
 }
-.awj-store-preview[data-gt~="cd-if"] [data-card-image] img {
+.awj-store-preview[data-gt~="cd-if"] [data-card-image] img,
+.awj-store-preview [data-sd~="cd-if"] [data-card-image] img {
   object-fit: var(--cd-if);
 }
-.awj-store-preview[data-gt~="cd-hv"] [data-card] {
+.awj-store-preview[data-gt~="cd-hv"] [data-card],
+.awj-store-preview [data-sd~="cd-hv"] [data-card] {
   transition-property: box-shadow, translate;
 }
-.awj-store-preview[data-gt~="cd-hv"] [data-card]:is(:hover, :focus-within) {
+.awj-store-preview[data-gt~="cd-hv"] [data-card]:is(:hover, :focus-within),
+.awj-store-preview [data-sd~="cd-hv"] [data-card]:is(:hover, :focus-within) {
   box-shadow: var(--cd-hs);
   translate: 0 var(--cd-hl);
 }
-.awj-store-preview[data-gt~="cd-hv"] [data-card]:hover [data-card-image] img {
+.awj-store-preview[data-gt~="cd-hv"] [data-card]:hover [data-card-image] img,
+.awj-store-preview [data-sd~="cd-hv"] [data-card]:hover [data-card-image] img {
   scale: var(--cd-hz);
 }
 @media (prefers-reduced-motion: reduce) {
   .awj-store-preview[data-gt~="cd-hv"] [data-card]:is(:hover, :focus-within),
-  .awj-store-preview[data-gt~="cd-hv"] [data-card]:hover [data-card-image] img {
+  .awj-store-preview [data-sd~="cd-hv"] [data-card]:is(:hover, :focus-within),
+  .awj-store-preview[data-gt~="cd-hv"] [data-card]:hover [data-card-image] img,
+  .awj-store-preview [data-sd~="cd-hv"] [data-card]:hover [data-card-image] img {
     translate: none;
     scale: 1;
   }
