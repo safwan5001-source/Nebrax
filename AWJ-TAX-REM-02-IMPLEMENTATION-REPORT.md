@@ -125,11 +125,22 @@ No change to `LedgerService`, `InventoryService`, `PosReturnService`, `PaymentSe
 * Against the original `CreditNoteService`: 29 of 34 accuracy tests failed (the rest are guards that hold either way).
 * PostgreSQL concurrency with the invoice-row lock removed: 3–4 of the 7 PostgreSQL tests fail on every run; with the lock: 7/7 pass on 3 consecutive runs.
 
-**Runs** — _see §8._
+**Runs** — see §8.
 
 ## 8. Test & CI results
 
-_Filled in after the runs complete._
+**Local, PHP 8.3** (SQLite and PostgreSQL 16; sandbox lacks `bcmath`, the AWS SDK and mail transport, so a few unrelated classes cannot pass here — CI installs them):
+
+| Run | Result |
+|---|---|
+| New REM-02 classes, SQLite | `CreditNoteSourceVatAccuracyTest` 35 ✅ · `CreditNoteMigrationPolicyTest` 7 ✅ (PG-only test skipped) |
+| New PostgreSQL class (`CreditNoteSourcePostgresTest`), PG 16 | 7 ✅ — repeated 3× with the lock in place; 3–4 fail without it |
+| Credit/debit-note + refund + document + return + invoice-API related set, SQLite | 588 passed (the only failures were R2/AWS-SDK tests caught by my broad filter, and two `ProductReferenceRegistryTest` cases that pass alone) |
+| Same related set, PostgreSQL | 368 passed; 7 `ApiInvoiceTest` failures were the known migration-DDL collision between sessions — class alone: **25/25 pass** |
+| Full suite, SQLite | 5 897 passed · 69 skipped · 125 failed — all in classes unrelated to this change: Fuel (`bcmul()` missing, no `bcmath`), StorefrontMedia/ProductMedia/R2 (AWS SDK missing), AuthRecovery/UserInvitation/ResendMail (mail transport), plus 5 "database is locked" from running two suites at once. None touches credit notes, returns, invoices or the ledger. |
+| Full suite, PostgreSQL (same unrelated families excluded; R2 tests hang on network here) | 5 780 passed · 1 skipped · 5 failed: `AccountManagementTest` (1 DDL deadlock + 2 cascaded) and `CashDrawerBridgeTest` ×2 — both classes **pass alone (14/14)** |
+
+**CI on the head commit** — _see the PR checks; recorded in the PR description once complete._
 
 ## 9. Risks / not done on purpose
 
