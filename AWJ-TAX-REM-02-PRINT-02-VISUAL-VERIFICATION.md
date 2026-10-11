@@ -201,7 +201,7 @@ A saved layout that omits a necessary financial column therefore **can** show a 
 | `oracle.py` reproduces from the committed evidence | 122 cases checked; 4 residual cosmetic flags (`minimal-v2` Qty header, F5) — as recorded in §5 |
 | `tsc` / full suite / build | unaffected by construction (no `.ts/.tsx/.js` in the diff); CI runs them — see below |
 
-**Base / Head / CI / mergeability:** *pending at this commit* — CI is re-running after the scope-correction push; the verified result, final Base/Head SHAs and `mergeable_state` are recorded in the report-only follow-up commit and in the PR description.
+**Base / Head / CI / mergeability:** **Base** `main` @ `3209fcb77cc4e02b729bb74c34adf7e131869a1b` (merge-base == `main`). **Verified head `c11ce2535b5c49c7f85fe2c0c14ea60fc00502d5`** (the scope-correction commit): **6/6 check runs `success`** — web build (`npm run test` + `npm run build`), PHP sqlite and PHP pgsql, across both workflow runs (completed 17:37 UTC) — and GitHub `mergeable_state: clean`, **146 changed files**. The head of the PR is the commit that adds this paragraph (`c11ce25` + a report-only commit that changes no other file); its CI is re-verified separately in the PR description before the PR is called ready.
 
 **Remaining risks (specific to this PR):**
 1. Merging adds ≈8 MB of screenshots to the repo history (can be closed unmerged instead; no shipped fix depends on it).
