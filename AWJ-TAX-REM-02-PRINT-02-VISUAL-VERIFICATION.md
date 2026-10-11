@@ -17,7 +17,7 @@
 | Head SHA | `2c82b01afbc8f2a5fb4ea9d01509c9fe1776eda9` (unchanged) | **start of task** `1287f514a88f2d482e1eb6d309002e2d2a8b5d5f` → **now** `b3adda190da55e250d7940d436d9cd97e9f3af7b` (this task's fix commit) |
 | Base | `main` @ `bdecbd01…` (main is now `eae4bd7c…`) | `claude/awj-tax-rem-02-credit-note-vat` (= #1304) @ `2c82b01…` |
 | Mergeability | API says `unknown` (not recomputed since `main` moved). **I verified with `git merge-tree`: #1304 merges into current `main` with no conflicts.** | `clean` |
-| CI | all 5 runs `success` on its head (web build, PHP sqlite, PHP pgsql) | start of task: 6/6 `success` on `1287f51`. On `b3adda1`: web build + `npm run test` (the web-ci job): **success** on `b3adda1` (both workflow runs). PHP sqlite/pgsql: **in progress at time of writing** (this PR changes no PHP; the previous head `1287f51` was green on all 6) — final status in the PR checks |
+| CI | all 5 runs `success` on its head (web build, PHP sqlite, PHP pgsql) | start of task: 6/6 `success` on `1287f51`. On `b3adda1`: **6/6 `success`** (web build + `npm run test`, PHP sqlite, PHP pgsql — both workflow runs; completed 15:16 UTC), `mergeable_state: clean` |
 
 **Important:** the earlier green CI on `1287f51` did **not** prove the print output was correct — the thermal defect below was present and CI cannot see it. The PRINT-01 report's statement that thermal "consumes the one model built by this builder" was true but incomplete: the thermal receipt is a separate template with no discount row (§5, F1). This report supersedes that statement.
 
@@ -138,7 +138,7 @@ A saved layout that omits a necessary financial column therefore **can** show a 
 | `npm run build` on final code | **passes** |
 | `tsc --noEmit` | 0 new errors vs. baseline |
 | Drift ratchet (`src/design`) | caught `bg-white` in my first QA page; fixed (passes) |
-| CI #1315 @ `b3adda1` | web build + `npm run test` (the web-ci job): **success** on `b3adda1` (both workflow runs). PHP sqlite/pgsql: **in progress at time of writing** (this PR changes no PHP; the previous head `1287f51` was green on all 6) — final status in the PR checks |
+| CI #1315 @ `b3adda1` | **6/6 `success`** (web build + tests, PHP sqlite, PHP pgsql; both runs; verified after completion) |
 | CI #1304 @ `2c82b01` | 5/5 success (unchanged) |
 
 ## 9. Changes made in this task
@@ -158,7 +158,7 @@ A saved layout that omits a necessary financial column therefore **can** show a 
 
 ## 11. Final recommendation: **READY — conditional**
 
-**#1315 is READY to merge after #1304**, on these conditions: **(a)** CI is green on `b3adda1` (web: success; PHP sqlite/pgsql must finish green — re-check before merging); **(b)** the owner accepts that A5 is unsupported and that physical-thermal-printer behaviour is NOT VERIFIED; **(c)** the owner accepts F1's effect on invoice thermal receipts with a header discount (or asks for it to be gated). It is **not** safe to merge #1315 at `1287f51` (the thermal defect). This report does not approve #1304's accounting — that is covered by its own report/review.
+**#1315 is READY to merge after #1304**, on these conditions: **(a)** CI stays green on `b3adda1` — **verified 6/6 success**; re-check after retargeting to `main`; **(b)** the owner accepts that A5 is unsupported and that physical-thermal-printer behaviour is NOT VERIFIED; **(c)** the owner accepts F1's effect on invoice thermal receipts with a header discount (or asks for it to be gated). It is **not** safe to merge #1315 at `1287f51` (the thermal defect). This report does not approve #1304's accounting — that is covered by its own report/review.
 
 **Exact merge order and prerequisites**
 
