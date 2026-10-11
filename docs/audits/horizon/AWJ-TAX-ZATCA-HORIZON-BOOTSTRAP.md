@@ -1,5 +1,8 @@
 # AWJ-TAX-ZATCA-HORIZON — Claude Code Bootstrap / Handoff
 
+> **Owner activation decision (2026-10-11):** Pause Delivery execution and make TAX-ZATCA the active Horizon when PR #1324 is merged. No parallel Delivery task execution. TAX-HZ-00 evidence-only phase may begin after merged activation; stop before code implementation for review and scope selection. Explicit Safwan approval is required for each merge, separately from any Deploy decision.
+
+
 **Mode:** Evidence-and-planning first, READ-ONLY on product code. Do not implement a remediation task until the owner approves Horizon activation and the first task. No Merge, Deploy, credentials, live ZATCA requests or production migrations.
 
 ## Work location
