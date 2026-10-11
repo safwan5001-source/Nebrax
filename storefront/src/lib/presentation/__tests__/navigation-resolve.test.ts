@@ -5,6 +5,7 @@ import {
   MAX_NAV_PRODUCT_TARGETS,
   type NavResolveContext,
   navTargetHref,
+  resolveFooterGroups,
   resolveNavMenu,
 } from "../navigation-resolve";
 
@@ -180,6 +181,127 @@ describe("collectNavTargetIds (V7d-3)", () => {
     ]);
     const ids = collectNavTargetIds(m);
     expect(ids.categoryIds).toEqual(["c1"]);
+    expect(ids.productIds).toHaveLength(MAX_NAV_PRODUCT_TARGETS);
+  });
+});
+
+describe("resolveFooterGroups (V7e-2)", () => {
+  const link = (id: string, label: string, target: unknown) =>
+    ({ id, label, target, enabled: true }) as never;
+  const menus = [
+    {
+      id: "footer",
+      name: "",
+      items: [
+        link("m1", "Privacy", { kind: "content", slug: "privacy-policy" }),
+        link("m2", "Gone", { kind: "category", id: "zzz" }),
+      ],
+    },
+  ] as never;
+
+  it("a referenced menu wins over the group's own links, top-level only, dead items omitted", () => {
+    const [g] = resolveFooterGroups(
+      [
+        {
+          id: "g",
+          title: "Info",
+          menu: "footer",
+          links: [link("x", "Ignored", { kind: "home" })],
+        },
+      ] as never,
+      menus,
+      ctx,
+    );
+    expect(g?.items.map((i) => i.label)).toEqual(["Privacy"]);
+    expect(g?.span).toBe(1);
+  });
+
+  it("a missing menu degrades to the group's own links", () => {
+    const [g] = resolveFooterGroups(
+      [
+        {
+          id: "g",
+          title: "Info",
+          menu: "nope",
+          span: 2,
+          links: [link("x", "Home", { kind: "home" })],
+        },
+      ] as never,
+      menus,
+      ctx,
+    );
+    expect(g?.items.map((i) => i.label)).toEqual(["Home"]);
+    expect(g?.span).toBe(2);
+  });
+
+  it("omits a group without a title or without a live link", () => {
+    const out = resolveFooterGroups(
+      [
+        { id: "a", title: "  ", links: [link("x", "Home", { kind: "home" })] },
+        { id: "b", title: "Empty" },
+        {
+          id: "c",
+          title: "Dead",
+          links: [link("y", "Gone", { kind: "product", id: "zzz" })],
+        },
+        {
+          id: "d",
+          title: "Ok",
+          links: [link("z", "Shoes", { kind: "category", id: "c1" })],
+        },
+      ] as never,
+      [],
+      ctx,
+    );
+    expect(out.map((g) => g.id)).toEqual(["d"]);
+  });
+
+  it("children never reach a footer group; icons and badges survive", () => {
+    const [g] = resolveFooterGroups(
+      [
+        {
+          id: "g",
+          title: "T",
+          links: [
+            {
+              id: "x",
+              label: "A",
+              target: { kind: "home" },
+              enabled: true,
+              icon: "tag",
+              badge: { text: "New" },
+            },
+          ],
+        },
+      ] as never,
+      [],
+      ctx,
+    );
+    expect(g?.items[0]).toEqual({
+      id: "x",
+      label: "A",
+      href: "/sa/ar",
+      newTab: false,
+      icon: "tag",
+      badge: { text: "New" },
+    });
+  });
+});
+
+describe("collectNavTargetIds across menus (V7e-2)", () => {
+  it("shares the product cap across menus", () => {
+    const mk = (n: number, prefix: string) =>
+      ({
+        id: prefix,
+        name: "",
+        items: Array.from({ length: n }, (_, i) => ({
+          id: `${prefix}${i}`,
+          label: "x",
+          enabled: true,
+          target: { kind: "product", id: `${prefix}-p${i}` },
+        })),
+      }) as never;
+    const ids = collectNavTargetIds([mk(6, "a"), mk(6, "b")]);
     expect(ids.productIds).toHaveLength(MAX_NAV_PRODUCT_TARGETS);
   });
 });

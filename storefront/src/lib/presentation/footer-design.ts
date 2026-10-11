@@ -17,6 +17,7 @@
  */
 
 import {
+  autoForeground,
   parseHex,
   passes,
   solidInterval,
@@ -25,6 +26,7 @@ import {
 import { type NavItem, normalizeNavFlatItems } from "./navigation";
 import { type PresentationPalette, resolveRoleHex } from "./palette";
 import { type ColorRef, normalizeColorRef } from "./section-design";
+import { mixHex } from "./tokens";
 
 export const FOOTER_LAYOUTS = [
   "compact",
@@ -224,4 +226,77 @@ export function footerContrastIssues(
     }
   }
   return issues;
+}
+
+export interface ResolvedFooterDesign {
+  /**
+   * Validated `--store-footer*` custom properties for the `<footer>` element: they override the theme's footer tokens, so every
+   * existing footer class (`bg-store-footer`, `text-store-footer-link` …) follows with no new CSS. Undefined ⇒ none at all.
+   */
+  style?: Record<string, string>;
+  spacing: { top: FooterSpacing; bottom: FooterSpacing };
+  logoSize: FooterLogoSize | undefined;
+  align: FooterAlign | undefined;
+  /** True when any design key is set. */
+  designed: boolean;
+}
+
+/** Whether `mixed` (a step from `from` toward `bg`) still clears 4.5:1 against `bg`. */
+function mixedPasses(mixed: string, bg: string): boolean {
+  const rgb = parseHex(bg);
+  return rgb ? passes(worstRatioForHex(mixed, solidInterval(rgb))) : false;
+}
+
+/**
+ * The one pure function from the document to what the footer renderer needs. Over a **designed background** every colour
+ * the merchant did not choose is derived and proven by construction: the heading is the best of pure white / black, the body
+ * (muted) text and the links are a step toward the background taken only while they still clear 4.5:1, else the full
+ * foreground; the divider is a decorative tint. Without a designed background only the explicit colours are emitted, each
+ * overriding exactly the one token it names — and an explicit colour is gated at Publish (`footerContrastIssues`).
+ * No string from the document ever reaches CSS: every value is a validated hex.
+ */
+export function resolveFooterDesign(
+  design: FooterDesign | undefined,
+  ctx?: FooterColourContext,
+): ResolvedFooterDesign {
+  const style: Record<string, string> = {};
+  if (design && ctx) {
+    const bg = design.surface
+      ? colourHex(design.surface.background, ctx)
+      : null;
+    const bgRgb = bg ? parseHex(bg) : null;
+    const explicit = {
+      heading: design.heading ? colourHex(design.heading, ctx) : null,
+      text: design.text ? colourHex(design.text, ctx) : null,
+      link: design.link ? colourHex(design.link, ctx) : null,
+      divider: design.divider ? colourHex(design.divider.color, ctx) : null,
+    };
+    if (bg && bgRgb) {
+      const fg = autoForeground(solidInterval(bgRgb));
+      style["--store-footer"] = bg;
+      style["--store-footer-foreground"] = explicit.heading ?? fg;
+      const step = (amounts: number[]) =>
+        amounts.map((a) => mixHex(fg, bg, a)).find((m) => mixedPasses(m, bg)) ??
+        fg;
+      style["--store-footer-muted"] = explicit.text ?? step([0.35, 0.22]);
+      style["--store-footer-link"] = explicit.link ?? step([0.18]);
+      style["--store-footer-border"] = explicit.divider ?? mixHex(bg, fg, 0.18);
+    } else {
+      if (explicit.heading)
+        style["--store-footer-foreground"] = explicit.heading;
+      if (explicit.text) style["--store-footer-muted"] = explicit.text;
+      if (explicit.link) style["--store-footer-link"] = explicit.link;
+      if (explicit.divider) style["--store-footer-border"] = explicit.divider;
+    }
+  }
+  return {
+    ...(Object.keys(style).length > 0 ? { style } : {}),
+    spacing: {
+      top: design?.spacing?.top ?? "md",
+      bottom: design?.spacing?.bottom ?? "md",
+    },
+    logoSize: design?.logo?.size,
+    align: design?.align,
+    designed: design !== undefined,
+  };
 }

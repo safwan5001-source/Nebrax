@@ -3,9 +3,16 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { normalizePresentationConfig } from "../config";
 import {
+  parseHex,
+  passes,
+  solidInterval,
+  worstRatioForHex,
+} from "../contrast-engine";
+import {
   FOOTER_DEFAULT_BACKDROP,
   footerContrastIssues,
   normalizeFooterExtras,
+  resolveFooterDesign,
 } from "../footer-design";
 
 const dir = resolve(__dirname, "../../../../../tests/Fixtures/presentation");
@@ -124,5 +131,99 @@ describe("footer contrast — shared fixture (V7e-1)", () => {
         accentColor: null,
       }),
     ).toEqual([]);
+  });
+});
+
+describe("resolveFooterDesign (V7e-2)", () => {
+  const ctx = { primaryColor: "#12372a", accentColor: null };
+
+  it("no design ⇒ no style at all and the default structure", () => {
+    expect(resolveFooterDesign(undefined, ctx)).toEqual({
+      spacing: { top: "md", bottom: "md" },
+      logoSize: undefined,
+      align: undefined,
+      designed: false,
+    });
+  });
+
+  it("a structural-only design emits no colour variables", () => {
+    const r = resolveFooterDesign(
+      { spacing: { top: "lg" }, align: "center", logo: { size: "sm" } },
+      ctx,
+    );
+    expect(r.style).toBeUndefined();
+    expect(r).toMatchObject({
+      spacing: { top: "lg", bottom: "md" },
+      align: "center",
+      logoSize: "sm",
+      designed: true,
+    });
+  });
+
+  it("a designed background derives every colour it did not choose, each proven ≥ 4.5:1", () => {
+    for (const bg of [
+      "#ffffff",
+      "#f8fafc",
+      "#fde68a",
+      "#777777",
+      "#12372a",
+      "#0f172a",
+      "#000000",
+      "#2563eb",
+      "#c2410c",
+    ]) {
+      const r = resolveFooterDesign(
+        { surface: { background: { hex: bg } } },
+        ctx,
+      );
+      const s = r.style as Record<string, string>;
+      expect(s["--store-footer"]).toBe(bg);
+      const rgb = parseHex(bg) as [number, number, number];
+      for (const key of [
+        "--store-footer-foreground",
+        "--store-footer-muted",
+        "--store-footer-link",
+      ]) {
+        expect(
+          passes(worstRatioForHex(s[key] as string, solidInterval(rgb))),
+        ).toBe(true);
+      }
+    }
+  });
+
+  it("explicit colours override only the token they name", () => {
+    const r = resolveFooterDesign(
+      { link: { hex: "#e2e8f0" }, heading: { hex: "#ffffff" } },
+      ctx,
+    );
+    expect(r.style).toEqual({
+      "--store-footer-foreground": "#ffffff",
+      "--store-footer-link": "#e2e8f0",
+    });
+  });
+
+  it("explicit colours win over the derived ones on a designed background", () => {
+    const r = resolveFooterDesign(
+      {
+        surface: { background: { hex: "#0f172a" } },
+        heading: { hex: "#fde68a" },
+        divider: { color: { hex: "#334155" } },
+      },
+      ctx,
+    );
+    const s = r.style as Record<string, string>;
+    expect(s["--store-footer-foreground"]).toBe("#fde68a");
+    expect(s["--store-footer-border"]).toBe("#334155");
+    expect(s["--store-footer"]).toBe("#0f172a");
+  });
+
+  it("a role resolves through the palette; every emitted value is a hex", () => {
+    const r = resolveFooterDesign(
+      { surface: { background: { role: "brand" } } },
+      ctx,
+    );
+    const s = r.style as Record<string, string>;
+    expect(s["--store-footer"]).toBe("#12372a");
+    for (const v of Object.values(s)) expect(v).toMatch(/^#[0-9a-f]{6}$/i);
   });
 });
