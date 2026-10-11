@@ -166,6 +166,23 @@
       "pause": "إيقاف الشرائح مؤقتاً",
       "play": "تشغيل الشرائح",
       "choose": "اختر شريحة"
+    },
+    "gallery": {
+      "label": "معرض الصور",
+      "item": "الصورة {number}",
+      "previous": "الصور السابقة",
+      "next": "الصور التالية",
+      "open": "عرض الصورة {number} بحجم أكبر",
+      "viewer": "عارض الصور",
+      "close": "إغلاق العارض",
+      "viewerPrevious": "الصورة السابقة",
+      "viewerNext": "الصورة التالية",
+      "counter": "{current} من {total}"
+    },
+    "content": {
+      "note": "ملاحظة",
+      "success": "نجاح",
+      "warning": "تنبيه"
     }
   },
   "cart": {

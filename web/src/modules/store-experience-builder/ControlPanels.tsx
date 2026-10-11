@@ -41,7 +41,9 @@ import {
   bannerContentOf,
   bannerCtasOf,
   type HeroContent,
+  galleryContentOf,
   heroContentOf,
+  sliderContentOf,
   benefitsContentOf,
   customContentOf,
   deliveryPromiseContentOf,
@@ -80,9 +82,12 @@ import {
 } from "./DataSectionFields";
 import { OfferCatalog } from "./OfferCatalog";
 import { DesignInspector } from "./design/DesignInspector";
+import { GalleryFields } from "./GalleryFields";
+import { SliderFields } from "./SliderFields";
 import { useBackgroundMediaBounds } from "./media/use-background-media-bounds";
 import { GlobalTokensEditor } from "./design/GlobalTokensEditor";
 import { PaletteEditor } from "./design/PaletteEditor";
+import { ICON_KEYS, iconLabel, normalizeIconKey } from "./presentation/icon-registry";
 import { SECTION_DESIGN_CAPABILITIES } from "./presentation/section-design";
 import type { SectionDesign } from "./presentation/section-design";
 import type { DesignContext } from "./presentation/section-design-resolve";
@@ -182,6 +187,9 @@ interface PanelsProps {
   onChange: (next: StorefrontPresentationConfig) => void;
   selectedSection?: string | null;
   onSelectSection?: (id: string | null) => void;
+  /** CUST-HV V8c — the slide each slider section is showing (shared with the Canvas), by section id. */
+  activeSlides?: Record<string, string>;
+  onActiveSlideChange?: (sectionId: string, slideId: string) => void;
   /** CUST-H4-2 mobile fix — only `HomepagePanel` reads this, to pick the
    * Section Library's presentation: a centered dialog on desktop, inline
    * content replacing the composer body on mobile (no nested Bottom Sheet). */
@@ -228,6 +236,8 @@ export function ControlPanels({
   onChange,
   selectedSection = null,
   onSelectSection,
+  activeSlides,
+  onActiveSlideChange,
   isMobileViewport = false,
   featuredPickerSearch = "",
   featuredPickerListState = "idle",
@@ -271,6 +281,8 @@ export function ControlPanels({
           patch={patch}
           selectedSection={selectedSection}
           onSelectSection={onSelectSection}
+          activeSlides={activeSlides}
+          onActiveSlideChange={onActiveSlideChange}
           isMobileViewport={isMobileViewport}
           featuredPickerSearch={featuredPickerSearch}
           featuredPickerListState={featuredPickerListState}
@@ -1048,6 +1060,8 @@ function HomepagePanel({
   patch,
   selectedSection = null,
   onSelectSection,
+  activeSlides,
+  onActiveSlideChange,
   isMobileViewport = false,
   featuredPickerSearch = "",
   featuredPickerListState = "idle",
@@ -1069,6 +1083,9 @@ function HomepagePanel({
   patch: (partial: Partial<StorefrontPresentationConfig>) => void;
   selectedSection?: string | null;
   onSelectSection?: (id: string | null) => void;
+  /** CUST-HV V8c — the slide each slider section is showing (shared with the Canvas), by section id. */
+  activeSlides?: Record<string, string>;
+  onActiveSlideChange?: (sectionId: string, slideId: string) => void;
   isMobileViewport?: boolean;
   featuredPickerSearch?: string;
   featuredPickerListState?: "idle" | "loading" | "error" | "ready";
@@ -1316,10 +1333,43 @@ function HomepagePanel({
                   })
                 }
               />
+            ) : selected.type === "slider" ? (
+              <SliderFields
+                key={selected.id}
+                content={sliderContentOf(selected)}
+                ctx={designContext}
+                bounds={backgroundBounds}
+                locale={locale === "en" ? "en" : "ar"}
+                t={t}
+                activeSlideId={activeSlides?.[selected.id] ?? null}
+                onActiveSlideChange={(slideId) => onActiveSlideChange?.(selected.id, slideId)}
+                onChange={(content) =>
+                  updateSection(selectedIndex, {
+                    ...selected,
+                    content: content.slides.length > 0 ? content : undefined,
+                  })
+                }
+              />
+            ) : selected.type === "gallery" ? (
+              <GalleryFields
+                key={selected.id}
+                content={galleryContentOf(selected)}
+                locale={locale === "en" ? "en" : "ar"}
+                t={t}
+                activeImageId={activeSlides?.[selected.id] ?? null}
+                onActiveImageChange={(imageId) => onActiveSlideChange?.(selected.id, imageId)}
+                onChange={(content) =>
+                  updateSection(selectedIndex, {
+                    ...selected,
+                    content: content.images.length > 0 ? content : undefined,
+                  })
+                }
+              />
             ) : selected.type === "benefits" ? (
               <BenefitsFields
                 items={benefitsContentOf(selected).items}
                 t={t}
+                locale={locale === "en" ? "en" : "ar"}
                 onChange={(items) =>
                   updateSection(selectedIndex, {
                     ...selected,
@@ -2408,19 +2458,46 @@ function BannerFields({
   );
 }
 
-function BenefitsFields({
+export function BenefitsFields({
   items,
   t,
+  locale,
   onChange,
 }: {
   items: BenefitItem[];
   t: (key: CustomizerMessageKey) => string;
+  locale: "ar" | "en";
   onChange: (items: BenefitItem[]) => void;
 }) {
   return (
     <div className="space-y-3">
+      <p className="text-[12px] leading-5 text-muted">{t("benefitsLayoutNote")}</p>
       {items.map((item, index) => (
-        <div key={item.id} className="space-y-2 border border-neutral-200 p-2">
+        <div key={item.id} className="space-y-2 border border-neutral-200 p-2" data-benefit-row="">
+          <Field label={t("navItemIcon")}>
+            <select
+              className={selectClass}
+              data-benefit-icon-select=""
+              value={item.icon ?? ""}
+              onChange={(event) => {
+                const icon = normalizeIconKey(event.target.value);
+                onChange(
+                  items.map((row, i) => {
+                    if (i !== index) return row;
+                    const { icon: _drop, ...rest } = row;
+                    return icon ? { ...rest, icon } : rest;
+                  }),
+                );
+              }}
+            >
+              <option value="">{t("navIconNone")}</option>
+              {ICON_KEYS.map((key) => (
+                <option key={key} value={key}>
+                  {iconLabel(key, locale)}
+                </option>
+              ))}
+            </select>
+          </Field>
           <Field label={t("benefitTitle")}>
             <input
               className={inputClass}
@@ -2467,38 +2544,35 @@ function CustomFields({
   t: (key: CustomizerMessageKey) => string;
   onChange: (blocks: CustomBlock[]) => void;
 }) {
-  const add = (kind: CustomBlock["kind"]) => {
+  // V9c-1: this editor still edits the two original kinds. Any other kind already in the document (it can arrive through the API)
+  // is kept exactly where it is, never dropped by an edit here.
+  const add = (kind: "heading" | "paragraph") => {
     if (blocks.length >= MAX_CUSTOM_BLOCKS) return;
-    onChange([...blocks, { id: `block-${blocks.length + 1}`, kind, text: "" }]);
+    const taken = new Set(blocks.map((block) => block.id));
+    let n = blocks.length + 1;
+    while (taken.has(`block-${n}`)) n += 1;
+    onChange([...blocks, { id: `block-${n}`, kind, text: "" }]);
   };
+  const setText = (index: number, text: string) =>
+    onChange(blocks.map((row, i) => (i === index && (row.kind === "heading" || row.kind === "paragraph") ? { ...row, text } : row)));
   return (
     <div className="space-y-3">
-      {blocks.map((block, index) => (
-        <div key={block.id} className="space-y-2 border border-neutral-200 p-2">
-          <Field label={t("blockText")}>
-            {block.kind === "heading" ? (
-              <input
-                className={inputClass}
-                value={block.text}
-                onChange={(event) =>
-                  onChange(blocks.map((row, i) => (i === index ? { ...row, text: event.target.value } : row)))
-                }
-              />
-            ) : (
-              <textarea
-                className={`${inputClass} h-20 py-2`}
-                value={block.text}
-                onChange={(event) =>
-                  onChange(blocks.map((row, i) => (i === index ? { ...row, text: event.target.value } : row)))
-                }
-              />
-            )}
-          </Field>
-          <button type="button" className="text-xs text-neutral-500" onClick={() => onChange(blocks.filter((_, i) => i !== index))}>
-            {t("removeItem")}
-          </button>
-        </div>
-      ))}
+      {blocks.map((block, index) =>
+        block.kind === "heading" || block.kind === "paragraph" ? (
+          <div key={block.id} className="space-y-2 border border-neutral-200 p-2">
+            <Field label={t("blockText")}>
+              {block.kind === "heading" ? (
+                <input className={inputClass} value={block.text} onChange={(event) => setText(index, event.target.value)} />
+              ) : (
+                <textarea className={`${inputClass} h-20 py-2`} value={block.text} onChange={(event) => setText(index, event.target.value)} />
+              )}
+            </Field>
+            <button type="button" className="text-xs text-neutral-500" onClick={() => onChange(blocks.filter((_, i) => i !== index))}>
+              {t("removeItem")}
+            </button>
+          </div>
+        ) : null,
+      )}
       <div className="flex gap-3">
         <button type="button" disabled={blocks.length >= MAX_CUSTOM_BLOCKS} className="text-xs font-medium disabled:opacity-40" onClick={() => add("heading")}>
           + {t("addHeading")}
@@ -2884,7 +2958,7 @@ function OffersPickerFields({
  * `onBlur`, so a blur in the same turn as the last keystroke cannot drop
  * the character that has not re-rendered yet.
  */
-function DeferredCommitField({
+export function DeferredCommitField({
   label,
   hint,
   placeholder,

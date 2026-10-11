@@ -166,6 +166,23 @@
       "pause": "Folien anhalten",
       "play": "Folien abspielen",
       "choose": "Folie auswählen"
+    },
+    "gallery": {
+      "label": "Galerie",
+      "item": "Bild {number}",
+      "previous": "Vorherige Bilder",
+      "next": "Nächste Bilder",
+      "open": "Bild {number} vergrößern",
+      "viewer": "Bildbetrachter",
+      "close": "Betrachter schließen",
+      "viewerPrevious": "Vorheriges Bild",
+      "viewerNext": "Nächstes Bild",
+      "counter": "{current} von {total}"
+    },
+    "content": {
+      "note": "Hinweis",
+      "success": "Erfolg",
+      "warning": "Warnung"
     }
   },
   "cart": {

@@ -262,20 +262,31 @@ export const SECTION_CAPABILITIES: Record<
     titleKey: "sectionDeliveryPromise",
     descriptionKey: "sectionDeliveryPromiseDescription",
   },
-  // CUST-HV V8a — the content model and Publish rules exist (an API-authored slider is stored and
-  // gated), but neither the Canvas nor the storefront draws it and the editor is not built yet
-  // (V8b–V8d). Visible and disabled in the Library, never hidden, until it is honest to add.
+  // CUST-HV V8c — the model (V8a), the storefront (V8b), the Canvas and the editor are all built: live and addable.
+  // It starts empty (an empty slider is not stored) and the Publish gate asks for two slides.
   slider: {
     type: "slider",
     maxInstances: null,
     canDuplicate: true,
     canDelete: true,
-    state: "deferred",
+    state: "live",
     category: "mediaVideo",
-    merchantAddable: false,
+    merchantAddable: true,
     titleKey: "sectionSlider",
     descriptionKey: "sectionSliderDescription",
-    reasonKey: "sectionSliderReason",
+  },
+  // CUST-HV V8f — the model (V8d), the storefront (V8e), the Canvas and the editor are all built: live and addable.
+  // It starts empty (an empty gallery is not stored) and the Publish rule asks for two pictures.
+  gallery: {
+    type: "gallery",
+    maxInstances: null,
+    canDuplicate: true,
+    canDelete: true,
+    state: "live",
+    category: "mediaVideo",
+    merchantAddable: true,
+    titleKey: "sectionGallery",
+    descriptionKey: "sectionGalleryDescription",
   },
 };
 

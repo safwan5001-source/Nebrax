@@ -560,11 +560,22 @@ describe("hero / banner layout variants (CUST-HV V6c-7)", () => {
     fireEvent.change(select(), { target: { value: "text-band" } });
     expect(out()).toEqual({ layout: "text-band" });
     banner.unmount();
-    for (const type of ["categories", "benefits", "featured"]) {
+    for (const type of ["categories", "featured"]) {
       const view = render(<Harness type={type} />);
       expect(document.querySelector("[data-design-layout]")).toBeNull();
       view.unmount();
     }
+  });
+
+  it("benefits offers flat and the column counts; the default is Automatic and is never stored (CUST-HV V9b)", () => {
+    render(<Harness type="benefits" />);
+    expect([...select().options].map((o) => o.value)).toEqual(["", "flat", "columns-2", "columns-3", "columns-4"]);
+    expect(select().options[0].textContent).toBe(CUSTOMIZER_MESSAGES.en.designLayoutDefault);
+    fireEvent.change(select(), { target: { value: "columns-4" } });
+    expect(out()).toEqual({ layout: "columns-4" });
+    fireEvent.change(select(), { target: { value: "" } });
+    expect(out()).toBeNull();
+    expect(document.body.textContent).toContain(CUSTOMIZER_MESSAGES.en.designLayoutBenefitsHint);
   });
 
   it("says so when a hero's split cannot apply (no proven picture), and not for a proven one or another layout", () => {

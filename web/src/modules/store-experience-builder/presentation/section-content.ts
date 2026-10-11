@@ -1,4 +1,7 @@
 import { normalizeWindowEdges } from "./announcements";
+import { type ContentBlock, MAX_CONTENT_BLOCKS, normalizeContentBlocks } from "./content-blocks";
+import { type IconKey, normalizeIconKey } from "./icon-registry";
+import { type GalleryContent, normalizeGalleryContent } from "./gallery-content";
 import { type SliderContent, normalizeSliderContent } from "./slider-content";
 import { sanitizeExternalUrl } from "./urls";
 
@@ -8,7 +11,7 @@ import { sanitizeExternalUrl } from "./urls";
  */
 
 export const MAX_BENEFIT_ITEMS = 6;
-export const MAX_CUSTOM_BLOCKS = 8;
+export const MAX_CUSTOM_BLOCKS = MAX_CONTENT_BLOCKS;
 export const MAX_FEATURED_PRODUCTS = 8;
 export const MAX_OFFERS = 8;
 
@@ -46,17 +49,16 @@ export interface BenefitItem {
   id: string;
   title: string;
   body: string;
+  /** CUST-HV V9b — optional glyph from the curated registry; absence = no icon (never stored as empty). */
+  icon?: IconKey;
 }
 
 export interface BenefitsContent {
   items: BenefitItem[];
 }
 
-export interface CustomBlock {
-  id: string;
-  kind: "heading" | "paragraph";
-  text: string;
-}
+/** CUST-HV V9c-1 (V0 §15) — the shared block vocabulary; `heading` / `paragraph` are its two original members. */
+export type CustomBlock = ContentBlock;
 
 export interface CustomContent {
   blocks: CustomBlock[];
@@ -174,7 +176,8 @@ export type SectionContent =
   | ProductShelfContent
   | DiscoveryContent
   | DeliveryPromiseContent
-  | SliderContent;
+  | SliderContent
+  | GalleryContent;
 
 /** The hero instance's own content, or `undefined` while it still reads the legacy globals. */
 export function heroContentOf(section: {
@@ -286,6 +289,18 @@ export function discoveryContentOf(section: {
     : { title: "", axis: "facet", dimension: "", display: "tiles" };
 }
 
+/** CUST-HV V8d — the gallery instance's images and options (an empty image list while none is authored). */
+export function galleryContentOf(section: {
+  type: string;
+  content?: SectionContent;
+}): GalleryContent {
+  return section.type === "gallery" &&
+    section.content &&
+    "images" in section.content
+    ? section.content
+    : { images: [] };
+}
+
 /** CUST-HV V8a — the slider instance's slides and behaviour (an empty slide list while none is authored). */
 export function sliderContentOf(section: {
   type: string;
@@ -352,6 +367,9 @@ export function normalizeOptionalSectionContent(
   }
   if (type === "slider") {
     return normalizeSliderContent(raw, sanitizeContentHref);
+  }
+  if (type === "gallery") {
+    return normalizeGalleryContent(raw, sanitizeContentHref);
   }
   return undefined;
 }
@@ -477,27 +495,14 @@ function normalizeBenefits(source: Record<string, unknown>): BenefitsContent {
     const body = asString(row.body).trim().slice(0, 200);
     const id = safeToken(row.id, `benefit-${index}`);
     if (!id || items.some((existing) => existing.id === id)) return;
-    items.push({ id, title, body });
+    const icon = normalizeIconKey(row.icon);
+    items.push(icon ? { id, title, body, icon } : { id, title, body });
   });
   return { items: items.slice(0, MAX_BENEFIT_ITEMS) };
 }
 
 function normalizeCustom(source: Record<string, unknown>): CustomContent {
-  if (!Array.isArray(source.blocks)) return { blocks: [] };
-  const blocks: CustomBlock[] = [];
-  source.blocks.forEach((block, index) => {
-    if (!block || typeof block !== "object" || Array.isArray(block)) return;
-    const row = block as Record<string, unknown>;
-    const kind = row.kind === "heading" || row.kind === "paragraph" ? row.kind : null;
-    if (!kind) return;
-    const text = asString(row.text)
-      .trim()
-      .slice(0, kind === "heading" ? 120 : 600);
-    const id = safeToken(row.id, `block-${index}`);
-    if (!id || blocks.some((existing) => existing.id === id)) return;
-    blocks.push({ id, kind, text });
-  });
-  return { blocks: blocks.slice(0, MAX_CUSTOM_BLOCKS) };
+  return normalizeContentBlocks(source, sanitizeContentHref) ?? { blocks: [] };
 }
 
 function normalizeFeatured(source: Record<string, unknown>): FeaturedContent {

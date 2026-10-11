@@ -162,6 +162,14 @@ const CATEGORY: Record<CategoryPageRegionKey, PageRegionCapability> = {
     previewRenderer: "Breadcrumbs",
     publishedRenderer: "Breadcrumbs",
   }),
+  cover: capability("cover", ["category"], {
+    fixedRequired: false,
+    requirement: "OPTIONAL_TOGGLE",
+    requiredDataDependency: "category.image",
+    fallbackBehavior: "omit",
+    previewRenderer: "CategoryBanner (cover picture)",
+    publishedRenderer: "CategoryBanner (cover picture)",
+  }),
   identity_title: capability("identity_title", ["category"], {
     fixedRequired: true,
     requirement: "FIXED_REQUIRED",

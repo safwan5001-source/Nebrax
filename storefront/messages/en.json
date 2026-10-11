@@ -166,6 +166,23 @@
       "pause": "Pause slides",
       "play": "Play slides",
       "choose": "Choose a slide"
+    },
+    "gallery": {
+      "label": "Gallery",
+      "item": "Picture {number}",
+      "previous": "Previous pictures",
+      "next": "Next pictures",
+      "open": "View picture {number} larger",
+      "viewer": "Picture viewer",
+      "close": "Close viewer",
+      "viewerPrevious": "Previous picture",
+      "viewerNext": "Next picture",
+      "counter": "{current} of {total}"
+    },
+    "content": {
+      "note": "Note",
+      "success": "Success",
+      "warning": "Warning"
     }
   },
   "cart": {

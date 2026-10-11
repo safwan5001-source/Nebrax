@@ -1,0 +1,2046 @@
+{
+    "_note": "CUST-HV V9c-1 — customContent block vocabulary (V0 §15). Shared by PHP StorefrontContentBlocksNormalizer (via StorefrontPresentationNormalizer) and both TS twins (content-blocks.ts via normalizeOptionalSectionContent). expected=null means the section content is absent. Expected values were computed by the PHP authority and reviewed line by line.",
+    "cases": [
+        {
+            "name": "not an object",
+            "input": null,
+            "expected": null
+        },
+        {
+            "name": "string",
+            "input": "x",
+            "expected": null
+        },
+        {
+            "name": "list",
+            "input": [
+                1,
+                2
+            ],
+            "expected": null
+        },
+        {
+            "name": "no blocks key",
+            "input": [],
+            "expected": null
+        },
+        {
+            "name": "blocks not a list",
+            "input": {
+                "blocks": "x"
+            },
+            "expected": null
+        },
+        {
+            "name": "empty blocks",
+            "input": {
+                "blocks": []
+            },
+            "expected": null
+        },
+        {
+            "name": "legacy heading + paragraph are unchanged",
+            "input": {
+                "blocks": [
+                    {
+                        "id": "b1",
+                        "kind": "heading",
+                        "text": "About us"
+                    },
+                    {
+                        "id": "b2",
+                        "kind": "paragraph",
+                        "text": "We sell flowers."
+                    }
+                ]
+            },
+            "expected": {
+                "blocks": [
+                    {
+                        "id": "b1",
+                        "kind": "heading",
+                        "text": "About us"
+                    },
+                    {
+                        "id": "b2",
+                        "kind": "paragraph",
+                        "text": "We sell flowers."
+                    }
+                ]
+            }
+        },
+        {
+            "name": "legacy: whitespace trimmed, empty text kept",
+            "input": {
+                "blocks": [
+                    {
+                        "id": "b1",
+                        "kind": "heading",
+                        "text": "  Hi  "
+                    },
+                    {
+                        "id": "b2",
+                        "kind": "paragraph",
+                        "text": "   "
+                    }
+                ]
+            },
+            "expected": {
+                "blocks": [
+                    {
+                        "id": "b1",
+                        "kind": "heading",
+                        "text": "Hi"
+                    },
+                    {
+                        "id": "b2",
+                        "kind": "paragraph",
+                        "text": ""
+                    }
+                ]
+            }
+        },
+        {
+            "name": "legacy: heading cut at 120 code points, paragraph at 600",
+            "input": {
+                "blocks": [
+                    {
+                        "id": "h",
+                        "kind": "heading",
+                        "text": "عععععععععععععععععععععععععععععععععععععععععععععععععععععععععععععععععععععععععععععععععععععععععععععععععععععععععععععععععععععععععععععععععع"
+                    },
+                    {
+                        "id": "p",
+                        "kind": "paragraph",
+                        "text": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                    }
+                ]
+            },
+            "expected": {
+                "blocks": [
+                    {
+                        "id": "h",
+                        "kind": "heading",
+                        "text": "عععععععععععععععععععععععععععععععععععععععععععععععععععععععععععععععععععععععععععععععععععععععععععععععععععععععععععععععععععععععع"
+                    },
+                    {
+                        "id": "p",
+                        "kind": "paragraph",
+                        "text": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                    }
+                ]
+            }
+        },
+        {
+            "name": "legacy: astral characters count as one code point",
+            "input": {
+                "blocks": [
+                    {
+                        "id": "h",
+                        "kind": "heading",
+                        "text": "😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀"
+                    }
+                ]
+            },
+            "expected": {
+                "blocks": [
+                    {
+                        "id": "h",
+                        "kind": "heading",
+                        "text": "😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀"
+                    }
+                ]
+            }
+        },
+        {
+            "name": "unknown kind dropped",
+            "input": {
+                "blocks": [
+                    {
+                        "id": "a",
+                        "kind": "video",
+                        "src": "x"
+                    },
+                    {
+                        "id": "b",
+                        "kind": "paragraph",
+                        "text": "ok"
+                    }
+                ]
+            },
+            "expected": {
+                "blocks": [
+                    {
+                        "id": "b",
+                        "kind": "paragraph",
+                        "text": "ok"
+                    }
+                ]
+            }
+        },
+        {
+            "name": "non-object block dropped",
+            "input": {
+                "blocks": [
+                    "x",
+                    3,
+                    null,
+                    [
+                        1
+                    ],
+                    {
+                        "id": "b",
+                        "kind": "paragraph",
+                        "text": "ok"
+                    }
+                ]
+            },
+            "expected": {
+                "blocks": [
+                    {
+                        "id": "b",
+                        "kind": "paragraph",
+                        "text": "ok"
+                    }
+                ]
+            }
+        },
+        {
+            "name": "heading level 3 kept, 2 and others are the absence",
+            "input": {
+                "blocks": [
+                    {
+                        "id": "a",
+                        "kind": "heading",
+                        "text": "A",
+                        "level": 3
+                    },
+                    {
+                        "id": "b",
+                        "kind": "heading",
+                        "text": "B",
+                        "level": 2
+                    },
+                    {
+                        "id": "c",
+                        "kind": "heading",
+                        "text": "C",
+                        "level": 1
+                    },
+                    {
+                        "id": "d",
+                        "kind": "heading",
+                        "text": "D",
+                        "level": "3"
+                    }
+                ]
+            },
+            "expected": {
+                "blocks": [
+                    {
+                        "id": "a",
+                        "kind": "heading",
+                        "text": "A",
+                        "level": 3
+                    },
+                    {
+                        "id": "b",
+                        "kind": "heading",
+                        "text": "B"
+                    },
+                    {
+                        "id": "c",
+                        "kind": "heading",
+                        "text": "C"
+                    },
+                    {
+                        "id": "d",
+                        "kind": "heading",
+                        "text": "D"
+                    }
+                ]
+            }
+        },
+        {
+            "name": "align center and end kept; start and other values are the absence",
+            "input": {
+                "blocks": [
+                    {
+                        "id": "a",
+                        "kind": "heading",
+                        "text": "A",
+                        "align": "center"
+                    },
+                    {
+                        "id": "b",
+                        "kind": "paragraph",
+                        "text": "B",
+                        "align": "end"
+                    },
+                    {
+                        "id": "c",
+                        "kind": "paragraph",
+                        "text": "C",
+                        "align": "start"
+                    },
+                    {
+                        "id": "d",
+                        "kind": "paragraph",
+                        "text": "D",
+                        "align": "left"
+                    }
+                ]
+            },
+            "expected": {
+                "blocks": [
+                    {
+                        "id": "a",
+                        "kind": "heading",
+                        "text": "A",
+                        "align": "center"
+                    },
+                    {
+                        "id": "b",
+                        "kind": "paragraph",
+                        "text": "B",
+                        "align": "end"
+                    },
+                    {
+                        "id": "c",
+                        "kind": "paragraph",
+                        "text": "C"
+                    },
+                    {
+                        "id": "d",
+                        "kind": "paragraph",
+                        "text": "D"
+                    }
+                ]
+            }
+        },
+        {
+            "name": "canonical key order: id, kind, text, level, align",
+            "input": {
+                "blocks": [
+                    {
+                        "align": "center",
+                        "level": 3,
+                        "text": "A",
+                        "kind": "heading",
+                        "id": "a"
+                    }
+                ]
+            },
+            "expected": {
+                "blocks": [
+                    {
+                        "id": "a",
+                        "kind": "heading",
+                        "text": "A",
+                        "level": 3,
+                        "align": "center"
+                    }
+                ]
+            }
+        },
+        {
+            "name": "heading level 3.0 is the number 3 (JSON has one number type)",
+            "input": {
+                "blocks": [
+                    {
+                        "id": "a",
+                        "kind": "heading",
+                        "text": "A",
+                        "level": 3
+                    }
+                ]
+            },
+            "expected": {
+                "blocks": [
+                    {
+                        "id": "a",
+                        "kind": "heading",
+                        "text": "A",
+                        "level": 3
+                    }
+                ]
+            }
+        },
+        {
+            "name": "image keeps the whole MediaRef, caption and link",
+            "input": {
+                "blocks": [
+                    {
+                        "id": "i",
+                        "kind": "image",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+                            "fit": "contain",
+                            "alt": {
+                                "ar": "وردة",
+                                "en": "Rose"
+                            }
+                        },
+                        "caption": "Spring",
+                        "link": "/c/roses"
+                    }
+                ]
+            },
+            "expected": {
+                "blocks": [
+                    {
+                        "id": "i",
+                        "kind": "image",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+                            "fit": "contain",
+                            "alt": {
+                                "ar": "وردة",
+                                "en": "Rose"
+                            }
+                        },
+                        "caption": "Spring",
+                        "link": "/c/roses"
+                    }
+                ]
+            }
+        },
+        {
+            "name": "image without a usable MediaRef drops whole",
+            "input": {
+                "blocks": [
+                    {
+                        "id": "i",
+                        "kind": "image"
+                    },
+                    {
+                        "id": "j",
+                        "kind": "image",
+                        "media": {
+                            "mediaId": "not-a-uuid"
+                        }
+                    },
+                    {
+                        "id": "k",
+                        "kind": "image",
+                        "media": "x"
+                    },
+                    {
+                        "id": "p",
+                        "kind": "paragraph",
+                        "text": "ok"
+                    }
+                ]
+            },
+            "expected": {
+                "blocks": [
+                    {
+                        "id": "p",
+                        "kind": "paragraph",
+                        "text": "ok"
+                    }
+                ]
+            }
+        },
+        {
+            "name": "image caption: whitespace is absence, long cut at 120 code points",
+            "input": {
+                "blocks": [
+                    {
+                        "id": "i",
+                        "kind": "image",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        },
+                        "caption": "   "
+                    },
+                    {
+                        "id": "j",
+                        "kind": "image",
+                        "media": {
+                            "mediaId": "1c9a7d3f-4e4b-4b64-8d8f-9a2b3c4d5e6f"
+                        },
+                        "caption": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+                    }
+                ]
+            },
+            "expected": {
+                "blocks": [
+                    {
+                        "id": "i",
+                        "kind": "image",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "j",
+                        "kind": "image",
+                        "media": {
+                            "mediaId": "1c9a7d3f-4e4b-4b64-8d8f-9a2b3c4d5e6f"
+                        },
+                        "caption": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+                    }
+                ]
+            }
+        },
+        {
+            "name": "image link goes through the content-href rules",
+            "input": {
+                "blocks": [
+                    {
+                        "id": "a",
+                        "kind": "image",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        },
+                        "link": "javascript:alert(1)"
+                    },
+                    {
+                        "id": "b",
+                        "kind": "image",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        },
+                        "link": "//evil.example"
+                    },
+                    {
+                        "id": "c",
+                        "kind": "image",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        },
+                        "link": "http://plain.example"
+                    },
+                    {
+                        "id": "d",
+                        "kind": "image",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        },
+                        "link": "https://ok.example/x"
+                    }
+                ]
+            },
+            "expected": {
+                "blocks": [
+                    {
+                        "id": "a",
+                        "kind": "image",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "b",
+                        "kind": "image",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "c",
+                        "kind": "image",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "d",
+                        "kind": "image",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        },
+                        "link": "https://ok.example/x"
+                    }
+                ]
+            }
+        },
+        {
+            "name": "image: url/src/style keys are never kept",
+            "input": {
+                "blocks": [
+                    {
+                        "id": "a",
+                        "kind": "image",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+                            "url": "https://x"
+                        },
+                        "src": "https://x",
+                        "style": "color:red",
+                        "html": "<b>"
+                    }
+                ]
+            },
+            "expected": {
+                "blocks": [
+                    {
+                        "id": "a",
+                        "kind": "image",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "name": "button: label and link kept, solid is the absence",
+            "input": {
+                "blocks": [
+                    {
+                        "id": "b",
+                        "kind": "button",
+                        "label": "Shop",
+                        "href": "/c/roses",
+                        "style": "solid"
+                    }
+                ]
+            },
+            "expected": {
+                "blocks": [
+                    {
+                        "id": "b",
+                        "kind": "button",
+                        "label": "Shop",
+                        "href": "/c/roses"
+                    }
+                ]
+            }
+        },
+        {
+            "name": "button: outline and link styles kept; soft and unknown are not accepted",
+            "input": {
+                "blocks": [
+                    {
+                        "id": "a",
+                        "kind": "button",
+                        "label": "A",
+                        "href": "/a",
+                        "style": "outline"
+                    },
+                    {
+                        "id": "b",
+                        "kind": "button",
+                        "label": "B",
+                        "href": "/b",
+                        "style": "link"
+                    },
+                    {
+                        "id": "c",
+                        "kind": "button",
+                        "label": "C",
+                        "href": "/c",
+                        "style": "soft"
+                    },
+                    {
+                        "id": "d",
+                        "kind": "button",
+                        "label": "D",
+                        "href": "/d",
+                        "style": "neon"
+                    }
+                ]
+            },
+            "expected": {
+                "blocks": [
+                    {
+                        "id": "a",
+                        "kind": "button",
+                        "label": "A",
+                        "href": "/a",
+                        "style": "outline"
+                    },
+                    {
+                        "id": "b",
+                        "kind": "button",
+                        "label": "B",
+                        "href": "/b",
+                        "style": "link"
+                    },
+                    {
+                        "id": "c",
+                        "kind": "button",
+                        "label": "C",
+                        "href": "/c"
+                    },
+                    {
+                        "id": "d",
+                        "kind": "button",
+                        "label": "D",
+                        "href": "/d"
+                    }
+                ]
+            }
+        },
+        {
+            "name": "button: a draft with only a label or only a link is kept; an empty one drops",
+            "input": {
+                "blocks": [
+                    {
+                        "id": "a",
+                        "kind": "button",
+                        "label": "Only label",
+                        "href": ""
+                    },
+                    {
+                        "id": "b",
+                        "kind": "button",
+                        "label": "",
+                        "href": "/only-link"
+                    },
+                    {
+                        "id": "c",
+                        "kind": "button",
+                        "label": "  ",
+                        "href": ""
+                    },
+                    {
+                        "id": "p",
+                        "kind": "paragraph",
+                        "text": "ok"
+                    }
+                ]
+            },
+            "expected": {
+                "blocks": [
+                    {
+                        "id": "a",
+                        "kind": "button",
+                        "label": "Only label",
+                        "href": ""
+                    },
+                    {
+                        "id": "b",
+                        "kind": "button",
+                        "label": "",
+                        "href": "/only-link"
+                    },
+                    {
+                        "id": "p",
+                        "kind": "paragraph",
+                        "text": "ok"
+                    }
+                ]
+            }
+        },
+        {
+            "name": "button: unsafe link is dropped, leaving the label as a draft",
+            "input": {
+                "blocks": [
+                    {
+                        "id": "a",
+                        "kind": "button",
+                        "label": "Go",
+                        "href": "javascript:alert(1)"
+                    }
+                ]
+            },
+            "expected": {
+                "blocks": [
+                    {
+                        "id": "a",
+                        "kind": "button",
+                        "label": "Go",
+                        "href": ""
+                    }
+                ]
+            }
+        },
+        {
+            "name": "button: no colour is accepted",
+            "input": {
+                "blocks": [
+                    {
+                        "id": "a",
+                        "kind": "button",
+                        "label": "Go",
+                        "href": "/go",
+                        "colour": "brand",
+                        "icon": "truck"
+                    }
+                ]
+            },
+            "expected": {
+                "blocks": [
+                    {
+                        "id": "a",
+                        "kind": "button",
+                        "label": "Go",
+                        "href": "/go"
+                    }
+                ]
+            }
+        },
+        {
+            "name": "button label cut at 80 code points",
+            "input": {
+                "blocks": [
+                    {
+                        "id": "a",
+                        "kind": "button",
+                        "label": "llllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllll",
+                        "href": "/x"
+                    }
+                ]
+            },
+            "expected": {
+                "blocks": [
+                    {
+                        "id": "a",
+                        "kind": "button",
+                        "label": "llllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllll",
+                        "href": "/x"
+                    }
+                ]
+            }
+        },
+        {
+            "name": "divider: dots kept, line is the absence",
+            "input": {
+                "blocks": [
+                    {
+                        "id": "a",
+                        "kind": "divider",
+                        "style": "dots"
+                    },
+                    {
+                        "id": "b",
+                        "kind": "divider",
+                        "style": "line"
+                    },
+                    {
+                        "id": "c",
+                        "kind": "divider"
+                    }
+                ]
+            },
+            "expected": {
+                "blocks": [
+                    {
+                        "id": "a",
+                        "kind": "divider",
+                        "style": "dots"
+                    },
+                    {
+                        "id": "b",
+                        "kind": "divider"
+                    },
+                    {
+                        "id": "c",
+                        "kind": "divider"
+                    }
+                ]
+            }
+        },
+        {
+            "name": "spacer: sm and lg kept, md is the absence",
+            "input": {
+                "blocks": [
+                    {
+                        "id": "a",
+                        "kind": "spacer",
+                        "size": "sm"
+                    },
+                    {
+                        "id": "b",
+                        "kind": "spacer",
+                        "size": "md"
+                    },
+                    {
+                        "id": "c",
+                        "kind": "spacer",
+                        "size": "lg"
+                    },
+                    {
+                        "id": "d",
+                        "kind": "spacer",
+                        "size": "xl"
+                    }
+                ]
+            },
+            "expected": {
+                "blocks": [
+                    {
+                        "id": "a",
+                        "kind": "spacer",
+                        "size": "sm"
+                    },
+                    {
+                        "id": "b",
+                        "kind": "spacer"
+                    },
+                    {
+                        "id": "c",
+                        "kind": "spacer",
+                        "size": "lg"
+                    },
+                    {
+                        "id": "d",
+                        "kind": "spacer"
+                    }
+                ]
+            }
+        },
+        {
+            "name": "callout: tone and icon from the closed lists",
+            "input": {
+                "blocks": [
+                    {
+                        "id": "a",
+                        "kind": "callout",
+                        "text": "Careful",
+                        "tone": "warning",
+                        "icon": "lock"
+                    },
+                    {
+                        "id": "b",
+                        "kind": "callout",
+                        "text": "Done",
+                        "tone": "success"
+                    },
+                    {
+                        "id": "c",
+                        "kind": "callout",
+                        "text": "FYI",
+                        "tone": "info"
+                    },
+                    {
+                        "id": "d",
+                        "kind": "callout",
+                        "text": "Odd",
+                        "tone": "danger",
+                        "icon": "rocket"
+                    }
+                ]
+            },
+            "expected": {
+                "blocks": [
+                    {
+                        "id": "a",
+                        "kind": "callout",
+                        "text": "Careful",
+                        "tone": "warning",
+                        "icon": "lock"
+                    },
+                    {
+                        "id": "b",
+                        "kind": "callout",
+                        "text": "Done",
+                        "tone": "success"
+                    },
+                    {
+                        "id": "c",
+                        "kind": "callout",
+                        "text": "FYI"
+                    },
+                    {
+                        "id": "d",
+                        "kind": "callout",
+                        "text": "Odd"
+                    }
+                ]
+            }
+        },
+        {
+            "name": "callout: text cut at 300 code points, empty text kept as a draft",
+            "input": {
+                "blocks": [
+                    {
+                        "id": "a",
+                        "kind": "callout",
+                        "text": "tttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt"
+                    },
+                    {
+                        "id": "b",
+                        "kind": "callout",
+                        "text": "  "
+                    }
+                ]
+            },
+            "expected": {
+                "blocks": [
+                    {
+                        "id": "a",
+                        "kind": "callout",
+                        "text": "tttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt"
+                    },
+                    {
+                        "id": "b",
+                        "kind": "callout",
+                        "text": ""
+                    }
+                ]
+            }
+        },
+        {
+            "name": "callout: wrong-case or non-string icon dropped",
+            "input": {
+                "blocks": [
+                    {
+                        "id": "a",
+                        "kind": "callout",
+                        "text": "x",
+                        "icon": "Truck"
+                    },
+                    {
+                        "id": "b",
+                        "kind": "callout",
+                        "text": "x",
+                        "icon": [
+                            "truck"
+                        ]
+                    }
+                ]
+            },
+            "expected": {
+                "blocks": [
+                    {
+                        "id": "a",
+                        "kind": "callout",
+                        "text": "x"
+                    },
+                    {
+                        "id": "b",
+                        "kind": "callout",
+                        "text": "x"
+                    }
+                ]
+            }
+        },
+        {
+            "name": "columns: exactly two arrays, a missing one is completed empty",
+            "input": {
+                "blocks": [
+                    {
+                        "id": "c",
+                        "kind": "columns",
+                        "columns": [
+                            [
+                                {
+                                    "id": "a",
+                                    "kind": "paragraph",
+                                    "text": "left"
+                                }
+                            ]
+                        ]
+                    }
+                ]
+            },
+            "expected": {
+                "blocks": [
+                    {
+                        "id": "c",
+                        "kind": "columns",
+                        "columns": [
+                            [
+                                {
+                                    "id": "a",
+                                    "kind": "paragraph",
+                                    "text": "left"
+                                }
+                            ],
+                            []
+                        ]
+                    }
+                ]
+            }
+        },
+        {
+            "name": "columns: both columns kept in order with leaf blocks",
+            "input": {
+                "blocks": [
+                    {
+                        "id": "c",
+                        "kind": "columns",
+                        "columns": [
+                            [
+                                {
+                                    "id": "a",
+                                    "kind": "heading",
+                                    "text": "One"
+                                },
+                                {
+                                    "id": "b",
+                                    "kind": "paragraph",
+                                    "text": "First"
+                                }
+                            ],
+                            [
+                                {
+                                    "id": "d",
+                                    "kind": "image",
+                                    "media": {
+                                        "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                                    }
+                                },
+                                {
+                                    "id": "e",
+                                    "kind": "button",
+                                    "label": "Go",
+                                    "href": "/go"
+                                }
+                            ]
+                        ]
+                    }
+                ]
+            },
+            "expected": {
+                "blocks": [
+                    {
+                        "id": "c",
+                        "kind": "columns",
+                        "columns": [
+                            [
+                                {
+                                    "id": "a",
+                                    "kind": "heading",
+                                    "text": "One"
+                                },
+                                {
+                                    "id": "b",
+                                    "kind": "paragraph",
+                                    "text": "First"
+                                }
+                            ],
+                            [
+                                {
+                                    "id": "d",
+                                    "kind": "image",
+                                    "media": {
+                                        "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                                    }
+                                },
+                                {
+                                    "id": "e",
+                                    "kind": "button",
+                                    "label": "Go",
+                                    "href": "/go"
+                                }
+                            ]
+                        ]
+                    }
+                ]
+            }
+        },
+        {
+            "name": "columns: no nesting, a columns inside a column is dropped",
+            "input": {
+                "blocks": [
+                    {
+                        "id": "c",
+                        "kind": "columns",
+                        "columns": [
+                            [
+                                {
+                                    "id": "n",
+                                    "kind": "columns",
+                                    "columns": [
+                                        [],
+                                        []
+                                    ]
+                                },
+                                {
+                                    "id": "a",
+                                    "kind": "paragraph",
+                                    "text": "kept"
+                                }
+                            ],
+                            []
+                        ]
+                    }
+                ]
+            },
+            "expected": {
+                "blocks": [
+                    {
+                        "id": "c",
+                        "kind": "columns",
+                        "columns": [
+                            [
+                                {
+                                    "id": "a",
+                                    "kind": "paragraph",
+                                    "text": "kept"
+                                }
+                            ],
+                            []
+                        ]
+                    }
+                ]
+            }
+        },
+        {
+            "name": "columns: at most 4 blocks per column",
+            "input": {
+                "blocks": [
+                    {
+                        "id": "c",
+                        "kind": "columns",
+                        "columns": [
+                            [
+                                {
+                                    "id": "a",
+                                    "kind": "spacer"
+                                },
+                                {
+                                    "id": "b",
+                                    "kind": "spacer"
+                                },
+                                {
+                                    "id": "d",
+                                    "kind": "spacer"
+                                },
+                                {
+                                    "id": "e",
+                                    "kind": "spacer"
+                                },
+                                {
+                                    "id": "f",
+                                    "kind": "spacer"
+                                }
+                            ],
+                            []
+                        ]
+                    }
+                ]
+            },
+            "expected": {
+                "blocks": [
+                    {
+                        "id": "c",
+                        "kind": "columns",
+                        "columns": [
+                            [
+                                {
+                                    "id": "a",
+                                    "kind": "spacer"
+                                },
+                                {
+                                    "id": "b",
+                                    "kind": "spacer"
+                                },
+                                {
+                                    "id": "d",
+                                    "kind": "spacer"
+                                },
+                                {
+                                    "id": "e",
+                                    "kind": "spacer"
+                                }
+                            ],
+                            []
+                        ]
+                    }
+                ]
+            }
+        },
+        {
+            "name": "columns: three or more column arrays keep only the first two",
+            "input": {
+                "blocks": [
+                    {
+                        "id": "c",
+                        "kind": "columns",
+                        "columns": [
+                            [
+                                {
+                                    "id": "a",
+                                    "kind": "spacer"
+                                }
+                            ],
+                            [
+                                {
+                                    "id": "b",
+                                    "kind": "spacer"
+                                }
+                            ],
+                            [
+                                {
+                                    "id": "d",
+                                    "kind": "spacer"
+                                }
+                            ]
+                        ]
+                    }
+                ]
+            },
+            "expected": {
+                "blocks": [
+                    {
+                        "id": "c",
+                        "kind": "columns",
+                        "columns": [
+                            [
+                                {
+                                    "id": "a",
+                                    "kind": "spacer"
+                                }
+                            ],
+                            [
+                                {
+                                    "id": "b",
+                                    "kind": "spacer"
+                                }
+                            ]
+                        ]
+                    }
+                ]
+            }
+        },
+        {
+            "name": "columns: not a list, or an object, becomes two empty columns",
+            "input": {
+                "blocks": [
+                    {
+                        "id": "a",
+                        "kind": "columns",
+                        "columns": "x"
+                    },
+                    {
+                        "id": "b",
+                        "kind": "columns",
+                        "columns": [
+                            [],
+                            []
+                        ]
+                    },
+                    {
+                        "id": "c",
+                        "kind": "columns"
+                    }
+                ]
+            },
+            "expected": {
+                "blocks": [
+                    {
+                        "id": "a",
+                        "kind": "columns",
+                        "columns": [
+                            [],
+                            []
+                        ]
+                    },
+                    {
+                        "id": "b",
+                        "kind": "columns",
+                        "columns": [
+                            [],
+                            []
+                        ]
+                    },
+                    {
+                        "id": "c",
+                        "kind": "columns",
+                        "columns": [
+                            [],
+                            []
+                        ]
+                    }
+                ]
+            }
+        },
+        {
+            "name": "columns: an invalid image inside a column drops without breaking the rest",
+            "input": {
+                "blocks": [
+                    {
+                        "id": "c",
+                        "kind": "columns",
+                        "columns": [
+                            [
+                                {
+                                    "id": "i",
+                                    "kind": "image"
+                                },
+                                {
+                                    "id": "a",
+                                    "kind": "paragraph",
+                                    "text": "kept"
+                                }
+                            ],
+                            []
+                        ]
+                    }
+                ]
+            },
+            "expected": {
+                "blocks": [
+                    {
+                        "id": "c",
+                        "kind": "columns",
+                        "columns": [
+                            [
+                                {
+                                    "id": "a",
+                                    "kind": "paragraph",
+                                    "text": "kept"
+                                }
+                            ],
+                            []
+                        ]
+                    }
+                ]
+            }
+        },
+        {
+            "name": "ids: duplicates across the section, columns included, drop the later block",
+            "input": {
+                "blocks": [
+                    {
+                        "id": "x",
+                        "kind": "paragraph",
+                        "text": "first"
+                    },
+                    {
+                        "id": "x",
+                        "kind": "paragraph",
+                        "text": "second"
+                    },
+                    {
+                        "id": "c",
+                        "kind": "columns",
+                        "columns": [
+                            [
+                                {
+                                    "id": "x",
+                                    "kind": "paragraph",
+                                    "text": "in column"
+                                },
+                                {
+                                    "id": "y",
+                                    "kind": "paragraph",
+                                    "text": "ok"
+                                }
+                            ],
+                            [
+                                {
+                                    "id": "c",
+                                    "kind": "paragraph",
+                                    "text": "clashes with the columns id"
+                                }
+                            ]
+                        ]
+                    }
+                ]
+            },
+            "expected": {
+                "blocks": [
+                    {
+                        "id": "x",
+                        "kind": "paragraph",
+                        "text": "first"
+                    },
+                    {
+                        "id": "c",
+                        "kind": "columns",
+                        "columns": [
+                            [
+                                {
+                                    "id": "y",
+                                    "kind": "paragraph",
+                                    "text": "ok"
+                                }
+                            ],
+                            []
+                        ]
+                    }
+                ]
+            }
+        },
+        {
+            "name": "ids: invalid ids fall back to block-{position} and col-{i}-{c}-{k}",
+            "input": {
+                "blocks": [
+                    {
+                        "id": "bad id!",
+                        "kind": "paragraph",
+                        "text": "a"
+                    },
+                    {
+                        "kind": "paragraph",
+                        "text": "b"
+                    },
+                    {
+                        "id": "c",
+                        "kind": "columns",
+                        "columns": [
+                            [
+                                {
+                                    "id": "",
+                                    "kind": "spacer"
+                                }
+                            ],
+                            [
+                                {
+                                    "kind": "spacer"
+                                }
+                            ]
+                        ]
+                    }
+                ]
+            },
+            "expected": {
+                "blocks": [
+                    {
+                        "id": "block-0",
+                        "kind": "paragraph",
+                        "text": "a"
+                    },
+                    {
+                        "id": "block-1",
+                        "kind": "paragraph",
+                        "text": "b"
+                    },
+                    {
+                        "id": "c",
+                        "kind": "columns",
+                        "columns": [
+                            [
+                                {
+                                    "id": "col-2-0-0",
+                                    "kind": "spacer"
+                                }
+                            ],
+                            [
+                                {
+                                    "id": "col-2-1-0",
+                                    "kind": "spacer"
+                                }
+                            ]
+                        ]
+                    }
+                ]
+            }
+        },
+        {
+            "name": "ids: an id of 65 characters falls back",
+            "input": {
+                "blocks": [
+                    {
+                        "id": "iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii",
+                        "kind": "paragraph",
+                        "text": "a"
+                    }
+                ]
+            },
+            "expected": {
+                "blocks": [
+                    {
+                        "id": "block-0",
+                        "kind": "paragraph",
+                        "text": "a"
+                    }
+                ]
+            }
+        },
+        {
+            "name": "ids: surrounding whitespace is trimmed",
+            "input": {
+                "blocks": [
+                    {
+                        "id": "  trimmed  ",
+                        "kind": "paragraph",
+                        "text": "a"
+                    }
+                ]
+            },
+            "expected": {
+                "blocks": [
+                    {
+                        "id": "trimmed",
+                        "kind": "paragraph",
+                        "text": "a"
+                    }
+                ]
+            }
+        },
+        {
+            "name": "at most 12 top-level blocks",
+            "input": {
+                "blocks": [
+                    {
+                        "id": "b0",
+                        "kind": "spacer"
+                    },
+                    {
+                        "id": "b1",
+                        "kind": "spacer"
+                    },
+                    {
+                        "id": "b2",
+                        "kind": "spacer"
+                    },
+                    {
+                        "id": "b3",
+                        "kind": "spacer"
+                    },
+                    {
+                        "id": "b4",
+                        "kind": "spacer"
+                    },
+                    {
+                        "id": "b5",
+                        "kind": "spacer"
+                    },
+                    {
+                        "id": "b6",
+                        "kind": "spacer"
+                    },
+                    {
+                        "id": "b7",
+                        "kind": "spacer"
+                    },
+                    {
+                        "id": "b8",
+                        "kind": "spacer"
+                    },
+                    {
+                        "id": "b9",
+                        "kind": "spacer"
+                    },
+                    {
+                        "id": "b10",
+                        "kind": "spacer"
+                    },
+                    {
+                        "id": "b11",
+                        "kind": "spacer"
+                    },
+                    {
+                        "id": "b12",
+                        "kind": "spacer"
+                    },
+                    {
+                        "id": "b13",
+                        "kind": "spacer"
+                    },
+                    {
+                        "id": "b14",
+                        "kind": "spacer"
+                    }
+                ]
+            },
+            "expected": {
+                "blocks": [
+                    {
+                        "id": "b0",
+                        "kind": "spacer"
+                    },
+                    {
+                        "id": "b1",
+                        "kind": "spacer"
+                    },
+                    {
+                        "id": "b2",
+                        "kind": "spacer"
+                    },
+                    {
+                        "id": "b3",
+                        "kind": "spacer"
+                    },
+                    {
+                        "id": "b4",
+                        "kind": "spacer"
+                    },
+                    {
+                        "id": "b5",
+                        "kind": "spacer"
+                    },
+                    {
+                        "id": "b6",
+                        "kind": "spacer"
+                    },
+                    {
+                        "id": "b7",
+                        "kind": "spacer"
+                    },
+                    {
+                        "id": "b8",
+                        "kind": "spacer"
+                    },
+                    {
+                        "id": "b9",
+                        "kind": "spacer"
+                    },
+                    {
+                        "id": "b10",
+                        "kind": "spacer"
+                    },
+                    {
+                        "id": "b11",
+                        "kind": "spacer"
+                    }
+                ]
+            }
+        },
+        {
+            "name": "the 12 limit counts kept blocks only",
+            "input": {
+                "blocks": [
+                    {
+                        "id": "x0",
+                        "kind": "video"
+                    },
+                    {
+                        "id": "x1",
+                        "kind": "video"
+                    },
+                    {
+                        "id": "x2",
+                        "kind": "video"
+                    },
+                    {
+                        "id": "x3",
+                        "kind": "video"
+                    },
+                    {
+                        "id": "x4",
+                        "kind": "video"
+                    },
+                    {
+                        "id": "b0",
+                        "kind": "spacer"
+                    },
+                    {
+                        "id": "b1",
+                        "kind": "spacer"
+                    },
+                    {
+                        "id": "b2",
+                        "kind": "spacer"
+                    },
+                    {
+                        "id": "b3",
+                        "kind": "spacer"
+                    },
+                    {
+                        "id": "b4",
+                        "kind": "spacer"
+                    },
+                    {
+                        "id": "b5",
+                        "kind": "spacer"
+                    },
+                    {
+                        "id": "b6",
+                        "kind": "spacer"
+                    },
+                    {
+                        "id": "b7",
+                        "kind": "spacer"
+                    },
+                    {
+                        "id": "b8",
+                        "kind": "spacer"
+                    },
+                    {
+                        "id": "b9",
+                        "kind": "spacer"
+                    },
+                    {
+                        "id": "b10",
+                        "kind": "spacer"
+                    },
+                    {
+                        "id": "b11",
+                        "kind": "spacer"
+                    },
+                    {
+                        "id": "b12",
+                        "kind": "spacer"
+                    },
+                    {
+                        "id": "b13",
+                        "kind": "spacer"
+                    }
+                ]
+            },
+            "expected": {
+                "blocks": [
+                    {
+                        "id": "b0",
+                        "kind": "spacer"
+                    },
+                    {
+                        "id": "b1",
+                        "kind": "spacer"
+                    },
+                    {
+                        "id": "b2",
+                        "kind": "spacer"
+                    },
+                    {
+                        "id": "b3",
+                        "kind": "spacer"
+                    },
+                    {
+                        "id": "b4",
+                        "kind": "spacer"
+                    },
+                    {
+                        "id": "b5",
+                        "kind": "spacer"
+                    },
+                    {
+                        "id": "b6",
+                        "kind": "spacer"
+                    },
+                    {
+                        "id": "b7",
+                        "kind": "spacer"
+                    },
+                    {
+                        "id": "b8",
+                        "kind": "spacer"
+                    },
+                    {
+                        "id": "b9",
+                        "kind": "spacer"
+                    },
+                    {
+                        "id": "b10",
+                        "kind": "spacer"
+                    },
+                    {
+                        "id": "b11",
+                        "kind": "spacer"
+                    }
+                ]
+            }
+        },
+        {
+            "name": "a legacy 8-block document is untouched",
+            "input": {
+                "blocks": [
+                    {
+                        "id": "b0",
+                        "kind": "heading",
+                        "text": "t0"
+                    },
+                    {
+                        "id": "b1",
+                        "kind": "paragraph",
+                        "text": "t1"
+                    },
+                    {
+                        "id": "b2",
+                        "kind": "heading",
+                        "text": "t2"
+                    },
+                    {
+                        "id": "b3",
+                        "kind": "paragraph",
+                        "text": "t3"
+                    },
+                    {
+                        "id": "b4",
+                        "kind": "heading",
+                        "text": "t4"
+                    },
+                    {
+                        "id": "b5",
+                        "kind": "paragraph",
+                        "text": "t5"
+                    },
+                    {
+                        "id": "b6",
+                        "kind": "heading",
+                        "text": "t6"
+                    },
+                    {
+                        "id": "b7",
+                        "kind": "paragraph",
+                        "text": "t7"
+                    }
+                ]
+            },
+            "expected": {
+                "blocks": [
+                    {
+                        "id": "b0",
+                        "kind": "heading",
+                        "text": "t0"
+                    },
+                    {
+                        "id": "b1",
+                        "kind": "paragraph",
+                        "text": "t1"
+                    },
+                    {
+                        "id": "b2",
+                        "kind": "heading",
+                        "text": "t2"
+                    },
+                    {
+                        "id": "b3",
+                        "kind": "paragraph",
+                        "text": "t3"
+                    },
+                    {
+                        "id": "b4",
+                        "kind": "heading",
+                        "text": "t4"
+                    },
+                    {
+                        "id": "b5",
+                        "kind": "paragraph",
+                        "text": "t5"
+                    },
+                    {
+                        "id": "b6",
+                        "kind": "heading",
+                        "text": "t6"
+                    },
+                    {
+                        "id": "b7",
+                        "kind": "paragraph",
+                        "text": "t7"
+                    }
+                ]
+            }
+        },
+        {
+            "name": "every kind together keeps the canonical shape",
+            "input": {
+                "blocks": [
+                    {
+                        "id": "h",
+                        "kind": "heading",
+                        "text": "T",
+                        "level": 3,
+                        "align": "center"
+                    },
+                    {
+                        "id": "p",
+                        "kind": "paragraph",
+                        "text": "P"
+                    },
+                    {
+                        "id": "i",
+                        "kind": "image",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        },
+                        "caption": "C",
+                        "link": "/x"
+                    },
+                    {
+                        "id": "b",
+                        "kind": "button",
+                        "label": "B",
+                        "href": "/b",
+                        "style": "link"
+                    },
+                    {
+                        "id": "d",
+                        "kind": "divider",
+                        "style": "dots"
+                    },
+                    {
+                        "id": "s",
+                        "kind": "spacer",
+                        "size": "lg"
+                    },
+                    {
+                        "id": "k",
+                        "kind": "callout",
+                        "text": "K",
+                        "tone": "success",
+                        "icon": "gift"
+                    },
+                    {
+                        "id": "c",
+                        "kind": "columns",
+                        "columns": [
+                            [
+                                {
+                                    "id": "c1",
+                                    "kind": "paragraph",
+                                    "text": "1"
+                                }
+                            ],
+                            [
+                                {
+                                    "id": "c2",
+                                    "kind": "paragraph",
+                                    "text": "2"
+                                }
+                            ]
+                        ]
+                    }
+                ]
+            },
+            "expected": {
+                "blocks": [
+                    {
+                        "id": "h",
+                        "kind": "heading",
+                        "text": "T",
+                        "level": 3,
+                        "align": "center"
+                    },
+                    {
+                        "id": "p",
+                        "kind": "paragraph",
+                        "text": "P"
+                    },
+                    {
+                        "id": "i",
+                        "kind": "image",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        },
+                        "caption": "C",
+                        "link": "/x"
+                    },
+                    {
+                        "id": "b",
+                        "kind": "button",
+                        "label": "B",
+                        "href": "/b",
+                        "style": "link"
+                    },
+                    {
+                        "id": "d",
+                        "kind": "divider",
+                        "style": "dots"
+                    },
+                    {
+                        "id": "s",
+                        "kind": "spacer",
+                        "size": "lg"
+                    },
+                    {
+                        "id": "k",
+                        "kind": "callout",
+                        "text": "K",
+                        "tone": "success",
+                        "icon": "gift"
+                    },
+                    {
+                        "id": "c",
+                        "kind": "columns",
+                        "columns": [
+                            [
+                                {
+                                    "id": "c1",
+                                    "kind": "paragraph",
+                                    "text": "1"
+                                }
+                            ],
+                            [
+                                {
+                                    "id": "c2",
+                                    "kind": "paragraph",
+                                    "text": "2"
+                                }
+                            ]
+                        ]
+                    }
+                ]
+            }
+        }
+    ]
+}

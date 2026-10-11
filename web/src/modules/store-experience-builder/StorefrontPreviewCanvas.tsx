@@ -60,6 +60,7 @@ import {
   discoveryContentOf,
   offersContentOf,
   productShelfContentOf,
+  galleryContentOf,
   sliderContentOf,
 } from "./presentation/section-content";
 import {
@@ -76,6 +77,7 @@ import {
   type CustomizerMessageKey,
 } from "./messages";
 import { CanvasBackdrop } from "./media/CanvasBackdrop";
+import { CanvasGallery } from "./CanvasGallery";
 import { CanvasSlider } from "./CanvasSlider";
 import { useBackgroundMediaBounds } from "./media/use-background-media-bounds";
 import { announcementWindowState } from "./presentation/announcements";
@@ -83,7 +85,9 @@ import { useWindowsClock } from "./use-announcement-clock";
 import { useMediaRefPreview } from "./media/use-media-ref-preview";
 import { fontFamilyStack } from "./presentation/font-catalogue";
 import { resolveGlobalTokens } from "./presentation/global-tokens";
-import type { SectionDesign } from "./presentation/section-design";
+import type { HeadingBlock, ParagraphBlock } from "./presentation/content-blocks";
+import { StoreIcon } from "./StoreIcon";
+import type { BenefitsLayout, SectionDesign } from "./presentation/section-design";
 import { resolveSectionDesign } from "./presentation/section-design-resolve";
 import { SectionDesignFrame } from "./SectionDesignFrame";
 import type { DesignContext } from "./presentation/section-design-resolve";
@@ -133,6 +137,9 @@ interface StorefrontPreviewCanvasProps {
    */
   selectedSection?: string | null;
   onSelectSection?: (id: string) => void;
+  /** CUST-HV V8c — the slide each slider section shows (the editor's selection), by section id; browsing in the Canvas reports back. */
+  activeSlides?: Record<string, string>;
+  onActiveSlideChange?: (sectionId: string, slideId: string) => void;
   /**
    * Click-to-edit for fixed chrome (UX V2 §3.2). Not presentation data.
    * Header, logo, footer, WhatsApp and social links route to existing panels.
@@ -274,6 +281,8 @@ export function StorefrontPreviewCanvas({
   businessIdentity = { legal_name: null, cr_number: null, vat_number: null },
   selectedSection = null,
   onSelectSection,
+  activeSlides,
+  onActiveSlideChange,
   selectedChrome = null,
   onSelectChrome,
   productPreviewState = "idle",
@@ -1019,6 +1028,8 @@ export function StorefrontPreviewCanvas({
                   behaviour={slider.behaviour}
                   context={designContext}
                   viewport={viewport}
+                  activeSlideId={activeSlides?.[section.id] ?? null}
+                  onActiveSlideChange={(slideId) => onActiveSlideChange?.(section.id, slideId)}
                   labels={{
                     label: t("canvasSliderLabel"),
                     slide: t("canvasSliderSlide"),
@@ -1027,6 +1038,27 @@ export function StorefrontPreviewCanvas({
                     goTo: t("canvasSliderGoTo"),
                     empty: t("canvasSliderEmpty"),
                     autoplayNote: t("canvasSliderAutoplayNote"),
+                  }}
+                />
+              );
+            }
+
+            if (section.type === "gallery") {
+              // CUST-HV V8f — the same `data-gallery` DOM as the storefront; the layout is the section design's (`carousel`, else the grid).
+              const gallery = galleryContentOf(section);
+              return (
+                <CanvasGallery
+                  key={section.id}
+                  images={gallery.images}
+                  options={gallery.options}
+                  layout={section.design?.layout === "carousel" ? "carousel" : "grid"}
+                  dir={designContext.dir}
+                  viewport={viewport}
+                  activeImageId={activeSlides?.[section.id] ?? null}
+                  labels={{
+                    label: t("canvasGalleryLabel"),
+                    empty: t("canvasGalleryEmpty"),
+                    item: t("canvasGalleryItem"),
                   }}
                 />
               );
@@ -1133,17 +1165,36 @@ export function StorefrontPreviewCanvas({
               // card surface (and the block marker its design rules address) apply only
               // while a design frame wraps it.
               const designed = resolveSectionDesign(section.type, section.design, designContext) !== null;
+              const benefitsLayout = section.design?.layout as BenefitsLayout | undefined;
+              const benefitsFlat = benefitsLayout === "flat";
               return (
-                <section key={section.id} data-section-block={designed ? "" : undefined}>
+                <section key={section.id} data-section-block={designed ? "" : undefined} data-benefits={benefitsLayout ?? "auto"} data-vp={viewport}>
                   <h2 className="text-base font-extrabold">{t("sectionBenefits")}</h2>
                   {items.length === 0 ? (
                     <p className="mt-2 text-sm text-store-muted-foreground">{t("sectionBenefits")}</p>
                   ) : (
-                    <ul className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                    <ul className={cn("mt-3 grid", benefitsFlat ? "gap-x-6 gap-y-5" : "gap-2")}>
                       {items.map((item) => (
-                        <li key={item.id} className={cn("min-w-0 break-words rounded-store border border-store-border", designed ? "bg-store-surface px-4 py-4" : "px-3 py-3")}>
-                          {item.title ? <p className="break-words text-sm font-bold">{item.title}</p> : null}
-                          {item.body ? <p className="break-words text-sm text-store-muted-foreground">{item.body}</p> : null}
+                        <li
+                          key={item.id}
+                          data-benefit-item=""
+                          className={cn(
+                            "flex min-w-0 items-start gap-3 break-words",
+                            benefitsFlat ? null : cn("rounded-store border border-store-border", designed ? "bg-store-surface px-4 py-4" : "px-3 py-3"),
+                          )}
+                        >
+                          {item.icon ? (
+                            <span
+                              data-benefit-icon=""
+                              className="flex size-10 shrink-0 items-center justify-center rounded-store border border-store-border text-store-foreground"
+                            >
+                              <StoreIcon name={item.icon} className="size-5" />
+                            </span>
+                          ) : null}
+                          <div className="min-w-0 flex-1">
+                            {item.title ? <p className="break-words text-sm font-bold">{item.title}</p> : null}
+                            {item.body ? <p className="break-words text-sm text-store-muted-foreground">{item.body}</p> : null}
+                          </div>
                         </li>
                       ))}
                     </ul>
@@ -1153,7 +1204,10 @@ export function StorefrontPreviewCanvas({
             }
 
             if (section.type === "customContent") {
-              const blocks = customContentOf(section).blocks.filter((block) => block.text.trim());
+              // V9c-1: the Canvas still draws the two original kinds only; the other block kinds arrive with the editor (V9c-2).
+              const blocks = customContentOf(section).blocks.filter(
+                (block): block is HeadingBlock | ParagraphBlock => (block.kind === "heading" || block.kind === "paragraph") && block.text.trim() !== "",
+              );
               // AWJ Market presents multi-question content as an accordion (published
               // `CustomContentBand`): mirror its cards so the preview shows the same surfaces.
               const groups: Array<{ heading: (typeof blocks)[number] | null; body: typeof blocks }> = [];
@@ -2055,6 +2109,18 @@ function CategoryPagePreview({
                 ))}
                 <bdi className="truncate font-medium text-store-foreground">{category.name}</bdi>
               </nav>,
+            );
+          case "cover":
+            // CUST-HV V9a — the workspace category read does not carry the picture, so the preview cannot show THIS category's
+            // image; it says plainly what the published page does (the picture when the category has one, nothing otherwise).
+            return wrap(
+              region,
+              <div
+                data-category-preview-cover=""
+                className="flex aspect-[16/5] items-center justify-center rounded-store border border-dashed border-store-border-strong bg-store-surface-muted px-4 text-center"
+              >
+                <p className="text-xs leading-5 text-store-muted-foreground">{t("categoryPreviewCoverNote")}</p>
+              </div>,
             );
           case "identity_title":
             return wrap(

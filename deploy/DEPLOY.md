@@ -158,6 +158,19 @@ Host ثم Origin على مستوى الـ backend حصراً — لا عبر أ�
 مقصودة تشمل إعداد المخزن، الأسرار، الاختبارات، وسياسة ترحيل الملفات قبل تحويل القفل إلى
 `true`.
 
+## حدود الرفع في PHP
+
+الصورة الرسمية `php:8.3-apache` بلا `php.ini`، فالافتراضي (`upload_max_filesize=2M`، `post_max_size=8M`) كان يُسقط أي رفع فوق 2MB قبل وصوله إلى Laravel (`The media.0 failed to upload.`). تُضبط الحدود الآن داخل الصورة عبر `deploy/php/awj-uploads.ini` (يُنسخ إلى `conf.d` فيقرؤه Apache/mod_php وCLI):
+
+| الإعداد | القيمة | المبرّر |
+|---|---|---|
+| `upload_max_filesize` | 20M | أكبر ملف منفرد: مركز المستندات 20480KB |
+| `post_max_size` | 128M | أكبر طلب: 10 مرفقات × 10240KB = 100MiB + هامش multipart |
+| `max_file_uploads` | 20 | أقصى عدد ملفات في طلب = 10 |
+| `memory_limit` | 256M | فكّ الصور/المشتقات |
+
+لا تُوسّع هذه القيم حدود أي وحدة؛ التحقق (النوع/الحجم/العدد) يبقى في FormRequests. `PhpUploadLimitsContractTest` يفشل إن انحرف الـini عن هذه الحدود، و`runtime-smoke` يرفع ملفات فعلية عبر Apache داخل الصورة. بعد النشر: `php --ini` يجب أن يُظهر `zz-awj-uploads.ini`، ثم جرّب رفع صورة 4–6MB.
+
 ## منصّات بديلة
 
 الصورة قياسية (Dockerfile واحد)، فتعمل كما هي على **Railway** أو **Fly.io** أو أي

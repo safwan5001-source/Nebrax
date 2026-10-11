@@ -15,6 +15,11 @@ RUN docker-php-ext-configure gd --with-freetype --with-jpeg --with-webp \
     && a2enmod mpm_prefork rewrite \
     && apache2ctl configtest
 
+# AWJ-UPLOAD-PHP-LIMITS-1: الصورة الرسمية بلا php.ini، فكان الافتراضي
+# upload_max_filesize=2M / post_max_size=8M يُسقط أي ملف أكبر من 2MB قبل أن يصل
+# Laravel. conf.d يقرؤه mod_php وCLI معاً؛ القيم ومبرّراتها في الملف نفسه.
+COPY deploy/php/awj-uploads.ini /usr/local/etc/php/conf.d/zz-awj-uploads.ini
+
 COPY --from=composer:2.7 /usr/bin/composer /usr/bin/composer
 
 ENV COMPOSER_ALLOW_SUPERUSER=1 \

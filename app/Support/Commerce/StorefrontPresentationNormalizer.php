@@ -84,7 +84,8 @@ final class StorefrontPresentationNormalizer
 
     public const MAX_BENEFIT_ITEMS = 6;
 
-    public const MAX_CUSTOM_BLOCKS = 8;
+    /** CUST-HV V9c-1 (V0 §15) — كان 8؛ الرفع إلى 12 لا يُبطل وثيقةً قائمة. توأم `MAX_CUSTOM_BLOCKS` في ملفَّي section-content.ts. */
+    public const MAX_CUSTOM_BLOCKS = 12;
 
     public const MAX_FEATURED_PRODUCTS = 8;
 
@@ -138,12 +139,13 @@ final class StorefrontPresentationNormalizer
     ];
 
     /**
-     * CUST-HV V8 — أقسام الوسائط (V0 §13): `slider` الآن (و`gallery` في شريحةٍ لاحقة). مقبولة للتخزين (المحتوى مُطبَّع
+     * CUST-HV V8 — أقسام الوسائط (V0 §13): `slider` (V8a) و`gallery` (V8d). مقبولة للتخزين (المحتوى مُطبَّع
      * fail-closed) لكنها خارج القائمة الافتراضية للوثيقة كأقسام البيانات، فلا تتغيّر الوثيقة الافتراضية ولا توأماها.
      * مجموعةٌ منفصلة عن `HOME_DATA_SECTION_KEYS` عمداً: تلك تُحصى في إعداد القطاع كـ«أقسام بيانات».
      */
     public const HOME_MEDIA_SECTION_KEYS = [
         'slider',
+        'gallery',
     ];
 
     public const IMPLEMENTED_HOME_SECTION_KEYS = [
@@ -237,6 +239,8 @@ final class StorefrontPresentationNormalizer
      */
     public const CATEGORY_PAGE_REGION_KEYS = [
         'breadcrumbs',
+        // CUST-HV V9a (V0 §14.2، DEF-3b) — غلاف التصنيف الاختياري: صورة التصنيف نفسها حين توجد. يبدأ مخفياً (اختيار صريح).
+        'cover',
         'identity_title',
         'description',
         'subcategories_rail',
@@ -851,6 +855,10 @@ final class StorefrontPresentationNormalizer
             return StorefrontSliderNormalizer::normalize($raw, fn (string $href): string => $this->sanitizeContentHref($href));
         }
 
+        if ($type === 'gallery') {
+            return StorefrontGalleryNormalizer::normalize($raw, fn (string $href): string => $this->sanitizeContentHref($href));
+        }
+
         if ($type === 'benefits') {
             $items = [];
             $seen = [];
@@ -865,7 +873,13 @@ final class StorefrontPresentationNormalizer
                     continue;
                 }
                 $seen[$id] = true;
-                $items[] = ['id' => $id, 'title' => $title, 'body' => $body];
+                $entry = ['id' => $id, 'title' => $title, 'body' => $body];
+                // CUST-HV V9b (V0 §11.4) — أيقونة اختيارية من السجلّ المنتقى؛ المفتاح المجهول يُسقط (لا أيقونة) ولا يُخزَّن غيابٌ.
+                $icon = $item['icon'] ?? null;
+                if (is_string($icon) && in_array($icon, IconRegistry::KEYS, true)) {
+                    $entry['icon'] = $icon;
+                }
+                $items[] = $entry;
                 if (count($items) >= self::MAX_BENEFIT_ITEMS) {
                     break;
                 }
@@ -875,30 +889,8 @@ final class StorefrontPresentationNormalizer
         }
 
         if ($type === 'customContent') {
-            $blocks = [];
-            $seen = [];
-            foreach (array_values(is_array($source['blocks'] ?? null) ? $source['blocks'] : []) as $index => $block) {
-                if (! is_array($block) || array_is_list($block)) {
-                    continue;
-                }
-                $kind = $block['kind'] ?? null;
-                if ($kind !== 'heading' && $kind !== 'paragraph') {
-                    continue;
-                }
-                $limit = $kind === 'heading' ? 120 : 600;
-                $text = mb_substr(trim($this->asString($block['text'] ?? null)), 0, $limit);
-                $id = $this->safeId($block['id'] ?? null, 'block-'.$index);
-                if ($id === '' || isset($seen[$id])) {
-                    continue;
-                }
-                $seen[$id] = true;
-                $blocks[] = ['id' => $id, 'kind' => $kind, 'text' => $text];
-                if (count($blocks) >= self::MAX_CUSTOM_BLOCKS) {
-                    break;
-                }
-            }
-
-            return $blocks === [] ? null : ['blocks' => $blocks];
+            // CUST-HV V9c-1 (V0 §15) — مفردات الكتل المشتركة؛ كتلتا heading/paragraph القديمتان تُطبَّعان إلى الشكل نفسه.
+            return StorefrontContentBlocksNormalizer::normalize($raw, fn (string $href): string => $this->sanitizeContentHref($href));
         }
 
         if ($type === 'featured') {

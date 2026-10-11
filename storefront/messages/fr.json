@@ -166,6 +166,23 @@
       "pause": "Mettre le diaporama en pause",
       "play": "Lancer le diaporama",
       "choose": "Choisir une diapositive"
+    },
+    "gallery": {
+      "label": "Galerie",
+      "item": "Image {number}",
+      "previous": "Images précédentes",
+      "next": "Images suivantes",
+      "open": "Agrandir l'image {number}",
+      "viewer": "Visionneuse d'images",
+      "close": "Fermer la visionneuse",
+      "viewerPrevious": "Image précédente",
+      "viewerNext": "Image suivante",
+      "counter": "{current} sur {total}"
+    },
+    "content": {
+      "note": "Remarque",
+      "success": "Succès",
+      "warning": "Avertissement"
     }
   },
   "cart": {
