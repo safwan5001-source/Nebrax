@@ -8,6 +8,7 @@ use App\Models\Invoice;
 use App\Models\InvoiceLine;
 use App\Models\Purchase;
 use App\Models\ReturnLine;
+use App\Tenancy\BranchScope;
 
 /**
  * ═══════════════════════════════════════════════════════════════
@@ -200,8 +201,8 @@ class ReturnSourceAllocator
      *      إلى السطر الذي حدّدته المالية (يُشترط أن يكون من الفاتورة نفسها)، و
      *      `not_applicable` ⇒ `ignored` (لا يستهلك سطراً).
      *   2. **نسب آلي** إن كان للسطر منتج وسطر الفاتورة الحامل له (والمتغيّر إن حُدِّد)
-     *      وحيداً ⇒ `attributed`.
-     *   3. غير ذلك (بلا منتج، أو منتجه يتكرر) ⇒ `unresolved`: لا يُخمَّن، وتُحظر العمليات
+     *      وحيداً، وطرف الإشعار هو مالك الفاتورة ⇒ `attributed`.
+     *   3. غير ذلك (بلا منتج، أو منتجه يتكرر، أو طرف الإشعار غير مالك الفاتورة) ⇒ `unresolved`: لا يُخمَّن، وتُحظر العمليات
      *      المتأثرة على الفاتورة حتى تراجعه المالية ({@see assertNoUnresolvedLegacyCredits()}).
      *
      * @param  array<int, string>  $invoiceIds
@@ -217,11 +218,16 @@ class ReturnSourceAllocator
         $legacy = CreditNoteLine::query()
             ->whereNull('source_line_id')
             ->whereHas('creditNote', fn ($q) => $q->where('status', 'posted')->whereIn('original_invoice_id', $invoiceIds))
-            ->with('creditNote:id,number,original_invoice_id')
+            ->with('creditNote:id,number,original_invoice_id,partner_id')
             ->get();
         if ($legacy->isEmpty()) {
             return [];
         }
+
+        // مالك كل فاتورة: إشعارٌ تاريخي مربوطٌ بفاتورة طرفٍ آخر (شذوذٌ تسمح به وتسجّله
+        // ترحيلة التقييد، `other_customer`) لا يُنسب آلياً إلى تلك الفاتورة فيستهلك سقف
+        // عميلها الحقيقي — يُصنَّف غير محسوم لتراجعه المالية.
+        $invoiceOwners = BranchScope::reference(Invoice::class)->whereIn('id', $invoiceIds)->pluck('partner_id', 'id');
 
         $invoiceLines = InvoiceLine::query()->whereIn('invoice_id', $invoiceIds)
             ->get(['id', 'invoice_id', 'product_id', 'product_variant_id']);
@@ -245,7 +251,11 @@ class ReturnSourceAllocator
                 continue;
             }
 
-            $matches = $line->product_id === null ? collect() : $invoiceLines->filter(
+            $foreignOwner = $line->creditNote->partner_id !== null
+                && $invoiceOwners->get($invoiceId) !== null
+                && (string) $line->creditNote->partner_id !== (string) $invoiceOwners->get($invoiceId);
+
+            $matches = ($line->product_id === null || $foreignOwner) ? collect() : $invoiceLines->filter(
                 fn ($l) => $l->invoice_id === $invoiceId
                     && $l->product_id === $line->product_id
                     && ($line->product_variant_id === null || $l->product_variant_id === $line->product_variant_id)

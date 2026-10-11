@@ -93,10 +93,10 @@ class CreditNoteLegacyBlockTest extends TestCase
     }
 
     /** إشعار دائن مرحَّل قديم (قبل REM-02): مربوط بالفاتورة، وأسطره بلا source_line_id. */
-    private function legacyNote(Invoice $invoice, ?string $productId, int $qty = 1, int $net = 10000): CreditNoteLine
+    private function legacyNote(Invoice $invoice, ?string $productId, int $qty = 1, int $net = 10000, ?string $partnerId = null): CreditNoteLine
     {
         $note = CreditNote::create([
-            'number' => 'CN-OLD-'.uniqid(), 'type' => 'sales', 'partner_id' => $invoice->partner_id,
+            'number' => 'CN-OLD-'.uniqid(), 'type' => 'sales', 'partner_id' => $partnerId ?? $invoice->partner_id,
             'refund_type' => 'credit', 'note_date' => now()->toDateString(), 'status' => 'posted',
             'original_invoice_id' => $invoice->id, 'subtotal' => $net, 'tax_amount' => intdiv($net * 15, 100), 'total' => $net + intdiv($net * 15, 100),
         ]);
@@ -269,6 +269,26 @@ class CreditNoteLegacyBlockTest extends TestCase
 
         // …والخادم يقبل الإشعار الدائن عليها (الشاشة لا تمنعه: noteBlockedReasonKey).
         $this->noteAttempt($invoice->fresh('lines'), 1)->assertCreated();
+    }
+
+    /** @test */
+    public function a_legacy_note_owned_by_another_customer_is_quarantined_not_attributed_to_the_invoice(): void
+    {
+        $other = Partner::create(['name' => 'عميل آخر', 'type' => 'customer']);
+        $invoice = $this->sale([$this->item(3, 10000)]);
+
+        // إشعارٌ تاريخي مربوط بفاتورة عميلٍ آخر وبمنتجها نفسه: لا يُنسب آلياً (وإلا استهلك سقف المالك الحقيقي)،
+        // بل يُصنَّف غير محسوم فتُحظر العمليات المتأثرة حتى تراجعه المالية.
+        $legacy = $this->legacyNote($invoice, $this->service->id, 1, 10000, $other->id);
+
+        $this->noteAttempt($invoice, 1)->assertStatus(422);
+        $this->returnAttempt($invoice, 1)->assertStatus(422);
+        $source = collect($this->getJson("/api/returns/sources/sales?partner_id={$invoice->partner_id}")->assertOk()->json('data'))->firstWhere('id', $invoice->id);
+        $this->assertSame('legacy_credit_review', $source['blocked_reason']);
+
+        // قرار المالية «لا ينطبق» يفكّ الحظر دون أن يستهلك سقف المالك الحقيقي.
+        $this->assertSame(0, $this->resolve($legacy, ['--not-applicable' => true]));
+        $this->noteAttempt($invoice, 3)->assertCreated();
     }
 
     /** @test */
