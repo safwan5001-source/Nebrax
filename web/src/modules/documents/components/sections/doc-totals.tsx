@@ -4,7 +4,7 @@ import { useTranslations } from 'next-intl';
 import { cn } from '@/lib/utils';
 import type { DocumentModel } from '../../types';
 import { useDocStyle } from '../doc-style-context';
-import { VISUAL_V2, formatModernMoney } from '../../presentation/visual-v2';
+import { VISUAL_V2, applyVatRateToLabel, formatModernMoney } from '../../presentation/visual-v2';
 import { ERP_V2 } from '../../presentation/erp-v2';
 import { CLASSIC_V2 } from '../../presentation/classic-v2';
 import { MINIMAL_V2 } from '../../presentation/minimal-v2';
@@ -42,9 +42,9 @@ export function DocTotals({
     ? (minor: number) => formatModernMoney(minor, model.currency, mode)
     : formatMoney;
   const totalLabel = (key: 'subtotal' | 'discount' | 'shipping' | 'adjustment' | 'vat' | 'grand_total') => {
-    if (usesV2Labels) return <ModernTotalLabel field={key} mode={mode} />;
+    if (usesV2Labels) return <ModernTotalLabel field={key} mode={mode} vatRate={totals.taxRate} />;
     if (key === 'discount' || key === 'shipping' || key === 'adjustment') return tp(key);
-    return t(key);
+    return key === 'vat' ? applyVatRateToLabel(t(key), totals.taxRate) : t(key);
   };
 
   const baseRow = cn(

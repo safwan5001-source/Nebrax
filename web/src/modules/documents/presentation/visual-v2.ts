@@ -114,6 +114,9 @@ export const MODERN_COLUMN_LABELS: Record<DocItemsColumnId, { ar: string; en: st
   quantity: { ar: 'الكمية', en: 'Qty' },
   unit_price: { ar: 'سعر الوحدة', en: 'Unit price' },
   price_before_tax: { ar: 'السعر قبل الضريبة', en: 'Price before tax' },
+  line_discount: { ar: 'الخصم', en: 'Discount' },
+  line_net: { ar: 'الصافي قبل الضريبة', en: 'Net before VAT' },
+  tax_rate: { ar: 'نسبة الضريبة', en: 'VAT rate' },
   tax: { ar: 'الضريبة', en: 'Tax' },
   total: { ar: 'الإجمالي', en: 'Total' },
 };
@@ -131,6 +134,17 @@ export const MODERN_TOTAL_LABELS = {
   vat: { ar: 'ضريبة القيمة المضافة (15%)', en: 'VAT (15%)' },
   grand_total: { ar: 'الإجمالي شامل الضريبة', en: 'Total (incl. VAT)' },
 } as const;
+
+/**
+ * عنوان صفّ الضريبة يحمل «(15%)» ثابتاً في كل اللغات. حين يعلن المصدر نسبة سطوره
+ * (`totals.taxRate`) يُستبدل الرقم بها، وحين تتعدد النسب (`null`) يُحذف الرقم؛
+ * وغياب الإعلان يُبقي العنوان كما كان حرفياً لكل مستند آخر.
+ */
+export function applyVatRateToLabel(label: string, rate: number | null | undefined): string {
+  if (rate === undefined) return label;
+  const fixed = /\s*\(\s*15\s*%\s*\)/;
+  return rate === null ? label.replace(fixed, '') : label.replace(fixed, ` (${rate}%)`);
+}
 
 export function modernTotalLabel(
   key: keyof typeof MODERN_TOTAL_LABELS,
@@ -167,6 +181,8 @@ export const MODERN_ITEMS_ROW_CLASS = 'border-b border-[color:var(--border)]';
 const MODERN_MONEY_COLUMNS = new Set<DocItemsColumnId>([
   'unit_price',
   'price_before_tax',
+  'line_discount',
+  'line_net',
   'tax',
   'total',
 ]);
@@ -197,6 +213,12 @@ export function modernItemsColumnWidthClass(column: DocItemsColumnId): string {
       return 'w-[8%]';
     case 'price_before_tax':
       return 'w-[10%]';
+    case 'line_discount':
+      return 'w-[8%]';
+    case 'line_net':
+      return 'w-[10%]';
+    case 'tax_rate':
+      return 'w-[6%]';
     case 'tax':
       return 'w-[8%]';
     case 'total':

@@ -80,6 +80,9 @@ const MONOSPACE_VALUE_COLUMNS = new Set<DocItemsColumnId>([
   'quantity',
   'price_before_tax',
   'unit_price',
+  'line_discount',
+  'line_net',
+  'tax_rate',
   'tax',
   'total',
 ]);
@@ -215,6 +218,9 @@ export function DocItemsTable({
     quantity: t('qty'),
     price_before_tax: t('price_before_tax'),
     unit_price: t('unit_price'),
+    line_discount: t('line_discount'),
+    line_net: t('line_net'),
+    tax_rate: t('tax_rate'),
     tax: t('tax'),
     total: t('total'),
   };
@@ -240,6 +246,9 @@ export function DocItemsTable({
       case 'quantity': return line.quantity;
       case 'price_before_tax': return line.priceBeforeTax === null || line.priceBeforeTax === undefined ? '—' : moneyValue(line.priceBeforeTax);
       case 'unit_price': return moneyValue(line.unitPrice);
+      case 'line_discount': return line.discount === null || line.discount === undefined ? '—' : moneyValue(line.discount);
+      case 'line_net': return line.netAmount === null || line.netAmount === undefined ? '—' : moneyValue(line.netAmount);
+      case 'tax_rate': return line.taxRate === null || line.taxRate === undefined ? '—' : `${line.taxRate}%`;
       case 'tax': return moneyValue(line.tax);
       case 'total': return moneyValue(line.total);
     }
@@ -324,9 +333,15 @@ export function DocItemsTable({
     </table>
   );
 
+  // سعر الوحدة المعروض مقرَّب؛ مبلغ السطر المخزَّن هو المرجع. تُذكر الحقيقة بدل إخفاء الفرق.
+  const showsUnitPrice = columns.some((column) => column.id === 'price_before_tax' || column.id === 'unit_price');
+  const roundingNote = showsUnitPrice && model.lines.some((line) => line.unitPriceRounded)
+    ? <p data-doc-rounding-note className="mt-1.5 text-[9px] leading-snug text-[color:var(--muted)]">{t('unit_price_rounding_note')}</p>
+    : null;
+
   if (usesV2Labels) {
-    return <div className={cn('overflow-hidden', style.sectionGap)}>{table}</div>;
+    return <div className={cn('overflow-hidden', style.sectionGap)}>{table}{roundingNote}</div>;
   }
 
-  return table;
+  return roundingNote ? <>{table}{roundingNote}</> : table;
 }

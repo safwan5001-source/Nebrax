@@ -43,6 +43,12 @@ export function purchaseOrderItemsColumnWidthClass(column: DocItemsColumnId): st
       return 'w-[8%]';
     case 'price_before_tax':
       return 'w-[6%]';
+    case 'line_discount':
+      return 'w-[6%]';
+    case 'line_net':
+      return 'w-[7%]';
+    case 'tax_rate':
+      return 'w-[5%]';
     case 'tax':
       return 'w-[6%]';
     case 'total':

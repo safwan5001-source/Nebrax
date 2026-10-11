@@ -44,6 +44,12 @@ export function classicItemsColumnWidthClass(column: DocItemsColumnId): string {
       return 'w-[8%]';
     case 'price_before_tax':
       return 'w-[9%]';
+    case 'line_discount':
+      return 'w-[7%]';
+    case 'line_net':
+      return 'w-[9%]';
+    case 'tax_rate':
+      return 'w-[6%]';
     case 'tax':
       return 'w-[8%]';
     case 'total':

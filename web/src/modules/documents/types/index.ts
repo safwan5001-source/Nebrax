@@ -75,6 +75,17 @@ export interface DocumentLine {
   unitPrice: number; // minor units
   /** سعر الوحدة قبل الضريبة؛ تجهزه طبقة المصدر ولا يُشتق في العارض. */
   priceBeforeTax?: number | null;
+  /**
+   * خصم السطر شاملاً حصته من خصم الرأس (وحدات صغرى). تجهزه طبقة المصدر من مبلغ
+   * مخزَّن؛ `null`/غياب = غير معروف ولا يُفترض صفراً.
+   */
+  discount?: number | null;
+  /** الصافي الخاضع بعد الخصم وقبل الضريبة (وحدات صغرى): `netAmount + tax = total`. */
+  netAmount?: number | null;
+  /** نسبة ضريبة السطر المخزَّنة كنسبة مئوية (15 = 15%). */
+  taxRate?: number | null;
+  /** سعر الوحدة المعروض مقرَّب: الكمية × السعر ≠ مبلغ السطر المخزَّن بالهللة. */
+  unitPriceRounded?: boolean;
   tax: number;       // minor units
   total: number;     // minor units (شامل الضريبة للسطر)
 }
@@ -86,6 +97,11 @@ export interface DocumentTotals {
   shipping?: number;
   /** فرق تسوية موجب أو سالب؛ يستخدمه الشراء للحفاظ على تطابق الإجمالي المطبوع. */
   adjustment?: number;
+  /**
+   * نسبة الضريبة لعنوان صفّ الضريبة: رقم = نسبة موحّدة، `null` = نسب متعددة (يُحذف
+   * الرقم من العنوان)، غياب = العنوان الافتراضي كما كان.
+   */
+  taxRate?: number | null;
   tax: number;
   total: number;
 }
@@ -257,7 +273,9 @@ export type DocBlockImageOpacity = 'solid' | 'soft' | 'faint';
 /** أعمدة جدول البنود التي يستطيع العارض رسمها بالفعل. */
 export type DocItemsColumnId =
   | 'number' | 'product_code' | 'barcode' | 'product' | 'description'
-  | 'quantity' | 'price_before_tax' | 'unit_price' | 'tax' | 'total';
+  | 'quantity' | 'price_before_tax' | 'unit_price' | 'tax' | 'total'
+  /** أعمدة تسوية اختيارية (إشعار دائن): لا تدخل أي مجموعة أعمدة افتراضية سوى ما يعلنه نوع المستند. */
+  | 'line_discount' | 'line_net' | 'tax_rate';
 
 /** تخصيص عمود واحد: عنوان ثابت اختياري ومحاذاة منطقية. */
 export interface DocItemsColumn {

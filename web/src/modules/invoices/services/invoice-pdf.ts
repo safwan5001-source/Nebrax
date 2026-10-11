@@ -336,10 +336,13 @@ export async function createInvoicePdf(input: InvoicePdfInput): Promise<Blob> {
     product_code: input.labels.productCode ?? 'SKU', barcode: input.labels.barcode ?? 'Barcode',
     quantity: input.labels.quantity, price_before_tax: input.labels.priceBeforeTax ?? 'Net price',
     unit_price: input.labels.unitPrice, tax: input.labels.tax, total: input.labels.total,
+    // أعمدة تسوية الإشعار الدائن: لا يحملها تخطيط فاتورة محفوظ (يرفضها العقد)؛ مدخلات للتمام النوعي فقط.
+    line_discount: '—', line_net: '—', tax_rate: '—',
   };
   const columnWeights: Record<DocItemsColumnId, number> = {
     number: 10, product_code: 28, barcode: 34, product: 42, description: 52,
     unit_price: 32, quantity: 20, price_before_tax: 34, tax: 32, total: 40,
+    line_discount: 30, line_net: 34, tax_rate: 20,
   };
   const totalWeight = selectedColumns.reduce((sum, column) => sum + columnWeights[column.id], 0);
   const defaultAlignment = (id: DocItemsColumnId): DocBlockAlignment => (
@@ -420,6 +423,7 @@ export async function createInvoicePdf(input: InvoicePdfInput): Promise<Blob> {
         ? '—'
         : money(line.unit_price_before_tax),
       unit_price: money(line.unit_price), tax: money(line.line_tax), total: money(line.line_total),
+      line_discount: '—', line_net: '—', tax_rate: '—',
     };
     let cursor = right;
     columns.forEach((column) => {
