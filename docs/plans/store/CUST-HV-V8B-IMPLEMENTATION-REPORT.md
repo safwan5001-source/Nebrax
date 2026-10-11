@@ -36,13 +36,30 @@ A document without a slider renders byte-identically (no new markup, no new requ
 
 ## Tests
 
-- `slider-resolve.test.ts` (15), `HomeSlider.test.tsx` (27: server markup, controls, keyboard in LTR / RTL, swipe both ways, loop and clamping, every autoplay rule with fake timers, reduced motion), `published-nodes.slider.test.tsx` (7); PHP `StorefrontMediaRefTest` +1.
+- `slider-resolve.test.ts` (15), `HomeSlider.test.tsx` (28: server markup, controls, keyboard in LTR / RTL, swipe both ways, loop and clamping, every autoplay rule with fake timers, reduced motion), `published-nodes.slider.test.tsx` (7); PHP `StorefrontMediaRefTest` +1.
 
 ## Design Quality Pass — real Chromium
 
 `scripts/slider-proof/` renders the **production** `publishedNodes` → `resolveSlider` → `HomeSlider` for 12 configurations (basic, light picture, black|white split under a 70 % wash, three alignments, fade, none, autoplay, phone art direction, eight slides with an unbroken word, a single slide, an unproven picture, and a designed frame) in AR RTL and EN LTR at 390 / 430 / 768 / 1024 / 1280 / 1440 and mounts the **real client component**:
 
-RESULT_PLACEHOLDER
+**7 324 checks, 0 violations.**
+
+| Area | What is asserted (every page × direction × width unless noted) |
+|---|---|
+| Layout | no horizontal overflow · exactly slide 1 active and inside the slider · every other slide `inert` + `aria-hidden` **and** actually not showing (parked outside, or hidden for fade / none) · the active picture loaded, the **phone picture below 768 px** (asserted from `currentSrc`) · copy never leaves its slide (a 100-character unbroken word wraps, 8 slides, AR + EN) · the three alignments land start / centre / end, mirrored under RTL · copy never collides with an arrow, the dots or the pause control and is the topmost thing at its centre · a designed frame applies its tokens and the *tall* preset |
+| Logical RTL | "previous" on the inline-start edge, "next" on the inline-end edge · the next slide waits on the inline-end side · `→` / `←` follow the visual direction · a touch swipe toward the inline-start edge goes forward (both directions, both languages) |
+| Controls & keyboard | arrows and pause ≥ 44 px, dots ≥ 24 × 44 · `aria-current` follows the active dot · pause button iff autoplay · `aria-live` off while it runs, polite otherwise · Tab never lands inside an inactive slide · every control shows a two-tone focus ring · slide names read "n of N" / "n من N" |
+| No JavaScript | JavaScript disabled: slide 1 whole, no dead control, other slides not showing |
+| Readability on real pixels | with the glyphs hidden, every pixel under each heading and sub line is read back (at 390 / 768 / 1280): the WCAG ratio of the copy colour against **that pixel** is ≥ 4.5 on every slide — dark picture, light picture, and the black \| white split under a 70 % wash; an unproven picture draws the brand surface at ≥ 4.5 and no `<img>`; the button fill equals the copy colour and its label clears 4.5 |
+| Motion | `prefers-reduced-motion`: every slide transition is `0s`, autoplay never advances and there is no Pause button · with motion: autoplay advances after the 5 s interval, the Pause button holds it (label flips to Play), hover holds it, and it resumes after |
+
+**Negative controls — each makes the proof fail:** `--noinert` (36 violations) · `--physical` left / right arrows (12, all RTL) · `--lie` low-contrast copy (66) · `--nomotion` reduced-motion rules removed (42).
+
+**Defects the proof found and this slice fixed:**
+1. A designed section background recoloured the slide copy dark (≈ 1.4 : 1 over the pictures): the shared resolver emitted `fg / heading / link` text tokens for a `slider` from its section surface. `resolveSectionDesign` now emits none for `slider` (both byte-identical twins, regression test in both apps); the copy colour is per slide, over its own picture.
+2. Focus on the Pause / Play button held the show, so pressing Play did not start it. Focus on that button no longer counts as reading the slides (unit test added).
+
+Screenshots: `docs/plans/store/cust-hv-v8b/` (LTR desktop, RTL phone, light picture, wash, designed frame, withheld picture, alignment, phone art direction).
 
 ## Limitations (stated)
 
