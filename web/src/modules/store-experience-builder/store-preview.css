@@ -334,6 +334,21 @@
   --bn: 4;
 }
 
+/* ── CUST-HV V9c-2 — the Custom Content blocks in the Canvas. The storefront stacks its two columns below `md` with a media query against the
+   HOST window; the Canvas takes the SIMULATED device instead (`data-vp`): one column on phones, two from tablet. The block the editor has selected
+   is ringed (the ring never changes the layout). ── */
+.awj-store-preview [data-content-blocks] [data-content-columns] {
+  grid-template-columns: minmax(0, 1fr);
+}
+.awj-store-preview [data-content-blocks][data-vp="tablet"] [data-content-columns],
+.awj-store-preview [data-content-blocks][data-vp="desktop"] [data-content-columns] {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.awj-store-preview [data-content-block][data-selected] {
+  outline: 2px solid var(--store-primary, currentColor);
+  outline-offset: 2px;
+}
+
 /* ── CUST-HV V8c — the slider in the Canvas. The slider rules below the V5c marker are the storefront's (parity-tested); they size the
    copy and the slide height with media queries against the HOST window, which is not the simulated device's width. `data-vp` carries
    the device, so these higher-specificity rules take the device's own values. Same numbers as the storefront's queries. ── */
