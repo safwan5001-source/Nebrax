@@ -163,6 +163,11 @@ export default async function HomePage({ params }: HomePageProps) {
             viewerNext: homeCopy("gallery.viewerNext"),
             counter: String(homeCopy.raw("gallery.counter")),
           },
+          contentLabels: {
+            note: homeCopy("content.note"),
+            success: homeCopy("content.success"),
+            warning: homeCopy("content.warning"),
+          },
           benefitsTitle: homeCopy("benefits"),
           featuredTitle: homeCopy("featured"),
           offersTitle: homeCopy("offers"),

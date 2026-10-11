@@ -149,7 +149,7 @@ const OUTLINE_BUTTON = {
   "data-variant": "outline",
 } as const;
 
-function BannerCtaLink({
+export function BannerCtaLink({
   cta,
   index,
   designCtx,

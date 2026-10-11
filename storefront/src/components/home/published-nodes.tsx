@@ -2,7 +2,10 @@ import { cloneElement, Fragment, isValidElement } from "react";
 import { AppPromoBand } from "@/components/home/AppPromoBand";
 import { BannerBand } from "@/components/home/BannerBand";
 import { BenefitsBand } from "@/components/home/BenefitsBand";
-import { CustomContentBand } from "@/components/home/CustomContentBand";
+import {
+  type ContentLabels,
+  CustomContentBand,
+} from "@/components/home/CustomContentBand";
 import { DeliveryPromiseBand } from "@/components/home/DeliveryPromiseBand";
 import { DiscoverySection } from "@/components/home/DiscoverySection";
 import { FeaturedShelf } from "@/components/home/FeaturedShelf";
@@ -20,6 +23,11 @@ import {
   sectionBackdrop,
 } from "@/lib/presentation/background-media";
 import type { PresentationHomeSection } from "@/lib/presentation/config";
+import { blockHasContent } from "@/lib/presentation/content-blocks";
+import {
+  isTextOnly,
+  resolveContentBlocks,
+} from "@/lib/presentation/content-blocks-resolve";
 import { resolveGallery } from "@/lib/presentation/gallery-resolve";
 import {
   type HeaderOverlay,
@@ -112,6 +120,8 @@ export async function publishedNodes(
     sliderLabels?: SliderLabels;
     /** CUST-HV V8e — the gallery's accessible names (already translated); absent ⇒ a published gallery is omitted. */
     galleryLabels?: GalleryLabels;
+    /** CUST-HV V9c-1 — the screen-reader names of the callout tones. */
+    contentLabels?: ContentLabels;
     benefitsTitle: string;
     featuredTitle: string;
     offersTitle: string;
@@ -344,13 +354,24 @@ async function pushSectionNode(
   }
   if (section.type === "customContent") {
     const content = customContentOf(section);
-    if (!content.blocks.some((block) => block.text.trim())) return;
+    // CUST-HV V9c-1 (V0 §15) — a section of nothing but headings and paragraphs draws exactly as it always did; any other
+    // block kind takes the general path, whose images are joined to the pictures the server resolved.
+    const view = isTextOnly(content.blocks)
+      ? undefined
+      : resolveContentBlocks(section, index, ctx.media ?? {}, ctx.locale);
+    const drawable = view
+      ? view.length > 0
+      : content.blocks.some((block) => blockHasContent(block));
+    if (!drawable) return;
     nodes.push(
       <CustomContentBand
         key={section.id}
         sectionId={section.id}
         content={content}
         themePreset={ctx.themePreset}
+        view={view}
+        basePath={ctx.basePath}
+        labels={ctx.contentLabels}
       />,
     );
     return;

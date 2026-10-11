@@ -2544,38 +2544,35 @@ function CustomFields({
   t: (key: CustomizerMessageKey) => string;
   onChange: (blocks: CustomBlock[]) => void;
 }) {
-  const add = (kind: CustomBlock["kind"]) => {
+  // V9c-1: this editor still edits the two original kinds. Any other kind already in the document (it can arrive through the API)
+  // is kept exactly where it is, never dropped by an edit here.
+  const add = (kind: "heading" | "paragraph") => {
     if (blocks.length >= MAX_CUSTOM_BLOCKS) return;
-    onChange([...blocks, { id: `block-${blocks.length + 1}`, kind, text: "" }]);
+    const taken = new Set(blocks.map((block) => block.id));
+    let n = blocks.length + 1;
+    while (taken.has(`block-${n}`)) n += 1;
+    onChange([...blocks, { id: `block-${n}`, kind, text: "" }]);
   };
+  const setText = (index: number, text: string) =>
+    onChange(blocks.map((row, i) => (i === index && (row.kind === "heading" || row.kind === "paragraph") ? { ...row, text } : row)));
   return (
     <div className="space-y-3">
-      {blocks.map((block, index) => (
-        <div key={block.id} className="space-y-2 border border-neutral-200 p-2">
-          <Field label={t("blockText")}>
-            {block.kind === "heading" ? (
-              <input
-                className={inputClass}
-                value={block.text}
-                onChange={(event) =>
-                  onChange(blocks.map((row, i) => (i === index ? { ...row, text: event.target.value } : row)))
-                }
-              />
-            ) : (
-              <textarea
-                className={`${inputClass} h-20 py-2`}
-                value={block.text}
-                onChange={(event) =>
-                  onChange(blocks.map((row, i) => (i === index ? { ...row, text: event.target.value } : row)))
-                }
-              />
-            )}
-          </Field>
-          <button type="button" className="text-xs text-neutral-500" onClick={() => onChange(blocks.filter((_, i) => i !== index))}>
-            {t("removeItem")}
-          </button>
-        </div>
-      ))}
+      {blocks.map((block, index) =>
+        block.kind === "heading" || block.kind === "paragraph" ? (
+          <div key={block.id} className="space-y-2 border border-neutral-200 p-2">
+            <Field label={t("blockText")}>
+              {block.kind === "heading" ? (
+                <input className={inputClass} value={block.text} onChange={(event) => setText(index, event.target.value)} />
+              ) : (
+                <textarea className={`${inputClass} h-20 py-2`} value={block.text} onChange={(event) => setText(index, event.target.value)} />
+              )}
+            </Field>
+            <button type="button" className="text-xs text-neutral-500" onClick={() => onChange(blocks.filter((_, i) => i !== index))}>
+              {t("removeItem")}
+            </button>
+          </div>
+        ) : null,
+      )}
       <div className="flex gap-3">
         <button type="button" disabled={blocks.length >= MAX_CUSTOM_BLOCKS} className="text-xs font-medium disabled:opacity-40" onClick={() => add("heading")}>
           + {t("addHeading")}
