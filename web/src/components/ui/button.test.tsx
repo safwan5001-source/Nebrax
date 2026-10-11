@@ -2,7 +2,7 @@
 import * as React from 'react';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { cleanup, render } from '@testing-library/react';
+import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 import { Button } from './button';
 
@@ -102,5 +102,31 @@ describe('danger button contrast', () => {
     document.documentElement.setAttribute('data-awj-ui', '3');
     const { getByRole } = render(<Button variant="danger">حذف</Button>);
     expect(getComputedStyle(getByRole('button')).color).toBe('var(--awj-text-inverse)');
+  });
+});
+
+describe('Button asChild', () => {
+  it('renders a navigational child as a semantic anchor without a nested button', () => {
+    render(
+      <Button asChild variant="outline">
+        <a href="/invoices">الفواتير</a>
+      </Button>
+    );
+
+    const link = screen.getByRole('link', { name: 'الفواتير' });
+    expect(link.tagName).toBe('A');
+    expect(link.getAttribute('href')).toBe('/invoices');
+    expect(link.querySelector('button')).toBeNull();
+  });
+
+  it('keeps the danger classes on an asChild anchor', () => {
+    render(
+      <Button asChild variant="danger">
+        <a href="/x">حذف</a>
+      </Button>
+    );
+    const link = screen.getByRole('link', { name: 'حذف' });
+    expect(link.className).toContain('bg-negative');
+    expect(link.className).toContain('text-white');
   });
 });

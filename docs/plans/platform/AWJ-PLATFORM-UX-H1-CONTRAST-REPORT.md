@@ -57,9 +57,18 @@ Headless Chromium, using the rules copied from `globals.css` plus the two utilit
 | Dark, `data-awj-ui="3"` | `rgb(14, 26, 49)` | not this slice's token remap |
 | Dark, gate off, opacity 0.9 | still `rgb(14, 16, 20)` | `--negative` still `rgb(248, 113, 113)` |
 
+## Recovery pass (Claude, 2026-10-11)
+
+- Branch `feat/awj-platform-ux-h1-contrast` (one Grok commit, `52618f2`) was merged into `claude/awj-h1-contrast-recovery-fx8unn` on top of current `origin/main` (`e0e5160`). The merge was clean; no stray changes were left by the stopped session.
+- Fix: the Grok commit replaced the existing `Button asChild` test. It is restored, with an added danger-on-asChild case. `button.test.tsx` now has 6 tests, all passing.
+- Verified: `button.tsx` is unchanged versus `main`. `--negative`, `--positive` and `--warning` are unchanged, so financial status colors are unchanged. The v3 rule (`globals.css` line ~1619) is still later and more specific.
+
 ## Build / lint / typecheck
 
-Not run as a separate local production build. CI `web build (Next.js)` is the build check.
+- Full `npm test` in `web/`: 483 files, 4982 tests, all passed.
+- `npm run build`: passed.
+- `tsc --noEmit`: 48 errors, all in unrelated test files (e.g. `SliderFields.test.tsx`). Count is identical with and without this change; none touch `button` or `globals.css`.
+- ESLint is not configured in the repo (interactive prompt), so lint was not run.
 
 ## CI
 
@@ -140,9 +149,9 @@ None that blocks this slice.
 
 ## Git state
 
-- Branch: `feat/awj-platform-ux-h1-contrast`
+- Branch: `claude/awj-h1-contrast-recovery-fx8unn` (includes `feat/awj-platform-ux-h1-contrast`)
 - PR: see the pull request opened from this branch
-- Base SHA: `31035783a36b3fbaf329b7c789c8af64e9097279`
+- Base SHA: `e0e5160a0d396cc46a035f9d225046a721a965d2` (`origin/main`)
 - Head SHA: the pull request head after push. This file is part of that commit.
 
 ## Recommended next dependency-ready task
