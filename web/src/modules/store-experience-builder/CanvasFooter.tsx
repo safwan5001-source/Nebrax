@@ -157,7 +157,7 @@ export function CanvasFooter(props: CanvasFooterProps) {
       <a
         href={footerWhatsapp}
         data-preview-chrome="whatsapp"
-        className="inline-flex min-h-11 items-center gap-2 text-store-footer-link underline-offset-2 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+        className="inline-flex min-h-11 items-center gap-2 text-store-footer-link underline-offset-2 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--store-footer-foreground)]"
         onClick={select("whatsapp")}
       >
         <OfficialSocialMark network="whatsapp" />
