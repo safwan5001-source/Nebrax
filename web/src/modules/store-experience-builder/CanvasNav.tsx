@@ -46,7 +46,7 @@ function Chip({ badge }: { badge: NavBadge }) {
   );
 }
 
-function Inner({ item }: { item: NavItem }) {
+export function Inner({ item }: { item: NavItem }) {
   return (
     <>
       {item.icon ? <StoreIcon name={item.icon} /> : null}
@@ -145,4 +145,40 @@ function CanvasDropdown({ item, kids }: { item: NavItem; kids: NavItem[] }) {
       </span>
     </span>
   );
+}
+
+export interface CanvasFooterGroup {
+  id: string;
+  title: string;
+  span: 1 | 2;
+  items: NavItem[];
+}
+
+/**
+ * CUST-HV V7e-3 — the footer's link groups as the Canvas draws them: the same rules as the storefront resolver, minus the
+ * live-catalogue checks the Canvas cannot make (a category / product target is drawn from its label). `null` ⇒ the footer has no
+ * `groups` (the fixed columns apply). A group without a title, or whose referenced menu / own links leave nothing to show
+ * (disabled, label-less, a content page the storefront does not serve), is absent.
+ */
+export function canvasFooterGroups(footer: {
+  groups?: Array<{ id: string; title: string; menu?: string; links?: NavItem[]; span?: 1 | 2 }>;
+}, menus: readonly NavMenu[]): CanvasFooterGroup[] | null {
+  if (!footer.groups) return null;
+  const shown = (item: NavItem) =>
+    item.enabled &&
+    item.label.trim() !== "" &&
+    (item.target.kind !== "content" || isServedContentSlug(item.target.slug));
+  const out: CanvasFooterGroup[] = [];
+  for (const group of footer.groups) {
+    const title = group.title.trim();
+    if (!title) continue;
+    const menu = group.menu ? menus.find((m) => m.id === group.menu) : undefined;
+    const items = (menu ? menu.items : (group.links ?? [])).filter(shown).map((item) => {
+      const { children: _children, presentation: _presentation, ...flat } = item;
+      return flat as NavItem;
+    });
+    if (items.length === 0) continue;
+    out.push({ id: group.id, title, span: group.span ?? 1, items });
+  }
+  return out;
 }
