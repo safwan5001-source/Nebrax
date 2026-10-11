@@ -27,7 +27,8 @@ const bundle = esbuild.buildSync({
   loader: { ".json": "json" },
 }).outputFiles[0].text;
 const dir = resolve(process.argv[2]);
-const strip = process.argv.includes("--strip") || process.argv.includes("--physical");
+const strip = ["--strip", "--physical", "--noflip"].some((f) => process.argv.includes(f));
+const noflip = process.argv.includes("--noflip");
 const physical = process.argv.includes("--physical");
 let css = readFileSync(join(dir, "storefront.css"), "utf8");
 if (strip) {
@@ -35,7 +36,8 @@ if (strip) {
   // --strip: the panel loses `position:absolute` (it must then push the header taller); --physical: `start-0` becomes a PHYSICAL `left: 0`
   // (the alignment check must then fail under RTL).
   parsed.walkRules((r) => {
-    if (physical) { if (/^\.start-0$/.test(r.selector)) r.walkDecls("inset-inline-start", (d) => { d.prop = "left"; }); }
+    if (noflip) { if (/^\.end-0$/.test(r.selector)) r.remove(); }
+    else if (physical) { if (/^\.start-0$/.test(r.selector)) r.walkDecls("inset-inline-start", (d) => { d.prop = "left"; }); }
     else if (/^\.absolute$/.test(r.selector)) r.remove();
   });
   css = parsed.toString();
@@ -52,11 +54,12 @@ const lum = ([r, g, b]) => 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
 const ratio = (a, b) => { const [hi, lo] = lum(a) > lum(b) ? [a, b] : [b, a]; return (lum(hi) + 0.05) / (lum(lo) + 0.05); };
 const rgb = (s) => (s.match(/[\d.]+/g) ?? []).slice(0, 3).map(Number);
 
-for (const dirName of ["ltr", "rtl"]) {
+const flips = {}; // page.dir -> number of viewports where the panel flipped
+for (const pageName of ["nav", "navlast"]) for (const dirName of ["ltr", "rtl"]) {
   const rtl = dirName === "rtl";
-  const html = readFileSync(join(dir, "pages", `nav.${dirName}.html`), "utf8").replace(/<style>[\s\S]*?<\/style>/, `<style>${css}</style>`);
+  const html = readFileSync(join(dir, "pages", `${pageName}.${dirName}.html`), "utf8").replace(/<style>[\s\S]*?<\/style>/, `<style>${css}</style>`);
   for (const [w, h] of viewports) {
-    const tag = `nav.${dirName}@${w}`;
+    const tag = `${pageName}.${dirName}@${w}`;
     const ctx = await browser.newContext({ viewport: { width: w, height: h } });
     const page = await ctx.newPage();
     await page.setContent(html, { waitUntil: "load" });
@@ -106,22 +109,27 @@ for (const dirName of ["ltr", "rtl"]) {
           expanded: dd.querySelector("button").getAttribute("aria-expanded"), controls: dd.querySelector("button").getAttribute("aria-controls") === panel.id,
           focusFirst: document.activeElement === first, hit: panel.contains(hit), pl: pb.left, pr: pb.right, dl: db.left, dr: db.right, vw: document.documentElement.clientWidth,
           pt: pb.top, headerBottom: b(document.querySelector("header")).bottom, headerH: b(document.querySelector("header")).height,
-          rel: kids[2].getAttribute("rel"), target: kids[2].getAttribute("target"), w: pb.width,
-          outline: (() => { first.focus(); const s = getComputedStyle(first); return s.backgroundColor; })(),
+          n: kids.length, rel: kids.find((k) => k.getAttribute("target") === "_blank")?.getAttribute("rel"), target: kids.find((k) => k.getAttribute("target") === "_blank")?.getAttribute("target"), w: pb.width,
+          flipped: dd.hasAttribute("data-flip"), outline: (() => { first.focus(); const s = getComputedStyle(first); return s.backgroundColor; })(),
         };
       });
       ok(st.expanded === "true" && st.controls, `${tag} ArrowDown did not open (aria ${st.expanded}/${st.controls})`);
       ok(st.focusFirst, `${tag} first child not focused`);
       ok(st.hit, `${tag} panel does not paint over the page (hit-test failed)`);
       ok(st.pl >= -0.5 && st.pr <= st.vw + 0.5, `${tag} panel leaves the viewport (${st.pl}..${st.pr} of ${st.vw})`);
-      ok(rtl ? near(st.pr, st.dr, 1.5) : near(st.pl, st.dl, 1.5), `${tag} panel not aligned to the parent's inline-start edge (${rtl ? `panel.r ${st.pr} vs ${st.dr}` : `panel.l ${st.pl} vs ${st.dl}`})`);
+      // default: the parent's inline-start edge; flipped (only when that would leave the viewport): its inline-end edge
+      const startAligned = rtl ? near(st.pr, st.dr, 1.5) : near(st.pl, st.dl, 1.5);
+      const endAligned = rtl ? near(st.pl, st.dl, 1.5) : near(st.pr, st.dr, 1.5);
+      if (st.flipped) flips[`${pageName}.${dirName}`] = (flips[`${pageName}.${dirName}`] ?? 0) + 1;
+      ok(st.flipped ? endAligned : startAligned, `${tag} panel ${st.flipped ? "(flipped) not aligned to the inline-end" : "not aligned to the inline-start"} edge of its parent (panel ${st.pl}..${st.pr}, parent ${st.dl}..${st.dr})`);
+      if (!st.flipped) ok(rtl ? st.pl >= 8 - 0.5 : st.pr <= st.vw - 8 + 0.5, `${tag} an unflipped panel is within 8px of the viewport edge (${st.pl}..${st.pr} of ${st.vw})`);
       ok(near(st.headerH, info.headerH, 0.5), `${tag} opening the panel changed the header height (${info.headerH} -> ${st.headerH})`);
       ok(st.rel === "noopener noreferrer" && st.target === "_blank", `${tag} new-tab child rel/target ${st.rel}/${st.target}`);
       ok(st.outline !== "rgba(0, 0, 0, 0)", `${tag} focused child shows no focus background`);
       // roving
       const active = () => page.evaluate(() => document.activeElement?.textContent?.trim().slice(0, 12));
       await page.keyboard.press("ArrowDown"); const second = await active();
-      await page.keyboard.press("ArrowDown"); await page.keyboard.press("ArrowDown"); const wrapped = await active();
+      for (let i = 1; i < st.n; i++) await page.keyboard.press("ArrowDown"); const wrapped = await active(); // N presses from the first child wrap to it
       await page.keyboard.press("End"); const end = await active();
       await page.keyboard.press("Home"); const home = await active();
       ok(second !== wrapped, `${tag} arrows did not rove`); ok(wrapped === home, `${tag} ArrowDown did not wrap to the first child`);
@@ -164,7 +172,7 @@ for (const dirName of ["ltr", "rtl"]) {
         const b = (e) => e.getBoundingClientRect();
         return { exp: group.querySelector("button").getAttribute("aria-expanded"), n: kids.length, vis: kids.every((k) => k.getClientRects().length > 0), pl: b(parent).left, pr: b(parent).right, kl: Math.min(...kids.map((k) => b(k).left)), kr: Math.max(...kids.map((k) => b(k).right)), vw: document.documentElement.clientWidth, minH: Math.min(...kids.map((k) => b(k).height)) };
       });
-      ok(o.exp === "true" && o.n === 3 && o.vis, `${tag} accordion did not open (${o.exp}, ${o.n}, ${o.vis})`);
+      ok(o.exp === "true" && o.n === (pageName === "navlast" ? 4 : 3) && o.vis, `${tag} accordion did not open (${o.exp}, ${o.n}, ${o.vis})`);
       ok(rtl ? o.kr < o.pr - 4 : o.kl > o.pl + 4, `${tag} children not indented on the logical start side`);
       ok(o.kl >= -0.5 && o.kr <= o.vw + 0.5, `${tag} children leave the viewport`);
       ok(o.minH >= 40, `${tag} child row only ${o.minH}px tall`);
@@ -176,6 +184,8 @@ for (const dirName of ["ltr", "rtl"]) {
   }
 }
 await browser.close();
-console.log(`${strip ? (physical ? "PHYSICAL (negative control)" : "STRIPPED (negative control)") : "production"}: 2 pages x ${viewports.length} viewports, ${checks} checks, ${violations.length} violations`);
+// the long-label page must actually exercise the flip somewhere in each direction (otherwise the rule is unproven)
+if (!strip) for (const dirName of ["ltr", "rtl"]) ok((flips[`navlast.${dirName}`] ?? 0) > 0, `navlast.${dirName}: the panel never flipped at any viewport — the flip rule is unproven`);
+console.log(`${strip ? (physical ? "PHYSICAL (negative control)" : noflip ? "NOFLIP (negative control)" : "STRIPPED (negative control)") : "production"}: 4 pages x ${viewports.length} viewports, ${checks} checks, ${violations.length} violations`);
 for (const v of violations.slice(0, 80)) console.log("  ✗", v);
 process.exit(strip ? (violations.length > 0 ? 0 : 1) : violations.length > 0 ? 1 : 0);

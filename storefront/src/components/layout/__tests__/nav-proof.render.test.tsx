@@ -157,6 +157,7 @@ const ITEMS = [
   },
 ];
 const AR_LABELS: Record<string, string> = {
+  k4: "LONG",
   offers: "العروض",
   shop: "المتجر",
   privacy: "الخصوصية",
@@ -171,60 +172,93 @@ describe("navigation proof", () => {
     async () => {
       mkdirSync(join(DIR, "pages"), { recursive: true });
       const css = readFileSync(join(DIR, "storefront.css"), "utf8");
-      for (const dir of ["ltr", "rtl"] as const) {
-        const items = ITEMS.map((item) => ({
-          ...item,
-          label: dir === "rtl" ? AR_LABELS[item.id] : item.label,
-          children: item.children.map((c) => ({
-            ...c,
-            label: dir === "rtl" ? AR_LABELS[c.id] : c.label,
-          })),
-        }));
-        const presentation = normalizePresentationConfig({});
-        const header = await Header({
-          basePath: "/sa/en",
-          locale: dir === "rtl" ? "ar" : "en",
-          storeName: "Daisy Shop Flowers",
-          compact: headerIsCompact(presentation.header),
-          design: presentation.header.design,
-          extraLinks: items as never,
-          mobileNavigation: (
-            <button
-              type="button"
-              data-menu=""
-              className="inline-flex"
-              style={{ width: "2.5rem", height: "2.5rem" }}
+      const LONG_EN =
+        "Our complete collection of hand-tied seasonal bouquets and arrangements";
+      const LONG_AR =
+        "مجموعتنا الكاملة من باقات الورد الموسمية المنسقة يدوياً وتنسيقات الهدايا";
+      const SHOP = ITEMS[1] as (typeof ITEMS)[number];
+      for (const page of ["nav", "navlast"] as const)
+        for (const dir of ["ltr", "rtl"] as const) {
+          // `navlast`: the dropdown is the LAST item and carries a very long child, so its default alignment cannot fit
+          const source =
+            page === "nav"
+              ? ITEMS
+              : [
+                  ITEMS[0] as (typeof ITEMS)[number],
+                  ITEMS[2] as (typeof ITEMS)[number],
+                  {
+                    ...SHOP,
+                    children: [
+                      {
+                        id: "k4",
+                        label: "LONG",
+                        href: "/sa/en/c/long",
+                        newTab: false,
+                      },
+                      ...SHOP.children,
+                    ],
+                  },
+                ];
+          const items = source.map((item) => ({
+            ...item,
+            label: dir === "rtl" ? AR_LABELS[item.id] : item.label,
+            children: item.children.map((c) => ({
+              ...c,
+              label:
+                c.id === "k4"
+                  ? dir === "rtl"
+                    ? LONG_AR
+                    : LONG_EN
+                  : dir === "rtl"
+                    ? AR_LABELS[c.id]
+                    : c.label,
+            })),
+          }));
+          const presentation = normalizePresentationConfig({});
+          const header = await Header({
+            basePath: "/sa/en",
+            locale: dir === "rtl" ? "ar" : "en",
+            storeName: "Daisy Shop Flowers",
+            compact: headerIsCompact(presentation.header),
+            design: presentation.header.design,
+            extraLinks: items as never,
+            mobileNavigation: (
+              <button
+                type="button"
+                data-menu=""
+                className="inline-flex"
+                style={{ width: "2.5rem", height: "2.5rem" }}
+              >
+                menu
+              </button>
+            ),
+            categoryNavigation: null,
+          });
+          const attrs = publishedThemeAttrs(presentation) ?? {};
+          const style = publishedThemeStyle(presentation) ?? {};
+          const wrapper = renderToStaticMarkup(
+            <div
+              data-published-theme=""
+              {...attrs}
+              className="flex min-h-screen flex-1 flex-col"
+              style={style}
             >
-              menu
-            </button>
-          ),
-          categoryNavigation: null,
-        });
-        const attrs = publishedThemeAttrs(presentation) ?? {};
-        const style = publishedThemeStyle(presentation) ?? {};
-        const wrapper = renderToStaticMarkup(
-          <div
-            data-published-theme=""
-            {...attrs}
-            className="flex min-h-screen flex-1 flex-col"
-            style={style}
-          >
-            {header}
-            <main id="main-content" className="flex-1">
-              <div style={{ height: "600px", padding: "1rem" }}>
-                page content under the dropdown
-              </div>
-              <div
-                data-mobile-mount=""
-                data-items={JSON.stringify(items)}
-                style={{ maxWidth: "430px" }}
-              />
-            </main>
-          </div>,
-        );
-        const html = `<!doctype html><html lang="${dir === "rtl" ? "ar" : "en"}" dir="${dir}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}</style><style>:root{--store-primary:#12372a;--store-primary-foreground:#ffffff;--store-accent:#ffd166;--store-accent-foreground:#111827;--store-foreground:#111827;--store-muted-foreground:#4b5563;--store-border:#d1d5db;--store-surface:#ffffff;--store-surface-muted:#f3f4f6;--store-radius:14px}body{background:#f8f9fa;margin:0;font-family:system-ui,sans-serif}</style></head><body>${wrapper}</body></html>`;
-        writeFileSync(join(DIR, "pages", `nav.${dir}.html`), html);
-      }
+              {header}
+              <main id="main-content" className="flex-1">
+                <div style={{ height: "600px", padding: "1rem" }}>
+                  page content under the dropdown
+                </div>
+                <div
+                  data-mobile-mount=""
+                  data-items={JSON.stringify(items)}
+                  style={{ maxWidth: "430px" }}
+                />
+              </main>
+            </div>,
+          );
+          const html = `<!doctype html><html lang="${dir === "rtl" ? "ar" : "en"}" dir="${dir}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}</style><style>:root{--store-primary:#12372a;--store-primary-foreground:#ffffff;--store-accent:#ffd166;--store-accent-foreground:#111827;--store-foreground:#111827;--store-muted-foreground:#4b5563;--store-border:#d1d5db;--store-surface:#ffffff;--store-surface-muted:#f3f4f6;--store-radius:14px}body{background:#f8f9fa;margin:0;font-family:system-ui,sans-serif}</style></head><body>${wrapper}</body></html>`;
+          writeFileSync(join(DIR, "pages", `${page}.${dir}.html`), html);
+        }
       expect(true).toBe(true);
     },
   );
