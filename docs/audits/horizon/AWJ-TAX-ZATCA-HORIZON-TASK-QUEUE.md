@@ -56,3 +56,7 @@ Other independent tasks REM-07, REM-20, REM-37, REM-38 and tier dependencies sta
 
 ## Selection policy
 Select the smallest highest-risk *dependency-ready and activated* task after verifying the live repo. Never infer `done` from historical audit or test green alone. Remediation tasks remain candidates until explicitly authorized under the active Horizon. Stop for merge approval and material decisions.
+
+
+## TAX-HZ-00 research deliverables (owner-approved)
+The read-only Evidence Pass includes **deep primary-source review** of current ZATCA/Fatoora official specifications, applicable Saudi VAT regulations and the official offline validator, plus grounded UX benchmarking of suitable accounting/ERP systems. Deliver an external-evidence register and an observed-UX comparison with direct citations, version/date checks, actionable design proposals and open decision packets. No competitor pattern may become an unreviewed financial or ZATCA rule. These deliverables are part of TAX-HZ-00 acceptance, not a licence to start product implementation.
