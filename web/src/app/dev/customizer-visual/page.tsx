@@ -33,7 +33,8 @@ type Scenario =
   | "heroes"
   | "overlay"
   | "navigation"
-  | "footer";
+  | "footer"
+  | "slider";
 type PreviewViewport = "mobile" | "tablet" | "desktop";
 
 function scenarioOf(value: string | null): Scenario {
@@ -48,7 +49,8 @@ function scenarioOf(value: string | null): Scenario {
     value === "heroes" ||
     value === "overlay" ||
     value === "navigation" ||
-    value === "footer"
+    value === "footer" ||
+    value === "slider"
   ) {
     return value;
   }
@@ -206,6 +208,40 @@ function configFor(locale: "ar" | "en", scenario: Scenario, footerLayout: string
               { id: "n4", label: ar ? "من نحن" : "About us", target: { kind: "content", slug: "about" } },
             ],
           },
+        ],
+      },
+    });
+  }
+  if (scenario === "slider") {
+    // CUST-HV V8c — a slider above the catalogue. The e2e specs mock the media endpoints: picture A is dark with proven bounds, picture B has
+    // none (so its slide draws the brand surface), picture C is a light one (the copy turns dark).
+    const ar = locale === "ar";
+    const slide = (id: string, mediaId: string, heading: string, sub: string, label: string, extra: Record<string, unknown> = {}) => ({
+      id,
+      media: { mediaId, decorative: true },
+      heading,
+      sub,
+      cta: { label, href: "/collections/new" },
+      ...extra,
+    });
+    return normalizePresentationConfig({
+      ...configFor(locale, "populated"),
+      homepage: {
+        ...configFor(locale, "populated").homepage,
+        sections: [
+          {
+            id: "sl",
+            type: "slider",
+            visible: true,
+            content: {
+              slides: [
+                slide("s1", "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e", ar ? "الربيع في أبهى صوره" : "Spring in bloom", ar ? "ورود طازجة تصل إلى بابك كل صباح." : "Fresh flowers, delivered every morning.", ar ? "تسوّق الربيع" : "Shop spring"),
+                slide("s2", "1c9a7d3f-4e4b-4b64-8d8f-9a2b3c4d5e6f", ar ? "شريحة بلا إثبات" : "A slide with no proof", ar ? "صورتها بلا بيانات تباين." : "Its picture has no contrast evidence.", ar ? "اطلب الآن" : "Order now", { align: "center" }),
+                slide("s3", "2d0b8e4a-5f5c-4c75-9e9a-ab3c4d5e6f70", ar ? "هدايا تدوم" : "Gifts that last", ar ? "صناديق ونباتات لكل مناسبة." : "Boxes and plants for every occasion.", ar ? "شاهد الهدايا" : "See gifts", { align: "end" }),
+              ],
+            },
+          },
+          ...configFor(locale, "populated").homepage.sections.filter((section) => section.type !== "hero"),
         ],
       },
     });

@@ -46,6 +46,16 @@ describe("backgroundPictureRefs", () => {
   });
 });
 
+describe("backgroundPictureRefs — slider slides (CUST-HV V8c)", () => {
+  const ref = (n: string) => ({ mediaId: `0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d${n}` });
+  it("collects every visible slider slide's picture and phone picture, and ignores a hidden slider", () => {
+    const content = { slides: [{ id: "a", media: ref("01"), mobile: ref("02") }, { id: "b", media: ref("03") }] };
+    expect(backgroundPictureRefs([{ visible: true, type: "slider", content }])).toEqual([ref("01"), ref("02"), ref("03")]);
+    expect(backgroundPictureRefs([{ visible: false, type: "slider", content }])).toEqual([]);
+    expect(backgroundPictureRefs([{ visible: true, type: "banner", content }])).toEqual([]);
+  });
+});
+
 describe("useBackgroundMediaBounds (CUST-HV V6b-4a)", () => {
   it("reads each picture's bounds once and exposes them; unknown refs are unproven", async () => {
     status.mockResolvedValue(usage({ contrast: { min: [1, 2, 3], max: [4, 5, 6] } }));

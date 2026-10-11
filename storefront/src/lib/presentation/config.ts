@@ -26,8 +26,10 @@ import {
   type HeaderStyleId,
   HOME_BUILDER_SECTION_KEYS,
   HOME_DATA_SECTION_KEYS,
+  HOME_MEDIA_SECTION_KEYS,
   type HomeBuilderSectionKey,
   type HomeDataSectionKey,
+  type HomeMediaSectionKey,
   isSafeHexColor,
   PRESENTATION_CONFIG_VERSION,
   PRODUCT_CARD_PRESETS,
@@ -71,7 +73,7 @@ export interface PresentationNavLink {
  */
 export interface PresentationHomeSection {
   id: string;
-  type: HomeBuilderSectionKey | HomeDataSectionKey;
+  type: HomeBuilderSectionKey | HomeDataSectionKey | HomeMediaSectionKey;
   visible: boolean;
   /** Present only when this instance has non-empty authored content. */
   content?: SectionContent;
@@ -376,7 +378,8 @@ function resolveHomeBuilderSections(
     }
     if (
       !(HOME_BUILDER_SECTION_KEYS as readonly string[]).includes(type) &&
-      !(HOME_DATA_SECTION_KEYS as readonly string[]).includes(type)
+      !(HOME_DATA_SECTION_KEYS as readonly string[]).includes(type) &&
+      !(HOME_MEDIA_SECTION_KEYS as readonly string[]).includes(type)
     ) {
       continue;
     }
@@ -392,7 +395,10 @@ function resolveHomeBuilderSections(
     seenTypes.add(type);
     const section: PresentationHomeSection = {
       id,
-      type: type as HomeBuilderSectionKey | HomeDataSectionKey,
+      type: type as
+        | HomeBuilderSectionKey
+        | HomeDataSectionKey
+        | HomeMediaSectionKey,
       visible: asBoolean(entry.visible, false),
     };
     const content = normalizeOptionalSectionContent(type, entry.content);

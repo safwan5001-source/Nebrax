@@ -156,7 +156,17 @@
     "earliestDelivery": "Earliest delivery",
     "deliveryToday": "Today",
     "deliveryTomorrow": "Tomorrow",
-    "deliveryAt": "{day}, {window}"
+    "deliveryAt": "{day}, {window}",
+    "slider": {
+      "label": "Featured slides",
+      "slide": "{current} of {total}",
+      "previous": "Previous slide",
+      "next": "Next slide",
+      "goTo": "Go to slide {number}",
+      "pause": "Pause slides",
+      "play": "Play slides",
+      "choose": "Choose a slide"
+    }
   },
   "cart": {
     "cart": "Cart",

@@ -126,6 +126,10 @@ final class StorefrontSectionDesignNormalizer
             'hero' => $heroOnly,
             'banner' => $banner,
             'categories' => ['background' => self::BACKGROUND_KINDS, 'text' => ['heading'], 'typography' => ['headingStyle'], 'width' => true, 'spacing' => true, 'border' => true, 'radius' => true, 'separator' => true],
+            // CUST-HV V8a (V0 §3.4) — الشرائح: خلفية القسم (صلبة/تدرّج) والعرض والتباعد والحدّ والاستدارة والظل والفاصل
+            // وارتفاعٌ مُعدّ مسبقاً. لا مجموعة `text`: ألوان النص **لكل شريحة** (محتوى الشريحة) لأنها تقع فوق صورتها. ولا `layout`
+            // (`split` يضع النص على سطح القسم لا الصورة — إثبات تباينه شريحةٌ لاحقة). الحركة (`transition`) سلوكٌ في المحتوى.
+            'slider' => ['background' => self::BACKGROUND_KINDS, 'width' => true, 'spacing' => true, 'border' => true, 'radius' => true, 'shadow' => true, 'separator' => true, 'mediaTreatment' => ['height']],
             'newArrivals' => $shelf,
             'featured' => $shelf,
             'offers' => $shelf,
@@ -341,7 +345,7 @@ final class StorefrontSectionDesignNormalizer
     }
 
     /** @return array<string,mixed>|null */
-    private static function backgroundRef(mixed $raw): ?array
+    public static function backgroundRef(mixed $raw): ?array
     {
         $ref = StorefrontMediaRefNormalizer::normalize($raw);
         if ($ref === null) {
@@ -354,7 +358,7 @@ final class StorefrontSectionDesignNormalizer
     }
 
     /** @return array{color:array<string,string>,alpha:int}|null */
-    private static function overlay(mixed $raw): ?array
+    public static function overlay(mixed $raw): ?array
     {
         if (! self::isObject($raw)) {
             return null;

@@ -49,6 +49,7 @@ final class StorefrontPresentationPublishValidator
             + $this->bannerWindowErrors($normalized['homepage']['sections'] ?? null)
             + SectionDesignContrast::errors($normalized, $this->mediaBounds())
             + CtaColourContrast::errors($normalized, $this->mediaBounds())
+            + SliderPublishRules::errors($normalized, $this->mediaBounds())
             + ButtonTokensContrast::errors($normalized)
             + HeaderDesignContrast::errors($normalized)
             + FooterDesignContrast::errors($normalized)

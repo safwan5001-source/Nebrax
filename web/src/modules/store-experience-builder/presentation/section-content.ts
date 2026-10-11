@@ -1,4 +1,5 @@
 import { normalizeWindowEdges } from "./announcements";
+import { type SliderContent, normalizeSliderContent } from "./slider-content";
 import { sanitizeExternalUrl } from "./urls";
 
 /**
@@ -172,7 +173,8 @@ export type SectionContent =
   | OffersContent
   | ProductShelfContent
   | DiscoveryContent
-  | DeliveryPromiseContent;
+  | DeliveryPromiseContent
+  | SliderContent;
 
 /** The hero instance's own content, or `undefined` while it still reads the legacy globals. */
 export function heroContentOf(section: {
@@ -284,6 +286,18 @@ export function discoveryContentOf(section: {
     : { title: "", axis: "facet", dimension: "", display: "tiles" };
 }
 
+/** CUST-HV V8a — the slider instance's slides and behaviour (an empty slide list while none is authored). */
+export function sliderContentOf(section: {
+  type: string;
+  content?: SectionContent;
+}): SliderContent {
+  return section.type === "slider" &&
+    section.content &&
+    "slides" in section.content
+    ? section.content
+    : { slides: [] };
+}
+
 export function deliveryPromiseContentOf(section: {
   type: string;
   content?: SectionContent;
@@ -335,6 +349,9 @@ export function normalizeOptionalSectionContent(
   }
   if (type === "deliveryPromise") {
     return normalizeDeliveryPromise(source);
+  }
+  if (type === "slider") {
+    return normalizeSliderContent(raw, sanitizeContentHref);
   }
   return undefined;
 }

@@ -1,0 +1,3009 @@
+{
+  "_note": "CUST-HV V8a — slider content + publish rules. `content`: normalizer cases (PHP StorefrontSliderNormalizer ↔ both TS twins; key order is part of the contract). `publish`: SliderPublishRules / sliderPublishIssues; `media` maps mediaId → encoded-channel bounds {min,max} (already widened by the encoding margin) or null; an id missing from the map has no evidence. `expected` lists {path, code} in report order, paths relative to the section content.",
+  "content": [
+    {
+      "name": "absent",
+      "input": null,
+      "expected": null
+    },
+    {
+      "name": "not an object",
+      "input": "slider",
+      "expected": null
+    },
+    {
+      "name": "a list is not an object",
+      "input": [
+        [
+          "slides"
+        ]
+      ],
+      "expected": null
+    },
+    {
+      "name": "empty object",
+      "input": [],
+      "expected": null
+    },
+    {
+      "name": "empty slides",
+      "input": {
+        "slides": []
+      },
+      "expected": null
+    },
+    {
+      "name": "slides not a list",
+      "input": {
+        "slides": "x"
+      },
+      "expected": null
+    },
+    {
+      "name": "a slide without a media reference drops whole",
+      "input": {
+        "slides": [
+          {
+            "heading": "Hi"
+          }
+        ]
+      },
+      "expected": null
+    },
+    {
+      "name": "a slide with an invalid media id drops whole",
+      "input": {
+        "slides": [
+          {
+            "media": {
+              "mediaId": "nope"
+            }
+          }
+        ]
+      },
+      "expected": null
+    },
+    {
+      "name": "a url instead of a media reference never survives",
+      "input": {
+        "slides": [
+          {
+            "media": {
+              "url": "https://evil.example/a.jpg"
+            }
+          }
+        ]
+      },
+      "expected": null
+    },
+    {
+      "name": "minimal slide gets a positional id",
+      "input": {
+        "slides": [
+          {
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            }
+          }
+        ]
+      },
+      "expected": {
+        "slides": [
+          {
+            "id": "slide-0",
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "full slide keeps canonical key order",
+      "input": {
+        "slides": [
+          {
+            "align": "center",
+            "text": {
+              "role": "surface"
+            },
+            "overlay": {
+              "color": {
+                "role": "overlay"
+              },
+              "alpha": 40
+            },
+            "cta": {
+              "href": "/c/roses",
+              "label": "Shop"
+            },
+            "sub": "Fresh daily",
+            "heading": "Spring",
+            "mobile": {
+              "mediaId": "1c9a7d3f-4e4b-4b64-8d8f-9a2b3c4d5e6f"
+            },
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+              "alt": {
+                "ar": "ورد",
+                "en": "Roses"
+              }
+            },
+            "id": "s-one"
+          }
+        ]
+      },
+      "expected": {
+        "slides": [
+          {
+            "id": "s-one",
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+              "alt": {
+                "ar": "ورد",
+                "en": "Roses"
+              }
+            },
+            "mobile": {
+              "mediaId": "1c9a7d3f-4e4b-4b64-8d8f-9a2b3c4d5e6f",
+              "decorative": true
+            },
+            "heading": "Spring",
+            "sub": "Fresh daily",
+            "cta": {
+              "label": "Shop",
+              "href": "/c/roses"
+            },
+            "overlay": {
+              "color": {
+                "role": "overlay"
+              },
+              "alpha": 40
+            },
+            "text": {
+              "role": "surface"
+            },
+            "align": "center"
+          }
+        ]
+      }
+    },
+    {
+      "name": "fit contain is dropped from the slide picture",
+      "input": {
+        "slides": [
+          {
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+              "fit": "contain"
+            }
+          }
+        ]
+      },
+      "expected": {
+        "slides": [
+          {
+            "id": "slide-0",
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "slide picture keeps alt and decorative",
+      "input": {
+        "slides": [
+          {
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+              "alt": {
+                "ar": "أ",
+                "en": "a"
+              }
+            }
+          },
+          {
+            "id": "b",
+            "media": {
+              "mediaId": "1c9a7d3f-4e4b-4b64-8d8f-9a2b3c4d5e6f",
+              "decorative": true
+            }
+          }
+        ]
+      },
+      "expected": {
+        "slides": [
+          {
+            "id": "slide-0",
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+              "alt": {
+                "ar": "أ",
+                "en": "a"
+              }
+            }
+          },
+          {
+            "id": "b",
+            "media": {
+              "mediaId": "1c9a7d3f-4e4b-4b64-8d8f-9a2b3c4d5e6f",
+              "decorative": true
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "mobile shares the slide alt: stored decorative without alt or fit",
+      "input": {
+        "slides": [
+          {
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            },
+            "mobile": {
+              "mediaId": "1c9a7d3f-4e4b-4b64-8d8f-9a2b3c4d5e6f",
+              "alt": {
+                "en": "x"
+              },
+              "fit": "contain",
+              "decorative": false
+            }
+          }
+        ]
+      },
+      "expected": {
+        "slides": [
+          {
+            "id": "slide-0",
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            },
+            "mobile": {
+              "mediaId": "1c9a7d3f-4e4b-4b64-8d8f-9a2b3c4d5e6f",
+              "decorative": true
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "an invalid mobile drops alone",
+      "input": {
+        "slides": [
+          {
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            },
+            "mobile": {
+              "mediaId": "bad"
+            },
+            "heading": "Keep"
+          }
+        ]
+      },
+      "expected": {
+        "slides": [
+          {
+            "id": "slide-0",
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            },
+            "heading": "Keep"
+          }
+        ]
+      }
+    },
+    {
+      "name": "focal crop rotate survive on the picture",
+      "input": {
+        "slides": [
+          {
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+              "focal": {
+                "x": 20,
+                "y": 80
+              },
+              "rotate": 90
+            }
+          }
+        ]
+      },
+      "expected": {
+        "slides": [
+          {
+            "id": "slide-0",
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+              "focal": {
+                "x": 20,
+                "y": 80
+              },
+              "rotate": 90
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "extra keys on the slide and picture never survive",
+      "input": {
+        "slides": [
+          {
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+              "url": "https://x/y.jpg",
+              "style": "x"
+            },
+            "style": "color:red",
+            "href": "https://x"
+          }
+        ]
+      },
+      "expected": {
+        "slides": [
+          {
+            "id": "slide-0",
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "whitespace-only text is absence",
+      "input": {
+        "slides": [
+          {
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            },
+            "heading": "   ",
+            "sub": "\n\t"
+          }
+        ]
+      },
+      "expected": {
+        "slides": [
+          {
+            "id": "slide-0",
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "text is kept as written",
+      "input": {
+        "slides": [
+          {
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            },
+            "heading": "  Spring sale ",
+            "sub": " two  words "
+          }
+        ]
+      },
+      "expected": {
+        "slides": [
+          {
+            "id": "slide-0",
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            },
+            "heading": "  Spring sale ",
+            "sub": " two  words "
+          }
+        ]
+      }
+    },
+    {
+      "name": "heading truncated to 120 code points",
+      "input": {
+        "slides": [
+          {
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            },
+            "heading": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        ]
+      },
+      "expected": {
+        "slides": [
+          {
+            "id": "slide-0",
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            },
+            "heading": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        ]
+      }
+    },
+    {
+      "name": "sub truncated to 200 code points",
+      "input": {
+        "slides": [
+          {
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            },
+            "sub": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          }
+        ]
+      },
+      "expected": {
+        "slides": [
+          {
+            "id": "slide-0",
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            },
+            "sub": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          }
+        ]
+      }
+    },
+    {
+      "name": "astral code points count once",
+      "input": {
+        "slides": [
+          {
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            },
+            "heading": "😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀"
+          }
+        ]
+      },
+      "expected": {
+        "slides": [
+          {
+            "id": "slide-0",
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            },
+            "heading": "😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀"
+          }
+        ]
+      }
+    },
+    {
+      "name": "button with label and internal link",
+      "input": {
+        "slides": [
+          {
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            },
+            "cta": {
+              "label": "Shop",
+              "href": "/c/roses"
+            }
+          }
+        ]
+      },
+      "expected": {
+        "slides": [
+          {
+            "id": "slide-0",
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            },
+            "cta": {
+              "label": "Shop",
+              "href": "/c/roses"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "button with label and https link",
+      "input": {
+        "slides": [
+          {
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            },
+            "cta": {
+              "label": "Go",
+              "href": "https://example.com/p"
+            }
+          }
+        ]
+      },
+      "expected": {
+        "slides": [
+          {
+            "id": "slide-0",
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            },
+            "cta": {
+              "label": "Go",
+              "href": "https://example.com/p"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "button draft with a label only is kept",
+      "input": {
+        "slides": [
+          {
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            },
+            "cta": {
+              "label": "Shop"
+            }
+          }
+        ]
+      },
+      "expected": {
+        "slides": [
+          {
+            "id": "slide-0",
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            },
+            "cta": {
+              "label": "Shop",
+              "href": ""
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "button draft with a link only is kept",
+      "input": {
+        "slides": [
+          {
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            },
+            "cta": {
+              "href": "/c/roses"
+            }
+          }
+        ]
+      },
+      "expected": {
+        "slides": [
+          {
+            "id": "slide-0",
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            },
+            "cta": {
+              "label": "",
+              "href": "/c/roses"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "button with an unsafe link and no label drops",
+      "input": {
+        "slides": [
+          {
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            },
+            "cta": {
+              "label": "",
+              "href": "javascript:alert(1)"
+            }
+          }
+        ]
+      },
+      "expected": {
+        "slides": [
+          {
+            "id": "slide-0",
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "button with an unsafe link keeps the label",
+      "input": {
+        "slides": [
+          {
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            },
+            "cta": {
+              "label": "Go",
+              "href": "javascript:alert(1)"
+            }
+          }
+        ]
+      },
+      "expected": {
+        "slides": [
+          {
+            "id": "slide-0",
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            },
+            "cta": {
+              "label": "Go",
+              "href": ""
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "button protocol-relative link is refused",
+      "input": {
+        "slides": [
+          {
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            },
+            "cta": {
+              "label": "Go",
+              "href": "//evil.example"
+            }
+          }
+        ]
+      },
+      "expected": {
+        "slides": [
+          {
+            "id": "slide-0",
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            },
+            "cta": {
+              "label": "Go",
+              "href": ""
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "button http link is refused",
+      "input": {
+        "slides": [
+          {
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            },
+            "cta": {
+              "label": "Go",
+              "href": "http://example.com"
+            }
+          }
+        ]
+      },
+      "expected": {
+        "slides": [
+          {
+            "id": "slide-0",
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            },
+            "cta": {
+              "label": "Go",
+              "href": ""
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "button label truncated to 80",
+      "input": {
+        "slides": [
+          {
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            },
+            "cta": {
+              "label": "ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "href": "/x"
+            }
+          }
+        ]
+      },
+      "expected": {
+        "slides": [
+          {
+            "id": "slide-0",
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            },
+            "cta": {
+              "label": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "href": "/x"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "button is an object only",
+      "input": {
+        "slides": [
+          {
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            },
+            "cta": [
+              "a"
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "slides": [
+          {
+            "id": "slide-0",
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "button style and colour are not accepted yet",
+      "input": {
+        "slides": [
+          {
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            },
+            "cta": {
+              "label": "Go",
+              "href": "/x",
+              "style": "outline",
+              "colour": "accent"
+            }
+          }
+        ]
+      },
+      "expected": {
+        "slides": [
+          {
+            "id": "slide-0",
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            },
+            "cta": {
+              "label": "Go",
+              "href": "/x"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "overlay alpha 90 kept",
+      "input": {
+        "slides": [
+          {
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            },
+            "overlay": {
+              "color": {
+                "hex": "#000000"
+              },
+              "alpha": 90
+            }
+          }
+        ]
+      },
+      "expected": {
+        "slides": [
+          {
+            "id": "slide-0",
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            },
+            "overlay": {
+              "color": {
+                "hex": "#000000"
+              },
+              "alpha": 90
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "overlay alpha steps: 7, 95, 0, string and null all drop",
+      "input": {
+        "slides": [
+          {
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            },
+            "id": "a",
+            "overlay": {
+              "alpha": 7
+            }
+          },
+          {
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            },
+            "id": "b",
+            "overlay": {
+              "alpha": 95
+            }
+          },
+          {
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            },
+            "id": "c",
+            "overlay": {
+              "alpha": 0
+            }
+          },
+          {
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            },
+            "id": "d",
+            "overlay": {
+              "alpha": "40"
+            }
+          },
+          {
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            },
+            "id": "e",
+            "overlay": {
+              "alpha": null
+            }
+          }
+        ]
+      },
+      "expected": {
+        "slides": [
+          {
+            "id": "a",
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            }
+          },
+          {
+            "id": "b",
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            }
+          },
+          {
+            "id": "c",
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            }
+          },
+          {
+            "id": "d",
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            }
+          },
+          {
+            "id": "e",
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "overlay colour falls back to the overlay role",
+      "input": {
+        "slides": [
+          {
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            },
+            "overlay": {
+              "color": {
+                "hex": "red"
+              },
+              "alpha": 50
+            }
+          }
+        ]
+      },
+      "expected": {
+        "slides": [
+          {
+            "id": "slide-0",
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            },
+            "overlay": {
+              "color": {
+                "role": "overlay"
+              },
+              "alpha": 50
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "overlay hex is lower-cased",
+      "input": {
+        "slides": [
+          {
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            },
+            "overlay": {
+              "color": {
+                "hex": "#AABBCC"
+              },
+              "alpha": 20
+            }
+          }
+        ]
+      },
+      "expected": {
+        "slides": [
+          {
+            "id": "slide-0",
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            },
+            "overlay": {
+              "color": {
+                "hex": "#aabbcc"
+              },
+              "alpha": 20
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "text colour role beats hex",
+      "input": {
+        "slides": [
+          {
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            },
+            "text": {
+              "role": "heading",
+              "hex": "#ffffff"
+            }
+          }
+        ]
+      },
+      "expected": {
+        "slides": [
+          {
+            "id": "slide-0",
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            },
+            "text": {
+              "role": "heading"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "text colour hex is lower-cased",
+      "input": {
+        "slides": [
+          {
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            },
+            "text": {
+              "hex": "#FFFFFF"
+            }
+          }
+        ]
+      },
+      "expected": {
+        "slides": [
+          {
+            "id": "slide-0",
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            },
+            "text": {
+              "hex": "#ffffff"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "text colour invalid drops",
+      "input": {
+        "slides": [
+          {
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            },
+            "text": {
+              "hex": "white"
+            }
+          },
+          {
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            },
+            "id": "x",
+            "text": "#fff"
+          }
+        ]
+      },
+      "expected": {
+        "slides": [
+          {
+            "id": "slide-0",
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            }
+          },
+          {
+            "id": "x",
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "align accepts the closed list only",
+      "input": {
+        "slides": [
+          {
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            },
+            "id": "a",
+            "align": "start"
+          },
+          {
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            },
+            "id": "b",
+            "align": "end"
+          },
+          {
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            },
+            "id": "c",
+            "align": "justify"
+          },
+          {
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            },
+            "id": "d",
+            "align": "CENTER"
+          }
+        ]
+      },
+      "expected": {
+        "slides": [
+          {
+            "id": "a",
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            },
+            "align": "start"
+          },
+          {
+            "id": "b",
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            },
+            "align": "end"
+          },
+          {
+            "id": "c",
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            }
+          },
+          {
+            "id": "d",
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "duplicate ids keep the first",
+      "input": {
+        "slides": [
+          {
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            },
+            "id": "same",
+            "heading": "one"
+          },
+          {
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            },
+            "id": "same",
+            "heading": "two"
+          },
+          {
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            },
+            "id": "other",
+            "heading": "three"
+          }
+        ]
+      },
+      "expected": {
+        "slides": [
+          {
+            "id": "same",
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            },
+            "heading": "one"
+          },
+          {
+            "id": "other",
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            },
+            "heading": "three"
+          }
+        ]
+      }
+    },
+    {
+      "name": "invalid ids fall back to the position",
+      "input": {
+        "slides": [
+          {
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            },
+            "id": "has space",
+            "heading": "a"
+          },
+          {
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            },
+            "id": "",
+            "heading": "b"
+          },
+          {
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            },
+            "id": 5,
+            "heading": "c"
+          },
+          {
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            },
+            "id": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+            "heading": "d"
+          }
+        ]
+      },
+      "expected": {
+        "slides": [
+          {
+            "id": "slide-0",
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            },
+            "heading": "a"
+          },
+          {
+            "id": "slide-1",
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            },
+            "heading": "b"
+          },
+          {
+            "id": "slide-2",
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            },
+            "heading": "c"
+          },
+          {
+            "id": "slide-3",
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            },
+            "heading": "d"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ids are trimmed",
+      "input": {
+        "slides": [
+          {
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            },
+            "id": "  keep-me  "
+          }
+        ]
+      },
+      "expected": {
+        "slides": [
+          {
+            "id": "keep-me",
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "non-object slide entries are skipped but still count for the position",
+      "input": {
+        "slides": [
+          "x",
+          null,
+          {
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            },
+            "heading": "p"
+          }
+        ]
+      },
+      "expected": {
+        "slides": [
+          {
+            "id": "slide-2",
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            },
+            "heading": "p"
+          }
+        ]
+      }
+    },
+    {
+      "name": "at most eight slides",
+      "input": {
+        "slides": [
+          {
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            },
+            "id": "s0"
+          },
+          {
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            },
+            "id": "s1"
+          },
+          {
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            },
+            "id": "s2"
+          },
+          {
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            },
+            "id": "s3"
+          },
+          {
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            },
+            "id": "s4"
+          },
+          {
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            },
+            "id": "s5"
+          },
+          {
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            },
+            "id": "s6"
+          },
+          {
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            },
+            "id": "s7"
+          },
+          {
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            },
+            "id": "s8"
+          },
+          {
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            },
+            "id": "s9"
+          }
+        ]
+      },
+      "expected": {
+        "slides": [
+          {
+            "id": "s0",
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            }
+          },
+          {
+            "id": "s1",
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            }
+          },
+          {
+            "id": "s2",
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            }
+          },
+          {
+            "id": "s3",
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            }
+          },
+          {
+            "id": "s4",
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            }
+          },
+          {
+            "id": "s5",
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            }
+          },
+          {
+            "id": "s6",
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            }
+          },
+          {
+            "id": "s7",
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "a duplicate does not use a slot",
+      "input": {
+        "slides": [
+          {
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            },
+            "id": "d"
+          },
+          {
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            },
+            "id": "d"
+          },
+          {
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            },
+            "id": "d"
+          },
+          {
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            },
+            "id": "s0"
+          },
+          {
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            },
+            "id": "s1"
+          },
+          {
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            },
+            "id": "s2"
+          },
+          {
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            },
+            "id": "s3"
+          },
+          {
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            },
+            "id": "s4"
+          },
+          {
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            },
+            "id": "s5"
+          },
+          {
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            },
+            "id": "s6"
+          },
+          {
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            },
+            "id": "s7"
+          }
+        ]
+      },
+      "expected": {
+        "slides": [
+          {
+            "id": "d",
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            }
+          },
+          {
+            "id": "s0",
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            }
+          },
+          {
+            "id": "s1",
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            }
+          },
+          {
+            "id": "s2",
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            }
+          },
+          {
+            "id": "s3",
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            }
+          },
+          {
+            "id": "s4",
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            }
+          },
+          {
+            "id": "s5",
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            }
+          },
+          {
+            "id": "s6",
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "behaviour defaults are never stored",
+      "input": {
+        "slides": [
+          {
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            }
+          }
+        ],
+        "behaviour": {
+          "autoplay": false,
+          "interval": 6,
+          "transition": "slide",
+          "duration": "base",
+          "arrows": true,
+          "dots": true,
+          "loop": false
+        }
+      },
+      "expected": {
+        "slides": [
+          {
+            "id": "slide-0",
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "autoplay with a custom interval",
+      "input": {
+        "slides": [
+          {
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            }
+          }
+        ],
+        "behaviour": {
+          "autoplay": true,
+          "interval": 8
+        }
+      },
+      "expected": {
+        "slides": [
+          {
+            "id": "slide-0",
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            }
+          }
+        ],
+        "behaviour": {
+          "autoplay": true,
+          "interval": 8
+        }
+      }
+    },
+    {
+      "name": "autoplay with the default interval stores no interval",
+      "input": {
+        "slides": [
+          {
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            }
+          }
+        ],
+        "behaviour": {
+          "autoplay": true,
+          "interval": 6
+        }
+      },
+      "expected": {
+        "slides": [
+          {
+            "id": "slide-0",
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            }
+          }
+        ],
+        "behaviour": {
+          "autoplay": true
+        }
+      }
+    },
+    {
+      "name": "autoplay with an integral float interval",
+      "input": {
+        "slides": [
+          {
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            }
+          }
+        ],
+        "behaviour": {
+          "autoplay": true,
+          "interval": 10.0
+        }
+      },
+      "expected": {
+        "slides": [
+          {
+            "id": "slide-0",
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            }
+          }
+        ],
+        "behaviour": {
+          "autoplay": true,
+          "interval": 10
+        }
+      }
+    },
+    {
+      "name": "intervals below five or off the list drop",
+      "input": {
+        "slides": [
+          {
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            },
+            "id": "a"
+          }
+        ],
+        "behaviour": {
+          "autoplay": true,
+          "interval": 3
+        }
+      },
+      "expected": {
+        "slides": [
+          {
+            "id": "a",
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            }
+          }
+        ],
+        "behaviour": {
+          "autoplay": true
+        }
+      }
+    },
+    {
+      "name": "a string interval drops",
+      "input": {
+        "slides": [
+          {
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            },
+            "id": "a"
+          }
+        ],
+        "behaviour": {
+          "autoplay": true,
+          "interval": "8"
+        }
+      },
+      "expected": {
+        "slides": [
+          {
+            "id": "a",
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            }
+          }
+        ],
+        "behaviour": {
+          "autoplay": true
+        }
+      }
+    },
+    {
+      "name": "interval without autoplay drops",
+      "input": {
+        "slides": [
+          {
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            }
+          }
+        ],
+        "behaviour": {
+          "interval": 10
+        }
+      },
+      "expected": {
+        "slides": [
+          {
+            "id": "slide-0",
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "autoplay must be exactly true",
+      "input": {
+        "slides": [
+          {
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            }
+          }
+        ],
+        "behaviour": {
+          "autoplay": "true",
+          "interval": 10
+        }
+      },
+      "expected": {
+        "slides": [
+          {
+            "id": "slide-0",
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "transition fade and none are stored, slide and unknown are not",
+      "input": {
+        "slides": [
+          {
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            },
+            "id": "a"
+          }
+        ],
+        "behaviour": {
+          "transition": "fade"
+        }
+      },
+      "expected": {
+        "slides": [
+          {
+            "id": "a",
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            }
+          }
+        ],
+        "behaviour": {
+          "transition": "fade"
+        }
+      }
+    },
+    {
+      "name": "transition none",
+      "input": {
+        "slides": [
+          {
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            }
+          }
+        ],
+        "behaviour": {
+          "transition": "none"
+        }
+      },
+      "expected": {
+        "slides": [
+          {
+            "id": "slide-0",
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            }
+          }
+        ],
+        "behaviour": {
+          "transition": "none"
+        }
+      }
+    },
+    {
+      "name": "transition default and unknown drop",
+      "input": {
+        "slides": [
+          {
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            }
+          }
+        ],
+        "behaviour": {
+          "transition": "flip"
+        }
+      },
+      "expected": {
+        "slides": [
+          {
+            "id": "slide-0",
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "duration fast",
+      "input": {
+        "slides": [
+          {
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            }
+          }
+        ],
+        "behaviour": {
+          "duration": "fast"
+        }
+      },
+      "expected": {
+        "slides": [
+          {
+            "id": "slide-0",
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            }
+          }
+        ],
+        "behaviour": {
+          "duration": "fast"
+        }
+      }
+    },
+    {
+      "name": "duration slow",
+      "input": {
+        "slides": [
+          {
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            }
+          }
+        ],
+        "behaviour": {
+          "duration": "slow"
+        }
+      },
+      "expected": {
+        "slides": [
+          {
+            "id": "slide-0",
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            }
+          }
+        ],
+        "behaviour": {
+          "duration": "slow"
+        }
+      }
+    },
+    {
+      "name": "duration unknown drops",
+      "input": {
+        "slides": [
+          {
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            }
+          }
+        ],
+        "behaviour": {
+          "duration": "instant"
+        }
+      },
+      "expected": {
+        "slides": [
+          {
+            "id": "slide-0",
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "arrows false and dots false",
+      "input": {
+        "slides": [
+          {
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            }
+          }
+        ],
+        "behaviour": {
+          "arrows": false,
+          "dots": false
+        }
+      },
+      "expected": {
+        "slides": [
+          {
+            "id": "slide-0",
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            }
+          }
+        ],
+        "behaviour": {
+          "arrows": false,
+          "dots": false
+        }
+      }
+    },
+    {
+      "name": "loop true",
+      "input": {
+        "slides": [
+          {
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            }
+          }
+        ],
+        "behaviour": {
+          "loop": true
+        }
+      },
+      "expected": {
+        "slides": [
+          {
+            "id": "slide-0",
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            }
+          }
+        ],
+        "behaviour": {
+          "loop": true
+        }
+      }
+    },
+    {
+      "name": "behaviour canonical order",
+      "input": {
+        "slides": [
+          {
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            }
+          }
+        ],
+        "behaviour": {
+          "loop": true,
+          "dots": false,
+          "arrows": false,
+          "duration": "slow",
+          "transition": "fade",
+          "interval": 5,
+          "autoplay": true
+        }
+      },
+      "expected": {
+        "slides": [
+          {
+            "id": "slide-0",
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            }
+          }
+        ],
+        "behaviour": {
+          "autoplay": true,
+          "interval": 5,
+          "transition": "fade",
+          "duration": "slow",
+          "arrows": false,
+          "dots": false,
+          "loop": true
+        }
+      }
+    },
+    {
+      "name": "behaviour that is a list is ignored",
+      "input": {
+        "slides": [
+          {
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            }
+          }
+        ],
+        "behaviour": [
+          "autoplay"
+        ]
+      },
+      "expected": {
+        "slides": [
+          {
+            "id": "slide-0",
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "behaviour with no slides is not stored",
+      "input": {
+        "behaviour": {
+          "autoplay": true
+        }
+      },
+      "expected": null
+    },
+    {
+      "name": "unknown top-level keys drop",
+      "input": {
+        "slides": [
+          {
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            }
+          }
+        ],
+        "title": "x",
+        "autoplay": true
+      },
+      "expected": {
+        "slides": [
+          {
+            "id": "slide-0",
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "publish": [
+    {
+      "name": "one slide is a hero, not a slider",
+      "config": {
+        "primaryColor": "#12372a",
+        "accentColor": null,
+        "palette": []
+      },
+      "content": {
+        "slides": [
+          {
+            "id": "a",
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            },
+            "heading": "Hi"
+          }
+        ]
+      },
+      "media": {
+        "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e": {
+          "min": [
+            0,
+            0,
+            0
+          ],
+          "max": [
+            40,
+            50,
+            60
+          ]
+        }
+      },
+      "expected": [
+        {
+          "path": "slides",
+          "code": "slider_slides_min"
+        }
+      ]
+    },
+    {
+      "name": "no slides at all",
+      "config": {
+        "primaryColor": "#12372a",
+        "accentColor": null,
+        "palette": []
+      },
+      "content": {
+        "slides": []
+      },
+      "media": {},
+      "expected": [
+        {
+          "path": "slides",
+          "code": "slider_slides_min"
+        }
+      ]
+    },
+    {
+      "name": "two slides with no text need no evidence",
+      "config": {
+        "primaryColor": "#12372a",
+        "accentColor": null,
+        "palette": []
+      },
+      "content": {
+        "slides": [
+          {
+            "id": "a",
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            }
+          },
+          {
+            "id": "b",
+            "media": {
+              "mediaId": "1c9a7d3f-4e4b-4b64-8d8f-9a2b3c4d5e6f"
+            }
+          }
+        ]
+      },
+      "media": {},
+      "expected": []
+    },
+    {
+      "name": "a dark picture proves the automatic white",
+      "config": {
+        "primaryColor": "#12372a",
+        "accentColor": null,
+        "palette": []
+      },
+      "content": {
+        "slides": [
+          {
+            "id": "a",
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            },
+            "heading": "Hi"
+          },
+          {
+            "id": "b",
+            "media": {
+              "mediaId": "1c9a7d3f-4e4b-4b64-8d8f-9a2b3c4d5e6f"
+            }
+          }
+        ]
+      },
+      "media": {
+        "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e": {
+          "min": [
+            0,
+            0,
+            0
+          ],
+          "max": [
+            40,
+            50,
+            60
+          ]
+        }
+      },
+      "expected": []
+    },
+    {
+      "name": "a picture with no evidence is unprovable at the media path",
+      "config": {
+        "primaryColor": "#12372a",
+        "accentColor": null,
+        "palette": []
+      },
+      "content": {
+        "slides": [
+          {
+            "id": "a",
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            },
+            "heading": "Hi"
+          },
+          {
+            "id": "b",
+            "media": {
+              "mediaId": "1c9a7d3f-4e4b-4b64-8d8f-9a2b3c4d5e6f"
+            }
+          }
+        ]
+      },
+      "media": {},
+      "expected": [
+        {
+          "path": "slides[0].media",
+          "code": "contrast_unprovable"
+        }
+      ]
+    },
+    {
+      "name": "a picture with null evidence is unprovable",
+      "config": {
+        "primaryColor": "#12372a",
+        "accentColor": null,
+        "palette": []
+      },
+      "content": {
+        "slides": [
+          {
+            "id": "a",
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            },
+            "heading": "Hi"
+          },
+          {
+            "id": "b",
+            "media": {
+              "mediaId": "1c9a7d3f-4e4b-4b64-8d8f-9a2b3c4d5e6f"
+            }
+          }
+        ]
+      },
+      "media": {
+        "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e": null
+      },
+      "expected": [
+        {
+          "path": "slides[0].media",
+          "code": "contrast_unprovable"
+        }
+      ]
+    },
+    {
+      "name": "a full-range picture cannot prove any automatic colour",
+      "config": {
+        "primaryColor": "#12372a",
+        "accentColor": null,
+        "palette": []
+      },
+      "content": {
+        "slides": [
+          {
+            "id": "a",
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            },
+            "sub": "Fresh"
+          },
+          {
+            "id": "b",
+            "media": {
+              "mediaId": "1c9a7d3f-4e4b-4b64-8d8f-9a2b3c4d5e6f"
+            }
+          }
+        ]
+      },
+      "media": {
+        "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e": {
+          "min": [
+            0,
+            0,
+            0
+          ],
+          "max": [
+            255,
+            255,
+            255
+          ]
+        }
+      },
+      "expected": [
+        {
+          "path": "slides[0].media",
+          "code": "contrast_unprovable"
+        }
+      ]
+    },
+    {
+      "name": "a strong dark overlay makes the full-range picture provable",
+      "config": {
+        "primaryColor": "#12372a",
+        "accentColor": null,
+        "palette": []
+      },
+      "content": {
+        "slides": [
+          {
+            "id": "a",
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            },
+            "sub": "Fresh",
+            "overlay": {
+              "color": {
+                "hex": "#000000"
+              },
+              "alpha": 90
+            }
+          },
+          {
+            "id": "b",
+            "media": {
+              "mediaId": "1c9a7d3f-4e4b-4b64-8d8f-9a2b3c4d5e6f"
+            }
+          }
+        ]
+      },
+      "media": {
+        "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e": {
+          "min": [
+            0,
+            0,
+            0
+          ],
+          "max": [
+            255,
+            255,
+            255
+          ]
+        }
+      },
+      "expected": []
+    },
+    {
+      "name": "a weak overlay does not",
+      "config": {
+        "primaryColor": "#12372a",
+        "accentColor": null,
+        "palette": []
+      },
+      "content": {
+        "slides": [
+          {
+            "id": "a",
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            },
+            "sub": "Fresh",
+            "overlay": {
+              "color": {
+                "hex": "#000000"
+              },
+              "alpha": 10
+            }
+          },
+          {
+            "id": "b",
+            "media": {
+              "mediaId": "1c9a7d3f-4e4b-4b64-8d8f-9a2b3c4d5e6f"
+            }
+          }
+        ]
+      },
+      "media": {
+        "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e": {
+          "min": [
+            0,
+            0,
+            0
+          ],
+          "max": [
+            255,
+            255,
+            255
+          ]
+        }
+      },
+      "expected": [
+        {
+          "path": "slides[0].media",
+          "code": "contrast_unprovable"
+        }
+      ]
+    },
+    {
+      "name": "explicit dark text over a dark picture fails at the text path",
+      "config": {
+        "primaryColor": "#12372a",
+        "accentColor": null,
+        "palette": []
+      },
+      "content": {
+        "slides": [
+          {
+            "id": "a",
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            },
+            "heading": "Hi",
+            "text": {
+              "hex": "#222222"
+            }
+          },
+          {
+            "id": "b",
+            "media": {
+              "mediaId": "1c9a7d3f-4e4b-4b64-8d8f-9a2b3c4d5e6f"
+            }
+          }
+        ]
+      },
+      "media": {
+        "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e": {
+          "min": [
+            0,
+            0,
+            0
+          ],
+          "max": [
+            40,
+            50,
+            60
+          ]
+        }
+      },
+      "expected": [
+        {
+          "path": "slides[0].text",
+          "code": "contrast_insufficient"
+        }
+      ]
+    },
+    {
+      "name": "explicit white text over a dark picture passes",
+      "config": {
+        "primaryColor": "#12372a",
+        "accentColor": null,
+        "palette": []
+      },
+      "content": {
+        "slides": [
+          {
+            "id": "a",
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            },
+            "heading": "Hi",
+            "text": {
+              "hex": "#ffffff"
+            }
+          },
+          {
+            "id": "b",
+            "media": {
+              "mediaId": "1c9a7d3f-4e4b-4b64-8d8f-9a2b3c4d5e6f"
+            }
+          }
+        ]
+      },
+      "media": {
+        "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e": {
+          "min": [
+            0,
+            0,
+            0
+          ],
+          "max": [
+            40,
+            50,
+            60
+          ]
+        }
+      },
+      "expected": []
+    },
+    {
+      "name": "explicit white text over a light picture fails",
+      "config": {
+        "primaryColor": "#12372a",
+        "accentColor": null,
+        "palette": []
+      },
+      "content": {
+        "slides": [
+          {
+            "id": "a",
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            },
+            "heading": "Hi",
+            "text": {
+              "hex": "#ffffff"
+            }
+          },
+          {
+            "id": "b",
+            "media": {
+              "mediaId": "1c9a7d3f-4e4b-4b64-8d8f-9a2b3c4d5e6f"
+            }
+          }
+        ]
+      },
+      "media": {
+        "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e": {
+          "min": [
+            220,
+            220,
+            220
+          ],
+          "max": [
+            255,
+            255,
+            255
+          ]
+        }
+      },
+      "expected": [
+        {
+          "path": "slides[0].text",
+          "code": "contrast_insufficient"
+        }
+      ]
+    },
+    {
+      "name": "a light picture proves the automatic black",
+      "config": {
+        "primaryColor": "#12372a",
+        "accentColor": null,
+        "palette": []
+      },
+      "content": {
+        "slides": [
+          {
+            "id": "a",
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            },
+            "heading": "Hi"
+          },
+          {
+            "id": "b",
+            "media": {
+              "mediaId": "1c9a7d3f-4e4b-4b64-8d8f-9a2b3c4d5e6f"
+            }
+          }
+        ]
+      },
+      "media": {
+        "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e": {
+          "min": [
+            220,
+            220,
+            220
+          ],
+          "max": [
+            255,
+            255,
+            255
+          ]
+        }
+      },
+      "expected": []
+    },
+    {
+      "name": "the phone picture widens the judged range",
+      "config": {
+        "primaryColor": "#12372a",
+        "accentColor": null,
+        "palette": []
+      },
+      "content": {
+        "slides": [
+          {
+            "id": "a",
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            },
+            "heading": "Hi",
+            "mobile": {
+              "mediaId": "2d0b8e4a-5f5c-4c75-9e9a-ab3c4d5e6f70",
+              "decorative": true
+            }
+          },
+          {
+            "id": "b",
+            "media": {
+              "mediaId": "1c9a7d3f-4e4b-4b64-8d8f-9a2b3c4d5e6f"
+            }
+          }
+        ]
+      },
+      "media": {
+        "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e": {
+          "min": [
+            0,
+            0,
+            0
+          ],
+          "max": [
+            40,
+            50,
+            60
+          ]
+        },
+        "2d0b8e4a-5f5c-4c75-9e9a-ab3c4d5e6f70": {
+          "min": [
+            220,
+            220,
+            220
+          ],
+          "max": [
+            255,
+            255,
+            255
+          ]
+        }
+      },
+      "expected": [
+        {
+          "path": "slides[0].media",
+          "code": "contrast_unprovable"
+        }
+      ]
+    },
+    {
+      "name": "a phone picture without evidence is unprovable",
+      "config": {
+        "primaryColor": "#12372a",
+        "accentColor": null,
+        "palette": []
+      },
+      "content": {
+        "slides": [
+          {
+            "id": "a",
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            },
+            "heading": "Hi",
+            "mobile": {
+              "mediaId": "2d0b8e4a-5f5c-4c75-9e9a-ab3c4d5e6f70",
+              "decorative": true
+            }
+          },
+          {
+            "id": "b",
+            "media": {
+              "mediaId": "1c9a7d3f-4e4b-4b64-8d8f-9a2b3c4d5e6f"
+            }
+          }
+        ]
+      },
+      "media": {
+        "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e": {
+          "min": [
+            0,
+            0,
+            0
+          ],
+          "max": [
+            40,
+            50,
+            60
+          ]
+        }
+      },
+      "expected": [
+        {
+          "path": "slides[0].media",
+          "code": "contrast_unprovable"
+        }
+      ]
+    },
+    {
+      "name": "a palette overlay role is judged by the stored palette",
+      "config": {
+        "primaryColor": "#12372a",
+        "accentColor": null,
+        "palette": {
+          "overlay": "#000000"
+        }
+      },
+      "content": {
+        "slides": [
+          {
+            "id": "a",
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            },
+            "heading": "Hi",
+            "overlay": {
+              "color": {
+                "role": "overlay"
+              },
+              "alpha": 90
+            }
+          },
+          {
+            "id": "b",
+            "media": {
+              "mediaId": "1c9a7d3f-4e4b-4b64-8d8f-9a2b3c4d5e6f"
+            }
+          }
+        ]
+      },
+      "media": {
+        "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e": {
+          "min": [
+            0,
+            0,
+            0
+          ],
+          "max": [
+            255,
+            255,
+            255
+          ]
+        }
+      },
+      "expected": []
+    },
+    {
+      "name": "a brand-coloured overlay is judged by the brand",
+      "config": {
+        "primaryColor": "#12372a",
+        "accentColor": null,
+        "palette": []
+      },
+      "content": {
+        "slides": [
+          {
+            "id": "a",
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            },
+            "heading": "Hi",
+            "overlay": {
+              "color": {
+                "role": "brand"
+              },
+              "alpha": 90
+            }
+          },
+          {
+            "id": "b",
+            "media": {
+              "mediaId": "1c9a7d3f-4e4b-4b64-8d8f-9a2b3c4d5e6f"
+            }
+          }
+        ]
+      },
+      "media": {
+        "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e": {
+          "min": [
+            0,
+            0,
+            0
+          ],
+          "max": [
+            255,
+            255,
+            255
+          ]
+        }
+      },
+      "expected": []
+    },
+    {
+      "name": "an incomplete button alone is not text",
+      "config": {
+        "primaryColor": "#12372a",
+        "accentColor": null,
+        "palette": []
+      },
+      "content": {
+        "slides": [
+          {
+            "id": "a",
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            },
+            "cta": {
+              "label": "Shop",
+              "href": ""
+            }
+          },
+          {
+            "id": "b",
+            "media": {
+              "mediaId": "1c9a7d3f-4e4b-4b64-8d8f-9a2b3c4d5e6f"
+            }
+          }
+        ]
+      },
+      "media": {},
+      "expected": []
+    },
+    {
+      "name": "a complete button is text",
+      "config": {
+        "primaryColor": "#12372a",
+        "accentColor": null,
+        "palette": []
+      },
+      "content": {
+        "slides": [
+          {
+            "id": "a",
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            },
+            "cta": {
+              "label": "Shop",
+              "href": "/c/x"
+            }
+          },
+          {
+            "id": "b",
+            "media": {
+              "mediaId": "1c9a7d3f-4e4b-4b64-8d8f-9a2b3c4d5e6f"
+            }
+          }
+        ]
+      },
+      "media": {},
+      "expected": [
+        {
+          "path": "slides[0].media",
+          "code": "contrast_unprovable"
+        }
+      ]
+    },
+    {
+      "name": "only the failing slide is reported",
+      "config": {
+        "primaryColor": "#12372a",
+        "accentColor": null,
+        "palette": []
+      },
+      "content": {
+        "slides": [
+          {
+            "id": "a",
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            },
+            "heading": "Hi"
+          },
+          {
+            "id": "b",
+            "media": {
+              "mediaId": "1c9a7d3f-4e4b-4b64-8d8f-9a2b3c4d5e6f"
+            },
+            "heading": "Yo"
+          }
+        ]
+      },
+      "media": {
+        "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e": {
+          "min": [
+            0,
+            0,
+            0
+          ],
+          "max": [
+            40,
+            50,
+            60
+          ]
+        },
+        "1c9a7d3f-4e4b-4b64-8d8f-9a2b3c4d5e6f": {
+          "min": [
+            0,
+            0,
+            0
+          ],
+          "max": [
+            255,
+            255,
+            255
+          ]
+        }
+      },
+      "expected": [
+        {
+          "path": "slides[1].media",
+          "code": "contrast_unprovable"
+        }
+      ]
+    },
+    {
+      "name": "each failing slide is reported at its own index",
+      "config": {
+        "primaryColor": "#12372a",
+        "accentColor": null,
+        "palette": []
+      },
+      "content": {
+        "slides": [
+          {
+            "id": "a",
+            "media": {
+              "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+            },
+            "heading": "Hi"
+          },
+          {
+            "id": "b",
+            "media": {
+              "mediaId": "1c9a7d3f-4e4b-4b64-8d8f-9a2b3c4d5e6f"
+            },
+            "heading": "Yo",
+            "text": {
+              "hex": "#222222"
+            }
+          }
+        ]
+      },
+      "media": {
+        "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e": {
+          "min": [
+            0,
+            0,
+            0
+          ],
+          "max": [
+            255,
+            255,
+            255
+          ]
+        },
+        "1c9a7d3f-4e4b-4b64-8d8f-9a2b3c4d5e6f": {
+          "min": [
+            0,
+            0,
+            0
+          ],
+          "max": [
+            40,
+            50,
+            60
+          ]
+        }
+      },
+      "expected": [
+        {
+          "path": "slides[0].media",
+          "code": "contrast_unprovable"
+        },
+        {
+          "path": "slides[1].text",
+          "code": "contrast_insufficient"
+        }
+      ]
+    }
+  ]
+}

@@ -156,7 +156,17 @@
     "earliestDelivery": "Früheste Lieferung",
     "deliveryToday": "Heute",
     "deliveryTomorrow": "Morgen",
-    "deliveryAt": "{day}, {window}"
+    "deliveryAt": "{day}, {window}",
+    "slider": {
+      "label": "Hervorgehobene Folien",
+      "slide": "{current} von {total}",
+      "previous": "Vorherige Folie",
+      "next": "Nächste Folie",
+      "goTo": "Zu Folie {number}",
+      "pause": "Folien anhalten",
+      "play": "Folien abspielen",
+      "choose": "Folie auswählen"
+    }
   },
   "cart": {
     "cart": "Warenkorb",

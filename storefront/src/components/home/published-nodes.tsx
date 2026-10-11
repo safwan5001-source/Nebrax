@@ -6,6 +6,7 @@ import { CustomContentBand } from "@/components/home/CustomContentBand";
 import { DeliveryPromiseBand } from "@/components/home/DeliveryPromiseBand";
 import { DiscoverySection } from "@/components/home/DiscoverySection";
 import { FeaturedShelf } from "@/components/home/FeaturedShelf";
+import { HomeSlider, type SliderLabels } from "@/components/home/HomeSlider";
 import { OffersShelf } from "@/components/home/OffersShelf";
 import { ProductShelfSection } from "@/components/home/ProductShelfSection";
 import { SectionBackdrop } from "@/components/home/SectionBackdrop";
@@ -38,6 +39,7 @@ import {
   type DesignContext,
   resolveSectionDesign,
 } from "@/lib/presentation/section-design-resolve";
+import { resolveSlider } from "@/lib/presentation/slider-resolve";
 import type { ThemePresetId } from "@/lib/presentation/tokens";
 
 /**
@@ -100,6 +102,11 @@ export async function publishedNodes(
       androidUrl: string;
       appName: string;
     };
+    /**
+     * CUST-HV V8b — the slider's accessible names (already translated). Absent ⇒ a published slider cannot be drawn
+     * (the section is omitted), never drawn without its names.
+     */
+    sliderLabels?: SliderLabels;
     benefitsTitle: string;
     featuredTitle: string;
     offersTitle: string;
@@ -266,6 +273,26 @@ async function pushSectionNode(
         }
         backdrop={backdropNode(section, index, ctx, false)}
         designCtx={ctx.design}
+      />,
+    );
+    return;
+  }
+  if (section.type === "slider") {
+    // CUST-HV V8b (V0 §13.1) — a slider with no resolvable slide is omitted outright (no empty band); the first
+    // slide's picture loads eagerly only when the slider opens the page (it is then the likely LCP element).
+    const view = ctx.sliderLabels
+      ? resolveSlider(section, index, ctx.media ?? {}, ctx.design, ctx.locale)
+      : null;
+    if (!view || !ctx.sliderLabels) return;
+    nodes.push(
+      <HomeSlider
+        key={section.id}
+        view={view}
+        labels={ctx.sliderLabels}
+        basePath={ctx.basePath}
+        dir={ctx.design.dir}
+        priority={nodes.length === 0}
+        sectionId={section.id}
       />,
     );
     return;
