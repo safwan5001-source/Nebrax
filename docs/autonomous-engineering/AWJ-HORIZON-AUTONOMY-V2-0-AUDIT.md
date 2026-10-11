@@ -62,3 +62,28 @@ Existing Horizon already specifies evidence, Researcher/Architect, scoped planni
 **Unsafe without further proof:** automatically merging any PR, changing `CURRENT-STATE.md` or current horizon queues on behalf of others, introducing broad standing GitHub credentials, changing shared workflow behavior, auto-deploying, or assuming old open PRs are running work.
 
 **Next decision:** finish V2-0 missing proof; then review explicit enrollment/authority contract (V2-1). No automatic merge or production rights follow from this report.
+
+## 6. Targeted PR changed-path matrix (verified 2026-10-11)
+
+GitHub changed-file listing was checked for PRs #1326, #1328, #1329, #1327, #1089. **No identical changed filenames among these five PRs**; this does not prove semantic independence, absence of merge conflicts on a later main, or current agent activity.
+
+| PR | Primary touched areas | Integration / risk observations |
+|---|---|---|
+| #1326 Media Storage S1 | Laravel Employee/Expense/Invoice/Payment/Purchase controllers, AttachmentStorage, storage config, employee photo migration, feature tests | **High-impact surface:** affects financial/API upload workflows and DB. Must review financial atomicity, orphan prevention, tenant storage isolation, migration safety and API compatibility, including potential semantic overlap with TAX/Delivery. Not automatic-merge eligible based on title or file count. |
+| #1328 Platform H1-CONTRAST | `web/src/app/globals.css`, button tests, platform docs | Shared global CSS can affect ERP and platform beyond named screen; visual/accessibility regression evidence and affected selectors required. |
+| #1329 CUST-HV V9d-1 | Laravel StorefrontGlobalTokensNormalizer, storefront components/CSS, builder components/config, feature and visual tests | Cross-boundary storefront ↔ backend token contract; no direct path collision with #1328, but global design/presentation changes need integration QA. |
+| #1327 V2 docs | Two `docs/autonomous-engineering` docs only | No runtime code or authorization change; doc-review and consistency checks. |
+| #1089 Store Publishing | Laravel commerce presentation controller, service, request, routes and tests | Open historical PR; may affect publishing APIs/versions and Customizer semantics. Verify current applicability/staleness before any action. |
+
+### Branch protection / rulesets / identity — NOT YET VERIFIED
+
+The currently exposed GitHub connector actions include changed-file listing, compare and CI status retrieval, but **do not expose read-only branch-protection or repository-ruleset inspection**. Thus no claims are made about required reviewers, bypass actors, automatic merge availability, merge queue, workflow trust or current GitHub token privileges. These must be checked using a suitably authorized read-only GitHub CLI/API session (or owner screenshots/settings), without changing settings, before choosing a concurrency/merge mechanism.
+
+Do **not** substitute an observed green check or the existence of a merge tool for proof of branch-protection and authorization policy.
+
+### Focused next proof
+
+1. Read-only capture of main rulesets/branch-protection required status checks, reviews, merge queue and bypass/permission controls.
+2. Sample current PR head/base SHAs and exact-head workflow evidence for pilot candidates.
+3. Semantic conflict review on finance/tenant/API (especially #1326 vs TAX and Delivery) and Customizer/publishing (especially #1329 vs #1089).
+4. Build a registry with **verified** horizon state, activity unknown markers and assigned branch ownership; begin as report only, not a lock implementation.
