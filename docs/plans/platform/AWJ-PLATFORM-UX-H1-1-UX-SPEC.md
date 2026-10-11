@@ -1,10 +1,11 @@
 # AWJ-PLATFORM-UX-H1-1 — Platform console UX specification
 
-Status: **WRITTEN / DESIGN_GATE OPEN BEFORE H1-2**  
+Status: **SCREEN SPEC ADDED / DESIGN_GATE OPEN BEFORE ANY CODE**  
 No product code in this slice. No merge. No deploy.  
 Owner decision: option A from H1-0, approved 2026-10-11, with the three amendments in §1.  
 Evidence: [AWJ-PLATFORM-UX-H1-AUDIT.md](./AWJ-PLATFORM-UX-H1-AUDIT.md)  
-Base inspected: `main` `4d8e1a66673d970b318514664d383a9c4455e999`
+Base inspected: `main` `4d8e1a66673d970b318514664d383a9c4455e999`  
+`main` later moved to `ab51046576cf7d05a3c33b003a78227521dd9efe` (storefront gallery). That range does not touch `web/src/app/platform`, `web/src/components/platform`, `web/src/components/ui/button.tsx`, or `web/src/components/data-table.tsx`.
 
 This document is the implementation contract for later slices. It is not approval to start H1-2.
 
@@ -316,6 +317,8 @@ Known limit, accepted: `Dialog` does not trap Tab today. A focus trap is a share
 
 ## 9. Per-route notes
 
+Binding layouts, states, and acceptance for every existing screen are in §12. This table is the short index only.
+
 | Route | Keep | Later slice may change |
 |---|---|---|
 | Login | `AuthShell`, Zod form, password toggle, tenant login link | Nothing in H1-2 |
@@ -379,9 +382,204 @@ Carried from H1-0, not re-litigated:
 ### Still open
 
 None that block H1-PAGINATION or H1-CONTRAST.  
-H1-2 stays blocked until the owner explicitly accepts this spec. Option A approved the direction. It did not approve these interaction details.
+H1-2, H1-PAGINATION, and H1-CONTRAST stay blocked until the owner explicitly accepts this spec, including §12. Option A approved the direction. It did not by itself approve these screen details.
 
-## 12. Risks
+## 12. Screen specifications
+
+These layouts describe the existing screens. They do not add destinations, metrics, or writes. The shell from §4 wraps every screen except login, and only after H1-2 is approved. Until a page slice removes a private header, that header may sit under the shell. Pagination and contrast PRs do not restyle these screens.
+
+Shared rules for every authenticated screen:
+
+- Direction is `<html dir>` only. Logical properties. Codes, emails, URLs, dates, and money values that are Latin use `dir="ltr"` on the value, not on the page.
+- Light and dark use gate-off tokens only. No hex in page components. Dark danger text is fixed only by `H1-CONTRAST`, not by these screens.
+- 320, 768, and 1024 are the three design widths. 375, 390, 430, 1440, and 1920 must not introduce a new layout; they use the nearest rule. Portrait and landscape change width, not a separate design.
+- Page `scrollWidth` must not exceed the viewport. Table overflow stays inside its wrapper.
+- New shell controls are at least 44px. Existing `size="sm"` controls stay 32px until a page slice is explicitly told to enlarge one named control.
+- First load uses a skeleton if the page already has one. Refresh does not blank data that is already visible.
+- Errors are `role="alert"`. Success is `role="status"`. A failed write is never status.
+
+### 12.1 Login — `/platform/login`
+
+No shell. `AuthShell` stays: logo, language, theme, centered column `max-w-md`, page padding `px-4` and `pt-16` so the toggles do not cover the title.
+
+| Region | Order | Behavior |
+|---|---|---|
+| Toggles | Top inline-end | Existing `LangToggle` and `ThemeToggle` |
+| Mark | Center | Existing logo link home |
+| Card | Title, notice, email, password, submit | Unchanged Zod rules |
+| Footer | Tenant login | Link to `/login`, not a platform route |
+
+Desktop and tablet: card centered vertically from `sm`. Phone: card under the toggles, full width of the padding. Email input stays `dir="ltr"`. Password show/hide stays a 48×44 target with an accessible name.
+
+States: invalid email, empty password, submitting (`aria-busy`, spinner, label changes), server `role="alert"`. No skeleton. No console nav if the token is missing or present; a signed-in operator who opens login is not auto-redirected by this spec (current page does not redirect). Do not add that redirect in a UX PR.
+
+Acceptance: both locales, both themes, 320 and 1024, no horizontal page scroll, password toggle named, tenant link still points at `/login`. H1-2 does not edit this file.
+
+### 12.2 Overview — `/platform`
+
+Read-only. Data is `GET /platform/overview` only: tenant totals, user totals, subscription counts, contracted MRR/ARR, renewal windows, renewal value at risk, plan breakdown. Labels keep `contractedRevenueNotice`. Amounts use `formatRiyal`. No sparkline, no cash, no health score.
+
+Order:
+
+1. Shell, once it exists. Until H1-3, the page header (eyebrow, title, subtitle, four destination buttons, refresh, logout, signed-in name) remains.
+2. Read-only line.
+3. Error card with retry, or two skeletons plus one wide skeleton, or the metric grid.
+
+Desktop (≥1024): metric grid `sm:grid-cols-2`. Tenant card and user card side by side. Subscription card spans both columns. Inside it, MRR is the primary figure; the six secondary figures are a 2-column grid; the plan table sits below with `overflow-x-auto` and `min-w-96`.
+
+Tablet (768–1023): same two-column grid. Header actions wrap. Shell drawer replaces the need to use those action buttons, but the buttons stay until H1-3.
+
+Phone (320–767): one column. MRR, then the six figures in two columns, then the plan table scrolling inside the card. Header buttons wrap onto extra rows. They must not force page overflow.
+
+States: loading skeleton, `loadFailed` plus retry, empty plan list (`noSubscriptions`), signed-out redirect to login. Refresh spins and does not clear the last good figures until the request finishes. Logout stays the current `platformLogout` path.
+
+H1-3 acceptance, after the shell is on `main`: private header buttons and the page logout are gone; shell logout remains; the four destinations are not duplicated; MRR notice and the same API fields remain; 320 has no page-level horizontal scroll.
+
+### 12.3 Tenants — `/platform/tenants`
+
+Order:
+
+1. Page header until the tenants visual slice. Back and refresh stay until then.
+2. Error card or the stack below.
+3. `GlobalApplicationControlsCard`.
+4. Plan and status selects.
+5. `DataTable`.
+6. After `H1-PAGINATION`, the existing `Pagination` footer.
+
+`H1-PAGINATION` adds the footer, the in-page filter sentence, the page query, and an accessible name on the refresh icon. It does not change columns or add `mobileRecord`.
+
+Columns, this order, unchanged: name (link to detail, slug beside it), account number, support number, contact name, email, phone, plan badge, status badge, trial end, user count. Numbers and emails are `dir="ltr"`.
+
+Desktop (≥768 for the table, because `DataTable` switches at `md`): table inside its own scroll wrapper. Toolbar: search, CSV export. Search is server-side with the 250ms debounce. CSV exports the loaded page only; the pagination note does not claim otherwise. Do not hide CSV.
+
+Tablet: same table. Filter selects stay on one row if they fit; they already wrap.
+
+Phone (<768): `DataTable` stacks every cell. That dump remains until the tenants visual slice. That later slice passes `mobileRecord` with this order: name and status, account number, plan, users, then email, phone, support number, trial. Nothing is removed. The row's primary target is the name link, large enough to hit without relying on a 12px slug.
+
+Filter note, visible above the selects once pagination ships: «التصفية على هذه الصفحة فقط» / "Filters apply to this page only."
+
+Global card, all widths: title, refresh, four bulk buttons that wrap, search, two filters, then either a table (`md` and up) or a card with a labeled overflow menu (below `md`). Preview dialog stays the confirmation. 403 keeps the rest of the page and, in the tenants visual slice, replaces silent `null` with one muted line. Pagination does not change this card.
+
+States: loading inside the table, empty label, load error with retry, copy/search reset of page to 1. No new bulk selection.
+
+### 12.4 Tenant detail — `/platform/tenants/[id]`
+
+Not a nav item. Tenants stays `aria-current`.
+
+Order, unchanged:
+
+1. Header: shield, name, slug, back. Name wraps. Do not truncate a legal name to one line if it fits by wrapping.
+2. Error, then success notice.
+3. Identity card.
+4. Change plan.
+5. Trial.
+6. Access.
+7. Contract management.
+8. Commercial operations.
+9. Application overrides.
+10. Audit notice, centered, unchanged text.
+
+Identity grid: two columns below `sm` is too tight for email at 320. The detail slice changes the identity grid to one column below `sm` and two from `sm`, three from `lg`. Fields stay: account number, support number, contact name, email, phone, status, plan, trial end, active users, total users, registered date. Copy reference stays an icon button; the detail slice gives it a 44px hit area without changing the 16px icon, using padding. `aria-label` already exists.
+
+Plan, trial, and access cards: controls wrap. Below `sm`, the primary button is `w-full`. Selects and date inputs are `w-full` below `sm` instead of fixed `w-40` / `w-44`. Disabled rules stay: save plan only when the choice differs; save trial only with a date; clear trial only when one is set; buttons disabled while `saving`.
+
+Access: explanatory notice, then one button. Deactivate is `danger`. Activate is `primary`. The detail slice replaces `window.confirm` with `Dialog` as specified in §8. Payload stays `{ is_active }`.
+
+Contracts: existing create form (plan, status, start, reference, reason) stacks in one column below `sm`, two from `sm`, three from `lg`. History is a table from `lg` and cards below `lg`. Cancel and expire move from `window.confirm` to `Dialog` in the same slice. Create stays a single submit; it is not given a second confirm. Event list stays inside the card.
+
+Commercial: summary counts, product table from `lg` and cards below, assignment dialog, access inspector. Do not redesign the commercial rules. The detail slice only aligns spacing, full-width actions below `sm`, and contained scroll. `min-w-[56rem]` stays inside `overflow-x-auto`.
+
+Application overrides: until its card split ships, horizontal scroll is allowed inside the card. The detail slice adds a card below `md` with the same row actions the table has, matching commercial. Search and filters stay. Preview dialog and confirmation token stay. Do not collapse that flow into `window.confirm` or a thinner dialog.
+
+States: skeleton of two blocks while the tenant is null, including when an error is also shown (current behavior). Retry reloads. Notices are status. Action failures are alert. Copy success is status. Missing tenant id is the API error, not a made-up empty illustration.
+
+Back icon becomes `ChevronLeft` plus `rtl:rotate-180` in this slice, with the visible "back" label kept.
+
+### 12.5 Prices — `/platform/prices`
+
+Read and write both require `platform:manage`. The screen does not grow a read-only mode. A 403 from the API stays an alert with retry.
+
+Order: header, alert, success status, new-price card, history card.
+
+New price, one column below `sm`. From `sm`, two columns. From `lg`, four columns on one row: plan, monthly amount, effective date, save. Below `sm` the save button is `w-full`. Plan options stay the four codes until a copy slice; this spec does not invent marketing names. Amount is `inputMode="decimal"`, parsed only by `riyalToMinor` / `isValidRiyal`. Invalid input sets the existing save-failed alert and does not POST. Currency sent stays `SAR`. Effective date is `type="date"`.
+
+History: table from `md`, cards below `md` (current). Columns: plan, amount (`formatRiyal`, end-aligned), currency, effective date. Empty sentence stays. No edit and no delete; versions are append-only in the current API. Do not add those actions.
+
+No confirm on create. It is a new version, not a destructive replace. Success clears the amount and shows `saved`.
+
+Back icon follows the same chevron rule in this slice.
+
+### 12.6 Integrations — `/platform/integrations`
+
+Order:
+
+1. Header with back and refresh.
+2. Notice (success or test result) and, separately, load error.
+3. Runtime card when the overview payload exists.
+4. Two-column grid from `xl`, one column below: object storage, then malware scanner.
+5. File-scan exceptions, full width.
+6. Document processing, full width of the grid (it is the next grid child).
+7. AI heading, engine card (primary, fallback, attempts), then one card per provider returned by the API.
+
+Do not hardcode a provider that the payload does not list. Gemini keeps save-before-test when the form is dirty. Secret inputs stay `type="password"`. Admin password stays on every write that already requires it. Test and save stay on the card. Disabled and busy labels stay.
+
+Desktop (≥1280, the `xl` grid): storage beside scanner. Processing and AI use the full content width, with the provider cards in three columns at `xl` and two at `md` where the page already does that.
+
+Tablet (768–1023): one column for the settings cards. Fields inside a card may be two columns from `md` where they already are. They must not be four columns at 768.
+
+Phone: one column. Card actions wrap. The load-error row gains `flex-wrap` and `items-start` so the retry button drops under a long message instead of squeezing it. The integrations slice does that and nothing else to the error component.
+
+File-scan exceptions: the four inputs (tenant, reason, expiry, password) are one column below `md`, not four columns. Grant stays at the inline-end on desktop and `w-full` below `sm`. Exception rows already stack below `sm`. Tenant names stay; this is an authorized operations list. The slice moves the hardcoded bilingual strings into `documentOperations` or `platformIntegrations` messages, Arabic and English, without changing the warning that an exception is not a clean scan. Do not drop either language's meaning.
+
+States: the existing tall skeleton on first load; refresh keeps the form; save success and failure are distinct; test failure is an alert, or the existing notice only when that notice already has a failure tone. If `Notice` uses one style for both, the slice adds a failure tone (`text-negative` and `role="alert"`) and keeps success as status. Secrets are never copied into a toast or a query string.
+
+### 12.7 Document operations — `/platform/document-operations`
+
+Order:
+
+1. Header: back, title, subtitle, export audit, refresh.
+2. One notice region today. The page slice splits it: success and progress stay `role="status"`; action and load failures become `role="alert"` with retry where a retry exists.
+3. Loading line. The slice replaces first-load text with three skeleton cards. Refresh does not blank the last overview.
+4. Four runtime tiles: processing mode, worker, network lock, running count. One column below `md`, two from `md`, four from `xl`.
+5. Two cards from `xl`, stacked below: retention policy (days 1–3650, enabled checkbox, save) and retention run (cursor, dry-run default on, apply checkbox only when dry-run is off, run button disabled until apply is checked).
+6. Usage totals and retention-run history, same grid.
+
+Usage shows operations, pages, input tokens, output tokens only. `per_tenant` and provider rows in the payload are not rendered. Run history shows a shortened id, status badge, purged and scanned counts, and the resume cursor with `break-all`. Export stays a button, not a new page. Demo download behavior stays.
+
+Dry-run remains the default. Turning it off clears the apply checkbox. Apply is the only extra confirmation; do not add a second dialog in this slice. The button label switches between run and apply as it does now.
+
+Back control: replace the bare `←` with the shared chevron and a visible text label, min height 44px.
+
+Phone: days input and checkboxes are full width. The run button is `w-full` below `sm`. Cursor strings wrap (`break-all` already). Export and refresh wrap in the header.
+
+### 12.8 Component map
+
+| UI | Source | Used by |
+|---|---|---|
+| Shell, skip link, drawer | new `platform-shell.tsx` in H1-2 | all authenticated routes |
+| Language, theme | existing toggles | login now; shell later |
+| Pagination | `web/src/components/nebrax/pagination.tsx` | tenants, pagination PR |
+| Data table | `web/src/components/data-table.tsx` | tenants |
+| Dialog | `web/src/components/ui/dialog.tsx` | global overrides now; deactivate and contract actions later |
+| Button, card, input, select, badge, skeleton | `web/src/components/ui/*` | all |
+| Money | `formatRiyal`, `riyalToMinor`, `isValidRiyal` | overview, prices, contract amounts |
+| Session | `platform-auth`, `platform-api` | all |
+
+No new visual library. No tenant `Sidebar` or `Topbar`.
+
+### 12.9 Accessibility acceptance, all screens
+
+- One `h1` per page. Shell wordmark is not an `h1`.
+- Every input has a visible label or `aria-label`. Placeholder does not count.
+- Icon-only controls that a slice touches get a name in that slice. H1-2 names the menu, close, and logout controls. Pagination names refresh. The tenants visual slice does not leave a new icon-only control unnamed.
+- Focus-visible ring stays the existing global outline plus the button ring.
+- Drawer: `aria-expanded`, `aria-controls`, `inert` when closed below `lg`, Escape, focus to close on open, focus back to menu on close.
+- `aria-current="page"` on exactly one nav link.
+- Contrast: body text and muted text stay on the token pairs measured in H1-0. Danger fill text is owned by `H1-CONTRAST`.
+- Motion: the existing refresh spin is the only required motion. No new autoplaying animation.
+- Zoom: layouts are flex and grid, not fixed pixel canvases. At 320 CSS pixels the actions wrap. Browser zoom is rechecked in H1-5, not claimed here.
+
+## 13. Risks
 
 - Moving files into `(console)` can break relative imports and tests that import `./page`. H1-2 must update those imports and run the existing platform tests.
 - Two logout buttons on the overview until H1-3. Accepted.
@@ -390,14 +588,14 @@ H1-2 stays blocked until the owner explicitly accepts this spec. Option A approv
 - Contrast rule must stay weaker than the v3 selector. A reviewer checks specificity on the diff.
 - Shared `Button` class names stay, so every gate-off dark danger button gets the new foreground. That is intentional and limited to color.
 
-## 13. What this slice did not do
+## 14. What this slice did not do
 
 - No `web/` or `app/` edit.
 - No merge, no deploy.
 - No live browser of the Next.js app.
 - No start of H1-2, H1-PAGINATION, or H1-CONTRAST.
 
-## 14. Next, after explicit approval of this file
+## 15. Next, after explicit approval of this file
 
 1. `H1-PAGINATION` from latest `main`. Its own branch and PR. Stop before merge.
 2. `H1-CONTRAST` from latest `main`, parallel if the pagination PR is still open, because the files do not overlap. Stop before merge.
