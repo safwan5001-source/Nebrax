@@ -73,7 +73,12 @@ class StorefrontCommerceFirewallTest extends TestCase
             return false;
         }
 
-        return array_intersect($words, $fixture['commerceWords']) !== [] && ! in_array(end($words), $fixture['presentationSuffixes'], true);
+        if (array_intersect($words, $fixture['commerceWords']) === []) {
+            return false;
+        }
+
+        // a hiding / scaling verb anywhere in the key denies it, whatever its suffix (hidePricePosition, hideStockPlacement…)
+        return array_intersect($words, $fixture['hidingVerbs']) !== [] || ! in_array(end($words), $fixture['presentationSuffixes'], true);
     }
 
     /**
@@ -85,7 +90,7 @@ class StorefrontCommerceFirewallTest extends TestCase
     {
         $found = [];
         foreach ($node as $key => $value) {
-            if (is_string($key) && (is_int($value) || is_float($value) || (is_array($value) && array_filter($value, static fn ($v): bool => is_int($v) || is_float($v)) !== []))) {
+            if (is_string($key) && ! in_array($key, $fixture['selectorKeys'], true) && (is_int($value) || is_float($value) || is_bool($value) || (is_array($value) && array_filter($value, static fn ($v): bool => is_int($v) || is_float($v) || is_bool($v)) !== []))) {
                 $words = array_map('strtolower', preg_split('/[\s_\-]+|(?<=[a-z0-9])(?=[A-Z])/', $key, -1, PREG_SPLIT_NO_EMPTY) ?: []);
                 if (array_intersect($words, $fixture['commerceWords']) !== []) {
                     $found[] = $key;
@@ -109,7 +114,7 @@ class StorefrontCommerceFirewallTest extends TestCase
         $this->assertSame([], $offending, 'commercial keys leaked into the normalised presentation: '.implode(', ', $offending));
 
         // value check for the suffix-exempt controls: a key that contains a commerce word never carries a number (V0 §14.3 schema assertion)
-        $this->assertSame([], $this->numericCommerceKeys($normalized, $fixture), 'a commerce-named presentation key accepted a numeric value');
+        $this->assertSame([], $this->numericCommerceKeys($normalized, $fixture), 'a commerce-named presentation key accepted a number or boolean');
 
         $json = json_encode($normalized, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE);
         foreach ($fixture['forbiddenValues'] as $value) {
@@ -150,6 +155,12 @@ class StorefrontCommerceFirewallTest extends TestCase
         $this->assertSame('نوصل اليوم', $byType['deliveryPromise']['content']['body']);
         $this->assertSame('sl1', $byType['slider']['content']['slides'][0]['id']);
         $this->assertSame('g1', $byType['gallery']['content']['images'][0]['id']);
+        // every custom-content block kind (and the nested column blocks) was processed, not dropped
+        $kinds = array_column($byType['customContent']['content']['blocks'], 'kind');
+        $this->assertSame(['heading', 'button', 'paragraph', 'image', 'divider', 'spacer', 'callout', 'columns'], $kinds);
+        $columns = $byType['customContent']['content']['blocks'][7]['columns'];
+        $this->assertSame(['heading', 'paragraph'], array_column($columns[0], 'kind'));
+        $this->assertSame(['button', 'callout'], array_column($columns[1], 'kind'));
         $this->assertSame(['align' => 'center', 'imageRatio' => '1:1', 'imageFit' => 'contain', 'hover' => 'lift'], $sections[0]['design']['cards']);
         $this->assertSame(['offerIds' => ['o1'], 'showTitle' => false], $sections[2]['content']);
 

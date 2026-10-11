@@ -1,5 +1,5 @@
 {
-    "_note": "CUST-HV V9d-4 — commerce firewall (V0 §14.3). A hostile document: every scope the production normalizer accepts (document tokens, branding, header, footer, contact, whatsapp, social, verification, sbc, apps, navigation, pagePresentation, announcements, palette, homepage sections, section content, section design, design.cards, nested items) carries commercial keys (price, discount, stock, availability, tax, total, currency, sku, quantity, shipping fee / amount, freight, delivery fee, offer status, coupon code, cost). After normalisation NO such key may survive anywhere, and no injected value may be reachable. Shared by PHP StorefrontPresentationNormalizer and both TS twins (normalizePresentationConfig). Deny rule (shared by the PHP and both TS suites): split a key into words (camelCase / snake_case / kebab-case, lower-cased); the key is DENIED when any word is in `commerceWords` and the LAST word is not in `presentationSuffixes`. So value-bearing and scaling / hiding controls (price, unitPrice, taxAmount, priceMultiplier, discountScale, hideStock, availabilityVisible, showPrice, offerStatus…) are denied, while position / colour-role / size-step / shape / placement controls over real data (pricePosition, stockTextSize, availabilityBadgePlacement…) and the id selectors (offerIds, productIds) are allowed. `allowedKeys` must never be denied; `deniedKeys` must always be. Exempt (suffix) keys are checked by VALUE as well: a key that contains a commerce word must never carry a number after normalisation (priceSize: 0, stockTextSize: 0, pricePosition: 5 are injected; presentation controls are bounded string enums), which is the schema assertion V0 §14.3 asks for. Only the approved selector keys (`selectorKeys`: productIds, offerIds) are exempt by name as id lists; any other `…Ids` key (priceIds, stockIds) is denied, and a commerce-named key must not carry a number or a list containing one.",
+    "_note": "CUST-HV V9d-4 — commerce firewall (V0 §14.3). A hostile document: every scope the production normalizer accepts (document tokens, branding, header, footer, contact, whatsapp, social, verification, sbc, apps, navigation, pagePresentation, announcements, palette, homepage sections, section content, section design, design.cards, nested items) carries commercial keys (price, discount, stock, availability, tax, total, currency, sku, quantity, shipping fee / amount, freight, delivery fee, offer status, coupon code, cost). After normalisation NO such key may survive anywhere, and no injected value may be reachable. Shared by PHP StorefrontPresentationNormalizer and both TS twins (normalizePresentationConfig). Deny rule (shared by the PHP and both TS suites): split a key into words (camelCase / snake_case / kebab-case, lower-cased); the key is DENIED when any word is in `commerceWords` and the LAST word is not in `presentationSuffixes`. So value-bearing and scaling / hiding controls (price, unitPrice, taxAmount, priceMultiplier, discountScale, hideStock, availabilityVisible, showPrice, offerStatus…) are denied, while position / colour-role / size-step / shape / placement controls over real data (pricePosition, stockTextSize, availabilityBadgePlacement…) and the id selectors (offerIds, productIds) are allowed. `allowedKeys` must never be denied; `deniedKeys` must always be. Exempt (suffix) keys are checked by VALUE as well: a key that contains a commerce word must never carry a number after normalisation (priceSize: 0, stockTextSize: 0, pricePosition: 5 are injected; presentation controls are bounded string enums), which is the schema assertion V0 §14.3 asks for. Only the approved selector keys (`selectorKeys`: productIds, offerIds) are exempt by name as id lists; any other `…Ids` key (priceIds, stockIds) is denied, and a commerce-named key must not carry a number or a list containing one. A commerce-named key is also denied when it contains a hiding / scaling verb (`hidingVerbs`: hidePricePosition, hideStockPlacement), whatever its suffix, and a commerce-named key must not carry a number, a boolean or a list containing one (controls are bounded string enums).",
     "commerceWords": [
         "price",
         "cost",
@@ -117,7 +117,9 @@
             ],
             "stockIds": [
                 3
-            ]
+            ],
+            "hidePricePosition": true,
+            "hideStockPlacement": true
         },
         "surfaces": {
             "radius": "md",
@@ -169,7 +171,9 @@
             ],
             "stockIds": [
                 3
-            ]
+            ],
+            "hidePricePosition": true,
+            "hideStockPlacement": true
         },
         "typography": {
             "headingScale": "lg",
@@ -221,7 +225,9 @@
             ],
             "stockIds": [
                 3
-            ]
+            ],
+            "hidePricePosition": true,
+            "hideStockPlacement": true
         },
         "layout": {
             "contentWidth": "wide",
@@ -273,7 +279,9 @@
             ],
             "stockIds": [
                 3
-            ]
+            ],
+            "hidePricePosition": true,
+            "hideStockPlacement": true
         },
         "motion": {
             "reveal": "fade-up",
@@ -325,7 +333,9 @@
             ],
             "stockIds": [
                 3
-            ]
+            ],
+            "hidePricePosition": true,
+            "hideStockPlacement": true
         },
         "productCard": {
             "density": "compact",
@@ -377,7 +387,9 @@
             ],
             "stockIds": [
                 3
-            ]
+            ],
+            "hidePricePosition": true,
+            "hideStockPlacement": true
         },
         "homepage": {
             "sections": [
@@ -449,7 +461,9 @@
                         ],
                         "stockIds": [
                             3
-                        ]
+                        ],
+                        "hidePricePosition": true,
+                        "hideStockPlacement": true
                     },
                     "design": {
                         "layout": "rail",
@@ -507,7 +521,9 @@
                             ],
                             "stockIds": [
                                 3
-                            ]
+                            ],
+                            "hidePricePosition": true,
+                            "hideStockPlacement": true
                         },
                         "border": "hairline",
                         "radius": "md",
@@ -562,7 +578,9 @@
                             ],
                             "stockIds": [
                                 3
-                            ]
+                            ],
+                            "hidePricePosition": true,
+                            "hideStockPlacement": true
                         },
                         "price": 1,
                         "priceMinor": 100,
@@ -612,7 +630,9 @@
                         ],
                         "stockIds": [
                             3
-                        ]
+                        ],
+                        "hidePricePosition": true,
+                        "hideStockPlacement": true
                     },
                     "shippingFee": 1500,
                     "shippingAmount": 900,
@@ -649,7 +669,9 @@
                     ],
                     "stockIds": [
                         3
-                    ]
+                    ],
+                    "hidePricePosition": true,
+                    "hideStockPlacement": true
                 },
                 {
                     "id": "s-2",
@@ -721,7 +743,9 @@
                         ],
                         "stockIds": [
                             3
-                        ]
+                        ],
+                        "hidePricePosition": true,
+                        "hideStockPlacement": true
                     },
                     "design": {
                         "layout": "rail",
@@ -779,7 +803,9 @@
                             ],
                             "stockIds": [
                                 3
-                            ]
+                            ],
+                            "hidePricePosition": true,
+                            "hideStockPlacement": true
                         },
                         "border": "hairline",
                         "radius": "md",
@@ -834,7 +860,9 @@
                             ],
                             "stockIds": [
                                 3
-                            ]
+                            ],
+                            "hidePricePosition": true,
+                            "hideStockPlacement": true
                         },
                         "price": 1,
                         "priceMinor": 100,
@@ -884,7 +912,9 @@
                         ],
                         "stockIds": [
                             3
-                        ]
+                        ],
+                        "hidePricePosition": true,
+                        "hideStockPlacement": true
                     },
                     "shippingFee": 1500,
                     "shippingAmount": 900,
@@ -921,7 +951,9 @@
                     ],
                     "stockIds": [
                         3
-                    ]
+                    ],
+                    "hidePricePosition": true,
+                    "hideStockPlacement": true
                 },
                 {
                     "id": "s-3",
@@ -993,7 +1025,9 @@
                         ],
                         "stockIds": [
                             3
-                        ]
+                        ],
+                        "hidePricePosition": true,
+                        "hideStockPlacement": true
                     },
                     "design": {
                         "columns": 2,
@@ -1050,7 +1084,9 @@
                             ],
                             "stockIds": [
                                 3
-                            ]
+                            ],
+                            "hidePricePosition": true,
+                            "hideStockPlacement": true
                         },
                         "price": 1,
                         "priceMinor": 100,
@@ -1100,7 +1136,9 @@
                         ],
                         "stockIds": [
                             3
-                        ]
+                        ],
+                        "hidePricePosition": true,
+                        "hideStockPlacement": true
                     },
                     "shippingFee": 1500,
                     "shippingAmount": 900,
@@ -1137,7 +1175,9 @@
                     ],
                     "stockIds": [
                         3
-                    ]
+                    ],
+                    "hidePricePosition": true,
+                    "hideStockPlacement": true
                 },
                 {
                     "id": "s-4",
@@ -1209,7 +1249,9 @@
                             ],
                             "stockIds": [
                                 3
-                            ]
+                            ],
+                            "hidePricePosition": true,
+                            "hideStockPlacement": true
                         },
                         "limit": 8,
                         "deliverToday": false,
@@ -1261,7 +1303,9 @@
                         ],
                         "stockIds": [
                             3
-                        ]
+                        ],
+                        "hidePricePosition": true,
+                        "hideStockPlacement": true
                     },
                     "design": {
                         "layout": "rail",
@@ -1319,7 +1363,9 @@
                             ],
                             "stockIds": [
                                 3
-                            ]
+                            ],
+                            "hidePricePosition": true,
+                            "hideStockPlacement": true
                         },
                         "border": "hairline",
                         "radius": "md",
@@ -1374,7 +1420,9 @@
                             ],
                             "stockIds": [
                                 3
-                            ]
+                            ],
+                            "hidePricePosition": true,
+                            "hideStockPlacement": true
                         },
                         "price": 1,
                         "priceMinor": 100,
@@ -1424,7 +1472,9 @@
                         ],
                         "stockIds": [
                             3
-                        ]
+                        ],
+                        "hidePricePosition": true,
+                        "hideStockPlacement": true
                     },
                     "shippingFee": 1500,
                     "shippingAmount": 900,
@@ -1461,7 +1511,9 @@
                     ],
                     "stockIds": [
                         3
-                    ]
+                    ],
+                    "hidePricePosition": true,
+                    "hideStockPlacement": true
                 },
                 {
                     "id": "s-5",
@@ -1534,7 +1586,9 @@
                                 ],
                                 "stockIds": [
                                     3
-                                ]
+                                ],
+                                "hidePricePosition": true,
+                                "hideStockPlacement": true
                             }
                         ],
                         "price": 1,
@@ -1585,7 +1639,9 @@
                         ],
                         "stockIds": [
                             3
-                        ]
+                        ],
+                        "hidePricePosition": true,
+                        "hideStockPlacement": true
                     },
                     "design": {
                         "height": "tall",
@@ -1637,7 +1693,9 @@
                         ],
                         "stockIds": [
                             3
-                        ]
+                        ],
+                        "hidePricePosition": true,
+                        "hideStockPlacement": true
                     },
                     "shippingFee": 1500,
                     "shippingAmount": 900,
@@ -1674,7 +1732,9 @@
                     ],
                     "stockIds": [
                         3
-                    ]
+                    ],
+                    "hidePricePosition": true,
+                    "hideStockPlacement": true
                 },
                 {
                     "id": "s-6",
@@ -1747,7 +1807,9 @@
                                 ],
                                 "stockIds": [
                                     3
-                                ]
+                                ],
+                                "hidePricePosition": true,
+                                "hideStockPlacement": true
                             }
                         ],
                         "price": 1,
@@ -1798,7 +1860,9 @@
                         ],
                         "stockIds": [
                             3
-                        ]
+                        ],
+                        "hidePricePosition": true,
+                        "hideStockPlacement": true
                     },
                     "design": {
                         "layout": "columns-3",
@@ -1850,7 +1914,9 @@
                         ],
                         "stockIds": [
                             3
-                        ]
+                        ],
+                        "hidePricePosition": true,
+                        "hideStockPlacement": true
                     },
                     "shippingFee": 1500,
                     "shippingAmount": 900,
@@ -1887,7 +1953,9 @@
                     ],
                     "stockIds": [
                         3
-                    ]
+                    ],
+                    "hidePricePosition": true,
+                    "hideStockPlacement": true
                 },
                 {
                     "id": "s-7",
@@ -1960,7 +2028,9 @@
                                 ],
                                 "stockIds": [
                                     3
-                                ]
+                                ],
+                                "hidePricePosition": true,
+                                "hideStockPlacement": true
                             },
                             {
                                 "id": "b2",
@@ -2016,7 +2086,633 @@
                                 ],
                                 "stockIds": [
                                     3
-                                ]
+                                ],
+                                "hidePricePosition": true,
+                                "hideStockPlacement": true
+                            },
+                            {
+                                "id": "b3",
+                                "kind": "paragraph",
+                                "text": "نص",
+                                "price": 1,
+                                "priceMinor": 100,
+                                "discount": "10%",
+                                "discountPercent": 10,
+                                "stock": 0,
+                                "stockLabel": "low",
+                                "availability": "in_stock",
+                                "tax": 15,
+                                "vat": "exempt",
+                                "total": 5,
+                                "currency": "USD",
+                                "sku": "X",
+                                "quantity": 3,
+                                "shippingFee": 1500,
+                                "shippingAmount": 900,
+                                "freight": "free_shipping",
+                                "deliveryFee": 200,
+                                "fee": 5,
+                                "offerStatus": "expired",
+                                "offer_status": "live",
+                                "couponCode": "SAVE20",
+                                "cost": 7,
+                                "salePrice": 9000,
+                                "compareAtPrice": 12000,
+                                "stockCount": 4,
+                                "taxRate": 15,
+                                "discountAmount": 300,
+                                "grandTotal": 999,
+                                "unitPrice": 8000,
+                                "taxAmount": 1200,
+                                "shippingCost": 2500,
+                                "checkoutTotal": 31000,
+                                "subtotal": 29800,
+                                "priceMultiplier": 1.1,
+                                "discountScale": 2,
+                                "hideStock": true,
+                                "availabilityVisible": false,
+                                "showPrice": true,
+                                "deliveryCharge": 2500,
+                                "priceSize": 0,
+                                "stockTextSize": 0,
+                                "pricePosition": 5,
+                                "availabilityBadgePlacement": 3,
+                                "priceIds": [
+                                    19000
+                                ],
+                                "stockIds": [
+                                    3
+                                ],
+                                "hidePricePosition": true,
+                                "hideStockPlacement": true
+                            },
+                            {
+                                "id": "b4",
+                                "kind": "image",
+                                "media": {
+                                    "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+                                    "price": 1,
+                                    "priceMinor": 100,
+                                    "discount": "10%",
+                                    "discountPercent": 10,
+                                    "stock": 0,
+                                    "stockLabel": "low",
+                                    "availability": "in_stock",
+                                    "tax": 15,
+                                    "vat": "exempt",
+                                    "total": 5,
+                                    "currency": "USD",
+                                    "sku": "X",
+                                    "quantity": 3,
+                                    "shippingFee": 1500,
+                                    "shippingAmount": 900,
+                                    "freight": "free_shipping",
+                                    "deliveryFee": 200,
+                                    "fee": 5,
+                                    "offerStatus": "expired",
+                                    "offer_status": "live",
+                                    "couponCode": "SAVE20",
+                                    "cost": 7,
+                                    "salePrice": 9000,
+                                    "compareAtPrice": 12000,
+                                    "stockCount": 4,
+                                    "taxRate": 15,
+                                    "discountAmount": 300,
+                                    "grandTotal": 999,
+                                    "unitPrice": 8000,
+                                    "taxAmount": 1200,
+                                    "shippingCost": 2500,
+                                    "checkoutTotal": 31000,
+                                    "subtotal": 29800,
+                                    "priceMultiplier": 1.1,
+                                    "discountScale": 2,
+                                    "hideStock": true,
+                                    "availabilityVisible": false,
+                                    "showPrice": true,
+                                    "deliveryCharge": 2500,
+                                    "priceSize": 0,
+                                    "stockTextSize": 0,
+                                    "pricePosition": 5,
+                                    "availabilityBadgePlacement": 3,
+                                    "priceIds": [
+                                        19000
+                                    ],
+                                    "stockIds": [
+                                        3
+                                    ],
+                                    "hidePricePosition": true,
+                                    "hideStockPlacement": true
+                                },
+                                "caption": "صورة",
+                                "link": "/products",
+                                "price": 1,
+                                "priceMinor": 100,
+                                "discount": "10%",
+                                "discountPercent": 10,
+                                "stock": 0,
+                                "stockLabel": "low",
+                                "availability": "in_stock",
+                                "tax": 15,
+                                "vat": "exempt",
+                                "total": 5,
+                                "currency": "USD",
+                                "sku": "X",
+                                "quantity": 3,
+                                "shippingFee": 1500,
+                                "shippingAmount": 900,
+                                "freight": "free_shipping",
+                                "deliveryFee": 200,
+                                "fee": 5,
+                                "offerStatus": "expired",
+                                "offer_status": "live",
+                                "couponCode": "SAVE20",
+                                "cost": 7,
+                                "salePrice": 9000,
+                                "compareAtPrice": 12000,
+                                "stockCount": 4,
+                                "taxRate": 15,
+                                "discountAmount": 300,
+                                "grandTotal": 999,
+                                "unitPrice": 8000,
+                                "taxAmount": 1200,
+                                "shippingCost": 2500,
+                                "checkoutTotal": 31000,
+                                "subtotal": 29800,
+                                "priceMultiplier": 1.1,
+                                "discountScale": 2,
+                                "hideStock": true,
+                                "availabilityVisible": false,
+                                "showPrice": true,
+                                "deliveryCharge": 2500,
+                                "priceSize": 0,
+                                "stockTextSize": 0,
+                                "pricePosition": 5,
+                                "availabilityBadgePlacement": 3,
+                                "priceIds": [
+                                    19000
+                                ],
+                                "stockIds": [
+                                    3
+                                ],
+                                "hidePricePosition": true,
+                                "hideStockPlacement": true
+                            },
+                            {
+                                "id": "b5",
+                                "kind": "divider",
+                                "style": "dots",
+                                "price": 1,
+                                "priceMinor": 100,
+                                "discount": "10%",
+                                "discountPercent": 10,
+                                "stock": 0,
+                                "stockLabel": "low",
+                                "availability": "in_stock",
+                                "tax": 15,
+                                "vat": "exempt",
+                                "total": 5,
+                                "currency": "USD",
+                                "sku": "X",
+                                "quantity": 3,
+                                "shippingFee": 1500,
+                                "shippingAmount": 900,
+                                "freight": "free_shipping",
+                                "deliveryFee": 200,
+                                "fee": 5,
+                                "offerStatus": "expired",
+                                "offer_status": "live",
+                                "couponCode": "SAVE20",
+                                "cost": 7,
+                                "salePrice": 9000,
+                                "compareAtPrice": 12000,
+                                "stockCount": 4,
+                                "taxRate": 15,
+                                "discountAmount": 300,
+                                "grandTotal": 999,
+                                "unitPrice": 8000,
+                                "taxAmount": 1200,
+                                "shippingCost": 2500,
+                                "checkoutTotal": 31000,
+                                "subtotal": 29800,
+                                "priceMultiplier": 1.1,
+                                "discountScale": 2,
+                                "hideStock": true,
+                                "availabilityVisible": false,
+                                "showPrice": true,
+                                "deliveryCharge": 2500,
+                                "priceSize": 0,
+                                "stockTextSize": 0,
+                                "pricePosition": 5,
+                                "availabilityBadgePlacement": 3,
+                                "priceIds": [
+                                    19000
+                                ],
+                                "stockIds": [
+                                    3
+                                ],
+                                "hidePricePosition": true,
+                                "hideStockPlacement": true
+                            },
+                            {
+                                "id": "b6",
+                                "kind": "spacer",
+                                "size": "lg",
+                                "price": 1,
+                                "priceMinor": 100,
+                                "discount": "10%",
+                                "discountPercent": 10,
+                                "stock": 0,
+                                "stockLabel": "low",
+                                "availability": "in_stock",
+                                "tax": 15,
+                                "vat": "exempt",
+                                "total": 5,
+                                "currency": "USD",
+                                "sku": "X",
+                                "quantity": 3,
+                                "shippingFee": 1500,
+                                "shippingAmount": 900,
+                                "freight": "free_shipping",
+                                "deliveryFee": 200,
+                                "fee": 5,
+                                "offerStatus": "expired",
+                                "offer_status": "live",
+                                "couponCode": "SAVE20",
+                                "cost": 7,
+                                "salePrice": 9000,
+                                "compareAtPrice": 12000,
+                                "stockCount": 4,
+                                "taxRate": 15,
+                                "discountAmount": 300,
+                                "grandTotal": 999,
+                                "unitPrice": 8000,
+                                "taxAmount": 1200,
+                                "shippingCost": 2500,
+                                "checkoutTotal": 31000,
+                                "subtotal": 29800,
+                                "priceMultiplier": 1.1,
+                                "discountScale": 2,
+                                "hideStock": true,
+                                "availabilityVisible": false,
+                                "showPrice": true,
+                                "deliveryCharge": 2500,
+                                "priceSize": 0,
+                                "stockTextSize": 0,
+                                "pricePosition": 5,
+                                "availabilityBadgePlacement": 3,
+                                "priceIds": [
+                                    19000
+                                ],
+                                "stockIds": [
+                                    3
+                                ],
+                                "hidePricePosition": true,
+                                "hideStockPlacement": true
+                            },
+                            {
+                                "id": "b7",
+                                "kind": "callout",
+                                "text": "تنبيه",
+                                "tone": "warning",
+                                "price": 1,
+                                "priceMinor": 100,
+                                "discount": "10%",
+                                "discountPercent": 10,
+                                "stock": 0,
+                                "stockLabel": "low",
+                                "availability": "in_stock",
+                                "tax": 15,
+                                "vat": "exempt",
+                                "total": 5,
+                                "currency": "USD",
+                                "sku": "X",
+                                "quantity": 3,
+                                "shippingFee": 1500,
+                                "shippingAmount": 900,
+                                "freight": "free_shipping",
+                                "deliveryFee": 200,
+                                "fee": 5,
+                                "offerStatus": "expired",
+                                "offer_status": "live",
+                                "couponCode": "SAVE20",
+                                "cost": 7,
+                                "salePrice": 9000,
+                                "compareAtPrice": 12000,
+                                "stockCount": 4,
+                                "taxRate": 15,
+                                "discountAmount": 300,
+                                "grandTotal": 999,
+                                "unitPrice": 8000,
+                                "taxAmount": 1200,
+                                "shippingCost": 2500,
+                                "checkoutTotal": 31000,
+                                "subtotal": 29800,
+                                "priceMultiplier": 1.1,
+                                "discountScale": 2,
+                                "hideStock": true,
+                                "availabilityVisible": false,
+                                "showPrice": true,
+                                "deliveryCharge": 2500,
+                                "priceSize": 0,
+                                "stockTextSize": 0,
+                                "pricePosition": 5,
+                                "availabilityBadgePlacement": 3,
+                                "priceIds": [
+                                    19000
+                                ],
+                                "stockIds": [
+                                    3
+                                ],
+                                "hidePricePosition": true,
+                                "hideStockPlacement": true
+                            },
+                            {
+                                "id": "b8",
+                                "kind": "columns",
+                                "columns": [
+                                    [
+                                        {
+                                            "id": "c1",
+                                            "kind": "heading",
+                                            "text": "عمود",
+                                            "price": 1,
+                                            "priceMinor": 100,
+                                            "discount": "10%",
+                                            "discountPercent": 10,
+                                            "stock": 0,
+                                            "stockLabel": "low",
+                                            "availability": "in_stock",
+                                            "tax": 15,
+                                            "vat": "exempt",
+                                            "total": 5,
+                                            "currency": "USD",
+                                            "sku": "X",
+                                            "quantity": 3,
+                                            "shippingFee": 1500,
+                                            "shippingAmount": 900,
+                                            "freight": "free_shipping",
+                                            "deliveryFee": 200,
+                                            "fee": 5,
+                                            "offerStatus": "expired",
+                                            "offer_status": "live",
+                                            "couponCode": "SAVE20",
+                                            "cost": 7,
+                                            "salePrice": 9000,
+                                            "compareAtPrice": 12000,
+                                            "stockCount": 4,
+                                            "taxRate": 15,
+                                            "discountAmount": 300,
+                                            "grandTotal": 999,
+                                            "unitPrice": 8000,
+                                            "taxAmount": 1200,
+                                            "shippingCost": 2500,
+                                            "checkoutTotal": 31000,
+                                            "subtotal": 29800,
+                                            "priceMultiplier": 1.1,
+                                            "discountScale": 2,
+                                            "hideStock": true,
+                                            "availabilityVisible": false,
+                                            "showPrice": true,
+                                            "deliveryCharge": 2500,
+                                            "priceSize": 0,
+                                            "stockTextSize": 0,
+                                            "pricePosition": 5,
+                                            "availabilityBadgePlacement": 3,
+                                            "priceIds": [
+                                                19000
+                                            ],
+                                            "stockIds": [
+                                                3
+                                            ],
+                                            "hidePricePosition": true,
+                                            "hideStockPlacement": true
+                                        },
+                                        {
+                                            "id": "c2",
+                                            "kind": "paragraph",
+                                            "text": "نص",
+                                            "price": 1,
+                                            "priceMinor": 100,
+                                            "discount": "10%",
+                                            "discountPercent": 10,
+                                            "stock": 0,
+                                            "stockLabel": "low",
+                                            "availability": "in_stock",
+                                            "tax": 15,
+                                            "vat": "exempt",
+                                            "total": 5,
+                                            "currency": "USD",
+                                            "sku": "X",
+                                            "quantity": 3,
+                                            "shippingFee": 1500,
+                                            "shippingAmount": 900,
+                                            "freight": "free_shipping",
+                                            "deliveryFee": 200,
+                                            "fee": 5,
+                                            "offerStatus": "expired",
+                                            "offer_status": "live",
+                                            "couponCode": "SAVE20",
+                                            "cost": 7,
+                                            "salePrice": 9000,
+                                            "compareAtPrice": 12000,
+                                            "stockCount": 4,
+                                            "taxRate": 15,
+                                            "discountAmount": 300,
+                                            "grandTotal": 999,
+                                            "unitPrice": 8000,
+                                            "taxAmount": 1200,
+                                            "shippingCost": 2500,
+                                            "checkoutTotal": 31000,
+                                            "subtotal": 29800,
+                                            "priceMultiplier": 1.1,
+                                            "discountScale": 2,
+                                            "hideStock": true,
+                                            "availabilityVisible": false,
+                                            "showPrice": true,
+                                            "deliveryCharge": 2500,
+                                            "priceSize": 0,
+                                            "stockTextSize": 0,
+                                            "pricePosition": 5,
+                                            "availabilityBadgePlacement": 3,
+                                            "priceIds": [
+                                                19000
+                                            ],
+                                            "stockIds": [
+                                                3
+                                            ],
+                                            "hidePricePosition": true,
+                                            "hideStockPlacement": true
+                                        }
+                                    ],
+                                    [
+                                        {
+                                            "id": "c3",
+                                            "kind": "button",
+                                            "label": "اشتر",
+                                            "href": "/products",
+                                            "style": "outline",
+                                            "price": 1,
+                                            "priceMinor": 100,
+                                            "discount": "10%",
+                                            "discountPercent": 10,
+                                            "stock": 0,
+                                            "stockLabel": "low",
+                                            "availability": "in_stock",
+                                            "tax": 15,
+                                            "vat": "exempt",
+                                            "total": 5,
+                                            "currency": "USD",
+                                            "sku": "X",
+                                            "quantity": 3,
+                                            "shippingFee": 1500,
+                                            "shippingAmount": 900,
+                                            "freight": "free_shipping",
+                                            "deliveryFee": 200,
+                                            "fee": 5,
+                                            "offerStatus": "expired",
+                                            "offer_status": "live",
+                                            "couponCode": "SAVE20",
+                                            "cost": 7,
+                                            "salePrice": 9000,
+                                            "compareAtPrice": 12000,
+                                            "stockCount": 4,
+                                            "taxRate": 15,
+                                            "discountAmount": 300,
+                                            "grandTotal": 999,
+                                            "unitPrice": 8000,
+                                            "taxAmount": 1200,
+                                            "shippingCost": 2500,
+                                            "checkoutTotal": 31000,
+                                            "subtotal": 29800,
+                                            "priceMultiplier": 1.1,
+                                            "discountScale": 2,
+                                            "hideStock": true,
+                                            "availabilityVisible": false,
+                                            "showPrice": true,
+                                            "deliveryCharge": 2500,
+                                            "priceSize": 0,
+                                            "stockTextSize": 0,
+                                            "pricePosition": 5,
+                                            "availabilityBadgePlacement": 3,
+                                            "priceIds": [
+                                                19000
+                                            ],
+                                            "stockIds": [
+                                                3
+                                            ],
+                                            "hidePricePosition": true,
+                                            "hideStockPlacement": true
+                                        },
+                                        {
+                                            "id": "c4",
+                                            "kind": "callout",
+                                            "text": "ملاحظة",
+                                            "tone": "success",
+                                            "price": 1,
+                                            "priceMinor": 100,
+                                            "discount": "10%",
+                                            "discountPercent": 10,
+                                            "stock": 0,
+                                            "stockLabel": "low",
+                                            "availability": "in_stock",
+                                            "tax": 15,
+                                            "vat": "exempt",
+                                            "total": 5,
+                                            "currency": "USD",
+                                            "sku": "X",
+                                            "quantity": 3,
+                                            "shippingFee": 1500,
+                                            "shippingAmount": 900,
+                                            "freight": "free_shipping",
+                                            "deliveryFee": 200,
+                                            "fee": 5,
+                                            "offerStatus": "expired",
+                                            "offer_status": "live",
+                                            "couponCode": "SAVE20",
+                                            "cost": 7,
+                                            "salePrice": 9000,
+                                            "compareAtPrice": 12000,
+                                            "stockCount": 4,
+                                            "taxRate": 15,
+                                            "discountAmount": 300,
+                                            "grandTotal": 999,
+                                            "unitPrice": 8000,
+                                            "taxAmount": 1200,
+                                            "shippingCost": 2500,
+                                            "checkoutTotal": 31000,
+                                            "subtotal": 29800,
+                                            "priceMultiplier": 1.1,
+                                            "discountScale": 2,
+                                            "hideStock": true,
+                                            "availabilityVisible": false,
+                                            "showPrice": true,
+                                            "deliveryCharge": 2500,
+                                            "priceSize": 0,
+                                            "stockTextSize": 0,
+                                            "pricePosition": 5,
+                                            "availabilityBadgePlacement": 3,
+                                            "priceIds": [
+                                                19000
+                                            ],
+                                            "stockIds": [
+                                                3
+                                            ],
+                                            "hidePricePosition": true,
+                                            "hideStockPlacement": true
+                                        }
+                                    ]
+                                ],
+                                "price": 1,
+                                "priceMinor": 100,
+                                "discount": "10%",
+                                "discountPercent": 10,
+                                "stock": 0,
+                                "stockLabel": "low",
+                                "availability": "in_stock",
+                                "tax": 15,
+                                "vat": "exempt",
+                                "total": 5,
+                                "currency": "USD",
+                                "sku": "X",
+                                "quantity": 3,
+                                "shippingFee": 1500,
+                                "shippingAmount": 900,
+                                "freight": "free_shipping",
+                                "deliveryFee": 200,
+                                "fee": 5,
+                                "offerStatus": "expired",
+                                "offer_status": "live",
+                                "couponCode": "SAVE20",
+                                "cost": 7,
+                                "salePrice": 9000,
+                                "compareAtPrice": 12000,
+                                "stockCount": 4,
+                                "taxRate": 15,
+                                "discountAmount": 300,
+                                "grandTotal": 999,
+                                "unitPrice": 8000,
+                                "taxAmount": 1200,
+                                "shippingCost": 2500,
+                                "checkoutTotal": 31000,
+                                "subtotal": 29800,
+                                "priceMultiplier": 1.1,
+                                "discountScale": 2,
+                                "hideStock": true,
+                                "availabilityVisible": false,
+                                "showPrice": true,
+                                "deliveryCharge": 2500,
+                                "priceSize": 0,
+                                "stockTextSize": 0,
+                                "pricePosition": 5,
+                                "availabilityBadgePlacement": 3,
+                                "priceIds": [
+                                    19000
+                                ],
+                                "stockIds": [
+                                    3
+                                ],
+                                "hidePricePosition": true,
+                                "hideStockPlacement": true
                             }
                         ],
                         "price": 1,
@@ -2067,7 +2763,9 @@
                         ],
                         "stockIds": [
                             3
-                        ]
+                        ],
+                        "hidePricePosition": true,
+                        "hideStockPlacement": true
                     },
                     "design": {
                         "align": "center",
@@ -2119,7 +2817,9 @@
                         ],
                         "stockIds": [
                             3
-                        ]
+                        ],
+                        "hidePricePosition": true,
+                        "hideStockPlacement": true
                     },
                     "shippingFee": 1500,
                     "shippingAmount": 900,
@@ -2156,7 +2856,9 @@
                     ],
                     "stockIds": [
                         3
-                    ]
+                    ],
+                    "hidePricePosition": true,
+                    "hideStockPlacement": true
                 },
                 {
                     "id": "s-cat",
@@ -2210,7 +2912,9 @@
                     ],
                     "stockIds": [
                         3
-                    ]
+                    ],
+                    "hidePricePosition": true,
+                    "hideStockPlacement": true
                 },
                 {
                     "id": "s-wh",
@@ -2264,7 +2968,9 @@
                     ],
                     "stockIds": [
                         3
-                    ]
+                    ],
+                    "hidePricePosition": true,
+                    "hideStockPlacement": true
                 },
                 {
                     "id": "s-ban",
@@ -2325,7 +3031,9 @@
                         ],
                         "stockIds": [
                             3
-                        ]
+                        ],
+                        "hidePricePosition": true,
+                        "hideStockPlacement": true
                     },
                     "price": 1,
                     "priceMinor": 100,
@@ -2375,7 +3083,9 @@
                     ],
                     "stockIds": [
                         3
-                    ]
+                    ],
+                    "hidePricePosition": true,
+                    "hideStockPlacement": true
                 },
                 {
                     "id": "s-app",
@@ -2429,7 +3139,9 @@
                     ],
                     "stockIds": [
                         3
-                    ]
+                    ],
+                    "hidePricePosition": true,
+                    "hideStockPlacement": true
                 },
                 {
                     "id": "s-disc",
@@ -2488,7 +3200,9 @@
                         ],
                         "stockIds": [
                             3
-                        ]
+                        ],
+                        "hidePricePosition": true,
+                        "hideStockPlacement": true
                     },
                     "price": 1,
                     "priceMinor": 100,
@@ -2538,7 +3252,9 @@
                     ],
                     "stockIds": [
                         3
-                    ]
+                    ],
+                    "hidePricePosition": true,
+                    "hideStockPlacement": true
                 },
                 {
                     "id": "s-del",
@@ -2595,7 +3311,9 @@
                         ],
                         "stockIds": [
                             3
-                        ]
+                        ],
+                        "hidePricePosition": true,
+                        "hideStockPlacement": true
                     },
                     "price": 1,
                     "priceMinor": 100,
@@ -2645,7 +3363,9 @@
                     ],
                     "stockIds": [
                         3
-                    ]
+                    ],
+                    "hidePricePosition": true,
+                    "hideStockPlacement": true
                 },
                 {
                     "id": "s-sld",
@@ -2705,7 +3425,9 @@
                                     ],
                                     "stockIds": [
                                         3
-                                    ]
+                                    ],
+                                    "hidePricePosition": true,
+                                    "hideStockPlacement": true
                                 },
                                 "price": 1,
                                 "priceMinor": 100,
@@ -2755,7 +3477,9 @@
                                 ],
                                 "stockIds": [
                                     3
-                                ]
+                                ],
+                                "hidePricePosition": true,
+                                "hideStockPlacement": true
                             }
                         ],
                         "price": 1,
@@ -2806,7 +3530,9 @@
                         ],
                         "stockIds": [
                             3
-                        ]
+                        ],
+                        "hidePricePosition": true,
+                        "hideStockPlacement": true
                     },
                     "price": 1,
                     "priceMinor": 100,
@@ -2856,7 +3582,9 @@
                     ],
                     "stockIds": [
                         3
-                    ]
+                    ],
+                    "hidePricePosition": true,
+                    "hideStockPlacement": true
                 },
                 {
                     "id": "s-gal",
@@ -2916,7 +3644,9 @@
                                     ],
                                     "stockIds": [
                                         3
-                                    ]
+                                    ],
+                                    "hidePricePosition": true,
+                                    "hideStockPlacement": true
                                 },
                                 "price": 1,
                                 "priceMinor": 100,
@@ -2966,7 +3696,9 @@
                                 ],
                                 "stockIds": [
                                     3
-                                ]
+                                ],
+                                "hidePricePosition": true,
+                                "hideStockPlacement": true
                             }
                         ],
                         "price": 1,
@@ -3017,7 +3749,9 @@
                         ],
                         "stockIds": [
                             3
-                        ]
+                        ],
+                        "hidePricePosition": true,
+                        "hideStockPlacement": true
                     },
                     "price": 1,
                     "priceMinor": 100,
@@ -3067,7 +3801,9 @@
                     ],
                     "stockIds": [
                         3
-                    ]
+                    ],
+                    "hidePricePosition": true,
+                    "hideStockPlacement": true
                 }
             ],
             "price": 1,
@@ -3118,7 +3854,9 @@
             ],
             "stockIds": [
                 3
-            ]
+            ],
+            "hidePricePosition": true,
+            "hideStockPlacement": true
         },
         "price": 1,
         "priceMinor": 100,
@@ -3183,7 +3921,9 @@
             ],
             "stockIds": [
                 3
-            ]
+            ],
+            "hidePricePosition": true,
+            "hideStockPlacement": true
         },
         "header": {
             "style": "compact",
@@ -3242,7 +3982,9 @@
                     ],
                     "stockIds": [
                         3
-                    ]
+                    ],
+                    "hidePricePosition": true,
+                    "hideStockPlacement": true
                 }
             ],
             "design": {
@@ -3295,7 +4037,9 @@
                 ],
                 "stockIds": [
                     3
-                ]
+                ],
+                "hidePricePosition": true,
+                "hideStockPlacement": true
             },
             "price": 1,
             "priceMinor": 100,
@@ -3345,7 +4089,9 @@
             ],
             "stockIds": [
                 3
-            ]
+            ],
+            "hidePricePosition": true,
+            "hideStockPlacement": true
         },
         "footer": {
             "tagline": "نصنع الفرق",
@@ -3399,7 +4145,9 @@
                 ],
                 "stockIds": [
                     3
-                ]
+                ],
+                "hidePricePosition": true,
+                "hideStockPlacement": true
             },
             "groups": [
                 {
@@ -3461,7 +4209,9 @@
                                 ],
                                 "stockIds": [
                                     3
-                                ]
+                                ],
+                                "hidePricePosition": true,
+                                "hideStockPlacement": true
                             },
                             "price": 1,
                             "priceMinor": 100,
@@ -3511,7 +4261,9 @@
                             ],
                             "stockIds": [
                                 3
-                            ]
+                            ],
+                            "hidePricePosition": true,
+                            "hideStockPlacement": true
                         }
                     ],
                     "price": 1,
@@ -3562,7 +4314,9 @@
                     ],
                     "stockIds": [
                         3
-                    ]
+                    ],
+                    "hidePricePosition": true,
+                    "hideStockPlacement": true
                 }
             ],
             "price": 1,
@@ -3613,7 +4367,9 @@
             ],
             "stockIds": [
                 3
-            ]
+            ],
+            "hidePricePosition": true,
+            "hideStockPlacement": true
         },
         "contact": {
             "email": "hello@example.com",
@@ -3665,7 +4421,9 @@
             ],
             "stockIds": [
                 3
-            ]
+            ],
+            "hidePricePosition": true,
+            "hideStockPlacement": true
         },
         "whatsapp": {
             "enabled": true,
@@ -3720,7 +4478,9 @@
             ],
             "stockIds": [
                 3
-            ]
+            ],
+            "hidePricePosition": true,
+            "hideStockPlacement": true
         },
         "social": [
             {
@@ -3776,7 +4536,9 @@
                 ],
                 "stockIds": [
                     3
-                ]
+                ],
+                "hidePricePosition": true,
+                "hideStockPlacement": true
             }
         ],
         "verification": {
@@ -3831,7 +4593,9 @@
             ],
             "stockIds": [
                 3
-            ]
+            ],
+            "hidePricePosition": true,
+            "hideStockPlacement": true
         },
         "sbc": {
             "authentication_number": "A1",
@@ -3885,7 +4649,9 @@
             ],
             "stockIds": [
                 3
-            ]
+            ],
+            "hidePricePosition": true,
+            "hideStockPlacement": true
         },
         "apps": {
             "iosUrl": "https://apps.apple.com/app/id1",
@@ -3937,7 +4703,9 @@
             ],
             "stockIds": [
                 3
-            ]
+            ],
+            "hidePricePosition": true,
+            "hideStockPlacement": true
         },
         "navigation": {
             "menus": [
@@ -3999,7 +4767,9 @@
                                 ],
                                 "stockIds": [
                                     3
-                                ]
+                                ],
+                                "hidePricePosition": true,
+                                "hideStockPlacement": true
                             },
                             "price": 1,
                             "priceMinor": 100,
@@ -4049,7 +4819,9 @@
                             ],
                             "stockIds": [
                                 3
-                            ]
+                            ],
+                            "hidePricePosition": true,
+                            "hideStockPlacement": true
                         },
                         {
                             "id": "e",
@@ -4105,7 +4877,9 @@
                                 ],
                                 "stockIds": [
                                     3
-                                ]
+                                ],
+                                "hidePricePosition": true,
+                                "hideStockPlacement": true
                             },
                             "price": 1,
                             "priceMinor": 100,
@@ -4155,7 +4929,9 @@
                             ],
                             "stockIds": [
                                 3
-                            ]
+                            ],
+                            "hidePricePosition": true,
+                            "hideStockPlacement": true
                         }
                     ],
                     "price": 1,
@@ -4206,7 +4982,9 @@
                     ],
                     "stockIds": [
                         3
-                    ]
+                    ],
+                    "hidePricePosition": true,
+                    "hideStockPlacement": true
                 }
             ],
             "price": 1,
@@ -4257,7 +5035,9 @@
             ],
             "stockIds": [
                 3
-            ]
+            ],
+            "hidePricePosition": true,
+            "hideStockPlacement": true
         },
         "pagePresentation": {
             "product": {
@@ -4315,7 +5095,9 @@
                         ],
                         "stockIds": [
                             3
-                        ]
+                        ],
+                        "hidePricePosition": true,
+                        "hideStockPlacement": true
                     }
                 ],
                 "price": 1,
@@ -4366,7 +5148,9 @@
                 ],
                 "stockIds": [
                     3
-                ]
+                ],
+                "hidePricePosition": true,
+                "hideStockPlacement": true
             },
             "price": 1,
             "priceMinor": 100,
@@ -4466,7 +5250,9 @@
                         ],
                         "stockIds": [
                             3
-                        ]
+                        ],
+                        "hidePricePosition": true,
+                        "hideStockPlacement": true
                     }
                 ],
                 "price": 1,
@@ -4517,14 +5303,18 @@
                 ],
                 "stockIds": [
                     3
-                ]
+                ],
+                "hidePricePosition": true,
+                "hideStockPlacement": true
             },
             "priceIds": [
                 19000
             ],
             "stockIds": [
                 3
-            ]
+            ],
+            "hidePricePosition": true,
+            "hideStockPlacement": true
         },
         "announcements": {
             "enabled": false,
@@ -4580,7 +5370,9 @@
                     ],
                     "stockIds": [
                         3
-                    ]
+                    ],
+                    "hidePricePosition": true,
+                    "hideStockPlacement": true
                 }
             ],
             "price": 1,
@@ -4631,7 +5423,9 @@
             ],
             "stockIds": [
                 3
-            ]
+            ],
+            "hidePricePosition": true,
+            "hideStockPlacement": true
         },
         "palette": {
             "link": "#0B5FFF",
@@ -4683,7 +5477,9 @@
             ],
             "stockIds": [
                 3
-            ]
+            ],
+            "hidePricePosition": true,
+            "hideStockPlacement": true
         },
         "shippingFee": 1500,
         "shippingAmount": 900,
@@ -4720,7 +5516,9 @@
         ],
         "stockIds": [
             3
-        ]
+        ],
+        "hidePricePosition": true,
+        "hideStockPlacement": true
     },
     "deniedKeys": [
         "price",
@@ -4746,10 +5544,26 @@
         "deliveryCharge",
         "shippingCharge",
         "priceIds",
-        "stockIds"
+        "stockIds",
+        "hidePricePosition",
+        "hideStockPlacement"
     ],
     "selectorKeys": [
         "productIds",
         "offerIds"
+    ],
+    "hidingVerbs": [
+        "hide",
+        "hidden",
+        "show",
+        "visible",
+        "scale",
+        "scaled",
+        "multiplier",
+        "multiply",
+        "override",
+        "force",
+        "free",
+        "round"
     ]
 }

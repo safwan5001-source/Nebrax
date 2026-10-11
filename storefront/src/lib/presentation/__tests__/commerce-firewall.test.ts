@@ -7,6 +7,7 @@ interface Fixture {
   commerceWords: string[];
   presentationSuffixes: string[];
   selectorKeys: string[];
+  hidingVerbs: string[];
   deniedKeys: string[];
   allowedKeys: string[];
   forbiddenValues: string[];
@@ -42,8 +43,10 @@ function denies(key: string): boolean {
     .split(/[\s_-]+|(?<=[a-z0-9])(?=[A-Z])/)
     .filter(Boolean)
     .map((word) => word.toLowerCase());
+  if (!words.some((word) => fixture.commerceWords.includes(word))) return false;
+  // a hiding / scaling verb anywhere in the key denies it, whatever its suffix (hidePricePosition, hideStockPlacement…)
   return (
-    words.some((word) => fixture.commerceWords.includes(word)) &&
+    words.some((word) => fixture.hidingVerbs.includes(word)) ||
     !fixture.presentationSuffixes.includes(words[words.length - 1])
   );
 }
@@ -58,10 +61,11 @@ function numericCommerceKeys(node: unknown, out: string[] = []): string[] {
         .split(/[\s_-]+|(?<=[a-z0-9])(?=[A-Z])/)
         .filter(Boolean)
         .map((word) => word.toLowerCase());
+      const isNonEnum = (item: unknown) =>
+        typeof item === "number" || typeof item === "boolean";
       const numeric =
-        typeof value === "number" ||
-        (Array.isArray(value) &&
-          value.some((item) => typeof item === "number"));
+        !fixture.selectorKeys.includes(key) &&
+        (isNonEnum(value) || (Array.isArray(value) && value.some(isNonEnum)));
       if (numeric && words.some((word) => fixture.commerceWords.includes(word)))
         out.push(key);
       numericCommerceKeys(value, out);
@@ -130,6 +134,28 @@ describe("commerce firewall — presentation normalisation", () => {
     expect(content("deliveryPromise").body).toBe("نوصل اليوم");
     expect(content("slider").slides[0].id).toBe("sl1");
     expect(content("gallery").images[0].id).toBe("g1");
+    // every custom-content block kind (and the nested column blocks) was processed, not dropped
+    const blocks = content("customContent").blocks as Array<
+      Record<string, any>
+    >;
+    expect(blocks.map((b) => b.kind)).toEqual([
+      "heading",
+      "button",
+      "paragraph",
+      "image",
+      "divider",
+      "spacer",
+      "callout",
+      "columns",
+    ]);
+    expect(blocks[7].columns[0].map((b: any) => b.kind)).toEqual([
+      "heading",
+      "paragraph",
+    ]);
+    expect(blocks[7].columns[1].map((b: any) => b.kind)).toEqual([
+      "button",
+      "callout",
+    ]);
     expect(sections[0].design?.cards).toEqual({
       align: "center",
       imageRatio: "1:1",
