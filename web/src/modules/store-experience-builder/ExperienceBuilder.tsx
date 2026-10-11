@@ -2173,6 +2173,7 @@ export function ExperienceBuilder({
           businessIdentity={businessIdentity}
           onChange={updateDraft}
           timezone={tenantTimezone}
+          storefrontId={storefrontId}
           selectedSection={selectedSection}
           onSelectSection={(id) => handleSelectSection(id, "sidebar")}
           isMobileViewport={isMobileViewport}
@@ -2255,6 +2256,7 @@ export function ExperienceBuilder({
         businessIdentity={businessIdentity}
         onChange={updateDraft}
         timezone={tenantTimezone}
+        storefrontId={storefrontId}
         selectedSection={selectedSection}
         onSelectSection={(id) => handleSelectSection(id, "sidebar")}
         isMobileViewport={isMobileViewport}

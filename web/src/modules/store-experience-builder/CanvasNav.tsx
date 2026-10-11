@@ -1,5 +1,9 @@
+"use client";
+
 import { ChevronDown } from "lucide-react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
+import { shouldFlipPanel } from "./presentation/nav-flip";
 import { StoreIcon } from "./StoreIcon";
 import {
   isServedContentSlug,
@@ -66,10 +70,50 @@ export function CanvasNavItem({ item }: { item: NavItem }) {
       </span>
     );
   }
+  return <CanvasDropdown item={item} kids={kids} />;
+}
+
+/**
+ * The Canvas disclosure: opens on hover and on focus-within (the Canvas is a preview, so there is no click-to-pin), and — like
+ * the storefront — opens from the inline-end edge instead when the default would pass the Canvas frame (`nav-flip.ts`).
+ */
+function CanvasDropdown({ item, kids }: { item: NavItem; kids: NavItem[] }) {
+  const root = useRef<HTMLSpanElement>(null);
+  const panel = useRef<HTMLSpanElement>(null);
+  const [open, setOpen] = useState(false);
+  const [flip, setFlip] = useState(false);
+
+  useLayoutEffect(() => {
+    if (!open) {
+      setFlip(false);
+      return;
+    }
+    const el = panel.current;
+    const frame = root.current?.closest("[data-preview-canvas]");
+    if (!el || !frame || !root.current) return;
+    const rect = el.getBoundingClientRect();
+    const bounds = frame.getBoundingClientRect();
+    setFlip(
+      shouldFlipPanel(
+        { left: rect.left, right: rect.right },
+        { left: bounds.left, right: bounds.right },
+        getComputedStyle(root.current).direction === "rtl",
+      ),
+    );
+  }, [open]);
+
   return (
     <span
+      ref={root}
       data-nav-dropdown=""
-      className="group relative inline-flex items-center"
+      data-flip={flip ? "" : undefined}
+      className="relative inline-flex items-center"
+      onPointerEnter={() => setOpen(true)}
+      onPointerLeave={() => setOpen(false)}
+      onFocus={() => setOpen(true)}
+      onBlur={(event) => {
+        if (!root.current?.contains(event.relatedTarget as Node | null)) setOpen(false);
+      }}
     >
       <span
         data-extra-nav=""
@@ -80,8 +124,14 @@ export function CanvasNavItem({ item }: { item: NavItem }) {
         <ChevronDown aria-hidden className="size-3.5" />
       </span>
       <span
+        ref={panel}
         data-nav-panel=""
-        className="absolute start-0 top-full z-50 mt-1 hidden min-w-44 flex-col rounded-store border border-store-border bg-store-surface py-1 shadow-lg group-focus-within:flex group-hover:flex"
+        hidden={!open}
+        className={cn(
+          "absolute top-full z-50 mt-1 min-w-44 flex-col rounded-store border border-store-border bg-store-surface py-1 shadow-lg",
+          flip ? "end-0" : "start-0",
+          open ? "flex" : "hidden",
+        )}
       >
         {kids.map((child) => (
           <span

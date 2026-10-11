@@ -31,6 +31,9 @@ import {
   type ThemePresetId,
 } from "./presentation";
 import { HeaderDesignPanel } from "./HeaderDesignPanel";
+import { NavigationPanel } from "./NavigationPanel";
+import { emptyMainMenu, migrateLegacyLinks, withMainMenu } from "./navigation-edit";
+import { mainMenu } from "./presentation/navigation";
 import { SectionLibraryContent, SectionLibraryDialog } from "./SectionLibrary";
 import { buildWhatsAppUrl } from "./presentation/urls";
 import {
@@ -211,6 +214,8 @@ interface PanelsProps {
   offerManagement?: OfferManagement;
   /** CUST-HV V3 — the store's authoritative IANA zone (`/me` → `company.timezone`); announcement windows are entered in it. */
   timezone?: string;
+  /** CUST-HV V7d-4 — the workspace storefront the navigation pickers read categories / products from. */
+  storefrontId?: string | null;
 }
 
 export function ControlPanels({
@@ -236,6 +241,7 @@ export function ControlPanels({
   onRetryOffers,
   offerManagement,
   timezone = DEFAULT_TENANT_TIMEZONE,
+  storefrontId = null,
 }: PanelsProps) {
   const t = (key: CustomizerMessageKey) => customizerMessage(locale, key);
   const patch = (partial: Partial<StorefrontPresentationConfig>) =>
@@ -255,7 +261,7 @@ export function ControlPanels({
         />
       );
     case "header":
-      return <HeaderPanel config={config} t={t} patch={patch} locale={locale} />;
+      return <HeaderPanel config={config} t={t} patch={patch} locale={locale} storefrontId={storefrontId} />;
     case "homepage":
       return (
         <HomepagePanel
@@ -773,12 +779,16 @@ function HeaderPanel({
   t,
   patch,
   locale,
+  storefrontId = null,
 }: {
   config: StorefrontPresentationConfig;
   t: (key: CustomizerMessageKey) => string;
   patch: (partial: Partial<StorefrontPresentationConfig>) => void;
   locale: string;
+  storefrontId?: string | null;
 }) {
+  const [skippedLinks, setSkippedLinks] = useState<string[]>([]);
+  const hasMainMenu = Boolean(mainMenu(config.navigation));
   return (
     <div className="space-y-6">
       <Field label={t("headerStyle")}>
@@ -845,6 +855,24 @@ function HeaderPanel({
           }
         />
       </div>
+      {hasMainMenu ? (
+        <>
+          {skippedLinks.length > 0 ? (
+            <div role="status" data-nav-migration-skipped="" className="border border-warning/30 bg-warning/10 px-3 py-2 text-xs leading-5 text-text">
+              <p>{t("navMigrationSkipped")}</p>
+              <p className="font-medium">{skippedLinks.join(" · ")}</p>
+            </div>
+          ) : null}
+          <NavigationPanel
+            navigation={config.navigation}
+            storefrontId={storefrontId}
+            locale={locale === "en" ? "en" : "ar"}
+            t={t}
+            onChange={(navigation) => patch({ navigation })}
+          />
+        </>
+      ) : (
+        <>
       <div className="space-y-2">
         <div className="flex items-center justify-between gap-2">
           <span className="text-[12px] font-semibold tracking-wide text-neutral-500">
@@ -992,6 +1020,23 @@ function HeaderPanel({
           ))}
         </ul>
       </div>
+          <div className="space-y-1 border border-border p-3">
+            <button
+              type="button"
+              className={btnClass}
+              data-nav-migrate=""
+              onClick={() => {
+                const { items, skipped } = migrateLegacyLinks(config.header.links);
+                setSkippedLinks(skipped);
+                patch({ navigation: withMainMenu(config.navigation, { ...emptyMainMenu(), items }) });
+              }}
+            >
+              {t("navUseNewEditor")}
+            </button>
+            <p className="text-[12px] leading-5 text-muted">{t("navUseNewEditorHint")}</p>
+          </div>
+        </>
+      )}
     </div>
   );
 }

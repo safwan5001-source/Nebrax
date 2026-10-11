@@ -8,11 +8,13 @@ import {
   useCallback,
   useEffect,
   useId,
+  useLayoutEffect,
   useRef,
   useState,
 } from "react";
 import type { StoreExtraNavLink } from "@/components/layout/MobileMenu";
 import { NavItemContent } from "@/components/layout/NavItemContent";
+import { shouldFlipPanel } from "@/lib/presentation/nav-flip";
 
 const LINK =
   "inline-flex items-center gap-1.5 whitespace-nowrap px-2 py-1.5 text-sm text-store-muted-foreground transition-colors hover:text-store-foreground";
@@ -68,7 +70,29 @@ function DropdownItem({ item }: { item: StoreExtraNavLink }) {
   const panelId = useId();
   // Opened by a mouse hover: the click that follows must pin it open, not toggle it shut.
   const hoverOpened = useRef(false);
+  const panel = useRef<HTMLUListElement>(null);
+  // Opens from the inline-end edge instead when the default would leave the viewport (see `nav-flip.ts`).
+  const [flip, setFlip] = useState(false);
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useLayoutEffect(() => {
+    if (!open) {
+      setFlip(false);
+      return;
+    }
+    const el = panel.current;
+    const host = root.current;
+    if (!el || !host) return;
+    const rect = el.getBoundingClientRect();
+    const rtl = getComputedStyle(host).direction === "rtl";
+    setFlip(
+      shouldFlipPanel(
+        { left: rect.left, right: rect.right },
+        { left: 0, right: document.documentElement.clientWidth },
+        rtl,
+      ),
+    );
+  }, [open]);
 
   const cancelClose = useCallback(() => {
     if (closeTimer.current) clearTimeout(closeTimer.current);
@@ -124,6 +148,7 @@ function DropdownItem({ item }: { item: StoreExtraNavLink }) {
       ref={root}
       data-nav-dropdown=""
       data-open={open ? "" : undefined}
+      data-flip={flip ? "" : undefined}
       className="relative inline-flex items-center"
       onPointerEnter={(event) => {
         if (event.pointerType !== "mouse") return;
@@ -172,11 +197,12 @@ function DropdownItem({ item }: { item: StoreExtraNavLink }) {
         />
       </button>
       <ul
+        ref={panel}
         id={panelId}
         hidden={!open}
         onKeyDown={onPanelKey}
         data-nav-panel=""
-        className="absolute start-0 top-full z-50 mt-1 min-w-48 rounded-store border border-store-border bg-store-surface py-1 shadow-lg"
+        className={`absolute ${flip ? "end-0" : "start-0"} top-full z-50 mt-1 min-w-48 rounded-store border border-store-border bg-store-surface py-1 shadow-lg`}
       >
         {item.children?.map((child) => (
           <li key={child.id}>

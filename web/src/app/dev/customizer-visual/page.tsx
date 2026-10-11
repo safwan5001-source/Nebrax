@@ -31,7 +31,8 @@ type Scenario =
   | "design"
   | "global"
   | "heroes"
-  | "overlay";
+  | "overlay"
+  | "navigation";
 type PreviewViewport = "mobile" | "tablet" | "desktop";
 
 function scenarioOf(value: string | null): Scenario {
@@ -44,7 +45,8 @@ function scenarioOf(value: string | null): Scenario {
     value === "design" ||
     value === "global" ||
     value === "heroes" ||
-    value === "overlay"
+    value === "overlay" ||
+    value === "navigation"
   ) {
     return value;
   }
@@ -147,6 +149,36 @@ function configFor(locale: "ar" | "en", scenario: Scenario): StorefrontPresentat
       surfaces: { radius: "pill", border: { width: "medium" }, shadow: "medium" },
       layout: { contentWidth: "narrow" },
       motion: { duration: "slow", easing: "emphasized" },
+    });
+  }
+  if (scenario === "navigation") {
+    // CUST-HV V7d-3 — a `main` menu with plain items, a badge + icon item, and a dropdown parent with children.
+    const ar = locale === "ar";
+    return normalizePresentationConfig({
+      ...configFor(locale, "populated"),
+      navigation: {
+        menus: [
+          {
+            id: "main",
+            items: [
+              { id: "n1", label: ar ? "العروض" : "Offers", icon: "percent", badge: { text: ar ? "جديد" : "New", tone: "accent" }, target: { kind: "home" } },
+              {
+                id: "n2",
+                label: ar ? "المتجر" : "Shop",
+                target: { kind: "home" },
+                presentation: { kind: "dropdown" },
+                children: [
+                  { id: "n2a", label: ar ? "الورود" : "Roses", icon: "heart", target: { kind: "category", id: "c1" } },
+                  { id: "n2b", label: ar ? "الهدايا والمناسبات الخاصة" : "Gifts and special occasions", target: { kind: "category", id: "c2" } },
+                  { id: "n2c", label: ar ? "مدونتنا" : "Our blog", icon: "globe", target: { kind: "external", href: "https://example.com/blog", newTab: true } },
+                ],
+              },
+              { id: "n3", label: ar ? "سياسة الخصوصية" : "Privacy policy", target: { kind: "content", slug: "privacy-policy" } },
+              { id: "n4", label: ar ? "من نحن" : "About us", target: { kind: "content", slug: "about" } },
+            ],
+          },
+        ],
+      },
     });
   }
   if (scenario === "overlay") {
