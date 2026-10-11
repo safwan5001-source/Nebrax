@@ -109,7 +109,12 @@ function Leaf({ block, labels, number, wide }: { block: LeafBlock; labels: Canva
     case "button":
       return (
         <div data-content-button="">
-          <span className={BUTTON_CLASS[block.style ?? "solid"]} data-cta-style={block.style ?? "solid"}>
+          <span
+            className={BUTTON_CLASS[block.style ?? "solid"]}
+            data-cta-style={block.style ?? "solid"}
+            // the published outline button is the shared Button's outline variant for the global button tokens — mark it the same way
+            {...(block.style === "outline" ? { "data-slot": "button", "data-variant": "outline" } : {})}
+          >
             <span className="min-w-0 truncate">{block.label.trim()}</span>
           </span>
         </div>

@@ -55,6 +55,16 @@ describe("CanvasContentBlocks (CUST-HV V9c-2)", () => {
     expect([mobile2, mobile3, wide2, wide3].join(" ")).not.toContain("md:");
   });
 
+  it("an outline button carries the same token marker as the published one (global button size / radius / weight / case reach it); solid and link do not", () => {
+    const { container } = mount([
+      { id: "a", kind: "button", label: "Shop", href: "/shop" },
+      { id: "b", kind: "button", label: "Learn", href: "/learn", style: "outline" },
+      { id: "c", kind: "button", label: "More", href: "/more", style: "link" },
+    ]);
+    const marked = [...container.querySelectorAll('[data-slot="button"][data-variant="outline"]')];
+    expect(marked.map((n) => n.getAttribute("data-cta-style"))).toEqual(["outline"]);
+  });
+
   it("an image uses the signed preview, is named by its position (decorative ⇒ empty alt) and carries its caption", () => {
     const { container } = mount([
       { id: "a", kind: "image", media: { mediaId: A }, caption: "Spring" },

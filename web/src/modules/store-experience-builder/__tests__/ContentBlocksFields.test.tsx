@@ -270,3 +270,19 @@ describe("text fields respect the stored limits, by code point (V9c review)", ()
     expect(rows()[0].textContent).toContain("Keep");
   });
 });
+
+describe("a button's label while it has no link (V9c review, round 3)", () => {
+  it("clearing the label of an unlinked button keeps the block and the field so replacement text can be typed", () => {
+    const seen: ContentBlocks[] = [];
+    render(<Harness initial={{ blocks: [] }} onContent={(c) => seen.push(c)} />);
+    fireEvent.change(addSelect(), { target: { value: "button" } });
+    const input = () => document.querySelector<HTMLInputElement>("input[data-content-button-label]") as HTMLInputElement;
+    fireEvent.change(input(), { target: { value: "" } });
+    expect(rows()).toHaveLength(1);
+    expect(input().value).toBe("");
+    expect(seen.at(-1)?.blocks[0]).toMatchObject({ kind: "button", label: t("cbButtonDefault") });
+    fireEvent.change(input(), { target: { value: "Shop now" } });
+    expect(seen.at(-1)?.blocks[0]).toMatchObject({ kind: "button", label: "Shop now", href: "" });
+    expect(rows()).toHaveLength(1);
+  });
+});

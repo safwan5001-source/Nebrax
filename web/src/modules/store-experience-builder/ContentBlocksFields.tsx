@@ -500,11 +500,15 @@ function BlockEditor({
       return (
         <>
           <Field label={t("cbButtonLabel")}>
-            <input
-              className={inputClass}
-              data-content-button-label=""
+            <BufferedText
               value={block.label}
-              onChange={(event) => onChange(setButtonLabel(content, block.id, event.target.value))}
+              // a button with neither a label nor a link is not a button: while it has no link, an emptied label stays in the field and
+              // is not committed (committing it would drop the whole block before the replacement text can be typed)
+              onCommit={(label) => {
+                if (label.trim() === "" && block.href.trim() === "") return;
+                onChange(setButtonLabel(content, block.id, label));
+              }}
+              data-content-button-label=""
             />
           </Field>
           <DeferredCommitField
