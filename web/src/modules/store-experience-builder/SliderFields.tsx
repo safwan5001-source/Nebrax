@@ -84,7 +84,7 @@ function pictureStatusOf(slide: SliderSlide, ctx: DesignContext, bounds: Backgro
 }
 
 const iconButton =
-  "inline-flex size-11 items-center justify-center text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900 disabled:text-neutral-300 disabled:hover:bg-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 md:size-8";
+  "inline-flex size-11 items-center justify-center text-muted hover:bg-background hover:text-text disabled:opacity-40 disabled:hover:bg-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 md:size-8";
 
 export function SliderFields({
   content,
@@ -132,15 +132,15 @@ export function SliderFields({
     <div className="space-y-4" data-slider-fields="">
       <section className="space-y-2" aria-labelledby="slider-slides-title">
         <div className="flex items-center justify-between gap-2">
-          <h3 id="slider-slides-title" className="text-[12px] font-semibold tracking-wide text-neutral-500">
+          <h3 id="slider-slides-title" className="text-[12px] font-semibold tracking-wide text-muted">
             {t("sliderSlidesTitle")}
           </h3>
-          <span className="text-[12px] tabular-nums text-neutral-500" data-slider-count="">
+          <span className="text-[12px] tabular-nums text-muted" data-slider-count="">
             {fillTemplate(t("sliderSlidesCount"), { count: slides.length, max: MAX_SLIDER_SLIDES })}
           </span>
         </div>
         {slides.length < MIN_SLIDER_SLIDES_TO_PUBLISH ? (
-          <p role="status" data-slider-min="" className="text-[12px] leading-5 text-neutral-600">
+          <p role="status" data-slider-min="" className="text-[12px] leading-5 text-muted">
             {t("sliderMinHint")}
           </p>
         ) : null}
@@ -167,13 +167,13 @@ export function SliderFields({
           data-slider-add=""
           disabled={!canAddSlide(content)}
           onClick={() => setPicking(true)}
-          className="inline-flex min-h-11 w-full items-center justify-center gap-1.5 border border-dashed border-neutral-300 bg-white px-3 text-[13px] font-medium text-neutral-800 hover:bg-neutral-50 disabled:cursor-not-allowed disabled:text-neutral-400 md:min-h-9"
+          className="inline-flex min-h-11 w-full items-center justify-center gap-1.5 border border-dashed border-border bg-surface px-3 text-[13px] font-medium text-text hover:bg-background disabled:cursor-not-allowed disabled:opacity-50 md:min-h-9"
         >
           <Plus aria-hidden="true" className="size-4" />
           {t("sliderAdd")}
         </button>
         {!canAddSlide(content) ? (
-          <p className="text-[12px] leading-5 text-neutral-500">
+          <p className="text-[12px] leading-5 text-muted">
             {fillTemplate(t("sliderAddMax"), { max: MAX_SLIDER_SLIDES })}
           </p>
         ) : null}
@@ -206,7 +206,7 @@ export function SliderFields({
       ) : null}
 
       <fieldset className="min-w-0 space-y-3" data-slider-behaviour="">
-        <legend className="mb-1 text-[12px] font-semibold tracking-wide text-neutral-500">
+        <legend className="mb-1 text-[12px] font-semibold tracking-wide text-muted">
           {t("sliderBehaviourTitle")}
         </legend>
         <Toggle
@@ -245,7 +245,7 @@ export function SliderFields({
         <Toggle label={t("sliderArrows")} checked={behaviour.arrows} onChange={(arrows) => onChange(setBehaviour(content, { arrows }))} />
         <Toggle label={t("sliderDots")} checked={behaviour.dots} onChange={(dots) => onChange(setBehaviour(content, { dots }))} />
         <Toggle label={t("sliderLoop")} checked={behaviour.loop} onChange={(loop) => onChange(setBehaviour(content, { loop }))} />
-        <p className="text-[12px] leading-5 text-neutral-500">{t("sliderMotionHint")}</p>
+        <p className="text-[12px] leading-5 text-muted">{t("sliderMotionHint")}</p>
       </fieldset>
     </div>
   );
@@ -284,7 +284,7 @@ function SlideRow({
       data-slider-slide-row={slide.id}
       data-selected={selected ? "" : undefined}
       data-status={status}
-      className={`flex items-center gap-1 border ${selected ? "border-primary bg-primary-soft" : "border-neutral-200 bg-white"}`}
+      className={`flex items-center gap-1 border ${selected ? "border-primary bg-primary-soft" : "border-border bg-surface"}`}
     >
       <button
         type="button"
@@ -292,15 +292,15 @@ function SlideRow({
         onClick={onSelect}
         className="flex min-h-11 min-w-0 flex-1 items-center gap-2 px-2 text-start focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 md:min-h-10"
       >
-        <span className="flex size-9 shrink-0 items-center justify-center overflow-hidden border border-neutral-200 bg-neutral-100">
+        <span className="flex size-9 shrink-0 items-center justify-center overflow-hidden border border-border bg-background">
           {thumb ? (
             // biome-ignore lint/performance/noImgElement: editor-only signed preview URL
             <img src={thumb} alt="" className="size-full object-cover" />
           ) : null}
         </span>
         <span className="min-w-0 flex-1">
-          <span className="block text-[12px] font-medium text-neutral-800">{fillTemplate(t("sliderSlideLabel"), { number })}</span>
-          <span className="block truncate text-[12px] text-neutral-500" dir="auto">
+          <span className="block text-[12px] font-medium text-text">{fillTemplate(t("sliderSlideLabel"), { number })}</span>
+          <span className="block truncate text-[12px] text-muted" dir="auto">
             {slide.heading || slide.sub || t("sliderSlideNoText")}
           </span>
         </span>
@@ -367,11 +367,11 @@ function SlideEditor({
 
   return (
     <section
-      className="space-y-3 border-t border-neutral-200 pt-3"
+      className="space-y-3 border-t border-border pt-3"
       data-slider-slide-editor={id}
       aria-label={fillTemplate(t("sliderSlideLabel"), { number: position })}
     >
-      <h3 className="text-[13px] font-semibold text-neutral-800">{fillTemplate(t("sliderSlideLabel"), { number: position })}</h3>
+      <h3 className="text-[13px] font-semibold text-text">{fillTemplate(t("sliderSlideLabel"), { number: position })}</h3>
 
       <MediaRefField
         slot="slider-slide"
@@ -425,7 +425,7 @@ function SlideEditor({
           dir="ltr"
           onCommit={(href) => onChange((content) => setSlideCta(content, id, { href }))}
         />
-        <p className="text-[12px] leading-5 text-neutral-500">{t("sliderCtaHint")}</p>
+        <p className="text-[12px] leading-5 text-muted">{t("sliderCtaHint")}</p>
       </fieldset>
 
       <Field label={t("designOverlayStrength")}>
