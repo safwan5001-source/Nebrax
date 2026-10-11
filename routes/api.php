@@ -136,6 +136,7 @@ use App\Http\Controllers\Api\ReturnSourcesController;
 use App\Http\Controllers\Api\RoleController;
 use App\Http\Controllers\Api\SalesConfigController;
 use App\Http\Controllers\Api\SalesReportController;
+use App\Http\Controllers\Api\DeliveryChannelReportController;
 use App\Http\Controllers\Api\SalesSettingsController;
 use App\Http\Controllers\Api\DocumentDisplaySettingsController;
 use App\Http\Controllers\Api\SettlementTypeController;
@@ -1427,6 +1428,8 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
 
         Route::get('reports/classification-analytics', [ClassificationAnalyticsReportController::class, 'show'])->middleware($perm('reports.view'));
         Route::get('reports/sales', [SalesReportController::class, 'show'])->middleware($perm('reports.view'));
+        // قنوات التوصيل: فواتير POS المرحّلة ذات السياق فقط. قراءة. بلا Hub وبلا ترحيل.
+        Route::get('reports/delivery-channel', [DeliveryChannelReportController::class, 'show'])->middleware($perm('reports.view'));
         // تقارير المشتريات: فواتير شراء وسندات صرف مرحّلة فقط؛ لا أثر محاسبي جديد.
         Route::get('reports/purchases', [PurchaseReportController::class, 'show'])->middleware($perm('reports.view'));
         Route::get('reports/purchases/creators', [PurchaseReportController::class, 'creators'])->middleware($perm('reports.view'));
