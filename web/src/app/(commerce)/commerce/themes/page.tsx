@@ -1,106 +1,38 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useLocale } from 'next-intl';
-import { useRouter } from 'next/navigation';
-import { Check, ExternalLink, Palette } from 'lucide-react';
+import { Check, ExternalLink } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { PageHeader } from '@/components/nebrax';
 import { currentUser } from '@/lib/auth';
 import { hasPermission } from '@/lib/permissions';
 import { commerceWorkspaceMessage, type CommerceWorkspaceMessageKey } from '@/modules/commerce-workspace/messages';
 import { useCommerceStoreContext } from '@/modules/commerce-workspace/store-context';
-import { THEME_REGISTRY, isRuntimeBackedTheme, type ThemeRegistryEntry } from '@/modules/commerce-workspace/theme-registry';
-import {
-  createPresentationVersion,
-  deletePresentationVersion,
-  savePresentationVersion,
-} from '@/modules/commerce-workspace/presentation-versions';
-import { applyFlowersGiftSections, presetSelectionPatch, THEME_PRESETS } from '@/modules/store-experience-builder/presentation';
-import { loadFacets } from '@/modules/commerce-workspace/merchandising/client';
-import { loadVerticalSetup } from '@/modules/commerce-workspace/vertical-setup';
+import { listPresentationVersions } from '@/modules/commerce-workspace/presentation-versions';
+import { BUILT_IN_THEMES, previewBaseVersion, themePreviewHref, type ThemeDefinition } from '@/modules/store-experience-builder/themes';
 
 export default function CommerceThemesPage() {
-  const locale = useLocale();
-  const router = useRouter();
+  const locale = useLocale() === 'en' ? 'en' : 'ar';
   const t = (key: CommerceWorkspaceMessageKey) => commerceWorkspaceMessage(locale, key);
   const { selectedStoreId, viewStoreUrl } = useCommerceStoreContext();
   const viewer = currentUser();
   const canManage = hasPermission(viewer?.permissions, viewer?.role, 'commerce.manage');
-  const [applyingThemeId, setApplyingThemeId] = useState<string | null>(null);
-  const [applyError, setApplyError] = useState<string | null>(null);
+  const [baseVersionId, setBaseVersionId] = useState<string | null>(null);
 
-  async function floralGiftSections(sections: Parameters<typeof applyFlowersGiftSections>[0]) {
-    if (!selectedStoreId) return null;
-    try {
-      const [facets, setup] = await Promise.all([loadFacets(), loadVerticalSetup(selectedStoreId)]);
-      const keyOf = (systemKey: 'occasion' | 'recipient') =>
-        facets?.find((facet) => facet.systemKey === systemKey && facet.isActive)?.key ?? null;
-      return applyFlowersGiftSections(sections, {
-        facetKeys: { occasion: keyOf('occasion'), recipient: keyOf('recipient') },
-        deliveryScheduleConfigured:
-          setup?.items.find((item) => item.key === 'delivery_scheduling')?.state === 'configured',
-        copy: {
-          occasionTitle: t('bloomSectionOccasion'),
-          recipientTitle: t('bloomSectionRecipient'),
-          deliveryPromiseTitle: t('bloomSectionDelivery'),
-        },
-      });
-    } catch {
-      return null;
-    }
-  }
-
-  async function handleUseTheme(theme: ThemeRegistryEntry) {
-    if (!selectedStoreId || !canManage || !isRuntimeBackedTheme(theme) || applyingThemeId) {
-      if (!selectedStoreId) setApplyError(t('themeGalleryNoStore'));
-      return;
-    }
-
-    setApplyingThemeId(theme.id);
-    setApplyError(null);
-    const created = await createPresentationVersion(
-      selectedStoreId,
-      `${t(theme.nameKey as CommerceWorkspaceMessageKey)} — Theme Gallery`,
-    );
-    if (!created.ok) {
-      setApplyingThemeId(null);
-      setApplyError(t('themeGalleryApplyFailed'));
-      return;
-    }
-
-    const preset = THEME_PRESETS.find((candidate) => candidate.id === theme.presetId);
-    if (!preset) {
-      await deletePresentationVersion(selectedStoreId, created.data.id);
-      setApplyingThemeId(null);
-      setApplyError(t('themeGalleryApplyFailed'));
-      return;
-    }
-
-    // FLOWERS-H15: the gift pack only adds what the store can back, and never blocks the theme itself.
-    const giftSections = theme.category === 'floral' ? await floralGiftSections(created.data.config.homepage.sections) : null;
-    const presetPatch = presetSelectionPatch(created.data.config, preset);
-    const nextConfig = {
-      ...created.data.config,
-      ...presetPatch,
-      ...(giftSections ? { homepage: { ...created.data.config.homepage, sections: giftSections } } : {}),
+  useEffect(() => {
+    let cancelled = false;
+    setBaseVersionId(null);
+    if (!selectedStoreId) return;
+    void listPresentationVersions(selectedStoreId).then((result) => {
+      if (cancelled || !result.ok) return;
+      setBaseVersionId(previewBaseVersion(result.data)?.id ?? null);
+    });
+    return () => {
+      cancelled = true;
     };
-    const saved = await savePresentationVersion(
-      selectedStoreId,
-      created.data.id,
-      nextConfig,
-      created.data.revision,
-    );
-    if (!saved.ok) {
-      await deletePresentationVersion(selectedStoreId, created.data.id);
-      setApplyingThemeId(null);
-      setApplyError(t('themeGalleryApplyFailed'));
-      return;
-    }
-
-    router.push(`/commerce/appearance?version=${encodeURIComponent(created.data.id)}`);
-  }
+  }, [selectedStoreId]);
 
   return (
     <div className="space-y-6">
@@ -109,9 +41,7 @@ export default function CommerceThemesPage() {
         title={t('themeGallery')}
         description={t('themeGalleryDescription')}
         actionsSlot={
-          // One honest link to the *published* store. It is deliberately not a
-          // per-theme "Preview": it shows the live store, never the theme
-          // (CUST-HV DEF-4). A true theme preview is V10.
+          // One honest link to the *published* store. Theme previews open in the builder, over the merchant's own data.
           viewStoreUrl ? (
             <a
               href={viewStoreUrl}
@@ -131,21 +61,14 @@ export default function CommerceThemesPage() {
         }
       />
 
-      {applyError ? (
-        <p role="alert" className="rounded-md border border-negative/30 bg-negative/5 px-3 py-2 text-sm text-negative">
-          {applyError}
-        </p>
-      ) : null}
-
       <section className="grid gap-5 xl:grid-cols-2">
-        {THEME_REGISTRY.map((theme) => (
+        {BUILT_IN_THEMES.map((theme) => (
           <ThemeCard
             key={theme.id}
             theme={theme}
-            selectedStoreId={selectedStoreId}
-            canManage={canManage}
-            applying={applyingThemeId === theme.id}
-            onUseTheme={handleUseTheme}
+            locale={locale}
+            canPreview={Boolean(selectedStoreId) && canManage}
+            href={themePreviewHref(theme.id, baseVersionId)}
             t={t}
           />
         ))}
@@ -156,70 +79,66 @@ export default function CommerceThemesPage() {
 
 function ThemeCard({
   theme,
-  selectedStoreId,
-  canManage,
-  applying,
-  onUseTheme,
+  locale,
+  canPreview,
+  href,
   t,
 }: {
-  theme: ThemeRegistryEntry;
-  selectedStoreId: string | null;
-  canManage: boolean;
-  applying: boolean;
-  onUseTheme: (theme: ThemeRegistryEntry) => void;
+  theme: ThemeDefinition;
+  locale: 'ar' | 'en';
+  canPreview: boolean;
+  href: string;
   t: (key: CommerceWorkspaceMessageKey) => string;
 }) {
-  const available = isRuntimeBackedTheme(theme);
-
   return (
-    <article className="overflow-hidden rounded-xl border border-border bg-surface shadow-sm">
+    <article data-theme-card={theme.id} className="overflow-hidden rounded-xl border border-border bg-surface shadow-sm">
       <div className="grid min-h-[320px] md:grid-cols-[minmax(0,1.12fr)_minmax(260px,0.88fr)]">
         <div className="border-b border-border bg-background p-4 md:border-b-0 md:border-e">
-          <ThemePreview
-            variant={theme.category}
-            muted={!available}
-            primary={THEME_PRESETS.find((preset) => preset.id === theme.presetId)?.primary ?? null}
-          />
+          <ThemePreview variant={theme.vertical} muted={false} primary={theme.primaryColor} />
         </div>
 
         <div className="flex flex-col p-5">
           <div className="flex flex-wrap items-center gap-2">
-            <Badge tone={available ? 'positive' : 'muted'}>
+            <Badge tone="positive">
               <span className="inline-flex items-center gap-1">
-                {available ? <Check className="h-3.5 w-3.5" aria-hidden /> : <Palette className="h-3.5 w-3.5" aria-hidden />}
-                {available ? t('themeGalleryAvailable') : t('themeGalleryPlanned')}
+                <Check className="h-3.5 w-3.5" aria-hidden />
+                {t('themeGalleryAvailable')}
               </span>
             </Badge>
-            {theme.official ? <Badge tone="neutral">{t('themeGalleryOfficial')}</Badge> : null}
+            <Badge tone="neutral">{t('themeGalleryOfficial')}</Badge>
           </div>
 
           <div className="mt-5">
             <h2 className="text-xl font-semibold text-text">
-              {t(theme.nameKey as CommerceWorkspaceMessageKey)}
+              <bdi>{theme.name[locale]}</bdi>
             </h2>
-            <p className="mt-2 max-w-xl text-sm leading-6 text-muted">
-              {t(theme.descriptionKey as CommerceWorkspaceMessageKey)}
-            </p>
+            <p className="mt-2 max-w-xl text-sm leading-6 text-muted">{theme.description[locale]}</p>
           </div>
 
-          {available ? (
-            <div className="mt-auto flex flex-wrap gap-2 pt-6">
-              <button
-                type="button"
-                onClick={() => void onUseTheme(theme)}
-                disabled={applying || !selectedStoreId || !canManage}
-                className="inline-flex min-h-11 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {applying ? t('themeGalleryApplying') : t('themeGalleryUse')}
-              </button>
+          <div className="mt-auto flex flex-wrap gap-2 pt-6">
+            {canPreview ? (
               <Link
-                href="/commerce/appearance"
-                className="inline-flex min-h-11 items-center justify-center rounded-md border border-border bg-surface px-4 text-sm font-medium text-text hover:bg-primary-soft hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                href={href}
+                data-theme-preview-link={theme.id}
+                className="inline-flex min-h-11 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
               >
-                {t('themeGalleryCustomize')}
+                {t('themeGalleryPreviewApply')}
               </Link>
-            </div>
-          ) : null}
+            ) : (
+              <span
+                aria-disabled="true"
+                className="inline-flex min-h-11 cursor-not-allowed items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground opacity-50"
+              >
+                {t('themeGalleryPreviewApply')}
+              </span>
+            )}
+            <Link
+              href="/commerce/appearance"
+              className="inline-flex min-h-11 items-center justify-center rounded-md border border-border bg-surface px-4 text-sm font-medium text-text hover:bg-primary-soft hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+            >
+              {t('themeGalleryCustomize')}
+            </Link>
+          </div>
         </div>
       </div>
     </article>
@@ -231,7 +150,7 @@ function ThemePreview({
   muted,
   primary,
 }: {
-  variant: ThemeRegistryEntry['category'];
+  variant: ThemeDefinition['vertical'];
   muted: boolean;
   /** The preset's real primary color, so each card previews its own identity (not the admin app's). */
   primary: string | null;

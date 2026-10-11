@@ -2,7 +2,7 @@
 
 import { describePublishIssues } from "./announcement-status";
 import type { ReactNode } from "react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CalendarClock, ExternalLink, MoreHorizontal, RotateCcw } from "lucide-react";
 import { Dropdown, DropdownItem } from "@/components/ui/dropdown";
 import { ScrollIndicator } from "./ScrollIndicator";
@@ -19,11 +19,21 @@ import {
   normalizePresentationConfig,
   type PageRegionInstance,
   type PageType,
+  type PresentationHomeSection,
   type ProductPageRegionKey,
   presentationConfigsEqual,
   type StorefrontPresentationConfig,
 } from "./presentation";
 import { featuredContentOf } from "./presentation/section-content";
+import {
+  THEME_AREAS,
+  THEME_KEPT,
+  type ThemeDefinition,
+  applyTheme,
+  applyThemeAsNewDraft,
+  builtInTheme,
+} from "./themes";
+import { ThemePreviewBar } from "./themes/ThemePreviewBar";
 import { ProductPreviewPicker } from "./ProductPreviewPicker";
 import { ProductPreviewPickerPanel } from "./ProductPreviewPickerPanel";
 import { ProductRegionInspector } from "./ProductRegionInspector";
@@ -134,6 +144,15 @@ interface ExperienceBuilderProps {
   storefrontId?: string | null;
   storefrontUrl?: string | null;
   versionId?: string | null;
+  /**
+   * CUST-HV V10b (V0 §16) — open the builder in Theme Preview: the Canvas renders this document with the theme applied (unsaved,
+   * read-only) and the Apply summary replaces editing until the merchant applies it as a new Draft Version or exits.
+   */
+  previewThemeId?: string | null;
+  /** The gift sections a themed pack may add (needs the merchant's real facets); optional — a theme applies without it. */
+  themePackSections?: (
+    sections: readonly PresentationHomeSection[],
+  ) => Promise<PresentationHomeSection[] | null>;
 }
 
 export function ExperienceBuilder({
@@ -144,6 +163,8 @@ export function ExperienceBuilder({
   storefrontId = null,
   storefrontUrl = null,
   versionId = null,
+  previewThemeId = null,
+  themePackSections,
 }: ExperienceBuilderProps) {
   const seed = normalizePresentationConfig(
     initialConfig ?? DEFAULT_PRESENTATION_CONFIG,
@@ -151,6 +172,23 @@ export function ExperienceBuilder({
   const [saved, setSaved] = useState<StorefrontPresentationConfig>(seed);
   const [draft, setDraft] = useState<StorefrontPresentationConfig>(seed);
   const locale: CustomizerLocale = initialLocale;
+  // CUST-HV V10b — Theme Preview (unsaved, read-only). `null` = the normal editor.
+  const [previewTheme, setPreviewTheme] = useState<ThemeDefinition | null>(
+    () => (previewThemeId ? (builtInTheme(previewThemeId) ?? null) : null),
+  );
+  // The page reads `?previewTheme=` on the client only, so the id can arrive after the first render.
+  useEffect(() => {
+    setPreviewTheme(previewThemeId ? (builtInTheme(previewThemeId) ?? null) : null);
+  }, [previewThemeId]);
+  const [themeApplying, setThemeApplying] = useState(false);
+  const [themeError, setThemeError] = useState<CustomizerMessageKey | null>(null);
+  const themed = useMemo(
+    () => (previewTheme ? applyTheme(draft, previewTheme) : null),
+    [draft, previewTheme],
+  );
+  const canvasConfig = themed?.ok ? themed.config : draft;
+  // React 18 renders `inert` only as a string attribute: while a theme is previewed the editing UI is not operable or focusable.
+  const inertWhenThemePreview = previewTheme ? ({ inert: "" } as Record<string, string>) : {};
   const [panel, setPanel] = useState<CustomizerPanel>("theme");
   const [device, setDevice] = useState<PreviewDevice>("desktop");
   const [mobilePane, setMobilePane] = useState<"edit" | "preview">("preview");
@@ -1378,6 +1416,34 @@ export function ExperienceBuilder({
     void loadProductList(productSearch);
   }
 
+  async function handleApplyTheme() {
+    if (!previewTheme || !storefrontId || themeApplying) return;
+    setThemeApplying(true);
+    setThemeError(null);
+    const result = await applyThemeAsNewDraft({
+      storefrontId,
+      base: draft,
+      theme: previewTheme,
+      versionName: `${previewTheme.name[locale]} — ${t("themePreviewLabel")}`,
+      giftSections: themePackSections,
+    });
+    if (!result.ok) {
+      setThemeApplying(false);
+      setThemeError(result.reason === "assets_unsupported" ? "themeApplyUnsupported" : "themeApplyFailed");
+      return;
+    }
+    window.location.href = `/commerce/appearance?version=${encodeURIComponent(result.versionId)}`;
+  }
+
+  function handleExitThemePreview() {
+    if (themeApplying) return;
+    setPreviewTheme(null);
+    setThemeError(null);
+    const url = new URL(window.location.href);
+    url.searchParams.delete("previewTheme");
+    window.history.replaceState(null, "", url.toString());
+  }
+
   function handleSelectProductRegion(id: string) {
     setSelectedProductRegion(id);
     setPanel("product");
@@ -2307,6 +2373,7 @@ export function ExperienceBuilder({
   // drift apart.
   const hasConflict = versionConflict?.versionId === selectedVersion?.id;
   const saveDisabled =
+    previewTheme !== null ||
     busy !== null ||
     !selectedVersion ||
     isPublishedReadOnly ||
@@ -2321,6 +2388,7 @@ export function ExperienceBuilder({
           ? t("versionStaleConflict")
           : undefined;
   const publishDisabled =
+    previewTheme !== null ||
     !storefrontId ||
     !selectedVersion ||
     selectedVersion.state !== "draft" ||
@@ -2692,8 +2760,9 @@ export function ExperienceBuilder({
       <div className="relative flex min-h-0 flex-1">
         <nav
           aria-label={t("controls")}
+          {...inertWhenThemePreview}
           data-customizer-scroll=""
-          className={`${
+          className={`${previewTheme ? "!hidden " : ""}${
             mobilePane === "preview" ? "hidden lg:flex" : "hidden md:flex"
           } ${railCollapsed ? "lg:w-16" : "w-[196px]"} shrink-0 flex-col overflow-y-auto border-e border-neutral-200 bg-white`}
         >
@@ -2761,9 +2830,10 @@ export function ExperienceBuilder({
         </nav>
 
         <aside
+          {...inertWhenThemePreview}
           data-builder-controls=""
           data-builder-drawer={drawerOpen ? "open" : isTabletViewport ? "closed" : undefined}
-          className={`${
+          className={`${previewTheme ? "!hidden " : ""}${
             mobilePane === "edit" ? "flex" : "hidden"
           } w-full min-w-0 flex-col border-neutral-200 bg-white md:flex-1 lg:flex lg:w-[300px] lg:flex-none lg:border-e xl:w-[320px] ${
             drawerOpen
@@ -2891,6 +2961,22 @@ export function ExperienceBuilder({
               </span>
             </div>
           </div>
+          {previewTheme && themed ? (
+            <ThemePreviewBar
+              locale={locale}
+              theme={previewTheme}
+              summary={
+                themed.ok
+                  ? themed.summary
+                  : { areas: THEME_AREAS.map((area) => ({ area, changed: false })), kept: THEME_KEPT, noop: true }
+              }
+              applying={themeApplying}
+              error={themed.ok ? themeError : "themeApplyUnsupported"}
+              canApply={themed.ok && Boolean(storefrontId)}
+              onApply={() => void handleApplyTheme()}
+              onExit={handleExitThemePreview}
+            />
+          ) : null}
           <div className="relative min-h-0 flex-1">
             <div
               ref={canvasScrollRef}
@@ -2919,14 +3005,14 @@ export function ExperienceBuilder({
                 style={{ width: Math.min(width, 1440), maxWidth: "100%" }}
               >
                 <StorefrontPreviewCanvas
-                  config={draft}
+                  config={canvasConfig}
                   locale={locale}
                   viewport={effectiveDevice}
                   page={currentPage}
                   liveStoreName={liveStoreName}
                   businessIdentity={businessIdentity}
-                  selectedSection={selectedSection}
-                  onSelectSection={(key) => handleSelectSection(key, "preview")}
+                  selectedSection={previewTheme ? null : selectedSection}
+                  onSelectSection={previewTheme ? () => {} : (key) => handleSelectSection(key, "preview")}
                   activeSlides={activeSlides}
                   onActiveSlideChange={handleActiveSlideChange}
                   selectedChrome={selectedChrome}
