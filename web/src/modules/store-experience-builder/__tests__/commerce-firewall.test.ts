@@ -96,5 +96,16 @@ describe("commerce firewall — presentation normalisation", () => {
     ]) {
       expect(normalized, scope).toHaveProperty(scope);
     }
+
+    // ...and the nested, accepted items inside the variable-shape scopes were really processed (not merely replaced by defaults)
+    expect(normalized.social[0]?.network).toBe("x");
+    expect(normalized.header.links[0]?.id).toBe("nav-home");
+    expect(normalized.navigation?.menus[0]?.items.map((i) => i.id)).toEqual([
+      "h",
+      "e",
+    ]);
+    expect(normalized.footer.groups?.[0]?.links?.[0]?.id).toBe("a");
+    expect(normalized.announcements?.items[0]?.id).toBe("a");
+    expect(normalized.pagePresentation?.product?.regions[0]?.key).toBe("price");
   });
 });

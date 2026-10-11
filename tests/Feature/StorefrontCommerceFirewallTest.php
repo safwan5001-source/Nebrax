@@ -89,6 +89,14 @@ class StorefrontCommerceFirewallTest extends TestCase
         foreach (['branding', 'header', 'footer', 'contact', 'whatsapp', 'social', 'verification', 'sbc', 'apps', 'navigation', 'pagePresentation', 'announcements', 'palette'] as $scope) {
             $this->assertArrayHasKey($scope, $normalized, "the {$scope} scope disappeared");
         }
+
+        // ...and the nested, accepted items inside the variable-shape scopes were really processed (not merely replaced by defaults)
+        $this->assertSame('x', $normalized['social'][0]['network']);
+        $this->assertSame('nav-home', $normalized['header']['links'][0]['id']);
+        $this->assertSame(['h', 'e'], array_column($normalized['navigation']['menus'][0]['items'], 'id'));
+        $this->assertSame('a', $normalized['footer']['groups'][0]['links'][0]['id']);
+        $this->assertSame('a', $normalized['announcements']['items'][0]['id']);
+        $this->assertSame('price', $normalized['pagePresentation']['product']['regions'][0]['key']);
     }
 
     /** @test */
