@@ -389,7 +389,7 @@ class ReturnSourceAllocator
     }
 
     /** F(n): نصيب أول n وحدة من `$amount` المباع منه `$sold` — والمباع كلّه يأخذ المبلغ كاملاً. */
-    public function cumulative(int $amount, int $sold, int $units): int
+    private function cumulative(int $amount, int $sold, int $units): int
     {
         if ($units >= $sold) {
             return $amount;

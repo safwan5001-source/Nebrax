@@ -311,9 +311,9 @@ class PosReturnService
                 && (int) $charged[$line->id]['unit_price'] > 0
                 && (int) ($previous->min_price ?? PHP_INT_MAX) < (int) $charged[$line->id]['unit_price'];
             $isFinalPart = $quantity === $remainingQuantity && ! $reducedBefore;
-            $subtotal = $this->allocate($allocator, (int) $charged[$line->id]['subtotal'], $sold, $quantity, $returnedQuantity, (int) ($previous?->subtotal ?? 0), $isFinalPart);
-            $discount = $this->allocate($allocator, (int) $charged[$line->id]['discount'], $sold, $quantity, $returnedQuantity, (int) ($previous?->discount ?? 0), $isFinalPart);
-            $tax = $this->allocate($allocator, (int) $charged[$line->id]['tax'], $sold, $quantity, $returnedQuantity, (int) ($previous?->tax ?? 0), $isFinalPart);
+            $subtotal = $this->allocate((int) $charged[$line->id]['subtotal'], $sold, $quantity, (int) ($previous?->subtotal ?? 0), $isFinalPart);
+            $discount = $this->allocate((int) $charged[$line->id]['discount'], $sold, $quantity, (int) ($previous?->discount ?? 0), $isFinalPart);
+            $tax = $this->allocate((int) $charged[$line->id]['tax'], $sold, $quantity, (int) ($previous?->tax ?? 0), $isFinalPart);
 
             $items[] = [
                 'source_line_id' => $line->id,
@@ -336,30 +336,14 @@ class PosReturnService
         return $items;
     }
 
-    /**
-     * يوزع قيمة المصدر بالكمية. الجزء الأخير يحمل بقايا هللات كل الأجزاء السابقة؛ وغيره
-     * يأخذ فرق التوزيع التراكمي `F(c+q) − F(c)` من موضع ما استُهلك فعلاً (مرتجعات وإشعارات)
-     * — نفس قاعدة `ReturnSourceAllocator::allocate()` — لا `floor(الكل × q ÷ المباع)` من
-     * الصفر، وإلا خرج جزءٌ يتلو إشعاراً دائناً بهللةٍ أقل من نصيبه. الحدّ: لا يتجاوز المتبقي.
-     */
-    private function allocate(
-        ReturnSourceAllocator $allocator,
-        int $sourceAmount,
-        int $sourceQuantity,
-        int $quantity,
-        int $alreadyQuantity,
-        int $alreadyAllocated,
-        bool $isFinalPart,
-    ): int {
-        $remaining = max(0, $sourceAmount - $alreadyAllocated);
+    /** يوزع قيمة المصدر بالكمية؛ المرتجع الأخير يحمل بقايا هللات كل الأجزاء السابقة. */
+    private function allocate(int $sourceAmount, int $sourceQuantity, int $quantity, int $alreadyAllocated, bool $isFinalPart): int
+    {
         if ($isFinalPart) {
-            return $remaining;
+            return max(0, $sourceAmount - $alreadyAllocated);
         }
 
-        $part = $allocator->cumulative($sourceAmount, $sourceQuantity, $alreadyQuantity + $quantity)
-            - $allocator->cumulative($sourceAmount, $sourceQuantity, $alreadyQuantity);
-
-        return min(max(0, $part), $remaining);
+        return intdiv($sourceAmount * $quantity, $sourceQuantity);
     }
 
     /** @param array<int,array<string,int|string|null>> $items */

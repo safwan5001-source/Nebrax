@@ -508,10 +508,11 @@ class CreditNoteSourceVatAccuracyTest extends TestCase
     }
 
     /** @test */
-    public function a_non_final_pos_part_after_a_note_takes_its_cumulative_share(): void
+    public function non_final_pos_parts_keep_the_rem01_independent_floor_and_the_final_part_closes_the_vat(): void
     {
-        // 7 × 0.10: ضريبة 0.11. التوزيع التراكمي F(n)=floor(11n/7): 0,1,3,4,6,7,9,11.
-        // إشعار بوحدة (F(1)−F(0)=1)، ثم ردّ POS بوحدة غير أخيرة: F(2)−F(1)=2 لا floor(11/7)=1.
+        // اصطلاح POS (REM-01، تحرسه ReturnPosApiMixedReturnsTest): الجزء غير الأخير = floor(الكل × q ÷ المباع)
+        // بمعزل عن السابق، والأخير يكنس المتبقي. REM-02 لا يغيّره — الإشعار الدائن يدخل في «المتبقي» فقط،
+        // فمجموع الإشعار + أجزاء POS يغلق ضريبة الفاتورة هللةً بهللة (7 × 0.10 ⇒ 0.11).
         $invoice = $this->sale([$this->item(7, 10)]);
         $line = $invoice->lines->first();
         $note = $this->note($invoice, [[$line, 1]]);
@@ -520,17 +521,12 @@ class CreditNoteSourceVatAccuracyTest extends TestCase
         $service = app(\App\Services\Accounting\PosReturnService::class);
         $derive = new \ReflectionMethod($service, 'buildSourceItems');
         $derive->setAccessible(true);
+        $tax = fn (int $q) => $derive->invoke($service, $invoice->fresh('lines'), [['source_line_id' => $line->id, 'quantity' => $q]])[0]['line_tax_override'];
 
-        $first = $derive->invoke($service, $invoice->fresh('lines'), [['source_line_id' => $line->id, 'quantity' => 1]])[0];
-        $this->assertSame(2, $first['line_tax_override'], 'الجزء الثاني (وحدة بعد إشعار وحدة) = 2 هللة لا 1.');
-
-        // ثلاث وحدات بعد الإشعار: F(4)−F(1)=6−1=5 هللات.
-        $three = $derive->invoke($service, $invoice->fresh('lines'), [['source_line_id' => $line->id, 'quantity' => 3]])[0];
-        $this->assertSame(5, $three['line_tax_override']);
-
-        // والمتبقي الستّ يغلق الفاتورة بالضبط (1 + 10 = 11).
-        $rest = $derive->invoke($service, $invoice->fresh('lines'), [['source_line_id' => $line->id, 'quantity' => 6]])[0];
-        $this->assertSame(11, (int) $note->tax_amount + $rest['line_tax_override']);
+        $this->assertSame(1, $tax(1), 'جزء غير أخير: floor(11 × 1 ÷ 7).');
+        $this->assertSame(4, $tax(3), 'جزء غير أخير: floor(11 × 3 ÷ 7).');
+        $this->assertSame(10, $tax(6), 'الجزء الأخير يكنس المتبقي بعد الإشعار.');
+        $this->assertSame(11, (int) $note->tax_amount + $tax(6), 'إشعار + الجزء الأخير = ضريبة الفاتورة.');
     }
 
     /** @test */
