@@ -180,20 +180,17 @@ class StorefrontCommerceFirewallTest extends TestCase
         return array_merge(glob($root.'/Storefront*Normalizer.php') ?: [], glob($root.'/*Publish*.php') ?: [], glob($root.'/*Contrast.php') ?: []);
     }
 
-    /** @test */
-    public function the_presentation_layer_names_no_class_that_owns_commerce_truth(): void
+    /**
+     * Every model and service is a potential commerce-truth owner (deny-by-default on NAMES, not on a keyword list); so is any
+     * App\Support\Commerce class that itself reaches into a model or service, directly or through another owner (fixed point), e.g.
+     * DeliverTodayFilter → CommerceDeliveryPromiseService.
+     *
+     * @param  array<string,int>  $allowed  class short names that are NOT owners (the presentation layer and what it may call)
+     * @return array<string,true>
+     */
+    private function commerceTruthOwners(array $allowed): array
     {
         $app = dirname(__DIR__, 2).'/app';
-        $files = $this->presentationFiles();
-        $this->assertNotEmpty($files);
-
-        // the presentation layer's own classes and the media / validation helpers it is allowed to call (none reads a price, offer, stock or tax value)
-        $presentation = array_map(static fn (string $file): string => basename($file, '.php'), $files);
-        $helpers = ['StorefrontMediaTransform', 'StorefrontMediaPublishGate', 'StorefrontMediaContrastEvidence', 'PresentationPublishValidationException'];
-        $allowed = array_flip(array_merge($presentation, $helpers));
-
-        // every model and service is a potential commerce-truth owner (deny-by-default on NAMES, not on a keyword list); so is any
-        // App\Support\Commerce class that itself reaches into a model or service (e.g. DeliverTodayFilter → CommerceDeliveryPromiseService)
         $owners = [];
         foreach ([$app.'/Models', $app.'/Services'] as $dir) {
             foreach (new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($dir, \FilesystemIterator::SKIP_DOTS)) as $file) {
@@ -226,6 +223,23 @@ class StorefrontCommerceFirewallTest extends TestCase
                 }
             }
         } while ($grew);
+
+        return $owners;
+    }
+
+    /** @test */
+    public function the_presentation_layer_names_no_class_that_owns_commerce_truth(): void
+    {
+        $app = dirname(__DIR__, 2).'/app';
+        $files = $this->presentationFiles();
+        $this->assertNotEmpty($files);
+
+        // the presentation layer's own classes and the media / validation helpers it is allowed to call (none reads a price, offer, stock or tax value)
+        $presentation = array_map(static fn (string $file): string => basename($file, '.php'), $files);
+        $helpers = ['StorefrontMediaTransform', 'StorefrontMediaPublishGate', 'StorefrontMediaContrastEvidence', 'PresentationPublishValidationException'];
+        $allowed = array_flip(array_merge($presentation, $helpers));
+
+        $owners = $this->commerceTruthOwners($allowed);
         $this->assertArrayHasKey('DeliverTodayFilter', $owners, 'control: the known commerce reader inside the support namespace is detected');
 
         foreach ($files as $file) {
@@ -249,13 +263,23 @@ class StorefrontCommerceFirewallTest extends TestCase
             'StorefrontPresentationService', 'StorefrontPresentationVersionService', 'StorefrontPresentationVersionBackfillService',
             'ScheduledPresentationDispatcher', 'StorefrontMediaReferenceScanner', 'StorefrontPublishedMediaIndex',
         ];
-        $truthOwners = [
-            'CommercePriceResolver', 'StorefrontOfferResolver', 'StorefrontOffer', 'PriceListService', 'ProductPricingService', 'AvailableToSellService',
-            'ShippingRateService', 'CommerceDeliveryPromiseService', 'InventoryReservationService', 'FulfillmentPolicyService', 'CommerceCartService',
-            'CommerceCheckoutService', 'CommerceOrderService', 'CommercePaymentIntentService', 'Product', 'ProductVariant', 'PriceList', 'PriceListItem',
-            'StockMovement', 'ProductWarehouseStock', 'InventoryReservation', 'CommerceListing', 'Invoice', 'Payment', 'LedgerService', 'JournalEntry',
-            'CommerceOrder', 'CommerceCart',
+        // what a presentation-owning service may legitimately name: its own models / helpers (no price, offer, stock, tax or shipping value)
+        $presentationSide = [
+            'Storefront', 'StorefrontPresentation', 'StorefrontPresentationVersion', 'StorefrontMedia', 'StorefrontMediaDerivative',
+            'StorefrontPublishedMedia', 'StorefrontDomain', 'StorefrontBusinessProfile', 'Tenant', 'User', 'BaseModel',
+            'PresentationDocumentTooLargeException', 'PresentationPublishValidationException', 'StorefrontMediaTransform',
+            'StorefrontMediaPublishGate', 'StorefrontMediaContrastEvidence', 'ForwardSchemaVersionException', 'ActiveVersionImmutableException',
+            // the draft / version lifecycle's own exceptions (they carry no price, offer, stock, tax or shipping value)
+            'NothingToPublishException', 'StaleDraftRevisionException', 'StaleVersionRevisionException', 'StalePublicationHeadException',
+            'VersionLifecycleConflictException', 'StaleScheduleTokenException', 'SourceVersionNotFoundException', 'InvalidScheduleTimeException',
         ];
+        $allowed = array_flip(array_merge(
+            $presentationSide,
+            $owning,
+            array_map(static fn (string $file): string => basename($file, '.php'), $this->presentationFiles()),
+        ));
+        $owners = $this->commerceTruthOwners($allowed);
+        $violations = [];
 
         foreach ($owning as $name) {
             $this->assertFileExists("{$services}/{$name}.php");
@@ -264,9 +288,13 @@ class StorefrontCommerceFirewallTest extends TestCase
                     continue;
                 }
                 $short = ltrim(strrchr('\\'.$token[1], '\\'), '\\');
-                $this->assertNotContains($short, $truthOwners, "{$name} names {$short}, a commerce-truth owner");
+                if (isset($owners[$short])) {
+                    $violations[$name.' → '.$short] = true;
+                }
             }
         }
+
+        $this->assertSame([], array_keys($violations), 'a presentation-owning service names a class that may own commerce truth');
     }
 
     /** @test */
@@ -285,6 +313,18 @@ class StorefrontCommerceFirewallTest extends TestCase
         // scanned for qualified presentation dependencies only: its bare `$presentation` parameter is the listing's title / description copy
         $bareWordExempt = ['CommerceListingService'];
         $files = [$app.'/Services/PriceListService.php', $app.'/Services/ProductPricingService.php'];
+        // ...and every service / support class the price and offer resolvers import (e.g. the partner price-list resolver, unit conversion):
+        // a presentation lookup there would change the resolved price just as surely as one in the resolver itself
+        foreach (['CommercePriceResolver', 'StorefrontOfferResolver'] as $resolver) {
+            preg_match_all('/^use (App\\\\(?:Services|Support)\\\\[A-Za-z0-9_\\\\]+);/m', (string) file_get_contents($app.'/Services/Commerce/'.$resolver.'.php'), $imports);
+            foreach ($imports[1] as $import) {
+                $path = $app.'/'.str_replace('\\', '/', substr($import, 4)).'.php';
+                if (is_file($path)) {
+                    $files[] = $path;
+                }
+            }
+        }
+        $files = array_values(array_unique($files));
         foreach (new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($app.'/Services/Commerce', \FilesystemIterator::SKIP_DOTS)) as $file) {
             if ($file->getExtension() === 'php') {
                 $files[] = $file->getPathname();
@@ -307,7 +347,7 @@ class StorefrontCommerceFirewallTest extends TestCase
             }
         }
         $this->assertGreaterThan(60, $checked, 'the scan must cover the commerce services broadly (sub-namespaces included), not a handful');
-        foreach (['ShippingRateService', 'CommerceDeliveryPromiseService', 'InventoryReservationService', 'FulfillmentPolicyService', 'CommercePriceResolver', 'StorefrontOfferResolver'] as $named) {
+        foreach (['ShippingRateService', 'CommerceDeliveryPromiseService', 'InventoryReservationService', 'FulfillmentPolicyService', 'CommercePriceResolver', 'StorefrontOfferResolver', 'PosCustomerPriceListResolver', 'UnitConversion'] as $named) {
             $this->assertContains($named, array_map(static fn (string $f): string => basename($f, '.php'), $files), "{$named} must be in the scan");
         }
     }
