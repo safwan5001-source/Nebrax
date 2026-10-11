@@ -138,6 +138,8 @@ POS checkout returns create a `ReturnDocument`, not a `CreditNote` (`PosReturnSe
 
 Tenant and branch authorization apply to both sides. The note, the source invoice, and the context must share the current tenant. `credit_notes.branch_id` and the source `invoices.branch_id` must each pass `ReportBranchScope`. If either branch is outside the caller's allowed set, the note is excluded. That stops a visible note from publishing another branch's platform activity. `delivery_invoice_contexts.invoice_id` is unique, so one note joins at most one context and is not multiplied into the sum. The total counts distinct note ids. The same note is not also subtracted from metric 5 or metric 9, including when both the invoice date and the note date fall in the range.
 
+`CreditNoteService::create` stores `partner_id` from the request and `original_invoice_id` separately. `CreditNoteOwnershipResolver` only checks that the invoice exists and that the note is a sales note. It does not require the same customer. A note whose `partner_id` differs from the source invoice's `partner_id` is not an adjustment of that sale. Metric 7 excludes it and the report counts it as an exception. This pass does not change credit-note posting. The stored note total is not capped to the invoice balance, because no such cap exists today; a same-customer note is still not folded into metric 9.
+
 Nothing in the inspected services forbids both a posted sales return and a posted sales credit note against the same invoice. Adding them into one net would be an estimate. Metric 9 therefore subtracts POS returns only. A combined net is BLOCKED.
 
 Purchase credit notes are excluded (`CreditNoteOwnershipResolver` purchase path).
@@ -260,7 +262,7 @@ SQLite and PostgreSQL, read-only:
 6. A return of a non-delivery invoice is excluded.
 7. A posted sales credit note whose `note_date` is inside the range and whose source invoice is in the attribution set appears only in the credit-note block. Metric 9 is unchanged. This includes a source invoice whose `invoice_date` is before the range.
 8. A credit note with no `original_invoice_id`, or whose source is not a posted POS delivery invoice, is absent. A note whose `note_date` is outside the range is absent even when the source `invoice_date` is inside the range. When both dates are inside the range, the note id is counted once.
-9. A credit note is excluded when the note's branch or the source invoice's branch fails `ReportBranchScope`, or when the note, invoice, and context are not the same tenant.
+9. A credit note is excluded when the note's branch or the source invoice's branch fails `ReportBranchScope`, or when the note, invoice, and context are not the same tenant. A note whose `partner_id` differs from the source invoice's `partner_id` is an exception and is absent from metric 7.
 10. A Hub row, including one that shares `external_order_reference` text with an invoice, does not change any money metric or the invoice count.
 11. Another tenant's invoice and context are invisible.
 12. A branch-restricted user does not see another branch, and omitting `branch_id` still limits them to allowed branches.
@@ -309,6 +311,7 @@ No test may call `InvoiceService::post` through a new report path. Fixtures post
 | Return and credit note added together | Combined net BLOCKED |
 | Credit note dated outside the source invoice period dropped | Attribution set has no invoice-date filter; `note_date` is the period |
 | One credit note counted as a sale reduction and as metric 7 | Metric 7 is separate; metric 9 subtracts returns only |
+| Credit note linked to another customer's invoice | Excluded from metric 7; posting is unchanged |
 | CSV formula in an external reference | Export prefixes formula-leading string cells; stored value unchanged |
 | Cross-tenant or cross-branch context | Query matches tenant and branch; `ReportBranchScope` applies to the note and the source invoice |
 | New posting or VAT rule | Out of scope |
