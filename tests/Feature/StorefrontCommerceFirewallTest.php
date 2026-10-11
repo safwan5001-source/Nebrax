@@ -113,30 +113,51 @@ class StorefrontCommerceFirewallTest extends TestCase
         $this->assertSame('price', $normalized['pagePresentation']['product']['regions'][0]['key']);
     }
 
-    /** @test */
-    public function the_presentation_layer_is_not_coupled_to_price_offer_cart_or_stock_services(): void
+    /** @return list<string> */
+    private function presentationFiles(): array
     {
         $root = dirname(__DIR__, 2).'/app/Support/Commerce';
-        $files = array_merge(glob($root.'/Storefront*Normalizer.php') ?: [], glob($root.'/*Publish*.php') ?: [], glob($root.'/*Contrast.php') ?: []);
+
+        return array_merge(glob($root.'/Storefront*Normalizer.php') ?: [], glob($root.'/*Publish*.php') ?: [], glob($root.'/*Contrast.php') ?: []);
+    }
+
+    /** @test */
+    public function the_presentation_layer_names_no_class_that_owns_commerce_truth(): void
+    {
+        $app = dirname(__DIR__, 2).'/app';
+        $files = $this->presentationFiles();
         $this->assertNotEmpty($files);
 
-        // allow-list, not a deny-list: a presentation file may reference only its own namespace and these media / validation helpers
-        // (none of which reads a price, offer, stock or tax value). Any other `App\...` reference — a model, a pricing / offer / cart
-        // service, a ledger class — fails, whatever its name.
-        $allowed = [
-            'App\\Services\\Commerce\\StorefrontMediaTransform',
-            'App\\Services\\Commerce\\StorefrontMediaPublishGate',
-            'App\\Services\\Commerce\\StorefrontMediaContrastEvidence',
-            'App\\Services\\Commerce\\PresentationPublishValidationException',
-        ];
+        // the presentation layer's own classes and the media / validation helpers it is allowed to call (none reads a price, offer, stock or tax value)
+        $presentation = array_map(static fn (string $file): string => basename($file, '.php'), $files);
+        $helpers = ['StorefrontMediaTransform', 'StorefrontMediaPublishGate', 'StorefrontMediaContrastEvidence', 'PresentationPublishValidationException'];
+        $allowed = array_flip(array_merge($presentation, $helpers));
+
+        // every model and service is a potential commerce-truth owner (deny-by-default on NAMES, not on a keyword list); so is any
+        // App\Support\Commerce class that itself reaches into a model or service (e.g. DeliverTodayFilter → CommerceDeliveryPromiseService)
+        $owners = [];
+        foreach ([$app.'/Models', $app.'/Services'] as $dir) {
+            foreach (new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($dir, \FilesystemIterator::SKIP_DOTS)) as $file) {
+                if ($file->getExtension() === 'php' && ! isset($allowed[$file->getBasename('.php')])) {
+                    $owners[$file->getBasename('.php')] = true;
+                }
+            }
+        }
+        foreach (glob($app.'/Support/Commerce/*.php') ?: [] as $file) {
+            $name = basename($file, '.php');
+            if (! isset($allowed[$name]) && preg_match('/\\bApp\\\\(Models|Services)\\\\/', $this->withoutComments((string) file_get_contents($file))) === 1) {
+                $owners[$name] = true;
+            }
+        }
+        $this->assertArrayHasKey('DeliverTodayFilter', $owners, 'control: the known commerce reader inside the support namespace is detected');
 
         foreach ($files as $file) {
-            preg_match_all('/\bApp(?:\\\\[A-Za-z0-9_]+)+/', $this->withoutComments((string) file_get_contents($file)), $matches);
-            foreach (array_unique($matches[0]) as $reference) {
-                $this->assertTrue(
-                    $reference === 'App\\Support\\Commerce' || str_starts_with($reference, 'App\\Support\\Commerce\\') || in_array($reference, $allowed, true),
-                    basename($file)." references {$reference}, outside the presentation namespace and its allow-listed helpers",
-                );
+            foreach (token_get_all((string) file_get_contents($file)) as $token) {
+                if (! is_array($token) || ! in_array($token[0], [T_STRING, T_NAME_QUALIFIED, T_NAME_FULLY_QUALIFIED], true)) {
+                    continue;
+                }
+                $short = ltrim(strrchr('\\'.$token[1], '\\'), '\\');
+                $this->assertArrayNotHasKey($short, $owners, basename($file)." names {$token[1]}, a class outside the presentation layer (it may own price, offer, stock, tax or shipping truth)");
             }
         }
     }
@@ -144,11 +165,32 @@ class StorefrontCommerceFirewallTest extends TestCase
     /** @test */
     public function the_commercial_services_do_not_read_the_presentation_layer(): void
     {
-        $services = dirname(__DIR__, 2).'/app/Services/Commerce';
-        foreach (['CommercePriceResolver.php', 'StorefrontOfferResolver.php', 'CommerceCartService.php', 'CommerceCheckoutService.php', 'CommerceOrderService.php'] as $name) {
-            $source = (string) file_get_contents($services.'/'.$name);
+        $app = dirname(__DIR__, 2).'/app';
+
+        // every service in the commerce namespace (price, offer, cart, checkout, order, inventory, delivery, shipping, tax, payment…) plus the
+        // two pricing services that live outside it — EXCEPT the services whose job is the presentation itself (their own versions, publishing,
+        // media references) and CommerceListingService, whose `$presentation` parameter is the product listing's title / description copy.
+        $presentationSide = [
+            'PresentationDocumentTooLargeException', 'PresentationPublishValidationException', 'ScheduledPresentationDispatcher',
+            'StorefrontMediaReferenceScanner', 'StorefrontPresentationService', 'StorefrontPresentationVersionBackfillService',
+            'StorefrontPresentationVersionService', 'StorefrontPublishedMediaIndex', 'StorefrontVerticalSetupService', 'CommerceListingService',
+        ];
+        $files = array_merge(glob($app.'/Services/Commerce/*.php') ?: [], [$app.'/Services/PriceListService.php', $app.'/Services/ProductPricingService.php']);
+        $checked = 0;
+
+        foreach ($files as $file) {
+            $name = basename($file, '.php');
+            if (in_array($name, $presentationSide, true)) {
+                continue;
+            }
+            $checked++;
+            $source = $this->withoutComments((string) file_get_contents($file));
             $this->assertStringNotContainsString('Support\\Commerce\\Storefront', $source, "{$name} must not depend on presentation normalisers");
-            $this->assertStringNotContainsString('presentation', strtolower($this->withoutComments($source)), "{$name} must not read the presentation");
+            $this->assertStringNotContainsString('presentation', strtolower($source), "{$name} must not read the presentation");
+        }
+        $this->assertGreaterThan(60, $checked, 'the scan must cover the commerce services broadly, not a handful');
+        foreach (['ShippingRateService', 'CommerceDeliveryPromiseService', 'InventoryReservationService', 'FulfillmentPolicyService', 'CommercePriceResolver', 'StorefrontOfferResolver'] as $named) {
+            $this->assertContains($named, array_map(static fn (string $f): string => basename($f, '.php'), $files), "{$named} must be in the scan");
         }
     }
 }
