@@ -21,6 +21,31 @@ const rtl: DesignContext = { ...ctx, dir: "rtl" };
 
 afterEach(cleanup);
 
+describe("slider copy is never recoloured by the section surface (V8b)", () => {
+  it("a slider with a designed background emits no text tokens — its copy colour is per slide, over each picture", () => {
+    const r = resolveSectionDesign(
+      "slider",
+      { background: { kind: "solid", color: { role: "surface" } }, spacing: { top: "md" } },
+      ctx,
+    )!;
+    const tokens = r.attrs["data-sd"].split(" ");
+    expect(tokens).toContain("bg");
+    expect(tokens).not.toContain("fg");
+    expect(tokens).not.toContain("heading");
+    expect(tokens).not.toContain("link");
+    expect(r.style["--sec-fg"]).toBeUndefined();
+    expect(r.style["--sec-heading"]).toBeUndefined();
+    expect(r.style["--sec-link"]).toBeUndefined();
+    // any other type keeps recolouring its text over its own background
+    const benefits = resolveSectionDesign(
+      "benefits",
+      { background: { kind: "solid", color: { role: "brand" } } },
+      ctx,
+    )!;
+    expect(benefits.attrs["data-sd"].split(" ")).toContain("fg");
+  });
+});
+
 describe("resolveSectionDesign (CUST-HV V5c)", () => {
   it("absent or empty design ⇒ null (the caller renders the section untouched)", () => {
     expect(resolveSectionDesign("hero", undefined, ctx)).toBeNull();

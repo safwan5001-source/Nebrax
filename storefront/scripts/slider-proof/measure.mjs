@@ -341,32 +341,34 @@ async function run() {
             if (shotsAt && ((w === 1280 || w === 390) && i < 2)) await rp.screenshot({ path: join(shotsAt, `${name}-${d}-${w}-s${i + 1}.png`), fullPage: false });
           }
           if (name === "auto" && w === 1280) {
-            const before = await snap(rp);
+            const fresh = await load(rctx, name, d);
+            const before = await snap(fresh);
             ok(!before.pause, `${tag}[reduced]: pause button must not exist`);
-            await rp.waitForTimeout(5600);
-            ok(activeOf(await snap(rp)) === 0, `${tag}[reduced]: autoplay advanced under prefers-reduced-motion`);
+            await fresh.waitForTimeout(5600);
+            ok(activeOf(await snap(fresh)) === 0, `${tag}[reduced]: autoplay advanced under prefers-reduced-motion`);
           }
           await rctx.close();
         }
 
         // ── autoplay (motion allowed) ──
         if (name === "auto" && w === 1280) {
-          const first = await snap(page);
+          const autoPage = await load(ctx, name, d);
+          const first = await snap(autoPage);
           ok(!!first.pause && first.pause.label === (rtl ? "إيقاف الشرائح مؤقتاً" : "Pause slides"), `${tag}[auto]: pause label`);
-          await page.mouse.move(0, 0);
-          await page.waitForTimeout(5600);
-          ok(activeOf(await snap(page)) === 1, `${tag}[auto]: did not advance after 5 s`);
-          await page.click("[data-slider-pause]");
-          ok((await snap(page)).pause.label === (rtl ? "تشغيل الشرائح" : "Play slides"), `${tag}[auto]: play label`);
-          await page.waitForTimeout(5600);
-          ok(activeOf(await snap(page)) === 1, `${tag}[auto]: Pause did not hold`);
-          await page.click("[data-slider-pause]"); // resume
-          await page.mouse.move(s.root.cx, s.root.cy); // hover holds it
-          await page.waitForTimeout(5600);
-          ok(activeOf(await snap(page)) === 1, `${tag}[auto]: hover did not pause`);
-          await page.mouse.move(0, 0);
-          await page.waitForTimeout(5600);
-          ok(activeOf(await snap(page)) === 2, `${tag}[auto]: did not resume after hover`);
+          await autoPage.mouse.move(0, 0);
+          await autoPage.waitForTimeout(5600);
+          ok(activeOf(await snap(autoPage)) === 1, `${tag}[auto]: did not advance after 5 s`);
+          await autoPage.click("[data-slider-pause]");
+          ok((await snap(autoPage)).pause.label === (rtl ? "تشغيل الشرائح" : "Play slides"), `${tag}[auto]: play label`);
+          await autoPage.waitForTimeout(5600);
+          ok(activeOf(await snap(autoPage)) === 1, `${tag}[auto]: Pause did not hold`);
+          await autoPage.click("[data-slider-pause]"); // resume
+          await autoPage.mouse.move(s.root.cx, s.root.cy); // hover holds it
+          await autoPage.waitForTimeout(5600);
+          ok(activeOf(await snap(autoPage)) === 1, `${tag}[auto]: hover did not pause`);
+          await autoPage.mouse.move(0, 0);
+          await autoPage.waitForTimeout(5600);
+          ok(activeOf(await snap(autoPage)) === 2, `${tag}[auto]: did not resume after hover`);
         }
 
         if (shotsAt && (w === 1280 || w === 390) && ["basic", "withheld", "align", "designed", "phone"].includes(name)) {

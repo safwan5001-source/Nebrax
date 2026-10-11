@@ -898,3 +898,286 @@
     transition: none;
   }
 }
+/* ───────────────────────────── CUST-HV V8b — the published slider (V0 §13.1, §6.6) ─────────────────────────────
+   Slides are stacked in ONE grid cell; the active one is selected by `--sl-active` (set on the root) against each
+   slide's `--sl-i`. Every colour comes from a validated custom property written by the renderer (`--sl-fg`, `--sl-btn`,
+   `--sl-ovl`, `--sl-ovl-a`); nothing from the document reaches CSS as text. Direction is the root's `dir`: the slide
+   offset is mirrored by `--sl-sgn`, the arrows sit on logical edges and the chevrons mirror. Inactive slides are
+   `inert` (markup), clipped by the viewport, and — for `fade` / `none` — hidden. Reduced motion removes every
+   transition (the component also never starts autoplay). */
+.awj-store-preview [data-slider] {
+  --sl-sgn: 1;
+  --sl-dur: 300ms;
+  --sl-ease: cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--store-radius, 0.75rem);
+}
+.awj-store-preview [data-slider][dir="rtl"] {
+  --sl-sgn: -1;
+}
+.awj-store-preview [data-slider][data-duration="fast"] {
+  --sl-dur: 150ms;
+}
+.awj-store-preview [data-slider][data-duration="slow"] {
+  --sl-dur: 500ms;
+}
+.awj-store-preview [data-slider-viewport] {
+  overflow: hidden;
+  touch-action: pan-y;
+}
+.awj-store-preview [data-slider-track] {
+  display: grid;
+}
+.awj-store-preview [data-slider-slide] {
+  grid-area: 1 / 1;
+  position: relative;
+  display: grid;
+  min-inline-size: 0;
+  min-block-size: var(--sec-minh, clamp(16rem, 36vw, 30rem));
+  overflow: hidden;
+  color: var(--sl-fg, inherit);
+  transform: translateX(
+    calc((var(--sl-i) - var(--sl-active)) * 100% * var(--sl-sgn))
+  );
+  transition:
+    transform var(--sl-dur) var(--sl-ease),
+    opacity var(--sl-dur) var(--sl-ease),
+    visibility 0s linear var(--sl-dur);
+}
+.awj-store-preview [data-slider-slide][data-surface="brand"] {
+  background: var(--store-primary);
+}
+/* fade / none: slides do not travel, they stack and the inactive ones are hidden */
+.awj-store-preview [data-slider][data-transition="fade"] [data-slider-slide],
+.awj-store-preview [data-slider][data-transition="none"] [data-slider-slide] {
+  transform: none;
+}
+.awj-store-preview [data-slider][data-transition="fade"] [data-slider-slide]:not([data-active]) {
+  opacity: 0;
+  visibility: hidden;
+}
+.awj-store-preview [data-slider][data-transition="none"] [data-slider-slide] {
+  transition: none;
+}
+.awj-store-preview [data-slider][data-transition="none"] [data-slider-slide]:not([data-active]) {
+  visibility: hidden;
+}
+.awj-store-preview [data-slider][data-transition="fade"] [data-slider-slide][data-active] {
+  transition-delay: 0s;
+}
+/* slide travel: an inactive slide is parked off-screen but never shown mid-travel to AT (it is inert) */
+.awj-store-preview [data-slider-picture],
+.awj-store-preview [data-slider-picture] img {
+  position: absolute;
+  inset: 0;
+  display: block;
+  inline-size: 100%;
+  block-size: 100%;
+}
+.awj-store-preview [data-slider-picture] img {
+  object-fit: cover;
+  object-position: var(--sl-pos, 50% 50%);
+}
+@media (max-width: 767px) {
+  .awj-store-preview [data-slider-picture] img {
+    object-position: var(--sl-pos-m, var(--sl-pos, 50% 50%));
+  }
+}
+.awj-store-preview [data-slider-wash] {
+  position: absolute;
+  inset: 0;
+  background: var(--sl-ovl);
+  opacity: var(--sl-ovl-a);
+  pointer-events: none;
+}
+.awj-store-preview [data-slider-copy] {
+  position: relative;
+  z-index: 1;
+  align-self: center;
+  justify-self: start;
+  box-sizing: border-box;
+  max-inline-size: min(42rem, 100%);
+  padding: 1.25rem 3.5rem 3.5rem;
+  overflow-wrap: anywhere;
+  text-align: start;
+}
+@media (min-width: 768px) {
+  .awj-store-preview [data-slider-copy] {
+    padding: 2.5rem 4.5rem 4rem;
+  }
+}
+@media (min-width: 1024px) {
+  .awj-store-preview [data-slider-copy] {
+    padding: 3.5rem 5rem 4rem;
+  }
+}
+.awj-store-preview [data-slider-slide][data-align="center"] [data-slider-copy] {
+  justify-self: center;
+  text-align: center;
+}
+.awj-store-preview [data-slider-slide][data-align="end"] [data-slider-copy] {
+  justify-self: end;
+  text-align: end;
+}
+.awj-store-preview [data-slider-copy] h2 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 900;
+  line-height: 1.25;
+  color: var(--sl-fg, inherit);
+}
+@media (min-width: 640px) {
+  .awj-store-preview [data-slider-copy] h2 {
+    font-size: 1.5rem;
+  }
+}
+@media (min-width: 1024px) {
+  .awj-store-preview [data-slider-copy] h2 {
+    font-size: 2.25rem;
+  }
+}
+.awj-store-preview [data-slider-copy] p {
+  margin: 0.5rem 0 0;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: var(--sl-fg, inherit);
+}
+@media (min-width: 768px) {
+  .awj-store-preview [data-slider-copy] p {
+    font-size: 1rem;
+  }
+}
+.awj-store-preview [data-slider-cta] {
+  display: inline-flex;
+  align-items: center;
+  min-block-size: 2.75rem;
+  margin-block-start: 1rem;
+  padding-inline: 1.25rem;
+  border-radius: var(--store-radius, 0.5rem);
+  background: var(--sl-fg);
+  color: var(--sl-btn);
+  font-size: 0.875rem;
+  font-weight: 700;
+  box-shadow: 0 4px 10px rgb(0 0 0 / 0.18);
+  transition: opacity 150ms;
+}
+.awj-store-preview [data-slider-cta]:hover {
+  opacity: 0.9;
+}
+.awj-store-preview [data-slider-cta]:focus-visible {
+  outline: 2px solid var(--sl-fg);
+  outline-offset: 3px;
+}
+/* controls: translucent dark discs / pill — their glyphs contrast with their OWN fill, whatever the picture */
+.awj-store-preview [data-slider-arrow],
+.awj-store-preview [data-slider-pause],
+.awj-store-preview [data-slider-dots] button {
+  appearance: none;
+  border: 0;
+  cursor: pointer;
+  color: #fff;
+}
+.awj-store-preview [data-slider-arrow] {
+  position: absolute;
+  inset-block-start: calc(50% - 1.375rem);
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  inline-size: 2.75rem;
+  block-size: 2.75rem;
+  border-radius: 9999px;
+  background: rgb(0 0 0 / 0.6);
+}
+.awj-store-preview [data-slider-arrow="previous"] {
+  inset-inline-start: 0.5rem;
+}
+.awj-store-preview [data-slider-arrow="next"] {
+  inset-inline-end: 0.5rem;
+}
+/* the chevron points at the inline-end edge by default (right in LTR, left in RTL) */
+.awj-store-preview [data-slider-arrow] svg {
+  display: block;
+}
+.awj-store-preview [data-slider-arrow="next"] svg {
+  transform: none;
+}
+.awj-store-preview [data-slider-arrow="previous"] svg {
+  transform: scaleX(-1);
+}
+.awj-store-preview [data-slider][dir="rtl"] [data-slider-arrow="next"] svg {
+  transform: scaleX(-1);
+}
+.awj-store-preview [data-slider][dir="rtl"] [data-slider-arrow="previous"] svg {
+  transform: none;
+}
+.awj-store-preview [data-slider-arrow][aria-disabled="true"] {
+  opacity: 0.4;
+  cursor: default;
+}
+.awj-store-preview [data-slider-bar] {
+  position: absolute;
+  inset-block-end: 0.5rem;
+  inset-inline: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  pointer-events: none;
+}
+.awj-store-preview [data-slider-bar] > * {
+  pointer-events: auto;
+  background: rgb(0 0 0 / 0.6);
+  border-radius: 9999px;
+}
+.awj-store-preview [data-slider-pause] {
+  display: grid;
+  place-items: center;
+  inline-size: 2.75rem;
+  block-size: 2.75rem;
+}
+.awj-store-preview [data-slider-pause] svg {
+  inline-size: 1.25rem;
+  block-size: 1.25rem;
+}
+.awj-store-preview [data-slider-dots] {
+  display: flex;
+  align-items: center;
+  padding-inline: 0.25rem;
+}
+.awj-store-preview [data-slider-dots] button {
+  display: grid;
+  place-items: center;
+  inline-size: 2rem;
+  block-size: 2.75rem;
+  background: none;
+}
+.awj-store-preview [data-slider-dots] button span {
+  display: block;
+  inline-size: 0.625rem;
+  block-size: 0.625rem;
+  border: 2px solid #fff;
+  border-radius: 9999px;
+  box-sizing: border-box;
+}
+.awj-store-preview [data-slider-dots] button[aria-current="true"] span {
+  background: #fff;
+}
+/* two-tone focus ring: visible on a light or a dark picture */
+.awj-store-preview [data-slider-arrow]:focus-visible,
+.awj-store-preview [data-slider-pause]:focus-visible,
+.awj-store-preview [data-slider-dots] button:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+  box-shadow: 0 0 0 2px #000;
+}
+@media (prefers-reduced-motion: reduce) {
+  .awj-store-preview [data-slider] {
+    --sl-dur: 0s;
+  }
+  .awj-store-preview [data-slider] [data-slider-slide],
+  .awj-store-preview [data-slider] [data-slider-cta] {
+    transition: none !important;
+  }
+}
