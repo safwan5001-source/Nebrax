@@ -207,6 +207,8 @@ async function run() {
           ok(side(centre(c0)) < 0, `${tag}: align start sits on the inline-start side`);
           ok(Math.abs(centre(c1)) <= 8, `${tag}: align center is centred (${centre(c1).toFixed(1)})`);
           ok(side(centre(c2)) > 0, `${tag}: align end sits on the inline-end side`);
+          await page.keyboard.press("Home");
+          await page.waitForTimeout(450);
           s = await snap(page);
         }
 
