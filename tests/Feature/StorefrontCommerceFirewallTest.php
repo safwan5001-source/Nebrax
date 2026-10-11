@@ -59,14 +59,26 @@ class StorefrontCommerceFirewallTest extends TestCase
         return $code;
     }
 
+    /**
+     * The deny rule shared with the TS suites (see the fixture note): split the key into lower-cased words; denied when any word is a commerce
+     * word and the LAST word is not a presentation suffix (position / role / size / shape / placement of real data, or an id selector).
+     *
+     * @param  array<string,mixed>  $fixture
+     */
+    private function denies(string $key, array $fixture): bool
+    {
+        $words = array_map('strtolower', preg_split('/[\s_\-]+|(?<=[a-z0-9])(?=[A-Z])/', $key, -1, PREG_SPLIT_NO_EMPTY) ?: []);
+
+        return array_intersect($words, $fixture['commerceWords']) !== [] && ! in_array(end($words), $fixture['presentationSuffixes'], true);
+    }
+
     /** @test */
     public function no_commercial_key_survives_normalisation_in_any_scope(): void
     {
         $fixture = $this->fixture();
         $normalized = (new StorefrontPresentationNormalizer)->normalize($fixture['input']);
-        $pattern = '/'.$fixture['forbiddenKeyPattern'].'/i';
 
-        $offending = array_values(array_filter(array_unique($this->keysOf($normalized)), static fn (string $key): bool => preg_match($pattern, $key) === 1));
+        $offending = array_values(array_filter(array_unique($this->keysOf($normalized)), fn (string $key): bool => $this->denies($key, $fixture)));
         $this->assertSame([], $offending, 'commercial keys leaked into the normalised presentation: '.implode(', ', $offending));
 
         $json = json_encode($normalized, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE);
@@ -76,17 +88,18 @@ class StorefrontCommerceFirewallTest extends TestCase
     }
 
     /** @test */
-    public function the_deny_pattern_matches_value_bearing_keys_and_never_an_allowed_presentation_control(): void
+    public function the_deny_rule_rejects_value_bearing_scaling_and_hiding_keys_and_never_an_allowed_presentation_control(): void
     {
         $fixture = $this->fixture();
-        $pattern = '/'.$fixture['forbiddenKeyPattern'].'/i';
 
         foreach ($fixture['allowedKeys'] as $key) {
-            $this->assertSame(0, preg_match($pattern, $key), "{$key} is an allowed presentation control but the deny pattern rejects it");
+            $this->assertFalse($this->denies($key, $fixture), "{$key} is an allowed presentation control but the deny rule rejects it");
         }
-        foreach (['price', 'salePrice', 'stockCount', 'shippingFee', 'offerStatus', 'grandTotal', 'unitPrice', 'taxAmount', 'shippingCost', 'checkoutTotal', 'subtotal'] as $key) {
-            $this->assertSame(1, preg_match($pattern, $key), "{$key} must be denied");
+        foreach ($fixture['deniedKeys'] as $key) {
+            $this->assertTrue($this->denies($key, $fixture), "{$key} must be denied");
         }
+        // control: the raw hostile document carries many denied keys, so the scan can see them
+        $this->assertGreaterThanOrEqual(10, count(array_filter(array_unique($this->keysOf($fixture['input'])), fn (string $key): bool => $this->denies($key, $fixture))));
     }
 
     /** @test */

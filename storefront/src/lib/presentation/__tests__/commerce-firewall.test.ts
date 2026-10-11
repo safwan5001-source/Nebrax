@@ -4,7 +4,9 @@ import { describe, expect, it } from "vitest";
 import { normalizePresentationConfig } from "../config";
 
 interface Fixture {
-  forbiddenKeyPattern: string;
+  commerceWords: string[];
+  presentationSuffixes: string[];
+  deniedKeys: string[];
   allowedKeys: string[];
   forbiddenValues: string[];
   input: unknown;
@@ -32,6 +34,18 @@ function keysOf(node: unknown, out: Set<string> = new Set()): Set<string> {
   return out;
 }
 
+/** The deny rule shared with the PHP suite (see the fixture note): denied when any word is a commerce word and the LAST word is not a presentation suffix. */
+function denies(key: string): boolean {
+  const words = key
+    .split(/[\s_-]+|(?<=[a-z0-9])(?=[A-Z])/)
+    .filter(Boolean)
+    .map((word) => word.toLowerCase());
+  return (
+    words.some((word) => fixture.commerceWords.includes(word)) &&
+    !fixture.presentationSuffixes.includes(words[words.length - 1])
+  );
+}
+
 /**
  * CUST-HV V9d-4 (V0 §14.3) — the TS twin of PHP's `StorefrontCommerceFirewallTest`: a hostile document carrying commercial keys in every
  * presentation scope loses all of them in normalisation, and the legitimate parts survive.
@@ -40,37 +54,17 @@ describe("commerce firewall — presentation normalisation", () => {
   const normalized = normalizePresentationConfig(fixture.input);
 
   it("control: the raw document does carry commercial keys (the scan can see them)", () => {
-    const pattern = new RegExp(fixture.forbiddenKeyPattern, "i");
-    const raw = [...keysOf(fixture.input)].filter((key) => pattern.test(key));
+    const raw = [...keysOf(fixture.input)].filter(denies);
     expect(raw.length).toBeGreaterThanOrEqual(10);
   });
 
-  it("the deny pattern matches value-bearing keys and never an allowed presentation control", () => {
-    const pattern = new RegExp(fixture.forbiddenKeyPattern, "i");
-    for (const key of fixture.allowedKeys)
-      expect(pattern.test(key), key).toBe(false);
-    for (const key of [
-      "price",
-      "salePrice",
-      "stockCount",
-      "shippingFee",
-      "offerStatus",
-      "grandTotal",
-      "unitPrice",
-      "taxAmount",
-      "shippingCost",
-      "checkoutTotal",
-      "subtotal",
-    ]) {
-      expect(pattern.test(key), key).toBe(true);
-    }
+  it("the deny rule rejects value-bearing, scaling and hiding keys and never an allowed presentation control", () => {
+    for (const key of fixture.allowedKeys) expect(denies(key), key).toBe(false);
+    for (const key of fixture.deniedKeys) expect(denies(key), key).toBe(true);
   });
 
   it("no commercial key survives in any scope", () => {
-    const pattern = new RegExp(fixture.forbiddenKeyPattern, "i");
-    const offending = [...keysOf(normalized)].filter((key) =>
-      pattern.test(key),
-    );
+    const offending = [...keysOf(normalized)].filter(denies);
     expect(offending).toEqual([]);
   });
 

@@ -1,6 +1,42 @@
 {
-    "_note": "CUST-HV V9d-4 — commerce firewall (V0 §14.3). A hostile document: every scope the production normalizer accepts (document tokens, branding, header, footer, contact, whatsapp, social, verification, sbc, apps, navigation, pagePresentation, announcements, palette, homepage sections, section content, section design, design.cards, nested items) carries commercial keys (price, discount, stock, availability, tax, total, currency, sku, quantity, shipping fee / amount, freight, delivery fee, offer status, coupon code, cost). After normalisation NO such key may survive anywhere, and no injected value may be reachable. Shared by PHP StorefrontPresentationNormalizer and both TS twins (normalizePresentationConfig). `forbiddenKeyPattern` matches the exact value-bearing commercial key names (anchored); `allowedKeys` are presentation controls V0 §14.3 allows (position / colour role / size step of price, stock or badge text) and must never match, so a legitimate future control is not rejected by the scan. The pattern is two clauses: the exact names above, plus any key that ENDS in a value noun (price / cost / total / amount / fee), so composed names such as unitPrice, taxAmount, shippingCost, checkoutTotal and subtotal are denied while position / colour-role / size controls (pricePosition, stockTextSize…) are not.",
-    "forbiddenKeyPattern": "^(price|priceMinor|salePrice|compareAtPrice|discount|discountPercent|discountAmount|stock|stockCount|stockLabel|availability|tax|taxRate|vat|total|grandTotal|amount|currency|sku|quantity|inventory|shippingFee|shippingAmount|freight|deliveryFee|fee|offerStatus|offer_status|couponCode|cost)$|(price|cost|total|amount|fee)$",
+    "_note": "CUST-HV V9d-4 — commerce firewall (V0 §14.3). A hostile document: every scope the production normalizer accepts (document tokens, branding, header, footer, contact, whatsapp, social, verification, sbc, apps, navigation, pagePresentation, announcements, palette, homepage sections, section content, section design, design.cards, nested items) carries commercial keys (price, discount, stock, availability, tax, total, currency, sku, quantity, shipping fee / amount, freight, delivery fee, offer status, coupon code, cost). After normalisation NO such key may survive anywhere, and no injected value may be reachable. Shared by PHP StorefrontPresentationNormalizer and both TS twins (normalizePresentationConfig). Deny rule (shared by the PHP and both TS suites): split a key into words (camelCase / snake_case / kebab-case, lower-cased); the key is DENIED when any word is in `commerceWords` and the LAST word is not in `presentationSuffixes`. So value-bearing and scaling / hiding controls (price, unitPrice, taxAmount, priceMultiplier, discountScale, hideStock, availabilityVisible, showPrice, offerStatus…) are denied, while position / colour-role / size-step / shape / placement controls over real data (pricePosition, stockTextSize, availabilityBadgePlacement…) and the id selectors (offerIds, productIds) are allowed. `allowedKeys` must never be denied; `deniedKeys` must always be.",
+    "commerceWords": [
+        "price",
+        "cost",
+        "discount",
+        "stock",
+        "availability",
+        "tax",
+        "vat",
+        "total",
+        "subtotal",
+        "amount",
+        "currency",
+        "sku",
+        "quantity",
+        "qty",
+        "inventory",
+        "shipping",
+        "freight",
+        "fee",
+        "coupon",
+        "offer",
+        "order",
+        "checkout"
+    ],
+    "presentationSuffixes": [
+        "position",
+        "color",
+        "colour",
+        "role",
+        "size",
+        "step",
+        "shape",
+        "placement",
+        "ids",
+        "align",
+        "alignment"
+    ],
     "allowedKeys": [
         "pricePosition",
         "priceColorRole",
@@ -9,7 +45,10 @@
         "compareAtPriceSize",
         "availabilityBadgePlacement",
         "badgeVisible",
-        "showStockText"
+        "offerIds",
+        "productIds",
+        "priceTextAlign",
+        "stockBadgeShape"
     ],
     "forbiddenValues": [
         "10%",
@@ -60,7 +99,12 @@
             "taxAmount": 1200,
             "shippingCost": 2500,
             "checkoutTotal": 31000,
-            "subtotal": 29800
+            "subtotal": 29800,
+            "priceMultiplier": 1.1,
+            "discountScale": 2,
+            "hideStock": true,
+            "availabilityVisible": false,
+            "showPrice": true
         },
         "surfaces": {
             "radius": "md",
@@ -96,7 +140,12 @@
             "taxAmount": 1200,
             "shippingCost": 2500,
             "checkoutTotal": 31000,
-            "subtotal": 29800
+            "subtotal": 29800,
+            "priceMultiplier": 1.1,
+            "discountScale": 2,
+            "hideStock": true,
+            "availabilityVisible": false,
+            "showPrice": true
         },
         "typography": {
             "headingScale": "lg",
@@ -132,7 +181,12 @@
             "taxAmount": 1200,
             "shippingCost": 2500,
             "checkoutTotal": 31000,
-            "subtotal": 29800
+            "subtotal": 29800,
+            "priceMultiplier": 1.1,
+            "discountScale": 2,
+            "hideStock": true,
+            "availabilityVisible": false,
+            "showPrice": true
         },
         "layout": {
             "contentWidth": "wide",
@@ -168,7 +222,12 @@
             "taxAmount": 1200,
             "shippingCost": 2500,
             "checkoutTotal": 31000,
-            "subtotal": 29800
+            "subtotal": 29800,
+            "priceMultiplier": 1.1,
+            "discountScale": 2,
+            "hideStock": true,
+            "availabilityVisible": false,
+            "showPrice": true
         },
         "motion": {
             "reveal": "fade-up",
@@ -204,7 +263,12 @@
             "taxAmount": 1200,
             "shippingCost": 2500,
             "checkoutTotal": 31000,
-            "subtotal": 29800
+            "subtotal": 29800,
+            "priceMultiplier": 1.1,
+            "discountScale": 2,
+            "hideStock": true,
+            "availabilityVisible": false,
+            "showPrice": true
         },
         "productCard": {
             "density": "compact",
@@ -240,7 +304,12 @@
             "taxAmount": 1200,
             "shippingCost": 2500,
             "checkoutTotal": 31000,
-            "subtotal": 29800
+            "subtotal": 29800,
+            "priceMultiplier": 1.1,
+            "discountScale": 2,
+            "hideStock": true,
+            "availabilityVisible": false,
+            "showPrice": true
         },
         "homepage": {
             "sections": [
@@ -296,7 +365,12 @@
                         "taxAmount": 1200,
                         "shippingCost": 2500,
                         "checkoutTotal": 31000,
-                        "subtotal": 29800
+                        "subtotal": 29800,
+                        "priceMultiplier": 1.1,
+                        "discountScale": 2,
+                        "hideStock": true,
+                        "availabilityVisible": false,
+                        "showPrice": true
                     },
                     "design": {
                         "layout": "rail",
@@ -338,7 +412,12 @@
                             "taxAmount": 1200,
                             "shippingCost": 2500,
                             "checkoutTotal": 31000,
-                            "subtotal": 29800
+                            "subtotal": 29800,
+                            "priceMultiplier": 1.1,
+                            "discountScale": 2,
+                            "hideStock": true,
+                            "availabilityVisible": false,
+                            "showPrice": true
                         },
                         "border": "hairline",
                         "radius": "md",
@@ -377,7 +456,12 @@
                             "taxAmount": 1200,
                             "shippingCost": 2500,
                             "checkoutTotal": 31000,
-                            "subtotal": 29800
+                            "subtotal": 29800,
+                            "priceMultiplier": 1.1,
+                            "discountScale": 2,
+                            "hideStock": true,
+                            "availabilityVisible": false,
+                            "showPrice": true
                         },
                         "price": 1,
                         "priceMinor": 100,
@@ -411,7 +495,12 @@
                         "taxAmount": 1200,
                         "shippingCost": 2500,
                         "checkoutTotal": 31000,
-                        "subtotal": 29800
+                        "subtotal": 29800,
+                        "priceMultiplier": 1.1,
+                        "discountScale": 2,
+                        "hideStock": true,
+                        "availabilityVisible": false,
+                        "showPrice": true
                     },
                     "shippingFee": 1500,
                     "shippingAmount": 900,
@@ -432,7 +521,12 @@
                     "taxAmount": 1200,
                     "shippingCost": 2500,
                     "checkoutTotal": 31000,
-                    "subtotal": 29800
+                    "subtotal": 29800,
+                    "priceMultiplier": 1.1,
+                    "discountScale": 2,
+                    "hideStock": true,
+                    "availabilityVisible": false,
+                    "showPrice": true
                 },
                 {
                     "id": "s-2",
@@ -488,7 +582,12 @@
                         "taxAmount": 1200,
                         "shippingCost": 2500,
                         "checkoutTotal": 31000,
-                        "subtotal": 29800
+                        "subtotal": 29800,
+                        "priceMultiplier": 1.1,
+                        "discountScale": 2,
+                        "hideStock": true,
+                        "availabilityVisible": false,
+                        "showPrice": true
                     },
                     "design": {
                         "layout": "rail",
@@ -530,7 +629,12 @@
                             "taxAmount": 1200,
                             "shippingCost": 2500,
                             "checkoutTotal": 31000,
-                            "subtotal": 29800
+                            "subtotal": 29800,
+                            "priceMultiplier": 1.1,
+                            "discountScale": 2,
+                            "hideStock": true,
+                            "availabilityVisible": false,
+                            "showPrice": true
                         },
                         "border": "hairline",
                         "radius": "md",
@@ -569,7 +673,12 @@
                             "taxAmount": 1200,
                             "shippingCost": 2500,
                             "checkoutTotal": 31000,
-                            "subtotal": 29800
+                            "subtotal": 29800,
+                            "priceMultiplier": 1.1,
+                            "discountScale": 2,
+                            "hideStock": true,
+                            "availabilityVisible": false,
+                            "showPrice": true
                         },
                         "price": 1,
                         "priceMinor": 100,
@@ -603,7 +712,12 @@
                         "taxAmount": 1200,
                         "shippingCost": 2500,
                         "checkoutTotal": 31000,
-                        "subtotal": 29800
+                        "subtotal": 29800,
+                        "priceMultiplier": 1.1,
+                        "discountScale": 2,
+                        "hideStock": true,
+                        "availabilityVisible": false,
+                        "showPrice": true
                     },
                     "shippingFee": 1500,
                     "shippingAmount": 900,
@@ -624,7 +738,12 @@
                     "taxAmount": 1200,
                     "shippingCost": 2500,
                     "checkoutTotal": 31000,
-                    "subtotal": 29800
+                    "subtotal": 29800,
+                    "priceMultiplier": 1.1,
+                    "discountScale": 2,
+                    "hideStock": true,
+                    "availabilityVisible": false,
+                    "showPrice": true
                 },
                 {
                     "id": "s-3",
@@ -680,7 +799,12 @@
                         "taxAmount": 1200,
                         "shippingCost": 2500,
                         "checkoutTotal": 31000,
-                        "subtotal": 29800
+                        "subtotal": 29800,
+                        "priceMultiplier": 1.1,
+                        "discountScale": 2,
+                        "hideStock": true,
+                        "availabilityVisible": false,
+                        "showPrice": true
                     },
                     "design": {
                         "columns": 2,
@@ -721,7 +845,12 @@
                             "taxAmount": 1200,
                             "shippingCost": 2500,
                             "checkoutTotal": 31000,
-                            "subtotal": 29800
+                            "subtotal": 29800,
+                            "priceMultiplier": 1.1,
+                            "discountScale": 2,
+                            "hideStock": true,
+                            "availabilityVisible": false,
+                            "showPrice": true
                         },
                         "price": 1,
                         "priceMinor": 100,
@@ -755,7 +884,12 @@
                         "taxAmount": 1200,
                         "shippingCost": 2500,
                         "checkoutTotal": 31000,
-                        "subtotal": 29800
+                        "subtotal": 29800,
+                        "priceMultiplier": 1.1,
+                        "discountScale": 2,
+                        "hideStock": true,
+                        "availabilityVisible": false,
+                        "showPrice": true
                     },
                     "shippingFee": 1500,
                     "shippingAmount": 900,
@@ -776,7 +910,12 @@
                     "taxAmount": 1200,
                     "shippingCost": 2500,
                     "checkoutTotal": 31000,
-                    "subtotal": 29800
+                    "subtotal": 29800,
+                    "priceMultiplier": 1.1,
+                    "discountScale": 2,
+                    "hideStock": true,
+                    "availabilityVisible": false,
+                    "showPrice": true
                 },
                 {
                     "id": "s-4",
@@ -832,7 +971,12 @@
                             "taxAmount": 1200,
                             "shippingCost": 2500,
                             "checkoutTotal": 31000,
-                            "subtotal": 29800
+                            "subtotal": 29800,
+                            "priceMultiplier": 1.1,
+                            "discountScale": 2,
+                            "hideStock": true,
+                            "availabilityVisible": false,
+                            "showPrice": true
                         },
                         "limit": 8,
                         "deliverToday": false,
@@ -868,7 +1012,12 @@
                         "taxAmount": 1200,
                         "shippingCost": 2500,
                         "checkoutTotal": 31000,
-                        "subtotal": 29800
+                        "subtotal": 29800,
+                        "priceMultiplier": 1.1,
+                        "discountScale": 2,
+                        "hideStock": true,
+                        "availabilityVisible": false,
+                        "showPrice": true
                     },
                     "design": {
                         "layout": "rail",
@@ -910,7 +1059,12 @@
                             "taxAmount": 1200,
                             "shippingCost": 2500,
                             "checkoutTotal": 31000,
-                            "subtotal": 29800
+                            "subtotal": 29800,
+                            "priceMultiplier": 1.1,
+                            "discountScale": 2,
+                            "hideStock": true,
+                            "availabilityVisible": false,
+                            "showPrice": true
                         },
                         "border": "hairline",
                         "radius": "md",
@@ -949,7 +1103,12 @@
                             "taxAmount": 1200,
                             "shippingCost": 2500,
                             "checkoutTotal": 31000,
-                            "subtotal": 29800
+                            "subtotal": 29800,
+                            "priceMultiplier": 1.1,
+                            "discountScale": 2,
+                            "hideStock": true,
+                            "availabilityVisible": false,
+                            "showPrice": true
                         },
                         "price": 1,
                         "priceMinor": 100,
@@ -983,7 +1142,12 @@
                         "taxAmount": 1200,
                         "shippingCost": 2500,
                         "checkoutTotal": 31000,
-                        "subtotal": 29800
+                        "subtotal": 29800,
+                        "priceMultiplier": 1.1,
+                        "discountScale": 2,
+                        "hideStock": true,
+                        "availabilityVisible": false,
+                        "showPrice": true
                     },
                     "shippingFee": 1500,
                     "shippingAmount": 900,
@@ -1004,7 +1168,12 @@
                     "taxAmount": 1200,
                     "shippingCost": 2500,
                     "checkoutTotal": 31000,
-                    "subtotal": 29800
+                    "subtotal": 29800,
+                    "priceMultiplier": 1.1,
+                    "discountScale": 2,
+                    "hideStock": true,
+                    "availabilityVisible": false,
+                    "showPrice": true
                 },
                 {
                     "id": "s-5",
@@ -1061,7 +1230,12 @@
                                 "taxAmount": 1200,
                                 "shippingCost": 2500,
                                 "checkoutTotal": 31000,
-                                "subtotal": 29800
+                                "subtotal": 29800,
+                                "priceMultiplier": 1.1,
+                                "discountScale": 2,
+                                "hideStock": true,
+                                "availabilityVisible": false,
+                                "showPrice": true
                             }
                         ],
                         "price": 1,
@@ -1096,7 +1270,12 @@
                         "taxAmount": 1200,
                         "shippingCost": 2500,
                         "checkoutTotal": 31000,
-                        "subtotal": 29800
+                        "subtotal": 29800,
+                        "priceMultiplier": 1.1,
+                        "discountScale": 2,
+                        "hideStock": true,
+                        "availabilityVisible": false,
+                        "showPrice": true
                     },
                     "design": {
                         "height": "tall",
@@ -1132,7 +1311,12 @@
                         "taxAmount": 1200,
                         "shippingCost": 2500,
                         "checkoutTotal": 31000,
-                        "subtotal": 29800
+                        "subtotal": 29800,
+                        "priceMultiplier": 1.1,
+                        "discountScale": 2,
+                        "hideStock": true,
+                        "availabilityVisible": false,
+                        "showPrice": true
                     },
                     "shippingFee": 1500,
                     "shippingAmount": 900,
@@ -1153,7 +1337,12 @@
                     "taxAmount": 1200,
                     "shippingCost": 2500,
                     "checkoutTotal": 31000,
-                    "subtotal": 29800
+                    "subtotal": 29800,
+                    "priceMultiplier": 1.1,
+                    "discountScale": 2,
+                    "hideStock": true,
+                    "availabilityVisible": false,
+                    "showPrice": true
                 },
                 {
                     "id": "s-6",
@@ -1210,7 +1399,12 @@
                                 "taxAmount": 1200,
                                 "shippingCost": 2500,
                                 "checkoutTotal": 31000,
-                                "subtotal": 29800
+                                "subtotal": 29800,
+                                "priceMultiplier": 1.1,
+                                "discountScale": 2,
+                                "hideStock": true,
+                                "availabilityVisible": false,
+                                "showPrice": true
                             }
                         ],
                         "price": 1,
@@ -1245,7 +1439,12 @@
                         "taxAmount": 1200,
                         "shippingCost": 2500,
                         "checkoutTotal": 31000,
-                        "subtotal": 29800
+                        "subtotal": 29800,
+                        "priceMultiplier": 1.1,
+                        "discountScale": 2,
+                        "hideStock": true,
+                        "availabilityVisible": false,
+                        "showPrice": true
                     },
                     "design": {
                         "layout": "columns-3",
@@ -1281,7 +1480,12 @@
                         "taxAmount": 1200,
                         "shippingCost": 2500,
                         "checkoutTotal": 31000,
-                        "subtotal": 29800
+                        "subtotal": 29800,
+                        "priceMultiplier": 1.1,
+                        "discountScale": 2,
+                        "hideStock": true,
+                        "availabilityVisible": false,
+                        "showPrice": true
                     },
                     "shippingFee": 1500,
                     "shippingAmount": 900,
@@ -1302,7 +1506,12 @@
                     "taxAmount": 1200,
                     "shippingCost": 2500,
                     "checkoutTotal": 31000,
-                    "subtotal": 29800
+                    "subtotal": 29800,
+                    "priceMultiplier": 1.1,
+                    "discountScale": 2,
+                    "hideStock": true,
+                    "availabilityVisible": false,
+                    "showPrice": true
                 },
                 {
                     "id": "s-7",
@@ -1359,7 +1568,12 @@
                                 "taxAmount": 1200,
                                 "shippingCost": 2500,
                                 "checkoutTotal": 31000,
-                                "subtotal": 29800
+                                "subtotal": 29800,
+                                "priceMultiplier": 1.1,
+                                "discountScale": 2,
+                                "hideStock": true,
+                                "availabilityVisible": false,
+                                "showPrice": true
                             },
                             {
                                 "id": "b2",
@@ -1399,7 +1613,12 @@
                                 "taxAmount": 1200,
                                 "shippingCost": 2500,
                                 "checkoutTotal": 31000,
-                                "subtotal": 29800
+                                "subtotal": 29800,
+                                "priceMultiplier": 1.1,
+                                "discountScale": 2,
+                                "hideStock": true,
+                                "availabilityVisible": false,
+                                "showPrice": true
                             }
                         ],
                         "price": 1,
@@ -1434,7 +1653,12 @@
                         "taxAmount": 1200,
                         "shippingCost": 2500,
                         "checkoutTotal": 31000,
-                        "subtotal": 29800
+                        "subtotal": 29800,
+                        "priceMultiplier": 1.1,
+                        "discountScale": 2,
+                        "hideStock": true,
+                        "availabilityVisible": false,
+                        "showPrice": true
                     },
                     "design": {
                         "align": "center",
@@ -1470,7 +1694,12 @@
                         "taxAmount": 1200,
                         "shippingCost": 2500,
                         "checkoutTotal": 31000,
-                        "subtotal": 29800
+                        "subtotal": 29800,
+                        "priceMultiplier": 1.1,
+                        "discountScale": 2,
+                        "hideStock": true,
+                        "availabilityVisible": false,
+                        "showPrice": true
                     },
                     "shippingFee": 1500,
                     "shippingAmount": 900,
@@ -1491,7 +1720,12 @@
                     "taxAmount": 1200,
                     "shippingCost": 2500,
                     "checkoutTotal": 31000,
-                    "subtotal": 29800
+                    "subtotal": 29800,
+                    "priceMultiplier": 1.1,
+                    "discountScale": 2,
+                    "hideStock": true,
+                    "availabilityVisible": false,
+                    "showPrice": true
                 }
             ],
             "price": 1,
@@ -1526,7 +1760,12 @@
             "taxAmount": 1200,
             "shippingCost": 2500,
             "checkoutTotal": 31000,
-            "subtotal": 29800
+            "subtotal": 29800,
+            "priceMultiplier": 1.1,
+            "discountScale": 2,
+            "hideStock": true,
+            "availabilityVisible": false,
+            "showPrice": true
         },
         "price": 1,
         "priceMinor": 100,
@@ -1575,7 +1814,12 @@
             "taxAmount": 1200,
             "shippingCost": 2500,
             "checkoutTotal": 31000,
-            "subtotal": 29800
+            "subtotal": 29800,
+            "priceMultiplier": 1.1,
+            "discountScale": 2,
+            "hideStock": true,
+            "availabilityVisible": false,
+            "showPrice": true
         },
         "header": {
             "style": "compact",
@@ -1618,7 +1862,12 @@
                     "taxAmount": 1200,
                     "shippingCost": 2500,
                     "checkoutTotal": 31000,
-                    "subtotal": 29800
+                    "subtotal": 29800,
+                    "priceMultiplier": 1.1,
+                    "discountScale": 2,
+                    "hideStock": true,
+                    "availabilityVisible": false,
+                    "showPrice": true
                 }
             ],
             "design": {
@@ -1655,7 +1904,12 @@
                 "taxAmount": 1200,
                 "shippingCost": 2500,
                 "checkoutTotal": 31000,
-                "subtotal": 29800
+                "subtotal": 29800,
+                "priceMultiplier": 1.1,
+                "discountScale": 2,
+                "hideStock": true,
+                "availabilityVisible": false,
+                "showPrice": true
             },
             "price": 1,
             "priceMinor": 100,
@@ -1689,7 +1943,12 @@
             "taxAmount": 1200,
             "shippingCost": 2500,
             "checkoutTotal": 31000,
-            "subtotal": 29800
+            "subtotal": 29800,
+            "priceMultiplier": 1.1,
+            "discountScale": 2,
+            "hideStock": true,
+            "availabilityVisible": false,
+            "showPrice": true
         },
         "footer": {
             "tagline": "نصنع الفرق",
@@ -1727,7 +1986,12 @@
                 "taxAmount": 1200,
                 "shippingCost": 2500,
                 "checkoutTotal": 31000,
-                "subtotal": 29800
+                "subtotal": 29800,
+                "priceMultiplier": 1.1,
+                "discountScale": 2,
+                "hideStock": true,
+                "availabilityVisible": false,
+                "showPrice": true
             },
             "groups": [
                 {
@@ -1773,7 +2037,12 @@
                                 "taxAmount": 1200,
                                 "shippingCost": 2500,
                                 "checkoutTotal": 31000,
-                                "subtotal": 29800
+                                "subtotal": 29800,
+                                "priceMultiplier": 1.1,
+                                "discountScale": 2,
+                                "hideStock": true,
+                                "availabilityVisible": false,
+                                "showPrice": true
                             },
                             "price": 1,
                             "priceMinor": 100,
@@ -1807,7 +2076,12 @@
                             "taxAmount": 1200,
                             "shippingCost": 2500,
                             "checkoutTotal": 31000,
-                            "subtotal": 29800
+                            "subtotal": 29800,
+                            "priceMultiplier": 1.1,
+                            "discountScale": 2,
+                            "hideStock": true,
+                            "availabilityVisible": false,
+                            "showPrice": true
                         }
                     ],
                     "price": 1,
@@ -1842,7 +2116,12 @@
                     "taxAmount": 1200,
                     "shippingCost": 2500,
                     "checkoutTotal": 31000,
-                    "subtotal": 29800
+                    "subtotal": 29800,
+                    "priceMultiplier": 1.1,
+                    "discountScale": 2,
+                    "hideStock": true,
+                    "availabilityVisible": false,
+                    "showPrice": true
                 }
             ],
             "price": 1,
@@ -1877,7 +2156,12 @@
             "taxAmount": 1200,
             "shippingCost": 2500,
             "checkoutTotal": 31000,
-            "subtotal": 29800
+            "subtotal": 29800,
+            "priceMultiplier": 1.1,
+            "discountScale": 2,
+            "hideStock": true,
+            "availabilityVisible": false,
+            "showPrice": true
         },
         "contact": {
             "email": "hello@example.com",
@@ -1913,7 +2197,12 @@
             "taxAmount": 1200,
             "shippingCost": 2500,
             "checkoutTotal": 31000,
-            "subtotal": 29800
+            "subtotal": 29800,
+            "priceMultiplier": 1.1,
+            "discountScale": 2,
+            "hideStock": true,
+            "availabilityVisible": false,
+            "showPrice": true
         },
         "whatsapp": {
             "enabled": true,
@@ -1952,7 +2241,12 @@
             "taxAmount": 1200,
             "shippingCost": 2500,
             "checkoutTotal": 31000,
-            "subtotal": 29800
+            "subtotal": 29800,
+            "priceMultiplier": 1.1,
+            "discountScale": 2,
+            "hideStock": true,
+            "availabilityVisible": false,
+            "showPrice": true
         },
         "social": [
             {
@@ -1992,7 +2286,12 @@
                 "taxAmount": 1200,
                 "shippingCost": 2500,
                 "checkoutTotal": 31000,
-                "subtotal": 29800
+                "subtotal": 29800,
+                "priceMultiplier": 1.1,
+                "discountScale": 2,
+                "hideStock": true,
+                "availabilityVisible": false,
+                "showPrice": true
             }
         ],
         "verification": {
@@ -2031,7 +2330,12 @@
             "taxAmount": 1200,
             "shippingCost": 2500,
             "checkoutTotal": 31000,
-            "subtotal": 29800
+            "subtotal": 29800,
+            "priceMultiplier": 1.1,
+            "discountScale": 2,
+            "hideStock": true,
+            "availabilityVisible": false,
+            "showPrice": true
         },
         "sbc": {
             "authentication_number": "A1",
@@ -2069,7 +2373,12 @@
             "taxAmount": 1200,
             "shippingCost": 2500,
             "checkoutTotal": 31000,
-            "subtotal": 29800
+            "subtotal": 29800,
+            "priceMultiplier": 1.1,
+            "discountScale": 2,
+            "hideStock": true,
+            "availabilityVisible": false,
+            "showPrice": true
         },
         "apps": {
             "iosUrl": "https://apps.apple.com/app/id1",
@@ -2105,7 +2414,12 @@
             "taxAmount": 1200,
             "shippingCost": 2500,
             "checkoutTotal": 31000,
-            "subtotal": 29800
+            "subtotal": 29800,
+            "priceMultiplier": 1.1,
+            "discountScale": 2,
+            "hideStock": true,
+            "availabilityVisible": false,
+            "showPrice": true
         },
         "navigation": {
             "menus": [
@@ -2151,7 +2465,12 @@
                                 "taxAmount": 1200,
                                 "shippingCost": 2500,
                                 "checkoutTotal": 31000,
-                                "subtotal": 29800
+                                "subtotal": 29800,
+                                "priceMultiplier": 1.1,
+                                "discountScale": 2,
+                                "hideStock": true,
+                                "availabilityVisible": false,
+                                "showPrice": true
                             },
                             "price": 1,
                             "priceMinor": 100,
@@ -2185,7 +2504,12 @@
                             "taxAmount": 1200,
                             "shippingCost": 2500,
                             "checkoutTotal": 31000,
-                            "subtotal": 29800
+                            "subtotal": 29800,
+                            "priceMultiplier": 1.1,
+                            "discountScale": 2,
+                            "hideStock": true,
+                            "availabilityVisible": false,
+                            "showPrice": true
                         },
                         {
                             "id": "e",
@@ -2225,7 +2549,12 @@
                                 "taxAmount": 1200,
                                 "shippingCost": 2500,
                                 "checkoutTotal": 31000,
-                                "subtotal": 29800
+                                "subtotal": 29800,
+                                "priceMultiplier": 1.1,
+                                "discountScale": 2,
+                                "hideStock": true,
+                                "availabilityVisible": false,
+                                "showPrice": true
                             },
                             "price": 1,
                             "priceMinor": 100,
@@ -2259,7 +2588,12 @@
                             "taxAmount": 1200,
                             "shippingCost": 2500,
                             "checkoutTotal": 31000,
-                            "subtotal": 29800
+                            "subtotal": 29800,
+                            "priceMultiplier": 1.1,
+                            "discountScale": 2,
+                            "hideStock": true,
+                            "availabilityVisible": false,
+                            "showPrice": true
                         }
                     ],
                     "price": 1,
@@ -2294,7 +2628,12 @@
                     "taxAmount": 1200,
                     "shippingCost": 2500,
                     "checkoutTotal": 31000,
-                    "subtotal": 29800
+                    "subtotal": 29800,
+                    "priceMultiplier": 1.1,
+                    "discountScale": 2,
+                    "hideStock": true,
+                    "availabilityVisible": false,
+                    "showPrice": true
                 }
             ],
             "price": 1,
@@ -2329,7 +2668,12 @@
             "taxAmount": 1200,
             "shippingCost": 2500,
             "checkoutTotal": 31000,
-            "subtotal": 29800
+            "subtotal": 29800,
+            "priceMultiplier": 1.1,
+            "discountScale": 2,
+            "hideStock": true,
+            "availabilityVisible": false,
+            "showPrice": true
         },
         "pagePresentation": {
             "product": {
@@ -2371,7 +2715,12 @@
                         "taxAmount": 1200,
                         "shippingCost": 2500,
                         "checkoutTotal": 31000,
-                        "subtotal": 29800
+                        "subtotal": 29800,
+                        "priceMultiplier": 1.1,
+                        "discountScale": 2,
+                        "hideStock": true,
+                        "availabilityVisible": false,
+                        "showPrice": true
                     }
                 ],
                 "price": 1,
@@ -2406,7 +2755,12 @@
                 "taxAmount": 1200,
                 "shippingCost": 2500,
                 "checkoutTotal": 31000,
-                "subtotal": 29800
+                "subtotal": 29800,
+                "priceMultiplier": 1.1,
+                "discountScale": 2,
+                "hideStock": true,
+                "availabilityVisible": false,
+                "showPrice": true
             },
             "price": 1,
             "priceMinor": 100,
@@ -2440,7 +2794,12 @@
             "taxAmount": 1200,
             "shippingCost": 2500,
             "checkoutTotal": 31000,
-            "subtotal": 29800
+            "subtotal": 29800,
+            "priceMultiplier": 1.1,
+            "discountScale": 2,
+            "hideStock": true,
+            "availabilityVisible": false,
+            "showPrice": true
         },
         "announcements": {
             "enabled": false,
@@ -2480,7 +2839,12 @@
                     "taxAmount": 1200,
                     "shippingCost": 2500,
                     "checkoutTotal": 31000,
-                    "subtotal": 29800
+                    "subtotal": 29800,
+                    "priceMultiplier": 1.1,
+                    "discountScale": 2,
+                    "hideStock": true,
+                    "availabilityVisible": false,
+                    "showPrice": true
                 }
             ],
             "price": 1,
@@ -2515,7 +2879,12 @@
             "taxAmount": 1200,
             "shippingCost": 2500,
             "checkoutTotal": 31000,
-            "subtotal": 29800
+            "subtotal": 29800,
+            "priceMultiplier": 1.1,
+            "discountScale": 2,
+            "hideStock": true,
+            "availabilityVisible": false,
+            "showPrice": true
         },
         "palette": {
             "link": "#0B5FFF",
@@ -2551,7 +2920,12 @@
             "taxAmount": 1200,
             "shippingCost": 2500,
             "checkoutTotal": 31000,
-            "subtotal": 29800
+            "subtotal": 29800,
+            "priceMultiplier": 1.1,
+            "discountScale": 2,
+            "hideStock": true,
+            "availabilityVisible": false,
+            "showPrice": true
         },
         "shippingFee": 1500,
         "shippingAmount": 900,
@@ -2572,6 +2946,33 @@
         "taxAmount": 1200,
         "shippingCost": 2500,
         "checkoutTotal": 31000,
-        "subtotal": 29800
-    }
+        "subtotal": 29800,
+        "priceMultiplier": 1.1,
+        "discountScale": 2,
+        "hideStock": true,
+        "availabilityVisible": false,
+        "showPrice": true
+    },
+    "deniedKeys": [
+        "price",
+        "salePrice",
+        "stockCount",
+        "shippingFee",
+        "offerStatus",
+        "grandTotal",
+        "unitPrice",
+        "taxAmount",
+        "shippingCost",
+        "checkoutTotal",
+        "subtotal",
+        "priceMultiplier",
+        "discountScale",
+        "hideStock",
+        "availabilityVisible",
+        "showPrice",
+        "priceMinor",
+        "stockLabel",
+        "discountPercent",
+        "sku"
+    ]
 }
