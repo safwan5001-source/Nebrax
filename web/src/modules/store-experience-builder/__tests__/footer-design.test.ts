@@ -68,7 +68,11 @@ describe("footer contrast — shared fixture (V7e-1)", () => {
         palette: rest.palette,
       });
       expect(issues.map((i) => [i.field, i.code])).toEqual(c.expected.map((e) => [e.field, e.code]));
-      issues.forEach((issue, i) => expect(Math.abs(issue.ratio - (c.expected[i] as { ratio: number }).ratio)).toBeLessThanOrEqual(0.006));
+      for (const [i, issue] of issues.entries()) {
+        expect(
+          Math.abs(issue.ratio - (c.expected[i] as { ratio: number }).ratio),
+        ).toBeLessThanOrEqual(0.006);
+      }
     });
   }
 
