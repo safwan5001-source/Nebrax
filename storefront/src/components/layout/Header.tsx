@@ -5,6 +5,7 @@ import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import type { ReactNode } from "react";
 import { CartButton } from "@/components/layout/CartButton";
+import { HeaderNavLinks } from "@/components/layout/HeaderNavLinks";
 import { HeaderOverlay } from "@/components/layout/HeaderOverlay";
 import { HeaderScrollUp } from "@/components/layout/HeaderScrollUp";
 import type { StoreExtraNavLink } from "@/components/layout/MobileMenu";
@@ -261,16 +262,7 @@ export async function Header({
                   {t("wholesale")}
                 </Link>
               )}
-              {extraLinks.map((link) => (
-                <Link
-                  key={link.id}
-                  href={link.href}
-                  data-extra-nav=""
-                  className="hidden whitespace-nowrap px-2 py-1.5 text-sm text-store-muted-foreground transition-colors hover:text-store-foreground lg:block"
-                >
-                  {link.label}
-                </Link>
-              ))}
+              <HeaderNavLinks items={extraLinks} />
               {showAccount ? (
                 <div className="hidden md:block">
                   <Button variant="ghost" size="icon-lg" asChild>

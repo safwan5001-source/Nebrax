@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useLocale, useTranslations } from "next-intl";
 import { useRef, useState } from "react";
 import { flushSync } from "react-dom";
+import { MobileNavItem } from "@/components/layout/MobileNavItem";
 import { RegionPreferences } from "@/components/layout/RegionPreferences";
 import { Button } from "@/components/ui/button";
 import {
@@ -16,11 +17,21 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { localeDirection } from "@/i18n/locales";
+import type { IconKey } from "@/lib/presentation/icon-registry";
+import type { NavBadge } from "@/lib/presentation/navigation";
+import type { ResolvedNavChild } from "@/lib/presentation/navigation-resolve";
 
 export interface StoreExtraNavLink {
   id: string;
   label: string;
   href: string;
+  /** External target opened in a new tab (`rel="noopener noreferrer"`). */
+  newTab?: boolean;
+  icon?: IconKey;
+  badge?: NavBadge;
+  /** Published `dropdown` presentation with at least one live child. */
+  dropdown?: boolean;
+  children?: ResolvedNavChild[];
 }
 
 type PanelType = { kind: "main" } | { kind: "category"; category: Category };
@@ -256,15 +267,12 @@ export function MobileMenu({
                 ),
               )}
               {extraLinks.map((link) => (
-                <Link
+                <MobileNavItem
                   key={link.id}
-                  href={link.href}
-                  data-mobile-extra-nav=""
-                  onClick={() => setOpen(false)}
-                  className={linkClass}
-                >
-                  {link.label}
-                </Link>
+                  item={link}
+                  linkClass={linkClass}
+                  onNavigate={() => setOpen(false)}
+                />
               ))}
               <Link
                 href={`${basePath}/#contact`}
