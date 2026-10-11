@@ -914,7 +914,16 @@ final class StorefrontPresentationNormalizer
                 }
             }
 
-            return $ids === [] ? null : ['productIds' => $ids];
+            $extra = $this->shelfTitleFields($source);
+
+            return $ids === [] && $extra === [] ? null : ['productIds' => $ids] + $extra;
+        }
+
+        if ($type === 'newArrivals') {
+            // CUST-HV V9d-3 — قسم «وصل حديثاً» بلا محتوى سابقاً؛ الآن عنوانٌ اختياري وإخفاؤه فقط. بيانات الرفّ من الكتالوج.
+            $extra = $this->shelfTitleFields($source);
+
+            return $extra === [] ? null : $extra;
         }
 
         if ($type === 'offers') {
@@ -941,7 +950,9 @@ final class StorefrontPresentationNormalizer
                 }
             }
 
-            return $ids === [] ? null : ['offerIds' => $ids];
+            $extra = $this->shelfTitleFields($source);
+
+            return $ids === [] && $extra === [] ? null : ['offerIds' => $ids] + $extra;
         }
 
         if ($type === 'productShelf') {
@@ -971,6 +982,9 @@ final class StorefrontPresentationNormalizer
             $content = ['title' => $title, 'deliverToday' => $deliverToday, 'limit' => $limit];
             if ($normalizedSource !== null) {
                 $content['source'] = $normalizedSource;
+            }
+            if (($source['showTitle'] ?? null) === false) {
+                $content['showTitle'] = false;
             }
 
             return $content;
@@ -1491,6 +1505,27 @@ final class StorefrontPresentationNormalizer
                 'key' => $key,
                 'visible' => $isFixedRequired ? true : (bool) ($entry['visible'] ?? false),
             ];
+        }
+
+        return $out;
+    }
+
+    /**
+     * CUST-HV V9d-3 (V0 §14.2) — عنوان الرفّ: `title` اختياري (≤ 80 بنقاط الترميز، الفراغ غياب) و`showTitle` لا يُخزَّن إلا `false`
+     * (الافتراضي = ظاهر). إخفاء العنوان بصري فقط: يبقى العنوان لقارئ الشاشة اسماً للمنطقة. توأم `shelfTitleFields` في ملفَّي section-content.ts.
+     *
+     * @param  array<string,mixed>  $source
+     * @return array<string,mixed>
+     */
+    private function shelfTitleFields(array $source): array
+    {
+        $out = [];
+        $title = mb_substr(trim($this->asString($source['title'] ?? null)), 0, self::MAX_SECTION_TITLE_LENGTH);
+        if ($title !== '') {
+            $out['title'] = $title;
+        }
+        if (($source['showTitle'] ?? null) === false) {
+            $out['showTitle'] = false;
         }
 
         return $out;

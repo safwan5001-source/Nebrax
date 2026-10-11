@@ -9,7 +9,7 @@
  * (`activeBlockId`); alt text per locale (or the decorative flag) is the media field's, judged at Publish by the generic media gate.
  */
 import { ArrowDown, ArrowUp, Copy, Trash2 } from "lucide-react";
-import { useEffect, useId, useState } from "react";
+import { useId, useState } from "react";
 import { DeferredCommitField, Field, inputClass, Segmented, selectClass } from "./ControlPanels";
 import {
   addBlock,
@@ -36,6 +36,7 @@ import {
   setSpacerSize,
   setText,
 } from "./content-blocks-edit";
+import { BufferedText } from "./BufferedText";
 import { MediaPicker } from "./media/MediaPicker";
 import { MediaRefField } from "./media/MediaRefField";
 import { useMediaRefPreview } from "./media/use-media-ref-preview";
@@ -75,48 +76,6 @@ const KIND_LABEL = {
 
 const iconButton =
   "inline-flex size-11 items-center justify-center text-muted hover:bg-background hover:text-text disabled:opacity-40 disabled:hover:bg-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 md:size-8";
-
-/** The text the stored form keeps (the normaliser trims heading / paragraph text with PHP's `trim` set). */
-function stored(value: string): string {
-  return value.replace(/^[ \t\n\r\0\v]+|[ \t\n\r\0\v]+$/g, "");
-}
-
-/**
- * A text field whose stored form is trimmed: the draft is normalised on every keystroke, so a controlled value straight from the draft would
- * swallow every space typed at the end of a word. The field keeps what the merchant typed and only adopts the draft's value when it really
- * changed from elsewhere (another block selected, undo, a restored version).
- */
-function BufferedText({
-  value,
-  onCommit,
-  multiline,
-  limit,
-  ...rest
-}: {
-  value: string;
-  onCommit: (value: string) => void;
-  multiline?: boolean;
-  /** The stored limit in Unicode code points (what the contract counts): the field never holds, or shows, what Save would drop. */
-  limit?: number;
-} & Record<`data-${string}`, string>) {
-  const [local, setLocal] = useState(value);
-  useEffect(() => {
-    setLocal((current) => (stored(current) === value ? current : value));
-  }, [value]);
-  const commit = (typed: string) => {
-    // the limit is on the STORED (trimmed) form, so leading whitespace does not spend the quota
-    const lead = typed.length - typed.replace(/^[ \t\n\r\0\v]+/, "").length;
-    const points = limit === undefined ? null : Array.from(typed);
-    const next = points && points.length > limit! + lead ? points.slice(0, limit! + lead).join("") : typed;
-    setLocal(next);
-    onCommit(next);
-  };
-  return multiline ? (
-    <textarea className={`${inputClass} h-24 py-2`} value={local} onChange={(event) => commit(event.target.value)} {...rest} />
-  ) : (
-    <input className={inputClass} value={local} onChange={(event) => commit(event.target.value)} {...rest} />
-  );
-}
 
 /** The block to select after `id` is removed: its next sibling, else the previous one, else its column's parent, else none. */
 function neighbourAfterRemoval(content: ContentBlocks, id: string): string | null {

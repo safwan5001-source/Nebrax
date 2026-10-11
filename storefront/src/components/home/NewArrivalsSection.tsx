@@ -59,6 +59,9 @@ interface NewArrivalsSectionProps {
   /** CUST-HV V9d-2 — the section design's `layout` / `columns`; absent = the theme's own form and today's columns. */
   layout?: ShelfLayout;
   columns?: ShelfColumns;
+  /** CUST-HV V9d-3 — the merchant's own title (absent = the translated default) and whether to show it. */
+  title?: string;
+  hideTitle?: boolean;
 }
 
 /**
@@ -74,6 +77,8 @@ export async function NewArrivalsSection({
   themePreset,
   layout,
   columns,
+  title,
+  hideTitle = false,
 }: NewArrivalsSectionProps) {
   const t = await getTranslations({
     locale: locale as Locale,
@@ -85,7 +90,8 @@ export async function NewArrivalsSection({
     <section aria-labelledby="home-new-arrivals">
       <SectionHeading
         id="home-new-arrivals"
-        title={t("newArrivals")}
+        title={title || t("newArrivals")}
+        hideTitle={hideTitle}
         action={{ href: `${basePath}/products`, label: t("viewAll") }}
       />
       <div className="mt-3">

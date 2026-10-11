@@ -35,6 +35,7 @@ export async function ProductShelfSection({
   themePreset,
   layout,
   columns,
+  hideTitle = false,
 }: {
   content: ProductShelfContent;
   basePath: string;
@@ -45,6 +46,8 @@ export async function ProductShelfSection({
   /** CUST-HV V9d-2 — the section design's `layout` / `columns`; absent = the theme's own form and today's columns. */
   layout?: ShelfLayout;
   columns?: ShelfColumns;
+  /** CUST-HV V9d-3 — the merchant hid the title: it stays as the section's accessible name, visually hidden. */
+  hideTitle?: boolean;
 }) {
   const products = await fetchShelfProducts(content).catch((error) => {
     console.error("ProductShelfSection: failed to load shelf products", error);
@@ -70,6 +73,7 @@ export async function ProductShelfSection({
       <SectionHeading
         id={headingId}
         title={title}
+        hideTitle={hideTitle}
         action={{ href: `${basePath}/products?${query}`, label: t("viewAll") }}
       />
       {rail ? (

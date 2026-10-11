@@ -42,6 +42,7 @@ import {
   deliveryPromiseContentOf,
   discoveryContentOf,
   featuredContentOf,
+  newArrivalsContentOf,
   offersContentOf,
   productShelfContentOf,
 } from "@/lib/presentation/section-content";
@@ -253,16 +254,23 @@ async function pushSectionNode(
             designed: true,
           })
         : section.type === "newArrivals" &&
-            (section.design?.layout || section.design?.columns) &&
+            (section.design?.layout ||
+              section.design?.columns ||
+              newArrivalsContentOf(section).title ||
+              newArrivalsContentOf(section).showTitle === false) &&
             isValidElement(node)
           ? cloneElement(
               node as React.ReactElement<{
                 layout?: ShelfLayout;
                 columns?: ShelfColumns;
+                title?: string;
+                hideTitle?: boolean;
               }>,
               {
                 layout: section.design?.layout as ShelfLayout | undefined,
                 columns: section.design?.columns,
+                title: newArrivalsContentOf(section).title,
+                hideTitle: newArrivalsContentOf(section).showTitle === false,
               },
             )
           : node;
@@ -407,7 +415,8 @@ async function pushSectionNode(
         basePath={ctx.basePath}
         locale={ctx.locale}
         currency={ctx.currency}
-        title={ctx.featuredTitle}
+        title={content.title || ctx.featuredTitle}
+        hideTitle={content.showTitle === false}
         headingId={`featured-${section.id}`}
         themePreset={ctx.themePreset}
         layout={section.design?.layout as ShelfLayout | undefined}
@@ -420,7 +429,8 @@ async function pushSectionNode(
     // CUST-H4-7 — real Offers. The stored ids are references to
     // `storefront_offers`; liveness, prices and the discount come from the
     // Host-resolved `GET /store/v1/offers` inside `OffersShelf`.
-    const offerIds = offersContentOf(section).offerIds.filter((id) =>
+    const offers = offersContentOf(section);
+    const offerIds = offers.offerIds.filter((id) =>
       /^[a-zA-Z0-9_-]{1,64}$/.test(id),
     );
     if (offerIds.length === 0) return;
@@ -429,7 +439,8 @@ async function pushSectionNode(
         key={section.id}
         offerIds={offerIds}
         basePath={ctx.basePath}
-        title={ctx.offersTitle}
+        title={offers.title || ctx.offersTitle}
+        hideTitle={offers.showTitle === false}
         headingId={`offers-${section.id}`}
         columns={section.design?.columns}
       />,
@@ -449,6 +460,7 @@ async function pushSectionNode(
         locale={ctx.locale}
         currency={ctx.currency}
         headingId={`shelf-${section.id}`}
+        hideTitle={content.showTitle === false}
         themePreset={ctx.themePreset}
         layout={section.design?.layout as ShelfLayout | undefined}
         columns={section.design?.columns}
