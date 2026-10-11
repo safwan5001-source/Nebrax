@@ -36,13 +36,13 @@ A document without a slider renders byte-identically (no new markup, no new requ
 
 ## Tests
 
-- `slider-resolve.test.ts` (15), `HomeSlider.test.tsx` (28: server markup, controls, keyboard in LTR / RTL, swipe both ways, loop and clamping, every autoplay rule with fake timers, reduced motion), `published-nodes.slider.test.tsx` (7); PHP `StorefrontMediaRefTest` +1.
+- `slider-resolve.test.ts` (15), `HomeSlider.test.tsx` (33: server markup, controls, keyboard in LTR / RTL, swipe both ways, loop and clamping, every autoplay rule with fake timers, reduced motion), `published-nodes.slider.test.tsx` (8); PHP `StorefrontMediaRefTest` +1.
 
 ## Design Quality Pass — real Chromium
 
 `scripts/slider-proof/` renders the **production** `publishedNodes` → `resolveSlider` → `HomeSlider` for 12 configurations (basic, light picture, black|white split under a 70 % wash, three alignments, fade, none, autoplay, phone art direction, eight slides with an unbroken word, a single slide, an unproven picture, and a designed frame) in AR RTL and EN LTR at 390 / 430 / 768 / 1024 / 1280 / 1440 and mounts the **real client component**:
 
-**7 324 checks, 0 violations.**
+**7 336 checks, 0 violations** (the autoplay page re-run on the final code: 610 / 0).
 
 | Area | What is asserted (every page × direction × width unless noted) |
 |---|---|
@@ -58,6 +58,8 @@ A document without a slider renders byte-identically (no new markup, no new requ
 **Defects the proof found and this slice fixed:**
 1. A designed section background recoloured the slide copy dark (≈ 1.4 : 1 over the pictures): the shared resolver emitted `fg / heading / link` text tokens for a `slider` from its section surface. `resolveSectionDesign` now emits none for `slider` (both byte-identical twins, regression test in both apps); the copy colour is per slide, over its own picture.
 2. Focus on the Pause / Play button held the show, so pressing Play did not start it. Focus on that button no longer counts as reading the slides (unit test added).
+
+**Review round (Codex, 5 findings — all valid, all fixed with tests):** arriving on Pause / Play from another control now clears the focus hold · Play at the end of a non-looping show restarts from slide 1 · the CTA hover keeps the proven fill / label pair (no opacity; underline + shadow instead; proof asserts it) · any change of more than one slide (wrap, far dot, Home, End) is a **cut** (`data-snap`) instead of sweeping every slide through the viewport (proof asserts it on a wrap) · eager loading follows the first section actually drawn (a closed banner window no longer demotes the slider) · a touch on an arrow or dot pauses autoplay for good (handled at the carousel root; Pause / Play exempt).
 
 Screenshots: `docs/plans/store/cust-hv-v8b/` (LTR desktop, RTL phone, light picture, wash, designed frame, withheld picture, alignment, phone art direction).
 
