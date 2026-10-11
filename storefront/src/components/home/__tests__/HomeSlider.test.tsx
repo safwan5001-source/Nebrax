@@ -502,6 +502,19 @@ describe("HomeSlider — autoplay (D-16)", () => {
     expect(activeIndex()).toBe(2);
   });
 
+  it("focus on the Pause / Play button itself does not hold the show: pressing Play starts it", () => {
+    vi.useFakeTimers();
+    mount(view(3, auto({ loop: true })));
+    const pause = screen.getByRole("button", { name: "Pause slides" });
+    fireEvent.focus(pause);
+    fireEvent.click(pause); // paused
+    fireEvent.click(screen.getByRole("button", { name: "Play slides" })); // playing again, focus still on the button
+    act(() => {
+      vi.advanceTimersByTime(6_100);
+    });
+    expect(activeIndex()).toBe(1);
+  });
+
   it("the first touch pauses it for good until Play is pressed", () => {
     vi.useFakeTimers();
     const { container } = mount(view(3, auto({ loop: true })));

@@ -58,7 +58,8 @@ const inlineCss = (html) => html.replace(/<style>[\s\S]*?<\/style>/, `<style>${c
 const browser = await chromium.launch(process.env.PIXEL_PROOF_CHROMIUM ? { executablePath: process.env.PIXEL_PROOF_CHROMIUM } : {});
 const VIEWPORTS = [[390, 844], [430, 932], [768, 1024], [1024, 768], [1280, 800], [1440, 900]];
 const PIXEL_WIDTHS = new Set([390, 768, 1280]);
-const PAGES = ["basic", "light", "wash", "align", "fade", "none", "auto", "phone", "long", "single", "withheld", "designed"];
+const ONLY = process.argv.includes("--pages") ? process.argv[process.argv.indexOf("--pages") + 1].split(",") : null;
+const PAGES = ["basic", "light", "wash", "align", "fade", "none", "auto", "phone", "long", "single", "withheld", "designed"].filter((n) => !ONLY || ONLY.includes(n));
 const violations = [];
 let checks = 0;
 const ok = (cond, msg) => { checks++; if (!cond) violations.push(msg); };

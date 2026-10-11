@@ -261,7 +261,13 @@ export function HomeSlider({
       onKeyDown={onKeyDown}
       onMouseEnter={() => setHovering(true)}
       onMouseLeave={() => setHovering(false)}
-      onFocus={() => setFocused(true)}
+      onFocus={(event) => {
+        // Focus on the Pause / Play button itself is not "reading the slides": pressing Play must start the show even
+        // though the button keeps focus.
+        if (!(event.target as HTMLElement).closest("[data-slider-pause]")) {
+          setFocused(true);
+        }
+      }}
       onBlur={(event) => {
         if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
           setFocused(false);
