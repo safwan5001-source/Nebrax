@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Models\Invoice;
 use App\Models\Purchase;
 use App\Models\ReturnLine;
+use App\Services\Accounting\ReturnSourceAllocator;
 use App\Support\Money;
 use App\Tenancy\BranchScope;
 use Illuminate\Http\JsonResponse;
@@ -41,9 +42,24 @@ class ReturnableController extends ApiController
             ->selectRaw('source_line_id, SUM(quantity) as qty')
             ->pluck('qty', 'source_line_id');
 
-        $lines = $document->lines->map(function ($line) use ($returned) {
+        // REM-01: ما حُصِّل فعلاً على كل سطر (أساس صافٍ وضريبة بعد خصم السطر
+        // والرأس) وما رُدَّ منه — فتعرض الشاشة المتبقي الحقيقي بدل أن تُعيد
+        // حسابه من السعر الإجمالي. إضافةٌ فقط: الحقول القائمة بحالها.
+        $allocator = app(ReturnSourceAllocator::class);
+        $charged   = $allocator->charged($document);
+        $amounts   = $allocator->returned($document->lines->pluck('id')->all());
+        $inclusive = (bool) $document->tax_inclusive;
+
+        $lines = $document->lines->map(function ($line) use ($returned, $charged, $amounts, $allocator, $inclusive) {
             $already   = (int) ($returned[$line->id] ?? 0);
             $remaining = max(0, (int) $line->quantity - $already);
+            $chargedLine  = $charged[$line->id];
+            $returnedLine = $amounts[$line->id] ?? ['net' => 0, 'tax' => 0];
+            // سبق على السطر ردٌّ بسعر مخفَّض؟ عندها لا يأخذ الجزء الأخير «المتبقي».
+            $reducedBefore = isset($returnedLine['min_price']) && $chargedLine['unit_price'] > 0
+                && $returnedLine['min_price'] < $chargedLine['unit_price'];
+            $remainingNet = max(0, $chargedLine['net'] - $returnedLine['net']);
+            $remainingTax = max(0, $chargedLine['tax'] - $returnedLine['tax']);
 
             return [
                 'source_line_id' => $line->id,
@@ -58,6 +74,14 @@ class ReturnableController extends ApiController
                 'remaining'      => $remaining,
                 'unit_price'     => Money::toRiyal($line->unit_price),
                 'tax_rate'       => (int) $line->tax_rate,
+                'unit_price_before_tax' => Money::toRiyal($allocator->unitPriceBeforeTax($line, $inclusive)),
+                'charged_net'    => Money::toRiyal($chargedLine['net']),
+                'charged_tax'    => Money::toRiyal($chargedLine['tax']),
+                'returned_net'   => Money::toRiyal($returnedLine['net']),
+                'returned_tax'   => Money::toRiyal($returnedLine['tax']),
+                'remaining_net'  => Money::toRiyal($remainingNet),
+                'remaining_tax'  => Money::toRiyal($remainingTax),
+                'reduced_price_returned' => $reducedBefore,
             ];
         })->values();
 
@@ -67,6 +91,7 @@ class ReturnableController extends ApiController
                 'number'      => $document->number,
                 'partner_id'   => $document->partner_id,
                 'warehouse_id' => $document->warehouse_id,
+                'tax_inclusive' => (bool) $document->tax_inclusive,
                 'date'         => optional($type === 'sales' ? $document->invoice_date : $document->purchase_date)
                     ->toDateString(),
                 // مستندٌ رُدَّ بالكامل يبقى مرئياً بسطوره صفراً — إخفاؤه يترك

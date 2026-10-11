@@ -15,6 +15,7 @@ import { api, ApiError } from '@/lib/api';
 import { useNumberPreview } from '@/lib/use-number-preview';
 import { formatRiyal, riyalToMinor } from '@/lib/money';
 import type { Warehouse } from '@/lib/warehouse';
+import { sourceLineAmounts, type SourceCharge } from './source-line-amounts';
 
 interface Partner { id: string; name: string; type: string; phone?: string | null; vat_number?: string | null }
 interface Product {
@@ -28,6 +29,11 @@ interface Line {
   sourceLineId: string | null;
   /** المتبقي القابل للردّ من ذلك السطر — سقفٌ يُعرَض لا يُكتشَف عند الرفض. */
   remaining: number | null;
+  /**
+   * ما حصّله المصدر فعلاً على السطر (هللات) — يُشتقّ منه المرتجع في الخادم:
+   * الأساس الصافي والضريبة بعد خصم السطر والرأس. null في المرتجع الحرّ.
+   */
+  charged: SourceCharge | null;
 }
 interface SourceDoc {
   id: string; number: string; date: string | null; total: string; remaining: number;
@@ -38,12 +44,16 @@ interface SourceDoc {
 interface ReturnableLine {
   source_line_id: string; product_id: string | null; description: string | null;
   quantity: number; returned: number; remaining: number; unit_price: string; tax_rate: number;
+  /** REM-01 — اختيارية: خادمٌ أقدم لا يرسلها فتبقى المعاينة على الحساب القديم. */
+  charged_net?: string; charged_tax?: string; remaining_net?: string; remaining_tax?: string;
+  reduced_price_returned?: boolean;
 }
 
 const emptyLine = (): Line => ({
   productId: null, description: '', quantity: '1', unit_price: '', tax_rate: '15',
-  sourceLineId: null, remaining: null,
+  sourceLineId: null, remaining: null, charged: null,
 });
+
 
 export function CreateReturnDialog({
   open,
@@ -214,6 +224,15 @@ export function CreateReturnDialog({
           tax_rate: String(l.tax_rate),
           sourceLineId: l.source_line_id,
           remaining: l.remaining,
+          charged: l.charged_net !== undefined && l.charged_tax !== undefined
+            && l.remaining_net !== undefined && l.remaining_tax !== undefined
+            ? {
+                soldQty: l.quantity, returnedQty: l.returned, unitPrice: riyalToMinor(l.unit_price),
+                net: riyalToMinor(l.charged_net), tax: riyalToMinor(l.charged_tax),
+                remainingNet: riyalToMinor(l.remaining_net), remainingTax: riyalToMinor(l.remaining_tax),
+                reducedBefore: !!l.reduced_price_returned,
+              }
+            : null,
         }));
       if (pulled.length === 0) { setError(t('fully_returned')); setSourceId(''); return; }
       setLines(pulled);
@@ -253,6 +272,12 @@ export function CreateReturnDialog({
     && (!requireSource || !!sourceId);
 
   const totalMinor = lines.reduce((sum, l) => {
+    // سطرٌ مرتبط بمصدر: المبلغ من محصَّل المصدر (يحفظ وضع الضريبة والخصومات)،
+    // لا من السعر الإجمالي × النسبة. السطر الحرّ كما كان.
+    if (l.charged) {
+      const { net, tax } = sourceLineAmounts(l.charged, Number(l.quantity) || 0, riyalToMinor(l.unit_price));
+      return sum + net + tax;
+    }
     const sub = (Number(l.quantity) || 0) * riyalToMinor(l.unit_price);
     return sum + sub + Math.round((sub * (Number(l.tax_rate) || 0)) / 100);
   }, 0);
@@ -433,7 +458,8 @@ export function CreateReturnDialog({
                   onChange={(e) => setLine(i, { quantity: e.target.value })}
                 />
                 <Input className="num col-span-2 text-end" inputMode="decimal" placeholder={t('price')} value={l.unit_price} onChange={(e) => setLine(i, { unit_price: e.target.value })} />
-                <Input className="num col-span-2 text-end" type="number" min={0} max={100} value={l.tax_rate} onChange={(e) => setLine(i, { tax_rate: e.target.value })} />
+                {/* نسبة سطر المصدر ثابتة: الخادم يرثها من المصدر ويتجاهل ما يُرسَل. */}
+                <Input className="num col-span-2 text-end" type="number" min={0} max={100} value={l.tax_rate} disabled={!!l.sourceLineId} onChange={(e) => setLine(i, { tax_rate: e.target.value })} />
                 <Button type="button" variant="ghost" size="icon" className="col-span-1" aria-label={t('remove_line')} onClick={() => removeLine(i)}>
                   <Trash2 className="h-4 w-4 text-negative" strokeWidth={1.7} />
                 </Button>

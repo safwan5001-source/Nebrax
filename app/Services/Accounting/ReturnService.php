@@ -63,6 +63,8 @@ use RuntimeException;
  */
 class ReturnService
 {
+    use ComputesLineTax;
+
     // ACC-5: حسابات المخزون والتكلفة والتلف صارت أدواراً دلالية. الباقي هنا
     // أكوادٌ ثابتة عمداً: طرفا مرتجع المبيعات التجاريان (1110/1130/2120/4110)
     // خارج نطاق ACC-5، و5116 ليس دوراً معتمَداً في أي شريحة حتى اليوم.
@@ -128,9 +130,12 @@ class ReturnService
                 'warehouse_id'  => $data['warehouse_id'] ?? $source?->warehouse_id,
                 'pos_session_id' => $data['pos_session_id'] ?? null,
                 'payment_type'  => $data['payment_type'] ?? 'credit',
-                // لقطة وضع الضريبة تشرح مصدر قيم السطور التاريخي؛ الافتراض false
-                // يحافظ على تفسير المرتجعات التي سبقت هذا الحقل.
-                'tax_inclusive' => (bool) ($data['tax_inclusive'] ?? false),
+                // لقطة وضع الضريبة: المرتجع المرتبط يرث وضع **مصدره** (لا يُصدَّق ما
+                // يُرسَل)، والحرّ يتبع المُعلَن والافتراض false — فيبقى تفسير
+                // المرتجعات التي سبقت هذا الحقل كما كان.
+                'tax_inclusive' => $source !== null
+                    ? (bool) $source->tax_inclusive
+                    : (bool) ($data['tax_inclusive'] ?? false),
                 // null = «اتبع سياسة المستأجر» — تُحسَم عند الترحيل لا الآن،
                 // فتبقى المسوّدة تابعةً للسياسة ولو تغيّرت قبل ترحيلها.
                 'restock'       => array_key_exists('restock', $data) && $data['restock'] !== null
@@ -148,35 +153,62 @@ class ReturnService
 
             $subtotal = $taxTotal = 0;
 
-            foreach ($items as $item) {
+            // REM-01: مرتجعٌ مرتبط بمصدر يرث أساسه وضريبته من سطر المصدر المرحَّل
+            // (خصم السطر + حصة خصم الرأس + وضع الضريبة) بدل إعادة حسابهما من
+            // السعر المُرسَل. تخطّي POS: سطوره تحمل اشتقاقها (`*_override`).
+            $derivedByIndex = $source ? $this->deriveFromSource($source, $items) : [];
+
+            foreach ($items as $index => $item) {
                 $qty       = (int) ($item['quantity'] ?? 1);
                 $unitPrice = (int) ($item['unit_price'] ?? 0);
                 $rate      = (int) ($item['tax_rate'] ?? 15);
+                $derived   = $derivedByIndex[$index] ?? null;
 
                 if ($qty <= 0 || $unitPrice < 0) {
                     throw new RuntimeException('الكمية يجب أن تكون موجبة والسعر غير سالب.');
                 }
 
-                // خدمة POS فقط تمرر أساس السطر الموزّع من الوثيقة المصدر؛ أما
-                // API العام فيبقى على كمية × سعر الوحدة كما كان. لا يتحكم عميل
-                // API في المفتاح لأنه غير موجود في طلبه المتحقق منه.
-                $lineSubtotal = array_key_exists('line_subtotal_override', $item)
-                    ? (int) $item['line_subtotal_override']
-                    : $qty * $unitPrice;
-                if ($lineSubtotal < 0) {
-                    throw new RuntimeException('أساس سطر المرتجع لا يمكن أن يكون سالباً.');
+                if ($derived !== null) {
+                    // المبالغ من سطر المصدر؛ ونسبة الضريبة نسبته هو لا المُرسَلة.
+                    $rate         = $derived['tax_rate'];
+                    $lineSubtotal = $derived['subtotal'];
+                    $lineDiscount = $derived['discount'];
+                    $lineNet      = $derived['net'];
+                    $lineTax      = $derived['tax'];
+                } else {
+                    // خدمة POS فقط تمرر أساس السطر الموزّع من الوثيقة المصدر؛ أما
+                    // API العام فيبقى على كمية × سعر الوحدة كما كان. لا يتحكم عميل
+                    // API في المفتاح لأنه غير موجود في طلبه المتحقق منه.
+                    $lineSubtotal = array_key_exists('line_subtotal_override', $item)
+                        ? (int) $item['line_subtotal_override']
+                        : $qty * $unitPrice;
+                    if ($lineSubtotal < 0) {
+                        throw new RuntimeException('أساس سطر المرتجع لا يمكن أن يكون سالباً.');
+                    }
+                    $lineDiscount = max(0, (int) ($item['line_discount'] ?? 0));
+                    if ($lineDiscount > $lineSubtotal) {
+                        throw new RuntimeException('خصم سطر المرتجع لا يمكن أن يتجاوز إجمالي السطر.');
+                    }
+
+                    if (! array_key_exists('line_subtotal_override', $item) && $return->tax_inclusive) {
+                        // مرتجعٌ حرّ بأسعار متضمّنة الضريبة: تُستخرَج الضريبة من
+                        // السعر ولا تُضاف فوقه (نفس صيغة `InvoiceService`)، ويُخزَّن
+                        // الأساس والخصم صافيَين فيبقى (subtotal − discount) = الأساس الخاضع.
+                        $discounted   = $lineSubtotal - $lineDiscount;
+                        [$lineNet, $lineTax] = $this->splitLineTax($discounted, $rate, true);
+                        $discNet      = $lineDiscount - $this->extractTax($lineDiscount, $rate);
+                        $lineSubtotal = $lineNet + $discNet;
+                        $lineDiscount = $discNet;
+                    } else {
+                        $lineNet = $lineSubtotal - $lineDiscount;
+                        // لا يرسل عميل API هذا المفتاح (طلب المرتجع العام لا يتحقق منه).
+                        // تستخدمه خدمة POS فقط بعد اشتقاقه من سطر المصدر المثبت، كي تبقى
+                        // هللات ضريبة السعر المتضمن مطابقة للفاصل الضريبي الأصلي.
+                        $lineTax = array_key_exists('line_tax_override', $item)
+                            ? (int) $item['line_tax_override']
+                            : $this->calcTax($lineNet, $rate);
+                    }
                 }
-                $lineDiscount = max(0, (int) ($item['line_discount'] ?? 0));
-                if ($lineDiscount > $lineSubtotal) {
-                    throw new RuntimeException('خصم سطر المرتجع لا يمكن أن يتجاوز إجمالي السطر.');
-                }
-                $lineNet = $lineSubtotal - $lineDiscount;
-                // لا يرسل عميل API هذا المفتاح (طلب المرتجع العام لا يتحقق منه).
-                // تستخدمه خدمة POS فقط بعد اشتقاقه من سطر المصدر المثبت، كي تبقى
-                // هللات ضريبة السعر المتضمن مطابقة للفاصل الضريبي الأصلي.
-                $lineTax = array_key_exists('line_tax_override', $item)
-                    ? (int) $item['line_tax_override']
-                    : $this->calcTax($lineNet, $rate);
                 if ($lineTax < 0) {
                     throw new RuntimeException('ضريبة سطر المرتجع لا يمكن أن تكون سالبة.');
                 }
@@ -226,7 +258,7 @@ class ReturnService
      *  مصدراً من نوعٍ يخالف نوع المرتجع، أو لا يخصّ طرفه، أو غير مرحّل،
      *  أو غياب المصدر أصلاً حين يُلزِم به إعداد المستأجر.
      */
-    protected function resolveSource(array $data, string $type): Invoice|Purchase|null
+    protected function resolveSource(array $data, string $type, bool $lock = false): Invoice|Purchase|null
     {
         $class = $type === 'sales' ? Invoice::class : Purchase::class;
         $id    = $data['original_id'] ?? null;
@@ -253,7 +285,15 @@ class ReturnService
 
         // معرّف مخزَّن يُحلّ **خارج عزل الفرع**: المستند المصدر حجّة قائمة لا
         // نتيجة تصفّح، وفرعُ المرتجع قد يخالف فرع الفاتورة.
-        $source = BranchScope::reference($class)->find($id);
+        //
+        // `$lock` عند الترحيل: قفل صفّ المصدر يُسلسل كل ترحيلات المرتجعات على
+        // المستند نفسه، وإلا رأت معاملتان متزامنتان (READ COMMITTED) المتبقي
+        // ذاته فتردّان معاً أكثر مما بيع. **ترتيب الأقفال:** المرتجع ← المصدر ←
+        // مِرساة ترقيم القيد (المستأجر) في المحرك — كمسار ترحيل الدفعات. ومرتجع
+        // POS يُستثنى: يقفل الفرع أولاً (مفتاح الـidempotency) فقفل المصدر بعده
+        // كان سيعكس الترتيب مع مسار الـAPI؛ وتسلسله محروسٌ بقفل الفرع أصلاً.
+        $query = BranchScope::reference($class);
+        $source = ($lock ? $query->lockForUpdate() : $query)->find($id);
 
         if (! $source) {
             throw new RuntimeException('المستند المصدر غير موجود.');
@@ -390,6 +430,103 @@ class ReturnService
     }
 
     /**
+     * ═══════════════════════════════════════════════════════════════
+     *  REM-01 — اشتقاق مبالغ المرتجع من سطر المصدر
+     * ═══════════════════════════════════════════════════════════════
+     *  لكل بندٍ مرتبط بسطر مصدر (وبلا اشتقاق POS الجاهز): الأساس الصافي
+     *  والخصم والضريبة من المحصَّل على السطر، موزّعةً بالكمية ومقيَّدةً بالمتبقي
+     *  تراكمياً. سعر الوحدة المُرسَل يخفّض ولا يرفع (استردادٌ جزئي مشروع).
+     *
+     *  البنود في الطلب نفسه تُعدّ تراكمياً بالترتيب، فتحمل الأخيرة بقايا الهللات.
+     *
+     * @return array<int, array{tax_rate:int, subtotal:int, discount:int, net:int, tax:int}>  بمفتاح موضع البند
+     */
+    protected function deriveFromSource(Invoice|Purchase $source, array $items, ?string $exceptReturnId = null): array
+    {
+        $allocator = app(ReturnSourceAllocator::class);
+        $charged   = $allocator->charged($source);
+        $running   = $allocator->returned(array_keys($charged), $exceptReturnId);
+
+        $out = [];
+        foreach ($items as $index => $item) {
+            if (array_key_exists('line_subtotal_override', $item)) {
+                continue;
+            }
+            $lineId = $item['source_line_id'] ?? null;
+            if (! $lineId || ! isset($charged[$lineId])) {
+                continue;
+            }
+
+            $qty   = (int) ($item['quantity'] ?? 0);
+            $alloc = $allocator->allocate($charged[$lineId], $running[$lineId] ?? [], $qty, (int) ($item['unit_price'] ?? 0));
+
+            $prior = $running[$lineId] ?? ['quantity' => 0, 'subtotal' => 0, 'discount' => 0, 'net' => 0, 'tax' => 0];
+            $price = (int) ($item['unit_price'] ?? 0);
+            $running[$lineId] = [
+                'quantity' => $prior['quantity'] + $qty,
+                'subtotal' => $prior['subtotal'] + $alloc['subtotal'],
+                'discount' => $prior['discount'] + $alloc['discount'],
+                'net'      => $prior['net'] + $alloc['net'],
+                'tax'      => $prior['tax'] + $alloc['tax'],
+                'min_price' => isset($prior['min_price']) ? min($prior['min_price'], $price) : $price,
+            ];
+
+            $out[$index] = [
+                'tax_rate' => $charged[$lineId]['tax_rate'],
+                'subtotal' => $alloc['subtotal'],
+                'discount' => $alloc['discount'],
+                'net'      => $alloc['net'],
+                'tax'      => $alloc['tax'],
+            ];
+        }
+
+        return $out;
+    }
+
+    /**
+     * يعيد اشتقاق مبالغ مسوّدة مرتبطة بمصدر عند الترحيل (داخل المعاملة وتحت
+     * قفل المصدر)، ويحدّث سطورها وإجمالياتها إن اختلفت عمّا حُسب عند الإنشاء.
+     */
+    protected function rederiveSourceAmounts(ReturnDocument $return, Invoice|Purchase $source): ReturnDocument
+    {
+        $lines = $return->lines()->orderBy('id')->get();
+
+        $derived = $this->deriveFromSource(
+            $source,
+            $lines->map(fn (ReturnLine $l) => [
+                'source_line_id' => $l->source_line_id,
+                'quantity'       => $l->quantity,
+                'unit_price'     => $l->unit_price,
+            ])->all(),
+            $return->id
+        );
+
+        $subtotal = $taxTotal = 0;
+        foreach ($lines->values() as $index => $line) {
+            if (isset($derived[$index])) {
+                $d = $derived[$index];
+                $line->update([
+                    'tax_rate'      => $d['tax_rate'],
+                    'line_subtotal' => $d['subtotal'],
+                    'line_discount' => $d['discount'],
+                    'line_tax'      => $d['tax'],
+                    'line_total'    => $d['net'] + $d['tax'],
+                ]);
+            }
+            $subtotal += (int) $line->line_subtotal - (int) $line->line_discount;
+            $taxTotal += (int) $line->line_tax;
+        }
+
+        $return->update([
+            'subtotal'   => $subtotal,
+            'tax_amount' => $taxTotal,
+            'total'      => $subtotal + $taxTotal,
+        ]);
+
+        return $return->load('lines');
+    }
+
+    /**
      * ترحيل المرتجع: توليد القيد العكسي ومعالجة المخزون.
      */
     public function post(ReturnDocument $return): ReturnDocument
@@ -413,7 +550,7 @@ class ReturnService
                     'original_type' => $return->original_type,
                     'partner_id'    => $return->partner_id,
                     'return_date'   => $return->return_date->toDateString(),
-                ], $return->type);
+                ], $return->type, lock: $return->pos_session_id === null);
 
                 if ($source) {
                     $this->assertWithinSource(
@@ -432,6 +569,14 @@ class ReturnService
                         ])->all(),
                         $return->id
                     );
+
+                    // REM-01: المبالغ تُعاد اشتقاقها **تحت قفل المصدر** من المرحَّل
+                    // فعلاً — مسوّدتان أُنشئتا معاً لا تعرف إحداهما الأخرى، فتوزيع
+                    // الباقي على «الجزء الأخير» لا يُحسَم إلا هنا. مرتجع POS يُستثنى
+                    // (سطوره مشتقة بخدمته داخل المعاملة نفسها، وتسلسله محروس بقفل الفرع).
+                    if ($return->pos_session_id === null) {
+                        $return = $this->rederiveSourceAmounts($return, $source);
+                    }
                 }
             }
 
