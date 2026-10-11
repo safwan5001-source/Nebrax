@@ -87,6 +87,7 @@ import { SliderFields } from "./SliderFields";
 import { useBackgroundMediaBounds } from "./media/use-background-media-bounds";
 import { GlobalTokensEditor } from "./design/GlobalTokensEditor";
 import { PaletteEditor } from "./design/PaletteEditor";
+import { ICON_KEYS, iconLabel, normalizeIconKey } from "./presentation/icon-registry";
 import { SECTION_DESIGN_CAPABILITIES } from "./presentation/section-design";
 import type { SectionDesign } from "./presentation/section-design";
 import type { DesignContext } from "./presentation/section-design-resolve";
@@ -1368,6 +1369,7 @@ function HomepagePanel({
               <BenefitsFields
                 items={benefitsContentOf(selected).items}
                 t={t}
+                locale={locale === "en" ? "en" : "ar"}
                 onChange={(items) =>
                   updateSection(selectedIndex, {
                     ...selected,
@@ -2456,19 +2458,46 @@ function BannerFields({
   );
 }
 
-function BenefitsFields({
+export function BenefitsFields({
   items,
   t,
+  locale,
   onChange,
 }: {
   items: BenefitItem[];
   t: (key: CustomizerMessageKey) => string;
+  locale: "ar" | "en";
   onChange: (items: BenefitItem[]) => void;
 }) {
   return (
     <div className="space-y-3">
+      <p className="text-[12px] leading-5 text-muted">{t("benefitsLayoutNote")}</p>
       {items.map((item, index) => (
-        <div key={item.id} className="space-y-2 border border-neutral-200 p-2">
+        <div key={item.id} className="space-y-2 border border-neutral-200 p-2" data-benefit-row="">
+          <Field label={t("navItemIcon")}>
+            <select
+              className={selectClass}
+              data-benefit-icon-select=""
+              value={item.icon ?? ""}
+              onChange={(event) => {
+                const icon = normalizeIconKey(event.target.value);
+                onChange(
+                  items.map((row, i) => {
+                    if (i !== index) return row;
+                    const { icon: _drop, ...rest } = row;
+                    return icon ? { ...rest, icon } : rest;
+                  }),
+                );
+              }}
+            >
+              <option value="">{t("navIconNone")}</option>
+              {ICON_KEYS.map((key) => (
+                <option key={key} value={key}>
+                  {iconLabel(key, locale)}
+                </option>
+              ))}
+            </select>
+          </Field>
           <Field label={t("benefitTitle")}>
             <input
               className={inputClass}

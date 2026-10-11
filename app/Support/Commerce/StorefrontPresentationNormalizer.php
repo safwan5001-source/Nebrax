@@ -872,7 +872,13 @@ final class StorefrontPresentationNormalizer
                     continue;
                 }
                 $seen[$id] = true;
-                $items[] = ['id' => $id, 'title' => $title, 'body' => $body];
+                $entry = ['id' => $id, 'title' => $title, 'body' => $body];
+                // CUST-HV V9b (V0 §11.4) — أيقونة اختيارية من السجلّ المنتقى؛ المفتاح المجهول يُسقط (لا أيقونة) ولا يُخزَّن غيابٌ.
+                $icon = $item['icon'] ?? null;
+                if (is_string($icon) && in_array($icon, IconRegistry::KEYS, true)) {
+                    $entry['icon'] = $icon;
+                }
+                $items[] = $entry;
                 if (count($items) >= self::MAX_BENEFIT_ITEMS) {
                     break;
                 }

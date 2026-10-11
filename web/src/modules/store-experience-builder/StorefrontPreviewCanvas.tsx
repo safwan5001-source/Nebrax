@@ -85,7 +85,8 @@ import { useWindowsClock } from "./use-announcement-clock";
 import { useMediaRefPreview } from "./media/use-media-ref-preview";
 import { fontFamilyStack } from "./presentation/font-catalogue";
 import { resolveGlobalTokens } from "./presentation/global-tokens";
-import type { SectionDesign } from "./presentation/section-design";
+import { StoreIcon } from "./StoreIcon";
+import type { BenefitsLayout, SectionDesign } from "./presentation/section-design";
 import { resolveSectionDesign } from "./presentation/section-design-resolve";
 import { SectionDesignFrame } from "./SectionDesignFrame";
 import type { DesignContext } from "./presentation/section-design-resolve";
@@ -1163,17 +1164,36 @@ export function StorefrontPreviewCanvas({
               // card surface (and the block marker its design rules address) apply only
               // while a design frame wraps it.
               const designed = resolveSectionDesign(section.type, section.design, designContext) !== null;
+              const benefitsLayout = section.design?.layout as BenefitsLayout | undefined;
+              const benefitsFlat = benefitsLayout === "flat";
               return (
-                <section key={section.id} data-section-block={designed ? "" : undefined}>
+                <section key={section.id} data-section-block={designed ? "" : undefined} data-benefits={benefitsLayout ?? "auto"} data-vp={viewport}>
                   <h2 className="text-base font-extrabold">{t("sectionBenefits")}</h2>
                   {items.length === 0 ? (
                     <p className="mt-2 text-sm text-store-muted-foreground">{t("sectionBenefits")}</p>
                   ) : (
-                    <ul className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                    <ul className={cn("mt-3 grid", benefitsFlat ? "gap-x-6 gap-y-5" : "gap-2")}>
                       {items.map((item) => (
-                        <li key={item.id} className={cn("min-w-0 break-words rounded-store border border-store-border", designed ? "bg-store-surface px-4 py-4" : "px-3 py-3")}>
-                          {item.title ? <p className="break-words text-sm font-bold">{item.title}</p> : null}
-                          {item.body ? <p className="break-words text-sm text-store-muted-foreground">{item.body}</p> : null}
+                        <li
+                          key={item.id}
+                          data-benefit-item=""
+                          className={cn(
+                            "flex min-w-0 items-start gap-3 break-words",
+                            benefitsFlat ? null : cn("rounded-store border border-store-border", designed ? "bg-store-surface px-4 py-4" : "px-3 py-3"),
+                          )}
+                        >
+                          {item.icon ? (
+                            <span
+                              data-benefit-icon=""
+                              className="flex size-10 shrink-0 items-center justify-center rounded-store border border-store-border text-store-foreground"
+                            >
+                              <StoreIcon name={item.icon} className="size-5" />
+                            </span>
+                          ) : null}
+                          <div className="min-w-0 flex-1">
+                            {item.title ? <p className="break-words text-sm font-bold">{item.title}</p> : null}
+                            {item.body ? <p className="break-words text-sm text-store-muted-foreground">{item.body}</p> : null}
+                          </div>
                         </li>
                       ))}
                     </ul>

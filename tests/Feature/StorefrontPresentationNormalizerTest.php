@@ -167,6 +167,36 @@ class StorefrontPresentationNormalizerTest extends TestCase
     }
 
     /** @test */
+    public function benefits_item_icon_is_a_registry_key_or_absent(): void
+    {
+        $normalized = $this->normalizer->normalize([
+            'version' => 2,
+            'homepage' => [
+                'sections' => [[
+                    'id' => 'benefits', 'type' => 'benefits', 'visible' => true,
+                    'content' => ['items' => [
+                        ['id' => 'a', 'title' => 'Fast', 'body' => '', 'icon' => 'truck'],
+                        ['id' => 'b', 'title' => 'Safe', 'body' => ''],
+                        ['id' => 'c', 'title' => 'x', 'body' => '', 'icon' => 'rocket'],
+                        ['id' => 'd', 'title' => 'x', 'body' => '', 'icon' => 'Truck'],
+                        ['id' => 'e', 'title' => 'x', 'body' => '', 'icon' => ['truck']],
+                        ['id' => 'f', 'title' => 'x', 'body' => '', 'icon' => ''],
+                    ]],
+                ]],
+            ],
+        ]);
+
+        $this->assertSame([
+            ['id' => 'a', 'title' => 'Fast', 'body' => '', 'icon' => 'truck'],
+            ['id' => 'b', 'title' => 'Safe', 'body' => ''],
+            ['id' => 'c', 'title' => 'x', 'body' => ''],
+            ['id' => 'd', 'title' => 'x', 'body' => ''],
+            ['id' => 'e', 'title' => 'x', 'body' => ''],
+            ['id' => 'f', 'title' => 'x', 'body' => ''],
+        ], $normalized['homepage']['sections'][0]['content']['items']);
+    }
+
+    /** @test */
     public function v2_absence_means_delete_and_never_resurrects_defaults(): void
     {
         $normalized = $this->normalizer->normalize([

@@ -37,6 +37,7 @@ import {
   offersContentOf,
   productShelfContentOf,
 } from "@/lib/presentation/section-content";
+import type { BenefitsLayout } from "@/lib/presentation/section-design";
 import {
   type DesignContext,
   resolveSectionDesign,
@@ -333,6 +334,9 @@ async function pushSectionNode(
         designed={
           resolveSectionDesign(section.type, section.design, ctx.design) !==
           null
+        }
+        layout={
+          (section.design?.layout as BenefitsLayout | undefined) ?? undefined
         }
       />,
     );

@@ -3,6 +3,7 @@ import {
   type GalleryContent,
   normalizeGalleryContent,
 } from "./gallery-content";
+import { type IconKey, normalizeIconKey } from "./icon-registry";
 import { normalizeSliderContent, type SliderContent } from "./slider-content";
 import { sanitizeExternalUrl } from "./urls";
 
@@ -56,6 +57,8 @@ export interface BenefitItem {
   id: string;
   title: string;
   body: string;
+  /** CUST-HV V9b — optional glyph from the curated registry; absence = no icon (never stored as empty). */
+  icon?: IconKey;
 }
 
 export interface BenefitsContent {
@@ -516,7 +519,8 @@ function normalizeBenefits(source: Record<string, unknown>): BenefitsContent {
     const body = asString(row.body).trim().slice(0, 200);
     const id = safeToken(row.id, `benefit-${index}`);
     if (!id || items.some((existing) => existing.id === id)) return;
-    items.push({ id, title, body });
+    const icon = normalizeIconKey(row.icon);
+    items.push(icon ? { id, title, body, icon } : { id, title, body });
   });
   return { items: items.slice(0, MAX_BENEFIT_ITEMS) };
 }
