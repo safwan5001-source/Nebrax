@@ -29,7 +29,10 @@ describe("slider copy is never recoloured by the section surface (V8b)", () => {
   it("a slider with a designed background emits no text tokens — its copy colour is per slide, over each picture", () => {
     const r = resolveSectionDesign(
       "slider",
-      { background: { kind: "solid", color: { role: "surface" } }, spacing: { top: "md" } },
+      {
+        background: { kind: "solid", color: { role: "surface" } },
+        spacing: { top: "md" },
+      },
       ctx,
     )!;
     const tokens = r.attrs["data-sd"].split(" ");
