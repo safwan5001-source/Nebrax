@@ -6,6 +6,7 @@ import { useTranslations } from 'next-intl';
 import {
   ArrowRight,
   BarChart3,
+  Bike,
   BookOpen,
   Boxes,
   CalendarDays,
@@ -56,6 +57,7 @@ const REPORT_CATEGORIES: ReportCategoryDefinition[] = [
     icon: BarChart3,
     reports: [
       { key: 'posSession', href: '/pos/report', icon: Receipt, status: 'ready' },
+      { key: 'deliveryChannel', href: '/reports/sales/delivery-channel', icon: Bike, status: 'ready' },
       { key: 'salesByPeriod', href: '/reports/sales/by-period', icon: CalendarDays, status: 'ready' },
       { key: 'salesByCustomer', href: '/reports/sales/by-customer', icon: Users, status: 'ready' },
       { key: 'salesByProduct', href: '/reports/sales/by-product', icon: Package, status: 'ready' },
