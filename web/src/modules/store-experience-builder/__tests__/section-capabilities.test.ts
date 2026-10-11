@@ -187,8 +187,8 @@ describe("CUST-H4-2 capability registry — state/category/library metadata", ()
       deliveryPromise: "live",
       // CUST-HV V8c — model, storefront, Canvas and editor are all built.
       slider: "live",
-      // CUST-HV V8d — the model and the Publish rule exist; nothing draws or edits it yet (V8e–V8f).
-      gallery: "deferred",
+      // CUST-HV V8f — model, storefront, Canvas and editor are all built.
+      gallery: "live",
     };
     for (const type of ALL_HOME_SECTION_KEYS) {
       expect(SECTION_CAPABILITIES[type].state).toBe(expected[type]);
@@ -235,7 +235,6 @@ describe("CUST-H4-2 capability registry — state/category/library metadata", ()
 
   it("leaves every other section's capability state unchanged by the Offers transition", () => {
     for (const type of ALL_HOME_SECTION_KEYS) {
-      if (type === "gallery") continue; // V8d: deferred until its renderers and editor ship (below)
       expect(SECTION_CAPABILITIES[type].state).toBe("live");
       expect(SECTION_CAPABILITIES[type].merchantAddable).toBe(true);
     }
@@ -283,7 +282,7 @@ describe("CUST-H4-2 capability registry — state/category/library metadata", ()
     // Every type is merchant-addable (Offers flipped in CUST-H4-7), so
     // instance-count rules are the only remaining gate.
     for (const type of ALL_HOME_SECTION_KEYS) {
-      expect(SECTION_CAPABILITIES[type].merchantAddable).toBe(type !== "gallery");
+      expect(SECTION_CAPABILITIES[type].merchantAddable).toBe(true);
     }
     const sections = DEFAULT_PRESENTATION_CONFIG.homepage.sections.filter(
       (s) => s.type !== "appPromo",
@@ -313,13 +312,18 @@ describe("CUST-HV V8c slider capability (live and addable)", () => {
   });
 });
 
-describe("CUST-HV V8d gallery capability (deferred until V8e–V8f)", () => {
-  it("is visible in the Library but not addable, with the reason shown, and kept out of the default document", () => {
+describe("CUST-HV V8f gallery capability (live and addable)", () => {
+  it("is addable from the Library, carries no reason, and stays out of the default document", () => {
     const cap = SECTION_CAPABILITIES.gallery;
-    expect(cap.state).toBe("deferred");
-    expect(cap.merchantAddable).toBe(false);
-    expect(cap.reasonKey).toBe("sectionGalleryReason");
-    expect(canAddSectionType([], "gallery")).toBe(false);
+    expect(cap.state).toBe("live");
+    expect(cap.merchantAddable).toBe(true);
+    expect(cap.reasonKey).toBeUndefined();
+    expect("sectionGalleryReason" in CUSTOMIZER_MESSAGES.ar).toBe(false);
+    expect("sectionGalleryReason" in CUSTOMIZER_MESSAGES.en).toBe(false);
+    expect(canAddSectionType([], "gallery")).toBe(true);
+    // several galleries are allowed (maxInstances: null) and each is duplicable
+    expect(cap.maxInstances).toBeNull();
+    expect(cap.canDuplicate).toBe(true);
     expect(HOME_BUILDER_SECTION_KEYS).not.toContain("gallery");
     expect(HOME_DATA_SECTION_KEYS).not.toContain("gallery");
     expect(ALL_HOME_SECTION_KEYS).toContain("gallery");

@@ -60,6 +60,7 @@ import {
   discoveryContentOf,
   offersContentOf,
   productShelfContentOf,
+  galleryContentOf,
   sliderContentOf,
 } from "./presentation/section-content";
 import {
@@ -76,6 +77,7 @@ import {
   type CustomizerMessageKey,
 } from "./messages";
 import { CanvasBackdrop } from "./media/CanvasBackdrop";
+import { CanvasGallery } from "./CanvasGallery";
 import { CanvasSlider } from "./CanvasSlider";
 import { useBackgroundMediaBounds } from "./media/use-background-media-bounds";
 import { announcementWindowState } from "./presentation/announcements";
@@ -1034,6 +1036,27 @@ export function StorefrontPreviewCanvas({
                     goTo: t("canvasSliderGoTo"),
                     empty: t("canvasSliderEmpty"),
                     autoplayNote: t("canvasSliderAutoplayNote"),
+                  }}
+                />
+              );
+            }
+
+            if (section.type === "gallery") {
+              // CUST-HV V8f — the same `data-gallery` DOM as the storefront; the layout is the section design's (`carousel`, else the grid).
+              const gallery = galleryContentOf(section);
+              return (
+                <CanvasGallery
+                  key={section.id}
+                  images={gallery.images}
+                  options={gallery.options}
+                  layout={section.design?.layout === "carousel" ? "carousel" : "grid"}
+                  dir={designContext.dir}
+                  viewport={viewport}
+                  activeImageId={activeSlides?.[section.id] ?? null}
+                  labels={{
+                    label: t("canvasGalleryLabel"),
+                    empty: t("canvasGalleryEmpty"),
+                    item: t("canvasGalleryItem"),
                   }}
                 />
               );

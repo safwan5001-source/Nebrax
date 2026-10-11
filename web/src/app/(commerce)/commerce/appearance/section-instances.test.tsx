@@ -182,10 +182,10 @@ describe('commerce appearance — STORE-CUSTOMIZER-V2-2 section instances', () =
     const sliderOption = picker.querySelector('[data-picker-option="slider"]') as HTMLButtonElement;
     expect(sliderOption.disabled).toBe(false);
     expect(sliderOption.textContent).not.toContain('قيد الإعداد');
-    // CUST-HV V8d — the gallery is listed but not addable yet, and says why.
+    // CUST-HV V8f — the gallery is built: listed, addable, no reason.
     const galleryOption = picker.querySelector('[data-picker-option="gallery"]') as HTMLButtonElement;
-    expect(galleryOption.disabled).toBe(true);
-    expect(galleryOption.textContent).toContain('محرّر المعرض قيد الإعداد');
+    expect(galleryOption.disabled).toBe(false);
+    expect(galleryOption.textContent).not.toContain('قيد الإعداد');
   });
 
   it('add creates a new instance with a safe unique id and selects it', async () => {
