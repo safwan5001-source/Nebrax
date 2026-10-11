@@ -10,6 +10,7 @@ use App\Models\Partner;
 use App\Models\Tenant;
 use App\Services\Accounting\ChartOfAccountsSeeder;
 use App\Services\Accounting\CreditNoteService;
+use App\Support\Settings;
 use App\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -50,6 +51,8 @@ class DebitNoteTest extends TestCase
 
         app(TenantContext::class)->set($this->tenant->id);
         app(ChartOfAccountsSeeder::class)->seed($this->tenant->id);
+        // ADR-E (REM-02): إشعارات المبيعات المستقلة هنا مقصودة — تمرّ بالسياسة الصريحة.
+        Settings::put('sales', ['allow_standalone_credit_notes' => true], $this->tenant);
 
         $this->supplier = Partner::create(['name' => 'مورد', 'type' => 'supplier']);
         $this->customer = Partner::create(['name' => 'عميل', 'type' => 'customer']);

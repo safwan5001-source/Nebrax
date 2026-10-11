@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Models\Invoice;
 use App\Models\Purchase;
-use App\Models\ReturnLine;
+use App\Services\Accounting\ReturnSourceAllocator;
 use App\Support\Money;
 use App\Support\Settings;
 use App\Tenancy\BranchScope;
@@ -43,27 +43,39 @@ class ReturnSourcesController extends ApiController
 
         // مستندات الطرف المرحَّلة — مرجعٌ لا تصفّح، فقد يُرَدّ في فرعٍ غير
         // الذي بِيع فيه (نفس قاعدة `ReturnableController`).
-        $documents = BranchScope::reference($class)
+        $query = BranchScope::reference($class)
             ->with('lines:id,' . ($type === 'sales' ? 'invoice_id' : 'purchase_id') . ',quantity')
             ->where('partner_id', $partnerId)
-            ->where('status', 'posted')
-            ->latest($dateField)
-            ->limit(200)
-            ->get();
+            ->where('status', 'posted');
+
+        // REM-02: منتقي الإشعار الدائن يعرض ما يقبله `CreditNoteController::store` فقط — الإشعار
+        // يتحقق من فرع الفاتورة (404 لفرعٍ خارج نطاق المستخدم)، أما المرتجع فمرجعيّ عابر للفروع.
+        // نفس قاعدة `assertRecordAccessible`: فرعٌ فارغ مسموح، وغيره ضمن فروع المستخدم.
+        if ($type === 'sales' && $request->query('purpose') === 'credit_note'
+            && ($allowed = $request->user()?->allowedBranchIds()) !== null) {
+            $query->where(fn ($q) => $q->whereNull('branch_id')->orWhereIn('branch_id', $allowed));
+        }
+
+        $documents = $query->latest($dateField)->limit(200)->get();
 
         // ما رُدَّ من كل سطر — استعلامٌ واحد لكل المستندات لا استعلام لمستند.
         $lineIds  = $documents->flatMap(fn ($d) => $d->lines->pluck('id'));
-        $returned = ReturnLine::query()
-            ->whereIn('source_line_id', $lineIds)
-            ->whereHas('return', fn ($q) => $q->where('status', 'posted'))
-            ->groupBy('source_line_id')
-            ->selectRaw('source_line_id, SUM(quantity) as qty')
-            ->pluck('qty', 'source_line_id');
+        // AWJ-TAX-REM-02: «المردود» يشمل الإشعارات الدائنة المرحَّلة المربوطة بالسطر —
+        // السقف التراكمي واحد، فلا تُعرض فاتورةٌ مُستنفَدة بإشعارٍ كأنها صالحة للردّ.
+        $returned = array_map(
+            fn (array $row) => $row['quantity'],
+            app(ReturnSourceAllocator::class)->returned($lineIds->all())
+        );
+
+        // فواتير عليها إشعارات دائنة تاريخية غير محسومة (REM-02): تُعرض ممنوعةً بسببها.
+        $legacy = $type === 'sales'
+            ? app(ReturnSourceAllocator::class)->unresolvedLegacyCounts($documents->pluck('id')->all())
+            : [];
 
         $windowDays = (int) Settings::get($group, 'return_window_days');
         $today      = Carbon::parse(now()->toDateString());
 
-        $data = $documents->map(function ($doc) use ($dateField, $returned, $windowDays, $today) {
+        $data = $documents->map(function ($doc) use ($dateField, $returned, $windowDays, $today, $legacy) {
             $remaining = $doc->lines->sum(
                 fn ($l) => max(0, (int) $l->quantity - (int) ($returned[$l->id] ?? 0))
             );
@@ -83,7 +95,8 @@ class ReturnSourcesController extends ApiController
                 // سببٌ واحد يكفي المستخدم؛ و«رُدَّ بالكامل» أسبق لأنه نهائي
                 // بينما المهلة قد تكون قابلة للتفاوض خارج النظام.
                 'blocked_reason' => $remaining <= 0 ? 'fully_returned'
-                    : ($expired ? 'out_of_window' : null),
+                    : (isset($legacy[$doc->id]) ? 'legacy_credit_review'
+                    : ($expired ? 'out_of_window' : null)),
                 'elapsed_days'   => $elapsed,
             ];
         });

@@ -9,6 +9,8 @@ export interface SourceCreditNoteLine {
   description: string | null;
   quantity: number;
   unit_price: string;
+  /** قبل الضريبة (اختياري للتوافق مع إشعارات قديمة): يجعل سعر الوحدة والضريبة والإجمالي متطابقة في الطباعة. */
+  unit_price_before_tax?: string | null;
   line_tax: string;
   line_total: string;
 }
@@ -60,14 +62,23 @@ export function buildCreditNoteDocumentModel(input: {
       city: customer?.city ?? null,
     },
     meta: { number: note.number, date: note.note_date, dueDate: null, paymentType: null },
-    lines: note.lines.map((l) => ({
-      id: l.id,
-      description: l.description ?? '',
-      quantity: l.quantity,
-      unitPrice: riyalToMinor(l.unit_price),
-      tax: riyalToMinor(l.line_tax),
-      total: riyalToMinor(l.line_total),
-    })),
+    lines: note.lines.map((l) => {
+      // إشعارٌ على فاتورة شاملة للضريبة يخزّن unit_price بسعر الفاتورة (شاملاً)؛ المستند
+      // يعرض السعر قبل الضريبة كي لا يظهر «115.00 + 15.00 = 115.00».
+      const beforeTax = l.unit_price_before_tax === null || l.unit_price_before_tax === undefined
+        ? null
+        : riyalToMinor(l.unit_price_before_tax);
+
+      return {
+        id: l.id,
+        description: l.description ?? '',
+        quantity: l.quantity,
+        unitPrice: beforeTax ?? riyalToMinor(l.unit_price),
+        priceBeforeTax: beforeTax,
+        tax: riyalToMinor(l.line_tax),
+        total: riyalToMinor(l.line_total),
+      };
+    }),
     totals: {
       subtotal: riyalToMinor(note.subtotal),
       tax: riyalToMinor(note.tax_amount),

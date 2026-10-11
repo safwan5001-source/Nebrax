@@ -2,9 +2,13 @@
 
 namespace App\Services\Accounting;
 
+use App\Models\CreditNoteLegacyReview;
+use App\Models\CreditNoteLine;
 use App\Models\Invoice;
+use App\Models\InvoiceLine;
 use App\Models\Purchase;
 use App\Models\ReturnLine;
+use App\Tenancy\BranchScope;
 
 /**
  * ═══════════════════════════════════════════════════════════════
@@ -93,16 +97,24 @@ class ReturnSourceAllocator
     }
 
     /**
-     * ما رُدَّ سابقاً على كل سطر مصدر — من المرتجعات **المرحَّلة** وحدها.
+     * ما رُدَّ أو خُصم سابقاً على كل سطر مصدر — من المستندات **المرحَّلة** وحدها:
+     * المرتجعات، **والإشعارات الدائنة المربوطة بسطر** (AWJ-TAX-REM-02). الاثنان
+     * يستهلكان الكمية والأساس والضريبة المحصَّلة نفسها، فيُجمعان في سقفٍ واحد؛
+     * وإلا ردّ مرتجعٌ ما خصمه إشعار (أو العكس) فتجاوز مجموعهما ما حُصِّل.
      *
      * @param  array<int, string>  $sourceLineIds
+     * @param  string|null  $exceptReturnId  مرتجعٌ يُستثنى (يُعاد اشتقاقه الآن)
+     * @param  string|null  $exceptCreditNoteId  إشعارٌ يُستثنى (يُعاد اشتقاقه الآن)
      * @return array<string, array{quantity:int, subtotal:int, discount:int, net:int, tax:int, min_price:int}>
      */
-    public function returned(array $sourceLineIds, ?string $exceptReturnId = null): array
+    public function returned(array $sourceLineIds, ?string $exceptReturnId = null, ?string $exceptCreditNoteId = null): array
     {
         if ($sourceLineIds === []) {
             return [];
         }
+
+        $select = 'source_line_id, SUM(quantity) as qty, SUM(line_subtotal) as subtotal, '
+            . 'SUM(line_discount) as discount, SUM(line_tax) as tax, MIN(unit_price) as min_price';
 
         $rows = ReturnLine::query()
             ->whereIn('source_line_id', $sourceLineIds)
@@ -113,26 +125,185 @@ class ReturnSourceAllocator
                 }
             })
             ->groupBy('source_line_id')
-            ->selectRaw(
-                'source_line_id, SUM(quantity) as qty, SUM(line_subtotal) as subtotal, '
-                . 'SUM(line_discount) as discount, SUM(line_tax) as tax, MIN(unit_price) as min_price'
-            )
+            ->selectRaw($select)
+            ->get();
+
+        $noteRows = CreditNoteLine::query()
+            ->whereIn('source_line_id', $sourceLineIds)
+            ->whereHas('creditNote', function ($q) use ($exceptCreditNoteId) {
+                $q->where('status', 'posted');
+                if ($exceptCreditNoteId) {
+                    $q->where('id', '!=', $exceptCreditNoteId);
+                }
+            })
+            ->groupBy('source_line_id')
+            ->selectRaw($select)
             ->get();
 
         $out = [];
-        foreach ($rows as $row) {
+        foreach ($rows->concat($noteRows)->concat($this->legacyCreditRows($sourceLineIds)) as $row) {
+            $prior = $out[$row->source_line_id] ?? null;
+            $subtotal = (int) $row->subtotal + ($prior['subtotal'] ?? 0);
+            $discount = (int) $row->discount + ($prior['discount'] ?? 0);
             $out[$row->source_line_id] = [
-                'quantity' => (int) $row->qty,
-                'subtotal' => (int) $row->subtotal,
-                'discount' => (int) $row->discount,
-                'net'      => (int) $row->subtotal - (int) $row->discount,
-                'tax'      => (int) $row->tax,
+                'quantity' => (int) $row->qty + ($prior['quantity'] ?? 0),
+                'subtotal' => $subtotal,
+                'discount' => $discount,
+                'net'      => $subtotal - $discount,
+                'tax'      => (int) $row->tax + ($prior['tax'] ?? 0),
                 // أدنى سعر ردٍّ سابق على السطر — يكشف الاسترداد بسعر مخفَّض.
-                'min_price' => (int) $row->min_price,
+                'min_price' => isset($prior['min_price']) ? min($prior['min_price'], (int) $row->min_price) : (int) $row->min_price,
             ];
         }
 
         return $out;
+    }
+
+    /**
+     * إشعارات دائنة **مرحَّلة سبقت REM-02** وأسطرها بلا `source_line_id` — تُستهلك في
+     * السقف التراكمي دون تعديل أي صف مرحَّل. التصنيف في {@see legacyCreditLines()}.
+     *
+     * @param  array<int, string>  $sourceLineIds
+     * @return \Illuminate\Support\Collection<int, object>  صفوف بشكل صفوف التجميع في `returned()`
+     */
+    private function legacyCreditRows(array $sourceLineIds): \Illuminate\Support\Collection
+    {
+        $invoiceIds = InvoiceLine::query()->whereIn('id', $sourceLineIds)->pluck('invoice_id')->unique()->values()->all();
+
+        $acc = [];
+        foreach ($this->legacyCreditLines($invoiceIds) as $item) {
+            if ($item['status'] !== 'attributed' || ! in_array($item['target'], $sourceLineIds, true)) {
+                continue;
+            }
+
+            $line = $item['line'];
+            $target = (string) $item['target'];
+            $acc[$target] ??= (object) [
+                'source_line_id' => $target, 'qty' => 0, 'subtotal' => 0, 'discount' => 0, 'tax' => 0,
+                'min_price' => (int) $line->unit_price,
+            ];
+            $acc[$target]->qty += (int) $line->quantity;
+            $acc[$target]->subtotal += (int) $line->line_subtotal;
+            $acc[$target]->discount += (int) $line->line_discount;
+            $acc[$target]->tax += (int) $line->line_tax;
+            $acc[$target]->min_price = min($acc[$target]->min_price, (int) $line->unit_price);
+        }
+
+        return collect(array_values($acc));
+    }
+
+    /**
+     * ═══════════════════════════════════════════════════════════════
+     *  تصنيف أسطر الإشعارات التاريخية (مرحَّلة، بلا `source_line_id`) على فواتير
+     * ═══════════════════════════════════════════════════════════════
+     *  لكل سطر قرارٌ واحد من ثلاثة، بهذا الترتيب:
+     *   1. **قرار مراجعة المالية** (`CreditNoteLegacyReview`) إن وُجد: `attributed` ⇒ يُنسب
+     *      إلى السطر الذي حدّدته المالية (يُشترط أن يكون من الفاتورة نفسها)، و
+     *      `not_applicable` ⇒ `ignored` (لا يستهلك سطراً).
+     *   2. **نسب آلي** إن كان للسطر منتج وسطر الفاتورة الحامل له (والمتغيّر إن حُدِّد)
+     *      وحيداً، وطرف الإشعار هو مالك الفاتورة ⇒ `attributed`.
+     *   3. غير ذلك (بلا منتج، أو منتجه يتكرر، أو طرف الإشعار غير مالك الفاتورة) ⇒ `unresolved`: لا يُخمَّن، وتُحظر العمليات
+     *      المتأثرة على الفاتورة حتى تراجعه المالية ({@see assertNoUnresolvedLegacyCredits()}).
+     *
+     * @param  array<int, string>  $invoiceIds
+     * @return list<array{line: CreditNoteLine, invoice_id: string, status: string, target: ?string}>
+     */
+    public function legacyCreditLines(array $invoiceIds): array
+    {
+        $invoiceIds = array_values(array_unique(array_filter($invoiceIds)));
+        if ($invoiceIds === []) {
+            return [];
+        }
+
+        $legacy = CreditNoteLine::query()
+            ->whereNull('source_line_id')
+            ->whereHas('creditNote', fn ($q) => $q->where('status', 'posted')->whereIn('original_invoice_id', $invoiceIds))
+            ->with('creditNote:id,number,original_invoice_id,partner_id')
+            ->get();
+        if ($legacy->isEmpty()) {
+            return [];
+        }
+
+        // مالك كل فاتورة: إشعارٌ تاريخي مربوطٌ بفاتورة طرفٍ آخر (شذوذٌ تسمح به وتسجّله
+        // ترحيلة التقييد، `other_customer`) لا يُنسب آلياً إلى تلك الفاتورة فيستهلك سقف
+        // عميلها الحقيقي — يُصنَّف غير محسوم لتراجعه المالية.
+        $invoiceOwners = BranchScope::reference(Invoice::class)->whereIn('id', $invoiceIds)->pluck('partner_id', 'id');
+
+        $invoiceLines = InvoiceLine::query()->whereIn('invoice_id', $invoiceIds)
+            ->get(['id', 'invoice_id', 'product_id', 'product_variant_id']);
+        $reviews = CreditNoteLegacyReview::query()->whereIn('credit_note_line_id', $legacy->pluck('id'))->get()
+            ->keyBy('credit_note_line_id');
+
+        $out = [];
+        foreach ($legacy as $line) {
+            $invoiceId = (string) $line->creditNote->original_invoice_id;
+            $review = $reviews->get($line->id);
+
+            if ($review !== null) {
+                $valid = $review->outcome === CreditNoteLegacyReview::ATTRIBUTED
+                    && $invoiceLines->contains(fn ($l) => $l->id === $review->source_line_id && $l->invoice_id === $invoiceId);
+                $status = $review->outcome === CreditNoteLegacyReview::NOT_APPLICABLE
+                    ? 'ignored'
+                    : ($valid ? 'attributed' : 'unresolved');
+                $out[] = ['line' => $line, 'invoice_id' => $invoiceId, 'status' => $status,
+                    'target' => $valid ? (string) $review->source_line_id : null];
+
+                continue;
+            }
+
+            $foreignOwner = $line->creditNote->partner_id !== null
+                && $invoiceOwners->get($invoiceId) !== null
+                && (string) $line->creditNote->partner_id !== (string) $invoiceOwners->get($invoiceId);
+
+            $matches = ($line->product_id === null || $foreignOwner) ? collect() : $invoiceLines->filter(
+                fn ($l) => $l->invoice_id === $invoiceId
+                    && $l->product_id === $line->product_id
+                    && ($line->product_variant_id === null || $l->product_variant_id === $line->product_variant_id)
+            );
+            $out[] = $matches->count() === 1
+                ? ['line' => $line, 'invoice_id' => $invoiceId, 'status' => 'attributed', 'target' => (string) $matches->first()->id]
+                : ['line' => $line, 'invoice_id' => $invoiceId, 'status' => 'unresolved', 'target' => null];
+        }
+
+        return $out;
+    }
+
+    /**
+     * عدد الأسطر غير المحسومة لكل فاتورة (الفواتير الخالية منها لا تظهر في الناتج).
+     *
+     * @param  array<int, string>  $invoiceIds
+     * @return array<string, int>
+     */
+    public function unresolvedLegacyCounts(array $invoiceIds): array
+    {
+        $counts = [];
+        foreach ($this->legacyCreditLines($invoiceIds) as $item) {
+            if ($item['status'] === 'unresolved') {
+                $counts[$item['invoice_id']] = ($counts[$item['invoice_id']] ?? 0) + 1;
+            }
+        }
+
+        return $counts;
+    }
+
+    /**
+     * حظرٌ محدّد: فاتورةٌ عليها إشعارات دائنة مرحَّلة قديمة غير قابلة للربط بسطر بلا تخمين
+     * لا تقبل عكساً إضافياً (إشعاراً أو مرتجعاً أو مرتجع POS) حتى تراجعها المالية. المصدر
+     * الشراء لا يتأثر. لا يُعدَّل أي مستند مرحَّل؛ مسار المراجعة: `credit-notes:legacy-review`.
+     */
+    public function assertNoUnresolvedLegacyCredits(Invoice|Purchase $source): void
+    {
+        if (! $source instanceof Invoice) {
+            return;
+        }
+
+        $count = $this->unresolvedLegacyCounts([(string) $source->id])[(string) $source->id] ?? 0;
+        if ($count > 0) {
+            throw new \RuntimeException(
+                "على الفاتورة {$source->number} {$count} سطر/أسطر إشعارٍ دائن مرحَّل قديم لا يُنسب إلى سطر بعينه في الفاتورة؛ "
+                . 'لا يُسمح بإشعار دائن أو مرتجع إضافي عليها حتى تراجعها المالية (credit-notes:legacy-review).'
+            );
+        }
     }
 
     /**
@@ -213,6 +384,18 @@ class ReturnSourceAllocator
         $price = (int) $sourceLine->unit_price;
 
         return $inclusive ? $price - $this->extractTax($price, (int) $sourceLine->tax_rate) : $price;
+    }
+
+    /**
+     * سعر الوحدة قبل الضريبة عند سعر ردٍّ `$price`: سعر المصدر قبل الضريبة، مخفَّضاً
+     * تناسبياً إن كان `$price` أقل من سعر السطر (استردادٌ جزئي). للعرض والطباعة فقط.
+     */
+    public function unitPriceBeforeTaxAt(object $sourceLine, bool $inclusive, int $price): int
+    {
+        $base = $this->unitPriceBeforeTax($sourceLine, $inclusive);
+        $source = (int) $sourceLine->unit_price;
+
+        return $source > 0 && $price < $source ? $this->mulDiv($base, max(0, $price), $source)[0] : $base;
     }
 
     /** F(n): نصيب أول n وحدة من `$amount` المباع منه `$sold` — والمباع كلّه يأخذ المبلغ كاملاً. */

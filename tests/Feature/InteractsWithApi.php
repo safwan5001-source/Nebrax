@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\User;
 use App\Services\TenantApplicationService;
 use App\Support\ApplicationCatalog;
+use App\Support\Settings;
 use App\Tenancy\TenantContext;
 
 /**
@@ -40,6 +41,22 @@ trait InteractsWithApi
                 $tenant->set($setupTenantId);
             }
         }
+    }
+
+    /**
+     * AWJ-TAX-REM-02 / ADR-E: المستأجر الجديد يتطلب إشعارُه الدائن فاتورةً مصدراً.
+     * اختبارات تمارس الإشعار **المستقل** عمداً تُفعّل السياسة صراحةً، كما يفعل
+     * المستأجر القائم الذي ثبّتته هجرة 2026_11_04_030000 على `true`.
+     */
+    protected function allowStandaloneCreditNotes(string $tenantId): void
+    {
+        $context  = app(TenantContext::class);
+        $previous = $context->id();
+
+        $context->set($tenantId);
+        Settings::put('sales', ['allow_standalone_credit_notes' => true]);
+
+        $previous === null ? $context->forget() : $context->set($previous);
     }
 
     /**

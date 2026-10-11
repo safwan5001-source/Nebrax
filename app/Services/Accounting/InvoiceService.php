@@ -4,6 +4,7 @@ namespace App\Services\Accounting;
 
 use App\Models\Account;
 use App\Models\CostCenter;
+use App\Models\CreditNote;
 use App\Models\Invoice;
 use App\Models\Partner;
 use App\Models\InvoiceLine;
@@ -463,6 +464,11 @@ class InvoiceService
                 throw new RuntimeException('لا يمكن حذف فاتورة مرحّلة.');
             }
             $this->assertDeliveryNoteSourcedDraftMutable($invoice, 'حذف');
+            // AWJ-TAX-REM-02: المفتاح الأجنبي `credit_notes.original_invoice_id` صار RESTRICT؛
+            // رفضٌ مفهوم هنا بدل خطأ قاعدة بيانات (إشعارات تاريخية قد تشير إلى مسودة).
+            if (CreditNote::where('original_invoice_id', $invoice->id)->exists()) {
+                throw new RuntimeException('لا يمكن حذف فاتورة يشير إليها إشعار دائن.');
+            }
             $invoice->lines()->delete();
             $invoice->delete();
         });

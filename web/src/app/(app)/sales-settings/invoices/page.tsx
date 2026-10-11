@@ -21,6 +21,7 @@ interface SalesSettings {
   require_return_source: boolean;
   return_window_days: number;
   enforce_min_sale_price: boolean;
+  allow_standalone_credit_notes: boolean;
   default_terms: string;
 }
 
@@ -88,6 +89,7 @@ export default function InvoiceSettingsPage() {
           require_return_source: form.require_return_source,
           return_window_days: form.return_window_days,
           enforce_min_sale_price: form.enforce_min_sale_price,
+          allow_standalone_credit_notes: form.allow_standalone_credit_notes,
           default_terms: form.default_terms || null,
         },
       });
@@ -171,6 +173,19 @@ export default function InvoiceSettingsPage() {
                     <option value="0">{t('enforce_min_sale_price_off')}</option>
                   </Select>
                   <p className="text-xs leading-relaxed text-muted">{t('enforce_min_sale_price_hint')}</p>
+                </div>
+
+                <div className="space-y-1.5 sm:col-span-2">
+                  <Label htmlFor="standalone-credit-notes">{t('allow_standalone_credit_notes')}</Label>
+                  <Select
+                    id="standalone-credit-notes"
+                    value={form.allow_standalone_credit_notes ? '1' : '0'}
+                    onChange={(e) => set('allow_standalone_credit_notes', e.target.value === '1')}
+                  >
+                    <option value="0">{t('allow_standalone_credit_notes_off')}</option>
+                    <option value="1">{t('allow_standalone_credit_notes_on')}</option>
+                  </Select>
+                  <p className="text-xs leading-relaxed text-muted">{t('allow_standalone_credit_notes_hint')}</p>
                 </div>
               </div>
               {/* الشروط المطبوعة على المستند تأتي من «تصميم المستندات» لا من هنا —

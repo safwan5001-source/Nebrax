@@ -38,7 +38,7 @@ interface Line {
 interface SourceDoc {
   id: string; number: string; date: string | null; total: string; remaining: number;
   /** سبب المنع إن وُجد — تعرضه الشاشة على الخيار المعطّل. */
-  blocked_reason: 'fully_returned' | 'out_of_window' | null;
+  blocked_reason: 'fully_returned' | 'out_of_window' | 'legacy_credit_review' | null;
   elapsed_days: number;
 }
 interface ReturnableLine {
@@ -181,7 +181,8 @@ export function CreateReturnDialog({
       label: d.number,
       sub: d.date ?? undefined,
       hint: d.blocked_reason
-        ? t(d.blocked_reason === 'fully_returned' ? 'blocked_returned' : 'blocked_window')
+        ? t(d.blocked_reason === 'fully_returned' ? 'blocked_returned'
+          : d.blocked_reason === 'legacy_credit_review' ? 'blocked_legacy_credit_review' : 'blocked_window')
         : d.total,
       disabled: !!d.blocked_reason,
     })),

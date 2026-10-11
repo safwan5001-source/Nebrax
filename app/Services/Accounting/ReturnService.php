@@ -358,20 +358,18 @@ class ReturnService
      */
     protected function assertWithinSource(Invoice|Purchase $source, array $items, ?string $exceptReturnId = null): void
     {
+        // AWJ-TAX-REM-02: إشعارات دائنة تاريخية غير قابلة للربط ⇒ لا مرتجع إضافي (إنشاءً وترحيلاً)
+        // حتى تراجعها المالية؛ مصدر الشراء لا يتأثر.
+        app(ReturnSourceAllocator::class)->assertNoUnresolvedLegacyCredits($source);
+
         $sourceLines = $source->lines()->get()->keyBy('id');
 
-        // الكميات المردودة سابقاً لكل سطر مصدر — استعلامٌ واحد لا استعلام لكل سطر.
-        $alreadyReturned = ReturnLine::query()
-            ->whereIn('source_line_id', $sourceLines->keys())
-            ->whereHas('return', function ($q) use ($exceptReturnId) {
-                $q->where('status', 'posted');
-                if ($exceptReturnId) {
-                    $q->where('id', '!=', $exceptReturnId);
-                }
-            })
-            ->groupBy('source_line_id')
-            ->selectRaw('source_line_id, SUM(quantity) as qty')
-            ->pluck('qty', 'source_line_id');
+        // الكميات المردودة سابقاً لكل سطر مصدر — مرتجعاتٌ **وإشعارات دائنة** مرحَّلة
+        // (AWJ-TAX-REM-02: الاثنان يستهلكان الكمية نفسها)، لا استعلام لكل سطر.
+        $alreadyReturned = array_map(
+            fn (array $row) => $row['quantity'],
+            app(ReturnSourceAllocator::class)->returned($sourceLines->keys()->all(), $exceptReturnId)
+        );
 
         // كميات هذا المستند مجموعةً بسطرها — سطران يشيران للسطر نفسه يُجمعان.
         $requested = [];

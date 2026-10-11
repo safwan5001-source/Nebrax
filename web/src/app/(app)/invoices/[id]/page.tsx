@@ -8,7 +8,7 @@ import { useLocale, useTranslations } from 'next-intl';
 import {
   ArrowRight, Banknote, BookOpen, Boxes, CheckCircle2, ChevronDown, Copy, Download, Paperclip,
   FileSpreadsheet, LayoutTemplate, MoreVertical, Pencil, Printer,
-  RotateCcw, Share2, Trash2,
+  FileMinus, RotateCcw, Share2, Trash2,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -606,6 +606,7 @@ export default function InvoiceDetailPage() {
       <DropdownItem icon={Copy} onClick={duplicateInvoice} disabled={duplicating}>{duplicating ? t('duplicating') : t('duplicate')}</DropdownItem>
       {canCollect && <DropdownItem icon={Banknote} href={`/invoices/${invoice.id}/payments/new`}>{t('add_payment')}</DropdownItem>}
       {isPosted && <DropdownItem icon={RotateCcw} onClick={() => setReturnOpen(true)}>{t('create_return')}</DropdownItem>}
+      {isPosted && <DropdownItem icon={FileMinus} href={`/credit-notes/new?invoice=${invoice.id}`}>{t('create_credit_note')}</DropdownItem>}
       <DropdownItem icon={Paperclip} onClick={() => setNoteOpen(true)}>{t('add_note_attachment')}</DropdownItem>
       <DropdownItem icon={Printer} onClick={() => printDocument(paper, 'print-root')}>{t('print')}</DropdownItem>
       <DropdownItem icon={Download} onClick={handleDownloadPdf}>{busy === 'pdf' ? t('generating') : t('download_pdf')}</DropdownItem>
@@ -904,6 +905,7 @@ export default function InvoiceDetailPage() {
       { key: 'share', label: t('share'), icon: Share2, onClick: handleShare, variant: 'outline', emphasis: 'secondary' },
       { key: 'excel', label: t('excel'), icon: FileSpreadsheet, onClick: handleExcel, variant: 'outline', emphasis: 'secondary' },
       ...(isPosted ? [{ key: 'return', label: t('create_return'), icon: RotateCcw, onClick: () => setReturnOpen(true), variant: 'outline' as const, emphasis: 'secondary' as const }] : []),
+      ...(isPosted ? [{ key: 'credit-note', label: t('create_credit_note'), icon: FileMinus, href: `/credit-notes/new?invoice=${invoice.id}`, variant: 'outline' as const, emphasis: 'secondary' as const }] : []),
       { key: 'duplicate', label: duplicating ? t('duplicating') : t('duplicate'), icon: Copy, onClick: duplicateInvoice, disabled: duplicating, variant: 'outline', emphasis: 'secondary' },
       { key: 'note', label: t('add_note_attachment'), icon: Paperclip, onClick: () => setNoteOpen(true), variant: 'outline', emphasis: 'secondary' },
       ...(thermalPaper ? [{ key: 'thermal', label: tPrint('thermal_print'), icon: Printer, onClick: () => printDocument(thermalPaper.paper, 'thermal-print-root'), variant: 'outline' as const, emphasis: 'secondary' as const }] : []),

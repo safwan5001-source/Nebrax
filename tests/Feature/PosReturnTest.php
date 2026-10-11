@@ -242,6 +242,36 @@ class PosReturnTest extends TestCase
     }
 
     /** @test */
+    public function the_pos_returnable_view_reports_a_legacy_credit_review_block_with_nothing_selectable(): void
+    {
+        $auth = $this->registerTenant();
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $session = $this->openSession($auth);
+        $invoice = $this->checkout($auth, $this->customer($auth['token']), $session['session_id'], $this->product(), ['cash' => 11500]);
+
+        $url = "/api/pos/returnable-invoices/{$invoice->id}?pos_session_id={$session['session_id']}";
+        $this->withToken($auth['token'])->getJson($url)->assertOk()
+            ->assertJsonPath('data.blocked_reason', null)
+            ->assertJsonPath('data.lines.0.remaining', 1);
+
+        // إشعارٌ دائن تاريخي مرحَّل بلا منتج: لا يُنسب إلى سطر → حظر المراجعة المالية.
+        $note = \App\Models\CreditNote::create([
+            'number' => 'CN-OLD-1', 'type' => 'sales', 'partner_id' => $invoice->partner_id, 'refund_type' => 'credit',
+            'note_date' => now()->toDateString(), 'status' => 'posted', 'original_invoice_id' => $invoice->id,
+            'subtotal' => 1000, 'tax_amount' => 150, 'total' => 1150,
+        ]);
+        \App\Models\CreditNoteLine::create([
+            'credit_note_id' => $note->id, 'product_id' => null, 'description' => 'تسوية قديمة', 'quantity' => 1,
+            'unit_price' => 1000, 'tax_rate' => 15, 'line_subtotal' => 1000, 'line_tax' => 150, 'line_total' => 1150,
+        ]);
+
+        $this->withToken($auth['token'])->getJson($url)->assertOk()
+            ->assertJsonPath('data.blocked_reason', 'legacy_credit_review')
+            ->assertJsonPath('data.lines.0.remaining', 0)
+            ->assertJsonPath('data.lines.0.remaining_total', '0.00');
+    }
+
+    /** @test */
     public function returnable_endpoints_expose_session_bound_lines_and_a_truthful_cash_quote(): void
     {
         $auth = $this->registerTenant();

@@ -55,11 +55,23 @@ class CreditNoteSourceOwnershipTest extends TestCase
     {
         $customerId = $this->customer($token, "عميل فاتورة {$suffix}");
 
-        return $this->withToken($token)->postJson('/api/invoices', [
+        $invoiceId = $this->withToken($token)->postJson('/api/invoices', [
             'partner_id' => $customerId,
             'payment_type' => 'credit',
             'items' => [['description' => 'خدمة', 'quantity' => 1, 'unit_price' => 10000, 'tax_rate' => 15]],
-        ])->assertCreated()['data'];
+        ])->assertCreated()['data']['id'];
+
+        // REM-02: الإشعار لا يُصدَر إلا على فاتورة مرحَّلة، ويرث من سطرها.
+        return $this->withToken($token)->postJson("/api/invoices/{$invoiceId}/post")->assertOk()['data'];
+    }
+
+    /** إشعار مرتبط بفاتورة: يحدّد سطرها ويرث الخادم الباقي. */
+    private function invoiceNotePayload(array $invoice, array $extra = []): array
+    {
+        return array_merge([
+            'partner_id' => $invoice['partner_id'],
+            'items' => [['source_line_id' => $invoice['lines'][0]['id'], 'quantity' => 1]],
+        ], $extra);
     }
 
     private function creditNotePayload(string $partnerId, array $extra = []): array
@@ -104,8 +116,8 @@ class CreditNoteSourceOwnershipTest extends TestCase
         $auth = $this->registerTenant('invoice-source-derived', 'owner@invoice-source-derived.test');
         $invoice = $this->invoiceSource($auth['token'], 'derive');
 
-        $note = $this->withToken($auth['token'])->postJson('/api/credit-notes', $this->creditNotePayload(
-            $invoice['partner_id'],
+        $note = $this->withToken($auth['token'])->postJson('/api/credit-notes', $this->invoiceNotePayload(
+            $invoice,
             ['original_invoice_id' => $invoice['id']],
         ))->assertCreated()['data'];
 
@@ -120,13 +132,13 @@ class CreditNoteSourceOwnershipTest extends TestCase
         $auth = $this->registerTenant('invoice-source-conflict', 'owner@invoice-source-conflict.test');
         $invoice = $this->invoiceSource($auth['token'], 'conflict');
 
-        $this->withToken($auth['token'])->postJson('/api/credit-notes', $this->creditNotePayload(
-            $invoice['partner_id'],
+        $this->withToken($auth['token'])->postJson('/api/credit-notes', $this->invoiceNotePayload(
+            $invoice,
             ['type' => 'sales', 'original_invoice_id' => $invoice['id']],
         ))->assertCreated()->assertJsonPath('data.type', 'sales');
 
-        $this->withToken($auth['token'])->postJson('/api/credit-notes', $this->creditNotePayload(
-            $invoice['partner_id'],
+        $this->withToken($auth['token'])->postJson('/api/credit-notes', $this->invoiceNotePayload(
+            $invoice,
             ['type' => 'purchase', 'original_invoice_id' => $invoice['id']],
         ))->assertStatus(422);
     }
@@ -192,8 +204,8 @@ class CreditNoteSourceOwnershipTest extends TestCase
 
         $salesTenant = $this->registerTenant('sales-note-independent', 'owner@sales-note-independent.test', autoEnableApplications: false);
         $invoice = $this->invoiceSource($salesTenant['token'], 'independent');
-        $this->withToken($salesTenant['token'])->postJson('/api/credit-notes', $this->creditNotePayload(
-            $invoice['partner_id'],
+        $this->withToken($salesTenant['token'])->postJson('/api/credit-notes', $this->invoiceNotePayload(
+            $invoice,
             ['original_invoice_id' => $invoice['id']],
         ))->assertCreated()->assertJsonPath('data.type', 'sales');
     }

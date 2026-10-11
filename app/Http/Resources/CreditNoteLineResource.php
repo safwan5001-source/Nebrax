@@ -13,13 +13,17 @@ class CreditNoteLineResource extends JsonResource
         return [
             'id'            => $this->id,
             'product_id'    => $this->product_id,
+            'source_line_id' => $this->source_line_id,
             'product_variant_id' => $this->product_variant_id,
             'variant_descriptor' => $this->variant_descriptor_snapshot,
             'description'   => $this->description,
             'quantity'      => $this->quantity,
             'unit_price'    => Money::toRiyal($this->unit_price),
+            // قبل الضريبة: ما يطابق الضريبة والإجمالي بصرياً في المستند المطبوع (NULL ⇒ unit_price).
+            'unit_price_before_tax' => Money::toRiyal($this->unit_price_before_tax ?? $this->unit_price),
             'tax_rate'      => $this->tax_rate,
             'line_subtotal' => Money::toRiyal($this->line_subtotal),
+            'line_discount' => Money::toRiyal($this->line_discount),
             'line_tax'      => Money::toRiyal($this->line_tax),
             'line_total'    => Money::toRiyal($this->line_total),
         ];

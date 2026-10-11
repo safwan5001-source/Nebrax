@@ -52,6 +52,7 @@ class DocumentHttpVariantsTest extends TestCase
         parent::setUp();
 
         $this->auth = $this->registerTenant('var-fu-1', 'owner@var-fu-1.test');
+        $this->allowStandaloneCreditNotes($this->auth['tenant_id']); // ADR-E (REM-02): إشعار مستقل مقصود
         app(TenantContext::class)->set($this->auth['tenant_id']);
 
         $this->customerId = Partner::create(['name' => 'عميل', 'type' => 'customer'])->id;

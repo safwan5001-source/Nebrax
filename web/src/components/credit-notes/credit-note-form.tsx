@@ -15,19 +15,89 @@ import { useToast } from '@/components/ui/toast';
 import { api, ApiError } from '@/lib/api';
 import { useNumberPreview } from '@/lib/use-number-preview';
 import { formatRiyal, riyalToMinor } from '@/lib/money';
+import { cn } from '@/lib/utils';
+import { CreditNoteLinkedForm } from './credit-note-linked-form';
 
 interface Partner { id: string; name: string }
 interface Product { id: string; name: string; sale_price: string; tax_rate: number; is_active: boolean }
 interface Line { key: string; productId: string | null; description: string; qty: string; price: string; tax: string }
 
 let seq = 0;
-const newLine = (): Line => ({ key: `l${++seq}`, productId: null, description: '', qty: '1', price: '', tax: '15' });
+/**
+ * نسبة الضريبة الفارغة (`''`) = «النسبة الافتراضية للمنشأة»: لا تُرسَل `tax_rate` فيطبّق الخادم
+ * `sales.default_tax_rate` (CreditNoteService::defaultRate). المشتريات تبقى على 15 كما كانت.
+ */
+const newLine = (tax = ''): Line => ({ key: `l${++seq}`, productId: null, description: '', qty: '1', price: '', tax });
+
+type Mode = 'linked' | 'standalone';
 
 /**
  * نموذج إنشاء الإشعار — مشترك بين الدائن (للعميل) والمدين (للمورّد).
  * النوع يحدّد: فضاء الترجمة · نوع الطرف المعروض · جسم الطلب · وجهة العودة.
+ *
+ * مبيعات: الافتراضي إشعار **مرتبط بفاتورة مرحَّلة**؛ المستقل بلا فاتورة لا يُعرض
+ * إلا إن سمحت به سياسة المنشأة (`allow_standalone_credit_notes`). المشتريات كما كانت.
  */
-export function CreditNoteForm({ type = 'sales' }: { type?: 'sales' | 'purchase' }) {
+export function CreditNoteForm({ type = 'sales', initialInvoiceId }: { type?: 'sales' | 'purchase'; initialInvoiceId?: string | null }) {
+  const isPurchase = type === 'purchase';
+  const t = useTranslations(isPurchase ? 'debitNotes' : 'creditNotes');
+  const tn = useTranslations('creditNotes');
+  // null = لم يُجلب بعد: لا نومض التلميح قبل معرفة السياسة.
+  const [allowStandalone, setAllowStandalone] = useState<boolean | null>(null);
+  const [mode, setMode] = useState<Mode>('linked');
+
+  // فشل جلب الإعداد لا يعطّل النموذج: يبقى المرتبط (الآمن) متاحاً.
+  useEffect(() => {
+    if (isPurchase) return;
+    api<{ data: { allow_standalone_credit_notes?: boolean } }>('/sales-settings')
+      .then((r) => setAllowStandalone(!!r.data.allow_standalone_credit_notes))
+      .catch(() => setAllowStandalone(false));
+  }, [isPurchase]);
+
+  const effectiveMode: Mode = isPurchase || (allowStandalone && mode === 'standalone') ? 'standalone' : 'linked';
+  const modes: { value: Mode; label: string }[] = [
+    { value: 'linked', label: tn('mode_linked') },
+    { value: 'standalone', label: tn('mode_standalone') },
+  ];
+
+  return (
+    <div className="space-y-5">
+      <div className="flex items-center gap-3">
+        <Button asChild variant="ghost" size="icon" aria-label={t('back')}><Link href={isPurchase ? '/debit-notes' : '/credit-notes'}>
+          <ArrowRight className="h-4 w-4" strokeWidth={1.7} />
+        </Link></Button>
+        <h1 className="text-xl font-semibold text-text">{t('new_title')}</h1>
+      </div>
+
+      {!isPurchase && allowStandalone && (
+        <div role="group" aria-label={tn('mode_label')} className="inline-flex rounded border border-border bg-surface p-0.5">
+          {modes.map((m) => (
+            <button
+              key={m.value} type="button" aria-pressed={effectiveMode === m.value} onClick={() => setMode(m.value)}
+              className={cn(
+                'rounded px-3 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40',
+                effectiveMode === m.value ? 'bg-primary-soft font-medium text-primary' : 'text-muted hover:text-text',
+              )}
+            >{m.label}</button>
+          ))}
+        </div>
+      )}
+      {!isPurchase && allowStandalone === false && (
+        <p className="text-xs leading-relaxed text-muted">
+          {tn('standalone_disabled_hint')}{' '}
+          <Link href="/sales-settings/invoices" className="text-primary hover:underline">{tn('standalone_disabled_link')}</Link>
+        </p>
+      )}
+
+      {effectiveMode === 'linked'
+        ? <CreditNoteLinkedForm initialInvoiceId={initialInvoiceId} />
+        : <StandaloneForm type={type} />}
+    </div>
+  );
+}
+
+/** الإشعار المستقل (بلا فاتورة) والمدين للمورّد — السلوك السابق حرفياً. */
+function StandaloneForm({ type }: { type: 'sales' | 'purchase' }) {
   const isPurchase = type === 'purchase';
   const t = useTranslations(isPurchase ? 'debitNotes' : 'creditNotes');
   const tf = useTranslations('invoiceForm');
@@ -41,7 +111,9 @@ export function CreditNoteForm({ type = 'sales' }: { type?: 'sales' | 'purchase'
   const [refundType, setRefundType] = useState('credit');
   const [date, setDate] = useState('');
   const [reason, setReason] = useState('');
-  const [lines, setLines] = useState<Line[]>([newLine()]);
+  const initialTax = isPurchase ? '15' : '';
+  const [defaultRate, setDefaultRate] = useState('15');
+  const [lines, setLines] = useState<Line[]>([newLine(initialTax)]);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const { number: suggestedNumber, loading: loadingNumber } = useNumberPreview('credit_note', { seriesKey: type, date });
@@ -53,11 +125,18 @@ export function CreditNoteForm({ type = 'sales' }: { type?: 'sales' | 'purchase'
       if (r.data[0]) setPartnerId((p) => p || r.data[0].id);
     });
     api<{ data: Product[] }>('/products').then((r) => setProducts(r.data.filter((p) => p.is_active))).catch(() => {});
+    // النسبة الافتراضية للمنشأة تُعرض كتلميح وتدخل المعاينة؛ الفشل يُبقي 15 (والخادم هو الحَكَم).
+    if (!isPurchase) {
+      api<{ data: { default_tax_rate?: number } }>('/sales-settings')
+        .then((r) => { if (typeof r.data.default_tax_rate === 'number') setDefaultRate(String(r.data.default_tax_rate)); })
+        .catch(() => {});
+    }
   }, [isPurchase]);
 
   const setLine = (key: string, patch: Partial<Line>) =>
     setLines((ls) => ls.map((l) => (l.key === key ? { ...l, ...patch } : l)));
-  const addLine = () => setLines((ls) => [...ls, newLine()]);
+  const addLine = () => setLines((ls) => [...ls, newLine(initialTax)]);
+  const rateOf = (l: Line) => (l.tax === '' ? Number(defaultRate) || 0 : Number(l.tax) || 0);
   const removeLine = (key: string) => setLines((ls) => (ls.length > 1 ? ls.filter((l) => l.key !== key) : ls));
 
   function pickProduct(key: string, productId: string) {
@@ -69,7 +148,7 @@ export function CreditNoteForm({ type = 'sales' }: { type?: 'sales' | 'purchase'
   const subMinor = lines.reduce((s, l) => s + (Number(l.qty) || 0) * riyalToMinor(l.price), 0);
   const taxMinor = lines.reduce((s, l) => {
     const sub = (Number(l.qty) || 0) * riyalToMinor(l.price);
-    return s + Math.round((sub * (Number(l.tax) || 0)) / 100);
+    return s + Math.round((sub * rateOf(l)) / 100);
   }, 0);
 
   async function submit() {
@@ -80,7 +159,8 @@ export function CreditNoteForm({ type = 'sales' }: { type?: 'sales' | 'purchase'
         description: l.description || null,
         quantity: Number(l.qty) || 1,
         unit_price: riyalToMinor(l.price),
-        tax_rate: Number(l.tax) || 0,
+        // فارغة = الافتراضية: تُحذف فيطبّق الخادم النسبة المضبوطة لا 15 مفروضة.
+        ...(l.tax === '' ? {} : { tax_rate: Number(l.tax) || 0 }),
       }));
     if (items.length === 0) {
       setError(tf('need_line'));
@@ -102,14 +182,7 @@ export function CreditNoteForm({ type = 'sales' }: { type?: 'sales' | 'purchase'
   }
 
   return (
-    <div className="space-y-5">
-      <div className="flex items-center gap-3">
-        <Button asChild variant="ghost" size="icon" aria-label={t('back')}><Link href={isPurchase ? '/debit-notes' : '/credit-notes'}>
-          <ArrowRight className="h-4 w-4" strokeWidth={1.7} />
-        </Link></Button>
-        <h1 className="text-xl font-semibold text-text">{t('new_title')}</h1>
-      </div>
-
+    <>
       <Card>
         <CardHeader><CardTitle>{t('details')}</CardTitle></CardHeader>
         <CardContent>
@@ -162,7 +235,7 @@ export function CreditNoteForm({ type = 'sales' }: { type?: 'sales' | 'purchase'
 
           {lines.map((l) => {
             const lt = (Number(l.qty) || 0) * riyalToMinor(l.price);
-            const lx = Math.round((lt * (Number(l.tax) || 0)) / 100);
+            const lx = Math.round((lt * rateOf(l)) / 100);
             return (
               <div key={l.key} className="grid grid-cols-2 items-center gap-2 rounded border border-border p-2 md:grid-cols-12 md:border-0 md:p-0">
                 <Select className="col-span-2 md:col-span-3" value={l.productId ?? ''} onChange={(e) => pickProduct(l.key, e.target.value)}>
@@ -172,7 +245,7 @@ export function CreditNoteForm({ type = 'sales' }: { type?: 'sales' | 'purchase'
                 <Input className="col-span-2 md:col-span-3" placeholder={tf('description')} value={l.description} onChange={(e) => setLine(l.key, { description: e.target.value, productId: null })} />
                 <Input className="num text-end md:col-span-1" type="number" min={1} value={l.qty} onChange={(e) => setLine(l.key, { qty: e.target.value })} />
                 <Input className="num text-end md:col-span-2" inputMode="decimal" placeholder={tf('price')} value={l.price} onChange={(e) => setLine(l.key, { price: e.target.value })} />
-                <Input className="num text-end md:col-span-1" type="number" min={0} max={100} value={l.tax} onChange={(e) => setLine(l.key, { tax: e.target.value })} />
+                <Input className="num text-end md:col-span-1" type="number" min={0} max={100} value={l.tax} placeholder={defaultRate} onChange={(e) => setLine(l.key, { tax: e.target.value })} />
                 <div className="num col-span-1 text-end text-sm md:col-span-1">{formatRiyal((lt + lx) / 100)}</div>
                 <Button type="button" variant="ghost" size="icon" className="col-span-1 ms-auto md:col-span-1" aria-label={tf('remove_line')} onClick={() => removeLine(l.key)}>
                   <Trash2 className="h-4 w-4 text-negative" strokeWidth={1.7} />
@@ -197,6 +270,6 @@ export function CreditNoteForm({ type = 'sales' }: { type?: 'sales' | 'purchase'
           <Button disabled={saving || !partnerId} onClick={submit}>{t('save')}</Button>
         </div>
       </div>
-    </div>
+    </>
   );
 }

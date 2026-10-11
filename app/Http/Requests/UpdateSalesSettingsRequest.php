@@ -21,6 +21,7 @@ class UpdateSalesSettingsRequest extends FormRequest
             'require_return_source' => ['nullable', 'boolean'],
             'return_window_days'      => ['nullable', 'integer', 'min:0', 'max:3650'],
             'enforce_min_sale_price' => ['nullable', 'boolean'],
+            'allow_standalone_credit_notes' => ['nullable', 'boolean'],
         ];
     }
 }

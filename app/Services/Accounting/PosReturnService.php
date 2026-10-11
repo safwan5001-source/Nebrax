@@ -9,7 +9,6 @@ use App\Models\PosExchange;
 use App\Models\PosReturnAttempt;
 use App\Models\PosSession;
 use App\Models\ReturnDocument;
-use App\Models\ReturnLine;
 use App\Models\User;
 use App\Services\Pos\PosAuditService;
 use App\Services\Pos\PosIdempotencyConflictException;
@@ -80,7 +79,12 @@ class PosReturnService
     {
         $idempotencyKey = $data['idempotency_key'] ?? null;
         if (! is_string($idempotencyKey) || $idempotencyKey === '') {
-            return DB::transaction(fn () => $this->buildAndPostReturn($data, $actor));
+            return DB::transaction(function () use ($data, $actor) {
+                // REM-02: فاتورة المصدر أولاً (قبل أي قفل فرع) — انظر `SourceInvoiceLock`.
+                SourceInvoiceLock::acquire($data['original_invoice_id'] ?? null);
+
+                return $this->buildAndPostReturn($data, $actor);
+            });
         }
 
         $idempotencyKey = $this->requireIdempotencyKey($idempotencyKey);
@@ -88,6 +92,10 @@ class PosReturnService
 
         try {
             return DB::transaction(function () use ($data, $actor, $idempotencyKey, $checksum) {
+                // REM-02: فاتورة المصدر **قبل** صف الفرع: إشعارٌ دائن أو مرتجع API على السطر نفسه
+                // يأخذ الفاتورة ثم الفرع، فبقاء الترتيب واحداً يمنع الانسداد ويُسلسل الاستهلاك.
+                SourceInvoiceLock::acquire($data['original_invoice_id'] ?? null);
+
                 // مرساة ثابتة لكل فرع: تمنع سباق المفتاح نفسه حتى مع جلسات متوازية.
                 $branchId = app(BranchContext::class)->id();
                 if (! is_string($branchId) || $branchId === '') {
@@ -264,13 +272,18 @@ class PosReturnService
     private function buildSourceItems(Invoice $invoice, array $requested): array
     {
         $sourceLines = $invoice->lines->keyBy('id');
-        $returned = ReturnLine::query()
-            ->whereIn('source_line_id', $sourceLines->keys())
-            ->whereHas('return', fn ($query) => $query->where('status', 'posted'))
-            ->selectRaw('source_line_id, SUM(quantity) as quantity, SUM(line_subtotal) as subtotal, SUM(line_discount) as discount, SUM(line_tax) as tax')
-            ->groupBy('source_line_id')
-            ->get()
-            ->keyBy('source_line_id');
+        // AWJ-TAX-REM-02: التراكم ينظر إلى المرتجعات **والإشعارات الدائنة** المرحَّلة معاً —
+        // وإلا اشتُقّ جزء POS بموضعٍ (c) لا يحسب ما استهلكه إشعارٌ، فبقيت هللات من
+        // الضريبة بلا عكس رغم نفاد الكمية.
+        $allocator = app(ReturnSourceAllocator::class);
+        // AWJ-TAX-REM-02: نفس الحظر المحدّد (إشعارات تاريخية غير محسومة) — معاينةً وإنشاءً.
+        $allocator->assertNoUnresolvedLegacyCredits($invoice);
+        $returned = collect($allocator->returned($sourceLines->keys()->all()))
+            ->map(fn (array $row) => (object) $row);
+        // المبالغ المحصَّلة بعد حصة خصم الرأس — الأساس نفسه الذي يُخصم منه `returned()`؛
+        // وإلا طُرح من السطر الخام ما استُهلك من السطر المعدَّل. فاتورة POS لا تحمل خصم
+        // رأس اليوم فتتطابق القيمتان؛ لكن الاشتقاق لا يفترض ذلك.
+        $charged = $allocator->charged($invoice);
 
         $items = [];
         foreach ($requested as $item) {
@@ -291,10 +304,16 @@ class PosReturnService
                 throw new RuntimeException("الكمية المردودة ({$quantity}) تتجاوز المتبقي ({$remainingQuantity}) في فاتورة POS المصدر.");
             }
 
-            $isFinalPart = $quantity === $remainingQuantity;
-            $subtotal = $this->allocate((int) $line->line_subtotal, $sold, $quantity, (int) ($previous?->subtotal ?? 0), $isFinalPart);
-            $discount = $this->allocate((int) $line->line_discount, $sold, $quantity, (int) ($previous?->discount ?? 0), $isFinalPart);
-            $tax = $this->allocate((int) $line->line_tax, $sold, $quantity, (int) ($previous?->tax ?? 0), $isFinalPart);
+            // الجزء الأخير يكنس المتبقي إلا إن سبق على السطر ردٌّ/إشعار **بسعر مخفَّض**: الفرق
+            // المحتجَز عندئذ قرارٌ تجاري لا يُردّ مع آخر وحدة (نفس قاعدة `allocate()` في
+            // المرتجع بالـAPI)، فيُوزَّع الجزء بالتناسب ويبقى المحتجَز محتجَزاً.
+            $reducedBefore = $previous !== null
+                && (int) $charged[$line->id]['unit_price'] > 0
+                && (int) ($previous->min_price ?? PHP_INT_MAX) < (int) $charged[$line->id]['unit_price'];
+            $isFinalPart = $quantity === $remainingQuantity && ! $reducedBefore;
+            $subtotal = $this->allocate((int) $charged[$line->id]['subtotal'], $sold, $quantity, (int) ($previous?->subtotal ?? 0), $isFinalPart);
+            $discount = $this->allocate((int) $charged[$line->id]['discount'], $sold, $quantity, (int) ($previous?->discount ?? 0), $isFinalPart);
+            $tax = $this->allocate((int) $charged[$line->id]['tax'], $sold, $quantity, (int) ($previous?->tax ?? 0), $isFinalPart);
 
             $items[] = [
                 'source_line_id' => $line->id,

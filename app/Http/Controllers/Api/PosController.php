@@ -22,7 +22,6 @@ use App\Models\Payment;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\ReturnDocument;
-use App\Models\ReturnLine;
 use App\Models\SalesChannel;
 use App\Support\DeliveryPlatformCatalog;
 use App\Support\Money;
@@ -455,19 +454,22 @@ class PosController extends ApiController
             ->where('pos_session_id', $session->id)
             ->where('status', 'posted')
             ->findOrFail($id);
-        $returned = ReturnLine::whereIn('source_line_id', $invoice->lines->pluck('id'))
-            ->whereHas('return', fn ($query) => $query->where('status', 'posted'))
-            ->groupBy('source_line_id')
-            ->selectRaw('source_line_id, SUM(quantity) as quantity, SUM(line_total) as total')
-            ->get()
-            ->keyBy('source_line_id');
+        // AWJ-TAX-REM-02: يشمل الإشعارات الدائنة المرحَّلة (سقفٌ تراكمي واحد).
+        $returned = collect(app(\App\Services\Accounting\ReturnSourceAllocator::class)->returned($invoice->lines->pluck('id')->all()))
+            ->map(fn (array $row) => (object) ['quantity' => $row['quantity'], 'total' => $row['net'] + $row['tax']]);
+
+        // سطر إشعارٍ دائن تاريخي غير محسوم يمنع كل عكسٍ جديد (REM-02): لا نعرض كميةً
+        // متاحة ستفشل عند المعاينة؛ الكمية المتبقية صفر والسبب صريح للشاشة.
+        $legacyBlocked = (app(\App\Services\Accounting\ReturnSourceAllocator::class)
+            ->unresolvedLegacyCounts([(string) $invoice->id])[(string) $invoice->id] ?? 0) > 0;
 
         return response()->json(['data' => [
             'id' => $invoice->id,
             'number' => $invoice->number,
             'customer_name' => $invoice->partner?->name,
             'total' => Money::toRiyal($invoice->total),
-            'lines' => $invoice->lines->map(function ($line) use ($returned) {
+            'blocked_reason' => $legacyBlocked ? 'legacy_credit_review' : null,
+            'lines' => $invoice->lines->map(function ($line) use ($returned, $legacyBlocked) {
                 $previous = $returned->get($line->id);
                 $already = (int) ($previous?->quantity ?? 0);
                 $returnedTotal = (int) ($previous?->total ?? 0);
@@ -480,10 +482,10 @@ class PosController extends ApiController
                     'variant_descriptor' => $line->variant_descriptor_snapshot,
                     'quantity' => (int) $line->quantity,
                     'returned' => $already,
-                    'remaining' => max(0, (int) $line->quantity - $already),
+                    'remaining' => $legacyBlocked ? 0 : max(0, (int) $line->quantity - $already),
                     'line_total' => Money::toRiyal($lineTotal),
                     'returned_total' => Money::toRiyal($returnedTotal),
-                    'remaining_total' => Money::toRiyal(max(0, $lineTotal - $returnedTotal)),
+                    'remaining_total' => Money::toRiyal($legacyBlocked ? 0 : max(0, $lineTotal - $returnedTotal)),
                 ];
             })->values(),
         ]]);
