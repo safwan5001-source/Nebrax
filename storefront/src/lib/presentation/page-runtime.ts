@@ -29,6 +29,7 @@
 
 import {
   CATEGORY_PAGE_REGION_KEYS,
+  CATEGORY_REGIONS_DEFAULT_HIDDEN,
   type CategoryPageRegionKey,
   FIXED_REQUIRED_CATEGORY_REGION_KEYS,
   FIXED_REQUIRED_PRODUCT_REGION_KEYS,
@@ -54,6 +55,7 @@ function mergeRegionsFailSafe<K extends string>(
   stored: readonly PageRegionInstance<K>[] | undefined,
   canonicalKeys: readonly K[],
   mustPresentKeys: readonly K[],
+  hiddenByDefault: readonly K[] = [],
 ): PageRegionInstance<K>[] {
   const seen = new Set<string>();
   const kept: PageRegionInstance<K>[] = [];
@@ -73,7 +75,7 @@ function mergeRegionsFailSafe<K extends string>(
       kept.find((region) => region.key === key) ?? {
         id: key,
         key,
-        visible: true,
+        visible: !hiddenByDefault.includes(key),
       },
   );
 }
@@ -130,6 +132,7 @@ export function resolvePublicCategoryRegions(
     pagePresentation?.category?.regions,
     CATEGORY_PAGE_REGION_KEYS,
     FIXED_REQUIRED_CATEGORY_REGION_KEYS,
+    CATEGORY_REGIONS_DEFAULT_HIDDEN,
   );
 
   return merged.filter((region) => region.visible).map((region) => region.key);

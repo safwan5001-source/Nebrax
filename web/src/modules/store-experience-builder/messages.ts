@@ -85,6 +85,8 @@ export const CUSTOMIZER_MESSAGES = {
     categoryRegionsHelp:
       "أظهر/أخفِ مناطق صفحة التصنيف الاختيارية، ورتّب ما يُسمح بترتيبه. المناطق الإلزامية (مسار التنقّل، العنوان، شريط الفرز والتصفية، شبكة المنتجات) ثابتة ولا يمكن إخفاؤها أو نقلها.",
     regionBreadcrumbs: "مسار التنقّل",
+    regionCover: "غلاف التصنيف (صورته)",
+    categoryPreviewCoverNote: "تظهر هنا صورة التصنيف نفسها إن وُجدت — ولا يظهر شيء إن لم تكن له صورة.",
     regionIdentityTitle: "عنوان التصنيف",
     regionSubcategoriesRail: "شريط التصنيفات الفرعية",
     regionFilterSortBar: "شريط الفرز والتصفية",
@@ -1401,6 +1403,8 @@ export const CUSTOMIZER_MESSAGES = {
     categoryRegionsHelp:
       "Show/hide the Category page's optional regions, and reorder what may be reordered. Required regions (breadcrumbs, title, filter/sort bar, product grid) are fixed and cannot be hidden or moved.",
     regionBreadcrumbs: "Breadcrumbs",
+    regionCover: "Cover (the category picture)",
+    categoryPreviewCoverNote: "The category's own picture appears here when it has one — nothing appears when it does not.",
     regionIdentityTitle: "Category title",
     regionSubcategoriesRail: "Subcategories rail",
     regionFilterSortBar: "Filter/sort bar",

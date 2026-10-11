@@ -187,6 +187,95 @@ describe("CategoryBanner — CUST-H2-5 public page presentation parity", () => {
     );
   });
 
+  describe("cover region (CUST-HV V9a)", () => {
+    const image = { url: "/media/cat.jpg", alt: "Gadgets" };
+    const regions = (coverVisible: boolean): PagePresentation => ({
+      category: {
+        version: 1,
+        regions: [
+          { id: "breadcrumbs", key: "breadcrumbs", visible: true },
+          { id: "cover", key: "cover", visible: coverVisible },
+          { id: "identity_title", key: "identity_title", visible: true },
+          { id: "description", key: "description", visible: true },
+          {
+            id: "subcategories_rail",
+            key: "subcategories_rail",
+            visible: true,
+          },
+          { id: "filter_sort_bar", key: "filter_sort_bar", visible: true },
+          { id: "product_grid", key: "product_grid", visible: true },
+        ],
+      },
+    });
+
+    it("is off by default: an existing store never gains a banner", async () => {
+      const element = await loadBanner({
+        category: category({ image }),
+        basePath: "/sa/en",
+        locale: "en",
+      });
+      const { container } = render(element as React.JSX.Element);
+      expect(container.querySelector("img")).toBeNull();
+    });
+
+    it("draws the category picture between the breadcrumbs and the title when shown", async () => {
+      const element = await loadBanner({
+        category: category({ image }),
+        basePath: "/sa/en",
+        locale: "en",
+        pagePresentation: regions(true),
+      });
+      const { container } = render(element as React.JSX.Element);
+      const img = container.querySelector("img");
+      expect(img).not.toBeNull();
+      expect(img?.getAttribute("alt")).toBe("Gadgets");
+      const text = container.textContent ?? "";
+      expect(text.indexOf("breadcrumbs-mock")).toBeLessThan(
+        text.indexOf("Electronics"),
+      );
+      const html = container.innerHTML;
+      expect(html.indexOf("<img")).toBeGreaterThan(
+        html.indexOf("breadcrumbs-mock"),
+      );
+      expect(html.indexOf("<img")).toBeLessThan(html.indexOf("<h1"));
+    });
+
+    it("names the picture after the category when the picture has no alt", async () => {
+      const element = await loadBanner({
+        category: category({ image: { url: "/media/cat.jpg", alt: "" } }),
+        basePath: "/sa/en",
+        locale: "en",
+        pagePresentation: regions(true),
+      });
+      const { container } = render(element as React.JSX.Element);
+      expect(container.querySelector("img")?.getAttribute("alt")).toBe(
+        "Electronics",
+      );
+    });
+
+    it("draws nothing when the category has no picture — never invents one", async () => {
+      const element = await loadBanner({
+        category: category({ image: null }),
+        basePath: "/sa/en",
+        locale: "en",
+        pagePresentation: regions(true),
+      });
+      const { container } = render(element as React.JSX.Element);
+      expect(container.querySelector("img")).toBeNull();
+    });
+
+    it("draws nothing when marked not visible", async () => {
+      const element = await loadBanner({
+        category: category({ image }),
+        basePath: "/sa/en",
+        locale: "en",
+        pagePresentation: regions(false),
+      });
+      const { container } = render(element as React.JSX.Element);
+      expect(container.querySelector("img")).toBeNull();
+    });
+  });
+
   it("never hides breadcrumbs/identity_title, even from a malformed stored array", async () => {
     const malformedPagePresentation = {
       category: {

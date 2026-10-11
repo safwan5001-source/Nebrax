@@ -238,6 +238,8 @@ final class StorefrontPresentationNormalizer
      */
     public const CATEGORY_PAGE_REGION_KEYS = [
         'breadcrumbs',
+        // CUST-HV V9a (V0 §14.2، DEF-3b) — غلاف التصنيف الاختياري: صورة التصنيف نفسها حين توجد. يبدأ مخفياً (اختيار صريح).
+        'cover',
         'identity_title',
         'description',
         'subcategories_rail',

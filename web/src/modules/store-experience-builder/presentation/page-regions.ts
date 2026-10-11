@@ -44,6 +44,7 @@ export type ProductPageRegionKey = (typeof PRODUCT_PAGE_REGION_KEYS)[number];
  */
 export const CATEGORY_PAGE_REGION_KEYS = [
   "breadcrumbs",
+  "cover",
   "identity_title",
   "description",
   "subcategories_rail",
@@ -51,6 +52,15 @@ export const CATEGORY_PAGE_REGION_KEYS = [
   "product_grid",
 ] as const;
 export type CategoryPageRegionKey = (typeof CATEGORY_PAGE_REGION_KEYS)[number];
+
+/**
+ * CUST-HV V9a (V0 §14.2, DEF-3b) — optional regions that start HIDDEN. The `cover` band (the category's own picture) is new: showing
+ * it by default would change every existing store's category pages the moment this ships, so it is an opt-in. A stored document that
+ * predates it simply has no `cover` entry (nothing changes); a document that was never customised falls back to the canonical list
+ * with these regions hidden.
+ */
+export const CATEGORY_REGIONS_DEFAULT_HIDDEN: readonly CategoryPageRegionKey[] = ["cover"];
+
 
 /**
  * FIXED_REQUIRED regions are forced back to `visible: true` at
@@ -139,7 +149,36 @@ export function defaultProductPageRegions(): PageRegionInstance<ProductPageRegio
  * (a toggle or a reorder) materializes this shape into the draft.
  */
 export function defaultCategoryPageRegions(): PageRegionInstance<CategoryPageRegionKey>[] {
-  return CATEGORY_PAGE_REGION_KEYS.map((key) => ({ id: key, key, visible: true }));
+  return CATEGORY_PAGE_REGION_KEYS.map((key) => ({
+    id: key,
+    key,
+    visible: !CATEGORY_REGIONS_DEFAULT_HIDDEN.includes(key),
+  }));
+}
+
+/**
+ * CUST-HV V9a — the Category regions the editor shows for a stored list: every stored entry as it is (order, visibility, ids untouched),
+ * plus any canonical region the document predates (today only `cover`), inserted at its canonical position and HIDDEN by default. In
+ * memory only — like the default list, it is written to the draft only by an actual edit.
+ */
+export function completeCategoryRegions(
+  stored: readonly PageRegionInstance<CategoryPageRegionKey>[],
+): PageRegionInstance<CategoryPageRegionKey>[] {
+  const out = [...stored];
+  for (const [index, key] of CATEGORY_PAGE_REGION_KEYS.entries()) {
+    if (out.some((region) => region.key === key)) continue;
+    // after the nearest canonical predecessor that is present (else first)
+    let at = 0;
+    for (let k = index - 1; k >= 0; k -= 1) {
+      const found = out.findIndex((region) => region.key === CATEGORY_PAGE_REGION_KEYS[k]);
+      if (found >= 0) {
+        at = found + 1;
+        break;
+      }
+    }
+    out.splice(at, 0, { id: key, key, visible: !CATEGORY_REGIONS_DEFAULT_HIDDEN.includes(key) });
+  }
+  return out;
 }
 
 function asString(value: unknown, fallback = ""): string {
