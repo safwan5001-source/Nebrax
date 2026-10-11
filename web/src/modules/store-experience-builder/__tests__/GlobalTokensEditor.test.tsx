@@ -42,6 +42,10 @@ describe("GlobalTokensEditor (CUST-HV V5e-2a)", () => {
       "surfaces.radius",
       "surfaces.border",
       "surfaces.shadow",
+      "cards.align",
+      "cards.imageRatio",
+      "cards.imageFit",
+      "cards.hover",
       "layout.contentWidth",
       "motion.duration",
       "motion.easing",
@@ -140,3 +144,36 @@ describe("GlobalTokensEditor (CUST-HV V5e-2a)", () => {
     expect(patch).toHaveBeenLastCalledWith({ typography: undefined });
   });
 });
+
+describe("GlobalTokensEditor — cards (CUST-HV V9d-1)", () => {
+  it("writes the card tokens as named steps and removes the group when emptied", () => {
+    const { field, patch } = mount();
+    fireEvent.change(field("cards.align"), { target: { value: "center" } });
+    expect(patch).toHaveBeenLastCalledWith({ cards: { align: "center" } });
+    const second = mount({ cards: { align: "center", hover: "lift" } });
+    fireEvent.change(second.field("cards.imageRatio"), { target: { value: "3:4" } });
+    expect(second.patch).toHaveBeenLastCalledWith({ cards: { align: "center", hover: "lift", imageRatio: "3:4" } });
+    fireEvent.change(second.field("cards.align"), { target: { value: "" } });
+    expect(second.patch).toHaveBeenLastCalledWith({ cards: { hover: "lift" } });
+    const last = mount({ cards: { imageFit: "contain" } });
+    fireEvent.change(last.field("cards.imageFit"), { target: { value: "" } });
+    expect(last.patch).toHaveBeenLastCalledWith({ cards: undefined });
+  });
+
+  it("says what a card token can never do, and where density and corners live; has Arabic copy", () => {
+    const { container } = mount();
+    expect(container.querySelector("[data-gt-cards]")?.textContent).toContain(tEn("gtCardsNote"));
+    expect(tEn("gtCardsNote")).toMatch(/never change/);
+    for (const key of ["gtCards", "gtCardsNote", "gtCardAlign", "gtCardImageRatio", "gtCardImageFit", "gtCardHover", "gtCardHoverLift"] as const) {
+      expect(tAr(key)).toBeTruthy();
+      expect(tAr(key)).not.toBe(tEn(key));
+    }
+  });
+
+  it("reset clears the card group too", () => {
+    const { container, patch } = mount({ cards: { hover: "none" } });
+    fireEvent.click(container.querySelector("[data-gt-reset]") as HTMLButtonElement);
+    expect(patch).toHaveBeenLastCalledWith(expect.objectContaining({ cards: undefined }));
+  });
+});
+

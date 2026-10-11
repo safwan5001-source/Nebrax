@@ -24,7 +24,14 @@ const fixture = JSON.parse(
   }>;
 };
 
-const KEYS = ["typography", "buttons", "surfaces", "layout", "motion"] as const;
+const KEYS = [
+  "typography",
+  "buttons",
+  "surfaces",
+  "cards",
+  "layout",
+  "motion",
+] as const;
 
 describe("global tokens — shared fixture (V5e-2a)", () => {
   for (const c of fixture.cases) {
@@ -303,4 +310,88 @@ describe("button contrast gate — shared fixture (V5e-2b)", () => {
       });
     });
   }
+});
+
+describe("card tokens (CUST-HV V9d-1)", () => {
+  it("no card token emits nothing: a card keeps today's look", () => {
+    expect(resolveGlobalTokens({ cards: {} })).toBeNull();
+    expect(
+      resolveGlobalTokens({ cards: { align: "start", imageFit: "cover" } }),
+    ).toBeNull();
+  });
+
+  it("each token becomes a validated custom property and a token, never a string from the document", () => {
+    const r = resolveGlobalTokens({
+      cards: {
+        align: "center",
+        imageRatio: "4:3",
+        imageFit: "contain",
+        hover: "lift",
+      },
+    });
+    expect(r?.attrs["data-gt"]?.split(" ")).toEqual([
+      "cd-al",
+      "cd-ir",
+      "cd-if",
+      "cd-hv",
+    ]);
+    expect(r?.style).toMatchObject({
+      "--cd-al": "center",
+      "--cd-ir": "4 / 3",
+      "--cd-if": "contain",
+      "--cd-hl": "-4px",
+      "--cd-hz": "1",
+    });
+    expect(r?.style["--cd-hs"]).toContain("rgba(");
+  });
+
+  it("the three hovers: none = nothing moves, lift = lift + shadow, zoom = image zoom only", () => {
+    const hover = (h: "none" | "lift" | "zoom") =>
+      resolveGlobalTokens({ cards: { hover: h } })?.style;
+    expect(hover("none")).toEqual({
+      "--cd-hs": "none",
+      "--cd-hl": "0px",
+      "--cd-hz": "1",
+    });
+    expect(hover("lift")).toMatchObject({ "--cd-hl": "-4px", "--cd-hz": "1" });
+    expect(hover("zoom")).toEqual({
+      "--cd-hs": "none",
+      "--cd-hl": "0px",
+      "--cd-hz": "1.06",
+    });
+  });
+
+  it("every ratio maps to a CSS ratio", () => {
+    const ratio = (r: "1:1" | "4:3" | "3:4") =>
+      resolveGlobalTokens({ cards: { imageRatio: r } })?.style["--cd-ir"];
+    expect([ratio("1:1"), ratio("4:3"), ratio("3:4")]).toEqual([
+      "1 / 1",
+      "4 / 3",
+      "3 / 4",
+    ]);
+  });
+
+  it("cannot reach commerce: no card token key names a price, a discount, stock or availability", () => {
+    const r = resolveGlobalTokens({
+      cards: {
+        align: "center",
+        imageRatio: "1:1",
+        imageFit: "contain",
+        hover: "zoom",
+      },
+    });
+    const keys = [
+      ...Object.keys(r?.style ?? {}),
+      ...(r?.attrs["data-gt"]?.split(" ") ?? []),
+    ].join(" ");
+    expect(keys).not.toMatch(
+      /price|discount|sale|stock|avail|offer|tax|total/i,
+    );
+    // the document form accepts closed lists only, so a number or a string cannot smuggle a value in
+    expect(
+      normalizeGlobalTokens({
+        cards: { price: 10, discount: 50, stock: 3, align: "center" },
+      }).cards,
+    ).toEqual({ align: "center" });
+  });
 });

@@ -873,6 +873,39 @@
 .awj-store-preview[data-gt~="shd"] :where([class~="rounded-store"][class~="bg-store-surface"]) {
   box-shadow: var(--gt-shd);
 }
+/* CUST-HV V9d-1 — card tokens (V0 §14.1). Product and offer cards carry stable hooks (`data-card`, `data-card-image`, `data-card-body`,
+   `data-card-price`); a token is a validated custom property, so the nearest scope's value wins by inheritance. Defaults emit nothing:
+   without these tokens a card is exactly what it was (start-aligned body, a height-sized cover image, a soft shadow and a 3 % image zoom). */
+.awj-store-preview[data-gt~="cd-al"] [data-card-body] {
+  text-align: var(--cd-al);
+}
+.awj-store-preview[data-gt~="cd-al"] [data-card-price] {
+  justify-content: var(--cd-al);
+}
+.awj-store-preview[data-gt~="cd-ir"] [data-card-image] {
+  height: auto;
+  aspect-ratio: var(--cd-ir);
+}
+.awj-store-preview[data-gt~="cd-if"] [data-card-image] img {
+  object-fit: var(--cd-if);
+}
+.awj-store-preview[data-gt~="cd-hv"] [data-card] {
+  transition-property: box-shadow, translate;
+}
+.awj-store-preview[data-gt~="cd-hv"] [data-card]:is(:hover, :focus-within) {
+  box-shadow: var(--cd-hs);
+  translate: 0 var(--cd-hl);
+}
+.awj-store-preview[data-gt~="cd-hv"] [data-card]:hover [data-card-image] img {
+  scale: var(--cd-hz);
+}
+@media (prefers-reduced-motion: reduce) {
+  .awj-store-preview[data-gt~="cd-hv"] [data-card]:is(:hover, :focus-within),
+  .awj-store-preview[data-gt~="cd-hv"] [data-card]:hover [data-card-image] img {
+    translate: none;
+    scale: 1;
+  }
+}
 /* motion — duration / easing of the components' own transitions; static under reduced motion */
 .awj-store-preview[data-gt~="mo-d"] :where([class*="transition"]) {
   transition-duration: var(--gt-md);

@@ -28,7 +28,7 @@ class StorefrontGlobalTokensTest extends TestCase
 
             // والوثيقة الكاملة تحمل المفاتيح نفسها (وأي مفتاح غائب لا يظهر).
             $config = $this->normalize($case['input']);
-            foreach (['typography', 'buttons', 'surfaces', 'layout', 'motion'] as $key) {
+            foreach (['typography', 'buttons', 'surfaces', 'cards', 'layout', 'motion'] as $key) {
                 if (array_key_exists($key, $case['expected'])) {
                     $this->assertSame($case['expected'][$key], $config[$key], $case['name'].' → '.$key);
                 } else {
@@ -42,7 +42,7 @@ class StorefrontGlobalTokensTest extends TestCase
     public function a_document_without_global_tokens_is_byte_identical_and_the_version_stays_three(): void
     {
         $plain = $this->normalize([]);
-        foreach (['typography', 'buttons', 'surfaces', 'layout', 'motion'] as $key) {
+        foreach (['typography', 'buttons', 'surfaces', 'cards', 'layout', 'motion'] as $key) {
             $this->assertArrayNotHasKey($key, $plain);
         }
         $this->assertSame(3, $plain['version']);
