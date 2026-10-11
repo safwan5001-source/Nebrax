@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  blockedReasonKey, buildLinkedBody, evaluateLine, summarize,
+  blockedReasonKey, noteBlockedReasonKey, buildLinkedBody, evaluateLine, summarize,
   type LineInput, type ReturnableLine,
 } from './invoice-linked';
 
@@ -12,6 +12,15 @@ const line = (over: Partial<ReturnableLine> = {}): ReturnableLine => ({
   ...over,
 });
 const inp = (quantity: string, price = ''): LineInput => ({ quantity, price });
+
+describe('noteBlockedReasonKey', () => {
+  it('does not apply the return window to credit notes, but keeps every other block', () => {
+    expect(noteBlockedReasonKey('out_of_window')).toBeNull();
+    expect(noteBlockedReasonKey('fully_returned')).toBe('blocked_fully_returned');
+    expect(noteBlockedReasonKey('legacy_credit_review')).toBe('blocked_legacy_credit_review');
+    expect(noteBlockedReasonKey(null)).toBeNull();
+  });
+});
 
 describe('blockedReasonKey', () => {
   it('maps known reasons and falls back to a generic one', () => {

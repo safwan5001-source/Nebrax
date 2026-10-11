@@ -3658,6 +3658,7 @@
     "return_change_invoice": "تغيير الفاتورة",
     "return_items": "البنود المراد إرجاعها",
     "return_remaining": "المتبقي: {count}",
+    "return_legacy_review": "عليها إشعارات دائنة قديمة تحتاج مراجعة مالية، فلا يمكن ردّها الآن.",
     "return_quantity": "كمية المرتجع",
     "return_decrease": "إنقاص كمية المرتجع",
     "return_increase": "زيادة كمية المرتجع",

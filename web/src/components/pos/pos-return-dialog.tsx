@@ -36,6 +36,7 @@ interface ReturnableInvoiceDetail {
   number: string;
   customer_name: string | null;
   total: string;
+  blocked_reason?: string | null;
   lines: ReturnableLine[];
 }
 interface Quote { total: string; cash_allowed: boolean; cash_block_reason: string | null }
@@ -193,6 +194,7 @@ export function PosReturnDialog({
             {loadingDetail || !detail ? <Skeleton className="h-48 w-full" /> : (
               <section className="space-y-2" aria-label={t('return_items')}>
                 <h3 className="text-sm font-semibold text-text">{t('return_items')}</h3>
+                {detail.blocked_reason && <p role="alert" className="rounded bg-negative/10 px-3 py-2 text-xs text-negative">{t('return_legacy_review')}</p>}
                 <div className="divide-y divide-border rounded border border-border">
                   {detail.lines.map((line) => {
                     const quantity = quantities[line.source_line_id] ?? 0;

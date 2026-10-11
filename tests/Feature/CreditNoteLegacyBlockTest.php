@@ -257,6 +257,21 @@ class CreditNoteLegacyBlockTest extends TestCase
     }
 
     /** @test */
+    public function the_return_window_is_a_return_policy_not_a_credit_note_rule(): void
+    {
+        \App\Support\Settings::put('sales', ['return_window_days' => 1]);
+        $invoice = $this->sale([$this->item(2, 10000)]);
+        Invoice::query()->whereKey($invoice->id)->update(['invoice_date' => now()->subDays(30)->toDateString()]);
+
+        // قائمة المصادر تعلّم الفاتورة خارج مهلة الردّ (للمرتجعات)…
+        $source = collect($this->getJson("/api/returns/sources/sales?partner_id={$invoice->partner_id}")->assertOk()->json('data'))->firstWhere('id', $invoice->id);
+        $this->assertSame('out_of_window', $source['blocked_reason']);
+
+        // …والخادم يقبل الإشعار الدائن عليها (الشاشة لا تمنعه: noteBlockedReasonKey).
+        $this->noteAttempt($invoice->fresh('lines'), 1)->assertCreated();
+    }
+
+    /** @test */
     public function resolving_never_modifies_any_posted_document(): void
     {
         $invoice = $this->sale([$this->item(3, 10000)]);

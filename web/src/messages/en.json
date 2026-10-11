@@ -3658,6 +3658,7 @@
     "return_change_invoice": "Change invoice",
     "return_items": "Items to return",
     "return_remaining": "Remaining: {count}",
+    "return_legacy_review": "This invoice has older credit notes pending finance review, so it cannot be returned yet.",
     "return_quantity": "Return quantity",
     "return_decrease": "Decrease return quantity",
     "return_increase": "Increase return quantity",

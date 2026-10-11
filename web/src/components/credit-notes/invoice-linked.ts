@@ -76,6 +76,14 @@ export function blockedReasonKey(reason: string | null | undefined): string | nu
   return BLOCKED_KEYS[reason] ?? 'blocked_generic';
 }
 
+/**
+ * منع الإشعار الدائن: مهلة المرتجع (`out_of_window`) سياسةُ ردٍّ فقط — الخدمة لا تفرضها على
+ * الإشعارات (تسوية سعر لاحقة مشروعة)، فلا تُعطِّل الشاشةُ ما يقبله الخادم.
+ */
+export function noteBlockedReasonKey(reason: string | null | undefined): string | null {
+  return reason === 'out_of_window' ? null : blockedReasonKey(reason);
+}
+
 /** محصَّل السطر كما يطلبه مُخصِّص المعاينة — نفس تحويل `create-return-dialog`. */
 export function toCharge(line: ReturnableLine): SourceCharge {
   return {

@@ -16,7 +16,7 @@ import { api, ApiError } from '@/lib/api';
 import { useNumberPreview } from '@/lib/use-number-preview';
 import { formatRiyal } from '@/lib/money';
 import {
-  blockedReasonKey, buildLinkedBody, emptyInput, summarize,
+  noteBlockedReasonKey, buildLinkedBody, emptyInput, summarize,
   type LineInput, type ReturnableInvoice, type SourceInvoice,
 } from './invoice-linked';
 
@@ -88,7 +88,7 @@ export function CreditNoteLinkedForm({ initialInvoiceId }: { initialInvoiceId?: 
 
   const summary = useMemo(() => summarize(invoice?.lines ?? [], inputs), [invoice, inputs]);
   const selectedSource = sources.find((s) => s.id === invoiceId);
-  const blockedKey = blockedReasonKey(selectedSource?.blocked_reason);
+  const blockedKey = noteBlockedReasonKey(selectedSource?.blocked_reason);
 
   const setInput = (lineId: string, patch: Partial<LineInput>) =>
     setInputs((cur) => ({ ...cur, [lineId]: { ...emptyInput(), ...cur[lineId], ...patch } }));
@@ -118,7 +118,7 @@ export function CreditNoteLinkedForm({ initialInvoiceId }: { initialInvoiceId?: 
 
   const invoiceLabel = (s: SourceInvoice) => {
     const base = [s.number, s.date, formatRiyal(s.total)].filter(Boolean).join(' · ');
-    const key = blockedReasonKey(s.blocked_reason);
+    const key = noteBlockedReasonKey(s.blocked_reason);
     return key ? `${base} — ${t(key)}` : base;
   };
 
@@ -147,7 +147,7 @@ export function CreditNoteLinkedForm({ initialInvoiceId }: { initialInvoiceId?: 
               >
                 <option value="" disabled>{partnerId ? t('choose_invoice') : t('choose_partner_first')}</option>
                 {sources.map((s) => (
-                  <option key={s.id} value={s.id} disabled={!!s.blocked_reason}>{invoiceLabel(s)}</option>
+                  <option key={s.id} value={s.id} disabled={!!noteBlockedReasonKey(s.blocked_reason)}>{invoiceLabel(s)}</option>
                 ))}
               </Select>
               {partnerId && !sourcesLoading && sources.length === 0 && (
