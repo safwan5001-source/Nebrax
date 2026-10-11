@@ -263,3 +263,24 @@ describe("Canvas — text-only custom content keeps the editor's block selection
     expect(container.querySelector('[data-content-block="b1"]')?.hasAttribute("data-selected")).toBe(false);
   });
 });
+
+describe("Canvas — text-only sub-headings follow the simulated device (V9c review)", () => {
+  afterEach(() => cleanup());
+
+  it("a level-3 heading is sized from the viewport, not from a host media query", () => {
+    const config = withSections([
+      { id: "cc-1", type: "customContent", visible: true, content: { blocks: [{ id: "b1", kind: "heading", text: "Sub", level: 3 }] } },
+    ]);
+    const sizeOn = (viewport: "mobile" | "desktop") => {
+      const { container, unmount } = render(
+        <StorefrontPreviewCanvas config={config} locale="en" viewport={viewport} onSelectSection={() => {}} />,
+      );
+      const cls = container.querySelector("h3")?.className ?? "";
+      unmount();
+      return cls;
+    };
+    expect(sizeOn("mobile")).toContain("text-base");
+    expect(sizeOn("desktop")).toContain("text-lg");
+    expect(`${sizeOn("mobile")} ${sizeOn("desktop")}`).not.toContain("md:");
+  });
+});

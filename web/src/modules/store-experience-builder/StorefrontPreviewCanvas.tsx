@@ -1276,7 +1276,7 @@ export function StorefrontPreviewCanvas({
                       <Selectable key={block.id} id={block.id} selected={block.id === (activeSlides?.[section.id] ?? null)}>
                         {block.kind === "heading" ? (
                           block.level === 3 ? (
-                            <h3 className={cn("break-words text-base font-extrabold md:text-lg", block.align === "center" && "text-center", block.align === "end" && "text-end")}>
+                            <h3 className={cn("break-words font-extrabold", viewport === "mobile" ? "text-base" : "text-lg", block.align === "center" && "text-center", block.align === "end" && "text-end")}>
                               {block.text}
                             </h3>
                           ) : (

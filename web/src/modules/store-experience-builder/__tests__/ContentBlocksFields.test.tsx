@@ -28,6 +28,9 @@ vi.mock("../media/MediaRefField", () => ({
       <button type="button" onClick={() => onChange({ mediaId: "9999aaaa-3d3a-4a53-9c7e-8f1a2b3c4d5e", decorative: true })}>
         replace
       </button>
+      <button type="button" onClick={() => onChange(null)}>
+        remove-picture
+      </button>
     </div>
   ),
 }));
@@ -231,8 +234,9 @@ describe("ContentBlocksFields (CUST-HV V9c-2)", () => {
   });
 });
 
-describe("text fields respect the stored limits (V9c review)", () => {
-  it("a heading input stops at 120 characters and a paragraph at 600, so the field never shows what Save would drop", () => {
+describe("text fields respect the stored limits, by code point (V9c review)", () => {
+  it("a heading stops at 120 code points and a paragraph at 600 — an emoji counts once, so nothing is shown that Save would drop", () => {
+    const seen: ContentBlocks[] = [];
     render(
       <Harness
         initial={{
@@ -241,11 +245,28 @@ describe("text fields respect the stored limits (V9c review)", () => {
             { id: "p", kind: "paragraph", text: "y" },
           ],
         }}
+        onContent={(c) => seen.push(c)}
       />,
     );
     fireEvent.click(rows()[0].querySelector("button") as HTMLElement);
-    expect(document.querySelector<HTMLInputElement>("input[data-content-text]")?.maxLength).toBe(120);
+    const heading = document.querySelector<HTMLInputElement>("input[data-content-text]") as HTMLInputElement;
+    fireEvent.change(heading, { target: { value: "😀".repeat(130) } });
+    expect(Array.from(heading.value)).toHaveLength(120);
+    const storedHeading = seen.at(-1)?.blocks[0] as { text: string };
+    expect(Array.from(storedHeading.text)).toHaveLength(120);
+
     fireEvent.click(rows()[1].querySelector("button") as HTMLElement);
-    expect(document.querySelector<HTMLTextAreaElement>("textarea[data-content-text]")?.maxLength).toBe(600);
+    const paragraph = document.querySelector<HTMLTextAreaElement>("textarea[data-content-text]") as HTMLTextAreaElement;
+    fireEvent.change(paragraph, { target: { value: "س".repeat(700) } });
+    expect(Array.from(paragraph.value)).toHaveLength(600);
+  });
+
+  it("removing an image block's picture deletes the block (the field's Remove is not a silent no-op)", () => {
+    render(<Harness initial={{ blocks: [{ id: "i", kind: "image", media: { mediaId: A } }, { id: "h", kind: "heading", text: "Keep" }] }} />);
+    fireEvent.click(rows()[0].querySelector("button") as HTMLElement);
+    expect(document.querySelector('[data-testid="field-content-block-image"]')).not.toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "remove-picture" }));
+    expect(rows()).toHaveLength(1);
+    expect(rows()[0].textContent).toContain("Keep");
   });
 });

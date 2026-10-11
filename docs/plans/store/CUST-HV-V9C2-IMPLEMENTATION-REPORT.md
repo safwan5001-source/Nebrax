@@ -58,6 +58,7 @@ Tenant isolation, authN/authZ, Draft vs Published, revision concurrency, media o
 | Heading / paragraph inputs kept characters beyond the stored limit (the draft truncates, the buffered field kept showing them) | `BufferedText` takes the stored limit as `maxLength` (120 / 600): the field never holds what Save would drop. Test. |
 | "Sub-heading" changed only the size on the published text-only band (always `<h2>`) | The storefront's text-only path now renders `level: 3` as a real `<h3>` (default unchanged; the section still takes its name from the first heading). Test. |
 | Canvas heading sizes used `md:` (host window) instead of the simulated device | Sizes are chosen from `viewport` (mobile → the base pair, otherwise the `md:` pair): no `md:` class remains. Test. |
+| Round 2 — the text-only level-3 heading still used `md:` in the Canvas; `maxLength` counts UTF-16 units not code points; an image field's Remove was a silent no-op | The text-only h3 is sized from `viewport`; the buffered fields cut by **code point** (`limit`, emoji count once — tests with 130 emoji / 700 Arabic letters); the image field's Remove now deletes the block, as the list's delete does. |
 | A text-only section bypassed the selection ring / scroll | Its flat preview wraps each block in the same `Selectable` as the general path (the accordion mirror of a designed Market section remains a collapsed-cards preview). Test. |
 
 ---

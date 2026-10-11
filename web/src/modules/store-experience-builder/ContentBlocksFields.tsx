@@ -89,27 +89,29 @@ function BufferedText({
   value,
   onCommit,
   multiline,
-  maxLength,
+  limit,
   ...rest
 }: {
   value: string;
   onCommit: (value: string) => void;
   multiline?: boolean;
-  /** The stored limit: the field never holds (and shows) characters Save would drop. */
-  maxLength?: number;
+  /** The stored limit in Unicode code points (what the contract counts): the field never holds, or shows, what Save would drop. */
+  limit?: number;
 } & Record<`data-${string}`, string>) {
   const [local, setLocal] = useState(value);
   useEffect(() => {
     setLocal((current) => (stored(current) === value ? current : value));
   }, [value]);
-  const commit = (next: string) => {
+  const commit = (typed: string) => {
+    const points = limit === undefined ? null : Array.from(typed);
+    const next = points && points.length > limit! ? points.slice(0, limit).join("") : typed;
     setLocal(next);
     onCommit(next);
   };
   return multiline ? (
-    <textarea className={`${inputClass} h-24 py-2`} value={local} maxLength={maxLength} onChange={(event) => commit(event.target.value)} {...rest} />
+    <textarea className={`${inputClass} h-24 py-2`} value={local} onChange={(event) => commit(event.target.value)} {...rest} />
   ) : (
-    <input className={inputClass} value={local} maxLength={maxLength} onChange={(event) => commit(event.target.value)} {...rest} />
+    <input className={inputClass} value={local} onChange={(event) => commit(event.target.value)} {...rest} />
   );
 }
 
@@ -441,7 +443,7 @@ function BlockEditor({
       return (
         <>
           <Field label={t("blockText")} hint={`${Array.from(block.text).length}/${MAX_HEADING_LENGTH}`}>
-            <BufferedText value={block.text} maxLength={MAX_HEADING_LENGTH} onCommit={(v) => onChange(setText(content, block.id, v))} data-content-text="" />
+            <BufferedText value={block.text} limit={MAX_HEADING_LENGTH} onCommit={(v) => onChange(setText(content, block.id, v))} data-content-text="" />
           </Field>
           <SegmentedField label={t("cbHeadingLevel")} hint={t("cbHeadingLevelHint")}>
             <Segmented
@@ -460,7 +462,7 @@ function BlockEditor({
       return (
         <>
           <Field label={t("blockText")} hint={`${Array.from(block.text).length}/${MAX_PARAGRAPH_LENGTH}`}>
-            <BufferedText multiline value={block.text} maxLength={MAX_PARAGRAPH_LENGTH} onCommit={(v) => onChange(setText(content, block.id, v))} data-content-text="" />
+            <BufferedText multiline value={block.text} limit={MAX_PARAGRAPH_LENGTH} onCommit={(v) => onChange(setText(content, block.id, v))} data-content-text="" />
           </Field>
           <AlignField value={block.align ?? "start"} t={t} onChange={(align) => onChange(setAlign(content, block.id, align))} />
         </>
@@ -472,8 +474,8 @@ function BlockEditor({
             slot="content-block-image"
             label={t("cbPicture")}
             value={block.media}
-            // an image always needs its picture: removing it is "delete the block", which the list offers
-            onChange={(media) => media && onChange(setImageMedia(content, block.id, media))}
+            // an image always needs its picture, so the field's Remove deletes the block (as the list's delete does)
+            onChange={(media) => onChange(media ? setImageMedia(content, block.id, media) : removeBlock(content, block.id))}
             t={t}
             locale={locale}
           />
