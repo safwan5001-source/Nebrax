@@ -313,6 +313,41 @@ class DeliveryChannelReportTest extends TestCase
     }
 
     /** @test */
+    public function both_null_branches_match_and_a_one_sided_null_is_an_exception(): void
+    {
+        $world = $this->boot('null-branch');
+        $matched = $this->deliver($world, $this->plainHeader(10000), $this->plainLines(10000));
+        DB::table('invoices')->where('id', $matched->id)->update(['branch_id' => null]);
+        DB::table('delivery_invoice_contexts')->where('invoice_id', $matched->id)->update(['branch_id' => null]);
+
+        $contextNull = $this->deliver($world, $this->plainHeader(20000), $this->plainLines(20000));
+        DB::table('delivery_invoice_contexts')->where('invoice_id', $contextNull->id)->update(['branch_id' => null]);
+
+        $invoiceNull = $this->deliver($world, $this->plainHeader(30000), $this->plainLines(30000));
+        DB::table('invoices')->where('id', $invoiceNull->id)->update(['branch_id' => null]);
+
+        $report = $this->report($world['token'], 'from=2026-03-01&to=2026-03-31');
+        $this->assertSame(1, $report['summary']['invoice_count']);
+        $this->assertSame('100.00', $report['summary']['total']);
+        $this->assertSame($matched->id, $report['invoices'][0]['id']);
+        $this->assertNull($report['invoices'][0]['branch_id']);
+        $this->assertSame(2, $report['exceptions']['context_branch_mismatch']);
+
+        app(TenantContext::class)->set($world['tenant_id']);
+        $restricted = User::create([
+            'tenant_id' => $world['tenant_id'],
+            'name' => 'محاسب بلا فروع فارغة',
+            'email' => 'null-branch@dlv-rpt-null-branch.test',
+            'password' => 'password123',
+            'role' => 'accountant',
+        ]);
+        $restricted->branches()->sync([$world['branch_id']]);
+        $scoped = $this->report($restricted->createToken('api')->plainTextToken, 'from=2026-03-01&to=2026-03-31');
+        $this->assertSame(0, $scoped['summary']['invoice_count']);
+        $this->assertSame(1, $scoped['exceptions']['context_branch_mismatch']);
+    }
+
+    /** @test */
     public function another_tenant_is_invisible(): void
     {
         $world = $this->boot('tenant');

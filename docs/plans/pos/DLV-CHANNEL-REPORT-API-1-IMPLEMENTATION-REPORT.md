@@ -46,7 +46,7 @@ Drill-down: `invoices` (sales population only, pinned version `display_name` / `
 
 ## Population
 
-Sales population: `status = posted`, `type = sale`, `pos_session_id` not null, `invoice_date` in range when a bound is present, and one `delivery_invoice_contexts` row with the same `invoice_id`, `tenant_id`, and `branch_id`. Optional profile filter uses `delivery_platform_profile_id`. Branch filter is `ReportBranchScope` on `invoices.branch_id`.
+Sales population: `status = posted`, `type = sale`, `pos_session_id` not null, `invoice_date` in range when a bound is present, and one `delivery_invoice_contexts` row with the same `invoice_id` and `tenant_id`, and the same branch on both sides. Branch equality is null-safe: both `branch_id` values null is a match, because `DeliveryInvoiceContext` copies the invoice branch and SQL `NULL = NULL` is unknown. One side null is a context-branch exception, not a sale. Optional profile filter uses `delivery_platform_profile_id`. Branch filter is `ReportBranchScope` on `invoices.branch_id`; a null invoice branch is outside a restricted user's allowed set.
 
 Attribution set: the same invoice rule with no `invoice_date` predicate. Returns use `return_documents.return_date`. Credit notes use `credit_notes.note_date`. Source documents must be in the attribution set. `original_type` is `App\Models\Invoice` (`Invoice::class`), which is the value `PosReturnService` stores. The design's word "Invoice" is that morph, not the literal string `Invoice`.
 

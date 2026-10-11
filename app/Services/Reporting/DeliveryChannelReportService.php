@@ -180,8 +180,8 @@ class DeliveryChannelReportService
         $byPlatform = $this->creditsQuery($from, $to, $profileId, $branches, $tenantId, true)
             ->join('delivery_invoice_contexts as ctx', function ($join) use ($tenantId): void {
                 $join->on('ctx.invoice_id', '=', 'invoices.id')
-                    ->where('ctx.tenant_id', $tenantId)
-                    ->whereColumn('ctx.branch_id', 'invoices.branch_id');
+                    ->where('ctx.tenant_id', $tenantId);
+                $this->whereSameBranch($join);
             })
             ->join('delivery_platform_profiles as profiles', function ($join) use ($tenantId): void {
                 $join->on('profiles.id', '=', 'ctx.delivery_platform_profile_id')
@@ -252,8 +252,8 @@ class DeliveryChannelReportService
         $returnRows = $this->returnsQuery($from, $to, $profileId, $branches, $tenantId)
             ->join('delivery_invoice_contexts as ctx', function ($join) use ($tenantId): void {
                 $join->on('ctx.invoice_id', '=', 'invoices.id')
-                    ->where('ctx.tenant_id', $tenantId)
-                    ->whereColumn('ctx.branch_id', 'invoices.branch_id');
+                    ->where('ctx.tenant_id', $tenantId);
+                $this->whereSameBranch($join);
             })
             ->join('delivery_platform_profiles as profiles', function ($join) use ($tenantId): void {
                 $join->on('profiles.id', '=', 'ctx.delivery_platform_profile_id')
@@ -390,8 +390,8 @@ class DeliveryChannelReportService
         return $this->returnsQuery($from, $to, $profileId, $branches, $tenantId)
             ->join('delivery_invoice_contexts as ctx', function ($join) use ($tenantId): void {
                 $join->on('ctx.invoice_id', '=', 'invoices.id')
-                    ->where('ctx.tenant_id', $tenantId)
-                    ->whereColumn('ctx.branch_id', 'invoices.branch_id');
+                    ->where('ctx.tenant_id', $tenantId);
+                $this->whereSameBranch($join);
             })
             ->join('delivery_platform_profiles as profiles', function ($join) use ($tenantId): void {
                 $join->on('profiles.id', '=', 'ctx.delivery_platform_profile_id')
@@ -431,8 +431,8 @@ class DeliveryChannelReportService
         return $this->creditsQuery($from, $to, $profileId, $branches, $tenantId, true)
             ->join('delivery_invoice_contexts as ctx', function ($join) use ($tenantId): void {
                 $join->on('ctx.invoice_id', '=', 'invoices.id')
-                    ->where('ctx.tenant_id', $tenantId)
-                    ->whereColumn('ctx.branch_id', 'invoices.branch_id');
+                    ->where('ctx.tenant_id', $tenantId);
+                $this->whereSameBranch($join);
             })
             ->join('delivery_platform_profiles as profiles', function ($join) use ($tenantId): void {
                 $join->on('profiles.id', '=', 'ctx.delivery_platform_profile_id')
@@ -477,8 +477,15 @@ class DeliveryChannelReportService
                 ->whereColumn('ctx.invoice_id', 'invoices.id')
                 ->where('ctx.tenant_id', $tenantId)
                 ->where(function ($branch) {
-                    $branch->whereColumn('ctx.branch_id', '!=', 'invoices.branch_id')
-                        ->orWhereNull('ctx.branch_id');
+                    $branch->where(function ($different) {
+                        $different->whereColumn('ctx.branch_id', '!=', 'invoices.branch_id')
+                            ->whereNotNull('ctx.branch_id')
+                            ->whereNotNull('invoices.branch_id');
+                    })->orWhere(function ($onlyInvoice) {
+                        $onlyInvoice->whereNull('ctx.branch_id')->whereNotNull('invoices.branch_id');
+                    })->orWhere(function ($onlyContext) {
+                        $onlyContext->whereNotNull('ctx.branch_id')->whereNull('invoices.branch_id');
+                    });
                 });
             if ($profileId !== null) {
                 $sub->where('ctx.delivery_platform_profile_id', $profileId);
@@ -500,8 +507,24 @@ class DeliveryChannelReportService
     {
         $join->on('ctx.invoice_id', '=', 'invoices.id')
             ->where('ctx.tenant_id', $tenantId)
-            ->whereColumn('ctx.tenant_id', 'invoices.tenant_id')
-            ->whereColumn('ctx.branch_id', 'invoices.branch_id');
+            ->whereColumn('ctx.tenant_id', 'invoices.tenant_id');
+        $this->whereSameBranch($join);
+    }
+
+    /**
+     * `NULL = NULL` ليست مطابقة في SQL. فرع الفاتورة وسياقها يُنسخان معاً،
+     * فغياب الفرع عن الطرفين تطابق لا استثناء.
+     *
+     * @param  \Illuminate\Database\Query\JoinClause|\Illuminate\Database\Query\Builder  $query
+     */
+    private function whereSameBranch($query): void
+    {
+        $query->where(function ($match) {
+            $match->whereColumn('ctx.branch_id', 'invoices.branch_id')
+                ->orWhere(function ($bothNull) {
+                    $bothNull->whereNull('ctx.branch_id')->whereNull('invoices.branch_id');
+                });
+        });
     }
 
     /** @return Builder<Invoice> */
@@ -517,8 +540,8 @@ class DeliveryChannelReportService
                     ->from('delivery_invoice_contexts as ctx')
                     ->whereColumn('ctx.invoice_id', 'invoices.id')
                     ->where('ctx.tenant_id', $tenantId)
-                    ->whereColumn('ctx.tenant_id', 'invoices.tenant_id')
-                    ->whereColumn('ctx.branch_id', 'invoices.branch_id');
+                    ->whereColumn('ctx.tenant_id', 'invoices.tenant_id');
+                $this->whereSameBranch($sub);
                 if ($profileId !== null) {
                     $sub->where('ctx.delivery_platform_profile_id', $profileId);
                 }
