@@ -123,5 +123,7 @@ describe("commerce firewall — presentation normalisation", () => {
     expect(normalized.footer.groups?.[0]?.links?.[0]?.id).toBe("a");
     expect(normalized.announcements?.items[0]?.id).toBe("a");
     expect(normalized.pagePresentation?.product?.regions[0]?.key).toBe("price");
+    // the hostile document tried to HIDE the required price region (`visible: false`): presentation data cannot hide authoritative price
+    expect(normalized.pagePresentation?.product?.regions[0]?.visible).toBe(true);
   });
 });

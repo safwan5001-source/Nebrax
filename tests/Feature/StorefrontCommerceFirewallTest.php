@@ -124,6 +124,8 @@ class StorefrontCommerceFirewallTest extends TestCase
         $this->assertSame('a', $normalized['footer']['groups'][0]['links'][0]['id']);
         $this->assertSame('a', $normalized['announcements']['items'][0]['id']);
         $this->assertSame('price', $normalized['pagePresentation']['product']['regions'][0]['key']);
+        // the hostile document tried to HIDE the required price region (`visible: false`): presentation data cannot hide authoritative price
+        $this->assertTrue($normalized['pagePresentation']['product']['regions'][0]['visible']);
     }
 
     /** @return list<string> */
@@ -156,12 +158,30 @@ class StorefrontCommerceFirewallTest extends TestCase
                 }
             }
         }
+        // support-namespace classes: an owner when it reaches a model / service directly OR names another owner (fixed point = transitive)
+        $support = [];
         foreach (glob($app.'/Support/Commerce/*.php') ?: [] as $file) {
             $name = basename($file, '.php');
-            if (! isset($allowed[$name]) && preg_match('/\\bApp\\\\(Models|Services)\\\\/', $this->withoutComments((string) file_get_contents($file))) === 1) {
-                $owners[$name] = true;
+            if (! isset($allowed[$name])) {
+                $support[$name] = $this->withoutComments((string) file_get_contents($file));
             }
         }
+        do {
+            $grew = false;
+            foreach ($support as $name => $code) {
+                if (isset($owners[$name])) {
+                    continue;
+                }
+                $reaches = preg_match('/\bApp\\\\(Models|Services)\\\\/', $code) === 1;
+                foreach (array_keys($owners) as $owner) {
+                    $reaches = $reaches || preg_match('/\b'.preg_quote($owner, '/').'\b/', $code) === 1;
+                }
+                if ($reaches) {
+                    $owners[$name] = true;
+                    $grew = true;
+                }
+            }
+        } while ($grew);
         $this->assertArrayHasKey('DeliverTodayFilter', $owners, 'control: the known commerce reader inside the support namespace is detected');
 
         foreach ($files as $file) {

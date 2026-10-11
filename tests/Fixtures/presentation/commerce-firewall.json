@@ -2682,7 +2682,7 @@
                     {
                         "id": "price",
                         "key": "price",
-                        "visible": true,
+                        "visible": false,
                         "price": 1,
                         "priceMinor": 100,
                         "discount": "10%",
