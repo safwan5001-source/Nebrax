@@ -1016,13 +1016,48 @@ class CreditNoteSourceVatAccuracyTest extends TestCase
         Sanctum::actingAs($restricted);
         $this->flushHeaders();
 
-        $ids = fn (string $qs) => collect($this->getJson("/api/returns/sources/sales?{$qs}partner_id={$this->customer->id}")
+        $ids = fn (string $url) => collect($this->getJson("{$url}partner_id={$this->customer->id}")
             ->assertOk()->json('data'))->pluck('id')->all();
 
-        // منتقي الإشعار الدائن: ما يقبله الخادم فقط.
-        $this->assertSame([$invoiceA->id], $ids('purpose=credit_note&'));
+        // منتقي الإشعار الدائن (نقطته المخصّصة): ما يقبله الخادم فقط.
+        $this->assertSame([$invoiceA->id], $ids('/api/credit-notes/sources?'));
         // قائمة المرتجعات المرجعية عابرة للفروع كما كانت (لا تغيير).
-        $this->assertEqualsCanonicalizing([$invoiceA->id, $invoiceB->id], $ids(''));
+        $this->assertEqualsCanonicalizing([$invoiceA->id, $invoiceB->id], $ids('/api/returns/sources/sales?'));
+
+        // الرابط العميق (تفصيل الفاتورة): فرعٌ ممنوع ⇒ 404 غير مُسرِّب؛ المسموح يُحمَّل.
+        $this->getJson("/api/credit-notes/returnable/{$invoiceA->id}")->assertOk();
+        $this->getJson("/api/credit-notes/returnable/{$invoiceB->id}")->assertNotFound();
+        // ومسار المرتجعات المرجعي لم يتغيّر.
+        $this->getJson("/api/returns/returnable/sales/{$invoiceB->id}")->assertOk();
+    }
+
+    /** @test */
+    public function the_credit_note_source_endpoints_follow_the_note_permission_not_the_returns_permission(): void
+    {
+        $invoice = $this->sale([$this->item(1, 10000)]);
+
+        // staff: returns.view نعم، invoices.manage لا ⇒ لا يصل إلى مصادر الإشعار (ولا ينشئه).
+        $staff = User::create([
+            'tenant_id' => $this->tenant->id, 'name' => 'موظف', 'email' => 'staff-src@nibras.sa',
+            'password' => bcrypt('secret1234'), 'role' => 'staff',
+        ]);
+        Sanctum::actingAs($staff);
+        $this->flushHeaders();
+        $this->getJson("/api/credit-notes/sources?partner_id={$this->customer->id}")->assertForbidden();
+        $this->getJson("/api/credit-notes/returnable/{$invoice->id}")->assertForbidden();
+        $this->getJson("/api/returns/sources/sales?partner_id={$this->customer->id}")->assertOk();
+
+        // accountant: invoices.manage ⇒ يصل.
+        $accountant = User::create([
+            'tenant_id' => $this->tenant->id, 'name' => 'محاسب', 'email' => 'acc-src@nibras.sa',
+            'password' => bcrypt('secret1234'), 'role' => 'accountant',
+        ]);
+        Sanctum::actingAs($accountant);
+        $this->flushHeaders();
+        $this->getJson("/api/credit-notes/sources?partner_id={$this->customer->id}")->assertOk()
+            ->assertJsonPath('data.0.id', $invoice->id);
+        $this->getJson("/api/credit-notes/returnable/{$invoice->id}")->assertOk()
+            ->assertJsonPath('data.lines.0.remaining', 1);
     }
 
     /** @test */

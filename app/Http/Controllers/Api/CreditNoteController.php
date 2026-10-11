@@ -51,6 +51,25 @@ class CreditNoteController extends ApiController
         return (new CreditNoteResource($note->load('lines')))->response()->setStatusCode(201);
     }
 
+    /**
+     * فواتير الطرف الصالحة مصدراً للإشعار (REM-02) — نفس قائمة المرتجعات بتصفية الفروع المتاحة للمستخدم،
+     * لكن بصلاحية إنشاء الإشعار وتشغيله لا بصلاحية/تشغيل المرتجعات.
+     */
+    public function sources(Request $request): JsonResponse
+    {
+        $request->query->set('purpose', 'credit_note');
+
+        return app(ReturnSourcesController::class)($request, 'sales');
+    }
+
+    /** سطور فاتورة مصدر بكمياتها المتبقية للإشعار؛ فاتورة فرعٍ ممنوع ⇒ 404 (كما `store`). */
+    public function returnable(Request $request, string $invoice): JsonResponse
+    {
+        $request->query->set('purpose', 'credit_note');
+
+        return app(ReturnableController::class)($request, 'sales', $invoice);
+    }
+
     public function show(string $id): JsonResponse
     {
         $note = CreditNote::with(['lines', 'printTemplateRevision', 'pdfTemplateRevision', 'thermalTemplateRevision'])->findOrFail($id);

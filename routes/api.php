@@ -728,6 +728,11 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
 
         // الإشعارات الدائنة (مستند مالي؛ الترحيل يولّد قيداً عكسياً)
         Route::get('credit-notes', [CreditNoteController::class, 'index'])->middleware([$perm('invoices.view'), EnsureApplicationOperationActive::class . ':credit-note']);
+        // (المعامل `{invoice}` لا `{id}`: وسيط التشغيل يفسّر `{id}` على أنه معرّف إشعار.)
+        // مصادر الإشعار الدائن وسطورها المتبقية: بصلاحية **إنشاء الإشعار** (invoices.manage) لا صلاحية المرتجعات —
+        // دورٌ يملك إنشاء الإشعار دون returns.view كان يرى الشاشة ثم يُرفض 403 عند جلب المصدر.
+        Route::get('credit-notes/sources', [CreditNoteController::class, 'sources'])->middleware([$perm('invoices.manage'), EnsureApplicationOperationActive::class . ':credit-note']);
+        Route::get('credit-notes/returnable/{invoice}', [CreditNoteController::class, 'returnable'])->middleware([$perm('invoices.manage'), EnsureApplicationOperationActive::class . ':credit-note']);
         Route::get('credit-notes/{id}', [CreditNoteController::class, 'show'])->middleware([$perm('invoices.view'), EnsureApplicationOperationActive::class . ':credit-note']);
         Route::post('credit-notes', [CreditNoteController::class, 'store'])->middleware([$perm('invoices.manage'), EnsureApplicationOperationActive::class . ':credit-note']);
         Route::post('credit-notes/{id}/post', [CreditNoteController::class, 'post'])->middleware([$perm('invoices.manage'), EnsureApplicationOperationActive::class . ':credit-note']);

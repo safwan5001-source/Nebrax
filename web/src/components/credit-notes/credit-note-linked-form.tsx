@@ -54,7 +54,7 @@ export function CreditNoteLinkedForm({ initialInvoiceId }: { initialInvoiceId?: 
     setError(null);
     if (!id) return;
     try {
-      const r = await api<{ data: ReturnableInvoice }>(`/returns/returnable/sales/${id}`);
+      const r = await api<{ data: ReturnableInvoice }>(`/credit-notes/returnable/${id}`);
       setInvoice(r.data);
       return r.data;
     } catch (err) {
@@ -80,7 +80,7 @@ export function CreditNoteLinkedForm({ initialInvoiceId }: { initialInvoiceId?: 
   useEffect(() => {
     if (!partnerId) { setSources([]); return; }
     setSourcesLoading(true);
-    api<{ data: SourceInvoice[] }>(`/returns/sources/sales?purpose=credit_note&partner_id=${partnerId}`)
+    api<{ data: SourceInvoice[] }>(`/credit-notes/sources?partner_id=${partnerId}`)
       .then((r) => setSources(r.data))
       .catch(() => setSources([]))
       .finally(() => setSourcesLoading(false));

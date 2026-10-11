@@ -32,6 +32,12 @@ class ReturnableController extends ApiController
 
         abort_unless($document->isPosted(), 422, 'لا يُرَدّ على مستند غير مرحّل.');
 
+        // REM-02: مسار الإشعار الدائن يحترم فرع المستخدم كما يفعل `CreditNoteController::store` (404 غير مُسرِّب)؛
+        // مسار المرتجعات المرجعي عابر للفروع كما كان.
+        if ($type === 'sales' && $request->query('purpose') === 'credit_note') {
+            $this->assertRecordAccessible($document->branch_id, []);
+        }
+
         // REM-01: ما حُصِّل فعلاً على كل سطر (أساس صافٍ وضريبة بعد خصم السطر
         // والرأس) وما رُدَّ منه — فتعرض الشاشة المتبقي الحقيقي بدل أن تُعيد
         // حسابه من السعر الإجمالي. إضافةٌ فقط: الحقول القائمة بحالها.

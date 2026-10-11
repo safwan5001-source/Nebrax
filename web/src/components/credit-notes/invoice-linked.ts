@@ -7,7 +7,7 @@ import { sourceLineAmounts, type SourceCharge } from '@/components/returns/sourc
  * المبالغ بالمُخصِّص نفسه (`sourceLineAmounts`) — لا حساب توزيع ثانٍ هنا.
  */
 
-/** سطر قابل للردّ كما يعيده `GET /returns/returnable/sales/{id}` (المبالغ ريال نصّاً). */
+/** سطر قابل للردّ كما يعيده `GET /credit-notes/returnable/{id}` (المبالغ ريال نصّاً). */
 export interface ReturnableLine {
   source_line_id: string;
   product_id: string | null;
@@ -37,7 +37,7 @@ export interface ReturnableInvoice {
   lines: ReturnableLine[];
 }
 
-/** فاتورة مرحَّلة كمصدر محتمل (`GET /returns/sources/sales`). */
+/** فاتورة مرحَّلة كمصدر محتمل (`GET /credit-notes/sources`). */
 export interface SourceInvoice {
   id: string;
   number: string;
