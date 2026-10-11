@@ -163,6 +163,9 @@ class StorefrontCommerceFirewallTest extends TestCase
         $this->assertSame('price', $normalized['pagePresentation']['product']['regions'][0]['key']);
         // the hostile document tried to HIDE the required price region (`visible: false`): presentation data cannot hide authoritative price
         $this->assertTrue($normalized['pagePresentation']['product']['regions'][0]['visible']);
+        // ...and the category document's required product grid (a separate branch) is forced visible too
+        $this->assertSame('product_grid', $normalized['pagePresentation']['category']['regions'][0]['key']);
+        $this->assertTrue($normalized['pagePresentation']['category']['regions'][0]['visible']);
     }
 
     /** @return list<string> */
@@ -243,9 +246,16 @@ class StorefrontCommerceFirewallTest extends TestCase
         $presentationSide = [
             'PresentationDocumentTooLargeException', 'PresentationPublishValidationException', 'ScheduledPresentationDispatcher',
             'StorefrontMediaReferenceScanner', 'StorefrontPresentationService', 'StorefrontPresentationVersionBackfillService',
-            'StorefrontPresentationVersionService', 'StorefrontPublishedMediaIndex', 'StorefrontVerticalSetupService', 'CommerceListingService',
+            'StorefrontPresentationVersionService', 'StorefrontPublishedMediaIndex', 'StorefrontVerticalSetupService',
         ];
-        $files = array_merge(glob($app.'/Services/Commerce/*.php') ?: [], [$app.'/Services/PriceListService.php', $app.'/Services/ProductPricingService.php']);
+        // scanned for qualified presentation dependencies only: its bare `$presentation` parameter is the listing's title / description copy
+        $bareWordExempt = ['CommerceListingService'];
+        $files = [$app.'/Services/PriceListService.php', $app.'/Services/ProductPricingService.php'];
+        foreach (new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($app.'/Services/Commerce', \FilesystemIterator::SKIP_DOTS)) as $file) {
+            if ($file->getExtension() === 'php') {
+                $files[] = $file->getPathname();
+            }
+        }
         $checked = 0;
 
         foreach ($files as $file) {
@@ -256,9 +266,13 @@ class StorefrontCommerceFirewallTest extends TestCase
             $checked++;
             $source = $this->withoutComments((string) file_get_contents($file));
             $this->assertStringNotContainsString('Support\\Commerce\\Storefront', $source, "{$name} must not depend on presentation normalisers");
-            $this->assertStringNotContainsString('presentation', strtolower($source), "{$name} must not read the presentation");
+            $this->assertStringNotContainsString('Commerce\\StorefrontPresentation', $source, "{$name} must not depend on the presentation services or models");
+            $this->assertStringNotContainsString('Models\\StorefrontPresentation', $source, "{$name} must not read the presentation models");
+            if (! in_array($name, $bareWordExempt, true)) {
+                $this->assertStringNotContainsString('presentation', strtolower($source), "{$name} must not read the presentation");
+            }
         }
-        $this->assertGreaterThan(60, $checked, 'the scan must cover the commerce services broadly, not a handful');
+        $this->assertGreaterThan(60, $checked, 'the scan must cover the commerce services broadly (sub-namespaces included), not a handful');
         foreach (['ShippingRateService', 'CommerceDeliveryPromiseService', 'InventoryReservationService', 'FulfillmentPolicyService', 'CommercePriceResolver', 'StorefrontOfferResolver'] as $named) {
             $this->assertContains($named, array_map(static fn (string $f): string => basename($f, '.php'), $files), "{$named} must be in the scan");
         }

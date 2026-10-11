@@ -159,5 +159,8 @@ describe("commerce firewall — presentation normalisation", () => {
     expect(normalized.pagePresentation?.product?.regions[0]?.key).toBe("price");
     // the hostile document tried to HIDE the required price region (`visible: false`): presentation data cannot hide authoritative price
     expect(normalized.pagePresentation?.product?.regions[0]?.visible).toBe(true);
+    // ...and the category document's required product grid (a separate branch) is forced visible too
+    expect(normalized.pagePresentation?.category?.regions[0]?.key).toBe("product_grid");
+    expect(normalized.pagePresentation?.category?.regions[0]?.visible).toBe(true);
   });
 });
