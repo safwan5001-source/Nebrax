@@ -48,7 +48,7 @@ describe("commerce firewall — presentation normalisation", () => {
   it("the deny pattern matches value-bearing keys and never an allowed presentation control", () => {
     const pattern = new RegExp(fixture.forbiddenKeyPattern, "i");
     for (const key of fixture.allowedKeys) expect(pattern.test(key), key).toBe(false);
-    for (const key of ["price", "salePrice", "stockCount", "shippingFee", "offerStatus", "grandTotal"]) {
+    for (const key of ["price", "salePrice", "stockCount", "shippingFee", "offerStatus", "grandTotal", "unitPrice", "taxAmount", "shippingCost", "checkoutTotal", "subtotal"]) {
       expect(pattern.test(key), key).toBe(true);
     }
   });

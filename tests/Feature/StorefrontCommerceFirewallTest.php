@@ -84,7 +84,7 @@ class StorefrontCommerceFirewallTest extends TestCase
         foreach ($fixture['allowedKeys'] as $key) {
             $this->assertSame(0, preg_match($pattern, $key), "{$key} is an allowed presentation control but the deny pattern rejects it");
         }
-        foreach (['price', 'salePrice', 'stockCount', 'shippingFee', 'offerStatus', 'grandTotal'] as $key) {
+        foreach (['price', 'salePrice', 'stockCount', 'shippingFee', 'offerStatus', 'grandTotal', 'unitPrice', 'taxAmount', 'shippingCost', 'checkoutTotal', 'subtotal'] as $key) {
             $this->assertSame(1, preg_match($pattern, $key), "{$key} must be denied");
         }
     }
@@ -120,13 +120,24 @@ class StorefrontCommerceFirewallTest extends TestCase
         $files = array_merge(glob($root.'/Storefront*Normalizer.php') ?: [], glob($root.'/*Publish*.php') ?: [], glob($root.'/*Contrast.php') ?: []);
         $this->assertNotEmpty($files);
 
+        // allow-list, not a deny-list: a presentation file may reference only its own namespace and these media / validation helpers
+        // (none of which reads a price, offer, stock or tax value). Any other `App\...` reference — a model, a pricing / offer / cart
+        // service, a ledger class — fails, whatever its name.
+        $allowed = [
+            'App\\Services\\Commerce\\StorefrontMediaTransform',
+            'App\\Services\\Commerce\\StorefrontMediaPublishGate',
+            'App\\Services\\Commerce\\StorefrontMediaContrastEvidence',
+            'App\\Services\\Commerce\\PresentationPublishValidationException',
+        ];
+
         foreach ($files as $file) {
-            $source = (string) file_get_contents($file);
-            $this->assertDoesNotMatchRegularExpression(
-                '/App\\\\(Services\\\\Commerce|Services\\\\Accounting|Models)\\\\\w*(Price|Offer|Cart|Checkout|Order|Inventory|Stock|Ledger|Journal)\w*/',
-                $source,
-                basename($file).' imports a commercial / accounting service or model',
-            );
+            preg_match_all('/\bApp(?:\\\\[A-Za-z0-9_]+)+/', $this->withoutComments((string) file_get_contents($file)), $matches);
+            foreach (array_unique($matches[0]) as $reference) {
+                $this->assertTrue(
+                    $reference === 'App\\Support\\Commerce' || str_starts_with($reference, 'App\\Support\\Commerce\\') || in_array($reference, $allowed, true),
+                    basename($file)." references {$reference}, outside the presentation namespace and its allow-listed helpers",
+                );
+            }
         }
     }
 

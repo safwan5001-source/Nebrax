@@ -56,6 +56,11 @@ describe("commerce firewall — presentation normalisation", () => {
       "shippingFee",
       "offerStatus",
       "grandTotal",
+      "unitPrice",
+      "taxAmount",
+      "shippingCost",
+      "checkoutTotal",
+      "subtotal",
     ]) {
       expect(pattern.test(key), key).toBe(true);
     }

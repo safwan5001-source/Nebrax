@@ -1,6 +1,6 @@
 {
-    "_note": "CUST-HV V9d-4 — commerce firewall (V0 §14.3). A hostile document: every scope the production normalizer accepts (document tokens, branding, header, footer, contact, whatsapp, social, verification, sbc, apps, navigation, pagePresentation, announcements, palette, homepage sections, section content, section design, design.cards, nested items) carries commercial keys (price, discount, stock, availability, tax, total, currency, sku, quantity, shipping fee / amount, freight, delivery fee, offer status, coupon code, cost). After normalisation NO such key may survive anywhere, and no injected value may be reachable. Shared by PHP StorefrontPresentationNormalizer and both TS twins (normalizePresentationConfig). `forbiddenKeyPattern` matches the exact value-bearing commercial key names (anchored); `allowedKeys` are presentation controls V0 §14.3 allows (position / colour role / size step of price, stock or badge text) and must never match, so a legitimate future control is not rejected by the scan.",
-    "forbiddenKeyPattern": "^(price|priceMinor|salePrice|compareAtPrice|discount|discountPercent|discountAmount|stock|stockCount|stockLabel|availability|tax|taxRate|vat|total|grandTotal|amount|currency|sku|quantity|inventory|shippingFee|shippingAmount|freight|deliveryFee|fee|offerStatus|offer_status|couponCode|cost)$",
+    "_note": "CUST-HV V9d-4 — commerce firewall (V0 §14.3). A hostile document: every scope the production normalizer accepts (document tokens, branding, header, footer, contact, whatsapp, social, verification, sbc, apps, navigation, pagePresentation, announcements, palette, homepage sections, section content, section design, design.cards, nested items) carries commercial keys (price, discount, stock, availability, tax, total, currency, sku, quantity, shipping fee / amount, freight, delivery fee, offer status, coupon code, cost). After normalisation NO such key may survive anywhere, and no injected value may be reachable. Shared by PHP StorefrontPresentationNormalizer and both TS twins (normalizePresentationConfig). `forbiddenKeyPattern` matches the exact value-bearing commercial key names (anchored); `allowedKeys` are presentation controls V0 §14.3 allows (position / colour role / size step of price, stock or badge text) and must never match, so a legitimate future control is not rejected by the scan. The pattern is two clauses: the exact names above, plus any key that ENDS in a value noun (price / cost / total / amount / fee), so composed names such as unitPrice, taxAmount, shippingCost, checkoutTotal and subtotal are denied while position / colour-role / size controls (pricePosition, stockTextSize…) are not.",
+    "forbiddenKeyPattern": "^(price|priceMinor|salePrice|compareAtPrice|discount|discountPercent|discountAmount|stock|stockCount|stockLabel|availability|tax|taxRate|vat|total|grandTotal|amount|currency|sku|quantity|inventory|shippingFee|shippingAmount|freight|deliveryFee|fee|offerStatus|offer_status|couponCode|cost)$|(price|cost|total|amount|fee)$",
     "allowedKeys": [
         "pricePosition",
         "priceColorRole",
@@ -55,7 +55,12 @@
             "stockCount": 4,
             "taxRate": 15,
             "discountAmount": 300,
-            "grandTotal": 999
+            "grandTotal": 999,
+            "unitPrice": 8000,
+            "taxAmount": 1200,
+            "shippingCost": 2500,
+            "checkoutTotal": 31000,
+            "subtotal": 29800
         },
         "surfaces": {
             "radius": "md",
@@ -86,7 +91,12 @@
             "stockCount": 4,
             "taxRate": 15,
             "discountAmount": 300,
-            "grandTotal": 999
+            "grandTotal": 999,
+            "unitPrice": 8000,
+            "taxAmount": 1200,
+            "shippingCost": 2500,
+            "checkoutTotal": 31000,
+            "subtotal": 29800
         },
         "typography": {
             "headingScale": "lg",
@@ -117,7 +127,12 @@
             "stockCount": 4,
             "taxRate": 15,
             "discountAmount": 300,
-            "grandTotal": 999
+            "grandTotal": 999,
+            "unitPrice": 8000,
+            "taxAmount": 1200,
+            "shippingCost": 2500,
+            "checkoutTotal": 31000,
+            "subtotal": 29800
         },
         "layout": {
             "contentWidth": "wide",
@@ -148,7 +163,12 @@
             "stockCount": 4,
             "taxRate": 15,
             "discountAmount": 300,
-            "grandTotal": 999
+            "grandTotal": 999,
+            "unitPrice": 8000,
+            "taxAmount": 1200,
+            "shippingCost": 2500,
+            "checkoutTotal": 31000,
+            "subtotal": 29800
         },
         "motion": {
             "reveal": "fade-up",
@@ -179,7 +199,12 @@
             "stockCount": 4,
             "taxRate": 15,
             "discountAmount": 300,
-            "grandTotal": 999
+            "grandTotal": 999,
+            "unitPrice": 8000,
+            "taxAmount": 1200,
+            "shippingCost": 2500,
+            "checkoutTotal": 31000,
+            "subtotal": 29800
         },
         "productCard": {
             "density": "compact",
@@ -210,7 +235,12 @@
             "stockCount": 4,
             "taxRate": 15,
             "discountAmount": 300,
-            "grandTotal": 999
+            "grandTotal": 999,
+            "unitPrice": 8000,
+            "taxAmount": 1200,
+            "shippingCost": 2500,
+            "checkoutTotal": 31000,
+            "subtotal": 29800
         },
         "homepage": {
             "sections": [
@@ -261,7 +291,12 @@
                         "stockCount": 4,
                         "taxRate": 15,
                         "discountAmount": 300,
-                        "grandTotal": 999
+                        "grandTotal": 999,
+                        "unitPrice": 8000,
+                        "taxAmount": 1200,
+                        "shippingCost": 2500,
+                        "checkoutTotal": 31000,
+                        "subtotal": 29800
                     },
                     "design": {
                         "layout": "rail",
@@ -298,7 +333,12 @@
                             "stockCount": 4,
                             "taxRate": 15,
                             "discountAmount": 300,
-                            "grandTotal": 999
+                            "grandTotal": 999,
+                            "unitPrice": 8000,
+                            "taxAmount": 1200,
+                            "shippingCost": 2500,
+                            "checkoutTotal": 31000,
+                            "subtotal": 29800
                         },
                         "border": "hairline",
                         "radius": "md",
@@ -332,7 +372,12 @@
                             "stockCount": 4,
                             "taxRate": 15,
                             "discountAmount": 300,
-                            "grandTotal": 999
+                            "grandTotal": 999,
+                            "unitPrice": 8000,
+                            "taxAmount": 1200,
+                            "shippingCost": 2500,
+                            "checkoutTotal": 31000,
+                            "subtotal": 29800
                         },
                         "price": 1,
                         "priceMinor": 100,
@@ -361,7 +406,12 @@
                         "stockCount": 4,
                         "taxRate": 15,
                         "discountAmount": 300,
-                        "grandTotal": 999
+                        "grandTotal": 999,
+                        "unitPrice": 8000,
+                        "taxAmount": 1200,
+                        "shippingCost": 2500,
+                        "checkoutTotal": 31000,
+                        "subtotal": 29800
                     },
                     "shippingFee": 1500,
                     "shippingAmount": 900,
@@ -377,7 +427,12 @@
                     "stockCount": 4,
                     "taxRate": 15,
                     "discountAmount": 300,
-                    "grandTotal": 999
+                    "grandTotal": 999,
+                    "unitPrice": 8000,
+                    "taxAmount": 1200,
+                    "shippingCost": 2500,
+                    "checkoutTotal": 31000,
+                    "subtotal": 29800
                 },
                 {
                     "id": "s-2",
@@ -428,7 +483,12 @@
                         "stockCount": 4,
                         "taxRate": 15,
                         "discountAmount": 300,
-                        "grandTotal": 999
+                        "grandTotal": 999,
+                        "unitPrice": 8000,
+                        "taxAmount": 1200,
+                        "shippingCost": 2500,
+                        "checkoutTotal": 31000,
+                        "subtotal": 29800
                     },
                     "design": {
                         "layout": "rail",
@@ -465,7 +525,12 @@
                             "stockCount": 4,
                             "taxRate": 15,
                             "discountAmount": 300,
-                            "grandTotal": 999
+                            "grandTotal": 999,
+                            "unitPrice": 8000,
+                            "taxAmount": 1200,
+                            "shippingCost": 2500,
+                            "checkoutTotal": 31000,
+                            "subtotal": 29800
                         },
                         "border": "hairline",
                         "radius": "md",
@@ -499,7 +564,12 @@
                             "stockCount": 4,
                             "taxRate": 15,
                             "discountAmount": 300,
-                            "grandTotal": 999
+                            "grandTotal": 999,
+                            "unitPrice": 8000,
+                            "taxAmount": 1200,
+                            "shippingCost": 2500,
+                            "checkoutTotal": 31000,
+                            "subtotal": 29800
                         },
                         "price": 1,
                         "priceMinor": 100,
@@ -528,7 +598,12 @@
                         "stockCount": 4,
                         "taxRate": 15,
                         "discountAmount": 300,
-                        "grandTotal": 999
+                        "grandTotal": 999,
+                        "unitPrice": 8000,
+                        "taxAmount": 1200,
+                        "shippingCost": 2500,
+                        "checkoutTotal": 31000,
+                        "subtotal": 29800
                     },
                     "shippingFee": 1500,
                     "shippingAmount": 900,
@@ -544,7 +619,12 @@
                     "stockCount": 4,
                     "taxRate": 15,
                     "discountAmount": 300,
-                    "grandTotal": 999
+                    "grandTotal": 999,
+                    "unitPrice": 8000,
+                    "taxAmount": 1200,
+                    "shippingCost": 2500,
+                    "checkoutTotal": 31000,
+                    "subtotal": 29800
                 },
                 {
                     "id": "s-3",
@@ -595,7 +675,12 @@
                         "stockCount": 4,
                         "taxRate": 15,
                         "discountAmount": 300,
-                        "grandTotal": 999
+                        "grandTotal": 999,
+                        "unitPrice": 8000,
+                        "taxAmount": 1200,
+                        "shippingCost": 2500,
+                        "checkoutTotal": 31000,
+                        "subtotal": 29800
                     },
                     "design": {
                         "columns": 2,
@@ -631,7 +716,12 @@
                             "stockCount": 4,
                             "taxRate": 15,
                             "discountAmount": 300,
-                            "grandTotal": 999
+                            "grandTotal": 999,
+                            "unitPrice": 8000,
+                            "taxAmount": 1200,
+                            "shippingCost": 2500,
+                            "checkoutTotal": 31000,
+                            "subtotal": 29800
                         },
                         "price": 1,
                         "priceMinor": 100,
@@ -660,7 +750,12 @@
                         "stockCount": 4,
                         "taxRate": 15,
                         "discountAmount": 300,
-                        "grandTotal": 999
+                        "grandTotal": 999,
+                        "unitPrice": 8000,
+                        "taxAmount": 1200,
+                        "shippingCost": 2500,
+                        "checkoutTotal": 31000,
+                        "subtotal": 29800
                     },
                     "shippingFee": 1500,
                     "shippingAmount": 900,
@@ -676,7 +771,12 @@
                     "stockCount": 4,
                     "taxRate": 15,
                     "discountAmount": 300,
-                    "grandTotal": 999
+                    "grandTotal": 999,
+                    "unitPrice": 8000,
+                    "taxAmount": 1200,
+                    "shippingCost": 2500,
+                    "checkoutTotal": 31000,
+                    "subtotal": 29800
                 },
                 {
                     "id": "s-4",
@@ -727,7 +827,12 @@
                             "stockCount": 4,
                             "taxRate": 15,
                             "discountAmount": 300,
-                            "grandTotal": 999
+                            "grandTotal": 999,
+                            "unitPrice": 8000,
+                            "taxAmount": 1200,
+                            "shippingCost": 2500,
+                            "checkoutTotal": 31000,
+                            "subtotal": 29800
                         },
                         "limit": 8,
                         "deliverToday": false,
@@ -758,7 +863,12 @@
                         "stockCount": 4,
                         "taxRate": 15,
                         "discountAmount": 300,
-                        "grandTotal": 999
+                        "grandTotal": 999,
+                        "unitPrice": 8000,
+                        "taxAmount": 1200,
+                        "shippingCost": 2500,
+                        "checkoutTotal": 31000,
+                        "subtotal": 29800
                     },
                     "design": {
                         "layout": "rail",
@@ -795,7 +905,12 @@
                             "stockCount": 4,
                             "taxRate": 15,
                             "discountAmount": 300,
-                            "grandTotal": 999
+                            "grandTotal": 999,
+                            "unitPrice": 8000,
+                            "taxAmount": 1200,
+                            "shippingCost": 2500,
+                            "checkoutTotal": 31000,
+                            "subtotal": 29800
                         },
                         "border": "hairline",
                         "radius": "md",
@@ -829,7 +944,12 @@
                             "stockCount": 4,
                             "taxRate": 15,
                             "discountAmount": 300,
-                            "grandTotal": 999
+                            "grandTotal": 999,
+                            "unitPrice": 8000,
+                            "taxAmount": 1200,
+                            "shippingCost": 2500,
+                            "checkoutTotal": 31000,
+                            "subtotal": 29800
                         },
                         "price": 1,
                         "priceMinor": 100,
@@ -858,7 +978,12 @@
                         "stockCount": 4,
                         "taxRate": 15,
                         "discountAmount": 300,
-                        "grandTotal": 999
+                        "grandTotal": 999,
+                        "unitPrice": 8000,
+                        "taxAmount": 1200,
+                        "shippingCost": 2500,
+                        "checkoutTotal": 31000,
+                        "subtotal": 29800
                     },
                     "shippingFee": 1500,
                     "shippingAmount": 900,
@@ -874,7 +999,12 @@
                     "stockCount": 4,
                     "taxRate": 15,
                     "discountAmount": 300,
-                    "grandTotal": 999
+                    "grandTotal": 999,
+                    "unitPrice": 8000,
+                    "taxAmount": 1200,
+                    "shippingCost": 2500,
+                    "checkoutTotal": 31000,
+                    "subtotal": 29800
                 },
                 {
                     "id": "s-5",
@@ -926,7 +1056,12 @@
                                 "stockCount": 4,
                                 "taxRate": 15,
                                 "discountAmount": 300,
-                                "grandTotal": 999
+                                "grandTotal": 999,
+                                "unitPrice": 8000,
+                                "taxAmount": 1200,
+                                "shippingCost": 2500,
+                                "checkoutTotal": 31000,
+                                "subtotal": 29800
                             }
                         ],
                         "price": 1,
@@ -956,7 +1091,12 @@
                         "stockCount": 4,
                         "taxRate": 15,
                         "discountAmount": 300,
-                        "grandTotal": 999
+                        "grandTotal": 999,
+                        "unitPrice": 8000,
+                        "taxAmount": 1200,
+                        "shippingCost": 2500,
+                        "checkoutTotal": 31000,
+                        "subtotal": 29800
                     },
                     "design": {
                         "height": "tall",
@@ -987,7 +1127,12 @@
                         "stockCount": 4,
                         "taxRate": 15,
                         "discountAmount": 300,
-                        "grandTotal": 999
+                        "grandTotal": 999,
+                        "unitPrice": 8000,
+                        "taxAmount": 1200,
+                        "shippingCost": 2500,
+                        "checkoutTotal": 31000,
+                        "subtotal": 29800
                     },
                     "shippingFee": 1500,
                     "shippingAmount": 900,
@@ -1003,7 +1148,12 @@
                     "stockCount": 4,
                     "taxRate": 15,
                     "discountAmount": 300,
-                    "grandTotal": 999
+                    "grandTotal": 999,
+                    "unitPrice": 8000,
+                    "taxAmount": 1200,
+                    "shippingCost": 2500,
+                    "checkoutTotal": 31000,
+                    "subtotal": 29800
                 },
                 {
                     "id": "s-6",
@@ -1055,7 +1205,12 @@
                                 "stockCount": 4,
                                 "taxRate": 15,
                                 "discountAmount": 300,
-                                "grandTotal": 999
+                                "grandTotal": 999,
+                                "unitPrice": 8000,
+                                "taxAmount": 1200,
+                                "shippingCost": 2500,
+                                "checkoutTotal": 31000,
+                                "subtotal": 29800
                             }
                         ],
                         "price": 1,
@@ -1085,7 +1240,12 @@
                         "stockCount": 4,
                         "taxRate": 15,
                         "discountAmount": 300,
-                        "grandTotal": 999
+                        "grandTotal": 999,
+                        "unitPrice": 8000,
+                        "taxAmount": 1200,
+                        "shippingCost": 2500,
+                        "checkoutTotal": 31000,
+                        "subtotal": 29800
                     },
                     "design": {
                         "layout": "columns-3",
@@ -1116,7 +1276,12 @@
                         "stockCount": 4,
                         "taxRate": 15,
                         "discountAmount": 300,
-                        "grandTotal": 999
+                        "grandTotal": 999,
+                        "unitPrice": 8000,
+                        "taxAmount": 1200,
+                        "shippingCost": 2500,
+                        "checkoutTotal": 31000,
+                        "subtotal": 29800
                     },
                     "shippingFee": 1500,
                     "shippingAmount": 900,
@@ -1132,7 +1297,12 @@
                     "stockCount": 4,
                     "taxRate": 15,
                     "discountAmount": 300,
-                    "grandTotal": 999
+                    "grandTotal": 999,
+                    "unitPrice": 8000,
+                    "taxAmount": 1200,
+                    "shippingCost": 2500,
+                    "checkoutTotal": 31000,
+                    "subtotal": 29800
                 },
                 {
                     "id": "s-7",
@@ -1184,7 +1354,12 @@
                                 "stockCount": 4,
                                 "taxRate": 15,
                                 "discountAmount": 300,
-                                "grandTotal": 999
+                                "grandTotal": 999,
+                                "unitPrice": 8000,
+                                "taxAmount": 1200,
+                                "shippingCost": 2500,
+                                "checkoutTotal": 31000,
+                                "subtotal": 29800
                             },
                             {
                                 "id": "b2",
@@ -1219,7 +1394,12 @@
                                 "stockCount": 4,
                                 "taxRate": 15,
                                 "discountAmount": 300,
-                                "grandTotal": 999
+                                "grandTotal": 999,
+                                "unitPrice": 8000,
+                                "taxAmount": 1200,
+                                "shippingCost": 2500,
+                                "checkoutTotal": 31000,
+                                "subtotal": 29800
                             }
                         ],
                         "price": 1,
@@ -1249,7 +1429,12 @@
                         "stockCount": 4,
                         "taxRate": 15,
                         "discountAmount": 300,
-                        "grandTotal": 999
+                        "grandTotal": 999,
+                        "unitPrice": 8000,
+                        "taxAmount": 1200,
+                        "shippingCost": 2500,
+                        "checkoutTotal": 31000,
+                        "subtotal": 29800
                     },
                     "design": {
                         "align": "center",
@@ -1280,7 +1465,12 @@
                         "stockCount": 4,
                         "taxRate": 15,
                         "discountAmount": 300,
-                        "grandTotal": 999
+                        "grandTotal": 999,
+                        "unitPrice": 8000,
+                        "taxAmount": 1200,
+                        "shippingCost": 2500,
+                        "checkoutTotal": 31000,
+                        "subtotal": 29800
                     },
                     "shippingFee": 1500,
                     "shippingAmount": 900,
@@ -1296,7 +1486,12 @@
                     "stockCount": 4,
                     "taxRate": 15,
                     "discountAmount": 300,
-                    "grandTotal": 999
+                    "grandTotal": 999,
+                    "unitPrice": 8000,
+                    "taxAmount": 1200,
+                    "shippingCost": 2500,
+                    "checkoutTotal": 31000,
+                    "subtotal": 29800
                 }
             ],
             "price": 1,
@@ -1326,7 +1521,12 @@
             "stockCount": 4,
             "taxRate": 15,
             "discountAmount": 300,
-            "grandTotal": 999
+            "grandTotal": 999,
+            "unitPrice": 8000,
+            "taxAmount": 1200,
+            "shippingCost": 2500,
+            "checkoutTotal": 31000,
+            "subtotal": 29800
         },
         "price": 1,
         "priceMinor": 100,
@@ -1370,7 +1570,12 @@
             "stockCount": 4,
             "taxRate": 15,
             "discountAmount": 300,
-            "grandTotal": 999
+            "grandTotal": 999,
+            "unitPrice": 8000,
+            "taxAmount": 1200,
+            "shippingCost": 2500,
+            "checkoutTotal": 31000,
+            "subtotal": 29800
         },
         "header": {
             "style": "compact",
@@ -1408,7 +1613,12 @@
                     "stockCount": 4,
                     "taxRate": 15,
                     "discountAmount": 300,
-                    "grandTotal": 999
+                    "grandTotal": 999,
+                    "unitPrice": 8000,
+                    "taxAmount": 1200,
+                    "shippingCost": 2500,
+                    "checkoutTotal": 31000,
+                    "subtotal": 29800
                 }
             ],
             "design": {
@@ -1440,7 +1650,12 @@
                 "stockCount": 4,
                 "taxRate": 15,
                 "discountAmount": 300,
-                "grandTotal": 999
+                "grandTotal": 999,
+                "unitPrice": 8000,
+                "taxAmount": 1200,
+                "shippingCost": 2500,
+                "checkoutTotal": 31000,
+                "subtotal": 29800
             },
             "price": 1,
             "priceMinor": 100,
@@ -1469,7 +1684,12 @@
             "stockCount": 4,
             "taxRate": 15,
             "discountAmount": 300,
-            "grandTotal": 999
+            "grandTotal": 999,
+            "unitPrice": 8000,
+            "taxAmount": 1200,
+            "shippingCost": 2500,
+            "checkoutTotal": 31000,
+            "subtotal": 29800
         },
         "footer": {
             "tagline": "نصنع الفرق",
@@ -1502,7 +1722,12 @@
                 "stockCount": 4,
                 "taxRate": 15,
                 "discountAmount": 300,
-                "grandTotal": 999
+                "grandTotal": 999,
+                "unitPrice": 8000,
+                "taxAmount": 1200,
+                "shippingCost": 2500,
+                "checkoutTotal": 31000,
+                "subtotal": 29800
             },
             "groups": [
                 {
@@ -1543,7 +1768,12 @@
                                 "stockCount": 4,
                                 "taxRate": 15,
                                 "discountAmount": 300,
-                                "grandTotal": 999
+                                "grandTotal": 999,
+                                "unitPrice": 8000,
+                                "taxAmount": 1200,
+                                "shippingCost": 2500,
+                                "checkoutTotal": 31000,
+                                "subtotal": 29800
                             },
                             "price": 1,
                             "priceMinor": 100,
@@ -1572,7 +1802,12 @@
                             "stockCount": 4,
                             "taxRate": 15,
                             "discountAmount": 300,
-                            "grandTotal": 999
+                            "grandTotal": 999,
+                            "unitPrice": 8000,
+                            "taxAmount": 1200,
+                            "shippingCost": 2500,
+                            "checkoutTotal": 31000,
+                            "subtotal": 29800
                         }
                     ],
                     "price": 1,
@@ -1602,7 +1837,12 @@
                     "stockCount": 4,
                     "taxRate": 15,
                     "discountAmount": 300,
-                    "grandTotal": 999
+                    "grandTotal": 999,
+                    "unitPrice": 8000,
+                    "taxAmount": 1200,
+                    "shippingCost": 2500,
+                    "checkoutTotal": 31000,
+                    "subtotal": 29800
                 }
             ],
             "price": 1,
@@ -1632,7 +1872,12 @@
             "stockCount": 4,
             "taxRate": 15,
             "discountAmount": 300,
-            "grandTotal": 999
+            "grandTotal": 999,
+            "unitPrice": 8000,
+            "taxAmount": 1200,
+            "shippingCost": 2500,
+            "checkoutTotal": 31000,
+            "subtotal": 29800
         },
         "contact": {
             "email": "hello@example.com",
@@ -1663,7 +1908,12 @@
             "stockCount": 4,
             "taxRate": 15,
             "discountAmount": 300,
-            "grandTotal": 999
+            "grandTotal": 999,
+            "unitPrice": 8000,
+            "taxAmount": 1200,
+            "shippingCost": 2500,
+            "checkoutTotal": 31000,
+            "subtotal": 29800
         },
         "whatsapp": {
             "enabled": true,
@@ -1697,7 +1947,12 @@
             "stockCount": 4,
             "taxRate": 15,
             "discountAmount": 300,
-            "grandTotal": 999
+            "grandTotal": 999,
+            "unitPrice": 8000,
+            "taxAmount": 1200,
+            "shippingCost": 2500,
+            "checkoutTotal": 31000,
+            "subtotal": 29800
         },
         "social": [
             {
@@ -1732,7 +1987,12 @@
                 "stockCount": 4,
                 "taxRate": 15,
                 "discountAmount": 300,
-                "grandTotal": 999
+                "grandTotal": 999,
+                "unitPrice": 8000,
+                "taxAmount": 1200,
+                "shippingCost": 2500,
+                "checkoutTotal": 31000,
+                "subtotal": 29800
             }
         ],
         "verification": {
@@ -1766,7 +2026,12 @@
             "stockCount": 4,
             "taxRate": 15,
             "discountAmount": 300,
-            "grandTotal": 999
+            "grandTotal": 999,
+            "unitPrice": 8000,
+            "taxAmount": 1200,
+            "shippingCost": 2500,
+            "checkoutTotal": 31000,
+            "subtotal": 29800
         },
         "sbc": {
             "authentication_number": "A1",
@@ -1799,7 +2064,12 @@
             "stockCount": 4,
             "taxRate": 15,
             "discountAmount": 300,
-            "grandTotal": 999
+            "grandTotal": 999,
+            "unitPrice": 8000,
+            "taxAmount": 1200,
+            "shippingCost": 2500,
+            "checkoutTotal": 31000,
+            "subtotal": 29800
         },
         "apps": {
             "iosUrl": "https://apps.apple.com/app/id1",
@@ -1830,7 +2100,12 @@
             "stockCount": 4,
             "taxRate": 15,
             "discountAmount": 300,
-            "grandTotal": 999
+            "grandTotal": 999,
+            "unitPrice": 8000,
+            "taxAmount": 1200,
+            "shippingCost": 2500,
+            "checkoutTotal": 31000,
+            "subtotal": 29800
         },
         "navigation": {
             "menus": [
@@ -1871,7 +2146,12 @@
                                 "stockCount": 4,
                                 "taxRate": 15,
                                 "discountAmount": 300,
-                                "grandTotal": 999
+                                "grandTotal": 999,
+                                "unitPrice": 8000,
+                                "taxAmount": 1200,
+                                "shippingCost": 2500,
+                                "checkoutTotal": 31000,
+                                "subtotal": 29800
                             },
                             "price": 1,
                             "priceMinor": 100,
@@ -1900,7 +2180,12 @@
                             "stockCount": 4,
                             "taxRate": 15,
                             "discountAmount": 300,
-                            "grandTotal": 999
+                            "grandTotal": 999,
+                            "unitPrice": 8000,
+                            "taxAmount": 1200,
+                            "shippingCost": 2500,
+                            "checkoutTotal": 31000,
+                            "subtotal": 29800
                         },
                         {
                             "id": "e",
@@ -1935,7 +2220,12 @@
                                 "stockCount": 4,
                                 "taxRate": 15,
                                 "discountAmount": 300,
-                                "grandTotal": 999
+                                "grandTotal": 999,
+                                "unitPrice": 8000,
+                                "taxAmount": 1200,
+                                "shippingCost": 2500,
+                                "checkoutTotal": 31000,
+                                "subtotal": 29800
                             },
                             "price": 1,
                             "priceMinor": 100,
@@ -1964,7 +2254,12 @@
                             "stockCount": 4,
                             "taxRate": 15,
                             "discountAmount": 300,
-                            "grandTotal": 999
+                            "grandTotal": 999,
+                            "unitPrice": 8000,
+                            "taxAmount": 1200,
+                            "shippingCost": 2500,
+                            "checkoutTotal": 31000,
+                            "subtotal": 29800
                         }
                     ],
                     "price": 1,
@@ -1994,7 +2289,12 @@
                     "stockCount": 4,
                     "taxRate": 15,
                     "discountAmount": 300,
-                    "grandTotal": 999
+                    "grandTotal": 999,
+                    "unitPrice": 8000,
+                    "taxAmount": 1200,
+                    "shippingCost": 2500,
+                    "checkoutTotal": 31000,
+                    "subtotal": 29800
                 }
             ],
             "price": 1,
@@ -2024,7 +2324,12 @@
             "stockCount": 4,
             "taxRate": 15,
             "discountAmount": 300,
-            "grandTotal": 999
+            "grandTotal": 999,
+            "unitPrice": 8000,
+            "taxAmount": 1200,
+            "shippingCost": 2500,
+            "checkoutTotal": 31000,
+            "subtotal": 29800
         },
         "pagePresentation": {
             "product": {
@@ -2061,7 +2366,12 @@
                         "stockCount": 4,
                         "taxRate": 15,
                         "discountAmount": 300,
-                        "grandTotal": 999
+                        "grandTotal": 999,
+                        "unitPrice": 8000,
+                        "taxAmount": 1200,
+                        "shippingCost": 2500,
+                        "checkoutTotal": 31000,
+                        "subtotal": 29800
                     }
                 ],
                 "price": 1,
@@ -2091,7 +2401,12 @@
                 "stockCount": 4,
                 "taxRate": 15,
                 "discountAmount": 300,
-                "grandTotal": 999
+                "grandTotal": 999,
+                "unitPrice": 8000,
+                "taxAmount": 1200,
+                "shippingCost": 2500,
+                "checkoutTotal": 31000,
+                "subtotal": 29800
             },
             "price": 1,
             "priceMinor": 100,
@@ -2120,7 +2435,12 @@
             "stockCount": 4,
             "taxRate": 15,
             "discountAmount": 300,
-            "grandTotal": 999
+            "grandTotal": 999,
+            "unitPrice": 8000,
+            "taxAmount": 1200,
+            "shippingCost": 2500,
+            "checkoutTotal": 31000,
+            "subtotal": 29800
         },
         "announcements": {
             "enabled": false,
@@ -2155,7 +2475,12 @@
                     "stockCount": 4,
                     "taxRate": 15,
                     "discountAmount": 300,
-                    "grandTotal": 999
+                    "grandTotal": 999,
+                    "unitPrice": 8000,
+                    "taxAmount": 1200,
+                    "shippingCost": 2500,
+                    "checkoutTotal": 31000,
+                    "subtotal": 29800
                 }
             ],
             "price": 1,
@@ -2185,7 +2510,12 @@
             "stockCount": 4,
             "taxRate": 15,
             "discountAmount": 300,
-            "grandTotal": 999
+            "grandTotal": 999,
+            "unitPrice": 8000,
+            "taxAmount": 1200,
+            "shippingCost": 2500,
+            "checkoutTotal": 31000,
+            "subtotal": 29800
         },
         "palette": {
             "link": "#0B5FFF",
@@ -2216,7 +2546,12 @@
             "stockCount": 4,
             "taxRate": 15,
             "discountAmount": 300,
-            "grandTotal": 999
+            "grandTotal": 999,
+            "unitPrice": 8000,
+            "taxAmount": 1200,
+            "shippingCost": 2500,
+            "checkoutTotal": 31000,
+            "subtotal": 29800
         },
         "shippingFee": 1500,
         "shippingAmount": 900,
@@ -2232,6 +2567,11 @@
         "stockCount": 4,
         "taxRate": 15,
         "discountAmount": 300,
-        "grandTotal": 999
+        "grandTotal": 999,
+        "unitPrice": 8000,
+        "taxAmount": 1200,
+        "shippingCost": 2500,
+        "checkoutTotal": 31000,
+        "subtotal": 29800
     }
 }
