@@ -82,3 +82,29 @@ Real production data/residency and backups; current live ZATCA credential/onboar
 Run **TAX-HZ-00 Evidence and Decision Pass** (read-only, no code / no merge / no deploy): reconcile live `main` with the full 40-task remediation queue, current external ZATCA references, existing active Delivery horizon, and decision owners. Return a precise activation Decision Packet and a first dependency-ready task recommendation. Do not begin REM implementation before activation approval.
 
 **Companion:** `AWJ-TAX-ZATCA-HORIZON-TASK-QUEUE.md` and `AWJ-TAX-ZATCA-HORIZON-BOOTSTRAP.md`.
+
+
+## Research charter — owner-approved 2026-10-11
+Claude Code is expressly authorized to spend the time reasonably needed for **thorough, evidence-first research** before selecting tax/ZATCA architecture, operational workflows or relevant UX. Research depth is not limited to a quick scan; avoid repeated searches without decision value.
+
+### Regulatory/technical primary sources (priority)
+- **ZATCA (هيئة الزكاة والضريبة والجمارك)** official website, Fatoora/e-invoicing developer and integration documentation, E-Invoicing Regulation, implementation resolutions, XML Implementation Standard, Data Dictionary, Security Features Implementation Standards, developer portal and official SDK validator; use their latest available *applicable* releases and confirm effective dates.
+- Official Saudi VAT law, implementing regulations, guides, rulings/circulars and official clarifications as applicable; distinguish mandatory law/regulation from explanatory guidance, SDK behavior, examples and proposals.
+- Official sources for UBL 2.1 / EN 16931 when needed for interoperability; verify that Saudi overlays/requirements take precedence for KSA documents.
+- Record each consulted primary document's exact title, publisher, URL, version, release/effective date (when available), retrieval date and relevant section/page/rule ID. Do not infer validity from search snippets alone. If official sources contradict, identify the discrepancy and escalate material compliance interpretation instead of guessing.
+
+### UX / comparable systems
+Study relevant **official** product documentation, public help centers, product demos and accessible UI examples for suitable Saudi accounting/POS/ERP systems (e.g. Daftra, Salla, Qoyod, Zoho Books, Odoo, ERPNext and others if relevant). Focus on real invoice/credit-note lifecycle, tax settings, ZATCA connection status, submission outcomes, blocked/error states, financial reconciliation, permissions, print and bilingual/RTL presentation.
+
+For every proposed UI pattern, identify the reference product and exact observed URL/screen, what was actually observed (versus assumed), usability trade-offs, and how it fits AWJ's dense, clear, trustworthy daily accounting UI. Respect product terms/copyright; do not copy source code, protected layouts/assets, brands or wording. External UI is **design evidence**, not legal authority and never overrides AWJ accounting, tenancy, compatibility or official ZATCA rules.
+
+### Required research outputs / decision discipline
+Build an evidence register and a small comparison matrix with columns **Source / Current version or date / Verifiable evidence / Proposed AWJ use / Status (mandatory, guidance, inspiration, unresolved)**. Separate:
+1. **External official requirements and verified facts**;
+2. **Observed competitor UX patterns**;
+3. **AWJ decisions/proposals with rationale**;
+4. **Open owner/compliance decisions**.
+
+Revalidate primary sources immediately before implementing each rule-sensitive slice, record any changed regulations or SDK versions, and tie applicable requirements to acceptance tests and official SDK fixtures. Screenshots/public UI references support design decisions but do not prove ZATCA compliance. If external sites are inaccessible, record **NOT VERIFIED**, never manufacture evidence.
+
+Research is authorized; production API traffic, sensitive credentials, change of accounting semantics, merging PRs and deploying are not authorized by this charter.
