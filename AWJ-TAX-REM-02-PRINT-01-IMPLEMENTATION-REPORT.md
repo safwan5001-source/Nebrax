@@ -4,14 +4,14 @@
 |---|---|
 | **Task** | Print/PDF follow-up to REM-02 (#1304): every amount a customer sees on a credit note reconciles with the posted amounts, to the halala. Closes the three open Codex threads on #1304 that were deferred to this slice (see §9). |
 | **Branch** | `claude/awj-tax-rem-02-print-01` |
-| **PR** | opened against `claude/awj-tax-rem-02-credit-note-vat` (**stacked on #1304**, see §1). Link in the PR / final message. |
-| **Base SHA** | `2c82b01afbc8f2a5fb4ea9d01509c9fe1776eda9` — head of #1304. (`origin/main` is `4d8e1a66…`; merge-base of #1304 with `main` is `bdecbd01…`.) |
-| **Head SHA (code)** | `e6d5548d732b470fe63d6e8e63a83d14362a2d1a` — the only code commit. The commit that adds this report changes no code. |
-| **Status** | Implemented, web-only. Focused + full web suites green, production build green. **Not merged, not deployed, no migration, no backend change.** |
+| **PR** | [#1315](https://github.com/safwan5001-source/Nebrax/pull/1315) — **retargeted to `main`** after #1304 was squash-merged (`56fcac62…`); no longer stacked (§1, §12). |
+| **Base SHA** | `5b9d9dce86988ffd03b32bcc6c158710ee9110a8` — `origin/main`, which contains the #1304 squash `56fcac621411a10506ed626f43b4d5a99b2ed798`. *(Original stack base, now historical: #1304's head `2c82b01afbc8f2a5fb4ea9d01509c9fe1776eda9`.)* |
+| **Head SHA** | Code is unchanged since `b3adda190da55e250d7940d436d9cd97e9f3af7b` (PRINT-01 `e6d5548` + PRINT-02 fix `b3adda1`). Retarget cleanup = merge commit `88e7072…` (tree `03588e1…`), then a docs-only commit for this report; the final head is the PR head. |
+| **Status** | Implemented, web-only, **PR diff = 23 files only** (post-retarget, §12). Focused + full web suites green, production build green. **Not merged, not deployed, no migration, no backend change.** |
 
 ---
 
-## 1. Why this is stacked on #1304 and cannot sit on `main`
+## 1. Why this was stacked on #1304 — **resolved: #1304 is merged, this PR now targets `main`**
 
 The print fix needs stored amounts that **only #1304 creates**:
 
@@ -22,7 +22,7 @@ The print fix needs stored amounts that **only #1304 creates**:
 | `line_discount` / `unit_price_before_tax` / `source_line_id` in the API payload | `CreditNoteLineResource` — #1304 only |
 | builder already mapping `unit_price_before_tax` | `from-credit-note.ts` — #1304 only |
 
-On `main` there is no discount datum for a credit-note line at all, so a branch from `main` could neither show a discount nor be tested against real payload shapes. **Dependency, stated explicitly:** this PR is stacked on #1304's head `2c82b01`. Merge order: #1304 first, then retarget this PR to `main` (it is 19 web-only files and rebases cleanly on top of #1304's merge). **#1304 itself is untouched** — no commit, comment or thread change was made there.
+On `main` there is no discount datum for a credit-note line at all, so a branch from `main` could neither show a discount nor be tested against real payload shapes. **Dependency (now satisfied):** this PR was stacked on #1304's head `2c82b01`; #1304 has since been squash-merged to `main` (`56fcac62`) and this PR was retargeted to `main`. The branch's original #1304 commit history was then cleaned up without rewriting history — see §12. **#1304 itself was never touched** by this work.
 
 ## 2. Root cause
 
@@ -98,18 +98,19 @@ Mutations run and caught: discount not added back to the printed subtotal (4 fai
 |---|---|
 | Focused: `builder/from-credit-note*` | 19 passed |
 | Affected: `modules/documents`, `components/credit-notes`, `modules/invoices`, `modules/print-templates` | 52 files / 459 tests passed |
-| **Full web suite** (`npm test`, the CI command) | **466 files / 4,653 tests passed** |
+| **Full web suite** (`npm test`, the CI command) — original run | 466 files / 4,653 tests passed |
+| **Full web suite on the post-retarget tree** (§12; includes the 21 PRINT-02 tests and the tests now on `main`) | **478 files / 4,828 tests passed** |
 | **`npm run build`** (the CI command) | **passed** |
 | `tsc --noEmit` | 0 new errors (26 pre-existing errors in unrelated test/e2e files, identical set before and after) |
 | PHP suites | not run — no PHP, migration or API change in this PR |
 
-CI on the PR: see the PR checks (`web-ci.yml` = `npm ci`, `npm run test`, `npm run build`). Result is stated in the final message after the run.
+CI: see §12 for the post-retarget head. (Earlier head `b3adda1`, stacked: 6/6 success.)
 
 ## 8. Compatibility
 
 * **Other document types:** their default columns, widths of existing columns, labels and totals are unchanged (asserted). New optional fields default to absent; the VAT label override needs an explicit declaration only the credit/debit-note builder makes.
 * **Saved / frozen print-template layouts:** per the registry contract, type defaults are *fallbacks*; a tenant layout (or a frozen revision on a posted note) that stores explicit `columns` keeps exactly those columns. Those tenants therefore do **not** get the new columns (see §10-1). Their totals block and VAT label still improve.
-* **Print vs PDF vs thermal:** the page renders `CreditNoteDocument` for `print-root`, `pdf-print-root` and `thermal-print-root`; the PDF is a capture of that DOM and `thermal-layout.tsx` is a page wrapper — all three consume the one model built by this builder.
+* **Print vs PDF vs thermal:** the page renders `CreditNoteDocument` for `print-root`, `pdf-print-root` and `thermal-print-root`; the PDF is a capture of that DOM and all three consume the one model built by this builder. **Correction (PRINT-02):** the thermal *receipt template* is not the A4 table/totals — it renders its own totals and, in this PR's first version, ignored `totals.discount` and `totals.taxRate`, so a discounted note printed `100.00 + 12.00 ≠ 92.00` on 58/80 mm. Fixed in `b3adda1` (`templates/thermal-receipt.tsx`: discount row, real VAT rate, rounding note); verified in real Chromium renders (PRINT-02 report, #1320). Side effect: any document with `totals.discount > 0` printed on thermal now shows the discount row (this also corrects invoices with a header discount).
 * **Debit notes:** share the builder, so the data and VAT label apply, but `debit_note` keeps the generic default columns (unchanged by design).
 * **Ledger / tax / schema:** untouched. No posted value is read differently; the builder only re-expresses stored values.
 
@@ -130,14 +131,46 @@ I did not reply to or resolve these threads on #1304; that is for the owner once
 3. **Historical rows:** unknown discount prints "—" (never 0); unit price prints "—" unless proven pre-tax by `qty × price == line_subtotal`. Net is derived from the stored `total − tax` identity.
 4. **Printed "Subtotal" for a discounted note is the pre-discount amount**, so it differs from the posted `subtotal` field (net) by the discount; `printed subtotal − printed discount = posted subtotal` exactly. Owner may prefer to keep the net subtotal and show the discount informationally — a policy/wording choice, not a calculation.
 5. **Shared label wording:** the discount row uses the existing shared label ("Invoice discount" / "خصم الفاتورة"); not changed to avoid touching invoices.
-6. **Layout not verified visually.** 9 columns on A4 are covered by structure/width tests only; narrow papers (thermal 58/80 mm, A5) were not rendered in a browser. Column widths for the new columns were chosen per composition by analogy with `price_before_tax`/`tax`.
+6. **Layout — now verified in a real browser (PRINT-02, #1320):** A4 (all 12 compositions), thermal 80 mm and 58 mm, Arabic and English, saved layouts — 122/122 renders reconcile. **Still not verified:** A5 (AWJ has no A5 paper size or template) and a physical thermal printer / roll.
 7. The jsPDF `invoice-pdf.ts` path (invoices only) got placeholder map entries; credit notes never use it.
 
 ## 11. Recommended next step
 
-1. Review/accept #1304, merge it, then retarget this PR to `main` and re-run CI.
-2. Open a visual-QA pass for the credit-note print on A4, A5 and thermal 80 mm (ar + en) and adjust widths if needed.
+1. ~~Merge #1304 and retarget~~ — done (#1304 merged `56fcac62`; #1315 retargeted; cleanup in §12).
+2. ~~Visual QA on A4/thermal~~ — done (PRINT-02). Remaining: A5 scope decision and a physical thermal-printer test.
 3. Decide §10-1 (allow the columns in saved layouts: web registry + PHP `ITEM_COLUMNS` + editor) and §10-4 (printed subtotal wording).
-4. Reply to / resolve the three Codex threads on #1304 with a pointer to this PR.
+4. The three print-related Codex threads belonged to #1304 (now merged); this PR is their resolution.
+
+**Not merged. Not deployed. No migration. No production change.**
+
+---
+
+## 12. Post-squash retarget cleanup (R1)
+
+**Symptom.** After #1304 was squash-merged (`56fcac621411a10506ed626f43b4d5a99b2ed798`) and this PR was retargeted to `main`, GitHub reported **76 changed files** and `mergeable=false`. **Cause:** the branch still carried #1304's 27 original commits, which are not ancestors of the squash commit, so the merge-base stayed at the pre-#1304 `main` (`bdecbd01…`) and the three-dot diff re-included all of REM-02 (54 of its 56 files are byte-identical on `main`; `ar.json`/`en.json` differ only because other work reached `main` first).
+
+**Approach — non-destructive, no history rewrite, no force-push.** Merged current `main` into the branch (merge commit `88e70722536d21e4545f61fe4844f076325761fa`, pushed as a plain fast-forward from `b3adda19`). That makes `main` the merge-base, so the PR diff is only the incremental change.
+
+| Step | Result |
+|---|---|
+| Fetch | `main` = `5b9d9dce86988ffd03b32bcc6c158710ee9110a8` (contains #1304 squash `56fcac62`); PR head was `b3adda190da55e250d7940d436d9cd97e9f3af7b`; 30 commits ahead of `main`, merge-base `bdecbd01` |
+| Conflicts | **1:** `web/src/modules/documents/builder/from-credit-note.ts`. `main`'s blob `1539ef5` == #1304's old-head blob (both sides had applied the same #1304 edit; this branch adds the PRINT-01 rewrite on top) ⇒ resolved by keeping this branch's version (proof: `git diff 2c82b01..HEAD` and `git diff main..HEAD` are identical for that file). `ar.json`/`en.json` auto-merged. No conflict markers. |
+| **Independent cross-check** | Replayed this branch's three commits (`e6d5548`, `1287f51`, `b3adda1`) with `git cherry-pick` onto a clean `main` worktree: resulting tree `03588e1ebb57d130e06463daf5d0a8dfc3c75eb6` is **byte-identical** to the merge result's tree. So the merge result is exactly *`main` + the PRINT commits*, nothing more, nothing lost. |
+| PR diff vs `main` (three-dot) | **23 files, +1,074 / −33** — identical to the incremental change set against #1304's old head. GitHub now reports `changed_files: 23`, base `main` @ `5b9d9dce`, head `88e70722`. |
+| Forbidden areas in the diff | **None:** no `*.php`, no `migrations`, no `app/`, no `database/` — no tax, ledger, POS, migration or accounting change. |
+| Verified fixes preserved | thermal discount row / VAT rate / rounding note (`thermal-receipt.tsx`), saved-layout discount note, column widths, builder, fixtures and all tests are in the diff unchanged (tree-identical to `b3adda1`'s content). |
+
+**Verification on the post-retarget tree (local):**
+
+| Check | Result |
+|---|---|
+| Focused: `modules/documents`, `design`, `components/credit-notes`, `modules/invoices`, `modules/print-templates` | 58 files / 585 tests pass |
+| Full web suite (`npm test`) | **478 files / 4,828 tests pass** |
+| `npm run build` | passes |
+| `tsc --noEmit` | 48 errors, **identical set to pristine `main`'s 48** (all pre-existing, in unrelated test/e2e files, e.g. `SliderFields.test.tsx`) — **0 introduced** |
+
+**CI and mergeability on `88e70722`:** **pending at time of writing** — web build, PHP sqlite/pgsql and the `storefront` check were queued/running on the merge commit. This PR changes no PHP; the previous head `b3adda1` was 6/6 green. The final result and `mergeable` state are recorded in the PR checks and in the follow-up status note.
+
+**Residual notes.** The PR still lists 31 commits (the old #1304 commits remain reachable through the branch history); this is cosmetic — the diff is 23 files — and irrelevant if the PR is squash-merged like #1304. Cleaning the commit list itself would need a force-push of this branch and was deliberately not done. The PRINT-02 evidence PR (#1320) is stacked on this branch's previous head and is unaffected (docs/QA only).
 
 **Not merged. Not deployed. No migration. No production change.**
