@@ -7,6 +7,8 @@
 | **Result** | **1 blocking defect found in #1315 (thermal), fixed in #1315 and re-verified.** All 122 cases now reconcile to the halala. A5 is **not a supported AWJ paper** (§3). **Recommendation: READY — conditional** (§11). |
 | **Not done** | No merge, no deploy, no migration, no accounting/tax/posted-value change, no change to #1304, no Codex re-review requested. |
 
+> **Post-merge update.** #1304 was squash-merged to `main` as `56fcac62…`; **#1315 was squash-merged to `main` as `3209fcb77cc4e02b729bb74c34adf7e131869a1b`** (final PR head `8615b3e9…`, CI 5/5 success, `mergeable_state: clean`, 23 web-only files). The fixes this report found (thermal discount row / real VAT rate / rounding note, saved-layout note, header widths) are therefore **on `main`**. What remains in *this* PR is docs/QA only: the report, the evidence, the isolated `/document-qa/credit-note` route and the capture scripts. Its branch was cleaned up by merging `main` (no history rewrite); the "merge order" in §11 is now historical — #1304 → #1315 are done, this PR is optional. SHAs quoted below are as of the verification run.
+
 ---
 
 ## 1. PR and SHA status (re-fetched at start of this task)
