@@ -69,6 +69,10 @@ class StorefrontCommerceFirewallTest extends TestCase
     {
         $words = array_map('strtolower', preg_split('/[\s_\-]+|(?<=[a-z0-9])(?=[A-Z])/', $key, -1, PREG_SPLIT_NO_EMPTY) ?: []);
 
+        if (in_array($key, $fixture['selectorKeys'], true)) {
+            return false;
+        }
+
         return array_intersect($words, $fixture['commerceWords']) !== [] && ! in_array(end($words), $fixture['presentationSuffixes'], true);
     }
 
@@ -81,7 +85,7 @@ class StorefrontCommerceFirewallTest extends TestCase
     {
         $found = [];
         foreach ($node as $key => $value) {
-            if (is_string($key) && (is_int($value) || is_float($value))) {
+            if (is_string($key) && (is_int($value) || is_float($value) || (is_array($value) && array_filter($value, static fn ($v): bool => is_int($v) || is_float($v)) !== []))) {
                 $words = array_map('strtolower', preg_split('/[\s_\-]+|(?<=[a-z0-9])(?=[A-Z])/', $key, -1, PREG_SPLIT_NO_EMPTY) ?: []);
                 if (array_intersect($words, $fixture['commerceWords']) !== []) {
                     $found[] = $key;
@@ -231,6 +235,36 @@ class StorefrontCommerceFirewallTest extends TestCase
                 }
                 $short = ltrim(strrchr('\\'.$token[1], '\\'), '\\');
                 $this->assertArrayNotHasKey($short, $owners, basename($file)." names {$token[1]}, a class outside the presentation layer (it may own price, offer, stock, tax or shipping truth)");
+            }
+        }
+    }
+
+    /** @test */
+    public function the_presentation_owning_services_name_no_commerce_truth_owner(): void
+    {
+        $services = dirname(__DIR__, 2).'/app/Services/Commerce';
+        // the services that persist / publish / index the presentation document (draft → published path, versions, media references);
+        // StorefrontVerticalSetupService is excluded because it SETS UP a store (creating its fulfilment policy), it does not persist presentation values
+        $owning = [
+            'StorefrontPresentationService', 'StorefrontPresentationVersionService', 'StorefrontPresentationVersionBackfillService',
+            'ScheduledPresentationDispatcher', 'StorefrontMediaReferenceScanner', 'StorefrontPublishedMediaIndex',
+        ];
+        $truthOwners = [
+            'CommercePriceResolver', 'StorefrontOfferResolver', 'StorefrontOffer', 'PriceListService', 'ProductPricingService', 'AvailableToSellService',
+            'ShippingRateService', 'CommerceDeliveryPromiseService', 'InventoryReservationService', 'FulfillmentPolicyService', 'CommerceCartService',
+            'CommerceCheckoutService', 'CommerceOrderService', 'CommercePaymentIntentService', 'Product', 'ProductVariant', 'PriceList', 'PriceListItem',
+            'StockMovement', 'ProductWarehouseStock', 'InventoryReservation', 'CommerceListing', 'Invoice', 'Payment', 'LedgerService', 'JournalEntry',
+            'CommerceOrder', 'CommerceCart',
+        ];
+
+        foreach ($owning as $name) {
+            $this->assertFileExists("{$services}/{$name}.php");
+            foreach (token_get_all((string) file_get_contents("{$services}/{$name}.php")) as $token) {
+                if (! is_array($token) || ! in_array($token[0], [T_STRING, T_NAME_QUALIFIED, T_NAME_FULLY_QUALIFIED], true)) {
+                    continue;
+                }
+                $short = ltrim(strrchr('\\'.$token[1], '\\'), '\\');
+                $this->assertNotContains($short, $truthOwners, "{$name} names {$short}, a commerce-truth owner");
             }
         }
     }

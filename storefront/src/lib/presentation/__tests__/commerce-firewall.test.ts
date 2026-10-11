@@ -6,6 +6,7 @@ import { normalizePresentationConfig } from "../config";
 interface Fixture {
   commerceWords: string[];
   presentationSuffixes: string[];
+  selectorKeys: string[];
   deniedKeys: string[];
   allowedKeys: string[];
   forbiddenValues: string[];
@@ -36,6 +37,7 @@ function keysOf(node: unknown, out: Set<string> = new Set()): Set<string> {
 
 /** The deny rule shared with the PHP suite (see the fixture note): denied when any word is a commerce word and the LAST word is not a presentation suffix. */
 function denies(key: string): boolean {
+  if (fixture.selectorKeys.includes(key)) return false;
   const words = key
     .split(/[\s_-]+|(?<=[a-z0-9])(?=[A-Z])/)
     .filter(Boolean)
@@ -56,10 +58,11 @@ function numericCommerceKeys(node: unknown, out: string[] = []): string[] {
         .split(/[\s_-]+|(?<=[a-z0-9])(?=[A-Z])/)
         .filter(Boolean)
         .map((word) => word.toLowerCase());
-      if (
-        typeof value === "number" &&
-        words.some((word) => fixture.commerceWords.includes(word))
-      )
+      const numeric =
+        typeof value === "number" ||
+        (Array.isArray(value) &&
+          value.some((item) => typeof item === "number"));
+      if (numeric && words.some((word) => fixture.commerceWords.includes(word)))
         out.push(key);
       numericCommerceKeys(value, out);
     }
