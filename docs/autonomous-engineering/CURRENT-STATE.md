@@ -1,5 +1,20 @@
 # AWJ Autonomous Engineering — Current State
 
+LAST_UPDATED: 2026-10-11 (OWNER DECISION: **AWJ Delivery Platforms & Settlement Horizon V1 is PAUSED; AWJ TAX-ZATCA Horizon is the sole designated ACTIVE horizon**, effective on merge of PR #1324. Planning/activation docs only; no remediation PR, production deployment, or migration authorized by this statement.)
+LAYER_VERSION: V1
+STATUS: TAX-ZATCA HORIZON ACTIVE UPON MERGE OF ACTIVATION PR #1324 — use `docs/audits/horizon/AWJ-TAX-ZATCA-HORIZON-{MASTER-PLAN,TASK-QUEUE,BOOTSTRAP}.md`. **TAX-HZ-00 is the only first task; read-only Evidence/Decision Pass.** Separate owner approval is required for every PR merge. The Delivery entries below are historical frozen snapshots, not the active queue.
+
+## Paused Horizon handoff — Delivery Platforms & Settlement
+- Owner instruction: pause implementation, do not close/delete prior progress. No new delivery PR, merge, execution, or deploy is authorized by the TAX activation.
+- Last durable Delivery snapshot (2026-10-04): DELIVERY-DECISION-PASS-6 merged at `aea1e9290503da1325be5713654dd98ad4beb5c8`; OD-DG-3-POSTING-GATE accepted, DG-3 **NOT CLOSED**; DLV-FINANCIAL-ROLE-CONFIG-1 was **in review / not merged at that snapshot**. Its **live PR state must be reverified at resumption**. Do not infer it has merged or authorize invoice posting.
+- Preserve `docs/autonomous-engineering/TASK-QUEUE.md` Delivery section, ADRs, reports and open gates intact. On resumption, fetch current main/PRs and confirm unmet dependencies; do not assume this handoff's historical status is current.
+- Cross-horizon conflict: TAX changes to invoices, VAT, payments, tenant/branch permissions or locks must not silently trigger Delivery work; any overlap requires specific ownership/contract review.
+
+## Active Horizon objective — TAX-HZ-00
+Run a narrow, read-only evidence and policy pass against the 40-task VAT/ZATCA remediation plan and current main. Confirm candidate REM-03 / REM-11 / REM-04 priority and record remaining material decisions before code. No ZATCA production claims, live submission, deploy, or migration. Stop before implementation until this evidence gate is accepted.
+
+## Earlier state (historical, superseded)
+
 > This file is a durable resume point, not a substitute for Git/GitHub evidence.
 
 LAST_UPDATED: 2026-10-04 (**AWJ Delivery Platforms & Settlement Horizon V1 is the single ACTIVE horizon.** DELIVERY-DECISION-PASS-6 is merged at `aea1e9290503da1325be5713654dd98ad4beb5c8`. OD-DG-3-POSTING-GATE is accepted. DG-3 is not closed. **DLV-FINANCIAL-ROLE-CONFIG-1 is in review and not merged.** It stores the gate. It does not post. No deploy.)
