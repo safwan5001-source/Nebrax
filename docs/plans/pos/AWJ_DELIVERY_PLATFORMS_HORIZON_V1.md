@@ -1,7 +1,7 @@
 # AWJ Delivery Platforms & Settlement Horizon V1
 
 **System:** AWJ Autonomous Engineering Horizon  
-**Status:** ACTIVE — PASS-7 accepted; PASS-8 merged; Connector Core merged (PR #1287); DLV-PROVIDER-READINESS-1 recorded; DLV-CHANNEL-REPORT-1 design recorded; no native connector promoted
+**Status:** ACTIVE — PASS-7 accepted; PASS-8 merged; Connector Core merged (PR #1287); DLV-PROVIDER-READINESS-1 recorded; DLV-CHANNEL-REPORT-1 design merged; DLV-CHANNEL-REPORT-API-1 implemented, not merged; no native connector promoted
 **Prepared:** 2026-10-02  
 **Planning Base SHA:** `78ca324504db30185bc074fd91e77efbccaf7267`  
 **Primary decision:** `docs/plans/pos/AWJ_POS_DELIVERY_PLATFORMS_ACCOUNTING_UX_DECISION.md`  
@@ -155,15 +155,16 @@ The Chefz stay not enabled. None is `READY` for a connector, and none is
 that report exists. No adapter, credential, webhook, or financial task is
 authorized by this horizon update.
 
-`DLV-CHANNEL-REPORT-1` is an evidence and design pass only, recorded in
-`docs/plans/pos/DLV-CHANNEL-REPORT-1-EVIDENCE-DESIGN.md` (base
-`999e06c52cd9e7dba3d8e16b3be00fc8d9ad9fa0`). It specifies a read-only report
-over posted POS invoices that already have a delivery context. It does not
-count Hub rows as sales, does not change VAT or posting, and does not promote
-a connector or a financial implementation task. The combined net of POS
-returns plus credit notes stays blocked. The next implementation candidate
-after that design merges, and only with separate authorization, is the
-read-only `DLV-CHANNEL-REPORT-API-1` slice.
+`DLV-CHANNEL-REPORT-1` is merged at `896516f1d954184b619603d3150d23794ad01e69`.
+The read-only `DLV-CHANNEL-REPORT-API-1` slice implements
+`GET /api/reports/delivery-channel` from that design: metrics 1–9, platform
+comparison, drill-down, and the two exception counts. It does not join Hub,
+does not export CSV, and does not change posting or VAT. Spreadsheet-formula
+neutralization stays a `DLV-CHANNEL-REPORT-UI-1` requirement and is not
+claimed by the API. Hub operational count remains
+`DLV-CHANNEL-REPORT-HUB-COUNT-1`. Combined net, commissions, settlements,
+imported posting, and native connectors stay blocked. UI-1 is the next
+candidate only after this API slice merges.
 
 ## 6. Task acceptance highlights
 
