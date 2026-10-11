@@ -76,6 +76,20 @@ class StorefrontCommerceFirewallTest extends TestCase
     }
 
     /** @test */
+    public function the_deny_pattern_matches_value_bearing_keys_and_never_an_allowed_presentation_control(): void
+    {
+        $fixture = $this->fixture();
+        $pattern = '/'.$fixture['forbiddenKeyPattern'].'/i';
+
+        foreach ($fixture['allowedKeys'] as $key) {
+            $this->assertSame(0, preg_match($pattern, $key), "{$key} is an allowed presentation control but the deny pattern rejects it");
+        }
+        foreach (['price', 'salePrice', 'stockCount', 'shippingFee', 'offerStatus', 'grandTotal'] as $key) {
+            $this->assertSame(1, preg_match($pattern, $key), "{$key} must be denied");
+        }
+    }
+
+    /** @test */
     public function the_legitimate_parts_of_the_hostile_document_still_normalise(): void
     {
         $normalized = (new StorefrontPresentationNormalizer)->normalize($this->fixture()['input']);

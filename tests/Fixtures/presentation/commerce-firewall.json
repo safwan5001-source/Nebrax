@@ -1,6 +1,16 @@
 {
-    "_note": "CUST-HV V9d-4 — commerce firewall (V0 §14.3). A hostile document: every scope the production normalizer accepts (document tokens, branding, header, footer, contact, whatsapp, social, verification, sbc, apps, navigation, pagePresentation, announcements, palette, homepage sections, section content, section design, design.cards, nested items) carries commercial keys (price, discount, stock, availability, tax, total, currency, sku, quantity, shipping fee / amount, freight, delivery fee, offer status, coupon code, cost). After normalisation NO such key may survive anywhere, and no injected value may be reachable. Shared by PHP StorefrontPresentationNormalizer and both TS twins (normalizePresentationConfig).",
-    "forbiddenKeyPattern": "price|discount|stock|availab|tax|vat|total|amount|currency|inventory|quantity|sku|shipping|freight|fee|offerstatus|offer_status|coupon|cost",
+    "_note": "CUST-HV V9d-4 — commerce firewall (V0 §14.3). A hostile document: every scope the production normalizer accepts (document tokens, branding, header, footer, contact, whatsapp, social, verification, sbc, apps, navigation, pagePresentation, announcements, palette, homepage sections, section content, section design, design.cards, nested items) carries commercial keys (price, discount, stock, availability, tax, total, currency, sku, quantity, shipping fee / amount, freight, delivery fee, offer status, coupon code, cost). After normalisation NO such key may survive anywhere, and no injected value may be reachable. Shared by PHP StorefrontPresentationNormalizer and both TS twins (normalizePresentationConfig). `forbiddenKeyPattern` matches the exact value-bearing commercial key names (anchored); `allowedKeys` are presentation controls V0 §14.3 allows (position / colour role / size step of price, stock or badge text) and must never match, so a legitimate future control is not rejected by the scan.",
+    "forbiddenKeyPattern": "^(price|priceMinor|salePrice|compareAtPrice|discount|discountPercent|discountAmount|stock|stockCount|stockLabel|availability|tax|taxRate|vat|total|grandTotal|amount|currency|sku|quantity|inventory|shippingFee|shippingAmount|freight|deliveryFee|fee|offerStatus|offer_status|couponCode|cost)$",
+    "allowedKeys": [
+        "pricePosition",
+        "priceColorRole",
+        "priceSizeStep",
+        "stockTextSize",
+        "compareAtPriceSize",
+        "availabilityBadgePlacement",
+        "badgeVisible",
+        "showStockText"
+    ],
     "forbiddenValues": [
         "10%",
         "in_stock",
@@ -39,7 +49,13 @@
             "offerStatus": "expired",
             "offer_status": "live",
             "couponCode": "SAVE20",
-            "cost": 7
+            "cost": 7,
+            "salePrice": 9000,
+            "compareAtPrice": 12000,
+            "stockCount": 4,
+            "taxRate": 15,
+            "discountAmount": 300,
+            "grandTotal": 999
         },
         "surfaces": {
             "radius": "md",
@@ -64,7 +80,13 @@
             "offerStatus": "expired",
             "offer_status": "live",
             "couponCode": "SAVE20",
-            "cost": 7
+            "cost": 7,
+            "salePrice": 9000,
+            "compareAtPrice": 12000,
+            "stockCount": 4,
+            "taxRate": 15,
+            "discountAmount": 300,
+            "grandTotal": 999
         },
         "typography": {
             "headingScale": "lg",
@@ -89,7 +111,13 @@
             "offerStatus": "expired",
             "offer_status": "live",
             "couponCode": "SAVE20",
-            "cost": 7
+            "cost": 7,
+            "salePrice": 9000,
+            "compareAtPrice": 12000,
+            "stockCount": 4,
+            "taxRate": 15,
+            "discountAmount": 300,
+            "grandTotal": 999
         },
         "layout": {
             "contentWidth": "wide",
@@ -114,7 +142,13 @@
             "offerStatus": "expired",
             "offer_status": "live",
             "couponCode": "SAVE20",
-            "cost": 7
+            "cost": 7,
+            "salePrice": 9000,
+            "compareAtPrice": 12000,
+            "stockCount": 4,
+            "taxRate": 15,
+            "discountAmount": 300,
+            "grandTotal": 999
         },
         "motion": {
             "reveal": "fade-up",
@@ -139,7 +173,13 @@
             "offerStatus": "expired",
             "offer_status": "live",
             "couponCode": "SAVE20",
-            "cost": 7
+            "cost": 7,
+            "salePrice": 9000,
+            "compareAtPrice": 12000,
+            "stockCount": 4,
+            "taxRate": 15,
+            "discountAmount": 300,
+            "grandTotal": 999
         },
         "productCard": {
             "density": "compact",
@@ -164,7 +204,13 @@
             "offerStatus": "expired",
             "offer_status": "live",
             "couponCode": "SAVE20",
-            "cost": 7
+            "cost": 7,
+            "salePrice": 9000,
+            "compareAtPrice": 12000,
+            "stockCount": 4,
+            "taxRate": 15,
+            "discountAmount": 300,
+            "grandTotal": 999
         },
         "homepage": {
             "sections": [
@@ -209,7 +255,13 @@
                         "offerStatus": "expired",
                         "offer_status": "live",
                         "couponCode": "SAVE20",
-                        "cost": 7
+                        "cost": 7,
+                        "salePrice": 9000,
+                        "compareAtPrice": 12000,
+                        "stockCount": 4,
+                        "taxRate": 15,
+                        "discountAmount": 300,
+                        "grandTotal": 999
                     },
                     "design": {
                         "layout": "rail",
@@ -240,7 +292,13 @@
                             "offerStatus": "expired",
                             "offer_status": "live",
                             "couponCode": "SAVE20",
-                            "cost": 7
+                            "cost": 7,
+                            "salePrice": 9000,
+                            "compareAtPrice": 12000,
+                            "stockCount": 4,
+                            "taxRate": 15,
+                            "discountAmount": 300,
+                            "grandTotal": 999
                         },
                         "border": "hairline",
                         "radius": "md",
@@ -268,7 +326,13 @@
                             "offerStatus": "expired",
                             "offer_status": "live",
                             "couponCode": "SAVE20",
-                            "cost": 7
+                            "cost": 7,
+                            "salePrice": 9000,
+                            "compareAtPrice": 12000,
+                            "stockCount": 4,
+                            "taxRate": 15,
+                            "discountAmount": 300,
+                            "grandTotal": 999
                         },
                         "price": 1,
                         "priceMinor": 100,
@@ -291,7 +355,13 @@
                         "offerStatus": "expired",
                         "offer_status": "live",
                         "couponCode": "SAVE20",
-                        "cost": 7
+                        "cost": 7,
+                        "salePrice": 9000,
+                        "compareAtPrice": 12000,
+                        "stockCount": 4,
+                        "taxRate": 15,
+                        "discountAmount": 300,
+                        "grandTotal": 999
                     },
                     "shippingFee": 1500,
                     "shippingAmount": 900,
@@ -301,7 +371,13 @@
                     "offerStatus": "expired",
                     "offer_status": "live",
                     "couponCode": "SAVE20",
-                    "cost": 7
+                    "cost": 7,
+                    "salePrice": 9000,
+                    "compareAtPrice": 12000,
+                    "stockCount": 4,
+                    "taxRate": 15,
+                    "discountAmount": 300,
+                    "grandTotal": 999
                 },
                 {
                     "id": "s-2",
@@ -346,7 +422,13 @@
                         "offerStatus": "expired",
                         "offer_status": "live",
                         "couponCode": "SAVE20",
-                        "cost": 7
+                        "cost": 7,
+                        "salePrice": 9000,
+                        "compareAtPrice": 12000,
+                        "stockCount": 4,
+                        "taxRate": 15,
+                        "discountAmount": 300,
+                        "grandTotal": 999
                     },
                     "design": {
                         "layout": "rail",
@@ -377,7 +459,13 @@
                             "offerStatus": "expired",
                             "offer_status": "live",
                             "couponCode": "SAVE20",
-                            "cost": 7
+                            "cost": 7,
+                            "salePrice": 9000,
+                            "compareAtPrice": 12000,
+                            "stockCount": 4,
+                            "taxRate": 15,
+                            "discountAmount": 300,
+                            "grandTotal": 999
                         },
                         "border": "hairline",
                         "radius": "md",
@@ -405,7 +493,13 @@
                             "offerStatus": "expired",
                             "offer_status": "live",
                             "couponCode": "SAVE20",
-                            "cost": 7
+                            "cost": 7,
+                            "salePrice": 9000,
+                            "compareAtPrice": 12000,
+                            "stockCount": 4,
+                            "taxRate": 15,
+                            "discountAmount": 300,
+                            "grandTotal": 999
                         },
                         "price": 1,
                         "priceMinor": 100,
@@ -428,7 +522,13 @@
                         "offerStatus": "expired",
                         "offer_status": "live",
                         "couponCode": "SAVE20",
-                        "cost": 7
+                        "cost": 7,
+                        "salePrice": 9000,
+                        "compareAtPrice": 12000,
+                        "stockCount": 4,
+                        "taxRate": 15,
+                        "discountAmount": 300,
+                        "grandTotal": 999
                     },
                     "shippingFee": 1500,
                     "shippingAmount": 900,
@@ -438,7 +538,13 @@
                     "offerStatus": "expired",
                     "offer_status": "live",
                     "couponCode": "SAVE20",
-                    "cost": 7
+                    "cost": 7,
+                    "salePrice": 9000,
+                    "compareAtPrice": 12000,
+                    "stockCount": 4,
+                    "taxRate": 15,
+                    "discountAmount": 300,
+                    "grandTotal": 999
                 },
                 {
                     "id": "s-3",
@@ -483,7 +589,13 @@
                         "offerStatus": "expired",
                         "offer_status": "live",
                         "couponCode": "SAVE20",
-                        "cost": 7
+                        "cost": 7,
+                        "salePrice": 9000,
+                        "compareAtPrice": 12000,
+                        "stockCount": 4,
+                        "taxRate": 15,
+                        "discountAmount": 300,
+                        "grandTotal": 999
                     },
                     "design": {
                         "columns": 2,
@@ -513,7 +625,13 @@
                             "offerStatus": "expired",
                             "offer_status": "live",
                             "couponCode": "SAVE20",
-                            "cost": 7
+                            "cost": 7,
+                            "salePrice": 9000,
+                            "compareAtPrice": 12000,
+                            "stockCount": 4,
+                            "taxRate": 15,
+                            "discountAmount": 300,
+                            "grandTotal": 999
                         },
                         "price": 1,
                         "priceMinor": 100,
@@ -536,7 +654,13 @@
                         "offerStatus": "expired",
                         "offer_status": "live",
                         "couponCode": "SAVE20",
-                        "cost": 7
+                        "cost": 7,
+                        "salePrice": 9000,
+                        "compareAtPrice": 12000,
+                        "stockCount": 4,
+                        "taxRate": 15,
+                        "discountAmount": 300,
+                        "grandTotal": 999
                     },
                     "shippingFee": 1500,
                     "shippingAmount": 900,
@@ -546,7 +670,13 @@
                     "offerStatus": "expired",
                     "offer_status": "live",
                     "couponCode": "SAVE20",
-                    "cost": 7
+                    "cost": 7,
+                    "salePrice": 9000,
+                    "compareAtPrice": 12000,
+                    "stockCount": 4,
+                    "taxRate": 15,
+                    "discountAmount": 300,
+                    "grandTotal": 999
                 },
                 {
                     "id": "s-4",
@@ -591,7 +721,13 @@
                             "offerStatus": "expired",
                             "offer_status": "live",
                             "couponCode": "SAVE20",
-                            "cost": 7
+                            "cost": 7,
+                            "salePrice": 9000,
+                            "compareAtPrice": 12000,
+                            "stockCount": 4,
+                            "taxRate": 15,
+                            "discountAmount": 300,
+                            "grandTotal": 999
                         },
                         "limit": 8,
                         "deliverToday": false,
@@ -616,7 +752,13 @@
                         "offerStatus": "expired",
                         "offer_status": "live",
                         "couponCode": "SAVE20",
-                        "cost": 7
+                        "cost": 7,
+                        "salePrice": 9000,
+                        "compareAtPrice": 12000,
+                        "stockCount": 4,
+                        "taxRate": 15,
+                        "discountAmount": 300,
+                        "grandTotal": 999
                     },
                     "design": {
                         "layout": "rail",
@@ -647,7 +789,13 @@
                             "offerStatus": "expired",
                             "offer_status": "live",
                             "couponCode": "SAVE20",
-                            "cost": 7
+                            "cost": 7,
+                            "salePrice": 9000,
+                            "compareAtPrice": 12000,
+                            "stockCount": 4,
+                            "taxRate": 15,
+                            "discountAmount": 300,
+                            "grandTotal": 999
                         },
                         "border": "hairline",
                         "radius": "md",
@@ -675,7 +823,13 @@
                             "offerStatus": "expired",
                             "offer_status": "live",
                             "couponCode": "SAVE20",
-                            "cost": 7
+                            "cost": 7,
+                            "salePrice": 9000,
+                            "compareAtPrice": 12000,
+                            "stockCount": 4,
+                            "taxRate": 15,
+                            "discountAmount": 300,
+                            "grandTotal": 999
                         },
                         "price": 1,
                         "priceMinor": 100,
@@ -698,7 +852,13 @@
                         "offerStatus": "expired",
                         "offer_status": "live",
                         "couponCode": "SAVE20",
-                        "cost": 7
+                        "cost": 7,
+                        "salePrice": 9000,
+                        "compareAtPrice": 12000,
+                        "stockCount": 4,
+                        "taxRate": 15,
+                        "discountAmount": 300,
+                        "grandTotal": 999
                     },
                     "shippingFee": 1500,
                     "shippingAmount": 900,
@@ -708,7 +868,13 @@
                     "offerStatus": "expired",
                     "offer_status": "live",
                     "couponCode": "SAVE20",
-                    "cost": 7
+                    "cost": 7,
+                    "salePrice": 9000,
+                    "compareAtPrice": 12000,
+                    "stockCount": 4,
+                    "taxRate": 15,
+                    "discountAmount": 300,
+                    "grandTotal": 999
                 },
                 {
                     "id": "s-5",
@@ -754,7 +920,13 @@
                                 "offerStatus": "expired",
                                 "offer_status": "live",
                                 "couponCode": "SAVE20",
-                                "cost": 7
+                                "cost": 7,
+                                "salePrice": 9000,
+                                "compareAtPrice": 12000,
+                                "stockCount": 4,
+                                "taxRate": 15,
+                                "discountAmount": 300,
+                                "grandTotal": 999
                             }
                         ],
                         "price": 1,
@@ -778,7 +950,13 @@
                         "offerStatus": "expired",
                         "offer_status": "live",
                         "couponCode": "SAVE20",
-                        "cost": 7
+                        "cost": 7,
+                        "salePrice": 9000,
+                        "compareAtPrice": 12000,
+                        "stockCount": 4,
+                        "taxRate": 15,
+                        "discountAmount": 300,
+                        "grandTotal": 999
                     },
                     "design": {
                         "height": "tall",
@@ -803,7 +981,13 @@
                         "offerStatus": "expired",
                         "offer_status": "live",
                         "couponCode": "SAVE20",
-                        "cost": 7
+                        "cost": 7,
+                        "salePrice": 9000,
+                        "compareAtPrice": 12000,
+                        "stockCount": 4,
+                        "taxRate": 15,
+                        "discountAmount": 300,
+                        "grandTotal": 999
                     },
                     "shippingFee": 1500,
                     "shippingAmount": 900,
@@ -813,7 +997,13 @@
                     "offerStatus": "expired",
                     "offer_status": "live",
                     "couponCode": "SAVE20",
-                    "cost": 7
+                    "cost": 7,
+                    "salePrice": 9000,
+                    "compareAtPrice": 12000,
+                    "stockCount": 4,
+                    "taxRate": 15,
+                    "discountAmount": 300,
+                    "grandTotal": 999
                 },
                 {
                     "id": "s-6",
@@ -859,7 +1049,13 @@
                                 "offerStatus": "expired",
                                 "offer_status": "live",
                                 "couponCode": "SAVE20",
-                                "cost": 7
+                                "cost": 7,
+                                "salePrice": 9000,
+                                "compareAtPrice": 12000,
+                                "stockCount": 4,
+                                "taxRate": 15,
+                                "discountAmount": 300,
+                                "grandTotal": 999
                             }
                         ],
                         "price": 1,
@@ -883,7 +1079,13 @@
                         "offerStatus": "expired",
                         "offer_status": "live",
                         "couponCode": "SAVE20",
-                        "cost": 7
+                        "cost": 7,
+                        "salePrice": 9000,
+                        "compareAtPrice": 12000,
+                        "stockCount": 4,
+                        "taxRate": 15,
+                        "discountAmount": 300,
+                        "grandTotal": 999
                     },
                     "design": {
                         "layout": "columns-3",
@@ -908,7 +1110,13 @@
                         "offerStatus": "expired",
                         "offer_status": "live",
                         "couponCode": "SAVE20",
-                        "cost": 7
+                        "cost": 7,
+                        "salePrice": 9000,
+                        "compareAtPrice": 12000,
+                        "stockCount": 4,
+                        "taxRate": 15,
+                        "discountAmount": 300,
+                        "grandTotal": 999
                     },
                     "shippingFee": 1500,
                     "shippingAmount": 900,
@@ -918,7 +1126,13 @@
                     "offerStatus": "expired",
                     "offer_status": "live",
                     "couponCode": "SAVE20",
-                    "cost": 7
+                    "cost": 7,
+                    "salePrice": 9000,
+                    "compareAtPrice": 12000,
+                    "stockCount": 4,
+                    "taxRate": 15,
+                    "discountAmount": 300,
+                    "grandTotal": 999
                 },
                 {
                     "id": "s-7",
@@ -964,7 +1178,13 @@
                                 "offerStatus": "expired",
                                 "offer_status": "live",
                                 "couponCode": "SAVE20",
-                                "cost": 7
+                                "cost": 7,
+                                "salePrice": 9000,
+                                "compareAtPrice": 12000,
+                                "stockCount": 4,
+                                "taxRate": 15,
+                                "discountAmount": 300,
+                                "grandTotal": 999
                             },
                             {
                                 "id": "b2",
@@ -993,7 +1213,13 @@
                                 "offerStatus": "expired",
                                 "offer_status": "live",
                                 "couponCode": "SAVE20",
-                                "cost": 7
+                                "cost": 7,
+                                "salePrice": 9000,
+                                "compareAtPrice": 12000,
+                                "stockCount": 4,
+                                "taxRate": 15,
+                                "discountAmount": 300,
+                                "grandTotal": 999
                             }
                         ],
                         "price": 1,
@@ -1017,7 +1243,13 @@
                         "offerStatus": "expired",
                         "offer_status": "live",
                         "couponCode": "SAVE20",
-                        "cost": 7
+                        "cost": 7,
+                        "salePrice": 9000,
+                        "compareAtPrice": 12000,
+                        "stockCount": 4,
+                        "taxRate": 15,
+                        "discountAmount": 300,
+                        "grandTotal": 999
                     },
                     "design": {
                         "align": "center",
@@ -1042,7 +1274,13 @@
                         "offerStatus": "expired",
                         "offer_status": "live",
                         "couponCode": "SAVE20",
-                        "cost": 7
+                        "cost": 7,
+                        "salePrice": 9000,
+                        "compareAtPrice": 12000,
+                        "stockCount": 4,
+                        "taxRate": 15,
+                        "discountAmount": 300,
+                        "grandTotal": 999
                     },
                     "shippingFee": 1500,
                     "shippingAmount": 900,
@@ -1052,7 +1290,13 @@
                     "offerStatus": "expired",
                     "offer_status": "live",
                     "couponCode": "SAVE20",
-                    "cost": 7
+                    "cost": 7,
+                    "salePrice": 9000,
+                    "compareAtPrice": 12000,
+                    "stockCount": 4,
+                    "taxRate": 15,
+                    "discountAmount": 300,
+                    "grandTotal": 999
                 }
             ],
             "price": 1,
@@ -1076,7 +1320,13 @@
             "offerStatus": "expired",
             "offer_status": "live",
             "couponCode": "SAVE20",
-            "cost": 7
+            "cost": 7,
+            "salePrice": 9000,
+            "compareAtPrice": 12000,
+            "stockCount": 4,
+            "taxRate": 15,
+            "discountAmount": 300,
+            "grandTotal": 999
         },
         "price": 1,
         "priceMinor": 100,
@@ -1114,7 +1364,13 @@
             "offerStatus": "expired",
             "offer_status": "live",
             "couponCode": "SAVE20",
-            "cost": 7
+            "cost": 7,
+            "salePrice": 9000,
+            "compareAtPrice": 12000,
+            "stockCount": 4,
+            "taxRate": 15,
+            "discountAmount": 300,
+            "grandTotal": 999
         },
         "header": {
             "style": "compact",
@@ -1146,7 +1402,13 @@
                     "offerStatus": "expired",
                     "offer_status": "live",
                     "couponCode": "SAVE20",
-                    "cost": 7
+                    "cost": 7,
+                    "salePrice": 9000,
+                    "compareAtPrice": 12000,
+                    "stockCount": 4,
+                    "taxRate": 15,
+                    "discountAmount": 300,
+                    "grandTotal": 999
                 }
             ],
             "design": {
@@ -1172,7 +1434,13 @@
                 "offerStatus": "expired",
                 "offer_status": "live",
                 "couponCode": "SAVE20",
-                "cost": 7
+                "cost": 7,
+                "salePrice": 9000,
+                "compareAtPrice": 12000,
+                "stockCount": 4,
+                "taxRate": 15,
+                "discountAmount": 300,
+                "grandTotal": 999
             },
             "price": 1,
             "priceMinor": 100,
@@ -1195,7 +1463,13 @@
             "offerStatus": "expired",
             "offer_status": "live",
             "couponCode": "SAVE20",
-            "cost": 7
+            "cost": 7,
+            "salePrice": 9000,
+            "compareAtPrice": 12000,
+            "stockCount": 4,
+            "taxRate": 15,
+            "discountAmount": 300,
+            "grandTotal": 999
         },
         "footer": {
             "tagline": "نصنع الفرق",
@@ -1222,7 +1496,13 @@
                 "offerStatus": "expired",
                 "offer_status": "live",
                 "couponCode": "SAVE20",
-                "cost": 7
+                "cost": 7,
+                "salePrice": 9000,
+                "compareAtPrice": 12000,
+                "stockCount": 4,
+                "taxRate": 15,
+                "discountAmount": 300,
+                "grandTotal": 999
             },
             "groups": [
                 {
@@ -1257,7 +1537,13 @@
                                 "offerStatus": "expired",
                                 "offer_status": "live",
                                 "couponCode": "SAVE20",
-                                "cost": 7
+                                "cost": 7,
+                                "salePrice": 9000,
+                                "compareAtPrice": 12000,
+                                "stockCount": 4,
+                                "taxRate": 15,
+                                "discountAmount": 300,
+                                "grandTotal": 999
                             },
                             "price": 1,
                             "priceMinor": 100,
@@ -1280,7 +1566,13 @@
                             "offerStatus": "expired",
                             "offer_status": "live",
                             "couponCode": "SAVE20",
-                            "cost": 7
+                            "cost": 7,
+                            "salePrice": 9000,
+                            "compareAtPrice": 12000,
+                            "stockCount": 4,
+                            "taxRate": 15,
+                            "discountAmount": 300,
+                            "grandTotal": 999
                         }
                     ],
                     "price": 1,
@@ -1304,7 +1596,13 @@
                     "offerStatus": "expired",
                     "offer_status": "live",
                     "couponCode": "SAVE20",
-                    "cost": 7
+                    "cost": 7,
+                    "salePrice": 9000,
+                    "compareAtPrice": 12000,
+                    "stockCount": 4,
+                    "taxRate": 15,
+                    "discountAmount": 300,
+                    "grandTotal": 999
                 }
             ],
             "price": 1,
@@ -1328,7 +1626,13 @@
             "offerStatus": "expired",
             "offer_status": "live",
             "couponCode": "SAVE20",
-            "cost": 7
+            "cost": 7,
+            "salePrice": 9000,
+            "compareAtPrice": 12000,
+            "stockCount": 4,
+            "taxRate": 15,
+            "discountAmount": 300,
+            "grandTotal": 999
         },
         "contact": {
             "email": "hello@example.com",
@@ -1353,7 +1657,13 @@
             "offerStatus": "expired",
             "offer_status": "live",
             "couponCode": "SAVE20",
-            "cost": 7
+            "cost": 7,
+            "salePrice": 9000,
+            "compareAtPrice": 12000,
+            "stockCount": 4,
+            "taxRate": 15,
+            "discountAmount": 300,
+            "grandTotal": 999
         },
         "whatsapp": {
             "enabled": true,
@@ -1381,7 +1691,13 @@
             "offerStatus": "expired",
             "offer_status": "live",
             "couponCode": "SAVE20",
-            "cost": 7
+            "cost": 7,
+            "salePrice": 9000,
+            "compareAtPrice": 12000,
+            "stockCount": 4,
+            "taxRate": 15,
+            "discountAmount": 300,
+            "grandTotal": 999
         },
         "social": [
             {
@@ -1410,7 +1726,13 @@
                 "offerStatus": "expired",
                 "offer_status": "live",
                 "couponCode": "SAVE20",
-                "cost": 7
+                "cost": 7,
+                "salePrice": 9000,
+                "compareAtPrice": 12000,
+                "stockCount": 4,
+                "taxRate": 15,
+                "discountAmount": 300,
+                "grandTotal": 999
             }
         ],
         "verification": {
@@ -1438,7 +1760,13 @@
             "offerStatus": "expired",
             "offer_status": "live",
             "couponCode": "SAVE20",
-            "cost": 7
+            "cost": 7,
+            "salePrice": 9000,
+            "compareAtPrice": 12000,
+            "stockCount": 4,
+            "taxRate": 15,
+            "discountAmount": 300,
+            "grandTotal": 999
         },
         "sbc": {
             "authentication_number": "A1",
@@ -1465,7 +1793,13 @@
             "offerStatus": "expired",
             "offer_status": "live",
             "couponCode": "SAVE20",
-            "cost": 7
+            "cost": 7,
+            "salePrice": 9000,
+            "compareAtPrice": 12000,
+            "stockCount": 4,
+            "taxRate": 15,
+            "discountAmount": 300,
+            "grandTotal": 999
         },
         "apps": {
             "iosUrl": "https://apps.apple.com/app/id1",
@@ -1490,7 +1824,13 @@
             "offerStatus": "expired",
             "offer_status": "live",
             "couponCode": "SAVE20",
-            "cost": 7
+            "cost": 7,
+            "salePrice": 9000,
+            "compareAtPrice": 12000,
+            "stockCount": 4,
+            "taxRate": 15,
+            "discountAmount": 300,
+            "grandTotal": 999
         },
         "navigation": {
             "menus": [
@@ -1525,7 +1865,13 @@
                                 "offerStatus": "expired",
                                 "offer_status": "live",
                                 "couponCode": "SAVE20",
-                                "cost": 7
+                                "cost": 7,
+                                "salePrice": 9000,
+                                "compareAtPrice": 12000,
+                                "stockCount": 4,
+                                "taxRate": 15,
+                                "discountAmount": 300,
+                                "grandTotal": 999
                             },
                             "price": 1,
                             "priceMinor": 100,
@@ -1548,7 +1894,13 @@
                             "offerStatus": "expired",
                             "offer_status": "live",
                             "couponCode": "SAVE20",
-                            "cost": 7
+                            "cost": 7,
+                            "salePrice": 9000,
+                            "compareAtPrice": 12000,
+                            "stockCount": 4,
+                            "taxRate": 15,
+                            "discountAmount": 300,
+                            "grandTotal": 999
                         },
                         {
                             "id": "e",
@@ -1577,7 +1929,13 @@
                                 "offerStatus": "expired",
                                 "offer_status": "live",
                                 "couponCode": "SAVE20",
-                                "cost": 7
+                                "cost": 7,
+                                "salePrice": 9000,
+                                "compareAtPrice": 12000,
+                                "stockCount": 4,
+                                "taxRate": 15,
+                                "discountAmount": 300,
+                                "grandTotal": 999
                             },
                             "price": 1,
                             "priceMinor": 100,
@@ -1600,7 +1958,13 @@
                             "offerStatus": "expired",
                             "offer_status": "live",
                             "couponCode": "SAVE20",
-                            "cost": 7
+                            "cost": 7,
+                            "salePrice": 9000,
+                            "compareAtPrice": 12000,
+                            "stockCount": 4,
+                            "taxRate": 15,
+                            "discountAmount": 300,
+                            "grandTotal": 999
                         }
                     ],
                     "price": 1,
@@ -1624,7 +1988,13 @@
                     "offerStatus": "expired",
                     "offer_status": "live",
                     "couponCode": "SAVE20",
-                    "cost": 7
+                    "cost": 7,
+                    "salePrice": 9000,
+                    "compareAtPrice": 12000,
+                    "stockCount": 4,
+                    "taxRate": 15,
+                    "discountAmount": 300,
+                    "grandTotal": 999
                 }
             ],
             "price": 1,
@@ -1648,7 +2018,13 @@
             "offerStatus": "expired",
             "offer_status": "live",
             "couponCode": "SAVE20",
-            "cost": 7
+            "cost": 7,
+            "salePrice": 9000,
+            "compareAtPrice": 12000,
+            "stockCount": 4,
+            "taxRate": 15,
+            "discountAmount": 300,
+            "grandTotal": 999
         },
         "pagePresentation": {
             "product": {
@@ -1679,7 +2055,13 @@
                         "offerStatus": "expired",
                         "offer_status": "live",
                         "couponCode": "SAVE20",
-                        "cost": 7
+                        "cost": 7,
+                        "salePrice": 9000,
+                        "compareAtPrice": 12000,
+                        "stockCount": 4,
+                        "taxRate": 15,
+                        "discountAmount": 300,
+                        "grandTotal": 999
                     }
                 ],
                 "price": 1,
@@ -1703,7 +2085,13 @@
                 "offerStatus": "expired",
                 "offer_status": "live",
                 "couponCode": "SAVE20",
-                "cost": 7
+                "cost": 7,
+                "salePrice": 9000,
+                "compareAtPrice": 12000,
+                "stockCount": 4,
+                "taxRate": 15,
+                "discountAmount": 300,
+                "grandTotal": 999
             },
             "price": 1,
             "priceMinor": 100,
@@ -1726,7 +2114,13 @@
             "offerStatus": "expired",
             "offer_status": "live",
             "couponCode": "SAVE20",
-            "cost": 7
+            "cost": 7,
+            "salePrice": 9000,
+            "compareAtPrice": 12000,
+            "stockCount": 4,
+            "taxRate": 15,
+            "discountAmount": 300,
+            "grandTotal": 999
         },
         "announcements": {
             "enabled": false,
@@ -1755,7 +2149,13 @@
                     "offerStatus": "expired",
                     "offer_status": "live",
                     "couponCode": "SAVE20",
-                    "cost": 7
+                    "cost": 7,
+                    "salePrice": 9000,
+                    "compareAtPrice": 12000,
+                    "stockCount": 4,
+                    "taxRate": 15,
+                    "discountAmount": 300,
+                    "grandTotal": 999
                 }
             ],
             "price": 1,
@@ -1779,7 +2179,13 @@
             "offerStatus": "expired",
             "offer_status": "live",
             "couponCode": "SAVE20",
-            "cost": 7
+            "cost": 7,
+            "salePrice": 9000,
+            "compareAtPrice": 12000,
+            "stockCount": 4,
+            "taxRate": 15,
+            "discountAmount": 300,
+            "grandTotal": 999
         },
         "palette": {
             "link": "#0B5FFF",
@@ -1804,7 +2210,13 @@
             "offerStatus": "expired",
             "offer_status": "live",
             "couponCode": "SAVE20",
-            "cost": 7
+            "cost": 7,
+            "salePrice": 9000,
+            "compareAtPrice": 12000,
+            "stockCount": 4,
+            "taxRate": 15,
+            "discountAmount": 300,
+            "grandTotal": 999
         },
         "shippingFee": 1500,
         "shippingAmount": 900,
@@ -1814,6 +2226,12 @@
         "offerStatus": "expired",
         "offer_status": "live",
         "couponCode": "SAVE20",
-        "cost": 7
+        "cost": 7,
+        "salePrice": 9000,
+        "compareAtPrice": 12000,
+        "stockCount": 4,
+        "taxRate": 15,
+        "discountAmount": 300,
+        "grandTotal": 999
     }
 }

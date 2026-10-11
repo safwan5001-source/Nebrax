@@ -21,6 +21,7 @@ use Tests\TestCase;
 class StorefrontCommerceFirewallRuntimeTest extends TestCase
 {
     use RefreshDatabase;
+    use InteractsWithApi;
     use SeedsStorefrontOffers;
 
     private const NOW = '2026-10-15 12:00:00';
@@ -46,14 +47,15 @@ class StorefrontCommerceFirewallRuntimeTest extends TestCase
     }
 
     /**
-     * ما يراه المتسوّق ومساحة العمل من الحقيقة التجارية: سعر المنتج المحسوم، وكل عرض (حيّ أو محجوب) بأسعاره، وردّ العروض العام.
+     * ما يراه المتسوّق ومساحة العمل (التي تغذّي الـCanvas) من الحقيقة التجارية: سعر المنتج المحسوم، وكل عرض (حيّ أو محجوب) بأسعاره،
+     * وردّ العروض العام (المنشور)، وردّ مساحة العمل المصادَق (الـCanvas).
      *
      * @param  array<string,mixed>  $s
      * @return array<string,mixed>
      */
     private function commerceTruth(array $s): array
     {
-        app(TenantContext::class)->set($s['tenant']->id);
+        app(TenantContext::class)->set($s['tenantId']);
         try {
             $price = app(CommercePriceResolver::class)->resolve($s['product']->id, $s['channel']->id);
             $offers = array_map(static fn ($view): array => [
@@ -70,27 +72,30 @@ class StorefrontCommerceFirewallRuntimeTest extends TestCase
         }
 
         $public = $this->getJson("http://{$s['host']}/store/v1/offers")->assertOk()->json('data');
+        $workspace = $this->withToken($s['token'])->getJson("/api/commerce/workspace/storefronts/{$s['storefront']->id}/offers")->assertOk()->json('data');
 
-        return ['price' => get_object_vars($price), 'offers' => $offers, 'public' => $public];
+        return ['price' => get_object_vars($price), 'offers' => $offers, 'public' => $public, 'workspace' => $workspace];
     }
 
     /** @return array<string,mixed> */
     private function store(): array
     {
-        $tenant = $this->publicTenant();
+        $auth = $this->registerTenant('fw-runtime', 'owner@fw-runtime.test');
+        $tenantId = $auth['tenant_id'];
+        $token = $auth['token'];
         $host = 'firewall.example.test';
-        ['channel' => $channel, 'storefront' => $storefront] = $this->offerStore($tenant->id, $host);
-        $product = $this->offerProduct($tenant->id, $channel, ['name' => 'منتج مخفَّض', 'sale_price' => 25000]);
-        $this->channelPriceList($tenant->id, $channel, [$product->id => 19000]);
-        $offer = $this->makeOffer($tenant->id, $storefront, $product);
+        ['channel' => $channel, 'storefront' => $storefront] = $this->offerStore($tenantId, $host);
+        $product = $this->offerProduct($tenantId, $channel, ['name' => 'منتج مخفَّض', 'sale_price' => 25000]);
+        $this->channelPriceList($tenantId, $channel, [$product->id => 19000]);
+        $offer = $this->makeOffer($tenantId, $storefront, $product);
 
-        return compact('tenant', 'channel', 'storefront', 'host', 'product', 'offer');
+        return compact('tenantId', 'token', 'channel', 'storefront', 'host', 'product', 'offer');
     }
 
     /** @param  array<string,mixed>  $s */
     private function storePresentation(array $s, array $draft, ?array $published): void
     {
-        app(TenantContext::class)->set($s['tenant']->id);
+        app(TenantContext::class)->set($s['tenantId']);
         try {
             StorefrontPresentation::create([
                 'storefront_id' => $s['storefront']->id,
@@ -111,6 +116,7 @@ class StorefrontCommerceFirewallRuntimeTest extends TestCase
         // sanity: the baseline is a real authoritative discount (25000 → 19000), not an empty comparison
         $this->assertSame(19000, $before['price']['amount']);
         $this->assertCount(1, $before['public']);
+        $this->assertCount(1, $before['workspace']);
 
         $hostile = $this->hostileDocument();
         $normalized = (new StorefrontPresentationNormalizer)->normalize($hostile);

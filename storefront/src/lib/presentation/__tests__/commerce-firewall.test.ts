@@ -5,6 +5,7 @@ import { normalizePresentationConfig } from "../config";
 
 interface Fixture {
   forbiddenKeyPattern: string;
+  allowedKeys: string[];
   forbiddenValues: string[];
   input: unknown;
 }
@@ -42,6 +43,22 @@ describe("commerce firewall — presentation normalisation", () => {
     const pattern = new RegExp(fixture.forbiddenKeyPattern, "i");
     const raw = [...keysOf(fixture.input)].filter((key) => pattern.test(key));
     expect(raw.length).toBeGreaterThanOrEqual(10);
+  });
+
+  it("the deny pattern matches value-bearing keys and never an allowed presentation control", () => {
+    const pattern = new RegExp(fixture.forbiddenKeyPattern, "i");
+    for (const key of fixture.allowedKeys)
+      expect(pattern.test(key), key).toBe(false);
+    for (const key of [
+      "price",
+      "salePrice",
+      "stockCount",
+      "shippingFee",
+      "offerStatus",
+      "grandTotal",
+    ]) {
+      expect(pattern.test(key), key).toBe(true);
+    }
   });
 
   it("no commercial key survives in any scope", () => {
