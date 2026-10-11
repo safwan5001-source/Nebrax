@@ -1,5 +1,5 @@
 {
-    "_note": "CUST-HV V9d-4 — commerce firewall (V0 §14.3). A hostile document: every scope the production normalizer accepts (document tokens, branding, header, footer, contact, whatsapp, social, verification, sbc, apps, navigation, pagePresentation, announcements, palette, homepage sections, section content, section design, design.cards, nested items) carries commercial keys (price, discount, stock, availability, tax, total, currency, sku, quantity, shipping fee / amount, freight, delivery fee, offer status, coupon code, cost). After normalisation NO such key may survive anywhere, and no injected value may be reachable. Shared by PHP StorefrontPresentationNormalizer and both TS twins (normalizePresentationConfig). Deny rule (shared by the PHP and both TS suites): split a key into words (camelCase / snake_case / kebab-case, lower-cased); the key is DENIED when any word is in `commerceWords` and the LAST word is not in `presentationSuffixes`. So value-bearing and scaling / hiding controls (price, unitPrice, taxAmount, priceMultiplier, discountScale, hideStock, availabilityVisible, showPrice, offerStatus…) are denied, while position / colour-role / size-step / shape / placement controls over real data (pricePosition, stockTextSize, availabilityBadgePlacement…) and the id selectors (offerIds, productIds) are allowed. `allowedKeys` must never be denied; `deniedKeys` must always be.",
+    "_note": "CUST-HV V9d-4 — commerce firewall (V0 §14.3). A hostile document: every scope the production normalizer accepts (document tokens, branding, header, footer, contact, whatsapp, social, verification, sbc, apps, navigation, pagePresentation, announcements, palette, homepage sections, section content, section design, design.cards, nested items) carries commercial keys (price, discount, stock, availability, tax, total, currency, sku, quantity, shipping fee / amount, freight, delivery fee, offer status, coupon code, cost). After normalisation NO such key may survive anywhere, and no injected value may be reachable. Shared by PHP StorefrontPresentationNormalizer and both TS twins (normalizePresentationConfig). Deny rule (shared by the PHP and both TS suites): split a key into words (camelCase / snake_case / kebab-case, lower-cased); the key is DENIED when any word is in `commerceWords` and the LAST word is not in `presentationSuffixes`. So value-bearing and scaling / hiding controls (price, unitPrice, taxAmount, priceMultiplier, discountScale, hideStock, availabilityVisible, showPrice, offerStatus…) are denied, while position / colour-role / size-step / shape / placement controls over real data (pricePosition, stockTextSize, availabilityBadgePlacement…) and the id selectors (offerIds, productIds) are allowed. `allowedKeys` must never be denied; `deniedKeys` must always be. Exempt (suffix) keys are checked by VALUE as well: a key that contains a commerce word must never carry a number after normalisation (priceSize: 0, stockTextSize: 0, pricePosition: 5 are injected; presentation controls are bounded string enums), which is the schema assertion V0 §14.3 asks for.",
     "commerceWords": [
         "price",
         "cost",
@@ -22,7 +22,10 @@
         "coupon",
         "offer",
         "order",
-        "checkout"
+        "checkout",
+        "charge",
+        "surcharge",
+        "levy"
     ],
     "presentationSuffixes": [
         "position",
@@ -104,7 +107,12 @@
             "discountScale": 2,
             "hideStock": true,
             "availabilityVisible": false,
-            "showPrice": true
+            "showPrice": true,
+            "deliveryCharge": 2500,
+            "priceSize": 0,
+            "stockTextSize": 0,
+            "pricePosition": 5,
+            "availabilityBadgePlacement": 3
         },
         "surfaces": {
             "radius": "md",
@@ -145,7 +153,12 @@
             "discountScale": 2,
             "hideStock": true,
             "availabilityVisible": false,
-            "showPrice": true
+            "showPrice": true,
+            "deliveryCharge": 2500,
+            "priceSize": 0,
+            "stockTextSize": 0,
+            "pricePosition": 5,
+            "availabilityBadgePlacement": 3
         },
         "typography": {
             "headingScale": "lg",
@@ -186,7 +199,12 @@
             "discountScale": 2,
             "hideStock": true,
             "availabilityVisible": false,
-            "showPrice": true
+            "showPrice": true,
+            "deliveryCharge": 2500,
+            "priceSize": 0,
+            "stockTextSize": 0,
+            "pricePosition": 5,
+            "availabilityBadgePlacement": 3
         },
         "layout": {
             "contentWidth": "wide",
@@ -227,7 +245,12 @@
             "discountScale": 2,
             "hideStock": true,
             "availabilityVisible": false,
-            "showPrice": true
+            "showPrice": true,
+            "deliveryCharge": 2500,
+            "priceSize": 0,
+            "stockTextSize": 0,
+            "pricePosition": 5,
+            "availabilityBadgePlacement": 3
         },
         "motion": {
             "reveal": "fade-up",
@@ -268,7 +291,12 @@
             "discountScale": 2,
             "hideStock": true,
             "availabilityVisible": false,
-            "showPrice": true
+            "showPrice": true,
+            "deliveryCharge": 2500,
+            "priceSize": 0,
+            "stockTextSize": 0,
+            "pricePosition": 5,
+            "availabilityBadgePlacement": 3
         },
         "productCard": {
             "density": "compact",
@@ -309,7 +337,12 @@
             "discountScale": 2,
             "hideStock": true,
             "availabilityVisible": false,
-            "showPrice": true
+            "showPrice": true,
+            "deliveryCharge": 2500,
+            "priceSize": 0,
+            "stockTextSize": 0,
+            "pricePosition": 5,
+            "availabilityBadgePlacement": 3
         },
         "homepage": {
             "sections": [
@@ -370,7 +403,12 @@
                         "discountScale": 2,
                         "hideStock": true,
                         "availabilityVisible": false,
-                        "showPrice": true
+                        "showPrice": true,
+                        "deliveryCharge": 2500,
+                        "priceSize": 0,
+                        "stockTextSize": 0,
+                        "pricePosition": 5,
+                        "availabilityBadgePlacement": 3
                     },
                     "design": {
                         "layout": "rail",
@@ -417,7 +455,12 @@
                             "discountScale": 2,
                             "hideStock": true,
                             "availabilityVisible": false,
-                            "showPrice": true
+                            "showPrice": true,
+                            "deliveryCharge": 2500,
+                            "priceSize": 0,
+                            "stockTextSize": 0,
+                            "pricePosition": 5,
+                            "availabilityBadgePlacement": 3
                         },
                         "border": "hairline",
                         "radius": "md",
@@ -461,7 +504,12 @@
                             "discountScale": 2,
                             "hideStock": true,
                             "availabilityVisible": false,
-                            "showPrice": true
+                            "showPrice": true,
+                            "deliveryCharge": 2500,
+                            "priceSize": 0,
+                            "stockTextSize": 0,
+                            "pricePosition": 5,
+                            "availabilityBadgePlacement": 3
                         },
                         "price": 1,
                         "priceMinor": 100,
@@ -500,7 +548,12 @@
                         "discountScale": 2,
                         "hideStock": true,
                         "availabilityVisible": false,
-                        "showPrice": true
+                        "showPrice": true,
+                        "deliveryCharge": 2500,
+                        "priceSize": 0,
+                        "stockTextSize": 0,
+                        "pricePosition": 5,
+                        "availabilityBadgePlacement": 3
                     },
                     "shippingFee": 1500,
                     "shippingAmount": 900,
@@ -526,7 +579,12 @@
                     "discountScale": 2,
                     "hideStock": true,
                     "availabilityVisible": false,
-                    "showPrice": true
+                    "showPrice": true,
+                    "deliveryCharge": 2500,
+                    "priceSize": 0,
+                    "stockTextSize": 0,
+                    "pricePosition": 5,
+                    "availabilityBadgePlacement": 3
                 },
                 {
                     "id": "s-2",
@@ -587,7 +645,12 @@
                         "discountScale": 2,
                         "hideStock": true,
                         "availabilityVisible": false,
-                        "showPrice": true
+                        "showPrice": true,
+                        "deliveryCharge": 2500,
+                        "priceSize": 0,
+                        "stockTextSize": 0,
+                        "pricePosition": 5,
+                        "availabilityBadgePlacement": 3
                     },
                     "design": {
                         "layout": "rail",
@@ -634,7 +697,12 @@
                             "discountScale": 2,
                             "hideStock": true,
                             "availabilityVisible": false,
-                            "showPrice": true
+                            "showPrice": true,
+                            "deliveryCharge": 2500,
+                            "priceSize": 0,
+                            "stockTextSize": 0,
+                            "pricePosition": 5,
+                            "availabilityBadgePlacement": 3
                         },
                         "border": "hairline",
                         "radius": "md",
@@ -678,7 +746,12 @@
                             "discountScale": 2,
                             "hideStock": true,
                             "availabilityVisible": false,
-                            "showPrice": true
+                            "showPrice": true,
+                            "deliveryCharge": 2500,
+                            "priceSize": 0,
+                            "stockTextSize": 0,
+                            "pricePosition": 5,
+                            "availabilityBadgePlacement": 3
                         },
                         "price": 1,
                         "priceMinor": 100,
@@ -717,7 +790,12 @@
                         "discountScale": 2,
                         "hideStock": true,
                         "availabilityVisible": false,
-                        "showPrice": true
+                        "showPrice": true,
+                        "deliveryCharge": 2500,
+                        "priceSize": 0,
+                        "stockTextSize": 0,
+                        "pricePosition": 5,
+                        "availabilityBadgePlacement": 3
                     },
                     "shippingFee": 1500,
                     "shippingAmount": 900,
@@ -743,7 +821,12 @@
                     "discountScale": 2,
                     "hideStock": true,
                     "availabilityVisible": false,
-                    "showPrice": true
+                    "showPrice": true,
+                    "deliveryCharge": 2500,
+                    "priceSize": 0,
+                    "stockTextSize": 0,
+                    "pricePosition": 5,
+                    "availabilityBadgePlacement": 3
                 },
                 {
                     "id": "s-3",
@@ -804,7 +887,12 @@
                         "discountScale": 2,
                         "hideStock": true,
                         "availabilityVisible": false,
-                        "showPrice": true
+                        "showPrice": true,
+                        "deliveryCharge": 2500,
+                        "priceSize": 0,
+                        "stockTextSize": 0,
+                        "pricePosition": 5,
+                        "availabilityBadgePlacement": 3
                     },
                     "design": {
                         "columns": 2,
@@ -850,7 +938,12 @@
                             "discountScale": 2,
                             "hideStock": true,
                             "availabilityVisible": false,
-                            "showPrice": true
+                            "showPrice": true,
+                            "deliveryCharge": 2500,
+                            "priceSize": 0,
+                            "stockTextSize": 0,
+                            "pricePosition": 5,
+                            "availabilityBadgePlacement": 3
                         },
                         "price": 1,
                         "priceMinor": 100,
@@ -889,7 +982,12 @@
                         "discountScale": 2,
                         "hideStock": true,
                         "availabilityVisible": false,
-                        "showPrice": true
+                        "showPrice": true,
+                        "deliveryCharge": 2500,
+                        "priceSize": 0,
+                        "stockTextSize": 0,
+                        "pricePosition": 5,
+                        "availabilityBadgePlacement": 3
                     },
                     "shippingFee": 1500,
                     "shippingAmount": 900,
@@ -915,7 +1013,12 @@
                     "discountScale": 2,
                     "hideStock": true,
                     "availabilityVisible": false,
-                    "showPrice": true
+                    "showPrice": true,
+                    "deliveryCharge": 2500,
+                    "priceSize": 0,
+                    "stockTextSize": 0,
+                    "pricePosition": 5,
+                    "availabilityBadgePlacement": 3
                 },
                 {
                     "id": "s-4",
@@ -976,7 +1079,12 @@
                             "discountScale": 2,
                             "hideStock": true,
                             "availabilityVisible": false,
-                            "showPrice": true
+                            "showPrice": true,
+                            "deliveryCharge": 2500,
+                            "priceSize": 0,
+                            "stockTextSize": 0,
+                            "pricePosition": 5,
+                            "availabilityBadgePlacement": 3
                         },
                         "limit": 8,
                         "deliverToday": false,
@@ -1017,7 +1125,12 @@
                         "discountScale": 2,
                         "hideStock": true,
                         "availabilityVisible": false,
-                        "showPrice": true
+                        "showPrice": true,
+                        "deliveryCharge": 2500,
+                        "priceSize": 0,
+                        "stockTextSize": 0,
+                        "pricePosition": 5,
+                        "availabilityBadgePlacement": 3
                     },
                     "design": {
                         "layout": "rail",
@@ -1064,7 +1177,12 @@
                             "discountScale": 2,
                             "hideStock": true,
                             "availabilityVisible": false,
-                            "showPrice": true
+                            "showPrice": true,
+                            "deliveryCharge": 2500,
+                            "priceSize": 0,
+                            "stockTextSize": 0,
+                            "pricePosition": 5,
+                            "availabilityBadgePlacement": 3
                         },
                         "border": "hairline",
                         "radius": "md",
@@ -1108,7 +1226,12 @@
                             "discountScale": 2,
                             "hideStock": true,
                             "availabilityVisible": false,
-                            "showPrice": true
+                            "showPrice": true,
+                            "deliveryCharge": 2500,
+                            "priceSize": 0,
+                            "stockTextSize": 0,
+                            "pricePosition": 5,
+                            "availabilityBadgePlacement": 3
                         },
                         "price": 1,
                         "priceMinor": 100,
@@ -1147,7 +1270,12 @@
                         "discountScale": 2,
                         "hideStock": true,
                         "availabilityVisible": false,
-                        "showPrice": true
+                        "showPrice": true,
+                        "deliveryCharge": 2500,
+                        "priceSize": 0,
+                        "stockTextSize": 0,
+                        "pricePosition": 5,
+                        "availabilityBadgePlacement": 3
                     },
                     "shippingFee": 1500,
                     "shippingAmount": 900,
@@ -1173,7 +1301,12 @@
                     "discountScale": 2,
                     "hideStock": true,
                     "availabilityVisible": false,
-                    "showPrice": true
+                    "showPrice": true,
+                    "deliveryCharge": 2500,
+                    "priceSize": 0,
+                    "stockTextSize": 0,
+                    "pricePosition": 5,
+                    "availabilityBadgePlacement": 3
                 },
                 {
                     "id": "s-5",
@@ -1235,7 +1368,12 @@
                                 "discountScale": 2,
                                 "hideStock": true,
                                 "availabilityVisible": false,
-                                "showPrice": true
+                                "showPrice": true,
+                                "deliveryCharge": 2500,
+                                "priceSize": 0,
+                                "stockTextSize": 0,
+                                "pricePosition": 5,
+                                "availabilityBadgePlacement": 3
                             }
                         ],
                         "price": 1,
@@ -1275,7 +1413,12 @@
                         "discountScale": 2,
                         "hideStock": true,
                         "availabilityVisible": false,
-                        "showPrice": true
+                        "showPrice": true,
+                        "deliveryCharge": 2500,
+                        "priceSize": 0,
+                        "stockTextSize": 0,
+                        "pricePosition": 5,
+                        "availabilityBadgePlacement": 3
                     },
                     "design": {
                         "height": "tall",
@@ -1316,7 +1459,12 @@
                         "discountScale": 2,
                         "hideStock": true,
                         "availabilityVisible": false,
-                        "showPrice": true
+                        "showPrice": true,
+                        "deliveryCharge": 2500,
+                        "priceSize": 0,
+                        "stockTextSize": 0,
+                        "pricePosition": 5,
+                        "availabilityBadgePlacement": 3
                     },
                     "shippingFee": 1500,
                     "shippingAmount": 900,
@@ -1342,7 +1490,12 @@
                     "discountScale": 2,
                     "hideStock": true,
                     "availabilityVisible": false,
-                    "showPrice": true
+                    "showPrice": true,
+                    "deliveryCharge": 2500,
+                    "priceSize": 0,
+                    "stockTextSize": 0,
+                    "pricePosition": 5,
+                    "availabilityBadgePlacement": 3
                 },
                 {
                     "id": "s-6",
@@ -1404,7 +1557,12 @@
                                 "discountScale": 2,
                                 "hideStock": true,
                                 "availabilityVisible": false,
-                                "showPrice": true
+                                "showPrice": true,
+                                "deliveryCharge": 2500,
+                                "priceSize": 0,
+                                "stockTextSize": 0,
+                                "pricePosition": 5,
+                                "availabilityBadgePlacement": 3
                             }
                         ],
                         "price": 1,
@@ -1444,7 +1602,12 @@
                         "discountScale": 2,
                         "hideStock": true,
                         "availabilityVisible": false,
-                        "showPrice": true
+                        "showPrice": true,
+                        "deliveryCharge": 2500,
+                        "priceSize": 0,
+                        "stockTextSize": 0,
+                        "pricePosition": 5,
+                        "availabilityBadgePlacement": 3
                     },
                     "design": {
                         "layout": "columns-3",
@@ -1485,7 +1648,12 @@
                         "discountScale": 2,
                         "hideStock": true,
                         "availabilityVisible": false,
-                        "showPrice": true
+                        "showPrice": true,
+                        "deliveryCharge": 2500,
+                        "priceSize": 0,
+                        "stockTextSize": 0,
+                        "pricePosition": 5,
+                        "availabilityBadgePlacement": 3
                     },
                     "shippingFee": 1500,
                     "shippingAmount": 900,
@@ -1511,7 +1679,12 @@
                     "discountScale": 2,
                     "hideStock": true,
                     "availabilityVisible": false,
-                    "showPrice": true
+                    "showPrice": true,
+                    "deliveryCharge": 2500,
+                    "priceSize": 0,
+                    "stockTextSize": 0,
+                    "pricePosition": 5,
+                    "availabilityBadgePlacement": 3
                 },
                 {
                     "id": "s-7",
@@ -1573,7 +1746,12 @@
                                 "discountScale": 2,
                                 "hideStock": true,
                                 "availabilityVisible": false,
-                                "showPrice": true
+                                "showPrice": true,
+                                "deliveryCharge": 2500,
+                                "priceSize": 0,
+                                "stockTextSize": 0,
+                                "pricePosition": 5,
+                                "availabilityBadgePlacement": 3
                             },
                             {
                                 "id": "b2",
@@ -1618,7 +1796,12 @@
                                 "discountScale": 2,
                                 "hideStock": true,
                                 "availabilityVisible": false,
-                                "showPrice": true
+                                "showPrice": true,
+                                "deliveryCharge": 2500,
+                                "priceSize": 0,
+                                "stockTextSize": 0,
+                                "pricePosition": 5,
+                                "availabilityBadgePlacement": 3
                             }
                         ],
                         "price": 1,
@@ -1658,7 +1841,12 @@
                         "discountScale": 2,
                         "hideStock": true,
                         "availabilityVisible": false,
-                        "showPrice": true
+                        "showPrice": true,
+                        "deliveryCharge": 2500,
+                        "priceSize": 0,
+                        "stockTextSize": 0,
+                        "pricePosition": 5,
+                        "availabilityBadgePlacement": 3
                     },
                     "design": {
                         "align": "center",
@@ -1699,7 +1887,12 @@
                         "discountScale": 2,
                         "hideStock": true,
                         "availabilityVisible": false,
-                        "showPrice": true
+                        "showPrice": true,
+                        "deliveryCharge": 2500,
+                        "priceSize": 0,
+                        "stockTextSize": 0,
+                        "pricePosition": 5,
+                        "availabilityBadgePlacement": 3
                     },
                     "shippingFee": 1500,
                     "shippingAmount": 900,
@@ -1725,7 +1918,12 @@
                     "discountScale": 2,
                     "hideStock": true,
                     "availabilityVisible": false,
-                    "showPrice": true
+                    "showPrice": true,
+                    "deliveryCharge": 2500,
+                    "priceSize": 0,
+                    "stockTextSize": 0,
+                    "pricePosition": 5,
+                    "availabilityBadgePlacement": 3
                 },
                 {
                     "id": "s-cat",
@@ -1768,7 +1966,12 @@
                     "discountScale": 2,
                     "hideStock": true,
                     "availabilityVisible": false,
-                    "showPrice": true
+                    "showPrice": true,
+                    "deliveryCharge": 2500,
+                    "priceSize": 0,
+                    "stockTextSize": 0,
+                    "pricePosition": 5,
+                    "availabilityBadgePlacement": 3
                 },
                 {
                     "id": "s-wh",
@@ -1811,7 +2014,12 @@
                     "discountScale": 2,
                     "hideStock": true,
                     "availabilityVisible": false,
-                    "showPrice": true
+                    "showPrice": true,
+                    "deliveryCharge": 2500,
+                    "priceSize": 0,
+                    "stockTextSize": 0,
+                    "pricePosition": 5,
+                    "availabilityBadgePlacement": 3
                 },
                 {
                     "id": "s-ban",
@@ -1861,7 +2069,12 @@
                         "discountScale": 2,
                         "hideStock": true,
                         "availabilityVisible": false,
-                        "showPrice": true
+                        "showPrice": true,
+                        "deliveryCharge": 2500,
+                        "priceSize": 0,
+                        "stockTextSize": 0,
+                        "pricePosition": 5,
+                        "availabilityBadgePlacement": 3
                     },
                     "price": 1,
                     "priceMinor": 100,
@@ -1900,7 +2113,12 @@
                     "discountScale": 2,
                     "hideStock": true,
                     "availabilityVisible": false,
-                    "showPrice": true
+                    "showPrice": true,
+                    "deliveryCharge": 2500,
+                    "priceSize": 0,
+                    "stockTextSize": 0,
+                    "pricePosition": 5,
+                    "availabilityBadgePlacement": 3
                 },
                 {
                     "id": "s-app",
@@ -1943,7 +2161,12 @@
                     "discountScale": 2,
                     "hideStock": true,
                     "availabilityVisible": false,
-                    "showPrice": true
+                    "showPrice": true,
+                    "deliveryCharge": 2500,
+                    "priceSize": 0,
+                    "stockTextSize": 0,
+                    "pricePosition": 5,
+                    "availabilityBadgePlacement": 3
                 },
                 {
                     "id": "s-disc",
@@ -1991,7 +2214,12 @@
                         "discountScale": 2,
                         "hideStock": true,
                         "availabilityVisible": false,
-                        "showPrice": true
+                        "showPrice": true,
+                        "deliveryCharge": 2500,
+                        "priceSize": 0,
+                        "stockTextSize": 0,
+                        "pricePosition": 5,
+                        "availabilityBadgePlacement": 3
                     },
                     "price": 1,
                     "priceMinor": 100,
@@ -2030,7 +2258,12 @@
                     "discountScale": 2,
                     "hideStock": true,
                     "availabilityVisible": false,
-                    "showPrice": true
+                    "showPrice": true,
+                    "deliveryCharge": 2500,
+                    "priceSize": 0,
+                    "stockTextSize": 0,
+                    "pricePosition": 5,
+                    "availabilityBadgePlacement": 3
                 },
                 {
                     "id": "s-del",
@@ -2076,7 +2309,12 @@
                         "discountScale": 2,
                         "hideStock": true,
                         "availabilityVisible": false,
-                        "showPrice": true
+                        "showPrice": true,
+                        "deliveryCharge": 2500,
+                        "priceSize": 0,
+                        "stockTextSize": 0,
+                        "pricePosition": 5,
+                        "availabilityBadgePlacement": 3
                     },
                     "price": 1,
                     "priceMinor": 100,
@@ -2115,7 +2353,12 @@
                     "discountScale": 2,
                     "hideStock": true,
                     "availabilityVisible": false,
-                    "showPrice": true
+                    "showPrice": true,
+                    "deliveryCharge": 2500,
+                    "priceSize": 0,
+                    "stockTextSize": 0,
+                    "pricePosition": 5,
+                    "availabilityBadgePlacement": 3
                 },
                 {
                     "id": "s-sld",
@@ -2164,7 +2407,12 @@
                                     "discountScale": 2,
                                     "hideStock": true,
                                     "availabilityVisible": false,
-                                    "showPrice": true
+                                    "showPrice": true,
+                                    "deliveryCharge": 2500,
+                                    "priceSize": 0,
+                                    "stockTextSize": 0,
+                                    "pricePosition": 5,
+                                    "availabilityBadgePlacement": 3
                                 },
                                 "price": 1,
                                 "priceMinor": 100,
@@ -2203,7 +2451,12 @@
                                 "discountScale": 2,
                                 "hideStock": true,
                                 "availabilityVisible": false,
-                                "showPrice": true
+                                "showPrice": true,
+                                "deliveryCharge": 2500,
+                                "priceSize": 0,
+                                "stockTextSize": 0,
+                                "pricePosition": 5,
+                                "availabilityBadgePlacement": 3
                             }
                         ],
                         "price": 1,
@@ -2243,7 +2496,12 @@
                         "discountScale": 2,
                         "hideStock": true,
                         "availabilityVisible": false,
-                        "showPrice": true
+                        "showPrice": true,
+                        "deliveryCharge": 2500,
+                        "priceSize": 0,
+                        "stockTextSize": 0,
+                        "pricePosition": 5,
+                        "availabilityBadgePlacement": 3
                     },
                     "price": 1,
                     "priceMinor": 100,
@@ -2282,7 +2540,12 @@
                     "discountScale": 2,
                     "hideStock": true,
                     "availabilityVisible": false,
-                    "showPrice": true
+                    "showPrice": true,
+                    "deliveryCharge": 2500,
+                    "priceSize": 0,
+                    "stockTextSize": 0,
+                    "pricePosition": 5,
+                    "availabilityBadgePlacement": 3
                 },
                 {
                     "id": "s-gal",
@@ -2331,7 +2594,12 @@
                                     "discountScale": 2,
                                     "hideStock": true,
                                     "availabilityVisible": false,
-                                    "showPrice": true
+                                    "showPrice": true,
+                                    "deliveryCharge": 2500,
+                                    "priceSize": 0,
+                                    "stockTextSize": 0,
+                                    "pricePosition": 5,
+                                    "availabilityBadgePlacement": 3
                                 },
                                 "price": 1,
                                 "priceMinor": 100,
@@ -2370,7 +2638,12 @@
                                 "discountScale": 2,
                                 "hideStock": true,
                                 "availabilityVisible": false,
-                                "showPrice": true
+                                "showPrice": true,
+                                "deliveryCharge": 2500,
+                                "priceSize": 0,
+                                "stockTextSize": 0,
+                                "pricePosition": 5,
+                                "availabilityBadgePlacement": 3
                             }
                         ],
                         "price": 1,
@@ -2410,7 +2683,12 @@
                         "discountScale": 2,
                         "hideStock": true,
                         "availabilityVisible": false,
-                        "showPrice": true
+                        "showPrice": true,
+                        "deliveryCharge": 2500,
+                        "priceSize": 0,
+                        "stockTextSize": 0,
+                        "pricePosition": 5,
+                        "availabilityBadgePlacement": 3
                     },
                     "price": 1,
                     "priceMinor": 100,
@@ -2449,7 +2727,12 @@
                     "discountScale": 2,
                     "hideStock": true,
                     "availabilityVisible": false,
-                    "showPrice": true
+                    "showPrice": true,
+                    "deliveryCharge": 2500,
+                    "priceSize": 0,
+                    "stockTextSize": 0,
+                    "pricePosition": 5,
+                    "availabilityBadgePlacement": 3
                 }
             ],
             "price": 1,
@@ -2489,7 +2772,12 @@
             "discountScale": 2,
             "hideStock": true,
             "availabilityVisible": false,
-            "showPrice": true
+            "showPrice": true,
+            "deliveryCharge": 2500,
+            "priceSize": 0,
+            "stockTextSize": 0,
+            "pricePosition": 5,
+            "availabilityBadgePlacement": 3
         },
         "price": 1,
         "priceMinor": 100,
@@ -2543,7 +2831,12 @@
             "discountScale": 2,
             "hideStock": true,
             "availabilityVisible": false,
-            "showPrice": true
+            "showPrice": true,
+            "deliveryCharge": 2500,
+            "priceSize": 0,
+            "stockTextSize": 0,
+            "pricePosition": 5,
+            "availabilityBadgePlacement": 3
         },
         "header": {
             "style": "compact",
@@ -2591,7 +2884,12 @@
                     "discountScale": 2,
                     "hideStock": true,
                     "availabilityVisible": false,
-                    "showPrice": true
+                    "showPrice": true,
+                    "deliveryCharge": 2500,
+                    "priceSize": 0,
+                    "stockTextSize": 0,
+                    "pricePosition": 5,
+                    "availabilityBadgePlacement": 3
                 }
             ],
             "design": {
@@ -2633,7 +2931,12 @@
                 "discountScale": 2,
                 "hideStock": true,
                 "availabilityVisible": false,
-                "showPrice": true
+                "showPrice": true,
+                "deliveryCharge": 2500,
+                "priceSize": 0,
+                "stockTextSize": 0,
+                "pricePosition": 5,
+                "availabilityBadgePlacement": 3
             },
             "price": 1,
             "priceMinor": 100,
@@ -2672,7 +2975,12 @@
             "discountScale": 2,
             "hideStock": true,
             "availabilityVisible": false,
-            "showPrice": true
+            "showPrice": true,
+            "deliveryCharge": 2500,
+            "priceSize": 0,
+            "stockTextSize": 0,
+            "pricePosition": 5,
+            "availabilityBadgePlacement": 3
         },
         "footer": {
             "tagline": "نصنع الفرق",
@@ -2715,7 +3023,12 @@
                 "discountScale": 2,
                 "hideStock": true,
                 "availabilityVisible": false,
-                "showPrice": true
+                "showPrice": true,
+                "deliveryCharge": 2500,
+                "priceSize": 0,
+                "stockTextSize": 0,
+                "pricePosition": 5,
+                "availabilityBadgePlacement": 3
             },
             "groups": [
                 {
@@ -2766,7 +3079,12 @@
                                 "discountScale": 2,
                                 "hideStock": true,
                                 "availabilityVisible": false,
-                                "showPrice": true
+                                "showPrice": true,
+                                "deliveryCharge": 2500,
+                                "priceSize": 0,
+                                "stockTextSize": 0,
+                                "pricePosition": 5,
+                                "availabilityBadgePlacement": 3
                             },
                             "price": 1,
                             "priceMinor": 100,
@@ -2805,7 +3123,12 @@
                             "discountScale": 2,
                             "hideStock": true,
                             "availabilityVisible": false,
-                            "showPrice": true
+                            "showPrice": true,
+                            "deliveryCharge": 2500,
+                            "priceSize": 0,
+                            "stockTextSize": 0,
+                            "pricePosition": 5,
+                            "availabilityBadgePlacement": 3
                         }
                     ],
                     "price": 1,
@@ -2845,7 +3168,12 @@
                     "discountScale": 2,
                     "hideStock": true,
                     "availabilityVisible": false,
-                    "showPrice": true
+                    "showPrice": true,
+                    "deliveryCharge": 2500,
+                    "priceSize": 0,
+                    "stockTextSize": 0,
+                    "pricePosition": 5,
+                    "availabilityBadgePlacement": 3
                 }
             ],
             "price": 1,
@@ -2885,7 +3213,12 @@
             "discountScale": 2,
             "hideStock": true,
             "availabilityVisible": false,
-            "showPrice": true
+            "showPrice": true,
+            "deliveryCharge": 2500,
+            "priceSize": 0,
+            "stockTextSize": 0,
+            "pricePosition": 5,
+            "availabilityBadgePlacement": 3
         },
         "contact": {
             "email": "hello@example.com",
@@ -2926,7 +3259,12 @@
             "discountScale": 2,
             "hideStock": true,
             "availabilityVisible": false,
-            "showPrice": true
+            "showPrice": true,
+            "deliveryCharge": 2500,
+            "priceSize": 0,
+            "stockTextSize": 0,
+            "pricePosition": 5,
+            "availabilityBadgePlacement": 3
         },
         "whatsapp": {
             "enabled": true,
@@ -2970,7 +3308,12 @@
             "discountScale": 2,
             "hideStock": true,
             "availabilityVisible": false,
-            "showPrice": true
+            "showPrice": true,
+            "deliveryCharge": 2500,
+            "priceSize": 0,
+            "stockTextSize": 0,
+            "pricePosition": 5,
+            "availabilityBadgePlacement": 3
         },
         "social": [
             {
@@ -3015,7 +3358,12 @@
                 "discountScale": 2,
                 "hideStock": true,
                 "availabilityVisible": false,
-                "showPrice": true
+                "showPrice": true,
+                "deliveryCharge": 2500,
+                "priceSize": 0,
+                "stockTextSize": 0,
+                "pricePosition": 5,
+                "availabilityBadgePlacement": 3
             }
         ],
         "verification": {
@@ -3059,7 +3407,12 @@
             "discountScale": 2,
             "hideStock": true,
             "availabilityVisible": false,
-            "showPrice": true
+            "showPrice": true,
+            "deliveryCharge": 2500,
+            "priceSize": 0,
+            "stockTextSize": 0,
+            "pricePosition": 5,
+            "availabilityBadgePlacement": 3
         },
         "sbc": {
             "authentication_number": "A1",
@@ -3102,7 +3455,12 @@
             "discountScale": 2,
             "hideStock": true,
             "availabilityVisible": false,
-            "showPrice": true
+            "showPrice": true,
+            "deliveryCharge": 2500,
+            "priceSize": 0,
+            "stockTextSize": 0,
+            "pricePosition": 5,
+            "availabilityBadgePlacement": 3
         },
         "apps": {
             "iosUrl": "https://apps.apple.com/app/id1",
@@ -3143,7 +3501,12 @@
             "discountScale": 2,
             "hideStock": true,
             "availabilityVisible": false,
-            "showPrice": true
+            "showPrice": true,
+            "deliveryCharge": 2500,
+            "priceSize": 0,
+            "stockTextSize": 0,
+            "pricePosition": 5,
+            "availabilityBadgePlacement": 3
         },
         "navigation": {
             "menus": [
@@ -3194,7 +3557,12 @@
                                 "discountScale": 2,
                                 "hideStock": true,
                                 "availabilityVisible": false,
-                                "showPrice": true
+                                "showPrice": true,
+                                "deliveryCharge": 2500,
+                                "priceSize": 0,
+                                "stockTextSize": 0,
+                                "pricePosition": 5,
+                                "availabilityBadgePlacement": 3
                             },
                             "price": 1,
                             "priceMinor": 100,
@@ -3233,7 +3601,12 @@
                             "discountScale": 2,
                             "hideStock": true,
                             "availabilityVisible": false,
-                            "showPrice": true
+                            "showPrice": true,
+                            "deliveryCharge": 2500,
+                            "priceSize": 0,
+                            "stockTextSize": 0,
+                            "pricePosition": 5,
+                            "availabilityBadgePlacement": 3
                         },
                         {
                             "id": "e",
@@ -3278,7 +3651,12 @@
                                 "discountScale": 2,
                                 "hideStock": true,
                                 "availabilityVisible": false,
-                                "showPrice": true
+                                "showPrice": true,
+                                "deliveryCharge": 2500,
+                                "priceSize": 0,
+                                "stockTextSize": 0,
+                                "pricePosition": 5,
+                                "availabilityBadgePlacement": 3
                             },
                             "price": 1,
                             "priceMinor": 100,
@@ -3317,7 +3695,12 @@
                             "discountScale": 2,
                             "hideStock": true,
                             "availabilityVisible": false,
-                            "showPrice": true
+                            "showPrice": true,
+                            "deliveryCharge": 2500,
+                            "priceSize": 0,
+                            "stockTextSize": 0,
+                            "pricePosition": 5,
+                            "availabilityBadgePlacement": 3
                         }
                     ],
                     "price": 1,
@@ -3357,7 +3740,12 @@
                     "discountScale": 2,
                     "hideStock": true,
                     "availabilityVisible": false,
-                    "showPrice": true
+                    "showPrice": true,
+                    "deliveryCharge": 2500,
+                    "priceSize": 0,
+                    "stockTextSize": 0,
+                    "pricePosition": 5,
+                    "availabilityBadgePlacement": 3
                 }
             ],
             "price": 1,
@@ -3397,7 +3785,12 @@
             "discountScale": 2,
             "hideStock": true,
             "availabilityVisible": false,
-            "showPrice": true
+            "showPrice": true,
+            "deliveryCharge": 2500,
+            "priceSize": 0,
+            "stockTextSize": 0,
+            "pricePosition": 5,
+            "availabilityBadgePlacement": 3
         },
         "pagePresentation": {
             "product": {
@@ -3444,7 +3837,12 @@
                         "discountScale": 2,
                         "hideStock": true,
                         "availabilityVisible": false,
-                        "showPrice": true
+                        "showPrice": true,
+                        "deliveryCharge": 2500,
+                        "priceSize": 0,
+                        "stockTextSize": 0,
+                        "pricePosition": 5,
+                        "availabilityBadgePlacement": 3
                     }
                 ],
                 "price": 1,
@@ -3484,7 +3882,12 @@
                 "discountScale": 2,
                 "hideStock": true,
                 "availabilityVisible": false,
-                "showPrice": true
+                "showPrice": true,
+                "deliveryCharge": 2500,
+                "priceSize": 0,
+                "stockTextSize": 0,
+                "pricePosition": 5,
+                "availabilityBadgePlacement": 3
             },
             "price": 1,
             "priceMinor": 100,
@@ -3523,7 +3926,12 @@
             "discountScale": 2,
             "hideStock": true,
             "availabilityVisible": false,
-            "showPrice": true
+            "showPrice": true,
+            "deliveryCharge": 2500,
+            "priceSize": 0,
+            "stockTextSize": 0,
+            "pricePosition": 5,
+            "availabilityBadgePlacement": 3
         },
         "announcements": {
             "enabled": false,
@@ -3568,7 +3976,12 @@
                     "discountScale": 2,
                     "hideStock": true,
                     "availabilityVisible": false,
-                    "showPrice": true
+                    "showPrice": true,
+                    "deliveryCharge": 2500,
+                    "priceSize": 0,
+                    "stockTextSize": 0,
+                    "pricePosition": 5,
+                    "availabilityBadgePlacement": 3
                 }
             ],
             "price": 1,
@@ -3608,7 +4021,12 @@
             "discountScale": 2,
             "hideStock": true,
             "availabilityVisible": false,
-            "showPrice": true
+            "showPrice": true,
+            "deliveryCharge": 2500,
+            "priceSize": 0,
+            "stockTextSize": 0,
+            "pricePosition": 5,
+            "availabilityBadgePlacement": 3
         },
         "palette": {
             "link": "#0B5FFF",
@@ -3649,7 +4067,12 @@
             "discountScale": 2,
             "hideStock": true,
             "availabilityVisible": false,
-            "showPrice": true
+            "showPrice": true,
+            "deliveryCharge": 2500,
+            "priceSize": 0,
+            "stockTextSize": 0,
+            "pricePosition": 5,
+            "availabilityBadgePlacement": 3
         },
         "shippingFee": 1500,
         "shippingAmount": 900,
@@ -3675,7 +4098,12 @@
         "discountScale": 2,
         "hideStock": true,
         "availabilityVisible": false,
-        "showPrice": true
+        "showPrice": true,
+        "deliveryCharge": 2500,
+        "priceSize": 0,
+        "stockTextSize": 0,
+        "pricePosition": 5,
+        "availabilityBadgePlacement": 3
     },
     "deniedKeys": [
         "price",
@@ -3697,6 +4125,8 @@
         "priceMinor",
         "stockLabel",
         "discountPercent",
-        "sku"
+        "sku",
+        "deliveryCharge",
+        "shippingCharge"
     ]
 }

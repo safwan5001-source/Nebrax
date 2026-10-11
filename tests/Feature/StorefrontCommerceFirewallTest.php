@@ -72,6 +72,29 @@ class StorefrontCommerceFirewallTest extends TestCase
         return array_intersect($words, $fixture['commerceWords']) !== [] && ! in_array(end($words), $fixture['presentationSuffixes'], true);
     }
 
+    /**
+     * @param  array<mixed>  $node
+     * @param  array<string,mixed>  $fixture
+     * @return list<string>
+     */
+    private function numericCommerceKeys(array $node, array $fixture): array
+    {
+        $found = [];
+        foreach ($node as $key => $value) {
+            if (is_string($key) && (is_int($value) || is_float($value))) {
+                $words = array_map('strtolower', preg_split('/[\s_\-]+|(?<=[a-z0-9])(?=[A-Z])/', $key, -1, PREG_SPLIT_NO_EMPTY) ?: []);
+                if (array_intersect($words, $fixture['commerceWords']) !== []) {
+                    $found[] = $key;
+                }
+            }
+            if (is_array($value)) {
+                array_push($found, ...$this->numericCommerceKeys($value, $fixture));
+            }
+        }
+
+        return $found;
+    }
+
     /** @test */
     public function no_commercial_key_survives_normalisation_in_any_scope(): void
     {
@@ -80,6 +103,9 @@ class StorefrontCommerceFirewallTest extends TestCase
 
         $offending = array_values(array_filter(array_unique($this->keysOf($normalized)), fn (string $key): bool => $this->denies($key, $fixture)));
         $this->assertSame([], $offending, 'commercial keys leaked into the normalised presentation: '.implode(', ', $offending));
+
+        // value check for the suffix-exempt controls: a key that contains a commerce word never carries a number (V0 §14.3 schema assertion)
+        $this->assertSame([], $this->numericCommerceKeys($normalized, $fixture), 'a commerce-named presentation key accepted a numeric value');
 
         $json = json_encode($normalized, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE);
         foreach ($fixture['forbiddenValues'] as $value) {

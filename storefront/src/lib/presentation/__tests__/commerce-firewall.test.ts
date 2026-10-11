@@ -46,6 +46,27 @@ function denies(key: string): boolean {
   );
 }
 
+/** Keys that contain a commerce word and carry a number: presentation controls are bounded string enums, never numeric (V0 §14.3). */
+function numericCommerceKeys(node: unknown, out: string[] = []): string[] {
+  if (Array.isArray(node)) {
+    for (const item of node) numericCommerceKeys(item, out);
+  } else if (node && typeof node === "object") {
+    for (const [key, value] of Object.entries(node)) {
+      const words = key
+        .split(/[\s_-]+|(?<=[a-z0-9])(?=[A-Z])/)
+        .filter(Boolean)
+        .map((word) => word.toLowerCase());
+      if (
+        typeof value === "number" &&
+        words.some((word) => fixture.commerceWords.includes(word))
+      )
+        out.push(key);
+      numericCommerceKeys(value, out);
+    }
+  }
+  return out;
+}
+
 /**
  * CUST-HV V9d-4 (V0 §14.3) — the TS twin of PHP's `StorefrontCommerceFirewallTest`: a hostile document carrying commercial keys in every
  * presentation scope loses all of them in normalisation, and the legitimate parts survive.
@@ -66,6 +87,7 @@ describe("commerce firewall — presentation normalisation", () => {
   it("no commercial key survives in any scope", () => {
     const offending = [...keysOf(normalized)].filter(denies);
     expect(offending).toEqual([]);
+    expect(numericCommerceKeys(normalized)).toEqual([]);
   });
 
   it("no injected commercial value is reachable", () => {
