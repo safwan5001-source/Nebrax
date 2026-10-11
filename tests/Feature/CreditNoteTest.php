@@ -37,6 +37,7 @@ class CreditNoteTest extends TestCase
     public function creating_a_credit_note_derives_totals_without_a_journal_entry(): void
     {
         $auth = $this->registerTenant();
+        $this->allowStandaloneCreditNotes($auth['tenant_id']);
         $partnerId = $this->partner($auth['token']);
 
         $res = $this->withToken($auth['token'])->postJson('/api/credit-notes', [
@@ -56,6 +57,7 @@ class CreditNoteTest extends TestCase
     public function posting_a_credit_note_generates_a_balanced_reversing_entry(): void
     {
         $auth = $this->registerTenant();
+        $this->allowStandaloneCreditNotes($auth['tenant_id']);
         $partnerId = $this->partner($auth['token']);
 
         $id = $this->withToken($auth['token'])->postJson('/api/credit-notes', [
@@ -83,6 +85,7 @@ class CreditNoteTest extends TestCase
     public function posting_an_credit_note_freezes_the_matching_published_template_revision(): void
     {
         $auth = $this->registerTenant('credit-template-freeze', 'owner@credit-template-freeze.test');
+        $this->allowStandaloneCreditNotes($auth['tenant_id']);
         $customerId = $this->partner($auth['token']);
         $supplierId = $this->partner($auth['token'], 'supplier');
 
@@ -193,6 +196,7 @@ class CreditNoteTest extends TestCase
     public function reassigning_print_after_post_does_not_change_the_frozen_sales_credit_note(): void
     {
         $auth = $this->registerTenant();
+        $this->allowStandaloneCreditNotes($auth['tenant_id']);
         $partnerId = $this->partner($auth['token']);
         app(TenantContext::class)->set($auth['tenant_id']);
 
@@ -234,6 +238,7 @@ class CreditNoteTest extends TestCase
     public function posting_a_sales_credit_note_without_pdf_assignment_leaves_pdf_revision_null(): void
     {
         $auth = $this->registerTenant();
+        $this->allowStandaloneCreditNotes($auth['tenant_id']);
         $partnerId = $this->partner($auth['token']);
         app(TenantContext::class)->set($auth['tenant_id']);
 
@@ -265,6 +270,7 @@ class CreditNoteTest extends TestCase
     public function reassigning_print_after_post_does_not_change_the_frozen_purchase_debit_note(): void
     {
         $auth = $this->registerTenant();
+        $this->allowStandaloneCreditNotes($auth['tenant_id']);
         $partnerId = $this->partner($auth['token'], 'supplier');
         app(TenantContext::class)->set($auth['tenant_id']);
 
@@ -306,6 +312,7 @@ class CreditNoteTest extends TestCase
     public function posting_a_purchase_debit_note_without_pdf_assignment_leaves_pdf_revision_null(): void
     {
         $auth = $this->registerTenant();
+        $this->allowStandaloneCreditNotes($auth['tenant_id']);
         $partnerId = $this->partner($auth['token'], 'supplier');
         app(TenantContext::class)->set($auth['tenant_id']);
 
@@ -345,6 +352,7 @@ class CreditNoteTest extends TestCase
     public function purchase_debit_notes_are_tenant_isolated(): void
     {
         $a = $this->registerTenant('debit-acme', 'owner@debit-acme.test');
+        $this->allowStandaloneCreditNotes($a['tenant_id']);
         $supplierA = $this->partner($a['token'], 'supplier');
         $id = $this->withToken($a['token'])->postJson('/api/credit-notes', [
             'partner_id' => $supplierA,
@@ -361,6 +369,7 @@ class CreditNoteTest extends TestCase
     public function cash_refund_credits_the_cash_account(): void
     {
         $auth = $this->registerTenant();
+        $this->allowStandaloneCreditNotes($auth['tenant_id']);
         $partnerId = $this->partner($auth['token']);
 
         $id = $this->withToken($auth['token'])->postJson('/api/credit-notes', [
@@ -382,6 +391,7 @@ class CreditNoteTest extends TestCase
     public function a_credit_note_cannot_be_posted_twice(): void
     {
         $auth = $this->registerTenant();
+        $this->allowStandaloneCreditNotes($auth['tenant_id']);
         $partnerId = $this->partner($auth['token']);
         $id = $this->withToken($auth['token'])->postJson('/api/credit-notes', [
             'partner_id' => $partnerId, 'type' => 'sales', 'items' => [['quantity' => 1, 'unit_price' => 10000]],
@@ -395,6 +405,7 @@ class CreditNoteTest extends TestCase
     public function credit_notes_are_tenant_isolated(): void
     {
         $a = $this->registerTenant('acme', 'owner@acme.test');
+        $this->allowStandaloneCreditNotes($a['tenant_id']);
         $partnerA = $this->partner($a['token']);
         $id = $this->withToken($a['token'])->postJson('/api/credit-notes', [
             'partner_id' => $partnerA, 'type' => 'sales', 'items' => [['quantity' => 1, 'unit_price' => 10000]],

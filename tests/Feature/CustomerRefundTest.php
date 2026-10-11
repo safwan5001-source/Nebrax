@@ -25,6 +25,7 @@ use App\Services\Accounting\CreditNoteService;
 use App\Services\Accounting\CustomerRefundService;
 use App\Services\Accounting\ReturnService;
 use App\Support\DocumentNumberingCatalog;
+use App\Support\Settings;
 use App\Tenancy\BranchContext;
 use App\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -73,6 +74,8 @@ class CustomerRefundTest extends TestCase
         app(TenantContext::class)->set($tenant->id);
         app(ChartOfAccountsSeeder::class)->seed($tenant->id);
         app(CashBankAccountService::class)->bootstrapDefaults();
+        // ADR-E (REM-02): هذه الاختبارات تُصدر إشعاراتٍ مستقلة عمداً — تمرّ بالسياسة الصريحة.
+        Settings::put('sales', ['allow_standalone_credit_notes' => true], $tenant);
 
         return $tenant;
     }

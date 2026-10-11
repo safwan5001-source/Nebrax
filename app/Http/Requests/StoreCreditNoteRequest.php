@@ -26,12 +26,16 @@ class StoreCreditNoteRequest extends FormRequest
             'original_invoice_id' => ['nullable', 'uuid'],
             'items'               => ['required', 'array', 'min:1'],
             'items.*.product_id'  => ['nullable', 'uuid'],
+            // AWJ-TAX-REM-02: سطر الفاتورة المصدر. مع `original_invoice_id` يرث الخادم
+            // منه الأساس والخصم والضريبة؛ ملكيته للفاتورة تُتحقَّق في الخدمة.
+            'items.*.source_line_id' => ['nullable', 'uuid'],
             // VAR-FU-1: تحقّقٌ بنيويّ فقط — `DocumentLineVariantResolver` (VAR-DOC-1)
             // داخل الخدمة هو السلطة الوحيدة للاعتماد/العزل/الإلزامية.
             'items.*.product_variant_id' => ['nullable', 'uuid'],
             'items.*.description' => ['nullable', 'string'],
             'items.*.quantity'    => ['required', 'integer', 'min:1', 'max:1000000'],
-            'items.*.unit_price'  => ['required', 'integer', 'min:0', 'max:100000000000'], // هللات
+            // هللات. مع فاتورة مصدر اختياري (الغياب = سعر سطرها) ويُسقَّف بسعره؛ بدونها إلزامي.
+            'items.*.unit_price'  => ['required_without:original_invoice_id', 'nullable', 'integer', 'min:0', 'max:100000000000'],
             'items.*.tax_rate'    => ['nullable', 'integer', 'min:0', 'max:100'],
         ];
     }

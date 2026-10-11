@@ -58,19 +58,27 @@ class CreditNotePostingOwnershipTest extends TestCase
     {
         $customerId = $this->customer($token, $suffix);
 
-        return $this->withToken($token)->postJson('/api/invoices', [
+        $invoiceId = $this->withToken($token)->postJson('/api/invoices', [
             'partner_id' => $customerId,
             'payment_type' => 'credit',
             'items' => [['description' => 'خدمة ترحيل', 'quantity' => 1, 'unit_price' => 10000, 'tax_rate' => 15]],
-        ])->assertCreated()['data'];
+        ])->assertCreated()['data']['id'];
+
+        // REM-02: الإشعار لا يُصدَر إلا على فاتورة مرحَّلة، ويرث من سطرها.
+        return $this->withToken($token)->postJson("/api/invoices/{$invoiceId}/post")->assertOk()['data'];
     }
 
     private function createSourceNote(string $token, array $source, string $sourceKey): array
     {
+        $item = ['description' => 'تصحيح مصدر', 'quantity' => 1, 'unit_price' => 10000, 'tax_rate' => 15];
+        if ($sourceKey === 'original_invoice_id') {
+            $item = ['source_line_id' => $source['lines'][0]['id'], 'quantity' => 1];
+        }
+
         return $this->withToken($token)->postJson('/api/credit-notes', [
             'partner_id' => $source['partner_id'],
             $sourceKey => $source['id'],
-            'items' => [['description' => 'تصحيح مصدر', 'quantity' => 1, 'unit_price' => 10000, 'tax_rate' => 15]],
+            'items' => [$item],
         ])->assertCreated()['data'];
     }
 
@@ -247,6 +255,8 @@ class CreditNotePostingOwnershipTest extends TestCase
         app(TenantContext::class)->set($other['tenant_id']);
         $this->assertNoPostEffects($foreign->id);
 
+        // ADR-E: الإشعار المستقل يتطلب السياسة صراحةً.
+        $this->allowStandaloneCreditNotes($other['tenant_id']);
         $customerId = $this->customer($other['token'], 'مستقل صريح');
         $standalone = $this->withToken($other['token'])->postJson('/api/credit-notes', [
             'partner_id' => $customerId,

@@ -4,7 +4,6 @@ namespace App\Http\Controllers\Api;
 
 use App\Models\Invoice;
 use App\Models\Purchase;
-use App\Models\ReturnLine;
 use App\Services\Accounting\ReturnSourceAllocator;
 use App\Support\Money;
 use App\Tenancy\BranchScope;
@@ -33,21 +32,17 @@ class ReturnableController extends ApiController
 
         abort_unless($document->isPosted(), 422, 'لا يُرَدّ على مستند غير مرحّل.');
 
-        // ما رُدَّ سابقاً لكل سطر — من المرتجعات **المرحَّلة** وحدها، فالمسوّدة
-        // لا تحجز كمية (نفس قاعدة الحارس في `ReturnService`).
-        $returned = ReturnLine::query()
-            ->whereIn('source_line_id', $document->lines->pluck('id'))
-            ->whereHas('return', fn ($q) => $q->where('status', 'posted'))
-            ->groupBy('source_line_id')
-            ->selectRaw('source_line_id, SUM(quantity) as qty')
-            ->pluck('qty', 'source_line_id');
-
         // REM-01: ما حُصِّل فعلاً على كل سطر (أساس صافٍ وضريبة بعد خصم السطر
         // والرأس) وما رُدَّ منه — فتعرض الشاشة المتبقي الحقيقي بدل أن تُعيد
         // حسابه من السعر الإجمالي. إضافةٌ فقط: الحقول القائمة بحالها.
+        //
+        // AWJ-TAX-REM-02: «المردود» يشمل الإشعارات الدائنة المرحَّلة المربوطة بالسطر
+        // — الاثنان يستهلكان سقفاً واحداً، فالمتبقي المعروض هو ما يقبله الخادم فعلاً.
+        // المسوّدة لا تحجز كمية (نفس قاعدة الحارس في `ReturnService`).
         $allocator = app(ReturnSourceAllocator::class);
         $charged   = $allocator->charged($document);
         $amounts   = $allocator->returned($document->lines->pluck('id')->all());
+        $returned  = array_map(fn (array $row) => $row['quantity'], $amounts);
         $inclusive = (bool) $document->tax_inclusive;
 
         $lines = $document->lines->map(function ($line) use ($returned, $charged, $amounts, $allocator, $inclusive) {

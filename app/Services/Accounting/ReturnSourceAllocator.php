@@ -2,6 +2,7 @@
 
 namespace App\Services\Accounting;
 
+use App\Models\CreditNoteLine;
 use App\Models\Invoice;
 use App\Models\Purchase;
 use App\Models\ReturnLine;
@@ -93,16 +94,24 @@ class ReturnSourceAllocator
     }
 
     /**
-     * ما رُدَّ سابقاً على كل سطر مصدر — من المرتجعات **المرحَّلة** وحدها.
+     * ما رُدَّ أو خُصم سابقاً على كل سطر مصدر — من المستندات **المرحَّلة** وحدها:
+     * المرتجعات، **والإشعارات الدائنة المربوطة بسطر** (AWJ-TAX-REM-02). الاثنان
+     * يستهلكان الكمية والأساس والضريبة المحصَّلة نفسها، فيُجمعان في سقفٍ واحد؛
+     * وإلا ردّ مرتجعٌ ما خصمه إشعار (أو العكس) فتجاوز مجموعهما ما حُصِّل.
      *
      * @param  array<int, string>  $sourceLineIds
+     * @param  string|null  $exceptReturnId  مرتجعٌ يُستثنى (يُعاد اشتقاقه الآن)
+     * @param  string|null  $exceptCreditNoteId  إشعارٌ يُستثنى (يُعاد اشتقاقه الآن)
      * @return array<string, array{quantity:int, subtotal:int, discount:int, net:int, tax:int, min_price:int}>
      */
-    public function returned(array $sourceLineIds, ?string $exceptReturnId = null): array
+    public function returned(array $sourceLineIds, ?string $exceptReturnId = null, ?string $exceptCreditNoteId = null): array
     {
         if ($sourceLineIds === []) {
             return [];
         }
+
+        $select = 'source_line_id, SUM(quantity) as qty, SUM(line_subtotal) as subtotal, '
+            . 'SUM(line_discount) as discount, SUM(line_tax) as tax, MIN(unit_price) as min_price';
 
         $rows = ReturnLine::query()
             ->whereIn('source_line_id', $sourceLineIds)
@@ -113,22 +122,34 @@ class ReturnSourceAllocator
                 }
             })
             ->groupBy('source_line_id')
-            ->selectRaw(
-                'source_line_id, SUM(quantity) as qty, SUM(line_subtotal) as subtotal, '
-                . 'SUM(line_discount) as discount, SUM(line_tax) as tax, MIN(unit_price) as min_price'
-            )
+            ->selectRaw($select)
+            ->get();
+
+        $noteRows = CreditNoteLine::query()
+            ->whereIn('source_line_id', $sourceLineIds)
+            ->whereHas('creditNote', function ($q) use ($exceptCreditNoteId) {
+                $q->where('status', 'posted');
+                if ($exceptCreditNoteId) {
+                    $q->where('id', '!=', $exceptCreditNoteId);
+                }
+            })
+            ->groupBy('source_line_id')
+            ->selectRaw($select)
             ->get();
 
         $out = [];
-        foreach ($rows as $row) {
+        foreach ($rows->concat($noteRows) as $row) {
+            $prior = $out[$row->source_line_id] ?? null;
+            $subtotal = (int) $row->subtotal + ($prior['subtotal'] ?? 0);
+            $discount = (int) $row->discount + ($prior['discount'] ?? 0);
             $out[$row->source_line_id] = [
-                'quantity' => (int) $row->qty,
-                'subtotal' => (int) $row->subtotal,
-                'discount' => (int) $row->discount,
-                'net'      => (int) $row->subtotal - (int) $row->discount,
-                'tax'      => (int) $row->tax,
+                'quantity' => (int) $row->qty + ($prior['quantity'] ?? 0),
+                'subtotal' => $subtotal,
+                'discount' => $discount,
+                'net'      => $subtotal - $discount,
+                'tax'      => (int) $row->tax + ($prior['tax'] ?? 0),
                 // أدنى سعر ردٍّ سابق على السطر — يكشف الاسترداد بسعر مخفَّض.
-                'min_price' => (int) $row->min_price,
+                'min_price' => isset($prior['min_price']) ? min($prior['min_price'], (int) $row->min_price) : (int) $row->min_price,
             ];
         }
 
