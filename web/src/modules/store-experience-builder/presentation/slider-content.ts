@@ -21,8 +21,10 @@
  *  - The slide button is label + link only and always draws as the solid primary button.
  */
 
+import { autoForeground, parseHex, solidInterval } from "./contrast-engine";
 import type { MediaRef } from "./media-ref";
 import { normalizeMediaRef } from "./media-ref";
+import { resolveRoleHex } from "./palette";
 import {
   ALIGNS,
   type Align,
@@ -34,6 +36,7 @@ import {
 } from "./section-design";
 import {
   type DesignContext,
+  effectiveText,
   type SectionContrastIssue,
   sectionContrastIssues,
 } from "./section-design-resolve";
@@ -272,5 +275,51 @@ function sliderPseudoDesign(slide: SliderSlide) {
       ...(slide.overlay ? { overlay: slide.overlay } : {}),
     },
     ...(slide.text ? { text: { body: slide.text } } : {}),
+  };
+}
+
+/**
+ * What one slide is drawn with — the single decision the published storefront and the editor Canvas share (V8b / V8c). `ctx.mediaBounds` carries
+ * the proven bounds of the slide's pictures (the server's, or the editor's read-only ones); a slide with copy whose pictures are **not** proven
+ * withholds its picture and draws the brand surface with its own automatic foreground (text is never placed on a surface the proof did not
+ * cover). The button is solid in the copy colour, its label the better of pure white / black over that fill.
+ */
+export interface SlideDraw {
+  surface: "picture" | "brand";
+  foreground: string | null;
+  buttonLabel: string | null;
+  overlay: { colour: string; alpha: number } | null;
+}
+
+export function slideDraw(slide: SliderSlide, ctx: DesignContext): SlideDraw {
+  const design = sliderPseudoDesign(slide);
+  const text = effectiveText(design, ctx);
+  const proven =
+    text.background !== null && sectionContrastIssues(design, ctx).length === 0;
+  const hasText = slideHasText(slide);
+  const withheld = hasText && !proven;
+  const foreground = !hasText
+    ? null
+    : withheld
+      ? effectiveText(
+          { background: { kind: "solid", color: { role: "brand" } } },
+          ctx,
+        ).body
+      : text.body;
+  const fill = foreground ? parseHex(foreground) : null;
+  return {
+    surface: withheld ? "brand" : "picture",
+    foreground,
+    buttonLabel: fill ? autoForeground(solidInterval(fill)) : null,
+    overlay:
+      !withheld && slide.overlay
+        ? {
+            colour:
+              "role" in slide.overlay.color
+                ? resolveRoleHex(slide.overlay.color.role, ctx)
+                : slide.overlay.color.hex,
+            alpha: slide.overlay.alpha / 100,
+          }
+        : null,
   };
 }

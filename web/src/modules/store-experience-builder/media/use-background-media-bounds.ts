@@ -23,6 +23,7 @@ import {
 } from "@/modules/commerce-workspace/storefront-media";
 import type { MediaRef } from "../presentation/media-ref";
 import type { SectionDesign } from "../presentation/section-design";
+import type { SectionContent } from "../presentation/section-content";
 import type { MediaBounds } from "../presentation/section-design-resolve";
 import { onUsageGenerated, usageKey } from "./use-usage-readiness";
 
@@ -40,23 +41,32 @@ const MAX_POLLS = 30;
 /** Consecutive failed reads tolerated (a transient network/5xx) before the usage is called unavailable. */
 const MAX_READ_FAILURES = 4;
 
-/** Every picture of every visible picture background (a hidden section never blocks publishing). */
-export function backgroundPictureRefs(
-  sections: ReadonlyArray<{ visible: boolean; design?: SectionDesign }>,
-): MediaRef[] {
+type PictureSection = { visible: boolean; type?: string; design?: SectionDesign; content?: SectionContent };
+
+/**
+ * Every picture a visible section needs proven bounds for: a picture background's pictures and — since V8c — every visible slider
+ * slide's picture and phone picture (a hidden section never blocks publishing).
+ */
+export function backgroundPictureRefs(sections: ReadonlyArray<PictureSection>): MediaRef[] {
   const out: MediaRef[] = [];
   for (const section of sections) {
+    if (!section.visible) continue;
     const bg = section.design?.background;
-    if (!section.visible || bg?.kind !== "media") continue;
-    out.push(bg.media);
-    if (bg.mobile) out.push(bg.mobile);
+    if (bg?.kind === "media") {
+      out.push(bg.media);
+      if (bg.mobile) out.push(bg.mobile);
+    }
+    if (section.type === "slider" && section.content && "slides" in section.content) {
+      for (const slide of section.content.slides) {
+        out.push(slide.media);
+        if (slide.mobile) out.push(slide.mobile);
+      }
+    }
   }
   return out;
 }
 
-export function useBackgroundMediaBounds(
-  sections: ReadonlyArray<{ visible: boolean; design?: SectionDesign }>,
-): BackgroundMediaBounds {
+export function useBackgroundMediaBounds(sections: ReadonlyArray<PictureSection>): BackgroundMediaBounds {
   const refs = backgroundPictureRefs(sections);
   const signature = refs.map((ref) => usageKey(ref)).join("|");
   const [entries, setEntries] = useState<Record<string, Entry>>({});

@@ -297,6 +297,46 @@
   padding-block-start: 0;
 }
 
+/* ── CUST-HV V8c — the slider in the Canvas. The slider rules below the V5c marker are the storefront's (parity-tested); they size the
+   copy and the slide height with media queries against the HOST window, which is not the simulated device's width. `data-vp` carries
+   the device, so these higher-specificity rules take the device's own values. Same numbers as the storefront's queries. ── */
+.awj-store-preview [data-slider][data-vp="mobile"] [data-slider-slide] {
+  min-block-size: var(--sec-minh, 16rem);
+}
+.awj-store-preview [data-slider][data-vp="tablet"] [data-slider-slide] {
+  min-block-size: var(--sec-minh, 17.25rem);
+}
+.awj-store-preview [data-slider][data-vp="desktop"] [data-slider-slide] {
+  min-block-size: var(--sec-minh, 28.8rem);
+}
+.awj-store-preview [data-slider][data-vp="mobile"] [data-slider-copy] {
+  padding: 1.25rem 3.5rem 3.5rem;
+}
+.awj-store-preview [data-slider][data-vp="mobile"] [data-slider-copy] h2 {
+  font-size: 1.25rem;
+}
+.awj-store-preview [data-slider][data-vp="mobile"] [data-slider-copy] p {
+  font-size: 0.875rem;
+}
+.awj-store-preview [data-slider][data-vp="tablet"] [data-slider-copy] {
+  padding: 2.5rem 4.5rem 4rem;
+}
+.awj-store-preview [data-slider][data-vp="tablet"] [data-slider-copy] h2 {
+  font-size: 1.5rem;
+}
+.awj-store-preview [data-slider][data-vp="tablet"] [data-slider-copy] p {
+  font-size: 1rem;
+}
+.awj-store-preview [data-slider][data-vp="desktop"] [data-slider-copy] {
+  padding: 3.5rem 5rem 4rem;
+}
+.awj-store-preview [data-slider][data-vp="desktop"] [data-slider-copy] h2 {
+  font-size: 2.25rem;
+}
+.awj-store-preview [data-slider][data-vp="desktop"] [data-slider-copy] p {
+  font-size: 1rem;
+}
+
 /*
  * CUST-HV V5c — section design (contract §3.5). Every rule keys off a validated
  * `--sec-*` custom property the resolver set (`section-design-resolve.ts`); no

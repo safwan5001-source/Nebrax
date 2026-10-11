@@ -17,22 +17,14 @@
  * A slide whose picture the server did not resolve is omitted, never guessed. Slide numbering counts what is drawn.
  */
 import type { PresentationHomeSection } from "./config";
-import { autoForeground, parseHex, solidInterval } from "./contrast-engine";
 import type { MediaRef, ResolvedMedia, ResolvedMediaMap } from "./media-ref";
-import { resolveRoleHex } from "./palette";
 import { sliderContentOf } from "./section-content";
-import type { Align, ColorRef, SectionDesign } from "./section-design";
-import {
-  type DesignContext,
-  effectiveText,
-  type MediaBounds,
-  sectionContrastIssues,
-} from "./section-design-resolve";
+import type { Align } from "./section-design";
+import type { DesignContext, MediaBounds } from "./section-design-resolve";
 import {
   type ResolvedSliderBehaviour,
   resolveSliderBehaviour,
-  type SliderSlide,
-  slideHasText,
+  slideDraw,
 } from "./slider-content";
 
 export function slidePicturePath(
@@ -75,26 +67,10 @@ export interface SliderView {
   behaviour: ResolvedSliderBehaviour;
 }
 
-function colour(ref: ColorRef, ctx: DesignContext): string {
-  return "role" in ref ? resolveRoleHex(ref.role, ctx) : ref.hex;
-}
-
 function boundsOf(media: ResolvedMedia | undefined): MediaBounds | null {
   return media?.contrast
     ? { min: media.contrast.min, max: media.contrast.max }
     : null;
-}
-
-function slidePseudoDesign(slide: SliderSlide): SectionDesign {
-  return {
-    background: {
-      kind: "media",
-      media: slide.media,
-      ...(slide.mobile ? { mobile: slide.mobile } : {}),
-      ...(slide.overlay ? { overlay: slide.overlay } : {}),
-    },
-    ...(slide.text ? { text: { body: slide.text } } : {}),
-  };
 }
 
 function altFor(media: ResolvedMedia, locale: string): string {
@@ -119,7 +95,6 @@ export function resolveSlider(
       ? resolved[slidePicturePath(sectionIndex, slideIndex, "mobile")]
       : undefined;
 
-    const hasText = slideHasText(slide);
     const cta =
       slide.cta && slide.cta.label.trim() !== "" && slide.cta.href.trim() !== ""
         ? { label: slide.cta.label, href: slide.cta.href }
@@ -131,27 +106,13 @@ export function resolveSlider(
     if (own) byRef.set(slide.media, own);
     const phone = slide.mobile ? boundsOf(mobile) : null;
     if (slide.mobile && phone) byRef.set(slide.mobile, phone);
-    const slideCtx: DesignContext = {
+    // The one decision the editor Canvas shares (`slideDraw`).
+    const draw = slideDraw(slide, {
       ...ctx,
       mediaBounds: (ref) => byRef.get(ref) ?? null,
-    };
-    const design = slidePseudoDesign(slide);
-    const text = effectiveText(design, slideCtx);
-    const proven =
-      text.background !== null &&
-      sectionContrastIssues(design, slideCtx).length === 0;
+    });
+    const withheld = draw.surface === "brand";
 
-    const withheld = hasText && !proven;
-    const foreground = !hasText
-      ? null
-      : withheld
-        ? effectiveText(
-            { background: { kind: "solid", color: { role: "brand" } } },
-            ctx,
-          ).body
-        : text.body;
-
-    const fill = foreground ? parseHex(foreground) : null;
     slides.push({
       id: slide.id,
       position: slides.length + 1,
@@ -165,17 +126,11 @@ export function resolveSlider(
       heading: slide.heading ?? "",
       sub: slide.sub ?? "",
       cta,
-      foreground,
-      buttonLabel: fill ? autoForeground(solidInterval(fill)) : null,
-      overlay:
-        !withheld && slide.overlay
-          ? {
-              colour: colour(slide.overlay.color, ctx),
-              alpha: slide.overlay.alpha / 100,
-            }
-          : null,
+      foreground: draw.foreground,
+      buttonLabel: draw.buttonLabel,
+      overlay: draw.overlay,
       align: slide.align ?? "start",
-      surface: withheld ? "brand" : "picture",
+      surface: draw.surface,
     });
   });
 
