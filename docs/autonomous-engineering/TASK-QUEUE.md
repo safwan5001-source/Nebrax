@@ -1,5 +1,28 @@
 # AWJ Autonomous Engineering — Durable Task Queue
 
+## ACTIVE HORIZON — AWJ TAX-ZATCA Horizon (Owner decision 2026-10-11)
+
+**Status:** ACTIVE **when activation PR #1324 is merged into main**. Until that merge, this section is a proposed activation transition. The owner's choice is recorded: **Delivery Platforms & Settlement V1 is PAUSED, not closed**.
+
+Authoritative TAX programme plan/queue:
+- `docs/audits/horizon/AWJ-TAX-ZATCA-HORIZON-MASTER-PLAN.md`
+- `docs/audits/horizon/AWJ-TAX-ZATCA-HORIZON-TASK-QUEUE.md`
+- `docs/audits/AWJ-TAX-ZATCA-REMEDIATION-PLAN.md` (canonical 40-REM dependency matrix).
+
+| Order | Task | Activation status | Dependency / gate |
+|---:|---|---|---|
+| 0 | TAX-HZ-00 | ready for read-only Evidence & Decision Pass **after activation merge** | owner activation decision made; no code / no release |
+| 1 | REM-03 | candidate, not implementation-authorized | current-main branch mutation access evidence |
+| 2 | REM-11 | candidate, not implementation-authorized | official SDK versions / harness evidence |
+| 3 | REM-04 | candidate, not implementation-authorized | retest current lock ordering; avoid double fix |
+| 4+ | Other REM tasks | per TAX horizon queue | canonical dependencies, owner material decisions, merge gates |
+
+**Merge authority:** owner's current instruction requires *explicit approval for each merge*, even if older sections below say standing authority. Never deploy, run production migration, activate outbound ZATCA or alter credentials without a separate explicit approval.
+
+**Delivery handoff:** Historical Delivery tasks and open gates remain below unchanged. No Delivery task is eligible for selection while paused; do not update their old row statuses without a new evidence pass when resumed.
+
+---
+
 ## Purpose
 
 This is the human-reviewable V1 queue. It is deliberately Markdown first. Do not introduce a second YAML/JSON source of truth until the schema and workflow prove stable.
