@@ -591,7 +591,8 @@ export function normalizeSectionDesign(
   }
   if (Array.isArray(capability.layout)) {
     const layout = pick(raw.layout, capability.layout as readonly string[]);
-    if (layout) out.layout = layout as HeroLayout | BannerLayout | GalleryLayout;
+    if (layout)
+      out.layout = layout as HeroLayout | BannerLayout | GalleryLayout;
   }
   if (capability.border) {
     const border = normalizeBorder(raw.border);
