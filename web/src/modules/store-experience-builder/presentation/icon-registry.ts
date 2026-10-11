@@ -52,35 +52,132 @@ export interface IconInfo {
 }
 
 export const ICON_REGISTRY: Readonly<Record<IconKey, IconInfo>> = {
-  truck: { label: { ar: "شاحنة", en: "Truck" }, tags: ["delivery", "shipping", "توصيل", "شحن"], directional: true },
-  "shield-check": { label: { ar: "حماية", en: "Shield" }, tags: ["secure", "warranty", "guarantee", "ضمان", "أمان"], directional: false },
-  "credit-card": { label: { ar: "بطاقة دفع", en: "Credit card" }, tags: ["payment", "pay", "دفع"], directional: false },
-  gift: { label: { ar: "هدية", en: "Gift" }, tags: ["present", "offer", "هدايا"], directional: false },
-  clock: { label: { ar: "ساعة", en: "Clock" }, tags: ["time", "hours", "fast", "وقت", "سريع"], directional: false },
-  phone: { label: { ar: "هاتف", en: "Phone" }, tags: ["call", "contact", "اتصال"], directional: false },
-  "message-circle": { label: { ar: "رسالة", en: "Message" }, tags: ["chat", "whatsapp", "support", "محادثة"], directional: false },
-  mail: { label: { ar: "بريد", en: "Mail" }, tags: ["email", "contact", "إيميل"], directional: false },
-  "map-pin": { label: { ar: "موقع", en: "Location" }, tags: ["address", "branch", "map", "عنوان", "فرع"], directional: false },
-  store: { label: { ar: "متجر", en: "Store" }, tags: ["shop", "branch", "محل"], directional: false },
-  star: { label: { ar: "نجمة", en: "Star" }, tags: ["favourite", "rating", "featured", "تقييم", "مميز"], directional: false },
-  heart: { label: { ar: "قلب", en: "Heart" }, tags: ["love", "wishlist", "like", "مفضلة"], directional: false },
-  tag: { label: { ar: "وسم", en: "Tag" }, tags: ["price", "label", "sale", "سعر"], directional: false },
-  percent: { label: { ar: "خصم", en: "Discount" }, tags: ["sale", "offer", "discount", "عرض", "تخفيض"], directional: false },
-  package: { label: { ar: "طرد", en: "Package" }, tags: ["order", "box", "parcel", "طلب"], directional: false },
-  "refresh-ccw": { label: { ar: "استرجاع", en: "Returns" }, tags: ["return", "exchange", "refund", "استبدال"], directional: false },
-  headphones: { label: { ar: "دعم", en: "Support" }, tags: ["help", "service", "مساعدة", "خدمة"], directional: false },
-  leaf: { label: { ar: "طبيعي", en: "Leaf" }, tags: ["natural", "organic", "fresh", "eco", "طازج", "عضوي"], directional: false },
-  sparkles: { label: { ar: "لمعان", en: "Sparkles" }, tags: ["new", "premium", "special", "جديد", "فاخر"], directional: false },
-  "badge-check": { label: { ar: "موثّق", en: "Verified" }, tags: ["trusted", "authentic", "original", "أصلي", "موثوق"], directional: false },
-  calendar: { label: { ar: "تقويم", en: "Calendar" }, tags: ["date", "schedule", "booking", "موعد", "حجز"], directional: false },
-  users: { label: { ar: "فريق", en: "People" }, tags: ["team", "community", "about", "عنا"], directional: false },
-  lock: { label: { ar: "أمان", en: "Lock" }, tags: ["secure", "private", "privacy", "خصوصية"], directional: false },
-  globe: { label: { ar: "عالمي", en: "Globe" }, tags: ["world", "international", "language", "دولي", "لغة"], directional: false },
+  truck: {
+    label: { ar: "شاحنة", en: "Truck" },
+    tags: ["delivery", "shipping", "توصيل", "شحن"],
+    directional: true,
+  },
+  "shield-check": {
+    label: { ar: "حماية", en: "Shield" },
+    tags: ["secure", "warranty", "guarantee", "ضمان", "أمان"],
+    directional: false,
+  },
+  "credit-card": {
+    label: { ar: "بطاقة دفع", en: "Credit card" },
+    tags: ["payment", "pay", "دفع"],
+    directional: false,
+  },
+  gift: {
+    label: { ar: "هدية", en: "Gift" },
+    tags: ["present", "offer", "هدايا"],
+    directional: false,
+  },
+  clock: {
+    label: { ar: "ساعة", en: "Clock" },
+    tags: ["time", "hours", "fast", "وقت", "سريع"],
+    directional: false,
+  },
+  phone: {
+    label: { ar: "هاتف", en: "Phone" },
+    tags: ["call", "contact", "اتصال"],
+    directional: false,
+  },
+  "message-circle": {
+    label: { ar: "رسالة", en: "Message" },
+    tags: ["chat", "whatsapp", "support", "محادثة"],
+    directional: false,
+  },
+  mail: {
+    label: { ar: "بريد", en: "Mail" },
+    tags: ["email", "contact", "إيميل"],
+    directional: false,
+  },
+  "map-pin": {
+    label: { ar: "موقع", en: "Location" },
+    tags: ["address", "branch", "map", "عنوان", "فرع"],
+    directional: false,
+  },
+  store: {
+    label: { ar: "متجر", en: "Store" },
+    tags: ["shop", "branch", "محل"],
+    directional: false,
+  },
+  star: {
+    label: { ar: "نجمة", en: "Star" },
+    tags: ["favourite", "rating", "featured", "تقييم", "مميز"],
+    directional: false,
+  },
+  heart: {
+    label: { ar: "قلب", en: "Heart" },
+    tags: ["love", "wishlist", "like", "مفضلة"],
+    directional: false,
+  },
+  tag: {
+    label: { ar: "وسم", en: "Tag" },
+    tags: ["price", "label", "sale", "سعر"],
+    directional: false,
+  },
+  percent: {
+    label: { ar: "خصم", en: "Discount" },
+    tags: ["sale", "offer", "discount", "عرض", "تخفيض"],
+    directional: false,
+  },
+  package: {
+    label: { ar: "طرد", en: "Package" },
+    tags: ["order", "box", "parcel", "طلب"],
+    directional: false,
+  },
+  "refresh-ccw": {
+    label: { ar: "استرجاع", en: "Returns" },
+    tags: ["return", "exchange", "refund", "استبدال"],
+    directional: false,
+  },
+  headphones: {
+    label: { ar: "دعم", en: "Support" },
+    tags: ["help", "service", "مساعدة", "خدمة"],
+    directional: false,
+  },
+  leaf: {
+    label: { ar: "طبيعي", en: "Leaf" },
+    tags: ["natural", "organic", "fresh", "eco", "طازج", "عضوي"],
+    directional: false,
+  },
+  sparkles: {
+    label: { ar: "لمعان", en: "Sparkles" },
+    tags: ["new", "premium", "special", "جديد", "فاخر"],
+    directional: false,
+  },
+  "badge-check": {
+    label: { ar: "موثّق", en: "Verified" },
+    tags: ["trusted", "authentic", "original", "أصلي", "موثوق"],
+    directional: false,
+  },
+  calendar: {
+    label: { ar: "تقويم", en: "Calendar" },
+    tags: ["date", "schedule", "booking", "موعد", "حجز"],
+    directional: false,
+  },
+  users: {
+    label: { ar: "فريق", en: "People" },
+    tags: ["team", "community", "about", "عنا"],
+    directional: false,
+  },
+  lock: {
+    label: { ar: "أمان", en: "Lock" },
+    tags: ["secure", "private", "privacy", "خصوصية"],
+    directional: false,
+  },
+  globe: {
+    label: { ar: "عالمي", en: "Globe" },
+    tags: ["world", "international", "language", "دولي", "لغة"],
+    directional: false,
+  },
 };
 
 export function isIconKey(value: unknown): value is IconKey {
   return (
-    typeof value === "string" && (ICON_KEYS as readonly string[]).includes(value)
+    typeof value === "string" &&
+    (ICON_KEYS as readonly string[]).includes(value)
   );
 }
 

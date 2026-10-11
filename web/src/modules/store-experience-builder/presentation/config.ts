@@ -2,6 +2,7 @@ import { type MediaRef, normalizeMediaRef } from "./media-ref";
 import { type PresentationPalette, normalizePalette } from "./palette";
 import { type GlobalTokensDoc, normalizeGlobalTokens } from "./global-tokens";
 import { type HeaderDesign, normalizeHeaderDesign } from "./header-design";
+import { type NavigationDoc, normalizeNavigation } from "./navigation";
 import { type SectionDesign, normalizeSectionDesign } from "./section-design";
 import {
   type AnnouncementsDoc,
@@ -182,6 +183,8 @@ export interface StorefrontPresentationConfig {
    * CUST-HV V3 — additive, optional announcement bar (contract §12). Absent =
    * no bar; pre-V3 documents normalize without this key, byte-identically.
    */
+  /** CUST-HV V7d-2 — typed navigation menus (V0 §11); `main` supersedes `header.links`. */
+  navigation?: NavigationDoc;
   announcements?: AnnouncementsDoc;
   /**
    * CUST-HV V5a — additive, optional palette roles beyond brand (= `primaryColor`)
@@ -521,6 +524,7 @@ export function normalizePresentationConfig(
   const palette = normalizePalette(raw.palette);
   const globalTokens = normalizeGlobalTokens(raw);
   const headerDesign = normalizeHeaderDesign(headerRaw.design);
+  const navigation = normalizeNavigation(raw.navigation);
 
   return {
     version: PRESENTATION_CONFIG_VERSION,
@@ -609,6 +613,7 @@ export function normalizePresentationConfig(
           .map((page, index) => normalizePage(page, index))
           .filter((page): page is PresentationContentPage => Boolean(page))
       : DEFAULT_PRESENTATION_CONFIG.pages.map((page) => ({ ...page })),
+    ...(navigation ? { navigation } : {}),
     ...(pagePresentation ? { pagePresentation } : {}),
     ...(announcements ? { announcements } : {}),
     ...(palette ? { palette } : {}),

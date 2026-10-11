@@ -413,6 +413,8 @@ final class StorefrontPresentationNormalizer
         $palette = $this->normalizePalette($input['palette'] ?? null);
         // CUST-HV V7a — تصميم الترويسة البنيوي: مفتاح اختياري داخل `header`، الغياب = لا مفتاح.
         $headerDesign = StorefrontHeaderDesignNormalizer::normalize($headerRaw['design'] ?? null);
+        // CUST-HV V7d-2 — وثيقة التنقّل `navigation`: مفتاح اختياري إضافي، الغياب = لا مفتاح.
+        $navigation = StorefrontNavigationNormalizer::normalize($input['navigation'] ?? null, fn (string $url) => $this->sanitizeExternalUrl($url));
 
         $config = [
             'version' => self::VERSION,
@@ -488,6 +490,10 @@ final class StorefrontPresentationNormalizer
 
         if ($headerDesign !== null) {
             $config['header']['design'] = $headerDesign;
+        }
+
+        if ($navigation !== null) {
+            $config['navigation'] = $navigation;
         }
 
         if ($pagePresentation !== null) {
