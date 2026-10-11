@@ -1,7 +1,7 @@
 # AWJ Delivery Platforms & Settlement Horizon V1
 
 **System:** AWJ Autonomous Engineering Horizon  
-**Status:** ACTIVE — PASS-7 accepted; PASS-8 merged; Connector Core merged (PR #1287); DLV-PROVIDER-READINESS-1 recorded; no native connector promoted
+**Status:** ACTIVE — PASS-7 accepted; PASS-8 merged; Connector Core merged (PR #1287); DLV-PROVIDER-READINESS-1 recorded; DLV-CHANNEL-REPORT-1 design recorded; no native connector promoted
 **Prepared:** 2026-10-02  
 **Planning Base SHA:** `78ca324504db30185bc074fd91e77efbccaf7267`  
 **Primary decision:** `docs/plans/pos/AWJ_POS_DELIVERY_PLATFORMS_ACCOUNTING_UX_DECISION.md`  
@@ -154,6 +154,16 @@ The Chefz stay not enabled. None is `READY` for a connector, and none is
 `DLV-KEETA-1` stay not dependency-ready until the owner evidence named in
 that report exists. No adapter, credential, webhook, or financial task is
 authorized by this horizon update.
+
+`DLV-CHANNEL-REPORT-1` is an evidence and design pass only, recorded in
+`docs/plans/pos/DLV-CHANNEL-REPORT-1-EVIDENCE-DESIGN.md` (base
+`999e06c52cd9e7dba3d8e16b3be00fc8d9ad9fa0`). It specifies a read-only report
+over posted POS invoices that already have a delivery context. It does not
+count Hub rows as sales, does not change VAT or posting, and does not promote
+a connector or a financial implementation task. The combined net of POS
+returns plus credit notes stays blocked. The next implementation candidate
+after that design merges, and only with separate authorization, is the
+read-only `DLV-CHANNEL-REPORT-API-1` slice.
 
 ## 6. Task acceptance highlights
 
