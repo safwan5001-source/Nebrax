@@ -1,5 +1,7 @@
 """Offline tests for the CI Gate. Run: python3 -m unittest discover -s scripts/ci-gate"""
 import argparse
+import contextlib
+import io
 import json
 import os
 import shutil
@@ -348,7 +350,8 @@ class EndToEnd(unittest.TestCase):
         try:
             args = argparse.Namespace(root=str(g.ROOT), base_root=str(g.ROOT), pr=5, sha=SHA,
                                       timeout_minutes=1, interval=0)
-            return g.run_gate(args)
+            with contextlib.redirect_stdout(io.StringIO()):  # keep CI logs free of a scary "FAIL" table
+                return g.run_gate(args)
         finally:
             g.Api = orig
 
@@ -361,6 +364,23 @@ class EndToEnd(unittest.TestCase):
     def test_stale_head_fails_closed(self):
         with self.assertRaises(g.GateError):
             self._run({PHP[0]: "success", PHP[1]: "success"}, head="e" * 40)
+
+
+class Timeouts(unittest.TestCase):
+    """Regression (POST-MERGE): 70 min failed healthy PRs whose runner queue was long (observed 73 and 114 min)."""
+
+    def test_deadline_covers_observed_worst_case(self):
+        self.assertGreaterEqual(g.DEFAULT_TIMEOUT_MINUTES, 120)
+
+    def test_job_timeout_exceeds_gate_deadline(self):
+        doc = g.load_yaml(g.ROOT / ".github/workflows/ci-gate.yml")
+        self.assertGreater(doc["jobs"]["gate"]["timeout-minutes"], g.DEFAULT_TIMEOUT_MINUTES + 5)
+
+    def test_cli_default_uses_constant(self):
+        import re
+        src = (g.ROOT / "scripts/ci-gate/ci_gate.py").read_text()
+        self.assertIn("default=DEFAULT_TIMEOUT_MINUTES", src)
+        self.assertIsNone(re.search(r"default=70", src))
 
 
 class Hygiene(unittest.TestCase):
