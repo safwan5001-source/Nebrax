@@ -43,13 +43,20 @@ class ReturnSourcesController extends ApiController
 
         // مستندات الطرف المرحَّلة — مرجعٌ لا تصفّح، فقد يُرَدّ في فرعٍ غير
         // الذي بِيع فيه (نفس قاعدة `ReturnableController`).
-        $documents = BranchScope::reference($class)
+        $query = BranchScope::reference($class)
             ->with('lines:id,' . ($type === 'sales' ? 'invoice_id' : 'purchase_id') . ',quantity')
             ->where('partner_id', $partnerId)
-            ->where('status', 'posted')
-            ->latest($dateField)
-            ->limit(200)
-            ->get();
+            ->where('status', 'posted');
+
+        // REM-02: منتقي الإشعار الدائن يعرض ما يقبله `CreditNoteController::store` فقط — الإشعار
+        // يتحقق من فرع الفاتورة (404 لفرعٍ خارج نطاق المستخدم)، أما المرتجع فمرجعيّ عابر للفروع.
+        // نفس قاعدة `assertRecordAccessible`: فرعٌ فارغ مسموح، وغيره ضمن فروع المستخدم.
+        if ($type === 'sales' && $request->query('purpose') === 'credit_note'
+            && ($allowed = $request->user()?->allowedBranchIds()) !== null) {
+            $query->where(fn ($q) => $q->whereNull('branch_id')->orWhereIn('branch_id', $allowed));
+        }
+
+        $documents = $query->latest($dateField)->limit(200)->get();
 
         // ما رُدَّ من كل سطر — استعلامٌ واحد لكل المستندات لا استعلام لمستند.
         $lineIds  = $documents->flatMap(fn ($d) => $d->lines->pluck('id'));

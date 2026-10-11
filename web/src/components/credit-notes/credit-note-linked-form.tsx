@@ -80,7 +80,7 @@ export function CreditNoteLinkedForm({ initialInvoiceId }: { initialInvoiceId?: 
   useEffect(() => {
     if (!partnerId) { setSources([]); return; }
     setSourcesLoading(true);
-    api<{ data: SourceInvoice[] }>(`/returns/sources/sales?partner_id=${partnerId}`)
+    api<{ data: SourceInvoice[] }>(`/returns/sources/sales?purpose=credit_note&partner_id=${partnerId}`)
       .then((r) => setSources(r.data))
       .catch(() => setSources([]))
       .finally(() => setSourcesLoading(false));

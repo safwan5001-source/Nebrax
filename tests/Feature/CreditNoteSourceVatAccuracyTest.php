@@ -508,6 +508,32 @@ class CreditNoteSourceVatAccuracyTest extends TestCase
     }
 
     /** @test */
+    public function a_non_final_pos_part_after_a_note_takes_its_cumulative_share(): void
+    {
+        // 7 × 0.10: ضريبة 0.11. التوزيع التراكمي F(n)=floor(11n/7): 0,1,3,4,6,7,9,11.
+        // إشعار بوحدة (F(1)−F(0)=1)، ثم ردّ POS بوحدة غير أخيرة: F(2)−F(1)=2 لا floor(11/7)=1.
+        $invoice = $this->sale([$this->item(7, 10)]);
+        $line = $invoice->lines->first();
+        $note = $this->note($invoice, [[$line, 1]]);
+        $this->assertSame(1, (int) $note->tax_amount);
+
+        $service = app(\App\Services\Accounting\PosReturnService::class);
+        $derive = new \ReflectionMethod($service, 'buildSourceItems');
+        $derive->setAccessible(true);
+
+        $first = $derive->invoke($service, $invoice->fresh('lines'), [['source_line_id' => $line->id, 'quantity' => 1]])[0];
+        $this->assertSame(2, $first['line_tax_override'], 'الجزء الثاني (وحدة بعد إشعار وحدة) = 2 هللة لا 1.');
+
+        // ثلاث وحدات بعد الإشعار: F(4)−F(1)=6−1=5 هللات.
+        $three = $derive->invoke($service, $invoice->fresh('lines'), [['source_line_id' => $line->id, 'quantity' => 3]])[0];
+        $this->assertSame(5, $three['line_tax_override']);
+
+        // والمتبقي الستّ يغلق الفاتورة بالضبط (1 + 10 = 11).
+        $rest = $derive->invoke($service, $invoice->fresh('lines'), [['source_line_id' => $line->id, 'quantity' => 6]])[0];
+        $this->assertSame(11, (int) $note->tax_amount + $rest['line_tax_override']);
+    }
+
+    /** @test */
     public function pos_style_derivation_after_a_note_on_a_header_discounted_invoice_never_exceeds_the_invoice(): void
     {
         // 2 × 100.00 بخصم رأس 20.00: صافٍ 180.00 وضريبة 27.00. إشعار بوحدة ثم ردّ POS للأخرى:
@@ -973,6 +999,34 @@ class CreditNoteSourceVatAccuracyTest extends TestCase
         $this->postJson("/api/credit-notes/{$noteB->id}/post")->assertNotFound();
         $this->assertSame('draft', $noteB->fresh()->status);
         $this->assertSame(0, JournalEntry::where('source_type', CreditNote::class)->count());
+    }
+
+    /** @test */
+    public function the_credit_note_source_picker_hides_invoices_of_inaccessible_branches_but_the_return_list_does_not(): void
+    {
+        $a = Branch::create(['code' => '00002', 'name' => 'فرع أ', 'is_main' => false]);
+        $b = Branch::create(['code' => '00003', 'name' => 'فرع ب', 'is_main' => false]);
+
+        app(BranchContext::class)->set($a->id);
+        $invoiceA = $this->sale([$this->item(1, 10000)]);
+        app(BranchContext::class)->set($b->id);
+        $invoiceB = $this->sale([$this->item(1, 10000)]);
+
+        $restricted = User::create([
+            'tenant_id' => $this->tenant->id, 'name' => 'محدود', 'email' => 'picker-a@nibras.sa',
+            'password' => bcrypt('secret1234'), 'role' => 'owner',
+        ]);
+        $restricted->branches()->sync([$a->id]);
+        Sanctum::actingAs($restricted);
+        $this->flushHeaders();
+
+        $ids = fn (string $qs) => collect($this->getJson("/api/returns/sources/sales?{$qs}partner_id={$this->customer->id}")
+            ->assertOk()->json('data'))->pluck('id')->all();
+
+        // منتقي الإشعار الدائن: ما يقبله الخادم فقط.
+        $this->assertSame([$invoiceA->id], $ids('purpose=credit_note&'));
+        // قائمة المرتجعات المرجعية عابرة للفروع كما كانت (لا تغيير).
+        $this->assertEqualsCanonicalizing([$invoiceA->id, $invoiceB->id], $ids(''));
     }
 
     /** @test */
