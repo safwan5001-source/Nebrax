@@ -33,6 +33,9 @@
 .awj-store-preview .bg-store-primary { background-color: var(--store-primary); }
 .awj-store-preview .bg-store-primary-foreground { background-color: var(--store-primary-foreground); }
 .awj-store-preview .bg-store-footer { background-color: var(--store-footer); }
+/* CUST-HV V7e-3 — the brand-heavy footer's CTA pill: heading colour on the footer surface, as the storefront draws it. */
+.awj-store-preview .bg-store-footer-foreground { background-color: var(--store-footer-foreground); }
+.awj-store-preview .text-store-footer { color: var(--store-footer); }
 /* CUST-HV V5d-3 (DEF-2) — accent role; today's badge colours when the merchant set none. */
 .awj-store-preview .bg-store-accent { background-color: var(--store-accent, var(--store-foreground)); }
 .awj-store-preview .text-store-foreground { color: var(--store-foreground); }

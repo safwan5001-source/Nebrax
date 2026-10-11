@@ -31,6 +31,7 @@ import {
   type ThemePresetId,
 } from "./presentation";
 import { HeaderDesignPanel } from "./HeaderDesignPanel";
+import { FooterEditor } from "./FooterEditor";
 import { NavigationPanel } from "./NavigationPanel";
 import { emptyMainMenu, migrateLegacyLinks, withMainMenu } from "./navigation-edit";
 import { mainMenu } from "./presentation/navigation";
@@ -288,7 +289,7 @@ export function ControlPanels({
         />
       );
     case "footer":
-      return <FooterPanel config={config} t={t} patch={patch} />;
+      return <FooterPanel config={config} t={t} patch={patch} locale={locale === "en" ? "en" : "ar"} storefrontId={storefrontId} />;
     case "contact":
       return <ContactPanel config={config} t={t} patch={patch} />;
     case "whatsapp":
@@ -1584,10 +1585,14 @@ function FooterPanel({
   config,
   t,
   patch,
+  locale,
+  storefrontId = null,
 }: {
   config: StorefrontPresentationConfig;
   t: (key: CustomizerMessageKey) => string;
   patch: (partial: Partial<StorefrontPresentationConfig>) => void;
+  locale: "ar" | "en";
+  storefrontId?: string | null;
 }) {
   return (
     <div className="space-y-6">
@@ -1620,6 +1625,7 @@ function FooterPanel({
           }
         />
       </Field>
+      <FooterEditor config={config} t={t} locale={locale} storefrontId={storefrontId} patch={patch} />
     </div>
   );
 }
