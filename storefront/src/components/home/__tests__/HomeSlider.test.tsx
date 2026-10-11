@@ -588,6 +588,34 @@ describe("HomeSlider — autoplay (D-16)", () => {
     ).toBe(false);
   });
 
+  it("any jump of more than one slide is a cut: a far dot, Home and End snap; an adjacent dot and a two-slide wrap do not (Codex P2)", () => {
+    vi.useFakeTimers();
+    vi.stubGlobal("requestAnimationFrame", () => 1);
+    vi.stubGlobal("cancelAnimationFrame", () => {});
+    const { container, unmount } = mount(view(5));
+    const root = () => container.querySelector("[data-slider]")!;
+    const snapped = () => root().hasAttribute("data-snap");
+    fireEvent.click(screen.getByRole("button", { name: "Go to slide 2" }));
+    expect(snapped()).toBe(false); // adjacent
+    fireEvent.click(screen.getByRole("button", { name: "Go to slide 5" }));
+    expect(snapped()).toBe(true); // 2 → 5
+    unmount();
+
+    const keys = mount(view(5));
+    const kr = keys.container.querySelector("[data-slider]")!;
+    fireEvent.keyDown(kr, { key: "End" });
+    expect(activeIndex()).toBe(4);
+    expect(kr.hasAttribute("data-snap")).toBe(true);
+    keys.unmount();
+
+    const two = mount(view(2, { loop: true }));
+    fireEvent.click(screen.getByRole("button", { name: "Next slide" }));
+    fireEvent.click(screen.getByRole("button", { name: "Next slide" })); // 2 → 1 is one step in a two-slide show
+    expect(
+      two.container.querySelector("[data-slider]")!.hasAttribute("data-snap"),
+    ).toBe(false);
+  });
+
   it("the first touch pauses it for good until Play is pressed", () => {
     vi.useFakeTimers();
     const { container } = mount(view(3, auto({ loop: true })));

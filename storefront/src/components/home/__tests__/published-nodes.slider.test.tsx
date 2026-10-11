@@ -154,6 +154,30 @@ describe("publishedNodes — slider (V8b)", () => {
     ).toBe("lazy");
   });
 
+  it("eager loading follows the first section actually drawn, not the first visible entry (Codex P2)", async () => {
+    const closedBanner: PresentationHomeSection = {
+      id: "b",
+      type: "banner",
+      visible: true,
+      content: {
+        title: "Sale",
+        subtitle: "",
+        ctaLabel: "",
+        ctaHref: "",
+        imageUrl: null,
+        imageAlt: "",
+        window: { endsAt: "2020-01-01T00:00:00Z" },
+      },
+    };
+    const c = await mount([closedBanner, slider("sl")], mediaFor(1), {
+      nowMs: Date.parse("2026-01-01T00:00:00Z"),
+    });
+    expect(c.querySelector("[data-slider]")).not.toBeNull();
+    expect(c.querySelector("[data-slider] img")?.getAttribute("loading")).toBe(
+      "eager",
+    );
+  });
+
   it("a designed slider is wrapped by its frame with the slider as the frame's only child", async () => {
     const c = await mount(
       [

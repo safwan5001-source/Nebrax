@@ -187,16 +187,17 @@ export function HomeSlider({
   const canPrev = loop || !atStart;
   const canNext = loop || !atEnd;
 
-  // A wrap moves the track across every slide at once; with the sliding transition that would sweep them all through
-  // the viewport, so a wrap is a cut: `data-snap` suppresses the transition for the one render that changes the slide.
+  // The track moves every slide at once: a change of more than one step (a wrap, Home / End, a far dot) would sweep every
+  // slide in between through the viewport under the sliding transition, so it is a cut — `data-snap` suppresses the
+  // transition for the one render that changes the slide.
   const [snap, setSnap] = useState(false);
   const isSliding = behaviour.transition === "slide";
   const go = useCallback(
-    (to: number, wraps: boolean) => {
-      if (wraps && isSliding) setSnap(true);
+    (to: number) => {
+      if (isSliding && Math.abs(to - active) > 1) setSnap(true);
       setActive(to);
     },
-    [isSliding],
+    [isSliding, active],
   );
   useEffect(() => {
     if (!snap) return;
@@ -212,12 +213,12 @@ export function HomeSlider({
   }, [snap]);
 
   const next = useCallback(() => {
-    if (active + 1 < total) go(active + 1, false);
-    else if (loop) go(0, true);
+    if (active + 1 < total) go(active + 1);
+    else if (loop) go(0);
   }, [active, total, loop, go]);
   const previous = useCallback(() => {
-    if (active > 0) go(active - 1, false);
-    else if (loop) go(total - 1, true);
+    if (active > 0) go(active - 1);
+    else if (loop) go(total - 1);
   }, [active, total, loop, go]);
 
   const autoplay = behaviour.autoplay && !reduced && total > 1;
@@ -240,7 +241,7 @@ export function HomeSlider({
   // Play at the end of a non-looping show starts it again from the first slide; otherwise the next tick would find
   // itself on the last slide again and pause without ever playing.
   const togglePlay = () => {
-    if (paused && !loop && active === total - 1) go(0, true);
+    if (paused && !loop && active === total - 1) go(0);
     setPaused((p) => !p);
   };
 
@@ -251,8 +252,8 @@ export function HomeSlider({
     const backward = dir === "rtl" ? "ArrowRight" : "ArrowLeft";
     if (event.key === forward) next();
     else if (event.key === backward) previous();
-    else if (event.key === "Home") setActive(0);
-    else if (event.key === "End") setActive(total - 1);
+    else if (event.key === "Home") go(0);
+    else if (event.key === "End") go(total - 1);
     else return;
     event.preventDefault();
   };
@@ -443,7 +444,7 @@ export function HomeSlider({
                     aria-label={fill(labels.goTo, { number: slide.position })}
                     aria-current={index === active ? "true" : undefined}
                     aria-controls={`${idBase}-track`}
-                    onClick={() => setActive(index)}
+                    onClick={() => go(index)}
                   >
                     <span aria-hidden="true" />
                   </button>

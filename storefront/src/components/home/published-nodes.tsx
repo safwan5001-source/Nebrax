@@ -117,7 +117,6 @@ export async function publishedNodes(
   },
 ): Promise<React.ReactNode[]> {
   const nodes: React.ReactNode[] = [];
-  const firstVisibleIndex = sections.findIndex((section) => section.visible);
   const firstHeroId = sections.find(
     (section) => section.visible && section.type === "hero",
   )?.id;
@@ -131,14 +130,7 @@ export async function publishedNodes(
   for (const [index, section] of sections.entries()) {
     if (!section.visible) continue;
     const before = nodes.length;
-    await pushSectionNode(
-      nodes,
-      section,
-      sectionCtx,
-      firstHeroId,
-      index,
-      firstVisibleIndex,
-    );
+    await pushSectionNode(nodes, section, sectionCtx, firstHeroId, index);
     // CUST-HV V5c — wrap only a section that carries a design; any other section is
     // exactly the node it always was.
     if (section.design && nodes.length === before + 1) {
@@ -196,7 +188,6 @@ async function pushSectionNode(
   ctx: Parameters<typeof publishedNodes>[1],
   firstHeroId: string | undefined,
   index: number,
-  firstVisibleIndex: number,
 ): Promise<void> {
   if (section.type === "hero" && ctx.renderHero) {
     // Instance-keyed (V6a): each hero renders its own content. The same wrapper rules apply as for
@@ -300,7 +291,7 @@ async function pushSectionNode(
         labels={ctx.sliderLabels}
         basePath={ctx.basePath}
         dir={ctx.design.dir}
-        priority={index === firstVisibleIndex}
+        priority={nodes.length === 0}
         sectionId={section.id}
       />,
     );
