@@ -23,6 +23,8 @@ import {
 } from "./presentation/config";
 import { HeaderOverlayPreview } from "./HeaderOverlayPreview";
 import { HeaderScrollUpPreview } from "./HeaderScrollUpPreview";
+import { CanvasNavItem, canvasNavItems } from "./CanvasNav";
+import { mainMenu } from "./presentation/navigation";
 import { overlayMarker, resolveHeaderOverlay } from "./presentation/header-overlay";
 import { headerIsCompact, resolveHeaderDesign } from "./presentation/header-design";
 import type { CategoryPageRegionKey, PageRegionInstance, PageType, ProductPageRegionKey } from "./presentation/page-regions";
@@ -468,7 +470,10 @@ export function StorefrontPreviewCanvas({
     const href = sanitizeExternalUrl(item.url);
     return href ? [{ ...item, href }] : [];
   });
-  const extraNav = config.header.links.filter((link) => {
+  // V7d: a `main` menu supersedes the legacy flat `header.links` (V0 §11.1).
+  const publishedMain = mainMenu(config.navigation);
+  const mainNavItems = publishedMain ? canvasNavItems(publishedMain) : null;
+  const extraNav = (publishedMain ? [] : config.header.links).filter((link) => {
     if (!link.enabled || !link.label.trim()) return false;
     if (link.kind === "external") {
       return Boolean(sanitizeExternalUrl(link.href));
@@ -680,12 +685,12 @@ export function StorefrontPreviewCanvas({
           </div>
         </div>
 
-        {(config.header.showCategoryNav || extraNav.length > 0) && !mobileViewport && (
+        {(config.header.showCategoryNav || extraNav.length > 0 || (mainNavItems?.length ?? 0) > 0) && !mobileViewport && (
           <nav
             aria-label={t("sectionCategories")}
             className="border-b border-store-border bg-store-surface-muted"
           >
-            <div className={cn(storeContainerClassName, "flex h-9 items-center gap-4 overflow-hidden text-sm")}>
+            <div className={cn(storeContainerClassName, "flex h-9 items-center gap-4 overflow-x-clip text-sm")}>
               {config.header.showCategoryNav ? (
                 <>
                   <span className="rounded-md bg-store-surface px-2 py-1 font-medium text-store-foreground">
@@ -706,6 +711,9 @@ export function StorefrontPreviewCanvas({
                 >
                   {link.label}
                 </span>
+              ))}
+              {mainNavItems?.map((item) => (
+                <CanvasNavItem key={item.id} item={item} />
               ))}
             </div>
           </nav>

@@ -8,7 +8,13 @@
  */
 
 import type { IconKey } from "./icon-registry";
-import type { NavBadge, NavItem, NavMenu, NavTarget } from "./navigation";
+import {
+  isServedContentSlug,
+  type NavBadge,
+  type NavItem,
+  type NavMenu,
+  type NavTarget,
+} from "./navigation";
 import { sanitizeExternalUrl } from "./urls";
 
 /** Product targets resolved per menu — the batch read the backend accepts (`MAX_FEATURED_PRODUCTS`). */
@@ -37,17 +43,6 @@ export interface ResolvedNavItem extends ResolvedNavChild {
   children: ResolvedNavChild[];
 }
 
-/**
- * Content pages the storefront actually serves. `about` / `faq` have no public route yet, so
- * a target at them is omitted rather than pointed at a 404 — the capability is not invented.
- */
-const POLICY_SLUGS = new Set([
-  "shipping-policy",
-  "privacy-policy",
-  "returns-policy",
-  "terms-of-service",
-]);
-
 export function navTargetHref(
   target: NavTarget,
   ctx: NavResolveContext,
@@ -65,10 +60,10 @@ export function navTargetHref(
         ? `${base}/products/${target.id}`
         : null;
     case "content":
-      if (POLICY_SLUGS.has(target.slug)) {
-        return `${base}/policies/${target.slug}`;
-      }
-      return target.slug === "contact" ? `${base}/#contact` : null;
+      if (!isServedContentSlug(target.slug)) return null;
+      return target.slug === "contact"
+        ? `${base}/#contact`
+        : `${base}/policies/${target.slug}`;
     case "external":
       return sanitizeExternalUrl(target.href);
   }

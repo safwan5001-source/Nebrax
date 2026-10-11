@@ -75,6 +75,23 @@ export interface NavigationDoc {
   menus: NavMenu[];
 }
 
+/**
+ * Content pages the storefront actually serves today (policies + the home `#contact` anchor).
+ * `about` / `faq` are valid stored targets (V0 §11.1) but have no public route yet, so the storefront
+ * omits them and the pickers mark them unavailable — the capability is not invented.
+ */
+export const SERVED_CONTENT_SLUGS: readonly ContentPageSlug[] = [
+  "shipping-policy",
+  "privacy-policy",
+  "returns-policy",
+  "terms-of-service",
+  "contact",
+];
+
+export function isServedContentSlug(slug: string): boolean {
+  return (SERVED_CONTENT_SLUGS as readonly string[]).includes(slug);
+}
+
 const ID = /^[a-zA-Z0-9_-]{1,64}$/;
 
 function isObject(value: unknown): value is Record<string, unknown> {
