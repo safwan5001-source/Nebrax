@@ -55,14 +55,12 @@ import {
   CTA_COLOURS,
   CTA_STYLES,
   MAX_BENEFIT_ITEMS,
-  MAX_CUSTOM_BLOCKS,
   MAX_FEATURED_PRODUCTS,
   MAX_OFFERS,
   type BannerContent,
   type BenefitItem,
   type CtaColour,
   type CtaStyle,
-  type CustomBlock,
 } from "./presentation/section-content";
 import { type CtaColourIssue, ctaColourIssues } from "./presentation/cta-colour";
 import {
@@ -82,6 +80,7 @@ import {
 } from "./DataSectionFields";
 import { OfferCatalog } from "./OfferCatalog";
 import { DesignInspector } from "./design/DesignInspector";
+import { ContentBlocksFields } from "./ContentBlocksFields";
 import { GalleryFields } from "./GalleryFields";
 import { SliderFields } from "./SliderFields";
 import { useBackgroundMediaBounds } from "./media/use-background-media-bounds";
@@ -403,6 +402,7 @@ export function Segmented<T extends string>({
         <button
           key={option.id}
           type="button"
+          aria-pressed={value === option.id}
           onClick={() => onChange(option.id)}
           className={`h-9 flex-1 px-2 text-[12px] font-medium ${
             value === option.id
@@ -1378,13 +1378,17 @@ function HomepagePanel({
                 }
               />
             ) : selected.type === "customContent" ? (
-              <CustomFields
-                blocks={customContentOf(selected).blocks}
+              <ContentBlocksFields
+                key={selected.id}
+                content={customContentOf(selected)}
+                locale={locale === "en" ? "en" : "ar"}
                 t={t}
-                onChange={(blocks) =>
+                activeBlockId={activeSlides?.[selected.id] ?? null}
+                onActiveBlockChange={(blockId) => onActiveSlideChange?.(selected.id, blockId)}
+                onChange={(content) =>
                   updateSection(selectedIndex, {
                     ...selected,
-                    content: blocks.length ? { blocks } : undefined,
+                    content: content.blocks.length ? content : undefined,
                   })
                 }
               />
@@ -2531,56 +2535,6 @@ export function BenefitsFields({
       >
         + {t("addBenefit")}
       </button>
-    </div>
-  );
-}
-
-function CustomFields({
-  blocks,
-  t,
-  onChange,
-}: {
-  blocks: CustomBlock[];
-  t: (key: CustomizerMessageKey) => string;
-  onChange: (blocks: CustomBlock[]) => void;
-}) {
-  // V9c-1: this editor still edits the two original kinds. Any other kind already in the document (it can arrive through the API)
-  // is kept exactly where it is, never dropped by an edit here.
-  const add = (kind: "heading" | "paragraph") => {
-    if (blocks.length >= MAX_CUSTOM_BLOCKS) return;
-    const taken = new Set(blocks.map((block) => block.id));
-    let n = blocks.length + 1;
-    while (taken.has(`block-${n}`)) n += 1;
-    onChange([...blocks, { id: `block-${n}`, kind, text: "" }]);
-  };
-  const setText = (index: number, text: string) =>
-    onChange(blocks.map((row, i) => (i === index && (row.kind === "heading" || row.kind === "paragraph") ? { ...row, text } : row)));
-  return (
-    <div className="space-y-3">
-      {blocks.map((block, index) =>
-        block.kind === "heading" || block.kind === "paragraph" ? (
-          <div key={block.id} className="space-y-2 border border-neutral-200 p-2">
-            <Field label={t("blockText")}>
-              {block.kind === "heading" ? (
-                <input className={inputClass} value={block.text} onChange={(event) => setText(index, event.target.value)} />
-              ) : (
-                <textarea className={`${inputClass} h-20 py-2`} value={block.text} onChange={(event) => setText(index, event.target.value)} />
-              )}
-            </Field>
-            <button type="button" className="text-xs text-neutral-500" onClick={() => onChange(blocks.filter((_, i) => i !== index))}>
-              {t("removeItem")}
-            </button>
-          </div>
-        ) : null,
-      )}
-      <div className="flex gap-3">
-        <button type="button" disabled={blocks.length >= MAX_CUSTOM_BLOCKS} className="text-xs font-medium disabled:opacity-40" onClick={() => add("heading")}>
-          + {t("addHeading")}
-        </button>
-        <button type="button" disabled={blocks.length >= MAX_CUSTOM_BLOCKS} className="text-xs font-medium disabled:opacity-40" onClick={() => add("paragraph")}>
-          + {t("addParagraph")}
-        </button>
-      </div>
     </div>
   );
 }

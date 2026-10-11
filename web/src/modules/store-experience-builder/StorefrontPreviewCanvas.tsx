@@ -77,6 +77,7 @@ import {
   type CustomizerMessageKey,
 } from "./messages";
 import { CanvasBackdrop } from "./media/CanvasBackdrop";
+import { CanvasContentBlocks, Selectable } from "./CanvasContentBlocks";
 import { CanvasGallery } from "./CanvasGallery";
 import { CanvasSlider } from "./CanvasSlider";
 import { useBackgroundMediaBounds } from "./media/use-background-media-bounds";
@@ -1204,8 +1205,28 @@ export function StorefrontPreviewCanvas({
             }
 
             if (section.type === "customContent") {
-              // V9c-1: the Canvas still draws the two original kinds only; the other block kinds arrive with the editor (V9c-2).
-              const blocks = customContentOf(section).blocks.filter(
+              const allBlocks = customContentOf(section).blocks;
+              // CUST-HV V9c-2 (V0 §15) — a section with any block kind beyond headings and paragraphs takes the general path (the same
+              // decision the storefront makes); a text-only section keeps its original preview, accordion mirror included.
+              if (!allBlocks.every((block) => block.kind === "heading" || block.kind === "paragraph")) {
+                return (
+                  <CanvasContentBlocks
+                    key={section.id}
+                    blocks={allBlocks}
+                    dir={designContext.dir}
+                    viewport={viewport}
+                    activeBlockId={activeSlides?.[section.id] ?? null}
+                    labels={{
+                      note: t("cbToneInfo"),
+                      success: t("cbToneSuccess"),
+                      warning: t("cbToneWarning"),
+                      empty: t("cbCanvasEmpty"),
+                      item: t("canvasGalleryItem"),
+                    }}
+                  />
+                );
+              }
+              const blocks = allBlocks.filter(
                 (block): block is HeadingBlock | ParagraphBlock => (block.kind === "heading" || block.kind === "paragraph") && block.text.trim() !== "",
               );
               // AWJ Market presents multi-question content as an accordion (published
@@ -1250,13 +1271,26 @@ export function StorefrontPreviewCanvas({
                   {blocks.length === 0 ? (
                     <p className="text-sm text-store-muted-foreground">{t("sectionCustomContent")}</p>
                   ) : (
-                    blocks.map((block) =>
-                      block.kind === "heading" ? (
-                        <h2 key={block.id} className="break-words text-lg font-extrabold">{block.text}</h2>
-                      ) : (
-                        <p key={block.id} className="break-words text-sm text-store-muted-foreground">{block.text}</p>
-                      ),
-                    )
+                    blocks.map((block) => (
+                      // CUST-HV V9c-2 — the editor's selected block is ringed and kept in view here too (same wrapper as the general path)
+                      <Selectable key={block.id} id={block.id} selected={block.id === (activeSlides?.[section.id] ?? null)}>
+                        {block.kind === "heading" ? (
+                          block.level === 3 ? (
+                            <h3 className={cn("break-words font-extrabold", viewport === "mobile" ? "text-base" : "text-lg", block.align === "center" && "text-center", block.align === "end" && "text-end")}>
+                              {block.text}
+                            </h3>
+                          ) : (
+                            <h2 className={cn("break-words text-lg font-extrabold", block.align === "center" && "text-center", block.align === "end" && "text-end")}>
+                              {block.text}
+                            </h2>
+                          )
+                        ) : (
+                          <p className={cn("whitespace-pre-line break-words text-sm text-store-muted-foreground", block.align === "center" && "text-center", block.align === "end" && "text-end")}>
+                            {block.text}
+                          </p>
+                        )}
+                      </Selectable>
+                    ))
                   )}
                 </section>
               );

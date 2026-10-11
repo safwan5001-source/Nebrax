@@ -64,3 +64,25 @@ describe("CustomContentBand — AWJ Market FAQ accordion", () => {
     expect(container.textContent).toContain("نعم خلال 14 يوماً.");
   });
 });
+
+describe("CustomContentBand — a text-only sub-heading is a real h3 (V9c review)", () => {
+  it("renders level 3 as <h3> and the default as <h2>, both still naming the section", () => {
+    const { container } = render(
+      <CustomContentBand
+        sectionId="t-1"
+        content={{
+          blocks: [
+            { id: "h1", kind: "heading", text: "Main" },
+            { id: "h2", kind: "heading", text: "Sub", level: 3 },
+            { id: "p1", kind: "paragraph", text: "Body" },
+          ],
+        }}
+      />,
+    );
+    expect(container.querySelector("h2")?.textContent).toBe("Main");
+    expect(container.querySelector("h3")?.textContent).toBe("Sub");
+    expect(
+      container.querySelector("section")?.getAttribute("aria-labelledby"),
+    ).toBe(container.querySelector("h2")?.id);
+  });
+});

@@ -230,3 +230,57 @@ describe("Canvas — App Promo (CUST-H4-4 real-config parity proof)", () => {
     expect(section.querySelectorAll("img").length).toBe(0);
   });
 });
+
+describe("Canvas — text-only custom content keeps the editor's block selection (V9c review)", () => {
+  afterEach(() => cleanup());
+
+  it("rings the selected heading / paragraph even though the section has no other block kind", () => {
+    const config = withSections([
+      {
+        id: "cc-1",
+        type: "customContent",
+        visible: true,
+        content: {
+          blocks: [
+            { id: "b1", kind: "heading", text: "Title" },
+            { id: "b2", kind: "paragraph", text: "Body" },
+          ],
+        },
+      },
+    ]);
+    const { container } = render(
+      <StorefrontPreviewCanvas
+        config={config}
+        locale="en"
+        viewport="desktop"
+        onSelectSection={() => {}}
+        activeSlides={{ "cc-1": "b2" }}
+      />,
+    );
+    const marked = container.querySelectorAll("[data-content-block]");
+    expect(Array.from(marked).map((n) => n.getAttribute("data-content-block"))).toEqual(["b1", "b2"]);
+    expect(container.querySelector('[data-content-block="b2"]')?.hasAttribute("data-selected")).toBe(true);
+    expect(container.querySelector('[data-content-block="b1"]')?.hasAttribute("data-selected")).toBe(false);
+  });
+});
+
+describe("Canvas — text-only sub-headings follow the simulated device (V9c review)", () => {
+  afterEach(() => cleanup());
+
+  it("a level-3 heading is sized from the viewport, not from a host media query", () => {
+    const config = withSections([
+      { id: "cc-1", type: "customContent", visible: true, content: { blocks: [{ id: "b1", kind: "heading", text: "Sub", level: 3 }] } },
+    ]);
+    const sizeOn = (viewport: "mobile" | "desktop") => {
+      const { container, unmount } = render(
+        <StorefrontPreviewCanvas config={config} locale="en" viewport={viewport} onSelectSection={() => {}} />,
+      );
+      const cls = container.querySelector("h3")?.className ?? "";
+      unmount();
+      return cls;
+    };
+    expect(sizeOn("mobile")).toContain("text-base");
+    expect(sizeOn("desktop")).toContain("text-lg");
+    expect(`${sizeOn("mobile")} ${sizeOn("desktop")}`).not.toContain("md:");
+  });
+});
