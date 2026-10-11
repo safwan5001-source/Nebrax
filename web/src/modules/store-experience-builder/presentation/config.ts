@@ -2,6 +2,7 @@ import { type MediaRef, normalizeMediaRef } from "./media-ref";
 import { type PresentationPalette, normalizePalette } from "./palette";
 import { type GlobalTokensDoc, normalizeGlobalTokens } from "./global-tokens";
 import { type HeaderDesign, normalizeHeaderDesign } from "./header-design";
+import { type FooterExtras, normalizeFooterExtras } from "./footer-design";
 import { type NavigationDoc, normalizeNavigation } from "./navigation";
 import { type SectionDesign, normalizeSectionDesign } from "./section-design";
 import {
@@ -136,7 +137,7 @@ export interface StorefrontPresentationConfig {
     tagline: string;
     showLogo: boolean;
     copyright: string;
-  };
+  } & FooterExtras;
   contact: {
     phone: string;
     email: string;
@@ -525,6 +526,7 @@ export function normalizePresentationConfig(
   const globalTokens = normalizeGlobalTokens(raw);
   const headerDesign = normalizeHeaderDesign(headerRaw.design);
   const navigation = normalizeNavigation(raw.navigation);
+  const footerExtras = normalizeFooterExtras(footerRaw);
 
   return {
     version: PRESENTATION_CONFIG_VERSION,
@@ -568,6 +570,7 @@ export function normalizePresentationConfig(
       tagline: asString(footerRaw.tagline).slice(0, 200),
       showLogo: asBoolean(footerRaw.showLogo, true),
       copyright: asString(footerRaw.copyright).slice(0, 120),
+      ...footerExtras,
     },
     contact: {
       phone: asString(contactRaw.phone).slice(0, 40),

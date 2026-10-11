@@ -415,6 +415,8 @@ final class StorefrontPresentationNormalizer
         $headerDesign = StorefrontHeaderDesignNormalizer::normalize($headerRaw['design'] ?? null);
         // CUST-HV V7d-2 — وثيقة التنقّل `navigation`: مفتاح اختياري إضافي، الغياب = لا مفتاح.
         $navigation = StorefrontNavigationNormalizer::normalize($input['navigation'] ?? null, fn (string $url) => $this->sanitizeExternalUrl($url));
+        // CUST-HV V7e-1 — `footer.layout` / `footer.groups` / `footer.design`: مفاتيح اختيارية إضافية، الغياب = لا مفتاح.
+        $footerExtras = StorefrontFooterNormalizer::normalize($footerRaw, fn (string $url) => $this->sanitizeExternalUrl($url));
 
         $config = [
             'version' => self::VERSION,
@@ -452,7 +454,7 @@ final class StorefrontPresentationNormalizer
                 'tagline' => mb_substr($this->asString($footerRaw['tagline'] ?? null), 0, 200),
                 'showLogo' => $this->asBoolean($footerRaw['showLogo'] ?? null, true),
                 'copyright' => mb_substr($this->asString($footerRaw['copyright'] ?? null), 0, 120),
-            ],
+            ] + $footerExtras,
             'contact' => [
                 'phone' => mb_substr($this->asString($contactRaw['phone'] ?? null), 0, 40),
                 'email' => mb_substr($this->asString($contactRaw['email'] ?? null), 0, 120),

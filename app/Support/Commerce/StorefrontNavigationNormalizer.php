@@ -62,6 +62,34 @@ final class StorefrontNavigationNormalizer
     }
 
     /**
+     * قائمة روابط مسطَّحة بلا أبناء ولا عرض منسدل (مجموعات التذييل، V0 §10.3): نفس عنصر التنقّل المُصنَّف الهدف، حدّها
+     * `$max`، ومعرّفاتها فريدة داخل القائمة. `presentation` لا معنى له خارج الترويسة فيُسقط.
+     *
+     * @param  callable(string):?string  $sanitize
+     * @return list<array<string,mixed>>
+     */
+    public static function normalizeFlatItems(mixed $raw, int $max, callable $sanitize): array
+    {
+        if (! is_array($raw) || ! array_is_list($raw)) {
+            return [];
+        }
+        $seen = [];
+        $items = [];
+        foreach ($raw as $index => $item) {
+            $normalized = self::normalizeItem($item, $index, self::MAX_DEPTH, $seen, $sanitize);
+            if ($normalized !== null) {
+                unset($normalized['presentation']);
+                $items[] = $normalized;
+            }
+            if (count($items) >= $max) {
+                break;
+            }
+        }
+
+        return $items;
+    }
+
+    /**
      * @param  array<string,bool>  $seen
      * @return array<string,mixed>|null
      */

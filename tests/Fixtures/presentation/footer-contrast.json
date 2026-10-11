@@ -1,0 +1,16 @@
+{
+  "_note": "CUST-HV V7e-1 — publish gate for explicit footer text / heading / link colours. Shared by PHP FooterDesignContrast and both TS twins (footerContrastIssues). Only an explicit colour is proven, against the designed footer background if there is one, else the default footer surface #111827; the automatic colour over a designed background is the best of pure white / black and passes by construction. The divider colour is decorative and never judged. `ratio` is the worst ratio rounded to 2 decimals.",
+  "cases": [
+    {"name":"no colours","config":{"primaryColor":"#12372a","design":{"layout":"x","align":"center"}},"expected":[]},
+    {"name":"a background alone is fine — its colours are automatic and proven by construction","config":{"primaryColor":"#12372a","design":{"surface":{"background":{"hex":"#12372a"}}}},"expected":[]},
+    {"name":"explicit white text on the default dark surface passes","config":{"primaryColor":"#12372a","design":{"text":{"hex":"#ffffff"}}},"expected":[]},
+    {"name":"explicit dark text on the default dark surface fails","config":{"primaryColor":"#12372a","design":{"text":{"hex":"#1f2937"}}},"expected":[{"field":"text","code":"contrast_insufficient","ratio":1.21}]},
+    {"name":"heading and link are judged separately, in field order","config":{"primaryColor":"#12372a","design":{"text":{"hex":"#ffffff"},"heading":{"hex":"#222222"},"link":{"hex":"#333333"}}},"expected":[{"field":"heading","code":"contrast_insufficient","ratio":1.12},{"field":"link","code":"contrast_insufficient","ratio":1.4}]},
+    {"name":"light link on a light designed background fails","config":{"primaryColor":"#12372a","design":{"surface":{"background":{"hex":"#f8fafc"}},"link":{"hex":"#e2e8f0"}}},"expected":[{"field":"link","code":"contrast_insufficient","ratio":1.18}]},
+    {"name":"dark text on a light designed background passes","config":{"primaryColor":"#12372a","design":{"surface":{"background":{"hex":"#f8fafc"}},"text":{"hex":"#0f172a"},"heading":{"hex":"#000000"},"link":{"hex":"#1d4ed8"}}},"expected":[]},
+    {"name":"a role resolves through the palette: brand text on a brand background fails","config":{"primaryColor":"#12372a","design":{"surface":{"background":{"role":"brand"}},"heading":{"role":"brand"}}},"expected":[{"field":"heading","code":"contrast_insufficient","ratio":1}]},
+    {"name":"a mid grey background is judged exactly","config":{"primaryColor":"#12372a","design":{"surface":{"background":{"hex":"#777777"}},"text":{"hex":"#ffffff"}}},"expected":[{"field":"text","code":"contrast_insufficient","ratio":4.48}]},
+    {"name":"the divider colour is decorative and never judged","config":{"primaryColor":"#12372a","design":{"divider":{"color":{"hex":"#111827"}}}},"expected":[]},
+    {"name":"a designed background replaces the default as the judged backdrop","config":{"primaryColor":"#12372a","design":{"surface":{"background":{"hex":"#ffffff"}},"text":{"hex":"#ffffff"}}},"expected":[{"field":"text","code":"contrast_insufficient","ratio":1}]}
+  ]
+}

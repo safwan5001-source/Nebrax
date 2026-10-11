@@ -1,4 +1,5 @@
 import { type AnnouncementsDoc, normalizeAnnouncements } from "./announcements";
+import { type FooterExtras, normalizeFooterExtras } from "./footer-design";
 import { type GlobalTokensDoc, normalizeGlobalTokens } from "./global-tokens";
 import { type HeaderDesign, normalizeHeaderDesign } from "./header-design";
 import { type MediaRef, normalizeMediaRef } from "./media-ref";
@@ -142,7 +143,7 @@ export interface StorefrontPresentationConfig {
     tagline: string;
     showLogo: boolean;
     copyright: string;
-  };
+  } & FooterExtras;
   contact: {
     phone: string;
     email: string;
@@ -557,6 +558,7 @@ export function normalizePresentationConfig(
   const globalTokens = normalizeGlobalTokens(raw);
   const headerDesign = normalizeHeaderDesign(headerRaw.design);
   const navigation = normalizeNavigation(raw.navigation);
+  const footerExtras = normalizeFooterExtras(footerRaw);
 
   return {
     version: PRESENTATION_CONFIG_VERSION,
@@ -610,6 +612,7 @@ export function normalizePresentationConfig(
       tagline: asString(footerRaw.tagline).slice(0, 200),
       showLogo: asBoolean(footerRaw.showLogo, true),
       copyright: asString(footerRaw.copyright).slice(0, 120),
+      ...footerExtras,
     },
     contact: {
       phone: asString(contactRaw.phone).slice(0, 40),
