@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Models\Invoice;
 use App\Models\Purchase;
-use App\Models\ReturnLine;
+use App\Services\Accounting\ReturnSourceAllocator;
 use App\Support\Money;
 use App\Support\Settings;
 use App\Tenancy\BranchScope;
@@ -53,12 +53,12 @@ class ReturnSourcesController extends ApiController
 
         // ما رُدَّ من كل سطر — استعلامٌ واحد لكل المستندات لا استعلام لمستند.
         $lineIds  = $documents->flatMap(fn ($d) => $d->lines->pluck('id'));
-        $returned = ReturnLine::query()
-            ->whereIn('source_line_id', $lineIds)
-            ->whereHas('return', fn ($q) => $q->where('status', 'posted'))
-            ->groupBy('source_line_id')
-            ->selectRaw('source_line_id, SUM(quantity) as qty')
-            ->pluck('qty', 'source_line_id');
+        // AWJ-TAX-REM-02: «المردود» يشمل الإشعارات الدائنة المرحَّلة المربوطة بالسطر —
+        // السقف التراكمي واحد، فلا تُعرض فاتورةٌ مُستنفَدة بإشعارٍ كأنها صالحة للردّ.
+        $returned = array_map(
+            fn (array $row) => $row['quantity'],
+            app(ReturnSourceAllocator::class)->returned($lineIds->all())
+        );
 
         $windowDays = (int) Settings::get($group, 'return_window_days');
         $today      = Carbon::parse(now()->toDateString());

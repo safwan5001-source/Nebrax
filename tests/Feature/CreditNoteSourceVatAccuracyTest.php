@@ -465,6 +465,49 @@ class CreditNoteSourceVatAccuracyTest extends TestCase
     }
 
     /** @test */
+    public function the_return_source_list_reflects_credit_note_usage(): void
+    {
+        $invoice = $this->sale([$this->item(2, 10000)]);
+        $line = $invoice->lines->first();
+
+        $find = fn () => collect($this->getJson("/api/returns/sources/sales?partner_id={$invoice->partner_id}")
+            ->assertOk()->json('data'))->firstWhere('id', $invoice->id);
+
+        $this->assertSame(2, $find()['remaining']);
+
+        $this->note($invoice, [[$line, 1]]);
+        $this->assertSame(1, $find()['remaining']);
+        $this->assertNull($find()['blocked_reason']);
+
+        $this->note($invoice, [[$line, 1]]);
+        $this->assertSame(0, $find()['remaining']);
+        $this->assertSame('fully_returned', $find()['blocked_reason'], 'فاتورة استُنفدت بإشعارات لا تُعرض صالحةً للردّ.');
+    }
+
+    /** @test */
+    public function pos_style_return_derivation_counts_credit_notes_and_closes_the_vat_exactly(): void
+    {
+        // 7 × 0.10: ضريبة 0.11. إشعار بوحدة (0.01) ثم ردّ POS لما تبقّى (6): كان
+        // يُشتقّ بـ floor(11×6/7)=0.09 فتبقى هللة بلا عكس؛ الآن يأخذ المتبقي الفعلي 0.10.
+        $invoice = $this->sale([$this->item(7, 10)]);
+        $line = $invoice->lines->first();
+        $note = $this->note($invoice, [[$line, 1]]);
+        $this->assertSame(1, (int) $note->tax_amount);
+
+        $service = app(\App\Services\Accounting\PosReturnService::class);
+        $derive = new \ReflectionMethod($service, 'buildSourceItems');
+        $derive->setAccessible(true);
+
+        $items = $derive->invoke($service, $invoice->fresh('lines'), [['source_line_id' => $line->id, 'quantity' => 6]]);
+        $this->assertSame(10, $items[0]['line_tax_override']);
+        $this->assertSame(11, (int) $note->tax_amount + $items[0]['line_tax_override'], 'Σ الإشعار + ردّ POS = ضريبة الفاتورة.');
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('تتجاوز المتبقي');
+        $derive->invoke($service, $invoice->fresh('lines'), [['source_line_id' => $line->id, 'quantity' => 7]]);
+    }
+
+    /** @test */
     public function a_note_first_then_a_return_is_also_capped(): void
     {
         $invoice = $this->sale([$this->item(2, 10000)]);

@@ -85,7 +85,8 @@ _See the PR file list; summary below._
 | `app/Services/Accounting/ReturnService.php` | `assertWithinSource` reads cumulative quantity through the allocator (4 lines) |
 | `app/Services/Accounting/InvoiceService.php` | `deleteDraft` guard against referenced drafts (5 lines) |
 | `app/Http/Controllers/Api/CreditNoteController.php` | branch access on show/post and on the source invoice |
-| `app/Http/Controllers/Api/ReturnableController.php` | `returned/remaining` now include posted notes |
+| `app/Http/Controllers/Api/ReturnableController.php`, `ReturnSourcesController.php`, `PosController::returnableInvoice` | `returned/remaining` now include posted notes (screens agree with the enforced cap) |
+| `app/Services/Accounting/PosReturnService.php` | `buildSourceItems` accumulates through the credit-note-aware `returned()` (POS-derived VAT closes exactly after a note) |
 | `app/Http/Requests/StoreCreditNoteRequest.php` | `items.*.source_line_id`; `unit_price` optional when an invoice is given |
 | `app/Http/Requests/UpdateSalesSettingsRequest.php`, `app/Support/Settings.php` | the new setting |
 | `app/Models/CreditNoteLine.php`, `app/Http/Resources/CreditNoteLineResource.php` | the new columns (`source_line_id`, `line_discount`, `unit_price_before_tax`) |
@@ -96,7 +97,7 @@ _See the PR file list; summary below._
 | `tests/Feature/CreditNoteSourcePostgresTest.php` | **new** — 7 tests (PostgreSQL: restrict rule, rollback, real forked concurrency) |
 | existing credit-note tests (`CreditNoteTest`, `…SourceOwnershipTest`, `…PostingOwnershipTest`, `CustomerRefundTest`, `DebitNoteTest`, `DocumentHttpVariantsTest`, `InteractsWithApi`) | mechanical: standalone-note tests opt in to the policy; invoice-source tests now use a *posted* invoice and a source line |
 
-No change to `LedgerService`, `InventoryService`, `PosReturnService`, `PaymentService`, ZATCA, or any posted document. **No e-invoicing of credit notes (REM-18).** Web change limited to the credit-note document builder mapping (one file + test).
+No change to `LedgerService`, `InventoryService`, `PaymentService`, ZATCA, or any posted document. **No e-invoicing of credit notes (REM-18).** Web change limited to the credit-note document builder mapping (one file + test).
 
 ## 7. Tests
 
@@ -146,7 +147,7 @@ No change to `LedgerService`, `InventoryService`, `PosReturnService`, `PaymentSe
 ## 9. Risks / not done on purpose
 
 1. **Quantity is consumed by price-only notes.** The cap is cumulative in *quantity* as well as net/VAT (as for returns). A series of reduced-price notes against a single unit (e.g. two 20 % rebates on a 1-unit line) is refused after the first one even though value remains. Alternative: a value-only cap for notes below invoiced price — an owner/product decision, deliberately not guessed.
-2. **Note vs POS return race.** POS returns take the branch lock, not the invoice lock (REM-01's deliberate choice to keep lock order consistent). A note posted concurrently with a POS return of the same line is not serialized with it; the net/VAT clamp at post prevents any over-credit of value, but a quantity could in theory be double-counted in that narrow window. Same residual risk REM-01 recorded for POS-vs-API returns.
+2. **Note vs POS return race.** (Derivation is now consistent — POS returns count posted notes — but the *concurrency* gap below remains.) POS returns take the branch lock, not the invoice lock (REM-01's deliberate choice to keep lock order consistent). A note posted concurrently with a POS return of the same line is not serialized with it; the net/VAT clamp at post prevents any over-credit of value, but a quantity could in theory be double-counted in that narrow window. Same residual risk REM-01 recorded for POS-vs-API returns.
 3. **Historic posted notes without line links.** Posted notes from before this change have `source_line_id = NULL`. The cap counts them at read time (no posted row is modified) when their product is the **single** matching line of the invoice; a legacy line with no product, or whose product repeats in the invoice, cannot be attributed without guessing and is **not** counted — the restrict migration logs how many lines have no product so Finance can review. (Before this PR no cap existed at all, so this is not a regression.)
 4. **Historic invoice-linked drafts** that cannot be bound to exactly one invoice line (or whose price exceeds the invoice's) will be refused at post and there is no draft-delete endpoint for credit notes; Finance would have to recreate them. The restrict migration logs how many such drafts exist per database.
 5. **Web is only minimally touched** (document builder).  The new-tenant default means the existing credit-note screen (standalone-only) is refused until the setting is enabled via `PUT /api/sales-settings` (no toggle in the settings UI yet), and the form does not yet send `source_line_id` (it still works for an unambiguous product). A follow-up web slice should add the toggle and an invoice-linked flow.

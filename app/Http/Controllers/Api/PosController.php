@@ -22,7 +22,6 @@ use App\Models\Payment;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\ReturnDocument;
-use App\Models\ReturnLine;
 use App\Models\SalesChannel;
 use App\Support\DeliveryPlatformCatalog;
 use App\Support\Money;
@@ -455,12 +454,9 @@ class PosController extends ApiController
             ->where('pos_session_id', $session->id)
             ->where('status', 'posted')
             ->findOrFail($id);
-        $returned = ReturnLine::whereIn('source_line_id', $invoice->lines->pluck('id'))
-            ->whereHas('return', fn ($query) => $query->where('status', 'posted'))
-            ->groupBy('source_line_id')
-            ->selectRaw('source_line_id, SUM(quantity) as quantity, SUM(line_total) as total')
-            ->get()
-            ->keyBy('source_line_id');
+        // AWJ-TAX-REM-02: يشمل الإشعارات الدائنة المرحَّلة (سقفٌ تراكمي واحد).
+        $returned = collect(app(\App\Services\Accounting\ReturnSourceAllocator::class)->returned($invoice->lines->pluck('id')->all()))
+            ->map(fn (array $row) => (object) ['quantity' => $row['quantity'], 'total' => $row['net'] + $row['tax']]);
 
         return response()->json(['data' => [
             'id' => $invoice->id,

@@ -9,7 +9,6 @@ use App\Models\PosExchange;
 use App\Models\PosReturnAttempt;
 use App\Models\PosSession;
 use App\Models\ReturnDocument;
-use App\Models\ReturnLine;
 use App\Models\User;
 use App\Services\Pos\PosAuditService;
 use App\Services\Pos\PosIdempotencyConflictException;
@@ -264,13 +263,11 @@ class PosReturnService
     private function buildSourceItems(Invoice $invoice, array $requested): array
     {
         $sourceLines = $invoice->lines->keyBy('id');
-        $returned = ReturnLine::query()
-            ->whereIn('source_line_id', $sourceLines->keys())
-            ->whereHas('return', fn ($query) => $query->where('status', 'posted'))
-            ->selectRaw('source_line_id, SUM(quantity) as quantity, SUM(line_subtotal) as subtotal, SUM(line_discount) as discount, SUM(line_tax) as tax')
-            ->groupBy('source_line_id')
-            ->get()
-            ->keyBy('source_line_id');
+        // AWJ-TAX-REM-02: التراكم ينظر إلى المرتجعات **والإشعارات الدائنة** المرحَّلة معاً —
+        // وإلا اشتُقّ جزء POS بموضعٍ (c) لا يحسب ما استهلكه إشعارٌ، فبقيت هللات من
+        // الضريبة بلا عكس رغم نفاد الكمية.
+        $returned = collect(app(ReturnSourceAllocator::class)->returned($sourceLines->keys()->all()))
+            ->map(fn (array $row) => (object) $row);
 
         $items = [];
         foreach ($requested as $item) {
