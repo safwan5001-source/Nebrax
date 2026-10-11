@@ -10,6 +10,7 @@ use App\Models\Invoice;
 use App\Models\Partner;
 use App\Models\Product;
 use App\Services\Accounting\CreditNoteService;
+use App\Tenancy\BranchScope;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -82,6 +83,14 @@ class CreditNoteController extends ApiController
     {
         $note = CreditNote::findOrFail($id);
         $this->assertRecordAccessible($note->branch_id, []);
+        // فرع الفاتورة المصدر يُعاد فحصه عند الترحيل لا عند الإنشاء فقط: المسوّدة قد تكون أُنشئت بصلاحية أوسع
+        // أو تغيّر نطاق فروع المستخدم بعدها (نفس قاعدة `store`، 404 غير مُسرِّب).
+        if ($note->original_invoice_id !== null) {
+            $this->assertRecordAccessible(
+                BranchScope::reference(Invoice::class)->whereKey($note->original_invoice_id)->value('branch_id'),
+                []
+            );
+        }
         $posted = $this->domain(fn () => $this->creditNotes->post($note));
 
         return (new CreditNoteResource($posted->load(['lines', 'printTemplateRevision', 'pdfTemplateRevision', 'thermalTemplateRevision'])))->response();

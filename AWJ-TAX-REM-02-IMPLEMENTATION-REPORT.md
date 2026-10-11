@@ -6,7 +6,7 @@
 | **Branch** | `claude/awj-tax-rem-02-credit-note-vat` |
 | **PR** | [#1304](https://github.com/safwan5001-source/Nebrax/pull/1304) — open, ready for review, not merged |
 | **Base SHA** | `999e06c52cd9e7dba3d8e16b3be00fc8d9ad9fa0` (`origin/main`, includes merged #1291 / REM-01) |
-| **Head SHA** | `6f9fa4a850474cc6b315e52ac749224234cd70eb` (code head; this report is committed after it, so the PR head is one docs-only commit ahead). Main at last merge: `bdecbd01668df6cb43cd3899b3d9ba10f24a4b03` |
+| **Head SHA** | the PR head at hand-over (see the PR / final message — the last commit is this report together with the final code). Previous code heads: `6f9fa4a` (green on SQLite, PostgreSQL, web), `5773123` (green), `100dfd6`. Main at last merge: `bdecbd01668df6cb43cd3899b3d9ba10f24a4b03` |
 | **Owner decisions applied** | **ADR-E → Option A** (source invoice required by default; standalone only by setting). **Migrations → both** (`source_line_id` + `restrictOnDelete`), additive only. |
 | **Status** | Pre-merge review round done (§0). **Not merged, not deployed, no production migration run. Awaiting owner approval.** |
 
@@ -35,6 +35,20 @@
 | Return-source list ignores notes (P2) / POS derivation (P1 ×3) | Fixed (`2675c9a`, `6c7f019`, `1f1c5ba`). |
 | Serialize POS with credit-note posting (P1) | **Fixed in this round** (decision 1) — supersedes the earlier "follow-up slice" reply. |
 | Usable path before disabling standalone (P1) | Toggle (`6c7f019`) + invoice-linked screen (decision 4). |
+
+**Second pass on the pre-merge head (Codex re-reviews of each push):**
+
+| Finding | Resolution |
+|---|---|
+| Return window disabled invoices in the note picker (P2) | Window is a return-only policy not enforced on notes; the screen no longer blocks on it (`2d3216c`). |
+| POS returnable view hid the legacy block (P2) | `blocked_reason` + zero remaining on the POS detail endpoint; both POS dialogs show the reason (`2d3216c`). |
+| Return picker mislabelled the legacy block (P2) / deep link ignored the loaded block (P2) | Own message; fallback to the loaded invoice's `blocked_reason` (`63ce33f`). |
+| Standalone lines seeded with 15 % (P1) | Lines start on the tenant default and omit `tax_rate` (`9f17fa6`). |
+| Credit-note picker showed inaccessible branches (P2) / deep link / permission (P2) | Dedicated `GET /credit-notes/sources` and `/credit-notes/returnable/{invoice}` (`invoices.manage` + credit-note operation, branch rule as `store`) (`5230d5c`, `100dfd6`). |
+| POS non-final part ignores the note offset (P1) | **Tried and reverted** (`5230d5c` → `5773123`): the change broke REM-01's pinned POS convention (`ReturnPosApiMixedReturnsTest`). Totals close exactly either way; recorded as owner decision (§9, item 13). |
+| Foreign-customer legacy note attributed to the invoice (P2) | Classified unresolved → Finance review (`7fd4eeb`). |
+| Post did not recheck the source invoice branch (P1) | Fixed in the final commit (test fails on the old controller). |
+| Customers list needs `partners.view` (P2) | Not changed: platform-wide form convention (invoice/quote forms share it); recorded (§9, item 14). |
 
 ### 0.2 Lock order — design and rollout
 
@@ -193,7 +207,13 @@ No change to `LedgerService`, `InventoryService`, `PaymentService`, ZATCA, or an
 | Full suite, SQLite (final head) | 5 677 passed · 72 skipped · 92 failed. 88 of the failures were collateral of running two suites at once ("database is locked" / missing table on the shared SQLite file); the credit-note, contract, cost-centre, contact and company classes **all pass when re-run alone** (264 passed). The 4 remaining failures are `StorefrontSliderTest` media-upload cases (no AWS SDK in the sandbox; arrived with the merge of `main`, unrelated to credit notes) |
 | Full suite, PostgreSQL (final head) | 5 828 passed · 1 skipped · 12 failed: 11 × `StorefrontSliderTest` / `StorefrontSectionDesignTest` (same sandbox limitation, from `main`) and `ImportJobApplyTest` (concurrent-run timing) — **`ImportJobApplyTest` passes alone 14/14**. No credit-note, return, POS, invoice or ledger test fails |
 
-**CI on the head commit** — `6aca2887b473098bb76f2c7f76baa5239a4a6b47` (code identical to `1f1c5ba`): `php artisan test (L11, sqlite)` ✅ · `php artisan test (L11, pgsql)` ✅ · `web build (Next.js)` ✅ — full suites, both the push and the pull-request runs.
+**Final round, local wide set** (`Return|Pos|CreditNote|DebitNote|Refund|Invoice|Vat|Quote|Discrepancy|Zatca|Route|OpenApi|Contract|Classifier|Application|Permission|Rbac|Role`, R2/media/mail excluded): SQLite **1 184 passed** · PostgreSQL 16 **1 235 passed**. New in this round: `CreditNoteLegacyBlockTest` (13), `CreditNotePosLockOrderPostgresTest` (4), picker/permission/branch/post-recheck tests in `CreditNoteSourceVatAccuracyTest`, `vitest` 14 in `invoice-linked.test.ts`.
+
+**CI history on this branch**
+* `6aca288`, `2ccff55`, `6f9fa4a` (merge of `main` included): SQLite ✅ · PostgreSQL ✅ · web build ✅ (push and pull-request runs).
+* `5230d5c` / `9f17fa6`: SQLite ❌ — `ReturnPosApiMixedReturnsTest` (my POS rounding change; **reverted**, see §0.1). Lesson applied: the wide set above is now run before every code push.
+* `5773123` (revert): all checks completed without failures.
+* The final head's CI result is posted as a PR comment (this file is not re-edited after the last push, to avoid a second CI cycle for a docs-only change).
 
 ## 9. What remains (risks / not done on purpose)
 
@@ -210,8 +230,21 @@ No change to `LedgerService`, `InventoryService`, `PaymentService`, ZATCA, or an
 9. **Pre-existing SQLite-only quirk** (REM-01): branch-less unique numbering index on `credit_notes` lost its `WHERE` predicate; the branch test passes explicit numbers.
 10. **Multi-invoice notes (R1-117)** not implemented; per-line `source_line_id` keeps the design compatible with a later note↔invoice link table (REM-18).
 11. **Branch checks on `show`/`post`** are new for credit notes: a branch-restricted user now gets 404 for a note of a branch they cannot access (legacy null-branch notes are hidden from restricted users, as for customer refunds).
+13. **OWNER DECISION — POS non-final part rounding.** POS returns round each non-final part down independently (REM-01 convention, pinned by `ReturnPosApiMixedReturnsTest`); the API/credit-note allocator uses the cumulative rule. After a credit note, a non-final POS part can be one halala lower than the cumulative rule would give; the final part sweeps the remainder, so totals close exactly and the cap is never exceeded. Aligning POS with the cumulative rule changes numbers REM-01 fixed on purpose — not done here.
+14. **OWNER DECISION — form-level permissions.** Loading customers needs `partners.view` on every sales form; a custom role with `invoices.manage` but no `partners.view` cannot use any of them (credit-note form included). An RBAC bundle decision, not REM-02.
+15. **Return window and credit notes.** `sales.return_window_days` governs returns only; credit notes are not window-limited (a later price adjustment is legitimate). If the owner wants the window on notes it must be a setting.
 12. **Pre-existing lock-order risks outside these paths** (e.g. a transaction that takes a numbering anchor and *then* locks an existing invoice for payment allocation) are unchanged by this PR.
 
 ## 10. Readiness decision
 
-@@READINESS@@
+**Not ready to merge until the owner approves — but ready for owner review.**
+
+What the owner asked for is implemented and evidenced: no cap bypass under POS/note concurrency (one lock order, PostgreSQL forked tests with negative controls), reduced-price hold-back on every path, targeted legacy block with an append-only Finance review path, a usable invoice-linked screen under ADR-E Option A, the print-amount issue documented with the smallest fix, the price-adjustment question in its own ADR, and the Codex findings answered with evidence (one attempted change reverted because CI proved it wrong).
+
+Conditions / open items for the owner before merge (none is a known financial defect):
+1. **Confirm the CI result of the final head** on the PR (SQLite, PostgreSQL, web).
+2. Decide §9 items 13–15 (POS partial-part rounding, form-level permissions, return window on notes) and ADR-E2 (price-only notes).
+3. Confirm the Arabic wording of the `legacy_credit_review` messages and plan Finance's use of `credit-notes:legacy-review` **before** enabling the block in production (the migration logs how many lines are affected).
+4. Deploy plan: code + three additive migrations (`…010000`, `…020000` PostgreSQL-only RESTRICT with pre-checks, `…030000` policy pin with marker, plus `…2026_11_05_010000` for the review overlay). **No production migration has been run.** Watch PostgreSQL for `40P01` after deploy; rollback = revert the three `SourceInvoiceLock` calls.
+
+**No merge. No deploy. No production migration.**

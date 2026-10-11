@@ -1032,6 +1032,32 @@ class CreditNoteSourceVatAccuracyTest extends TestCase
     }
 
     /** @test */
+    public function posting_rechecks_the_source_invoice_branch_not_only_the_note_branch(): void
+    {
+        $a = Branch::create(['code' => '00002', 'name' => 'فرع أ', 'is_main' => false]);
+        $b = Branch::create(['code' => '00003', 'name' => 'فرع ب', 'is_main' => false]);
+
+        // مستخدم غير مقيَّد ينشئ مسوّدة في فرع أ على فاتورة فرع ب.
+        app(BranchContext::class)->set($b->id);
+        $invoiceB = $this->sale([$this->item(1, 10000)]);
+        $draft = $this->note($invoiceB, [[$invoiceB->lines->first(), 1]], post: false, branchId: $a->id);
+        $this->assertSame($a->id, $draft->branch_id);
+
+        // مقيَّد بفرع أ: يرى المسوّدة (فرعها أ) لكنه لا يرحّلها لأن فاتورتها المصدر في فرع ب.
+        $restricted = User::create([
+            'tenant_id' => $this->tenant->id, 'name' => 'محدود', 'email' => 'post-a@nibras.sa',
+            'password' => bcrypt('secret1234'), 'role' => 'owner',
+        ]);
+        $restricted->branches()->sync([$a->id]);
+        Sanctum::actingAs($restricted);
+        $this->flushHeaders();
+
+        $this->postJson("/api/credit-notes/{$draft->id}/post")->assertNotFound();
+        $this->assertSame('draft', $draft->fresh()->status);
+        $this->assertSame(0, JournalEntry::where('source_type', CreditNote::class)->count());
+    }
+
+    /** @test */
     public function the_credit_note_source_endpoints_follow_the_note_permission_not_the_returns_permission(): void
     {
         $invoice = $this->sale([$this->item(1, 10000)]);
