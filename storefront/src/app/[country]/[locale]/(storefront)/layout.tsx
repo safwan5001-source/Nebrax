@@ -13,6 +13,7 @@ import { PublishedThemeMarkerProvider } from "@/components/layout/PublishedTheme
 import { StoreWhatsApp } from "@/components/layout/StoreWhatsApp";
 import { fetchStorefrontConfig } from "@/lib/commerce/storefront";
 import { getCategories } from "@/lib/data/categories";
+import { resolveFooterDesign } from "@/lib/presentation/footer-design";
 import { headerIsCompact } from "@/lib/presentation/header-design";
 import {
   publishedExtraNav,
@@ -23,6 +24,7 @@ import {
   publishedThemeStyle,
   publishedWhatsAppHref,
 } from "@/lib/presentation/public";
+import { publishedFooterGroups } from "@/lib/presentation/public-footer";
 import { publishedMainNav } from "@/lib/presentation/public-navigation";
 import { publishedLogoMedia } from "@/lib/presentation/resolved-media";
 import {
@@ -196,6 +198,15 @@ export default async function StorefrontLayout({
   const extraLinks =
     (await publishedMainNav(presentation, basePath)) ??
     publishedExtraNav(presentation, basePath);
+  // V7e: the footer's merchant link groups (resolved against the live catalogue) and its design.
+  const footerGroups = await publishedFooterGroups(presentation, basePath);
+  const footerDesign = presentation?.footer.design
+    ? resolveFooterDesign(presentation.footer.design, {
+        primaryColor: presentation.primaryColor,
+        accentColor: presentation.accentColor,
+        palette: presentation.palette,
+      })
+    : undefined;
   const showCategoryNav = presentation
     ? presentation.header.showCategoryNav
     : true;
@@ -318,6 +329,9 @@ export default async function StorefrontLayout({
         whatsappHref={footerWhatsApp}
         appLinks={appLinks}
         licenseNumber={presentation?.verification.licenseNumber ?? ""}
+        layout={presentation?.footer.layout}
+        groups={footerGroups}
+        design={footerDesign}
         categoryLinks={
           <Suspense fallback={<FooterCategoryLinksFallback />}>
             <StorefrontFooterCategoryLinks

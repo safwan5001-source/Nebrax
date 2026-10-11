@@ -7,6 +7,7 @@
  * Storefront-only — the Canvas draws labels, not hrefs, so there is no web twin.
  */
 
+import type { FooterGroup } from "./footer-design";
 import type { IconKey } from "./icon-registry";
 import {
   isServedContentSlug,
@@ -109,8 +110,11 @@ export function resolveNavMenu(
   return out;
 }
 
-/** Every category / product id a menu targets, in document order, products capped. */
-export function collectNavTargetIds(menu: NavMenu): {
+/**
+ * Every category / product id one or more menus target, in document order, products capped (shared across the menus —
+ * the batched product read the backend accepts is per request, not per menu).
+ */
+export function collectNavTargetIds(menus: NavMenu | readonly NavMenu[]): {
   categoryIds: string[];
   productIds: string[];
 } {
@@ -127,6 +131,50 @@ export function collectNavTargetIds(menu: NavMenu): {
     }
     for (const child of item.children ?? []) visit(child);
   };
-  for (const item of menu.items) visit(item);
+  for (const menu of Array.isArray(menus) ? menus : [menus as NavMenu]) {
+    for (const item of menu.items) visit(item);
+  }
   return { categoryIds: [...categoryIds], productIds: [...productIds] };
+}
+
+export interface ResolvedFooterGroup {
+  id: string;
+  title: string;
+  span: 1 | 2;
+  items: ResolvedNavChild[];
+}
+
+/**
+ * CUST-HV V7e-2 — a footer group's links (V0 §10.3): the menu it references when that menu exists, else its own links.
+ * Only top-level items count (a footer has no dropdowns); a group whose title is empty or that resolves to nothing is
+ * omitted — never a heading over an empty list, never a dead link. The caller supplies the live-catalogue context.
+ */
+export function resolveFooterGroups(
+  groups: readonly FooterGroup[],
+  menus: readonly NavMenu[],
+  ctx: NavResolveContext,
+): ResolvedFooterGroup[] {
+  const out: ResolvedFooterGroup[] = [];
+  for (const group of groups) {
+    const title = group.title.trim();
+    if (!title) continue;
+    const menu = group.menu
+      ? menus.find((m) => m.id === group.menu)
+      : undefined;
+    const source: NavItem[] = menu ? menu.items : (group.links ?? []);
+    const items = resolveNavMenu(
+      { id: group.id, name: title, items: source },
+      ctx,
+    ).map(({ id, label, href, newTab, icon, badge }) => ({
+      id,
+      label,
+      href,
+      newTab,
+      ...(icon ? { icon } : {}),
+      ...(badge ? { badge } : {}),
+    }));
+    if (items.length === 0) continue;
+    out.push({ id: group.id, title, span: group.span ?? 1, items });
+  }
+  return out;
 }
