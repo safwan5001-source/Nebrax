@@ -1,5 +1,7 @@
 """Offline tests for the CI Gate. Run: python3 -m unittest discover -s scripts/ci-gate"""
 import argparse
+import contextlib
+import io
 import json
 import os
 import shutil
@@ -348,7 +350,8 @@ class EndToEnd(unittest.TestCase):
         try:
             args = argparse.Namespace(root=str(g.ROOT), base_root=str(g.ROOT), pr=5, sha=SHA,
                                       timeout_minutes=1, interval=0)
-            return g.run_gate(args)
+            with contextlib.redirect_stdout(io.StringIO()):  # keep CI logs free of a scary "FAIL" table
+                return g.run_gate(args)
         finally:
             g.Api = orig
 
