@@ -297,6 +297,24 @@
   padding-block-start: 0;
 }
 
+/* ── CUST-HV V8f — the gallery in the Canvas. The shared gallery rules (below the V5c marker, parity-tested) pick the visible column count
+   with media queries against the HOST window; `data-vp` carries the simulated device, so these higher-specificity rules take the device's
+   own count (phones 2, tablets the cap, desktops the authored count — the storefront's numbers). The picture the editor has selected is
+   ringed. ── */
+.awj-store-preview [data-gallery][data-vp="mobile"] {
+  --ga-n: var(--ga-cols-p);
+}
+.awj-store-preview [data-gallery][data-vp="tablet"] {
+  --ga-n: var(--ga-cols-t);
+}
+.awj-store-preview [data-gallery][data-vp="desktop"] {
+  --ga-n: var(--ga-cols-d);
+}
+.awj-store-preview [data-gallery-item][data-selected] [data-gallery-frame] {
+  outline: 2px solid var(--store-primary, currentColor);
+  outline-offset: 2px;
+}
+
 /* ── CUST-HV V8c — the slider in the Canvas. The slider rules below the V5c marker are the storefront's (parity-tested); they size the
    copy and the slide height with media queries against the HOST window, which is not the simulated device's width. `data-vp` carries
    the device, so these higher-specificity rules take the device's own values. Same numbers as the storefront's queries. ── */

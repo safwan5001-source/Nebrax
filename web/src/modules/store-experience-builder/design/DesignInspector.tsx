@@ -115,6 +115,7 @@ const LAYOUT_LABEL: Record<string, CustomizerMessageKey> = {
   split: "designLayoutSplit",
   minimal: "designLayoutMinimal",
   "text-band": "designLayoutTextBand",
+  carousel: "designLayoutCarousel",
 };
 const OVERLAP_LABEL: Record<(typeof OVERLAPS)[number], CustomizerMessageKey> = {
   none: "designUnset",
@@ -700,7 +701,7 @@ export function DesignInspector({
               value={current.layout ?? ""}
               onChange={(event) => set("layout", (event.target.value || undefined) as SectionDesign["layout"])}
             >
-              <option value="">{t("designLayoutDefault")}</option>
+              <option value="">{t(type === "gallery" ? "designLayoutGrid" : "designLayoutDefault")}</option>
               {(capability.layout as readonly string[]).map((layout) => (
                 <option key={layout} value={layout}>
                   {t(LAYOUT_LABEL[layout])}
@@ -708,7 +709,7 @@ export function DesignInspector({
               ))}
             </select>
           </Field>
-          <p className="text-[12px] leading-5 text-muted">{t("designLayoutHint")}</p>
+          <p className="text-[12px] leading-5 text-muted">{t(type === "gallery" ? "designLayoutGalleryHint" : "designLayoutHint")}</p>
           {layoutInactive ? (
             <p data-design-layout-inactive="" role="status" className="text-[12px] leading-5 text-warning">
               {t("designLayoutSplitInactive")}

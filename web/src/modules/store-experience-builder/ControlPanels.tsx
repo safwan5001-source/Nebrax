@@ -41,6 +41,7 @@ import {
   bannerContentOf,
   bannerCtasOf,
   type HeroContent,
+  galleryContentOf,
   heroContentOf,
   sliderContentOf,
   benefitsContentOf,
@@ -81,6 +82,7 @@ import {
 } from "./DataSectionFields";
 import { OfferCatalog } from "./OfferCatalog";
 import { DesignInspector } from "./design/DesignInspector";
+import { GalleryFields } from "./GalleryFields";
 import { SliderFields } from "./SliderFields";
 import { useBackgroundMediaBounds } from "./media/use-background-media-bounds";
 import { GlobalTokensEditor } from "./design/GlobalTokensEditor";
@@ -1344,6 +1346,21 @@ function HomepagePanel({
                   updateSection(selectedIndex, {
                     ...selected,
                     content: content.slides.length > 0 ? content : undefined,
+                  })
+                }
+              />
+            ) : selected.type === "gallery" ? (
+              <GalleryFields
+                key={selected.id}
+                content={galleryContentOf(selected)}
+                locale={locale === "en" ? "en" : "ar"}
+                t={t}
+                activeImageId={activeSlides?.[selected.id] ?? null}
+                onActiveImageChange={(imageId) => onActiveSlideChange?.(selected.id, imageId)}
+                onChange={(content) =>
+                  updateSection(selectedIndex, {
+                    ...selected,
+                    content: content.images.length > 0 ? content : undefined,
                   })
                 }
               />
