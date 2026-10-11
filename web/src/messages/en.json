@@ -2215,6 +2215,7 @@
     "line_net": "Net before VAT",
     "tax_rate": "VAT rate",
     "unit_price_rounding_note": "Unit prices are shown rounded for display; the recorded line amounts are authoritative.",
+    "line_discount_note": "Unit prices are before discount and line totals are after discount; the discount is itemised in the totals summary.",
     "unit_price": "Unit price",
     "tax": "Tax",
     "total": "Total",

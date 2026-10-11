@@ -45,11 +45,11 @@ export function minimalItemsColumnWidthClass(column: DocItemsColumnId): string {
     case 'price_before_tax':
       return 'w-[8%]';
     case 'line_discount':
-      return 'w-[7%]';
+      return 'w-[9%]';
     case 'line_net':
-      return 'w-[8%]';
+      return 'w-[7%]';
     case 'tax_rate':
-      return 'w-[6%]';
+      return 'w-[7%]';
     case 'tax':
       return 'w-[7%]';
     case 'total':

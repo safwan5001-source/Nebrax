@@ -339,9 +339,15 @@ export function DocItemsTable({
     ? <p data-doc-rounding-note className="mt-1.5 text-[9px] leading-snug text-[color:var(--muted)]">{t('unit_price_rounding_note')}</p>
     : null;
 
+  // تخطيطٌ محفوظ بلا عمود الخصم: السطر يعرض سعراً قبل الخصم وإجمالياً بعده، فيُصرَّح بذلك بدل ترك المعادلة مبهمة.
+  const discountNote = !columns.some((column) => column.id === 'line_discount') && model.lines.some((line) => (line.discount ?? 0) > 0)
+    ? <p data-doc-discount-note className="mt-1.5 text-[9px] leading-snug text-[color:var(--muted)]">{t('line_discount_note')}</p>
+    : null;
+  const notes = roundingNote || discountNote ? <>{discountNote}{roundingNote}</> : null;
+
   if (usesV2Labels) {
-    return <div className={cn('overflow-hidden', style.sectionGap)}>{table}{roundingNote}</div>;
+    return <div className={cn('overflow-hidden', style.sectionGap)}>{table}{notes}</div>;
   }
 
-  return roundingNote ? <>{table}{roundingNote}</> : table;
+  return notes ? <>{table}{notes}</> : table;
 }

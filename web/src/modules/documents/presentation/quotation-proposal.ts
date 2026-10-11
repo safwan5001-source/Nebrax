@@ -44,11 +44,11 @@ export function quotationItemsColumnWidthClass(column: DocItemsColumnId): string
     case 'price_before_tax':
       return 'w-[7%]';
     case 'line_discount':
-      return 'w-[6%]';
+      return 'w-[8%]';
     case 'line_net':
       return 'w-[7%]';
     case 'tax_rate':
-      return 'w-[5%]';
+      return 'w-[6%]';
     case 'tax':
       return 'w-[7%]';
     case 'total':

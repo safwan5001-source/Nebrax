@@ -4,6 +4,7 @@ import { useTranslations } from 'next-intl';
 import { QRCodeSVG } from 'qrcode.react';
 import type { DocumentTemplateProps } from '../types';
 import { ThermalLayout } from '../components/thermal-layout';
+import { applyVatRateToLabel } from '../presentation/visual-v2';
 
 function Row({ label, value }: { label: string; value: React.ReactNode }) {
   if (value === null || value === undefined || value === '') return null;
@@ -29,6 +30,7 @@ export function ThermalReceipt({
   const t = useTranslations('invoiceDoc');
   const dt = useTranslations('documentTypes');
   const tv = useTranslations('voucherDoc');
+  const tp = useTranslations('purchaseForm');
   const rule = 'my-2 border-t border-dashed border-border';
   const v = model.voucher;
 
@@ -109,12 +111,18 @@ export function ThermalReceipt({
           <div className={rule} />
           <div className="space-y-0.5">
             <Row label={t('subtotal')} value={<span className="num">{formatMoney(model.totals.subtotal)}</span>} />
-            <Row label={t('vat')} value={<span className="num">{formatMoney(model.totals.tax)}</span>} />
+            {model.totals.discount && model.totals.discount > 0 ? (
+              <Row label={tp('discount')} value={<span className="num" dir="ltr">− {formatMoney(model.totals.discount)}</span>} />
+            ) : null}
+            <Row label={applyVatRateToLabel(t('vat'), model.totals.taxRate)} value={<span className="num">{formatMoney(model.totals.tax)}</span>} />
             <div className="flex justify-between pt-1 text-[13px] font-bold">
               <span>{t('grand_total')}</span>
               <span className="num">{formatMoney(model.totals.total)}</span>
             </div>
           </div>
+          {model.lines.some((line) => line.unitPriceRounded) && (
+            <div data-doc-rounding-note className="mt-1 text-[9px] leading-snug text-muted">{t('unit_price_rounding_note')}</div>
+          )}
         </>
       )}
 
