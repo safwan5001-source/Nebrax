@@ -482,6 +482,7 @@ def run_gate(args) -> int:
         print(f"::warning::{banner}")
 
     start, deadline = time.monotonic(), args.timeout_minutes * 60
+    last_sig = None
     gate_name = manifest["gate_check_name"]
     while True:
         wf_all = api.pages("actions/runs", "workflow_runs", {"head_sha": sha, "event": "pull_request"})
@@ -493,7 +494,10 @@ def run_gate(args) -> int:
         summary = render_summary(verdict, rows, warnings, expected, sha, files_known)
         if banner:
             summary += f"\n> {banner}\n"
-        print(summary)
+        sig = (verdict, tuple((r[0], r[3]) for r in rows))
+        if sig != last_sig or verdict != "wait":  # log only on change (a 45-min wait otherwise prints ~90 tables)
+            print(summary)
+            last_sig = sig
         if verdict != "wait":
             break
         time.sleep(args.interval)

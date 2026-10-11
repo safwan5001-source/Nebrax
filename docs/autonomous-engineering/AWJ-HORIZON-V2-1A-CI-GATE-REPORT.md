@@ -160,3 +160,33 @@ Fail-closed: خطأ API بعد 5 محاولات، بنية workflow غير مد�
 ## 13. الخطوة التالية
 
 مراجعة المالك لهذا التقرير ← قرارات D1–D5 ← مراقبة `CI Gate` على PRs فعلية ← تنفيذ §8 يدوياً من المالك. **V2-1B لا تبدأ قبل ذلك.**
+
+---
+
+## 14. جولة المراجعة 1 — ملاحظات المالك وأدلتها
+
+| # | الملاحظة | الإجراء | الدليل |
+|---|---|---|---|
+| 1 | ملفات `.pyc` داخل PR | أُزيلت من الفهرس؛ `.gitignore` يمنع `__pycache__/` و`*.pyc`؛ الـworkflow يضبط `PYTHONDONTWRITEBYTECODE=1`؛ اختبار `Hygiene` يفشل إن تُتبّع bytecode | `git ls-files \| grep pyc` فارغ؛ `Hygiene.test_no_bytecode_tracked_and_ignored` |
+| 2 | Head SHA مقابل Merge SHA | **مُثبَت من سجل التشغيل الحي** (job `114566107980`): `GITHUB_SHA(merge)=111996ca4f46b8c80161143c1c9d68fbec19a0fd`، `GITHUB_REF=refs/pull/1334/merge`، `event=pull_request`، `pr.head=f0881033038f01f25f3f4e042d4379a3bbd4c4fe`، `pr.base=981663adf7bbb8d3a5a44a092839b35e28ad107c`، `pr.merge_commit_sha=111996c…` (= GITHUB_SHA). أي: الـworkflow يعمل على **merge ref**، بينما check runs تُرفق بـ**head SHA**؛ البوابة تستعلم بالـhead (`github.event.pull_request.head.sha`) وتتحقق قبل/أثناء/بعد الانتظار أن رأس الـPR لم يتغيّر | سجل الـjob، سطر `Evidence:` |
+| 3 | check runs قديمة / غير مرتبطة / rerun | **عيب فعلي وُجد وأُصلح:** `push` و`pull_request` ينتجان check runs بنفس الاسم على نفس الـSHA (run `38171911599` push مقابل `38171914689` pull_request على head `f088103`)؛ الإصدار الأول كان يختار «الأعلى id» بين الاثنين فيمكن لإعادة تشغيل run الـpush الأخضر أن تُخفي فشل run الـPR. الآن: لا يُقبل check run إلا من `check_suite` يعود لـworkflow run حدثه `pull_request` وhead_sha مطابق؛ وrerun داخل نفس الـsuite يُحكَم بأحدث محاولة مع تحذير؛ وSHA قديم ⇒ فشل | `Binding.*`, `EndToEnd.test_pr_failure_not_hidden_by_green_push_twin`, `test_stale_head_fails_closed` |
+| 4 | تعديل ملفات البوابة/المانيفست | **ثغرتان وُجدتا وأُصلحتا:** (أ) تعديل `required-checks.json` أو `ci_gate.py` داخل الـPR كان يُضعف البوابة نفسها؛ (ب) تضييق `pull_request.paths` في `web-ci.yml` كان يُسقط `web build` من المطلوب. الآن: السكربت الحاكم يُنفَّذ من **checkout موثوق لـbase** ويقارن بـ`compare_baseline` (لا حذف/خفض tier/تغيير job/تقليص guard/حذف نمط path)، مع لافتة `GATE SELF-CHANGE`. **ما لا يُغلق تقنياً:** تعديل `ci-gate.yml` نفسه (خطوات الـjob تأتي من الـPR) أو إفراغ خطوات workflow غير محروسة — يحتاج مراجعاً مستقلاً/CODEOWNERS (D5). في هذا الـPR الأساس (`main`) بلا بوابة فاستُعمل مسار `Bootstrap` (ظاهر في السجل) | `Baseline.*` (8) |
+| 5 | CI الحالي | انتظر الانتهاء؛ لا فشل | §15 |
+| 6 | Regression | 46 اختباراً (17 جديدة) تغطي البنود 1–4 | `python3 -m unittest discover -s scripts/ci-gate` ⇒ 46/46؛ ويُنفَّذ أيضاً داخل الـjob (`Ran 46 tests … OK` في السجل) |
+
+ملاحظة تشغيلية: كان السجل الأول يطبع جدول الحالة كل 30ث (~90 نسخة)؛ صار يطبع عند التغيّر فقط.
+
+## 15. حالة CI الفعلية (على `f0881033038f01f25f3f4e042d4379a3bbd4c4fe`)
+
+| فحص | النتيجة |
+|---|---|
+| `php artisan test (L11, sqlite)` — pull_request / push | ✅ / ✅ |
+| `php artisan test (L11, pgsql)` — pull_request / push | ✅ / ✅ |
+| `CI Gate` (job `114566107980`) | ✅ **PASS** — 21:07:27Z؛ المتوقع: الفحصان الخلفيان فقط (PR مسّ `.github/` و`scripts/` و`docs/` و`.gitignore`)؛ باقي الفحوص «not required (path filter)» |
+| `web/storefront/mobile/runtime-smoke` | لم تعمل (لا مسار مطابق) وقد حُكم عليها «غير مطلوبة» بدل أن تعلّق الـPR — السلوك المطلوب |
+
+زمن الانتظار: الـrunners كانت مزدحمة (CI Gate في الطابور ~31 دقيقة، pgsql ~23 دقيقة تشغيل). تنبيه: مهمة البوابة تشغل runner طوال انتظار أبطأ فحص — تكلفة مقبولة لكنها تنافس نفس المجمّع؛ يُراقَب (D4).
+
+## 16. Final Head SHA
+
+لا يمكن لملف أن يتضمن Hash الـcommit الذي يحتويه. السجل: **commit الإصلاح السلوكي الأخير المُثبَت بـCI** = `f088103…` (§15). الـcommits اللاحقة: تقرير الجولة 1 + تقليل ضجيج السجل (تغيير لا يمس منطق الحكم). **Final Head SHA وحالة CI عليه مدرجان في وصف الـPR** وفي رسالة التسليم.
