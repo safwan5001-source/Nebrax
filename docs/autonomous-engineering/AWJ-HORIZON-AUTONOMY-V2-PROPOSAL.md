@@ -159,3 +159,29 @@ Simulate or dry-run grant validation **without performing automatic merge** unti
 ## 12. Current state
 
 **Documented proposal only.** No new standing merge authorization, no running orchestrator, no automation deployed, no product code changed, no merge or deploy performed. Owner preference to stop only for material decisions is recorded; precise future merge grant remains an approval gate.
+
+## 13. Parallel horizons and non-disruptive transition (mandatory design requirement)
+
+Several AWJ horizons may already be actively executing. **V2 must never assume an exclusive single-agent/single-horizon repository.** The currently running horizons are not silently migrated, paused, restarted, granted new merge rights or forced to adopt revised protocols by merging this proposal. Their actual identities and states are **not established by this document**; V2-0 must discover and verify them from current repository/PR/handoff evidence before planning rollout.
+
+### Compatibility and rollout
+
+- **Existing horizons:** remain governed by their recorded/authorized protocol and merge authority until individually migrated with documented consent and a clean checkpoint. Changes to shared bootstrap/protocol files require compatibility review before activation; do not overwrite their handoffs.
+- **V2 trial:** use a separate pilot scope and isolated branches/PRs. No writes to active-horizon branches or task files as part of V2 development.
+- **Transition record:** for each voluntarily migrated horizon, capture horizon/task IDs, protocol version before/after, running agent identity if known, latest verified main/head/merge SHAs, open PRs, unmerged work, dependency graph, approvals and rollback plan.
+- **Safe migration point:** require task checkpoint, no ambiguous in-flight mutation/merge and refreshed CI/reviews if Head changes; do not assume a stopped chat means work is not running elsewhere.
+- **Rollout flag:** V2 authority applies only to explicitly enrolled horizons; otherwise existing merge/deploy rules remain binding.
+
+### Concurrency coordination (to design and verify in V2-0/V2-1)
+
+Maintain a durable **Active Horizon Registry** recording horizon ID, owner/agent, authorized scope, protocol version, branches/PRs, shared files/surfaces, dependencies, risk class, latest checkpoint and lifecycle status (observed vs reported). Never treat stale registry entries as authoritative without GitHub verification.
+
+Introduce exclusive ownership/leases for **mutations** of the same branch or overlapping critical files and for merge orchestration against shared main. Leases need owner, expiry, fencing token/generation and recovery rules; when safe locking is unavailable, serialize conflicting operations or escalate. No reliance on timestamps or an editable document alone to prevent concurrent writes.
+
+Before opening/merging a PR, assess overlap with active horizons, shared contracts, migrations and dependent work. Validate current base/main and head, required branch protection and checks at the exact intended SHA. A successful merge by another horizon invalidates stale integration assumptions and can require a fresh review/rebase. Never let one horizon overwrite another's changes or merge dependent changes out of order.
+
+On conflict, prefer safe independent tasks, smaller PRs or sequencing; escalate material behavior/architecture conflicts. Do not interrupt unrelated ongoing horizons just because V2 is under development.
+
+### V2-0 evidence additions
+
+Inventory currently active horizons using current PRs, branches, implementation reports, task queues and verified operator information where available; explicitly mark unknown/unverifiable sessions. Capture branch protection and concurrency capabilities/limitations and produce a **non-disruption impact assessment**. No registry, automation, lease, merge or protocol switch is implemented by this documentation PR.
