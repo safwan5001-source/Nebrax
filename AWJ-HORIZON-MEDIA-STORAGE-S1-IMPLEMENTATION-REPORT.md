@@ -17,7 +17,7 @@
 | `database/migrations/2026_11_06_010000_add_photo_disk_to_employees.php` (جديد) | `employees.photo_disk` string(50) nullable، إضافي بحت، بلا backfill (Q13) |
 | `Expense/Payment/Purchase/Invoice/EmployeeController` | الكتابة والتنزيل والحذف عبر `AttachmentStorage`؛ ذرّية الطلب؛ ترتيب استبدال صورة الموظف |
 | `docs/storage.md` | قسم عقد المرفقات |
-| `tests/Feature/AttachmentDurabilityS1Test.php` + `FakeR2Bucket.php` (جديدان) | 19 اختباراً، دلو R2 في الذاكرة يحفظ البايتات ويحقن الفشل |
+| `tests/Feature/AttachmentDurabilityS1Test.php` + `FakeR2Bucket.php` (جديدان) | 20 اختباراً، دلو R2 في الذاكرة يحفظ البايتات ويحقن الفشل |
 
 **لم يُمَس:** `R2StorageService` · أي خدمة مالية (`ExpenseService`/`PaymentService`/`LedgerService`) · `UpdatePlatformIntegrationRequest`/`PlatformIntegrationService` (A-18) · `DocumentStorageService` (A-19) · أي اختبار قائم (BC-4: صفر تعديل على اختبار موجود).
 

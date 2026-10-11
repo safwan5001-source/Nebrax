@@ -111,16 +111,23 @@ class EmployeeController extends ApiController
         $employee = Employee::findOrFail($id);
         $attachments = $employee->attachments()->get();
 
-        // بياناتٌ شخصية: تُمحى الكائنات **قبل** إزالة الصفوف (Plan §9.2) فلا يبقى كائنٌ يتيمٌ
-        // لا يجده سردٌ ولا إعادة محاولة. فشل المحو يرمي والصفوف باقية، فالطلب قابل لإعادة المحاولة
-        // (حذف كائنٍ مفقود لا يُعدّ خطأً).
-        if ($employee->photo_path) {
-            $this->attachmentStorage->delete($this->photoDisk($employee), $employee->photo_path);
-        }
-        foreach ($attachments as $attachment) {
-            $this->attachmentStorage->delete($attachment->disk, $attachment->path);
-        }
-        $employee->delete();
+        // بياناتٌ شخصية: لا يُترك كائنٌ يتيمٌ لا يجده سردٌ ولا إعادة محاولة (Plan §9.2)، ولا يُمحى ملفٌ
+        // لموظفٍ بقي. لذلك حذف الصفوف ثم محو الكائنات **داخل معاملة واحدة والمحو قبل الـcommit**:
+        // فشل الحذف (قيد مرجعي) لا يمحو شيئاً، وفشل المحو يُرجع الصفوف فيُعاد الطلب
+        // (محو كائنٍ مفقود لا يُعدّ خطأً).
+        DB::transaction(function () use ($employee, $attachments): void {
+            $photo = $employee->photo_path
+                ? ['disk' => $this->photoDisk($employee), 'path' => $employee->photo_path]
+                : null;
+            $employee->delete();
+
+            if ($photo !== null) {
+                $this->attachmentStorage->delete($photo['disk'], $photo['path']);
+            }
+            foreach ($attachments as $attachment) {
+                $this->attachmentStorage->delete($attachment->disk, $attachment->path);
+            }
+        });
 
         return response()->json(['message' => 'تم الحذف.']);
     }

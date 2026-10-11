@@ -547,6 +547,36 @@ class AttachmentDurabilityS1Test extends TestCase
     }
 
     /** @test */
+    public function a_blocked_employee_delete_erases_nothing_and_a_failed_erasure_keeps_the_employee(): void
+    {
+        $auth = $this->registerTenant();
+        $emp = $this->employee($auth['token']);
+        $this->withToken($auth['token'])->postJson("/api/employees/{$emp['id']}/attachments", [
+            'attachments' => [$this->pdf()],
+        ])->assertCreated();
+        $this->assertCount(1, $this->bucket->keys());
+
+        // فشل محو الكائن ⇒ تتراجع المعاملة: الموظف ومرفقه باقيان.
+        $this->bucket->failDeletes = true;
+        $this->withToken($auth['token'])->deleteJson("/api/employees/{$emp['id']}")->assertStatus(503);
+        $this->assertSame(1, Employee::where('id', $emp['id'])->count());
+        $this->assertSame(1, EmployeeAttachment::count());
+        $this->bucket->failDeletes = false;
+
+        // فشل الحذف نفسه (قيد مرجعي) ⇒ لا يُمحى أي كائن.
+        Employee::deleting(function () {
+            throw new RuntimeException('referential block');
+        });
+        $this->withoutExceptionHandling();
+        try {
+            $this->withToken($auth['token'])->deleteJson("/api/employees/{$emp['id']}");
+            $this->fail('the delete must fail');
+        } catch (RuntimeException) {
+        }
+        $this->assertCount(1, $this->bucket->keys(), 'no object may be erased for an employee that stays');
+    }
+
+    /** @test */
     public function an_accounting_attachment_delete_removes_the_row_even_if_object_erasure_fails(): void
     {
         $auth = $this->registerTenant();
