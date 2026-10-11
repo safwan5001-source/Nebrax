@@ -6,9 +6,44 @@
 | **Branch** | `claude/awj-tax-rem-02-credit-note-vat` |
 | **PR** | [#1304](https://github.com/safwan5001-source/Nebrax/pull/1304) — open, ready for review, not merged |
 | **Base SHA** | `999e06c52cd9e7dba3d8e16b3be00fc8d9ad9fa0` (`origin/main`, includes merged #1291 / REM-01) |
-| **Head SHA (code)** | `1f1c5bae54968eb277c9d5d27a08a5ad433a8e19` — last code commit; later commits on the branch are docs-only (this report). Check the PR for the exact head. |
+| **Head SHA** | `6f9fa4a850474cc6b315e52ac749224234cd70eb` (code head; this report is committed after it, so the PR head is one docs-only commit ahead). Main at last merge: `bdecbd01668df6cb43cd3899b3d9ba10f24a4b03` |
 | **Owner decisions applied** | **ADR-E → Option A** (source invoice required by default; standalone only by setting). **Migrations → both** (`source_line_id` + `restrictOnDelete`), additive only. |
-| **Status** | Implemented. Test results below. **Not merged, not deployed. Awaiting owner approval.** |
+| **Status** | Pre-merge review round done (§0). **Not merged, not deployed, no production migration run. Awaiting owner approval.** |
+
+---
+
+## 0. Pre-merge review — owner decisions (2026-10-11) and outcome
+
+| # | Decision | Outcome | Evidence |
+|---|---|---|---|
+| 1 | No bypass of the VAT/amount cap, **even when POS runs concurrently with a credit note** | **Done.** One lock order everywhere: *source invoice row → branch row → tenant*. `PosReturnService::create` (both entry paths) and `PosExchangeService::create` now take the invoice lock **first** (`SourceInvoiceLock`), before the branch idempotency lock. Notes and API returns already took invoice → branch. | `CreditNotePosLockOrderPostgresTest` (4 tests, real `pcntl_fork` processes calling the real `PosReturnService::create`): POS vs note, POS vs API return, 3-way partials, 4-way mixed deadlock stress (4 rounds). **Mutations:** lock removed → 3/4 fail (over-credit); lock taken *after* the branch lock → `SQLSTATE[40P01] deadlock detected` (proves why the order matters); correct order → 4/4 pass on 6 consecutive runs. |
+| 2 | Fix refund of withheld amounts after reduced-price notes — pre-merge condition | **Done.** POS final part no longer sweeps a prior reduced-price hold-back (`1f1c5ba`); the API/note paths already honour it through the shared allocator (`min_price`), now fed by notes too. | Tests for every pair: note→API return, API return→note, note→note, API return→POS, note→POS (`…withheld…`), the returnable flag, and a seeded random sequence test (10 cases: never exceeds invoice net/VAT at any prefix; exact to the halala at full price). |
+| 3 | Legacy notes that cannot be tied to an invoice line must not allow unsafe extra reversal — **targeted block + safe finance review path, no edit of posted documents** | **Done.** Per-invoice block (not global): further credit notes, API returns, POS returns/quotes on an invoice that has posted pre-REM-02 note lines with **no product or an ambiguous product** are refused with an explicit message and surfaced as `blocked_reason = legacy_credit_review` (sources list, returnable endpoint, web). Attributable lines (single matching product) keep being counted automatically. **Finance path:** `php artisan credit-notes:legacy-review --tenant=` (read-only list with candidate lines) and `credit-notes:legacy-resolve <line> --tenant= (--attribute-to=<invoice line> \| --not-applicable) --reason= --by=<reviewer e-mail>`; each decision is an **append-only overlay row** (`credit_note_legacy_reviews`: outcome, mandatory reason ≥ 10 chars, reviewer of the same tenant, timestamp). Nothing in `credit_notes`/`credit_note_lines`/invoices is modified. | `CreditNoteLegacyBlockTest` (11 tests): no-product and ambiguous cases block note/return/POS and the list/endpoint; other invoices and attributable lines unaffected; attribute-to counts against the cap and lifts the block; not-applicable lifts without counting; snapshot proves no posted row changes; input validation (both/none options, short reason, unknown reviewer, foreign-invoice line, already-resolved, bad tenant UUID); append-only; cross-tenant isolation. Mutation (block disabled) → tests fail. |
+| 4 | Keep ADR-E Option A, but give users a clear path to create an invoice-linked note | **Done.** `/credit-notes/new` defaults to **invoice-linked** mode (customer → posted invoice → lines with remaining qty, optional lowered price, preview through the shared allocator mirror). Standalone mode appears only if the tenant setting allows it, otherwise a hint points to Sales settings. Deep link `/credit-notes/new?invoice=<id>` and a "create credit note" action on posted invoices; the Sales-settings toggle exists. Blocked invoices are listed disabled with the reason (incl. `legacy_credit_review`). | 13 vitest tests (`invoice-linked.test.ts`) + existing helper tests; `tsc` clean for touched files; web build in CI. Not exercised in a real browser. |
+| 5 | Do **not** widen REM-02 into a general document-template redesign; document the display problem and propose the smallest independent fix | **Done (docs only).** | `docs/audits/AWJ-TAX-REM-02-PRINT-AMOUNTS-NOTE.md`: root cause, the two remaining cases (discounted line; per-unit rounding), and the smallest independent fix — one optional `lineNet` field + one opt-in `line_net` column for credit/debit-note templates (row reads *amount before tax + tax = total*, exact). Not implemented. |
+| 6 | Separate the price-adjustment-without-quantity decision into a clear ADR, without changing financial rules automatically | **Done (docs only).** | `docs/audits/ADR-E2-PRICE-ADJUSTMENT-CREDIT-NOTES.md` — **Proposed**, options A/B/C, the Finance/tax questions that must be answered first, sizing of the implementation. Current behaviour (price-only notes consume quantity) unchanged. |
+| 7 | Focused tests on SQLite and PostgreSQL: concurrency, discounts, rounding, tenant isolation | **Done** — see §8. | |
+| 8 | Address open Codex findings with evidence; update report and PR | **Done** — see §0.1 and the PR. | |
+
+### 0.1 Codex threads
+
+| Thread | Resolution |
+|---|---|
+| Legacy credits in the cap (P1, ×2) | Attributable lines counted at read time (`fa1090f`); **unattributable lines now block the invoice + finance review path** (decision 3). |
+| Rollback keeps prior policy values (P2) | Marker-based `down()` (`fa1090f`). |
+| Printed line amounts (P1, ×3) | Pre-tax unit price printed (`9a8a2eb`); discount/rounding limit documented with the smallest independent fix (decision 5); thread left for the owner. |
+| Return-source list ignores notes (P2) / POS derivation (P1 ×3) | Fixed (`2675c9a`, `6c7f019`, `1f1c5ba`). |
+| Serialize POS with credit-note posting (P1) | **Fixed in this round** (decision 1) — supersedes the earlier "follow-up slice" reply. |
+| Usable path before disabling standalone (P1) | Toggle (`6c7f019`) + invoice-linked screen (decision 4). |
+
+### 0.2 Lock order — design and rollout
+
+* **Order (all sourced reversal paths):** `invoice (FOR UPDATE)` → `branch (numbering/idempotency anchor)` → `tenant`.
+  `CreditNoteService::post`: note → invoice → ledger. `ReturnService::post` (non-POS): return → invoice → ledger. POS return / exchange: invoice → branch → … (new). The ledger's journal numbering locks the branch row, which is why taking the invoice **after** the branch deadlocks (reproduced).
+* **Change size:** 1 new 40-line class + 3 one-line calls; no schema change, no setting.
+* **Rollout:** code-only, no migration; safe to deploy in any order across app servers (the lock is advisory to the code, not a DB object). **Rollback** = revert the 3 calls (restores the old behaviour including the old race; no data impact).
+* **Monitoring after deploy:** PostgreSQL log for `40P01` (deadlock) and the POS return latency; any occurrence ⇒ stop and report (the stress test did not reproduce one in 6 consecutive runs of 4 rounds).
+* **Not covered (pre-existing, unchanged):** flows that take a branch/numbering anchor and *then* lock an existing invoice for a different purpose (e.g. payment allocation in the same transaction as document creation) — same class of risk as before this PR, not introduced by it.
 
 ---
 
@@ -57,7 +92,8 @@ The cap is **cumulative and shared with returns**: quantity, net and VAT consume
 |---|---|---|
 | `2026_11_04_010000_add_source_line_to_credit_note_lines` | `source_line_id` (nullable uuid, indexed with tenant), `line_discount` (default 0), `unit_price_before_tax` (nullable; print/display only) | Existing rows: `NULL` / `0` → their derived totals do not change. `down()` drops both. |
 | `2026_11_04_020000_restrict_credit_note_original_invoice_delete` | `original_invoice_id`: `SET NULL` → `RESTRICT` (PostgreSQL) | **Pre-checks first**: a *dangling* reference aborts the migration with a clear message (nothing rewritten); cross-tenant / other-customer / non-posted-source / draft-without-line-links counts are **logged, not modified**. SQLite DDL is skipped on purpose (same precedent as `2026_08_31_020000`: a table rebuild drops the partial numbering indexes); the app-level guard below covers both drivers. `down()` restores `SET NULL`. |
-| `2026_11_04_030000_pin_standalone_credit_notes_for_existing_tenants` | JSON update of `tenants.settings` | Idempotent; explicit values untouched; no accounting table touched. |
+| `2026_11_04_030000_pin_standalone_credit_notes_for_existing_tenants` | JSON update of `tenants.settings` | Idempotent; explicit values untouched; no accounting table touched; `down()` removes only what it pinned (marker). |
+| `2026_11_05_010000_create_credit_note_legacy_reviews` | new table — append-only finance review decisions (overlay) | additive; no existing row touched; `down()` drops the table only. |
 
 `InvoiceService::deleteDraft` now refuses (clear message) to delete a draft invoice that a historic note references, instead of surfacing a DB error.
 
@@ -96,9 +132,16 @@ _See the PR file list; summary below._
 | `tests/Feature/CreditNoteSourceVatAccuracyTest.php` | **new** — 41 tests |
 | `tests/Feature/CreditNoteMigrationPolicyTest.php` | **new** — 7 tests (existing/new tenants, rollback, historical references) |
 | `tests/Feature/CreditNoteSourcePostgresTest.php` | **new** — 7 tests (PostgreSQL: restrict rule, rollback, real forked concurrency) |
+| `app/Services/Accounting/SourceInvoiceLock.php`, `PosReturnService.php`, `PosExchangeService.php` | one lock order (invoice → branch → tenant) for POS return / exchange |
+| `app/Models/CreditNoteLegacyReview.php`, `app/Services/Accounting/CreditNoteLegacyReviewService.php`, `app/Console/Commands/{ReviewLegacyCreditNotes,ResolveLegacyCreditNote,LegacyCreditNoteCommandSupport}.php`, migration `2026_11_05_010000…` | legacy-credit finance review path (append-only overlay) |
+| `ReturnSourceAllocator.php` (`legacyCreditLines`, `unresolvedLegacyCounts`, `assertNoUnresolvedLegacyCredits`), `CreditNoteService.php`, `ReturnService.php`, `PosReturnService.php`, `ReturnSourcesController.php`, `ReturnableController.php` | targeted block + `blocked_reason = legacy_credit_review` |
+| `web/src/components/credit-notes/{credit-note-form,credit-note-linked-form}.tsx`, `invoice-linked.ts` (+ test), `web/src/app/(app)/credit-notes/new/page.tsx`, `web/src/app/(app)/invoices/[id]/page.tsx`, `web/src/messages/{ar,en}.json` | invoice-linked credit-note screen, deep link, invoice action |
+| `tests/Feature/CreditNotePosLockOrderPostgresTest.php` | **new** — 4 PostgreSQL tests (real POS service, forked processes, deadlock stress) |
+| `tests/Feature/CreditNoteLegacyBlockTest.php` | **new** — 11 tests (block, review path, isolation, append-only) |
+| `docs/audits/AWJ-TAX-REM-02-PRINT-AMOUNTS-NOTE.md`, `docs/audits/ADR-E2-PRICE-ADJUSTMENT-CREDIT-NOTES.md` | documentation only |
 | existing credit-note tests (`CreditNoteTest`, `…SourceOwnershipTest`, `…PostingOwnershipTest`, `CustomerRefundTest`, `DebitNoteTest`, `DocumentHttpVariantsTest`, `InteractsWithApi`) | mechanical: standalone-note tests opt in to the policy; invoice-source tests now use a *posted* invoice and a source line |
 
-No change to `LedgerService`, `InventoryService`, `PaymentService`, ZATCA, or any posted document. **No e-invoicing of credit notes (REM-18).** Web changes limited to the credit-note document builder mapping and the standalone-notes toggle on the sales-settings page.
+No change to `LedgerService`, `InventoryService`, `PaymentService`, ZATCA, or any posted document. **No e-invoicing of credit notes (REM-18).**
 
 ## 7. Tests
 
@@ -122,11 +165,17 @@ No change to `LedgerService`, `InventoryService`, `PaymentService`, ZATCA, or an
 | Migration rollback / history | `the_columns_migration_is_additive_and_rolls_back…`, `rolling_the_policy_back…`, `the_restrict_migration_passes_on_clean_data_and_leaves_historical_mismatches_untouched`, `…refuses_to_run_over_a_dangling_reference`, `the_restrict_rule_rolls_back_to_set_null_and_forward_again` (PostgreSQL) |
 | Historic drafts / immutability | `a_historic_invoice_linked_draft_without_line_links_is_rederived_on_post`, `a_historic_draft_that_cannot_be_mapped_is_refused…`, `posted_notes_are_never_rewritten_by_later_activity` |
 | Concurrency (PostgreSQL, forked processes) | 2 concurrent full posts → 1 wins; 3 concurrent 1-unit posts → Σ exact (26 090 / 3 913 / 30 003); note vs return of the same units → exactly one; 2 notes + 2 returns mixed → Σ exact |
+| POS vs note lock order (PostgreSQL, real `PosReturnService::create`, forked) | `CreditNotePosLockOrderPostgresTest` ×4: POS return vs note, keyed and non-keyed POS path, POS exchange, deadlock stress (4 rounds) — exactly one consumer wins, Σ never exceeds the invoice, no `40P01` |
+| Reduced-price hold-back on every path | note→API return, API return→note, note→note, note→POS final part, returnable screen flag, seeded random mixed sequences (Σ never exceeds the invoice; withheld amount stays withheld) |
+| Legacy unattributable credits | `CreditNoteLegacyBlockTest` ×11: block on notes / returns / POS returns / quotes, `blocked_reason = legacy_credit_review`, resolve `attributed` / `not_applicable`, mandatory reason, tenant-scoped reviewer, append-only overlay, other invoices unaffected |
+| Invoice-linked web flow | `invoice-linked.test.ts` ×13 (vitest) + `from-credit-note.test.ts`; web build |
 | Ledger + VAT balance | `assertBalanced` / `assertBooksBalanced` in the accuracy tests; `2120` Dr = charged VAT asserted |
 
 **Evidence the tests bite**
 * Against the original `CreditNoteService`: 29 of 34 accuracy tests failed (the rest are guards that hold either way).
 * PostgreSQL concurrency with the invoice-row lock removed: 3–4 of the 7 PostgreSQL tests fail on every run; with the lock: 7/7 pass on 3 consecutive runs.
+* POS lock order: without `SourceInvoiceLock` in the POS paths 3 of 4 `CreditNotePosLockOrderPostgresTest` tests fail (cap exceeded); with the lock taken *after* the branch lock PostgreSQL raises `40P01` (deadlock); with invoice → branch the class passes 6/6 consecutive runs.
+* Legacy block: with the `assertNoUnresolvedLegacyCredits` calls removed the block tests fail (mutation checked on SQLite).
 
 **Runs** — see §8.
 
@@ -140,25 +189,29 @@ No change to `LedgerService`, `InventoryService`, `PaymentService`, ZATCA, or an
 | New PostgreSQL class (`CreditNoteSourcePostgresTest`), PG 16 | 7 ✅ — repeated 3× with the lock in place; 3–4 fail without it |
 | Credit/debit-note + refund + document + return + invoice-API related set, SQLite | 588 passed (the only failures were R2/AWS-SDK tests caught by my broad filter, and two `ProductReferenceRegistryTest` cases that pass alone) |
 | Same related set, PostgreSQL | 368 passed; 7 `ApiInvoiceTest` failures were the known migration-DDL collision between sessions — class alone: **25/25 pass** |
-| Full suite, SQLite | 5 897 passed · 69 skipped · 125 failed — all in classes unrelated to this change: Fuel (`bcmul()` missing, no `bcmath`), StorefrontMedia/ProductMedia/R2 (AWS SDK missing), AuthRecovery/UserInvitation/ResendMail (mail transport), plus 5 "database is locked" from running two suites at once. None touches credit notes, returns, invoices or the ledger. |
-| Full suite, PostgreSQL (same unrelated families excluded; R2 tests hang on network here) | 5 780 passed · 1 skipped · 5 failed: `AccountManagementTest` (1 DDL deadlock + 2 cascaded) and `CashDrawerBridgeTest` ×2 — both classes **pass alone (14/14)** |
+| New classes, final round | SQLite: `CreditNoteSourceVatAccuracyTest` + `CreditNoteLegacyBlockTest` + `CreditNoteMigrationPolicyTest` + ownership classes all green · PostgreSQL: `CreditNoteSourcePostgresTest` 7 ✅, `CreditNotePosLockOrderPostgresTest` 4 ✅ (6 consecutive runs) |
+| Full suite, SQLite (final head) | 5 677 passed · 72 skipped · 92 failed. 88 of the failures were collateral of running two suites at once ("database is locked" / missing table on the shared SQLite file); the credit-note, contract, cost-centre, contact and company classes **all pass when re-run alone** (264 passed). The 4 remaining failures are `StorefrontSliderTest` media-upload cases (no AWS SDK in the sandbox; arrived with the merge of `main`, unrelated to credit notes) |
+| Full suite, PostgreSQL (final head) | 5 828 passed · 1 skipped · 12 failed: 11 × `StorefrontSliderTest` / `StorefrontSectionDesignTest` (same sandbox limitation, from `main`) and `ImportJobApplyTest` (concurrent-run timing) — **`ImportJobApplyTest` passes alone 14/14**. No credit-note, return, POS, invoice or ledger test fails |
 
 **CI on the head commit** — `6aca2887b473098bb76f2c7f76baa5239a4a6b47` (code identical to `1f1c5ba`): `php artisan test (L11, sqlite)` ✅ · `php artisan test (L11, pgsql)` ✅ · `web build (Next.js)` ✅ — full suites, both the push and the pull-request runs.
 
-## 9. Risks / not done on purpose
+## 9. What remains (risks / not done on purpose)
 
-1. **Quantity is consumed by price-only notes.** The cap is cumulative in *quantity* as well as net/VAT (as for returns). A series of reduced-price notes against a single unit (e.g. two 20 % rebates on a 1-unit line) is refused after the first one even though value remains. Alternative: a value-only cap for notes below invoiced price — an owner/product decision, deliberately not guessed.
-2. **Note vs POS return race.** (Derivation is now consistent — POS returns count posted notes — but the *concurrency* gap remains.) POS returns take the branch lock, not the invoice lock (REM-01's deliberate choice to keep lock order consistent). A note posted concurrently with a POS return of the same line is not serialized with it; the net/VAT clamp at post prevents any over-credit of value, but a quantity could in theory be double-counted in that narrow window. Same residual risk REM-01 recorded for POS-vs-API returns.
-3. **Historic posted notes without line links.** Posted notes from before this change have `source_line_id = NULL`. The cap counts them at read time (no posted row is modified) when their product is the **single** matching line of the invoice; a legacy line with no product, or whose product repeats in the invoice, cannot be attributed without guessing and is **not** counted — the restrict migration logs how many lines have no product so Finance can review. (Before this PR no cap existed at all, so this is not a regression.)
-4. **Historic invoice-linked drafts** that cannot be bound to exactly one invoice line (or whose price exceeds the invoice's) will be refused at post and there is no draft-delete endpoint for credit notes; Finance would have to recreate them. The restrict migration logs how many such drafts exist per database.
-5. **Web credit-note form is still standalone-only.** New tenants (default: source required) must switch on «Standalone credit notes» in Sales settings (toggle added in this PR) before the existing form works; the form does not yet pick an invoice or send `source_line_id`. An invoice-linked credit-note form is the follow-up web slice.
-6. **Standalone notes stay uncapped and exclusive-only** by design of ADR-E Option A — the setting is the control.
-7. **SQLite keeps the old FK action** (`SET NULL`) at DB level; production (PostgreSQL) is `RESTRICT`. SQLite is test-only; the service-level guard covers the draft-invoice case on both.
-8. **Pre-existing SQLite-only quirk** (documented in REM-01): the branch-less unique numbering index on `credit_notes` lost its `WHERE branch_id IS NULL` predicate, so two branches cannot reuse a number on SQLite; the branch test passes explicit numbers.
-9. **Multi-invoice notes (R1-117)** are not implemented; per-line `source_line_id` keeps the design compatible with a later note↔invoice link table (REM-18).
-11. **Printed line equation is exact only at line-net and document level.** The document model has no discount or line-net column, and the per-unit price is a rounded display value. So for a discounted line (unit price × quantity − discount) or a multi-unit inclusive line whose per-unit tax rounds differently from the aggregate (e.g. 7 × 0.01 at 15 %), the visible `unit price × qty + tax` can differ from the line total by the discount or a few halalas. What always reconciles: each line's `line_total = net + tax` and the document's subtotal / tax / total. Invoices carry the same limitation. A line-net/discount column is a document-template change outside REM-02 (Codex print threads left open for the owner).
-10. **Branch checks on `show`/`post` are new** for credit notes: a branch-restricted user now gets 404 for a note of a branch they cannot access (`canAccessBranch(null)` is false for restricted users, so legacy null-branch notes are also hidden from them — same as customer refunds).
+**Resolved in the pre-merge round** (were open before): POS-vs-note race (§0.2), legacy unattributable credits (block + review path), invoice-linked creation path, reduced-price hold-back on every path.
 
-## 10. Recommended next step
+1. **Price-only notes still consume quantity** (two 20 % rebates on a 1-unit line: the second is refused although value remains). Unchanged on purpose — decision pending in `ADR-E2-PRICE-ADJUSTMENT-CREDIT-NOTES.md`; it can never over-credit.
+2. **Printed row equation** is exact at line-net and document level only (discount / per-unit rounding). Smallest independent fix documented in `AWJ-TAX-REM-02-PRINT-AMOUNTS-NOTE.md`; not implemented (owner: no template redesign here).
+3. **Finance review path is CLI-only.** `credit-notes:legacy-review/-resolve` need an operator with shell access; there is no web screen. Decisions are append-only: a *wrong* decision is corrected by an operational procedure, not by the app. Count of affected lines is logged by migration `…020000` (`posted_invoice_note_lines_without_product`) so the blast radius is known before deploy.
+4. **Deadlock watch.** The lock-order change was verified with 6×4 rounds of mixed forked POS/note/API postings and a negative control (reverse order deadlocks), but production traffic is the real test: watch PostgreSQL for `40P01` after deploy; rollback = revert the three `SourceInvoiceLock::acquire` calls.
+5. **Web invoice-linked screen is unit-tested, not browser-tested** (vitest on the pure logic; `tsc` clean; build in CI). The Arabic wording of the `legacy_credit_review` message is mine and should be confirmed by the owner.
+6. **Historic invoice-linked drafts** that cannot be bound to exactly one invoice line (or whose price exceeds the invoice's) are refused at post; there is no draft-delete endpoint for credit notes. Migration `…020000` logs how many exist.
+7. **Standalone notes stay uncapped and exclusive-only** by design of ADR-E Option A — the setting is the control.
+8. **SQLite keeps the old FK action** (`SET NULL`); production PostgreSQL is `RESTRICT`. The service-level guard covers the draft-invoice case on both.
+9. **Pre-existing SQLite-only quirk** (REM-01): branch-less unique numbering index on `credit_notes` lost its `WHERE` predicate; the branch test passes explicit numbers.
+10. **Multi-invoice notes (R1-117)** not implemented; per-line `source_line_id` keeps the design compatible with a later note↔invoice link table (REM-18).
+11. **Branch checks on `show`/`post`** are new for credit notes: a branch-restricted user now gets 404 for a note of a branch they cannot access (legacy null-branch notes are hidden from restricted users, as for customer refunds).
+12. **Pre-existing lock-order risks outside these paths** (e.g. a transaction that takes a numbering anchor and *then* locks an existing invoice for payment allocation) are unchanged by this PR.
 
-Owner review of the PR (focus: `CreditNoteService::deriveFromInvoice` / `post()` lock placement, `ReturnSourceAllocator::returned()`, and migration `…020000`), then decide risk 1 (quantity consumption by price-only notes) and the web follow-up (setting toggle + invoice-linked credit-note form).
+## 10. Readiness decision
+
+@@READINESS@@
