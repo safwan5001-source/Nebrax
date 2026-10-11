@@ -84,7 +84,7 @@ function pictureStatusOf(slide: SliderSlide, ctx: DesignContext, bounds: Backgro
 }
 
 const iconButton =
-  "inline-flex size-9 items-center justify-center text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900 disabled:text-neutral-300 disabled:hover:bg-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 md:size-8";
+  "inline-flex size-11 items-center justify-center text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900 disabled:text-neutral-300 disabled:hover:bg-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 md:size-8";
 
 export function SliderFields({
   content,
