@@ -5,6 +5,11 @@ async function loadShelf(
   fetchProductsByIds: ReturnType<typeof vi.fn>,
   productIds: string[] = ["p1"],
   themePreset?: "awj-market",
+  shelf: {
+    hideTitle?: boolean;
+    columns?: 2 | 3 | 4;
+    layout?: "grid" | "rail";
+  } = {},
 ) {
   vi.resetModules();
   vi.doMock("@/components/products/ProductCard", () => ({
@@ -39,6 +44,7 @@ async function loadShelf(
     title: "مميز",
     headingId: "featured-1",
     themePreset,
+    ...shelf,
   });
 }
 
@@ -125,5 +131,57 @@ describe("FeaturedShelf — CUST-H4-5 batched read", () => {
     const carousel = rendered.getByTestId("product-carousel");
     expect(carousel.dataset.ids).toBe("p1,p3");
     expect(carousel.dataset.count).toBe("2");
+  });
+
+  it("CUST-HV V9d-3: a hidden title stays as the section's accessible name, visually hidden", async () => {
+    const fetchProductsByIds = vi.fn().mockResolvedValue([{ id: "p1" }]);
+    const hidden = render(
+      (await loadShelf(fetchProductsByIds, ["p1"], undefined, {
+        hideTitle: true,
+      })) as React.JSX.Element,
+    );
+    const heading = hidden.container.querySelector("h2") as HTMLElement;
+    expect(heading.id).toBe("featured-1");
+    expect(heading.textContent).toBe("مميز");
+    expect(heading.className).toContain("sr-only");
+    expect(
+      hidden.container
+        .querySelector("section")
+        ?.getAttribute("aria-labelledby"),
+    ).toBe("featured-1");
+    hidden.unmount();
+    const shown = render(
+      (await loadShelf(fetchProductsByIds)) as React.JSX.Element,
+    );
+    expect(shown.container.querySelector("h2")?.className).not.toContain(
+      "sr-only",
+    );
+  });
+
+  it("CUST-HV V9d-2: an explicit layout and the column count reach the shelf", async () => {
+    const fetchProductsByIds = vi
+      .fn()
+      .mockResolvedValue([{ id: "p1" }, { id: "p2" }]);
+    const rail = render(
+      (await loadShelf(fetchProductsByIds, ["p1", "p2"], undefined, {
+        layout: "rail",
+      })) as React.JSX.Element,
+    );
+    expect(
+      rail.container.querySelector('[data-testid="product-carousel"]'),
+    ).not.toBeNull();
+    rail.unmount();
+    const grid = render(
+      (await loadShelf(fetchProductsByIds, ["p1", "p2"], "awj-market", {
+        layout: "grid",
+        columns: 3,
+      })) as React.JSX.Element,
+    );
+    expect(
+      grid.container.querySelector('[data-testid="product-carousel"]'),
+    ).toBeNull();
+    const cls = grid.container.querySelector("ul")?.className ?? "";
+    expect(cls).toContain("sm:grid-cols-3");
+    expect(cls).not.toContain("lg:grid-cols-4");
   });
 });

@@ -1227,6 +1227,48 @@ input[type="search"]::-webkit-search-cancel-button {
 [data-gt~="shd"] :where([class~="rounded-store"][class~="bg-store-surface"]) {
   box-shadow: var(--gt-shd);
 }
+/* CUST-HV V9d-1 — card tokens (V0 §14.1). Product and offer cards carry stable hooks (`data-card`, `data-card-image`, `data-card-body`,
+   `data-card-price`); a token is a validated custom property, so the nearest scope's value wins by inheritance. Defaults emit nothing:
+   without these tokens a card is exactly what it was (start-aligned body, a height-sized cover image, a soft shadow and a 3 % image zoom). */
+[data-gt~="cd-al"] [data-card-body],
+[data-sd~="cd-al"] [data-card-body] {
+  text-align: var(--cd-al);
+}
+[data-gt~="cd-al"] [data-card-price],
+[data-sd~="cd-al"] [data-card-price] {
+  justify-content: var(--cd-al);
+}
+[data-gt~="cd-ir"] [data-card-image],
+[data-sd~="cd-ir"] [data-card-image] {
+  height: auto;
+  aspect-ratio: var(--cd-ir);
+}
+[data-gt~="cd-if"] [data-card-image] img,
+[data-sd~="cd-if"] [data-card-image] img {
+  object-fit: var(--cd-if);
+}
+[data-gt~="cd-hv"] [data-card],
+[data-sd~="cd-hv"] [data-card] {
+  transition-property: box-shadow, translate;
+}
+[data-gt~="cd-hv"] [data-card]:is(:hover, :focus-within),
+[data-sd~="cd-hv"] [data-card]:is(:hover, :focus-within) {
+  box-shadow: var(--cd-hs);
+  translate: 0 var(--cd-hl);
+}
+[data-gt~="cd-hv"] [data-card]:hover [data-card-image] img,
+[data-sd~="cd-hv"] [data-card]:hover [data-card-image] img {
+  scale: var(--cd-hz);
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-gt~="cd-hv"] [data-card]:is(:hover, :focus-within),
+  [data-sd~="cd-hv"] [data-card]:is(:hover, :focus-within),
+  [data-gt~="cd-hv"] [data-card]:hover [data-card-image] img,
+  [data-sd~="cd-hv"] [data-card]:hover [data-card-image] img {
+    translate: none;
+    scale: 1;
+  }
+}
 /* motion — duration / easing of the components' own transitions; static under reduced motion */
 [data-gt~="mo-d"] :where([class*="transition"]) {
   transition-duration: var(--gt-md);

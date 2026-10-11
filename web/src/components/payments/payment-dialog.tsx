@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useRef } from 'react';
+import { createIdempotencyGuard } from '@/lib/idempotency';
 import { useTranslations } from 'next-intl';
 import { Dialog } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -48,6 +49,7 @@ export function PaymentDialog({
   const [amount, setAmount] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const idempotency = useRef(createIdempotencyGuard());
 
   useEffect(() => {
     if (!open) return;
@@ -132,8 +134,13 @@ export function PaymentDialog({
       body[direction === 'received' ? 'invoice_id' : 'purchase_id'] = docId;
     }
     try {
-      const created = await api<{ data: { id: string } }>('/payments', { method: 'POST', body });
+      const created = await api<{ data: { id: string } }>('/payments', {
+        method: 'POST',
+        body,
+        headers: { 'Idempotency-Key': idempotency.current.keyFor(body) },
+      });
       await api(`/payments/${created.data.id}/post`, { method: 'POST' });
+      idempotency.current.done();
       success(tc('created'));
       setPartnerId('');
       setAmount('');

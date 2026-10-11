@@ -75,6 +75,11 @@ export const GLOBAL_RADII = ["none", "sm", "md", "lg", "pill"] as const;
 export const GLOBAL_BORDER_WIDTHS = ["none", "hairline", "medium"] as const;
 export const GLOBAL_SHADOWS = ["none", "soft", "medium", "strong"] as const;
 export const GLOBAL_CONTENT_WIDTHS = ["narrow", "standard", "wide"] as const;
+/** CUST-HV V9d-1 (V0 §14.1) — card tokens. `density` is the existing `productCard` control and `radius` / `border` / `shadow` are `surfaces`. */
+export const GLOBAL_CARD_ALIGNS = ["start", "center"] as const;
+export const GLOBAL_CARD_IMAGE_RATIOS = ["1:1", "4:3", "3:4"] as const;
+export const GLOBAL_CARD_IMAGE_FITS = ["cover", "contain"] as const;
+export const GLOBAL_CARD_HOVERS = ["none", "lift", "zoom"] as const;
 export const GLOBAL_DURATIONS = ["instant", "fast", "base", "slow"] as const;
 export const GLOBAL_EASINGS = ["standard", "emphasized"] as const;
 
@@ -108,6 +113,18 @@ export interface GlobalSurfaces {
   shadow?: (typeof GLOBAL_SHADOWS)[number];
 }
 
+/**
+ * CUST-HV V9d-1 (V0 §14.1) — what a product / offer card shows beyond its chrome. Absent = today's card: a start-aligned body, an image
+ * frame sized by height (cover), a soft shadow and a 3 % image zoom on hover. Every value changes only presentation of data the Commerce
+ * layer already produced (position, shape, crop, motion) — nothing here can set, hide or restate a price, discount, stock or availability.
+ */
+export interface GlobalCards {
+  align?: (typeof GLOBAL_CARD_ALIGNS)[number];
+  imageRatio?: (typeof GLOBAL_CARD_IMAGE_RATIOS)[number];
+  imageFit?: (typeof GLOBAL_CARD_IMAGE_FITS)[number];
+  hover?: (typeof GLOBAL_CARD_HOVERS)[number];
+}
+
 export interface GlobalLayout {
   contentWidth?: (typeof GLOBAL_CONTENT_WIDTHS)[number];
 }
@@ -121,6 +138,7 @@ export interface GlobalTokensDoc {
   typography?: GlobalTypography;
   buttons?: GlobalButtons;
   surfaces?: GlobalSurfaces;
+  cards?: GlobalCards;
   layout?: GlobalLayout;
   motion?: GlobalMotion;
 }
@@ -150,8 +168,22 @@ function pickFields(
 }
 
 /**
+ * CUST-HV V9d-1/2 — the card tokens of a raw value: a closed list per field, one invalid field never costs the valid ones, an empty
+ * group is `undefined`. Used for the document's `cards` and for a section's own override (`design.cards`).
+ */
+export function normalizeGlobalCards(raw: unknown): GlobalCards | undefined {
+  const cards = pickFields(raw, [
+    ["align", GLOBAL_CARD_ALIGNS],
+    ["imageRatio", GLOBAL_CARD_IMAGE_RATIOS],
+    ["imageFit", GLOBAL_CARD_IMAGE_FITS],
+    ["hover", GLOBAL_CARD_HOVERS],
+  ]);
+  return cards ? (cards as GlobalCards) : undefined;
+}
+
+/**
  * Normalises the four global-token keys of a raw presentation document. Returns only the
- * keys that survive, in a fixed canonical order (typography, surfaces, layout, motion).
+ * keys that survive, in a fixed canonical order (typography, buttons, surfaces, cards, layout, motion).
  */
 export function normalizeGlobalTokens(
   raw: Record<string, unknown>,
@@ -208,6 +240,9 @@ export function normalizeGlobalTokens(
       surfaces.shadow = radiusAndShadow.shadow as GlobalSurfaces["shadow"];
     out.surfaces = surfaces;
   }
+
+  const cards = normalizeGlobalCards(raw.cards);
+  if (cards) out.cards = cards;
 
   const layout = pickFields(raw.layout, [
     ["contentWidth", GLOBAL_CONTENT_WIDTHS],
@@ -392,6 +427,56 @@ export interface ResolvedGlobalTokens {
   style: Record<string, string>;
 }
 
+const CARD_RATIO: Record<string, string> = {
+  "1:1": "1 / 1",
+  "4:3": "4 / 3",
+  "3:4": "3 / 4",
+};
+/** What a card does on hover: `--cd-hs` (box shadow), `--cd-hl` (lift) and `--cd-hz` (image zoom). Absent = today's soft shadow + 3 % zoom. */
+const CARD_HOVER: Record<
+  string,
+  { shadow: string; lift: string; zoom: string }
+> = {
+  none: { shadow: "none", lift: "0px", zoom: "1" },
+  lift: { shadow: SHADOW.medium, lift: "-4px", zoom: "1" },
+  zoom: { shadow: "none", lift: "0px", zoom: "1.06" },
+};
+
+/**
+ * CUST-HV V9d-1 — the card tokens as the stylesheet's inputs: a token list (`cd-al` …) and validated `--cd-*` custom properties, written onto
+ * `style` and returned as tokens. Shared by the document-level resolver and (V9d-2) a section's own override, so the nearest scope wins by
+ * plain custom-property inheritance. At the document level `start` alignment and `cover` fit are today's behaviour and emit nothing;
+ * in a SECTION's own override they are written out, because there they must win over a store-wide `center` / `contain`.
+ */
+export function resolveCardTokens(
+  cards: GlobalCards | undefined,
+  style: Record<string, string>,
+  scope: "document" | "section" = "document",
+): string[] {
+  const tokens: string[] = [];
+  if (!cards) return tokens;
+  if (cards.align && (cards.align === "center" || scope === "section")) {
+    style["--cd-al"] = cards.align;
+    tokens.push("cd-al");
+  }
+  if (cards.imageRatio && CARD_RATIO[cards.imageRatio]) {
+    style["--cd-ir"] = CARD_RATIO[cards.imageRatio];
+    tokens.push("cd-ir");
+  }
+  if (cards.imageFit && (cards.imageFit === "contain" || scope === "section")) {
+    style["--cd-if"] = cards.imageFit;
+    tokens.push("cd-if");
+  }
+  if (cards.hover && CARD_HOVER[cards.hover]) {
+    const hover = CARD_HOVER[cards.hover];
+    style["--cd-hs"] = hover.shadow;
+    style["--cd-hl"] = hover.lift;
+    style["--cd-hz"] = hover.zoom;
+    tokens.push("cd-hv");
+  }
+  return tokens;
+}
+
 /**
  * The one pure function from the document's global tokens to the theme wrapper's
  * attributes and variables. `null` = nothing to apply (the wrapper is exactly as before).
@@ -501,6 +586,8 @@ export function resolveGlobalTokens(
       gt.push("shd");
     }
   }
+
+  gt.push(...resolveCardTokens(doc.cards, style));
 
   const width = doc.layout?.contentWidth;
   if (width && CONTENT_MAX[width]) {

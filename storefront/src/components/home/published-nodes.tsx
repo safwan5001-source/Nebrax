@@ -42,10 +42,15 @@ import {
   deliveryPromiseContentOf,
   discoveryContentOf,
   featuredContentOf,
+  newArrivalsContentOf,
   offersContentOf,
   productShelfContentOf,
 } from "@/lib/presentation/section-content";
-import type { BenefitsLayout } from "@/lib/presentation/section-design";
+import type {
+  BenefitsLayout,
+  ShelfColumns,
+  ShelfLayout,
+} from "@/lib/presentation/section-design";
 import {
   type DesignContext,
   resolveSectionDesign,
@@ -242,17 +247,38 @@ async function pushSectionNode(
     const node = ctx.implemented[section.type];
     // The hero's content-box marker is emitted only while a design frame is active, so an
     // undesigned hero stays byte-identical to its legacy output.
+    // CUST-HV V9d-2 — the new-arrivals shelf is built once by the page; the section's own `layout` / `columns` reach it here.
     const rendered =
       framed && section.type === "hero" && isValidElement(node)
         ? cloneElement(node as React.ReactElement<{ designed?: boolean }>, {
             designed: true,
           })
-        : node;
+        : section.type === "newArrivals" &&
+            (section.design?.layout ||
+              section.design?.columns ||
+              newArrivalsContentOf(section).title ||
+              newArrivalsContentOf(section).showTitle === false) &&
+            isValidElement(node)
+          ? cloneElement(
+              node as React.ReactElement<{
+                layout?: ShelfLayout;
+                columns?: ShelfColumns;
+                title?: string;
+                hideTitle?: boolean;
+              }>,
+              {
+                layout: section.design?.layout as ShelfLayout | undefined,
+                columns: section.design?.columns,
+                title: newArrivalsContentOf(section).title,
+                hideTitle: newArrivalsContentOf(section).showTitle === false,
+              },
+            )
+          : node;
     nodes.push(
       framed ? (
         <Fragment key={section.id}>{rendered}</Fragment>
       ) : (
-        <div key={section.id}>{ctx.implemented[section.type]}</div>
+        <div key={section.id}>{rendered}</div>
       ),
     );
     return;
@@ -389,9 +415,12 @@ async function pushSectionNode(
         basePath={ctx.basePath}
         locale={ctx.locale}
         currency={ctx.currency}
-        title={ctx.featuredTitle}
+        title={content.title || ctx.featuredTitle}
+        hideTitle={content.showTitle === false}
         headingId={`featured-${section.id}`}
         themePreset={ctx.themePreset}
+        layout={section.design?.layout as ShelfLayout | undefined}
+        columns={section.design?.columns}
       />,
     );
     return;
@@ -400,7 +429,8 @@ async function pushSectionNode(
     // CUST-H4-7 — real Offers. The stored ids are references to
     // `storefront_offers`; liveness, prices and the discount come from the
     // Host-resolved `GET /store/v1/offers` inside `OffersShelf`.
-    const offerIds = offersContentOf(section).offerIds.filter((id) =>
+    const offers = offersContentOf(section);
+    const offerIds = offers.offerIds.filter((id) =>
       /^[a-zA-Z0-9_-]{1,64}$/.test(id),
     );
     if (offerIds.length === 0) return;
@@ -409,8 +439,10 @@ async function pushSectionNode(
         key={section.id}
         offerIds={offerIds}
         basePath={ctx.basePath}
-        title={ctx.offersTitle}
+        title={offers.title || ctx.offersTitle}
+        hideTitle={offers.showTitle === false}
         headingId={`offers-${section.id}`}
+        columns={section.design?.columns}
       />,
     );
     return;
@@ -428,7 +460,10 @@ async function pushSectionNode(
         locale={ctx.locale}
         currency={ctx.currency}
         headingId={`shelf-${section.id}`}
+        hideTitle={content.showTitle === false}
         themePreset={ctx.themePreset}
+        layout={section.design?.layout as ShelfLayout | undefined}
+        columns={section.design?.columns}
       />,
     );
     return;

@@ -28,6 +28,7 @@ import {
   TEXT_NORMAL,
   worstRatioForHex,
 } from "./contrast-engine";
+import { resolveCardTokens } from "./global-tokens";
 import type { MediaRef } from "./media-ref";
 import { type PresentationPalette, resolveRoleHex } from "./palette";
 import type {
@@ -586,6 +587,10 @@ export function resolveSectionDesign(
     sd.push("lh");
   }
   if (ty?.headingStyle) sd.push(`hstyle-${ty.headingStyle}`);
+
+  // CUST-HV V9d-2 (V0 §14.1) — this section's own card tokens: the same validated variables and tokens the document-level resolver
+  // writes, on the section's own frame, so the nearest scope wins by plain custom-property inheritance.
+  sd.push(...resolveCardTokens(design.cards, style, "section"));
 
   const sp = design.spacing;
   if (sp?.top) {

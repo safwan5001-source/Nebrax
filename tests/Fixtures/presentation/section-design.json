@@ -139,6 +139,16 @@
             ],
             "width": true,
             "spacing": true,
+            "layout": [
+                "grid",
+                "rail"
+            ],
+            "columns": [
+                2,
+                3,
+                4
+            ],
+            "cards": true,
             "separator": true
         },
         "featured": {
@@ -154,6 +164,16 @@
             ],
             "width": true,
             "spacing": true,
+            "layout": [
+                "grid",
+                "rail"
+            ],
+            "columns": [
+                2,
+                3,
+                4
+            ],
+            "cards": true,
             "separator": true
         },
         "offers": {
@@ -169,6 +189,12 @@
             ],
             "width": true,
             "spacing": true,
+            "columns": [
+                2,
+                3,
+                4
+            ],
+            "cards": true,
             "separator": true
         },
         "productShelf": {
@@ -184,6 +210,16 @@
             ],
             "width": true,
             "spacing": true,
+            "layout": [
+                "grid",
+                "rail"
+            ],
+            "columns": [
+                2,
+                3,
+                4
+            ],
+            "cards": true,
             "separator": true
         },
         "discovery": {
@@ -3027,6 +3063,309 @@
                 },
                 "motion": {
                     "reveal": "fade-up"
+                }
+            }
+        },
+        {
+            "name": "V9d-2: newArrivals keeps layout grid and rail (both stored: the default depends on the theme)",
+            "type": "newArrivals",
+            "input": {
+                "layout": "rail"
+            },
+            "expected": {
+                "layout": "rail"
+            }
+        },
+        {
+            "name": "V9d-2: newArrivals grid is stored too",
+            "type": "newArrivals",
+            "input": {
+                "layout": "grid"
+            },
+            "expected": {
+                "layout": "grid"
+            }
+        },
+        {
+            "name": "V9d-2: featured keeps layout grid and rail (both stored: the default depends on the theme)",
+            "type": "featured",
+            "input": {
+                "layout": "rail"
+            },
+            "expected": {
+                "layout": "rail"
+            }
+        },
+        {
+            "name": "V9d-2: featured grid is stored too",
+            "type": "featured",
+            "input": {
+                "layout": "grid"
+            },
+            "expected": {
+                "layout": "grid"
+            }
+        },
+        {
+            "name": "V9d-2: productShelf keeps layout grid and rail (both stored: the default depends on the theme)",
+            "type": "productShelf",
+            "input": {
+                "layout": "rail"
+            },
+            "expected": {
+                "layout": "rail"
+            }
+        },
+        {
+            "name": "V9d-2: productShelf grid is stored too",
+            "type": "productShelf",
+            "input": {
+                "layout": "grid"
+            },
+            "expected": {
+                "layout": "grid"
+            }
+        },
+        {
+            "name": "V9d-2: offers has no layout (no offer rail exists yet)",
+            "type": "offers",
+            "input": {
+                "layout": "rail",
+                "spacing": {
+                    "top": "md"
+                }
+            },
+            "expected": {
+                "spacing": {
+                    "top": "md"
+                }
+            }
+        },
+        {
+            "name": "V9d-2: another type's layout variant is dropped on a shelf",
+            "type": "newArrivals",
+            "input": {
+                "layout": "split",
+                "spacing": {
+                    "top": "md"
+                }
+            },
+            "expected": {
+                "spacing": {
+                    "top": "md"
+                }
+            }
+        },
+        {
+            "name": "V9d-2: newArrivals keeps columns 2, 3 and 4 only",
+            "type": "newArrivals",
+            "input": {
+                "columns": 4
+            },
+            "expected": {
+                "columns": 4
+            }
+        },
+        {
+            "name": "V9d-2: featured keeps columns 2, 3 and 4 only",
+            "type": "featured",
+            "input": {
+                "columns": 4
+            },
+            "expected": {
+                "columns": 4
+            }
+        },
+        {
+            "name": "V9d-2: productShelf keeps columns 2, 3 and 4 only",
+            "type": "productShelf",
+            "input": {
+                "columns": 4
+            },
+            "expected": {
+                "columns": 4
+            }
+        },
+        {
+            "name": "V9d-2: offers keeps columns 2, 3 and 4 only",
+            "type": "offers",
+            "input": {
+                "columns": 4
+            },
+            "expected": {
+                "columns": 4
+            }
+        },
+        {
+            "name": "V9d-2: columns out of range and wrong types are dropped",
+            "type": "newArrivals",
+            "input": {
+                "columns": 5,
+                "spacing": {
+                    "top": "md"
+                }
+            },
+            "expected": {
+                "spacing": {
+                    "top": "md"
+                }
+            }
+        },
+        {
+            "name": "V9d-2: columns as a string is dropped",
+            "type": "featured",
+            "input": {
+                "columns": "3",
+                "spacing": {
+                    "top": "md"
+                }
+            },
+            "expected": {
+                "spacing": {
+                    "top": "md"
+                }
+            }
+        },
+        {
+            "name": "V9d-2: columns 3.0 is the number 3 (JSON has one number type)",
+            "type": "productShelf",
+            "input": {
+                "columns": 3
+            },
+            "expected": {
+                "columns": 3
+            }
+        },
+        {
+            "name": "V9d-2: columns on a type without the group is dropped",
+            "type": "benefits",
+            "input": {
+                "columns": 3,
+                "spacing": {
+                    "top": "md"
+                }
+            },
+            "expected": {
+                "spacing": {
+                    "top": "md"
+                }
+            }
+        },
+        {
+            "name": "V9d-2: shelf card tokens keep the closed lists, canonical order",
+            "type": "newArrivals",
+            "input": {
+                "cards": {
+                    "hover": "zoom",
+                    "imageFit": "contain",
+                    "imageRatio": "3:4",
+                    "align": "center"
+                }
+            },
+            "expected": {
+                "cards": {
+                    "align": "center",
+                    "imageRatio": "3:4",
+                    "imageFit": "contain",
+                    "hover": "zoom"
+                }
+            }
+        },
+        {
+            "name": "V9d-2: shelf card tokens drop unknown values one by one",
+            "type": "featured",
+            "input": {
+                "cards": {
+                    "align": "end",
+                    "imageRatio": "16:9",
+                    "hover": "lift"
+                }
+            },
+            "expected": {
+                "cards": {
+                    "hover": "lift"
+                }
+            }
+        },
+        {
+            "name": "V9d-2: shelf card tokens never carry density, radius, shadow or any commerce key",
+            "type": "offers",
+            "input": {
+                "cards": {
+                    "align": "center",
+                    "density": "compact",
+                    "radius": "lg",
+                    "shadow": "strong",
+                    "price": "free",
+                    "discount": 99,
+                    "stock": 0
+                }
+            },
+            "expected": {
+                "cards": {
+                    "align": "center"
+                }
+            }
+        },
+        {
+            "name": "V9d-2: an empty or non-object cards group is dropped",
+            "type": "productShelf",
+            "input": {
+                "cards": [],
+                "spacing": {
+                    "top": "md"
+                }
+            },
+            "expected": {
+                "spacing": {
+                    "top": "md"
+                }
+            }
+        },
+        {
+            "name": "V9d-2: cards on a type without the group is dropped",
+            "type": "customContent",
+            "input": {
+                "cards": {
+                    "align": "center"
+                },
+                "spacing": {
+                    "top": "md"
+                }
+            },
+            "expected": {
+                "spacing": {
+                    "top": "md"
+                }
+            }
+        },
+        {
+            "name": "V9d-2: canonical order puts layout and columns before border and cards after shadow",
+            "type": "newArrivals",
+            "input": {
+                "cards": {
+                    "align": "center"
+                },
+                "separator": {
+                    "top": "line"
+                },
+                "columns": 3,
+                "layout": "rail",
+                "spacing": {
+                    "top": "md"
+                }
+            },
+            "expected": {
+                "spacing": {
+                    "top": "md"
+                },
+                "layout": "rail",
+                "columns": 3,
+                "cards": {
+                    "align": "center"
+                },
+                "separator": {
+                    "top": "line"
                 }
             }
         }

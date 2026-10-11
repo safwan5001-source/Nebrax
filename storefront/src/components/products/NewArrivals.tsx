@@ -3,6 +3,13 @@ import { ProductCard } from "@/components/products/ProductCard";
 import { ProductCarousel } from "@/components/products/ProductCarousel";
 import { PRODUCT_CARD_FIELDS } from "@/lib/data/cached";
 import { cachedListProducts } from "@/lib/data/products";
+import {
+  type ShelfColumns,
+  type ShelfLayout,
+  shelfForm,
+  shelfGridClass,
+  shelfRailBreakpoints,
+} from "@/lib/home/shelf-layout";
 import type { ThemePresetId } from "@/lib/presentation/tokens";
 
 interface NewArrivalsProps {
@@ -13,6 +20,9 @@ interface NewArrivalsProps {
   limit?: number;
   /** See `CategoriesSection`'s identical prop doc for why this is explicit. */
   themePreset?: ThemePresetId;
+  /** CUST-HV V9d-2 — the section design's `layout` / `columns`; absent = the theme's own form and today's columns. */
+  layout?: ShelfLayout;
+  columns?: ShelfColumns;
 }
 
 /**
@@ -33,8 +43,10 @@ export async function NewArrivals({
   currency,
   limit = 8,
   themePreset,
+  layout,
+  columns,
 }: NewArrivalsProps) {
-  const isMarket = themePreset === "awj-market";
+  const rail = shelfForm(layout, themePreset === "awj-market") === "rail";
   const products = await cachedListProducts(
     { limit, sort: "-available_on", fields: PRODUCT_CARD_FIELDS },
     { locale, country },
@@ -68,7 +80,7 @@ export async function NewArrivals({
   // `ProductCarousel` already existed (used nowhere before this) and takes
   // the exact same `Product[]`/`ProductCard` contract this shelf already
   // fetches, so no new data path or component fork is introduced.
-  if (isMarket) {
+  if (rail) {
     return (
       <ProductCarousel
         products={products}
@@ -77,16 +89,13 @@ export async function NewArrivals({
         listId="home_new_arrivals"
         listName="Home — New arrivals"
         slidesPerView={2}
-        breakpoints={{
-          640: { slidesPerView: 3, spaceBetween: 16 },
-          1024: { slidesPerView: 5, spaceBetween: 20 },
-        }}
+        breakpoints={shelfRailBreakpoints(columns)}
       />
     );
   }
 
   return (
-    <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 md:gap-5">
+    <ul className={`grid gap-3 md:gap-5 ${shelfGridClass(columns)}`}>
       {products.map((product, index) => (
         <li key={product.id}>
           <ProductCard

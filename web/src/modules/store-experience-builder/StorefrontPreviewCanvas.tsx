@@ -56,6 +56,7 @@ import {
   benefitsContentOf,
   customContentOf,
   featuredContentOf,
+  newArrivalsContentOf,
   deliveryPromiseContentOf,
   discoveryContentOf,
   offersContentOf,
@@ -272,6 +273,20 @@ const BANNER_CTA_CLASS: Record<CtaStyle, string> = {
   link: "inline-flex h-10 max-w-full items-center px-1 text-sm font-bold text-store-foreground underline decoration-2 underline-offset-4",
   soft: "inline-flex h-10 max-w-full items-center rounded-store bg-store-primary px-4 text-sm font-bold text-store-primary-foreground",
 };
+
+/**
+ * CUST-HV V9d-2 — the attributes a product / offer shelf carries once the merchant chose a `layout` or `columns` in its design: the closed-list
+ * values and the simulated device, which the Canvas-only block of `store-preview.css` turns into the storefront's own column / rail numbers.
+ * No choice ⇒ no attributes ⇒ the legacy preview, byte for byte.
+ */
+function shelfAttrs(design: SectionDesign | undefined, viewport: "desktop" | "tablet" | "mobile"): Record<string, string> {
+  if (!design?.layout && !design?.columns) return {};
+  return {
+    "data-shelf": design.layout === "rail" ? "rail" : "grid",
+    "data-vp": viewport,
+    ...(design.columns ? { "data-cols": String(design.columns) } : {}),
+  };
+}
 
 export function StorefrontPreviewCanvas({
   config,
@@ -912,9 +927,14 @@ export function StorefrontPreviewCanvas({
             }
 
             if (section.type === "newArrivals") {
+              const arrivalsOwn = newArrivalsContentOf(section);
               return (
                 <section key="newArrivals" aria-labelledby="preview-arrivals">
-                  <SectionRule title={t("newArrivals")} action={t("viewAll")} />
+                  <SectionRule
+                    title={arrivalsOwn.title ?? t("newArrivals")}
+                    hideTitle={arrivalsOwn.showTitle === false}
+                    action={t("viewAll")}
+                  />
                   {/* Same "idle" ≡ "loading" rule as the categories section
                       above — see its comment. */}
                   {homeNewArrivalsState === "loading" || homeNewArrivalsState === "idle" ? (
@@ -928,7 +948,7 @@ export function StorefrontPreviewCanvas({
                           className="overflow-hidden rounded-store border border-store-border bg-store-surface"
                         >
                           <div className={cn(cardImageHeight, "animate-pulse bg-store-surface-muted")} />
-                          <div className={cardPad}>
+                          <div data-card-body="" className={cardPad}>
                             <div className="h-3 w-3/4 animate-pulse rounded-store bg-store-surface-muted" />
                           </div>
                         </li>
@@ -958,13 +978,15 @@ export function StorefrontPreviewCanvas({
                       {t("homeNewArrivalsEmpty")}
                     </p>
                   ) : (
-                    <ul className={cn("mt-4 grid gap-3", newArrivalsColumns)}>
+                    <ul className={cn("mt-4 grid gap-3", newArrivalsColumns)} {...shelfAttrs(section.design, viewport)}>
                       {homeNewArrivals.map((product) => (
                         <li
                           key={product.id}
+                          data-card=""
                           className="overflow-hidden rounded-store border border-store-border bg-store-surface"
                         >
                           <div
+                            data-card-image=""
                             className={cn(
                               cardImageHeight,
                               "relative bg-store-surface-muted",
@@ -990,7 +1012,7 @@ export function StorefrontPreviewCanvas({
                               </span>
                             )}
                           </div>
-                          <div className={cardPad}>
+                          <div data-card-body="" className={cardPad}>
                             <p className="line-clamp-2 text-sm font-semibold text-store-foreground">
                               <bdi>{product.name}</bdi>
                             </p>
@@ -1305,9 +1327,15 @@ export function StorefrontPreviewCanvas({
               const resolvedState = ids.length === 0 ? "ready" : (featuredResolvedState[section.id] ?? "idle");
               const products = featuredResolved[section.id] ?? [];
               const headingId = `preview-featured-${section.id}`;
+              const featuredOwn = featuredContentOf(section);
               return (
                 <section key={section.id} aria-labelledby={headingId}>
-                  <h2 id={headingId} className="text-base font-extrabold">{t("sectionFeatured")}</h2>
+                  <h2
+                    id={headingId}
+                    className={cn("text-base font-extrabold", featuredOwn.showTitle === false && "sr-only")}
+                  >
+                    {featuredOwn.title ?? t("sectionFeatured")}
+                  </h2>
                   {resolvedState === "loading" || resolvedState === "idle" ? (
                     <ul
                       aria-hidden="true"
@@ -1319,7 +1347,7 @@ export function StorefrontPreviewCanvas({
                           className="overflow-hidden rounded-store border border-store-border bg-store-surface"
                         >
                           <div className={cn(cardImageHeight, "animate-pulse bg-store-surface-muted")} />
-                          <div className={cardPad}>
+                          <div data-card-body="" className={cardPad}>
                             <div className="h-3 w-3/4 animate-pulse rounded-store bg-store-surface-muted" />
                           </div>
                         </li>
@@ -1347,16 +1375,17 @@ export function StorefrontPreviewCanvas({
                       {t("homeFeaturedEmpty")}
                     </p>
                   ) : (
-                    <ul className={cn("mt-4 grid gap-3", newArrivalsColumns)}>
+                    <ul className={cn("mt-4 grid gap-3", newArrivalsColumns)} {...shelfAttrs(section.design, viewport)}>
                       {ids
                         .map((id) => products.find((product) => product.id === id))
                         .filter((product): product is NonNullable<typeof product> => product !== undefined)
                         .map((product) => (
                           <li
                             key={product.id}
-                            className="overflow-hidden rounded-store border border-store-border bg-store-surface"
+                            data-card=""
+                          className="overflow-hidden rounded-store border border-store-border bg-store-surface"
                           >
-                            <div className={cn(cardImageHeight, "bg-store-surface-muted")}>
+                            <div data-card-image="" className={cn(cardImageHeight, "bg-store-surface-muted")}>
                               {product.thumbnailUrl ? (
                                 // eslint-disable-next-line @next/next/no-img-element -- tenant media URL, not a static asset
                                 <img
@@ -1366,7 +1395,7 @@ export function StorefrontPreviewCanvas({
                                 />
                               ) : null}
                             </div>
-                            <div className={cardPad}>
+                            <div data-card-body="" className={cardPad}>
                               <p className="line-clamp-2 text-sm font-semibold text-store-foreground">
                                 <bdi>{product.name}</bdi>
                               </p>
@@ -1396,9 +1425,15 @@ export function StorefrontPreviewCanvas({
                     offer !== undefined && offer.isLive && offer.product !== null,
                 );
               const headingId = `preview-offers-${section.id}`;
+              const offersOwn = offersContentOf(section);
               return (
                 <section key={section.id} aria-labelledby={headingId}>
-                  <h2 id={headingId} className="text-base font-extrabold">{t("sectionOffers")}</h2>
+                  <h2
+                    id={headingId}
+                    className={cn("text-base font-extrabold", offersOwn.showTitle === false && "sr-only")}
+                  >
+                    {offersOwn.title ?? t("sectionOffers")}
+                  </h2>
                   {resolvedState === "loading" || resolvedState === "idle" ? (
                     <ul
                       aria-hidden="true"
@@ -1410,7 +1445,7 @@ export function StorefrontPreviewCanvas({
                           className="overflow-hidden rounded-store border border-store-border bg-store-surface"
                         >
                           <div className={cn(cardImageHeight, "animate-pulse bg-store-surface-muted")} />
-                          <div className={cardPad}>
+                          <div data-card-body="" className={cardPad}>
                             <div className="h-3 w-3/4 animate-pulse rounded-store bg-store-surface-muted" />
                           </div>
                         </li>
@@ -1445,7 +1480,7 @@ export function StorefrontPreviewCanvas({
                       {t("homeOffersNoneLive")}
                     </p>
                   ) : (
-                    <ul className={cn("mt-4 grid gap-3", newArrivalsColumns)}>
+                    <ul className={cn("mt-4 grid gap-3", newArrivalsColumns)} {...shelfAttrs(section.design, viewport)}>
                       {liveOffers.map((offer) => (
                         <li
                           key={offer.id}
@@ -1453,9 +1488,10 @@ export function StorefrontPreviewCanvas({
                           // `relative` contains the card's sr-only price labels: an absolutely
                           // positioned sr-only span otherwise escapes the clipped preview
                           // scroller and widens the document (horizontal page scroll).
+                          data-card=""
                           className="relative min-w-0 overflow-hidden rounded-store border border-store-border bg-store-surface"
                         >
-                          <div className={cn(cardImageHeight, "relative bg-store-surface-muted")}>
+                          <div data-card-image="" className={cn(cardImageHeight, "relative bg-store-surface-muted")}>
                             {offer.product.thumbnailUrl ? (
                               // eslint-disable-next-line @next/next/no-img-element -- tenant media URL, not a static asset
                               <img
@@ -1473,11 +1509,11 @@ export function StorefrontPreviewCanvas({
                               </span>
                             ) : null}
                           </div>
-                          <div className={cardPad}>
+                          <div data-card-body="" className={cardPad}>
                             <p className="line-clamp-2 break-words text-sm font-semibold text-store-foreground">
                               <bdi>{offerDisplayName(offer, locale)}</bdi>
                             </p>
-                            <p className="mt-1.5 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                            <p data-card-price="" className="mt-1.5 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
                               {offer.offerPrice ? (
                                 <span className="text-sm font-black text-store-primary">
                                   <span className="sr-only">{t("offersOfferPrice")}: </span>
@@ -1552,8 +1588,10 @@ export function StorefrontPreviewCanvas({
               let title = "";
               let note: CustomizerMessageKey = "canvasShelfLive";
               let badge: string | null = null;
+              let hideShelfTitle = false;
               if (section.type === "productShelf") {
                 const shelf = productShelfContentOf(section);
+                hideShelfTitle = shelf.showTitle === false;
                 title = shelf.title.trim();
                 note = "canvasShelfLive";
                 badge = shelf.deliverToday ? t("canvasShelfDeliverToday") : null;
@@ -1575,7 +1613,10 @@ export function StorefrontPreviewCanvas({
                   className="rounded-store border border-dashed border-store-border-strong bg-store-surface px-4 py-5"
                 >
                   <div className="flex items-center justify-between gap-3">
-                    <h2 id={headingId} className="text-sm font-bold text-store-foreground">
+                    <h2
+                      id={headingId}
+                      className={cn("text-sm font-bold text-store-foreground", hideShelfTitle && "sr-only")}
+                    >
                       {title || t(SECTION_TITLE[section.type] ?? "sectionCustomContent")}
                     </h2>
                     {badge ? (
@@ -2318,7 +2359,26 @@ function SelectablePreviewSection({
   );
 }
 
-function SectionRule({ title, action }: { title: string; action: string }) {
+function SectionRule({
+  title,
+  action,
+  hideTitle = false,
+}: {
+  title: string;
+  action: string;
+  /** CUST-HV V9d-3 — the merchant chose not to show the shelf title: it stays as the accessible name, only the action remains visible. */
+  hideTitle?: boolean;
+}) {
+  if (hideTitle) {
+    return (
+      <div data-section-heading="" data-title-hidden="" className="flex items-start justify-end gap-4">
+        <h2 className="sr-only">
+          {title}
+        </h2>
+        <span data-section-action="" className="text-xs font-bold text-store-primary md:text-sm">{action}</span>
+      </div>
+    );
+  }
   return (
     <div data-section-heading="" className="flex items-start justify-between gap-4">
       <div className="flex min-w-0 items-start gap-2">

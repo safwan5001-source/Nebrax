@@ -8,6 +8,11 @@ interface SectionHeadingProps {
   description?: string | null;
   action?: { href: string; label: string } | null;
   children?: ReactNode;
+  /**
+   * CUST-HV V9d-3 — the merchant chose not to show the title: it stays in the DOM, visually hidden, as the section's accessible name
+   * (the `aria-labelledby` target), and only the action link remains visible, on the end edge.
+   */
+  hideTitle?: boolean;
 }
 
 /**
@@ -23,7 +28,22 @@ export function SectionHeading({
   title,
   description,
   action,
+  hideTitle = false,
 }: SectionHeadingProps) {
+  if (hideTitle) {
+    return (
+      <div
+        data-section-heading=""
+        data-title-hidden=""
+        className="flex items-start justify-end gap-4"
+      >
+        <h2 id={id} className="sr-only">
+          {title}
+        </h2>
+        {action ? <HeadingAction action={action} /> : null}
+      </div>
+    );
+  }
   return (
     <div
       data-section-heading=""
@@ -49,27 +69,31 @@ export function SectionHeading({
           )}
         </div>
       </div>
-      {action && (
-        <Link
-          href={action.href}
-          className="mt-0.5 inline-flex shrink-0 items-center gap-1 text-xs font-bold text-store-primary transition-colors hover:text-store-primary-hover md:text-sm"
-        >
-          <span>{action.label}</span>
-          <svg
-            aria-hidden="true"
-            viewBox="0 0 24 24"
-            fill="none"
-            strokeWidth={2.5}
-            className="size-3.5 stroke-current rtl:rotate-180"
-          >
-            <path
-              d="M9 5l7 7-7 7"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-        </Link>
-      )}
+      {action ? <HeadingAction action={action} /> : null}
     </div>
+  );
+}
+
+function HeadingAction({
+  action,
+}: {
+  action: { href: string; label: string };
+}) {
+  return (
+    <Link
+      href={action.href}
+      className="mt-0.5 inline-flex shrink-0 items-center gap-1 text-xs font-bold text-store-primary transition-colors hover:text-store-primary-hover md:text-sm"
+    >
+      <span>{action.label}</span>
+      <svg
+        aria-hidden="true"
+        viewBox="0 0 24 24"
+        fill="none"
+        strokeWidth={2.5}
+        className="size-3.5 stroke-current rtl:rotate-180"
+      >
+        <path d="M9 5l7 7-7 7" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    </Link>
   );
 }
