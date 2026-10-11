@@ -1,0 +1,98 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Support\Commerce\StorefrontPresentationNormalizer;
+use Tests\TestCase;
+
+/**
+ * CUST-HV V9d-4 — جدار التجارة (V0 §14.3): لا حقل عرض يحدّد سعراً أو خصماً أو مخزوناً أو توفراً أو ضريبة أو مبلغاً.
+ *
+ * ثلاثة أبعاد: (١) وثيقة عدائية بمفاتيح تجارية في كل نطاق لا يبقى منها شيء بعد التطبيع، وتوأما TS يثبتان الشيء نفسه من
+ * الملف المشترك؛ (٢) أي مفتاح مسموح في مخرجات التطبيع لا يطابق نمط المفاتيح التجارية؛ (٣) ساكن: طبقة العرض لا تستورد
+ * خدمات السعر/العرض/السلة/المخزون ولا العكس (لا اقتران بين الطبقتين).
+ *
+ * تشغيل: php artisan test --filter=StorefrontCommerceFirewallTest
+ */
+class StorefrontCommerceFirewallTest extends TestCase
+{
+    /** @return array<string,mixed> */
+    private function fixture(): array
+    {
+        return json_decode((string) file_get_contents(__DIR__.'/../Fixtures/presentation/commerce-firewall.json'), true, 512, JSON_THROW_ON_ERROR);
+    }
+
+    /**
+     * @param  array<mixed>  $node
+     * @return list<string>
+     */
+    private function keysOf(array $node): array
+    {
+        $keys = [];
+        foreach ($node as $key => $value) {
+            if (is_string($key)) {
+                $keys[] = $key;
+            }
+            if (is_array($value)) {
+                array_push($keys, ...$this->keysOf($value));
+            }
+        }
+
+        return $keys;
+    }
+
+    /** @test */
+    public function no_commercial_key_survives_normalisation_in_any_scope(): void
+    {
+        $fixture = $this->fixture();
+        $normalized = (new StorefrontPresentationNormalizer)->normalize($fixture['input']);
+        $pattern = '/'.$fixture['forbiddenKeyPattern'].'/i';
+
+        $offending = array_values(array_filter(array_unique($this->keysOf($normalized)), static fn (string $key): bool => preg_match($pattern, $key) === 1));
+        $this->assertSame([], $offending, 'commercial keys leaked into the normalised presentation: '.implode(', ', $offending));
+
+        $json = json_encode($normalized, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE);
+        foreach ($fixture['forbiddenValues'] as $value) {
+            $this->assertStringNotContainsString('"'.$value.'"', $json, "an injected commercial value is reachable: {$value}");
+        }
+    }
+
+    /** @test */
+    public function the_legitimate_parts_of_the_hostile_document_still_normalise(): void
+    {
+        $normalized = (new StorefrontPresentationNormalizer)->normalize($this->fixture()['input']);
+        $sections = $normalized['homepage']['sections'];
+
+        $this->assertSame(['newArrivals', 'featured', 'offers', 'productShelf', 'hero', 'benefits', 'customContent'], array_column($sections, 'type'));
+        $this->assertSame(['align' => 'center', 'imageRatio' => '1:1', 'imageFit' => 'contain', 'hover' => 'lift'], $sections[0]['design']['cards']);
+        $this->assertSame(['offerIds' => ['o1'], 'showTitle' => false], $sections[2]['content']);
+    }
+
+    /** @test */
+    public function the_presentation_layer_is_not_coupled_to_price_offer_cart_or_stock_services(): void
+    {
+        $root = dirname(__DIR__, 2).'/app/Support/Commerce';
+        $files = array_merge(glob($root.'/Storefront*Normalizer.php') ?: [], glob($root.'/*Publish*.php') ?: [], glob($root.'/*Contrast.php') ?: []);
+        $this->assertNotEmpty($files);
+
+        foreach ($files as $file) {
+            $source = (string) file_get_contents($file);
+            $this->assertDoesNotMatchRegularExpression(
+                '/App\\\\(Services\\\\Commerce|Services\\\\Accounting|Models)\\\\\w*(Price|Offer|Cart|Checkout|Order|Inventory|Stock|Ledger|Journal)\w*/',
+                $source,
+                basename($file).' imports a commercial / accounting service or model',
+            );
+        }
+    }
+
+    /** @test */
+    public function the_commercial_services_do_not_read_the_presentation_layer(): void
+    {
+        $services = dirname(__DIR__, 2).'/app/Services/Commerce';
+        foreach (['CommercePriceResolver.php', 'StorefrontOfferResolver.php', 'CommerceCartService.php', 'CommerceCheckoutService.php', 'CommerceOrderService.php'] as $name) {
+            $source = (string) file_get_contents($services.'/'.$name);
+            $this->assertStringNotContainsString('Support\\Commerce\\Storefront', $source, "{$name} must not depend on presentation normalisers");
+            $this->assertStringNotContainsString('presentation', strtolower(preg_replace('#//.*|/\*.*?\*/#s', '', $source) ?? ''), "{$name} must not read the presentation");
+        }
+    }
+}
