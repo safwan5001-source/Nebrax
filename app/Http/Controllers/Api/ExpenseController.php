@@ -10,15 +10,18 @@ use App\Models\ExpenseAttachment;
 use App\Models\ExpenseCategory;
 use App\Models\Partner;
 use App\Services\Accounting\ExpenseService;
+use App\Services\AttachmentStorage;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ExpenseController extends ApiController
 {
-    public function __construct(protected ExpenseService $expenses) {}
+    public function __construct(
+        protected ExpenseService $expenses,
+        protected AttachmentStorage $attachmentStorage,
+    ) {}
 
     public function index(Request $request): JsonResponse
     {
@@ -32,8 +35,11 @@ class ExpenseController extends ApiController
         $data = $request->validated();
         $this->assertReferences($data);
 
-        $expense = $this->domain(fn () => $this->expenses->create($data));
-        $this->storeAttachments($request, $expense);
+        $expense = $this->atomicWithAttachments(
+            $request,
+            $this->attachmentStorage->newResourceId(),
+            fn () => $this->domain(fn () => $this->expenses->create($data)),
+        );
 
         return (new ExpenseResource($expense->load(['account', 'category', 'attachments'])->loadCount('documentTransactionLinks')))->response()->setStatusCode(201);
     }
@@ -54,8 +60,11 @@ class ExpenseController extends ApiController
         $data = $request->validated();
         $this->assertReferences($data);
 
-        $updated = $this->domain(fn () => $this->expenses->update($expense, $data));
-        $this->storeAttachments($request, $updated);
+        $updated = $this->atomicWithAttachments(
+            $request,
+            (string) $expense->id,
+            fn () => $this->domain(fn () => $this->expenses->update($expense, $data)),
+        );
 
         return (new ExpenseResource($updated->load(['account', 'category', 'partner', 'costCenter', 'attachments'])->loadCount('documentTransactionLinks')))->response();
     }
@@ -86,9 +95,8 @@ class ExpenseController extends ApiController
             $expense->delete();
         });
 
-        foreach ($attachments as $attachment) {
-            Storage::disk($attachment->disk)->delete($attachment->path);
-        }
+        // الصف حُذف أولاً (يبقى السجل صحيحاً)؛ فشل حذف الكائن يُسجَّل ولا يُفشل الطلب.
+        $this->attachmentStorage->discard($attachments->all());
 
         return response()->json(['message' => 'deleted']);
     }
@@ -106,15 +114,10 @@ class ExpenseController extends ApiController
     {
         $expense = $this->visibleExpense($request, $id);
         $attachment = $expense->attachments()->whereKey($attachmentId)->firstOrFail();
-        $disk = Storage::disk($attachment->disk);
 
-        if (! $disk->exists($attachment->path)) {
-            abort(404, 'ملف المرفق غير موجود.');
-        }
-
-        return $disk->download($attachment->path, $attachment->original_name, [
-            'Content-Type' => $attachment->mime_type ?? 'application/octet-stream',
-        ]);
+        return $this->attachmentStorage->download(
+            $attachment->disk, $attachment->path, $attachment->original_name, $attachment->mime_type,
+        );
     }
 
     /** المصروفات محاسبية بلا Scope عالمي؛ عرضها وتنفيذ الإجراء عليها يُصفّيان صراحةً بالفرع. */
@@ -143,23 +146,32 @@ class ExpenseController extends ApiController
     }
 
     /**
-     * تُحفَظ الملفات على قرص خاص وتُربط بمسودة المصروف. لا يُقبل من العميل
-     * مسار جاهز، فلا يستطيع ربط مستند بملف يخص مستأجراً أو مصروفاً آخر.
+     * ذرّية الطلب (Q12): الملفات تُكتب أولاً خارج المعاملة، ثم الأب المالي وصفوف المرفقات في
+     * معاملة واحدة. أي فشل يتراجع عنه الأب وصفوفه وقيده (المعاملات الداخلية للخدمة savepoints)
+     * وتُحذف الكائنات المكتوبة، فإعادة الطلب محاولة أولى نظيفة لا تُنتج مصروفاً مكرّراً.
+     * لا يُقبل من العميل مسار جاهز، فلا يستطيع ربط مستند بملف مستأجر أو مصروف آخر.
      */
-    private function storeAttachments(StoreExpenseRequest $request, Expense $expense): void
+    private function atomicWithAttachments(StoreExpenseRequest $request, string $resourceId, \Closure $persistParent): Expense
     {
-        foreach ($request->file('attachments', []) as $file) {
-            $path = $file->store("expenses/{$expense->id}", 'local');
+        $stored = $this->attachmentStorage->putMany(
+            AttachmentStorage::DOMAIN_EXPENSE, $resourceId, $request->file('attachments', []), "expenses/{$resourceId}",
+        );
 
-            ExpenseAttachment::create([
-                'expense_id'    => $expense->id,
-                'disk'          => 'local',
-                'path'          => $path,
-                'original_name' => $file->getClientOriginalName(),
-                'mime_type'     => $file->getMimeType(),
-                'size'          => $file->getSize(),
-                'uploaded_by'   => $request->user()?->id,
-            ]);
+        try {
+            return DB::transaction(function () use ($request, $persistParent, $stored): Expense {
+                $expense = $persistParent();
+                foreach ($stored as $file) {
+                    ExpenseAttachment::create($file + [
+                        'expense_id' => $expense->id,
+                        'uploaded_by' => $request->user()?->id,
+                    ]);
+                }
+
+                return $expense;
+            });
+        } catch (\Throwable $e) {
+            $this->attachmentStorage->discard($stored);
+            throw $e;
         }
     }
 }

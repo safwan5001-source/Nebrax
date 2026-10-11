@@ -14,10 +14,11 @@ use App\Models\PaymentMethod;
 use App\Models\Purchase;
 use App\Services\Accounting\PaymentReversalService;
 use App\Services\Accounting\PaymentService;
+use App\Services\AttachmentStorage;
 use App\Services\ClassificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class PaymentController extends ApiController
@@ -26,6 +27,7 @@ class PaymentController extends ApiController
         protected PaymentService $payments,
         protected PaymentReversalService $paymentReversals,
         protected ClassificationService $classifications,
+        protected AttachmentStorage $attachmentStorage,
     ) {}
 
     /**
@@ -57,10 +59,11 @@ class PaymentController extends ApiController
         }
         $this->assertReferences($data);
 
-        $payment = $this->domain(
-            fn () => $this->payments->create($data, $data['allocations'] ?? [])
+        $payment = $this->atomicWithAttachments(
+            $request,
+            $this->attachmentStorage->newResourceId(),
+            fn () => $this->domain(fn () => $this->payments->create($data, $data['allocations'] ?? [])),
         );
-        $this->storeAttachments($request, $payment);
 
         return (new PaymentResource($payment->load(['partner', 'cashAccount', 'paymentMethod', 'collectorEmployee', 'attachments'])))->response()->setStatusCode(201);
     }
@@ -93,8 +96,11 @@ class PaymentController extends ApiController
         }
         $this->assertReferences($data);
 
-        $updated = $this->domain(fn () => $this->payments->update($payment, $data, $data['allocations'] ?? []));
-        $this->storeAttachments($request, $updated);
+        $updated = $this->atomicWithAttachments(
+            $request,
+            (string) $payment->id,
+            fn () => $this->domain(fn () => $this->payments->update($payment, $data, $data['allocations'] ?? [])),
+        );
 
         return (new PaymentResource($updated->load(['partner', 'cashAccount', 'paymentMethod', 'collectorEmployee', 'attachments', 'allocations.allocatable'])))->response();
     }
@@ -135,9 +141,8 @@ class PaymentController extends ApiController
             $payment->delete();
         });
 
-        foreach ($attachments as $attachment) {
-            Storage::disk($attachment->disk)->delete($attachment->path);
-        }
+        // الصف حُذف أولاً (يبقى السجل صحيحاً)؛ فشل حذف الكائن يُسجَّل ولا يُفشل الطلب.
+        $this->attachmentStorage->discard($attachments->all());
 
         return response()->json(['message' => 'deleted']);
     }
@@ -179,15 +184,10 @@ class PaymentController extends ApiController
     {
         $payment = $this->visiblePayment($request, $id);
         $attachment = $payment->attachments()->whereKey($attachmentId)->firstOrFail();
-        $disk = Storage::disk($attachment->disk);
 
-        if (! $disk->exists($attachment->path)) {
-            abort(404, 'ملف المرفق غير موجود.');
-        }
-
-        return $disk->download($attachment->path, $attachment->original_name, [
-            'Content-Type' => $attachment->mime_type ?? 'application/octet-stream',
-        ]);
+        return $this->attachmentStorage->download(
+            $attachment->disk, $attachment->path, $attachment->original_name, $attachment->mime_type,
+        );
     }
 
     /** سندات القبض مستندات مالية بلا Scope فرع عالمي، فتقيّد كل عملية بالفرع النشط. */
@@ -213,22 +213,29 @@ class PaymentController extends ApiController
     }
 
     /**
-     * تُحفَظ الملفات على قرص خاص وتُربط بالسند الذي أنشأه الخادم فقط؛ لا يقبل
-     * الطلب مساراً جاهزاً، فلا يمكن ربط سند بملف يخص مستأجراً أو وثيقة أخرى.
+     * ذرّية الطلب (Q12): الملفات تُكتب أولاً خارج المعاملة، ثم السند وتخصيصاته ومرفقاته في معاملة
+     * واحدة. أي فشل يتراجع عنه السند وصفوفه (المعاملات الداخلية للخدمة savepoints) وتُحذف
+     * الكائنات المكتوبة، فإعادة الطلب محاولة أولى نظيفة لا تُنتج دفعةً مكرّرة. لا يقبل الطلب
+     * مساراً جاهزاً، فلا يمكن ربط سند بملف يخص مستأجراً أو وثيقة أخرى.
      */
-    private function storeAttachments(StorePaymentRequest $request, Payment $payment): void
+    private function atomicWithAttachments(StorePaymentRequest $request, string $resourceId, \Closure $persistParent): Payment
     {
-        foreach ($request->file('attachments', []) as $file) {
-            $path = $file->store("payments/{$payment->id}", 'local');
+        $stored = $this->attachmentStorage->putMany(
+            AttachmentStorage::DOMAIN_PAYMENT, $resourceId, $request->file('attachments', []), "payments/{$resourceId}",
+        );
 
-            $payment->attachments()->create([
-                'disk'          => 'local',
-                'path'          => $path,
-                'original_name' => $file->getClientOriginalName(),
-                'mime_type'     => $file->getMimeType(),
-                'size'          => $file->getSize(),
-                'uploaded_by'   => $request->user()?->id,
-            ]);
+        try {
+            return DB::transaction(function () use ($request, $persistParent, $stored): Payment {
+                $payment = $persistParent();
+                foreach ($stored as $file) {
+                    $payment->attachments()->create($file + ['uploaded_by' => $request->user()?->id]);
+                }
+
+                return $payment;
+            });
+        } catch (\Throwable $e) {
+            $this->attachmentStorage->discard($stored);
+            throw $e;
         }
     }
 }
