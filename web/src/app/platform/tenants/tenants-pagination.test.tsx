@@ -1,6 +1,6 @@
 /* @vitest-environment jsdom */
 import * as React from 'react';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, act } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import PlatformTenantsPage from './page';
 
@@ -297,5 +297,142 @@ describe('platform tenant pagination', () => {
     render(<PlatformTenantsPage />);
     await waitFor(() => expect(routerReplace).toHaveBeenCalledWith('/platform/login'));
     expect(platformApi).not.toHaveBeenCalled();
+  });
+
+  it('keeps the newest page, page size, search, and out-of-range correction when older responses arrive later', async () => {
+    const queue: Array<{ path: string; resolve: (value: unknown) => void; reject: (reason?: unknown) => void }> = [];
+    platformApi.mockImplementation((path: string) => new Promise((resolve, reject) => {
+      queue.push({ path, resolve, reject });
+    }));
+    const take = async (part: string) => {
+      await waitFor(() => expect(queue.some((entry) => entry.path.includes(part))).toBe(true));
+      const index = queue.findIndex((entry) => entry.path.includes(part));
+      return queue.splice(index, 1)[0];
+    };
+
+    render(<PlatformTenantsPage />);
+    const first = await take('page=1');
+    await act(async () => {
+      first.resolve(payload(1, 5, [tenant('first', 'First Co')], 80));
+    });
+    expect(await screen.findByText('First Co')).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Next page' }));
+    const second = await take('page=2');
+    fireEvent.change(screen.getByRole('combobox', { name: 'Rows per page' }), { target: { value: '50' } });
+    const wider = await take('per_page=50');
+
+    await act(async () => {
+      wider.resolve(payload(1, 2, [tenant('wide', 'Wider Co')], 80, 50));
+    });
+    expect(await screen.findByText('Wider Co')).toBeTruthy();
+    await act(async () => {
+      second.resolve(payload(2, 5, [tenant('stale-page', 'Stale Page Co')], 80));
+    });
+    expect(screen.queryByText('Stale Page Co')).toBeNull();
+    expect(screen.getByText('Wider Co')).toBeTruthy();
+    expect(screen.getByText(/total:80/)).toBeTruthy();
+
+    fireEvent.change(screen.getByRole('textbox', { name: 'Search tenants' }), { target: { value: 'matched' } });
+    const matched = await take('search=matched');
+    fireEvent.change(screen.getByRole('textbox', { name: 'Search tenants' }), { target: { value: 'newer' } });
+    const newer = await take('search=newer');
+    await act(async () => {
+      newer.resolve(payload(1, 1, [tenant('new', 'Newer Co')], 1));
+    });
+    expect(await screen.findByText('Newer Co')).toBeTruthy();
+    await act(async () => {
+      matched.resolve(payload(1, 1, [tenant('old-search', 'Older Search Co')], 1));
+    });
+    expect(screen.queryByText('Older Search Co')).toBeNull();
+    expect(screen.queryByText('Matched Co')).toBeNull();
+    expect(screen.getByText('Newer Co')).toBeTruthy();
+
+    fireEvent.change(screen.getByRole('textbox', { name: 'Search tenants' }), { target: { value: '' } });
+    const cleared = await take('per_page=50&page=1');
+    await act(async () => {
+      cleared.resolve(payload(1, 4, [tenant('cleared', 'Cleared Co')], 80, 50));
+    });
+    expect(await screen.findByText('Cleared Co')).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Next page' }));
+    const overshot = await take('page=2');
+    fireEvent.change(screen.getByRole('textbox', { name: 'Search tenants' }), { target: { value: 'owned' } });
+    await act(async () => {
+      overshot.resolve(payload(9, 2, [tenant('overshoot', 'Overshoot Co')], 40));
+    });
+    expect(screen.queryByText('Overshoot Co')).toBeNull();
+    expect(screen.queryByRole('alert')).toBeNull();
+    const owned = await take('search=owned');
+    await act(async () => {
+      owned.resolve(payload(1, 1, [tenant('owner', 'Owned Co')], 1));
+    });
+    expect(await screen.findByText('Owned Co')).toBeTruthy();
+    expect(screen.queryByText('Overshoot Co')).toBeNull();
+    expect(screen.queryByText('Cleared Co')).toBeNull();
+    expect(screen.getByText(/total:1/)).toBeTruthy();
+    expect(platformApi.mock.calls.filter(([path]) => String(path).includes('search=owned')).length).toBe(1);
+  });
+
+  it('ignores a stale failure after a newer success, and a stale success after a newer failure', async () => {
+    const queue: Array<{ path: string; resolve: (value: unknown) => void; reject: (reason?: unknown) => void }> = [];
+    platformApi.mockImplementation((path: string) => new Promise((resolve, reject) => {
+      queue.push({ path, resolve, reject });
+    }));
+    const take = async (part: string) => {
+      await waitFor(() => expect(queue.some((entry) => entry.path.includes(part))).toBe(true));
+      const index = queue.findIndex((entry) => entry.path.includes(part));
+      return queue.splice(index, 1)[0];
+    };
+
+    render(<PlatformTenantsPage />);
+    const first = await take('page=1');
+    await act(async () => {
+      first.resolve(payload(1, 4, [tenant('first', 'First Co')], 40));
+    });
+    expect(await screen.findByText('First Co')).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Next page' }));
+    const second = await take('page=2');
+    fireEvent.change(screen.getByRole('textbox', { name: 'Search tenants' }), { target: { value: 'current' } });
+    const current = await take('search=current');
+    expect(screen.getByRole('status').textContent).toBe('loading');
+
+    await act(async () => {
+      second.reject(new ApiError('stale failure'));
+    });
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(screen.getByRole('status').textContent).toBe('loading');
+
+    await act(async () => {
+      current.resolve(payload(1, 1, [tenant('current', 'Current Co')], 1));
+    });
+    expect(await screen.findByText('Current Co')).toBeTruthy();
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(screen.queryByRole('status')).toBeNull();
+
+    fireEvent.change(screen.getByRole('combobox', { name: 'Rows per page' }), { target: { value: '100' } });
+    const lateSuccess = await take('per_page=100');
+    fireEvent.change(screen.getByRole('textbox', { name: 'Search tenants' }), { target: { value: 'broken' } });
+    const broken = await take('search=broken');
+    await act(async () => {
+      broken.reject(new ApiError('newest failed'));
+    });
+    expect((await screen.findByRole('alert')).textContent).toContain('newest failed');
+    expect(screen.queryByText('Current Co')).toBeNull();
+
+    await act(async () => {
+      lateSuccess.resolve(payload(1, 1, [tenant('late', 'Late Success Co')], 40, 100));
+    });
+    expect(screen.queryByText('Late Success Co')).toBeNull();
+    expect(screen.getByRole('alert').textContent).toContain('newest failed');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    const retried = await take('search=broken');
+    await act(async () => {
+      retried.resolve(payload(1, 1, [tenant('retried', 'Retried Co')], 1));
+    });
+    expect(await screen.findByText('Retried Co')).toBeTruthy();
+    expect(screen.queryByRole('alert')).toBeNull();
   });
 });

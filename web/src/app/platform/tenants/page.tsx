@@ -53,21 +53,35 @@ export default function PlatformTenantsPage() {
   const [lastPage, setLastPage] = useState(1);
   const overshootCorrected = useRef(false);
   const seenSearch = useRef(search);
+  const requestSeq = useRef(0);
+  const desired = useRef({ page: 1, perPage: 25, search: '' });
 
   const load = useCallback(async () => {
+    const requested = { page, perPage, search: search.trim() };
+    const matchesDesired = () =>
+      desired.current.page === requested.page
+      && desired.current.perPage === requested.perPage
+      && desired.current.search.trim() === requested.search;
+    if (!matchesDesired()) return;
+
+    const requestId = ++requestSeq.current;
+    const stillCurrent = () => requestId === requestSeq.current && matchesDesired();
     setLoading(true);
     setError(null);
     try {
       const params = new URLSearchParams({
-        per_page: String(perPage),
-        page: String(page),
+        per_page: String(requested.perPage),
+        page: String(requested.page),
       });
-      if (search.trim() !== '') params.set('search', search.trim());
+      if (requested.search !== '') params.set('search', requested.search);
       const response = await platformApi<TenantsResponse>(`/platform/tenants?${params.toString()}`);
+      if (!stillCurrent()) return;
       const meta = response.pagination;
       const boundedLast = Math.max(1, meta?.last_page ?? 1);
-      if ((meta?.current_page ?? page) > boundedLast && page !== boundedLast && !overshootCorrected.current) {
+      if ((meta?.current_page ?? requested.page) > boundedLast && requested.page !== boundedLast && !overshootCorrected.current) {
         overshootCorrected.current = true;
+        desired.current = { ...desired.current, page: boundedLast };
+        requestSeq.current += 1;
         setPage(boundedLast);
         return;
       }
@@ -76,9 +90,10 @@ export default function PlatformTenantsPage() {
       setTotal(typeof meta?.total === 'number' ? meta.total : (response.data?.length ?? 0));
       setLastPage(boundedLast);
     } catch (reason) {
+      if (!stillCurrent()) return;
       setError(reason instanceof ApiError ? reason.message : t('loadFailed'));
     } finally {
-      setLoading(false);
+      if (stillCurrent()) setLoading(false);
     }
   }, [page, perPage, search, t]);
 
@@ -98,17 +113,23 @@ export default function PlatformTenantsPage() {
 
   const changeSearch = (value: string) => {
     overshootCorrected.current = false;
+    desired.current = { ...desired.current, page: 1, search: value };
+    requestSeq.current += 1;
     setSearch(value);
     setPage(1);
   };
 
   const changePage = (next: number) => {
     overshootCorrected.current = false;
+    desired.current = { ...desired.current, page: next };
+    requestSeq.current += 1;
     setPage(next);
   };
 
   const changePerPage = (next: number) => {
     overshootCorrected.current = false;
+    desired.current = { ...desired.current, page: 1, perPage: next };
+    requestSeq.current += 1;
     setPerPage(next);
     setPage(1);
   };

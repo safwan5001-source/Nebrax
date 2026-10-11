@@ -10,8 +10,9 @@ Date: 2026-10-11
 | | |
 |---|---|
 | Base (`main`) | `eae4bd7c3c1219bdab6552519f127bdb3577d479` |
+| Reviewed head (P1 found) | `86ab260c50b8e9a086eef896592631da0048c7d5` |
 | Branch | `feat/awj-platform-ux-h1-pagination` |
-| Head | The tip of that branch. The pull request body repeats the exact head SHA after push. This file is part of that commit, so the hash cannot be written inside itself. |
+| Head | The tip of that branch after the generation-guard commit. The pull request body repeats the exact head SHA. |
 
 ## What changed
 
@@ -23,7 +24,9 @@ Laravel already reads `page` inside `paginate()`. No controller, service, route,
 
 Plan and status stay **filters of the loaded page only**. A visible sentence says so, in Arabic «التصفية على هذه الصفحة فقط» and in English "Filters apply to this page only." The footer count is `pagination.total`, not the number of rows after the in-page filter, so a partial page is not presented as the full directory.
 
-Search still debounces 250ms and now returns to page 1 before the request. Changing the page size also returns to page 1. If the API answers with `current_page` past `last_page`, the page moves to `max(1, last_page)` and fetches once. Retry and refresh repeat the current page. The refresh control has an accessible name. The signed-out redirect is unchanged. `platformApi` is still the only client, so no tenant ERP session and no `X-Branch-Id` is introduced.
+Search still debounces 250ms and now returns to page 1 before the request. Changing the page size also returns to page 1. If the API answers with `current_page` past `last_page`, the page moves to `max(1, last_page)` and fetches once. A later response cannot apply that correction after the operator has already moved on.
+
+In-flight list requests are ordered. Changing the page, the page size, or the search — and the out-of-range correction itself — advances a generation counter and the desired query. A response may write rows, the total, the error, or `loading` only when it is still that generation and still the desired query. An older success cannot replace a newer page. An older failure cannot raise an alert over a newer success. An older success cannot clear a newer failure. Retry starts a new generation for the same query. `loading` stays on until that generation finishes, not when an older request finishes.
 
 ## Files
 
@@ -42,7 +45,7 @@ Local, from `web/`:
 
 `npm test -- src/app/platform/tenants/tenants-pagination.test.tsx src/app/platform/tenants/tenant-reference-numbers.test.tsx`
 
-Result: **9 passed, 2 files.**
+Result before the race fix: **9 passed**. After the generation guard: **11 passed, 2 files.**
 
 Covered:
 
@@ -51,7 +54,9 @@ Covered:
 - Search and page-size changes go back to page 1. A search is not sent with the old page.
 - Plan and status hide rows on this page only and do not add `plan` or `status` to the query. The note stays visible. The server total stays 80 while the filtered table is empty.
 - First load shows the loading status. A failed page 2 shows `role="alert"` and retry repeats `page=2`.
-- An overshot `current_page` is corrected once.
+- A stale page, page-size, or search response that resolves after the newer one does not change rows or `pagination.total`.
+- A stale out-of-range payload does not move the page or replace the search that superseded it.
+- A stale failure does not create an alert while a newer request is loading or after it succeeds. A stale success does not clear a newer failure. Retry still replaces that failure.
 - Breakpoint classes: header `lg:flex-row`, filters `flex-wrap`, pagination `flex-col` / `sm:flex-row`.
 - The page does not set `dir`. `rtl:rotate-180` stays on the existing pager icons. `documentElement.dir = rtl` is left alone.
 - A signed-out operator is sent to `/platform/login` and the list API is not called.
@@ -60,7 +65,7 @@ No browser was driven. These are jsdom tests. H1-5 still owes screenshots at 320
 
 ## CI
 
-Recorded on the pull request after push. Not claimed green in this file until the checks finish.
+The first head `86ab260` was green (sqlite, pgsql, Next build, both workflow runs). This follow-up is a new head. CI on that head is recorded in the pull request body after the checks finish. Do not treat this file as a green claim for the new head until then.
 
 ## Risks
 
@@ -68,7 +73,7 @@ Recorded on the pull request after push. Not claimed green in this file until th
 - The empty label is still "No tenants yet" when an in-page filter hides every loaded row. The spec says to keep that label. The footer total and the note contradict a "no tenants exist" reading.
 - CSV export still exports the loaded, already filtered page. It did before. It does not export every tenant.
 - `Dialog` focus trap, danger-button contrast, and the shell are not in this PR.
-- Out-of-range correction trusts `last_page` from the list payload. It does not invent a second request shape.
+- Out-of-range correction trusts `last_page` from the list payload. It does not invent a second request shape. A correction that is no longer the latest intent is dropped.
 
 ## Gate
 
