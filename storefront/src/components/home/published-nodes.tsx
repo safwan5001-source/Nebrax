@@ -6,6 +6,7 @@ import { CustomContentBand } from "@/components/home/CustomContentBand";
 import { DeliveryPromiseBand } from "@/components/home/DeliveryPromiseBand";
 import { DiscoverySection } from "@/components/home/DiscoverySection";
 import { FeaturedShelf } from "@/components/home/FeaturedShelf";
+import { HomeSlider, type SliderLabels } from "@/components/home/HomeSlider";
 import { OffersShelf } from "@/components/home/OffersShelf";
 import { ProductShelfSection } from "@/components/home/ProductShelfSection";
 import { SectionBackdrop } from "@/components/home/SectionBackdrop";
@@ -38,6 +39,7 @@ import {
   type DesignContext,
   resolveSectionDesign,
 } from "@/lib/presentation/section-design-resolve";
+import { resolveSlider } from "@/lib/presentation/slider-resolve";
 import type { ThemePresetId } from "@/lib/presentation/tokens";
 
 /**
@@ -100,6 +102,11 @@ export async function publishedNodes(
       androidUrl: string;
       appName: string;
     };
+    /**
+     * CUST-HV V8b — the slider's accessible names (already translated). Absent ⇒ a published slider cannot be drawn
+     * (the section is omitted), never drawn without its names.
+     */
+    sliderLabels?: SliderLabels;
     benefitsTitle: string;
     featuredTitle: string;
     offersTitle: string;
@@ -110,6 +117,7 @@ export async function publishedNodes(
   },
 ): Promise<React.ReactNode[]> {
   const nodes: React.ReactNode[] = [];
+  const firstVisibleIndex = sections.findIndex((section) => section.visible);
   const firstHeroId = sections.find(
     (section) => section.visible && section.type === "hero",
   )?.id;
@@ -123,7 +131,14 @@ export async function publishedNodes(
   for (const [index, section] of sections.entries()) {
     if (!section.visible) continue;
     const before = nodes.length;
-    await pushSectionNode(nodes, section, sectionCtx, firstHeroId, index);
+    await pushSectionNode(
+      nodes,
+      section,
+      sectionCtx,
+      firstHeroId,
+      index,
+      firstVisibleIndex,
+    );
     // CUST-HV V5c — wrap only a section that carries a design; any other section is
     // exactly the node it always was.
     if (section.design && nodes.length === before + 1) {
@@ -181,6 +196,7 @@ async function pushSectionNode(
   ctx: Parameters<typeof publishedNodes>[1],
   firstHeroId: string | undefined,
   index: number,
+  firstVisibleIndex: number,
 ): Promise<void> {
   if (section.type === "hero" && ctx.renderHero) {
     // Instance-keyed (V6a): each hero renders its own content. The same wrapper rules apply as for
@@ -266,6 +282,26 @@ async function pushSectionNode(
         }
         backdrop={backdropNode(section, index, ctx, false)}
         designCtx={ctx.design}
+      />,
+    );
+    return;
+  }
+  if (section.type === "slider") {
+    // CUST-HV V8b (V0 §13.1) — a slider with no resolvable slide is omitted outright (no empty band); the first
+    // slide's picture loads eagerly only when the slider opens the page (it is then the likely LCP element).
+    const view = ctx.sliderLabels
+      ? resolveSlider(section, index, ctx.media ?? {}, ctx.design, ctx.locale)
+      : null;
+    if (!view || !ctx.sliderLabels) return;
+    nodes.push(
+      <HomeSlider
+        key={section.id}
+        view={view}
+        labels={ctx.sliderLabels}
+        basePath={ctx.basePath}
+        dir={ctx.design.dir}
+        priority={index === firstVisibleIndex}
+        sectionId={section.id}
       />,
     );
     return;

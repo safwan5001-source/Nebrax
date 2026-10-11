@@ -138,6 +138,18 @@ export default async function HomePage({ params }: HomePageProps) {
           currency,
           themePreset: presentation.themePreset,
           apps: presentation.apps,
+          // CUST-HV V8b — the slider's names; the two templates keep their `{current}` / `{total}` / `{number}`
+          // placeholders (filled in the client component, per slide).
+          sliderLabels: {
+            label: homeCopy("slider.label"),
+            slide: String(homeCopy.raw("slider.slide")),
+            previous: homeCopy("slider.previous"),
+            next: homeCopy("slider.next"),
+            goTo: String(homeCopy.raw("slider.goTo")),
+            pause: homeCopy("slider.pause"),
+            play: homeCopy("slider.play"),
+            choose: homeCopy("slider.choose"),
+          },
           benefitsTitle: homeCopy("benefits"),
           featuredTitle: homeCopy("featured"),
           offersTitle: homeCopy("offers"),

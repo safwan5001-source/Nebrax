@@ -156,7 +156,17 @@
     "earliestDelivery": "Prochaine livraison",
     "deliveryToday": "Aujourd’hui",
     "deliveryTomorrow": "Demain",
-    "deliveryAt": "{day}, {window}"
+    "deliveryAt": "{day}, {window}",
+    "slider": {
+      "label": "Diaporama à la une",
+      "slide": "{current} sur {total}",
+      "previous": "Diapositive précédente",
+      "next": "Diapositive suivante",
+      "goTo": "Aller à la diapositive {number}",
+      "pause": "Mettre le diaporama en pause",
+      "play": "Lancer le diaporama",
+      "choose": "Choisir une diapositive"
+    }
   },
   "cart": {
     "cart": "Panier",

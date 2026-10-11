@@ -13,7 +13,7 @@ use InvalidArgumentException;
  * المُصيِّر إلى حساب مفاتيح التحويل (لا توأم TS لتجزئة `transformKey`) ولا إلى
  * معرفة أي موضع بعينه — يعمل لكل حقلٍ تضيفه شرائح V5–V9.
  *
- * **استثناء مقصود (V6b-3):** مرجعٌ تحت `design.background` (صورة خلفية قسم) يحمل `contrast` — حدّا قنوات
+ * **استثناء مقصود (V6b-3، ويشمل صور شرائح `slider` منذ V8b):** مرجعٌ تحت `design.background` (صورة خلفية قسم) أو `content.slides[].media|mobile` يحمل `contrast` — حدّا قنوات
  * مشفّرة (min/max، موسَّعان بهامش الترميز) تُطابق ما أُثبت عند النشر — لأن المتجر العام يختار منهما لون
  * النص التلقائي بالخوارزمية ذاتها. هي أرقامٌ مشتقّة من صورةٍ عامة أصلاً (لا سرّ فيها) ولا تخرج لغير هذا الموضع.
  *
@@ -28,6 +28,9 @@ use InvalidArgumentException;
 final class StorefrontPublishedMediaResolver
 {
     public const PROXY_PREFIX = '/api/storefront/media/customizer/';
+
+    /** V8b — مسار صورة شريحة (`homepage.sections.{i}.content.slides.{j}.media|mobile`) كما يفتاحها الماسح. */
+    private const SLIDE_PICTURE_PATH = '/\Ahomepage\.sections\.\d+\.content\.slides\.\d+\.(?:media|mobile)\z/';
 
     public function __construct(private readonly StorefrontMediaReferenceScanner $scanner) {}
 
@@ -68,7 +71,9 @@ final class StorefrontPublishedMediaResolver
             $entry = $this->entry($asset, $ref);
             if ($entry !== null) {
                 // V6b-3 — حدود التباين لصور خلفيات الأقسام فقط؛ غيابها (دليلٌ غير صالح) = «غير مُثبَت» فلا لون نص تلقائي.
-                if (str_contains($path, '.design.background.')) {
+                // V8b — وصور شرائح `slider` (الافتراضية والجوال) كذلك: النص يقع فوق كل صورة، والمتجر يعيد قرار لون النص
+                // التلقائي بالخوارزمية ذاتها التي أثبتتها بوابة النشر (`SliderPublishRules`).
+                if (str_contains($path, '.design.background.') || preg_match(self::SLIDE_PICTURE_PATH, $path) === 1) {
                     $contrast = $this->contrastFor($evidence, $asset, $ref, $bounds);
                     if ($contrast !== null) {
                         $entry['contrast'] = $contrast;
