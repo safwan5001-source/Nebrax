@@ -36,6 +36,9 @@ ROOT = Path(__file__).resolve().parents[2]
 MANIFEST = ROOT / ".github" / "ci-gate" / "required-checks.json"
 GITHUB_ACTIONS_APP = "github-actions"
 BLOCKING = ("always", "paths")
+# Measured on 119 merged PRs: CI wall time median 24 min, p90 38, max 114 (runner queue up to 90 min).
+# 120 min covers all of them; 70 would have failed 2 healthy PRs. Keep the workflow job timeout above this.
+DEFAULT_TIMEOUT_MINUTES = 120
 MAX_PR_FILES = 3000  # REST cap: beyond it the file list is incomplete -> require everything
 
 
@@ -524,7 +527,7 @@ def main(argv=None) -> int:
     g.add_argument("--base-root", default=None, help="trusted checkout of the base commit (no-weakening baseline)")
     g.add_argument("--pr", type=int, required=True)
     g.add_argument("--sha", required=True)
-    g.add_argument("--timeout-minutes", type=int, default=70)
+    g.add_argument("--timeout-minutes", type=int, default=DEFAULT_TIMEOUT_MINUTES)
     g.add_argument("--interval", type=int, default=30)
     args = ap.parse_args(argv)
     try:

@@ -363,6 +363,23 @@ class EndToEnd(unittest.TestCase):
             self._run({PHP[0]: "success", PHP[1]: "success"}, head="e" * 40)
 
 
+class Timeouts(unittest.TestCase):
+    """Regression (POST-MERGE): 70 min failed healthy PRs whose runner queue was long (observed 73 and 114 min)."""
+
+    def test_deadline_covers_observed_worst_case(self):
+        self.assertGreaterEqual(g.DEFAULT_TIMEOUT_MINUTES, 120)
+
+    def test_job_timeout_exceeds_gate_deadline(self):
+        doc = g.load_yaml(g.ROOT / ".github/workflows/ci-gate.yml")
+        self.assertGreater(doc["jobs"]["gate"]["timeout-minutes"], g.DEFAULT_TIMEOUT_MINUTES + 5)
+
+    def test_cli_default_uses_constant(self):
+        import re
+        src = (g.ROOT / "scripts/ci-gate/ci_gate.py").read_text()
+        self.assertIn("default=DEFAULT_TIMEOUT_MINUTES", src)
+        self.assertIsNone(re.search(r"default=70", src))
+
+
 class Hygiene(unittest.TestCase):
     def test_no_bytecode_tracked_and_ignored(self):
         try:
