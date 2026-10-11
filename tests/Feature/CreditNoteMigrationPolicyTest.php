@@ -191,6 +191,22 @@ class CreditNoteMigrationPolicyTest extends TestCase
         $this->assertSame(11500, (int) $line->fresh()->line_total);
     }
 
+    /** @test */
+    public function the_legacy_review_table_is_additive_and_rolls_back_cleanly(): void
+    {
+        $file = '2026_11_05_010000_create_credit_note_legacy_reviews.php';
+        $this->assertTrue(Schema::hasTable('credit_note_legacy_reviews'));
+        $this->assertTrue(Schema::hasColumns('credit_note_legacy_reviews', ['tenant_id', 'credit_note_line_id', 'outcome', 'source_line_id', 'reason', 'reviewed_by', 'reviewed_at']));
+
+        $migration = $this->migration($file);
+        $migration->down();
+        $this->assertFalse(Schema::hasTable('credit_note_legacy_reviews'));
+        $this->assertTrue(Schema::hasTable('credit_note_lines'), 'التراجع لا يمسّ أسطر الإشعارات.');
+
+        $migration->up();
+        $this->assertTrue(Schema::hasTable('credit_note_legacy_reviews'));
+    }
+
     // ── هجرة تقييد الحذف: تحقق قبل التقييد ────────────────────────
 
     private function postedInvoice(Tenant $tenant): Invoice

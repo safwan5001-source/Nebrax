@@ -358,6 +358,10 @@ class ReturnService
      */
     protected function assertWithinSource(Invoice|Purchase $source, array $items, ?string $exceptReturnId = null): void
     {
+        // AWJ-TAX-REM-02: إشعارات دائنة تاريخية غير قابلة للربط ⇒ لا مرتجع إضافي (إنشاءً وترحيلاً)
+        // حتى تراجعها المالية؛ مصدر الشراء لا يتأثر.
+        app(ReturnSourceAllocator::class)->assertNoUnresolvedLegacyCredits($source);
+
         $sourceLines = $source->lines()->get()->keyBy('id');
 
         // الكميات المردودة سابقاً لكل سطر مصدر — مرتجعاتٌ **وإشعارات دائنة** مرحَّلة

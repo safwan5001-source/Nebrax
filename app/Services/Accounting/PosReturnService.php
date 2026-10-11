@@ -276,6 +276,8 @@ class PosReturnService
         // وإلا اشتُقّ جزء POS بموضعٍ (c) لا يحسب ما استهلكه إشعارٌ، فبقيت هللات من
         // الضريبة بلا عكس رغم نفاد الكمية.
         $allocator = app(ReturnSourceAllocator::class);
+        // AWJ-TAX-REM-02: نفس الحظر المحدّد (إشعارات تاريخية غير محسومة) — معاينةً وإنشاءً.
+        $allocator->assertNoUnresolvedLegacyCredits($invoice);
         $returned = collect($allocator->returned($sourceLines->keys()->all()))
             ->map(fn (array $row) => (object) $row);
         // المبالغ المحصَّلة بعد حصة خصم الرأس — الأساس نفسه الذي يُخصم منه `returned()`؛

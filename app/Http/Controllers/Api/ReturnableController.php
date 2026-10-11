@@ -43,6 +43,9 @@ class ReturnableController extends ApiController
         $charged   = $allocator->charged($document);
         $amounts   = $allocator->returned($document->lines->pluck('id')->all());
         $returned  = array_map(fn (array $row) => $row['quantity'], $amounts);
+        // REM-02: فاتورة عليها إشعارات دائنة تاريخية غير محسومة تُعرض ممنوعةً بسببها (إضافة فقط).
+        $legacyBlocked = $type === 'sales'
+            && (app(ReturnSourceAllocator::class)->unresolvedLegacyCounts([(string) $document->id])[(string) $document->id] ?? 0) > 0;
         $inclusive = (bool) $document->tax_inclusive;
 
         $lines = $document->lines->map(function ($line) use ($returned, $charged, $amounts, $allocator, $inclusive) {
@@ -92,6 +95,7 @@ class ReturnableController extends ApiController
                 // مستندٌ رُدَّ بالكامل يبقى مرئياً بسطوره صفراً — إخفاؤه يترك
                 // المستخدم يبحث عمّا ردّه بنفسه ظانّاً أنه أخطأ في الرقم.
                 'fully_returned' => $lines->every(fn ($l) => $l['remaining'] === 0),
+                'blocked_reason' => $legacyBlocked ? 'legacy_credit_review' : null,
                 'lines'          => $lines,
             ],
         ]);

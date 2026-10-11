@@ -2,6 +2,7 @@
 
 namespace App\Services\Accounting;
 
+use App\Models\CreditNoteLegacyReview;
 use App\Models\CreditNoteLine;
 use App\Models\Invoice;
 use App\Models\InvoiceLine;
@@ -158,45 +159,24 @@ class ReturnSourceAllocator
     }
 
     /**
-     * إشعارات دائنة **مرحَّلة سبقت REM-02** وأسطرها بلا `source_line_id`: تُنسب عند
-     * القراءة إلى سطر الفاتورة الوحيد الذي يحمل منتجها (والمتغيّر إن وُجد) — دون أي
-     * تعديل على صف مرحَّل. سطرٌ لا يُحسم نسبُه (بلا منتج، أو منتجه يتكرر في
-     * الفاتورة) لا يُحسب هنا لأن توزيعه تخمين؛ ويُسجَّل عدّه عند هجرة التقييد
-     * لمراجعة المالية. بلا هذا النسب كان إشعارٌ تاريخي كامل يُخفي استهلاكه فيُردّ
-     * الشيء نفسه مرةً ثانية.
+     * إشعارات دائنة **مرحَّلة سبقت REM-02** وأسطرها بلا `source_line_id` — تُستهلك في
+     * السقف التراكمي دون تعديل أي صف مرحَّل. التصنيف في {@see legacyCreditLines()}.
      *
      * @param  array<int, string>  $sourceLineIds
      * @return \Illuminate\Support\Collection<int, object>  صفوف بشكل صفوف التجميع في `returned()`
      */
     private function legacyCreditRows(array $sourceLineIds): \Illuminate\Support\Collection
     {
-        $invoiceIds = InvoiceLine::query()->whereIn('id', $sourceLineIds)->pluck('invoice_id')->unique()->values();
-        if ($invoiceIds->isEmpty()) {
-            return collect();
-        }
-
-        $invoiceLines = InvoiceLine::query()->whereIn('invoice_id', $invoiceIds)
-            ->get(['id', 'invoice_id', 'product_id', 'product_variant_id']);
-
-        $legacy = CreditNoteLine::query()
-            ->whereNull('source_line_id')
-            ->whereNotNull('product_id')
-            ->whereHas('creditNote', fn ($q) => $q->where('status', 'posted')->whereIn('original_invoice_id', $invoiceIds))
-            ->with('creditNote:id,original_invoice_id')
-            ->get();
+        $invoiceIds = InvoiceLine::query()->whereIn('id', $sourceLineIds)->pluck('invoice_id')->unique()->values()->all();
 
         $acc = [];
-        foreach ($legacy as $line) {
-            $matches = $invoiceLines->filter(
-                fn ($l) => $l->invoice_id === $line->creditNote->original_invoice_id
-                    && $l->product_id === $line->product_id
-                    && ($line->product_variant_id === null || $l->product_variant_id === $line->product_variant_id)
-            );
-            if ($matches->count() !== 1) {
+        foreach ($this->legacyCreditLines($invoiceIds) as $item) {
+            if ($item['status'] !== 'attributed' || ! in_array($item['target'], $sourceLineIds, true)) {
                 continue;
             }
 
-            $target = (string) $matches->first()->id;
+            $line = $item['line'];
+            $target = (string) $item['target'];
             $acc[$target] ??= (object) [
                 'source_line_id' => $target, 'qty' => 0, 'subtotal' => 0, 'discount' => 0, 'tax' => 0,
                 'min_price' => (int) $line->unit_price,
@@ -208,7 +188,112 @@ class ReturnSourceAllocator
             $acc[$target]->min_price = min($acc[$target]->min_price, (int) $line->unit_price);
         }
 
-        return collect(array_values($acc))->filter(fn ($row) => in_array($row->source_line_id, $sourceLineIds, true));
+        return collect(array_values($acc));
+    }
+
+    /**
+     * ═══════════════════════════════════════════════════════════════
+     *  تصنيف أسطر الإشعارات التاريخية (مرحَّلة، بلا `source_line_id`) على فواتير
+     * ═══════════════════════════════════════════════════════════════
+     *  لكل سطر قرارٌ واحد من ثلاثة، بهذا الترتيب:
+     *   1. **قرار مراجعة المالية** (`CreditNoteLegacyReview`) إن وُجد: `attributed` ⇒ يُنسب
+     *      إلى السطر الذي حدّدته المالية (يُشترط أن يكون من الفاتورة نفسها)، و
+     *      `not_applicable` ⇒ `ignored` (لا يستهلك سطراً).
+     *   2. **نسب آلي** إن كان للسطر منتج وسطر الفاتورة الحامل له (والمتغيّر إن حُدِّد)
+     *      وحيداً ⇒ `attributed`.
+     *   3. غير ذلك (بلا منتج، أو منتجه يتكرر) ⇒ `unresolved`: لا يُخمَّن، وتُحظر العمليات
+     *      المتأثرة على الفاتورة حتى تراجعه المالية ({@see assertNoUnresolvedLegacyCredits()}).
+     *
+     * @param  array<int, string>  $invoiceIds
+     * @return list<array{line: CreditNoteLine, invoice_id: string, status: string, target: ?string}>
+     */
+    public function legacyCreditLines(array $invoiceIds): array
+    {
+        $invoiceIds = array_values(array_unique(array_filter($invoiceIds)));
+        if ($invoiceIds === []) {
+            return [];
+        }
+
+        $legacy = CreditNoteLine::query()
+            ->whereNull('source_line_id')
+            ->whereHas('creditNote', fn ($q) => $q->where('status', 'posted')->whereIn('original_invoice_id', $invoiceIds))
+            ->with('creditNote:id,number,original_invoice_id')
+            ->get();
+        if ($legacy->isEmpty()) {
+            return [];
+        }
+
+        $invoiceLines = InvoiceLine::query()->whereIn('invoice_id', $invoiceIds)
+            ->get(['id', 'invoice_id', 'product_id', 'product_variant_id']);
+        $reviews = CreditNoteLegacyReview::query()->whereIn('credit_note_line_id', $legacy->pluck('id'))->get()
+            ->keyBy('credit_note_line_id');
+
+        $out = [];
+        foreach ($legacy as $line) {
+            $invoiceId = (string) $line->creditNote->original_invoice_id;
+            $review = $reviews->get($line->id);
+
+            if ($review !== null) {
+                $valid = $review->outcome === CreditNoteLegacyReview::ATTRIBUTED
+                    && $invoiceLines->contains(fn ($l) => $l->id === $review->source_line_id && $l->invoice_id === $invoiceId);
+                $status = $review->outcome === CreditNoteLegacyReview::NOT_APPLICABLE
+                    ? 'ignored'
+                    : ($valid ? 'attributed' : 'unresolved');
+                $out[] = ['line' => $line, 'invoice_id' => $invoiceId, 'status' => $status,
+                    'target' => $valid ? (string) $review->source_line_id : null];
+
+                continue;
+            }
+
+            $matches = $line->product_id === null ? collect() : $invoiceLines->filter(
+                fn ($l) => $l->invoice_id === $invoiceId
+                    && $l->product_id === $line->product_id
+                    && ($line->product_variant_id === null || $l->product_variant_id === $line->product_variant_id)
+            );
+            $out[] = $matches->count() === 1
+                ? ['line' => $line, 'invoice_id' => $invoiceId, 'status' => 'attributed', 'target' => (string) $matches->first()->id]
+                : ['line' => $line, 'invoice_id' => $invoiceId, 'status' => 'unresolved', 'target' => null];
+        }
+
+        return $out;
+    }
+
+    /**
+     * عدد الأسطر غير المحسومة لكل فاتورة (الفواتير الخالية منها لا تظهر في الناتج).
+     *
+     * @param  array<int, string>  $invoiceIds
+     * @return array<string, int>
+     */
+    public function unresolvedLegacyCounts(array $invoiceIds): array
+    {
+        $counts = [];
+        foreach ($this->legacyCreditLines($invoiceIds) as $item) {
+            if ($item['status'] === 'unresolved') {
+                $counts[$item['invoice_id']] = ($counts[$item['invoice_id']] ?? 0) + 1;
+            }
+        }
+
+        return $counts;
+    }
+
+    /**
+     * حظرٌ محدّد: فاتورةٌ عليها إشعارات دائنة مرحَّلة قديمة غير قابلة للربط بسطر بلا تخمين
+     * لا تقبل عكساً إضافياً (إشعاراً أو مرتجعاً أو مرتجع POS) حتى تراجعها المالية. المصدر
+     * الشراء لا يتأثر. لا يُعدَّل أي مستند مرحَّل؛ مسار المراجعة: `credit-notes:legacy-review`.
+     */
+    public function assertNoUnresolvedLegacyCredits(Invoice|Purchase $source): void
+    {
+        if (! $source instanceof Invoice) {
+            return;
+        }
+
+        $count = $this->unresolvedLegacyCounts([(string) $source->id])[(string) $source->id] ?? 0;
+        if ($count > 0) {
+            throw new \RuntimeException(
+                "على الفاتورة {$source->number} {$count} سطر/أسطر إشعارٍ دائن مرحَّل قديم لا يُنسب إلى سطر بعينه في الفاتورة؛ "
+                . 'لا يُسمح بإشعار دائن أو مرتجع إضافي عليها حتى تراجعها المالية (credit-notes:legacy-review).'
+            );
+        }
     }
 
     /**

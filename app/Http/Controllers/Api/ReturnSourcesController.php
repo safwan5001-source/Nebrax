@@ -60,10 +60,15 @@ class ReturnSourcesController extends ApiController
             app(ReturnSourceAllocator::class)->returned($lineIds->all())
         );
 
+        // فواتير عليها إشعارات دائنة تاريخية غير محسومة (REM-02): تُعرض ممنوعةً بسببها.
+        $legacy = $type === 'sales'
+            ? app(ReturnSourceAllocator::class)->unresolvedLegacyCounts($documents->pluck('id')->all())
+            : [];
+
         $windowDays = (int) Settings::get($group, 'return_window_days');
         $today      = Carbon::parse(now()->toDateString());
 
-        $data = $documents->map(function ($doc) use ($dateField, $returned, $windowDays, $today) {
+        $data = $documents->map(function ($doc) use ($dateField, $returned, $windowDays, $today, $legacy) {
             $remaining = $doc->lines->sum(
                 fn ($l) => max(0, (int) $l->quantity - (int) ($returned[$l->id] ?? 0))
             );
@@ -83,7 +88,8 @@ class ReturnSourcesController extends ApiController
                 // سببٌ واحد يكفي المستخدم؛ و«رُدَّ بالكامل» أسبق لأنه نهائي
                 // بينما المهلة قد تكون قابلة للتفاوض خارج النظام.
                 'blocked_reason' => $remaining <= 0 ? 'fully_returned'
-                    : ($expired ? 'out_of_window' : null),
+                    : (isset($legacy[$doc->id]) ? 'legacy_credit_review'
+                    : ($expired ? 'out_of_window' : null)),
                 'elapsed_days'   => $elapsed,
             ];
         });

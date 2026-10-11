@@ -246,6 +246,8 @@ class CreditNoteService
     protected function deriveFromInvoice(Invoice $invoice, array $items, ?string $exceptNoteId = null): array
     {
         $allocator   = app(ReturnSourceAllocator::class);
+        // إشعارات تاريخية مرحَّلة غير قابلة للربط بسطر ⇒ لا عكس إضافي حتى مراجعة المالية.
+        $allocator->assertNoUnresolvedLegacyCredits($invoice);
         $sourceLines = $invoice->lines()->orderBy('id')->get()->keyBy('id');
         $charged     = $allocator->charged($invoice);
         $running     = $allocator->returned(array_keys($charged), null, $exceptNoteId);
