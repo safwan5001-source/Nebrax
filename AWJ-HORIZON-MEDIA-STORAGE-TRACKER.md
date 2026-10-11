@@ -70,13 +70,29 @@
   - **تفعيل `AWJ_ATTACHMENTS_R2_ENABLED`** تغيير متغيّر بيئة في Railway (= إعادة نشر) — بوابة مالك صريحة.
 - الأفق **لا يُعلن مكتملاً** قبل إثبات عمل الرفع الفعلي على R2 (`A-02`). حتى ذلك الحين الحالة: *الكود جاهز ومُختبَر على محاكاة R2؛ الإثبات الإنتاجي معلّق على المالك*.
 
-## 6. بوابات المالك المفتوحة (الأفق غير مكتمل)
+## 6. أدلة الإنتاج الفعلية (Railway · 2026-10-11)
+
+| # | الدليل | المصدر | الحالة |
+|---|---|---|---|
+| E1 | نشر S1 `981663a` على `nibras-api` (`8740dff6`): SUCCESS؛ الـmigration `2026_11_06_010000_add_photo_disk_to_employees` ظهر `DONE` في سجل الإقلاع؛ `GET /api/health` = 200 | `list-deployments` + `get-logs` (Railway MCP) | ✅ مُتحقَّق |
+| E2 | `awj:r2-smoke-test` من Production Console: PASS (write/exists/read/delete/cleanup) | **المالك** (تنفيذ يدوي) | ✅ مُتحقَّق (تقرير المالك) |
+| E3 | تفعيل `AWJ_ATTACHMENTS_R2_ENABLED=true` على `nibras-api` بتفويض المالك؛ نشر `d9c1f379` SUCCESS؛ `/api/health` = 200 | `set-variables` + `list-deployments` + `get-logs` | ✅ مُتحقَّق. **التراجع:** `AWJ_ATTACHMENTS_R2_ENABLED=false` (القراءة تتبع عمود `disk` فلا تضيع صفوف R2) |
+| E4 | رفض نظام الأذونات (Production Deploy): إنشاء خدمة مؤقتة لـsmoke test، وقراءة سجلات HTTP | محاولات Claude | ❌ لم تُنفَّذ ولم يُلتفّ عليها |
+
+## 7. حالة التحقق الإنتاجي لـS1
+
+**S1 = DEPLOYED · FLAG ON · لم تصبح PRODUCTION VERIFIED.** ينقص:
+1. رفع مرفق فعلي (مستأجر اختبار) ⇒ صف `disk='r2'` ⇒ تنزيله.
+2. إعادة نشر ثم تنزيله مجدداً (الاستمرارية).
+3. إثبات العزل وعدم كشف ملف خاص عبر الـAPI.
+
+الأداة المجهّزة لإثبات (2) و(3) على مسار الكود الفعلي بلا مستأجر حقيقي: `awj:attachments-verify` (PR #1335) — `--put` ثم إعادة نشر ثم `--check=<path> --cleanup`. اختبار الرفع عبر الواجهة/الـAPI بمستأجر اختبار (1) يحتاج اعتماداً لا أملكه.
+
+## 8. بوابات المفتوحة
 
 | # | البوابة | يحجز |
 |---|---|---|
-| 1 | تأكيد نجاح نشر Railway لـ`981663a` وتشغيل الـmigration (`employees.photo_disk`) | التحقق الإنتاجي |
-| 2 | `awj:r2-smoke-test` من بيئة تملك اعتماد R2 | بوابة تفعيل العلم |
-| 3 | ضبط `AWJ_ATTACHMENTS_R2_ENABLED=true` في Railway (إعادة نشر) | **إغلاق `K-01` فعلياً** |
-| 4 | إثبات الدوام: رفع مرفق مصروف → إعادة نشر → تنزيله | `A-02` الإنتاجي |
-| 5 | قرار S2 (مركز المستندات): (أ) تفعيل `DOCUMENT_DURABLE_STORAGE_ENABLED` + إعداد `document_storage` من شاشة المنصة بلا كود، أم (ب) سائق R2 داخل `DocumentStorageService`؟ مفاتيحه `tenants/…` وتمرّ عبر Flysystem-S3 (خطر ACL على R2 غير مُتحقَّق منه) و`A-19` يمنع تغيير الأسبقية | S2 |
-| 6 | قرار `Idempotency-Key` لـ`POST /expenses` و`POST /payments` (تكرار بعد «نجح الحفظ وضاعت الاستجابة») — تغيير مالي | حدّ معلَن في تقرير S1 §5 |
+| 1 | دمج #1335 ونشره، ثم تشغيل `--put` و`--check` من Console | E5: دوام وعزل على R2 الفعلي |
+| 2 | رفع مرفق مصروف من الواجهة بمستأجر اختبار → إعادة نشر → تنزيله | **S1 PRODUCTION VERIFIED** |
+| 3 | قرار S2: تفعيل `DOCUMENT_DURABLE_STORAGE_ENABLED` + إعداد `document_storage` في شاشة المنصة (سرّ R2 يُدخله المالك) بعد دمج #1332 | S2 إنتاجياً |
+| 4 | دمج #1333 (Idempotency) ونشره | S3 |
