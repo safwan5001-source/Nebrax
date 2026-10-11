@@ -1,5 +1,8 @@
 # AWJ-TAX-ZATCA-HORIZON — Master Plan (Bootstrap V1)
 
+> **Owner activation decision — 2026-10-11:** Pause AWJ Delivery Platforms & Settlement Horizon V1 and designate TAX-ZATCA the sole active Horizon **effective once this documentation PR merges**. Preserve Delivery evidence and resume point; do not execute both in parallel. The initial approved activity is the read-only TAX-HZ-00 Evidence/Decision Pass. This approval does **not** authorize remediation code, a PR merge without specific owner approval, Deploy, ZATCA submission, or production migration. This decision supersedes the initial proposal's unresolved active-versus-parallel gate below.
+
+
 **Status:** PROPOSED / DOCUMENTED — not activated, not released, not ZATCA-certified  
 **Prepared:** 2026-10-11  
 **Repository:** `safwan5001-source/Nebrax`
