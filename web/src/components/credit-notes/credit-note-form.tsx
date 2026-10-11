@@ -15,6 +15,8 @@ import { useToast } from '@/components/ui/toast';
 import { api, ApiError } from '@/lib/api';
 import { useNumberPreview } from '@/lib/use-number-preview';
 import { formatRiyal, riyalToMinor } from '@/lib/money';
+import { cn } from '@/lib/utils';
+import { CreditNoteLinkedForm } from './credit-note-linked-form';
 
 interface Partner { id: string; name: string }
 interface Product { id: string; name: string; sale_price: string; tax_rate: number; is_active: boolean }
@@ -23,11 +25,75 @@ interface Line { key: string; productId: string | null; description: string; qty
 let seq = 0;
 const newLine = (): Line => ({ key: `l${++seq}`, productId: null, description: '', qty: '1', price: '', tax: '15' });
 
+type Mode = 'linked' | 'standalone';
+
 /**
  * نموذج إنشاء الإشعار — مشترك بين الدائن (للعميل) والمدين (للمورّد).
  * النوع يحدّد: فضاء الترجمة · نوع الطرف المعروض · جسم الطلب · وجهة العودة.
+ *
+ * مبيعات: الافتراضي إشعار **مرتبط بفاتورة مرحَّلة**؛ المستقل بلا فاتورة لا يُعرض
+ * إلا إن سمحت به سياسة المنشأة (`allow_standalone_credit_notes`). المشتريات كما كانت.
  */
-export function CreditNoteForm({ type = 'sales' }: { type?: 'sales' | 'purchase' }) {
+export function CreditNoteForm({ type = 'sales', initialInvoiceId }: { type?: 'sales' | 'purchase'; initialInvoiceId?: string | null }) {
+  const isPurchase = type === 'purchase';
+  const t = useTranslations(isPurchase ? 'debitNotes' : 'creditNotes');
+  const tn = useTranslations('creditNotes');
+  // null = لم يُجلب بعد: لا نومض التلميح قبل معرفة السياسة.
+  const [allowStandalone, setAllowStandalone] = useState<boolean | null>(null);
+  const [mode, setMode] = useState<Mode>('linked');
+
+  // فشل جلب الإعداد لا يعطّل النموذج: يبقى المرتبط (الآمن) متاحاً.
+  useEffect(() => {
+    if (isPurchase) return;
+    api<{ data: { allow_standalone_credit_notes?: boolean } }>('/sales-settings')
+      .then((r) => setAllowStandalone(!!r.data.allow_standalone_credit_notes))
+      .catch(() => setAllowStandalone(false));
+  }, [isPurchase]);
+
+  const effectiveMode: Mode = isPurchase || (allowStandalone && mode === 'standalone') ? 'standalone' : 'linked';
+  const modes: { value: Mode; label: string }[] = [
+    { value: 'linked', label: tn('mode_linked') },
+    { value: 'standalone', label: tn('mode_standalone') },
+  ];
+
+  return (
+    <div className="space-y-5">
+      <div className="flex items-center gap-3">
+        <Button asChild variant="ghost" size="icon" aria-label={t('back')}><Link href={isPurchase ? '/debit-notes' : '/credit-notes'}>
+          <ArrowRight className="h-4 w-4" strokeWidth={1.7} />
+        </Link></Button>
+        <h1 className="text-xl font-semibold text-text">{t('new_title')}</h1>
+      </div>
+
+      {!isPurchase && allowStandalone && (
+        <div role="group" aria-label={tn('mode_label')} className="inline-flex rounded border border-border bg-surface p-0.5">
+          {modes.map((m) => (
+            <button
+              key={m.value} type="button" aria-pressed={effectiveMode === m.value} onClick={() => setMode(m.value)}
+              className={cn(
+                'rounded px-3 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40',
+                effectiveMode === m.value ? 'bg-primary-soft font-medium text-primary' : 'text-muted hover:text-text',
+              )}
+            >{m.label}</button>
+          ))}
+        </div>
+      )}
+      {!isPurchase && allowStandalone === false && (
+        <p className="text-xs leading-relaxed text-muted">
+          {tn('standalone_disabled_hint')}{' '}
+          <Link href="/sales-settings/invoices" className="text-primary hover:underline">{tn('standalone_disabled_link')}</Link>
+        </p>
+      )}
+
+      {effectiveMode === 'linked'
+        ? <CreditNoteLinkedForm initialInvoiceId={initialInvoiceId} />
+        : <StandaloneForm type={type} />}
+    </div>
+  );
+}
+
+/** الإشعار المستقل (بلا فاتورة) والمدين للمورّد — السلوك السابق حرفياً. */
+function StandaloneForm({ type }: { type: 'sales' | 'purchase' }) {
   const isPurchase = type === 'purchase';
   const t = useTranslations(isPurchase ? 'debitNotes' : 'creditNotes');
   const tf = useTranslations('invoiceForm');
@@ -102,14 +168,7 @@ export function CreditNoteForm({ type = 'sales' }: { type?: 'sales' | 'purchase'
   }
 
   return (
-    <div className="space-y-5">
-      <div className="flex items-center gap-3">
-        <Button asChild variant="ghost" size="icon" aria-label={t('back')}><Link href={isPurchase ? '/debit-notes' : '/credit-notes'}>
-          <ArrowRight className="h-4 w-4" strokeWidth={1.7} />
-        </Link></Button>
-        <h1 className="text-xl font-semibold text-text">{t('new_title')}</h1>
-      </div>
-
+    <>
       <Card>
         <CardHeader><CardTitle>{t('details')}</CardTitle></CardHeader>
         <CardContent>
@@ -197,6 +256,6 @@ export function CreditNoteForm({ type = 'sales' }: { type?: 'sales' | 'purchase'
           <Button disabled={saving || !partnerId} onClick={submit}>{t('save')}</Button>
         </div>
       </div>
-    </div>
+    </>
   );
 }
