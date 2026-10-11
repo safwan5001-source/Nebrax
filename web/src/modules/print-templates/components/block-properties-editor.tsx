@@ -199,6 +199,9 @@ export function BlockPropertiesEditor({
     quantity: tInvoice('qty'),
     price_before_tax: tInvoice('price_before_tax'),
     unit_price: tInvoice('unit_price'),
+    line_discount: tInvoice('line_discount'),
+    line_net: tInvoice('line_net'),
+    tax_rate: tInvoice('tax_rate'),
     tax: tInvoice('tax'),
     total: tInvoice('total'),
   };

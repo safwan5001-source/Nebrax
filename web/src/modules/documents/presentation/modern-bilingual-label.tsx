@@ -5,6 +5,7 @@ import {
   MODERN_STATUS_LABELS,
   MODERN_TOTAL_LABELS,
   isModernMoneyColumn,
+  applyVatRateToLabel,
   modernCurrencyUnit,
   type DocumentLabelMode,
 } from './visual-v2';
@@ -75,12 +76,16 @@ export function ModernColumnHeader({
 export function ModernTotalLabel({
   field,
   mode,
+  vatRate,
 }: {
   field: keyof typeof MODERN_TOTAL_LABELS;
   mode: DocumentLabelMode;
+  /** نسبة الضريبة المعلنة من المصدر؛ تُطبَّق على صفّ الضريبة وحده. */
+  vatRate?: number | null;
 }) {
   const pair = MODERN_TOTAL_LABELS[field];
-  return <ModernBilingualLabel ar={pair.ar} en={pair.en} mode={mode} />;
+  const rate = field === 'vat' ? vatRate : undefined;
+  return <ModernBilingualLabel ar={applyVatRateToLabel(pair.ar, rate)} en={applyVatRateToLabel(pair.en, rate)} mode={mode} />;
 }
 
 export function ModernStatusLabel({

@@ -122,6 +122,11 @@ export const DEFAULT_DOCUMENT_ITEMS_COLUMNS = [
   'quantity', 'price_before_tax', 'tax', 'total',
 ] as const satisfies readonly DocItemsColumnId[];
 
+export const CREDIT_NOTE_ITEMS_COLUMNS = [
+  'number', 'description', 'quantity', 'price_before_tax', 'line_discount',
+  'line_net', 'tax_rate', 'tax', 'total',
+] as const satisfies readonly DocItemsColumnId[];
+
 /**
  * أعمدة fallback بحسب دلالة المستند. لا تُكتب في تعريف المراجعة، لذلك تبقى
  * تخصيصات الأعمدة المحفوظة والمراجعات المثبتة أعلى أولوية من هذه القيم.
@@ -138,7 +143,8 @@ export const DOCUMENT_TYPE_DEFAULT_ITEM_COLUMNS: Readonly<Record<DocumentTypeId,
   packing_list: DEFAULT_DOCUMENT_ITEMS_COLUMNS,
   receipt_voucher: DEFAULT_DOCUMENT_ITEMS_COLUMNS,
   payment_voucher: DEFAULT_DOCUMENT_ITEMS_COLUMNS,
-  credit_note: DEFAULT_DOCUMENT_ITEMS_COLUMNS,
+  // سطر يتسوّى بصرياً: الكمية · السعر قبل الضريبة · الخصم · الصافي · النسبة · الضريبة · الإجمالي.
+  credit_note: CREDIT_NOTE_ITEMS_COLUMNS,
   debit_note: DEFAULT_DOCUMENT_ITEMS_COLUMNS,
   statement_of_account: DEFAULT_DOCUMENT_ITEMS_COLUMNS,
 };
@@ -390,7 +396,7 @@ export function validateDocumentBlockProperties(
         continue;
       }
       const columnIds = columns.map((column) => column.id);
-      if (columnIds.some((id) => !DOCUMENT_ITEMS_COLUMN_IDS.includes(id))) errors.push('invalid_items_column');
+      if (columnIds.some((id) => !(DOCUMENT_ITEMS_COLUMN_IDS as readonly DocItemsColumnId[]).includes(id))) errors.push('invalid_items_column');
       if (new Set(columnIds).size !== columnIds.length) errors.push('duplicate_items_column');
       if (REQUIRED_ITEMS_COLUMNS.some((id) => !columnIds.includes(id))) errors.push('required_items_column_missing');
       for (const column of columns) {
