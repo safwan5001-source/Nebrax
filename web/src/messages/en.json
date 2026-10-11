@@ -5480,6 +5480,10 @@
           "title": "Point-of-sale session report",
           "description": "Summary of cash and expected sales for the active sales session."
         },
+        "deliveryChannel": {
+          "title": "Delivery platform sales",
+          "description": "Posted point-of-sale invoices linked to a delivery channel. Hub orders are not invoices, and credit notes are not subtracted from the net."
+        },
         "salesByPeriod": {
           "title": "Sales by period",
           "description": "Daily, weekly, and monthly sales invoices."
@@ -5640,6 +5644,107 @@
           "title": "Inventory turnover",
           "description": "Measure item turnover speed during the selected period."
         }
+      }
+    },
+    "deliveryChannel": {
+      "title": "Delivery platform sales",
+      "description": "Financial summary of posted point-of-sale invoices that have a delivery context.",
+      "caption": "Posted point-of-sale invoices linked to a delivery channel only. Ordinary POS sales are excluded. Hub orders are not posted invoices and are not counted here.",
+      "back": "Back to sales reports",
+      "platform": "Delivery platform",
+      "allPlatforms": "All platforms",
+      "exportCsv": "Export CSV",
+      "forbidden": "You do not have permission to view reports.",
+      "forbiddenHint": "This report requires reports.view. No figures were requested.",
+      "loadFailed": "The report could not be loaded. Check the connection and try again.",
+      "incomplete": "The report response is incomplete or does not match the contract. No substitute figures were shown.",
+      "retry": "Try again",
+      "empty": "No posted delivery invoices, returns, or credit notes are in this scope.",
+      "emptyCreditNotes": "No credit notes are in this scope.",
+      "creditNotesTitle": "Credit notes",
+      "separateFromNet": "Not subtracted from the net",
+      "creditNotesHint": "Credit notes are shown on their own by note date. They are not subtracted again from net sales after POS returns.",
+      "comparisonTitle": "Platform comparison",
+      "invoicesTitle": "Delivery invoices",
+      "returnsTitle": "POS returns",
+      "collectionCaption": "Split of the VAT-inclusive total, not an addition to it: platform collected {platform} · merchant collected {merchant} · unclassified {unclassified}.",
+      "exceptions": "Counts with no amount: context branch mismatch {context} · credit-note customer mismatch {partner}.",
+      "collectionModes": {
+        "platform_collected": "Platform collected",
+        "merchant_collected": "Merchant collected"
+      },
+      "metrics": {
+        "gross_sales": "Gross sales before discounts",
+        "discounts": "Discounts",
+        "net_sales": "Net sales before VAT",
+        "vat": "VAT",
+        "total": "Total sales including VAT",
+        "invoice_count": "Posted invoice count",
+        "returns_count": "POS return count",
+        "returns_subtotal": "POS returns before VAT",
+        "returns_vat": "POS return VAT",
+        "returns_total": "POS returns including VAT",
+        "net_after_pos_returns": "Net sales after POS returns",
+        "shipping": "Shipping",
+        "adjustment": "Adjustment",
+        "credit_note_count": "Credit-note count",
+        "credit_note_total": "Credit-note value",
+        "platform_collected": "Platform collected",
+        "merchant_collected": "Merchant collected",
+        "unclassified": "Unclassified",
+        "context_mismatch": "Context branch mismatch",
+        "partner_mismatch": "Credit-note customer mismatch"
+      },
+      "columns": {
+        "platformKey": "Platform",
+        "number": "Number",
+        "date": "Invoice date",
+        "returnDate": "Return date",
+        "noteDate": "Note date",
+        "branch": "Branch",
+        "displayName": "Pinned name",
+        "collectionMode": "Collection mode",
+        "externalReference": "External order reference",
+        "sourceInvoice": "Source invoice",
+        "session": "POS session"
+      },
+      "csv": {
+        "section": "Section",
+        "name": "Item",
+        "count": "Count",
+        "amount": "Amount",
+        "profile_id": "Platform id",
+        "platform_key": "Platform key",
+        "number": "Number",
+        "date": "Date",
+        "branch_name": "Branch",
+        "display_name": "Pinned name",
+        "display_name_en": "Pinned English name",
+        "collection_mode": "Collection mode",
+        "external_order_reference": "External order reference",
+        "source_invoice_number": "Source invoice number",
+        "subtotal": "Amount before VAT",
+        "gross_sales": "Gross sales before discounts",
+        "discounts": "Discounts",
+        "shipping": "Shipping",
+        "adjustment": "Adjustment",
+        "net_sales": "Net sales before VAT",
+        "vat": "VAT",
+        "total": "Total including VAT",
+        "returns_total": "POS returns",
+        "net_after_pos_returns": "Net after POS returns",
+        "pos_session_id": "POS session"
+      },
+      "csvSections": {
+        "summary": "Summary",
+        "creditNotes": "Credit notes",
+        "creditNotesNotSubtracted": "Credit notes — not subtracted from net after POS returns",
+        "collection": "Collection split",
+        "exceptions": "Exceptions",
+        "platform": "Platform",
+        "invoice": "Invoice",
+        "returnDocument": "Return",
+        "creditNote": "Credit note"
       }
     },
     "sales": {
