@@ -1,7 +1,7 @@
 # AWJ Delivery Platforms & Settlement Horizon V1
 
 **System:** AWJ Autonomous Engineering Horizon  
-**Status:** ACTIVE — PASS-7 accepted; PASS-8 merged; each implementation still requires its own authorization
+**Status:** ACTIVE — PASS-7 accepted; PASS-8 merged; Connector Core merged (PR #1287); DLV-PROVIDER-READINESS-1 recorded; no native connector promoted
 **Prepared:** 2026-10-02  
 **Planning Base SHA:** `78ca324504db30185bc074fd91e77efbccaf7267`  
 **Primary decision:** `docs/plans/pos/AWJ_POS_DELIVERY_PLATFORMS_ACCOUNTING_UX_DECISION.md`  
@@ -132,21 +132,28 @@ close/Z-report presentation and channel-total separation, using existing
 manual-POS session attribution only. It does not require imported-order VAT
 recognition.
 
-`DLV-CONNECTOR-CORE-1` is implemented on its focused PR as an operational
-ingestion and security foundation only. It is not merged by this horizon
-update. It reuses the Delivery Hub projection, the existing encrypted-cast
-secret pattern, and `WebhookSignature` HMAC verification. It does not enable a
-provider, does not implement provider-specific authentication, and does not
-implement the PASS-8 financial/tax evidence contract. `DLV-COMMISSION-1`,
-`DLV-SETTLEMENT-1`, `DLV-RECON-1`, `DLV-REFUND-1`, and all imported
-financial-transition work remain blocked by their respective evidence,
-provider, DG-3, or owner gates. Manual POS remains independent and unchanged.
+`DLV-CONNECTOR-CORE-1` is merged in PR #1287 at
+`23a99b104b7b95e7616d4797075de453183696e6`. It remains an operational
+ingestion and security foundation only. It reuses the Delivery Hub projection,
+the existing encrypted-cast secret pattern, and `WebhookSignature` HMAC
+verification. It does not enable a provider, does not implement
+provider-specific authentication, and does not implement the PASS-8
+financial/tax evidence contract. `DLV-COMMISSION-1`, `DLV-SETTLEMENT-1`,
+`DLV-RECON-1`, `DLV-REFUND-1`, and all imported financial-transition work
+remain blocked by their respective evidence, provider, DG-3, or owner gates.
+Manual POS remains independent and unchanged.
 
 No further delivery financial implementation task is promoted as ready.
 `DLV-CONNECTOR-CORE-1` does not authorize imported-order financial behavior.
-After it merges, the next candidate is an evidence-only
-`DLV-PROVIDER-READINESS-1` packet. Native connectors stay blocked until an
-official contract and test path exist.
+`DLV-PROVIDER-READINESS-1` is recorded in
+`docs/plans/pos/DLV-PROVIDER-READINESS-1-REPORT.md` (verification 2026-10-11,
+base `23a99b104b7b95e7616d4797075de453183696e6`). That assessment does not
+promote a native connector. HungerStation, Keeta, Jahez, Mrsool, Ninja, and
+The Chefz stay not enabled. None is `READY` for a connector, and none is
+`READY` for imported financial posting. `DLV-HUNGERSTATION-1` and
+`DLV-KEETA-1` stay not dependency-ready until the owner evidence named in
+that report exists. No adapter, credential, webhook, or financial task is
+authorized by this horizon update.
 
 ## 6. Task acceptance highlights
 
