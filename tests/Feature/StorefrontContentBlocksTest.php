@@ -183,15 +183,17 @@ class StorefrontContentBlocksTest extends TestCase
     }
 
     /** @test */
-    public function a_hidden_custom_content_section_never_blocks_publish(): void
+    public function the_media_gate_judges_a_picture_wherever_it_is_even_in_a_hidden_section(): void
     {
         $t = $this->tenantWithPicture('cb-hidden');
         app(TenantContext::class)->set($t['auth']['tenant_id']);
 
+        // الوسائط قاعدة وثيقة لا قاعدة قسمٍ ظاهر: الملكية والنص البديل تُحكَم أينما وُجد المرجع (يُظهر التاجر القسم لاحقاً بلا مفاجأة).
         $codes = $this->codes($this->document(['blocks' => [
             ['id' => 'i', 'kind' => 'image', 'media' => ['mediaId' => $t['a']]],
         ]], false));
 
-        $this->assertSame([], array_filter($codes, static fn (string $code): bool => str_starts_with($code, 'alt_required')));
+        $this->assertSame('alt_required_ar', $codes['homepage.sections.0.content.blocks.0.media.alt.ar'] ?? null);
+        $this->assertSame('alt_required_en', $codes['homepage.sections.0.content.blocks.0.media.alt.en'] ?? null);
     }
 }

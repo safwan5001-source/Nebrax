@@ -41,7 +41,7 @@
 ## Tests
 
 - Shared fixture `content-blocks.json` (47 cases, expected values computed by the PHP authority and reviewed line by line) × PHP `StorefrontContentBlocksTest`, storefront and web `content-blocks.test.ts` (96 each, incl. idempotence and key order).
-- PHP integration with real uploads: per-locale alt required at the right path **inside a column too**, decorative accepted, **another tenant's picture is `media_missing`**, hidden section never blocks.
+- PHP integration with real uploads: per-locale alt required at the right path **inside a column too**, decorative accepted, **another tenant's picture is `media_missing`**, the media gate judges a picture wherever it is, a hidden section included.
 - Storefront: `content-blocks-resolve.test.ts` (6), `CustomContentBand.blocks.test.tsx` (11), existing FAQ tests unchanged and green.
 
 ## Design Quality Pass — real Chromium
