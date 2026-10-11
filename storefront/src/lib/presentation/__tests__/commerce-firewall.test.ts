@@ -85,7 +85,26 @@ describe("commerce firewall — presentation normalisation", () => {
       "hero",
       "benefits",
       "customContent",
+      "categories",
+      "wholesale",
+      "banner",
+      "appPromo",
+      "discovery",
+      "deliveryPromise",
+      "slider",
+      "gallery",
     ]);
+    // the distinct normalisation branches really processed their (hostile) content rather than dropping it
+    const content = (type: string) =>
+      sections.find((s) => s.type === type)?.content as never as Record<
+        string,
+        any
+      >;
+    expect(content("banner").title).toBe("خصم الصيف");
+    expect(content("discovery").dimension).toBe("color");
+    expect(content("deliveryPromise").body).toBe("نوصل اليوم");
+    expect(content("slider").slides[0].id).toBe("sl1");
+    expect(content("gallery").images[0].id).toBe("g1");
     expect(sections[0].design?.cards).toEqual({
       align: "center",
       imageRatio: "1:1",

@@ -108,7 +108,18 @@ class StorefrontCommerceFirewallTest extends TestCase
         $normalized = (new StorefrontPresentationNormalizer)->normalize($this->fixture()['input']);
         $sections = $normalized['homepage']['sections'];
 
-        $this->assertSame(['newArrivals', 'featured', 'offers', 'productShelf', 'hero', 'benefits', 'customContent'], array_column($sections, 'type'));
+        $this->assertSame(
+            ['newArrivals', 'featured', 'offers', 'productShelf', 'hero', 'benefits', 'customContent', 'categories', 'wholesale', 'banner', 'appPromo', 'discovery', 'deliveryPromise', 'slider', 'gallery'],
+            array_column($sections, 'type'),
+            'every accepted homepage section type must be present in the hostile document and survive normalisation',
+        );
+        // the distinct normalisation branches really processed their (hostile) content rather than dropping it
+        $byType = array_column($sections, null, 'type');
+        $this->assertSame('خصم الصيف', $byType['banner']['content']['title']);
+        $this->assertSame('color', $byType['discovery']['content']['dimension']);
+        $this->assertSame('نوصل اليوم', $byType['deliveryPromise']['content']['body']);
+        $this->assertSame('sl1', $byType['slider']['content']['slides'][0]['id']);
+        $this->assertSame('g1', $byType['gallery']['content']['images'][0]['id']);
         $this->assertSame(['align' => 'center', 'imageRatio' => '1:1', 'imageFit' => 'contain', 'hover' => 'lift'], $sections[0]['design']['cards']);
         $this->assertSame(['offerIds' => ['o1'], 'showTitle' => false], $sections[2]['content']);
 
