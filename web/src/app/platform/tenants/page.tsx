@@ -2,13 +2,14 @@
 
 import Link from 'next/link';
 import * as React from 'react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { type ColumnDef } from '@tanstack/react-table';
 import { ArrowRight, RefreshCw, ShieldCheck } from 'lucide-react';
 import { GlobalApplicationControlsCard } from '@/components/platform/global-application-controls-card';
 import { DataTable } from '@/components/data-table';
+import { Pagination } from '@/components/nebrax/pagination';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
@@ -46,30 +47,71 @@ export default function PlatformTenantsPage() {
   const [planFilter, setPlanFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
   const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const [perPage, setPerPage] = useState(25);
+  const [total, setTotal] = useState(0);
+  const [lastPage, setLastPage] = useState(1);
+  const overshootCorrected = useRef(false);
+  const seenSearch = useRef(search);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const params = new URLSearchParams({ per_page: '100' });
+      const params = new URLSearchParams({
+        per_page: String(perPage),
+        page: String(page),
+      });
       if (search.trim() !== '') params.set('search', search.trim());
       const response = await platformApi<TenantsResponse>(`/platform/tenants?${params.toString()}`);
-      setRows(response.data);
+      const meta = response.pagination;
+      const boundedLast = Math.max(1, meta?.last_page ?? 1);
+      if ((meta?.current_page ?? page) > boundedLast && page !== boundedLast && !overshootCorrected.current) {
+        overshootCorrected.current = true;
+        setPage(boundedLast);
+        return;
+      }
+      overshootCorrected.current = false;
+      setRows(response.data ?? []);
+      setTotal(typeof meta?.total === 'number' ? meta.total : (response.data?.length ?? 0));
+      setLastPage(boundedLast);
     } catch (reason) {
       setError(reason instanceof ApiError ? reason.message : t('loadFailed'));
     } finally {
       setLoading(false);
     }
-  }, [search, t]);
+  }, [page, perPage, search, t]);
 
   useEffect(() => {
     if (!isPlatformAuthenticated()) {
       router.replace('/platform/login');
       return;
     }
-    const timer = window.setTimeout(() => load(), search.trim() === '' ? 0 : 250);
+    const searchChanged = seenSearch.current !== search;
+    seenSearch.current = search;
+    const delay = searchChanged && search.trim() !== '' ? 250 : 0;
+    const timer = window.setTimeout(() => {
+      void load();
+    }, delay);
     return () => window.clearTimeout(timer);
   }, [load, router, search]);
+
+  const changeSearch = (value: string) => {
+    overshootCorrected.current = false;
+    setSearch(value);
+    setPage(1);
+  };
+
+  const changePage = (next: number) => {
+    overshootCorrected.current = false;
+    setPage(next);
+  };
+
+  const changePerPage = (next: number) => {
+    overshootCorrected.current = false;
+    setPerPage(next);
+    setPage(1);
+  };
 
   const columns = useMemo<ColumnDef<TenantRow, unknown>[]>(
     () => [
@@ -168,7 +210,7 @@ export default function PlatformTenantsPage() {
               <ArrowRight className="h-4 w-4" strokeWidth={1.7} aria-hidden="true" />
               {t('back')}
             </Link></Button>
-            <Button variant="outline" size="sm" onClick={load} disabled={loading}>
+            <Button variant="outline" size="sm" onClick={() => void load()} disabled={loading} aria-label={t('refresh')}>
               <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} strokeWidth={1.7} aria-hidden="true" />
             </Button>
           </div>
@@ -186,6 +228,7 @@ export default function PlatformTenantsPage() {
         ) : (
           <div className="space-y-3">
             <GlobalApplicationControlsCard />
+            <p className="text-sm text-muted">{t('pageFilterNote')}</p>
             <div className="flex flex-wrap items-center gap-2">
               <Select
                 value={planFilter}
@@ -215,9 +258,18 @@ export default function PlatformTenantsPage() {
               loading={loading}
               searchPlaceholder={t('search')}
               searchValue={search}
-              onSearchChange={setSearch}
+              onSearchChange={changeSearch}
               emptyLabel={t('empty')}
               exportName="tenants"
+            />
+            <Pagination
+              page={page}
+              lastPage={lastPage}
+              perPage={perPage}
+              total={total}
+              onPageChange={changePage}
+              onPerPageChange={changePerPage}
+              disabled={loading}
             />
           </div>
         )}

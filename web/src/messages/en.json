@@ -446,6 +446,8 @@
     "allPlans": "All plans",
     "filterByStatus": "Filter by status",
     "allStatuses": "All statuses",
+    "pageFilterNote": "Filters apply to this page only.",
+    "refresh": "Refresh",
     "trialEndsAt": "Trial ends",
     "usersCount": "Users",
     "active": "Active",

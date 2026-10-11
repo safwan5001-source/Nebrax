@@ -5,15 +5,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import PlatformTenantsPage from './page';
 import PlatformTenantDetailPage from './[id]/page';
 
-const { platformApi, clipboardWriteText, routerPush, translate } = vi.hoisted(() => ({
-  platformApi: vi.fn(),
-  clipboardWriteText: vi.fn(),
-  routerPush: vi.fn(),
-  translate: (key: string) => ({
+const { platformApi, clipboardWriteText, routerPush, translate } = vi.hoisted(() => {
+  const translate = Object.assign((key: string) => ({
     title: 'Tenants', subtitle: 'Tenant operations', back: 'Back', search: 'Search by account number',
     name: 'Organization', accountNumber: 'Account number', supportNumber: 'Support number',
     contactName: 'Owner name', contact: 'Owner email', phone: 'Phone', plan: 'Plan', status: 'Status',
     filterByPlan: 'Filter by plan', allPlans: 'All plans', filterByStatus: 'Filter by status', allStatuses: 'All statuses',
+    pageFilterNote: 'Filters apply to this page only.', refresh: 'Refresh',
     trialEndsAt: 'Trial ends', usersCount: 'Users', active: 'Active', inactive: 'Inactive', noTrial: 'No trial',
     loadFailed: 'Load failed', retry: 'Retry', empty: 'No tenants', detailTitle: 'Tenant details',
     activeUsers: 'Active users', totalUsers: 'Total users', registeredOn: 'Registered on', currentPlan: 'Current plan',
@@ -21,10 +19,19 @@ const { platformApi, clipboardWriteText, routerPush, translate } = vi.hoisted(()
     clearTrial: 'Clear trial', saveTrial: 'Save trial', accessManagement: 'Access management', accessNotice: 'Access notice',
     deactivate: 'Deactivate', activate: 'Activate', auditNotice: 'Audit notice', copyReference: 'Copy number',
     referenceCopied: 'Number copied.', commercialOperations: 'Commercial operations',
-  }[key] ?? key),
-}));
+    resultsNavigation: 'Results', perPage: 'Rows per page', previousPage: 'Previous page', nextPage: 'Next page',
+  }[key] ?? key), {
+    rich: (key: string) => key,
+  });
+  return {
+    platformApi: vi.fn(),
+    clipboardWriteText: vi.fn(),
+    routerPush: vi.fn(),
+    translate,
+  };
+});
 
-vi.mock('next-intl', () => ({ useTranslations: () => translate }));
+vi.mock('next-intl', () => ({ useTranslations: () => translate, useLocale: () => 'en' }));
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: routerPush, replace: routerPush }), useParams: () => ({ id: 'tenant-1' }) }));
 vi.mock('@/lib/platform-auth', () => ({ isPlatformAuthenticated: () => true }));
 vi.mock('@/lib/platform-api', () => ({ platformApi }));
@@ -43,7 +50,7 @@ vi.mock('lucide-react', () => {
     has: () => true,
   });
 });
-vi.mock('@/components/ui/button', () => ({ Button: ({ children, ...props }: any) => <button {...props}>{children}</button> }));
+vi.mock('@/components/ui/button', () => ({ Button: ({ children, asChild: _asChild, ...props }: any) => <button {...props}>{children}</button> }));
 vi.mock('@/components/ui/card', () => ({ Card: ({ children }: any) => <section>{children}</section>, CardContent: ({ children }: any) => <div>{children}</div>, CardHeader: ({ children }: any) => <header>{children}</header>, CardTitle: ({ children }: any) => <h2>{children}</h2> }));
 vi.mock('@/components/ui/badge', () => ({ Badge: ({ children }: any) => <span>{children}</span> }));
 vi.mock('@/components/ui/input', () => ({ Input: (props: any) => <input {...props} /> }));
@@ -86,7 +93,7 @@ describe('tenant reference numbers in Platform Admin', () => {
     expect(await screen.findByText('Reference Co 1000000 1000')).toBeTruthy();
     fireEvent.change(screen.getByRole('textbox', { name: 'Search by account number' }), { target: { value: '1000' } });
 
-    await waitFor(() => expect(platformApi).toHaveBeenCalledWith('/platform/tenants?per_page=100&search=1000'));
+    await waitFor(() => expect(platformApi).toHaveBeenCalledWith('/platform/tenants?per_page=25&page=1&search=1000'));
   });
 
   it('displays the numbers on tenant detail and copies the selected identifier', async () => {
