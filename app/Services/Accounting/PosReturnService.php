@@ -266,8 +266,13 @@ class PosReturnService
         // AWJ-TAX-REM-02: التراكم ينظر إلى المرتجعات **والإشعارات الدائنة** المرحَّلة معاً —
         // وإلا اشتُقّ جزء POS بموضعٍ (c) لا يحسب ما استهلكه إشعارٌ، فبقيت هللات من
         // الضريبة بلا عكس رغم نفاد الكمية.
-        $returned = collect(app(ReturnSourceAllocator::class)->returned($sourceLines->keys()->all()))
+        $allocator = app(ReturnSourceAllocator::class);
+        $returned = collect($allocator->returned($sourceLines->keys()->all()))
             ->map(fn (array $row) => (object) $row);
+        // المبالغ المحصَّلة بعد حصة خصم الرأس — الأساس نفسه الذي يُخصم منه `returned()`؛
+        // وإلا طُرح من السطر الخام ما استُهلك من السطر المعدَّل. فاتورة POS لا تحمل خصم
+        // رأس اليوم فتتطابق القيمتان؛ لكن الاشتقاق لا يفترض ذلك.
+        $charged = $allocator->charged($invoice);
 
         $items = [];
         foreach ($requested as $item) {
@@ -289,9 +294,9 @@ class PosReturnService
             }
 
             $isFinalPart = $quantity === $remainingQuantity;
-            $subtotal = $this->allocate((int) $line->line_subtotal, $sold, $quantity, (int) ($previous?->subtotal ?? 0), $isFinalPart);
-            $discount = $this->allocate((int) $line->line_discount, $sold, $quantity, (int) ($previous?->discount ?? 0), $isFinalPart);
-            $tax = $this->allocate((int) $line->line_tax, $sold, $quantity, (int) ($previous?->tax ?? 0), $isFinalPart);
+            $subtotal = $this->allocate((int) $charged[$line->id]['subtotal'], $sold, $quantity, (int) ($previous?->subtotal ?? 0), $isFinalPart);
+            $discount = $this->allocate((int) $charged[$line->id]['discount'], $sold, $quantity, (int) ($previous?->discount ?? 0), $isFinalPart);
+            $tax = $this->allocate((int) $charged[$line->id]['tax'], $sold, $quantity, (int) ($previous?->tax ?? 0), $isFinalPart);
 
             $items[] = [
                 'source_line_id' => $line->id,

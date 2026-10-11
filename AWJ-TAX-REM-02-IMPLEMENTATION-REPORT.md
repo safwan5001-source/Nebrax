@@ -90,6 +90,7 @@ _See the PR file list; summary below._
 | `app/Http/Requests/StoreCreditNoteRequest.php` | `items.*.source_line_id`; `unit_price` optional when an invoice is given |
 | `app/Http/Requests/UpdateSalesSettingsRequest.php`, `app/Support/Settings.php` | the new setting |
 | `app/Models/CreditNoteLine.php`, `app/Http/Resources/CreditNoteLineResource.php` | the new columns (`source_line_id`, `line_discount`, `unit_price_before_tax`) |
+| `web/src/app/(app)/sales-settings/invoices/page.tsx`, `web/src/messages/{ar,en}.json` | the opt-in toggle for standalone credit notes (so new tenants can enable the policy from the UI) |
 | `web/src/modules/documents/builder/from-credit-note.ts` (+ test) | the printed credit note uses the pre-tax unit price so unit price, tax and total reconcile for inclusive invoices (2 vitest cases) |
 | `database/migrations/2026_11_04_01…/02…/03…` | see §4 |
 | `tests/Feature/CreditNoteSourceVatAccuracyTest.php` | **new** — 35 tests |
@@ -97,7 +98,7 @@ _See the PR file list; summary below._
 | `tests/Feature/CreditNoteSourcePostgresTest.php` | **new** — 7 tests (PostgreSQL: restrict rule, rollback, real forked concurrency) |
 | existing credit-note tests (`CreditNoteTest`, `…SourceOwnershipTest`, `…PostingOwnershipTest`, `CustomerRefundTest`, `DebitNoteTest`, `DocumentHttpVariantsTest`, `InteractsWithApi`) | mechanical: standalone-note tests opt in to the policy; invoice-source tests now use a *posted* invoice and a source line |
 
-No change to `LedgerService`, `InventoryService`, `PaymentService`, ZATCA, or any posted document. **No e-invoicing of credit notes (REM-18).** Web change limited to the credit-note document builder mapping (one file + test).
+No change to `LedgerService`, `InventoryService`, `PaymentService`, ZATCA, or any posted document. **No e-invoicing of credit notes (REM-18).** Web changes limited to the credit-note document builder mapping and the standalone-notes toggle on the sales-settings page.
 
 ## 7. Tests
 

@@ -508,6 +508,27 @@ class CreditNoteSourceVatAccuracyTest extends TestCase
     }
 
     /** @test */
+    public function pos_style_derivation_after_a_note_on_a_header_discounted_invoice_never_exceeds_the_invoice(): void
+    {
+        // 2 × 100.00 بخصم رأس 20.00: صافٍ 180.00 وضريبة 27.00. إشعار بوحدة ثم ردّ POS للأخرى:
+        // المجموع = الفاتورة بالضبط (كان يُشتقّ الجزء الأخير من الخام فيتجاوز).
+        $invoice = $this->sale([$this->item(2, 10000)], ['discount' => 2000]);
+        $line = $invoice->lines->first();
+        $this->assertSame([18000, 2700], [(int) $invoice->subtotal - (int) $invoice->discount, (int) $invoice->tax_amount]);
+
+        $note = $this->note($invoice, [[$line, 1]]);
+
+        $service = app(\App\Services\Accounting\PosReturnService::class);
+        $derive = new \ReflectionMethod($service, 'buildSourceItems');
+        $derive->setAccessible(true);
+        $item = $derive->invoke($service, $invoice->fresh('lines'), [['source_line_id' => $line->id, 'quantity' => 1]])[0];
+
+        $posNet = $item['line_subtotal_override'] - $item['line_discount'];
+        $this->assertSame(18000, (int) $note->subtotal + $posNet, 'Σ الأساس = صافي الفاتورة.');
+        $this->assertSame(2700, (int) $note->tax_amount + $item['line_tax_override'], 'Σ الضريبة = ضريبة الفاتورة.');
+    }
+
+    /** @test */
     public function a_note_first_then_a_return_is_also_capped(): void
     {
         $invoice = $this->sale([$this->item(2, 10000)]);
