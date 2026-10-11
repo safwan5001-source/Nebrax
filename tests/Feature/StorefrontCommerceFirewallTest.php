@@ -41,6 +41,24 @@ class StorefrontCommerceFirewallTest extends TestCase
         return $keys;
     }
 
+    /** The PHP source with comments removed by the tokenizer (a regex would also eat code that follows a `//` inside a string or URL). */
+    private function withoutComments(string $source): string
+    {
+        $code = '';
+        foreach (token_get_all($source) as $token) {
+            if (is_array($token)) {
+                if ($token[0] === T_COMMENT || $token[0] === T_DOC_COMMENT) {
+                    continue;
+                }
+                $code .= $token[1];
+            } else {
+                $code .= $token;
+            }
+        }
+
+        return $code;
+    }
+
     /** @test */
     public function no_commercial_key_survives_normalisation_in_any_scope(): void
     {
@@ -66,6 +84,11 @@ class StorefrontCommerceFirewallTest extends TestCase
         $this->assertSame(['newArrivals', 'featured', 'offers', 'productShelf', 'hero', 'benefits', 'customContent'], array_column($sections, 'type'));
         $this->assertSame(['align' => 'center', 'imageRatio' => '1:1', 'imageFit' => 'contain', 'hover' => 'lift'], $sections[0]['design']['cards']);
         $this->assertSame(['offerIds' => ['o1'], 'showTitle' => false], $sections[2]['content']);
+
+        // every scope the hostile document carried is still produced by the normaliser (the firewall strips keys, not scopes)
+        foreach (['branding', 'header', 'footer', 'contact', 'whatsapp', 'social', 'verification', 'sbc', 'apps', 'navigation', 'pagePresentation', 'announcements', 'palette'] as $scope) {
+            $this->assertArrayHasKey($scope, $normalized, "the {$scope} scope disappeared");
+        }
     }
 
     /** @test */
@@ -92,7 +115,7 @@ class StorefrontCommerceFirewallTest extends TestCase
         foreach (['CommercePriceResolver.php', 'StorefrontOfferResolver.php', 'CommerceCartService.php', 'CommerceCheckoutService.php', 'CommerceOrderService.php'] as $name) {
             $source = (string) file_get_contents($services.'/'.$name);
             $this->assertStringNotContainsString('Support\\Commerce\\Storefront', $source, "{$name} must not depend on presentation normalisers");
-            $this->assertStringNotContainsString('presentation', strtolower(preg_replace('#//.*|/\*.*?\*/#s', '', $source) ?? ''), "{$name} must not read the presentation");
+            $this->assertStringNotContainsString('presentation', strtolower($this->withoutComments($source)), "{$name} must not read the presentation");
         }
     }
 }

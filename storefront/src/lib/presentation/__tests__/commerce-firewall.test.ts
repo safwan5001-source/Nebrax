@@ -77,5 +77,24 @@ describe("commerce firewall — presentation normalisation", () => {
       hover: "lift",
     });
     expect(sections[2].content).toEqual({ offerIds: ["o1"], showTitle: false });
+
+    // every scope the hostile document carried is still produced (the firewall strips keys, not scopes)
+    for (const scope of [
+      "branding",
+      "header",
+      "footer",
+      "contact",
+      "whatsapp",
+      "social",
+      "verification",
+      "sbc",
+      "apps",
+      "navigation",
+      "pagePresentation",
+      "announcements",
+      "palette",
+    ]) {
+      expect(normalized, scope).toHaveProperty(scope);
+    }
   });
 });
