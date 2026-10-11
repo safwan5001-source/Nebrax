@@ -7,6 +7,12 @@ import type { BackgroundMediaBounds } from "../media/use-background-media-bounds
 import type { CustomizerMessageKey } from "../messages";
 import { autoForeground } from "../presentation/contrast-engine";
 import {
+  GLOBAL_CARD_ALIGNS,
+  GLOBAL_CARD_HOVERS,
+  GLOBAL_CARD_IMAGE_FITS,
+  GLOBAL_CARD_IMAGE_RATIOS,
+} from "../presentation/global-tokens";
+import {
   ALIGNS,
   BODY_SCALES,
   BORDER_WIDTHS,
@@ -116,6 +122,8 @@ const LAYOUT_LABEL: Record<string, CustomizerMessageKey> = {
   minimal: "designLayoutMinimal",
   "text-band": "designLayoutTextBand",
   carousel: "designLayoutCarousel",
+  grid: "designLayoutGrid",
+  rail: "designLayoutRail",
   flat: "designLayoutFlat",
   "columns-2": "designLayoutColumns2",
   "columns-3": "designLayoutColumns3",
@@ -156,7 +164,22 @@ const HSTYLE_LABEL: Record<string, CustomizerMessageKey> = {
   underline: "designHsUnderline",
 };
 
-function allows(allowance: true | readonly string[] | undefined, field: string): boolean {
+/** CUST-HV V9d-2 — the product / offer shelves: they share the columns control and the card override. */
+const SHELF_TYPES = new Set(["newArrivals", "featured", "offers", "productShelf"]);
+
+const CARD_FIELDS = [
+  { key: "align", label: "gtCardAlign", values: GLOBAL_CARD_ALIGNS, names: { start: "gtCardAlignStart", center: "gtCardAlignCenter" } },
+  {
+    key: "imageRatio",
+    label: "gtCardImageRatio",
+    values: GLOBAL_CARD_IMAGE_RATIOS,
+    names: { "1:1": "gtCardRatioSquare", "4:3": "gtCardRatioLandscape", "3:4": "gtCardRatioPortrait" },
+  },
+  { key: "imageFit", label: "gtCardImageFit", values: GLOBAL_CARD_IMAGE_FITS, names: { cover: "gtCardFitCover", contain: "gtCardFitContain" } },
+  { key: "hover", label: "gtCardHover", values: GLOBAL_CARD_HOVERS, names: { none: "gtCardHoverNone", lift: "gtCardHoverLift", zoom: "gtCardHoverZoom" } },
+] as const;
+
+function allows(allowance: true | readonly (string | number)[] | undefined, field: string): boolean {
   return allowance === true || (Array.isArray(allowance) && allowance.includes(field));
 }
 
@@ -705,7 +728,7 @@ export function DesignInspector({
               value={current.layout ?? ""}
               onChange={(event) => set("layout", (event.target.value || undefined) as SectionDesign["layout"])}
             >
-              <option value="">{t(type === "gallery" ? "designLayoutGrid" : "designLayoutDefault")}</option>
+              <option value="">{t(type === "gallery" ? "designLayoutGrid" : SHELF_TYPES.has(type) ? "designLayoutShelfDefault" : "designLayoutDefault")}</option>
               {(capability.layout as readonly string[]).map((layout) => (
                 <option key={layout} value={layout}>
                   {t(LAYOUT_LABEL[layout])}
@@ -714,7 +737,15 @@ export function DesignInspector({
             </select>
           </Field>
           <p className="text-[12px] leading-5 text-muted">
-            {t(type === "gallery" ? "designLayoutGalleryHint" : type === "benefits" ? "designLayoutBenefitsHint" : "designLayoutHint")}
+            {t(
+              type === "gallery"
+                ? "designLayoutGalleryHint"
+                : type === "benefits"
+                  ? "designLayoutBenefitsHint"
+                  : SHELF_TYPES.has(type)
+                    ? "designLayoutShelfHint"
+                    : "designLayoutHint",
+            )}
           </p>
           {layoutInactive ? (
             <p data-design-layout-inactive="" role="status" className="text-[12px] leading-5 text-warning">
@@ -722,6 +753,56 @@ export function DesignInspector({
             </p>
           ) : null}
         </div>
+      ) : null}
+
+      {Array.isArray(capability.columns) ? (
+        <div className="space-y-1" data-design-columns-group="">
+          <Field label={t("designColumns")}>
+            <select
+              className={selectClass}
+              data-design-columns=""
+              value={current.columns === undefined ? "" : String(current.columns)}
+              onChange={(event) => set("columns", event.target.value ? (Number(event.target.value) as SectionDesign["columns"]) : undefined)}
+            >
+              <option value="">{t("designColumnsDefault")}</option>
+              {(capability.columns as readonly number[]).map((columns) => (
+                <option key={columns} value={String(columns)}>
+                  {columns}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <p className="text-[12px] leading-5 text-muted">{t("designColumnsHint")}</p>
+        </div>
+      ) : null}
+
+      {capability.cards ? (
+        <fieldset className="min-w-0 space-y-3" data-design-cards="">
+          <legend className="mb-1 text-[12px] font-semibold tracking-wide text-muted">{t("designCards")}</legend>
+          <p className="text-[12px] leading-5 text-muted">{t("designCardsHint")}</p>
+          {CARD_FIELDS.map((field) => (
+            <Field key={field.key} label={t(field.label)}>
+              <select
+                className={selectClass}
+                data-design-cards-field={field.key}
+                value={current.cards?.[field.key] ?? ""}
+                onChange={(event) => {
+                  const next: Record<string, string> = { ...(current.cards ?? {}) };
+                  if (event.target.value) next[field.key] = event.target.value;
+                  else delete next[field.key];
+                  set("cards", Object.keys(next).length > 0 ? (next as SectionDesign["cards"]) : undefined);
+                }}
+              >
+                <option value="">{t("designCardsInherit")}</option>
+                {(field.values as readonly string[]).map((value) => (
+                  <option key={value} value={value}>
+                    {t((field.names as Record<string, CustomizerMessageKey>)[value])}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          ))}
+        </fieldset>
       ) : null}
 
       {capability.overlap ? (

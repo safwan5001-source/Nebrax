@@ -135,12 +135,7 @@ final class StorefrontGlobalTokensNormalizer
         }
 
         // CUST-HV V9d-1 — البطاقات (`align` · `imageRatio` · `imageFit` · `hover`): تمثيلٌ لبياناتٍ أنتجتها طبقة التجارة، لا تمسّ سعراً ولا مخزوناً.
-        $cards = self::pickFields($input['cards'] ?? null, [
-            'align' => self::CARD_ALIGNS,
-            'imageRatio' => self::CARD_IMAGE_RATIOS,
-            'imageFit' => self::CARD_IMAGE_FITS,
-            'hover' => self::CARD_HOVERS,
-        ]);
+        $cards = self::cards($input['cards'] ?? null);
         if ($cards !== null) {
             $out['cards'] = $cards;
         }
@@ -159,6 +154,21 @@ final class StorefrontGlobalTokensNormalizer
         }
 
         return $out;
+    }
+
+    /**
+     * رموز البطاقة (V0 §14.1) — مشتركة بين الوثيقة (`cards`) والتجاوز لكل قسم (`design.cards`، V9d-2): قوائم مغلقة فقط.
+     *
+     * @return array<string,int|string>|null
+     */
+    public static function cards(mixed $raw): ?array
+    {
+        return self::pickFields($raw, [
+            'align' => self::CARD_ALIGNS,
+            'imageRatio' => self::CARD_IMAGE_RATIOS,
+            'imageFit' => self::CARD_IMAGE_FITS,
+            'hover' => self::CARD_HOVERS,
+        ]);
     }
 
     /**

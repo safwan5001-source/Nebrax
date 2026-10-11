@@ -1,6 +1,13 @@
 import { ProductCard } from "@/components/products/ProductCard";
 import { ProductCarousel } from "@/components/products/ProductCarousel";
 import { fetchProductsByIds } from "@/lib/commerce/products";
+import {
+  type ShelfColumns,
+  type ShelfLayout,
+  shelfForm,
+  shelfGridClass,
+  shelfRailBreakpoints,
+} from "@/lib/home/shelf-layout";
 import type { ThemePresetId } from "@/lib/presentation/tokens";
 
 export async function FeaturedShelf({
@@ -11,6 +18,8 @@ export async function FeaturedShelf({
   title,
   headingId,
   themePreset,
+  layout,
+  columns,
 }: {
   productIds: readonly string[];
   basePath: string;
@@ -20,8 +29,11 @@ export async function FeaturedShelf({
   headingId: string;
   /** See `CategoriesSection`'s identical prop doc for why this is explicit. */
   themePreset?: ThemePresetId;
+  /** CUST-HV V9d-2 — the section design's `layout` / `columns`; absent = the theme's own form and today's columns. */
+  layout?: ShelfLayout;
+  columns?: ShelfColumns;
 }) {
-  const isMarket = themePreset === "awj-market";
+  const rail = shelfForm(layout, themePreset === "awj-market") === "rail";
   // CUST-H4-5 — one batched request instead of N per-id fetches. The API
   // may answer in any order, so the merchant's stored `productIds` order is
   // restored here — that array is presentation's own authority over display
@@ -51,7 +63,7 @@ export async function FeaturedShelf({
       >
         {title}
       </h2>
-      {isMarket ? (
+      {rail ? (
         <div className="mt-4">
           <ProductCarousel
             products={products}
@@ -60,14 +72,11 @@ export async function FeaturedShelf({
             listId="home_featured"
             listName="Home — Featured"
             slidesPerView={2}
-            breakpoints={{
-              640: { slidesPerView: 3, spaceBetween: 16 },
-              1024: { slidesPerView: 5, spaceBetween: 20 },
-            }}
+            breakpoints={shelfRailBreakpoints(columns)}
           />
         </div>
       ) : (
-        <ul className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 md:gap-5">
+        <ul className={`mt-4 grid gap-3 md:gap-5 ${shelfGridClass(columns)}`}>
           {products.map((product, index) => (
             <li key={product.id} className="min-w-0">
               <ProductCard

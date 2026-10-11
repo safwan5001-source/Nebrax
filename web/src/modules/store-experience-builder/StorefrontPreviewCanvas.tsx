@@ -273,6 +273,20 @@ const BANNER_CTA_CLASS: Record<CtaStyle, string> = {
   soft: "inline-flex h-10 max-w-full items-center rounded-store bg-store-primary px-4 text-sm font-bold text-store-primary-foreground",
 };
 
+/**
+ * CUST-HV V9d-2 — the attributes a product / offer shelf carries once the merchant chose a `layout` or `columns` in its design: the closed-list
+ * values and the simulated device, which the Canvas-only block of `store-preview.css` turns into the storefront's own column / rail numbers.
+ * No choice ⇒ no attributes ⇒ the legacy preview, byte for byte.
+ */
+function shelfAttrs(design: SectionDesign | undefined, viewport: "desktop" | "tablet" | "mobile"): Record<string, string> {
+  if (!design?.layout && !design?.columns) return {};
+  return {
+    "data-shelf": design.layout === "rail" ? "rail" : "grid",
+    "data-vp": viewport,
+    ...(design.columns ? { "data-cols": String(design.columns) } : {}),
+  };
+}
+
 export function StorefrontPreviewCanvas({
   config,
   locale,
@@ -958,7 +972,7 @@ export function StorefrontPreviewCanvas({
                       {t("homeNewArrivalsEmpty")}
                     </p>
                   ) : (
-                    <ul className={cn("mt-4 grid gap-3", newArrivalsColumns)}>
+                    <ul className={cn("mt-4 grid gap-3", newArrivalsColumns)} {...shelfAttrs(section.design, viewport)}>
                       {homeNewArrivals.map((product) => (
                         <li
                           key={product.id}
@@ -1349,7 +1363,7 @@ export function StorefrontPreviewCanvas({
                       {t("homeFeaturedEmpty")}
                     </p>
                   ) : (
-                    <ul className={cn("mt-4 grid gap-3", newArrivalsColumns)}>
+                    <ul className={cn("mt-4 grid gap-3", newArrivalsColumns)} {...shelfAttrs(section.design, viewport)}>
                       {ids
                         .map((id) => products.find((product) => product.id === id))
                         .filter((product): product is NonNullable<typeof product> => product !== undefined)
@@ -1448,7 +1462,7 @@ export function StorefrontPreviewCanvas({
                       {t("homeOffersNoneLive")}
                     </p>
                   ) : (
-                    <ul className={cn("mt-4 grid gap-3", newArrivalsColumns)}>
+                    <ul className={cn("mt-4 grid gap-3", newArrivalsColumns)} {...shelfAttrs(section.design, viewport)}>
                       {liveOffers.map((offer) => (
                         <li
                           key={offer.id}

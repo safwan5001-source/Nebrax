@@ -3,12 +3,24 @@ import { Suspense } from "react";
 import { SectionHeading } from "@/components/home/SectionHeading";
 import { NewArrivals } from "@/components/products/NewArrivals";
 import { ProductCardSkeleton } from "@/components/products/ProductCardSkeleton";
+import {
+  type ShelfColumns,
+  type ShelfLayout,
+  shelfForm,
+  shelfGridClass,
+} from "@/lib/home/shelf-layout";
 import type { ThemePresetId } from "@/lib/presentation/tokens";
 
 const SHELF_SIZE = 8;
 
-function ShelfSkeleton({ isMarket }: { isMarket: boolean }) {
-  if (isMarket) {
+function ShelfSkeleton({
+  rail,
+  columns,
+}: {
+  rail: boolean;
+  columns?: ShelfColumns;
+}) {
+  if (rail) {
     // Approximates the carousel's own 2/3/5-per-view rhythm (see
     // `NewArrivals.tsx`) so the loading state doesn't jump from a grid to a
     // horizontal rail the instant the real shelf resolves.
@@ -27,7 +39,7 @@ function ShelfSkeleton({ isMarket }: { isMarket: boolean }) {
   }
 
   return (
-    <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 md:gap-5">
+    <ul className={`grid gap-3 md:gap-5 ${shelfGridClass(columns)}`}>
       {Array.from({ length: SHELF_SIZE }, (_, i) => i).map((i) => (
         <li key={i}>
           <ProductCardSkeleton />
@@ -44,6 +56,9 @@ interface NewArrivalsSectionProps {
   currency?: string;
   /** See `CategoriesSection`'s identical prop doc for why this is explicit. */
   themePreset?: ThemePresetId;
+  /** CUST-HV V9d-2 — the section design's `layout` / `columns`; absent = the theme's own form and today's columns. */
+  layout?: ShelfLayout;
+  columns?: ShelfColumns;
 }
 
 /**
@@ -57,12 +72,14 @@ export async function NewArrivalsSection({
   country,
   currency,
   themePreset,
+  layout,
+  columns,
 }: NewArrivalsSectionProps) {
   const t = await getTranslations({
     locale: locale as Locale,
     namespace: "home",
   });
-  const isMarket = themePreset === "awj-market";
+  const rail = shelfForm(layout, themePreset === "awj-market") === "rail";
 
   return (
     <section aria-labelledby="home-new-arrivals">
@@ -72,7 +89,7 @@ export async function NewArrivalsSection({
         action={{ href: `${basePath}/products`, label: t("viewAll") }}
       />
       <div className="mt-3">
-        <Suspense fallback={<ShelfSkeleton isMarket={isMarket} />}>
+        <Suspense fallback={<ShelfSkeleton rail={rail} columns={columns} />}>
           <NewArrivals
             basePath={basePath}
             locale={locale}
@@ -80,6 +97,8 @@ export async function NewArrivalsSection({
             currency={currency}
             limit={SHELF_SIZE}
             themePreset={themePreset}
+            layout={layout}
+            columns={columns}
           />
         </Suspense>
       </div>

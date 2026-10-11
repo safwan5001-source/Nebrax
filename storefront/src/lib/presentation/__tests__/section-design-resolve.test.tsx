@@ -921,3 +921,75 @@ describe("resolveSectionDesign — hero / banner layout variants (CUST-HV V6c-7)
     );
   });
 });
+
+describe("resolveSectionDesign — a shelf's own card tokens (CUST-HV V9d-2)", () => {
+  it("writes the same validated variables and tokens as the document-level resolver, on the section's own frame", () => {
+    const r = resolveSectionDesign(
+      "newArrivals",
+      {
+        cards: {
+          align: "center",
+          imageRatio: "4:3",
+          imageFit: "contain",
+          hover: "zoom",
+        },
+      },
+      ctx,
+    )!;
+    expect(r.attrs["data-sd"]?.split(" ")).toEqual(
+      expect.arrayContaining(["cd-al", "cd-ir", "cd-if", "cd-hv"]),
+    );
+    expect(r.style).toMatchObject({
+      "--cd-al": "center",
+      "--cd-ir": "4 / 3",
+      "--cd-if": "contain",
+      "--cd-hz": "1.06",
+      "--cd-hl": "0px",
+      "--cd-hs": "none",
+    });
+  });
+
+  it("in a section's own override `start` and `cover` ARE written out: they must win over a store-wide `center` / `contain`", () => {
+    const r = resolveSectionDesign(
+      "featured",
+      { cards: { align: "start", imageFit: "cover" } },
+      ctx,
+    )!;
+    expect(r.attrs["data-sd"]?.split(" ")).toEqual(
+      expect.arrayContaining(["cd-al", "cd-if"]),
+    );
+    expect(r.style).toMatchObject({ "--cd-al": "start", "--cd-if": "cover" });
+  });
+
+  it("columns and layout are read by the shelf itself: they add no token and no variable", () => {
+    expect(resolveSectionDesign("offers", { columns: 3 }, ctx)).toBeNull();
+    expect(
+      resolveSectionDesign("productShelf", { layout: "rail", columns: 2 }, ctx),
+    ).toBeNull();
+    const withSpacing = resolveSectionDesign(
+      "newArrivals",
+      { columns: 3, spacing: { top: "md" } },
+      ctx,
+    )!;
+    expect(
+      Object.keys(withSpacing.style).some(
+        (key) => key.includes("cd-") || key.includes("col"),
+      ),
+    ).toBe(false);
+  });
+
+  it("no card key names a price, a discount, stock, availability, an offer or tax", () => {
+    const r = resolveSectionDesign(
+      "offers",
+      { cards: { align: "center", imageRatio: "1:1", hover: "lift" } },
+      ctx,
+    )!;
+    const names = [
+      ...Object.keys(r.style),
+      ...(r.attrs["data-sd"] ?? "").split(" "),
+    ].join(" ");
+    expect(names).not.toMatch(
+      /price|discount|sale|stock|avail|offer|tax|total/i,
+    );
+  });
+});

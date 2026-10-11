@@ -68,7 +68,13 @@ final class StorefrontSectionDesignNormalizer
         // CUST-HV V9b (V0 §3.4) — مزايا المتجر: البطاقات بأعمدة تلقائية هي الافتراضي (غياب)؛ `flat` بلا إطار بطاقة،
         // و`columns-N` بطاقات بعدد أعمدة ثابت على الشاشات الواسعة (الهاتف عمود واحد دائماً، اللوح عمودان).
         'benefits' => ['flat', 'columns-2', 'columns-3', 'columns-4'],
+        // CUST-HV V9d-2 (V0 §14.2) — رفوف المنتجات: الغياب = شكل القالب (شبكة في Modern، شريط في Market)، فكلتا القيمتين تُخزَّنان.
+        // العروض لا شريط لها بعد (لا مكوّن شريطٍ للعروض) فلا `layout` لها.
+        'shelf' => ['grid', 'rail'],
     ];
+
+    /** CUST-HV V9d-2 — عدد الأعمدة على الشاشات الواسعة لرفوف المنتجات والعروض (الهاتف عمودان دائماً). */
+    public const SHELF_COLUMNS = [2, 3, 4];
 
     /** V6c-3 (V0 §8.3) — ارتفاع القسم المُعدّ مسبقاً للبطل واللافتة (حدّ أدنى فقط؛ المحتوى لا يُقصّ أبداً). */
     public const HEIGHT_PRESETS = ['compact', 'standard', 'tall', 'screen'];
@@ -125,7 +131,8 @@ final class StorefrontSectionDesignNormalizer
                 $heroOnly['overlap'] = true;
             }
         }
-        $shelf = ['background' => self::BACKGROUND_KINDS, 'text' => ['heading'], 'typography' => ['headingStyle'], 'width' => true, 'spacing' => true, 'separator' => true];
+        $shelf = ['background' => self::BACKGROUND_KINDS, 'text' => ['heading'], 'typography' => ['headingStyle'], 'width' => true, 'spacing' => true, 'layout' => self::LAYOUTS['shelf'], 'columns' => self::SHELF_COLUMNS, 'cards' => true, 'separator' => true];
+        $offers = ['background' => self::BACKGROUND_KINDS, 'text' => ['heading'], 'typography' => ['headingStyle'], 'width' => true, 'spacing' => true, 'columns' => self::SHELF_COLUMNS, 'cards' => true, 'separator' => true];
 
         return [
             'hero' => $heroOnly,
@@ -140,7 +147,7 @@ final class StorefrontSectionDesignNormalizer
             'gallery' => ['background' => self::BACKGROUND_KINDS, 'width' => true, 'spacing' => true, 'layout' => self::LAYOUTS['gallery'], 'border' => true, 'radius' => true, 'shadow' => true, 'separator' => true],
             'newArrivals' => $shelf,
             'featured' => $shelf,
-            'offers' => $shelf,
+            'offers' => $offers,
             'productShelf' => $shelf,
             'discovery' => ['background' => self::BACKGROUND_KINDS, 'text' => ['heading'], 'spacing' => true, 'separator' => true],
             'benefits' => ['background' => self::BACKGROUND_KINDS, 'text' => self::FULL_TEXT, 'typography' => self::FULL_TYPO, 'spacing' => true, 'align' => true, 'layout' => self::LAYOUTS['benefits'], 'border' => true, 'radius' => true, 'shadow' => true, 'separator' => true],
@@ -210,6 +217,12 @@ final class StorefrontSectionDesignNormalizer
                 $out['layout'] = $layout;
             }
         }
+        if (isset($capability['columns'])) {
+            $columns = self::pick($raw['columns'] ?? null, $capability['columns']);
+            if ($columns !== null) {
+                $out['columns'] = $columns;
+            }
+        }
         if (isset($capability['border'])) {
             $border = self::border($raw['border'] ?? null);
             if ($border !== null) {
@@ -226,6 +239,13 @@ final class StorefrontSectionDesignNormalizer
             $shadow = self::pick($raw['shadow'] ?? null, self::SHADOWS);
             if ($shadow !== null) {
                 $out['shadow'] = $shadow;
+            }
+        }
+        if (isset($capability['cards'])) {
+            // CUST-HV V9d-2 (V0 §14.1) — تجاوز رموز البطاقة لهذا القسم: القوائم المغلقة نفسها للوثيقة.
+            $cards = StorefrontGlobalTokensNormalizer::cards($raw['cards'] ?? null);
+            if ($cards !== null) {
+                $out['cards'] = $cards;
             }
         }
         if (isset($capability['separator'])) {
