@@ -23,6 +23,7 @@ import {
   publishedThemeStyle,
   publishedWhatsAppHref,
 } from "@/lib/presentation/public";
+import { publishedMainNav } from "@/lib/presentation/public-navigation";
 import { publishedLogoMedia } from "@/lib/presentation/resolved-media";
 import {
   isSafeAppStoreUrl,
@@ -191,7 +192,10 @@ export default async function StorefrontLayout({
     identity?.presentationMedia ?? {},
     compact,
   );
-  const extraLinks = publishedExtraNav(presentation, basePath);
+  // V7d: a published `main` menu supersedes the legacy flat `header.links` (V0 §11.1).
+  const extraLinks =
+    (await publishedMainNav(presentation, basePath)) ??
+    publishedExtraNav(presentation, basePath);
   const showCategoryNav = presentation
     ? presentation.header.showCategoryNav
     : true;
