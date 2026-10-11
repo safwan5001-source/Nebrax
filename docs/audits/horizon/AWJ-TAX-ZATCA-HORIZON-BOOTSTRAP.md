@@ -35,3 +35,17 @@ One PR per bounded task; start with focused tests, then full financial/security/
 What is verified versus inferred, files changed, tests/CI, risks, unresolved decisions, Branch/PR/Base SHA/Head SHA, first recommended task, and explicit next owner action.
 
 **Stop condition:** activation decision unresolved, a material financial/tax/tenant/API policy choice, actual production credentials or deployment needed. It is permitted to continue independent read-only research while waiting.
+
+
+## Research mandate — explicit owner authorization
+During TAX-HZ-00 and before each relevant REM, invest enough time to review current **official ZATCA / Fatoora / Saudi VAT primary documentation** and their applicable version/effective dates. Consult primary UBL/EN standards if relevant and verify in the official ZATCA offline SDK where appropriate.
+
+Also examine documented and publicly visible workflows of suitable accounting/ERP/POS and Saudi commerce systems such as Daftra, Qoyod, Salla, Odoo, Zoho Books or ERPNext **for UX inspiration only**. Study invoice issue/posting, credit/debit notes, ZATCA setup/status, rejection/retry, validation feedback, role permissions, bilingual/RTL print and user-facing reconciliation. Select patterns that genuinely fit AWJ rather than copying competitors.
+
+Deliver:
+- `TAX-HZ-00-EXTERNAL-EVIDENCE-REGISTER.md` with official titles, direct URLs, dates/versions, precise rule or section, applicable requirement IDs and verification status.
+- `TAX-HZ-00-UX-BENCHMARK.md` with observed screens/workflows, URLs and explicit comparisons, accessibility/RTL considerations, and **AWJ recommendations (not decisions)**.
+- Clear boundary between binding regulation, official technical guidance, competitor observation and proposed AWJ behavior.
+- Material ambiguities as Decision Packets rather than unapproved assumptions.
+
+Do not rush or artificially limit high-value research; avoid speculative descriptions when a page cannot be accessed. This charter authorizes **research/documentation**, not automatic code implementation, Merge, Deploy, live ZATCA calls or secrets.
