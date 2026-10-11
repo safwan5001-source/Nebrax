@@ -42,6 +42,7 @@ import {
   bannerCtasOf,
   type HeroContent,
   heroContentOf,
+  sliderContentOf,
   benefitsContentOf,
   customContentOf,
   deliveryPromiseContentOf,
@@ -80,6 +81,7 @@ import {
 } from "./DataSectionFields";
 import { OfferCatalog } from "./OfferCatalog";
 import { DesignInspector } from "./design/DesignInspector";
+import { SliderFields } from "./SliderFields";
 import { useBackgroundMediaBounds } from "./media/use-background-media-bounds";
 import { GlobalTokensEditor } from "./design/GlobalTokensEditor";
 import { PaletteEditor } from "./design/PaletteEditor";
@@ -182,6 +184,9 @@ interface PanelsProps {
   onChange: (next: StorefrontPresentationConfig) => void;
   selectedSection?: string | null;
   onSelectSection?: (id: string | null) => void;
+  /** CUST-HV V8c — the slide each slider section is showing (shared with the Canvas), by section id. */
+  activeSlides?: Record<string, string>;
+  onActiveSlideChange?: (sectionId: string, slideId: string) => void;
   /** CUST-H4-2 mobile fix — only `HomepagePanel` reads this, to pick the
    * Section Library's presentation: a centered dialog on desktop, inline
    * content replacing the composer body on mobile (no nested Bottom Sheet). */
@@ -228,6 +233,8 @@ export function ControlPanels({
   onChange,
   selectedSection = null,
   onSelectSection,
+  activeSlides,
+  onActiveSlideChange,
   isMobileViewport = false,
   featuredPickerSearch = "",
   featuredPickerListState = "idle",
@@ -271,6 +278,8 @@ export function ControlPanels({
           patch={patch}
           selectedSection={selectedSection}
           onSelectSection={onSelectSection}
+          activeSlides={activeSlides}
+          onActiveSlideChange={onActiveSlideChange}
           isMobileViewport={isMobileViewport}
           featuredPickerSearch={featuredPickerSearch}
           featuredPickerListState={featuredPickerListState}
@@ -1048,6 +1057,8 @@ function HomepagePanel({
   patch,
   selectedSection = null,
   onSelectSection,
+  activeSlides,
+  onActiveSlideChange,
   isMobileViewport = false,
   featuredPickerSearch = "",
   featuredPickerListState = "idle",
@@ -1069,6 +1080,9 @@ function HomepagePanel({
   patch: (partial: Partial<StorefrontPresentationConfig>) => void;
   selectedSection?: string | null;
   onSelectSection?: (id: string | null) => void;
+  /** CUST-HV V8c — the slide each slider section is showing (shared with the Canvas), by section id. */
+  activeSlides?: Record<string, string>;
+  onActiveSlideChange?: (sectionId: string, slideId: string) => void;
   isMobileViewport?: boolean;
   featuredPickerSearch?: string;
   featuredPickerListState?: "idle" | "loading" | "error" | "ready";
@@ -1313,6 +1327,23 @@ function HomepagePanel({
                   updateSection(selectedIndex, {
                     ...selected,
                     content: isBannerEmpty(content) ? undefined : content,
+                  })
+                }
+              />
+            ) : selected.type === "slider" ? (
+              <SliderFields
+                key={selected.id}
+                content={sliderContentOf(selected)}
+                ctx={designContext}
+                bounds={backgroundBounds}
+                locale={locale === "en" ? "en" : "ar"}
+                t={t}
+                activeSlideId={activeSlides?.[selected.id] ?? null}
+                onActiveSlideChange={(slideId) => onActiveSlideChange?.(selected.id, slideId)}
+                onChange={(content) =>
+                  updateSection(selectedIndex, {
+                    ...selected,
+                    content: content.slides.length > 0 ? content : undefined,
                   })
                 }
               />
@@ -2884,7 +2915,7 @@ function OffersPickerFields({
  * `onBlur`, so a blur in the same turn as the last keystroke cannot drop
  * the character that has not re-rendered yet.
  */
-function DeferredCommitField({
+export function DeferredCommitField({
   label,
   hint,
   placeholder,

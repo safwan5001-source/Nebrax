@@ -254,8 +254,7 @@ export function sliderPublishIssues(
   }
   const out = new Map<string, SliderPublishIssue>();
   slides.forEach((slide, j) => {
-    if (!slideHasText(slide)) return;
-    for (const issue of sectionContrastIssues(sliderPseudoDesign(slide), ctx)) {
+    for (const issue of slideContrastIssues(slide, ctx)) {
       const path =
         issue.field === "background"
           ? `slides[${j}].media`
@@ -264,6 +263,19 @@ export function sliderPublishIssues(
     }
   });
   return [...out.values()];
+}
+
+/**
+ * The Publish gate's verdict for ONE slide (a slide without copy is never judged) — the editor shows it per slide, whatever the slide
+ * count, while `sliderPublishIssues` adds the count rule on top.
+ */
+export function slideContrastIssues(
+  slide: SliderSlide,
+  ctx: DesignContext,
+): SectionContrastIssue[] {
+  return slideHasText(slide)
+    ? sectionContrastIssues(sliderPseudoDesign(slide), ctx)
+    : [];
 }
 
 function sliderPseudoDesign(slide: SliderSlide) {

@@ -9,6 +9,7 @@ import {
   normalizeSliderContent,
   resolveSliderBehaviour,
   type SliderContent,
+  slideContrastIssues,
   slideDraw,
   sliderPublishIssues,
 } from "../slider-content";
@@ -96,6 +97,31 @@ describe("slider publish rules — shared fixture (V8a)", () => {
     expect(
       sliderPublishIssues({ slides: [slide("a", "Hi"), slide("b")] }, ctx),
     ).toEqual([{ path: "slides[0].media", code: "contrast_unprovable" }]);
+  });
+});
+
+describe("slideContrastIssues (V8c)", () => {
+  const ctx: DesignContext = {
+    primaryColor: "#12372a",
+    accentColor: null,
+    dir: "ltr",
+  };
+  const media = { mediaId: "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e" };
+
+  it("judges one slide on its own, whatever the slide count — a slide without copy is never judged", () => {
+    expect(slideContrastIssues({ id: "a", media }, ctx)).toEqual([]);
+    expect(slideContrastIssues({ id: "a", media, heading: "Hi" }, ctx)).toEqual(
+      [
+        expect.objectContaining({
+          field: "background",
+          code: "contrast_unprovable",
+        }),
+      ],
+    );
+    // the count rule short-circuits `sliderPublishIssues` for one slide; the per-slide verdict does not
+    expect(
+      sliderPublishIssues({ slides: [{ id: "a", media, heading: "Hi" }] }, ctx),
+    ).toEqual([{ path: "slides", code: "slider_slides_min" }]);
   });
 });
 

@@ -177,10 +177,10 @@ describe('commerce appearance — STORE-CUSTOMIZER-V2-2 section instances', () =
     // CUST-H4-7 — Offers is multi-instance and merchant-addable: its Add
     // control is enabled even though a default instance already exists.
     expect((offersOption as HTMLButtonElement).disabled).toBe(false);
-    // CUST-HV V8a — the slider is listed but not addable yet, and says why.
+    // CUST-HV V8c — the slider is built: listed, addable, no reason.
     const sliderOption = picker.querySelector('[data-picker-option="slider"]') as HTMLButtonElement;
-    expect(sliderOption.disabled).toBe(true);
-    expect(sliderOption.textContent).toContain('محرّر الشرائح قيد الإعداد');
+    expect(sliderOption.disabled).toBe(false);
+    expect(sliderOption.textContent).not.toContain('قيد الإعداد');
   });
 
   it('add creates a new instance with a safe unique id and selects it', async () => {

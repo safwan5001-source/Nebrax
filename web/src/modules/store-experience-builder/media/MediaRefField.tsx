@@ -46,6 +46,7 @@ export function MediaRefField({
   slot,
   locale,
   decorativeOnly = false,
+  coverOnly = decorativeOnly,
 }: {
   label: string;
   hint?: string;
@@ -60,6 +61,11 @@ export function MediaRefField({
    * `decorative`, drops its alt): the decorative toggle and the alt fields are not offered.
    */
   decorativeOnly?: boolean;
+  /**
+   * CUST-HV V8c — the framing editor offers no `fit` (a slide picture always covers: a letterboxed frame would reveal a
+   * surface the picture's luminance evidence does not cover) while the alt text stays. Defaults to `decorativeOnly`.
+   */
+  coverOnly?: boolean;
 }) {
   const [picking, setPicking] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -233,7 +239,7 @@ export function MediaRefField({
           }}
           t={t}
           locale={locale}
-          coverOnly={decorativeOnly}
+          coverOnly={coverOnly}
         />
       ) : null}
     </div>
