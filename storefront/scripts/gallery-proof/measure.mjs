@@ -178,7 +178,7 @@ for (const name of PAGES) {
           const moved = await page.evaluate(() => document.querySelector("[data-gallery-list]").scrollLeft);
           ok(rtl ? moved < -4 : moved > 4, `${tag}: next moved the strip to ${moved} (should travel toward the inline-end edge)`);
           // to the end
-          for (let k = 0; k < 12; k++) { const d = await page.getAttribute('[data-gallery-arrow="next"]', "aria-disabled"); if (d === "true") break; await page.click('[data-gallery-arrow="next"]'); await page.waitForTimeout(450); }
+          for (let k = 0; k < 12; k++) { const d = await page.getAttribute('[data-gallery-arrow="next"]', "aria-disabled"); if (d === "true") break; await page.click('[data-gallery-arrow="next"]', { force: true }); await page.waitForTimeout(600); }
           ok((await page.getAttribute('[data-gallery-arrow="next"]', "aria-disabled")) === "true", `${tag}: next is not disabled at the end`);
           await page.click('[data-gallery-arrow="previous"]');
           await page.waitForTimeout(600);

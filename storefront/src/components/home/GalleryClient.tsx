@@ -153,7 +153,6 @@ export function GalleryClient({
   const showControls = layout === "carousel" && overflowing;
 
   return (
-    // biome-ignore lint/a11y/useKeyWithClickEvents lint/a11y/noStaticElementInteractions: click delegation only — the keyboard-operable elements are the anchors inside; Enter on one dispatches this same click
     <div ref={rootRef} data-gallery-root="" onClick={onClick}>
       {children}
       {showControls ? (

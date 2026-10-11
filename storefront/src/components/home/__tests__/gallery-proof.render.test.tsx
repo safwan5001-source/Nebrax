@@ -11,8 +11,8 @@ import { isValidElement, type ReactElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { HomeGallery } from "@/components/home/HomeGallery";
-import { galleryImagePath } from "@/lib/presentation/gallery-resolve";
 import type { PresentationHomeSection } from "@/lib/presentation/config";
+import { galleryImagePath } from "@/lib/presentation/gallery-resolve";
 import type { ResolvedMedia } from "@/lib/presentation/media-ref";
 import ar from "../../../../messages/ar.json";
 import en from "../../../../messages/en.json";
@@ -32,8 +32,34 @@ interface PageSpec {
 }
 
 const CAPTIONS = {
-  en: ["Spring in bloom", "Same-day delivery", "Gifts that last", "Weddings and events", "Subscriptions", "Corporate", "Care guides", "New arrivals", "Sympathy", "Plants", "Bouquets", "Boxes"],
-  ar: ["الربيع في أبهى صوره", "توصيل في اليوم نفسه", "هدايا تدوم", "الأعراس والمناسبات", "الاشتراكات", "الشركات", "أدلة العناية", "وصل حديثاً", "المواساة", "النباتات", "الباقات", "الصناديق"],
+  en: [
+    "Spring in bloom",
+    "Same-day delivery",
+    "Gifts that last",
+    "Weddings and events",
+    "Subscriptions",
+    "Corporate",
+    "Care guides",
+    "New arrivals",
+    "Sympathy",
+    "Plants",
+    "Bouquets",
+    "Boxes",
+  ],
+  ar: [
+    "الربيع في أبهى صوره",
+    "توصيل في اليوم نفسه",
+    "هدايا تدوم",
+    "الأعراس والمناسبات",
+    "الاشتراكات",
+    "الشركات",
+    "أدلة العناية",
+    "وصل حديثاً",
+    "المواساة",
+    "النباتات",
+    "الباقات",
+    "الصناديق",
+  ],
 };
 const LONG = {
   en: "Supercalifragilisticexpialidocious-flowers-and-more-flowers-than-anybody-could-ever-possibly-need",
@@ -41,8 +67,16 @@ const LONG = {
 };
 
 const PAGES: Record<string, PageSpec> = {
-  grid3: { count: 6, pics: ["dark", "light", "dark2"], options: { captions: true } },
-  grid6: { count: 12, pics: ["dark", "light", "dark2", "phone"], options: { columns: 6, gap: "sm", aspect: "4:3", captions: true } },
+  grid3: {
+    count: 6,
+    pics: ["dark", "light", "dark2"],
+    options: { captions: true },
+  },
+  grid6: {
+    count: 12,
+    pics: ["dark", "light", "dark2", "phone"],
+    options: { columns: 6, gap: "sm", aspect: "4:3", captions: true },
+  },
   grid2: {
     count: 5,
     pics: ["dark", "phone", "light"],
@@ -53,9 +87,19 @@ const PAGES: Record<string, PageSpec> = {
     count: 4,
     pics: ["phone", "dark", "light"],
     options: { aspect: "16:9", gap: "none" },
-    per: (i) => ({ media: { fit: i % 2 === 0 ? "contain" : undefined, focal: { x: 20, y: 80 } } }),
+    per: (i) => ({
+      media: {
+        fit: i % 2 === 0 ? "contain" : undefined,
+        focal: { x: 20, y: 80 },
+      },
+    }),
   },
-  strip: { count: 8, pics: ["dark", "light", "dark2"], options: { columns: 4, captions: true }, design: { layout: "carousel" } },
+  strip: {
+    count: 8,
+    pics: ["dark", "light", "dark2"],
+    options: { columns: 4, captions: true },
+    design: { layout: "carousel" },
+  },
   viewer: {
     count: 6,
     pics: ["dark", "light", "dark2", "phone"],
@@ -95,7 +139,9 @@ describe("gallery proof", () => {
   it.skipIf(!DIR)("renders every page × direction", async () => {
     mkdirSync(join(DIR, "pages"), { recursive: true });
     const css = readFileSync(join(DIR, "storefront.css"), "utf8");
-    const bounds = JSON.parse(readFileSync(join(DIR, "bounds.json"), "utf8")) as Bounds;
+    const bounds = JSON.parse(
+      readFileSync(join(DIR, "bounds.json"), "utf8"),
+    ) as Bounds;
 
     for (const [name, spec] of Object.entries(PAGES)) {
       for (const dir of ["ltr", "rtl"] as const) {
@@ -114,20 +160,29 @@ describe("gallery proof", () => {
               [bounds[pic].width / 2, bounds[pic].width].map((width) => ({
                 kind: "w" as const,
                 width,
-                height: Math.round((width * bounds[pic].height) / bounds[pic].width),
+                height: Math.round(
+                  (width * bounds[pic].height) / bounds[pic].width,
+                ),
                 format,
                 src: `../pics/${pic}.png`,
               })),
             ),
           };
-          const { media: mediaExtra, caption, ...rest } = extra as {
+          const {
+            media: mediaExtra,
+            caption,
+            ...rest
+          } = extra as {
             media?: Record<string, unknown>;
             caption?: string;
           };
           return {
             id: `i${i + 1}`,
             media: { mediaId: ID(i), ...(mediaExtra ?? {}) },
-            caption: caption === "LONG" ? LONG[l] : CAPTIONS[l][i % CAPTIONS[l].length],
+            caption:
+              caption === "LONG"
+                ? LONG[l]
+                : CAPTIONS[l][i % CAPTIONS[l].length],
             ...rest,
           };
         });
@@ -135,7 +190,10 @@ describe("gallery proof", () => {
           id: "ga",
           type: "gallery",
           visible: true,
-          content: { images, ...(spec.options ? { options: spec.options } : {}) },
+          content: {
+            images,
+            ...(spec.options ? { options: spec.options } : {}),
+          },
           ...(spec.design ? { design: spec.design } : {}),
         } as unknown as PresentationHomeSection;
 

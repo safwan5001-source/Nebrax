@@ -1442,8 +1442,9 @@
   place-items: center;
   inline-size: 2.75rem;
   block-size: 2.75rem;
+  border: 1px solid rgb(255 255 255 / 0.6);
   border-radius: 9999px;
-  background: rgb(255 255 255 / 0.14);
+  background: rgb(0 0 0 / 0.6);
   color: #fff;
 }
 .awj-store-preview [data-gallery-viewer-close] {
