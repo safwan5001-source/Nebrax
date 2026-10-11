@@ -55,7 +55,7 @@ The cap is **cumulative and shared with returns**: quantity, net and VAT consume
 
 | Migration | What | Safety |
 |---|---|---|
-| `2026_11_04_010000_add_source_line_to_credit_note_lines` | `source_line_id` (nullable uuid, indexed with tenant), `line_discount` (default 0) | Existing rows: `NULL` / `0` → their derived totals do not change. `down()` drops both. |
+| `2026_11_04_010000_add_source_line_to_credit_note_lines` | `source_line_id` (nullable uuid, indexed with tenant), `line_discount` (default 0), `unit_price_before_tax` (nullable; print/display only) | Existing rows: `NULL` / `0` → their derived totals do not change. `down()` drops both. |
 | `2026_11_04_020000_restrict_credit_note_original_invoice_delete` | `original_invoice_id`: `SET NULL` → `RESTRICT` (PostgreSQL) | **Pre-checks first**: a *dangling* reference aborts the migration with a clear message (nothing rewritten); cross-tenant / other-customer / non-posted-source / draft-without-line-links counts are **logged, not modified**. SQLite DDL is skipped on purpose (same precedent as `2026_08_31_020000`: a table rebuild drops the partial numbering indexes); the app-level guard below covers both drivers. `down()` restores `SET NULL`. |
 | `2026_11_04_030000_pin_standalone_credit_notes_for_existing_tenants` | JSON update of `tenants.settings` | Idempotent; explicit values untouched; no accounting table touched. |
 
@@ -88,14 +88,15 @@ _See the PR file list; summary below._
 | `app/Http/Controllers/Api/ReturnableController.php` | `returned/remaining` now include posted notes |
 | `app/Http/Requests/StoreCreditNoteRequest.php` | `items.*.source_line_id`; `unit_price` optional when an invoice is given |
 | `app/Http/Requests/UpdateSalesSettingsRequest.php`, `app/Support/Settings.php` | the new setting |
-| `app/Models/CreditNoteLine.php`, `app/Http/Resources/CreditNoteLineResource.php` | the two new columns |
+| `app/Models/CreditNoteLine.php`, `app/Http/Resources/CreditNoteLineResource.php` | the new columns (`source_line_id`, `line_discount`, `unit_price_before_tax`) |
+| `web/src/modules/documents/builder/from-credit-note.ts` (+ test) | the printed credit note uses the pre-tax unit price so unit price, tax and total reconcile for inclusive invoices (2 vitest cases) |
 | `database/migrations/2026_11_04_01…/02…/03…` | see §4 |
 | `tests/Feature/CreditNoteSourceVatAccuracyTest.php` | **new** — 35 tests |
 | `tests/Feature/CreditNoteMigrationPolicyTest.php` | **new** — 7 tests (existing/new tenants, rollback, historical references) |
 | `tests/Feature/CreditNoteSourcePostgresTest.php` | **new** — 7 tests (PostgreSQL: restrict rule, rollback, real forked concurrency) |
 | existing credit-note tests (`CreditNoteTest`, `…SourceOwnershipTest`, `…PostingOwnershipTest`, `CustomerRefundTest`, `DebitNoteTest`, `DocumentHttpVariantsTest`, `InteractsWithApi`) | mechanical: standalone-note tests opt in to the policy; invoice-source tests now use a *posted* invoice and a source line |
 
-No change to `LedgerService`, `InventoryService`, `PosReturnService`, `PaymentService`, ZATCA, or any posted document. **No e-invoicing of credit notes (REM-18).** No web (`web/`) change.
+No change to `LedgerService`, `InventoryService`, `PosReturnService`, `PaymentService`, ZATCA, or any posted document. **No e-invoicing of credit notes (REM-18).** Web change limited to the credit-note document builder mapping (one file + test).
 
 ## 7. Tests
 
@@ -148,11 +149,12 @@ No change to `LedgerService`, `InventoryService`, `PosReturnService`, `PaymentSe
 2. **Note vs POS return race.** POS returns take the branch lock, not the invoice lock (REM-01's deliberate choice to keep lock order consistent). A note posted concurrently with a POS return of the same line is not serialized with it; the net/VAT clamp at post prevents any over-credit of value, but a quantity could in theory be double-counted in that narrow window. Same residual risk REM-01 recorded for POS-vs-API returns.
 3. **Historic posted notes without line links.** Posted notes from before this change have `source_line_id = NULL`. The cap counts them at read time (no posted row is modified) when their product is the **single** matching line of the invoice; a legacy line with no product, or whose product repeats in the invoice, cannot be attributed without guessing and is **not** counted — the restrict migration logs how many lines have no product so Finance can review. (Before this PR no cap existed at all, so this is not a regression.)
 4. **Historic invoice-linked drafts** that cannot be bound to exactly one invoice line (or whose price exceeds the invoice's) will be refused at post and there is no draft-delete endpoint for credit notes; Finance would have to recreate them. The restrict migration logs how many such drafts exist per database.
-5. **Web is untouched.** The new-tenant default means the existing credit-note screen (standalone-only) is refused until the setting is enabled via `PUT /api/sales-settings` (no toggle in the settings UI yet), and the form does not yet send `source_line_id` (it still works for an unambiguous product). A follow-up web slice should add the toggle and an invoice-linked flow.
+5. **Web is only minimally touched** (document builder).  The new-tenant default means the existing credit-note screen (standalone-only) is refused until the setting is enabled via `PUT /api/sales-settings` (no toggle in the settings UI yet), and the form does not yet send `source_line_id` (it still works for an unambiguous product). A follow-up web slice should add the toggle and an invoice-linked flow.
 6. **Standalone notes stay uncapped and exclusive-only** by design of ADR-E Option A — the setting is the control.
 7. **SQLite keeps the old FK action** (`SET NULL`) at DB level; production (PostgreSQL) is `RESTRICT`. SQLite is test-only; the service-level guard covers the draft-invoice case on both.
 8. **Pre-existing SQLite-only quirk** (documented in REM-01): the branch-less unique numbering index on `credit_notes` lost its `WHERE branch_id IS NULL` predicate, so two branches cannot reuse a number on SQLite; the branch test passes explicit numbers.
 9. **Multi-invoice notes (R1-117)** are not implemented; per-line `source_line_id` keeps the design compatible with a later note↔invoice link table (REM-18).
+11. **Line discounts are not a printed column.** A discounted credit-note line shows the pre-tax unit price, so unit price × quantity differs from the line total by the discount; document-level subtotal/tax/total reconcile. A discount column is a document-template change outside REM-02 (Codex P1 thread left open for the owner).
 10. **Branch checks on `show`/`post` are new** for credit notes: a branch-restricted user now gets 404 for a note of a branch they cannot access (`canAccessBranch(null)` is false for restricted users, so legacy null-branch notes are also hidden from them — same as customer refunds).
 
 ## 10. Recommended next step
