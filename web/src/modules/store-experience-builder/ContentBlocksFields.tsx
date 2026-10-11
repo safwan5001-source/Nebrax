@@ -89,11 +89,14 @@ function BufferedText({
   value,
   onCommit,
   multiline,
+  maxLength,
   ...rest
 }: {
   value: string;
   onCommit: (value: string) => void;
   multiline?: boolean;
+  /** The stored limit: the field never holds (and shows) characters Save would drop. */
+  maxLength?: number;
 } & Record<`data-${string}`, string>) {
   const [local, setLocal] = useState(value);
   useEffect(() => {
@@ -104,9 +107,9 @@ function BufferedText({
     onCommit(next);
   };
   return multiline ? (
-    <textarea className={`${inputClass} h-24 py-2`} value={local} onChange={(event) => commit(event.target.value)} {...rest} />
+    <textarea className={`${inputClass} h-24 py-2`} value={local} maxLength={maxLength} onChange={(event) => commit(event.target.value)} {...rest} />
   ) : (
-    <input className={inputClass} value={local} onChange={(event) => commit(event.target.value)} {...rest} />
+    <input className={inputClass} value={local} maxLength={maxLength} onChange={(event) => commit(event.target.value)} {...rest} />
   );
 }
 
@@ -438,7 +441,7 @@ function BlockEditor({
       return (
         <>
           <Field label={t("blockText")} hint={`${Array.from(block.text).length}/${MAX_HEADING_LENGTH}`}>
-            <BufferedText value={block.text} onCommit={(v) => onChange(setText(content, block.id, v))} data-content-text="" />
+            <BufferedText value={block.text} maxLength={MAX_HEADING_LENGTH} onCommit={(v) => onChange(setText(content, block.id, v))} data-content-text="" />
           </Field>
           <SegmentedField label={t("cbHeadingLevel")} hint={t("cbHeadingLevelHint")}>
             <Segmented
@@ -457,7 +460,7 @@ function BlockEditor({
       return (
         <>
           <Field label={t("blockText")} hint={`${Array.from(block.text).length}/${MAX_PARAGRAPH_LENGTH}`}>
-            <BufferedText multiline value={block.text} onCommit={(v) => onChange(setText(content, block.id, v))} data-content-text="" />
+            <BufferedText multiline value={block.text} maxLength={MAX_PARAGRAPH_LENGTH} onCommit={(v) => onChange(setText(content, block.id, v))} data-content-text="" />
           </Field>
           <AlignField value={block.align ?? "start"} t={t} onChange={(align) => onChange(setAlign(content, block.id, align))} />
         </>

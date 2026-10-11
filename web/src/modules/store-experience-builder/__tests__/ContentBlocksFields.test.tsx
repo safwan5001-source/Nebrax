@@ -230,3 +230,22 @@ describe("ContentBlocksFields (CUST-HV V9c-2)", () => {
     }
   });
 });
+
+describe("text fields respect the stored limits (V9c review)", () => {
+  it("a heading input stops at 120 characters and a paragraph at 600, so the field never shows what Save would drop", () => {
+    render(
+      <Harness
+        initial={{
+          blocks: [
+            { id: "h", kind: "heading", text: "x" },
+            { id: "p", kind: "paragraph", text: "y" },
+          ],
+        }}
+      />,
+    );
+    fireEvent.click(rows()[0].querySelector("button") as HTMLElement);
+    expect(document.querySelector<HTMLInputElement>("input[data-content-text]")?.maxLength).toBe(120);
+    fireEvent.click(rows()[1].querySelector("button") as HTMLElement);
+    expect(document.querySelector<HTMLTextAreaElement>("textarea[data-content-text]")?.maxLength).toBe(600);
+  });
+});

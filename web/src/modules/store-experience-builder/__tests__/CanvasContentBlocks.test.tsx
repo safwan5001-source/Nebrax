@@ -39,6 +39,22 @@ describe("CanvasContentBlocks (CUST-HV V9c-2)", () => {
     expect(container.innerHTML).not.toMatch(/text-(left|right)\b/);
   });
 
+  it("heading sizes follow the SIMULATED device, not the host window (no md: pair)", () => {
+    const sizes = (viewport: "mobile" | "desktop") => {
+      const { container, unmount } = mount([{ id: "a", kind: "heading", text: "H" }, { id: "b", kind: "heading", text: "S", level: 3 }], { viewport });
+      const classes = Array.from(container.querySelectorAll("h2,h3")).map((h) => h.className);
+      unmount();
+      return classes;
+    };
+    const [mobile2, mobile3] = sizes("mobile");
+    const [wide2, wide3] = sizes("desktop");
+    expect(mobile2).toContain("text-lg");
+    expect(mobile3).toContain("text-base");
+    expect(wide2).toContain("text-xl");
+    expect(wide3).toContain("text-lg");
+    expect([mobile2, mobile3, wide2, wide3].join(" ")).not.toContain("md:");
+  });
+
   it("an image uses the signed preview, is named by its position (decorative ⇒ empty alt) and carries its caption", () => {
     const { container } = mount([
       { id: "a", kind: "image", media: { mediaId: A }, caption: "Spring" },

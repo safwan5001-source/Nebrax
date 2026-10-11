@@ -44,7 +44,7 @@ const BUTTON_CLASS = {
   link: "inline-flex h-10 max-w-full items-center px-1 text-sm font-bold text-store-foreground underline decoration-2 underline-offset-4",
 } as const;
 
-function Selectable({ id, selected, children }: { id: string; selected: boolean; children: React.ReactNode }) {
+export function Selectable({ id, selected, children }: { id: string; selected: boolean; children: React.ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     // the editor's selection stays in view (the page does not jump)
@@ -88,10 +88,12 @@ function Callout({ block, labels }: { block: CalloutBlock; labels: CanvasContent
   );
 }
 
-function Leaf({ block, labels, number }: { block: LeafBlock; labels: CanvasContentLabels; number: number }) {
+function Leaf({ block, labels, number, wide }: { block: LeafBlock; labels: CanvasContentLabels; number: number; wide: boolean }) {
   switch (block.kind) {
     case "heading": {
-      const cls = `break-words font-extrabold text-store-foreground ${block.level === 3 ? "text-base md:text-lg" : "text-lg md:text-xl"} ${
+      // sized from the SIMULATED device (the storefront's `md:` pair), not a media query against the host window
+      const size = block.level === 3 ? (wide ? "text-lg" : "text-base") : wide ? "text-xl" : "text-lg";
+      const cls = `break-words font-extrabold text-store-foreground ${size} ${
         block.align ? ALIGN_CLASS[block.align] : ""
       }`;
       return block.level === 3 ? <h3 className={cls}>{block.text}</h3> : <h2 className={cls}>{block.text}</h2>;
@@ -143,6 +145,7 @@ export function CanvasContentBlocks({
   /** The block the editor has selected; ringed and kept in view. */
   activeBlockId?: string | null;
 }) {
+  const wide = viewport !== "mobile";
   const drawn = blocks.filter(blockHasContent);
   if (drawn.length === 0) {
     return (
@@ -164,7 +167,7 @@ export function CanvasContentBlocks({
                 <div key={index} data-content-column="" className="min-w-0 space-y-3">
                   {column.filter(blockHasContent).map((leaf) => (
                     <Selectable key={leaf.id} id={leaf.id} selected={leaf.id === activeBlockId}>
-                      <Leaf block={leaf} labels={labels} number={numberOf(leaf)} />
+                      <Leaf block={leaf} labels={labels} number={numberOf(leaf)} wide={wide} />
                     </Selectable>
                   ))}
                 </div>
@@ -173,7 +176,7 @@ export function CanvasContentBlocks({
           </Selectable>
         ) : (
           <Selectable key={block.id} id={block.id} selected={block.id === activeBlockId}>
-            <Leaf block={block} labels={labels} number={numberOf(block)} />
+            <Leaf block={block} labels={labels} number={numberOf(block)} wide={wide} />
           </Selectable>
         ),
       )}

@@ -51,6 +51,15 @@ A section of only headings and paragraphs previews and edits as before (plus the
 
 Tenant isolation, authN/authZ, Draft vs Published, revision concurrency, media ownership: **untouched** — the editor writes the Draft through the existing `updateDraft`, picks media through the existing workspace-scoped picker, and the Canvas reads only the signed read-only previews it already reads. No arbitrary CSS / JS / HTML. Commerce firewall: nothing here touches price, offer, stock or tax. No journal entry, no accounting behaviour.
 
+## Review round (four findings, all real, all fixed)
+
+| Finding | Fix |
+|---|---|
+| Heading / paragraph inputs kept characters beyond the stored limit (the draft truncates, the buffered field kept showing them) | `BufferedText` takes the stored limit as `maxLength` (120 / 600): the field never holds what Save would drop. Test. |
+| "Sub-heading" changed only the size on the published text-only band (always `<h2>`) | The storefront's text-only path now renders `level: 3` as a real `<h3>` (default unchanged; the section still takes its name from the first heading). Test. |
+| Canvas heading sizes used `md:` (host window) instead of the simulated device | Sizes are chosen from `viewport` (mobile → the base pair, otherwise the `md:` pair): no `md:` class remains. Test. |
+| A text-only section bypassed the selection ring / scroll | Its flat preview wraps each block in the same `Selectable` as the general path (the accordion mirror of a designed Market section remains a collapsed-cards preview). Test. |
+
 ---
 
 **Merge: PERFORMED only if and when all gates pass under Safwan's CUST-HV sequential-merge authorization (see PR). Deploy: NOT PERFORMED. Production release: NOT PERFORMED.**

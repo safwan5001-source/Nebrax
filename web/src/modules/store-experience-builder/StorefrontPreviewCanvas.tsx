@@ -77,7 +77,7 @@ import {
   type CustomizerMessageKey,
 } from "./messages";
 import { CanvasBackdrop } from "./media/CanvasBackdrop";
-import { CanvasContentBlocks } from "./CanvasContentBlocks";
+import { CanvasContentBlocks, Selectable } from "./CanvasContentBlocks";
 import { CanvasGallery } from "./CanvasGallery";
 import { CanvasSlider } from "./CanvasSlider";
 import { useBackgroundMediaBounds } from "./media/use-background-media-bounds";
@@ -1271,23 +1271,26 @@ export function StorefrontPreviewCanvas({
                   {blocks.length === 0 ? (
                     <p className="text-sm text-store-muted-foreground">{t("sectionCustomContent")}</p>
                   ) : (
-                    blocks.map((block) =>
-                      block.kind === "heading" ? (
-                        block.level === 3 ? (
-                          <h3 key={block.id} className={cn("break-words text-base font-extrabold md:text-lg", block.align === "center" && "text-center", block.align === "end" && "text-end")}>
-                            {block.text}
-                          </h3>
+                    blocks.map((block) => (
+                      // CUST-HV V9c-2 — the editor's selected block is ringed and kept in view here too (same wrapper as the general path)
+                      <Selectable key={block.id} id={block.id} selected={block.id === (activeSlides?.[section.id] ?? null)}>
+                        {block.kind === "heading" ? (
+                          block.level === 3 ? (
+                            <h3 className={cn("break-words text-base font-extrabold md:text-lg", block.align === "center" && "text-center", block.align === "end" && "text-end")}>
+                              {block.text}
+                            </h3>
+                          ) : (
+                            <h2 className={cn("break-words text-lg font-extrabold", block.align === "center" && "text-center", block.align === "end" && "text-end")}>
+                              {block.text}
+                            </h2>
+                          )
                         ) : (
-                          <h2 key={block.id} className={cn("break-words text-lg font-extrabold", block.align === "center" && "text-center", block.align === "end" && "text-end")}>
+                          <p className={cn("whitespace-pre-line break-words text-sm text-store-muted-foreground", block.align === "center" && "text-center", block.align === "end" && "text-end")}>
                             {block.text}
-                          </h2>
-                        )
-                      ) : (
-                        <p key={block.id} className={cn("whitespace-pre-line break-words text-sm text-store-muted-foreground", block.align === "center" && "text-center", block.align === "end" && "text-end")}>
-                          {block.text}
-                        </p>
-                      ),
-                    )
+                          </p>
+                        )}
+                      </Selectable>
+                    ))
                   )}
                 </section>
               );

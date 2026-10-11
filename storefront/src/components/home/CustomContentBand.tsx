@@ -338,6 +338,24 @@ export function CustomContentBand({
   );
 }
 
+/** A heading of the level the merchant chose (2 by default, 3 for a sub-heading) — the semantic level, not only the size. */
+function TextHeading({
+  level,
+  children,
+  ...rest
+}: {
+  level: 2 | 3;
+  id: string;
+  className: string;
+  children: React.ReactNode;
+}) {
+  return level === 3 ? (
+    <h3 {...rest}>{children}</h3>
+  ) : (
+    <h2 {...rest}>{children}</h2>
+  );
+}
+
 /**
  * The original heading / paragraph rendering — byte-for-byte what a text-only section always drew, including the FAQ
  * accordion of the Market preset. A section with any other block kind takes the general path above.
@@ -377,9 +395,10 @@ function TextBand({
       >
         {blocks.map((block) =>
           block.kind === "heading" ? (
-            <h2
+            <TextHeading
               key={block.id}
               id={domId(block.id)}
+              level={block.level === 3 ? 3 : 2}
               className={cn(
                 "break-words text-lg font-extrabold text-store-foreground md:text-xl",
                 block.level === 3 && "text-base md:text-lg",
@@ -387,7 +406,7 @@ function TextBand({
               )}
             >
               {block.text}
-            </h2>
+            </TextHeading>
           ) : (
             <p
               key={block.id}
