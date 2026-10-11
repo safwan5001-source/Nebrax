@@ -1,7 +1,9 @@
 """Offline tests for the CI Gate. Run: python3 -m unittest discover -s scripts/ci-gate"""
-import copy
+import argparse
 import json
+import os
 import shutil
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -190,6 +192,188 @@ class Validation(unittest.TestCase):
             "name: New\non:\n  pull_request:\njobs:\n  x:\n    runs-on: ubuntu-latest\n    steps: []\n")
         _, warns = g.validate(d)
         self.assertTrue(any("unclassified" in w for w in warns), warns)
+
+
+SHA = "a" * 40
+
+
+def wfr(path, suite, event="pull_request", sha=SHA, status="in_progress", conclusion=None):
+    return {"path": path, "check_suite_id": suite, "event": event, "head_sha": sha,
+            "status": status, "conclusion": conclusion}
+
+
+def scr(name, suite, id, conclusion="success", status="completed"):
+    r = cr(name, status=status, conclusion=conclusion, id=id)
+    r["check_suite"] = {"id": suite}
+    return r
+
+
+class Binding(unittest.TestCase):
+    """Regression: PR #1334 showed push-event and pull_request-event runs publish the SAME
+    check names on the SAME head SHA."""
+    CI = ".github/workflows/ci.yml"
+
+    def test_push_event_check_runs_are_ignored(self):
+        wf = [wfr(self.CI, 1, event="push"), wfr(self.CI, 2)]
+        raw = [scr(PHP[0], 1, 10), scr(PHP[1], 1, 11), scr(PHP[0], 2, 20), scr(PHP[1], 2, 21)]
+        bound, mine = g.bind_check_runs(raw, wf, SHA)
+        self.assertEqual({r["id"] for r in bound}, {20, 21})
+        self.assertEqual(len(mine), 1)
+
+    def test_push_run_rerun_cannot_mask_pr_failure(self):
+        wf = [wfr(self.CI, 1, event="push"), wfr(self.CI, 2)]
+        raw = [scr(PHP[0], 2, 20), scr(PHP[1], 2, 21, conclusion="failure"),
+               scr(PHP[0], 1, 90), scr(PHP[1], 1, 91)]  # push run re-run later: higher ids, green
+        bound, mine = g.bind_check_runs(raw, wf, SHA)
+        exp = g.expected_checks(M, DOCS, ["docs/a.md"])
+        self.assertEqual(g.evaluate(M, exp, bound, mine, 60, 4200)[0], "fail")
+
+    def test_runs_of_other_sha_are_ignored(self):
+        wf = [wfr(self.CI, 7, sha="b" * 40)]
+        raw = [scr(PHP[0], 7, 5), scr(PHP[1], 7, 6)]
+        bound, mine = g.bind_check_runs(raw, wf, SHA)
+        self.assertEqual((bound, mine), ([], []))
+        exp = g.expected_checks(M, DOCS, ["docs/a.md"])
+        self.assertEqual(g.evaluate(M, exp, bound, mine, 30, 4200)[0], "wait")
+
+    def test_check_run_from_unrelated_suite_is_ignored(self):
+        bound, _ = g.bind_check_runs([scr(PHP[0], 99, 5)], [wfr(self.CI, 2)], SHA)
+        self.assertEqual(bound, [])
+
+    def test_rerun_same_suite_takes_newest(self):
+        wf = [wfr(self.CI, 2)]
+        raw = [scr(PHP[0], 2, 20), scr(PHP[1], 2, 21, conclusion="failure"), scr(PHP[1], 2, 31)]
+        bound, mine = g.bind_check_runs(raw, wf, SHA)
+        exp = g.expected_checks(M, DOCS, ["docs/a.md"])
+        self.assertEqual(g.evaluate(M, exp, bound, mine, 60, 4200)[0], "pass")
+
+
+class Baseline(unittest.TestCase):
+    """Regression: a PR must not weaken required checks by editing the manifest/workflows."""
+
+    def _pair(self):
+        d = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, d)
+        for side in ("base", "head"):
+            shutil.copytree(g.ROOT / ".github", d / side / ".github")
+        return d / "base", d / "head"
+
+    def _edit_manifest(self, head, fn):
+        p = head / ".github/ci-gate/required-checks.json"
+        m = json.loads(p.read_text())
+        fn(m)
+        p.write_text(json.dumps(m))
+
+    def test_identical_is_fine(self):
+        b, h = self._pair()
+        self.assertEqual(g.compare_baseline(b, h), [])
+
+    def test_bootstrap_without_base_manifest(self):
+        b, h = self._pair()
+        (b / ".github/ci-gate/required-checks.json").unlink()
+        self.assertEqual(g.compare_baseline(b, h), [])
+
+    def test_removing_blocking_check_fails(self):
+        b, h = self._pair()
+        self._edit_manifest(h, lambda m: m["checks"].pop(0))
+        self.assertTrue(any("removed" in e for e in g.compare_baseline(b, h)))
+
+    def test_demoting_tier_fails(self):
+        b, h = self._pair()
+        def f(m):
+            for c in m["checks"]:
+                if c["name"] == "web build (Next.js)":
+                    c["tier"] = "advisory"
+        self._edit_manifest(h, f)
+        self.assertTrue(any("tier weakened" in e for e in g.compare_baseline(b, h)))
+
+    def test_guard_shrink_fails(self):
+        b, h = self._pair()
+        def f(m):
+            m["checks"][0]["guard"]["forbidden"].remove("--filter")
+        self._edit_manifest(h, f)
+        self.assertTrue(any("guard.forbidden" in e for e in g.compare_baseline(b, h)))
+
+    def test_narrowing_path_filter_fails(self):
+        b, h = self._pair()
+        p = h / ".github/workflows/web-ci.yml"
+        t = p.read_text()
+        p.write_text(t.replace("  pull_request:\n    branches: ['**']\n    paths: ['web/**', ", "  pull_request:\n    branches: ['**']\n    paths: [", 1))
+        self.assertTrue(any("paths lost" in e for e in g.compare_baseline(b, h)), t[:0])
+
+    def test_adding_checks_or_paths_is_allowed(self):
+        b, h = self._pair()
+        def f(m):
+            m["checks"].append({"name": "extra", "workflow": ".github/workflows/web-ci.yml", "job": "build", "tier": "advisory"})
+        self._edit_manifest(h, f)
+        self.assertEqual(g.compare_baseline(b, h), [])
+
+    def test_touches_gate(self):
+        self.assertTrue(g.touches_gate(["scripts/ci-gate/ci_gate.py"]))
+        self.assertTrue(g.touches_gate([".github/ci-gate/required-checks.json"]))
+        self.assertTrue(g.touches_gate([".github/workflows/ci-gate.yml"]))
+        self.assertTrue(g.touches_gate(None))
+        self.assertFalse(g.touches_gate(["docs/a.md", "web/x.ts"]))
+
+
+class FakeApi:
+    """Scripted GitHub: one PR (docs-only diff) whose PR-event run reports `results`."""
+    head = SHA
+
+    def __init__(self, results, head=None):
+        self.results, self.head_now = results, head or SHA
+
+    def get(self, path, params=None):
+        assert path == "pulls/5"
+        return {"state": "open", "head": {"sha": self.head_now}, "base": {"sha": "c" * 40}, "merge_commit_sha": "d" * 40}
+
+    def pages(self, path, key, params=None):
+        if path == "pulls/5/files":
+            return [{"filename": "docs/a.md"}]
+        if path == "actions/runs":
+            return [wfr(".github/workflows/ci.yml", 1, event="push"),
+                    wfr(".github/workflows/ci.yml", 2, status="completed", conclusion="success")]
+        if path == f"commits/{SHA}/check-runs":
+            return ([scr(PHP[0], 1, 1), scr(PHP[1], 1, 2)] +  # push-event twins, always green
+                    [scr(n, 2, 10 + i, conclusion=c) for i, (n, c) in enumerate(self.results.items())])
+        raise AssertionError(path)
+
+
+class EndToEnd(unittest.TestCase):
+    def _run(self, results, head=None):
+        orig = g.Api
+        g.Api = lambda repo, token: FakeApi(results, head)
+        os.environ.update(GITHUB_REPOSITORY="o/r", GITHUB_TOKEN="t")
+        os.environ.pop("GITHUB_STEP_SUMMARY", None)
+        try:
+            args = argparse.Namespace(root=str(g.ROOT), base_root=str(g.ROOT), pr=5, sha=SHA,
+                                      timeout_minutes=1, interval=0)
+            return g.run_gate(args)
+        finally:
+            g.Api = orig
+
+    def test_green(self):
+        self.assertEqual(self._run({PHP[0]: "success", PHP[1]: "success"}), 0)
+
+    def test_pr_failure_not_hidden_by_green_push_twin(self):
+        self.assertEqual(self._run({PHP[0]: "success", PHP[1]: "failure"}), 1)
+
+    def test_stale_head_fails_closed(self):
+        with self.assertRaises(g.GateError):
+            self._run({PHP[0]: "success", PHP[1]: "success"}, head="e" * 40)
+
+
+class Hygiene(unittest.TestCase):
+    def test_no_bytecode_tracked_and_ignored(self):
+        try:
+            tracked = subprocess.run(["git", "ls-files"], cwd=g.ROOT, capture_output=True, text=True, check=True).stdout
+        except (OSError, subprocess.CalledProcessError):
+            self.skipTest("git unavailable")
+        bad = [f for f in tracked.splitlines() if "__pycache__" in f or f.endswith(".pyc")]
+        self.assertEqual(bad, [])
+        ignore = (g.ROOT / ".gitignore").read_text()
+        self.assertIn("__pycache__/", ignore)
+        self.assertIn("*.pyc", ignore)
 
 
 if __name__ == "__main__":

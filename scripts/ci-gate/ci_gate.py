@@ -235,6 +235,58 @@ def validate(root: Path = ROOT, manifest: dict | None = None) -> tuple[list[str]
     return errors, warnings
 
 
+GATE_PATHS = (".github/workflows/ci-gate.yml", ".github/ci-gate/", "scripts/ci-gate/")
+
+
+def touches_gate(files: list[str] | None) -> bool:
+    return files is None or any(f.startswith(GATE_PATHS) for f in files)
+
+
+def compare_baseline(base_root: Path, head_root: Path) -> list[str]:
+    """A PR may add checks or tighten, never weaken what `main` already requires.
+    Compares the base branch's manifest/workflows with the PR's. Errors = weakening."""
+    bp = base_root / ".github" / "ci-gate" / "required-checks.json"
+    if not bp.exists():
+        return []  # bootstrap: the base has no gate yet
+    base, head = load_manifest(bp), load_manifest(head_root / ".github" / "ci-gate" / "required-checks.json")
+    errors = []
+    hmap = {c["name"]: c for c in head["checks"]}
+    rank = {"advisory": 0, "paths": 1, "always": 2}
+    for bc in base["checks"]:
+        if bc["tier"] not in BLOCKING:
+            continue
+        hc = hmap.get(bc["name"])
+        if hc is None:
+            errors.append(f"[{bc['name']}] blocking check removed from the manifest")
+            continue
+        if rank[hc["tier"]] < rank[bc["tier"]]:
+            errors.append(f"[{bc['name']}] tier weakened {bc['tier']} -> {hc['tier']}")
+        if (hc["workflow"], hc["job"]) != (bc["workflow"], bc["job"]):
+            errors.append(f"[{bc['name']}] now points at a different workflow/job")
+        bg, hg = bc.get("guard") or {}, hc.get("guard") or {}
+        if bg:
+            for key in ("forbidden", "require"):
+                lost = set(bg.get(key, [])) - set(hg.get(key, []))
+                if lost:
+                    errors.append(f"[{bc['name']}] guard.{key} lost {sorted(lost)}")
+            if bg.get("step_run_contains") != hg.get("step_run_contains"):
+                errors.append(f"[{bc['name']}] guard.step_run_contains changed")
+        # Path filters live in the workflow: removing a pattern silently un-requires files.
+        if bc["tier"] == "paths":
+            try:
+                _, bpaths = pr_trigger(load_yaml(base_root / bc["workflow"]))
+                _, hpaths = pr_trigger(load_yaml(head_root / hc["workflow"]))
+            except (GateError, FileNotFoundError) as e:
+                errors.append(f"[{bc['name']}] cannot compare path filters: {e}")
+                continue
+            lost = set(bpaths or []) - set(hpaths or [])
+            if hpaths is None:
+                lost = set()  # no filter = runs always = stricter
+            if lost:
+                errors.append(f"[{bc['name']}] pull_request.paths lost {sorted(lost)}")
+    return errors
+
+
 # ───────────────────────── expectation + verdict (pure) ─────────────────────────
 
 def expected_checks(manifest: dict, docs: dict[str, dict], files: list[str] | None) -> dict[str, str]:
@@ -254,6 +306,17 @@ def expected_checks(manifest: dict, docs: dict[str, dict], files: list[str] | No
         elif paths_match(paths, files):
             out[c["name"]] = "paths match"
     return out
+
+
+def bind_check_runs(check_runs: list[dict], wf_runs: list[dict], sha: str) -> tuple[list[dict], list[dict]]:
+    """Keep only check runs that belong to a `pull_request`-event workflow run of this exact
+    head SHA. `push`-event runs of the same branch publish identically named check runs on the
+    same SHA (observed on PR #1334); they are a different attempt context and must not decide
+    (or mask) the PR verdict. Returns (bound_check_runs, relevant_workflow_runs)."""
+    mine = [w for w in wf_runs if w.get("event") == "pull_request" and w.get("head_sha") == sha]
+    suites = {w["check_suite_id"] for w in mine if w.get("check_suite_id") is not None}
+    bound = [r for r in check_runs if (r.get("check_suite") or {}).get("id") in suites]
+    return bound, mine
 
 
 def latest_by_name(check_runs: list[dict]) -> dict[str, dict]:
@@ -374,17 +437,32 @@ def render_summary(verdict, rows, warnings, expected, sha, files_known):
 
 
 def run_gate(args) -> int:
-    errors, warns = validate()
+    root = Path(args.root).resolve()
+    errors, warns = validate(root)
+    if args.base_root:
+        errors += compare_baseline(Path(args.base_root).resolve(), root)
     for w in warns:
         print(f"::warning::{w}")
     if errors:
         for e in errors:
             print(f"::error::{e}")
         return 1
-    manifest = load_manifest()
-    docs = {c["workflow"]: load_yaml(ROOT / c["workflow"]) for c in manifest["checks"]}
+    manifest = load_manifest(root / ".github" / "ci-gate" / "required-checks.json")
+    docs = {c["workflow"]: load_yaml(root / c["workflow"]) for c in manifest["checks"]}
     api = Api(os.environ["GITHUB_REPOSITORY"], os.environ["GITHUB_TOKEN"])
     sha, pr = args.sha, args.pr
+
+    def assert_head_current():
+        info = api.get(f"pulls/{pr}")
+        if info["state"] != "open" or info["head"]["sha"] != sha:
+            raise GateError(f"stale gate: PR head is now {info['head']['sha']} (state {info['state']}), this run evaluates {sha}")
+        return info
+
+    info = assert_head_current()
+    # Evidence: the workflow executes on the merge ref; checks are attached to the PR head SHA.
+    print(f"Evidence: GITHUB_SHA(merge)={os.environ.get('GITHUB_SHA')} GITHUB_REF={os.environ.get('GITHUB_REF')} "
+          f"event={os.environ.get('GITHUB_EVENT_NAME')} pr.head={info['head']['sha']} pr.base={info['base']['sha']} "
+          f"pr.merge_commit_sha={info.get('merge_commit_sha')}")
 
     files = api.pages(f"pulls/{pr}/files", None)
     files_known = len(files) < MAX_PR_FILES
@@ -397,20 +475,30 @@ def run_gate(args) -> int:
                 names.append(f["previous_filename"])
     expected = expected_checks(manifest, docs, names)
     print("Expected:", json.dumps(expected, ensure_ascii=False))
+    banner = ""
+    if touches_gate(names):
+        banner = ("GATE SELF-CHANGE: this PR modifies the gate/manifest. Weakening vs main is blocked automatically; "
+                  "other gate changes need manual owner review.")
+        print(f"::warning::{banner}")
 
     start, deadline = time.monotonic(), args.timeout_minutes * 60
     gate_name = manifest["gate_check_name"]
     while True:
-        check_runs = [r for r in api.pages(f"commits/{sha}/check-runs", "check_runs", {"filter": "all"})
-                      if r["name"] != gate_name]
-        wf_runs = api.pages("actions/runs", "workflow_runs", {"head_sha": sha, "event": "pull_request"})
+        wf_all = api.pages("actions/runs", "workflow_runs", {"head_sha": sha, "event": "pull_request"})
+        raw = [r for r in api.pages(f"commits/{sha}/check-runs", "check_runs", {"filter": "all"})
+               if r["name"] != gate_name]
+        check_runs, wf_runs = bind_check_runs(raw, wf_all, sha)
         verdict, rows, warnings = evaluate(manifest, expected, check_runs, wf_runs,
                                            time.monotonic() - start, deadline)
         summary = render_summary(verdict, rows, warnings, expected, sha, files_known)
+        if banner:
+            summary += f"\n> {banner}\n"
         print(summary)
         if verdict != "wait":
             break
         time.sleep(args.interval)
+        assert_head_current()
+    assert_head_current()
 
     if os.environ.get("GITHUB_STEP_SUMMARY"):
         Path(os.environ["GITHUB_STEP_SUMMARY"]).write_text(summary, encoding="utf-8")
@@ -425,8 +513,11 @@ def run_gate(args) -> int:
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser()
     sub = ap.add_subparsers(dest="cmd", required=True)
-    sub.add_parser("validate")
+    v = sub.add_parser("validate")
+    v.add_argument("--root", default=str(ROOT))
     g = sub.add_parser("gate")
+    g.add_argument("--root", default=str(ROOT), help="PR checkout (manifest + workflows under test)")
+    g.add_argument("--base-root", default=None, help="trusted checkout of the base commit (no-weakening baseline)")
     g.add_argument("--pr", type=int, required=True)
     g.add_argument("--sha", required=True)
     g.add_argument("--timeout-minutes", type=int, default=70)
@@ -434,7 +525,7 @@ def main(argv=None) -> int:
     args = ap.parse_args(argv)
     try:
         if args.cmd == "validate":
-            errors, warns = validate()
+            errors, warns = validate(Path(args.root).resolve())
             for w in warns:
                 print(f"warning: {w}")
             for e in errors:
