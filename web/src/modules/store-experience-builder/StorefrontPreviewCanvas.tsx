@@ -56,6 +56,7 @@ import {
   benefitsContentOf,
   customContentOf,
   featuredContentOf,
+  newArrivalsContentOf,
   deliveryPromiseContentOf,
   discoveryContentOf,
   offersContentOf,
@@ -926,9 +927,14 @@ export function StorefrontPreviewCanvas({
             }
 
             if (section.type === "newArrivals") {
+              const arrivalsOwn = newArrivalsContentOf(section);
               return (
                 <section key="newArrivals" aria-labelledby="preview-arrivals">
-                  <SectionRule title={t("newArrivals")} action={t("viewAll")} />
+                  <SectionRule
+                    title={arrivalsOwn.title ?? t("newArrivals")}
+                    hideTitle={arrivalsOwn.showTitle === false}
+                    action={t("viewAll")}
+                  />
                   {/* Same "idle" ≡ "loading" rule as the categories section
                       above — see its comment. */}
                   {homeNewArrivalsState === "loading" || homeNewArrivalsState === "idle" ? (
@@ -1321,9 +1327,15 @@ export function StorefrontPreviewCanvas({
               const resolvedState = ids.length === 0 ? "ready" : (featuredResolvedState[section.id] ?? "idle");
               const products = featuredResolved[section.id] ?? [];
               const headingId = `preview-featured-${section.id}`;
+              const featuredOwn = featuredContentOf(section);
               return (
                 <section key={section.id} aria-labelledby={headingId}>
-                  <h2 id={headingId} className="text-base font-extrabold">{t("sectionFeatured")}</h2>
+                  <h2
+                    id={headingId}
+                    className={cn("text-base font-extrabold", featuredOwn.showTitle === false && "sr-only")}
+                  >
+                    {featuredOwn.title ?? t("sectionFeatured")}
+                  </h2>
                   {resolvedState === "loading" || resolvedState === "idle" ? (
                     <ul
                       aria-hidden="true"
@@ -1413,9 +1425,15 @@ export function StorefrontPreviewCanvas({
                     offer !== undefined && offer.isLive && offer.product !== null,
                 );
               const headingId = `preview-offers-${section.id}`;
+              const offersOwn = offersContentOf(section);
               return (
                 <section key={section.id} aria-labelledby={headingId}>
-                  <h2 id={headingId} className="text-base font-extrabold">{t("sectionOffers")}</h2>
+                  <h2
+                    id={headingId}
+                    className={cn("text-base font-extrabold", offersOwn.showTitle === false && "sr-only")}
+                  >
+                    {offersOwn.title ?? t("sectionOffers")}
+                  </h2>
                   {resolvedState === "loading" || resolvedState === "idle" ? (
                     <ul
                       aria-hidden="true"
@@ -1570,8 +1588,10 @@ export function StorefrontPreviewCanvas({
               let title = "";
               let note: CustomizerMessageKey = "canvasShelfLive";
               let badge: string | null = null;
+              let hideShelfTitle = false;
               if (section.type === "productShelf") {
                 const shelf = productShelfContentOf(section);
+                hideShelfTitle = shelf.showTitle === false;
                 title = shelf.title.trim();
                 note = "canvasShelfLive";
                 badge = shelf.deliverToday ? t("canvasShelfDeliverToday") : null;
@@ -1593,7 +1613,10 @@ export function StorefrontPreviewCanvas({
                   className="rounded-store border border-dashed border-store-border-strong bg-store-surface px-4 py-5"
                 >
                   <div className="flex items-center justify-between gap-3">
-                    <h2 id={headingId} className="text-sm font-bold text-store-foreground">
+                    <h2
+                      id={headingId}
+                      className={cn("text-sm font-bold text-store-foreground", hideShelfTitle && "sr-only")}
+                    >
                       {title || t(SECTION_TITLE[section.type] ?? "sectionCustomContent")}
                     </h2>
                     {badge ? (
@@ -2336,7 +2359,26 @@ function SelectablePreviewSection({
   );
 }
 
-function SectionRule({ title, action }: { title: string; action: string }) {
+function SectionRule({
+  title,
+  action,
+  hideTitle = false,
+}: {
+  title: string;
+  action: string;
+  /** CUST-HV V9d-3 — the merchant chose not to show the shelf title: it stays as the accessible name, only the action remains visible. */
+  hideTitle?: boolean;
+}) {
+  if (hideTitle) {
+    return (
+      <div data-section-heading="" data-title-hidden="" className="flex items-start justify-end gap-4">
+        <h2 className="sr-only">
+          {title}
+        </h2>
+        <span data-section-action="" className="text-xs font-bold text-store-primary md:text-sm">{action}</span>
+      </div>
+    );
+  }
   return (
     <div data-section-heading="" className="flex items-start justify-between gap-4">
       <div className="flex min-w-0 items-start gap-2">

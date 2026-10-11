@@ -51,6 +51,7 @@ import {
   emptyBannerContent,
   featuredContentOf,
   offersContentOf,
+  newArrivalsContentOf,
   productShelfContentOf,
   CTA_COLOURS,
   CTA_STYLES,
@@ -81,6 +82,7 @@ import {
 import { OfferCatalog } from "./OfferCatalog";
 import { DesignInspector } from "./design/DesignInspector";
 import { ContentBlocksFields } from "./ContentBlocksFields";
+import { ShelfTitleFields } from "./ShelfTitleFields";
 import { GalleryFields } from "./GalleryFields";
 import { SliderFields } from "./SliderFields";
 import { useBackgroundMediaBounds } from "./media/use-background-media-bounds";
@@ -415,6 +417,19 @@ export function Segmented<T extends string>({
       ))}
     </div>
   );
+}
+
+/** CUST-HV V9d-3 — a featured / offers shelf's content: its picked ids plus its optional title; nothing while both are empty. */
+function shelfContent<K extends "productIds" | "offerIds">(
+  ids: Record<K, string[]>,
+  own: { title?: string; showTitle?: false },
+): (Record<K, string[]> & { title?: string; showTitle?: false }) | undefined {
+  const ownFields: { title?: string; showTitle?: false } = {};
+  if (own.title !== undefined) ownFields.title = own.title;
+  if (own.showTitle === false) ownFields.showTitle = false;
+  const hasIds = Object.values<string[]>(ids).some((list) => list.length > 0);
+  if (!hasIds && Object.keys(ownFields).length === 0) return undefined;
+  return { ...ids, ...ownFields };
 }
 
 export const inputClass =
@@ -1392,16 +1407,47 @@ function HomepagePanel({
                   })
                 }
               />
+            ) : selected.type === "newArrivals" ? (
+              <ShelfTitleFields
+                key={selected.id}
+                content={newArrivalsContentOf(selected)}
+                t={t}
+                onChange={(content) =>
+                  updateSection(selectedIndex, {
+                    ...selected,
+                    content: Object.keys(content).length ? content : undefined,
+                  })
+                }
+              />
             ) : selected.type === "featured" ? (
+              <>
+              <ShelfTitleFields
+                key={`${selected.id}-title`}
+                content={featuredContentOf(selected)}
+                t={t}
+                onChange={(own) =>
+                  updateSection(selectedIndex, {
+                    ...selected,
+                    content: shelfContent(
+                      { productIds: featuredContentOf(selected).productIds },
+                      own,
+                    ),
+                  })
+                }
+              />
               <FeaturedPickerFields
                 productIds={featuredContentOf(selected).productIds}
                 t={t}
-                onChange={(productIds) =>
+                onChange={(productIds) => {
+                  const own = featuredContentOf(selected);
                   updateSection(selectedIndex, {
                     ...selected,
-                    content: productIds.length ? { productIds } : undefined,
-                  })
-                }
+                    content: shelfContent(
+                      { productIds },
+                      { title: own.title, showTitle: own.showTitle },
+                    ),
+                  });
+                }}
                 search={featuredPickerSearch}
                 listState={featuredPickerListState}
                 list={featuredPickerList}
@@ -1411,22 +1457,43 @@ function HomepagePanel({
                 selectedState={featuredResolvedState[selected.id] ?? "idle"}
                 onRetrySelected={() => onRetryFeaturedResolution?.(selected.id)}
               />
+              </>
             ) : selected.type === "offers" ? (
+              <>
+              <ShelfTitleFields
+                key={`${selected.id}-title`}
+                content={offersContentOf(selected)}
+                t={t}
+                onChange={(own) =>
+                  updateSection(selectedIndex, {
+                    ...selected,
+                    content: shelfContent(
+                      { offerIds: offersContentOf(selected).offerIds },
+                      own,
+                    ),
+                  })
+                }
+              />
               <OffersPickerFields
                 offerIds={offersContentOf(selected).offerIds}
                 t={t}
                 locale={locale}
-                onChange={(offerIds) =>
+                onChange={(offerIds) => {
+                  const own = offersContentOf(selected);
                   updateSection(selectedIndex, {
                     ...selected,
-                    content: offerIds.length ? { offerIds } : undefined,
-                  })
-                }
+                    content: shelfContent(
+                      { offerIds },
+                      { title: own.title, showTitle: own.showTitle },
+                    ),
+                  });
+                }}
                 offers={offers}
                 state={offersState}
                 onRetry={onRetryOffers}
                 management={offerManagement}
               />
+              </>
             ) : selected.type === "productShelf" ? (
               <ProductShelfFields
                 key={selected.id}

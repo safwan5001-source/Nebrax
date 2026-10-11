@@ -1,0 +1,333 @@
+{
+    "_note": "CUST-HV V9d-3 — product / offer shelf title (V0 §14.2): an optional `title` (≤ 80 code points) and `showTitle`, stored only as `false`. Shared by PHP StorefrontPresentationNormalizer and both TS twins (normalizeOptionalSectionContent). expected=null means the section content is absent.",
+    "cases": [
+        {
+            "name": "newArrivals: nothing authored is nothing stored",
+            "type": "newArrivals",
+            "input": [],
+            "expected": null
+        },
+        {
+            "name": "newArrivals: not an object",
+            "type": "newArrivals",
+            "input": "x",
+            "expected": null
+        },
+        {
+            "name": "newArrivals: a title is kept (trimmed, ≤ 80 code points)",
+            "type": "newArrivals",
+            "input": {
+                "title": "  Just in  "
+            },
+            "expected": {
+                "title": "Just in"
+            }
+        },
+        {
+            "name": "newArrivals: a blank title is absence",
+            "type": "newArrivals",
+            "input": {
+                "title": "   "
+            },
+            "expected": null
+        },
+        {
+            "name": "newArrivals: showTitle false is kept",
+            "type": "newArrivals",
+            "input": {
+                "showTitle": false
+            },
+            "expected": {
+                "showTitle": false
+            }
+        },
+        {
+            "name": "newArrivals: showTitle true is the default and is never stored",
+            "type": "newArrivals",
+            "input": {
+                "showTitle": true
+            },
+            "expected": null
+        },
+        {
+            "name": "newArrivals: showTitle \"false\" (a string) is not false",
+            "type": "newArrivals",
+            "input": {
+                "showTitle": "false"
+            },
+            "expected": null
+        },
+        {
+            "name": "newArrivals: showTitle 0 is not false",
+            "type": "newArrivals",
+            "input": {
+                "showTitle": 0
+            },
+            "expected": null
+        },
+        {
+            "name": "newArrivals: title and showTitle together, canonical order",
+            "type": "newArrivals",
+            "input": {
+                "showTitle": false,
+                "title": "Fresh"
+            },
+            "expected": {
+                "title": "Fresh",
+                "showTitle": false
+            }
+        },
+        {
+            "name": "newArrivals: a long title is cut at 80 code points",
+            "type": "newArrivals",
+            "input": {
+                "title": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+            },
+            "expected": {
+                "title": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+            }
+        },
+        {
+            "name": "newArrivals: astral characters count as one code point",
+            "type": "newArrivals",
+            "input": {
+                "title": "😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀"
+            },
+            "expected": {
+                "title": "😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀"
+            }
+        },
+        {
+            "name": "newArrivals: unknown keys never survive",
+            "type": "newArrivals",
+            "input": {
+                "title": "A",
+                "limit": 3,
+                "price": 1,
+                "productIds": [
+                    "p1",
+                    "p2"
+                ]
+            },
+            "expected": {
+                "title": "A"
+            }
+        },
+        {
+            "name": "featured: legacy ids only are unchanged",
+            "type": "featured",
+            "input": {
+                "productIds": [
+                    "p1",
+                    "p2"
+                ]
+            },
+            "expected": {
+                "productIds": [
+                    "p1",
+                    "p2"
+                ]
+            }
+        },
+        {
+            "name": "featured: ids with a title and the title hidden",
+            "type": "featured",
+            "input": {
+                "productIds": [
+                    "p1",
+                    "p2"
+                ],
+                "title": "Picks",
+                "showTitle": false
+            },
+            "expected": {
+                "productIds": [
+                    "p1",
+                    "p2"
+                ],
+                "title": "Picks",
+                "showTitle": false
+            }
+        },
+        {
+            "name": "featured: a title with no products is kept (the merchant types before picking)",
+            "type": "featured",
+            "input": {
+                "title": "Picks"
+            },
+            "expected": {
+                "productIds": [],
+                "title": "Picks"
+            }
+        },
+        {
+            "name": "featured: showTitle false with no products is kept",
+            "type": "featured",
+            "input": {
+                "showTitle": false
+            },
+            "expected": {
+                "productIds": [],
+                "showTitle": false
+            }
+        },
+        {
+            "name": "featured: nothing at all is nothing stored",
+            "type": "featured",
+            "input": {
+                "productIds": []
+            },
+            "expected": null
+        },
+        {
+            "name": "featured: blank title and no products is nothing stored",
+            "type": "featured",
+            "input": {
+                "title": " ",
+                "productIds": []
+            },
+            "expected": null
+        },
+        {
+            "name": "offers: offer ids with a title",
+            "type": "offers",
+            "input": {
+                "offerIds": [
+                    "p1",
+                    "p2"
+                ],
+                "title": "Deals"
+            },
+            "expected": {
+                "offerIds": [
+                    "p1",
+                    "p2"
+                ],
+                "title": "Deals"
+            }
+        },
+        {
+            "name": "offers: hidden title",
+            "type": "offers",
+            "input": {
+                "offerIds": [
+                    "o1"
+                ],
+                "showTitle": false
+            },
+            "expected": {
+                "offerIds": [
+                    "o1"
+                ],
+                "showTitle": false
+            }
+        },
+        {
+            "name": "offers: a title with no offers is kept",
+            "type": "offers",
+            "input": {
+                "title": "Deals"
+            },
+            "expected": {
+                "offerIds": [],
+                "title": "Deals"
+            }
+        },
+        {
+            "name": "offers: nothing at all is nothing stored",
+            "type": "offers",
+            "input": {
+                "offerIds": []
+            },
+            "expected": null
+        },
+        {
+            "name": "offers: unsafe ids are still dropped, the title survives",
+            "type": "offers",
+            "input": {
+                "offerIds": [
+                    "bad id!"
+                ],
+                "title": "Deals"
+            },
+            "expected": {
+                "offerIds": [],
+                "title": "Deals"
+            }
+        },
+        {
+            "name": "productShelf: showTitle false is kept after the source",
+            "type": "productShelf",
+            "input": {
+                "title": "Roses",
+                "deliverToday": true,
+                "showTitle": false
+            },
+            "expected": {
+                "title": "Roses",
+                "deliverToday": true,
+                "limit": 8,
+                "showTitle": false
+            }
+        },
+        {
+            "name": "productShelf: showTitle true or absent is not stored",
+            "type": "productShelf",
+            "input": {
+                "title": "Roses",
+                "deliverToday": true,
+                "showTitle": true
+            },
+            "expected": {
+                "title": "Roses",
+                "deliverToday": true,
+                "limit": 8
+            }
+        },
+        {
+            "name": "productShelf: a shelf with no source and no deliver-today is still nothing",
+            "type": "productShelf",
+            "input": {
+                "title": "Roses",
+                "showTitle": false
+            },
+            "expected": null
+        },
+        {
+            "name": "productShelf: collection source with showTitle false",
+            "type": "productShelf",
+            "input": {
+                "source": {
+                    "kind": "collection",
+                    "slug": "roses"
+                },
+                "limit": 6,
+                "showTitle": false
+            },
+            "expected": {
+                "title": "",
+                "deliverToday": false,
+                "limit": 6,
+                "source": {
+                    "kind": "collection",
+                    "slug": "roses"
+                },
+                "showTitle": false
+            }
+        },
+        {
+            "name": "other types never take a shelf title",
+            "type": "discovery",
+            "input": {
+                "axis": "brand",
+                "display": "chips",
+                "showTitle": false
+            },
+            "expected": {
+                "title": "",
+                "axis": "brand",
+                "display": "chips"
+            }
+        }
+    ]
+}

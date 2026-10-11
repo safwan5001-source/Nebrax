@@ -26,6 +26,7 @@ export async function OffersShelf({
   title,
   headingId,
   columns,
+  hideTitle = false,
 }: {
   offerIds: readonly string[];
   basePath: string;
@@ -33,6 +34,8 @@ export async function OffersShelf({
   headingId: string;
   /** CUST-HV V9d-2 — the section design's `columns`; absent = today's. Offers have no rail. */
   columns?: ShelfColumns;
+  /** CUST-HV V9d-3 — the merchant hid the title: it stays as the section's accessible name, visually hidden. */
+  hideTitle?: boolean;
 }) {
   const live = await fetchOffers().catch((error) => {
     console.error("OffersShelf: failed to load offers", error);
@@ -48,7 +51,11 @@ export async function OffersShelf({
     <section aria-labelledby={headingId}>
       <h2
         id={headingId}
-        className="text-base font-extrabold text-store-foreground md:text-lg"
+        className={
+          hideTitle
+            ? "sr-only"
+            : "text-base font-extrabold text-store-foreground md:text-lg"
+        }
       >
         {title}
       </h2>

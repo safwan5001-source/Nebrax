@@ -177,6 +177,7 @@ export function ProductShelfFields({
   );
   const [deliverToday, setDeliverToday] = useState(content.deliverToday);
   const [limit, setLimit] = useState(content.limit);
+  const [showTitle, setShowTitle] = useState(content.showTitle !== false);
 
   const [collections, retryCollections] = useRemote(loadCollections);
   const [facets, retryFacets] = useRemote(loadFacets);
@@ -189,7 +190,10 @@ export function ProductShelfFields({
     facetValue?: string;
     deliverToday?: boolean;
     limit?: number;
+    showTitle?: boolean;
   }) => {
+    const nextShowTitle = next.showTitle ?? showTitle;
+    if (next.showTitle !== undefined) setShowTitle(next.showTitle);
     const nextKind = next.kind ?? kind;
     const nextTitle = next.title ?? title;
     const nextSlug = next.slug ?? slug;
@@ -220,6 +224,7 @@ export function ProductShelfFields({
       ...(source ? { source } : {}),
       deliverToday: nextDeliver,
       limit: nextLimit,
+      ...(nextShowTitle ? {} : { showTitle: false as const }),
     });
   };
 
@@ -245,6 +250,16 @@ export function ProductShelfFields({
   return (
     <div className="space-y-4" data-data-section="productShelf">
       <TitleField value={title} onChange={(value) => commit({ title: value })} t={t} />
+      <Toggle
+        label={t("shelfTitleShow")}
+        checked={showTitle}
+        onChange={(value) => commit({ showTitle: value })}
+      />
+      {showTitle ? null : (
+        <p className="text-xs text-muted" data-shelf-title-hidden-note="">
+          {t("shelfTitleHiddenNote")}
+        </p>
+      )}
 
       <Field label={t("shelfSourceLabel")}>
         <select

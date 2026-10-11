@@ -64,7 +64,15 @@ export interface CustomContent {
   blocks: CustomBlock[];
 }
 
-export interface FeaturedContent {
+/** CUST-HV V9d-3 (V0 §14.2) — an optional title and "show title" for a product / offer shelf. `showTitle` is only ever stored as `false`. */
+export interface ShelfTitle {
+  title?: string;
+  showTitle?: false;
+}
+
+export interface NewArrivalsContent extends ShelfTitle {}
+
+export interface FeaturedContent extends ShelfTitle {
   productIds: string[];
 }
 
@@ -74,7 +82,7 @@ export interface FeaturedContent {
  * discount, stock, date or live state is ever persisted here. Those are read
  * fresh from the workspace/public Offers APIs.
  */
-export interface OffersContent {
+export interface OffersContent extends ShelfTitle {
   offerIds: string[];
 }
 
@@ -105,7 +113,7 @@ export type ShelfSource =
   | { kind: "collection"; slug: string }
   | { kind: "facet"; key: string; value: string };
 
-export interface ProductShelfContent {
+export interface ProductShelfContent extends ShelfTitle {
   title: string;
   source?: ShelfSource;
   deliverToday: boolean;
@@ -174,6 +182,7 @@ export type SectionContent =
   | FeaturedContent
   | OffersContent
   | ProductShelfContent
+  | NewArrivalsContent
   | DiscoveryContent
   | DeliveryPromiseContent
   | SliderContent
@@ -267,6 +276,16 @@ export function offersContentOf(section: {
     : { offerIds: [] };
 }
 
+/** CUST-HV V9d-3 — the new-arrivals shelf's optional title / show-title (an empty object while none is authored). */
+export function newArrivalsContentOf(section: {
+  type: string;
+  content?: SectionContent;
+}): NewArrivalsContent {
+  return section.type === "newArrivals" && section.content
+    ? (section.content as NewArrivalsContent)
+    : {};
+}
+
 export function productShelfContentOf(section: {
   type: string;
   content?: SectionContent;
@@ -350,11 +369,18 @@ export function normalizeOptionalSectionContent(
   }
   if (type === "featured") {
     const content = normalizeFeatured(source);
-    return content.productIds.length === 0 ? undefined : content;
+    return content.productIds.length === 0 && !hasShelfTitle(content)
+      ? undefined
+      : content;
   }
   if (type === "offers") {
     const content = normalizeOffers(source);
-    return content.offerIds.length === 0 ? undefined : content;
+    return content.offerIds.length === 0 && !hasShelfTitle(content)
+      ? undefined
+      : content;
+  }
+  if (type === "newArrivals") {
+    return normalizeNewArrivals(source);
   }
   if (type === "productShelf") {
     return normalizeProductShelf(source);
@@ -505,8 +531,32 @@ function normalizeCustom(source: Record<string, unknown>): CustomContent {
   return normalizeContentBlocks(source, sanitizeContentHref) ?? { blocks: [] };
 }
 
+/** Twin of PHP `shelfTitleFields`: a title (≤ 80 code points, blank = absent) and `showTitle`, stored only as `false`. */
+function shelfTitleFields(source: Record<string, unknown>): ShelfTitle {
+  const out: ShelfTitle = {};
+  const title = truncateToCodePoints(
+    asString(source.title).trim(),
+    MAX_SECTION_TITLE_LENGTH,
+  );
+  if (title !== "") out.title = title;
+  if (source.showTitle === false) out.showTitle = false;
+  return out;
+}
+
+function hasShelfTitle(content: ShelfTitle): boolean {
+  return content.title !== undefined || content.showTitle === false;
+}
+
+function normalizeNewArrivals(
+  source: Record<string, unknown>,
+): NewArrivalsContent | undefined {
+  const fields = shelfTitleFields(source);
+  return Object.keys(fields).length === 0 ? undefined : fields;
+}
+
 function normalizeFeatured(source: Record<string, unknown>): FeaturedContent {
-  if (!Array.isArray(source.productIds)) return { productIds: [] };
+  if (!Array.isArray(source.productIds))
+    return { productIds: [], ...shelfTitleFields(source) };
   const productIds: string[] = [];
   for (const value of source.productIds) {
     if (typeof value !== "string") continue;
@@ -516,11 +566,12 @@ function normalizeFeatured(source: Record<string, unknown>): FeaturedContent {
     productIds.push(id);
     if (productIds.length >= MAX_FEATURED_PRODUCTS) break;
   }
-  return { productIds };
+  return { productIds, ...shelfTitleFields(source) };
 }
 
 function normalizeOffers(source: Record<string, unknown>): OffersContent {
-  if (!Array.isArray(source.offerIds)) return { offerIds: [] };
+  if (!Array.isArray(source.offerIds))
+    return { offerIds: [], ...shelfTitleFields(source) };
   const offerIds: string[] = [];
   for (const value of source.offerIds) {
     if (typeof value !== "string") continue;
@@ -532,7 +583,7 @@ function normalizeOffers(source: Record<string, unknown>): OffersContent {
     offerIds.push(id);
     if (offerIds.length >= MAX_OFFERS) break;
   }
-  return { offerIds };
+  return { offerIds, ...shelfTitleFields(source) };
 }
 
 function normalizeProductShelf(
@@ -563,6 +614,7 @@ function normalizeProductShelf(
     limit,
   };
   if (shelfSource) content.source = shelfSource;
+  if (source.showTitle === false) content.showTitle = false;
   return content;
 }
 
