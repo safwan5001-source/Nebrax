@@ -20,13 +20,14 @@ class CreditNoteLine extends BaseModel implements CompanyWide
 
     protected $fillable = [
         'tenant_id', 'credit_note_id', 'product_id', 'source_line_id', 'product_variant_id', 'variant_descriptor_snapshot', 'description',
-        'quantity', 'unit_price', 'tax_rate',
+        'quantity', 'unit_price', 'unit_price_before_tax', 'tax_rate',
         'line_subtotal', 'line_discount', 'line_tax', 'line_total',
     ];
 
     protected $casts = [
         'quantity'      => 'integer',
         'unit_price'    => 'integer',
+        'unit_price_before_tax' => 'integer',
         'tax_rate'      => 'integer',
         'line_subtotal' => 'integer',
         'line_discount' => 'integer',

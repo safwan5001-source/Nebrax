@@ -19,6 +19,8 @@ class CreditNoteLineResource extends JsonResource
             'description'   => $this->description,
             'quantity'      => $this->quantity,
             'unit_price'    => Money::toRiyal($this->unit_price),
+            // قبل الضريبة: ما يطابق الضريبة والإجمالي بصرياً في المستند المطبوع (NULL ⇒ unit_price).
+            'unit_price_before_tax' => Money::toRiyal($this->unit_price_before_tax ?? $this->unit_price),
             'tax_rate'      => $this->tax_rate,
             'line_subtotal' => Money::toRiyal($this->line_subtotal),
             'line_discount' => Money::toRiyal($this->line_discount),

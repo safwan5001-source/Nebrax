@@ -58,4 +58,28 @@ describe('buildCreditNoteDocumentModel', () => {
     expect(model.direction).toBe('ltr');
     expect(model.seller.logoUrl).toBe('https://assets.example/logo.png');
   });
+
+  it('shows the pre-tax unit price so unit price, tax and total reconcile for an inclusive source', () => {
+    const model = buildCreditNoteDocumentModel({
+      note: {
+        ...note,
+        lines: [{ id: 'l1', description: 'خدمة', quantity: 1, unit_price: '115.00', unit_price_before_tax: '100.00', line_tax: '15.00', line_total: '115.00' }],
+      },
+      company: { name: 'نبراس' },
+      customer: null,
+    });
+    expect(model.lines[0]).toMatchObject({ unitPrice: 10000, priceBeforeTax: 10000, tax: 1500, total: 11500 });
+  });
+
+  it('keeps the stored unit price for notes without a pre-tax price', () => {
+    const model = buildCreditNoteDocumentModel({
+      note: {
+        ...note,
+        lines: [{ id: 'l1', description: 'قديم', quantity: 2, unit_price: '50.00', line_tax: '15.00', line_total: '115.00' }],
+      },
+      company: { name: 'نبراس' },
+      customer: null,
+    });
+    expect(model.lines[0]).toMatchObject({ unitPrice: 5000, priceBeforeTax: null });
+  });
 });

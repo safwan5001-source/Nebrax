@@ -586,6 +586,35 @@ class CreditNoteSourceVatAccuracyTest extends TestCase
     }
 
     /** @test */
+    public function the_printed_line_carries_a_pre_tax_unit_price_that_reconciles_with_tax_and_total(): void
+    {
+        // فاتورة شاملة: unit_price المخزَّن 115.00 (مفتاح مقارنة السقف) والمطبوع يُظهر 100.00 قبل الضريبة.
+        $invoice = $this->sale([$this->item(2, 11500)], ['tax_inclusive' => true]);
+        $line = $invoice->lines->first();
+
+        $full = $this->note($invoice, [[$line, 1]]);
+        $row = $this->getJson("/api/credit-notes/{$full->id}")->assertOk()->json('data.lines.0');
+        $this->assertSame('115.00', $row['unit_price']);
+        $this->assertSame('100.00', $row['unit_price_before_tax']);
+        $this->assertSame('15.00', $row['line_tax']);
+        $this->assertSame('115.00', $row['line_total']);
+
+        // استرداد جزئي بنصف السعر: السعر قبل الضريبة يتناسب (50.00) والإجمالي 57.50.
+        $half = $this->note($invoice, [[$line, 1, 5750]]);
+        $row = $this->getJson("/api/credit-notes/{$half->id}")->assertOk()->json('data.lines.0');
+        $this->assertSame('50.00', $row['unit_price_before_tax']);
+        $this->assertSame('57.50', $row['line_total']);
+
+        // إشعار مستقل: غير شامل، فالسعر قبل الضريبة = السعر.
+        Settings::put('sales', ['allow_standalone_credit_notes' => true]);
+        $standalone = $this->postJson('/api/credit-notes', [
+            'partner_id' => $this->customer->id, 'type' => 'sales',
+            'items' => [['quantity' => 1, 'unit_price' => 10000]],
+        ])->assertCreated()->json('data.lines.0');
+        $this->assertSame('100.00', $standalone['unit_price_before_tax']);
+    }
+
+    /** @test */
     public function an_omitted_unit_price_defaults_to_the_invoiced_price(): void
     {
         $invoice = $this->sale([$this->item(1, 10000)]);

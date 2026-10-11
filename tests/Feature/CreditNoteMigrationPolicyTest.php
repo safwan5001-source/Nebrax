@@ -175,6 +175,7 @@ class CreditNoteMigrationPolicyTest extends TestCase
         $migration->down();
         $this->assertFalse(Schema::hasColumn('credit_note_lines', 'source_line_id'));
         $this->assertFalse(Schema::hasColumn('credit_note_lines', 'line_discount'));
+        $this->assertFalse(Schema::hasColumn('credit_note_lines', 'unit_price_before_tax'));
         $this->assertSame(
             [10000, 1500, 11500],
             array_map('intval', array_values((array) DB::table('credit_note_lines')->where('id', $line->id)->first(['line_subtotal', 'line_tax', 'line_total']))),
@@ -184,6 +185,7 @@ class CreditNoteMigrationPolicyTest extends TestCase
         $migration->up();
         $this->assertTrue(Schema::hasColumn('credit_note_lines', 'source_line_id'));
         $this->assertTrue(Schema::hasColumn('credit_note_lines', 'line_discount'));
+        $this->assertTrue(Schema::hasColumn('credit_note_lines', 'unit_price_before_tax'));
         $this->assertNull($line->fresh()->source_line_id);
         $this->assertSame(0, (int) $line->fresh()->line_discount);
         $this->assertSame(11500, (int) $line->fresh()->line_total);

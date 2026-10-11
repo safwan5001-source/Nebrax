@@ -307,6 +307,7 @@ class CreditNoteService
                 'description'    => $item['description'] ?? $source->description,
                 'quantity'       => $qty,
                 'unit_price'     => $price,
+                'unit_price_before_tax' => $allocator->unitPriceBeforeTaxAt($source, (bool) $invoice->tax_inclusive, $price),
                 'tax_rate'       => $charged[$lineId]['tax_rate'],
                 'line_subtotal'  => $alloc['subtotal'],
                 'line_discount'  => $alloc['discount'],
@@ -425,6 +426,7 @@ class CreditNoteService
                 'description'    => $item['description'] ?? null,
                 'quantity'       => $qty,
                 'unit_price'     => $unitPrice,
+                'unit_price_before_tax' => $unitPrice, // المستقل غير شامل للضريبة
                 'tax_rate'       => $rate,
                 'line_subtotal'  => $lineSubtotal,
                 'line_discount'  => 0,

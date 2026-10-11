@@ -23,6 +23,11 @@ return new class extends Migration
      *    الرأس لتبقى الصيغة (subtotal − discount = الصافي) واحدة في المرتجع
      *    والإشعار، ويُجمَع الاثنان في سقفٍ واحد.
      *
+     *  - `unit_price_before_tax`: سعر الوحدة قبل الضريبة (من سطر الفاتورة، ويُخفَّض
+     *    تناسبياً مع السعر المخفَّض). `unit_price` يبقى بوحدة الفاتورة (شاملاً للضريبة
+     *    على فاتورة شاملة) لأنه مفتاح مقارنة السقف؛ والمستند المطبوع يعرض هذا العمود
+     *    كي يتطابق سعر الوحدة والضريبة والإجمالي بصرياً. NULL ⇒ يُقرأ `unit_price`.
+     *
      *  **إضافية بحتة:** كلا العمودين nullable/افتراضه صفر. كل إشعار قائم
      *  (مرحَّل أو مسوَّدة) يبقى كما هو بالبايت: `line_discount = 0` و
      *  `source_line_id = NULL`، فالمجاميع المشتقة منها لا تتغير.
@@ -32,6 +37,7 @@ return new class extends Migration
         Schema::table('credit_note_lines', function (Blueprint $table) {
             $table->uuid('source_line_id')->nullable()->after('product_id');
             $table->bigInteger('line_discount')->default(0)->after('line_subtotal');
+            $table->bigInteger('unit_price_before_tax')->nullable()->after('unit_price');
 
             $table->index(['tenant_id', 'source_line_id'], 'credit_note_lines_tenant_source_line_index');
         });
@@ -41,7 +47,7 @@ return new class extends Migration
     {
         Schema::table('credit_note_lines', function (Blueprint $table) {
             $table->dropIndex('credit_note_lines_tenant_source_line_index');
-            $table->dropColumn(['source_line_id', 'line_discount']);
+            $table->dropColumn(['source_line_id', 'line_discount', 'unit_price_before_tax']);
         });
     }
 };

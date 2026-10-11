@@ -291,6 +291,18 @@ class ReturnSourceAllocator
         return $inclusive ? $price - $this->extractTax($price, (int) $sourceLine->tax_rate) : $price;
     }
 
+    /**
+     * سعر الوحدة قبل الضريبة عند سعر ردٍّ `$price`: سعر المصدر قبل الضريبة، مخفَّضاً
+     * تناسبياً إن كان `$price` أقل من سعر السطر (استردادٌ جزئي). للعرض والطباعة فقط.
+     */
+    public function unitPriceBeforeTaxAt(object $sourceLine, bool $inclusive, int $price): int
+    {
+        $base = $this->unitPriceBeforeTax($sourceLine, $inclusive);
+        $source = (int) $sourceLine->unit_price;
+
+        return $source > 0 && $price < $source ? $this->mulDiv($base, max(0, $price), $source)[0] : $base;
+    }
+
     /** F(n): نصيب أول n وحدة من `$amount` المباع منه `$sold` — والمباع كلّه يأخذ المبلغ كاملاً. */
     private function cumulative(int $amount, int $sold, int $units): int
     {
