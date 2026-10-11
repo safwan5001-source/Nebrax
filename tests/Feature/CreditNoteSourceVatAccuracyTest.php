@@ -529,6 +529,25 @@ class CreditNoteSourceVatAccuracyTest extends TestCase
     }
 
     /** @test */
+    public function a_pos_final_part_does_not_sweep_the_amount_withheld_by_a_reduced_price_credit(): void
+    {
+        // 2 × 100.00: إشعار بوحدة بنصف السعر (50.00 + ضريبة 7.50) ثم ردّ POS للوحدة الأخيرة.
+        // الفرق المحتجَز (50.00) قرارٌ تجاري لا يُردّ معها: 100.00 + 15.00 لا 150.00 + 22.50.
+        $invoice = $this->sale([$this->item(2, 10000)]);
+        $line = $invoice->lines->first();
+        $note = $this->note($invoice, [[$line, 1, 5000]]);
+        $this->assertSame([5000, 750], [(int) $note->subtotal, (int) $note->tax_amount]);
+
+        $service = app(\App\Services\Accounting\PosReturnService::class);
+        $derive = new \ReflectionMethod($service, 'buildSourceItems');
+        $derive->setAccessible(true);
+        $item = $derive->invoke($service, $invoice->fresh('lines'), [['source_line_id' => $line->id, 'quantity' => 1]])[0];
+
+        $this->assertSame(10000, $item['line_subtotal_override'] - $item['line_discount']);
+        $this->assertSame(1500, $item['line_tax_override']);
+    }
+
+    /** @test */
     public function a_note_first_then_a_return_is_also_capped(): void
     {
         $invoice = $this->sale([$this->item(2, 10000)]);

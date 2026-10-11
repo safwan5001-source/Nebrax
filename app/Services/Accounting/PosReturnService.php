@@ -293,7 +293,13 @@ class PosReturnService
                 throw new RuntimeException("الكمية المردودة ({$quantity}) تتجاوز المتبقي ({$remainingQuantity}) في فاتورة POS المصدر.");
             }
 
-            $isFinalPart = $quantity === $remainingQuantity;
+            // الجزء الأخير يكنس المتبقي إلا إن سبق على السطر ردٌّ/إشعار **بسعر مخفَّض**: الفرق
+            // المحتجَز عندئذ قرارٌ تجاري لا يُردّ مع آخر وحدة (نفس قاعدة `allocate()` في
+            // المرتجع بالـAPI)، فيُوزَّع الجزء بالتناسب ويبقى المحتجَز محتجَزاً.
+            $reducedBefore = $previous !== null
+                && (int) $charged[$line->id]['unit_price'] > 0
+                && (int) ($previous->min_price ?? PHP_INT_MAX) < (int) $charged[$line->id]['unit_price'];
+            $isFinalPart = $quantity === $remainingQuantity && ! $reducedBefore;
             $subtotal = $this->allocate((int) $charged[$line->id]['subtotal'], $sold, $quantity, (int) ($previous?->subtotal ?? 0), $isFinalPart);
             $discount = $this->allocate((int) $charged[$line->id]['discount'], $sold, $quantity, (int) ($previous?->discount ?? 0), $isFinalPart);
             $tax = $this->allocate((int) $charged[$line->id]['tax'], $sold, $quantity, (int) ($previous?->tax ?? 0), $isFinalPart);
