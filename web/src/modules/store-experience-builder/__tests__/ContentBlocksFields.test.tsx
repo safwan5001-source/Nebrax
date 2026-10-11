@@ -296,3 +296,44 @@ describe("a button's label while it has no link (V9c review, round 3)", () => {
     expect(rows()).toHaveLength(1);
   });
 });
+
+describe("button label and link, and image removal (V9c review, round 4)", () => {
+  it("entering the link before replacement text brings the field back to the label that is really stored", () => {
+    const seen: ContentBlocks[] = [];
+    render(<Harness initial={{ blocks: [] }} onContent={(c) => seen.push(c)} />);
+    fireEvent.change(addSelect(), { target: { value: "button" } });
+    const label = () => document.querySelector<HTMLInputElement>("input[data-content-button-label]") as HTMLInputElement;
+    fireEvent.change(label(), { target: { value: "" } });
+    expect(label().value).toBe("");
+    const href = document.querySelector<HTMLInputElement>("[data-content-button-href], input[dir='ltr']") as HTMLInputElement;
+    fireEvent.change(href, { target: { value: "https://example.com/shop" } });
+    fireEvent.blur(href);
+    expect(seen.at(-1)?.blocks[0]).toMatchObject({ kind: "button", label: t("cbButtonDefault"), href: "https://example.com/shop" });
+    expect(label().value).toBe(t("cbButtonDefault"));
+  });
+
+  it("the button label stops at 80 code points", () => {
+    render(<Harness initial={{ blocks: [{ id: "b", kind: "button", label: "x", href: "/shop" }] }} />);
+    fireEvent.click(rows()[0].querySelector("button") as HTMLElement);
+    const label = document.querySelector<HTMLInputElement>("input[data-content-button-label]") as HTMLInputElement;
+    fireEvent.change(label, { target: { value: "😀".repeat(90) } });
+    expect(Array.from(label.value)).toHaveLength(80);
+  });
+
+  it("removing the selected image selects its neighbour, like the list's delete", () => {
+    render(
+      <Harness
+        initial={{
+          blocks: [
+            { id: "i", kind: "image", media: { mediaId: A } },
+            { id: "h", kind: "heading", text: "Keep" },
+          ],
+        }}
+      />,
+    );
+    fireEvent.click(rows()[0].querySelector("button") as HTMLElement);
+    fireEvent.click(screen.getByRole("button", { name: "remove-picture" }));
+    expect(rows()).toHaveLength(1);
+    expect(rows()[0].getAttribute("data-selected")).toBe("");
+  });
+});

@@ -53,6 +53,7 @@ import {
   MAX_CALLOUT_LENGTH,
   MAX_COLUMN_BLOCKS,
   MAX_CONTENT_BLOCKS,
+  MAX_BLOCK_BUTTON_LABEL_LENGTH,
   MAX_HEADING_LENGTH,
   MAX_PARAGRAPH_LENGTH,
 } from "./presentation/content-blocks";
@@ -115,6 +116,20 @@ function BufferedText({
   ) : (
     <input className={inputClass} value={local} onChange={(event) => commit(event.target.value)} {...rest} />
   );
+}
+
+/** The block to select after `id` is removed: its next sibling, else the previous one, else its column's parent, else none. */
+function neighbourAfterRemoval(content: ContentBlocks, id: string): string | null {
+  const top = content.blocks.findIndex((block) => block.id === id);
+  if (top >= 0) return (content.blocks[top + 1] ?? content.blocks[top - 1])?.id ?? null;
+  for (const block of content.blocks) {
+    if (block.kind !== "columns") continue;
+    for (const column of block.columns) {
+      const index = column.findIndex((leaf) => leaf.id === id);
+      if (index >= 0) return (column[index + 1] ?? column[index - 1])?.id ?? block.id;
+    }
+  }
+  return null;
 }
 
 export function ContentBlocksFields({
@@ -257,7 +272,14 @@ export function ContentBlocksFields({
           aria-label={t(KIND_LABEL[selected.kind])}
         >
           <h3 className="text-[13px] font-semibold text-text">{t(KIND_LABEL[selected.kind])}</h3>
-          <BlockEditor block={selected} content={content} locale={locale} t={t} onChange={onChange} />
+          <BlockEditor
+            block={selected}
+            content={content}
+            locale={locale}
+            t={t}
+            onChange={onChange}
+            onRemove={() => remove(selected.id, neighbourAfterRemoval(content, selected.id))}
+          />
         </section>
       ) : null}
     </div>
@@ -427,18 +449,74 @@ function AlignField({ value, t, onChange }: { value: "start" | "center" | "end";
   );
 }
 
+/**
+ * A button's label and link. A button with neither is not a button (the normaliser drops it), so while it has no link an emptied label is
+ * kept in the field and not committed — the block survives until text is typed. If the link is entered first, the field is brought back to
+ * the label that is really stored, so the editor never shows a blank the Canvas and the saved page do not honour.
+ */
+function ButtonTextFields({
+  block,
+  content,
+  t,
+  onChange,
+}: {
+  block: Extract<ContentBlock, { kind: "button" }>;
+  content: ContentBlocks;
+  t: T;
+  onChange: (content: ContentBlocks) => void;
+}) {
+  const [pendingEmpty, setPendingEmpty] = useState(false);
+  const [generation, setGeneration] = useState(0);
+  return (
+    <>
+      <Field label={t("cbButtonLabel")}>
+        <BufferedText
+          key={generation}
+          value={block.label}
+          limit={MAX_BLOCK_BUTTON_LABEL_LENGTH}
+          onCommit={(label) => {
+            if (label.trim() === "" && block.href.trim() === "") {
+              setPendingEmpty(true);
+              return;
+            }
+            setPendingEmpty(false);
+            onChange(setButtonLabel(content, block.id, label));
+          }}
+          data-content-button-label=""
+        />
+      </Field>
+      <DeferredCommitField
+        label={t("cbButtonHref")}
+        hint={t("cbButtonHrefHint")}
+        value={block.href}
+        dir="ltr"
+        onCommit={(href) => {
+          if (pendingEmpty && href.trim() !== "") {
+            setPendingEmpty(false);
+            setGeneration((n) => n + 1);
+          }
+          onChange(setButtonHref(content, block.id, href));
+        }}
+      />
+    </>
+  );
+}
+
 function BlockEditor({
   block,
   content,
   locale,
   t,
   onChange,
+  onRemove,
 }: {
   block: ContentBlock;
   content: ContentBlocks;
   locale: "ar" | "en";
   t: T;
   onChange: (content: ContentBlocks) => void;
+  /** Remove this block the way the list's delete does (and select its neighbour). */
+  onRemove: () => void;
 }) {
   switch (block.kind) {
     case "heading":
@@ -476,8 +554,8 @@ function BlockEditor({
             slot="content-block-image"
             label={t("cbPicture")}
             value={block.media}
-            // an image always needs its picture, so the field's Remove deletes the block (as the list's delete does)
-            onChange={(media) => onChange(media ? setImageMedia(content, block.id, media) : removeBlock(content, block.id))}
+            // an image always needs its picture, so the field's Remove deletes the block — through the same path as the list's delete
+            onChange={(media) => (media ? onChange(setImageMedia(content, block.id, media)) : onRemove())}
             t={t}
             locale={locale}
           />
@@ -501,25 +579,7 @@ function BlockEditor({
     case "button":
       return (
         <>
-          <Field label={t("cbButtonLabel")}>
-            <BufferedText
-              value={block.label}
-              // a button with neither a label nor a link is not a button: while it has no link, an emptied label stays in the field and
-              // is not committed (committing it would drop the whole block before the replacement text can be typed)
-              onCommit={(label) => {
-                if (label.trim() === "" && block.href.trim() === "") return;
-                onChange(setButtonLabel(content, block.id, label));
-              }}
-              data-content-button-label=""
-            />
-          </Field>
-          <DeferredCommitField
-            label={t("cbButtonHref")}
-            hint={t("cbButtonHrefHint")}
-            value={block.href}
-            dir="ltr"
-            onCommit={(href) => onChange(setButtonHref(content, block.id, href))}
-          />
+          <ButtonTextFields key={block.id} block={block} content={content} t={t} onChange={onChange} />
           <SegmentedField label={t("cbButtonStyle")}>
             <Segmented
               value={block.style ?? "solid"}
