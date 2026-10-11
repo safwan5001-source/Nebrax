@@ -262,6 +262,21 @@ export const SECTION_CAPABILITIES: Record<
     titleKey: "sectionDeliveryPromise",
     descriptionKey: "sectionDeliveryPromiseDescription",
   },
+  // CUST-HV V8a — the content model and Publish rules exist (an API-authored slider is stored and
+  // gated), but neither the Canvas nor the storefront draws it and the editor is not built yet
+  // (V8b–V8d). Visible and disabled in the Library, never hidden, until it is honest to add.
+  slider: {
+    type: "slider",
+    maxInstances: null,
+    canDuplicate: true,
+    canDelete: true,
+    state: "deferred",
+    category: "mediaVideo",
+    merchantAddable: false,
+    titleKey: "sectionSlider",
+    descriptionKey: "sectionSliderDescription",
+    reasonKey: "sectionSliderReason",
+  },
 };
 
 export function sectionCapability(

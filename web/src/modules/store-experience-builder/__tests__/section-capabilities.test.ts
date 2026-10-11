@@ -185,6 +185,8 @@ describe("CUST-H4-2 capability registry — state/category/library metadata", ()
       productShelf: "live",
       discovery: "live",
       deliveryPromise: "live",
+      // CUST-HV V8a — the model and the Publish rules exist; nothing draws or edits it yet.
+      slider: "deferred",
     };
     for (const type of ALL_HOME_SECTION_KEYS) {
       expect(SECTION_CAPABILITIES[type].state).toBe(expected[type]);
@@ -231,6 +233,7 @@ describe("CUST-H4-2 capability registry — state/category/library metadata", ()
 
   it("leaves every other section's capability state unchanged by the Offers transition", () => {
     for (const type of ALL_HOME_SECTION_KEYS) {
+      if (type === "slider") continue; // V8a: deferred until its renderers and editor ship (below)
       expect(SECTION_CAPABILITIES[type].state).toBe("live");
       expect(SECTION_CAPABILITIES[type].merchantAddable).toBe(true);
     }
@@ -278,12 +281,28 @@ describe("CUST-H4-2 capability registry — state/category/library metadata", ()
     // Every type is merchant-addable (Offers flipped in CUST-H4-7), so
     // instance-count rules are the only remaining gate.
     for (const type of ALL_HOME_SECTION_KEYS) {
-      expect(SECTION_CAPABILITIES[type].merchantAddable).toBe(true);
+      expect(SECTION_CAPABILITIES[type].merchantAddable).toBe(type !== "slider");
     }
     const sections = DEFAULT_PRESENTATION_CONFIG.homepage.sections.filter(
       (s) => s.type !== "appPromo",
     );
     expect(canAddSectionType(sections, "appPromo")).toBe(true);
+  });
+});
+
+describe("CUST-HV V8a slider capability (deferred until V8b–V8d)", () => {
+  it("is visible in the Library but not addable, with the reason shown, and kept out of the default document", () => {
+    const cap = SECTION_CAPABILITIES.slider;
+    expect(cap.state).toBe("deferred");
+    expect(cap.merchantAddable).toBe(false);
+    expect(cap.reasonKey).toBe("sectionSliderReason");
+    expect(canAddSectionType([], "slider")).toBe(false);
+    expect(HOME_BUILDER_SECTION_KEYS).not.toContain("slider");
+    expect(HOME_DATA_SECTION_KEYS).not.toContain("slider");
+    expect(ALL_HOME_SECTION_KEYS).toContain("slider");
+    expect(
+      DEFAULT_PRESENTATION_CONFIG.homepage.sections.some((entry) => entry.type === "slider"),
+    ).toBe(false);
   });
 });
 

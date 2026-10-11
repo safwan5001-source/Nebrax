@@ -96,6 +96,21 @@
             "radius": true,
             "separator": true
         },
+        "slider": {
+            "background": [
+                "solid",
+                "gradient"
+            ],
+            "width": true,
+            "spacing": true,
+            "border": true,
+            "radius": true,
+            "shadow": true,
+            "separator": true,
+            "mediaTreatment": [
+                "height"
+            ]
+        },
         "newArrivals": {
             "background": [
                 "solid",
