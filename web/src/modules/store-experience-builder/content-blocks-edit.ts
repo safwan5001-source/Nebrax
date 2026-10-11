@@ -205,10 +205,15 @@ function withoutKey<T extends object, K extends keyof T>(value: T, key: K): Omit
   return rest;
 }
 
+/** The stored form of heading / paragraph text: PHP's default trim set (the normaliser's first step), so the limit is on what is kept. */
+function storedForm(value: string): string {
+  return value.replace(/^[ \t\n\r\0\v]+|[ \t\n\r\0\v]+$/g, "");
+}
+
 export function setText(content: ContentBlocks, id: string, value: string): ContentBlocks {
   return updateBlock(content, id, (block) => {
-    if (block.kind === "heading") return { ...block, text: cut(value, MAX_HEADING_LENGTH) };
-    if (block.kind === "paragraph") return { ...block, text: cut(value, MAX_PARAGRAPH_LENGTH) };
+    if (block.kind === "heading") return { ...block, text: cut(storedForm(value), MAX_HEADING_LENGTH) };
+    if (block.kind === "paragraph") return { ...block, text: cut(storedForm(value), MAX_PARAGRAPH_LENGTH) };
     if (block.kind === "callout") return { ...block, text: cut(value, MAX_CALLOUT_LENGTH) };
     return block;
   });

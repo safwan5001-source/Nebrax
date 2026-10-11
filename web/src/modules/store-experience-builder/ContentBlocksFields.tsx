@@ -103,8 +103,10 @@ function BufferedText({
     setLocal((current) => (stored(current) === value ? current : value));
   }, [value]);
   const commit = (typed: string) => {
+    // the limit is on the STORED (trimmed) form, so leading whitespace does not spend the quota
+    const lead = typed.length - typed.replace(/^[ \t\n\r\0\v]+/, "").length;
     const points = limit === undefined ? null : Array.from(typed);
-    const next = points && points.length > limit! ? points.slice(0, limit).join("") : typed;
+    const next = points && points.length > limit! + lead ? points.slice(0, limit! + lead).join("") : typed;
     setLocal(next);
     onCommit(next);
   };

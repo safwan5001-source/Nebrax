@@ -261,6 +261,16 @@ describe("text fields respect the stored limits, by code point (V9c review)", ()
     expect(Array.from(paragraph.value)).toHaveLength(600);
   });
 
+  it("leading whitespace does not spend the quota: the limit applies to the trimmed stored form", () => {
+    const seen: ContentBlocks[] = [];
+    render(<Harness initial={{ blocks: [{ id: "h", kind: "heading", text: "x" }] }} onContent={(c) => seen.push(c)} />);
+    fireEvent.click(rows()[0].querySelector("button") as HTMLElement);
+    const heading = document.querySelector<HTMLInputElement>("input[data-content-text]") as HTMLInputElement;
+    fireEvent.change(heading, { target: { value: `   ${"a".repeat(130)}` } });
+    expect(Array.from((seen.at(-1)?.blocks[0] as { text: string }).text)).toHaveLength(120);
+    expect(heading.value.trimStart().length).toBe(120);
+  });
+
   it("removing an image block's picture deletes the block (the field's Remove is not a silent no-op)", () => {
     render(<Harness initial={{ blocks: [{ id: "i", kind: "image", media: { mediaId: A } }, { id: "h", kind: "heading", text: "Keep" }] }} />);
     fireEvent.click(rows()[0].querySelector("button") as HTMLElement);
