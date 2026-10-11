@@ -239,6 +239,18 @@ export const SECTION_DESIGN_CAPABILITIES: Record<string, DesignCapability> = {
     radius: true,
     separator: true,
   },
+  // CUST-HV V8a (V0 §3.4) — twin of PHP: no `text` (colours are per slide, over each picture)
+  // and no `layout` yet (`split` puts the copy on the section surface — its own proof, later).
+  slider: {
+    background: BACKGROUND_KINDS,
+    width: true,
+    spacing: true,
+    border: true,
+    radius: true,
+    shadow: true,
+    separator: true,
+    mediaTreatment: ["height"],
+  },
   newArrivals: {
     background: BACKGROUND_KINDS,
     text: ["heading"],
@@ -380,14 +392,14 @@ function normalizeBackground(
  * The picture is decorative by definition (no alt) and always `cover`: a frame that does
  * not fill the box would reveal a surface the contrast evidence does not cover.
  */
-function normalizeBackgroundRef(raw: unknown): MediaRef | undefined {
+export function normalizeBackgroundRef(raw: unknown): MediaRef | undefined {
   const ref = normalizeMediaRef(raw);
   if (!ref) return undefined;
   const { fit: _fit, alt: _alt, ...rest } = ref;
   return { ...rest, decorative: true };
 }
 
-function normalizeMediaOverlay(raw: unknown): MediaOverlay | undefined {
+export function normalizeMediaOverlay(raw: unknown): MediaOverlay | undefined {
   if (!isRecord(raw)) return undefined;
   const alpha = pick(raw.alpha, OVERLAY_ALPHAS);
   if (alpha === undefined) return undefined;

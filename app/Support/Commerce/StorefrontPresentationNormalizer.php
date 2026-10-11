@@ -137,6 +137,15 @@ final class StorefrontPresentationNormalizer
         'deliveryPromise',
     ];
 
+    /**
+     * CUST-HV V8 — أقسام الوسائط (V0 §13): `slider` الآن (و`gallery` في شريحةٍ لاحقة). مقبولة للتخزين (المحتوى مُطبَّع
+     * fail-closed) لكنها خارج القائمة الافتراضية للوثيقة كأقسام البيانات، فلا تتغيّر الوثيقة الافتراضية ولا توأماها.
+     * مجموعةٌ منفصلة عن `HOME_DATA_SECTION_KEYS` عمداً: تلك تُحصى في إعداد القطاع كـ«أقسام بيانات».
+     */
+    public const HOME_MEDIA_SECTION_KEYS = [
+        'slider',
+    ];
+
     public const IMPLEMENTED_HOME_SECTION_KEYS = [
         'hero',
         'categories',
@@ -720,7 +729,9 @@ final class StorefrontPresentationNormalizer
                 $type = $id;
             }
 
-            if (! in_array($type, self::HOME_BUILDER_SECTION_KEYS, true) && ! in_array($type, self::HOME_DATA_SECTION_KEYS, true)) {
+            if (! in_array($type, self::HOME_BUILDER_SECTION_KEYS, true)
+                && ! in_array($type, self::HOME_DATA_SECTION_KEYS, true)
+                && ! in_array($type, self::HOME_MEDIA_SECTION_KEYS, true)) {
                 continue;
             }
             if (isset($seenIds[$id])) {
@@ -834,6 +845,10 @@ final class StorefrontPresentationNormalizer
             }
 
             return $empty ? null : $content;
+        }
+
+        if ($type === 'slider') {
+            return StorefrontSliderNormalizer::normalize($raw, fn (string $href): string => $this->sanitizeContentHref($href));
         }
 
         if ($type === 'benefits') {

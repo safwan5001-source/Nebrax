@@ -108,10 +108,19 @@ export const HOME_DATA_SECTION_KEYS = [
 
 export type HomeDataSectionKey = (typeof HOME_DATA_SECTION_KEYS)[number];
 
-/** Every section type the builder knows (default-document types + data-backed). */
+/**
+ * CUST-HV V8 — media sections (twin of PHP `HOME_MEDIA_SECTION_KEYS`): `slider` now,
+ * `gallery` with its own slice. Outside the default document like the data sections.
+ */
+export const HOME_MEDIA_SECTION_KEYS = ["slider"] as const;
+
+export type HomeMediaSectionKey = (typeof HOME_MEDIA_SECTION_KEYS)[number];
+
+/** Every section type the builder knows (default-document types + data-backed + media). */
 export const ALL_HOME_SECTION_KEYS = [
   ...HOME_BUILDER_SECTION_KEYS,
   ...HOME_DATA_SECTION_KEYS,
+  ...HOME_MEDIA_SECTION_KEYS,
 ] as const;
 
 export type HomeBuilderSectionKey = (typeof ALL_HOME_SECTION_KEYS)[number];
