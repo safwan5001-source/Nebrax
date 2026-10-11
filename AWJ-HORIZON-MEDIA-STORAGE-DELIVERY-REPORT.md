@@ -11,7 +11,8 @@
 | Repository | `safwan5001-source/Nebrax` · PR **#1323** |
 | الفرع | `docs/horizon-media-storage-master-plan` |
 | **Base SHA** | `5b9d9dc` — `docs(audit): AWJ-UPLOAD-RELIABILITY-1 … (#1314)` |
-| **Head SHA** | **`76c0a04`** — `docs(storage): rebuild the media-storage plan as one consolidated version` |
+| **commit الخطة الموحَّدة** | `76c0a04` — `docs(storage): rebuild the media-storage plan as one consolidated version` |
+| **Head SHA للفرع** | `06908b7` — commit هذا التقرير. ⚠️ **وهو آخرُ ما دُفع:** أيُّ تصحيحٍ لاحقٍ لهذا التقرير يُقدّم الرأس، **فالمرجعُ القاطع هو `git rev-parse origin/<الفرع>` لا هذا السطر** |
 | `origin/main` | `3209fcb` · **دمج نظيف بلا تعارض** (`git merge-tree`) |
 | commits على الفرع | 15 — كلُّها توثيقية |
 | **نطاق التغيير** | `git diff 5b9d9dc...HEAD --name-only` ⇒ **ملفات `.md` فقط**. صفرُ ملفٍ في `app/` أو `config/` أو `database/` أو `routes/` أو `web/` أو `deploy/` |
@@ -69,7 +70,7 @@
 
 | البند | القيمة |
 |---|---|
-| الرأس الحالي `76c0a04` | **دُفع الآن — الفحوص لم تبدأ بعد عند كتابة هذا السطر.** لا أُعلن نتيجةً قبل ظهورها |
+| الرأس الحالي للفرع | **فحوصُه لم تكتمل عند كتابة هذا السطر.** لا أُعلن نتيجةً قبل ظهورها — تُقرأ من صفحة الـPR |
 | أرؤسٌ سابقة اكتملت **بلا فشل** | `7ca869f` · `e770c99` · `5eacdcf` · `2922e87` · `c75357a` · `905fff9` · `0f36310` · `d926131` — **ثمانية** |
 | تعارضُ دمج | **لا** |
 | خيوطُ المراجعة | **28/28 مُغلقة** · كلُّها تحقّقتُ منها في الكود قبل العمل بها · كلُّها كانت صحيحة |
