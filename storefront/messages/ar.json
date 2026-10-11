@@ -156,7 +156,17 @@
     "earliestDelivery": "أقرب موعد توصيل",
     "deliveryToday": "اليوم",
     "deliveryTomorrow": "غداً",
-    "deliveryAt": "{day}، {window}"
+    "deliveryAt": "{day}، {window}",
+    "slider": {
+      "label": "شرائح مميّزة",
+      "slide": "{current} من {total}",
+      "previous": "الشريحة السابقة",
+      "next": "الشريحة التالية",
+      "goTo": "الانتقال إلى الشريحة {number}",
+      "pause": "إيقاف الشرائح مؤقتاً",
+      "play": "تشغيل الشرائح",
+      "choose": "اختر شريحة"
+    }
   },
   "cart": {
     "cart": "السلة",

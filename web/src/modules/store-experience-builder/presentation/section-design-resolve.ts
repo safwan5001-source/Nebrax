@@ -529,15 +529,18 @@ export function resolveSectionDesign(
     }
   }
 
-  if (text.body) {
+  // A slider's copy sits on each slide's own picture (its colour is per slide, proven over that picture), never on the
+  // section surface — the section background must not recolour it (V8b: found by the real-pixel proof).
+  const recolours = type !== "slider";
+  if (recolours && text.body) {
     style["--sec-fg"] = text.body;
     sd.push("fg");
   }
-  if (text.heading) {
+  if (recolours && text.heading) {
     style["--sec-heading"] = text.heading;
     sd.push("heading");
   }
-  if (text.link) {
+  if (recolours && text.link) {
     style["--sec-link"] = text.link;
     sd.push("link");
   }

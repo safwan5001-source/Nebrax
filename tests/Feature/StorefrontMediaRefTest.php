@@ -306,4 +306,31 @@ class StorefrontMediaRefTest extends TestCase
         $this->assertArrayNotHasKey('contrast', $resolved['homepage.sections.0.design.background.media'], 'no valid evidence ⇒ nothing is claimed');
         app(TenantContext::class)->forget();
     }
+    /** @test */
+    public function slide_pictures_carry_the_same_bounds_and_no_other_content_picture_does(): void
+    {
+        $this->fakeStorefrontMediaR2();
+        $store = $this->store('mr-slides');
+        $media = $this->uploadMedia($store['auth']);
+        app(TenantContext::class)->set($store['auth']['tenant_id']);
+        $ref = ['mediaId' => $media['id'], 'decorative' => true];
+        $doc = [
+            'homepage' => ['sections' => [
+                ['id' => 'a', 'type' => 'slider', 'content' => ['slides' => [
+                    ['id' => 's0', 'media' => $ref, 'mobile' => $ref],
+                    ['id' => 's1', 'media' => $ref],
+                ]]],
+                ['id' => 'b', 'type' => 'customContent', 'content' => ['picture' => $ref]],
+            ]],
+        ];
+
+        $resolved = app(StorefrontPublishedMediaResolver::class)->resolve($doc);
+
+        foreach (['homepage.sections.0.content.slides.0.media', 'homepage.sections.0.content.slides.0.mobile', 'homepage.sections.0.content.slides.1.media'] as $path) {
+            $this->assertIsArray($resolved[$path]['contrast'] ?? null, $path);
+            $this->assertArrayNotHasKey('region_luminance', $resolved[$path], 'raw evidence never leaves');
+        }
+        $this->assertArrayNotHasKey('contrast', $resolved['homepage.sections.1.content.picture'], 'only slide pictures (and section backgrounds) carry bounds');
+        app(TenantContext::class)->forget();
+    }
 }

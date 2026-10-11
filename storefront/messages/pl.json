@@ -156,7 +156,17 @@
     "earliestDelivery": "Najbliższa dostawa",
     "deliveryToday": "Dziś",
     "deliveryTomorrow": "Jutro",
-    "deliveryAt": "{day}, {window}"
+    "deliveryAt": "{day}, {window}",
+    "slider": {
+      "label": "Wyróżnione slajdy",
+      "slide": "{current} z {total}",
+      "previous": "Poprzedni slajd",
+      "next": "Następny slajd",
+      "goTo": "Przejdź do slajdu {number}",
+      "pause": "Zatrzymaj slajdy",
+      "play": "Odtwórz slajdy",
+      "choose": "Wybierz slajd"
+    }
   },
   "cart": {
     "cart": "Koszyk",

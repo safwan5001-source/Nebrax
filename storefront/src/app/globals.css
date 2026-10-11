@@ -1344,4 +1344,294 @@ input[type="search"]::-webkit-search-cancel-button {
     transition: none;
   }
 }
+
+/* ───────────────────────────── CUST-HV V8b — the published slider (V0 §13.1, §6.6) ─────────────────────────────
+   Slides are stacked in ONE grid cell; the active one is selected by `--sl-active` (set on the root) against each
+   slide's `--sl-i`. Every colour comes from a validated custom property written by the renderer (`--sl-fg`, `--sl-btn`,
+   `--sl-ovl`, `--sl-ovl-a`); nothing from the document reaches CSS as text. Direction is the root's `dir`: the slide
+   offset is mirrored by `--sl-sgn`, the arrows sit on logical edges and the chevrons mirror. Inactive slides are
+   `inert` (markup), clipped by the viewport, and — for `fade` / `none` — hidden. Reduced motion removes every
+   transition (the component also never starts autoplay). */
+[data-slider] {
+  --sl-sgn: 1;
+  --sl-dur: 300ms;
+  --sl-ease: cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--store-radius, 0.75rem);
+}
+[data-slider][dir="rtl"] {
+  --sl-sgn: -1;
+}
+[data-slider][data-duration="fast"] {
+  --sl-dur: 150ms;
+}
+[data-slider][data-duration="slow"] {
+  --sl-dur: 500ms;
+}
+[data-slider-viewport] {
+  overflow: hidden;
+  touch-action: pan-y;
+}
+[data-slider-track] {
+  display: grid;
+}
+[data-slider-slide] {
+  grid-area: 1 / 1;
+  position: relative;
+  display: grid;
+  min-inline-size: 0;
+  min-block-size: var(--sec-minh, clamp(16rem, 36vw, 30rem));
+  overflow: hidden;
+  color: var(--sl-fg, inherit);
+  transform: translateX(
+    calc((var(--sl-i) - var(--sl-active)) * 100% * var(--sl-sgn))
+  );
+  transition:
+    transform var(--sl-dur) var(--sl-ease),
+    opacity var(--sl-dur) var(--sl-ease),
+    visibility 0s linear var(--sl-dur);
+}
+[data-slider-slide][data-surface="brand"] {
+  background: var(--store-primary);
+}
+/* fade / none: slides do not travel, they stack and the inactive ones are hidden */
+[data-slider][data-transition="fade"] [data-slider-slide],
+[data-slider][data-transition="none"] [data-slider-slide] {
+  transform: none;
+}
+[data-slider][data-transition="fade"] [data-slider-slide]:not([data-active]) {
+  opacity: 0;
+  visibility: hidden;
+}
+/* a wrap (last → first, or Play from the end) is a cut: the track must not sweep every slide through the viewport */
+[data-slider][data-transition="none"] [data-slider-slide],
+[data-slider][data-snap] [data-slider-slide] {
+  transition: none;
+}
+[data-slider][data-transition="none"] [data-slider-slide]:not([data-active]) {
+  visibility: hidden;
+}
+[data-slider][data-transition="fade"] [data-slider-slide][data-active] {
+  transition-delay: 0s;
+}
+/* slide travel: an inactive slide is parked off-screen but never shown mid-travel to AT (it is inert) */
+[data-slider-picture],
+[data-slider-picture] img {
+  position: absolute;
+  inset: 0;
+  display: block;
+  inline-size: 100%;
+  block-size: 100%;
+}
+[data-slider-picture] img {
+  object-fit: cover;
+  object-position: var(--sl-pos, 50% 50%);
+}
+@media (max-width: 767px) {
+  [data-slider-picture] img {
+    object-position: var(--sl-pos-m, var(--sl-pos, 50% 50%));
+  }
+}
+[data-slider-wash] {
+  position: absolute;
+  inset: 0;
+  background: var(--sl-ovl);
+  opacity: var(--sl-ovl-a);
+  pointer-events: none;
+}
+[data-slider-copy] {
+  position: relative;
+  z-index: 1;
+  align-self: center;
+  justify-self: start;
+  box-sizing: border-box;
+  max-inline-size: min(42rem, 100%);
+  padding: 1.25rem 3.5rem 3.5rem;
+  overflow-wrap: anywhere;
+  text-align: start;
+}
+@media (min-width: 768px) {
+  [data-slider-copy] {
+    padding: 2.5rem 4.5rem 4rem;
+  }
+}
+@media (min-width: 1024px) {
+  [data-slider-copy] {
+    padding: 3.5rem 5rem 4rem;
+  }
+}
+[data-slider-slide][data-align="center"] [data-slider-copy] {
+  justify-self: center;
+  text-align: center;
+}
+[data-slider-slide][data-align="end"] [data-slider-copy] {
+  justify-self: end;
+  text-align: end;
+}
+[data-slider-copy] h2 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 900;
+  line-height: 1.25;
+  color: var(--sl-fg, inherit);
+}
+@media (min-width: 640px) {
+  [data-slider-copy] h2 {
+    font-size: 1.5rem;
+  }
+}
+@media (min-width: 1024px) {
+  [data-slider-copy] h2 {
+    font-size: 2.25rem;
+  }
+}
+[data-slider-copy] p {
+  margin: 0.5rem 0 0;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: var(--sl-fg, inherit);
+}
+@media (min-width: 768px) {
+  [data-slider-copy] p {
+    font-size: 1rem;
+  }
+}
+[data-slider-cta] {
+  display: inline-flex;
+  align-items: center;
+  min-block-size: 2.75rem;
+  margin-block-start: 1rem;
+  padding-inline: 1.25rem;
+  border-radius: var(--store-radius, 0.5rem);
+  background: var(--sl-fg);
+  color: var(--sl-btn);
+  font-size: 0.875rem;
+  font-weight: 700;
+  box-shadow: 0 4px 10px rgb(0 0 0 / 0.18);
+  transition: box-shadow 150ms;
+}
+/* hover keeps the proven fill / label pair untouched (no opacity: it would blend both over the picture and void the
+   contrast guarantee) — it underlines the label and deepens the shadow instead */
+[data-slider-cta]:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  box-shadow: 0 6px 14px rgb(0 0 0 / 0.28);
+}
+[data-slider-cta]:focus-visible {
+  outline: 2px solid var(--sl-fg);
+  outline-offset: 3px;
+}
+/* controls: translucent dark discs / pill — their glyphs contrast with their OWN fill, whatever the picture */
+[data-slider-arrow],
+[data-slider-pause],
+[data-slider-dots] button {
+  appearance: none;
+  border: 0;
+  cursor: pointer;
+  color: #fff;
+}
+[data-slider-arrow] {
+  position: absolute;
+  inset-block-start: calc(50% - 1.375rem);
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  inline-size: 2.75rem;
+  block-size: 2.75rem;
+  border-radius: 9999px;
+  background: rgb(0 0 0 / 0.6);
+}
+[data-slider-arrow="previous"] {
+  inset-inline-start: 0.5rem;
+}
+[data-slider-arrow="next"] {
+  inset-inline-end: 0.5rem;
+}
+/* the chevron points at the inline-end edge by default (right in LTR, left in RTL) */
+[data-slider-arrow] svg {
+  display: block;
+}
+[data-slider-arrow="next"] svg {
+  transform: none;
+}
+[data-slider-arrow="previous"] svg {
+  transform: scaleX(-1);
+}
+[data-slider][dir="rtl"] [data-slider-arrow="next"] svg {
+  transform: scaleX(-1);
+}
+[data-slider][dir="rtl"] [data-slider-arrow="previous"] svg {
+  transform: none;
+}
+[data-slider-arrow][aria-disabled="true"] {
+  opacity: 0.4;
+  cursor: default;
+}
+[data-slider-bar] {
+  position: absolute;
+  inset-block-end: 0.5rem;
+  inset-inline: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  pointer-events: none;
+}
+[data-slider-bar] > * {
+  pointer-events: auto;
+  background: rgb(0 0 0 / 0.6);
+  border-radius: 9999px;
+}
+[data-slider-pause] {
+  display: grid;
+  place-items: center;
+  inline-size: 2.75rem;
+  block-size: 2.75rem;
+}
+[data-slider-pause] svg {
+  inline-size: 1.25rem;
+  block-size: 1.25rem;
+}
+[data-slider-dots] {
+  display: flex;
+  align-items: center;
+  padding-inline: 0.25rem;
+}
+[data-slider-dots] button {
+  display: grid;
+  place-items: center;
+  inline-size: 2rem;
+  block-size: 2.75rem;
+  background: none;
+}
+[data-slider-dots] button span {
+  display: block;
+  inline-size: 0.625rem;
+  block-size: 0.625rem;
+  border: 2px solid #fff;
+  border-radius: 9999px;
+  box-sizing: border-box;
+}
+[data-slider-dots] button[aria-current="true"] span {
+  background: #fff;
+}
+/* two-tone focus ring: visible on a light or a dark picture */
+[data-slider-arrow]:focus-visible,
+[data-slider-pause]:focus-visible,
+[data-slider-dots] button:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+  box-shadow: 0 0 0 2px #000;
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-slider] {
+    --sl-dur: 0s;
+  }
+  [data-slider] [data-slider-slide],
+  [data-slider] [data-slider-cta] {
+    transition: none !important;
+  }
+}
 }
