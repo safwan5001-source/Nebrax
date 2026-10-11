@@ -34,7 +34,10 @@ import type {
   PagePresentation,
   ProductPageRegionKey,
 } from "@/lib/presentation/page-regions";
-import { resolvePublicProductRegions } from "@/lib/presentation/page-runtime";
+import {
+  resolvePublicProductRegions,
+  resolvePublicProductZoom,
+} from "@/lib/presentation/page-runtime";
 import { publishedPageContainerPaddingClass } from "@/lib/presentation/public-rhythm";
 import { cn } from "@/lib/utils";
 
@@ -589,6 +592,7 @@ export function ProductDetails({
             images={galleryImages}
             productName={product.name}
             activeIndex={variantImageIndex}
+            zoomEnabled={resolvePublicProductZoom(pagePresentation)}
           />
         </div>
 

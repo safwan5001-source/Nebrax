@@ -36,6 +36,11 @@ interface MediaGalleryProps {
   images: GalleryMedia[];
   productName: string;
   activeIndex?: number | null;
+  /**
+   * CUST-HV V9e — the merchant's product-page zoom choice. `false` leaves the picture as a plain image: no click-to-enlarge, no
+   * lightbox, no hint. Defaults to on (today's behaviour).
+   */
+  zoomEnabled?: boolean;
 }
 
 /** Prefer pre-sized Spree media URLs over the full-resolution original,
@@ -66,6 +71,7 @@ function MediaGalleryInner({
   images,
   productName,
   activeIndex,
+  zoomEnabled = true,
 }: MediaGalleryProps) {
   const t = useTranslations("products");
   const [selectedIndex, setSelectedIndex] = useState(activeIndex ?? 0);
@@ -140,45 +146,71 @@ function MediaGalleryInner({
   return (
     <div className="flex flex-col gap-4">
       {/* Main Image */}
-      <button
-        type="button"
-        className="relative aspect-square w-full cursor-zoom-in touch-pan-y overflow-hidden rounded-store bg-store-surface-muted"
-        onClick={() => {
-          if (suppressClickRef.current) {
-            suppressClickRef.current = false;
-            return;
-          }
-          if (showMainImage) setIsZoomed(true);
-        }}
-        onTouchStart={handleTouchStart}
-        onTouchEnd={handleTouchEnd}
-        aria-label={t("openImageZoom")}
-        disabled={!showMainImage}
-      >
-        <ProductImage
-          key={safeIndex}
-          src={mainImageUrl}
-          alt={selectedImage?.alt || productName}
-          fill
-          className="object-cover"
-          fetchPriority="high"
-          loading="eager"
-          priority
-          quality={85}
-          sizes="(max-width: 768px) 100vw, 50vw"
-          placeholder="blur"
-          blurDataURL={BLUR_PLACEHOLDER}
-          iconClassName="w-24 h-24"
-          onError={() => mainImageUrl && setMainImageErrorUrl(mainImageUrl)}
-        />
-        {/* Zoom hint */}
-        {showMainImage && (
-          <div className="absolute bottom-4 right-4 bg-white/80 backdrop-blur-sm px-3 py-1.5 rounded-lg text-sm text-gray-600 flex items-center gap-1.5">
-            <ZoomIn className="w-4 h-4" />
-            {t("clickToZoom")}
-          </div>
-        )}
-      </button>
+      {zoomEnabled ? (
+        <button
+          type="button"
+          className="relative aspect-square w-full cursor-zoom-in touch-pan-y overflow-hidden rounded-store bg-store-surface-muted"
+          onClick={() => {
+            if (suppressClickRef.current) {
+              suppressClickRef.current = false;
+              return;
+            }
+            if (showMainImage) setIsZoomed(true);
+          }}
+          onTouchStart={handleTouchStart}
+          onTouchEnd={handleTouchEnd}
+          aria-label={t("openImageZoom")}
+          disabled={!showMainImage}
+        >
+          <ProductImage
+            key={safeIndex}
+            src={mainImageUrl}
+            alt={selectedImage?.alt || productName}
+            fill
+            className="object-cover"
+            fetchPriority="high"
+            loading="eager"
+            priority
+            quality={85}
+            sizes="(max-width: 768px) 100vw, 50vw"
+            placeholder="blur"
+            blurDataURL={BLUR_PLACEHOLDER}
+            iconClassName="w-24 h-24"
+            onError={() => mainImageUrl && setMainImageErrorUrl(mainImageUrl)}
+          />
+          {/* Zoom hint */}
+          {showMainImage && (
+            <div className="absolute bottom-4 right-4 bg-white/80 backdrop-blur-sm px-3 py-1.5 rounded-lg text-sm text-gray-600 flex items-center gap-1.5">
+              <ZoomIn className="w-4 h-4" />
+              {t("clickToZoom")}
+            </div>
+          )}
+        </button>
+      ) : (
+        <div
+          data-zoom="off"
+          className="relative aspect-square w-full touch-pan-y overflow-hidden rounded-store bg-store-surface-muted"
+          onTouchStart={handleTouchStart}
+          onTouchEnd={handleTouchEnd}
+        >
+          <ProductImage
+            key={safeIndex}
+            src={mainImageUrl}
+            alt={selectedImage?.alt || productName}
+            fill
+            className="object-cover"
+            fetchPriority="high"
+            loading="eager"
+            priority
+            quality={85}
+            sizes="(max-width: 768px) 100vw, 50vw"
+            placeholder="blur"
+            blurDataURL={BLUR_PLACEHOLDER}
+            iconClassName="w-24 h-24"
+            onError={() => mainImageUrl && setMainImageErrorUrl(mainImageUrl)}
+          />
+        </div>
+      )}
 
       {/* Thumbnails */}
       {images.length > 1 && (
@@ -210,7 +242,7 @@ function MediaGalleryInner({
       )}
 
       {/* Lightbox (lazy) */}
-      {isZoomed && showMainImage && (
+      {zoomEnabled && isZoomed && showMainImage && (
         <LazyMediaLightbox
           images={images}
           activeIndex={safeIndex}

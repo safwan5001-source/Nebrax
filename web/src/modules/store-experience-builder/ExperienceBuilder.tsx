@@ -1389,7 +1389,19 @@ export function ExperienceBuilder({
   function writeProductRegions(regions: PageRegionInstance<ProductPageRegionKey>[]) {
     updateDraft({
       ...draft,
-      pagePresentation: { ...draft.pagePresentation, product: { version: 1, regions } },
+      // CUST-HV V9e — the product page also carries the zoom choice: a region edit must not drop it.
+      pagePresentation: { ...draft.pagePresentation, product: { ...draft.pagePresentation?.product, version: 1, regions } },
+    });
+  }
+
+  function handleProductZoomChange(on: boolean) {
+    const { zoom: _previous, ...base } = draft.pagePresentation?.product ?? { version: 1 as const, regions: effectiveProductRegions };
+    updateDraft({
+      ...draft,
+      pagePresentation: {
+        ...draft.pagePresentation,
+        product: { ...base, ...(on ? {} : { zoom: "off" as const }) },
+      },
     });
   }
 
@@ -2149,6 +2161,8 @@ export function ExperienceBuilder({
           onToggleVisibility={handleToggleProductRegionVisibility}
           onMove={handleMoveProductRegion}
           readOnly={isPublishedReadOnly}
+          zoomOn={draft.pagePresentation?.product?.zoom !== "off"}
+          onZoomChange={handleProductZoomChange}
         />
       );
     }

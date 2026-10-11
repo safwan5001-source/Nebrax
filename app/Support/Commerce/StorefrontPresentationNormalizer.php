@@ -1417,6 +1417,7 @@ final class StorefrontPresentationNormalizer
             $raw['product'] ?? null,
             self::PRODUCT_PAGE_REGION_KEYS,
             self::FIXED_REQUIRED_PRODUCT_REGION_KEYS,
+            true,
         );
         $category = $this->normalizePageTypePresentation(
             $raw['category'] ?? null,
@@ -1447,9 +1448,9 @@ final class StorefrontPresentationNormalizer
      *
      * @param  list<string>  $allowedKeys
      * @param  list<string>  $fixedRequiredKeys
-     * @return array{version: int, regions: list<array{id: string, key: string, visible: bool}>}|null
+     * @return array{version: int, regions: list<array{id: string, key: string, visible: bool}>, zoom?: string}|null
      */
-    private function normalizePageTypePresentation(mixed $raw, array $allowedKeys, array $fixedRequiredKeys): ?array
+    private function normalizePageTypePresentation(mixed $raw, array $allowedKeys, array $fixedRequiredKeys, bool $withZoom = false): ?array
     {
         if (! is_array($raw) || $this->isList($raw)) {
             return null;
@@ -1459,10 +1460,17 @@ final class StorefrontPresentationNormalizer
             return null;
         }
 
-        return [
+        $page = [
             'version' => 1,
             'regions' => $this->normalizePageRegions($raw['regions'] ?? null, $allowedKeys, $fixedRequiredKeys),
         ];
+
+        // CUST-HV V9e (V0 §14.2) — `zoom: on|off` للصفحة المنتج: الغياب = مفعّل (اليوم)، ولا يُخزَّن إلا `off`.
+        if ($withZoom && ($raw['zoom'] ?? null) === 'off') {
+            $page['zoom'] = 'off';
+        }
+
+        return $page;
     }
 
     /**
