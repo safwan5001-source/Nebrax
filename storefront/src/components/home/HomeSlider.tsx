@@ -211,6 +211,13 @@ export function HomeSlider({
     return () => window.clearTimeout(timer);
   }, [running, active, interval, loop, total, next]);
 
+  // Play at the end of a non-looping show starts it again from the first slide; otherwise the next tick would find
+  // itself on the last slide again and pause without ever playing.
+  const togglePlay = () => {
+    if (paused && !loop && active === total - 1) setActive(0);
+    setPaused((p) => !p);
+  };
+
   const onKeyDown = (event: KeyboardEvent<HTMLElement>) => {
     if (total < 2) return;
     // Arrows follow the visual direction: under RTL the right arrow goes back.
@@ -263,10 +270,11 @@ export function HomeSlider({
       onMouseLeave={() => setHovering(false)}
       onFocus={(event) => {
         // Focus on the Pause / Play button itself is not "reading the slides": pressing Play must start the show even
-        // though the button keeps focus.
-        if (!(event.target as HTMLElement).closest("[data-slider-pause]")) {
-          setFocused(true);
-        }
+        // though the button keeps focus — including when focus arrived from another control inside the slider, which
+        // had already set the flag.
+        setFocused(
+          !(event.target as HTMLElement).closest("[data-slider-pause]"),
+        );
       }}
       onBlur={(event) => {
         if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
@@ -377,7 +385,7 @@ export function HomeSlider({
                 type="button"
                 data-slider-pause=""
                 aria-label={paused ? labels.play : labels.pause}
-                onClick={() => setPaused((p) => !p)}
+                onClick={togglePlay}
               >
                 {paused ? (
                   <svg

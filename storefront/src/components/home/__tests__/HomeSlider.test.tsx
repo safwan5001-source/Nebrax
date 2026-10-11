@@ -515,6 +515,42 @@ describe("HomeSlider — autoplay (D-16)", () => {
     expect(activeIndex()).toBe(1);
   });
 
+  it("tabbing from another control to the Pause / Play button clears the focus hold (Codex P2)", () => {
+    vi.useFakeTimers();
+    mount(view(3, auto({ loop: true })));
+    const next = screen.getByRole("button", { name: "Next slide" });
+    const pause = screen.getByRole("button", { name: "Pause slides" });
+    fireEvent.focus(next); // the hold starts
+    act(() => {
+      vi.advanceTimersByTime(30_000);
+    });
+    expect(activeIndex()).toBe(0);
+    fireEvent.blur(next, { relatedTarget: pause }); // focus moves within the slider: still held…
+    fireEvent.focus(pause); // …until it lands on the Pause / Play button
+    act(() => {
+      vi.advanceTimersByTime(6_100);
+    });
+    expect(activeIndex()).toBe(1);
+  });
+
+  it("Play at the end of a non-looping show restarts from the first slide (Codex P2)", () => {
+    vi.useFakeTimers();
+    mount(view(2, auto()));
+    act(() => {
+      vi.advanceTimersByTime(6_100);
+    });
+    act(() => {
+      vi.advanceTimersByTime(6_100);
+    });
+    expect(activeIndex()).toBe(1);
+    fireEvent.click(screen.getByRole("button", { name: "Play slides" }));
+    expect(activeIndex()).toBe(0);
+    act(() => {
+      vi.advanceTimersByTime(6_100);
+    });
+    expect(activeIndex()).toBe(1);
+  });
+
   it("the first touch pauses it for good until Play is pressed", () => {
     vi.useFakeTimers();
     const { container } = mount(view(3, auto({ loop: true })));
