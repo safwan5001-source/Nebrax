@@ -73,6 +73,13 @@ class StorefrontCommerceFirewallTest extends TestCase
             return false;
         }
 
+        // commerce CONTENT (product names / images, invented badges, urgency copy) is denied by word combination, whatever the value type
+        foreach ($fixture['forbiddenWordSets'] as $set) {
+            if (array_diff($set, $words) === []) {
+                return true;
+            }
+        }
+
         if (array_intersect($words, $fixture['commerceWords']) === []) {
             return false;
         }

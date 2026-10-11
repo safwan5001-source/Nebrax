@@ -1,5 +1,5 @@
 {
-    "_note": "CUST-HV V9d-4 — commerce firewall (V0 §14.3). A hostile document: every scope the production normalizer accepts (document tokens, branding, header, footer, contact, whatsapp, social, verification, sbc, apps, navigation, pagePresentation, announcements, palette, homepage sections, section content, section design, design.cards, nested items) carries commercial keys (price, discount, stock, availability, tax, total, currency, sku, quantity, shipping fee / amount, freight, delivery fee, offer status, coupon code, cost). After normalisation NO such key may survive anywhere, and no injected value may be reachable. Shared by PHP StorefrontPresentationNormalizer and both TS twins (normalizePresentationConfig). Deny rule (shared by the PHP and both TS suites): split a key into words (camelCase / snake_case / kebab-case, lower-cased); the key is DENIED when any word is in `commerceWords` and the LAST word is not in `presentationSuffixes`. So value-bearing and scaling / hiding controls (price, unitPrice, taxAmount, priceMultiplier, discountScale, hideStock, availabilityVisible, showPrice, offerStatus…) are denied, while position / colour-role / size-step / shape / placement controls over real data (pricePosition, stockTextSize, availabilityBadgePlacement…) and the id selectors (offerIds, productIds) are allowed. `allowedKeys` must never be denied; `deniedKeys` must always be. Exempt (suffix) keys are checked by VALUE as well: a key that contains a commerce word must never carry a number after normalisation (priceSize: 0, stockTextSize: 0, pricePosition: 5 are injected; presentation controls are bounded string enums), which is the schema assertion V0 §14.3 asks for. Only the approved selector keys (`selectorKeys`: productIds, offerIds) are exempt by name as id lists; any other `…Ids` key (priceIds, stockIds) is denied, and a commerce-named key must not carry a number or a list containing one. A commerce-named key is also denied when it contains a hiding / scaling verb (`hidingVerbs`: hidePricePosition, hideStockPlacement), whatever its suffix, and a commerce-named key must not carry a number, a boolean or a list containing one (controls are bounded string enums).",
+    "_note": "CUST-HV V9d-4 — commerce firewall (V0 §14.3). A hostile document: every scope the production normalizer accepts (document tokens, branding, header, footer, contact, whatsapp, social, verification, sbc, apps, navigation, pagePresentation, announcements, palette, homepage sections, section content, section design, design.cards, nested items) carries commercial keys (price, discount, stock, availability, tax, total, currency, sku, quantity, shipping fee / amount, freight, delivery fee, offer status, coupon code, cost). After normalisation NO such key may survive anywhere, and no injected value may be reachable. Shared by PHP StorefrontPresentationNormalizer and both TS twins (normalizePresentationConfig). Deny rule (shared by the PHP and both TS suites): split a key into words (camelCase / snake_case / kebab-case, lower-cased); the key is DENIED when any word is in `commerceWords` and the LAST word is not in `presentationSuffixes`. So value-bearing and scaling / hiding controls (price, unitPrice, taxAmount, priceMultiplier, discountScale, hideStock, availabilityVisible, showPrice, offerStatus…) are denied, while position / colour-role / size-step / shape / placement controls over real data (pricePosition, stockTextSize, availabilityBadgePlacement…) and the id selectors (offerIds, productIds) are allowed. `allowedKeys` must never be denied; `deniedKeys` must always be. Exempt (suffix) keys are checked by VALUE as well: a key that contains a commerce word must never carry a number after normalisation (priceSize: 0, stockTextSize: 0, pricePosition: 5 are injected; presentation controls are bounded string enums), which is the schema assertion V0 §14.3 asks for. Only the approved selector keys (`selectorKeys`: productIds, offerIds) are exempt by name as id lists; any other `…Ids` key (priceIds, stockIds) is denied, and a commerce-named key must not carry a number or a list containing one. A commerce-named key is also denied when it contains a hiding / scaling verb (`hidingVerbs`: hidePricePosition, hideStockPlacement), whatever its suffix, and a commerce-named key must not carry a number, a boolean or a list containing one (controls are bounded string enums). Non-numeric commerce CONTENT is denied too (V0 §14.3: no product names / images stored in presentation JSON, no invented badges, no generated urgency copy): a key whose words include every word of any `forbiddenWordSets` entry is denied (productName, productImage, badgeText, saleBadge, countdownCopy, urgencyText…), and the injected strings (`Last 3!`, `SALE NOW`) must not be reachable in the normalised document.",
     "commerceWords": [
         "price",
         "cost",
@@ -59,7 +59,9 @@
         "low",
         "free_shipping",
         "expired",
-        "SAVE20"
+        "SAVE20",
+        "Last 3!",
+        "SALE NOW"
     ],
     "input": {
         "version": 2,
@@ -119,7 +121,13 @@
                 3
             ],
             "hidePricePosition": true,
-            "hideStockPlacement": true
+            "hideStockPlacement": true,
+            "productName": "وردة",
+            "productImage": "https://example.com/p.png",
+            "badgeText": "Last 3!",
+            "countdownCopy": "SALE NOW",
+            "urgencyText": "Last 3!",
+            "saleBadge": "SALE NOW"
         },
         "surfaces": {
             "radius": "md",
@@ -173,7 +181,13 @@
                 3
             ],
             "hidePricePosition": true,
-            "hideStockPlacement": true
+            "hideStockPlacement": true,
+            "productName": "وردة",
+            "productImage": "https://example.com/p.png",
+            "badgeText": "Last 3!",
+            "countdownCopy": "SALE NOW",
+            "urgencyText": "Last 3!",
+            "saleBadge": "SALE NOW"
         },
         "typography": {
             "headingScale": "lg",
@@ -227,7 +241,13 @@
                 3
             ],
             "hidePricePosition": true,
-            "hideStockPlacement": true
+            "hideStockPlacement": true,
+            "productName": "وردة",
+            "productImage": "https://example.com/p.png",
+            "badgeText": "Last 3!",
+            "countdownCopy": "SALE NOW",
+            "urgencyText": "Last 3!",
+            "saleBadge": "SALE NOW"
         },
         "layout": {
             "contentWidth": "wide",
@@ -281,7 +301,13 @@
                 3
             ],
             "hidePricePosition": true,
-            "hideStockPlacement": true
+            "hideStockPlacement": true,
+            "productName": "وردة",
+            "productImage": "https://example.com/p.png",
+            "badgeText": "Last 3!",
+            "countdownCopy": "SALE NOW",
+            "urgencyText": "Last 3!",
+            "saleBadge": "SALE NOW"
         },
         "motion": {
             "reveal": "fade-up",
@@ -335,7 +361,13 @@
                 3
             ],
             "hidePricePosition": true,
-            "hideStockPlacement": true
+            "hideStockPlacement": true,
+            "productName": "وردة",
+            "productImage": "https://example.com/p.png",
+            "badgeText": "Last 3!",
+            "countdownCopy": "SALE NOW",
+            "urgencyText": "Last 3!",
+            "saleBadge": "SALE NOW"
         },
         "productCard": {
             "density": "compact",
@@ -389,7 +421,13 @@
                 3
             ],
             "hidePricePosition": true,
-            "hideStockPlacement": true
+            "hideStockPlacement": true,
+            "productName": "وردة",
+            "productImage": "https://example.com/p.png",
+            "badgeText": "Last 3!",
+            "countdownCopy": "SALE NOW",
+            "urgencyText": "Last 3!",
+            "saleBadge": "SALE NOW"
         },
         "homepage": {
             "sections": [
@@ -463,7 +501,13 @@
                             3
                         ],
                         "hidePricePosition": true,
-                        "hideStockPlacement": true
+                        "hideStockPlacement": true,
+                        "productName": "وردة",
+                        "productImage": "https://example.com/p.png",
+                        "badgeText": "Last 3!",
+                        "countdownCopy": "SALE NOW",
+                        "urgencyText": "Last 3!",
+                        "saleBadge": "SALE NOW"
                     },
                     "design": {
                         "layout": "rail",
@@ -523,7 +567,13 @@
                                 3
                             ],
                             "hidePricePosition": true,
-                            "hideStockPlacement": true
+                            "hideStockPlacement": true,
+                            "productName": "وردة",
+                            "productImage": "https://example.com/p.png",
+                            "badgeText": "Last 3!",
+                            "countdownCopy": "SALE NOW",
+                            "urgencyText": "Last 3!",
+                            "saleBadge": "SALE NOW"
                         },
                         "border": "hairline",
                         "radius": "md",
@@ -580,7 +630,13 @@
                                 3
                             ],
                             "hidePricePosition": true,
-                            "hideStockPlacement": true
+                            "hideStockPlacement": true,
+                            "productName": "وردة",
+                            "productImage": "https://example.com/p.png",
+                            "badgeText": "Last 3!",
+                            "countdownCopy": "SALE NOW",
+                            "urgencyText": "Last 3!",
+                            "saleBadge": "SALE NOW"
                         },
                         "price": 1,
                         "priceMinor": 100,
@@ -632,7 +688,13 @@
                             3
                         ],
                         "hidePricePosition": true,
-                        "hideStockPlacement": true
+                        "hideStockPlacement": true,
+                        "productName": "وردة",
+                        "productImage": "https://example.com/p.png",
+                        "badgeText": "Last 3!",
+                        "countdownCopy": "SALE NOW",
+                        "urgencyText": "Last 3!",
+                        "saleBadge": "SALE NOW"
                     },
                     "shippingFee": 1500,
                     "shippingAmount": 900,
@@ -671,7 +733,13 @@
                         3
                     ],
                     "hidePricePosition": true,
-                    "hideStockPlacement": true
+                    "hideStockPlacement": true,
+                    "productName": "وردة",
+                    "productImage": "https://example.com/p.png",
+                    "badgeText": "Last 3!",
+                    "countdownCopy": "SALE NOW",
+                    "urgencyText": "Last 3!",
+                    "saleBadge": "SALE NOW"
                 },
                 {
                     "id": "s-2",
@@ -745,7 +813,13 @@
                             3
                         ],
                         "hidePricePosition": true,
-                        "hideStockPlacement": true
+                        "hideStockPlacement": true,
+                        "productName": "وردة",
+                        "productImage": "https://example.com/p.png",
+                        "badgeText": "Last 3!",
+                        "countdownCopy": "SALE NOW",
+                        "urgencyText": "Last 3!",
+                        "saleBadge": "SALE NOW"
                     },
                     "design": {
                         "layout": "rail",
@@ -805,7 +879,13 @@
                                 3
                             ],
                             "hidePricePosition": true,
-                            "hideStockPlacement": true
+                            "hideStockPlacement": true,
+                            "productName": "وردة",
+                            "productImage": "https://example.com/p.png",
+                            "badgeText": "Last 3!",
+                            "countdownCopy": "SALE NOW",
+                            "urgencyText": "Last 3!",
+                            "saleBadge": "SALE NOW"
                         },
                         "border": "hairline",
                         "radius": "md",
@@ -862,7 +942,13 @@
                                 3
                             ],
                             "hidePricePosition": true,
-                            "hideStockPlacement": true
+                            "hideStockPlacement": true,
+                            "productName": "وردة",
+                            "productImage": "https://example.com/p.png",
+                            "badgeText": "Last 3!",
+                            "countdownCopy": "SALE NOW",
+                            "urgencyText": "Last 3!",
+                            "saleBadge": "SALE NOW"
                         },
                         "price": 1,
                         "priceMinor": 100,
@@ -914,7 +1000,13 @@
                             3
                         ],
                         "hidePricePosition": true,
-                        "hideStockPlacement": true
+                        "hideStockPlacement": true,
+                        "productName": "وردة",
+                        "productImage": "https://example.com/p.png",
+                        "badgeText": "Last 3!",
+                        "countdownCopy": "SALE NOW",
+                        "urgencyText": "Last 3!",
+                        "saleBadge": "SALE NOW"
                     },
                     "shippingFee": 1500,
                     "shippingAmount": 900,
@@ -953,7 +1045,13 @@
                         3
                     ],
                     "hidePricePosition": true,
-                    "hideStockPlacement": true
+                    "hideStockPlacement": true,
+                    "productName": "وردة",
+                    "productImage": "https://example.com/p.png",
+                    "badgeText": "Last 3!",
+                    "countdownCopy": "SALE NOW",
+                    "urgencyText": "Last 3!",
+                    "saleBadge": "SALE NOW"
                 },
                 {
                     "id": "s-3",
@@ -1027,7 +1125,13 @@
                             3
                         ],
                         "hidePricePosition": true,
-                        "hideStockPlacement": true
+                        "hideStockPlacement": true,
+                        "productName": "وردة",
+                        "productImage": "https://example.com/p.png",
+                        "badgeText": "Last 3!",
+                        "countdownCopy": "SALE NOW",
+                        "urgencyText": "Last 3!",
+                        "saleBadge": "SALE NOW"
                     },
                     "design": {
                         "columns": 2,
@@ -1086,7 +1190,13 @@
                                 3
                             ],
                             "hidePricePosition": true,
-                            "hideStockPlacement": true
+                            "hideStockPlacement": true,
+                            "productName": "وردة",
+                            "productImage": "https://example.com/p.png",
+                            "badgeText": "Last 3!",
+                            "countdownCopy": "SALE NOW",
+                            "urgencyText": "Last 3!",
+                            "saleBadge": "SALE NOW"
                         },
                         "price": 1,
                         "priceMinor": 100,
@@ -1138,7 +1248,13 @@
                             3
                         ],
                         "hidePricePosition": true,
-                        "hideStockPlacement": true
+                        "hideStockPlacement": true,
+                        "productName": "وردة",
+                        "productImage": "https://example.com/p.png",
+                        "badgeText": "Last 3!",
+                        "countdownCopy": "SALE NOW",
+                        "urgencyText": "Last 3!",
+                        "saleBadge": "SALE NOW"
                     },
                     "shippingFee": 1500,
                     "shippingAmount": 900,
@@ -1177,7 +1293,13 @@
                         3
                     ],
                     "hidePricePosition": true,
-                    "hideStockPlacement": true
+                    "hideStockPlacement": true,
+                    "productName": "وردة",
+                    "productImage": "https://example.com/p.png",
+                    "badgeText": "Last 3!",
+                    "countdownCopy": "SALE NOW",
+                    "urgencyText": "Last 3!",
+                    "saleBadge": "SALE NOW"
                 },
                 {
                     "id": "s-4",
@@ -1251,7 +1373,13 @@
                                 3
                             ],
                             "hidePricePosition": true,
-                            "hideStockPlacement": true
+                            "hideStockPlacement": true,
+                            "productName": "وردة",
+                            "productImage": "https://example.com/p.png",
+                            "badgeText": "Last 3!",
+                            "countdownCopy": "SALE NOW",
+                            "urgencyText": "Last 3!",
+                            "saleBadge": "SALE NOW"
                         },
                         "limit": 8,
                         "deliverToday": false,
@@ -1305,7 +1433,13 @@
                             3
                         ],
                         "hidePricePosition": true,
-                        "hideStockPlacement": true
+                        "hideStockPlacement": true,
+                        "productName": "وردة",
+                        "productImage": "https://example.com/p.png",
+                        "badgeText": "Last 3!",
+                        "countdownCopy": "SALE NOW",
+                        "urgencyText": "Last 3!",
+                        "saleBadge": "SALE NOW"
                     },
                     "design": {
                         "layout": "rail",
@@ -1365,7 +1499,13 @@
                                 3
                             ],
                             "hidePricePosition": true,
-                            "hideStockPlacement": true
+                            "hideStockPlacement": true,
+                            "productName": "وردة",
+                            "productImage": "https://example.com/p.png",
+                            "badgeText": "Last 3!",
+                            "countdownCopy": "SALE NOW",
+                            "urgencyText": "Last 3!",
+                            "saleBadge": "SALE NOW"
                         },
                         "border": "hairline",
                         "radius": "md",
@@ -1422,7 +1562,13 @@
                                 3
                             ],
                             "hidePricePosition": true,
-                            "hideStockPlacement": true
+                            "hideStockPlacement": true,
+                            "productName": "وردة",
+                            "productImage": "https://example.com/p.png",
+                            "badgeText": "Last 3!",
+                            "countdownCopy": "SALE NOW",
+                            "urgencyText": "Last 3!",
+                            "saleBadge": "SALE NOW"
                         },
                         "price": 1,
                         "priceMinor": 100,
@@ -1474,7 +1620,13 @@
                             3
                         ],
                         "hidePricePosition": true,
-                        "hideStockPlacement": true
+                        "hideStockPlacement": true,
+                        "productName": "وردة",
+                        "productImage": "https://example.com/p.png",
+                        "badgeText": "Last 3!",
+                        "countdownCopy": "SALE NOW",
+                        "urgencyText": "Last 3!",
+                        "saleBadge": "SALE NOW"
                     },
                     "shippingFee": 1500,
                     "shippingAmount": 900,
@@ -1513,7 +1665,13 @@
                         3
                     ],
                     "hidePricePosition": true,
-                    "hideStockPlacement": true
+                    "hideStockPlacement": true,
+                    "productName": "وردة",
+                    "productImage": "https://example.com/p.png",
+                    "badgeText": "Last 3!",
+                    "countdownCopy": "SALE NOW",
+                    "urgencyText": "Last 3!",
+                    "saleBadge": "SALE NOW"
                 },
                 {
                     "id": "s-5",
@@ -1588,7 +1746,13 @@
                                     3
                                 ],
                                 "hidePricePosition": true,
-                                "hideStockPlacement": true
+                                "hideStockPlacement": true,
+                                "productName": "وردة",
+                                "productImage": "https://example.com/p.png",
+                                "badgeText": "Last 3!",
+                                "countdownCopy": "SALE NOW",
+                                "urgencyText": "Last 3!",
+                                "saleBadge": "SALE NOW"
                             }
                         ],
                         "price": 1,
@@ -1641,7 +1805,13 @@
                             3
                         ],
                         "hidePricePosition": true,
-                        "hideStockPlacement": true
+                        "hideStockPlacement": true,
+                        "productName": "وردة",
+                        "productImage": "https://example.com/p.png",
+                        "badgeText": "Last 3!",
+                        "countdownCopy": "SALE NOW",
+                        "urgencyText": "Last 3!",
+                        "saleBadge": "SALE NOW"
                     },
                     "design": {
                         "height": "tall",
@@ -1695,7 +1865,13 @@
                             3
                         ],
                         "hidePricePosition": true,
-                        "hideStockPlacement": true
+                        "hideStockPlacement": true,
+                        "productName": "وردة",
+                        "productImage": "https://example.com/p.png",
+                        "badgeText": "Last 3!",
+                        "countdownCopy": "SALE NOW",
+                        "urgencyText": "Last 3!",
+                        "saleBadge": "SALE NOW"
                     },
                     "shippingFee": 1500,
                     "shippingAmount": 900,
@@ -1734,7 +1910,13 @@
                         3
                     ],
                     "hidePricePosition": true,
-                    "hideStockPlacement": true
+                    "hideStockPlacement": true,
+                    "productName": "وردة",
+                    "productImage": "https://example.com/p.png",
+                    "badgeText": "Last 3!",
+                    "countdownCopy": "SALE NOW",
+                    "urgencyText": "Last 3!",
+                    "saleBadge": "SALE NOW"
                 },
                 {
                     "id": "s-6",
@@ -1809,7 +1991,13 @@
                                     3
                                 ],
                                 "hidePricePosition": true,
-                                "hideStockPlacement": true
+                                "hideStockPlacement": true,
+                                "productName": "وردة",
+                                "productImage": "https://example.com/p.png",
+                                "badgeText": "Last 3!",
+                                "countdownCopy": "SALE NOW",
+                                "urgencyText": "Last 3!",
+                                "saleBadge": "SALE NOW"
                             }
                         ],
                         "price": 1,
@@ -1862,7 +2050,13 @@
                             3
                         ],
                         "hidePricePosition": true,
-                        "hideStockPlacement": true
+                        "hideStockPlacement": true,
+                        "productName": "وردة",
+                        "productImage": "https://example.com/p.png",
+                        "badgeText": "Last 3!",
+                        "countdownCopy": "SALE NOW",
+                        "urgencyText": "Last 3!",
+                        "saleBadge": "SALE NOW"
                     },
                     "design": {
                         "layout": "columns-3",
@@ -1916,7 +2110,13 @@
                             3
                         ],
                         "hidePricePosition": true,
-                        "hideStockPlacement": true
+                        "hideStockPlacement": true,
+                        "productName": "وردة",
+                        "productImage": "https://example.com/p.png",
+                        "badgeText": "Last 3!",
+                        "countdownCopy": "SALE NOW",
+                        "urgencyText": "Last 3!",
+                        "saleBadge": "SALE NOW"
                     },
                     "shippingFee": 1500,
                     "shippingAmount": 900,
@@ -1955,7 +2155,13 @@
                         3
                     ],
                     "hidePricePosition": true,
-                    "hideStockPlacement": true
+                    "hideStockPlacement": true,
+                    "productName": "وردة",
+                    "productImage": "https://example.com/p.png",
+                    "badgeText": "Last 3!",
+                    "countdownCopy": "SALE NOW",
+                    "urgencyText": "Last 3!",
+                    "saleBadge": "SALE NOW"
                 },
                 {
                     "id": "s-7",
@@ -2030,7 +2236,13 @@
                                     3
                                 ],
                                 "hidePricePosition": true,
-                                "hideStockPlacement": true
+                                "hideStockPlacement": true,
+                                "productName": "وردة",
+                                "productImage": "https://example.com/p.png",
+                                "badgeText": "Last 3!",
+                                "countdownCopy": "SALE NOW",
+                                "urgencyText": "Last 3!",
+                                "saleBadge": "SALE NOW"
                             },
                             {
                                 "id": "b2",
@@ -2088,7 +2300,13 @@
                                     3
                                 ],
                                 "hidePricePosition": true,
-                                "hideStockPlacement": true
+                                "hideStockPlacement": true,
+                                "productName": "وردة",
+                                "productImage": "https://example.com/p.png",
+                                "badgeText": "Last 3!",
+                                "countdownCopy": "SALE NOW",
+                                "urgencyText": "Last 3!",
+                                "saleBadge": "SALE NOW"
                             },
                             {
                                 "id": "b3",
@@ -2144,7 +2362,13 @@
                                     3
                                 ],
                                 "hidePricePosition": true,
-                                "hideStockPlacement": true
+                                "hideStockPlacement": true,
+                                "productName": "وردة",
+                                "productImage": "https://example.com/p.png",
+                                "badgeText": "Last 3!",
+                                "countdownCopy": "SALE NOW",
+                                "urgencyText": "Last 3!",
+                                "saleBadge": "SALE NOW"
                             },
                             {
                                 "id": "b4",
@@ -2201,7 +2425,13 @@
                                         3
                                     ],
                                     "hidePricePosition": true,
-                                    "hideStockPlacement": true
+                                    "hideStockPlacement": true,
+                                    "productName": "وردة",
+                                    "productImage": "https://example.com/p.png",
+                                    "badgeText": "Last 3!",
+                                    "countdownCopy": "SALE NOW",
+                                    "urgencyText": "Last 3!",
+                                    "saleBadge": "SALE NOW"
                                 },
                                 "caption": "صورة",
                                 "link": "/products",
@@ -2255,7 +2485,13 @@
                                     3
                                 ],
                                 "hidePricePosition": true,
-                                "hideStockPlacement": true
+                                "hideStockPlacement": true,
+                                "productName": "وردة",
+                                "productImage": "https://example.com/p.png",
+                                "badgeText": "Last 3!",
+                                "countdownCopy": "SALE NOW",
+                                "urgencyText": "Last 3!",
+                                "saleBadge": "SALE NOW"
                             },
                             {
                                 "id": "b5",
@@ -2311,7 +2547,13 @@
                                     3
                                 ],
                                 "hidePricePosition": true,
-                                "hideStockPlacement": true
+                                "hideStockPlacement": true,
+                                "productName": "وردة",
+                                "productImage": "https://example.com/p.png",
+                                "badgeText": "Last 3!",
+                                "countdownCopy": "SALE NOW",
+                                "urgencyText": "Last 3!",
+                                "saleBadge": "SALE NOW"
                             },
                             {
                                 "id": "b6",
@@ -2367,7 +2609,13 @@
                                     3
                                 ],
                                 "hidePricePosition": true,
-                                "hideStockPlacement": true
+                                "hideStockPlacement": true,
+                                "productName": "وردة",
+                                "productImage": "https://example.com/p.png",
+                                "badgeText": "Last 3!",
+                                "countdownCopy": "SALE NOW",
+                                "urgencyText": "Last 3!",
+                                "saleBadge": "SALE NOW"
                             },
                             {
                                 "id": "b7",
@@ -2424,7 +2672,13 @@
                                     3
                                 ],
                                 "hidePricePosition": true,
-                                "hideStockPlacement": true
+                                "hideStockPlacement": true,
+                                "productName": "وردة",
+                                "productImage": "https://example.com/p.png",
+                                "badgeText": "Last 3!",
+                                "countdownCopy": "SALE NOW",
+                                "urgencyText": "Last 3!",
+                                "saleBadge": "SALE NOW"
                             },
                             {
                                 "id": "b8",
@@ -2485,7 +2739,13 @@
                                                 3
                                             ],
                                             "hidePricePosition": true,
-                                            "hideStockPlacement": true
+                                            "hideStockPlacement": true,
+                                            "productName": "وردة",
+                                            "productImage": "https://example.com/p.png",
+                                            "badgeText": "Last 3!",
+                                            "countdownCopy": "SALE NOW",
+                                            "urgencyText": "Last 3!",
+                                            "saleBadge": "SALE NOW"
                                         },
                                         {
                                             "id": "c2",
@@ -2541,7 +2801,13 @@
                                                 3
                                             ],
                                             "hidePricePosition": true,
-                                            "hideStockPlacement": true
+                                            "hideStockPlacement": true,
+                                            "productName": "وردة",
+                                            "productImage": "https://example.com/p.png",
+                                            "badgeText": "Last 3!",
+                                            "countdownCopy": "SALE NOW",
+                                            "urgencyText": "Last 3!",
+                                            "saleBadge": "SALE NOW"
                                         }
                                     ],
                                     [
@@ -2601,7 +2867,13 @@
                                                 3
                                             ],
                                             "hidePricePosition": true,
-                                            "hideStockPlacement": true
+                                            "hideStockPlacement": true,
+                                            "productName": "وردة",
+                                            "productImage": "https://example.com/p.png",
+                                            "badgeText": "Last 3!",
+                                            "countdownCopy": "SALE NOW",
+                                            "urgencyText": "Last 3!",
+                                            "saleBadge": "SALE NOW"
                                         },
                                         {
                                             "id": "c4",
@@ -2658,7 +2930,13 @@
                                                 3
                                             ],
                                             "hidePricePosition": true,
-                                            "hideStockPlacement": true
+                                            "hideStockPlacement": true,
+                                            "productName": "وردة",
+                                            "productImage": "https://example.com/p.png",
+                                            "badgeText": "Last 3!",
+                                            "countdownCopy": "SALE NOW",
+                                            "urgencyText": "Last 3!",
+                                            "saleBadge": "SALE NOW"
                                         }
                                     ]
                                 ],
@@ -2712,7 +2990,13 @@
                                     3
                                 ],
                                 "hidePricePosition": true,
-                                "hideStockPlacement": true
+                                "hideStockPlacement": true,
+                                "productName": "وردة",
+                                "productImage": "https://example.com/p.png",
+                                "badgeText": "Last 3!",
+                                "countdownCopy": "SALE NOW",
+                                "urgencyText": "Last 3!",
+                                "saleBadge": "SALE NOW"
                             }
                         ],
                         "price": 1,
@@ -2765,7 +3049,13 @@
                             3
                         ],
                         "hidePricePosition": true,
-                        "hideStockPlacement": true
+                        "hideStockPlacement": true,
+                        "productName": "وردة",
+                        "productImage": "https://example.com/p.png",
+                        "badgeText": "Last 3!",
+                        "countdownCopy": "SALE NOW",
+                        "urgencyText": "Last 3!",
+                        "saleBadge": "SALE NOW"
                     },
                     "design": {
                         "align": "center",
@@ -2819,7 +3109,13 @@
                             3
                         ],
                         "hidePricePosition": true,
-                        "hideStockPlacement": true
+                        "hideStockPlacement": true,
+                        "productName": "وردة",
+                        "productImage": "https://example.com/p.png",
+                        "badgeText": "Last 3!",
+                        "countdownCopy": "SALE NOW",
+                        "urgencyText": "Last 3!",
+                        "saleBadge": "SALE NOW"
                     },
                     "shippingFee": 1500,
                     "shippingAmount": 900,
@@ -2858,7 +3154,13 @@
                         3
                     ],
                     "hidePricePosition": true,
-                    "hideStockPlacement": true
+                    "hideStockPlacement": true,
+                    "productName": "وردة",
+                    "productImage": "https://example.com/p.png",
+                    "badgeText": "Last 3!",
+                    "countdownCopy": "SALE NOW",
+                    "urgencyText": "Last 3!",
+                    "saleBadge": "SALE NOW"
                 },
                 {
                     "id": "s-cat",
@@ -2914,7 +3216,13 @@
                         3
                     ],
                     "hidePricePosition": true,
-                    "hideStockPlacement": true
+                    "hideStockPlacement": true,
+                    "productName": "وردة",
+                    "productImage": "https://example.com/p.png",
+                    "badgeText": "Last 3!",
+                    "countdownCopy": "SALE NOW",
+                    "urgencyText": "Last 3!",
+                    "saleBadge": "SALE NOW"
                 },
                 {
                     "id": "s-wh",
@@ -2970,7 +3278,13 @@
                         3
                     ],
                     "hidePricePosition": true,
-                    "hideStockPlacement": true
+                    "hideStockPlacement": true,
+                    "productName": "وردة",
+                    "productImage": "https://example.com/p.png",
+                    "badgeText": "Last 3!",
+                    "countdownCopy": "SALE NOW",
+                    "urgencyText": "Last 3!",
+                    "saleBadge": "SALE NOW"
                 },
                 {
                     "id": "s-ban",
@@ -3033,7 +3347,13 @@
                             3
                         ],
                         "hidePricePosition": true,
-                        "hideStockPlacement": true
+                        "hideStockPlacement": true,
+                        "productName": "وردة",
+                        "productImage": "https://example.com/p.png",
+                        "badgeText": "Last 3!",
+                        "countdownCopy": "SALE NOW",
+                        "urgencyText": "Last 3!",
+                        "saleBadge": "SALE NOW"
                     },
                     "price": 1,
                     "priceMinor": 100,
@@ -3085,7 +3405,13 @@
                         3
                     ],
                     "hidePricePosition": true,
-                    "hideStockPlacement": true
+                    "hideStockPlacement": true,
+                    "productName": "وردة",
+                    "productImage": "https://example.com/p.png",
+                    "badgeText": "Last 3!",
+                    "countdownCopy": "SALE NOW",
+                    "urgencyText": "Last 3!",
+                    "saleBadge": "SALE NOW"
                 },
                 {
                     "id": "s-app",
@@ -3141,7 +3467,13 @@
                         3
                     ],
                     "hidePricePosition": true,
-                    "hideStockPlacement": true
+                    "hideStockPlacement": true,
+                    "productName": "وردة",
+                    "productImage": "https://example.com/p.png",
+                    "badgeText": "Last 3!",
+                    "countdownCopy": "SALE NOW",
+                    "urgencyText": "Last 3!",
+                    "saleBadge": "SALE NOW"
                 },
                 {
                     "id": "s-disc",
@@ -3202,7 +3534,13 @@
                             3
                         ],
                         "hidePricePosition": true,
-                        "hideStockPlacement": true
+                        "hideStockPlacement": true,
+                        "productName": "وردة",
+                        "productImage": "https://example.com/p.png",
+                        "badgeText": "Last 3!",
+                        "countdownCopy": "SALE NOW",
+                        "urgencyText": "Last 3!",
+                        "saleBadge": "SALE NOW"
                     },
                     "price": 1,
                     "priceMinor": 100,
@@ -3254,7 +3592,13 @@
                         3
                     ],
                     "hidePricePosition": true,
-                    "hideStockPlacement": true
+                    "hideStockPlacement": true,
+                    "productName": "وردة",
+                    "productImage": "https://example.com/p.png",
+                    "badgeText": "Last 3!",
+                    "countdownCopy": "SALE NOW",
+                    "urgencyText": "Last 3!",
+                    "saleBadge": "SALE NOW"
                 },
                 {
                     "id": "s-del",
@@ -3313,7 +3657,13 @@
                             3
                         ],
                         "hidePricePosition": true,
-                        "hideStockPlacement": true
+                        "hideStockPlacement": true,
+                        "productName": "وردة",
+                        "productImage": "https://example.com/p.png",
+                        "badgeText": "Last 3!",
+                        "countdownCopy": "SALE NOW",
+                        "urgencyText": "Last 3!",
+                        "saleBadge": "SALE NOW"
                     },
                     "price": 1,
                     "priceMinor": 100,
@@ -3365,7 +3715,13 @@
                         3
                     ],
                     "hidePricePosition": true,
-                    "hideStockPlacement": true
+                    "hideStockPlacement": true,
+                    "productName": "وردة",
+                    "productImage": "https://example.com/p.png",
+                    "badgeText": "Last 3!",
+                    "countdownCopy": "SALE NOW",
+                    "urgencyText": "Last 3!",
+                    "saleBadge": "SALE NOW"
                 },
                 {
                     "id": "s-sld",
@@ -3427,7 +3783,13 @@
                                         3
                                     ],
                                     "hidePricePosition": true,
-                                    "hideStockPlacement": true
+                                    "hideStockPlacement": true,
+                                    "productName": "وردة",
+                                    "productImage": "https://example.com/p.png",
+                                    "badgeText": "Last 3!",
+                                    "countdownCopy": "SALE NOW",
+                                    "urgencyText": "Last 3!",
+                                    "saleBadge": "SALE NOW"
                                 },
                                 "price": 1,
                                 "priceMinor": 100,
@@ -3479,7 +3841,13 @@
                                     3
                                 ],
                                 "hidePricePosition": true,
-                                "hideStockPlacement": true
+                                "hideStockPlacement": true,
+                                "productName": "وردة",
+                                "productImage": "https://example.com/p.png",
+                                "badgeText": "Last 3!",
+                                "countdownCopy": "SALE NOW",
+                                "urgencyText": "Last 3!",
+                                "saleBadge": "SALE NOW"
                             }
                         ],
                         "price": 1,
@@ -3532,7 +3900,13 @@
                             3
                         ],
                         "hidePricePosition": true,
-                        "hideStockPlacement": true
+                        "hideStockPlacement": true,
+                        "productName": "وردة",
+                        "productImage": "https://example.com/p.png",
+                        "badgeText": "Last 3!",
+                        "countdownCopy": "SALE NOW",
+                        "urgencyText": "Last 3!",
+                        "saleBadge": "SALE NOW"
                     },
                     "price": 1,
                     "priceMinor": 100,
@@ -3584,7 +3958,13 @@
                         3
                     ],
                     "hidePricePosition": true,
-                    "hideStockPlacement": true
+                    "hideStockPlacement": true,
+                    "productName": "وردة",
+                    "productImage": "https://example.com/p.png",
+                    "badgeText": "Last 3!",
+                    "countdownCopy": "SALE NOW",
+                    "urgencyText": "Last 3!",
+                    "saleBadge": "SALE NOW"
                 },
                 {
                     "id": "s-gal",
@@ -3646,7 +4026,13 @@
                                         3
                                     ],
                                     "hidePricePosition": true,
-                                    "hideStockPlacement": true
+                                    "hideStockPlacement": true,
+                                    "productName": "وردة",
+                                    "productImage": "https://example.com/p.png",
+                                    "badgeText": "Last 3!",
+                                    "countdownCopy": "SALE NOW",
+                                    "urgencyText": "Last 3!",
+                                    "saleBadge": "SALE NOW"
                                 },
                                 "price": 1,
                                 "priceMinor": 100,
@@ -3698,7 +4084,13 @@
                                     3
                                 ],
                                 "hidePricePosition": true,
-                                "hideStockPlacement": true
+                                "hideStockPlacement": true,
+                                "productName": "وردة",
+                                "productImage": "https://example.com/p.png",
+                                "badgeText": "Last 3!",
+                                "countdownCopy": "SALE NOW",
+                                "urgencyText": "Last 3!",
+                                "saleBadge": "SALE NOW"
                             }
                         ],
                         "price": 1,
@@ -3751,7 +4143,13 @@
                             3
                         ],
                         "hidePricePosition": true,
-                        "hideStockPlacement": true
+                        "hideStockPlacement": true,
+                        "productName": "وردة",
+                        "productImage": "https://example.com/p.png",
+                        "badgeText": "Last 3!",
+                        "countdownCopy": "SALE NOW",
+                        "urgencyText": "Last 3!",
+                        "saleBadge": "SALE NOW"
                     },
                     "price": 1,
                     "priceMinor": 100,
@@ -3803,7 +4201,13 @@
                         3
                     ],
                     "hidePricePosition": true,
-                    "hideStockPlacement": true
+                    "hideStockPlacement": true,
+                    "productName": "وردة",
+                    "productImage": "https://example.com/p.png",
+                    "badgeText": "Last 3!",
+                    "countdownCopy": "SALE NOW",
+                    "urgencyText": "Last 3!",
+                    "saleBadge": "SALE NOW"
                 }
             ],
             "price": 1,
@@ -3856,7 +4260,13 @@
                 3
             ],
             "hidePricePosition": true,
-            "hideStockPlacement": true
+            "hideStockPlacement": true,
+            "productName": "وردة",
+            "productImage": "https://example.com/p.png",
+            "badgeText": "Last 3!",
+            "countdownCopy": "SALE NOW",
+            "urgencyText": "Last 3!",
+            "saleBadge": "SALE NOW"
         },
         "price": 1,
         "priceMinor": 100,
@@ -3923,7 +4333,13 @@
                 3
             ],
             "hidePricePosition": true,
-            "hideStockPlacement": true
+            "hideStockPlacement": true,
+            "productName": "وردة",
+            "productImage": "https://example.com/p.png",
+            "badgeText": "Last 3!",
+            "countdownCopy": "SALE NOW",
+            "urgencyText": "Last 3!",
+            "saleBadge": "SALE NOW"
         },
         "header": {
             "style": "compact",
@@ -3984,7 +4400,13 @@
                         3
                     ],
                     "hidePricePosition": true,
-                    "hideStockPlacement": true
+                    "hideStockPlacement": true,
+                    "productName": "وردة",
+                    "productImage": "https://example.com/p.png",
+                    "badgeText": "Last 3!",
+                    "countdownCopy": "SALE NOW",
+                    "urgencyText": "Last 3!",
+                    "saleBadge": "SALE NOW"
                 }
             ],
             "design": {
@@ -4039,7 +4461,13 @@
                     3
                 ],
                 "hidePricePosition": true,
-                "hideStockPlacement": true
+                "hideStockPlacement": true,
+                "productName": "وردة",
+                "productImage": "https://example.com/p.png",
+                "badgeText": "Last 3!",
+                "countdownCopy": "SALE NOW",
+                "urgencyText": "Last 3!",
+                "saleBadge": "SALE NOW"
             },
             "price": 1,
             "priceMinor": 100,
@@ -4091,7 +4519,13 @@
                 3
             ],
             "hidePricePosition": true,
-            "hideStockPlacement": true
+            "hideStockPlacement": true,
+            "productName": "وردة",
+            "productImage": "https://example.com/p.png",
+            "badgeText": "Last 3!",
+            "countdownCopy": "SALE NOW",
+            "urgencyText": "Last 3!",
+            "saleBadge": "SALE NOW"
         },
         "footer": {
             "tagline": "نصنع الفرق",
@@ -4147,7 +4581,13 @@
                     3
                 ],
                 "hidePricePosition": true,
-                "hideStockPlacement": true
+                "hideStockPlacement": true,
+                "productName": "وردة",
+                "productImage": "https://example.com/p.png",
+                "badgeText": "Last 3!",
+                "countdownCopy": "SALE NOW",
+                "urgencyText": "Last 3!",
+                "saleBadge": "SALE NOW"
             },
             "groups": [
                 {
@@ -4211,7 +4651,13 @@
                                     3
                                 ],
                                 "hidePricePosition": true,
-                                "hideStockPlacement": true
+                                "hideStockPlacement": true,
+                                "productName": "وردة",
+                                "productImage": "https://example.com/p.png",
+                                "badgeText": "Last 3!",
+                                "countdownCopy": "SALE NOW",
+                                "urgencyText": "Last 3!",
+                                "saleBadge": "SALE NOW"
                             },
                             "price": 1,
                             "priceMinor": 100,
@@ -4263,7 +4709,13 @@
                                 3
                             ],
                             "hidePricePosition": true,
-                            "hideStockPlacement": true
+                            "hideStockPlacement": true,
+                            "productName": "وردة",
+                            "productImage": "https://example.com/p.png",
+                            "badgeText": "Last 3!",
+                            "countdownCopy": "SALE NOW",
+                            "urgencyText": "Last 3!",
+                            "saleBadge": "SALE NOW"
                         }
                     ],
                     "price": 1,
@@ -4316,7 +4768,13 @@
                         3
                     ],
                     "hidePricePosition": true,
-                    "hideStockPlacement": true
+                    "hideStockPlacement": true,
+                    "productName": "وردة",
+                    "productImage": "https://example.com/p.png",
+                    "badgeText": "Last 3!",
+                    "countdownCopy": "SALE NOW",
+                    "urgencyText": "Last 3!",
+                    "saleBadge": "SALE NOW"
                 }
             ],
             "price": 1,
@@ -4369,7 +4827,13 @@
                 3
             ],
             "hidePricePosition": true,
-            "hideStockPlacement": true
+            "hideStockPlacement": true,
+            "productName": "وردة",
+            "productImage": "https://example.com/p.png",
+            "badgeText": "Last 3!",
+            "countdownCopy": "SALE NOW",
+            "urgencyText": "Last 3!",
+            "saleBadge": "SALE NOW"
         },
         "contact": {
             "email": "hello@example.com",
@@ -4423,7 +4887,13 @@
                 3
             ],
             "hidePricePosition": true,
-            "hideStockPlacement": true
+            "hideStockPlacement": true,
+            "productName": "وردة",
+            "productImage": "https://example.com/p.png",
+            "badgeText": "Last 3!",
+            "countdownCopy": "SALE NOW",
+            "urgencyText": "Last 3!",
+            "saleBadge": "SALE NOW"
         },
         "whatsapp": {
             "enabled": true,
@@ -4480,7 +4950,13 @@
                 3
             ],
             "hidePricePosition": true,
-            "hideStockPlacement": true
+            "hideStockPlacement": true,
+            "productName": "وردة",
+            "productImage": "https://example.com/p.png",
+            "badgeText": "Last 3!",
+            "countdownCopy": "SALE NOW",
+            "urgencyText": "Last 3!",
+            "saleBadge": "SALE NOW"
         },
         "social": [
             {
@@ -4538,7 +5014,13 @@
                     3
                 ],
                 "hidePricePosition": true,
-                "hideStockPlacement": true
+                "hideStockPlacement": true,
+                "productName": "وردة",
+                "productImage": "https://example.com/p.png",
+                "badgeText": "Last 3!",
+                "countdownCopy": "SALE NOW",
+                "urgencyText": "Last 3!",
+                "saleBadge": "SALE NOW"
             }
         ],
         "verification": {
@@ -4595,7 +5077,13 @@
                 3
             ],
             "hidePricePosition": true,
-            "hideStockPlacement": true
+            "hideStockPlacement": true,
+            "productName": "وردة",
+            "productImage": "https://example.com/p.png",
+            "badgeText": "Last 3!",
+            "countdownCopy": "SALE NOW",
+            "urgencyText": "Last 3!",
+            "saleBadge": "SALE NOW"
         },
         "sbc": {
             "authentication_number": "A1",
@@ -4651,7 +5139,13 @@
                 3
             ],
             "hidePricePosition": true,
-            "hideStockPlacement": true
+            "hideStockPlacement": true,
+            "productName": "وردة",
+            "productImage": "https://example.com/p.png",
+            "badgeText": "Last 3!",
+            "countdownCopy": "SALE NOW",
+            "urgencyText": "Last 3!",
+            "saleBadge": "SALE NOW"
         },
         "apps": {
             "iosUrl": "https://apps.apple.com/app/id1",
@@ -4705,7 +5199,13 @@
                 3
             ],
             "hidePricePosition": true,
-            "hideStockPlacement": true
+            "hideStockPlacement": true,
+            "productName": "وردة",
+            "productImage": "https://example.com/p.png",
+            "badgeText": "Last 3!",
+            "countdownCopy": "SALE NOW",
+            "urgencyText": "Last 3!",
+            "saleBadge": "SALE NOW"
         },
         "navigation": {
             "menus": [
@@ -4769,7 +5269,13 @@
                                     3
                                 ],
                                 "hidePricePosition": true,
-                                "hideStockPlacement": true
+                                "hideStockPlacement": true,
+                                "productName": "وردة",
+                                "productImage": "https://example.com/p.png",
+                                "badgeText": "Last 3!",
+                                "countdownCopy": "SALE NOW",
+                                "urgencyText": "Last 3!",
+                                "saleBadge": "SALE NOW"
                             },
                             "price": 1,
                             "priceMinor": 100,
@@ -4821,7 +5327,13 @@
                                 3
                             ],
                             "hidePricePosition": true,
-                            "hideStockPlacement": true
+                            "hideStockPlacement": true,
+                            "productName": "وردة",
+                            "productImage": "https://example.com/p.png",
+                            "badgeText": "Last 3!",
+                            "countdownCopy": "SALE NOW",
+                            "urgencyText": "Last 3!",
+                            "saleBadge": "SALE NOW"
                         },
                         {
                             "id": "e",
@@ -4879,7 +5391,13 @@
                                     3
                                 ],
                                 "hidePricePosition": true,
-                                "hideStockPlacement": true
+                                "hideStockPlacement": true,
+                                "productName": "وردة",
+                                "productImage": "https://example.com/p.png",
+                                "badgeText": "Last 3!",
+                                "countdownCopy": "SALE NOW",
+                                "urgencyText": "Last 3!",
+                                "saleBadge": "SALE NOW"
                             },
                             "price": 1,
                             "priceMinor": 100,
@@ -4931,7 +5449,13 @@
                                 3
                             ],
                             "hidePricePosition": true,
-                            "hideStockPlacement": true
+                            "hideStockPlacement": true,
+                            "productName": "وردة",
+                            "productImage": "https://example.com/p.png",
+                            "badgeText": "Last 3!",
+                            "countdownCopy": "SALE NOW",
+                            "urgencyText": "Last 3!",
+                            "saleBadge": "SALE NOW"
                         }
                     ],
                     "price": 1,
@@ -4984,7 +5508,13 @@
                         3
                     ],
                     "hidePricePosition": true,
-                    "hideStockPlacement": true
+                    "hideStockPlacement": true,
+                    "productName": "وردة",
+                    "productImage": "https://example.com/p.png",
+                    "badgeText": "Last 3!",
+                    "countdownCopy": "SALE NOW",
+                    "urgencyText": "Last 3!",
+                    "saleBadge": "SALE NOW"
                 }
             ],
             "price": 1,
@@ -5037,7 +5567,13 @@
                 3
             ],
             "hidePricePosition": true,
-            "hideStockPlacement": true
+            "hideStockPlacement": true,
+            "productName": "وردة",
+            "productImage": "https://example.com/p.png",
+            "badgeText": "Last 3!",
+            "countdownCopy": "SALE NOW",
+            "urgencyText": "Last 3!",
+            "saleBadge": "SALE NOW"
         },
         "pagePresentation": {
             "product": {
@@ -5097,7 +5633,13 @@
                             3
                         ],
                         "hidePricePosition": true,
-                        "hideStockPlacement": true
+                        "hideStockPlacement": true,
+                        "productName": "وردة",
+                        "productImage": "https://example.com/p.png",
+                        "badgeText": "Last 3!",
+                        "countdownCopy": "SALE NOW",
+                        "urgencyText": "Last 3!",
+                        "saleBadge": "SALE NOW"
                     }
                 ],
                 "price": 1,
@@ -5150,7 +5692,13 @@
                     3
                 ],
                 "hidePricePosition": true,
-                "hideStockPlacement": true
+                "hideStockPlacement": true,
+                "productName": "وردة",
+                "productImage": "https://example.com/p.png",
+                "badgeText": "Last 3!",
+                "countdownCopy": "SALE NOW",
+                "urgencyText": "Last 3!",
+                "saleBadge": "SALE NOW"
             },
             "price": 1,
             "priceMinor": 100,
@@ -5252,7 +5800,13 @@
                             3
                         ],
                         "hidePricePosition": true,
-                        "hideStockPlacement": true
+                        "hideStockPlacement": true,
+                        "productName": "وردة",
+                        "productImage": "https://example.com/p.png",
+                        "badgeText": "Last 3!",
+                        "countdownCopy": "SALE NOW",
+                        "urgencyText": "Last 3!",
+                        "saleBadge": "SALE NOW"
                     }
                 ],
                 "price": 1,
@@ -5305,7 +5859,13 @@
                     3
                 ],
                 "hidePricePosition": true,
-                "hideStockPlacement": true
+                "hideStockPlacement": true,
+                "productName": "وردة",
+                "productImage": "https://example.com/p.png",
+                "badgeText": "Last 3!",
+                "countdownCopy": "SALE NOW",
+                "urgencyText": "Last 3!",
+                "saleBadge": "SALE NOW"
             },
             "priceIds": [
                 19000
@@ -5314,7 +5874,13 @@
                 3
             ],
             "hidePricePosition": true,
-            "hideStockPlacement": true
+            "hideStockPlacement": true,
+            "productName": "وردة",
+            "productImage": "https://example.com/p.png",
+            "badgeText": "Last 3!",
+            "countdownCopy": "SALE NOW",
+            "urgencyText": "Last 3!",
+            "saleBadge": "SALE NOW"
         },
         "announcements": {
             "enabled": false,
@@ -5372,7 +5938,13 @@
                         3
                     ],
                     "hidePricePosition": true,
-                    "hideStockPlacement": true
+                    "hideStockPlacement": true,
+                    "productName": "وردة",
+                    "productImage": "https://example.com/p.png",
+                    "badgeText": "Last 3!",
+                    "countdownCopy": "SALE NOW",
+                    "urgencyText": "Last 3!",
+                    "saleBadge": "SALE NOW"
                 }
             ],
             "price": 1,
@@ -5425,7 +5997,13 @@
                 3
             ],
             "hidePricePosition": true,
-            "hideStockPlacement": true
+            "hideStockPlacement": true,
+            "productName": "وردة",
+            "productImage": "https://example.com/p.png",
+            "badgeText": "Last 3!",
+            "countdownCopy": "SALE NOW",
+            "urgencyText": "Last 3!",
+            "saleBadge": "SALE NOW"
         },
         "palette": {
             "link": "#0B5FFF",
@@ -5479,7 +6057,13 @@
                 3
             ],
             "hidePricePosition": true,
-            "hideStockPlacement": true
+            "hideStockPlacement": true,
+            "productName": "وردة",
+            "productImage": "https://example.com/p.png",
+            "badgeText": "Last 3!",
+            "countdownCopy": "SALE NOW",
+            "urgencyText": "Last 3!",
+            "saleBadge": "SALE NOW"
         },
         "shippingFee": 1500,
         "shippingAmount": 900,
@@ -5518,7 +6102,13 @@
             3
         ],
         "hidePricePosition": true,
-        "hideStockPlacement": true
+        "hideStockPlacement": true,
+        "productName": "وردة",
+        "productImage": "https://example.com/p.png",
+        "badgeText": "Last 3!",
+        "countdownCopy": "SALE NOW",
+        "urgencyText": "Last 3!",
+        "saleBadge": "SALE NOW"
     },
     "deniedKeys": [
         "price",
@@ -5546,7 +6136,13 @@
         "priceIds",
         "stockIds",
         "hidePricePosition",
-        "hideStockPlacement"
+        "hideStockPlacement",
+        "productName",
+        "productImage",
+        "badgeText",
+        "countdownCopy",
+        "urgencyText",
+        "saleBadge"
     ],
     "selectorKeys": [
         "productIds",
@@ -5565,5 +6161,52 @@
         "force",
         "free",
         "round"
+    ],
+    "forbiddenWordSets": [
+        [
+            "product",
+            "name"
+        ],
+        [
+            "product",
+            "image"
+        ],
+        [
+            "product",
+            "title"
+        ],
+        [
+            "product",
+            "description"
+        ],
+        [
+            "product",
+            "thumbnail"
+        ],
+        [
+            "badge",
+            "text"
+        ],
+        [
+            "badge",
+            "label"
+        ],
+        [
+            "badge",
+            "copy"
+        ],
+        [
+            "sale",
+            "badge"
+        ],
+        [
+            "countdown"
+        ],
+        [
+            "urgency"
+        ],
+        [
+            "timer"
+        ]
     ]
 }

@@ -8,6 +8,7 @@ interface Fixture {
   presentationSuffixes: string[];
   selectorKeys: string[];
   hidingVerbs: string[];
+  forbiddenWordSets: string[][];
   deniedKeys: string[];
   allowedKeys: string[];
   forbiddenValues: string[];
@@ -43,6 +44,13 @@ function denies(key: string): boolean {
     .split(/[\s_-]+|(?<=[a-z0-9])(?=[A-Z])/)
     .filter(Boolean)
     .map((word) => word.toLowerCase());
+  // commerce CONTENT (product names / images, invented badges, urgency copy) is denied by word combination, whatever the value type
+  if (
+    fixture.forbiddenWordSets.some((set) =>
+      set.every((word) => words.includes(word)),
+    )
+  )
+    return true;
   if (!words.some((word) => fixture.commerceWords.includes(word))) return false;
   // a hiding / scaling verb anywhere in the key denies it, whatever its suffix (hidePricePosition, hideStockPlacement…)
   return (
