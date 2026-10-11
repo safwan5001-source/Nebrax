@@ -57,6 +57,12 @@ Schedule::command('imports:prune')
     ->withoutOverlapping()
     ->onOneServer();
 
+// S3: تقليم مفاتيح Idempotency المنتهية لطلبات الواجهة — نفس ملاحظة التفعيل أعلاه.
+Schedule::command('request-idempotency:prune')
+    ->dailyAt('02:30')
+    ->withoutOverlapping()
+    ->onOneServer();
+
 // CUST-H1-4: نشر نسخ عروض المتاجر المجدولة المستحقّة. كل عنصر معزول ذرّياً
 // (قفل صفّ + فحص جيل الجدولة) — فشل عنصرٍ واحد لا يوقف الدفعة، والقاعدة
 // تبقى مصدر الحقيقة فيسترد المُرسِل ما فات تلقائياً بعد أي تعطّل.

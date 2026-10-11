@@ -1,7 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, useRef } from 'react';
+import { createIdempotencyGuard } from '@/lib/idempotency';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { ArrowRight, FileText, Paperclip, X } from 'lucide-react';
@@ -55,6 +56,7 @@ export function GeneralPaymentForm() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<SubmitMode | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const idempotency = useRef(createIdempotencyGuard());
   const { number: suggestedNumber, loading: loadingNumber } = useNumberPreview('payment', { seriesKey: direction, date });
 
   const selectedMethod = methods.find((method) => method.id === paymentMethodId) ?? null;
@@ -165,13 +167,19 @@ export function GeneralPaymentForm() {
     files.forEach((file) => body.append('attachments[]', file));
 
     try {
-      const created = await api<{ data: { id: string } }>('/payments', { method: 'POST', body });
+      const created = await api<{ data: { id: string } }>('/payments', {
+        method: 'POST',
+        body,
+        headers: { 'Idempotency-Key': idempotency.current.keyFor(body) },
+      });
       if (mode === 'post') {
         await api(`/payments/${created.data.id}/post`, { method: 'POST' });
         success(t('confirm_success'));
+        idempotency.current.done();
         router.push(documentId ? (direction === 'received' ? `/invoices/${documentId}` : `/purchases/${documentId}`) : '/payments');
       } else {
         success(t('save_draft_success'));
+        idempotency.current.done();
         router.push(`/payments/${created.data.id}`);
       }
     } catch (requestError) {
