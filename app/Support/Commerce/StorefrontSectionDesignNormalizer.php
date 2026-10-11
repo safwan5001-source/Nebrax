@@ -65,6 +65,9 @@ final class StorefrontSectionDesignNormalizer
         'banner' => ['split', 'text-band'],
         // CUST-HV V8d (V0 §3.4، D-24) — المعرض: الشبكة هي الافتراضي (غياب)، و`carousel` وحده يُخزَّن.
         'gallery' => ['carousel'],
+        // CUST-HV V9b (V0 §3.4) — مزايا المتجر: البطاقات بأعمدة تلقائية هي الافتراضي (غياب)؛ `flat` بلا إطار بطاقة،
+        // و`columns-N` بطاقات بعدد أعمدة ثابت على الشاشات الواسعة (الهاتف عمود واحد دائماً، اللوح عمودان).
+        'benefits' => ['flat', 'columns-2', 'columns-3', 'columns-4'],
     ];
 
     /** V6c-3 (V0 §8.3) — ارتفاع القسم المُعدّ مسبقاً للبطل واللافتة (حدّ أدنى فقط؛ المحتوى لا يُقصّ أبداً). */
@@ -140,7 +143,7 @@ final class StorefrontSectionDesignNormalizer
             'offers' => $shelf,
             'productShelf' => $shelf,
             'discovery' => ['background' => self::BACKGROUND_KINDS, 'text' => ['heading'], 'spacing' => true, 'separator' => true],
-            'benefits' => ['background' => self::BACKGROUND_KINDS, 'text' => self::FULL_TEXT, 'typography' => self::FULL_TYPO, 'spacing' => true, 'align' => true, 'border' => true, 'radius' => true, 'shadow' => true, 'separator' => true],
+            'benefits' => ['background' => self::BACKGROUND_KINDS, 'text' => self::FULL_TEXT, 'typography' => self::FULL_TYPO, 'spacing' => true, 'align' => true, 'layout' => self::LAYOUTS['benefits'], 'border' => true, 'radius' => true, 'shadow' => true, 'separator' => true],
             'customContent' => ['background' => self::BACKGROUND_KINDS, 'text' => self::FULL_TEXT, 'typography' => self::FULL_TYPO, 'width' => ['max'], 'spacing' => true, 'align' => true, 'separator' => true],
             'appPromo' => ['background' => self::BACKGROUND_KINDS, 'text' => self::FULL_TEXT, 'spacing' => true, 'border' => true, 'radius' => true, 'separator' => true],
             'deliveryPromise' => ['background' => self::BACKGROUND_KINDS, 'spacing' => true, 'separator' => true],

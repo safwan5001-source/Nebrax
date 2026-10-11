@@ -217,6 +217,12 @@
             ],
             "spacing": true,
             "align": true,
+            "layout": [
+                "flat",
+                "columns-2",
+                "columns-3",
+                "columns-4"
+            ],
             "border": true,
             "radius": true,
             "shadow": true,
@@ -2863,7 +2869,7 @@
             }
         },
         {
-            "name": "V6c-7: `benefits` has no layout variants yet (V8/V9): dropped",
+            "name": "V6c-7: `benefits` drops another type's layout (`split` is a hero/banner variant)",
             "type": "benefits",
             "input": {
                 "layout": "split",
@@ -2874,6 +2880,97 @@
             "expected": {
                 "spacing": {
                     "top": "md"
+                }
+            }
+        },
+        {
+            "name": "V9b: benefits layout `flat` is kept",
+            "type": "benefits",
+            "input": {
+                "layout": "flat"
+            },
+            "expected": {
+                "layout": "flat"
+            }
+        },
+        {
+            "name": "V9b: benefits layout `columns-2` is kept",
+            "type": "benefits",
+            "input": {
+                "layout": "columns-2"
+            },
+            "expected": {
+                "layout": "columns-2"
+            }
+        },
+        {
+            "name": "V9b: benefits layout `columns-3` is kept",
+            "type": "benefits",
+            "input": {
+                "layout": "columns-3"
+            },
+            "expected": {
+                "layout": "columns-3"
+            }
+        },
+        {
+            "name": "V9b: benefits layout `columns-4` is kept",
+            "type": "benefits",
+            "input": {
+                "layout": "columns-4"
+            },
+            "expected": {
+                "layout": "columns-4"
+            }
+        },
+        {
+            "name": "V9b: benefits layout `cards` is the default (absence) and is never stored; wrong case and `columns-5` are dropped",
+            "type": "benefits",
+            "input": {
+                "layout": "cards",
+                "radius": "sm"
+            },
+            "expected": {
+                "radius": "sm"
+            }
+        },
+        {
+            "name": "V9b: benefits layout wrong case is dropped",
+            "type": "benefits",
+            "input": {
+                "layout": "Columns-3",
+                "radius": "sm"
+            },
+            "expected": {
+                "radius": "sm"
+            }
+        },
+        {
+            "name": "V9b: benefits layout out of range is dropped",
+            "type": "benefits",
+            "input": {
+                "layout": "columns-5",
+                "radius": "sm"
+            },
+            "expected": {
+                "radius": "sm"
+            }
+        },
+        {
+            "name": "V9b: benefits canonical order puts layout after align and before border",
+            "type": "benefits",
+            "input": {
+                "border": {
+                    "width": "hairline"
+                },
+                "layout": "columns-3",
+                "align": "center"
+            },
+            "expected": {
+                "align": "center",
+                "layout": "columns-3",
+                "border": {
+                    "width": "hairline"
                 }
             }
         },

@@ -104,6 +104,54 @@ describe("Canvas — Benefits (CUST-H4-4 parity proof)", () => {
   });
 });
 
+describe("Canvas — Benefits icons and layout (CUST-HV V9b)", () => {
+  afterEach(() => cleanup());
+
+  const sections = (design?: Record<string, unknown>) =>
+    withSections([
+      {
+        id: "benefits-1",
+        type: "benefits",
+        visible: true,
+        ...(design ? { design } : {}),
+        content: {
+          items: [
+            { id: "b1", title: "Free delivery", body: "", icon: "truck" },
+            { id: "b2", title: "Easy returns", body: "" },
+          ],
+        },
+      },
+    ] as never);
+  const mount = (design?: Record<string, unknown>) =>
+    render(
+      <StorefrontPreviewCanvas config={sections(design)} locale="en" viewport="desktop" onSelectSection={() => {}} />,
+    ).container.querySelector('[data-preview-section-id="benefits-1"]') as HTMLElement;
+
+  it("draws the icon only on the item that has one, decoratively", () => {
+    const section = mount();
+    const icons = section.querySelectorAll("[data-benefit-icon]");
+    expect(icons).toHaveLength(1);
+    expect(icons[0].querySelector("svg")?.getAttribute("aria-hidden")).toBe("true");
+    expect(section.querySelectorAll("[data-benefit-item]")[1].querySelector("[data-benefit-icon]")).toBeNull();
+  });
+
+  it("absent layout is cards in automatic columns; the layout and the simulated device reach the list's attributes (columns are proven in the browser)", () => {
+    const auto = mount();
+    const root = auto.querySelector("[data-benefits]") as HTMLElement;
+    expect(root.getAttribute("data-benefits")).toBe("auto");
+    expect(root.getAttribute("data-vp")).toBe("desktop");
+    expect(auto.querySelector("li")?.className).toContain("border-store-border");
+    cleanup();
+    const four = mount({ layout: "columns-4" });
+    expect(four.querySelector("[data-benefits]")?.getAttribute("data-benefits")).toBe("columns-4");
+    expect(four.querySelector("li")?.className).toContain("border-store-border");
+    cleanup();
+    const flat = mount({ layout: "flat" });
+    expect(flat.querySelector("[data-benefits]")?.getAttribute("data-benefits")).toBe("flat");
+    expect(flat.querySelector("li")?.className).not.toContain("border-store-border");
+  });
+});
+
 describe("Canvas — Custom Content (CUST-H4-4 parity proof)", () => {
   afterEach(() => cleanup());
 
