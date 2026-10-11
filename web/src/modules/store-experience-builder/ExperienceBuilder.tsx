@@ -10,6 +10,7 @@ import {
   type CategoryPageRegionKey,
   clonePresentationConfig,
   DEFAULT_PRESENTATION_CONFIG,
+  completeCategoryRegions,
   defaultCategoryPageRegions,
   defaultProductPageRegions,
   type HomeBuilderSectionKey,
@@ -885,7 +886,7 @@ export function ExperienceBuilder({
 
   // CUST-H2-4 — نفس منطق `effectiveProductRegions` أعلاه بالضبط، للتصنيف.
   const effectiveCategoryRegions: PageRegionInstance<CategoryPageRegionKey>[] =
-    draft.pagePresentation?.category?.regions ?? defaultCategoryPageRegions();
+    completeCategoryRegions(draft.pagePresentation?.category?.regions ?? defaultCategoryPageRegions());
 
   async function loadCategoryList(search?: string) {
     if (!storefrontId) return;

@@ -1,14 +1,17 @@
 import type { Category } from "@spree/sdk";
 import { cacheLife, cacheTag } from "next/cache";
+import Image from "next/image";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { StoreContainer } from "@/components/layout/StoreContainer";
 import { Breadcrumbs } from "@/components/navigation/Breadcrumbs";
+import type { StoreCategory } from "@/lib/commerce/types";
 import type { PagePresentation } from "@/lib/presentation/page-regions";
 import { resolvePublicCategoryRegions } from "@/lib/presentation/page-runtime";
 
 interface CategoryBannerProps {
-  category: Category;
+  /** Optional `image`: only the AWJ category read model carries it. */
+  category: Category & { image?: StoreCategory["image"] };
   basePath: string;
   locale: string;
   /**
@@ -27,6 +30,7 @@ interface CategoryBannerProps {
 
 const BANNER_REGION_KEYS = [
   "breadcrumbs",
+  "cover",
   "identity_title",
   "description",
   "subcategories_rail",
@@ -41,13 +45,13 @@ const BANNER_REGION_KEYS = [
  * the first viewport spent saying nothing — and it was removed rather than
  * filled with an invented photograph.
  *
- * The category resource carries the merchant's image now (since #1110; the
- * Home categories section already renders it), but this header deliberately
- * still renders none: a cover must appear only when the category actually has
- * an image, never as a reserved band or a placeholder. That optional `cover`
- * region is CUST-HV V9 (DEF-3b). Until then the header is breadcrumbs, the
- * name, the merchant's own description when there is one, and the real
- * subcategories.
+ * CUST-HV V9a (DEF-3b): the category resource carries the merchant's image now
+ * (since #1110), and the header offers it as the optional `cover` region — OFF
+ * by default (turning it on is the merchant's choice, so no existing store's
+ * category pages change), and rendered **only when the category actually has an
+ * image**, never as a reserved band or a placeholder. Otherwise the header is
+ * breadcrumbs, the name, the merchant's own description when there is one, and
+ * the real subcategories.
  */
 export async function CategoryBanner({
   category,
@@ -76,10 +80,25 @@ export async function CategoryBanner({
    * description — exactly like the Customizer's own `CategoryPagePreview`
    * already does.
    */
+  const cover = category.image?.url ? category.image : null;
   const regionNodes: Record<(typeof BANNER_REGION_KEYS)[number], ReactNode> = {
     breadcrumbs: (
       <Breadcrumbs category={category} basePath={basePath} locale={locale} />
     ),
+    cover: cover ? (
+      <div className="mt-2 overflow-hidden rounded-store">
+        <Image
+          src={cover.url}
+          alt={cover.alt || category.name}
+          width={1600}
+          height={500}
+          sizes="100vw"
+          className="aspect-[16/5] w-full object-cover"
+          priority
+          unoptimized
+        />
+      </div>
+    ) : null,
     identity_title: (
       <div className="mt-2 flex items-start gap-2">
         <span

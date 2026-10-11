@@ -713,6 +713,29 @@ class StorefrontPresentationNormalizerTest extends TestCase
     }
 
     /** @test */
+    public function category_cover_is_an_optional_region_that_keeps_its_authored_visibility(): void
+    {
+        $this->assertContains('cover', StorefrontPresentationNormalizer::CATEGORY_PAGE_REGION_KEYS);
+        $this->assertNotContains('cover', StorefrontPresentationNormalizer::FIXED_REQUIRED_CATEGORY_REGION_KEYS);
+
+        foreach ([true, false] as $visible) {
+            $normalized = $this->normalizer->normalize([
+                'pagePresentation' => [
+                    'category' => [
+                        'regions' => [
+                            ['key' => 'breadcrumbs', 'visible' => true],
+                            ['key' => 'cover', 'visible' => $visible],
+                        ],
+                    ],
+                ],
+            ]);
+
+            $regions = collect($normalized['pagePresentation']['category']['regions'])->keyBy('key');
+            $this->assertSame($visible, $regions['cover']['visible']);
+        }
+    }
+
+    /** @test */
     public function variant_selector_is_not_forced_visible_because_it_is_data_dependent(): void
     {
         $normalized = $this->normalizer->normalize([

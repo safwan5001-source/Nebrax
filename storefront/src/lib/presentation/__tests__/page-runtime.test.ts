@@ -150,10 +150,60 @@ describe("resolvePublicProductRegions", () => {
 });
 
 describe("resolvePublicCategoryRegions", () => {
-  it("falls back to the canonical default order when pagePresentation is absent", () => {
+  it("falls back to the canonical default order when pagePresentation is absent — with the optional cover OFF (V9a: no existing store changes)", () => {
     expect(resolvePublicCategoryRegions(undefined)).toEqual(
-      CATEGORY_PAGE_REGION_KEYS,
+      CATEGORY_PAGE_REGION_KEYS.filter((key) => key !== "cover"),
     );
+  });
+
+  it("a stored document that predates the cover has no cover; one that turns it on shows it after the breadcrumbs", () => {
+    const base = [
+      { id: "breadcrumbs", key: "breadcrumbs", visible: true },
+      { id: "identity_title", key: "identity_title", visible: true },
+      { id: "filter_sort_bar", key: "filter_sort_bar", visible: true },
+      { id: "product_grid", key: "product_grid", visible: true },
+    ] as const;
+    expect(
+      resolvePublicCategoryRegions({
+        category: { version: 1, regions: [...base] },
+      }),
+    ).toEqual([
+      "breadcrumbs",
+      "identity_title",
+      "filter_sort_bar",
+      "product_grid",
+    ]);
+    expect(
+      resolvePublicCategoryRegions({
+        category: {
+          version: 1,
+          regions: [
+            base[0],
+            { id: "cover", key: "cover", visible: true },
+            base[1],
+            base[2],
+            base[3],
+          ],
+        },
+      }),
+    ).toEqual([
+      "breadcrumbs",
+      "cover",
+      "identity_title",
+      "filter_sort_bar",
+      "product_grid",
+    ]);
+  });
+
+  it("a stored document missing a required region falls back to canonical with the cover still hidden", () => {
+    expect(
+      resolvePublicCategoryRegions({
+        category: {
+          version: 1,
+          regions: [{ id: "breadcrumbs", key: "breadcrumbs", visible: true }],
+        },
+      }),
+    ).not.toContain("cover");
   });
 
   it("respects a hidden description and an authored subcategories_rail position", () => {

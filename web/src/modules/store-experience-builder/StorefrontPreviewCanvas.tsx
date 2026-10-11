@@ -2086,6 +2086,18 @@ function CategoryPagePreview({
                 <bdi className="truncate font-medium text-store-foreground">{category.name}</bdi>
               </nav>,
             );
+          case "cover":
+            // CUST-HV V9a — the workspace category read does not carry the picture, so the preview cannot show THIS category's
+            // image; it says plainly what the published page does (the picture when the category has one, nothing otherwise).
+            return wrap(
+              region,
+              <div
+                data-category-preview-cover=""
+                className="flex aspect-[16/5] items-center justify-center rounded-store border border-dashed border-store-border-strong bg-store-surface-muted px-4 text-center"
+              >
+                <p className="text-xs leading-5 text-store-muted-foreground">{t("categoryPreviewCoverNote")}</p>
+              </div>,
+            );
           case "identity_title":
             return wrap(
               region,

@@ -18,6 +18,7 @@ import { type CustomizerLocale, type CustomizerMessageKey, customizerMessage } f
 
 const REGION_LABEL_KEY: Record<CategoryPageRegionKey, CustomizerMessageKey> = {
   breadcrumbs: "regionBreadcrumbs",
+  cover: "regionCover",
   identity_title: "regionIdentityTitle",
   description: "regionDescription",
   subcategories_rail: "regionSubcategoriesRail",
