@@ -56,8 +56,12 @@ export function HeaderOverlay({ sticky }: { sticky: boolean }) {
     if (sticky) header.setAttribute("data-header-live", "");
     measure();
     update();
-    const resize = new ResizeObserver(measure);
-    for (const band of bands()) resize.observe(band);
+    // no ResizeObserver (an old engine, a test DOM) ⇒ the measurement above stays; the stylesheet's fallback covers the rest
+    const resize =
+      typeof ResizeObserver === "undefined"
+        ? null
+        : new ResizeObserver(measure);
+    for (const band of bands()) resize?.observe(band);
     const mutations = new MutationObserver(update);
     mutations.observe(header, {
       attributes: true,
@@ -76,7 +80,7 @@ export function HeaderOverlay({ sticky }: { sticky: boolean }) {
       window.removeEventListener("scroll", onScroll);
       header.removeEventListener("focusin", update);
       header.removeEventListener("focusout", onScroll);
-      resize.disconnect();
+      resize?.disconnect();
       mutations.disconnect();
       if (frame) cancelAnimationFrame(frame);
       header.removeAttribute("data-header-live");

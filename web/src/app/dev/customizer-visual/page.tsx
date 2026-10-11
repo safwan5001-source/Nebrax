@@ -172,7 +172,7 @@ function configFor(locale: "ar" | "en", scenario: Scenario): StorefrontPresentat
               background: {
                 kind: "media",
                 media: { mediaId: "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e", decorative: true },
-                overlay: { color: { hex: "#000000" }, alpha: 40 },
+                overlay: { color: { role: "overlay" }, alpha: 40 },
               },
             },
           },
