@@ -187,6 +187,8 @@ describe("CUST-H4-2 capability registry — state/category/library metadata", ()
       deliveryPromise: "live",
       // CUST-HV V8c — model, storefront, Canvas and editor are all built.
       slider: "live",
+      // CUST-HV V8d — the model and the Publish rule exist; nothing draws or edits it yet (V8e–V8f).
+      gallery: "deferred",
     };
     for (const type of ALL_HOME_SECTION_KEYS) {
       expect(SECTION_CAPABILITIES[type].state).toBe(expected[type]);
@@ -233,6 +235,7 @@ describe("CUST-H4-2 capability registry — state/category/library metadata", ()
 
   it("leaves every other section's capability state unchanged by the Offers transition", () => {
     for (const type of ALL_HOME_SECTION_KEYS) {
+      if (type === "gallery") continue; // V8d: deferred until its renderers and editor ship (below)
       expect(SECTION_CAPABILITIES[type].state).toBe("live");
       expect(SECTION_CAPABILITIES[type].merchantAddable).toBe(true);
     }
@@ -280,7 +283,7 @@ describe("CUST-H4-2 capability registry — state/category/library metadata", ()
     // Every type is merchant-addable (Offers flipped in CUST-H4-7), so
     // instance-count rules are the only remaining gate.
     for (const type of ALL_HOME_SECTION_KEYS) {
-      expect(SECTION_CAPABILITIES[type].merchantAddable).toBe(true);
+      expect(SECTION_CAPABILITIES[type].merchantAddable).toBe(type !== "gallery");
     }
     const sections = DEFAULT_PRESENTATION_CONFIG.homepage.sections.filter(
       (s) => s.type !== "appPromo",
@@ -306,6 +309,22 @@ describe("CUST-HV V8c slider capability (live and addable)", () => {
     expect(ALL_HOME_SECTION_KEYS).toContain("slider");
     expect(
       DEFAULT_PRESENTATION_CONFIG.homepage.sections.some((entry) => entry.type === "slider"),
+    ).toBe(false);
+  });
+});
+
+describe("CUST-HV V8d gallery capability (deferred until V8e–V8f)", () => {
+  it("is visible in the Library but not addable, with the reason shown, and kept out of the default document", () => {
+    const cap = SECTION_CAPABILITIES.gallery;
+    expect(cap.state).toBe("deferred");
+    expect(cap.merchantAddable).toBe(false);
+    expect(cap.reasonKey).toBe("sectionGalleryReason");
+    expect(canAddSectionType([], "gallery")).toBe(false);
+    expect(HOME_BUILDER_SECTION_KEYS).not.toContain("gallery");
+    expect(HOME_DATA_SECTION_KEYS).not.toContain("gallery");
+    expect(ALL_HOME_SECTION_KEYS).toContain("gallery");
+    expect(
+      DEFAULT_PRESENTATION_CONFIG.homepage.sections.some((entry) => entry.type === "gallery"),
     ).toBe(false);
   });
 });

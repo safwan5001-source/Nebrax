@@ -1,4 +1,5 @@
 import { normalizeWindowEdges } from "./announcements";
+import { type GalleryContent, normalizeGalleryContent } from "./gallery-content";
 import { type SliderContent, normalizeSliderContent } from "./slider-content";
 import { sanitizeExternalUrl } from "./urls";
 
@@ -174,7 +175,8 @@ export type SectionContent =
   | ProductShelfContent
   | DiscoveryContent
   | DeliveryPromiseContent
-  | SliderContent;
+  | SliderContent
+  | GalleryContent;
 
 /** The hero instance's own content, or `undefined` while it still reads the legacy globals. */
 export function heroContentOf(section: {
@@ -286,6 +288,18 @@ export function discoveryContentOf(section: {
     : { title: "", axis: "facet", dimension: "", display: "tiles" };
 }
 
+/** CUST-HV V8d — the gallery instance's images and options (an empty image list while none is authored). */
+export function galleryContentOf(section: {
+  type: string;
+  content?: SectionContent;
+}): GalleryContent {
+  return section.type === "gallery" &&
+    section.content &&
+    "images" in section.content
+    ? section.content
+    : { images: [] };
+}
+
 /** CUST-HV V8a — the slider instance's slides and behaviour (an empty slide list while none is authored). */
 export function sliderContentOf(section: {
   type: string;
@@ -352,6 +366,9 @@ export function normalizeOptionalSectionContent(
   }
   if (type === "slider") {
     return normalizeSliderContent(raw, sanitizeContentHref);
+  }
+  if (type === "gallery") {
+    return normalizeGalleryContent(raw, sanitizeContentHref);
   }
   return undefined;
 }

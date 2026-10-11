@@ -63,6 +63,8 @@ final class StorefrontSectionDesignNormalizer
     public const LAYOUTS = [
         'hero' => ['centered', 'split', 'minimal'],
         'banner' => ['split', 'text-band'],
+        // CUST-HV V8d (V0 §3.4، D-24) — المعرض: الشبكة هي الافتراضي (غياب)، و`carousel` وحده يُخزَّن.
+        'gallery' => ['carousel'],
     ];
 
     /** V6c-3 (V0 §8.3) — ارتفاع القسم المُعدّ مسبقاً للبطل واللافتة (حدّ أدنى فقط؛ المحتوى لا يُقصّ أبداً). */
@@ -130,6 +132,9 @@ final class StorefrontSectionDesignNormalizer
             // وارتفاعٌ مُعدّ مسبقاً. لا مجموعة `text`: ألوان النص **لكل شريحة** (محتوى الشريحة) لأنها تقع فوق صورتها. ولا `layout`
             // (`split` يضع النص على سطح القسم لا الصورة — إثبات تباينه شريحةٌ لاحقة). الحركة (`transition`) سلوكٌ في المحتوى.
             'slider' => ['background' => self::BACKGROUND_KINDS, 'width' => true, 'spacing' => true, 'border' => true, 'radius' => true, 'shadow' => true, 'separator' => true, 'mediaTreatment' => ['height']],
+            // CUST-HV V8d (V0 §3.4) — المعرض: خلفية القسم (صلبة/تدرّج) والعرض والتباعد والحدّ والاستدارة والظل والفاصل و`layout`
+            // (`carousel`). لا `text` (التعليق على سطح القسم بلونٍ تلقائي مُثبَت) ولا `mediaTreatment` (النسبة في المحتوى `options.aspect`).
+            'gallery' => ['background' => self::BACKGROUND_KINDS, 'width' => true, 'spacing' => true, 'layout' => self::LAYOUTS['gallery'], 'border' => true, 'radius' => true, 'shadow' => true, 'separator' => true],
             'newArrivals' => $shelf,
             'featured' => $shelf,
             'offers' => $shelf,

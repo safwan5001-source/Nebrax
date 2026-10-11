@@ -1,0 +1,2524 @@
+{
+    "_note": "CUST-HV V8d — gallery content + publish rules. `content`: normalizer cases (PHP StorefrontGalleryNormalizer ↔ both TS twins; key order is part of the contract). `publish`: GalleryPublishRules / galleryPublishIssues. `expected` lists {path, code} in report order, paths relative to the section content.",
+    "content": [
+        {
+            "name": "absent",
+            "input": null,
+            "expected": null
+        },
+        {
+            "name": "not an object",
+            "input": "gallery",
+            "expected": null
+        },
+        {
+            "name": "a list is not an object",
+            "input": [
+                {
+                    "id": "a",
+                    "media": {
+                        "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                    }
+                }
+            ],
+            "expected": null
+        },
+        {
+            "name": "empty object",
+            "input": [],
+            "expected": null
+        },
+        {
+            "name": "empty images",
+            "input": {
+                "images": []
+            },
+            "expected": null
+        },
+        {
+            "name": "images not a list",
+            "input": {
+                "images": "x"
+            },
+            "expected": null
+        },
+        {
+            "name": "an image without a media reference drops whole",
+            "input": {
+                "images": [
+                    {
+                        "id": "a"
+                    },
+                    {
+                        "id": "b",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    }
+                ]
+            },
+            "expected": {
+                "images": [
+                    {
+                        "id": "b",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "name": "an image with an invalid media id drops whole",
+            "input": {
+                "images": [
+                    {
+                        "id": "a",
+                        "media": {
+                            "mediaId": "nope"
+                        }
+                    },
+                    {
+                        "id": "b",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    }
+                ]
+            },
+            "expected": {
+                "images": [
+                    {
+                        "id": "b",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "name": "a url instead of a media reference never survives",
+            "input": {
+                "images": [
+                    {
+                        "id": "a",
+                        "media": "https://x.test/a.jpg"
+                    },
+                    {
+                        "id": "b",
+                        "media": {
+                            "url": "https://x.test/a.jpg"
+                        }
+                    }
+                ]
+            },
+            "expected": null
+        },
+        {
+            "name": "minimal image gets a positional id",
+            "input": {
+                "images": [
+                    {
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    }
+                ]
+            },
+            "expected": {
+                "images": [
+                    {
+                        "id": "image-0",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "name": "full image keeps canonical key order",
+            "input": {
+                "images": [
+                    {
+                        "link": "/products",
+                        "caption": "Spring",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        },
+                        "id": "a"
+                    }
+                ]
+            },
+            "expected": {
+                "images": [
+                    {
+                        "id": "a",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        },
+                        "caption": "Spring",
+                        "link": "/products"
+                    }
+                ]
+            }
+        },
+        {
+            "name": "the image keeps its media reference: alt, focal point, rotation and fit",
+            "input": {
+                "images": [
+                    {
+                        "id": "a",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+                            "alt": {
+                                "ar": "وردة",
+                                "en": "A rose"
+                            },
+                            "fit": "contain",
+                            "focal": {
+                                "x": 10,
+                                "y": 20
+                            },
+                            "rotate": 90
+                        }
+                    }
+                ]
+            },
+            "expected": {
+                "images": [
+                    {
+                        "id": "a",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+                            "fit": "contain",
+                            "focal": {
+                                "x": 10,
+                                "y": 20
+                            },
+                            "rotate": 90,
+                            "alt": {
+                                "ar": "وردة",
+                                "en": "A rose"
+                            }
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "name": "decorative picture survives",
+            "input": {
+                "images": [
+                    {
+                        "id": "a",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+                            "decorative": true
+                        }
+                    }
+                ]
+            },
+            "expected": {
+                "images": [
+                    {
+                        "id": "a",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+                            "decorative": true
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "name": "extra keys on the image and picture never survive",
+            "input": {
+                "images": [
+                    {
+                        "id": "a",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+                            "url": "https://x.test/a.jpg",
+                            "style": "x"
+                        },
+                        "onclick": "x",
+                        "html": "<b>"
+                    }
+                ],
+                "script": "x"
+            },
+            "expected": {
+                "images": [
+                    {
+                        "id": "a",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "name": "whitespace-only caption is absence",
+            "input": {
+                "images": [
+                    {
+                        "id": "a",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        },
+                        "caption": "   \n"
+                    }
+                ]
+            },
+            "expected": {
+                "images": [
+                    {
+                        "id": "a",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "name": "caption is kept as written",
+            "input": {
+                "images": [
+                    {
+                        "id": "a",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        },
+                        "caption": "  تشكيلة  الربيع  "
+                    }
+                ]
+            },
+            "expected": {
+                "images": [
+                    {
+                        "id": "a",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        },
+                        "caption": "  تشكيلة  الربيع  "
+                    }
+                ]
+            }
+        },
+        {
+            "name": "caption truncated to 120 code points",
+            "input": {
+                "images": [
+                    {
+                        "id": "a",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        },
+                        "caption": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                    }
+                ]
+            },
+            "expected": {
+                "images": [
+                    {
+                        "id": "a",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        },
+                        "caption": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                    }
+                ]
+            }
+        },
+        {
+            "name": "astral code points count once in a caption",
+            "input": {
+                "images": [
+                    {
+                        "id": "a",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        },
+                        "caption": "😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀"
+                    }
+                ]
+            },
+            "expected": {
+                "images": [
+                    {
+                        "id": "a",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        },
+                        "caption": "😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀"
+                    }
+                ]
+            }
+        },
+        {
+            "name": "caption must be a string",
+            "input": {
+                "images": [
+                    {
+                        "id": "a",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        },
+                        "caption": 5
+                    }
+                ]
+            },
+            "expected": {
+                "images": [
+                    {
+                        "id": "a",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "name": "internal link",
+            "input": {
+                "images": [
+                    {
+                        "id": "a",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        },
+                        "link": "/products/rose"
+                    }
+                ]
+            },
+            "expected": {
+                "images": [
+                    {
+                        "id": "a",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        },
+                        "link": "/products/rose"
+                    }
+                ]
+            }
+        },
+        {
+            "name": "https link",
+            "input": {
+                "images": [
+                    {
+                        "id": "a",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        },
+                        "link": "https://example.com/a"
+                    }
+                ]
+            },
+            "expected": {
+                "images": [
+                    {
+                        "id": "a",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        },
+                        "link": "https://example.com/a"
+                    }
+                ]
+            }
+        },
+        {
+            "name": "javascript link drops alone",
+            "input": {
+                "images": [
+                    {
+                        "id": "a",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        },
+                        "link": "javascript:alert(1)",
+                        "caption": "kept"
+                    }
+                ]
+            },
+            "expected": {
+                "images": [
+                    {
+                        "id": "a",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        },
+                        "caption": "kept"
+                    }
+                ]
+            }
+        },
+        {
+            "name": "protocol-relative link is refused",
+            "input": {
+                "images": [
+                    {
+                        "id": "a",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        },
+                        "link": "//evil.test"
+                    }
+                ]
+            },
+            "expected": {
+                "images": [
+                    {
+                        "id": "a",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "name": "http link is refused",
+            "input": {
+                "images": [
+                    {
+                        "id": "a",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        },
+                        "link": "http://example.com"
+                    }
+                ]
+            },
+            "expected": {
+                "images": [
+                    {
+                        "id": "a",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "name": "link must be a string",
+            "input": {
+                "images": [
+                    {
+                        "id": "a",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        },
+                        "link": {
+                            "href": "/x"
+                        }
+                    }
+                ]
+            },
+            "expected": {
+                "images": [
+                    {
+                        "id": "a",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "name": "duplicate ids keep the first",
+            "input": {
+                "images": [
+                    {
+                        "id": "a",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "a",
+                        "media": {
+                            "mediaId": "1c9a7d3f-4e4b-4b64-8d8f-9a2b3c4d5e6f"
+                        }
+                    },
+                    {
+                        "id": "b",
+                        "media": {
+                            "mediaId": "2d0b8e4a-5f5c-4c75-9e9a-ab3c4d5e6f70"
+                        }
+                    }
+                ]
+            },
+            "expected": {
+                "images": [
+                    {
+                        "id": "a",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "b",
+                        "media": {
+                            "mediaId": "2d0b8e4a-5f5c-4c75-9e9a-ab3c4d5e6f70"
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "name": "invalid ids fall back to the position",
+            "input": {
+                "images": [
+                    {
+                        "id": "bad id!",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "ok",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    }
+                ]
+            },
+            "expected": {
+                "images": [
+                    {
+                        "id": "image-0",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "image-1",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "ok",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "name": "ids are trimmed",
+            "input": {
+                "images": [
+                    {
+                        "id": "  a  ",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    }
+                ]
+            },
+            "expected": {
+                "images": [
+                    {
+                        "id": "a",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "name": "non-object image entries are skipped but still count for the position",
+            "input": {
+                "images": [
+                    "x",
+                    null,
+                    5,
+                    {
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    }
+                ]
+            },
+            "expected": {
+                "images": [
+                    {
+                        "id": "image-3",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "name": "at most twenty-four images",
+            "input": {
+                "images": [
+                    {
+                        "id": "i0",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i1",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i2",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i3",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i4",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i5",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i6",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i7",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i8",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i9",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i10",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i11",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i12",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i13",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i14",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i15",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i16",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i17",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i18",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i19",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i20",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i21",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i22",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i23",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i24",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i25",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i26",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i27",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i28",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i29",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    }
+                ]
+            },
+            "expected": {
+                "images": [
+                    {
+                        "id": "i0",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i1",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i2",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i3",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i4",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i5",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i6",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i7",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i8",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i9",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i10",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i11",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i12",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i13",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i14",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i15",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i16",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i17",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i18",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i19",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i20",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i21",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i22",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i23",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "name": "a duplicate does not use a slot",
+            "input": {
+                "images": [
+                    {
+                        "id": "i0",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i1",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i2",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i3",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i4",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i5",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i6",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i7",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i8",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i9",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i10",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i11",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i12",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i13",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i14",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i15",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i16",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i17",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i18",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i19",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i20",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i21",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i22",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i0",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "last",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "over",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    }
+                ]
+            },
+            "expected": {
+                "images": [
+                    {
+                        "id": "i0",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i1",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i2",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i3",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i4",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i5",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i6",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i7",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i8",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i9",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i10",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i11",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i12",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i13",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i14",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i15",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i16",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i17",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i18",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i19",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i20",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i21",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i22",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "last",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "name": "options default is never stored",
+            "input": {
+                "images": [
+                    {
+                        "id": "a",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "b",
+                        "media": {
+                            "mediaId": "1c9a7d3f-4e4b-4b64-8d8f-9a2b3c4d5e6f"
+                        }
+                    }
+                ],
+                "options": {
+                    "columns": 3,
+                    "aspect": "1:1",
+                    "gap": "md",
+                    "captions": false,
+                    "lightbox": false
+                }
+            },
+            "expected": {
+                "images": [
+                    {
+                        "id": "a",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "b",
+                        "media": {
+                            "mediaId": "1c9a7d3f-4e4b-4b64-8d8f-9a2b3c4d5e6f"
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "name": "columns 2, 4 and 6 are stored; 3 is the default",
+            "input": {
+                "images": [
+                    {
+                        "id": "a",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "b",
+                        "media": {
+                            "mediaId": "1c9a7d3f-4e4b-4b64-8d8f-9a2b3c4d5e6f"
+                        }
+                    }
+                ],
+                "options": {
+                    "columns": 4
+                }
+            },
+            "expected": {
+                "images": [
+                    {
+                        "id": "a",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "b",
+                        "media": {
+                            "mediaId": "1c9a7d3f-4e4b-4b64-8d8f-9a2b3c4d5e6f"
+                        }
+                    }
+                ],
+                "options": {
+                    "columns": 4
+                }
+            }
+        },
+        {
+            "name": "columns 2",
+            "input": {
+                "images": [
+                    {
+                        "id": "a",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "b",
+                        "media": {
+                            "mediaId": "1c9a7d3f-4e4b-4b64-8d8f-9a2b3c4d5e6f"
+                        }
+                    }
+                ],
+                "options": {
+                    "columns": 2
+                }
+            },
+            "expected": {
+                "images": [
+                    {
+                        "id": "a",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "b",
+                        "media": {
+                            "mediaId": "1c9a7d3f-4e4b-4b64-8d8f-9a2b3c4d5e6f"
+                        }
+                    }
+                ],
+                "options": {
+                    "columns": 2
+                }
+            }
+        },
+        {
+            "name": "columns 6",
+            "input": {
+                "images": [
+                    {
+                        "id": "a",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "b",
+                        "media": {
+                            "mediaId": "1c9a7d3f-4e4b-4b64-8d8f-9a2b3c4d5e6f"
+                        }
+                    }
+                ],
+                "options": {
+                    "columns": 6
+                }
+            },
+            "expected": {
+                "images": [
+                    {
+                        "id": "a",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "b",
+                        "media": {
+                            "mediaId": "1c9a7d3f-4e4b-4b64-8d8f-9a2b3c4d5e6f"
+                        }
+                    }
+                ],
+                "options": {
+                    "columns": 6
+                }
+            }
+        },
+        {
+            "name": "columns off the list drop",
+            "input": {
+                "images": [
+                    {
+                        "id": "a",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "b",
+                        "media": {
+                            "mediaId": "1c9a7d3f-4e4b-4b64-8d8f-9a2b3c4d5e6f"
+                        }
+                    }
+                ],
+                "options": {
+                    "columns": 5
+                }
+            },
+            "expected": {
+                "images": [
+                    {
+                        "id": "a",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "b",
+                        "media": {
+                            "mediaId": "1c9a7d3f-4e4b-4b64-8d8f-9a2b3c4d5e6f"
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "name": "columns 1 and 7 drop",
+            "input": {
+                "images": [
+                    {
+                        "id": "a",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "b",
+                        "media": {
+                            "mediaId": "1c9a7d3f-4e4b-4b64-8d8f-9a2b3c4d5e6f"
+                        }
+                    }
+                ],
+                "options": {
+                    "columns": 1
+                }
+            },
+            "expected": {
+                "images": [
+                    {
+                        "id": "a",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "b",
+                        "media": {
+                            "mediaId": "1c9a7d3f-4e4b-4b64-8d8f-9a2b3c4d5e6f"
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "name": "a string columns value drops",
+            "input": {
+                "images": [
+                    {
+                        "id": "a",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "b",
+                        "media": {
+                            "mediaId": "1c9a7d3f-4e4b-4b64-8d8f-9a2b3c4d5e6f"
+                        }
+                    }
+                ],
+                "options": {
+                    "columns": "4"
+                }
+            },
+            "expected": {
+                "images": [
+                    {
+                        "id": "a",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "b",
+                        "media": {
+                            "mediaId": "1c9a7d3f-4e4b-4b64-8d8f-9a2b3c4d5e6f"
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "name": "an integral float columns value is accepted",
+            "input": {
+                "images": [
+                    {
+                        "id": "a",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "b",
+                        "media": {
+                            "mediaId": "1c9a7d3f-4e4b-4b64-8d8f-9a2b3c4d5e6f"
+                        }
+                    }
+                ],
+                "options": {
+                    "columns": 4
+                }
+            },
+            "expected": {
+                "images": [
+                    {
+                        "id": "a",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "b",
+                        "media": {
+                            "mediaId": "1c9a7d3f-4e4b-4b64-8d8f-9a2b3c4d5e6f"
+                        }
+                    }
+                ],
+                "options": {
+                    "columns": 4
+                }
+            }
+        },
+        {
+            "name": "aspect 4:3",
+            "input": {
+                "images": [
+                    {
+                        "id": "a",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "b",
+                        "media": {
+                            "mediaId": "1c9a7d3f-4e4b-4b64-8d8f-9a2b3c4d5e6f"
+                        }
+                    }
+                ],
+                "options": {
+                    "aspect": "4:3"
+                }
+            },
+            "expected": {
+                "images": [
+                    {
+                        "id": "a",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "b",
+                        "media": {
+                            "mediaId": "1c9a7d3f-4e4b-4b64-8d8f-9a2b3c4d5e6f"
+                        }
+                    }
+                ],
+                "options": {
+                    "aspect": "4:3"
+                }
+            }
+        },
+        {
+            "name": "aspect 16:9",
+            "input": {
+                "images": [
+                    {
+                        "id": "a",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "b",
+                        "media": {
+                            "mediaId": "1c9a7d3f-4e4b-4b64-8d8f-9a2b3c4d5e6f"
+                        }
+                    }
+                ],
+                "options": {
+                    "aspect": "16:9"
+                }
+            },
+            "expected": {
+                "images": [
+                    {
+                        "id": "a",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "b",
+                        "media": {
+                            "mediaId": "1c9a7d3f-4e4b-4b64-8d8f-9a2b3c4d5e6f"
+                        }
+                    }
+                ],
+                "options": {
+                    "aspect": "16:9"
+                }
+            }
+        },
+        {
+            "name": "aspect 4:5",
+            "input": {
+                "images": [
+                    {
+                        "id": "a",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "b",
+                        "media": {
+                            "mediaId": "1c9a7d3f-4e4b-4b64-8d8f-9a2b3c4d5e6f"
+                        }
+                    }
+                ],
+                "options": {
+                    "aspect": "4:5"
+                }
+            },
+            "expected": {
+                "images": [
+                    {
+                        "id": "a",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "b",
+                        "media": {
+                            "mediaId": "1c9a7d3f-4e4b-4b64-8d8f-9a2b3c4d5e6f"
+                        }
+                    }
+                ],
+                "options": {
+                    "aspect": "4:5"
+                }
+            }
+        },
+        {
+            "name": "aspect default and unknown drop",
+            "input": {
+                "images": [
+                    {
+                        "id": "a",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "b",
+                        "media": {
+                            "mediaId": "1c9a7d3f-4e4b-4b64-8d8f-9a2b3c4d5e6f"
+                        }
+                    }
+                ],
+                "options": {
+                    "aspect": "3:1"
+                }
+            },
+            "expected": {
+                "images": [
+                    {
+                        "id": "a",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "b",
+                        "media": {
+                            "mediaId": "1c9a7d3f-4e4b-4b64-8d8f-9a2b3c4d5e6f"
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "name": "aspect free-locked is not offered",
+            "input": {
+                "images": [
+                    {
+                        "id": "a",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "b",
+                        "media": {
+                            "mediaId": "1c9a7d3f-4e4b-4b64-8d8f-9a2b3c4d5e6f"
+                        }
+                    }
+                ],
+                "options": {
+                    "aspect": "free-locked"
+                }
+            },
+            "expected": {
+                "images": [
+                    {
+                        "id": "a",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "b",
+                        "media": {
+                            "mediaId": "1c9a7d3f-4e4b-4b64-8d8f-9a2b3c4d5e6f"
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "name": "gap none xs sm lg xl are stored",
+            "input": {
+                "images": [
+                    {
+                        "id": "a",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "b",
+                        "media": {
+                            "mediaId": "1c9a7d3f-4e4b-4b64-8d8f-9a2b3c4d5e6f"
+                        }
+                    }
+                ],
+                "options": {
+                    "gap": "none"
+                }
+            },
+            "expected": {
+                "images": [
+                    {
+                        "id": "a",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "b",
+                        "media": {
+                            "mediaId": "1c9a7d3f-4e4b-4b64-8d8f-9a2b3c4d5e6f"
+                        }
+                    }
+                ],
+                "options": {
+                    "gap": "none"
+                }
+            }
+        },
+        {
+            "name": "gap xl",
+            "input": {
+                "images": [
+                    {
+                        "id": "a",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "b",
+                        "media": {
+                            "mediaId": "1c9a7d3f-4e4b-4b64-8d8f-9a2b3c4d5e6f"
+                        }
+                    }
+                ],
+                "options": {
+                    "gap": "xl"
+                }
+            },
+            "expected": {
+                "images": [
+                    {
+                        "id": "a",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "b",
+                        "media": {
+                            "mediaId": "1c9a7d3f-4e4b-4b64-8d8f-9a2b3c4d5e6f"
+                        }
+                    }
+                ],
+                "options": {
+                    "gap": "xl"
+                }
+            }
+        },
+        {
+            "name": "gap default and unknown drop",
+            "input": {
+                "images": [
+                    {
+                        "id": "a",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "b",
+                        "media": {
+                            "mediaId": "1c9a7d3f-4e4b-4b64-8d8f-9a2b3c4d5e6f"
+                        }
+                    }
+                ],
+                "options": {
+                    "gap": "huge"
+                }
+            },
+            "expected": {
+                "images": [
+                    {
+                        "id": "a",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "b",
+                        "media": {
+                            "mediaId": "1c9a7d3f-4e4b-4b64-8d8f-9a2b3c4d5e6f"
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "name": "captions must be exactly true",
+            "input": {
+                "images": [
+                    {
+                        "id": "a",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "b",
+                        "media": {
+                            "mediaId": "1c9a7d3f-4e4b-4b64-8d8f-9a2b3c4d5e6f"
+                        }
+                    }
+                ],
+                "options": {
+                    "captions": 1
+                }
+            },
+            "expected": {
+                "images": [
+                    {
+                        "id": "a",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "b",
+                        "media": {
+                            "mediaId": "1c9a7d3f-4e4b-4b64-8d8f-9a2b3c4d5e6f"
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "name": "captions true",
+            "input": {
+                "images": [
+                    {
+                        "id": "a",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "b",
+                        "media": {
+                            "mediaId": "1c9a7d3f-4e4b-4b64-8d8f-9a2b3c4d5e6f"
+                        }
+                    }
+                ],
+                "options": {
+                    "captions": true
+                }
+            },
+            "expected": {
+                "images": [
+                    {
+                        "id": "a",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "b",
+                        "media": {
+                            "mediaId": "1c9a7d3f-4e4b-4b64-8d8f-9a2b3c4d5e6f"
+                        }
+                    }
+                ],
+                "options": {
+                    "captions": true
+                }
+            }
+        },
+        {
+            "name": "lightbox true",
+            "input": {
+                "images": [
+                    {
+                        "id": "a",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "b",
+                        "media": {
+                            "mediaId": "1c9a7d3f-4e4b-4b64-8d8f-9a2b3c4d5e6f"
+                        }
+                    }
+                ],
+                "options": {
+                    "lightbox": true
+                }
+            },
+            "expected": {
+                "images": [
+                    {
+                        "id": "a",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "b",
+                        "media": {
+                            "mediaId": "1c9a7d3f-4e4b-4b64-8d8f-9a2b3c4d5e6f"
+                        }
+                    }
+                ],
+                "options": {
+                    "lightbox": true
+                }
+            }
+        },
+        {
+            "name": "lightbox must be exactly true",
+            "input": {
+                "images": [
+                    {
+                        "id": "a",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "b",
+                        "media": {
+                            "mediaId": "1c9a7d3f-4e4b-4b64-8d8f-9a2b3c4d5e6f"
+                        }
+                    }
+                ],
+                "options": {
+                    "lightbox": "yes"
+                }
+            },
+            "expected": {
+                "images": [
+                    {
+                        "id": "a",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "b",
+                        "media": {
+                            "mediaId": "1c9a7d3f-4e4b-4b64-8d8f-9a2b3c4d5e6f"
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "name": "options canonical order",
+            "input": {
+                "images": [
+                    {
+                        "id": "a",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "b",
+                        "media": {
+                            "mediaId": "1c9a7d3f-4e4b-4b64-8d8f-9a2b3c4d5e6f"
+                        }
+                    }
+                ],
+                "options": {
+                    "lightbox": true,
+                    "captions": true,
+                    "gap": "lg",
+                    "aspect": "4:3",
+                    "columns": 6
+                }
+            },
+            "expected": {
+                "images": [
+                    {
+                        "id": "a",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "b",
+                        "media": {
+                            "mediaId": "1c9a7d3f-4e4b-4b64-8d8f-9a2b3c4d5e6f"
+                        }
+                    }
+                ],
+                "options": {
+                    "columns": 6,
+                    "aspect": "4:3",
+                    "gap": "lg",
+                    "captions": true,
+                    "lightbox": true
+                }
+            }
+        },
+        {
+            "name": "options that is a list is ignored",
+            "input": {
+                "images": [
+                    {
+                        "id": "a",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "b",
+                        "media": {
+                            "mediaId": "1c9a7d3f-4e4b-4b64-8d8f-9a2b3c4d5e6f"
+                        }
+                    }
+                ],
+                "options": [
+                    4
+                ]
+            },
+            "expected": {
+                "images": [
+                    {
+                        "id": "a",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "b",
+                        "media": {
+                            "mediaId": "1c9a7d3f-4e4b-4b64-8d8f-9a2b3c4d5e6f"
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "name": "options with no images are not stored",
+            "input": {
+                "options": {
+                    "columns": 4
+                }
+            },
+            "expected": null
+        },
+        {
+            "name": "unknown top-level keys drop",
+            "input": {
+                "images": [
+                    {
+                        "id": "a",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "b",
+                        "media": {
+                            "mediaId": "1c9a7d3f-4e4b-4b64-8d8f-9a2b3c4d5e6f"
+                        }
+                    }
+                ],
+                "layout": "carousel",
+                "columns": 4,
+                "slides": [
+                    1
+                ],
+                "behaviour": {
+                    "autoplay": true
+                }
+            },
+            "expected": {
+                "images": [
+                    {
+                        "id": "a",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "b",
+                        "media": {
+                            "mediaId": "1c9a7d3f-4e4b-4b64-8d8f-9a2b3c4d5e6f"
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "name": "caption off keeps the caption",
+            "input": {
+                "images": [
+                    {
+                        "id": "a",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        },
+                        "caption": "Kept"
+                    }
+                ],
+                "options": {
+                    "captions": false
+                }
+            },
+            "expected": {
+                "images": [
+                    {
+                        "id": "a",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        },
+                        "caption": "Kept"
+                    }
+                ]
+            }
+        }
+    ],
+    "publish": [
+        {
+            "name": "no images at all",
+            "content": {
+                "images": []
+            },
+            "expected": [
+                {
+                    "path": "images",
+                    "code": "gallery_images_min"
+                }
+            ]
+        },
+        {
+            "name": "one image is not a gallery",
+            "content": {
+                "images": [
+                    {
+                        "id": "a",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    }
+                ]
+            },
+            "expected": [
+                {
+                    "path": "images",
+                    "code": "gallery_images_min"
+                }
+            ]
+        },
+        {
+            "name": "two images publish",
+            "content": {
+                "images": [
+                    {
+                        "id": "a",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "b",
+                        "media": {
+                            "mediaId": "1c9a7d3f-4e4b-4b64-8d8f-9a2b3c4d5e6f"
+                        }
+                    }
+                ]
+            },
+            "expected": []
+        },
+        {
+            "name": "twenty-four images publish",
+            "content": {
+                "images": [
+                    {
+                        "id": "i0",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i1",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i2",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i3",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i4",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i5",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i6",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i7",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i8",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i9",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i10",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i11",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i12",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i13",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i14",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i15",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i16",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i17",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i18",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i19",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i20",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i21",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i22",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    },
+                    {
+                        "id": "i23",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        }
+                    }
+                ]
+            },
+            "expected": []
+        },
+        {
+            "name": "captions and links never block",
+            "content": {
+                "images": [
+                    {
+                        "id": "a",
+                        "media": {
+                            "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                        },
+                        "caption": "x",
+                        "link": "/p"
+                    },
+                    {
+                        "id": "b",
+                        "media": {
+                            "mediaId": "1c9a7d3f-4e4b-4b64-8d8f-9a2b3c4d5e6f"
+                        }
+                    }
+                ],
+                "options": {
+                    "captions": true,
+                    "lightbox": true
+                }
+            },
+            "expected": []
+        },
+        {
+            "name": "an absent content is a gallery with no images",
+            "content": null,
+            "expected": [
+                {
+                    "path": "images",
+                    "code": "gallery_images_min"
+                }
+            ]
+        }
+    ]
+}
