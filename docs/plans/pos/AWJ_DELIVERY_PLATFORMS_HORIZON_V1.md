@@ -156,15 +156,13 @@ that report exists. No adapter, credential, webhook, or financial task is
 authorized by this horizon update.
 
 `DLV-CHANNEL-REPORT-1` is merged at `896516f1d954184b619603d3150d23794ad01e69`.
-The read-only `DLV-CHANNEL-REPORT-API-1` slice implements
-`GET /api/reports/delivery-channel` from that design: metrics 1–9, platform
-comparison, drill-down, and the two exception counts. It does not join Hub,
-does not export CSV, and does not change posting or VAT. Spreadsheet-formula
-neutralization stays a `DLV-CHANNEL-REPORT-UI-1` requirement and is not
-claimed by the API. Hub operational count remains
-`DLV-CHANNEL-REPORT-HUB-COUNT-1`. Combined net, commissions, settlements,
-imported posting, and native connectors stay blocked. UI-1 is the next
-candidate only after this API slice merges.
+`DLV-CHANNEL-REPORT-API-1` is merged at `82616b0b8ee217603339c7993b4aa4c296a49070`.
+`DLV-CHANNEL-REPORT-UI-1` reads that API only: metrics 1–9, comparison by
+`delivery_platform_profile_id`, drill-down, and a scoped CSV that neutralizes
+formula-leading text before the shared delimiter escape. It does not change
+`toCsv`, stored references, posting, or VAT. It does not count Hub orders.
+Hub operational count remains `DLV-CHANNEL-REPORT-HUB-COUNT-1`. Combined net,
+commissions, settlements, imported posting, and native connectors stay blocked.
 
 ## 6. Task acceptance highlights
 

@@ -5520,6 +5520,10 @@
           "title": "تقرير جلسة نقطة البيع",
           "description": "ملخص المبيعات النقدية والمتوقعة لجلسة البيع الحالية."
         },
+        "deliveryChannel": {
+          "title": "مبيعات منصات التوصيل",
+          "description": "فواتير نقاط البيع المرحّلة المرتبطة بقناة توصيل. طلبات Hub ليست فواتير، وإشعارات الدائن لا تُطرح من الصافي."
+        },
         "salesByPeriod": {
           "title": "المبيعات حسب المدة الزمنية",
           "description": "فواتير المبيعات اليومية والأسبوعية والشهرية."
@@ -5680,6 +5684,107 @@
           "title": "معدل دوران المخزون",
           "description": "قياس سرعة دوران الأصناف خلال الفترة."
         }
+      }
+    },
+    "deliveryChannel": {
+      "title": "مبيعات منصات التوصيل",
+      "description": "ملخص مالي لفواتير نقاط البيع المرحّلة ذات سياق توصيل فقط.",
+      "caption": "الفواتير المرحّلة من نقطة البيع والمرتبطة بقناة توصيل فقط. مبيعات الصندوق العادية غير داخلة. طلبات Hub ليست فواتير مرحّلة ولا تُحسب هنا.",
+      "back": "العودة إلى تقارير المبيعات",
+      "platform": "منصة التوصيل",
+      "allPlatforms": "كل المنصات",
+      "exportCsv": "تصدير CSV",
+      "forbidden": "لا تملك صلاحية عرض التقارير.",
+      "forbiddenHint": "هذا التقرير يتطلب reports.view. لم يُطلب أي رقم.",
+      "loadFailed": "تعذر تحميل التقرير. تحقق من الاتصال ثم أعد المحاولة.",
+      "incomplete": "استجابة التقرير ناقصة أو غير مطابقة للعقد. لم تُعرض أرقام بديلة.",
+      "retry": "إعادة المحاولة",
+      "empty": "لا توجد فواتير توصيل مرحّلة أو مرتجعات أو إشعارات ضمن النطاق.",
+      "emptyCreditNotes": "لا توجد إشعارات دائن ضمن النطاق.",
+      "creditNotesTitle": "إشعارات الدائن",
+      "separateFromNet": "لا تُطرح من الصافي",
+      "creditNotesHint": "تُعرض إشعارات الدائن وحدها حسب تاريخ الإشعار. لا تُطرح مرة أخرى من صافي المبيعات بعد مرتجعات نقطة البيع.",
+      "comparisonTitle": "المقارنة بين المنصات",
+      "invoicesTitle": "فواتير التوصيل",
+      "returnsTitle": "مرتجعات نقطة البيع",
+      "collectionCaption": "تقسيم الإجمالي شامل الضريبة، وليس إضافة عليه: تحصيل المنصة {platform} · تحصيل التاجر {merchant} · غير مصنّف {unclassified}.",
+      "exceptions": "استثناءات بلا مبلغ: اختلاف فرع السياق {context} · اختلاف عميل إشعار الدائن {partner}.",
+      "collectionModes": {
+        "platform_collected": "تحصيل المنصة",
+        "merchant_collected": "تحصيل التاجر"
+      },
+      "metrics": {
+        "gross_sales": "المبيعات قبل الخصم",
+        "discounts": "الخصومات",
+        "net_sales": "صافي المبيعات قبل الضريبة",
+        "vat": "ضريبة القيمة المضافة",
+        "total": "إجمالي المبيعات شامل الضريبة",
+        "invoice_count": "عدد الفواتير المرحّلة",
+        "returns_count": "عدد مرتجعات نقطة البيع",
+        "returns_subtotal": "مرتجعات نقطة البيع قبل الضريبة",
+        "returns_vat": "ضريبة مرتجعات نقطة البيع",
+        "returns_total": "مرتجعات نقطة البيع شامل الضريبة",
+        "net_after_pos_returns": "الصافي بعد مرتجعات نقطة البيع",
+        "shipping": "الشحن",
+        "adjustment": "التسوية",
+        "credit_note_count": "عدد إشعارات الدائن",
+        "credit_note_total": "قيمة إشعارات الدائن",
+        "platform_collected": "تحصيل المنصة",
+        "merchant_collected": "تحصيل التاجر",
+        "unclassified": "غير مصنّف",
+        "context_mismatch": "اختلاف فرع السياق",
+        "partner_mismatch": "اختلاف عميل الإشعار"
+      },
+      "columns": {
+        "platformKey": "المنصة",
+        "number": "الرقم",
+        "date": "تاريخ الفاتورة",
+        "returnDate": "تاريخ المرتجع",
+        "noteDate": "تاريخ الإشعار",
+        "branch": "الفرع",
+        "displayName": "الاسم المثبّت",
+        "collectionMode": "طريقة التحصيل",
+        "externalReference": "مرجع الطلب الخارجي",
+        "sourceInvoice": "فاتورة المصدر",
+        "session": "جلسة نقطة البيع"
+      },
+      "csv": {
+        "section": "القسم",
+        "name": "البند",
+        "count": "العدد",
+        "amount": "المبلغ",
+        "profile_id": "معرّف المنصة",
+        "platform_key": "مفتاح المنصة",
+        "number": "الرقم",
+        "date": "التاريخ",
+        "branch_name": "الفرع",
+        "display_name": "الاسم المثبّت",
+        "display_name_en": "الاسم المثبّت بالإنجليزية",
+        "collection_mode": "طريقة التحصيل",
+        "external_order_reference": "مرجع الطلب الخارجي",
+        "source_invoice_number": "رقم فاتورة المصدر",
+        "subtotal": "المجموع قبل الضريبة",
+        "gross_sales": "المبيعات قبل الخصم",
+        "discounts": "الخصومات",
+        "shipping": "الشحن",
+        "adjustment": "التسوية",
+        "net_sales": "صافي المبيعات قبل الضريبة",
+        "vat": "ضريبة القيمة المضافة",
+        "total": "الإجمالي شامل الضريبة",
+        "returns_total": "مرتجعات نقطة البيع",
+        "net_after_pos_returns": "الصافي بعد مرتجعات نقطة البيع",
+        "pos_session_id": "جلسة نقطة البيع"
+      },
+      "csvSections": {
+        "summary": "الملخص",
+        "creditNotes": "إشعارات الدائن",
+        "creditNotesNotSubtracted": "إشعارات الدائن — لا تُطرح من الصافي بعد المرتجعات",
+        "collection": "تقسيم التحصيل",
+        "exceptions": "استثناءات",
+        "platform": "منصة",
+        "invoice": "فاتورة",
+        "returnDocument": "مرتجع",
+        "creditNote": "إشعار دائن"
       }
     },
     "sales": {

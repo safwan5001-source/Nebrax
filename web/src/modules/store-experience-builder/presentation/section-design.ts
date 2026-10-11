@@ -73,9 +73,16 @@ export const REVEALS = ["none", "fade-up"] as const;
 export const LAYOUTS = {
   hero: ["centered", "split", "minimal"],
   banner: ["split", "text-band"],
+  // CUST-HV V8d (V0 §3.4, D-24) — the gallery is a grid by default (absence); only `carousel` is stored.
+  gallery: ["carousel"],
+  // CUST-HV V9b (V0 §3.4) — benefits: cards in automatic columns is the default (absence); `flat` drops the card frame,
+  // `columns-N` fixes the wide-screen column count (phones are always one column, tablets two).
+  benefits: ["flat", "columns-2", "columns-3", "columns-4"],
 } as const;
 export type HeroLayout = (typeof LAYOUTS.hero)[number];
 export type BannerLayout = (typeof LAYOUTS.banner)[number];
+export type GalleryLayout = (typeof LAYOUTS.gallery)[number];
+export type BenefitsLayout = (typeof LAYOUTS.benefits)[number];
 
 /** V6c-4 (V0 §6.5, D-13) — hero overlap presets; `none` is the absence of the field and is never stored. */
 export const OVERLAPS = ["none", "sm", "md"] as const;
@@ -164,7 +171,7 @@ export interface SectionDesign {
   /** V6c-3 — the block-axis half of the 3×3 content position (`align` is the inline half). */
   valign?: Align;
   /** V6c-7 — hero: `centered` | `split` | `minimal`; banner: `split` | `text-band`. Absent = the default layout. */
-  layout?: HeroLayout | BannerLayout;
+  layout?: HeroLayout | BannerLayout | GalleryLayout | BenefitsLayout;
   border?: SectionBorder;
   radius?: (typeof RADII)[number];
   shadow?: (typeof SHADOWS)[number];
@@ -251,6 +258,18 @@ export const SECTION_DESIGN_CAPABILITIES: Record<string, DesignCapability> = {
     separator: true,
     mediaTreatment: ["height"],
   },
+  // CUST-HV V8d (V0 §3.4) — twin of PHP: no `text` (the caption sits on the section surface in the proven automatic colour)
+  // and no `mediaTreatment` (the aspect is `content.options.aspect`); the layout is `grid` (absence) or `carousel`.
+  gallery: {
+    background: BACKGROUND_KINDS,
+    width: true,
+    spacing: true,
+    layout: LAYOUTS.gallery,
+    border: true,
+    radius: true,
+    shadow: true,
+    separator: true,
+  },
   newArrivals: {
     background: BACKGROUND_KINDS,
     text: ["heading"],
@@ -295,6 +314,7 @@ export const SECTION_DESIGN_CAPABILITIES: Record<string, DesignCapability> = {
     typography: FULL_TYPO,
     spacing: true,
     align: true,
+    layout: LAYOUTS.benefits,
     border: true,
     radius: true,
     shadow: true,
@@ -576,7 +596,12 @@ export function normalizeSectionDesign(
   }
   if (Array.isArray(capability.layout)) {
     const layout = pick(raw.layout, capability.layout as readonly string[]);
-    if (layout) out.layout = layout as HeroLayout | BannerLayout;
+    if (layout)
+      out.layout = layout as
+        | HeroLayout
+        | BannerLayout
+        | GalleryLayout
+        | BenefitsLayout;
   }
   if (capability.border) {
     const border = normalizeBorder(raw.border);

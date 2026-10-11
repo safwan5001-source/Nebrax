@@ -1,4 +1,9 @@
 import { normalizeWindowEdges } from "./announcements";
+import {
+  type GalleryContent,
+  normalizeGalleryContent,
+} from "./gallery-content";
+import { type IconKey, normalizeIconKey } from "./icon-registry";
 import { normalizeSliderContent, type SliderContent } from "./slider-content";
 import { sanitizeExternalUrl } from "./urls";
 
@@ -52,6 +57,8 @@ export interface BenefitItem {
   id: string;
   title: string;
   body: string;
+  /** CUST-HV V9b — optional glyph from the curated registry; absence = no icon (never stored as empty). */
+  icon?: IconKey;
 }
 
 export interface BenefitsContent {
@@ -180,7 +187,8 @@ export type SectionContent =
   | ProductShelfContent
   | DiscoveryContent
   | DeliveryPromiseContent
-  | SliderContent;
+  | SliderContent
+  | GalleryContent;
 
 /** The hero instance's own content, or `undefined` while it still reads the legacy globals. */
 export function heroContentOf(section: {
@@ -294,6 +302,18 @@ export function discoveryContentOf(section: {
     : { title: "", axis: "facet", dimension: "", display: "tiles" };
 }
 
+/** CUST-HV V8d — the gallery instance's images and options (an empty image list while none is authored). */
+export function galleryContentOf(section: {
+  type: string;
+  content?: SectionContent;
+}): GalleryContent {
+  return section.type === "gallery" &&
+    section.content &&
+    "images" in section.content
+    ? section.content
+    : { images: [] };
+}
+
 /** CUST-HV V8a — the slider instance's slides and behaviour (an empty slide list while none is authored). */
 export function sliderContentOf(section: {
   type: string;
@@ -360,6 +380,9 @@ export function normalizeOptionalSectionContent(
   }
   if (type === "slider") {
     return normalizeSliderContent(raw, sanitizeContentHref);
+  }
+  if (type === "gallery") {
+    return normalizeGalleryContent(raw, sanitizeContentHref);
   }
   return undefined;
 }
@@ -496,7 +519,8 @@ function normalizeBenefits(source: Record<string, unknown>): BenefitsContent {
     const body = asString(row.body).trim().slice(0, 200);
     const id = safeToken(row.id, `benefit-${index}`);
     if (!id || items.some((existing) => existing.id === id)) return;
-    items.push({ id, title, body });
+    const icon = normalizeIconKey(row.icon);
+    items.push(icon ? { id, title, body, icon } : { id, title, body });
   });
   return { items: items.slice(0, MAX_BENEFIT_ITEMS) };
 }

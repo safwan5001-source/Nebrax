@@ -55,6 +55,7 @@ export function CanvasSlider({
   viewport,
   labels,
   activeSlideId,
+  onActiveSlideChange,
 }: {
   slides: SliderSlide[];
   behaviour: Parameters<typeof resolveSliderBehaviour>[0];
@@ -63,6 +64,8 @@ export function CanvasSlider({
   labels: CanvasSliderLabels;
   /** The slide the editor has selected; the preview shows it. Absent ⇒ the first. */
   activeSlideId?: string | null;
+  /** Browsing in the Canvas selects the slide in the editor panel too. */
+  onActiveSlideChange?: (slideId: string) => void;
 }) {
   const behaviour = resolveSliderBehaviour(rawBehaviour);
   const [browsed, setBrowsed] = useState(0);
@@ -78,7 +81,11 @@ export function CanvasSlider({
     );
   }
 
-  const go = (to: number) => setBrowsed(Math.max(0, Math.min(total - 1, to)));
+  const go = (to: number) => {
+    const next = Math.max(0, Math.min(total - 1, to));
+    setBrowsed(next);
+    onActiveSlideChange?.(slides[next].id);
+  };
   const canPrev = behaviour.loop || active > 0;
   const canNext = behaviour.loop || active < total - 1;
 

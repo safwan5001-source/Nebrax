@@ -44,6 +44,7 @@ export type ProductPageRegionKey = (typeof PRODUCT_PAGE_REGION_KEYS)[number];
  */
 export const CATEGORY_PAGE_REGION_KEYS = [
   "breadcrumbs",
+  "cover",
   "identity_title",
   "description",
   "subcategories_rail",
@@ -51,6 +52,15 @@ export const CATEGORY_PAGE_REGION_KEYS = [
   "product_grid",
 ] as const;
 export type CategoryPageRegionKey = (typeof CATEGORY_PAGE_REGION_KEYS)[number];
+
+/**
+ * CUST-HV V9a (V0 §14.2, DEF-3b) — optional regions that start HIDDEN. The `cover` band (the category's own picture) is new: showing
+ * it by default would change every existing store's category pages the moment this ships, so it is an opt-in. A stored document that
+ * predates it simply has no `cover` entry (nothing changes); a document that was never customised falls back to the canonical list
+ * with these regions hidden.
+ */
+export const CATEGORY_REGIONS_DEFAULT_HIDDEN: readonly CategoryPageRegionKey[] =
+  ["cover"];
 
 /**
  * FIXED_REQUIRED regions are forced back to `visible: true` at
@@ -123,7 +133,7 @@ export function defaultCategoryPageRegions(): PageRegionInstance<CategoryPageReg
   return CATEGORY_PAGE_REGION_KEYS.map((key) => ({
     id: key,
     key,
-    visible: true,
+    visible: !CATEGORY_REGIONS_DEFAULT_HIDDEN.includes(key),
   }));
 }
 

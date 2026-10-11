@@ -3,10 +3,13 @@ import { DEFAULT_PRESENTATION_CONFIG, normalizePresentationConfig } from "../pre
 import { PRESENTATION_CONFIG_VERSION } from "../presentation/tokens";
 import {
   CATEGORY_PAGE_REGION_KEYS,
+  CATEGORY_REGIONS_DEFAULT_HIDDEN,
   FIXED_REQUIRED_CATEGORY_REGION_KEYS,
   FIXED_REQUIRED_PRODUCT_REGION_KEYS,
   PAGE_TYPES,
   PRODUCT_PAGE_REGION_KEYS,
+  completeCategoryRegions,
+  defaultCategoryPageRegions,
   normalizePagePresentation,
 } from "../presentation/page-regions";
 import {
@@ -198,5 +201,37 @@ describe("CUST-H2-1 page presentation schema", () => {
     });
     const twice = normalizePresentationConfig(JSON.parse(JSON.stringify(once)));
     expect(twice.pagePresentation).toEqual(once.pagePresentation);
+  });
+});
+
+describe("CUST-HV V9a — category cover region", () => {
+  it("is an optional region placed right after the breadcrumbs, hidden by default", () => {
+    expect(CATEGORY_PAGE_REGION_KEYS.slice(0, 3)).toEqual(["breadcrumbs", "cover", "identity_title"]);
+    expect(FIXED_REQUIRED_CATEGORY_REGION_KEYS).not.toContain("cover");
+    expect(CATEGORY_REGIONS_DEFAULT_HIDDEN).toEqual(["cover"]);
+    const regions = defaultCategoryPageRegions();
+    expect(regions.find((r) => r.key === "cover")?.visible).toBe(false);
+    expect(regions.filter((r) => r.key !== "cover").every((r) => r.visible)).toBe(true);
+  });
+
+  it("keeps an authored visibility through normalisation", () => {
+    for (const visible of [true, false]) {
+      const out = normalizePagePresentation({
+        category: { regions: [{ key: "cover", visible }] },
+      });
+      expect(out?.category?.regions.find((r) => r.key === "cover")?.visible).toBe(visible);
+    }
+  });
+
+  it("completes a document stored before the cover existed — hidden, at its canonical position", () => {
+    const stored = defaultCategoryPageRegions().filter((r) => r.key !== "cover");
+    const completed = completeCategoryRegions(stored);
+    expect(completed.map((r) => r.key)).toEqual([...CATEGORY_PAGE_REGION_KEYS]);
+    expect(completed[1]).toMatchObject({ key: "cover", visible: false });
+  });
+
+  it("never touches a document that already has the cover", () => {
+    const stored = defaultCategoryPageRegions().map((r) => (r.key === "cover" ? { ...r, visible: true } : r));
+    expect(completeCategoryRegions(stored)).toEqual(stored);
   });
 });

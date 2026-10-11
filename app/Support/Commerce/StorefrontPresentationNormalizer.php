@@ -138,12 +138,13 @@ final class StorefrontPresentationNormalizer
     ];
 
     /**
-     * CUST-HV V8 — أقسام الوسائط (V0 §13): `slider` الآن (و`gallery` في شريحةٍ لاحقة). مقبولة للتخزين (المحتوى مُطبَّع
+     * CUST-HV V8 — أقسام الوسائط (V0 §13): `slider` (V8a) و`gallery` (V8d). مقبولة للتخزين (المحتوى مُطبَّع
      * fail-closed) لكنها خارج القائمة الافتراضية للوثيقة كأقسام البيانات، فلا تتغيّر الوثيقة الافتراضية ولا توأماها.
      * مجموعةٌ منفصلة عن `HOME_DATA_SECTION_KEYS` عمداً: تلك تُحصى في إعداد القطاع كـ«أقسام بيانات».
      */
     public const HOME_MEDIA_SECTION_KEYS = [
         'slider',
+        'gallery',
     ];
 
     public const IMPLEMENTED_HOME_SECTION_KEYS = [
@@ -237,6 +238,8 @@ final class StorefrontPresentationNormalizer
      */
     public const CATEGORY_PAGE_REGION_KEYS = [
         'breadcrumbs',
+        // CUST-HV V9a (V0 §14.2، DEF-3b) — غلاف التصنيف الاختياري: صورة التصنيف نفسها حين توجد. يبدأ مخفياً (اختيار صريح).
+        'cover',
         'identity_title',
         'description',
         'subcategories_rail',
@@ -851,6 +854,10 @@ final class StorefrontPresentationNormalizer
             return StorefrontSliderNormalizer::normalize($raw, fn (string $href): string => $this->sanitizeContentHref($href));
         }
 
+        if ($type === 'gallery') {
+            return StorefrontGalleryNormalizer::normalize($raw, fn (string $href): string => $this->sanitizeContentHref($href));
+        }
+
         if ($type === 'benefits') {
             $items = [];
             $seen = [];
@@ -865,7 +872,13 @@ final class StorefrontPresentationNormalizer
                     continue;
                 }
                 $seen[$id] = true;
-                $items[] = ['id' => $id, 'title' => $title, 'body' => $body];
+                $entry = ['id' => $id, 'title' => $title, 'body' => $body];
+                // CUST-HV V9b (V0 §11.4) — أيقونة اختيارية من السجلّ المنتقى؛ المفتاح المجهول يُسقط (لا أيقونة) ولا يُخزَّن غيابٌ.
+                $icon = $item['icon'] ?? null;
+                if (is_string($icon) && in_array($icon, IconRegistry::KEYS, true)) {
+                    $entry['icon'] = $icon;
+                }
+                $items[] = $entry;
                 if (count($items) >= self::MAX_BENEFIT_ITEMS) {
                     break;
                 }

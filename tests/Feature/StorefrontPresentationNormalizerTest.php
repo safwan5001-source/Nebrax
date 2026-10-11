@@ -167,6 +167,36 @@ class StorefrontPresentationNormalizerTest extends TestCase
     }
 
     /** @test */
+    public function benefits_item_icon_is_a_registry_key_or_absent(): void
+    {
+        $normalized = $this->normalizer->normalize([
+            'version' => 2,
+            'homepage' => [
+                'sections' => [[
+                    'id' => 'benefits', 'type' => 'benefits', 'visible' => true,
+                    'content' => ['items' => [
+                        ['id' => 'a', 'title' => 'Fast', 'body' => '', 'icon' => 'truck'],
+                        ['id' => 'b', 'title' => 'Safe', 'body' => ''],
+                        ['id' => 'c', 'title' => 'x', 'body' => '', 'icon' => 'rocket'],
+                        ['id' => 'd', 'title' => 'x', 'body' => '', 'icon' => 'Truck'],
+                        ['id' => 'e', 'title' => 'x', 'body' => '', 'icon' => ['truck']],
+                        ['id' => 'f', 'title' => 'x', 'body' => '', 'icon' => ''],
+                    ]],
+                ]],
+            ],
+        ]);
+
+        $this->assertSame([
+            ['id' => 'a', 'title' => 'Fast', 'body' => '', 'icon' => 'truck'],
+            ['id' => 'b', 'title' => 'Safe', 'body' => ''],
+            ['id' => 'c', 'title' => 'x', 'body' => ''],
+            ['id' => 'd', 'title' => 'x', 'body' => ''],
+            ['id' => 'e', 'title' => 'x', 'body' => ''],
+            ['id' => 'f', 'title' => 'x', 'body' => ''],
+        ], $normalized['homepage']['sections'][0]['content']['items']);
+    }
+
+    /** @test */
     public function v2_absence_means_delete_and_never_resurrects_defaults(): void
     {
         $normalized = $this->normalizer->normalize([
@@ -709,6 +739,29 @@ class StorefrontPresentationNormalizerTest extends TestCase
         }
         foreach ($normalized['pagePresentation']['category']['regions'] as $region) {
             $this->assertTrue($region['visible'], $region['key']);
+        }
+    }
+
+    /** @test */
+    public function category_cover_is_an_optional_region_that_keeps_its_authored_visibility(): void
+    {
+        $this->assertContains('cover', StorefrontPresentationNormalizer::CATEGORY_PAGE_REGION_KEYS);
+        $this->assertNotContains('cover', StorefrontPresentationNormalizer::FIXED_REQUIRED_CATEGORY_REGION_KEYS);
+
+        foreach ([true, false] as $visible) {
+            $normalized = $this->normalizer->normalize([
+                'pagePresentation' => [
+                    'category' => [
+                        'regions' => [
+                            ['key' => 'breadcrumbs', 'visible' => true],
+                            ['key' => 'cover', 'visible' => $visible],
+                        ],
+                    ],
+                ],
+            ]);
+
+            $regions = collect($normalized['pagePresentation']['category']['regions'])->keyBy('key');
+            $this->assertSame($visible, $regions['cover']['visible']);
         }
     }
 

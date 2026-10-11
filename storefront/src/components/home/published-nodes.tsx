@@ -6,6 +6,7 @@ import { CustomContentBand } from "@/components/home/CustomContentBand";
 import { DeliveryPromiseBand } from "@/components/home/DeliveryPromiseBand";
 import { DiscoverySection } from "@/components/home/DiscoverySection";
 import { FeaturedShelf } from "@/components/home/FeaturedShelf";
+import { type GalleryLabels, HomeGallery } from "@/components/home/HomeGallery";
 import { HomeSlider, type SliderLabels } from "@/components/home/HomeSlider";
 import { OffersShelf } from "@/components/home/OffersShelf";
 import { ProductShelfSection } from "@/components/home/ProductShelfSection";
@@ -19,6 +20,7 @@ import {
   sectionBackdrop,
 } from "@/lib/presentation/background-media";
 import type { PresentationHomeSection } from "@/lib/presentation/config";
+import { resolveGallery } from "@/lib/presentation/gallery-resolve";
 import {
   type HeaderOverlay,
   overlayMarker,
@@ -35,6 +37,7 @@ import {
   offersContentOf,
   productShelfContentOf,
 } from "@/lib/presentation/section-content";
+import type { BenefitsLayout } from "@/lib/presentation/section-design";
 import {
   type DesignContext,
   resolveSectionDesign,
@@ -107,6 +110,8 @@ export async function publishedNodes(
      * (the section is omitted), never drawn without its names.
      */
     sliderLabels?: SliderLabels;
+    /** CUST-HV V8e — the gallery's accessible names (already translated); absent ⇒ a published gallery is omitted. */
+    galleryLabels?: GalleryLabels;
     benefitsTitle: string;
     featuredTitle: string;
     offersTitle: string;
@@ -297,6 +302,26 @@ async function pushSectionNode(
     );
     return;
   }
+  if (section.type === "gallery") {
+    // CUST-HV V8e (V0 §13.2) — a gallery with no resolvable image is omitted outright (no empty band). Its first row
+    // loads eagerly only when the gallery opens the page (it is then the likely LCP element).
+    const view = ctx.galleryLabels
+      ? resolveGallery(section, index, ctx.media ?? {}, ctx.locale)
+      : null;
+    if (!view || !ctx.galleryLabels) return;
+    nodes.push(
+      <HomeGallery
+        key={section.id}
+        view={view}
+        labels={ctx.galleryLabels}
+        basePath={ctx.basePath}
+        dir={ctx.design.dir}
+        priority={nodes.length === 0}
+        sectionId={section.id}
+      />,
+    );
+    return;
+  }
   if (section.type === "benefits") {
     const content = benefitsContentOf(section);
     if (!content.items.some((item) => item.title || item.body)) return;
@@ -309,6 +334,9 @@ async function pushSectionNode(
         designed={
           resolveSectionDesign(section.type, section.design, ctx.design) !==
           null
+        }
+        layout={
+          (section.design?.layout as BenefitsLayout | undefined) ?? undefined
         }
       />,
     );
