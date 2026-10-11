@@ -224,6 +224,26 @@ function normalizeMenu(
 }
 
 /** The valid navigation document, or `undefined` when there is no menu (the key is then absent). */
+/**
+ * A flat list of typed links with no children and no header presentation — a footer group's `links` (V0 §10.3): the
+ * same item model and normaliser as a menu, capped at `max`, ids unique within the list. Twin of PHP
+ * `StorefrontNavigationNormalizer::normalizeFlatItems`.
+ */
+export function normalizeNavFlatItems(raw: unknown, max: number): NavItem[] {
+  if (!Array.isArray(raw)) return [];
+  const seen = new Set<string>();
+  const out: NavItem[] = [];
+  for (const [index, entry] of raw.entries()) {
+    const item = normalizeItem(entry, index, MAX_NAV_DEPTH, seen);
+    if (item) {
+      delete item.presentation;
+      out.push(item);
+    }
+    if (out.length >= max) break;
+  }
+  return out;
+}
+
 export function normalizeNavigation(raw: unknown): NavigationDoc | undefined {
   if (!isObject(raw) || !Array.isArray(raw.menus)) return undefined;
   const seen = new Set<string>();
