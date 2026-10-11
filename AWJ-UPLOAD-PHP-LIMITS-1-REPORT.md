@@ -11,8 +11,8 @@
 | Branch | `fix/upload-php-limits-1` |
 | PR | https://github.com/safwan5001-source/Nebrax/pull/1316 |
 | Base SHA (عند إنشاء الفرع) | `ba9a652123b1b941c1f4fce136120e4691c9a320` (`origin/main`) |
-| Head SHA (الكود) | `4ef6b90b0920ea6e0cf6695edeef0ac533b85de1` |
-| Head SHA (بعد إضافة هذا التقرير) | يظهر في PR (commit توثيقي فقط، لا يغيّر الكود) |
+| Head SHA (commit الكود) | `4ef6b90b0920ea6e0cf6695edeef0ac533b85de1` |
+| Head SHA (نهاية الفرع، الذي تغطيه فحوص CI النهائية) | `bf89bc0743ae64ef54f23e755ea00e0e24c18349` — commit توثيقي فقط (هذا التقرير)؛ الفرق بين الـHeadين ملف md واحد |
 | `origin/main` الآن | `eae4bd7` (+1 commit توثيقي `#1312` لا يلمس ملفات هذا PR) — `git merge-tree`: **دمج نظيف بلا تعارض** |
 | تقرير التدقيق المرجعي | PR #1314 (`AWJ-UPLOAD-RELIABILITY-1`) — لم يُكرَّر |
 
@@ -108,9 +108,10 @@
 | محلي: الأصناف الثلاثة الجديدة (تجميعة معاد بناؤها من الفرع عبر `setup.sh`) | **24 نجحت (324 assertion)** |
 | محلي: مرشّح الرفع/الوسائط الأوسع على الفرع السابق للتغيير (مرجع قبل) | 384 نجحت، 1 تخطّي، 0 فشل |
 | محلي: `php artisan test` الكامل على الفرع | قيد التشغيل وقت كتابة هذه المسودة — تُحدَّث النتيجة هنا |
-| CI `php artisan test (L11, sqlite)` ×2 | **نجح** ×2 |
-| CI `php artisan test (L11, pgsql)` ×2 | واحد **نجح**، والآخر (تشغيل حدث الـPR) قيد التشغيل وقت كتابة هذه المسودة — تُحدَّث النتيجة هنا |
-| CI `Docker runtime smoke` | **نجح** (§4) |
+| CI على Head النهائي `bf89bc0` — `php artisan test (L11, sqlite)` ×2 (تشغيل push + PR) | **نجح ×2** |
+| CI على Head النهائي — `php artisan test (L11, pgsql)` ×2 | **نجح ×2** |
+| CI على Head النهائي — `Docker runtime smoke` (Apache/mod_php) | **نجح** (مرتان إجمالاً: على `4ef6b90` وعلى `bf89bc0`) |
+| CI على `4ef6b90` (قبل commit التقرير) | sqlite ×2 نجح · pgsql ×1 نجح · pgsql ×1 **فشل مرة** في `CommerceWorkspaceCustomDomainPostgresConcurrencyTest` (اختبار تسابق `pcntl_fork` لنطاقات المتجر، `1 failed, 6249 passed`) — **ليس من هذا PR**: لا يلمس PR أي كود تطبيقي، ونفس الـcommit نجح في تشغيل pgsql المماثل، ولم يتكرر على الـHead النهائي في تشغيليه. علّقتُ بذلك على PR وأعدتُ تشغيل الـjob مرة واحدة (التعليق: #1316 issuecomment-6110048664) |
 | CI الواجهة (web) | لم يُشغَّل — لا تغيير في `web/` |
 
 > ملاحظة: التشغيل الأول لمرشّح الرفع في التدقيق السابق فشل 90 اختباراً بسبب حزمة AWS SDK ناقصة في تجميعة الجلسة فقط (بيئية)؛ أُصلحت بتثبيت الحزمة خارج المستودع وليست عيباً في المنتج (الإنتاج وCI يثبّتانها).
