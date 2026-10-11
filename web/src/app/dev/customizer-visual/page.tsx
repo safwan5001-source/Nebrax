@@ -32,7 +32,8 @@ type Scenario =
   | "global"
   | "heroes"
   | "overlay"
-  | "navigation";
+  | "navigation"
+  | "footer";
 type PreviewViewport = "mobile" | "tablet" | "desktop";
 
 function scenarioOf(value: string | null): Scenario {
@@ -46,7 +47,8 @@ function scenarioOf(value: string | null): Scenario {
     value === "global" ||
     value === "heroes" ||
     value === "overlay" ||
-    value === "navigation"
+    value === "navigation" ||
+    value === "footer"
   ) {
     return value;
   }
@@ -134,7 +136,7 @@ function dataSectionsConfig(locale: "ar" | "en") {
   });
 }
 
-function configFor(locale: "ar" | "en", scenario: Scenario): StorefrontPresentationConfig {
+function configFor(locale: "ar" | "en", scenario: Scenario, footerLayout: string | null = null): StorefrontPresentationConfig {
   if (scenario === "global") {
     // CUST-HV V5e-2a — the populated page wearing every global token at its boldest step.
     const base = configFor(locale, "populated");
@@ -149,6 +151,33 @@ function configFor(locale: "ar" | "en", scenario: Scenario): StorefrontPresentat
       surfaces: { radius: "pill", border: { width: "medium" }, shadow: "medium" },
       layout: { contentWidth: "narrow" },
       motion: { duration: "slow", easing: "emphasized" },
+    });
+  }
+  if (scenario === "footer") {
+    // CUST-HV V7e-3 — a footer with link groups, contact, social, WhatsApp and an app badge; `?layout=` picks one of the six.
+    const ar = locale === "ar";
+    const link = (id: string, label: string, target: unknown) => ({ id, label, target, enabled: true });
+    return normalizePresentationConfig({
+      ...configFor(locale, "populated"),
+      footer: {
+        tagline: ar ? "ورود طازجة تصل إلى بابك كل يوم" : "Fresh flowers delivered to your door every day",
+        showLogo: true,
+        copyright: ar ? "© متجر الأزهار" : "© Daisy Shop Flowers",
+        ...(footerLayout ? { layout: footerLayout } : {}),
+        groups: Array.from({ length: 6 }, (_, i) => ({
+          id: `g${i + 1}`,
+          title: (ar ? ["التسوق", "الشركة", "الدعم", "القانونية", "الشركاء", "المجتمع"] : ["Shop", "Company", "Support", "Legal", "Partners", "Community"])[i],
+          links: [
+            link(`g${i}a`, ar ? "العروض" : "Offers", { kind: "home" }),
+            link(`g${i}b`, ar ? "سياسة الخصوصية" : "Privacy policy", { kind: "content", slug: "privacy-policy" }),
+            link(`g${i}c`, ar ? "مدونتنا" : "Our blog", { kind: "external", href: "https://example.com/blog", newTab: true }),
+          ],
+        })),
+      },
+      contact: { phone: "+966500000000", email: "hello@daisy.sa", address: ar ? "الرياض" : "Riyadh", hours: "" },
+      social: [{ id: "i", network: "instagram", url: "https://instagram.com/daisy", enabled: true }],
+      whatsapp: { enabled: true, phone: "966500000000", message: "", placement: "footer" },
+      apps: { iosUrl: "https://apps.apple.com/app/id1", androidUrl: "", appName: "", showHomepageSection: false, showFooterLinks: true },
     });
   }
   if (scenario === "navigation") {
@@ -343,7 +372,7 @@ function Fixture() {
   const locale = params.get("locale") === "en" ? "en" : "ar";
   const scenario = scenarioOf(params.get("scenario"));
   const viewport = viewportOf(params.get("viewport"));
-  const config = configFor(locale, scenario);
+  const config = configFor(locale, scenario, params.get("layout"));
 
   return (
     <main data-visual-root="" data-surface="merchant-preview" data-scenario={scenario}>

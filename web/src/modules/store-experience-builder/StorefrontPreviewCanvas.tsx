@@ -23,6 +23,7 @@ import {
 } from "./presentation/config";
 import { HeaderOverlayPreview } from "./HeaderOverlayPreview";
 import { HeaderScrollUpPreview } from "./HeaderScrollUpPreview";
+import { CanvasFooter } from "./CanvasFooter";
 import { CanvasNavItem, canvasNavItems } from "./CanvasNav";
 import { mainMenu } from "./presentation/navigation";
 import { overlayMarker, resolveHeaderOverlay } from "./presentation/header-overlay";
@@ -1524,252 +1525,23 @@ export function StorefrontPreviewCanvas({
       </div>
       )}
 
-      <footer
-        className={cn(
-          "bg-store-footer text-store-footer-link",
-          onSelectChrome && "awj-preview-section",
-          selectedChrome === "footer" && "awj-preview-section-selected",
-        )}
-        data-preview-chrome={onSelectChrome ? "footer" : undefined}
-        data-chrome-selected={
-          onSelectChrome && selectedChrome === "footer" ? "" : undefined
-        }
-        onClick={
-          onSelectChrome
-            ? (event) => {
-                const inner = (event.target as HTMLElement).closest(
-                  "[data-preview-chrome]",
-                );
-                if (inner && inner !== event.currentTarget) return;
-                onSelectChrome("footer");
-              }
-            : undefined
-        }
-      >
-        {onSelectChrome ? (
-          <button
-            type="button"
-            className="sr-only"
-            aria-pressed={selectedChrome === "footer"}
-            onClick={(event) => {
-              event.stopPropagation();
-              onSelectChrome("footer");
-            }}
-          >
-            {t("footer")}
-          </button>
-        ) : null}
-        <div className={cn(storeContainerClassName, "py-10 md:py-12")}>
-          {config.footer.showLogo && (
-            <button
-              type="button"
-              data-preview-chrome={onSelectChrome ? "branding" : undefined}
-              aria-label={onSelectChrome ? t("branding") : undefined}
-              onClick={
-                onSelectChrome
-                  ? (event) => {
-                      event.stopPropagation();
-                      onSelectChrome("branding");
-                    }
-                  : undefined
-              }
-              className="inline-flex min-w-0 max-w-full"
-            >
-              <StoreBrand
-                href="#preview"
-                name={storeName}
-                tone="dark"
-                size="md"
-                logoUrl={logo}
-                linked={!onSelectChrome}
-              />
-            </button>
-          )}
-          {config.footer.tagline.trim() ? (
-            <p className="mt-3 max-w-lg break-words text-sm text-store-footer-muted">
-              {config.footer.tagline}
-            </p>
-          ) : null}
-          <div className="mt-8 grid grid-cols-2 gap-x-6 gap-y-8 border-t border-store-footer-border pt-8 sm:grid-cols-3">
-            <FooterCol title={t("shop")}>
-              <span>{t("allProducts")}</span>
-              {PREVIEW_CATEGORIES.slice(0, 4).map((category) => (
-                <span key={category.id}>{category.name[locale]}</span>
-              ))}
-            </FooterCol>
-            <FooterCol title={t("account")}>
-              <span>{t("account")}</span>
-              <span>{t("cart")}</span>
-            </FooterCol>
-            <FooterCol title={t("policies")}>
-              {visiblePages.length
-                ? visiblePages.map((page) => (
-                    <span key={page.id}>
-                      {page.title.trim() || t(pageTitleKey(page.slug))}
-                    </span>
-                  ))
-                : <span>{t("pagesHint")}</span>}
-            </FooterCol>
-          </div>
-          {(phone ||
-            email ||
-            address ||
-            hours ||
-            footerWhatsapp ||
-            enabledSocial.length > 0 ||
-            hasBusinessIdentity ||
-            config.verification.licenseNumber.trim() ||
-            config.sbc.show_in_storefront ||
-            (hasApps && config.apps.showFooterLinks)) && (
-            <div className="mt-8 grid grid-cols-1 gap-x-8 gap-y-8 border-t border-store-footer-border pt-6 text-sm text-store-footer-muted sm:grid-cols-2 lg:grid-cols-3">
-              {hasBusinessIdentity ? (
-                <section className="min-w-0">
-                  <h3 className="text-sm font-bold text-store-footer-foreground">
-                    {t("businessInformation")}
-                  </h3>
-                  <div className="mt-3 break-words">
-                    {legalName ? (
-                      <p className="break-words">
-                        {t("legalName")}: {legalName}
-                      </p>
-                    ) : null}
-                    <IdentityDetail
-                      kind="cr"
-                      label={t("crNumber")}
-                      value={crNumber}
-                    />
-                    <IdentityDetail
-                      kind="vat"
-                      label={t("vatNumber")}
-                      value={vatNumber}
-                    />
-                  </div>
-                </section>
-              ) : null}
-              {config.verification.licenseNumber.trim() ? (
-                <section className="min-w-0">
-                  <h3 className="text-sm font-bold text-store-footer-foreground">
-                    {t("merchantProvided")}
-                  </h3>
-                  <p className="mt-3 break-words">
-                    {t("licenseNumber")}: {config.verification.licenseNumber}
-                  </p>
-                </section>
-              ) : null}
-              {config.sbc.show_in_storefront ? (
-                <section className="min-w-0">
-                  <h3 className="text-sm font-bold text-store-footer-foreground">
-                    {t("sbcGroup")}
-                  </h3>
-                  <div className="mt-3">
-                    {config.sbc.seal_token.trim() ? (
-                      <SbcSeal message={t("sbcSealPreview")} />
-                    ) : (
-                      <p className="font-medium text-store-footer-link">
-                        {t("sbcVerified")}
-                      </p>
-                    )}
-                  </div>
-                </section>
-              ) : null}
-              {phone ||
-              email ||
-              address ||
-              hours ||
-              footerWhatsapp ||
-              enabledSocial.length > 0 ? (
-                <section className="min-w-0">
-                  <h3 className="text-sm font-bold text-store-footer-foreground">
-                    {t("communication")}
-                  </h3>
-                  <div className="mt-3 space-y-2 break-words">
-                    {phone ? <ContactDetail kind="phone" value={phone} /> : null}
-                    {email ? <ContactDetail kind="email" value={email} /> : null}
-                    {address ? (
-                      <ContactDetail kind="address" value={address} />
-                    ) : null}
-                    {hours ? <ContactDetail kind="hours" value={hours} /> : null}
-                    {footerWhatsapp ? (
-                      <p>
-                        <a
-                          href={footerWhatsapp}
-                          data-preview-chrome="whatsapp"
-                          className="inline-flex min-h-11 items-center gap-2 text-store-footer-link underline-offset-2 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
-                          onClick={(event) => {
-                            event.preventDefault();
-                            event.stopPropagation();
-                            onSelectChrome?.("whatsapp");
-                          }}
-                        >
-                          <OfficialSocialMark network="whatsapp" />
-                          {t("whatsapp")}
-                        </a>
-                      </p>
-                    ) : null}
-                    {enabledSocial.length > 0 ? (
-                      <div className="flex flex-wrap items-center gap-1">
-                        {enabledSocial.map((item) => {
-                          const label = socialLabel(t, item.network);
-                          return (
-                            <a
-                              key={item.id}
-                              href={item.href}
-                              aria-label={label}
-                              data-preview-chrome="social"
-                              className={officialSocialLinkClassName}
-                              onClick={(event) => {
-                                event.preventDefault();
-                                event.stopPropagation();
-                                onSelectChrome?.("social");
-                              }}
-                            >
-                              <OfficialSocialMark network={item.network} />
-                            </a>
-                          );
-                        })}
-                      </div>
-                    ) : null}
-                  </div>
-                </section>
-              ) : null}
-              {hasApps && config.apps.showFooterLinks ? (
-                <section className="min-w-0">
-                  <h3 className="text-sm font-bold text-store-footer-foreground">
-                    {t("applications")}
-                  </h3>
-                  <div className="mt-3 flex flex-wrap items-center gap-3">
-                    {ios ? (
-                      <OfficialStoreBadge
-                        store="apple"
-                        href={ios}
-                        locale={locale}
-                        label="App Store"
-                        onClick={(event) => event.preventDefault()}
-                      />
-                    ) : null}
-                    {android ? (
-                      <OfficialStoreBadge
-                        store="google"
-                        href={android}
-                        locale={locale}
-                        label="Google Play"
-                        onClick={(event) => event.preventDefault()}
-                      />
-                    ) : null}
-                  </div>
-                </section>
-              ) : null}
-            </div>
-          )}
-        </div>
-        <div className="border-t border-store-footer-border">
-          <div className={cn(storeContainerClassName, "py-5")}>
-            <p className="break-words text-xs text-store-footer-muted">
-              {config.footer.copyright.trim() || `© ${storeName}`}
-            </p>
-          </div>
-        </div>
-      </footer>
+      <CanvasFooter
+        config={config}
+        t={t}
+        locale={locale}
+        viewport={viewport}
+        storeName={storeName}
+        logo={logo}
+        onSelectChrome={onSelectChrome as never}
+        selectedChrome={selectedChrome}
+        pageTitles={visiblePages.map((page) => page.title.trim() || t(pageTitleKey(page.slug)))}
+        contact={{ phone: phone ?? "", email: email ?? "", address: address ?? "", hours: hours ?? "" }}
+        footerWhatsapp={footerWhatsapp}
+        social={enabledSocial.map((item) => ({ id: item.id, network: item.network, href: item.href, label: socialLabel(t, item.network) }))}
+        identity={{ legalName, crNumber, vatNumber, has: hasBusinessIdentity }}
+        apps={{ ios, android, has: hasApps }}
+        colourContext={{ primaryColor: config.primaryColor, accentColor: config.accentColor, palette: config.palette }}
+      />
 
       {mobileViewport && (
         <nav
@@ -2435,15 +2207,6 @@ function SectionRule({ title, action }: { title: string; action: string }) {
         </h2>
       </div>
       <span data-section-action="" className="text-xs font-bold text-store-primary md:text-sm">{action}</span>
-    </div>
-  );
-}
-
-function FooterCol({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <div>
-      <h2 className="text-sm font-bold text-store-footer-foreground">{title}</h2>
-      <div className="mt-4 space-y-2.5 text-sm">{children}</div>
     </div>
   );
 }
