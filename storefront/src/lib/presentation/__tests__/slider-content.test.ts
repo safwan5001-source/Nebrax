@@ -9,6 +9,7 @@ import {
   normalizeSliderContent,
   resolveSliderBehaviour,
   type SliderContent,
+  slideDraw,
   sliderPublishIssues,
 } from "../slider-content";
 
@@ -153,5 +154,104 @@ describe("slider helpers (V8a)", () => {
       false,
     );
     expect(config.version).toBe(3);
+  });
+});
+
+describe("slideDraw — the one per-slide decision the storefront and the Canvas share (V8c)", () => {
+  const ID = "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e";
+  const ID2 = "1c9a7d3f-4e4b-4b64-8d8f-9a2b3c4d5e6f";
+  const dark = { min: [10, 12, 14], max: [40, 50, 60] } as MediaBounds;
+  const wide = { min: [0, 0, 0], max: [255, 255, 255] } as MediaBounds;
+  const ctx = (bounds: Record<string, MediaBounds | null>): DesignContext => ({
+    primaryColor: "#12372a",
+    accentColor: null,
+    dir: "ltr",
+    mediaBounds: (ref) => bounds[ref.mediaId] ?? null,
+  });
+  const slide = (extra: Record<string, unknown> = {}) =>
+    ({ id: "a", media: { mediaId: ID }, ...extra }) as never;
+
+  it("a proven picture draws the picture with the proven colour and the solid button's label", () => {
+    expect(slideDraw(slide({ heading: "Hi" }), ctx({ [ID]: dark }))).toEqual({
+      surface: "picture",
+      foreground: "#ffffff",
+      buttonLabel: "#000000",
+      overlay: null,
+    });
+  });
+
+  it("unproven copy withholds the picture: the brand surface with its own foreground", () => {
+    const d = slideDraw(
+      slide({
+        heading: "Hi",
+        overlay: { color: { hex: "#000000" }, alpha: 10 },
+      }),
+      ctx({ [ID]: wide }),
+    );
+    expect(d.surface).toBe("brand");
+    expect(d.overlay).toBeNull();
+    expect(d.foreground).toBe("#ffffff");
+    expect(slideDraw(slide({ heading: "Hi" }), ctx({})).surface).toBe("brand");
+  });
+
+  it("no copy: the picture shows whatever the evidence, and nothing is coloured", () => {
+    expect(slideDraw(slide(), ctx({}))).toEqual({
+      surface: "picture",
+      foreground: null,
+      buttonLabel: null,
+      overlay: null,
+    });
+  });
+
+  it("an overlay resolves its colour (hex or palette role) and strength, and makes a wide picture provable", () => {
+    const d = slideDraw(
+      slide({
+        heading: "Hi",
+        overlay: { color: { hex: "#000000" }, alpha: 70 },
+      }),
+      ctx({ [ID]: wide }),
+    );
+    expect(d).toMatchObject({
+      surface: "picture",
+      overlay: { colour: "#000000", alpha: 0.7 },
+    });
+    expect(
+      slideDraw(
+        slide({ overlay: { color: { role: "brand" }, alpha: 40 } }),
+        ctx({ [ID]: dark }),
+      ).overlay,
+    ).toEqual({ colour: "#12372a", alpha: 0.4 });
+  });
+
+  it("an explicit colour that fails withholds the picture; one that passes is used", () => {
+    expect(
+      slideDraw(
+        slide({ heading: "Hi", text: { hex: "#222222" } }),
+        ctx({ [ID]: dark }),
+      ).surface,
+    ).toBe("brand");
+    expect(
+      slideDraw(
+        slide({ heading: "Hi", text: { hex: "#fffbe6" } }),
+        ctx({ [ID]: dark }),
+      ),
+    ).toMatchObject({
+      surface: "picture",
+      foreground: "#fffbe6",
+    });
+  });
+
+  it("the phone picture is judged with the default one", () => {
+    const withPhone = slide({
+      heading: "Hi",
+      mobile: { mediaId: ID2, decorative: true },
+    });
+    expect(slideDraw(withPhone, ctx({ [ID]: dark, [ID2]: dark })).surface).toBe(
+      "picture",
+    );
+    expect(slideDraw(withPhone, ctx({ [ID]: dark, [ID2]: wide })).surface).toBe(
+      "brand",
+    );
+    expect(slideDraw(withPhone, ctx({ [ID]: dark })).surface).toBe("brand");
   });
 });

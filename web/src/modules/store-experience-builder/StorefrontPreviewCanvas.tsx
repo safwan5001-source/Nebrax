@@ -60,6 +60,7 @@ import {
   discoveryContentOf,
   offersContentOf,
   productShelfContentOf,
+  sliderContentOf,
 } from "./presentation/section-content";
 import {
   buildWhatsAppUrl,
@@ -75,6 +76,7 @@ import {
   type CustomizerMessageKey,
 } from "./messages";
 import { CanvasBackdrop } from "./media/CanvasBackdrop";
+import { CanvasSlider } from "./CanvasSlider";
 import { useBackgroundMediaBounds } from "./media/use-background-media-bounds";
 import { announcementWindowState } from "./presentation/announcements";
 import { useWindowsClock } from "./use-announcement-clock";
@@ -1004,6 +1006,29 @@ export function StorefrontPreviewCanvas({
                       : "The wholesale block stays as designed on the storefront, gated by channel configuration."}
                   </p>
                 </section>
+              );
+            }
+
+            if (section.type === "slider") {
+              // CUST-HV V8c — the same `data-slider` DOM and per-slide decision as the storefront (`slideDraw`, fed by the proven bounds).
+              const slider = sliderContentOf(section);
+              return (
+                <CanvasSlider
+                  key={section.id}
+                  slides={slider.slides}
+                  behaviour={slider.behaviour}
+                  context={designContext}
+                  viewport={viewport}
+                  labels={{
+                    label: t("canvasSliderLabel"),
+                    slide: t("canvasSliderSlide"),
+                    previous: t("canvasSliderPrevious"),
+                    next: t("canvasSliderNext"),
+                    goTo: t("canvasSliderGoTo"),
+                    empty: t("canvasSliderEmpty"),
+                    autoplayNote: t("canvasSliderAutoplayNote"),
+                  }}
+                />
               );
             }
 
