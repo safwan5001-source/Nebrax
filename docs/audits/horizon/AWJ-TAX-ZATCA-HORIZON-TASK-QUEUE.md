@@ -1,5 +1,8 @@
 # AWJ-TAX-ZATCA-HORIZON — Task Queue (Bootstrap V1)
 
+> **Owner decision 2026-10-11:** TAX-ZATCA designated as the sole active Horizon on merge of activation PR #1324. Delivery execution is paused. TAX-HZ-00 is the first permitted read-only evidence pass. Candidate REM implementation remains gated on that pass and subsequent owner-approved task scope and merge approvals.
+
+
 **Status:** PROPOSED / NOT ACTIVATED. This file is an *overlay* on the canonical 40-task audit remediation queue; it does not replace that queue or the current active Delivery Horizon in `docs/autonomous-engineering/TASK-QUEUE.md`.
 
 ## State vocabulary
