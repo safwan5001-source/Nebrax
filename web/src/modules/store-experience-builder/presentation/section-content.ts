@@ -1,4 +1,5 @@
 import { normalizeWindowEdges } from "./announcements";
+import { type ContentBlock, MAX_CONTENT_BLOCKS, normalizeContentBlocks } from "./content-blocks";
 import { type IconKey, normalizeIconKey } from "./icon-registry";
 import { type GalleryContent, normalizeGalleryContent } from "./gallery-content";
 import { type SliderContent, normalizeSliderContent } from "./slider-content";
@@ -10,7 +11,7 @@ import { sanitizeExternalUrl } from "./urls";
  */
 
 export const MAX_BENEFIT_ITEMS = 6;
-export const MAX_CUSTOM_BLOCKS = 8;
+export const MAX_CUSTOM_BLOCKS = MAX_CONTENT_BLOCKS;
 export const MAX_FEATURED_PRODUCTS = 8;
 export const MAX_OFFERS = 8;
 
@@ -56,11 +57,8 @@ export interface BenefitsContent {
   items: BenefitItem[];
 }
 
-export interface CustomBlock {
-  id: string;
-  kind: "heading" | "paragraph";
-  text: string;
-}
+/** CUST-HV V9c-1 (V0 §15) — the shared block vocabulary; `heading` / `paragraph` are its two original members. */
+export type CustomBlock = ContentBlock;
 
 export interface CustomContent {
   blocks: CustomBlock[];
@@ -504,21 +502,7 @@ function normalizeBenefits(source: Record<string, unknown>): BenefitsContent {
 }
 
 function normalizeCustom(source: Record<string, unknown>): CustomContent {
-  if (!Array.isArray(source.blocks)) return { blocks: [] };
-  const blocks: CustomBlock[] = [];
-  source.blocks.forEach((block, index) => {
-    if (!block || typeof block !== "object" || Array.isArray(block)) return;
-    const row = block as Record<string, unknown>;
-    const kind = row.kind === "heading" || row.kind === "paragraph" ? row.kind : null;
-    if (!kind) return;
-    const text = asString(row.text)
-      .trim()
-      .slice(0, kind === "heading" ? 120 : 600);
-    const id = safeToken(row.id, `block-${index}`);
-    if (!id || blocks.some((existing) => existing.id === id)) return;
-    blocks.push({ id, kind, text });
-  });
-  return { blocks: blocks.slice(0, MAX_CUSTOM_BLOCKS) };
+  return normalizeContentBlocks(source, sanitizeContentHref) ?? { blocks: [] };
 }
 
 function normalizeFeatured(source: Record<string, unknown>): FeaturedContent {

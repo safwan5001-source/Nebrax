@@ -178,6 +178,11 @@
       "viewerPrevious": "الصورة السابقة",
       "viewerNext": "الصورة التالية",
       "counter": "{current} من {total}"
+    },
+    "content": {
+      "note": "ملاحظة",
+      "success": "نجاح",
+      "warning": "تنبيه"
     }
   },
   "cart": {

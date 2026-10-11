@@ -84,7 +84,8 @@ final class StorefrontPresentationNormalizer
 
     public const MAX_BENEFIT_ITEMS = 6;
 
-    public const MAX_CUSTOM_BLOCKS = 8;
+    /** CUST-HV V9c-1 (V0 §15) — كان 8؛ الرفع إلى 12 لا يُبطل وثيقةً قائمة. توأم `MAX_CUSTOM_BLOCKS` في ملفَّي section-content.ts. */
+    public const MAX_CUSTOM_BLOCKS = 12;
 
     public const MAX_FEATURED_PRODUCTS = 8;
 
@@ -888,30 +889,8 @@ final class StorefrontPresentationNormalizer
         }
 
         if ($type === 'customContent') {
-            $blocks = [];
-            $seen = [];
-            foreach (array_values(is_array($source['blocks'] ?? null) ? $source['blocks'] : []) as $index => $block) {
-                if (! is_array($block) || array_is_list($block)) {
-                    continue;
-                }
-                $kind = $block['kind'] ?? null;
-                if ($kind !== 'heading' && $kind !== 'paragraph') {
-                    continue;
-                }
-                $limit = $kind === 'heading' ? 120 : 600;
-                $text = mb_substr(trim($this->asString($block['text'] ?? null)), 0, $limit);
-                $id = $this->safeId($block['id'] ?? null, 'block-'.$index);
-                if ($id === '' || isset($seen[$id])) {
-                    continue;
-                }
-                $seen[$id] = true;
-                $blocks[] = ['id' => $id, 'kind' => $kind, 'text' => $text];
-                if (count($blocks) >= self::MAX_CUSTOM_BLOCKS) {
-                    break;
-                }
-            }
-
-            return $blocks === [] ? null : ['blocks' => $blocks];
+            // CUST-HV V9c-1 (V0 §15) — مفردات الكتل المشتركة؛ كتلتا heading/paragraph القديمتان تُطبَّعان إلى الشكل نفسه.
+            return StorefrontContentBlocksNormalizer::normalize($raw, fn (string $href): string => $this->sanitizeContentHref($href));
         }
 
         if ($type === 'featured') {

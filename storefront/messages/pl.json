@@ -178,6 +178,11 @@
       "viewerPrevious": "Poprzednie zdjęcie",
       "viewerNext": "Następne zdjęcie",
       "counter": "{current} z {total}"
+    },
+    "content": {
+      "note": "Uwaga",
+      "success": "Sukces",
+      "warning": "Ostrzeżenie"
     }
   },
   "cart": {

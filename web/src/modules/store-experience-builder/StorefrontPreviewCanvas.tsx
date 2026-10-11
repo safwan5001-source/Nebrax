@@ -85,6 +85,7 @@ import { useWindowsClock } from "./use-announcement-clock";
 import { useMediaRefPreview } from "./media/use-media-ref-preview";
 import { fontFamilyStack } from "./presentation/font-catalogue";
 import { resolveGlobalTokens } from "./presentation/global-tokens";
+import type { HeadingBlock, ParagraphBlock } from "./presentation/content-blocks";
 import { StoreIcon } from "./StoreIcon";
 import type { BenefitsLayout, SectionDesign } from "./presentation/section-design";
 import { resolveSectionDesign } from "./presentation/section-design-resolve";
@@ -1203,7 +1204,10 @@ export function StorefrontPreviewCanvas({
             }
 
             if (section.type === "customContent") {
-              const blocks = customContentOf(section).blocks.filter((block) => block.text.trim());
+              // V9c-1: the Canvas still draws the two original kinds only; the other block kinds arrive with the editor (V9c-2).
+              const blocks = customContentOf(section).blocks.filter(
+                (block): block is HeadingBlock | ParagraphBlock => (block.kind === "heading" || block.kind === "paragraph") && block.text.trim() !== "",
+              );
               // AWJ Market presents multi-question content as an accordion (published
               // `CustomContentBand`): mirror its cards so the preview shows the same surfaces.
               const groups: Array<{ heading: (typeof blocks)[number] | null; body: typeof blocks }> = [];

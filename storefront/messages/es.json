@@ -178,6 +178,11 @@
       "viewerPrevious": "Imagen anterior",
       "viewerNext": "Imagen siguiente",
       "counter": "{current} de {total}"
+    },
+    "content": {
+      "note": "Nota",
+      "success": "Éxito",
+      "warning": "Advertencia"
     }
   },
   "cart": {
