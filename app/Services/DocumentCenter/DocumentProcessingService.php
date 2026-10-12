@@ -110,6 +110,53 @@ class DocumentProcessingService
         }
     }
 
+    /**
+     * إعادة إرسال فحص عالق (QUEUED/RUNNING قديم أو مهمة ضاعت). محدودة بـ`max_attempts`:
+     * بلوغها يُغلق الملف FAILED (fail-closed) بدل التكرار اللانهائي. المهمة فريدة
+     * (`ShouldBeUnique`) فلا تتضاعف إن كانت الأولى ما زالت حيّة.
+     *
+     * @return 'requeued'|'failed_closed'|'skipped'
+     */
+    public function redispatchStaleSafetyScan(DocumentProcessingRun $run, DocumentFile $file): string
+    {
+        if ($file->scan_status !== DocumentScanStatus::PENDING
+            || ! in_array($run->status, [DocumentProcessingStatus::QUEUED, DocumentProcessingStatus::RUNNING], true)) {
+            return 'skipped';
+        }
+
+        $policy = $this->settings->processingPolicy();
+        if ($run->attempt_count >= $policy['max_attempts']) {
+            $this->failSafetyScanClosed($run, $file);
+
+            return 'failed_closed';
+        }
+
+        $jobUuid = (string) Str::uuid();
+        $run->fill([
+            'status' => DocumentProcessingStatus::QUEUED,
+            'job_uuid' => $jobUuid,
+            'started_at' => null,
+            'finished_at' => null,
+        ])->save();
+
+        if ($this->settings->documentProcessingMode() === DocumentExtractionPolicy::MODE_SYNC) {
+            $this->executeSafetyScanSynchronously($run->fresh(), $file, $jobUuid);
+        } else {
+            ScanDocumentFile::dispatch(
+                $run->tenant_id,
+                $run->branch_id,
+                $run->id,
+                $file->id,
+                $jobUuid,
+                $policy['backoff_seconds'],
+                $policy['max_attempts'],
+                $policy['timeout_seconds'],
+            )->onQueue('documents');
+        }
+
+        return 'requeued';
+    }
+
     public function failSafetyScanClosed(DocumentProcessingRun $run, DocumentFile $file): void
     {
         $this->failed($run);

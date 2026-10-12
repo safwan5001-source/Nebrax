@@ -32,6 +32,23 @@ class ClamAvTcpDocumentSafetyScanner implements DocumentSafetyScanner
         }
     }
 
+    /**
+     * عدد تواقيع القاعدة المحمّلة من `zVERSION` ("ClamAV 1.4.6/27800/<date>"). صفر = القاعدة
+     * لم تُحمَّل بعد (إقلاع أول/تنزيل freshclam) فلا يُعدّ الفاحص جاهزاً.
+     */
+    public function signatureDatabaseVersion(): int
+    {
+        $socket = $this->connect();
+        try {
+            $this->writeAll($socket, "zVERSION\0");
+            $parts = explode('/', trim($this->readResponse($socket), "\0\n "));
+        } finally {
+            fclose($socket);
+        }
+
+        return isset($parts[1]) ? max(0, (int) $parts[1]) : 0;
+    }
+
     public function scan($stream): DocumentScanStatus
     {
         if (! is_resource($stream)) {

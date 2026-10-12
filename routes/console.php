@@ -75,3 +75,11 @@ Schedule::command('storefront-presentations:dispatch-due')
     ->everyMinute()
     ->withoutOverlapping()
     ->onOneServer();
+
+// مركز المستندات: ملفات عالقة في pending (فاحص أُعدّ بعد الاستقبال، أو مهمة ضاعت) تُعاد إلى
+// مسار الفحص القائم؛ لا يُعلَّم أي ملف CLEAN هنا. رمز الخروج غير الصفري = تنبيه تشغيلي.
+// ⚠ يعمل فقط حيث يوجد مجدول (schedule:work) أو يُستدعى يدوياً/بمهمة Railway cron.
+Schedule::command('documents:sweep-scans')
+    ->everyTenMinutes()
+    ->withoutOverlapping()
+    ->onOneServer();
