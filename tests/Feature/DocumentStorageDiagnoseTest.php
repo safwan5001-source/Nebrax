@@ -45,12 +45,12 @@ class DocumentStorageDiagnoseTest extends TestCase
         ]);
     }
 
-    private function awsError(string $code, int $status): AwsException
+    private function awsError(string $code, int $status, ?string $message = null): AwsException
     {
         $command = Mockery::mock(CommandInterface::class);
         $command->shouldReceive('getName')->andReturn('PutObject');
 
-        return new AwsException("secret-bearing raw message SECRET-X {$code}", $command, ['code' => $code, 'response' => new \GuzzleHttp\Psr7\Response($status)]);
+        return new AwsException("secret-bearing raw message SECRET-X {$code}", $command, ['code' => $code, 'message' => $message, 'response' => new \GuzzleHttp\Psr7\Response($status)]);
     }
 
     /** @param array<int, \Aws\ResultInterface|\Throwable> $queue */
@@ -168,5 +168,50 @@ class DocumentStorageDiagnoseTest extends TestCase
         $this->assertSame('FAIL: AwsException InternalError http=500', $report['path.delete']);
         $this->assertSame('OK', $report['path.delete_acl_object'], 'the second object is still attempted');
         $this->assertCount(4, $deleted);
+    }
+
+    /** @test */
+    public function the_sanitised_s3_message_names_the_rejected_parameter_without_leaking_secrets(): void
+    {
+        $badKey = 'cfat_'.str_repeat('Q', 35); // 40 محرفاً: «Token value» ملصوق بدل Access Key ID
+        $this->integration(['access_key_id' => $badKey]);
+        $message = "Credential access key has length 40, should be 32 (key {$badKey}) token ".str_repeat('Z', 30);
+        $queue = array_fill(0, 10, $this->awsError('InvalidArgument', 400, $message));
+        $report = $this->serviceWithSdk($queue)->diagnosePlatformConfiguration();
+        $json = json_encode($report, JSON_UNESCAPED_UNICODE);
+
+        $this->assertStringContainsString('Credential access key has length 40, should be 32', $report['path.get_missing_key']);
+        $this->assertStringContainsString('InvalidArgument http=400', $report['path.get_missing_key']);
+        $this->assertStringNotContainsString($badKey, $json);
+        $this->assertStringNotContainsString(str_repeat('Z', 30), $json);
+        $this->assertStringNotContainsString('SECRET-X', $json);
+        $this->assertStringContainsString('[REDACTED]', $report['path.get_missing_key']);
+    }
+
+    /** @test */
+    public function the_credential_shape_flags_a_wrong_length_charset_and_whitespace_without_showing_values(): void
+    {
+        $badKey = "cfat_abc123DEF456ghi789JKL012mno345pqr678\n"; // طول ≠ 32 + محارف غير سداسية + سطر جديد
+        $this->integration(['access_key_id' => $badKey, 'bucket' => 'Bad_Bucket']);
+        $report = $this->serviceWithSdk([])->diagnosePlatformConfiguration();
+
+        $this->assertStringContainsString('MISMATCH', $report['access_key_id_length']);
+        $this->assertStringContainsString('R2 expects hex', $report['access_key_id_charset']);
+        $this->assertStringStartsWith('YES', $report['access_key_id_whitespace']);
+        $this->assertStringStartsWith('NO', $report['bucket_name_valid']);
+        $this->assertStringNotContainsString('abc123DEF456', json_encode($report));
+    }
+
+    /** @test */
+    public function a_well_formed_credential_shape_is_reported_clean(): void
+    {
+        $this->integration(['access_key_id' => str_repeat('a1', 16), 'secret_access_key' => str_repeat('b2', 32)]);
+        $report = $this->serviceWithSdk([])->diagnosePlatformConfiguration();
+
+        $this->assertSame('32 (R2 expects 32)', $report['access_key_id_length']);
+        $this->assertSame('hex', $report['access_key_id_charset']);
+        $this->assertSame('no', $report['access_key_id_whitespace']);
+        $this->assertSame('64 (R2 expects 64)', $report['secret_length']);
+        $this->assertSame('yes', $report['bucket_name_valid']);
     }
 }
