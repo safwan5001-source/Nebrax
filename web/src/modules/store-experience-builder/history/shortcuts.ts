@@ -19,15 +19,18 @@ export interface ShortcutKeyEvent {
   shiftKey: boolean;
 }
 
-/** حرف ASCII لاتيني؟ على تخطيطات غير لاتينية (عربي مثلاً) يكون `key` حرفاً آخر ويبقى `code` ثابتاً بموضع المفتاح. */
-function isAsciiLetter(key: string): boolean {
-  return /^[a-z]$/i.test(key);
+/**
+ * حرف غير لاتيني؟ على تخطيطات غير لاتينية (عربي مثلاً) يكون `key` حرفاً من أبجدية أخرى ويبقى `code` ثابتاً بموضع المفتاح.
+ * الرموز وعلامات الترقيم (`;` على Dvorak) ليست حروفاً: هناك يحسم `key` المنطقي وحده، وإلا اشتعل الاختصار بـ`Ctrl+;`.
+ */
+function isNonLatinLetter(key: string): boolean {
+  return /^\p{L}$/u.test(key) && !/^[a-z]$/i.test(key);
 }
 
 function matchesLetter(event: ShortcutKeyEvent, letter: "z" | "y"): boolean {
   if (event.key.toLowerCase() === letter) return true;
-  // تخطيط غير لاتيني: نعتمد موضع المفتاح الفيزيائي. على تخطيط لاتيني مختلف (Dvorak) يحسم `key` أعلاه.
-  return !isAsciiLetter(event.key) && event.code === (letter === "z" ? "KeyZ" : "KeyY");
+  // تخطيط بحروف غير لاتينية: نعتمد موضع المفتاح الفيزيائي. على تخطيط لاتيني مختلف (Dvorak) يحسم `key` أعلاه.
+  return isNonLatinLetter(event.key) && event.code === (letter === "z" ? "KeyZ" : "KeyY");
 }
 
 export function resolveHistoryShortcut(event: ShortcutKeyEvent, isMac: boolean): HistoryShortcut | null {

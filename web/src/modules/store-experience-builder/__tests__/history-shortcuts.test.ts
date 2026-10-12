@@ -48,8 +48,18 @@ describe("resolveHistoryShortcut (CUST-H5-2 §3.1)", () => {
   });
 
   it("a Latin layout that moved Z elsewhere (Dvorak) follows the letter, not the position", () => {
-    expect(resolveHistoryShortcut(key({ key: ";", code: "KeyZ", ctrlKey: true }), false)).toBe("undo");
+    // Dvorak: the logical Z is at the physical "/" position; the physical Z position types ";".
+    expect(resolveHistoryShortcut(key({ key: "z", code: "Slash", ctrlKey: true }), false)).toBe("undo");
+    expect(resolveHistoryShortcut(key({ key: ";", code: "KeyZ", ctrlKey: true }), false)).toBeNull();
     expect(resolveHistoryShortcut(key({ key: "q", code: "KeyZ", ctrlKey: true }), false)).toBeNull();
+  });
+
+  it("the physical-position fallback is limited to non-Latin letters (not punctuation or digits)", () => {
+    expect(resolveHistoryShortcut(key({ key: "ئ", code: "KeyZ", ctrlKey: true }), false)).toBe("undo");
+    expect(resolveHistoryShortcut(key({ key: "я", code: "KeyZ", ctrlKey: true }), false)).toBe("undo"); // Cyrillic
+    expect(resolveHistoryShortcut(key({ key: ".", code: "KeyZ", ctrlKey: true }), false)).toBeNull();
+    expect(resolveHistoryShortcut(key({ key: "1", code: "KeyY", ctrlKey: true }), false)).toBeNull();
+    expect(resolveHistoryShortcut(key({ key: "Unidentified", code: "KeyZ", ctrlKey: true }), false)).toBeNull();
   });
 });
 

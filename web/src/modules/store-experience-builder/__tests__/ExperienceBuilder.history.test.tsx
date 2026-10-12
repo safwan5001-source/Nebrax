@@ -265,6 +265,31 @@ describe('ExperienceBuilder — CUST-H5-2 Undo / Redo', () => {
     expect(root().getAttribute('data-lifecycle')).toBe('dirty');
   });
 
+  it('shortcuts do nothing while an inline delete confirmation (alertdialog, no aria-modal) is pending', async () => {
+    // Every section carries a typed name, so deleting any of them asks first (an inline `alertdialog`).
+    const named = {
+      ...DEFAULT_PRESENTATION_CONFIG,
+      homepage: {
+        ...DEFAULT_PRESENTATION_CONFIG.homepage,
+        sections: DEFAULT_PRESENTATION_CONFIG.homepage.sections.map((section) => ({ ...section, label: 'اسم' })),
+      },
+    };
+    const user = await mount({ config: named });
+    await user.type(firstTextbox(), 'a');
+    expect(root().getAttribute('data-can-undo')).toBe('true');
+
+    await user.click(document.querySelector('[data-panel-option="homepage"]') as HTMLElement);
+    const remove = screen.getAllByRole('button', { name: 'حذف القسم' })[0];
+    await user.click(remove);
+    const confirm = await screen.findByRole('alertdialog');
+    expect(confirm.getAttribute('aria-modal')).toBeNull(); // the case a `[aria-modal]`-only guard would miss
+
+    remove.focus();
+    fireEvent.keyDown(remove, { key: 'z', code: 'KeyZ', ctrlKey: true });
+    expect(root().getAttribute('data-can-undo')).toBe('true');
+    expect(root().getAttribute('data-lifecycle')).toBe('dirty');
+  });
+
   it('shortcuts do nothing while a mobile bottom sheet is open, even with focus left on its trigger behind it', async () => {
     const originalInnerWidth = window.innerWidth;
     Object.defineProperty(window, 'innerWidth', { value: 390, configurable: true });

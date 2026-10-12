@@ -1747,7 +1747,13 @@ export function ExperienceBuilder({
       if (historyModalOpenRef.current) return;
       // أي حوار مفتوح في المستند يمنع الاختصار — لا نعدّد حوارات المحرِّر واحداً واحداً: مكتبة الأقسام وغيرها تُبقي
       // التركيز على زرّها خلف الطبقة، فلا يكفي فحص هدف الحدث. المخفي عن التقنيات المساعدة (`aria-hidden`) لا يُعدّ مفتوحاً.
-      if (document.querySelector('[role="dialog"]:not([aria-hidden="true"]), [aria-modal="true"]:not([aria-hidden="true"])')) return;
+      if (
+        document.querySelector(
+          '[role="dialog"]:not([aria-hidden="true"]), [role="alertdialog"]:not([aria-hidden="true"]), [aria-modal="true"]:not([aria-hidden="true"])',
+        )
+      ) {
+        return;
+      }
       event.preventDefault();
       applyHistoryStepRef.current(kind);
     };
