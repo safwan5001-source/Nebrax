@@ -1,13 +1,13 @@
 # AWJ-PLATFORM-UX-H1 — Platform Administration UX Horizon
 
-Status: **H1-3 DASHBOARD IN REVIEW / NO MERGE** (H1-0, H1-1, H1-PAGINATION, H1-CONTRAST, H1-2 merged; post-merge verification not recorded for any of them)  
+Status: **H1-4A TENANTS LIST IN REVIEW / NO MERGE** (H1-0, H1-1, H1-PAGINATION, H1-CONTRAST, H1-2, H1-3 merged; post-merge verification not recorded for any of them)  
 Owner: Safwan | Implementer: **Grok** | Date: 2026-10-11  
 Repository: `safwan5001-source/Nebrax`  
 Execution protocol: [AWJ Horizon System](../../autonomous-engineering/AWJ-HORIZON-SYSTEM.md)  
 H1-0 evidence: [AWJ-PLATFORM-UX-H1-AUDIT.md](./AWJ-PLATFORM-UX-H1-AUDIT.md)  
 H1-1 spec: [AWJ-PLATFORM-UX-H1-1-UX-SPEC.md](./AWJ-PLATFORM-UX-H1-1-UX-SPEC.md)  
 
-Owner decision 2026-10-11: option A approved. `H1-PAGINATION` merged as `31035783a36b3fbaf329b7c789c8af64e9097279` (PR #1318). `H1-CONTRAST` merged as `bda44687e98e69c95c452846baeac473b3ff5e4d` (PR #1328, [report](./AWJ-PLATFORM-UX-H1-CONTRAST-REPORT.md)); post-merge verification on `main` has not been recorded. `H1-2` (unified shell) merged as `2bc1c1250af710af96a9aa3b0428e2a4f61925cc` (PR #1355, [report](./AWJ-PLATFORM-UX-H1-2-SHELL-REPORT.md)). `H1-3` (platform dashboard, [report](./AWJ-PLATFORM-UX-H1-3-DASHBOARD-REPORT.md)) is the current slice and is in review. Its PR is not merge approval. H1-4 is not started.
+Owner decision 2026-10-11: option A approved. `H1-PAGINATION` merged as `31035783a36b3fbaf329b7c789c8af64e9097279` (PR #1318). `H1-CONTRAST` merged as `bda44687e98e69c95c452846baeac473b3ff5e4d` (PR #1328, [report](./AWJ-PLATFORM-UX-H1-CONTRAST-REPORT.md)); post-merge verification on `main` has not been recorded. `H1-2` (unified shell) merged as `2bc1c1250af710af96a9aa3b0428e2a4f61925cc` (PR #1355, [report](./AWJ-PLATFORM-UX-H1-2-SHELL-REPORT.md)). `H1-3` (platform dashboard) merged as `b97b19dd28818fbf9e84dfcc037602d56486fe33` (PR #1358, [report](./AWJ-PLATFORM-UX-H1-3-DASHBOARD-REPORT.md)). `H1-4A` (tenants list, [report](./AWJ-PLATFORM-UX-H1-4A-TENANTS-REPORT.md)) is the current slice and is in review. Its PR is not merge approval. H1-4B (tenant detail) is not started.
 
 ## Purpose
 
@@ -75,7 +75,7 @@ Verify viewports **320 / 375 / 390 / 430 / 768 / 1024 / 1440 / 1920px**, portrai
 | H1-PAGINATION | H1-1 spec approved, latest main | tenants list uses existing `page` metadata. No new API | **MERGED** (PR #1318, `31035783`) |
 | H1-CONTRAST | latest main. No shared files with pagination | gate-off dark danger text contrast. Sizes unchanged | **MERGED** (PR #1328, `bda44687`). Post-merge verification not recorded |
 | H1-2 shell | H1-1 spec approved, and it does not edit the pagination or contrast files in the same PR | platform console shell only | **MERGED** (PR #1355, `2bc1c125`). Post-merge verification not recorded |
-| H1-3 overview | shell merged and post-merge verified, or an explicit independence note | focused UI PR | **IN REVIEW**. Shell merged; post-merge verification was not recorded, so this slice is explicitly independent of it (UI change only, no shared files with H1-2 beyond the page it sits under). Merge needs explicit owner approval |
+| H1-3 overview | shell merged and post-merge verified, or an explicit independence note | focused UI PR | **MERGED** (PR #1358, `b97b19dd`). Post-merge verification not recorded |
 | H1-4 management | relevant prior dependencies | small per-page PRs | **MERGE_GATE per PR** |
 | H1-5 closure | approved changes on main | QA report | no deploy without permission |
 
