@@ -176,7 +176,7 @@ class DocumentStorageService
     /**
      * تشخيص يُشغَّل **عند فشل التحقق فقط**: يفصل الأسباب المحتملة بمصفوفة صغيرة بالإعداد المحفوظ نفسه — SDK مباشر
      * (كما يعمل `R2StorageService` الذي أثبت نجاحه في Production) بنمطَي العنونة (path/virtual-hosted) مع ACL وبدونه.
-     * HEAD لمفتاح غير موجود يجب أن يعيد `NotFound` (404) إن كان الاعتماد والدلو سليمين. كائنات اصطناعية تحت `healthchecks/`
+     * GET لمفتاح غير موجود يجب أن يعيد `NoSuchKey` إن كان الاعتماد والدلو سليمين (`NoSuchBucket` ⇒ دلو/endpoint خاطئ؛ HEAD لا يفصل بينهما). كائنات اصطناعية تحت `healthchecks/`
      * وتُحذف؛ المخرجات رموز خطأ وحالات HTTP فقط.
      *
      * @return array<string, string>
@@ -209,27 +209,28 @@ class DocumentStorageService
             }
             $bucket = (string) $settings['bucket'];
             $key = 'healthchecks/diagnose-'.Str::uuid().'.txt';
-            $report["{$label}.head_missing_key"] = $this->probe(fn () => $client->headObject(['Bucket' => $bucket, 'Key' => $key]), expectNotFound: true);
+            // GET لا HEAD: أخطاء HEAD بلا جسم فيتساوى `NoSuchKey` و`NoSuchBucket` (كلاهما 404). GET يعيد رمز S3 فيفصل بينهما:
+            // `NoSuchKey` ⇒ وصل الطلب إلى الدلو بمصادقة سليمة؛ `NoSuchBucket` ⇒ دلو/endpoint خاطئ.
+            $report["{$label}.get_missing_key"] = $this->probe(fn () => $client->getObject(['Bucket' => $bucket, 'Key' => $key]), expectNoSuchKey: true);
             $report["{$label}.put_no_acl"] = $this->probe(fn () => $client->putObject(['Bucket' => $bucket, 'Key' => $key, 'Body' => 'x']));
             $report["{$label}.put_acl_private"] = $this->probe(fn () => $client->putObject(['Bucket' => $bucket, 'Key' => $key.'.acl', 'Body' => 'x', 'ACL' => 'private']));
-            $report["{$label}.delete"] = $this->probe(function () use ($client, $bucket, $key) {
-                $client->deleteObject(['Bucket' => $bucket, 'Key' => $key]);
-                $client->deleteObject(['Bucket' => $bucket, 'Key' => $key.'.acl']);
-            });
+            // كل حذف مستقل: فشل الأول لا يمنع محاولة الثاني، فلا يبقى كائن اصطناعي أثناء التحقيق.
+            $report["{$label}.delete"] = $this->probe(fn () => $client->deleteObject(['Bucket' => $bucket, 'Key' => $key]));
+            $report["{$label}.delete_acl_object"] = $this->probe(fn () => $client->deleteObject(['Bucket' => $bucket, 'Key' => $key.'.acl']));
         }
 
         return $report;
     }
 
-    private function probe(\Closure $call, bool $expectNotFound = false): string
+    private function probe(\Closure $call, bool $expectNoSuchKey = false): string
     {
         try {
             $call();
 
-            return $expectNotFound ? 'FOUND (unexpected)' : 'OK';
+            return $expectNoSuchKey ? 'FOUND (unexpected)' : 'OK';
         } catch (Throwable $e) {
-            if ($expectNotFound && $e instanceof AwsException && $e->getStatusCode() === 404) {
-                return 'OK (404 NotFound: credentials and bucket are valid)';
+            if ($expectNoSuchKey && $e instanceof AwsException && $e->getAwsErrorCode() === 'NoSuchKey') {
+                return 'OK (NoSuchKey: credentials and bucket are valid)';
             }
 
             return 'FAIL: '.$this->describeFailure($e);

@@ -96,19 +96,19 @@ class DocumentStorageDiagnoseTest extends TestCase
     public function the_diagnosis_matrix_separates_credentials_from_acl_and_addressing(): void
     {
         $this->integration(['endpoint' => 'https://0123456789abcdef.r2.cloudflarestorage.com/awj-documents']);
-        // path: head 404 (creds ok) · put no-acl OK · put acl FAIL 501 NotImplemented · delete OK
+        // path: get NoSuchKey (creds+bucket ok) · put no-acl OK · put acl FAIL 501 NotImplemented · delete OK ×2
         // virtual: head 403 · put 403 · put-acl 403 · delete 403
         $queue = [
-            $this->awsError('NotFound', 404), new Result([]), $this->awsError('NotImplemented', 501), new Result([]), new Result([]),
+            $this->awsError('NoSuchKey', 404), new Result([]), $this->awsError('NotImplemented', 501), new Result([]), new Result([]),
             $this->awsError('AccessDenied', 403), $this->awsError('AccessDenied', 403), $this->awsError('AccessDenied', 403), $this->awsError('AccessDenied', 403), $this->awsError('AccessDenied', 403),
         ];
         $report = $this->serviceWithSdk($queue)->diagnosePlatformConfiguration();
 
         $this->assertSame('YES (should be empty)', $report['endpoint_has_path']);
-        $this->assertStringStartsWith('OK (404', $report['path.head_missing_key']);
+        $this->assertStringStartsWith('OK (NoSuchKey', $report['path.get_missing_key']);
         $this->assertSame('OK', $report['path.put_no_acl']);
         $this->assertSame('FAIL: AwsException NotImplemented http=501', $report['path.put_acl_private']);
-        $this->assertSame('FAIL: AwsException AccessDenied http=403', $report['virtual.head_missing_key']);
+        $this->assertSame('FAIL: AwsException AccessDenied http=403', $report['virtual.get_missing_key']);
         $this->assertStringNotContainsString('SECRET-X', json_encode($report));
     }
 
@@ -126,5 +126,47 @@ class DocumentStorageDiagnoseTest extends TestCase
 
         $this->assertSame('eu', $report['endpoint_jurisdiction']);
         $this->assertSame('no', $report['endpoint_has_path']);
+    }
+
+    /** @test */
+    public function a_missing_bucket_is_not_reported_as_valid_credentials(): void
+    {
+        $this->integration();
+        $queue = array_merge(
+            [$this->awsError('NoSuchBucket', 404), new Result([]), new Result([]), new Result([]), new Result([])],
+            [$this->awsError('NoSuchBucket', 404), new Result([]), new Result([]), new Result([]), new Result([])],
+        );
+        $report = $this->serviceWithSdk($queue)->diagnosePlatformConfiguration();
+
+        $this->assertSame('FAIL: AwsException NoSuchBucket http=404', $report['path.get_missing_key']);
+    }
+
+    /** @test */
+    public function both_diagnostic_objects_are_deleted_even_when_the_first_deletion_fails(): void
+    {
+        $this->integration();
+        $deleted = [];
+        $service = Mockery::mock(DocumentStorageService::class, [app(\App\Services\PlatformIntegrationResolver::class)])->makePartial();
+        $service->shouldAllowMockingProtectedMethods();
+        $service->shouldReceive('makeS3Client')->andReturnUsing(function () use (&$deleted): S3ClientInterface {
+            $handler = function (CommandInterface $command, RequestInterface $request) use (&$deleted) {
+                if ($command->getName() === 'DeleteObject') {
+                    $deleted[] = $command['Key'];
+                    if (count($deleted) % 2 === 1) {
+                        return \GuzzleHttp\Promise\Create::rejectionFor($this->awsError('InternalError', 500));
+                    }
+                }
+
+                return \GuzzleHttp\Promise\Create::promiseFor(new Result([]));
+            };
+
+            return new S3Client(['version' => 'latest', 'region' => 'auto', 'endpoint' => 'https://x.r2.cloudflarestorage.com', 'credentials' => ['key' => 'k', 'secret' => 's'], 'retries' => 0, 'handler' => $handler]);
+        });
+
+        $report = $service->diagnosePlatformConfiguration();
+
+        $this->assertSame('FAIL: AwsException InternalError http=500', $report['path.delete']);
+        $this->assertSame('OK', $report['path.delete_acl_object'], 'the second object is still attempted');
+        $this->assertCount(4, $deleted);
     }
 }

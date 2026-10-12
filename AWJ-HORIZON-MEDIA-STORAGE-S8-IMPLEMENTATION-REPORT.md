@@ -23,8 +23,8 @@
 | الفرضية | تتوقع المصفوفة | الإجراء |
 |---|---|---|
 | اعتماد خاطئ (Secret ≠ Token value، أو Key خاطئ) | كل الطلبات `InvalidAccessKeyId`/`SignatureDoesNotMatch` 403 في النمطين | إعادة إدخال Access Key ID وSecret **من شاشة إنشاء Token نفسها** |
-| صلاحية/نطاق الـToken لا يشمل `awj-documents` | `head` و`put` و`delete` ⇒ `AccessDenied` 403 | إصلاح نطاق الـToken: Object Read & Write + **Specify bucket = awj-documents** (وليس الحساب كله بلا دلو) |
-| endpoint خاطئ (فيه اسم الدلو/ولاية EU) | `endpoint_has_path: YES` أو `jurisdiction: eu` + `NoSuchBucket`/`403` | endpoint بلا مسار؛ لدلو EU استعمل عنوان `.eu.` |
+| صلاحية/نطاق الـToken لا يشمل `awj-documents` | `get` و`put` و`delete` ⇒ `AccessDenied` 403 | إصلاح نطاق الـToken: Object Read & Write + **Specify bucket = awj-documents** (وليس الحساب كله بلا دلو) |
+| endpoint خاطئ (فيه اسم الدلو/ولاية EU) | `endpoint_has_path: YES` أو `jurisdiction: eu` + `NoSuchBucket` (404) أو 403 | endpoint بلا مسار؛ لدلو EU استعمل عنوان `.eu.` |
 | عنونة path-style لا تناسب | `virtual.*` OK و`path.*` FAIL | افتراض `virtual` للتكامل |
 | ACL يُرفض (`NotImplemented`) | `put_no_acl` OK و`put_acl_private` FAIL | إصلاح كود: إزالة رأس `x-amz-acl` لمضيف R2 (انظر §4) |
 | شبكة/TLS | `FAIL: ConnectException` بلا رمز S3 | فحص خروج الشبكة من الخدمة |
@@ -32,7 +32,7 @@
 ## 3. ما نُفِّذ في هذه الشريحة (تشخيص، بلا تغيير في التشغيل)
 
 - `verifyPlatformConfiguration()`: **كل خطوة مستقلة** (كتابة/وجود/قراءة/حذف) فلا تُخفي الأولى نتيجة الأخريات، وتعيد السبب بلا أسرار: فئة الاستثناء ← **رمز خطأ S3** ← **حالة HTTP** (مثال: `FAIL: UnableToWriteFile ← S3Exception AccessDenied http=403`). لا رسالة خام (قد تحوي عنوان الطلب).
-- `diagnosePlatformConfiguration()` (يُستدعى تلقائياً من الأمر **عند الفشل فقط**): بالإعداد المحفوظ نفسه، SDK مباشر (كما يعمل `R2StorageService`) بنمطَي العنونة `path`/`virtual` × (`head` لمفتاح غير موجود — يجب أن يعيد 404 إن كان الاعتماد والدلو سليمين · `put` بلا ACL · `put` بـ`ACL=private` · `delete`) + صفات الـendpoint (مضيف R2؟ فيه مسار؟ ولاية؟ region؟ نمط العنونة المضبوط). كائنات اصطناعية تحت `healthchecks/` وتُحذف.
+- `diagnosePlatformConfiguration()` (يُستدعى تلقائياً من الأمر **عند الفشل فقط**): بالإعداد المحفوظ نفسه، SDK مباشر (كما يعمل `R2StorageService`) بنمطَي العنونة `path`/`virtual` × (`get` لمفتاح غير موجود — يجب أن يعيد `NoSuchKey` إن كان الاعتماد والدلو سليمين، و`NoSuchBucket` يعني دلو/endpoint خاطئاً؛ استُعمل GET لا HEAD لأن أخطاء HEAD بلا جسم فيتساوى الاثنان (404) — ملاحظة مراجعة · `put` بلا ACL · `put` بـ`ACL=private` · `delete` لكل كائن **بمحاولة مستقلة** فلا يبقى كائن اصطناعي إن فشل الأول) + صفات الـendpoint (مضيف R2؟ فيه مسار؟ ولاية؟ region؟ نمط العنونة المضبوط). كائنات اصطناعية تحت `healthchecks/` وتُحذف.
 - الأمر يطبع المصفوفة بعد `--- diagnose (codes only, no secrets) ---`. **لا أسرار** (يُختبر صراحةً).
 - `DocumentStorageDiagnoseTest` (4) + تحديث اختبار S6 الذي افترض مفتاح `error`.
 
