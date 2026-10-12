@@ -125,6 +125,7 @@ import { useDocumentHistory } from "./history/use-document-history";
 import { HistoryPreviewBar } from "./history/HistoryPreviewBar";
 import { type RevisionHistoryListState, RevisionHistoryDialog } from "./history/RevisionHistoryDialog";
 import { fillTemplate } from "./slider-edit";
+import { useUnsavedGuard } from "@/modules/commerce-workspace/flowers-admin/use-unsaved-guard";
 
 // CUST-H5-2 — أسهم التراجع/الإعادة تتبع اتجاه **المحرِّر** (`locale`) لا اتجاه وسم الصفحة: متغيّر `rtl:` يطابق أي سلف RTL
 // حتى لو كان أقرب سلف LTR. في RTL يسير الزمن من اليمين لليسار فيُعكس السهم.
@@ -497,6 +498,9 @@ export function ExperienceBuilder({
   const t = (key: CustomizerMessageKey) => customizerMessage(locale, key);
 
   const dirty = !presentationConfigsEqual(draft, saved);
+  // CUST-H5-6 (§3.7) — إعادة التحميل/إغلاق التبويب تُسقط التعديلات غير المحفوظة وسجلّ التراجع المحلي (لا تخزين متصفح كمرجع): الحارس
+  // يسأل قبل ذلك، ويسجّل المسودة في سجلّ مساحة التجارة فيسأل مبدِّل المتجر. في الذاكرة فقط؛ لا يُكتب شيء في التخزين.
+  useUnsavedGuard(dirty);
   // CUST-H2-2 — لوحة "homepage" (أقسام الصفحة الرئيسية) صالحة على الرئيسية
   // فقط؛ اللوحات الأخرى كلها هوية/تصميم/تواصل عالمية تصلح لكل صفحة (راجع
   // "Global vs Page-Specific Matrix" في العقد المعماري). إخفاؤها من التنقّل
