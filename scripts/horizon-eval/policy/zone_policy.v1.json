@@ -7,7 +7,7 @@
     {"id": "docs", "zone": "A", "patterns": ["docs/**"]},
 
     {"id": "governance", "zone": "C", "surfaces": ["S-GOV-DOCS"], "patterns": [
-      "docs/autonomous-engineering/**", "docs/engineering/**", "AGENTS.md", "**/AGENTS.md", "docs/**/ADR-*.md", "docs/**/ADR-*/**", "CLAUDE.md", "**/CLAUDE.md", ".claude/**",
+      "docs/autonomous-engineering/**", "docs/engineering/**", "AGENTS.md", "**/AGENTS.md", "GEMINI.md", "**/GEMINI.md", ".cursorrules", "**/.cursorrules", ".cursor/**", "**/.claude/**", "docs/**/ADR-*.md", "docs/**/ADR-*/**", "docs/ADR/**", "docs/**/adr/**", "CLAUDE.md", "**/CLAUDE.md", ".claude/**",
       "CODEOWNERS", ".github/CODEOWNERS", "docs/CODEOWNERS", "design-system/foundations/configurable-policies.md",
       "scripts/horizon-eval/**"
     ]},
@@ -77,7 +77,7 @@
 
   "hard_deny_patterns": [
     ".github/**", "scripts/ci-gate/**", "scripts/horizon-eval/**", ".claude/**", "docs/autonomous-engineering/**",
-    "docs/engineering/**", "AGENTS.md", "**/AGENTS.md", "CLAUDE.md", "**/CLAUDE.md", "CODEOWNERS", "**/CODEOWNERS",
+    "docs/engineering/**", "AGENTS.md", "**/AGENTS.md", "GEMINI.md", "**/GEMINI.md", ".cursorrules", "**/.cursorrules", ".cursor/**", "**/.claude/**", "docs/ADR/**", "docs/**/adr/**", "CLAUDE.md", "**/CLAUDE.md", "CODEOWNERS", "**/CODEOWNERS",
     "database/migrations/**", "database/seeders/**", "Dockerfile", "**/Dockerfile", "deploy/**", ".env", ".env.*", "**/.env", "**/.env.*"
   ],
 

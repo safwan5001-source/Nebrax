@@ -79,6 +79,8 @@ def sha256_hex(text: str) -> str:
 def parse_ts(value) -> datetime | None:
     if not isinstance(value, str):
         return None
+    if not re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z", value):   # ASCII, canonical only
+        return None
     try:
         return datetime.strptime(value, TS_FORMAT).replace(tzinfo=timezone.utc)
     except ValueError:
@@ -96,6 +98,14 @@ def safe_path(value, limit: int = 300) -> str:
     """Paths are repository metadata, but they come from untrusted PRs: keep them readable, drop control/markup chars."""
     text = "".join("?" if (ord(ch) < 32 or ch in "<>\"'`&") else ch for ch in str(value))
     return text[:limit]
+
+
+_LOGIN_RX = re.compile(r"[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})(?:\[bot\])?")
+
+
+def valid_login(value) -> bool:
+    """GitHub-style ASCII login. Free-text names, zero-width or non-ASCII characters are never an identity."""
+    return isinstance(value, str) and _LOGIN_RX.fullmatch(value) is not None
 
 
 def norm_identity(value) -> str:
@@ -459,15 +469,23 @@ _NOT_PRESENTATIONAL_WORDS = re.compile(
 )
 
 
+# Characters str.splitlines() treats as line breaks but a diff does not: they would hide the text after them from every screen.
+_HIDDEN_SEPARATORS = re.compile("[\u2028\u2029\x85\x0b\x0c\x1c\x1d\x1e]|\r(?!\n)")
+
+
+def _lines(patch: str) -> list[str]:
+    return patch.split("\n")
+
+
 def _added_lines(patch: str):
     """GitHub `patch` fields carry no file header, so every '+' line is content (a '+++x' line is the content '++x')."""
-    for line in patch.splitlines():
+    for line in _lines(patch):
         if line.startswith("+"):
             yield line[1:]
 
 
 def _removed_lines(patch: str):
-    for line in patch.splitlines():
+    for line in _lines(patch):
         if line.startswith("-"):
             yield line[1:]
 
@@ -505,7 +523,7 @@ def _presentational_line(line: str) -> bool:
 
 def patch_counts(patch: str) -> tuple[int, int]:
     """(added, removed) lines a GitHub `patch` actually represents. Hunk lines always start with '+', '-', ' ', '\\' or '@@'."""
-    lines = patch.splitlines()
+    lines = _lines(patch)
     return sum(1 for l in lines if l.startswith("+")), sum(1 for l in lines if l.startswith("-"))
 
 
@@ -545,6 +563,11 @@ def classify_files(files: list[dict], policy: dict, reasons: Reasons):
                 reasons.add("BLOCK", "PATH_UNSAFE", safe_path(name))
                 fzone = zmax(fzone, "C")
                 continue
+            if not name.isascii():   # lookalikes, invisible characters, NFC/NFD twins: default-deny
+                reasons.add("BLOCK", "PATH_NON_ASCII", safe_path(name))
+                fzone = zmax(fzone, "C")
+                matched.append("<non-ascii>")
+                continue
             hit = False
             for rule in rules:
                 protected = ZONE_RANK[rule["zone"]] >= ZONE_RANK["C"]
@@ -568,6 +591,8 @@ def classify_files(files: list[dict], policy: dict, reasons: Reasons):
         patch0 = f.get("patch")
         if (not isinstance(patch0, str) or patch0 == "") and not (f["status"] in ("renamed", "copied") and f["additions"] + f["deletions"] == 0):
             reasons.add("BLOCK", "PATCH_UNAVAILABLE", safe_path(f["filename"]))
+        elif isinstance(patch0, str) and _HIDDEN_SEPARATORS.search(patch0):
+            reasons.add("BLOCK", "PATCH_HIDDEN_LINE_SEPARATORS", safe_path(f["filename"]))
         elif isinstance(patch0, str) and patch0 != "" and patch_counts(patch0) != (f["additions"], f["deletions"]):
             # a non-empty patch that does not account for every reported change is incomplete: omitted lines could hide anything
             reasons.add("BLOCK", "PATCH_INCOMPLETE", safe_path(f["filename"]))
@@ -742,7 +767,7 @@ def select_grant(case: dict, mode: str, reasons: Reasons):
     doc = chosen["document"]
     for sib in candidates:
         sd = sib["document"]
-        if sib is not chosen and sd.get("status") in ("revoked", "suspended") and str(sd.get("issued_at")) >= str(doc.get("issued_at")):
+        if sib is not chosen and sd.get("status") in ("revoked", "suspended") and (parse_ts(sd.get("issued_at")) is None or parse_ts(sd.get("issued_at")) >= parse_ts(doc.get("issued_at"))):
             reasons.add("BLOCK", "GRANT_SUPERSEDED_BY_REVOCATION", safe(sd.get("grant_id")))
     errs = validate_grant(doc)
     if errs:
@@ -871,8 +896,9 @@ def check_conflicts(case: dict, own_surfaces: dict[str, str], own_files: set[str
             policy, Reasons())
         theirs = surface_modes_for(o_surf, (claim or {}).get("surfaces"), policy)
         reported_only = set((claim or {}).get("surfaces", {})) - o_surf
-        folded_own = {x.casefold(): x for x in own_files}
-        shared_paths = sorted(folded_own[x.casefold()] for x in other_files if x.casefold() in folded_own)
+        fold = lambda x: unicodedata.normalize("NFKC", x).casefold()  # noqa: E731
+        folded_own = {fold(x): x for x in own_files}
+        shared_paths = sorted(folded_own[fold(x)] for x in other_files if fold(x) in folded_own)
         shared_surfaces = sorted(set(own_surfaces) & set(theirs))
         if not shared_paths and not shared_surfaces:
             continue
@@ -1099,6 +1125,15 @@ def check_own_pr(case: dict, registry: dict, policy: dict, reasons: Reasons):
         reasons.add("BLOCK", "HEAD_NOT_IN_COMMITS")
     if not pr["files"]:
         reasons.add("BLOCK", "PR_HAS_NO_FILES")
+    ids = [c["id"] for c in ev["checks"]]
+    if len(ids) != len(set(ids)):
+        reasons.add("BLOCK", "EVIDENCE_DUPLICATE_CHECK_ID", "check-run ids must be unique")
+    hz = [h["horizon_id"] for h in ev["registry"]["horizons"]]
+    if len(hz) != len(set(hz)):
+        reasons.add("BLOCK", "EVIDENCE_DUPLICATE_HORIZON", "registry horizon ids must be unique")
+    people = [pr["author"]] + [c["author"] for c in pr["commits"]] + [a["by"] for a in ev["attestations"]] + [o["author"] for o in ev["other_prs"]]
+    if not all(valid_login(x) for x in people):
+        reasons.add("BLOCK", "IDENTITY_NOT_ASCII_LOGIN", "author/attestor identities must be plain GitHub logins")
     if pr["additions"] != sum(f["additions"] for f in pr["files"]) or pr["deletions"] != sum(f["deletions"] for f in pr["files"]):
         reasons.add("BLOCK", "CHANGE_COUNTERS_INCONSISTENT", "PR totals differ from the per-file counts")
     for f in pr["files"]:

@@ -36,9 +36,15 @@ def _plausible(record: dict) -> bool:
     return True
 
 
+REPO_ROOT = Path(__file__).resolve().parents[2]
+
+
 class Ledger:
     def __init__(self, root: Path):
         self.root = Path(root)
+        resolved = self.root.resolve()
+        if resolved == REPO_ROOT or REPO_ROOT in resolved.parents:
+            raise ValueError("the audit ledger must live outside the repository working tree")
         self.records = self.root / "records"
         self.pending = self.root / "pending"
         self.records.mkdir(parents=True, exist_ok=True)
@@ -96,6 +102,16 @@ class Ledger:
         return sum(1 for _ in self.pending.glob("*.json"))
 
 
+def _replay_allowed(record: dict, case: dict, allow_synthetic: bool) -> bool:
+    """A stored record is only a cache hint. It must describe THIS case's mode, and an ELIGIBLE record is replayed
+    only for an explicitly enabled synthetic case; anything else is re-evaluated (never trusted)."""
+    if record.get("mode") != case.get("mode"):
+        return False
+    if record.get("decision") == "ELIGIBLE_SIMULATED":
+        return bool(allow_synthetic) and case.get("mode") == "synthetic-test"
+    return True
+
+
 def evaluate_recorded(case, ledger: Ledger, *, allow_synthetic: bool = False, wall_clock=None) -> dict:
     """Evaluate once per (key, evidence). Safe to call again after any interruption."""
     case = case if isinstance(case, dict) else {}
@@ -106,7 +122,7 @@ def evaluate_recorded(case, ledger: Ledger, *, allow_synthetic: bool = False, wa
         out.update(replayed=False, ledger_skipped=True)
         return out
     existing = ledger.lookup(record_id)
-    if existing is not None:
+    if existing is not None and _replay_allowed(existing, case, allow_synthetic):
         replay = dict(existing)
         replay["replayed"] = True
         return replay

@@ -9,7 +9,7 @@ SCOPE: dry-run only. **No merge, no deploy, no Ruleset/Protection/Auto-Merge/per
 **Evidence for PASS**
 - Evaluator implemented, offline and incapable of acting (static guards: no network/process/env/write/merge symbols; GET-only collector).
 - Live mode **can never** return `ELIGIBLE_SIMULATED` (no owner-authenticity verifier exists); synthetic grants are refused in live mode and live evidence cannot be relabelled synthetic.
-- 165 local tests OK (stdlib), 23/23 V2-1B contract cases in 11 scenarios (+2 extras), **false-eligible = 0**; 472-point single-input mutation sweep and a sabotage run (22/23 injected defects caught, survivor double-defended) found no eligible survivor.
+- 172 local tests OK (stdlib), 23/23 V2-1B contract cases in 11 scenarios (+2 extras), **false-eligible = 0**; 472-point single-input mutation sweep and a sabotage run (22/23 injected defects caught, survivor double-defended) found no eligible survivor.
 - CI green on the last code commit (§7). No merge, deploy, ruleset/protection/auto-merge/permission change, grant, or other-horizon edit.
 
 **Conditions (why it is "conditional")**
@@ -114,11 +114,11 @@ Command: `PYTHONDONTWRITEBYTECODE=1 python3 -I -m unittest discover -s scripts/h
 
 | Layer | File | Tests | Result |
 |---|---|---|---|
-| 1. Focused evaluator unit tests (incl. 39 review-finding regressions) | `test_horizon_eval.py` | 125 | OK |
+| 1. Focused evaluator unit tests (incl. 46 review-finding regressions) | `test_horizon_eval.py` | 132 | OK |
 | 2. Contract + regression + mutation | `test_contract.py` | 12 | OK |
 | 3. Representative read-only repository evidence | `test_live_snapshots.py` | 8 | OK |
 | Static guards (no capability, fixture isolation) | `test_static_guards.py` | 20 | OK |
-| **Total** | | **165** | **OK, 0 failures, 0 errors** |
+| **Total** | | **172** | **OK, 0 failures, 0 errors** |
 
 Fail-closed evidence beyond the contract table:
 - **472 single-input mutation points** (two eligible bases: A and B) — each element deleted, nulled, and type-swapped; none stays eligible except a reviewed harmless list (free-text/optional elements) — this found a real gap (manifest lacking a required check) fixed with the policy `ci_floor`.
@@ -289,6 +289,18 @@ Each fix was verified present at HEAD, covered by a named regression test, and *
 | 17 | standalone literals (P1) | bare lines never Zone A | `test_standalone_literals_and_bare_text_lines_are_not_zone_a`, `test_path_zones` |
 
 Residual risks the reviewer listed that are **not** closed (declared in §11): unauthenticated attestations; test code executes in CI; symlinks/file modes invisible in the files API; injection regexes are defence-in-depth (paraphrase/homoglyph can evade; classification never depends on text); `head_pushed_at` is the author-controlled commit date; no semantic check of `approved_outcome`.
+
+### 8.6 Final closure Reviewer pass (fresh-context subagent, read-only) — 4 findings, all fixed
+
+| Sev | Finding | Resolution (regression test) |
+|---|---|---|
+| High | `str.splitlines()` also splits on U+2028/2029, `\x85`, `\x0b/0c/1c-1e`, lone `\r`: text after the separator escaped every screen (token scan, allowlist, injection scan, line counts) and Zone A UI + `fetch(..., POST)` stayed eligible | patches are split on `\n` only; any such separator → `PATCH_HIDDEN_LINE_SEPARATORS` BLOCK; CRLF patches unaffected (`test_unicode_line_separators_cannot_hide_patch_content`) |
+| Low/Med | non-canonical timestamps (`2026-9-30…`, lowercase `z`, Arabic-Indic digits) let a later revocation sort earlier as a string | `parse_ts` is ASCII-canonical only; sibling revocation compares parsed datetimes (`test_timestamps_are_strict_ascii_canonical`) |
+| Low/Med | a forged ledger record could replay `ELIGIBLE` for a live case | a stored record is only a cache hint: mode must match the case, and an ELIGIBLE record replays only when synthetic mode is explicitly enabled; ledger root must be outside the repository (`test_forged_or_foreign_ledger_record_is_never_replayed_as_eligible`, `test_ledger_must_live_outside_the_repository`) |
+| Low | evidence integrity: duplicate check-run ids resolved by order; duplicate registry horizons; zero-width/free-text identities | `EVIDENCE_DUPLICATE_CHECK_ID`, `EVIDENCE_DUPLICATE_HORIZON`, `IDENTITY_NOT_ASCII_LOGIN` BLOCKs (`test_evidence_integrity_duplicates_and_identities`) |
+| residual | non-ASCII/NFC-NFD paths fell through as Zone A; `docs/.claude/**`, `GEMINI.md`, `.cursorrules`, `docs/ADR/` were Zone A | non-ASCII paths → `PATH_NON_ASCII` BLOCK + Zone C, overlaps compared NFKC-casefolded; agent-instruction files and ADR dirs → Zone C (`test_non_ascii_paths_default_deny_and_unicode_twins_overlap`, `test_agent_instruction_files_and_adr_dirs_are_zone_c`) |
+
+Declared residual (unchanged): an empty `other_prs` list cannot be proven complete by the evaluator (the collector paginates the open-PR list); attestations are unauthenticated; test code executes in CI; the collector falls back to the free-text git name when a commit author has no login (now blocked by the login rule).
 
 ### 8.3 AWJ Guardian
 Accounting/tax/ZATCA: no effect, no journal entries. Tenant/branch isolation and RBAC: untouched; no tenant data in code, fixtures or snapshots. Security: no secrets; no credential, no permission, no workflow; collector is GET-only and statically guarded. GitHub settings: untouched (read-only probes). Other horizons: no branch, file or claim touched. V2-2/V2-3/V2-4: not started.
