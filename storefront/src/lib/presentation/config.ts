@@ -208,6 +208,8 @@ export interface StorefrontPresentationConfig {
    * byte-identically.
    */
   typography?: GlobalTokensDoc["typography"];
+  /** CUST-HV V5e-2b — button tokens (style / size / radius / colour / hover). Absent = today's buttons. */
+  buttons?: GlobalTokensDoc["buttons"];
   surfaces?: GlobalTokensDoc["surfaces"];
   /** CUST-HV V9d-1 — card tokens (V0 §14.1): alignment, image ratio / fit, hover. Absent = today's card. */
   cards?: GlobalTokensDoc["cards"];
