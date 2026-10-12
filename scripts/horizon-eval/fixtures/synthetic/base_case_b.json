@@ -64,7 +64,8 @@
       ],
       "claim": {
         "task_id": "SYNTH-T-002"
-      }
+      },
+      "head_ref": "synth-hz-pilot/null-guard"
     },
     "attestations": [
       {

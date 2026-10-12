@@ -54,9 +54,9 @@
     "status": "completed"
    }
   ],
-  "fetched_at": "2026-10-12T02:51:20Z",
+  "fetched_at": "2026-10-12T03:04:16Z",
   "grant_store": {
-   "fetched_at": "2026-10-12T02:51:20Z",
+   "fetched_at": "2026-10-12T03:04:16Z",
    "grants": [],
    "kill_switch": false,
    "ref": "main",
@@ -75,11 +75,12 @@
      "app/Services/DocumentCenter/DocumentStorageService.php",
      "tests/Feature/DocumentStorageDurableProfileTest.php"
     ],
+    "files_complete": true,
     "head_ref": "horizon/media-storage-s7-documents-reads",
     "horizon_id": null,
     "last_activity_at": "2026-10-12T02:42:47Z",
     "number": 1350,
-    "observed_at": "2026-10-12T02:51:20Z",
+    "observed_at": "2026-10-12T03:04:16Z",
     "state": "open"
    },
    {
@@ -105,11 +106,12 @@
      "web/src/modules/store-experience-builder/themes/index.ts",
      "web/src/modules/store-experience-builder/themes/preview-link.ts"
     ],
+    "files_complete": true,
     "head_ref": "cust-hv/v10b-theme-preview-apply",
     "horizon_id": null,
     "last_activity_at": "2026-10-12T02:42:34Z",
     "number": 1349,
-    "observed_at": "2026-10-12T02:51:20Z",
+    "observed_at": "2026-10-12T03:04:16Z",
     "state": "open"
    },
    {
@@ -118,11 +120,12 @@
      "docs/plans/growth/AWJ_GROWTH_FOUNDATION_HORIZON_V1.md",
      "docs/plans/growth/AWJ_GROWTH_FOUNDATION_HORIZON_V1_BOOTSTRAP.md"
     ],
+    "files_complete": true,
     "head_ref": "docs/awj-growth-foundation-horizon-v1",
     "horizon_id": null,
     "last_activity_at": "2026-09-30T18:12:05Z",
     "number": 1128,
-    "observed_at": "2026-10-12T02:51:20Z",
+    "observed_at": "2026-10-12T03:04:16Z",
     "state": "open"
    },
    {
@@ -181,11 +184,12 @@
      "motion/awj-commercial/src/ui/common.tsx",
      "motion/awj-commercial/tsconfig.json"
     ],
+    "files_complete": true,
     "head_ref": "motion/awj-commercial-15s",
     "horizon_id": null,
     "last_activity_at": "2026-09-29T05:29:57Z",
     "number": 1105,
-    "observed_at": "2026-10-12T02:51:20Z",
+    "observed_at": "2026-10-12T03:04:16Z",
     "state": "open"
    },
    {
@@ -195,11 +199,12 @@
      "docs/plans/cloudflare/AWJ_CLOUDFLARE_PLATFORM_HORIZON_V1.md",
      "docs/plans/cloudflare/CF-SAAS-DOMAIN-PROVIDER-1-DECISION-PACKET.md"
     ],
+    "files_complete": true,
     "head_ref": "docs/awj-cloudflare-platform-horizon-v1",
     "horizon_id": null,
     "last_activity_at": "2026-09-28T21:32:28Z",
     "number": 1093,
-    "observed_at": "2026-10-12T02:51:20Z",
+    "observed_at": "2026-10-12T03:04:16Z",
     "state": "open"
    },
    {
@@ -212,11 +217,12 @@
      "tests/Feature/CommerceModuleBoundaryTest.php",
      "tests/Feature/StorefrontPresentationVersionPublishApiTest.php"
     ],
+    "files_complete": true,
     "head_ref": "feat/theme-version-publish",
     "horizon_id": null,
     "last_activity_at": "2026-09-28T15:37:50Z",
     "number": 1089,
-    "observed_at": "2026-10-12T02:51:20Z",
+    "observed_at": "2026-10-12T03:04:16Z",
     "state": "open"
    },
    {
@@ -224,11 +230,12 @@
     "files": [
      "docs/plans/store/AWJ_STORE_CUSTOMIZER_EXTENDED_ARCHITECTURE.md"
     ],
+    "files_complete": true,
     "head_ref": "docs/store-customizer-extended-architecture",
     "horizon_id": null,
     "last_activity_at": "2026-09-17T10:42:20Z",
     "number": 853,
-    "observed_at": "2026-10-12T02:51:20Z",
+    "observed_at": "2026-10-12T03:04:16Z",
     "state": "open"
    },
    {
@@ -236,11 +243,12 @@
     "files": [
      "app/Console/Commands/RecoverHistoricalTenantCommand.php"
     ],
+    "files_complete": true,
     "head_ref": "feat/awj-taiba-tenant-recovery-platform-admin",
     "horizon_id": null,
     "last_activity_at": "2026-09-12T04:21:51Z",
     "number": 784,
-    "observed_at": "2026-10-12T02:51:20Z",
+    "observed_at": "2026-10-12T03:04:16Z",
     "state": "open"
    },
    {
@@ -249,11 +257,12 @@
      "docs/plans/payments/AWJ_PAY_V2_6A_GATEWAY_REFUND_ACCOUNTING_DESIGN.md",
      "docs/plans/payments/AWJ_PAY_V2_6B_CUSTOMER_REFUND_EVIDENCE_PASS.md"
     ],
+    "files_complete": true,
     "head_ref": "docs/pay-v2-6a-gateway-refund-accounting-design",
     "horizon_id": null,
     "last_activity_at": "2026-09-12T01:19:29Z",
     "number": 778,
-    "observed_at": "2026-10-12T02:51:20Z",
+    "observed_at": "2026-10-12T03:04:16Z",
     "state": "open"
    },
    {
@@ -261,11 +270,12 @@
     "files": [
      "docs/audits/AWJ_ACCOUNTING_SETTINGS_PRODUCT_COMPLETENESS_AUDIT_2026-09.md"
     ],
+    "files_complete": true,
     "head_ref": "claude/accounting-settings-product-completeness-audit",
     "horizon_id": null,
     "last_activity_at": "2026-09-08T22:37:53Z",
     "number": 704,
-    "observed_at": "2026-10-12T02:51:20Z",
+    "observed_at": "2026-10-12T03:04:16Z",
     "state": "open"
    },
    {
@@ -276,11 +286,12 @@
      "docs/plans/design/references/awj-v2-product-master-desktop-mobile.jpeg",
      "docs/plans/design/references/awj-v2-sales-invoice-desktop.jpeg"
     ],
+    "files_complete": true,
     "head_ref": "claude/awj-v2-visual-references-62yiwn",
     "horizon_id": null,
     "last_activity_at": "2026-09-08T15:40:55Z",
     "number": 703,
-    "observed_at": "2026-10-12T02:51:20Z",
+    "observed_at": "2026-10-12T03:04:16Z",
     "state": "open"
    },
    {
@@ -290,11 +301,12 @@
      "app/Services/Accounting/ZatcaSignedInvoiceQrResult.php",
      "tests/Feature/ZatcaSignedInvoiceQrCoordinatorTest.php"
     ],
+    "files_complete": true,
     "head_ref": "feat/zatca-signed-invoice-qr-coordinator",
     "horizon_id": null,
     "last_activity_at": "2026-08-30T14:12:47Z",
     "number": 586,
-    "observed_at": "2026-10-12T02:51:20Z",
+    "observed_at": "2026-10-12T03:04:16Z",
     "state": "open"
    },
    {
@@ -304,11 +316,12 @@
      "app/Console/Commands/DocumentReadinessCommand.php",
      "deploy/document-worker.sh"
     ],
+    "files_complete": true,
     "head_ref": "fix/document-database-queue-readiness",
     "horizon_id": null,
     "last_activity_at": "2026-08-30T01:37:44Z",
     "number": 578,
-    "observed_at": "2026-10-12T02:51:20Z",
+    "observed_at": "2026-10-12T03:04:16Z",
     "state": "open"
    },
    {
@@ -321,11 +334,12 @@
      "setup.sh",
      "tests/Feature/AccountingGuardTest.php"
     ],
+    "files_complete": true,
     "head_ref": "claude/ai-assistant-guidelines-9gxfjs",
     "horizon_id": null,
     "last_activity_at": "2026-08-14T23:31:52Z",
     "number": 202,
-    "observed_at": "2026-10-12T02:51:20Z",
+    "observed_at": "2026-10-12T03:04:16Z",
     "state": "open"
    }
   ],
@@ -333,6 +347,7 @@
    "additions": 504,
    "author": "safwan5001-source",
    "base_ref": "main",
+   "base_repo": "safwan5001-source/Nebrax",
    "base_sha": "b3dc3d8e68a127dfd2ca5d1c3f50e4e5a8676ffd",
    "body": "## AWJ-HORIZON-V2-1B — Authority & Threat Model\n\n**Documentation only.** No merge, deploy, Ruleset, Branch Protection, Auto-Merge, GitHub permission change, or grant is enabled. V2-2/3/4 not started. No other Horizon touched.\n\n| | |\n|---|---|\n| Base SHA | `b3dc3d8e68a127dfd2ca5d1c3f50e4e5a8676ffd` |\n| Head SHA | `473f6a83a1c0b2f9edbcd1efcaf564906c6734cb` (supersedes `cb6c381`; results for the earlier SHA are not relied on) |\n\n### Contents\n- `AWJ-HORIZON-V2-1B-AUTHORITY-THREAT-MODEL.md` — Zones A/B/C/P, Grant Schema + fail-closed evaluation, Threat Model T1–T10, GitHub safety plan G0–G5 (explicitly **not enabled**), parallel-horizon registry, dry-run contract (**11 scenarios / 23 test cases**), Decision Packet D1–D10.\n- `AWJ-HORIZON-V2-1B-IMPLEMENTATION-REPORT.md` — final report.\n- `AWJ-HORIZON-AUTONOMY-V2-PROPOSAL.md` — one-line pointer in §10.\n\n### Corrections in this head\n- Dry-run counts unified and verified against the table (previously \"25 sub-cases\"/\"ten cases\" inconsistently).\n- §4.6: a signed commit alone does **not** prove grant authenticity (GitHub signs merge commits; a signature proves key possession, not owner intent). Owner identity verification out-of-band, isolated keys, pinned `allowed_signers`, content binding, and rotation/revocation are mandatory.\n- §7: table stating every protection (Ruleset, Required Check, Require PR, gate-file protection, independent review, Auto-Merge) is currently **not enabled**.\n\n### Checks\n`ci-gate` self-tests 49/49 OK · `git diff --check` clean · `php artisan test` runs in CI on this head. No financial operations → no accounting entries.\n\nMerge authority is the owner's alone.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nhttps://claude.ai/code/session_01X2ShKtNyjEJkNK5m7yC6BU",
    "changed_files": 3,
@@ -345,10 +360,12 @@
    ],
    "commits": [
     {
+     "author": "claude",
      "message": "docs(horizon): V2-1B authority & threat model, GitHub safety plan, dry-run contract\n\nDocumentation only. No merge, deploy, ruleset, protection or grant is enabled.\n\nCo-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01X2ShKtNyjEJkNK5m7yC6BU",
      "sha": "cb6c3818b748d8634c6d218566435d0082fa43d4"
     },
     {
+     "author": "claude",
      "message": "docs(horizon): V2-1B — fix dry-run counts (11 scenarios/23 cases), state signed commits are insufficient for grant authenticity, list protections as not enabled\n\nCo-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01X2ShKtNyjEJkNK5m7yC6BU",
      "sha": "473f6a83a1c0b2f9edbcd1efcaf564906c6734cb"
     }
@@ -360,7 +377,7 @@
      "additions": 1,
      "deletions": 1,
      "filename": "docs/autonomous-engineering/AWJ-HORIZON-AUTONOMY-V2-PROPOSAL.md",
-     "patch": "",
+     "patch": null,
      "previous_filename": null,
      "status": "modified"
     },
@@ -368,7 +385,7 @@
      "additions": 453,
      "deletions": 0,
      "filename": "docs/autonomous-engineering/AWJ-HORIZON-V2-1B-AUTHORITY-THREAT-MODEL.md",
-     "patch": "",
+     "patch": null,
      "previous_filename": null,
      "status": "added"
     },
@@ -376,12 +393,14 @@
      "additions": 50,
      "deletions": 0,
      "filename": "docs/autonomous-engineering/AWJ-HORIZON-V2-1B-IMPLEMENTATION-REPORT.md",
-     "patch": "",
+     "patch": null,
      "previous_filename": null,
      "status": "added"
     }
    ],
    "head_pushed_at": "2026-10-12T01:58:43Z",
+   "head_ref": "docs/awj-horizon-v2-1b-authority-threat-model",
+   "head_repo": "safwan5001-source/Nebrax",
    "head_sha": "473f6a83a1c0b2f9edbcd1efcaf564906c6734cb",
    "labels": [],
    "merge_commit_sha": "6532c0c9df1a769c72b07edbc5e48912b01a1950",
@@ -415,7 +434,7 @@
   "source": "github-readonly"
  },
  "mode": "live",
- "now": "2026-10-12T02:51:20Z",
+ "now": "2026-10-12T03:04:16Z",
  "request": {
   "action": "merge",
   "agent_id": "pilot-session",

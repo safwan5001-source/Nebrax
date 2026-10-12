@@ -17,7 +17,9 @@
   "evidence": {
     "fetched_at": "2026-10-12T11:59:30Z",
     "source": "synthetic-fixture",
-    "main": {"sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+    "main": {
+      "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
     "grant_store": {
       "ref": "main",
       "ref_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
@@ -42,19 +44,47 @@
             "expires_at": "2026-10-17T00:00:00Z",
             "horizon_id": "SYNTH-HZ-PILOT",
             "approved_outcome": "Synthetic: documentation-only wording changes.",
-            "repositories": ["synthetic-owner/synthetic-repo"],
-            "base_branches": ["main"],
-            "zones_allowed": ["A"],
-            "task_categories": ["docs-nongov", "a11y-label"],
+            "repositories": [
+              "synthetic-owner/synthetic-repo"
+            ],
+            "base_branches": [
+              "main"
+            ],
+            "zones_allowed": [
+              "A"
+            ],
+            "task_categories": [
+              "docs-nongov",
+              "a11y-label"
+            ],
             "tasks_allowlist": [],
-            "paths_allow": ["docs/**", "web/src/**/*.tsx"],
-            "paths_deny": ["docs/private/**"],
-            "limits": {"max_merges": 5, "max_merges_per_day": 2, "max_files_per_pr": 8, "max_changed_lines": 200, "max_open_prs": 1},
-            "agents": ["synthetic-agent-1"],
-            "required_checks": ["CI Gate"],
-            "review_requirements": ["PRE_MERGE_REVIEW"],
+            "paths_allow": [
+              "docs/**",
+              "web/src/**/*.tsx"
+            ],
+            "paths_deny": [
+              "docs/private/**"
+            ],
+            "limits": {
+              "max_merges": 5,
+              "max_merges_per_day": 2,
+              "max_files_per_pr": 8,
+              "max_changed_lines": 200,
+              "max_open_prs": 1
+            },
+            "agents": [
+              "synthetic-agent-1"
+            ],
+            "required_checks": [
+              "CI Gate"
+            ],
+            "review_requirements": [
+              "PRE_MERGE_REVIEW"
+            ],
             "conflict_policy": "stop",
-            "revocation": {"channel": "synthetic"},
+            "revocation": {
+              "channel": "synthetic"
+            },
             "production_gated": true,
             "audit": "synthetic-ledger"
           },
@@ -76,11 +106,44 @@
         }
       ]
     },
-    "grant_usage": [{"grant_id": "GR-SYNTHETIC-001", "merges_total": 0, "merges_today": 0, "open_prs": 1}],
+    "grant_usage": [
+      {
+        "grant_id": "GR-SYNTHETIC-001",
+        "merges_total": 0,
+        "merges_today": 0,
+        "open_prs": 1
+      }
+    ],
     "registry": {
       "horizons": [
-        {"horizon_id": "SYNTH-HZ-PILOT", "protocol_version": "v2", "owner_agent": "synthetic-agent-1", "status_reported": "active", "claim_order": 5, "claimed_surfaces": {}},
-        {"horizon_id": "SYNTH-HZ-OTHER", "protocol_version": "v2", "owner_agent": "synthetic-agent-2", "status_reported": "active", "claim_order": 3, "claimed_surfaces": {}}
+        {
+          "horizon_id": "SYNTH-HZ-PILOT",
+          "protocol_version": "v2",
+          "owner_agent": "synthetic-agent-1",
+          "status_reported": "active",
+          "claim_order": 5,
+          "claimed_surfaces": {},
+          "branch_prefixes": [
+            "synth-hz-pilot/"
+          ],
+          "authors": [
+            "synthetic-author"
+          ]
+        },
+        {
+          "horizon_id": "SYNTH-HZ-OTHER",
+          "protocol_version": "v2",
+          "owner_agent": "synthetic-agent-2",
+          "status_reported": "active",
+          "claim_order": 3,
+          "claimed_surfaces": {},
+          "branch_prefixes": [
+            "synth-hz-other/"
+          ],
+          "authors": [
+            "synthetic-author-2"
+          ]
+        }
       ]
     },
     "pr": {
@@ -99,39 +162,123 @@
       "additions": 30,
       "deletions": 6,
       "changed_files": 3,
-      "labels": ["horizon:SYNTH-HZ-PILOT"],
-      "files": [
-        {"filename": "docs/guides/synthetic-a.md", "status": "modified", "additions": 10, "deletions": 2, "patch": "@@ -1 +1 @@\n-old text\n+clearer text"},
-        {"filename": "docs/guides/synthetic-b.md", "status": "modified", "additions": 10, "deletions": 2, "patch": "@@ -1 +1 @@\n-old text\n+clearer text"},
-        {"filename": "docs/guides/synthetic-c.md", "status": "modified", "additions": 10, "deletions": 2, "patch": "@@ -1 +1 @@\n-old text\n+clearer text"}
+      "labels": [
+        "horizon:SYNTH-HZ-PILOT"
       ],
-      "commits": [{"sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "message": "docs: clarify wording"}],
+      "files": [
+        {
+          "filename": "docs/guides/synthetic-a.md",
+          "status": "modified",
+          "additions": 10,
+          "deletions": 2,
+          "patch": "@@ -1 +1 @@\n-old text\n+clearer text"
+        },
+        {
+          "filename": "docs/guides/synthetic-b.md",
+          "status": "modified",
+          "additions": 10,
+          "deletions": 2,
+          "patch": "@@ -1 +1 @@\n-old text\n+clearer text"
+        },
+        {
+          "filename": "docs/guides/synthetic-c.md",
+          "status": "modified",
+          "additions": 10,
+          "deletions": 2,
+          "patch": "@@ -1 +1 @@\n-old text\n+clearer text"
+        }
+      ],
+      "commits": [
+        {
+          "sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "message": "docs: clarify wording",
+          "author": "synthetic-author"
+        }
+      ],
       "comments": [],
       "reviews": [],
-      "claim": {"horizon_id": "SYNTH-HZ-PILOT", "task_id": "SYNTH-T-001", "surfaces": {}, "claim_order": 5}
+      "claim": {
+        "horizon_id": "SYNTH-HZ-PILOT",
+        "task_id": "SYNTH-T-001",
+        "surfaces": {},
+        "claim_order": 5
+      },
+      "head_ref": "synth-hz-pilot/docs-wording",
+      "head_repo": "synthetic-owner/synthetic-repo",
+      "base_repo": "synthetic-owner/synthetic-repo"
     },
     "checks": [
-      {"id": 1001, "name": "CI Gate", "status": "completed", "conclusion": "success", "head_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "event": "pull_request", "completed_at": "2026-10-12T11:48:00Z", "app": "github-actions"},
-      {"id": 1002, "name": "php artisan test (L11, sqlite)", "status": "completed", "conclusion": "success", "head_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "event": "pull_request", "completed_at": "2026-10-12T11:40:00Z", "app": "github-actions"},
-      {"id": 1003, "name": "php artisan test (L11, pgsql)", "status": "completed", "conclusion": "success", "head_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "event": "pull_request", "completed_at": "2026-10-12T11:45:00Z", "app": "github-actions"}
+      {
+        "id": 1001,
+        "name": "CI Gate",
+        "status": "completed",
+        "conclusion": "success",
+        "head_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "event": "pull_request",
+        "completed_at": "2026-10-12T11:48:00Z",
+        "app": "github-actions"
+      },
+      {
+        "id": 1002,
+        "name": "php artisan test (L11, sqlite)",
+        "status": "completed",
+        "conclusion": "success",
+        "head_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "event": "pull_request",
+        "completed_at": "2026-10-12T11:40:00Z",
+        "app": "github-actions"
+      },
+      {
+        "id": 1003,
+        "name": "php artisan test (L11, pgsql)",
+        "status": "completed",
+        "conclusion": "success",
+        "head_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "event": "pull_request",
+        "completed_at": "2026-10-12T11:45:00Z",
+        "app": "github-actions"
+      }
     ],
     "required_checks": {
       "source_ref": "main",
       "source_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "gate_name": "CI Gate",
-      "always_names": ["php artisan test (L11, sqlite)", "php artisan test (L11, pgsql)"],
-      "path_names": ["web build (Next.js)"],
+      "always_names": [
+        "php artisan test (L11, sqlite)",
+        "php artisan test (L11, pgsql)"
+      ],
+      "path_names": [
+        "web build (Next.js)",
+        "storefront (lint + typecheck + test)"
+      ],
       "grace_minutes_no_run": 10
     },
     "attestations": [
-      {"type": "PRE_MERGE_REVIEW", "sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "by": "synthetic-agent-1", "result": "PASS"}
+      {
+        "type": "PRE_MERGE_REVIEW",
+        "sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "by": "synthetic-agent-1",
+        "result": "PASS"
+      }
     ],
     "other_prs": [
       {
-        "number": 9100, "state": "open", "horizon_id": "SYNTH-HZ-OTHER", "head_ref": "synth-hz-other/unrelated",
-        "observed_at": "2026-10-12T11:59:00Z", "last_activity_at": "2026-10-12T11:58:00Z",
-        "files": ["storefront/src/components/Unrelated.tsx"],
-        "claim": {"horizon_id": "SYNTH-HZ-OTHER", "task_id": "SYNTH-T-900", "surfaces": {}, "claim_order": 3}
+        "number": 9100,
+        "state": "open",
+        "horizon_id": "SYNTH-HZ-OTHER",
+        "head_ref": "synth-hz-other/unrelated",
+        "observed_at": "2026-10-12T11:59:00Z",
+        "last_activity_at": "2026-10-12T11:58:00Z",
+        "files": [
+          "storefront/src/components/Unrelated.tsx"
+        ],
+        "claim": {
+          "horizon_id": "SYNTH-HZ-OTHER",
+          "task_id": "SYNTH-T-900",
+          "surfaces": {},
+          "claim_order": 3
+        },
+        "files_complete": true
       }
     ]
   }

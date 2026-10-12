@@ -7,7 +7,7 @@
     {"id": "docs", "zone": "A", "patterns": ["docs/**"]},
 
     {"id": "governance", "zone": "C", "surfaces": ["S-GOV-DOCS"], "patterns": [
-      "docs/autonomous-engineering/**", "docs/engineering/AWJ_HORIZON_*", "CLAUDE.md", "**/CLAUDE.md", ".claude/**",
+      "docs/autonomous-engineering/**", "docs/engineering/**", "AGENTS.md", "**/AGENTS.md", "docs/**/ADR-*.md", "docs/**/ADR-*/**", "CLAUDE.md", "**/CLAUDE.md", ".claude/**",
       "CODEOWNERS", ".github/CODEOWNERS", "docs/CODEOWNERS", "design-system/foundations/configurable-policies.md",
       "scripts/horizon-eval/**"
     ]},
@@ -48,7 +48,12 @@
       "web/src/components/layout/sidebar*", "web/src/**/sidebar.tsx", "storefront/src/i18n/**", "web/messages/**"
     ]},
     {"id": "tests", "zone": "B", "added_only_zone": "A", "patterns": ["tests/**", "web/e2e/**", "web/src/**/*.test.ts", "web/src/**/*.test.tsx", "web/src/**/__tests__/**", "storefront/src/**/__tests__/**", "storefront/**/*.test.ts", "storefront/**/*.test.tsx"]},
-    {"id": "ui", "zone": "A", "behavior": true, "patterns": ["web/src/**", "storefront/src/**"]}
+    {"id": "ui-sensitive", "zone": "C", "surfaces": ["S-RBAC-TENANT"], "patterns": [
+      "web/src/lib/**", "web/src/app/api/**", "**/middleware.*", "**/auth/**", "**/auth.*", "**/auth-*", "**/*-auth.*", "**/*_auth.*", "**/login/**", "storefront/src/app/api/**"
+    ]},
+    {"id": "ui", "zone": "A", "behavior": true, "patterns": [
+      "web/src/components/**", "web/src/modules/**", "web/src/app/**", "storefront/src/components/**", "storefront/src/app/**"
+    ]}
   ],
 
   "categories": {
@@ -61,7 +66,7 @@
 
   "hard_deny_patterns": [
     ".github/**", "scripts/ci-gate/**", "scripts/horizon-eval/**", ".claude/**", "docs/autonomous-engineering/**",
-    "docs/engineering/AWJ_HORIZON_*", "CLAUDE.md", "**/CLAUDE.md", "CODEOWNERS", "**/CODEOWNERS",
+    "docs/engineering/**", "AGENTS.md", "**/AGENTS.md", "CLAUDE.md", "**/CLAUDE.md", "CODEOWNERS", "**/CODEOWNERS",
     "database/migrations/**", "database/seeders/**", "Dockerfile", "**/Dockerfile", "deploy/**", ".env", ".env.*", "**/.env", "**/.env.*"
   ],
 
@@ -79,7 +84,11 @@
     "comment": "Minimum checks the evaluator demands whatever the manifest evidence says (a manifest that omits them is itself a BLOCK).",
     "gate_name": "CI Gate",
     "always": ["php artisan test (L11, sqlite)", "php artisan test (L11, pgsql)"],
-    "path": ["web build (Next.js)"]
+    "path": ["web build (Next.js)", "storefront (lint + typecheck + test)"],
+    "required_when_touched": {
+      "web/**": "web build (Next.js)",
+      "storefront/**": "storefront (lint + typecheck + test)"
+    }
   },
 
   "windows": {

@@ -60,6 +60,7 @@ AUTHENTICITY_CONDITIONS = (
     "web_flow_signatures_excluded",
 )
 
+TRUNCATION_MARKER = "[[TRUNCATED]]"
 SHA_RX = r"[0-9a-f]{40}"
 HEX64_RX = r"[0-9a-f]{64}"
 TS_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
@@ -68,7 +69,7 @@ TS_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 # ───────────────────────────── helpers ─────────────────────────────
 
 def canon(obj) -> str:
-    return json.dumps(obj, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    return json.dumps(obj, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
 
 
 def sha256_hex(text: str) -> str:
@@ -95,6 +96,12 @@ def safe_path(value, limit: int = 300) -> str:
     """Paths are repository metadata, but they come from untrusted PRs: keep them readable, drop control/markup chars."""
     text = "".join("?" if (ord(ch) < 32 or ch in "<>\"'`&") else ch for ch in str(value))
     return text[:limit]
+
+
+def norm_identity(value) -> str:
+    """Case/format-insensitive account identity: 'Synthetic-Author', 'synthetic-author[bot]' are the same actor."""
+    text = unicodedata.normalize("NFKC", str(value)).strip().casefold()
+    return text[:-5] if text.endswith("[bot]") else text
 
 
 def zmax(*zones: str) -> str:
@@ -147,7 +154,7 @@ def unsafe_path(path) -> bool:
         or "\\" in path
         or "\x00" in path
         or any(ord(ch) < 32 for ch in path)
-        or any(seg in ("..", ".") or seg == "" for seg in path.split("/"))
+        or any(seg in ("..", ".") or seg == "" or seg.endswith((".", " ")) for seg in path.split("/"))
     )
 
 
@@ -280,11 +287,13 @@ CASE_VALIDATOR = v_obj(
                 "registry": v_obj({"horizons": v_list(v_obj({
                     "horizon_id": v_str(), "protocol_version": v_enum("v1", "v2"), "owner_agent": v_str(),
                     "status_reported": v_str(), "claim_order": v_int(1), "claimed_surfaces": _SURFACE_MODES,
+                    "branch_prefixes": v_list(v_str(), minlen=1), "authors": v_list(v_str(), minlen=1),
                 }))}),
                 "pr": v_obj(
                     {
                         "number": v_int(1), "state": v_enum("open", "closed"), "draft": v_bool(), "merged": v_bool(),
                         "merge_commit_sha": v_null(v_str(rx=SHA_RX)), "author": v_str(),
+                        "head_ref": v_str(), "head_repo": v_str(), "base_repo": v_str(),
                         "title": v_str(minlen=0), "body": v_str(minlen=0),
                         "head_sha": v_str(rx=SHA_RX), "head_pushed_at": v_ts(),
                         "base_sha": v_str(rx=SHA_RX), "base_ref": v_str(),
@@ -295,7 +304,7 @@ CASE_VALIDATOR = v_obj(
                              "additions": v_int(), "deletions": v_int()},
                             {"previous_filename": v_null(v_str()), "patch": v_null(v_str(minlen=0))},
                         ), maxlen=3000),
-                        "commits": v_list(v_obj({"sha": v_str(rx=SHA_RX), "message": v_str(minlen=0)})),
+                        "commits": v_list(v_obj({"sha": v_str(rx=SHA_RX), "message": v_str(minlen=0), "author": v_str()}), minlen=1),
                         "comments": v_list(v_obj({"author": v_str(), "body": v_str(minlen=0)})),
                         "reviews": v_list(v_obj({
                             "reviewer": v_str(), "state": v_enum("APPROVED", "CHANGES_REQUESTED", "COMMENTED", "DISMISSED"),
@@ -320,7 +329,7 @@ CASE_VALIDATOR = v_obj(
                 "other_prs": v_list(v_obj({
                     "number": v_int(1), "state": v_enum("open", "closed"), "horizon_id": v_null(v_str()),
                     "head_ref": v_str(), "observed_at": v_ts(), "last_activity_at": v_ts(),
-                    "files": v_list(v_str()), "claim": v_null(_CLAIM),
+                    "files": v_list(v_str()), "files_complete": v_bool(), "claim": v_null(_CLAIM),
                 })),
             },
             {"handoff": v_obj({"claims_merged": v_bool()})},
@@ -423,20 +432,48 @@ class Reasons:
 
 _C_TOKENS = re.compile(
     r"tax_amount|\bvat\b|zatca|ledgerservice|journal_(?:entries|lines)|\bdebit\b|\bcredit\b|tenantscope|tenant_id|"
-    r"rbac::|ensurepermission|sanctum|password|api[_-]?key|secret",
+    r"rbac::|ensurepermission|sanctum|password|api[_-]?key|secret|app_key|"
+    r"shell_exec|proc_open|popen|passthru|\bexec\s*\(|\bsystem\s*\(|child_process|process\.env|getenv|\benv\s*\(|\beval\s*\(|new\s+function",
     re.IGNORECASE,
 )
 _B_TOKENS = re.compile(
-    r"\bfetch\(|\baxios\b|method:\s*['\"](?:post|put|patch|delete)|\.delete\(|\.post\(|\.put\(|dangerouslysetinnerhtml|"
-    r"\bprice\b|\btotal\b|\bamount\b|\bbalance\b|\binvoice\b|localstorage|router\.push|\bnavigate\(",
+    r"\bfetch\s*\(|\baxios\b|xmlhttprequest|sendbeacon|websocket|http::|\bcurl|https?://|file_get_contents|file_put_contents|fopen|"
+    r"fsockopen|readfile|\bunlink\s*\(|\.(?:delete|post|put|patch)\s*\(|"
+    r"method\s*:\s*['\"](?:post|put|patch|delete)|dangerouslysetinnerhtml|"
+    r"\bprice\b|\btotal\b|\bamount\b|\bbalance\b|\binvoice\b|localstorage|router\.push|\bnavigate\s*\(",
+    re.IGNORECASE,
+)
+# Zone A UI code is a POSITIVE allowlist, not an absence-of-bad-tokens check: every added AND removed line must be
+# plain markup/text/attribute material (no calls, brackets, template strings, arrows, comments, URLs, imports...).
+_PRESENTATIONAL_LINE = re.compile(r"[\w\s<>/\"'.,:!?\-\u2013\u2014=_{}#%&|@*\u00b7\u2022\u2026]*")
+_NOT_PRESENTATIONAL_WORDS = re.compile(
+    r"\b(?:import|export|require|eval|function|fetch|new|window|document|process|script|iframe|href|src|action|http|https|"
+    r"javascript|dangerouslysetinnerhtml|onclick|onerror|onload|style|xmlhttprequest|beacon|websocket|localstorage|cookie|"
+    r"token|password|auth|return|if|else|throw|await|async)\b|//|/\*|=>|\$",
     re.IGNORECASE,
 )
 
 
 def _added_lines(patch: str):
+    """GitHub `patch` fields carry no file header, so every '+' line is content (a '+++x' line is the content '++x')."""
     for line in patch.splitlines():
-        if line.startswith("+") and not line.startswith("+++"):
+        if line.startswith("+"):
             yield line[1:]
+
+
+def _removed_lines(patch: str):
+    for line in patch.splitlines():
+        if line.startswith("-"):
+            yield line[1:]
+
+
+def presentational_only(patch: str) -> bool:
+    for line in list(_added_lines(patch)) + list(_removed_lines(patch)):
+        if not line.strip():
+            continue
+        if len(line) > 300 or not _PRESENTATIONAL_LINE.fullmatch(line) or _NOT_PRESENTATIONAL_WORDS.search(line):
+            return False
+    return True
 
 
 def classify_files(files: list[dict], policy: dict, reasons: Reasons):
@@ -448,7 +485,7 @@ def classify_files(files: list[dict], policy: dict, reasons: Reasons):
         fzone, matched, fsurfaces = "A", [], set()
         for name in names:
             if unsafe_path(name):
-                reasons.add("BLOCK", "PATH_UNSAFE", name)
+                reasons.add("BLOCK", "PATH_UNSAFE", safe_path(name))
                 fzone = zmax(fzone, "C")
                 continue
             hit = False
@@ -474,17 +511,19 @@ def classify_files(files: list[dict], policy: dict, reasons: Reasons):
             if f["status"] in ("removed", "renamed", "copied"):
                 bzone = zmax(bzone, "B")
             if not isinstance(patch, str) or patch == "":
-                if behavior_rule or fzone in ("A", "B"):
-                    bzone = zmax(bzone, "B")
-                    reasons.add("INFO", "BEHAVIOR_UNASSESSABLE_RAISED_TO_B", f["filename"])
+                bzone = zmax(bzone, "B")
+                reasons.add("INFO", "BEHAVIOR_UNASSESSABLE_RAISED_TO_B", safe_path(f["filename"]))
             else:
-                lines = "\n".join(_added_lines(patch))
-                if _C_TOKENS.search(lines):
+                text = "\n".join(list(_added_lines(patch)) + list(_removed_lines(patch)))
+                if _C_TOKENS.search(text):
                     bzone = zmax(bzone, "C")
-                    reasons.add("INFO", "BEHAVIOR_FINANCIAL_OR_SECURITY_TOKEN", f["filename"])
-                elif _B_TOKENS.search(lines):
+                    reasons.add("INFO", "BEHAVIOR_FINANCIAL_OR_SECURITY_TOKEN", safe_path(f["filename"]))
+                elif _B_TOKENS.search(text):
                     bzone = zmax(bzone, "B")
-                    reasons.add("INFO", "BEHAVIOR_MONEY_OR_ACTION_TOKEN", f["filename"])
+                    reasons.add("INFO", "BEHAVIOR_MONEY_OR_ACTION_TOKEN", safe_path(f["filename"]))
+                if behavior_rule and not presentational_only(patch):
+                    bzone = zmax(bzone, "B")
+                    reasons.add("INFO", "BEHAVIOR_NOT_PRESENTATIONAL", safe_path(f["filename"]))
         records.append({
             "path": safe_path(f["filename"]),
             "previous_path": safe_path(f["previous_filename"]) if f.get("previous_filename") else None, "status": f["status"],
@@ -629,6 +668,10 @@ def select_grant(case: dict, mode: str, reasons: Reasons):
         return None
     chosen = actives[0] if actives else sorted(candidates, key=lambda g: str(g["document"].get("grant_id")))[-1]
     doc = chosen["document"]
+    for sib in candidates:
+        sd = sib["document"]
+        if sib is not chosen and sd.get("status") in ("revoked", "suspended") and str(sd.get("issued_at")) >= str(doc.get("issued_at")):
+            reasons.add("BLOCK", "GRANT_SUPERSEDED_BY_REVOCATION", safe(sd.get("grant_id")))
     errs = validate_grant(doc)
     if errs:
         reasons.add("BLOCK", "GRANT_SCHEMA_INVALID", ";".join(errs[:6]))
@@ -691,16 +734,16 @@ def check_grant_scope(doc: dict, case: dict, pr: dict, files: list[dict], file_r
     if zone == "B" and req["task_id"] not in doc["tasks_allowlist"]:
         reasons.add("BLOCK", "TASK_NOT_ALLOWLISTED", req["task_id"])
     hard = policy["hard_deny_patterns"]
-    for rec in file_records:
-        for name in [rec["path"]] + ([rec["previous_path"]] if rec["previous_path"] else []):
+    for f in files:  # RAW names: display sanitising/truncation must never influence allow/deny matching
+        for name in [f["filename"]] + ([f["previous_filename"]] if f.get("previous_filename") else []):
             if unsafe_path(name):
                 continue
             if any_match_ci(hard, name):
                 reasons.add("STOP", "HARD_DENY_PATH", safe_path(name))
-            if any_match(doc["paths_deny"], name):
-                reasons.add("BLOCK", "PATH_DENIED_BY_GRANT", name)
+            if any_match_ci(doc["paths_deny"], name):
+                reasons.add("BLOCK", "PATH_DENIED_BY_GRANT", safe_path(name))
             if not any_match(doc["paths_allow"], name):
-                reasons.add("BLOCK", "PATH_NOT_ALLOWED_BY_GRANT", name)
+                reasons.add("BLOCK", "PATH_NOT_ALLOWED_BY_GRANT", safe_path(name))
     lim = doc["limits"]
     if len(files) > lim["max_files_per_pr"]:
         reasons.add("BLOCK", "LIMIT_FILES_EXCEEDED", f"{len(files)}>{lim['max_files_per_pr']}")
@@ -735,10 +778,17 @@ def check_conflicts(case: dict, own_surfaces: dict[str, str], own_files: set[str
         if (now - obs).total_seconds() > windows["observation_ttl_seconds"]:
             reasons.add("WAIT", "OBSERVATION_STALE", f"PR#{other['number']} must be re-observed")
         last = parse_ts(other["last_activity_at"])
+        if (obs - now).total_seconds() > 60 or (last - now).total_seconds() > 60:
+            reasons.add("BLOCK", "EVIDENCE_FROM_FUTURE", f"PR#{other['number']}")
+        if not other["files_complete"]:
+            reasons.add("BLOCK", "OTHER_PR_FILES_INCOMPLETE", f"PR#{other['number']}")
         recent = (now - last) <= timedelta(minutes=windows["unregistered_recent_activity_minutes"])
         horizon = other["horizon_id"]
         claim = other["claim"]
-        registered = bool(horizon and horizon in registry and claim and claim["horizon_id"] == horizon)
+        reg_entry = registry.get(horizon) if horizon else None
+        # registration is NOT self-asserted: the claim must match a registry entry AND the branch must carry its prefix
+        registered = bool(reg_entry and claim and claim["horizon_id"] == horizon
+                          and any(other["head_ref"].startswith(px) for px in reg_entry["branch_prefixes"]))
         other_files = {f for f in other["files"] if isinstance(f, str)}
         # observed surfaces from the other PR's real file list
         o_recs, _, _, o_surf = classify_files(
@@ -746,7 +796,8 @@ def check_conflicts(case: dict, own_surfaces: dict[str, str], own_files: set[str
             policy, Reasons())
         theirs = surface_modes_for(o_surf, (claim or {}).get("surfaces"), policy)
         reported_only = set((claim or {}).get("surfaces", {})) - o_surf
-        shared_paths = sorted(own_files & other_files)
+        folded_own = {x.casefold(): x for x in own_files}
+        shared_paths = sorted(folded_own[x.casefold()] for x in other_files if x.casefold() in folded_own)
         shared_surfaces = sorted(set(own_surfaces) & set(theirs))
         if not shared_paths and not shared_surfaces:
             continue
@@ -826,6 +877,10 @@ def check_ci(case: dict, doc: dict | None, policy: dict, reasons: Reasons) -> li
     required = {floor["gate_name"], rc["gate_name"]} | set(floor["always"]) | set(rc["always_names"]) | set((doc or {}).get("required_checks", []))
     if doc is not None and floor["gate_name"] not in doc["required_checks"]:
         reasons.add("BLOCK", "GRANT_OMITS_CI_GATE")
+    touched = [f["filename"] for f in pr["files"]] + [f["previous_filename"] for f in pr["files"] if f.get("previous_filename")]
+    for pattern, name in floor.get("required_when_touched", {}).items():
+        if any(any_match([pattern], t) for t in touched):
+            required.add(name)
     head = pr["head_sha"]
     pushed = parse_ts(pr["head_pushed_at"])
     considered, ignored_stale, ignored_twin = [], 0, 0
@@ -837,7 +892,16 @@ def check_ci(case: dict, doc: dict | None, policy: dict, reasons: Reasons) -> li
         if c["event"] != "pull_request":
             ignored_twin += 1
             continue
+        if c["completed_at"] and (parse_ts(c["completed_at"]) - now).total_seconds() > 60:
+            reasons.add("BLOCK", "EVIDENCE_FROM_FUTURE", f"check {safe(c['name'], 40)}")
         by_name.setdefault(c["name"], []).append(c)
+    spoofed = {n for n, runs in by_name.items() if any(r["app"] != "github-actions" for r in runs)}
+    for n in sorted(spoofed & (required | set(rc["path_names"]) | set(floor["path"]))):
+        reasons.add("BLOCK", "CI_CHECK_WRONG_APP", f"{safe(n, 60)} also reported by a non-Actions app")
+    for n in list(by_name):
+        by_name[n] = [r for r in by_name[n] if r["app"] == "github-actions"]
+        if not by_name[n]:
+            del by_name[n]
     grace = timedelta(minutes=rc["grace_minutes_no_run"])
     for name in sorted(required):
         runs = by_name.get(name)
@@ -849,9 +913,6 @@ def check_ci(case: dict, doc: dict | None, policy: dict, reasons: Reasons) -> li
             continue
         last = _latest(runs)
         considered.append(last)
-        if name == rc["gate_name"] and last["app"] != "github-actions":
-            reasons.add("BLOCK", "CI_CHECK_WRONG_APP", f"{name} reported by {safe(last['app'], 30)}")
-            continue
         if last["status"] != "completed":
             reasons.add("WAIT", "CI_CHECK_PENDING", f"{name} {last['status']}")
         elif last["conclusion"] != "success":
@@ -900,11 +961,13 @@ def check_reviews(case: dict, doc: dict | None, zone: str, surfaces_rules: set[s
         if rule["id"] in surfaces_rules:
             needed |= set(rule.get("requires_attestation", []))
     used = []
+    reg = {h["horizon_id"]: h for h in ev["registry"]["horizons"]}.get(req["horizon_id"], {})
+    internal = {norm_identity(x) for x in [pr["author"], reg.get("owner_agent", "")] + list((doc or {}).get("agents", [])) + list(reg.get("authors", []))}
     agents = set((doc or {}).get("agents", []))
     for typ in sorted(needed):
         atts = [a for a in ev["attestations"] if a["type"] == typ]
         if typ == "INDEPENDENT_REVIEW":
-            indep = [a for a in atts if a["by"] != pr["author"] and a["by"] not in agents]
+            indep = [a for a in atts if norm_identity(a["by"]) not in internal]
             if len(indep) != len(atts) and atts:
                 reasons.add("INFO", "INDEPENDENT_REVIEW_NOT_INDEPENDENT", "same identity as author/agent does not count")
             atts = indep
@@ -917,38 +980,89 @@ def check_reviews(case: dict, doc: dict | None, zone: str, surfaces_rules: set[s
             reasons.add("BLOCK", "HEAD_SHA_CHANGED_AFTER_REVIEW", f"{typ} attests a different sha; review invalidated")
         else:
             reasons.add("WAIT", f"{typ}_MISSING", head[:8])
-    last_state: dict[str, str] = {}
-    for r in pr["reviews"]:
-        last_state[r["reviewer"]] = r["state"]
-    for reviewer, state in sorted(last_state.items()):
-        if state == "CHANGES_REQUESTED":
-            reasons.add("BLOCK", "CHANGES_REQUESTED_OUTSTANDING", reviewer)
+    blocked: dict[str, bool] = {}
+    for r in pr["reviews"]:  # GitHub semantics: only APPROVED / DISMISSED clears a change request; COMMENTED does not
+        who = norm_identity(r["reviewer"])
+        if r["state"] == "CHANGES_REQUESTED":
+            blocked[who] = True
+        elif r["state"] in ("APPROVED", "DISMISSED"):
+            blocked[who] = False
+    for reviewer, is_blocked in sorted(blocked.items()):
+        if is_blocked:
+            reasons.add("BLOCK", "CHANGES_REQUESTED_OUTSTANDING", safe(reviewer, 40))
     return used
 
 
 # ───────────────────────────── orchestration ─────────────────────────────
 
+def check_own_pr(case: dict, registry: dict, policy: dict, reasons: Reasons):
+    """Identity, provenance and sanity of the PR itself. Registration is bound to who/where, never to PR text."""
+    req, pr, ev = case["request"], case["evidence"]["pr"], case["evidence"]
+    now = parse_ts(case["now"])
+    if not (pr["head_repo"] == pr["base_repo"] == req["repository"]):
+        reasons.add("BLOCK", "FORK_OR_FOREIGN_REPOSITORY", f"head {safe(pr['head_repo'], 40)} base {safe(pr['base_repo'], 40)}")
+    reg = registry.get(req["horizon_id"])
+    if reg is not None:
+        if norm_identity(reg["owner_agent"]) != norm_identity(req["agent_id"]):
+            reasons.add("BLOCK", "AGENT_NOT_REGISTERED_OWNER", safe(req["agent_id"], 40))
+        if not any(pr["head_ref"].startswith(px) for px in reg["branch_prefixes"]):
+            reasons.add("BLOCK", "BRANCH_NOT_UNDER_HORIZON_PREFIX", safe(pr["head_ref"], 60))
+        allowed = {norm_identity(a) for a in reg["authors"]}
+        authors = {norm_identity(pr["author"])} | {norm_identity(c["author"]) for c in pr["commits"]}
+        if not authors <= allowed:
+            reasons.add("BLOCK", "AUTHOR_NOT_AUTHORISED", f"{len(authors - allowed)} unregistered author(s)")
+    if pr["head_sha"] not in {c["sha"] for c in pr["commits"]}:
+        reasons.add("BLOCK", "HEAD_NOT_IN_COMMITS")
+    if not pr["files"]:
+        reasons.add("BLOCK", "PR_HAS_NO_FILES")
+    for f in pr["files"]:
+        if f["status"] in ("renamed", "copied") and not f.get("previous_filename"):
+            reasons.add("BLOCK", "RENAME_WITHOUT_PREVIOUS_FILENAME", safe_path(f["filename"]))
+    if (parse_ts(pr["head_pushed_at"]) - now).total_seconds() > 60:
+        reasons.add("BLOCK", "EVIDENCE_FROM_FUTURE", "head push time")
+    texts = [pr["title"], pr["body"]] + [c["body"] for c in pr["comments"]] + [r["body"] for r in pr["reviews"]] + [c["message"] for c in pr["commits"]]
+    if any(TRUNCATION_MARKER in t for t in texts):
+        reasons.add("BLOCK", "UNTRUSTED_TEXT_TRUNCATED", "text was cut before screening; cannot be assessed")
+
+
 def idempotency_key(case) -> str:
     try:
         r = case["request"]
         head = case["evidence"]["pr"]["head_sha"]
-        return sha256_hex(f"{r['horizon_id']}|{r['task_id']}|{head}|{r['action']}")[:32]
+        return sha256_hex(canon([r["horizon_id"], r["task_id"], head, r["action"]]))[:32]
     except (KeyError, TypeError):
         return sha256_hex("invalid-case")[:32]
 
 
-def evidence_digest(case) -> str:
-    try:
-        body = {k: case[k] for k in ("mode", "now", "request", "evidence") if k in case}
-        return sha256_hex(canon({"v": VERSION, "case": body}))
-    except (TypeError, ValueError):
-        return sha256_hex("unhashable-case")
+def eval_context(case, allow_synthetic: bool, wall_clock, policy_sha: str | None = None) -> dict:
+    """Everything besides the case that can change a decision. It is part of the record identity, so a stored
+    ELIGIBLE record can never be replayed under different flags, clock binding or policy."""
+    now = parse_ts(case.get("now")) if isinstance(case, dict) else None
+    return {
+        "allow_synthetic": bool(allow_synthetic),
+        "clock_bound": wall_clock is not None,
+        "clock_ok": (wall_clock is None) or (now is not None and abs((now - wall_clock).total_seconds()) <= 300),
+        "policy_sha256": policy_sha if policy_sha is not None else load_policy()[1],
+    }
+
+
+def evidence_digest(case, ctx: dict | None = None) -> str:
+    """Strict: raises on anything not hashable instead of collapsing to a constant."""
+    body = {k: case[k] for k in ("mode", "now", "request", "evidence") if k in case}
+    return sha256_hex(canon({"v": VERSION, "case": body, "ctx": ctx or {}}))
 
 
 _SECRET_RX = re.compile(
     r"ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|gh[ousr]_[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|"
     r"-----BEGIN [A-Z ]*PRIVATE KEY|xox[baprs]-[A-Za-z0-9-]{10,}|sk-[A-Za-z0-9]{20,}|[Bb]earer\s+[A-Za-z0-9._~+/=-]{20,}"
 )
+
+
+def _digest_or_unique(case, ctx) -> str:
+    try:
+        return evidence_digest(case, ctx)
+    except Exception:  # unhashable evidence: never collapse to a shared constant (that would let records collide)
+        return "unhashable-" + sha256_hex(repr(id(case)))[:24]
 
 
 def _empty_record(case, mode_label: str, now: str) -> dict:
@@ -970,18 +1084,28 @@ def evaluate(case, *, allow_synthetic: bool = False, policy: dict | None = None,
     except Exception as exc:  # fail closed on any bug or hostile input
         reasons = Reasons()
         reasons.add("BLOCK", "EVALUATOR_ERROR", type(exc).__name__)
-        return _finalise(case if isinstance(case, dict) else {}, reasons, {}, "unknown", None)
+        return _finalise(case if isinstance(case, dict) else {}, reasons, {}, "unknown", None,
+                         _safe_ctx(case, allow_synthetic, wall_clock))
+
+
+def _safe_ctx(case, allow_synthetic, wall_clock):
+    try:
+        return eval_context(case, allow_synthetic, wall_clock)
+    except Exception:
+        return {"unavailable": True}
 
 
 def _evaluate(case, allow_synthetic: bool, policy: dict | None, wall_clock: datetime | None = None) -> dict:
     reasons = Reasons()
     pol, pol_sha = (policy, "inline") if policy is not None else load_policy()
+    ctx = _safe_ctx(case, allow_synthetic, wall_clock)
+    ctx["policy_sha256"] = pol_sha
     errs = validate_case(case)
     if errs:
         for e in errs:
             reasons.add("BLOCK", "INPUT_INVALID", e)
         return _finalise(case if isinstance(case, dict) else {}, reasons, {"policy_sha256": pol_sha, "policy_version": pol["policy_version"]},
-                         case.get("mode", "unknown") if isinstance(case, dict) and isinstance(case.get("mode"), str) else "unknown", None)
+                         case.get("mode", "unknown") if isinstance(case, dict) and isinstance(case.get("mode"), str) else "unknown", None, ctx)
 
     mode, now = case["mode"], parse_ts(case["now"])
     ev, req, pr = case["evidence"], case["request"], case["evidence"]["pr"]
@@ -1031,13 +1155,15 @@ def _evaluate(case, allow_synthetic: bool, policy: dict | None, wall_clock: date
     if not claim or claim["horizon_id"] != req["horizon_id"] or claim["task_id"] != req["task_id"]:
         reasons.add("BLOCK", "CLAIM_MISSING_OR_MISMATCH")
 
+    check_own_pr(case, reg, pol, reasons)
+
     # classification
     file_records, path_zone, behavior_zone, surfaces = classify_files(pr["files"], pol, reasons)
     own_modes = surface_modes_for(surfaces, (claim or {}).get("surfaces"), pol)
     own_paths = {f["filename"] for f in pr["files"]} | {f["previous_filename"] for f in pr["files"] if f.get("previous_filename")}
-    if any(r["path"].startswith(".github/workflows/") and isinstance(f.get("patch"), str) and
+    if any(f["filename"].startswith(".github/workflows/") and isinstance(f.get("patch"), str) and
            re.search(r"echo\s+['\"]?skip|exit\s+0\b|\|\|\s*true|continue-on-error:\s*true|if:\s*false", "\n".join(_added_lines(f["patch"])))
-           for r, f in zip(file_records, pr["files"])):
+           for f in pr["files"]):
         reasons.add("STOP", "CI_STEP_HOLLOWING_SUSPECTED", "workflow patch weakens or skips a step")
 
     # grant
@@ -1086,10 +1212,10 @@ def _evaluate(case, allow_synthetic: bool, policy: dict | None, wall_clock: date
         "human_checks_remaining": ["approved_outcome_matches_pr_intent",
                                    "refetch_grants_and_head_immediately_before_any_real_merge"],
     })
-    return _finalise(case, reasons, facts, mode, case)
+    return _finalise(case, reasons, facts, mode, case, ctx)
 
 
-def _finalise(case: dict, reasons: Reasons, facts: dict, mode: str, full_case) -> dict:
+def _finalise(case: dict, reasons: Reasons, facts: dict, mode: str, full_case, ctx: dict | None = None) -> dict:
     decision = reasons.decision()
     synthetic = mode == "synthetic-test"
     # last line of defence: eligibility must be explicit, synthetic and reason-free
@@ -1113,7 +1239,7 @@ def _finalise(case: dict, reasons: Reasons, facts: dict, mode: str, full_case) -
                "state": pr.get("state") if pr.get("state") in ("open", "closed") else None},
         "main_sha": safe_sha(main.get("sha")),
         "idempotency_key": idempotency_key(case),
-        "evidence_digest": evidence_digest(case),
+        "evidence_digest": _digest_or_unique(case, ctx),
         "merge_sha": None, "post_merge_checks": None,
         "tool_calls": {"merge": 0, "auto_merge": 0, "update_branch": 0, "writes": 0},
     })

@@ -44,9 +44,9 @@
     "status": "completed"
    }
   ],
-  "fetched_at": "2026-10-12T02:51:31Z",
+  "fetched_at": "2026-10-12T03:04:25Z",
   "grant_store": {
-   "fetched_at": "2026-10-12T02:51:31Z",
+   "fetched_at": "2026-10-12T03:04:25Z",
    "grants": [],
    "kill_switch": false,
    "ref": "main",
@@ -65,11 +65,12 @@
      "app/Services/DocumentCenter/DocumentStorageService.php",
      "tests/Feature/DocumentStorageDurableProfileTest.php"
     ],
+    "files_complete": true,
     "head_ref": "horizon/media-storage-s7-documents-reads",
     "horizon_id": null,
     "last_activity_at": "2026-10-12T02:42:47Z",
     "number": 1350,
-    "observed_at": "2026-10-12T02:51:31Z",
+    "observed_at": "2026-10-12T03:04:25Z",
     "state": "open"
    },
    {
@@ -95,11 +96,12 @@
      "web/src/modules/store-experience-builder/themes/index.ts",
      "web/src/modules/store-experience-builder/themes/preview-link.ts"
     ],
+    "files_complete": true,
     "head_ref": "cust-hv/v10b-theme-preview-apply",
     "horizon_id": null,
     "last_activity_at": "2026-10-12T02:42:34Z",
     "number": 1349,
-    "observed_at": "2026-10-12T02:51:31Z",
+    "observed_at": "2026-10-12T03:04:25Z",
     "state": "open"
    },
    {
@@ -108,11 +110,12 @@
      "docs/plans/growth/AWJ_GROWTH_FOUNDATION_HORIZON_V1.md",
      "docs/plans/growth/AWJ_GROWTH_FOUNDATION_HORIZON_V1_BOOTSTRAP.md"
     ],
+    "files_complete": true,
     "head_ref": "docs/awj-growth-foundation-horizon-v1",
     "horizon_id": null,
     "last_activity_at": "2026-09-30T18:12:05Z",
     "number": 1128,
-    "observed_at": "2026-10-12T02:51:31Z",
+    "observed_at": "2026-10-12T03:04:25Z",
     "state": "open"
    },
    {
@@ -171,11 +174,12 @@
      "motion/awj-commercial/src/ui/common.tsx",
      "motion/awj-commercial/tsconfig.json"
     ],
+    "files_complete": true,
     "head_ref": "motion/awj-commercial-15s",
     "horizon_id": null,
     "last_activity_at": "2026-09-29T05:29:57Z",
     "number": 1105,
-    "observed_at": "2026-10-12T02:51:31Z",
+    "observed_at": "2026-10-12T03:04:25Z",
     "state": "open"
    },
    {
@@ -185,11 +189,12 @@
      "docs/plans/cloudflare/AWJ_CLOUDFLARE_PLATFORM_HORIZON_V1.md",
      "docs/plans/cloudflare/CF-SAAS-DOMAIN-PROVIDER-1-DECISION-PACKET.md"
     ],
+    "files_complete": true,
     "head_ref": "docs/awj-cloudflare-platform-horizon-v1",
     "horizon_id": null,
     "last_activity_at": "2026-09-28T21:32:28Z",
     "number": 1093,
-    "observed_at": "2026-10-12T02:51:31Z",
+    "observed_at": "2026-10-12T03:04:25Z",
     "state": "open"
    },
    {
@@ -202,11 +207,12 @@
      "tests/Feature/CommerceModuleBoundaryTest.php",
      "tests/Feature/StorefrontPresentationVersionPublishApiTest.php"
     ],
+    "files_complete": true,
     "head_ref": "feat/theme-version-publish",
     "horizon_id": null,
     "last_activity_at": "2026-09-28T15:37:50Z",
     "number": 1089,
-    "observed_at": "2026-10-12T02:51:31Z",
+    "observed_at": "2026-10-12T03:04:25Z",
     "state": "open"
    },
    {
@@ -214,11 +220,12 @@
     "files": [
      "docs/plans/store/AWJ_STORE_CUSTOMIZER_EXTENDED_ARCHITECTURE.md"
     ],
+    "files_complete": true,
     "head_ref": "docs/store-customizer-extended-architecture",
     "horizon_id": null,
     "last_activity_at": "2026-09-17T10:42:20Z",
     "number": 853,
-    "observed_at": "2026-10-12T02:51:31Z",
+    "observed_at": "2026-10-12T03:04:25Z",
     "state": "open"
    },
    {
@@ -226,11 +233,12 @@
     "files": [
      "app/Console/Commands/RecoverHistoricalTenantCommand.php"
     ],
+    "files_complete": true,
     "head_ref": "feat/awj-taiba-tenant-recovery-platform-admin",
     "horizon_id": null,
     "last_activity_at": "2026-09-12T04:21:51Z",
     "number": 784,
-    "observed_at": "2026-10-12T02:51:31Z",
+    "observed_at": "2026-10-12T03:04:25Z",
     "state": "open"
    },
    {
@@ -239,11 +247,12 @@
      "docs/plans/payments/AWJ_PAY_V2_6A_GATEWAY_REFUND_ACCOUNTING_DESIGN.md",
      "docs/plans/payments/AWJ_PAY_V2_6B_CUSTOMER_REFUND_EVIDENCE_PASS.md"
     ],
+    "files_complete": true,
     "head_ref": "docs/pay-v2-6a-gateway-refund-accounting-design",
     "horizon_id": null,
     "last_activity_at": "2026-09-12T01:19:29Z",
     "number": 778,
-    "observed_at": "2026-10-12T02:51:31Z",
+    "observed_at": "2026-10-12T03:04:25Z",
     "state": "open"
    },
    {
@@ -251,11 +260,12 @@
     "files": [
      "docs/audits/AWJ_ACCOUNTING_SETTINGS_PRODUCT_COMPLETENESS_AUDIT_2026-09.md"
     ],
+    "files_complete": true,
     "head_ref": "claude/accounting-settings-product-completeness-audit",
     "horizon_id": null,
     "last_activity_at": "2026-09-08T22:37:53Z",
     "number": 704,
-    "observed_at": "2026-10-12T02:51:31Z",
+    "observed_at": "2026-10-12T03:04:25Z",
     "state": "open"
    },
    {
@@ -266,11 +276,12 @@
      "docs/plans/design/references/awj-v2-product-master-desktop-mobile.jpeg",
      "docs/plans/design/references/awj-v2-sales-invoice-desktop.jpeg"
     ],
+    "files_complete": true,
     "head_ref": "claude/awj-v2-visual-references-62yiwn",
     "horizon_id": null,
     "last_activity_at": "2026-09-08T15:40:55Z",
     "number": 703,
-    "observed_at": "2026-10-12T02:51:31Z",
+    "observed_at": "2026-10-12T03:04:25Z",
     "state": "open"
    },
    {
@@ -280,11 +291,12 @@
      "app/Console/Commands/DocumentReadinessCommand.php",
      "deploy/document-worker.sh"
     ],
+    "files_complete": true,
     "head_ref": "fix/document-database-queue-readiness",
     "horizon_id": null,
     "last_activity_at": "2026-08-30T01:37:44Z",
     "number": 578,
-    "observed_at": "2026-10-12T02:51:31Z",
+    "observed_at": "2026-10-12T03:04:25Z",
     "state": "open"
    },
    {
@@ -297,11 +309,12 @@
      "setup.sh",
      "tests/Feature/AccountingGuardTest.php"
     ],
+    "files_complete": true,
     "head_ref": "claude/ai-assistant-guidelines-9gxfjs",
     "horizon_id": null,
     "last_activity_at": "2026-08-14T23:31:52Z",
     "number": 202,
-    "observed_at": "2026-10-12T02:51:31Z",
+    "observed_at": "2026-10-12T03:04:25Z",
     "state": "open"
    }
   ],
@@ -309,6 +322,7 @@
    "additions": 559,
    "author": "safwan5001-source",
    "base_ref": "main",
+   "base_repo": "safwan5001-source/Nebrax",
    "base_sha": "4710169140224f8439a809920c2a6e56c8cbab84",
    "body": "## الهدف\n\nتجميع توقيع فاتورة ZATCA وبناء QR للمرحلة الثانية داخل عملية ذرية تعتمد لقطة اعتماد واحدة.\n\n## التغيير\n\n- حل الاعتماد النشط وسياسة التوقيع مرة واحدة.\n- توقيع UBL/XAdES ثم التحقق من مادة الهاش والتوقيع المستخرجة من XML الناتج.\n- اشتقاق المفتاح العام وتوقيع الشهادة من شهادة leaf نفسها المستخدمة في التوقيع.\n- بناء QR بوسوم 1–9 للفواتير المبسطة و1–8 للفواتير القياسية.\n- إعادة نتيجة داخلية واضحة: XML الموقّع، هاش SHA-256 الخام، وQR Base64.\n- اختبارات تكاملية لمساري `simplified` و`standard` وربط وسوم 6–9 بالمادة الفعلية.\n\n## خارج النطاق\n\n- لا حفظ في قاعدة البيانات.\n- لا إرسال إلى ZATCA أو Queue.\n- لا ربط بدورة ترحيل الفاتورة حتى اكتمال تحقق UBL/XSD وSchematron.\n\n## التحقق\n\nبيئة العمل الحالية لا تحتوي PHP؛ تعتمد نتيجة التنفيذ على GitHub Actions، مع مراجعة diff يدوية قبل فتح الطلب.",
    "changed_files": 3,
@@ -341,22 +355,27 @@
    ],
    "commits": [
     {
+     "author": "safwan5001-source",
      "message": "feat(zatca): coordinate signed invoice QR generation",
      "sha": "18370643234119866ff20c0e502bd538a124be46"
     },
     {
+     "author": "safwan5001-source",
      "message": "fix(zatca): derive QR document type from signed snapshot",
      "sha": "45bed5ca9412da57f971edfa56a2a7b76e454fe8"
     },
     {
+     "author": "safwan5001-source",
      "message": "fix(zatca): bind QR business fields to invoice XML",
      "sha": "db68e4d213494566a1ea2abf1d3f01e88c90ecec"
     },
     {
+     "author": "safwan5001-source",
      "message": "fix(zatca): normalize repeated totals and UTC issue time",
      "sha": "62ed463d4c0ca6ba4625641a95153b1df2f81d30"
     },
     {
+     "author": "safwan5001-source",
      "message": "fix(zatca): embed verified phase two QR in signed XML",
      "sha": "156b4270f9e454bcf78362ea9a2088afbe478e1a"
     }
@@ -368,7 +387,7 @@
      "additions": 294,
      "deletions": 0,
      "filename": "app/Services/Accounting/ZatcaSignedInvoiceQrCoordinator.php",
-     "patch": "",
+     "patch": null,
      "previous_filename": null,
      "status": "added"
     },
@@ -376,7 +395,7 @@
      "additions": 13,
      "deletions": 0,
      "filename": "app/Services/Accounting/ZatcaSignedInvoiceQrResult.php",
-     "patch": "",
+     "patch": null,
      "previous_filename": null,
      "status": "added"
     },
@@ -384,12 +403,14 @@
      "additions": 252,
      "deletions": 0,
      "filename": "tests/Feature/ZatcaSignedInvoiceQrCoordinatorTest.php",
-     "patch": "",
+     "patch": null,
      "previous_filename": null,
      "status": "added"
     }
    ],
    "head_pushed_at": "2026-08-30T14:10:07Z",
+   "head_ref": "feat/zatca-signed-invoice-qr-coordinator",
+   "head_repo": "safwan5001-source/Nebrax",
    "head_sha": "156b4270f9e454bcf78362ea9a2088afbe478e1a",
    "labels": [],
    "merge_commit_sha": null,
@@ -484,7 +505,7 @@
   "source": "github-readonly"
  },
  "mode": "live",
- "now": "2026-10-12T02:51:31Z",
+ "now": "2026-10-12T03:04:25Z",
  "request": {
   "action": "merge",
   "agent_id": "pilot-session",

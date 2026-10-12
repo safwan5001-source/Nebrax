@@ -39,7 +39,7 @@ Method: `gh api` GET requests through the session proxy, nothing written. Anythi
 | Commit signatures on `main` | last 8 commits: `verified:true, reason:valid`, **committer = GitHub** (web-flow), author = the owner account → the Verified badge on `main` is produced by GitHub's own key and proves nothing about owner intent (confirms V2-1B §4.6) |
 | `CI Gate` coverage of open PRs | 14 open PRs; **only #1349 and #1348 have a `CI Gate` check run; 12 have none** → if `CI Gate` became required, those 12 would sit at "Expected — waiting" until a new push (V2-1B D7) |
 | Check-run twins | live on #1349: `php artisan test (L11, sqlite/pgsql)` and `web build (Next.js)` each appear twice (one from the `push` workflow run, one from `pull_request`); the event is only recoverable via `actions/runs` (readable) → twin handling is required, not hypothetical |
-| Parallel horizons right now | #1349 (CUST-HV V10b) active; #1348 (Media Storage S6) **merged by someone else during this session** (`main` moved `6532c0c → 11abda9`) and #1350 (Media Storage S7) opened — a live demonstration of the "main moved after testing" case (T3) |
+| Parallel horizons right now | #1349 (CUST-HV V10b) active; #1348 (Media Storage S6) **merged by another session during this one** (`main` moved `6532c0c → 11abda9`) and #1350 (Media Storage S7) opened — a live demonstration of the "main moved after testing" case (T3) |
 
 ### 3.2 Not verifiable from this session (proxy/token refused or API cannot answer)
 
@@ -76,7 +76,7 @@ A pure, offline, deterministic evaluator of the V2-1B §4.2 algorithm, with a re
 | `scripts/horizon-eval/contract_runner.py` | loads the 23 contract fixtures (base + overlay), prints the PASS/FAIL table. |
 | `scripts/horizon-eval/collect_snapshot.py` | **GET-only** `gh api` collector → `live` snapshot of one PR. |
 | `scripts/horizon-eval/fixtures/synthetic/**` | 2 base cases + 25 overlay cases. Every file carries `SYNTHETIC` notice; grants are `GR-SYNTHETIC-*`. The only place a grant-like file exists. |
-| `scripts/horizon-eval/snapshots/**` | 5 frozen read-only snapshots of real PRs (patches omitted). |
+| `scripts/horizon-eval/snapshots/**` | 5 frozen read-only snapshots of real PRs (#1349, #1350, #1346, #586, #1093; patches omitted). |
 | `scripts/horizon-eval/test_*.py` (4 files) | unit · contract + exhaustive mutation · static guards · live-snapshot validation |
 | `scripts/horizon-eval/README.md` | minimal usage |
 | this report | |
@@ -102,20 +102,48 @@ Command: `PYTHONDONTWRITEBYTECODE=1 python3 -I -m unittest discover -s scripts/h
 
 | Layer | File | Tests | Result |
 |---|---|---|---|
-| 1. Focused evaluator unit tests | `test_horizon_eval.py` | 89 | OK |
+| 1. Focused evaluator unit tests (incl. 24 reviewer-finding regressions) | `test_horizon_eval.py` | 110 | OK |
 | 2. Contract + regression + mutation | `test_contract.py` | 12 | OK |
 | 3. Representative read-only repository evidence | `test_live_snapshots.py` | 8 | OK |
 | Static guards (no capability, fixture isolation) | `test_static_guards.py` | 18 | OK |
-| **Total** | | **127** | **OK, 0 failures, 0 errors** |
+| **Total** | | **148** | **OK, 0 failures, 0 errors** |
 
 Fail-closed evidence beyond the contract table:
-- **444 single-input mutation points** (two eligible bases: A and B) — each element deleted, nulled, and type-swapped; none stays eligible except a reviewed harmless list (free-text/optional elements) — this found a real gap (manifest lacking a required check) fixed with the policy `ci_floor`.
-- **Sabotage run**: 16 deliberate defects injected into the evaluator (ignore CI conclusion, accept live authenticity, drop default-deny, ignore injection, accept grants from branches, ignore expiry, push-twin counted, wrong-app gate accepted, rename ignored, action gate dropped, …) → **16/16 caught**, 0 survivors.
+- **472 single-input mutation points** (two eligible bases: A and B) — each element deleted, nulled, and type-swapped; none stays eligible except a reviewed harmless list (free-text/optional elements) — this found a real gap (manifest lacking a required check) fixed with the policy `ci_floor`.
+- **Sabotage run**: 23 deliberate defects injected into the evaluator (ignore CI conclusion, accept live authenticity, drop default-deny, ignore injection, accept grants from branches, ignore expiry, push-twin counted, rename ignored, action gate dropped, drop the presentational allowlist, self-asserted registration, COMMENTED clears change request, `+++` lines skipped, author check dropped, ledger context ignored, …) → **22/23 caught**; the survivor (dropping the app filter for same-named checks) is masked by a second, independent defence (`CI_CHECK_WRONG_APP` BLOCK) — redundancy, not a hole.
 - Adversarial review (section 8) findings are listed with their resolution.
 
 Contract table (11 scenarios / 23 cases + 2 extras), all PASS, **false-eligible = 0**:
 
-@@TABLE@@
+| case | expected | got | result | blocking reasons |
+|---|---|---|---|---|
+| DR-01 | ELIGIBLE_SIMULATED | ELIGIBLE_SIMULATED | PASS |  |
+| DR-02 | WAIT | WAIT | PASS | INDEPENDENT_REVIEW_MISSING |
+| DR-03 | STOP_OWNER_DECISION | STOP_OWNER_DECISION | PASS | ZONE_C_OWNER_GATED |
+| DR-04a | BLOCK | BLOCK | PASS | CI_CHECK_NOT_SUCCESS |
+| DR-04b | WAIT | WAIT | PASS | CI_CHECK_PENDING, CI_CHECK_PENDING |
+| DR-04c | BLOCK | BLOCK | PASS | CI_CHECK_NOT_SUCCESS |
+| DR-05a | BLOCK | BLOCK | PASS | HEAD_NOT_IN_COMMITS, HEAD_SHA_CHANGED_AFTER_REVIEW, CI_CHECK_MISSING, CI_CHECK_MISSING, CI |
+| DR-05b | WAIT | WAIT | PASS | CI_CHECK_PENDING |
+| DR-05c | WAIT | WAIT | PASS | BASE_MOVED_RETEST |
+| DR-06a | BLOCK | BLOCK | PASS | GRANT_EXPIRED |
+| DR-06b | BLOCK | BLOCK | PASS | GRANT_REVOKED, KILL_SWITCH_ACTIVE |
+| DR-06c | BLOCK | BLOCK | PASS | GRANT_FROM_UNTRUSTED_ORIGIN, NO_ACTIVE_GRANT |
+| DR-07a | STOP_OWNER_DECISION | STOP_OWNER_DECISION | PASS | CONFLICT_EXCLUSIVE_SURFACE, ZONE_C_OWNER_GATED |
+| DR-07b | STOP_OWNER_DECISION | STOP_OWNER_DECISION | PASS | CONFLICT_POLICY_STOP, CATEGORY_PATH_MISMATCH, CI_CHECK_NEVER_STARTED |
+| DR-07c | STOP_OWNER_DECISION | STOP_OWNER_DECISION | PASS | UNREGISTERED_HORIZON_ACTIVE, TASK_NOT_ALLOWLISTED, ZONE_EXCEEDS_CATEGORY, ZONE_NOT_IN_GRAN |
+| DR-08a | STOP_OWNER_DECISION | STOP_OWNER_DECISION | PASS | HARD_DENY_PATH, ZONE_C_OWNER_GATED, CATEGORY_PATH_MISMATCH |
+| DR-08b | STOP_OWNER_DECISION | STOP_OWNER_DECISION | PASS | CI_STEP_HOLLOWING_SUSPECTED, HARD_DENY_PATH, ZONE_C_OWNER_GATED, CATEGORY_PATH_MISMATCH |
+| DR-08c | STOP_OWNER_DECISION | STOP_OWNER_DECISION | PASS | HARD_DENY_PATH, ZONE_C_OWNER_GATED, CATEGORY_PATH_MISMATCH |
+| DR-08d | STOP_OWNER_DECISION | STOP_OWNER_DECISION | PASS | HARD_DENY_PATH, HARD_DENY_PATH, HARD_DENY_PATH, ZONE_C_OWNER_GATED, CATEGORY_PATH_MISMATCH |
+| DR-09a | BLOCK | BLOCK | PASS | PR_ALREADY_MERGED |
+| DR-09b | ELIGIBLE_SIMULATED | ELIGIBLE_SIMULATED | PASS |  |
+| DR-10 | STOP_OWNER_DECISION | STOP_OWNER_DECISION | PASS | INJECTION_SUSPECTED |
+| DR-11 | STOP_OWNER_DECISION | STOP_OWNER_DECISION | PASS | HARD_DENY_PATH, ZONE_P_NEVER_AUTONOMOUS, CATEGORY_PATH_MISMATCH |
+| X-01 | ELIGIBLE_SIMULATED | ELIGIBLE_SIMULATED | PASS |  |
+| X-02 | BLOCK | BLOCK | PASS | GRANT_AUTHENTICITY_UNVERIFIED, SYNTHETIC_GRANT_IN_LIVE_MODE |
+
+contract cases: 23 in 11 scenarios · pass 23/23 · extra cases: 2 · false-eligible: 0
 
 `php artisan test` was **not** run locally: the change contains no PHP/application/DB/API code. The repository's full PHP matrix runs in PR CI (section 7).
 
@@ -149,7 +177,37 @@ Deviations from the V2-1B contract (all in the conservative direction):
 
 ## 8. Reviews
 
-@@REVIEWS@@
+### 8.1 Implementer self-review
+Scope stayed inside `scripts/horizon-eval/**` + this report. Defects found by my own tests and fixed before review: a required check missing from the evidence manifest left a case eligible (→ policy `ci_floor`); the evaluator trusted `now` from the evidence (→ CLI binds to the wall clock, `CLOCK_SKEW`); case-colliding protected paths (→ case-insensitive match for Zone C/P and hard-deny); claim-order ties did not serialise.
+
+### 8.2 Reviewer — independent adversarial review (fresh-context subagent, read-only)
+Same GitHub identity as the author, so this is **not** an "independent reviewer" in the V2-1B §3/T2 sense; it is an extra adversarial pass. It reproduced **false-eligible results** against the first pushed version (`09aac33`). All were treated as blocking and fixed in this PR, each with a regression test (`ReviewerFindings`, 24 tests):
+
+| # | Finding (severity) | Resolution |
+|---|---|---|
+| 1 | `+++…` content lines skipped by the scanners (blocker) | every `+` line is content; regression for behaviour and injection scans |
+| 2 | JS-only token denylist trivially evaded; added tests/PHP unscanned; pure deletions ignored (blocker) | Zone A UI code now requires a **positive presentational allowlist** on added *and* removed lines; broader C/B token sets; removed lines scanned; added-test files with dangerous APIs leave Zone A |
+| 3 | all of `web/src`, `storefront/src` treated as UI (high) | narrowed to component/module/app dirs; `lib/`, `middleware`, `auth`, `app/api` → Zone C |
+| 4 | horizon registration self-asserted from PR text (high) | registration needs registry entry **and** branch prefix; own PR needs registered `owner_agent`, branch prefix |
+| 5 | no author/fork/commit-author check (high) | head repo = base repo = requested repo; PR and every commit author ∈ registry `authors` |
+| 6 | a COMMENTED review erased CHANGES_REQUESTED (high) | only APPROVED/DISMISSED clear it |
+| 7 | independence case/format-sensitive (high) | identities normalised (case, `[bot]`, whitespace) against author, agents, registry owner/authors |
+| 8 | 300-char display truncation let long paths dodge `paths_deny` (medium) | allow/deny/hard-deny match the **raw** filename; display only is sanitised |
+| 9 | ledger replay ignored flags/clock/policy; lone surrogates collapsed digests (high) | record identity now includes `allow_synthetic`, clock binding + skew outcome, policy hash; ASCII-safe canonical JSON; unhashable input never persists or replays; replayed ELIGIBLE must be self-consistent |
+| 10 | same-named check from another app masked a failure (medium) | only `github-actions` runs count; a non-Actions duplicate of a required name is a BLOCK |
+| 11 | low items: rename without previous name, trailing-dot dirs, nested governance glob, case-sensitive overlaps, dropped renames, future timestamps, head ∉ commits, revoked sibling grant, zero-file PR, surrogate `task_id` raising | all fixed with tests |
+| 12 | unkeyed ledger hash can be forged (low) | documented: detects corruption, not forgery; replay re-validates plausibility; the ledger authorises nothing |
+| 13 | collector truncated text before scanning (medium) | truncation is marked (`[[TRUNCATED]]` → BLOCK); oversize patches become unassessable (→ Zone B) |
+| residual | web/storefront CI was never *required* | files under `web/**` / `storefront/**` now require the matching check (policy `required_when_touched`); `docs/engineering/**`, `AGENTS.md`, ADRs are Zone C |
+
+Residual risks the reviewer listed that are **not** closed (declared in §11): unauthenticated attestations; test code executes in CI; symlinks/file modes invisible in the files API; injection regexes are defence-in-depth (paraphrase/homoglyph can evade; classification never depends on text); `head_pushed_at` is the author-controlled commit date; no semantic check of `approved_outcome`.
+
+### 8.3 AWJ Guardian
+Accounting/tax/ZATCA: no effect, no journal entries. Tenant/branch isolation and RBAC: untouched; no tenant data in code, fixtures or snapshots. Security: no secrets; no credential, no permission, no workflow; collector is GET-only and statically guarded. GitHub settings: untouched (read-only probes). Other horizons: no branch, file or claim touched. V2-2/V2-3/V2-4: not started.
+
+### 8.4 PRE_MERGE_REVIEW
+`@@PMR@@` This is a verdict about the pilot PR only; it is **not** an authorisation to merge (the PR touches a Zone C directory and needs the owner).
+
 
 ## 9. Evidence: verified vs assumed vs unavailable
 
@@ -160,7 +218,7 @@ Deviations from the V2-1B contract (all in the conservative direction):
 ## 10. Security / tenant / accounting impact
 
 - **Accounting / tax / ZATCA / RBAC / tenant isolation / migrations / APIs:** none touched. No financial operation → no journal entries to tabulate.
-- **Tenant data / secrets:** the evaluator and ledger never read secrets or tenant data; snapshots hold public PR metadata with **patches omitted** (an earlier raw snapshot of #1348 contained a test literal shaped like an AWS key id; it was discarded, not committed).
+- **Tenant data / secrets:** the evaluator and ledger never read secrets or tenant data; snapshots hold public PR metadata with **patches omitted** (an earlier raw snapshot of #1348 contained a test literal shaped like an AWS key id; it was discarded, not committed, and #1348 was replaced by #1350).
 - **Security posture:** adds a deny-by-default decision library that nothing invokes; no workflow runs it; no permission is granted. Risk of the PR itself ≈ nil; risk it models is described in V2-1B.
 - **Backward compatibility:** purely additive under a new directory.
 

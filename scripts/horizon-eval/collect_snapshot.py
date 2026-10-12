@@ -26,7 +26,7 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-from horizon_eval import CASE_SCHEMA, canon, sha256_hex
+from horizon_eval import CASE_SCHEMA, TRUNCATION_MARKER, canon, sha256_hex
 
 GRANTS_DIR = "docs/autonomous-engineering/grants"
 CLAIM_RX = re.compile(r"Horizon-Claim:\s*([A-Za-z0-9._-]+)\s*/\s*([A-Za-z0-9._-]+)")
@@ -59,7 +59,20 @@ def ts(value) -> str | None:
 
 
 def clip(text, limit=TEXT_LIMIT) -> str:
-    return (text or "")[:limit]
+    """Untrusted text is screened by the evaluator, so a cut must be visible: a marker makes it unassessable (BLOCK)."""
+    text = text or ""
+    return text if len(text) <= limit else text[:limit] + TRUNCATION_MARKER
+
+
+def clip_patch(patch, limit):
+    """A patch that does not fit is dropped (None => behaviour unassessable => raised to Zone B), never half-scanned."""
+    if patch is None or limit <= 0 or len(patch) > limit:
+        return None
+    return patch
+
+
+def names_of(f) -> list[str]:
+    return [f["filename"]] + ([f["previous_filename"]] if f.get("previous_filename") else [])
 
 
 def collect(repo: str, pr_number: int, req: dict, patch_limit: int = PATCH_LIMIT) -> dict:
@@ -105,7 +118,7 @@ def collect(repo: str, pr_number: int, req: dict, patch_limit: int = PATCH_LIMIT
         claim = {"horizon_id": m.group(1), "task_id": m.group(2), "surfaces": {}, "claim_order": 1} if m else None
         others.append({"number": o["number"], "state": "open", "horizon_id": m.group(1) if m else None,
                        "head_ref": o["head"]["ref"], "observed_at": now, "last_activity_at": ts(o["updated_at"]),
-                       "files": sorted(f["filename"] for f in ofiles), "claim": claim})
+                       "files": sorted({n for f in ofiles for n in names_of(f)}), "files_complete": len(ofiles) < 3000, "claim": claim})
 
     m = CLAIM_RX.search(pr.get("body") or "")
     return {
@@ -126,14 +139,17 @@ def collect(repo: str, pr_number: int, req: dict, patch_limit: int = PATCH_LIMIT
                 "number": pr_number, "state": pr["state"], "draft": bool(pr["draft"]), "merged": bool(pr.get("merged")),
                 "merge_commit_sha": pr.get("merge_commit_sha") if pr.get("merged") else None,
                 "author": pr["user"]["login"], "title": clip(pr["title"], 300), "body": clip(pr.get("body")),
+                "head_ref": pr["head"]["ref"], "head_repo": (pr["head"].get("repo") or {}).get("full_name", "unknown"),
+                "base_repo": pr["base"]["repo"]["full_name"],
                 "head_sha": head, "head_pushed_at": ts(head_commit["commit"]["committer"]["date"]),
                 "base_sha": pr["base"]["sha"], "base_ref": pr["base"]["ref"],
                 "additions": pr["additions"], "deletions": pr["deletions"], "changed_files": pr["changed_files"],
                 "labels": [l["name"] for l in pr["labels"]],
                 "files": [{"filename": f["filename"], "status": f["status"], "additions": f["additions"],
                            "deletions": f["deletions"], "previous_filename": f.get("previous_filename"),
-                           "patch": clip(f.get("patch"), patch_limit) if f.get("patch") is not None else None} for f in files],
-                "commits": [{"sha": c["sha"], "message": clip(c["commit"]["message"], 2000)} for c in commits],
+                           "patch": clip_patch(f.get("patch"), patch_limit)} for f in files],
+                "commits": [{"sha": c["sha"], "message": clip(c["commit"]["message"], 2000),
+                             "author": (c.get("author") or {}).get("login") or c["commit"]["author"]["name"]} for c in commits],
                 "comments": [{"author": c["user"]["login"], "body": clip(c["body"])} for c in comments],
                 "reviews": [{"reviewer": r["user"]["login"], "state": r["state"] if r["state"] in
                              ("APPROVED", "CHANGES_REQUESTED", "COMMENTED", "DISMISSED") else "COMMENTED",

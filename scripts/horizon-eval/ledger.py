@@ -20,7 +20,20 @@ import json
 import os
 from pathlib import Path
 
-from horizon_eval import canon, evaluate, evidence_digest, idempotency_key, sha256_hex
+from horizon_eval import canon, eval_context, evaluate, evidence_digest, idempotency_key, sha256_hex
+
+
+def _plausible(record: dict) -> bool:
+    """The integrity hash is unkeyed (it detects corruption, not forgery). A replay must at least be self-consistent:
+    an ELIGIBLE record has to be synthetic, reason-free of blockers and never claim to merge or to be authentic."""
+    if record.get("would_merge") is not False or record.get("authentic_grant_verified") is not False:
+        return False
+    if record.get("decision") == "ELIGIBLE_SIMULATED":
+        if record.get("synthetic") is not True or record.get("mode") != "synthetic-test":
+            return False
+        if any(r.get("severity") != "INFO" for r in record.get("reasons", [])):
+            return False
+    return True
 
 
 class Ledger:
@@ -42,6 +55,8 @@ class Ledger:
             wrapper = json.loads(path.read_text(encoding="utf-8"))
             record = wrapper["record"]
             if wrapper["integrity"] != sha256_hex(canon(record)) or record.get("record_id") != record_id:
+                return None
+            if not _plausible(record):
                 return None
             return record
         except (OSError, ValueError, KeyError, TypeError):
@@ -84,7 +99,12 @@ class Ledger:
 def evaluate_recorded(case, ledger: Ledger, *, allow_synthetic: bool = False, wall_clock=None) -> dict:
     """Evaluate once per (key, evidence). Safe to call again after any interruption."""
     case = case if isinstance(case, dict) else {}
-    record_id = sha256_hex(idempotency_key(case) + evidence_digest(case))
+    try:
+        record_id = sha256_hex(idempotency_key(case) + evidence_digest(case, eval_context(case, allow_synthetic, wall_clock)))
+    except Exception:  # not hashable: evaluate (fail closed) but persist/replay nothing
+        out = dict(evaluate(case, allow_synthetic=allow_synthetic, wall_clock=wall_clock))
+        out.update(replayed=False, ledger_skipped=True)
+        return out
     existing = ledger.lookup(record_id)
     if existing is not None:
         replay = dict(existing)

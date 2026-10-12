@@ -19,7 +19,7 @@ EXPECTED = {
     # file: (decision, zone, must-include reasons)
     "live-pr1093.json": ("BLOCK", "A", {"CI_CHECK_NEVER_STARTED", "NO_ACTIVE_GRANT", "HORIZON_NOT_REGISTERED_V2"}),
     "live-pr1346.json": ("STOP_OWNER_DECISION", "C", {"ZONE_C_OWNER_GATED", "PR_ALREADY_MERGED", "UNREGISTERED_PR_OVERLAP"}),
-    "live-pr1348.json": ("STOP_OWNER_DECISION", "C", {"ZONE_C_OWNER_GATED", "PR_ALREADY_MERGED", "UNREGISTERED_HORIZON_ACTIVE"}),
+    "live-pr1350.json": ("STOP_OWNER_DECISION", "C", {"ZONE_C_OWNER_GATED", "NO_ACTIVE_GRANT", "HORIZON_NOT_REGISTERED_V2"}),
     "live-pr1349.json": ("BLOCK", "B", {"CI_CHECK_PENDING", "NO_ACTIVE_GRANT", "INDEPENDENT_REVIEW_MISSING"}),
     "live-pr586.json": ("STOP_OWNER_DECISION", "C", {"ZONE_C_OWNER_GATED", "CI_CHECK_NEVER_STARTED"}),
 }
@@ -49,9 +49,10 @@ class LiveSnapshots(unittest.TestCase):
             self.assertFalse(rec["would_merge"])
 
     def test_real_parallel_horizon_overlaps_are_observed_not_reported(self):
-        rec = he.evaluate(load("live-pr1348.json"))
+        rec = he.evaluate(load("live-pr1346.json"))
         kinds = {c["evidence_kind"] for c in rec["conflicts"]}
-        self.assertEqual(kinds, {"observed"})          # nobody registered a claim: only GitHub-observed evidence exists
+        self.assertEqual(kinds, {"observed"})
+        self.assertTrue(rec["conflicts"], "PR #1346 (governance docs) overlaps the stale PR #202 on S-GOV-DOCS")          # nobody registered a claim: only GitHub-observed evidence exists
         self.assertTrue(all(c["registered"] is False for c in rec["conflicts"]))
 
     def test_gate_never_ran_on_legacy_prs_is_visible(self):

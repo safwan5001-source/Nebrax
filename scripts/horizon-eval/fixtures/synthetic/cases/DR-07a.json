@@ -44,7 +44,8 @@
             "S-ATTACH-STORAGE": "exclusive"
           },
           "claim_order": 3
-        }
+        },
+        "files_complete": true
       }
     ]
   }

@@ -20,7 +20,8 @@
         "files": [
           "docs/guides/synthetic-a.md"
         ],
-        "claim": null
+        "claim": null,
+        "files_complete": true
       }
     ]
   }

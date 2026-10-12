@@ -44,9 +44,9 @@
     "status": "completed"
    }
   ],
-  "fetched_at": "2026-10-12T02:51:40Z",
+  "fetched_at": "2026-10-12T03:04:35Z",
   "grant_store": {
-   "fetched_at": "2026-10-12T02:51:40Z",
+   "fetched_at": "2026-10-12T03:04:35Z",
    "grants": [],
    "kill_switch": false,
    "ref": "main",
@@ -65,11 +65,12 @@
      "app/Services/DocumentCenter/DocumentStorageService.php",
      "tests/Feature/DocumentStorageDurableProfileTest.php"
     ],
+    "files_complete": true,
     "head_ref": "horizon/media-storage-s7-documents-reads",
     "horizon_id": null,
     "last_activity_at": "2026-10-12T02:42:47Z",
     "number": 1350,
-    "observed_at": "2026-10-12T02:51:40Z",
+    "observed_at": "2026-10-12T03:04:35Z",
     "state": "open"
    },
    {
@@ -95,11 +96,12 @@
      "web/src/modules/store-experience-builder/themes/index.ts",
      "web/src/modules/store-experience-builder/themes/preview-link.ts"
     ],
+    "files_complete": true,
     "head_ref": "cust-hv/v10b-theme-preview-apply",
     "horizon_id": null,
     "last_activity_at": "2026-10-12T02:42:34Z",
     "number": 1349,
-    "observed_at": "2026-10-12T02:51:40Z",
+    "observed_at": "2026-10-12T03:04:35Z",
     "state": "open"
    },
    {
@@ -108,11 +110,12 @@
      "docs/plans/growth/AWJ_GROWTH_FOUNDATION_HORIZON_V1.md",
      "docs/plans/growth/AWJ_GROWTH_FOUNDATION_HORIZON_V1_BOOTSTRAP.md"
     ],
+    "files_complete": true,
     "head_ref": "docs/awj-growth-foundation-horizon-v1",
     "horizon_id": null,
     "last_activity_at": "2026-09-30T18:12:05Z",
     "number": 1128,
-    "observed_at": "2026-10-12T02:51:40Z",
+    "observed_at": "2026-10-12T03:04:35Z",
     "state": "open"
    },
    {
@@ -171,11 +174,12 @@
      "motion/awj-commercial/src/ui/common.tsx",
      "motion/awj-commercial/tsconfig.json"
     ],
+    "files_complete": true,
     "head_ref": "motion/awj-commercial-15s",
     "horizon_id": null,
     "last_activity_at": "2026-09-29T05:29:57Z",
     "number": 1105,
-    "observed_at": "2026-10-12T02:51:40Z",
+    "observed_at": "2026-10-12T03:04:35Z",
     "state": "open"
    },
    {
@@ -188,11 +192,12 @@
      "tests/Feature/CommerceModuleBoundaryTest.php",
      "tests/Feature/StorefrontPresentationVersionPublishApiTest.php"
     ],
+    "files_complete": true,
     "head_ref": "feat/theme-version-publish",
     "horizon_id": null,
     "last_activity_at": "2026-09-28T15:37:50Z",
     "number": 1089,
-    "observed_at": "2026-10-12T02:51:40Z",
+    "observed_at": "2026-10-12T03:04:35Z",
     "state": "open"
    },
    {
@@ -200,11 +205,12 @@
     "files": [
      "docs/plans/store/AWJ_STORE_CUSTOMIZER_EXTENDED_ARCHITECTURE.md"
     ],
+    "files_complete": true,
     "head_ref": "docs/store-customizer-extended-architecture",
     "horizon_id": null,
     "last_activity_at": "2026-09-17T10:42:20Z",
     "number": 853,
-    "observed_at": "2026-10-12T02:51:40Z",
+    "observed_at": "2026-10-12T03:04:35Z",
     "state": "open"
    },
    {
@@ -212,11 +218,12 @@
     "files": [
      "app/Console/Commands/RecoverHistoricalTenantCommand.php"
     ],
+    "files_complete": true,
     "head_ref": "feat/awj-taiba-tenant-recovery-platform-admin",
     "horizon_id": null,
     "last_activity_at": "2026-09-12T04:21:51Z",
     "number": 784,
-    "observed_at": "2026-10-12T02:51:40Z",
+    "observed_at": "2026-10-12T03:04:35Z",
     "state": "open"
    },
    {
@@ -225,11 +232,12 @@
      "docs/plans/payments/AWJ_PAY_V2_6A_GATEWAY_REFUND_ACCOUNTING_DESIGN.md",
      "docs/plans/payments/AWJ_PAY_V2_6B_CUSTOMER_REFUND_EVIDENCE_PASS.md"
     ],
+    "files_complete": true,
     "head_ref": "docs/pay-v2-6a-gateway-refund-accounting-design",
     "horizon_id": null,
     "last_activity_at": "2026-09-12T01:19:29Z",
     "number": 778,
-    "observed_at": "2026-10-12T02:51:40Z",
+    "observed_at": "2026-10-12T03:04:35Z",
     "state": "open"
    },
    {
@@ -237,11 +245,12 @@
     "files": [
      "docs/audits/AWJ_ACCOUNTING_SETTINGS_PRODUCT_COMPLETENESS_AUDIT_2026-09.md"
     ],
+    "files_complete": true,
     "head_ref": "claude/accounting-settings-product-completeness-audit",
     "horizon_id": null,
     "last_activity_at": "2026-09-08T22:37:53Z",
     "number": 704,
-    "observed_at": "2026-10-12T02:51:40Z",
+    "observed_at": "2026-10-12T03:04:35Z",
     "state": "open"
    },
    {
@@ -252,11 +261,12 @@
      "docs/plans/design/references/awj-v2-product-master-desktop-mobile.jpeg",
      "docs/plans/design/references/awj-v2-sales-invoice-desktop.jpeg"
     ],
+    "files_complete": true,
     "head_ref": "claude/awj-v2-visual-references-62yiwn",
     "horizon_id": null,
     "last_activity_at": "2026-09-08T15:40:55Z",
     "number": 703,
-    "observed_at": "2026-10-12T02:51:40Z",
+    "observed_at": "2026-10-12T03:04:35Z",
     "state": "open"
    },
    {
@@ -266,11 +276,12 @@
      "app/Services/Accounting/ZatcaSignedInvoiceQrResult.php",
      "tests/Feature/ZatcaSignedInvoiceQrCoordinatorTest.php"
     ],
+    "files_complete": true,
     "head_ref": "feat/zatca-signed-invoice-qr-coordinator",
     "horizon_id": null,
     "last_activity_at": "2026-08-30T14:12:47Z",
     "number": 586,
-    "observed_at": "2026-10-12T02:51:40Z",
+    "observed_at": "2026-10-12T03:04:35Z",
     "state": "open"
    },
    {
@@ -280,11 +291,12 @@
      "app/Console/Commands/DocumentReadinessCommand.php",
      "deploy/document-worker.sh"
     ],
+    "files_complete": true,
     "head_ref": "fix/document-database-queue-readiness",
     "horizon_id": null,
     "last_activity_at": "2026-08-30T01:37:44Z",
     "number": 578,
-    "observed_at": "2026-10-12T02:51:40Z",
+    "observed_at": "2026-10-12T03:04:35Z",
     "state": "open"
    },
    {
@@ -297,11 +309,12 @@
      "setup.sh",
      "tests/Feature/AccountingGuardTest.php"
     ],
+    "files_complete": true,
     "head_ref": "claude/ai-assistant-guidelines-9gxfjs",
     "horizon_id": null,
     "last_activity_at": "2026-08-14T23:31:52Z",
     "number": 202,
-    "observed_at": "2026-10-12T02:51:40Z",
+    "observed_at": "2026-10-12T03:04:35Z",
     "state": "open"
    }
   ],
@@ -309,6 +322,7 @@
    "additions": 795,
    "author": "safwan5001-source",
    "base_ref": "main",
+   "base_repo": "safwan5001-source/Nebrax",
    "base_sha": "e6fc91d172c0759f1b7e422e9396b775995fc645",
    "body": "## الهدف\n\nتوثيق خطة Cloudflare الكاملة لأَوْج وفق **نظام الأفق** دون تنفيذ أو نشر أي تغيير إنتاجي.\n\n## يتضمن\n\n- Cloudflare R2 كطبقة تخزين ملفات مركزية مع الحفاظ على PostgreSQL كمصدر حقيقة للأعمال.\n- Railway كـ application origin.\n- DNS/TLS/DDoS/WAF/Rate Limiting.\n- Turnstile لمسارات التسجيل/تسجيل الدخول/استرجاع كلمة المرور ضمن حدود Auth الحالية.\n- CDN/Cache مع fail-closed للبيانات الخاصة والمالية.\n- Cloudflare Images + R2.\n- Cloudflare for SaaS كـ Decision Gate مستقل بسبب وجود معمارية Railway custom-domain حالية.\n- Workers/Queues/KV/Durable Objects وZero Trust كخيارات مؤجلة تعتمد على evidence.\n- Quality Gates، Production Owner Gates، Dependency-safe task queue، Definition of Done.\n- Bootstrap مستقل لنظام الأفق.\n- Decision Packet لمقارنة Railway custom domains وCloudflare for SaaS.\n\n## الملفات\n\n- `docs/plans/cloudflare/AWJ_CLOUDFLARE_PLATFORM_HORIZON_V1.md`\n- `docs/plans/cloudflare/AWJ_CLOUDFLARE_PLATFORM_BOOTSTRAP.md`\n- `docs/plans/cloudflare/CF-SAAS-DOMAIN-PROVIDER-1-DECISION-PACKET.md`\n\n## الحدود\n\n- Docs only.\n- لا Merge تلقائي.\n- لا Deploy.\n- لا DNS cutover.\n- لا Railway secrets.\n- لا Cloudflare production rules.\n- لا تغيير في التخزين الحالي.\n- لا استبدال لمعمارية custom domains الحالية بدون قرار صريح.\n\n## Evidence\n\nالمصادر الخارجية الرسمية مذكورة داخل خطة الأفق بتاريخ 2026-09-29، مع فصل External Evidence عن AWJ Decisions وDecision Gates.",
    "changed_files": 3,
@@ -321,14 +335,17 @@
    ],
    "commits": [
     {
+     "author": "safwan5001-source",
      "message": "docs: add AWJ Cloudflare platform horizon V1",
      "sha": "d332579d3907783edeb070671f6955d403b98f65"
     },
     {
+     "author": "safwan5001-source",
      "message": "docs: add Cloudflare horizon bootstrap",
      "sha": "81565ef8d831fabf2c438338cfb0cf72f6772fa6"
     },
     {
+     "author": "safwan5001-source",
      "message": "docs: add Cloudflare SaaS domain provider decision packet",
      "sha": "bba69ca54090a405248795107d35d8fd279d07a4"
     }
@@ -340,7 +357,7 @@
      "additions": 99,
      "deletions": 0,
      "filename": "docs/plans/cloudflare/AWJ_CLOUDFLARE_PLATFORM_BOOTSTRAP.md",
-     "patch": "",
+     "patch": null,
      "previous_filename": null,
      "status": "added"
     },
@@ -348,7 +365,7 @@
      "additions": 583,
      "deletions": 0,
      "filename": "docs/plans/cloudflare/AWJ_CLOUDFLARE_PLATFORM_HORIZON_V1.md",
-     "patch": "",
+     "patch": null,
      "previous_filename": null,
      "status": "added"
     },
@@ -356,12 +373,14 @@
      "additions": 113,
      "deletions": 0,
      "filename": "docs/plans/cloudflare/CF-SAAS-DOMAIN-PROVIDER-1-DECISION-PACKET.md",
-     "patch": "",
+     "patch": null,
      "previous_filename": null,
      "status": "added"
     }
    ],
    "head_pushed_at": "2026-09-28T21:32:07Z",
+   "head_ref": "docs/awj-cloudflare-platform-horizon-v1",
+   "head_repo": "safwan5001-source/Nebrax",
    "head_sha": "bba69ca54090a405248795107d35d8fd279d07a4",
    "labels": [],
    "merge_commit_sha": null,
@@ -395,7 +414,7 @@
   "source": "github-readonly"
  },
  "mode": "live",
- "now": "2026-10-12T02:51:40Z",
+ "now": "2026-10-12T03:04:35Z",
  "request": {
   "action": "merge",
   "agent_id": "pilot-session",
