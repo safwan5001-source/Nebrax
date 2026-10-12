@@ -69,7 +69,8 @@
 
 | البند | يحجب | من يفكّه |
 |---|---|---|
-| إدخال اعتماد R2 للتكامل `document_storage` في شاشة المنصة | `awj:documents-storage-verify` ثم فتح `DOCUMENT_DURABLE_STORAGE_ENABLED` | المالك (سرّ لا أراه) |
+| 🔴 **S6: R2 WRITE FAILED في Production** (E36): كتابة R2 لمركز المستندات فشلت (`UnableToWriteFile` + `UnableToDeleteFile`) رغم تكامل مُدخَل وإعداد صالح — السبب قيد التشخيص (S8): اعتماد/صلاحية دلو/endpoint/عنونة أو ACL | فتح `DOCUMENT_DURABLE_STORAGE_ENABLED` (لا يُفتح) | Claude (تشخيص/إصلاح) ← المالك (تشغيل الأمر بعد S8) |
+| (أُنجز) إدخال اعتماد R2 للتكامل `document_storage` في شاشة المنصة | — | المالك |
 | تشغيل `awj:documents-storage-verify` في Production Console | بوابة فتح القفل | المالك |
 | استحقاق تجاري `document_center.core` لمستأجر الاختبار A (حالياً 403) | التحقق الإنتاجي لرفع/قراءة/حذف المستند | المالك (إسناد من المنصة) — وإلا يبقى التحقق في بيئة الاختبار فقط |
 | (أُنجز) S6 منشور `27dfc988` وS7 مدموج `40832b2` | — | — |
