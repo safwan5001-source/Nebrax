@@ -1,8 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { CalendarClock, FileClock, Plus, XCircle } from 'lucide-react';
+import { ConfirmDialog } from '@/components/platform/confirm-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -66,6 +67,7 @@ export function ContractManagementCard({ tenantId, subscriptions, onChanged }: P
   const [actionReason, setActionReason] = useState('');
   const [events, setEvents] = useState<ContractEvent[] | null>(null);
   const [eventsFor, setEventsFor] = useState<ContractSubscription | null>(null);
+  const openerRef = useRef<HTMLElement | null>(null);
 
   function resetMessages(): void {
     setError(null);
@@ -91,7 +93,8 @@ export function ContractManagementCard({ tenantId, subscriptions, onChanged }: P
     }
   }
 
-  function openAction(type: Action, subscription: ContractSubscription): void {
+  function openAction(type: Action, subscription: ContractSubscription, opener?: HTMLElement): void {
+    openerRef.current = opener ?? null;
     resetMessages();
     setAction({ type, subscription });
     setEffectiveOn(new Date().toISOString().slice(0, 10));
@@ -102,9 +105,6 @@ export function ContractManagementCard({ tenantId, subscriptions, onChanged }: P
 
   async function submitAction(): Promise<void> {
     if (!action) return;
-    if (action.type === 'cancel' && !window.confirm(t('confirmCancelContract'))) return;
-    if (action.type === 'expire' && !window.confirm(t('confirmExpireContract'))) return;
-
     setSaving(true);
     resetMessages();
     try {
@@ -156,7 +156,7 @@ export function ContractManagementCard({ tenantId, subscriptions, onChanged }: P
             <label className="space-y-1.5 text-sm font-medium text-text"><span>{t('contractReference')}</span><Input value={reference} onChange={(event) => setReference(event.target.value)} /></label>
             <label className="space-y-1.5 text-sm font-medium text-text sm:col-span-2"><span>{t('reason')}</span><Input value={reason} onChange={(event) => setReason(event.target.value)} /></label>
           </div>
-          <Button onClick={createContract} disabled={saving || !startsOn}><Plus className="h-4 w-4" strokeWidth={1.7} aria-hidden="true" />{saving ? t('saving') : t('createContract')}</Button>
+          <Button className="h-11 w-full sm:w-auto" onClick={createContract} disabled={saving || !startsOn}><Plus className="h-4 w-4" strokeWidth={1.7} aria-hidden="true" />{saving ? t('saving') : t('createContract')}</Button>
         </CardContent>
       </Card>
 
@@ -170,15 +170,37 @@ export function ContractManagementCard({ tenantId, subscriptions, onChanged }: P
         </CardContent>
       </Card>
 
-      <Dialog open={action !== null} onClose={() => !saving && setAction(null)} title={action ? action.type === 'transition' ? t('changeContract') : action.type === 'cancel' ? t('cancelContract') : t('expireContract') : t('changeContract')}>
-        {action && <div className="space-y-4">
-          {action.type === 'transition' && <label className="block space-y-1.5 text-sm font-medium text-text"><span>{t('plan')}</span><Select value={nextPlan} onChange={(event) => setNextPlan(event.target.value)}>{PLANS.map((item) => <option key={item} value={item}>{item}</option>)}</Select></label>}
+      <Dialog open={action?.type === 'transition'} onClose={() => !saving && setAction(null)} title={t('changeContract')}>
+        {action?.type === 'transition' && <div className="space-y-4">
+          <label className="block space-y-1.5 text-sm font-medium text-text"><span>{t('plan')}</span><Select value={nextPlan} onChange={(event) => setNextPlan(event.target.value)}>{PLANS.map((item) => <option key={item} value={item}>{item}</option>)}</Select></label>
           <label className="block space-y-1.5 text-sm font-medium text-text"><span>{t('effectiveOn')}</span><Input type="date" value={effectiveOn} onChange={(event) => setEffectiveOn(event.target.value)} /></label>
-          {action.type === 'transition' && <label className="block space-y-1.5 text-sm font-medium text-text"><span>{t('contractReference')}</span><Input value={actionReference} onChange={(event) => setActionReference(event.target.value)} /></label>}
+          <label className="block space-y-1.5 text-sm font-medium text-text"><span>{t('contractReference')}</span><Input value={actionReference} onChange={(event) => setActionReference(event.target.value)} /></label>
           <label className="block space-y-1.5 text-sm font-medium text-text"><span>{t('reason')}</span><Input value={actionReason} onChange={(event) => setActionReason(event.target.value)} /></label>
-          <div className="flex flex-wrap justify-end gap-2"><Button variant="outline" onClick={() => setAction(null)} disabled={saving}>{t('close')}</Button><Button onClick={submitAction} disabled={saving || !effectiveOn}>{saving ? t('saving') : action.type === 'transition' ? t('transitionContract') : action.type === 'cancel' ? t('cancelContract') : t('expireContract')}</Button></div>
+          <div className="flex flex-wrap justify-end gap-2"><Button variant="outline" onClick={() => setAction(null)} disabled={saving}>{t('close')}</Button><Button onClick={submitAction} disabled={saving || !effectiveOn}>{saving ? t('saving') : t('transitionContract')}</Button></div>
         </div>}
       </Dialog>
+
+      {/* إلغاء العقد وإثبات انتهائه: الحوار نفسه هو التأكيد (بدل window.confirm)، والطلب لا يُرسَل إلا بزر التأكيد. */}
+      <ConfirmDialog
+        open={action?.type === 'cancel' || action?.type === 'expire'}
+        onCancel={() => setAction(null)}
+        onConfirm={() => void submitAction()}
+        title={action?.type === 'expire' ? t('expireContract') : t('cancelContract')}
+        description={action?.type === 'expire' ? t('confirmExpireContract') : t('confirmCancelContract')}
+        confirmLabel={saving ? t('saving') : action?.type === 'expire' ? t('expireContract') : t('cancelContract')}
+        confirmVariant="danger"
+        confirmIcon={<XCircle className="h-4 w-4" strokeWidth={1.7} aria-hidden="true" />}
+        confirmDisabled={!effectiveOn}
+        cancelLabel={t('goBack')}
+        closeLabel={t('close')}
+        busy={saving}
+        returnFocusTo={openerRef.current}
+      >
+        <div className="space-y-4">
+          <label className="block space-y-1.5 text-sm font-medium text-text"><span>{t('effectiveOn')}</span><Input type="date" value={effectiveOn} onChange={(event) => setEffectiveOn(event.target.value)} /></label>
+          <label className="block space-y-1.5 text-sm font-medium text-text"><span>{t('reason')}</span><Input value={actionReason} onChange={(event) => setActionReason(event.target.value)} /></label>
+        </div>
+      </ConfirmDialog>
 
       <Dialog open={eventsFor !== null} onClose={() => setEventsFor(null)} title={t('contractEvents')}>
         {events === null ? <p className="text-sm text-muted">{t('saving')}</p> : events.length === 0 ? <p className="text-sm text-muted">{t('noContractEvents')}</p> : <div className="space-y-3">{events.map((event) => <div key={event.id} className="rounded border border-border p-3"><div className="flex items-center justify-between gap-3"><Badge tone="muted">{eventLabel(event.action, t)}</Badge><span className="num text-xs text-muted">{event.effective_on ?? '—'}</span></div><p className="mt-2 text-sm text-text">{event.from_plan ?? '—'} → {event.to_plan ?? '—'}</p>{event.reason && <p className="mt-1 text-xs text-muted">{event.reason}</p>}</div>)}</div>}
@@ -187,17 +209,17 @@ export function ContractManagementCard({ tenantId, subscriptions, onChanged }: P
   );
 }
 
-function SubscriptionRow({ subscription, onAction, onEvents, t }: { subscription: ContractSubscription; onAction: (type: Action, subscription: ContractSubscription) => void; onEvents: (subscription: ContractSubscription) => void; t: (key: string) => string }) {
+function SubscriptionRow({ subscription, onAction, onEvents, t }: { subscription: ContractSubscription; onAction: (type: Action, subscription: ContractSubscription, opener?: HTMLElement) => void; onEvents: (subscription: ContractSubscription) => void; t: (key: string) => string }) {
   const changeable = ACTIVE_STATUSES.includes(subscription.status);
   return <TR><TD className="font-medium">{subscription.plan}{subscription.price_effective_on && <p className="num mt-1 text-xs font-normal text-muted">{t('priceEffectiveOn')} {subscription.price_effective_on}</p>}</TD><TD><Badge tone="muted">{statusLabel(subscription.status, t)}</Badge></TD><TD className="num text-end">{formatRiyal(subscription.monthly_amount)}</TD><TD className="num text-muted">{subscription.starts_on ?? '—'}</TD><TD className="num text-muted">{subscription.ends_on ?? '—'}</TD><TD><ActionButtons subscription={subscription} changeable={changeable} onAction={onAction} onEvents={onEvents} t={t} /></TD></TR>;
 }
 
-function SubscriptionMobileCard({ subscription, onAction, onEvents, t }: { subscription: ContractSubscription; onAction: (type: Action, subscription: ContractSubscription) => void; onEvents: (subscription: ContractSubscription) => void; t: (key: string) => string }) {
+function SubscriptionMobileCard({ subscription, onAction, onEvents, t }: { subscription: ContractSubscription; onAction: (type: Action, subscription: ContractSubscription, opener?: HTMLElement) => void; onEvents: (subscription: ContractSubscription) => void; t: (key: string) => string }) {
   return <div className="rounded border border-border p-3"><div className="flex items-center justify-between gap-3"><div><p className="font-medium text-text">{subscription.plan}</p><p className="num mt-1 text-xs text-muted">{subscription.starts_on ?? '—'} · {subscription.ends_on ?? '—'}</p></div><div className="text-end"><Badge tone="muted">{statusLabel(subscription.status, t)}</Badge><p className="num mt-1 text-sm text-text">{formatRiyal(subscription.monthly_amount)}</p></div></div><div className="mt-3 border-t border-border pt-3"><ActionButtons subscription={subscription} changeable={ACTIVE_STATUSES.includes(subscription.status)} onAction={onAction} onEvents={onEvents} t={t} /></div></div>;
 }
 
-function ActionButtons({ subscription, changeable, onAction, onEvents, t }: { subscription: ContractSubscription; changeable: boolean; onAction: (type: Action, subscription: ContractSubscription) => void; onEvents: (subscription: ContractSubscription) => void; t: (key: string) => string }) {
-  return <div className="flex flex-wrap gap-2"><Button size="sm" variant="outline" onClick={() => onEvents(subscription)}><FileClock className="h-4 w-4" strokeWidth={1.7} aria-hidden="true" />{t('viewEvents')}</Button>{changeable && <><Button size="sm" variant="outline" onClick={() => onAction('transition', subscription)}><CalendarClock className="h-4 w-4" strokeWidth={1.7} aria-hidden="true" />{t('changeContract')}</Button><Button size="sm" variant="outline" onClick={() => onAction('expire', subscription)}>{t('expireContract')}</Button><Button size="sm" variant="danger" onClick={() => onAction('cancel', subscription)}><XCircle className="h-4 w-4" strokeWidth={1.7} aria-hidden="true" />{t('cancelContract')}</Button></>}</div>;
+function ActionButtons({ subscription, changeable, onAction, onEvents, t }: { subscription: ContractSubscription; changeable: boolean; onAction: (type: Action, subscription: ContractSubscription, opener?: HTMLElement) => void; onEvents: (subscription: ContractSubscription) => void; t: (key: string) => string }) {
+  return <div className="flex flex-wrap gap-2"><Button size="sm" variant="outline" onClick={() => onEvents(subscription)}><FileClock className="h-4 w-4" strokeWidth={1.7} aria-hidden="true" />{t('viewEvents')}</Button>{changeable && <><Button size="sm" variant="outline" onClick={(event) => onAction('transition', subscription, event.currentTarget)}><CalendarClock className="h-4 w-4" strokeWidth={1.7} aria-hidden="true" />{t('changeContract')}</Button><Button size="sm" variant="outline" onClick={(event) => onAction('expire', subscription, event.currentTarget)}>{t('expireContract')}</Button><Button size="sm" variant="danger" onClick={(event) => onAction('cancel', subscription, event.currentTarget)}><XCircle className="h-4 w-4" strokeWidth={1.7} aria-hidden="true" />{t('cancelContract')}</Button></>}</div>;
 }
 
 function statusLabel(status: string, t: (key: string) => string): string {

@@ -384,12 +384,12 @@ export function CommercialOperationsCard({ tenantId, onChanged }: { tenantId: st
 
   return (
     <Card>
-      <CardHeader className="flex flex-row items-start justify-between gap-3">
+      <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-3">
         <div className="flex items-start gap-3">
           <Boxes className="mt-0.5 h-5 w-5 shrink-0 text-primary" strokeWidth={1.7} aria-hidden="true" />
           <div><CardTitle>{t('subscriptionApplications')}</CardTitle><p className="mt-1 text-sm text-muted">{t('subscriptionApplicationsNotice')}</p></div>
         </div>
-        <div className="flex shrink-0 gap-2"><Button size="sm" variant="outline" onClick={load} disabled={loading || acting}><RefreshCw className="h-4 w-4" strokeWidth={1.7} aria-hidden="true" />{t('retry')}</Button><Button size="sm" onClick={openAssign} disabled={loading}><Plus className="h-4 w-4" strokeWidth={1.7} aria-hidden="true" />{t('assignApplication')}</Button></div>
+        <div className="flex flex-wrap gap-2"><Button size="sm" variant="outline" onClick={load} disabled={loading || acting}><RefreshCw className="h-4 w-4" strokeWidth={1.7} aria-hidden="true" />{t('retry')}</Button><Button size="sm" onClick={openAssign} disabled={loading}><Plus className="h-4 w-4" strokeWidth={1.7} aria-hidden="true" />{t('assignApplication')}</Button></div>
       </CardHeader>
       <CardContent className="space-y-5">
         {error && <p role="alert" className="rounded-md bg-negative/10 px-3 py-2 text-sm text-negative">{error}</p>}
