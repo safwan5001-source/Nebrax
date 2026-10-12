@@ -1,6 +1,6 @@
 # H1-4B — Platform Tenant Details UX — Implementation report
 
-STATUS: IN REVIEW / DO NOT MERGE / DO NOT DEPLOY
+STATUS: MERGED (PR #1366, `56e3d83b2eee97ff671ddd47800a3bda345917a6`) / NOT DEPLOYED / POST-MERGE VERIFICATION NOT RECORDED
 Horizon: AWJ-PLATFORM-UX-H1 · Slice: H1-4B (tenant detail) · Date: 2026-10-12
 Spec: [AWJ-PLATFORM-UX-H1-1-UX-SPEC.md](./AWJ-PLATFORM-UX-H1-1-UX-SPEC.md) §8 (dialogs) and §12.4 (tenant detail)
 
@@ -113,12 +113,14 @@ Product changes are confined to this page, a new dialog wrapper, the contract ca
 
 ## CI
 
-Recorded on the pull request for the exact head SHA (the checks and the final head are listed in the PR and in the hand-off summary). This file is part of that head, so it does not restate results that did not exist when it was committed.
+Final Head `c0262640cb0dcf9cbf14e180f37996d23293c74f` of PR #1366: all 8 GitHub check runs `success` (CI Gate, web build ×2, php artisan test sqlite ×2, pgsql ×2, storefront lint/typecheck/test), read through the GitHub API. The Codex review of that head completed with no findings.
 
 ## Merge / post-merge
 
-- Merge status: not merged. Merge SHA: none. Post-merge review: not done. Deploy: not requested.
-- Post-merge verification of #1318, #1328, #1355, #1358 and #1362 on `main` has not been recorded; this slice does not claim it.
+- PRE_MERGE_REVIEW: PASS, recorded as a comment on PR #1366 by the repository owner account for the exact Head above; zero unresolved review threads.
+- Merge status: merged on 2026-10-12 (about 08:18 UTC). Merge SHA `56e3d83b2eee97ff671ddd47800a3bda345917a6`, confirmed an ancestor of `main` (subject "feat(platform): H1-4B tenant detail UX (#1366)"). The merge was not performed by the Claude session.
+- Post-merge review: not done. No target-branch check or smoke evidence on `56e3d83` was collected, so none is claimed.
+- Deploy / production release: not done.
 
 ## Risks and remaining work
 
@@ -132,8 +134,8 @@ Recorded on the pull request for the exact head SHA (the checks and the final he
 
 - Branch: `claude/awj-h1-contrast-recovery-fx8unn` (restarted from `main` after #1362 merged; older remote history is merged in so no force-push is needed).
 - Base SHA: `93a30cf873c99078b0d766f4ade7537f765bacd7` (`origin/main` at start).
-- Head SHA and PR: see the pull request.
+- Head SHA: `c0262640cb0dcf9cbf14e180f37996d23293c74f`. PR: #1366 (merged).
 
 ## Next dependency-ready task
 
-**H1-4C**, the next page in the H1-4 list (prices, integrations or document operations, one per PR, spec §12.5 to §12.7). Not started.
+**H1-4C** prices: see `AWJ-PLATFORM-UX-H1-4C-PRICING-REPORT.md`.
