@@ -1,6 +1,6 @@
 # H1-2 — Unified Platform Administration Shell — Implementation report
 
-STATUS: IN REVIEW / DO NOT MERGE / DO NOT DEPLOY
+STATUS: MERGED (PR #1355, `2bc1c1250af710af96a9aa3b0428e2a4f61925cc`) / NOT DEPLOYED / POST-MERGE VERIFICATION NOT RECORDED
 Horizon: AWJ-PLATFORM-UX-H1 · Slice: H1-2 · Date: 2026-10-12
 Spec: [AWJ-PLATFORM-UX-H1-1-UX-SPEC.md](./AWJ-PLATFORM-UX-H1-1-UX-SPEC.md) §3–§5, §10, §12.9
 
@@ -135,13 +135,14 @@ Scope is the shell, the route group and its messages. Page files are pure rename
 
 ## CI
 
-Recorded on the pull request for the exact head SHA (the checks, their results and the final head are listed in the PR and in the hand-off summary). This file is part of that head, so it does not restate results that did not exist when it was committed.
+Final Head `bf35e5ba0f4eb14cadf3d663d7cf1fd4c5f375ce` of PR #1355: all 7 GitHub check runs `success` (CI Gate, web build ×2, php artisan test sqlite ×2, pgsql ×2), read through the GitHub API before the merge.
 
 ## Merge / post-merge
 
-- Merge status: not merged. Merge SHA: none.
-- Post-merge review: not done.
-- Deploy / production release: not requested, not done.
+- PRE_MERGE_REVIEW: PASS, recorded as a comment on PR #1355 by the repository owner account for the exact Head above. No open review threads. The only bot comment was a Codex usage-limit notice.
+- Merge status: merged on 2026-10-12 (about 04:55 UTC). Merge SHA `2bc1c1250af710af96a9aa3b0428e2a4f61925cc`, confirmed an ancestor of `main`. The merge was not performed by the Claude session.
+- Post-merge review: not done; no target-branch check or smoke evidence on `2bc1c12` was collected, so none is claimed.
+- Deploy / production release: not done.
 
 ## Risks and remaining work
 
@@ -155,8 +156,8 @@ Recorded on the pull request for the exact head SHA (the checks, their results a
 
 - Branch: `claude/awj-h1-contrast-recovery-fx8unn` (restarted from `main` after PR #1328 merged, per the session's branch rule).
 - Base SHA: `11abda97dd1d25782d27f06f0312a3d5abec57a2` (`origin/main` when work started; PR #1328 merge `bda44687…` is its ancestor).
-- Head SHA and PR: see the pull request.
+- Head SHA: `bf35e5ba0f4eb14cadf3d663d7cf1fd4c5f375ce`. PR: #1355 (merged).
 
 ## Next dependency-ready task
 
-**H1-3 — Platform overview.** From latest `main` after this PR is merged and verified: remove the overview's private navigation and logout (the shell has both), keep the same API fields and the contracted-revenue notice, no new charts; acceptance in spec §12.2. Stop before merge.
+**H1-3 — Platform overview** (see `AWJ-PLATFORM-UX-H1-3-DASHBOARD-REPORT.md`). From latest `main`: remove the overview's private navigation and logout (the shell has both), keep the same API fields and the contracted-revenue notice, no new charts; acceptance in spec §12.2. Stop before merge.
