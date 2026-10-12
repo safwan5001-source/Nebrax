@@ -16,7 +16,7 @@ Every authenticated platform page now renders inside one platform-only shell: a 
   - Skip link first, targeting `#platform-content`.
   - Sidebar `nav` (`aria-label`), 15rem (`lg:w-60`), `border-e`, sticky full height, no icon rail. Wordmark text, five links with a visible label and a 16px icon, `aria-current="page"` on exactly one link; tenant detail marks Tenants.
   - Top bar: menu button (below `lg`), static breadcrumb (from `sm`), `LangToggle`, `ThemeToggle`, truncated name with `title` (from `sm`), logout with a visible label.
-  - Drawer below `lg`: `aria-expanded` and `aria-controls="platform-nav"` on the menu button, focus moves to the close button on open, Escape / scrim / close button / choosing a link all close it, focus returns to the menu button, `inert` while closed, `overflow-hidden` scroll lock removed on close and unmount, drawer closes if the viewport grows to `lg`.
+  - Drawer below `lg`: `aria-expanded` and `aria-controls="platform-nav"` on the menu button, focus moves to the close button on open, Tab and Shift+Tab are contained in the drawer while it is open (review fix, see below), Escape / scrim / close button / choosing a link all close it, focus returns to the menu button (including after a link choice), `inert` while closed, `overflow-hidden` scroll lock removed on close and unmount, drawer closes if the viewport grows to `lg`.
   - Sign-out calls the existing `platformLogout()` then `router.replace('/platform/login')`.
   - Unauthenticated: renders only an empty busy placeholder and redirects to `/platform/login` (no console navigation is ever shown).
 - **Messages.** New `platformShell` namespace in `ar.json` and `en.json`; no hard-coded sentences. `common.languageToggle` / `common.themeToggle` are reused.
@@ -64,14 +64,13 @@ Unit/component (vitest, jsdom, real components, mocked router/auth):
 
 | Command | Result |
 |---|---|
-| `npx vitest run src/components/platform src/app/platform` | 10 files, 48 tests passed (includes the 13 new shell tests and the untouched pagination, reference-number, integrations, commercial tests) |
-| `npx vitest run src/design` | passed (118 tests with the shell tests) |
-| `npm test` (full web suite, final tree) | 490 files, 5172 tests passed. An earlier run had one failure, the drift ratchet on the first scrim class, fixed (see decisions) |
+| `npx vitest run src/components/platform src/app/platform src/design` | 15 files, 159 tests passed after the review fix (19 shell tests plus the untouched pagination, reference-number, integrations, commercial, drift-ratchet and contrast tests) |
+| `npm test` (full web suite, after the review fix) | 490 files, 5178 tests passed. An earlier run had one failure, the drift ratchet on the first scrim class, fixed (see decisions) |
 | `npm run build` | passed; all seven `/platform*` routes build with unchanged URLs |
 | `npx tsc --noEmit` | 48 errors, identical count to `main`; none in files touched here (they are existing test-file type errors) |
 | ESLint | not run: the repo has no ESLint config (`next lint` prompts interactively) |
 
-New shell tests: active-destination matching (exact overview, segment-boundary prefix, trailing slash, `/platform/tenantsx` and login not matched); exactly five declared hrefs; five links with one `aria-current`, tenant detail marks Tenants; skip target is a focusable `div` with a single `main` on the page; unauthenticated redirect renders no console; `aria-expanded`/`aria-controls`/closed `inert`; not inert at the desktop breakpoint; Escape closes, restores focus and unlocks scroll; scrim and close button close; link click closes; logout calls `platformLogout` then redirects; breadcrumbs; 44px classes on the new controls.
+New shell tests (19 after the review fix; the focus ones are described in the review-fix section): active-destination matching (exact overview, segment-boundary prefix, trailing slash, `/platform/tenantsx` and login not matched); exactly five declared hrefs; five links with one `aria-current`, tenant detail marks Tenants; skip target is a focusable `div` with a single `main` on the page; unauthenticated redirect renders no console; `aria-expanded`/`aria-controls`/closed `inert`; not inert at the desktop breakpoint; Escape closes, restores focus and unlocks scroll; scrim and close button close; link click closes; logout calls `platformLogout` then redirects; breadcrumbs; 44px classes on the new controls.
 
 Real browser (Playwright-core + Chromium 1194, Next dev server, demo mode, no backend API): these were run against the real app, not mocked. They are an ad-hoc probe run during this slice; the scripts are not committed and CI does not repeat them.
 
@@ -88,11 +87,26 @@ Defects the real browser caught and that were fixed before this report:
 1. Drawer focus stayed on the menu button because the nav was still `inert` when focus ran (the unit test could not see it because jsdom does not enforce inert). Fixed by ordering the effects.
 2. At 320 and 375px in English the language and theme toggles were squeezed to 31 and 43px wide next to the longer "Sign out" label. Fixed with a `shrink-0` wrapper; re-run showed 0 sub-44px shell controls.
 
+## Review fix — drawer focus management (PR review finding)
+
+Finding: choosing a link in the drawer called `setOpen(false)` without moving focus out first, so the focused link became `inert`, and Tab / Shift+Tab were not contained, so focus could reach the page behind the open drawer.
+
+Change, in `platform-shell.tsx` only:
+
+1. Link `onClick` is now `open && dismiss()`. `dismiss` already focuses the menu button before closing. The `open` guard keeps desktop sidebar clicks (drawer never open) from touching focus.
+2. The existing document `keydown` handler (active only while open) now also handles Tab: if focus is outside the drawer it is pulled to the first control (last on Shift+Tab); Tab on the last control wraps to the first and Shift+Tab on the first wraps to the last; everything else is left to the browser. Ctrl/Alt/Meta+Tab is ignored. First control is the close button, last is the Document operations link.
+
+Why a Tab wrap and not `inert` on the page behind: marking the header inert would also make the menu button unfocusable at the moment `dismiss` returns focus to it, and would need another effect-ordering rule. The wrap is 15 lines, local to the already-existing open-state effect, and behaves the same in RTL and LTR (it uses DOM order, not direction). Trade-off: a screen reader virtual cursor can still read the page behind; that is the same limit the spec records for `Dialog` and remains an H1-5 item.
+
+New regression tests (6, in `platform-shell.test.tsx`, 19 in the file): link choice moves focus to the menu button (verified to fail without the change); desktop link click does not steal focus; Tab from the last link wraps; Shift+Tab from the first control wraps; Tab inside the drawer is left to the browser and escaped focus is pulled back; Tab is not intercepted when closed or with Ctrl/Alt/Meta. Escape, scrim, close-button, aria and `inert` tests are unchanged and still pass.
+
+Real browser (Chromium, demo mode, RTL and LTR at 320, 390 and 768): 14 Tab presses and 14 Shift+Tab presses from the open drawer never left `#platform-nav` in any of the six runs; selecting a link navigated (at 320/RTL the first dev-server compile of the next route was slower than the 1.2 s wait, but focus and closing were already correct); focus ended on the menu button with `aria-expanded="false"`; Escape still returned focus to the menu button. At 1440 Tab still reaches page controls (the sidebar does not trap).
+
 ## Responsive and accessibility results
 
 - **Viewports (320, 375, 390, 430, 768, 1024, 1440, 1920):** verified in a real browser for page-level overflow and shell behaviour, both directions, both themes (table above).
 - **Touch targets:** 44px on every new shell control, measured, not only classed. Existing page controls (`size="sm"`, 32px) are intentionally unchanged (spec §12).
-- **Keyboard/focus:** skip link, drawer open, Escape, focus return, inert, tab containment: verified in the browser.
+- **Keyboard/focus:** skip link, drawer open, Escape, focus return (also after a link choice), inert, Tab/Shift+Tab containment while open: verified in the browser.
 - **Landmarks:** one `nav` for site navigation (`aria-label`), one for the breadcrumb (`aria-label`), one `main` (the page's own), `h1` untouched.
 - **Light/dark:** the shell uses only existing tokens; the only non-token value is the scrim fallback inside `var(--awj-elevation-scrim, …)`.
 - **Not verified:** landscape orientation, browser zoom and text scaling, real iOS safe-area insets (the `env()` paddings are present but the headless browser has none), screen-reader announcements, a real authenticated platform session against the Laravel API (the probe used the repository's demo mode; list pages showed their normal load-error state because no API ran). H1-5 owns the full closure pass.
@@ -107,7 +121,7 @@ Scope is the shell, the route group and its messages. Page files are pure rename
 
 - Specificity/regression: no CSS added; the shell uses utilities only. `[&>main]:min-h-0` has higher specificity than the page's `.min-h-screen`, confirmed by the absence of a permanent vertical scrollbar in screenshots.
 - `inert`: `setAttribute` in an effect keyed on `open`, `desktop`, `ready`. It also reruns when `ready` flips so the first mount is covered. A race where the nav is inert at the instant the matchMedia query flips is closed by the same dependency list.
-- Focus: `dismiss` focuses the menu button before the drawer closes, so focus never sits in an inert subtree.
+- Focus: `dismiss` focuses the menu button before the drawer closes. The first version used it for Escape, scrim and the close button but not for link choice, so a focused link could become inert; PR review caught this and it is fixed (see the review-fix section). Tab was not contained while open; also fixed there.
 - Pages still own their auth redirect, so removing the shell would not weaken any guard; the shell's own guard is an addition for navigation chrome, not the security boundary.
 - Existing overview private nav and double logout are accepted per spec until H1-3.
 

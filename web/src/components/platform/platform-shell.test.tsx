@@ -160,12 +160,83 @@ describe('PlatformShell', () => {
     expect(menu.getAttribute('aria-expanded')).toBe('false');
   });
 
-  it('choosing a link closes the drawer', () => {
+  it('choosing a link closes the drawer and moves focus to the menu button before the nav goes inert', () => {
     renderShell();
     const menu = screen.getByRole('button', { name: 'فتح القائمة' });
     fireEvent.click(menu);
-    fireEvent.click(screen.getByRole('link', { name: /المؤسسات/ }));
+    const link = screen.getByRole('link', { name: /المؤسسات/ });
+    link.focus();
+    expect(document.activeElement).toBe(link);
+    fireEvent.click(link);
     expect(menu.getAttribute('aria-expanded')).toBe('false');
+    expect(document.activeElement).toBe(menu);
+  });
+
+  it('a sidebar link click at the desktop breakpoint does not steal focus', () => {
+    window.matchMedia = ((query: string) => ({
+      matches: true,
+      media: query,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    })) as unknown as typeof window.matchMedia;
+    renderShell();
+    const link = screen.getByRole('link', { name: /المؤسسات/ });
+    link.focus();
+    fireEvent.click(link);
+    expect(document.activeElement).toBe(link);
+  });
+
+  describe('focus containment while the drawer is open', () => {
+    function openDrawer() {
+      const utils = renderShell();
+      fireEvent.click(screen.getByRole('button', { name: 'فتح القائمة' }));
+      const close = screen.getByRole('button', { name: 'إغلاق القائمة' });
+      const links = Array.from(utils.container.querySelectorAll<HTMLElement>('#platform-nav a'));
+      return { close, links, last: links[links.length - 1] as HTMLElement };
+    }
+
+    it('Tab from the last link wraps to the first control instead of reaching the page', () => {
+      const { close, last } = openDrawer();
+      last.focus();
+      const proceeded = fireEvent.keyDown(last, { key: 'Tab' });
+      expect(proceeded).toBe(false);
+      expect(document.activeElement).toBe(close);
+    });
+
+    it('Shift+Tab from the first control wraps to the last link', () => {
+      const { close, last } = openDrawer();
+      close.focus();
+      const proceeded = fireEvent.keyDown(close, { key: 'Tab', shiftKey: true });
+      expect(proceeded).toBe(false);
+      expect(document.activeElement).toBe(last);
+    });
+
+    it('Tab inside the drawer is left to the browser, and focus that escaped is pulled back in', () => {
+      const { close, links } = openDrawer();
+      close.focus();
+      expect(fireEvent.keyDown(close, { key: 'Tab' })).toBe(true);
+      (links[0] as HTMLElement).focus();
+      expect(fireEvent.keyDown(links[0] as HTMLElement, { key: 'Tab', shiftKey: true })).toBe(true);
+
+      (screen.getByText('محتوى') as HTMLElement).tabIndex = 0;
+      (screen.getByText('محتوى') as HTMLElement).focus();
+      expect(fireEvent.keyDown(document.activeElement as Element, { key: 'Tab' })).toBe(false);
+      expect(document.activeElement).toBe(close);
+    });
+
+    it('does not intercept Tab when the drawer is closed', () => {
+      renderShell();
+      const menu = screen.getByRole('button', { name: 'فتح القائمة' });
+      menu.focus();
+      expect(fireEvent.keyDown(menu, { key: 'Tab' })).toBe(true);
+      expect(fireEvent.keyDown(menu, { key: 'Tab', shiftKey: true })).toBe(true);
+    });
+
+    it('does not intercept Ctrl/Alt/Meta+Tab while open', () => {
+      const { close } = openDrawer();
+      close.focus();
+      expect(fireEvent.keyDown(close, { key: 'Tab', shiftKey: true, ctrlKey: true })).toBe(true);
+    });
   });
 
   it('logout calls the existing platformLogout then returns to the platform login', async () => {

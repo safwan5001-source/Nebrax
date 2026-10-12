@@ -88,7 +88,25 @@ export function PlatformShell({ children }: { children: React.ReactNode }) {
     const root = document.documentElement;
     root.classList.add('overflow-hidden');
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') dismiss();
+      if (event.key === 'Escape') {
+        dismiss();
+        return;
+      }
+      if (event.key !== 'Tab' || event.ctrlKey || event.metaKey || event.altKey) return;
+      // الدرج مشروط modal: Tab وShift+Tab يدوران داخله ولا يتسرّبان إلى المحتوى خلفه.
+      const items = Array.from(navRef.current?.querySelectorAll<HTMLElement>('a[href], button:not([disabled])') ?? []);
+      const first = items[0];
+      const last = items[items.length - 1];
+      if (!first || !last) return;
+      const active = document.activeElement;
+      const outside = !navRef.current?.contains(active);
+      if (outside || (event.shiftKey && active === first)) {
+        event.preventDefault();
+        (event.shiftKey ? last : first).focus();
+      } else if (!event.shiftKey && active === last) {
+        event.preventDefault();
+        first.focus();
+      }
     };
     document.addEventListener('keydown', onKey);
     return () => {
@@ -172,7 +190,8 @@ export function PlatformShell({ children }: { children: React.ReactNode }) {
                 <Link
                   href={item.href}
                   aria-current={current ? 'page' : undefined}
-                  onClick={() => setOpen(false)}
+                  // الرابط المُركَّز داخل الدرج سيصبح inert عند الإغلاق، فننقل التركيز إلى زر القائمة أولاً.
+                  onClick={() => open && dismiss()}
                   className={cn(
                     'flex min-h-11 items-center gap-3 rounded px-3 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
                     current ? 'bg-primary-soft text-primary' : 'text-text hover:bg-primary-soft'
