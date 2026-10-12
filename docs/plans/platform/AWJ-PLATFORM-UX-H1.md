@@ -1,13 +1,13 @@
 # AWJ-PLATFORM-UX-H1 — Platform Administration UX Horizon
 
-Status: **H1-CONTRAST IN REVIEW / NO MERGE**  
+Status: **H1-2 SHELL IN REVIEW / NO MERGE** (H1-0, H1-1, H1-PAGINATION, H1-CONTRAST merged)  
 Owner: Safwan | Implementer: **Grok** | Date: 2026-10-11  
 Repository: `safwan5001-source/Nebrax`  
 Execution protocol: [AWJ Horizon System](../../autonomous-engineering/AWJ-HORIZON-SYSTEM.md)  
 H1-0 evidence: [AWJ-PLATFORM-UX-H1-AUDIT.md](./AWJ-PLATFORM-UX-H1-AUDIT.md)  
 H1-1 spec: [AWJ-PLATFORM-UX-H1-1-UX-SPEC.md](./AWJ-PLATFORM-UX-H1-1-UX-SPEC.md)  
 
-Owner decision 2026-10-11: option A approved. `H1-PAGINATION` merged as `31035783a36b3fbaf329b7c789c8af64e9097279` (PR #1318). `H1-CONTRAST` is the next code slice: gate-off dark danger text only. H1-2 stays unstarted. This contrast PR is not merge approval.
+Owner decision 2026-10-11: option A approved. `H1-PAGINATION` merged as `31035783a36b3fbaf329b7c789c8af64e9097279` (PR #1318). `H1-CONTRAST` merged as `bda44687e98e69c95c452846baeac473b3ff5e4d` (PR #1328, [report](./AWJ-PLATFORM-UX-H1-CONTRAST-REPORT.md)); post-merge verification on `main` has not been recorded. `H1-2` (unified shell, [report](./AWJ-PLATFORM-UX-H1-2-SHELL-REPORT.md)) is the current slice and is in review. The H1-2 PR is not merge approval. H1-3 is not started.
 
 ## Purpose
 
@@ -72,9 +72,9 @@ Verify viewports **320 / 375 / 390 / 430 / 768 / 1024 / 1440 / 1920px**, portrai
 |---|---|---|---|
 | H1-0 audit | latest main + Horizon references | audit / factual inventory | done, no product UI code |
 | H1-1 UX spec | approved option A | detailed IA, shell, states, acceptance matrix | **DESIGN_GATE before H1-2** |
-| H1-PAGINATION | H1-1 spec approved, latest main | tenants list uses existing `page` metadata. No new API | **MERGE_GATE**. Highest-priority code slice. Independent of the shell |
-| H1-CONTRAST | latest main. No shared files with pagination | gate-off dark danger text contrast. Sizes unchanged | **MERGE_GATE**. Separate PR. Not bundled with the shell or ERP restyle |
-| H1-2 shell | H1-1 spec approved, and it does not edit the pagination or contrast files in the same PR | platform console shell only | **MERGE_GATE**. Do not start before H1-1 approval |
+| H1-PAGINATION | H1-1 spec approved, latest main | tenants list uses existing `page` metadata. No new API | **MERGED** (PR #1318, `31035783`) |
+| H1-CONTRAST | latest main. No shared files with pagination | gate-off dark danger text contrast. Sizes unchanged | **MERGED** (PR #1328, `bda44687`). Post-merge verification not recorded |
+| H1-2 shell | H1-1 spec approved, and it does not edit the pagination or contrast files in the same PR | platform console shell only | **IN REVIEW**. Merge needs explicit owner approval |
 | H1-3 overview | shell merged and post-merge verified, or an explicit independence note | focused UI PR | **MERGE_GATE** |
 | H1-4 management | relevant prior dependencies | small per-page PRs | **MERGE_GATE per PR** |
 | H1-5 closure | approved changes on main | QA report | no deploy without permission |

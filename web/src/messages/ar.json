@@ -240,6 +240,22 @@
     "error": "تعذر تسجيل دخول مدير المنصة.",
     "tenantLogin": "العودة إلى دخول المؤسسة"
   },
+  "platformShell": {
+    "brand": "لوحة المنصة",
+    "navLabel": "تنقل لوحة المنصة",
+    "overview": "نظرة عامة",
+    "tenants": "المؤسسات",
+    "prices": "الأسعار",
+    "integrations": "التكاملات",
+    "documentOperations": "عمليات المستندات",
+    "skipToContent": "تخطٍ إلى المحتوى",
+    "openMenu": "فتح قائمة التنقل",
+    "closeMenu": "إغلاق قائمة التنقل",
+    "breadcrumbLabel": "مسار التنقل",
+    "signedInAs": "مسجل الدخول: {name}",
+    "logout": "خروج",
+    "signingOut": "جارٍ الخروج…"
+  },
   "platform": {
     "eyebrow": "تشغيل أَوْج الداخلي",
     "title": "لوحة إدارة المنصة",
