@@ -1,0 +1,41 @@
+{
+  "_extends": "../base_case.json",
+  "_synthetic_notice": "SYNTHETIC TEST FIXTURE - overlay on base_case(.b).json. Not real evidence, not a grant.",
+  "case_id": "DR-08b",
+  "_expect": {
+    "decision": "STOP_OWNER_DECISION",
+    "must_include": [
+      "ZONE_C_OWNER_GATED",
+      "CI_STEP_HOLLOWING_SUSPECTED"
+    ]
+  },
+  "evidence": {
+    "grant_store": {
+      "grants": {
+        "$index": {
+          "0": {
+            "document": {
+              "paths_allow": [
+                "**"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "pr": {
+      "files": [
+        {
+          "filename": ".github/workflows/web-ci.yml",
+          "status": "modified",
+          "additions": 1,
+          "deletions": 1,
+          "patch": "@@ -20 +20 @@\n-        run: npm run build\n+        run: echo skip"
+        }
+      ],
+      "changed_files": 1,
+      "additions": 1,
+      "deletions": 1
+    }
+  }
+}

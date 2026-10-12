@@ -1,0 +1,30 @@
+{
+  "_extends": "../base_case.json",
+  "_synthetic_notice": "SYNTHETIC TEST FIXTURE - overlay on base_case(.b).json. Not real evidence, not a grant.",
+  "case_id": "DR-04b",
+  "_expect": {
+    "decision": "WAIT",
+    "must_include": [
+      "CI_CHECK_PENDING"
+    ],
+    "must_not_include": [
+      "CI_CHECK_NOT_SUCCESS"
+    ]
+  },
+  "evidence": {
+    "checks": {
+      "$index": {
+        "0": {
+          "status": "in_progress",
+          "conclusion": "$null",
+          "completed_at": "$null"
+        },
+        "2": {
+          "status": "in_progress",
+          "conclusion": "$null",
+          "completed_at": "$null"
+        }
+      }
+    }
+  }
+}

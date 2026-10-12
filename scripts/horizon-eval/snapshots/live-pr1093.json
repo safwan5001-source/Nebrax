@@ -1,0 +1,410 @@
+{
+ "case_id": "LIVE-PR1093-bba69ca5",
+ "evidence": {
+  "attestations": [],
+  "checks": [
+   {
+    "app": "github-actions",
+    "completed_at": "2026-09-28T21:41:13Z",
+    "conclusion": "success",
+    "event": "pull_request",
+    "head_sha": "bba69ca54090a405248795107d35d8fd279d07a4",
+    "id": 109145470481,
+    "name": "php artisan test (L11, sqlite)",
+    "status": "completed"
+   },
+   {
+    "app": "github-actions",
+    "completed_at": "2026-09-28T21:50:06Z",
+    "conclusion": "success",
+    "event": "pull_request",
+    "head_sha": "bba69ca54090a405248795107d35d8fd279d07a4",
+    "id": 109145470208,
+    "name": "php artisan test (L11, pgsql)",
+    "status": "completed"
+   },
+   {
+    "app": "github-actions",
+    "completed_at": "2026-09-28T21:41:13Z",
+    "conclusion": "success",
+    "event": "push",
+    "head_sha": "bba69ca54090a405248795107d35d8fd279d07a4",
+    "id": 109145362354,
+    "name": "php artisan test (L11, sqlite)",
+    "status": "completed"
+   },
+   {
+    "app": "github-actions",
+    "completed_at": "2026-09-28T21:53:18Z",
+    "conclusion": "success",
+    "event": "push",
+    "head_sha": "bba69ca54090a405248795107d35d8fd279d07a4",
+    "id": 109145361992,
+    "name": "php artisan test (L11, pgsql)",
+    "status": "completed"
+   }
+  ],
+  "fetched_at": "2026-10-12T02:51:40Z",
+  "grant_store": {
+   "fetched_at": "2026-10-12T02:51:40Z",
+   "grants": [],
+   "kill_switch": false,
+   "ref": "main",
+   "ref_sha": "11abda97dd1d25782d27f06f0312a3d5abec57a2",
+   "revoked_grant_ids": []
+  },
+  "grant_usage": [],
+  "main": {
+   "sha": "11abda97dd1d25782d27f06f0312a3d5abec57a2"
+  },
+  "other_prs": [
+   {
+    "claim": null,
+    "files": [
+     "AWJ-HORIZON-MEDIA-STORAGE-S7-IMPLEMENTATION-REPORT.md",
+     "app/Services/DocumentCenter/DocumentStorageService.php",
+     "tests/Feature/DocumentStorageDurableProfileTest.php"
+    ],
+    "head_ref": "horizon/media-storage-s7-documents-reads",
+    "horizon_id": null,
+    "last_activity_at": "2026-10-12T02:42:47Z",
+    "number": 1350,
+    "observed_at": "2026-10-12T02:51:40Z",
+    "state": "open"
+   },
+   {
+    "claim": null,
+    "files": [
+     "docs/plans/store/CUST-HV-V10A-IMPLEMENTATION-REPORT.md",
+     "docs/plans/store/CUST-HV-V10B-IMPLEMENTATION-REPORT.md",
+     "web/e2e/flowers-h15-bloom-theme.spec.ts",
+     "web/src/app/(commerce)/commerce/appearance/page.tsx",
+     "web/src/app/(commerce)/commerce/themes/page.test.tsx",
+     "web/src/app/(commerce)/commerce/themes/page.tsx",
+     "web/src/modules/commerce-workspace/messages.ts",
+     "web/src/modules/commerce-workspace/theme-registry.test.ts",
+     "web/src/modules/commerce-workspace/theme-registry.ts",
+     "web/src/modules/store-experience-builder/ExperienceBuilder.tsx",
+     "web/src/modules/store-experience-builder/__tests__/ExperienceBuilder.themePreview.test.tsx",
+     "web/src/modules/store-experience-builder/__tests__/apply-theme-flow.test.ts",
+     "web/src/modules/store-experience-builder/messages.ts",
+     "web/src/modules/store-experience-builder/themes/ThemePreviewBar.tsx",
+     "web/src/modules/store-experience-builder/themes/apply-theme-flow.ts",
+     "web/src/modules/store-experience-builder/themes/apply-theme.ts",
+     "web/src/modules/store-experience-builder/themes/built-in-themes.ts",
+     "web/src/modules/store-experience-builder/themes/index.ts",
+     "web/src/modules/store-experience-builder/themes/preview-link.ts"
+    ],
+    "head_ref": "cust-hv/v10b-theme-preview-apply",
+    "horizon_id": null,
+    "last_activity_at": "2026-10-12T02:42:34Z",
+    "number": 1349,
+    "observed_at": "2026-10-12T02:51:40Z",
+    "state": "open"
+   },
+   {
+    "claim": null,
+    "files": [
+     "docs/plans/growth/AWJ_GROWTH_FOUNDATION_HORIZON_V1.md",
+     "docs/plans/growth/AWJ_GROWTH_FOUNDATION_HORIZON_V1_BOOTSTRAP.md"
+    ],
+    "head_ref": "docs/awj-growth-foundation-horizon-v1",
+    "horizon_id": null,
+    "last_activity_at": "2026-09-30T18:12:05Z",
+    "number": 1128,
+    "observed_at": "2026-10-12T02:51:40Z",
+    "state": "open"
+   },
+   {
+    "claim": null,
+    "files": [
+     "motion/awj-commercial/.gitignore",
+     "motion/awj-commercial/README.md",
+     "motion/awj-commercial/docs/CREATIVE_TREATMENT.md",
+     "motion/awj-commercial/docs/IMPLEMENTATION_REPORT.md",
+     "motion/awj-commercial/docs/SOUND_CUE_SHEET.md",
+     "motion/awj-commercial/package.json",
+     "motion/awj-commercial/public/fonts/OFL-IBM-Plex.txt",
+     "motion/awj-commercial/public/fonts/OFL-saudi-riyal.txt",
+     "motion/awj-commercial/public/fonts/ibm-plex-mono-latin-400-normal.woff2",
+     "motion/awj-commercial/public/fonts/ibm-plex-mono-latin-500-normal.woff2",
+     "motion/awj-commercial/public/fonts/ibm-plex-mono-latin-600-normal.woff2",
+     "motion/awj-commercial/public/fonts/ibm-plex-mono-latin-700-normal.woff2",
+     "motion/awj-commercial/public/fonts/ibm-plex-sans-arabic-arabic-300-normal.woff2",
+     "motion/awj-commercial/public/fonts/ibm-plex-sans-arabic-arabic-400-normal.woff2",
+     "motion/awj-commercial/public/fonts/ibm-plex-sans-arabic-arabic-500-normal.woff2",
+     "motion/awj-commercial/public/fonts/ibm-plex-sans-arabic-arabic-600-normal.woff2",
+     "motion/awj-commercial/public/fonts/ibm-plex-sans-arabic-arabic-700-normal.woff2",
+     "motion/awj-commercial/public/fonts/ibm-plex-sans-arabic-latin-300-normal.woff2",
+     "motion/awj-commercial/public/fonts/ibm-plex-sans-arabic-latin-400-normal.woff2",
+     "motion/awj-commercial/public/fonts/ibm-plex-sans-arabic-latin-500-normal.woff2",
+     "motion/awj-commercial/public/fonts/ibm-plex-sans-arabic-latin-600-normal.woff2",
+     "motion/awj-commercial/public/fonts/ibm-plex-sans-arabic-latin-700-normal.woff2",
+     "motion/awj-commercial/remotion.config.ts",
+     "motion/awj-commercial/scripts/sheet.py",
+     "motion/awj-commercial/scripts/stills.mjs",
+     "motion/awj-commercial/src/AwjCommercial.tsx",
+     "motion/awj-commercial/src/Root.tsx",
+     "motion/awj-commercial/src/config/demo-data.ts",
+     "motion/awj-commercial/src/config/theme.ts",
+     "motion/awj-commercial/src/config/timeline.ts",
+     "motion/awj-commercial/src/index.ts",
+     "motion/awj-commercial/src/lib/fonts.ts",
+     "motion/awj-commercial/src/lib/motion.ts",
+     "motion/awj-commercial/src/primitives/Camera.tsx",
+     "motion/awj-commercial/src/primitives/Carrier.tsx",
+     "motion/awj-commercial/src/primitives/Mask.tsx",
+     "motion/awj-commercial/src/primitives/Qr.tsx",
+     "motion/awj-commercial/src/primitives/Riyal.tsx",
+     "motion/awj-commercial/src/primitives/RollingNumber.tsx",
+     "motion/awj-commercial/src/scenes/S1Hook.tsx",
+     "motion/awj-commercial/src/scenes/S2Sale.tsx",
+     "motion/awj-commercial/src/scenes/S3Ledger.tsx",
+     "motion/awj-commercial/src/scenes/S4Control.tsx",
+     "motion/awj-commercial/src/scenes/S5Brand.tsx",
+     "motion/awj-commercial/src/ui/Dashboard.tsx",
+     "motion/awj-commercial/src/ui/DocMorph.tsx",
+     "motion/awj-commercial/src/ui/InventoryScreen.tsx",
+     "motion/awj-commercial/src/ui/JournalScreen.tsx",
+     "motion/awj-commercial/src/ui/Panels.tsx",
+     "motion/awj-commercial/src/ui/PosScreen.tsx",
+     "motion/awj-commercial/src/ui/common.tsx",
+     "motion/awj-commercial/tsconfig.json"
+    ],
+    "head_ref": "motion/awj-commercial-15s",
+    "horizon_id": null,
+    "last_activity_at": "2026-09-29T05:29:57Z",
+    "number": 1105,
+    "observed_at": "2026-10-12T02:51:40Z",
+    "state": "open"
+   },
+   {
+    "claim": null,
+    "files": [
+     "app/Http/Controllers/Api/CommerceWorkspaceStorefrontPresentationVersionController.php",
+     "app/Http/Requests/PublishStorefrontPresentationVersionRequest.php",
+     "app/Services/Commerce/StorefrontPresentationVersionService.php",
+     "routes/api.php",
+     "tests/Feature/CommerceModuleBoundaryTest.php",
+     "tests/Feature/StorefrontPresentationVersionPublishApiTest.php"
+    ],
+    "head_ref": "feat/theme-version-publish",
+    "horizon_id": null,
+    "last_activity_at": "2026-09-28T15:37:50Z",
+    "number": 1089,
+    "observed_at": "2026-10-12T02:51:40Z",
+    "state": "open"
+   },
+   {
+    "claim": null,
+    "files": [
+     "docs/plans/store/AWJ_STORE_CUSTOMIZER_EXTENDED_ARCHITECTURE.md"
+    ],
+    "head_ref": "docs/store-customizer-extended-architecture",
+    "horizon_id": null,
+    "last_activity_at": "2026-09-17T10:42:20Z",
+    "number": 853,
+    "observed_at": "2026-10-12T02:51:40Z",
+    "state": "open"
+   },
+   {
+    "claim": null,
+    "files": [
+     "app/Console/Commands/RecoverHistoricalTenantCommand.php"
+    ],
+    "head_ref": "feat/awj-taiba-tenant-recovery-platform-admin",
+    "horizon_id": null,
+    "last_activity_at": "2026-09-12T04:21:51Z",
+    "number": 784,
+    "observed_at": "2026-10-12T02:51:40Z",
+    "state": "open"
+   },
+   {
+    "claim": null,
+    "files": [
+     "docs/plans/payments/AWJ_PAY_V2_6A_GATEWAY_REFUND_ACCOUNTING_DESIGN.md",
+     "docs/plans/payments/AWJ_PAY_V2_6B_CUSTOMER_REFUND_EVIDENCE_PASS.md"
+    ],
+    "head_ref": "docs/pay-v2-6a-gateway-refund-accounting-design",
+    "horizon_id": null,
+    "last_activity_at": "2026-09-12T01:19:29Z",
+    "number": 778,
+    "observed_at": "2026-10-12T02:51:40Z",
+    "state": "open"
+   },
+   {
+    "claim": null,
+    "files": [
+     "docs/audits/AWJ_ACCOUNTING_SETTINGS_PRODUCT_COMPLETENESS_AUDIT_2026-09.md"
+    ],
+    "head_ref": "claude/accounting-settings-product-completeness-audit",
+    "horizon_id": null,
+    "last_activity_at": "2026-09-08T22:37:53Z",
+    "number": 704,
+    "observed_at": "2026-10-12T02:51:40Z",
+    "state": "open"
+   },
+   {
+    "claim": null,
+    "files": [
+     "docs/plans/design/AWJ_DESIGN_SYSTEM_V2_BLUEPRINT.md",
+     "docs/plans/design/references/awj-v2-customer-master-desktop-mobile.jpeg",
+     "docs/plans/design/references/awj-v2-product-master-desktop-mobile.jpeg",
+     "docs/plans/design/references/awj-v2-sales-invoice-desktop.jpeg"
+    ],
+    "head_ref": "claude/awj-v2-visual-references-62yiwn",
+    "horizon_id": null,
+    "last_activity_at": "2026-09-08T15:40:55Z",
+    "number": 703,
+    "observed_at": "2026-10-12T02:51:40Z",
+    "state": "open"
+   },
+   {
+    "claim": null,
+    "files": [
+     "app/Services/Accounting/ZatcaSignedInvoiceQrCoordinator.php",
+     "app/Services/Accounting/ZatcaSignedInvoiceQrResult.php",
+     "tests/Feature/ZatcaSignedInvoiceQrCoordinatorTest.php"
+    ],
+    "head_ref": "feat/zatca-signed-invoice-qr-coordinator",
+    "horizon_id": null,
+    "last_activity_at": "2026-08-30T14:12:47Z",
+    "number": 586,
+    "observed_at": "2026-10-12T02:51:40Z",
+    "state": "open"
+   },
+   {
+    "claim": null,
+    "files": [
+     "Dockerfile",
+     "app/Console/Commands/DocumentReadinessCommand.php",
+     "deploy/document-worker.sh"
+    ],
+    "head_ref": "fix/document-database-queue-readiness",
+    "horizon_id": null,
+    "last_activity_at": "2026-08-30T01:37:44Z",
+    "number": 578,
+    "observed_at": "2026-10-12T02:51:40Z",
+    "state": "open"
+   },
+   {
+    "claim": null,
+    "files": [
+     ".github/workflows/ci.yml",
+     "AGENTS.md",
+     "CLAUDE.md",
+     "deploy/assemble.sh",
+     "setup.sh",
+     "tests/Feature/AccountingGuardTest.php"
+    ],
+    "head_ref": "claude/ai-assistant-guidelines-9gxfjs",
+    "horizon_id": null,
+    "last_activity_at": "2026-08-14T23:31:52Z",
+    "number": 202,
+    "observed_at": "2026-10-12T02:51:40Z",
+    "state": "open"
+   }
+  ],
+  "pr": {
+   "additions": 795,
+   "author": "safwan5001-source",
+   "base_ref": "main",
+   "base_sha": "e6fc91d172c0759f1b7e422e9396b775995fc645",
+   "body": "## الهدف\n\nتوثيق خطة Cloudflare الكاملة لأَوْج وفق **نظام الأفق** دون تنفيذ أو نشر أي تغيير إنتاجي.\n\n## يتضمن\n\n- Cloudflare R2 كطبقة تخزين ملفات مركزية مع الحفاظ على PostgreSQL كمصدر حقيقة للأعمال.\n- Railway كـ application origin.\n- DNS/TLS/DDoS/WAF/Rate Limiting.\n- Turnstile لمسارات التسجيل/تسجيل الدخول/استرجاع كلمة المرور ضمن حدود Auth الحالية.\n- CDN/Cache مع fail-closed للبيانات الخاصة والمالية.\n- Cloudflare Images + R2.\n- Cloudflare for SaaS كـ Decision Gate مستقل بسبب وجود معمارية Railway custom-domain حالية.\n- Workers/Queues/KV/Durable Objects وZero Trust كخيارات مؤجلة تعتمد على evidence.\n- Quality Gates، Production Owner Gates، Dependency-safe task queue، Definition of Done.\n- Bootstrap مستقل لنظام الأفق.\n- Decision Packet لمقارنة Railway custom domains وCloudflare for SaaS.\n\n## الملفات\n\n- `docs/plans/cloudflare/AWJ_CLOUDFLARE_PLATFORM_HORIZON_V1.md`\n- `docs/plans/cloudflare/AWJ_CLOUDFLARE_PLATFORM_BOOTSTRAP.md`\n- `docs/plans/cloudflare/CF-SAAS-DOMAIN-PROVIDER-1-DECISION-PACKET.md`\n\n## الحدود\n\n- Docs only.\n- لا Merge تلقائي.\n- لا Deploy.\n- لا DNS cutover.\n- لا Railway secrets.\n- لا Cloudflare production rules.\n- لا تغيير في التخزين الحالي.\n- لا استبدال لمعمارية custom domains الحالية بدون قرار صريح.\n\n## Evidence\n\nالمصادر الخارجية الرسمية مذكورة داخل خطة الأفق بتاريخ 2026-09-29، مع فصل External Evidence عن AWJ Decisions وDecision Gates.",
+   "changed_files": 3,
+   "claim": null,
+   "comments": [
+    {
+     "author": "chatgpt-codex-connector[bot]",
+     "body": "You have reached your Codex usage limits for code reviews. You can see your limits in the [Codex usage dashboard](https://chatgpt.com/codex/cloud/settings/usage).\nTo continue using code reviews, you can upgrade your account or add credits to your account and enable them for code reviews in your [settings](https://chatgpt.com/codex/cloud/settings/code-review)."
+    }
+   ],
+   "commits": [
+    {
+     "message": "docs: add AWJ Cloudflare platform horizon V1",
+     "sha": "d332579d3907783edeb070671f6955d403b98f65"
+    },
+    {
+     "message": "docs: add Cloudflare horizon bootstrap",
+     "sha": "81565ef8d831fabf2c438338cfb0cf72f6772fa6"
+    },
+    {
+     "message": "docs: add Cloudflare SaaS domain provider decision packet",
+     "sha": "bba69ca54090a405248795107d35d8fd279d07a4"
+    }
+   ],
+   "deletions": 0,
+   "draft": false,
+   "files": [
+    {
+     "additions": 99,
+     "deletions": 0,
+     "filename": "docs/plans/cloudflare/AWJ_CLOUDFLARE_PLATFORM_BOOTSTRAP.md",
+     "patch": "",
+     "previous_filename": null,
+     "status": "added"
+    },
+    {
+     "additions": 583,
+     "deletions": 0,
+     "filename": "docs/plans/cloudflare/AWJ_CLOUDFLARE_PLATFORM_HORIZON_V1.md",
+     "patch": "",
+     "previous_filename": null,
+     "status": "added"
+    },
+    {
+     "additions": 113,
+     "deletions": 0,
+     "filename": "docs/plans/cloudflare/CF-SAAS-DOMAIN-PROVIDER-1-DECISION-PACKET.md",
+     "patch": "",
+     "previous_filename": null,
+     "status": "added"
+    }
+   ],
+   "head_pushed_at": "2026-09-28T21:32:07Z",
+   "head_sha": "bba69ca54090a405248795107d35d8fd279d07a4",
+   "labels": [],
+   "merge_commit_sha": null,
+   "merged": false,
+   "number": 1093,
+   "reviews": [],
+   "state": "open",
+   "title": "DOCS — AWJ Cloudflare Platform Horizon V1"
+  },
+  "registry": {
+   "horizons": []
+  },
+  "required_checks": {
+   "always_names": [
+    "php artisan test (L11, pgsql)",
+    "php artisan test (L11, sqlite)"
+   ],
+   "gate_name": "CI Gate",
+   "grace_minutes_no_run": 10,
+   "path_names": [
+    "Docker runtime smoke",
+    "mobile (Android release build proof)",
+    "mobile (analyze + test)",
+    "mobile (iOS release build proof)",
+    "storefront (lint + typecheck + test)",
+    "web build (Next.js)"
+   ],
+   "source_ref": "main",
+   "source_sha": "11abda97dd1d25782d27f06f0312a3d5abec57a2"
+  },
+  "source": "github-readonly"
+ },
+ "mode": "live",
+ "now": "2026-10-12T02:51:40Z",
+ "request": {
+  "action": "merge",
+  "agent_id": "pilot-session",
+  "base_branch": "main",
+  "horizon_id": "CLOUDFLARE-PLATFORM",
+  "pr_number": 1093,
+  "repository": "safwan5001-source/Nebrax",
+  "task_category": "docs-nongov",
+  "task_id": "H1"
+ },
+ "schema": "horizon-eval-case/1"
+}

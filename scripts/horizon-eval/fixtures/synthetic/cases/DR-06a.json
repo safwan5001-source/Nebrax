@@ -1,0 +1,26 @@
+{
+  "_extends": "../base_case.json",
+  "_synthetic_notice": "SYNTHETIC TEST FIXTURE - overlay on base_case(.b).json. Not real evidence, not a grant.",
+  "case_id": "DR-06a",
+  "_expect": {
+    "decision": "BLOCK",
+    "must_include": [
+      "GRANT_EXPIRED"
+    ]
+  },
+  "evidence": {
+    "grant_store": {
+      "grants": {
+        "$index": {
+          "0": {
+            "document": {
+              "issued_at": "2026-09-30T23:00:00Z",
+              "not_before": "2026-10-01T00:00:00Z",
+              "expires_at": "2026-10-08T00:00:00Z"
+            }
+          }
+        }
+      }
+    }
+  }
+}

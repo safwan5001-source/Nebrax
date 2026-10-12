@@ -1,0 +1,92 @@
+{
+  "policy_version": 1,
+  "source": "docs/autonomous-engineering/AWJ-HORIZON-V2-1B-AUTHORITY-THREAT-MODEL.md §3.3 / §6.2 (PROPOSED - NOT ACTIVE). Dry-run data only: editing this file is itself Zone C.",
+  "default_zone": "C",
+  "zone_order": ["A", "B", "C", "P"],
+  "path_rules": [
+    {"id": "docs", "zone": "A", "patterns": ["docs/**"]},
+
+    {"id": "governance", "zone": "C", "surfaces": ["S-GOV-DOCS"], "patterns": [
+      "docs/autonomous-engineering/**", "docs/engineering/AWJ_HORIZON_*", "CLAUDE.md", "**/CLAUDE.md", ".claude/**",
+      "CODEOWNERS", ".github/CODEOWNERS", "docs/CODEOWNERS", "design-system/foundations/configurable-policies.md",
+      "scripts/horizon-eval/**"
+    ]},
+    {"id": "ci-gate", "zone": "C", "surfaces": ["S-CI-GATE"], "patterns": [".github/**", "scripts/ci-gate/**"]},
+    {"id": "ledger", "zone": "C", "surfaces": ["S-LEDGER"], "patterns": [
+      "app/Services/Accounting/**", "app/Models/Journal*", "**/LedgerService*", "app/Support/Money*", "app/Support/GeneratesDocumentNumbers*"
+    ]},
+    {"id": "zatca", "zone": "C", "surfaces": ["S-ZATCA-ICV"], "patterns": ["**/Zatca*", "**/zatca*"]},
+    {"id": "rbac-tenant", "zone": "C", "surfaces": ["S-RBAC-TENANT"], "patterns": [
+      "app/Tenancy/**", "app/Http/Middleware/**", "app/Support/Rbac*", "app/Support/Plans*", "config/auth*", "config/sanctum*"
+    ]},
+    {"id": "routes", "zone": "C", "surfaces": ["S-ROUTES"], "patterns": ["routes/**"]},
+    {"id": "migrations", "zone": "C", "surfaces": ["S-MIGRATIONS"], "patterns": ["database/migrations/**", "database/seeders/**"]},
+    {"id": "fin-controllers", "zone": "C", "surfaces": ["S-FIN-CONTROLLERS"], "patterns": [
+      "app/Http/Controllers/Api/Invoice*", "app/Http/Controllers/Api/Payment*", "app/Http/Controllers/Api/Purchase*",
+      "app/Http/Controllers/Api/Return*", "app/Http/Controllers/Api/Expense*"
+    ]},
+    {"id": "production", "zone": "P", "patterns": [
+      "Dockerfile", "Dockerfile.*", "**/Dockerfile", "**/Dockerfile.*", "deploy/**", "railway*", "render.yaml", "docker-compose*",
+      ".env", ".env.*", "**/.env", "**/.env.*", "**/*.pem", "**/*.key"
+    ]},
+
+    {"id": "app", "zone": "B", "patterns": ["app/**"]},
+    {"id": "attach-storage", "zone": "B", "surfaces": ["S-ATTACH-STORAGE"], "patterns": [
+      "**/AttachmentStorage*", "config/attachments.php", "app/Services/DocumentCenter/**"
+    ]},
+    {"id": "tokens-contract", "zone": "B", "surfaces": ["S-TOKENS-CONTRACT"], "patterns": [
+      "app/Support/Commerce/StorefrontGlobalTokensNormalizer.php", "storefront/src/lib/presentation/global-tokens.ts",
+      "tests/Fixtures/presentation/global-tokens.json"
+    ]},
+    {"id": "presentation", "zone": "B", "surfaces": ["S-PRESENTATION"], "patterns": [
+      "app/Support/Commerce/StorefrontPresentationPublishValidator.php", "app/Services/Commerce/PresentationPublish*"
+    ]},
+    {"id": "design-tokens", "zone": "B", "surfaces": ["S-DESIGN-TOKENS"], "requires_attestation": ["CODEOWNER_REVIEW"], "patterns": [
+      "web/src/app/globals.css", "design-system/**"
+    ]},
+    {"id": "nav-i18n", "zone": "B", "surfaces": ["S-NAV-I18N"], "patterns": [
+      "web/src/components/layout/sidebar*", "web/src/**/sidebar.tsx", "storefront/src/i18n/**", "web/messages/**"
+    ]},
+    {"id": "tests", "zone": "B", "added_only_zone": "A", "patterns": ["tests/**", "web/e2e/**", "web/src/**/*.test.ts", "web/src/**/*.test.tsx", "web/src/**/__tests__/**", "storefront/src/**/__tests__/**", "storefront/**/*.test.ts", "storefront/**/*.test.tsx"]},
+    {"id": "ui", "zone": "A", "behavior": true, "patterns": ["web/src/**", "storefront/src/**"]}
+  ],
+
+  "categories": {
+    "docs-nongov": {"max_zone": "A", "rules": ["docs"]},
+    "a11y-label": {"max_zone": "A", "rules": ["ui"]},
+    "presentational-ui": {"max_zone": "A", "rules": ["ui", "tests"]},
+    "tests-additive": {"max_zone": "A", "rules": ["tests"]},
+    "isolated-bugfix": {"max_zone": "B", "rules": ["app", "ui", "tests", "attach-storage"]}
+  },
+
+  "hard_deny_patterns": [
+    ".github/**", "scripts/ci-gate/**", "scripts/horizon-eval/**", ".claude/**", "docs/autonomous-engineering/**",
+    "docs/engineering/AWJ_HORIZON_*", "CLAUDE.md", "**/CLAUDE.md", "CODEOWNERS", "**/CODEOWNERS",
+    "database/migrations/**", "database/seeders/**", "Dockerfile", "**/Dockerfile", "deploy/**", ".env", ".env.*", "**/.env", "**/.env.*"
+  ],
+
+  "surface_modes": {
+    "always_exclusive": ["S-LEDGER", "S-ZATCA-ICV", "S-RBAC-TENANT", "S-CI-GATE", "S-GOV-DOCS"]
+  },
+
+  "owner_gated_actions": [
+    "deploy", "release", "migrate_run", "production_write", "secrets_change", "ruleset_change",
+    "protection_change", "auto_merge_enable", "grant_issue", "grant_edit", "registry_edit", "policy_edit"
+  ],
+  "supported_actions": ["merge"],
+
+  "ci_floor": {
+    "comment": "Minimum checks the evaluator demands whatever the manifest evidence says (a manifest that omits them is itself a BLOCK).",
+    "gate_name": "CI Gate",
+    "always": ["php artisan test (L11, sqlite)", "php artisan test (L11, pgsql)"],
+    "path": ["web build (Next.js)"]
+  },
+
+  "windows": {
+    "grant_max_hours": {"A": 168, "B": 48},
+    "evidence_max_age_seconds": 300,
+    "grants_max_age_seconds": 60,
+    "unregistered_recent_activity_minutes": 30,
+    "observation_ttl_seconds": 600
+  }
+}

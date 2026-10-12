@@ -1,0 +1,51 @@
+{
+  "_extends": "../base_case_b.json",
+  "_synthetic_notice": "SYNTHETIC TEST FIXTURE - overlay on base_case(.b).json. Not real evidence, not a grant.",
+  "case_id": "DR-07a",
+  "_expect": {
+    "decision": "STOP_OWNER_DECISION",
+    "must_include": [
+      "CONFLICT_EXCLUSIVE_SURFACE"
+    ]
+  },
+  "evidence": {
+    "grant_store": {
+      "grants": {
+        "$index": {
+          "0": {
+            "document": {
+              "paths_allow": [
+                "docs/**",
+                "app/**",
+                "tests/**",
+                "storefront/src/**",
+                "config/**"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "other_prs": [
+      {
+        "number": 9101,
+        "state": "open",
+        "horizon_id": "SYNTH-HZ-OTHER",
+        "head_ref": "synth-hz-other/attachments",
+        "observed_at": "2026-10-12T11:59:00Z",
+        "last_activity_at": "2026-10-12T11:55:00Z",
+        "files": [
+          "config/attachments.php"
+        ],
+        "claim": {
+          "horizon_id": "SYNTH-HZ-OTHER",
+          "task_id": "SYNTH-T-901",
+          "surfaces": {
+            "S-ATTACH-STORAGE": "exclusive"
+          },
+          "claim_order": 3
+        }
+      }
+    ]
+  }
+}
