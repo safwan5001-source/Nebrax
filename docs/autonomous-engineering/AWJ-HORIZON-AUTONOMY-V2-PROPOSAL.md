@@ -142,7 +142,7 @@ Simulate or dry-run grant validation **without performing automatic merge** unti
 | Stage | Outcome | Gate |
 |---|---|---|
 | V2-0 | evidence audit of all current protocol files, branch protections and execution environment | docs only — V2-0 (this PR, partial) and V2-0B (#1331, merged) done |
-| V2-1 | finalize authority model, grant schema, threat model, policy conflicts | owner Decision Gate — **V2-1A CI Gate (#1334, #1341) merged in informational mode; V2-1B NOT started** |
+| V2-1 | finalize authority model, grant schema, threat model, policy conflicts | owner Decision Gate — **V2-1A CI Gate (#1334, #1341) merged in informational mode; V2-1B authority/threat model proposed in [AWJ-HORIZON-V2-1B-AUTHORITY-THREAT-MODEL.md](./AWJ-HORIZON-V2-1B-AUTHORITY-THREAT-MODEL.md) (design only, not active; owner decisions D1–D10 pending)** |
 | V2-2 | update official protocol, quality gates, escalation docs and Claude bootstrap consistently | independent PR review |
 | V2-3 | pilot durable checkpoints and no-merge dry-run orchestrator | tests and safety review |
 | V2-4 | authorized low-risk automatic merges in pilot only | **separate explicit activation / grant** |
