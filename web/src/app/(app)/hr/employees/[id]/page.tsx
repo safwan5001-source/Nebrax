@@ -252,7 +252,7 @@ export default function EmployeeProfilePage() {
     if (!id) return;
     setBusyAttachmentId(attachment.id);
     try {
-      await downloadFile(`/employees/${id}/attachments/${attachment.id}`, attachment.original_name);
+      await downloadFile(`/employees/${id}/attachments/${attachment.id}/download`, attachment.original_name);
     } catch (err) {
       toastError(err instanceof ApiError ? err.message : t('download_attachment_failed'));
     } finally {
