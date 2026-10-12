@@ -1,7 +1,7 @@
 # CUST-H5 — Undo / Redo, Recovery & Change Confidence
 ## Evidence, Architecture & Execution Plan
 
-**Status:** PROPOSED FOR OWNER REVIEW — documentation only  
+**Status:** OWNER-APPROVED EXECUTION AUTHORITY — H5-0 approved; guarded autonomous execution authorized for H5-1 through H5-6  
 **Date:** 2026-10-12  
 **Repository:** `safwan5001-source/Nebrax`  
 **Base:** `main@d94ecd4e3e74bb54241d76af28895d2f327c4455` (CUST-HV V11 closure)  
@@ -9,8 +9,8 @@
 **Persistence authority:** `docs/plans/store/CUST-H1-ARCH-1-THEME-VERSION-PERSISTENCE-SCHEDULING.md` + CUST-H2 whole-document Version contract  
 **Predecessor:** CUST-HV — CLOSED  
 **Successor:** CUST-H6 — Advanced Extensibility  
-**Scope of this document:** Evidence Pass + UX/architecture contract + dependency-safe execution plan.  
-**No application code, migration, API change, merge, deploy or Production release is authorized by this document alone.**
+**Scope of this document:** Evidence Pass + UX/architecture contract + dependency-safe execution plan + Owner authorization for guarded sequential H5 execution.  
+**Application code, migrations and API changes are authorized only within the approved H5 contract and per-slice gates below. Squash Merge is authorized only after all required implementation, test, CI, review and quality gates pass. Deploy and Production release remain separately prohibited without explicit Owner approval.**
 
 ---
 
@@ -598,11 +598,42 @@ For each slice:
 
 Do not stack unmerged H5 slices.
 
-### Important
+### Owner authorization — 2026-10-12
 
-This document itself does **not** grant automatic H5 merge authorization. The Owner may choose the same guarded sequential-merge authorization used for CUST-HV after H5-0 is approved.
+Safwan explicitly authorizes **guarded sequential autonomous execution and Squash Merge for CUST-H5 slices H5-1 through H5-6**.
 
-Deploy and Production release always remain separate Owner gates.
+Claude Code may continue without asking between normal implementation steps and may Squash Merge each H5 slice PR automatically **only when all slice gates pass**:
+
+- implementation is complete and within the approved H5 contract;
+- focused tests pass;
+- required broader tests/build pass;
+- CI Gate is green;
+- legitimate review findings are resolved;
+- Design Quality Pass is complete for visual/interaction changes;
+- Tenant Isolation, security, Draft/Published separation, Version-level revision concurrency, media ownership, commerce truth and backward compatibility remain intact;
+- the final MD Implementation Report is complete;
+- no Mandatory STOP condition in §10 applies.
+
+Required continuous loop:
+
+1. sync latest `origin/main`;
+2. inspect only relevant dependencies / overlapping work;
+3. implement **one dependency-safe H5 slice**;
+4. test and perform UX/design QA where applicable;
+5. open **one focused PR**;
+6. wait for CI/review and resolve legitimate findings;
+7. complete the final MD Implementation Report;
+8. if all gates pass, **Squash Merge**;
+9. sync latest `main`;
+10. immediately continue to the next dependency-safe H5 slice.
+
+Do **not** accumulate multiple unmerged H5 PRs.
+
+Normal implementation problems, test failures, CI failures/timeouts, merge conflicts, reversible UX decisions and ordinary review findings must be solved autonomously and are **not** reasons to stop.
+
+Stop only for the consequential conditions in §10, including architecture/contract changes, security/Tenant Isolation uncertainty, breaking API/DB changes, accounting behavior changes, technically impossible frozen contracts, material cross-Horizon conflicts, new Production infrastructure requirements, or Deploy / Production Release.
+
+**Deploy is NOT authorized. Production Release is NOT authorized. Destructive Production actions are NOT authorized.**
 
 ---
 
@@ -671,17 +702,15 @@ Unless implementation evidence forces reconsideration:
 
 ---
 
-# 13. Recommendation
+# 13. Owner approval and next action
 
-Proceed with **H5-0 only** first.
-
-Do not begin runtime implementation until the Owner reviews these three high-impact decisions:
+**H5-0 is approved.** Safwan approved the three high-impact decisions below and authorized guarded sequential execution of H5-1 → H5-6 under §9:
 
 1. **Save is a hard Undo/Redo boundary.**
 2. **Durable recovery uses bounded server-side successful-save snapshots.**
 3. **Restore loads history into an editable Draft flow using the current Version revision; it never rewinds revision or mutates Published.**
 
-If approved, Claude Code can execute H5-1 → H5-6 sequentially under the same guarded Horizon discipline used successfully for CUST-HV.
+Claude Code should now execute H5-1 → H5-6 continuously, one focused slice at a time, using the build → test → review → quality → report → Squash Merge loop in §9. It must stop only for the Mandatory STOP conditions in §10.
 
 ---
 
