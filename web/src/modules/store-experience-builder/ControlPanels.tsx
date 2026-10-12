@@ -434,12 +434,16 @@ function shelfContent<K extends "productIds" | "offerIds">(
   return { ...ids, ...ownFields };
 }
 
-/** CUST-HV V10c — the name of a duplicated section: the original's, plus a suffix, never past the limit. */
-function copyLabel(label: string, suffix: string): string {
-  const joined = `${label} · ${suffix}`;
-  return Array.from(joined).length <= MAX_SECTION_LABEL
-    ? joined
-    : Array.from(joined).slice(0, MAX_SECTION_LABEL).join("").trimEnd();
+/**
+ * CUST-HV V10c — the name of a duplicated section: the original's, plus a suffix, never past the limit. When it does not fit, the
+ * ORIGINAL name is shortened — the suffix is what tells the two apart, so it is never the part that is cut.
+ */
+export function copyLabel(label: string, suffix: string): string {
+  const tail = ` · ${suffix}`;
+  const room = Math.max(0, MAX_SECTION_LABEL - Array.from(tail).length);
+  const head = Array.from(label);
+  const kept = head.length <= room ? label : head.slice(0, room).join("").trimEnd();
+  return `${kept}${tail}`;
 }
 
 export const inputClass =

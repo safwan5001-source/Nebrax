@@ -3,7 +3,7 @@
  */
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ControlPanels } from "../ControlPanels";
+import { ControlPanels, copyLabel } from "../ControlPanels";
 import { DEFAULT_PRESENTATION_CONFIG, type StorefrontPresentationConfig } from "../presentation/config";
 
 afterEach(cleanup);
@@ -80,7 +80,9 @@ describe("section name (V10c)", () => {
     const [original, copy] = lastSections(onChange);
     expect(copy.id).not.toBe(original.id);
     expect(Array.from(copy.label ?? "").length).toBeLessThanOrEqual(60);
-    expect(copy.label?.startsWith("x".repeat(58))).toBe(true);
+    // the original is shortened to make room; the suffix that tells the two apart survives
+    expect(copy.label?.endsWith(" · copy")).toBe(true);
+    expect(copy.label?.startsWith("x".repeat(10))).toBe(true);
     expect(copy.design).toEqual({ radius: "md" });
   });
 
@@ -88,5 +90,15 @@ describe("section name (V10c)", () => {
     const onChange = mount(withSections([{ id: "f1", type: "featured", visible: true }]), null);
     fireEvent.click(screen.getByRole("button", { name: "Duplicate section" }));
     expect("label" in lastSections(onChange)[1]).toBe(false);
+  });
+
+  it("copyLabel never loses the suffix, at any original length, and stays within the limit", () => {
+    for (const length of [1, 20, 52, 53, 58, 60]) {
+      const label = copyLabel("ع".repeat(length), "copy");
+      expect(Array.from(label).length).toBeLessThanOrEqual(60);
+      expect(label.endsWith(" · copy")).toBe(true);
+      expect(label).not.toBe("ع".repeat(length));
+    }
+    expect(copyLabel("Eid drop", "copy")).toBe("Eid drop · copy");
   });
 });
