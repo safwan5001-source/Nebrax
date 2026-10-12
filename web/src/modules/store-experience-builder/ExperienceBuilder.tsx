@@ -20,6 +20,10 @@ import {
   type PageRegionInstance,
   type PageType,
   type PresentationHomeSection,
+  deleteSection,
+  duplicateSection,
+  moveSection,
+  setSectionVisible,
   type ProductPageRegionKey,
   presentationConfigsEqual,
   type StorefrontPresentationConfig,
@@ -36,6 +40,7 @@ import {
   writeThemedDraft,
 } from "./themes";
 import { ThemePreviewBar } from "./themes/ThemePreviewBar";
+import type { CanvasSectionActions } from "./CanvasSectionActions";
 import { ProductPreviewPicker } from "./ProductPreviewPicker";
 import { ProductPreviewPickerPanel } from "./ProductPreviewPickerPanel";
 import { ProductRegionInspector } from "./ProductRegionInspector";
@@ -1477,6 +1482,44 @@ export function ExperienceBuilder({
     url.searchParams.delete("previewTheme");
     window.history.replaceState(null, "", url.toString());
   }
+
+  // CUST-HV V10d — the Canvas hover action bar: each button is a shared pure section operation committed as an ordinary draft edit
+  // (revision-checked at Save). Offered only while editing the Home page of a Draft / Scheduled Version.
+  const canvasSectionActions: CanvasSectionActions | undefined =
+    currentPage === "home" && !previewTheme && !isPublishedReadOnly
+      ? {
+          onMove: (id, delta) => {
+            const next = moveSection(draft, id, delta);
+            if (next) updateDraft(next);
+          },
+          onHide: (id) => {
+            const next = setSectionVisible(draft, id, false);
+            if (next) updateDraft(next);
+          },
+          onDuplicate: (id) => {
+            const result = duplicateSection(draft, id, t("sectionCopySuffix"));
+            if (!result) return;
+            updateDraft(result.config);
+            handleSelectSection(result.id, "preview");
+          },
+          onDelete: (id) => {
+            const result = deleteSection(draft, id);
+            if (!result) return;
+            updateDraft(result.config);
+            if (selectedSection === id) setSelectedSection(result.fallbackId);
+          },
+          labels: {
+            toolbar: t("sectionActionsToolbar"),
+            moveUp: t("moveUp"),
+            moveDown: t("moveDown"),
+            duplicate: t("duplicateSection"),
+            hide: t("canvasHideSection"),
+            remove: t("deleteSection"),
+            confirmRemove: t("deleteSectionConfirm"),
+            cancel: t("deleteSectionCancel"),
+          },
+        }
+      : undefined;
 
   function handleSelectProductRegion(id: string) {
     setSelectedProductRegion(id);
@@ -3052,6 +3095,7 @@ export function ExperienceBuilder({
               >
                 <StorefrontPreviewCanvas
                   config={canvasConfig}
+                  sectionActions={canvasSectionActions}
                   locale={locale}
                   viewport={effectiveDevice}
                   page={currentPage}

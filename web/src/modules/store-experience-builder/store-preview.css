@@ -72,6 +72,13 @@
 .awj-store-preview .awj-preview-section {
   cursor: pointer;
   scroll-margin-top: 5rem;
+  position: relative;
+}
+/* CUST-HV V10d — the hover action bar: hidden until the section is hovered, focused within, or selected. */
+.awj-store-preview .awj-preview-section:hover > [data-section-actions],
+.awj-store-preview .awj-preview-section:focus-within > [data-section-actions],
+.awj-store-preview .awj-preview-section-selected > [data-section-actions] {
+  display: flex;
 }
 .awj-store-preview .awj-preview-section:focus-visible {
   outline: 2px solid var(--store-primary);
@@ -101,6 +108,11 @@
   color: var(--primary-foreground, #fff);
   font: 600 0.6875rem/1.25rem var(--font-sans, inherit);
   pointer-events: none;
+}
+/* CUST-HV V10d — while the hover action bar (inline-end) is showing, the chip (inline-start) leaves it room: the two never overlap. */
+.awj-store-preview .awj-preview-section:hover > .awj-preview-section-chip,
+.awj-store-preview .awj-preview-section:focus-within > .awj-preview-section-chip {
+  max-width: calc(100% - 11.5rem);
 }
 
 /* Independent, thin-but-visible scrollbars for the customizer's own

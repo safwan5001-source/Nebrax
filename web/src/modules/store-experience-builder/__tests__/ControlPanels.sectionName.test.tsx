@@ -3,7 +3,8 @@
  */
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ControlPanels, copyLabel } from "../ControlPanels";
+import { ControlPanels } from "../ControlPanels";
+import { copyLabel } from "../presentation/section-ops";
 import { DEFAULT_PRESENTATION_CONFIG, type StorefrontPresentationConfig } from "../presentation/config";
 
 afterEach(cleanup);
