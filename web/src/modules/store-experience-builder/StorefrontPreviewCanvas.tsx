@@ -1657,6 +1657,7 @@ export function StorefrontPreviewCanvas({
                 sectionId={section.id}
                 selected={selectedSection === section.id}
                 onSelect={onSelectSection}
+                label={section.label}
               >
                 <SectionDesignFrame
                   section={section}
@@ -2325,12 +2326,15 @@ function SelectablePreviewSection({
   sectionId,
   selected,
   onSelect,
+  label,
   children,
 }: {
   sectionKey: string;
   sectionId: string;
   selected: boolean;
   onSelect?: (id: string) => void;
+  /** CUST-HV V10c (V0 §17.1) — the merchant's own name for the section: an editor aid shown only on the selected section. */
+  label?: string;
   children: ReactNode;
 }) {
   if (!onSelect) return <>{children}</>;
@@ -2352,8 +2356,16 @@ function SelectablePreviewSection({
       className={cn(
         "awj-preview-section",
         selected && "awj-preview-section-selected",
+        selected && label && "awj-preview-section-named",
       )}
     >
+      {selected && label ? (
+        // Editor chrome, never storefront content: plain text (the label is merchant-typed), not announced twice (the list and the
+        // inspector carry it), and transparent to the pointer so it never intercepts a click on the section.
+        <span aria-hidden="true" data-section-chip="" className="awj-preview-section-chip">
+          {label}
+        </span>
+      ) : null}
       {children}
     </div>
   );
