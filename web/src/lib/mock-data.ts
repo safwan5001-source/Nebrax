@@ -3757,7 +3757,10 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
     // "succeeded" with an empty body and failed to parse. Let that one verb
     // through; create/rename/delete keep their existing demo defaults.
     const versionSavePath = /^\/commerce\/workspace\/storefronts\/[^/]+\/presentation\/versions\/[^/]+$/.test(clean);
-    if (!(m === 'PUT' && versionSavePath)) return resolve({ data: { id: 'demo-new' } });
+    // CUST-H5-4/5 — Version *create* (POST …/versions, incl. from a snapshot or as «save my work as a new draft») has the same
+    // problem: its handler (below) was unreachable. Let that one verb through too; rename/delete keep their demo defaults.
+    const versionCreatePath = /^\/commerce\/workspace\/storefronts\/[^/]+\/presentation\/versions$/.test(clean);
+    if (!(m === 'PUT' && versionSavePath) && !(m === 'POST' && versionCreatePath)) return resolve({ data: { id: 'demo-new' } });
   }
 
   if (clean === '/print-templates') return resolve({ data: mockPrintTemplates });

@@ -1228,10 +1228,23 @@ export const CUSTOMIZER_MESSAGES = {
     versionCancel: "إلغاء",
     versionConfirmDelete: "حذف النسخة",
     versionSaveSuccess: "تم حفظ النسخة.",
-    versionSaveFailed: "تعذّر حفظ النسخة.",
+    versionSaveFailed: "تعذّر حفظ النسخة. تعديلاتك وسجل التراجع ما زالا هنا ولم يضع شيء — أعد المحاولة.",
     versionStaleConflict:
       "تم تعديل هذه النسخة من جلسة أخرى. حدّث النسخة قبل متابعة التعديل.",
     versionReloadLatest: "تحديث النسخة",
+    // CUST-H5-5 — خيارات التعافي الصريحة عند التعارض: لا دمج تلقائي ولا إعادة محاولة صامتة.
+    conflictRecoveryHint:
+      "تعديلاتك المحلية محفوظة هنا إلى أن تختار: راجع النسخة الأحدث، أو احفظ عملك كمسودة جديدة (نسخة منفصلة وليست دمجاً)، أو حدّث النسخة (وهذا يتجاهل تعديلاتك).",
+    conflictReview: "مراجعة النسخة الأحدث",
+    conflictSaveAsDraft: "حفظ عملي كمسودة جديدة",
+    conflictCopyNameSuffix: "نسخة من تعديلاتي",
+    conflictCopySaved:
+      "حُفظ عملك كمسودة جديدة منفصلة «{name}» (نسخة وليست دمجاً). النسخة الأصلية لم تتغيّر.",
+    conflictCopySavedKeepEditing:
+      "حُفظت مسودة منفصلة «{name}» بتعديلاتك حتى لحظة الضغط، وتعديلاتك الأحدث ما زالت هنا. النسخة الأصلية لم تتغيّر.",
+    conflictCopyFailed: "تعذّر إنشاء المسودة. تعديلاتك ما زالت هنا ولم يتغيّر شيء.",
+    conflictCopyPartial:
+      "أُنشئت المسودة «{name}» لكن تعذّر حفظ تعديلاتك فيها. تعديلاتك ما زالت هنا — أعد المحاولة ولن تُنشأ نسخة ثانية.",
     versionPublishedReadOnlyTitle: "هذه النسخة منشورة ومقروءة فقط",
     versionPublishedReadOnlyBody:
       "هذه هي النسخة المباشرة على المتجر الحي. لتعديلها، أنشئ مسودة منها أولاً.",
@@ -2727,10 +2740,23 @@ export const CUSTOMIZER_MESSAGES = {
     versionCancel: "Cancel",
     versionConfirmDelete: "Delete version",
     versionSaveSuccess: "Version saved.",
-    versionSaveFailed: "Could not save the version.",
+    versionSaveFailed: "Could not save the version. Your changes and Undo history are still here — nothing was lost. Try again.",
     versionStaleConflict:
       "This version was edited from another session. Reload it before continuing to edit.",
     versionReloadLatest: "Reload version",
+    // CUST-H5-5 — explicit recovery choices on a stale conflict: no auto-merge, no silent retry.
+    conflictRecoveryHint:
+      "Your local edits are kept here until you choose: review the newer version, save your work as a new draft (a separate copy, not a merge), or reload (which discards your edits).",
+    conflictReview: "Review newer version",
+    conflictSaveAsDraft: "Save my work as a new draft",
+    conflictCopyNameSuffix: "my edits",
+    conflictCopySaved:
+      "Your work was saved as a separate new draft “{name}” (a copy, not a merge). The original version is unchanged.",
+    conflictCopySavedKeepEditing:
+      "A separate draft “{name}” was saved with your edits up to when you clicked; your newer edits are still here. The original version is unchanged.",
+    conflictCopyFailed: "Couldn't create the draft. Your edits are still here and nothing changed.",
+    conflictCopyPartial:
+      "The draft “{name}” was created but your edits couldn't be saved into it. Your edits are still here — try again and no second copy will be created.",
     versionPublishedReadOnlyTitle: "This version is published and read-only",
     versionPublishedReadOnlyBody:
       "This is the live version on the storefront. To edit it, create a draft from it first.",
