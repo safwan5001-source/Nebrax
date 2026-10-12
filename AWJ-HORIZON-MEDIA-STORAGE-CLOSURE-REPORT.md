@@ -69,7 +69,7 @@
 
 | البند | يحجب | من يفكّه |
 |---|---|---|
-| 🔴 **S6: R2 WRITE FAILED في Production** (E36): كتابة R2 لمركز المستندات فشلت (`UnableToWriteFile` + `UnableToDeleteFile`) رغم تكامل مُدخَل وإعداد صالح — السبب قيد التشخيص (S8): اعتماد/صلاحية دلو/endpoint/عنونة أو ACL | فتح `DOCUMENT_DURABLE_STORAGE_ENABLED` (لا يُفتح) | Claude (تشخيص/إصلاح) ← المالك (تشغيل الأمر بعد S8) |
+| 🔴 **S6: R2 WRITE FAILED في Production** (E36): كتابة R2 لمركز المستندات فشلت (`UnableToWriteFile` + `UnableToDeleteFile`) رغم تكامل مُدخَل وإعداد صالح — تشخيص S8 (E37) حصر السبب: **`InvalidArgument` HTTP 400 على كل طلب** (GET/PUT/DELETE، path/virtual، مع ACL وبدونه) ⇒ ليس ACL ولا العنونة ولا endpoint ولا الكود؛ الفرضية الراجحة غير المُثبَتة: Access Key ID المحفوظ مشوَّه (≠32 محرفاً سداسياً). S9 يحسمها | فتح `DOCUMENT_DURABLE_STORAGE_ENABLED` (لا يُفتح) | المالك (مقارنة آخر 4 محارف وإعادة إدخال الاعتماد، ثم تشغيل الأمر) ← Claude (قراءة نتيجة S9) |
 | تشغيل `awj:documents-storage-verify` في Production Console | بوابة فتح القفل | المالك |
 | استحقاق تجاري `document_center.core` لمستأجر الاختبار A (حالياً 403) | التحقق الإنتاجي لرفع/قراءة/حذف المستند | المالك (إسناد من المنصة) — وإلا يبقى التحقق في بيئة الاختبار فقط |
 

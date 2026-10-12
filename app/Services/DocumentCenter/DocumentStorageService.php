@@ -141,7 +141,7 @@ class DocumentStorageService
             try {
                 $result['steps'][$name] = $run() === true ? true : false;
             } catch (Throwable $e) {
-                $result['steps'][$name] = 'FAIL: '.$this->describeFailure($e);
+                $result['steps'][$name] = 'FAIL: '.$this->describeFailure($e, [$settings['key'] ?? null, $settings['secret'] ?? null]);
             }
         }
 
@@ -155,7 +155,7 @@ class DocumentStorageService
      * سبب الفشل **بلا أسرار**: فئة الاستثناء + رمز خطأ S3 + حالة HTTP (حين وُجدت في سلسلة الأسباب). لا رسالة خام — قد تحوي
      * عنوان الطلب. مثال: `UnableToWriteFile ← S3Exception AccessDenied http=403`.
      */
-    private function describeFailure(Throwable $e): string
+    private function describeFailure(Throwable $e, array $secrets = []): string
     {
         $parts = [];
         for ($cause = $e; $cause !== null; $cause = $cause->getPrevious()) {
@@ -166,11 +166,65 @@ class DocumentStorageService
                 if ($status !== null) {
                     $label .= ' http='.$status;
                 }
+                $message = $this->safeS3Message((string) $cause->getAwsErrorMessage(), $secrets);
+                if ($message !== '') {
+                    $label .= ' msg="'.$message.'"';
+                }
             }
             $parts[] = $label;
         }
 
         return implode(' ← ', $parts);
+    }
+
+    /**
+     * رسالة خطأ S3 **المُحلَّلة** (عنصر `Message` من استجابة الخدمة — ليست رسالة الاستثناء الكاملة التي تحوي عنوان الطلب) بعد
+     * تنقية: تُحجب قيم الاعتماد الفعلية إن ظهرت، وأي سلسلة طويلة (≥20 محرفاً من أبجدية المفاتيح) تُستبدل بـ[REDACTED]، وتُقصّ.
+     * فتبقى عبارة مثل «Credential access key has length 40, should be 32» التي تسمّي الوسيط غير المقبول بلا كشف أي سرّ.
+     *
+     * @param array<int, mixed> $secrets
+     */
+    private function safeS3Message(string $message, array $secrets): string
+    {
+        foreach ($secrets as $secret) {
+            if (is_string($secret) && strlen($secret) >= 4) {
+                $message = str_replace($secret, '[REDACTED]', $message);
+            }
+        }
+        $message = (string) preg_replace('/[A-Za-z0-9+\/=_\-]{20,}/', '[REDACTED]', $message);
+        $message = trim((string) preg_replace('/\s+/', ' ', $message));
+
+        return mb_substr(str_replace('"', "'", $message), 0, 200);
+    }
+
+    /**
+     * شكل الاعتماد **بلا قيمه**: أطوال وأنواع محارف وفراغات. يكشف أخطاء الإدخال الشائعة (لصق «Token value» بدل Access Key ID،
+     * فراغ أو سطر جديد لاصق، مفتاح مقتطع) التي تعيد R2 بسببها `InvalidArgument` 400 على كل طلب. R2: معرّف المفتاح 32 محرفاً
+     * سداسياً، والسرّ 64 سداسياً، واسم الدلو 3–63 حرفاً صغيراً/رقماً/شرطة.
+     *
+     * @param array<string, mixed> $settings
+     * @return array<string, string>
+     */
+    private function credentialShape(array $settings): array
+    {
+        $describe = function (string $label, mixed $value, int $expected): array {
+            $v = is_string($value) ? $value : '';
+            $charset = $v === '' ? 'empty' : (ctype_xdigit($v) ? 'hex' : (ctype_alnum($v) ? 'alphanumeric' : 'other'));
+
+            return [
+                "{$label}_length" => strlen($v).' (R2 expects '.$expected.')'.(strlen($v) === $expected ? '' : ' MISMATCH'),
+                "{$label}_charset" => $charset.($charset === 'hex' ? '' : ' (R2 expects hex)'),
+                "{$label}_whitespace" => $v !== trim($v) || preg_match('/\s/', $v) === 1 ? 'YES (leading/trailing/inner whitespace or newline)' : 'no',
+            ];
+        };
+        $key = $settings['key'] ?? null;
+        $secret = $settings['secret'] ?? null;
+        $bucket = (string) ($settings['bucket'] ?? '');
+
+        return $describe('access_key_id', $key, 32) + $describe('secret', $secret, 64) + [
+            'key_equals_secret' => (is_string($key) && $key !== '' && $key === $secret) ? 'YES' : 'no',
+            'bucket_name_valid' => preg_match('/^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$/', $bucket) === 1 ? 'yes' : 'NO (3–63 lowercase letters/digits/hyphens)',
+        ];
     }
 
     /**
@@ -197,13 +251,14 @@ class DocumentStorageService
             'endpoint_jurisdiction' => preg_match('/\.(eu|fedramp)\.r2\./i', $host, $m) === 1 ? strtolower($m[1]) : 'default',
             'region' => (string) ($settings['region'] ?? ''),
             'configured_path_style' => ($settings['use_path_style_endpoint'] ?? false) ? 'true' : 'false',
-        ];
+        ] + $this->credentialShape($settings);
+        $secrets = [$settings['key'] ?? null, $settings['secret'] ?? null];
 
         foreach ([true => 'path', false => 'virtual'] as $pathStyle => $label) {
             try {
                 $client = $this->makeS3Client($settings, (bool) $pathStyle);
             } catch (Throwable $e) {
-                $report["{$label}.client"] = 'FAIL: '.$this->describeFailure($e);
+                $report["{$label}.client"] = 'FAIL: '.$this->describeFailure($e, $secrets);
 
                 continue;
             }
@@ -211,18 +266,18 @@ class DocumentStorageService
             $key = 'healthchecks/diagnose-'.Str::uuid().'.txt';
             // GET لا HEAD: أخطاء HEAD بلا جسم فيتساوى `NoSuchKey` و`NoSuchBucket` (كلاهما 404). GET يعيد رمز S3 فيفصل بينهما:
             // `NoSuchKey` ⇒ وصل الطلب إلى الدلو بمصادقة سليمة؛ `NoSuchBucket` ⇒ دلو/endpoint خاطئ.
-            $report["{$label}.get_missing_key"] = $this->probe(fn () => $client->getObject(['Bucket' => $bucket, 'Key' => $key]), expectNoSuchKey: true);
-            $report["{$label}.put_no_acl"] = $this->probe(fn () => $client->putObject(['Bucket' => $bucket, 'Key' => $key, 'Body' => 'x']));
-            $report["{$label}.put_acl_private"] = $this->probe(fn () => $client->putObject(['Bucket' => $bucket, 'Key' => $key.'.acl', 'Body' => 'x', 'ACL' => 'private']));
+            $report["{$label}.get_missing_key"] = $this->probe(fn () => $client->getObject(['Bucket' => $bucket, 'Key' => $key]), $secrets, expectNoSuchKey: true);
+            $report["{$label}.put_no_acl"] = $this->probe(fn () => $client->putObject(['Bucket' => $bucket, 'Key' => $key, 'Body' => 'x']), $secrets);
+            $report["{$label}.put_acl_private"] = $this->probe(fn () => $client->putObject(['Bucket' => $bucket, 'Key' => $key.'.acl', 'Body' => 'x', 'ACL' => 'private']), $secrets);
             // كل حذف مستقل: فشل الأول لا يمنع محاولة الثاني، فلا يبقى كائن اصطناعي أثناء التحقيق.
-            $report["{$label}.delete"] = $this->probe(fn () => $client->deleteObject(['Bucket' => $bucket, 'Key' => $key]));
-            $report["{$label}.delete_acl_object"] = $this->probe(fn () => $client->deleteObject(['Bucket' => $bucket, 'Key' => $key.'.acl']));
+            $report["{$label}.delete"] = $this->probe(fn () => $client->deleteObject(['Bucket' => $bucket, 'Key' => $key]), $secrets);
+            $report["{$label}.delete_acl_object"] = $this->probe(fn () => $client->deleteObject(['Bucket' => $bucket, 'Key' => $key.'.acl']), $secrets);
         }
 
         return $report;
     }
 
-    private function probe(\Closure $call, bool $expectNoSuchKey = false): string
+    private function probe(\Closure $call, array $secrets, bool $expectNoSuchKey = false): string
     {
         try {
             $call();
@@ -233,7 +288,7 @@ class DocumentStorageService
                 return 'OK (NoSuchKey: credentials and bucket are valid)';
             }
 
-            return 'FAIL: '.$this->describeFailure($e);
+            return 'FAIL: '.$this->describeFailure($e, $secrets);
         }
     }
 
