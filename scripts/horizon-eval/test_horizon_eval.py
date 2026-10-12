@@ -109,7 +109,7 @@ class Classification(unittest.TestCase):
             "app/Http/Controllers/Api/InvoiceController.php": "C",
             "Dockerfile": "P", "deploy/railway.json": "P", ".env.production": "P", "render.yaml": "P",
             "app/Services/Foo.php": "C",                 # generic backend code is NOT Zone B any more: unknown -> default-deny
-            "app/Services/DocumentCenter/Foo.php": "B",   # explicitly listed bounded subtree
+            "app/Services/DocumentCenter/Foo.php": "C",   # storage code holds tenant guards: no backend subtree is Zone B until the owner approves one
             "web/src/app/globals.css": "B",
             "design-system/foundations/x.md": "B",
             "web/src/components/Button.tsx": "A",
@@ -498,7 +498,7 @@ class Reviews(unittest.TestCase):
 
 
 class ParallelHorizons(unittest.TestCase):
-    SHARED = "app/Services/DocumentCenter/SyntheticHelper.php"
+    SHARED = "web/src/modules/synthetic/helper.ts"
 
     def other(self, **kw):
         o = {"number": 9200, "state": "open", "horizon_id": "SYNTH-HZ-OTHER", "head_ref": "synth-hz-other/x", "head_repo": "synthetic-owner/synthetic-repo", "author": "synthetic-author-2", "files_complete": True, "observed_at": "2026-10-12T11:59:00Z",
@@ -545,10 +545,11 @@ class ParallelHorizons(unittest.TestCase):
         self.assertIn("REPORTED_STATUS_CONTRADICTED_BY_OBSERVATION", codes(rec, "INFO"))
 
     def test_reported_claim_cannot_shrink_observed_surface(self):
-        c = base_b()
-        c = with_grant(c, paths_allow=["docs/**", "app/**", "tests/**", "config/**"], conflict_policy="serialize")
-        c["evidence"]["other_prs"] = [self.other(files=["config/attachments.php"],
-                                                 claim={"horizon_id": "SYNTH-HZ-OTHER", "task_id": "T", "surfaces": {"S-ATTACH-STORAGE": "shared-read"}, "claim_order": 3})]
+        c = with_files(base_b(), ("web/src/components/layout/sidebar-item.tsx", "modified", "@@ -1 +1 @@\n-<li>a</li>\n+<li>b</li>"))
+        c = with_grant(c, conflict_policy="serialize")
+        c["evidence"]["checks"] = base_b()["evidence"]["checks"]
+        c["evidence"]["other_prs"] = [self.other(files=["web/messages/ar.json"],
+                                                 claim={"horizon_id": "SYNTH-HZ-OTHER", "task_id": "T", "surfaces": {"S-NAV-I18N": "shared-read"}, "claim_order": 3})]
         rec = run(c)
         # claimed shared-read, but real files are changed => treated as shared-write => serialisation applies
         self.assertEqual(rec["decision"], "WAIT")
@@ -650,7 +651,7 @@ class ReviewerFindings(unittest.TestCase):
 
     def test_backend_monetary_changes_are_zone_c(self):  # Codex P1
         for body in ["return $amount * 2;", "$total += $fee;", "$invoice->discount = 5;", "$balance = 0;", "$price = $price * 1.15;"]:
-            c = with_files(base_b(), ("app/Services/DocumentCenter/SyntheticHelper.php", "modified", "@@ -1 +1 @@\n-old\n+" + body))
+            c = with_files(base_b(), ("tests/Feature/SyntheticHelperTest.php", "modified", "@@ -1 +1 @@\n-old\n+" + body))
             rec = run(c)
             self.assertEqual(rec["zone"], "C", body)
             self.assertEqual(rec["decision"], "STOP_OWNER_DECISION", body)
@@ -689,7 +690,7 @@ class ReviewerFindings(unittest.TestCase):
 
     def test_uninspectable_patch_blocks_even_in_a_zone_b_file(self):  # Codex round 3, P1
         for patch in (None, ""):
-            c = with_files(base_b(), ("app/Services/DocumentCenter/SyntheticHelper.php", "modified", patch))
+            c = with_files(base_b(), ("tests/Feature/SyntheticHelperTest.php", "modified", patch))
             rec = run(c)
             self.assertEqual(rec["decision"], "BLOCK")
             self.assertIn("PATCH_UNAVAILABLE", codes(rec))
@@ -705,6 +706,25 @@ class ReviewerFindings(unittest.TestCase):
         c["evidence"]["pr"]["files"][0].update(status="renamed", previous_filename="docs/guides/old-a.md", patch=None, additions=0, deletions=0)
         c["evidence"]["pr"].update(additions=20, deletions=4)
         self.assertNotIn("PATCH_UNAVAILABLE", codes(run(c)))
+
+    def test_inconsistent_change_counters_fail_closed(self):  # Codex round 6, P1
+        c = base_a()
+        for f in c["evidence"]["pr"]["files"]:
+            f["additions"] = 100          # per-file says 300 added lines, PR total still says 30
+        rec = run(c)
+        self.assertEqual(rec["decision"], "BLOCK")
+        self.assertIn("CHANGE_COUNTERS_INCONSISTENT", codes(rec))
+        self.assertIn("LIMIT_LINES_EXCEEDED", codes(rec))      # and the limit uses the larger figure either way
+        c = base_a()
+        c["evidence"]["pr"]["deletions"] = 5
+        self.assertIn("CHANGE_COUNTERS_INCONSISTENT", codes(run(c)))
+
+    def test_storage_and_tenant_code_is_zone_c_not_a_b_subtree(self):  # Codex round 6, P1
+        for path in ["app/Services/AttachmentStorage.php", "app/Services/DocumentCenter/DocumentStorageService.php", "config/attachments.php"]:
+            c = with_files(base_b(), (path, "modified", "@@ -1 +1 @@\n-if ($tenant === $this->tenantContext) {\n+if (false) {"))
+            rec = run(c)
+            self.assertEqual(rec["zone"], "C", path)
+            self.assertEqual(rec["decision"], "STOP_OWNER_DECISION", path)
 
     def test_authorization_implementation_paths_are_zone_c(self):  # Codex round 3, P1
         for path in ["app/Models/Role.php", "app/Http/Requests/StoreRoleRequest.php", "app/Policies/InvoicePolicy.php", "app/Models/Permission.php",
@@ -919,7 +939,7 @@ class ReviewerFindings(unittest.TestCase):
 
     def test_overlap_detection_is_case_insensitive_and_sees_renames(self):  # F11
         c = base_b()
-        c["evidence"]["other_prs"] = [ParallelHorizons().other(files=["APP/SERVICES/DOCUMENTCENTER/SYNTHETICHELPER.PHP"])]
+        c["evidence"]["other_prs"] = [ParallelHorizons().other(files=["WEB/SRC/MODULES/SYNTHETIC/HELPER.TS"])]
         self.assertEqual(run(c)["decision"], "STOP_OWNER_DECISION")
         c["evidence"]["other_prs"][0]["files_complete"] = False
         self.assertIn("OTHER_PR_FILES_INCOMPLETE", codes(run(c)))

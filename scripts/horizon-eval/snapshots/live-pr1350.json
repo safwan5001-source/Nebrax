@@ -59,9 +59,9 @@
     "tested_base_sha": null
    }
   ],
-  "fetched_at": "2026-10-12T03:32:20Z",
+  "fetched_at": "2026-10-12T03:43:10Z",
   "grant_store": {
-   "fetched_at": "2026-10-12T03:32:20Z",
+   "fetched_at": "2026-10-12T03:43:10Z",
    "grants": [],
    "kill_switch": false,
    "ref": "main",
@@ -91,7 +91,7 @@
     "horizon_id": null,
     "last_activity_at": "2026-10-12T03:29:52Z",
     "number": 1354,
-    "observed_at": "2026-10-12T03:32:20Z",
+    "observed_at": "2026-10-12T03:43:10Z",
     "state": "open"
    },
    {
@@ -105,14 +105,18 @@
      "tests/Feature/StorefrontMediaRefTest.php",
      "tests/Feature/StorefrontSectionLabelsTest.php",
      "tests/Fixtures/presentation/section-labels.json",
+     "web/e2e/cust-hv-v10c-section-chip.spec.ts",
      "web/src/modules/store-experience-builder/ControlPanels.tsx",
+     "web/src/modules/store-experience-builder/StorefrontPreviewCanvas.tsx",
      "web/src/modules/store-experience-builder/__tests__/ControlPanels.deleteConfirm.test.tsx",
      "web/src/modules/store-experience-builder/__tests__/ControlPanels.sectionName.test.tsx",
+     "web/src/modules/store-experience-builder/__tests__/StorefrontPreviewCanvas.sectionChip.test.tsx",
      "web/src/modules/store-experience-builder/__tests__/section-labels.test.ts",
      "web/src/modules/store-experience-builder/__tests__/section-presets.test.tsx",
      "web/src/modules/store-experience-builder/design/DesignInspector.tsx",
      "web/src/modules/store-experience-builder/messages.ts",
      "web/src/modules/store-experience-builder/presentation/config.ts",
+     "web/src/modules/store-experience-builder/store-preview.css",
      "web/src/modules/store-experience-builder/themes/index.ts",
      "web/src/modules/store-experience-builder/themes/section-presets.ts"
     ],
@@ -120,9 +124,9 @@
     "head_ref": "cust-hv/v10c-section-workflow",
     "head_repo": "safwan5001-source/Nebrax",
     "horizon_id": null,
-    "last_activity_at": "2026-10-12T03:30:43Z",
+    "last_activity_at": "2026-10-12T03:38:06Z",
     "number": 1353,
-    "observed_at": "2026-10-12T03:32:20Z",
+    "observed_at": "2026-10-12T03:43:10Z",
     "state": "open"
    },
    {
@@ -177,9 +181,9 @@
     "head_ref": "horizon/v2-1c-dryrun-authorization-evaluator",
     "head_repo": "safwan5001-source/Nebrax",
     "horizon_id": null,
-    "last_activity_at": "2026-10-12T03:30:37Z",
+    "last_activity_at": "2026-10-12T03:42:07Z",
     "number": 1351,
-    "observed_at": "2026-10-12T03:32:20Z",
+    "observed_at": "2026-10-12T03:43:10Z",
     "state": "open"
    },
    {
@@ -195,7 +199,7 @@
     "horizon_id": null,
     "last_activity_at": "2026-09-30T18:12:05Z",
     "number": 1128,
-    "observed_at": "2026-10-12T03:32:20Z",
+    "observed_at": "2026-10-12T03:43:10Z",
     "state": "open"
    },
    {
@@ -261,7 +265,7 @@
     "horizon_id": null,
     "last_activity_at": "2026-09-29T05:29:57Z",
     "number": 1105,
-    "observed_at": "2026-10-12T03:32:20Z",
+    "observed_at": "2026-10-12T03:43:10Z",
     "state": "open"
    },
    {
@@ -278,7 +282,7 @@
     "horizon_id": null,
     "last_activity_at": "2026-09-28T21:32:28Z",
     "number": 1093,
-    "observed_at": "2026-10-12T03:32:20Z",
+    "observed_at": "2026-10-12T03:43:10Z",
     "state": "open"
    },
    {
@@ -298,7 +302,7 @@
     "horizon_id": null,
     "last_activity_at": "2026-09-28T15:37:50Z",
     "number": 1089,
-    "observed_at": "2026-10-12T03:32:20Z",
+    "observed_at": "2026-10-12T03:43:10Z",
     "state": "open"
    },
    {
@@ -313,7 +317,7 @@
     "horizon_id": null,
     "last_activity_at": "2026-09-17T10:42:20Z",
     "number": 853,
-    "observed_at": "2026-10-12T03:32:20Z",
+    "observed_at": "2026-10-12T03:43:10Z",
     "state": "open"
    },
    {
@@ -328,7 +332,7 @@
     "horizon_id": null,
     "last_activity_at": "2026-09-12T04:21:51Z",
     "number": 784,
-    "observed_at": "2026-10-12T03:32:20Z",
+    "observed_at": "2026-10-12T03:43:10Z",
     "state": "open"
    },
    {
@@ -344,7 +348,7 @@
     "horizon_id": null,
     "last_activity_at": "2026-09-12T01:19:29Z",
     "number": 778,
-    "observed_at": "2026-10-12T03:32:20Z",
+    "observed_at": "2026-10-12T03:43:10Z",
     "state": "open"
    },
    {
@@ -359,7 +363,7 @@
     "horizon_id": null,
     "last_activity_at": "2026-09-08T22:37:53Z",
     "number": 704,
-    "observed_at": "2026-10-12T03:32:20Z",
+    "observed_at": "2026-10-12T03:43:10Z",
     "state": "open"
    },
    {
@@ -377,7 +381,7 @@
     "horizon_id": null,
     "last_activity_at": "2026-09-08T15:40:55Z",
     "number": 703,
-    "observed_at": "2026-10-12T03:32:20Z",
+    "observed_at": "2026-10-12T03:43:10Z",
     "state": "open"
    },
    {
@@ -394,7 +398,7 @@
     "horizon_id": null,
     "last_activity_at": "2026-08-30T14:12:47Z",
     "number": 586,
-    "observed_at": "2026-10-12T03:32:20Z",
+    "observed_at": "2026-10-12T03:43:10Z",
     "state": "open"
    },
    {
@@ -411,7 +415,7 @@
     "horizon_id": null,
     "last_activity_at": "2026-08-30T01:37:44Z",
     "number": 578,
-    "observed_at": "2026-10-12T03:32:20Z",
+    "observed_at": "2026-10-12T03:43:10Z",
     "state": "open"
    },
    {
@@ -431,7 +435,7 @@
     "horizon_id": null,
     "last_activity_at": "2026-08-14T23:31:52Z",
     "number": 202,
-    "observed_at": "2026-10-12T03:32:20Z",
+    "observed_at": "2026-10-12T03:43:10Z",
     "state": "open"
    }
   ],
@@ -531,7 +535,7 @@
   "source": "github-readonly"
  },
  "mode": "live",
- "now": "2026-10-12T03:32:20Z",
+ "now": "2026-10-12T03:43:10Z",
  "request": {
   "action": "merge",
   "agent_id": "pilot-session",

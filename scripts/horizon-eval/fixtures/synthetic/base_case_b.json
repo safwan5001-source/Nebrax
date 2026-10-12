@@ -25,7 +25,7 @@
               ],
               "paths_allow": [
                 "docs/**",
-                "app/**",
+                "web/**",
                 "tests/**"
               ],
               "not_before": "2026-10-12T00:00:00Z",
@@ -41,25 +41,25 @@
       }
     },
     "pr": {
-      "title": "fix: isolated null guard in synthetic helper",
+      "title": "fix: isolated null guard in synthetic UI helper",
       "body": "Isolated bugfix.\n\nHorizon-Claim: SYNTH-HZ-PILOT / SYNTH-T-002",
       "additions": 14,
       "deletions": 3,
       "changed_files": 2,
       "files": [
         {
-          "filename": "app/Services/DocumentCenter/SyntheticHelper.php",
+          "filename": "web/src/modules/synthetic/helper.ts",
           "status": "modified",
           "additions": 8,
           "deletions": 3,
-          "patch": "@@ -10,3 +10,8 @@\n-    return $x;\n+    if ($x === null) {\n+        return '';\n+    }\n+    return $x;"
+          "patch": "@@ -10,3 +10,8 @@\n-    return x;\n+    if (x === null) {\n+        return '';\n+    }\n+    return x;"
         },
         {
-          "filename": "tests/Feature/SyntheticHelperTest.php",
+          "filename": "web/src/modules/synthetic/helper.test.ts",
           "status": "added",
           "additions": 6,
           "deletions": 0,
-          "patch": "@@ -0,0 +1,6 @@\n+<?php\n+it('guards null', fn () => expect(helper(null))->toBe(''));"
+          "patch": "@@ -0,0 +1,6 @@\n+import { helper } from './helper';\n+it('guards null', () => expect(helper(null)).toBe(''));"
         }
       ],
       "claim": {
@@ -91,6 +91,52 @@
         "sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
         "by": "synthetic-independent-reviewer",
         "result": "PASS"
+      }
+    ],
+    "checks": [
+      {
+        "id": 1001,
+        "name": "CI Gate",
+        "status": "completed",
+        "conclusion": "success",
+        "head_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "event": "pull_request",
+        "completed_at": "2026-10-12T11:48:00Z",
+        "app": "github-actions",
+        "tested_base_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      {
+        "id": 1002,
+        "name": "php artisan test (L11, sqlite)",
+        "status": "completed",
+        "conclusion": "success",
+        "head_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "event": "pull_request",
+        "completed_at": "2026-10-12T11:40:00Z",
+        "app": "github-actions",
+        "tested_base_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      {
+        "id": 1003,
+        "name": "php artisan test (L11, pgsql)",
+        "status": "completed",
+        "conclusion": "success",
+        "head_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "event": "pull_request",
+        "completed_at": "2026-10-12T11:45:00Z",
+        "app": "github-actions",
+        "tested_base_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      {
+        "id": 1004,
+        "name": "web build (Next.js)",
+        "status": "completed",
+        "conclusion": "success",
+        "head_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "event": "pull_request",
+        "completed_at": "2026-10-12T11:46:00Z",
+        "app": "github-actions",
+        "tested_base_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
       }
     ]
   }

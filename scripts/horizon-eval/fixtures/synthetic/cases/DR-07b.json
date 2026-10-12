@@ -19,10 +19,9 @@
             "document": {
               "paths_allow": [
                 "docs/**",
-                "app/**",
+                "web/**",
                 "tests/**",
-                "storefront/src/**",
-                "config/**"
+                "storefront/src/**"
               ]
             }
           }

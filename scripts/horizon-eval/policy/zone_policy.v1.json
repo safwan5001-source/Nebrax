@@ -32,7 +32,7 @@
       ".env", ".env.*", "**/.env", "**/.env.*", "**/*.pem", "**/*.key"
     ]},
 
-    {"id": "attach-storage", "zone": "B", "surfaces": ["S-ATTACH-STORAGE"], "patterns": [
+    {"id": "attach-storage", "zone": "C", "surfaces": ["S-ATTACH-STORAGE"], "patterns": [
       "**/AttachmentStorage*", "config/attachments.php", "app/Services/DocumentCenter/**"
     ]},
     {"id": "tokens-contract", "zone": "B", "surfaces": ["S-TOKENS-CONTRACT"], "patterns": [
@@ -72,7 +72,7 @@
     "a11y-label": {"max_zone": "A", "rules": ["ui"]},
     "presentational-ui": {"max_zone": "A", "rules": ["ui", "tests"]},
     "tests-additive": {"max_zone": "A", "rules": ["tests"]},
-    "isolated-bugfix": {"max_zone": "B", "rules": ["ui", "tests", "attach-storage"]}
+    "isolated-bugfix": {"max_zone": "B", "rules": ["ui", "tests"]}
   },
 
   "hard_deny_patterns": [

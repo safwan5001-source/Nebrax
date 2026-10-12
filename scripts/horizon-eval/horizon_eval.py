@@ -806,8 +806,9 @@ def check_grant_scope(doc: dict, case: dict, pr: dict, files: list[dict], file_r
     lim = doc["limits"]
     if len(files) > lim["max_files_per_pr"]:
         reasons.add("BLOCK", "LIMIT_FILES_EXCEEDED", f"{len(files)}>{lim['max_files_per_pr']}")
-    if pr["additions"] + pr["deletions"] > lim["max_changed_lines"]:
-        reasons.add("BLOCK", "LIMIT_LINES_EXCEEDED", f"{pr['additions'] + pr['deletions']}>{lim['max_changed_lines']}")
+    changed = max(pr["additions"] + pr["deletions"], sum(f["additions"] + f["deletions"] for f in files))   # never trust the lower figure
+    if changed > lim["max_changed_lines"]:
+        reasons.add("BLOCK", "LIMIT_LINES_EXCEEDED", f"{changed}>{lim['max_changed_lines']}")
     usage = [u for u in ev["grant_usage"] if u["grant_id"] == doc["grant_id"]]
     if len(usage) != 1:
         reasons.add("BLOCK", "GRANT_USAGE_UNKNOWN", doc["grant_id"])
@@ -1085,6 +1086,8 @@ def check_own_pr(case: dict, registry: dict, policy: dict, reasons: Reasons):
         reasons.add("BLOCK", "HEAD_NOT_IN_COMMITS")
     if not pr["files"]:
         reasons.add("BLOCK", "PR_HAS_NO_FILES")
+    if pr["additions"] != sum(f["additions"] for f in pr["files"]) or pr["deletions"] != sum(f["deletions"] for f in pr["files"]):
+        reasons.add("BLOCK", "CHANGE_COUNTERS_INCONSISTENT", "PR totals differ from the per-file counts")
     for f in pr["files"]:
         if f["status"] in ("renamed", "copied") and not f.get("previous_filename"):
             reasons.add("BLOCK", "RENAME_WITHOUT_PREVIOUS_FILENAME", safe_path(f["filename"]))

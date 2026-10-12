@@ -16,10 +16,8 @@
             "document": {
               "paths_allow": [
                 "docs/**",
-                "app/**",
-                "tests/**",
-                "storefront/src/**",
-                "config/**"
+                "web/**",
+                "tests/**"
               ]
             }
           }
@@ -31,17 +29,17 @@
         "number": 9101,
         "state": "open",
         "horizon_id": "SYNTH-HZ-OTHER",
-        "head_ref": "synth-hz-other/attachments",
+        "head_ref": "synth-hz-other/nav",
         "observed_at": "2026-10-12T11:59:00Z",
         "last_activity_at": "2026-10-12T11:55:00Z",
         "files": [
-          "config/attachments.php"
+          "web/messages/ar.json"
         ],
         "claim": {
           "horizon_id": "SYNTH-HZ-OTHER",
           "task_id": "SYNTH-T-901",
           "surfaces": {
-            "S-ATTACH-STORAGE": "exclusive"
+            "S-NAV-I18N": "exclusive"
           },
           "claim_order": 3
         },
@@ -49,6 +47,20 @@
         "head_repo": "synthetic-owner/synthetic-repo",
         "author": "synthetic-author-2"
       }
-    ]
+    ],
+    "pr": {
+      "files": [
+        {
+          "filename": "web/src/components/layout/sidebar-item.tsx",
+          "status": "modified",
+          "additions": 4,
+          "deletions": 1,
+          "patch": "@@ -1 +1 @@\n-<li>old</li>\n+<li>new</li>"
+        }
+      ],
+      "changed_files": 1,
+      "additions": 4,
+      "deletions": 1
+    }
   }
 }
