@@ -797,7 +797,7 @@ class ReviewerFindings(unittest.TestCase):
 
     def test_jsx_expression_containers_are_not_presentational(self):  # Codex P1
         for line in ['<button disabled={!isAdmin}>Delete</button>', '<a aria-label={label}>x</a>', "{show && <b>x</b>}", '{" "}']:
-            rec = run(ui_case("@@ -1 +1 @@\n-<button>Delete</button>\n+" + line))
+            rec = run(ui_case("@@ -1 +1 @@\n-<span>old</span>\n+" + line))   # removed line is safe: only the ADDED line decides
             self.assertNotEqual(rec["zone"], "A", line)
             self.assertNotEqual(rec["decision"], "ELIGIBLE_SIMULATED", line)
 

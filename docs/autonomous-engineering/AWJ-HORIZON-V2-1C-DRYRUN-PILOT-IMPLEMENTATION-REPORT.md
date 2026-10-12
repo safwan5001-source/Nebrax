@@ -9,7 +9,7 @@ SCOPE: dry-run only. **No merge, no deploy, no Ruleset/Protection/Auto-Merge/per
 **Evidence for PASS**
 - Evaluator implemented, offline and incapable of acting (static guards: no network/process/env/write/merge symbols; GET-only collector).
 - Live mode **can never** return `ELIGIBLE_SIMULATED` (no owner-authenticity verifier exists); synthetic grants are refused in live mode and live evidence cannot be relabelled synthetic.
-- 164 local tests OK (stdlib), 23/23 V2-1B contract cases in 11 scenarios (+2 extras), **false-eligible = 0**; 472-point single-input mutation sweep and a sabotage run (22/23 injected defects caught, survivor double-defended) found no eligible survivor.
+- 165 local tests OK (stdlib), 23/23 V2-1B contract cases in 11 scenarios (+2 extras), **false-eligible = 0**; 472-point single-input mutation sweep and a sabotage run (22/23 injected defects caught, survivor double-defended) found no eligible survivor.
 - CI green on the last code commit (§7). No merge, deploy, ruleset/protection/auto-merge/permission change, grant, or other-horizon edit.
 
 **Conditions (why it is "conditional")**
@@ -117,8 +117,8 @@ Command: `PYTHONDONTWRITEBYTECODE=1 python3 -I -m unittest discover -s scripts/h
 | 1. Focused evaluator unit tests (incl. 39 review-finding regressions) | `test_horizon_eval.py` | 125 | OK |
 | 2. Contract + regression + mutation | `test_contract.py` | 12 | OK |
 | 3. Representative read-only repository evidence | `test_live_snapshots.py` | 8 | OK |
-| Static guards (no capability, fixture isolation) | `test_static_guards.py` | 19 | OK |
-| **Total** | | **164** | **OK, 0 failures, 0 errors** |
+| Static guards (no capability, fixture isolation) | `test_static_guards.py` | 20 | OK |
+| **Total** | | **165** | **OK, 0 failures, 0 errors** |
 
 Fail-closed evidence beyond the contract table:
 - **472 single-input mutation points** (two eligible bases: A and B) — each element deleted, nulled, and type-swapped; none stays eligible except a reviewed harmless list (free-text/optional elements) — this found a real gap (manifest lacking a required check) fixed with the policy `ci_floor`.
@@ -263,6 +263,30 @@ Round 7 (`b34c3f7`): a non-empty patch that does not account for every reported 
 Round 8 (`dfbea19`): a changed line that is a bare literal or bare text (`true`, `42`, `Delete`) is indistinguishable from the continuation of a code expression split across lines → Zone A UI now requires every changed line to carry a safe element or be a whitelisted bare attribute; everything else is Zone B.
 
 Known limit of the allowlist: a line-based view of a diff cannot see surrounding code. The allowlist is therefore deliberately narrow (single-line elements with whitelisted literal attributes) and anything it does not recognise falls to Zone B, never A. It remains a heuristic: it can only ever be exercised in synthetic mode, because live mode is unconditionally non-eligible.
+
+
+### 8.5 Closure of the 17 Codex review threads (final review closure)
+Each fix was verified present at HEAD, covered by a named regression test, and **proved by reverting it**: the fix was removed in a scratch copy and the suite had to fail (17/17 reverts killed; a first run showed thread 2's test was masked by an unsafe *removed* line, so the test was corrected and re-proved).
+
+| # | Thread (severity) | Fix | Regression test(s) that fail when the fix is reverted |
+|---|---|---|---|
+| 1 | backend money → Zone C (P1) | monetary tokens in non-UI code → C | `test_backend_monetary_changes_are_zone_c` |
+| 2 | JSX expression containers (P1) | no braces in the Zone A allowlist | `test_jsx_expression_containers_are_not_presentational` |
+| 3 | paginated `gh` shapes (P2) | `--paginate --slurp` + `flatten_pages` | `test_runtime_argv_is_exactly_gh_api_path`, `test_single_subprocess_call_site_and_get_only_argv` |
+| 4 | other-PR provenance (P1) | head repo + author bound to registry | `test_other_pr_provenance_is_bound_to_repo_and_author` |
+| 5 | form markup (P1) | structural safe-element allowlist | `test_behavior_bearing_markup_is_not_presentational` |
+| 6 | token-free financial edits (P1) | financial path words → C | `test_token_free_numeric_edits_in_financial_files_are_zone_c` |
+| 7 | RBAC paths (P1) | explicit RBAC paths + generic `app/**` default-deny | `test_authorization_implementation_paths_are_zone_c`, `test_path_zones`, `test_unlisted_backend_code_is_default_deny_not_zone_b` |
+| 8 | code patch unavailable (P1) | `PATCH_UNAVAILABLE` BLOCK | `test_uninspectable_patch_blocks_even_in_a_zone_b_file`, `test_missing_patch_for_code_is_not_assumed_safe` |
+| 9 | expense/cost paths (P1) | wider vocabulary + default-deny | `test_unlisted_backend_code_is_default_deny_not_zone_b`, `test_path_zones` |
+| 10 | checks bound to tested base (P1) | per-run `tested_base_sha` | `test_checks_must_be_bound_to_the_tested_base` |
+| 11 | Horizon label (P1) | exact `horizon:<id>` label | `test_horizon_label_is_required_and_exclusive` |
+| 12 | docs patch unavailable (P1) | block for every file with changed lines | `test_uninspectable_docs_patch_blocks_too` |
+| 13 | workflow-runs pagination (P2) | paginated lookup | `test_every_list_endpoint_the_collector_reads_is_paginated` (**added in this closure pass**; the fix previously had live verification only) |
+| 14 | tenant/storage code (P1) | storage subtree Zone C, no backend Zone B | `test_storage_and_tenant_code_is_zone_c_not_a_b_subtree`, `test_path_zones` |
+| 15 | inconsistent counters (P1) | `CHANGE_COUNTERS_INCONSISTENT` + larger figure | `test_inconsistent_change_counters_fail_closed` |
+| 16 | incomplete patch (P1) | `PATCH_INCOMPLETE` | `test_patch_that_omits_reported_changes_is_incomplete` |
+| 17 | standalone literals (P1) | bare lines never Zone A | `test_standalone_literals_and_bare_text_lines_are_not_zone_a`, `test_path_zones` |
 
 Residual risks the reviewer listed that are **not** closed (declared in §11): unauthenticated attestations; test code executes in CI; symlinks/file modes invisible in the files API; injection regexes are defence-in-depth (paraphrase/homoglyph can evade; classification never depends on text); `head_pushed_at` is the author-controlled commit date; no semantic check of `approved_outcome`.
 

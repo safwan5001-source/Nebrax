@@ -117,6 +117,41 @@ class CollectorIsReadOnly(unittest.TestCase):
         self.assertEqual(seen[0], ["gh", "api", "repos/o/r/pulls/1"])
         self.assertEqual(seen[1], ["gh", "api", "repos/o/r/pulls/1/files?per_page=100", "--paginate", "--slurp"])
 
+    def test_every_list_endpoint_the_collector_reads_is_paginated(self):  # Codex thread 13 (workflow-runs lookup)
+        calls = []
+
+        def fake_gh_get(path, paginate=False):
+            calls.append((path.split("?")[0], paginate))
+            tail = path.split("?")[0]
+            if tail.endswith("/branches/main"):
+                return {"commit": {"sha": "a" * 40}}
+            if "/pulls/" in tail and tail.count("/") == 4:
+                return {"state": "open", "draft": False, "merged": False, "merge_commit_sha": None, "user": {"login": "u"}, "title": "t", "body": "",
+                        "head": {"sha": "b" * 40, "ref": "r", "repo": {"full_name": "o/r"}}, "base": {"sha": "a" * 40, "ref": "main", "repo": {"full_name": "o/r"}},
+                        "additions": 0, "deletions": 0, "changed_files": 0, "labels": []}
+            if tail.endswith("/files") or tail.endswith("/commits") or tail.endswith("/comments") or tail.endswith("/reviews"):
+                return []
+            if "/commits/" in tail and tail.endswith("/b" * 1 + "b" * 39):
+                return {"commit": {"committer": {"date": "2026-10-12T00:00:00Z"}}}
+            if tail.endswith("/check-runs"):
+                return {"check_runs": []}
+            if tail.endswith("/actions/runs"):
+                return {"workflow_runs": []}
+            if "/contents/.github/ci-gate" in tail:
+                import base64
+                return {"content": base64.b64encode(json.dumps({"gate_check_name": "CI Gate", "grace_minutes_no_run": 10, "checks": []}).encode()).decode()}
+            if "/contents/docs/autonomous-engineering/grants" in tail:
+                raise cs.CollectError("404 Not Found")
+            if tail.endswith("/pulls"):
+                return []
+            return {"commit": {"committer": {"date": "2026-10-12T00:00:00Z"}}}
+
+        with mock.patch.object(cs, "gh_get", fake_gh_get):
+            cs.collect("o/r", 7, {"horizon_id": "h", "task_id": "t", "task_category": "c", "agent_id": "a", "repository": "o/r", "base_branch": "main", "action": "merge"})
+        paginated = {path for path, pag in calls if pag}
+        for tail in ("/pulls/7/files", "/pulls/7/commits", "/issues/7/comments", "/pulls/7/reviews", "/check-runs", "/actions/runs", "/pulls"):
+            self.assertTrue(any(p.endswith(tail) for p in paginated), f"{tail} must be read with pagination")
+
     def test_paginated_shapes_are_flattened(self):
         self.assertEqual(cs.flatten_pages([[1, 2], [3]]), [1, 2, 3])
         merged = cs.flatten_pages([{"total_count": 3, "check_runs": [{"id": 1}, {"id": 2}]}, {"total_count": 3, "check_runs": [{"id": 3}]}])
