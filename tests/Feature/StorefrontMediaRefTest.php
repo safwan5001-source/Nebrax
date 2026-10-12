@@ -165,6 +165,26 @@ class StorefrontMediaRefTest extends TestCase
     }
 
     /** @test */
+    public function editor_only_section_labels_never_reach_the_public_snapshot(): void
+    {
+        $store = $this->store('mr-labels');
+        $this->publish($store, ['homepage' => ['sections' => [
+            ['id' => 'hero', 'type' => 'hero', 'visible' => true, 'label' => 'الرئيسي'],
+            ['id' => 'newArrivals', 'type' => 'newArrivals', 'visible' => true, 'label' => 'وصل حديثاً — موسم العيد', 'content' => ['title' => 'جديدنا']],
+        ]]]);
+
+        $response = $this->getJson("http://{$store['host']}/store/v1/storefront")->assertOk();
+        $sections = $response->json('data.presentation.homepage.sections');
+
+        $this->assertSame(['hero', 'newArrivals'], array_column($sections, 'id'), 'the sections themselves are untouched');
+        $this->assertSame(['title' => 'جديدنا'], $sections[1]['content']);
+        foreach ($sections as $section) {
+            $this->assertArrayNotHasKey('label', $section);
+        }
+        $this->assertStringNotContainsString('موسم العيد', (string) $response->getContent());
+    }
+
+    /** @test */
     public function a_transformed_usage_resolves_to_its_own_derivative_sources_at_their_real_sizes(): void
     {
         $this->fakeStorefrontMediaR2();

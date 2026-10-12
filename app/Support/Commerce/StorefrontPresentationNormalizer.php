@@ -34,6 +34,9 @@ final class StorefrontPresentationNormalizer
     /** CUST-HV V6a (V0 §8.1) — بطل لكل instance، محدود: Banner/Slider تغطيان الأشرطة الإضافية. */
     public const MAX_HERO_INSTANCES = 3;
 
+    /** CUST-HV V10c (V0 §17.1) — أقصى طول لاسم القسم (بيانات محرر فقط). */
+    public const MAX_SECTION_LABEL = 60;
+
     private const MAX_HERO_HEADLINE_LENGTH = 120;
 
     private const MAX_HERO_SUBHEADLINE_LENGTH = 200;
@@ -755,6 +758,11 @@ final class StorefrontPresentationNormalizer
                 'type' => $type,
                 'visible' => (bool) ($section['visible'] ?? false),
             ];
+            // CUST-HV V10c (V0 §17.1) — اسم القسم: بيانات محرر فقط (≤ 60 نقطة ترميز، الفراغ = غياب). لا يُعرض في المتجر.
+            $label = is_string($section['label'] ?? null) ? trim($section['label']) : '';
+            if ($label !== '') {
+                $instance['label'] = mb_substr($label, 0, self::MAX_SECTION_LABEL);
+            }
             $content = $this->normalizeOptionalSectionContent($type, $section['content'] ?? null);
             if ($content !== null) {
                 $instance['content'] = $content;

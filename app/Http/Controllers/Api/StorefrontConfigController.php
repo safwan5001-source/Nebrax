@@ -62,6 +62,20 @@ class StorefrontConfigController extends PublicApiController
                 }
             }
 
+            // CUST-HV V10c (V0 §17.1) — أسماء الأقسام بيانات محرر فقط؛ لا تُكشف في اللقطة العامة.
+            if (is_array($presentation) && isset($presentation['homepage']['sections']) && is_array($presentation['homepage']['sections'])) {
+                $presentation['homepage']['sections'] = array_map(
+                    static function (mixed $section): mixed {
+                        if (is_array($section)) {
+                            unset($section['label']);
+                        }
+
+                        return $section;
+                    },
+                    $presentation['homepage']['sections'],
+                );
+            }
+
             $tenant = $row
                 ? Tenant::query()->find($row->tenant_id, ['name', 'cr_number', 'vat_number'])
                 : null;
