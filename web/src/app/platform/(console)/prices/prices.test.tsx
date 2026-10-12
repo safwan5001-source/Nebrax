@@ -411,6 +411,30 @@ describe('platform prices UX (H1-4C)', () => {
     });
   });
 
+  describe('summary and history during the post-save reload', () => {
+    it('show skeletons instead of the pre-save list while the reload is pending, then the fresh list', async () => {
+      await renderLoaded();
+      const created = price('now', 'basic', '120.00', '2026-10-12', '2026-10-12T09:00:00+00:00'); // effective today
+      let resolve!: (v: unknown) => void;
+      const reload = new Promise((r) => { resolve = r; });
+      platformApi.mockResolvedValueOnce({ data: created }); // POST
+      platformApi.mockReturnValueOnce(reload); // reload pending
+      fireEvent.change(screen.getByLabelText(t('monthlyPrice')), { target: { value: '120' } });
+      fireEvent.change(screen.getByLabelText(t('effectiveOn')), { target: { value: '2026-10-12' } });
+      fireEvent.click(screen.getByRole('button', { name: t('save') }));
+      await screen.findByRole('status');
+      // the previous basic price (99.00) must not be presented as current next to the success message
+      expect(screen.getByTestId('prices-skeleton')).toBeTruthy();
+      expect(screen.queryAllByText(formatRiyal('99.00'))).toHaveLength(0);
+      expect(screen.queryAllByRole('row').filter((row) => row.textContent?.includes(formatRiyal('99.00')))).toHaveLength(0);
+      resolve({ data: [...catalogue().data, created] });
+      await waitFor(() => expect(screen.queryByTestId('prices-skeleton')).toBeNull());
+      const summary = document.getElementById('prices-summary')?.closest('section') as HTMLElement;
+      const basicCard = within(summary).getByText('basic').closest('[data-awj-card]') as HTMLElement;
+      expect(within(basicCard).getByText(formatRiyal('120.00'))).toBeTruthy();
+    });
+  });
+
   describe('catalogue requests racing with a save', () => {
     const deferred = <T,>() => {
       let resolve!: (value: T) => void;

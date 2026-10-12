@@ -105,6 +105,7 @@ export default function PlatformPricesPage() {
   // الكتالوج «طازج» حين يكتمل جلبه الأول ولا يجري جلب (بعد حفظ مثلاً) ولا يوجد خطأ جلب؛ وإلا فالقائمة المحلية قد
   // تسبق النسخة المحفوظة للتو، فلا يُجزم بشيء لتاريخ ماضٍ. التاريخ المستقبلي «مجدول» في كل الأحوال.
   const catalogueFresh = catalogueLoaded && !loading && !loadError;
+  // الملخص والسجل يُعرضان من كتالوج طازج فقط: أثناء الجلب اللاحق للحفظ تظهر الهياكل بدل قائمة تسبق النسخة المحفوظة.
   const previewKey = !effectiveOn
     ? 'previewEffective'
     : !catalogueFresh
@@ -167,7 +168,7 @@ export default function PlatformPricesPage() {
 
       <section aria-labelledby="prices-summary">
         <h2 id="prices-summary" className="mb-3 text-sm font-semibold text-text">{t('summaryTitle')}</h2>
-        {loadError ? null : !catalogueLoaded ? (
+        {loadError ? null : !catalogueFresh ? (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4" data-testid="prices-skeleton">
             {PLANS.map((code) => <Skeleton key={code} className="h-28" />)}
           </div>
@@ -256,7 +257,7 @@ export default function PlatformPricesPage() {
                 <p className="text-sm text-negative" role="alert">{loadError}</p>
                 <Button variant="outline" className="h-11" onClick={load}>{t('retry')}</Button>
               </div>
-            ) : !catalogueLoaded ? (
+            ) : !catalogueFresh ? (
               <Skeleton className="h-52 w-full" />
             ) : prices.length === 0 ? (
               <p className="text-sm text-muted">{t('empty')}</p>
