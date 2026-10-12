@@ -281,10 +281,12 @@ class StorefrontCommerceFirewallTest extends TestCase
         $owning = [
             'StorefrontPresentationService', 'StorefrontPresentationVersionService', 'StorefrontPresentationVersionBackfillService',
             'ScheduledPresentationDispatcher', 'StorefrontMediaReferenceScanner', 'StorefrontPublishedMediaIndex',
+            // CUST-H5-3 — records immutable snapshots of the presentation document on save (presentation data only)
+            'StorefrontPresentationRevisionRecorder',
         ];
         // what a presentation-owning service may legitimately name: its own models / helpers (no price, offer, stock, tax or shipping value)
         $presentationSide = [
-            'Storefront', 'StorefrontPresentation', 'StorefrontPresentationVersion', 'StorefrontMedia', 'StorefrontMediaDerivative',
+            'Storefront', 'StorefrontPresentation', 'StorefrontPresentationVersion', 'StorefrontPresentationVersionRevision', 'StorefrontMedia', 'StorefrontMediaDerivative',
             'StorefrontPublishedMedia', 'StorefrontDomain', 'StorefrontBusinessProfile', 'Tenant', 'User', 'BaseModel',
             'PresentationDocumentTooLargeException', 'PresentationPublishValidationException', 'StorefrontMediaTransform',
             'StorefrontMediaPublishGate', 'StorefrontMediaContrastEvidence', 'ForwardSchemaVersionException', 'ActiveVersionImmutableException',
@@ -328,6 +330,8 @@ class StorefrontCommerceFirewallTest extends TestCase
             'PresentationDocumentTooLargeException', 'PresentationPublishValidationException', 'ScheduledPresentationDispatcher',
             'StorefrontMediaReferenceScanner', 'StorefrontPresentationService', 'StorefrontPresentationVersionBackfillService',
             'StorefrontPresentationVersionService', 'StorefrontPublishedMediaIndex', 'StorefrontVerticalSetupService',
+            // CUST-H5-3 — the presentation document's own snapshot recorder
+            'StorefrontPresentationRevisionRecorder',
         ];
         // scanned for qualified presentation dependencies only: CommerceListingService's bare `$presentation` parameter is the listing's title /
         // description copy, and PosSettings' CATEGORY_PRESENTATION_* constants are the POS tile display modes (neither is the storefront document)

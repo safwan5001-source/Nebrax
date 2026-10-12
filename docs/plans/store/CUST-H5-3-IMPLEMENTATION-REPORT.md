@@ -71,6 +71,10 @@ Also green on PostgreSQL: `StorefrontPresentationVersionApiTest` and `Storefront
 | 8 processes save the same expected revision at once | exactly **1 × 200, 7 × 409**; history = baseline + that one save; Version revision = 2 |
 | 6 processes × 5 successful saves each, retrying on 409 (30 successes, 58 conflicts) | final revision **31**; history **30 rows, revisions 2…31 contiguous, 0 gaps, 30 distinct documents, 0 duplicates** (cap reached; baseline correctly pruned; newest kept) |
 
+## Full local run
+
+`php artisan test` (SQLite, local build): 6,330 passed / 156 failed / 73 skipped. The one failure attributable to this slice was caught by the **commerce-firewall guard** (`StorefrontCommerceFirewallTest`: new presentation classes must be registered in its allow-lists) — fixed by registering `StorefrontPresentationRevisionRecorder` and `StorefrontPresentationVersionRevision` there; the guard now passes (6/6). The remaining failures are environmental to this sandbox build and unrelated to presentation code: missing `bcmath` (`bcmul()` undefined — Fuel/price areas), missing AWS SDK (`Aws\Exception\AwsException` — R2/attachments/media upload), missing mail class in the stripped local app (auth recovery), and SQLite file locks from running other test processes alongside. CI installs those extensions and is the authoritative full run (SQLite + PostgreSQL).
+
 ## Accounting entries
 
 Not applicable — this slice records presentation documents only. No financial operation, ledger write or journal line is created or modified.
