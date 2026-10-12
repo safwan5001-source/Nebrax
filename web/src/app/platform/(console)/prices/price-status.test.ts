@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { classifyPriceVersions, msUntilNextUtcMidnight, nextScheduled, todayIsoDate } from './price-status';
+import { classifyPriceVersions, msUntilNextUtcMidnight, nextScheduled, previewOutcome, todayIsoDate } from './price-status';
 
 const v = (id: string, plan: string, effective_on: string | null, currency = 'SAR') => ({ id, plan, currency, effective_on });
 
@@ -56,6 +56,19 @@ describe('price version status (derived from effective_on and today only)', () =
     const list = [v('a', 'pro', '2026-09-01'), v('b', 'pro', '2027-01-01'), v('c', 'pro', '2026-11-01')];
     expect(nextScheduled(list, today)?.id).toBe('c');
     expect(nextScheduled([v('a', 'pro', '2026-09-01')], today)).toBeNull();
+  });
+
+  it('previews an unsaved version with the same rule as the saved ones', () => {
+    const list = [v('a', 'pro', '2026-06-01'), v('b', 'basic', '2026-09-01'), v('c', 'pro', '2027-01-01'), v('d', 'pro', '2026-06-01', 'USD')];
+    const cand = (plan: string, effective_on: string, currency = 'SAR') => ({ plan, currency, effective_on });
+    expect(previewOutcome(list, cand('pro', '2026-12-01'), today)).toBe('scheduled');
+    expect(previewOutcome(list, cand('pro', '2026-01-01'), today)).toBe('superseded'); // an older date behind June
+    expect(previewOutcome(list, cand('pro', '2026-07-01'), today)).toBe('effective'); // newer than June
+    expect(previewOutcome(list, cand('pro', '2026-06-01'), today)).toBe('effective'); // equal date is not "later"
+    expect(previewOutcome(list, cand('basic', '2026-01-01'), today)).toBe('superseded');
+    expect(previewOutcome(list, cand('enterprise', '2026-01-01'), today)).toBe('effective'); // no other version
+    expect(previewOutcome(list, cand('pro', '2026-07-01', 'USD'), today)).toBe('effective'); // other currency group
+    expect(previewOutcome(list, cand('pro', '2026-01-01'), today)).not.toBe('scheduled');
   });
 
   it('todayIsoDate is the UTC calendar date', () => {

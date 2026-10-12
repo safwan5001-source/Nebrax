@@ -58,6 +58,29 @@ export function classifyPriceVersions(
   return result;
 }
 
+export type PreviewOutcome = 'scheduled' | 'effective' | 'superseded';
+
+/**
+ * ما ستؤول إليه نسخة لم تُحفظ بعد، بالقاعدة نفسها: مستقبلية = مجدولة؛ وإلا فإن وُجدت نسخة أخرى لنفس
+ * (الخطة، العملة) تاريخها بعد تاريخ هذه وحتى اليوم فهذه «سابقة»؛ وإلا «سارية». يُستدعى بكتالوج مكتمل التحميل فقط.
+ */
+export function previewOutcome(
+  prices: readonly PriceVersionLike[],
+  candidate: { plan: string; currency: string; effective_on: string },
+  today: string
+): PreviewOutcome {
+  if (candidate.effective_on > today) return 'scheduled';
+  const laterInEffect = prices.some(
+    (price) =>
+      price.plan === candidate.plan &&
+      price.currency === candidate.currency &&
+      price.effective_on !== null &&
+      price.effective_on > candidate.effective_on &&
+      price.effective_on <= today
+  );
+  return laterInEffect ? 'superseded' : 'effective';
+}
+
 /** أقرب نسخة مجدولة (أصغر تاريخ مستقبلي) في مجموعة نسخ خطة واحدة، أو null. */
 export function nextScheduled<T extends PriceVersionLike>(versions: readonly T[], today: string): T | null {
   const future = versions.filter((price) => price.effective_on !== null && price.effective_on > today);

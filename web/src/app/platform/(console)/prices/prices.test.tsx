@@ -280,6 +280,45 @@ describe('platform prices UX (H1-4C)', () => {
     });
   });
 
+  describe('preview of an unsaved version', () => {
+    const fill = (value: string, date: string, planValue = 'pro') => {
+      fireEvent.change(screen.getByLabelText(t('plan')), { target: { value: planValue } });
+      fireEvent.change(screen.getByLabelText(t('monthlyPrice')), { target: { value } });
+      fireEvent.change(screen.getByLabelText(t('effectiveOn')), { target: { value: date } });
+    };
+
+    it('says a retroactive date behind a later in-effect version is superseded, and matches the saved status', async () => {
+      await renderLoaded();
+      fill('120', '2026-01-01'); // pro already has a June 2026 version in effect
+      const preview = screen.getByTestId('price-preview');
+      expect(preview.textContent).toContain(t('previewSuperseded'));
+      expect(preview.textContent).not.toContain(t('previewEffective'));
+      expect(posts()).toHaveLength(0);
+      platformApi.mockResolvedValueOnce({ data: price('retro', 'pro', '120.00', '2026-01-01') });
+      fireEvent.click(screen.getByRole('button', { name: t('save') }));
+      expect((await screen.findByRole('status')).textContent).toContain(t('savedSuperseded'));
+    });
+
+    it('keeps the other outcomes: scheduled for a future date, in effect for a newer past date', async () => {
+      await renderLoaded();
+      fill('120', '2026-12-25');
+      expect(screen.getByTestId('price-preview').textContent).toContain(t('previewScheduled'));
+      fill('120', '2026-07-01');
+      expect(screen.getByTestId('price-preview').textContent).toContain(t('previewEffective'));
+    });
+
+    it('does not claim the version applies while the catalogue is not loaded', async () => {
+      platformApi.mockReset();
+      platformApi.mockRejectedValueOnce(new ApiError('outage'));
+      render(<PlatformPricesPage />);
+      await screen.findByRole('alert');
+      fill('120', '2026-01-01');
+      const preview = screen.getByTestId('price-preview');
+      expect(preview.textContent).toContain(t('previewUnverified'));
+      expect(preview.textContent).not.toContain(t('previewEffective'));
+    });
+  });
+
   describe('catalogue requests racing with a save', () => {
     const deferred = <T,>() => {
       let resolve!: (value: T) => void;
@@ -349,7 +388,7 @@ describe('platform prices UX (H1-4C)', () => {
     expect(isolated).toContain('2026-06-01');
     expect(isolated).toContain('2026-12-01');
     expect(isolated).toContain(formatRiyal('199.99'));
-    const keys = ['summaryTitle', 'summaryNote', 'statusColumn', 'addedOn', 'statusCurrent', 'statusScheduled', 'statusSuperseded', 'statusUnknown', 'sinceDate', 'startsOn', 'monthlyWord', 'effectiveWord', 'noPrice', 'noCurrentPrice', 'nextScheduled', 'tiedDate', 'effectNote', 'amountHint', 'invalidAmount', 'previewTitle', 'previewScheduled', 'previewEffective', 'previewStored', 'savedScheduled', 'savedEffective', 'savedSuperseded', 'historyNote'];
+    const keys = ['summaryTitle', 'summaryNote', 'statusColumn', 'addedOn', 'statusCurrent', 'statusScheduled', 'statusSuperseded', 'statusUnknown', 'sinceDate', 'startsOn', 'monthlyWord', 'effectiveWord', 'noPrice', 'noCurrentPrice', 'nextScheduled', 'tiedDate', 'effectNote', 'amountHint', 'invalidAmount', 'previewTitle', 'previewScheduled', 'previewEffective', 'previewSuperseded', 'previewUnverified', 'previewStored', 'savedScheduled', 'savedEffective', 'savedSuperseded', 'historyNote'];
     for (const lang of [ar, en]) for (const key of keys) expect(typeof (lang.platformPrices as Record<string, unknown>)[key]).toBe('string');
   });
 });

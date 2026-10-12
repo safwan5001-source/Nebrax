@@ -468,6 +468,8 @@
     "previewTitle": "What will be added",
     "previewScheduled": "Scheduled: not treated as in effect before this date.",
     "previewEffective": "Today or earlier: applies to contracts that start on or after this date.",
+    "previewSuperseded": "Superseded: a later version is already in effect for this plan, so this version will not apply to new contracts.",
+    "previewUnverified": "Today or earlier: whether a later version is already in effect can't be confirmed until the price list loads.",
     "previewStored": "Sent to the server as {minor} halalas.",
     "savedScheduled": "Scheduled until",
     "savedEffective": "In effect by date",

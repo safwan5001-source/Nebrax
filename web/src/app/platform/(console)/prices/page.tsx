@@ -16,7 +16,7 @@ import { ApiError } from '@/lib/api';
 import { formatMinorRiyal, formatRiyal, isValidRiyal, riyalToMinor } from '@/lib/money';
 import { isPlatformAuthenticated } from '@/lib/platform-auth';
 import { platformApi } from '@/lib/platform-api';
-import { classifyPriceVersions, nextScheduled, todayIsoDate, type PriceClassification, type PriceStatus } from './price-status';
+import { classifyPriceVersions, nextScheduled, previewOutcome, todayIsoDate, type PriceClassification, type PriceStatus } from './price-status';
 import { useToday } from './use-today';
 
 const PLANS = ['free', 'basic', 'pro', 'enterprise'] as const;
@@ -100,6 +100,18 @@ export default function PlatformPricesPage() {
 
   const today = useToday();
   const classification = useMemo(() => classifyPriceVersions(prices, today), [prices, today]);
+
+  // نص المعاينة يُشتق من الكتالوج الكامل لا من مقارنة التاريخ باليوم وحده: نسخة بأثر رجعي خلف نسخة أحدث سارية «سابقة».
+  // قبل اكتمال التحميل لا يُجزم بشيء لتاريخ ماضٍ.
+  const previewKey = !effectiveOn
+    ? 'previewEffective'
+    : effectiveOn > today
+      ? 'previewScheduled'
+      : !catalogueLoaded
+        ? 'previewUnverified'
+        : ({ scheduled: 'previewScheduled', effective: 'previewEffective', superseded: 'previewSuperseded' } as const)[
+            previewOutcome(prices, { plan, currency: 'SAR', effective_on: effectiveOn }, today)
+          ];
 
   const typedMinor = monthlyPrice.trim() === '' ? null : riyalToMinor(monthlyPrice);
   const amountValid = typedMinor !== null && isValidRiyal(monthlyPrice) && typedMinor >= 0;
@@ -220,7 +232,7 @@ export default function PlatformPricesPage() {
                 <p className="mt-1 text-text">
                   <Ltr>{plan}</Ltr> · <Ltr>{formatMinorRiyal(typedMinor)}</Ltr> {t('monthlyWord')} · {t('effectiveWord')} <Ltr>{effectiveOn}</Ltr>
                 </p>
-                <p className="mt-1 text-xs text-muted">{effectiveOn > today ? t('previewScheduled') : t('previewEffective')}</p>
+                <p className="mt-1 text-xs text-muted">{t(previewKey)}</p>
                 <p className="num mt-1 text-xs text-muted" dir="ltr">{t('previewStored', { minor: typedMinor ?? 0 })}</p>
               </div>
             )}
