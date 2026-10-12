@@ -7,7 +7,7 @@ namespace App\Support\Commerce;
  * §6.3 عرض المحتوى، §6.6 الحركة). السلطة (PHP) لتوأمَي TS (`global-tokens.ts` في web
  * وstorefront، متطابقان حرفياً)، وثلاثتها على `tests/Fixtures/presentation/global-tokens.json`.
  *
- * مفاتيح اختيارية إضافية بحتة: `typography` · `surfaces` · `layout` · `motion`. الغياب
+ * مفاتيح اختيارية إضافية بحتة: `typography` · `buttons` · `surfaces` · `cards` · `layout` · `motion`. الغياب
  * (أو كل الحقول غير صالحة) = لا مفتاح، فتبقى مخرجات الوثيقة القديمة **بلا أي تغيير**.
  * قيمة خارج المجموعة المعدودة تُسقط وحدها (لا قيمة افتراضية مرئية)، والمجموعة الفارغة
  * تُحذف، والترتيب قانوني ثابت. V5e-2b يضيف `buttons` و`typography.buttonText` (إثبات تباين
@@ -55,6 +55,15 @@ final class StorefrontGlobalTokensNormalizer
     public const SHADOWS = ['none', 'soft', 'medium', 'strong'];
 
     public const CONTENT_WIDTHS = ['narrow', 'standard', 'wide'];
+
+    /** CUST-HV V9d-1 (V0 §14.1) — رموز البطاقة: `density` هو `productCard` القائم، و`radius`/`border`/`shadow` هي `surfaces`. */
+    public const CARD_ALIGNS = ['start', 'center'];
+
+    public const CARD_IMAGE_RATIOS = ['1:1', '4:3', '3:4'];
+
+    public const CARD_IMAGE_FITS = ['cover', 'contain'];
+
+    public const CARD_HOVERS = ['none', 'lift', 'zoom'];
 
     public const DURATIONS = ['instant', 'fast', 'base', 'slow'];
 
@@ -125,6 +134,12 @@ final class StorefrontGlobalTokensNormalizer
             $out['surfaces'] = $ordered;
         }
 
+        // CUST-HV V9d-1 — البطاقات (`align` · `imageRatio` · `imageFit` · `hover`): تمثيلٌ لبياناتٍ أنتجتها طبقة التجارة، لا تمسّ سعراً ولا مخزوناً.
+        $cards = self::cards($input['cards'] ?? null);
+        if ($cards !== null) {
+            $out['cards'] = $cards;
+        }
+
         $layout = self::pickFields($input['layout'] ?? null, ['contentWidth' => self::CONTENT_WIDTHS]);
         if ($layout !== null) {
             $out['layout'] = $layout;
@@ -139,6 +154,21 @@ final class StorefrontGlobalTokensNormalizer
         }
 
         return $out;
+    }
+
+    /**
+     * رموز البطاقة (V0 §14.1) — مشتركة بين الوثيقة (`cards`) والتجاوز لكل قسم (`design.cards`، V9d-2): قوائم مغلقة فقط.
+     *
+     * @return array<string,int|string>|null
+     */
+    public static function cards(mixed $raw): ?array
+    {
+        return self::pickFields($raw, [
+            'align' => self::CARD_ALIGNS,
+            'imageRatio' => self::CARD_IMAGE_RATIOS,
+            'imageFit' => self::CARD_IMAGE_FITS,
+            'hover' => self::CARD_HOVERS,
+        ]);
     }
 
     /**

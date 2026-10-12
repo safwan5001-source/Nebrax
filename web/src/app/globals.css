@@ -26,6 +26,7 @@
   --primary-foreground: #ffffff;
   --positive: #166534;
   --negative: #b91c1c;
+  --danger-fg: #ffffff;
   --warning: #92400e;
   --flag-saudi: #006c35;
   --flag-mark: #ffffff;
@@ -45,9 +46,17 @@
   --primary-foreground: #0e1014;
   --positive: #16a34a;
   --negative: #f87171;
+  --danger-fg: #0e1014;
   --warning: #d97706;
   --flag-saudi: #006c35;
   --flag-mark: #ffffff;
+}
+
+/* Gate-off dark danger fill. White on #f87171 is 2.77:1; #0e1014 on that fill is 6.88:1.
+   Less specific than html[data-awj-ui="3"].dark .bg-negative.text-white, so v3 keeps
+   --awj-text-inverse. Light mode is untouched. Do not change --negative. */
+.dark .bg-negative.text-white {
+  color: var(--danger-fg);
 }
 
 /*

@@ -19,6 +19,7 @@
  * smuggle an unproven background past the publish gate.
  */
 
+import { type GlobalCards, normalizeGlobalCards } from "./global-tokens";
 import { type MediaRef, normalizeMediaRef } from "./media-ref";
 import { PALETTE_ROLES, type PaletteRole } from "./palette";
 import { isSafeHexColor } from "./tokens";
@@ -78,11 +79,18 @@ export const LAYOUTS = {
   // CUST-HV V9b (V0 §3.4) — benefits: cards in automatic columns is the default (absence); `flat` drops the card frame,
   // `columns-N` fixes the wide-screen column count (phones are always one column, tablets two).
   benefits: ["flat", "columns-2", "columns-3", "columns-4"],
+  // CUST-HV V9d-2 (V0 §14.2) — product shelves: absence = the theme's own form (a grid in Modern, a rail in Market), so both values
+  // are stored. Offers have no rail (no offer carousel exists) and therefore no `layout`.
+  shelf: ["grid", "rail"],
 } as const;
+/** CUST-HV V9d-2 — the wide-screen column count of a product / offer shelf (phones are always two). */
+export const SHELF_COLUMNS = [2, 3, 4] as const;
+export type ShelfColumns = (typeof SHELF_COLUMNS)[number];
 export type HeroLayout = (typeof LAYOUTS.hero)[number];
 export type BannerLayout = (typeof LAYOUTS.banner)[number];
 export type GalleryLayout = (typeof LAYOUTS.gallery)[number];
 export type BenefitsLayout = (typeof LAYOUTS.benefits)[number];
+export type ShelfLayout = (typeof LAYOUTS.shelf)[number];
 
 /** V6c-4 (V0 §6.5, D-13) — hero overlap presets; `none` is the absence of the field and is never stored. */
 export const OVERLAPS = ["none", "sm", "md"] as const;
@@ -171,10 +179,19 @@ export interface SectionDesign {
   /** V6c-3 — the block-axis half of the 3×3 content position (`align` is the inline half). */
   valign?: Align;
   /** V6c-7 — hero: `centered` | `split` | `minimal`; banner: `split` | `text-band`. Absent = the default layout. */
-  layout?: HeroLayout | BannerLayout | GalleryLayout | BenefitsLayout;
+  layout?:
+    | HeroLayout
+    | BannerLayout
+    | GalleryLayout
+    | BenefitsLayout
+    | ShelfLayout;
+  /** CUST-HV V9d-2 — product / offer shelves: the wide-screen column count (2 | 3 | 4). Absent = today's. */
+  columns?: ShelfColumns;
   border?: SectionBorder;
   radius?: (typeof RADII)[number];
   shadow?: (typeof SHADOWS)[number];
+  /** CUST-HV V9d-2 (V0 §14.1) — product / offer shelves: this section's own card tokens, winning over the document's. */
+  cards?: GlobalCards;
   separator?: SectionSeparator;
   /** V6c-4 — hero only: the FOLLOWING section slides up over the hero's bottom edge (≥ md, picture heroes). */
   overlap?: Exclude<(typeof OVERLAPS)[number], "none">;
@@ -189,7 +206,7 @@ export type DesignGroup = keyof SectionDesign;
  * fields the type may use inside it (`true` = the whole group). A section never
  * exposes a group it cannot render.
  */
-type GroupAllowance = true | readonly string[];
+type GroupAllowance = true | readonly (string | number)[];
 export type DesignCapability = Partial<Record<DesignGroup, GroupAllowance>>;
 
 const MEDIA_BACKGROUND = [...BACKGROUND_KINDS, "media"] as const;
@@ -276,6 +293,9 @@ export const SECTION_DESIGN_CAPABILITIES: Record<string, DesignCapability> = {
     typography: ["headingStyle"],
     width: true,
     spacing: true,
+    layout: LAYOUTS.shelf,
+    columns: SHELF_COLUMNS,
+    cards: true,
     separator: true,
   },
   featured: {
@@ -284,6 +304,9 @@ export const SECTION_DESIGN_CAPABILITIES: Record<string, DesignCapability> = {
     typography: ["headingStyle"],
     width: true,
     spacing: true,
+    layout: LAYOUTS.shelf,
+    columns: SHELF_COLUMNS,
+    cards: true,
     separator: true,
   },
   offers: {
@@ -292,6 +315,8 @@ export const SECTION_DESIGN_CAPABILITIES: Record<string, DesignCapability> = {
     typography: ["headingStyle"],
     width: true,
     spacing: true,
+    columns: SHELF_COLUMNS,
+    cards: true,
     separator: true,
   },
   productShelf: {
@@ -300,6 +325,9 @@ export const SECTION_DESIGN_CAPABILITIES: Record<string, DesignCapability> = {
     typography: ["headingStyle"],
     width: true,
     spacing: true,
+    layout: LAYOUTS.shelf,
+    columns: SHELF_COLUMNS,
+    cards: true,
     separator: true,
   },
   discovery: {
@@ -601,7 +629,12 @@ export function normalizeSectionDesign(
         | HeroLayout
         | BannerLayout
         | GalleryLayout
-        | BenefitsLayout;
+        | BenefitsLayout
+        | ShelfLayout;
+  }
+  if (Array.isArray(capability.columns)) {
+    const columns = pick(raw.columns, capability.columns as readonly number[]);
+    if (columns) out.columns = columns as ShelfColumns;
   }
   if (capability.border) {
     const border = normalizeBorder(raw.border);
@@ -614,6 +647,10 @@ export function normalizeSectionDesign(
   if (capability.shadow) {
     const shadow = pick(raw.shadow, SHADOWS);
     if (shadow) out.shadow = shadow;
+  }
+  if (capability.cards) {
+    const cards = normalizeGlobalCards(raw.cards);
+    if (cards) out.cards = cards;
   }
   if (capability.separator) {
     const separator = normalizeSeparator(raw.separator);

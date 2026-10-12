@@ -14,6 +14,10 @@ import {
   GLOBAL_BUTTON_STYLES,
   GLOBAL_BUTTON_TEXT_CASES,
   GLOBAL_BUTTON_TEXT_WEIGHTS,
+  GLOBAL_CARD_ALIGNS,
+  GLOBAL_CARD_HOVERS,
+  GLOBAL_CARD_IMAGE_FITS,
+  GLOBAL_CARD_IMAGE_RATIOS,
   GLOBAL_CONTENT_WIDTHS,
   GLOBAL_DURATIONS,
   GLOBAL_EASINGS,
@@ -69,6 +73,10 @@ const SHADOW: Record<string, CustomizerMessageKey> = {
   medium: "designShadowMedium",
   strong: "designShadowStrong",
 };
+const CARD_ALIGN: Record<string, CustomizerMessageKey> = { start: "gtCardAlignStart", center: "gtCardAlignCenter" };
+const CARD_RATIO: Record<string, CustomizerMessageKey> = { "1:1": "gtCardRatioSquare", "4:3": "gtCardRatioLandscape", "3:4": "gtCardRatioPortrait" };
+const CARD_FIT: Record<string, CustomizerMessageKey> = { cover: "gtCardFitCover", contain: "gtCardFitContain" };
+const CARD_HOVER: Record<string, CustomizerMessageKey> = { none: "gtCardHoverNone", lift: "gtCardHoverLift", zoom: "gtCardHoverZoom" };
 const WIDTH: Record<string, CustomizerMessageKey> = {
   narrow: "designWidthNarrow",
   standard: "designWidthStandard",
@@ -187,8 +195,9 @@ export function GlobalTokensEditor({
   const ty = config.typography;
   const bt = config.buttons;
   const su = config.surfaces;
+  const cd = config.cards;
   const mo = config.motion;
-  const dirty = Boolean(ty || bt || su || config.layout || mo);
+  const dirty = Boolean(ty || bt || su || cd || config.layout || mo);
   const contrastIssue = colours ? buttonContrastIssues(config, colours).length > 0 : false;
 
   return (
@@ -261,6 +270,15 @@ export function GlobalTokensEditor({
         {select("surfaces", "shadow", "designShadow", GLOBAL_SHADOWS, (v) => t(SHADOW[v]), su?.shadow)}
       </fieldset>
 
+      <fieldset className="min-w-0 space-y-4" data-gt-cards="">
+        <legend className="mb-1 text-[12px] font-semibold tracking-wide text-muted">{t("gtCards")}</legend>
+        <p className="text-[12px] leading-5 text-muted">{t("gtCardsNote")}</p>
+        {select("cards", "align", "gtCardAlign", GLOBAL_CARD_ALIGNS, (v) => t(CARD_ALIGN[v]), cd?.align)}
+        {select("cards", "imageRatio", "gtCardImageRatio", GLOBAL_CARD_IMAGE_RATIOS, (v) => t(CARD_RATIO[v]), cd?.imageRatio)}
+        {select("cards", "imageFit", "gtCardImageFit", GLOBAL_CARD_IMAGE_FITS, (v) => t(CARD_FIT[v]), cd?.imageFit)}
+        {select("cards", "hover", "gtCardHover", GLOBAL_CARD_HOVERS, (v) => t(CARD_HOVER[v]), cd?.hover)}
+      </fieldset>
+
       <fieldset className="min-w-0 space-y-4">
         <legend className="mb-1 text-[12px] font-semibold tracking-wide text-muted">{t("gtLayout")}</legend>
         {select("layout", "contentWidth", "gtContentWidth", GLOBAL_CONTENT_WIDTHS, (v) => t(WIDTH[v]), config.layout?.contentWidth)}
@@ -278,7 +296,7 @@ export function GlobalTokensEditor({
         data-gt-reset=""
         disabled={!dirty}
         onClick={() =>
-          patch({ typography: undefined, buttons: undefined, surfaces: undefined, layout: undefined, motion: undefined })
+          patch({ typography: undefined, buttons: undefined, surfaces: undefined, cards: undefined, layout: undefined, motion: undefined })
         }
         className={`${btnClass} disabled:opacity-50`}
       >

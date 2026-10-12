@@ -560,9 +560,52 @@ describe("hero / banner layout variants (CUST-HV V6c-7)", () => {
     fireEvent.change(select(), { target: { value: "text-band" } });
     expect(out()).toEqual({ layout: "text-band" });
     banner.unmount();
-    for (const type of ["categories", "featured"]) {
+    for (const type of ["categories", "offers"]) {
       const view = render(<Harness type={type} />);
       expect(document.querySelector("[data-design-layout]")).toBeNull();
+      view.unmount();
+    }
+  });
+
+  it("product shelves offer grid and rail (both stored: Automatic follows the theme), columns and the card override (CUST-HV V9d-2)", () => {
+    for (const type of ["newArrivals", "featured", "productShelf"]) {
+      const view = render(<Harness type={type} />);
+      expect([...select().options].map((o) => o.value)).toEqual(["", "grid", "rail"]);
+      expect(select().options[0].textContent).toBe(CUSTOMIZER_MESSAGES.en.designLayoutShelfDefault);
+      fireEvent.change(select(), { target: { value: "grid" } });
+      expect(out()).toEqual({ layout: "grid" });
+      fireEvent.change(select(), { target: { value: "" } });
+      expect(out()).toBeNull();
+      view.unmount();
+    }
+  });
+
+  it("columns and per-section card tokens write the canonical form; the default removes the field; offers have columns and cards but no layout", () => {
+    const view = render(<Harness type="newArrivals" />);
+    const columns = () => document.querySelector("[data-design-columns]") as HTMLSelectElement;
+    expect([...columns().options].map((o) => o.value)).toEqual(["", "2", "3", "4"]);
+    fireEvent.change(columns(), { target: { value: "3" } });
+    expect(out()).toEqual({ columns: 3 });
+    const card = (name: string) => document.querySelector(`[data-design-cards-field="${name}"]`) as HTMLSelectElement;
+    fireEvent.change(card("align"), { target: { value: "center" } });
+    fireEvent.change(card("hover"), { target: { value: "lift" } });
+    expect(out()).toEqual({ columns: 3, cards: { align: "center", hover: "lift" } });
+    fireEvent.change(card("align"), { target: { value: "" } });
+    fireEvent.change(card("hover"), { target: { value: "" } });
+    fireEvent.change(columns(), { target: { value: "" } });
+    expect(out()).toBeNull();
+    view.unmount();
+    render(<Harness type="offers" />);
+    expect(document.querySelector("[data-design-layout]")).toBeNull();
+    expect(document.querySelector("[data-design-columns]")).not.toBeNull();
+    expect(document.querySelector("[data-design-cards]")).not.toBeNull();
+  });
+
+  it("types without the groups show neither columns nor the card override", () => {
+    for (const type of ["categories", "benefits", "customContent", "gallery"]) {
+      const view = render(<Harness type={type} />);
+      expect(document.querySelector("[data-design-columns]")).toBeNull();
+      expect(document.querySelector("[data-design-cards]")).toBeNull();
       view.unmount();
     }
   });

@@ -31,6 +31,7 @@ vi.mock("@/components/products/ProductCarousel", () => ({
 async function loadNewArrivals(
   listProducts: ReturnType<typeof vi.fn>,
   themePreset?: "awj-market",
+  shelf: { layout?: "grid" | "rail"; columns?: 2 | 3 | 4 } = {},
 ): Promise<{ element: React.JSX.Element; listProducts: typeof listProducts }> {
   vi.resetModules();
   vi.doMock("next-intl/server", () => ({
@@ -68,6 +69,7 @@ async function loadNewArrivals(
     country: "sa",
     currency: "SAR",
     themePreset,
+    ...shelf,
   });
 
   return { element, listProducts };
@@ -149,5 +151,46 @@ describe("NewArrivals (AWJ catalog)", () => {
     expect(modern.container.querySelector("ul")?.className).toContain(
       "lg:grid-cols-4",
     );
+  });
+
+  it("CUST-HV V9d-2: the section's own layout and columns reach the shelf", async () => {
+    const products = { data: [{ id: "p1" }, { id: "p2" }] };
+    // Modern + an explicit rail ⇒ a carousel; Market + an explicit grid ⇒ a grid
+    const rail = await loadNewArrivals(
+      vi.fn().mockResolvedValue(products),
+      undefined,
+      { layout: "rail" },
+    );
+    expect(
+      render(rail.element).container.querySelector(
+        '[data-testid="product-carousel"]',
+      ),
+    ).not.toBeNull();
+    const grid = await loadNewArrivals(
+      vi.fn().mockResolvedValue(products),
+      "awj-market",
+      { layout: "grid" },
+    );
+    const view = render(grid.element);
+    expect(
+      view.container.querySelector('[data-testid="product-carousel"]'),
+    ).toBeNull();
+    expect(
+      view.container.querySelectorAll('[data-testid="product-card"]'),
+    ).toHaveLength(2);
+    // columns: 2 / 3 / 4 on wide screens, phones always two, absent = today's
+    const cls = async (columns?: 2 | 3 | 4) => {
+      const { element } = await loadNewArrivals(
+        vi.fn().mockResolvedValue(products),
+        undefined,
+        { columns },
+      );
+      return render(element).container.querySelector("ul")?.className ?? "";
+    };
+    expect(await cls()).toContain("grid-cols-2 sm:grid-cols-3 lg:grid-cols-4");
+    expect(await cls(2)).not.toContain("sm:grid-cols-3");
+    expect(await cls(3)).toContain("sm:grid-cols-3");
+    expect(await cls(3)).not.toContain("lg:grid-cols-4");
+    expect(await cls(4)).toContain("lg:grid-cols-4");
   });
 });

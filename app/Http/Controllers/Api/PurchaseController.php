@@ -15,11 +15,12 @@ use App\Models\PurchaseAttachment;
 use App\Models\StockMovement;
 use App\Services\Accounting\PurchaseRelationsService;
 use App\Services\Accounting\PurchaseService;
+use App\Services\AttachmentStorage;
 use App\Services\ClassificationService;
 use App\Support\Money;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class PurchaseController extends ApiController
@@ -28,6 +29,7 @@ class PurchaseController extends ApiController
         protected PurchaseService $purchases,
         protected PurchaseRelationsService $relations,
         protected ClassificationService $classifications,
+        protected AttachmentStorage $attachmentStorage,
     ) {}
 
     public function index(Request $request): JsonResponse
@@ -159,15 +161,10 @@ class PurchaseController extends ApiController
     {
         $purchase = $this->visiblePurchase($request, $id);
         $attachment = $purchase->attachments()->whereKey($attachmentId)->firstOrFail();
-        $disk = Storage::disk($attachment->disk);
 
-        if (! $disk->exists($attachment->path)) {
-            abort(404, 'ملف المرفق غير موجود.');
-        }
-
-        return $disk->download($attachment->path, $attachment->original_name, [
-            'Content-Type' => $attachment->mime_type ?? 'application/octet-stream',
-        ]);
+        return $this->attachmentStorage->download(
+            $attachment->disk, $attachment->path, $attachment->original_name, $attachment->mime_type,
+        );
     }
 
     /** حذف مرفق مسودة فقط، مع تنظيف الملف الخاص من القرص. */
@@ -179,10 +176,10 @@ class PurchaseController extends ApiController
         }
 
         $attachment = $purchase->attachments()->whereKey($attachmentId)->firstOrFail();
-        $disk = $attachment->disk;
-        $path = $attachment->path;
+        $stored = [['disk' => $attachment->disk, 'path' => $attachment->path]];
         $attachment->delete();
-        Storage::disk($disk)->delete($path);
+        // الصف حُذف أولاً؛ فشل حذف الكائن يُسجَّل ولا يُفشل الطلب.
+        $this->attachmentStorage->discard($stored);
 
         return response()->json(['message' => 'تم حذف المرفق.']);
     }
@@ -289,9 +286,7 @@ class PurchaseController extends ApiController
         $attachments = $purchase->attachments()->get();
         $this->domain(fn () => $this->purchases->deleteDraft($purchase));
 
-        foreach ($attachments as $attachment) {
-            Storage::disk($attachment->disk)->delete($attachment->path);
-        }
+        $this->attachmentStorage->discard($attachments->all());
 
         return response()->json(['message' => 'تم الحذف.']);
     }
@@ -317,19 +312,22 @@ class PurchaseController extends ApiController
         ])->all();
     }
 
+    /** كلُّها أو لا شيء: فشل ملف لا يُبقي صفاً ولا كائناً (الأب موجود مسبقاً فلا خطر تكرار). */
     private function persistAttachments(StorePurchaseAttachmentsRequest $request, Purchase $purchase): void
     {
-        foreach ($request->file('attachments', []) as $file) {
-            $path = $file->store("purchases/{$purchase->id}", 'local');
+        $stored = $this->attachmentStorage->putMany(
+            AttachmentStorage::DOMAIN_PURCHASE, (string) $purchase->id, $request->file('attachments', []), "purchases/{$purchase->id}",
+        );
 
-            $purchase->attachments()->create([
-                'disk' => 'local',
-                'path' => $path,
-                'original_name' => $file->getClientOriginalName(),
-                'mime_type' => $file->getMimeType(),
-                'size' => $file->getSize(),
-                'uploaded_by' => $request->user()?->id,
-            ]);
+        try {
+            DB::transaction(function () use ($request, $purchase, $stored): void {
+                foreach ($stored as $file) {
+                    $purchase->attachments()->create($file + ['uploaded_by' => $request->user()?->id]);
+                }
+            });
+        } catch (\Throwable $e) {
+            $this->attachmentStorage->discard($stored);
+            throw $e;
         }
     }
 

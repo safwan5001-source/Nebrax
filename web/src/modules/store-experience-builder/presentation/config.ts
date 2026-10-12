@@ -201,6 +201,8 @@ export interface StorefrontPresentationConfig {
    */
   typography?: GlobalTokensDoc["typography"];
   surfaces?: GlobalTokensDoc["surfaces"];
+  /** CUST-HV V9d-1 — card tokens (V0 §14.1): alignment, image ratio / fit, hover. Absent = today's card. */
+  cards?: GlobalTokensDoc["cards"];
   layout?: GlobalTokensDoc["layout"];
   motion?: GlobalTokensDoc["motion"];
 }

@@ -22,6 +22,7 @@ const propsSeen: Array<Record<string, unknown>> = [];
 async function loadShelf(
   fetchOffers: ReturnType<typeof vi.fn>,
   offerIds: string[] = ["o1"],
+  shelf: { hideTitle?: boolean; columns?: 2 | 3 | 4 } = {},
 ) {
   vi.resetModules();
   vi.doMock("@/components/products/OfferCard", () => ({
@@ -46,6 +47,7 @@ async function loadShelf(
     basePath: "/sa/ar",
     title: "العروض",
     headingId: "offers-s1",
+    ...shelf,
   });
 }
 
@@ -168,5 +170,21 @@ describe("OffersShelf — CUST-H4-7 public read + stored order", () => {
     expect(list.className).toContain("grid-cols-2");
     expect(list.className).toContain("lg:grid-cols-4");
     expect(container.querySelector("li")?.className).toContain("min-w-0");
+  });
+
+  it("CUST-HV V9d-3: a hidden title stays as the accessible name; V9d-2: columns follow the section's choice", async () => {
+    const fetchOffers = vi.fn().mockResolvedValue([offer("o1"), offer("o2")]);
+    const hidden = render(
+      (await loadShelf(fetchOffers, ["o1", "o2"], {
+        hideTitle: true,
+        columns: 2,
+      })) as React.JSX.Element,
+    );
+    const heading = hidden.container.querySelector("h2") as HTMLElement;
+    expect(heading.className).toContain("sr-only");
+    expect(heading.textContent).toBe("العروض");
+    const cls = hidden.container.querySelector("ul")?.className ?? "";
+    expect(cls).toContain("grid-cols-2");
+    expect(cls).not.toContain("sm:grid-cols-3");
   });
 });

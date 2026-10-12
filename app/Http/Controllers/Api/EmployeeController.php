@@ -26,16 +26,18 @@ use App\Models\LeaveRequest;
 use App\Models\LeaveType;
 use App\Models\RequestType;
 use App\Models\Shift;
+use App\Services\AttachmentStorage;
 use App\Tenancy\BranchScope;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class EmployeeController extends ApiController
 {
     private const WITH = ['manager', 'jobTitle', 'department', 'jobLevel', 'employmentType'];
+
+    public function __construct(protected AttachmentStorage $attachmentStorage) {}
 
     public function index(): JsonResponse
     {
@@ -107,29 +109,61 @@ class EmployeeController extends ApiController
     public function destroy(string $id): JsonResponse
     {
         $employee = Employee::findOrFail($id);
-        if ($employee->photo_path) {
-            Storage::disk('local')->delete($employee->photo_path);
-        }
         $attachments = $employee->attachments()->get();
-        $employee->delete();
-        foreach ($attachments as $attachment) {
-            Storage::disk($attachment->disk)->delete($attachment->path);
-        }
+
+        // بياناتٌ شخصية: لا يُترك كائنٌ يتيمٌ لا يجده سردٌ ولا إعادة محاولة (Plan §9.2)، ولا يُمحى ملفٌ
+        // لموظفٍ بقي. لذلك حذف الصفوف ثم محو الكائنات **داخل معاملة واحدة والمحو قبل الـcommit**:
+        // فشل الحذف (قيد مرجعي) لا يمحو شيئاً، وفشل المحو يُرجع الصفوف فيُعاد الطلب
+        // (محو كائنٍ مفقود لا يُعدّ خطأً).
+        DB::transaction(function () use ($employee, $attachments): void {
+            $photo = $employee->photo_path
+                ? ['disk' => $this->photoDisk($employee), 'path' => $employee->photo_path]
+                : null;
+            $employee->delete();
+
+            if ($photo !== null) {
+                $this->attachmentStorage->delete($photo['disk'], $photo['path']);
+            }
+            foreach ($attachments as $attachment) {
+                $this->attachmentStorage->delete($attachment->disk, $attachment->path);
+            }
+        });
 
         return response()->json(['message' => 'تم الحذف.']);
     }
 
-    /** يستبدل صورة الموظف (إن وُجدت سابقاً تُحذف) — لا يمرّ عبر update العادي عمداً. */
+    /** مخزن صورة الموظف من العمود الصريح: `null`/`local` = القرص المحلي القديم (Q13). */
+    private function photoDisk(Employee $employee): string
+    {
+        return $employee->photo_disk ?: 'local';
+    }
+
+    /**
+     * يستبدل صورة الموظف — لا يمرّ عبر update العادي عمداً. الترتيب (يعالج B3): الجديدة تُكتب أولاً،
+     * ثم يُثبَّت المؤشّر، ثم تُحذف القديمة؛ فشل حفظ الجديدة لا يُضيع القديمة.
+     */
     public function uploadPhoto(UploadEmployeePhotoRequest $request, string $id): JsonResponse
     {
         $employee = Employee::findOrFail($id);
+        $old = $employee->photo_path ? ['disk' => $this->photoDisk($employee), 'path' => $employee->photo_path] : null;
 
-        if ($employee->photo_path) {
-            Storage::disk('local')->delete($employee->photo_path);
+        $new = $this->attachmentStorage->put(
+            AttachmentStorage::DOMAIN_EMPLOYEE_PHOTO, (string) $employee->id, $request->file('photo'), "employees/{$employee->id}",
+        );
+
+        try {
+            $employee->photo_path = $new['path'];
+            $employee->photo_disk = $new['disk'];
+            $employee->save();
+        } catch (\Throwable $e) {
+            $this->attachmentStorage->discard([$new]);
+            throw $e;
         }
 
-        $employee->photo_path = $request->file('photo')->store("employees/{$employee->id}", 'local');
-        $employee->save();
+        if ($old !== null) {
+            // الجديدة ثُبّتت؛ فشل محو القديمة يُسجَّل بمفتاح الكائن للتنظيف اليدوي ولا يُفشل الطلب.
+            $this->attachmentStorage->discard([$old]);
+        }
 
         return (new EmployeeResource($employee->load(self::WITH)))->response();
     }
@@ -139,8 +173,10 @@ class EmployeeController extends ApiController
         $employee = Employee::findOrFail($id);
 
         if ($employee->photo_path) {
-            Storage::disk('local')->delete($employee->photo_path);
+            // محو الكائن قبل إزالة المؤشّر (بيانات شخصية) — الفشل يرمي والمؤشّر باقٍ فيُعاد المحاولة.
+            $this->attachmentStorage->delete($this->photoDisk($employee), $employee->photo_path);
             $employee->photo_path = null;
+            $employee->photo_disk = null;
             $employee->save();
         }
 
@@ -151,13 +187,12 @@ class EmployeeController extends ApiController
     public function showPhoto(string $id): StreamedResponse
     {
         $employee = Employee::findOrFail($id);
-        $disk = Storage::disk('local');
 
-        if (! $employee->photo_path || ! $disk->exists($employee->photo_path)) {
+        if (! $employee->photo_path) {
             abort(404, 'لا صورة لهذا الموظف.');
         }
 
-        return $disk->response($employee->photo_path);
+        return $this->attachmentStorage->inlineImage($this->photoDisk($employee), $employee->photo_path);
     }
 
     /** مسوّغات التعيين لهذا الموظف. */
@@ -176,17 +211,21 @@ class EmployeeController extends ApiController
     {
         $employee = Employee::findOrFail($id);
 
-        foreach ($request->file('attachments', []) as $file) {
-            $path = $file->store("employees/{$employee->id}/attachments", 'local');
+        // كلُّها أو لا شيء: فشل ملف لا يُبقي صفاً ولا كائناً.
+        $stored = $this->attachmentStorage->putMany(
+            AttachmentStorage::DOMAIN_EMPLOYEE, (string) $employee->id, $request->file('attachments', []),
+            "employees/{$employee->id}/attachments",
+        );
 
-            $employee->attachments()->create([
-                'disk'          => 'local',
-                'path'          => $path,
-                'original_name' => $file->getClientOriginalName(),
-                'mime_type'     => $file->getMimeType(),
-                'size'          => $file->getSize(),
-                'uploaded_by'   => $request->user()?->id,
-            ]);
+        try {
+            DB::transaction(function () use ($employee, $stored, $request): void {
+                foreach ($stored as $file) {
+                    $employee->attachments()->create($file + ['uploaded_by' => $request->user()?->id]);
+                }
+            });
+        } catch (\Throwable $e) {
+            $this->attachmentStorage->discard($stored);
+            throw $e;
         }
 
         return EmployeeAttachmentResource::collection($employee->attachments()->latest()->get())
@@ -198,25 +237,19 @@ class EmployeeController extends ApiController
     {
         $employee = Employee::findOrFail($id);
         $attachment = $employee->attachments()->whereKey($attachmentId)->firstOrFail();
-        $disk = Storage::disk($attachment->disk);
 
-        if (! $disk->exists($attachment->path)) {
-            abort(404, 'ملف المرفق غير موجود.');
-        }
-
-        return $disk->download($attachment->path, $attachment->original_name, [
-            'Content-Type' => $attachment->mime_type ?? 'application/octet-stream',
-        ]);
+        return $this->attachmentStorage->download(
+            $attachment->disk, $attachment->path, $attachment->original_name, $attachment->mime_type,
+        );
     }
 
     public function destroyAttachment(string $id, string $attachmentId): JsonResponse
     {
         $employee = Employee::findOrFail($id);
         $attachment = $employee->attachments()->whereKey($attachmentId)->firstOrFail();
-        $disk = $attachment->disk;
-        $path = $attachment->path;
+        // بيانات شخصية: محو الكائن قبل الصف؛ الفشل يرمي والصف باقٍ فيُعاد المحاولة.
+        $this->attachmentStorage->delete($attachment->disk, $attachment->path);
         $attachment->delete();
-        Storage::disk($disk)->delete($path);
 
         return response()->json(['message' => 'تم الحذف.']);
     }
