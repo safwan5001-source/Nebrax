@@ -18,7 +18,8 @@ class DocumentsSweepScansCommand extends Command
     {
         $report = $sweeper->sweep((int) $this->option('older-than'), (int) $this->option('limit'), (bool) $this->option('dry-run'));
 
-        $this->line('scanner_ready:  ' . ($report['scanner_ready'] ? 'yes' : 'NO'));
+        $this->line('scanner_ready:     ' . ($report['scanner_ready'] ? 'yes' : 'NO'));
+        $this->line('scanner_reachable: ' . ($report['scanner_reachable'] ? 'yes' : 'NO'));
         foreach (['examined', 'requeued', 'failed_closed', 'failed_runs', 'unattended'] as $key) {
             $this->line(str_pad($key . ':', 16) . $report[$key]);
         }

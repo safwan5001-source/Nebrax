@@ -40,6 +40,7 @@ class DocumentScanSweepTest extends TestCase
         config()->set('document_center.storage.disk', 'local');
         config()->set('queue.default', 'redis');
         Queue::fake();
+        $this->app->bind(DocumentSafetyScanner::class, fn () => $this->eicarAwareScanner());
         $this->png = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', true);
     }
 
@@ -101,6 +102,8 @@ class DocumentScanSweepTest extends TestCase
         $run = DocumentProcessingRun::withoutGlobalScopes()->firstOrFail();
         DB::table('document_processing_runs')->where('id', $run->id)->update(['updated_at' => now('UTC')->subHour(), 'attempt_count' => 1]);
 
+        // المهمة ShouldBeUnique (قفل 900ث): الكنّاس لا يتجاوزه — نمرّر العتبة بتفريغ القفل كما ينقضي إنتاجياً.
+        \Illuminate\Support\Facades\Cache::lock('laravel_unique_job:' . ScanDocumentFile::class . ':document-safety-scan:' . $a['tenant_id'] . ':' . $a['branch_id'] . ':' . $a['file_id'])->forceRelease();
         $this->assertSame(1, $this->sweep()['requeued']);
         Queue::assertPushed(ScanDocumentFile::class, 2);
 
@@ -111,7 +114,7 @@ class DocumentScanSweepTest extends TestCase
         Queue::assertPushed(ScanDocumentFile::class, 2);
         $this->assertSame(DocumentScanStatus::FAILED, DocumentFile::withoutGlobalScopes()->findOrFail($a['file_id'])->scan_status);
         $this->assertSame(DocumentProcessingStatus::FAILED, DocumentProcessingRun::withoutGlobalScopes()->findOrFail($run->id)->status);
-        $this->withToken($a['token'])->getJson("/api/document-files/{$a['file_id']}/download-url")->assertStatus(422);
+        $this->as($a['token'])->getJson("/api/document-files/{$a['file_id']}/download-url")->assertStatus(422);
     }
 
     /** @test */
@@ -146,20 +149,136 @@ class DocumentScanSweepTest extends TestCase
         Queue::assertNothingPushed();
         $this->assertSame(DocumentScanStatus::CLEAN, DocumentFile::withoutGlobalScopes()->findOrFail($clean['file_id'])->scan_status);
         $this->assertSame(DocumentScanStatus::INFECTED, DocumentFile::withoutGlobalScopes()->findOrFail($infected['file_id'])->scan_status);
-        $this->withToken($clean['token'])->getJson("/api/document-files/{$clean['file_id']}/download-url")->assertOk();
-        $this->withToken($infected['token'])->getJson("/api/document-files/{$infected['file_id']}/download-url")->assertStatus(422);
+        $this->as($clean['token'])->getJson("/api/document-files/{$clean['file_id']}/download-url")->assertOk();
+        $this->as($infected['token'])->getJson("/api/document-files/{$infected['file_id']}/download-url")->assertStatus(422);
         // لا كشف عابر للمستأجرين: B لا يرى ملف A ولا حالته.
-        $this->withToken($infected['token'])->getJson("/api/document-files/{$clean['file_id']}/download-url")->assertNotFound();
-        $this->withToken($clean['token'])->getJson("/api/document-files/{$infected['file_id']}/download-url")->assertNotFound();
+        $this->as($infected['token'])->getJson("/api/document-files/{$clean['file_id']}/download-url")->assertNotFound();
+        $this->as($clean['token'])->getJson("/api/document-files/{$infected['file_id']}/download-url")->assertNotFound();
     }
 
-    /** @return array{scanner_ready:bool,examined:int,requeued:int,failed_closed:int,failed_runs:int,unattended:int,dry_run:bool} */
+
+    /** @test */
+    public function an_unreachable_scanner_never_burns_the_attempt_budget_and_alerts(): void
+    {
+        $a = $this->tenantWithPendingFile('sw-h');
+        $this->configureScanner();
+        $this->sweep();
+        $run = DocumentProcessingRun::withoutGlobalScopes()->firstOrFail();
+        DB::table('document_processing_runs')->where('id', $run->id)->update(['updated_at' => now('UTC')->subHour(), 'attempt_count' => 2]);
+        $this->app->bind(DocumentSafetyScanner::class, fn () => $this->throwingScanner());
+        Queue::fake();
+
+        $report = $this->sweep();
+
+        $this->assertTrue($report['scanner_ready']);
+        $this->assertFalse($report['scanner_reachable']);
+        $this->assertSame(1, $report['unattended']);
+        $this->assertSame(0, $report['requeued']);
+        Queue::assertNothingPushed();
+        $this->assertSame(2, DocumentProcessingRun::withoutGlobalScopes()->findOrFail($run->id)->attempt_count);
+        $this->assertSame(DocumentScanStatus::PENDING, DocumentFile::withoutGlobalScopes()->findOrFail($a['file_id'])->scan_status);
+    }
+
+    /** @test */
+    public function scanner_error_or_timeout_in_sync_mode_fails_closed_and_blocks_download(): void
+    {
+        $a = $this->tenantWithPendingFile('sw-i');
+        $this->configureScanner(syncMode: true);
+        $this->app->bind(DocumentSafetyScanner::class, fn () => $this->throwingScanner(scanFails: true));
+
+        $report = $this->sweep();
+
+        $this->assertSame(1, $report['requeued']);
+        $this->assertSame(DocumentScanStatus::FAILED, DocumentFile::withoutGlobalScopes()->findOrFail($a['file_id'])->scan_status);
+        $run = DocumentProcessingRun::withoutGlobalScopes()->firstOrFail();
+        $this->assertSame(DocumentProcessingStatus::FAILED, $run->status);
+        $this->as($a['token'])->getJson("/api/document-files/{$a['file_id']}/download-url")->assertStatus(422);
+
+        // التشغيل الفاشل لا يُعاد تلقائياً: يُعدّ ويُنبَّه عنه فقط (إعادته قرار بشري عبر retry).
+        $this->assertSame(0, DocumentFile::withoutGlobalScopes()->where('scan_status', 'pending')->count());
+    }
+
+    /** @test */
+    public function sweeping_twice_never_creates_a_duplicate_scan_run_or_second_job(): void
+    {
+        $this->tenantWithPendingFile('sw-j');
+        $this->configureScanner();
+
+        $this->sweep();
+        $second = $this->sweep();
+
+        $this->assertSame(1, DocumentProcessingRun::withoutGlobalScopes()->count());
+        Queue::assertPushed(ScanDocumentFile::class, 1);
+        $this->assertSame(0, $second['requeued']);
+    }
+
+    /** @test */
+    public function the_alert_log_carries_counts_only_never_tenant_or_file_identifiers(): void
+    {
+        $a = $this->tenantWithPendingFile('sw-k');
+        $this->configureScanner();
+        $this->app->bind(DocumentSafetyScanner::class, fn () => $this->throwingScanner());
+        $logged = [];
+        \Illuminate\Support\Facades\Log::shouldReceive('error')->andReturnUsing(function ($message, $context = []) use (&$logged) {
+            $logged[] = [$message, $context];
+        });
+        \Illuminate\Support\Facades\Log::shouldReceive('warning')->andReturnUsing(function ($message, $context = []) use (&$logged) {
+            $logged[] = [$message, $context];
+        });
+
+        $this->sweep();
+
+        $this->assertNotEmpty($logged);
+        $dump = json_encode($logged);
+        $this->assertStringNotContainsString($a['tenant_id'], $dump);
+        $this->assertStringNotContainsString($a['file_id'], $dump);
+        $this->assertStringNotContainsString('clamav.internal', $dump);
+    }
+
+    private function throwingScanner(bool $scanFails = false): DocumentSafetyScanner
+    {
+        return new class($scanFails) implements DocumentSafetyScanner
+        {
+            public function __construct(private readonly bool $scanFails)
+            {
+            }
+
+            public function scan($stream): DocumentScanStatus
+            {
+                throw new \RuntimeException('Malware scanner connection timed out.');
+            }
+
+            public function ping(): bool
+            {
+                if ($this->scanFails) {
+                    return true;
+                }
+                throw new \RuntimeException('Malware scanner is unavailable.');
+            }
+
+            public function providerName(): string
+            {
+                return 'test-throwing-scanner';
+            }
+        };
+    }
+
+    /** @return array{scanner_ready:bool,scanner_reachable:bool,examined:int,requeued:int,failed_closed:int,failed_runs:int,unattended:int,dry_run:bool} */
     private function sweep(bool $dryRun = false): array
     {
         app(TenantContext::class)->forget();
         app(BranchContext::class)->forget();
 
         return app(\App\Services\DocumentCenter\DocumentScanSweepService::class)->sweep(15, 100, $dryRun);
+    }
+
+    /** كل طلب إنتاجي يبدأ بسياق فارغ؛ الاختبار يتقاسم حاوية واحدة فنمسح ما خلّفه الطلب السابق. */
+    private function as(string $token): static
+    {
+        app(TenantContext::class)->forget();
+        app(BranchContext::class)->forget();
+
+        return $this->withToken($token);
     }
 
     private function eicar(): string
@@ -235,13 +354,13 @@ class DocumentScanSweepTest extends TestCase
 
         app(TenantContext::class)->forget();
         app(BranchContext::class)->forget();
-        $batch = $this->withToken($auth['token'])->postJson('/api/document-batches', ['document_type' => 'purchase_invoice'])->assertCreated()->json('data.id');
-        $fileId = $this->withToken($auth['token'])->post("/api/document-batches/{$batch}/files", [
+        $batch = $this->as($auth['token'])->postJson('/api/document-batches', ['document_type' => 'purchase_invoice'])->assertCreated()->json('data.id');
+        $fileId = $this->as($auth['token'])->post("/api/document-batches/{$batch}/files", [
             'file' => UploadedFile::fake()->createWithContent('sweep.png', $content ?? $this->png),
         ], ['Accept' => 'application/json'])->assertCreated()->json('data.id');
         app(TenantContext::class)->forget();
         app(BranchContext::class)->forget();
-        $this->withToken($auth['token'])->postJson("/api/document-batches/{$batch}/complete")->assertOk();
+        $this->as($auth['token'])->postJson("/api/document-batches/{$batch}/complete")->assertOk();
 
         DB::table('document_files')->where('id', $fileId)->update(['created_at' => now('UTC')->subMinutes($ageMinutes)]);
 

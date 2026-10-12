@@ -2,6 +2,7 @@
 
 namespace App\Services\DocumentCenter;
 
+use App\Contracts\DocumentSafetyScanner;
 use App\Models\DocumentFile;
 use App\Models\DocumentProcessingRun;
 use App\Services\PlatformIntegrationResolver;
@@ -28,18 +29,20 @@ final class DocumentScanSweepService
     public function __construct(
         private readonly PlatformIntegrationResolver $settings,
         private readonly DocumentProcessingService $processing,
+        private readonly DocumentSafetyScanner $scanner,
         private readonly TenantContext $tenant,
         private readonly BranchContext $branch,
     ) {
     }
 
     /**
-     * @return array{scanner_ready:bool,examined:int,requeued:int,failed_closed:int,failed_runs:int,unattended:int,dry_run:bool}
+     * @return array{scanner_ready:bool,scanner_reachable:bool,examined:int,requeued:int,failed_closed:int,failed_runs:int,unattended:int,dry_run:bool}
      */
     public function sweep(int $olderThanMinutes = 15, int $limit = 100, bool $dryRun = false): array
     {
         $report = [
             'scanner_ready' => $this->scannerReady(),
+            'scanner_reachable' => false,
             'examined' => 0,
             'requeued' => 0,
             'failed_closed' => 0,
@@ -47,6 +50,9 @@ final class DocumentScanSweepService
             'unattended' => 0,
             'dry_run' => $dryRun,
         ];
+
+        // لا نُحرق ميزانية محاولات الملفات بينما الفاحص نفسه معطّل: نتحقق أولاً ونُنبّه.
+        $report['scanner_reachable'] = $report['scanner_ready'] && $this->reachable();
 
         $cutoff = now('UTC')->subMinutes(max(1, $olderThanMinutes));
         $files = DocumentFile::withoutGlobalScopes()
@@ -59,7 +65,7 @@ final class DocumentScanSweepService
 
         foreach ($files as $stub) {
             $report['examined']++;
-            if (! $report['scanner_ready']) {
+            if (! $report['scanner_ready'] || ! $report['scanner_reachable']) {
                 $report['unattended']++;
                 continue;
             }
@@ -111,11 +117,23 @@ final class DocumentScanSweepService
             }
         }
 
+        if (! $dryRun && $report['scanner_ready'] && ! $report['scanner_reachable']) {
+            Log::error('document_scanner_unreachable', ['pending_examined' => $report['examined']]);
+        }
         if (! $dryRun && ($report['failed_closed'] > 0 || $report['failed_runs'] > 0 || $report['unattended'] > 0)) {
             Log::warning('document_scan_stuck', $report);
         }
 
         return $report;
+    }
+
+    private function reachable(): bool
+    {
+        try {
+            return $this->scanner->ping();
+        } catch (Throwable) {
+            return false;
+        }
     }
 
     private function scannerReady(): bool
