@@ -1,7 +1,7 @@
 # AWJ Horizon Autonomy V2 — V2-0 Initial Repository Evidence Audit
 
 **Date:** 2026-10-11  
-**Status:** PARTIAL / read-only repository inventory; not a conclusive inventory of live agent sessions.  
+**Status:** PARTIAL / read-only repository inventory; not a conclusive inventory of live agent sessions. **Aligned with `main` on 2026-10-12 — see §7 (PR/horizon status corrections and closed gaps).**  
 **Base:** source docs read from repository default branch on this date.  
 **Boundaries:** no change to existing protocol/permissions, other horizon branches, merges, or production.
 
@@ -14,7 +14,7 @@
 - `docs/autonomous-engineering/CURRENT-STATE.md`
 - `docs/autonomous-engineering/TASK-QUEUE.md`
 - GitHub open-PR search and branch-name search.
-- Verified PR #1324 appears merged, not open, in GitHub PR searches.
+- Verified PR #1324 appears merged, not open, in GitHub PR searches (`21fed64`).
 
 ## 2. Material findings
 
@@ -24,11 +24,11 @@
 ### Active vs paused vs open but unverified
 - TAX-ZATCA: the recorded active horizon after PR #1324 activation merge. Its first recorded task is **TAX-HZ-00 read-only Evidence/Decision Pass**, not automatic remediation, posting, credentials, production integration or release.
 - Delivery Platforms & Settlement V1: explicitly **PAUSED**, not deleted or closed. Preserve its gates/handoffs, no task selection while paused.
-- PR #1326: `AWJ-HORIZON-MEDIA-STORAGE S1`; **open PR** evidence of work, not proof of a currently running agent.
-- PR #1329: `CUST-HV V9d-1`; **open PR**, potential Customizer horizon overlap.
-- PR #1328: `H1-CONTRAST`; **open PR**, platform UX work.
-- PR #1327: this proposal; **draft open PR**.
-- Other open documentary/feature PRs include Growth Foundation #1128, Cloudflare #1093, Customizer #1089 and others. These may be paused, historical, or active; **do not infer runtime status** from age or presence.
+- PR #1326: `AWJ-HORIZON-MEDIA-STORAGE S1`; ~~open PR~~ **MERGED** (`981663a`) — merge is evidence of past work, not proof of a currently running agent. *(corrected 2026-10-12)*
+- PR #1329: `CUST-HV V9d-1`; ~~open PR~~ **MERGED** (`b35017b`); Customizer work continues in later slices (V9d-2/3 merged). *(corrected 2026-10-12)*
+- PR #1328: `H1-CONTRAST`; ~~open PR~~ **MERGED** (`bda4468`), platform UX work. *(corrected 2026-10-12)*
+- PR #1327: this proposal; **draft open PR** (docs only).
+- Other open documentary/feature PRs include Growth Foundation #1128, Cloudflare #1093, Customizer #1089 (CUST-H1-3, base ≈1100 commits behind `main`, last updated 2026-09-28 — likely superseded, owner decision pending) and others. These may be paused, historical, or active; **do not infer runtime status** from age or presence.
 - Branch-name search finds numerous `docs/*horizon*` and `claude/*horizon*` names; names alone are not active-session confirmation.
 
 ### Concurrency risk
@@ -65,7 +65,7 @@ Existing Horizon already specifies evidence, Researcher/Architect, scoped planni
 
 ## 6. Targeted PR changed-path matrix (verified 2026-10-11)
 
-GitHub changed-file listing was checked for PRs #1326, #1328, #1329, #1327, #1089. **No identical changed filenames among these five PRs**; this does not prove semantic independence, absence of merge conflicts on a later main, or current agent activity.
+GitHub changed-file listing was checked for PRs #1326, #1328, #1329, #1327, #1089 (at that time #1326/#1328/#1329 were open; all three are now merged — see §7). **No identical changed filenames among these five PRs**; this does not prove semantic independence, absence of merge conflicts on a later main, or current agent activity.
 
 | PR | Primary touched areas | Integration / risk observations |
 |---|---|---|
@@ -75,7 +75,7 @@ GitHub changed-file listing was checked for PRs #1326, #1328, #1329, #1327, #108
 | #1327 V2 docs | Two `docs/autonomous-engineering` docs only | No runtime code or authorization change; doc-review and consistency checks. |
 | #1089 Store Publishing | Laravel commerce presentation controller, service, request, routes and tests | Open historical PR; may affect publishing APIs/versions and Customizer semantics. Verify current applicability/staleness before any action. |
 
-### Branch protection / rulesets / identity — NOT YET VERIFIED
+### Branch protection / rulesets / identity — NOT VERIFIED AT THE TIME (since partly closed, see §7)
 
 The currently exposed GitHub connector actions include changed-file listing, compare and CI status retrieval, but **do not expose read-only branch-protection or repository-ruleset inspection**. Thus no claims are made about required reviewers, bypass actors, automatic merge availability, merge queue, workflow trust or current GitHub token privileges. These must be checked using a suitably authorized read-only GitHub CLI/API session (or owner screenshots/settings), without changing settings, before choosing a concurrency/merge mechanism.
 
@@ -87,3 +87,31 @@ Do **not** substitute an observed green check or the existence of a merge tool f
 2. Sample current PR head/base SHAs and exact-head workflow evidence for pilot candidates.
 3. Semantic conflict review on finance/tenant/API (especially #1326 vs TAX and Delivery) and Customizer/publishing (especially #1329 vs #1089).
 4. Build a registry with **verified** horizon state, activity unknown markers and assigned branch ownership; begin as report only, not a lock implementation.
+
+## 7. Alignment update — 2026-10-12 (sections 1–6 above remain a dated historical record)
+
+**Sources:** merged reports on `main` — #1331 (V2-0B governance audit, `2080abe`), #1334 (V2-1A CI Gate, `1be3735`), #1341 (CI Gate deadline fix + post-merge readiness, `af24b1f`) — and live GitHub PR state.
+
+### 7.1 PR status as per GitHub (verified 2026-10-12)
+
+| PR | Subject | State | Merge SHA |
+|---|---|---|---|
+| #1324 | TAX-ZATCA Horizon bootstrap | Merged | `21fed64` |
+| #1326 | Media Storage S1 | Merged | `981663a` |
+| #1328 | Platform H1-CONTRAST | Merged | `bda4468` |
+| #1329 | CUST-HV V9d-1 | Merged | `b35017b` |
+| #1330 | Media Storage tracker (production evidence) | Merged | `64c0d1e` |
+| #1331 | V2-0B governance audit | Merged | `2080abe` |
+| #1334 | V2-1A CI Gate (informational) | Merged | `1be3735` |
+| #1341 | CI Gate deadline 120 min + readiness report | Merged | `af24b1f` |
+| #1327 | This proposal + V2-0 audit | Open, draft | — |
+| #1089 | CUST-H1-3 theme version publishing | Open, stale (base `019f2ad`, updated 2026-09-28) | — |
+
+### 7.2 Gaps from §"Limitations" that are now (partly) closed
+- **Branch protection / rulesets:** read via REST in #1331/#1341 — `main` is `protected:false`, `GET /rulesets` = `[]`. No Required checks, no Required reviews. (Authenticated read of Actions/Merge Queue/collaborator settings is still incomplete.)
+- **Single identity:** every PR and commit is authored by `safwan5001-source`; GitHub cannot enforce an "independent reviewer".
+- **CI usable as a gate:** `CI Gate` (`.github/workflows/ci-gate.yml`, manifest `.github/ci-gate/required-checks.json`) exists on `main` in **informational mode**. It is the **candidate** future Required Check; it is **not** required today and nothing in `main` enforces it.
+- **Merge-authority conflict (P1):** unchanged — still requires an owner decision (D2); no grant exists.
+
+### 7.3 Still open
+Concurrency/lease registry (report-only), live CI Gate observation for web/storefront/mobile PRs, re-run of the gate after `main` moves, and the owner decisions D1–D7 (#1331) and P1–P5 (#1341). No protection/ruleset/auto-merge has been enabled by this PR.

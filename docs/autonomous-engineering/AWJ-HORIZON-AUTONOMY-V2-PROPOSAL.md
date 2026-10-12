@@ -3,7 +3,8 @@
 Status: **PROPOSED — NOT ACTIVE**  
 Date: 2026-10-11  
 Owner: Safwan  
-Scope: improvement of existing AWJ Autonomous Engineering Horizon, **not** a replacement.
+Scope: improvement of existing AWJ Autonomous Engineering Horizon, **not** a replacement.  
+Aligned with `main` on: 2026-10-12 (see §14). **Merging this document is documentation only — it is NOT a grant of automatic merge, deploy, ruleset or Auto-Merge activation.**
 
 ## 0. Baseline and precedence
 
@@ -47,6 +48,7 @@ A grant must be an explicit, dated, durable record with all fields below:
 - authorized tool/agent and maximum duration or expiry;
 - mandatory quality gates and branch protection compliance;
 - handling of conflicts, incidents and revocation;
+- the required check set (see §7: `CI Gate` is the candidate; not yet required);
 - confirmation that **production deploy remains separately owner-gated**.
 
 Per PR, agent must establish that the grant still applies **and is not expired or revoked**; record the grant ID in the PR; record exact reviewed Head SHA, passing required checks, review findings, PRE_MERGE_REVIEW: PASS; perform merge with expected-head guard only if branch protections and all mandatory reviews permit. No self-approval used to circumvent required independent reviewer controls.
@@ -102,7 +104,7 @@ Packet: decision ID, blocker, evidence, options, costs/risks, recommended option
 - Implementer review, independent-style Reviewer, AWJ Guardian with explicit threat/tenant/accounting impact statement.
 - Focused tests then risk-based broader verification; never downgrade finance/security/tenant tests to reduce costs.
 - Validate real browser behavior for UI assertions where required; source-level CSS simulation is not live app proof.
-- Observe required CI on exact final Head SHA, review complete diff, check credentials and unrelated changes.
+- Observe required CI on exact final Head SHA (today: the existing `php artisan test` jobs plus the informational `CI Gate`; once a ruleset is activated by the owner, `CI Gate` is the single candidate Required Check — see §14.2), review complete diff, check credentials and unrelated changes.
 - Enforce protected branch policy, actual approvals, mergeability, no unresolved findings.
 - Record `PRE_MERGE_REVIEW: PASS` **only on exact reviewed SHA** and after all gates.
 - If authorized, merge with expected-head protection, record Merge SHA, independently confirm merged and post-merge checks; record `POST_MERGE_REVIEW: PASS` only with evidence.
@@ -121,7 +123,7 @@ Avoid repeated broad repo scans, unrelated CI polling, expensive agent escalatio
 
 ## 9. Suggested pilot: platform console H1
 
-Pilot only in **low-risk self-contained slices** after the current H1-CONTRAST PR is properly reviewed and merged under currently applicable owner authorization; then H1-2 and other UI slices. Do not fold H1 changes into this docs PR.
+Pilot only in **low-risk self-contained slices**. The precondition on H1-CONTRAST is satisfied (#1328 merged as `bda4468` under owner authorization); candidate next slices are H1-2 and other isolated UI slices, subject to the owner's pilot grant. Do not fold H1 changes into this docs PR.
 
 Measure:
 - correct automatic next-task selection and handoff quality;
@@ -139,8 +141,8 @@ Simulate or dry-run grant validation **without performing automatic merge** unti
 
 | Stage | Outcome | Gate |
 |---|---|---|
-| V2-0 | evidence audit of all current protocol files, branch protections and execution environment | docs only |
-| V2-1 | finalize authority model, grant schema, threat model, policy conflicts | owner Decision Gate |
+| V2-0 | evidence audit of all current protocol files, branch protections and execution environment | docs only — V2-0 (this PR, partial) and V2-0B (#1331, merged) done |
+| V2-1 | finalize authority model, grant schema, threat model, policy conflicts | owner Decision Gate — **V2-1A CI Gate (#1334, #1341) merged in informational mode; V2-1B NOT started** |
 | V2-2 | update official protocol, quality gates, escalation docs and Claude bootstrap consistently | independent PR review |
 | V2-3 | pilot durable checkpoints and no-merge dry-run orchestrator | tests and safety review |
 | V2-4 | authorized low-risk automatic merges in pilot only | **separate explicit activation / grant** |
@@ -150,7 +152,7 @@ Simulate or dry-run grant validation **without performing automatic merge** unti
 
 - Protocol has a single unambiguous source for active merge authority.
 - Explicit grant validation, expiration/revocation, exact SHA and audit evidence work in tests.
-- CI/review/branch protection cannot be bypassed.
+- CI/review/branch protection cannot be bypassed **within the limits recorded in §14.3 (S12/S13)**: a gate running inside the PR's own workflow does not by itself close those two paths without protected gate files and an independent reviewer.
 - Successful interruption recovery demonstrated; repeated actions are idempotent.
 - Decision gates stop risky actions; independent tasks may continue safely.
 - Production remains separately gated.
@@ -185,3 +187,36 @@ On conflict, prefer safe independent tasks, smaller PRs or sequencing; escalate 
 ### V2-0 evidence additions
 
 Inventory currently active horizons using current PRs, branches, implementation reports, task queues and verified operator information where available; explicitly mark unknown/unverifiable sessions. Capture branch protection and concurrency capabilities/limitations and produce a **non-disruption impact assessment**. No registry, automation, lease, merge or protocol switch is implemented by this documentation PR.
+
+## 14. Alignment with `main` (2026-10-12) — corrections and merged V2 results
+
+Historical text above stays as the original proposal; this section is authoritative where it differs.
+
+### 14.1 Merged V2 work and corrected PR/horizon facts
+| Item | Status (GitHub, verified 2026-10-12) |
+|---|---|
+| #1331 V2-0B governance audit | Merged `2080abe` |
+| #1334 V2-1A CI Gate (informational) | Merged `1be3735` |
+| #1341 CI Gate deadline 120 min + readiness report | Merged `af24b1f` |
+| #1326 Media Storage S1 · #1328 H1-CONTRAST · #1329 CUST-HV V9d-1 | All **merged** (`981663a`, `bda4468`, `b35017b`) — earlier mentions of them as open are superseded |
+| #1089 CUST-H1-3 | Open but stale (base ≈1100 commits behind); likely superseded; owner decision pending |
+| `main` protection | `protected:false`, rulesets `[]` — **nothing is enforced yet** |
+
+Horizon states in the V2-0 audit are not runtime proof; verify against current PRs/handoffs before relying on them.
+
+### 14.2 CI Gate: candidate Required Check, currently informational
+`CI Gate` (workflow `ci-gate.yml`, manifest `.github/ci-gate/required-checks.json`, evaluator `scripts/ci-gate/ci_gate.py`) aggregates the path-filtered CI jobs into one stable check name. It is the **candidate** to become the single Required Check in a future owner-activated ruleset. **Today it is informational: no ruleset, Required check or Auto-Merge is enabled, and this document does not enable them.** Activation preconditions are listed in the V2-1A post-merge readiness report (§8): live PASS on web/storefront PRs, decision on "require up to date", decision D5, and a rollback drill. Until then, "required checks" in this proposal means the checks the owner confirms per PR.
+
+### 14.3 Residual risks S12 / S13 — gate files need protection and independent review
+Per the V2-1A readiness report §4:
+- **S12** — a PR can hollow out a test step (e.g. replace `npm run build` with `echo skip`) and still satisfy the gate, because step contents of unprotected workflows come from the PR.
+- **S13** — a PR can edit `ci-gate.yml` itself (e.g. replace the gate step with `echo`).
+- S14 (editing `ci_gate.py`) has no practical effect because the governing script runs from trusted `main`, but baseline validation does not flag it.
+
+Gate code running inside the PR cannot close S12/S13. Closing them needs **(a)** protection of `.github/**` and `scripts/ci-gate/**` (CODEOWNERS plus an **independent** reviewer — impossible while every commit/PR uses one GitHub identity, #1331 A6/G3), or **(b)** sourcing the workflow from the base branch (`pull_request_target` + manual commit status, which the docs warn against for PR code). This is owner decision D5/P4 and is **not implemented**. Consequently any future merge grant MUST: exclude PRs touching gate/CI files from Zone A/B autonomous merge (treat as Zone C), and must not claim "CI cannot be bypassed" before D5 is resolved.
+
+### 14.4 Parallel horizons and branch hygiene
+Per-horizon branch ownership remains: no horizon writes to another's branch or task files. This PR touches only the two V2 docs in `docs/autonomous-engineering/`. It updates from `main` by merge commit (no rebase, no force-push, no history rewrite).
+
+### 14.5 Unchanged authority
+Zones A/B/C and P are unchanged. Zone C and production (deploy, release, production config/data) stay under explicit owner approval, and merging this document confers no merge authority. V2-1B is not started.
