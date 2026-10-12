@@ -26,7 +26,7 @@ Product code: `web/src/app/platform/(console)/tenants/page.tsx`, plus two additi
 - **Mobile cards** (below 768px, through the existing `mobileRecord` prop of `DataTable`): name link first (44px, wraps, `dir="auto"`), then account number and slug, users count, status and plan badges, trial date or "No trial", then a detail block with owner name, support number, owner email and phone as LTR values. Nothing the table shows is dropped.
 - **Desktop and tablet table:** unchanged component. Plan and status are now the 2nd and 3rd columns (they were 7th and 8th), so the most important state is not pushed out of view by the table's contained horizontal scroll. Email, phone and trial date are `dir="ltr"`.
 - **Messages:** 10 new keys in `platformTenants` (ar and en).
-- **`DataTable` additive props:** `searchLabel` (defaults to the placeholder, which is the spec's rule) and `exportLabel` (when absent, the button keeps its previous title and has no `aria-label`). No other behaviour changed.
+- **`DataTable` additive props:** `searchLabel` (defaults to the placeholder, which is the spec's rule), `exportLabel` (when absent, the button keeps its previous title and has no `aria-label`) and `exportColumnOrder` (see "Review correction"). No other behaviour changed.
 - **Docs:** H1-3 report corrected to MERGED (PR #1358, `b97b19dd28818fbf9e84dfcc037602d56486fe33`, CI and pre-merge review recorded); horizon status updated; this report.
 
 ## Not done, deliberately
@@ -40,9 +40,9 @@ Product code: `web/src/app/platform/(console)/tenants/page.tsx`, plus two additi
 ## Files changed
 
 - `web/src/app/platform/(console)/tenants/page.tsx`
-- `web/src/app/platform/(console)/tenants/tenants-ux.test.tsx` (new, 9 tests)
+- `web/src/app/platform/(console)/tenants/tenants-ux.test.tsx` (new, 10 tests)
 - `web/src/app/platform/(console)/tenants/tenants-pagination.test.tsx` (3 assertions updated, see below)
-- `web/src/components/data-table.tsx` (two optional props) and `web/src/components/data-table.test.tsx` (+2 tests)
+- `web/src/components/data-table.tsx` (three optional props) and `web/src/components/data-table.test.tsx` (+4 tests)
 - `web/src/messages/ar.json`, `web/src/messages/en.json` (+10 keys each)
 - `docs/plans/platform/AWJ-PLATFORM-UX-H1-4A-TENANTS-REPORT.md` (new)
 - `docs/plans/platform/AWJ-PLATFORM-UX-H1-3-DASHBOARD-REPORT.md`, `AWJ-PLATFORM-UX-H1.md` (status/closure only)
@@ -55,13 +55,13 @@ All nine still pass and all behavioural assertions are unchanged (page and `per_
 
 | Command | Result |
 |---|---|
-| `npx vitest run src/components/platform src/app/platform src/design src/components/data-table.test.tsx` | 18 files, 208 tests passed |
-| `npm test` (full web suite) | 501 files, 5270 tests passed |
+| `npx vitest run src/components/platform src/app/platform src/design src/components/data-table.test.tsx` | 18 files, 211 tests passed (after the CSV correction) |
+| `npm test` (full web suite) | 501 files, 5273 tests passed (after the CSV correction) |
 | `npm run build` | passed; all 7 `/platform*` routes build, URLs unchanged |
 | `npx tsc --noEmit` | 48 errors, same count as `main`; none in the tenants page, its tests or `data-table` |
 | ESLint | not run: the repo has no ESLint config |
 
-New tenants tests (9, jsdom, real `DataTable` and real `ar.json`/`en.json`): no links in the header, Refresh label and height; scope text, count line, export and search names; filters change only the shown count, warn, and make no request; **CSV contains only the filtered rows of the loaded page**; the three empty cases and Clear filters; error keeps the global controls and Retry reloads the same page; mobile cards keep every field in the required order with LTR values and a 44px link, and placeholders for a tenant without contact or trial; Arabic render; message keys in both locales. Search, pagination, filters, export and actions are covered together with the nine retained H1-PAGINATION tests and the two reference-number tests. The page has no row actions beyond the name link, so "actions" means that link, Refresh, Retry and Clear filters.
+New tenants tests (10, jsdom, real `DataTable` and real `ar.json`/`en.json`): no links in the header, Refresh label and height; scope text, count line, export and search names; filters change only the shown count, warn, and make no request; **CSV contains only the filtered rows of the loaded page**; **CSV header and value order are the pre-reorder order**; the three empty cases and Clear filters; error keeps the global controls and Retry reloads the same page; mobile cards keep every field in the required order with LTR values and a 44px link, and placeholders for a tenant without contact or trial; Arabic render; message keys in both locales. Search, pagination, filters, export and actions are covered together with the nine retained H1-PAGINATION tests and the two reference-number tests. The page has no row actions beyond the name link, so "actions" means that link, Refresh, Retry and Clear filters.
 
 Real browser (Playwright-core and Chromium, Next dev server, demo mode; **the `/platform/tenants` API response was intercepted with a 25-row fixture** and the other API calls returned 503, because no Laravel API ran). Ad-hoc probes, not committed and not run by CI.
 
@@ -80,6 +80,16 @@ The fixture used a 60-character Arabic name, a long slug and 55-character emails
 - **Names and targets:** search box, CSV button, filter group, Refresh and Retry all have accessible names; new controls are at least 44px.
 - **Not verified:** landscape, zoom and text scaling, screen readers, and a real authenticated session against the API (rows came from the fixture). H1-5 owns those. Plan/status filters were not exercised against empty-result keyboard flows beyond the unit tests.
 
+## Review correction: CSV column order (P1)
+
+Finding: moving plan and status up in the table also moved them in the exported CSV, because `DataTable.exportCsv` follows the current column order. That is a backward-compatibility break for anyone parsing the export by position.
+
+Fix, smallest form:
+- `DataTable` gets one optional prop `exportColumnOrder?: string[]` (column ids). When absent, `exportCsv` is byte-for-byte what it was, so no other table changes. When present, the export columns are stably sorted by that list; unlisted columns follow in display order. Only the order is affected: header text, cell values, filtered row set and file name are untouched.
+- The tenants page passes the order it shipped with in H1-PAGINATION: `name, account_number, support_number, contactName, contactEmail, contactPhone, plan, is_active, trial_ends_at, users_count`. The on-screen table keeps plan and status in columns 2 and 3.
+
+Regression tests: the tenants test asserts the exact header row (Organization, Account number, Support number, Owner name, Owner email, Phone number, Plan, Status, Trial ends, Users) and the exact value rows for a full tenant and a tenant without contact or trial (`Free Co,1000001,2000002,Owner One,owner@example.com,+966500000000,free,true,2026-12-31,7` and `Pro Co,1000001,2000002,,,,pro,false,,7`), and that the on-screen headers start `Organization, Plan, Status`. I confirmed the test fails without the prop (the header then starts `Organization,Plan,Status,Account number`) and passes with it. Two `DataTable` tests pin the default (display order) and the override (declared order, unlisted columns following). Scope of the CSV is unchanged: the loaded page after the local filters, as before.
+
 ## Pre-merge reviews
 
 ### Implementer
@@ -89,7 +99,7 @@ One page file plus two additive `DataTable` props. The request logic (`load`, `d
 ### Reviewer
 
 - The count line and the CSV note cannot imply a global figure: `total` is explicitly "across all pages", `shown` and `loaded` are explicitly "on this page", and CSV exports `data` (the locally filtered page), which a test asserts.
-- Reordering columns also reorders the CSV columns (CSV follows column order). Anyone who parses these exports by position would be affected; the header row is unchanged in text.
+- Reordering the display columns reordered the CSV, because `DataTable` exports in display order. This was found by the independent review as a P1 and is corrected, see "Review correction".
 - `searchLabel` defaults to the placeholder, so other screens gain a name equal to their placeholder text and nothing else changes; the two new `DataTable` tests pin both the default and the override.
 - The mobile detail block reuses the card's actions slot for layout only; it contains no actions. A real row action would need a shared-component change and was out of scope.
 
@@ -114,7 +124,7 @@ Recorded on the pull request for the exact head SHA (the checks and the final he
 - **Local filters can hide rows that exist on other pages.** The text says so in three places, but a user can still miss a tenant that is not on the loaded page. The fix is server-side filtering, a separate API slice.
 - **Pagination controls** (previous, next, rows per page) are 36 to 40px high. They belong to the shared `Pagination` component, which this slice must not refactor.
 - **Global controls card** selects are 36px; it is a separate component and untouched.
-- **Column order and CSV order changed** (plan and status moved up). Low risk, flagged above.
+- Display column order changed (plan and status moved up); the CSV order did not (see "Review correction").
 - **Tablet width** (768 to 1023) still scrolls the 10-column table inside its wrapper when emails are long; that is allowed by the spec and a later density pass could revisit it.
 - Browser rows came from an intercepted fixture, not the Laravel API.
 - Pre-existing and unrelated: 48 `tsc` errors in test files; `IntlError` for a `cart.itemCount` key printed by some tests; Next dev overlay badge in dev screenshots.

@@ -19,6 +19,20 @@ import { ApiError } from '@/lib/api';
 import { isPlatformAuthenticated } from '@/lib/platform-auth';
 import { platformApi } from '@/lib/platform-api';
 
+/** ترتيب أعمدة CSV السابق حرفياً؛ ترتيب العرض تغيّر (الخطة والحالة أولاً) ولا يجوز أن يغيّر الملف المُصدَّر. */
+const CSV_COLUMN_ORDER = [
+  'name',
+  'account_number',
+  'support_number',
+  'contactName',
+  'contactEmail',
+  'contactPhone',
+  'plan',
+  'is_active',
+  'trial_ends_at',
+  'users_count',
+];
+
 const PLAN_OPTIONS = ['free', 'basic', 'pro', 'enterprise'] as const;
 
 interface TenantRow {
@@ -351,6 +365,7 @@ export default function PlatformTenantsPage() {
               searchPlaceholder={t('search')}
               searchLabel={t('search')}
               exportLabel={t('exportLabel')}
+              exportColumnOrder={CSV_COLUMN_ORDER}
               searchValue={search}
               onSearchChange={changeSearch}
               emptyLabel={emptyLabel}

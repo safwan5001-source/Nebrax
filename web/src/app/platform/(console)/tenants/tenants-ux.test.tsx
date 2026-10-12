@@ -109,6 +109,26 @@ describe('platform tenants list UX (H1-4A)', () => {
     expect(csv.trim().split('\n')).toHaveLength(2);
   });
 
+  it('keeps the CSV column order exactly as before the table reorder (headers and values)', async () => {
+    render(<PlatformTenantsPage />);
+    await screen.findAllByText('Free Co');
+    fireEvent.click(screen.getByRole('button', { name: t().exportLabel }));
+    const [, csv] = downloadCsv.mock.calls[0] as [string, string];
+    const [header, first, second] = csv.replace(/^\ufeff/, '').trim().split(/\r?\n/);
+    // headers: the column order shipped by H1-PAGINATION
+    expect(header).toBe(
+      ['name', 'accountNumber', 'supportNumber', 'contactName', 'contact', 'phone', 'plan', 'status', 'trialEndsAt', 'usersCount']
+        .map((key) => t()[key])
+        .join(',')
+    );
+    // values follow the same order
+    expect(first).toBe('Free Co,1000001,2000002,Owner One,owner@example.com,+966500000000,free,true,2026-12-31,7');
+    expect(second).toBe('Pro Co,1000001,2000002,,,,pro,false,,7');
+    // while the on-screen table puts plan and status right after the organisation
+    const headers = screen.getAllByRole('columnheader').map((th) => th.textContent?.trim());
+    expect(headers.slice(0, 3)).toEqual(['Organization', 'Plan', 'Status']);
+  });
+
   it('distinguishes the three empty cases and offers Clear filters when a filter hides the page', async () => {
     const { rerender } = render(<PlatformTenantsPage />);
     await screen.findAllByText('Free Co');

@@ -56,6 +56,11 @@ interface DataTableProps<T> {
   searchLabel?: string;
   /** اسم/تلميح زر CSV حين يلزم توضيح نطاق ما يُصدَّر. الافتراضي السلوك الحالي. */
   exportLabel?: string;
+  /**
+   * ترتيب أعمدة CSV بمعرّفات الأعمدة حين يختلف عن ترتيب العرض. الأعمدة غير المذكورة
+   * تلي المذكورة بترتيبها الحالي. الافتراضي: ترتيب العرض كما هو.
+   */
+  exportColumnOrder?: string[];
   emptyLabel?: string;
   emptyDescription?: string;
   emptyAction?: React.ReactNode;
@@ -101,6 +106,7 @@ export function DataTable<T>({
   searchPlaceholder,
   searchLabel,
   exportLabel,
+  exportColumnOrder,
   emptyLabel,
   emptyDescription,
   emptyAction,
@@ -164,6 +170,13 @@ export function DataTable<T>({
         const def = c.columnDef as { accessorKey?: unknown; accessorFn?: unknown };
         return def.accessorKey != null || def.accessorFn != null;
       });
+    if (exportColumnOrder) {
+      const rank = (id: string) => {
+        const index = exportColumnOrder.indexOf(id);
+        return index === -1 ? exportColumnOrder.length : index;
+      };
+      cols.sort((a, b) => rank(a.id) - rank(b.id)); // الفرز مستقر: غير المذكورة تحتفظ بترتيبها
+    }
     const headers = cols.map((c) => (typeof c.columnDef.header === 'string' ? c.columnDef.header : c.id));
     const rows = table.getFilteredRowModel().rows.map((r) =>
       cols.map((c) => r.getValue(c.id) as string | number | null | undefined)

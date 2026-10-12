@@ -397,3 +397,27 @@ describe('DataTable toolbar accessible names (H1-4A, additive)', () => {
     expect(csv.getAttribute('title')).toBe('تصدير هذه الصفحة');
   });
 });
+
+describe('DataTable CSV column order (H1-4A, additive)', () => {
+  const csvOf = async (props: { exportColumnOrder?: string[] }) => {
+    const exported: string[] = [];
+    vi.resetModules();
+    vi.doMock('@/lib/export', async (importOriginal) => ({
+      ...(await importOriginal<typeof import('@/lib/export')>()),
+      downloadCsv: (_name: string, csv: string) => exported.push(csv),
+    }));
+    const { DataTable: Fresh } = await import('./data-table');
+    renderIntl(<Fresh columns={columns} data={rows} {...props} />);
+    await userEvent.click(screen.getByRole('button', { name: 'CSV' }));
+    vi.doUnmock('@/lib/export');
+    return exported[0]?.replace(/^\ufeff/, '').split(/\r?\n/)[0];
+  };
+
+  it('exports in display order by default, so other tables are unchanged', async () => {
+    expect(await csvOf({})).toBe('الرقم,العميل,الإجمالي,الحالة');
+  });
+
+  it('exports in the declared order when exportColumnOrder is given; unlisted columns follow in display order', async () => {
+    expect(await csvOf({ exportColumnOrder: ['status', 'number'] })).toBe('الحالة,الرقم,العميل,الإجمالي');
+  });
+});
