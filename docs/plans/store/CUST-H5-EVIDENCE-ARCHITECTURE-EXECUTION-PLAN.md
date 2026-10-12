@@ -598,11 +598,42 @@ For each slice:
 
 Do not stack unmerged H5 slices.
 
-### Important
+### Owner authorization — 2026-10-12
 
-This document itself does **not** grant automatic H5 merge authorization. The Owner may choose the same guarded sequential-merge authorization used for CUST-HV after H5-0 is approved.
+Safwan explicitly authorizes **guarded sequential autonomous execution and Squash Merge for CUST-H5 slices H5-1 through H5-6**.
 
-Deploy and Production release always remain separate Owner gates.
+Claude Code may continue without asking between normal implementation steps and may Squash Merge each H5 slice PR automatically **only when all slice gates pass**:
+
+- implementation is complete and within the approved H5 contract;
+- focused tests pass;
+- required broader tests/build pass;
+- CI Gate is green;
+- legitimate review findings are resolved;
+- Design Quality Pass is complete for visual/interaction changes;
+- Tenant Isolation, security, Draft/Published separation, Version-level revision concurrency, media ownership, commerce truth and backward compatibility remain intact;
+- the final MD Implementation Report is complete;
+- no Mandatory STOP condition in §10 applies.
+
+Required continuous loop:
+
+1. sync latest `origin/main`;
+2. inspect only relevant dependencies / overlapping work;
+3. implement **one dependency-safe H5 slice**;
+4. test and perform UX/design QA where applicable;
+5. open **one focused PR**;
+6. wait for CI/review and resolve legitimate findings;
+7. complete the final MD Implementation Report;
+8. if all gates pass, **Squash Merge**;
+9. sync latest `main`;
+10. immediately continue to the next dependency-safe H5 slice.
+
+Do **not** accumulate multiple unmerged H5 PRs.
+
+Normal implementation problems, test failures, CI failures/timeouts, merge conflicts, reversible UX decisions and ordinary review findings must be solved autonomously and are **not** reasons to stop.
+
+Stop only for the consequential conditions in §10, including architecture/contract changes, security/Tenant Isolation uncertainty, breaking API/DB changes, accounting behavior changes, technically impossible frozen contracts, material cross-Horizon conflicts, new Production infrastructure requirements, or Deploy / Production Release.
+
+**Deploy is NOT authorized. Production Release is NOT authorized. Destructive Production actions are NOT authorized.**
 
 ---
 
