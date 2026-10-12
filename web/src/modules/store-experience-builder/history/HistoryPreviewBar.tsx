@@ -31,6 +31,7 @@ export function HistoryPreviewBar({
   locale,
   revision,
   published,
+  dirty,
   busy,
   onRestore,
   onExit,
@@ -38,11 +39,14 @@ export function HistoryPreviewBar({
   locale: CustomizerLocale;
   revision: PresentationVersionRevisionDetail;
   published: boolean;
+  /** تعديلات غير محفوظة في المحرّر: استرداد اللقطة «الحالية» يظل مفيداً عندها. */
+  dirty: boolean;
   busy: boolean;
   onRestore: () => void;
   onExit: () => void;
 }) {
   const t = (key: CustomizerMessageKey) => customizerMessage(locale, key);
+  const restoreIsNoop = revision.isCurrent && !published && !dirty;
   const groups = groupMediaIssues(revision.mediaIssues);
   return (
     <section
@@ -75,8 +79,8 @@ export function HistoryPreviewBar({
             type="button"
             data-history-preview-restore=""
             onClick={onRestore}
-            disabled={busy || (revision.isCurrent && !published)}
-            title={revision.isCurrent && !published ? t("historyRestoreCurrentDisabled") : undefined}
+            disabled={busy || restoreIsNoop}
+            title={restoreIsNoop ? t("historyRestoreCurrentDisabled") : undefined}
             className="min-h-9 rounded-md bg-primary px-3 text-xs font-semibold text-primary-foreground hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-not-allowed disabled:opacity-40"
           >
             {t(published ? "historyCreateDraftAction" : "historyRestoreAction")}

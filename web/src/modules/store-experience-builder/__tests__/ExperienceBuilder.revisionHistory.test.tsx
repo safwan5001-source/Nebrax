@@ -248,6 +248,25 @@ describe('ExperienceBuilder — CUST-H5-4 saved history & restore', () => {
     expect(document.querySelector('[data-history-dirty-note]')).toBeTruthy();
   });
 
+  it('with unsaved edits the latest saved snapshot stays restorable and undoes them (Undo brings them back)', async () => {
+    const user = await mount();
+    await user.click(screen.getByRole('button', { name: 'Verification & trust' }));
+    const field = screen.getAllByRole('textbox')[0] as HTMLInputElement;
+    await user.type(field, 'unsaved');
+    expect(field.value).toBe('unsaved');
+    revShowMock.mockResolvedValueOnce({ ok: true, data: revDetail({ id: 'r2', versionRevision: 7, isCurrent: true, config: DEFAULT_PRESENTATION_CONFIG }) });
+    await openHistory(user);
+    expect(rowButton(0, 'Restore').disabled).toBe(false);
+
+    await user.click(rowButton(0, 'Restore'));
+
+    await waitFor(() => expect((screen.getAllByRole('textbox')[0] as HTMLInputElement).value).toBe(''));
+    expect(screen.queryByText(/The snapshot is identical to what's in the editor now/)).toBeNull();
+    expect(saveMock).not.toHaveBeenCalled();
+    await user.click(document.querySelector('[data-history-action="undo"]') as HTMLElement);
+    expect((screen.getAllByRole('textbox')[0] as HTMLInputElement).value).toBe('unsaved');
+  });
+
   describe('Published Version', () => {
     async function mountPublished() {
       return mount({ state: 'published', publishedRevision: 7 });

@@ -3448,6 +3448,7 @@ export function ExperienceBuilder({
               locale={locale}
               revision={historyPreview}
               published={isPublishedReadOnly}
+              dirty={dirty}
               busy={historyBusyId !== null}
               onRestore={() => void handleRestoreRevision(historyPreview)}
               onExit={exitHistoryPreview}

@@ -160,7 +160,7 @@ function detail(overrides: Partial<PresentationVersionRevisionDetail> = {}): Pre
 describe("HistoryPreviewBar (CUST-H5-4)", () => {
   function bar(props: Partial<React.ComponentProps<typeof HistoryPreviewBar>> = {}) {
     const h = { onRestore: vi.fn(), onExit: vi.fn() };
-    render(<HistoryPreviewBar locale="en" revision={detail()} published={false} busy={false} {...h} {...props} />);
+    render(<HistoryPreviewBar locale="en" revision={detail()} published={false} dirty={false} busy={false} {...h} {...props} />);
     return h;
   }
 
@@ -213,6 +213,15 @@ describe("HistoryPreviewBar (CUST-H5-4)", () => {
     cleanup();
     bar({ revision: detail({ isCurrent: true }) });
     expect((screen.getByRole("button", { name: "Restore" }) as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("«current» only means equal to the SAVED document: with unsaved edits its Restore stays available (preview bar and list)", () => {
+    bar({ revision: detail({ isCurrent: true }), dirty: true });
+    expect((screen.getByRole("button", { name: "Restore" }) as HTMLButtonElement).disabled).toBe(false);
+    cleanup();
+    setup({ dirty: true });
+    const rows = document.querySelectorAll("[data-history-row]");
+    expect((within(rows[0] as HTMLElement).getByRole("button", { name: "Restore" }) as HTMLButtonElement).disabled).toBe(false);
   });
 
   it("disables both actions while the restore is in flight", () => {

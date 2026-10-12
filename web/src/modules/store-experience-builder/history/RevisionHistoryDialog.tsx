@@ -153,7 +153,9 @@ export function RevisionHistoryDialog({
               {revisions.map((revision) => {
                 const busy = busyId === revision.id;
                 const disabled = busyId !== null;
-                const restoreDisabled = disabled || (revision.isCurrent && !published);
+                // «الحالية» تعني مطابقة المستند المحفوظ لا مسودة المحرّر: مع تعديلات غير محفوظة يبقى استردادها تراجعاً مشروعاً عنها.
+                const restoreIsNoop = revision.isCurrent && !published && !dirty;
+                const restoreDisabled = disabled || restoreIsNoop;
                 return (
                   <li
                     key={revision.id}
@@ -190,7 +192,7 @@ export function RevisionHistoryDialog({
                         data-history-restore=""
                         disabled={restoreDisabled}
                         aria-busy={busy || undefined}
-                        title={revision.isCurrent && !published ? t("historyRestoreCurrentDisabled") : undefined}
+                        title={restoreIsNoop ? t("historyRestoreCurrentDisabled") : undefined}
                         onClick={() => onRestore(revision)}
                         className="min-h-9 rounded-md bg-primary px-3 text-xs font-semibold text-primary-foreground hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-not-allowed disabled:opacity-40"
                       >
