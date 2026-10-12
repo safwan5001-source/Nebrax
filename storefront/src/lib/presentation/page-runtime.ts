@@ -124,6 +124,16 @@ export function resolvePublicProductRegions(
     .map((region) => region.key);
 }
 
+/**
+ * CUST-HV V9e — whether the product page's image zoom (click-to-enlarge) is on. Absence is today's behaviour (on); only an explicit
+ * `zoom: "off"` turns it off. The merchant's choice never reaches the picture, its URL or any commerce value.
+ */
+export function resolvePublicProductZoom(
+  pagePresentation: PagePresentation | undefined,
+): boolean {
+  return pagePresentation?.product?.zoom !== "off";
+}
+
 /** Final, ordered, visible-only Category region keys for the current request. */
 export function resolvePublicCategoryRegions(
   pagePresentation: PagePresentation | undefined,

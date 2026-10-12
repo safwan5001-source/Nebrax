@@ -1,0 +1,423 @@
+{
+    "_note": "CUST-HV V9e (V0 §14.2) — product page `zoom: on|off`: stored ONLY as \"off\" (absence = on, today). `input` is a raw `pagePresentation`; `expected` the normalised namespace (null = nothing stored). Shared by PHP StorefrontPresentationNormalizer and both TS twins (normalizePagePresentation).",
+    "cases": [
+        {
+            "name": "product page: zoom off is kept after the regions",
+            "input": {
+                "product": {
+                    "version": 1,
+                    "regions": [
+                        {
+                            "id": "media_gallery",
+                            "key": "media_gallery",
+                            "visible": true
+                        },
+                        {
+                            "id": "price",
+                            "key": "price",
+                            "visible": true
+                        }
+                    ],
+                    "zoom": "off"
+                }
+            },
+            "expected": {
+                "product": {
+                    "version": 1,
+                    "regions": [
+                        {
+                            "id": "media_gallery",
+                            "key": "media_gallery",
+                            "visible": true
+                        },
+                        {
+                            "id": "price",
+                            "key": "price",
+                            "visible": true
+                        }
+                    ],
+                    "zoom": "off"
+                }
+            }
+        },
+        {
+            "name": "product page: zoom on is the absence",
+            "input": {
+                "product": {
+                    "version": 1,
+                    "regions": [
+                        {
+                            "id": "media_gallery",
+                            "key": "media_gallery",
+                            "visible": true
+                        },
+                        {
+                            "id": "price",
+                            "key": "price",
+                            "visible": true
+                        }
+                    ],
+                    "zoom": "on"
+                }
+            },
+            "expected": {
+                "product": {
+                    "version": 1,
+                    "regions": [
+                        {
+                            "id": "media_gallery",
+                            "key": "media_gallery",
+                            "visible": true
+                        },
+                        {
+                            "id": "price",
+                            "key": "price",
+                            "visible": true
+                        }
+                    ]
+                }
+            }
+        },
+        {
+            "name": "product page: zoom absent",
+            "input": {
+                "product": {
+                    "version": 1,
+                    "regions": [
+                        {
+                            "id": "media_gallery",
+                            "key": "media_gallery",
+                            "visible": true
+                        },
+                        {
+                            "id": "price",
+                            "key": "price",
+                            "visible": true
+                        }
+                    ]
+                }
+            },
+            "expected": {
+                "product": {
+                    "version": 1,
+                    "regions": [
+                        {
+                            "id": "media_gallery",
+                            "key": "media_gallery",
+                            "visible": true
+                        },
+                        {
+                            "id": "price",
+                            "key": "price",
+                            "visible": true
+                        }
+                    ]
+                }
+            }
+        },
+        {
+            "name": "product page: zoom false is not off",
+            "input": {
+                "product": {
+                    "version": 1,
+                    "regions": [
+                        {
+                            "id": "media_gallery",
+                            "key": "media_gallery",
+                            "visible": true
+                        },
+                        {
+                            "id": "price",
+                            "key": "price",
+                            "visible": true
+                        }
+                    ],
+                    "zoom": false
+                }
+            },
+            "expected": {
+                "product": {
+                    "version": 1,
+                    "regions": [
+                        {
+                            "id": "media_gallery",
+                            "key": "media_gallery",
+                            "visible": true
+                        },
+                        {
+                            "id": "price",
+                            "key": "price",
+                            "visible": true
+                        }
+                    ]
+                }
+            }
+        },
+        {
+            "name": "product page: zoom true is not a value",
+            "input": {
+                "product": {
+                    "version": 1,
+                    "regions": [
+                        {
+                            "id": "media_gallery",
+                            "key": "media_gallery",
+                            "visible": true
+                        },
+                        {
+                            "id": "price",
+                            "key": "price",
+                            "visible": true
+                        }
+                    ],
+                    "zoom": true
+                }
+            },
+            "expected": {
+                "product": {
+                    "version": 1,
+                    "regions": [
+                        {
+                            "id": "media_gallery",
+                            "key": "media_gallery",
+                            "visible": true
+                        },
+                        {
+                            "id": "price",
+                            "key": "price",
+                            "visible": true
+                        }
+                    ]
+                }
+            }
+        },
+        {
+            "name": "product page: zoom is case-sensitive",
+            "input": {
+                "product": {
+                    "version": 1,
+                    "regions": [
+                        {
+                            "id": "media_gallery",
+                            "key": "media_gallery",
+                            "visible": true
+                        },
+                        {
+                            "id": "price",
+                            "key": "price",
+                            "visible": true
+                        }
+                    ],
+                    "zoom": "OFF"
+                }
+            },
+            "expected": {
+                "product": {
+                    "version": 1,
+                    "regions": [
+                        {
+                            "id": "media_gallery",
+                            "key": "media_gallery",
+                            "visible": true
+                        },
+                        {
+                            "id": "price",
+                            "key": "price",
+                            "visible": true
+                        }
+                    ]
+                }
+            }
+        },
+        {
+            "name": "product page: zoom is not a number",
+            "input": {
+                "product": {
+                    "version": 1,
+                    "regions": [
+                        {
+                            "id": "media_gallery",
+                            "key": "media_gallery",
+                            "visible": true
+                        },
+                        {
+                            "id": "price",
+                            "key": "price",
+                            "visible": true
+                        }
+                    ],
+                    "zoom": 0
+                }
+            },
+            "expected": {
+                "product": {
+                    "version": 1,
+                    "regions": [
+                        {
+                            "id": "media_gallery",
+                            "key": "media_gallery",
+                            "visible": true
+                        },
+                        {
+                            "id": "price",
+                            "key": "price",
+                            "visible": true
+                        }
+                    ]
+                }
+            }
+        },
+        {
+            "name": "product page: zoom off with no regions authored",
+            "input": {
+                "product": {
+                    "zoom": "off"
+                }
+            },
+            "expected": {
+                "product": {
+                    "version": 1,
+                    "regions": [],
+                    "zoom": "off"
+                }
+            }
+        },
+        {
+            "name": "product page: a newer page version fails closed, zoom or not",
+            "input": {
+                "product": {
+                    "version": 2,
+                    "regions": [
+                        {
+                            "id": "media_gallery",
+                            "key": "media_gallery",
+                            "visible": true
+                        },
+                        {
+                            "id": "price",
+                            "key": "price",
+                            "visible": true
+                        }
+                    ],
+                    "zoom": "off"
+                }
+            },
+            "expected": null
+        },
+        {
+            "name": "category page: zoom is not a category key",
+            "input": {
+                "category": {
+                    "version": 1,
+                    "regions": [
+                        {
+                            "id": "product_grid",
+                            "key": "product_grid",
+                            "visible": true
+                        }
+                    ],
+                    "zoom": "off"
+                }
+            },
+            "expected": {
+                "category": {
+                    "version": 1,
+                    "regions": [
+                        {
+                            "id": "product_grid",
+                            "key": "product_grid",
+                            "visible": true
+                        }
+                    ]
+                }
+            }
+        },
+        {
+            "name": "both pages: only the product keeps zoom",
+            "input": {
+                "product": {
+                    "version": 1,
+                    "regions": [
+                        {
+                            "id": "media_gallery",
+                            "key": "media_gallery",
+                            "visible": true
+                        },
+                        {
+                            "id": "price",
+                            "key": "price",
+                            "visible": true
+                        }
+                    ],
+                    "zoom": "off"
+                },
+                "category": {
+                    "version": 1,
+                    "regions": [],
+                    "zoom": "off"
+                }
+            },
+            "expected": {
+                "product": {
+                    "version": 1,
+                    "regions": [
+                        {
+                            "id": "media_gallery",
+                            "key": "media_gallery",
+                            "visible": true
+                        },
+                        {
+                            "id": "price",
+                            "key": "price",
+                            "visible": true
+                        }
+                    ],
+                    "zoom": "off"
+                },
+                "category": {
+                    "version": 1,
+                    "regions": []
+                }
+            }
+        },
+        {
+            "name": "canonical order survives a shuffled input",
+            "input": {
+                "product": {
+                    "zoom": "off",
+                    "regions": [
+                        {
+                            "id": "media_gallery",
+                            "key": "media_gallery",
+                            "visible": true
+                        },
+                        {
+                            "id": "price",
+                            "key": "price",
+                            "visible": true
+                        }
+                    ],
+                    "version": 1
+                }
+            },
+            "expected": {
+                "product": {
+                    "version": 1,
+                    "regions": [
+                        {
+                            "id": "media_gallery",
+                            "key": "media_gallery",
+                            "visible": true
+                        },
+                        {
+                            "id": "price",
+                            "key": "price",
+                            "visible": true
+                        }
+                    ],
+                    "zoom": "off"
+                }
+            }
+        }
+    ]
+}

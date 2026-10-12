@@ -41,6 +41,8 @@ export function ProductRegionInspector({
   onToggleVisibility,
   onMove,
   readOnly,
+  zoomOn = true,
+  onZoomChange,
 }: {
   locale: CustomizerLocale;
   regions: PageRegionInstance<ProductPageRegionKey>[];
@@ -50,6 +52,9 @@ export function ProductRegionInspector({
   onToggleVisibility: (id: string) => void;
   onMove: (id: string, delta: 1 | -1) => void;
   readOnly: boolean;
+  /** CUST-HV V9e — product image zoom (click-to-enlarge); absent = on, today's behaviour. */
+  zoomOn?: boolean;
+  onZoomChange?: (on: boolean) => void;
 }) {
   const t = (key: CustomizerMessageKey) => customizerMessage(locale, key);
   // `variant_selector` always exists in the stored/default list (H2-1's
@@ -129,6 +134,17 @@ export function ProductRegionInspector({
           );
         })}
       </ul>
+      {onZoomChange ? (
+        <div data-product-zoom="" className="flex flex-col gap-1 border-t border-border pt-3">
+          <Toggle
+            label={t("productZoomLabel")}
+            checked={zoomOn}
+            disabled={readOnly}
+            onChange={onZoomChange}
+          />
+          <p className="text-xs leading-5 text-muted">{t("productZoomHelp")}</p>
+        </div>
+      ) : null}
     </div>
   );
 }

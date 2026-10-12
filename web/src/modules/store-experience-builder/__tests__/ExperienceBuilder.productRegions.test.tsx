@@ -293,6 +293,42 @@ describe('ExperienceBuilder — CUST-H2-3 Product page structured editing', () =
     expect(saveMock.mock.calls[0][3]).toBe(5);
   });
 
+  it('V9e. the zoom switch is stored only as "off", survives a region edit, and returns to absence when switched back on', async () => {
+    const user = userEvent.setup();
+    await renderReady(user);
+    saveMock.mockResolvedValue({ ok: true, data: versionDetail({ revision: 6 }) });
+
+    await user.click(screen.getByRole('button', { name: 'Product page structure' }));
+    const zoom = within(document.querySelector('[data-product-zoom]') as HTMLElement).getByRole('checkbox');
+    expect((zoom as HTMLInputElement).checked).toBe(true);
+
+    await user.click(zoom);
+    expect(builderRoot().getAttribute('data-lifecycle')).toBe('dirty');
+    // a region edit afterwards must not drop the choice
+    await user.click(within(regionRow('availability')).getByRole('checkbox'));
+    await user.click(screen.getByRole('button', { name: 'Save draft' }));
+    await waitFor(() => expect(saveMock).toHaveBeenCalledTimes(1));
+    const saved = saveMock.mock.calls[0][2].pagePresentation.product;
+    expect(saved.zoom).toBe('off');
+    expect(saved.regions.find((r: { key: string }) => r.key === 'availability').visible).toBe(false);
+    expect(Object.keys(saved)).toEqual(['version', 'regions', 'zoom']);
+  });
+
+  it('V9e. switching zoom back on stores nothing for it', async () => {
+    const user = userEvent.setup();
+    await renderReady(user);
+    saveMock.mockResolvedValue({ ok: true, data: versionDetail({ revision: 6 }) });
+
+    await user.click(screen.getByRole('button', { name: 'Product page structure' }));
+    const zoom = within(document.querySelector('[data-product-zoom]') as HTMLElement).getByRole('checkbox');
+    await user.click(zoom);
+    await user.click(zoom);
+    await user.click(within(regionRow('availability')).getByRole('checkbox'));
+    await user.click(screen.getByRole('button', { name: 'Save draft' }));
+    await waitFor(() => expect(saveMock).toHaveBeenCalledTimes(1));
+    expect('zoom' in saveMock.mock.calls[0][2].pagePresentation.product).toBe(false);
+  });
+
   it('16. switching Home → Product → Home preserves the unsaved Product region edit', async () => {
     const user = userEvent.setup();
     await renderReady(user);

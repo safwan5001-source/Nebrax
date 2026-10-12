@@ -101,6 +101,11 @@ export interface PageRegionInstance<K extends string> {
 export interface ProductPagePresentation {
   version: 1;
   regions: PageRegionInstance<ProductPageRegionKey>[];
+  /**
+   * CUST-HV V9e (V0 §14.2) — the product image zoom (the click-to-enlarge lightbox). Stored ONLY as `"off"`: absence is today's
+   * behaviour (zoom on), so a document that never chose it is byte-identical.
+   */
+  zoom?: "off";
 }
 
 export interface CategoryPagePresentation {
@@ -232,7 +237,8 @@ function normalizePageTypePresentation<K extends string>(
   raw: unknown,
   allowedKeys: readonly K[],
   fixedRequiredKeys: readonly K[],
-): { version: 1; regions: PageRegionInstance<K>[] } | null {
+  withZoom = false,
+): { version: 1; regions: PageRegionInstance<K>[]; zoom?: "off" } | null {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
   const value = raw as Record<string, unknown>;
 
@@ -241,10 +247,14 @@ function normalizePageTypePresentation<K extends string>(
   // the only one this slice supports fails closed rather than being guessed.
   if (typeof value.version === "number" && value.version > 1) return null;
 
-  return {
-    version: 1,
-    regions: normalizeRegions(value.regions, allowedKeys, fixedRequiredKeys),
-  };
+  const page: { version: 1; regions: PageRegionInstance<K>[]; zoom?: "off" } =
+    {
+      version: 1,
+      regions: normalizeRegions(value.regions, allowedKeys, fixedRequiredKeys),
+    };
+  // CUST-HV V9e — `zoom: on|off` of the product page: absence = on (today), only `off` is stored.
+  if (withZoom && value.zoom === "off") page.zoom = "off";
+  return page;
 }
 
 /**
@@ -260,6 +270,7 @@ export function normalizePagePresentation(raw: unknown): PagePresentation | unde
     value.product,
     PRODUCT_PAGE_REGION_KEYS,
     FIXED_REQUIRED_PRODUCT_REGION_KEYS,
+    true,
   );
   const category = normalizePageTypePresentation(
     value.category,
