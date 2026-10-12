@@ -26,6 +26,9 @@ import { HeaderScrollUpPreview } from "./HeaderScrollUpPreview";
 import { CanvasFooter } from "./CanvasFooter";
 import { CanvasNavItem, canvasNavItems } from "./CanvasNav";
 import { mainMenu } from "./presentation/navigation";
+import type { PresentationHomeSection } from "./presentation/config";
+import { canDeleteSection, canDuplicateSection } from "./presentation/section-capabilities";
+import { sectionIsAuthored } from "./presentation/section-ops";
 import { overlayMarker, resolveHeaderOverlay } from "./presentation/header-overlay";
 import { headerIsCompact, resolveHeaderDesign } from "./presentation/header-design";
 import type { CategoryPageRegionKey, PageRegionInstance, PageType, ProductPageRegionKey } from "./presentation/page-regions";
@@ -79,6 +82,7 @@ import {
 } from "./messages";
 import { CanvasBackdrop } from "./media/CanvasBackdrop";
 import { CanvasContentBlocks, Selectable } from "./CanvasContentBlocks";
+import { SectionActionBar, type CanvasSectionActions, type CanvasSectionEligibility } from "./CanvasSectionActions";
 import { CanvasGallery } from "./CanvasGallery";
 import { CanvasSlider } from "./CanvasSlider";
 import { useBackgroundMediaBounds } from "./media/use-background-media-bounds";
@@ -225,6 +229,11 @@ interface StorefrontPreviewCanvasProps {
    */
   offers?: WorkspaceOffer[];
   offersState?: "idle" | "loading" | "error" | "ready";
+  /**
+   * CUST-HV V10d — the hover action bar (move / hide / duplicate / delete) on each Home section. Absent on a Published Version, in
+   * Theme Preview and in the dev harness: no bar is drawn.
+   */
+  sectionActions?: CanvasSectionActions;
   onRetryOffers?: () => void;
 }
 
@@ -325,6 +334,7 @@ export function StorefrontPreviewCanvas({
   onRetryFeatured,
   offers = [],
   offersState = "idle",
+  sectionActions,
   onRetryOffers,
 }: StorefrontPreviewCanvasProps) {
   const t = (key: CustomizerMessageKey) => customizerMessage(locale, key);
@@ -1658,6 +1668,15 @@ export function StorefrontPreviewCanvas({
                 selected={selectedSection === section.id}
                 onSelect={onSelectSection}
                 label={section.label}
+                actions={
+                  sectionActions ? (
+                    <SectionActionBar
+                      section={section}
+                      actions={sectionActions}
+                      eligibility={sectionEligibility(config.homepage.sections, section)}
+                    />
+                  ) : undefined
+                }
               >
                 <SectionDesignFrame
                   section={section}
@@ -2321,12 +2340,28 @@ function CategoryRegionShell({
   );
 }
 
+/** What the action bar may offer for a section, from the same capability rules the section list uses. */
+function sectionEligibility(
+  sections: readonly PresentationHomeSection[],
+  section: PresentationHomeSection,
+): CanvasSectionEligibility {
+  const index = sections.findIndex((item) => item.id === section.id);
+  return {
+    canMoveUp: index > 0,
+    canMoveDown: index >= 0 && index < sections.length - 1,
+    canDuplicate: canDuplicateSection(sections, section),
+    canDelete: canDeleteSection(section),
+    authored: sectionIsAuthored(section),
+  };
+}
+
 function SelectablePreviewSection({
   sectionKey,
   sectionId,
   selected,
   onSelect,
   label,
+  actions,
   children,
 }: {
   sectionKey: string;
@@ -2335,6 +2370,8 @@ function SelectablePreviewSection({
   onSelect?: (id: string) => void;
   /** CUST-HV V10c (V0 §17.1) — the merchant's own name for the section: an editor aid shown only on the selected section. */
   label?: string;
+  /** CUST-HV V10d — the hover action bar, rendered inside the wrapper (the sibling rules of the hero overlap stay valid). */
+  actions?: ReactNode;
   children: ReactNode;
 }) {
   if (!onSelect) return <>{children}</>;
@@ -2357,6 +2394,7 @@ function SelectablePreviewSection({
         "awj-preview-section",
         selected && "awj-preview-section-selected",
         selected && label && "awj-preview-section-named",
+        actions && "awj-preview-section-actionable",
       )}
     >
       {selected && label ? (
@@ -2367,6 +2405,7 @@ function SelectablePreviewSection({
         </span>
       ) : null}
       {children}
+      {actions}
     </div>
   );
 }
