@@ -107,6 +107,9 @@ def collect(repo: str, pr_number: int, req: dict, patch_limit: int = PATCH_LIMIT
     check_runs = (runs or {}).get("check_runs", [])
     wf = gh_get(f"{base}/actions/runs?head_sha={head}&per_page=100")
     event_by_suite = {w["check_suite_id"]: w["event"] for w in (wf or {}).get("workflow_runs", [])}
+    # the base each run was created against (GitHub records it on the workflow run's pull_requests[] entry)
+    base_by_suite = {w["check_suite_id"]: ((w.get("pull_requests") or [{}])[0].get("base") or {}).get("sha")
+                     for w in (wf or {}).get("workflow_runs", [])}
 
     manifest_file = gh_get(f"{base}/contents/.github/ci-gate/required-checks.json?ref={main_sha}")
     manifest = json.loads(base64.b64decode(manifest_file["content"]).decode("utf-8"))
@@ -175,7 +178,8 @@ def collect(repo: str, pr_number: int, req: dict, patch_limit: int = PATCH_LIMIT
             },
             "checks": [{"id": c["id"], "name": c["name"], "status": c["status"], "conclusion": c["conclusion"],
                         "head_sha": c["head_sha"], "event": event_by_suite.get(c["check_suite"]["id"], "unknown"),
-                        "completed_at": ts(c.get("completed_at")), "app": (c.get("app") or {}).get("slug", "unknown")}
+                        "completed_at": ts(c.get("completed_at")), "app": (c.get("app") or {}).get("slug", "unknown"),
+                        "tested_base_sha": base_by_suite.get(c["check_suite"]["id"])}
                        for c in check_runs],
             "required_checks": {
                 "source_ref": "main", "source_sha": main_sha, "gate_name": manifest["gate_check_name"],

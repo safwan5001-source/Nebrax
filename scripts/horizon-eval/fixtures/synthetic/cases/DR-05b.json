@@ -22,7 +22,8 @@
         "head_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
         "event": "pull_request",
         "completed_at": null,
-        "app": "github-actions"
+        "app": "github-actions",
+        "tested_base_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
       },
       {
         "id": 999,
@@ -32,7 +33,8 @@
         "head_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
         "event": "push",
         "completed_at": "2026-10-12T11:47:00Z",
-        "app": "github-actions"
+        "app": "github-actions",
+        "tested_base_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
       },
       {
         "id": 1002,
@@ -42,7 +44,8 @@
         "head_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
         "event": "pull_request",
         "completed_at": "2026-10-12T11:40:00Z",
-        "app": "github-actions"
+        "app": "github-actions",
+        "tested_base_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
       },
       {
         "id": 1003,
@@ -52,7 +55,8 @@
         "head_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
         "event": "pull_request",
         "completed_at": "2026-10-12T11:45:00Z",
-        "app": "github-actions"
+        "app": "github-actions",
+        "tested_base_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
       }
     ]
   }

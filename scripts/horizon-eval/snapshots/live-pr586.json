@@ -11,7 +11,8 @@
     "head_sha": "156b4270f9e454bcf78362ea9a2088afbe478e1a",
     "id": 99269808543,
     "name": "php artisan test (L11, pgsql)",
-    "status": "completed"
+    "status": "completed",
+    "tested_base_sha": "4710169140224f8439a809920c2a6e56c8cbab84"
    },
    {
     "app": "github-actions",
@@ -21,7 +22,8 @@
     "head_sha": "156b4270f9e454bcf78362ea9a2088afbe478e1a",
     "id": 99269808398,
     "name": "php artisan test (L11, sqlite)",
-    "status": "completed"
+    "status": "completed",
+    "tested_base_sha": "4710169140224f8439a809920c2a6e56c8cbab84"
    },
    {
     "app": "github-actions",
@@ -31,7 +33,8 @@
     "head_sha": "156b4270f9e454bcf78362ea9a2088afbe478e1a",
     "id": 99269802423,
     "name": "php artisan test (L11, pgsql)",
-    "status": "completed"
+    "status": "completed",
+    "tested_base_sha": "4710169140224f8439a809920c2a6e56c8cbab84"
    },
    {
     "app": "github-actions",
@@ -41,12 +44,13 @@
     "head_sha": "156b4270f9e454bcf78362ea9a2088afbe478e1a",
     "id": 99269802323,
     "name": "php artisan test (L11, sqlite)",
-    "status": "completed"
+    "status": "completed",
+    "tested_base_sha": "4710169140224f8439a809920c2a6e56c8cbab84"
    }
   ],
-  "fetched_at": "2026-10-12T03:18:53Z",
+  "fetched_at": "2026-10-12T03:31:19Z",
   "grant_store": {
-   "fetched_at": "2026-10-12T03:18:53Z",
+   "fetched_at": "2026-10-12T03:31:19Z",
    "grants": [],
    "kill_switch": false,
    "ref": "main",
@@ -62,6 +66,27 @@
     "author": "safwan5001-source",
     "claim": null,
     "files": [
+     "AWJ-HORIZON-MEDIA-STORAGE-CLOSURE-REPORT.md",
+     "AWJ-HORIZON-MEDIA-STORAGE-S8-IMPLEMENTATION-REPORT.md",
+     "AWJ-HORIZON-MEDIA-STORAGE-TRACKER.md",
+     "app/Console/Commands/AwjDocumentsStorageVerifyCommand.php",
+     "app/Services/DocumentCenter/DocumentStorageService.php",
+     "tests/Feature/DocumentStorageDiagnoseTest.php",
+     "tests/Feature/DocumentsStorageVerifyTest.php"
+    ],
+    "files_complete": true,
+    "head_ref": "horizon/media-storage-s8-r2-diagnose",
+    "head_repo": "safwan5001-source/Nebrax",
+    "horizon_id": null,
+    "last_activity_at": "2026-10-12T03:29:52Z",
+    "number": 1354,
+    "observed_at": "2026-10-12T03:31:19Z",
+    "state": "open"
+   },
+   {
+    "author": "safwan5001-source",
+    "claim": null,
+    "files": [
      "app/Http/Controllers/Api/StorefrontConfigController.php",
      "app/Support/Commerce/StorefrontPresentationNormalizer.php",
      "docs/plans/store/CUST-HV-V10C-IMPLEMENTATION-REPORT.md",
@@ -70,6 +95,7 @@
      "tests/Feature/StorefrontSectionLabelsTest.php",
      "tests/Fixtures/presentation/section-labels.json",
      "web/src/modules/store-experience-builder/ControlPanels.tsx",
+     "web/src/modules/store-experience-builder/__tests__/ControlPanels.deleteConfirm.test.tsx",
      "web/src/modules/store-experience-builder/__tests__/ControlPanels.sectionName.test.tsx",
      "web/src/modules/store-experience-builder/__tests__/section-labels.test.ts",
      "web/src/modules/store-experience-builder/__tests__/section-presets.test.tsx",
@@ -83,25 +109,9 @@
     "head_ref": "cust-hv/v10c-section-workflow",
     "head_repo": "safwan5001-source/Nebrax",
     "horizon_id": null,
-    "last_activity_at": "2026-10-12T03:18:34Z",
+    "last_activity_at": "2026-10-12T03:30:43Z",
     "number": 1353,
-    "observed_at": "2026-10-12T03:18:53Z",
-    "state": "open"
-   },
-   {
-    "author": "safwan5001-source",
-    "claim": null,
-    "files": [
-     "AWJ-HORIZON-MEDIA-STORAGE-CLOSURE-REPORT.md",
-     "AWJ-HORIZON-MEDIA-STORAGE-TRACKER.md"
-    ],
-    "files_complete": true,
-    "head_ref": "horizon/media-storage-tracker-s6s7",
-    "head_repo": "safwan5001-source/Nebrax",
-    "horizon_id": null,
-    "last_activity_at": "2026-10-12T03:17:36Z",
-    "number": 1352,
-    "observed_at": "2026-10-12T03:18:53Z",
+    "observed_at": "2026-10-12T03:31:19Z",
     "state": "open"
    },
    {
@@ -156,9 +166,9 @@
     "head_ref": "horizon/v2-1c-dryrun-authorization-evaluator",
     "head_repo": "safwan5001-source/Nebrax",
     "horizon_id": null,
-    "last_activity_at": "2026-10-12T03:17:27Z",
+    "last_activity_at": "2026-10-12T03:30:37Z",
     "number": 1351,
-    "observed_at": "2026-10-12T03:18:53Z",
+    "observed_at": "2026-10-12T03:31:19Z",
     "state": "open"
    },
    {
@@ -174,7 +184,7 @@
     "horizon_id": null,
     "last_activity_at": "2026-09-30T18:12:05Z",
     "number": 1128,
-    "observed_at": "2026-10-12T03:18:53Z",
+    "observed_at": "2026-10-12T03:31:19Z",
     "state": "open"
    },
    {
@@ -240,7 +250,7 @@
     "horizon_id": null,
     "last_activity_at": "2026-09-29T05:29:57Z",
     "number": 1105,
-    "observed_at": "2026-10-12T03:18:53Z",
+    "observed_at": "2026-10-12T03:31:19Z",
     "state": "open"
    },
    {
@@ -257,7 +267,7 @@
     "horizon_id": null,
     "last_activity_at": "2026-09-28T21:32:28Z",
     "number": 1093,
-    "observed_at": "2026-10-12T03:18:53Z",
+    "observed_at": "2026-10-12T03:31:19Z",
     "state": "open"
    },
    {
@@ -277,7 +287,7 @@
     "horizon_id": null,
     "last_activity_at": "2026-09-28T15:37:50Z",
     "number": 1089,
-    "observed_at": "2026-10-12T03:18:53Z",
+    "observed_at": "2026-10-12T03:31:19Z",
     "state": "open"
    },
    {
@@ -292,7 +302,7 @@
     "horizon_id": null,
     "last_activity_at": "2026-09-17T10:42:20Z",
     "number": 853,
-    "observed_at": "2026-10-12T03:18:53Z",
+    "observed_at": "2026-10-12T03:31:19Z",
     "state": "open"
    },
    {
@@ -307,7 +317,7 @@
     "horizon_id": null,
     "last_activity_at": "2026-09-12T04:21:51Z",
     "number": 784,
-    "observed_at": "2026-10-12T03:18:53Z",
+    "observed_at": "2026-10-12T03:31:19Z",
     "state": "open"
    },
    {
@@ -323,7 +333,7 @@
     "horizon_id": null,
     "last_activity_at": "2026-09-12T01:19:29Z",
     "number": 778,
-    "observed_at": "2026-10-12T03:18:53Z",
+    "observed_at": "2026-10-12T03:31:19Z",
     "state": "open"
    },
    {
@@ -338,7 +348,7 @@
     "horizon_id": null,
     "last_activity_at": "2026-09-08T22:37:53Z",
     "number": 704,
-    "observed_at": "2026-10-12T03:18:53Z",
+    "observed_at": "2026-10-12T03:31:19Z",
     "state": "open"
    },
    {
@@ -356,7 +366,7 @@
     "horizon_id": null,
     "last_activity_at": "2026-09-08T15:40:55Z",
     "number": 703,
-    "observed_at": "2026-10-12T03:18:53Z",
+    "observed_at": "2026-10-12T03:31:19Z",
     "state": "open"
    },
    {
@@ -373,7 +383,7 @@
     "horizon_id": null,
     "last_activity_at": "2026-08-30T01:37:44Z",
     "number": 578,
-    "observed_at": "2026-10-12T03:18:53Z",
+    "observed_at": "2026-10-12T03:31:19Z",
     "state": "open"
    },
    {
@@ -393,7 +403,7 @@
     "horizon_id": null,
     "last_activity_at": "2026-08-14T23:31:52Z",
     "number": 202,
-    "observed_at": "2026-10-12T03:18:53Z",
+    "observed_at": "2026-10-12T03:31:19Z",
     "state": "open"
    }
   ],
@@ -584,7 +594,7 @@
   "source": "github-readonly"
  },
  "mode": "live",
- "now": "2026-10-12T03:18:53Z",
+ "now": "2026-10-12T03:31:19Z",
  "request": {
   "action": "merge",
   "agent_id": "pilot-session",

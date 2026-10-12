@@ -11,7 +11,8 @@
     "head_sha": "bba69ca54090a405248795107d35d8fd279d07a4",
     "id": 109145470481,
     "name": "php artisan test (L11, sqlite)",
-    "status": "completed"
+    "status": "completed",
+    "tested_base_sha": "e6fc91d172c0759f1b7e422e9396b775995fc645"
    },
    {
     "app": "github-actions",
@@ -21,7 +22,8 @@
     "head_sha": "bba69ca54090a405248795107d35d8fd279d07a4",
     "id": 109145470208,
     "name": "php artisan test (L11, pgsql)",
-    "status": "completed"
+    "status": "completed",
+    "tested_base_sha": "e6fc91d172c0759f1b7e422e9396b775995fc645"
    },
    {
     "app": "github-actions",
@@ -31,7 +33,8 @@
     "head_sha": "bba69ca54090a405248795107d35d8fd279d07a4",
     "id": 109145362354,
     "name": "php artisan test (L11, sqlite)",
-    "status": "completed"
+    "status": "completed",
+    "tested_base_sha": "e6fc91d172c0759f1b7e422e9396b775995fc645"
    },
    {
     "app": "github-actions",
@@ -41,12 +44,13 @@
     "head_sha": "bba69ca54090a405248795107d35d8fd279d07a4",
     "id": 109145361992,
     "name": "php artisan test (L11, pgsql)",
-    "status": "completed"
+    "status": "completed",
+    "tested_base_sha": "e6fc91d172c0759f1b7e422e9396b775995fc645"
    }
   ],
-  "fetched_at": "2026-10-12T03:19:03Z",
+  "fetched_at": "2026-10-12T03:31:30Z",
   "grant_store": {
-   "fetched_at": "2026-10-12T03:19:03Z",
+   "fetched_at": "2026-10-12T03:31:30Z",
    "grants": [],
    "kill_switch": false,
    "ref": "main",
@@ -62,6 +66,27 @@
     "author": "safwan5001-source",
     "claim": null,
     "files": [
+     "AWJ-HORIZON-MEDIA-STORAGE-CLOSURE-REPORT.md",
+     "AWJ-HORIZON-MEDIA-STORAGE-S8-IMPLEMENTATION-REPORT.md",
+     "AWJ-HORIZON-MEDIA-STORAGE-TRACKER.md",
+     "app/Console/Commands/AwjDocumentsStorageVerifyCommand.php",
+     "app/Services/DocumentCenter/DocumentStorageService.php",
+     "tests/Feature/DocumentStorageDiagnoseTest.php",
+     "tests/Feature/DocumentsStorageVerifyTest.php"
+    ],
+    "files_complete": true,
+    "head_ref": "horizon/media-storage-s8-r2-diagnose",
+    "head_repo": "safwan5001-source/Nebrax",
+    "horizon_id": null,
+    "last_activity_at": "2026-10-12T03:29:52Z",
+    "number": 1354,
+    "observed_at": "2026-10-12T03:31:30Z",
+    "state": "open"
+   },
+   {
+    "author": "safwan5001-source",
+    "claim": null,
+    "files": [
      "app/Http/Controllers/Api/StorefrontConfigController.php",
      "app/Support/Commerce/StorefrontPresentationNormalizer.php",
      "docs/plans/store/CUST-HV-V10C-IMPLEMENTATION-REPORT.md",
@@ -70,6 +95,7 @@
      "tests/Feature/StorefrontSectionLabelsTest.php",
      "tests/Fixtures/presentation/section-labels.json",
      "web/src/modules/store-experience-builder/ControlPanels.tsx",
+     "web/src/modules/store-experience-builder/__tests__/ControlPanels.deleteConfirm.test.tsx",
      "web/src/modules/store-experience-builder/__tests__/ControlPanels.sectionName.test.tsx",
      "web/src/modules/store-experience-builder/__tests__/section-labels.test.ts",
      "web/src/modules/store-experience-builder/__tests__/section-presets.test.tsx",
@@ -83,25 +109,9 @@
     "head_ref": "cust-hv/v10c-section-workflow",
     "head_repo": "safwan5001-source/Nebrax",
     "horizon_id": null,
-    "last_activity_at": "2026-10-12T03:18:34Z",
+    "last_activity_at": "2026-10-12T03:30:43Z",
     "number": 1353,
-    "observed_at": "2026-10-12T03:19:03Z",
-    "state": "open"
-   },
-   {
-    "author": "safwan5001-source",
-    "claim": null,
-    "files": [
-     "AWJ-HORIZON-MEDIA-STORAGE-CLOSURE-REPORT.md",
-     "AWJ-HORIZON-MEDIA-STORAGE-TRACKER.md"
-    ],
-    "files_complete": true,
-    "head_ref": "horizon/media-storage-tracker-s6s7",
-    "head_repo": "safwan5001-source/Nebrax",
-    "horizon_id": null,
-    "last_activity_at": "2026-10-12T03:17:36Z",
-    "number": 1352,
-    "observed_at": "2026-10-12T03:19:03Z",
+    "observed_at": "2026-10-12T03:31:30Z",
     "state": "open"
    },
    {
@@ -156,9 +166,9 @@
     "head_ref": "horizon/v2-1c-dryrun-authorization-evaluator",
     "head_repo": "safwan5001-source/Nebrax",
     "horizon_id": null,
-    "last_activity_at": "2026-10-12T03:17:27Z",
+    "last_activity_at": "2026-10-12T03:30:37Z",
     "number": 1351,
-    "observed_at": "2026-10-12T03:19:03Z",
+    "observed_at": "2026-10-12T03:31:30Z",
     "state": "open"
    },
    {
@@ -174,7 +184,7 @@
     "horizon_id": null,
     "last_activity_at": "2026-09-30T18:12:05Z",
     "number": 1128,
-    "observed_at": "2026-10-12T03:19:03Z",
+    "observed_at": "2026-10-12T03:31:30Z",
     "state": "open"
    },
    {
@@ -240,7 +250,7 @@
     "horizon_id": null,
     "last_activity_at": "2026-09-29T05:29:57Z",
     "number": 1105,
-    "observed_at": "2026-10-12T03:19:03Z",
+    "observed_at": "2026-10-12T03:31:30Z",
     "state": "open"
    },
    {
@@ -260,7 +270,7 @@
     "horizon_id": null,
     "last_activity_at": "2026-09-28T15:37:50Z",
     "number": 1089,
-    "observed_at": "2026-10-12T03:19:03Z",
+    "observed_at": "2026-10-12T03:31:30Z",
     "state": "open"
    },
    {
@@ -275,7 +285,7 @@
     "horizon_id": null,
     "last_activity_at": "2026-09-17T10:42:20Z",
     "number": 853,
-    "observed_at": "2026-10-12T03:19:03Z",
+    "observed_at": "2026-10-12T03:31:30Z",
     "state": "open"
    },
    {
@@ -290,7 +300,7 @@
     "horizon_id": null,
     "last_activity_at": "2026-09-12T04:21:51Z",
     "number": 784,
-    "observed_at": "2026-10-12T03:19:03Z",
+    "observed_at": "2026-10-12T03:31:30Z",
     "state": "open"
    },
    {
@@ -306,7 +316,7 @@
     "horizon_id": null,
     "last_activity_at": "2026-09-12T01:19:29Z",
     "number": 778,
-    "observed_at": "2026-10-12T03:19:03Z",
+    "observed_at": "2026-10-12T03:31:30Z",
     "state": "open"
    },
    {
@@ -321,7 +331,7 @@
     "horizon_id": null,
     "last_activity_at": "2026-09-08T22:37:53Z",
     "number": 704,
-    "observed_at": "2026-10-12T03:19:03Z",
+    "observed_at": "2026-10-12T03:31:30Z",
     "state": "open"
    },
    {
@@ -339,7 +349,7 @@
     "horizon_id": null,
     "last_activity_at": "2026-09-08T15:40:55Z",
     "number": 703,
-    "observed_at": "2026-10-12T03:19:03Z",
+    "observed_at": "2026-10-12T03:31:30Z",
     "state": "open"
    },
    {
@@ -356,7 +366,7 @@
     "horizon_id": null,
     "last_activity_at": "2026-08-30T14:12:47Z",
     "number": 586,
-    "observed_at": "2026-10-12T03:19:03Z",
+    "observed_at": "2026-10-12T03:31:30Z",
     "state": "open"
    },
    {
@@ -373,7 +383,7 @@
     "horizon_id": null,
     "last_activity_at": "2026-08-30T01:37:44Z",
     "number": 578,
-    "observed_at": "2026-10-12T03:19:03Z",
+    "observed_at": "2026-10-12T03:31:30Z",
     "state": "open"
    },
    {
@@ -393,7 +403,7 @@
     "horizon_id": null,
     "last_activity_at": "2026-08-14T23:31:52Z",
     "number": 202,
-    "observed_at": "2026-10-12T03:19:03Z",
+    "observed_at": "2026-10-12T03:31:30Z",
     "state": "open"
    }
   ],
@@ -493,7 +503,7 @@
   "source": "github-readonly"
  },
  "mode": "live",
- "now": "2026-10-12T03:19:03Z",
+ "now": "2026-10-12T03:31:30Z",
  "request": {
   "action": "merge",
   "agent_id": "pilot-session",

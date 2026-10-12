@@ -380,7 +380,7 @@ class CiAndHead(unittest.TestCase):
     def test_path_tier_failure_is_caught_when_it_ran(self):
         c = base_a()
         c["evidence"]["checks"].append({"id": 1010, "name": "web build (Next.js)", "status": "completed", "conclusion": "failure",
-                                        "head_sha": H, "event": "pull_request", "completed_at": "2026-10-12T11:47:00Z", "app": "github-actions"})
+                                        "head_sha": H, "event": "pull_request", "completed_at": "2026-10-12T11:47:00Z", "app": "github-actions", "tested_base_sha": "a" * 40})
         self.assertEqual(run(c)["decision"], "BLOCK")
 
     def test_gate_from_another_app_is_rejected(self):
@@ -422,7 +422,7 @@ class CiAndHead(unittest.TestCase):
     def test_rerun_after_failure_is_noted_not_hidden(self):
         c = base_a()
         c["evidence"]["checks"].append({"id": 900, "name": "CI Gate", "status": "completed", "conclusion": "failure", "head_sha": H,
-                                        "event": "pull_request", "completed_at": "2026-10-12T11:30:00Z", "app": "github-actions"})
+                                        "event": "pull_request", "completed_at": "2026-10-12T11:30:00Z", "app": "github-actions", "tested_base_sha": "a" * 40})
         rec = run(c)
         self.assertEqual(rec["decision"], "ELIGIBLE_SIMULATED")
         self.assertIn("RERUN_AFTER_FAILURE", codes(rec, "INFO"))
@@ -491,7 +491,7 @@ class Reviews(unittest.TestCase):
         c = with_files(base_b(), ("web/src/app/globals.css", "modified", "@@ -1 +1 @@\n-a\n+b"))
         c = with_grant(c, paths_allow=["web/**"], task_categories=["isolated-bugfix"])
         c["evidence"]["checks"].append({"id": 1020, "name": "web build (Next.js)", "status": "completed", "conclusion": "success", "head_sha": H,
-                                        "event": "pull_request", "completed_at": "2026-10-12T11:47:00Z", "app": "github-actions"})
+                                        "event": "pull_request", "completed_at": "2026-10-12T11:47:00Z", "app": "github-actions", "tested_base_sha": "a" * 40})
         rec = run(c)
         self.assertEqual(rec["decision"], "WAIT")
         self.assertIn("CODEOWNER_REVIEW_MISSING", codes(rec))
@@ -621,7 +621,7 @@ def ui_case(patch, path="web/src/components/Label.tsx", status="modified"):
     c = with_grant(c, paths_allow=["web/**", "tests/**", "docs/**"], task_categories=["a11y-label", "presentational-ui", "tests-additive", "docs-nongov"])
     c["request"]["task_category"] = "a11y-label"
     c["evidence"]["checks"].append({"id": 1030, "name": "web build (Next.js)", "status": "completed", "conclusion": "success", "head_sha": H,
-                                    "event": "pull_request", "completed_at": "2026-10-12T11:47:00Z", "app": "github-actions"})
+                                    "event": "pull_request", "completed_at": "2026-10-12T11:47:00Z", "app": "github-actions", "tested_base_sha": "a" * 40})
     return c
 
 
@@ -712,6 +712,36 @@ class ReviewerFindings(unittest.TestCase):
         for path in ["app/Services/DocumentCenter/ExpenseAttachment.php", "app/Services/DocumentCenter/CostSheet.php"]:
             c = with_files(base_b(), (path, "modified", "@@ -1 +1 @@\n-return 1;\n+return 2;"))
             self.assertEqual(run(c)["zone"], "C", path)
+
+    def test_checks_must_be_bound_to_the_tested_base(self):  # Codex round 4, P1
+        # snapshot taken after main moved AND the PR base field refreshed: both fields agree, but the runs tested an older base
+        c = base_a()
+        new_main = "9" * 40
+        c["evidence"]["main"]["sha"] = new_main
+        c["evidence"]["pr"]["base_sha"] = new_main
+        c["evidence"]["grant_store"]["ref_sha"] = new_main
+        c["evidence"]["grant_store"]["grants"][0]["origin"]["commit_sha"] = new_main
+        c["evidence"]["required_checks"]["source_sha"] = new_main
+        rec = run(c)
+        self.assertNotIn("BASE_MOVED_RETEST", codes(rec))
+        self.assertEqual(rec["decision"], "WAIT")
+        self.assertIn("CI_TESTED_AGAINST_OLDER_BASE", codes(rec))
+        for ch in c["evidence"]["checks"]:
+            ch["tested_base_sha"] = new_main
+        self.assertEqual(run(c)["decision"], "ELIGIBLE_SIMULATED")
+        c["evidence"]["checks"][0]["tested_base_sha"] = None
+        self.assertIn("TESTED_BASE_UNKNOWN", codes(run(c)))
+
+    def test_horizon_label_is_required_and_exclusive(self):  # Codex round 4, P1
+        for labels in ([], ["horizon:OTHER"], ["horizon:SYNTH-HZ-PILOT", "horizon:OTHER"], ["bug"]):
+            c = base_a()
+            c["evidence"]["pr"]["labels"] = labels
+            rec = run(c)
+            self.assertEqual(rec["decision"], "BLOCK", labels)
+            self.assertIn("HORIZON_LABEL_MISSING_OR_CONTRADICTORY", codes(rec))
+        c = base_a()
+        c["evidence"]["pr"]["labels"] = ["bug", "horizon:SYNTH-HZ-PILOT"]
+        self.assertEqual(run(c)["decision"], "ELIGIBLE_SIMULATED")
 
     def test_jsx_expression_containers_are_not_presentational(self):  # Codex P1
         for line in ['<button disabled={!isAdmin}>Delete</button>', '<a aria-label={label}>x</a>', "{show && <b>x</b>}", '{" "}']:
@@ -843,7 +873,7 @@ class ReviewerFindings(unittest.TestCase):
         c = base_a()
         c["evidence"]["checks"][2].update(conclusion="failure")
         c["evidence"]["checks"].append({"id": 5000, "name": "php artisan test (L11, pgsql)", "status": "completed", "conclusion": "success",
-                                        "head_sha": H, "event": "pull_request", "completed_at": "2026-10-12T11:50:00Z", "app": "some-other-app"})
+                                        "head_sha": H, "event": "pull_request", "completed_at": "2026-10-12T11:50:00Z", "app": "some-other-app", "tested_base_sha": "a" * 40})
         rec = run(c)
         self.assertEqual(rec["decision"], "BLOCK")
         self.assertIn("CI_CHECK_WRONG_APP", codes(rec))
@@ -853,7 +883,7 @@ class ReviewerFindings(unittest.TestCase):
         c["evidence"]["checks"] = [x for x in c["evidence"]["checks"] if x["name"] != "web build (Next.js)"]
         self.assertNotEqual(run(c)["decision"], "ELIGIBLE_SIMULATED")
         c["evidence"]["checks"].append({"id": 7000, "name": "web build (Next.js)", "status": "completed", "conclusion": "failure", "head_sha": H,
-                                        "event": "pull_request", "completed_at": "2026-10-12T11:47:00Z", "app": "github-actions"})
+                                        "event": "pull_request", "completed_at": "2026-10-12T11:47:00Z", "app": "github-actions", "tested_base_sha": "a" * 40})
         self.assertEqual(run(c)["decision"], "BLOCK")
 
     def test_low_severity_findings(self):  # F11

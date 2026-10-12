@@ -317,7 +317,7 @@ CASE_VALIDATOR = v_obj(
                     "id": v_int(1), "name": v_str(),
                     "status": v_enum("queued", "in_progress", "completed", "waiting", "requested", "pending"),
                     "conclusion": v_null(v_str()), "head_sha": v_str(rx=SHA_RX), "event": v_str(),
-                    "completed_at": v_null(v_ts()), "app": v_str(),
+                    "completed_at": v_null(v_ts()), "app": v_str(), "tested_base_sha": v_null(v_str(rx=SHA_RX)),
                 })),
                 "required_checks": v_obj({
                     "source_ref": v_str(), "source_sha": v_str(rx=SHA_RX), "gate_name": v_str(),
@@ -970,6 +970,11 @@ def check_ci(case: dict, doc: dict | None, policy: dict, reasons: Reasons) -> li
             continue
         last = _latest(runs)
         considered.append(last)
+        # each run must record the base it was tested against (workflow run's pull_requests[].base.sha) and it must be today's main
+        if last["tested_base_sha"] is None:
+            reasons.add("BLOCK", "TESTED_BASE_UNKNOWN", safe(name, 60))
+        elif last["tested_base_sha"] != ev["main"]["sha"]:
+            reasons.add("WAIT", "CI_TESTED_AGAINST_OLDER_BASE", f"{safe(name, 50)}: main moved since this run; re-run needed")
         if last["status"] != "completed":
             reasons.add("WAIT", "CI_CHECK_PENDING", f"{name} {last['status']}")
         elif last["conclusion"] != "success":
@@ -988,6 +993,10 @@ def check_ci(case: dict, doc: dict | None, policy: dict, reasons: Reasons) -> li
             continue  # path-conditional (tier=paths) checks may legitimately be absent; CI Gate owns that decision
         last = _latest(runs)
         considered.append(last)
+        if last["tested_base_sha"] is None:
+            reasons.add("BLOCK", "TESTED_BASE_UNKNOWN", safe(name, 60))
+        elif last["tested_base_sha"] != ev["main"]["sha"]:
+            reasons.add("WAIT", "CI_TESTED_AGAINST_OLDER_BASE", f"{safe(name, 50)}: main moved since this run; re-run needed")
         if last["status"] != "completed":
             reasons.add("WAIT", "CI_CHECK_PENDING", f"{name} {last['status']}")
         elif last["conclusion"] != "success":
@@ -1211,6 +1220,10 @@ def _evaluate(case, allow_synthetic: bool, policy: dict | None, wall_clock: date
     claim = pr["claim"]
     if not claim or claim["horizon_id"] != req["horizon_id"] or claim["task_id"] != req["task_id"]:
         reasons.add("BLOCK", "CLAIM_MISSING_OR_MISMATCH")
+    # V2-1B 6.3: a claim is branch + `horizon:<id>` label + Horizon-Claim block - all three, all consistent
+    horizon_labels = {l for l in pr["labels"] if l.casefold().startswith("horizon:")}
+    if horizon_labels != {f"horizon:{req['horizon_id']}"}:
+        reasons.add("BLOCK", "HORIZON_LABEL_MISSING_OR_CONTRADICTORY", f"{len(horizon_labels)} horizon label(s)")
 
     check_own_pr(case, reg, pol, reasons)
 

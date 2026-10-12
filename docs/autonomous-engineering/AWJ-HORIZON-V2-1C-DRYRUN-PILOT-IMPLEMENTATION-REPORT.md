@@ -76,7 +76,7 @@ A pure, offline, deterministic evaluator of the V2-1B §4.2 algorithm, with a re
 | `scripts/horizon-eval/contract_runner.py` | loads the 23 contract fixtures (base + overlay), prints the PASS/FAIL table. |
 | `scripts/horizon-eval/collect_snapshot.py` | **GET-only** `gh api` collector → `live` snapshot of one PR. |
 | `scripts/horizon-eval/fixtures/synthetic/**` | 2 base cases + 25 overlay cases. Every file carries `SYNTHETIC` notice; grants are `GR-SYNTHETIC-*`. The only place a grant-like file exists. |
-| `scripts/horizon-eval/snapshots/**` | 5 frozen read-only snapshots of real PRs (#1349, #1350, #1346, #586, #1093; patches omitted). |
+| `scripts/horizon-eval/snapshots/**` | 5 frozen read-only snapshots of real PRs (#1349, #1350, #1346, #586, #1093; patches omitted, so code files read `PATCH_UNAVAILABLE`). |
 | `scripts/horizon-eval/test_*.py` (4 files) | unit · contract + exhaustive mutation · static guards · live-snapshot validation |
 | `scripts/horizon-eval/README.md` | minimal usage |
 | this report | |
@@ -102,11 +102,11 @@ Command: `PYTHONDONTWRITEBYTECODE=1 python3 -I -m unittest discover -s scripts/h
 
 | Layer | File | Tests | Result |
 |---|---|---|---|
-| 1. Focused evaluator unit tests (incl. 32 review-finding regressions) | `test_horizon_eval.py` | 118 | OK |
+| 1. Focused evaluator unit tests (incl. 34 review-finding regressions) | `test_horizon_eval.py` | 120 | OK |
 | 2. Contract + regression + mutation | `test_contract.py` | 12 | OK |
 | 3. Representative read-only repository evidence | `test_live_snapshots.py` | 8 | OK |
 | Static guards (no capability, fixture isolation) | `test_static_guards.py` | 19 | OK |
-| **Total** | | **157** | **OK, 0 failures, 0 errors** |
+| **Total** | | **159** | **OK, 0 failures, 0 errors** |
 
 Fail-closed evidence beyond the contract table:
 - **472 single-input mutation points** (two eligible bases: A and B) — each element deleted, nulled, and type-swapped; none stays eligible except a reviewed harmless list (free-text/optional elements) — this found a real gap (manifest lacking a required check) fixed with the policy `ci_floor`.
@@ -200,7 +200,7 @@ Same GitHub identity as the author, so this is **not** an "independent reviewer"
 | 13 | collector truncated text before scanning (medium) | truncation is marked (`[[TRUNCATED]]` → BLOCK); oversize patches become unassessable (→ Zone B) |
 | residual | web/storefront CI was never *required* | files under `web/**` / `storefront/**` now require the matching check (policy `required_when_touched`); `docs/engineering/**`, `AGENTS.md`, ADRs are Zone C |
 
-### 8.2b Codex automated review on PR #1351 (round 1: 3 findings on `a272dc0`; round 2: 3 findings on `96d346d`; round 3: 3 findings on `8d22cf7`; all valid, all fixed)
+### 8.2b Codex automated review on PR #1351 (round 1: 3 findings on `a272dc0`; round 2: 3 findings on `96d346d`; round 3: 3 findings on `8d22cf7`; round 4: 2 findings on `3294f3b`; all valid, all fixed)
 | Severity | Finding | Resolution |
 |---|---|---|
 | P1 | backend monetary tokens (`amount`, `total`, `price`, `invoice`, …) only raised to Zone B → `$amount * 2` stayed eligible under a B grant | monetary tokens in non-UI code → **Zone C** (`BEHAVIOR_MONETARY_TOKEN_IN_BACKEND`); UI keeps B |
@@ -222,6 +222,13 @@ Round 3 (`8d22cf7`) — the findings shared one root cause: *generic `app/**` wa
 | P1 | missing/oversize patch on an already-Zone-B backend file stayed eligible | uninspectable code patch → `PATCH_UNAVAILABLE` **BLOCK** (no zone bound is assumed) |
 | P1 | `Role.php`, `StoreRoleRequest.php`… fell to generic Zone B (`return true;` in `grants()`) | generic `app/**` is **no longer Zone B**: unlisted backend paths are default-deny Zone C; Zone B is only the explicit bounded subtrees (`app/Services/DocumentCenter/**`, the tokens/presentation files, tests, bounded UI). RBAC/policy/provider/user/tenant/role/permission implementations are explicit `S-RBAC-TENANT` Zone C |
 | P1 | financial vocabulary lacked `expense`, `cost`, … | vocabulary extended (expense, cost, margin, revenue, purchase, cash, bank, custody, gosi, loan, inventory, stock, …) and now explicitly **defence in depth only**; completeness is no longer the guard |
+
+Round 4 (`3294f3b`):
+
+| Severity | Finding | Resolution |
+|---|---|---|
+| P1 | `pr.base_sha == main.sha` can both be fresh while checks ran against an older merge ref | every counted run must carry the base it was **tested** against (collector reads it from the workflow run's `pull_requests[].base.sha`); mismatch → `CI_TESTED_AGAINST_OLDER_BASE` (WAIT), unknown → `TESTED_BASE_UNKNOWN` (BLOCK) |
+| P1 | claim validated from the body only | exact `horizon:<id>` label required and no contradictory `horizon:*` label (V2-1B §6.3: branch + label + claim block) |
 
 Known limit of the allowlist: a plain-text line is indistinguishable from an attribute line in multi-line JSX beyond the boolean-attribute list; the allowlist is deliberately narrow (labels/text), and anything it does not recognise falls to Zone B, never A.
 
