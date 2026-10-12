@@ -11,6 +11,25 @@
 
 type Json = unknown;
 
+/**
+ * مصدر الحدث شرط ثانٍ للتجميع (مراجعة Codex): نوع الورقة وحده لا يميّز الكتابة عن **اختيار منفصل** — تغيير قائمة منسدلة أو
+ * صورة مرتين خلال ثانية لا يجوز أن يُدمج فيُفقد الاختيار الأوسط. لذا لا يُجمَّع إلا ما نشأ من حدث `input` لعنصر إدخال
+ * مستمر: نص/رقم/منزلق/لون/منطقة نصية. القوائم المنسدلة والأزرار والمنتقيات تبقى خطوات مستقلة دائماً.
+ */
+const CONTINUOUS_INPUT_TYPES = new Set(["text", "search", "email", "url", "tel", "password", "number", "range", "color"]);
+
+export function isContinuousInputTarget(target: EventTarget | null): boolean {
+  const element = target as HTMLElement | null;
+  if (!element || typeof element.tagName !== "string") return false;
+  const tag = element.tagName.toLowerCase();
+  if (tag === "textarea") return true;
+  if (tag !== "input") return false;
+  return CONTINUOUS_INPUT_TYPES.has(((element as HTMLInputElement).type || "text").toLowerCase());
+}
+
+/** نافذة ربط التعديل بحدث `input` المستمر: المعالج يعمل متزامناً داخل الحدث؛ ما يتأخر عن ذلك (debounce) لا يُجمَّع. */
+export const CONTINUOUS_INPUT_WINDOW_MS = 100;
+
 const MAX_DIFFS = 2;
 
 function isPlainObject(value: Json): value is Record<string, Json> {

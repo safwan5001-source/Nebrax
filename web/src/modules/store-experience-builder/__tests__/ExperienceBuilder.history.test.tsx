@@ -139,6 +139,27 @@ describe('ExperienceBuilder — CUST-H5-2 Undo / Redo', () => {
     await waitFor(() => expect(firstTextbox().value).toBe(original + 'abc'));
   });
 
+  it('two quick choices on a discrete control (a select) are two Undo steps, never merged like keystrokes', async () => {
+    const user = await mount();
+    await user.click(document.querySelector('[data-panel-option="theme"]') as HTMLElement);
+    const select = screen.getByRole('combobox', { name: 'الخط' }) as HTMLSelectElement; // the font preset: a document field
+    expect(select.options.length).toBeGreaterThanOrEqual(2);
+    const original = select.value;
+    const other = Array.from(select.options).find((o) => o.value !== original)!.value;
+
+    await user.selectOptions(select, other);
+    await user.selectOptions(select, original); // back again, well inside the 1 s grouping window
+    expect(select.value).toBe(original);
+    // Merged like keystrokes, the round trip would cancel out and leave nothing to undo.
+    expect(undoBtn().getAttribute('aria-disabled')).toBe('false');
+
+    await user.click(undoBtn());
+    expect(select.value).toBe(other); // the intermediate choice is not skipped
+    await user.click(undoBtn());
+    expect(select.value).toBe(original);
+    expect(undoBtn().getAttribute('aria-disabled')).toBe('true');
+  });
+
   it('a new edit after Undo discards the Redo branch', async () => {
     const user = await mount();
     await user.type(firstTextbox(), 'a');

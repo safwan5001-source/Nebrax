@@ -1,5 +1,8 @@
+/**
+ * @vitest-environment jsdom
+ */
 import { describe, expect, it } from "vitest";
-import { intentGroupKey } from "../history/change-intent";
+import { intentGroupKey, isContinuousInputTarget } from "../history/change-intent";
 import {
   DEFAULT_PRESENTATION_CONFIG,
   clonePresentationConfig,
@@ -74,5 +77,41 @@ describe("intentGroupKey (CUST-H5-2)", () => {
     if (dup) expect(intentGroupKey(base, dup.config)).toBeUndefined();
     const del = deleteSection(base, ids[ids.length - 1]);
     if (del) expect(intentGroupKey(base, del.config)).toBeUndefined();
+  });
+});
+
+describe("isContinuousInputTarget (CUST-H5-2 review)", () => {
+  const make = (html: string) => {
+    const host = document.createElement("div");
+    host.innerHTML = html;
+    return host.firstElementChild as HTMLElement;
+  };
+
+  it("is true only for continuous text/number/range/colour inputs and textareas", () => {
+    for (const html of [
+      "<input>",
+      '<input type="text">',
+      '<input type="search">',
+      '<input type="number">',
+      '<input type="range">',
+      '<input type="color">',
+      "<textarea></textarea>",
+    ]) {
+      expect(isContinuousInputTarget(make(html)), html).toBe(true);
+    }
+  });
+
+  it("is false for discrete controls: select, checkbox, radio, file, buttons, plain elements, null", () => {
+    for (const html of [
+      "<select><option>a</option></select>",
+      '<input type="checkbox">',
+      '<input type="radio">',
+      '<input type="file">',
+      "<button>x</button>",
+      "<div>x</div>",
+    ]) {
+      expect(isContinuousInputTarget(make(html)), html).toBe(false);
+    }
+    expect(isContinuousInputTarget(null)).toBe(false);
   });
 });

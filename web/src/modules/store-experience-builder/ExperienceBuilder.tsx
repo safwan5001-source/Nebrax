@@ -108,7 +108,7 @@ import {
 import { useCompany } from "@/lib/company";
 import { safeTimeZone } from "@/lib/timezone";
 import { CancelScheduleConfirmDialog, ScheduleConfirmDialog } from "./ScheduleDialogs";
-import { intentGroupKey } from "./history/change-intent";
+import { CONTINUOUS_INPUT_WINDOW_MS, intentGroupKey, isContinuousInputTarget } from "./history/change-intent";
 import {
   type HistoryShortcut,
   ariaKeyShortcuts,
@@ -457,6 +457,7 @@ export function ExperienceBuilder({
   const historyScopeRef = useRef(historyScope);
   historyScopeRef.current = historyScope;
   const [historyAnnouncement, setHistoryAnnouncement] = useState({ text: "", n: 0 });
+  const continuousInputAtRef = useRef(Number.NEGATIVE_INFINITY);
   // المنصّة تُحدَّد بعد التركيب فقط: الخادم لا `navigator` له، فتحديدها أثناء التصيير يُنتج `title`/`aria-keyshortcuts` مختلفين
   // بين HTML الخادم والتهيئة (hydration mismatch) على macOS.
   const [historyIsMac, setHistoryIsMac] = useState(false);
@@ -1618,7 +1619,11 @@ export function ExperienceBuilder({
     normalized.sbc.authentication_number = next.sbc.authentication_number;
     normalized.sbc.seal_token = next.sbc.seal_token;
     // CUST-H5-2 — نية التعديل (حقل نصّي/رقمي واحد) تُجمَّع في خطوة تراجع واحدة؛ كل ما عداه خطوة مستقلة.
-    if (historyScope) history.record(historyScope, normalized, intentGroupKey(draftRef.current, normalized));
+    // التجميع يشترط أن التعديل وليد حدث إدخال مستمر (نص/رقم/منزلق/لون) لا اختيار منفصل (قائمة/منتقي/زر).
+    const fromContinuousInput = performance.now() - continuousInputAtRef.current < CONTINUOUS_INPUT_WINDOW_MS;
+    if (historyScope) {
+      history.record(historyScope, normalized, fromContinuousInput ? intentGroupKey(draftRef.current, normalized) : undefined);
+    }
     setDraft(normalized);
     setLifecycle("dirty");
     setNotice(null);
@@ -2640,6 +2645,9 @@ export function ExperienceBuilder({
       data-selected-version-id={selectedVersion?.id ?? ""}
       data-selected-version-state={selectedVersion?.state ?? ""}
       data-selected-version-revision={selectedVersion?.revision ?? ""}
+      onInputCapture={(event) => {
+        if (isContinuousInputTarget(event.target)) continuousInputAtRef.current = performance.now();
+      }}
       data-can-undo={undoEnabled ? "true" : "false"}
       data-can-redo={redoEnabled ? "true" : "false"}
       data-panel={panel}
