@@ -158,7 +158,9 @@ class DocumentStorageDurableProfileTest extends TestCase
         $this->assertTrue(app(DocumentStorageService::class)->exists('platform', 'tenants/t/legacy.pdf'), 'lock open ⇒ S3');
 
         $this->close();
-        Storage::fake('local');
+        $local = Mockery::mock(Filesystem::class);
+        $local->shouldReceive('exists')->with('tenants/t/legacy.pdf')->once()->andReturn(false);
+        Storage::shouldReceive('disk')->with('local')->once()->andReturn($local);
         $this->assertFalse(app(DocumentStorageService::class)->exists('platform', 'tenants/t/legacy.pdf'), 'lock closed ⇒ local');
     }
 
