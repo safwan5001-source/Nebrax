@@ -14,7 +14,7 @@ The page now shows, from the data the API already returns: the price in effect b
 
 ## What was done
 
-Product code: `prices/page.tsx` (rewritten layout), `prices/price-status.ts` (new, pure date comparison), new message keys in the `platformPrices` namespace of `ar.json` and `en.json`.
+Product code: `prices/page.tsx` (rewritten layout), `prices/price-status.ts` (new, pure date comparison) and `prices/use-today.ts` (new, see the review corrections), new message keys in the `platformPrices` namespace of `ar.json` and `en.json`.
 
 - **Header:** one `h1` and subtitle. The page-level "back" link is gone (the shell has the Prices destination); `Prices` is a top-level destination so there is no parent to return to.
 - **Current prices by plan** (new section): one card per plan (`free`, `basic`, `pro`, `enterprise`, plus any other plan code the API returns): the amount in effect by date, since which date, and the next scheduled version with its start date. No amount is computed; each is `formatRiyal` of the API's `monthly_amount` string. A plan with no versions says so; a plan whose only versions are in the future says "No version in effect yet".
@@ -46,8 +46,9 @@ Product code: `prices/page.tsx` (rewritten layout), `prices/price-status.ts` (ne
 ## Files changed
 
 - `web/src/app/platform/(console)/prices/page.tsx`
-- `web/src/app/platform/(console)/prices/price-status.ts` (new) and `price-status.test.ts` (new, 8 tests)
-- `web/src/app/platform/(console)/prices/prices.test.tsx` (new, 17 tests)
+- `web/src/app/platform/(console)/prices/price-status.ts` (new) and `price-status.test.ts` (new, 9 tests)
+- `web/src/app/platform/(console)/prices/use-today.ts` and `use-today.test.tsx` (new, 3 tests)
+- `web/src/app/platform/(console)/prices/prices.test.tsx` (new, 18 tests)
 - `web/src/messages/ar.json`, `web/src/messages/en.json`
 - `docs/plans/platform/AWJ-PLATFORM-UX-H1-4C-PRICING-REPORT.md` (new)
 - `docs/plans/platform/AWJ-PLATFORM-UX-H1-4B-TENANT-DETAIL-REPORT.md`, `AWJ-PLATFORM-UX-H1.md` (status and closure only)
@@ -58,13 +59,13 @@ No existing test file needed changes: the platform shell tests, the tenant tests
 
 | Command | Result |
 |---|---|
-| `npx vitest run src/components/platform src/app/platform src/design src/lib` | 99 files, 718 tests passed |
-| `npm test` (full web suite) | 507 files, 5328 tests passed |
+| `npx vitest run src/components/platform src/app/platform src/design src/lib` | 100 files, 723 tests passed (after the review corrections) |
+| `npm test` (full web suite) | 508 files, 5333 tests passed (after the review corrections) |
 | `npm run build` | passed; all 7 `/platform*` routes build, URLs unchanged |
 | `npx tsc --noEmit` | 48 errors, same count as `main`; none in the prices files |
 | ESLint | not run: the repo has no ESLint config |
 
-New tests (25, jsdom, real page, real `ar.json`/`en.json`, real `formatRiyal`, `platformApi` mocked, system date pinned to 2026-10-12): no private link, one `h1` and three labelled sections; every API amount shown exactly as `formatRiyal` formats the API string and no derived sum; in-effect, scheduled and superseded by date in the summary and the history; a lone future version is never current; equal-date versions are not disambiguated; typing and previewing send nothing and the preview echoes amount and integer minor units; exact POST body with an integer amount; Arabic-Indic digits and separators produce the same integer; malformed and negative amounts produce no request and an inline error; success is a status with the saved values and the date-derived state, failure is an alert and keeps history and input; labels and 44px controls; load failure alert with 44px Retry while the form stays; skeleton and empty states; the signed-out redirect; Arabic render with dates isolated left-to-right; message keys in both locales. The 8 unit tests cover the date rule (today is in effect, tomorrow is not, grouping by plan and currency, ties, null dates, next scheduled, UTC date).
+New tests (30 after the review corrections, jsdom, real page, real `ar.json`/`en.json`, real `formatRiyal`, `platformApi` mocked, system date pinned to 2026-10-12): no private link, one `h1` and three labelled sections; every API amount shown exactly as `formatRiyal` formats the API string and no derived sum; in-effect, scheduled and superseded by date in the summary and the history; a lone future version is never current; equal-date versions are not disambiguated; typing and previewing send nothing and the preview echoes amount and integer minor units; exact POST body with an integer amount; Arabic-Indic digits and separators produce the same integer; malformed and negative amounts produce no request and an inline error; success is a status with the saved values and the date-derived state, failure is an alert and keeps history and input; labels and 44px controls; load failure alert with 44px Retry while the form stays; skeleton and empty states; the signed-out redirect; Arabic render with dates isolated left-to-right; message keys in both locales. The 8 unit tests cover the date rule (today is in effect, tomorrow is not, grouping by plan and currency, ties, null dates, next scheduled, UTC date).
 
 Real browser (Playwright-core and Chromium, Next dev server, demo mode). **Mock versus real session:** every `/api/*` call was intercepted by the probe. `GET` and `POST /platform/prices` returned fixtures built relative to the run date (past, today-tied, future, a 999,999,999.99 amount); other endpoints returned 503. There was no Laravel API and no real platform session, so server validation (for example whether it accepts past dates), real latency and authorization were not exercised. Ad-hoc probes, not committed, not run by CI.
 
@@ -82,6 +83,15 @@ Findings from the browser run, fixed before this report: at 1024px with extreme 
 - **Keyboard:** the form is reachable in order with native controls; a failure is an `alert`, success a `status`; there is no dialog on this page, so no dialog focus management applies.
 - **Labels and targets:** the three form controls have programmatic labels; the amount has `aria-invalid` and `aria-describedby` for its hint or error; the primary action is 44px.
 - **Not verified:** landscape, zoom and text scaling, screen readers, and a real authenticated session against the Laravel API. H1-5 owns those.
+
+## Review corrections (two P2 findings from the automated Codex review of `5bb833e`)
+
+Both were verified against the code before changing anything; both were real, small and in scope.
+
+1. **Saved-version confirmation could contradict the history.** The success message labelled a new version "In effect by date" whenever its date was not in the future. A retroactive version (for example dated 2026-01-01 when the plan already has a version from 2026-09-01) is classified as superseded in the history by the same rule, so the two disagreed. The confirmation now reads its state from the same classification of the updated catalogue the history uses: scheduled, in effect by date, or a new text "Superseded: a later version is already in effect". A test saves a retroactive version and asserts the message and the row agree; it fails if the old behaviour is restored.
+2. **Date-derived state could go stale in a long-lived tab.** "Today" was computed on render, so a page left open across UTC midnight kept yesterday's classification until an unrelated render. A small hook, `useToday`, now holds today's UTC date as state, advances it at the next UTC midnight (and every day after), and re-reads it when the tab becomes visible again (a sleeping device skips timers). Tests use fake timers to prove the rollover without interaction, the repeat roll, the visibility re-read, and that the timer is cleared on unmount; a pure helper has its own unit test.
+
+Neither change touches the request, the money helpers or any other behaviour.
 
 ## Pre-merge reviews
 

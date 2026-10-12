@@ -196,6 +196,19 @@ describe('platform prices UX (H1-4C)', () => {
       expect(screen.queryByRole('alert')).toBeNull();
     });
 
+    it('labels a retroactive version as superseded in the confirmation, matching its row in the history', async () => {
+      await renderLoaded();
+      platformApi.mockResolvedValueOnce({ data: price('retro', 'pro', '99.00', '2026-01-01', '2026-10-12T09:00:00+00:00') });
+      fireEvent.change(screen.getByLabelText(t('plan')), { target: { value: 'pro' } });
+      fill('99', '2026-01-01');
+      fireEvent.click(screen.getByRole('button', { name: t('save') }));
+      const status = await screen.findByRole('status');
+      expect(status.textContent).toContain(t('savedSuperseded'));
+      expect(status.textContent).not.toContain(t('savedEffective'));
+      const row = screen.getAllByRole('row').find((r) => r.textContent?.startsWith('pro') && r.textContent.includes(formatRiyal('99.00'))) as HTMLElement;
+      expect(within(row).getByText(t('statusSuperseded'))).toBeTruthy();
+    });
+
     it('a failed save shows the server message as an alert next to the form and keeps the history', async () => {
       await renderLoaded();
       platformApi.mockRejectedValueOnce(new ApiError('Date must not be in the past'));
@@ -246,7 +259,7 @@ describe('platform prices UX (H1-4C)', () => {
     expect(isolated).toContain('2026-06-01');
     expect(isolated).toContain('2026-12-01');
     expect(isolated).toContain(formatRiyal('199.99'));
-    const keys = ['summaryTitle', 'summaryNote', 'statusColumn', 'addedOn', 'statusCurrent', 'statusScheduled', 'statusSuperseded', 'statusUnknown', 'sinceDate', 'startsOn', 'monthlyWord', 'effectiveWord', 'noPrice', 'noCurrentPrice', 'nextScheduled', 'tiedDate', 'effectNote', 'amountHint', 'invalidAmount', 'previewTitle', 'previewScheduled', 'previewEffective', 'previewStored', 'savedScheduled', 'savedEffective', 'historyNote'];
+    const keys = ['summaryTitle', 'summaryNote', 'statusColumn', 'addedOn', 'statusCurrent', 'statusScheduled', 'statusSuperseded', 'statusUnknown', 'sinceDate', 'startsOn', 'monthlyWord', 'effectiveWord', 'noPrice', 'noCurrentPrice', 'nextScheduled', 'tiedDate', 'effectNote', 'amountHint', 'invalidAmount', 'previewTitle', 'previewScheduled', 'previewEffective', 'previewStored', 'savedScheduled', 'savedEffective', 'savedSuperseded', 'historyNote'];
     for (const lang of [ar, en]) for (const key of keys) expect(typeof (lang.platformPrices as Record<string, unknown>)[key]).toBe('string');
   });
 });

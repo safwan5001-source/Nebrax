@@ -64,3 +64,9 @@ export function nextScheduled<T extends PriceVersionLike>(versions: readonly T[]
   if (future.length === 0) return null;
   return future.reduce((min, price) => ((price.effective_on as string) < (min.effective_on as string) ? price : min));
 }
+
+/** مللي ثانية حتى منتصف الليل UTC التالي (دائماً > 0) — لإعادة اشتقاق «اليوم» في صفحة تبقى مفتوحة. */
+export function msUntilNextUtcMidnight(now: Date = new Date()): number {
+  const next = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1);
+  return next - now.getTime();
+}

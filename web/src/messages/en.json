@@ -474,6 +474,7 @@
     "historyNote": "Append-only history: price versions are never edited or deleted.",
     "monthlyWord": "monthly",
     "effectiveWord": "effective",
+    "savedSuperseded": "Superseded: a later version is already in effect",
     "history": "Price version history",
     "empty": "No price versions recorded yet.",
     "price": "Monthly price",

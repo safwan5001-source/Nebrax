@@ -17,6 +17,7 @@ import { formatMinorRiyal, formatRiyal, isValidRiyal, riyalToMinor } from '@/lib
 import { isPlatformAuthenticated } from '@/lib/platform-auth';
 import { platformApi } from '@/lib/platform-api';
 import { classifyPriceVersions, nextScheduled, todayIsoDate, type PriceClassification, type PriceStatus } from './price-status';
+import { useToday } from './use-today';
 
 const PLANS = ['free', 'basic', 'pro', 'enterprise'] as const;
 
@@ -88,7 +89,7 @@ export default function PlatformPricesPage() {
     load();
   }, [load, router]);
 
-  const today = todayIsoDate();
+  const today = useToday();
   const classification = useMemo(() => classifyPriceVersions(prices, today), [prices, today]);
 
   const typedMinor = monthlyPrice.trim() === '' ? null : riyalToMinor(monthlyPrice);
@@ -125,7 +126,11 @@ export default function PlatformPricesPage() {
     return [...PLANS, ...Array.from(new Set(extra))];
   }, [prices]);
 
-  const savedStatus = saved ? (saved.effective_on && saved.effective_on > today ? 'savedScheduled' : 'savedEffective') : null;
+  // حالة النسخة المحفوظة تُشتق من التصنيف نفسه المستخدم في السجل بعد إدراجها: نسخة بأثر رجعي خلف نسخة أحدث
+  // سارية تظهر «سابقة» هنا أيضاً لا «سارية».
+  const savedState = saved ? classification.get(saved.id)?.status : undefined;
+  const savedStatus =
+    savedState === 'scheduled' ? 'savedScheduled' : savedState === 'current' ? 'savedEffective' : savedState === 'superseded' ? 'savedSuperseded' : null;
 
   return (
     <main className="mx-auto max-w-5xl space-y-6 px-4 py-6 sm:px-6 lg:px-8">
@@ -206,12 +211,12 @@ export default function PlatformPricesPage() {
             )}
 
             {saveError && <p className="text-sm text-negative" role="alert">{saveError}</p>}
-            {saved && savedStatus && (
+            {saved && (
               <div className="rounded border border-positive/20 bg-positive/10 px-3 py-2 text-sm text-positive" role="status">
                 <p>{t('saved')}</p>
                 <p className="mt-1 text-xs">
                   <Ltr>{saved.plan}</Ltr> · <Ltr>{formatRiyal(saved.monthly_amount)}</Ltr> {t('monthlyWord')} · {t('effectiveWord')} <Ltr>{saved.effective_on ?? '—'}</Ltr> ·{' '}
-                  {savedStatus === 'savedScheduled' ? <>{t('savedScheduled')} <Ltr>{saved.effective_on ?? '—'}</Ltr></> : t('savedEffective')}
+                  {savedStatus === 'savedScheduled' ? <>{t('savedScheduled')} <Ltr>{saved.effective_on ?? '—'}</Ltr></> : savedStatus ? t(savedStatus) : null}
                 </p>
               </div>
             )}
