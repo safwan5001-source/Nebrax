@@ -964,6 +964,10 @@ export function ExperienceBuilder({
   // (تبديل رؤية أو نقل) وحده يُماديها فعلياً عبر `updateDraft` أول مرة.
   const effectiveProductRegions: PageRegionInstance<ProductPageRegionKey>[] =
     draft.pagePresentation?.product?.regions ?? defaultProductPageRegions();
+  // معاينة لقطة: الكانفاس يعرض تخطيط صفحتَي المنتج/التصنيف من **اللقطة** لا من المسودة الحية (التحرير يبقى على `effective*`).
+  const canvasProductRegions: PageRegionInstance<ProductPageRegionKey>[] = historyPreview
+    ? historyPreview.config.pagePresentation?.product?.regions ?? defaultProductPageRegions()
+    : effectiveProductRegions;
 
   async function loadProductList(search?: string) {
     if (!storefrontId) return;
@@ -1033,6 +1037,9 @@ export function ExperienceBuilder({
   // CUST-H2-4 — نفس منطق `effectiveProductRegions` أعلاه بالضبط، للتصنيف.
   const effectiveCategoryRegions: PageRegionInstance<CategoryPageRegionKey>[] =
     completeCategoryRegions(draft.pagePresentation?.category?.regions ?? defaultCategoryPageRegions());
+  const canvasCategoryRegions: PageRegionInstance<CategoryPageRegionKey>[] = historyPreview
+    ? completeCategoryRegions(historyPreview.config.pagePresentation?.category?.regions ?? defaultCategoryPageRegions())
+    : effectiveCategoryRegions;
 
   async function loadCategoryList(search?: string) {
     if (!storefrontId) return;
@@ -1796,7 +1803,10 @@ export function ExperienceBuilder({
   }
 
   function focusHistoryTrigger() {
-    const trigger = historyTriggerRef.current;
+    const recorded = historyTriggerRef.current;
+    // عنصر داخل قائمة منسدلة (المزيد) يبقى متصلاً بعد إغلاقها لكنه مخفيّ: نعيد التركيز إلى زرّ القائمة المرئي نفسه لا إلى عنصرها.
+    const menu = recorded?.closest<HTMLElement>('[role="menu"]');
+    const trigger = menu ? menu.parentElement?.querySelector<HTMLElement>(":scope > button[aria-haspopup]") ?? null : recorded;
     const target = trigger?.isConnected ? trigger : document.querySelector<HTMLElement>("[data-builder-toolbar] [aria-expanded]");
     window.setTimeout(() => target?.focus(), 0);
   }
@@ -3497,12 +3507,12 @@ export function ExperienceBuilder({
                   onSelectChrome={handleSelectChrome}
                   productPreviewState={previewProductState}
                   previewProduct={previewProduct}
-                  productRegions={effectiveProductRegions}
+                  productRegions={canvasProductRegions}
                   selectedProductRegionId={selectedProductRegion}
                   onSelectProductRegion={handleSelectProductRegion}
                   categoryPreviewState={previewCategoryState}
                   previewCategory={previewCategory}
-                  categoryRegions={effectiveCategoryRegions}
+                  categoryRegions={canvasCategoryRegions}
                   selectedCategoryRegionId={selectedCategoryRegion}
                   onSelectCategoryRegion={handleSelectCategoryRegion}
                   categoryGridProductsState={categoryGridProductsState}
