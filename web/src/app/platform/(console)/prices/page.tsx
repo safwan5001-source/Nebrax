@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { Tag } from 'lucide-react';
@@ -70,17 +70,23 @@ export default function PlatformPricesPage() {
   const [monthlyPrice, setMonthlyPrice] = useState('');
   const [effectiveOn, setEffectiveOn] = useState(() => todayIsoDate());
 
+  // رقم آخر طلب جلب: نتيجة طلب أقدم تُهمل كلياً فلا تمحو نسخة حُفظت بعد انطلاقه ولا تُظهر قائمة سابقة لها.
+  const loadSeq = useRef(0);
+
   const load = useCallback(async () => {
+    const seq = ++loadSeq.current;
     setLoading(true);
     setLoadError(null);
     try {
       const response = await platformApi<{ data: PriceVersion[] }>('/platform/prices');
+      if (seq !== loadSeq.current) return;
       setPrices(response.data);
       setCatalogueLoaded(true);
     } catch (reason) {
+      if (seq !== loadSeq.current) return;
       setLoadError(reason instanceof ApiError ? reason.message : t('loadFailed'));
     } finally {
-      setLoading(false);
+      if (seq === loadSeq.current) setLoading(false);
     }
   }, [t]);
 
@@ -114,11 +120,15 @@ export default function PlatformPricesPage() {
         method: 'POST',
         body: { plan, currency: 'SAR', monthly_amount: amount, effective_on: effectiveOn },
       });
-      setPrices((current) => sortPrices([response.data, ...current]));
       setMonthlyPrice('');
       setSaved(response.data);
-      // الجلب الأول فشل: القائمة المحلية ناقصة، فنعيد جلب الكتالوج كاملاً بدل إظهار خطأ قديم بجانب نجاح الحفظ.
-      if (!catalogueLoaded) void load();
+      if (catalogueLoaded) {
+        setPrices((current) => sortPrices([response.data, ...current]));
+      } else {
+        // الكتالوج لم يكتمل جلبه (فشل أو ما زال جارياً): لا تُبنى قائمة جزئية من الصف المُرجَع وحده، بل يُعاد الجلب،
+        // وتبقى الملخصات والسجل غير متاحة حتى ينجح جلب كامل. الجلب الأقدم المعلّق يُهمل برقم الطلب.
+        void load();
+      }
     } catch (reason) {
       setSaveError(reason instanceof ApiError ? reason.message : t('saveFailed'));
     } finally {
@@ -149,11 +159,11 @@ export default function PlatformPricesPage() {
 
       <section aria-labelledby="prices-summary">
         <h2 id="prices-summary" className="mb-3 text-sm font-semibold text-text">{t('summaryTitle')}</h2>
-        {loading && prices.length === 0 ? (
+        {loadError ? null : !catalogueLoaded ? (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4" data-testid="prices-skeleton">
             {PLANS.map((code) => <Skeleton key={code} className="h-28" />)}
           </div>
-        ) : loadError ? null : (
+        ) : (
           <>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
               {planCodes.map((code) => (
@@ -238,7 +248,7 @@ export default function PlatformPricesPage() {
                 <p className="text-sm text-negative" role="alert">{loadError}</p>
                 <Button variant="outline" className="h-11" onClick={load}>{t('retry')}</Button>
               </div>
-            ) : loading && prices.length === 0 ? (
+            ) : !catalogueLoaded ? (
               <Skeleton className="h-52 w-full" />
             ) : prices.length === 0 ? (
               <p className="text-sm text-muted">{t('empty')}</p>

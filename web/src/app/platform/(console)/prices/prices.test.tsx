@@ -280,6 +280,57 @@ describe('platform prices UX (H1-4C)', () => {
     });
   });
 
+  describe('catalogue requests racing with a save', () => {
+    const deferred = <T,>() => {
+      let resolve!: (value: T) => void;
+      const promise = new Promise<T>((r) => { resolve = r; });
+      return { promise, resolve };
+    };
+    const saveOne = () => {
+      fireEvent.change(screen.getByLabelText(t('monthlyPrice')), { target: { value: '110' } });
+      fireEvent.change(screen.getByLabelText(t('effectiveOn')), { target: { value: '2026-12-25' } });
+      fireEvent.click(screen.getByRole('button', { name: t('save') }));
+    };
+
+    it('ignores an older catalogue response that arrives after the post-save reload', async () => {
+      const first = deferred<{ data: unknown[] }>();
+      const created = price('new', 'basic', '110.00', '2026-12-25');
+      platformApi.mockReset();
+      platformApi.mockReturnValueOnce(first.promise); // initial GET, still pending
+      platformApi.mockResolvedValueOnce({ data: created }); // POST
+      platformApi.mockResolvedValueOnce({ data: [...catalogue().data, created] }); // reload after the save
+      render(<PlatformPricesPage />);
+      saveOne();
+      await screen.findByRole('status');
+      // the confirmation also shows the amount, so look in the history table only
+      const inHistory = () => screen.queryAllByRole('row').filter((row) => row.textContent?.includes(formatRiyal('110.00')));
+      await waitFor(() => expect(inHistory()).toHaveLength(1));
+      // the stale initial response (captured before the save) now lands last
+      first.resolve(catalogue());
+      await new Promise((r) => setTimeout(r, 0));
+      expect(inHistory()).toHaveLength(1);
+    });
+
+    it('keeps the summary and history unavailable until a complete catalogue arrives', async () => {
+      platformApi.mockReset();
+      platformApi.mockRejectedValueOnce(new ApiError('temporary outage'));
+      render(<PlatformPricesPage />);
+      await screen.findByRole('alert');
+      const reload = deferred<{ data: unknown[] }>();
+      platformApi.mockResolvedValueOnce({ data: price('new', 'basic', '110.00', '2026-01-01') }); // POST
+      platformApi.mockReturnValueOnce(reload.promise); // reload hangs
+      saveOne();
+      await screen.findByRole('status');
+      // only the returned row exists locally; it must not be presented as a catalogue or a current price
+      expect(screen.getByTestId('prices-skeleton')).toBeTruthy();
+      expect(screen.queryAllByText(formatRiyal('110.00'))).toHaveLength(1); // the confirmation only
+      expect(screen.queryByText(t('empty'))).toBeNull();
+      reload.resolve({ data: [...catalogue().data, price('new', 'basic', '110.00', '2026-01-01')] });
+      await waitFor(() => expect(screen.queryByTestId('prices-skeleton')).toBeNull());
+      expect(screen.getAllByText(formatRiyal('199.99')).length).toBeGreaterThan(0);
+    });
+  });
+
   it('shows skeletons while loading and an empty state with no price anywhere', async () => {
     platformApi.mockResolvedValue({ data: [] });
     render(<PlatformPricesPage />);
