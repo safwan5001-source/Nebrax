@@ -1,19 +1,19 @@
 # AWJ-HORIZON-V2-1C — Practical Autonomy Pilot (dry-run evaluator) — Implementation Report
 
-STATUS: ``PILOT_PASS` (conditional — see §1) · PR open, CI green on the last code commit, **not merged**`
+STATUS: `PILOT_PASS` (conditional — see §1) · PR #1351 open, CI green on the final code head, final review closure done, **not merged**
 DATE: 2026-10-12
 SCOPE: dry-run only. **No merge, no deploy, no Ruleset/Protection/Auto-Merge/permission change, no grant issued, no other Horizon touched, no V2-4.** `ELIGIBLE_SIMULATED` is a statement about decision logic over synthetic fixtures, never permission to merge.
 
-## 1. Executive verdict — ``PILOT_PASS` — with the conditions below`
+## 1. Executive verdict — `PILOT_PASS` (conditional)
 
 **Evidence for PASS**
 - Evaluator implemented, offline and incapable of acting (static guards: no network/process/env/write/merge symbols; GET-only collector).
 - Live mode **can never** return `ELIGIBLE_SIMULATED` (no owner-authenticity verifier exists); synthetic grants are refused in live mode and live evidence cannot be relabelled synthetic.
-- 172 local tests OK (stdlib), 23/23 V2-1B contract cases in 11 scenarios (+2 extras), **false-eligible = 0**; 472-point single-input mutation sweep and a sabotage run (22/23 injected defects caught, survivor double-defended) found no eligible survivor.
-- CI green on the last code commit (§7). No merge, deploy, ruleset/protection/auto-merge/permission change, grant, or other-horizon edit.
+- 172 local tests OK (stdlib), 23/23 V2-1B contract cases in 11 scenarios (+2 extras), **false-eligible = 0**; 492-point single-input mutation sweep and a sabotage run (22/23 injected defects caught, survivor double-defended) found no eligible survivor.
+- CI green on the final code head `7189ae8` (§7); all 17 Codex review threads resolved, each fix proved by reverting it (§8.5). No merge, deploy, ruleset/protection/auto-merge/permission change, grant, or other-horizon edit.
 
 **Conditions (why it is "conditional")**
-1. *Heuristic zone classifier is not exhaustive.* Eight rounds of automated + adversarial review each found real false-eligible paths in the **synthetic-mode classifier** (all fixed, each with a test). The reviewer's quota ended before the final head was re-reviewed. Known classes of residual are listed in §8/§11. This affects only the simulation — live mode is unconditionally non-eligible — but it means "eligible in simulation" must not be read as "the classifier is proven".
+1. *Heuristic zone classifier is not exhaustive.* Eight Codex rounds plus two adversarial Reviewer passes each found real false-eligible paths in the **synthetic-mode classifier** (all fixed, each with a test; the second Reviewer pass ran on the final tree). Codex's quota ended after round 8, so the last fixes had no further Codex round. Known classes of residual are listed in §8/§11. This affects only the simulation — live mode is unconditionally non-eligible — but it means "eligible in simulation" must not be read as "the classifier is proven".
 2. *No independent reviewer identity exists* (T2/D4); every review here was by the same GitHub identity.
 3. *Authenticity (D2) is unresolved by design*; a pilot with real merges is out of scope until it is.
 4. *Tests are not wired into CI* (needs a Zone C `.github/**` change).
@@ -26,8 +26,8 @@ None of the above is a bypassed security or authenticity check; they are declare
 |---|---|
 | Branch | `horizon/v2-1c-dryrun-authorization-evaluator` (new, independent, from latest `origin/main`) |
 | PR | [#1351](https://github.com/safwan5001-source/Nebrax/pull/1351) (open, ready for review, not merged) |
-| Base SHA (`origin/main` when the PR was opened) | `11abda97dd1d25782d27f06f0312a3d5abec57a2` (PR base; `main` has since advanced to `fa23d08a2b98…` with unrelated changes, no conflict) |
-| Final Head SHA | last code commit `3825c3ccef21bab174110237559c15827cfda1b6` — CI verified on it (§7). The commit that adds this filled-in report is docs-only; its own CI result is posted on the PR (the report cannot contain the hash of the commit that contains it; the PR description and the delivery comment carry the exact SHA) |
+| Base SHA | PR opened on `11abda97dd1d25782d27f06f0312a3d5abec57a2`; `main` was merged into the branch twice since (merge commits, no rebase/force-push); latest merged `main` = `b97b19dd28818fbf9e84dfcc037602d56486fe33` (merge-base with the final head) |
+| Final code head (CI verified) | `7189ae83fa77cdcd4b85ea51d55834013186b2a4` — §7. A report cannot contain the hash of the commit that contains it: the **Final Head SHA** (this file's last docs-only commit, identical code) and its CI run ids are recorded in the PR delivery comment |
 | Last confirmed #1346 merge SHA | `6532c0c9df1a769c72b07edbc5e48912b01a1950` (confirmed on `main`) |
 
 ## 3. G1 — GitHub readiness (read-only, 2026-10-12)
@@ -121,7 +121,7 @@ Command: `PYTHONDONTWRITEBYTECODE=1 python3 -I -m unittest discover -s scripts/h
 | **Total** | | **172** | **OK, 0 failures, 0 errors** |
 
 Fail-closed evidence beyond the contract table:
-- **472 single-input mutation points** (two eligible bases: A and B) — each element deleted, nulled, and type-swapped; none stays eligible except a reviewed harmless list (free-text/optional elements) — this found a real gap (manifest lacking a required check) fixed with the policy `ci_floor`.
+- **492 single-input mutation points** (two eligible bases: A and B) — each element deleted, nulled, and type-swapped; none stays eligible except a reviewed harmless list (free-text/optional elements) — this found a real gap (manifest lacking a required check) fixed with the policy `ci_floor`.
 - **Sabotage run**: 23 deliberate defects injected into the evaluator (ignore CI conclusion, accept live authenticity, drop default-deny, ignore injection, accept grants from branches, ignore expiry, push-twin counted, rename ignored, action gate dropped, drop the presentational allowlist, self-asserted registration, COMMENTED clears change request, `+++` lines skipped, author check dropped, ledger context ignored, …) → **22/23 caught**; the survivor (dropping the app filter for same-named checks) is masked by a second, independent defence (`CI_CHECK_WRONG_APP` BLOCK) — redundancy, not a hole.
 - Adversarial review (section 8) findings are listed with their resolution.
 
@@ -185,19 +185,18 @@ Deviations from the V2-1B contract (all in the conservative direction):
 
 ## 7. CI
 
-CI on the last code commit **`3825c3ccef21bab174110237559c15827cfda1b6`** (observed via the Checks / Actions API; the PR is `mergeable_state: clean`):
+CI on the final code head **`7189ae83fa77cdcd4b85ea51d55834013186b2a4`** (Checks / Actions API; `mergeable_state: clean`):
 
 | Workflow run | Event | Check | Check-run id | Result |
 |---|---|---|---|---|
-| CI Gate `38201627904` | pull_request | **CI Gate** | `114656119272` | success |
-| CI `38201627890` | pull_request | php artisan test (L11, sqlite) | `114656093162` | success |
-| CI `38201627890` | pull_request | php artisan test (L11, pgsql) | `114656093066` | success |
-| CI `38201624832` | push | php artisan test (L11, sqlite) | `114656083338` | success |
-| CI `38201624832` | push | php artisan test (L11, pgsql) | `114656083157` | success |
+| CI Gate `38209867006` | pull_request | **CI Gate** | `114681409568` | success |
+| CI `38209866976` | pull_request | php artisan test (L11, sqlite) | `114681407330` | success |
+| CI `38209866976` | pull_request | php artisan test (L11, pgsql) | `114681407138` | success |
+| CI `38209862692` | push | php artisan test (L11, sqlite) | `114681394758` | success |
+| CI `38209862692` | push | php artisan test (L11, pgsql) | `114681394504` | success |
+| Web CI `38209862792` | push | web build (Next.js) | `114681394797` | success (triggered by the merged `main` content, not by this PR's files) |
 
-Web/storefront/mobile checks did not trigger (no path under their filters changed) — consistent with the CI Gate manifest. This PR changes no PHP; the PHP matrix is unaffected and was green.
-
-Not claimed: CI on the later docs-only commit that fills in this report (its status is on the PR); CI results of the 9 earlier heads, all superseded. Run time on this PR was dominated by queueing behind superseded pushes (~1 h) — an argument for fewer, batched pushes under D3.
+This PR changes no PHP and no web files; the PHP matrix is unaffected and green. CI on earlier heads is superseded and not claimed. CI on the docs-only final commit is recorded in the PR delivery comment.
 
 ## 8. Reviews
 
@@ -306,8 +305,7 @@ Declared residual (unchanged): an empty `other_prs` list cannot be proven comple
 Accounting/tax/ZATCA: no effect, no journal entries. Tenant/branch isolation and RBAC: untouched; no tenant data in code, fixtures or snapshots. Security: no secrets; no credential, no permission, no workflow; collector is GET-only and statically guarded. GitHub settings: untouched (read-only probes). Other horizons: no branch, file or claim touched. V2-2/V2-3/V2-4: not started.
 
 ### 8.4 PRE_MERGE_REVIEW
-``PASS (conditional)` for reviewed code head `3825c3c`: CI green on that exact SHA, 164/164 local tests, 23/23 contract cases, 0 false-eligible, no capability to act. Conditions: (1) the automated reviewer's quota ended after round 8, so `3825c3c` — the last head — had **no** automated review round; (2) no independent human/second-identity review exists (single GitHub identity, V2-1B T2); (3) the owner must review (Zone C directory).` This is a verdict about the pilot PR only; it is **not** an authorisation to merge (the PR touches a Zone C directory and needs the owner).
-
+`PASS (conditional)` for code head `7189ae83fa77cdcd4b85ea51d55834013186b2a4`: CI Gate + php sqlite/pgsql green on that exact SHA, 172/172 local tests, 23/23 contract cases (11 scenarios), 0 false-eligible, 17/17 Codex threads resolved with revert-proofs, final fresh-context Reviewer pass done (4 findings fixed), no capability to act. Conditions: (1) Codex's quota ended after round 8, so the last fixes had no further Codex round (the independent Reviewer pass covered the final tree); (2) no independent human/second-identity review exists (single GitHub identity, V2-1B T2); (3) the owner must review (Zone C directory). This is a verdict about the pilot PR only — **not** an authorisation to merge.
 
 ## 9. Evidence: verified vs assumed vs unavailable
 
