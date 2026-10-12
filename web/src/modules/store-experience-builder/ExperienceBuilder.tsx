@@ -1745,8 +1745,9 @@ export function ExperienceBuilder({
       // لا نسرق التراجع الأصلي من حقل نصّي، ولا نعمل خلف حوار.
       if (isNativeEditingTarget(event.target)) return;
       if (historyModalOpenRef.current) return;
-      const el = event.target as HTMLElement | null;
-      if (el?.closest?.('[role="dialog"], [aria-modal="true"]')) return;
+      // أي حوار مفتوح في المستند يمنع الاختصار — لا نعدّد حوارات المحرِّر واحداً واحداً: مكتبة الأقسام وغيرها تُبقي
+      // التركيز على زرّها خلف الطبقة، فلا يكفي فحص هدف الحدث. المخفي عن التقنيات المساعدة (`aria-hidden`) لا يُعدّ مفتوحاً.
+      if (document.querySelector('[role="dialog"]:not([aria-hidden="true"]), [aria-modal="true"]:not([aria-hidden="true"])')) return;
       event.preventDefault();
       applyHistoryStepRef.current(kind);
     };

@@ -248,6 +248,23 @@ describe('ExperienceBuilder — CUST-H5-2 Undo / Redo', () => {
     expect(isDisabled(redoBtn())).toBe(false); // still there, untouched behind the modal
   });
 
+  it('shortcuts do nothing while the section library dialog is open on desktop, with focus left on its trigger', async () => {
+    const user = await mount();
+    await user.type(firstTextbox(), 'a');
+    expect(root().getAttribute('data-can-undo')).toBe('true');
+
+    await user.click(document.querySelector('[data-panel-option="homepage"]') as HTMLElement);
+    const trigger = screen.getAllByRole('button').find((b) => /إضافة قسم/.test(b.textContent ?? '')) as HTMLElement;
+    expect(trigger).toBeTruthy();
+    await user.click(trigger);
+    await screen.findByRole('dialog');
+
+    trigger.focus(); // focus stays on the trigger behind the overlay
+    fireEvent.keyDown(trigger, { key: 'z', code: 'KeyZ', ctrlKey: true });
+    expect(root().getAttribute('data-can-undo')).toBe('true');
+    expect(root().getAttribute('data-lifecycle')).toBe('dirty');
+  });
+
   it('shortcuts do nothing while a mobile bottom sheet is open, even with focus left on its trigger behind it', async () => {
     const originalInnerWidth = window.innerWidth;
     Object.defineProperty(window, 'innerWidth', { value: 390, configurable: true });
