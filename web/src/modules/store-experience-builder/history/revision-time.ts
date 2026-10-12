@@ -1,3 +1,5 @@
+import { formatDateTime } from "@/lib/formatting";
+
 /**
  * CUST-H5-4 — عرض وقت لقطة محفوظة بلغة التاجر: الوقت النسبي («قبل 3 ساعات») مع الوقت المطلق. لغة لا أرقام مراجعات (§4.4).
  * دوال نقيّة (الوقت الحالي يُمرَّر) فتُختبر بلا ساعة.
@@ -25,12 +27,7 @@ export function relativeTimeLabel(iso: string | null, locale: "ar" | "en", nowMs
   return formatter.format(0, "second");
 }
 
-/** وقت مطلق قصير (تاريخ + ساعة) بلغة الواجهة؛ غير صالح ⇒ شرطة. أرقام لاتينية عمداً (تقويم ميلادي) كبقية المحرّر. */
+/** وقت مطلق قصير (تاريخ + ساعة) بلغة الواجهة عبر المنسِّق المركزي (ميلادي بأرقام لاتينية)؛ غير صالح ⇒ شرطة. */
 export function absoluteTimeLabel(iso: string | null, locale: "ar" | "en"): string {
-  const time = iso ? Date.parse(iso) : Number.NaN;
-  if (!Number.isFinite(time)) return "—";
-  return new Intl.DateTimeFormat(locale === "ar" ? "ar-SA-u-nu-latn-ca-gregory" : "en-GB", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(time));
+  return formatDateTime(iso, locale);
 }
