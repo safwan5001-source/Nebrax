@@ -7,6 +7,7 @@ use Illuminate\Contracts\Filesystem\Filesystem;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use RuntimeException;
+use Throwable;
 
 /** عقد تخزين خاص محايد عن R2/S3؛ بيانات الاتصال لا تدخل صفوف التشغيل. */
 class DocumentStorageService
@@ -54,6 +55,79 @@ class DocumentStorageService
         }
     }
 
+    /** قفل التشغيل `DOCUMENT_DURABLE_STORAGE_ENABLED`: ما لم يُفتح، يبقى كل شيء على القرص المحلي. */
+    public function persistentEnabled(): bool
+    {
+        return (bool) config('document_center.storage.persistent_enabled', false);
+    }
+
+    /** السائق الذي يستعمله التشغيل **الآن** (`local` أو `s3`) — يتبع القفل لا الإعداد المحفوظ وحده. */
+    public function effectiveDriver(): string
+    {
+        return (string) $this->settings()['driver'];
+    }
+
+    /**
+     * يتحقق من إعداد التكامل `document_storage` المحفوظ في المنصة **بمعزل عن قفل التشغيل**: كتابة ثم وجود ثم قراءة
+     * ومطابقة المحتوى ثم حذف لكائن اصطناعي تحت `healthchecks/` لا يلمس أي مستأجر. لا يغيّر شيئاً في مسار التشغيل
+     * العادي، فيُثبت جاهزية R2 **قبل** فتح القفل. لا يعيد أسراراً ولا رسائل استثناء — اسم الخطوة وفئة الخطأ فقط.
+     *
+     * @return array{ok:bool, steps:array<string,bool|string>, endpoint_host:?string, bucket:?string}
+     */
+    public function verifyPlatformConfiguration(): array
+    {
+        $settings = $this->settings(true);
+        $platform = $this->integrations->activeConfiguration('document_storage');
+        $host = parse_url((string) ($settings['endpoint'] ?? ''), PHP_URL_HOST);
+        $result = ['ok' => false, 'steps' => [], 'endpoint_host' => is_string($host) ? $host : null, 'bucket' => $settings['bucket'] ?? null];
+        if ($platform === []) {
+            $result['steps']['integration_enabled'] = false;
+
+            return $result;
+        }
+        $result['steps']['integration_enabled'] = true;
+
+        try {
+            $filesystem = $this->build($settings);
+            $result['steps']['configuration_valid'] = true;
+        } catch (RuntimeException $e) {
+            $result['steps']['configuration_valid'] = $e->getMessage();
+
+            return $result;
+        } catch (Throwable $e) {
+            $result['steps']['configuration_valid'] = class_basename($e);
+
+            return $result;
+        }
+
+        $key = 'healthchecks/verify-'.Str::uuid().'.txt';
+        $payload = 'awj-documents-storage-verify:'.Str::random(32);
+        $options = $this->writeOptions($settings);
+        try {
+            $result['steps']['write'] = (bool) $filesystem->put($key, $payload, $options);
+            $result['steps']['exists'] = $filesystem->exists($key);
+            $result['steps']['content_intact'] = $filesystem->get($key) === $payload;
+        } catch (Throwable $e) {
+            $result['steps']['error'] = class_basename($e);
+        } finally {
+            try {
+                $filesystem->delete($key);
+                $result['steps']['deleted'] = ! $filesystem->exists($key);
+            } catch (Throwable $e) {
+                $result['steps']['deleted'] = false;
+                $result['steps']['cleanup_error'] = class_basename($e);
+            }
+        }
+
+        $result['ok'] = ($result['steps']['write'] ?? false) === true
+            && ($result['steps']['exists'] ?? false) === true
+            && ($result['steps']['content_intact'] ?? false) === true
+            && ($result['steps']['deleted'] ?? false) === true
+            && ! isset($result['steps']['error']);
+
+        return $result;
+    }
+
     /** اختبار كتابة وقراءة وحذف لكائن مؤقت لا يتضمن أي بيانات عميل. */
     public function healthCheck(): bool
     {
@@ -76,7 +150,12 @@ class DocumentStorageService
             throw new RuntimeException('Unknown document storage profile.');
         }
 
-        $settings = $this->settings();
+        return $this->build($this->settings());
+    }
+
+    /** @param array<string, mixed> $settings */
+    private function build(array $settings): Filesystem
+    {
         if ($settings['driver'] === 'local') {
             return Storage::disk((string) $settings['disk']);
         }
@@ -115,9 +194,9 @@ class DocumentStorageService
      *
      * @return array<string, mixed>
      */
-    private function writeOptions(): array
+    private function writeOptions(?array $settings = null): array
     {
-        return $this->isCloudflareR2($this->settings()) ? [] : ['visibility' => 'private'];
+        return $this->isCloudflareR2($settings ?? $this->settings()) ? [] : ['visibility' => 'private'];
     }
 
     /** @param array<string, mixed> $settings */
@@ -132,7 +211,7 @@ class DocumentStorageService
     }
 
     /** @return array<string, mixed> */
-    private function settings(): array
+    private function settings(bool $ignoreGate = false): array
     {
         $base = [
             'driver' => (string) config('document_center.storage.driver', 'local'),
@@ -148,7 +227,7 @@ class DocumentStorageService
 
         // قرار تشغيلي مؤقت: التخزين الدائم مؤجل لكل النظام.
         // وجود إعداد R2/S3 محفوظ في منصة الإدارة لا يفعّله ما لم يُفتح هذا القفل صراحةً.
-        if (! (bool) config('document_center.storage.persistent_enabled', false)) {
+        if (! $ignoreGate && ! $this->persistentEnabled()) {
             return array_replace($base, [
                 'driver' => 'local',
                 'disk' => (string) config('document_center.storage.disk', 'local'),
