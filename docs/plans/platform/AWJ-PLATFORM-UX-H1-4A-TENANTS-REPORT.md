@@ -1,6 +1,6 @@
 # H1-4A — Platform Tenants Management UX — Implementation report
 
-STATUS: IN REVIEW / DO NOT MERGE / DO NOT DEPLOY
+STATUS: MERGED (PR #1362, `93a30cf873c99078b0d766f4ade7537f765bacd7`) / NOT DEPLOYED / POST-MERGE VERIFICATION NOT RECORDED
 Horizon: AWJ-PLATFORM-UX-H1 · Slice: H1-4A (tenant list only) · Date: 2026-10-12
 Spec: [AWJ-PLATFORM-UX-H1-1-UX-SPEC.md](./AWJ-PLATFORM-UX-H1-1-UX-SPEC.md) §8 and §12.3
 
@@ -112,12 +112,14 @@ One page file plus two additive `DataTable` props. The request logic (`load`, `d
 
 ## CI
 
-Recorded on the pull request for the exact head SHA (the checks and the final head are listed in the PR and in the hand-off summary). This file is part of that head, so it does not restate results that did not exist when it was committed.
+Final Head `2fcfb786152f8fd4b2ee0b9aa991385eed5791de` of PR #1362: all 7 GitHub check runs `success` (CI Gate, web build ×2, php artisan test sqlite ×2, pgsql ×2), read through the GitHub API after the CSV-order correction. The earlier head `979ef37` (before the CSV correction) had also gone green but is superseded.
 
 ## Merge / post-merge
 
-- Merge status: not merged. Merge SHA: none. Post-merge review: not done. Deploy: not requested.
-- Post-merge verification of #1318, #1328, #1355 and #1358 on `main` has not been recorded; this slice does not claim it.
+- PRE_MERGE_REVIEW: PASS, recorded as a comment on PR #1362 by the repository owner account for the exact Head above; no unresolved review threads. The independent review's P1 (CSV column order) is the correction described above. The only bot comment was a Codex usage-limit notice.
+- Merge status: merged on 2026-10-12 (about 07:19 UTC). Merge SHA `93a30cf873c99078b0d766f4ade7537f765bacd7`, confirmed an ancestor of `main` (subject "feat(platform): H1-4A tenants list UX (#1362)"). The merge was not performed by the Claude session.
+- Post-merge review: not done. No target-branch check or smoke evidence on `93a30cf` was collected, so none is claimed.
+- Deploy / production release: not done.
 
 ## Risks and remaining work
 
@@ -133,8 +135,8 @@ Recorded on the pull request for the exact head SHA (the checks and the final he
 
 - Branch: `claude/awj-h1-contrast-recovery-fx8unn` (restarted from `main` after #1358 merged; the older remote history is merged in so no force-push is needed).
 - Base SHA: `b97b19dd28818fbf9e84dfcc037602d56486fe33` (`origin/main` at start).
-- Head SHA and PR: see the pull request.
+- Head SHA: `2fcfb786152f8fd4b2ee0b9aa991385eed5791de`. PR: #1362 (merged).
 
 ## Next dependency-ready task
 
-H1-4B tenant detail (spec §12.4: one-column identity grid on phones, dialogs in place of `window.confirm`, logical back icon). Not started.
+H1-4B tenant detail: see `AWJ-PLATFORM-UX-H1-4B-TENANT-DETAIL-REPORT.md`.
