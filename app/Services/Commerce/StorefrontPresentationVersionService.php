@@ -95,10 +95,10 @@ final class StorefrontPresentationVersionService
      * @throws SourceVersionNotFoundException
      * @throws ForwardSchemaVersionException
      */
-    public function createForCurrentTenant(string $storefrontId, string $name, ?string $sourceVersionId): ?array
+    public function createForCurrentTenant(string $storefrontId, string $name, ?string $sourceVersionId, ?string $sourceRevisionId = null): ?array
     {
         try {
-            return $this->attemptCreate($storefrontId, $name, $sourceVersionId);
+            return $this->attemptCreate($storefrontId, $name, $sourceVersionId, $sourceRevisionId);
         } catch (QueryException $e) {
             if (! $this->isUniqueViolation($e)) {
                 throw $e;
@@ -106,7 +106,7 @@ final class StorefrontPresentationVersionService
 
             // معاملة أخرى أنشأت الرأس بالتزامن — أُعيد المحاولة على معاملة
             // جديدة نظيفة (لا نكمل داخل معاملة Postgres مُجهَضة).
-            return $this->attemptCreate($storefrontId, $name, $sourceVersionId);
+            return $this->attemptCreate($storefrontId, $name, $sourceVersionId, $sourceRevisionId);
         }
     }
 
@@ -266,9 +266,35 @@ final class StorefrontPresentationVersionService
 
         $currentHash = StorefrontPresentationRevisionRecorder::hashOf((array) $version->config);
 
+        $normalized = $this->normalizer->normalize((array) $revision->config, (int) $revision->schema_version);
+
         return array_merge($this->summarizeRevision($revision, $currentHash), [
-            'config' => $this->normalizer->normalize((array) $revision->config, (int) $revision->schema_version),
+            'config' => $normalized,
+            // CUST-H5-4 — إعادة فحص الوسائط **الآن** (ملكية المستأجر + الجاهزية) قبل أي استرداد: لا نُحيي بايتات محذوفة
+            // بمعرّفها، ولا نخفي المشكلة — تُعاد ليعرضها المحرِّر ويحجبها النشر كما يفعل دائماً.
+            'media_issues' => $this->mediaIssuesFor($normalized),
         ]);
+    }
+
+    /**
+     * مراجع الوسائط في المستند التي لم تعد صالحة **اليوم** لهذا المستأجر: غير موجودة/محذوفة (`media_missing`) أو غير جاهزة
+     * (`media_not_ready`، `derivative_*`). قراءةٌ فقط عبر بوابة النشر نفسها (مصدر واحد للحقيقة) — تُصفّى أخطاء النصوص البديلة
+     * (جودة نشر لا صلاحية استرداد).
+     *
+     * @param  array<string, mixed>  $normalized
+     * @return list<array{path: string, code: string, message: string}>
+     */
+    private function mediaIssuesFor(array $normalized): array
+    {
+        $restorable = ['media_missing', 'media_not_ready', 'derivative_not_ready', 'derivative_failed'];
+        $issues = [];
+        foreach (app(StorefrontMediaPublishGate::class)->errors($normalized) as $path => $error) {
+            if (in_array($error['code'], $restorable, true)) {
+                $issues[] = ['path' => (string) $path, 'code' => $error['code'], 'message' => $error['message']];
+            }
+        }
+
+        return $issues;
     }
 
     /** @return array<string, mixed> */
@@ -784,9 +810,9 @@ final class StorefrontPresentationVersionService
      * @throws SourceVersionNotFoundException
      * @throws ForwardSchemaVersionException
      */
-    private function attemptCreate(string $storefrontId, string $name, ?string $sourceVersionId): ?array
+    private function attemptCreate(string $storefrontId, string $name, ?string $sourceVersionId, ?string $sourceRevisionId = null): ?array
     {
-        return DB::transaction(function () use ($storefrontId, $name, $sourceVersionId) {
+        return DB::transaction(function () use ($storefrontId, $name, $sourceVersionId, $sourceRevisionId) {
             $storefront = $this->lockOwnedStorefront($storefrontId);
             if ($storefront === null) {
                 return null;
@@ -817,7 +843,7 @@ final class StorefrontPresentationVersionService
                     ->first();
             }
 
-            [$sourceConfig, $sourceSchemaVersion] = $this->resolveSourceConfig($storefront, $head, $sourceVersionId);
+            [$sourceConfig, $sourceSchemaVersion] = $this->resolveSourceConfig($storefront, $head, $sourceVersionId, $sourceRevisionId);
 
             if ($sourceSchemaVersion > StorefrontPresentationNormalizer::VERSION) {
                 throw new ForwardSchemaVersionException;
@@ -835,7 +861,14 @@ final class StorefrontPresentationVersionService
                 'revision' => 1,
             ]);
 
-            return $this->detail($version, $head);
+            $detail = $this->detail($version, $head);
+
+            // CUST-H5-4 — مسودة منشأة من لقطة محفوظة: تُعاد معها مشاكل الوسائط الحالية (لا تُصلَح ولا تُحذف صامتةً).
+            if ($sourceRevisionId !== null) {
+                $detail['media_issues'] = $this->mediaIssuesFor($normalized);
+            }
+
+            return $detail;
         });
     }
 
@@ -844,7 +877,7 @@ final class StorefrontPresentationVersionService
      *
      * @throws SourceVersionNotFoundException
      */
-    private function resolveSourceConfig(Storefront $storefront, StorefrontPresentation $lockedHead, ?string $sourceVersionId): array
+    private function resolveSourceConfig(Storefront $storefront, StorefrontPresentation $lockedHead, ?string $sourceVersionId, ?string $sourceRevisionId = null): array
     {
         if ($sourceVersionId !== null) {
             $source = $this->findOwnedVersion($storefront, $sourceVersionId);
@@ -852,7 +885,25 @@ final class StorefrontPresentationVersionService
                 throw new SourceVersionNotFoundException;
             }
 
+            if ($sourceRevisionId !== null) {
+                // CUST-H5-4 — لقطة محفوظة **تخصّ هذه النسخة وهذا المتجر وهذا المستأجر** فقط؛ غيرها = 404 كالنسخة المصدر المفقودة.
+                $revision = StorefrontPresentationVersionRevision::query()
+                    ->whereKey($sourceRevisionId)
+                    ->where('version_id', $source->id)
+                    ->where('storefront_id', $storefront->id)
+                    ->first();
+                if ($revision === null) {
+                    throw new SourceVersionNotFoundException;
+                }
+
+                return [(array) $revision->config, (int) $revision->schema_version];
+            }
+
             return [$source->config ?? [], (int) $source->schema_version];
+        }
+
+        if ($sourceRevisionId !== null) {
+            throw new SourceVersionNotFoundException;
         }
 
         if ($lockedHead->active_version_id !== null) {
