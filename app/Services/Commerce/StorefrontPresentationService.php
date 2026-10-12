@@ -28,12 +28,16 @@ final class StorefrontPresentationService
 {
     private readonly StorefrontPresentationPublishValidator $publishValidator;
 
+    private readonly StorefrontPresentationRevisionRecorder $revisions;
+
     public function __construct(
         private readonly StorefrontPresentationNormalizer $normalizer,
         private readonly StorefrontPresentationVersionBackfillService $backfill,
         ?StorefrontPresentationPublishValidator $publishValidator = null,
+        ?StorefrontPresentationRevisionRecorder $revisions = null,
     ) {
         $this->publishValidator = $publishValidator ?? new StorefrontPresentationPublishValidator;
+        $this->revisions = $revisions ?? new StorefrontPresentationRevisionRecorder;
     }
 
     /**
@@ -396,11 +400,19 @@ final class StorefrontPresentationService
             'draft_schema_version' => StorefrontPresentationNormalizer::VERSION,
         ])->save();
 
+        // CUST-H5-3 — حفظ المسودة القديم يكتب مستند نسخة العمل ومراجعتها أيضاً: يُسجَّل في السجلّ نفسه (مسار واحد للاتفاقية)
+        // كي لا تنشأ فجوات للعملاء القدامى. الحالة قبل الكتابة تُلتقَط لخط الأساس الكسول.
+        $priorConfig = is_array($compat->config) ? $compat->config : null;
+        $priorRevision = (int) $compat->revision;
+        $priorSchemaVersion = (int) $compat->schema_version;
+
         $compat->forceFill([
             'config' => $normalized,
             'schema_version' => StorefrontPresentationNormalizer::VERSION,
             'revision' => $newRevision,
         ])->save();
+
+        $this->revisions->recordSave($compat, $priorConfig, $priorRevision, $priorSchemaVersion);
 
         return $this->present($storefront, $row->fresh());
     }

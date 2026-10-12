@@ -95,6 +95,46 @@ class CommerceWorkspaceStorefrontPresentationVersionController extends ApiContro
         return response()->json(['data' => $payload]);
     }
 
+    /** CUST-H5-3 — قائمة المراجعات المحفوظة لنسخة (بيانات وصفية فقط). */
+    public function revisions(
+        Request $request,
+        StorefrontPresentationVersionService $versions,
+        string $id,
+        string $version,
+    ): JsonResponse {
+        $this->denySelfService($request);
+
+        $payload = $versions->listRevisionsForCurrentTenant($id, $version);
+        if ($payload === null) {
+            abort(404, 'النسخة غير موجودة.');
+        }
+
+        return response()->json(['data' => $payload]);
+    }
+
+    /** CUST-H5-3 — مراجعة محفوظة واحدة مع مستندها المُطبَّع (للمعاينة والاسترداد). قراءة فقط. */
+    public function showRevision(
+        Request $request,
+        StorefrontPresentationVersionService $versions,
+        string $id,
+        string $version,
+        string $revision,
+    ): JsonResponse {
+        $this->denySelfService($request);
+
+        try {
+            $payload = $versions->showRevisionForCurrentTenant($id, $version, $revision);
+        } catch (ForwardSchemaVersionException $e) {
+            abort(409, $e->getMessage());
+        }
+
+        if ($payload === null) {
+            abort(404, 'المراجعة غير موجودة.');
+        }
+
+        return response()->json(['data' => $payload]);
+    }
+
     public function update(
         SaveStorefrontPresentationVersionRequest $request,
         StorefrontPresentationVersionService $versions,
