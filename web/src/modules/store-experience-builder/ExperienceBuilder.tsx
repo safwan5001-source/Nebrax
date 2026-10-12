@@ -241,6 +241,8 @@ export function ExperienceBuilder({
     return applied;
   }, [draft, previewTheme, themePack]);
   const canvasConfig = historyPreview ? historyPreview.config : themed?.ok ? themed.config : draft;
+  // أقسام الصفحة الرئيسية التي تعرضها المعاينة الآن: لقطة السجل إن فُتحت، وإلا المسودة. محمِّلات البيانات (التصنيفات/وصل حديثاً/المميّز/العروض) تقرأ منها لا من المسودة وحدها.
+  const homeSectionsShown = historyPreview ? historyPreview.config.homepage.sections : draft.homepage.sections;
   // React 18 renders `inert` only as a string attribute: while a theme is previewed the editing UI is not operable or focusable.
   const inertWhenThemePreview = readOnlyPreview ? ({ inert: "" } as Record<string, string>) : {};
   const [panel, setPanel] = useState<CustomizerPanel>("theme");
@@ -1193,7 +1195,7 @@ export function ExperienceBuilder({
     setHomeCategories(result.data);
   }
 
-  const categoriesSectionVisible = draft.homepage.sections.some(
+  const categoriesSectionVisible = homeSectionsShown.some(
     (section) => section.type === "categories" && section.visible,
   );
 
@@ -1248,7 +1250,7 @@ export function ExperienceBuilder({
     setHomeNewArrivals(result.data);
   }
 
-  const newArrivalsSectionVisible = draft.homepage.sections.some(
+  const newArrivalsSectionVisible = homeSectionsShown.some(
     (section) => section.type === "newArrivals" && section.visible,
   );
 
@@ -1309,7 +1311,7 @@ export function ExperienceBuilder({
     // selection must not re-fetch a sibling Featured section that didn't
     // change, and an unrelated re-render must not re-fetch either.
     if (currentPage !== "home" || !storefrontId || busy === "loading") return;
-    for (const section of draft.homepage.sections) {
+    for (const section of homeSectionsShown) {
       if (section.type !== "featured" || !section.visible) continue;
       const ids = featuredContentOf(section).productIds.filter((id) => id);
       const key = ids.join(",");
@@ -1323,10 +1325,10 @@ export function ExperienceBuilder({
       void loadFeaturedResolution(section.id, ids);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentPage, storefrontId, busy, draft.homepage.sections]);
+  }, [currentPage, storefrontId, busy, homeSectionsShown]);
 
   function handleRetryFeaturedResolution(sectionId: string) {
-    const section = draft.homepage.sections.find((item) => item.id === sectionId);
+    const section = homeSectionsShown.find((item) => item.id === sectionId);
     if (!section) return;
     const ids = featuredContentOf(section).productIds.filter((id) => id);
     if (ids.length === 0) return;
@@ -1403,7 +1405,7 @@ export function ExperienceBuilder({
     if (result.maxOffers !== null) setOffersMax(result.maxOffers);
   }
 
-  const hasOffersSection = draft.homepage.sections.some(
+  const hasOffersSection = homeSectionsShown.some(
     (section) => section.type === "offers" && (section.visible || section.id === selectedSection),
   );
 
@@ -1824,8 +1826,11 @@ export function ExperienceBuilder({
     setHistoryList(result.ok ? { state: "ready", rows: result.data } : { state: "error", rows: [] });
   }
 
+  // إنشاء/تكرار/كتابة نسخة قيد التنفيذ: لا يُعاد فتح السجل (نافذته قابلة للإغلاق أثناء الطلب) فلا يتكرر الإنشاء.
+  const historyWriteBusy = versionBusy !== null || versionCreating;
+
   function openHistory(trigger?: HTMLElement | null) {
-    if (!storefrontId || !selectedVersion || readOnlyPreview || busy !== null) return;
+    if (!storefrontId || !selectedVersion || readOnlyPreview || busy !== null || historyWriteBusy) return;
     historyTriggerRef.current = trigger ?? (document.activeElement as HTMLElement | null);
     setHistoryOpen(true);
     void loadHistoryList();
@@ -1893,7 +1898,7 @@ export function ExperienceBuilder({
   }
 
   async function handleCreateDraftFromRevision(revision: PresentationVersionRevisionSummary) {
-    if (!storefrontId || !selectedVersion) return;
+    if (!storefrontId || !selectedVersion || historyWriteBusy) return;
     // نفس تأكيد التكرار: تبنّي النسخة الجديدة يستبدل المسودة المحلية غير المحفوظة.
     if (dirty && !window.confirm(t("versionSwitchDiscardConfirm"))) return;
     const originStorefrontId = storefrontId;
@@ -3028,7 +3033,7 @@ export function ExperienceBuilder({
             data-history-open=""
             aria-label={t("historyOpen")}
             title={t("historyOpen")}
-            disabled={!storefrontId || !selectedVersion || readOnlyPreview || busy !== null}
+            disabled={!storefrontId || !selectedVersion || readOnlyPreview || busy !== null || historyWriteBusy}
             onClick={(event) => openHistory(event.currentTarget)}
             className="hidden size-9 shrink-0 items-center justify-center rounded-md border border-transparent text-text hover:border-border hover:bg-primary-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-not-allowed disabled:opacity-40 lg:inline-flex"
           >
@@ -3171,7 +3176,7 @@ export function ExperienceBuilder({
                   <DropdownItem
                     icon={History}
                     onClick={() => openHistory(null)}
-                    disabled={!storefrontId || !selectedVersion || readOnlyPreview || busy !== null}
+                    disabled={!storefrontId || !selectedVersion || readOnlyPreview || busy !== null || historyWriteBusy}
                     dataAttrs={{ "data-more-history": "" }}
                   >
                     {t("historyOpen")}
