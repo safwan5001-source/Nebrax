@@ -6,6 +6,9 @@ use App\Services\PlatformIntegrationResolver;
 use Illuminate\Contracts\Filesystem\Filesystem;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Aws\Exception\AwsException;
+use Aws\S3\S3Client;
+use Aws\S3\S3ClientInterface;
 use RuntimeException;
 use Throwable;
 
@@ -122,29 +125,128 @@ class DocumentStorageService
         $key = 'healthchecks/verify-'.Str::uuid().'.txt';
         $payload = 'awj-documents-storage-verify:'.Str::random(32);
         $options = $this->writeOptions($settings);
-        try {
-            $result['steps']['write'] = (bool) $filesystem->put($key, $payload, $options);
-            $result['steps']['exists'] = $filesystem->exists($key);
-            $result['steps']['content_intact'] = $filesystem->get($key) === $payload;
-        } catch (Throwable $e) {
-            $result['steps']['error'] = class_basename($e);
-        } finally {
-            try {
+        // كل خطوة مستقلة: فشل الكتابة لا يُخفي نتيجة القراءة والحذف — النمط بينها يكشف السبب (اعتماد/دلو/endpoint ≠ ACL).
+        // `deleted` بعد فشل كتابة لا يعني كائناً يتيماً: لم يُكتب شيء، وفشله غالباً الخطأ الجذري نفسه.
+        $steps = [
+            'write' => fn () => (bool) $filesystem->put($key, $payload, $options),
+            'exists' => fn () => $filesystem->exists($key),
+            'content_intact' => fn () => $filesystem->get($key) === $payload,
+            'deleted' => function () use ($filesystem, $key) {
                 $filesystem->delete($key);
-                $result['steps']['deleted'] = ! $filesystem->exists($key);
+
+                return ! $filesystem->exists($key);
+            },
+        ];
+        foreach ($steps as $name => $run) {
+            try {
+                $result['steps'][$name] = $run() === true ? true : false;
             } catch (Throwable $e) {
-                $result['steps']['deleted'] = false;
-                $result['steps']['cleanup_error'] = class_basename($e);
+                $result['steps'][$name] = 'FAIL: '.$this->describeFailure($e);
             }
         }
 
-        $result['ok'] = ($result['steps']['write'] ?? false) === true
-            && ($result['steps']['exists'] ?? false) === true
-            && ($result['steps']['content_intact'] ?? false) === true
-            && ($result['steps']['deleted'] ?? false) === true
-            && ! isset($result['steps']['error']);
+        $result['ok'] = collect(['write', 'exists', 'content_intact', 'deleted'])
+            ->every(fn (string $step) => ($result['steps'][$step] ?? null) === true);
 
         return $result;
+    }
+
+    /**
+     * سبب الفشل **بلا أسرار**: فئة الاستثناء + رمز خطأ S3 + حالة HTTP (حين وُجدت في سلسلة الأسباب). لا رسالة خام — قد تحوي
+     * عنوان الطلب. مثال: `UnableToWriteFile ← S3Exception AccessDenied http=403`.
+     */
+    private function describeFailure(Throwable $e): string
+    {
+        $parts = [];
+        for ($cause = $e; $cause !== null; $cause = $cause->getPrevious()) {
+            $label = class_basename($cause);
+            if ($cause instanceof AwsException) {
+                $label .= ' '.($cause->getAwsErrorCode() ?: 'no-code');
+                $status = $cause->getStatusCode();
+                if ($status !== null) {
+                    $label .= ' http='.$status;
+                }
+            }
+            $parts[] = $label;
+        }
+
+        return implode(' ← ', $parts);
+    }
+
+    /**
+     * تشخيص يُشغَّل **عند فشل التحقق فقط**: يفصل الأسباب المحتملة بمصفوفة صغيرة بالإعداد المحفوظ نفسه — SDK مباشر
+     * (كما يعمل `R2StorageService` الذي أثبت نجاحه في Production) بنمطَي العنونة (path/virtual-hosted) مع ACL وبدونه.
+     * GET لمفتاح غير موجود يجب أن يعيد `NoSuchKey` إن كان الاعتماد والدلو سليمين (`NoSuchBucket` ⇒ دلو/endpoint خاطئ؛ HEAD لا يفصل بينهما). كائنات اصطناعية تحت `healthchecks/`
+     * وتُحذف؛ المخرجات رموز خطأ وحالات HTTP فقط.
+     *
+     * @return array<string, string>
+     */
+    public function diagnosePlatformConfiguration(): array
+    {
+        $platform = $this->integrations->activeConfiguration('document_storage');
+        if ($platform === []) {
+            return ['integration' => 'disabled'];
+        }
+        $settings = $this->settings(true);
+        $endpoint = (string) ($settings['endpoint'] ?? '');
+        $host = (string) parse_url($endpoint, PHP_URL_HOST);
+        $path = (string) parse_url($endpoint, PHP_URL_PATH);
+        $report = [
+            'endpoint_is_r2_host' => $this->isCloudflareR2($settings) ? 'yes' : 'no',
+            'endpoint_has_path' => ($path !== '' && $path !== '/') ? 'YES (should be empty)' : 'no',
+            'endpoint_jurisdiction' => preg_match('/\.(eu|fedramp)\.r2\./i', $host, $m) === 1 ? strtolower($m[1]) : 'default',
+            'region' => (string) ($settings['region'] ?? ''),
+            'configured_path_style' => ($settings['use_path_style_endpoint'] ?? false) ? 'true' : 'false',
+        ];
+
+        foreach ([true => 'path', false => 'virtual'] as $pathStyle => $label) {
+            try {
+                $client = $this->makeS3Client($settings, (bool) $pathStyle);
+            } catch (Throwable $e) {
+                $report["{$label}.client"] = 'FAIL: '.$this->describeFailure($e);
+
+                continue;
+            }
+            $bucket = (string) $settings['bucket'];
+            $key = 'healthchecks/diagnose-'.Str::uuid().'.txt';
+            // GET لا HEAD: أخطاء HEAD بلا جسم فيتساوى `NoSuchKey` و`NoSuchBucket` (كلاهما 404). GET يعيد رمز S3 فيفصل بينهما:
+            // `NoSuchKey` ⇒ وصل الطلب إلى الدلو بمصادقة سليمة؛ `NoSuchBucket` ⇒ دلو/endpoint خاطئ.
+            $report["{$label}.get_missing_key"] = $this->probe(fn () => $client->getObject(['Bucket' => $bucket, 'Key' => $key]), expectNoSuchKey: true);
+            $report["{$label}.put_no_acl"] = $this->probe(fn () => $client->putObject(['Bucket' => $bucket, 'Key' => $key, 'Body' => 'x']));
+            $report["{$label}.put_acl_private"] = $this->probe(fn () => $client->putObject(['Bucket' => $bucket, 'Key' => $key.'.acl', 'Body' => 'x', 'ACL' => 'private']));
+            // كل حذف مستقل: فشل الأول لا يمنع محاولة الثاني، فلا يبقى كائن اصطناعي أثناء التحقيق.
+            $report["{$label}.delete"] = $this->probe(fn () => $client->deleteObject(['Bucket' => $bucket, 'Key' => $key]));
+            $report["{$label}.delete_acl_object"] = $this->probe(fn () => $client->deleteObject(['Bucket' => $bucket, 'Key' => $key.'.acl']));
+        }
+
+        return $report;
+    }
+
+    private function probe(\Closure $call, bool $expectNoSuchKey = false): string
+    {
+        try {
+            $call();
+
+            return $expectNoSuchKey ? 'FOUND (unexpected)' : 'OK';
+        } catch (Throwable $e) {
+            if ($expectNoSuchKey && $e instanceof AwsException && $e->getAwsErrorCode() === 'NoSuchKey') {
+                return 'OK (NoSuchKey: credentials and bucket are valid)';
+            }
+
+            return 'FAIL: '.$this->describeFailure($e);
+        }
+    }
+
+    /** @param array<string, mixed> $settings */
+    protected function makeS3Client(array $settings, bool $pathStyle): S3ClientInterface
+    {
+        return new S3Client([
+            'version' => 'latest',
+            'region' => $settings['region'],
+            'endpoint' => $settings['endpoint'],
+            'use_path_style_endpoint' => $pathStyle,
+            'credentials' => ['key' => $settings['key'], 'secret' => $settings['secret']],
+        ]);
     }
 
     /** اختبار كتابة وقراءة وحذف لكائن مؤقت لا يتضمن أي بيانات عميل. */

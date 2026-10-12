@@ -176,7 +176,7 @@ class DocumentsStorageVerifyTest extends TestCase
         $report = app(DocumentStorageService::class)->verifyPlatformConfiguration();
 
         $this->assertFalse($report['ok']);
-        $this->assertSame('RuntimeException', $report['steps']['error']);
+        $this->assertSame('FAIL: RuntimeException', $report['steps']['write']);
         $this->assertStringNotContainsString('SUPER-SECRET', json_encode($report));
         $this->assertSame([], $store);
     }
