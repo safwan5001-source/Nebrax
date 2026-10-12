@@ -19,7 +19,7 @@
 | Where it exists | Only while editing the Home page of a **Draft / Scheduled** Version — never on a Published Version, in Theme Preview or in the dev harness (the prop is absent). Every action is an ordinary draft edit (`updateDraft`), revision-checked at Save. | Draft vs Published invariant; a preview must not be able to edit. |
 | Drag reorder | HTML5 drag and drop on the section list rows (handle hint on ≥ md), with a before / after drop indicator; **the up / down buttons remain the keyboard and touch path** (drag is an addition, never the only way). | WCAG 2.5.7 — a dragging alternative must exist. |
 | Library thumbnails | `SectionThumbnails.tsx`: a layout **wireframe per section type** (72×48 SVG: hero, slider with dots, gallery grid, categories, shelves with rail peek, offers with tag corners, benefits, app promo, content lines, discovery chips, delivery band, wholesale rows…) replacing the 16 px glyphs — **slider and gallery had none**. Pure SVG, no text, no price / product / picture, token colours, mirrored in RTL. A test requires one for every `ALL_HOME_SECTION_KEYS` type, structurally distinct. | Distinguish section types at a glance without implying content the merchant does not have. |
-| Not built | Canvas selection chip with the section name (the outline + list + inspector title carry it); touch long-press drag; user-saved presets (V0 §17.3 LATER). | Smallest coherent set; stated. |
+| Not built (the Canvas name chip was built in V10c's review and ships; see below) | touch long-press drag; user-saved presets (V0 §17.3 LATER). | Smallest coherent set; stated. |
 
 ## Tests
 

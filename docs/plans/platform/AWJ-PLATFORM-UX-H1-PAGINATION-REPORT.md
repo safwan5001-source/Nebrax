@@ -1,6 +1,6 @@
 # H1-PAGINATION — Implementation report
 
-Status: **IN REVIEW / DO NOT MERGE / DO NOT DEPLOY**  
+Status: **MERGED (PR #1318, `31035783a36b3fbaf329b7c789c8af64e9097279`) / NOT DEPLOYED / POST-MERGE VERIFICATION NOT RECORDED**  
 Horizon: AWJ-PLATFORM-UX-H1  
 Slice: first code slice after the merged H1-1 spec (PR #1312)  
 Date: 2026-10-11
@@ -75,6 +75,10 @@ The first head `86ab260` was green (sqlite, pgsql, Next build, both workflow run
 - `Dialog` focus trap, danger-button contrast, and the shell are not in this PR.
 - Out-of-range correction trusts `last_page` from the list payload. It does not invent a second request shape. A correction that is no longer the latest intent is dropped.
 
-## Gate
+## Merge
 
-No merge. No deploy. `H1-CONTRAST` and H1-2 are not started.
+Merged into `main` as PR #1318, Merge SHA `31035783a36b3fbaf329b7c789c8af64e9097279`. The status line above replaces the pre-merge wording this file carried (corrected in the H1-3 PR). No evidence of target-branch checks or a smoke run on that SHA was collected, so post-merge verification is not claimed. No deploy.
+
+## Gate (historical, at PR time)
+
+No merge. No deploy. `H1-CONTRAST` and H1-2 were not started.
