@@ -2,7 +2,7 @@
  * @vitest-environment jsdom
  */
 import { describe, expect, it } from "vitest";
-import { intentGroupKey, isContinuousInputTarget } from "../history/change-intent";
+import { createContinuousInputGate, intentGroupKey, isContinuousInputTarget } from "../history/change-intent";
 import {
   DEFAULT_PRESENTATION_CONFIG,
   clonePresentationConfig,
@@ -113,5 +113,39 @@ describe("isContinuousInputTarget (CUST-H5-2 review)", () => {
       expect(isContinuousInputTarget(make(html)), html).toBe(false);
     }
     expect(isContinuousInputTarget(null)).toBe(false);
+  });
+});
+
+describe("createContinuousInputGate (CUST-H5-2 review)", () => {
+  it("a marked input event is consumed by the first edit it produces, and only that one", () => {
+    const gate = createContinuousInputGate(100);
+    gate.mark(1000);
+    expect(gate.consume(1010)).toBe(true);
+    // A discrete click inside the same window (e.g. a preset rewriting the same leaf) must not inherit the intent.
+    expect(gate.consume(1020)).toBe(false);
+  });
+
+  it("an edit with no input event is never continuous", () => {
+    const gate = createContinuousInputGate(100);
+    expect(gate.consume(5)).toBe(false);
+  });
+
+  it("a late commit (debounce) beyond the window is not continuous", () => {
+    const gate = createContinuousInputGate(100);
+    gate.mark(1000);
+    expect(gate.consume(1100)).toBe(false);
+  });
+
+  it("any discrete interaction (pointer / click / key) drops a lingering mark", () => {
+    const gate = createContinuousInputGate(100);
+    gate.mark(1000); // an input event that produced no draft edit (e.g. a buffered field)
+    gate.reset(); // …then the merchant clicks something
+    expect(gate.consume(1010)).toBe(false);
+  });
+
+  it("a clock that goes backwards is not continuous", () => {
+    const gate = createContinuousInputGate(100);
+    gate.mark(2000);
+    expect(gate.consume(1000)).toBe(false);
   });
 });

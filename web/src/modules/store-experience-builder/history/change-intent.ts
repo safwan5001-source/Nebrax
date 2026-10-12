@@ -30,6 +30,35 @@ export function isContinuousInputTarget(target: EventTarget | null): boolean {
 /** نافذة ربط التعديل بحدث `input` المستمر: المعالج يعمل متزامناً داخل الحدث؛ ما يتأخر عن ذلك (debounce) لا يُجمَّع. */
 export const CONTINUOUS_INPUT_WINDOW_MS = 100;
 
+export interface ContinuousInputGate {
+  /** حدث `input` مستمر وقع الآن. */
+  mark: (now: number) => void;
+  /** تفاعل منفصل (ضغط/نقر/مفتاح): أي علَم عالق يسقط. */
+  reset: () => void;
+  /**
+   * هل التعديل الجاري وليد إدخال مستمر؟ **يُستهلَك العلَم بالقراءة**: التعديل الأول فقط ينتفع به، فنقرة منفصلة لاحقة ضمن النافذة
+   * نفسها (نمط جاهز يعيد كتابة الحقل ذاته) لا ترث نيّة الكتابة (مراجعة Codex).
+   */
+  consume: (now: number) => boolean;
+}
+
+export function createContinuousInputGate(windowMs: number = CONTINUOUS_INPUT_WINDOW_MS): ContinuousInputGate {
+  let markedAt = Number.NEGATIVE_INFINITY;
+  return {
+    mark: (now) => {
+      markedAt = now;
+    },
+    reset: () => {
+      markedAt = Number.NEGATIVE_INFINITY;
+    },
+    consume: (now) => {
+      const fresh = now - markedAt >= 0 && now - markedAt < windowMs;
+      markedAt = Number.NEGATIVE_INFINITY;
+      return fresh;
+    },
+  };
+}
+
 const MAX_DIFFS = 2;
 
 function isPlainObject(value: Json): value is Record<string, Json> {

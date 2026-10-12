@@ -108,7 +108,7 @@ import {
 import { useCompany } from "@/lib/company";
 import { safeTimeZone } from "@/lib/timezone";
 import { CancelScheduleConfirmDialog, ScheduleConfirmDialog } from "./ScheduleDialogs";
-import { CONTINUOUS_INPUT_WINDOW_MS, intentGroupKey, isContinuousInputTarget } from "./history/change-intent";
+import { createContinuousInputGate, intentGroupKey, isContinuousInputTarget } from "./history/change-intent";
 import {
   type HistoryShortcut,
   ariaKeyShortcuts,
@@ -457,7 +457,7 @@ export function ExperienceBuilder({
   const historyScopeRef = useRef(historyScope);
   historyScopeRef.current = historyScope;
   const [historyAnnouncement, setHistoryAnnouncement] = useState({ text: "", n: 0 });
-  const continuousInputAtRef = useRef(Number.NEGATIVE_INFINITY);
+  const [continuousInput] = useState(() => createContinuousInputGate());
   // المنصّة تُحدَّد بعد التركيب فقط: الخادم لا `navigator` له، فتحديدها أثناء التصيير يُنتج `title`/`aria-keyshortcuts` مختلفين
   // بين HTML الخادم والتهيئة (hydration mismatch) على macOS.
   const [historyIsMac, setHistoryIsMac] = useState(false);
@@ -1620,7 +1620,8 @@ export function ExperienceBuilder({
     normalized.sbc.seal_token = next.sbc.seal_token;
     // CUST-H5-2 — نية التعديل (حقل نصّي/رقمي واحد) تُجمَّع في خطوة تراجع واحدة؛ كل ما عداه خطوة مستقلة.
     // التجميع يشترط أن التعديل وليد حدث إدخال مستمر (نص/رقم/منزلق/لون) لا اختيار منفصل (قائمة/منتقي/زر).
-    const fromContinuousInput = performance.now() - continuousInputAtRef.current < CONTINUOUS_INPUT_WINDOW_MS;
+    // يُستهلَك العلَم بأول تعديل ينتجه حدث الإدخال: فعلٌ منفصل لاحق (نقرة على نمط جاهز) لا يرث نيّته.
+    const fromContinuousInput = continuousInput.consume(performance.now());
     if (historyScope) {
       history.record(historyScope, normalized, fromContinuousInput ? intentGroupKey(draftRef.current, normalized) : undefined);
     }
@@ -2646,8 +2647,12 @@ export function ExperienceBuilder({
       data-selected-version-state={selectedVersion?.state ?? ""}
       data-selected-version-revision={selectedVersion?.revision ?? ""}
       onInputCapture={(event) => {
-        if (isContinuousInputTarget(event.target)) continuousInputAtRef.current = performance.now();
+        if (isContinuousInputTarget(event.target)) continuousInput.mark(performance.now());
       }}
+      // أي تفاعل منفصل (ضغط/نقر/مفتاح) يُسقط علَم الإدخال المستمر العالق؛ حدث `input` يأتي بعد `keydown` فلا يتأثر.
+      onPointerDownCapture={continuousInput.reset}
+      onClickCapture={continuousInput.reset}
+      onKeyDownCapture={continuousInput.reset}
       data-can-undo={undoEnabled ? "true" : "false"}
       data-can-redo={redoEnabled ? "true" : "false"}
       data-panel={panel}
