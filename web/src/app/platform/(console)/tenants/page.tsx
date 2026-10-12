@@ -6,13 +6,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { type ColumnDef } from '@tanstack/react-table';
-import { ArrowRight, RefreshCw, ShieldCheck } from 'lucide-react';
+import { RefreshCw, ShieldCheck } from 'lucide-react';
 import { GlobalApplicationControlsCard } from '@/components/platform/global-application-controls-card';
 import { DataTable } from '@/components/data-table';
 import { Pagination } from '@/components/nebrax/pagination';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
+import type { MobileRecord } from '@/components/nebrax/mobile-record';
 import { Select } from '@/components/ui/select';
 import { ApiError } from '@/lib/api';
 import { isPlatformAuthenticated } from '@/lib/platform-auth';
@@ -149,6 +150,21 @@ export default function PlatformTenantsPage() {
           </Link>
         ),
       },
+      // H1-4A: الحالة والخطة أولاً بعد الاسم حتى لا تُدفعا خارج الإطار عند التمرير داخل الجدول.
+      {
+        accessorKey: 'plan',
+        header: t('plan'),
+        cell: ({ row }) => <Badge tone="muted">{row.original.plan}</Badge>,
+      },
+      {
+        accessorKey: 'is_active',
+        header: t('status'),
+        cell: ({ row }) => (
+          <Badge tone={row.original.is_active ? 'positive' : 'negative'}>
+            {row.original.is_active ? t('active') : t('inactive')}
+          </Badge>
+        ),
+      },
       {
         accessorKey: 'account_number',
         header: t('accountNumber'),
@@ -169,32 +185,18 @@ export default function PlatformTenantsPage() {
         id: 'contactEmail',
         accessorFn: (row) => row.contact?.email ?? '',
         header: t('contact'),
-        cell: ({ row }) => <span className="num text-muted">{row.original.contact?.email ?? '—'}</span>,
+        cell: ({ row }) => <span className="num text-muted" dir="ltr">{row.original.contact?.email ?? '—'}</span>,
       },
       {
         id: 'contactPhone',
         accessorFn: (row) => row.contact?.phone ?? '',
         header: t('phone'),
-        cell: ({ row }) => <span className="num text-muted">{row.original.contact?.phone ?? '—'}</span>,
-      },
-      {
-        accessorKey: 'plan',
-        header: t('plan'),
-        cell: ({ row }) => <Badge tone="muted">{row.original.plan}</Badge>,
-      },
-      {
-        accessorKey: 'is_active',
-        header: t('status'),
-        cell: ({ row }) => (
-          <Badge tone={row.original.is_active ? 'positive' : 'negative'}>
-            {row.original.is_active ? t('active') : t('inactive')}
-          </Badge>
-        ),
+        cell: ({ row }) => <span className="num text-muted" dir="ltr">{row.original.contact?.phone ?? '—'}</span>,
       },
       {
         accessorKey: 'trial_ends_at',
         header: t('trialEndsAt'),
-        cell: ({ row }) => <span className="num text-muted">{row.original.trial_ends_at ?? t('noTrial')}</span>,
+        cell: ({ row }) => <span className="num text-muted" dir={row.original.trial_ends_at ? 'ltr' : undefined}>{row.original.trial_ends_at ?? t('noTrial')}</span>,
       },
       {
         accessorKey: 'users_count',
@@ -215,47 +217,107 @@ export default function PlatformTenantsPage() {
     [rows, planFilter, statusFilter]
   );
 
-  return (
-    <main className="min-h-screen bg-background">
-      <header className="border-b border-border bg-surface">
-        <div className="mx-auto flex max-w-6xl flex-col gap-4 px-4 py-4 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8">
-          <div className="flex items-start gap-3">
-            <ShieldCheck className="mt-0.5 h-6 w-6 shrink-0 text-primary" strokeWidth={1.7} aria-hidden="true" />
-            <div>
-              <h1 className="text-xl font-semibold text-text">{t('title')}</h1>
-              <p className="mt-1 text-sm text-muted">{t('subtitle')}</p>
-            </div>
+  const filtersActive = planFilter !== 'all' || statusFilter !== 'all';
+  const clearFilters = () => {
+    setPlanFilter('all');
+    setStatusFilter('all');
+  };
+
+  // الترتيب المعتمد للجوال: الاسم والحالة، ثم رقم الحساب والخطة والمستخدمون، ثم بقية بيانات التواصل.
+  // لا حقل محذوف؛ التفاصيل الطويلة تنزل إلى كتلة أخيرة بقيم LTR.
+  const mobileRecord = useCallback(
+    (row: TenantRow): MobileRecord => ({
+      title: (
+        <Link
+          href={`/platform/tenants/${row.id}`}
+          className="inline-flex min-h-11 max-w-full items-center whitespace-normal break-words font-medium text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+        >
+          <span dir="auto">{row.name}</span>
+        </Link>
+      ),
+      subtitle: (
+        <span>
+          {t('accountNumber')}: <span className="num" dir="ltr">{row.account_number ?? '—'}</span>
+        </span>
+      ),
+      caption: <span dir="ltr">{row.slug}</span>,
+      amountLabel: t('usersCount'),
+      amount: row.users_count,
+      status: (
+        <>
+          <Badge tone={row.is_active ? 'positive' : 'negative'}>{row.is_active ? t('active') : t('inactive')}</Badge>
+          <Badge tone="muted">{row.plan}</Badge>
+        </>
+      ),
+      meta: row.trial_ends_at ? `${t('trialEndsAt')}: ${row.trial_ends_at}` : t('noTrial'),
+      actions: (
+        <dl className="grid w-full grid-cols-1 gap-x-4 gap-y-1.5 text-xs min-[420px]:grid-cols-2">
+          <div className="min-w-0">
+            <dt className="text-muted">{t('contactName')}</dt>
+            <dd className="truncate text-text">{row.contact?.name ?? '—'}</dd>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <Button asChild variant="outline" size="sm"><Link href='/platform'>
-              <ArrowRight className="h-4 w-4" strokeWidth={1.7} aria-hidden="true" />
-              {t('back')}
-            </Link></Button>
-            <Button variant="outline" size="sm" onClick={() => void load()} disabled={loading} aria-label={t('refresh')}>
-              <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} strokeWidth={1.7} aria-hidden="true" />
-            </Button>
+          <div className="min-w-0">
+            <dt className="text-muted">{t('supportNumber')}</dt>
+            <dd className="num text-text" dir="ltr">{row.support_number ?? '—'}</dd>
+          </div>
+          <div className="min-w-0">
+            <dt className="text-muted">{t('contact')}</dt>
+            <dd className="num break-all text-text" dir="ltr">{row.contact?.email ?? '—'}</dd>
+          </div>
+          <div className="min-w-0">
+            <dt className="text-muted">{t('phone')}</dt>
+            <dd className="num text-text" dir="ltr">{row.contact?.phone ?? '—'}</dd>
+          </div>
+        </dl>
+      ),
+    }),
+    [t]
+  );
+
+  const clearFiltersButton = (
+    <Button variant="outline" className="h-11" onClick={clearFilters}>
+      {t('clearFilters')}
+    </Button>
+  );
+  const emptyLabel =
+    rows.length > 0 && filtersActive ? t('emptyFiltered') : search.trim() !== '' ? t('emptySearch') : t('empty');
+
+  return (
+    <main className="mx-auto max-w-6xl space-y-6 px-4 py-6 sm:px-6 lg:px-8">
+      <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex items-start gap-3">
+          <ShieldCheck className="mt-0.5 h-6 w-6 shrink-0 text-primary" strokeWidth={1.7} aria-hidden="true" />
+          <div className="min-w-0">
+            <h1 className="text-xl font-semibold text-text">{t('title')}</h1>
+            <p className="mt-1 text-sm text-muted">{t('subtitle')}</p>
           </div>
         </div>
+        <Button variant="outline" className="h-11 shrink-0 self-start" onClick={() => void load()} disabled={loading}>
+          <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} strokeWidth={1.7} aria-hidden="true" />
+          {t('refresh')}
+        </Button>
       </header>
 
-      <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:px-8">
+      <GlobalApplicationControlsCard />
+
+      <section aria-labelledby="platform-tenant-list" className="space-y-3">
+        <h2 id="platform-tenant-list" className="text-sm font-semibold text-text">{t('listTitle')}</h2>
+
         {error ? (
           <Card>
             <CardContent className="flex flex-col items-start gap-3 p-5 sm:flex-row sm:items-center sm:justify-between">
               <p className="text-sm text-negative" role="alert">{error}</p>
-              <Button variant="outline" onClick={load}>{t('retry')}</Button>
+              <Button variant="outline" className="h-11" onClick={() => void load()}>{t('retry')}</Button>
             </CardContent>
           </Card>
         ) : (
-          <div className="space-y-3">
-            <GlobalApplicationControlsCard />
-            <p className="text-sm text-muted">{t('pageFilterNote')}</p>
-            <div className="flex flex-wrap items-center gap-2">
+          <>
+            <div role="group" aria-label={t('filtersLabel')} className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
               <Select
                 value={planFilter}
                 onChange={(e) => setPlanFilter(e.target.value)}
                 aria-label={t('filterByPlan')}
-                className="w-40"
+                className="h-11 sm:w-44"
               >
                 <option value="all">{t('allPlans')}</option>
                 {PLAN_OPTIONS.map((plan) => (
@@ -266,21 +328,35 @@ export default function PlatformTenantsPage() {
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
                 aria-label={t('filterByStatus')}
-                className="w-40"
+                className="h-11 sm:w-44"
               >
                 <option value="all">{t('allStatuses')}</option>
                 <option value="true">{t('active')}</option>
                 <option value="false">{t('inactive')}</option>
               </Select>
+              {filtersActive ? clearFiltersButton : null}
+            </div>
+            <div className="space-y-1 text-xs leading-relaxed text-muted">
+              <p>{t('pageFilterNote')}</p>
+              <p>{t('csvNote')}</p>
+              {filtersActive ? <p className="text-text">{t('localFilterWarning')}</p> : null}
+              <p aria-live="polite">
+                {loading ? '' : t('listSummary', { shown: filteredRows.length, loaded: rows.length, total })}
+              </p>
             </div>
             <DataTable
               columns={columns}
               data={filteredRows}
               loading={loading}
               searchPlaceholder={t('search')}
+              searchLabel={t('search')}
+              exportLabel={t('exportLabel')}
               searchValue={search}
               onSearchChange={changeSearch}
-              emptyLabel={t('empty')}
+              emptyLabel={emptyLabel}
+              emptyDescription={rows.length > 0 && filtersActive ? t('emptyFilteredHint') : undefined}
+              emptyAction={rows.length > 0 && filtersActive ? clearFiltersButton : undefined}
+              mobileRecord={mobileRecord}
               exportName="tenants"
             />
             <Pagination
@@ -292,9 +368,9 @@ export default function PlatformTenantsPage() {
               onPerPageChange={changePerPage}
               disabled={loading}
             />
-          </div>
+          </>
         )}
-      </div>
+      </section>
     </main>
   );
 }

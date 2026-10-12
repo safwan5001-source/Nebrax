@@ -52,6 +52,10 @@ interface DataTableProps<T> {
   data: T[];
   loading?: boolean;
   searchPlaceholder?: string;
+  /** اسم وصول حقل البحث. الافتراضي نص العنصر النائب الحالي. */
+  searchLabel?: string;
+  /** اسم/تلميح زر CSV حين يلزم توضيح نطاق ما يُصدَّر. الافتراضي السلوك الحالي. */
+  exportLabel?: string;
   emptyLabel?: string;
   emptyDescription?: string;
   emptyAction?: React.ReactNode;
@@ -95,6 +99,8 @@ export function DataTable<T>({
   data,
   loading,
   searchPlaceholder,
+  searchLabel,
+  exportLabel,
   emptyLabel,
   emptyDescription,
   emptyAction,
@@ -240,6 +246,7 @@ export function DataTable<T>({
             value={globalFilter}
             onChange={(e) => setGlobalFilter(e.target.value)}
             placeholder={searchPlaceholder}
+            aria-label={searchLabel ?? searchPlaceholder}
             data-awj-grid-search=""
             className="h-8 w-full max-w-xs bg-transparent text-sm text-text placeholder:text-muted focus:outline-none"
           />
@@ -262,7 +269,8 @@ export function DataTable<T>({
             className={columnVisibility ? '' : 'ms-auto'}
             onClick={exportCsv}
             disabled={loading || data.length === 0}
-            title={t('exportCsv')}
+            title={exportLabel ?? t('exportCsv')}
+            aria-label={exportLabel}
           >
             <Download className="h-3.5 w-3.5" strokeWidth={1.7} />
             CSV

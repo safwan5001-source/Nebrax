@@ -381,3 +381,19 @@ describe('DataTable row selection', () => {
     expect(container.textContent).not.toMatch(/[؀-ۿ]/);
   });
 });
+
+describe('DataTable toolbar accessible names (H1-4A, additive)', () => {
+  it('names the search box after the placeholder by default and the export button as before', () => {
+    renderIntl(<DataTable columns={columns} data={rows} searchPlaceholder="بحث" />);
+    expect(screen.getByRole('textbox', { name: 'بحث' })).toBeTruthy();
+    const csv = screen.getByRole('button', { name: 'CSV' });
+    expect(csv.hasAttribute('aria-label')).toBe(false);
+  });
+
+  it('lets a screen declare the search name and the export scope', () => {
+    renderIntl(<DataTable columns={columns} data={rows} searchPlaceholder="بحث" searchLabel="بحث بالاسم" exportLabel="تصدير هذه الصفحة" />);
+    expect(screen.getByRole('textbox', { name: 'بحث بالاسم' })).toBeTruthy();
+    const csv = screen.getByRole('button', { name: 'تصدير هذه الصفحة' });
+    expect(csv.getAttribute('title')).toBe('تصدير هذه الصفحة');
+  });
+});

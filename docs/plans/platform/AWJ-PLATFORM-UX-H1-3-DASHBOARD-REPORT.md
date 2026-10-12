@@ -1,6 +1,6 @@
 # H1-3 — Platform Executive Dashboard — Implementation report
 
-STATUS: IN REVIEW / DO NOT MERGE / DO NOT DEPLOY
+STATUS: MERGED (PR #1358, `b97b19dd28818fbf9e84dfcc037602d56486fe33`) / NOT DEPLOYED / POST-MERGE VERIFICATION NOT RECORDED
 Horizon: AWJ-PLATFORM-UX-H1 · Slice: H1-3 · Date: 2026-10-12
 Spec: [AWJ-PLATFORM-UX-H1-1-UX-SPEC.md](./AWJ-PLATFORM-UX-H1-1-UX-SPEC.md) §12.2 (Overview)
 
@@ -90,12 +90,14 @@ Only the page file changed in product code. The data effect, `load`, error handl
 
 ## CI
 
-Recorded on the pull request for the exact head SHA (the checks and the final head are listed in the PR and in the hand-off summary). This file is part of that head, so it does not restate results that did not exist when it was committed.
+Final Head `53db1b59f4846e3a77cd4c614e65f3b9b7ebaf7e` of PR #1358: all 8 GitHub check runs `success` (CI Gate, web build ×2, php artisan test sqlite ×2, pgsql ×2, storefront lint/typecheck/test), read through the GitHub API.
 
 ## Merge / post-merge
 
-- Merge status: not merged. Merge SHA: none. Post-merge review: not done. Deploy: not requested.
-- Post-merge verification of #1318, #1328 and #1355 on `main` has not been recorded either; this slice does not claim it.
+- PRE_MERGE_REVIEW: PASS, recorded as a comment on PR #1358 by the repository owner account for the exact Head above; no unresolved review threads. The only bot comment was a Codex usage-limit notice.
+- Merge status: merged on 2026-10-12 (about 05:50 UTC). Merge SHA `b97b19dd28818fbf9e84dfcc037602d56486fe33`, confirmed an ancestor of `main` (subject "feat(platform): H1-3 platform executive dashboard (#1358)"). The merge was not performed by the Claude session.
+- Post-merge review: not done. No target-branch check or smoke evidence on `b97b19d` was collected, so none is claimed.
+- Deploy / production release: not done.
 
 ## Risks and remaining work
 
@@ -108,8 +110,8 @@ Recorded on the pull request for the exact head SHA (the checks and the final he
 
 - Branch: `claude/awj-h1-contrast-recovery-fx8unn` (restarted from `main` after #1355 merged; the old remote history is merged in so no force-push is needed).
 - Base SHA: `2bc1c1250af710af96a9aa3b0428e2a4f61925cc` (`origin/main` at start).
-- Head SHA and PR: see the pull request.
+- Head SHA: `53db1b59f4846e3a77cd4c614e65f3b9b7ebaf7e`. PR: #1358 (merged).
 
 ## Next dependency-ready task
 
-H1-4 management pages, one page per PR (tenants visual slice first per the spec), only after H1-3 is closed. Not started.
+H1-4A tenants list (see `AWJ-PLATFORM-UX-H1-4A-TENANTS-REPORT.md`), then H1-4B tenant detail and the remaining pages, one per PR.
