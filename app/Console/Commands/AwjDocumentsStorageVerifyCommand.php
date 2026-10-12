@@ -34,11 +34,14 @@ final class AwjDocumentsStorageVerifyCommand extends Command
             $this->line('bucket: '.$report['bucket']);
         }
         foreach ($report['steps'] as $step => $value) {
-            $ok = $value === true;
-            $this->line(sprintf('%s: %s', $step, $ok ? 'PASS' : ($value === false ? 'FAIL' : 'FAIL ('.$value.')')));
+            $this->line(sprintf('%s: %s', $step, $value === true ? 'PASS' : (is_string($value) ? (str_starts_with($value, 'FAIL') ? $value : 'FAIL: '.$value) : 'FAIL')));
         }
 
         if (! $report['ok']) {
+            $this->line('--- diagnose (codes only, no secrets) ---');
+            foreach ($storage->diagnosePlatformConfiguration() as $name => $value) {
+                $this->line(sprintf('%s: %s', $name, $value));
+            }
             $this->error('FAIL: إعداد التخزين غير جاهز — لا تفتح القفل.');
 
             return self::FAILURE;
