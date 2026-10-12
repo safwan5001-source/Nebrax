@@ -31,6 +31,8 @@
 
 - Interplay with V10c (merged first): the shared section operations carry V10c's review fixes — `copyLabel` shortens the original name, never the suffix; a section with only a typed name counts as authored (deleting it asks). The Canvas name chip (inline-start) and this slice's action bar (inline-end) share the selected section: while the bar shows, the chip's width is capped so the two never overlap. Real Chromium (`never overlap`, 4): AR / EN at 1024 / 1280 with the builder simulating a phone and a 60-character name — fails without the cap, passes with it.
 
+- CI review round (merchant-preview visual QA, `merchant preview long values do not overflow`, 390 px): the bar's containing block was first made `position: relative` on **every** `.awj-preview-section`, which re-anchors absolutely positioned content inside any section (the dev harness passes no bar yet is affected). It now applies only to a wrapper that carries the bar (`awj-preview-section-actionable`); every other section keeps exactly the box it had. Unit test: only a section with the bar gets the class.
+
 ## Design Quality Pass
 
 Screenshots from the run (`test-results/cust-hv-v10d/*.png`): bar over a new-arrivals section and over the selected benefits section in AR RTL; the Library in EN LTR with wireframes. Targets: bar buttons 28 px (compact, pointer-oriented; the 44 px list controls remain the touch path), focus ring on every button, no colour-only state (the delete is also the ✕ glyph and the confirm is text), reduced-motion unaffected (no animation added).

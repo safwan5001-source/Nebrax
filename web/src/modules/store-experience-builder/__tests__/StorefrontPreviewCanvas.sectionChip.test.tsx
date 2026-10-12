@@ -69,4 +69,30 @@ describe("Canvas selection chip (section name)", () => {
     const { container } = mount(config("Eid perks"), "b1");
     expect(container.querySelector("[data-sd] [data-section-chip]")).toBeNull();
   });
+
+  // CUST-HV V10d review (CI visual QA): a positioned section wrapper re-anchors absolutely positioned content inside the section, so
+  // only a section that carries the action bar becomes positioned — everything else keeps the box it had.
+  it("only a section that carries the action bar becomes positioned (the wrapper is untouched everywhere else)", () => {
+    const labels = { toolbar: "t", moveUp: "u", moveDown: "d", duplicate: "c", hide: "h", remove: "r", confirmRemove: "y", cancel: "n" };
+    const actions = { onMove() {}, onDuplicate() {}, onHide() {}, onDelete() {}, labels };
+
+    const plain = mount(config(), null);
+    expect(plain.container.querySelectorAll("[data-preview-section-id]").length).toBeGreaterThan(0);
+    expect(plain.container.querySelector(".awj-preview-section-actionable")).toBeNull();
+    plain.unmount();
+
+    const { container } = render(
+      <StorefrontPreviewCanvas
+        config={config()}
+        locale="en"
+        viewport="desktop"
+        selectedSection={null}
+        onSelectSection={() => {}}
+        sectionActions={actions}
+      />,
+    );
+    const wrappers = container.querySelectorAll("[data-preview-section-id]");
+    expect(wrappers.length).toBeGreaterThan(0);
+    for (const wrapper of wrappers) expect(wrapper.classList.contains("awj-preview-section-actionable")).toBe(true);
+  });
 });

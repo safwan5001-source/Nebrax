@@ -2394,6 +2394,7 @@ function SelectablePreviewSection({
         "awj-preview-section",
         selected && "awj-preview-section-selected",
         selected && label && "awj-preview-section-named",
+        actions && "awj-preview-section-actionable",
       )}
     >
       {selected && label ? (

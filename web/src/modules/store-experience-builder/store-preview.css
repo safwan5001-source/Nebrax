@@ -72,6 +72,11 @@
 .awj-store-preview .awj-preview-section {
   cursor: pointer;
   scroll-margin-top: 5rem;
+}
+/* CUST-HV V10d — only a section that carries the action bar becomes the bar's containing block. Every other section (the dev
+   harness, a Published Version, Theme Preview) keeps exactly the box it had: a positioned wrapper would re-anchor any absolutely
+   positioned content inside a section, so it is never applied to sections that do not need it. */
+.awj-store-preview .awj-preview-section-actionable {
   position: relative;
 }
 /* CUST-HV V10d — the hover action bar: hidden until the section is hovered, focused within, or selected. */
