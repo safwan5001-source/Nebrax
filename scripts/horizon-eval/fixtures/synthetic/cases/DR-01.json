@@ -1,0 +1,9 @@
+{
+  "_extends": "../base_case.json",
+  "_synthetic_notice": "SYNTHETIC TEST FIXTURE - overlay on base_case(.b).json. Not real evidence, not a grant.",
+  "case_id": "DR-01",
+  "_expect": {
+    "decision": "ELIGIBLE_SIMULATED",
+    "must_not_include": []
+  }
+}

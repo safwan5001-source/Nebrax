@@ -1,0 +1,143 @@
+{
+  "_extends": "base_case.json",
+  "_synthetic_notice": "SYNTHETIC TEST FIXTURE. Zone B, every extra evidence item present (the only case that is meant to be ELIGIBLE_SIMULATED among B variants).",
+  "case_id": "BASE-B",
+  "request": {
+    "task_category": "isolated-bugfix",
+    "task_id": "SYNTH-T-002"
+  },
+  "evidence": {
+    "grant_store": {
+      "grants": {
+        "$index": {
+          "0": {
+            "document": {
+              "zones_allowed": [
+                "A",
+                "B"
+              ],
+              "task_categories": [
+                "docs-nongov",
+                "isolated-bugfix"
+              ],
+              "tasks_allowlist": [
+                "SYNTH-T-002"
+              ],
+              "paths_allow": [
+                "docs/**",
+                "web/**",
+                "tests/**"
+              ],
+              "not_before": "2026-10-12T00:00:00Z",
+              "expires_at": "2026-10-13T12:00:00Z",
+              "review_requirements": [
+                "PRE_MERGE_REVIEW",
+                "GUARDIAN",
+                "INDEPENDENT_REVIEW"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "pr": {
+      "title": "fix: isolated null guard in synthetic UI helper",
+      "body": "Isolated bugfix.\n\nHorizon-Claim: SYNTH-HZ-PILOT / SYNTH-T-002",
+      "additions": 6,
+      "deletions": 1,
+      "changed_files": 2,
+      "files": [
+        {
+          "filename": "web/src/modules/synthetic/helper.ts",
+          "status": "modified",
+          "additions": 4,
+          "deletions": 1,
+          "patch": "@@ -10,3 +10,8 @@\n-    return x;\n+    if (x === null) {\n+        return '';\n+    }\n+    return x;"
+        },
+        {
+          "filename": "web/src/modules/synthetic/helper.test.ts",
+          "status": "added",
+          "additions": 2,
+          "deletions": 0,
+          "patch": "@@ -0,0 +1,6 @@\n+import { helper } from './helper';\n+it('guards null', () => expect(helper(null)).toBe(''));"
+        }
+      ],
+      "claim": {
+        "task_id": "SYNTH-T-002"
+      },
+      "head_ref": "synth-hz-pilot/null-guard"
+    },
+    "attestations": [
+      {
+        "type": "PRE_MERGE_REVIEW",
+        "sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "by": "synthetic-agent-1",
+        "result": "PASS"
+      },
+      {
+        "type": "GUARDIAN",
+        "sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "by": "synthetic-guardian",
+        "result": "PASS"
+      },
+      {
+        "type": "REGRESSION_TEST",
+        "sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "by": "synthetic-agent-1",
+        "result": "PASS"
+      },
+      {
+        "type": "INDEPENDENT_REVIEW",
+        "sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "by": "synthetic-independent-reviewer",
+        "result": "PASS"
+      }
+    ],
+    "checks": [
+      {
+        "id": 1001,
+        "name": "CI Gate",
+        "status": "completed",
+        "conclusion": "success",
+        "head_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "event": "pull_request",
+        "completed_at": "2026-10-12T11:48:00Z",
+        "app": "github-actions",
+        "tested_base_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      {
+        "id": 1002,
+        "name": "php artisan test (L11, sqlite)",
+        "status": "completed",
+        "conclusion": "success",
+        "head_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "event": "pull_request",
+        "completed_at": "2026-10-12T11:40:00Z",
+        "app": "github-actions",
+        "tested_base_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      {
+        "id": 1003,
+        "name": "php artisan test (L11, pgsql)",
+        "status": "completed",
+        "conclusion": "success",
+        "head_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "event": "pull_request",
+        "completed_at": "2026-10-12T11:45:00Z",
+        "app": "github-actions",
+        "tested_base_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      {
+        "id": 1004,
+        "name": "web build (Next.js)",
+        "status": "completed",
+        "conclusion": "success",
+        "head_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "event": "pull_request",
+        "completed_at": "2026-10-12T11:46:00Z",
+        "app": "github-actions",
+        "tested_base_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    ]
+  }
+}

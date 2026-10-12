@@ -1,0 +1,66 @@
+{
+  "_extends": "../base_case_b.json",
+  "_synthetic_notice": "SYNTHETIC TEST FIXTURE - overlay on base_case(.b).json. Not real evidence, not a grant.",
+  "case_id": "DR-07a",
+  "_expect": {
+    "decision": "STOP_OWNER_DECISION",
+    "must_include": [
+      "CONFLICT_EXCLUSIVE_SURFACE"
+    ]
+  },
+  "evidence": {
+    "grant_store": {
+      "grants": {
+        "$index": {
+          "0": {
+            "document": {
+              "paths_allow": [
+                "docs/**",
+                "web/**",
+                "tests/**"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "other_prs": [
+      {
+        "number": 9101,
+        "state": "open",
+        "horizon_id": "SYNTH-HZ-OTHER",
+        "head_ref": "synth-hz-other/nav",
+        "observed_at": "2026-10-12T11:59:00Z",
+        "last_activity_at": "2026-10-12T11:55:00Z",
+        "files": [
+          "web/messages/ar.json"
+        ],
+        "claim": {
+          "horizon_id": "SYNTH-HZ-OTHER",
+          "task_id": "SYNTH-T-901",
+          "surfaces": {
+            "S-NAV-I18N": "exclusive"
+          },
+          "claim_order": 3
+        },
+        "files_complete": true,
+        "head_repo": "synthetic-owner/synthetic-repo",
+        "author": "synthetic-author-2"
+      }
+    ],
+    "pr": {
+      "files": [
+        {
+          "filename": "web/src/components/layout/sidebar-item.tsx",
+          "status": "modified",
+          "additions": 1,
+          "deletions": 1,
+          "patch": "@@ -1 +1 @@\n-<li>old</li>\n+<li>new</li>"
+        }
+      ],
+      "changed_files": 1,
+      "additions": 1,
+      "deletions": 1
+    }
+  }
+}

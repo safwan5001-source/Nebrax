@@ -1,0 +1,20 @@
+{
+  "_extends": "../base_case.json",
+  "_synthetic_notice": "SYNTHETIC TEST FIXTURE - overlay on base_case(.b).json. Not real evidence, not a grant.",
+  "case_id": "DR-04a",
+  "_expect": {
+    "decision": "BLOCK",
+    "must_include": [
+      "CI_CHECK_NOT_SUCCESS"
+    ]
+  },
+  "evidence": {
+    "checks": {
+      "$index": {
+        "0": {
+          "conclusion": "failure"
+        }
+      }
+    }
+  }
+}

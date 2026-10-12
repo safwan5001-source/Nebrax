@@ -1,0 +1,40 @@
+{
+  "_extends": "../base_case.json",
+  "_synthetic_notice": "SYNTHETIC TEST FIXTURE - overlay on base_case(.b).json. Not real evidence, not a grant.",
+  "case_id": "DR-08c",
+  "_expect": {
+    "decision": "STOP_OWNER_DECISION",
+    "must_include": [
+      "ZONE_C_OWNER_GATED"
+    ]
+  },
+  "evidence": {
+    "grant_store": {
+      "grants": {
+        "$index": {
+          "0": {
+            "document": {
+              "paths_allow": [
+                "**"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "pr": {
+      "files": [
+        {
+          "filename": ".github/workflows/ci-gate.yml",
+          "status": "modified",
+          "additions": 1,
+          "deletions": 1,
+          "patch": "@@ -50 +50 @@\n-        run: python .base/scripts/ci-gate/ci_gate.py gate\n+        run: python scripts/ci-gate/ci_gate.py gate"
+        }
+      ],
+      "changed_files": 1,
+      "additions": 1,
+      "deletions": 1
+    }
+  }
+}

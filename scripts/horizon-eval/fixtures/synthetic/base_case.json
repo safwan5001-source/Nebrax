@@ -1,0 +1,290 @@
+{
+  "_synthetic_notice": "SYNTHETIC TEST FIXTURE. Not a grant, not authority, not real evidence. Never copy into a live grant directory.",
+  "schema": "horizon-eval-case/1",
+  "case_id": "BASE-A",
+  "mode": "synthetic-test",
+  "now": "2026-10-12T12:00:00Z",
+  "request": {
+    "horizon_id": "SYNTH-HZ-PILOT",
+    "task_id": "SYNTH-T-001",
+    "task_category": "docs-nongov",
+    "agent_id": "synthetic-agent-1",
+    "repository": "synthetic-owner/synthetic-repo",
+    "base_branch": "main",
+    "action": "merge",
+    "pr_number": 9001
+  },
+  "evidence": {
+    "fetched_at": "2026-10-12T11:59:30Z",
+    "source": "synthetic-fixture",
+    "main": {
+      "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "grant_store": {
+      "ref": "main",
+      "ref_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "fetched_at": "2026-10-12T11:59:50Z",
+      "kill_switch": false,
+      "revoked_grant_ids": [],
+      "grants": [
+        {
+          "origin": {
+            "ref": "main",
+            "commit_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "path": "scripts/horizon-eval/fixtures/synthetic/grants/GR-SYNTHETIC-001.json"
+          },
+          "document": {
+            "schema_version": 1,
+            "synthetic": true,
+            "grant_id": "GR-SYNTHETIC-001",
+            "status": "active",
+            "owner": "synthetic-owner",
+            "issued_at": "2026-10-11T23:00:00Z",
+            "not_before": "2026-10-12T00:00:00Z",
+            "expires_at": "2026-10-17T00:00:00Z",
+            "horizon_id": "SYNTH-HZ-PILOT",
+            "approved_outcome": "Synthetic: documentation-only wording changes.",
+            "repositories": [
+              "synthetic-owner/synthetic-repo"
+            ],
+            "base_branches": [
+              "main"
+            ],
+            "zones_allowed": [
+              "A"
+            ],
+            "task_categories": [
+              "docs-nongov",
+              "a11y-label"
+            ],
+            "tasks_allowlist": [],
+            "paths_allow": [
+              "docs/**",
+              "web/src/**/*.tsx"
+            ],
+            "paths_deny": [
+              "docs/private/**"
+            ],
+            "limits": {
+              "max_merges": 5,
+              "max_merges_per_day": 2,
+              "max_files_per_pr": 8,
+              "max_changed_lines": 200,
+              "max_open_prs": 1
+            },
+            "agents": [
+              "synthetic-agent-1"
+            ],
+            "required_checks": [
+              "CI Gate"
+            ],
+            "review_requirements": [
+              "PRE_MERGE_REVIEW"
+            ],
+            "conflict_policy": "stop",
+            "revocation": {
+              "channel": "synthetic"
+            },
+            "production_gated": true,
+            "audit": "synthetic-ledger"
+          },
+          "content_sha256": "@auto",
+          "authenticity": {
+            "method": "synthetic-test-attestation",
+            "verified_by": "synthetic-test-verifier",
+            "github_verified_badge": false,
+            "signed_content_sha256": "@auto",
+            "conditions": {
+              "out_of_band_owner_binding": true,
+              "isolated_hardware_key": true,
+              "allowed_signers_pinned_on_main": true,
+              "signature_binds_content": true,
+              "revocation_path_declared": true,
+              "web_flow_signatures_excluded": true
+            }
+          }
+        }
+      ]
+    },
+    "grant_usage": [
+      {
+        "grant_id": "GR-SYNTHETIC-001",
+        "merges_total": 0,
+        "merges_today": 0,
+        "open_prs": 1
+      }
+    ],
+    "registry": {
+      "horizons": [
+        {
+          "horizon_id": "SYNTH-HZ-PILOT",
+          "protocol_version": "v2",
+          "owner_agent": "synthetic-agent-1",
+          "status_reported": "active",
+          "claim_order": 5,
+          "claimed_surfaces": {},
+          "branch_prefixes": [
+            "synth-hz-pilot/"
+          ],
+          "authors": [
+            "synthetic-author"
+          ]
+        },
+        {
+          "horizon_id": "SYNTH-HZ-OTHER",
+          "protocol_version": "v2",
+          "owner_agent": "synthetic-agent-2",
+          "status_reported": "active",
+          "claim_order": 3,
+          "claimed_surfaces": {},
+          "branch_prefixes": [
+            "synth-hz-other/"
+          ],
+          "authors": [
+            "synthetic-author-2"
+          ]
+        }
+      ]
+    },
+    "pr": {
+      "number": 9001,
+      "state": "open",
+      "draft": false,
+      "merged": false,
+      "merge_commit_sha": null,
+      "author": "synthetic-author",
+      "title": "docs: clarify synthetic wording",
+      "body": "Documentation wording only.\n\nHorizon-Claim: SYNTH-HZ-PILOT / SYNTH-T-001",
+      "head_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "head_pushed_at": "2026-10-12T11:20:00Z",
+      "base_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "base_ref": "main",
+      "additions": 3,
+      "deletions": 3,
+      "changed_files": 3,
+      "labels": [
+        "horizon:SYNTH-HZ-PILOT"
+      ],
+      "files": [
+        {
+          "filename": "docs/guides/synthetic-a.md",
+          "status": "modified",
+          "additions": 1,
+          "deletions": 1,
+          "patch": "@@ -1 +1 @@\n-old text\n+clearer text"
+        },
+        {
+          "filename": "docs/guides/synthetic-b.md",
+          "status": "modified",
+          "additions": 1,
+          "deletions": 1,
+          "patch": "@@ -1 +1 @@\n-old text\n+clearer text"
+        },
+        {
+          "filename": "docs/guides/synthetic-c.md",
+          "status": "modified",
+          "additions": 1,
+          "deletions": 1,
+          "patch": "@@ -1 +1 @@\n-old text\n+clearer text"
+        }
+      ],
+      "commits": [
+        {
+          "sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "message": "docs: clarify wording",
+          "author": "synthetic-author"
+        }
+      ],
+      "comments": [],
+      "reviews": [],
+      "claim": {
+        "horizon_id": "SYNTH-HZ-PILOT",
+        "task_id": "SYNTH-T-001",
+        "surfaces": {},
+        "claim_order": 5
+      },
+      "head_ref": "synth-hz-pilot/docs-wording",
+      "head_repo": "synthetic-owner/synthetic-repo",
+      "base_repo": "synthetic-owner/synthetic-repo"
+    },
+    "checks": [
+      {
+        "id": 1001,
+        "name": "CI Gate",
+        "status": "completed",
+        "conclusion": "success",
+        "head_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "event": "pull_request",
+        "completed_at": "2026-10-12T11:48:00Z",
+        "app": "github-actions",
+        "tested_base_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      {
+        "id": 1002,
+        "name": "php artisan test (L11, sqlite)",
+        "status": "completed",
+        "conclusion": "success",
+        "head_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "event": "pull_request",
+        "completed_at": "2026-10-12T11:40:00Z",
+        "app": "github-actions",
+        "tested_base_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      {
+        "id": 1003,
+        "name": "php artisan test (L11, pgsql)",
+        "status": "completed",
+        "conclusion": "success",
+        "head_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "event": "pull_request",
+        "completed_at": "2026-10-12T11:45:00Z",
+        "app": "github-actions",
+        "tested_base_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    ],
+    "required_checks": {
+      "source_ref": "main",
+      "source_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "gate_name": "CI Gate",
+      "always_names": [
+        "php artisan test (L11, sqlite)",
+        "php artisan test (L11, pgsql)"
+      ],
+      "path_names": [
+        "web build (Next.js)",
+        "storefront (lint + typecheck + test)"
+      ],
+      "grace_minutes_no_run": 10
+    },
+    "attestations": [
+      {
+        "type": "PRE_MERGE_REVIEW",
+        "sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "by": "synthetic-agent-1",
+        "result": "PASS"
+      }
+    ],
+    "other_prs": [
+      {
+        "number": 9100,
+        "state": "open",
+        "horizon_id": "SYNTH-HZ-OTHER",
+        "head_ref": "synth-hz-other/unrelated",
+        "observed_at": "2026-10-12T11:59:00Z",
+        "last_activity_at": "2026-10-12T11:58:00Z",
+        "files": [
+          "storefront/src/components/Unrelated.tsx"
+        ],
+        "claim": {
+          "horizon_id": "SYNTH-HZ-OTHER",
+          "task_id": "SYNTH-T-900",
+          "surfaces": {},
+          "claim_order": 3
+        },
+        "files_complete": true,
+        "head_repo": "synthetic-owner/synthetic-repo",
+        "author": "synthetic-author-2"
+      }
+    ]
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "_extends": "../base_case.json",
+  "_synthetic_notice": "SYNTHETIC TEST FIXTURE - overlay on base_case(.b).json. Not real evidence, not a grant.",
+  "case_id": "DR-09a",
+  "_expect": {
+    "decision": "BLOCK",
+    "must_include": [
+      "PR_ALREADY_MERGED",
+      "HANDOFF_CONTRADICTS_GITHUB"
+    ]
+  },
+  "evidence": {
+    "pr": {
+      "state": "closed",
+      "merged": true,
+      "merge_commit_sha": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+    },
+    "handoff": {
+      "claims_merged": false
+    }
+  }
+}

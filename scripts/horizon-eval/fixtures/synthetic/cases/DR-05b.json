@@ -1,0 +1,63 @@
+{
+  "_extends": "../base_case.json",
+  "_synthetic_notice": "SYNTHETIC TEST FIXTURE - overlay on base_case(.b).json. Not real evidence, not a grant.",
+  "case_id": "DR-05b",
+  "_expect": {
+    "decision": "WAIT",
+    "must_include": [
+      "CI_CHECK_PENDING",
+      "CI_NON_PR_EVENT_RUNS_IGNORED"
+    ],
+    "must_not_include": [
+      "CI_CHECK_NOT_SUCCESS"
+    ]
+  },
+  "evidence": {
+    "checks": [
+      {
+        "id": 1005,
+        "name": "CI Gate",
+        "status": "in_progress",
+        "conclusion": null,
+        "head_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "event": "pull_request",
+        "completed_at": null,
+        "app": "github-actions",
+        "tested_base_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      {
+        "id": 999,
+        "name": "CI Gate",
+        "status": "completed",
+        "conclusion": "success",
+        "head_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "event": "push",
+        "completed_at": "2026-10-12T11:47:00Z",
+        "app": "github-actions",
+        "tested_base_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      {
+        "id": 1002,
+        "name": "php artisan test (L11, sqlite)",
+        "status": "completed",
+        "conclusion": "success",
+        "head_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "event": "pull_request",
+        "completed_at": "2026-10-12T11:40:00Z",
+        "app": "github-actions",
+        "tested_base_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      {
+        "id": 1003,
+        "name": "php artisan test (L11, pgsql)",
+        "status": "completed",
+        "conclusion": "success",
+        "head_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "event": "pull_request",
+        "completed_at": "2026-10-12T11:45:00Z",
+        "app": "github-actions",
+        "tested_base_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    ]
+  }
+}

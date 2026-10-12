@@ -1,0 +1,70 @@
+{
+  "_extends": "../base_case_b.json",
+  "_synthetic_notice": "SYNTHETIC TEST FIXTURE - overlay on base_case(.b).json. Not real evidence, not a grant.",
+  "case_id": "DR-07b",
+  "_expect": {
+    "decision": "STOP_OWNER_DECISION",
+    "must_include": [
+      "CONFLICT_POLICY_STOP"
+    ],
+    "must_not_include": [
+      "ZONE_C_OWNER_GATED"
+    ]
+  },
+  "evidence": {
+    "grant_store": {
+      "grants": {
+        "$index": {
+          "0": {
+            "document": {
+              "paths_allow": [
+                "docs/**",
+                "web/**",
+                "tests/**",
+                "storefront/src/**"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "pr": {
+      "files": [
+        {
+          "filename": "storefront/src/lib/presentation/global-tokens.ts",
+          "status": "modified",
+          "additions": 1,
+          "deletions": 1,
+          "patch": "@@ -1 +1 @@\n-export const gap = 4;\n+export const gap = 8;"
+        }
+      ],
+      "changed_files": 1,
+      "additions": 1,
+      "deletions": 1
+    },
+    "other_prs": [
+      {
+        "number": 9102,
+        "state": "open",
+        "horizon_id": "SYNTH-HZ-OTHER",
+        "head_ref": "synth-hz-other/tokens-php",
+        "observed_at": "2026-10-12T11:59:00Z",
+        "last_activity_at": "2026-10-12T11:50:00Z",
+        "files": [
+          "app/Support/Commerce/StorefrontGlobalTokensNormalizer.php"
+        ],
+        "claim": {
+          "horizon_id": "SYNTH-HZ-OTHER",
+          "task_id": "SYNTH-T-902",
+          "surfaces": {
+            "S-TOKENS-CONTRACT": "shared-write"
+          },
+          "claim_order": 3
+        },
+        "files_complete": true,
+        "head_repo": "synthetic-owner/synthetic-repo",
+        "author": "synthetic-author-2"
+      }
+    ]
+  }
+}

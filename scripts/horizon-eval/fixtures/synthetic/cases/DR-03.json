@@ -1,0 +1,27 @@
+{
+  "_extends": "../base_case_b.json",
+  "_synthetic_notice": "SYNTHETIC TEST FIXTURE - overlay on base_case(.b).json. Not real evidence, not a grant.",
+  "case_id": "DR-03",
+  "_expect": {
+    "decision": "STOP_OWNER_DECISION",
+    "must_include": [
+      "ZONE_C_OWNER_GATED"
+    ]
+  },
+  "evidence": {
+    "pr": {
+      "files": [
+        {
+          "filename": "app/Services/Accounting/InvoiceService.php",
+          "status": "modified",
+          "additions": 1,
+          "deletions": 1,
+          "patch": "@@ -5 +5 @@\n-    $a = 1;\n+    $a = 2;"
+        }
+      ],
+      "changed_files": 1,
+      "additions": 1,
+      "deletions": 1
+    }
+  }
+}

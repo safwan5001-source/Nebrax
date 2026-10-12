@@ -1,0 +1,15 @@
+{
+  "_extends": "../base_case.json",
+  "_synthetic_notice": "SYNTHETIC TEST FIXTURE - overlay on base_case(.b).json. Not real evidence, not a grant.",
+  "case_id": "X-02",
+  "_expect": {
+    "decision": "BLOCK",
+    "must_include": [
+      "GRANT_AUTHENTICITY_UNVERIFIED"
+    ]
+  },
+  "mode": "live",
+  "evidence": {
+    "source": "github-readonly"
+  }
+}
