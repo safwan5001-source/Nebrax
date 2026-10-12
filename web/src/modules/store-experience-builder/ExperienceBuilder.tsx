@@ -3,7 +3,7 @@
 import { describePublishIssues } from "./announcement-status";
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { CalendarClock, ExternalLink, MoreHorizontal, RotateCcw } from "lucide-react";
+import { CalendarClock, ExternalLink, type LucideIcon, MoreHorizontal, Redo2, RotateCcw, Undo2 } from "lucide-react";
 import { Dropdown, DropdownItem } from "@/components/ui/dropdown";
 import { ScrollIndicator } from "./ScrollIndicator";
 import {
@@ -108,6 +108,21 @@ import {
 import { useCompany } from "@/lib/company";
 import { safeTimeZone } from "@/lib/timezone";
 import { CancelScheduleConfirmDialog, ScheduleConfirmDialog } from "./ScheduleDialogs";
+import { createContinuousInputGate, intentGroupKey, isContinuousInputTarget } from "./history/change-intent";
+import {
+  type HistoryShortcut,
+  ariaKeyShortcuts,
+  isMacPlatform,
+  isNativeEditingTarget,
+  resolveHistoryShortcut,
+  shortcutHint,
+} from "./history/shortcuts";
+import { useDocumentHistory } from "./history/use-document-history";
+
+// CUST-H5-2 — أسهم التراجع/الإعادة تتبع اتجاه **المحرِّر** (`locale`) لا اتجاه وسم الصفحة: متغيّر `rtl:` يطابق أي سلف RTL
+// حتى لو كان أقرب سلف LTR. في RTL يسير الزمن من اليمين لليسار فيُعكس السهم.
+const UndoIconRtl = ((props) => <Undo2 {...props} className={`${props.className ?? ""} -scale-x-100`} />) as LucideIcon;
+const RedoIconRtl = ((props) => <Redo2 {...props} className={`${props.className ?? ""} -scale-x-100`} />) as LucideIcon;
 
 export const PREVIEW_WIDTHS = {
   mobile: 390,
@@ -427,6 +442,33 @@ export function ExperienceBuilder({
   const selectedVersionIdRef = useRef<string | null>(selectedVersion?.id ?? null);
   selectedVersionIdRef.current = selectedVersion?.id ?? null;
 
+  // CUST-H5-2 — Undo/Redo محلي لتعديلات الجلسة غير المحفوظة. النطاق = معرّف النسخة المفتوحة القابلة للتحرير؛ النسخة المنشورة
+  // (أو لا نسخة) = لا سجلّ إطلاقاً. بلا `storefrontId` (تحرير محلي بحت) نطاق ثابت واحد. الحفظ الناجح حدٌّ صلب (`handleSave`).
+  const historyScope: string | null = selectedVersion
+    ? selectedVersion.state === "published"
+      ? null
+      : selectedVersion.id
+    : storefrontId
+      ? null
+      : "local-draft";
+  const history = useDocumentHistory<StorefrontPresentationConfig>(seed, {
+    equals: presentationConfigsEqual,
+  });
+  const historyScopeRef = useRef(historyScope);
+  historyScopeRef.current = historyScope;
+  const [historyAnnouncement, setHistoryAnnouncement] = useState({ text: "", n: 0 });
+  const [continuousInput] = useState(() => createContinuousInputGate());
+  // المنصّة تُحدَّد بعد التركيب فقط: الخادم لا `navigator` له، فتحديدها أثناء التصيير يُنتج `title`/`aria-keyshortcuts` مختلفين
+  // بين HTML الخادم والتهيئة (hydration mismatch) على macOS.
+  const [historyIsMac, setHistoryIsMac] = useState(false);
+  useEffect(() => setHistoryIsMac(isMacPlatform()), []);
+  // تبديل نسخة/متجر، أو انتقال النسخة إلى منشورة، يبدأ جلسة جديدة فارغة من المستند الحالي (الذي ضُبط في الدفعة نفسها).
+  useEffect(() => {
+    if (historyScope) history.begin(historyScope, draftRef.current);
+    else history.end();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `history.begin/end` ثابتتان؛ المفتاح هو النطاق وحده.
+  }, [historyScope]);
+
   function stillCurrent(originStorefrontId: string | null, tokenAtStart: number): boolean {
     return storefrontIdRef.current === originStorefrontId && tokenAtStart === versionRequestTokenRef.current;
   }
@@ -610,6 +652,11 @@ export function ExperienceBuilder({
     });
   }
 
+  function resetHistoryFor(detail: PresentationVersionDetail) {
+    if (detail.state === "published") history.end();
+    else history.begin(detail.id, detail.config);
+  }
+
   // النقطة الوحيدة التي تجلب مستند نسخة فعلياً وتطبّقه على المحرِّر. لا حرس
   // تكافؤ ولا تأكيد تجاهل هنا عمداً — `selectVersion` (الاختيار العادي)
   // يضيفهما، بينما `reloadConflictedVersion` (§15) يحتاج تجاوزهما معاً.
@@ -668,6 +715,8 @@ export function ExperienceBuilder({
     setSelectedSection(null);
     setSelectedChrome(null);
     updateVersionSummaryInList(result.data);
+    // إعادة تحميل النسخة نفسها (تعارض قديم) لا يغيّر معرّفها فلا يُطلق تأثير النطاق — حدّ إعادة ضبط صريح.
+    resetHistoryFor(result.data);
   }
 
   function selectVersion(target: PresentationVersionSummary) {
@@ -724,6 +773,7 @@ export function ExperienceBuilder({
     setSelectedSection(null);
     setSelectedChrome(null);
     updateVersionSummaryInList(detail);
+    resetHistoryFor(detail);
   }
 
   // مسار الاختيار التلقائي الحاسم عند أول تحميل: يُستدعى من تأثير `storefrontId`
@@ -1568,6 +1618,13 @@ export function ExperienceBuilder({
     // persistence boundary below performs the contract-required outer trim.
     normalized.sbc.authentication_number = next.sbc.authentication_number;
     normalized.sbc.seal_token = next.sbc.seal_token;
+    // CUST-H5-2 — نية التعديل (حقل نصّي/رقمي واحد) تُجمَّع في خطوة تراجع واحدة؛ كل ما عداه خطوة مستقلة.
+    // التجميع يشترط أن التعديل وليد حدث إدخال مستمر (نص/رقم/منزلق/لون) لا اختيار منفصل (قائمة/منتقي/زر).
+    // يُستهلَك العلَم بأول تعديل ينتجه حدث الإدخال: فعلٌ منفصل لاحق (نقرة على نمط جاهز) لا يرث نيّته.
+    const fromContinuousInput = continuousInput.consume(performance.now());
+    if (historyScope) {
+      history.record(historyScope, normalized, fromContinuousInput ? intentGroupKey(draftRef.current, normalized) : undefined);
+    }
     setDraft(normalized);
     setLifecycle("dirty");
     setNotice(null);
@@ -1624,6 +1681,8 @@ export function ExperienceBuilder({
       // لا لِما يُعرَض الآن) يُفقدها بصمت. نحدِّث `saved`/`selectedVersion`
       // دوماً (مراجعة الخادم صحيحة الآن)، لكن `draft` فقط إن لم يتغيّر شيء.
       const editedSincePersist = !presentationConfigsEqual(draftRef.current, draftAtSaveStart);
+      // حدّ التراجع الصلب (§3.5): كل حفظ ناجح يُفرغ السجلّ، بما فيه حين استمر التاجر بالتعديل أثناء الطلب.
+      history.markSaved(savingVersionId, result.data.config, editedSincePersist);
       setSaved(result.data.config);
       setSelectedVersion(result.data);
       if (editedSincePersist) {
@@ -1649,11 +1708,64 @@ export function ExperienceBuilder({
     if (isPublishedReadOnly || previewTheme) return;
     const confirmed = window.confirm(t("restoreConfirm"));
     if (!confirmed) return;
-    setDraft(clonePresentationConfig(DEFAULT_PRESENTATION_CONFIG));
+    const restored = clonePresentationConfig(DEFAULT_PRESENTATION_CONFIG);
+    // «استعادة الافتراضي» تعديل مسودة عادي — قابل للتراجع عنه.
+    if (historyScope) history.record(historyScope, restored);
+    setDraft(restored);
     setLifecycle("dirty");
     setNoticeKind("status");
     setNotice(null);
   }
+
+  // ── CUST-H5-2 — تراجع/إعادة ───────────────────────────────────────────────
+  const historyEnabled = historyScope !== null && previewTheme === null && !isPublishedReadOnly;
+  const undoEnabled = historyEnabled && history.canUndo;
+  const redoEnabled = historyEnabled && history.canRedo;
+
+  function applyHistoryStep(kind: HistoryShortcut) {
+    if (!historyScope || !historyEnabled) return;
+    const doc = kind === "undo" ? history.undo(historyScope) : history.redo(historyScope);
+    if (!doc) return;
+    // الخطوة تغيّر المستند المحلي فقط: لا شبكة، لا مراجعة، لا نشر. السياق (القسم/الصفحة/المعاينة) خارج السجلّ عمداً،
+    // لكن قسماً محدداً لم يعد موجوداً بعد التراجع (مثلاً عن تكرار) لا يُترك محدداً على لا شيء.
+    setDraft(doc);
+    setLifecycle(presentationConfigsEqual(doc, saved) ? "clean" : "dirty");
+    setNotice(null);
+    if (selectedSection && !doc.homepage.sections.some((section) => section.id === selectedSection)) {
+      setSelectedSection(null);
+    }
+    setHistoryAnnouncement((prev) => ({ text: t(kind === "undo" ? "historyUndone" : "historyRedone"), n: prev.n + 1 }));
+  }
+  const applyHistoryStepRef = useRef(applyHistoryStep);
+  applyHistoryStepRef.current = applyHistoryStep;
+  const historyModalOpenRef = useRef(false);
+  // الورقة السفلية على الجوال مشروطة بالتركيز على زرّها خلف الحوار، فلا يكفي فحص `event.target.closest` وحده.
+  historyModalOpenRef.current = Boolean(publishTarget || scheduleTarget || cancelScheduleTarget || mobileSheet !== null);
+
+  useEffect(() => {
+    const mac = isMacPlatform();
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.defaultPrevented) return;
+      const kind = resolveHistoryShortcut(event, mac);
+      if (!kind) return;
+      // لا نسرق التراجع الأصلي من حقل نصّي، ولا نعمل خلف حوار.
+      if (isNativeEditingTarget(event.target)) return;
+      if (historyModalOpenRef.current) return;
+      // أي حوار مفتوح في المستند يمنع الاختصار — لا نعدّد حوارات المحرِّر واحداً واحداً: مكتبة الأقسام وغيرها تُبقي
+      // التركيز على زرّها خلف الطبقة، فلا يكفي فحص هدف الحدث. المخفي عن التقنيات المساعدة (`aria-hidden`) لا يُعدّ مفتوحاً.
+      if (
+        document.querySelector(
+          '[role="dialog"]:not([aria-hidden="true"]), [role="alertdialog"]:not([aria-hidden="true"]), [aria-modal="true"]:not([aria-hidden="true"])',
+        )
+      ) {
+        return;
+      }
+      event.preventDefault();
+      applyHistoryStepRef.current(kind);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
 
   async function handleCreateVersion(name: string) {
     if (!storefrontId) return;
@@ -2506,6 +2618,8 @@ export function ExperienceBuilder({
               : !selectedVersion.schedulingRuntimeActive
                 ? t("versionSchedulingGatedBody")
                 : undefined;
+  const undoTitle = undoEnabled ? `${t("undo")} (${shortcutHint("undo", historyIsMac)})` : t("undoUnavailable");
+  const redoTitle = redoEnabled ? `${t("redo")} (${shortcutHint("redo", historyIsMac)})` : t("redoUnavailable");
   const handlePublishClick = () => {
     if (!selectedVersion) return;
     handleOpenPublishConfirm(toSummary(selectedVersion));
@@ -2532,6 +2646,15 @@ export function ExperienceBuilder({
       data-selected-version-id={selectedVersion?.id ?? ""}
       data-selected-version-state={selectedVersion?.state ?? ""}
       data-selected-version-revision={selectedVersion?.revision ?? ""}
+      onInputCapture={(event) => {
+        if (isContinuousInputTarget(event.target)) continuousInput.mark(performance.now());
+      }}
+      // أي تفاعل منفصل (ضغط/نقر/مفتاح) يُسقط علَم الإدخال المستمر العالق؛ حدث `input` يأتي بعد `keydown` فلا يتأثر.
+      onPointerDownCapture={continuousInput.reset}
+      onClickCapture={continuousInput.reset}
+      onKeyDownCapture={continuousInput.reset}
+      data-can-undo={undoEnabled ? "true" : "false"}
+      data-can-redo={redoEnabled ? "true" : "false"}
       data-panel={panel}
       data-device={effectiveDevice}
       data-selected-section={selectedSection ?? ""}
@@ -2681,6 +2804,35 @@ export function ExperienceBuilder({
               </button>
             ))}
           </div>
+          {/*
+            CUST-H5-2 — Undo / Redo. Inline from md; below md the same two actions (same eligibility, same wording) live in the
+            «More» menu so the Canvas-first mobile toolbar keeps Exit / Save / Publish unchanged. `aria-disabled` rather than
+            `disabled`: after the last Undo the button must keep keyboard focus instead of dropping it.
+          */}
+          <div role="group" aria-label={t("historyGroup")} data-history-group="" className="hidden items-center gap-0.5 md:flex">
+            {([
+              { kind: "undo", Icon: locale === "ar" ? UndoIconRtl : Undo2, enabled: undoEnabled, title: undoTitle, label: t("undo") },
+              { kind: "redo", Icon: locale === "ar" ? RedoIconRtl : Redo2, enabled: redoEnabled, title: redoTitle, label: t("redo") },
+            ] as const).map(({ kind, Icon, enabled, title, label }) => (
+              <button
+                key={kind}
+                type="button"
+                data-history-action={kind}
+                aria-label={label}
+                aria-disabled={!enabled}
+                aria-keyshortcuts={ariaKeyShortcuts(kind, historyIsMac)}
+                title={title}
+                onClick={() => {
+                  if (enabled) applyHistoryStep(kind);
+                }}
+                className={`inline-flex size-9 items-center justify-center rounded-md border border-transparent text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${
+                  enabled ? "hover:border-border hover:bg-primary-soft" : "cursor-not-allowed opacity-40"
+                }`}
+              >
+                <Icon className="size-4" strokeWidth={1.8} aria-hidden="true" />
+              </button>
+            ))}
+          </div>
           <button
             type="button"
             data-save=""
@@ -2783,6 +2935,26 @@ export function ExperienceBuilder({
                     </DropdownItem>
                   ))}
                 </div>
+                <div role="group" aria-label={t("historyGroup")} className="md:hidden">
+                  <DropdownItem
+                    icon={locale === "ar" ? UndoIconRtl : Undo2}
+                    onClick={() => applyHistoryStep("undo")}
+                    disabled={!undoEnabled}
+                    title={undoTitle}
+                    dataAttrs={{ "data-more-undo": "" }}
+                  >
+                    {t("undo")}
+                  </DropdownItem>
+                  <DropdownItem
+                    icon={locale === "ar" ? RedoIconRtl : Redo2}
+                    onClick={() => applyHistoryStep("redo")}
+                    disabled={!redoEnabled}
+                    title={redoTitle}
+                    dataAttrs={{ "data-more-redo": "" }}
+                  >
+                    {t("redo")}
+                  </DropdownItem>
+                </div>
                 <div className="xl:hidden">
                   <DropdownItem
                     icon={CalendarClock}
@@ -2807,6 +2979,10 @@ export function ExperienceBuilder({
           </Dropdown>
         </div>
       </header>
+
+      <div aria-live="polite" aria-atomic="true" data-history-announcer="" className="sr-only">
+        {historyAnnouncement.text ? `${historyAnnouncement.text}${historyAnnouncement.n % 2 ? "" : "\u200B"}` : ""}
+      </div>
 
       {notice ? (
         <div

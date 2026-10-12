@@ -1142,6 +1142,14 @@ export const CUSTOMIZER_MESSAGES = {
     noSocial: "لا روابط مضافة",
     noApps: "لا روابط تطبيقات صالحة",
     restoreConfirm: "إعادة المسودة إلى افتراضي أَوْج الحديث؟ لن يُمس المتجر الحي.",
+    // CUST-H5-2 — تراجع/إعادة محليان لتعديلات الجلسة غير المحفوظة. الحفظ الناجح حدٌّ صلب: ما قبله لا يُتراجَع عنه هنا.
+    undo: "تراجع عن التعديل",
+    redo: "إعادة التعديل",
+    undoUnavailable: "لا تعديلات غير محفوظة للتراجع عنها",
+    redoUnavailable: "لا خطوات لإعادتها",
+    historyUndone: "تم التراجع عن آخر تعديل.",
+    historyRedone: "تمت إعادة التعديل.",
+    historyGroup: "تراجع وإعادة",
     contrastOk: "تباين النص على اللون الأساسي كافٍ.",
     contrastWarn: "اللون الأساسي ضعيف التباين مع الأبيض؛ سيُستخدم نص داكن.",
     versionsLabel: "نسخ التصميم",
@@ -2599,6 +2607,14 @@ export const CUSTOMIZER_MESSAGES = {
     noApps: "No valid app store links",
     restoreConfirm:
       "Reset the draft to AWJ Modern defaults? The live storefront will not be touched.",
+    // CUST-H5-2 — local undo/redo of the session's unsaved edits. A successful Save is a hard boundary: nothing before it is undoable here.
+    undo: "Undo",
+    redo: "Redo",
+    undoUnavailable: "No unsaved changes to undo",
+    redoUnavailable: "Nothing to redo",
+    historyUndone: "Last change undone.",
+    historyRedone: "Change redone.",
+    historyGroup: "Undo and redo",
     contrastOk: "Primary color contrast against white is sufficient.",
     contrastWarn:
       "Primary color contrast against white is weak; dark text will be used.",
