@@ -37,7 +37,7 @@ export default defineConfig({
       ['src/components/commerce-workspace/**/*.test.tsx', 'jsdom'],
       ['src/app/(app)/accounts/**/*.test.tsx', 'jsdom'],
       ['src/app/(app)/products/**/*.test.tsx', 'jsdom'],
-      ['src/app/platform/tenants/**/*.test.tsx', 'jsdom'],
+      ['src/app/platform/**/tenants/**/*.test.tsx', 'jsdom'],
       // يحتاج window/document/localStorage لاختبار بوابة AWJ v3 (Horizon 1).
       ['src/lib/__tests__/awj-ui-gate.test.ts', 'jsdom'],
       ['src/lib/__tests__/awj-theme.test.ts', 'jsdom'],

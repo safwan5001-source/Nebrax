@@ -2,7 +2,7 @@
 
 import { describePublishIssues } from "./announcement-status";
 import type { ReactNode } from "react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CalendarClock, ExternalLink, MoreHorizontal, RotateCcw } from "lucide-react";
 import { Dropdown, DropdownItem } from "@/components/ui/dropdown";
 import { ScrollIndicator } from "./ScrollIndicator";
@@ -19,11 +19,28 @@ import {
   normalizePresentationConfig,
   type PageRegionInstance,
   type PageType,
+  type PresentationHomeSection,
+  deleteSection,
+  duplicateSection,
+  moveSection,
+  setSectionVisible,
   type ProductPageRegionKey,
   presentationConfigsEqual,
   type StorefrontPresentationConfig,
 } from "./presentation";
 import { featuredContentOf } from "./presentation/section-content";
+import {
+  THEME_AREAS,
+  THEME_KEPT,
+  type ThemeDefinition,
+  applyTheme,
+  builtInTheme,
+  computeThemePack,
+  withThemePack,
+  writeThemedDraft,
+} from "./themes";
+import { ThemePreviewBar } from "./themes/ThemePreviewBar";
+import type { CanvasSectionActions } from "./CanvasSectionActions";
 import { ProductPreviewPicker } from "./ProductPreviewPicker";
 import { ProductPreviewPickerPanel } from "./ProductPreviewPickerPanel";
 import { ProductRegionInspector } from "./ProductRegionInspector";
@@ -134,6 +151,15 @@ interface ExperienceBuilderProps {
   storefrontId?: string | null;
   storefrontUrl?: string | null;
   versionId?: string | null;
+  /**
+   * CUST-HV V10b (V0 §16) — open the builder in Theme Preview: the Canvas renders this document with the theme applied (unsaved,
+   * read-only) and the Apply summary replaces editing until the merchant applies it as a new Draft Version or exits.
+   */
+  previewThemeId?: string | null;
+  /** The gift sections a themed pack may add (needs the merchant's real facets); optional — a theme applies without it. */
+  themePackSections?: (
+    sections: readonly PresentationHomeSection[],
+  ) => Promise<PresentationHomeSection[] | null>;
 }
 
 export function ExperienceBuilder({
@@ -144,6 +170,8 @@ export function ExperienceBuilder({
   storefrontId = null,
   storefrontUrl = null,
   versionId = null,
+  previewThemeId = null,
+  themePackSections,
 }: ExperienceBuilderProps) {
   const seed = normalizePresentationConfig(
     initialConfig ?? DEFAULT_PRESENTATION_CONFIG,
@@ -151,6 +179,36 @@ export function ExperienceBuilder({
   const [saved, setSaved] = useState<StorefrontPresentationConfig>(seed);
   const [draft, setDraft] = useState<StorefrontPresentationConfig>(seed);
   const locale: CustomizerLocale = initialLocale;
+  // CUST-HV V10b — Theme Preview (unsaved, read-only). `null` = the normal editor.
+  const [previewTheme, setPreviewTheme] = useState<ThemeDefinition | null>(
+    () => (previewThemeId ? (builtInTheme(previewThemeId) ?? null) : null),
+  );
+  // The page reads `?previewTheme=` on the client only, so the id can arrive after the first render.
+  useEffect(() => {
+    setPreviewTheme(previewThemeId ? (builtInTheme(previewThemeId) ?? null) : null);
+  }, [previewThemeId]);
+  const [themeApplying, setThemeApplying] = useState(false);
+  const [themeError, setThemeError] = useState<CustomizerMessageKey | null>(null);
+  // The themed pack (FLOWERS-H15) is computed BEFORE the preview is shown, so the Canvas, the Apply summary and the saved draft
+  // are the same configuration. It is keyed by the document and theme it was computed for; anything else is stale.
+  const [themePack, setThemePack] = useState<{
+    draft: StorefrontPresentationConfig;
+    themeId: string;
+    sections: PresentationHomeSection[] | null;
+  } | null>(null);
+  const themePackRef = useRef(themePackSections);
+  themePackRef.current = themePackSections;
+  const themed = useMemo(() => {
+    if (!previewTheme) return null;
+    const applied = applyTheme(draft, previewTheme);
+    if (themePack && themePack.draft === draft && themePack.themeId === previewTheme.id) {
+      return withThemePack(applied, themePack.sections);
+    }
+    return applied;
+  }, [draft, previewTheme, themePack]);
+  const canvasConfig = themed?.ok ? themed.config : draft;
+  // React 18 renders `inert` only as a string attribute: while a theme is previewed the editing UI is not operable or focusable.
+  const inertWhenThemePreview = previewTheme ? ({ inert: "" } as Record<string, string>) : {};
   const [panel, setPanel] = useState<CustomizerPanel>("theme");
   const [device, setDevice] = useState<PreviewDevice>("desktop");
   const [mobilePane, setMobilePane] = useState<"edit" | "preview">("preview");
@@ -415,6 +473,25 @@ export function ExperienceBuilder({
     versions.length === 0 &&
     selectedVersion === null &&
     versionSwitchingId === null;
+
+  // Apply is only ever offered over the merchant's own, fully loaded document: a loaded version, or a store with none yet.
+  // Before that `draft` is the default document, and a draft created from it would silently drop the merchant's content.
+  const themeBaseReady = noVersionsYet || (selectedVersion !== null && versionSwitchingId === null);
+  useEffect(() => {
+    if (!previewTheme?.pack || !themeBaseReady) return;
+    const applied = applyTheme(draft, previewTheme);
+    if (!applied.ok) return;
+    let cancelled = false;
+    void computeThemePack(previewTheme, applied.config.homepage.sections, themePackRef.current).then((sections) => {
+      if (!cancelled) setThemePack({ draft, themeId: previewTheme.id, sections });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [previewTheme, draft, themeBaseReady]);
+  const themePackPending =
+    Boolean(previewTheme?.pack && themePackSections) &&
+    !(themePack && themePack.draft === draft && themePack.themeId === previewTheme?.id);
 
   useEffect(() => {
     const updateViewport = () => {
@@ -1378,6 +1455,72 @@ export function ExperienceBuilder({
     void loadProductList(productSearch);
   }
 
+  async function handleApplyTheme() {
+    if (!previewTheme || !storefrontId || themeApplying || !themeBaseReady || themePackPending) return;
+    if (!themed?.ok) return;
+    setThemeApplying(true);
+    setThemeError(null);
+    // Exactly the configuration that was previewed (pack included) is what the new draft holds.
+    const result = await writeThemedDraft({
+      storefrontId,
+      config: themed.config,
+      versionName: `${previewTheme.name[locale]} — ${t("themePreviewLabel")}`,
+    });
+    if (!result.ok) {
+      setThemeApplying(false);
+      setThemeError(result.reason === "assets_unsupported" ? "themeApplyUnsupported" : "themeApplyFailed");
+      return;
+    }
+    window.location.href = `/commerce/appearance?version=${encodeURIComponent(result.versionId)}`;
+  }
+
+  function handleExitThemePreview() {
+    if (themeApplying) return;
+    setPreviewTheme(null);
+    setThemeError(null);
+    const url = new URL(window.location.href);
+    url.searchParams.delete("previewTheme");
+    window.history.replaceState(null, "", url.toString());
+  }
+
+  // CUST-HV V10d — the Canvas hover action bar: each button is a shared pure section operation committed as an ordinary draft edit
+  // (revision-checked at Save). Offered only while editing the Home page of a Draft / Scheduled Version.
+  const canvasSectionActions: CanvasSectionActions | undefined =
+    currentPage === "home" && !previewTheme && !isPublishedReadOnly
+      ? {
+          onMove: (id, delta) => {
+            const next = moveSection(draft, id, delta);
+            if (next) updateDraft(next);
+          },
+          onHide: (id) => {
+            const next = setSectionVisible(draft, id, false);
+            if (next) updateDraft(next);
+          },
+          onDuplicate: (id) => {
+            const result = duplicateSection(draft, id, t("sectionCopySuffix"));
+            if (!result) return;
+            updateDraft(result.config);
+            handleSelectSection(result.id, "preview");
+          },
+          onDelete: (id) => {
+            const result = deleteSection(draft, id);
+            if (!result) return;
+            updateDraft(result.config);
+            if (selectedSection === id) setSelectedSection(result.fallbackId);
+          },
+          labels: {
+            toolbar: t("sectionActionsToolbar"),
+            moveUp: t("moveUp"),
+            moveDown: t("moveDown"),
+            duplicate: t("duplicateSection"),
+            hide: t("canvasHideSection"),
+            remove: t("deleteSection"),
+            confirmRemove: t("deleteSectionConfirm"),
+            cancel: t("deleteSectionCancel"),
+          },
+        }
+      : undefined;
+
   function handleSelectProductRegion(id: string) {
     setSelectedProductRegion(id);
     setPanel("product");
@@ -1503,7 +1646,7 @@ export function ExperienceBuilder({
   }
 
   function handleRestore() {
-    if (isPublishedReadOnly) return;
+    if (isPublishedReadOnly || previewTheme) return;
     const confirmed = window.confirm(t("restoreConfirm"));
     if (!confirmed) return;
     setDraft(clonePresentationConfig(DEFAULT_PRESENTATION_CONFIG));
@@ -2307,6 +2450,7 @@ export function ExperienceBuilder({
   // drift apart.
   const hasConflict = versionConflict?.versionId === selectedVersion?.id;
   const saveDisabled =
+    previewTheme !== null ||
     busy !== null ||
     !selectedVersion ||
     isPublishedReadOnly ||
@@ -2321,6 +2465,7 @@ export function ExperienceBuilder({
           ? t("versionStaleConflict")
           : undefined;
   const publishDisabled =
+    previewTheme !== null ||
     !storefrontId ||
     !selectedVersion ||
     selectedVersion.state !== "draft" ||
@@ -2414,8 +2559,11 @@ export function ExperienceBuilder({
           data-builder-exit=""
           aria-label={t("exit")}
           title={t("exit")}
-          onClick={() => { window.location.href = "/commerce"; }}
-          className="inline-flex min-h-10 shrink-0 items-center gap-2 rounded-md border border-border px-2.5 text-xs font-medium text-text hover:bg-primary-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 md:px-3 md:text-sm"
+          // A theme apply is two requests (create, then save); a full-page navigation in between would abort the save and
+          // skip the rollback, leaving an empty draft behind.
+          disabled={themeApplying}
+          onClick={() => { if (!themeApplying) window.location.href = "/commerce"; }}
+          className="inline-flex min-h-10 shrink-0 items-center gap-2 rounded-md border border-border px-2.5 text-xs font-medium text-text hover:bg-primary-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-not-allowed disabled:opacity-50 md:px-3 md:text-sm"
         >
           <span aria-hidden="true" className="rtl:-scale-x-100">←</span>
           <span className="hidden xl:inline">{t("exit")}</span>
@@ -2481,6 +2629,7 @@ export function ExperienceBuilder({
             <button
               type="button"
               data-version-selector-mobile=""
+              disabled={previewTheme !== null}
               onClick={() => setMobileSheet("versions")}
               className="flex min-h-10 min-w-0 items-center gap-1 border-s border-border px-2 py-1 ps-3 text-[11px] font-medium text-text sm:ms-0"
             >
@@ -2489,13 +2638,15 @@ export function ExperienceBuilder({
               </bdi>
             </button>
           ) : (
-            <VersionSelector
-              locale={locale}
-              currentName={selectedVersion?.name ?? null}
-              currentState={selectedVersion?.state ?? null}
-              loading={versionSwitchingId !== null}
-              panelProps={versionManagerPanelProps}
-            />
+            <div className="contents" {...inertWhenThemePreview}>
+              <VersionSelector
+                locale={locale}
+                currentName={selectedVersion?.name ?? null}
+                currentState={selectedVersion?.state ?? null}
+                loading={versionSwitchingId !== null}
+                panelProps={versionManagerPanelProps}
+              />
+            </div>
           )
         ) : null}
         <span
@@ -2646,7 +2797,7 @@ export function ExperienceBuilder({
                 <DropdownItem
                   icon={RotateCcw}
                   onClick={handleRestore}
-                  disabled={isPublishedReadOnly}
+                  disabled={isPublishedReadOnly || previewTheme !== null}
                   dataAttrs={{ "data-more-restore": "" }}
                 >
                   {t("restore")}
@@ -2692,8 +2843,9 @@ export function ExperienceBuilder({
       <div className="relative flex min-h-0 flex-1">
         <nav
           aria-label={t("controls")}
+          {...inertWhenThemePreview}
           data-customizer-scroll=""
-          className={`${
+          className={`${previewTheme ? "!hidden " : ""}${
             mobilePane === "preview" ? "hidden lg:flex" : "hidden md:flex"
           } ${railCollapsed ? "lg:w-16" : "w-[196px]"} shrink-0 flex-col overflow-y-auto border-e border-neutral-200 bg-white`}
         >
@@ -2761,9 +2913,10 @@ export function ExperienceBuilder({
         </nav>
 
         <aside
+          {...inertWhenThemePreview}
           data-builder-controls=""
           data-builder-drawer={drawerOpen ? "open" : isTabletViewport ? "closed" : undefined}
-          className={`${
+          className={`${previewTheme ? "!hidden " : ""}${
             mobilePane === "edit" ? "flex" : "hidden"
           } w-full min-w-0 flex-col border-neutral-200 bg-white md:flex-1 lg:flex lg:w-[300px] lg:flex-none lg:border-e xl:w-[320px] ${
             drawerOpen
@@ -2891,6 +3044,28 @@ export function ExperienceBuilder({
               </span>
             </div>
           </div>
+          {previewTheme && themed ? (
+            <ThemePreviewBar
+              locale={locale}
+              theme={previewTheme}
+              summary={
+                themed.ok
+                  ? themed.summary
+                  : {
+                      areas: THEME_AREAS.map((area) => ({ area, changed: false })),
+                      kept: THEME_KEPT,
+                      addedSectionIds: [],
+                      noop: true,
+                    }
+              }
+              applying={themeApplying}
+              error={themed.ok ? themeError : "themeApplyUnsupported"}
+              canApply={themed.ok && Boolean(storefrontId) && themeBaseReady && !themePackPending}
+              preparing={Boolean(storefrontId) && themed.ok && (!themeBaseReady || themePackPending)}
+              onApply={() => void handleApplyTheme()}
+              onExit={handleExitThemePreview}
+            />
+          ) : null}
           <div className="relative min-h-0 flex-1">
             <div
               ref={canvasScrollRef}
@@ -2919,14 +3094,15 @@ export function ExperienceBuilder({
                 style={{ width: Math.min(width, 1440), maxWidth: "100%" }}
               >
                 <StorefrontPreviewCanvas
-                  config={draft}
+                  config={canvasConfig}
+                  sectionActions={canvasSectionActions}
                   locale={locale}
                   viewport={effectiveDevice}
                   page={currentPage}
                   liveStoreName={liveStoreName}
                   businessIdentity={businessIdentity}
-                  selectedSection={selectedSection}
-                  onSelectSection={(key) => handleSelectSection(key, "preview")}
+                  selectedSection={previewTheme ? null : selectedSection}
+                  onSelectSection={previewTheme ? () => {} : (key) => handleSelectSection(key, "preview")}
                   activeSlides={activeSlides}
                   onActiveSlideChange={handleActiveSlideChange}
                   selectedChrome={selectedChrome}
@@ -2964,7 +3140,8 @@ export function ExperienceBuilder({
         </section>
       </div>
 
-      {isMobileViewport ? <div data-builder-mobile-bar="" className="flex h-16 shrink-0 items-center gap-2 border-t border-border bg-surface px-3 lg:hidden">
+      {/* While a theme is previewed (read-only) the mobile editing bar and its sheets are not offered at all. */}
+      {isMobileViewport && !previewTheme ? <div data-builder-mobile-bar="" className="flex h-16 shrink-0 items-center gap-2 border-t border-border bg-surface px-3 lg:hidden">
         {currentPage === "home" ? (
           <>
             <button
@@ -3053,7 +3230,7 @@ export function ExperienceBuilder({
         )}
       </div> : null}
 
-      {isMobileViewport && mobileSheet ? (
+      {isMobileViewport && mobileSheet && !previewTheme ? (
         <div
           className="fixed inset-0 z-50 flex items-end bg-black/40 md:hidden"
           role="presentation"

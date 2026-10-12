@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 describe('platform AI provider actions', () => {
-  const source = readFileSync(join(process.cwd(), 'src/app/platform/integrations/page.tsx'), 'utf8');
+  const source = readFileSync(join(process.cwd(), 'src/app/platform/(console)/integrations/page.tsx'), 'utf8');
 
   it('keeps provider connection testing available before the extraction engine is enabled', () => {
     expect(source).not.toContain('engineEnabled');

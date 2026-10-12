@@ -73,6 +73,18 @@
   cursor: pointer;
   scroll-margin-top: 5rem;
 }
+/* CUST-HV V10d — only a section that carries the action bar becomes the bar's containing block. Every other section (the dev
+   harness, a Published Version, Theme Preview) keeps exactly the box it had: a positioned wrapper would re-anchor any absolutely
+   positioned content inside a section, so it is never applied to sections that do not need it. */
+.awj-store-preview .awj-preview-section-actionable {
+  position: relative;
+}
+/* CUST-HV V10d — the hover action bar: hidden until the section is hovered, focused within, or selected. */
+.awj-store-preview .awj-preview-section:hover > [data-section-actions],
+.awj-store-preview .awj-preview-section:focus-within > [data-section-actions],
+.awj-store-preview .awj-preview-section-selected > [data-section-actions] {
+  display: flex;
+}
 .awj-store-preview .awj-preview-section:focus-visible {
   outline: 2px solid var(--store-primary);
   outline-offset: 2px;
@@ -80,6 +92,32 @@
 .awj-store-preview .awj-preview-section-selected {
   outline: 2px solid var(--store-primary);
   outline-offset: 2px;
+}
+/* CUST-HV V10c (V0 §17.1) — the selection chip: the merchant's own name for the selected section. Editor chrome (the editor's
+   tokens, not the store's), pointer-transparent, one line, inside the section's box so it can never widen the page. */
+.awj-store-preview .awj-preview-section-named {
+  position: relative;
+}
+.awj-store-preview .awj-preview-section-chip {
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline-start: 0;
+  z-index: 5;
+  max-width: calc(100% - 1rem);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 0.125rem 0.5rem;
+  border-end-end-radius: 0.375rem;
+  background: var(--primary, #1e40af);
+  color: var(--primary-foreground, #fff);
+  font: 600 0.6875rem/1.25rem var(--font-sans, inherit);
+  pointer-events: none;
+}
+/* CUST-HV V10d — while the hover action bar (inline-end) is showing, the chip (inline-start) leaves it room: the two never overlap. */
+.awj-store-preview .awj-preview-section:hover > .awj-preview-section-chip,
+.awj-store-preview .awj-preview-section:focus-within > .awj-preview-section-chip {
+  max-width: calc(100% - 11.5rem);
 }
 
 /* Independent, thin-but-visible scrollbars for the customizer's own

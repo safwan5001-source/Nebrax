@@ -1,6 +1,6 @@
 # H1-CONTRAST — Implementation Report
 
-STATUS: IN REVIEW / DO NOT MERGE / DO NOT DEPLOY
+STATUS: MERGED (PR #1328) / NOT DEPLOYED / POST-MERGE VERIFICATION NOT DONE
 DATE: 2026-10-11
 
 ## Outcome
@@ -72,24 +72,32 @@ Headless Chromium, using the rules copied from `globals.css` plus the two utilit
 
 ## CI
 
-Recorded on the pull request for the final head. Not claimed green in this file until those checks finish.
+Exact Head `c4310e1db356e5389027d5a5ee665d6f662fd632` of PR #1328. All 7 GitHub check runs finished `success` (checked via the GitHub API before merge):
+
+| Check | Result |
+|---|---|
+| web build (Next.js), two runs | success |
+| php artisan test (L11, sqlite), two runs | success |
+| php artisan test (L11, pgsql), two runs | success |
+| storefront (lint + typecheck + test) | success |
 
 ## Pre-merge review
 
-- PRE_MERGE_REVIEW: not requested
-- Reviewed Head SHA: the pull request head
-- Findings / resolution: see the three passes below. No open blocker.
+- PRE_MERGE_REVIEW: PASS, recorded as a comment on PR #1328 by the repository owner account (`safwan5001-source`) for the exact Head above.
+- Reviewed Head SHA: `c4310e1db356e5389027d5a5ee665d6f662fd632`
+- Findings / resolution: no open review threads. The one bot comment was an automated Codex usage-limit notice, not a finding. The pending-CI wording that this file carried before the merge is superseded by the table above.
 
 ## Merge
 
-- Merge status: not merged
-- Merge SHA: none
+- Merge status: merged into `main` on 2026-10-11 (about 20:28 UTC), as a single-parent commit on `main`.
+- Merge SHA: `bda44687e98e69c95c452846baeac473b3ff5e4d` (parent `b35017b377543aea3ae112703b7022316dcb4c23`, title "fix(platform): H1-CONTRAST — gate-off dark danger button contrast (#1328)"). Confirmed to be an ancestor of `main`.
+- The merge was not performed by the Claude session that prepared the PR. Deploy and production release did not happen.
 
 ## Post-merge review
 
-- POST_MERGE_REVIEW: not done
+- POST_MERGE_REVIEW: not done. No evidence of target-branch checks or a smoke run on `bda4468` was collected, so none is claimed.
 - Reviewed Merge SHA: none
-- Target-branch checks/smoke: none
+- Target-branch checks/smoke: none recorded
 - Findings / resolution: none
 
 ## Self-review
@@ -149,11 +157,10 @@ None that blocks this slice.
 
 ## Git state
 
-- Branch: `claude/awj-h1-contrast-recovery-fx8unn` (includes `feat/awj-platform-ux-h1-contrast`)
-- PR: see the pull request opened from this branch
-- Base SHA: `e0e5160a0d396cc46a035f9d225046a721a965d2` (`origin/main`)
-- Head SHA: the pull request head after push. This file is part of that commit.
+- Implementation branch: `feat/awj-platform-ux-h1-contrast` (Grok commit `52618f2`), merged into `claude/awj-h1-contrast-recovery-fx8unn` with the `asChild` test restored (Head `c4310e1`).
+- PR: #1328, merged. Base SHA at PR time: `e0e5160a0d396cc46a035f9d225046a721a965d2`.
+- Merge SHA: `bda44687e98e69c95c452846baeac473b3ff5e4d`.
 
 ## Recommended next dependency-ready task
 
-H1-2 platform shell, from latest `main`, only after this contrast PR is either merged or explicitly left behind. Stop before merge.
+H1-2 platform shell, from latest `main`. See `AWJ-PLATFORM-UX-H1-2-SHELL-REPORT.md`.

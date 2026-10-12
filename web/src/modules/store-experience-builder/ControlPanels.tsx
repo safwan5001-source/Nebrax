@@ -18,6 +18,14 @@ import {
   type HomeBuilderSectionKey,
   isGatedHomeSection,
   MAX_HOME_SECTIONS,
+  MAX_SECTION_LABEL,
+  moveSectionTo,
+  setSectionVisible,
+  duplicateSection as duplicateSectionOp,
+  deleteSection as deleteSectionOp,
+  sectionIsAuthored,
+  legacyHeroContent,
+  isHeroAuthored,
   newHomeSectionId,
   type PresentationHomeSection,
   presetSelectionPatch,
@@ -82,6 +90,7 @@ import {
 import { OfferCatalog } from "./OfferCatalog";
 import { DesignInspector } from "./design/DesignInspector";
 import { ContentBlocksFields } from "./ContentBlocksFields";
+import { BufferedText, stored } from "./BufferedText";
 import { ShelfTitleFields } from "./ShelfTitleFields";
 import { GalleryFields } from "./GalleryFields";
 import { SliderFields } from "./SliderFields";
@@ -1119,33 +1128,25 @@ function HomepagePanel({
   offerManagement?: OfferManagement;
 }) {
   const [pickerOpen, setPickerOpen] = useState(false);
+  // CUST-HV V10d — drag and drop is an extra way to reorder; the up / down buttons remain the keyboard and touch path.
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [overId, setOverId] = useState<string | null>(null);
   const sections = config.homepage.sections;
+  const dragIndex = dragId ? sections.findIndex((item) => item.id === dragId) : -1;
 
   const setSections = (next: PresentationHomeSection[]) =>
     patch({ homepage: { ...config.homepage, sections: next } });
 
-  const move = (index: number, delta: number) => {
-    const next = [...sections];
-    const target = index + delta;
-    if (target < 0 || target >= next.length) return;
-    const [item] = next.splice(index, 1);
-    next.splice(target, 0, item);
-    setSections(next);
+  // CUST-HV V10d — the list operations are the shared pure ops (`presentation/section-ops.ts`), also used by the Canvas action bar.
+  const applyOp = (next: StorefrontPresentationConfig | null) => {
+    if (next) patch({ homepage: next.homepage, apps: next.apps });
   };
+
+  const move = (index: number, delta: number) => applyOp(moveSectionTo(config, index, index + delta));
 
   const setVisible = (index: number, visible: boolean) => {
     const current = sections[index];
-    const nextSections = sections.map((item, i) =>
-      i === index ? { ...item, visible } : item,
-    );
-    if (current?.type === "appPromo") {
-      patch({
-        homepage: { ...config.homepage, sections: nextSections },
-        apps: { ...config.apps, showHomepageSection: visible },
-      });
-      return;
-    }
-    setSections(nextSections);
+    if (current) applyOp(setSectionVisible(config, current.id, visible));
   };
 
   const updateSection = (index: number, next: PresentationHomeSection) => {
@@ -1169,28 +1170,14 @@ function HomepagePanel({
     onSelectSection?.(id);
   };
 
-  // Duplicate: ينسخ type/visible والمحتوى (و`design` — V5b: التصميم البصري جزءٌ مما
-  // يراه التاجر في القسم فلا يضيع بالنسخ)، بمعرّف جديد، ويوضع مباشرة بعد الأصل
-  // ويصبح selected.
+  // Duplicate with design: content, design and a suffixed name, under a new id, right after the original; it becomes selected.
   const duplicateSection = (index: number) => {
     const source = sections[index];
-    if (!source || !canDuplicateSection(sections, source)) return;
-    const copy: PresentationHomeSection = {
-      id: newHomeSectionId(),
-      type: source.type,
-      visible: source.visible,
-      ...(source.content ? { content: structuredClone(source.content) } : {}),
-      ...(source.design ? { design: structuredClone(source.design) } : {}),
-    };
-    // A hero still reading the legacy globals is copied with that text made explicit, so the
-    // duplicate is a real instance and does not depend on the globals the original still reads.
-    if (source.type === "hero" && !source.content) {
-      copy.content = legacyHeroContent(config.homepage);
-    }
-    const next = [...sections];
-    next.splice(index + 1, 0, copy);
-    setSections(next);
-    onSelectSection?.(copy.id);
+    if (!source) return;
+    const result = duplicateSectionOp(config, source.id, t("sectionCopySuffix"));
+    if (!result) return;
+    applyOp(result.config);
+    onSelectSection?.(result.id);
   };
 
   // Delete: في عقد v2 إزالة الـinstance من homepage.sections هي الحذف
@@ -1202,12 +1189,7 @@ function HomepagePanel({
   const requestDelete = (index: number) => {
     const target = sections[index];
     if (!target) return;
-    const authored =
-      (target.content &&
-        (target.type === "hero"
-          ? isHeroAuthored(heroContentOf(target))
-          : Object.keys(target.content).length > 0)) ||
-      (target.design && Object.keys(target.design).length > 0);
+    const authored = sectionIsAuthored(target);
     if (authored) setPendingDelete(target.id);
     else deleteSection(index);
   };
@@ -1215,12 +1197,10 @@ function HomepagePanel({
     const removed = sections[index];
     if (!removed) return;
     setPendingDelete(null);
-    const next = sections.filter((_, i) => i !== index);
-    setSections(next);
-    if (selectedSection === removed.id) {
-      const fallback = next[index] ?? next[index - 1] ?? null;
-      onSelectSection?.(fallback ? fallback.id : null);
-    }
+    const result = deleteSectionOp(config, removed.id);
+    if (!result) return;
+    applyOp(result.config);
+    if (selectedSection === removed.id) onSelectSection?.(result.fallbackId);
   };
 
   const selectedIndex = selectedSection
@@ -1275,7 +1255,7 @@ function HomepagePanel({
     <div className="space-y-7">
       {selected ? (
         <Section
-          title={t(SECTION_LABEL[selected.type])}
+          title={selected.label || t(SECTION_LABEL[selected.type])}
           hint={t("selectedSectionHint")}
         >
           <div
@@ -1290,6 +1270,21 @@ function HomepagePanel({
               checked={selected.visible}
               onChange={(visible) => setVisible(selectedIndex, visible)}
             />
+            <Field label={t("sectionNameLabel")}>
+              <BufferedText
+                key={selected.id}
+                value={selected.label ?? ""}
+                limit={MAX_SECTION_LABEL}
+                placeholder={t(SECTION_LABEL[selected.type])}
+                onCommit={(text) => {
+                  const { label: _previous, ...rest } = selected;
+                  const label = stored(text);
+                  updateSection(selectedIndex, label ? { ...rest, label: text } : rest);
+                }}
+                data-section-name=""
+              />
+            </Field>
+            <p className="-mt-2 text-[11px] leading-4 text-muted">{t("sectionNameHelp")}</p>
             {SECTION_DESIGN_CAPABILITIES[selected.type] ? (
               <Segmented
                 value={designTab}
@@ -1574,12 +1569,44 @@ function HomepagePanel({
               key={section.id}
               data-composer-section={section.type}
               data-section-id={section.id}
-              className={`flex h-12 items-center gap-1 border-b border-neutral-200 px-1 last:border-b-0 ${
+              data-dragging={dragId === section.id ? "" : undefined}
+              data-drop-target={dragId && dragId !== section.id && overId === section.id ? (dragIndex < index ? "after" : "before") : undefined}
+              draggable
+              onDragStart={(event) => {
+                setDragId(section.id);
+                event.dataTransfer?.setData("text/plain", section.id);
+                if (event.dataTransfer) event.dataTransfer.effectAllowed = "move";
+              }}
+              onDragOver={(event) => {
+                if (!dragId) return;
+                event.preventDefault();
+                if (overId !== section.id) setOverId(section.id);
+              }}
+              onDrop={(event) => {
+                event.preventDefault();
+                const from = sections.findIndex((item) => item.id === dragId);
+                applyOp(moveSectionTo(config, from, index));
+                setDragId(null);
+                setOverId(null);
+              }}
+              onDragEnd={() => {
+                setDragId(null);
+                setOverId(null);
+              }}
+              className={`flex h-12 items-center gap-1 border-b border-neutral-200 px-1 last:border-b-0 data-[dragging]:opacity-40 data-[drop-target=before]:shadow-[inset_0_2px_0_0_var(--primary)] data-[drop-target=after]:shadow-[inset_0_-2px_0_0_var(--primary)] ${
                 isSelected
                   ? "border-s-2 border-s-primary bg-primary-soft ps-0.5"
                   : ""
               }`}
             >
+              <span
+                aria-hidden="true"
+                data-drag-handle=""
+                title={t("dragToReorder")}
+                className="hidden shrink-0 cursor-grab select-none px-0.5 text-[14px] leading-none text-neutral-400 active:cursor-grabbing md:inline"
+              >
+                ⋮⋮
+              </span>
               <div className="flex">
                 <button
                   type="button"
@@ -1604,7 +1631,7 @@ function HomepagePanel({
                 type="button"
                 data-section-option={section.type}
                 aria-pressed={isSelected}
-                title={t(SECTION_LABEL[section.type])}
+                title={section.label ? `${section.label} · ${t(SECTION_LABEL[section.type])}` : t(SECTION_LABEL[section.type])}
                 onClick={() => onSelectSection?.(section.id)}
                 className="min-w-0 flex-1 rounded-sm px-1 py-1 text-start outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
               >
@@ -1613,8 +1640,13 @@ function HomepagePanel({
                     isSelected ? "font-semibold" : "font-medium"
                   }`}
                 >
-                  {t(SECTION_LABEL[section.type])}
+                  <bdi>{section.label || t(SECTION_LABEL[section.type])}</bdi>
                 </p>
+                {section.label ? (
+                  <p className="truncate text-[10px] leading-none text-neutral-400" data-section-type-hint="">
+                    {t(SECTION_LABEL[section.type])}
+                  </p>
+                ) : null}
                 {isGatedHomeSection(section.type) ? (
                   <p className="text-[10px] leading-none text-neutral-400">
                     {t("gatedBadge")}
@@ -2219,28 +2251,6 @@ function isBannerEmpty(content: BannerContent): boolean {
     !content.ctaHref &&
     !content.imageUrl &&
     !content.ctas?.length
-  );
-}
-
-/** The legacy global hero text as the explicit content of an instance (V0 §8.1.4). */
-function legacyHeroContent(homepage: {
-  heroHeadline: string;
-  heroSubheadline: string;
-}): HeroContent {
-  const subheadline = homepage.heroSubheadline.trim();
-  return {
-    headline: homepage.heroHeadline.trim(),
-    ...(subheadline ? { subheadline } : {}),
-  };
-}
-
-/** A hero is "authored" once it says something — an explicit empty headline is not content to lose. */
-function isHeroAuthored(content: HeroContent | undefined): boolean {
-  if (!content) return false;
-  return (
-    content.headline.trim() !== "" ||
-    (content.subheadline ?? "").trim() !== "" ||
-    (content.ctas?.length ?? 0) > 0
   );
 }
 

@@ -10,7 +10,7 @@ export const BUILT_IN_THEMES: readonly ThemeDefinition[] = [
   {
     id: "awj-modern",
     version: 1,
-    name: { ar: "حديث", en: "Modern" },
+    name: { ar: "أَوْج الحديث", en: "AWJ Modern" },
     description: {
       ar: "هوية عامة نظيفة: أخضر داكن، زوايا معتدلة، ظل خفيف ورأس ثابت.",
       en: "A clean general identity: deep green, moderate corners, a soft shadow and a sticky header.",
@@ -33,7 +33,7 @@ export const BUILT_IN_THEMES: readonly ThemeDefinition[] = [
   {
     id: "awj-market",
     version: 1,
-    name: { ar: "سوق", en: "Market" },
+    name: { ar: "أَوْج ماركت", en: "AWJ Market" },
     description: {
       ar: "كثيف وسريع التصفح للمتاجر ذات الكتالوج الكبير: شبكة مدمجة وأرفف أفقية.",
       en: "Dense and quick to browse for large catalogues: compact grid and horizontal shelves.",
@@ -61,7 +61,7 @@ export const BUILT_IN_THEMES: readonly ThemeDefinition[] = [
   {
     id: "awj-bloom",
     version: 1,
-    name: { ar: "بلوم", en: "Bloom" },
+    name: { ar: "أَوْج بلوم", en: "AWJ Bloom" },
     description: {
       ar: "هوية دافئة للهدايا والورد: خط عنواني زخرفي، زوايا مستديرة وبطاقات متمركزة.",
       en: "A warm identity for gifts and flowers: a display heading face, rounded corners and centred cards.",
@@ -85,7 +85,7 @@ export const BUILT_IN_THEMES: readonly ThemeDefinition[] = [
   {
     id: "awj-atelier",
     version: 1,
-    name: { ar: "أتيليه", en: "Atelier" },
+    name: { ar: "أَوْج أتيليه", en: "AWJ Atelier" },
     description: {
       ar: "تحريري أنيق: خط عنواني بسيريف، حواف حادة وحدود رفيعة بلا ظلال.",
       en: "Editorial and refined: a serif heading face, sharp corners and hairline borders without shadows.",
@@ -108,7 +108,7 @@ export const BUILT_IN_THEMES: readonly ThemeDefinition[] = [
   {
     id: "awj-trade",
     version: 1,
-    name: { ar: "تجارة الجملة", en: "Trade" },
+    name: { ar: "أَوْج للجملة", en: "AWJ Trade" },
     description: {
       ar: "جاد وواضح للبيع بالجملة والمنتجات التقنية: أزرق داكن، عرض واسع ورأس بصفين.",
       en: "Serious and clear for wholesale and technical products: navy, wide content and a two-row header.",
@@ -135,7 +135,7 @@ export const BUILT_IN_THEMES: readonly ThemeDefinition[] = [
   {
     id: "awj-sand",
     version: 1,
-    name: { ar: "رمل", en: "Sand" },
+    name: { ar: "أَوْج رمل", en: "AWJ Sand" },
     description: {
       ar: "دافئ ومريح: ألوان ترابية، زوايا مستديرة وظل واضح وتذييل بهوية بارزة.",
       en: "Warm and inviting: earthy colour, rounded corners, a clear shadow and a brand-forward footer.",
