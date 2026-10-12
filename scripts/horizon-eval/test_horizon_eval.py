@@ -108,7 +108,8 @@ class Classification(unittest.TestCase):
             "database/migrations/2026_01_01_000001_x.php": "C",
             "app/Http/Controllers/Api/InvoiceController.php": "C",
             "Dockerfile": "P", "deploy/railway.json": "P", ".env.production": "P", "render.yaml": "P",
-            "app/Services/Foo.php": "B",
+            "app/Services/Foo.php": "C",                 # generic backend code is NOT Zone B any more: unknown -> default-deny
+            "app/Services/DocumentCenter/Foo.php": "B",   # explicitly listed bounded subtree
             "web/src/app/globals.css": "B",
             "design-system/foundations/x.md": "B",
             "web/src/components/Button.tsx": "A",
@@ -156,7 +157,9 @@ class Classification(unittest.TestCase):
 
     def test_missing_patch_for_code_is_not_assumed_safe(self):
         c = with_files(base_a(), ("web/src/components/Label.tsx", "modified", None))
-        self.assertEqual(run(c)["zone"], "B")
+        rec = run(c)
+        self.assertEqual(rec["zone"], "B")
+        self.assertIn("PATCH_UNAVAILABLE", codes(rec))
 
     def test_context_never_lowers(self):
         c = with_files(base_a(), ("Dockerfile", "modified", "@@ -1 +1 @@\n-a\n+b"))
@@ -683,6 +686,32 @@ class ReviewerFindings(unittest.TestCase):
             rec = run(c)
             self.assertEqual(rec["decision"], "STOP_OWNER_DECISION")
             self.assertIn("UNREGISTERED_HORIZON_ACTIVE", codes(rec))
+
+    def test_uninspectable_patch_blocks_even_in_a_zone_b_file(self):  # Codex round 3, P1
+        for patch in (None, ""):
+            c = with_files(base_b(), ("app/Services/DocumentCenter/SyntheticHelper.php", "modified", patch))
+            rec = run(c)
+            self.assertEqual(rec["decision"], "BLOCK")
+            self.assertIn("PATCH_UNAVAILABLE", codes(rec))
+
+    def test_authorization_implementation_paths_are_zone_c(self):  # Codex round 3, P1
+        for path in ["app/Models/Role.php", "app/Http/Requests/StoreRoleRequest.php", "app/Policies/InvoicePolicy.php", "app/Models/Permission.php",
+                     "app/Providers/AuthServiceProvider.php", "app/Http/Controllers/Api/AuthController.php", "app/Models/User.php", "app/Models/Tenant.php"]:
+            c = with_files(base_b(), (path, "modified", "@@ -1 +1 @@\n-return $this->can($p);\n+return true;"))
+            rec = run(c)
+            self.assertEqual(rec["zone"], "C", path)
+            self.assertEqual(rec["decision"], "STOP_OWNER_DECISION", path)
+
+    def test_unlisted_backend_code_is_default_deny_not_zone_b(self):  # root cause of the round-3 findings
+        for path in ["app/Models/Expense.php", "app/Models/CostCenter.php", "app/Services/FuelCostBasisService.php", "app/Jobs/Anything.php"]:
+            c = with_files(base_b(), (path, "modified", "@@ -1 +1 @@\n-return 0.15;\n+return 0.25;"))
+            rec = run(c)
+            self.assertEqual(rec["zone"], "C", path)
+            self.assertEqual(rec["decision"], "STOP_OWNER_DECISION", path)
+        # and even inside a listed subtree, a financial-sounding file name stays Zone C
+        for path in ["app/Services/DocumentCenter/ExpenseAttachment.php", "app/Services/DocumentCenter/CostSheet.php"]:
+            c = with_files(base_b(), (path, "modified", "@@ -1 +1 @@\n-return 1;\n+return 2;"))
+            self.assertEqual(run(c)["zone"], "C", path)
 
     def test_jsx_expression_containers_are_not_presentational(self):  # Codex P1
         for line in ['<button disabled={!isAdmin}>Delete</button>', '<a aria-label={label}>x</a>', "{show && <b>x</b>}", '{" "}']:

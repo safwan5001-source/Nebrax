@@ -562,8 +562,9 @@ def classify_files(files: list[dict], policy: dict, reasons: Reasons):
             if f["status"] in ("removed", "renamed", "copied"):
                 bzone = zmax(bzone, "B")
             if not isinstance(patch, str) or patch == "":
+                # an uninspectable code change can hide anything (financial, security): never assume a zone bound
                 bzone = zmax(bzone, "B")
-                reasons.add("INFO", "BEHAVIOR_UNASSESSABLE_RAISED_TO_B", safe_path(f["filename"]))
+                reasons.add("BLOCK", "PATCH_UNAVAILABLE", safe_path(f["filename"]))
             else:
                 text = "\n".join(list(_added_lines(patch)) + list(_removed_lines(patch)))
                 if _C_TOKENS.search(text):
