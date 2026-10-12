@@ -58,10 +58,11 @@ export function classifyPriceVersions(
   return result;
 }
 
-export type PreviewOutcome = 'scheduled' | 'effective' | 'superseded';
+export type PreviewOutcome = 'scheduled' | 'effective' | 'superseded' | 'duplicate';
 
 /**
- * ما ستؤول إليه نسخة لم تُحفظ بعد، بالقاعدة نفسها: مستقبلية = مجدولة؛ وإلا فإن وُجدت نسخة أخرى لنفس
+ * ما ستؤول إليه نسخة لم تُحفظ بعد، بالقاعدة نفسها. قيد قاعدة البيانات `(plan, currency, effective_on)` فريد، فتاريخ
+ * مطابق لنسخة موجودة «مكرّر» ويرفضه الخادم. غير ذلك: مستقبلية = مجدولة؛ وإلا فإن وُجدت نسخة أخرى لنفس
  * (الخطة، العملة) تاريخها بعد تاريخ هذه وحتى اليوم فهذه «سابقة»؛ وإلا «سارية». يُستدعى بكتالوج مكتمل التحميل فقط.
  */
 export function previewOutcome(
@@ -69,6 +70,8 @@ export function previewOutcome(
   candidate: { plan: string; currency: string; effective_on: string },
   today: string
 ): PreviewOutcome {
+  const sameKey = (price: PriceVersionLike) => price.plan === candidate.plan && price.currency === candidate.currency;
+  if (prices.some((price) => sameKey(price) && price.effective_on === candidate.effective_on)) return 'duplicate';
   if (candidate.effective_on > today) return 'scheduled';
   const laterInEffect = prices.some(
     (price) =>

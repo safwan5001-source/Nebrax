@@ -184,13 +184,15 @@ describe('platform prices UX (H1-4C)', () => {
 
     it('announces success as status with the saved values and the date-derived state, and adds the version to the history', async () => {
       await renderLoaded();
-      platformApi.mockResolvedValueOnce({ data: price('new', 'basic', '110.00', '2026-12-25', '2026-10-12T09:00:00+00:00') });
+      const created = price('new', 'basic', '110.00', '2026-12-25', '2026-10-12T09:00:00+00:00');
+      platformApi.mockResolvedValueOnce({ data: created });
+      platformApi.mockResolvedValueOnce({ data: [...catalogue().data, created] }); // the reload after every save
       fill('110', '2026-12-25');
       fireEvent.click(screen.getByRole('button', { name: t('save') }));
       const status = await screen.findByRole('status');
       expect(status.textContent).toContain(t('saved'));
       expect(status.textContent).toContain(`basic · ${formatRiyal('110.00')} monthly · effective 2026-12-25`);
-      expect(status.textContent).toContain('Scheduled until 2026-12-25');
+      await waitFor(() => expect(screen.getByRole('status').textContent).toContain('Scheduled until 2026-12-25'));
       expect(screen.getAllByText(formatRiyal('110.00')).length).toBeGreaterThan(0);
       expect((screen.getByLabelText(t('monthlyPrice')) as HTMLInputElement).value).toBe('');
       expect(screen.queryByRole('alert')).toBeNull();
@@ -198,12 +200,14 @@ describe('platform prices UX (H1-4C)', () => {
 
     it('labels a retroactive version as superseded in the confirmation, matching its row in the history', async () => {
       await renderLoaded();
-      platformApi.mockResolvedValueOnce({ data: price('retro', 'pro', '99.00', '2026-01-01', '2026-10-12T09:00:00+00:00') });
+      const retro = price('retro', 'pro', '99.00', '2026-01-01', '2026-10-12T09:00:00+00:00');
+      platformApi.mockResolvedValueOnce({ data: retro });
+      platformApi.mockResolvedValueOnce({ data: [...catalogue().data, retro] });
       fireEvent.change(screen.getByLabelText(t('plan')), { target: { value: 'pro' } });
       fill('99', '2026-01-01');
       fireEvent.click(screen.getByRole('button', { name: t('save') }));
-      const status = await screen.findByRole('status');
-      expect(status.textContent).toContain(t('savedSuperseded'));
+      await waitFor(() => expect(screen.getByRole('status').textContent).toContain(t('savedSuperseded')));
+      const status = screen.getByRole('status');
       expect(status.textContent).not.toContain(t('savedEffective'));
       const row = screen.getAllByRole('row').find((r) => r.textContent?.startsWith('pro') && r.textContent.includes(formatRiyal('99.00'))) as HTMLElement;
       expect(within(row).getByText(t('statusSuperseded'))).toBeTruthy();
@@ -294,9 +298,29 @@ describe('platform prices UX (H1-4C)', () => {
       expect(preview.textContent).toContain(t('previewSuperseded'));
       expect(preview.textContent).not.toContain(t('previewEffective'));
       expect(posts()).toHaveLength(0);
-      platformApi.mockResolvedValueOnce({ data: price('retro', 'pro', '120.00', '2026-01-01') });
+      const retro = price('retro', 'pro', '120.00', '2026-01-01');
+      platformApi.mockResolvedValueOnce({ data: retro });
+      platformApi.mockResolvedValueOnce({ data: [...catalogue().data, retro] });
       fireEvent.click(screen.getByRole('button', { name: t('save') }));
-      expect((await screen.findByRole('status')).textContent).toContain(t('savedSuperseded'));
+      await waitFor(() => expect(screen.getByRole('status').textContent).toContain(t('savedSuperseded')));
+    });
+
+    it('describes a superseded version by its date window, not as unusable for every new contract', async () => {
+      await renderLoaded();
+      fill('120', '2026-01-01');
+      const text = screen.getByTestId('price-preview').textContent ?? '';
+      expect(text).toContain("before that later version's date");
+      expect(text).not.toMatch(/will not apply to new contracts\./);
+    });
+
+    it('flags a date that already exists for the plan, which the unique key would reject, without blocking the request', async () => {
+      await renderLoaded();
+      fill('120', '2026-06-01'); // pro already has 2026-06-01
+      expect(screen.getByTestId('price-preview').textContent).toContain(t('previewDuplicate'));
+      fill('120', '2026-12-01'); // a future duplicate too
+      expect(screen.getByTestId('price-preview').textContent).toContain(t('previewDuplicate'));
+      expect((screen.getByRole('button', { name: t('save') }) as HTMLButtonElement).disabled).toBe(false);
+      expect(posts()).toHaveLength(0);
     });
 
     it('keeps the other outcomes: scheduled for a future date, in effect for a newer past date', async () => {
@@ -316,6 +340,33 @@ describe('platform prices UX (H1-4C)', () => {
       const preview = screen.getByTestId('price-preview');
       expect(preview.textContent).toContain(t('previewUnverified'));
       expect(preview.textContent).not.toContain(t('previewEffective'));
+    });
+  });
+
+  describe('statuses after a save come from a fresh catalogue', () => {
+    it('reloads after every successful save, so a version another administrator added is taken into account', async () => {
+      platformApi.mockReset();
+      // this tab only knows a January version of pro
+      platformApi.mockResolvedValueOnce({ data: [price('p-jan', 'pro', '100.00', '2026-01-01')] });
+      render(<PlatformPricesPage />);
+      await screen.findAllByText(formatRiyal('100.00'));
+      // meanwhile another administrator added September; this tab adds June
+      const june = price('p-jun', 'pro', '120.00', '2026-06-01');
+      const sep = price('p-sep', 'pro', '150.00', '2026-09-01');
+      const reload = (() => { let resolve!: (v: unknown) => void; const promise = new Promise((r) => { resolve = r; }); return { promise, resolve }; })();
+      platformApi.mockResolvedValueOnce({ data: june }); // POST
+      platformApi.mockReturnValueOnce(reload.promise); // reload, still pending
+      fireEvent.change(screen.getByLabelText(t('plan')), { target: { value: 'pro' } });
+      fireEvent.change(screen.getByLabelText(t('monthlyPrice')), { target: { value: '120' } });
+      fireEvent.change(screen.getByLabelText(t('effectiveOn')), { target: { value: '2026-06-01' } });
+      fireEvent.click(screen.getByRole('button', { name: t('save') }));
+      const status = await screen.findByRole('status');
+      // no state is claimed from the stale list while the reload is pending
+      for (const key of ['savedEffective', 'savedSuperseded', 'savedScheduled']) expect(status.textContent).not.toContain(t(key));
+      reload.resolve({ data: [sep, june, price('p-jan', 'pro', '100.00', '2026-01-01')] });
+      await waitFor(() => expect(screen.getByRole('status').textContent).toContain(t('savedSuperseded')));
+      expect(screen.getByRole('status').textContent).not.toContain(t('savedEffective'));
+      expect(platformApi.mock.calls.filter(([, o]) => !o?.method)).toHaveLength(2);
     });
   });
 
@@ -388,7 +439,7 @@ describe('platform prices UX (H1-4C)', () => {
     expect(isolated).toContain('2026-06-01');
     expect(isolated).toContain('2026-12-01');
     expect(isolated).toContain(formatRiyal('199.99'));
-    const keys = ['summaryTitle', 'summaryNote', 'statusColumn', 'addedOn', 'statusCurrent', 'statusScheduled', 'statusSuperseded', 'statusUnknown', 'sinceDate', 'startsOn', 'monthlyWord', 'effectiveWord', 'noPrice', 'noCurrentPrice', 'nextScheduled', 'tiedDate', 'effectNote', 'amountHint', 'invalidAmount', 'previewTitle', 'previewScheduled', 'previewEffective', 'previewSuperseded', 'previewUnverified', 'previewStored', 'savedScheduled', 'savedEffective', 'savedSuperseded', 'historyNote'];
+    const keys = ['summaryTitle', 'summaryNote', 'statusColumn', 'addedOn', 'statusCurrent', 'statusScheduled', 'statusSuperseded', 'statusUnknown', 'sinceDate', 'startsOn', 'monthlyWord', 'effectiveWord', 'noPrice', 'noCurrentPrice', 'nextScheduled', 'tiedDate', 'effectNote', 'amountHint', 'invalidAmount', 'previewTitle', 'previewScheduled', 'previewEffective', 'previewSuperseded', 'previewDuplicate', 'previewUnverified', 'previewStored', 'savedScheduled', 'savedEffective', 'savedSuperseded', 'historyNote'];
     for (const lang of [ar, en]) for (const key of keys) expect(typeof (lang.platformPrices as Record<string, unknown>)[key]).toBe('string');
   });
 });

@@ -64,7 +64,10 @@ describe('price version status (derived from effective_on and today only)', () =
     expect(previewOutcome(list, cand('pro', '2026-12-01'), today)).toBe('scheduled');
     expect(previewOutcome(list, cand('pro', '2026-01-01'), today)).toBe('superseded'); // an older date behind June
     expect(previewOutcome(list, cand('pro', '2026-07-01'), today)).toBe('effective'); // newer than June
-    expect(previewOutcome(list, cand('pro', '2026-06-01'), today)).toBe('effective'); // equal date is not "later"
+    expect(previewOutcome(list, cand('pro', '2026-06-01'), today)).toBe('duplicate'); // the unique key (plan, currency, date)
+    expect(previewOutcome(list, cand('pro', '2027-01-01'), today)).toBe('duplicate'); // also for a future date
+    expect(previewOutcome(list, cand('pro', '2026-06-01', 'USD'), today)).toBe('duplicate');
+    expect(previewOutcome(list, cand('pro', '2026-06-02', 'USD'), today)).toBe('effective'); // later than USD's June, same group
     expect(previewOutcome(list, cand('basic', '2026-01-01'), today)).toBe('superseded');
     expect(previewOutcome(list, cand('enterprise', '2026-01-01'), today)).toBe('effective'); // no other version
     expect(previewOutcome(list, cand('pro', '2026-07-01', 'USD'), today)).toBe('effective'); // other currency group

@@ -105,11 +105,9 @@ export default function PlatformPricesPage() {
   // قبل اكتمال التحميل لا يُجزم بشيء لتاريخ ماضٍ.
   const previewKey = !effectiveOn
     ? 'previewEffective'
-    : effectiveOn > today
-      ? 'previewScheduled'
-      : !catalogueLoaded
-        ? 'previewUnverified'
-        : ({ scheduled: 'previewScheduled', effective: 'previewEffective', superseded: 'previewSuperseded' } as const)[
+    : !catalogueLoaded
+      ? effectiveOn > today ? 'previewScheduled' : 'previewUnverified'
+      : ({ scheduled: 'previewScheduled', effective: 'previewEffective', superseded: 'previewSuperseded', duplicate: 'previewDuplicate' } as const)[
             previewOutcome(prices, { plan, currency: 'SAR', effective_on: effectiveOn }, today)
           ];
 
@@ -134,13 +132,9 @@ export default function PlatformPricesPage() {
       });
       setMonthlyPrice('');
       setSaved(response.data);
-      if (catalogueLoaded) {
-        setPrices((current) => sortPrices([response.data, ...current]));
-      } else {
-        // الكتالوج لم يكتمل جلبه (فشل أو ما زال جارياً): لا تُبنى قائمة جزئية من الصف المُرجَع وحده، بل يُعاد الجلب،
-        // وتبقى الملخصات والسجل غير متاحة حتى ينجح جلب كامل. الجلب الأقدم المعلّق يُهمل برقم الطلب.
-        void load();
-      }
+      // كل حفظ ناجح يعيد جلب الكتالوج كاملاً: مدير آخر قد يكون أضاف نسخاً بعد جلب هذه التبويبة، فلا تُشتق حالة
+      // النسخة من قائمة محلية قديمة. لا تُدمج النسخة المُرجَعة محلياً؛ تظهر بالجلب فقط، فلا تُصنَّف حالتها إلا من قائمة تحتويها.
+      void load();
     } catch (reason) {
       setSaveError(reason instanceof ApiError ? reason.message : t('saveFailed'));
     } finally {
