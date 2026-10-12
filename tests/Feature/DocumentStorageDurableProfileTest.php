@@ -90,26 +90,26 @@ class DocumentStorageDurableProfileTest extends TestCase
     }
 
     /** @test */
-    public function the_write_profile_is_durable_only_when_the_lock_is_open_and_an_integration_is_active(): void
+    public function the_profile_is_durable_only_when_the_lock_is_open_and_an_integration_is_active(): void
     {
         $storage = app(DocumentStorageService::class);
-        $this->assertSame('platform', $storage->writeProfile(), 'lock closed, no integration');
+        $this->assertSame('platform', $storage->profile(), 'lock closed, no integration');
 
         $this->integration();
-        $this->assertSame('platform', $storage->writeProfile(), 'lock closed, integration saved');
+        $this->assertSame('platform', $storage->profile(), 'lock closed, integration saved');
 
         $this->open();
-        $this->assertSame(DocumentStorageService::PROFILE_DURABLE, $storage->writeProfile());
+        $this->assertSame(DocumentStorageService::PROFILE_DURABLE, $storage->profile());
     }
 
     /** @test */
     public function an_open_lock_without_an_active_integration_never_claims_the_durable_profile(): void
     {
         $this->open();
-        $this->assertSame('platform', app(DocumentStorageService::class)->writeProfile());
+        $this->assertSame('platform', app(DocumentStorageService::class)->profile());
 
         $this->integration(enabled: false);
-        $this->assertSame('platform', app(DocumentStorageService::class)->writeProfile());
+        $this->assertSame('platform', app(DocumentStorageService::class)->profile());
     }
 
     /** @test */
@@ -121,7 +121,7 @@ class DocumentStorageDurableProfileTest extends TestCase
         $storage = app(DocumentStorageService::class);
 
         $this->open();
-        $profile = $storage->writeProfile();
+        $profile = $storage->profile();
         $storage->put($profile, 'tenants/t/doc.pdf', $this->stream('PDF-BYTES'));
         $this->assertArrayHasKey('tenants/t/doc.pdf', $store);
 

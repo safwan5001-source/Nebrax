@@ -21,20 +21,21 @@ class DocumentStorageService
 
     public function __construct(private readonly PlatformIntegrationResolver $integrations) {}
 
-    public function profile(): string
-    {
-        return (string) config('document_center.storage.profile', 'platform');
-    }
-
     /**
-     * الملف الذي يُسجَّل في صف **مستند جديد**: `platform-s3` حين يكون التخزين الدائم فعلياً الآن (القفل مفتوح وتكامل
-     * مفعَّل)، وإلا `platform` كالسابق. وحده مركز المستندات يستعمله؛ بقية المستدعين يبقون على `profile()`.
+     * ملف **الكتابة الجديدة** (يُسجَّل في صف المستند): `platform-s3` حين يكون التخزين الدائم فعلياً الآن (القفل مفتوح
+     * وتكامل مفعَّل)، وإلا `platform` كالسابق. مستدعو `profile()` الآخرون (وسائط المنتج القديمة…) يحصلون على
+     * `platform-s3` في الحالة نفسها، وهو يبني الـS3 نفسه الذي كان `platform` سيبنيه والقفل مفتوح — فلا فرق لهم.
      */
-    public function writeProfile(): string
+    public function profile(): string
     {
         return $this->persistentEnabled() && $this->integrations->activeConfiguration('document_storage') !== []
             ? self::PROFILE_DURABLE
-            : $this->profile();
+            : $this->baseProfile();
+    }
+
+    private function baseProfile(): string
+    {
+        return (string) config('document_center.storage.profile', 'platform');
     }
 
     /** @param resource $stream */
@@ -179,7 +180,7 @@ class DocumentStorageService
 
             return $this->build($this->settings(true));
         }
-        if ($profile !== $this->profile()) {
+        if ($profile !== $this->baseProfile()) {
             throw new RuntimeException('Unknown document storage profile.');
         }
 

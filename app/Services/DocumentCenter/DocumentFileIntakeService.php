@@ -41,7 +41,7 @@ class DocumentFileIntakeService
             throw ValidationException::withMessages(['file' => 'هذا الملف مرفوع مسبقًا في الفرع الحالي.']);
         }
 
-        $profile = $this->storage->writeProfile();
+        $profile = $this->storage->profile();
         $objectKey = $this->objectKey($batch, $inspected->extension);
         $stream = fopen($uploadedFile->getRealPath(), 'rb');
         if (! is_resource($stream)) {
