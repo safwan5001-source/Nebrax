@@ -58,6 +58,7 @@ class CommerceWorkspaceStorefrontPresentationVersionController extends ApiContro
                 $id,
                 $request->validated('name'),
                 $request->validated('source_version_id'),
+                $request->validated('source_revision_id'),
             );
         } catch (SourceVersionNotFoundException $e) {
             abort(404, $e->getMessage());

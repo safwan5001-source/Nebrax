@@ -3,7 +3,7 @@
 import { describePublishIssues } from "./announcement-status";
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { CalendarClock, ExternalLink, type LucideIcon, MoreHorizontal, Redo2, RotateCcw, Undo2 } from "lucide-react";
+import { CalendarClock, ExternalLink, History, type LucideIcon, MoreHorizontal, Redo2, RotateCcw, Undo2 } from "lucide-react";
 import { Dropdown, DropdownItem } from "@/components/ui/dropdown";
 import { ScrollIndicator } from "./ScrollIndicator";
 import {
@@ -96,14 +96,18 @@ import {
   cancelPresentationVersionSchedule,
   createPresentationVersion,
   deletePresentationVersion,
+  listPresentationVersionRevisions,
   listPresentationVersions,
   type PresentationVersionDetail,
+  type PresentationVersionRevisionDetail,
+  type PresentationVersionRevisionSummary,
   type PresentationVersionSummary,
   publishPresentationVersion,
   renamePresentationVersion,
   savePresentationVersion,
   schedulePresentationVersion,
   showPresentationVersion,
+  showPresentationVersionRevision,
 } from "@/modules/commerce-workspace/presentation-versions";
 import { useCompany } from "@/lib/company";
 import { safeTimeZone } from "@/lib/timezone";
@@ -118,6 +122,9 @@ import {
   shortcutHint,
 } from "./history/shortcuts";
 import { useDocumentHistory } from "./history/use-document-history";
+import { HistoryPreviewBar } from "./history/HistoryPreviewBar";
+import { type RevisionHistoryListState, RevisionHistoryDialog } from "./history/RevisionHistoryDialog";
+import { fillTemplate } from "./slider-edit";
 
 // CUST-H5-2 — أسهم التراجع/الإعادة تتبع اتجاه **المحرِّر** (`locale`) لا اتجاه وسم الصفحة: متغيّر `rtl:` يطابق أي سلف RTL
 // حتى لو كان أقرب سلف LTR. في RTL يسير الزمن من اليمين لليسار فيُعكس السهم.
@@ -211,6 +218,18 @@ export function ExperienceBuilder({
     themeId: string;
     sections: PresentationHomeSection[] | null;
   } | null>(null);
+  // CUST-H5-4 — السجل المحفوظ: نافذة القائمة، ومعاينة لقطة (للقراءة فقط) تشارك آلية Theme Preview في تعطيل التحرير.
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [historyList, setHistoryList] = useState<{ state: RevisionHistoryListState; rows: PresentationVersionRevisionSummary[] }>({
+    state: "loading",
+    rows: [],
+  });
+  const [historyBusyId, setHistoryBusyId] = useState<string | null>(null);
+  const [historyPreview, setHistoryPreview] = useState<PresentationVersionRevisionDetail | null>(null);
+  const historyRequestRef = useRef(0);
+  const historyTriggerRef = useRef<HTMLElement | null>(null);
+  // محرِّر للقراءة فقط: معاينة سمة أو معاينة لقطة. كل بوابات التحرير تقرأ هذا العلَم الواحد.
+  const readOnlyPreview = previewTheme !== null || historyPreview !== null;
   const themePackRef = useRef(themePackSections);
   themePackRef.current = themePackSections;
   const themed = useMemo(() => {
@@ -221,9 +240,11 @@ export function ExperienceBuilder({
     }
     return applied;
   }, [draft, previewTheme, themePack]);
-  const canvasConfig = themed?.ok ? themed.config : draft;
+  const canvasConfig = historyPreview ? historyPreview.config : themed?.ok ? themed.config : draft;
+  // أقسام الصفحة الرئيسية التي تعرضها المعاينة الآن: لقطة السجل إن فُتحت، وإلا المسودة. محمِّلات البيانات (التصنيفات/وصل حديثاً/المميّز/العروض) تقرأ منها لا من المسودة وحدها.
+  const homeSectionsShown = historyPreview ? historyPreview.config.homepage.sections : draft.homepage.sections;
   // React 18 renders `inert` only as a string attribute: while a theme is previewed the editing UI is not operable or focusable.
-  const inertWhenThemePreview = previewTheme ? ({ inert: "" } as Record<string, string>) : {};
+  const inertWhenThemePreview = readOnlyPreview ? ({ inert: "" } as Record<string, string>) : {};
   const [panel, setPanel] = useState<CustomizerPanel>("theme");
   const [device, setDevice] = useState<PreviewDevice>("desktop");
   const [mobilePane, setMobilePane] = useState<"edit" | "preview">("preview");
@@ -945,6 +966,10 @@ export function ExperienceBuilder({
   // (تبديل رؤية أو نقل) وحده يُماديها فعلياً عبر `updateDraft` أول مرة.
   const effectiveProductRegions: PageRegionInstance<ProductPageRegionKey>[] =
     draft.pagePresentation?.product?.regions ?? defaultProductPageRegions();
+  // معاينة لقطة: الكانفاس يعرض تخطيط صفحتَي المنتج/التصنيف من **اللقطة** لا من المسودة الحية (التحرير يبقى على `effective*`).
+  const canvasProductRegions: PageRegionInstance<ProductPageRegionKey>[] = historyPreview
+    ? historyPreview.config.pagePresentation?.product?.regions ?? defaultProductPageRegions()
+    : effectiveProductRegions;
 
   async function loadProductList(search?: string) {
     if (!storefrontId) return;
@@ -1014,6 +1039,9 @@ export function ExperienceBuilder({
   // CUST-H2-4 — نفس منطق `effectiveProductRegions` أعلاه بالضبط، للتصنيف.
   const effectiveCategoryRegions: PageRegionInstance<CategoryPageRegionKey>[] =
     completeCategoryRegions(draft.pagePresentation?.category?.regions ?? defaultCategoryPageRegions());
+  const canvasCategoryRegions: PageRegionInstance<CategoryPageRegionKey>[] = historyPreview
+    ? completeCategoryRegions(historyPreview.config.pagePresentation?.category?.regions ?? defaultCategoryPageRegions())
+    : effectiveCategoryRegions;
 
   async function loadCategoryList(search?: string) {
     if (!storefrontId) return;
@@ -1167,7 +1195,7 @@ export function ExperienceBuilder({
     setHomeCategories(result.data);
   }
 
-  const categoriesSectionVisible = draft.homepage.sections.some(
+  const categoriesSectionVisible = homeSectionsShown.some(
     (section) => section.type === "categories" && section.visible,
   );
 
@@ -1222,7 +1250,7 @@ export function ExperienceBuilder({
     setHomeNewArrivals(result.data);
   }
 
-  const newArrivalsSectionVisible = draft.homepage.sections.some(
+  const newArrivalsSectionVisible = homeSectionsShown.some(
     (section) => section.type === "newArrivals" && section.visible,
   );
 
@@ -1283,7 +1311,7 @@ export function ExperienceBuilder({
     // selection must not re-fetch a sibling Featured section that didn't
     // change, and an unrelated re-render must not re-fetch either.
     if (currentPage !== "home" || !storefrontId || busy === "loading") return;
-    for (const section of draft.homepage.sections) {
+    for (const section of homeSectionsShown) {
       if (section.type !== "featured" || !section.visible) continue;
       const ids = featuredContentOf(section).productIds.filter((id) => id);
       const key = ids.join(",");
@@ -1297,10 +1325,10 @@ export function ExperienceBuilder({
       void loadFeaturedResolution(section.id, ids);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentPage, storefrontId, busy, draft.homepage.sections]);
+  }, [currentPage, storefrontId, busy, homeSectionsShown]);
 
   function handleRetryFeaturedResolution(sectionId: string) {
-    const section = draft.homepage.sections.find((item) => item.id === sectionId);
+    const section = homeSectionsShown.find((item) => item.id === sectionId);
     if (!section) return;
     const ids = featuredContentOf(section).productIds.filter((id) => id);
     if (ids.length === 0) return;
@@ -1377,7 +1405,7 @@ export function ExperienceBuilder({
     if (result.maxOffers !== null) setOffersMax(result.maxOffers);
   }
 
-  const hasOffersSection = draft.homepage.sections.some(
+  const hasOffersSection = homeSectionsShown.some(
     (section) => section.type === "offers" && (section.visible || section.id === selectedSection),
   );
 
@@ -1536,7 +1564,7 @@ export function ExperienceBuilder({
   // CUST-HV V10d — the Canvas hover action bar: each button is a shared pure section operation committed as an ordinary draft edit
   // (revision-checked at Save). Offered only while editing the Home page of a Draft / Scheduled Version.
   const canvasSectionActions: CanvasSectionActions | undefined =
-    currentPage === "home" && !previewTheme && !isPublishedReadOnly
+    currentPage === "home" && !readOnlyPreview && !isPublishedReadOnly
       ? {
           onMove: (id, delta) => {
             const next = moveSection(draft, id, delta);
@@ -1705,7 +1733,7 @@ export function ExperienceBuilder({
   }
 
   function handleRestore() {
-    if (isPublishedReadOnly || previewTheme) return;
+    if (isPublishedReadOnly || readOnlyPreview) return;
     const confirmed = window.confirm(t("restoreConfirm"));
     if (!confirmed) return;
     const restored = clonePresentationConfig(DEFAULT_PRESENTATION_CONFIG);
@@ -1718,7 +1746,7 @@ export function ExperienceBuilder({
   }
 
   // ── CUST-H5-2 — تراجع/إعادة ───────────────────────────────────────────────
-  const historyEnabled = historyScope !== null && previewTheme === null && !isPublishedReadOnly;
+  const historyEnabled = historyScope !== null && !readOnlyPreview && !isPublishedReadOnly;
   const undoEnabled = historyEnabled && history.canUndo;
   const redoEnabled = historyEnabled && history.canRedo;
 
@@ -1766,6 +1794,172 @@ export function ExperienceBuilder({
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
+
+  // ── CUST-H5-4 — السجل المحفوظ والاسترداد ──────────────────────────────────────
+  // الاسترداد لنسخة قابلة للتحرير = تحميل مستند اللقطة في المحرِّر كتعديل محلي غير محفوظ (يمرّ بـ`updateDraft` فيدخل سجلّ
+  // التراجع ويمكن التراجع عنه)، والحفظ بعده يستعمل مراجعة النسخة **الحالية** دائماً — لا شيء هنا يلمس المراجعة أو الخادم.
+  // النسخة المنشورة لا تُعدَّل أبداً: «إنشاء مسودة» يُنشئ نسخة جديدة ثم يفتحها. لا نجاح قبل ردّ الخادم.
+  function historyMediaNote(detail: { mediaIssues?: readonly unknown[] }): string {
+    const count = detail.mediaIssues?.length ?? 0;
+    return count > 0 ? ` ${fillTemplate(t("historyMediaIssuesBody"), { n: count })}` : "";
+  }
+
+  function focusHistoryTrigger() {
+    const recorded = historyTriggerRef.current;
+    // عنصر داخل قائمة منسدلة (المزيد) يبقى متصلاً بعد إغلاقها لكنه مخفيّ: نعيد التركيز إلى زرّ القائمة المرئي نفسه لا إلى عنصرها.
+    const menu = recorded?.closest<HTMLElement>('[role="menu"]');
+    const trigger = menu ? menu.parentElement?.querySelector<HTMLElement>(":scope > button[aria-haspopup]") ?? null : recorded;
+    const target = trigger?.isConnected ? trigger : document.querySelector<HTMLElement>("[data-builder-toolbar] [aria-expanded]");
+    window.setTimeout(() => target?.focus(), 0);
+  }
+
+  async function loadHistoryList() {
+    if (!storefrontId || !selectedVersion) return;
+    const request = ++historyRequestRef.current;
+    const originStorefrontId = storefrontId;
+    const versionIdAtStart = selectedVersion.id;
+    setHistoryList({ state: "loading", rows: [] });
+    const result = await listPresentationVersionRevisions(originStorefrontId, versionIdAtStart);
+    // أُغلقت النافذة أو بُدِّلت النسخة/المتجر أثناء الانتظار: النتيجة المتأخرة لا تُعرَض.
+    if (request !== historyRequestRef.current) return;
+    if (storefrontIdRef.current !== originStorefrontId || selectedVersionIdRef.current !== versionIdAtStart) return;
+    setHistoryList(result.ok ? { state: "ready", rows: result.data } : { state: "error", rows: [] });
+  }
+
+  // إنشاء/تكرار/كتابة نسخة قيد التنفيذ: لا يُعاد فتح السجل (نافذته قابلة للإغلاق أثناء الطلب) فلا يتكرر الإنشاء.
+  const historyWriteBusy = versionBusy !== null || versionCreating;
+
+  function openHistory(trigger?: HTMLElement | null) {
+    if (!storefrontId || !selectedVersion || readOnlyPreview || busy !== null || historyWriteBusy) return;
+    historyTriggerRef.current = trigger ?? (document.activeElement as HTMLElement | null);
+    setHistoryOpen(true);
+    void loadHistoryList();
+  }
+
+  function closeHistory() {
+    ++historyRequestRef.current;
+    setHistoryOpen(false);
+    setHistoryBusyId(null);
+    focusHistoryTrigger();
+  }
+
+  function exitHistoryPreview() {
+    ++historyRequestRef.current;
+    setHistoryPreview(null);
+    setHistoryBusyId(null);
+    focusHistoryTrigger();
+  }
+
+  /** يجلب لقطة مفردة بمستندها وفحص الوسائط الحالي. `null` عند الفشل/التقادم (والإشعار مضبوط عند الفشل الحقيقي). */
+  async function fetchHistoryRevision(revision: PresentationVersionRevisionSummary, failureKey: CustomizerMessageKey) {
+    if (!storefrontId || !selectedVersion) return null;
+    const request = ++historyRequestRef.current;
+    const originStorefrontId = storefrontId;
+    const versionIdAtStart = selectedVersion.id;
+    setHistoryBusyId(revision.id);
+    const result = await showPresentationVersionRevision(originStorefrontId, versionIdAtStart, revision.id);
+    if (request !== historyRequestRef.current) return null;
+    setHistoryBusyId(null);
+    if (storefrontIdRef.current !== originStorefrontId || selectedVersionIdRef.current !== versionIdAtStart) return null;
+    if (!result.ok) {
+      setNoticeKind("status");
+      setNotice(t(result.reason === "unsupported_schema" ? "versionUnsupportedSchema" : failureKey));
+      return null;
+    }
+    return result.data;
+  }
+
+  async function handlePreviewRevision(revision: PresentationVersionRevisionSummary) {
+    const detail = await fetchHistoryRevision(revision, "historyPreviewFailed");
+    if (!detail) return;
+    setHistoryOpen(false);
+    setHistoryPreview(detail);
+    setNotice(null);
+  }
+
+  function applyRestoredRevision(detail: PresentationVersionRevisionDetail) {
+    setHistoryOpen(false);
+    setHistoryPreview(null);
+    if (isPublishedReadOnly) return; // دفاعي: لا تعديل لمنشورة أبداً (الواجهة تعرض «إنشاء مسودة» لها).
+    if (presentationConfigsEqual(detail.config, draftRef.current)) {
+      setNoticeKind("status");
+      setNotice(t("historyRestoreNoChange"));
+      focusHistoryTrigger();
+      return;
+    }
+    // تعديل عادي بمراجعة النسخة الحالية — يُسجَّل للتراجع، ويبقى القسم المحدد إن بقي موجوداً.
+    updateDraft(detail.config);
+    if (selectedSection && !detail.config.homepage.sections.some((section) => section.id === selectedSection)) {
+      setSelectedSection(null);
+    }
+    setNoticeKind("status");
+    setNotice(`${t("historyRestoreDone")}${historyMediaNote(detail)}`);
+    focusHistoryTrigger();
+  }
+
+  async function handleCreateDraftFromRevision(revision: PresentationVersionRevisionSummary) {
+    if (!storefrontId || !selectedVersion || historyWriteBusy) return;
+    // نفس تأكيد التكرار: تبنّي النسخة الجديدة يستبدل المسودة المحلية غير المحفوظة.
+    if (dirty && !window.confirm(t("versionSwitchDiscardConfirm"))) return;
+    const originStorefrontId = storefrontId;
+    const tokenAtStart = versionRequestTokenRef.current;
+    const draftAtStart = draft;
+    const sourceVersion = selectedVersion;
+    const writeRequestId = ++versionWriteRequestRef.current;
+    const name = `${sourceVersion.name} — ${t("historyDraftNameSuffix")}`.slice(0, 120);
+    setHistoryBusyId(revision.id);
+    setVersionBusy({ id: sourceVersion.id, action: "duplicate" });
+    const result = await createPresentationVersion(originStorefrontId, name, sourceVersion.id, revision.id);
+    const sameStorefront = storefrontIdRef.current === originStorefrontId;
+    const isLatestWrite = writeRequestId === versionWriteRequestRef.current;
+    if (sameStorefront && isLatestWrite) {
+      setVersionBusy(null);
+      setHistoryBusyId(null);
+    }
+    if (!result.ok) {
+      if (sameStorefront && isLatestWrite) {
+        setNoticeKind("status");
+        setNotice(t(result.reason === "unsupported_schema" ? "versionUnsupportedSchema" : "historyDraftFailed"));
+      }
+      return;
+    }
+    if (!sameStorefront) return;
+    if (
+      tokenAtStart !== versionRequestTokenRef.current ||
+      selectedVersionIdRef.current !== sourceVersion.id ||
+      !presentationConfigsEqual(draftRef.current, draftAtStart)
+    ) {
+      updateVersionSummaryInList(result.data);
+      return;
+    }
+    setHistoryOpen(false);
+    setHistoryPreview(null);
+    adoptCreatedVersion(result.data);
+    setNoticeKind("status");
+    setNotice(`${t("historyDraftCreated")}${historyMediaNote(result.data)}`);
+  }
+
+  async function handleRestoreRevision(revision: PresentationVersionRevisionSummary) {
+    if (isPublishedReadOnly) {
+      await handleCreateDraftFromRevision(revision);
+      return;
+    }
+    const detail = await fetchHistoryRevision(revision, "historyRestoreFailed");
+    if (detail) applyRestoredRevision(detail);
+  }
+
+  // تبديل النسخة/المتجر يُغلق النافذة والمعاينة ويُبطل أي جلب معلَّق (لا لقطة نسخة سابقة فوق نسخة جديدة).
+  useEffect(() => {
+    ++historyRequestRef.current;
+    setHistoryOpen(false);
+    setHistoryPreview(null);
+    setHistoryBusyId(null);
+  }, [selectedVersion?.id, storefrontId]);
+
+  // دخول المعاينة: التركيز على «الخروج» (لا يبقى على زرّ خلف طبقة معطَّلة).
+  useEffect(() => {
+    if (historyPreview) document.querySelector<HTMLElement>("[data-history-preview-exit]")?.focus();
+  }, [historyPreview]);
 
   async function handleCreateVersion(name: string) {
     if (!storefrontId) return;
@@ -2562,7 +2756,7 @@ export function ExperienceBuilder({
   // drift apart.
   const hasConflict = versionConflict?.versionId === selectedVersion?.id;
   const saveDisabled =
-    previewTheme !== null ||
+    readOnlyPreview ||
     busy !== null ||
     !selectedVersion ||
     isPublishedReadOnly ||
@@ -2577,7 +2771,7 @@ export function ExperienceBuilder({
           ? t("versionStaleConflict")
           : undefined;
   const publishDisabled =
-    previewTheme !== null ||
+    readOnlyPreview ||
     !storefrontId ||
     !selectedVersion ||
     selectedVersion.state !== "draft" ||
@@ -2653,6 +2847,7 @@ export function ExperienceBuilder({
       onPointerDownCapture={continuousInput.reset}
       onClickCapture={continuousInput.reset}
       onKeyDownCapture={continuousInput.reset}
+      data-history-preview={historyPreview ? "true" : "false"}
       data-can-undo={undoEnabled ? "true" : "false"}
       data-can-redo={redoEnabled ? "true" : "false"}
       data-panel={panel}
@@ -2752,7 +2947,7 @@ export function ExperienceBuilder({
             <button
               type="button"
               data-version-selector-mobile=""
-              disabled={previewTheme !== null}
+              disabled={readOnlyPreview}
               onClick={() => setMobileSheet("versions")}
               className="flex min-h-10 min-w-0 items-center gap-1 border-s border-border px-2 py-1 ps-3 text-[11px] font-medium text-text sm:ms-0"
             >
@@ -2833,6 +3028,17 @@ export function ExperienceBuilder({
               </button>
             ))}
           </div>
+          <button
+            type="button"
+            data-history-open=""
+            aria-label={t("historyOpen")}
+            title={t("historyOpen")}
+            disabled={!storefrontId || !selectedVersion || readOnlyPreview || busy !== null || historyWriteBusy}
+            onClick={(event) => openHistory(event.currentTarget)}
+            className="hidden size-9 shrink-0 items-center justify-center rounded-md border border-transparent text-text hover:border-border hover:bg-primary-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-not-allowed disabled:opacity-40 lg:inline-flex"
+          >
+            <History className="size-4" strokeWidth={1.8} aria-hidden="true" />
+          </button>
           <button
             type="button"
             data-save=""
@@ -2966,10 +3172,20 @@ export function ExperienceBuilder({
                     {t("versionSchedule")}
                   </DropdownItem>
                 </div>
+                <div className="lg:hidden">
+                  <DropdownItem
+                    icon={History}
+                    onClick={() => openHistory(null)}
+                    disabled={!storefrontId || !selectedVersion || readOnlyPreview || busy !== null || historyWriteBusy}
+                    dataAttrs={{ "data-more-history": "" }}
+                  >
+                    {t("historyOpen")}
+                  </DropdownItem>
+                </div>
                 <DropdownItem
                   icon={RotateCcw}
                   onClick={handleRestore}
-                  disabled={isPublishedReadOnly || previewTheme !== null}
+                  disabled={isPublishedReadOnly || readOnlyPreview}
                   dataAttrs={{ "data-more-restore": "" }}
                 >
                   {t("restore")}
@@ -3021,7 +3237,7 @@ export function ExperienceBuilder({
           aria-label={t("controls")}
           {...inertWhenThemePreview}
           data-customizer-scroll=""
-          className={`${previewTheme ? "!hidden " : ""}${
+          className={`${readOnlyPreview ? "!hidden " : ""}${
             mobilePane === "preview" ? "hidden lg:flex" : "hidden md:flex"
           } ${railCollapsed ? "lg:w-16" : "w-[196px]"} shrink-0 flex-col overflow-y-auto border-e border-neutral-200 bg-white`}
         >
@@ -3092,7 +3308,7 @@ export function ExperienceBuilder({
           {...inertWhenThemePreview}
           data-builder-controls=""
           data-builder-drawer={drawerOpen ? "open" : isTabletViewport ? "closed" : undefined}
-          className={`${previewTheme ? "!hidden " : ""}${
+          className={`${readOnlyPreview ? "!hidden " : ""}${
             mobilePane === "edit" ? "flex" : "hidden"
           } w-full min-w-0 flex-col border-neutral-200 bg-white md:flex-1 lg:flex lg:w-[300px] lg:flex-none lg:border-e xl:w-[320px] ${
             drawerOpen
@@ -3242,6 +3458,17 @@ export function ExperienceBuilder({
               onExit={handleExitThemePreview}
             />
           ) : null}
+          {historyPreview ? (
+            <HistoryPreviewBar
+              locale={locale}
+              revision={historyPreview}
+              published={isPublishedReadOnly}
+              dirty={dirty}
+              busy={historyBusyId !== null}
+              onRestore={() => void handleRestoreRevision(historyPreview)}
+              onExit={exitHistoryPreview}
+            />
+          ) : null}
           <div className="relative min-h-0 flex-1">
             <div
               ref={canvasScrollRef}
@@ -3277,20 +3504,20 @@ export function ExperienceBuilder({
                   page={currentPage}
                   liveStoreName={liveStoreName}
                   businessIdentity={businessIdentity}
-                  selectedSection={previewTheme ? null : selectedSection}
-                  onSelectSection={previewTheme ? () => {} : (key) => handleSelectSection(key, "preview")}
+                  selectedSection={readOnlyPreview ? null : selectedSection}
+                  onSelectSection={readOnlyPreview ? () => {} : (key) => handleSelectSection(key, "preview")}
                   activeSlides={activeSlides}
                   onActiveSlideChange={handleActiveSlideChange}
                   selectedChrome={selectedChrome}
                   onSelectChrome={handleSelectChrome}
                   productPreviewState={previewProductState}
                   previewProduct={previewProduct}
-                  productRegions={effectiveProductRegions}
+                  productRegions={canvasProductRegions}
                   selectedProductRegionId={selectedProductRegion}
                   onSelectProductRegion={handleSelectProductRegion}
                   categoryPreviewState={previewCategoryState}
                   previewCategory={previewCategory}
-                  categoryRegions={effectiveCategoryRegions}
+                  categoryRegions={canvasCategoryRegions}
                   selectedCategoryRegionId={selectedCategoryRegion}
                   onSelectCategoryRegion={handleSelectCategoryRegion}
                   categoryGridProductsState={categoryGridProductsState}
@@ -3317,7 +3544,7 @@ export function ExperienceBuilder({
       </div>
 
       {/* While a theme is previewed (read-only) the mobile editing bar and its sheets are not offered at all. */}
-      {isMobileViewport && !previewTheme ? <div data-builder-mobile-bar="" className="flex h-16 shrink-0 items-center gap-2 border-t border-border bg-surface px-3 lg:hidden">
+      {isMobileViewport && !readOnlyPreview ? <div data-builder-mobile-bar="" className="flex h-16 shrink-0 items-center gap-2 border-t border-border bg-surface px-3 lg:hidden">
         {currentPage === "home" ? (
           <>
             <button
@@ -3406,7 +3633,7 @@ export function ExperienceBuilder({
         )}
       </div> : null}
 
-      {isMobileViewport && mobileSheet && !previewTheme ? (
+      {isMobileViewport && mobileSheet && !readOnlyPreview ? (
         <div
           className="fixed inset-0 z-50 flex items-end bg-black/40 md:hidden"
           role="presentation"
@@ -3608,6 +3835,22 @@ export function ExperienceBuilder({
           busy={versionBusy?.id === cancelScheduleTarget.id && versionBusy.action === "cancel_schedule"}
           onCancel={handleCancelCancelScheduleConfirm}
           onConfirm={() => void handleConfirmCancelSchedule()}
+        />
+      ) : null}
+
+      {historyOpen && selectedVersion ? (
+        <RevisionHistoryDialog
+          locale={locale}
+          versionName={selectedVersion.name}
+          published={isPublishedReadOnly}
+          dirty={dirty}
+          listState={historyList.state}
+          revisions={historyList.rows}
+          busyId={historyBusyId}
+          onPreview={(revision) => void handlePreviewRevision(revision)}
+          onRestore={(revision) => void handleRestoreRevision(revision)}
+          onRetry={() => void loadHistoryList()}
+          onClose={closeHistory}
         />
       ) : null}
 
