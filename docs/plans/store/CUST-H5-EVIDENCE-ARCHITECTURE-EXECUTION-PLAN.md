@@ -1,7 +1,7 @@
 # CUST-H5 — Undo / Redo, Recovery & Change Confidence
 ## Evidence, Architecture & Execution Plan
 
-**Status:** PROPOSED FOR OWNER REVIEW — documentation only  
+**Status:** OWNER-APPROVED EXECUTION AUTHORITY — H5-0 approved; guarded autonomous execution authorized for H5-1 through H5-6  
 **Date:** 2026-10-12  
 **Repository:** `safwan5001-source/Nebrax`  
 **Base:** `main@d94ecd4e3e74bb54241d76af28895d2f327c4455` (CUST-HV V11 closure)  
@@ -9,8 +9,8 @@
 **Persistence authority:** `docs/plans/store/CUST-H1-ARCH-1-THEME-VERSION-PERSISTENCE-SCHEDULING.md` + CUST-H2 whole-document Version contract  
 **Predecessor:** CUST-HV — CLOSED  
 **Successor:** CUST-H6 — Advanced Extensibility  
-**Scope of this document:** Evidence Pass + UX/architecture contract + dependency-safe execution plan.  
-**No application code, migration, API change, merge, deploy or Production release is authorized by this document alone.**
+**Scope of this document:** Evidence Pass + UX/architecture contract + dependency-safe execution plan + Owner authorization for guarded sequential H5 execution.  
+**Application code, migrations and API changes are authorized only within the approved H5 contract and per-slice gates below. Squash Merge is authorized only after all required implementation, test, CI, review and quality gates pass. Deploy and Production release remain separately prohibited without explicit Owner approval.**
 
 ---
 
@@ -702,17 +702,15 @@ Unless implementation evidence forces reconsideration:
 
 ---
 
-# 13. Recommendation
+# 13. Owner approval and next action
 
-Proceed with **H5-0 only** first.
-
-Do not begin runtime implementation until the Owner reviews these three high-impact decisions:
+**H5-0 is approved.** Safwan approved the three high-impact decisions below and authorized guarded sequential execution of H5-1 → H5-6 under §9:
 
 1. **Save is a hard Undo/Redo boundary.**
 2. **Durable recovery uses bounded server-side successful-save snapshots.**
 3. **Restore loads history into an editable Draft flow using the current Version revision; it never rewinds revision or mutates Published.**
 
-If approved, Claude Code can execute H5-1 → H5-6 sequentially under the same guarded Horizon discipline used successfully for CUST-HV.
+Claude Code should now execute H5-1 → H5-6 continuously, one focused slice at a time, using the build → test → review → quality → report → Squash Merge loop in §9. It must stop only for the Mandatory STOP conditions in §10.
 
 ---
 
