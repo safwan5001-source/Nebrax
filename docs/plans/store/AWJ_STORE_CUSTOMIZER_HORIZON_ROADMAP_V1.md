@@ -708,6 +708,8 @@ Avoid inventing a different settings experience for every component.
 
 ## HORIZON CUST-H5 — Undo / Redo, Recovery & Change Confidence
 
+**H5 evidence / architecture / execution authority (proposed):** `docs/plans/store/CUST-H5-EVIDENCE-ARCHITECTURE-EXECUTION-PLAN.md` — docs-only until Owner approval; it does not authorize runtime implementation, merge, deploy or Production release.
+
 > **Sequencing note (2026-10-05):** CUST-H5 follows **CUST-HV**. The HV contract keeps the presentation document plain immutable JSON with media referenced by id so Undo/Redo and version Restore remain cheap; Restore re-validates media references. H5 is **not renumbered**.
 
 **Purpose:** make experimentation safe.
