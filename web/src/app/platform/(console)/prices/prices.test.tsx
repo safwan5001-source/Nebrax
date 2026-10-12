@@ -241,6 +241,45 @@ describe('platform prices UX (H1-4C)', () => {
     expect((await screen.findAllByText(formatRiyal('199.99'))).length).toBeGreaterThan(0);
   });
 
+  describe('a save after a failed first load', () => {
+    const saveOne = async () => {
+      fireEvent.change(screen.getByLabelText(t('monthlyPrice')), { target: { value: '110' } });
+      fireEvent.change(screen.getByLabelText(t('effectiveOn')), { target: { value: '2026-12-25' } });
+      fireEvent.click(screen.getByRole('button', { name: t('save') }));
+    };
+
+    it('reloads the catalogue, clears the stale error and shows the new version with the rest', async () => {
+      platformApi.mockRejectedValueOnce(new ApiError('temporary outage'));
+      render(<PlatformPricesPage />);
+      await screen.findByRole('alert');
+      const created = price('new', 'basic', '110.00', '2026-12-25');
+      platformApi.mockResolvedValueOnce({ data: created });
+      platformApi.mockResolvedValueOnce({ data: [...catalogue().data, created] });
+      await saveOne();
+      expect((await screen.findByRole('status')).textContent).toContain(t('saved'));
+      await waitFor(() => expect(screen.queryByRole('alert')).toBeNull());
+      expect(screen.getAllByText(formatRiyal('110.00')).length).toBeGreaterThan(0);
+      expect(screen.getAllByText(formatRiyal('199.99')).length).toBeGreaterThan(0);
+      const gets = platformApi.mock.calls.filter(([, o]) => !o?.method);
+      expect(gets).toHaveLength(2);
+      // the state label comes from the complete catalogue
+      expect(screen.getByRole('status').textContent).toContain('Scheduled until 2026-12-25');
+    });
+
+    it('never labels the saved version from an incomplete list while the catalogue is still unavailable', async () => {
+      platformApi.mockRejectedValueOnce(new ApiError('temporary outage'));
+      render(<PlatformPricesPage />);
+      await screen.findByRole('alert');
+      platformApi.mockResolvedValueOnce({ data: price('new', 'basic', '110.00', '2026-01-01') });
+      platformApi.mockRejectedValueOnce(new ApiError('still down'));
+      await saveOne();
+      const status = await screen.findByRole('status');
+      expect(status.textContent).toContain(t('saved'));
+      for (const key of ['savedEffective', 'savedSuperseded']) expect(status.textContent).not.toContain(t(key));
+      await waitFor(() => expect(screen.getByRole('alert').textContent).toBe('still down'));
+    });
+  });
+
   it('shows skeletons while loading and an empty state with no price anywhere', async () => {
     platformApi.mockResolvedValue({ data: [] });
     render(<PlatformPricesPage />);

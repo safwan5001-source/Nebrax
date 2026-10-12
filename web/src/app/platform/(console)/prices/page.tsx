@@ -61,6 +61,8 @@ export default function PlatformPricesPage() {
   const [prices, setPrices] = useState<PriceVersion[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  // true بعد أول جلب ناجح للكتالوج كاملاً. قبل ذلك لا يصحّ اشتقاق حالة نسخة من قائمة ناقصة.
+  const [catalogueLoaded, setCatalogueLoaded] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saved, setSaved] = useState<PriceVersion | null>(null);
   const [saving, setSaving] = useState(false);
@@ -74,6 +76,7 @@ export default function PlatformPricesPage() {
     try {
       const response = await platformApi<{ data: PriceVersion[] }>('/platform/prices');
       setPrices(response.data);
+      setCatalogueLoaded(true);
     } catch (reason) {
       setLoadError(reason instanceof ApiError ? reason.message : t('loadFailed'));
     } finally {
@@ -114,6 +117,8 @@ export default function PlatformPricesPage() {
       setPrices((current) => sortPrices([response.data, ...current]));
       setMonthlyPrice('');
       setSaved(response.data);
+      // الجلب الأول فشل: القائمة المحلية ناقصة، فنعيد جلب الكتالوج كاملاً بدل إظهار خطأ قديم بجانب نجاح الحفظ.
+      if (!catalogueLoaded) void load();
     } catch (reason) {
       setSaveError(reason instanceof ApiError ? reason.message : t('saveFailed'));
     } finally {
@@ -128,7 +133,7 @@ export default function PlatformPricesPage() {
 
   // حالة النسخة المحفوظة تُشتق من التصنيف نفسه المستخدم في السجل بعد إدراجها: نسخة بأثر رجعي خلف نسخة أحدث
   // سارية تظهر «سابقة» هنا أيضاً لا «سارية».
-  const savedState = saved ? classification.get(saved.id)?.status : undefined;
+  const savedState = saved && catalogueLoaded ? classification.get(saved.id)?.status : undefined;
   const savedStatus =
     savedState === 'scheduled' ? 'savedScheduled' : savedState === 'current' ? 'savedEffective' : savedState === 'superseded' ? 'savedSuperseded' : null;
 
