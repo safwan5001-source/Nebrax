@@ -42,14 +42,14 @@ describe('Theme Gallery (CUST-HV V10b)', () => {
     listMock.mockReset();
   });
 
-  it('lists every built-in theme with its own name and a Preview & apply link', () => {
+  it('lists every built-in theme with its own name and a Preview & apply link', async () => {
     listMock.mockResolvedValue({ ok: true, data: [] });
     render(<CommerceThemesPage />);
 
     expect(screen.getAllByRole('article')).toHaveLength(BUILT_IN_THEMES.length);
     expect(screen.getByText('أَوْج ماركت')).toBeTruthy();
     expect(screen.getByText('أَوْج بلوم')).toBeTruthy();
-    expect(screen.getAllByRole('link', { name: 'معاينة وتطبيق' })).toHaveLength(BUILT_IN_THEMES.length);
+    await waitFor(() => expect(screen.getAllByRole('link', { name: 'معاينة وتطبيق' })).toHaveLength(BUILT_IN_THEMES.length));
     // Applying is no longer one click: no card applies directly.
     expect(screen.queryByRole('button', { name: 'استخدام الثيم' })).toBeNull();
   });
@@ -80,12 +80,31 @@ describe('Theme Gallery (CUST-HV V10b)', () => {
     });
     unmount();
 
+    listMock.mockResolvedValue({ ok: true, data: [] });
+    render(<CommerceThemesPage />);
+    await waitFor(() => {
+      expect(document.querySelector('[data-theme-preview-link="awj-modern"]')?.getAttribute('href')).toBe(
+        '/commerce/appearance?previewTheme=awj-modern',
+      );
+    });
+  });
+
+  it('offers no Preview link while the base version is still loading, nor when it failed to load (review)', async () => {
+    let release: (value: unknown) => void = () => {};
+    listMock.mockReturnValue(new Promise((resolve) => (release = resolve)));
+    const { unmount } = render(<CommerceThemesPage />);
+    expect(screen.queryAllByRole('link', { name: 'معاينة وتطبيق' })).toHaveLength(0);
+    expect(document.querySelector('[data-theme-preview-disabled="loading"]')).not.toBeNull();
+    release({ ok: true, data: [version('p1', 'published', '2026-09-01')] });
+    await waitFor(() => expect(screen.getAllByRole('link', { name: 'معاينة وتطبيق' })).toHaveLength(BUILT_IN_THEMES.length));
+    unmount();
+
+    listMock.mockReset();
     listMock.mockResolvedValue({ ok: false, reason: 'error' });
     render(<CommerceThemesPage />);
-    await waitFor(() => expect(listMock).toHaveBeenCalledTimes(2));
-    expect(document.querySelector('[data-theme-preview-link="awj-modern"]')?.getAttribute('href')).toBe(
-      '/commerce/appearance?previewTheme=awj-modern',
-    );
+    await waitFor(() => expect(document.querySelector('[data-theme-base-error]')).not.toBeNull());
+    expect(screen.queryAllByRole('link', { name: 'معاينة وتطبيق' })).toHaveLength(0);
+    expect(document.querySelector('[data-theme-preview-link]')).toBeNull();
   });
 
   it('offers no Preview link without a store or without permission', () => {

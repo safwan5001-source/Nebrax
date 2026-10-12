@@ -271,4 +271,40 @@ describe('ExperienceBuilder — Theme Preview (V10b)', () => {
       await waitFor(() => expect((document.querySelector('[data-theme-apply]') as HTMLButtonElement).disabled).toBe(false));
     });
   });
+
+  it('while applying, the toolbar exit is disabled too (a navigation would abort the save and skip the rollback)', async () => {
+    let releaseSave: (value: unknown) => void = () => {};
+    createMock.mockResolvedValue({ ok: true, data: { id: 'v-new', storefrontId: 'store-1', revision: 1, config: DEFAULT_PRESENTATION_CONFIG } });
+    saveMock.mockReturnValue(new Promise((resolve) => (releaseSave = resolve)));
+    const user = userEvent.setup();
+    await ready();
+    expect((document.querySelector('[data-builder-exit]') as HTMLButtonElement).disabled).toBe(false);
+
+    await user.click(document.querySelector('[data-theme-apply]') as HTMLElement);
+    await waitFor(() => expect(saveMock).toHaveBeenCalled());
+    expect((document.querySelector('[data-builder-exit]') as HTMLButtonElement).disabled).toBe(true);
+    expect((document.querySelector('[data-theme-exit]') as HTMLButtonElement).disabled).toBe(true);
+    releaseSave({ ok: true, data: {} });
+    await waitFor(() => expect(hrefSet).toHaveBeenCalledWith('/commerce/appearance?version=v-new'));
+  });
+
+  it('read-only on a phone too: no mobile editing bar or sheets, and no way to restore the default into the draft', async () => {
+    const originalWidth = window.innerWidth;
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 390 });
+    try {
+      renderPreview();
+      await waitFor(() => expect(document.querySelector('[data-theme-preview-bar]')).not.toBeNull());
+      await waitFor(() => expect(showMock).toHaveBeenCalled());
+      expect(document.querySelector('[data-builder-mobile-bar]')).toBeNull();
+      expect((document.querySelector('[data-version-selector-mobile]') as HTMLButtonElement | null)?.disabled ?? true).toBe(true);
+
+      // …and it is a phone layout: leaving the preview brings the editing bar back.
+      const replace = vi.spyOn(window.history, 'replaceState').mockImplementation(() => {});
+      await userEvent.setup().click(document.querySelector('[data-theme-exit]') as HTMLElement);
+      expect(document.querySelector('[data-builder-mobile-bar]')).not.toBeNull();
+      replace.mockRestore();
+    } finally {
+      Object.defineProperty(window, 'innerWidth', { configurable: true, value: originalWidth });
+    }
+  });
 });

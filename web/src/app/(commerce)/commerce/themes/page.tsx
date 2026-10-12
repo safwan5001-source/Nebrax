@@ -19,15 +19,25 @@ export default function CommerceThemesPage() {
   const { selectedStoreId, viewStoreUrl } = useCommerceStoreContext();
   const viewer = currentUser();
   const canManage = hasPermission(viewer?.permissions, viewer?.role, 'commerce.manage');
-  const [baseVersionId, setBaseVersionId] = useState<string | null>(null);
+  // The preview link is offered only once the base version is KNOWN: still loading, or failed, is not "this store has no
+  // versions" — a link without `version` would let the builder pick a draft (or none) instead of the Published Version.
+  const [base, setBase] = useState<{ state: 'loading' | 'ready' | 'error'; versionId: string | null }>({
+    state: 'loading',
+    versionId: null,
+  });
+  const baseVersionId = base.versionId;
 
   useEffect(() => {
     let cancelled = false;
-    setBaseVersionId(null);
+    setBase({ state: 'loading', versionId: null });
     if (!selectedStoreId) return;
     void listPresentationVersions(selectedStoreId).then((result) => {
-      if (cancelled || !result.ok) return;
-      setBaseVersionId(previewBaseVersion(result.data)?.id ?? null);
+      if (cancelled) return;
+      if (!result.ok) {
+        setBase({ state: 'error', versionId: null });
+        return;
+      }
+      setBase({ state: 'ready', versionId: previewBaseVersion(result.data)?.id ?? null });
     });
     return () => {
       cancelled = true;
@@ -67,7 +77,8 @@ export default function CommerceThemesPage() {
             key={theme.id}
             theme={theme}
             locale={locale}
-            canPreview={Boolean(selectedStoreId) && canManage}
+            canPreview={Boolean(selectedStoreId) && canManage && base.state === 'ready'}
+            baseState={selectedStoreId ? base.state : 'ready'}
             href={themePreviewHref(theme.id, baseVersionId)}
             t={t}
           />
@@ -81,12 +92,14 @@ function ThemeCard({
   theme,
   locale,
   canPreview,
+  baseState,
   href,
   t,
 }: {
   theme: ThemeDefinition;
   locale: 'ar' | 'en';
   canPreview: boolean;
+  baseState: 'loading' | 'ready' | 'error';
   href: string;
   t: (key: CommerceWorkspaceMessageKey) => string;
 }) {
@@ -127,11 +140,17 @@ function ThemeCard({
             ) : (
               <span
                 aria-disabled="true"
+                data-theme-preview-disabled={baseState === 'ready' ? undefined : baseState}
                 className="inline-flex min-h-11 cursor-not-allowed items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground opacity-50"
               >
                 {t('themeGalleryPreviewApply')}
               </span>
             )}
+            {baseState === 'error' ? (
+              <p role="status" data-theme-base-error="" className="basis-full text-xs text-muted">
+                {t('themeGalleryVersionsError')}
+              </p>
+            ) : null}
             <Link
               href="/commerce/appearance"
               className="inline-flex min-h-11 items-center justify-center rounded-md border border-border bg-surface px-4 text-sm font-medium text-text hover:bg-primary-soft hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"

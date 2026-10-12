@@ -1603,7 +1603,7 @@ export function ExperienceBuilder({
   }
 
   function handleRestore() {
-    if (isPublishedReadOnly) return;
+    if (isPublishedReadOnly || previewTheme) return;
     const confirmed = window.confirm(t("restoreConfirm"));
     if (!confirmed) return;
     setDraft(clonePresentationConfig(DEFAULT_PRESENTATION_CONFIG));
@@ -2516,8 +2516,11 @@ export function ExperienceBuilder({
           data-builder-exit=""
           aria-label={t("exit")}
           title={t("exit")}
-          onClick={() => { window.location.href = "/commerce"; }}
-          className="inline-flex min-h-10 shrink-0 items-center gap-2 rounded-md border border-border px-2.5 text-xs font-medium text-text hover:bg-primary-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 md:px-3 md:text-sm"
+          // A theme apply is two requests (create, then save); a full-page navigation in between would abort the save and
+          // skip the rollback, leaving an empty draft behind.
+          disabled={themeApplying}
+          onClick={() => { if (!themeApplying) window.location.href = "/commerce"; }}
+          className="inline-flex min-h-10 shrink-0 items-center gap-2 rounded-md border border-border px-2.5 text-xs font-medium text-text hover:bg-primary-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-not-allowed disabled:opacity-50 md:px-3 md:text-sm"
         >
           <span aria-hidden="true" className="rtl:-scale-x-100">←</span>
           <span className="hidden xl:inline">{t("exit")}</span>
@@ -2583,6 +2586,7 @@ export function ExperienceBuilder({
             <button
               type="button"
               data-version-selector-mobile=""
+              disabled={previewTheme !== null}
               onClick={() => setMobileSheet("versions")}
               className="flex min-h-10 min-w-0 items-center gap-1 border-s border-border px-2 py-1 ps-3 text-[11px] font-medium text-text sm:ms-0"
             >
@@ -2591,13 +2595,15 @@ export function ExperienceBuilder({
               </bdi>
             </button>
           ) : (
-            <VersionSelector
-              locale={locale}
-              currentName={selectedVersion?.name ?? null}
-              currentState={selectedVersion?.state ?? null}
-              loading={versionSwitchingId !== null}
-              panelProps={versionManagerPanelProps}
-            />
+            <div className="contents" {...inertWhenThemePreview}>
+              <VersionSelector
+                locale={locale}
+                currentName={selectedVersion?.name ?? null}
+                currentState={selectedVersion?.state ?? null}
+                loading={versionSwitchingId !== null}
+                panelProps={versionManagerPanelProps}
+              />
+            </div>
           )
         ) : null}
         <span
@@ -2748,7 +2754,7 @@ export function ExperienceBuilder({
                 <DropdownItem
                   icon={RotateCcw}
                   onClick={handleRestore}
-                  disabled={isPublishedReadOnly}
+                  disabled={isPublishedReadOnly || previewTheme !== null}
                   dataAttrs={{ "data-more-restore": "" }}
                 >
                   {t("restore")}
@@ -3090,7 +3096,8 @@ export function ExperienceBuilder({
         </section>
       </div>
 
-      {isMobileViewport ? <div data-builder-mobile-bar="" className="flex h-16 shrink-0 items-center gap-2 border-t border-border bg-surface px-3 lg:hidden">
+      {/* While a theme is previewed (read-only) the mobile editing bar and its sheets are not offered at all. */}
+      {isMobileViewport && !previewTheme ? <div data-builder-mobile-bar="" className="flex h-16 shrink-0 items-center gap-2 border-t border-border bg-surface px-3 lg:hidden">
         {currentPage === "home" ? (
           <>
             <button
@@ -3179,7 +3186,7 @@ export function ExperienceBuilder({
         )}
       </div> : null}
 
-      {isMobileViewport && mobileSheet ? (
+      {isMobileViewport && mobileSheet && !previewTheme ? (
         <div
           className="fixed inset-0 z-50 flex items-end bg-black/40 md:hidden"
           role="presentation"
