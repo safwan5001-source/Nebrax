@@ -240,6 +240,22 @@
     "error": "Unable to sign in as a platform administrator.",
     "tenantLogin": "Return to tenant sign in"
   },
+  "platformShell": {
+    "brand": "Platform console",
+    "navLabel": "Platform console navigation",
+    "overview": "Overview",
+    "tenants": "Tenants",
+    "prices": "Prices",
+    "integrations": "Integrations",
+    "documentOperations": "Document operations",
+    "skipToContent": "Skip to content",
+    "openMenu": "Open navigation menu",
+    "closeMenu": "Close navigation menu",
+    "breadcrumbLabel": "Breadcrumb",
+    "signedInAs": "Signed in as: {name}",
+    "logout": "Sign out",
+    "signingOut": "Signing out…"
+  },
   "platform": {
     "eyebrow": "AWJ internal operations",
     "title": "Platform administration",
