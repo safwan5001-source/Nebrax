@@ -113,7 +113,7 @@ class Classification(unittest.TestCase):
             "app/Services/DocumentCenter/Foo.php": "C",   # storage code holds tenant guards: no backend subtree is Zone B until the owner approves one
             "web/src/app/globals.css": "B",
             "design-system/foundations/x.md": "B",
-            "web/src/components/Button.tsx": "A",
+            "web/src/components/Button.tsx": "B",         # bare changed lines are never Zone A (see ReviewerFindings for the positive case)
             "composer.json": "C",            # unknown -> default deny
             "totally/new/place.txt": "C",
             "Docs/x.md": "C",                # case trick does not match docs/** -> default deny
@@ -673,8 +673,8 @@ class ReviewerFindings(unittest.TestCase):
                      '<label for="x">x</label>', '<div style="x">x</div>', 'type="submit"', 'disabled']:
             rec = run(ui_case("@@ -1 +1 @@\n-<span>x</span>\n+" + line))
             self.assertNotEqual(rec["zone"], "A", line)
-        for line in ['<label aria-label="Full name">Full name</label>', '<p className="muted">Hello</p>', '<h2 title="Orders">Orders</h2>', "plain text line", "</div>", '<br />']:
-            self.assertEqual(run(ui_case("@@ -1 +1 @@\n-old text\n+" + line))["zone"], "A", line)
+        for line in ['<label aria-label="Full name">Full name</label>', '<p className="muted">Hello</p>', '<h2 title="Orders">Orders</h2>', "</div>", '<br />', '<div className="row">']:
+            self.assertEqual(run(ui_case("@@ -1 +1 @@\n-<span>old</span>\n+" + line))["zone"], "A", line)
 
     def test_other_pr_provenance_is_bound_to_repo_and_author(self):  # Codex round 2, P1
         for mutate in (lambda o: o.update(head_repo="outsider/synthetic-repo"), lambda o: o.update(author="outsider")):
@@ -739,6 +739,12 @@ class ReviewerFindings(unittest.TestCase):
         c["evidence"]["pr"]["files"][0]["patch"] += "\n+an extra line the metadata does not count"
         self.assertIn("PATCH_INCOMPLETE", codes(run(c)))
         self.assertEqual(he.patch_counts("@@ -1,2 +1,2 @@\n-a\n+b\n c\n\\ No newline at end of file"), (1, 1))
+
+    def test_standalone_literals_and_bare_text_lines_are_not_zone_a(self):  # Codex round 8, P1
+        for line in ["true", "false", "42", "null", "Delete", "plain text line", '"admin"', "'x'", "0.25"]:
+            rec = run(ui_case("@@ -1 +1 @@\n-" + ("false" if line == "true" else "true") + "\n+" + line))
+            self.assertNotEqual(rec["zone"], "A", line)
+            self.assertNotEqual(rec["decision"], "ELIGIBLE_SIMULATED", line)
 
     def test_authorization_implementation_paths_are_zone_c(self):  # Codex round 3, P1
         for path in ["app/Models/Role.php", "app/Http/Requests/StoreRoleRequest.php", "app/Policies/InvoicePolicy.php", "app/Models/Permission.php",

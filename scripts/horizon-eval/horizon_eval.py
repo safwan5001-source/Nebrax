@@ -495,6 +495,10 @@ def _presentational_line(line: str) -> bool:
     rest = _OPEN_TAG.sub(" ", line)
     rest = _CLOSE_TAG.sub(" ", rest)
     rest = _OPEN_TAG_START.sub(" ", rest)
+    if rest == line:
+        # no safe element on this line: a bare text/literal line (`true`, `42`, `Delete`) is indistinguishable from the
+        # continuation of a code expression, so it is never Zone A
+        return False
     # what is left must be plain text: no markup, no assignments, no expressions, no code words
     return bool(_PRESENTATIONAL_LINE.fullmatch(rest)) and not re.search(r"[<>=]", rest) and not _NOT_PRESENTATIONAL_WORDS.search(rest)
 

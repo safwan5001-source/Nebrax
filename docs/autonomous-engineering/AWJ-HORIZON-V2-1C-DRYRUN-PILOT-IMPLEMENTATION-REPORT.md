@@ -102,11 +102,11 @@ Command: `PYTHONDONTWRITEBYTECODE=1 python3 -I -m unittest discover -s scripts/h
 
 | Layer | File | Tests | Result |
 |---|---|---|---|
-| 1. Focused evaluator unit tests (incl. 38 review-finding regressions) | `test_horizon_eval.py` | 124 | OK |
+| 1. Focused evaluator unit tests (incl. 39 review-finding regressions) | `test_horizon_eval.py` | 125 | OK |
 | 2. Contract + regression + mutation | `test_contract.py` | 12 | OK |
 | 3. Representative read-only repository evidence | `test_live_snapshots.py` | 8 | OK |
 | Static guards (no capability, fixture isolation) | `test_static_guards.py` | 19 | OK |
-| **Total** | | **163** | **OK, 0 failures, 0 errors** |
+| **Total** | | **164** | **OK, 0 failures, 0 errors** |
 
 Fail-closed evidence beyond the contract table:
 - **472 single-input mutation points** (two eligible bases: A and B) — each element deleted, nulled, and type-swapped; none stays eligible except a reviewed harmless list (free-text/optional elements) — this found a real gap (manifest lacking a required check) fixed with the policy `ci_floor`.
@@ -200,7 +200,7 @@ Same GitHub identity as the author, so this is **not** an "independent reviewer"
 | 13 | collector truncated text before scanning (medium) | truncation is marked (`[[TRUNCATED]]` → BLOCK); oversize patches become unassessable (→ Zone B) |
 | residual | web/storefront CI was never *required* | files under `web/**` / `storefront/**` now require the matching check (policy `required_when_touched`); `docs/engineering/**`, `AGENTS.md`, ADRs are Zone C |
 
-### 8.2b Codex automated review on PR #1351 (round 1: 3 findings on `a272dc0`; round 2: 3 findings on `96d346d`; round 3: 3 findings on `8d22cf7`; round 4: 2 findings on `3294f3b`; round 5: 2 findings on `2d7ae8c`; round 6: 2 findings on `695d0b1`; round 7: 1 finding on `b34c3f7`; all valid, all fixed)
+### 8.2b Codex automated review on PR #1351 (round 1: 3 findings on `a272dc0`; round 2: 3 findings on `96d346d`; round 3: 3 findings on `8d22cf7`; round 4: 2 findings on `3294f3b`; round 5: 2 findings on `2d7ae8c`; round 6: 2 findings on `695d0b1`; round 7: 1 finding on `b34c3f7`; round 8: 1 finding on `dfbea19`; all valid, all fixed)
 | Severity | Finding | Resolution |
 |---|---|---|
 | P1 | backend monetary tokens (`amount`, `total`, `price`, `invoice`, …) only raised to Zone B → `$amount * 2` stayed eligible under a B grant | monetary tokens in non-UI code → **Zone C** (`BEHAVIOR_MONETARY_TOKEN_IN_BACKEND`); UI keeps B |
@@ -236,7 +236,9 @@ Round 6 (`695d0b1`): (a) PR-level and per-file change counters must agree (`CHAN
 
 Round 7 (`b34c3f7`): a non-empty patch that does not account for every reported added/removed line is incomplete (omitted lines could hide injection text or Zone C behaviour) → `PATCH_INCOMPLETE` BLOCK; verified against real GitHub data (all 19 files of #1349 match exactly).
 
-Known limit of the allowlist: a plain-text line is indistinguishable from an attribute line in multi-line JSX beyond the boolean-attribute list; the allowlist is deliberately narrow (labels/text), and anything it does not recognise falls to Zone B, never A.
+Round 8 (`dfbea19`): a changed line that is a bare literal or bare text (`true`, `42`, `Delete`) is indistinguishable from the continuation of a code expression split across lines → Zone A UI now requires every changed line to carry a safe element or be a whitelisted bare attribute; everything else is Zone B.
+
+Known limit of the allowlist: a line-based view of a diff cannot see surrounding code. The allowlist is therefore deliberately narrow (single-line elements with whitelisted literal attributes) and anything it does not recognise falls to Zone B, never A. It remains a heuristic: it can only ever be exercised in synthetic mode, because live mode is unconditionally non-eligible.
 
 Residual risks the reviewer listed that are **not** closed (declared in §11): unauthenticated attestations; test code executes in CI; symlinks/file modes invisible in the files API; injection regexes are defence-in-depth (paraphrase/homoglyph can evade; classification never depends on text); `head_pushed_at` is the author-controlled commit date; no semantic check of `approved_outcome`.
 
