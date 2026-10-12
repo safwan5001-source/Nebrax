@@ -101,11 +101,13 @@ export default function PlatformPricesPage() {
   const today = useToday();
   const classification = useMemo(() => classifyPriceVersions(prices, today), [prices, today]);
 
-  // نص المعاينة يُشتق من الكتالوج الكامل لا من مقارنة التاريخ باليوم وحده: نسخة بأثر رجعي خلف نسخة أحدث سارية «سابقة».
-  // قبل اكتمال التحميل لا يُجزم بشيء لتاريخ ماضٍ.
+  // نص المعاينة يُشتق من كتالوج طازج لا من مقارنة التاريخ باليوم وحده: نسخة بأثر رجعي خلف نسخة أحدث سارية «سابقة».
+  // الكتالوج «طازج» حين يكتمل جلبه الأول ولا يجري جلب (بعد حفظ مثلاً) ولا يوجد خطأ جلب؛ وإلا فالقائمة المحلية قد
+  // تسبق النسخة المحفوظة للتو، فلا يُجزم بشيء لتاريخ ماضٍ. التاريخ المستقبلي «مجدول» في كل الأحوال.
+  const catalogueFresh = catalogueLoaded && !loading && !loadError;
   const previewKey = !effectiveOn
     ? 'previewEffective'
-    : !catalogueLoaded
+    : !catalogueFresh
       ? effectiveOn > today ? 'previewScheduled' : 'previewUnverified'
       : ({ scheduled: 'previewScheduled', effective: 'previewEffective', superseded: 'previewSuperseded', duplicate: 'previewDuplicate' } as const)[
             previewOutcome(prices, { plan, currency: 'SAR', effective_on: effectiveOn }, today)

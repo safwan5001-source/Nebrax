@@ -309,7 +309,7 @@ describe('platform prices UX (H1-4C)', () => {
       await renderLoaded();
       fill('120', '2026-01-01');
       const text = screen.getByTestId('price-preview').textContent ?? '';
-      expect(text).toContain("before that later version's date");
+      expect(text).toContain("on or after this date and before that later version's date"); // inclusive, as scopeEffectiveOn is
       expect(text).not.toMatch(/will not apply to new contracts\./);
     });
 
@@ -367,6 +367,47 @@ describe('platform prices UX (H1-4C)', () => {
       await waitFor(() => expect(screen.getByRole('status').textContent).toContain(t('savedSuperseded')));
       expect(screen.getByRole('status').textContent).not.toContain(t('savedEffective'));
       expect(platformApi.mock.calls.filter(([, o]) => !o?.method)).toHaveLength(2);
+    });
+  });
+
+  describe('previews while the catalogue is being refreshed', () => {
+    const fill = (value: string, date: string) => {
+      fireEvent.change(screen.getByLabelText(t('plan')), { target: { value: 'pro' } });
+      fireEvent.change(screen.getByLabelText(t('monthlyPrice')), { target: { value } });
+      fireEvent.change(screen.getByLabelText(t('effectiveOn')), { target: { value: date } });
+    };
+
+    it('does not describe a past date from the pre-save list while the reload is pending, and recovers when it lands', async () => {
+      await renderLoaded();
+      const retro = price('retro', 'pro', '99.00', '2026-01-01');
+      let resolve!: (v: unknown) => void;
+      const reload = new Promise((r) => { resolve = r; });
+      platformApi.mockResolvedValueOnce({ data: retro }); // POST
+      platformApi.mockReturnValueOnce(reload); // reload pending
+      fill('99', '2026-01-01');
+      fireEvent.click(screen.getByRole('button', { name: t('save') }));
+      await screen.findByRole('status');
+      // a second retroactive version: the pre-save list would call it effective
+      fill('88', '2026-02-01');
+      const during = screen.getByTestId('price-preview').textContent ?? '';
+      expect(during).toContain(t('previewUnverified'));
+      expect(during).not.toContain(t('previewEffective'));
+      expect(during).not.toContain(t('previewSuperseded'));
+      resolve({ data: [...catalogue().data, retro] });
+      await waitFor(() => expect(screen.getByTestId('price-preview').textContent).toContain(t('previewSuperseded')));
+    });
+
+    it('stays unverified for a past date if the reload fails, but a future date is still scheduled', async () => {
+      await renderLoaded();
+      platformApi.mockResolvedValueOnce({ data: price('retro', 'pro', '99.00', '2026-01-01') }); // POST
+      platformApi.mockRejectedValueOnce(new ApiError('reload failed')); // reload
+      fill('99', '2026-01-01');
+      fireEvent.click(screen.getByRole('button', { name: t('save') }));
+      await screen.findByRole('alert');
+      fill('88', '2026-02-01');
+      expect(screen.getByTestId('price-preview').textContent).toContain(t('previewUnverified'));
+      fill('88', '2026-12-30');
+      expect(screen.getByTestId('price-preview').textContent).toContain(t('previewScheduled'));
     });
   });
 
