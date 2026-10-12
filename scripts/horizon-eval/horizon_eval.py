@@ -439,13 +439,18 @@ _C_TOKENS = re.compile(
 _B_TOKENS = re.compile(
     r"\bfetch\s*\(|\baxios\b|xmlhttprequest|sendbeacon|websocket|http::|\bcurl|https?://|file_get_contents|file_put_contents|fopen|"
     r"fsockopen|readfile|\bunlink\s*\(|\.(?:delete|post|put|patch)\s*\(|"
-    r"method\s*:\s*['\"](?:post|put|patch|delete)|dangerouslysetinnerhtml|"
-    r"\bprice\b|\btotal\b|\bamount\b|\bbalance\b|\binvoice\b|localstorage|router\.push|\bnavigate\s*\(",
+    r"method\s*:\s*['\"](?:post|put|patch|delete)|dangerouslysetinnerhtml|localstorage|router\.push|\bnavigate\s*\(",
+    re.IGNORECASE,
+)
+# Money in backend code is Zone C (V2-1B 3.2: touching an amount/tax/total is financial). In UI files it is a display
+# concern (Zone B at least; such lines also fail the presentational allowlist).
+_MONEY_TOKENS = re.compile(
+    r"\bprice\b|\btotal\b|\bsubtotal\b|\bamount\b|\bbalance\b|\binvoice\b|\bdiscount\b|\bpayment\b|\brefund\b|\bcurrency\b|\bvat\b|\btax\b",
     re.IGNORECASE,
 )
 # Zone A UI code is a POSITIVE allowlist, not an absence-of-bad-tokens check: every added AND removed line must be
 # plain markup/text/attribute material (no calls, brackets, template strings, arrows, comments, URLs, imports...).
-_PRESENTATIONAL_LINE = re.compile(r"[\w\s<>/\"'.,:!?\-\u2013\u2014=_{}#%&|@*\u00b7\u2022\u2026]*")
+_PRESENTATIONAL_LINE = re.compile(r"[\w\s<>/\"'.,:!?\-\u2013\u2014=_#%&|@*\u00b7\u2022\u2026]*")   # no braces: JSX expressions are runtime code
 _NOT_PRESENTATIONAL_WORDS = re.compile(
     r"\b(?:import|export|require|eval|function|fetch|new|window|document|process|script|iframe|href|src|action|http|https|"
     r"javascript|dangerouslysetinnerhtml|onclick|onerror|onload|style|xmlhttprequest|beacon|websocket|localstorage|cookie|"
@@ -518,7 +523,10 @@ def classify_files(files: list[dict], policy: dict, reasons: Reasons):
                 if _C_TOKENS.search(text):
                     bzone = zmax(bzone, "C")
                     reasons.add("INFO", "BEHAVIOR_FINANCIAL_OR_SECURITY_TOKEN", safe_path(f["filename"]))
-                elif _B_TOKENS.search(text):
+                elif _MONEY_TOKENS.search(text) and not behavior_rule:
+                    bzone = zmax(bzone, "C")
+                    reasons.add("INFO", "BEHAVIOR_MONETARY_TOKEN_IN_BACKEND", safe_path(f["filename"]))
+                elif _B_TOKENS.search(text) or _MONEY_TOKENS.search(text):
                     bzone = zmax(bzone, "B")
                     reasons.add("INFO", "BEHAVIOR_MONEY_OR_ACTION_TOKEN", safe_path(f["filename"]))
                 if behavior_rule and not presentational_only(patch):

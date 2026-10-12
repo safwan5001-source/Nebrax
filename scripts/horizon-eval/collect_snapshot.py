@@ -42,14 +42,30 @@ def gh_get(path: str, paginate: bool = False):
     """The ONLY network primitive in this module. GET-only by construction."""
     if not re.fullmatch(r"repos/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/[A-Za-z0-9_./?=&%:-]+|repos/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", path):
         raise CollectError(f"refused path: {path[:60]}")
-    argv = ["gh", "api", path] + (["--paginate"] if paginate else [])
+    argv = ["gh", "api", path] + (["--paginate", "--slurp"] if paginate else [])
     proc = subprocess.run(argv, capture_output=True, text=True, timeout=120)
     if proc.returncode != 0:
         raise CollectError(f"{path.split('?')[0]}: {proc.stderr.strip()[:160]}")
     text = proc.stdout.strip()
-    if paginate and "][" in text:  # gh concatenates pages
-        text = text.replace("][", ",")
-    return json.loads(text) if text else None
+    data = json.loads(text) if text else None
+    return flatten_pages(data) if paginate else data
+
+
+def flatten_pages(pages):
+    """`--slurp` yields a list of pages; a page is either an array (list endpoints) or an object (e.g. check-runs)."""
+    if pages is None:
+        return None
+    if not isinstance(pages, list):
+        raise CollectError("unexpected paginated shape")
+    if all(isinstance(p, list) for p in pages):
+        return [item for page in pages for item in page]
+    if all(isinstance(p, dict) for p in pages):
+        merged: dict = {}
+        for page in pages:
+            for key, value in page.items():
+                merged[key] = (merged.get(key, []) + value) if isinstance(value, list) else merged.get(key, value)
+        return merged
+    raise CollectError("mixed paginated shapes")
 
 
 def ts(value) -> str | None:
@@ -88,7 +104,7 @@ def collect(repo: str, pr_number: int, req: dict, patch_limit: int = PATCH_LIMIT
     reviews = gh_get(f"{base}/pulls/{pr_number}/reviews?per_page=100", paginate=True) or []
     head_commit = gh_get(f"{base}/commits/{head}")
     runs = gh_get(f"{base}/commits/{head}/check-runs?per_page=100", paginate=True)
-    check_runs = runs["check_runs"] if isinstance(runs, dict) else [c for page in (runs or []) for c in page.get("check_runs", [])]
+    check_runs = (runs or {}).get("check_runs", [])
     wf = gh_get(f"{base}/actions/runs?head_sha={head}&per_page=100")
     event_by_suite = {w["check_suite_id"]: w["event"] for w in (wf or {}).get("workflow_runs", [])}
 

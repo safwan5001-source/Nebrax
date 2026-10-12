@@ -102,11 +102,11 @@ Command: `PYTHONDONTWRITEBYTECODE=1 python3 -I -m unittest discover -s scripts/h
 
 | Layer | File | Tests | Result |
 |---|---|---|---|
-| 1. Focused evaluator unit tests (incl. 24 reviewer-finding regressions) | `test_horizon_eval.py` | 110 | OK |
+| 1. Focused evaluator unit tests (incl. 26 review-finding regressions) | `test_horizon_eval.py` | 112 | OK |
 | 2. Contract + regression + mutation | `test_contract.py` | 12 | OK |
 | 3. Representative read-only repository evidence | `test_live_snapshots.py` | 8 | OK |
-| Static guards (no capability, fixture isolation) | `test_static_guards.py` | 18 | OK |
-| **Total** | | **148** | **OK, 0 failures, 0 errors** |
+| Static guards (no capability, fixture isolation) | `test_static_guards.py` | 19 | OK |
+| **Total** | | **151** | **OK, 0 failures, 0 errors** |
 
 Fail-closed evidence beyond the contract table:
 - **472 single-input mutation points** (two eligible bases: A and B) — each element deleted, nulled, and type-swapped; none stays eligible except a reviewed harmless list (free-text/optional elements) — this found a real gap (manifest lacking a required check) fixed with the policy `ci_floor`.
@@ -199,6 +199,13 @@ Same GitHub identity as the author, so this is **not** an "independent reviewer"
 | 12 | unkeyed ledger hash can be forged (low) | documented: detects corruption, not forgery; replay re-validates plausibility; the ledger authorises nothing |
 | 13 | collector truncated text before scanning (medium) | truncation is marked (`[[TRUNCATED]]` → BLOCK); oversize patches become unassessable (→ Zone B) |
 | residual | web/storefront CI was never *required* | files under `web/**` / `storefront/**` now require the matching check (policy `required_when_touched`); `docs/engineering/**`, `AGENTS.md`, ADRs are Zone C |
+
+### 8.2b Codex automated review on PR #1351 (3 findings on `a272dc0`, all valid, all fixed)
+| Severity | Finding | Resolution |
+|---|---|---|
+| P1 | backend monetary tokens (`amount`, `total`, `price`, `invoice`, …) only raised to Zone B → `$amount * 2` stayed eligible under a B grant | monetary tokens in non-UI code → **Zone C** (`BEHAVIOR_MONETARY_TOKEN_IN_BACKEND`); UI keeps B |
+| P1 | presentational allowlist accepted JSX expression containers (`disabled={!isAdmin}`) | braces removed from the allowlist (JSX expressions are runtime code) |
+| P2 | collector mis-parsed paginated object responses (`check-runs`) | `gh api --paginate --slurp` + `flatten_pages()` for array and object pages (tested) |
 
 Residual risks the reviewer listed that are **not** closed (declared in §11): unauthenticated attestations; test code executes in CI; symlinks/file modes invisible in the files API; injection regexes are defence-in-depth (paraphrase/homoglyph can evade; classification never depends on text); `head_pushed_at` is the author-controlled commit date; no semantic check of `approved_outcome`.
 

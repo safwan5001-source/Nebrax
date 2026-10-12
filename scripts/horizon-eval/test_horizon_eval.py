@@ -645,6 +645,19 @@ class ReviewerFindings(unittest.TestCase):
             self.assertNotEqual(rec["zone"], "A", line)
             self.assertNotEqual(rec["decision"], "ELIGIBLE_SIMULATED", line)
 
+    def test_backend_monetary_changes_are_zone_c(self):  # Codex P1
+        for body in ["return $amount * 2;", "$total += $fee;", "$invoice->discount = 5;", "$balance = 0;", "$price = $price * 1.15;"]:
+            c = with_files(base_b(), ("app/Services/DocumentCenter/SyntheticHelper.php", "modified", "@@ -1 +1 @@\n-old\n+" + body))
+            rec = run(c)
+            self.assertEqual(rec["zone"], "C", body)
+            self.assertEqual(rec["decision"], "STOP_OWNER_DECISION", body)
+
+    def test_jsx_expression_containers_are_not_presentational(self):  # Codex P1
+        for line in ['<button disabled={!isAdmin}>Delete</button>', '<a aria-label={label}>x</a>', "{show && <b>x</b>}", '{" "}']:
+            rec = run(ui_case("@@ -1 +1 @@\n-<button>Delete</button>\n+" + line))
+            self.assertNotEqual(rec["zone"], "A", line)
+            self.assertNotEqual(rec["decision"], "ELIGIBLE_SIMULATED", line)
+
     def test_pure_deletion_of_a_guard_is_not_presentational(self):  # F2
         rec = run(ui_case("@@ -1,2 +1 @@\n-if (!session) return redirect('/login')\n"))
         self.assertNotEqual(rec["zone"], "A")

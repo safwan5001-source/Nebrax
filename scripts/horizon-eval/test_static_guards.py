@@ -100,22 +100,31 @@ class CollectorIsReadOnly(unittest.TestCase):
                  and n.func.attr in ("run", "Popen", "call", "check_output", "check_call")]
         self.assertEqual(len(calls), 1)
         body = inspect.getsource(cs.gh_get)
-        self.assertIn('argv = ["gh", "api", path] + (["--paginate"] if paginate else [])', body)
+        self.assertIn('argv = ["gh", "api", path] + (["--paginate", "--slurp"] if paginate else [])', body)
         flags = set(re.findall(r'"(-{1,2}[A-Za-z][A-Za-z-]*)"', body))
-        self.assertEqual(flags, {"--paginate"})
+        self.assertEqual(flags, {"--paginate", "--slurp"})
 
     def test_runtime_argv_is_exactly_gh_api_path(self):
         seen = []
 
         def fake_run(argv, **kw):
             seen.append(argv)
-            return real_subprocess.CompletedProcess(argv, 0, stdout='{"ok": true}', stderr="")
+            return real_subprocess.CompletedProcess(argv, 0, stdout='[[{"ok": true}]]' if "--slurp" in argv else '{"ok": true}', stderr="")
 
         with mock.patch.object(cs.subprocess, "run", fake_run):
             cs.gh_get("repos/o/r/pulls/1")
             cs.gh_get("repos/o/r/pulls/1/files?per_page=100", paginate=True)
         self.assertEqual(seen[0], ["gh", "api", "repos/o/r/pulls/1"])
-        self.assertEqual(seen[1], ["gh", "api", "repos/o/r/pulls/1/files?per_page=100", "--paginate"])
+        self.assertEqual(seen[1], ["gh", "api", "repos/o/r/pulls/1/files?per_page=100", "--paginate", "--slurp"])
+
+    def test_paginated_shapes_are_flattened(self):
+        self.assertEqual(cs.flatten_pages([[1, 2], [3]]), [1, 2, 3])
+        merged = cs.flatten_pages([{"total_count": 3, "check_runs": [{"id": 1}, {"id": 2}]}, {"total_count": 3, "check_runs": [{"id": 3}]}])
+        self.assertEqual([c["id"] for c in merged["check_runs"]], [1, 2, 3])
+        self.assertEqual(cs.flatten_pages([]), [])
+        for bad in ({"a": 1}, [[1], {"a": 1}], "x"):
+            with self.assertRaises(cs.CollectError):
+                cs.flatten_pages(bad)
 
     def test_refuses_anything_outside_repos_paths(self):
         for bad in ["user", "orgs/x/members", "/repos/o/r", "graphql", "repos/o", "repos/o/r/../../x", "repos/o/r/x -X DELETE",
