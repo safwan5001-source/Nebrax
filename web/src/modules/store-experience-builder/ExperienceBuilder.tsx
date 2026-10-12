@@ -457,6 +457,10 @@ export function ExperienceBuilder({
   const historyScopeRef = useRef(historyScope);
   historyScopeRef.current = historyScope;
   const [historyAnnouncement, setHistoryAnnouncement] = useState({ text: "", n: 0 });
+  // المنصّة تُحدَّد بعد التركيب فقط: الخادم لا `navigator` له، فتحديدها أثناء التصيير يُنتج `title`/`aria-keyshortcuts` مختلفين
+  // بين HTML الخادم والتهيئة (hydration mismatch) على macOS.
+  const [historyIsMac, setHistoryIsMac] = useState(false);
+  useEffect(() => setHistoryIsMac(isMacPlatform()), []);
   // تبديل نسخة/متجر، أو انتقال النسخة إلى منشورة، يبدأ جلسة جديدة فارغة من المستند الحالي (الذي ضُبط في الدفعة نفسها).
   useEffect(() => {
     if (historyScope) history.begin(historyScope, draftRef.current);
@@ -1729,7 +1733,8 @@ export function ExperienceBuilder({
   const applyHistoryStepRef = useRef(applyHistoryStep);
   applyHistoryStepRef.current = applyHistoryStep;
   const historyModalOpenRef = useRef(false);
-  historyModalOpenRef.current = Boolean(publishTarget || scheduleTarget || cancelScheduleTarget);
+  // الورقة السفلية على الجوال مشروطة بالتركيز على زرّها خلف الحوار، فلا يكفي فحص `event.target.closest` وحده.
+  historyModalOpenRef.current = Boolean(publishTarget || scheduleTarget || cancelScheduleTarget || mobileSheet !== null);
 
   useEffect(() => {
     const mac = isMacPlatform();
@@ -2600,7 +2605,6 @@ export function ExperienceBuilder({
               : !selectedVersion.schedulingRuntimeActive
                 ? t("versionSchedulingGatedBody")
                 : undefined;
-  const historyIsMac = isMacPlatform();
   const undoTitle = undoEnabled ? `${t("undo")} (${shortcutHint("undo", historyIsMac)})` : t("undoUnavailable");
   const redoTitle = redoEnabled ? `${t("redo")} (${shortcutHint("redo", historyIsMac)})` : t("redoUnavailable");
   const handlePublishClick = () => {

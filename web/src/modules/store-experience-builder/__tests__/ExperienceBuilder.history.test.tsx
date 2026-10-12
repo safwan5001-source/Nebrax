@@ -235,6 +235,49 @@ describe('ExperienceBuilder — CUST-H5-2 Undo / Redo', () => {
     expect(root().getAttribute('data-lifecycle')).toBe('clean');
   });
 
+  it('shortcuts do nothing while a confirmation dialog (Publish) is open', async () => {
+    const user = await mount();
+    await user.type(firstTextbox(), 'a');
+    await user.click(undoBtn()); // clean again, Redo available — Publish is enabled
+    expect(isDisabled(redoBtn())).toBe(false);
+    await user.click(document.querySelector('[data-publish]') as HTMLElement);
+    await waitFor(() => expect(screen.getByRole('dialog')).toBeTruthy());
+
+    fireEvent.keyDown(document.body, { key: 'y', code: 'KeyY', ctrlKey: true });
+    expect(root().getAttribute('data-lifecycle')).toBe('clean');
+    expect(isDisabled(redoBtn())).toBe(false); // still there, untouched behind the modal
+  });
+
+  it('shortcuts do nothing while a mobile bottom sheet is open, even with focus left on its trigger behind it', async () => {
+    const originalInnerWidth = window.innerWidth;
+    Object.defineProperty(window, 'innerWidth', { value: 390, configurable: true });
+    try {
+      listMock.mockResolvedValue({ ok: true, data: [summary()] });
+      showMock.mockResolvedValue({ ok: true, data: detail() });
+      const user = userEvent.setup();
+      render(<ExperienceBuilder storefrontId="store-1" initialLocale="ar" />);
+      await waitFor(() => expect(document.querySelector('[data-selected-version-id="v1"]')).toBeTruthy());
+
+      const trigger = document.querySelector('[data-builder-mobile-bar] button:first-child') as HTMLElement;
+      await user.click(trigger);
+      const sheet = await screen.findByRole('dialog');
+      await user.click(within(sheet).getAllByRole('button', { name: 'أسفل' })[0]); // move a section down — a real, undoable edit
+      expect(root().getAttribute('data-can-undo')).toBe('true'); // so the blocked assertion below is not vacuous
+
+      // Focus is on the trigger *behind* the sheet, outside the dialog element.
+      trigger.focus();
+      fireEvent.keyDown(trigger, { key: 'z', code: 'KeyZ', ctrlKey: true });
+      expect(root().getAttribute('data-lifecycle')).toBe('dirty');
+
+      await user.click(within(sheet).getAllByRole('button')[0]); // Close
+      await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+      fireEvent.keyDown(document.body, { key: 'z', code: 'KeyZ', ctrlKey: true });
+      await waitFor(() => expect(root().getAttribute('data-lifecycle')).toBe('clean'));
+    } finally {
+      Object.defineProperty(window, 'innerWidth', { value: originalInnerWidth, configurable: true });
+    }
+  });
+
   it('Undo never calls the network: no save, no reload, no publish', async () => {
     const user = await mount();
     await user.type(firstTextbox(), 'a');
