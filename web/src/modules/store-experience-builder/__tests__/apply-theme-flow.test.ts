@@ -10,8 +10,8 @@ vi.mock("@/modules/commerce-workspace/presentation-versions", () => ({
   deletePresentationVersion: (...args: unknown[]) => deleteMock(...args),
 }));
 
-import { DEFAULT_PRESENTATION_CONFIG, applyFlowersGiftSections } from "../presentation";
-import { BUILT_IN_THEMES, applyThemeAsNewDraft, builtInTheme } from "../themes";
+import { DEFAULT_PRESENTATION_CONFIG, type PresentationHomeSection, applyFlowersGiftSections } from "../presentation";
+import { BUILT_IN_THEMES, applyTheme, applyThemeAsNewDraft, builtInTheme, withThemePack } from "../themes";
 
 const bloom = builtInTheme("awj-bloom");
 const market = builtInTheme("awj-market");
@@ -86,7 +86,7 @@ describe("applyThemeAsNewDraft (V10b)", () => {
   });
 
   describe("AWJ Bloom gift pack (FLOWERS-H15)", () => {
-    const pack = (sections: readonly (typeof base.homepage.sections)[number][]) =>
+    const pack = (sections: readonly PresentationHomeSection[]) =>
       Promise.resolve(
         applyFlowersGiftSections(sections, {
           facetKeys: { occasion: "occasions-mine", recipient: null },
@@ -126,6 +126,34 @@ describe("applyThemeAsNewDraft (V10b)", () => {
         await applyThemeAsNewDraft({ storefrontId: "s1", base, theme, versionName: "x", giftSections: spy });
       }
       expect(spy).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("withThemePack (review: the pack is part of the previewed application)", () => {
+    it("adds the pack's sections to the config and reports them in the summary, even when the visual theme is otherwise identical", () => {
+      const themed = applyTheme(base, bloom);
+      if (!themed.ok) throw new Error("expected ok");
+      const again = applyTheme(themed.config, bloom);
+      if (!again.ok) throw new Error("expected ok");
+      expect(again.summary.noop).toBe(true);
+
+      const sections = applyFlowersGiftSections(again.config.homepage.sections, {
+        facetKeys: { occasion: "occasions-mine", recipient: null },
+        deliveryScheduleConfigured: true,
+        copy: { occasionTitle: "O", recipientTitle: "R", deliveryPromiseTitle: "D" },
+      });
+      const withPack = withThemePack(again, sections);
+      if (!withPack.ok) throw new Error("expected ok");
+      expect(withPack.summary.addedSectionIds).toHaveLength(2);
+      expect(withPack.summary.noop).toBe(false);
+      expect(withPack.config.homepage.sections.map((s) => s.type)).toEqual(["hero", "discovery", "deliveryPromise", "categories"]);
+    });
+
+    it("is the identity when the pack could not be computed (null) or the application failed", () => {
+      const themed = applyTheme(base, market);
+      expect(withThemePack(themed, null)).toBe(themed);
+      const failed = applyTheme(base, { ...market, assets: [{ key: "stock" }] });
+      expect(withThemePack(failed, [])).toBe(failed);
     });
   });
 });

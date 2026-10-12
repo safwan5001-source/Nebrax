@@ -14,12 +14,44 @@ import {
   savePresentationVersion,
 } from "@/modules/commerce-workspace/presentation-versions";
 import type { PresentationHomeSection, StorefrontPresentationConfig } from "../presentation/config";
-import { applyTheme } from "./apply-theme";
+import { type ThemeApplication, applyTheme, withThemePack } from "./apply-theme";
 import type { ThemeDefinition } from "./theme-definition";
 
 export type ApplyThemeFlowResult =
   | { ok: true; versionId: string }
   | { ok: false; reason: "assets_unsupported" | "create_failed" | "save_failed" };
+
+/** The pack step on its own: the sections the store can back for a themed pack, or `null` (never throws). */
+export async function computeThemePack(
+  theme: ThemeDefinition,
+  sections: readonly PresentationHomeSection[],
+  giftSections?: (sections: readonly PresentationHomeSection[]) => Promise<PresentationHomeSection[] | null>,
+): Promise<PresentationHomeSection[] | null> {
+  if (!theme.pack || !giftSections) return null;
+  try {
+    return await giftSections(sections);
+  } catch {
+    return null;
+  }
+}
+
+/** The one write: a NEW draft holding exactly `config` (what was previewed), rolled back if the save fails. */
+export async function writeThemedDraft(args: {
+  storefrontId: string;
+  config: StorefrontPresentationConfig;
+  versionName: string;
+}): Promise<ApplyThemeFlowResult> {
+  const { storefrontId, config, versionName } = args;
+  const created = await createPresentationVersion(storefrontId, versionName);
+  if (!created.ok) return { ok: false, reason: "create_failed" };
+
+  const saved = await savePresentationVersion(storefrontId, created.data.id, config, created.data.revision);
+  if (!saved.ok) {
+    await deletePresentationVersion(storefrontId, created.data.id);
+    return { ok: false, reason: "save_failed" };
+  }
+  return { ok: true, versionId: created.data.id };
+}
 
 export async function applyThemeAsNewDraft(args: {
   storefrontId: string;
@@ -33,25 +65,10 @@ export async function applyThemeAsNewDraft(args: {
 
   const applied = applyTheme(base, theme);
   if (!applied.ok) return { ok: false, reason: applied.reason };
-
-  let next = applied.config;
-  if (theme.pack && giftSections) {
-    let sections: PresentationHomeSection[] | null = null;
-    try {
-      sections = await giftSections(next.homepage.sections);
-    } catch {
-      sections = null;
-    }
-    if (sections) next = { ...next, homepage: { ...next.homepage, sections } };
-  }
-
-  const created = await createPresentationVersion(storefrontId, versionName);
-  if (!created.ok) return { ok: false, reason: "create_failed" };
-
-  const saved = await savePresentationVersion(storefrontId, created.data.id, next, created.data.revision);
-  if (!saved.ok) {
-    await deletePresentationVersion(storefrontId, created.data.id);
-    return { ok: false, reason: "save_failed" };
-  }
-  return { ok: true, versionId: created.data.id };
+  const application: ThemeApplication = withThemePack(
+    applied,
+    await computeThemePack(theme, applied.config.homepage.sections, giftSections),
+  );
+  if (!application.ok) return { ok: false, reason: application.reason };
+  return writeThemedDraft({ storefrontId, config: application.config, versionName });
 }

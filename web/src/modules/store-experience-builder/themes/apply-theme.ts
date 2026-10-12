@@ -8,7 +8,11 @@
  * media, links, logos, navigation, announcements, and every section's order and visibility.
  */
 
-import { type StorefrontPresentationConfig, normalizePresentationConfig } from "../presentation/config";
+import {
+  type PresentationHomeSection,
+  type StorefrontPresentationConfig,
+  normalizePresentationConfig,
+} from "../presentation/config";
 import { normalizeSectionDesign } from "../presentation/section-design";
 import type { ThemeDefinition } from "./theme-definition";
 
@@ -49,6 +53,8 @@ export interface ThemeAreaChange {
 export interface ThemeApplySummary {
   areas: ThemeAreaChange[];
   kept: readonly ThemeKept[];
+  /** Sections a themed pack adds (V10b review): empty unless the theme carries a pack the store can back. */
+  addedSectionIds: string[];
   /** True when applying changes nothing at all. */
   noop: boolean;
 }
@@ -137,6 +143,33 @@ export function applyTheme(
   return {
     ok: true,
     config: after,
-    summary: { areas, kept: THEME_KEPT, noop: areas.every((entry) => !entry.changed) },
+    summary: { areas, kept: THEME_KEPT, addedSectionIds: [], noop: areas.every((entry) => !entry.changed) },
+  };
+}
+
+/**
+ * A themed pack (FLOWERS-H15) adds sections the store can back. The pack is part of the application — the Canvas, the Apply
+ * summary and the saved draft are all derived from the SAME result — so what the merchant previews is what is written.
+ * `sections` is the pack's output for the applied document (`null` = it could not be computed: no sections are added).
+ */
+export function withThemePack(
+  application: ThemeApplication,
+  sections: readonly PresentationHomeSection[] | null,
+): ThemeApplication {
+  if (!application.ok || !sections) return application;
+  const config = normalizePresentationConfig({
+    ...application.config,
+    homepage: { ...application.config.homepage, sections: [...sections] },
+  });
+  const known = new Set(application.config.homepage.sections.map((section) => section.id));
+  const addedSectionIds = config.homepage.sections.map((section) => section.id).filter((id) => !known.has(id));
+  return {
+    ok: true,
+    config,
+    summary: {
+      ...application.summary,
+      addedSectionIds,
+      noop: application.summary.noop && addedSectionIds.length === 0,
+    },
   };
 }

@@ -43,6 +43,7 @@ export function ThemePreviewBar({
   applying,
   error,
   canApply,
+  preparing,
   onApply,
   onExit,
 }: {
@@ -52,6 +53,8 @@ export function ThemePreviewBar({
   applying: boolean;
   error: CustomizerMessageKey | null;
   canApply: boolean;
+  /** The merchant's base version (and any themed pack) is still being prepared — Apply cannot be enabled yet. */
+  preparing: boolean;
   onApply: () => void;
   onExit: () => void;
 }) {
@@ -96,6 +99,16 @@ export function ThemePreviewBar({
       {error ? (
         <p role="alert" data-theme-error="" className="mt-2 rounded-md border border-negative/30 bg-negative/5 px-3 py-2 text-xs text-negative">
           {t(error)}
+        </p>
+      ) : null}
+      {preparing ? (
+        <p data-theme-preparing="" role="status" className="mt-2 text-xs text-muted">
+          {t("themeBaseLoading")}
+        </p>
+      ) : null}
+      {summary.addedSectionIds.length > 0 ? (
+        <p data-theme-pack-adds="" className="mt-2 text-xs text-text">
+          {fillTemplate(t("themePackAdds"), { n: summary.addedSectionIds.length })}
         </p>
       ) : null}
       {summary.noop ? (

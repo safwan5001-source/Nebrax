@@ -30,8 +30,10 @@ import {
   THEME_KEPT,
   type ThemeDefinition,
   applyTheme,
-  applyThemeAsNewDraft,
   builtInTheme,
+  computeThemePack,
+  withThemePack,
+  writeThemedDraft,
 } from "./themes";
 import { ThemePreviewBar } from "./themes/ThemePreviewBar";
 import { ProductPreviewPicker } from "./ProductPreviewPicker";
@@ -182,10 +184,23 @@ export function ExperienceBuilder({
   }, [previewThemeId]);
   const [themeApplying, setThemeApplying] = useState(false);
   const [themeError, setThemeError] = useState<CustomizerMessageKey | null>(null);
-  const themed = useMemo(
-    () => (previewTheme ? applyTheme(draft, previewTheme) : null),
-    [draft, previewTheme],
-  );
+  // The themed pack (FLOWERS-H15) is computed BEFORE the preview is shown, so the Canvas, the Apply summary and the saved draft
+  // are the same configuration. It is keyed by the document and theme it was computed for; anything else is stale.
+  const [themePack, setThemePack] = useState<{
+    draft: StorefrontPresentationConfig;
+    themeId: string;
+    sections: PresentationHomeSection[] | null;
+  } | null>(null);
+  const themePackRef = useRef(themePackSections);
+  themePackRef.current = themePackSections;
+  const themed = useMemo(() => {
+    if (!previewTheme) return null;
+    const applied = applyTheme(draft, previewTheme);
+    if (themePack && themePack.draft === draft && themePack.themeId === previewTheme.id) {
+      return withThemePack(applied, themePack.sections);
+    }
+    return applied;
+  }, [draft, previewTheme, themePack]);
   const canvasConfig = themed?.ok ? themed.config : draft;
   // React 18 renders `inert` only as a string attribute: while a theme is previewed the editing UI is not operable or focusable.
   const inertWhenThemePreview = previewTheme ? ({ inert: "" } as Record<string, string>) : {};
@@ -453,6 +468,25 @@ export function ExperienceBuilder({
     versions.length === 0 &&
     selectedVersion === null &&
     versionSwitchingId === null;
+
+  // Apply is only ever offered over the merchant's own, fully loaded document: a loaded version, or a store with none yet.
+  // Before that `draft` is the default document, and a draft created from it would silently drop the merchant's content.
+  const themeBaseReady = noVersionsYet || (selectedVersion !== null && versionSwitchingId === null);
+  useEffect(() => {
+    if (!previewTheme?.pack || !themeBaseReady) return;
+    const applied = applyTheme(draft, previewTheme);
+    if (!applied.ok) return;
+    let cancelled = false;
+    void computeThemePack(previewTheme, applied.config.homepage.sections, themePackRef.current).then((sections) => {
+      if (!cancelled) setThemePack({ draft, themeId: previewTheme.id, sections });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [previewTheme, draft, themeBaseReady]);
+  const themePackPending =
+    Boolean(previewTheme?.pack && themePackSections) &&
+    !(themePack && themePack.draft === draft && themePack.themeId === previewTheme?.id);
 
   useEffect(() => {
     const updateViewport = () => {
@@ -1417,15 +1451,15 @@ export function ExperienceBuilder({
   }
 
   async function handleApplyTheme() {
-    if (!previewTheme || !storefrontId || themeApplying) return;
+    if (!previewTheme || !storefrontId || themeApplying || !themeBaseReady || themePackPending) return;
+    if (!themed?.ok) return;
     setThemeApplying(true);
     setThemeError(null);
-    const result = await applyThemeAsNewDraft({
+    // Exactly the configuration that was previewed (pack included) is what the new draft holds.
+    const result = await writeThemedDraft({
       storefrontId,
-      base: draft,
-      theme: previewTheme,
+      config: themed.config,
       versionName: `${previewTheme.name[locale]} — ${t("themePreviewLabel")}`,
-      giftSections: themePackSections,
     });
     if (!result.ok) {
       setThemeApplying(false);
@@ -2968,11 +3002,17 @@ export function ExperienceBuilder({
               summary={
                 themed.ok
                   ? themed.summary
-                  : { areas: THEME_AREAS.map((area) => ({ area, changed: false })), kept: THEME_KEPT, noop: true }
+                  : {
+                      areas: THEME_AREAS.map((area) => ({ area, changed: false })),
+                      kept: THEME_KEPT,
+                      addedSectionIds: [],
+                      noop: true,
+                    }
               }
               applying={themeApplying}
               error={themed.ok ? themeError : "themeApplyUnsupported"}
-              canApply={themed.ok && Boolean(storefrontId)}
+              canApply={themed.ok && Boolean(storefrontId) && themeBaseReady && !themePackPending}
+              preparing={Boolean(storefrontId) && themed.ok && (!themeBaseReady || themePackPending)}
               onApply={() => void handleApplyTheme()}
               onExit={handleExitThemePreview}
             />

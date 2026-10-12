@@ -28,7 +28,7 @@ vi.mock('@/modules/commerce-workspace/workspace-products', () => ({
   showWorkspaceProduct: vi.fn(),
 }));
 
-import { DEFAULT_PRESENTATION_CONFIG } from '../presentation';
+import { DEFAULT_PRESENTATION_CONFIG, applyFlowersGiftSections } from '../presentation';
 import { ExperienceBuilder } from '../ExperienceBuilder';
 
 function summary(overrides: Record<string, unknown> = {}) {
@@ -53,7 +53,7 @@ function summary(overrides: Record<string, unknown> = {}) {
 const hrefSet = vi.fn();
 const originalLocation = window.location;
 
-function renderPreview(themeId = 'awj-market') {
+function renderPreview(themeId = 'awj-market', extra: Record<string, unknown> = {}) {
   return render(
     <ExperienceBuilder
       storefrontId="store-1"
@@ -61,6 +61,7 @@ function renderPreview(themeId = 'awj-market') {
       previewThemeId={themeId}
       initialLocale="en"
       liveStoreName="Shop"
+      {...extra}
     />,
   );
 }
@@ -94,6 +95,7 @@ describe('ExperienceBuilder — Theme Preview (V10b)', () => {
     renderPreview();
     await waitFor(() => expect(document.querySelector('[data-theme-preview-bar]')).not.toBeNull());
     await waitFor(() => expect(showMock).toHaveBeenCalled());
+    await waitFor(() => expect((document.querySelector('[data-theme-apply]') as HTMLButtonElement).disabled).toBe(false));
   }
 
   it('shows the preview bar with the Apply summary and what is kept; editing is inert; nothing is written', async () => {
@@ -165,5 +167,108 @@ describe('ExperienceBuilder — Theme Preview (V10b)', () => {
     render(<ExperienceBuilder storefrontId="store-1" versionId="v1" previewThemeId="nope" initialLocale="en" />);
     await waitFor(() => expect(showMock).toHaveBeenCalled());
     expect(document.querySelector('[data-theme-preview-bar]')).toBeNull();
+  });
+
+  it('Apply stays disabled — and writes nothing — until the merchant\'s own version has loaded (never the default document)', async () => {
+    let release: (value: unknown) => void = () => {};
+    showMock.mockReturnValue(new Promise((resolve) => (release = resolve)));
+    const user = userEvent.setup();
+    renderPreview();
+    await waitFor(() => expect(document.querySelector('[data-theme-preview-bar]')).not.toBeNull());
+    await waitFor(() => expect(showMock).toHaveBeenCalled());
+
+    const apply = document.querySelector('[data-theme-apply]') as HTMLButtonElement;
+    expect(apply.disabled).toBe(true);
+    expect(document.querySelector('[data-theme-preparing]')).not.toBeNull();
+    await user.click(apply);
+    expect(createMock).not.toHaveBeenCalled();
+    expect(saveMock).not.toHaveBeenCalled();
+
+    const mine = {
+      ...DEFAULT_PRESENTATION_CONFIG,
+      homepage: {
+        ...DEFAULT_PRESENTATION_CONFIG.homepage,
+        sections: [{ id: 'hero-mine', type: 'hero' as const, visible: true }],
+      },
+    };
+    createMock.mockResolvedValue({ ok: true, data: { id: 'v-new', storefrontId: 'store-1', revision: 1, config: mine } });
+    saveMock.mockResolvedValue({ ok: true, data: {} });
+    release({ ok: true, data: { ...summary(), config: mine } });
+    await waitFor(() => expect(apply.disabled).toBe(false));
+    expect(document.querySelector('[data-theme-preparing]')).toBeNull();
+
+    await user.click(apply);
+    await waitFor(() => expect(saveMock).toHaveBeenCalled());
+    expect(saveMock.mock.calls[0][2].homepage.sections.map((x: { id: string }) => x.id)).toEqual(['hero-mine']);
+  });
+
+  it('a version that failed to load never enables Apply', async () => {
+    showMock.mockResolvedValue({ ok: false, reason: 'error' });
+    renderPreview();
+    await waitFor(() => expect(showMock).toHaveBeenCalled());
+    await waitFor(() => expect(document.querySelector('[data-theme-preview-bar]')).not.toBeNull());
+    expect((document.querySelector('[data-theme-apply]') as HTMLButtonElement).disabled).toBe(true);
+    expect(createMock).not.toHaveBeenCalled();
+  });
+
+  describe('AWJ Bloom gift pack is part of the preview', () => {
+    const mine = {
+      ...DEFAULT_PRESENTATION_CONFIG,
+      homepage: {
+        ...DEFAULT_PRESENTATION_CONFIG.homepage,
+        sections: [
+          { id: 'hero-mine', type: 'hero' as const, visible: true },
+          { id: 'cat-mine', type: 'categories' as const, visible: true },
+        ],
+      },
+    };
+    const pack = (sections: readonly (typeof mine.homepage.sections)[number][]) =>
+      Promise.resolve(
+        applyFlowersGiftSections(sections, {
+          facetKeys: { occasion: 'occasions-mine', recipient: null },
+          deliveryScheduleConfigured: true,
+          copy: { occasionTitle: 'Occasions', recipientTitle: 'R', deliveryPromiseTitle: 'Delivery' },
+        }),
+      );
+
+    it('the summary announces the sections the pack adds, and the saved draft holds exactly what was previewed', async () => {
+      showMock.mockResolvedValue({ ok: true, data: { ...summary(), config: mine } });
+      createMock.mockResolvedValue({ ok: true, data: { id: 'v-new', storefrontId: 'store-1', revision: 1, config: mine } });
+      saveMock.mockResolvedValue({ ok: true, data: {} });
+      const user = userEvent.setup();
+      renderPreview('awj-bloom', { themePackSections: pack });
+      await waitFor(() => expect(document.querySelector('[data-theme-pack-adds]')).not.toBeNull());
+      expect(document.querySelector('[data-theme-pack-adds]')?.textContent).toMatch(/adds 2 gift section/);
+      await waitFor(() => expect((document.querySelector('[data-theme-apply]') as HTMLButtonElement).disabled).toBe(false));
+      // the Canvas shows them too
+      expect(document.querySelector('[data-preview-frame]')?.innerHTML.length).toBeGreaterThan(0);
+
+      await user.click(document.querySelector('[data-theme-apply]') as HTMLElement);
+      await waitFor(() => expect(saveMock).toHaveBeenCalled());
+      expect(saveMock.mock.calls[0][2].homepage.sections.map((x: { type: string }) => x.type)).toEqual([
+        'hero',
+        'discovery',
+        'deliveryPromise',
+        'categories',
+      ]);
+    });
+
+    it('Apply waits for the pack to be computed', async () => {
+      showMock.mockResolvedValue({ ok: true, data: { ...summary(), config: mine } });
+      let release: (value: unknown) => void = () => {};
+      const slow = (sections: readonly (typeof mine.homepage.sections)[number][]) =>
+        new Promise<ReturnType<typeof applyFlowersGiftSections>>((resolve) => {
+          release = () => resolve(applyFlowersGiftSections(sections, {
+            facetKeys: { occasion: 'o', recipient: null },
+            deliveryScheduleConfigured: false,
+            copy: { occasionTitle: 'O', recipientTitle: 'R', deliveryPromiseTitle: 'D' },
+          }));
+        });
+      renderPreview('awj-bloom', { themePackSections: slow });
+      await waitFor(() => expect(document.querySelector('[data-theme-preparing]')).not.toBeNull());
+      expect((document.querySelector('[data-theme-apply]') as HTMLButtonElement).disabled).toBe(true);
+      release(null);
+      await waitFor(() => expect((document.querySelector('[data-theme-apply]') as HTMLButtonElement).disabled).toBe(false));
+    });
   });
 });
