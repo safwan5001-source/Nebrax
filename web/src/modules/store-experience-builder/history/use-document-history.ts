@@ -86,7 +86,7 @@ export function useDocumentHistory<T>(
         return after.present;
       },
       markSaved: (scopeKey: string, saved: T, editedSincePersist: boolean) =>
-        apply(engineMarkSaved(stateRef.current, scopeKey, saved, editedSincePersist, optionsRef.current)),
+        apply(engineMarkSaved(stateRef.current, scopeKey, saved, editedSincePersist)),
     }),
     [apply],
   );

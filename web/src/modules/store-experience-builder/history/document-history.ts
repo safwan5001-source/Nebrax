@@ -68,23 +68,21 @@ export function resetHistory<T>(scopeKey: string | null, present: T): DocumentHi
 }
 
 /**
- * حفظ ناجح: الوثيقة المُعادة من الخادم (المُطبَّعة) هي خط الأساس الجديد وحدّ التراجع.
+ * حفظ ناجح: الوثيقة المُعادة من الخادم (المُطبَّعة) هي خط الأساس الجديد، وحدّ التراجع **صلب دائماً** (§3.5): يُفرغ الخلف
+ * والأمام في كل حفظ ناجح بلا استثناء.
  *
  * `editedSincePersist`: التاجر عدّل المسودة أثناء طيران طلب الحفظ، فحالته الحالية أحدث مما حُفظ. تبقى الحالية كما هي
- * (لا تُفقد)، وتصير وثيقة الخادم هي الخطوة السابقة الوحيدة — فالتراجع يعود إلى المحفوظ ولا يعبر حدّه أبداً.
- * وإلا تصير الوثيقة المحفوظة هي الحالية والسجلّ فارغاً تماماً.
+ * (لا تُفقد ولا تُستبدل بوثيقة الخادم)، لكن السجلّ يبدأ فارغاً منها — لا يعبر التراجع حدّ الحفظ ولا يعود حتى إلى المحفوظ.
+ * وإلا تصير الوثيقة المحفوظة هي الحالية.
  */
 export function markSaved<T>(
   state: DocumentHistory<T>,
   scopeKey: string,
   saved: T,
   editedSincePersist: boolean,
-  options?: HistoryOptions<T>,
 ): DocumentHistory<T> {
   if (state.scopeKey !== scopeKey) return state;
-  if (!editedSincePersist) return createHistory(scopeKey, saved);
-  if (equalsOf(options)(state.present, saved)) return createHistory(scopeKey, saved);
-  return { scopeKey, present: state.present, past: [saved], future: [], lastGroup: null };
+  return createHistory(scopeKey, editedSincePersist ? state.present : saved);
 }
 
 /**

@@ -227,28 +227,26 @@ describe("document-history — scope and boundaries", () => {
     expect(s.present).toEqual(doc(100));
   });
 
-  it("an edit made while Save was in flight survives, and can be undone only back to the saved document", () => {
+  it("an edit made while Save was in flight survives, but the Save boundary still clears both stacks", () => {
     let s = createHistory(V1, doc(0));
     s = edit(s, 1);
     s = edit(s, 2); // sent
     s = edit(s, 3); // typed while the PUT was in flight
-    s = markSaved(s, V1, doc(2), true);
-    expect(s.present).toEqual(doc(3));
-    expect(s.past).toEqual([doc(2)]);
-    expect(canRedo(s)).toBe(false);
     s = undo(s, V1);
-    expect(s.present).toEqual(doc(2));
-    // The pre-Save history (doc 0/1) is unreachable.
+    s = markSaved(s, V1, doc(2), true);
+    expect(s.present).toEqual(doc(2)); // present was doc 2 after the undo: kept, never replaced by the server doc
     expect(canUndo(s)).toBe(false);
+    expect(canRedo(s)).toBe(false);
   });
 
-  it("an in-flight edit that reverted to the saved document leaves a clean session", () => {
+  it("with in-flight edits the newer local document is kept as present, with no history", () => {
     let s = createHistory(V1, doc(0));
     s = edit(s, 1);
     s = edit(s, 2);
-    s = edit(s, 1);
     s = markSaved(s, V1, doc(1), true);
+    expect(s.present).toEqual(doc(2));
     expect(canUndo(s)).toBe(false);
+    expect(canRedo(s)).toBe(false);
   });
 
   it("a failed Save has no engine call — the history is untouched by construction", () => {
@@ -375,7 +373,7 @@ describe("document-history — invariants over random operation sequences", () =
         }
       } else {
         // Save boundary.
-        s = markSaved(s, V1, doc(present), false, options);
+        s = markSaved(s, V1, doc(present), false);
         past = [];
         future = [];
       }
