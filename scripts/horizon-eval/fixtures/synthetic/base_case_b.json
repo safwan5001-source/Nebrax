@@ -43,21 +43,21 @@
     "pr": {
       "title": "fix: isolated null guard in synthetic UI helper",
       "body": "Isolated bugfix.\n\nHorizon-Claim: SYNTH-HZ-PILOT / SYNTH-T-002",
-      "additions": 14,
-      "deletions": 3,
+      "additions": 6,
+      "deletions": 1,
       "changed_files": 2,
       "files": [
         {
           "filename": "web/src/modules/synthetic/helper.ts",
           "status": "modified",
-          "additions": 8,
-          "deletions": 3,
+          "additions": 4,
+          "deletions": 1,
           "patch": "@@ -10,3 +10,8 @@\n-    return x;\n+    if (x === null) {\n+        return '';\n+    }\n+    return x;"
         },
         {
           "filename": "web/src/modules/synthetic/helper.test.ts",
           "status": "added",
-          "additions": 6,
+          "additions": 2,
           "deletions": 0,
           "patch": "@@ -0,0 +1,6 @@\n+import { helper } from './helper';\n+it('guards null', () => expect(helper(null)).toBe(''));"
         }

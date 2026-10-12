@@ -57,11 +57,12 @@ def with_files(case, *specs):
     c = copy.deepcopy(case)
     files = []
     for path, status, patch in specs:
-        files.append({"filename": path, "status": status, "additions": 1, "deletions": 0, "patch": patch})
+        a, d = he.patch_counts(patch) if isinstance(patch, str) and patch else (1, 0)
+        files.append({"filename": path, "status": status, "additions": a, "deletions": d, "patch": patch})
     c["evidence"]["pr"]["files"] = files
     c["evidence"]["pr"]["changed_files"] = len(files)
-    c["evidence"]["pr"]["additions"] = len(files)
-    c["evidence"]["pr"]["deletions"] = 0
+    c["evidence"]["pr"]["additions"] = sum(f["additions"] for f in files)
+    c["evidence"]["pr"]["deletions"] = sum(f["deletions"] for f in files)
     return c
 
 
@@ -204,7 +205,7 @@ class Grants(unittest.TestCase):
             "path not allowed": dict(paths_allow=["web/**"]),
             "path denied": dict(paths_deny=["docs/guides/**"]),
             "files cap": dict(limits={"max_merges": 5, "max_merges_per_day": 2, "max_files_per_pr": 2, "max_changed_lines": 200, "max_open_prs": 1}),
-            "lines cap": dict(limits={"max_merges": 5, "max_merges_per_day": 2, "max_files_per_pr": 8, "max_changed_lines": 10, "max_open_prs": 1}),
+            "lines cap": dict(limits={"max_merges": 5, "max_merges_per_day": 2, "max_files_per_pr": 8, "max_changed_lines": 4, "max_open_prs": 1}),
             "bad limits shape": dict(limits={"max_merges": 5}),
             "horizon mismatch": dict(horizon_id="OTHER"),
         }
@@ -725,6 +726,19 @@ class ReviewerFindings(unittest.TestCase):
             rec = run(c)
             self.assertEqual(rec["zone"], "C", path)
             self.assertEqual(rec["decision"], "STOP_OWNER_DECISION", path)
+
+    def test_patch_that_omits_reported_changes_is_incomplete(self):  # Codex round 7, P1
+        c = base_a()
+        f = c["evidence"]["pr"]["files"][0]
+        f.update(additions=50, deletions=50)                       # reports 100 changed lines, patch shows 2
+        c["evidence"]["pr"].update(additions=52, deletions=52)     # keep the PR totals consistent with the files
+        rec = run(c)
+        self.assertEqual(rec["decision"], "BLOCK")
+        self.assertIn("PATCH_INCOMPLETE", codes(rec))
+        c = base_a()
+        c["evidence"]["pr"]["files"][0]["patch"] += "\n+an extra line the metadata does not count"
+        self.assertIn("PATCH_INCOMPLETE", codes(run(c)))
+        self.assertEqual(he.patch_counts("@@ -1,2 +1,2 @@\n-a\n+b\n c\n\\ No newline at end of file"), (1, 1))
 
     def test_authorization_implementation_paths_are_zone_c(self):  # Codex round 3, P1
         for path in ["app/Models/Role.php", "app/Http/Requests/StoreRoleRequest.php", "app/Policies/InvoicePolicy.php", "app/Models/Permission.php",

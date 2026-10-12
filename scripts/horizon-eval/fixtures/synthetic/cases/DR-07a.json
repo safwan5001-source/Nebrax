@@ -53,13 +53,13 @@
         {
           "filename": "web/src/components/layout/sidebar-item.tsx",
           "status": "modified",
-          "additions": 4,
+          "additions": 1,
           "deletions": 1,
           "patch": "@@ -1 +1 @@\n-<li>old</li>\n+<li>new</li>"
         }
       ],
       "changed_files": 1,
-      "additions": 4,
+      "additions": 1,
       "deletions": 1
     }
   }

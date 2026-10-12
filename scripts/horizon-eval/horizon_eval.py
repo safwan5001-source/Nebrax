@@ -499,6 +499,12 @@ def _presentational_line(line: str) -> bool:
     return bool(_PRESENTATIONAL_LINE.fullmatch(rest)) and not re.search(r"[<>=]", rest) and not _NOT_PRESENTATIONAL_WORDS.search(rest)
 
 
+def patch_counts(patch: str) -> tuple[int, int]:
+    """(added, removed) lines a GitHub `patch` actually represents. Hunk lines always start with '+', '-', ' ', '\\' or '@@'."""
+    lines = patch.splitlines()
+    return sum(1 for l in lines if l.startswith("+")), sum(1 for l in lines if l.startswith("-"))
+
+
 def presentational_only(patch: str) -> bool:
     for line in list(_added_lines(patch)) + list(_removed_lines(patch)):
         if line.strip() and not _presentational_line(line):
@@ -558,6 +564,9 @@ def classify_files(files: list[dict], policy: dict, reasons: Reasons):
         patch0 = f.get("patch")
         if (not isinstance(patch0, str) or patch0 == "") and not (f["status"] in ("renamed", "copied") and f["additions"] + f["deletions"] == 0):
             reasons.add("BLOCK", "PATCH_UNAVAILABLE", safe_path(f["filename"]))
+        elif isinstance(patch0, str) and patch0 != "" and patch_counts(patch0) != (f["additions"], f["deletions"]):
+            # a non-empty patch that does not account for every reported change is incomplete: omitted lines could hide anything
+            reasons.add("BLOCK", "PATCH_INCOMPLETE", safe_path(f["filename"]))
         # behaviour: only raises, never lowers
         bzone = "A"
         behavior_rule = any(r["id"] in matched and r.get("behavior") for r in rules)
