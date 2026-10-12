@@ -694,6 +694,18 @@ class ReviewerFindings(unittest.TestCase):
             self.assertEqual(rec["decision"], "BLOCK")
             self.assertIn("PATCH_UNAVAILABLE", codes(rec))
 
+    def test_uninspectable_docs_patch_blocks_too(self):  # Codex round 5, P1
+        for patch in (None, ""):
+            c = base_a()
+            c["evidence"]["pr"]["files"][0]["patch"] = patch
+            rec = run(c)
+            self.assertEqual(rec["decision"], "BLOCK")
+            self.assertIn("PATCH_UNAVAILABLE", codes(rec))
+        c = base_a()   # pure rename with no changed lines has no patch and nothing to screen
+        c["evidence"]["pr"]["files"][0].update(status="renamed", previous_filename="docs/guides/old-a.md", patch=None, additions=0, deletions=0)
+        c["evidence"]["pr"].update(additions=20, deletions=4)
+        self.assertNotIn("PATCH_UNAVAILABLE", codes(run(c)))
+
     def test_authorization_implementation_paths_are_zone_c(self):  # Codex round 3, P1
         for path in ["app/Models/Role.php", "app/Http/Requests/StoreRoleRequest.php", "app/Policies/InvoicePolicy.php", "app/Models/Permission.php",
                      "app/Providers/AuthServiceProvider.php", "app/Http/Controllers/Api/AuthController.php", "app/Models/User.php", "app/Models/Tenant.php"]:

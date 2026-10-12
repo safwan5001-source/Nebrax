@@ -102,11 +102,11 @@ Command: `PYTHONDONTWRITEBYTECODE=1 python3 -I -m unittest discover -s scripts/h
 
 | Layer | File | Tests | Result |
 |---|---|---|---|
-| 1. Focused evaluator unit tests (incl. 34 review-finding regressions) | `test_horizon_eval.py` | 120 | OK |
+| 1. Focused evaluator unit tests (incl. 35 review-finding regressions) | `test_horizon_eval.py` | 121 | OK |
 | 2. Contract + regression + mutation | `test_contract.py` | 12 | OK |
 | 3. Representative read-only repository evidence | `test_live_snapshots.py` | 8 | OK |
 | Static guards (no capability, fixture isolation) | `test_static_guards.py` | 19 | OK |
-| **Total** | | **159** | **OK, 0 failures, 0 errors** |
+| **Total** | | **160** | **OK, 0 failures, 0 errors** |
 
 Fail-closed evidence beyond the contract table:
 - **472 single-input mutation points** (two eligible bases: A and B) — each element deleted, nulled, and type-swapped; none stays eligible except a reviewed harmless list (free-text/optional elements) — this found a real gap (manifest lacking a required check) fixed with the policy `ci_floor`.
@@ -200,7 +200,7 @@ Same GitHub identity as the author, so this is **not** an "independent reviewer"
 | 13 | collector truncated text before scanning (medium) | truncation is marked (`[[TRUNCATED]]` → BLOCK); oversize patches become unassessable (→ Zone B) |
 | residual | web/storefront CI was never *required* | files under `web/**` / `storefront/**` now require the matching check (policy `required_when_touched`); `docs/engineering/**`, `AGENTS.md`, ADRs are Zone C |
 
-### 8.2b Codex automated review on PR #1351 (round 1: 3 findings on `a272dc0`; round 2: 3 findings on `96d346d`; round 3: 3 findings on `8d22cf7`; round 4: 2 findings on `3294f3b`; all valid, all fixed)
+### 8.2b Codex automated review on PR #1351 (round 1: 3 findings on `a272dc0`; round 2: 3 findings on `96d346d`; round 3: 3 findings on `8d22cf7`; round 4: 2 findings on `3294f3b`; round 5: 2 findings on `2d7ae8c`; all valid, all fixed)
 | Severity | Finding | Resolution |
 |---|---|---|
 | P1 | backend monetary tokens (`amount`, `total`, `price`, `invoice`, …) only raised to Zone B → `$amount * 2` stayed eligible under a B grant | monetary tokens in non-UI code → **Zone C** (`BEHAVIOR_MONETARY_TOKEN_IN_BACKEND`); UI keeps B |
@@ -229,6 +229,8 @@ Round 4 (`3294f3b`):
 |---|---|---|
 | P1 | `pr.base_sha == main.sha` can both be fresh while checks ran against an older merge ref | every counted run must carry the base it was **tested** against (collector reads it from the workflow run's `pull_requests[].base.sha`); mismatch → `CI_TESTED_AGAINST_OLDER_BASE` (WAIT), unknown → `TESTED_BASE_UNKNOWN` (BLOCK) |
 | P1 | claim validated from the body only | exact `horizon:<id>` label required and no contradictory `horizon:*` label (V2-1B §6.3: branch + label + claim block) |
+
+Round 5 (`2d7ae8c`): documentation patches that are absent cannot be screened for injection → `PATCH_UNAVAILABLE` now applies to **every** file with changed lines (docs included; only a pure rename/copy with zero changed lines is exempt); the collector's workflow-run lookup is paginated like the other list endpoints.
 
 Known limit of the allowlist: a plain-text line is indistinguishable from an attribute line in multi-line JSX beyond the boolean-attribute list; the allowlist is deliberately narrow (labels/text), and anything it does not recognise falls to Zone B, never A.
 

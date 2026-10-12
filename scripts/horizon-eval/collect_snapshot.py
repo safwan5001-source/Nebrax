@@ -105,7 +105,7 @@ def collect(repo: str, pr_number: int, req: dict, patch_limit: int = PATCH_LIMIT
     head_commit = gh_get(f"{base}/commits/{head}")
     runs = gh_get(f"{base}/commits/{head}/check-runs?per_page=100", paginate=True)
     check_runs = (runs or {}).get("check_runs", [])
-    wf = gh_get(f"{base}/actions/runs?head_sha={head}&per_page=100")
+    wf = gh_get(f"{base}/actions/runs?head_sha={head}&per_page=100", paginate=True)
     event_by_suite = {w["check_suite_id"]: w["event"] for w in (wf or {}).get("workflow_runs", [])}
     # the base each run was created against (GitHub records it on the workflow run's pull_requests[] entry)
     base_by_suite = {w["check_suite_id"]: ((w.get("pull_requests") or [{}])[0].get("base") or {}).get("sha")

@@ -553,6 +553,11 @@ def classify_files(files: list[dict], policy: dict, reasons: Reasons):
             if not hit:
                 fzone = zmax(fzone, policy["default_zone"])
                 matched.append("<default-deny>")
+        # screening needs the text: an absent patch cannot be screened for injection or behaviour (docs included),
+        # except a pure rename/copy that changes no lines
+        patch0 = f.get("patch")
+        if (not isinstance(patch0, str) or patch0 == "") and not (f["status"] in ("renamed", "copied") and f["additions"] + f["deletions"] == 0):
+            reasons.add("BLOCK", "PATCH_UNAVAILABLE", safe_path(f["filename"]))
         # behaviour: only raises, never lowers
         bzone = "A"
         behavior_rule = any(r["id"] in matched and r.get("behavior") for r in rules)
@@ -564,7 +569,6 @@ def classify_files(files: list[dict], policy: dict, reasons: Reasons):
             if not isinstance(patch, str) or patch == "":
                 # an uninspectable code change can hide anything (financial, security): never assume a zone bound
                 bzone = zmax(bzone, "B")
-                reasons.add("BLOCK", "PATCH_UNAVAILABLE", safe_path(f["filename"]))
             else:
                 text = "\n".join(list(_added_lines(patch)) + list(_removed_lines(patch)))
                 if _C_TOKENS.search(text):
