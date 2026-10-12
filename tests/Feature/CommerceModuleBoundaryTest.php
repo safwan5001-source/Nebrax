@@ -135,6 +135,9 @@ class CommerceModuleBoundaryTest extends TestCase
         'api/commerce/workspace/storefronts/{id}/presentation/versions/{version}',
         // CUST-H1-3 — نشر فوري لنسخة محدَّدة تماماً.
         'api/commerce/workspace/storefronts/{id}/presentation/versions/{version}/publish',
+        // CUST-H5-3 — سجلّ المراجعات المحفوظة (قراءة فقط).
+        'api/commerce/workspace/storefronts/{id}/presentation/versions/{version}/revisions',
+        'api/commerce/workspace/storefronts/{id}/presentation/versions/{version}/revisions/{revision}',
         // CUST-H1-4 — جدولة/استبدال/إعادة جدولة (PUT) وإلغاء (DELETE) نشرٍ مستقبلي.
         'api/commerce/workspace/storefronts/{id}/presentation/versions/{version}/schedule',
         // CUST-H2-3 — قراءة منتجات مساحة عمل Commerce لمنتقي "معاينة منتج" في

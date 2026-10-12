@@ -1052,6 +1052,14 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         Route::get('commerce/workspace/storefronts/{id}/presentation/versions/{version}', [CommerceWorkspaceStorefrontPresentationVersionController::class, 'show'])
             ->whereUuid('id')->whereUuid('version')
             ->middleware($perm('commerce.manage'));
+        // CUST-H5-3: سجلّ المراجعات المحفوظة لنسخة (قراءة فقط: قائمة بلا مستند، ومراجعة واحدة بمستندها المُطبَّع).
+        // لا مسار عام ولا كتابة؛ نفس صلاحية بقية مسارات النسخ (commerce.manage) — لا صلاحية جديدة.
+        Route::get('commerce/workspace/storefronts/{id}/presentation/versions/{version}/revisions', [CommerceWorkspaceStorefrontPresentationVersionController::class, 'revisions'])
+            ->whereUuid('id')->whereUuid('version')
+            ->middleware($perm('commerce.manage'));
+        Route::get('commerce/workspace/storefronts/{id}/presentation/versions/{version}/revisions/{revision}', [CommerceWorkspaceStorefrontPresentationVersionController::class, 'showRevision'])
+            ->whereUuid('id')->whereUuid('version')->whereUuid('revision')
+            ->middleware($perm('commerce.manage'));
         Route::put('commerce/workspace/storefronts/{id}/presentation/versions/{version}', [CommerceWorkspaceStorefrontPresentationVersionController::class, 'update'])
             ->whereUuid('id')->whereUuid('version')
             ->middleware($perm('commerce.manage'));

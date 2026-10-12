@@ -5,6 +5,7 @@ namespace App\Services\Commerce;
 use App\Models\Storefront;
 use App\Models\StorefrontPresentation;
 use App\Models\StorefrontPresentationVersion;
+use App\Models\StorefrontPresentationVersionRevision;
 use App\Support\Commerce\SchedulePublicationTokenCodec;
 use App\Support\Commerce\StorefrontPresentationNormalizer;
 use App\Support\Commerce\StorefrontPresentationPublishValidator;
@@ -57,12 +58,16 @@ final class StorefrontPresentationVersionService
 
     private readonly StorefrontPresentationPublishValidator $publishValidator;
 
+    private readonly StorefrontPresentationRevisionRecorder $revisions;
+
     public function __construct(
         private readonly StorefrontPresentationNormalizer $normalizer,
         private readonly SchedulePublicationTokenCodec $tokenCodec,
         ?StorefrontPresentationPublishValidator $publishValidator = null,
+        ?StorefrontPresentationRevisionRecorder $revisions = null,
     ) {
         $this->publishValidator = $publishValidator ?? new StorefrontPresentationPublishValidator;
+        $this->revisions = $revisions ?? new StorefrontPresentationRevisionRecorder;
     }
 
     /** @return list<array<string, mixed>>|null */
@@ -166,11 +171,19 @@ final class StorefrontPresentationVersionService
 
             $newRevision = (int) $version->revision + 1;
 
+            // CUST-H5-3 — حالة ما قبل الحفظ تُلتقَط قبل الكتابة لخط الأساس الكسول للسجلّ (مصدر الاتفاقية: المسجِّل).
+            $priorConfig = is_array($version->config) ? $version->config : null;
+            $priorRevision = (int) $version->revision;
+            $priorSchemaVersion = (int) $version->schema_version;
+
             $version->forceFill([
                 'config' => $normalized,
                 'schema_version' => StorefrontPresentationNormalizer::VERSION,
                 'revision' => $newRevision,
             ])->save();
+
+            // داخل معاملة الحفظ نفسها وتحت قفل Storefront ← head ← Version: اللقطة تتبع الحفظ ذرّياً.
+            $this->revisions->recordSave($version, $priorConfig, $priorRevision, $priorSchemaVersion);
 
             // CUST-H1-1: إن كانت النسخة المحفوظة هي نسخة العمل المتوافقة
             // ذاتها، يجب مزامنة حقول المسودة على الرأس أيضاً في نفس
@@ -188,6 +201,88 @@ final class StorefrontPresentationVersionService
 
             return $this->detail($version->fresh(), $head);
         });
+    }
+
+    /**
+     * CUST-H5-3 — قائمة المراجعات المحفوظة لنسخة (الأحدث أولاً). بلا المستند: بيانات وصفية فقط. محدودة بسقف الاحتفاظ.
+     * أجنبي/مفقود → null. `is_current`: لقطةٌ مطابقة لمحتوى النسخة الآن.
+     *
+     * @return list<array<string, mixed>>|null
+     */
+    public function listRevisionsForCurrentTenant(string $storefrontId, string $versionId): ?array
+    {
+        $storefront = $this->ownedStorefront($storefrontId);
+        if ($storefront === null) {
+            return null;
+        }
+
+        $version = $this->findOwnedVersion($storefront, $versionId);
+        if ($version === null) {
+            return null;
+        }
+
+        $currentHash = StorefrontPresentationRevisionRecorder::hashOf((array) $version->config);
+
+        return StorefrontPresentationVersionRevision::query()
+            ->where('version_id', $version->id)
+            ->where('storefront_id', $storefront->id)
+            ->orderByDesc('version_revision')
+            ->get(['id', 'version_id', 'version_revision', 'schema_version', 'config_hash', 'size_bytes', 'created_at'])
+            ->map(fn (StorefrontPresentationVersionRevision $r) => $this->summarizeRevision($r, $currentHash))
+            ->values()
+            ->all();
+    }
+
+    /**
+     * CUST-H5-3 — مراجعة واحدة **مع** مستندها المُطبَّع تحت المخطط الحالي (للمعاينة/الاسترداد). قراءة فقط: لا تغيّر
+     * النسخة ولا مراجعتها ولا النشر. مراجعةٌ لا تخصّ هذه النسخة (أو مستأجراً/متجراً آخر) → null (404).
+     *
+     * @return array<string, mixed>|null
+     *
+     * @throws ForwardSchemaVersionException
+     */
+    public function showRevisionForCurrentTenant(string $storefrontId, string $versionId, string $revisionId): ?array
+    {
+        $storefront = $this->ownedStorefront($storefrontId);
+        if ($storefront === null) {
+            return null;
+        }
+
+        $version = $this->findOwnedVersion($storefront, $versionId);
+        if ($version === null) {
+            return null;
+        }
+
+        $revision = StorefrontPresentationVersionRevision::query()
+            ->whereKey($revisionId)
+            ->where('version_id', $version->id)
+            ->where('storefront_id', $storefront->id)
+            ->first();
+        if ($revision === null) {
+            return null;
+        }
+
+        $this->assertSupportedSchema((int) $revision->schema_version);
+
+        $currentHash = StorefrontPresentationRevisionRecorder::hashOf((array) $version->config);
+
+        return array_merge($this->summarizeRevision($revision, $currentHash), [
+            'config' => $this->normalizer->normalize((array) $revision->config, (int) $revision->schema_version),
+        ]);
+    }
+
+    /** @return array<string, mixed> */
+    private function summarizeRevision(StorefrontPresentationVersionRevision $revision, string $currentHash): array
+    {
+        return [
+            'id' => $revision->id,
+            'version_id' => $revision->version_id,
+            'version_revision' => (int) $revision->version_revision,
+            'schema_version' => (int) $revision->schema_version,
+            'size_bytes' => (int) $revision->size_bytes,
+            'created_at' => $revision->created_at?->toJSON(),
+            'is_current' => $revision->config_hash === $currentHash,
+        ];
     }
 
     /** @return array<string, mixed>|null */
