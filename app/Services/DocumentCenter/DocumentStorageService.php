@@ -12,11 +12,29 @@ use Throwable;
 /** عقد تخزين خاص محايد عن R2/S3؛ بيانات الاتصال لا تدخل صفوف التشغيل. */
 class DocumentStorageService
 {
+    /**
+     * ملفٌّ كُتب على التخزين الدائم المضبوط في تكامل المنصة: **يُقرأ ويُحذف من هناك دائماً**، بصرف النظر عن قفل
+     * التشغيل الحالي. بلا هذا المؤشر كان إغلاق `DOCUMENT_DURABLE_STORAGE_ENABLED` بعد إنشاء مستندات يجعلها غير
+     * مقروءة (الصف لا يعرف أين كُتب). الصفوف القديمة تحمل `platform` وتبقى تتبع القفل كما كانت (توافق خلفي).
+     */
+    public const PROFILE_DURABLE = 'platform-s3';
+
     public function __construct(private readonly PlatformIntegrationResolver $integrations) {}
 
     public function profile(): string
     {
         return (string) config('document_center.storage.profile', 'platform');
+    }
+
+    /**
+     * الملف الذي يُسجَّل في صف **مستند جديد**: `platform-s3` حين يكون التخزين الدائم فعلياً الآن (القفل مفتوح وتكامل
+     * مفعَّل)، وإلا `platform` كالسابق. وحده مركز المستندات يستعمله؛ بقية المستدعين يبقون على `profile()`.
+     */
+    public function writeProfile(): string
+    {
+        return $this->persistentEnabled() && $this->integrations->activeConfiguration('document_storage') !== []
+            ? self::PROFILE_DURABLE
+            : $this->profile();
     }
 
     /** @param resource $stream */
@@ -131,6 +149,12 @@ class DocumentStorageService
     /** اختبار كتابة وقراءة وحذف لكائن مؤقت لا يتضمن أي بيانات عميل. */
     public function healthCheck(): bool
     {
+        // تكامل مفعَّل محفوظ ⇒ يُختبَر **هو** (R2) لا القرص المحلي الذي يعيده القفل المغلق، فلا نجاح مضلِّل.
+        // بلا تكامل مفعَّل: السلوك القديم حرفياً (الإعداد الفعلي الحالي).
+        if ($this->integrations->activeConfiguration('document_storage') !== []) {
+            return $this->verifyPlatformConfiguration()['ok'];
+        }
+
         $key = 'healthchecks/'.Str::uuid().'.txt';
         $filesystem = $this->filesystem($this->profile());
         try {
@@ -146,6 +170,15 @@ class DocumentStorageService
 
     private function filesystem(string $profile): Filesystem
     {
+        if ($profile === self::PROFILE_DURABLE) {
+            // يُبنى من تكامل المنصة بمعزل عن القفل. تكامل غائب/معطّل = فشل صريح لا سقوط صامت إلى قرص محلي
+            // لا يحوي الملف (سقوطٌ كهذا كان سيُخفي فقد القراءة).
+            if ($this->integrations->activeConfiguration('document_storage') === []) {
+                throw new RuntimeException('Document storage integration is unavailable.');
+            }
+
+            return $this->build($this->settings(true));
+        }
         if ($profile !== $this->profile()) {
             throw new RuntimeException('Unknown document storage profile.');
         }
