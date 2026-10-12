@@ -1222,7 +1222,9 @@ function HomepagePanel({
         (target.type === "hero"
           ? isHeroAuthored(heroContentOf(target))
           : Object.keys(target.content).length > 0)) ||
-      (target.design && Object.keys(target.design).length > 0);
+      (target.design && Object.keys(target.design).length > 0) ||
+      // a name the merchant typed is authored too (V10c): deleting it deserves the same confirmation
+      Boolean(target.label);
     if (authored) setPendingDelete(target.id);
     else deleteSection(index);
   };

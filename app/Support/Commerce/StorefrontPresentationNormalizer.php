@@ -761,7 +761,8 @@ final class StorefrontPresentationNormalizer
             // CUST-HV V10c (V0 §17.1) — اسم القسم: بيانات محرر فقط (≤ 60 نقطة ترميز، الفراغ = غياب). لا يُعرض في المتجر.
             $label = is_string($section['label'] ?? null) ? trim($section['label']) : '';
             if ($label !== '') {
-                $instance['label'] = mb_substr($label, 0, self::MAX_SECTION_LABEL);
+                // الاقتطاع قد يترك فراغاً في الطرف؛ نُعيد القصّ لتبقى الدالة متساوية القوة (idempotent).
+                $instance['label'] = trim(mb_substr($label, 0, self::MAX_SECTION_LABEL));
             }
             $content = $this->normalizeOptionalSectionContent($type, $section['content'] ?? null);
             if ($content !== null) {

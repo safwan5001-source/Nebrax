@@ -63,7 +63,8 @@ export const MAX_SECTION_LABEL = 60;
 function sectionLabel(value: unknown): string {
   if (typeof value !== "string") return "";
   const trimmed = value.replace(/^[ \t\n\r\0\v]+|[ \t\n\r\0\v]+$/g, "");
-  return Array.from(trimmed).slice(0, MAX_SECTION_LABEL).join("");
+  // the cut can leave whitespace at the end: trim again, as the PHP authority does, so the function is idempotent
+  return Array.from(trimmed).slice(0, MAX_SECTION_LABEL).join("").replace(/^[ \t\n\r\0\v]+|[ \t\n\r\0\v]+$/g, "");
 }
 
 /**

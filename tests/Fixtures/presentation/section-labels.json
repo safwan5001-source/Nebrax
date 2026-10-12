@@ -202,6 +202,36 @@
                 "visible": true,
                 "label": "الرئيسي"
             }
+        },
+        {
+            "name": "a cut that lands after whitespace is trimmed again (idempotent)",
+            "input": {
+                "id": "s1",
+                "type": "newArrivals",
+                "visible": true,
+                "label": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa b"
+            },
+            "expected": {
+                "id": "s1",
+                "type": "newArrivals",
+                "visible": true,
+                "label": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            }
+        },
+        {
+            "name": "a cut that lands after a tab or newline is trimmed again",
+            "input": {
+                "id": "s1",
+                "type": "newArrivals",
+                "visible": true,
+                "label": "عععععععععععععععععععععععععععععععععععععععععععععععععععععععععع\t\nx"
+            },
+            "expected": {
+                "id": "s1",
+                "type": "newArrivals",
+                "visible": true,
+                "label": "عععععععععععععععععععععععععععععععععععععععععععععععععععععععععع"
+            }
         }
     ]
 }
