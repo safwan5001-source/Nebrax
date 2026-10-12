@@ -81,6 +81,27 @@
   outline: 2px solid var(--store-primary);
   outline-offset: 2px;
 }
+/* CUST-HV V10c (V0 §17.1) — the selection chip: the merchant's own name for the selected section. Editor chrome (the editor's
+   tokens, not the store's), pointer-transparent, one line, inside the section's box so it can never widen the page. */
+.awj-store-preview .awj-preview-section-named {
+  position: relative;
+}
+.awj-store-preview .awj-preview-section-chip {
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline-start: 0;
+  z-index: 5;
+  max-width: calc(100% - 1rem);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 0.125rem 0.5rem;
+  border-end-end-radius: 0.375rem;
+  background: var(--primary, #1e40af);
+  color: var(--primary-foreground, #fff);
+  font: 600 0.6875rem/1.25rem var(--font-sans, inherit);
+  pointer-events: none;
+}
 
 /* Independent, thin-but-visible scrollbars for the customizer's own
    scroll regions (canvas, inspector, navigation, mobile sheet), all of

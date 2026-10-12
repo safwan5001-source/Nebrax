@@ -50,6 +50,7 @@ import {
 import { resolveRoleHex } from "../presentation/palette";
 import { ColourField } from "./ColourField";
 import { PlacementGrid } from "./PlacementGrid";
+import { sectionPresetsFor } from "../themes/section-presets";
 import { copyDesign, pasteDesign, useDesignClipboard } from "./design-clipboard";
 import { commitDesign, setGroup } from "./design-edit";
 
@@ -418,6 +419,7 @@ export function DesignInspector({
     );
   };
 
+  const presets = sectionPresetsFor(type);
   const backgroundIssue = issues.find((i) => i.field === "background");
   const canBleed = !!capability.width && current.background?.kind === "solid";
 
@@ -450,6 +452,27 @@ export function DesignInspector({
           >
             {t("designPaste")}
           </button>
+          {presets.length > 0 ? (
+            <select
+              data-design-preset=""
+              aria-label={t("designPresetLabel")}
+              value=""
+              onChange={(event) => {
+                const preset = presets.find((candidate) => candidate.id === event.target.value);
+                if (!preset) return;
+                onChange(commitDesign(type, preset.design));
+                setNotice(t("designPresetApplied"));
+              }}
+              className={`${btnClass} max-w-full`}
+            >
+              <option value="">{t("designPresetLabel")}</option>
+              {presets.map((preset) => (
+                <option key={preset.id} value={preset.id}>
+                  {preset.label[locale]}
+                </option>
+              ))}
+            </select>
+          ) : null}
           {confirmReset ? (
             <>
               <button

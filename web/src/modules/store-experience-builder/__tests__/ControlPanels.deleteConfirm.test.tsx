@@ -46,6 +46,13 @@ describe("deleting a section (CUST-HV V1B / DEF-6)", () => {
     expect(lastSections(onChange).map((s) => s.id)).toEqual(["b2"]);
   });
 
+  it("a section with only a name the merchant typed asks too (V10c review)", () => {
+    const onChange = mount(withSections([{ id: "b1", type: "banner", visible: true, label: "Eid drop" }]));
+    fireEvent.click(screen.getByRole("button", { name: "Delete section" }));
+    expect(onChange).not.toHaveBeenCalled();
+    expect(screen.getByRole("alertdialog")).toBeTruthy();
+  });
+
   it("Escape cancels", () => {
     const onChange = mount(withSections([{ id: "b1", type: "banner", visible: true, design: { radius: "md" } }]));
     fireEvent.click(screen.getByRole("button", { name: "Delete section" }));

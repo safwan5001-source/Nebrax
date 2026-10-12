@@ -18,6 +18,7 @@ import {
   type HomeBuilderSectionKey,
   isGatedHomeSection,
   MAX_HOME_SECTIONS,
+  MAX_SECTION_LABEL,
   newHomeSectionId,
   type PresentationHomeSection,
   presetSelectionPatch,
@@ -82,6 +83,7 @@ import {
 import { OfferCatalog } from "./OfferCatalog";
 import { DesignInspector } from "./design/DesignInspector";
 import { ContentBlocksFields } from "./ContentBlocksFields";
+import { BufferedText, stored } from "./BufferedText";
 import { ShelfTitleFields } from "./ShelfTitleFields";
 import { GalleryFields } from "./GalleryFields";
 import { SliderFields } from "./SliderFields";
@@ -430,6 +432,18 @@ function shelfContent<K extends "productIds" | "offerIds">(
   const hasIds = Object.values<string[]>(ids).some((list) => list.length > 0);
   if (!hasIds && Object.keys(ownFields).length === 0) return undefined;
   return { ...ids, ...ownFields };
+}
+
+/**
+ * CUST-HV V10c — the name of a duplicated section: the original's, plus a suffix, never past the limit. When it does not fit, the
+ * ORIGINAL name is shortened — the suffix is what tells the two apart, so it is never the part that is cut.
+ */
+export function copyLabel(label: string, suffix: string): string {
+  const tail = ` · ${suffix}`;
+  const room = Math.max(0, MAX_SECTION_LABEL - Array.from(tail).length);
+  const head = Array.from(label);
+  const kept = head.length <= room ? label : head.slice(0, room).join("").trimEnd();
+  return `${kept}${tail}`;
 }
 
 export const inputClass =
@@ -1179,6 +1193,7 @@ function HomepagePanel({
       id: newHomeSectionId(),
       type: source.type,
       visible: source.visible,
+      ...(source.label ? { label: copyLabel(source.label, t("sectionCopySuffix")) } : {}),
       ...(source.content ? { content: structuredClone(source.content) } : {}),
       ...(source.design ? { design: structuredClone(source.design) } : {}),
     };
@@ -1207,7 +1222,9 @@ function HomepagePanel({
         (target.type === "hero"
           ? isHeroAuthored(heroContentOf(target))
           : Object.keys(target.content).length > 0)) ||
-      (target.design && Object.keys(target.design).length > 0);
+      (target.design && Object.keys(target.design).length > 0) ||
+      // a name the merchant typed is authored too (V10c): deleting it deserves the same confirmation
+      Boolean(target.label);
     if (authored) setPendingDelete(target.id);
     else deleteSection(index);
   };
@@ -1275,7 +1292,7 @@ function HomepagePanel({
     <div className="space-y-7">
       {selected ? (
         <Section
-          title={t(SECTION_LABEL[selected.type])}
+          title={selected.label || t(SECTION_LABEL[selected.type])}
           hint={t("selectedSectionHint")}
         >
           <div
@@ -1290,6 +1307,21 @@ function HomepagePanel({
               checked={selected.visible}
               onChange={(visible) => setVisible(selectedIndex, visible)}
             />
+            <Field label={t("sectionNameLabel")}>
+              <BufferedText
+                key={selected.id}
+                value={selected.label ?? ""}
+                limit={MAX_SECTION_LABEL}
+                placeholder={t(SECTION_LABEL[selected.type])}
+                onCommit={(text) => {
+                  const { label: _previous, ...rest } = selected;
+                  const label = stored(text);
+                  updateSection(selectedIndex, label ? { ...rest, label: text } : rest);
+                }}
+                data-section-name=""
+              />
+            </Field>
+            <p className="-mt-2 text-[11px] leading-4 text-muted">{t("sectionNameHelp")}</p>
             {SECTION_DESIGN_CAPABILITIES[selected.type] ? (
               <Segmented
                 value={designTab}
@@ -1604,7 +1636,7 @@ function HomepagePanel({
                 type="button"
                 data-section-option={section.type}
                 aria-pressed={isSelected}
-                title={t(SECTION_LABEL[section.type])}
+                title={section.label ? `${section.label} · ${t(SECTION_LABEL[section.type])}` : t(SECTION_LABEL[section.type])}
                 onClick={() => onSelectSection?.(section.id)}
                 className="min-w-0 flex-1 rounded-sm px-1 py-1 text-start outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
               >
@@ -1613,8 +1645,13 @@ function HomepagePanel({
                     isSelected ? "font-semibold" : "font-medium"
                   }`}
                 >
-                  {t(SECTION_LABEL[section.type])}
+                  <bdi>{section.label || t(SECTION_LABEL[section.type])}</bdi>
                 </p>
+                {section.label ? (
+                  <p className="truncate text-[10px] leading-none text-neutral-400" data-section-type-hint="">
+                    {t(SECTION_LABEL[section.type])}
+                  </p>
+                ) : null}
                 {isGatedHomeSection(section.type) ? (
                   <p className="text-[10px] leading-none text-neutral-400">
                     {t("gatedBadge")}

@@ -1,0 +1,237 @@
+{
+    "_note": "CUST-HV V10c (V0 §17.1) — a section's editor-only `label`: trimmed, ≤ 60 code points, blank/non-string = absent, canonical key order id · type · visible · label · content · design. `expected` is the normalised section. Shared by PHP StorefrontPresentationNormalizer and the merchant-app TS twin; the storefront twin deliberately ignores the key.",
+    "cases": [
+        {
+            "name": "absent",
+            "input": {
+                "id": "s1",
+                "type": "newArrivals",
+                "visible": true
+            },
+            "expected": {
+                "id": "s1",
+                "type": "newArrivals",
+                "visible": true
+            }
+        },
+        {
+            "name": "a name is kept, trimmed",
+            "input": {
+                "id": "s1",
+                "type": "newArrivals",
+                "visible": true,
+                "label": "  هدايا العيد \n"
+            },
+            "expected": {
+                "id": "s1",
+                "type": "newArrivals",
+                "visible": true,
+                "label": "هدايا العيد"
+            }
+        },
+        {
+            "name": "blank is absent",
+            "input": {
+                "id": "s1",
+                "type": "newArrivals",
+                "visible": true,
+                "label": ""
+            },
+            "expected": {
+                "id": "s1",
+                "type": "newArrivals",
+                "visible": true
+            }
+        },
+        {
+            "name": "whitespace only is absent",
+            "input": {
+                "id": "s1",
+                "type": "newArrivals",
+                "visible": true,
+                "label": " \t\n "
+            },
+            "expected": {
+                "id": "s1",
+                "type": "newArrivals",
+                "visible": true
+            }
+        },
+        {
+            "name": "not a string is absent: number",
+            "input": {
+                "id": "s1",
+                "type": "newArrivals",
+                "visible": true,
+                "label": 12
+            },
+            "expected": {
+                "id": "s1",
+                "type": "newArrivals",
+                "visible": true
+            }
+        },
+        {
+            "name": "not a string is absent: array",
+            "input": {
+                "id": "s1",
+                "type": "newArrivals",
+                "visible": true,
+                "label": [
+                    "x"
+                ]
+            },
+            "expected": {
+                "id": "s1",
+                "type": "newArrivals",
+                "visible": true
+            }
+        },
+        {
+            "name": "not a string is absent: null",
+            "input": {
+                "id": "s1",
+                "type": "newArrivals",
+                "visible": true,
+                "label": null
+            },
+            "expected": {
+                "id": "s1",
+                "type": "newArrivals",
+                "visible": true
+            }
+        },
+        {
+            "name": "sixty code points are kept (Arabic)",
+            "input": {
+                "id": "s1",
+                "type": "newArrivals",
+                "visible": true,
+                "label": "سسسسسسسسسسسسسسسسسسسسسسسسسسسسسسسسسسسسسسسسسسسسسسسسسسسسسسسسسسسس"
+            },
+            "expected": {
+                "id": "s1",
+                "type": "newArrivals",
+                "visible": true,
+                "label": "سسسسسسسسسسسسسسسسسسسسسسسسسسسسسسسسسسسسسسسسسسسسسسسسسسسسسسسسسسسس"
+            }
+        },
+        {
+            "name": "the sixty-first code point is cut (Arabic)",
+            "input": {
+                "id": "s1",
+                "type": "newArrivals",
+                "visible": true,
+                "label": "سسسسسسسسسسسسسسسسسسسسسسسسسسسسسسسسسسسسسسسسسسسسسسسسسسسسسسسسسسسسس"
+            },
+            "expected": {
+                "id": "s1",
+                "type": "newArrivals",
+                "visible": true,
+                "label": "سسسسسسسسسسسسسسسسسسسسسسسسسسسسسسسسسسسسسسسسسسسسسسسسسسسسسسسسسسسس"
+            }
+        },
+        {
+            "name": "code points not UTF-16 units (emoji)",
+            "input": {
+                "id": "s1",
+                "type": "newArrivals",
+                "visible": true,
+                "label": "😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀"
+            },
+            "expected": {
+                "id": "s1",
+                "type": "newArrivals",
+                "visible": true,
+                "label": "😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀"
+            }
+        },
+        {
+            "name": "inner whitespace is kept",
+            "input": {
+                "id": "s1",
+                "type": "newArrivals",
+                "visible": true,
+                "label": "عرض\tالصيف"
+            },
+            "expected": {
+                "id": "s1",
+                "type": "newArrivals",
+                "visible": true,
+                "label": "عرض\tالصيف"
+            }
+        },
+        {
+            "name": "canonical order: id, type, visible, label, content, design",
+            "input": {
+                "design": {
+                    "layout": "rail"
+                },
+                "content": {
+                    "title": "T"
+                },
+                "label": "مميز",
+                "visible": true,
+                "type": "newArrivals",
+                "id": "s1"
+            },
+            "expected": {
+                "id": "s1",
+                "type": "newArrivals",
+                "visible": true,
+                "label": "مميز",
+                "content": {
+                    "title": "T"
+                },
+                "design": {
+                    "layout": "rail"
+                }
+            }
+        },
+        {
+            "name": "any section type may carry a name",
+            "input": {
+                "id": "h1",
+                "type": "hero",
+                "visible": true,
+                "label": "الرئيسي"
+            },
+            "expected": {
+                "id": "h1",
+                "type": "hero",
+                "visible": true,
+                "label": "الرئيسي"
+            }
+        },
+        {
+            "name": "a cut that lands after whitespace is trimmed again (idempotent)",
+            "input": {
+                "id": "s1",
+                "type": "newArrivals",
+                "visible": true,
+                "label": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa b"
+            },
+            "expected": {
+                "id": "s1",
+                "type": "newArrivals",
+                "visible": true,
+                "label": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            }
+        },
+        {
+            "name": "a cut that lands after a tab or newline is trimmed again",
+            "input": {
+                "id": "s1",
+                "type": "newArrivals",
+                "visible": true,
+                "label": "عععععععععععععععععععععععععععععععععععععععععععععععععععععععععع\t\nx"
+            },
+            "expected": {
+                "id": "s1",
+                "type": "newArrivals",
+                "visible": true,
+                "label": "عععععععععععععععععععععععععععععععععععععععععععععععععععععععععع"
+            }
+        }
+    ]
+}

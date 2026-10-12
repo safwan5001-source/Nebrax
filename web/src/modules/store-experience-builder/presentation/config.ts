@@ -57,6 +57,16 @@ export interface PresentationNavLink {
   enabled: boolean;
 }
 
+export const MAX_SECTION_LABEL = 60;
+
+/** Twin of PHP's `trim` + `mb_substr`: the PHP default trim set, then ≤ 60 code points. */
+function sectionLabel(value: unknown): string {
+  if (typeof value !== "string") return "";
+  const trimmed = value.replace(/^[ \t\n\r\0\v]+|[ \t\n\r\0\v]+$/g, "");
+  // the cut can leave whitespace at the end: trim again, as the PHP authority does, so the function is idempotent
+  return Array.from(trimmed).slice(0, MAX_SECTION_LABEL).join("").replace(/^[ \t\n\r\0\v]+|[ \t\n\r\0\v]+$/g, "");
+}
+
 /**
  * Homepage section instance (contract v2). `id` is the stable instance
  * identity — local to this presentation document, never a global resource
@@ -67,6 +77,11 @@ export interface PresentationHomeSection {
   id: string;
   type: HomeBuilderSectionKey;
   visible: boolean;
+  /**
+   * CUST-HV V10c (V0 §17.1) — the merchant's own name for this section: **editor metadata only** (the section list and inspector
+   * title). Never rendered on the storefront, never an `aria-label` or heading; the public snapshot omits it.
+   */
+  label?: string;
   /** Present only when this instance has non-empty authored content. */
   content?: SectionContent;
   /**
@@ -385,6 +400,9 @@ function resolveHomeBuilderSections(
       type: type as HomeBuilderSectionKey,
       visible: asBoolean(entry.visible, false),
     };
+    // CUST-HV V10c (V0 §17.1) — editor-only section name (≤ 60 code points, blank = absent). The storefront never reads it.
+    const label = sectionLabel(entry.label);
+    if (label) section.label = label;
     const content = normalizeOptionalSectionContent(type, entry.content);
     if (content) section.content = content;
     // CUST-HV V5b — typed section design (contract §3). Absent = no key ⇒ unchanged.
