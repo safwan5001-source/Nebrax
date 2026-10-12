@@ -729,6 +729,7 @@ export function ExperienceBuilder({
     }
     setNotice(null);
     setVersionConflict(null);
+    conflictCopyRef.current = null;
     setSelectedVersion(result.data);
     setDraft(result.data.config);
     setSaved(result.data.config);
@@ -771,6 +772,66 @@ export function ExperienceBuilder({
     void applyVersionSelection(selectedVersion);
   }
 
+  // CUST-H5-5 — «احفظ عملي كمسودة جديدة» عند تعارض قديم: نسخة منفصلة بمستند المحرِّر المحلي، **لا دمج** ولا كتابة فوق الفائز.
+  // مساران موجودان فقط (لا واجهة جديدة): ١) إنشاء نسخة جديدة من النسخة الحالية على الخادم؛ ٢) حفظ مستند المحرِّر الكامل فيها
+  // (يتحقق الخادم من المستند كاملاً وملكية المستأجر). فشل الخطوة ٢ يُبقي المسودة المنشأة في `conflictCopyRef` فتُعاد المحاولة
+  // عليها وحدها — لا تتكاثر النسخ. أي فشل يُبقي التعديلات المحلية والسجلّ كما هي.
+  const conflictCopyRef = useRef<{ forVersionId: string; copy: { id: string; name: string; revision: number } } | null>(null);
+
+  async function handleSaveConflictAsDraft() {
+    if (!storefrontId || !selectedVersion || versionConflict?.versionId !== selectedVersion.id) return;
+    if (versionBusy !== null || versionCreating || busy !== null || readOnlyPreview) return;
+    const originStorefrontId = storefrontId;
+    const conflicted = selectedVersion;
+    const tokenAtStart = versionRequestTokenRef.current;
+    const draftAtStart = draftRef.current;
+    const persisted = normalizePresentationConfig(draftAtStart);
+    const writeRequestId = ++versionWriteRequestRef.current;
+    setVersionBusy({ id: conflicted.id, action: "duplicate" });
+    const finish = () => {
+      if (storefrontIdRef.current === originStorefrontId && writeRequestId === versionWriteRequestRef.current) setVersionBusy(null);
+    };
+    const note = (key: CustomizerMessageKey, name?: string) => {
+      if (storefrontIdRef.current !== originStorefrontId || tokenAtStart !== versionRequestTokenRef.current) return;
+      setNoticeKind("status");
+      setNotice(name === undefined ? t(key) : fillTemplate(t(key), { name }));
+    };
+
+    let copy = conflictCopyRef.current?.forVersionId === conflicted.id ? conflictCopyRef.current.copy : null;
+    if (!copy) {
+      const name = `${conflicted.name} — ${t("conflictCopyNameSuffix")}`.slice(0, 120);
+      const created = await createPresentationVersion(originStorefrontId, name, conflicted.id);
+      if (!created.ok) {
+        finish();
+        note("conflictCopyFailed");
+        return;
+      }
+      updateVersionSummaryInList(created.data);
+      copy = { id: created.data.id, name: created.data.name, revision: created.data.revision };
+      conflictCopyRef.current = { forVersionId: conflicted.id, copy };
+    }
+    const saved = await savePresentationVersion(originStorefrontId, copy.id, persisted, copy.revision);
+    finish();
+    if (!saved.ok) {
+      // المسودة المنشأة لم تعد صالحة للإعادة (تغيّرت/حُذفت): المحاولة التالية تُنشئ نسخة جديدة بدل العلق على مراجعة قديمة.
+      if (saved.reason === "conflict" || saved.reason === "not_found") conflictCopyRef.current = null;
+      note("conflictCopyPartial", copy.name);
+      return;
+    }
+    conflictCopyRef.current = null;
+    if (storefrontIdRef.current !== originStorefrontId) return;
+    updateVersionSummaryInList(saved.data);
+    if (tokenAtStart !== versionRequestTokenRef.current || selectedVersionIdRef.current !== conflicted.id) return;
+    if (!presentationConfigsEqual(draftRef.current, draftAtStart)) {
+      // تعديلات أحدث بعد الضغط: لا نستبدلها بصمت — تبقى هنا والتعارض قائماً، والنسخة المنفصلة محفوظة.
+      note("conflictCopySavedKeepEditing", saved.data.name);
+      return;
+    }
+    adoptCreatedVersion(saved.data);
+    setNoticeKind("status");
+    setNotice(fillTemplate(t("conflictCopySaved"), { name: saved.data.name }));
+  }
+
   function adoptCreatedVersion(detail: PresentationVersionDetail) {
     // إبطال أي طلب تبديل قيد التنفيذ — نسخة جديدة تم إنشاؤها للتو أولى بالتطبيق.
     ++versionRequestTokenRef.current;
@@ -786,6 +847,7 @@ export function ExperienceBuilder({
     // «تحديث النسخة» يُعيد تحميل هذه النسخة الجديدة نفسها *بلا* تأكيد تجاهل —
     // فيمحو بصمت أي تعديل محلي عليها ظنّاً من التاجر أنه يحلّ تعارضاً حقيقياً.
     setVersionConflict(null);
+    conflictCopyRef.current = null;
     setSelectedVersion(detail);
     setDraft(detail.config);
     setSaved(detail.config);
@@ -3220,15 +3282,40 @@ export function ExperienceBuilder({
           data-version-conflict=""
           className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-warning/30 bg-warning-soft px-3 py-2 text-xs leading-5 text-warning"
         >
-          <span>{t("versionStaleConflict")}</span>
-          <button
-            type="button"
-            data-version-reload=""
-            onClick={reloadConflictedVersion}
-            className="shrink-0 rounded-md border border-warning/40 bg-surface px-2.5 py-1 text-[11px] font-medium text-warning hover:bg-warning-soft"
-          >
-            {t("versionReloadLatest")}
-          </button>
+          <div className="min-w-0 flex-1 basis-64">
+            <p>{t("versionStaleConflict")}</p>
+            <p data-conflict-hint="" className="mt-0.5 text-[11px] opacity-90">{t("conflictRecoveryHint")}</p>
+          </div>
+          <div className="flex max-w-full flex-wrap items-center gap-1.5">
+            <button
+              type="button"
+              data-conflict-review=""
+              onClick={(event) => openHistory(event.currentTarget)}
+              disabled={historyWriteBusy || readOnlyPreview}
+              className="rounded-md border border-warning/40 bg-surface px-2.5 py-1 text-[11px] font-medium text-warning hover:bg-warning-soft disabled:opacity-50"
+            >
+              {t("conflictReview")}
+            </button>
+            {dirty ? (
+              <button
+                type="button"
+                data-conflict-save-as-draft=""
+                onClick={() => void handleSaveConflictAsDraft()}
+                disabled={versionBusy !== null || versionCreating || busy !== null || readOnlyPreview}
+                className="rounded-md border border-warning/40 bg-surface px-2.5 py-1 text-[11px] font-medium text-warning hover:bg-warning-soft disabled:opacity-50"
+              >
+                {t("conflictSaveAsDraft")}
+              </button>
+            ) : null}
+            <button
+              type="button"
+              data-version-reload=""
+              onClick={reloadConflictedVersion}
+              className="rounded-md border border-warning/40 bg-surface px-2.5 py-1 text-[11px] font-medium text-warning hover:bg-warning-soft"
+            >
+              {t("versionReloadLatest")}
+            </button>
+          </div>
         </div>
       ) : null}
 
