@@ -62,7 +62,9 @@
           },
           "claim_order": 3
         },
-        "files_complete": true
+        "files_complete": true,
+        "head_repo": "synthetic-owner/synthetic-repo",
+        "author": "synthetic-author-2"
       }
     ]
   }

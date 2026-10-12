@@ -56,6 +56,14 @@
     ]}
   ],
 
+  "financial_names": {
+    "comment": "A code/test file whose path names a financial concept is Zone C whatever its diff contains (token-free numeric edits, e.g. 0.15 -> 0.25).",
+    "roots": ["app/**", "tests/**", "web/src/**", "storefront/src/**", "database/**", "config/**", "resources/**", "routes/**"],
+    "terms": ["invoice", "payment", "tax", "vat", "price", "pricing", "discount", "refund", "ledger", "journal", "accounting", "money",
+              "currency", "billing", "subscription", "payroll", "salary", "commission", "balance", "total", "subtotal", "zatca",
+              "settlement", "credit", "debit", "receipt", "fee", "wallet", "payout", "tender"]
+  },
+
   "categories": {
     "docs-nongov": {"max_zone": "A", "rules": ["docs"]},
     "a11y-label": {"max_zone": "A", "rules": ["ui"]},

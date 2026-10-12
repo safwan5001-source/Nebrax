@@ -498,7 +498,7 @@ class ParallelHorizons(unittest.TestCase):
     SHARED = "app/Services/DocumentCenter/SyntheticHelper.php"
 
     def other(self, **kw):
-        o = {"number": 9200, "state": "open", "horizon_id": "SYNTH-HZ-OTHER", "head_ref": "synth-hz-other/x", "files_complete": True, "observed_at": "2026-10-12T11:59:00Z",
+        o = {"number": 9200, "state": "open", "horizon_id": "SYNTH-HZ-OTHER", "head_ref": "synth-hz-other/x", "head_repo": "synthetic-owner/synthetic-repo", "author": "synthetic-author-2", "files_complete": True, "observed_at": "2026-10-12T11:59:00Z",
              "last_activity_at": "2026-10-12T11:58:00Z", "files": [self.SHARED],
              "claim": {"horizon_id": "SYNTH-HZ-OTHER", "task_id": "T", "surfaces": {}, "claim_order": 3}}
         o.update(kw)
@@ -651,6 +651,38 @@ class ReviewerFindings(unittest.TestCase):
             rec = run(c)
             self.assertEqual(rec["zone"], "C", body)
             self.assertEqual(rec["decision"], "STOP_OWNER_DECISION", body)
+
+    def test_token_free_numeric_edits_in_financial_files_are_zone_c(self):  # Codex round 2, P1
+        for path in ["app/Services/InvoiceCalculator.php", "app/Support/VatRate.php", "app/Http/Helpers/PricingRules.php",
+                     "tests/Feature/PaymentRefundTest.php", "app/Services/Billing/late_fee.php", "web/src/modules/pos/receipt-total.ts"]:
+            c = with_files(base_b(), (path, "modified", "@@ -1 +1 @@\n-return 0.15;\n+return 0.25;"))
+            rec = run(c)
+            self.assertEqual(rec["zone"], "C", path)
+            self.assertEqual(rec["decision"], "STOP_OWNER_DECISION", path)
+        for path in ["app/Services/DocumentCenter/Syntax.php", "app/Services/Taxonomy/Labels.php", "app/Support/Fixtures.php"]:
+            self.assertEqual(he.is_financial_path(path, he.load_policy()[0]), False, path)   # words, not substrings
+
+    def test_behavior_bearing_markup_is_not_presentational(self):  # Codex round 2, P1
+        for line in ['<button type="submit">Delete</button>', '<input name="x" />', '<form action="/x">', '<a href="/x">x</a>', '<Button>x</Button>',
+                     '<div onClick="x">x</div>', '<div data-action="delete">x</div>', '<select>', '<img src="x" />', '<div hidden>x</div>',
+                     '<label for="x">x</label>', '<div style="x">x</div>', 'type="submit"', 'disabled']:
+            rec = run(ui_case("@@ -1 +1 @@\n-<span>x</span>\n+" + line))
+            self.assertNotEqual(rec["zone"], "A", line)
+        for line in ['<label aria-label="Full name">Full name</label>', '<p className="muted">Hello</p>', '<h2 title="Orders">Orders</h2>', "plain text line", "</div>", '<br />']:
+            self.assertEqual(run(ui_case("@@ -1 +1 @@\n-old text\n+" + line))["zone"], "A", line)
+
+    def test_other_pr_provenance_is_bound_to_repo_and_author(self):  # Codex round 2, P1
+        for mutate in (lambda o: o.update(head_repo="outsider/synthetic-repo"), lambda o: o.update(author="outsider")):
+            c = with_grant(base_b(), conflict_policy="serialize")
+            c["evidence"]["registry"]["horizons"][1]["claim_order"] = 9
+            c["evidence"]["pr"]["claim"]["claim_order"] = 5
+            other = ParallelHorizons().other()
+            other["claim"]["claim_order"] = 9
+            mutate(other)
+            c["evidence"]["other_prs"] = [other]
+            rec = run(c)
+            self.assertEqual(rec["decision"], "STOP_OWNER_DECISION")
+            self.assertIn("UNREGISTERED_HORIZON_ACTIVE", codes(rec))
 
     def test_jsx_expression_containers_are_not_presentational(self):  # Codex P1
         for line in ['<button disabled={!isAdmin}>Delete</button>', '<a aria-label={label}>x</a>', "{show && <b>x</b>}", '{" "}']:

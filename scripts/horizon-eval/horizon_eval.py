@@ -328,7 +328,7 @@ CASE_VALIDATOR = v_obj(
                 })),
                 "other_prs": v_list(v_obj({
                     "number": v_int(1), "state": v_enum("open", "closed"), "horizon_id": v_null(v_str()),
-                    "head_ref": v_str(), "observed_at": v_ts(), "last_activity_at": v_ts(),
+                    "head_ref": v_str(), "head_repo": v_str(), "author": v_str(), "observed_at": v_ts(), "last_activity_at": v_ts(),
                     "files": v_list(v_str()), "files_complete": v_bool(), "claim": v_null(_CLAIM),
                 })),
             },
@@ -394,7 +394,7 @@ def load_policy(path: Path = POLICY_PATH) -> tuple[dict, str]:
     raw = path.read_bytes()
     policy = json.loads(raw.decode("utf-8"))
     for key in ("policy_version", "default_zone", "path_rules", "categories", "hard_deny_patterns",
-                "surface_modes", "owner_gated_actions", "supported_actions", "windows", "ci_floor"):
+                "surface_modes", "owner_gated_actions", "supported_actions", "windows", "ci_floor", "financial_names"):
         if key not in policy:
             raise ValueError(f"policy missing {key}")
     if policy["default_zone"] != "C":
@@ -472,13 +472,55 @@ def _removed_lines(patch: str):
             yield line[1:]
 
 
+_SAFE_ELEMENTS = ("div", "span", "p", "h1", "h2", "h3", "h4", "h5", "h6", "label", "li", "ul", "ol", "strong", "em", "b", "i", "small",
+                  "section", "header", "footer", "main", "nav", "article", "table", "thead", "tbody", "tr", "td", "th", "caption", "br", "hr")
+_SAFE_ATTR = r'(?:className|class|aria-label|aria-labelledby|aria-describedby|alt|title|placeholder|lang|dir)\s*=\s*"[^"{}<>`$\\]*"'
+_OPEN_TAG = re.compile(r"<(?:" + "|".join(_SAFE_ELEMENTS) + r")(?:\s+" + _SAFE_ATTR + r")*\s*/?>")
+_OPEN_TAG_START = re.compile(r"<(?:" + "|".join(_SAFE_ELEMENTS) + r")(?:\s+" + _SAFE_ATTR + r")*\s*(?=$)")
+_CLOSE_TAG = re.compile(r"</(?:" + "|".join(_SAFE_ELEMENTS) + r")\s*>")
+_BARE_BEHAVIOR_WORDS = frozenset({"disabled", "hidden", "readonly", "required", "checked", "autofocus", "multiple", "selected", "open",
+                                  "download", "submit", "reset", "draggable", "contenteditable", "inert", "async", "defer"})
+_BARE_ATTR = re.compile(r"^\s*" + _SAFE_ATTR + r"\s*$")
+_TAG_END = re.compile(r"^\s*/?>\s*$")
+
+
+def _presentational_line(line: str) -> bool:
+    """Only safe elements (no a/button/input/form/custom components) with whitelisted literal attributes, plus plain text."""
+    if len(line) > 300:
+        return False
+    if _BARE_ATTR.match(line) or _TAG_END.match(line):
+        return True
+    if line.strip().lower() in _BARE_BEHAVIOR_WORDS:  # a lone boolean attribute on its own JSX line looks like text
+        return False
+    rest = _OPEN_TAG.sub(" ", line)
+    rest = _CLOSE_TAG.sub(" ", rest)
+    rest = _OPEN_TAG_START.sub(" ", rest)
+    # what is left must be plain text: no markup, no assignments, no expressions, no code words
+    return bool(_PRESENTATIONAL_LINE.fullmatch(rest)) and not re.search(r"[<>=]", rest) and not _NOT_PRESENTATIONAL_WORDS.search(rest)
+
+
 def presentational_only(patch: str) -> bool:
     for line in list(_added_lines(patch)) + list(_removed_lines(patch)):
-        if not line.strip():
-            continue
-        if len(line) > 300 or not _PRESENTATIONAL_LINE.fullmatch(line) or _NOT_PRESENTATIONAL_WORDS.search(line):
+        if line.strip() and not _presentational_line(line):
             return False
     return True
+
+
+def path_words(path: str) -> set[str]:
+    """camelCase / snake / kebab words of a path, lower-cased, plural 's' removed ('Syntax' -> 'syntax', never 'tax')."""
+    words = set()
+    for chunk in re.split(r"[^A-Za-z0-9]+", path):
+        for w in re.findall(r"[A-Z]?[a-z]+|[A-Z]+(?![a-z])|\d+", chunk):
+            w = w.lower()
+            words.add(w)
+            if w.endswith("s") and len(w) > 3:
+                words.add(w[:-1])
+    return words
+
+
+def is_financial_path(path: str, policy: dict) -> bool:
+    spec = policy["financial_names"]
+    return any(any_match([root], path) for root in spec["roots"]) and bool(path_words(path) & set(spec["terms"]))
 
 
 def classify_files(files: list[dict], policy: dict, reasons: Reasons):
@@ -504,6 +546,10 @@ def classify_files(files: list[dict], policy: dict, reasons: Reasons):
                     fzone = zmax(fzone, zone)
                     matched.append(rule["id"])
                     fsurfaces.update(rule.get("surfaces", []))
+            if is_financial_path(name, policy):
+                hit = True
+                fzone = zmax(fzone, "C")
+                matched.append("financial-names")
             if not hit:
                 fzone = zmax(fzone, policy["default_zone"])
                 matched.append("<default-deny>")
@@ -796,7 +842,9 @@ def check_conflicts(case: dict, own_surfaces: dict[str, str], own_files: set[str
         reg_entry = registry.get(horizon) if horizon else None
         # registration is NOT self-asserted: the claim must match a registry entry AND the branch must carry its prefix
         registered = bool(reg_entry and claim and claim["horizon_id"] == horizon
-                          and any(other["head_ref"].startswith(px) for px in reg_entry["branch_prefixes"]))
+                          and any(other["head_ref"].startswith(px) for px in reg_entry["branch_prefixes"])
+                          and other["head_repo"] == req["repository"]
+                          and norm_identity(other["author"]) in {norm_identity(a) for a in reg_entry["authors"]})
         other_files = {f for f in other["files"] if isinstance(f, str)}
         # observed surfaces from the other PR's real file list
         o_recs, _, _, o_surf = classify_files(

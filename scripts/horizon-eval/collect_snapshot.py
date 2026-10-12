@@ -133,7 +133,8 @@ def collect(repo: str, pr_number: int, req: dict, patch_limit: int = PATCH_LIMIT
         m = CLAIM_RX.search(o.get("body") or "")
         claim = {"horizon_id": m.group(1), "task_id": m.group(2), "surfaces": {}, "claim_order": 1} if m else None
         others.append({"number": o["number"], "state": "open", "horizon_id": m.group(1) if m else None,
-                       "head_ref": o["head"]["ref"], "observed_at": now, "last_activity_at": ts(o["updated_at"]),
+                       "head_ref": o["head"]["ref"], "head_repo": (o["head"].get("repo") or {}).get("full_name", "unknown"),
+                       "author": o["user"]["login"], "observed_at": now, "last_activity_at": ts(o["updated_at"]),
                        "files": sorted({n for f in ofiles for n in names_of(f)}), "files_complete": len(ofiles) < 3000, "claim": claim})
 
     m = CLAIM_RX.search(pr.get("body") or "")

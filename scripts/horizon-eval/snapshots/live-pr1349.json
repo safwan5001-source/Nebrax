@@ -15,23 +15,23 @@
    },
    {
     "app": "github-actions",
-    "completed_at": null,
-    "conclusion": null,
+    "completed_at": "2026-10-12T03:09:11Z",
+    "conclusion": "success",
     "event": "pull_request",
     "head_sha": "440ace1f90573e586d8478d83cda6c4890b018a5",
     "id": 114640632633,
     "name": "CI Gate",
-    "status": "in_progress"
+    "status": "completed"
    },
    {
     "app": "github-actions",
-    "completed_at": null,
-    "conclusion": null,
+    "completed_at": "2026-10-12T03:08:51Z",
+    "conclusion": "success",
     "event": "pull_request",
     "head_sha": "440ace1f90573e586d8478d83cda6c4890b018a5",
     "id": 114640592856,
     "name": "php artisan test (L11, pgsql)",
-    "status": "in_progress"
+    "status": "completed"
    },
    {
     "app": "github-actions",
@@ -94,36 +94,95 @@
     "status": "completed"
    }
   ],
-  "fetched_at": "2026-10-12T03:03:55Z",
+  "fetched_at": "2026-10-12T03:18:19Z",
   "grant_store": {
-   "fetched_at": "2026-10-12T03:03:55Z",
+   "fetched_at": "2026-10-12T03:18:19Z",
    "grants": [],
    "kill_switch": false,
    "ref": "main",
-   "ref_sha": "11abda97dd1d25782d27f06f0312a3d5abec57a2",
+   "ref_sha": "40832b21ffe99ec193ec2e7732c79b987debcc8e",
    "revoked_grant_ids": []
   },
   "grant_usage": [],
   "main": {
-   "sha": "11abda97dd1d25782d27f06f0312a3d5abec57a2"
+   "sha": "40832b21ffe99ec193ec2e7732c79b987debcc8e"
   },
   "other_prs": [
    {
+    "author": "safwan5001-source",
     "claim": null,
     "files": [
-     "AWJ-HORIZON-MEDIA-STORAGE-S7-IMPLEMENTATION-REPORT.md",
-     "app/Services/DocumentCenter/DocumentStorageService.php",
-     "tests/Feature/DocumentStorageDurableProfileTest.php"
+     "AWJ-HORIZON-MEDIA-STORAGE-CLOSURE-REPORT.md",
+     "AWJ-HORIZON-MEDIA-STORAGE-TRACKER.md"
     ],
     "files_complete": true,
-    "head_ref": "horizon/media-storage-s7-documents-reads",
+    "head_ref": "horizon/media-storage-tracker-s6s7",
+    "head_repo": "safwan5001-source/Nebrax",
     "horizon_id": null,
-    "last_activity_at": "2026-10-12T02:42:47Z",
-    "number": 1350,
-    "observed_at": "2026-10-12T03:03:55Z",
+    "last_activity_at": "2026-10-12T03:17:36Z",
+    "number": 1352,
+    "observed_at": "2026-10-12T03:18:19Z",
     "state": "open"
    },
    {
+    "author": "safwan5001-source",
+    "claim": null,
+    "files": [
+     "docs/autonomous-engineering/AWJ-HORIZON-V2-1C-DRYRUN-PILOT-IMPLEMENTATION-REPORT.md",
+     "scripts/horizon-eval/README.md",
+     "scripts/horizon-eval/collect_snapshot.py",
+     "scripts/horizon-eval/contract_runner.py",
+     "scripts/horizon-eval/fixtures/synthetic/base_case.json",
+     "scripts/horizon-eval/fixtures/synthetic/base_case_b.json",
+     "scripts/horizon-eval/fixtures/synthetic/cases/DR-01.json",
+     "scripts/horizon-eval/fixtures/synthetic/cases/DR-02.json",
+     "scripts/horizon-eval/fixtures/synthetic/cases/DR-03.json",
+     "scripts/horizon-eval/fixtures/synthetic/cases/DR-04a.json",
+     "scripts/horizon-eval/fixtures/synthetic/cases/DR-04b.json",
+     "scripts/horizon-eval/fixtures/synthetic/cases/DR-04c.json",
+     "scripts/horizon-eval/fixtures/synthetic/cases/DR-05a.json",
+     "scripts/horizon-eval/fixtures/synthetic/cases/DR-05b.json",
+     "scripts/horizon-eval/fixtures/synthetic/cases/DR-05c.json",
+     "scripts/horizon-eval/fixtures/synthetic/cases/DR-06a.json",
+     "scripts/horizon-eval/fixtures/synthetic/cases/DR-06b.json",
+     "scripts/horizon-eval/fixtures/synthetic/cases/DR-06c.json",
+     "scripts/horizon-eval/fixtures/synthetic/cases/DR-07a.json",
+     "scripts/horizon-eval/fixtures/synthetic/cases/DR-07b.json",
+     "scripts/horizon-eval/fixtures/synthetic/cases/DR-07c.json",
+     "scripts/horizon-eval/fixtures/synthetic/cases/DR-08a.json",
+     "scripts/horizon-eval/fixtures/synthetic/cases/DR-08b.json",
+     "scripts/horizon-eval/fixtures/synthetic/cases/DR-08c.json",
+     "scripts/horizon-eval/fixtures/synthetic/cases/DR-08d.json",
+     "scripts/horizon-eval/fixtures/synthetic/cases/DR-09a.json",
+     "scripts/horizon-eval/fixtures/synthetic/cases/DR-09b.json",
+     "scripts/horizon-eval/fixtures/synthetic/cases/DR-10.json",
+     "scripts/horizon-eval/fixtures/synthetic/cases/DR-11.json",
+     "scripts/horizon-eval/fixtures/synthetic/cases/X-01.json",
+     "scripts/horizon-eval/fixtures/synthetic/cases/X-02.json",
+     "scripts/horizon-eval/horizon_eval.py",
+     "scripts/horizon-eval/ledger.py",
+     "scripts/horizon-eval/policy/zone_policy.v1.json",
+     "scripts/horizon-eval/snapshots/live-pr1093.json",
+     "scripts/horizon-eval/snapshots/live-pr1346.json",
+     "scripts/horizon-eval/snapshots/live-pr1349.json",
+     "scripts/horizon-eval/snapshots/live-pr1350.json",
+     "scripts/horizon-eval/snapshots/live-pr586.json",
+     "scripts/horizon-eval/test_contract.py",
+     "scripts/horizon-eval/test_horizon_eval.py",
+     "scripts/horizon-eval/test_live_snapshots.py",
+     "scripts/horizon-eval/test_static_guards.py"
+    ],
+    "files_complete": true,
+    "head_ref": "horizon/v2-1c-dryrun-authorization-evaluator",
+    "head_repo": "safwan5001-source/Nebrax",
+    "horizon_id": null,
+    "last_activity_at": "2026-10-12T03:17:27Z",
+    "number": 1351,
+    "observed_at": "2026-10-12T03:18:19Z",
+    "state": "open"
+   },
+   {
+    "author": "safwan5001-source",
     "claim": null,
     "files": [
      "docs/plans/growth/AWJ_GROWTH_FOUNDATION_HORIZON_V1.md",
@@ -131,13 +190,15 @@
     ],
     "files_complete": true,
     "head_ref": "docs/awj-growth-foundation-horizon-v1",
+    "head_repo": "safwan5001-source/Nebrax",
     "horizon_id": null,
     "last_activity_at": "2026-09-30T18:12:05Z",
     "number": 1128,
-    "observed_at": "2026-10-12T03:03:55Z",
+    "observed_at": "2026-10-12T03:18:19Z",
     "state": "open"
    },
    {
+    "author": "safwan5001-source",
     "claim": null,
     "files": [
      "motion/awj-commercial/.gitignore",
@@ -195,13 +256,15 @@
     ],
     "files_complete": true,
     "head_ref": "motion/awj-commercial-15s",
+    "head_repo": "safwan5001-source/Nebrax",
     "horizon_id": null,
     "last_activity_at": "2026-09-29T05:29:57Z",
     "number": 1105,
-    "observed_at": "2026-10-12T03:03:55Z",
+    "observed_at": "2026-10-12T03:18:19Z",
     "state": "open"
    },
    {
+    "author": "safwan5001-source",
     "claim": null,
     "files": [
      "docs/plans/cloudflare/AWJ_CLOUDFLARE_PLATFORM_BOOTSTRAP.md",
@@ -210,13 +273,15 @@
     ],
     "files_complete": true,
     "head_ref": "docs/awj-cloudflare-platform-horizon-v1",
+    "head_repo": "safwan5001-source/Nebrax",
     "horizon_id": null,
     "last_activity_at": "2026-09-28T21:32:28Z",
     "number": 1093,
-    "observed_at": "2026-10-12T03:03:55Z",
+    "observed_at": "2026-10-12T03:18:19Z",
     "state": "open"
    },
    {
+    "author": "safwan5001-source",
     "claim": null,
     "files": [
      "app/Http/Controllers/Api/CommerceWorkspaceStorefrontPresentationVersionController.php",
@@ -228,39 +293,45 @@
     ],
     "files_complete": true,
     "head_ref": "feat/theme-version-publish",
+    "head_repo": "safwan5001-source/Nebrax",
     "horizon_id": null,
     "last_activity_at": "2026-09-28T15:37:50Z",
     "number": 1089,
-    "observed_at": "2026-10-12T03:03:55Z",
+    "observed_at": "2026-10-12T03:18:19Z",
     "state": "open"
    },
    {
+    "author": "safwan5001-source",
     "claim": null,
     "files": [
      "docs/plans/store/AWJ_STORE_CUSTOMIZER_EXTENDED_ARCHITECTURE.md"
     ],
     "files_complete": true,
     "head_ref": "docs/store-customizer-extended-architecture",
+    "head_repo": "safwan5001-source/Nebrax",
     "horizon_id": null,
     "last_activity_at": "2026-09-17T10:42:20Z",
     "number": 853,
-    "observed_at": "2026-10-12T03:03:55Z",
+    "observed_at": "2026-10-12T03:18:19Z",
     "state": "open"
    },
    {
+    "author": "safwan5001-source",
     "claim": null,
     "files": [
      "app/Console/Commands/RecoverHistoricalTenantCommand.php"
     ],
     "files_complete": true,
     "head_ref": "feat/awj-taiba-tenant-recovery-platform-admin",
+    "head_repo": "safwan5001-source/Nebrax",
     "horizon_id": null,
     "last_activity_at": "2026-09-12T04:21:51Z",
     "number": 784,
-    "observed_at": "2026-10-12T03:03:55Z",
+    "observed_at": "2026-10-12T03:18:19Z",
     "state": "open"
    },
    {
+    "author": "safwan5001-source",
     "claim": null,
     "files": [
      "docs/plans/payments/AWJ_PAY_V2_6A_GATEWAY_REFUND_ACCOUNTING_DESIGN.md",
@@ -268,26 +339,30 @@
     ],
     "files_complete": true,
     "head_ref": "docs/pay-v2-6a-gateway-refund-accounting-design",
+    "head_repo": "safwan5001-source/Nebrax",
     "horizon_id": null,
     "last_activity_at": "2026-09-12T01:19:29Z",
     "number": 778,
-    "observed_at": "2026-10-12T03:03:55Z",
+    "observed_at": "2026-10-12T03:18:19Z",
     "state": "open"
    },
    {
+    "author": "safwan5001-source",
     "claim": null,
     "files": [
      "docs/audits/AWJ_ACCOUNTING_SETTINGS_PRODUCT_COMPLETENESS_AUDIT_2026-09.md"
     ],
     "files_complete": true,
     "head_ref": "claude/accounting-settings-product-completeness-audit",
+    "head_repo": "safwan5001-source/Nebrax",
     "horizon_id": null,
     "last_activity_at": "2026-09-08T22:37:53Z",
     "number": 704,
-    "observed_at": "2026-10-12T03:03:55Z",
+    "observed_at": "2026-10-12T03:18:19Z",
     "state": "open"
    },
    {
+    "author": "safwan5001-source",
     "claim": null,
     "files": [
      "docs/plans/design/AWJ_DESIGN_SYSTEM_V2_BLUEPRINT.md",
@@ -297,13 +372,15 @@
     ],
     "files_complete": true,
     "head_ref": "claude/awj-v2-visual-references-62yiwn",
+    "head_repo": "safwan5001-source/Nebrax",
     "horizon_id": null,
     "last_activity_at": "2026-09-08T15:40:55Z",
     "number": 703,
-    "observed_at": "2026-10-12T03:03:55Z",
+    "observed_at": "2026-10-12T03:18:19Z",
     "state": "open"
    },
    {
+    "author": "safwan5001-source",
     "claim": null,
     "files": [
      "app/Services/Accounting/ZatcaSignedInvoiceQrCoordinator.php",
@@ -312,13 +389,15 @@
     ],
     "files_complete": true,
     "head_ref": "feat/zatca-signed-invoice-qr-coordinator",
+    "head_repo": "safwan5001-source/Nebrax",
     "horizon_id": null,
     "last_activity_at": "2026-08-30T14:12:47Z",
     "number": 586,
-    "observed_at": "2026-10-12T03:03:55Z",
+    "observed_at": "2026-10-12T03:18:19Z",
     "state": "open"
    },
    {
+    "author": "safwan5001-source",
     "claim": null,
     "files": [
      "Dockerfile",
@@ -327,13 +406,15 @@
     ],
     "files_complete": true,
     "head_ref": "fix/document-database-queue-readiness",
+    "head_repo": "safwan5001-source/Nebrax",
     "horizon_id": null,
     "last_activity_at": "2026-08-30T01:37:44Z",
     "number": 578,
-    "observed_at": "2026-10-12T03:03:55Z",
+    "observed_at": "2026-10-12T03:18:19Z",
     "state": "open"
    },
    {
+    "author": "safwan5001-source",
     "claim": null,
     "files": [
      ".github/workflows/ci.yml",
@@ -345,10 +426,11 @@
     ],
     "files_complete": true,
     "head_ref": "claude/ai-assistant-guidelines-9gxfjs",
+    "head_repo": "safwan5001-source/Nebrax",
     "horizon_id": null,
     "last_activity_at": "2026-08-14T23:31:52Z",
     "number": 202,
-    "observed_at": "2026-10-12T03:03:55Z",
+    "observed_at": "2026-10-12T03:18:19Z",
     "state": "open"
    }
   ],
@@ -549,8 +631,8 @@
    "head_repo": "safwan5001-source/Nebrax",
    "head_sha": "440ace1f90573e586d8478d83cda6c4890b018a5",
    "labels": [],
-   "merge_commit_sha": null,
-   "merged": false,
+   "merge_commit_sha": "06b66a5aab29351c5e10b6cc1ecf57bf052eeef6",
+   "merged": true,
    "number": 1349,
    "reviews": [
     {
@@ -596,7 +678,7 @@
      "state": "COMMENTED"
     }
    ],
-   "state": "open",
+   "state": "closed",
    "title": "CUST-HV V10b: true theme Preview, Apply summary and new-Draft apply; Theme Gallery over built-in themes"
   },
   "registry": {
@@ -618,12 +700,12 @@
     "web build (Next.js)"
    ],
    "source_ref": "main",
-   "source_sha": "11abda97dd1d25782d27f06f0312a3d5abec57a2"
+   "source_sha": "40832b21ffe99ec193ec2e7732c79b987debcc8e"
   },
   "source": "github-readonly"
  },
  "mode": "live",
- "now": "2026-10-12T03:03:55Z",
+ "now": "2026-10-12T03:18:19Z",
  "request": {
   "action": "merge",
   "agent_id": "pilot-session",

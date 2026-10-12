@@ -102,11 +102,11 @@ Command: `PYTHONDONTWRITEBYTECODE=1 python3 -I -m unittest discover -s scripts/h
 
 | Layer | File | Tests | Result |
 |---|---|---|---|
-| 1. Focused evaluator unit tests (incl. 26 review-finding regressions) | `test_horizon_eval.py` | 112 | OK |
+| 1. Focused evaluator unit tests (incl. 29 review-finding regressions) | `test_horizon_eval.py` | 115 | OK |
 | 2. Contract + regression + mutation | `test_contract.py` | 12 | OK |
 | 3. Representative read-only repository evidence | `test_live_snapshots.py` | 8 | OK |
 | Static guards (no capability, fixture isolation) | `test_static_guards.py` | 19 | OK |
-| **Total** | | **151** | **OK, 0 failures, 0 errors** |
+| **Total** | | **154** | **OK, 0 failures, 0 errors** |
 
 Fail-closed evidence beyond the contract table:
 - **472 single-input mutation points** (two eligible bases: A and B) — each element deleted, nulled, and type-swapped; none stays eligible except a reviewed harmless list (free-text/optional elements) — this found a real gap (manifest lacking a required check) fixed with the policy `ci_floor`.
@@ -200,12 +200,22 @@ Same GitHub identity as the author, so this is **not** an "independent reviewer"
 | 13 | collector truncated text before scanning (medium) | truncation is marked (`[[TRUNCATED]]` → BLOCK); oversize patches become unassessable (→ Zone B) |
 | residual | web/storefront CI was never *required* | files under `web/**` / `storefront/**` now require the matching check (policy `required_when_touched`); `docs/engineering/**`, `AGENTS.md`, ADRs are Zone C |
 
-### 8.2b Codex automated review on PR #1351 (3 findings on `a272dc0`, all valid, all fixed)
+### 8.2b Codex automated review on PR #1351 (round 1: 3 findings on `a272dc0`; round 2: 3 findings on `96d346d`; all valid, all fixed)
 | Severity | Finding | Resolution |
 |---|---|---|
 | P1 | backend monetary tokens (`amount`, `total`, `price`, `invoice`, …) only raised to Zone B → `$amount * 2` stayed eligible under a B grant | monetary tokens in non-UI code → **Zone C** (`BEHAVIOR_MONETARY_TOKEN_IN_BACKEND`); UI keeps B |
 | P1 | presentational allowlist accepted JSX expression containers (`disabled={!isAdmin}`) | braces removed from the allowlist (JSX expressions are runtime code) |
 | P2 | collector mis-parsed paginated object responses (`check-runs`) | `gh api --paginate --slurp` + `flatten_pages()` for array and object pages (tested) |
+
+Round 2 (`96d346d`):
+
+| Severity | Finding | Resolution |
+|---|---|---|
+| P1 | token-free numeric edit (`0.15 → 0.25`) in a financial helper stayed Zone B | financial **path words** (`invoice`, `tax`, `price`, `vat`, `payment`, `fee`, … matched as words, so `Syntax` ≠ `tax`) under code roots → Zone C regardless of the diff |
+| P1 | `<button type="submit">` passed the character allowlist | Zone A markup is now **structural**: only safe elements (no `a/button/input/form/select/img`, no components) with whitelisted literal attributes (`className, aria-label, alt, title, placeholder, lang, dir, …`) plus plain text; lone boolean-attribute lines (`disabled`) rejected |
+| P1 | another PR counted as "registered" from self-reported horizon + branch | registration also requires the other PR's head repo = requested repo and its author ∈ registry `authors` (collector now captures both) |
+
+Known limit of the allowlist: a plain-text line is indistinguishable from an attribute line in multi-line JSX beyond the boolean-attribute list; the allowlist is deliberately narrow (labels/text), and anything it does not recognise falls to Zone B, never A.
 
 Residual risks the reviewer listed that are **not** closed (declared in §11): unauthenticated attestations; test code executes in CI; symlinks/file modes invisible in the files API; injection regexes are defence-in-depth (paraphrase/homoglyph can evade; classification never depends on text); `head_pushed_at` is the author-controlled commit date; no semantic check of `approved_outcome`.
 

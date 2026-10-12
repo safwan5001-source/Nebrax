@@ -21,7 +21,9 @@
           "docs/guides/synthetic-a.md"
         ],
         "claim": null,
-        "files_complete": true
+        "files_complete": true,
+        "head_repo": "synthetic-owner/synthetic-repo",
+        "author": "unregistered-author"
       }
     ]
   }
