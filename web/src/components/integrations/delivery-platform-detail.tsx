@@ -123,17 +123,20 @@ export function DeliveryPlatformDetail({
             </ul>
           </section>
 
-          <section aria-labelledby="requires-heading" className="space-y-2">
-            <h2 id="requires-heading" className="text-sm font-semibold text-text">{t('detail.requiresTitle')}</h2>
-            <ul className="space-y-1.5 text-sm text-muted" role="list" data-testid="requires-list">
-              {(['agreement', 'testAccess', 'spec'] as const).map((item) => (
-                <li key={item} className="flex flex-wrap items-baseline justify-between gap-2 rounded border border-border bg-surface px-3 py-2">
-                  <span className="text-text">{t(`detail.requires.${item}`)}</span>
-                  <span>{t('detail.requiresNotYet')}</span>
-                </li>
-              ))}
-            </ul>
-          </section>
+          {/* قائمة المتطلبات تصف ما ينقص قبل أن يتاح التكامل الأصلي. إن صار متاحاً فلا معنى لها (ولا نملك بيانات ببنودها)، وإن تعذّرت قراءته فلا ندّعي «غير متوفر بعد». */}
+          {ladder.b !== 'available' ? (
+            <section aria-labelledby="requires-heading" className="space-y-2">
+              <h2 id="requires-heading" className="text-sm font-semibold text-text">{t('detail.requiresTitle')}</h2>
+              <ul className="space-y-1.5 text-sm text-muted" role="list" data-testid="requires-list">
+                {(['agreement', 'testAccess', 'spec'] as const).map((item) => (
+                  <li key={item} className="flex flex-wrap items-baseline justify-between gap-2 rounded border border-border bg-surface px-3 py-2">
+                    <span className="text-text">{t(`detail.requires.${item}`)}</span>
+                    <span>{ladder.b === 'unreadable' ? t('ladder.b.unreadable') : t('detail.requiresNotYet')}</span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
 
           <section className="space-y-1 text-xs leading-relaxed text-muted" data-testid="detail-boundaries">
             <p>{t('detail.hubOnlyNote')}</p>

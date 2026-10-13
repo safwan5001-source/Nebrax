@@ -204,13 +204,30 @@ describe.each(TEST_LOCALES)('delivery platform detail (%s)', (locale) => {
     expect(screen.getAllByRole('button')).toHaveLength(1);
   });
 
+  const patchedKeeta = (patch: Record<string, unknown>) => ({ data: TODAY.map((row) => (row.platform_key === 'keeta' ? { ...row, ...patch } : row)) });
+
   it('a contradictory readiness row is unreadable, not available', () => {
-    renderDetail(locale, 'keeta', {
-      readinessPayload: { data: [{ platform_key: 'keeta', ux_state: 'READY_TO_CONNECT', connect_enabled: false, sync_enabled: false }] },
-    });
+    renderDetail(locale, 'keeta', { readinessPayload: patchedKeeta({ ux_state: 'READY_TO_CONNECT' }) });
 
     const b = screen.getByTestId('capability-ladder').querySelector('[data-ladder-step="b"]');
     expect(b?.textContent?.trim()).toBe(m.ladder.b.unreadable);
+  });
+
+  it('the prerequisites list follows rung B: "not yet" while unavailable or pending, hidden once available, "could not be read" when unreadable', () => {
+    const { unmount } = renderDetail(locale, 'keeta');
+    expect(screen.getByTestId('requires-list').textContent).toContain(m.detail.requiresNotYet);
+    unmount();
+
+    const ready = renderDetail(locale, 'keeta', { readinessPayload: patchedKeeta({ ux_state: 'READY_TO_CONNECT', connect_enabled: true }) });
+    expect(screen.getByTestId('capability-ladder').querySelector('[data-ladder-step="b"]')?.textContent?.trim()).toBe(m.ladder.b.available);
+    expect(screen.queryByTestId('requires-list')).toBeNull();
+    expect(document.body.textContent).not.toContain(m.detail.requiresNotYet);
+    ready.unmount();
+
+    renderDetail(locale, 'keeta', { readinessPayload: patchedKeeta({ ux_state: 'READY_TO_CONNECT' }) });
+    const requires = screen.getByTestId('requires-list');
+    expect(requires.textContent).not.toContain(m.detail.requiresNotYet);
+    expect(requires.textContent?.split(m.ladder.b.unreadable).length).toBe(4);
   });
 });
 
