@@ -83,7 +83,7 @@ Local, Node + the repository's own tooling.
 |---|---|
 | New vitest files + `src/components/layout` (11 files) | **111 passed** |
 | New tests alone | 58 tests (11 + 36 + 7 + 4) |
-| Full web suite (`npm run test`) | VITEST_RESULT |
+| Full web suite (`npm run test`) | Still running when this report was committed; the final count is given in the hand-off message and is not claimed here |
 | `npm run build` (Next.js 15.5.19, includes type check) | **Succeeded** (`BUILD_EXIT 0`); `/integrations` is emitted (5.78 kB route, 185 kB first load) |
 | `tsc --noEmit` over the repository | Pre-existing errors in unrelated test/e2e files; **none** in any file of this change (the only line containing "integrations" is `src/app/platform/(console)/integrations/gemini-card.test.tsx`, which is unrelated and untouched) |
 | Playwright (real Chromium), `e2e/int-ux-1-integration-center.spec.ts`, projects desktop 1440 and mobile 390 | **35 passed, 1 skipped** (the sidebar-entry check is desktop-only by design) |
@@ -116,12 +116,12 @@ Not verified: behavior against the real backend and a real session (responses we
 
 ## CI
 
-CI_SECTION
+`web-ci.yml` (vitest + `npm run build`) and `ci.yml` run on PR #1387. When this report was committed no result had been observed for the PR head, so **no Green is claimed here**; the observed result for the exact head is stated in the hand-off message.
 
 ## Pre-merge review
 
-- PRE_MERGE_REVIEW: PRE_MERGE_STATUS
-- Reviewed Head SHA: HEAD_SHA_REVIEWED
+- PRE_MERGE_REVIEW: **not stamped** — requires CI green on the exact Head SHA (Gate 9). Any later head change invalidates it.
+- Reviewed Head SHA: the PR head at hand-off (this report-only commit follows the code SHA above; application code is unchanged by it)
 
 ## Merge
 
@@ -193,7 +193,7 @@ None.
 - PR: #1387 — https://github.com/safwan5001-source/Nebrax/pull/1387
 - Base SHA: `906e5afb76426a0bf128c03fe8891d384f31ef0d` (`origin/main` at start)
 - Code SHA (feature commit): `f17d5545632d84058c061f623e60cd6087c63dd1`
-- Head SHA: HEAD_SHA_FINAL
+- Head SHA: the PR head (this file cannot embed its own commit hash; it follows the code SHA above with documentation-only changes)
 
 ## Recommended next dependency-ready task
 
