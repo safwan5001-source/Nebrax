@@ -56,6 +56,16 @@ def load_snapshot(path: Path):
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def reread_refs(repo: str, number: int) -> dict:
+    """Read main and the PR refs again, AFTER collection (read-only GETs). Any failure yields {} so the observer blocks."""
+    try:
+        base = f"repos/{repo}"
+        pr = cs.gh_get(f"{base}/pulls/{number}")
+        return {"main_sha": cs.gh_get(f"{base}/branches/main")["commit"]["sha"], "head_sha": pr["head"]["sha"], "base_sha": pr["base"]["sha"]}
+    except Exception:  # noqa: BLE001 - unreadable refs are reported by the observer as a BLOCK
+        return {}
+
+
 def request_for(repo: str) -> dict:
     return {**so.REQUEST_DEFAULTS, "repository": repo, "base_branch": "main"}
 
@@ -82,7 +92,7 @@ def main(argv=None) -> int:
         try:
             if kind == "live":
                 case = cs.collect(args.repo, item, request_for(args.repo), args.patch_limit)
-                rep = so.observe(case, wall_clock=datetime.now(timezone.utc))
+                rep = so.observe(case, wall_clock=datetime.now(timezone.utc), revalidation=reread_refs(args.repo, item))
             else:
                 rep = so.observe(load_snapshot(item), replay=True)
         except Exception as exc:  # noqa: BLE001 - report which observation failed, write nothing for it

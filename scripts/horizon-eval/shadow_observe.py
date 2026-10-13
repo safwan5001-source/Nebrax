@@ -61,7 +61,7 @@ MISSING_EVIDENCE_CODES = frozenset({
 SHADOW_CODES = {
     "SHADOW_REQUIRES_LIVE_EVIDENCE": "BLOCK", "SHADOW_NO_CLOCK": "BLOCK", "SHADOW_REPLAY_HISTORICAL": "WAIT",
     "SHADOW_HARD_DENY_PATH": "STOP", "SHADOW_CI_GATE_NOT_CONFIRMED": "BLOCK",
-    "SHADOW_READY_PRECONDITION_FAILED": "BLOCK", "SHADOW_INTERNAL_ERROR": "BLOCK", "SHADOW_REPORT_WITHHELD": "BLOCK",
+    "SHADOW_READY_PRECONDITION_FAILED": "BLOCK", "SHADOW_REFS_NOT_REVALIDATED": "BLOCK", "SHADOW_INTERNAL_ERROR": "BLOCK", "SHADOW_REPORT_WITHHELD": "BLOCK",
     "SHADOW_HORIZON_ID_COLLISION": "BLOCK",
 }
 REQUEST_DEFAULTS = {"horizon_id": "SHADOW", "task_id": "observe", "task_category": "presentational-ui",
@@ -136,6 +136,15 @@ def _recommend(deciding: list[dict], zone: str) -> tuple[str, list[str]]:
     return "READY_FOR_MANUAL_REVIEW", []
 
 
+def _revalidation_problem(case: dict, reval) -> str | None:
+    if not isinstance(reval, dict):
+        return "refs were not re-read after collection"
+    pr = case["evidence"]["pr"]
+    expected = {"main_sha": case["evidence"]["main"]["sha"], "head_sha": pr["head_sha"], "base_sha": pr["base_sha"]}
+    moved = sorted(k for k, v in expected.items() if reval.get(k) != v)
+    return ("moved or unreadable during collection: " + ",".join(moved)) if moved else None
+
+
 def _facts_support_ready(case: dict, ci: dict, policy: dict) -> bool:
     """READY re-check straight from the evidence, independent of whatever reasons the evaluator did or did not emit:
     PR open/not draft/not merged, the gate and every required always-tier check present on the head, and EVERY observed check green."""
@@ -205,15 +214,19 @@ def _seal(rep: dict) -> dict:
     return body
 
 
-def observe(case, *, wall_clock: datetime | None = None, replay: bool = False, policy: dict | None = None) -> dict:
-    """Never raises. Returns the advisory report (see module docstring). `case` must be a live github-readonly case."""
+def observe(case, *, wall_clock: datetime | None = None, replay: bool = False, policy: dict | None = None,
+            revalidation: dict | None = None) -> dict:
+    """Never raises. Returns the advisory report (see module docstring). `case` must be a live github-readonly case.
+
+    `revalidation` (live only): {"main_sha", "head_sha", "base_sha"} re-read from GitHub AFTER the snapshot was collected. Collection takes
+    many requests, so main or the PR may have moved meanwhile; any difference - or its absence - is a BLOCK, never a READY."""
     try:
-        return _observe(case, wall_clock, replay, policy)
+        return _observe(case, wall_clock, replay, policy, revalidation)
     except Exception as exc:  # fail closed on any bug or hostile input
         return _error_report(case, [{"severity": "BLOCK", "code": "SHADOW_INTERNAL_ERROR", "detail": type(exc).__name__}])
 
 
-def _observe(case, wall_clock, replay, policy) -> dict:
+def _observe(case, wall_clock, replay, policy, revalidation=None) -> dict:
     now = _clean_time(case.get("now") if isinstance(case, dict) else None)
     if not (isinstance(case, dict) and case.get("mode") == "live"
             and isinstance(case.get("evidence"), dict) and case["evidence"].get("source") == "github-readonly"):
@@ -222,6 +235,10 @@ def _observe(case, wall_clock, replay, policy) -> dict:
     extra: list[dict] = []
     if not replay and wall_clock is None:
         extra.append({"severity": "BLOCK", "code": "SHADOW_NO_CLOCK", "detail": "a live observation needs a wall clock to prove freshness"})
+    if not replay:
+        problem = _revalidation_problem(case, revalidation)
+        if problem:
+            extra.append({"severity": "BLOCK", "code": "SHADOW_REFS_NOT_REVALIDATED", "detail": problem})
     if replay:
         extra.append({"severity": "WAIT", "code": "SHADOW_REPLAY_HISTORICAL",
                       "detail": "frozen snapshot evaluated at its own recorded time; historical, cannot be ready"})

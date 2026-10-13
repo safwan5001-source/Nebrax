@@ -21,9 +21,9 @@ the authorization blockers (no registered horizon / claim / grant / attestation)
 |---|---|
 | `scripts/horizon-eval/shadow_observe.py` | **new** — pure observer + JSON/Markdown renderers (no network/process/env/filesystem/clock) |
 | `scripts/horizon-eval/shadow_run.py` | **new** — manual runner: `--pr N` (live, read-only) / `--snapshot FILE` (replay), `--out-dir` required |
-| `scripts/horizon-eval/test_shadow_observe.py` | **new** — 55 tests (see §3) |
+| `scripts/horizon-eval/test_shadow_observe.py` | **new** — 57 tests (see §3) |
 | `scripts/horizon-eval/README.md` | usage + recommendation table |
-| `.github/workflows/horizon-eval-ci.yml` | **one number**: `MIN_TESTS` 181 → 236 (raise-only floor; an existing guard test *requires* it to track the suite size). No step, trigger, name or permission changed |
+| `.github/workflows/horizon-eval-ci.yml` | **one number**: `MIN_TESTS` 181 → 238 (raise-only floor; an existing guard test *requires* it to track the suite size). No step, trigger, name or permission changed |
 | `docs/autonomous-engineering/horizon-shadow-evidence/*` | **new** — 15 generated reports (14 observations + summary), §4 |
 | this report | **new** |
 
@@ -59,7 +59,7 @@ Manual only. **No workflow, schedule or trigger runs it** (a test fails if any w
 ## 3. Test results
 | Suite | Result |
 |---|---|
-| `python3 -I -B -m unittest discover -s scripts/horizon-eval` | **236 tests, OK** (181 existing + 55 new), 0 skips |
+| `python3 -I -B -m unittest discover -s scripts/horizon-eval` | **238 tests, OK** (181 existing + 57 new), 0 skips |
 | `contract_runner.py` | 23/23 PASS in 11 scenarios, **false-eligible 0** |
 | `python3 -I -B -m unittest discover -s scripts/ci-gate` | 72 tests, OK (CI Gate behaviour unchanged) |
 | Working tree after tests | clean (`git status --porcelain --ignored`) |
@@ -98,6 +98,7 @@ Observations worth the owner's attention:
 * The observer cannot see attestations (agent-recorded, not on GitHub), registries or grants — it reports them as authorization blockers; it cannot verify owner authenticity (V2-1B D2).
 * A fully green Zone A/B PR can reach READY despite the authorization blockers, by design; consumers must not read READY as permission.
 * Dropped patches (large diffs, `--patch-limit`) make behaviour unassessable → BLOCK. Conservative; raise `--patch-limit` to observe big PRs.
+* Live runs re-read main/head/base after collection; a ref that moves later is still only caught by the next observation.
 * Live freshness relies on the caller's clock; evaluator `CLOCK_SKEW` (>5 min) and `EVIDENCE_STALE` (>300 s) apply.
 * A `GRANT_*` problem in a future grant store makes Shadow BLOCK/WAIT rather than ignore it (stricter than needed; deliberate).
 * `snapshot_time` is the evidence time, not generation time (kept so output is deterministic).
@@ -120,13 +121,14 @@ Observations worth the owner's attention:
   6. Codex bot (P2): the READY re-check trusted evaluator reasons for CI/draft state → now re-derived from case facts (draft/merged/open, every observed check green, gate + required checks present); test added.
   7. Codex bot (P2, round 2): a withheld report has no `observation` key → runner `KeyError` mid-batch. Fixed; the regression test also exposed that the withheld report still echoed a secret-shaped `now` as `snapshot_time` → timestamps are now strictly validated before being echoed.
   8. Codex bot (P2 ×2, round 3): READY re-check now also demands the trusted policy CI floor (gate + floor always-tier + path-triggered checks), not only the observed manifest; reports now carry the real policy SHA (the evaluator is invoked through its default policy-loading path instead of being labelled `inline`). Tests added. Note: the committed evidence `.md` files were generated before this change, so their evidence digests predate it.
+  9. Codex bot (P2, round 4): snapshot collection takes many requests, so `main`/the PR could move meanwhile and still look fresh → live runs now re-read main, PR head and base after collection (`reread_refs`, read-only GETs) and `observe(revalidation=...)` BLOCKs on any difference, failure or absence (`SHADOW_REFS_NOT_REVALIDATED`). Tests added.
   Self-found: live and replay reports for the same PR/head overwrote each other → mode added to file names.
 * **PRE_MERGE_REVIEW:** scope check against the brief — no merge/deploy/auto-merge/ruleset/protection/permission change, no CI Gate behaviour change, no app code, no GitHub writes to observed PRs, no other Horizon branch touched, no grant activation, no new workflow, no zone expansion. ✔
   (This is an agent-recorded review, not a human approval and not an attestation the evaluator can consume.)
 
 ## 8. Risks, remaining decisions, rollback, next step
 * **Risk:** READY is misread as approval → mitigated by constants, wording in every report, tests; keep it advisory.
-* **Risk:** `MIN_TESTS` is exact (236); any later test-count change must move it (existing convention).
+* **Risk:** `MIN_TESTS` is exact (238); any later test-count change must move it (existing convention).
 * **Decisions for the owner:** (a) accept Zone-C-governed edit of `.github/workflows/horizon-eval-ci.yml` (one number); (b) whether Shadow output may later be posted anywhere (currently never); (c) whether to enable scheduled execution (not enabled; separate approval); (d) whether to review the `INJ-OVERRIDE` false-positive pattern; (e) whether Zone B should be able to reach READY.
 * **Rollback:** revert the PR (new files + one number); nothing else depends on them.
 * **Next step (V2-2b, needs approval):** optional scheduled runner writing artifacts only, then comparison of Shadow recommendations against actual human merge decisions to calibrate before any authority is ever considered.

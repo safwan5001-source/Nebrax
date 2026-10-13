@@ -67,8 +67,18 @@ def other_pr(number=9, files=("docs/plans/x.md",), **kw):
     return base
 
 
+def reval(case):
+    try:
+        e = case["evidence"]
+        return {"main_sha": e["main"]["sha"], "head_sha": e["pr"]["head_sha"], "base_sha": e["pr"]["base_sha"]}
+    except Exception:  # noqa: BLE001 - garbage input: no revalidation possible
+        return None
+
+
 def obs(case, **kw):
     kw.setdefault("wall_clock", CLOCK)
+    if not kw.get("replay"):
+        kw.setdefault("revalidation", reval(case))
     return so.observe(case, **kw)
 
 
@@ -221,6 +231,16 @@ class FailClosed(unittest.TestCase):
         self.assertEqual(rep["recommendation"], "BLOCK")
         self.assertIn("CLOCK_SKEW", codes(rep))
         self.not_ready(lambda e: e.update(fetched_at="2026-10-13T12:30:00Z"), "BLOCK", "evidence from the future")
+
+    def test_refs_must_be_revalidated_after_collection(self):
+        """Codex review: main or the PR moving while the snapshot was being collected must never end in READY."""
+        base = reval(green())
+        for name, bad in (("main moved", {**base, "main_sha": "d" * 40}), ("head moved", {**base, "head_sha": "d" * 40}),
+                          ("base moved", {**base, "base_sha": "d" * 40}), ("unreadable", {}), ("absent", None), ("wrong type", "x")):
+            rep = so.observe(green(), wall_clock=CLOCK, revalidation=bad)
+            self.assertEqual(rep["recommendation"], "BLOCK", name)
+            self.assertIn("SHADOW_REFS_NOT_REVALIDATED", codes(rep), name)
+        self.assertEqual(so.observe(green(), wall_clock=CLOCK, revalidation=base)["recommendation"], "READY_FOR_MANUAL_REVIEW")
 
     def test_no_clock_without_replay_is_a_block(self):
         rep = so.observe(green())
@@ -570,7 +590,8 @@ class RunnerIsManualAndReadOnly(unittest.TestCase):
                 ch["completed_at"] = "2026-10-13T11:58:00Z"
             return c
 
-        with tempfile.TemporaryDirectory() as d, mock.patch.object(sr.cs, "collect", fake_collect):
+        with tempfile.TemporaryDirectory() as d, mock.patch.object(sr.cs, "collect", fake_collect), \
+                mock.patch.object(sr, "reread_refs", lambda repo, n: reval(green())):
             code, out, _ = self.run_main(["--pr", "7", "--repo", "o/r", "--out-dir", d])
             rep = json.loads(next(Path(d).glob("shadow-pr7-*.json")).read_text(encoding="utf-8"))
         self.assertEqual(code, 0)
@@ -579,6 +600,27 @@ class RunnerIsManualAndReadOnly(unittest.TestCase):
         self.assertEqual(seen["req"]["action"], "merge")
         self.assertEqual((seen["req"]["horizon_id"], seen["req"]["agent_id"]), ("SHADOW", "shadow-observer"))
         self.assertIn("READY_FOR_MANUAL_REVIEW", out)
+        # the same run with main having moved after collection must not be READY
+        with tempfile.TemporaryDirectory() as d, mock.patch.object(sr.cs, "collect", fake_collect), \
+                mock.patch.object(sr, "reread_refs", lambda repo, n: {**reval(green()), "main_sha": "d" * 40}):
+            self.run_main(["--pr", "7", "--repo", "o/r", "--out-dir", d])
+            moved = json.loads(next(Path(d).glob("shadow-pr7-*.json")).read_text(encoding="utf-8"))
+        self.assertEqual(moved["recommendation"], "BLOCK")
+
+    def test_reread_refs_is_read_only_and_fails_to_empty(self):
+        calls = []
+
+        def fake_get(path, paginate=False):
+            calls.append(path)
+            if path.endswith("/branches/main"):
+                return {"commit": {"sha": MAIN}}
+            return {"head": {"sha": H}, "base": {"sha": BASE}}
+
+        with mock.patch.object(sr.cs, "gh_get", fake_get):
+            self.assertEqual(sr.reread_refs("o/r", 7), {"main_sha": MAIN, "head_sha": H, "base_sha": BASE})
+        self.assertEqual(sorted(calls), ["repos/o/r/branches/main", "repos/o/r/pulls/7"])
+        with mock.patch.object(sr.cs, "gh_get", side_effect=sr.cs.CollectError("502")):
+            self.assertEqual(sr.reread_refs("o/r", 7), {})
 
     def test_withheld_report_does_not_crash_the_runner_and_later_observations_still_run(self):
         """Codex review: a secret-shaped `now` withholds the report (no `observation` key); the runner must complete the whole batch."""
