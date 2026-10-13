@@ -36,6 +36,10 @@ const seedSessions = () => {
   localStorage.setItem('nibras_active_branch', 'branch-7');
 };
 const downloads: string[] = [];
+// the same worker runs other test files; whatever is replaced on window/URL is put back after every test
+const originalLocation = Object.getOwnPropertyDescriptor(window, 'location');
+const originalCreate = URL.createObjectURL;
+const originalRevoke = URL.revokeObjectURL;
 
 beforeEach(() => {
   localStorage.clear();
@@ -52,6 +56,10 @@ beforeEach(() => {
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
+  if (originalLocation) Object.defineProperty(window, 'location', originalLocation);
+  URL.createObjectURL = originalCreate;
+  URL.revokeObjectURL = originalRevoke;
+  localStorage.clear();
 });
 
 const expectErpUntouched = () => {
