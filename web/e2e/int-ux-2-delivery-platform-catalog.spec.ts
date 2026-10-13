@@ -11,7 +11,9 @@ import { expect, test, type Page, type Route } from '@playwright/test';
 const baseUrl = process.env.PLAYWRIGHT_BASE_URL ?? 'http://127.0.0.1:3001';
 const shots = process.env.INT_UX2_SHOTS;
 
-type Scenario = 'allowed' | 'app_off' | 'readiness_error' | 'profiles_error' | 'slow';
+type Scenario = 'allowed' | 'app_off' | 'readiness_error' | 'profiles_error' | 'slow' | 'evidence_malformed';
+/** طلبات الصفحة، وعليها رمز حالة مستند HTML الرئيسي (الذي يحدّده الخادم قبل أي عرض عميل). */
+type Requests = string[] & { documentStatus?: number };
 type Viewer = 'owner' | 'accountant' | 'denied';
 
 const SIX = [
@@ -30,7 +32,7 @@ function readiness(withEvidence: boolean) {
   }));
 }
 
-async function mockApi(page: Page, scenario: Scenario, viewer: Viewer, requests: string[]) {
+async function mockApi(page: Page, scenario: Scenario, viewer: Viewer, requests: Requests) {
   const json = (route: Route, body: unknown, status = 200) =>
     route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) });
 
@@ -41,6 +43,9 @@ async function mockApi(page: Page, scenario: Scenario, viewer: Viewer, requests:
     if (path === '/applications/nav-state') return json(route, { data: { 'sales.pos': scenario !== 'app_off' } });
     if (path === '/delivery-platforms/readiness') {
       if (scenario === 'readiness_error') return json(route, { message: 'down' }, 500);
+      if (scenario === 'evidence_malformed') {
+        return json(route, { data: readiness(true).map((row) => ({ ...row, technical: 7, evidence_ref: '' })) });
+      }
       return json(route, { data: readiness(viewer === 'owner') });
     }
     if (path === '/delivery-platforms') {
@@ -57,7 +62,7 @@ async function mockApi(page: Page, scenario: Scenario, viewer: Viewer, requests:
 }
 
 async function open(page: Page, path: string, opts: { scenario?: Scenario; locale: 'ar' | 'en'; theme: 'light' | 'dark'; viewer?: Viewer }) {
-  const requests: string[] = [];
+  const requests: Requests = [];
   const viewer = opts.viewer ?? 'owner';
   await page.context().addCookies([{ name: 'locale', value: opts.locale, url: baseUrl }]);
   await mockApi(page, opts.scenario ?? 'allowed', viewer, requests);
@@ -72,7 +77,8 @@ async function open(page: Page, path: string, opts: { scenario?: Scenario; local
     localStorage.setItem('user', userJson);
     localStorage.setItem('theme', theme);
   }, [opts.theme, JSON.stringify(user)] as const);
-  await page.goto(`${baseUrl}${path}`, { waitUntil: 'domcontentloaded' });
+  const response = await page.goto(`${baseUrl}${path}`, { waitUntil: 'domcontentloaded' });
+  requests.documentStatus = response?.status();
   return requests;
 }
 
@@ -270,12 +276,45 @@ test.describe('states', () => {
       await shot(page, `${info.project.name}-${locale}-${theme}-detail-app-off`);
     });
 
-    test(`unknown platform key: not found, zero data requests (${locale}/${theme})`, async ({ page }, info) => {
+    test(`unknown platform key: a real HTTP 404, the not-found page, zero data requests (${locale}/${theme})`, async ({ page }, info) => {
       const requests = await open(page, '/integrations/delivery-platforms/talabat', { locale, theme });
+      expect(requests.documentStatus).toBe(404);
       await expect(page.getByTestId('delivery-platform-unknown')).toBeVisible();
+      await expect(page.getByTestId('capability-ladder')).toHaveCount(0);
       // نداء `/applications/nav-state` يخص الشريط الجانبي لا الصفحة؛ المحكوم هنا طلبات منصات التوصيل.
       expect(requests.filter((r) => r.includes('/delivery-platforms'))).toEqual([]);
       await shot(page, `${info.project.name}-${locale}-${theme}-detail-unknown`);
+    });
+
+    test(`owner sees a note for a malformed evidence field; statuses and the six readiness rows are intact (${locale}/${theme})`, async ({ page }, info) => {
+      const requests = await open(page, '/integrations/delivery-platforms/keeta', { scenario: 'evidence_malformed', locale, theme });
+      expect(requests.documentStatus).toBe(200);
+      await expect(page.getByTestId('capability-ladder')).toBeVisible();
+      await expect(page.getByTestId('detail-advanced-malformed')).toBeVisible();
+      const b = await page.locator('[data-testid="capability-ladder"] [data-ladder-step="b"]').innerText();
+      expect(b).toMatch(/pending agreement|بانتظار اتفاق/i);
+      // إشعار فشل القراءة الخاص بالصفحة غائب (عنصر `alert` الفارغ في الصفحة هو معلن مسارات Next الداخلي).
+      await expect(page.getByTestId('detail-read-error')).toHaveCount(0);
+      const ratio = await contrast(page, '[data-testid="detail-advanced-malformed"]');
+      expect(ratio ?? 0).toBeGreaterThanOrEqual(4.5);
+      await shot(page, `${info.project.name}-${locale}-${theme}-detail-evidence-malformed`);
+    });
+  }
+
+  for (const key of ['KEETA', '%2E%2E%2Fkeeta', 'jahez%3Fx%3D1', 'keeta%20', '__proto__']) {
+    test(`unknown or malformed key ${key} answers HTTP 404 with no data request`, async ({ page }) => {
+      const requests = await open(page, `/integrations/delivery-platforms/${key}`, { locale: 'en', theme: 'light' });
+      expect(requests.documentStatus).toBe(404);
+      await expect(page.getByTestId('delivery-platform-unknown')).toBeVisible();
+      expect(requests.filter((r) => r.includes('/delivery-platforms'))).toEqual([]);
+    });
+  }
+
+  for (const key of ['hungerstation', 'jahez', 'mrsool', 'keeta', 'ninja', 'the_chefz']) {
+    test(`known key ${key} answers HTTP 200 and renders the ladder`, async ({ page }) => {
+      const requests = await open(page, `/integrations/delivery-platforms/${key}`, { locale: 'en', theme: 'light' });
+      expect(requests.documentStatus).toBe(200);
+      await expect(page.getByTestId('capability-ladder')).toBeVisible();
     });
   }
 

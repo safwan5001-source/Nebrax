@@ -140,6 +140,8 @@ export interface ReadinessRow {
   technical: string | null;
   evidenceDate: string | null;
   evidenceRef: string | null;
+  /** حقل دليل وُجد في الحمولة لكن بصيغة غير مقبولة: يُخفى ولا يُعرض، ولا يمسّ أي حالة جاهزية. */
+  evidenceMalformed: boolean;
 }
 
 export interface DeliveryLadder {
@@ -172,15 +174,31 @@ export function readManualStatuses(payload: unknown): Map<string, 'set' | 'disab
   return result;
 }
 
-function nullableText(value: unknown): string | null {
-  return typeof value === 'string' && value.trim() !== '' ? value : null;
+/** القيم التقنية التي يُرجعها الخادم (`DeliveryProviderReadiness::TECHNICAL_STATUSES`). */
+const TECHNICAL_VALUES: ReadonlySet<string> = new Set(['READY', 'BLOCKED', 'OWNER_GATE']);
+const EVIDENCE_REF_PATTERN = /^[^\u0000-\u001f\u007f]{1,300}$/;
+
+function isCalendarDate(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const parsed = new Date(`${value}T00:00:00Z`);
+  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
+}
+
+/**
+ * حقل دليل داخلي اختياري (للمالك/المدير فقط). الغياب (`undefined`/`null`) صالح: هكذا تصل الاستجابة العامة.
+ * الحاضر يجب أن يطابق صيغته المعروفة، وإلا يُخفى (`value: null`) ويُعلَّم مشوّهاً. الحقل وصفيّ فقط:
+ * تشويهه لا يُسقط قراءة الجاهزية ولا يغيّر حالة أي منصة.
+ */
+function evidenceField(raw: unknown, valid: (text: string) => boolean): { value: string | null; malformed: boolean } {
+  if (raw === undefined || raw === null) return { value: null, malformed: false };
+  return typeof raw === 'string' && valid(raw) ? { value: raw, malformed: false } : { value: null, malformed: true };
 }
 
 /**
  * صفوف `GET /delivery-platforms/readiness`. الخادم يُرجع المنصات الست دائماً؛ لذا حمولة
  * ينقص فيها صفّ معروف، أو يحمل صفٌّ معروف `ux_state` غير نصّي أو علماً غير منطقي، تعود
  * `null` (قراءة فاشلة بشعار إعادة المحاولة) لا خريطة جزئية تبدو ناجحة. تكرار مفتاح معروف مرفوض كذلك. صفوف المنصات
- * المجهولة تُتجاهل.
+ * المجهولة تُتجاهل. حقول الدليل الاختيارية لا تدخل في هذا الحكم: تشويهها يُخفيها ويُعلَّم بـ`evidenceMalformed` فقط.
  */
 export function readReadinessRows(payload: unknown): Map<string, ReadinessRow> | null {
   const list = strictRows(payload);
@@ -194,14 +212,18 @@ export function readReadinessRows(payload: unknown): Map<string, ReadinessRow> |
     if (typeof row.ux_state !== 'string' || typeof row.connect_enabled !== 'boolean' || typeof row.sync_enabled !== 'boolean') return null;
     // صفّان لمنصة واحدة: ترتيبهما كان سيحدّد الحالة المعروضة، فالحمولة غير موثوقة.
     if (result.has(row.platform_key)) return null;
+    const technical = evidenceField(row.technical, (text) => TECHNICAL_VALUES.has(text));
+    const evidenceDate = evidenceField(row.evidence_date, isCalendarDate);
+    const evidenceRef = evidenceField(row.evidence_ref, (text) => text.trim() === text && EVIDENCE_REF_PATTERN.test(text));
     result.set(row.platform_key, {
       platformKey: row.platform_key,
       uxState: row.ux_state,
       connectEnabled: row.connect_enabled,
       syncEnabled: row.sync_enabled,
-      technical: nullableText(row.technical),
-      evidenceDate: nullableText(row.evidence_date),
-      evidenceRef: nullableText(row.evidence_ref),
+      technical: technical.value,
+      evidenceDate: evidenceDate.value,
+      evidenceRef: evidenceRef.value,
+      evidenceMalformed: technical.malformed || evidenceDate.malformed || evidenceRef.malformed,
     });
   }
   return known.size === result.size ? result : null;

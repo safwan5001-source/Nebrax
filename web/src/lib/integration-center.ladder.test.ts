@@ -22,7 +22,7 @@ const TODAY = [
 function row(over: Partial<ReadinessRow> = {}): ReadinessRow {
   return {
     platformKey: 'keeta', uxState: 'AWAITING_PROVIDER_APPROVAL', connectEnabled: false, syncEnabled: false,
-    technical: null, evidenceDate: null, evidenceRef: null, ...over,
+    technical: null, evidenceDate: null, evidenceRef: null, evidenceMalformed: false, ...over,
   };
 }
 
@@ -159,6 +159,56 @@ describe('readReadinessRows and nativeStatusOf (step B)', () => {
     const without = readReadinessRows({ data: TODAY })?.get('keeta');
     expect(without?.technical).toBeNull();
     expect(without?.evidenceRef).toBeNull();
+  });
+});
+
+describe('internal evidence fields (optional, descriptive only)', () => {
+  const withKeeta = (patch: Record<string, unknown>) => ({ data: TODAY.map((r) => (r.platform_key === 'keeta' ? { ...r, ...patch } : r)) });
+  const GOOD = { technical: 'OWNER_GATE', evidence_date: '2026-10-11', evidence_ref: 'docs/plans/pos/DLV-PROVIDER-READINESS-1-REPORT.md §4.4' };
+
+  it('accepts well-formed values and the public shape (fields absent or null) without flagging anything', () => {
+    const good = readReadinessRows(withKeeta(GOOD))?.get('keeta');
+    expect(good).toMatchObject({ technical: 'OWNER_GATE', evidenceDate: '2026-10-11', evidenceRef: GOOD.evidence_ref, evidenceMalformed: false });
+
+    for (const patch of [{}, { technical: null, evidence_date: null, evidence_ref: null }]) {
+      const row = readReadinessRows(withKeeta(patch))?.get('keeta');
+      expect(row).toMatchObject({ technical: null, evidenceDate: null, evidenceRef: null, evidenceMalformed: false });
+    }
+  });
+
+  it.each([
+    ['technical', 7], ['technical', ''], ['technical', '  '], ['technical', 'ready'], ['technical', 'UNKNOWN_STATE'], ['technical', {}],
+    ['evidence_date', 20261011], ['evidence_date', ''], ['evidence_date', '   '], ['evidence_date', '2026-13-40'], ['evidence_date', '2026-02-30'], ['evidence_date', '11/10/2026'], ['evidence_date', '2026-10-11T00:00:00Z'],
+    ['evidence_ref', 7], ['evidence_ref', ''], ['evidence_ref', '   '], ['evidence_ref', 'a'.repeat(301)], ['evidence_ref', 'line1\nline2'], ['evidence_ref', 'bell\u0007'], ['evidence_ref', []],
+  ])('a present but malformed %s (%j) is hidden and flagged, and never rejects the read', (field, value) => {
+    const rows = readReadinessRows(withKeeta({ ...GOOD, [field]: value }));
+
+    expect(rows).not.toBeNull();
+    const keeta = rows?.get('keeta');
+    const key = field === 'technical' ? 'technical' : field === 'evidence_date' ? 'evidenceDate' : 'evidenceRef';
+    expect(keeta?.[key]).toBeNull();
+    expect(keeta?.evidenceMalformed).toBe(true);
+    // الحقلان الآخران السليمان يبقيان.
+    const others = (['technical', 'evidenceDate', 'evidenceRef'] as const).filter((k) => k !== key);
+    for (const other of others) expect(keeta?.[other]).not.toBeNull();
+  });
+
+  it('a malformed evidence field changes no readiness decision: all six rows, statuses and both flags are identical to the clean read', () => {
+    const clean = readReadinessRows({ data: TODAY });
+    const dirty = readReadinessRows({ data: TODAY.map((r) => ({ ...r, technical: 7, evidence_date: 'x', evidence_ref: '' })) });
+
+    expect(dirty?.size).toBe(6);
+    for (const key of deliveryPlatformKeys()) {
+      const a = clean?.get(key);
+      const b = dirty?.get(key);
+      expect(nativeStatusOf(b)).toBe(nativeStatusOf(a));
+      expect(b?.uxState).toBe(a?.uxState);
+      expect(b?.connectEnabled).toBe(a?.connectEnabled);
+      expect(b?.syncEnabled).toBe(a?.syncEnabled);
+      expect(b?.evidenceMalformed).toBe(true);
+      expect(a?.evidenceMalformed).toBe(false);
+    }
+    expect(deliveryLadder('keeta', new Map(), dirty)).toEqual(deliveryLadder('keeta', new Map(), clean));
   });
 });
 

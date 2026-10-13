@@ -144,6 +144,37 @@ describe.each(TEST_LOCALES)('delivery platform detail (%s)', (locale) => {
     expect(screen.getByTestId('detail-boundaries').textContent).toContain(m.detail.hubOnlyNote);
   });
 
+  it('a malformed evidence field is hidden with a visible note (owner/admin only), the valid ones stay, and no status changes', () => {
+    const malformed = { data: TODAY.map((row) => (row.platform_key === 'keeta' ? { ...row, technical: 7, evidence_date: '2026-10-11', evidence_ref: 'docs/x.md' } : row)) };
+    renderDetail(locale, 'keeta', { readinessPayload: malformed });
+
+    const advanced = screen.getByTestId('detail-advanced');
+    expect(advanced.textContent).not.toContain(m.detail.advanced.technical);
+    expect(advanced.textContent).toContain('2026-10-11');
+    expect(advanced.textContent).toContain('docs/x.md');
+    expect(within(advanced).getByTestId('detail-advanced-malformed').textContent).toBe(m.detail.advanced.malformed);
+    expect(screen.getByTestId('capability-ladder').querySelector('[data-ladder-step="b"]')?.textContent?.trim()).toBe(m.ladder.b.pending);
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('when every evidence field is malformed the section shows only the note, still without any alert', () => {
+    const all = { data: TODAY.map((row) => ({ ...row, technical: '', evidence_date: 'nope', evidence_ref: 5 })) };
+    renderDetail(locale, 'keeta', { readinessPayload: all });
+
+    const advanced = screen.getByTestId('detail-advanced');
+    expect(advanced.querySelectorAll('dt')).toHaveLength(0);
+    expect(within(advanced).getByTestId('detail-advanced-malformed')).toBeTruthy();
+    expect(screen.getByTestId('capability-ladder').querySelector('[data-ladder-step="b"]')?.textContent?.trim()).toBe(m.ladder.b.pending);
+  });
+
+  it('a viewer without the evidence permission never sees the section or the note, even if the payload is malformed', () => {
+    const all = { data: TODAY.map((row) => ({ ...row, technical: 7 })) };
+    renderDetail(locale, 'keeta', { readinessPayload: all, canViewEvidence: false });
+
+    expect(screen.queryByTestId('detail-advanced')).toBeNull();
+    expect(screen.queryByTestId('detail-advanced-malformed')).toBeNull();
+  });
+
   it('internal evidence fields appear only for a viewer who received them', () => {
     const { unmount } = renderDetail(locale, 'keeta');
     const advanced = screen.getByTestId('detail-advanced');

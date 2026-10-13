@@ -52,7 +52,7 @@ export function DeliveryPlatformDetail({
   const restricted = access === 'denied' || access === 'app_off';
   const catalogHref = '/integrations/delivery-platforms';
   const someFailed = manualFailed || readinessFailed;
-  const evidence = canViewEvidence && readiness && (readiness.technical || readiness.evidenceDate || readiness.evidenceRef) ? readiness : null;
+  const evidence = canViewEvidence && readiness && (readiness.technical || readiness.evidenceDate || readiness.evidenceRef || readiness.evidenceMalformed) ? readiness : null;
 
   return (
     <div className="space-y-5 pb-16 md:pb-0" data-testid="delivery-platform-detail" data-platform={platformKey}>
@@ -166,6 +166,9 @@ export function DeliveryPlatformDetail({
                   </>
                 ) : null}
               </dl>
+              {evidence.evidenceMalformed ? (
+                <p role="note" className="text-xs leading-relaxed text-muted" data-testid="detail-advanced-malformed">{t('detail.advanced.malformed')}</p>
+              ) : null}
             </section>
           ) : null}
         </>

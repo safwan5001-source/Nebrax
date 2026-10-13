@@ -1,37 +1,16 @@
-'use client';
-
-import { useParams } from 'next/navigation';
-import { DeliveryPlatformDetail, UnknownDeliveryPlatform } from '@/components/integrations/delivery-platform-detail';
-import { useDeliveryIntegrationData } from '@/components/integrations/use-delivery-integration-data';
-import { deliveryLadder, isKnownDeliveryPlatform } from '@/lib/integration-center';
+import { notFound } from 'next/navigation';
+import { DeliveryPlatformDetailScreen } from '@/components/integrations/delivery-platform-detail-screen';
+import { isKnownDeliveryPlatform } from '@/lib/integration-center';
 
 /**
- * تفاصيل منصة توصيل داخل مركز التكاملات (INT-UX-2). المفتاح يُتحقَّق منه مقابل السجلّ
- * المركزي **قبل** أي طلب: مفتاح غير معروف = صفحة «غير موجود» بصفر طلبات.
+ * تفاصيل منصة توصيل داخل مركز التكاملات (INT-UX-2). مكوّن خادم: المفتاح يُتحقَّق منه مقابل السجلّ
+ * المركزي **قبل** أي رسم أو طلب، ومفتاح غير معروف يستدعي `notFound()` فتخرج الاستجابة بـHTTP 404
+ * حقيقية (وتُرسم `not-found.tsx` المجاورة)، لا صفحة 200 تقول «غير موجود».
+ * `params` وعد في Next 15.
  */
-export default function DeliveryPlatformDetailPage() {
-  const params = useParams<{ platformKey: string }>();
-  const raw = params?.platformKey;
-  const platformKey = typeof raw === 'string' ? raw : '';
-  const known = isKnownDeliveryPlatform(platformKey);
-  const data = useDeliveryIntegrationData(known);
+export default async function DeliveryPlatformDetailPage({ params }: { params: Promise<{ platformKey: string }> }) {
+  const { platformKey } = await params;
+  if (!isKnownDeliveryPlatform(platformKey)) notFound();
 
-  if (!known) return <UnknownDeliveryPlatform />;
-
-  return (
-    <DeliveryPlatformDetail
-      platformKey={platformKey}
-      access={data.access}
-      loading={data.status === 'loading'}
-      ladder={deliveryLadder(platformKey, data.manual, data.readiness)}
-      readiness={data.readiness?.get(platformKey) ?? null}
-      manualFailed={data.manualFailed}
-      readinessFailed={data.readinessFailed}
-      canOpenApplications={data.canOpenApplications}
-      canViewHub={data.canViewHub}
-      canViewReport={data.canViewReport}
-      canViewEvidence={data.canViewEvidence}
-      onRetry={data.retry}
-    />
-  );
+  return <DeliveryPlatformDetailScreen platformKey={platformKey} />;
 }

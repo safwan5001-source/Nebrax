@@ -10164,7 +10164,8 @@
       "advanced": {
         "technical": "Technical status",
         "evidenceDate": "Evidence date",
-        "evidenceRef": "Evidence reference"
+        "evidenceRef": "Evidence reference",
+        "malformed": "Some technical details were not shown because their format was not recognized."
       },
       "unknownTitle": "Unknown platform",
       "unknownBody": "There is no delivery platform with this identifier in AWJ.",
