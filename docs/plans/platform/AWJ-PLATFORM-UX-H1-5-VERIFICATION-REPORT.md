@@ -6,7 +6,7 @@ Spec: [AWJ-PLATFORM-UX-H1-1-UX-SPEC.md](./AWJ-PLATFORM-UX-H1-1-UX-SPEC.md)
 
 ## Verdict
 
-**NOT READY to close the Horizon.** Two P1 defects were found by running the real Laravel backend, which no earlier slice did. Both are fixed in a separate, small, tested branch that is not merged ([fix branch](#fixes-proposed-not-merged)). The Horizon may be closed only after all three conditions hold: (1) that branch is reviewed and merged with Safwan's approval; (2) the P2 items below are accepted or scheduled by Safwan; (3) the checks this report could not run (a real screen reader, the browser's own zoom and text-size settings, Firefox and WebKit, and the Laravel suites green in CI on the merged head) are either performed or explicitly waived in writing by Safwan. A NOT VERIFIED item is not a pass and does not close by default. Nothing here changes the Backend, database, financial rules or permissions, and nothing was merged or deployed.
+**NOT READY to close the Horizon.** Two P1 defects were found by running the real Laravel backend, which no earlier slice did. Both were fixed in a separate, small, tested PR (#1376). **Update 2026-10-13 10:25 UTC:** the repository owner reviewed and merged #1376 as `4683c42aa95fd3f3fb5332dc2de0c8b8b324a40d` (PRE_MERGE_REVIEW PASS on head `c23944ea…`; the owner approved that merge only). The fixes were verified in a real browser on the PR branch before the merge; they have **not** been re-verified on `main` after the merge. ([fix details](#fixes-proposed-not-merged)). The Horizon may be closed only after all three conditions hold: (1) the P1 fix PR is merged with Safwan's approval (**met**: #1376, `4683c42a`); (2) the P2 items below are accepted or scheduled by Safwan; (3) the checks this report could not run (a real screen reader, the browser's own zoom and text-size settings, Firefox and WebKit, and the Laravel suites green in CI on the merged head) are either performed or explicitly waived in writing by Safwan. A NOT VERIFIED item is not a pass and does not close by default. Nothing here changes the Backend, database, financial rules or permissions, and nothing was merged or deployed.
 
 | P1 | Where | What a real backend showed | Mock tests said |
 |---|---|---|---|
@@ -74,8 +74,8 @@ Classification: P0 blocks release, P1 blocks the closure gate, P2 should be fixe
 
 | ID | Sev | Origin | Defect | Evidence | Status |
 |---|---|---|---|---|---|
-| H15-01 | **P1** | Pre-existing (request body from `5cdfe803`, kept by H1-4E) | Retention dry run always 422 | `{"dry_run":true}` and `{"dry_run":true,"apply":false}` → 422; `{"dry_run":true,"apply":true}` → 202. Reproduced through the real UI twice (policy off and on). No HTTP test covers this endpoint, only runner-level tests. | Fixed in the fix branch (web side); backend rule fix recommended |
-| H15-02 | **P1** | Pre-existing helper, carried by H1-4D | Integrations form controls without an accessible name | axe `label` critical ×42 and `select-name` critical ×5 on every run; real DOM: `<label>` with no `for`, input with no id | Fixed in the fix branch |
+| H15-01 | **P1** | Pre-existing (request body from `5cdfe803`, kept by H1-4E) | Retention dry run always 422 | `{"dry_run":true}` and `{"dry_run":true,"apply":false}` → 422; `{"dry_run":true,"apply":true}` → 202. Reproduced through the real UI twice (policy off and on). No HTTP test covers this endpoint, only runner-level tests. | Fixed in #1376 (merged `4683c42a`, web side; not re-verified on `main`); backend rule fix still recommended |
+| H15-02 | **P1** | Pre-existing helper, carried by H1-4D | Integrations form controls without an accessible name | axe `label` critical ×42 and `select-name` critical ×5 on every run; real DOM: `<label>` with no `for`, input with no id | Fixed in #1376 (merged `4683c42a`; not re-verified on `main`) |
 | H15-03 | P2 | H1-4D | Scan-exception tenant picker lists only the first 20 tenants | picker calls `GET /platform/tenants` with the default page size; 20 options for 28 tenants; no pagination or search. Mocks returned two tenants. Already recorded as a recommendation in H1-4D/4E | Open |
 | H15-04 | P2 | Pre-existing | Audit export with an expired session: no redirect to login, generic error | `platformDownloadFile` sends no `Accept`, does not handle 401, and falls back to a hard-coded Arabic message; the backend answers an unauthenticated request without `Accept` with a 500 HTML page (also true of `/platform/overview` and `/platform/prices`) | Open |
 | H15-05 | P2 | H1-4C (UI) and pre-existing (backend) | A known duplicate price version can be submitted and fails with a 500 | the preview says "already exists" but Save stays enabled; server returns 500 (unique key `plan,currency,effective_on`). With `APP_DEBUG=true` the UI shows the SQL text; with `APP_DEBUG=false` it shows "Server Error". No secret leak in production mode | Open |
@@ -92,9 +92,9 @@ Classification: P0 blocks release, P1 blocks the closure gate, P2 should be fixe
 | H15-16 | P3 | Known | Interactive controls below 44px remain in the tenants application cards (32px) and the date-picker icon (28px) | listed as unchanged in H1-4B | Open |
 | H15-17 | P3 | Pre-existing | Dashboard guard needs the stored administrator profile, other console pages need only the token; `IntlError INVALID_KEY` (`appBuilder.builder.visibility.signalOption`) logs on every page; the Dependencies cell repeats `fuel_stations.core` ×3 | console and DOM | Open |
 
-## Fixes proposed, not merged
+## Fixes (PR #1376, merged by the owner as `4683c42a`)
 
-Branch `claude/awj-h1-5-p1-fixes` (from Base SHA, web only, no Backend, database or permission change). It is a proposal for review, not part of this report's PR.
+Branch `claude/awj-h1-5-p1-fixes` (from Base SHA, web only, no Backend, database or permission change). It was reviewed and merged separately from this report's PR.
 
 - **H15-02:** `Field` generates an id (`useId`), links its label with `htmlFor` and assigns the id to the first element child; the custom `Select` forwards `id`. Regression test: every input and select on the page has a label or `aria-label`, ids are unique, `getAllByLabelText` resolves to the right control. Mutation check: reverting the fix makes it fail with 53 unnamed controls. Real browser, fixed code: 0 unnamed of 74 controls.
 - **H15-01:** the dry-run request also sends `apply: true`; the server reads `dry_run`, which stays true, so no purge can result. The existing request-body test is corrected to the contract the API actually enforces. Real browser, fixed code: `POST {"dry_run":true,"apply":true}` → 202 twice, no alert. **Recommended root-cause fix, needs Safwan's approval because it touches the Backend:** change the validation to require `apply` only when `dry_run` is false (`exclude_if:dry_run,true` plus the existing `required_if`/`accepted`) and add an HTTP test for this endpoint. The web fix keeps working after that change.
@@ -157,15 +157,15 @@ This PR changes documentation only (the H1-5 report, the H1-4E report's merge st
 
 ## Recommendation on closing the Horizon
 
-Do not close it yet. Closure needs all three conditions in the verdict: the P1 fix branch reviewed and merged by Safwan's decision; the P2 list accepted in writing or scheduled; and the NOT VERIFIED accessibility and browser checks (real screen reader, native browser zoom and text size, Firefox, WebKit) either done or waived by Safwan. Earlier slice reports assigned the screen-reader, zoom and text-scaling checks to H1-5; this report ran zoom and text scaling by emulation only and could not run a screen reader, so those gates stay open until done or waived. With the conditions met, the Horizon can close with this report as its verification record. The most valuable follow-up beyond the P2 list is one HTTP-level test per platform write endpoint, because the two P1 defects were invisible to every mocked test.
+Do not close it yet. Closure needs all three conditions in the verdict: the P1 fix PR merged by Safwan's decision (done: #1376); the P2 list accepted in writing or scheduled; and the NOT VERIFIED accessibility and browser checks (real screen reader, native browser zoom and text size, Firefox, WebKit) either done or waived by Safwan. Earlier slice reports assigned the screen-reader, zoom and text-scaling checks to H1-5; this report ran zoom and text scaling by emulation only and could not run a screen reader, so those gates stay open until done or waived. With the conditions met, the Horizon can close with this report as its verification record. The most valuable follow-up beyond the P2 list is one HTTP-level test per platform write endpoint, because the two P1 defects were invisible to every mocked test.
 
 ## Git state
 
 - Branch: `claude/awj-h1-5-platform-ux-verification` (new, from `origin/main`).
 - Base SHA: `9becbb62b5e76484ba287e5ef424185893a092a8` (H1-4E merge, PR #1375).
 - Head SHA and PR: see the pull request.
-- Fix branch (separate): `claude/awj-h1-5-p1-fixes`.
+- Fix PR (separate): #1376, branch `claude/awj-h1-5-p1-fixes`, head `c23944ea153d977045feecd0518843027ee6636b`, merged into `main` by the owner as `4683c42aa95fd3f3fb5332dc2de0c8b8b324a40d`.
 
 ## Next dependency-ready task
 
-Safwan's review of this report and of the fix branch. No further slice was started.
+Safwan's review of this report; a post-merge re-check of H15-01 and H15-02 on `main` if wanted; then decisions on the P2 list and on the unverified checks. No further slice was started.
