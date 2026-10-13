@@ -165,6 +165,24 @@ describe("social links", () => {
     expect(field.value).toBe("https://instagram.com/ne");
   });
 
+  it("drops a rejected URL from the field on blur, so nothing visible is silently discarded", async () => {
+    render(<Harness panel="social" initial={social()} />);
+    const field = screen.getByPlaceholderText("https://") as HTMLInputElement;
+    await userEvent.type(field, "http://example.com");
+    expect(field.value).toBe("http://example.com");
+    await userEvent.tab();
+    expect(field.value).toBe("");
+    expect(latest.social[0].url).toBe("");
+  });
+
+  it("keeps a valid URL on blur", async () => {
+    render(<Harness panel="social" initial={social()} />);
+    const field = screen.getByPlaceholderText("https://") as HTMLInputElement;
+    await userEvent.type(field, "https://instagram.com/awj");
+    await userEvent.tab();
+    expect(field.value).toBe("https://instagram.com/awj");
+  });
+
   it("does not store an unsafe URL even though the field shows what was typed", async () => {
     render(<Harness panel="social" initial={social()} />);
     const field = screen.getByPlaceholderText("https://") as HTMLInputElement;

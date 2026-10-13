@@ -24,6 +24,7 @@ export function BufferedText({
   dir,
   inputMode,
   maxLength,
+  reconcileOnBlur,
   ...rest
 }: {
   value: string;
@@ -43,6 +44,11 @@ export function BufferedText({
   dir?: "ltr" | "rtl";
   inputMode?: "url" | "text";
   maxLength?: number;
+  /**
+   * On blur, show the draft's value instead of the typed text. For fields the draft may reject outright (a URL that is not a safe
+   * https link) so the merchant never leaves with a visible value that Save will silently drop.
+   */
+  reconcileOnBlur?: boolean;
 } & Record<`data-${string}`, string>) {
   const [local, setLocal] = useState(value);
   useEffect(() => {
@@ -64,6 +70,7 @@ export function BufferedText({
       dir={dir}
       maxLength={maxLength}
       onChange={(event) => commit(event.target.value)}
+      onBlur={reconcileOnBlur ? () => setLocal(value) : undefined}
       {...rest}
     />
   ) : (
@@ -75,6 +82,7 @@ export function BufferedText({
       inputMode={inputMode}
       maxLength={maxLength}
       onChange={(event) => commit(event.target.value)}
+      onBlur={reconcileOnBlur ? () => setLocal(value) : undefined}
       {...rest}
     />
   );

@@ -2005,6 +2005,7 @@ function SocialPanel({
                 placeholder="https://"
                 value={item.url}
                 normalize={externalUrlText}
+                reconcileOnBlur
                 onCommit={(url) => {
                   const social = config.social.map((row, i) => (i === index ? { ...row, url } : row));
                   patch({ social });
@@ -2168,6 +2169,7 @@ function VerificationPanel({
             inputMode="url"
             value={config.verification.sourceUrl}
             normalize={externalUrlText}
+                reconcileOnBlur
             onCommit={(sourceUrl) =>
               patch({
                 verification: {
@@ -2520,7 +2522,14 @@ function BannerFields({
       />
       <p className="text-[12px] leading-5 text-muted">{t("bannerCtaHint")}</p>
       <Field label={t("bannerImageUrl")}>
-        <BufferedText dir="ltr" inputMode="url" value={value.imageUrl ?? ""} normalize={externalUrlText} onCommit={(imageUrl) => set({ imageUrl: imageUrl || null })} />
+        <BufferedText
+          dir="ltr"
+          inputMode="url"
+          value={value.imageUrl ?? ""}
+          normalize={externalUrlText}
+          reconcileOnBlur
+          onCommit={(imageUrl) => set({ imageUrl: imageUrl || null })}
+        />
       </Field>
       <DeferredCommitField
         label={t("bannerImageAlt")}
