@@ -14,6 +14,7 @@ import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { ApiError } from '@/lib/api';
+import { applicationLabel } from './application-label';
 import { platformApi } from '@/lib/platform-api';
 
 type GlobalOperation =
@@ -73,10 +74,6 @@ interface PendingAction {
   applicationKey: string | null;
 }
 
-function catalogKeyLabel(key: string): string {
-  return key.replaceAll('.', '_');
-}
-
 function protectedTone(status: GlobalApplication['protected_status']): 'warning' | 'negative' | 'muted' | 'neutral' {
   if (status === 'mandatory') return 'warning';
   if (status === 'retired') return 'negative';
@@ -125,7 +122,7 @@ export function GlobalApplicationControlsCard() {
   useEffect(() => { load(); }, [load]);
 
   const filtered = useMemo(() => applications.filter((app) => {
-    const label = tApps(`keys.${catalogKeyLabel(app.key)}`);
+    const label = applicationLabel(tApps, app.key);
     const matchesSearch = !search || app.key.includes(search) || label.includes(search);
     const matchesFilter = filter === 'all'
       || (filter === 'commercial' && app.access === 'commercial')
@@ -304,7 +301,7 @@ export function GlobalApplicationControlsCard() {
                   {filtered.map((app) => (
                     <tr key={app.key} className="border-t border-border">
                       <td className="px-3 py-2">
-                        <div className="break-words font-medium text-text">{tApps(`keys.${catalogKeyLabel(app.key)}`)}</div>
+                        <div className="break-words font-medium text-text">{applicationLabel(tApps, app.key)}</div>
                         <div className="font-mono text-xs text-muted break-words" dir="ltr">{app.key}</div>
                       </td>
                       <td className="px-3 py-2">
@@ -331,7 +328,7 @@ export function GlobalApplicationControlsCard() {
                 <div key={app.key} className="rounded border border-border bg-surface p-3">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <div className="break-words font-medium text-text">{tApps(`keys.${catalogKeyLabel(app.key)}`)}</div>
+                      <div className="break-words font-medium text-text">{applicationLabel(tApps, app.key)}</div>
                       <div className="font-mono text-xs text-muted break-words" dir="ltr">{app.key}</div>
                     </div>
                     {app.protected_status && (
