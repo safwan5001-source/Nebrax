@@ -80,8 +80,17 @@ class ResolveStorefrontDomain
         $this->branchContext->forget();
         $this->storefrontContext->forget();
 
+        $incoming = $this->incomingHostname($request);
+
+        // Host حقيقي لا يحمل مسارًا/استعلامًا/مستخدمًا/مسافة؛ المطبِّع يقصّ هذه
+        // الأجزاء بتسامحٍ مقصود لمسارات الإدخال اليدوي، أما هنا فوجودها في قيمة
+        // الترويسة انتحال/تشويه فيُرفض مغلقاً بدل «تنظيفه» إلى مضيف صالح.
+        if (preg_match('~[/?#@\x5c\s]|://~', $incoming) === 1) {
+            abort(404, 'تعذّر تحديد متجر صالح.');
+        }
+
         try {
-            $hostname = HostnameNormalizer::normalize($this->incomingHostname($request));
+            $hostname = HostnameNormalizer::normalize($incoming);
         } catch (InvalidHostnameException) {
             abort(404, 'تعذّر تحديد متجر صالح.');
         }

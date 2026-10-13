@@ -45,12 +45,20 @@ final class CreateStorefrontForCurrentTenant
                 throw new RuntimeException('المستأجر غير موجود.');
             }
 
+            // السلاج فريد لكل مستأجر (قيد القاعدة)، لكن المضيف الناتج
+            // `{tenant}-{store}` فريد عالمياً: يُلحَق اللاحقة الرقمية (حتمياً) إن كان
+            // المضيف محجوزاً لمتجر/مستأجر آخر — لا فشل ولا اختيار عشوائي.
+            $availability = app(ManagedHostnameAvailability::class);
             $slug = CatalogSlug::derive(
                 $name,
                 fn (string $candidate): bool => Storefront::withTrashed()
                     ->where('tenant_id', $tenantId)
                     ->where('slug', $candidate)
-                    ->exists(),
+                    ->exists()
+                    || $availability->isTaken(
+                        ManagedStorefrontHostname::forAdditionalStoreSlug($candidate, $tenant->slug, $baseDomain),
+                        $baseDomain,
+                    ),
                 'store',
             );
             $channelSlug = CatalogSlug::derive(
@@ -78,8 +86,8 @@ final class CreateStorefrontForCurrentTenant
                 'default_locale' => $defaultLocale,
             ]);
 
-            // المتجر الأول يبقى `{tenant}.{base}`؛ الإضافي يضيف هوية المتجر
-            // أمام هوية المستأجر، مع تطبيع مركزي وعدم قبول hostname من العميل.
+            // المتجر الأول يبقى `{tenant}.{base}`؛ الإضافي `{tenant}-{store}.{base}`
+            // (شريحة واحدة — تغطيها شهادة wildcard)، مع تطبيع مركزي وعدم قبول hostname من العميل.
             $hostname = ManagedStorefrontHostname::forAdditionalStoreSlug(
                 $slug,
                 $tenant->slug,

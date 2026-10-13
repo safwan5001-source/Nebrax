@@ -97,7 +97,17 @@ final class ManagedStorefrontHostname
         return $hostname;
     }
 
-    /** hostname إضافي بصيغة `{store-slug}.{tenant-slug}.{base-domain}`. */
+    /**
+     * hostname المتجر الإضافي — الخيار A المعتمد: `{tenant-slug}-{store-slug}.{base}`
+     * (شريحة واحدة فوق النطاق الأساسي، فتغطّيه شهادة `*.{base}` القائمة).
+     *
+     * الصيغة المتداخلة القديمة `{store}.{tenant}.{base}` لم تعد تُولَّد أبداً —
+     * شهادة wildcard بشريحة واحدة لا تغطي مضيفاً من شريحتين (TLS name mismatch).
+     *
+     * هذه الدالة نقية: لا تثبت التفرّد العالمي. الدمج بشرطة قد يُنتج النص ذاته من
+     * أزواج مختلفة (`a`+`b-c` و`a-b`+`c`، أو سلاج مستأجر `a-b-c`)؛ التفرّد يضمنه
+     * `ManagedHostnameAvailability` عند الإنشاء + قيد `storefront_domains.hostname`.
+     */
     public static function forAdditionalStoreSlug(string $storeSlug, string $tenantSlug, ?string $baseDomain = null): string
     {
         $baseDomain = $baseDomain === null
@@ -107,12 +117,30 @@ final class ManagedStorefrontHostname
             throw new StorefrontBaseDomainMisconfiguredException('هوية المتجر أو المستأجر فارغة — لا يمكن توليد نطاق متجر.');
         }
         try {
-            return HostnameNormalizer::normalize($storeSlug.'.'.$tenantSlug.'.'.$baseDomain);
+            $hostname = HostnameNormalizer::normalize($tenantSlug.'-'.$storeSlug.'.'.$baseDomain);
         } catch (InvalidHostnameException $e) {
             throw new StorefrontBaseDomainMisconfiguredException(
                 'تعذّر توليد نطاق متجر إضافي صالح: '.$e->getMessage()
             );
         }
+
+        // خط دفاع: أي نقطة في الأجزاء (لا تجتاز alpha_dash/CatalogSlug أصلاً) تُنتج
+        // أكثر من شريحة — يُرفض مغلقاً بدل إنتاج مضيف بلا شهادة.
+        if (! self::isUnderBaseDomain($hostname, $baseDomain)) {
+            throw new StorefrontBaseDomainMisconfiguredException(
+                'الاسم المولَّد لا يقع بشريحة واحدة ضمن النطاق الأساسي المُهيَّأ لمتاجر Commerce المُدارة.'
+            );
+        }
+
+        return $hostname;
+    }
+
+    /** الشريحة الوحيدة فوق النطاق الأساسي (`null` إن لم يكن مضيفاً بشريحة واحدة بالضبط). */
+    public static function labelOf(string $hostname, string $baseDomain): ?string
+    {
+        return self::isUnderBaseDomain($hostname, $baseDomain)
+            ? substr($hostname, 0, -strlen('.'.$baseDomain))
+            : null;
     }
 
     /** هل hostname يقع ضمن namespace AWJ المُدار، بما في ذلك المتاجر الإضافية؟ */
