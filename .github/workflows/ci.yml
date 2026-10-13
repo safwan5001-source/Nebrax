@@ -29,6 +29,9 @@ jobs:
   test:
     name: php artisan test (L11, ${{ matrix.db }})
     runs-on: ubuntu-latest
+    # أطول job مرصود ≈ 27 دقيقة. بلا سقفٍ صريح يحجز عاملٌ معلَّق المشغِّل 360 دقيقة
+    # (الافتراضي)؛ والسقف يفشل الـjob (مغلق على الفشل) ولا يُنجحه.
+    timeout-minutes: 60
 
     strategy:
       fail-fast: false
@@ -122,6 +125,13 @@ jobs:
           php artisan install:api --no-interaction --quiet || true
           rm -f database/migrations/*_create_personal_access_tokens_table.php
 
+      # ParaTest لفرع PostgreSQL وحده (تنفيذ متوازٍ، قاعدة بيانات معزولة لكل عامل: nibras_test_N).
+      # فرع SQLite يبقى تسلسلياً كما هو.
+      - name: تثبيت ParaTest (pgsql فقط)
+        if: matrix.db == 'pgsql'
+        working-directory: ${{ env.APP_DIR }}
+        run: composer require --dev "brianium/paratest:^7.4" --quiet
+
       - name: دمج ملفات النواة وطبقة الـ API
         run: |
           CORE="$GITHUB_WORKSPACE"
@@ -208,6 +218,27 @@ jobs:
             sed -i "s|return \[|return [\n    App\\\\Providers\\\\MailServiceProvider::class,|" bootstrap/providers.php
           rm -f database/migrations/0001_01_01_000000_create_users_table.php
 
+      # كل عامل متوازٍ ينفّذ `migrate:fresh` مرتين عند بدئه (إقلاع Laravel الموازي ثم RefreshDatabase)،
+      # وكل مرة `DROP TABLE` لـ ~330 جدولاً و~1150 فهرساً في معاملة واحدة ≈ 1500 قفل. بالافتراض
+      # (max_locks_per_transaction=64 × max_connections=100 = 6400 خانة مشتركة) تكاد أربعة عمّال
+      # أن تستنفدها (≈5900) فينهار التشغيل بـ«out of shared memory» أو يعلَّق (رُصد محلياً 3 من 4).
+      # الحدّ لا يتغيّر إلا بإعادة تشغيل الخادم (postmaster)، فنعيد تشغيل حاوية الخدمة ونتحقّق من القيمة.
+      - name: رفع حدّ أقفال PostgreSQL للتنفيذ المتوازي (pgsql فقط)
+        if: matrix.db == 'pgsql'
+        run: |
+          set -euo pipefail
+          CID="$(docker ps -q --filter ancestor=postgres:16)"
+          [ -n "$CID" ] && [ "$(echo "$CID" | wc -l)" -eq 1 ] || { echo "::error::تعذّر تحديد حاوية postgres الوحيدة"; exit 1; }
+          docker exec "$CID" psql -U nibras -d nibras -v ON_ERROR_STOP=1 -c "ALTER SYSTEM SET max_locks_per_transaction = 1024"
+          docker restart "$CID" >/dev/null
+          for i in $(seq 1 60); do
+            docker exec "$CID" pg_isready -U nibras -d nibras >/dev/null 2>&1 && break
+            sleep 1
+          done
+          LIMIT="$(docker exec "$CID" psql -U nibras -d nibras -Atc "SHOW max_locks_per_transaction")"
+          echo "max_locks_per_transaction=$LIMIT"
+          [ "$LIMIT" = "1024" ] || { echo "::error::لم يُطبَّق حدّ الأقفال (القيمة: $LIMIT)"; exit 1; }
+
       - name: تهيئة قاعدة البيانات (${{ matrix.db }})
         working-directory: ${{ env.APP_DIR }}
         run: |
@@ -226,7 +257,14 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          php artisan test 2>&1 | tee test-output-${{ matrix.db }}.txt
+          if [ "${{ matrix.db }}" = "pgsql" ]; then
+            # PostgreSQL: متوازٍ بعمّال بعدد أنوية العدّاد (≤4) وقاعدة معزولة لكل عامل. المجموعة كاملة
+            # بلا أي تصفية؛ SQLite أدناه تسلسلي كما كان.
+            PROCS="$(nproc)"; [ "$PROCS" -le 4 ] || PROCS=4
+            php artisan test --parallel --processes="$PROCS" 2>&1 | tee test-output-${{ matrix.db }}.txt
+          else
+            php artisan test 2>&1 | tee test-output-${{ matrix.db }}.txt
+          fi
 
       - name: حفظ مخرجات الاختبارات للتشخيص
         if: always()
