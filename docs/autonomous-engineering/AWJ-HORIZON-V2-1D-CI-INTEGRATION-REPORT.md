@@ -208,3 +208,4 @@ Revert the PR (`git revert -m 1 <merge>` via a PR). That removes the workflow an
 ## 14. Next step
 
 Owner decisions D1–D6 (§9), starting with D6 (inventory the 12 PRs) and D3 (how `.github/**` and the evaluator are protected). Then, and only then, a ruleset in *Evaluate* mode. No autonomy is activated by this PR.
+
