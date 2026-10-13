@@ -6,6 +6,9 @@ import { expect, test, type Page, type Route } from '@playwright/test';
  * يعمل ضد خادم الواجهة فقط: كل طلب `/api/*` يُعترَض ويُجاب ببيانات محكومة (لا خلفية ولا أي
  * اتصال بمزوّد). لكل مشروع Playwright (مكتب 1440 وجوال 390) × عربي RTL وإنجليزي LTR × فاتح وداكن.
  * اللقطات تُكتب فقط حين يُضبط `INT_UX2_SHOTS` (مجلد خارج المستودع).
+ *
+ * القسم الأخير (INT-UX-3): ظهور روابط الإسناد اليدوي الثلاثة (إعداد الملف `company.manage`، صندوق
+ * التوصيل `delivery_hub.view`، التقرير `reports.view`) حسب الدور، والتنقل منها وإليها.
  */
 
 const baseUrl = process.env.PLAYWRIGHT_BASE_URL ?? 'http://127.0.0.1:3001';
@@ -14,7 +17,7 @@ const shots = process.env.INT_UX2_SHOTS;
 type Scenario = 'allowed' | 'app_off' | 'readiness_error' | 'profiles_error' | 'slow' | 'evidence_malformed';
 /** طلبات الصفحة، وعليها رمز حالة مستند HTML الرئيسي (الذي يحدّده الخادم قبل أي عرض عميل). */
 type Requests = string[] & { documentStatus?: number };
-type Viewer = 'owner' | 'accountant' | 'denied';
+type Viewer = 'owner' | 'accountant' | 'denied' | 'manager';
 
 const SIX = [
   ['hungerstation', 'هنقرستيشن', 'HungerStation', 'OWNER_GATE', 'AWAITING_PROVIDER_APPROVAL'],
@@ -70,6 +73,8 @@ async function open(page: Page, path: string, opts: { scenario?: Scenario; local
     owner: { role: 'owner', permissions: ['*'] },
     accountant: { role: 'accountant', permissions: ['invoices.view', 'reports.view'] },
     denied: { role: 'custom', permissions: ['reports.view'] },
+    // دور مخصص يملك إعداد الملفات فقط (`company.manage`) دون الصندوق ولا التقرير.
+    manager: { role: 'custom', permissions: ['invoices.view', 'company.manage'] },
   } as const;
   const user = { id: 'u1', name: 'المالك', email: 'o@test', tenant_id: 't1', ...users[viewer] };
   await page.addInitScript(([theme, userJson]) => {
@@ -346,4 +351,108 @@ test('keyboard: the catalog links are reachable and show a visible focus indicat
     await page.keyboard.press('Tab');
   }
   expect(visited.map((href) => href.split('/').pop())).toEqual(['hungerstation', 'jahez', 'mrsool', 'keeta', 'ninja', 'the_chefz']);
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// INT-UX-3 — لوحة الإسناد اليدوي: قيمة A وروابطها العميقة حسب الصلاحيات الفعلية.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const SETUP = 'a[href="/delivery-platforms"]';
+const HUB = 'a[href="/delivery-hub"]';
+const REPORT = 'a[href="/reports/sales/delivery-channel"]';
+
+test.describe('INT-UX-3 manual attribution panel', () => {
+  for (const [locale, theme] of [['ar', 'light'], ['en', 'dark']] as const) {
+    test(`owner sees all three links; accountant sees the report link and a permission hint instead of the setup link (${locale}/${theme})`, async ({ page }, info) => {
+      await open(page, '/integrations/delivery-platforms/keeta', { locale, theme, viewer: 'owner' });
+      const ownerList = page.getByTestId('works-today');
+      await expect(ownerList.locator(SETUP)).toHaveCount(1);
+      await expect(ownerList.locator(HUB)).toHaveCount(1);
+      await expect(ownerList.locator(REPORT)).toHaveCount(1);
+      await expect(page.getByTestId('setup-needs-permission')).toHaveCount(0);
+      await shot(page, `${info.project.name}-${locale}-${theme}-links-owner`);
+
+      await page.unrouteAll({ behavior: 'ignoreErrors' });
+      await open(page, '/integrations/delivery-platforms/keeta', { locale, theme, viewer: 'accountant' });
+      const list = page.getByTestId('works-today');
+      await expect(list.locator(SETUP)).toHaveCount(0);
+      await expect(list.locator(HUB)).toHaveCount(0);
+      await expect(list.locator(REPORT)).toHaveCount(1);
+      await expect(page.getByTestId('setup-needs-permission')).toBeVisible();
+      expect((await contrast(page, '[data-testid="setup-needs-permission"]')) ?? 0).toBeGreaterThanOrEqual(4.5);
+      // قيمة الإسناد اليدوي (A) تبقى ظاهرة لمن لا يملك رابط الإعداد.
+      await expect(page.locator('[data-testid="capability-ladder"] [data-ladder-step="a"]')).toContainText(/set up|مهيأ/i);
+      await shot(page, `${info.project.name}-${locale}-${theme}-links-accountant`);
+    });
+  }
+
+  test('a custom role with company.manage only gets the setup link and nothing else', async ({ page }) => {
+    await open(page, '/integrations/delivery-platforms/keeta', { locale: 'en', theme: 'light', viewer: 'manager' });
+    const list = page.getByTestId('works-today');
+    await expect(list.locator(SETUP)).toHaveCount(1);
+    await expect(list.locator(HUB)).toHaveCount(0);
+    await expect(list.locator(REPORT)).toHaveCount(0);
+  });
+
+  test('no link is ever disabled or a button: a gated link is simply absent', async ({ page }) => {
+    await open(page, '/integrations/delivery-platforms/keeta', { locale: 'en', theme: 'light', viewer: 'accountant' });
+    const list = page.getByTestId('works-today');
+    await expect(list.locator('[disabled],[aria-disabled],button')).toHaveCount(0);
+  });
+
+  test('POS application off: the panel and every deep link are absent', async ({ page }) => {
+    await open(page, '/integrations/delivery-platforms/keeta', { scenario: 'app_off', locale: 'en', theme: 'light', viewer: 'owner' });
+    await expect(page.getByTestId('integration-restricted')).toHaveAttribute('data-state', 'app_off');
+    await expect(page.getByTestId('works-today')).toHaveCount(0);
+  });
+
+  test('self-service style denial: no links and no delivery data request', async ({ page }) => {
+    const requests = await open(page, '/integrations/delivery-platforms/keeta', { locale: 'en', theme: 'light', viewer: 'denied' });
+    await expect(page.getByTestId('integration-restricted')).toHaveAttribute('data-state', 'denied');
+    await expect(page.getByTestId('works-today')).toHaveCount(0);
+    expect(requests.filter((r) => r.includes('/delivery-platforms'))).toEqual([]);
+  });
+
+  test('navigation: Center → catalog → detail → setup link → back, and the hub and report links lead out', async ({ page }) => {
+    await open(page, '/integrations', { locale: 'en', theme: 'light', viewer: 'owner' });
+    await page.getByTestId('integration-card-delivery').click();
+    await expect(page).toHaveURL(/\/integrations\/delivery-platforms$/);
+    // الجدول على سطح المكتب والبطاقات على الجوال: يُنقر الرابط المرئي منهما.
+    await page.locator('a[href$="/integrations/delivery-platforms/keeta"]:visible').first().click();
+    await expect(page).toHaveURL(/\/integrations\/delivery-platforms\/keeta$/);
+
+    await page.getByTestId('works-today').locator(SETUP).click();
+    await expect(page).toHaveURL(/\/delivery-platforms$/);
+    await expect(page).not.toHaveURL(/integrations/);
+    await page.goBack();
+    await expect(page).toHaveURL(/\/integrations\/delivery-platforms\/keeta$/);
+    await expect(page.getByTestId('capability-ladder')).toBeVisible();
+
+    await page.getByTestId('works-today').locator(HUB).click();
+    await expect(page).toHaveURL(/\/delivery-hub$/);
+    await page.goBack();
+    await page.getByTestId('works-today').locator(REPORT).click();
+    await expect(page).toHaveURL(/\/reports\/sales\/delivery-channel$/);
+  });
+
+  test('keyboard: the allowed links are reachable in order with a visible focus indicator', async ({ page }, info) => {
+    test.skip(info.project.name === 'mobile', 'touch viewport; keyboard path verified on desktop');
+    await open(page, '/integrations/delivery-platforms/keeta', { locale: 'en', theme: 'light', viewer: 'owner' });
+    const links = page.getByTestId('works-today').locator('a');
+    await expect(links).toHaveCount(3);
+    const first = links.first();
+    await first.focus();
+    const visited: string[] = [];
+    for (let i = 0; i < 3; i += 1) {
+      visited.push(await page.evaluate(() => document.activeElement?.getAttribute('href') ?? ''));
+      const indicator = await page.evaluate(() => {
+        const el = document.activeElement as HTMLElement;
+        const style = getComputedStyle(el);
+        return style.boxShadow !== 'none' || style.outlineStyle !== 'none';
+      });
+      expect(indicator).toBe(true);
+      await page.keyboard.press('Tab');
+    }
+    expect(visited).toEqual(['/delivery-platforms', '/delivery-hub', '/reports/sales/delivery-channel']);
+  });
 });
