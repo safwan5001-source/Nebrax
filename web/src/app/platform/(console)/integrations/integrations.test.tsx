@@ -410,3 +410,19 @@ describe('locales', () => {
     expect(screen.getByText(ar.platformIntegrations.scanExWarning)).toBeTruthy();
   });
 });
+
+describe('every form control has a programmatic name (H1-5 P1)', () => {
+  it('ties each visible label to its input or select, so none is announced as an unnamed field', async () => {
+    const { container } = await renderLoaded();
+    const controls = [...container.querySelectorAll<HTMLInputElement | HTMLSelectElement>('input:not([type=hidden]), select')];
+    expect(controls.length).toBeGreaterThan(40);
+    const unnamed = controls.filter((control) => !(control.labels && control.labels.length > 0) && !control.getAttribute('aria-label') && !control.getAttribute('aria-labelledby'));
+    expect(unnamed.map((control) => `${control.tagName}:${control.getAttribute('type') ?? ''}`)).toEqual([]);
+    // label text resolves to the right control
+    expect(screen.getAllByLabelText(t('endpoint'))[0].tagName).toBe('INPUT');
+    expect(screen.getAllByLabelText(t('provider'))[0].tagName).toBe('SELECT');
+    // ids are unique, so a label never points at another card's control
+    const ids = controls.map((control) => control.id).filter(Boolean);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+});

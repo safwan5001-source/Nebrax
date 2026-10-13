@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Children, cloneElement, isValidElement, useCallback, useEffect, useId, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { useLocale, useTranslations } from 'next-intl';
@@ -585,11 +585,22 @@ function AiProviderCard({
 }
 
 function CardActions({ name, busy, testing, save, test, t }: { name: string; busy: string | null; testing: string | null; save: () => void; test: () => void; t: Translate }) { return <><Button variant="outline" size="sm" className="h-11" onClick={test} disabled={testing !== null || busy !== null}>{testing === name ? <Loader2 className="h-4 w-4 animate-spin" /> : <TestTube2 className="h-4 w-4" />}{t('test')}</Button><Button size="sm" className="h-11" onClick={save} disabled={busy !== null || testing !== null}>{busy === name ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}{t('save')}</Button></>; }
-function Field({ label, children }: { label: string; children: ReactNode }) { return <div className="space-y-1.5"><Label>{label}</Label>{children}</div>; }
+// The visible label is tied to its control with a generated id, so assistive technology announces a name for it (WCAG 1.3.1, 4.1.2).
+// The first element child is the control; any following element is help text.
+function Field({ label, children }: { label: string; children: ReactNode }) {
+  const id = useId();
+  let tagged = false;
+  const content = Children.map(children, (child) => {
+    if (tagged || !isValidElement<{ id?: string }>(child)) return child;
+    tagged = true;
+    return cloneElement(child, { id });
+  });
+  return <div className="space-y-1.5"><Label htmlFor={id}>{label}</Label>{content}</div>;
+}
 function ToggleField({ label, checked, onChange }: { label: string; checked: boolean; onChange: (value: boolean) => void }) { return <label className="flex min-h-11 cursor-pointer items-center justify-between gap-3 rounded-lg border border-border bg-surface px-3 text-sm text-text"><span>{label}</span><input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} className="h-4 w-4 accent-primary focus-visible:ring-2 focus-visible:ring-primary/40" /></label>; }
 function SecretField({ label, masked, value, onChange }: { label: string; masked: string; value: string; onChange: (value: string) => void }) { const t = useTranslations('platformIntegrations'); return <Field label={label}><Input className="h-11" type="password" autoComplete="new-password" value={value} onChange={(event) => onChange(event.target.value)} dir="ltr" placeholder={masked || t('secretPlaceholder')} /><p className="text-xs text-muted">{t('secretHelp')}</p></Field>; }
 function AdminPasswordField({ value, onChange }: { value: string; onChange: (value: string) => void }) { const t = useTranslations('platformIntegrations'); return <Field label={t('currentPassword')}><Input className="h-11" type="password" autoComplete="current-password" value={value} onChange={(event) => onChange(event.target.value)} /><p className="text-xs text-muted">{t('currentPasswordHelp')}</p></Field>; }
-function Select({ value, onChange, options }: { value: string; onChange: (value: string) => void; options: Array<[string, string]> }) { return <select value={value} onChange={(event) => onChange(event.target.value)} className="h-11 w-full rounded-lg border border-border bg-surface px-3 text-sm text-text outline-none focus-visible:ring-2 focus-visible:ring-primary/40">{options.map(([optionValue, label]) => <option key={optionValue} value={optionValue}>{label}</option>)}</select>; }
+function Select({ id, value, onChange, options }: { id?: string; value: string; onChange: (value: string) => void; options: Array<[string, string]> }) { return <select id={id} value={value} onChange={(event) => onChange(event.target.value)} className="h-11 w-full rounded-lg border border-border bg-surface px-3 text-sm text-text outline-none focus-visible:ring-2 focus-visible:ring-primary/40">{options.map(([optionValue, label]) => <option key={optionValue} value={optionValue}>{label}</option>)}</select>; }
 function Metric({ label, value }: { label: string; value: string | number }) { return <div><p className="text-xs text-muted">{label}</p><p className="num mt-1 break-all text-sm font-semibold text-text">{value}</p></div>; }
 
 function hydrateCoreForms(current: Record<CoreIntegrationKey, IntegrationFormState>, integrations: IntegrationSummary[]): Record<CoreIntegrationKey, IntegrationFormState> { const next = { ...current }; for (const item of integrations.filter((candidate): candidate is IntegrationSummary & { key: CoreIntegrationKey } => candidate.key !== 'document_ai')) { const configuration = item.configuration; next[item.key] = { ...current[item.key], enabled: item.enabled, provider: item.provider ?? current[item.key].provider, endpoint: String(configuration.endpoint ?? ''), bucket: String(configuration.bucket ?? ''), region: String(configuration.region ?? current[item.key].region), access_key_id: '', secret_access_key: '', use_path_style_endpoint: Boolean(configuration.use_path_style_endpoint ?? true), host: String(configuration.host ?? ''), port: String(configuration.port ?? current[item.key].port), timeout_seconds: String(configuration.timeout_seconds ?? current[item.key].timeout_seconds), max_attempts: String(configuration.max_attempts ?? current[item.key].max_attempts), backoff_seconds: Array.isArray(configuration.backoff_seconds) ? configuration.backoff_seconds.join(',') : current[item.key].backoff_seconds, model: '', api_key: '', current_password: '' }; } return next; }
