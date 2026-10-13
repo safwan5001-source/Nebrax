@@ -115,6 +115,7 @@ use App\Http\Controllers\Api\PosInvestigationCaseController;
 use App\Http\Controllers\Api\PosLpDigestController;
 use App\Http\Controllers\Api\PosController;
 use App\Http\Controllers\Api\DeliveryPlatformController;
+use App\Http\Controllers\Api\DeliveryProviderReadinessController;
 use App\Http\Controllers\Api\DeliveryConnectorAccountController;
 use App\Http\Controllers\Api\DeliveryConnectorIngestionController;
 use App\Http\Controllers\Api\DeliveryHubOrderController;
@@ -877,6 +878,8 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         // DLV-FOUNDATION-1 — إعداد منصات التوصيل (ملف + نسخ إلحاقية + حلّ تاريخي).
         // إعداد فقط: لا قيد ولا سند ولا تغيير في POS. القراءة invoices.view، والتعديل company.manage.
         Route::get('delivery-platforms/catalog', [DeliveryPlatformController::class, 'catalog'])->middleware([$perm('invoices.view'), $app('sales.pos')]);
+        // INT-READY-1 — جاهزية المزوّدين للتكامل الأصلي (سجلّ ثابت، قراءة فقط). لا ربط ولا اتصال خارجي.
+        Route::get('delivery-platforms/readiness', [DeliveryProviderReadinessController::class, 'index'])->middleware([$perm('invoices.view'), $app('sales.pos')]);
         Route::get('delivery-platforms', [DeliveryPlatformController::class, 'index'])->middleware([$perm('invoices.view'), $app('sales.pos')]);
         Route::get('delivery-platforms/{id}', [DeliveryPlatformController::class, 'show'])->whereUuid('id')->middleware([$perm('invoices.view'), $app('sales.pos')]);
         Route::get('delivery-platforms/{id}/versions', [DeliveryPlatformController::class, 'versions'])->whereUuid('id')->middleware([$perm('invoices.view'), $app('sales.pos')]);
