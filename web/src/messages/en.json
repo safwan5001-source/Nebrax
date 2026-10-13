@@ -10086,6 +10086,91 @@
     "planned": "Future expansion",
     "plannedNote": "No integrations with external platforms are available yet in the future-expansion categories.",
     "summaryError": "Could not load the status summary. The delivery platforms card works as usual.",
-    "retry": "Try again"
+    "retry": "Try again",
+    "breadcrumb": "Breadcrumb",
+    "backToCenter": "Back to the Integration Center",
+    "catalog": {
+      "title": "Delivery platforms",
+      "subtitle": "The status of each platform across four independent capabilities: manual attribution, native integration, merchant account, and order synchronization.",
+      "caption": "The six platforms and the status of their four capabilities",
+      "loading": "Loading delivery platforms",
+      "loadError": "Could not load the platform data. No integration is assumed to be available.",
+      "partialError": "Part of the data could not be read. Unreadable values are not treated as available.",
+      "columns": {
+        "platform": "Platform",
+        "action": "Details"
+      },
+      "view": "View details",
+      "boundary": "Manual POS attribution is independent of native integration. Incoming orders never create invoices, payments, VAT or commission."
+    },
+    "ladder": {
+      "a": {
+        "label": "Manual POS attribution",
+        "unset": "Not set up",
+        "set": "Set up",
+        "disabled": "Disabled",
+        "unreadable": "Could not be read",
+        "desc_unset": "This platform has not been set up for manual POS attribution yet.",
+        "desc_set": "The platform is set up for manual POS attribution. Independent of native integration.",
+        "desc_disabled": "Manual attribution is disabled for this platform.",
+        "desc_unreadable": "The manual attribution status could not be read. It is not assumed to be set up."
+      },
+      "b": {
+        "label": "Native integration",
+        "unavailable": "Not available",
+        "pending": "Pending agreement with the platform",
+        "available": "Available",
+        "unreadable": "Could not be read",
+        "desc_unavailable": "No integration with this platform is available in AWJ yet.",
+        "desc_pending": "Integration requires an agreement and test access from the platform.",
+        "desc_available": "The native integration is approved and available.",
+        "desc_unreadable": "The integration readiness could not be read. It is not assumed to be available."
+      },
+      "c": {
+        "label": "Merchant account",
+        "desc": "Connecting a merchant account at the platform with verified credentials. No native connection is approved at the moment."
+      },
+      "d": {
+        "label": "Order synchronization",
+        "desc": "Synchronizing operational orders into the Delivery Hub. No native synchronization is approved at the moment."
+      },
+      "downstream": {
+        "blocked": "Unavailable until a native integration exists",
+        "noData": "No connection data is available in this version",
+        "unreadable": "Could not be read"
+      }
+    },
+    "detail": {
+      "loading": "Loading platform details",
+      "ladderTitle": "Platform capabilities",
+      "ingressTitle": "The signed event ingress is not a connection to the platform",
+      "ingressBody": "The AWJ-signed event ingress is an internal technical capability. It is not a merchant account connected to {platform}. Its existence does not mean the platform is connected or that orders are being synchronized.",
+      "worksTitle": "What works today in AWJ",
+      "worksPos": "Record the platform on POS delivery sales.",
+      "worksPosLink": "Set up manual attribution",
+      "worksHub": "Enter and manage delivery orders manually.",
+      "worksHubLink": "Delivery Hub",
+      "worksReport": "See delivery-channel sales.",
+      "worksReportLink": "Delivery channel report",
+      "requiresTitle": "What native integration would require",
+      "requires": {
+        "agreement": "An agreement with the platform",
+        "testAccess": "Test access issued to AWJ",
+        "spec": "An approved technical specification"
+      },
+      "requiresNotYet": "Not yet available",
+      "hubOnlyNote": "Orders that arrive through a future integration appear in the Delivery Hub as operational records. They do not create invoices, payments, VAT, commission or settlement.",
+      "manualUnchanged": "Manual POS attribution and reports are unchanged.",
+      "advancedTitle": "Technical details (owner and admin)",
+      "advanced": {
+        "technical": "Technical status",
+        "evidenceDate": "Evidence date",
+        "evidenceRef": "Evidence reference",
+        "malformed": "Some technical details were not shown because their format was not recognized."
+      },
+      "unknownTitle": "Unknown platform",
+      "unknownBody": "There is no delivery platform with this identifier in AWJ.",
+      "backToCatalog": "Back to delivery platforms"
+    }
   }
 }

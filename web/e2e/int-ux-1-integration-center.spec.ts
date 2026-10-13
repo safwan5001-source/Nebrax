@@ -180,10 +180,10 @@ for (const [locale, dir] of LOCALES) {
         await shot(page, `${info.project.name}-${locale}-${theme}-allowed`);
       });
 
-      test('delivery card enters the existing section', async ({ page }) => {
+      test('delivery card enters the catalog inside the Integration Center', async ({ page }) => {
         await open(page, { scenario: 'allowed', locale, theme });
         await page.getByTestId('integration-card-delivery').click();
-        await expect(page).toHaveURL(/\/delivery-platforms$/);
+        await expect(page).toHaveURL(/\/integrations\/delivery-platforms$/);
       });
     });
   }

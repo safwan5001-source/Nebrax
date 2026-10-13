@@ -67,7 +67,7 @@ describe('IntegrationsPage', () => {
     expect(screen.getAllByRole('link').map((a) => a.getAttribute('href'))).toEqual(['/applications']);
   });
 
-  it('allowed: enters /delivery-platforms and summarizes A and B from the two existing reads', async () => {
+  it('allowed: enters the catalog and summarizes A and B from the two existing reads', async () => {
     owner();
     backend({
       '/applications/nav-state': () => ({ data: { 'sales.pos': true } }),
@@ -83,7 +83,7 @@ describe('IntegrationsPage', () => {
     const summary = await screen.findByTestId('integration-center-summary');
     expect(summary.textContent).toContain(m.delivery.setUp.replace('{count}', '2').replace('{total}', '6'));
     expect(summary.textContent).toContain(m.delivery.nativeNone);
-    expect(screen.getByRole('link', { name: m.delivery.title }).getAttribute('href')).toBe('/delivery-platforms');
+    expect(screen.getByRole('link', { name: m.delivery.title }).getAttribute('href')).toBe('/integrations/delivery-platforms');
 
     // قراءات فقط: لا طلب كتابة ولا أي مسار ربط.
     for (const call of api.mock.calls) {

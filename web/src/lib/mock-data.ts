@@ -3045,6 +3045,27 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
 
   const clean = path.split('?')[0];
   const m = method.toUpperCase();
+  // جاهزية مزوّدي التوصيل (INT-READY-1): تطابق السجلّ الثابت في الخادم، بالحقول العامة فقط.
+  // لا مزوّد جاهز (`READY_TO_CONNECT`) ولا علم تفعيل: العرض التجريبي لا يدّعي تكاملاً غير موجود.
+  if (clean === '/delivery-platforms/readiness' && m === 'GET') {
+    const state = (platform_key: string, name: string, name_en: string, ux_state: string) => (
+      { platform_key, name, name_en, ux_state, connect_enabled: false, sync_enabled: false }
+    );
+    return resolve({
+      data: [
+        state('hungerstation', 'هنقرستيشن', 'HungerStation', 'AWAITING_PROVIDER_APPROVAL'),
+        state('jahez', 'جاهز', 'Jahez', 'NOT_SUPPORTED'),
+        state('mrsool', 'مرسول', 'Mrsool', 'NOT_SUPPORTED'),
+        state('keeta', 'كيتا', 'Keeta', 'AWAITING_PROVIDER_APPROVAL'),
+        state('ninja', 'نينجا', 'Ninja', 'NOT_SUPPORTED'),
+        state('the_chefz', 'ذا شيفز', 'The Chefz', 'NOT_SUPPORTED'),
+      ],
+    } as T);
+  }
+  // ملفات الإسناد اليدوي: قائمة فارغة قراءة صالحة (كل المنصات «غير مهيأة») لمستأجر تجريبي جديد.
+  if (clean === '/delivery-platforms' && m === 'GET') {
+    return resolve({ data: [] } as T);
+  }
   if (clean === '/zatca-settings') {
     if (m === 'PUT') {
       const settings = body as {
