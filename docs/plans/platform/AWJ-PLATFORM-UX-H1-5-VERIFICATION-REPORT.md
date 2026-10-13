@@ -44,7 +44,7 @@ Counts: 224 page loads in the width matrix, 70 landscape, 28 zoom, 56 text scali
 | Wrong password | PASS | 422, message shown in the login alert, no token, stays on `/platform/login` |
 | Inactive administrator | PASS | 403, message shown, no token |
 | Invalid email / empty password | PASS | blocked client-side, no request sent |
-| Direct access to all 5 console routes without a session | PASS | all redirect to `/platform/login` |
+| Direct access to all 6 console routes without a session (`/platform`, `/platform/tenants`, `/platform/tenants/[id]`, `/platform/prices`, `/platform/integrations`, `/platform/document-operations`) | PASS | every one redirects to `/platform/login` with 0 API calls and no platform data in the page (the detail route was added after a review comment noted the first run covered five) |
 | Logout | PASS | `POST /platform/logout` 200, token cleared, protected route redirects, the old token returns 401 |
 | Session expiry / revoked token while on a page | PASS for page loads | redirects to login, token cleared |
 | Session expiry on the audit **export** | **FAIL** | H15-04 |
