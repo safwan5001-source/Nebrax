@@ -151,7 +151,7 @@ class PlatformIntegrationService
     }
 
     /**
-     * نتيجة اختبار التخزين تذكر الهدف الذي اختُبر فعلاً (`target`) ومكان التخزين التشغيلي الحالي (`operational_storage`)؛
+     * نتيجة اختبار التخزين تذكر الهدف الذي اختُبر فعلاً (`target`) ووجهة الكتابات الجديدة حالياً (`operational_storage`، لا موضع المستندات المحفوظة سابقاً)؛
      * ليسا الشيء نفسه. `ok` و`message` كما كانا شكلاً.
      *
      * @return array{ok:bool, message:string, target:string, operational_storage:string}

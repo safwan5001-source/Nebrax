@@ -19,7 +19,7 @@ Root cause analysis: given in the previous task's hand-off (no repository file);
 
 **Frontend** (`/platform/integrations`):
 - Reads `target` from the response. `local_fallback` is shown as neutral information (info icon, warning-toned border, `role="status"`) even when `ok` is true, with its own bilingual text; `saved_provider` follows `ok`; `environment_storage` is labelled as such.
-- A second line shows the operational storage from `operational_storage` (local or external).
+- A second line shows the destination for **new** document writes from `operational_storage` (local or external). It does not describe where every existing document lives: a document written while the lock was open keeps being read from the external provider after the lock closes (Codex review finding, accepted; wording corrected).
 - Texts come from the translation files (8 keys added in `ar` and `en`), not from the server's Arabic message.
 - Responses without `target` (older servers, other integrations) render exactly as before. The target is never inferred from the local, unsaved toggle.
 

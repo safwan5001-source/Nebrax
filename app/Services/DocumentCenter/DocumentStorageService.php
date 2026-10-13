@@ -320,7 +320,7 @@ class DocumentStorageService
     /**
      * نتيجة الاختبار **مع الهدف الذي اختُبر فعلاً**. الهدف يُشتقّ من المسار المنفَّذ لا من علم `enabled` وحده:
      * تكامل مفعَّل ⇒ المزود المحفوظ؛ وبدونه ⇒ السائق الذي يبنيه `settings()` فعلاً (محلي غالباً).
-     * `operational` هو مكان تخزين المستندات **الآن** (يتبع قفل `DOCUMENT_DURABLE_STORAGE_ENABLED`)، وهو غير الهدف:
+     * `operational` هو وجهة **الكتابات الجديدة** الآن (يتبع قفل `DOCUMENT_DURABLE_STORAGE_ENABLED`) لا موضع كل مستند قائم، وهو غير الهدف:
      * نجاح اختبار المزود المحفوظ لا يعني أن المستندات تُكتب عليه.
      *
      * @return array{ok: bool, target: string, operational: string}
