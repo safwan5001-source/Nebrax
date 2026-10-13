@@ -2808,6 +2808,7 @@
     "numberingSettings": "Document numbering",
     "paymentMethods": "Payment Methods",
     "applications": "Application Management",
+    "integrations": "Integration Center",
     "receiptVouchers": "Receipt Vouchers",
     "cashAndBank": "Cashboxes & Bank Accounts",
     "employeeCustodies": "Employee Custodies",
@@ -10048,5 +10049,34 @@
     "validation_allocation_required": "Select a customer and allocate an amount to at least one correction.",
     "dialog_hint": "A refund is fully allocated to posted credit sales returns or credit notes that created a customer balance: the allocation total is the refund amount. Entry: debit accounts receivable, credit cash/bank. It does not create a credit note or change VAT or invoices.",
     "reversed_hint": "This refund is reversed: its original entry was reversed on its original accounts, and the refundable balance returned to its sources. Allocation rows are kept as history."
+  },
+  "integrationCenter": {
+    "title": "Integration Center",
+    "subtitle": "One place to follow delivery platforms and external services with AWJ.",
+    "loading": "Loading the Integration Center",
+    "delivery": {
+      "title": "Delivery platforms",
+      "description": "Manual attribution in the POS and the Delivery Hub.",
+      "badge": "Manual attribution available",
+      "setUp": "{count} of {total} platforms set up for POS attribution",
+      "nativeNone": "Native integrations: none available yet",
+      "nativeSome": "Native integrations: {count} available",
+      "denied": "You do not have permission to view delivery platforms. Ask an owner or admin.",
+      "appOff": "The POS application is not enabled for this organization.",
+      "manageApplications": "Manage applications"
+    },
+    "ecommerce": {
+      "title": "Online stores"
+    },
+    "payments": {
+      "title": "Payment gateways"
+    },
+    "shipping": {
+      "title": "Shipping companies"
+    },
+    "planned": "Future expansion",
+    "plannedNote": "No integrations with external platforms are available yet in the future-expansion categories.",
+    "summaryError": "Could not load the status summary. The delivery platforms card works as usual.",
+    "retry": "Try again"
   }
 }
