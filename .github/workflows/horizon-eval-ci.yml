@@ -1,19 +1,24 @@
 name: Horizon Eval CI
 
-# AWJ-HORIZON-V2-1D — يجعل اختبارات مقيِّم Horizon (DRY-RUN) فحصاً مطلوباً في CI.
+# AWJ-HORIZON-V2-1D — يشغّل اختبارات مقيِّم Horizon (DRY-RUN) على كل PR يمسّ Horizon فقط.
 # أي تراجع أمني أو مخالفة للعقد (23 حالة) أو نتيجة eligible خاطئة يُفشل هذا الفحص، فتُفشل بوابة CI Gate الـPR.
+# الـPR الذي لا يمسّ هذه المسارات (محاسبة/POS/storefront/…) لا يطلب هذا الفحص ولا يتأثر به.
 #
-# قواعد لا تُكسَر (يفرضها CI Gate عبر required-checks.json، tier=always):
-#   - بلا `paths` ولا `paths-ignore` ولا `if:` على المهمة ولا `continue-on-error` — فحص متخطّى يُحسب نجاحاً.
+# قواعد لا تُكسَر (يفرضها CI Gate عبر required-checks.json، tier=paths):
+#   - مرشّح `paths` إلزامي هنا (البوابة تقرأه من هذا الملف نفسه) ولا يجوز تضييقه: compare_baseline يمنع حذف أي نمط.
+#   - بلا `paths-ignore` ولا `if:` على المهمة ولا `continue-on-error` — فحص متخطّى يُحسب نجاحاً.
 #   - بلا أسرار ولا شبكة ولا صلاحية كتابة: المقيِّم يقرأ ملفات محلية فقط (يحرس ذلك test_static_guards.py).
 #   - الاسم الظاهر للفحص جزء من العقد: تغييره يكسر المانيفست فتفشل البوابة (name drift).
 # التصميم: docs/autonomous-engineering/AWJ-HORIZON-V2-1D-CI-INTEGRATION-REPORT.md
 
+# المسارات = كل ما تقرؤه الاختبارات أو تحرسه: المقيِّم نفسه، وهذا الملف، والمانيفست (يقرؤه test_ci_integration).
 on:
   push:
     branches: ['**']
+    paths: ['scripts/horizon-eval/**', '.github/workflows/horizon-eval-ci.yml', '.github/ci-gate/**']
   pull_request:
     branches: ['**']
+    paths: ['scripts/horizon-eval/**', '.github/workflows/horizon-eval-ci.yml', '.github/ci-gate/**']
 
 permissions:
   contents: read

@@ -3,8 +3,8 @@ import argparse
 import contextlib
 import io
 import json
-import re
 import os
+import re
 import shutil
 import subprocess
 import tempfile
@@ -16,10 +16,17 @@ import ci_gate as g
 M = g.load_manifest()
 DOCS = {c["workflow"]: g.load_yaml(g.ROOT / c["workflow"]) for c in M["checks"]}
 PHP = ["php artisan test (L11, sqlite)", "php artisan test (L11, pgsql)"]
-HORIZON = "Horizon dry-run evaluator (tests)"  # AWJ-HORIZON-V2-1D: tier=always, like the PHP suites
+HORIZON = "Horizon dry-run evaluator (tests)"  # AWJ-HORIZON-V2-1D: tier=paths (only PRs that touch Horizon files)
 HZ_WF = ".github/workflows/horizon-eval-ci.yml"
-ALWAYS = PHP + [HORIZON]
-GREEN = {n: "success" for n in ALWAYS}
+HZ_FILES = ["scripts/horizon-eval/horizon_eval.py"]  # a Horizon-related diff
+HZ_TRIGGERS = [HZ_FILES[0], "scripts/horizon-eval/policy/zone_policy.v1.json", ".github/workflows/horizon-eval-ci.yml",
+               ".github/ci-gate/required-checks.json"]
+# diffs that must never be affected by the Horizon requirement (accounting / POS / storefront / web / DB / other CI)
+UNRELATED = ["app/Services/Accounting/LedgerService.php", "app/Http/Controllers/Api/PosSessionController.php",
+             "app/Services/Pos/PosCheckoutService.php", "storefront/src/app/page.tsx", "web/src/app/x.tsx",
+             "database/migrations/2026_10_13_000001_x.php", "routes/api.php", "docs/a.md", "README.md",
+             ".github/workflows/ci.yml", ".github/workflows/web-ci.yml", "scripts/ci-gate/ci_gate.py"]
+GREEN = {n: "success" for n in PHP}
 _id = iter(range(1, 10_000))
 
 
@@ -28,8 +35,7 @@ def cr(name, status="completed", conclusion="success", app="github-actions", id=
 
 
 def ok_php():
-    """A green run of every `always` check (name kept for the existing call sites)."""
-    return [cr(n) for n in ALWAYS]
+    return [cr(n) for n in PHP]
 
 
 def ev(files, runs, wf_runs=None, elapsed=60, deadline=4200):
@@ -51,7 +57,7 @@ class Globbing(unittest.TestCase):
 class Expectation(unittest.TestCase):
     def test_docs_only_expects_only_backend(self):
         exp = g.expected_checks(M, DOCS, ["docs/x.md"])
-        self.assertEqual(set(exp), set(ALWAYS))
+        self.assertEqual(set(exp), set(PHP))
 
     def test_web_change_adds_web(self):
         exp = g.expected_checks(M, DOCS, ["web/src/a.ts"])
@@ -65,12 +71,61 @@ class Expectation(unittest.TestCase):
 
     def test_unknown_diff_requires_everything_blocking(self):
         exp = g.expected_checks(M, DOCS, None)
-        self.assertEqual(len(exp), 9)
+        self.assertEqual(len(exp), 9)  # 8 before AWJ-HORIZON-V2-1D; +1 = the path-scoped Horizon check
         self.assertIn(HORIZON, exp)
 
     def test_advisory_never_expected(self):
         exp = g.expected_checks(M, DOCS, ["storefront/src/app/x.ts"])
         self.assertNotIn("merchant preview visual QA", exp)
+
+
+class HorizonPathsTier(unittest.TestCase):
+    """The Horizon check is tier=paths: required only for PRs that touch Horizon files, invisible to every other PR."""
+
+    def test_required_for_every_horizon_related_diff(self):
+        for f in HZ_TRIGGERS:
+            self.assertIn(HORIZON, g.expected_checks(M, DOCS, [f]), f)
+        # one Horizon file among many unrelated ones is enough
+        self.assertIn(HORIZON, g.expected_checks(M, DOCS, UNRELATED + HZ_FILES))
+        # a rename away from a Horizon path counts (previous_filename is part of the file list)
+        self.assertIn(HORIZON, g.expected_checks(M, DOCS, ["docs/moved.md", "scripts/horizon-eval/old.py"]))
+
+    def test_not_required_for_unrelated_prs(self):
+        for f in UNRELATED:
+            exp = g.expected_checks(M, DOCS, [f])
+            self.assertNotIn(HORIZON, exp, f)
+            self.assertTrue(set(PHP) <= set(exp), f)  # the always-checks are unchanged
+        self.assertNotIn(HORIZON, g.expected_checks(M, DOCS, UNRELATED))
+
+    def test_unrelated_pr_passes_without_any_horizon_run(self):
+        backend_only = [f for f in UNRELATED if not f.startswith(("web/", "storefront/", ".github/workflows/web-ci"))]
+        self.assertTrue(backend_only)
+        for f in backend_only:
+            _, (v, rows, _) = ev([f], [cr(n) for n in PHP])
+            self.assertEqual(v, "pass", f)
+            self.assertIn((HORIZON, "paths", "not required (path filter)", "-", "ok"), rows, f)
+        # web / storefront PRs keep their own existing requirement and gain nothing from Horizon
+        _, (v, rows, _) = ev(["web/src/x.tsx"], [cr(n) for n in PHP] + [cr("web build (Next.js)")])
+        self.assertEqual(v, "pass")
+        self.assertIn((HORIZON, "paths", "not required (path filter)", "-", "ok"), rows)
+
+    def test_horizon_pr_blocks_on_failure_and_waits_when_missing(self):
+        php = [cr(n) for n in PHP]
+        self.assertEqual(ev(HZ_FILES, php + [cr(HORIZON)])[1][0], "pass")
+        for concl in ("failure", "cancelled", "skipped", "neutral", "timed_out", "action_required", "stale", None):
+            self.assertEqual(ev(HZ_FILES, php + [cr(HORIZON, conclusion=concl)])[1][0], "fail", concl)
+        self.assertEqual(ev(HZ_FILES, php)[1][0], "wait")                       # not reported yet
+        self.assertEqual(ev(HZ_FILES, php, elapsed=4200)[1][0], "fail")        # never reported -> deadline
+        wf = [{"path": HZ_WF, "status": "completed", "conclusion": "success"}]
+        self.assertEqual(ev(HZ_FILES, php, wf_runs=wf)[1][0], "fail")          # workflow ran, job never reported
+        self.assertEqual(ev(HZ_FILES, php + [cr(HORIZON, app="evil-app")], elapsed=30)[1][0], "wait")
+        self.assertEqual(ev(HZ_FILES, php + [cr(HORIZON, status="in_progress", conclusion=None)])[1][0], "wait")
+
+    def test_unrelated_pr_is_not_blocked_by_a_stray_failing_horizon_run(self):
+        """A Horizon run that nevertheless exists on an unrelated PR is judged like any present check (strict, fail-closed)."""
+        php = [cr(n) for n in PHP]
+        self.assertEqual(ev(["docs/a.md"], php + [cr(HORIZON, conclusion="failure")])[1][0], "fail")
+        self.assertEqual(ev(["docs/a.md"], php + [cr(HORIZON)])[1][0], "pass")
 
 
 class Verdicts(unittest.TestCase):
@@ -83,73 +138,56 @@ class Verdicts(unittest.TestCase):
         self.assertEqual(v, "pass")
 
     def test_failure_fails(self):
-        runs = [cr(PHP[0]), cr(PHP[1], conclusion="failure"), cr(HORIZON)]
+        runs = [cr(PHP[0]), cr(PHP[1], conclusion="failure")]
         self.assertEqual(ev(["a.md"], runs)[1][0], "fail")
 
     def test_cancelled_skipped_neutral_timed_out_are_not_success(self):
         for concl in ("cancelled", "skipped", "neutral", "timed_out", "action_required", "stale", None):
-            runs = [cr(PHP[0]), cr(PHP[1], conclusion=concl), cr(HORIZON)]
+            runs = [cr(PHP[0]), cr(PHP[1], conclusion=concl)]
             self.assertEqual(ev(["a.md"], runs)[1][0], "fail", concl)
 
     def test_in_progress_waits(self):
-        # Horizon is supplied green so the wait can only come from the PHP check's status
-        runs = [cr(PHP[0]), cr(PHP[1], status="in_progress", conclusion=None), cr(HORIZON)]
+        runs = [cr(PHP[0]), cr(PHP[1], status="in_progress", conclusion=None)]
         self.assertEqual(ev(["a.md"], runs)[1][0], "wait")
 
     def test_not_yet_reported_waits_then_fails_at_deadline(self):
-        runs = [cr(PHP[0]), cr(HORIZON)]
+        runs = [cr(PHP[0])]
         self.assertEqual(ev(["a.md"], runs, elapsed=30)[1][0], "wait")
         self.assertEqual(ev(["a.md"], runs, elapsed=4200)[1][0], "fail")
 
     def test_workflow_never_triggered_fails_after_grace(self):
-        runs = [cr(PHP[0]), cr(HORIZON)]
+        runs = [cr(PHP[0])]
         v = ev(["a.md"], runs, wf_runs=[], elapsed=601)[1][0]
         self.assertEqual(v, "fail")
         self.assertEqual(ev(["a.md"], runs, wf_runs=[], elapsed=100)[1][0], "wait")
 
     def test_workflow_finished_without_job_fails(self):
-        runs = [cr(PHP[0]), cr(HORIZON)]
+        runs = [cr(PHP[0])]
         wf = [{"path": ".github/workflows/ci.yml", "status": "completed", "conclusion": "success"}]
         self.assertEqual(ev(["a.md"], runs, wf_runs=wf)[1][0], "fail")
 
     def test_action_required_fails(self):
         wf = [{"path": ".github/workflows/ci.yml", "status": "completed", "conclusion": "action_required"}]
-        self.assertEqual(ev(["a.md"], [cr(HORIZON)], wf_runs=wf)[1][0], "fail")
+        self.assertEqual(ev(["a.md"], [], wf_runs=wf)[1][0], "fail")
 
     def test_present_but_unexpected_check_must_still_pass(self):
         runs = ok_php() + [cr("web build (Next.js)", conclusion="failure")]
         self.assertEqual(ev(["docs/a.md"], runs)[1][0], "fail")
 
     def test_rerun_uses_latest_attempt_and_warns(self):
-        runs = [cr(PHP[0]), cr(HORIZON), cr(PHP[1], conclusion="failure", id=900), cr(PHP[1], id=901)]
+        runs = [cr(PHP[0]), cr(PHP[1], conclusion="failure", id=900), cr(PHP[1], id=901)]
         v, _, warns = ev(["a.md"], runs)[1]
         self.assertEqual(v, "pass")
         self.assertTrue(any("earlier attempt" in w for w in warns))
 
     def test_rerun_in_progress_after_failure_waits(self):
-        runs = [cr(PHP[0]), cr(HORIZON), cr(PHP[1], conclusion="failure", id=900),
+        runs = [cr(PHP[0]), cr(PHP[1], conclusion="failure", id=900),
                 cr(PHP[1], status="in_progress", conclusion=None, id=901)]
         self.assertEqual(ev(["a.md"], runs)[1][0], "wait")
 
     def test_spoofed_check_from_other_app_ignored(self):
-        runs = [cr(PHP[0]), cr(PHP[1], app="evil-app"), cr(HORIZON)]
+        runs = [cr(PHP[0]), cr(PHP[1], app="evil-app")]
         self.assertEqual(ev(["a.md"], runs, elapsed=30)[1][0], "wait")
-
-    def test_horizon_check_is_blocking(self):
-        for concl in ("failure", "cancelled", "skipped", "neutral", "timed_out", "action_required", "stale", None):
-            runs = [cr(n) for n in PHP] + [cr(HORIZON, conclusion=concl)]
-            self.assertEqual(ev(["docs/a.md"], runs)[1][0], "fail", concl)
-
-    def test_horizon_check_missing_never_passes(self):
-        runs = [cr(n) for n in PHP]
-        self.assertEqual(ev(["docs/a.md"], runs, elapsed=30)[1][0], "wait")
-        self.assertEqual(ev(["docs/a.md"], runs, elapsed=4200)[1][0], "fail")
-        wf = [{"path": ".github/workflows/horizon-eval-ci.yml", "status": "completed", "conclusion": "success"}]
-        self.assertEqual(ev(["docs/a.md"], runs, wf_runs=wf)[1][0], "fail")  # workflow ran but the job never reported
-
-    def test_horizon_check_from_another_app_is_ignored(self):
-        runs = [cr(n) for n in PHP] + [cr(HORIZON, app="evil-app")]
-        self.assertEqual(ev(["docs/a.md"], runs, elapsed=30)[1][0], "wait")
 
     def test_advisory_failure_does_not_block(self):
         runs = ok_php() + [cr("merchant preview visual QA", conclusion="failure")]
@@ -185,12 +223,13 @@ class Validation(unittest.TestCase):
 
     def test_horizon_workflow_cannot_be_path_filtered_or_skipped(self):
         cases = {
-            "path filter": ("  pull_request:\n    branches: ['**']\n", "  pull_request:\n    branches: ['**']\n    paths: ['scripts/horizon-eval/**']\n", "tier=always"),
+            # tier=paths REQUIRES a pull_request.paths filter; removing it would make the check run (and be required) everywhere
+            "pull_request path filter removed": ("  pull_request:\n    branches: ['**']\n    paths: ['scripts/horizon-eval/**', '.github/workflows/horizon-eval-ci.yml', '.github/ci-gate/**']\n", "  pull_request:\n    branches: ['**']\n", "tier=paths but"),
             "job-level if": ("    name: Horizon dry-run evaluator (tests)\n", "    name: Horizon dry-run evaluator (tests)\n    if: github.actor != 'x'\n", "job-level `if`"),
             "job continue-on-error": ("    name: Horizon dry-run evaluator (tests)\n", "    name: Horizon dry-run evaluator (tests)\n    continue-on-error: true\n", "continue-on-error"),
             "step continue-on-error": ("      - name: Contract table", "      - continue-on-error: true\n        name: Contract table", "continue-on-error"),
             "rename": ("name: Horizon dry-run evaluator (tests)", "name: Horizon tests", "name drift"),
-            "no pull_request": ("  pull_request:\n    branches: ['**']\n", "", "no longer triggers on pull_request"),
+            "no pull_request": ("  pull_request:\n    branches: ['**']\n    paths: ['scripts/horizon-eval/**', '.github/workflows/horizon-eval-ci.yml', '.github/ci-gate/**']\n", "", "no longer triggers on pull_request"),
         }
         for label, (old, new, expect) in cases.items():
             errs = self._mutate(self.HZ, old, new)
@@ -354,12 +393,11 @@ class Binding(unittest.TestCase):
 
     def test_horizon_push_twin_cannot_mask_pr_failure(self):
         wf = [wfr(self.CI, 1, event="push"), wfr(self.CI, 2),
-              wfr(".github/workflows/horizon-eval-ci.yml", 3, event="push"),
-              wfr(".github/workflows/horizon-eval-ci.yml", 4)]
+              wfr(HZ_WF, 3, event="push"), wfr(HZ_WF, 4)]
         raw = [scr(PHP[0], 2, 20), scr(PHP[1], 2, 21), scr(HORIZON, 4, 40, conclusion="failure"),
                scr(HORIZON, 3, 90)]  # push-event twin, higher id, green
         bound, mine = g.bind_check_runs(raw, wf, SHA)
-        exp = g.expected_checks(M, DOCS, ["docs/a.md"])
+        exp = g.expected_checks(M, DOCS, HZ_FILES)
         self.assertEqual(g.evaluate(M, exp, bound, mine, 60, 4200)[0], "fail")
 
     def test_impostor_check_from_another_workflow_does_not_satisfy_a_required_check(self):
@@ -372,7 +410,7 @@ class Binding(unittest.TestCase):
         bound, mine = g.bind_check_runs(raw, wf, SHA)
         kept = g.restrict_to_declared_workflows(M, bound, mine)
         self.assertEqual({r["id"] for r in kept if r["name"] == HORIZON}, {40})
-        exp = g.expected_checks(M, DOCS, ["docs/a.md"])
+        exp = g.expected_checks(M, DOCS, HZ_FILES)
         self.assertEqual(g.evaluate(M, exp, kept, mine, 60, 4200)[0], "fail")
 
     def test_impostor_alone_never_reports_the_required_check(self):
@@ -381,7 +419,7 @@ class Binding(unittest.TestCase):
         bound, mine = g.bind_check_runs(raw, wf, SHA)
         kept = g.restrict_to_declared_workflows(M, bound, mine)
         self.assertNotIn(HORIZON, {r["name"] for r in kept})
-        exp = g.expected_checks(M, DOCS, ["docs/a.md"])
+        exp = g.expected_checks(M, DOCS, HZ_FILES)
         self.assertEqual(g.evaluate(M, exp, kept, mine, 4200, 4200)[0], "fail")
 
     def test_unknown_suite_is_dropped_and_unlisted_names_pass_through(self):
@@ -404,7 +442,7 @@ class Binding(unittest.TestCase):
 
     def test_rerun_same_suite_takes_newest(self):
         wf = [wfr(self.CI, 2)]
-        raw = [scr(PHP[0], 2, 20), scr(PHP[1], 2, 21, conclusion="failure"), scr(PHP[1], 2, 31), scr(HORIZON, 2, 32)]
+        raw = [scr(PHP[0], 2, 20), scr(PHP[1], 2, 21, conclusion="failure"), scr(PHP[1], 2, 31)]
         bound, mine = g.bind_check_runs(raw, wf, SHA)
         exp = g.expected_checks(M, DOCS, ["docs/a.md"])
         self.assertEqual(g.evaluate(M, exp, bound, mine, 60, 4200)[0], "pass")
@@ -466,6 +504,24 @@ class Baseline(unittest.TestCase):
         self._edit_manifest(h, lambda m: self._horizon(m)["guard"]["require"].remove("MIN_TESTS="))
         self.assertTrue(any(HORIZON in e and "guard.require" in e for e in g.compare_baseline(b, h)))
 
+    def test_narrowing_the_horizon_path_filter_fails(self):
+        """Dropping a pattern would silently stop requiring the check for those files."""
+        for dropped in ("scripts/horizon-eval/**", ".github/workflows/horizon-eval-ci.yml", ".github/ci-gate/**"):
+            b, h = self._pair()
+            p = h / HZ_WF
+            t = p.read_text(encoding="utf-8")
+            self.assertIn(f"'{dropped}'", t)
+            p.write_text(t.replace(f"'{dropped}', ", "").replace(f", '{dropped}'", ""), encoding="utf-8")
+            errs = g.compare_baseline(b, h)
+            self.assertTrue(any(HORIZON in e and "paths lost" in e and dropped in e for e in errs), (dropped, errs))
+
+    def test_widening_the_horizon_path_filter_is_allowed(self):
+        b, h = self._pair()
+        p = h / HZ_WF
+        t = p.read_text(encoding="utf-8")
+        p.write_text(t.replace("'.github/ci-gate/**']", "'.github/ci-gate/**', 'docs/autonomous-engineering/**']"), encoding="utf-8")
+        self.assertEqual(g.compare_baseline(b, h), [])
+
     def test_demoting_tier_fails(self):
         b, h = self._pair()
         def f(m):
@@ -505,9 +561,9 @@ class Baseline(unittest.TestCase):
 
 
 class FakeApi:
-    """Scripted GitHub: one PR (docs-only diff) whose PR-event run reports `results`."""
+    """Scripted GitHub: one PR (docs-only diff unless `files` says otherwise) whose PR-event run reports `results`."""
     head = SHA
-
+    files = ["docs/a.md"]
     impostor = False  # a green job named like the Horizon check, reported by the PHP workflow's suite
 
     def __init__(self, results, head=None):
@@ -519,22 +575,25 @@ class FakeApi:
 
     def pages(self, path, key, params=None):
         if path == "pulls/5/files":
-            return [{"filename": "docs/a.md"}]
+            return [{"filename": f} for f in self.files]
         if path == "actions/runs":
-            return [wfr(".github/workflows/ci.yml", 1, event="push"),
-                    wfr(".github/workflows/ci.yml", 2, status="completed", conclusion="success"),
-                    wfr(HZ_WF, 3, event="push"),
-                    wfr(HZ_WF, 4, status="completed", conclusion="success")]
+            runs = [wfr(".github/workflows/ci.yml", 1, event="push"),
+                    wfr(".github/workflows/ci.yml", 2, status="completed", conclusion="success")]
+            if self.files == HZ_FILES:  # the path-filtered workflow only triggers for Horizon-related diffs
+                runs += [wfr(HZ_WF, 3, event="push"), wfr(HZ_WF, 4, status="completed", conclusion="success")]
+            return runs
         if path == f"commits/{SHA}/check-runs":
-            return ([scr(PHP[0], 1, 1), scr(PHP[1], 1, 2), scr(HORIZON, 3, 3)] +  # push-event twins, always green
+            return ([scr(PHP[0], 1, 1), scr(PHP[1], 1, 2)] +  # push-event twins, always green
+                    ([scr(HORIZON, 3, 3)] if self.files == HZ_FILES else []) +
                     [scr(n, 4 if n == HORIZON else 2, 10 + i, conclusion=c) for i, (n, c) in enumerate(self.results.items())] +
                     ([scr(HORIZON, 2, 99)] if self.impostor else []))
         raise AssertionError(path)
 
 
 class EndToEnd(unittest.TestCase):
-    def _run(self, results, head=None, timeout=1, impostor=False):
+    def _run(self, results, head=None, timeout=1, files=None, impostor=False):
         orig = g.Api
+        FakeApi.files = files or ["docs/a.md"]
         FakeApi.impostor = impostor
         g.Api = lambda repo, token: FakeApi(results, head)
         os.environ.update(GITHUB_REPOSITORY="o/r", GITHUB_TOKEN="t")
@@ -546,27 +605,29 @@ class EndToEnd(unittest.TestCase):
                 return g.run_gate(args)
         finally:
             g.Api = orig
+            FakeApi.files, FakeApi.impostor = ["docs/a.md"], False
 
     def test_green(self):
-        self.assertEqual(self._run(GREEN), 0)
+        self.assertEqual(self._run({PHP[0]: "success", PHP[1]: "success"}), 0)
 
     def test_pr_failure_not_hidden_by_green_push_twin(self):
-        self.assertEqual(self._run({**GREEN, PHP[1]: "failure"}), 1)
+        self.assertEqual(self._run({PHP[0]: "success", PHP[1]: "failure"}), 1)
 
-    def test_horizon_failure_fails_the_gate(self):
-        self.assertEqual(self._run({**GREEN, HORIZON: "failure"}), 1)
+    def test_unrelated_pr_is_green_without_any_horizon_run(self):
+        """End to end through run_gate: an accounting/POS/storefront-style PR is unaffected by the Horizon requirement."""
+        for f in ("app/Services/Accounting/LedgerService.php", "app/Http/Controllers/Api/PosSessionController.php", "docs/a.md"):
+            self.assertEqual(self._run(GREEN, files=[f], timeout=0), 0, f)
 
-    def test_impostor_horizon_check_from_another_workflow_cannot_pass_the_gate(self):
-        self.assertEqual(self._run({n: "success" for n in PHP}, timeout=0, impostor=True), 1)
-        self.assertEqual(self._run({**GREEN, HORIZON: "failure"}, impostor=True), 1)
-
-    def test_horizon_never_reported_fails_the_gate(self):
-        # timeout=0: the deadline is already reached, so "not reported yet" becomes a failure instead of a 60 s wait
-        self.assertEqual(self._run({n: "success" for n in PHP}, timeout=0), 1)
+    def test_horizon_pr_requires_and_is_blocked_by_the_horizon_check(self):
+        self.assertEqual(self._run({**GREEN, HORIZON: "success"}, files=HZ_FILES), 0)
+        self.assertEqual(self._run({**GREEN, HORIZON: "failure"}, files=HZ_FILES), 1)   # blocks on test failure
+        self.assertEqual(self._run(GREEN, files=HZ_FILES, timeout=0), 1)                 # required, never reported
+        self.assertEqual(self._run({**GREEN, HORIZON: "failure"}, files=HZ_FILES, impostor=True), 1)
+        self.assertEqual(self._run(GREEN, files=HZ_FILES, timeout=0, impostor=True), 1)  # impostor cannot stand in
 
     def test_stale_head_fails_closed(self):
         with self.assertRaises(g.GateError):
-            self._run(GREEN, head="e" * 40)
+            self._run({PHP[0]: "success", PHP[1]: "success"}, head="e" * 40)
 
 
 class Timeouts(unittest.TestCase):

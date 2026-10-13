@@ -6,6 +6,7 @@ They read text only - they never execute the workflow.
 """
 from __future__ import annotations
 
+import fnmatch
 import json
 import re
 import unittest
@@ -38,8 +39,9 @@ class GateManifest(unittest.TestCase):
         self.assertIn(CHECK_NAME, checks, "the Horizon evaluator check must be listed in the CI Gate manifest")
         self.check = checks[CHECK_NAME]
 
-    def test_is_blocking_on_every_pr(self):
-        self.assertEqual(self.check["tier"], "always")  # never `paths` (a path filter leaves the PR pending/skipped) or advisory
+    def test_is_blocking_and_path_scoped(self):
+        # `paths`: required only for PRs that touch the workflow's own pull_request.paths (never advisory, never a global `always`)
+        self.assertEqual(self.check["tier"], "paths")
 
     def test_points_at_this_workflow_and_job(self):
         self.assertEqual(self.check["workflow"], ".github/workflows/horizon-eval-ci.yml")
@@ -56,10 +58,14 @@ class GateManifest(unittest.TestCase):
 
 
 class WorkflowShape(unittest.TestCase):
-    def test_runs_on_every_pull_request_and_push(self):
+    def test_runs_on_every_horizon_related_pull_request_and_push(self):
         text = workflow_text()
-        self.assertRegex(text, r"(?m)^on:\n  push:\n    branches: \['\*\*'\]\n  pull_request:\n    branches: \['\*\*'\]\n")
-        for forbidden in (r"\bpaths(-ignore)?:", r"\bbranches-ignore:", r"\btags(-ignore)?:", r"(?m)^    if:", r"continue-on-error",
+        paths = r"\['scripts/horizon-eval/\*\*', '\.github/workflows/horizon-eval-ci\.yml', '\.github/ci-gate/\*\*'\]"
+        self.assertRegex(text, r"(?m)^on:\n  push:\n    branches: \['\*\*'\]\n    paths: " + paths + r"\n  pull_request:\n    branches: \['\*\*'\]\n    paths: " + paths + r"\n")
+        # the filter must cover everything the tests read or guard: the evaluator, this workflow, the CI Gate manifest
+        for f in ("scripts/horizon-eval/horizon_eval.py", ".github/workflows/horizon-eval-ci.yml", ".github/ci-gate/required-checks.json"):
+            self.assertTrue(any(fnmatch.fnmatchcase(f, pat.replace("**", "*")) for pat in re.findall(r"'([^']+)'", re.search(paths, text).group(0))), f)
+        for forbidden in (r"\bpaths-ignore:", r"\bbranches-ignore:", r"\btags(-ignore)?:", r"(?m)^    if:", r"continue-on-error",
                           r"pull_request_target", r"workflow_run", r"secrets\.", r"\|\| true"):
             self.assertNotRegex(text, forbidden)
 
