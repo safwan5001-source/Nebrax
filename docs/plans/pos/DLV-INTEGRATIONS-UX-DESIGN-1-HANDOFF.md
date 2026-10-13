@@ -9,10 +9,10 @@
 | Item | Value |
 |---|---|
 | Base SHA (`origin/main` at start) | `71cf6396728bbc65ea0921a7afee25b3945e5189` |
-| Content SHA (commit that added the two documents) | `CONTENT_SHA` |
+| Content SHA (commit that added the two documents) | `fb90c7e97adbbb7261935012a677824c2ac31d4c` |
 | Head SHA | The PR head. A later commit may only update this table; the PR page is authoritative. |
 | Branch | `docs/dlv-integrations-ux-design-1` |
-| PR | `PR_REF` |
+| PR | #1380 (https://github.com/safwan5001-source/Nebrax/pull/1380) |
 | PRE_MERGE_REVIEW | **Not stamped.** Documentation-scope result to be recorded after CI on the exact Head SHA. |
 
 ## 2. One-paragraph summary
@@ -93,7 +93,7 @@ No application code, migration, route, permission, translation file, workflow, o
 
 ## 10. Build / CI status
 
-Recorded on the PR for the exact Head SHA. `CI` (`ci.yml`, sqlite + pgsql) runs on every push/PR; `web-ci.yml` is path-filtered to `web/**` and is not expected to trigger for this change. Final status: `CI_STATUS`
+Recorded on the PR for the exact Head SHA. `CI` (`ci.yml`, sqlite + pgsql) runs on every push/PR; `web-ci.yml` is path-filtered to `web/**` and is not expected to trigger for this change. At the time of writing, the `sqlite` and `pgsql` jobs on content SHA `fb90c7e` were in progress; the final result must be read from the PR checks, not from this file.
 
 ## 11. Risks
 
