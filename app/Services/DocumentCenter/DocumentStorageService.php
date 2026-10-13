@@ -337,7 +337,15 @@ class DocumentStorageService
 
         $target = (string) ($this->settings()['driver'] ?? 'local') === 'local' ? self::TARGET_LOCAL_FALLBACK : self::TARGET_ENVIRONMENT;
 
-        return ['ok' => $this->legacyHealthCheck(), 'target' => $target, 'operational' => $operational];
+        // تخزين البيئة (S3) يُبنى بـ`throw` فيرمي عند تعذّر الوصول؛ الفشل هنا نتيجة اختبار صالحة لا استثناء، فيبقى
+        // `target` و`operational` في الاستجابة. لا يُسجَّل نص الاستثناء (قد يحمل مضيفاً أو معرّف مفتاح).
+        try {
+            $ok = $this->legacyHealthCheck();
+        } catch (Throwable) {
+            $ok = false;
+        }
+
+        return ['ok' => $ok, 'target' => $target, 'operational' => $operational];
     }
 
     private function legacyHealthCheck(): bool
@@ -351,7 +359,11 @@ class DocumentStorageService
 
             return $filesystem->exists($key);
         } finally {
-            $filesystem->delete($key);
+            try {
+                $filesystem->delete($key);
+            } catch (Throwable) {
+                // التنظيف جهد أفضل: فشله لا يُخفي نتيجة الاختبار ولا يستبدلها باستثناء.
+            }
         }
     }
 

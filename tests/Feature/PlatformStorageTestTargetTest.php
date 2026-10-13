@@ -229,6 +229,24 @@ class PlatformStorageTestTargetTest extends TestCase
     }
 
     /** @test */
+    public function an_unreachable_environment_storage_is_a_failed_test_that_still_names_its_target(): void
+    {
+        config()->set('document_center.storage', array_replace(config('document_center.storage'), [
+            'persistent_enabled' => true, 'driver' => 's3', 'key' => 'ENV-KEY', 'secret' => 'ENV-SECRET',
+            'bucket' => 'env-bucket', 'endpoint' => 'https://env.example.test',
+        ]));
+        app()->forgetInstance(DocumentStorageService::class);
+        $store = [];
+        $this->bucket($store, true);
+
+        $response = $this->callTest()->assertOk()
+            ->assertJsonPath('data.ok', false)
+            ->assertJsonPath('data.target', 'environment_storage')
+            ->assertJsonPath('data.operational_storage', 'external');
+        $this->assertStringNotContainsString('ENV-SECRET', $response->getContent());
+    }
+
+    /** @test */
     public function the_response_keeps_ok_and_message_adds_only_the_two_descriptive_fields_and_leaks_no_secret(): void
     {
         $this->saved(true);
