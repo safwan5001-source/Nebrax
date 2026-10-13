@@ -138,6 +138,23 @@ The CI of earlier PR branches is not used as evidence for the state of `main`; t
 - A production build served with a real production backend (the UI ran on the dev server, which also issues each read twice because of React strict mode; this is a dev-only effect and was not measured on a production build).
 - Deploy or production environment of any kind.
 
+## Pre-merge reviews
+
+### Implementer
+This PR changes documentation only (the H1-5 report, the H1-4E report's merge state, the horizon status line). The fixes are in PR #1376 and were limited to the two P1 defects: a label/id link in `Field` and `Select`, and one request-body field on the retention dry run. Each has a regression test; the integrations test was mutation-checked (fails with 53 unnamed controls without the fix). Both fixes were also re-run in a real browser against the real backend.
+
+### Reviewer
+- Evidence separates real-backend results from mocked ones; nothing mocked is counted as backend evidence. Every PASS in the tables names its observation; unobserved items are NOT VERIFIED.
+- A first axe pass that looked clean for the dashboard had silently loaded the login page (the dashboard guard needs the stored administrator profile). This was found, repeated with a complete session, and recorded in the report; the login page itself was not axe-scanned.
+- The Laravel results are reported as not green because the suites failed in this container for environment reasons; the report says so and does not infer a pass.
+- Open question for the reviewer: whether H15-03 (tenant picker limited to 20) should be raised to P1 for a platform with many tenants. It fails closed and the rest of the page works, so it is recorded as P2.
+
+### AWJ Guardian
+- **Backend / database / permissions / financial rules:** untouched. The proposed backend validation change for H15-01 is a recommendation only and needs Safwan's approval.
+- **Data:** only isolated test data; no production data, no real tenant, no external credential. Test secrets were fake and are absent from the DOM, storage, responses, logs, the audit CSV and the stored configuration (encrypted at rest).
+- **Dangerous actions:** none run on real tenants; plan, trial, contract and retention actions ran on test tenants only.
+- **Merge and deploy:** neither requested nor performed.
+
 ## Recommendation on closing the Horizon
 
 Do not close it yet. After the P1 fix branch is reviewed and merged by Safwan's decision, and the P2 list is either accepted in writing or scheduled, the Horizon can close with this report as its verification record. The most valuable follow-up beyond the P2 list is one HTTP-level test per platform write endpoint, because the two P1 defects were invisible to every mocked test.
