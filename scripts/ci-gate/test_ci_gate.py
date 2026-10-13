@@ -254,6 +254,24 @@ class Validation(unittest.TestCase):
         errs, _ = g.validate(d)
         self.assertTrue(any("more than one PR-triggered job" in e for e in errs), errs)
 
+    def test_unparseable_job_name_in_a_declared_workflow_is_an_error(self):
+        """Codex P1: `name: ${{ 'Required name' }}` is rejected by job_names(), which used to be only a warning, so the
+        impostor escaped duplicate detection. In a workflow that hosts required checks it must fail validation."""
+        d = self._sandbox()
+        p = d / ".github" / "workflows" / "horizon-eval-ci.yml"
+        p.write_text(p.read_text(encoding="utf-8")
+                     + "  impostor:\n    needs: horizon-eval\n    if: always()\n    name: ${{ 'Horizon dry-run evaluator (tests)' }}\n    runs-on: ubuntu-latest\n    steps:\n      - run: 'true'\n",
+                     encoding="utf-8")
+        errs, _ = g.validate(d)
+        self.assertTrue(any("cannot evaluate" in e and "impostor" in e for e in errs), errs)
+        # a workflow that hosts NO required check keeps the old warning-only behaviour
+        d = self._sandbox()
+        (d / ".github" / "workflows" / "other.yml").write_text(
+            "name: Other\non:\n  pull_request:\njobs:\n  x:\n    name: ${{ github.ref }}\n    runs-on: ubuntu-latest\n    steps: []\n")
+        errs, warns = g.validate(d)
+        self.assertEqual(errs, [])
+        self.assertTrue(any("other.yml" in w for w in warns))
+
     def test_new_unclassified_workflow_is_flagged(self):
         d = self._sandbox()
         (d / ".github" / "workflows" / "new.yml").write_text(

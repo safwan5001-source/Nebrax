@@ -215,6 +215,7 @@ def validate(root: Path = ROOT, manifest: dict | None = None) -> tuple[list[str]
     # Discovery: any PR-triggered workflow job nobody classified is a gap, not a pass.
     gate_wf = ".github/workflows/ci-gate.yml"
     producers: dict[str, list[str]] = {}
+    declared_wfs = {c["workflow"] for c in manifest["checks"]}
     for f in sorted((root / ".github" / "workflows").glob("*.y*ml")):
         rel = f.relative_to(root).as_posix()
         if rel == gate_wf:
@@ -232,6 +233,11 @@ def validate(root: Path = ROOT, manifest: dict | None = None) -> tuple[list[str]
                 names = job_names(jid, job)
             except GateError as e:
                 warnings.append(f"{rel}: {e}")
+                if rel in declared_wfs:
+                    # A job whose display name cannot be evaluated (e.g. `${{ 'Required check name' }}`) may report under a
+                    # required name and is invisible to duplicate detection. Inside a workflow that hosts required checks
+                    # that is an error, not a warning.
+                    errors.append(f"{rel}:{jid} has a job name the gate cannot evaluate in a workflow that hosts required checks ({e})")
                 continue
             for n in names:
                 producers.setdefault(n, []).append(f"{rel}:{jid}")
