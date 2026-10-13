@@ -87,12 +87,24 @@ def job_names(job_id: str, job: dict) -> list[str]:
     """Expand a job's display name over its matrix (single-axis lists only)."""
     template = str(job.get("name", job_id))
     matrix = ((job.get("strategy") or {}).get("matrix")) or {}
+    if not isinstance(matrix, dict):
+        raise GateError(f"job {job_id}: non-mapping matrix is not supported by the gate")
     if "include" in matrix or "exclude" in matrix:
         raise GateError(f"job {job_id}: matrix include/exclude not supported by the gate")
-    axes = {k: v for k, v in matrix.items() if isinstance(v, list)}
+    bad_axes = sorted(k for k, v in matrix.items() if not isinstance(v, list))
+    if bad_axes:  # e.g. `variant: ${{ fromJSON(...) }}`: the number of runs is unknowable here, so fail closed
+        raise GateError(f"job {job_id}: matrix axes with non-list values are not supported by the gate: {bad_axes}")
+    axes = dict(matrix)
     refs = set(re.findall(r"\$\{\{\s*([^}]*?)\s*\}\}", template))
+    # GitHub creates one check run per matrix combination. An axis the display name does not mention multiplies the
+    # runs sharing one name; count them, so the duplicate-producer scan sees the extra same-named check runs.
+    used = {r.split(".")[1] for r in refs if re.fullmatch(r"matrix\.\w+", r)}
+    hidden = 1
+    for k, v in axes.items():
+        if k not in used:
+            hidden *= max(len(v), 1)
     if not refs:
-        return [template]
+        return [template] * hidden
     for ref in refs:
         if not re.fullmatch(r"matrix\.\w+", ref) or ref.split(".")[1] not in axes:
             raise GateError(f"job {job_id}: unsupported expression in name: {template!r}")
@@ -102,7 +114,7 @@ def job_names(job_id: str, job: dict) -> list[str]:
         n = template
         for k, v in zip(keys, combo):
             n = re.sub(r"\$\{\{\s*matrix\." + k + r"\s*\}\}", str(v), n)
-        names.append(n)
+        names.extend([n] * hidden)
     return names
 
 
@@ -204,6 +216,8 @@ def validate(root: Path = ROOT, manifest: dict | None = None) -> tuple[list[str]
                 if not hit:
                     errors.append(f"[{c['name']}] no step runs {guard['step_run_contains']!r}")
                 for s in hit:
+                    if "if" in s:
+                        errors.append(f"[{c['name']}] guarded test step {s.get('name', '?')!r} has a step-level `if` (a skipped step still reports a green job)")
                     run = str(s.get("run", ""))
                     for bad in guard.get("forbidden", []):
                         if bad in run:
@@ -214,6 +228,8 @@ def validate(root: Path = ROOT, manifest: dict | None = None) -> tuple[list[str]
 
     # Discovery: any PR-triggered workflow job nobody classified is a gap, not a pass.
     gate_wf = ".github/workflows/ci-gate.yml"
+    producers: dict[str, list[str]] = {}
+    declared_wfs = {c["workflow"] for c in manifest["checks"]}
     for f in sorted((root / ".github" / "workflows").glob("*.y*ml")):
         rel = f.relative_to(root).as_posix()
         if rel == gate_wf:
@@ -231,10 +247,22 @@ def validate(root: Path = ROOT, manifest: dict | None = None) -> tuple[list[str]
                 names = job_names(jid, job)
             except GateError as e:
                 warnings.append(f"{rel}: {e}")
+                if rel in declared_wfs:
+                    # A job whose display name cannot be evaluated (e.g. `${{ 'Required check name' }}`) may report under a
+                    # required name and is invisible to duplicate detection. Inside a workflow that hosts required checks
+                    # that is an error, not a warning.
+                    errors.append(f"{rel}:{jid} has a job name the gate cannot evaluate in a workflow that hosts required checks ({e})")
                 continue
             for n in names:
+                producers.setdefault(n, []).append(f"{rel}:{jid}")
                 if (rel, n) not in classified:
                     warnings.append(f"unclassified PR check {n!r} ({rel}:{jid}) — add it to required-checks.json (tier required or advisory)")
+    # A required check name must be produced by exactly one job. A second job with the same display name (in this or
+    # another workflow) could report success under it; `latest_by_name` alone cannot tell the two apart.
+    for c in manifest["checks"]:
+        jobs = producers.get(c["name"], [])
+        if len(jobs) > 1:
+            errors.append(f"[{c['name']}] check name is produced by more than one PR-triggered job: {sorted(jobs)}")
     return errors, warnings
 
 
@@ -320,6 +348,21 @@ def bind_check_runs(check_runs: list[dict], wf_runs: list[dict], sha: str) -> tu
     suites = {w["check_suite_id"] for w in mine if w.get("check_suite_id") is not None}
     bound = [r for r in check_runs if (r.get("check_suite") or {}).get("id") in suites]
     return bound, mine
+
+
+def restrict_to_declared_workflows(manifest: dict, check_runs: list[dict], wf_runs: list[dict]) -> list[dict]:
+    """A manifest check only counts when its check run belongs to the suite of the workflow the manifest declares.
+    Without this, any PR-triggered job (another workflow, same display name, same github-actions app) satisfies a
+    required check without running it. Runs whose name is not in the manifest are passed through unchanged;
+    a manifest-named run with an unknown suite or a different workflow is dropped (fail closed: it is then 'not reported')."""
+    path_by_suite = {w["check_suite_id"]: w.get("path") for w in wf_runs if w.get("check_suite_id") is not None}
+    declared = {c["name"]: c["workflow"] for c in manifest["checks"]}
+    kept = []
+    for r in check_runs:
+        want = declared.get(r["name"])
+        if want is None or path_by_suite.get((r.get("check_suite") or {}).get("id")) == want:
+            kept.append(r)
+    return kept
 
 
 def latest_by_name(check_runs: list[dict]) -> dict[str, dict]:
@@ -492,6 +535,7 @@ def run_gate(args) -> int:
         raw = [r for r in api.pages(f"commits/{sha}/check-runs", "check_runs", {"filter": "all"})
                if r["name"] != gate_name]
         check_runs, wf_runs = bind_check_runs(raw, wf_all, sha)
+        check_runs = restrict_to_declared_workflows(manifest, check_runs, wf_runs)
         verdict, rows, warnings = evaluate(manifest, expected, check_runs, wf_runs,
                                            time.monotonic() - start, deadline)
         summary = render_summary(verdict, rows, warnings, expected, sha, files_known)

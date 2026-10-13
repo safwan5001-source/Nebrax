@@ -163,9 +163,14 @@ class CollectorIsReadOnly(unittest.TestCase):
 
     def test_refuses_anything_outside_repos_paths(self):
         for bad in ["user", "orgs/x/members", "/repos/o/r", "graphql", "repos/o", "repos/o/r/../../x", "repos/o/r/x -X DELETE",
-                    "repos/o/r/x;rm", "repos/o/r/pulls/1\n-f x=1"]:
-            with self.assertRaises(cs.CollectError, msg=bad):
-                cs.gh_get(bad)
+                    "repos/o/r/x;rm", "repos/o/r/pulls/1\n-f x=1",
+                    # dot-segments / encoded separators match the charset but would leave the repo namespace
+                    "repos/o/r/../../x", "repos/../../user/x", "repos/o/../x/y", "repos/o/r/./pulls",
+                    "repos/o/r/%2e%2e/%2e%2e/user", "repos/o/r/pulls%2F1", "repos/o/r/pulls?x=1/../../user"]:
+            # hermetic: a refused path must never reach a subprocess (so the test needs neither `gh` nor a network)
+            with mock.patch.object(cs.subprocess, "run", side_effect=AssertionError("spawned a process")):
+                with self.assertRaises(cs.CollectError, msg=bad):
+                    cs.gh_get(bad)
 
 
 class FixturesStaySynthetic(unittest.TestCase):

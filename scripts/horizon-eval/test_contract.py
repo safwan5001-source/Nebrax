@@ -25,6 +25,18 @@ class Contract(unittest.TestCase):
         cls.results = cr.run_all(lambda: Ledger(Path(tempfile.mkdtemp(prefix="hz-ledger-"))))
         cls.by_id = {r["case"]: r for r in cls.results}
 
+    def test_runner_exit_code_is_not_vacuous(self):
+        results = cr.run_all()
+        self.assertEqual(cr.exit_code(results), 0)
+        self.assertEqual(cr.exit_code([]), 1)  # no cases found must fail, not pass
+        self.assertEqual(cr.exit_code(results[:-3]), 1)  # fewer than 23 contract cases
+        bad = [dict(r) for r in results]
+        bad[0]["pass"] = False
+        self.assertEqual(cr.exit_code(bad), 1)
+        bad = [dict(r) for r in results]
+        bad[0]["false_eligible"] = True
+        self.assertEqual(cr.exit_code(bad), 1)
+
     def test_exactly_23_cases_in_11_scenarios(self):
         ids = sorted(r["case"] for r in self.results if r["case"].startswith("DR-"))
         self.assertEqual(ids, sorted(CONTRACT_IDS))
