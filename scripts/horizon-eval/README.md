@@ -23,7 +23,7 @@ Severity: `STOP_OWNER_DECISION > BLOCK > WAIT > ELIGIBLE_SIMULATED`. Every decis
 | `collect_snapshot.py` | **read-only** `gh api` GET collector that builds a `live` snapshot of one PR |
 | `fixtures/synthetic/` | **synthetic only** — the only place any grant-like file may exist |
 | `snapshots/` | frozen read-only evidence from the real repository (live mode, never eligible) |
-| `test_*.py` | unit, contract + exhaustive fail-closed mutation tests, static guards |
+| `test_*.py` | unit, contract + exhaustive fail-closed mutation tests, static guards, CI-wiring guards (`test_ci_integration.py`) |
 
 ## Use
 ```bash
@@ -42,5 +42,11 @@ python3 collect_snapshot.py --pr 1349 --horizon CUST-HV --task V10b --category p
 python3 horizon_eval.py evaluate /tmp/pr1349.json [--ledger /tmp/ledger]   # --replay for a frozen snapshot, e.g. snapshots/live-pr1349.json
 ```
 
+## CI (AWJ-HORIZON-V2-1D)
+`.github/workflows/horizon-eval-ci.yml` runs the suite on **every** push and pull request (no path filter, no skip) as the check
+`Horizon dry-run evaluator (tests)`. It is a `tier: always` entry in `.github/ci-gate/required-checks.json`, so **CI Gate waits for it** on every PR.
+It fails on any test failure/error/skip, on fewer tests than the `MIN_TESTS` floor, on a non-zero contract table (false-eligible must be 0),
+or if the tests dirty the working tree. Raise `MIN_TESTS` when you add tests; never lower it. It does not enable anything: no merge, no grant, no ruleset.
+
 ## Not covered (by design — see the implementation report)
-Real merges, auto-merge, branch updates, grant issuance, owner-authenticity verification, registry/grant directories on `main`, wiring into CI workflows, and semantic checking that a PR matches the grant's `approved_outcome` (listed as `human_checks_remaining` in every record).
+Real merges, auto-merge, branch updates, grant issuance, owner-authenticity verification, registry/grant directories on `main`, and semantic checking that a PR matches the grant's `approved_outcome` (listed as `human_checks_remaining` in every record).

@@ -15,6 +15,9 @@ import ci_gate as g
 M = g.load_manifest()
 DOCS = {c["workflow"]: g.load_yaml(g.ROOT / c["workflow"]) for c in M["checks"]}
 PHP = ["php artisan test (L11, sqlite)", "php artisan test (L11, pgsql)"]
+HORIZON = "Horizon dry-run evaluator (tests)"  # AWJ-HORIZON-V2-1D: tier=always, like the PHP suites
+ALWAYS = PHP + [HORIZON]
+GREEN = {n: "success" for n in ALWAYS}
 _id = iter(range(1, 10_000))
 
 
@@ -23,7 +26,8 @@ def cr(name, status="completed", conclusion="success", app="github-actions", id=
 
 
 def ok_php():
-    return [cr(n) for n in PHP]
+    """A green run of every `always` check (name kept for the existing call sites)."""
+    return [cr(n) for n in ALWAYS]
 
 
 def ev(files, runs, wf_runs=None, elapsed=60, deadline=4200):
@@ -45,7 +49,7 @@ class Globbing(unittest.TestCase):
 class Expectation(unittest.TestCase):
     def test_docs_only_expects_only_backend(self):
         exp = g.expected_checks(M, DOCS, ["docs/x.md"])
-        self.assertEqual(set(exp), set(PHP))
+        self.assertEqual(set(exp), set(ALWAYS))
 
     def test_web_change_adds_web(self):
         exp = g.expected_checks(M, DOCS, ["web/src/a.ts"])
@@ -59,7 +63,8 @@ class Expectation(unittest.TestCase):
 
     def test_unknown_diff_requires_everything_blocking(self):
         exp = g.expected_checks(M, DOCS, None)
-        self.assertEqual(len(exp), 8)
+        self.assertEqual(len(exp), 9)
+        self.assertIn(HORIZON, exp)
 
     def test_advisory_never_expected(self):
         exp = g.expected_checks(M, DOCS, ["storefront/src/app/x.ts"])
@@ -113,7 +118,7 @@ class Verdicts(unittest.TestCase):
         self.assertEqual(ev(["docs/a.md"], runs)[1][0], "fail")
 
     def test_rerun_uses_latest_attempt_and_warns(self):
-        runs = [cr(PHP[0]), cr(PHP[1], conclusion="failure", id=900), cr(PHP[1], id=901)]
+        runs = [cr(PHP[0]), cr(HORIZON), cr(PHP[1], conclusion="failure", id=900), cr(PHP[1], id=901)]
         v, _, warns = ev(["a.md"], runs)[1]
         self.assertEqual(v, "pass")
         self.assertTrue(any("earlier attempt" in w for w in warns))
@@ -126,6 +131,22 @@ class Verdicts(unittest.TestCase):
     def test_spoofed_check_from_other_app_ignored(self):
         runs = [cr(PHP[0]), cr(PHP[1], app="evil-app")]
         self.assertEqual(ev(["a.md"], runs, elapsed=30)[1][0], "wait")
+
+    def test_horizon_check_is_blocking(self):
+        for concl in ("failure", "cancelled", "skipped", "neutral", "timed_out", "action_required", "stale", None):
+            runs = [cr(n) for n in PHP] + [cr(HORIZON, conclusion=concl)]
+            self.assertEqual(ev(["docs/a.md"], runs)[1][0], "fail", concl)
+
+    def test_horizon_check_missing_never_passes(self):
+        runs = [cr(n) for n in PHP]
+        self.assertEqual(ev(["docs/a.md"], runs, elapsed=30)[1][0], "wait")
+        self.assertEqual(ev(["docs/a.md"], runs, elapsed=4200)[1][0], "fail")
+        wf = [{"path": ".github/workflows/horizon-eval-ci.yml", "status": "completed", "conclusion": "success"}]
+        self.assertEqual(ev(["docs/a.md"], runs, wf_runs=wf)[1][0], "fail")  # workflow ran but the job never reported
+
+    def test_horizon_check_from_another_app_is_ignored(self):
+        runs = [cr(n) for n in PHP] + [cr(HORIZON, app="evil-app")]
+        self.assertEqual(ev(["docs/a.md"], runs, elapsed=30)[1][0], "wait")
 
     def test_advisory_failure_does_not_block(self):
         runs = ok_php() + [cr("merchant preview visual QA", conclusion="failure")]
@@ -156,6 +177,35 @@ class Validation(unittest.TestCase):
         errs = self._mutate("ci.yml", "  pull_request:\n    branches: ['**']\n",
                             "  pull_request:\n    branches: ['**']\n    paths: ['app/**']\n")
         self.assertTrue(any("tier=always" in e for e in errs), errs)
+
+    HZ = "horizon-eval-ci.yml"
+
+    def test_horizon_workflow_cannot_be_path_filtered_or_skipped(self):
+        cases = {
+            "path filter": ("  pull_request:\n    branches: ['**']\n", "  pull_request:\n    branches: ['**']\n    paths: ['scripts/horizon-eval/**']\n", "tier=always"),
+            "job-level if": ("    name: Horizon dry-run evaluator (tests)\n", "    name: Horizon dry-run evaluator (tests)\n    if: github.actor != 'x'\n", "job-level `if`"),
+            "job continue-on-error": ("    name: Horizon dry-run evaluator (tests)\n", "    name: Horizon dry-run evaluator (tests)\n    continue-on-error: true\n", "continue-on-error"),
+            "step continue-on-error": ("      - name: Contract table", "      - continue-on-error: true\n        name: Contract table", "continue-on-error"),
+            "rename": ("name: Horizon dry-run evaluator (tests)", "name: Horizon tests", "name drift"),
+            "no pull_request": ("  pull_request:\n    branches: ['**']\n", "", "no longer triggers on pull_request"),
+        }
+        for label, (old, new, expect) in cases.items():
+            errs = self._mutate(self.HZ, old, new)
+            self.assertTrue(any(expect in e for e in errs), (label, errs))
+
+    def test_horizon_test_step_cannot_be_neutered(self):
+        cases = {
+            "floor removed": ("MIN_TESTS=172", "FLOOR=1", "MIN_TESTS="),
+            "clean-OK check removed": ('if [ "$last" != "OK" ]', "if false", '!= \"OK\"'),
+            "pipefail removed": ("set -o pipefail\n          set -eu\n          MIN_TESTS", "set -eu\n          MIN_TESTS", "pipefail"),
+            "swallowed failure": ("-v 2>&1 | tee", "-v 2>&1 || true | tee", "|| true"),
+            "forced success": ('echo "tests run:', "exit 0\n          echo \"tests run:", "exit 0"),
+            "filtered discovery": ("unittest discover -s scripts/horizon-eval -v", "unittest discover -s scripts/horizon-eval -p test_contract.py -v", " -p "),
+            "test step removed": ("python -I -m unittest discover -s scripts/horizon-eval -v", "python -I -m unittest --help", "no step runs"),
+        }
+        for label, (old, new, expect) in cases.items():
+            errs = self._mutate(self.HZ, old, new)
+            self.assertTrue(any(expect in e for e in errs), (label, errs))
 
     def test_job_rename_is_drift(self):
         errs = self._mutate("web-ci.yml", "name: web build (Next.js)", "name: web build")
@@ -230,6 +280,16 @@ class Binding(unittest.TestCase):
         exp = g.expected_checks(M, DOCS, ["docs/a.md"])
         self.assertEqual(g.evaluate(M, exp, bound, mine, 60, 4200)[0], "fail")
 
+    def test_horizon_push_twin_cannot_mask_pr_failure(self):
+        wf = [wfr(self.CI, 1, event="push"), wfr(self.CI, 2),
+              wfr(".github/workflows/horizon-eval-ci.yml", 3, event="push"),
+              wfr(".github/workflows/horizon-eval-ci.yml", 4)]
+        raw = [scr(PHP[0], 2, 20), scr(PHP[1], 2, 21), scr(HORIZON, 4, 40, conclusion="failure"),
+               scr(HORIZON, 3, 90)]  # push-event twin, higher id, green
+        bound, mine = g.bind_check_runs(raw, wf, SHA)
+        exp = g.expected_checks(M, DOCS, ["docs/a.md"])
+        self.assertEqual(g.evaluate(M, exp, bound, mine, 60, 4200)[0], "fail")
+
     def test_runs_of_other_sha_are_ignored(self):
         wf = [wfr(self.CI, 7, sha="b" * 40)]
         raw = [scr(PHP[0], 7, 5), scr(PHP[1], 7, 6)]
@@ -244,7 +304,7 @@ class Binding(unittest.TestCase):
 
     def test_rerun_same_suite_takes_newest(self):
         wf = [wfr(self.CI, 2)]
-        raw = [scr(PHP[0], 2, 20), scr(PHP[1], 2, 21, conclusion="failure"), scr(PHP[1], 2, 31)]
+        raw = [scr(PHP[0], 2, 20), scr(PHP[1], 2, 21, conclusion="failure"), scr(PHP[1], 2, 31), scr(HORIZON, 2, 32)]
         bound, mine = g.bind_check_runs(raw, wf, SHA)
         exp = g.expected_checks(M, DOCS, ["docs/a.md"])
         self.assertEqual(g.evaluate(M, exp, bound, mine, 60, 4200)[0], "pass")
@@ -279,6 +339,32 @@ class Baseline(unittest.TestCase):
         b, h = self._pair()
         self._edit_manifest(h, lambda m: m["checks"].pop(0))
         self.assertTrue(any("removed" in e for e in g.compare_baseline(b, h)))
+
+    def _horizon(self, m):
+        return next(c for c in m["checks"] if c["name"] == HORIZON)
+
+    def test_removing_horizon_check_fails(self):
+        b, h = self._pair()
+        self._edit_manifest(h, lambda m: m["checks"].remove(self._horizon(m)))
+        self.assertTrue(any(HORIZON in e and "removed" in e for e in g.compare_baseline(b, h)))
+
+    def test_demoting_horizon_check_fails(self):
+        b, h = self._pair()
+        self._edit_manifest(h, lambda m: self._horizon(m).update(tier="advisory"))
+        self.assertTrue(any(HORIZON in e and "tier weakened" in e for e in g.compare_baseline(b, h)))
+
+    def test_repointing_horizon_check_fails(self):
+        b, h = self._pair()
+        self._edit_manifest(h, lambda m: self._horizon(m).update(workflow=".github/workflows/ci.yml", job="test"))
+        self.assertTrue(any(HORIZON in e and "different workflow/job" in e for e in g.compare_baseline(b, h)))
+
+    def test_shrinking_horizon_guard_fails(self):
+        b, h = self._pair()
+        self._edit_manifest(h, lambda m: self._horizon(m)["guard"]["forbidden"].remove("|| true"))
+        self.assertTrue(any(HORIZON in e and "guard.forbidden" in e for e in g.compare_baseline(b, h)))
+        b, h = self._pair()
+        self._edit_manifest(h, lambda m: self._horizon(m)["guard"]["require"].remove("MIN_TESTS="))
+        self.assertTrue(any(HORIZON in e and "guard.require" in e for e in g.compare_baseline(b, h)))
 
     def test_demoting_tier_fails(self):
         b, h = self._pair()
@@ -336,34 +422,41 @@ class FakeApi:
             return [wfr(".github/workflows/ci.yml", 1, event="push"),
                     wfr(".github/workflows/ci.yml", 2, status="completed", conclusion="success")]
         if path == f"commits/{SHA}/check-runs":
-            return ([scr(PHP[0], 1, 1), scr(PHP[1], 1, 2)] +  # push-event twins, always green
+            return ([scr(PHP[0], 1, 1), scr(PHP[1], 1, 2), scr(HORIZON, 1, 3)] +  # push-event twins, always green
                     [scr(n, 2, 10 + i, conclusion=c) for i, (n, c) in enumerate(self.results.items())])
         raise AssertionError(path)
 
 
 class EndToEnd(unittest.TestCase):
-    def _run(self, results, head=None):
+    def _run(self, results, head=None, timeout=1):
         orig = g.Api
         g.Api = lambda repo, token: FakeApi(results, head)
         os.environ.update(GITHUB_REPOSITORY="o/r", GITHUB_TOKEN="t")
         os.environ.pop("GITHUB_STEP_SUMMARY", None)
         try:
             args = argparse.Namespace(root=str(g.ROOT), base_root=str(g.ROOT), pr=5, sha=SHA,
-                                      timeout_minutes=1, interval=0)
+                                      timeout_minutes=timeout, interval=0)
             with contextlib.redirect_stdout(io.StringIO()):  # keep CI logs free of a scary "FAIL" table
                 return g.run_gate(args)
         finally:
             g.Api = orig
 
     def test_green(self):
-        self.assertEqual(self._run({PHP[0]: "success", PHP[1]: "success"}), 0)
+        self.assertEqual(self._run(GREEN), 0)
 
     def test_pr_failure_not_hidden_by_green_push_twin(self):
-        self.assertEqual(self._run({PHP[0]: "success", PHP[1]: "failure"}), 1)
+        self.assertEqual(self._run({**GREEN, PHP[1]: "failure"}), 1)
+
+    def test_horizon_failure_fails_the_gate(self):
+        self.assertEqual(self._run({**GREEN, HORIZON: "failure"}), 1)
+
+    def test_horizon_never_reported_fails_the_gate(self):
+        # timeout=0: the deadline is already reached, so "not reported yet" becomes a failure instead of a 60 s wait
+        self.assertEqual(self._run({n: "success" for n in PHP}, timeout=0), 1)
 
     def test_stale_head_fails_closed(self):
         with self.assertRaises(g.GateError):
-            self._run({PHP[0]: "success", PHP[1]: "success"}, head="e" * 40)
+            self._run(GREEN, head="e" * 40)
 
 
 class Timeouts(unittest.TestCase):

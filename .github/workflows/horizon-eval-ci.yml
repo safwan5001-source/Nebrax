@@ -1,0 +1,80 @@
+name: Horizon Eval CI
+
+# AWJ-HORIZON-V2-1D — يجعل اختبارات مقيِّم Horizon (DRY-RUN) فحصاً مطلوباً في CI.
+# أي تراجع أمني أو مخالفة للعقد (23 حالة) أو نتيجة eligible خاطئة يُفشل هذا الفحص، فتُفشل بوابة CI Gate الـPR.
+#
+# قواعد لا تُكسَر (يفرضها CI Gate عبر required-checks.json، tier=always):
+#   - بلا `paths` ولا `paths-ignore` ولا `if:` على المهمة ولا `continue-on-error` — فحص متخطّى يُحسب نجاحاً.
+#   - بلا أسرار ولا شبكة ولا صلاحية كتابة: المقيِّم يقرأ ملفات محلية فقط (يحرس ذلك test_static_guards.py).
+#   - الاسم الظاهر للفحص جزء من العقد: تغييره يكسر المانيفست فتفشل البوابة (name drift).
+# التصميم: docs/autonomous-engineering/AWJ-HORIZON-V2-1D-CI-INTEGRATION-REPORT.md
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+    branches: ['**']
+
+permissions:
+  contents: read
+
+jobs:
+  horizon-eval:
+    name: Horizon dry-run evaluator (tests)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      # كود الـPR نفسه يُنفَّذ هنا، فلا يبقى رمز الوصول في .git/config.
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      # unit + contract (23 حالة) + mutation sweep + static guards + live snapshots. stdlib فقط.
+      # MIN_TESTS حدّ أدنى يمنع فقدان الاختبارات بصمت (حذف ملف/تغيير pattern)؛ يُرفع ولا يُخفَّض.
+      # الصفر تخطٍّ: أي `skipped`/`expected failures` يغيّر السطر الأخير عن `OK` فيفشل الفحص.
+      - name: Evaluator tests (unit + contract + mutation + static guards)
+        shell: bash
+        run: |
+          set -o pipefail
+          set -eu
+          MIN_TESTS=180
+          log="$RUNNER_TEMP/horizon-eval-tests.log"
+          python -I -m unittest discover -s scripts/horizon-eval -v 2>&1 | tee "$log"
+          total="$(sed -n 's/^Ran \([0-9][0-9]*\) tests\{0,1\} in .*/\1/p' "$log" | tail -n 1)"
+          last="$(grep -v '^[[:space:]]*$' "$log" | tail -n 1)"
+          echo "tests run: ${total:-none} (floor $MIN_TESTS) · final line: ${last:-none}"
+          if [ "$last" != "OK" ]; then
+            echo "::error::Horizon evaluator tests did not end with a clean OK (failures, errors, skips or expected failures)"
+            exit 1
+          fi
+          if [ -z "$total" ] || [ "$total" -lt "$MIN_TESTS" ]; then
+            echo "::error::Only ${total:-0} tests ran; the floor is $MIN_TESTS (tests were removed or are no longer discovered)"
+            exit 1
+          fi
+
+      # الجدول المقروء للعقد: 11 سيناريو / 23 حالة. يخرج بغير صفر عند أي فشل أو false-eligible.
+      - name: Contract table (11 scenarios / 23 cases, false-eligible must be 0)
+        shell: bash
+        run: |
+          set -o pipefail
+          set -eu
+          cd scripts/horizon-eval
+          python contract_runner.py
+
+      # الاختبارات لا تكتب داخل المستودع (المخزن خارجه بالحراسة). أثر جانبي هنا = اختبار غير معزول.
+      - name: Working tree stays clean
+        shell: bash
+        run: |
+          set -eu
+          if [ -n "$(git status --porcelain)" ]; then
+            git status --porcelain
+            echo "::error::The evaluator tests modified the working tree"
+            exit 1
+          fi

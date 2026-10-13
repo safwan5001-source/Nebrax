@@ -42,6 +42,9 @@ def gh_get(path: str, paginate: bool = False):
     """The ONLY network primitive in this module. GET-only by construction."""
     if not re.fullmatch(r"repos/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/[A-Za-z0-9_./?=&%:-]+|repos/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", path):
         raise CollectError(f"refused path: {path[:60]}")
+    # The charset above admits `.` and `%`, so dot-segments and encoded separators would still reach non-repo API paths.
+    if any(seg in (".", "..") for seg in path.replace("?", "/").split("/")) or re.search(r"%(2e|2f|5c)", path, re.IGNORECASE):
+        raise CollectError(f"refused path: {path[:60]}")
     argv = ["gh", "api", path] + (["--paginate", "--slurp"] if paginate else [])
     proc = subprocess.run(argv, capture_output=True, text=True, timeout=120)
     if proc.returncode != 0:

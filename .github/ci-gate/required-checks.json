@@ -20,6 +20,14 @@
       "covers": ["financial", "security", "tenant-isolation", "api", "postgres"],
       "guard": {"step_run_contains": "php artisan test", "require": ["set -o pipefail"], "forbidden": ["--filter", "--group", "--exclude-group", "--testsuite", "--stop-on", "|| true"]}
     },
+    {
+      "name": "Horizon dry-run evaluator (tests)",
+      "workflow": ".github/workflows/horizon-eval-ci.yml",
+      "job": "horizon-eval",
+      "tier": "always",
+      "covers": ["horizon-eval", "authorization-dry-run", "false-eligible", "contract"],
+      "guard": {"step_run_contains": "unittest discover -s scripts/horizon-eval", "require": ["set -o pipefail", "MIN_TESTS=", "!= \"OK\""], "forbidden": ["|| true", "|| :", "exit 0", " -k ", "--pattern", " -p ", "--failfast"]}
+    },
     {"name": "web build (Next.js)", "workflow": ".github/workflows/web-ci.yml", "job": "build", "tier": "paths", "covers": ["web"]},
     {"name": "storefront (lint + typecheck + test)", "workflow": ".github/workflows/storefront-ci.yml", "job": "check", "tier": "paths", "covers": ["storefront"]},
     {"name": "mobile (analyze + test)", "workflow": ".github/workflows/mobile-ci.yml", "job": "check", "tier": "paths", "covers": ["mobile"]},
