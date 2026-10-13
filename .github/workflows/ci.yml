@@ -5,11 +5,25 @@ name: CI
 # يشغّل المجموعة على قاعدتين: SQLite (سريع) و PostgreSQL (الإنتاج) عبر matrix.
 # المستودع يبقى نظيفاً (نواة فقط) — البناء يحدث هنا، لا vendor/ في الريبو.
 
+# المشغّلات:
+#   • pull_request (بلا فلتر فروع — تشترطه CI Gate وهو مصدر فحوص الـPR الوحيد المعتمد عليه).
+#   • push إلى main فقط: تحقق ما بعد الدمج. كان push على `**` يكرّر كل run لفرع له PR
+#     (run لـpush + run لـpull_request على نفس الـSHA = 4 jobs لكل commit)، والبوابة
+#     تتجاهل runs الـpush أصلاً (ci_gate.bind_check_runs).
+#   • workflow_dispatch: تشغيل يدوي لفرع بلا PR بعد.
 on:
   push:
-    branches: ['**']
+    branches: [main]
   pull_request:
     branches: ['**']
+  workflow_dispatch:
+
+# commit جديد على نفس الـPR يلغي run الـSHA القديم فقط (البوابة تقرأ SHA الرأس الحالي).
+# push إلى main لا يُلغى أبداً: مجموعته فريدة لكل SHA فلا يزيحه run أحدث،
+# و cancel-in-progress مقصور على أحداث pull_request.
+concurrency:
+  group: ci-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || format('{0}-{1}', github.event_name, github.sha) }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   test:
