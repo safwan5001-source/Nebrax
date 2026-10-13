@@ -24,8 +24,8 @@ class StorefrontFlatHostPlanCommand extends Command
         } else {
             $this->info('DRY RUN — لا تغييرات. النطاق الأساسي: '.$plan['base_domain']);
             $this->table(
-                ['host', 'status', 'target', 'conflicts'],
-                array_map(fn ($r) => [$r['hostname'], $r['status'], $r['target'] ?? '-', implode(',', $r['conflicts']) ?: '-'], $plan['rows']),
+                ['host', 'status', 'apply_as', 'target', 'conflicts'],
+                array_map(fn ($r) => [$r['hostname'], $r['status'], $r['apply_as'], $r['target'] ?? '-', implode(',', $r['conflicts']) ?: '-'], $plan['rows']),
             );
             foreach ($plan['summary'] as $k => $v) {
                 $this->line("{$k}: {$v}");

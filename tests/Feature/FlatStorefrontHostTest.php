@@ -323,20 +323,22 @@ class FlatStorefrontHostTest extends TestCase
 
     // ── المخطِّط (Dry Run) ───────────────────────────────────────────────
 
-    private function legacyRow(Tenant $tenant, string $storeSlug, ?string $hostname = null): void
+    private function legacyRow(Tenant $tenant, string $storeSlug, ?string $hostname = null, bool $active = true): array
     {
         $channel = SalesChannel::withoutGlobalScopes()->create([
             'tenant_id' => $tenant->id, 'slug' => 'c-'.$storeSlug, 'name' => $storeSlug, 'type' => SalesChannel::TYPE_WEB, 'is_active' => true,
         ]);
         $sf = Storefront::withoutGlobalScopes()->create([
-            'tenant_id' => $tenant->id, 'sales_channel_id' => $channel->id, 'slug' => $storeSlug, 'name' => $storeSlug, 'is_active' => true,
+            'tenant_id' => $tenant->id, 'sales_channel_id' => $channel->id, 'slug' => $storeSlug, 'name' => $storeSlug, 'is_active' => $active,
         ]);
-        StorefrontDomain::withoutGlobalScopes()->create([
+        $domain = StorefrontDomain::withoutGlobalScopes()->create([
             'tenant_id' => $tenant->id, 'storefront_id' => $sf->id,
             'hostname' => $hostname ?? "{$storeSlug}.{$tenant->slug}.".self::BASE,
-            'type' => StorefrontDomain::TYPE_AWJ_SUBDOMAIN, 'is_primary' => true, 'is_active' => true,
+            'type' => StorefrontDomain::TYPE_AWJ_SUBDOMAIN, 'is_primary' => true, 'is_active' => $active,
             'verification_status' => StorefrontDomain::VERIFICATION_VERIFIED,
         ]);
+
+        return ['storefront' => $sf, 'domain' => $domain];
     }
 
     /** @test */
@@ -380,5 +382,53 @@ class FlatStorefrontHostTest extends TestCase
         $this->tenant('dominah-x');
         $this->legacyRow($dominah, 'x');
         $this->artisan('storefront:flat-host-plan')->assertFailed();
+    }
+
+    /** @test */
+    public function production_shape_h_inactive_and_zhor_tyb_active_map_to_free_targets_and_inactive_stays_inactive(): void
+    {
+        $dominah = $this->tenant('dominah');
+        $other = $this->tenant('other');
+        $h = $this->legacyRow($dominah, 'h', null, false);
+        $z = $this->legacyRow($dominah, 'zhor-tyb');
+        $this->legacyRow($other, 'h'); // نفس سلاج المتجر عند مستأجر آخر: لا يؤثر على أهداف dominah
+
+        $snapshot = DB::table('storefront_domains')->orderBy('id')->get()->toJson();
+        $plan = app(FlatHostMigrationPlanner::class)->plan();
+        $by = collect($plan['rows'])->keyBy('hostname');
+
+        $hRow = $by['h.dominah.store.awjdev.xyz'];
+        $this->assertSame('dominah-h.store.awjdev.xyz', $hRow['target']);
+        $this->assertSame([], $hRow['conflicts']);
+        $this->assertSame('inactive', $hRow['apply_as']);          // لا تفعيل
+        $this->assertSame($dominah->id, $hRow['tenant_id']);
+        $this->assertSame($h['storefront']->id, $hRow['storefront_id']);
+
+        $zRow = $by['zhor-tyb.dominah.store.awjdev.xyz'];
+        $this->assertSame('dominah-zhor-tyb.store.awjdev.xyz', $zRow['target']);
+        $this->assertSame([], $zRow['conflicts']);
+        $this->assertSame('active', $zRow['apply_as']);
+        $this->assertSame($z['storefront']->id, $zRow['storefront_id']);
+
+        // مستأجر آخر بنفس سلاج المتجر → هدف مختلف تماماً
+        $this->assertSame('other-h.store.awjdev.xyz', $by['h.other.store.awjdev.xyz']['target']);
+        $this->assertSame(1, $plan['summary']['inactive_sources']);
+        $this->assertSame($snapshot, DB::table('storefront_domains')->orderBy('id')->get()->toJson(), 'planner must not write');
+    }
+
+    /** @test */
+    public function creating_new_stores_never_reactivates_an_inactive_store_or_domain(): void
+    {
+        $dominah = $this->tenant('dominah');
+        $h = $this->legacyRow($dominah, 'h', null, false);
+
+        // محاولة إنشاء متجر باسم «h» لنفس المستأجر: يأخذ سلاجاً جديداً (h-2)، ولا يمسّ القديم.
+        $new = $this->addStore($dominah, 'h');
+
+        $this->assertSame('https://dominah-h-2.store.awjdev.xyz/', $new['preview_url']);
+        $this->assertFalse((bool) Storefront::withoutGlobalScopes()->findOrFail($h['storefront']->id)->is_active);
+        $this->assertFalse((bool) StorefrontDomain::withoutGlobalScopes()->findOrFail($h['domain']->id)->is_active);
+        // والمضيف القديم لا يحسم (غير نشط) → 404
+        $this->getJson('http://h.dominah.store.awjdev.xyz/store/v1/storefront')->assertNotFound();
     }
 }

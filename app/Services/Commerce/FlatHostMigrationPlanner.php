@@ -17,6 +17,8 @@ use Illuminate\Support\Facades\DB;
  *  - unrecognized     مضيف مُدار لا يطابق أياً من الصيغتين — يُبلَّغ ولا يُمسّ.
  *  - (custom domains لا تُقرأ أصلاً: type = awj_subdomain فقط)
  *
+ * سياسة الحالة (`apply_as`): active | inactive | skip_deleted — المخطِّط لا يقترح تفعيلاً أبداً.
+ *
  * أنواع التعارض (conflict):
  *  - target_taken_by_domain   الهدف مسجَّل مسبقاً كصف آخر.
  *  - target_is_tenant_slug    الهدف يطابق سلاج مستأجر (محجوز لمتجره الأول).
@@ -37,7 +39,7 @@ final class FlatHostMigrationPlanner
             ->join('tenants as t', 't.id', '=', 'd.tenant_id')
             ->where('d.type', 'awj_subdomain')
             ->orderBy('d.hostname')
-            ->get(['d.id as domain_id', 'd.hostname', 'd.is_active', 'd.is_primary', 't.id as tenant_id', 't.slug as tenant_slug', 's.slug as store_slug']);
+            ->get(['d.id as domain_id', 'd.hostname', 'd.is_active', 'd.is_primary', 'd.verification_status', 'd.storefront_id', 't.id as tenant_id', 't.slug as tenant_slug', 's.slug as store_slug', 's.is_active as store_active', 's.deleted_at as store_deleted_at']);
 
         $existingHosts = DB::table('storefront_domains')->pluck('hostname')->flip();
         $tenantSlugs = DB::table('tenants')->pluck('slug')->flip();
@@ -49,8 +51,15 @@ final class FlatHostMigrationPlanner
             $row = [
                 'domain_id' => $r->domain_id,
                 'tenant_id' => $r->tenant_id,
+                'storefront_id' => $r->storefront_id,
                 'hostname' => $r->hostname,
                 'is_active' => (bool) $r->is_active,
+                'verification_status' => $r->verification_status,
+                'store_active' => (bool) $r->store_active,
+                'store_deleted' => $r->store_deleted_at !== null,
+                // سياسة الحالة لأي تطبيق مستقبلي: لا تفعيل أبداً. مصدر معطَّل (نطاق أو متجر)
+                // أو محذوف → الصف الجديد يُنشأ معطَّلاً أو يُتخطّى؛ لا يرث «نشطاً» من لا شيء.
+                'apply_as' => 'active',
                 'status' => 'unrecognized',
                 'target' => null,
                 'conflicts' => [],
@@ -73,6 +82,11 @@ final class FlatHostMigrationPlanner
         }
 
         foreach ($rows as &$row) {
+            if ($row['store_deleted']) {
+                $row['apply_as'] = 'skip_deleted';
+            } elseif (! $row['is_active'] || ! $row['store_active'] || $row['verification_status'] !== 'verified') {
+                $row['apply_as'] = 'inactive';
+            }
             $target = $row['target'];
             if ($target === null) {
                 continue;
@@ -90,10 +104,13 @@ final class FlatHostMigrationPlanner
         }
         unset($row);
 
-        $summary = ['first' => 0, 'legacy_nested' => 0, 'unrecognized' => 0, 'conflicting' => 0, 'safe_to_migrate' => 0];
+        $summary = ['first' => 0, 'legacy_nested' => 0, 'unrecognized' => 0, 'conflicting' => 0, 'safe_to_migrate' => 0, 'inactive_sources' => 0];
         foreach ($rows as $row) {
             $summary[$row['status']]++;
             if ($row['status'] === 'legacy_nested') {
+                if ($row['apply_as'] !== 'active') {
+                    $summary['inactive_sources']++;
+                }
                 $row['conflicts'] === [] ? $summary['safe_to_migrate']++ : $summary['conflicting']++;
             }
         }
