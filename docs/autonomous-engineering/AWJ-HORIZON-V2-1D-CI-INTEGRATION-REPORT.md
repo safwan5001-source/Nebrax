@@ -166,11 +166,25 @@ Reviewer-confirmed OK: triggers, permissions, no `${{ }}` injection surface, ski
 - Zone A/B not expanded; no grant issued; Auto-Merge/Ruleset/Protection untouched.
 
 ### PRE_MERGE_REVIEW
-_Filled after CI, §11._
+Reviewed code head `94c5d063caf858eb51059fc443e90b4edf36e2a1` (docs-only commits may follow it; the final head is in the PR comment). Scope = the 11 files in §2, no application/accounting/RBAC/tenant/migration/API path. CI green on that exact SHA (§11). Reviewer findings (3) and Codex findings (3: P1, P2, P1) all fixed with tests and resolved; Codex's last pass on `94c5d06` found nothing. No merge conflict (`git merge-tree` against current `main` is clean). **Merge is an owner decision.**
 
 ## 11. CI
 
-_Filled after the final head's runs complete._
+Code head `94c5d063caf858eb51059fc443e90b4edf36e2a1`:
+
+| Check | Event | Check-run ID | Result |
+|---|---|---|---|
+| CI Gate | pull_request | 115382643285 | ✅ (15:45 → 16:17, waits for the php suites) |
+| Horizon dry-run evaluator (tests) | pull_request | 115382637779 | ✅ (13 s) |
+| Horizon dry-run evaluator (tests) | push | 115382601977 | ✅ |
+| php artisan test (L11, sqlite) | pull_request / push | 115382638352 / 115382602149 | ✅ / ✅ |
+| php artisan test (L11, pgsql) | pull_request / push | 115382637662 / 115382602816 | ✅ / ✅ |
+
+Workflow runs: Horizon Eval CI `38422331403` (PR) / `38422321550` (push) · CI `38422331402` / `38422321474` · CI Gate `38422331421`.
+
+History worth knowing: the Gate run on `b0b23d5` failed with `stale gate: PR head is now …` — the designed abort when a newer push lands, not a test failure. Earlier heads' runs were superseded by the review-fix pushes. The Gate on this PR ran the **base** gate script (by design), so §5b's binding protects PRs only after merge; the new gate tests (66) were run locally and in the Gate's own "Gate self-tests (PR copy)" step.
+
+`main` has moved by 1 commit since the base (`704a7ef`), touching none of this PR's paths; not merged in, to avoid restarting CI.
 
 ## 12. Rollback
 
@@ -178,7 +192,10 @@ Revert the PR (`git revert -m 1 <merge>` via a PR). That removes the workflow an
 
 ## 13. Git state
 
-_Filled at delivery._
+- Branch: `horizon/v2-1d-ci-integration`
+- PR: #1382
+- Base SHA: `704a7efe1f5aabdd4ba3cb8b92394510446261e7` (`main` has since advanced; clean merge)
+- Code head SHA: `94c5d063caf858eb51059fc443e90b4edf36e2a1` (CI-verified, §11). Final head SHA: see the PR delivery comment (a docs-only commit records this very section).
 
 ## 14. Next step
 
