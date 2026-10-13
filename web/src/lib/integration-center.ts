@@ -20,13 +20,16 @@ export interface IntegrationCategory {
   href: string | null;
 }
 
+/** كتالوج منصات التوصيل داخل المركز (INT-UX-2). شاشة الإعداد القديمة `/delivery-platforms` تبقى كما هي. */
+export const DELIVERY_CATALOG_HREF = '/integrations/delivery-platforms';
+
 /**
  * الترتيب هو ترتيب التصوّر المعتمد (RTL: منصات التوصيل ثم المتاجر في الصف الأول،
- * وبوابات الدفع ثم الشحن في الثاني). منصات التوصيل تدخل **القسم القائم**
- * `/delivery-platforms` — لا مسار مكرر، ولا مسار `/integrations/*` قبل INT-UX-2.
+ * وبوابات الدفع ثم الشحن في الثاني). منصات التوصيل تدخل كتالوجها داخل المركز
+ * (INT-UX-2)؛ كان مدخلها `/delivery-platforms` في INT-UX-1 قبل وجود الكتالوج.
  */
 export const INTEGRATION_CATEGORIES: readonly IntegrationCategory[] = [
-  { key: 'delivery', href: '/delivery-platforms' },
+  { key: 'delivery', href: DELIVERY_CATALOG_HREF },
   { key: 'ecommerce', href: null },
   { key: 'payments', href: null },
   { key: 'shipping', href: null },
@@ -91,4 +94,126 @@ export function deliverySummary(profiles: unknown, readiness: unknown): Delivery
     total: deliveryPlatformPresentations().length,
     nativeAvailable: readNativeAvailableCount(readiness),
   };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// INT-UX-2 — سُلّم القدرات الأربع (A/B/C/D) لكل منصة.
+//
+// أربع حقائق مستقلة بمصادر مستقلة (DLV-INTEGRATIONS-UX-DESIGN-1 §3). لا تُدمج في شارة
+// واحدة، ولا يُشتق أي منها من آخر. القراءة الفاشلة أو غير المفهومة تعود «تعذّرت القراءة»
+// ولا تُعامَل أبداً كنجاح ولا كـ«لا يوجد»: الفشل المغلق هو القاعدة.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const HUB_VIEW_PERMISSION = 'delivery_hub.view';
+export const DELIVERY_REPORT_PERMISSION = 'reports.view';
+export const DELIVERY_CONNECTOR_VIEW_PERMISSION = 'delivery_connector.view';
+
+/** منصة معروفة في السجلّ المركزي؟ (مفتاح الواجهة يُتحقَّق منه قبل أي طلب). */
+export function isKnownDeliveryPlatform(key: string): boolean {
+  return deliveryPlatformPresentations().some((platform) => platform.key === key);
+}
+
+/** مفاتيح المنصات الست بترتيب السجلّ المركزي (نفس ترتيب نقطة الجاهزية). */
+export function deliveryPlatformKeys(): string[] {
+  return deliveryPlatformPresentations().map((platform) => platform.key);
+}
+
+export type ManualAttributionStatus = 'unset' | 'set' | 'disabled' | 'unreadable';
+export type NativeStatus = 'unavailable' | 'pending' | 'available' | 'unreadable';
+/** الخطوتان C وD: لا مصدر بيانات لهما اليوم، فتُشتقّان من B فقط ولا تُقرآن من أي مكان. */
+export type DownstreamStatus = 'blocked' | 'no_data' | 'unreadable';
+
+export interface ReadinessRow {
+  platformKey: string;
+  uxState: string;
+  connectEnabled: boolean;
+  syncEnabled: boolean;
+  /** حقول داخلية يرسلها الخادم لمن يملك `delivery_connector.view` فقط. */
+  technical: string | null;
+  evidenceDate: string | null;
+  evidenceRef: string | null;
+}
+
+export interface DeliveryLadder {
+  platformKey: string;
+  a: ManualAttributionStatus;
+  b: NativeStatus;
+  c: DownstreamStatus;
+  d: DownstreamStatus;
+}
+
+/**
+ * حالة الإسناد اليدوي لكل منصة من `GET /delivery-platforms`. غياب ملف المنصة يعني
+ * «غير مهيأة» (`unset`) — قراءة ناجحة بنتيجة صريحة — أما حمولة غير مقروءة فتعود `null`.
+ */
+export function readManualStatuses(payload: unknown): Map<string, 'set' | 'disabled'> | null {
+  const list = rows(payload);
+  if (list === null) return null;
+  const known = new Set(deliveryPlatformKeys());
+  const result = new Map<string, 'set' | 'disabled'>();
+  for (const row of list) {
+    if (typeof row.platform_key !== 'string' || !known.has(row.platform_key) || typeof row.is_active !== 'boolean') continue;
+    // ملف مفعّل واحد يكفي؛ المعطّل لا يُلغي مفعّلاً آخر لنفس المنصة.
+    if (row.is_active === true) result.set(row.platform_key, 'set');
+    else if (!result.has(row.platform_key)) result.set(row.platform_key, 'disabled');
+  }
+  return result;
+}
+
+function nullableText(value: unknown): string | null {
+  return typeof value === 'string' && value.trim() !== '' ? value : null;
+}
+
+/** صفوف `GET /delivery-platforms/readiness`. صف بلا `ux_state` نصّي لا يُحتسب، وحمولة غير مصفوفة ⇒ `null`. */
+export function readReadinessRows(payload: unknown): Map<string, ReadinessRow> | null {
+  const list = rows(payload);
+  if (list === null) return null;
+  const result = new Map<string, ReadinessRow>();
+  for (const row of list) {
+    if (typeof row.platform_key !== 'string' || typeof row.ux_state !== 'string') continue;
+    if (typeof row.connect_enabled !== 'boolean' || typeof row.sync_enabled !== 'boolean') continue;
+    result.set(row.platform_key, {
+      platformKey: row.platform_key,
+      uxState: row.ux_state,
+      connectEnabled: row.connect_enabled,
+      syncEnabled: row.sync_enabled,
+      technical: nullableText(row.technical),
+      evidenceDate: nullableText(row.evidence_date),
+      evidenceRef: nullableText(row.evidence_ref),
+    });
+  }
+  return result;
+}
+
+/**
+ * الخطوة B من صف الجاهزية، فشلاً مغلقاً: `available` تتطلب `READY_TO_CONNECT` **و**
+ * `connect_enabled=true` معاً؛ وأي تناقض (حالة غير جاهزة مع علم مفعّل، أو مزامنة بلا ربط،
+ * أو `ux_state` لا نعرفه) ⇒ `unreadable`، لا نخمّن أنه جاهز ولا أنه غير جاهز.
+ */
+export function nativeStatusOf(row: ReadinessRow | null | undefined): NativeStatus {
+  if (!row) return 'unreadable';
+  if (row.syncEnabled && !row.connectEnabled) return 'unreadable';
+  switch (row.uxState) {
+    case 'NOT_SUPPORTED':
+      return row.connectEnabled ? 'unreadable' : 'unavailable';
+    case 'AWAITING_PROVIDER_APPROVAL':
+      return row.connectEnabled ? 'unreadable' : 'pending';
+    case 'READY_TO_CONNECT':
+      return row.connectEnabled ? 'available' : 'unreadable';
+    default:
+      return 'unreadable';
+  }
+}
+
+/** سُلّم منصة واحدة. `manual`/`readiness` = `null` تعني أن قراءتها فشلت كلياً. */
+export function deliveryLadder(
+  platformKey: string,
+  manual: Map<string, 'set' | 'disabled'> | null,
+  readiness: Map<string, ReadinessRow> | null,
+): DeliveryLadder {
+  const a: ManualAttributionStatus = manual === null ? 'unreadable' : manual.get(platformKey) === 'set' ? 'set' : manual.get(platformKey) === 'disabled' ? 'disabled' : 'unset';
+  const b = nativeStatusOf(readiness?.get(platformKey));
+  // C وD لا مصدر لهما: لا نموذج اتصال في النظام. لا نقرأهما ولا نخترع لهما قيمة.
+  const downstream: DownstreamStatus = b === 'available' ? 'no_data' : b === 'unreadable' ? 'unreadable' : 'blocked';
+  return { platformKey, a, b, c: downstream, d: downstream };
 }

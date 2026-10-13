@@ -56,12 +56,12 @@ describe.each(TEST_LOCALES)('Integration Center landing (%s)', (locale) => {
     }
   });
 
-  it('delivery platforms enters the existing section and is the only link', () => {
+  it('delivery platforms enters its catalog and is the only link', () => {
     renderLanding(locale);
 
     const links = screen.getAllByRole('link');
     expect(links).toHaveLength(1);
-    expect(links[0].getAttribute('href')).toBe('/delivery-platforms');
+    expect(links[0].getAttribute('href')).toBe('/integrations/delivery-platforms');
     expect(links[0].getAttribute('data-testid')).toBe('integration-card-delivery');
     expect(screen.queryAllByRole('button')).toHaveLength(0);
   });

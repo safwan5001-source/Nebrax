@@ -13,10 +13,10 @@ describe('integration center categories', () => {
     expect(INTEGRATION_CATEGORIES.filter((c) => c.href !== null).map((c) => c.key)).toEqual(['delivery']);
   });
 
-  it('enters the existing delivery platforms section and creates no duplicate route', () => {
+  it('enters the delivery platforms catalog inside the Integration Center (INT-UX-2); the legacy screen is not duplicated', () => {
     const delivery = INTEGRATION_CATEGORIES.find((c) => c.key === 'delivery');
-    expect(delivery?.href).toBe('/delivery-platforms');
-    expect(INTEGRATION_CATEGORIES.some((c) => c.href?.startsWith('/integrations'))).toBe(false);
+    expect(delivery?.href).toBe('/integrations/delivery-platforms');
+    expect(INTEGRATION_CATEGORIES.filter((c) => c.href !== null)).toHaveLength(1);
   });
 });
 
