@@ -104,6 +104,8 @@ No code, no migration, no route, no permission, no provider credential, no Conne
 | Payment Gateways | Future. | Non-interactive "Planned" line. (A `PaymentGateway` model exists in the backend but is **not** an integration claim here; payment gateways are out of scope and must not be surfaced as available.) |
 | Shipping Providers | Future. | Non-interactive "Planned" line. |
 
+Scope clarification: these planned categories mean **integrations with external third-party platforms or providers**. AWJ's own native modules (the Commerce workspace/storefront, payment methods, and internal payment-gateway accounting services) are not integrations in this sense and are neither listed nor described by the Center.
+
 **Rule R-CAT.** A future category renders as plain text in a muted "Planned categories" list: no link, no button, no status dot, no count, not focusable. Copy states plainly that nothing is available there. No future category may appear in the sidebar or in route config.
 
 ### 2.3 Information architecture
@@ -238,6 +240,7 @@ Derived provider-level UX state:
 - **R-GATE-4.** Flipping `connect_enabled` for a provider is its own PR with the evidence appendix and a test that the provider's adapter passes the test path. Mixed PRs (UI + manifest flip) are rejected.
 - **R-GATE-5 (invariant test).** A permanent test enumerates all manifest rows and asserts: every row with `connect_enabled = false` renders no element matching Connect/Authorize/Link (role button or link) on the provider page, in both locales.
 - **R-GATE-6.** Today's six rows must all be `connect_enabled = false` in the first PR that introduces the manifest.
+- **R-GATE-7 (vocabulary).** The invariant test (R-GATE-5) forbids connection verbs — Connect, Link, Authorize, Integrate, Enable integration, Start sync, Reconnect — on any provider whose `connect_enabled` is false, including **Reconnect** on `DISCONNECTED` after a manifest revocation. Controls for the AWJ-signed ingress (DP-C) are a different capability: they must be titled "AWJ-signed ingress", sit in the collapsed Advanced section, be owner/admin only, and never use connection verbs or appear as a provider's primary action.
 
 ---
 
@@ -382,7 +385,7 @@ Desktop: a table, one row per provider store.
 Rules:
 
 - **R-MAP-1.** Save is an explicit confirmation: «لا يمكن تغيير الفرع بعد الحفظ.» / "The branch cannot be changed after saving." The control states the consequence before commit.
-- **R-MAP-2.** `mapping_ambiguous` (store already mapped) is shown generically: «معرّف المتجر مربوط مسبقاً ولا يمكن إعادة استخدامه.» The UI never says *which* tenant, and offers no "claim" action (the global-uniqueness oracle is intentional and must not leak more).
+- **R-MAP-2.** `mapping_ambiguous` (store already mapped) is shown generically: «معرّف المتجر مربوط مسبقاً ولا يمكن إعادة استخدامه. إن كان متجرك فتواصل مع الدعم.» The UI never says *which* tenant, and offers no "claim" action (the global-uniqueness oracle is intentional and must not leak more).
 - **R-MAP-3.** Provider-asserted `tenant_id`/`branch_id` are never used to choose the destination; the branch comes only from the user's selection (Core: "Destination branch … is not taken from the payload").
 - **R-MAP-4.** A restricted user sees and edits only stores mapped to branches they can access; unrouted accounts are hidden from them (Core: `visibleTo`).
 - **R-MAP-5.** "Change branch / re-home a store" is **not offered**. Copy under the row: «لنقل المتجر إلى فرع آخر تواصل مع الدعم.» until `DP-A` is decided.
@@ -695,7 +698,7 @@ Namespace proposal: `integrationCenter` (new; the existing `platformIntegrations
 | `category.delivery` | منصات التوصيل | Delivery platforms |
 | `category.deliveryDesc` | الإسناد اليدوي في نقطة البيع، وصندوق التوصيل، والتكاملات الأصلية عند توفرها. | Manual POS attribution, the Delivery Hub, and native integrations when available. |
 | `planned.title` | فئات مخطط لها | Planned categories |
-| `planned.note` | لا يتوفر أي تكامل في هذه الفئات حالياً. | No integration is available in these categories yet. |
+| `planned.note` | لا تتوفر حالياً أي تكاملات مع منصات خارجية في هذه الفئات. | No integrations with external platforms are available in these categories yet. |
 | `planned.ecommerce` | التجارة الإلكترونية | E-commerce |
 | `planned.payments` | بوابات الدفع | Payment gateways |
 | `planned.shipping` | مزوّدو الشحن | Shipping providers |
@@ -759,7 +762,7 @@ Namespace proposal: `integrationCenter` (new; the existing `platformIntegrations
 | Disconnect confirm | سيتم إيقاف المزامنة وإزالة بيانات الاعتماد. تبقى كل الطلبات والسجلات. | Synchronization will stop and credentials will be removed. All orders and records are kept. |
 | Revocation unconfirmed | سُحبت الصلاحيات محلياً. يلزم إلغاء التفويض من بوابة المنصة. | Credentials were removed locally. Revoke authorization in the platform's portal. |
 | Mapping save confirm | لا يمكن تغيير الفرع بعد الحفظ. | The branch cannot be changed after saving. |
-| Store already mapped | معرّف المتجر مربوط مسبقاً ولا يمكن إعادة استخدامه. | This store id is already mapped and cannot be reused. |
+| Store already mapped | معرّف المتجر مربوط مسبقاً ولا يمكن إعادة استخدامه. إن كان متجرك فتواصل مع الدعم. | This store id is already mapped and cannot be reused. If it is your store, contact support. |
 | Secret shown once | احفظ السر الآن. لن يُعرض مرة أخرى. | Save the secret now. It will not be shown again. |
 | Rotate result | تم تدوير السر. السر السابق لم يعد صالحاً. | The secret was rotated. The previous secret is no longer valid. |
 | Reassign done | تمت إعادة الإسناد. لم يتغير السر. | Reassigned. The secret was not changed. |
@@ -824,8 +827,21 @@ Each is raised because the design needs a change to an existing financial/securi
 - **Context.** `platform_key`, `external_store_id`, profile and branch are immutable after create; the pair is globally unique; disable keeps the store id reserved; no re-enable route exists (`DeliveryConnectorAccount::booted`, migration `delivery_connector_store_unique`, controller routes).
 - **Effect on UX.** A store can never move to another branch; a disconnected store can never be reattached; "Reconnect" cannot reuse the mapping.
 - **Options.** (1) Keep immutable; reconnection always creates new mappings under new ids (impossible for the same provider store id). (2) Add a guarded, audited **re-enable** of the same mapping by the same tenant. (3) Add a guarded, audited **branch re-home** with an in-flight-order policy. (4) Allow releasing a store id after verified disconnect.
-- **Recommendation.** (2) first (smallest, same tenant, no branch change), (3) only with a written policy for open Hub orders, (4) rejected (re-opens the cross-tenant claim risk).
-- **Needed from owner.** Pick an option before any task that offers "Reconnect" or "Change branch".
+- **Recommendation.** (2) first (smallest, same tenant, no branch change), (3) only with the policy below, (4) rejected as a general rule (see the squatting note).
+- **Minimum conditions for option (2) re-enable / reconnect** (all server-side, all required):
+  1. **Provider identity must match.** A provider connection may reattach a store mapping only if the newly verified provider merchant/store identity equals the identity recorded at the first verified connection. Otherwise the mapping stays closed and the tenant must use a different store id. Reattachment is never based on a typed id alone.
+  2. **Fresh credentials.** Re-enable of an AWJ-signed ingress account must rotate the secret as part of the same action (a secret that existed while the account was disabled is never silently revived). A provider connection requires a new authorization.
+  3. **Gates re-checked at enable time:** `sales.pos` enabled, subscription active, eligible `operated_by` (otherwise reassign first), caller holds `delivery_connector.manage` and passes `visibleTo`, and — for provider connections — manifest `connect_enabled`.
+  4. **Atomic and audited:** under the account row lock, in the same transaction as one audit event (DP-F). Same tenant only.
+  5. **No mapping change:** platform, store id, profile and branch are unchanged by re-enable.
+- **Minimum conditions for option (3) branch re-home** (otherwise not offered):
+  1. The actor must be able to access **both** the source and the destination branch (an unrouted connector can be re-homed only by an unrestricted actor); the destination must be active.
+  2. **Open-order policy is written before building.** Connector Core rejects an event whose provider order already lives on another branch (`branch_unavailable`) and ties each authoritative baseline to the connector that wrote it. Re-homing while non-terminal Hub orders exist would strand those orders (their later events would be rejected). The policy must say whether re-home is blocked until they reach a terminal state, or how they are handled; historical orders keep their original branch.
+  3. The current/new `operated_by` must still pass the destination branch check, or be reassigned in the same action.
+  4. Atomic under the account lock with one audit event; no change to `event_id` identity, attempts, or Hub order identity.
+  5. Changing the model's immutability rule is a security-contract change and needs its own approved implementation brief.
+- **Squatting risk (recorded, not solved here).** Store ids are user-typed today and unverified, and a created mapping reserves the id for all tenants permanently. A tenant (or a typo) can therefore block another merchant's real store id. Once provider identity verification exists (ladder step C), uniqueness should bind to the *verified* provider identity (see DP-D). For mappings that were never provider-verified, release is a **platform-operator, audited dispute procedure** (the separate platform administrator surface), never a tenant action. Until then `mapping_ambiguous` copy tells the user to contact support (it never reveals the other tenant).
+- **Needed from owner.** Pick an option before any task that offers "Reconnect" or "Change branch". Nothing in this packet authorizes changing the mapping columns, their immutability, or the unique index.
 
 ### DP-B — Connection persistence and provider-credential storage
 
@@ -833,6 +849,8 @@ Each is raised because the design needs a change to an existing financial/securi
 - **Options.** (1) App-key encryption with versioned records (current pattern). (2) External vault. (3) Provider-held credentials only (not feasible for refresh flows).
 - **Recommendation.** Decide DG-7 first; model the connection as its own tenant-scoped entity (not new values in `DeliveryConnectorAccount.status`), because the Core's `configured/disabled` pair is enforced by the model (`DomainException` otherwise) and must keep meaning "ingress".
 - **Constraint.** The ten UX states are not DB enums; persistence stores facts (credential validity, last verified, sync intent) and derives the state.
+- **Non-authorization.** Approving or discussing DP-B does **not** permit accepting, storing, logging, displaying or transmitting any provider credential or token. No credential field, endpoint or table may be built until (a) DP-B is decided with DG-7, (b) the provider passes G1-G9, and (c) the task brief is reviewed. This document and its UI specs contain no credential-handling behavior that is buildable on their own.
+- **Minimum constraints once decided.** Encrypted at rest and never returned by any read; tenant-scoped; refresh runs single-flight under a row lock (Keeta's documented limits make concurrent refresh unsafe); an app-key rotation plan exists before tokens are stored under the `encrypted` cast (a lost key makes ciphertext unreadable and forces `REAUTH_REQUIRED`); no token in logs, audit rows, error messages or URLs; purge on disconnect.
 
 ### DP-C — Exposing internal HMAC ingress accounts in the tenant UI
 
@@ -843,7 +861,7 @@ Each is raised because the design needs a change to an existing financial/securi
 ### DP-D — Provider merchant-account uniqueness across tenants
 
 - **Context.** Uniqueness exists on the store id only. A merchant account could in principle be authorized by two tenants.
-- **Recommendation.** Global unique `(platform_key, provider_merchant_id)` for active connections, with the same generic error text (no oracle expansion), decided with `DP-B`.
+- **Recommendation.** Global unique `(platform_key, provider_merchant_id)` for active connections, keyed on the **provider-verified** identity only (never a user-typed id, which would extend the squatting risk in DP-A), with the same generic error text (no oracle expansion), decided with `DP-B`.
 
 ### DP-E — Visibility of connection data to finance roles
 
@@ -854,7 +872,9 @@ Each is raised because the design needs a change to an existing financial/securi
 ### DP-F — Connection-lifecycle audit
 
 - **Context.** Rotate and disable are unaudited today (the service writes no event); only reassignment is audited.
-- **Recommendation.** One append-only table, cataloged in §7.4, added before any lifecycle UI beyond read-only. Includes back-filling nothing.
+- **Recommendation.** One append-only table, cataloged in §7.4, added **before** any UI or new endpoint that rotates, disables, enables, connects or disconnects. Back-fills nothing.
+- **Rules.** (1) The audit row is written in the **same database transaction** as the operation; if the audit insert fails, the operation rolls back (fail-closed). (2) Writers live in the backend service layer, not the UI, so direct API calls to `rotate-secret`/`disable` are covered too. (3) Rows hold ids, version numbers (e.g. `secret_version` old→new) and reason codes only — never secrets, tokens, payloads or provider bodies. (4) Model rejects update/delete, like `DeliveryConnectorOperatorEvent`.
+- **Interim state (honest).** Until `INT-AUDIT-1` ships, rotate and disable through the **existing API** remain unaudited; this design adds no new UI or caller for them before then (INT-UX-5 hard-depends on INT-AUDIT-1).
 
 ---
 
@@ -908,7 +928,7 @@ Two tracks. **Track U** (UX/catalog) is safe to build now and never touches prov
 
 #### INT-UX-5 — Ingress management actions *(only if DP-C option 3 is approved)*
 - **Scope.** Create, rotate (with one-time reveal), disable (with irreversibility warning), reassign operator, using the **existing** endpoints; extract/neutralize `ConfirmDialog` and `SecretRevealDialog` for shared use.
-- **Depends on.** INT-UX-4, DP-C, DP-F recommended.
+- **Depends on.** INT-UX-4, DP-C, **INT-AUDIT-1 (hard dependency: no rotate/disable/create/reassign UI ships before lifecycle audit exists)**.
 - **Acceptance.** Secret appears only in the reveal dialog and is cleared on close; disable dialog states irreversibility; reassign copy per §5.7.
 - **Security.** No storage/URL/log of secrets; `delivery_connector.manage`/`reassign` enforced server-side and mirrored client-side; actions absent (not disabled) without permission.
 - **Tests.** Secret-handling component tests; permission matrix; error-code mapping.
@@ -1053,7 +1073,7 @@ Codes below exist in the backend today (`DeliveryConnectorIngestionService`, `De
 | `subscription_inactive` | ingestion | الاشتراك غير فعّال. | The subscription is inactive. |
 | `connector_disabled` | ingestion | نقطة الاستقبال معطّلة. | The ingress is disabled. |
 | `state_not_applied` | ingestion | استُلم الحدث ولم تتغير حالة الطلب. | Event received; the order state was not changed. |
-| `mapping_ambiguous` | mgmt | معرّف المتجر مربوط مسبقاً ولا يمكن إعادة استخدامه. | This store id is already mapped and cannot be reused. |
+| `mapping_ambiguous` | mgmt | معرّف المتجر مربوط مسبقاً ولا يمكن إعادة استخدامه. إن كان متجرك فتواصل مع الدعم. | This store id is already mapped and cannot be reused. If it is your store, contact support. |
 | `invalid_store` | mgmt | معرّف المتجر مطلوب. | A store id is required. |
 | `branch_required` | mgmt | المستخدم المقيّد لا ينشئ ربطاً بلا فرع. | A branch-restricted user cannot create an unrouted connection. |
 | `branch_inactive` | mgmt | الفرع غير نشط. | The branch is inactive. |

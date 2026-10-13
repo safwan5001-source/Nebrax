@@ -13,7 +13,7 @@
 | Head SHA | The PR head. A later commit may only update this table; the PR page is authoritative. |
 | Branch | `docs/dlv-integrations-ux-design-1` |
 | PR | #1380 (https://github.com/safwan5001-source/Nebrax/pull/1380) |
-| PRE_MERGE_REVIEW | **Not stamped.** Documentation-scope result to be recorded after CI on the exact Head SHA. |
+| PRE_MERGE_REVIEW | **Not stamped in this file.** Documentation-scope result is recorded on the PR after CI on the exact Head SHA (see §13 for the review that preceded it). |
 
 ## 2. One-paragraph summary
 
@@ -45,12 +45,12 @@ Docs: `CLAUDE.md`, `DESIGN_SYSTEM.md`, `design-system/{patterns/states,layout/re
 
 | ID | Question | Recommendation in spec |
 |---|---|---|
-| **DP-A** | Mapping is immutable, store id globally unique and reserved forever, and there is no re-enable route: how are reconnect and branch re-home handled? | Guarded, audited re-enable first; re-home only with an open-order policy; never release store ids. |
-| **DP-B** | Storage and lifecycle of provider tokens and connection state (DG-7 still open). | Decide DG-7 first; separate tenant-scoped connection entity; state derived, not a new enum. |
+| **DP-A** | Mapping is immutable, store id globally unique and reserved forever, and there is no re-enable route: how are reconnect and branch re-home handled? | Guarded, audited re-enable first (provider identity must match, fresh secret, gates re-checked, atomic with audit); re-home only with both-branch authority and a written open-order policy; store-id release only as an audited platform-operator dispute for never-verified mappings. |
+| **DP-B** | Storage and lifecycle of provider tokens and connection state (DG-7 still open). | Decide DG-7 first; separate tenant-scoped connection entity; state derived, not a new enum. Explicitly authorizes no credential handling. |
 | **DP-C** | Should AWJ-signed ingress accounts appear in the tenant UI? | Read-only panel with explicit "not a platform connection" wording; full management later. |
 | **DP-D** | Uniqueness of a provider merchant account across tenants. | Global unique for active connections with the same generic error. |
 | **DP-E** | Finance roles seeing connection health (permissions are owner/admin only). | Keep owner/admin now. |
-| **DP-F** | Rotate/disable are unaudited. | One append-only lifecycle audit table before lifecycle UI. |
+| **DP-F** | Rotate/disable are unaudited. | One append-only audit table written in the same transaction as the operation, before any new UI/endpoint for it. |
 
 ## 6. Gap register (things the design needs that do not exist)
 
@@ -113,3 +113,18 @@ Recorded on the PR for the exact Head SHA. `CI` (`ci.yml`, sqlite + pgsql) runs 
 **`INT-READY-1`** (backend, additive): the readiness manifest with all six providers `connect_enabled = false`, derived UX states, a read-only endpoint, and the `provider_not_ready` guard. It is small, touches no tenant data, and is the single dependency for the catalog UI. Then `INT-UX-1` → `INT-UX-2` → `INT-UX-3` (spec §11). Parallel owner action: collect the per-provider evidence in `DLV-PROVIDER-READINESS-1` §7, starting with HungerStation (alternate track: Keeta). Do not start any adapter, commission, settlement or imported-order work.
 
 **Merge ≠ Deploy.** No production release is authorized.
+
+## 13. Final review (2026-10-13)
+
+Scope: the two documents of PR #1380. Reviewed head before edits: `b3d3f419d662fbdf95f140fbe298558d9fe65f3b` (base unchanged at `71cf639`).
+
+| Sev | Finding | Resolution |
+|---|---|---|
+| P2 | DP-A lacked conditions for safe reconnect/re-home: no provider-identity match, no mandatory secret rotation on re-enable, no gate re-check, no both-branch authority, no treatment of strand-able in-flight Hub orders, and the permanent store-id reservation (squatting by typo or tenant) was unaddressed. | DP-A rewritten with minimum conditions and a squatting note; `mapping_ambiguous` copy gains a support path; DP-D keyed on verified identity. |
+| P2 | INT-UX-5 (rotate/disable UI) depended on DP-F only as "recommended", contradicting DP-F's own rule and allowing an unaudited sensitive UI. | Hard dependency on `INT-AUDIT-1`; DP-F gains same-transaction, service-layer, no-secret rules and an honest interim statement. |
+| P2 | DP-B did not say it authorizes no credential handling. | Non-authorization clause and minimum constraints added. |
+| P2 | Gate invariant test could miss ingress "create" or "Reconnect" controls (not named Connect/Authorize/Link). | R-GATE-7 vocabulary rule. |
+| P3 | Planned categories could be read as "AWJ has no e-commerce/payment features" (native Commerce and payment-gateway services exist). | Scope clarification and reworded note. |
+| P3 (open) | Sidebar entry has no permission, so `self_service` users see an entry that leads to a permission-denied page. | Left as is; decide at `INT-UX-1`. |
+
+Verified without change: provider readiness table matches `DLV-PROVIDER-READINESS-1` (nothing READY; HungerStation/Keeta `OWNER_GATE`, others `BLOCKED`; posting `BLOCKED` for all); no active Connect control is specified for any unapproved provider; no application code, migration, route, permission, test or workflow file is changed.
