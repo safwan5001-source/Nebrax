@@ -21,6 +21,7 @@ export function DeliveryPlatformDetailScreen({ platformKey }: { platformKey: str
       manualFailed={data.manualFailed}
       readinessFailed={data.readinessFailed}
       canOpenApplications={data.canOpenApplications}
+      canManageProfiles={data.canManageProfiles}
       canViewHub={data.canViewHub}
       canViewReport={data.canViewReport}
       canViewEvidence={data.canViewEvidence}

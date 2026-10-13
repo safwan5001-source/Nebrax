@@ -28,6 +28,7 @@ export function DeliveryPlatformDetail({
   manualFailed,
   readinessFailed,
   canOpenApplications,
+  canManageProfiles,
   canViewHub,
   canViewReport,
   canViewEvidence,
@@ -41,6 +42,7 @@ export function DeliveryPlatformDetail({
   manualFailed: boolean;
   readinessFailed: boolean;
   canOpenApplications: boolean;
+  canManageProfiles: boolean;
   canViewHub: boolean;
   canViewReport: boolean;
   canViewEvidence: boolean;
@@ -106,7 +108,11 @@ export function DeliveryPlatformDetail({
             <ul className="space-y-1.5 text-sm text-muted" role="list" data-testid="works-today">
               <li>
                 {t('detail.worksPos')}{' '}
-                <Link href="/delivery-platforms" className={LINK}>{t('detail.worksPosLink')}</Link>
+                {canManageProfiles ? (
+                  <Link href="/delivery-platforms" className={LINK}>{t('detail.worksPosLink')}</Link>
+                ) : (
+                  <span data-testid="setup-needs-permission">{t('detail.setupNeedsPermission')}</span>
+                )}
               </li>
               {canViewHub ? (
                 <li>

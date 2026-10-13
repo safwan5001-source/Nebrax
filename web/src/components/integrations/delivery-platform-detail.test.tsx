@@ -26,14 +26,14 @@ const PUBLIC_ONLY = TODAY.map(({ platform_key, ux_state, connect_enabled, sync_e
 function renderDetail(locale: TestLocale, key: string, over: Partial<{
   access: DeliveryAccess; loading: boolean; manualPayload: unknown; readinessPayload: unknown;
   manualFailed: boolean; readinessFailed: boolean; canOpenApplications: boolean;
-  canViewHub: boolean; canViewReport: boolean; canViewEvidence: boolean; onRetry: () => void;
+  canManageProfiles: boolean; canViewHub: boolean; canViewReport: boolean; canViewEvidence: boolean; onRetry: () => void;
 }> = {}) {
   const o = {
     access: 'allowed' as DeliveryAccess, loading: false,
     manualPayload: { data: [{ platform_key: 'keeta', is_active: true }] } as unknown,
     readinessPayload: { data: TODAY } as unknown,
     manualFailed: false, readinessFailed: false, canOpenApplications: false,
-    canViewHub: true, canViewReport: true, canViewEvidence: true, onRetry: vi.fn(),
+    canManageProfiles: true, canViewHub: true, canViewReport: true, canViewEvidence: true, onRetry: vi.fn(),
     ...over,
   };
   const manual = o.manualPayload === null ? null : readManualStatuses(o.manualPayload);
@@ -49,6 +49,7 @@ function renderDetail(locale: TestLocale, key: string, over: Partial<{
         manualFailed={o.manualFailed}
         readinessFailed={o.readinessFailed}
         canOpenApplications={o.canOpenApplications}
+        canManageProfiles={o.canManageProfiles}
         canViewHub={o.canViewHub}
         canViewReport={o.canViewReport}
         canViewEvidence={o.canViewEvidence}
@@ -130,6 +131,46 @@ describe.each(TEST_LOCALES)('delivery platform detail (%s)', (locale) => {
 
     renderDetail(locale, 'keeta', { canViewHub: false, canViewReport: false });
     expect(within(screen.getByTestId('works-today')).getAllByRole('link').map((a) => a.getAttribute('href'))).toEqual(['/delivery-platforms']);
+  });
+
+  // مصفوفة ظهور الروابط الثلاثة: إعداد الملف (`company.manage`) · صندوق التوصيل (`delivery_hub.view`) · التقرير (`reports.view`).
+  it.each([
+    ['owner / admin (all three)', { canManageProfiles: true, canViewHub: true, canViewReport: true }, ['/delivery-platforms', '/delivery-hub', '/reports/sales/delivery-channel']],
+    ['accountant / staff (report only)', { canManageProfiles: false, canViewHub: false, canViewReport: true }, ['/reports/sales/delivery-channel']],
+    ['custom: manage only', { canManageProfiles: true, canViewHub: false, canViewReport: false }, ['/delivery-platforms']],
+    ['custom: hub only', { canManageProfiles: false, canViewHub: true, canViewReport: false }, ['/delivery-hub']],
+    ['custom: none of the three', { canManageProfiles: false, canViewHub: false, canViewReport: false }, []],
+  ])('link visibility matrix — %s', (_label, perms, hrefs) => {
+    renderDetail(locale, 'keeta', perms);
+
+    const links = within(screen.getByTestId('works-today')).queryAllByRole('link').map((a) => a.getAttribute('href'));
+    expect(links).toEqual(hrefs);
+    // الرابط المحجوب يغيب فعلاً من الشجرة (لا مخفياً بـCSS ولا معطّلاً).
+    expect(document.querySelectorAll('[disabled],[aria-disabled]')).toHaveLength(0);
+  });
+
+  it('a viewer who cannot manage profiles sees the fact plus a permission hint instead of a setup link', () => {
+    renderDetail(locale, 'keeta', { canManageProfiles: false });
+
+    const list = screen.getByTestId('works-today');
+    expect(list.textContent).toContain(m.detail.worksPos);
+    expect(within(list).getByTestId('setup-needs-permission').textContent).toBe(m.detail.setupNeedsPermission);
+    expect(within(list).queryByRole('link', { name: m.detail.worksPosLink })).toBeNull();
+  });
+
+  it('a manager sees the setup link and no permission hint', () => {
+    renderDetail(locale, 'keeta', { canManageProfiles: true });
+
+    const list = screen.getByTestId('works-today');
+    expect(within(list).getByRole('link', { name: m.detail.worksPosLink }).getAttribute('href')).toBe('/delivery-platforms');
+    expect(within(list).queryByTestId('setup-needs-permission')).toBeNull();
+  });
+
+  it('the manual-attribution value is shown for every viewer regardless of the links they may follow', () => {
+    renderDetail(locale, 'keeta', { canManageProfiles: false, canViewHub: false, canViewReport: false });
+
+    const a = screen.getByTestId('capability-ladder').querySelector('[data-ladder-step="a"]');
+    expect(a?.textContent?.trim()).toBe(m.ladder.a.set);
   });
 
   it('lists the three prerequisites as not yet available, and states the Hub-only boundary', () => {

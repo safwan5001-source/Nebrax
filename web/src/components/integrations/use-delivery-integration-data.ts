@@ -9,6 +9,7 @@ import {
   DELIVERY_PERMISSION,
   DELIVERY_REPORT_PERMISSION,
   HUB_VIEW_PERMISSION,
+  PROFILE_MANAGE_PERMISSION,
   isApplicationHidden,
   nativeStatusOf,
   readManualStatuses,
@@ -27,6 +28,8 @@ export interface DeliveryIntegrationData {
   manualFailed: boolean;
   readinessFailed: boolean;
   canOpenApplications: boolean;
+  /** إعداد ملفات الإسناد اليدوي (`company.manage`)؛ لا يُعرض رابط الإعداد بدونها. */
+  canManageProfiles: boolean;
   canViewHub: boolean;
   canViewReport: boolean;
   /** يرسل الخادم الحقول الداخلية لمن يملك `delivery_connector.view` وحده؛ الواجهة تعرض ما وصلها فقط. */
@@ -49,7 +52,7 @@ export function useDeliveryIntegrationData(enabled = true): DeliveryIntegrationD
   const [manualFailed, setManualFailed] = useState(false);
   const [readinessFailed, setReadinessFailed] = useState(false);
   const [attempt, setAttempt] = useState(0);
-  const [perms, setPerms] = useState({ apps: false, hub: false, report: false, evidence: false });
+  const [perms, setPerms] = useState({ apps: false, manage: false, hub: false, report: false, evidence: false });
 
   const retry = useCallback(() => setAttempt((value) => value + 1), []);
 
@@ -59,6 +62,7 @@ export function useDeliveryIntegrationData(enabled = true): DeliveryIntegrationD
     const user = currentUser();
     setPerms({
       apps: hasPermission(user?.permissions, user?.role, 'apps.view'),
+      manage: hasPermission(user?.permissions, user?.role, PROFILE_MANAGE_PERMISSION),
       hub: hasPermission(user?.permissions, user?.role, HUB_VIEW_PERMISSION),
       report: hasPermission(user?.permissions, user?.role, DELIVERY_REPORT_PERMISSION),
       evidence: hasPermission(user?.permissions, user?.role, DELIVERY_CONNECTOR_VIEW_PERMISSION),
@@ -111,6 +115,7 @@ export function useDeliveryIntegrationData(enabled = true): DeliveryIntegrationD
     manualFailed,
     readinessFailed,
     canOpenApplications: perms.apps,
+    canManageProfiles: perms.manage,
     canViewHub: perms.hub,
     canViewReport: perms.report,
     canViewEvidence: perms.evidence,

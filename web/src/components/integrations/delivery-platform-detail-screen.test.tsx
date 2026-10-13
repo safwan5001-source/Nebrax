@@ -80,9 +80,52 @@ describe('DeliveryPlatformDetailScreen (known platform, client states)', () => {
     await screen.findByTestId('capability-ladder');
     expect(screen.queryByTestId('detail-advanced')).toBeNull();
     expect(document.body.textContent).not.toContain('OWNER_GATE');
-    // محاسب: لا رابط لصندوق التوصيل (صلاحية delivery_hub.view)، ويبقى تقرير القناة (reports.view).
+    // محاسب: لا إعداد ملف (company.manage) ولا صندوق توصيل (delivery_hub.view)، ويبقى تقرير القناة (reports.view).
     const hrefs = Array.from(screen.getByTestId('works-today').querySelectorAll('a')).map((a) => a.getAttribute('href'));
-    expect(hrefs).toEqual(['/delivery-platforms', '/reports/sales/delivery-channel']);
+    expect(hrefs).toEqual(['/reports/sales/delivery-channel']);
+  });
+
+  // مصفوفة الأدوار من الطرف إلى الطرف عبر الـhook: قوائم الصلاحيات كما يرسلها الخادم (`Rbac::MATRIX`
+  // للمفاتيح الثلاثة)، وليس الدور: owner/admin `*`، والمحاسب والموظف `invoices.view` + `reports.view` فقط.
+  it.each([
+    ['owner', ['*'], ['/delivery-platforms', '/delivery-hub', '/reports/sales/delivery-channel']],
+    ['admin', ['*'], ['/delivery-platforms', '/delivery-hub', '/reports/sales/delivery-channel']],
+    ['accountant', ['invoices.view', 'invoices.manage', 'reports.view', 'branches.view'], ['/reports/sales/delivery-channel']],
+    ['staff', ['invoices.view', 'reports.view', 'branches.view'], ['/reports/sales/delivery-channel']],
+    ['custom (company.manage only)', ['invoices.view', 'company.manage'], ['/delivery-platforms']],
+    ['custom (delivery_hub.view only)', ['invoices.view', 'delivery_hub.view'], ['/delivery-hub']],
+    ['custom (invoices.view only)', ['invoices.view'], []],
+  ])('role matrix through the hook — %s', async (role, permissions, hrefs) => {
+    currentUser.mockReturnValue({ id: 'u9', role, permissions });
+    backend({ data: PUBLIC });
+    renderIntl(<DeliveryPlatformDetailScreen platformKey="keeta" />, 'en');
+
+    await screen.findByTestId('capability-ladder');
+    const links = Array.from(screen.getByTestId('works-today').querySelectorAll('a')).map((a) => a.getAttribute('href'));
+    expect(links).toEqual(hrefs);
+    // قيمة الإسناد اليدوي (A) تظهر للجميع أياً كانت الروابط المتاحة.
+    expect(step('a')).toBe(m.ladder.a.set);
+  });
+
+  it('a role with a stored permission list that omits company.manage never gets the setup link even if its role name is admin', async () => {
+    currentUser.mockReturnValue({ id: 'u10', role: 'admin', permissions: ['invoices.view', 'reports.view'] });
+    backend({ data: PUBLIC });
+    renderIntl(<DeliveryPlatformDetailScreen platformKey="keeta" />, 'en');
+
+    await screen.findByTestId('capability-ladder');
+    expect(screen.getByTestId('works-today').querySelector('a[href="/delivery-platforms"]')).toBeNull();
+    expect(screen.getByTestId('setup-needs-permission')).toBeTruthy();
+  });
+
+  it('self-service: no data request and no links at all', async () => {
+    currentUser.mockReturnValue({ id: 'u11', role: 'self_service', permissions: ['self_service.access'] });
+    renderIntl(<DeliveryPlatformDetailScreen platformKey="keeta" />, 'en');
+
+    await waitFor(() => expect(screen.getByTestId('integration-restricted').getAttribute('data-state')).toBe('denied'));
+    expect(api).not.toHaveBeenCalled();
+    expect(screen.queryByTestId('works-today')).toBeNull();
+    const gated = ['/delivery-platforms', '/delivery-hub', '/reports/sales/delivery-channel'];
+    expect(screen.queryAllByRole('link').filter((link) => gated.includes(link.getAttribute('href') ?? ''))).toHaveLength(0);
   });
 
   it('a failed read is unreadable with an alert, never "not available"', async () => {
