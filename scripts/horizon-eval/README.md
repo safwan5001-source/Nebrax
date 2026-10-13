@@ -51,7 +51,7 @@ python3 shadow_run.py --pr 1391 --pr 1390 --out-dir /tmp/shadow          # run f
 # re-render frozen evidence (historical; can never recommend READY_FOR_MANUAL_REVIEW)
 python3 shadow_run.py --snapshot snapshots/live-pr586.json --out-dir /tmp/shadow
 ```
-Writes `shadow-pr<N>-<head12>.json|.md` and `shadow-summary.md` (deterministic; no PR text, logins, tenant data or credentials).
+Writes `shadow-pr<N>-<head12>-<live|replay>.json|.md` and `shadow-summary.md` (deterministic; no PR text, logins, tenant data or credentials).
 The recommendation is **never** an authorization: every report carries `merge_authorized: false`, `grant_verified: false`, and lists the
 authorization blockers (no registered horizon / claim / grant / attestation) instead of hiding them.
 

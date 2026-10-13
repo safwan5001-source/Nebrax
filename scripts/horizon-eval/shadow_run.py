@@ -8,7 +8,7 @@
   python3 shadow_run.py --snapshot snapshots/live-pr586.json --out-dir /tmp/shadow
 
 Reads GitHub (GET only, via collect_snapshot.gh_get) and writes two local files per PR
-(shadow-pr<N>-<head12>.json / .md) plus shadow-summary.md. It never posts a comment, label, review or status,
+(shadow-pr<N>-<head12>-<live|replay>.json / .md) plus shadow-summary.md. It never posts a comment, label, review or status,
 never merges, never touches settings. Exit code 0 = every observation produced a report (whatever it recommends);
 2 = bad arguments; 1 = an observation could not be made at all (nothing is written for it).
 """
@@ -47,7 +47,8 @@ def report_stem(rep: dict) -> str:
     pr = rep.get("pr", {})
     number, head = pr.get("number"), pr.get("head_sha")
     if isinstance(number, int) and isinstance(head, str) and re.fullmatch(r"[0-9a-f]{40}", head):
-        return f"shadow-pr{number}-{head[:12]}"
+        mode = "replay" if rep.get("observation", {}).get("mode") == "replay-frozen" else "live"
+        return f"shadow-pr{number}-{head[:12]}-{mode}"
     return "shadow-unidentified-" + str(rep.get("report_sha256", "x"))[:12]
 
 

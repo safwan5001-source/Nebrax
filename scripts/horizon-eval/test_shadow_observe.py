@@ -332,7 +332,9 @@ class FailClosed(unittest.TestCase):
             self.assertFalse(code.startswith(risky), code)
         self.assertFalse(so.is_authorization_code("KILL_SWITCH_ACTIVE"))
         self.assertFalse(so.is_authorization_code("BRAND_NEW_RULE"))
-        self.assertTrue(so.is_authorization_code("GRANT_EXPIRED"))
+        for code in ("GRANT_EXPIRED", "GRANT_STORE_STALE", "GRANT_FROM_UNTRUSTED_ORIGIN", "GRANT_OMITS_CI_GATE", "GRANT_USAGE_UNKNOWN", "SYNTHETIC_GRANT_IN_LIVE_MODE"):
+            self.assertFalse(so.is_authorization_code(code), code)
+        self.assertTrue(so.is_authorization_code("NO_ACTIVE_GRANT"))
         # every AUTHORIZATION code the evaluator can emit exists in the evaluator (typos would silently stop carving out)
         src = (HERE / "horizon_eval.py").read_text(encoding="utf-8")
         for code in so.AUTHORIZATION_CODES:
@@ -343,7 +345,55 @@ class FailClosed(unittest.TestCase):
             self.assertIn(f"{typ}_MISSING", so.AUTHORIZATION_CODES)
 
 
+class GrantStoreIsASafetySignal(unittest.TestCase):
+    """Review finding: a stale / wrong-ref grant store means the kill switch cannot be verified - it must never be ignored."""
+
+    def test_stale_or_foreign_grant_store_is_not_ready(self):
+        for name, mutate, expect in (
+            ("stale", lambda g: g.update(fetched_at="2026-10-13T11:00:00Z"), "WAIT"),
+            ("wrong ref sha", lambda g: g.update(ref_sha="d" * 40), None),
+            ("wrong ref", lambda g: g.update(ref="feature"), None),
+            ("kill switch", lambda g: g.update(kill_switch=True), "BLOCK"),
+        ):
+            c = green()
+            mutate(c["evidence"]["grant_store"])
+            rep = obs(c)
+            self.assertNotEqual(rep["recommendation"], "READY_FOR_MANUAL_REVIEW", name)
+            if expect:
+                self.assertEqual(rep["recommendation"], expect, name)
+
+
 class ReportContract(unittest.TestCase):
+    def test_reserved_shadow_horizon_id_collision_is_a_block(self):
+        c = green()
+        c["evidence"]["registry"]["horizons"] = [{"horizon_id": "SHADOW", "protocol_version": "v2", "owner_agent": "shadow-observer",
+                                                  "status_reported": "active", "claim_order": 1, "claimed_surfaces": {},
+                                                  "branch_prefixes": ["docs/"], "authors": ["dev"]}]
+        rep = obs(c)
+        self.assertEqual(rep["recommendation"], "BLOCK")
+        self.assertIn("SHADOW_HORIZON_ID_COLLISION", codes(rep))
+
+    def test_reviewer_logins_and_refs_in_evaluator_details_are_not_echoed(self):
+        c = green()
+        c["evidence"]["pr"]["reviews"] = [{"reviewer": "alice-rev", "state": "CHANGES_REQUESTED", "commit_sha": H, "body": ""}]
+        c["evidence"]["pr"]["head_ref"] = "secret-branch-name"
+        rep = obs(c)
+        self.assertIn("CHANGES_REQUESTED_OUTSTANDING", codes(rep))
+        blob = so.report_json(rep) + so.render_markdown(rep)
+        self.assertNotIn("alice-rev", blob)
+        self.assertNotIn("secret-branch-name", blob)
+
+    def test_unknown_codes_show_no_detail(self):
+        rows = so._collapse([{"severity": "BLOCK", "code": "BRAND_NEW_RULE", "detail": "login-x"}])
+        self.assertEqual(rows[0]["detail"], "")
+
+    def test_markdown_link_mention_emphasis_syntax_is_neutralised_outside_code_spans(self):
+        text = so._md("[x](http://evil) @user #1 **b** _i_ ~s~ !img")
+        for ch in "[]()*_@#~!":
+            self.assertNotIn(ch, text)
+        self.assertIn("[id]", so._md("web/[id]/page.tsx", code=True))
+
+
     def test_deterministic(self):
         a, b = obs(green()), obs(green())
         self.assertEqual(so.report_json(a), so.report_json(b))
@@ -463,8 +513,8 @@ class RunnerIsManualAndReadOnly(unittest.TestCase):
             self.assertEqual(self.run_main(argv + ["--out-dir", d1])[0], 0)
             self.assertEqual(self.run_main(argv + ["--out-dir", d2])[0], 0)
             names = sorted(p.name for p in Path(d1).iterdir())
-            self.assertEqual(names, ["shadow-pr1093-bba69ca54090.json", "shadow-pr1093-bba69ca54090.md",
-                                     "shadow-pr586-156b4270f9e4.json", "shadow-pr586-156b4270f9e4.md", "shadow-summary.md"])
+            self.assertEqual(names, ["shadow-pr1093-bba69ca54090-replay.json", "shadow-pr1093-bba69ca54090-replay.md",
+                                     "shadow-pr586-156b4270f9e4-replay.json", "shadow-pr586-156b4270f9e4-replay.md", "shadow-summary.md"])
             for n in names:
                 self.assertEqual((Path(d1) / n).read_bytes(), (Path(d2) / n).read_bytes(), n)
             self.assertFalse([p for p in Path(d1).iterdir() if p.name.startswith(".shadow-")], "no temp files left behind")
@@ -476,6 +526,7 @@ class RunnerIsManualAndReadOnly(unittest.TestCase):
             seen.update(repo=repo, number=number, req=req)
             c = green()
             c["now"] = c["evidence"]["fetched_at"] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+            c["evidence"]["grant_store"]["fetched_at"] = c["now"]
             c["evidence"]["pr"]["head_pushed_at"] = "2026-10-13T11:50:00Z"
             for ch in c["evidence"]["checks"]:
                 ch["completed_at"] = "2026-10-13T11:58:00Z"
@@ -499,7 +550,8 @@ class RunnerIsManualAndReadOnly(unittest.TestCase):
         self.assertIn("observation failed", err)
 
     def test_file_names_come_only_from_validated_fields(self):
-        self.assertEqual(sr.report_stem({"pr": {"number": 7, "head_sha": H}}), "shadow-pr7-" + H[:12])
+        self.assertEqual(sr.report_stem({"pr": {"number": 7, "head_sha": H}}), "shadow-pr7-" + H[:12] + "-live")
+        self.assertEqual(sr.report_stem({"pr": {"number": 7, "head_sha": H}, "observation": {"mode": "replay-frozen"}}), "shadow-pr7-" + H[:12] + "-replay")
         for hostile in ({"pr": {"number": "7/../../x", "head_sha": H}}, {"pr": {"number": 7, "head_sha": "../../etc"}}, {"pr": {}}, {}):
             stem = sr.report_stem({**hostile, "report_sha256": "ab" * 32})
             self.assertTrue(stem.startswith("shadow-unidentified-") and "/" not in stem and ".." not in stem, stem)
