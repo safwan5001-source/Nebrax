@@ -1,6 +1,6 @@
 # H1-4D — Platform Integrations UX — Implementation report
 
-STATUS: IN REVIEW / DO NOT MERGE / DO NOT DEPLOY
+STATUS: MERGED (PR #1372, `0349b822b5f38cf4fb4fe7b1ee4b89e847030ddc`) / NOT DEPLOYED / POST-MERGE VERIFICATION NOT RECORDED
 Horizon: AWJ-PLATFORM-UX-H1 · Slice: H1-4D (integrations) · Date: 2026-10-12
 Spec: [AWJ-PLATFORM-UX-H1-1-UX-SPEC.md](./AWJ-PLATFORM-UX-H1-1-UX-SPEC.md) §8, §9 and §12.6
 
@@ -94,12 +94,14 @@ Behaviour-preserving: handlers, endpoints and payloads are the previous code; th
 
 ## CI
 
-Recorded on the pull request for the exact head SHA (the checks and the final head are listed in the PR and in the hand-off summary). This file is part of that head, so it does not restate results that did not exist when it was committed.
+Final Head `60071829adcf14f709bc4f7120c47994ed096c10` of PR #1372: all 7 GitHub check runs `success` (CI Gate, web build ×2, php artisan test sqlite ×2, pgsql ×2; the three workflow runs `38254410599`, `38254410692` and `38254410574`), read through the GitHub API. The Codex review of that head completed with no findings and there were no review threads.
 
 ## Merge / post-merge
 
-- Merge status: not merged. Merge SHA: none. Post-merge review: not done. Deploy: not requested.
-- H1-4C is recorded as merged (PR #1368, `62dabab4d59ee8c1a58e50f69854d7fe013613f6`); post-merge verification of #1318, #1328, #1355, #1358, #1362, #1366 and #1368 on `main` has not been recorded and this slice does not claim it.
+- PRE_MERGE_REVIEW: PASS, recorded as a comment on PR #1372 by the repository owner account for the exact Head above; no review threads.
+- Merge status: merged on 2026-10-13 (01:08:29 UTC) by the repository owner account, not by the Claude session. Merge SHA `0349b822b5f38cf4fb4fe7b1ee4b89e847030ddc`, confirmed on `origin/main` (subject "feat(platform): H1-4D integrations UX (#1372)"). The owner authorized the merge only, not deployment.
+- Post-merge review: not done. No target-branch check or smoke evidence on `0349b822` was collected, so none is claimed.
+- Deploy / production release: not done.
 
 ## Risks and remaining work
 
@@ -114,8 +116,8 @@ Recorded on the pull request for the exact head SHA (the checks and the final he
 
 - Branch: `claude/awj-h1-contrast-recovery-fx8unn` (restarted from `main` after #1368 merged; older remote history is merged in so no force-push is needed).
 - Base SHA: `62dabab4d59ee8c1a58e50f69854d7fe013613f6` (`origin/main` at start).
-- Head SHA and PR: see the pull request.
+- Head SHA: `60071829adcf14f709bc4f7120c47994ed096c10`. PR: #1372 (merged).
 
 ## Next dependency-ready task
 
-**H1-4E**: document operations (`/platform/document-operations`, spec §12.7): status vs alert, replace the `←` back arrow, keep dry-run default and aggregate totals only, do not render `per_tenant`. One page, one PR. Not started.
+**H1-4E** (document operations, spec §12.7): see `AWJ-PLATFORM-UX-H1-4E-DOCUMENT-OPERATIONS-REPORT.md`.
