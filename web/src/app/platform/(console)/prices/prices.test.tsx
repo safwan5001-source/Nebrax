@@ -313,14 +313,104 @@ describe('platform prices UX (H1-4C)', () => {
       expect(text).not.toMatch(/will not apply to new contracts\./);
     });
 
-    it('flags a date that already exists for the plan, which the unique key would reject, without blocking the request', async () => {
+    it('blocks a known duplicate (same plan, currency and effective date): clear message, disabled Save, no request', async () => {
       await renderLoaded();
       fill('120', '2026-06-01'); // pro already has 2026-06-01
-      expect(screen.getByTestId('price-preview').textContent).toContain(t('previewDuplicate'));
-      fill('120', '2026-12-01'); // a future duplicate too
-      expect(screen.getByTestId('price-preview').textContent).toContain(t('previewDuplicate'));
-      expect((screen.getByRole('button', { name: t('save') }) as HTMLButtonElement).disabled).toBe(false);
+      const save = screen.getByRole('button', { name: t('save') }) as HTMLButtonElement;
+      expect(screen.getByText(t('duplicateBlocked'))).toBeTruthy();
+      expect(save.disabled).toBe(true);
+      expect(screen.getByLabelText(t('effectiveOn')).getAttribute('aria-invalid')).toBe('true');
+      expect(screen.getByLabelText(t('effectiveOn')).getAttribute('aria-describedby')).toBe('price-duplicate');
+      expect(document.getElementById('price-duplicate')?.textContent).toBe(t('duplicateBlocked'));
+      // the preview no longer carries a second, competing sentence about the same thing
+      expect(screen.getByTestId('price-preview').textContent).not.toContain(t('previewDuplicate'));
+      fireEvent.click(save);
       expect(posts()).toHaveLength(0);
+      fill('120', '2026-12-01'); // a future duplicate is blocked too
+      expect(screen.getByText(t('duplicateBlocked'))).toBeTruthy();
+      expect((screen.getByRole('button', { name: t('save') }) as HTMLButtonElement).disabled).toBe(true);
+      expect(posts()).toHaveLength(0);
+    });
+
+    it('does not block a different date or a different plan, and posts the unchanged payload', async () => {
+      await renderLoaded();
+      fill('120', '2026-06-02'); // pro has 2026-06-01 and 2026-12-01, not this date
+      expect(screen.queryByText(t('duplicateBlocked'))).toBeNull();
+      expect(screen.getByLabelText(t('effectiveOn')).getAttribute('aria-invalid')).toBeNull();
+      expect((screen.getByRole('button', { name: t('save') }) as HTMLButtonElement).disabled).toBe(false);
+      fill('120', '2026-06-01', 'basic'); // the date pro already has, but basic does not
+      expect(screen.queryByText(t('duplicateBlocked'))).toBeNull();
+      platformApi.mockResolvedValueOnce({ data: price('b-new', 'basic', '120.00', '2026-06-01') });
+      fireEvent.click(screen.getByRole('button', { name: t('save') }));
+      await waitFor(() => expect(posts()).toHaveLength(1));
+      expect(posts()[0]).toEqual(['/platform/prices', { method: 'POST', body: { plan: 'basic', currency: 'SAR', monthly_amount: 12000, effective_on: '2026-06-01' } }]);
+    });
+
+    it('clears the block as soon as the date changes, with no reload needed', async () => {
+      await renderLoaded();
+      fill('120', '2026-06-01');
+      expect(screen.getByText(t('duplicateBlocked'))).toBeTruthy();
+      fill('120', '2026-06-03');
+      expect(screen.queryByText(t('duplicateBlocked'))).toBeNull();
+      expect((screen.getByRole('button', { name: t('save') }) as HTMLButtonElement).disabled).toBe(false);
+    });
+
+    it('draws no final verdict while the catalogue is unavailable: says it cannot confirm, does not claim a duplicate, leaves the decision to the server', async () => {
+      platformApi.mockReset();
+      platformApi.mockRejectedValueOnce(new ApiError('outage'));
+      render(<PlatformPricesPage />);
+      await screen.findByRole('alert');
+      fill('120', '2026-06-01');
+      expect(screen.getByText(t('duplicateUnverified'))).toBeTruthy();
+      expect(screen.queryByText(t('duplicateBlocked'))).toBeNull();
+      expect(screen.getByLabelText(t('effectiveOn')).getAttribute('aria-invalid')).toBeNull();
+      expect((screen.getByRole('button', { name: t('save') }) as HTMLButtonElement).disabled).toBe(false);
+      platformApi.mockRejectedValueOnce(new ApiError('The server rejected it'));
+      fireEvent.click(screen.getByRole('button', { name: t('save') }));
+      await waitFor(() => expect(posts()).toHaveLength(1)); // the request is not suppressed on an unconfirmed list
+    });
+
+    it('draws no verdict while the first load is still pending, and blocks once the complete list arrives', async () => {
+      const pending = (() => { let resolve!: (value: unknown) => void; const promise = new Promise((r) => { resolve = r; }); return { promise, resolve }; })();
+      platformApi.mockReset();
+      platformApi.mockReturnValueOnce(pending.promise);
+      render(<PlatformPricesPage />);
+      fill('120', '2026-06-01');
+      expect(screen.getByText(t('duplicateUnverified'))).toBeTruthy();
+      expect(screen.queryByText(t('duplicateBlocked'))).toBeNull();
+      pending.resolve(catalogue());
+      await screen.findByText(t('duplicateBlocked'));
+      expect(screen.queryByText(t('duplicateUnverified'))).toBeNull();
+      expect((screen.getByRole('button', { name: t('save') }) as HTMLButtonElement).disabled).toBe(true);
+    });
+
+    it('draws no verdict from a stale list: while the post-save reload is pending or has failed, a date in the old list is not claimed as a duplicate', async () => {
+      await renderLoaded();
+      const first = price('b-new', 'basic', '120.00', '2026-11-01');
+      platformApi.mockResolvedValueOnce({ data: first }); // POST
+      platformApi.mockRejectedValueOnce(new ApiError('reload failed')); // reload
+      fill('120', '2026-11-01', 'basic');
+      fireEvent.click(screen.getByRole('button', { name: t('save') }));
+      await waitFor(() => expect(screen.getByRole('alert').textContent).toBe('reload failed'));
+      // the old list still holds pro 2026-06-01, but it is not a complete, fresh catalogue any more
+      fill('130', '2026-06-01');
+      expect(screen.queryByText(t('duplicateBlocked'))).toBeNull();
+      expect(screen.getByText(t('duplicateUnverified'))).toBeTruthy();
+      expect((screen.getByRole('button', { name: t('save') }) as HTMLButtonElement).disabled).toBe(false);
+    });
+
+    it('after a successful save the reloaded list makes the same plan and date a known duplicate', async () => {
+      await renderLoaded();
+      const added = price('b-new', 'basic', '120.00', '2026-11-01');
+      platformApi.mockResolvedValueOnce({ data: added }); // POST
+      platformApi.mockResolvedValueOnce({ data: [...catalogue().data, added] }); // reload
+      fill('120', '2026-11-01', 'basic');
+      fireEvent.click(screen.getByRole('button', { name: t('save') }));
+      await screen.findByRole('status');
+      await screen.findByText(t('duplicateBlocked'));
+      fill('130', '2026-11-01', 'basic');
+      expect((screen.getByRole('button', { name: t('save') }) as HTMLButtonElement).disabled).toBe(true);
+      expect(posts()).toHaveLength(1);
     });
 
     it('keeps the other outcomes: scheduled for a future date, in effect for a newer past date', async () => {
@@ -504,7 +594,7 @@ describe('platform prices UX (H1-4C)', () => {
     expect(isolated).toContain('2026-06-01');
     expect(isolated).toContain('2026-12-01');
     expect(isolated).toContain(formatRiyal('199.99'));
-    const keys = ['summaryTitle', 'summaryNote', 'statusColumn', 'addedOn', 'statusCurrent', 'statusScheduled', 'statusSuperseded', 'statusUnknown', 'sinceDate', 'startsOn', 'monthlyWord', 'effectiveWord', 'noPrice', 'noCurrentPrice', 'nextScheduled', 'tiedDate', 'effectNote', 'amountHint', 'invalidAmount', 'previewTitle', 'previewScheduled', 'previewEffective', 'previewSuperseded', 'previewDuplicate', 'previewUnverified', 'previewStored', 'savedScheduled', 'savedEffective', 'savedSuperseded', 'historyNote'];
+    const keys = ['summaryTitle', 'summaryNote', 'statusColumn', 'addedOn', 'statusCurrent', 'statusScheduled', 'statusSuperseded', 'statusUnknown', 'sinceDate', 'startsOn', 'monthlyWord', 'effectiveWord', 'noPrice', 'noCurrentPrice', 'nextScheduled', 'tiedDate', 'effectNote', 'amountHint', 'invalidAmount', 'previewTitle', 'previewScheduled', 'previewEffective', 'previewSuperseded', 'previewDuplicate', 'previewUnverified', 'duplicateBlocked', 'duplicateUnverified', 'previewStored', 'savedScheduled', 'savedEffective', 'savedSuperseded', 'historyNote'];
     for (const lang of [ar, en]) for (const key of keys) expect(typeof (lang.platformPrices as Record<string, unknown>)[key]).toBe('string');
   });
 });
