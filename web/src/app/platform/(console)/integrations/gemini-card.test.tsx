@@ -18,7 +18,7 @@ const { platformApi, router, translate, i18nState } = vi.hoisted(() => {
 vi.mock('next/link', () => ({
   default: ({ children, href }: { children: React.ReactNode; href: string }) => <a href={href}>{children}</a>,
 }));
-vi.mock('next-intl', () => ({ useTranslations: () => translate }));
+vi.mock('next-intl', () => ({ useTranslations: () => translate, useLocale: () => 'en' }));
 vi.mock('next/navigation', () => ({
   useRouter: () => router,
 }));
@@ -317,7 +317,8 @@ describe('Gemini save/test UX', () => {
     await screen.findByText(labels.aiTitle);
 
     const card = screen.getByRole('heading', { name: labels.providerGoogleGemini }).closest('section') as HTMLElement;
-    expect(within(card).getByText(`${labels.lastTest}: ${labels.testFailedStatus} · formatted`)).toBeTruthy();
+    // the date sits in its own LTR-isolated element, so compare the paragraph's full text
+    expect(within(card).getByText((_, node) => node?.tagName === 'P' && node.textContent === `${labels.lastTest}: ${labels.testFailedStatus} · formatted`)).toBeTruthy();
     expect(within(card).getByText(labels.geminiErrorRateLimited)).toBeTruthy();
     expect(within(card).queryByText('429')).toBeNull();
   }, 15000);
