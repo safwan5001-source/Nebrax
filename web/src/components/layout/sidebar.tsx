@@ -47,6 +47,7 @@ import {
   Network,
   Package,
   PackagePlus,
+  Plug,
   Receipt,
   ReceiptText,
   ScrollText,
@@ -320,6 +321,11 @@ const GROUPS: NavGroup[] = [
       { href: '/tax-settings', icon: ReceiptText, key: 'taxSettings', built: true },
       { href: '/payment-methods', icon: WalletCards, key: 'paymentMethods', built: true },
       { href: '/applications', icon: LayoutGrid, key: 'applications', built: true },
+      // مركز التكاملات (INT-UX-1): الفئة الوحيدة الفاعلة اليوم هي منصات التوصيل، وتتطلب
+      // `invoices.view` — فلا يرى دورٌ بلا هذه الصلاحية (الخدمة الذاتية مثلاً) مدخلاً ينتهي
+      // برسالة «لا صلاحية». بلا `appKey`: المركز يمتدّ إلى فئات مستقبلية بقدرات مختلفة،
+      // وحالة قدرة `sales.pos` تُعرض داخل الصفحة نفسها.
+      { href: '/integrations', icon: Plug, key: 'integrations', built: true, permission: 'invoices.view' },
       { href: '/settings', icon: Settings, key: 'accountSettings', built: true },
     ],
   },
