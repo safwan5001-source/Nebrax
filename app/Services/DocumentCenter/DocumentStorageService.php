@@ -304,15 +304,52 @@ class DocumentStorageService
         ]);
     }
 
+    public const TARGET_SAVED_PROVIDER = 'saved_provider';
+
+    public const TARGET_LOCAL_FALLBACK = 'local_fallback';
+
+    /** مخزن مضبوط في بيئة التشغيل (لا تكامل منصة) وسائقه غير محلي: ليس المزود المحفوظ ولا القرص البديل. */
+    public const TARGET_ENVIRONMENT = 'environment_storage';
+
     /** اختبار كتابة وقراءة وحذف لكائن مؤقت لا يتضمن أي بيانات عميل. */
     public function healthCheck(): bool
     {
+        return $this->healthCheckResult()['ok'];
+    }
+
+    /**
+     * نتيجة الاختبار **مع الهدف الذي اختُبر فعلاً**. الهدف يُشتقّ من المسار المنفَّذ لا من علم `enabled` وحده:
+     * تكامل مفعَّل ⇒ المزود المحفوظ؛ وبدونه ⇒ السائق الذي يبنيه `settings()` فعلاً (محلي غالباً).
+     * `operational` هو وجهة **الكتابات الجديدة** الآن (يتبع قفل `DOCUMENT_DURABLE_STORAGE_ENABLED`) لا موضع كل مستند قائم، وهو غير الهدف:
+     * نجاح اختبار المزود المحفوظ لا يعني أن المستندات تُكتب عليه.
+     *
+     * @return array{ok: bool, target: string, operational: string}
+     */
+    public function healthCheckResult(): array
+    {
+        $operational = $this->effectiveDriver() === 'local' ? 'local' : 'external';
+
         // تكامل مفعَّل محفوظ ⇒ يُختبَر **هو** (R2) لا القرص المحلي الذي يعيده القفل المغلق، فلا نجاح مضلِّل.
         // بلا تكامل مفعَّل: السلوك القديم حرفياً (الإعداد الفعلي الحالي).
         if ($this->integrations->activeConfiguration('document_storage') !== []) {
-            return $this->verifyPlatformConfiguration()['ok'];
+            return ['ok' => $this->verifyPlatformConfiguration()['ok'], 'target' => self::TARGET_SAVED_PROVIDER, 'operational' => $operational];
         }
 
+        $target = (string) ($this->settings()['driver'] ?? 'local') === 'local' ? self::TARGET_LOCAL_FALLBACK : self::TARGET_ENVIRONMENT;
+
+        // تخزين البيئة (S3) يُبنى بـ`throw` فيرمي عند تعذّر الوصول؛ الفشل هنا نتيجة اختبار صالحة لا استثناء، فيبقى
+        // `target` و`operational` في الاستجابة. لا يُسجَّل نص الاستثناء (قد يحمل مضيفاً أو معرّف مفتاح).
+        try {
+            $ok = $this->legacyHealthCheck();
+        } catch (Throwable) {
+            $ok = false;
+        }
+
+        return ['ok' => $ok, 'target' => $target, 'operational' => $operational];
+    }
+
+    private function legacyHealthCheck(): bool
+    {
         $key = 'healthchecks/'.Str::uuid().'.txt';
         $filesystem = $this->filesystem($this->profile());
         try {
@@ -322,7 +359,11 @@ class DocumentStorageService
 
             return $filesystem->exists($key);
         } finally {
-            $filesystem->delete($key);
+            try {
+                $filesystem->delete($key);
+            } catch (Throwable) {
+                // التنظيف جهد أفضل: فشله لا يُخفي نتيجة الاختبار ولا يستبدلها باستثناء.
+            }
         }
     }
 
