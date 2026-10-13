@@ -88,11 +88,12 @@ No backend, API, database, migration, `Rbac`, readiness-registry, `DeliveryProvi
 
 | Run | Result |
 |---|---|
-| Ladder logic unit tests (`integration-center.ladder.test.ts`) | 16 passed |
+| Ladder logic unit tests (`integration-center.ladder.test.ts`) | 17 passed (after the review fix below) |
 | Catalog + detail + structural component tests | 110 passed (3 files, both locales) |
 | Page tests (catalog, detail, plus the updated Center page) | 27 passed (3 files) |
 | `no-connection-controls.test.ts` (structural source scans) | 6 passed: no raw `<button>`/`<form>`/`<input>`; `<Button` only for retry; no write HTTP methods and no connector/credential routes; only the three allowed endpoints; allow-listed hrefs only |
-| **Full web suite** (`npx vitest run`) | **535 files, 5788 tests passed**, exit 0 |
+| **Full web suite** (`npx vitest run`) | **535 files, 5788 tests passed**, exit 0 — run on code SHA `18121305`, before the review fix |
+| Re-run after the review fix (`src/lib`, `src/components/integrations`, `src/app/(app)/integrations`) | 87 files, 667 tests passed. The full suite was not re-run after this one-function change |
 | `npm run build` (Next.js 15.5.19, includes type check) | **Succeeded** (`BUILD_EXIT 0`); `/integrations/delivery-platforms` (3.93 kB) and `/integrations/delivery-platforms/[platformKey]` (4.09 kB) emitted |
 | Playwright (real Chromium), `int-ux-2` + `int-ux-1` specs, desktop 1440 and mobile 390 | **75 passed, 1 skipped** (desktop-only check, skipped by design), exit 0 |
 
@@ -111,6 +112,13 @@ Observed in the screenshots: the four status columns read as independent; the wa
 Findings from the visual pass requiring a code change: none after the test fixes already committed. The red "3 Issues" pill is the Next.js dev-server overlay; the pre-existing next-intl `INVALID_KEY` console messages appear on every page (also on `/applications`) and this change adds none.
 
 Not verified: behavior against the real backend and a real session (responses were intercepted); other browsers (Chromium only); a live screen-reader pass.
+
+## Review findings (Codex, on `797aaf34`)
+
+| Finding | Decision |
+|---|---|
+| P2 — a known-platform row with a missing/non-boolean `is_active` was dropped and shown as "Not set up" | **Valid; fixed in `2bde0d06`.** `readManualStatuses` now returns `null` (rung A "could not be read"). The earlier test that pinned the old behavior was replaced |
+| P2 — unknown platform key should return a real HTTP 404 | **Not changed; owner decision.** The page is a client component behind the authenticated shell, so crawlers/caches cannot reach it and the screen already makes zero data requests. A real 404 needs a server boundary, a segment `not-found.tsx` and rewrites of the unknown-key tests and browser spec. Offered as a small follow-up |
 
 ## CI
 
