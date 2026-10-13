@@ -6,19 +6,20 @@ Follows: V2-1C (PR #1351, merged as `04427a0`). Builds on V2-1A (CI Gate) and V2
 
 ## 1. Outcome
 
-A regression in the Horizon dry-run evaluator now turns CI red. The 172 existing tests (plus 8 CI-wiring guards = **180**) run on **every** push and pull request as the check `Horizon dry-run evaluator (tests)`, and **CI Gate waits for it** on every PR (`tier: always`).
+A regression in the Horizon dry-run evaluator now turns CI red. The 172 existing tests (plus 8 CI-wiring guards and 1 runner guard = **181**) run on **every** push and pull request as the check `Horizon dry-run evaluator (tests)`, and **CI Gate waits for it** on every PR (`tier: always`).
 
 It fails on: any test failure/error · any skipped or expected-failure test (final line must be exactly `OK`) · fewer than `MIN_TESTS` tests discovered · a non-zero contract table (23 cases / 11 scenarios, **false-eligible must be 0**) · tests that dirty the working tree.
 
 What it does **not** do: it grants nothing, merges nothing, and changes no GitHub setting. `ELIGIBLE_SIMULATED` is still not authorization; live mode still cannot be eligible (no independent owner-authenticity verifier, V2-1B §4.6 / D2).
 
-## 2. Changed files (7)
+## 2. Changed files (10)
 
 | File | Change |
 |---|---|
 | `.github/workflows/horizon-eval-ci.yml` | **new** — job `horizon-eval`, name `Horizon dry-run evaluator (tests)`; `push` + `pull_request` on `**`; no `paths`, no job `if`, no `continue-on-error`; `permissions: contents: read`; no secrets, no network, no installs; `persist-credentials: false`; 10-min timeout |
 | `.github/ci-gate/required-checks.json` | **+1 entry** `tier: always` with a guard (`require`: `set -o pipefail`, `MIN_TESTS=`, `!= "OK"`; `forbidden`: `\|\| true`, `\|\| :`, `exit 0`, ` -k `, `--pattern`, ` -p `, `--failfast`). No existing entry touched |
 | `scripts/ci-gate/test_ci_gate.py` | gate self-tests: the `always` set grew from 2 to 3 checks, so 8 hard-coded expectations had to follow (see §5). **+12 tests** for the new check. `ci_gate.py` itself is **unchanged** |
+| `scripts/horizon-eval/contract_runner.py` + `test_contract.py` | exit code now also requires exactly 23 contract cases (an empty fixture dir used to exit 0); +1 test |
 | `scripts/horizon-eval/test_ci_integration.py` | **new**, 8 stdlib-only guards: manifest entry, tier, guard strings, workflow shape, least privilege, no network, floor bounds |
 | `scripts/horizon-eval/collect_snapshot.py` | defect fix (§6): `gh_get` now refuses dot-segments and encoded separators |
 | `scripts/horizon-eval/test_static_guards.py` | the matching test is now hermetic and covers 7 more refused paths |
@@ -43,11 +44,11 @@ Not touched: application code, accounting, tax, ZATCA, RBAC, tenant isolation, m
 
 | Suite | Before | After | Result |
 |---|---|---|---|
-| `scripts/horizon-eval` (`python3 -I -m unittest discover`) | 172 | **180** (+8 `test_ci_integration`) | OK |
+| `scripts/horizon-eval` (`python3 -I -B -m unittest discover`) | 172 | **181** (+8 `test_ci_integration`, +1 `test_contract`) | OK |
 | `scripts/ci-gate` | 49 | **61** (+12) | OK |
 | Contract table | 23/23 · 2 extras | 23/23 · 2 extras | false-eligible **0** |
 | `ci_gate.py validate` | OK | OK | no errors, no warnings |
-| Workflow `run:` blocks executed locally in bash with `-eo pipefail`, clean env | — | 180 tests · floor 180 · `OK` · contract 23/23 · tree clean | rc 0 |
+| Workflow `run:` blocks executed locally in bash with `-eo pipefail`, clean env | — | 181 tests · floor 181 · `OK` · contract 23/23 · tree clean (incl. ignored files) | rc 0 |
 
 ### 4.1 Sabotage runs of the new job (each must turn CI red)
 
@@ -57,7 +58,7 @@ Run in scratch copies of the tree with the workflow's own `run:` blocks:
 |---|---|---|
 | a failing test | unittest | red |
 | a skipped class (`OK (skipped=3)`) | clean-`OK` check | red |
-| tests deleted (152 < 180) | `MIN_TESTS` floor (isolated from the in-suite floor test) | red |
+| tests deleted (152 < floor) | `MIN_TESTS` floor (isolated from the in-suite floor test) | red |
 | **security regression**: live-mode authenticity check disabled | unit/static tests **and** the contract table (rc 1) | red |
 | **policy regression**: `default_zone` C → B | 86 failures / 34 errors | red |
 | `\|\| true` swallowing the test exit code | in-suite guard (and, in CI, `validate()` guard) | red |
@@ -81,7 +82,7 @@ The allow-list regex admits `.` and `%`, so `repos/o/r/../../x` (and `%2e%2e`, `
 | PR-controlled code runs in the job | `contents: read` only, no secrets, `persist-credentials: false`, `pull_request` (never `pull_request_target`/`workflow_run`), no network/install step | The code can still read the checkout and use the runner's network; it holds no credential |
 | Check skipped / path-filtered / renamed | `tier: always` + `validate()` lints; push twins ignored by `bind_check_runs`; other-app spoofing ignored by `latest_by_name` (`github-actions` only) | none known |
 | Test silently dropped | `MIN_TESTS` floor (shell) + in-suite floor test (≤5 slack below reality) | a PR may lower both **and** the guard in one commit — see next row |
-| PR weakens the check itself | `compare_baseline` blocks removal/demotion/repointing and **loss** of guard strings once this is on `main` | **Open:** edits that keep the guard strings but change test *content* (e.g. weaken an assertion, lower `MIN_TESTS=` to a smaller number) are not machine-detectable. They are Zone C (`scripts/horizon-eval/**`, `.github/**`) and need owner review; no ruleset enforces that yet (D3 below) |
+| PR weakens the check itself | `compare_baseline` blocks removal/demotion/repointing and **loss** of guard strings once this is on `main` | **Open:** edits that keep the guard strings but change test *content* (e.g. weaken an assertion, lower the `MIN_TESTS=` value, monkeypatch `unittest`) or the workflow's unguarded parts (see the Reviewer list in §10) are not machine-detectable. They are Zone C (`scripts/horizon-eval/**`, `.github/**`) and need owner review; no ruleset enforces that yet (D3 below) |
 | `MIN_TESTS` ratchet cannot be a guard string | a literal value in `guard.require` would make every legitimate increase look like a weakening | value policed only by the in-suite test and review |
 | Bootstrap | on this PR the Gate runs the **base** gate script against the PR manifest, so the new check is already required on its own PR | — |
 
@@ -125,7 +126,7 @@ Nothing below has been changed. Unanswered = nothing changes. Recommended defaul
 | **D4** | **Force-push and deletion on `main`** | block both · allow | **Block both** (no workflow here needs them; feature-branch deletion is unaffected if the ruleset targets only the default branch). Zero operational cost. |
 | **D5** | **Bypass and emergency recovery** | (a) bypass list = repository admin (you), "pull requests only" · (b) no bypass | **(a).** You stay able to recover. Emergency stop, in order: set the ruleset to *Disabled* (one click, Settings → Rules); revert a bad merge with `git revert` via PR; for autonomy there is nothing to stop yet — Auto-Merge is off, no grants exist, the evaluator cannot act. Write down who holds the admin credential; Claude has none of this power (403). |
 | **D6** | **Open-PR compatibility** | (a) inventory and close/freeze the 12 PRs without a `CI Gate` run before D1 · (b) have each owner push once · (c) leave and accept they are blocked | **(a).** Required checks bind to the head SHA; those PRs never ran the Gate, so they would sit at "Expected — waiting". PRs that do run after this lands will also need `Horizon dry-run evaluator (tests)` — it appears automatically on their next push/reopen because the merge ref carries the new workflow. Docs-only PRs are **not** exempt (cost ≈ 15 s). |
-| D7 | Make the Horizon check's merge-blocking independent of the Gate | later | Only if D1(a) is chosen and you distrust a Gate bug; revisit after D3. |
+| D7 | Harden the trusted gate script (`ci_gate.py`): hard-fail duplicate job names across PR-triggered workflows; guard the contract-table and clean-tree steps | later, separate PR | Closes the impostor-check path for **all** `always` checks. Not done here because it edits the trusted gate logic (Zone C, owner review). |
 | D8 | The seven workflows registered from other branches (`AWJ translation migration`, `One-shot POS …`, `Patch …`) | review / delete those branches or disable the workflows | **Inspect before any protection work:** they are outside this PR's scope but are exactly the kind of write-capable automation a ruleset on `.github/**` is meant to cover. |
 
 **Not decided here and still gating any autonomy:** D2-authenticity (how an owner grant is proven authentic), policy-table approval, Zone A/B expansion. This PR expands neither.
@@ -135,8 +136,18 @@ Nothing below has been changed. Unanswered = nothing changes. Recommended defaul
 ### Implementer
 Wiring, gate-side tests, sabotage matrix (§4) and the two findings (§5, §6) done; every new guard has a test that fails when the guard is removed.
 
-### Reviewer (independent, fresh-context, read-only)
-_See §10.1._
+### Reviewer (independent, fresh-context, read-only subagent, on `b9b0f17`)
+Ran the suites, extracted the workflow `run:` blocks under `bash -e`, injected skips / expected failures / `atexit` forgery, and built a sabotage matrix. 3 confirmed findings, all fixed in the follow-up commit:
+
+| # | Sev | Finding | Resolution |
+|---|---|---|---|
+| 1 | **HIGH** | A gate self-test mutated the literal `MIN_TESTS=172`; after the floor was raised to 180 it failed, so **CI Gate would have gone red on every PR** (the self-tests run unconditionally in the Gate job). My mistake: I re-ran the gate suite before bumping the floor, not after. | The mutation now reads the live value. Both suites are now run after every edit. |
+| 2 | LOW | `python -I` implies `-E`, so `PYTHONDONTWRITEBYTECODE` was ignored and `__pycache__` was written; it is gitignored, so the clean-tree step could not see it. | `-B` added; the clean-tree step uses `git status --porcelain --ignored`. |
+| 3 | LOW | `contract_runner` exited 0 when zero cases were found (`all([])`). | Exits non-zero unless exactly 23 contract cases ran; test added. |
+
+Reviewer-confirmed OK: triggers, permissions, no `${{ }}` injection surface, skip/expected-failure/`pipefail`/`atexit` handling, output parsing, gate binding (twin runs, other-app spoofing, workflow-ran-but-job-missing), `ci_gate.py` unchanged, rollout (no baseline entry on this PR → `compare_baseline` is empty; after merge it protects the entry).
+
+**Allowed by `validate()` today — only owner review stands in the way** (carried to §7 / D3): lowering the `MIN_TESTS=` value; `|| echo` / `set +e` inside the step; a conditional that keeps the `!= "OK"` text but is dead; a decoy step that holds the guard strings while the real step evades the substring (e.g. double space); `shell: sh`, `timeout-minutes: 1`, an unusable `runs-on`; removing the contract-table or clean-tree steps (not guarded); a **duplicate job with the same name** in another PR-triggered workflow (only an "unclassified" warning; `latest_by_name` then picks the highest check-run id, so a trivially green impostor from the same app can win — inherited by the two PHP checks too; fix would be making a duplicate job name a hard `validate()` error — a change to the trusted gate script, deliberately **not** made here); and a test module in `scripts/horizon-eval` that monkeypatches `unittest` result classes at import time (rc 0, final line `OK`). The contract-table step is a second, independent signal for the last one — it does not go through `unittest`.
 
 ### AWJ Guardian
 - No ledger, journal, tax, ZATCA, RBAC, tenant, migration or API surface touched; no financial operation, so no journal entry is produced.
