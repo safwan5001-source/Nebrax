@@ -140,7 +140,7 @@ Environment: Laravel project built from the repo by `setup.sh` (`/home/user/nibr
 | Baseline (all failing classes, `main` without my changes) | 154 failed / 373 passed = identical to with-change run |
 | PostgreSQL CI | not run locally (SQLite only); CI will run it on the PR |
 | `web/` build / storefront build | not run — no `web/` or `storefront/` files changed |
-| GitHub CI on the PR | CI_PLACEHOLDER |
+| GitHub CI on the PR | previous head (docs-only, `2ae3a44`): sqlite + pgsql + CI Gate green. Code head: running when this report was written — see the PR checks (CI is the authority for the full suite and PostgreSQL) |
 
 New tests (`tests/Feature/FlatStorefrontHostTest.php`, 41 cases incl. data-provider rows) cover: builder format; nested form never generated; invalid/malicious parts (dot, slash, `@`, `_`, IDN lookalike, >63, empty);
 case normalisation; header-independence of link generation; global uniqueness (two tenants, same store slug); dash-concatenation ambiguity; tenant-slug reservation; registration collision; DB-level duplicate;
