@@ -15,8 +15,9 @@ use Illuminate\Http\Request;
  * قاعدة البيانات ولا كتابة. الصلاحية في `routes/api.php`: `invoices.view` وقدرة
  * `sales.pos` — كشاشة منصات التوصيل نفسها، فلا صلاحية جديدة.
  *
- * الحقل `evidence_ref` (مسار وثيقة داخلية) يُعاد فقط لمن يملك
- * `delivery_connector.view`؛ غيره يتلقى النتيجة نفسها بلا مرجع.
+ * الحقول الداخلية `technical` و`evidence_date` و`evidence_ref` (قسم «متقدم» في
+ * التصميم) تُعاد فقط لمن يملك `delivery_connector.view`؛ غيره يتلقى حالة UX
+ * العامة (`ux_state`) وأعلام الجاهزية بلا تفاصيل الدليل.
  */
 class DeliveryProviderReadinessController extends ApiController
 {
@@ -32,13 +33,15 @@ class DeliveryProviderReadinessController extends ApiController
                 'platform_key' => $key,
                 'name' => $catalog['name'] ?? $key,
                 'name_en' => $catalog['name_en'] ?? $key,
-                'technical' => $row['technical'],
                 'ux_state' => DeliveryProviderReadiness::uxState($row),
                 'connect_enabled' => $row['connect_enabled'],
                 'sync_enabled' => $row['sync_enabled'],
-                'evidence_date' => $row['evidence_date'],
             ];
+            // الحقول الثلاثة الداخلية (القيمة التقنية، تاريخ الدليل، مرجعه) لقسم «متقدم»
+            // لمالك/مدير فقط (تصميم DLV-INTEGRATIONS-UX-DESIGN-1 §5.3). `ux_state` عام.
             if ($withEvidence) {
+                $item['technical'] = $row['technical'];
+                $item['evidence_date'] = $row['evidence_date'];
                 $item['evidence_ref'] = $row['evidence_ref'];
             }
 

@@ -256,7 +256,7 @@ class DeliveryProviderReadinessTest extends TestCase
     }
 
     /** @test */
-    public function roles_without_connector_view_get_the_same_readiness_without_the_internal_evidence_reference(): void
+    public function roles_without_connector_view_get_the_public_readiness_without_any_internal_evidence_field(): void
     {
         $auth = $this->registerTenant('rdy-roles', 'owner@rdy-roles.test');
         $owner = $this->withToken($auth['token'])->getJson('/api/delivery-platforms/readiness')->assertOk()->json('data');
@@ -266,8 +266,16 @@ class DeliveryProviderReadinessTest extends TestCase
             $data = $this->withToken($token)->getJson('/api/delivery-platforms/readiness')->assertOk()->json('data');
 
             foreach ($data as $i => $item) {
-                $this->assertArrayNotHasKey('evidence_ref', $item, $role);
-                unset($owner[$i]['evidence_ref']);
+                // الحقول الثلاثة الداخلية (§5.3) غائبة تماماً؛ حالة UX وأعلام الجاهزية عامة.
+                foreach (['technical', 'evidence_date', 'evidence_ref'] as $internal) {
+                    $this->assertArrayNotHasKey($internal, $item, "{$role}: {$internal}");
+                    unset($owner[$i][$internal]);
+                }
+                $this->assertSame(
+                    ['platform_key', 'name', 'name_en', 'ux_state', 'connect_enabled', 'sync_enabled'],
+                    array_keys($item),
+                    $role,
+                );
                 $this->assertSame($owner[$i], $item, $role);
             }
         }

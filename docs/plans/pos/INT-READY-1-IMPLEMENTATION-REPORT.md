@@ -32,7 +32,7 @@ Source of every value: `docs/plans/pos/DLV-PROVIDER-READINESS-1-REPORT.md` §1 a
 
 1. **Manifest** `App\Support\DeliveryProviderReadiness` — `final`, constants only. Fields per platform: `technical`, `evidence_ref`, `evidence_date`, `auth_method` (null), `connect_enabled`, `sync_enabled`. `uxState()` derives the provider-level UX state (design §4.2): `BLOCKED → NOT_SUPPORTED`; `OWNER_GATE → AWAITING_PROVIDER_APPROVAL`; `READY` without `connect_enabled → AWAITING_PROVIDER_APPROVAL`; `READY` with `connect_enabled → READY_TO_CONNECT`. `validate()` rejects contradictory manifests: catalog keys must match exactly; connect only when `READY`; connect requires a declared `auth_method`; sync requires connect; flags must be real booleans; exact field set.
 2. **Gate** `App\Services\DeliveryHub\DeliveryProviderReadinessGate` — `canConnect/canSync/assertConnectable/assertSyncable`. Throws the existing `DeliveryConnectorException('provider_not_ready', 'هذا التكامل غير متاح بعد.', 409)`. Fail-closed: an unknown key, wrong case or empty string behaves exactly like a not-ready provider. The constructor validates its rows, so a contradictory manifest cannot produce a gate. The optional `$rows` argument exists only so tests can exercise the positive path.
-3. **Endpoint** `GET /api/delivery-platforms/readiness` → `DeliveryProviderReadinessController::index`, middleware `invoices.view` + `EnsureApplicationActive:sales.pos`. No database access, no writes. Response per row: `platform_key`, `name`, `name_en`, `technical`, `ux_state`, `connect_enabled`, `sync_enabled`, `evidence_date`, and `evidence_ref` **only** for users holding `delivery_connector.view` (owner/admin or a custom role granted it).
+3. **Endpoint** `GET /api/delivery-platforms/readiness` → `DeliveryProviderReadinessController::index`, middleware `invoices.view` + `EnsureApplicationActive:sales.pos`. No database access, no writes. Public fields per row: `platform_key`, `name`, `name_en`, `ux_state`, `connect_enabled`, `sync_enabled`. The three internal evidence fields — `technical`, `evidence_date`, `evidence_ref` (the design's owner/admin-only "Advanced" section, §5.3) — are returned **only** to users holding `delivery_connector.view` (owner/admin or a custom role granted it). A first version exposed `technical` and `evidence_date` to every `invoices.view` user; review finding P2 (codex, thread `PRRT_kwDOS52FT86r68se`) was verified as correct against §5.3 and fixed.
 
 ## Why this approach fits AWJ
 
@@ -57,14 +57,14 @@ Local runs used the repository's own `setup.sh` assembly (`/home/user/nibras-app
 
 | Run | Result |
 |---|---|
-| `php artisan test --filter=DeliveryProviderReadinessTest` | **24 passed, 281 assertions** |
+| `php artisan test --filter=DeliveryProviderReadinessTest` | **24 passed, 317 assertions** (after the P2 fix; 281 before it) |
 | Mutation check: temporarily set Keeta to `READY` + `connect_enabled=true` in the assembled copy | 8 of 24 tests failed (frozen table, contradictory-row, gate, endpoint, ladder tests), then restored byte-for-byte |
 | Route-inventory pattern check against sample URIs (`…/{key}/connect`, `…/{id}/authorize` flagged; `delivery-connectors/{id}/rotate-secret`, `delivery-hub/orders`, `delivery-platforms/readiness` not flagged) | as expected |
 | `--filter='Delivery\|BranchIsolationGuardTest\|ApplicationAccessGateGuardTest\|RoleTest\|PublicApiWriteSurfaceTest\|CommerceModuleBoundaryTest\|WebhookSignatureTest'` | 405 passed, 2 skipped, **13 failed**; the 13 are in `StorefrontMediaDeliveryTest`, `FuelReconciliationTest`, `FuelSupplyReceivingApiTest` (matched only because their names contain "Delivery") |
 | Same three classes on **pristine `main`** (my files removed, `routes/api.php` from `main`) | **20 failed, 7 passed** — the failures pre-exist and are independent of this change (local-environment dependent) |
 | Full suite, SQLite, branch (`php artisan test`) | Still running when this report was committed; the final count is given in the hand-off message and is not claimed here |
 
-Tests added cover: frozen manifest vs evidence, order, validity and exact catalog coverage; UX-state derivation; nine contradictory-row cases; missing/extra/malformed rows; the gate for all six platforms plus unknown, empty and wrong-case keys (code `provider_not_ready`, status 409); the positive path with injected valid rows (connect-only, connect+sync, sync without flag refused); gate refuses to build on a contradictory manifest; endpoint contents for an owner; staff/accountant receive the same data without `evidence_ref`; unauthenticated 401, `self_service` 403, `sales.pos` disabled 403; GET-only (405 for POST/PUT/PATCH/DELETE) and request parameters cannot flip a flag; identical payload for two tenants and no tenant id in the body; no INSERT/UPDATE/DELETE during the request (`DB::listen`, excluding the Sanctum token `last_used_at` update) and unchanged journal/invoice/payment/stock/profile/connector/hub counts; ladder independence (creating a Keeta manual profile and an AWJ-signed ingress account leaves readiness identical); no route containing connect/authorize/oauth/callback/link/sync/pair/credential/token under delivery/provider/integration URIs; the readiness route is a single guarded `GET`.
+Tests added cover: frozen manifest vs evidence, order, validity and exact catalog coverage; UX-state derivation; nine contradictory-row cases; missing/extra/malformed rows; the gate for all six platforms plus unknown, empty and wrong-case keys (code `provider_not_ready`, status 409); the positive path with injected valid rows (connect-only, connect+sync, sync without flag refused); gate refuses to build on a contradictory manifest; endpoint contents for an owner; staff/accountant receive only the six public fields (none of `technical`, `evidence_date`, `evidence_ref`) with identical `ux_state`/flags; unauthenticated 401, `self_service` 403, `sales.pos` disabled 403; GET-only (405 for POST/PUT/PATCH/DELETE) and request parameters cannot flip a flag; identical payload for two tenants and no tenant id in the body; no INSERT/UPDATE/DELETE during the request (`DB::listen`, excluding the Sanctum token `last_used_at` update) and unchanged journal/invoice/payment/stock/profile/connector/hub counts; ladder independence (creating a Keeta manual profile and an AWJ-signed ingress account leaves readiness identical); no route containing connect/authorize/oauth/callback/link/sync/pair/credential/token under delivery/provider/integration URIs; the readiness route is a single guarded `GET`.
 
 ## Build / lint / typecheck
 
@@ -76,7 +76,7 @@ PHP-only change. No frontend files changed, so `npm run build` and `web-ci.yml` 
 
 ## Pre-merge review
 
-- PRE_MERGE_REVIEW: **not stamped** — requires CI green on the exact Head SHA (Gate 9). Any later head change invalidates it.
+- PRE_MERGE_REVIEW: **not stamped** — requires CI green on the exact Head SHA (Gate 9). The P2 review fix changed the head after the first CI run, so that run no longer covers the reviewed code.
 - Reviewed Head SHA: the PR head at hand-off (a report-only commit may follow the code SHA; the code is unchanged by it)
 - Findings / resolution: none open (see Self-review).
 
@@ -99,7 +99,7 @@ POST_MERGE_REVIEW: not started (nothing merged).
 
 ### Reviewer
 - The gate is intentionally unreachable from HTTP today. This is documented in the class docblock and here so nobody reads it as an oversight; the first adapter task must call it before any outbound step.
-- `evidence_ref` is a path to an internal document, so it is limited to `delivery_connector.view`. `technical` (`OWNER_GATE`/`BLOCKED`) is visible to every `invoices.view` user; the UI must translate it into tenant-friendly copy (design §3.2), and the endpoint documents the stable `ux_state` for that purpose.
+- All internal evidence metadata (`technical`, `evidence_date`, `evidence_ref`) is limited to `delivery_connector.view`; tenant-facing screens use the public `ux_state` and the two flags, which is all the ladder (design §3) needs.
 - Manifest key order differs from `DeliveryPlatformCatalog::keys()` on purpose (UI registry order, design §5.2); a test pins it.
 - Route-inventory test uses a name pattern. A future legitimate route whose URI contains one of those words under delivery/provider/integration would fail it and need a deliberate edit — the intended friction.
 
@@ -112,7 +112,7 @@ POST_MERGE_REVIEW: not started (nothing merged).
 | Client forces readiness through query/body | Ignored; verified. |
 | Cross-tenant leakage / tenant data in the response | Static data, identical across tenants, no tenant id in the body. |
 | Writes or financial side effects | None; `DB::listen` proves no write statements, and financial/connector/hub counts are unchanged. |
-| Internal evidence path exposure | Only to `delivery_connector.view`. |
+| Internal evidence exposure (technical status, evidence date, evidence path) | Only to `delivery_connector.view`; verified for staff and accountant. |
 | Readiness mistaken for the manual-attribution state | Test proves A and the ingress account do not change B. |
 | External connection | None. No HTTP client, no credential, no provider SDK. |
 
@@ -149,7 +149,6 @@ API: `GET /api/delivery-platforms/readiness` (new, read-only). DB: none. Migrati
 |---|---|
 | Gate is unused until an adapter task exists | Intended. A future route that forgets to call it would be unguarded; INT-UX-2's invariant test and the route-inventory test here are the backstops, and the adapter brief must list the call as an acceptance criterion. |
 | Evidence date is 2026-10-11 | Re-verify before any flip, in that flip's PR. |
-| `technical` enum visible to all `invoices.view` users | Low sensitivity; UI maps it to tenant copy. |
 | PostgreSQL not run locally | The sandbox cannot start a local PostgreSQL; the `pgsql` CI job is the proof. |
 | Local-environment failures unrelated to this change (Fuel*, StorefrontMediaDelivery) | Reproduced on pristine `main`; CI environment is the reference. |
 
