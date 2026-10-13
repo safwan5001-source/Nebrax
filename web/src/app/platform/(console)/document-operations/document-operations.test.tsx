@@ -337,6 +337,23 @@ describe('audit export', () => {
     expect(writes()).toHaveLength(0);
   });
 
+  it('shows translated texts for a refused or failed export, never a server body', async () => {
+    await renderLoaded();
+    // 401: the library already cleared the platform session and redirects; the page's own translated text is shown
+    platformDownloadFile.mockRejectedValueOnce(new ApiError(401, ''));
+    fireEvent.click(button(t('exportAudit')));
+    expect((await screen.findByText(t('platformActionFailed'))).closest('[role="alert"]')).toBeTruthy();
+    // 403: a permission refusal in plain words, not a session expiry
+    platformDownloadFile.mockRejectedValueOnce(new ApiError(403, ''));
+    fireEvent.click(button(t('exportAudit')));
+    expect((await screen.findByText(t('platForbidden'))).closest('[role="alert"]')).toBeTruthy();
+    // 500: the library passes no server text on, so the generic translated text is shown
+    platformDownloadFile.mockRejectedValueOnce(new ApiError(500, ''));
+    fireEvent.click(button(t('exportAudit')));
+    await waitFor(() => expect(screen.getByRole('alert').textContent).toBe(t('platformActionFailed')));
+    expect(writes()).toHaveLength(0);
+  });
+
   it('does not start a second export while one is running', async () => {
     await renderLoaded();
     const pending = deferred<string>();

@@ -43,6 +43,18 @@ export function getPlatformAdministrator<T>(): T | null {
 }
 
 /**
+ * جلسة المنصة انتهت أو سُحبت (401): تُمسح جلسة المنصة وحدها — لا جلسة ERP ولا توكن أي مستأجر — ثم يُعاد
+ * المستخدم إلى تسجيل دخول المنصة. مشتركة بين `platformApi` وتنزيل الملفات كي لا يختلف المساران.
+ */
+function expirePlatformSession(): void {
+  if (typeof window === 'undefined') return;
+  clearPlatformSession();
+  if (!window.location.pathname.startsWith('/platform/login')) {
+    window.location.assign('/platform/login');
+  }
+}
+
+/**
  * عميل مساحة تشغيل المنصة فقط.
  *
  * لا يستخدم جلسة ERP العادية ولا يرسل `X-Branch-Id`، كي لا تختلط لوحة المنصة
@@ -73,12 +85,7 @@ export async function platformApi<T = unknown>(path: string, options: Options = 
       : undefined,
   });
 
-  if (response.status === 401 && typeof window !== 'undefined') {
-    clearPlatformSession();
-    if (!window.location.pathname.startsWith('/platform/login')) {
-      window.location.assign('/platform/login');
-    }
-  }
+  if (response.status === 401) expirePlatformSession();
 
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));
@@ -89,18 +96,35 @@ export async function platformApi<T = unknown>(path: string, options: Options = 
   return response.json() as Promise<T>;
 }
 
-/** تنزيل خاص ضمن جلسة منصة الإدارة، منفصل صراحةً عن توكن tenant. */
+/**
+ * خطأ تنزيل بلا محتوى خادمي غير آمن للعرض: لا يُقرأ جسم استجابة 5xx أصلاً (قد يكون صفحة HTML أو أثراً تقنياً)، ورسالة
+ * 401 تُترك فارغة لأن المستخدم يُحوَّل إلى الدخول، فتظهر رسالة الصفحة المترجمة بدل نص الخادم. 403 و404 تُصنَّفان في
+ * الصفحة بالحالة. ما سوى ذلك من 4xx يحمل رسالة الخادم إن كانت نصاً.
+ */
+async function downloadError(response: Response): Promise<ApiError> {
+  if (response.status >= 500) return new ApiError(response.status, '', {});
+  const body = await response.json().catch(() => ({}));
+  const message = (body as { message?: unknown }).message;
+  return new ApiError(response.status, response.status !== 401 && typeof message === 'string' ? message : '', body);
+}
+
+/**
+ * تنزيل خاص ضمن جلسة منصة الإدارة، منفصل صراحةً عن توكن tenant.
+ *
+ * يرسل `Accept: application/json` كبقية طلبات المنصة: بدونه يجيب الخادم على توكن منتهٍ أو غائب بصفحة HTML برمز 500
+ * (يحاول التحويل إلى مسار دخول غير موجود) بدل 401 JSON. الترويسة لا تغيّر الملف المُنزَّل: يعيد الخادم CSV نفسه.
+ * اسم الملف هو الاسم الاحتياطي الممرَّر كما كان.
+ */
 export async function platformDownloadFile(path: string, fallbackName: string): Promise<DownloadOutcome> {
   if (isDemo()) return 'demo-unavailable';
 
   const token = getPlatformToken();
   const response = await fetch(`${BASE_URL}${path}`, {
-    headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    headers: { Accept: 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
   });
-  if (!response.ok) {
-    const body = await response.json().catch(() => ({}));
-    throw new ApiError(response.status, (body as { message?: string }).message ?? 'حدث خطأ', body);
-  }
+  if (response.status === 401) expirePlatformSession();
+  if (!response.ok) throw await downloadError(response);
+
   const blob = await response.blob();
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement('a');
