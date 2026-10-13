@@ -13,6 +13,7 @@ import { useState } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 import { ControlPanels } from "../ControlPanels";
 import { BufferedText } from "../BufferedText";
+import { CUSTOMIZER_MESSAGES } from "../messages";
 import { normalizePresentationConfig, DEFAULT_PRESENTATION_CONFIG, type StorefrontPresentationConfig } from "../presentation/config";
 
 afterEach(cleanup);
@@ -107,6 +108,27 @@ describe("announcement link", () => {
     await userEvent.type(field, "/offers");
     expect(field.value).toBe("/offers");
     expect(latest.announcements?.items[0].href).toBe("/offers");
+  });
+});
+
+describe("announcement link validation hint", () => {
+  const hint = (key: "annLinkInvalid" | "annLinkHint") => CUSTOMIZER_MESSAGES.en[key];
+
+  it("warns about a typed link the draft will not store", async () => {
+    render(<Harness panel="announcements" initial={withAnnouncement()} />);
+    const field = document.querySelector('input[inputmode="url"]') as HTMLInputElement;
+    await userEvent.type(field, "http://example.com");
+    expect(field.value).toBe("http://example.com");
+    expect(latest.announcements?.items[0].href).toBeUndefined();
+    expect(screen.queryByText(hint("annLinkInvalid"))).not.toBeNull();
+  });
+
+  it("shows the neutral hint for a valid link", async () => {
+    render(<Harness panel="announcements" initial={withAnnouncement()} />);
+    const field = document.querySelector('input[inputmode="url"]') as HTMLInputElement;
+    await userEvent.type(field, "/offers");
+    expect(screen.queryByText(hint("annLinkInvalid"))).toBeNull();
+    expect(screen.queryByText(hint("annLinkHint"))).not.toBeNull();
   });
 });
 

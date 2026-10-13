@@ -381,6 +381,10 @@ function ItemEditor({
 }) {
   const codePoints = Array.from(item.text).length;
   const hrefRaw = item.href ?? "";
+  // The field keeps what was typed even when the draft drops it (an unsafe / half-typed link), so validate the text the merchant sees:
+  // the last typed value stands while it still normalises to the stored one, otherwise (undo, restore) the stored one does.
+  const [typedHref, setTypedHref] = useState(hrefRaw);
+  const shownHref = hrefText(typedHref) === hrefRaw ? typedHref : hrefRaw;
   const surface = item.surface;
   const backgroundHex = surface?.background.hex;
   const textHex =
@@ -462,7 +466,7 @@ function ItemEditor({
       <Field
         label={t("annLink")}
         hint={
-          hrefRaw !== "" && normalizeAnnouncementHref(hrefRaw) === null
+          shownHref !== "" && normalizeAnnouncementHref(shownHref) === null
             ? t("annLinkInvalid")
             : t("annLinkHint")
         }
@@ -473,7 +477,10 @@ function ItemEditor({
           inputMode="url"
           value={hrefRaw}
           normalize={hrefText}
-          onCommit={(href) => onChange({ href: href === "" ? undefined : href })}
+          onCommit={(href) => {
+            setTypedHref(href);
+            onChange({ href: href === "" ? undefined : href });
+          }}
         />
       </Field>
 
