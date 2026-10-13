@@ -63,6 +63,12 @@ Vocabulary — **Start approval**: the owner must decide something (ADR, policy,
 
 REM-03 and REM-08 touch disjoint controllers (`Invoice/Return/Quote/DocumentRevisionController` vs `SetTenant/UserController/AuthController`) and can be built concurrently, merged one at a time. **REM-11 should start as soon as D-03 is decided** — it does not compete with REM-03 for files.
 
+### REM-03 — status update (2026-10-13)
+
+> **Owner decision recorded: ACTIVE BRANCH ONLY** for the targeted REM-03 operations (a user must explicitly switch the active branch to operate on a document of another branch, even when that branch is in their allowed set; `?branch=all` never widens these operations; `allowedBranchIds()` semantics and the general Access Control V2 policy are unchanged).
+> **Implementation status: IN REVIEW — not closed.** Draft PR and evidence: see `REM-03-SEC-01-IMPLEMENTATION-REPORT.md` (same directory). The task is not marked closed until required tests, independent review and owner-approved merge are done. Access Control note: `docs/plans/access-control/AWJ_USERS_ROLES_PERMISSIONS_DAFTRA_REFERENCE.md` §42.
+> The card below is the original (pre-decision) plan; where it says "the user's allowed branches" the owner decision above supersedes it.
+
 ### REM-03 — card (ready for owner approval to start)
 
 | Field | Content |

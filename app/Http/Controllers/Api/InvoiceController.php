@@ -280,7 +280,7 @@ class InvoiceController extends ApiController
      */
     public function update(StoreInvoiceRequest $request, string $id): JsonResponse
     {
-        $invoice = Invoice::findOrFail($id); // عزل تلقائي بالمستأجر
+        $invoice = $this->targetInvoice($id); // REM-03: الفرع النشط فقط (فوق عزل المستأجر)
         $data = $request->validated();
         $data['minimum_price_override_actor_id'] = $request->user()?->id;
 
@@ -304,7 +304,7 @@ class InvoiceController extends ApiController
      */
     public function updateClassification(UpdateDocumentClassificationRequest $request, string $id): JsonResponse
     {
-        $invoice = Invoice::findOrFail($id);
+        $invoice = $this->targetInvoice($id);
         $updated = $this->domain(fn () => $this->classifications->updateDocumentClassification(
             $invoice,
             $request->validated('classification_id'),
@@ -330,7 +330,7 @@ class InvoiceController extends ApiController
      */
     public function destroy(string $id): JsonResponse
     {
-        $invoice = Invoice::findOrFail($id);
+        $invoice = $this->targetInvoice($id);
         $this->domain(fn () => $this->invoices->deleteDraft($invoice));
 
         return response()->json(['message' => 'تم الحذف.']);
@@ -338,7 +338,8 @@ class InvoiceController extends ApiController
 
     public function post(Request $request, string $id): JsonResponse
     {
-        $invoice = Invoice::findOrFail($id);
+        // الحارس قبل أي أثر: لا قيد ولا ICV ولا QR/XML ولا حركة مخزون عند الرفض.
+        $invoice = $this->targetInvoice($id);
         $this->assertWarehouseAllowed($invoice->warehouse_id, $invoice->branch_id);
         $posted = $this->domain(fn () => $this->invoices->post($invoice, null, $request->user()));
 
@@ -390,6 +391,16 @@ class InvoiceController extends ApiController
     private function visibleInvoice(Request $request, string $id): Invoice
     {
         return $this->scopeToActiveBranch(Invoice::query(), $request)->findOrFail($id);
+    }
+
+    /**
+     * REM-03 / SEC-01: فاتورة هدف عملية **تغييرية** (تعديل/تصنيف/حذف/ترحيل) —
+     * الفرع النشط فقط. لا يوسّعها `?branch=all` (على عكس `visibleInvoice()` الخاصة
+     * بالقراءة). انظر `ApiController::scopeToCurrentBranchOnly()`.
+     */
+    private function targetInvoice(string $id): Invoice
+    {
+        return $this->scopeToCurrentBranchOnly(Invoice::query())->findOrFail($id);
     }
 
     private function moneyFilterToMinor(string $value): int

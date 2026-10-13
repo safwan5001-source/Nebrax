@@ -34,14 +34,15 @@ class QuoteController extends ApiController
 
     public function show(string $id): JsonResponse
     {
-        return (new QuoteResource(Quote::with([
+        // REM-03: الفرع النشط فقط (فوق عزل المستأجر).
+        return (new QuoteResource($this->scopeToCurrentBranchOnly(Quote::with([
             'lines', 'printTemplateRevision', 'pdfTemplateRevision', 'thermalTemplateRevision', 'revisedFrom',
-        ])->findOrFail($id)))->response();
+        ]))->findOrFail($id)))->response();
     }
 
     public function update(StoreQuoteRequest $request, string $id): JsonResponse
     {
-        $quote = Quote::findOrFail($id);
+        $quote = $this->targetQuote($id);
         $data = $request->validated();
         Partner::findOrFail($data['partner_id']);
 
@@ -52,7 +53,7 @@ class QuoteController extends ApiController
 
     public function destroy(string $id): JsonResponse
     {
-        $quote = Quote::findOrFail($id);
+        $quote = $this->targetQuote($id);
         if ($quote->isPrintIssued()) {
             abort(422, 'لا يمكن حذف عرض سعر صادر للطباعة. أنشئ نسخة عمل أولاً.');
         }
@@ -64,7 +65,7 @@ class QuoteController extends ApiController
     /** يثبت قوالب الإخراج ويقفل عرض السعر عند إجراء الإصدار الصريح. */
     public function issue(string $id): JsonResponse
     {
-        $quote = Quote::findOrFail($id);
+        $quote = $this->targetQuote($id);
         $issued = $this->domain(fn () => $this->quotes->issueForPrint($quote));
 
         return (new QuoteResource($issued->load([
@@ -75,7 +76,7 @@ class QuoteController extends ApiController
     /** ينشئ نسخة عمل مسودة من عرض صادر من دون تعديل المستند التاريخي. */
     public function revise(string $id): JsonResponse
     {
-        $quote = Quote::findOrFail($id);
+        $quote = $this->targetQuote($id);
         $revision = $this->domain(fn () => $this->quotes->createPrintRevision($quote));
 
         return (new QuoteResource($revision->load(['lines', 'revisedFrom'])))->response()->setStatusCode(201);
@@ -83,12 +84,18 @@ class QuoteController extends ApiController
 
     public function convert(Request $request, string $id): JsonResponse
     {
-        $quote = Quote::findOrFail($id);
+        $quote = $this->targetQuote($id);
         $request->validate(['payment_type' => ['nullable', 'in:cash,credit']]);
         $paymentType = $request->input('payment_type', 'credit');
 
         $invoice = $this->domain(fn () => $this->quotes->convert($quote, $paymentType));
 
         return (new InvoiceResource($invoice->load('lines')))->response()->setStatusCode(201);
+    }
+
+    /** REM-03 / SEC-01: عرض سعر هدف عملية بمعرّفه — الفرع النشط فقط، قبل أي أثر. */
+    private function targetQuote(string $id): Quote
+    {
+        return $this->scopeToCurrentBranchOnly(Quote::query())->findOrFail($id);
     }
 }

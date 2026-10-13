@@ -1616,3 +1616,66 @@ Only where current findings support them as real, not speculative:
    closure pass since it was never part of any PR closed in §32–§40.
 
 **Process rule:** research/inspect → verify → update this file → confirm commit → summarize to Safwan.
+
+## 42. REM-03 / SEC-01 — Active-Branch-Only for targeted sales-document operations (2026-10-13)
+
+> Security-remediation note. **This does not change the general Access Control V2
+> branch policy.** It adds one narrower Workflow/Record-Scope intersection for a
+> short, explicit list of operations. Origin: TAX-HZ-00 backlog item `REM-03`
+> (`docs/audits/horizon/TAX-HZ-00-REMEDIATION-BACKLOG.md`); implementation report
+> `docs/audits/horizon/REM-03-SEC-01-IMPLEMENTATION-REPORT.md`.
+
+**Owner decision (authoritative for this task):** *Active Branch Only.* For a
+branch-bound record, `record.branch_id == BranchContext::id()`. A user assigned
+to several branches — and an unrestricted owner/admin — must explicitly switch the
+active branch before a targeted operation on a document of another branch. This is
+**not** "any allowed branch".
+
+```
+Tenant Isolation ∩ Existing Permission ∩ ACTIVE BRANCH MATCH ∩ Workflow/State/Accounting Invariants
+```
+
+**Where it applies (and only there):**
+
+| Surface | Operations |
+|---|---|
+| Invoices | `PUT /invoices/{id}`, `PUT /invoices/{id}/classification`, `DELETE /invoices/{id}`, `POST /invoices/{id}/post` |
+| Returns | `GET /returns/{id}`, `POST /returns/{id}/post` |
+| Quotes | `GET`, `PUT`, `DELETE /quotes/{id}`, `POST /quotes/{id}/issue`, `/revise`, `/convert` |
+| Document revisions | `GET /revisions` (feed) and `GET /revisions/{type}/{id}` |
+
+**Mechanism.** `ApiController::scopeToCurrentBranchOnly()` — an explicit query
+predicate (not a global scope) used by `findOrFail()`:
+
+* `branch_id = BranchContext::id()` **or** `branch_id IS NULL`;
+* with no active branch (a tenant without branches) only `branch_id IS NULL` rows;
+* **ignores** `?branch=all` and `allowedBranchIds()`;
+* a miss is a normal `findOrFail` miss ⇒ **404**, indistinguishable from a
+  nonexistent id; it runs before any ledger, stock, ICV, QR/XML or revision side
+  effect.
+
+**Why `BranchContext::id()` can be trusted as the comparison value.** `SetBranch`
+runs after `auth:sanctum` and `SetTenant`; it accepts `X-Branch-Id` only if it is a
+UUID, resolves under `TenantScope`, **and** `User::canAccessBranch()` holds;
+otherwise it falls back to the main branch (if the user may use it) or the user's
+first allowed branch. Unchanged by this task.
+
+**What is explicitly NOT changed**
+
+* `User::allowedBranchIds()` / `canAccessBranch()` semantics; empty assignment = unrestricted legacy.
+* `scopeToActiveBranch()` (lists/reads; `?branch=all` still widens *those* surfaces),
+  reports, `BelongsToBranch` (no global scope), `SetBranch`, RBAC/permissions, TenantScope.
+* Branchless historical rows (`branch_id IS NULL`) stay reachable.
+* Permission denial stays **403** (route middleware runs first); wrong active branch is **404**.
+* No accounting, VAT, ICV/PIH, QR/XML or ZATCA behaviour.
+
+**Compatibility consequences (deliberate, documented):** (1) an unrestricted owner
+or a multi-branch user who previously opened or mutated another branch's quote or
+return by id now needs the correct `X-Branch-Id`; (2) revisions of a **deleted**
+document no longer appear in the feed (its branch cannot be proven ⇒ fail closed).
+
+**Out of scope, reported separately:** other by-id invoice operations
+(`duplicate`, `storeNote`, `notes`, `payments`, `accounting`, `inventory`, `zatca`,
+note-attachment download) use `scopeToActiveBranch()` and therefore honour
+`?branch=all` for a user's allowed branches; `duplicate` and `storeNote` are
+mutating. See the implementation report, "Newly discovered / not changed".

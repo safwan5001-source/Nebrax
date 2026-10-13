@@ -24,6 +24,9 @@ class DocumentRevisionController extends ApiController
         $revisions = DocumentRevision::with(['user', 'document'])
             // الأنواع المعروفة وحدها: سجلٌّ لنموذج خارج القائمة لا واجهة له.
             ->whereIn('document_type', array_values(DocumentRevision::TYPES))
+            // REM-03: لا يظهر سجلُّ مستندٍ من غير الفرع النشط — الترشيح في SQL
+            // **قبل** `limit` فلا يتسرّب عدد ولا ترتيب ولا ما استُبعد.
+            ->where(fn ($q) => $this->whereDocumentInCurrentBranch($q))
             ->latest()
             ->limit((int) $request->query('limit', 10))
             ->get();
@@ -35,13 +38,32 @@ class DocumentRevisionController extends ApiController
     {
         $model = DocumentRevision::TYPES[$type] ?? abort(404, 'نوع مستند غير معروف.');
 
-        // العزل: المستند نفسه يجب أن يخصّ المستأجر — findOrFail يمرّ بـ TenantScope.
-        $model::findOrFail($id);
+        // العزل: المستند نفسه يجب أن يخصّ المستأجر (TenantScope) **وأن يقع في الفرع
+        // النشط** (REM-03) — وإلا 404 كمعرّفٍ غير موجود، فلا يُكشف وجوده في فرعٍ آخر.
+        $this->scopeToCurrentBranchOnly($model::query())->findOrFail($id);
 
         $revisions = DocumentRevision::with('user')
             ->where('document_type', $model)->where('document_id', $id)
             ->latest()->get();
 
         return DocumentRevisionResource::collection($revisions)->response();
+    }
+
+    /**
+     * يقيّد سجلات التعديل بمستندات الفرع النشط (أو بلا فرع) لكل نوع معروف.
+     *
+     * المستند يُحدَّد بمعرّفه عبر استعلام فرعي على نموذجه — يحمل TenantScope
+     * ومحمّلاً بنفس `scopeToCurrentBranchOnly()` — فلا استعلام لكل صف (لا N+1).
+     * سجلُّ مستندٍ لم يعد موجوداً (مسودة محذوفة) لا يُعرف فرعه فلا يُثبَت
+     * ترخيصه ⇒ يُستبعد (إغلاقٌ آمن).
+     */
+    private function whereDocumentInCurrentBranch(\Illuminate\Database\Eloquent\Builder $query): void
+    {
+        foreach (DocumentRevision::TYPES as $class) {
+            $query->orWhere(function ($q) use ($class) {
+                $q->where('document_type', $class)
+                    ->whereIn('document_id', $this->scopeToCurrentBranchOnly($class::query())->select('id'));
+            });
+        }
     }
 }
