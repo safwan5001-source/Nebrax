@@ -15,7 +15,7 @@ class DocumentScanSweepScheduleTest extends TestCase
 
         $this->assertNotNull($event, 'documents:sweep-scans must be scheduled');
         $this->assertSame('*/10 * * * *', $event->expression);
-        $this->assertSame('/dev/stdout', $event->output);
+        $this->assertSame('/proc/1/fd/1', $event->output);
         $this->assertTrue($event->withoutOverlapping);
         $this->assertTrue($event->onOneServer);
     }

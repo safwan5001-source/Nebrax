@@ -62,7 +62,43 @@ class DocumentFileScanService
                 }
             }
 
+            if ($decision === DocumentScanStatus::CLEAN) {
+                $this->releaseQuarantineAfterCleanRescan($locked, $provider);
+            }
+
             return $locked->fresh();
         }, 3);
+    }
+
+    /**
+     * فشل الفحص (مهلة/تعطل الفاحص) يحجر الحزمة fail-closed. حين تنجح إعادة الفحص الرسمية ويصير
+     * **كل** ملف في الحزمة CLEAN لا يبقى سبب للحجر: تعود إلى RECEIVING (انتقال قائم) بحدث تدقيق
+     * ليُكمِلها المستخدم صراحةً. لا تُفرَج أبداً إن بقي أي ملف INFECTED/FAILED/PENDING — فالمصاب
+     * لا يعود CLEAN، وبالتالي لا يمكن لهذا المسار أن يفرج عن حزمة فيها برمجية ضارة.
+     */
+    private function releaseQuarantineAfterCleanRescan(DocumentFile $file, string $provider): void
+    {
+        $batch = $file->batch()->lockForUpdate()->first();
+        if ($batch === null || $batch->status !== DocumentWorkflowStatus::QUARANTINED) {
+            return;
+        }
+
+        $notClean = $batch->files()
+            ->whereNull('purged_at')
+            ->where('scan_status', '!=', DocumentScanStatus::CLEAN->value)
+            ->exists();
+        if ($notClean) {
+            return;
+        }
+
+        $this->workflow->transition(
+            $batch,
+            DocumentWorkflowStatus::RECEIVING,
+            'quarantine_released_after_clean_rescan',
+            'system',
+            null,
+            'All files passed the safety rescan.',
+            ['file_id' => $file->id, 'scan_status' => DocumentScanStatus::CLEAN->value, 'scanner' => $provider],
+        );
     }
 }
