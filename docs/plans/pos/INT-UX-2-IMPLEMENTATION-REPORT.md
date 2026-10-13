@@ -88,12 +88,12 @@ The only non-INT-UX files touched are `web/src/lib/mock-data.ts` (demo fixtures,
 
 | Run | Result |
 |---|---|
-| Ladder logic unit tests (`integration-center.ladder.test.ts`) | 19 passed (after the review fixes below) |
+| Ladder logic unit tests (`integration-center.ladder.test.ts`) | 20 passed (after the review fixes below) |
 | Catalog + detail + structural component tests | 110 passed (3 files, both locales) |
 | Page tests (catalog, detail, plus the updated Center page) | 27 passed (3 files) |
 | `no-connection-controls.test.ts` (structural source scans) | 6 passed: no raw `<button>`/`<form>`/`<input>`; `<Button` only for retry; no write HTTP methods and no connector/credential routes; only the three allowed endpoints; allow-listed hrefs only |
 | **Full web suite** (`npx vitest run`) | **535 files, 5788 tests passed**, exit 0 — run on code SHA `18121305`, before the review fix |
-| Re-run after the review fixes (`src/lib`, `src/components/integrations`, `src/app/(app)/integrations`, plus the new demo test) | 671 tests passed in 88 files (includes the new demo test file). The full suite and the Playwright spec were not re-run after these changes (browser fixtures always return all six readiness rows) |
+| Re-run after the review fixes (`src/lib`, `src/components/integrations`, `src/app/(app)/integrations`, plus the new demo test) | 674 tests passed in 88 files (includes the new demo test file and the two new catalog page tests). The full suite and the Playwright spec were not re-run after these changes (browser fixtures always return all six readiness rows) |
 | `npm run build` (Next.js 15.5.19, includes type check) | **Succeeded** (`BUILD_EXIT 0`); `/integrations/delivery-platforms` (3.93 kB) and `/integrations/delivery-platforms/[platformKey]` (4.09 kB) emitted |
 | Playwright (real Chromium), `int-ux-2` + `int-ux-1` specs, desktop 1440 and mobile 390 | **75 passed, 1 skipped** (desktop-only check, skipped by design), exit 0 |
 
@@ -120,6 +120,8 @@ Not verified: behavior against the real backend and a real session (responses we
 | P2 — a known-platform row with a missing/non-boolean `is_active` was dropped and shown as "Not set up" | **Valid; fixed in `2bde0d06`.** `readManualStatuses` now returns `null` (rung A "could not be read"). The earlier test that pinned the old behavior was replaced |
 | P2 (second review, `ee466a38`) — malformed or missing readiness rows were skipped, giving a partial "successful" map with no banner/retry | **Valid; fixed.** `readReadinessRows` returns `null` when a known row is malformed or any of the six known rows is missing (unknown platforms are still ignored), so the read-failure banner and retry appear |
 | P2 (third review, `625365b8`) — a duplicate known provider row silently overwrote the first, so row order could decide the displayed state | **Valid; fixed.** A repeated known `platform_key` makes `readReadinessRows` return `null` (banner + retry). Manual-attribution profiles keep their documented rule (several profiles per platform are legitimate; one active profile is enough) |
+| P2 (fourth review, `0d7618e7`) — a contradictory or unknown-state readiness row stayed "could not be read" for its provider but showed no banner or retry | **Valid; fixed differently from the suggestion.** The hook raises the read-failure banner and retry whenever any known row resolves to "could not be read". The provider's own status stays unreadable and the other five keep their real status, instead of discarding the whole response |
+| P2 (fourth review) — `{ data: [null] }` was accepted as an empty profile list ("Not set up" for all) | **Valid; fixed.** `readManualStatuses` and `readReadinessRows` use a strict row reader: any non-object entry makes the read unreadable. The older shared `rows()` used by the INT-UX-1 landing summary is deliberately unchanged |
 | P2 (second review) — Demo login had no handlers for the two endpoints | **Valid; fixed.** `mock-data.ts` now serves `/delivery-platforms/readiness` (the six manifest rows, public fields only, none available, flags false) and `/delivery-platforms` (readable empty list). Pinned by `integration-center.demo.test.ts` |
 | P2 — unknown platform key should return a real HTTP 404 | **Not changed; owner decision.** The page is a client component behind the authenticated shell, so crawlers/caches cannot reach it and the screen already makes zero data requests. A real 404 needs a server boundary, a segment `not-found.tsx` and rewrites of the unknown-key tests and browser spec. Offered as a small follow-up |
 

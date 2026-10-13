@@ -111,6 +111,37 @@ describe('DeliveryPlatformsCatalogPage', () => {
     expect(screen.queryByRole('alert')).toBeNull();
   });
 
+  it('a contradictory provider row stays unreadable for that provider only, and still offers the alert and retry', async () => {
+    owner();
+    const contradictory = TODAY.map((row) => (row.platform_key === 'keeta' ? { ...row, ux_state: 'READY_TO_CONNECT' } : row));
+    backend({
+      '/applications/nav-state': () => ({ data: {} }),
+      '/delivery-platforms': () => ({ data: [] }),
+      '/delivery-platforms/readiness': () => ({ data: contradictory }),
+    });
+    renderIntl(<DeliveryPlatformsCatalogPage />, 'ar');
+
+    const alert = await screen.findByRole('alert');
+    expect(within(alert).getByRole('button', { name: m.retry })).toBeTruthy();
+    expect(bOf('keeta')).toBe(m.ladder.b.unreadable);
+    expect(bOf('jahez')).toBe(m.ladder.b.unavailable);
+    expect(bOf('hungerstation')).toBe(m.ladder.b.pending);
+  });
+
+  it('a null entry in the profiles list is a failed read, not an empty list of "not set up"', async () => {
+    owner();
+    backend({
+      '/applications/nav-state': () => ({ data: {} }),
+      '/delivery-platforms': () => ({ data: [null] }),
+      '/delivery-platforms/readiness': () => ({ data: TODAY }),
+    });
+    renderIntl(<DeliveryPlatformsCatalogPage />, 'ar');
+
+    await screen.findByRole('alert');
+    expect(aOf('keeta')).toBe(m.ladder.a.unreadable);
+    expect(aOf('jahez')).toBe(m.ladder.a.unreadable);
+  });
+
   it('a profiles failure makes only manual attribution unreadable', async () => {
     owner();
     backend({

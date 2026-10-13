@@ -62,6 +62,14 @@ function rows(payload: unknown): Record<string, unknown>[] | null {
   return data.filter((row): row is Record<string, unknown> => row !== null && typeof row === 'object' && !Array.isArray(row));
 }
 
+/** كـ`rows` لكن أي عنصر غير كائن يُفسد الحمولة كلها (`null`) بدل أن يُهمَل بصمت. للقارئين الصارمين في INT-UX-2. */
+function strictRows(payload: unknown): Record<string, unknown>[] | null {
+  const data = (payload as { data?: unknown } | null)?.data;
+  if (!Array.isArray(data)) return null;
+  if (!data.every((row) => row !== null && typeof row === 'object' && !Array.isArray(row))) return null;
+  return data as Record<string, unknown>[];
+}
+
 /** عدد المنصات الست المفعّلة. مفتاح خارج السجلّ لا يُحتسب. */
 export function readSetUpCount(payload: unknown): number | null {
   const list = rows(payload);
@@ -147,7 +155,7 @@ export interface DeliveryLadder {
  * «غير مهيأة» (`unset`) — قراءة ناجحة بنتيجة صريحة — أما حمولة غير مقروءة، أو صف معروف بعلم غير منطقي، فتعود `null`.
  */
 export function readManualStatuses(payload: unknown): Map<string, 'set' | 'disabled'> | null {
-  const list = rows(payload);
+  const list = strictRows(payload);
   if (list === null) return null;
   const known = new Set(deliveryPlatformKeys());
   const result = new Map<string, 'set' | 'disabled'>();
@@ -173,7 +181,7 @@ function nullableText(value: unknown): string | null {
  * المجهولة تُتجاهل.
  */
 export function readReadinessRows(payload: unknown): Map<string, ReadinessRow> | null {
-  const list = rows(payload);
+  const list = strictRows(payload);
   if (list === null) return null;
   const known = new Set(deliveryPlatformKeys());
   const result = new Map<string, ReadinessRow>();

@@ -10,6 +10,7 @@ import {
   DELIVERY_REPORT_PERMISSION,
   HUB_VIEW_PERMISSION,
   isApplicationHidden,
+  nativeStatusOf,
   readManualStatuses,
   readReadinessRows,
   type DeliveryAccess,
@@ -92,7 +93,8 @@ export function useDeliveryIntegrationData(enabled = true): DeliveryIntegrationD
       setManual(manualRead);
       setReadiness(readinessRead);
       setManualFailed(manualRead === null);
-      setReadinessFailed(readinessRead === null);
+      // صف متناقض أو بحالة لا نعرفها يبقى «تعذّرت القراءة» لمنصته فقط، لكن يظهر معه إشعار الفشل وإعادة المحاولة.
+      setReadinessFailed(readinessRead === null || [...readinessRead.values()].some((row) => nativeStatusOf(row) === 'unreadable'));
       setStatus('ready');
     })();
 

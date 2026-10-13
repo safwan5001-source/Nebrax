@@ -56,6 +56,14 @@ describe('readManualStatuses (step A)', () => {
     expect(readManualStatuses({ data: [{ platform_key: 'keeta', is_active: true }, { platform_key: 'keeta', is_active: false }] })?.get('keeta')).toBe('set');
   });
 
+  it('a non-object entry makes the read unreadable, never an empty list', () => {
+    expect(readManualStatuses({ data: [null] })).toBeNull();
+    expect(readManualStatuses({ data: ['keeta'] })).toBeNull();
+    expect(readManualStatuses({ data: [[]] })).toBeNull();
+    expect(readReadinessRows({ data: [...TODAY, null] })).toBeNull();
+    expect(readReadinessRows({ data: [...TODAY, 'jahez'] })).toBeNull();
+  });
+
   it('ignores rows of unknown platforms', () => {
     const manual = readManualStatuses({ data: [{ platform_key: 'talabat', is_active: true }, { platform_key: 'talabat' }] });
     expect(manual?.size).toBe(0);
