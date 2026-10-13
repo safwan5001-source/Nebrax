@@ -87,12 +87,21 @@ def job_names(job_id: str, job: dict) -> list[str]:
     """Expand a job's display name over its matrix (single-axis lists only)."""
     template = str(job.get("name", job_id))
     matrix = ((job.get("strategy") or {}).get("matrix")) or {}
+    if not isinstance(matrix, dict):
+        raise GateError(f"job {job_id}: non-mapping matrix is not supported by the gate")
     if "include" in matrix or "exclude" in matrix:
         raise GateError(f"job {job_id}: matrix include/exclude not supported by the gate")
     axes = {k: v for k, v in matrix.items() if isinstance(v, list)}
     refs = set(re.findall(r"\$\{\{\s*([^}]*?)\s*\}\}", template))
+    # GitHub creates one check run per matrix combination. An axis the display name does not mention multiplies the
+    # runs sharing one name; count them, so the duplicate-producer scan sees the extra same-named check runs.
+    used = {r.split(".")[1] for r in refs if re.fullmatch(r"matrix\.\w+", r)}
+    hidden = 1
+    for k, v in axes.items():
+        if k not in used:
+            hidden *= max(len(v), 1)
     if not refs:
-        return [template]
+        return [template] * hidden
     for ref in refs:
         if not re.fullmatch(r"matrix\.\w+", ref) or ref.split(".")[1] not in axes:
             raise GateError(f"job {job_id}: unsupported expression in name: {template!r}")
@@ -102,7 +111,7 @@ def job_names(job_id: str, job: dict) -> list[str]:
         n = template
         for k, v in zip(keys, combo):
             n = re.sub(r"\$\{\{\s*matrix\." + k + r"\s*\}\}", str(v), n)
-        names.append(n)
+        names.extend([n] * hidden)
     return names
 
 
@@ -204,6 +213,8 @@ def validate(root: Path = ROOT, manifest: dict | None = None) -> tuple[list[str]
                 if not hit:
                     errors.append(f"[{c['name']}] no step runs {guard['step_run_contains']!r}")
                 for s in hit:
+                    if "if" in s:
+                        errors.append(f"[{c['name']}] guarded test step {s.get('name', '?')!r} has a step-level `if` (a skipped step still reports a green job)")
                     run = str(s.get("run", ""))
                     for bad in guard.get("forbidden", []):
                         if bad in run:

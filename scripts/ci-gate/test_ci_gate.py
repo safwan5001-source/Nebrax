@@ -272,6 +272,31 @@ class Validation(unittest.TestCase):
         self.assertEqual(errs, [])
         self.assertTrue(any("other.yml" in w for w in warns))
 
+    def test_matrix_axis_missing_from_the_name_counts_as_duplicate_producers(self):
+        """Codex P1: GitHub creates one same-named check run per combination of an axis the name does not mention."""
+        self.assertEqual(g.job_names("j", {"name": "Fixed", "strategy": {"matrix": {"v": ["a", "b"]}}}), ["Fixed", "Fixed"])
+        self.assertEqual(g.job_names("j", {"name": "N ${{ matrix.db }}", "strategy": {"matrix": {"db": ["x", "y"], "v": ["a", "b", "c"]}}}),
+                         ["N x"] * 3 + ["N y"] * 3)
+        self.assertEqual(g.job_names("j", {"name": "Fixed"}), ["Fixed"])
+        with self.assertRaises(g.GateError):
+            g.job_names("j", {"name": "Fixed", "strategy": {"matrix": "${{ fromJson(needs.x.outputs.m) }}"}})
+        d = self._sandbox()
+        p = d / ".github" / "workflows" / "horizon-eval-ci.yml"
+        t = p.read_text(encoding="utf-8")
+        old = "    timeout-minutes: 10\n"
+        self.assertIn(old, t)
+        p.write_text(t.replace(old, old + "    strategy:\n      matrix:\n        variant: [checked, bypass]\n", 1), encoding="utf-8")
+        errs, _ = g.validate(d)
+        self.assertTrue(any("more than one PR-triggered job" in e for e in errs), errs)
+
+    def test_step_level_if_on_a_guarded_test_step_is_rejected(self):
+        """Codex P1: `if: false` on the guarded step leaves the job green without running a single test."""
+        errs = self._mutate("horizon-eval-ci.yml", "      - name: Evaluator tests (unit + contract + mutation + static guards)\n",
+                            "      - name: Evaluator tests (unit + contract + mutation + static guards)\n        if: false\n")
+        self.assertTrue(any("step-level `if`" in e for e in errs), errs)
+        # an `if` on an unguarded diagnostics step stays allowed (the PHP workflow has one)
+        self.assertEqual(g.validate()[0], [])
+
     def test_new_unclassified_workflow_is_flagged(self):
         d = self._sandbox()
         (d / ".github" / "workflows" / "new.yml").write_text(

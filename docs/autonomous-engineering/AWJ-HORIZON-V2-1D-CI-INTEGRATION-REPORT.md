@@ -19,7 +19,7 @@ What it does **not** do: it grants nothing, merges nothing, and changes no GitHu
 | `.github/workflows/horizon-eval-ci.yml` | **new** — job `horizon-eval`, name `Horizon dry-run evaluator (tests)`; `push` + `pull_request` on `**`; no `paths`, no job `if`, no `continue-on-error`; `permissions: contents: read`; no secrets, no network, no installs; `persist-credentials: false`; 10-min timeout |
 | `.github/ci-gate/required-checks.json` | **+1 entry** `tier: always` with a guard (`require`: `set -o pipefail`, `MIN_TESTS=`, `!= "OK"`; `forbidden`: `\|\| true`, `\|\| :`, `exit 0`, ` -k `, `--pattern`, ` -p `, `--failfast`). No existing entry touched |
 | `scripts/ci-gate/ci_gate.py` | **trusted gate logic, strengthened only** (§5b, Codex P1): a manifest check now counts only when its check run belongs to the suite of the workflow the manifest declares (`restrict_to_declared_workflows`), and `validate()` hard-fails if a required check name is produced by more than one PR-triggered job. No existing rule removed or relaxed |
-| `scripts/ci-gate/test_ci_gate.py` | gate self-tests: the `always` set grew from 2 to 3 checks, so 8 hard-coded expectations had to follow (see §5); PHP-focused fixtures now carry a green Horizon run so they cannot pass for the wrong reason. **+18 tests** (Horizon check, impostor binding, duplicate producer, unparseable job name) |
+| `scripts/ci-gate/test_ci_gate.py` | gate self-tests: the `always` set grew from 2 to 3 checks, so 8 hard-coded expectations had to follow (see §5); PHP-focused fixtures now carry a green Horizon run so they cannot pass for the wrong reason. **+20 tests** (Horizon check, impostor binding, duplicate producer, unparseable job name, hidden matrix axis, step-level `if`) |
 | `scripts/horizon-eval/contract_runner.py` + `test_contract.py` | exit code now also requires exactly 23 contract cases (an empty fixture dir used to exit 0); +1 test |
 | `scripts/horizon-eval/test_ci_integration.py` | **new**, 8 stdlib-only guards: manifest entry, tier, guard strings, workflow shape, least privilege, no network, floor bounds |
 | `scripts/horizon-eval/collect_snapshot.py` | defect fix (§6): `gh_get` now refuses dot-segments and encoded separators |
@@ -38,7 +38,7 @@ Not touched: application code, accounting, tax, ZATCA, RBAC, tenant isolation, m
 | New requirement on PRs | Every PR (any diff, including docs-only) must now also report `Horizon dry-run evaluator (tests)` = success. A PR that never reports it fails after the existing 10-min grace period (`workflow never triggered`), exactly like the PHP suites. |
 | Can a path filter or skip hide it? | Not silently. `validate()` already rejects, for `tier: always`: any `pull_request.paths`, a job-level `if`, `continue-on-error` on job or step, a rename (name drift), or the workflow no longer triggering on `pull_request`. Each is proven by a mutation test in `test_ci_gate.py` (§5). |
 | Push-event twin check-runs | Handled by the existing `bind_check_runs` (only `pull_request`-event runs of the exact head SHA count); a test shows a green push twin cannot mask a red PR-event run. |
-| Gate self-tests | 49 → **67**, all green (5 s). |
+| Gate self-tests | 49 → **69**, all green (5 s). |
 | Self-change banner | This PR edits `.github/ci-gate/**` and `scripts/ci-gate/**`, so the Gate prints its `GATE SELF-CHANGE` warning. Expected; weakening is blocked automatically, everything else is owner review. |
 
 ## 4. Tests and exact results
@@ -46,7 +46,7 @@ Not touched: application code, accounting, tax, ZATCA, RBAC, tenant isolation, m
 | Suite | Before | After | Result |
 |---|---|---|---|
 | `scripts/horizon-eval` (`python3 -I -B -m unittest discover`) | 172 | **181** (+8 `test_ci_integration`, +1 `test_contract`) | OK |
-| `scripts/ci-gate` | 49 | **67** (+18) | OK |
+| `scripts/ci-gate` | 49 | **69** (+20) | OK |
 | Contract table | 23/23 · 2 extras | 23/23 · 2 extras | false-eligible **0** |
 | `ci_gate.py validate` | OK | OK | no errors, no warnings |
 | Workflow `run:` blocks executed locally in bash with `-eo pipefail`, clean env | — | 181 tests · floor 181 · `OK` · contract 23/23 · tree clean (incl. ignored files) | rc 0 |
@@ -79,6 +79,8 @@ Manifest copies with the Horizon entry removed / demoted to `advisory` / guard d
 1. `restrict_to_declared_workflows`: a run named like a manifest check is kept only if its check suite belongs to the workflow run whose `path` equals the manifest's `workflow` (live `actions/runs` paths were checked: plain `.github/workflows/<file>.yml`). Unknown suite or other workflow → dropped → the check reads "not reported" → wait → fail at the deadline. Names not in the manifest pass through unchanged.
 2. `validate()`: a manifest check name produced by more than one PR-triggered job (same or another workflow) is a hard error (belt and braces for fix 1; none exist today).
 3. (Codex P1, second round) a job whose display name the gate cannot evaluate — e.g. `name: ${{ 'Horizon dry-run evaluator (tests)' }}` with `needs: horizon-eval` and `if: always()`, which would report success after the real job fails and win `latest_by_name` by id — used to be only a warning and was skipped by the duplicate scan. Inside any workflow that hosts a required check it is now a hard error. Workflows that host no required check keep the warning-only behaviour (none exist today with such names).
+4. (Codex P1, third round) a matrix axis the job name does not mention (`variant: [checked, bypass]` on a constant-named job) makes GitHub create several same-named check runs; `job_names()` now multiplies the name by the hidden combinations so the duplicate-producer scan rejects it. A non-mapping `matrix` (e.g. `fromJson`) is rejected.
+5. (Codex P1, third round) a step-level `if` on the guarded test step (`if: false`) left the job green with zero tests run. A guarded step with `if` is now an error (an `if` on an unguarded diagnostics step, as the PHP workflow has, stays allowed). The contract-table and clean-tree steps are still unguarded (D7) — skipping them leaves `test_contract` and the in-suite checks as the signal.
 
 Revert-proof: removing the call in `run_gate` fails `test_impostor_horizon_check_from_another_workflow_cannot_pass_the_gate` (end-to-end); disabling the duplicate check fails `test_duplicate_producer_…`. Residual: the trusted base copy of the gate runs on this PR, so this PR itself is not protected by the new binding; protection starts at merge.
 
