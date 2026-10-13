@@ -273,3 +273,17 @@ describe("social link visibility toggle", () => {
     ]);
   });
 });
+
+describe("switching between two benefits sections", () => {
+  it("does not carry the first section's unsaved buffer into the second", async () => {
+    const section = (id: string) => ({ id, type: "benefits", visible: true, content: { items: [{ id: "benefit-1", title: "Free", body: "" }] } }) as never;
+    const config = { ...DEFAULT_PRESENTATION_CONFIG, homepage: { ...DEFAULT_PRESENTATION_CONFIG.homepage, sections: [section("s1"), section("s2")] } };
+    const props = { panel: "homepage" as const, config, locale: "en" as const, liveStoreName: null, onChange: () => {} };
+    const { rerender } = render(<ControlPanels {...props} selectedSection="s1" />);
+    const titleInput = () => Array.from(document.querySelectorAll("input")).find((i) => i.value.startsWith("Free")) as HTMLInputElement;
+    await userEvent.type(titleInput(), " ");
+    expect(titleInput().value).toBe("Free ");
+    rerender(<ControlPanels {...props} selectedSection="s2" />);
+    expect(titleInput().value).toBe("Free");
+  });
+});

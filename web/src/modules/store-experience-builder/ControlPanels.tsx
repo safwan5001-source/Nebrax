@@ -1377,6 +1377,7 @@ function HomepagePanel({
               />
             ) : selected.type === "benefits" ? (
               <BenefitsFields
+                key={selected.id}
                 items={benefitsContentOf(selected).items}
                 t={t}
                 locale={locale === "en" ? "en" : "ar"}
