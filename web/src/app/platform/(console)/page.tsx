@@ -175,20 +175,20 @@ function RevenueSection({ metrics, t }: { metrics: SubscriptionMetrics; t: T }) 
             <h3 className="text-sm font-semibold text-text">{t('revenueScopeTitle')}</h3>
             <dl className="mt-3 space-y-3">
               {scope.map(({ key, shown }) => (
-                <div key={key} className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
-                  <div className="min-w-0">
-                    <dt className="text-sm font-medium text-text">{t(`scope${key}`)}</dt>
-                    <dd className="mt-0.5 text-xs leading-relaxed text-muted">{t(`scope${key}Desc`)}</dd>
-                  </div>
-                  <span
+                // مجموعة صالحة في `dl`: `div` يضم `dt` و`dd` فقط. الحالة وصفٌ ثانٍ للمصطلح نفسه (`dd`) لا `span` شقيق،
+                // والشبكة تُبقي المظهر السابق: العنوان والوصف في عمود، والشارة في العمود الآخر على الشاشات العريضة.
+                <div key={key} className="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_auto] sm:gap-x-4">
+                  <dt className="min-w-0 text-sm font-medium text-text sm:col-start-1">{t(`scope${key}`)}</dt>
+                  <dd className="mt-0.5 min-w-0 text-xs leading-relaxed text-muted sm:col-start-1">{t(`scope${key}Desc`)}</dd>
+                  <dd
                     className={
                       shown
-                        ? 'w-fit shrink-0 rounded bg-primary-soft px-2 py-0.5 text-xs font-medium text-primary'
-                        : 'w-fit shrink-0 rounded border border-border px-2 py-0.5 text-xs font-medium text-muted'
+                        ? 'mt-1 w-fit shrink-0 rounded bg-primary-soft px-2 py-0.5 text-xs font-medium text-primary sm:col-start-2 sm:row-span-2 sm:row-start-1 sm:self-start sm:mt-0'
+                        : 'mt-1 w-fit shrink-0 rounded border border-border px-2 py-0.5 text-xs font-medium text-muted sm:col-start-2 sm:row-span-2 sm:row-start-1 sm:self-start sm:mt-0'
                     }
                   >
                     {shown ? t('scopeShown') : t('scopeNotReported')}
-                  </span>
+                  </dd>
                 </div>
               ))}
             </dl>
