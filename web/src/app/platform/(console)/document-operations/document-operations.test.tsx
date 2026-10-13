@@ -254,12 +254,12 @@ describe('retention run: dry run default, apply confirmation, duplicates', () =>
     expect(writes()).toHaveLength(0);
   });
 
-  it('sends the same bodies: dry run with the resume cursor, then apply with apply:true', async () => {
+  it('sends the bodies the API accepts: dry run (apply is required by the API even then) with the resume cursor, then apply', async () => {
     await renderLoaded();
     platformApi.mockImplementationOnce(async () => ({ data: { run_id: 'r1', dry_run: true, status: 'completed', cutoff_at: null, after_file_id: CURSOR, next_after_file_id: null, results: { scanned: 1, eligible: 1, purged: 0, skipped: 0 } } }));
     fireEvent.click(button(t('runRetention')));
     await waitFor(() => expect(writes()).toHaveLength(1));
-    expect(writes()[0]).toEqual(['/platform/document-retention-runs', { method: 'POST', body: { dry_run: true, after_file_id: CURSOR } }]);
+    expect(writes()[0]).toEqual(['/platform/document-retention-runs', { method: 'POST', body: { dry_run: true, apply: true, after_file_id: CURSOR } }]);
     await waitFor(() => expect(screen.getByRole('status').textContent).toBe(t('runCompleted')));
 
     fireEvent.click(screen.getByLabelText(t('dryRun')));
