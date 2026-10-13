@@ -280,6 +280,16 @@ class Validation(unittest.TestCase):
         self.assertEqual(g.job_names("j", {"name": "Fixed"}), ["Fixed"])
         with self.assertRaises(g.GateError):
             g.job_names("j", {"name": "Fixed", "strategy": {"matrix": "${{ fromJson(needs.x.outputs.m) }}"}})
+        for bad in ("${{ fromJSON('[\"a\", \"b\"]') }}", "scalar", 3):  # Codex P1: an expression-valued axis is not a list
+            with self.assertRaises(g.GateError, msg=repr(bad)):
+                g.job_names("j", {"name": "Fixed", "strategy": {"matrix": {"variant": bad}}})
+        # ...and inside a workflow that hosts a required check that becomes a validation error
+        d = self._sandbox()
+        p = d / ".github" / "workflows" / "horizon-eval-ci.yml"
+        t = p.read_text(encoding="utf-8")
+        p.write_text(t.replace("    timeout-minutes: 10\n", "    timeout-minutes: 10\n    strategy:\n      matrix:\n        variant: ${{ fromJSON('[\"checked\", \"bypass\"]') }}\n", 1), encoding="utf-8")
+        errs, _ = g.validate(d)
+        self.assertTrue(any("cannot evaluate" in e for e in errs), errs)
         d = self._sandbox()
         p = d / ".github" / "workflows" / "horizon-eval-ci.yml"
         t = p.read_text(encoding="utf-8")

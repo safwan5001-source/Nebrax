@@ -91,7 +91,10 @@ def job_names(job_id: str, job: dict) -> list[str]:
         raise GateError(f"job {job_id}: non-mapping matrix is not supported by the gate")
     if "include" in matrix or "exclude" in matrix:
         raise GateError(f"job {job_id}: matrix include/exclude not supported by the gate")
-    axes = {k: v for k, v in matrix.items() if isinstance(v, list)}
+    bad_axes = sorted(k for k, v in matrix.items() if not isinstance(v, list))
+    if bad_axes:  # e.g. `variant: ${{ fromJSON(...) }}`: the number of runs is unknowable here, so fail closed
+        raise GateError(f"job {job_id}: matrix axes with non-list values are not supported by the gate: {bad_axes}")
+    axes = dict(matrix)
     refs = set(re.findall(r"\$\{\{\s*([^}]*?)\s*\}\}", template))
     # GitHub creates one check run per matrix combination. An axis the display name does not mention multiplies the
     # runs sharing one name; count them, so the duplicate-producer scan sees the extra same-named check runs.
