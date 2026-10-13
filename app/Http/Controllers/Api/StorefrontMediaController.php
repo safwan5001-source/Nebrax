@@ -119,6 +119,7 @@ class StorefrontMediaController extends PublicApiController
         $headers = [
             'Content-Type' => $category->image_mime_type ?: 'application/octet-stream',
             'Cache-Control' => 'public, max-age=3600',
+            'X-Content-Type-Options' => 'nosniff',
         ];
 
         if (ProductCategory::isR2ImagePath($category->image_path)) {

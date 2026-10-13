@@ -53,6 +53,8 @@ trait ServesProductMediaBytes
         $headers = [
             'Content-Type' => $mimeType ?? 'application/octet-stream',
             'Cache-Control' => $cacheControl,
+            // الـContent-Type المخزَّن (صورة مُتحقَّق منها) هو الحَكَم؛ لا يُسمح للمتصفح بالتخمين (O-3).
+            'X-Content-Type-Options' => 'nosniff',
         ];
 
         if ($media->disk === 'document') {

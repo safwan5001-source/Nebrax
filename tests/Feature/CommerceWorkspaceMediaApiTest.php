@@ -375,4 +375,33 @@ class CommerceWorkspaceMediaApiTest extends TestCase
         $this->assertStringNotContainsString('"disk"', $encoded);
         $this->assertStringNotContainsString('"path"', $encoded);
     }
+
+    // ── S15 (AWJ-HORIZON-MEDIA-STORAGE): O-1 https خلف الحافة · O-3 nosniff ─────
+
+    /** @test */
+    public function signed_workspace_urls_are_https_behind_the_edge_http_otherwise_and_still_validate_with_nosniff(): void
+    {
+        Storage::fake('local');
+        $auth = $this->registerTenant('ws-media-s15', 'owner@ws-media-s15.test');
+        $seeded = $this->seedWebStorefront($auth['tenant_id']);
+
+        app(TenantContext::class)->set($auth['tenant_id']);
+        $product = $this->seedPublishedProduct($seeded['channel']);
+        $media = $this->attachMedia($product);
+        app(TenantContext::class)->forget();
+
+        $list = '/api/commerce/workspace/storefronts/'.$seeded['storefront']->id.'/products';
+        $plain = collect($this->withToken($auth['token'])->getJson($list)->json('data'))->firstWhere('id', $product->id)['thumbnail_url'];
+        $this->assertStringStartsWith('http://', $plain);
+
+        $edge = collect($this->withToken($auth['token'])->withHeader('X-Forwarded-Proto', 'https')->getJson($list)->json('data'))->firstWhere('id', $product->id)['thumbnail_url'];
+        $this->assertStringStartsWith('https://', $edge);
+
+        // التوقيع صالح على ما يراه التطبيق (http) رغم أن المتصفح استعمل https.
+        $http = 'http://'.substr($edge, strlen('https://'));
+        $this->get($http)->assertOk()
+            ->assertHeader('Content-Type', 'image/webp')
+            ->assertHeader('X-Content-Type-Options', 'nosniff');
+        $this->get($http.'x')->assertStatus(403);
+    }
 }
