@@ -180,7 +180,10 @@ function normalizeSurface(raw: unknown): Announcement["surface"] | undefined {
  * points. Exported so the editor field compares against the very same rule the draft applies.
  */
 export function normalizeAnnouncementText(value: unknown): string {
-  const flattened = (typeof value === "string" ? value : "").replace(/\p{Cc}+/gu, " ");
+  const flattened = (typeof value === "string" ? value : "").replace(
+    /\p{Cc}+/gu,
+    " ",
+  );
   return capCodePoints(phpTrim(flattened), ANNOUNCEMENT_TEXT_MAX);
 }
 
