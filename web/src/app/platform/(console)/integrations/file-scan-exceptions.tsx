@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -16,6 +16,11 @@ import { isolateAuto } from './isolate';
 type ExceptionStatus = 'active' | 'expired' | 'revoked';
 type Exception = { id: string; tenant_id: string; tenant_name?: string; reason: string; expires_at: string | null; status: ExceptionStatus };
 type Tenant = { id: string; name: string };
+type TenantPage = { data: { data?: Tenant[] } | Tenant[]; pagination?: { current_page?: number; last_page?: number; total?: number } };
+
+/** حجم صفحة المؤسسات: افتراض الخادم نفسه (20). التصفح بـ`page` والبحث بـ`search` من جهة الخادم، فلا تُحمَّل كل المؤسسات. */
+const TENANT_PAGE_SIZE = 20;
+const SEARCH_DEBOUNCE_MS = 250;
 
 const STATUS_KEY = { active: 'scanExStatusActive', expired: 'scanExStatusExpired', revoked: 'scanExStatusRevoked' } as const;
 const STATUS_TONE = { active: 'positive', expired: 'muted', revoked: 'negative' } as const;
@@ -31,8 +36,17 @@ export function FileScanExceptions(): JSX.Element {
   const t = useTranslations('platformIntegrations');
   const locale = useLocale();
   const [items, setItems] = useState<Exception[]>([]);
-  const [tenants, setTenants] = useState<Tenant[]>([]);
-  const [tenantId, setTenantId] = useState('');
+  const [selected, setSelected] = useState<Tenant | null>(null);
+  const [tenantOptions, setTenantOptions] = useState<Tenant[]>([]);
+  const [tenantQuery, setTenantQuery] = useState('');
+  const [appliedQuery, setAppliedQuery] = useState('');
+  const [tenantPage, setTenantPage] = useState(1);
+  const [tenantLastPage, setTenantLastPage] = useState(1);
+  const [tenantTotal, setTenantTotal] = useState(0);
+  const [tenantsLoading, setTenantsLoading] = useState(true);
+  const [tenantsError, setTenantsError] = useState<'list' | 'more' | null>(null);
+  const tenantSeq = useRef(0);
+  const tenantId = selected?.id ?? '';
   const [reason, setReason] = useState('');
   const [expiresAt, setExpiresAt] = useState('');
   const [password, setPassword] = useState('');
@@ -49,14 +63,8 @@ export function FileScanExceptions(): JSX.Element {
     setLoading(true);
     setLoadError(false);
     try {
-      const [exceptions, tenantList] = await Promise.all([
-        platformApi<{ data: Exception[] }>('/platform/document-file-scan-exceptions'),
-        platformApi<{ data: { data?: Tenant[] } | Tenant[] }>('/platform/tenants'),
-      ]);
+      const exceptions = await platformApi<{ data: Exception[] }>('/platform/document-file-scan-exceptions');
       setItems(exceptions.data);
-      const rows = Array.isArray(tenantList.data) ? tenantList.data : (tenantList.data.data ?? []);
-      setTenants(rows);
-      setTenantId((current) => current || rows[0]?.id || '');
     } catch {
       setLoadError(true);
     } finally {
@@ -67,6 +75,59 @@ export function FileScanExceptions(): JSX.Element {
   useEffect(() => {
     void load();
   }, [load]);
+
+  /**
+   * صفحة مؤسسات من الخادم (`GET /platform/tenants?search&page&per_page`). الطلب الأحدث وحده يكتب الحالة،
+   * وتُدمج الصفحات بحسب المعرّف فلا تتكرر مؤسسة إن تغيّر الترتيب بين صفحتين. المؤسسة المختارة لا تتأثر بما يُحمَّل.
+   */
+  const loadTenants = useCallback(async (query: string, page: number): Promise<void> => {
+    const id = ++tenantSeq.current;
+    setTenantsLoading(true);
+    setTenantsError(null);
+    try {
+      const params = new URLSearchParams({ per_page: String(TENANT_PAGE_SIZE), page: String(page) });
+      if (query !== '') params.set('search', query);
+      const response = await platformApi<TenantPage>(`/platform/tenants?${params.toString()}`);
+      if (id !== tenantSeq.current) return;
+      const rows = Array.isArray(response.data) ? response.data : (response.data.data ?? []);
+      const meta = response.pagination;
+      setTenantOptions((current) => {
+        if (page === 1) return rows;
+        const known = new Set(current.map((row) => row.id));
+        return [...current, ...rows.filter((row) => !known.has(row.id))];
+      });
+      setTenantPage(page);
+      setTenantLastPage(Math.max(1, meta?.last_page ?? 1));
+      setTenantTotal(typeof meta?.total === 'number' ? meta.total : rows.length);
+      if (page === 1 && query === '') setSelected((current) => current ?? rows[0] ?? null);
+    } catch {
+      if (id !== tenantSeq.current) return;
+      setTenantsError(page === 1 ? 'list' : 'more');
+    } finally {
+      if (id === tenantSeq.current) setTenantsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadTenants(appliedQuery, 1);
+  }, [appliedQuery, loadTenants]);
+
+  useEffect(() => {
+    const next = tenantQuery.trim();
+    if (next === appliedQuery) return;
+    const timer = window.setTimeout(() => setAppliedQuery(next), next === '' ? 0 : SEARCH_DEBOUNCE_MS);
+    return () => window.clearTimeout(timer);
+  }, [tenantQuery, appliedQuery]);
+
+  function chooseTenant(value: string): void {
+    // الاختيار من المحمَّل فقط (أو المختار سابقاً): قيمة غير موجودة لا تُقبل ولا تُرسل.
+    const match = [...tenantOptions, ...(selected ? [selected] : [])].find((tenant) => tenant.id === value);
+    if (match) setSelected(match);
+  }
+
+  const retryTenants = (): void => void loadTenants(appliedQuery, tenantsError === 'more' ? tenantPage + 1 : 1);
+  const tenantSearchPending = tenantQuery.trim() !== appliedQuery;
+  const selectOptions = selected && !tenantOptions.some((tenant) => tenant.id === selected.id) ? [selected, ...tenantOptions] : tenantOptions;
 
   async function grant(): Promise<void> {
     setBusy(true);
@@ -132,11 +193,30 @@ export function FileScanExceptions(): JSX.Element {
       <CardContent className="space-y-4">
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
           <div className="space-y-1.5">
+            <Label htmlFor="scan-ex-tenant-search">{t('scanExTenantSearch')}</Label>
+            <Input id="scan-ex-tenant-search" className="h-11" type="search" autoComplete="off" placeholder={t('scanExTenantSearchPlaceholder')} value={tenantQuery} onChange={(event) => setTenantQuery(event.target.value)} aria-describedby="scan-ex-tenant-status" />
             <Label htmlFor="scan-ex-tenant">{t('scanExTenant')}</Label>
-            <select id="scan-ex-tenant" className={fieldClass} value={tenantId} onChange={(event) => setTenantId(event.target.value)} disabled={tenants.length === 0}>
-              {tenants.length === 0 ? <option value="">{t('scanExNoTenants')}</option> : null}
-              {tenants.map((tenant) => <option key={tenant.id} value={tenant.id}>{tenant.name}</option>)}
+            <select id="scan-ex-tenant" className={fieldClass} value={tenantId} onChange={(event) => chooseTenant(event.target.value)} disabled={selectOptions.length === 0} aria-describedby="scan-ex-tenant-status" aria-busy={tenantsLoading}>
+              {selectOptions.length === 0 ? <option value="">{t('scanExNoTenants')}</option> : null}
+              {selectOptions.map((tenant) => <option key={tenant.id} value={tenant.id}>{tenant.name}</option>)}
             </select>
+            <div id="scan-ex-tenant-status" className="space-y-1 text-xs text-muted" aria-live="polite">
+              {tenantsError ? (
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-negative" role="alert">{tenantsError === 'more' ? t('scanExTenantsMoreFailed') : t('scanExTenantsFailed')}</span>
+                  <Button variant="outline" className="h-11" onClick={retryTenants}>{t('retry')}</Button>
+                </div>
+              ) : tenantsLoading || tenantSearchPending ? (
+                <span>{t('scanExTenantsLoading')}</span>
+              ) : tenantOptions.length === 0 ? (
+                <span>{appliedQuery === '' ? t('scanExNoTenants') : t('scanExTenantsNoMatch', { query: appliedQuery })}</span>
+              ) : (
+                <span>{t('scanExTenantsShowing', { shown: tenantOptions.length, total: tenantTotal })}</span>
+              )}
+              {!tenantsError && !tenantsLoading && !tenantSearchPending && tenantPage < tenantLastPage ? (
+                <Button variant="outline" className="h-11 w-full" onClick={() => void loadTenants(appliedQuery, tenantPage + 1)}>{t('scanExTenantsMore')}</Button>
+              ) : null}
+            </div>
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="scan-ex-reason">{t('scanExReason')}</Label>

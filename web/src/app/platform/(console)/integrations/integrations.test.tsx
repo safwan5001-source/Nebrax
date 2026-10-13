@@ -85,7 +85,7 @@ beforeEach(() => {
     const method = init?.method ?? 'GET';
     if (path === '/platform/integrations' && method === 'GET') return { data: current };
     if (path === '/platform/document-file-scan-exceptions' && method === 'GET') return { data: exceptions() };
-    if (path === '/platform/tenants' && method === 'GET') return { data: { data: [{ id: 't1', name: 'Alpha Co' }, { id: 't2', name: 'Beta Co' }] } };
+    if (path.startsWith('/platform/tenants') && method === 'GET') return { data: { data: [{ id: 't1', name: 'Alpha Co' }, { id: 't2', name: 'Beta Co' }] } };
     throw new Error(`unexpected ${method} ${path}`);
   });
 });
@@ -264,7 +264,7 @@ describe('notices, errors and refresh', () => {
       platformApi.mockImplementation(async (path: string, init?: { method?: string }) => {
         if (path === '/platform/integrations' && (init?.method ?? 'GET') === 'GET') return { data: current };
         if (path === '/platform/document-file-scan-exceptions') return { data: exceptions() };
-        if (path === '/platform/tenants') return { data: { data: [] } };
+        if (path.startsWith('/platform/tenants')) return { data: { data: [] } };
         return { data: { ok: false, message: 'x', target: 'saved_provider', operational_storage: 'local' } };
       });
       await renderLoaded().catch(() => undefined);
@@ -318,7 +318,7 @@ describe('notices, errors and refresh', () => {
         return { data: current };
       }
       if (path === '/platform/document-file-scan-exceptions') return { data: exceptions() };
-      if (path === '/platform/tenants') return { data: { data: [] } };
+      if (path.startsWith('/platform/tenants')) return { data: { data: [] } };
       throw new Error(`unexpected ${init?.method} ${path}`);
     });
     render(<PlatformIntegrationsPage />);
