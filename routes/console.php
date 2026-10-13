@@ -79,7 +79,10 @@ Schedule::command('storefront-presentations:dispatch-due')
 // مركز المستندات: ملفات عالقة في pending (فاحص أُعدّ بعد الاستقبال، أو مهمة ضاعت) تُعاد إلى
 // مسار الفحص القائم؛ لا يُعلَّم أي ملف CLEAN هنا. رمز الخروج غير الصفري = تنبيه تشغيلي.
 // ⚠ يعمل فقط حيث يوجد مجدول (schedule:work) أو يُستدعى يدوياً/بمهمة Railway cron.
+// المخرجات (أعداد فقط، بلا معرّفات) تذهب إلى stdout ليظهر تقرير كل مرور في سجل الخدمة
+// (Railway) بدل /dev/null الافتراضي — بلا ذلك يبقى سبب الفشل التشغيلي غير مرئي.
 Schedule::command('documents:sweep-scans')
     ->everyTenMinutes()
     ->withoutOverlapping()
-    ->onOneServer();
+    ->onOneServer()
+    ->sendOutputTo('/dev/stdout');
