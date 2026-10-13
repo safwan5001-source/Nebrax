@@ -164,6 +164,26 @@ describe('tenant picker reaches every tenant (H15-03)', () => {
     expect(picker().options).toHaveLength(20);
   });
 
+  it('a failed replacement search drops the previous results but keeps only the selected tenant', async () => {
+    await renderReady();
+    fireEvent.change(picker(), { target: { value: 't07' } });
+    platformApi.mockImplementation(async (path: string, init?: { method?: string }) => {
+      if (path.includes('search=')) throw new Error('boom');
+      return serve(path, init);
+    });
+    fireEvent.change(search(), { target: { value: 'Tenant 3' } });
+    await screen.findByText(t('scanExTenantsFailed'));
+    expect(optionNames()).toEqual(['Tenant 07']);
+    expect(picker().value).toBe('t07');
+    expect(screen.queryByRole('button', { name: t('scanExTenantsMore') })).toBeNull();
+    fireEvent.change(picker(), { target: { value: 't30' } });
+    expect(picker().value).toBe('t07');
+    platformApi.mockImplementation(async (path: string, init?: { method?: string }) => serve(path, init));
+    fireEvent.click(screen.getAllByRole('button', { name: t('retry') }).at(-1)!);
+    await screen.findByText(t('scanExTenantsShowing', { shown: 10, total: 10 }));
+    expect(picker().value).toBe('t07');
+  });
+
   it('a failed Load more keeps what is loaded and the selection, and retry loads that same page', async () => {
     await renderReady();
     fireEvent.change(picker(), { target: { value: 't07' } });

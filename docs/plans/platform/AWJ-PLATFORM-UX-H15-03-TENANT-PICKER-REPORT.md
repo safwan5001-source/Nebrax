@@ -20,6 +20,7 @@ All in `file-scan-exceptions.tsx` (plus message keys and tests):
 - **Load more.** A button pages through the API (`page=2,3,…`, 20 per page) and appends. It disappears on the last page. A line states "Showing N of TOTAL tenants" so the administrator knows whether the list is complete. All tenants are never fetched at once.
 - **The selected tenant is kept** (held as its own record) while paging, searching and clearing the search; if a search no longer lists it, it stays as the first option of the select.
 - **Distinct states**: loading ("Loading tenants…"); empty ("No tenants match “…”.", or the existing "No tenants are available" with no search); failure ("Could not load tenants.") with **Retry**; a failed *Load more* says the already-loaded tenants are kept, and Retry loads that same page.
+- **A failed replacement search leaves nothing stale to pick:** if page 1 of a new search fails, the previous query's results are removed (only the selected tenant remains), so an unrelated tenant cannot be chosen while the UI says the search failed (Codex review finding, accepted).
 - **Only a loaded tenant can be chosen.** A value that is not among the loaded (or already selected) tenants is ignored, so an arbitrary id can never be sent.
 - **No duplicates.** Pages are merged by tenant id, so a row that shifts between two pages (new tenant created while paging; the API orders by `created_at` only, without an id tie-break) is listed once.
 - **Stale responses are ignored.** Only the newest request writes state, so a slow earlier search cannot overwrite a later one.
@@ -35,13 +36,13 @@ All in `file-scan-exceptions.tsx` (plus message keys and tests):
 |---|---|
 | `web/src/app/platform/(console)/integrations/file-scan-exceptions.tsx` | server-side search, paging, state handling, kept selection |
 | `web/src/messages/en.json`, `ar.json` | 8 keys added (`scanExTenantSearch`, `…SearchPlaceholder`, `scanExTenantsLoading`, `…Showing`, `…NoMatch`, `…Failed`, `…MoreFailed`, `…More`) |
-| `.../integrations/tenant-picker.test.tsx` | new, 17 regression tests |
+| `.../integrations/tenant-picker.test.tsx` | new, 18 regression tests |
 | `.../integrations/integrations.test.tsx` | tenant mocks match `/platform/tenants?…` (path now has a query string); no assertion changed |
 | this report | |
 
 ## Tests actually run
 
-**Mocked (a fake server with the real pagination contract; not evidence about the server):** `tenant-picker.test.tsx`, 17 tests:
+**Mocked (a fake server with the real pagination contract; not evidence about the server):** `tenant-picker.test.tsx`, 18 tests:
 
 | # | Required case | Covered by |
 |---|---|---|
@@ -49,7 +50,7 @@ All in `file-scan-exceptions.tsx` (plus message keys and tests):
 | 2 | tenant on page 2 or later | Load more twice reaches all 45; `Tenant 33` granted with its own id |
 | 3 | search over a large list | `search=Tenant 4` is sent to the server; a tenant outside the first 20 (`Tenant 45`) is found; clearing the search returns to page 1 |
 | 4 | no results | "No tenants match" shown; no alert, no loading text |
-| 5 | API failure and retry | initial failure shows the error and Retry recovers; failed *Load more* keeps loaded rows and the selection, Retry loads page 2 |
+| 5 | API failure and retry | initial failure shows the error and Retry recovers; failed *Load more* keeps loaded rows and the selection, Retry loads page 2; a failed *replacement search* drops the previous results (only the selected tenant stays choosable) and Retry recovers |
 | 6 | selection survives paging | selected `t05` kept through Load more and through a search that does not list it |
 | 7 | no duplicates | page 2 repeating a row from page 1 is listed once; a slow older search cannot overwrite a newer one |
 | 8 | correct tenant id | every grant asserts the exact `tenant_id` in the POST body |
@@ -59,12 +60,12 @@ All in `file-scan-exceptions.tsx` (plus message keys and tests):
 
 Also: both locales have all new keys and the picker renders in Arabic.
 
-Mutation checks (each reverted change fails tests): dropping the `search` parameter (5 tests fail), disabling the id-based merge (1), accepting an unknown value as the selection (1).
+Mutation checks (each reverted change fails tests): dropping the `search` parameter (5 tests fail), disabling the id-based merge (1), accepting an unknown value as the selection (1), keeping old results after a failed search (1).
 
 | Check | Result |
 |---|---|
-| integrations folder | 7 files, 67 tests passed (the 50 existing ones unchanged and passing, plus 17 new) |
-| Full web suite (`npm test`) | 524 files, 5590 tests passed |
+| integrations folder | 7 files, 68 tests passed (the 50 existing ones unchanged and passing, plus 18 new) |
+| Full web suite (`npm test`) | 524 files, 5591 tests passed |
 | `tsc --noEmit` | 48 errors, equal to the baseline; none outside test/spec files, none in the changed files |
 | `next build` | exit 0 |
 | GitHub CI | recorded on the PR for the final head (this file is part of that head) |

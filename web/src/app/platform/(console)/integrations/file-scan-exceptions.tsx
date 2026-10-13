@@ -102,6 +102,13 @@ export function FileScanExceptions(): JSX.Element {
       if (page === 1 && query === '') setSelected((current) => current ?? rows[0] ?? null);
     } catch {
       if (id !== tenantSeq.current) return;
+      if (page === 1) {
+        // نتائج الاستعلام السابق لم تعد تخص هذا البحث الفاشل: لا تبقى قابلة للاختيار. المؤسسة المختارة وحدها تبقى.
+        setTenantOptions([]);
+        setTenantPage(1);
+        setTenantLastPage(1);
+        setTenantTotal(0);
+      }
       setTenantsError(page === 1 ? 'list' : 'more');
     } finally {
       if (id === tenantSeq.current) setTenantsLoading(false);
