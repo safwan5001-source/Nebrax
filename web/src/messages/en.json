@@ -311,6 +311,7 @@
       "applyFailed": "Unable to apply the override.",
       "loading": "Loading…",
       "search": "Search applications…",
+      "filterLabel": "Filter applications",
       "filterAll": "All applications",
       "filterCommercial": "Commercially gated",
       "filterBuilt": "Built non-mandatory",

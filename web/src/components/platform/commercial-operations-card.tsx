@@ -2,7 +2,7 @@
 import { formatDate as formatDisplayDate } from '@/lib/formatting';
 
 import * as React from 'react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { Boxes, CalendarClock, Eye, Plus, RefreshCw, Search, ShieldCheck, XCircle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -15,6 +15,7 @@ import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { ApiError } from '@/lib/api';
 import { platformApi } from '@/lib/platform-api';
+import { useHorizontalOverflow } from './use-horizontal-overflow';
 
 type AssignmentKind = 'plan' | 'addon' | 'trial';
 type TrialTarget = 'plan' | 'addon';
@@ -159,6 +160,8 @@ function formatDate(value: string | null, locale: string): string {
 
 export function CommercialOperationsCard({ tenantId, onChanged }: { tenantId: string; onChanged?: () => void }) {
   const t = useTranslations('platformTenants');
+  const productsHeadingId = useId();
+  const [productsScrollRef, productsScroll] = useHorizontalOverflow<HTMLDivElement>();
   const [catalog, setCatalog] = useState<Catalog | null>(null);
   const [applications, setApplications] = useState<ApplicationEntry[]>([]);
   const [summary, setSummary] = useState<CommercialSummary | null>(null);
@@ -402,9 +405,9 @@ export function CommercialOperationsCard({ tenantId, onChanged }: { tenantId: st
           </section>
 
           <section className="space-y-3 border-t border-border pt-5">
-            <div className="flex flex-wrap items-end justify-between gap-3"><div><h3 className="font-medium text-text">{t('applicationProducts')}</h3><p className="mt-1 text-xs text-muted">{t('applicationProductsNotice')}</p></div><p className="text-xs text-muted">{t('operationalReadOnly')}</p></div>
+            <div className="flex flex-wrap items-end justify-between gap-3"><div><h3 id={productsHeadingId} className="font-medium text-text">{t('applicationProducts')}</h3><p className="mt-1 text-xs text-muted">{t('applicationProductsNotice')}</p></div><p className="text-xs text-muted">{t('operationalReadOnly')}</p></div>
             {productRows.length === 0 ? <Empty label={t('noCommercialProducts')} /> : <>
-              <div className="hidden overflow-x-auto lg:block"><table className="w-full min-w-[56rem] text-sm"><thead className="border-b border-border text-start text-xs text-muted"><tr><th className="px-3 py-2.5 font-medium">{t('commercialProduct')}</th><th className="px-3 py-2.5 font-medium">{t('commercialStatusLabel')}</th><th className="px-3 py-2.5 font-medium">{t('effectiveAccessLabel')}</th><th className="px-3 py-2.5 font-medium">{t('operationalStateLabel')}</th><th className="px-3 py-2.5 font-medium">{t('dependenciesLabel')}</th></tr></thead><tbody>{productRows.map((row) => <tr key={row.product.id} className="border-b border-border/70 last:border-0"><td className="px-3 py-3"><p className="font-medium text-text">{row.product.name}</p><p className="num mt-1 text-xs text-muted">{row.product.code}</p></td><td className="px-3 py-3">{commercialBadge(row.commercial)}</td><td className="px-3 py-3">{accessBadge(row.access)}</td><td className="px-3 py-3">{operationalBadge(row.operational)}</td><td className="px-3 py-3 text-xs text-muted">{row.capabilityApps.flatMap((app) => app.dependencies).join('، ') || '—'}</td></tr>)}</tbody></table></div>
+              <div ref={productsScrollRef} {...(productsScroll ? { role: 'region', tabIndex: 0, 'aria-labelledby': productsHeadingId } : {})} className="hidden overflow-x-auto rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 lg:block"><table className="w-full min-w-[56rem] text-sm"><thead className="border-b border-border text-start text-xs text-muted"><tr><th className="px-3 py-2.5 font-medium">{t('commercialProduct')}</th><th className="px-3 py-2.5 font-medium">{t('commercialStatusLabel')}</th><th className="px-3 py-2.5 font-medium">{t('effectiveAccessLabel')}</th><th className="px-3 py-2.5 font-medium">{t('operationalStateLabel')}</th><th className="px-3 py-2.5 font-medium">{t('dependenciesLabel')}</th></tr></thead><tbody>{productRows.map((row) => <tr key={row.product.id} className="border-b border-border/70 last:border-0"><td className="px-3 py-3"><p className="font-medium text-text">{row.product.name}</p><p className="num mt-1 text-xs text-muted">{row.product.code}</p></td><td className="px-3 py-3">{commercialBadge(row.commercial)}</td><td className="px-3 py-3">{accessBadge(row.access)}</td><td className="px-3 py-3">{operationalBadge(row.operational)}</td><td className="px-3 py-3 text-xs text-muted">{row.capabilityApps.flatMap((app) => app.dependencies).join('، ') || '—'}</td></tr>)}</tbody></table></div>
               <div className="space-y-3 lg:hidden">{productRows.map((row) => <article key={row.product.id} className="rounded-md border border-border p-3"><div className="flex items-start justify-between gap-3"><div><h4 className="font-medium text-text">{row.product.name}</h4><p className="num mt-1 text-xs text-muted">{row.product.code}</p></div>{commercialBadge(row.commercial)}</div><dl className="mt-3 grid grid-cols-2 gap-3 border-t border-border pt-3 text-xs"><div><dt className="text-muted">{t('effectiveAccessLabel')}</dt><dd className="mt-1">{accessBadge(row.access)}</dd></div><div><dt className="text-muted">{t('operationalStateLabel')}</dt><dd className="mt-1">{operationalBadge(row.operational)}</dd></div></dl></article>)}</div>
             </>}
           </section>
