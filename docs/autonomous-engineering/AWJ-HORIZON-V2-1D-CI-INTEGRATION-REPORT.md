@@ -12,13 +12,14 @@ It fails on: any test failure/error · any skipped or expected-failure test (fin
 
 What it does **not** do: it grants nothing, merges nothing, and changes no GitHub setting. `ELIGIBLE_SIMULATED` is still not authorization; live mode still cannot be eligible (no independent owner-authenticity verifier, V2-1B §4.6 / D2).
 
-## 2. Changed files (10)
+## 2. Changed files (11)
 
 | File | Change |
 |---|---|
 | `.github/workflows/horizon-eval-ci.yml` | **new** — job `horizon-eval`, name `Horizon dry-run evaluator (tests)`; `push` + `pull_request` on `**`; no `paths`, no job `if`, no `continue-on-error`; `permissions: contents: read`; no secrets, no network, no installs; `persist-credentials: false`; 10-min timeout |
 | `.github/ci-gate/required-checks.json` | **+1 entry** `tier: always` with a guard (`require`: `set -o pipefail`, `MIN_TESTS=`, `!= "OK"`; `forbidden`: `\|\| true`, `\|\| :`, `exit 0`, ` -k `, `--pattern`, ` -p `, `--failfast`). No existing entry touched |
-| `scripts/ci-gate/test_ci_gate.py` | gate self-tests: the `always` set grew from 2 to 3 checks, so 8 hard-coded expectations had to follow (see §5). **+12 tests** for the new check. `ci_gate.py` itself is **unchanged** |
+| `scripts/ci-gate/ci_gate.py` | **trusted gate logic, strengthened only** (§5b, Codex P1): a manifest check now counts only when its check run belongs to the suite of the workflow the manifest declares (`restrict_to_declared_workflows`), and `validate()` hard-fails if a required check name is produced by more than one PR-triggered job. No existing rule removed or relaxed |
+| `scripts/ci-gate/test_ci_gate.py` | gate self-tests: the `always` set grew from 2 to 3 checks, so 8 hard-coded expectations had to follow (see §5); PHP-focused fixtures now carry a green Horizon run so they cannot pass for the wrong reason. **+17 tests** (Horizon check, impostor binding, duplicate producer) |
 | `scripts/horizon-eval/contract_runner.py` + `test_contract.py` | exit code now also requires exactly 23 contract cases (an empty fixture dir used to exit 0); +1 test |
 | `scripts/horizon-eval/test_ci_integration.py` | **new**, 8 stdlib-only guards: manifest entry, tier, guard strings, workflow shape, least privilege, no network, floor bounds |
 | `scripts/horizon-eval/collect_snapshot.py` | defect fix (§6): `gh_get` now refuses dot-segments and encoded separators |
@@ -33,11 +34,11 @@ Not touched: application code, accounting, tax, ZATCA, RBAC, tenant isolation, m
 | Question | Answer |
 |---|---|
 | Existing required checks renamed or reclassified? | **No.** All 10 manifest entries are byte-identical; one is added. `compare_baseline` (run in CI with the trusted base copy) reports no weakening. |
-| Gate logic changed? | **No.** `scripts/ci-gate/ci_gate.py` and `ci-gate.yml` are untouched. |
+| Gate logic changed? | **Strengthened, not relaxed** (§5b): bind each required check to its declared workflow + reject duplicate producers of a required name. `ci-gate.yml` untouched. **These two additions take effect only after this PR merges** — the Gate on this PR runs the trusted *base* copy of the script by design. |
 | New requirement on PRs | Every PR (any diff, including docs-only) must now also report `Horizon dry-run evaluator (tests)` = success. A PR that never reports it fails after the existing 10-min grace period (`workflow never triggered`), exactly like the PHP suites. |
 | Can a path filter or skip hide it? | Not silently. `validate()` already rejects, for `tier: always`: any `pull_request.paths`, a job-level `if`, `continue-on-error` on job or step, a rename (name drift), or the workflow no longer triggering on `pull_request`. Each is proven by a mutation test in `test_ci_gate.py` (§5). |
 | Push-event twin check-runs | Handled by the existing `bind_check_runs` (only `pull_request`-event runs of the exact head SHA count); a test shows a green push twin cannot mask a red PR-event run. |
-| Gate self-tests | 49 → **61**, all green (3 s). |
+| Gate self-tests | 49 → **66**, all green (4 s). |
 | Self-change banner | This PR edits `.github/ci-gate/**` and `scripts/ci-gate/**`, so the Gate prints its `GATE SELF-CHANGE` warning. Expected; weakening is blocked automatically, everything else is owner review. |
 
 ## 4. Tests and exact results
@@ -45,7 +46,7 @@ Not touched: application code, accounting, tax, ZATCA, RBAC, tenant isolation, m
 | Suite | Before | After | Result |
 |---|---|---|---|
 | `scripts/horizon-eval` (`python3 -I -B -m unittest discover`) | 172 | **181** (+8 `test_ci_integration`, +1 `test_contract`) | OK |
-| `scripts/ci-gate` | 49 | **61** (+12) | OK |
+| `scripts/ci-gate` | 49 | **66** (+17) | OK |
 | Contract table | 23/23 · 2 extras | 23/23 · 2 extras | false-eligible **0** |
 | `ci_gate.py validate` | OK | OK | no errors, no warnings |
 | Workflow `run:` blocks executed locally in bash with `-eo pipefail`, clean env | — | 181 tests · floor 181 · `OK` · contract 23/23 · tree clean (incl. ignored files) | rc 0 |
@@ -70,6 +71,15 @@ Manifest copies with the Horizon entry removed / demoted to `advisory` / guard d
 ## 5. Finding: adding any `always` check breaks the gate's own self-tests
 
 `test_ci_gate.py` hard-coded the always-set as the two PHP checks (`len(exp) == 8`, `set(exp) == set(PHP)`, green fixtures with two runs). Adding the Horizon check turned 8 tests red — and those tests run inside the `CI Gate` job ("Gate self-tests (PR copy)"), so the PR would have failed its own Gate. They now derive from `ALWAYS = PHP + [HORIZON]`; no expectation was loosened (the count assertion went 8 → 9 and now also names the check). Future `always` checks need the same one-line update.
+
+## 5b. Finding (Codex P1): a same-named job in another workflow could satisfy a required check
+
+`bind_check_runs` pools check runs from every `pull_request` suite of the head SHA and `latest_by_name` then forgets which workflow a run came from. A PR could add a job named `Horizon dry-run evaluator (tests)` (or `php artisan test (L11, sqlite)` — **inherited, pre-existing for the PHP checks**) to any other PR-triggered workflow; its green result, from the same `github-actions` app, satisfied the manifest entry while the real job failed or never ran. `validate()` only warned ("unclassified"). Two fixes, both in the trusted gate and both strengthening-only:
+
+1. `restrict_to_declared_workflows`: a run named like a manifest check is kept only if its check suite belongs to the workflow run whose `path` equals the manifest's `workflow` (live `actions/runs` paths were checked: plain `.github/workflows/<file>.yml`). Unknown suite or other workflow → dropped → the check reads "not reported" → wait → fail at the deadline. Names not in the manifest pass through unchanged.
+2. `validate()`: a manifest check name produced by more than one PR-triggered job (same or another workflow) is a hard error (belt and braces for fix 1; none exist today).
+
+Revert-proof: removing the call in `run_gate` fails `test_impostor_horizon_check_from_another_workflow_cannot_pass_the_gate` (end-to-end); disabling the duplicate check fails `test_duplicate_producer_…`. Residual: the trusted base copy of the gate runs on this PR, so this PR itself is not protected by the new binding; protection starts at merge.
 
 ## 6. Finding: `collect_snapshot.gh_get` path guard was bypassable (fixed)
 
@@ -126,7 +136,7 @@ Nothing below has been changed. Unanswered = nothing changes. Recommended defaul
 | **D4** | **Force-push and deletion on `main`** | block both · allow | **Block both** (no workflow here needs them; feature-branch deletion is unaffected if the ruleset targets only the default branch). Zero operational cost. |
 | **D5** | **Bypass and emergency recovery** | (a) bypass list = repository admin (you), "pull requests only" · (b) no bypass | **(a).** You stay able to recover. Emergency stop, in order: set the ruleset to *Disabled* (one click, Settings → Rules); revert a bad merge with `git revert` via PR; for autonomy there is nothing to stop yet — Auto-Merge is off, no grants exist, the evaluator cannot act. Write down who holds the admin credential; Claude has none of this power (403). |
 | **D6** | **Open-PR compatibility** | (a) inventory and close/freeze the 12 PRs without a `CI Gate` run before D1 · (b) have each owner push once · (c) leave and accept they are blocked | **(a).** Required checks bind to the head SHA; those PRs never ran the Gate, so they would sit at "Expected — waiting". PRs that do run after this lands will also need `Horizon dry-run evaluator (tests)` — it appears automatically on their next push/reopen because the merge ref carries the new workflow. Docs-only PRs are **not** exempt (cost ≈ 15 s). |
-| D7 | Harden the trusted gate script (`ci_gate.py`): hard-fail duplicate job names across PR-triggered workflows; guard the contract-table and clean-tree steps | later, separate PR | Closes the impostor-check path for **all** `always` checks. Not done here because it edits the trusted gate logic (Zone C, owner review). |
+| D7 | Guard the contract-table and clean-tree steps too (they are not covered by the manifest guard) | later, separate PR | Duplicate-name/impostor hardening is **done** in §5b; this remaining item only extends `guard` coverage. |
 | D8 | The seven workflows registered from other branches (`AWJ translation migration`, `One-shot POS …`, `Patch …`) | review / delete those branches or disable the workflows | **Inspect before any protection work:** they are outside this PR's scope but are exactly the kind of write-capable automation a ruleset on `.github/**` is meant to cover. |
 
 **Not decided here and still gating any autonomy:** D2-authenticity (how an owner grant is proven authentic), policy-table approval, Zone A/B expansion. This PR expands neither.
@@ -147,7 +157,7 @@ Ran the suites, extracted the workflow `run:` blocks under `bash -e`, injected s
 
 Reviewer-confirmed OK: triggers, permissions, no `${{ }}` injection surface, skip/expected-failure/`pipefail`/`atexit` handling, output parsing, gate binding (twin runs, other-app spoofing, workflow-ran-but-job-missing), `ci_gate.py` unchanged, rollout (no baseline entry on this PR → `compare_baseline` is empty; after merge it protects the entry).
 
-**Allowed by `validate()` today — only owner review stands in the way** (carried to §7 / D3): lowering the `MIN_TESTS=` value; `|| echo` / `set +e` inside the step; a conditional that keeps the `!= "OK"` text but is dead; a decoy step that holds the guard strings while the real step evades the substring (e.g. double space); `shell: sh`, `timeout-minutes: 1`, an unusable `runs-on`; removing the contract-table or clean-tree steps (not guarded); a **duplicate job with the same name** in another PR-triggered workflow (only an "unclassified" warning; `latest_by_name` then picks the highest check-run id, so a trivially green impostor from the same app can win — inherited by the two PHP checks too; fix would be making a duplicate job name a hard `validate()` error — a change to the trusted gate script, deliberately **not** made here); and a test module in `scripts/horizon-eval` that monkeypatches `unittest` result classes at import time (rc 0, final line `OK`). The contract-table step is a second, independent signal for the last one — it does not go through `unittest`.
+**Allowed by `validate()` today — only owner review stands in the way** (carried to §7 / D3): lowering the `MIN_TESTS=` value; `|| echo` / `set +e` inside the step; a conditional that keeps the `!= "OK"` text but is dead; a decoy step that holds the guard strings while the real step evades the substring (e.g. double space); `shell: sh`, `timeout-minutes: 1`, an unusable `runs-on`; removing the contract-table or clean-tree steps (not guarded); a **duplicate job with the same name** in another PR-triggered workflow (**fixed afterwards, §5b**, after Codex rated it P1); and a test module in `scripts/horizon-eval` that monkeypatches `unittest` result classes at import time (rc 0, final line `OK`). The contract-table step is a second, independent signal for the last one — it does not go through `unittest`.
 
 ### AWJ Guardian
 - No ledger, journal, tax, ZATCA, RBAC, tenant, migration or API surface touched; no financial operation, so no journal entry is produced.
