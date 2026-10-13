@@ -311,6 +311,7 @@
       "applyFailed": "تعذر تطبيق التجاوز.",
       "loading": "جارٍ التحميل…",
       "search": "بحث بالتطبيق…",
+      "filterLabel": "تصفية التطبيقات",
       "filterAll": "كل التطبيقات",
       "filterCommercial": "محروسة تجارياً",
       "filterBuilt": "مبنية غير إلزامية",

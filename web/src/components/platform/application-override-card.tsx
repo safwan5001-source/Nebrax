@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { Eye, EyeOff, RefreshCw, Search, Shield, Undo2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -68,6 +68,7 @@ function catalogKeyLabel(key: string): string {
 
 export function ApplicationOverrideCard({ tenantId, onChanged }: { tenantId: string; onChanged?: () => void }) {
   const t = useTranslations('platform.applicationOverrides');
+  const filterId = useId();
   const tApps = useTranslations('applications');
   const [applications, setApplications] = useState<OverrideApplication[]>([]);
   const [loading, setLoading] = useState(true);
@@ -198,7 +199,8 @@ export function ApplicationOverrideCard({ tenantId, onChanged }: { tenantId: str
               <Search className="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" strokeWidth={1.7} aria-hidden="true" />
               <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t('search')} className="ps-9" />
             </div>
-            <Select value={filter} onChange={(e) => setFilter(e.target.value as typeof filter)} className="w-full sm:w-44">
+            <Label htmlFor={filterId} className="sr-only">{t('filterLabel')}</Label>
+            <Select id={filterId} value={filter} onChange={(e) => setFilter(e.target.value as typeof filter)} className="w-full sm:w-44">
               <option value="all">{t('filterAll')}</option>
               <option value="commercial">{t('filterCommercial')}</option>
               <option value="built">{t('filterBuilt')}</option>
