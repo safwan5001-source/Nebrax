@@ -56,9 +56,17 @@ describe('readManualStatuses (step A)', () => {
     expect(readManualStatuses({ data: [{ platform_key: 'keeta', is_active: true }, { platform_key: 'keeta', is_active: false }] })?.get('keeta')).toBe('set');
   });
 
-  it('ignores unknown platforms and rows without a boolean flag', () => {
-    const manual = readManualStatuses({ data: [{ platform_key: 'talabat', is_active: true }, { platform_key: 'keeta', is_active: 'yes' }] });
+  it('ignores rows of unknown platforms', () => {
+    const manual = readManualStatuses({ data: [{ platform_key: 'talabat', is_active: true }, { platform_key: 'talabat' }] });
     expect(manual?.size).toBe(0);
+  });
+
+  it('a known platform row without a boolean flag makes the whole read unreadable, never "not set up"', () => {
+    for (const is_active of ['yes', 1, 0, null, undefined]) {
+      expect(readManualStatuses({ data: [{ platform_key: 'keeta', is_active }] })).toBeNull();
+    }
+    expect(readManualStatuses({ data: [{ platform_key: 'jahez', is_active: true }, { platform_key: 'keeta' }] })).toBeNull();
+    expect(deliveryLadder('keeta', readManualStatuses({ data: [{ platform_key: 'keeta', is_active: 1 }] }), null).a).toBe('unreadable');
   });
 
   it('is null for an unreadable payload, never an empty success', () => {

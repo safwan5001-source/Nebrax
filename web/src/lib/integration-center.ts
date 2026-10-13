@@ -144,7 +144,7 @@ export interface DeliveryLadder {
 
 /**
  * حالة الإسناد اليدوي لكل منصة من `GET /delivery-platforms`. غياب ملف المنصة يعني
- * «غير مهيأة» (`unset`) — قراءة ناجحة بنتيجة صريحة — أما حمولة غير مقروءة فتعود `null`.
+ * «غير مهيأة» (`unset`) — قراءة ناجحة بنتيجة صريحة — أما حمولة غير مقروءة، أو صف معروف بعلم غير منطقي، فتعود `null`.
  */
 export function readManualStatuses(payload: unknown): Map<string, 'set' | 'disabled'> | null {
   const list = rows(payload);
@@ -152,7 +152,9 @@ export function readManualStatuses(payload: unknown): Map<string, 'set' | 'disab
   const known = new Set(deliveryPlatformKeys());
   const result = new Map<string, 'set' | 'disabled'>();
   for (const row of list) {
-    if (typeof row.platform_key !== 'string' || !known.has(row.platform_key) || typeof row.is_active !== 'boolean') continue;
+    if (typeof row.platform_key !== 'string' || !known.has(row.platform_key)) continue;
+    // صف لمنصة معروفة بلا علم منطقي صالح = انحراف في عقد الـAPI: القراءة كلها غير مقروءة، لا «غير مهيأة».
+    if (typeof row.is_active !== 'boolean') return null;
     // ملف مفعّل واحد يكفي؛ المعطّل لا يُلغي مفعّلاً آخر لنفس المنصة.
     if (row.is_active === true) result.set(row.platform_key, 'set');
     else if (!result.has(row.platform_key)) result.set(row.platform_key, 'disabled');
