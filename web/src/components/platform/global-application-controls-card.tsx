@@ -257,14 +257,14 @@ export function GlobalApplicationControlsCard() {
         {success && <p className="text-sm text-positive" role="status">{success}</p>}
 
         <div className="sticky top-0 z-10 -mx-1 flex flex-wrap gap-2 rounded-lg border border-border bg-surface p-2">
-          <Button variant="outline" size="sm" disabled={acting} onClick={() => openPreview('grant_all_apps_all_tenants', null)}>{t('allAppsGrant')}</Button>
-          <Button variant="outline" size="sm" disabled={acting} onClick={() => openPreview('revert_all_apps_all_tenants', null)}>{t('allAppsRevert')}</Button>
-          <Button variant="outline" size="sm" disabled={acting} onClick={() => openPreview('show_all_apps_all_tenants', null)}>{t('allAppsShow')}</Button>
-          <Button variant="outline" size="sm" disabled={acting} onClick={() => openPreview('hide_all_apps_all_tenants', null)}>{t('allAppsHide')}</Button>
+          <Button variant="outline" size="sm" wrap disabled={acting} onClick={() => openPreview('grant_all_apps_all_tenants', null)}>{t('allAppsGrant')}</Button>
+          <Button variant="outline" size="sm" wrap disabled={acting} onClick={() => openPreview('revert_all_apps_all_tenants', null)}>{t('allAppsRevert')}</Button>
+          <Button variant="outline" size="sm" wrap disabled={acting} onClick={() => openPreview('show_all_apps_all_tenants', null)}>{t('allAppsShow')}</Button>
+          <Button variant="outline" size="sm" wrap disabled={acting} onClick={() => openPreview('hide_all_apps_all_tenants', null)}>{t('allAppsHide')}</Button>
         </div>
 
         <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-          <div className="flex flex-1 flex-col gap-3 sm:flex-row">
+          <div className="flex min-w-0 flex-1 flex-col gap-3 sm:flex-row sm:flex-wrap">
             <div className="relative flex-1">
               <Search className="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" strokeWidth={1.7} aria-hidden="true" />
               <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t('search')} className="ps-9" />
@@ -304,19 +304,19 @@ export function GlobalApplicationControlsCard() {
                   {filtered.map((app) => (
                     <tr key={app.key} className="border-t border-border">
                       <td className="px-3 py-2">
-                        <div className="font-medium text-text">{tApps(`keys.${catalogKeyLabel(app.key)}`)}</div>
-                        <div className="font-mono text-xs text-muted" dir="ltr">{app.key}</div>
+                        <div className="break-words font-medium text-text">{tApps(`keys.${catalogKeyLabel(app.key)}`)}</div>
+                        <div className="font-mono text-xs text-muted break-words" dir="ltr">{app.key}</div>
                       </td>
                       <td className="px-3 py-2">
                         <div className="flex flex-wrap gap-1">
-                          <Badge tone="positive">{t('counts.granted', { count: app.global_commercial.granted })}</Badge>
-                          <Badge tone="neutral">{t('counts.enabled', { count: app.global_operational.enabled })}</Badge>
-                          <Badge tone="warning">{t('counts.suspended', { count: app.global_operational.suspended })}</Badge>
+                          <Badge wrap tone="positive">{t('counts.granted', { count: app.global_commercial.granted })}</Badge>
+                          <Badge wrap tone="neutral">{t('counts.enabled', { count: app.global_operational.enabled })}</Badge>
+                          <Badge wrap tone="warning">{t('counts.suspended', { count: app.global_operational.suspended })}</Badge>
                         </div>
                       </td>
                       <td className="px-3 py-2">
                         {app.protected_status
-                          ? <Badge tone={protectedTone(app.protected_status)}>{t(`protected.${app.protected_status}`)}</Badge>
+                          ? <Badge wrap tone={protectedTone(app.protected_status)}>{t(`protected.${app.protected_status}`)}</Badge>
                           : <span className="text-muted">—</span>}
                       </td>
                       <td className="px-3 py-2">{renderRowActions(app)}</td>
@@ -330,17 +330,17 @@ export function GlobalApplicationControlsCard() {
               {filtered.map((app) => (
                 <div key={app.key} className="rounded border border-border bg-surface p-3">
                   <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <div className="font-medium text-text">{tApps(`keys.${catalogKeyLabel(app.key)}`)}</div>
-                      <div className="font-mono text-xs text-muted" dir="ltr">{app.key}</div>
+                    <div className="min-w-0">
+                      <div className="break-words font-medium text-text">{tApps(`keys.${catalogKeyLabel(app.key)}`)}</div>
+                      <div className="font-mono text-xs text-muted break-words" dir="ltr">{app.key}</div>
                     </div>
                     {app.protected_status && (
-                      <Badge tone={protectedTone(app.protected_status)}>{t(`protected.${app.protected_status}`)}</Badge>
+                      <Badge wrap tone={protectedTone(app.protected_status)}>{t(`protected.${app.protected_status}`)}</Badge>
                     )}
                   </div>
                   <div className="mt-2 flex flex-wrap gap-1">
-                    <Badge tone="positive">{t('counts.granted', { count: app.global_commercial.granted })}</Badge>
-                    <Badge tone="neutral">{t('counts.enabled', { count: app.global_operational.enabled })}</Badge>
+                    <Badge wrap tone="positive">{t('counts.granted', { count: app.global_commercial.granted })}</Badge>
+                    <Badge wrap tone="neutral">{t('counts.enabled', { count: app.global_operational.enabled })}</Badge>
                   </div>
                   <div className="mt-3 flex justify-end">{renderRowActions(app)}</div>
                 </div>
@@ -396,7 +396,7 @@ export function GlobalApplicationControlsCard() {
                           <div className="font-mono text-xs text-muted" dir="ltr">{row.account_number ?? row.tenant_id}</div>
                         </td>
                         <td className="px-3 py-2">
-                          <Badge tone={row.outcome === 'applied' ? 'positive' : row.outcome === 'failed' ? 'negative' : 'muted'}>
+                          <Badge wrap tone={row.outcome === 'applied' ? 'positive' : row.outcome === 'failed' ? 'negative' : 'muted'}>
                             {t(`outcomes.${row.outcome}`)}
                           </Badge>
                         </td>

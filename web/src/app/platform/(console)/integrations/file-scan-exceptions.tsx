@@ -264,7 +264,7 @@ export function FileScanExceptions(): JSX.Element {
                 <div className="min-w-0">
                   <p className="flex flex-wrap items-center gap-2 font-medium text-text">
                     <span className="break-words">{item.tenant_name ?? item.tenant_id}</span>
-                    <Badge tone={STATUS_TONE[item.status] ?? 'muted'}>{STATUS_KEY[item.status] ? t(STATUS_KEY[item.status]) : item.status}</Badge>
+                    <Badge wrap tone={STATUS_TONE[item.status] ?? 'muted'}>{STATUS_KEY[item.status] ? t(STATUS_KEY[item.status]) : item.status}</Badge>
                   </p>
                   <p className="mt-1 break-words text-sm text-muted">{item.reason}</p>
                   <p className="mt-1 text-xs text-muted">

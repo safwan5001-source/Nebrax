@@ -242,20 +242,26 @@ export function PlatformShell({ children }: { children: React.ReactNode }) {
 
           <div className="flex-1" />
 
-          {/* shrink-0: بدونه يضغط flex الزرّين إلى أقل من 44px عند 320px مع تسمية الخروج الإنجليزية الأطول. */}
-          <div className="flex shrink-0 items-center">
-            <LangToggle />
-            <ThemeToggle />
+          {/*
+            مجموعة اليمين تلتف داخلياً عند الحاجة فقط (نص مكبَّر 200% على شاشة ضيقة لا يتسع لصف واحد): الأطراف ثابتة الترتيب
+            ولا يُقصّ شيء ولا يتولّد تمرير أفقي. عند 100% يتّسع الصف فلا التفاف ويبقى المظهر كما كان.
+            shrink-0 على الزرّين: بدونه يضغط flex الزرّين إلى أقل من 44px عند 320px مع تسمية الخروج الإنجليزية الأطول.
+          */}
+          <div className="flex flex-wrap items-center justify-end gap-1 sm:gap-2">
+            <div className="flex shrink-0 items-center">
+              <LangToggle />
+              <ThemeToggle />
+            </div>
+            {name && (
+              <span className="hidden max-w-40 truncate text-xs text-muted sm:inline" title={name}>
+                {name}
+              </span>
+            )}
+            <Button variant="outline" className="h-11 shrink-0 px-3" onClick={signOut} disabled={signingOut}>
+              <LogOut className="h-4 w-4" strokeWidth={1.7} aria-hidden="true" />
+              {signingOut ? t('signingOut') : t('logout')}
+            </Button>
           </div>
-          {name && (
-            <span className="hidden max-w-40 truncate text-xs text-muted sm:inline" title={name}>
-              {name}
-            </span>
-          )}
-          <Button variant="outline" className="h-11 shrink-0 px-3" onClick={signOut} disabled={signingOut}>
-            <LogOut className="h-4 w-4" strokeWidth={1.7} aria-hidden="true" />
-            {signingOut ? t('signingOut') : t('logout')}
-          </Button>
         </header>
 
         {/*

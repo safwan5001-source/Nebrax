@@ -168,13 +168,13 @@ export default function PlatformTenantsPage() {
       {
         accessorKey: 'plan',
         header: t('plan'),
-        cell: ({ row }) => <Badge tone="muted">{row.original.plan}</Badge>,
+        cell: ({ row }) => <Badge wrap tone="muted">{row.original.plan}</Badge>,
       },
       {
         accessorKey: 'is_active',
         header: t('status'),
         cell: ({ row }) => (
-          <Badge tone={row.original.is_active ? 'positive' : 'negative'}>
+          <Badge wrap tone={row.original.is_active ? 'positive' : 'negative'}>
             {row.original.is_active ? t('active') : t('inactive')}
           </Badge>
         ),
@@ -259,8 +259,8 @@ export default function PlatformTenantsPage() {
       amount: row.users_count,
       status: (
         <>
-          <Badge tone={row.is_active ? 'positive' : 'negative'}>{row.is_active ? t('active') : t('inactive')}</Badge>
-          <Badge tone="muted">{row.plan}</Badge>
+          <Badge wrap tone={row.is_active ? 'positive' : 'negative'}>{row.is_active ? t('active') : t('inactive')}</Badge>
+          <Badge wrap tone="muted">{row.plan}</Badge>
         </>
       ),
       meta: row.trial_ends_at ? `${t('trialEndsAt')}: ${row.trial_ends_at}` : t('noTrial'),

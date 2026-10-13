@@ -177,7 +177,7 @@ export default function PlatformDocumentOperationsPage() {
           <p className="mt-1 text-xs leading-relaxed text-muted">{t('platScopeNote')}</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button variant="outline" className="h-11" disabled={anyBusy} onClick={() => void exportAudit()}>
+          <Button variant="outline" wrap className="min-h-11" disabled={anyBusy} onClick={() => void exportAudit()}>
             {busy === 'export' ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Download className="h-4 w-4" aria-hidden="true" />}
             {t('exportAudit')}
           </Button>
@@ -221,15 +221,15 @@ export default function PlatformDocumentOperationsPage() {
           <section aria-label={t('runtime')} className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
             <Card className="min-w-0"><CardContent className="py-4">
               <p className="text-xs text-muted">{t('processingMode')}</p>
-              <Badge className="mt-2" tone={diagnostics.runtime.processing_mode === 'sync' ? 'neutral' : 'positive'}>{diagnostics.runtime.processing_mode === 'sync' ? t('processingModeSync') : t('processingModeAsync')}</Badge>
+              <Badge wrap className="mt-2" tone={diagnostics.runtime.processing_mode === 'sync' ? 'neutral' : 'positive'}>{diagnostics.runtime.processing_mode === 'sync' ? t('processingModeSync') : t('processingModeAsync')}</Badge>
             </CardContent></Card>
             <Card className="min-w-0"><CardContent className="py-4">
               <p className="text-xs text-muted">{t('queueWorker')}</p>
-              <Badge className="mt-2" tone={workerNotRequired ? 'muted' : diagnostics.runtime.worker_online ? 'positive' : 'warning'}>{workerNotRequired ? t('workerNotRequired') : diagnostics.runtime.worker_online ? t('workerOnline') : t('workerOffline')}</Badge>
+              <Badge wrap className="mt-2" tone={workerNotRequired ? 'muted' : diagnostics.runtime.worker_online ? 'positive' : 'warning'}>{workerNotRequired ? t('workerNotRequired') : diagnostics.runtime.worker_online ? t('workerOnline') : t('workerOffline')}</Badge>
             </CardContent></Card>
             <Card className="min-w-0"><CardContent className="py-4">
               <p className="text-xs text-muted">{t('networkLocked')}</p>
-              <Badge className="mt-2" tone={diagnostics.runtime.provider_network_locked ? 'warning' : 'positive'}>{diagnostics.runtime.provider_network_locked ? t('networkLocked') : t('networkOpen')}</Badge>
+              <Badge wrap className="mt-2" tone={diagnostics.runtime.provider_network_locked ? 'warning' : 'positive'}>{diagnostics.runtime.provider_network_locked ? t('networkLocked') : t('networkOpen')}</Badge>
             </CardContent></Card>
             <Card className="min-w-0"><CardContent className="py-4">
               <p className="text-xs text-muted">{t('processing')}</p>
@@ -319,8 +319,8 @@ export default function PlatformDocumentOperationsPage() {
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <span className="font-mono text-xs" dir="ltr">{run.id.slice(0, 12)}</span>
                       <span className="flex flex-wrap gap-1.5">
-                        <Badge tone="muted">{run.dry_run ? t('platRunDry') : t('platRunApplied')}</Badge>
-                        <Badge tone={statusTone(run.status)}>{statusLabel('platRet_', RETENTION_STATUSES, run.status, t)}</Badge>
+                        <Badge wrap tone="muted">{run.dry_run ? t('platRunDry') : t('platRunApplied')}</Badge>
+                        <Badge wrap tone={statusTone(run.status)}>{statusLabel('platRet_', RETENTION_STATUSES, run.status, t)}</Badge>
                       </span>
                     </div>
                     <dl className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs sm:grid-cols-4">
@@ -360,7 +360,7 @@ function StatusList({ title, rows, prefix, known, empty, t, numbers }: { title: 
         <ul className="mt-3 divide-y divide-border">
           {rows.map((row) => (
             <li key={row.status} className="flex items-center justify-between gap-3 py-2 text-sm">
-              <Badge className="min-w-0 max-w-full whitespace-normal break-all" tone={statusTone(row.status)}>{statusLabel(prefix, known, row.status, t)}</Badge>
+              <Badge wrap className="min-w-0 max-w-full whitespace-normal break-all" tone={statusTone(row.status)}>{statusLabel(prefix, known, row.status, t)}</Badge>
               <span className="font-semibold tabular-nums">{numbers.format(row.count)}</span>
             </li>
           ))}

@@ -357,11 +357,11 @@ export default function PlatformIntegrationsPage() {
                   <ToggleField label={t('testMode')} checked={aiForm.test_mode} onChange={(value) => updateAi('test_mode', value)} />
                   <AdminPasswordField value={aiForm.current_password} onChange={(value) => updateAi('current_password', value)} />
                 </div>
-                <div className="flex justify-end border-t border-border pt-4"><Button size="sm" className="h-11" onClick={saveAi} disabled={busy !== null || testing !== null}>{busy === 'document_ai' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}{t('save')}</Button></div>
+                <div className="flex justify-end border-t border-border pt-4"><Button size="sm" wrap className="min-h-11" onClick={saveAi} disabled={busy !== null || testing !== null}>{busy === 'document_ai' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}{t('save')}</Button></div>
               </CardContent>
             </Card>
 
-            <div className="grid grid-cols-1 gap-5 xl:grid-cols-3">
+            <div className="grid grid-cols-1 gap-5 xl:grid-cols-[repeat(auto-fit,minmax(min(100%,19rem),1fr))]">
               {AI_PROVIDER_KEYS.map((provider) => (
                 <AiProviderCard
                   key={provider}
@@ -486,7 +486,7 @@ function SettingsCard({
           </label>
         </div>
         <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
-          <Badge tone={statusTone}>{t(statusKey)}</Badge>
+          <Badge wrap tone={statusTone}>{t(statusKey)}</Badge>
           {configuredAt && <p className="text-xs text-muted">{t('configuredAt', { date: isolateAuto(formatDateTime(configuredAt, locale)) })}</p>}
         </div>
         {pendingChange && <p className="mt-2 text-xs leading-relaxed text-warning" role="note">{enabled ? t('pendingEnable') : t('pendingDisable')}</p>}
@@ -545,7 +545,7 @@ function AiProviderCard({
     <Card className="flex h-full flex-col">
       <CardHeader>
         <div className="flex items-start justify-between gap-3">
-          <div>
+          <div className="min-w-0 [overflow-wrap:anywhere]">
             <CardTitle>{providerLabel(provider, t)}</CardTitle>
             <p className="mt-1 text-sm text-muted">{t('aiProviderDescription')}</p>
           </div>
@@ -562,7 +562,7 @@ function AiProviderCard({
           </span>
         </p>
         <div className="mt-2 flex flex-wrap items-center gap-2">
-          <Badge tone={keyStored ? 'neutral' : 'muted'}>{keyStored ? t('keyStored') : t('keyNotStored')}</Badge>
+          <Badge wrap tone={keyStored ? 'neutral' : 'muted'}>{keyStored ? t('keyStored') : t('keyNotStored')}</Badge>
         </div>
         {form.enabled !== savedEnabled ? <p className="mt-2 text-xs leading-relaxed text-warning" role="note">{form.enabled ? t('pendingEnable') : t('pendingDisable')}</p> : null}
         {provider === 'google_gemini' && testStatus === 'failed' && lastErrorCode ? (
@@ -590,7 +590,8 @@ function AiProviderCard({
             <Button
               variant="outline"
               size="sm"
-              className="h-11"
+              wrap
+              className="min-h-11"
               onClick={test}
               disabled={testDisabled}
               title={testBlockedReason}
@@ -600,7 +601,7 @@ function AiProviderCard({
               {testing === `ai:${provider}` && geminiActions ? t('testing') : geminiActions ? t('testConnection') : t('test')}
             </Button>
             {onSave ? (
-              <Button size="sm" className="h-11" onClick={onSave} disabled={busy !== null || testing !== null}>
+              <Button size="sm" wrap className="min-h-11" onClick={onSave} disabled={busy !== null || testing !== null}>
                 {busy === 'document_ai' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                 {busy === 'document_ai' ? t('saving') : t('saveSettings')}
               </Button>
@@ -612,7 +613,7 @@ function AiProviderCard({
   );
 }
 
-function CardActions({ name, busy, testing, save, test, t }: { name: string; busy: string | null; testing: string | null; save: () => void; test: () => void; t: Translate }) { return <><Button variant="outline" size="sm" className="h-11" onClick={test} disabled={testing !== null || busy !== null}>{testing === name ? <Loader2 className="h-4 w-4 animate-spin" /> : <TestTube2 className="h-4 w-4" />}{t('test')}</Button><Button size="sm" className="h-11" onClick={save} disabled={busy !== null || testing !== null}>{busy === name ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}{t('save')}</Button></>; }
+function CardActions({ name, busy, testing, save, test, t }: { name: string; busy: string | null; testing: string | null; save: () => void; test: () => void; t: Translate }) { return <><Button variant="outline" size="sm" wrap className="min-h-11" onClick={test} disabled={testing !== null || busy !== null}>{testing === name ? <Loader2 className="h-4 w-4 animate-spin" /> : <TestTube2 className="h-4 w-4" />}{t('test')}</Button><Button size="sm" wrap className="min-h-11" onClick={save} disabled={busy !== null || testing !== null}>{busy === name ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}{t('save')}</Button></>; }
 // The visible label is tied to its control with a generated id, so assistive technology announces a name for it (WCAG 1.3.1, 4.1.2).
 // The first element child is the control; any following element is help text.
 function Field({ label, children }: { label: string; children: ReactNode }) {
