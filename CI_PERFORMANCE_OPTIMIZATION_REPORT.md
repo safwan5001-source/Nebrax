@@ -78,7 +78,7 @@ Safety properties:
 | `ci_gate.compare_baseline(main, PR)` (no weakening) | 0 errors |
 | `scripts/ci-gate` unit tests | 49 / 49 OK |
 | `scripts/horizon-eval` unit tests | 172 / 172 OK |
-| Required check names present on PR run | `php artisan test (L11, sqlite)` and `(L11, pgsql)` both reported (run 38438945108) |
+| Required check names present on PR run | `php artisan test (L11, sqlite)` and `(L11, pgsql)` both reported and green (run 38438945108) |
 | Duplicate trigger removed | Branch `claude/github-actions-ci-perf-c9i7sz` produced **one** CI run (9239, `pull_request`) instead of two |
 | `actionlint` | not available in the environment; not run |
 
@@ -87,7 +87,7 @@ Safety properties:
 | DB | Where | Result |
 |---|---|---|
 | SQLite | **GitHub Actions, PR run 38438945108** | **success** - full `php artisan test`, 10m33s (17:37:59 -> 17:48:32) |
-| PostgreSQL | **GitHub Actions, PR run 38438945108** | PGSQL_RESULT_PLACEHOLDER |
+| PostgreSQL | **GitHub Actions, PR run 38438945108** | **success** - full `php artisan test`, 27m24s (17:34:45 -> 18:02:09); higher than the baseline range, see section 6 |
 | SQLite | local sandbox (`/home/user/nibras-app`, PHP 8.3) | **Not conclusive.** 6382 passed / 73 skipped / **154 failed**; after installing the missing AWS S3 package, re-running the 31 failing classes left 38 failed: 24 are `Call to undefined function App\Services\bcmul()` (the sandbox PHP has no `bcmath`, which CI installs; apt install was unavailable). The remaining 14 (HTTP 500/503, one size assertion) were not root-caused and are most likely the same bcmath gap, but this is **unproven**. The change touches no PHP, so the CI run on the PR is the authoritative result. |
 | PostgreSQL | local | not run (no server in sandbox) |
 
@@ -97,9 +97,10 @@ Safety properties:
 |---|---|---|---|
 | CI runs per commit on a PR branch | 2 (push + PR) | **1** | observed |
 | Test jobs per commit | 4 | **2** | observed |
-| Runner-minutes per commit, SHA f17d554 | 78m14s (26m34+15m02 push, 23m56+12m42 PR) | 36m38s expected (PR twin only) | derived from baseline durations; this PR's own run is in progress/finished, see below |
+| Runner-minutes per commit, SHA f17d554 | 78m14s (26m34+15m02 push, 23m56+12m42 PR) | 36m38s expected (PR twin only) | derived from baseline durations; this PR's run is in section 5 |
 | Setup phase | ~70 s | ~70-75 s | unchanged, as expected |
 | `php artisan test` sqlite | 11m27s - 13m42s | 10m33s | within run-to-run noise; **not** an improvement claim |
+| `php artisan test` pgsql | 17m39s - 25m14s | 27m24s | above the baseline range. The change touches no test or DB code; run-to-run variance on shared runners is the likely cause but was **not** isolated. Not a claimed regression or improvement |
 | Queue time | 1m33s - 32m36s | 4m42s (pgsql), 8m07s (sqlite) | run 9239 still competed with pre-change duplicate runs of other PRs; queue improvement **cannot yet be claimed** and will only show once those older duplicates drain |
 
 Only the removal of duplicate runs (halving runner demand) is measured. Wall-clock/queue gains are a *consequence* to be verified over the next days of normal PR traffic, not a measured result.
