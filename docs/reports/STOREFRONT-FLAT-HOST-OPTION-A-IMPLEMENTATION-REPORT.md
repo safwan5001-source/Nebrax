@@ -2,8 +2,8 @@
 
 **Date:** 2026-10-13 · **Status:** IMPLEMENTED ON PR — **NOT MERGED — NOT DEPLOYED — NO DNS/RAILWAY/DATA CHANGES**
 **Decision (approved by Safwan):** first store `{tenant-slug}.store.awjdev.xyz`; additional stores `{tenant-slug}-{store-slug}.store.awjdev.xyz`.
-**Builds on:** `STOREFRONT-FLAT-HOST-MIGRATION-PHASE1-DIAGNOSIS.md` (PR #1397).
-**Branch:** `claude/store-host-flat-migration-diagnosis` (same PR #1397) · **Base SHA (main at Phase 1):** `073e102ac9334a4f80f368a64d1a3762bb701350`
+**Builds on:** `STOREFRONT-FLAT-HOST-MIGRATION-PHASE1-DIAGNOSIS.md` (PR #1397, merged by Safwan at 21:33 UTC with the docs-only head `2ae3a44`; the Option A code was pushed afterwards, so it ships in a new PR from the same branch rebased on `main` `0c90419`).
+**Branch:** `claude/store-host-flat-migration-diagnosis` · **Base SHA (main at rebase):** `0c90419`
 **Head SHA / PR:** see PR #1397 (final SHA in the PR and in the hand-off message).
 
 > **No schema change was needed.** Global uniqueness already exists (`storefront_domains.hostname` UNIQUE, `tenants.slug` UNIQUE);
