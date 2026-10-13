@@ -135,7 +135,9 @@ export default function PlatformDocumentOperationsPage() {
     try {
       const response = await platformApi<RetentionRunResponse>('/platform/document-retention-runs', {
         method: 'POST',
-        body: { dry_run: dryRun, ...(dryRun ? {} : { apply: confirmApply }), ...(afterFileId ? { after_file_id: afterFileId } : {}) },
+        // The API's rule is `apply: accepted` whether or not the run is a dry run (a dry run without it is answered 422), so `apply`
+        // is always sent. It cannot turn a dry run into a purge: the server reads `dry_run`, which stays true.
+        body: { dry_run: dryRun, apply: dryRun ? true : confirmApply, ...(afterFileId ? { after_file_id: afterFileId } : {}) },
       });
       setAfterFileId(response.data.next_after_file_id);
       setNotice({ ok: true, message: response.data.next_after_file_id ? t('runCompletedResume') : t('runCompleted') });
