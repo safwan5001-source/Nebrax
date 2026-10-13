@@ -6,7 +6,7 @@ import { useCallback, useEffect, useState } from 'react';
  * هل يتجاوز محتوى العنصر عرضه فيتمرّر أفقياً؟ تُقاس عند التركيب وعند تغيّر الحجم (ResizeObserver، أو `resize` النافذة
  * إن لم يتوفر). يُستعمل لمنح منطقة التمرير مدخل لوحة المفاتيح (`tabIndex`) **حين تتمرّر فعلاً** فقط: منطقة لا تتمرّر
  * لا تحتاج Tab stop، ومنطقة تتمرّر بلا محتوى قابل للتركيز لا يصل إليها مستخدم لوحة المفاتيح بدونه (axe: scrollable-region-focusable).
- * العنصر المخفيّ (`display:none`) يقيس 0 فلا يُعدّ متجاوزاً.
+ * العنصر المخفيّ (`display:none`) يقيس 0 فلا يُعدّ متجاوزاً. المقارنة مباشرة بلا هامش: القياسان عددان صحيحان مقرَّبان، وفرق بكسل واحد تمرير فعلي.
  */
 export function useHorizontalOverflow<T extends HTMLElement>(): [(node: T | null) => void, boolean] {
   const [node, setNode] = useState<T | null>(null);
@@ -18,7 +18,7 @@ export function useHorizontalOverflow<T extends HTMLElement>(): [(node: T | null
       setOverflows(false);
       return;
     }
-    const measure = (): void => setOverflows(node.scrollWidth > node.clientWidth + 1);
+    const measure = (): void => setOverflows(node.scrollWidth > node.clientWidth);
     measure();
     if (typeof ResizeObserver === 'undefined') {
       window.addEventListener('resize', measure);

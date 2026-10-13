@@ -177,6 +177,13 @@ describe('commercial products scroll region is keyboard reachable only when it s
     expect(document.querySelectorAll('[tabindex="0"]')).toHaveLength(1);
   });
 
+  it('counts a single pixel of overflow as scrolling', async () => {
+    measure(896, 895);
+    render(<CommercialOperationsCard tenantId="t1" />);
+    const region = await screen.findByRole('region', { name: heading('en') });
+    expect(region.tabIndex).toBe(0);
+  });
+
   it('adds no tab stop and no region when the table fits', async () => {
     measure(798, 798);
     render(<CommercialOperationsCard tenantId="t1" />);

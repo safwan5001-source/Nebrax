@@ -22,7 +22,7 @@ At 390 px the wrapper is `hidden` (the card view replaces it), so only `select-n
 ## What changed and why
 
 1. **Select name.** A visually hidden label, `<Label htmlFor={id} className="sr-only">`, with a stable `useId()` id, linked to the select (`<Select id=…>`). The text is a new key `platform.applicationOverrides.filterLabel`: "Filter applications" / «تصفية التطبيقات». The label is for assistive technology; the sighted layout is identical. Values, options, `onChange` and the data fetched are untouched. The name does not depend on a placeholder.
-2. **Scroll region.** The products wrapper becomes a **named, focusable region only while it actually overflows**: `role="region"`, `tabIndex={0}`, `aria-labelledby` pointing at the section's **existing visible heading** (`Products & applications` / «المنتجات والتطبيقات», so no duplicated text or new translation) and a visible focus ring (`focus-visible:ring-2 ring-primary/40`, the app's standard ring) with `rounded-md` so the ring follows the edge. When the table fits, no `tabindex` or `role` is added, so no unnecessary tab stop exists. A small hook, `use-horizontal-overflow.ts` (ResizeObserver, `resize` fallback), measures `scrollWidth > clientWidth`.
+2. **Scroll region.** The products wrapper becomes a **named, focusable region only while it actually overflows**: `role="region"`, `tabIndex={0}`, `aria-labelledby` pointing at the section's **existing visible heading** (`Products & applications` / «المنتجات والتطبيقات», so no duplicated text or new translation) and a visible focus ring (`focus-visible:ring-2 ring-primary/40`, the app's standard ring) with `rounded-md` so the ring follows the edge. When the table fits, no `tabindex` or `role` is added, so no unnecessary tab stop exists. A small hook, `use-horizontal-overflow.ts` (ResizeObserver, `resize` fallback), measures `scrollWidth > clientWidth` directly: both are rounded integers, so even a one-pixel overflow is real scrolling and counts (Codex review finding, accepted; an earlier version had a 1 px tolerance).
 
 Not changed: widths, spacing, the table, mouse/touch scrolling, RTL behaviour, the mobile card view, the other tables (the contract table and the override table each contain focusable buttons, and axe did not flag them).
 
@@ -34,12 +34,12 @@ Not changed: widths, spacing, the table, mouse/touch scrolling, RTL behaviour, t
 | `web/src/components/platform/commercial-operations-card.tsx` | heading id, conditional focusable named region with focus ring |
 | `web/src/components/platform/use-horizontal-overflow.ts` | new, tiny measuring hook |
 | `web/src/messages/en.json`, `ar.json` | one key added: `platform.applicationOverrides.filterLabel` |
-| `web/src/components/platform/tenant-details-a11y.test.tsx` | new, 12 regression tests |
+| `web/src/components/platform/tenant-details-a11y.test.tsx` | new, 13 regression tests |
 | this report | |
 
 ## Tests actually run
 
-**DOM tests (Testing Library, real translation files; the API client is mocked):** `tenant-details-a11y.test.tsx`, 12 tests:
+**DOM tests (Testing Library, real translation files; the API client is mocked):** `tenant-details-a11y.test.tsx`, 13 tests:
 
 | # | Required case | Covered by |
 |---|---|---|
@@ -52,11 +52,11 @@ Not changed: widths, spacing, the table, mouse/touch scrolling, RTL behaviour, t
 | 8 | no extra tab stop | when the table fits there is no `tabindex`, `role` or `aria-labelledby`; the region gains and loses the stop as the measured width changes |
 | — | name of the region | the region's accessible name equals the visible heading in both languages (`aria-labelledby` → the `h3`) |
 
-Mutation checks (each reverted change fails tests): removing the label (4 fail), never making the region focusable (6), always making it focusable (2), removing the focus ring (2). One of my own mistakes along the way: the first version of the suite hung because the `useTranslations` mock returned a new function on every render and re-fired the cards' load effects; the mock now returns a stable function per locale and namespace, like next-intl.
+Mutation checks (each reverted change fails tests): removing the label (4 fail), never making the region focusable (6), always making it focusable (2), removing the focus ring (2), a 1 px tolerance in the overflow test (1). One of my own mistakes along the way: the first version of the suite hung because the `useTranslations` mock returned a new function on every render and re-fired the cards' load effects; the mock now returns a stable function per locale and namespace, like next-intl.
 
 | Check | Result |
 |---|---|
-| `tenant-details-a11y` (12 new) and the existing platform component/tenant tests | 12 new tests pass; the existing platform component and tenant page tests pass unchanged (run as part of the full suite) |
+| `tenant-details-a11y` (12 new) and the existing platform component/tenant tests | 13 new tests pass; the existing platform component and tenant page tests pass unchanged (run as part of the full suite) |
 | Full web suite (`npm test`) | 530 files, 5684 tests passed |
 | `tsc --noEmit` | 48 errors, equal to the baseline; none outside test/spec files, none in the changed files |
 | `next build` | exit 0 |
