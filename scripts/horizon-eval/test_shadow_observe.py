@@ -566,6 +566,22 @@ class RunnerIsManualAndReadOnly(unittest.TestCase):
         self.assertEqual((seen["req"]["horizon_id"], seen["req"]["agent_id"]), ("SHADOW", "shadow-observer"))
         self.assertIn("READY_FOR_MANUAL_REVIEW", out)
 
+    def test_withheld_report_does_not_crash_the_runner_and_later_observations_still_run(self):
+        """Codex review: a secret-shaped `now` withholds the report (no `observation` key); the runner must complete the whole batch."""
+        hostile = green()
+        hostile["now"] = SECRET
+        with tempfile.TemporaryDirectory() as d, tempfile.TemporaryDirectory() as src:
+            bad = Path(src) / "hostile.json"
+            bad.write_text(json.dumps(hostile), encoding="utf-8")
+            code, out, err = self.run_main(["--snapshot", str(bad), "--snapshot", str(SNAP / "live-pr586.json"), "--out-dir", d])
+            names = sorted(p.name for p in Path(d).iterdir())
+            blob = "".join((Path(d) / n).read_text(encoding="utf-8") for n in names) + out + err
+        self.assertEqual(code, 0, err)
+        self.assertIn("shadow-summary.md", names)
+        self.assertTrue(any(n.startswith("shadow-pr586-") for n in names), "the observation after the hostile one still ran")
+        self.assertNotIn(SECRET, blob)
+        self.assertNotIn("Traceback", err)
+
     def test_failed_observation_writes_nothing_and_exits_one(self):
         with tempfile.TemporaryDirectory() as d, mock.patch.object(sr.cs, "collect", side_effect=sr.cs.CollectError("gh: 502")):
             code, _, err = self.run_main(["--pr", "7", "--out-dir", d])

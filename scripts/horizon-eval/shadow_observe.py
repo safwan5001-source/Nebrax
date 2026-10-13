@@ -155,6 +155,14 @@ def _hard_deny_hits(record: dict, policy: dict) -> list[str]:
     return sorted({p for p in paths if he.any_match_ci(policy["hard_deny_patterns"], p)})
 
 
+_TIME_RX = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z")
+
+
+def _clean_time(value) -> str:
+    """The snapshot time is echoed in the report, so only a strictly formatted UTC timestamp may pass; anything else is replaced."""
+    return value if isinstance(value, str) and _TIME_RX.fullmatch(value) else "<invalid>"
+
+
 def _base_report(case, now: str) -> dict:
     return {
         "schema": REPORT_SCHEMA, "shadow_version": SHADOW_VERSION, "evaluator_version": he.VERSION,
@@ -167,8 +175,8 @@ def _base_report(case, now: str) -> dict:
     }
 
 
-def _error_report(case, reasons: list[dict], now: str = "<unknown>") -> dict:
-    rep = _base_report(case, now)
+def _error_report(case, reasons: list[dict], now: str = "<invalid>") -> dict:
+    rep = _base_report(case, _clean_time(now))
     rep.update({
         "observation": {"mode": "unknown"}, "pr": {}, "zone": None, "zone_basis": {}, "paths": [], "paths_omitted": 0,
         "surfaces": {}, "ci": {"ci_gate": {"name": "CI Gate", "status": "absent", "conclusion": None}, "overall": "unconfirmed", "checks": []},
@@ -200,7 +208,7 @@ def observe(case, *, wall_clock: datetime | None = None, replay: bool = False, p
 
 
 def _observe(case, wall_clock, replay, policy) -> dict:
-    now = case.get("now") if isinstance(case, dict) and isinstance(case.get("now"), str) else "<unknown>"
+    now = _clean_time(case.get("now") if isinstance(case, dict) else None)
     if not (isinstance(case, dict) and case.get("mode") == "live"
             and isinstance(case.get("evidence"), dict) and case["evidence"].get("source") == "github-readonly"):
         return _error_report(case, [{"severity": "BLOCK", "code": "SHADOW_REQUIRES_LIVE_EVIDENCE",

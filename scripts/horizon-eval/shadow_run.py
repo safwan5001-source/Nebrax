@@ -93,7 +93,7 @@ def main(argv=None) -> int:
         write_atomic(args.out_dir / f"{stem}.json", so.report_json(rep))
         write_atomic(args.out_dir / f"{stem}.md", so.render_markdown(rep))
         reports.append(rep)
-        print(f"{stem}: {rep['recommendation']} (zone {rep.get('zone')}, ci {rep.get('ci', {}).get('overall')}, {rep['observation'].get('mode')})")
+        print(f"{stem}: {rep['recommendation']} (zone {rep.get('zone')}, ci {rep.get('ci', {}).get('overall')}, {rep.get('observation', {}).get('mode')})")
     if reports:
         write_atomic(args.out_dir / "shadow-summary.md", so.render_summary(reports))
     return 1 if failed else 0
