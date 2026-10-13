@@ -1,0 +1,266 @@
+{
+  "authorization": {
+    "advisory_only": true,
+    "grant_verified": false,
+    "merge_authorized": false,
+    "statement": "Shadow Mode never grants permission to merge, deploy or change settings. A person decides."
+  },
+  "authorization_blockers": [
+    {
+      "code": "CLAIM_MISSING_OR_MISMATCH",
+      "count": 1,
+      "detail": "",
+      "severity": "BLOCK"
+    },
+    {
+      "code": "HORIZON_LABEL_MISSING_OR_CONTRADICTORY",
+      "count": 1,
+      "detail": "0 horizon label(s)",
+      "severity": "BLOCK"
+    },
+    {
+      "code": "HORIZON_NOT_REGISTERED_V2",
+      "count": 1,
+      "detail": "",
+      "severity": "BLOCK"
+    },
+    {
+      "code": "NO_ACTIVE_GRANT",
+      "count": 1,
+      "detail": "",
+      "severity": "BLOCK"
+    },
+    {
+      "code": "PRE_MERGE_REVIEW_MISSING",
+      "count": 1,
+      "detail": "c9dd9aee",
+      "severity": "WAIT"
+    }
+  ],
+  "ci": {
+    "checks": [
+      {
+        "conclusion": "success",
+        "name": "web build (Next.js)",
+        "status": "completed"
+      },
+      {
+        "conclusion": "success",
+        "name": "CI Gate",
+        "status": "completed"
+      },
+      {
+        "conclusion": "success",
+        "name": "php artisan test (L11, pgsql)",
+        "status": "completed"
+      },
+      {
+        "conclusion": "success",
+        "name": "php artisan test (L11, sqlite)",
+        "status": "completed"
+      }
+    ],
+    "ci_gate": {
+      "conclusion": "success",
+      "name": "CI Gate",
+      "status": "completed"
+    },
+    "overall": "passing"
+  },
+  "conflicts": [
+    {
+      "evidence_kind": "observed",
+      "paths": [
+        "web/src/messages/ar.json",
+        "web/src/messages/en.json"
+      ],
+      "pr": 1390,
+      "recent_activity": false,
+      "registered": false,
+      "surfaces": []
+    }
+  ],
+  "evaluator_decision": "STOP_OWNER_DECISION",
+  "evaluator_version": "horizon-eval/0.1.0",
+  "human_checks_remaining": [
+    "a_person_decides_merge_shadow_mode_never_does",
+    "approved_outcome_matches_pr_intent",
+    "refetch_grants_and_head_immediately_before_any_real_merge"
+  ],
+  "missing_evidence": [
+    {
+      "code": "TESTED_BASE_UNKNOWN",
+      "count": 4,
+      "detail": "CI Gate",
+      "severity": "BLOCK"
+    }
+  ],
+  "observation": {
+    "evaluator_record_id": "8f59c9a0269b07a76340f305cec482b0953e9361c42fe5aaefc987b220580e90",
+    "evidence_age_seconds": 0,
+    "evidence_digest": "caf939bdaaf6c03a55d8c5c6b7831fe644cd4cdea1899e1c26efab963f858512",
+    "mode": "live",
+    "policy_sha256": "0ccfc5723b695dbefa6bced1518a161e66d054ca2920f986d768a671e372d249",
+    "snapshot_case_id": "LIVE-PR1391-c9dd9aee"
+  },
+  "owner_review_required": true,
+  "paths": [
+    {
+      "path": "docs/plans/platform/AWJ-PLATFORM-UX-H15-08-TENANT-DETAILS-A11Y-REPORT.md",
+      "status": "added",
+      "surfaces": [],
+      "zone": "A"
+    },
+    {
+      "path": "web/src/components/platform/application-override-card.tsx",
+      "status": "modified",
+      "surfaces": [],
+      "zone": "B"
+    },
+    {
+      "path": "web/src/components/platform/commercial-operations-card.tsx",
+      "status": "modified",
+      "surfaces": [],
+      "zone": "B"
+    },
+    {
+      "path": "web/src/components/platform/tenant-details-a11y.test.tsx",
+      "status": "added",
+      "surfaces": [],
+      "zone": "B"
+    },
+    {
+      "path": "web/src/components/platform/use-horizontal-overflow.ts",
+      "status": "added",
+      "surfaces": [],
+      "zone": "B"
+    },
+    {
+      "path": "web/src/messages/ar.json",
+      "status": "modified",
+      "surfaces": [],
+      "zone": "C"
+    },
+    {
+      "path": "web/src/messages/en.json",
+      "status": "modified",
+      "surfaces": [],
+      "zone": "C"
+    }
+  ],
+  "paths_omitted": 0,
+  "pr": {
+    "base_is_current_main": false,
+    "base_sha": "be3a7aac2353565d9f2beb5d9e2bb3b34bdd28e8",
+    "head_sha": "c9dd9aee142547fcaff66bef5353b4f7879896f2",
+    "main_sha": "073e102ac9334a4f80f368a64d1a3762bb701350",
+    "number": 1391,
+    "state": "closed"
+  },
+  "reasons": [
+    {
+      "code": "INJECTION_SUSPECTED",
+      "count": 1,
+      "detail": "INJ-AUTH-CLAIM,INJ-OVERRIDE",
+      "severity": "STOP"
+    },
+    {
+      "code": "UNREGISTERED_PR_OVERLAP",
+      "count": 1,
+      "detail": "PR#1390 overlaps with no registered claim",
+      "severity": "STOP"
+    },
+    {
+      "code": "ZONE_C_OWNER_GATED",
+      "count": 1,
+      "detail": "web/src/messages/ar.json,web/src/messages/en.json",
+      "severity": "STOP"
+    },
+    {
+      "code": "CLAIM_MISSING_OR_MISMATCH",
+      "count": 1,
+      "detail": "",
+      "severity": "BLOCK"
+    },
+    {
+      "code": "HORIZON_LABEL_MISSING_OR_CONTRADICTORY",
+      "count": 1,
+      "detail": "0 horizon label(s)",
+      "severity": "BLOCK"
+    },
+    {
+      "code": "HORIZON_NOT_REGISTERED_V2",
+      "count": 1,
+      "detail": "",
+      "severity": "BLOCK"
+    },
+    {
+      "code": "NO_ACTIVE_GRANT",
+      "count": 1,
+      "detail": "",
+      "severity": "BLOCK"
+    },
+    {
+      "code": "PR_ALREADY_MERGED",
+      "count": 1,
+      "detail": "",
+      "severity": "BLOCK"
+    },
+    {
+      "code": "TESTED_BASE_UNKNOWN",
+      "count": 4,
+      "detail": "CI Gate",
+      "severity": "BLOCK"
+    },
+    {
+      "code": "BASE_MOVED_RETEST",
+      "count": 1,
+      "detail": "",
+      "severity": "WAIT"
+    },
+    {
+      "code": "PRE_MERGE_REVIEW_MISSING",
+      "count": 1,
+      "detail": "c9dd9aee",
+      "severity": "WAIT"
+    },
+    {
+      "code": "BEHAVIOR_NOT_PRESENTATIONAL",
+      "count": 4,
+      "detail": "",
+      "severity": "INFO"
+    },
+    {
+      "code": "CI_NON_PR_EVENT_RUNS_IGNORED",
+      "count": 1,
+      "detail": "",
+      "severity": "INFO"
+    }
+  ],
+  "recommendation": "BLOCK",
+  "recommendation_basis": [
+    "PR_ALREADY_MERGED",
+    "TESTED_BASE_UNKNOWN"
+  ],
+  "report_sha256": "c39f2d78826a37ac51d2cc3e7e55c4b24a35c91260b1beb6b215f9d43d3e2a7c",
+  "safety": {
+    "github_writes": 0,
+    "tool_calls": {
+      "auto_merge": 0,
+      "merge": 0,
+      "update_branch": 0,
+      "writes": 0
+    },
+    "would_merge": false
+  },
+  "schema": "horizon-shadow-report/1",
+  "shadow_version": "horizon-shadow/0.1.0",
+  "snapshot_time": "2026-10-13T20:20:35Z",
+  "surfaces": {},
+  "zone": "C",
+  "zone_basis": {
+    "behavior": "B",
+    "context": "B",
+    "path": "C"
+  }
+}

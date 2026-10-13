@@ -6,17 +6,17 @@
 
 | Field | Value |
 |---|---|
-| Observation | live (evidence age 0s) at 2026-10-13T19:16:33Z |
+| Observation | live (evidence age 0s) at 2026-10-13T20:21:20Z |
 | PR state | open |
 | Head SHA | `156b4270f9e454bcf78362ea9a2088afbe478e1a` |
 | Base SHA | `4710169140224f8439a809920c2a6e56c8cbab84` |
-| Main SHA (at observation) | `8bd42cb040817873c319ff021bee0668e397aec1` · base is current main: False |
+| Main SHA (at observation) | `073e102ac9334a4f80f368a64d1a3762bb701350` · base is current main: False |
 | Risk zone | **C** (path C, behavior C, context A) |
 | CI | pending · CI Gate: absent/None |
 | Owner review required | True |
 | Evaluator raw decision | STOP OWNER DECISION |
-| Evidence digest | `31789dfae9dc8cc108a40e04c40996c0dbd3fd8c26ff4c8f45156ce0378be835` |
-| Report SHA-256 | `140c361eeb7097541c9744b5090d67cd395ddb26cf4b70c1d540b4c99e99464f` |
+| Evidence digest | `db7e3961738eceb088802e6addd5474e85f61eca9f6473580cc86d1210d266d2` |
+| Report SHA-256 | `de0223670a07ee1ae3806a4cd9f0a2e9c64599687c3a8299786602688959525c` |
 
 ## Why this recommendation
 
@@ -47,7 +47,7 @@ _none observed_
 
 | Severity | Code | × | Detail |
 |---|---|---|---|
-| BLOCK | `CI_CHECK_NEVER_STARTED` | 1 | CI Gate absent 63666m after head push |
+| BLOCK | `CI_CHECK_NEVER_STARTED` | 1 | CI Gate absent 63731m after head push |
 
 ## Authorization blockers (expected in Shadow Mode — no grant exists)
 
@@ -64,7 +64,7 @@ _none observed_
 | Severity | Code | × | Detail |
 |---|---|---|---|
 | STOP | `ZONE_C_OWNER_GATED` | 1 | app/Services/Accounting/ZatcaSignedInvoiceQrCoordinator.php,app/Services/Accounting/ZatcaSignedInvoiceQrResult.php,tests/Feature/ZatcaSignedInvoiceQrCoordinator |
-| BLOCK | `CI_CHECK_NEVER_STARTED` | 1 | CI Gate absent 63666m after head push |
+| BLOCK | `CI_CHECK_NEVER_STARTED` | 1 | CI Gate absent 63731m after head push |
 | BLOCK | `CLAIM_MISSING_OR_MISMATCH` | 1 |  |
 | BLOCK | `HORIZON_LABEL_MISSING_OR_CONTRADICTORY` | 1 | 0 horizon label s  |
 | BLOCK | `HORIZON_NOT_REGISTERED_V2` | 1 |  |

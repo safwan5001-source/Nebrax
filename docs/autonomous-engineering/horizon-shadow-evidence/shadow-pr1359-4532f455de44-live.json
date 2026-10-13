@@ -1,0 +1,231 @@
+{
+  "authorization": {
+    "advisory_only": true,
+    "grant_verified": false,
+    "merge_authorized": false,
+    "statement": "Shadow Mode never grants permission to merge, deploy or change settings. A person decides."
+  },
+  "authorization_blockers": [
+    {
+      "code": "CLAIM_MISSING_OR_MISMATCH",
+      "count": 1,
+      "detail": "",
+      "severity": "BLOCK"
+    },
+    {
+      "code": "HORIZON_LABEL_MISSING_OR_CONTRADICTORY",
+      "count": 1,
+      "detail": "0 horizon label(s)",
+      "severity": "BLOCK"
+    },
+    {
+      "code": "HORIZON_NOT_REGISTERED_V2",
+      "count": 1,
+      "detail": "",
+      "severity": "BLOCK"
+    },
+    {
+      "code": "NO_ACTIVE_GRANT",
+      "count": 1,
+      "detail": "",
+      "severity": "BLOCK"
+    },
+    {
+      "code": "PRE_MERGE_REVIEW_MISSING",
+      "count": 1,
+      "detail": "4532f455",
+      "severity": "WAIT"
+    }
+  ],
+  "ci": {
+    "checks": [
+      {
+        "conclusion": "success",
+        "name": "CI Gate",
+        "status": "completed"
+      },
+      {
+        "conclusion": "success",
+        "name": "php artisan test (L11, pgsql)",
+        "status": "completed"
+      },
+      {
+        "conclusion": "success",
+        "name": "php artisan test (L11, sqlite)",
+        "status": "completed"
+      }
+    ],
+    "ci_gate": {
+      "conclusion": "success",
+      "name": "CI Gate",
+      "status": "completed"
+    },
+    "overall": "passing"
+  },
+  "conflicts": [
+    {
+      "evidence_kind": "observed",
+      "paths": [
+        "AWJ-HORIZON-MEDIA-STORAGE-CLOSURE-REPORT.md",
+        "AWJ-HORIZON-MEDIA-STORAGE-TRACKER.md"
+      ],
+      "pr": 1396,
+      "recent_activity": true,
+      "registered": false,
+      "surfaces": []
+    }
+  ],
+  "evaluator_decision": "STOP_OWNER_DECISION",
+  "evaluator_version": "horizon-eval/0.1.0",
+  "human_checks_remaining": [
+    "a_person_decides_merge_shadow_mode_never_does",
+    "approved_outcome_matches_pr_intent",
+    "refetch_grants_and_head_immediately_before_any_real_merge"
+  ],
+  "missing_evidence": [
+    {
+      "code": "TESTED_BASE_UNKNOWN",
+      "count": 3,
+      "detail": "CI Gate",
+      "severity": "BLOCK"
+    }
+  ],
+  "observation": {
+    "evaluator_record_id": "de0fa8d66bef39296c87f9a7084b053054aaba6237ccb92a7fd0ed624eff5b5e",
+    "evidence_age_seconds": 0,
+    "evidence_digest": "aa5a1448974a47f58dbcaa6445469d73f01054499028114fd238e2dd6171b866",
+    "mode": "live",
+    "policy_sha256": "0ccfc5723b695dbefa6bced1518a161e66d054ca2920f986d768a671e372d249",
+    "snapshot_case_id": "LIVE-PR1359-4532f455"
+  },
+  "owner_review_required": true,
+  "paths": [
+    {
+      "path": "AWJ-HORIZON-MEDIA-STORAGE-CLOSURE-REPORT.md",
+      "status": "modified",
+      "surfaces": [],
+      "zone": "C"
+    },
+    {
+      "path": "AWJ-HORIZON-MEDIA-STORAGE-TRACKER.md",
+      "status": "modified",
+      "surfaces": [],
+      "zone": "C"
+    }
+  ],
+  "paths_omitted": 0,
+  "pr": {
+    "base_is_current_main": false,
+    "base_sha": "be3a7aac2353565d9f2beb5d9e2bb3b34bdd28e8",
+    "head_sha": "4532f455de44a19f76aef2a909637aef61de4d33",
+    "main_sha": "073e102ac9334a4f80f368a64d1a3762bb701350",
+    "number": 1359,
+    "state": "closed"
+  },
+  "reasons": [
+    {
+      "code": "UNREGISTERED_HORIZON_ACTIVE",
+      "count": 1,
+      "detail": "PR#1396 overlaps with no registered claim",
+      "severity": "STOP"
+    },
+    {
+      "code": "ZONE_C_OWNER_GATED",
+      "count": 1,
+      "detail": "AWJ-HORIZON-MEDIA-STORAGE-CLOSURE-REPORT.md,AWJ-HORIZON-MEDIA-STORAGE-TRACKER.md",
+      "severity": "STOP"
+    },
+    {
+      "code": "CLAIM_MISSING_OR_MISMATCH",
+      "count": 1,
+      "detail": "",
+      "severity": "BLOCK"
+    },
+    {
+      "code": "HORIZON_LABEL_MISSING_OR_CONTRADICTORY",
+      "count": 1,
+      "detail": "0 horizon label(s)",
+      "severity": "BLOCK"
+    },
+    {
+      "code": "HORIZON_NOT_REGISTERED_V2",
+      "count": 1,
+      "detail": "",
+      "severity": "BLOCK"
+    },
+    {
+      "code": "NO_ACTIVE_GRANT",
+      "count": 1,
+      "detail": "",
+      "severity": "BLOCK"
+    },
+    {
+      "code": "PR_ALREADY_MERGED",
+      "count": 1,
+      "detail": "",
+      "severity": "BLOCK"
+    },
+    {
+      "code": "TESTED_BASE_UNKNOWN",
+      "count": 3,
+      "detail": "CI Gate",
+      "severity": "BLOCK"
+    },
+    {
+      "code": "BASE_MOVED_RETEST",
+      "count": 1,
+      "detail": "",
+      "severity": "WAIT"
+    },
+    {
+      "code": "PRE_MERGE_REVIEW_MISSING",
+      "count": 1,
+      "detail": "4532f455",
+      "severity": "WAIT"
+    },
+    {
+      "code": "BEHAVIOR_FINANCIAL_OR_SECURITY_TOKEN",
+      "count": 1,
+      "detail": "",
+      "severity": "INFO"
+    },
+    {
+      "code": "BEHAVIOR_MONEY_OR_ACTION_TOKEN",
+      "count": 1,
+      "detail": "",
+      "severity": "INFO"
+    },
+    {
+      "code": "CI_NON_PR_EVENT_RUNS_IGNORED",
+      "count": 1,
+      "detail": "",
+      "severity": "INFO"
+    }
+  ],
+  "recommendation": "BLOCK",
+  "recommendation_basis": [
+    "PR_ALREADY_MERGED",
+    "TESTED_BASE_UNKNOWN"
+  ],
+  "report_sha256": "5dedfd791cf4f458dc39f156064053977a1fca7d6d790570f9deef84e193236f",
+  "safety": {
+    "github_writes": 0,
+    "tool_calls": {
+      "auto_merge": 0,
+      "merge": 0,
+      "update_branch": 0,
+      "writes": 0
+    },
+    "would_merge": false
+  },
+  "schema": "horizon-shadow-report/1",
+  "shadow_version": "horizon-shadow/0.1.0",
+  "snapshot_time": "2026-10-13T20:21:06Z",
+  "surfaces": {},
+  "zone": "C",
+  "zone_basis": {
+    "behavior": "C",
+    "context": "B",
+    "path": "C"
+  }
+}

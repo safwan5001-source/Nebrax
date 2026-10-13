@@ -15,8 +15,8 @@
 | CI | passing · CI Gate: completed/success |
 | Owner review required | True |
 | Evaluator raw decision | STOP OWNER DECISION |
-| Evidence digest | `d95c2dacfd7fa8af9300f3030229ec55f04ec425632c6768447df28b8fdf2f1f` |
-| Report SHA-256 | `5ca3af9f6f2cbd5df881be2fe4d9698973c9b09652eb2f5140e8c0fd3664fe37` |
+| Evidence digest | `6458dd88d34e88874c880fb1ed752015d105477c8502a1966833220d3e535775` |
+| Report SHA-256 | `1089f259819e8f2d66339f049a4293195e6d5dd6a2c57be8c19206f50d6fcbcf` |
 
 ## Why this recommendation
 

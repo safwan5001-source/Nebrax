@@ -6,17 +6,17 @@
 
 | Field | Value |
 |---|---|
-| Observation | live (evidence age 0s) at 2026-10-13T19:16:46Z |
+| Observation | live (evidence age 0s) at 2026-10-13T20:21:35Z |
 | PR state | open |
 | Head SHA | `b16735debb2f8619f2d3b1ac913be0b15695993d` |
 | Base SHA | `f23db797c7032d522f098d4622b0e3447d6cba39` |
-| Main SHA (at observation) | `8bd42cb040817873c319ff021bee0668e397aec1` · base is current main: False |
+| Main SHA (at observation) | `073e102ac9334a4f80f368a64d1a3762bb701350` · base is current main: False |
 | Risk zone | **C** (path C, behavior C, context A) |
 | CI | failing · CI Gate: absent/None |
 | Owner review required | True |
 | Evaluator raw decision | STOP OWNER DECISION |
-| Evidence digest | `a26aebe9bc6bd1074616331b954f55d836c91e54b6a1293aadadfc8394c8dcdb` |
-| Report SHA-256 | `cb207e68eca4c65fb3a825bc04e50507c17fe2ac0afdab9a1920a93d7eea9b11` |
+| Evidence digest | `5f0721d9a7ada9fdd44fa2b9410262261ad9b9fe83390804698ef4779d6cf289` |
+| Report SHA-256 | `19e08fad63e65a44e830f1db0eb0d83969111bd2b9107469292f80c373a87cfe` |
 
 ## Why this recommendation
 
@@ -45,7 +45,7 @@ _none observed_
 
 | Severity | Code | × | Detail |
 |---|---|---|---|
-| BLOCK | `CI_CHECK_NEVER_STARTED` | 1 | CI Gate absent 45535m after head push |
+| BLOCK | `CI_CHECK_NEVER_STARTED` | 1 | CI Gate absent 45600m after head push |
 
 ## Authorization blockers (expected in Shadow Mode — no grant exists)
 
@@ -62,7 +62,7 @@ _none observed_
 | Severity | Code | × | Detail |
 |---|---|---|---|
 | STOP | `ZONE_C_OWNER_GATED` | 1 | app/Console/Commands/RecoverHistoricalTenantCommand.php |
-| BLOCK | `CI_CHECK_NEVER_STARTED` | 1 | CI Gate absent 45535m after head push |
+| BLOCK | `CI_CHECK_NEVER_STARTED` | 1 | CI Gate absent 45600m after head push |
 | BLOCK | `CI_CHECK_NOT_SUCCESS` | 2 | php artisan test  L11, pgsql  failure |
 | BLOCK | `CLAIM_MISSING_OR_MISMATCH` | 1 |  |
 | BLOCK | `HORIZON_LABEL_MISSING_OR_CONTRADICTORY` | 1 | 0 horizon label s  |

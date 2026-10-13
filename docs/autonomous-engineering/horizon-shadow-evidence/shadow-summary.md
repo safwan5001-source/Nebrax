@@ -16,5 +16,5 @@ Advisory only — no row below authorises anything.
 | #1349 | BLOCK | B | passing | `440ace1f9057` | replay-frozen | PATCH_UNAVAILABLE, PR_ALREADY_MERGED, TESTED_BASE_UNKNOWN |
 | #1350 | BLOCK | C | passing | `31bf4f3f8f5d` | replay-frozen | PATCH_UNAVAILABLE, PR_ALREADY_MERGED, TESTED_BASE_UNKNOWN |
 | #1359 | BLOCK | C | passing | `4532f455de44` | live | PR_ALREADY_MERGED, TESTED_BASE_UNKNOWN |
-| #1390 | OWNER_REVIEW | C | pending | `ae0bd0bb94c6` | live | UNREGISTERED_HORIZON_ACTIVE, ZONE_C_OWNER_GATED |
-| #1391 | OWNER_REVIEW | C | pending | `c9dd9aee1425` | live | INJECTION_SUSPECTED, UNREGISTERED_HORIZON_ACTIVE, ZONE_C_OWNER_GATED |
+| #1390 | BLOCK | C | pending | `6e12fb1f8301` | live | PATCH_UNAVAILABLE |
+| #1391 | BLOCK | C | passing | `c9dd9aee1425` | live | PR_ALREADY_MERGED, TESTED_BASE_UNKNOWN |

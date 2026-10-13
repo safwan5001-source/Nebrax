@@ -6,17 +6,17 @@
 
 | Field | Value |
 |---|---|
-| Observation | live (evidence age 0s) at 2026-10-13T19:17:24Z |
+| Observation | live (evidence age 0s) at 2026-10-13T20:22:18Z |
 | PR state | open |
 | Head SHA | `6a73b21e7838b3f374ad520615043f187ea1d01b` |
 | Base SHA | `506a8c53238b7892ff1958ef860af8a9a6a3f0b6` |
-| Main SHA (at observation) | `8bd42cb040817873c319ff021bee0668e397aec1` · base is current main: False |
+| Main SHA (at observation) | `073e102ac9334a4f80f368a64d1a3762bb701350` · base is current main: False |
 | Risk zone | **A** (path A, behavior A, context A) |
 | CI | pending · CI Gate: absent/None |
 | Owner review required | False |
 | Evaluator raw decision | BLOCK |
-| Evidence digest | `444af7c6a8a9aa68a12eb00ed70b22ad54bc5c504885ab9cfa5df6fa5015701a` |
-| Report SHA-256 | `c349733490b89428ca6953535b0cfb6ccbedb49317cb76518686895137e233ed` |
+| Evidence digest | `2317c07b437d3e99392eb2304764a997b98a91292de258ef996b34436868426d` |
+| Report SHA-256 | `34a9e5790d6a3b783b75a69957a7e21a0615ff247cede37d27fdf5d4fc79719d` |
 
 ## Why this recommendation
 
@@ -45,7 +45,7 @@ _none observed_
 
 | Severity | Code | × | Detail |
 |---|---|---|---|
-| BLOCK | `CI_CHECK_NEVER_STARTED` | 1 | CI Gate absent 50199m after head push |
+| BLOCK | `CI_CHECK_NEVER_STARTED` | 1 | CI Gate absent 50264m after head push |
 | BLOCK | `PATCH_UNAVAILABLE` | 1 | docs/audits/AWJ ACCOUNTING SETTINGS PRODUCT COMPLETENESS AUDIT 2026-09.md |
 
 ## Authorization blockers (expected in Shadow Mode — no grant exists)
@@ -62,7 +62,7 @@ _none observed_
 
 | Severity | Code | × | Detail |
 |---|---|---|---|
-| BLOCK | `CI_CHECK_NEVER_STARTED` | 1 | CI Gate absent 50199m after head push |
+| BLOCK | `CI_CHECK_NEVER_STARTED` | 1 | CI Gate absent 50264m after head push |
 | BLOCK | `CLAIM_MISSING_OR_MISMATCH` | 1 |  |
 | BLOCK | `HORIZON_LABEL_MISSING_OR_CONTRADICTORY` | 1 | 0 horizon label s  |
 | BLOCK | `HORIZON_NOT_REGISTERED_V2` | 1 |  |

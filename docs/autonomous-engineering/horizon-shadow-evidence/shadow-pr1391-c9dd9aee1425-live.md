@@ -1,26 +1,26 @@
 # Horizon Shadow report — PR #1391
 
-**Recommendation: `OWNER_REVIEW`** — advisory only. `merge_authorized: false` · `grant_verified: false` · GitHub writes: 0
+**Recommendation: `BLOCK`** — advisory only. `merge_authorized: false` · `grant_verified: false` · GitHub writes: 0
 
 > Shadow Mode never grants permission to merge, deploy or change settings. A person decides.
 
 | Field | Value |
 |---|---|
-| Observation | live (evidence age 0s) at 2026-10-13T19:15:50Z |
-| PR state | open |
+| Observation | live (evidence age 0s) at 2026-10-13T20:20:35Z |
+| PR state | closed |
 | Head SHA | `c9dd9aee142547fcaff66bef5353b4f7879896f2` |
 | Base SHA | `be3a7aac2353565d9f2beb5d9e2bb3b34bdd28e8` |
-| Main SHA (at observation) | `8bd42cb040817873c319ff021bee0668e397aec1` · base is current main: False |
+| Main SHA (at observation) | `073e102ac9334a4f80f368a64d1a3762bb701350` · base is current main: False |
 | Risk zone | **C** (path C, behavior B, context B) |
-| CI | pending · CI Gate: in_progress/None |
+| CI | passing · CI Gate: completed/success |
 | Owner review required | True |
 | Evaluator raw decision | STOP OWNER DECISION |
-| Evidence digest | `affa869383d84b1288f86077f021112a80e8de598bfa7f25b21d15ac9bded761` |
-| Report SHA-256 | `ae9d3b00d1cf75947593d4b031a599fa4a70e0e8d6fa61a055472db83e302de3` |
+| Evidence digest | `caf939bdaaf6c03a55d8c5c6b7831fe644cd4cdea1899e1c26efab963f858512` |
+| Report SHA-256 | `c39f2d78826a37ac51d2cc3e7e55c4b24a35c91260b1beb6b215f9d43d3e2a7c` |
 
 ## Why this recommendation
 
-`INJECTION_SUSPECTED`, `UNREGISTERED_HORIZON_ACTIVE`, `ZONE_C_OWNER_GATED`
+`PR_ALREADY_MERGED`, `TESTED_BASE_UNKNOWN`
 
 ## Changed paths and semantic surfaces
 
@@ -41,19 +41,21 @@ Surfaces: _none_
 | Check | Status | Conclusion |
 |---|---|---|
 | `web build (Next.js)` | completed | success |
-| `CI Gate` | in_progress | - |
-| `php artisan test (L11, pgsql)` | in_progress | - |
+| `CI Gate` | completed | success |
+| `php artisan test (L11, pgsql)` | completed | success |
 | `php artisan test (L11, sqlite)` | completed | success |
 
 ## Parallel Horizon conflicts
 
 | PR | Evidence | Registered | Recent activity | Shared paths | Shared surfaces |
 |---|---|---|---|---|---|
-| #1390 | observed | False | True | web/src/messages/ar.json, web/src/messages/en.json | - |
+| #1390 | observed | False | False | web/src/messages/ar.json, web/src/messages/en.json | - |
 
 ## Missing evidence
 
-_none_
+| Severity | Code | × | Detail |
+|---|---|---|---|
+| BLOCK | `TESTED_BASE_UNKNOWN` | 4 | CI Gate |
 
 ## Authorization blockers (expected in Shadow Mode — no grant exists)
 
@@ -69,16 +71,16 @@ _none_
 
 | Severity | Code | × | Detail |
 |---|---|---|---|
-| STOP | `INJECTION_SUSPECTED` | 1 | INJ-OVERRIDE |
-| STOP | `UNREGISTERED_HORIZON_ACTIVE` | 1 | PR 1390 overlaps with no registered claim |
+| STOP | `INJECTION_SUSPECTED` | 1 | INJ-AUTH-CLAIM,INJ-OVERRIDE |
+| STOP | `UNREGISTERED_PR_OVERLAP` | 1 | PR 1390 overlaps with no registered claim |
 | STOP | `ZONE_C_OWNER_GATED` | 1 | web/src/messages/ar.json,web/src/messages/en.json |
 | BLOCK | `CLAIM_MISSING_OR_MISMATCH` | 1 |  |
 | BLOCK | `HORIZON_LABEL_MISSING_OR_CONTRADICTORY` | 1 | 0 horizon label s  |
 | BLOCK | `HORIZON_NOT_REGISTERED_V2` | 1 |  |
 | BLOCK | `NO_ACTIVE_GRANT` | 1 |  |
+| BLOCK | `PR_ALREADY_MERGED` | 1 |  |
+| BLOCK | `TESTED_BASE_UNKNOWN` | 4 | CI Gate |
 | WAIT | `BASE_MOVED_RETEST` | 1 |  |
-| WAIT | `CI_CHECK_PENDING` | 2 | CI Gate in progress |
-| WAIT | `CI_TESTED_AGAINST_OLDER_BASE` | 4 | CI Gate: main moved since this run; re-run needed |
 | WAIT | `PRE_MERGE_REVIEW_MISSING` | 1 | c9dd9aee |
 | INFO | `BEHAVIOR_NOT_PRESENTATIONAL` | 4 |  |
 | INFO | `CI_NON_PR_EVENT_RUNS_IGNORED` | 1 |  |

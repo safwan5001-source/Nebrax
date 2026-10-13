@@ -6,17 +6,17 @@
 
 | Field | Value |
 |---|---|
-| Observation | live (evidence age 0s) at 2026-10-13T19:16:18Z |
+| Observation | live (evidence age 0s) at 2026-10-13T20:21:06Z |
 | PR state | closed |
 | Head SHA | `4532f455de44a19f76aef2a909637aef61de4d33` |
 | Base SHA | `be3a7aac2353565d9f2beb5d9e2bb3b34bdd28e8` |
-| Main SHA (at observation) | `8bd42cb040817873c319ff021bee0668e397aec1` · base is current main: False |
-| Risk zone | **C** (path C, behavior C, context A) |
+| Main SHA (at observation) | `073e102ac9334a4f80f368a64d1a3762bb701350` · base is current main: False |
+| Risk zone | **C** (path C, behavior C, context B) |
 | CI | passing · CI Gate: completed/success |
 | Owner review required | True |
 | Evaluator raw decision | STOP OWNER DECISION |
-| Evidence digest | `abedf17fd251813f68fe2c15fc1608ff999809d82337dad75ce2912f9ada3920` |
-| Report SHA-256 | `12e3fb98cfc191904cb61e421e70b62ba96ad819d39e564158819b420e4968b2` |
+| Evidence digest | `aa5a1448974a47f58dbcaa6445469d73f01054499028114fd238e2dd6171b866` |
+| Report SHA-256 | `5dedfd791cf4f458dc39f156064053977a1fca7d6d790570f9deef84e193236f` |
 
 ## Why this recommendation
 
@@ -41,7 +41,9 @@ Surfaces: _none_
 
 ## Parallel Horizon conflicts
 
-_none observed_
+| PR | Evidence | Registered | Recent activity | Shared paths | Shared surfaces |
+|---|---|---|---|---|---|
+| #1396 | observed | False | True | AWJ-HORIZON-MEDIA-STORAGE-CLOSURE-REPORT.md, AWJ-HORIZON-MEDIA-STORAGE-TRACKER.md | - |
 
 ## Missing evidence
 
@@ -63,6 +65,7 @@ _none observed_
 
 | Severity | Code | × | Detail |
 |---|---|---|---|
+| STOP | `UNREGISTERED_HORIZON_ACTIVE` | 1 | PR 1396 overlaps with no registered claim |
 | STOP | `ZONE_C_OWNER_GATED` | 1 | AWJ-HORIZON-MEDIA-STORAGE-CLOSURE-REPORT.md,AWJ-HORIZON-MEDIA-STORAGE-TRACKER.md |
 | BLOCK | `CLAIM_MISSING_OR_MISMATCH` | 1 |  |
 | BLOCK | `HORIZON_LABEL_MISSING_OR_CONTRADICTORY` | 1 | 0 horizon label s  |

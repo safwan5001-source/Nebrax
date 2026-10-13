@@ -1,0 +1,218 @@
+{
+  "authorization": {
+    "advisory_only": true,
+    "grant_verified": false,
+    "merge_authorized": false,
+    "statement": "Shadow Mode never grants permission to merge, deploy or change settings. A person decides."
+  },
+  "authorization_blockers": [
+    {
+      "code": "CLAIM_MISSING_OR_MISMATCH",
+      "count": 1,
+      "detail": "",
+      "severity": "BLOCK"
+    },
+    {
+      "code": "HORIZON_LABEL_MISSING_OR_CONTRADICTORY",
+      "count": 1,
+      "detail": "0 horizon label(s)",
+      "severity": "BLOCK"
+    },
+    {
+      "code": "HORIZON_NOT_REGISTERED_V2",
+      "count": 1,
+      "detail": "",
+      "severity": "BLOCK"
+    },
+    {
+      "code": "NO_ACTIVE_GRANT",
+      "count": 1,
+      "detail": "",
+      "severity": "BLOCK"
+    },
+    {
+      "code": "PRE_MERGE_REVIEW_MISSING",
+      "count": 1,
+      "detail": "156b4270",
+      "severity": "WAIT"
+    }
+  ],
+  "ci": {
+    "checks": [
+      {
+        "conclusion": "success",
+        "name": "php artisan test (L11, sqlite)",
+        "status": "completed"
+      },
+      {
+        "conclusion": "success",
+        "name": "php artisan test (L11, pgsql)",
+        "status": "completed"
+      }
+    ],
+    "ci_gate": {
+      "conclusion": null,
+      "name": "CI Gate",
+      "status": "absent"
+    },
+    "overall": "pending"
+  },
+  "conflicts": [],
+  "evaluator_decision": "STOP_OWNER_DECISION",
+  "evaluator_version": "horizon-eval/0.1.0",
+  "human_checks_remaining": [
+    "a_person_decides_merge_shadow_mode_never_does",
+    "approved_outcome_matches_pr_intent",
+    "refetch_grants_and_head_immediately_before_any_real_merge"
+  ],
+  "missing_evidence": [
+    {
+      "code": "CI_CHECK_NEVER_STARTED",
+      "count": 1,
+      "detail": "CI Gate absent 63731m after head push",
+      "severity": "BLOCK"
+    }
+  ],
+  "observation": {
+    "evaluator_record_id": "cf51131cc71f4784f9b4ac7e0f804dd80fde7eac77eb04f36ce190ee7822b63c",
+    "evidence_age_seconds": 0,
+    "evidence_digest": "db7e3961738eceb088802e6addd5474e85f61eca9f6473580cc86d1210d266d2",
+    "mode": "live",
+    "policy_sha256": "0ccfc5723b695dbefa6bced1518a161e66d054ca2920f986d768a671e372d249",
+    "snapshot_case_id": "LIVE-PR586-156b4270"
+  },
+  "owner_review_required": true,
+  "paths": [
+    {
+      "path": "app/Services/Accounting/ZatcaSignedInvoiceQrCoordinator.php",
+      "status": "added",
+      "surfaces": [
+        "S-LEDGER",
+        "S-ZATCA-ICV"
+      ],
+      "zone": "C"
+    },
+    {
+      "path": "app/Services/Accounting/ZatcaSignedInvoiceQrResult.php",
+      "status": "added",
+      "surfaces": [
+        "S-LEDGER",
+        "S-ZATCA-ICV"
+      ],
+      "zone": "C"
+    },
+    {
+      "path": "tests/Feature/ZatcaSignedInvoiceQrCoordinatorTest.php",
+      "status": "added",
+      "surfaces": [
+        "S-ZATCA-ICV"
+      ],
+      "zone": "C"
+    }
+  ],
+  "paths_omitted": 0,
+  "pr": {
+    "base_is_current_main": false,
+    "base_sha": "4710169140224f8439a809920c2a6e56c8cbab84",
+    "head_sha": "156b4270f9e454bcf78362ea9a2088afbe478e1a",
+    "main_sha": "073e102ac9334a4f80f368a64d1a3762bb701350",
+    "number": 586,
+    "state": "open"
+  },
+  "reasons": [
+    {
+      "code": "ZONE_C_OWNER_GATED",
+      "count": 1,
+      "detail": "app/Services/Accounting/ZatcaSignedInvoiceQrCoordinator.php,app/Services/Accounting/ZatcaSignedInvoiceQrResult.php,tests/Feature/ZatcaSignedInvoiceQrCoordinator",
+      "severity": "STOP"
+    },
+    {
+      "code": "CI_CHECK_NEVER_STARTED",
+      "count": 1,
+      "detail": "CI Gate absent 63731m after head push",
+      "severity": "BLOCK"
+    },
+    {
+      "code": "CLAIM_MISSING_OR_MISMATCH",
+      "count": 1,
+      "detail": "",
+      "severity": "BLOCK"
+    },
+    {
+      "code": "HORIZON_LABEL_MISSING_OR_CONTRADICTORY",
+      "count": 1,
+      "detail": "0 horizon label(s)",
+      "severity": "BLOCK"
+    },
+    {
+      "code": "HORIZON_NOT_REGISTERED_V2",
+      "count": 1,
+      "detail": "",
+      "severity": "BLOCK"
+    },
+    {
+      "code": "NO_ACTIVE_GRANT",
+      "count": 1,
+      "detail": "",
+      "severity": "BLOCK"
+    },
+    {
+      "code": "BASE_MOVED_RETEST",
+      "count": 1,
+      "detail": "",
+      "severity": "WAIT"
+    },
+    {
+      "code": "CI_TESTED_AGAINST_OLDER_BASE",
+      "count": 2,
+      "detail": "php artisan test (L11, pgsql): main moved since this run; re-run needed",
+      "severity": "WAIT"
+    },
+    {
+      "code": "PRE_MERGE_REVIEW_MISSING",
+      "count": 1,
+      "detail": "156b4270",
+      "severity": "WAIT"
+    },
+    {
+      "code": "BEHAVIOR_FINANCIAL_OR_SECURITY_TOKEN",
+      "count": 3,
+      "detail": "",
+      "severity": "INFO"
+    },
+    {
+      "code": "CI_NON_PR_EVENT_RUNS_IGNORED",
+      "count": 1,
+      "detail": "",
+      "severity": "INFO"
+    }
+  ],
+  "recommendation": "BLOCK",
+  "recommendation_basis": [
+    "CI_CHECK_NEVER_STARTED"
+  ],
+  "report_sha256": "de0223670a07ee1ae3806a4cd9f0a2e9c64599687c3a8299786602688959525c",
+  "safety": {
+    "github_writes": 0,
+    "tool_calls": {
+      "auto_merge": 0,
+      "merge": 0,
+      "update_branch": 0,
+      "writes": 0
+    },
+    "would_merge": false
+  },
+  "schema": "horizon-shadow-report/1",
+  "shadow_version": "horizon-shadow/0.1.0",
+  "snapshot_time": "2026-10-13T20:21:20Z",
+  "surfaces": {
+    "S-LEDGER": "exclusive",
+    "S-ZATCA-ICV": "exclusive"
+  },
+  "zone": "C",
+  "zone_basis": {
+    "behavior": "C",
+    "context": "A",
+    "path": "C"
+  }
+}

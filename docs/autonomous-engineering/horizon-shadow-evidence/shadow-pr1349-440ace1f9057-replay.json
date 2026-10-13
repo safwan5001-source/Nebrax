@@ -1,0 +1,375 @@
+{
+  "authorization": {
+    "advisory_only": true,
+    "grant_verified": false,
+    "merge_authorized": false,
+    "statement": "Shadow Mode never grants permission to merge, deploy or change settings. A person decides."
+  },
+  "authorization_blockers": [
+    {
+      "code": "CLAIM_MISSING_OR_MISMATCH",
+      "count": 1,
+      "detail": "",
+      "severity": "BLOCK"
+    },
+    {
+      "code": "HORIZON_LABEL_MISSING_OR_CONTRADICTORY",
+      "count": 1,
+      "detail": "0 horizon label(s)",
+      "severity": "BLOCK"
+    },
+    {
+      "code": "HORIZON_NOT_REGISTERED_V2",
+      "count": 1,
+      "detail": "",
+      "severity": "BLOCK"
+    },
+    {
+      "code": "NO_ACTIVE_GRANT",
+      "count": 1,
+      "detail": "",
+      "severity": "BLOCK"
+    },
+    {
+      "code": "GUARDIAN_MISSING",
+      "count": 1,
+      "detail": "440ace1f",
+      "severity": "WAIT"
+    },
+    {
+      "code": "INDEPENDENT_REVIEW_MISSING",
+      "count": 1,
+      "detail": "440ace1f",
+      "severity": "WAIT"
+    },
+    {
+      "code": "PRE_MERGE_REVIEW_MISSING",
+      "count": 1,
+      "detail": "440ace1f",
+      "severity": "WAIT"
+    },
+    {
+      "code": "REGRESSION_TEST_MISSING",
+      "count": 1,
+      "detail": "440ace1f",
+      "severity": "WAIT"
+    }
+  ],
+  "ci": {
+    "checks": [
+      {
+        "conclusion": "success",
+        "name": "web build (Next.js)",
+        "status": "completed"
+      },
+      {
+        "conclusion": "success",
+        "name": "php artisan test (L11, sqlite)",
+        "status": "completed"
+      },
+      {
+        "conclusion": "success",
+        "name": "php artisan test (L11, pgsql)",
+        "status": "completed"
+      },
+      {
+        "conclusion": "success",
+        "name": "CI Gate",
+        "status": "completed"
+      }
+    ],
+    "ci_gate": {
+      "conclusion": "success",
+      "name": "CI Gate",
+      "status": "completed"
+    },
+    "overall": "passing"
+  },
+  "conflicts": [
+    {
+      "evidence_kind": "observed",
+      "paths": [
+        "web/src/modules/store-experience-builder/messages.ts",
+        "web/src/modules/store-experience-builder/themes/index.ts"
+      ],
+      "pr": 1353,
+      "recent_activity": true,
+      "registered": false,
+      "surfaces": []
+    }
+  ],
+  "evaluator_decision": "STOP_OWNER_DECISION",
+  "evaluator_version": "horizon-eval/0.1.0",
+  "human_checks_remaining": [
+    "a_person_decides_merge_shadow_mode_never_does",
+    "approved_outcome_matches_pr_intent",
+    "refetch_grants_and_head_immediately_before_any_real_merge"
+  ],
+  "missing_evidence": [
+    {
+      "code": "PATCH_UNAVAILABLE",
+      "count": 19,
+      "detail": "docs/plans/store/CUST-HV-V10A-IMPLEMENTATION-REPORT.md",
+      "severity": "BLOCK"
+    },
+    {
+      "code": "TESTED_BASE_UNKNOWN",
+      "count": 4,
+      "detail": "CI Gate",
+      "severity": "BLOCK"
+    }
+  ],
+  "observation": {
+    "evaluator_record_id": "7147ababb2a7799a18c79ae018d84a35c16daf4b00a2e153d704f1396408cb18",
+    "evidence_age_seconds": 0,
+    "evidence_digest": "54f85c44595a3404ced68e87e9d29fca408b83590e74c1f883c85556b5bebd6c",
+    "mode": "replay-frozen",
+    "policy_sha256": "0ccfc5723b695dbefa6bced1518a161e66d054ca2920f986d768a671e372d249",
+    "snapshot_case_id": "LIVE-PR1349-440ace1f"
+  },
+  "owner_review_required": true,
+  "paths": [
+    {
+      "path": "docs/plans/store/CUST-HV-V10A-IMPLEMENTATION-REPORT.md",
+      "status": "modified",
+      "surfaces": [],
+      "zone": "A"
+    },
+    {
+      "path": "docs/plans/store/CUST-HV-V10B-IMPLEMENTATION-REPORT.md",
+      "status": "added",
+      "surfaces": [],
+      "zone": "A"
+    },
+    {
+      "path": "web/e2e/flowers-h15-bloom-theme.spec.ts",
+      "status": "modified",
+      "surfaces": [],
+      "zone": "B"
+    },
+    {
+      "path": "web/src/app/(commerce)/commerce/appearance/page.tsx",
+      "status": "modified",
+      "surfaces": [],
+      "zone": "B"
+    },
+    {
+      "path": "web/src/app/(commerce)/commerce/themes/page.test.tsx",
+      "status": "modified",
+      "surfaces": [],
+      "zone": "B"
+    },
+    {
+      "path": "web/src/app/(commerce)/commerce/themes/page.tsx",
+      "status": "modified",
+      "surfaces": [],
+      "zone": "B"
+    },
+    {
+      "path": "web/src/modules/commerce-workspace/messages.ts",
+      "status": "modified",
+      "surfaces": [],
+      "zone": "B"
+    },
+    {
+      "path": "web/src/modules/commerce-workspace/theme-registry.test.ts",
+      "status": "removed",
+      "surfaces": [],
+      "zone": "B"
+    },
+    {
+      "path": "web/src/modules/commerce-workspace/theme-registry.ts",
+      "status": "removed",
+      "surfaces": [],
+      "zone": "B"
+    },
+    {
+      "path": "web/src/modules/store-experience-builder/ExperienceBuilder.tsx",
+      "status": "modified",
+      "surfaces": [],
+      "zone": "B"
+    },
+    {
+      "path": "web/src/modules/store-experience-builder/__tests__/ExperienceBuilder.themePreview.test.tsx",
+      "status": "added",
+      "surfaces": [],
+      "zone": "B"
+    },
+    {
+      "path": "web/src/modules/store-experience-builder/__tests__/apply-theme-flow.test.ts",
+      "status": "added",
+      "surfaces": [],
+      "zone": "B"
+    },
+    {
+      "path": "web/src/modules/store-experience-builder/messages.ts",
+      "status": "modified",
+      "surfaces": [],
+      "zone": "B"
+    },
+    {
+      "path": "web/src/modules/store-experience-builder/themes/ThemePreviewBar.tsx",
+      "status": "added",
+      "surfaces": [],
+      "zone": "B"
+    },
+    {
+      "path": "web/src/modules/store-experience-builder/themes/apply-theme-flow.ts",
+      "status": "added",
+      "surfaces": [],
+      "zone": "B"
+    },
+    {
+      "path": "web/src/modules/store-experience-builder/themes/apply-theme.ts",
+      "status": "modified",
+      "surfaces": [],
+      "zone": "B"
+    },
+    {
+      "path": "web/src/modules/store-experience-builder/themes/built-in-themes.ts",
+      "status": "modified",
+      "surfaces": [],
+      "zone": "B"
+    },
+    {
+      "path": "web/src/modules/store-experience-builder/themes/index.ts",
+      "status": "modified",
+      "surfaces": [],
+      "zone": "B"
+    },
+    {
+      "path": "web/src/modules/store-experience-builder/themes/preview-link.ts",
+      "status": "added",
+      "surfaces": [],
+      "zone": "B"
+    }
+  ],
+  "paths_omitted": 0,
+  "pr": {
+    "base_is_current_main": false,
+    "base_sha": "097c5ee7c40f152aaaa8468a970d3db66c1ebf74",
+    "head_sha": "440ace1f90573e586d8478d83cda6c4890b018a5",
+    "main_sha": "40832b21ffe99ec193ec2e7732c79b987debcc8e",
+    "number": 1349,
+    "state": "closed"
+  },
+  "reasons": [
+    {
+      "code": "UNREGISTERED_HORIZON_ACTIVE",
+      "count": 1,
+      "detail": "PR#1353 overlaps with no registered claim",
+      "severity": "STOP"
+    },
+    {
+      "code": "CLAIM_MISSING_OR_MISMATCH",
+      "count": 1,
+      "detail": "",
+      "severity": "BLOCK"
+    },
+    {
+      "code": "HORIZON_LABEL_MISSING_OR_CONTRADICTORY",
+      "count": 1,
+      "detail": "0 horizon label(s)",
+      "severity": "BLOCK"
+    },
+    {
+      "code": "HORIZON_NOT_REGISTERED_V2",
+      "count": 1,
+      "detail": "",
+      "severity": "BLOCK"
+    },
+    {
+      "code": "NO_ACTIVE_GRANT",
+      "count": 1,
+      "detail": "",
+      "severity": "BLOCK"
+    },
+    {
+      "code": "PATCH_UNAVAILABLE",
+      "count": 19,
+      "detail": "docs/plans/store/CUST-HV-V10A-IMPLEMENTATION-REPORT.md",
+      "severity": "BLOCK"
+    },
+    {
+      "code": "PR_ALREADY_MERGED",
+      "count": 1,
+      "detail": "",
+      "severity": "BLOCK"
+    },
+    {
+      "code": "TESTED_BASE_UNKNOWN",
+      "count": 4,
+      "detail": "CI Gate",
+      "severity": "BLOCK"
+    },
+    {
+      "code": "BASE_MOVED_RETEST",
+      "count": 1,
+      "detail": "",
+      "severity": "WAIT"
+    },
+    {
+      "code": "GUARDIAN_MISSING",
+      "count": 1,
+      "detail": "440ace1f",
+      "severity": "WAIT"
+    },
+    {
+      "code": "INDEPENDENT_REVIEW_MISSING",
+      "count": 1,
+      "detail": "440ace1f",
+      "severity": "WAIT"
+    },
+    {
+      "code": "PRE_MERGE_REVIEW_MISSING",
+      "count": 1,
+      "detail": "440ace1f",
+      "severity": "WAIT"
+    },
+    {
+      "code": "REGRESSION_TEST_MISSING",
+      "count": 1,
+      "detail": "440ace1f",
+      "severity": "WAIT"
+    },
+    {
+      "code": "SHADOW_REPLAY_HISTORICAL",
+      "count": 1,
+      "detail": "frozen snapshot evaluated at its own recorded time; historical, cannot be ready",
+      "severity": "WAIT"
+    },
+    {
+      "code": "CI_NON_PR_EVENT_RUNS_IGNORED",
+      "count": 1,
+      "detail": "",
+      "severity": "INFO"
+    }
+  ],
+  "recommendation": "BLOCK",
+  "recommendation_basis": [
+    "PATCH_UNAVAILABLE",
+    "PR_ALREADY_MERGED",
+    "TESTED_BASE_UNKNOWN"
+  ],
+  "report_sha256": "bc23f9a7eda558767971c68f58a798fe0a3c26678eb49a21340de9e393a40203",
+  "safety": {
+    "github_writes": 0,
+    "tool_calls": {
+      "auto_merge": 0,
+      "merge": 0,
+      "update_branch": 0,
+      "writes": 0
+    },
+    "would_merge": false
+  },
+  "schema": "horizon-shadow-report/1",
+  "shadow_version": "horizon-shadow/0.1.0",
+  "snapshot_time": "2026-10-12T03:43:52Z",
+  "surfaces": {},
+  "zone": "B",
+  "zone_basis": {
+    "behavior": "B",
+    "context": "B",
+    "path": "B"
+  }
+}

@@ -49,7 +49,7 @@ jobs:
         run: |
           set -o pipefail
           set -eu
-          MIN_TESTS=238
+          MIN_TESTS=243
           log="$RUNNER_TEMP/horizon-eval-tests.log"
           python -I -B -m unittest discover -s scripts/horizon-eval -v 2>&1 | tee "$log"
           total="$(sed -n 's/^Ran \([0-9][0-9]*\) tests\{0,1\} in .*/\1/p' "$log" | tail -n 1)"

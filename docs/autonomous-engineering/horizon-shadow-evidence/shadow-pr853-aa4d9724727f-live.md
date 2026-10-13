@@ -6,17 +6,17 @@
 
 | Field | Value |
 |---|---|
-| Observation | live (evidence age 0s) at 2026-10-13T19:17:11Z |
+| Observation | live (evidence age 0s) at 2026-10-13T20:22:04Z |
 | PR state | open |
 | Head SHA | `aa4d9724727f09978de35c57d391d30255da261b` |
 | Base SHA | `3b88a45731e190d09c38ba0790b8cdcd13d2897f` |
-| Main SHA (at observation) | `8bd42cb040817873c319ff021bee0668e397aec1` · base is current main: False |
+| Main SHA (at observation) | `073e102ac9334a4f80f368a64d1a3762bb701350` · base is current main: False |
 | Risk zone | **A** (path A, behavior A, context A) |
 | CI | pending · CI Gate: absent/None |
 | Owner review required | False |
 | Evaluator raw decision | BLOCK |
-| Evidence digest | `92d97308014c0e8e02a8dcabcd0ac1f7bcd6dfd76ad40e5bcba2cb89c1aad4cd` |
-| Report SHA-256 | `65405c6e302499c51abda790c5e76dc7efece44f8104169049614a9ca439692b` |
+| Evidence digest | `49374329387707eadf79dd36054f0e3daefb392d14cfa8d5d05fef89aa2f725d` |
+| Report SHA-256 | `6ffc2aa5b20796e445074c7520223aacf595608e09e0c3e316975dfe04c403a9` |
 
 ## Why this recommendation
 
@@ -45,7 +45,7 @@ _none observed_
 
 | Severity | Code | × | Detail |
 |---|---|---|---|
-| BLOCK | `CI_CHECK_NEVER_STARTED` | 1 | CI Gate absent 37957m after head push |
+| BLOCK | `CI_CHECK_NEVER_STARTED` | 1 | CI Gate absent 38022m after head push |
 
 ## Authorization blockers (expected in Shadow Mode — no grant exists)
 
@@ -61,7 +61,7 @@ _none observed_
 
 | Severity | Code | × | Detail |
 |---|---|---|---|
-| BLOCK | `CI_CHECK_NEVER_STARTED` | 1 | CI Gate absent 37957m after head push |
+| BLOCK | `CI_CHECK_NEVER_STARTED` | 1 | CI Gate absent 38022m after head push |
 | BLOCK | `CLAIM_MISSING_OR_MISMATCH` | 1 |  |
 | BLOCK | `HORIZON_LABEL_MISSING_OR_CONTRADICTORY` | 1 | 0 horizon label s  |
 | BLOCK | `HORIZON_NOT_REGISTERED_V2` | 1 |  |

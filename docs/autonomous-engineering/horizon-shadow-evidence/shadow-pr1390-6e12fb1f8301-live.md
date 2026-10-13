@@ -1,26 +1,26 @@
 # Horizon Shadow report — PR #1390
 
-**Recommendation: `OWNER_REVIEW`** — advisory only. `merge_authorized: false` · `grant_verified: false` · GitHub writes: 0
+**Recommendation: `BLOCK`** — advisory only. `merge_authorized: false` · `grant_verified: false` · GitHub writes: 0
 
 > Shadow Mode never grants permission to merge, deploy or change settings. A person decides.
 
 | Field | Value |
 |---|---|
-| Observation | live (evidence age 0s) at 2026-10-13T19:16:03Z |
+| Observation | live (evidence age 0s) at 2026-10-13T20:20:51Z |
 | PR state | open |
-| Head SHA | `ae0bd0bb94c675a2f9a11708248bbebbb0dc1a8d` |
+| Head SHA | `6e12fb1f83019b806b945910d6ebfb820b9182c8` |
 | Base SHA | `be3a7aac2353565d9f2beb5d9e2bb3b34bdd28e8` |
-| Main SHA (at observation) | `8bd42cb040817873c319ff021bee0668e397aec1` · base is current main: False |
-| Risk zone | **C** (path C, behavior C, context B) |
-| CI | pending · CI Gate: in_progress/None |
+| Main SHA (at observation) | `073e102ac9334a4f80f368a64d1a3762bb701350` · base is current main: False |
+| Risk zone | **C** (path C, behavior C, context A) |
+| CI | pending · CI Gate: completed/success |
 | Owner review required | True |
 | Evaluator raw decision | STOP OWNER DECISION |
-| Evidence digest | `ca09ed5ce4fe7bb6314ac76138c8cd98109ac03b2f232a3ce8f8946a8aa9752c` |
-| Report SHA-256 | `afa15c78d9e843fb0b84ece5100ed69d21234baf8318a525c6d24a187b0774c3` |
+| Evidence digest | `e5d5407a47713808e60f057cb79cfbe9e42a6361ab01bcd99d9744f753531a7e` |
+| Report SHA-256 | `21db37175728412f42ead3a1054122eef35d183775ef60189354a0fd7ba55796` |
 
 ## Why this recommendation
 
-`UNREGISTERED_HORIZON_ACTIVE`, `ZONE_C_OWNER_GATED`
+`PATCH_UNAVAILABLE`
 
 ## Changed paths and semantic surfaces
 
@@ -57,21 +57,20 @@ Surfaces: `S-RBAC-TENANT` (exclusive)
 
 | Check | Status | Conclusion |
 |---|---|---|
-| `web build (Next.js)` | in_progress | - |
-| `CI Gate` | in_progress | - |
-| `php artisan test (L11, pgsql)` | queued | - |
-| `php artisan test (L11, sqlite)` | queued | - |
+| `web build (Next.js)` | completed | success |
+| `php artisan test (L11, sqlite)` | completed | success |
+| `php artisan test (L11, pgsql)` | completed | success |
+| `CI Gate` | completed | success |
 
 ## Parallel Horizon conflicts
 
-| PR | Evidence | Registered | Recent activity | Shared paths | Shared surfaces |
-|---|---|---|---|---|---|
-| #1391 | observed | False | True | web/src/messages/ar.json, web/src/messages/en.json | - |
-| #1392 | observed | False | True | - | S-RBAC-TENANT |
+_none observed_
 
 ## Missing evidence
 
-_none_
+| Severity | Code | × | Detail |
+|---|---|---|---|
+| BLOCK | `PATCH_UNAVAILABLE` | 1 | docs/plans/pos/INT-UX-2-IMPLEMENTATION-REPORT.md |
 
 ## Authorization blockers (expected in Shadow Mode — no grant exists)
 
@@ -81,22 +80,21 @@ _none_
 | BLOCK | `HORIZON_LABEL_MISSING_OR_CONTRADICTORY` | 1 | 0 horizon label s  |
 | BLOCK | `HORIZON_NOT_REGISTERED_V2` | 1 |  |
 | BLOCK | `NO_ACTIVE_GRANT` | 1 |  |
-| WAIT | `PRE_MERGE_REVIEW_MISSING` | 1 | ae0bd0bb |
+| WAIT | `PRE_MERGE_REVIEW_MISSING` | 1 | 6e12fb1f |
 
 ## All reasons
 
 | Severity | Code | × | Detail |
 |---|---|---|---|
-| STOP | `UNREGISTERED_HORIZON_ACTIVE` | 2 | PR 1391 overlaps with no registered claim |
 | STOP | `ZONE_C_OWNER_GATED` | 1 | web/e2e/int-ux-2-delivery-platform-catalog.spec.ts,web/src/components/integrations/delivery-platform-catalog.test.tsx,web/src/components/integrations/delivery-p |
 | BLOCK | `CLAIM_MISSING_OR_MISMATCH` | 1 |  |
 | BLOCK | `HORIZON_LABEL_MISSING_OR_CONTRADICTORY` | 1 | 0 horizon label s  |
 | BLOCK | `HORIZON_NOT_REGISTERED_V2` | 1 |  |
 | BLOCK | `NO_ACTIVE_GRANT` | 1 |  |
+| BLOCK | `PATCH_UNAVAILABLE` | 1 | docs/plans/pos/INT-UX-2-IMPLEMENTATION-REPORT.md |
 | WAIT | `BASE_MOVED_RETEST` | 1 |  |
-| WAIT | `CI_CHECK_PENDING` | 4 | CI Gate in progress |
 | WAIT | `CI_TESTED_AGAINST_OLDER_BASE` | 4 | CI Gate: main moved since this run; re-run needed |
-| WAIT | `PRE_MERGE_REVIEW_MISSING` | 1 | ae0bd0bb |
+| WAIT | `PRE_MERGE_REVIEW_MISSING` | 1 | 6e12fb1f |
 | INFO | `BEHAVIOR_FINANCIAL_OR_SECURITY_TOKEN` | 5 |  |
 | INFO | `BEHAVIOR_NOT_PRESENTATIONAL` | 14 |  |
 | INFO | `CI_NON_PR_EVENT_RUNS_IGNORED` | 1 |  |

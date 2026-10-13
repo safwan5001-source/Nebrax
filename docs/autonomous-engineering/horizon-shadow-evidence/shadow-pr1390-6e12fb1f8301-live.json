@@ -1,0 +1,361 @@
+{
+  "authorization": {
+    "advisory_only": true,
+    "grant_verified": false,
+    "merge_authorized": false,
+    "statement": "Shadow Mode never grants permission to merge, deploy or change settings. A person decides."
+  },
+  "authorization_blockers": [
+    {
+      "code": "CLAIM_MISSING_OR_MISMATCH",
+      "count": 1,
+      "detail": "",
+      "severity": "BLOCK"
+    },
+    {
+      "code": "HORIZON_LABEL_MISSING_OR_CONTRADICTORY",
+      "count": 1,
+      "detail": "0 horizon label(s)",
+      "severity": "BLOCK"
+    },
+    {
+      "code": "HORIZON_NOT_REGISTERED_V2",
+      "count": 1,
+      "detail": "",
+      "severity": "BLOCK"
+    },
+    {
+      "code": "NO_ACTIVE_GRANT",
+      "count": 1,
+      "detail": "",
+      "severity": "BLOCK"
+    },
+    {
+      "code": "PRE_MERGE_REVIEW_MISSING",
+      "count": 1,
+      "detail": "6e12fb1f",
+      "severity": "WAIT"
+    }
+  ],
+  "ci": {
+    "checks": [
+      {
+        "conclusion": "success",
+        "name": "web build (Next.js)",
+        "status": "completed"
+      },
+      {
+        "conclusion": "success",
+        "name": "php artisan test (L11, sqlite)",
+        "status": "completed"
+      },
+      {
+        "conclusion": "success",
+        "name": "php artisan test (L11, pgsql)",
+        "status": "completed"
+      },
+      {
+        "conclusion": "success",
+        "name": "CI Gate",
+        "status": "completed"
+      }
+    ],
+    "ci_gate": {
+      "conclusion": "success",
+      "name": "CI Gate",
+      "status": "completed"
+    },
+    "overall": "pending"
+  },
+  "conflicts": [],
+  "evaluator_decision": "STOP_OWNER_DECISION",
+  "evaluator_version": "horizon-eval/0.1.0",
+  "human_checks_remaining": [
+    "a_person_decides_merge_shadow_mode_never_does",
+    "approved_outcome_matches_pr_intent",
+    "refetch_grants_and_head_immediately_before_any_real_merge"
+  ],
+  "missing_evidence": [
+    {
+      "code": "PATCH_UNAVAILABLE",
+      "count": 1,
+      "detail": "docs/plans/pos/INT-UX-2-IMPLEMENTATION-REPORT.md",
+      "severity": "BLOCK"
+    }
+  ],
+  "observation": {
+    "evaluator_record_id": "44ce2383eff499e48c353222ec5bb6a1eebc14ef2be5105ce831c7f2fa5b3adf",
+    "evidence_age_seconds": 0,
+    "evidence_digest": "e5d5407a47713808e60f057cb79cfbe9e42a6361ab01bcd99d9744f753531a7e",
+    "mode": "live",
+    "policy_sha256": "0ccfc5723b695dbefa6bced1518a161e66d054ca2920f986d768a671e372d249",
+    "snapshot_case_id": "LIVE-PR1390-6e12fb1f"
+  },
+  "owner_review_required": true,
+  "paths": [
+    {
+      "path": "docs/plans/pos/INT-UX-2-IMPLEMENTATION-REPORT.md",
+      "status": "added",
+      "surfaces": [],
+      "zone": "A"
+    },
+    {
+      "path": "web/e2e/int-ux-1-integration-center.spec.ts",
+      "status": "modified",
+      "surfaces": [],
+      "zone": "B"
+    },
+    {
+      "path": "web/e2e/int-ux-2-delivery-platform-catalog.spec.ts",
+      "status": "added",
+      "surfaces": [],
+      "zone": "C"
+    },
+    {
+      "path": "web/src/app/(app)/integrations/delivery-platforms/[platformKey]/page.test.tsx",
+      "status": "added",
+      "surfaces": [],
+      "zone": "B"
+    },
+    {
+      "path": "web/src/app/(app)/integrations/delivery-platforms/[platformKey]/page.tsx",
+      "status": "added",
+      "surfaces": [],
+      "zone": "B"
+    },
+    {
+      "path": "web/src/app/(app)/integrations/delivery-platforms/page.test.tsx",
+      "status": "added",
+      "surfaces": [],
+      "zone": "B"
+    },
+    {
+      "path": "web/src/app/(app)/integrations/delivery-platforms/page.tsx",
+      "status": "added",
+      "surfaces": [],
+      "zone": "B"
+    },
+    {
+      "path": "web/src/app/(app)/integrations/page.test.tsx",
+      "status": "modified",
+      "surfaces": [],
+      "zone": "B"
+    },
+    {
+      "path": "web/src/components/integrations/delivery-ladder.tsx",
+      "status": "added",
+      "surfaces": [],
+      "zone": "B"
+    },
+    {
+      "path": "web/src/components/integrations/delivery-platform-catalog.test.tsx",
+      "status": "added",
+      "surfaces": [],
+      "zone": "C"
+    },
+    {
+      "path": "web/src/components/integrations/delivery-platform-catalog.tsx",
+      "status": "added",
+      "surfaces": [],
+      "zone": "B"
+    },
+    {
+      "path": "web/src/components/integrations/delivery-platform-detail.test.tsx",
+      "status": "added",
+      "surfaces": [],
+      "zone": "C"
+    },
+    {
+      "path": "web/src/components/integrations/delivery-platform-detail.tsx",
+      "status": "added",
+      "surfaces": [],
+      "zone": "B"
+    },
+    {
+      "path": "web/src/components/integrations/integration-center-landing.test.tsx",
+      "status": "modified",
+      "surfaces": [],
+      "zone": "B"
+    },
+    {
+      "path": "web/src/components/integrations/integration-shell.tsx",
+      "status": "added",
+      "surfaces": [],
+      "zone": "B"
+    },
+    {
+      "path": "web/src/components/integrations/no-connection-controls.test.ts",
+      "status": "added",
+      "surfaces": [],
+      "zone": "C"
+    },
+    {
+      "path": "web/src/components/integrations/use-delivery-integration-data.ts",
+      "status": "added",
+      "surfaces": [],
+      "zone": "B"
+    },
+    {
+      "path": "web/src/lib/integration-center.demo.test.ts",
+      "status": "added",
+      "surfaces": [
+        "S-RBAC-TENANT"
+      ],
+      "zone": "C"
+    },
+    {
+      "path": "web/src/lib/integration-center.ladder.test.ts",
+      "status": "added",
+      "surfaces": [
+        "S-RBAC-TENANT"
+      ],
+      "zone": "C"
+    },
+    {
+      "path": "web/src/lib/integration-center.test.ts",
+      "status": "modified",
+      "surfaces": [
+        "S-RBAC-TENANT"
+      ],
+      "zone": "C"
+    },
+    {
+      "path": "web/src/lib/integration-center.ts",
+      "status": "modified",
+      "surfaces": [
+        "S-RBAC-TENANT"
+      ],
+      "zone": "C"
+    },
+    {
+      "path": "web/src/lib/mock-data.ts",
+      "status": "modified",
+      "surfaces": [
+        "S-RBAC-TENANT"
+      ],
+      "zone": "C"
+    },
+    {
+      "path": "web/src/messages/ar.json",
+      "status": "modified",
+      "surfaces": [],
+      "zone": "C"
+    },
+    {
+      "path": "web/src/messages/en.json",
+      "status": "modified",
+      "surfaces": [],
+      "zone": "C"
+    }
+  ],
+  "paths_omitted": 0,
+  "pr": {
+    "base_is_current_main": false,
+    "base_sha": "be3a7aac2353565d9f2beb5d9e2bb3b34bdd28e8",
+    "head_sha": "6e12fb1f83019b806b945910d6ebfb820b9182c8",
+    "main_sha": "073e102ac9334a4f80f368a64d1a3762bb701350",
+    "number": 1390,
+    "state": "open"
+  },
+  "reasons": [
+    {
+      "code": "ZONE_C_OWNER_GATED",
+      "count": 1,
+      "detail": "web/e2e/int-ux-2-delivery-platform-catalog.spec.ts,web/src/components/integrations/delivery-platform-catalog.test.tsx,web/src/components/integrations/delivery-p",
+      "severity": "STOP"
+    },
+    {
+      "code": "CLAIM_MISSING_OR_MISMATCH",
+      "count": 1,
+      "detail": "",
+      "severity": "BLOCK"
+    },
+    {
+      "code": "HORIZON_LABEL_MISSING_OR_CONTRADICTORY",
+      "count": 1,
+      "detail": "0 horizon label(s)",
+      "severity": "BLOCK"
+    },
+    {
+      "code": "HORIZON_NOT_REGISTERED_V2",
+      "count": 1,
+      "detail": "",
+      "severity": "BLOCK"
+    },
+    {
+      "code": "NO_ACTIVE_GRANT",
+      "count": 1,
+      "detail": "",
+      "severity": "BLOCK"
+    },
+    {
+      "code": "PATCH_UNAVAILABLE",
+      "count": 1,
+      "detail": "docs/plans/pos/INT-UX-2-IMPLEMENTATION-REPORT.md",
+      "severity": "BLOCK"
+    },
+    {
+      "code": "BASE_MOVED_RETEST",
+      "count": 1,
+      "detail": "",
+      "severity": "WAIT"
+    },
+    {
+      "code": "CI_TESTED_AGAINST_OLDER_BASE",
+      "count": 4,
+      "detail": "CI Gate: main moved since this run; re-run needed",
+      "severity": "WAIT"
+    },
+    {
+      "code": "PRE_MERGE_REVIEW_MISSING",
+      "count": 1,
+      "detail": "6e12fb1f",
+      "severity": "WAIT"
+    },
+    {
+      "code": "BEHAVIOR_FINANCIAL_OR_SECURITY_TOKEN",
+      "count": 5,
+      "detail": "",
+      "severity": "INFO"
+    },
+    {
+      "code": "BEHAVIOR_NOT_PRESENTATIONAL",
+      "count": 14,
+      "detail": "",
+      "severity": "INFO"
+    },
+    {
+      "code": "CI_NON_PR_EVENT_RUNS_IGNORED",
+      "count": 1,
+      "detail": "",
+      "severity": "INFO"
+    }
+  ],
+  "recommendation": "BLOCK",
+  "recommendation_basis": [
+    "PATCH_UNAVAILABLE"
+  ],
+  "report_sha256": "21db37175728412f42ead3a1054122eef35d183775ef60189354a0fd7ba55796",
+  "safety": {
+    "github_writes": 0,
+    "tool_calls": {
+      "auto_merge": 0,
+      "merge": 0,
+      "update_branch": 0,
+      "writes": 0
+    },
+    "would_merge": false
+  },
+  "schema": "horizon-shadow-report/1",
+  "shadow_version": "horizon-shadow/0.1.0",
+  "snapshot_time": "2026-10-13T20:20:51Z",
+  "surfaces": {
+    "S-RBAC-TENANT": "exclusive"
+  },
+  "zone": "C",
+  "zone_basis": {
+    "behavior": "C",
+    "context": "A",
+    "path": "C"
+  }
+}

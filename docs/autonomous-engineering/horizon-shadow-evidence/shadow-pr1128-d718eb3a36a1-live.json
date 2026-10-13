@@ -1,0 +1,189 @@
+{
+  "authorization": {
+    "advisory_only": true,
+    "grant_verified": false,
+    "merge_authorized": false,
+    "statement": "Shadow Mode never grants permission to merge, deploy or change settings. A person decides."
+  },
+  "authorization_blockers": [
+    {
+      "code": "CLAIM_MISSING_OR_MISMATCH",
+      "count": 1,
+      "detail": "",
+      "severity": "BLOCK"
+    },
+    {
+      "code": "HORIZON_LABEL_MISSING_OR_CONTRADICTORY",
+      "count": 1,
+      "detail": "0 horizon label(s)",
+      "severity": "BLOCK"
+    },
+    {
+      "code": "HORIZON_NOT_REGISTERED_V2",
+      "count": 1,
+      "detail": "",
+      "severity": "BLOCK"
+    },
+    {
+      "code": "NO_ACTIVE_GRANT",
+      "count": 1,
+      "detail": "",
+      "severity": "BLOCK"
+    },
+    {
+      "code": "PRE_MERGE_REVIEW_MISSING",
+      "count": 1,
+      "detail": "d718eb3a",
+      "severity": "WAIT"
+    }
+  ],
+  "ci": {
+    "checks": [
+      {
+        "conclusion": "success",
+        "name": "php artisan test (L11, sqlite)",
+        "status": "completed"
+      },
+      {
+        "conclusion": "success",
+        "name": "php artisan test (L11, pgsql)",
+        "status": "completed"
+      }
+    ],
+    "ci_gate": {
+      "conclusion": null,
+      "name": "CI Gate",
+      "status": "absent"
+    },
+    "overall": "pending"
+  },
+  "conflicts": [],
+  "evaluator_decision": "BLOCK",
+  "evaluator_version": "horizon-eval/0.1.0",
+  "human_checks_remaining": [
+    "a_person_decides_merge_shadow_mode_never_does",
+    "approved_outcome_matches_pr_intent",
+    "refetch_grants_and_head_immediately_before_any_real_merge"
+  ],
+  "missing_evidence": [
+    {
+      "code": "CI_CHECK_NEVER_STARTED",
+      "count": 1,
+      "detail": "CI Gate absent 18849m after head push",
+      "severity": "BLOCK"
+    }
+  ],
+  "observation": {
+    "evaluator_record_id": "f0e9befb9ce2d9b509c27f08b847758d4cc3fc2ac3a946aaf4ef7ed7547013ef",
+    "evidence_age_seconds": 0,
+    "evidence_digest": "56e91b0afc2c23156189cb8679175d8ff642f93d0ad1ba7defd284c841d9f910",
+    "mode": "live",
+    "policy_sha256": "0ccfc5723b695dbefa6bced1518a161e66d054ca2920f986d768a671e372d249",
+    "snapshot_case_id": "LIVE-PR1128-d718eb3a"
+  },
+  "owner_review_required": false,
+  "paths": [
+    {
+      "path": "docs/plans/growth/AWJ_GROWTH_FOUNDATION_HORIZON_V1.md",
+      "status": "added",
+      "surfaces": [],
+      "zone": "A"
+    },
+    {
+      "path": "docs/plans/growth/AWJ_GROWTH_FOUNDATION_HORIZON_V1_BOOTSTRAP.md",
+      "status": "added",
+      "surfaces": [],
+      "zone": "A"
+    }
+  ],
+  "paths_omitted": 0,
+  "pr": {
+    "base_is_current_main": false,
+    "base_sha": "82e5199fe75d06bb3546802d141f42da92e3a63f",
+    "head_sha": "d718eb3a36a107de793b5fff3f1e3299666eaa74",
+    "main_sha": "073e102ac9334a4f80f368a64d1a3762bb701350",
+    "number": 1128,
+    "state": "open"
+  },
+  "reasons": [
+    {
+      "code": "CI_CHECK_NEVER_STARTED",
+      "count": 1,
+      "detail": "CI Gate absent 18849m after head push",
+      "severity": "BLOCK"
+    },
+    {
+      "code": "CLAIM_MISSING_OR_MISMATCH",
+      "count": 1,
+      "detail": "",
+      "severity": "BLOCK"
+    },
+    {
+      "code": "HORIZON_LABEL_MISSING_OR_CONTRADICTORY",
+      "count": 1,
+      "detail": "0 horizon label(s)",
+      "severity": "BLOCK"
+    },
+    {
+      "code": "HORIZON_NOT_REGISTERED_V2",
+      "count": 1,
+      "detail": "",
+      "severity": "BLOCK"
+    },
+    {
+      "code": "NO_ACTIVE_GRANT",
+      "count": 1,
+      "detail": "",
+      "severity": "BLOCK"
+    },
+    {
+      "code": "BASE_MOVED_RETEST",
+      "count": 1,
+      "detail": "",
+      "severity": "WAIT"
+    },
+    {
+      "code": "CI_TESTED_AGAINST_OLDER_BASE",
+      "count": 2,
+      "detail": "php artisan test (L11, pgsql): main moved since this run; re-run needed",
+      "severity": "WAIT"
+    },
+    {
+      "code": "PRE_MERGE_REVIEW_MISSING",
+      "count": 1,
+      "detail": "d718eb3a",
+      "severity": "WAIT"
+    },
+    {
+      "code": "CI_NON_PR_EVENT_RUNS_IGNORED",
+      "count": 1,
+      "detail": "",
+      "severity": "INFO"
+    }
+  ],
+  "recommendation": "BLOCK",
+  "recommendation_basis": [
+    "CI_CHECK_NEVER_STARTED"
+  ],
+  "report_sha256": "e99e861fb791bc8081a9fdea830c456258138fc5353fea4b95991de56610c93f",
+  "safety": {
+    "github_writes": 0,
+    "tool_calls": {
+      "auto_merge": 0,
+      "merge": 0,
+      "update_branch": 0,
+      "writes": 0
+    },
+    "would_merge": false
+  },
+  "schema": "horizon-shadow-report/1",
+  "shadow_version": "horizon-shadow/0.1.0",
+  "snapshot_time": "2026-10-13T20:21:50Z",
+  "surfaces": {},
+  "zone": "A",
+  "zone_basis": {
+    "behavior": "A",
+    "context": "A",
+    "path": "A"
+  }
+}

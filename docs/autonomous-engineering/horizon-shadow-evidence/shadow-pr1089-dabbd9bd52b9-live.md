@@ -6,17 +6,17 @@
 
 | Field | Value |
 |---|---|
-| Observation | live (evidence age 0s) at 2026-10-13T19:17:37Z |
+| Observation | live (evidence age 0s) at 2026-10-13T20:22:31Z |
 | PR state | open |
 | Head SHA | `dabbd9bd52b97174981dacceac70b97a0d3703e4` |
 | Base SHA | `019f2ad36ae775f0d4ef51103282fa5f8c8c16c8` |
-| Main SHA (at observation) | `8bd42cb040817873c319ff021bee0668e397aec1` · base is current main: False |
+| Main SHA (at observation) | `073e102ac9334a4f80f368a64d1a3762bb701350` · base is current main: False |
 | Risk zone | **C** (path C, behavior C, context A) |
 | CI | pending · CI Gate: absent/None |
 | Owner review required | True |
 | Evaluator raw decision | STOP OWNER DECISION |
-| Evidence digest | `6727622c6fa7519679bf2dcfdab056b2ca9c260ab7d82ee5a464cc244938534b` |
-| Report SHA-256 | `782d304066033648bf76e84d3e2318854ed29c0b934c2542bbccd5370b4d9941` |
+| Evidence digest | `5f976b8aa95e9d935cd344c8f6c3ee04ec628f37b9609ca0f7ba793764596e48` |
+| Report SHA-256 | `134fb026d9223ea6efcbd75e5721973323739cbec39fca9652715233fd5b6b3c` |
 
 ## Why this recommendation
 
@@ -50,7 +50,7 @@ _none observed_
 
 | Severity | Code | × | Detail |
 |---|---|---|---|
-| BLOCK | `CI_CHECK_NEVER_STARTED` | 1 | CI Gate absent 21819m after head push |
+| BLOCK | `CI_CHECK_NEVER_STARTED` | 1 | CI Gate absent 21884m after head push |
 
 ## Authorization blockers (expected in Shadow Mode — no grant exists)
 
@@ -67,7 +67,7 @@ _none observed_
 | Severity | Code | × | Detail |
 |---|---|---|---|
 | STOP | `ZONE_C_OWNER_GATED` | 1 | app/Http/Controllers/Api/CommerceWorkspaceStorefrontPresentationVersionController.php,app/Http/Requests/PublishStorefrontPresentationVersionRequest.php,app/Serv |
-| BLOCK | `CI_CHECK_NEVER_STARTED` | 1 | CI Gate absent 21819m after head push |
+| BLOCK | `CI_CHECK_NEVER_STARTED` | 1 | CI Gate absent 21884m after head push |
 | BLOCK | `CLAIM_MISSING_OR_MISMATCH` | 1 |  |
 | BLOCK | `HORIZON_LABEL_MISSING_OR_CONTRADICTORY` | 1 | 0 horizon label s  |
 | BLOCK | `HORIZON_NOT_REGISTERED_V2` | 1 |  |
