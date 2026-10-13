@@ -17,8 +17,12 @@ use App\Tenancy\CustomerContext;
 use App\Tenancy\StorefrontContext;
 use App\Tenancy\HostnameTenantContext;
 use App\Tenancy\TenantContext;
+use Illuminate\Auth\AuthenticationException;
+use Illuminate\Auth\Middleware\Authenticate;
 use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Contracts\Debug\ExceptionHandler;
 use Illuminate\Database\Events\QueryExecuted;
+use Illuminate\Foundation\Exceptions\Handler;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\RateLimiter;
@@ -66,6 +70,8 @@ class TenancyServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        $this->renderApiAuthenticationFailuresAsJson();
+
         // Listener واحد لكل دورة حياة Laravel؛ لا يحمل state. يقرأ Request
         // الحالي فقط، فلا تتراكم المقاييس بين طلبات mod_php أو runtimes طويلة العمر.
         DB::listen(function (QueryExecuted $query): void {
@@ -231,6 +237,51 @@ class TenancyServiceProvider extends ServiceProvider
         // نافذة قصيرة + كيليد IP مستقلّ عن أي حصّة إصدار).
         RateLimiter::for('preview-exchange', function (Request $request): Limit {
             return Limit::perMinute(20)->by('preview-exchange|' . $request->ip());
+        });
+    }
+
+    /**
+     * طلب مجهول لمسار محمي تحت /api/* يجب أن يعيد 401 JSON مهما كان ترويس Accept.
+     *
+     * السبب الجذري: ApplicationBuilder::withMiddleware يثبّت افتراضياً
+     * `redirectGuestsTo(fn () => route('login'))`، و`Authenticate` يستدعيه فوراً
+     * (قبل أي معالج استثناء) عندما لا يطلب العميل JSON. المسار `login` غير معرّف
+     * هنا (لا مسارات ويب)، فتنتهي الطلبات بلا `Accept: application/json` بـ
+     * RouteNotFoundException → HTTP 500.
+     *
+     * الإصلاح ضيّق: لا وجهة إعادة توجيه لمسارات /api/*، ويُعرَض فشل المصادقة عليها
+     * JSON 401 دائماً. أي مسار آخر يحتفظ بالافتراضي حرفياً (`route('login')`
+     * وإعادة التوجيه، و`expectsJson`). لا يمسّ التحقق من التوكن ولا الصلاحيات.
+     */
+    private function renderApiAuthenticationFailuresAsJson(): void
+    {
+        $guestRedirect = static fn (Request $request): ?string => $request->is('api/*')
+            ? null
+            : route('login');
+
+        Authenticate::redirectUsing($guestRedirect);
+        AuthenticationException::redirectUsing($guestRedirect);
+
+        $configure = static function (Handler $handler): void {
+            $handler->shouldRenderJsonWhen(
+                static fn (Request $request, \Throwable $e): bool => $request->expectsJson()
+                    || ($e instanceof AuthenticationException && $request->is('api/*')),
+            );
+        };
+
+        if ($this->app->resolved(ExceptionHandler::class)) {
+            $handler = $this->app->make(ExceptionHandler::class);
+            if ($handler instanceof Handler) {
+                $configure($handler);
+            }
+
+            return;
+        }
+
+        $this->app->afterResolving(ExceptionHandler::class, static function ($handler) use ($configure): void {
+            if ($handler instanceof Handler) {
+                $configure($handler);
+            }
         });
     }
 }
