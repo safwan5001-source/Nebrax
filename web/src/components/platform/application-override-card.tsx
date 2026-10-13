@@ -232,14 +232,14 @@ export function ApplicationOverrideCard({ tenantId, onChanged }: { tenantId: str
                 {filtered.map((app) => (
                   <tr key={app.key} className="border-t border-border">
                     <td className="px-3 py-2">
-                      <div className="font-medium text-text">{tApps(`keys.${catalogKeyLabel(app.key)}`)}</div>
-                      <div className="text-xs text-muted" dir="ltr">{app.key}</div>
+                      <div className="break-words font-medium text-text">{tApps(`keys.${catalogKeyLabel(app.key)}`)}</div>
+                      <div className="text-xs text-muted break-words" dir="ltr">{app.key}</div>
                     </td>
                     <td className="px-3 py-2">
-                      <Badge tone={commercialModeTone[app.commercial_mode]}>{t(`commercialMode.${app.commercial_mode}`)}</Badge>
+                      <Badge wrap tone={commercialModeTone[app.commercial_mode]}>{t(`commercialMode.${app.commercial_mode}`)}</Badge>
                     </td>
                     <td className="px-3 py-2">
-                      <Badge tone={operationalTone[app.operational_status]}>{t(`operational.${app.operational_status}`)}</Badge>
+                      <Badge wrap tone={operationalTone[app.operational_status]}>{t(`operational.${app.operational_status}`)}</Badge>
                     </td>
                     <td className="px-3 py-2">
                       <span className="text-text">{t(`effective.${app.effective_access}`)}</span>
@@ -293,7 +293,7 @@ export function ApplicationOverrideCard({ tenantId, onChanged }: { tenantId: str
                   <tr key={row.application_key} className="border-t border-border">
                     <td className="px-3 py-2">{tApps(`keys.${catalogKeyLabel(row.application_key)}`)}</td>
                     <td className="px-3 py-2">
-                      <Badge tone={row.outcome === 'applied' ? 'positive' : 'muted'}>
+                      <Badge wrap tone={row.outcome === 'applied' ? 'positive' : 'muted'}>
                         {row.outcome === 'applied' ? t('outcomeApplied') : t('outcomeSkipped')}
                       </Badge>
                     </td>

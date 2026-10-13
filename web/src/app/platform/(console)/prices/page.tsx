@@ -335,7 +335,7 @@ function StatusBadge({ info, t }: { info: PriceClassification | undefined; t: T 
   const status = info?.status ?? 'unknown';
   return (
     <span className="inline-flex flex-col items-start gap-1">
-      <Badge tone={STATUS_TONE[status]}>{t(STATUS_KEY[status])}</Badge>
+      <Badge wrap tone={STATUS_TONE[status]}>{t(STATUS_KEY[status])}</Badge>
       {info?.tied && <span className="text-xs text-muted">{t('tiedDate')}</span>}
     </span>
   );
@@ -376,7 +376,7 @@ function PlanSummary({
         )}
         {upcoming && (
           <div className="mt-3 border-t border-border pt-3">
-            <Badge tone="warning">{t('nextScheduled')}</Badge>
+            <Badge wrap tone="warning">{t('nextScheduled')}</Badge>
             <p className="num mt-1.5 text-sm text-text"><Ltr>{formatRiyal(upcoming.monthly_amount)}</Ltr></p>
             <p className="num text-xs text-muted">{t('startsOn')} <Ltr>{upcoming.effective_on ?? '—'}</Ltr></p>
           </div>

@@ -28,11 +28,17 @@ export interface ButtonProps
     VariantProps<typeof buttonVariants> {
   /** يعرض الابن الوحيد (مثل next/link) بالهيئة نفسها، من دون زر متداخل داخل رابط. */
   asChild?: boolean;
+  /**
+   * يسمح بالتفاف التسمية الطويلة بدل تجاوز الحاوية عند تكبير النص (200%). الارتفاع يصير أدنى ارتفاع بدل ثابت، والحشوة العمودية
+   * صغيرة بحيث يبقى السطر الواحد بالارتفاع نفسه فلا يتغيّر المظهر عند 100%. `shrink-0` + `max-w-full`: يلتف النص حين تضيق الحاوية فعلاً
+   * ولا ينكمش الزر قبل أوانها. الافتراضي `false` كما كان.
+   */
+  wrap?: boolean;
 }
 
 export const Button = React.forwardRef<HTMLElement, ButtonProps>(
-  ({ className, variant, size, asChild = false, children, ...props }, ref) => {
-    const classes = cn(buttonVariants({ variant, size }), className);
+  ({ className, variant, size, asChild = false, wrap = false, children, ...props }, ref) => {
+    const classes = cn(buttonVariants({ variant, size }), wrap && ['h-auto max-w-full shrink-0 whitespace-normal py-1 text-center', size === 'sm' ? 'min-h-8' : 'min-h-9'], className);
 
     if (asChild) {
       const child = React.Children.only(children) as React.ReactElement<{ className?: string }>;

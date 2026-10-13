@@ -166,8 +166,8 @@ export default function PlatformTenantDetailPage() {
             {tenant && (
               <div className="mt-1.5 flex flex-wrap items-center gap-2 text-sm text-muted">
                 <span className="break-all" dir="ltr">{tenant.slug}</span>
-                <Badge tone={tenant.is_active ? 'positive' : 'negative'}>{tenant.is_active ? t('active') : t('inactive')}</Badge>
-                <Badge tone="muted">{tenant.plan}</Badge>
+                <Badge wrap tone={tenant.is_active ? 'positive' : 'negative'}>{tenant.is_active ? t('active') : t('inactive')}</Badge>
+                <Badge wrap tone="muted">{tenant.plan}</Badge>
               </div>
             )}
           </div>
@@ -212,7 +212,7 @@ export default function PlatformTenantDetailPage() {
                 <Info label={t('contact')} value={tenant.contact?.email ?? '—'} ltr breakAll />
                 <Info label={t('phone')} value={tenant.contact?.phone ?? '—'} ltr />
                 <Info label={t('status')}>
-                  <Badge tone={tenant.is_active ? 'positive' : 'negative'}>
+                  <Badge wrap tone={tenant.is_active ? 'positive' : 'negative'}>
                     {tenant.is_active ? t('active') : t('inactive')}
                   </Badge>
                 </Info>
@@ -239,7 +239,7 @@ export default function PlatformTenantDetailPage() {
                       ))}
                     </Select>
                   </div>
-                  <Button className="h-11 w-full sm:w-auto" onClick={savePlan} disabled={saving || planChoice === tenant.plan}>
+                  <Button wrap className="min-h-11 w-full sm:w-auto" onClick={savePlan} disabled={saving || planChoice === tenant.plan}>
                     {saving ? t('saving') : t('savePlan')}
                   </Button>
                 </CardContent>
@@ -277,7 +277,7 @@ export default function PlatformTenantDetailPage() {
                 <CardTitle id="tenant-access" className="flex items-center gap-2 text-text">
                   <ShieldAlert className="h-4 w-4 text-negative" strokeWidth={1.7} aria-hidden="true" />
                   {t('accessManagement')}
-                  <span className="rounded border border-negative/40 px-1.5 py-0.5 text-xs font-medium text-negative">{t('sensitiveAction')}</span>
+                  <span className="min-w-0 rounded border border-negative/40 px-1.5 py-0.5 text-xs font-medium text-negative">{t('sensitiveAction')}</span>
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
