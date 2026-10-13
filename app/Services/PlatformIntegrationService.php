@@ -135,9 +135,7 @@ class PlatformIntegrationService
             }
 
             return match ($key) {
-                'document_storage' => $this->storage->healthCheck()
-                    ? ['ok' => true, 'message' => 'تم الاتصال بالتخزين الخاص والكتابة والحذف بنجاح.']
-                    : ['ok' => false, 'message' => 'تعذر التحقق من التخزين الخاص.'],
+                'document_storage' => $this->testDocumentStorage(),
                 'malware_scanner' => $this->scanner->ping()
                     ? ['ok' => true, 'message' => 'استجاب فاحص الملفات بنجاح.']
                     : ['ok' => false, 'message' => 'لم يستجب فاحص الملفات.'],
@@ -150,6 +148,30 @@ class PlatformIntegrationService
                 'integration' => 'فشل اختبار الاتصال. تحقق من الإعدادات ومن إتاحة الخدمة الخاصة.',
             ]);
         }
+    }
+
+    /**
+     * نتيجة اختبار التخزين تذكر الهدف الذي اختُبر فعلاً (`target`) ومكان التخزين التشغيلي الحالي (`operational_storage`)؛
+     * ليسا الشيء نفسه. `ok` و`message` كما كانا شكلاً.
+     *
+     * @return array{ok:bool, message:string, target:string, operational_storage:string}
+     */
+    private function testDocumentStorage(): array
+    {
+        $result = $this->storage->healthCheckResult();
+        $message = match (true) {
+            $result['target'] === DocumentStorageService::TARGET_SAVED_PROVIDER => $result['ok']
+                ? 'تم الاتصال بالتخزين الخاص والكتابة والحذف بنجاح.'
+                : 'تعذر التحقق من التخزين الخاص.',
+            $result['target'] === DocumentStorageService::TARGET_LOCAL_FALLBACK => $result['ok']
+                ? 'نجح اختبار التخزين المحلي البديل فقط. تكامل التخزين الخاص معطّل أو غير محفوظ، ولم يُختبر المزود الخارجي.'
+                : 'تعذر اختبار التخزين المحلي البديل. لم يُختبر المزود الخارجي.',
+            default => $result['ok']
+                ? 'نجح اختبار التخزين المضبوط في بيئة التشغيل، وليس تكامل المنصة المحفوظ.'
+                : 'تعذر اختبار التخزين المضبوط في بيئة التشغيل.',
+        };
+
+        return ['ok' => $result['ok'], 'message' => $message, 'target' => $result['target'], 'operational_storage' => $result['operational']];
     }
 
     /** @return array{ok:bool, message:string, error_code?:string|null, http_status?:int} */

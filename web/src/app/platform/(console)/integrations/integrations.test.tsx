@@ -228,6 +228,89 @@ describe('notices, errors and refresh', () => {
     expect(screen.queryByRole('alert')).toBeNull();
   });
 
+  describe('private storage test result names what was tested (H15-10)', () => {
+    const storageTest = async (data: Record<string, unknown>) => {
+      await renderLoaded();
+      platformApi.mockImplementationOnce(async () => ({ data }));
+      fireEvent.click(within(card(t('storageTitle'))).getByRole('button', { name: t('test') }));
+    };
+    const post = () => platformApi.mock.calls.find(([path]) => String(path).endsWith('/document_storage/test'));
+
+    it('local fallback that passed: neutral information, not a connection success, and the provider is said to be untested', async () => {
+      await storageTest({ ok: true, message: 'تم الاتصال بالتخزين الخاص والكتابة والحذف بنجاح.', target: 'local_fallback', operational_storage: 'local' });
+      const status = await screen.findByText(t('storageTestLocalOnly'));
+      const box = status.closest('[role="status"]') as HTMLElement;
+      expect(box).toBeTruthy();
+      expect(box.className).toContain('border-warning/40'); // information tone, not the success style
+      expect(box.querySelector('svg')?.getAttribute('class')).not.toContain('text-positive');
+      expect(box.textContent).toContain(t('storageOperationalLocal'));
+      expect(screen.queryByText(t('storageTestProviderOk'))).toBeNull();
+      expect(document.body.textContent).not.toContain('تم الاتصال بالتخزين الخاص'); // the server wording is not shown for this target
+      expect(screen.queryByRole('alert')).toBeNull();
+    });
+
+    it('local fallback that failed is an alert and says the provider was not tested', async () => {
+      await storageTest({ ok: false, message: 'x', target: 'local_fallback', operational_storage: 'local' });
+      expect((await screen.findByText(t('storageTestLocalFailed'))).closest('[role="alert"]')).toBeTruthy();
+    });
+
+    it('saved provider: success and failure follow ok', async () => {
+      await storageTest({ ok: true, message: 'x', target: 'saved_provider', operational_storage: 'external' });
+      const ok = (await screen.findByText(t('storageTestProviderOk'))).closest('[role="status"]') as HTMLElement;
+      expect(ok.className).not.toContain('border-warning');
+      expect(ok.textContent).toContain(t('storageOperationalExternal'));
+      cleanup();
+      platformApi.mockReset();
+      platformApi.mockImplementation(async (path: string, init?: { method?: string }) => {
+        if (path === '/platform/integrations' && (init?.method ?? 'GET') === 'GET') return { data: current };
+        if (path === '/platform/document-file-scan-exceptions') return { data: exceptions() };
+        if (path === '/platform/tenants') return { data: { data: [] } };
+        return { data: { ok: false, message: 'x', target: 'saved_provider', operational_storage: 'local' } };
+      });
+      await renderLoaded().catch(() => undefined);
+      fireEvent.click(within(card(t('storageTitle'))).getByRole('button', { name: t('test') }));
+      expect((await screen.findByText(t('storageTestProviderFailed'))).closest('[role="alert"]')).toBeTruthy();
+    });
+
+    it('a provider test that passed does not claim documents are stored there: the operational line is separate', async () => {
+      await storageTest({ ok: true, message: 'x', target: 'saved_provider', operational_storage: 'local' });
+      const box = (await screen.findByText(t('storageTestProviderOk'))).closest('[role="status"]') as HTMLElement;
+      expect(box.textContent).toContain(t('storageOperationalLocal'));
+      expect(box.textContent).not.toContain(t('storageOperationalExternal'));
+    });
+
+    it('an older response without target is shown exactly as before: ok and the server message', async () => {
+      await storageTest({ ok: true, message: 'Legacy server message' });
+      expect(await screen.findByText('Legacy server message')).toBeTruthy();
+      expect(screen.queryByText(t('storageTestLocalOnly'))).toBeNull();
+    });
+
+    it('the target is read from the response, never inferred from the local unsaved toggle', async () => {
+      await renderLoaded();
+      const storage = card(t('storageTitle'));
+      // the saved row is enabled; flip the local toggle off without saving, then test
+      fireEvent.click(within(storage).getAllByRole('checkbox')[0]);
+      platformApi.mockImplementationOnce(async () => ({ data: { ok: true, message: 'x', target: 'saved_provider', operational_storage: 'external' } }));
+      fireEvent.click(within(storage).getByRole('button', { name: t('test') }));
+      expect(await screen.findByText(t('storageTestProviderOk'))).toBeTruthy();
+      expect(screen.queryByText(t('storageTestLocalOnly'))).toBeNull();
+      expect(post()).toBeTruthy();
+    });
+
+    it('other integrations are unchanged: a scanner result still shows its own message', async () => {
+      await renderLoaded();
+      platformApi.mockImplementationOnce(async () => ({ data: { ok: true, message: 'Scanner reachable' } }));
+      fireEvent.click(within(card(t('scannerTitle'))).getByRole('button', { name: t('test') }));
+      await waitFor(() => expect(noticeWith('Scanner reachable')).toBeTruthy());
+    });
+
+    it('has the new texts in both languages', () => {
+      for (const lang of [ar, en]) for (const key of ['storageTestLocalOnly', 'storageTestLocalFailed', 'storageTestProviderOk', 'storageTestProviderFailed', 'storageTestEnvironment', 'storageTestEnvironmentFailed', 'storageOperationalLocal', 'storageOperationalExternal']) {
+        expect(typeof (lang.platformIntegrations as Record<string, unknown>)[key]).toBe('string');
+      }
+    });
+  });
+
   it('shows a first-load failure as an alert with a 44px retry that wraps, then recovers', async () => {
     platformApi.mockImplementation(async (path: string, init?: { method?: string }) => {
       if (path === '/platform/integrations') {
