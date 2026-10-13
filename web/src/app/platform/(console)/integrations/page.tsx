@@ -8,6 +8,7 @@ import {
   Bot,
   CheckCircle2,
   Database,
+  Info,
   Loader2,
   RefreshCw,
   Save,
@@ -110,7 +111,7 @@ export default function PlatformIntegrationsPage() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [testing, setTesting] = useState<string | null>(null);
-  const [notice, setNotice] = useState<{ ok: boolean; message: string } | null>(null);
+  const [notice, setNotice] = useState<NoticeState | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -201,8 +202,9 @@ export default function PlatformIntegrationsPage() {
     setTesting(key);
     setNotice(null);
     try {
-      const response = await platformApi<{ data: { ok: boolean; message: string } }>(`/platform/integrations/${key}/test`, { method: 'POST' });
-      setNotice(response.data);
+      const response = await platformApi<{ data: ConnectionTestResult }>(`/platform/integrations/${key}/test`, { method: 'POST' });
+      // الاستجابات التي بلا `target` (خوادم أقدم، أو غير التخزين) تُعرض كما كانت: ok والرسالة. لا يُستنتج الهدف من واجهة محلية.
+      setNotice(key === 'document_storage' && response.data.target ? storageTestNotice(response.data, t) : response.data);
       await load();
     } catch (reason) {
       setNotice({ ok: false, message: reason instanceof ApiError ? reason.message : t('testFailed') });
@@ -389,17 +391,43 @@ function DisabledNotice({ t }: { t: Translate }) {
   return <div className="rounded-lg border border-warning/40 bg-surface p-4 text-sm leading-relaxed text-text" role="note">{t('aiDisabledNotice')}</div>;
 }
 
-function Notice({ notice }: { notice: { ok: boolean; message: string } }) {
-  // النجاح حالة (status) والفشل تنبيه (alert) بنبرة سلبية؛ لا يُنسخ أي سرّ إلى الرسالة.
-  const Icon = notice.ok ? CheckCircle2 : XCircle;
+type NoticeState = { ok: boolean; message: string; tone?: 'info'; detail?: string };
+
+/** ما يعيده الخادم لاختبار الاتصال. `target` و`operational_storage` للتخزين فقط، وقد يغيبان في الاستجابات القديمة. */
+type ConnectionTestResult = { ok: boolean; message: string; target?: string; operational_storage?: string };
+
+/**
+ * نتيجة اختبار التخزين بحسب **الهدف الذي أكّده الخادم**: اختبار القرص المحلي البديل ليس إثباتاً لاتصال R2/S3 ولو نجح،
+ * فيُعرض بنبرة معلوماتية. ومكان تخزين المستندات الآن (`operational_storage`) سطرٌ منفصل: نجاح اختبار المزود لا يعني أن
+ * المستندات تُكتب عليه. النصوص من ملفات الترجمة لا من رسالة الخادم العربية.
+ */
+function storageTestNotice(result: ConnectionTestResult, t: Translate): NoticeState {
+  const detail = result.operational_storage === 'local' ? t('storageOperationalLocal') : result.operational_storage === 'external' ? t('storageOperationalExternal') : undefined;
+  if (result.target === 'local_fallback') {
+    return result.ok ? { ok: true, tone: 'info', message: t('storageTestLocalOnly'), detail } : { ok: false, message: t('storageTestLocalFailed'), detail };
+  }
+  if (result.target === 'saved_provider') {
+    return { ok: result.ok, message: result.ok ? t('storageTestProviderOk') : t('storageTestProviderFailed'), detail };
+  }
+  // هدف آخر (تخزين مضبوط في بيئة التشغيل): لا يُسمّى مزوداً محفوظاً.
+  return result.ok ? { ok: true, tone: 'info', message: t('storageTestEnvironment'), detail } : { ok: false, message: t('storageTestEnvironmentFailed'), detail };
+}
+
+function Notice({ notice }: { notice: NoticeState }) {
+  // النجاح حالة (status) والفشل تنبيه (alert) بنبرة سلبية؛ لا يُنسخ أي سرّ إلى الرسالة. النبرة المعلوماتية حالة محايدة لا علامة نجاح.
+  const info = notice.tone === 'info';
+  const Icon = info ? Info : notice.ok ? CheckCircle2 : XCircle;
   return (
     <div
-      className={`flex items-start gap-2 rounded-lg border bg-surface p-3 text-sm ${notice.ok ? 'border-border' : 'border-negative/40'}`}
+      className={`flex items-start gap-2 rounded-lg border bg-surface p-3 text-sm ${info ? 'border-warning/40' : notice.ok ? 'border-border' : 'border-negative/40'}`}
       role={notice.ok ? 'status' : 'alert'}
       aria-atomic="true"
     >
-      <Icon className={`mt-0.5 h-4 w-4 shrink-0 ${notice.ok ? 'text-positive' : 'text-negative'}`} strokeWidth={1.7} aria-hidden="true" />
-      <span className={`min-w-0 break-words ${notice.ok ? 'text-text' : 'text-negative'}`}>{notice.message}</span>
+      <Icon className={`mt-0.5 h-4 w-4 shrink-0 ${info ? 'text-warning' : notice.ok ? 'text-positive' : 'text-negative'}`} strokeWidth={1.7} aria-hidden="true" />
+      <span className={`min-w-0 break-words ${notice.ok ? 'text-text' : 'text-negative'}`}>
+        {notice.message}
+        {notice.detail && <span className="mt-1 block text-xs text-muted">{notice.detail}</span>}
+      </span>
     </div>
   );
 }
