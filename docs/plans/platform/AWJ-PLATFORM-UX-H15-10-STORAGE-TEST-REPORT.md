@@ -52,7 +52,7 @@ All storage in these tests is a local fake or an in-memory mock: no external pro
 | Mutation checks | backend: reporting disabled as `saved_provider` fails 5 tests; deriving `operational` from the enabled flag instead of the lock fails 1. Frontend: showing a local pass as plain success fails 1; ignoring `target` fails 5 |
 | Full web suite | 523 files, 5573 tests passed |
 | `tsc --noEmit` | 48 errors, equal to the baseline (all in test/spec files) |
-| `next build` | recorded in the PR |
+| `next build` | exit 0 |
 | GitHub CI | recorded on the PR for the final head |
 
 **Real backend, isolated test data (real Laravel app on SQLite; fake endpoint and fake key ids, nothing production):**
