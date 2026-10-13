@@ -471,6 +471,8 @@
     "previewSuperseded": "Superseded: a later version is already in effect for this plan, so this one applies only to contracts that start on or after this date and before that later version's date.",
     "previewDuplicate": "A version for this plan and this date already exists, so the server will reject this one. Choose a different date.",
     "previewUnverified": "Today or earlier: whether a later version is already in effect can't be confirmed while the price list is loading or unavailable.",
+    "duplicateBlocked": "A version for this plan and effective date already exists, so it can't be added again. Choose a different effective date.",
+    "duplicateUnverified": "Whether a version already exists for this plan and date can't be confirmed while the price list is loading or unavailable. The server still rejects duplicates.",
     "previewStored": "Sent to the server as {minor} halalas.",
     "savedScheduled": "Scheduled until",
     "savedEffective": "In effect by date",

@@ -16,7 +16,7 @@ import { ApiError } from '@/lib/api';
 import { formatMinorRiyal, formatRiyal, isValidRiyal, riyalToMinor } from '@/lib/money';
 import { isPlatformAuthenticated } from '@/lib/platform-auth';
 import { platformApi } from '@/lib/platform-api';
-import { classifyPriceVersions, nextScheduled, previewOutcome, todayIsoDate, type PriceClassification, type PriceStatus } from './price-status';
+import { classifyPriceVersions, isDuplicateVersion, nextScheduled, previewOutcome, todayIsoDate, type PriceClassification, type PriceStatus } from './price-status';
 import { useToday } from './use-today';
 
 const PLANS = ['free', 'basic', 'pro', 'enterprise'] as const;
@@ -113,6 +113,11 @@ export default function PlatformPricesPage() {
       : ({ scheduled: 'previewScheduled', effective: 'previewEffective', superseded: 'previewSuperseded', duplicate: 'previewDuplicate' } as const)[
             previewOutcome(prices, { plan, currency: 'SAR', effective_on: effectiveOn }, today)
           ];
+
+  // نسخة مكررة معروفة: بالمفتاح نفسه (الخطة، العملة، تاريخ النفاذ) في كتالوج مكتمل وحديث. هذا فحص للواجهة يمنع طلباً
+  // محكوماً بالرفض؛ قيد التفرد في قاعدة البيانات يبقى المرجع (مدير آخر قد يضيف النسخة بعد جلب هذه التبويبة). وإن لم
+  // يكتمل الكتالوج أو تعذّر تحديثه فلا نتيجة تحقق هنا، ويُترك القرار للخادم.
+  const knownDuplicate = catalogueFresh && effectiveOn !== '' && isDuplicateVersion(prices, { plan, currency: 'SAR', effective_on: effectiveOn });
 
   const typedMinor = monthlyPrice.trim() === '' ? null : riyalToMinor(monthlyPrice);
   const amountValid = typedMinor !== null && isValidRiyal(monthlyPrice) && typedMinor >= 0;
@@ -214,14 +219,26 @@ export default function PlatformPricesPage() {
               </div>
               <div className="space-y-1.5">
                 <label htmlFor="price-effective" className="block text-sm font-medium text-text">{t('effectiveOn')}</label>
-                <Input id="price-effective" className="h-11" type="date" dir="ltr" value={effectiveOn} onChange={(event) => setEffectiveOn(event.target.value)} />
+                <Input
+                  id="price-effective"
+                  className="h-11"
+                  type="date"
+                  dir="ltr"
+                  value={effectiveOn}
+                  onChange={(event) => setEffectiveOn(event.target.value)}
+                  aria-invalid={knownDuplicate || undefined}
+                  aria-describedby={knownDuplicate ? 'price-duplicate' : undefined}
+                />
               </div>
               <div className="lg:pt-[1.625rem]">
-                <Button className="h-11 w-full" onClick={save} disabled={saving || !monthlyPrice || !effectiveOn}>
+                <Button className="h-11 w-full" onClick={save} disabled={saving || !monthlyPrice || !effectiveOn || knownDuplicate} aria-describedby={knownDuplicate ? 'price-duplicate' : undefined}>
                   {saving ? t('saving') : t('save')}
                 </Button>
               </div>
             </div>
+
+            {knownDuplicate && <p id="price-duplicate" className="text-sm text-negative">{t('duplicateBlocked')}</p>}
+            {!catalogueFresh && effectiveOn !== '' && <p role="note" className="text-xs text-muted">{t('duplicateUnverified')}</p>}
 
             {amountValid && effectiveOn && (
               <div className="rounded border border-border bg-background p-3 text-sm" data-testid="price-preview">
@@ -229,7 +246,7 @@ export default function PlatformPricesPage() {
                 <p className="mt-1 text-text">
                   <Ltr>{plan}</Ltr> · <Ltr>{formatMinorRiyal(typedMinor)}</Ltr> {t('monthlyWord')} · {t('effectiveWord')} <Ltr>{effectiveOn}</Ltr>
                 </p>
-                <p className="mt-1 text-xs text-muted">{t(previewKey)}</p>
+                {!knownDuplicate && <p className="mt-1 text-xs text-muted">{t(previewKey)}</p>}
                 <p className="num mt-1 text-xs text-muted" dir="ltr">{t('previewStored', { minor: typedMinor ?? 0 })}</p>
               </div>
             )}

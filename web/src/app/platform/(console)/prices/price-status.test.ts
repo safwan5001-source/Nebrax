@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { classifyPriceVersions, msUntilNextUtcMidnight, nextScheduled, previewOutcome, todayIsoDate } from './price-status';
+import { classifyPriceVersions, isDuplicateVersion, msUntilNextUtcMidnight, nextScheduled, previewOutcome, todayIsoDate } from './price-status';
 
 const v = (id: string, plan: string, effective_on: string | null, currency = 'SAR') => ({ id, plan, currency, effective_on });
 
@@ -82,5 +82,14 @@ describe('price version status (derived from effective_on and today only)', () =
     expect(msUntilNextUtcMidnight(new Date('2026-10-12T23:59:30Z'))).toBe(30_000);
     expect(msUntilNextUtcMidnight(new Date('2026-10-12T00:00:00Z'))).toBe(86_400_000);
     expect(msUntilNextUtcMidnight(new Date('2026-12-31T12:00:00Z'))).toBe(12 * 3_600_000);
+  });
+
+  it('isDuplicateVersion matches only the same plan, currency and effective date', () => {
+    const list = [v('a', 'pro', '2026-06-01'), v('b', 'basic', '2026-03-01'), v('c', 'pro', null)];
+    expect(isDuplicateVersion(list, { plan: 'pro', currency: 'SAR', effective_on: '2026-06-01' })).toBe(true);
+    expect(isDuplicateVersion(list, { plan: 'pro', currency: 'SAR', effective_on: '2026-06-02' })).toBe(false);
+    expect(isDuplicateVersion(list, { plan: 'basic', currency: 'SAR', effective_on: '2026-06-01' })).toBe(false);
+    expect(isDuplicateVersion(list, { plan: 'pro', currency: 'USD', effective_on: '2026-06-01' })).toBe(false);
+    expect(isDuplicateVersion([], { plan: 'pro', currency: 'SAR', effective_on: '2026-06-01' })).toBe(false);
   });
 });

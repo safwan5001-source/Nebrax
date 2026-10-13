@@ -61,6 +61,19 @@ export function classifyPriceVersions(
 export type PreviewOutcome = 'scheduled' | 'effective' | 'superseded' | 'duplicate';
 
 /**
+ * هل في القائمة نسخة بالمفتاح نفسه `(plan, currency, effective_on)`؟ فحص للواجهة وحدها: قيد التفرد في قاعدة البيانات هو
+ * المرجع، والقائمة قد تسبق نسخة أضافها مدير آخر بعد جلبها. يُستدعى بكتالوج مكتمل وحديث فقط.
+ */
+export function isDuplicateVersion(
+  prices: readonly PriceVersionLike[],
+  candidate: { plan: string; currency: string; effective_on: string }
+): boolean {
+  return prices.some(
+    (price) => price.plan === candidate.plan && price.currency === candidate.currency && price.effective_on === candidate.effective_on
+  );
+}
+
+/**
  * ما ستؤول إليه نسخة لم تُحفظ بعد، بالقاعدة نفسها. قيد قاعدة البيانات `(plan, currency, effective_on)` فريد، فتاريخ
  * مطابق لنسخة موجودة «مكرّر» ويرفضه الخادم. غير ذلك: مستقبلية = مجدولة؛ وإلا فإن وُجدت نسخة أخرى لنفس
  * (الخطة، العملة) تاريخها بعد تاريخ هذه وحتى اليوم فهذه «سابقة»؛ وإلا «سارية». يُستدعى بكتالوج مكتمل التحميل فقط.
@@ -70,8 +83,7 @@ export function previewOutcome(
   candidate: { plan: string; currency: string; effective_on: string },
   today: string
 ): PreviewOutcome {
-  const sameKey = (price: PriceVersionLike) => price.plan === candidate.plan && price.currency === candidate.currency;
-  if (prices.some((price) => sameKey(price) && price.effective_on === candidate.effective_on)) return 'duplicate';
+  if (isDuplicateVersion(prices, candidate)) return 'duplicate';
   if (candidate.effective_on > today) return 'scheduled';
   const laterInEffect = prices.some(
     (price) =>
