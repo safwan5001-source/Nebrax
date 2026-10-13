@@ -107,26 +107,32 @@ describe('readReadinessRows and nativeStatusOf (step B)', () => {
     expect(nativeStatusOf(undefined)).toBe('unreadable');
   });
 
-  it('drops rows without text ux_state or boolean flags, and is null for a non-list payload', () => {
-    const rows = readReadinessRows({ data: [
-      { platform_key: 'keeta', ux_state: 'NOT_SUPPORTED', connect_enabled: 'false', sync_enabled: false },
-      { platform_key: 'jahez', connect_enabled: false, sync_enabled: false },
-      { platform_key: 'ninja', ux_state: 'NOT_SUPPORTED', connect_enabled: false, sync_enabled: false },
-    ] });
-    expect([...(rows?.keys() ?? [])]).toEqual(['ninja']);
+  it('a known row without text ux_state or boolean flags, or a missing known row, makes the whole read unreadable', () => {
+    const without = (key: string) => TODAY.filter((r) => r.platform_key !== key);
+    const patched = (key: string, patch: Record<string, unknown>) => TODAY.map((r) => (r.platform_key === key ? { ...r, ...patch } : r));
+    expect(readReadinessRows({ data: patched('keeta', { connect_enabled: 'false' }) })).toBeNull();
+    expect(readReadinessRows({ data: patched('keeta', { sync_enabled: 0 }) })).toBeNull();
+    expect(readReadinessRows({ data: patched('jahez', { ux_state: undefined }) })).toBeNull();
+    expect(readReadinessRows({ data: patched('jahez', { ux_state: 7 }) })).toBeNull();
+    expect(readReadinessRows({ data: without('ninja') })).toBeNull();
+    expect(readReadinessRows({ data: [] })).toBeNull();
+  });
+
+  it('ignores rows of unknown platforms and is null for a non-list payload', () => {
+    expect(readReadinessRows({ data: [...TODAY, { platform_key: 'talabat', ux_state: 'READY_TO_CONNECT' }] })?.size).toBe(6);
     expect(readReadinessRows(null)).toBeNull();
     expect(readReadinessRows({ data: 'x' })).toBeNull();
   });
 
   it('carries the internal evidence fields only when the server sent them', () => {
-    const withEvidence = readReadinessRows({ data: [{
-      ...TODAY[3], technical: 'OWNER_GATE', evidence_date: '2026-10-11', evidence_ref: 'docs/x.md §4.4',
-    }] })?.get('keeta');
+    const withEvidence = readReadinessRows({ data: TODAY.map((r) => (r.platform_key === 'keeta'
+      ? { ...r, technical: 'OWNER_GATE', evidence_date: '2026-10-11', evidence_ref: 'docs/x.md §4.4' }
+      : r)) })?.get('keeta');
     expect(withEvidence?.technical).toBe('OWNER_GATE');
     expect(withEvidence?.evidenceDate).toBe('2026-10-11');
     expect(withEvidence?.evidenceRef).toBe('docs/x.md §4.4');
 
-    const without = readReadinessRows({ data: [TODAY[3]] })?.get('keeta');
+    const without = readReadinessRows({ data: TODAY })?.get('keeta');
     expect(without?.technical).toBeNull();
     expect(without?.evidenceRef).toBeNull();
   });

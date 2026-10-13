@@ -82,18 +82,18 @@ Done with a real Chromium (desktop and mobile); screenshots were viewed, not des
 | Tests (updated for the new href) | `integration-center.test.ts`, `integration-center-landing.test.tsx`, `integrations/page.test.tsx`, `e2e/int-ux-1-integration-center.spec.ts` |
 | `docs/plans/pos/INT-UX-2-IMPLEMENTATION-REPORT.md` | This report |
 
-No backend, API, database, migration, `Rbac`, readiness-registry, `DeliveryProviderReadinessGate`, accounting, POS or workflow change. The legacy `/delivery-platforms` screen is unmodified.
+The only non-INT-UX files touched are `web/src/lib/mock-data.ts` (demo fixtures, review fix) and its new test. No backend, API, database, migration, `Rbac`, readiness-registry, `DeliveryProviderReadinessGate`, accounting, POS or workflow change. The legacy `/delivery-platforms` screen is unmodified.
 
 ## Tests and exact results
 
 | Run | Result |
 |---|---|
-| Ladder logic unit tests (`integration-center.ladder.test.ts`) | 17 passed (after the review fix below) |
+| Ladder logic unit tests (`integration-center.ladder.test.ts`) | 18 passed (after the review fixes below) |
 | Catalog + detail + structural component tests | 110 passed (3 files, both locales) |
 | Page tests (catalog, detail, plus the updated Center page) | 27 passed (3 files) |
 | `no-connection-controls.test.ts` (structural source scans) | 6 passed: no raw `<button>`/`<form>`/`<input>`; `<Button` only for retry; no write HTTP methods and no connector/credential routes; only the three allowed endpoints; allow-listed hrefs only |
 | **Full web suite** (`npx vitest run`) | **535 files, 5788 tests passed**, exit 0 — run on code SHA `18121305`, before the review fix |
-| Re-run after the review fix (`src/lib`, `src/components/integrations`, `src/app/(app)/integrations`) | 87 files, 667 tests passed. The full suite was not re-run after this one-function change |
+| Re-run after the review fixes (`src/lib`, `src/components/integrations`, `src/app/(app)/integrations`, plus the new demo test) | 668 tests passed in 87 files, then 2 more in the new demo test file. The full suite and the Playwright spec were not re-run after these changes (browser fixtures always return all six readiness rows) |
 | `npm run build` (Next.js 15.5.19, includes type check) | **Succeeded** (`BUILD_EXIT 0`); `/integrations/delivery-platforms` (3.93 kB) and `/integrations/delivery-platforms/[platformKey]` (4.09 kB) emitted |
 | Playwright (real Chromium), `int-ux-2` + `int-ux-1` specs, desktop 1440 and mobile 390 | **75 passed, 1 skipped** (desktop-only check, skipped by design), exit 0 |
 
@@ -118,6 +118,8 @@ Not verified: behavior against the real backend and a real session (responses we
 | Finding | Decision |
 |---|---|
 | P2 — a known-platform row with a missing/non-boolean `is_active` was dropped and shown as "Not set up" | **Valid; fixed in `2bde0d06`.** `readManualStatuses` now returns `null` (rung A "could not be read"). The earlier test that pinned the old behavior was replaced |
+| P2 (second review, `ee466a38`) — malformed or missing readiness rows were skipped, giving a partial "successful" map with no banner/retry | **Valid; fixed.** `readReadinessRows` returns `null` when a known row is malformed or any of the six known rows is missing (unknown platforms are still ignored), so the read-failure banner and retry appear |
+| P2 (second review) — Demo login had no handlers for the two endpoints | **Valid; fixed.** `mock-data.ts` now serves `/delivery-platforms/readiness` (the six manifest rows, public fields only, none available, flags false) and `/delivery-platforms` (readable empty list). Pinned by `integration-center.demo.test.ts` |
 | P2 — unknown platform key should return a real HTTP 404 | **Not changed; owner decision.** The page is a client component behind the authenticated shell, so crawlers/caches cannot reach it and the screen already makes zero data requests. A real 404 needs a server boundary, a segment `not-found.tsx` and rewrites of the unknown-key tests and browser spec. Offered as a small follow-up |
 
 ## CI

@@ -166,14 +166,20 @@ function nullableText(value: unknown): string | null {
   return typeof value === 'string' && value.trim() !== '' ? value : null;
 }
 
-/** صفوف `GET /delivery-platforms/readiness`. صف بلا `ux_state` نصّي لا يُحتسب، وحمولة غير مصفوفة ⇒ `null`. */
+/**
+ * صفوف `GET /delivery-platforms/readiness`. الخادم يُرجع المنصات الست دائماً؛ لذا حمولة
+ * ينقص فيها صفّ معروف، أو يحمل صفٌّ معروف `ux_state` غير نصّي أو علماً غير منطقي، تعود
+ * `null` (قراءة فاشلة بشعار إعادة المحاولة) لا خريطة جزئية تبدو ناجحة. صفوف المنصات
+ * المجهولة تُتجاهل.
+ */
 export function readReadinessRows(payload: unknown): Map<string, ReadinessRow> | null {
   const list = rows(payload);
   if (list === null) return null;
+  const known = new Set(deliveryPlatformKeys());
   const result = new Map<string, ReadinessRow>();
   for (const row of list) {
-    if (typeof row.platform_key !== 'string' || typeof row.ux_state !== 'string') continue;
-    if (typeof row.connect_enabled !== 'boolean' || typeof row.sync_enabled !== 'boolean') continue;
+    if (typeof row.platform_key !== 'string' || !known.has(row.platform_key)) continue;
+    if (typeof row.ux_state !== 'string' || typeof row.connect_enabled !== 'boolean' || typeof row.sync_enabled !== 'boolean') return null;
     result.set(row.platform_key, {
       platformKey: row.platform_key,
       uxState: row.ux_state,
@@ -184,7 +190,7 @@ export function readReadinessRows(payload: unknown): Map<string, ReadinessRow> |
       evidenceRef: nullableText(row.evidence_ref),
     });
   }
-  return result;
+  return known.size === result.size ? result : null;
 }
 
 /**
