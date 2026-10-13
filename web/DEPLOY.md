@@ -29,6 +29,7 @@ web
 |---|---|
 | `NEXT_PUBLIC_API_URL` | `https://<عنوان-الـ-backend>/api` |
 | `NEXT_PUBLIC_TENANT_BASE_DOMAIN` | `awj.app` (لاحقة التسجيل `{slug}.awj.app`؛ للمحلي `localhost`) |
+| `NEXT_PUBLIC_AWJ_UI_DEFAULT` | `3` — يجعل AWJ v3 الواجهة الافتراضية لكل متصفح لم يختر صراحةً (اختياري؛ غيابه = القديم). يُدمج وقت البناء: يتطلّب Redeploy، والتراجع = حذفه ثم Redeploy. انظر `design-system/v3/MIGRATION.md` §6 و§9 |
 
 (القيمة الافتراضية في الكود `http://localhost:8000/api` للتطوير فقط — انظر `src/lib/api.ts`.)
 
