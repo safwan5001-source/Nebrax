@@ -181,12 +181,14 @@ describe.each(TEST_LOCALES)('delivery platform detail (%s)', (locale) => {
     const { unmount } = renderDetail(locale, 'keeta', { access: 'denied' });
     expect(screen.getByRole('note').textContent).toBe(m.delivery.denied);
     expect(screen.queryByTestId('capability-ladder')).toBeNull();
-    expect(within(screen.getByTestId('integration-restricted')).getByRole('link', { name: m.backToCenter }).getAttribute('href')).toBe('/integrations/delivery-platforms');
+    expect(within(screen.getByTestId('integration-restricted')).getByRole('link', { name: m.backToCenter }).getAttribute('href')).toBe('/integrations');
     unmount();
 
     renderDetail(locale, 'keeta', { access: 'app_off', canOpenApplications: false });
     expect(screen.getByRole('note').textContent).toBe(m.delivery.appOff);
     expect(within(screen.getByTestId('integration-restricted')).queryByRole('link', { name: m.delivery.manageApplications })).toBeNull();
+    // «العودة إلى مركز التكاملات» تقود إلى المركز نفسه لا إلى كتالوج مقيَّد آخر.
+    expect(within(screen.getByTestId('integration-restricted')).getByRole('link', { name: m.backToCenter }).getAttribute('href')).toBe('/integrations');
   });
 
   it('API failure: unreadable values, an alert, retry — never a success state or "none available"', async () => {

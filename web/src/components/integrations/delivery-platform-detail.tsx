@@ -70,7 +70,7 @@ export function DeliveryPlatformDetail({
       </header>
 
       {restricted ? (
-        <RestrictedNotice access={access} canOpenApplications={canOpenApplications} backHref={catalogHref} />
+        <RestrictedNotice access={access} canOpenApplications={canOpenApplications} backHref="/integrations" />
       ) : loading || access === 'checking' ? (
         <div role="status" aria-busy="true" aria-label={t('detail.loading')} className="space-y-3" data-testid="detail-loading">
           <Skeleton className="h-16 w-full" />
