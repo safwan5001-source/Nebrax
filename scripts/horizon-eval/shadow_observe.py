@@ -136,6 +136,20 @@ def _recommend(deciding: list[dict], zone: str) -> tuple[str, list[str]]:
     return "READY_FOR_MANUAL_REVIEW", []
 
 
+def _facts_support_ready(case: dict, ci: dict) -> bool:
+    """READY re-check straight from the evidence, independent of whatever reasons the evaluator did or did not emit:
+    PR open/not draft/not merged, the gate and every required always-tier check present on the head, and EVERY observed check green."""
+    ev = case["evidence"]
+    pr = ev["pr"]
+    if pr.get("draft") is not False or pr.get("merged") is not False or pr.get("state") != "open":
+        return False
+    if not ci["checks"] or any(c["status"] != "completed" or c["conclusion"] != "success" for c in ci["checks"]):
+        return False
+    names = {c["name"] for c in ci["checks"]}
+    rc = ev["required_checks"]
+    return {rc["gate_name"], *rc["always_names"]} <= names
+
+
 def _hard_deny_hits(record: dict, policy: dict) -> list[str]:
     paths = [f["path"] for f in record.get("files", [])] + [f["previous_path"] for f in record.get("files", []) if f.get("previous_path")]
     return sorted({p for p in paths if he.any_match_ci(policy["hard_deny_patterns"], p)})
@@ -223,7 +237,8 @@ def _observe(case, wall_clock, replay, policy) -> dict:
               and pr.get("state") == "open" and pr.get("base_sha") == record.get("main_sha")
               and record.get("would_merge") is False and record.get("decision") != "ELIGIBLE_SIMULATED"
               and zone in ("A", "B") and not hits and not replay and not record.get("injection_flags")
-              and pr.get("head_sha_reviewed") is not None and all(v == 0 for v in record.get("tool_calls", {}).values()))
+              and pr.get("head_sha_reviewed") is not None and all(v == 0 for v in record.get("tool_calls", {}).values())
+              and _facts_support_ready(case, ci))
         if not ok:
             code = "SHADOW_CI_GATE_NOT_CONFIRMED" if ci["ci_gate"]["conclusion"] != "success" else "SHADOW_READY_PRECONDITION_FAILED"
             all_reasons.append({"severity": "BLOCK", "code": code, "detail": "READY preconditions re-check failed"})

@@ -324,6 +324,30 @@ class FailClosed(unittest.TestCase):
         with mock.patch.object(so.he, "evaluate", lying):
             self.assertEqual(obs(green())["recommendation"], "BLOCK")
 
+    def test_ready_recheck_uses_case_facts_not_evaluator_reasons(self):
+        """Codex review: a quiet evaluator must not turn a failing non-gate check or a draft PR into READY."""
+        real = so.he.evaluate
+
+        def quiet(case, **kw):
+            rec = copy.deepcopy(real(case, **kw))
+            rec["reasons"] = []
+            return rec
+
+        def failing_extra(e):
+            e["checks"].append(check(4, "web build (Next.js)", conclusion="failure"))
+
+        def required_missing(e):
+            e["checks"] = [c for c in e["checks"] if c["name"] != "php artisan test (L11, pgsql)"]
+
+        for name, mutate in (("non-gate check failed", failing_extra), ("draft", lambda e: e["pr"].update(draft=True)),
+                             ("required check absent", required_missing), ("merged", lambda e: e["pr"].update(merged=True, merge_commit_sha="e" * 40))):
+            c = green()
+            mutate(c["evidence"])
+            with mock.patch.object(so.he, "evaluate", quiet):
+                rep = obs(c)
+            self.assertEqual(rep["recommendation"], "BLOCK", name)
+            self.assertIn("SHADOW_READY_PRECONDITION_FAILED", codes(rep), name)
+
     def test_authorization_codes_never_include_a_safety_signal(self):
         """The carve-out list is the only way a blocker can stop counting: keep it free of anything about CI, state, scope or safety."""
         risky = ("CI_", "PR_", "ZONE_", "HARD_DENY", "INJECTION", "EVIDENCE", "CONFLICT", "PATCH", "FILE_", "KILL_SWITCH", "INVARIANT",
