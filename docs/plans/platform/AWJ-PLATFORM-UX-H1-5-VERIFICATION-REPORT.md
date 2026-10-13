@@ -6,7 +6,7 @@ Spec: [AWJ-PLATFORM-UX-H1-1-UX-SPEC.md](./AWJ-PLATFORM-UX-H1-1-UX-SPEC.md)
 
 ## Verdict
 
-**NOT READY to close the Horizon.** Two P1 defects were found by running the real Laravel backend, which no earlier slice did. Both are fixed in a separate, small, tested branch that is not merged ([fix branch](#fixes-proposed-not-merged)). The Horizon may be closed after (1) that branch is reviewed and merged with Safwan's approval and (2) the P2 items below are accepted or scheduled by Safwan. Nothing here changes the Backend, database, financial rules or permissions, and nothing was merged or deployed.
+**NOT READY to close the Horizon.** Two P1 defects were found by running the real Laravel backend, which no earlier slice did. Both are fixed in a separate, small, tested branch that is not merged ([fix branch](#fixes-proposed-not-merged)). The Horizon may be closed only after all three conditions hold: (1) that branch is reviewed and merged with Safwan's approval; (2) the P2 items below are accepted or scheduled by Safwan; (3) the checks this report could not run (a real screen reader, the browser's own zoom and text-size settings, Firefox and WebKit, and the Laravel suites green in CI on the merged head) are either performed or explicitly waived in writing by Safwan. A NOT VERIFIED item is not a pass and does not close by default. Nothing here changes the Backend, database, financial rules or permissions, and nothing was merged or deployed.
 
 | P1 | Where | What a real backend showed | Mock tests said |
 |---|---|---|---|
@@ -157,7 +157,7 @@ This PR changes documentation only (the H1-5 report, the H1-4E report's merge st
 
 ## Recommendation on closing the Horizon
 
-Do not close it yet. After the P1 fix branch is reviewed and merged by Safwan's decision, and the P2 list is either accepted in writing or scheduled, the Horizon can close with this report as its verification record. The most valuable follow-up beyond the P2 list is one HTTP-level test per platform write endpoint, because the two P1 defects were invisible to every mocked test.
+Do not close it yet. Closure needs all three conditions in the verdict: the P1 fix branch reviewed and merged by Safwan's decision; the P2 list accepted in writing or scheduled; and the NOT VERIFIED accessibility and browser checks (real screen reader, native browser zoom and text size, Firefox, WebKit) either done or waived by Safwan. Earlier slice reports assigned the screen-reader, zoom and text-scaling checks to H1-5; this report ran zoom and text scaling by emulation only and could not run a screen reader, so those gates stay open until done or waived. With the conditions met, the Horizon can close with this report as its verification record. The most valuable follow-up beyond the P2 list is one HTTP-level test per platform write endpoint, because the two P1 defects were invisible to every mocked test.
 
 ## Git state
 
