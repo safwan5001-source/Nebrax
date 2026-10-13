@@ -127,7 +127,7 @@ Suggested small follow-ups (not built, not P1): H15-03 (page the tenant picker o
 | Next.js production build | `next build` completed (exit 0) on the Base SHA working tree with this report added. |
 | GitHub CI on this PR | See the checks on this PR (not repeated here: they did not exist when this file was committed). Fix PR: #1376. |
 
-The CI of earlier PR branches is not used as evidence for the state of `main`; the table above is from this session's own runs.
+GitHub CI on the fix PR #1376 (head `c23944ea153d977045feecd0518843027ee6636b`; PHP code identical to the Base SHA) finished with all 7 check runs `success`, including the full Laravel suite on SQLite and on PostgreSQL (workflow run 38365588245). That is independent evidence that the local Laravel failures above came from this container (no AWS SDK, no AVIF in GD, and so on) and not from the code. It is a result for that branch's head, not a post-merge result on `main`, and it is stated only for the suite as CI ran it. CI for this report PR is on the PR itself.
 
 ## NOT VERIFIED / BLOCKED (not passes)
 
