@@ -334,7 +334,7 @@ No Connect action column exists today (R-GATE-1).
 
 **Advanced (collapsed `TechnicalDetails`, owner/admin only):** manifest `technical` value, evidence date, evidence reference. For platform operators, not for merchants.
 
-**Internal ingress (`GATED` by `DP-C`).** If `DP-C` is approved, a read-only "AWJ signed ingress" panel lists the tenant's `DeliveryConnectorAccount` rows for this platform (store id, branch, status, secret prefix, version, operator). It is titled **"AWJ-signed event ingress — not a connection to {platform}"** / «استقبال أحداث موقّعة من أَوْج — ليس ربطاً مع {platform}». It must never reuse the words Connected/Live/Synced.
+**Internal ingress (`GATED` by `DP-C`).** If `DP-C` is approved, a read-only "AWJ signed ingress" panel lists the tenant's `DeliveryConnectorAccount` rows for this platform (store id, branch, status, secret prefix, version, operator). *(Approved for `INT-UX-4` on 2026-10-13 within the limits recorded under `DP-C`; the displayed fields there supersede this list — no secret prefix, no operator.)* It is titled **"AWJ-signed event ingress — not a connection to {platform}"** / «استقبال أحداث موقّعة من أَوْج — ليس ربطاً مع {platform}». It must never reuse the words Connected/Live/Synced.
 
 **Tabs.** `Overview` only while the provider is `NOT_SUPPORTED` / `AWAITING_PROVIDER_APPROVAL` (see §2.3). Other tabs appear only for `READY_TO_CONNECT` and later states.
 
@@ -857,6 +857,12 @@ Each is raised because the design needs a change to an existing financial/securi
 - **Context.** The AWJ-signed ingress is real and working but is not a provider connection; a `dsec_…` secret in the hands of a merchant could be misread as "my HungerStation integration".
 - **Options.** (1) Keep API-only. (2) Read-only list under a clearly-labeled "AWJ-signed event ingress" panel. (3) Full management UI (create, rotate, disable, reassign).
 - **Recommendation.** (2) in the UX slices; (3) only after an owner decision on who legitimately builds custom adapters. Never within the ladder rows.
+- **Decision (owner, 2026-10-13): option 2 approved for `INT-UX-4` only.** Not option 3, and not a standing approval for later slices.
+  - **Scope of the approval.** A read-only panel inside the delivery-platform detail page, listing the already-existing signed-ingress points from `GET /api/delivery-connectors` (permission `delivery_connector.view` + application `sales.pos`). The approved term is «نقطة استقبال أحداث موقّعة». No new API, permission, table or migration.
+  - **What it does not approve.** Any create / edit / disable / rotate / reassign / test / replay action (that stays `INT-UX-5`, still behind `INT-AUDIT-1`); any native provider connection, authorization, reconnect or sync; any change to readiness or to the capability ladder; any provider-store ↔ AWJ-branch mapping (`INT-MAP-1`); deploy or production release.
+  - **Wording limits.** An ingress point is never described as «متصل بالمنصة», «حساب التاجر مرتبط», «المزامنة مفعّلة» or «جاهز للتكامل الأصلي». The panel states that a point may be routed to a branch and that this does not map the provider's store to a branch, and that ingress status is not provider readiness.
+  - **Data limits.** Shown: store id, branch name (only with `branches.view`; otherwise a neutral «موجّهة إلى فرع»), the server's status, secret *version*, creation date. **Never** shown or held in UI state: the secret, `secret_prefix`, signing keys, tokens, the ingress id, operator/configurer identifiers. This **supersedes** the "secret prefix … operator" list in §5.3 and the INT-UX-4 scope line below: the prefix is a fragment of the signing secret, and there is no approved source for operator names in this slice.
+  - **`DP-E` is unchanged**: owner/admin only through the existing `delivery_connector.view`; finance roles do not gain visibility.
 
 ### DP-D — Provider merchant-account uniqueness across tenants
 
@@ -918,7 +924,7 @@ Two tracks. **Track U** (UX/catalog) is safe to build now and never touches prov
 - **Tests.** Link visibility matrix per role; existing `/delivery-platforms`, POS picker and report suites unchanged.
 - **Excludes.** Editing profiles, changing financial roles.
 
-#### INT-UX-4 — Read-only AWJ-signed ingress panel *(only if DP-C option 2 is approved)*
+#### INT-UX-4 — Read-only AWJ-signed ingress panel *(DP-C option 2 approved 2026-10-13, for this slice only — limits under `DP-C`)*
 - **Scope.** List `DeliveryConnectorAccount` rows per platform via existing `GET /api/delivery-connectors`; show store id, branch, status, secret prefix/version, operator; wording per §5.3/§6.5.
 - **Depends on.** DP-C, INT-UX-2.
 - **Acceptance.** Never uses Connected/Live/Synced; branch-restricted view hides unrouted/foreign rows; no secret fields in the UI model.
