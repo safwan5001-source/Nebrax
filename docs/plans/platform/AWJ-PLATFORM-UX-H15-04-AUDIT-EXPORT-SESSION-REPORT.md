@@ -55,7 +55,7 @@ Mutation checks (each reverted change fails tests): removing `Accept` (2 tests),
 | New and related tests (`platform-download`, `document-operations`) | 11 new tests added, all pass |
 | Full web suite | 523 files, 5565 tests passed. A first run showed 9 unrelated files failing: my new test replaced `window.location` and the `URL` stubs and did not restore them, which leaked into other files in the same worker. Fixed (restored after every test) and the suite re-run in full, which is the result stated here |
 | `tsc --noEmit` | 48 errors, equal to the baseline; none outside test/spec files, none in the changed files |
-| `next build` | see the PR (recorded below if complete before this was committed) |
+| `next build` | exit 0 (run on this branch's code after the test fix) |
 | GitHub CI | recorded on the PR for the final head (this file is part of that head) |
 
 **Real backend, real browser (Chromium, Laravel on SQLite with isolated test data, Next dev server, no route interception — these are the real requests):**
