@@ -1,6 +1,6 @@
 # H1-4E — Platform Document Operations UX — Implementation report
 
-STATUS: IN REVIEW / DO NOT MERGE / DO NOT DEPLOY
+STATUS: MERGED (PR #1375, `9becbb62b5e76484ba287e5ef424185893a092a8`) / NOT DEPLOYED / POST-MERGE VERIFICATION NOT RECORDED HERE (see the H1-5 report)
 Horizon: AWJ-PLATFORM-UX-H1 · Slice: H1-4E (document operations) · Date: 2026-10-13
 Spec: [AWJ-PLATFORM-UX-H1-1-UX-SPEC.md](./AWJ-PLATFORM-UX-H1-1-UX-SPEC.md) §8, §9 and §12.7
 
@@ -97,12 +97,13 @@ Behaviour-preserving: the three reads, the three actions, their bodies and the `
 
 ## CI
 
-Recorded on the pull request for the exact head SHA (the checks and the final head are listed in the PR and in the hand-off summary). This file is part of that head, so it does not restate results that did not exist when it was committed.
+Final head of PR #1375: `8fd2ee8edcaa9fdee20ec639f69630a65536448e`. All 7 GitHub check runs finished `success` (CI Gate, web build x2, php artisan test sqlite x2, pgsql x2; workflow runs 38332490289, 38332490329, 38332490330). One web build had failed earlier on a transient `next/font` fetch; it passed on a single re-run with no code change. CI on the PR head is not evidence of a check on `main` after the merge.
 
 ## Merge / post-merge
 
-- Merge status: not merged. Merge SHA: none. Post-merge review: not done. Deploy: not requested.
-- H1-4D is recorded as merged (PR #1372, `0349b822b5f38cf4fb4fe7b1ee4b89e847030ddc`); post-merge verification of #1318, #1328, #1355, #1358, #1362, #1366, #1368 and #1372 on `main` has not been recorded and this slice does not claim it.
+- Merged 2026-10-13 04:59:47 UTC by the repository owner account as PR #1375; merge SHA `9becbb62b5e76484ba287e5ef424185893a092a8`. PRE_MERGE_REVIEW: PASS, recorded as a PR comment for the exact head. The Codex bot was unavailable (usage limit); that is not represented as a pass.
+- Deploy: not requested, not done.
+- Post-merge verification of this slice on `main` is recorded in the H1-5 report, not here: [AWJ-PLATFORM-UX-H1-5-VERIFICATION-REPORT.md](./AWJ-PLATFORM-UX-H1-5-VERIFICATION-REPORT.md).
 
 ## Risks and remaining work
 
@@ -121,8 +122,8 @@ Recorded on the pull request for the exact head SHA (the checks and the final he
 
 - Branch: `claude/awj-h1-4e-document-operations` (new, from `origin/main`; not a reuse of an earlier slice branch).
 - Base SHA: `0349b822b5f38cf4fb4fe7b1ee4b89e847030ddc` (`origin/main` at start).
-- Head SHA and PR: see the pull request.
+- Head SHA: `8fd2ee8edcaa9fdee20ec639f69630a65536448e`. PR #1375, merged as `9becbb62b5e76484ba287e5ef424185893a092a8`.
 
 ## Next dependency-ready task
 
-**H1-5**: integrated verification of the platform administration UX (real session, landscape, zoom, screen readers, and the recorded recommendations). Not started.
+**H1-5**: integrated verification of the platform administration UX against a real backend. Done as a verification slice; see its report. Closing the Horizon is a separate decision.
