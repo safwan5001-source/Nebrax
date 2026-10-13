@@ -82,37 +82,38 @@ class Verdicts(unittest.TestCase):
         self.assertEqual(v, "pass")
 
     def test_failure_fails(self):
-        runs = [cr(PHP[0]), cr(PHP[1], conclusion="failure")]
+        runs = [cr(PHP[0]), cr(PHP[1], conclusion="failure"), cr(HORIZON)]
         self.assertEqual(ev(["a.md"], runs)[1][0], "fail")
 
     def test_cancelled_skipped_neutral_timed_out_are_not_success(self):
         for concl in ("cancelled", "skipped", "neutral", "timed_out", "action_required", "stale", None):
-            runs = [cr(PHP[0]), cr(PHP[1], conclusion=concl)]
+            runs = [cr(PHP[0]), cr(PHP[1], conclusion=concl), cr(HORIZON)]
             self.assertEqual(ev(["a.md"], runs)[1][0], "fail", concl)
 
     def test_in_progress_waits(self):
-        runs = [cr(PHP[0]), cr(PHP[1], status="in_progress", conclusion=None)]
+        # Horizon is supplied green so the wait can only come from the PHP check's status
+        runs = [cr(PHP[0]), cr(PHP[1], status="in_progress", conclusion=None), cr(HORIZON)]
         self.assertEqual(ev(["a.md"], runs)[1][0], "wait")
 
     def test_not_yet_reported_waits_then_fails_at_deadline(self):
-        runs = [cr(PHP[0])]
+        runs = [cr(PHP[0]), cr(HORIZON)]
         self.assertEqual(ev(["a.md"], runs, elapsed=30)[1][0], "wait")
         self.assertEqual(ev(["a.md"], runs, elapsed=4200)[1][0], "fail")
 
     def test_workflow_never_triggered_fails_after_grace(self):
-        runs = [cr(PHP[0])]
+        runs = [cr(PHP[0]), cr(HORIZON)]
         v = ev(["a.md"], runs, wf_runs=[], elapsed=601)[1][0]
         self.assertEqual(v, "fail")
         self.assertEqual(ev(["a.md"], runs, wf_runs=[], elapsed=100)[1][0], "wait")
 
     def test_workflow_finished_without_job_fails(self):
-        runs = [cr(PHP[0])]
+        runs = [cr(PHP[0]), cr(HORIZON)]
         wf = [{"path": ".github/workflows/ci.yml", "status": "completed", "conclusion": "success"}]
         self.assertEqual(ev(["a.md"], runs, wf_runs=wf)[1][0], "fail")
 
     def test_action_required_fails(self):
         wf = [{"path": ".github/workflows/ci.yml", "status": "completed", "conclusion": "action_required"}]
-        self.assertEqual(ev(["a.md"], [], wf_runs=wf)[1][0], "fail")
+        self.assertEqual(ev(["a.md"], [cr(HORIZON)], wf_runs=wf)[1][0], "fail")
 
     def test_present_but_unexpected_check_must_still_pass(self):
         runs = ok_php() + [cr("web build (Next.js)", conclusion="failure")]
@@ -125,12 +126,12 @@ class Verdicts(unittest.TestCase):
         self.assertTrue(any("earlier attempt" in w for w in warns))
 
     def test_rerun_in_progress_after_failure_waits(self):
-        runs = [cr(PHP[0]), cr(PHP[1], conclusion="failure", id=900),
+        runs = [cr(PHP[0]), cr(HORIZON), cr(PHP[1], conclusion="failure", id=900),
                 cr(PHP[1], status="in_progress", conclusion=None, id=901)]
         self.assertEqual(ev(["a.md"], runs)[1][0], "wait")
 
     def test_spoofed_check_from_other_app_ignored(self):
-        runs = [cr(PHP[0]), cr(PHP[1], app="evil-app")]
+        runs = [cr(PHP[0]), cr(PHP[1], app="evil-app"), cr(HORIZON)]
         self.assertEqual(ev(["a.md"], runs, elapsed=30)[1][0], "wait")
 
     def test_horizon_check_is_blocking(self):
