@@ -14,6 +14,7 @@ import { ChevronDown, ChevronUp, Plus, Trash2 } from "lucide-react";
 import { useId, useState } from "react";
 import { ANNOUNCEMENT_ICON_COMPONENTS } from "./announcement-icons";
 import { useAnnouncementClock } from "./use-announcement-clock";
+import { BufferedText } from "./BufferedText";
 import { WindowFields } from "./WindowFields";
 import {
   type AnnouncementEditorStatus,
@@ -47,6 +48,7 @@ import {
   announcementWindowState,
   autoForeground,
   normalizeAnnouncementHref,
+  normalizeAnnouncementText,
 } from "./presentation/announcements";
 import { contrastRatio, isSafeHexColor } from "./presentation/tokens";
 
@@ -357,6 +359,9 @@ export function AnnouncementsPanel({
   );
 }
 
+/** The draft drops an href that is not (yet) a safe link; the field compares against that, never overwrites a half-typed one. */
+const hrefText = (typed: string) => normalizeAnnouncementHref(typed) ?? "";
+
 function ItemEditor({
   item,
   locale,
@@ -413,11 +418,13 @@ function ItemEditor({
 
       <div className="space-y-1">
         <Field label={t("annText")} hint={t("annTextHint")}>
-          <textarea
-            className={`${inputClass} h-16 py-2`}
+          <BufferedText
+            multiline
+            className="h-16 py-2"
             value={item.text}
-            maxLength={ANNOUNCEMENT_TEXT_MAX * 2}
-            onChange={(event) => onChange({ text: event.target.value })}
+            normalize={normalizeAnnouncementText}
+            limit={ANNOUNCEMENT_TEXT_MAX}
+            onCommit={(text) => onChange({ text })}
           />
         </Field>
         <span
@@ -460,14 +467,13 @@ function ItemEditor({
             : t("annLinkHint")
         }
       >
-        <input
-          className={`${inputClass} font-mono`}
+        <BufferedText
+          className="font-mono"
           dir="ltr"
           inputMode="url"
           value={hrefRaw}
-          onChange={(event) =>
-            onChange({ href: event.target.value === "" ? undefined : event.target.value })
-          }
+          normalize={hrefText}
+          onCommit={(href) => onChange({ href: href === "" ? undefined : href })}
         />
       </Field>
 

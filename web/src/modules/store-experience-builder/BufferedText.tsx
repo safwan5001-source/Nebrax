@@ -19,6 +19,11 @@ export function BufferedText({
   multiline,
   limit,
   placeholder,
+  normalize = stored,
+  className,
+  dir,
+  inputMode,
+  maxLength,
   ...rest
 }: {
   value: string;
@@ -27,10 +32,21 @@ export function BufferedText({
   /** The stored limit in Unicode code points (what the contract counts): the field never holds, or shows, what Save would drop. */
   limit?: number;
   placeholder?: string;
+  /**
+   * The draft's own normaliser for this field (default: the trim above). Pass a stable (module-level) function. The field adopts the draft's value only when it differs from
+   * `normalize(typed)` — so a URL the draft drops while it is still half-typed (`h`, `https:/`), or a message the draft trims, never
+   * rewrites what the merchant is typing.
+   */
+  normalize?: (typed: string) => string;
+  /** Extra classes appended to the shared input style. */
+  className?: string;
+  dir?: "ltr" | "rtl";
+  inputMode?: "url" | "text";
+  maxLength?: number;
 } & Record<`data-${string}`, string>) {
   const [local, setLocal] = useState(value);
   useEffect(() => {
-    setLocal((current) => (stored(current) === value ? current : value));
+    setLocal((current) => (normalize(current) === value ? current : value));
   }, [value]);
   const commit = (typed: string) => {
     // the limit is on the STORED (trimmed) form, so leading whitespace does not spend the quota
@@ -41,8 +57,25 @@ export function BufferedText({
     onCommit(next);
   };
   return multiline ? (
-    <textarea className={`${inputClass} h-24 py-2`} value={local} placeholder={placeholder} onChange={(event) => commit(event.target.value)} {...rest} />
+    <textarea
+      className={`${inputClass} ${className ?? "h-24 py-2"}`}
+      value={local}
+      placeholder={placeholder}
+      dir={dir}
+      maxLength={maxLength}
+      onChange={(event) => commit(event.target.value)}
+      {...rest}
+    />
   ) : (
-    <input className={inputClass} value={local} placeholder={placeholder} onChange={(event) => commit(event.target.value)} {...rest} />
+    <input
+      className={`${inputClass}${className ? ` ${className}` : ""}`}
+      value={local}
+      placeholder={placeholder}
+      dir={dir}
+      inputMode={inputMode}
+      maxLength={maxLength}
+      onChange={(event) => commit(event.target.value)}
+      {...rest}
+    />
   );
 }

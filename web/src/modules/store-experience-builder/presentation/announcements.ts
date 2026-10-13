@@ -175,18 +175,22 @@ function normalizeSurface(raw: unknown): Announcement["surface"] | undefined {
   return surface;
 }
 
+/**
+ * The stored form of a message: control characters flattened to a space (exactly PHP's `/\p{Cc}+/u`), PHP-trimmed, capped in code
+ * points. Exported so the editor field compares against the very same rule the draft applies.
+ */
+export function normalizeAnnouncementText(value: unknown): string {
+  const flattened = (typeof value === "string" ? value : "").replace(/\p{Cc}+/gu, " ");
+  return capCodePoints(phpTrim(flattened), ANNOUNCEMENT_TEXT_MAX);
+}
+
 function normalizeItem(
   raw: Record<string, unknown>,
   index: number,
 ): Announcement {
-  // `\p{Cc}` = the C0 + C1 control characters, exactly PHP's `/\p{Cc}+/u`.
-  const flattened = (typeof raw.text === "string" ? raw.text : "").replace(
-    /\p{Cc}+/gu,
-    " ",
-  );
   const item: Announcement = {
     id: safeId(raw.id, `ann-${index}`),
-    text: capCodePoints(phpTrim(flattened), ANNOUNCEMENT_TEXT_MAX),
+    text: normalizeAnnouncementText(raw.text),
     enabled: typeof raw.enabled === "boolean" ? raw.enabled : true,
   };
 

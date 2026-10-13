@@ -44,7 +44,7 @@ import { NavigationPanel } from "./NavigationPanel";
 import { emptyMainMenu, migrateLegacyLinks, withMainMenu } from "./navigation-edit";
 import { mainMenu } from "./presentation/navigation";
 import { SectionLibraryContent, SectionLibraryDialog } from "./SectionLibrary";
-import { buildWhatsAppUrl } from "./presentation/urls";
+import { buildWhatsAppUrl, sanitizeExternalUrl } from "./presentation/urls";
 import {
   bannerContentOf,
   bannerCtasOf,
@@ -1908,6 +1908,18 @@ function WhatsAppPanel({
   );
 }
 
+/**
+ * `normalizePresentationConfig` drops a URL that is not yet a complete https link, so a URL typed key by key reads `""` in the draft until
+ * its last character. Fields bound through `BufferedText` compare against this instead of echoing the draft back over the caret.
+ */
+const externalUrlText = (typed: string) => sanitizeExternalUrl(typed) ?? "";
+
+// Mirrors of `normalizeBanner` / `normalizeBenefits` (section-content.ts) for the buffered fields below: `trim().slice(0, n)`.
+const bannerTitleText = (typed: string) => typed.trim().slice(0, 120);
+const bannerSubtitleText = (typed: string) => typed.trim().slice(0, 200);
+const benefitTitleText = (typed: string) => typed.trim().slice(0, 80);
+const benefitBodyText = (typed: string) => typed.trim().slice(0, 200);
+
 function SocialPanel({
   config,
   t,
@@ -1986,14 +1998,14 @@ function SocialPanel({
                   {t("removeLink")}
                 </button>
               </div>
-              <input
-                className={inputClass}
+              <BufferedText
+                dir="ltr"
+                inputMode="url"
                 placeholder="https://"
                 value={item.url}
-                onChange={(event) => {
-                  const social = config.social.map((row, i) =>
-                    i === index ? { ...row, url: event.target.value } : row,
-                  );
+                normalize={externalUrlText}
+                onCommit={(url) => {
+                  const social = config.social.map((row, i) => (i === index ? { ...row, url } : row));
                   patch({ social });
                 }}
               />
@@ -2004,7 +2016,7 @@ function SocialPanel({
                   checked={item.enabled}
                   onChange={(enabled) => {
                     const social = config.social.map((row, i) =>
-                      i === index ? { ...row, enabled } : item,
+                      i === index ? { ...row, enabled } : row,
                     );
                     patch({ social });
                   }}
@@ -2150,14 +2162,16 @@ function VerificationPanel({
           />
         </Field>
         <Field label={t("verificationUrl")}>
-          <input
-            className={inputClass}
+          <BufferedText
+            dir="ltr"
+            inputMode="url"
             value={config.verification.sourceUrl}
-            onChange={(event) =>
+            normalize={externalUrlText}
+            onCommit={(sourceUrl) =>
               patch({
                 verification: {
                   ...config.verification,
-                  sourceUrl: event.target.value,
+                  sourceUrl,
                 },
               })
             }
@@ -2491,10 +2505,10 @@ function BannerFields({
   return (
     <div className="space-y-3">
       <Field label={t("bannerTitle")}>
-        <input className={inputClass} value={value.title} onChange={(event) => set({ title: event.target.value })} />
+        <BufferedText value={value.title} limit={120} normalize={bannerTitleText} onCommit={(title) => set({ title })} />
       </Field>
       <Field label={t("bannerSubtitle")}>
-        <textarea className={`${inputClass} h-20 py-2`} value={value.subtitle} onChange={(event) => set({ subtitle: event.target.value })} />
+        <BufferedText multiline className="h-20 py-2" value={value.subtitle} limit={200} normalize={bannerSubtitleText} onCommit={(subtitle) => set({ subtitle })} />
       </Field>
       <CtaSlots
         slots={bannerSlots}
@@ -2505,7 +2519,7 @@ function BannerFields({
       />
       <p className="text-[12px] leading-5 text-muted">{t("bannerCtaHint")}</p>
       <Field label={t("bannerImageUrl")}>
-        <input className={inputClass} value={value.imageUrl ?? ""} onChange={(event) => set({ imageUrl: event.target.value || null })} />
+        <BufferedText dir="ltr" inputMode="url" value={value.imageUrl ?? ""} normalize={externalUrlText} onCommit={(imageUrl) => set({ imageUrl: imageUrl || null })} />
       </Field>
       <DeferredCommitField
         label={t("bannerImageAlt")}
@@ -2580,21 +2594,21 @@ export function BenefitsFields({
             </select>
           </Field>
           <Field label={t("benefitTitle")}>
-            <input
-              className={inputClass}
+            <BufferedText
               value={item.title}
-              onChange={(event) =>
-                onChange(items.map((row, i) => (i === index ? { ...row, title: event.target.value } : row)))
-              }
+              limit={80}
+              normalize={benefitTitleText}
+              onCommit={(title) => onChange(items.map((row, i) => (i === index ? { ...row, title } : row)))}
             />
           </Field>
           <Field label={t("benefitBody")}>
-            <textarea
-              className={`${inputClass} h-16 py-2`}
+            <BufferedText
+              multiline
+              className="h-16 py-2"
               value={item.body}
-              onChange={(event) =>
-                onChange(items.map((row, i) => (i === index ? { ...row, body: event.target.value } : row)))
-              }
+              limit={200}
+              normalize={benefitBodyText}
+              onCommit={(body) => onChange(items.map((row, i) => (i === index ? { ...row, body } : row)))}
             />
           </Field>
           <button type="button" className="text-xs text-neutral-500" onClick={() => onChange(items.filter((_, i) => i !== index))}>
