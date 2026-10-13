@@ -5,6 +5,7 @@ namespace App\Services\Commerce;
 use App\Models\Storefront;
 use App\Models\StorefrontPresentation;
 use App\Models\StorefrontPresentationVersion;
+use App\Models\StorefrontPresentationVersionRevision;
 use App\Support\Commerce\SchedulePublicationTokenCodec;
 use App\Support\Commerce\StorefrontPresentationNormalizer;
 use App\Support\Commerce\StorefrontPresentationPublishValidator;
@@ -57,12 +58,16 @@ final class StorefrontPresentationVersionService
 
     private readonly StorefrontPresentationPublishValidator $publishValidator;
 
+    private readonly StorefrontPresentationRevisionRecorder $revisions;
+
     public function __construct(
         private readonly StorefrontPresentationNormalizer $normalizer,
         private readonly SchedulePublicationTokenCodec $tokenCodec,
         ?StorefrontPresentationPublishValidator $publishValidator = null,
+        ?StorefrontPresentationRevisionRecorder $revisions = null,
     ) {
         $this->publishValidator = $publishValidator ?? new StorefrontPresentationPublishValidator;
+        $this->revisions = $revisions ?? new StorefrontPresentationRevisionRecorder;
     }
 
     /** @return list<array<string, mixed>>|null */
@@ -90,10 +95,10 @@ final class StorefrontPresentationVersionService
      * @throws SourceVersionNotFoundException
      * @throws ForwardSchemaVersionException
      */
-    public function createForCurrentTenant(string $storefrontId, string $name, ?string $sourceVersionId): ?array
+    public function createForCurrentTenant(string $storefrontId, string $name, ?string $sourceVersionId, ?string $sourceRevisionId = null): ?array
     {
         try {
-            return $this->attemptCreate($storefrontId, $name, $sourceVersionId);
+            return $this->attemptCreate($storefrontId, $name, $sourceVersionId, $sourceRevisionId);
         } catch (QueryException $e) {
             if (! $this->isUniqueViolation($e)) {
                 throw $e;
@@ -101,7 +106,7 @@ final class StorefrontPresentationVersionService
 
             // معاملة أخرى أنشأت الرأس بالتزامن — أُعيد المحاولة على معاملة
             // جديدة نظيفة (لا نكمل داخل معاملة Postgres مُجهَضة).
-            return $this->attemptCreate($storefrontId, $name, $sourceVersionId);
+            return $this->attemptCreate($storefrontId, $name, $sourceVersionId, $sourceRevisionId);
         }
     }
 
@@ -166,11 +171,19 @@ final class StorefrontPresentationVersionService
 
             $newRevision = (int) $version->revision + 1;
 
+            // CUST-H5-3 — حالة ما قبل الحفظ تُلتقَط قبل الكتابة لخط الأساس الكسول للسجلّ (مصدر الاتفاقية: المسجِّل).
+            $priorConfig = is_array($version->config) ? $version->config : null;
+            $priorRevision = (int) $version->revision;
+            $priorSchemaVersion = (int) $version->schema_version;
+
             $version->forceFill([
                 'config' => $normalized,
                 'schema_version' => StorefrontPresentationNormalizer::VERSION,
                 'revision' => $newRevision,
             ])->save();
+
+            // داخل معاملة الحفظ نفسها وتحت قفل Storefront ← head ← Version: اللقطة تتبع الحفظ ذرّياً.
+            $this->revisions->recordSave($version, $priorConfig, $priorRevision, $priorSchemaVersion);
 
             // CUST-H1-1: إن كانت النسخة المحفوظة هي نسخة العمل المتوافقة
             // ذاتها، يجب مزامنة حقول المسودة على الرأس أيضاً في نفس
@@ -188,6 +201,114 @@ final class StorefrontPresentationVersionService
 
             return $this->detail($version->fresh(), $head);
         });
+    }
+
+    /**
+     * CUST-H5-3 — قائمة المراجعات المحفوظة لنسخة (الأحدث أولاً). بلا المستند: بيانات وصفية فقط. محدودة بسقف الاحتفاظ.
+     * أجنبي/مفقود → null. `is_current`: لقطةٌ مطابقة لمحتوى النسخة الآن.
+     *
+     * @return list<array<string, mixed>>|null
+     */
+    public function listRevisionsForCurrentTenant(string $storefrontId, string $versionId): ?array
+    {
+        $storefront = $this->ownedStorefront($storefrontId);
+        if ($storefront === null) {
+            return null;
+        }
+
+        $version = $this->findOwnedVersion($storefront, $versionId);
+        if ($version === null) {
+            return null;
+        }
+
+        $currentHash = StorefrontPresentationRevisionRecorder::hashOf((array) $version->config);
+
+        return StorefrontPresentationVersionRevision::query()
+            ->where('version_id', $version->id)
+            ->where('storefront_id', $storefront->id)
+            ->orderByDesc('version_revision')
+            ->get(['id', 'version_id', 'version_revision', 'schema_version', 'config_hash', 'size_bytes', 'created_at'])
+            ->map(fn (StorefrontPresentationVersionRevision $r) => $this->summarizeRevision($r, $currentHash))
+            ->values()
+            ->all();
+    }
+
+    /**
+     * CUST-H5-3 — مراجعة واحدة **مع** مستندها المُطبَّع تحت المخطط الحالي (للمعاينة/الاسترداد). قراءة فقط: لا تغيّر
+     * النسخة ولا مراجعتها ولا النشر. مراجعةٌ لا تخصّ هذه النسخة (أو مستأجراً/متجراً آخر) → null (404).
+     *
+     * @return array<string, mixed>|null
+     *
+     * @throws ForwardSchemaVersionException
+     */
+    public function showRevisionForCurrentTenant(string $storefrontId, string $versionId, string $revisionId): ?array
+    {
+        $storefront = $this->ownedStorefront($storefrontId);
+        if ($storefront === null) {
+            return null;
+        }
+
+        $version = $this->findOwnedVersion($storefront, $versionId);
+        if ($version === null) {
+            return null;
+        }
+
+        $revision = StorefrontPresentationVersionRevision::query()
+            ->whereKey($revisionId)
+            ->where('version_id', $version->id)
+            ->where('storefront_id', $storefront->id)
+            ->first();
+        if ($revision === null) {
+            return null;
+        }
+
+        $this->assertSupportedSchema((int) $revision->schema_version);
+
+        $currentHash = StorefrontPresentationRevisionRecorder::hashOf((array) $version->config);
+
+        $normalized = $this->normalizer->normalize((array) $revision->config, (int) $revision->schema_version);
+
+        return array_merge($this->summarizeRevision($revision, $currentHash), [
+            'config' => $normalized,
+            // CUST-H5-4 — إعادة فحص الوسائط **الآن** (ملكية المستأجر + الجاهزية) قبل أي استرداد: لا نُحيي بايتات محذوفة
+            // بمعرّفها، ولا نخفي المشكلة — تُعاد ليعرضها المحرِّر ويحجبها النشر كما يفعل دائماً.
+            'media_issues' => $this->mediaIssuesFor($normalized),
+        ]);
+    }
+
+    /**
+     * مراجع الوسائط في المستند التي لم تعد صالحة **اليوم** لهذا المستأجر: غير موجودة/محذوفة (`media_missing`) أو غير جاهزة
+     * (`media_not_ready`، `derivative_*`). قراءةٌ فقط عبر بوابة النشر نفسها (مصدر واحد للحقيقة) — تُصفّى أخطاء النصوص البديلة
+     * (جودة نشر لا صلاحية استرداد).
+     *
+     * @param  array<string, mixed>  $normalized
+     * @return list<array{path: string, code: string, message: string}>
+     */
+    private function mediaIssuesFor(array $normalized): array
+    {
+        $restorable = ['media_missing', 'media_not_ready', 'derivative_not_ready', 'derivative_failed'];
+        $issues = [];
+        foreach (app(StorefrontMediaPublishGate::class)->errors($normalized) as $path => $error) {
+            if (in_array($error['code'], $restorable, true)) {
+                $issues[] = ['path' => (string) $path, 'code' => $error['code'], 'message' => $error['message']];
+            }
+        }
+
+        return $issues;
+    }
+
+    /** @return array<string, mixed> */
+    private function summarizeRevision(StorefrontPresentationVersionRevision $revision, string $currentHash): array
+    {
+        return [
+            'id' => $revision->id,
+            'version_id' => $revision->version_id,
+            'version_revision' => (int) $revision->version_revision,
+            'schema_version' => (int) $revision->schema_version,
+            'size_bytes' => (int) $revision->size_bytes,
+            'created_at' => $revision->created_at?->toJSON(),
+            'is_current' => $revision->config_hash === $currentHash,
+        ];
     }
 
     /** @return array<string, mixed>|null */
@@ -689,9 +810,9 @@ final class StorefrontPresentationVersionService
      * @throws SourceVersionNotFoundException
      * @throws ForwardSchemaVersionException
      */
-    private function attemptCreate(string $storefrontId, string $name, ?string $sourceVersionId): ?array
+    private function attemptCreate(string $storefrontId, string $name, ?string $sourceVersionId, ?string $sourceRevisionId = null): ?array
     {
-        return DB::transaction(function () use ($storefrontId, $name, $sourceVersionId) {
+        return DB::transaction(function () use ($storefrontId, $name, $sourceVersionId, $sourceRevisionId) {
             $storefront = $this->lockOwnedStorefront($storefrontId);
             if ($storefront === null) {
                 return null;
@@ -722,7 +843,7 @@ final class StorefrontPresentationVersionService
                     ->first();
             }
 
-            [$sourceConfig, $sourceSchemaVersion] = $this->resolveSourceConfig($storefront, $head, $sourceVersionId);
+            [$sourceConfig, $sourceSchemaVersion] = $this->resolveSourceConfig($storefront, $head, $sourceVersionId, $sourceRevisionId);
 
             if ($sourceSchemaVersion > StorefrontPresentationNormalizer::VERSION) {
                 throw new ForwardSchemaVersionException;
@@ -740,7 +861,14 @@ final class StorefrontPresentationVersionService
                 'revision' => 1,
             ]);
 
-            return $this->detail($version, $head);
+            $detail = $this->detail($version, $head);
+
+            // CUST-H5-4 — مسودة منشأة من لقطة محفوظة: تُعاد معها مشاكل الوسائط الحالية (لا تُصلَح ولا تُحذف صامتةً).
+            if ($sourceRevisionId !== null) {
+                $detail['media_issues'] = $this->mediaIssuesFor($normalized);
+            }
+
+            return $detail;
         });
     }
 
@@ -749,7 +877,7 @@ final class StorefrontPresentationVersionService
      *
      * @throws SourceVersionNotFoundException
      */
-    private function resolveSourceConfig(Storefront $storefront, StorefrontPresentation $lockedHead, ?string $sourceVersionId): array
+    private function resolveSourceConfig(Storefront $storefront, StorefrontPresentation $lockedHead, ?string $sourceVersionId, ?string $sourceRevisionId = null): array
     {
         if ($sourceVersionId !== null) {
             $source = $this->findOwnedVersion($storefront, $sourceVersionId);
@@ -757,7 +885,25 @@ final class StorefrontPresentationVersionService
                 throw new SourceVersionNotFoundException;
             }
 
+            if ($sourceRevisionId !== null) {
+                // CUST-H5-4 — لقطة محفوظة **تخصّ هذه النسخة وهذا المتجر وهذا المستأجر** فقط؛ غيرها = 404 كالنسخة المصدر المفقودة.
+                $revision = StorefrontPresentationVersionRevision::query()
+                    ->whereKey($sourceRevisionId)
+                    ->where('version_id', $source->id)
+                    ->where('storefront_id', $storefront->id)
+                    ->first();
+                if ($revision === null) {
+                    throw new SourceVersionNotFoundException;
+                }
+
+                return [(array) $revision->config, (int) $revision->schema_version];
+            }
+
             return [$source->config ?? [], (int) $source->schema_version];
+        }
+
+        if ($sourceRevisionId !== null) {
+            throw new SourceVersionNotFoundException;
         }
 
         if ($lockedHead->active_version_id !== null) {

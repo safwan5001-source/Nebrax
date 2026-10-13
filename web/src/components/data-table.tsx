@@ -52,6 +52,15 @@ interface DataTableProps<T> {
   data: T[];
   loading?: boolean;
   searchPlaceholder?: string;
+  /** اسم وصول حقل البحث. الافتراضي نص العنصر النائب الحالي. */
+  searchLabel?: string;
+  /** اسم/تلميح زر CSV حين يلزم توضيح نطاق ما يُصدَّر. الافتراضي السلوك الحالي. */
+  exportLabel?: string;
+  /**
+   * ترتيب أعمدة CSV بمعرّفات الأعمدة حين يختلف عن ترتيب العرض. الأعمدة غير المذكورة
+   * تلي المذكورة بترتيبها الحالي. الافتراضي: ترتيب العرض كما هو.
+   */
+  exportColumnOrder?: string[];
   emptyLabel?: string;
   emptyDescription?: string;
   emptyAction?: React.ReactNode;
@@ -95,6 +104,9 @@ export function DataTable<T>({
   data,
   loading,
   searchPlaceholder,
+  searchLabel,
+  exportLabel,
+  exportColumnOrder,
   emptyLabel,
   emptyDescription,
   emptyAction,
@@ -158,6 +170,13 @@ export function DataTable<T>({
         const def = c.columnDef as { accessorKey?: unknown; accessorFn?: unknown };
         return def.accessorKey != null || def.accessorFn != null;
       });
+    if (exportColumnOrder) {
+      const rank = (id: string) => {
+        const index = exportColumnOrder.indexOf(id);
+        return index === -1 ? exportColumnOrder.length : index;
+      };
+      cols.sort((a, b) => rank(a.id) - rank(b.id)); // الفرز مستقر: غير المذكورة تحتفظ بترتيبها
+    }
     const headers = cols.map((c) => (typeof c.columnDef.header === 'string' ? c.columnDef.header : c.id));
     const rows = table.getFilteredRowModel().rows.map((r) =>
       cols.map((c) => r.getValue(c.id) as string | number | null | undefined)
@@ -240,6 +259,7 @@ export function DataTable<T>({
             value={globalFilter}
             onChange={(e) => setGlobalFilter(e.target.value)}
             placeholder={searchPlaceholder}
+            aria-label={searchLabel ?? searchPlaceholder}
             data-awj-grid-search=""
             className="h-8 w-full max-w-xs bg-transparent text-sm text-text placeholder:text-muted focus:outline-none"
           />
@@ -262,7 +282,8 @@ export function DataTable<T>({
             className={columnVisibility ? '' : 'ms-auto'}
             onClick={exportCsv}
             disabled={loading || data.length === 0}
-            title={t('exportCsv')}
+            title={exportLabel ?? t('exportCsv')}
+            aria-label={exportLabel}
           >
             <Download className="h-3.5 w-3.5" strokeWidth={1.7} />
             CSV

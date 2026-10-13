@@ -3,7 +3,7 @@
 import { describePublishIssues } from "./announcement-status";
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { CalendarClock, ExternalLink, MoreHorizontal, RotateCcw } from "lucide-react";
+import { CalendarClock, ExternalLink, History, type LucideIcon, MoreHorizontal, Redo2, RotateCcw, Undo2 } from "lucide-react";
 import { Dropdown, DropdownItem } from "@/components/ui/dropdown";
 import { ScrollIndicator } from "./ScrollIndicator";
 import {
@@ -96,18 +96,41 @@ import {
   cancelPresentationVersionSchedule,
   createPresentationVersion,
   deletePresentationVersion,
+  listPresentationVersionRevisions,
   listPresentationVersions,
   type PresentationVersionDetail,
+  type PresentationVersionRevisionDetail,
+  type PresentationVersionRevisionSummary,
   type PresentationVersionSummary,
   publishPresentationVersion,
   renamePresentationVersion,
   savePresentationVersion,
   schedulePresentationVersion,
   showPresentationVersion,
+  showPresentationVersionRevision,
 } from "@/modules/commerce-workspace/presentation-versions";
 import { useCompany } from "@/lib/company";
 import { safeTimeZone } from "@/lib/timezone";
 import { CancelScheduleConfirmDialog, ScheduleConfirmDialog } from "./ScheduleDialogs";
+import { createContinuousInputGate, intentGroupKey, isContinuousInputTarget } from "./history/change-intent";
+import {
+  type HistoryShortcut,
+  ariaKeyShortcuts,
+  isMacPlatform,
+  isNativeEditingTarget,
+  resolveHistoryShortcut,
+  shortcutHint,
+} from "./history/shortcuts";
+import { useDocumentHistory } from "./history/use-document-history";
+import { HistoryPreviewBar } from "./history/HistoryPreviewBar";
+import { type RevisionHistoryListState, RevisionHistoryDialog } from "./history/RevisionHistoryDialog";
+import { fillTemplate } from "./slider-edit";
+import { useUnsavedGuard } from "@/modules/commerce-workspace/flowers-admin/use-unsaved-guard";
+
+// CUST-H5-2 — أسهم التراجع/الإعادة تتبع اتجاه **المحرِّر** (`locale`) لا اتجاه وسم الصفحة: متغيّر `rtl:` يطابق أي سلف RTL
+// حتى لو كان أقرب سلف LTR. في RTL يسير الزمن من اليمين لليسار فيُعكس السهم.
+const UndoIconRtl = ((props) => <Undo2 {...props} className={`${props.className ?? ""} -scale-x-100`} />) as LucideIcon;
+const RedoIconRtl = ((props) => <Redo2 {...props} className={`${props.className ?? ""} -scale-x-100`} />) as LucideIcon;
 
 export const PREVIEW_WIDTHS = {
   mobile: 390,
@@ -196,6 +219,18 @@ export function ExperienceBuilder({
     themeId: string;
     sections: PresentationHomeSection[] | null;
   } | null>(null);
+  // CUST-H5-4 — السجل المحفوظ: نافذة القائمة، ومعاينة لقطة (للقراءة فقط) تشارك آلية Theme Preview في تعطيل التحرير.
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [historyList, setHistoryList] = useState<{ state: RevisionHistoryListState; rows: PresentationVersionRevisionSummary[] }>({
+    state: "loading",
+    rows: [],
+  });
+  const [historyBusyId, setHistoryBusyId] = useState<string | null>(null);
+  const [historyPreview, setHistoryPreview] = useState<PresentationVersionRevisionDetail | null>(null);
+  const historyRequestRef = useRef(0);
+  const historyTriggerRef = useRef<HTMLElement | null>(null);
+  // محرِّر للقراءة فقط: معاينة سمة أو معاينة لقطة. كل بوابات التحرير تقرأ هذا العلَم الواحد.
+  const readOnlyPreview = previewTheme !== null || historyPreview !== null;
   const themePackRef = useRef(themePackSections);
   themePackRef.current = themePackSections;
   const themed = useMemo(() => {
@@ -206,9 +241,11 @@ export function ExperienceBuilder({
     }
     return applied;
   }, [draft, previewTheme, themePack]);
-  const canvasConfig = themed?.ok ? themed.config : draft;
+  const canvasConfig = historyPreview ? historyPreview.config : themed?.ok ? themed.config : draft;
+  // أقسام الصفحة الرئيسية التي تعرضها المعاينة الآن: لقطة السجل إن فُتحت، وإلا المسودة. محمِّلات البيانات (التصنيفات/وصل حديثاً/المميّز/العروض) تقرأ منها لا من المسودة وحدها.
+  const homeSectionsShown = historyPreview ? historyPreview.config.homepage.sections : draft.homepage.sections;
   // React 18 renders `inert` only as a string attribute: while a theme is previewed the editing UI is not operable or focusable.
-  const inertWhenThemePreview = previewTheme ? ({ inert: "" } as Record<string, string>) : {};
+  const inertWhenThemePreview = readOnlyPreview ? ({ inert: "" } as Record<string, string>) : {};
   const [panel, setPanel] = useState<CustomizerPanel>("theme");
   const [device, setDevice] = useState<PreviewDevice>("desktop");
   const [mobilePane, setMobilePane] = useState<"edit" | "preview">("preview");
@@ -427,6 +464,33 @@ export function ExperienceBuilder({
   const selectedVersionIdRef = useRef<string | null>(selectedVersion?.id ?? null);
   selectedVersionIdRef.current = selectedVersion?.id ?? null;
 
+  // CUST-H5-2 — Undo/Redo محلي لتعديلات الجلسة غير المحفوظة. النطاق = معرّف النسخة المفتوحة القابلة للتحرير؛ النسخة المنشورة
+  // (أو لا نسخة) = لا سجلّ إطلاقاً. بلا `storefrontId` (تحرير محلي بحت) نطاق ثابت واحد. الحفظ الناجح حدٌّ صلب (`handleSave`).
+  const historyScope: string | null = selectedVersion
+    ? selectedVersion.state === "published"
+      ? null
+      : selectedVersion.id
+    : storefrontId
+      ? null
+      : "local-draft";
+  const history = useDocumentHistory<StorefrontPresentationConfig>(seed, {
+    equals: presentationConfigsEqual,
+  });
+  const historyScopeRef = useRef(historyScope);
+  historyScopeRef.current = historyScope;
+  const [historyAnnouncement, setHistoryAnnouncement] = useState({ text: "", n: 0 });
+  const [continuousInput] = useState(() => createContinuousInputGate());
+  // المنصّة تُحدَّد بعد التركيب فقط: الخادم لا `navigator` له، فتحديدها أثناء التصيير يُنتج `title`/`aria-keyshortcuts` مختلفين
+  // بين HTML الخادم والتهيئة (hydration mismatch) على macOS.
+  const [historyIsMac, setHistoryIsMac] = useState(false);
+  useEffect(() => setHistoryIsMac(isMacPlatform()), []);
+  // تبديل نسخة/متجر، أو انتقال النسخة إلى منشورة، يبدأ جلسة جديدة فارغة من المستند الحالي (الذي ضُبط في الدفعة نفسها).
+  useEffect(() => {
+    if (historyScope) history.begin(historyScope, draftRef.current);
+    else history.end();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `history.begin/end` ثابتتان؛ المفتاح هو النطاق وحده.
+  }, [historyScope]);
+
   function stillCurrent(originStorefrontId: string | null, tokenAtStart: number): boolean {
     return storefrontIdRef.current === originStorefrontId && tokenAtStart === versionRequestTokenRef.current;
   }
@@ -434,6 +498,9 @@ export function ExperienceBuilder({
   const t = (key: CustomizerMessageKey) => customizerMessage(locale, key);
 
   const dirty = !presentationConfigsEqual(draft, saved);
+  // CUST-H5-6 (§3.7) — إعادة التحميل/إغلاق التبويب تُسقط التعديلات غير المحفوظة وسجلّ التراجع المحلي (لا تخزين متصفح كمرجع): الحارس
+  // يسأل قبل ذلك، ويسجّل المسودة في سجلّ مساحة التجارة فيسأل مبدِّل المتجر. في الذاكرة فقط؛ لا يُكتب شيء في التخزين.
+  useUnsavedGuard(dirty);
   // CUST-H2-2 — لوحة "homepage" (أقسام الصفحة الرئيسية) صالحة على الرئيسية
   // فقط؛ اللوحات الأخرى كلها هوية/تصميم/تواصل عالمية تصلح لكل صفحة (راجع
   // "Global vs Page-Specific Matrix" في العقد المعماري). إخفاؤها من التنقّل
@@ -610,6 +677,11 @@ export function ExperienceBuilder({
     });
   }
 
+  function resetHistoryFor(detail: PresentationVersionDetail) {
+    if (detail.state === "published") history.end();
+    else history.begin(detail.id, detail.config);
+  }
+
   // النقطة الوحيدة التي تجلب مستند نسخة فعلياً وتطبّقه على المحرِّر. لا حرس
   // تكافؤ ولا تأكيد تجاهل هنا عمداً — `selectVersion` (الاختيار العادي)
   // يضيفهما، بينما `reloadConflictedVersion` (§15) يحتاج تجاوزهما معاً.
@@ -661,6 +733,7 @@ export function ExperienceBuilder({
     }
     setNotice(null);
     setVersionConflict(null);
+    conflictCopyRef.current = null;
     setSelectedVersion(result.data);
     setDraft(result.data.config);
     setSaved(result.data.config);
@@ -668,6 +741,8 @@ export function ExperienceBuilder({
     setSelectedSection(null);
     setSelectedChrome(null);
     updateVersionSummaryInList(result.data);
+    // إعادة تحميل النسخة نفسها (تعارض قديم) لا يغيّر معرّفها فلا يُطلق تأثير النطاق — حدّ إعادة ضبط صريح.
+    resetHistoryFor(result.data);
   }
 
   function selectVersion(target: PresentationVersionSummary) {
@@ -701,6 +776,66 @@ export function ExperienceBuilder({
     void applyVersionSelection(selectedVersion);
   }
 
+  // CUST-H5-5 — «احفظ عملي كمسودة جديدة» عند تعارض قديم: نسخة منفصلة بمستند المحرِّر المحلي، **لا دمج** ولا كتابة فوق الفائز.
+  // مساران موجودان فقط (لا واجهة جديدة): ١) إنشاء نسخة جديدة من النسخة الحالية على الخادم؛ ٢) حفظ مستند المحرِّر الكامل فيها
+  // (يتحقق الخادم من المستند كاملاً وملكية المستأجر). فشل الخطوة ٢ يُبقي المسودة المنشأة في `conflictCopyRef` فتُعاد المحاولة
+  // عليها وحدها — لا تتكاثر النسخ. أي فشل يُبقي التعديلات المحلية والسجلّ كما هي.
+  const conflictCopyRef = useRef<{ forVersionId: string; copy: { id: string; name: string; revision: number } } | null>(null);
+
+  async function handleSaveConflictAsDraft() {
+    if (!storefrontId || !selectedVersion || versionConflict?.versionId !== selectedVersion.id) return;
+    if (versionBusy !== null || versionCreating || busy !== null || readOnlyPreview) return;
+    const originStorefrontId = storefrontId;
+    const conflicted = selectedVersion;
+    const tokenAtStart = versionRequestTokenRef.current;
+    const draftAtStart = draftRef.current;
+    const persisted = normalizePresentationConfig(draftAtStart);
+    const writeRequestId = ++versionWriteRequestRef.current;
+    setVersionBusy({ id: conflicted.id, action: "duplicate" });
+    const finish = () => {
+      if (storefrontIdRef.current === originStorefrontId && writeRequestId === versionWriteRequestRef.current) setVersionBusy(null);
+    };
+    const note = (key: CustomizerMessageKey, name?: string) => {
+      if (storefrontIdRef.current !== originStorefrontId || tokenAtStart !== versionRequestTokenRef.current) return;
+      setNoticeKind("status");
+      setNotice(name === undefined ? t(key) : fillTemplate(t(key), { name }));
+    };
+
+    let copy = conflictCopyRef.current?.forVersionId === conflicted.id ? conflictCopyRef.current.copy : null;
+    if (!copy) {
+      const name = `${conflicted.name} — ${t("conflictCopyNameSuffix")}`.slice(0, 120);
+      const created = await createPresentationVersion(originStorefrontId, name, conflicted.id);
+      if (!created.ok) {
+        finish();
+        note("conflictCopyFailed");
+        return;
+      }
+      updateVersionSummaryInList(created.data);
+      copy = { id: created.data.id, name: created.data.name, revision: created.data.revision };
+      conflictCopyRef.current = { forVersionId: conflicted.id, copy };
+    }
+    const saved = await savePresentationVersion(originStorefrontId, copy.id, persisted, copy.revision);
+    finish();
+    if (!saved.ok) {
+      // المسودة المنشأة لم تعد صالحة للإعادة (تغيّرت/حُذفت): المحاولة التالية تُنشئ نسخة جديدة بدل العلق على مراجعة قديمة.
+      if (saved.reason === "conflict" || saved.reason === "not_found") conflictCopyRef.current = null;
+      note("conflictCopyPartial", copy.name);
+      return;
+    }
+    conflictCopyRef.current = null;
+    if (storefrontIdRef.current !== originStorefrontId) return;
+    updateVersionSummaryInList(saved.data);
+    if (tokenAtStart !== versionRequestTokenRef.current || selectedVersionIdRef.current !== conflicted.id) return;
+    if (!presentationConfigsEqual(draftRef.current, draftAtStart)) {
+      // تعديلات أحدث بعد الضغط: لا نستبدلها بصمت — تبقى هنا والتعارض قائماً، والنسخة المنفصلة محفوظة.
+      note("conflictCopySavedKeepEditing", saved.data.name);
+      return;
+    }
+    adoptCreatedVersion(saved.data);
+    setNoticeKind("status");
+    setNotice(fillTemplate(t("conflictCopySaved"), { name: saved.data.name }));
+  }
+
   function adoptCreatedVersion(detail: PresentationVersionDetail) {
     // إبطال أي طلب تبديل قيد التنفيذ — نسخة جديدة تم إنشاؤها للتو أولى بالتطبيق.
     ++versionRequestTokenRef.current;
@@ -716,6 +851,7 @@ export function ExperienceBuilder({
     // «تحديث النسخة» يُعيد تحميل هذه النسخة الجديدة نفسها *بلا* تأكيد تجاهل —
     // فيمحو بصمت أي تعديل محلي عليها ظنّاً من التاجر أنه يحلّ تعارضاً حقيقياً.
     setVersionConflict(null);
+    conflictCopyRef.current = null;
     setSelectedVersion(detail);
     setDraft(detail.config);
     setSaved(detail.config);
@@ -724,6 +860,7 @@ export function ExperienceBuilder({
     setSelectedSection(null);
     setSelectedChrome(null);
     updateVersionSummaryInList(detail);
+    resetHistoryFor(detail);
   }
 
   // مسار الاختيار التلقائي الحاسم عند أول تحميل: يُستدعى من تأثير `storefrontId`
@@ -895,6 +1032,10 @@ export function ExperienceBuilder({
   // (تبديل رؤية أو نقل) وحده يُماديها فعلياً عبر `updateDraft` أول مرة.
   const effectiveProductRegions: PageRegionInstance<ProductPageRegionKey>[] =
     draft.pagePresentation?.product?.regions ?? defaultProductPageRegions();
+  // معاينة لقطة: الكانفاس يعرض تخطيط صفحتَي المنتج/التصنيف من **اللقطة** لا من المسودة الحية (التحرير يبقى على `effective*`).
+  const canvasProductRegions: PageRegionInstance<ProductPageRegionKey>[] = historyPreview
+    ? historyPreview.config.pagePresentation?.product?.regions ?? defaultProductPageRegions()
+    : effectiveProductRegions;
 
   async function loadProductList(search?: string) {
     if (!storefrontId) return;
@@ -964,6 +1105,9 @@ export function ExperienceBuilder({
   // CUST-H2-4 — نفس منطق `effectiveProductRegions` أعلاه بالضبط، للتصنيف.
   const effectiveCategoryRegions: PageRegionInstance<CategoryPageRegionKey>[] =
     completeCategoryRegions(draft.pagePresentation?.category?.regions ?? defaultCategoryPageRegions());
+  const canvasCategoryRegions: PageRegionInstance<CategoryPageRegionKey>[] = historyPreview
+    ? completeCategoryRegions(historyPreview.config.pagePresentation?.category?.regions ?? defaultCategoryPageRegions())
+    : effectiveCategoryRegions;
 
   async function loadCategoryList(search?: string) {
     if (!storefrontId) return;
@@ -1117,7 +1261,7 @@ export function ExperienceBuilder({
     setHomeCategories(result.data);
   }
 
-  const categoriesSectionVisible = draft.homepage.sections.some(
+  const categoriesSectionVisible = homeSectionsShown.some(
     (section) => section.type === "categories" && section.visible,
   );
 
@@ -1172,7 +1316,7 @@ export function ExperienceBuilder({
     setHomeNewArrivals(result.data);
   }
 
-  const newArrivalsSectionVisible = draft.homepage.sections.some(
+  const newArrivalsSectionVisible = homeSectionsShown.some(
     (section) => section.type === "newArrivals" && section.visible,
   );
 
@@ -1233,7 +1377,7 @@ export function ExperienceBuilder({
     // selection must not re-fetch a sibling Featured section that didn't
     // change, and an unrelated re-render must not re-fetch either.
     if (currentPage !== "home" || !storefrontId || busy === "loading") return;
-    for (const section of draft.homepage.sections) {
+    for (const section of homeSectionsShown) {
       if (section.type !== "featured" || !section.visible) continue;
       const ids = featuredContentOf(section).productIds.filter((id) => id);
       const key = ids.join(",");
@@ -1247,10 +1391,10 @@ export function ExperienceBuilder({
       void loadFeaturedResolution(section.id, ids);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentPage, storefrontId, busy, draft.homepage.sections]);
+  }, [currentPage, storefrontId, busy, homeSectionsShown]);
 
   function handleRetryFeaturedResolution(sectionId: string) {
-    const section = draft.homepage.sections.find((item) => item.id === sectionId);
+    const section = homeSectionsShown.find((item) => item.id === sectionId);
     if (!section) return;
     const ids = featuredContentOf(section).productIds.filter((id) => id);
     if (ids.length === 0) return;
@@ -1327,7 +1471,7 @@ export function ExperienceBuilder({
     if (result.maxOffers !== null) setOffersMax(result.maxOffers);
   }
 
-  const hasOffersSection = draft.homepage.sections.some(
+  const hasOffersSection = homeSectionsShown.some(
     (section) => section.type === "offers" && (section.visible || section.id === selectedSection),
   );
 
@@ -1486,7 +1630,7 @@ export function ExperienceBuilder({
   // CUST-HV V10d — the Canvas hover action bar: each button is a shared pure section operation committed as an ordinary draft edit
   // (revision-checked at Save). Offered only while editing the Home page of a Draft / Scheduled Version.
   const canvasSectionActions: CanvasSectionActions | undefined =
-    currentPage === "home" && !previewTheme && !isPublishedReadOnly
+    currentPage === "home" && !readOnlyPreview && !isPublishedReadOnly
       ? {
           onMove: (id, delta) => {
             const next = moveSection(draft, id, delta);
@@ -1568,6 +1712,13 @@ export function ExperienceBuilder({
     // persistence boundary below performs the contract-required outer trim.
     normalized.sbc.authentication_number = next.sbc.authentication_number;
     normalized.sbc.seal_token = next.sbc.seal_token;
+    // CUST-H5-2 — نية التعديل (حقل نصّي/رقمي واحد) تُجمَّع في خطوة تراجع واحدة؛ كل ما عداه خطوة مستقلة.
+    // التجميع يشترط أن التعديل وليد حدث إدخال مستمر (نص/رقم/منزلق/لون) لا اختيار منفصل (قائمة/منتقي/زر).
+    // يُستهلَك العلَم بأول تعديل ينتجه حدث الإدخال: فعلٌ منفصل لاحق (نقرة على نمط جاهز) لا يرث نيّته.
+    const fromContinuousInput = continuousInput.consume(performance.now());
+    if (historyScope) {
+      history.record(historyScope, normalized, fromContinuousInput ? intentGroupKey(draftRef.current, normalized) : undefined);
+    }
     setDraft(normalized);
     setLifecycle("dirty");
     setNotice(null);
@@ -1624,6 +1775,8 @@ export function ExperienceBuilder({
       // لا لِما يُعرَض الآن) يُفقدها بصمت. نحدِّث `saved`/`selectedVersion`
       // دوماً (مراجعة الخادم صحيحة الآن)، لكن `draft` فقط إن لم يتغيّر شيء.
       const editedSincePersist = !presentationConfigsEqual(draftRef.current, draftAtSaveStart);
+      // حدّ التراجع الصلب (§3.5): كل حفظ ناجح يُفرغ السجلّ، بما فيه حين استمر التاجر بالتعديل أثناء الطلب.
+      history.markSaved(savingVersionId, result.data.config, editedSincePersist);
       setSaved(result.data.config);
       setSelectedVersion(result.data);
       if (editedSincePersist) {
@@ -1646,14 +1799,233 @@ export function ExperienceBuilder({
   }
 
   function handleRestore() {
-    if (isPublishedReadOnly || previewTheme) return;
+    if (isPublishedReadOnly || readOnlyPreview) return;
     const confirmed = window.confirm(t("restoreConfirm"));
     if (!confirmed) return;
-    setDraft(clonePresentationConfig(DEFAULT_PRESENTATION_CONFIG));
+    const restored = clonePresentationConfig(DEFAULT_PRESENTATION_CONFIG);
+    // «استعادة الافتراضي» تعديل مسودة عادي — قابل للتراجع عنه.
+    if (historyScope) history.record(historyScope, restored);
+    setDraft(restored);
     setLifecycle("dirty");
     setNoticeKind("status");
     setNotice(null);
   }
+
+  // ── CUST-H5-2 — تراجع/إعادة ───────────────────────────────────────────────
+  const historyEnabled = historyScope !== null && !readOnlyPreview && !isPublishedReadOnly;
+  const undoEnabled = historyEnabled && history.canUndo;
+  const redoEnabled = historyEnabled && history.canRedo;
+
+  function applyHistoryStep(kind: HistoryShortcut) {
+    if (!historyScope || !historyEnabled) return;
+    const doc = kind === "undo" ? history.undo(historyScope) : history.redo(historyScope);
+    if (!doc) return;
+    // الخطوة تغيّر المستند المحلي فقط: لا شبكة، لا مراجعة، لا نشر. السياق (القسم/الصفحة/المعاينة) خارج السجلّ عمداً،
+    // لكن قسماً محدداً لم يعد موجوداً بعد التراجع (مثلاً عن تكرار) لا يُترك محدداً على لا شيء.
+    setDraft(doc);
+    setLifecycle(presentationConfigsEqual(doc, saved) ? "clean" : "dirty");
+    setNotice(null);
+    if (selectedSection && !doc.homepage.sections.some((section) => section.id === selectedSection)) {
+      setSelectedSection(null);
+    }
+    setHistoryAnnouncement((prev) => ({ text: t(kind === "undo" ? "historyUndone" : "historyRedone"), n: prev.n + 1 }));
+  }
+  const applyHistoryStepRef = useRef(applyHistoryStep);
+  applyHistoryStepRef.current = applyHistoryStep;
+  const historyModalOpenRef = useRef(false);
+  // الورقة السفلية على الجوال مشروطة بالتركيز على زرّها خلف الحوار، فلا يكفي فحص `event.target.closest` وحده.
+  historyModalOpenRef.current = Boolean(publishTarget || scheduleTarget || cancelScheduleTarget || mobileSheet !== null);
+
+  useEffect(() => {
+    const mac = isMacPlatform();
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.defaultPrevented) return;
+      const kind = resolveHistoryShortcut(event, mac);
+      if (!kind) return;
+      // لا نسرق التراجع الأصلي من حقل نصّي، ولا نعمل خلف حوار.
+      if (isNativeEditingTarget(event.target)) return;
+      if (historyModalOpenRef.current) return;
+      // أي حوار مفتوح في المستند يمنع الاختصار — لا نعدّد حوارات المحرِّر واحداً واحداً: مكتبة الأقسام وغيرها تُبقي
+      // التركيز على زرّها خلف الطبقة، فلا يكفي فحص هدف الحدث. المخفي عن التقنيات المساعدة (`aria-hidden`) لا يُعدّ مفتوحاً.
+      if (
+        document.querySelector(
+          '[role="dialog"]:not([aria-hidden="true"]), [role="alertdialog"]:not([aria-hidden="true"]), [aria-modal="true"]:not([aria-hidden="true"])',
+        )
+      ) {
+        return;
+      }
+      event.preventDefault();
+      applyHistoryStepRef.current(kind);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
+
+  // ── CUST-H5-4 — السجل المحفوظ والاسترداد ──────────────────────────────────────
+  // الاسترداد لنسخة قابلة للتحرير = تحميل مستند اللقطة في المحرِّر كتعديل محلي غير محفوظ (يمرّ بـ`updateDraft` فيدخل سجلّ
+  // التراجع ويمكن التراجع عنه)، والحفظ بعده يستعمل مراجعة النسخة **الحالية** دائماً — لا شيء هنا يلمس المراجعة أو الخادم.
+  // النسخة المنشورة لا تُعدَّل أبداً: «إنشاء مسودة» يُنشئ نسخة جديدة ثم يفتحها. لا نجاح قبل ردّ الخادم.
+  function historyMediaNote(detail: { mediaIssues?: readonly unknown[] }): string {
+    const count = detail.mediaIssues?.length ?? 0;
+    return count > 0 ? ` ${fillTemplate(t("historyMediaIssuesBody"), { n: count })}` : "";
+  }
+
+  function focusHistoryTrigger() {
+    const recorded = historyTriggerRef.current;
+    // عنصر داخل قائمة منسدلة (المزيد) يبقى متصلاً بعد إغلاقها لكنه مخفيّ: نعيد التركيز إلى زرّ القائمة المرئي نفسه لا إلى عنصرها.
+    const menu = recorded?.closest<HTMLElement>('[role="menu"]');
+    const trigger = menu ? menu.parentElement?.querySelector<HTMLElement>(":scope > button[aria-haspopup]") ?? null : recorded;
+    const target = trigger?.isConnected ? trigger : document.querySelector<HTMLElement>("[data-builder-toolbar] [aria-expanded]");
+    window.setTimeout(() => target?.focus(), 0);
+  }
+
+  async function loadHistoryList() {
+    if (!storefrontId || !selectedVersion) return;
+    const request = ++historyRequestRef.current;
+    const originStorefrontId = storefrontId;
+    const versionIdAtStart = selectedVersion.id;
+    setHistoryList({ state: "loading", rows: [] });
+    const result = await listPresentationVersionRevisions(originStorefrontId, versionIdAtStart);
+    // أُغلقت النافذة أو بُدِّلت النسخة/المتجر أثناء الانتظار: النتيجة المتأخرة لا تُعرَض.
+    if (request !== historyRequestRef.current) return;
+    if (storefrontIdRef.current !== originStorefrontId || selectedVersionIdRef.current !== versionIdAtStart) return;
+    setHistoryList(result.ok ? { state: "ready", rows: result.data } : { state: "error", rows: [] });
+  }
+
+  // إنشاء/تكرار/كتابة نسخة قيد التنفيذ: لا يُعاد فتح السجل (نافذته قابلة للإغلاق أثناء الطلب) فلا يتكرر الإنشاء.
+  const historyWriteBusy = versionBusy !== null || versionCreating;
+
+  function openHistory(trigger?: HTMLElement | null) {
+    if (!storefrontId || !selectedVersion || readOnlyPreview || busy !== null || historyWriteBusy) return;
+    historyTriggerRef.current = trigger ?? (document.activeElement as HTMLElement | null);
+    setHistoryOpen(true);
+    void loadHistoryList();
+  }
+
+  function closeHistory() {
+    ++historyRequestRef.current;
+    setHistoryOpen(false);
+    setHistoryBusyId(null);
+    focusHistoryTrigger();
+  }
+
+  function exitHistoryPreview() {
+    ++historyRequestRef.current;
+    setHistoryPreview(null);
+    setHistoryBusyId(null);
+    focusHistoryTrigger();
+  }
+
+  /** يجلب لقطة مفردة بمستندها وفحص الوسائط الحالي. `null` عند الفشل/التقادم (والإشعار مضبوط عند الفشل الحقيقي). */
+  async function fetchHistoryRevision(revision: PresentationVersionRevisionSummary, failureKey: CustomizerMessageKey) {
+    if (!storefrontId || !selectedVersion) return null;
+    const request = ++historyRequestRef.current;
+    const originStorefrontId = storefrontId;
+    const versionIdAtStart = selectedVersion.id;
+    setHistoryBusyId(revision.id);
+    const result = await showPresentationVersionRevision(originStorefrontId, versionIdAtStart, revision.id);
+    if (request !== historyRequestRef.current) return null;
+    setHistoryBusyId(null);
+    if (storefrontIdRef.current !== originStorefrontId || selectedVersionIdRef.current !== versionIdAtStart) return null;
+    if (!result.ok) {
+      setNoticeKind("status");
+      setNotice(t(result.reason === "unsupported_schema" ? "versionUnsupportedSchema" : failureKey));
+      return null;
+    }
+    return result.data;
+  }
+
+  async function handlePreviewRevision(revision: PresentationVersionRevisionSummary) {
+    const detail = await fetchHistoryRevision(revision, "historyPreviewFailed");
+    if (!detail) return;
+    setHistoryOpen(false);
+    setHistoryPreview(detail);
+    setNotice(null);
+  }
+
+  function applyRestoredRevision(detail: PresentationVersionRevisionDetail) {
+    setHistoryOpen(false);
+    setHistoryPreview(null);
+    if (isPublishedReadOnly) return; // دفاعي: لا تعديل لمنشورة أبداً (الواجهة تعرض «إنشاء مسودة» لها).
+    if (presentationConfigsEqual(detail.config, draftRef.current)) {
+      setNoticeKind("status");
+      setNotice(t("historyRestoreNoChange"));
+      focusHistoryTrigger();
+      return;
+    }
+    // تعديل عادي بمراجعة النسخة الحالية — يُسجَّل للتراجع، ويبقى القسم المحدد إن بقي موجوداً.
+    updateDraft(detail.config);
+    if (selectedSection && !detail.config.homepage.sections.some((section) => section.id === selectedSection)) {
+      setSelectedSection(null);
+    }
+    setNoticeKind("status");
+    setNotice(`${t("historyRestoreDone")}${historyMediaNote(detail)}`);
+    focusHistoryTrigger();
+  }
+
+  async function handleCreateDraftFromRevision(revision: PresentationVersionRevisionSummary) {
+    if (!storefrontId || !selectedVersion || historyWriteBusy) return;
+    // نفس تأكيد التكرار: تبنّي النسخة الجديدة يستبدل المسودة المحلية غير المحفوظة.
+    if (dirty && !window.confirm(t("versionSwitchDiscardConfirm"))) return;
+    const originStorefrontId = storefrontId;
+    const tokenAtStart = versionRequestTokenRef.current;
+    const draftAtStart = draft;
+    const sourceVersion = selectedVersion;
+    const writeRequestId = ++versionWriteRequestRef.current;
+    const name = `${sourceVersion.name} — ${t("historyDraftNameSuffix")}`.slice(0, 120);
+    setHistoryBusyId(revision.id);
+    setVersionBusy({ id: sourceVersion.id, action: "duplicate" });
+    const result = await createPresentationVersion(originStorefrontId, name, sourceVersion.id, revision.id);
+    const sameStorefront = storefrontIdRef.current === originStorefrontId;
+    const isLatestWrite = writeRequestId === versionWriteRequestRef.current;
+    if (sameStorefront && isLatestWrite) {
+      setVersionBusy(null);
+      setHistoryBusyId(null);
+    }
+    if (!result.ok) {
+      if (sameStorefront && isLatestWrite) {
+        setNoticeKind("status");
+        setNotice(t(result.reason === "unsupported_schema" ? "versionUnsupportedSchema" : "historyDraftFailed"));
+      }
+      return;
+    }
+    if (!sameStorefront) return;
+    if (
+      tokenAtStart !== versionRequestTokenRef.current ||
+      selectedVersionIdRef.current !== sourceVersion.id ||
+      !presentationConfigsEqual(draftRef.current, draftAtStart)
+    ) {
+      updateVersionSummaryInList(result.data);
+      return;
+    }
+    setHistoryOpen(false);
+    setHistoryPreview(null);
+    adoptCreatedVersion(result.data);
+    setNoticeKind("status");
+    setNotice(`${t("historyDraftCreated")}${historyMediaNote(result.data)}`);
+  }
+
+  async function handleRestoreRevision(revision: PresentationVersionRevisionSummary) {
+    if (isPublishedReadOnly) {
+      await handleCreateDraftFromRevision(revision);
+      return;
+    }
+    const detail = await fetchHistoryRevision(revision, "historyRestoreFailed");
+    if (detail) applyRestoredRevision(detail);
+  }
+
+  // تبديل النسخة/المتجر يُغلق النافذة والمعاينة ويُبطل أي جلب معلَّق (لا لقطة نسخة سابقة فوق نسخة جديدة).
+  useEffect(() => {
+    ++historyRequestRef.current;
+    setHistoryOpen(false);
+    setHistoryPreview(null);
+    setHistoryBusyId(null);
+  }, [selectedVersion?.id, storefrontId]);
+
+  // دخول المعاينة: التركيز على «الخروج» (لا يبقى على زرّ خلف طبقة معطَّلة).
+  useEffect(() => {
+    if (historyPreview) document.querySelector<HTMLElement>("[data-history-preview-exit]")?.focus();
+  }, [historyPreview]);
 
   async function handleCreateVersion(name: string) {
     if (!storefrontId) return;
@@ -2450,7 +2822,7 @@ export function ExperienceBuilder({
   // drift apart.
   const hasConflict = versionConflict?.versionId === selectedVersion?.id;
   const saveDisabled =
-    previewTheme !== null ||
+    readOnlyPreview ||
     busy !== null ||
     !selectedVersion ||
     isPublishedReadOnly ||
@@ -2465,7 +2837,7 @@ export function ExperienceBuilder({
           ? t("versionStaleConflict")
           : undefined;
   const publishDisabled =
-    previewTheme !== null ||
+    readOnlyPreview ||
     !storefrontId ||
     !selectedVersion ||
     selectedVersion.state !== "draft" ||
@@ -2506,6 +2878,8 @@ export function ExperienceBuilder({
               : !selectedVersion.schedulingRuntimeActive
                 ? t("versionSchedulingGatedBody")
                 : undefined;
+  const undoTitle = undoEnabled ? `${t("undo")} (${shortcutHint("undo", historyIsMac)})` : t("undoUnavailable");
+  const redoTitle = redoEnabled ? `${t("redo")} (${shortcutHint("redo", historyIsMac)})` : t("redoUnavailable");
   const handlePublishClick = () => {
     if (!selectedVersion) return;
     handleOpenPublishConfirm(toSummary(selectedVersion));
@@ -2532,6 +2906,16 @@ export function ExperienceBuilder({
       data-selected-version-id={selectedVersion?.id ?? ""}
       data-selected-version-state={selectedVersion?.state ?? ""}
       data-selected-version-revision={selectedVersion?.revision ?? ""}
+      onInputCapture={(event) => {
+        if (isContinuousInputTarget(event.target)) continuousInput.mark(performance.now());
+      }}
+      // أي تفاعل منفصل (ضغط/نقر/مفتاح) يُسقط علَم الإدخال المستمر العالق؛ حدث `input` يأتي بعد `keydown` فلا يتأثر.
+      onPointerDownCapture={continuousInput.reset}
+      onClickCapture={continuousInput.reset}
+      onKeyDownCapture={continuousInput.reset}
+      data-history-preview={historyPreview ? "true" : "false"}
+      data-can-undo={undoEnabled ? "true" : "false"}
+      data-can-redo={redoEnabled ? "true" : "false"}
       data-panel={panel}
       data-device={effectiveDevice}
       data-selected-section={selectedSection ?? ""}
@@ -2629,7 +3013,7 @@ export function ExperienceBuilder({
             <button
               type="button"
               data-version-selector-mobile=""
-              disabled={previewTheme !== null}
+              disabled={readOnlyPreview}
               onClick={() => setMobileSheet("versions")}
               className="flex min-h-10 min-w-0 items-center gap-1 border-s border-border px-2 py-1 ps-3 text-[11px] font-medium text-text sm:ms-0"
             >
@@ -2681,6 +3065,46 @@ export function ExperienceBuilder({
               </button>
             ))}
           </div>
+          {/*
+            CUST-H5-2 — Undo / Redo. Inline from md; below md the same two actions (same eligibility, same wording) live in the
+            «More» menu so the Canvas-first mobile toolbar keeps Exit / Save / Publish unchanged. `aria-disabled` rather than
+            `disabled`: after the last Undo the button must keep keyboard focus instead of dropping it.
+          */}
+          <div role="group" aria-label={t("historyGroup")} data-history-group="" className="hidden items-center gap-0.5 md:flex">
+            {([
+              { kind: "undo", Icon: locale === "ar" ? UndoIconRtl : Undo2, enabled: undoEnabled, title: undoTitle, label: t("undo") },
+              { kind: "redo", Icon: locale === "ar" ? RedoIconRtl : Redo2, enabled: redoEnabled, title: redoTitle, label: t("redo") },
+            ] as const).map(({ kind, Icon, enabled, title, label }) => (
+              <button
+                key={kind}
+                type="button"
+                data-history-action={kind}
+                aria-label={label}
+                aria-disabled={!enabled}
+                aria-keyshortcuts={ariaKeyShortcuts(kind, historyIsMac)}
+                title={title}
+                onClick={() => {
+                  if (enabled) applyHistoryStep(kind);
+                }}
+                className={`inline-flex size-9 items-center justify-center rounded-md border border-transparent text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${
+                  enabled ? "hover:border-border hover:bg-primary-soft" : "cursor-not-allowed opacity-40"
+                }`}
+              >
+                <Icon className="size-4" strokeWidth={1.8} aria-hidden="true" />
+              </button>
+            ))}
+          </div>
+          <button
+            type="button"
+            data-history-open=""
+            aria-label={t("historyOpen")}
+            title={t("historyOpen")}
+            disabled={!storefrontId || !selectedVersion || readOnlyPreview || busy !== null || historyWriteBusy}
+            onClick={(event) => openHistory(event.currentTarget)}
+            className="hidden size-9 shrink-0 items-center justify-center rounded-md border border-transparent text-text hover:border-border hover:bg-primary-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-not-allowed disabled:opacity-40 lg:inline-flex"
+          >
+            <History className="size-4" strokeWidth={1.8} aria-hidden="true" />
+          </button>
           <button
             type="button"
             data-save=""
@@ -2783,6 +3207,26 @@ export function ExperienceBuilder({
                     </DropdownItem>
                   ))}
                 </div>
+                <div role="group" aria-label={t("historyGroup")} className="md:hidden">
+                  <DropdownItem
+                    icon={locale === "ar" ? UndoIconRtl : Undo2}
+                    onClick={() => applyHistoryStep("undo")}
+                    disabled={!undoEnabled}
+                    title={undoTitle}
+                    dataAttrs={{ "data-more-undo": "" }}
+                  >
+                    {t("undo")}
+                  </DropdownItem>
+                  <DropdownItem
+                    icon={locale === "ar" ? RedoIconRtl : Redo2}
+                    onClick={() => applyHistoryStep("redo")}
+                    disabled={!redoEnabled}
+                    title={redoTitle}
+                    dataAttrs={{ "data-more-redo": "" }}
+                  >
+                    {t("redo")}
+                  </DropdownItem>
+                </div>
                 <div className="xl:hidden">
                   <DropdownItem
                     icon={CalendarClock}
@@ -2794,10 +3238,20 @@ export function ExperienceBuilder({
                     {t("versionSchedule")}
                   </DropdownItem>
                 </div>
+                <div className="lg:hidden">
+                  <DropdownItem
+                    icon={History}
+                    onClick={() => openHistory(null)}
+                    disabled={!storefrontId || !selectedVersion || readOnlyPreview || busy !== null || historyWriteBusy}
+                    dataAttrs={{ "data-more-history": "" }}
+                  >
+                    {t("historyOpen")}
+                  </DropdownItem>
+                </div>
                 <DropdownItem
                   icon={RotateCcw}
                   onClick={handleRestore}
-                  disabled={isPublishedReadOnly || previewTheme !== null}
+                  disabled={isPublishedReadOnly || readOnlyPreview}
                   dataAttrs={{ "data-more-restore": "" }}
                 >
                   {t("restore")}
@@ -2807,6 +3261,10 @@ export function ExperienceBuilder({
           </Dropdown>
         </div>
       </header>
+
+      <div aria-live="polite" aria-atomic="true" data-history-announcer="" className="sr-only">
+        {historyAnnouncement.text ? `${historyAnnouncement.text}${historyAnnouncement.n % 2 ? "" : "\u200B"}` : ""}
+      </div>
 
       {notice ? (
         <div
@@ -2828,15 +3286,40 @@ export function ExperienceBuilder({
           data-version-conflict=""
           className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-warning/30 bg-warning-soft px-3 py-2 text-xs leading-5 text-warning"
         >
-          <span>{t("versionStaleConflict")}</span>
-          <button
-            type="button"
-            data-version-reload=""
-            onClick={reloadConflictedVersion}
-            className="shrink-0 rounded-md border border-warning/40 bg-surface px-2.5 py-1 text-[11px] font-medium text-warning hover:bg-warning-soft"
-          >
-            {t("versionReloadLatest")}
-          </button>
+          <div className="min-w-0 flex-1 basis-64">
+            <p>{t("versionStaleConflict")}</p>
+            <p data-conflict-hint="" className="mt-0.5 text-[11px] opacity-90">{t("conflictRecoveryHint")}</p>
+          </div>
+          <div className="flex max-w-full flex-wrap items-center gap-1.5">
+            <button
+              type="button"
+              data-conflict-review=""
+              onClick={(event) => openHistory(event.currentTarget)}
+              disabled={historyWriteBusy || readOnlyPreview}
+              className="rounded-md border border-warning/40 bg-surface px-2.5 py-1 text-[11px] font-medium text-warning hover:bg-warning-soft disabled:opacity-50"
+            >
+              {t("conflictReview")}
+            </button>
+            {dirty ? (
+              <button
+                type="button"
+                data-conflict-save-as-draft=""
+                onClick={() => void handleSaveConflictAsDraft()}
+                disabled={versionBusy !== null || versionCreating || busy !== null || readOnlyPreview}
+                className="rounded-md border border-warning/40 bg-surface px-2.5 py-1 text-[11px] font-medium text-warning hover:bg-warning-soft disabled:opacity-50"
+              >
+                {t("conflictSaveAsDraft")}
+              </button>
+            ) : null}
+            <button
+              type="button"
+              data-version-reload=""
+              onClick={reloadConflictedVersion}
+              className="rounded-md border border-warning/40 bg-surface px-2.5 py-1 text-[11px] font-medium text-warning hover:bg-warning-soft"
+            >
+              {t("versionReloadLatest")}
+            </button>
+          </div>
         </div>
       ) : null}
 
@@ -2845,7 +3328,7 @@ export function ExperienceBuilder({
           aria-label={t("controls")}
           {...inertWhenThemePreview}
           data-customizer-scroll=""
-          className={`${previewTheme ? "!hidden " : ""}${
+          className={`${readOnlyPreview ? "!hidden " : ""}${
             mobilePane === "preview" ? "hidden lg:flex" : "hidden md:flex"
           } ${railCollapsed ? "lg:w-16" : "w-[196px]"} shrink-0 flex-col overflow-y-auto border-e border-neutral-200 bg-white`}
         >
@@ -2916,7 +3399,7 @@ export function ExperienceBuilder({
           {...inertWhenThemePreview}
           data-builder-controls=""
           data-builder-drawer={drawerOpen ? "open" : isTabletViewport ? "closed" : undefined}
-          className={`${previewTheme ? "!hidden " : ""}${
+          className={`${readOnlyPreview ? "!hidden " : ""}${
             mobilePane === "edit" ? "flex" : "hidden"
           } w-full min-w-0 flex-col border-neutral-200 bg-white md:flex-1 lg:flex lg:w-[300px] lg:flex-none lg:border-e xl:w-[320px] ${
             drawerOpen
@@ -3066,6 +3549,17 @@ export function ExperienceBuilder({
               onExit={handleExitThemePreview}
             />
           ) : null}
+          {historyPreview ? (
+            <HistoryPreviewBar
+              locale={locale}
+              revision={historyPreview}
+              published={isPublishedReadOnly}
+              dirty={dirty}
+              busy={historyBusyId !== null}
+              onRestore={() => void handleRestoreRevision(historyPreview)}
+              onExit={exitHistoryPreview}
+            />
+          ) : null}
           <div className="relative min-h-0 flex-1">
             <div
               ref={canvasScrollRef}
@@ -3101,20 +3595,20 @@ export function ExperienceBuilder({
                   page={currentPage}
                   liveStoreName={liveStoreName}
                   businessIdentity={businessIdentity}
-                  selectedSection={previewTheme ? null : selectedSection}
-                  onSelectSection={previewTheme ? () => {} : (key) => handleSelectSection(key, "preview")}
+                  selectedSection={readOnlyPreview ? null : selectedSection}
+                  onSelectSection={readOnlyPreview ? () => {} : (key) => handleSelectSection(key, "preview")}
                   activeSlides={activeSlides}
                   onActiveSlideChange={handleActiveSlideChange}
                   selectedChrome={selectedChrome}
                   onSelectChrome={handleSelectChrome}
                   productPreviewState={previewProductState}
                   previewProduct={previewProduct}
-                  productRegions={effectiveProductRegions}
+                  productRegions={canvasProductRegions}
                   selectedProductRegionId={selectedProductRegion}
                   onSelectProductRegion={handleSelectProductRegion}
                   categoryPreviewState={previewCategoryState}
                   previewCategory={previewCategory}
-                  categoryRegions={effectiveCategoryRegions}
+                  categoryRegions={canvasCategoryRegions}
                   selectedCategoryRegionId={selectedCategoryRegion}
                   onSelectCategoryRegion={handleSelectCategoryRegion}
                   categoryGridProductsState={categoryGridProductsState}
@@ -3141,7 +3635,7 @@ export function ExperienceBuilder({
       </div>
 
       {/* While a theme is previewed (read-only) the mobile editing bar and its sheets are not offered at all. */}
-      {isMobileViewport && !previewTheme ? <div data-builder-mobile-bar="" className="flex h-16 shrink-0 items-center gap-2 border-t border-border bg-surface px-3 lg:hidden">
+      {isMobileViewport && !readOnlyPreview ? <div data-builder-mobile-bar="" className="flex h-16 shrink-0 items-center gap-2 border-t border-border bg-surface px-3 lg:hidden">
         {currentPage === "home" ? (
           <>
             <button
@@ -3230,7 +3724,7 @@ export function ExperienceBuilder({
         )}
       </div> : null}
 
-      {isMobileViewport && mobileSheet && !previewTheme ? (
+      {isMobileViewport && mobileSheet && !readOnlyPreview ? (
         <div
           className="fixed inset-0 z-50 flex items-end bg-black/40 md:hidden"
           role="presentation"
@@ -3432,6 +3926,22 @@ export function ExperienceBuilder({
           busy={versionBusy?.id === cancelScheduleTarget.id && versionBusy.action === "cancel_schedule"}
           onCancel={handleCancelCancelScheduleConfirm}
           onConfirm={() => void handleConfirmCancelSchedule()}
+        />
+      ) : null}
+
+      {historyOpen && selectedVersion ? (
+        <RevisionHistoryDialog
+          locale={locale}
+          versionName={selectedVersion.name}
+          published={isPublishedReadOnly}
+          dirty={dirty}
+          listState={historyList.state}
+          revisions={historyList.rows}
+          busyId={historyBusyId}
+          onPreview={(revision) => void handlePreviewRevision(revision)}
+          onRestore={(revision) => void handleRestoreRevision(revision)}
+          onRetry={() => void loadHistoryList()}
+          onClose={closeHistory}
         />
       ) : null}
 

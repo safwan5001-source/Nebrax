@@ -234,7 +234,9 @@ describe('platform tenant pagination', () => {
 
     fireEvent.change(screen.getByRole('combobox', { name: 'Filter by status' }), { target: { value: 'true' } });
     expect(screen.queryByText('Pro Co')).toBeNull();
-    expect(screen.getByText('No tenants')).toBeTruthy();
+    // H1-4A: a filter that hides every loaded row no longer reads as «no tenants exist».
+    expect(screen.queryByText('No tenants')).toBeNull();
+    expect(screen.getByText('emptyFiltered')).toBeTruthy();
     expect(screen.getByText(/total:80/)).toBeTruthy();
 
     await new Promise((resolve) => setTimeout(resolve, 300));
@@ -284,8 +286,8 @@ describe('platform tenant pagination', () => {
     ]);
     expect(screen.getByRole('navigation', { name: 'Results' }).className).toContain('flex-col');
     expect(screen.getByRole('navigation', { name: 'Results' }).className).toContain('sm:flex-row');
-    expect(document.querySelector('header [class*="lg:flex-row"]')).toBeTruthy();
-    expect(screen.getByRole('combobox', { name: 'Filter by plan' }).parentElement?.className).toContain('flex-wrap');
+    expect(document.querySelector('header [class*="sm:flex-row"], header[class*="sm:flex-row"]')).toBeTruthy();
+    expect(screen.getByRole('combobox', { name: 'Filter by plan' }).parentElement?.className).toContain('sm:flex-wrap');
     expect(document.querySelector('main')?.getAttribute('dir')).toBeNull();
     expect(document.documentElement.dir).toBe('rtl');
     expect(document.querySelector('svg[class*="rtl:rotate-180"]')).toBeTruthy();

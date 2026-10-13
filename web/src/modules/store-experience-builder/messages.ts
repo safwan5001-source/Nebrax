@@ -1142,6 +1142,47 @@ export const CUSTOMIZER_MESSAGES = {
     noSocial: "لا روابط مضافة",
     noApps: "لا روابط تطبيقات صالحة",
     restoreConfirm: "إعادة المسودة إلى افتراضي أَوْج الحديث؟ لن يُمس المتجر الحي.",
+    // CUST-H5-2 — تراجع/إعادة محليان لتعديلات الجلسة غير المحفوظة. الحفظ الناجح حدٌّ صلب: ما قبله لا يُتراجَع عنه هنا.
+    undo: "تراجع عن التعديل",
+    redo: "إعادة التعديل",
+    undoUnavailable: "لا تعديلات غير محفوظة للتراجع عنها",
+    redoUnavailable: "لا خطوات لإعادتها",
+    historyUndone: "تم التراجع عن آخر تعديل.",
+    historyRedone: "تمت إعادة التعديل.",
+    historyGroup: "تراجع وإعادة",
+    // CUST-H5-4 — السجل المحفوظ والاسترداد: لقطات حفظ ناجح من الخادم؛ الاسترداد يحمّل اللقطة في المحرّر كتعديل غير محفوظ
+    // (مراجعة النسخة الحالية، لا تراجع للعدّاد)، وللمنشورة إنشاء مسودة جديدة — لا مسّ للمنشور أبداً.
+    historyOpen: "السجل المحفوظ",
+    historyTitle: "السجل المحفوظ",
+    historyIntro:
+      "نحتفظ بلقطة من كل حفظ ناجح لهذه النسخة. استرداد لقطة يحمّلها في المحرّر كتعديل غير محفوظ — لا يمسّ المتجر المنشور، ويمكنك التراجع عنه أو حفظه.",
+    historyIntroPublished:
+      "هذه النسخة منشورة ولا تُعدَّل. يمكنك إنشاء مسودة جديدة من أي لقطة؛ المتجر المنشور يبقى كما هو.",
+    historyDirtyNote: "لديك تعديلات غير محفوظة. استرداد لقطة سيستبدلها، ويمكنك التراجع عن ذلك بزر التراجع.",
+    historyLoading: "جارٍ تحميل السجل…",
+    historyLoadFailed: "تعذّر تحميل السجل المحفوظ.",
+    historyEmpty: "لا توجد لقطات بعد. تظهر هنا بعد حفظ المسودة.",
+    historyCurrentBadge: "مطابقة للحالية",
+    historyPreviewAction: "معاينة",
+    historyRestoreAction: "استرداد",
+    historyCreateDraftAction: "إنشاء مسودة",
+    historyRestoreCurrentDisabled: "هذه اللقطة مطابقة للنسخة الحالية — لا شيء لاسترداده",
+    historyClose: "إغلاق",
+    historyPreviewTitle: "معاينة لقطة محفوظة",
+    historyPreviewNote: "للقراءة فقط — لا يتغيّر شيء حتى تسترد اللقطة أو تنشئ منها مسودة.",
+    historyPreviewExit: "الخروج من المعاينة",
+    historyRestoreDone: "حُمِّلت اللقطة في المحرّر كتعديل غير محفوظ. احفظ للاحتفاظ بها أو تراجع عنها.",
+    historyRestoreNoChange: "اللقطة مطابقة لما في المحرّر الآن.",
+    historyRestoreFailed: "تعذّر استرداد اللقطة. لم يتغيّر شيء.",
+    historyPreviewFailed: "تعذّرت معاينة اللقطة.",
+    historyDraftCreated: "أُنشئت مسودة جديدة من اللقطة. المتجر المنشور لم يتغيّر.",
+    historyDraftFailed: "تعذّر إنشاء مسودة من اللقطة. لم يتغيّر شيء.",
+    historyDraftNameSuffix: "من لقطة محفوظة",
+    historyMediaIssuesTitle: "صور تحتاج إلى استبدال",
+    historyMediaIssuesBody:
+      "في هذه اللقطة {n} صورة لم تعد متاحة أو غير جاهزة. تبقى مراجعها كما هي — استبدلها قبل النشر.",
+    historyMediaMissing: "الصورة محذوفة أو غير متاحة",
+    historyMediaNotReady: "الصورة غير جاهزة بعد",
     contrastOk: "تباين النص على اللون الأساسي كافٍ.",
     contrastWarn: "اللون الأساسي ضعيف التباين مع الأبيض؛ سيُستخدم نص داكن.",
     versionsLabel: "نسخ التصميم",
@@ -1187,10 +1228,23 @@ export const CUSTOMIZER_MESSAGES = {
     versionCancel: "إلغاء",
     versionConfirmDelete: "حذف النسخة",
     versionSaveSuccess: "تم حفظ النسخة.",
-    versionSaveFailed: "تعذّر حفظ النسخة.",
+    versionSaveFailed: "تعذّر حفظ النسخة. تعديلاتك وسجل التراجع ما زالا هنا ولم يضع شيء — أعد المحاولة.",
     versionStaleConflict:
       "تم تعديل هذه النسخة من جلسة أخرى. حدّث النسخة قبل متابعة التعديل.",
     versionReloadLatest: "تحديث النسخة",
+    // CUST-H5-5 — خيارات التعافي الصريحة عند التعارض: لا دمج تلقائي ولا إعادة محاولة صامتة.
+    conflictRecoveryHint:
+      "تعديلاتك المحلية محفوظة هنا إلى أن تختار: راجع النسخة الأحدث، أو احفظ عملك كمسودة جديدة (نسخة منفصلة وليست دمجاً)، أو حدّث النسخة (وهذا يتجاهل تعديلاتك).",
+    conflictReview: "مراجعة النسخة الأحدث",
+    conflictSaveAsDraft: "حفظ عملي كمسودة جديدة",
+    conflictCopyNameSuffix: "نسخة من تعديلاتي",
+    conflictCopySaved:
+      "حُفظ عملك كمسودة جديدة منفصلة «{name}» (نسخة وليست دمجاً). النسخة الأصلية لم تتغيّر.",
+    conflictCopySavedKeepEditing:
+      "حُفظت مسودة منفصلة «{name}» بتعديلاتك حتى لحظة الضغط، وتعديلاتك الأحدث ما زالت هنا. النسخة الأصلية لم تتغيّر.",
+    conflictCopyFailed: "تعذّر إنشاء المسودة. تعديلاتك ما زالت هنا ولم يتغيّر شيء.",
+    conflictCopyPartial:
+      "أُنشئت المسودة «{name}» لكن تعذّر حفظ تعديلاتك فيها. تعديلاتك ما زالت هنا — أعد المحاولة ولن تُنشأ نسخة ثانية.",
     versionPublishedReadOnlyTitle: "هذه النسخة منشورة ومقروءة فقط",
     versionPublishedReadOnlyBody:
       "هذه هي النسخة المباشرة على المتجر الحي. لتعديلها، أنشئ مسودة منها أولاً.",
@@ -2599,6 +2653,47 @@ export const CUSTOMIZER_MESSAGES = {
     noApps: "No valid app store links",
     restoreConfirm:
       "Reset the draft to AWJ Modern defaults? The live storefront will not be touched.",
+    // CUST-H5-2 — local undo/redo of the session's unsaved edits. A successful Save is a hard boundary: nothing before it is undoable here.
+    undo: "Undo",
+    redo: "Redo",
+    undoUnavailable: "No unsaved changes to undo",
+    redoUnavailable: "Nothing to redo",
+    historyUndone: "Last change undone.",
+    historyRedone: "Change redone.",
+    historyGroup: "Undo and redo",
+    // CUST-H5-4 — saved history and restore: server snapshots of successful saves; Restore loads a snapshot into the editor as
+    // an unsaved edit (against the current Version revision, never rewinding it); a Published Version creates a new Draft instead.
+    historyOpen: "Saved history",
+    historyTitle: "Saved history",
+    historyIntro:
+      "We keep a snapshot of every successful save of this version. Restoring one loads it into the editor as an unsaved edit — the live store is untouched, and you can undo it or save it.",
+    historyIntroPublished:
+      "This version is published and cannot be edited. You can create a new draft from any snapshot; the live store stays as it is.",
+    historyDirtyNote: "You have unsaved changes. Restoring a snapshot replaces them, and you can undo that with Undo.",
+    historyLoading: "Loading history…",
+    historyLoadFailed: "Couldn't load the saved history.",
+    historyEmpty: "No snapshots yet. They appear here after you save the draft.",
+    historyCurrentBadge: "Same as current",
+    historyPreviewAction: "Preview",
+    historyRestoreAction: "Restore",
+    historyCreateDraftAction: "Create draft",
+    historyRestoreCurrentDisabled: "This snapshot matches the current version — nothing to restore",
+    historyClose: "Close",
+    historyPreviewTitle: "Previewing a saved snapshot",
+    historyPreviewNote: "Read-only — nothing changes until you restore the snapshot or create a draft from it.",
+    historyPreviewExit: "Exit preview",
+    historyRestoreDone: "Snapshot loaded into the editor as an unsaved edit. Save to keep it, or undo it.",
+    historyRestoreNoChange: "The snapshot is identical to what's in the editor now.",
+    historyRestoreFailed: "Couldn't restore the snapshot. Nothing changed.",
+    historyPreviewFailed: "Couldn't preview the snapshot.",
+    historyDraftCreated: "A new draft was created from the snapshot. The live store is unchanged.",
+    historyDraftFailed: "Couldn't create a draft from the snapshot. Nothing changed.",
+    historyDraftNameSuffix: "from saved snapshot",
+    historyMediaIssuesTitle: "Images to replace",
+    historyMediaIssuesBody:
+      "{n} image(s) in this snapshot are no longer available or not ready. Their references are kept as they are — replace them before publishing.",
+    historyMediaMissing: "Image deleted or unavailable",
+    historyMediaNotReady: "Image not ready yet",
     contrastOk: "Primary color contrast against white is sufficient.",
     contrastWarn:
       "Primary color contrast against white is weak; dark text will be used.",
@@ -2645,10 +2740,23 @@ export const CUSTOMIZER_MESSAGES = {
     versionCancel: "Cancel",
     versionConfirmDelete: "Delete version",
     versionSaveSuccess: "Version saved.",
-    versionSaveFailed: "Could not save the version.",
+    versionSaveFailed: "Could not save the version. Your changes and Undo history are still here — nothing was lost. Try again.",
     versionStaleConflict:
       "This version was edited from another session. Reload it before continuing to edit.",
     versionReloadLatest: "Reload version",
+    // CUST-H5-5 — explicit recovery choices on a stale conflict: no auto-merge, no silent retry.
+    conflictRecoveryHint:
+      "Your local edits are kept here until you choose: review the newer version, save your work as a new draft (a separate copy, not a merge), or reload (which discards your edits).",
+    conflictReview: "Review newer version",
+    conflictSaveAsDraft: "Save my work as a new draft",
+    conflictCopyNameSuffix: "my edits",
+    conflictCopySaved:
+      "Your work was saved as a separate new draft “{name}” (a copy, not a merge). The original version is unchanged.",
+    conflictCopySavedKeepEditing:
+      "A separate draft “{name}” was saved with your edits up to when you clicked; your newer edits are still here. The original version is unchanged.",
+    conflictCopyFailed: "Couldn't create the draft. Your edits are still here and nothing changed.",
+    conflictCopyPartial:
+      "The draft “{name}” was created but your edits couldn't be saved into it. Your edits are still here — try again and no second copy will be created.",
     versionPublishedReadOnlyTitle: "This version is published and read-only",
     versionPublishedReadOnlyBody:
       "This is the live version on the storefront. To edit it, create a draft from it first.",

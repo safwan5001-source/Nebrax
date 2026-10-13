@@ -3757,7 +3757,10 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
     // "succeeded" with an empty body and failed to parse. Let that one verb
     // through; create/rename/delete keep their existing demo defaults.
     const versionSavePath = /^\/commerce\/workspace\/storefronts\/[^/]+\/presentation\/versions\/[^/]+$/.test(clean);
-    if (!(m === 'PUT' && versionSavePath)) return resolve({ data: { id: 'demo-new' } });
+    // CUST-H5-4/5 — Version *create* (POST …/versions, incl. from a snapshot or as «save my work as a new draft») has the same
+    // problem: its handler (below) was unreachable. Let that one verb through too; rename/delete keep their demo defaults.
+    const versionCreatePath = /^\/commerce\/workspace\/storefronts\/[^/]+\/presentation\/versions$/.test(clean);
+    if (!(m === 'PUT' && versionSavePath) && !(m === 'POST' && versionCreatePath)) return resolve({ data: { id: 'demo-new' } });
   }
 
   if (clean === '/print-templates') return resolve({ data: mockPrintTemplates });
@@ -3869,6 +3872,29 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
       },
     });
   }
+  // CUST-H5-4 — dev-harness stand-in for the saved-history reads (`…/versions/{id}/revisions[/{rev}]`).
+  // Three fixed snapshots: the current one (identical to the Version), an older one, and the oldest with a
+  // media reference that is unavailable today — so the dialog, the Preview bar and the media-issues warning
+  // can all be exercised without a server. Never merchant data.
+  const revisionsMatch = clean.match(/^\/commerce\/workspace\/storefronts\/([^/]+)\/presentation\/versions\/([^/]+)\/revisions(?:\/([^/]+))?$/);
+  if (revisionsMatch && method.toUpperCase() === 'GET') {
+    const [, storefrontId, versionId, revisionId] = revisionsMatch;
+    const row = (mockPresentationVersionsByStore.get(storefrontId) ?? []).find((r) => r.id === versionId);
+    if (!row) return Promise.reject(Object.assign(new Error('النسخة غير موجودة.'), { status: 404 }));
+    const hoursAgo = (hours: number) => new Date(Date.now() - hours * 3600 * 1000).toISOString();
+    const revisions = [
+      { id: `${versionId}-rev-3`, version_revision: row.revision, created_at: hoursAgo(1), is_current: true },
+      { id: `${versionId}-rev-2`, version_revision: Math.max(1, row.revision - 1), created_at: hoursAgo(26), is_current: false },
+      { id: `${versionId}-rev-1`, version_revision: Math.max(1, row.revision - 2), created_at: hoursAgo(24 * 9), is_current: false },
+    ].map((r) => ({ ...r, version_id: versionId, schema_version: 3, size_bytes: 1800 }));
+    if (!revisionId) return resolve({ data: revisions });
+    const found = revisions.find((r) => r.id === revisionId);
+    if (!found) return Promise.reject(Object.assign(new Error('اللقطة غير موجودة.'), { status: 404 }));
+    const branding = (row.config.branding && typeof row.config.branding === 'object' ? row.config.branding : {}) as Record<string, unknown>;
+    const config = found.is_current ? row.config : { ...row.config, branding: { ...branding, displayName: found.id.endsWith('rev-1') ? 'الهوية القديمة' : 'اسم سابق للمتجر' } };
+    const media_issues = found.id.endsWith('rev-1') ? [{ path: 'branding.logoMedia.mediaId', code: 'media_missing', message: '' }] : [];
+    return resolve({ data: { ...found, config, media_issues } });
+  }
   const versionsListMatch = clean.match(/^\/commerce\/workspace\/storefronts\/([^/]+)\/presentation\/versions$/);
   if (versionsListMatch) {
     const storefrontId = versionsListMatch[1];
@@ -3878,6 +3904,7 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
       const bodyRecord = (body && typeof body === 'object' ? body : {}) as {
         name?: unknown;
         source_version_id?: unknown;
+        source_revision_id?: unknown;
       };
       const name = typeof bodyRecord.name === 'string' && bodyRecord.name.trim() !== '' ? bodyRecord.name : 'نسخة جديدة';
       const source =
@@ -3897,6 +3924,10 @@ export function mockApi<T = unknown>(path: string, method = 'GET', body?: unknow
         updated_at: now,
         config: source?.config ?? { version: 2 },
       };
+      if (typeof bodyRecord.source_revision_id === 'string' && !bodyRecord.source_revision_id.endsWith('rev-3')) {
+        const base = (source?.config.branding && typeof source.config.branding === 'object' ? source.config.branding : {}) as Record<string, unknown>;
+        created.config = { ...created.config, branding: { ...base, displayName: 'اسم سابق للمتجر' } };
+      }
       rows.push(created);
       mockPresentationVersionsByStore.set(storefrontId, rows);
       return resolve({ data: mockVersionDetail(storefrontId, created) });

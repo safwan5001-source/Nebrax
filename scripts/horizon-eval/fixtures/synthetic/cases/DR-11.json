@@ -1,0 +1,40 @@
+{
+  "_extends": "../base_case.json",
+  "_synthetic_notice": "SYNTHETIC TEST FIXTURE - overlay on base_case(.b).json. Not real evidence, not a grant.",
+  "case_id": "DR-11",
+  "_expect": {
+    "decision": "STOP_OWNER_DECISION",
+    "must_include": [
+      "ZONE_P_NEVER_AUTONOMOUS"
+    ]
+  },
+  "evidence": {
+    "grant_store": {
+      "grants": {
+        "$index": {
+          "0": {
+            "document": {
+              "paths_allow": [
+                "**"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "pr": {
+      "files": [
+        {
+          "filename": "Dockerfile",
+          "status": "modified",
+          "additions": 1,
+          "deletions": 1,
+          "patch": "@@ -1 +1 @@\n-FROM php:8.2\n+FROM php:8.3"
+        }
+      ],
+      "changed_files": 1,
+      "additions": 1,
+      "deletions": 1
+    }
+  }
+}

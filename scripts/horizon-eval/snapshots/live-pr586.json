@@ -1,0 +1,613 @@
+{
+ "case_id": "LIVE-PR586-156b4270",
+ "evidence": {
+  "attestations": [],
+  "checks": [
+   {
+    "app": "github-actions",
+    "completed_at": "2026-08-30T14:18:42Z",
+    "conclusion": "success",
+    "event": "pull_request",
+    "head_sha": "156b4270f9e454bcf78362ea9a2088afbe478e1a",
+    "id": 99269808543,
+    "name": "php artisan test (L11, pgsql)",
+    "status": "completed",
+    "tested_base_sha": "4710169140224f8439a809920c2a6e56c8cbab84"
+   },
+   {
+    "app": "github-actions",
+    "completed_at": "2026-08-30T14:14:25Z",
+    "conclusion": "success",
+    "event": "pull_request",
+    "head_sha": "156b4270f9e454bcf78362ea9a2088afbe478e1a",
+    "id": 99269808398,
+    "name": "php artisan test (L11, sqlite)",
+    "status": "completed",
+    "tested_base_sha": "4710169140224f8439a809920c2a6e56c8cbab84"
+   },
+   {
+    "app": "github-actions",
+    "completed_at": "2026-08-30T14:18:39Z",
+    "conclusion": "success",
+    "event": "push",
+    "head_sha": "156b4270f9e454bcf78362ea9a2088afbe478e1a",
+    "id": 99269802423,
+    "name": "php artisan test (L11, pgsql)",
+    "status": "completed",
+    "tested_base_sha": "4710169140224f8439a809920c2a6e56c8cbab84"
+   },
+   {
+    "app": "github-actions",
+    "completed_at": "2026-08-30T14:14:23Z",
+    "conclusion": "success",
+    "event": "push",
+    "head_sha": "156b4270f9e454bcf78362ea9a2088afbe478e1a",
+    "id": 99269802323,
+    "name": "php artisan test (L11, sqlite)",
+    "status": "completed",
+    "tested_base_sha": "4710169140224f8439a809920c2a6e56c8cbab84"
+   }
+  ],
+  "fetched_at": "2026-10-12T03:43:21Z",
+  "grant_store": {
+   "fetched_at": "2026-10-12T03:43:21Z",
+   "grants": [],
+   "kill_switch": false,
+   "ref": "main",
+   "ref_sha": "40832b21ffe99ec193ec2e7732c79b987debcc8e",
+   "revoked_grant_ids": []
+  },
+  "grant_usage": [],
+  "main": {
+   "sha": "40832b21ffe99ec193ec2e7732c79b987debcc8e"
+  },
+  "other_prs": [
+   {
+    "author": "safwan5001-source",
+    "claim": null,
+    "files": [
+     "AWJ-HORIZON-MEDIA-STORAGE-CLOSURE-REPORT.md",
+     "AWJ-HORIZON-MEDIA-STORAGE-S8-IMPLEMENTATION-REPORT.md",
+     "AWJ-HORIZON-MEDIA-STORAGE-TRACKER.md",
+     "app/Console/Commands/AwjDocumentsStorageVerifyCommand.php",
+     "app/Services/DocumentCenter/DocumentStorageService.php",
+     "tests/Feature/DocumentStorageDiagnoseTest.php",
+     "tests/Feature/DocumentsStorageVerifyTest.php"
+    ],
+    "files_complete": true,
+    "head_ref": "horizon/media-storage-s8-r2-diagnose",
+    "head_repo": "safwan5001-source/Nebrax",
+    "horizon_id": null,
+    "last_activity_at": "2026-10-12T03:29:52Z",
+    "number": 1354,
+    "observed_at": "2026-10-12T03:43:21Z",
+    "state": "open"
+   },
+   {
+    "author": "safwan5001-source",
+    "claim": null,
+    "files": [
+     "app/Http/Controllers/Api/StorefrontConfigController.php",
+     "app/Support/Commerce/StorefrontPresentationNormalizer.php",
+     "docs/plans/store/CUST-HV-V10C-IMPLEMENTATION-REPORT.md",
+     "storefront/src/lib/presentation/__tests__/section-labels.test.ts",
+     "tests/Feature/StorefrontMediaRefTest.php",
+     "tests/Feature/StorefrontSectionLabelsTest.php",
+     "tests/Fixtures/presentation/section-labels.json",
+     "web/e2e/cust-hv-v10c-section-chip.spec.ts",
+     "web/src/modules/store-experience-builder/ControlPanels.tsx",
+     "web/src/modules/store-experience-builder/StorefrontPreviewCanvas.tsx",
+     "web/src/modules/store-experience-builder/__tests__/ControlPanels.deleteConfirm.test.tsx",
+     "web/src/modules/store-experience-builder/__tests__/ControlPanels.sectionName.test.tsx",
+     "web/src/modules/store-experience-builder/__tests__/StorefrontPreviewCanvas.sectionChip.test.tsx",
+     "web/src/modules/store-experience-builder/__tests__/section-labels.test.ts",
+     "web/src/modules/store-experience-builder/__tests__/section-presets.test.tsx",
+     "web/src/modules/store-experience-builder/design/DesignInspector.tsx",
+     "web/src/modules/store-experience-builder/messages.ts",
+     "web/src/modules/store-experience-builder/presentation/config.ts",
+     "web/src/modules/store-experience-builder/store-preview.css",
+     "web/src/modules/store-experience-builder/themes/index.ts",
+     "web/src/modules/store-experience-builder/themes/section-presets.ts"
+    ],
+    "files_complete": true,
+    "head_ref": "cust-hv/v10c-section-workflow",
+    "head_repo": "safwan5001-source/Nebrax",
+    "horizon_id": null,
+    "last_activity_at": "2026-10-12T03:38:06Z",
+    "number": 1353,
+    "observed_at": "2026-10-12T03:43:21Z",
+    "state": "open"
+   },
+   {
+    "author": "safwan5001-source",
+    "claim": null,
+    "files": [
+     "docs/autonomous-engineering/AWJ-HORIZON-V2-1C-DRYRUN-PILOT-IMPLEMENTATION-REPORT.md",
+     "scripts/horizon-eval/README.md",
+     "scripts/horizon-eval/collect_snapshot.py",
+     "scripts/horizon-eval/contract_runner.py",
+     "scripts/horizon-eval/fixtures/synthetic/base_case.json",
+     "scripts/horizon-eval/fixtures/synthetic/base_case_b.json",
+     "scripts/horizon-eval/fixtures/synthetic/cases/DR-01.json",
+     "scripts/horizon-eval/fixtures/synthetic/cases/DR-02.json",
+     "scripts/horizon-eval/fixtures/synthetic/cases/DR-03.json",
+     "scripts/horizon-eval/fixtures/synthetic/cases/DR-04a.json",
+     "scripts/horizon-eval/fixtures/synthetic/cases/DR-04b.json",
+     "scripts/horizon-eval/fixtures/synthetic/cases/DR-04c.json",
+     "scripts/horizon-eval/fixtures/synthetic/cases/DR-05a.json",
+     "scripts/horizon-eval/fixtures/synthetic/cases/DR-05b.json",
+     "scripts/horizon-eval/fixtures/synthetic/cases/DR-05c.json",
+     "scripts/horizon-eval/fixtures/synthetic/cases/DR-06a.json",
+     "scripts/horizon-eval/fixtures/synthetic/cases/DR-06b.json",
+     "scripts/horizon-eval/fixtures/synthetic/cases/DR-06c.json",
+     "scripts/horizon-eval/fixtures/synthetic/cases/DR-07a.json",
+     "scripts/horizon-eval/fixtures/synthetic/cases/DR-07b.json",
+     "scripts/horizon-eval/fixtures/synthetic/cases/DR-07c.json",
+     "scripts/horizon-eval/fixtures/synthetic/cases/DR-08a.json",
+     "scripts/horizon-eval/fixtures/synthetic/cases/DR-08b.json",
+     "scripts/horizon-eval/fixtures/synthetic/cases/DR-08c.json",
+     "scripts/horizon-eval/fixtures/synthetic/cases/DR-08d.json",
+     "scripts/horizon-eval/fixtures/synthetic/cases/DR-09a.json",
+     "scripts/horizon-eval/fixtures/synthetic/cases/DR-09b.json",
+     "scripts/horizon-eval/fixtures/synthetic/cases/DR-10.json",
+     "scripts/horizon-eval/fixtures/synthetic/cases/DR-11.json",
+     "scripts/horizon-eval/fixtures/synthetic/cases/X-01.json",
+     "scripts/horizon-eval/fixtures/synthetic/cases/X-02.json",
+     "scripts/horizon-eval/horizon_eval.py",
+     "scripts/horizon-eval/ledger.py",
+     "scripts/horizon-eval/policy/zone_policy.v1.json",
+     "scripts/horizon-eval/snapshots/live-pr1093.json",
+     "scripts/horizon-eval/snapshots/live-pr1346.json",
+     "scripts/horizon-eval/snapshots/live-pr1349.json",
+     "scripts/horizon-eval/snapshots/live-pr1350.json",
+     "scripts/horizon-eval/snapshots/live-pr586.json",
+     "scripts/horizon-eval/test_contract.py",
+     "scripts/horizon-eval/test_horizon_eval.py",
+     "scripts/horizon-eval/test_live_snapshots.py",
+     "scripts/horizon-eval/test_static_guards.py"
+    ],
+    "files_complete": true,
+    "head_ref": "horizon/v2-1c-dryrun-authorization-evaluator",
+    "head_repo": "safwan5001-source/Nebrax",
+    "horizon_id": null,
+    "last_activity_at": "2026-10-12T03:42:07Z",
+    "number": 1351,
+    "observed_at": "2026-10-12T03:43:21Z",
+    "state": "open"
+   },
+   {
+    "author": "safwan5001-source",
+    "claim": null,
+    "files": [
+     "docs/plans/growth/AWJ_GROWTH_FOUNDATION_HORIZON_V1.md",
+     "docs/plans/growth/AWJ_GROWTH_FOUNDATION_HORIZON_V1_BOOTSTRAP.md"
+    ],
+    "files_complete": true,
+    "head_ref": "docs/awj-growth-foundation-horizon-v1",
+    "head_repo": "safwan5001-source/Nebrax",
+    "horizon_id": null,
+    "last_activity_at": "2026-09-30T18:12:05Z",
+    "number": 1128,
+    "observed_at": "2026-10-12T03:43:21Z",
+    "state": "open"
+   },
+   {
+    "author": "safwan5001-source",
+    "claim": null,
+    "files": [
+     "motion/awj-commercial/.gitignore",
+     "motion/awj-commercial/README.md",
+     "motion/awj-commercial/docs/CREATIVE_TREATMENT.md",
+     "motion/awj-commercial/docs/IMPLEMENTATION_REPORT.md",
+     "motion/awj-commercial/docs/SOUND_CUE_SHEET.md",
+     "motion/awj-commercial/package.json",
+     "motion/awj-commercial/public/fonts/OFL-IBM-Plex.txt",
+     "motion/awj-commercial/public/fonts/OFL-saudi-riyal.txt",
+     "motion/awj-commercial/public/fonts/ibm-plex-mono-latin-400-normal.woff2",
+     "motion/awj-commercial/public/fonts/ibm-plex-mono-latin-500-normal.woff2",
+     "motion/awj-commercial/public/fonts/ibm-plex-mono-latin-600-normal.woff2",
+     "motion/awj-commercial/public/fonts/ibm-plex-mono-latin-700-normal.woff2",
+     "motion/awj-commercial/public/fonts/ibm-plex-sans-arabic-arabic-300-normal.woff2",
+     "motion/awj-commercial/public/fonts/ibm-plex-sans-arabic-arabic-400-normal.woff2",
+     "motion/awj-commercial/public/fonts/ibm-plex-sans-arabic-arabic-500-normal.woff2",
+     "motion/awj-commercial/public/fonts/ibm-plex-sans-arabic-arabic-600-normal.woff2",
+     "motion/awj-commercial/public/fonts/ibm-plex-sans-arabic-arabic-700-normal.woff2",
+     "motion/awj-commercial/public/fonts/ibm-plex-sans-arabic-latin-300-normal.woff2",
+     "motion/awj-commercial/public/fonts/ibm-plex-sans-arabic-latin-400-normal.woff2",
+     "motion/awj-commercial/public/fonts/ibm-plex-sans-arabic-latin-500-normal.woff2",
+     "motion/awj-commercial/public/fonts/ibm-plex-sans-arabic-latin-600-normal.woff2",
+     "motion/awj-commercial/public/fonts/ibm-plex-sans-arabic-latin-700-normal.woff2",
+     "motion/awj-commercial/remotion.config.ts",
+     "motion/awj-commercial/scripts/sheet.py",
+     "motion/awj-commercial/scripts/stills.mjs",
+     "motion/awj-commercial/src/AwjCommercial.tsx",
+     "motion/awj-commercial/src/Root.tsx",
+     "motion/awj-commercial/src/config/demo-data.ts",
+     "motion/awj-commercial/src/config/theme.ts",
+     "motion/awj-commercial/src/config/timeline.ts",
+     "motion/awj-commercial/src/index.ts",
+     "motion/awj-commercial/src/lib/fonts.ts",
+     "motion/awj-commercial/src/lib/motion.ts",
+     "motion/awj-commercial/src/primitives/Camera.tsx",
+     "motion/awj-commercial/src/primitives/Carrier.tsx",
+     "motion/awj-commercial/src/primitives/Mask.tsx",
+     "motion/awj-commercial/src/primitives/Qr.tsx",
+     "motion/awj-commercial/src/primitives/Riyal.tsx",
+     "motion/awj-commercial/src/primitives/RollingNumber.tsx",
+     "motion/awj-commercial/src/scenes/S1Hook.tsx",
+     "motion/awj-commercial/src/scenes/S2Sale.tsx",
+     "motion/awj-commercial/src/scenes/S3Ledger.tsx",
+     "motion/awj-commercial/src/scenes/S4Control.tsx",
+     "motion/awj-commercial/src/scenes/S5Brand.tsx",
+     "motion/awj-commercial/src/ui/Dashboard.tsx",
+     "motion/awj-commercial/src/ui/DocMorph.tsx",
+     "motion/awj-commercial/src/ui/InventoryScreen.tsx",
+     "motion/awj-commercial/src/ui/JournalScreen.tsx",
+     "motion/awj-commercial/src/ui/Panels.tsx",
+     "motion/awj-commercial/src/ui/PosScreen.tsx",
+     "motion/awj-commercial/src/ui/common.tsx",
+     "motion/awj-commercial/tsconfig.json"
+    ],
+    "files_complete": true,
+    "head_ref": "motion/awj-commercial-15s",
+    "head_repo": "safwan5001-source/Nebrax",
+    "horizon_id": null,
+    "last_activity_at": "2026-09-29T05:29:57Z",
+    "number": 1105,
+    "observed_at": "2026-10-12T03:43:21Z",
+    "state": "open"
+   },
+   {
+    "author": "safwan5001-source",
+    "claim": null,
+    "files": [
+     "docs/plans/cloudflare/AWJ_CLOUDFLARE_PLATFORM_BOOTSTRAP.md",
+     "docs/plans/cloudflare/AWJ_CLOUDFLARE_PLATFORM_HORIZON_V1.md",
+     "docs/plans/cloudflare/CF-SAAS-DOMAIN-PROVIDER-1-DECISION-PACKET.md"
+    ],
+    "files_complete": true,
+    "head_ref": "docs/awj-cloudflare-platform-horizon-v1",
+    "head_repo": "safwan5001-source/Nebrax",
+    "horizon_id": null,
+    "last_activity_at": "2026-09-28T21:32:28Z",
+    "number": 1093,
+    "observed_at": "2026-10-12T03:43:21Z",
+    "state": "open"
+   },
+   {
+    "author": "safwan5001-source",
+    "claim": null,
+    "files": [
+     "app/Http/Controllers/Api/CommerceWorkspaceStorefrontPresentationVersionController.php",
+     "app/Http/Requests/PublishStorefrontPresentationVersionRequest.php",
+     "app/Services/Commerce/StorefrontPresentationVersionService.php",
+     "routes/api.php",
+     "tests/Feature/CommerceModuleBoundaryTest.php",
+     "tests/Feature/StorefrontPresentationVersionPublishApiTest.php"
+    ],
+    "files_complete": true,
+    "head_ref": "feat/theme-version-publish",
+    "head_repo": "safwan5001-source/Nebrax",
+    "horizon_id": null,
+    "last_activity_at": "2026-09-28T15:37:50Z",
+    "number": 1089,
+    "observed_at": "2026-10-12T03:43:21Z",
+    "state": "open"
+   },
+   {
+    "author": "safwan5001-source",
+    "claim": null,
+    "files": [
+     "docs/plans/store/AWJ_STORE_CUSTOMIZER_EXTENDED_ARCHITECTURE.md"
+    ],
+    "files_complete": true,
+    "head_ref": "docs/store-customizer-extended-architecture",
+    "head_repo": "safwan5001-source/Nebrax",
+    "horizon_id": null,
+    "last_activity_at": "2026-09-17T10:42:20Z",
+    "number": 853,
+    "observed_at": "2026-10-12T03:43:21Z",
+    "state": "open"
+   },
+   {
+    "author": "safwan5001-source",
+    "claim": null,
+    "files": [
+     "app/Console/Commands/RecoverHistoricalTenantCommand.php"
+    ],
+    "files_complete": true,
+    "head_ref": "feat/awj-taiba-tenant-recovery-platform-admin",
+    "head_repo": "safwan5001-source/Nebrax",
+    "horizon_id": null,
+    "last_activity_at": "2026-09-12T04:21:51Z",
+    "number": 784,
+    "observed_at": "2026-10-12T03:43:21Z",
+    "state": "open"
+   },
+   {
+    "author": "safwan5001-source",
+    "claim": null,
+    "files": [
+     "docs/plans/payments/AWJ_PAY_V2_6A_GATEWAY_REFUND_ACCOUNTING_DESIGN.md",
+     "docs/plans/payments/AWJ_PAY_V2_6B_CUSTOMER_REFUND_EVIDENCE_PASS.md"
+    ],
+    "files_complete": true,
+    "head_ref": "docs/pay-v2-6a-gateway-refund-accounting-design",
+    "head_repo": "safwan5001-source/Nebrax",
+    "horizon_id": null,
+    "last_activity_at": "2026-09-12T01:19:29Z",
+    "number": 778,
+    "observed_at": "2026-10-12T03:43:21Z",
+    "state": "open"
+   },
+   {
+    "author": "safwan5001-source",
+    "claim": null,
+    "files": [
+     "docs/audits/AWJ_ACCOUNTING_SETTINGS_PRODUCT_COMPLETENESS_AUDIT_2026-09.md"
+    ],
+    "files_complete": true,
+    "head_ref": "claude/accounting-settings-product-completeness-audit",
+    "head_repo": "safwan5001-source/Nebrax",
+    "horizon_id": null,
+    "last_activity_at": "2026-09-08T22:37:53Z",
+    "number": 704,
+    "observed_at": "2026-10-12T03:43:21Z",
+    "state": "open"
+   },
+   {
+    "author": "safwan5001-source",
+    "claim": null,
+    "files": [
+     "docs/plans/design/AWJ_DESIGN_SYSTEM_V2_BLUEPRINT.md",
+     "docs/plans/design/references/awj-v2-customer-master-desktop-mobile.jpeg",
+     "docs/plans/design/references/awj-v2-product-master-desktop-mobile.jpeg",
+     "docs/plans/design/references/awj-v2-sales-invoice-desktop.jpeg"
+    ],
+    "files_complete": true,
+    "head_ref": "claude/awj-v2-visual-references-62yiwn",
+    "head_repo": "safwan5001-source/Nebrax",
+    "horizon_id": null,
+    "last_activity_at": "2026-09-08T15:40:55Z",
+    "number": 703,
+    "observed_at": "2026-10-12T03:43:21Z",
+    "state": "open"
+   },
+   {
+    "author": "safwan5001-source",
+    "claim": null,
+    "files": [
+     "Dockerfile",
+     "app/Console/Commands/DocumentReadinessCommand.php",
+     "deploy/document-worker.sh"
+    ],
+    "files_complete": true,
+    "head_ref": "fix/document-database-queue-readiness",
+    "head_repo": "safwan5001-source/Nebrax",
+    "horizon_id": null,
+    "last_activity_at": "2026-08-30T01:37:44Z",
+    "number": 578,
+    "observed_at": "2026-10-12T03:43:21Z",
+    "state": "open"
+   },
+   {
+    "author": "safwan5001-source",
+    "claim": null,
+    "files": [
+     ".github/workflows/ci.yml",
+     "AGENTS.md",
+     "CLAUDE.md",
+     "deploy/assemble.sh",
+     "setup.sh",
+     "tests/Feature/AccountingGuardTest.php"
+    ],
+    "files_complete": true,
+    "head_ref": "claude/ai-assistant-guidelines-9gxfjs",
+    "head_repo": "safwan5001-source/Nebrax",
+    "horizon_id": null,
+    "last_activity_at": "2026-08-14T23:31:52Z",
+    "number": 202,
+    "observed_at": "2026-10-12T03:43:21Z",
+    "state": "open"
+   }
+  ],
+  "pr": {
+   "additions": 559,
+   "author": "safwan5001-source",
+   "base_ref": "main",
+   "base_repo": "safwan5001-source/Nebrax",
+   "base_sha": "4710169140224f8439a809920c2a6e56c8cbab84",
+   "body": "## الهدف\n\nتجميع توقيع فاتورة ZATCA وبناء QR للمرحلة الثانية داخل عملية ذرية تعتمد لقطة اعتماد واحدة.\n\n## التغيير\n\n- حل الاعتماد النشط وسياسة التوقيع مرة واحدة.\n- توقيع UBL/XAdES ثم التحقق من مادة الهاش والتوقيع المستخرجة من XML الناتج.\n- اشتقاق المفتاح العام وتوقيع الشهادة من شهادة leaf نفسها المستخدمة في التوقيع.\n- بناء QR بوسوم 1–9 للفواتير المبسطة و1–8 للفواتير القياسية.\n- إعادة نتيجة داخلية واضحة: XML الموقّع، هاش SHA-256 الخام، وQR Base64.\n- اختبارات تكاملية لمساري `simplified` و`standard` وربط وسوم 6–9 بالمادة الفعلية.\n\n## خارج النطاق\n\n- لا حفظ في قاعدة البيانات.\n- لا إرسال إلى ZATCA أو Queue.\n- لا ربط بدورة ترحيل الفاتورة حتى اكتمال تحقق UBL/XSD وSchematron.\n\n## التحقق\n\nبيئة العمل الحالية لا تحتوي PHP؛ تعتمد نتيجة التنفيذ على GitHub Actions، مع مراجعة diff يدوية قبل فتح الطلب.",
+   "changed_files": 3,
+   "claim": null,
+   "comments": [
+    {
+     "author": "safwan5001-source",
+     "body": "@codex review\n\nPlease review the atomic credential snapshot, signed XML verification, and Phase 2 QR tag binding. Pay special attention to avoiding cross-environment credential races and to the standard/simplified tag 9 boundary."
+    },
+    {
+     "author": "safwan5001-source",
+     "body": "@codex review\n\nPlease re-review head `45bed5ca`, especially the secure InvoiceTypeCode derivation and the removal of the independent document-type input."
+    },
+    {
+     "author": "safwan5001-source",
+     "body": "@codex review\n\nPlease perform a final review of head `db68e4d2`. All QR business fields and document class are now derived from the same secure UBL snapshot; please check UBL cardinality, transaction subtype handling, timestamp parsing, and credential/certificate binding."
+    },
+    {
+     "author": "safwan5001-source",
+     "body": "@codex review\n\nFinal review requested for head `62ed463d`. Repeated root TaxTotal values are accepted only when identical, and `Z` issue times are parsed with explicit UTC. Please report any remaining correctness or security issue."
+    },
+    {
+     "author": "safwan5001-source",
+     "body": "@codex review\n\nPlease perform the final review on head `156b4270`. The Phase 2 QR is now embedded in the unique QR attachment and the final XML is cryptographically re-verified after replacement."
+    },
+    {
+     "author": "chatgpt-codex-connector[bot]",
+     "body": "Codex Review: Didn't find any major issues. Swish!\n\n**Reviewed commit:** `156b4270f9`\n\n<details> <summary>ℹ️ About Codex in GitHub</summary>\n<br/>\n\n[Your team has set up Codex to review pull requests in this repo](https://chatgpt.com/codex/cloud/settings/general). Reviews are triggered when you\n- Open a pull request for review\n- Mark a draft as ready\n- Comment \"@codex review\".\n\nIf Codex has suggestions, it will comment; otherwise it will react with 👍.\n\n\n\n\nCodex can also answer questions or update the PR. Try commenting \"@codex address that feedback\".\n            \n</details>"
+    }
+   ],
+   "commits": [
+    {
+     "author": "safwan5001-source",
+     "message": "feat(zatca): coordinate signed invoice QR generation",
+     "sha": "18370643234119866ff20c0e502bd538a124be46"
+    },
+    {
+     "author": "safwan5001-source",
+     "message": "fix(zatca): derive QR document type from signed snapshot",
+     "sha": "45bed5ca9412da57f971edfa56a2a7b76e454fe8"
+    },
+    {
+     "author": "safwan5001-source",
+     "message": "fix(zatca): bind QR business fields to invoice XML",
+     "sha": "db68e4d213494566a1ea2abf1d3f01e88c90ecec"
+    },
+    {
+     "author": "safwan5001-source",
+     "message": "fix(zatca): normalize repeated totals and UTC issue time",
+     "sha": "62ed463d4c0ca6ba4625641a95153b1df2f81d30"
+    },
+    {
+     "author": "safwan5001-source",
+     "message": "fix(zatca): embed verified phase two QR in signed XML",
+     "sha": "156b4270f9e454bcf78362ea9a2088afbe478e1a"
+    }
+   ],
+   "deletions": 0,
+   "draft": false,
+   "files": [
+    {
+     "additions": 294,
+     "deletions": 0,
+     "filename": "app/Services/Accounting/ZatcaSignedInvoiceQrCoordinator.php",
+     "patch": null,
+     "previous_filename": null,
+     "status": "added"
+    },
+    {
+     "additions": 13,
+     "deletions": 0,
+     "filename": "app/Services/Accounting/ZatcaSignedInvoiceQrResult.php",
+     "patch": null,
+     "previous_filename": null,
+     "status": "added"
+    },
+    {
+     "additions": 252,
+     "deletions": 0,
+     "filename": "tests/Feature/ZatcaSignedInvoiceQrCoordinatorTest.php",
+     "patch": null,
+     "previous_filename": null,
+     "status": "added"
+    }
+   ],
+   "head_pushed_at": "2026-08-30T14:10:07Z",
+   "head_ref": "feat/zatca-signed-invoice-qr-coordinator",
+   "head_repo": "safwan5001-source/Nebrax",
+   "head_sha": "156b4270f9e454bcf78362ea9a2088afbe478e1a",
+   "labels": [],
+   "merge_commit_sha": null,
+   "merged": false,
+   "number": 586,
+   "reviews": [
+    {
+     "body": "\n### 💡 Codex Review\n\nHere are some automated review suggestions for this pull request.\n\n**Reviewed commit:** `1837064323`\n    \n\n<details> <summary>ℹ️ About Codex in GitHub</summary>\n<br/>\n\n[Your team has set up Codex to review pull requests in this repo](https://chatgpt.com/codex/cloud/settings/general). Reviews are triggered when you\n- Open a pull request for review\n- Mark a draft as ready\n- Comment \"@codex review\".\n\nIf Codex has suggestions, it will comment; otherwise it will react with 👍.\n\n\n\n\nCodex can also answer questions or update the PR. Try commenting \"@codex address that feedback\".\n            \n</details>",
+     "commit_sha": "18370643234119866ff20c0e502bd538a124be46",
+     "reviewer": "chatgpt-codex-connector[bot]",
+     "state": "COMMENTED"
+    },
+    {
+     "body": "",
+     "commit_sha": "45bed5ca9412da57f971edfa56a2a7b76e454fe8",
+     "reviewer": "safwan5001-source",
+     "state": "COMMENTED"
+    },
+    {
+     "body": "\n### 💡 Codex Review\n\nHere are some automated review suggestions for this pull request.\n\n**Reviewed commit:** `45bed5ca94`\n    \n\n<details> <summary>ℹ️ About Codex in GitHub</summary>\n<br/>\n\n[Your team has set up Codex to review pull requests in this repo](https://chatgpt.com/codex/cloud/settings/general). Reviews are triggered when you\n- Open a pull request for review\n- Mark a draft as ready\n- Comment \"@codex review\".\n\nIf Codex has suggestions, it will comment; otherwise it will react with 👍.\n\n\n\n\nCodex can also answer questions or update the PR. Try commenting \"@codex address that feedback\".\n            \n</details>",
+     "commit_sha": "45bed5ca9412da57f971edfa56a2a7b76e454fe8",
+     "reviewer": "chatgpt-codex-connector[bot]",
+     "state": "COMMENTED"
+    },
+    {
+     "body": "",
+     "commit_sha": "db68e4d213494566a1ea2abf1d3f01e88c90ecec",
+     "reviewer": "safwan5001-source",
+     "state": "COMMENTED"
+    },
+    {
+     "body": "",
+     "commit_sha": "db68e4d213494566a1ea2abf1d3f01e88c90ecec",
+     "reviewer": "safwan5001-source",
+     "state": "COMMENTED"
+    },
+    {
+     "body": "\n### 💡 Codex Review\n\nHere are some automated review suggestions for this pull request.\n\n**Reviewed commit:** `db68e4d213`\n    \n\n<details> <summary>ℹ️ About Codex in GitHub</summary>\n<br/>\n\n[Your team has set up Codex to review pull requests in this repo](https://chatgpt.com/codex/cloud/settings/general). Reviews are triggered when you\n- Open a pull request for review\n- Mark a draft as ready\n- Comment \"@codex review\".\n\nIf Codex has suggestions, it will comment; otherwise it will react with 👍.\n\n\n\n\nCodex can also answer questions or update the PR. Try commenting \"@codex address that feedback\".\n            \n</details>",
+     "commit_sha": "db68e4d213494566a1ea2abf1d3f01e88c90ecec",
+     "reviewer": "chatgpt-codex-connector[bot]",
+     "state": "COMMENTED"
+    },
+    {
+     "body": "",
+     "commit_sha": "62ed463d4c0ca6ba4625641a95153b1df2f81d30",
+     "reviewer": "safwan5001-source",
+     "state": "COMMENTED"
+    },
+    {
+     "body": "",
+     "commit_sha": "62ed463d4c0ca6ba4625641a95153b1df2f81d30",
+     "reviewer": "safwan5001-source",
+     "state": "COMMENTED"
+    },
+    {
+     "body": "\n### 💡 Codex Review\n\nHere are some automated review suggestions for this pull request.\n\n**Reviewed commit:** `62ed463d4c`\n    \n\n<details> <summary>ℹ️ About Codex in GitHub</summary>\n<br/>\n\n[Your team has set up Codex to review pull requests in this repo](https://chatgpt.com/codex/cloud/settings/general). Reviews are triggered when you\n- Open a pull request for review\n- Mark a draft as ready\n- Comment \"@codex review\".\n\nIf Codex has suggestions, it will comment; otherwise it will react with 👍.\n\n\n\n\nCodex can also answer questions or update the PR. Try commenting \"@codex address that feedback\".\n            \n</details>",
+     "commit_sha": "62ed463d4c0ca6ba4625641a95153b1df2f81d30",
+     "reviewer": "chatgpt-codex-connector[bot]",
+     "state": "COMMENTED"
+    },
+    {
+     "body": "",
+     "commit_sha": "156b4270f9e454bcf78362ea9a2088afbe478e1a",
+     "reviewer": "safwan5001-source",
+     "state": "COMMENTED"
+    }
+   ],
+   "state": "open",
+   "title": "feat(zatca): coordinate signed invoice QR generation"
+  },
+  "registry": {
+   "horizons": []
+  },
+  "required_checks": {
+   "always_names": [
+    "php artisan test (L11, pgsql)",
+    "php artisan test (L11, sqlite)"
+   ],
+   "gate_name": "CI Gate",
+   "grace_minutes_no_run": 10,
+   "path_names": [
+    "Docker runtime smoke",
+    "mobile (Android release build proof)",
+    "mobile (analyze + test)",
+    "mobile (iOS release build proof)",
+    "storefront (lint + typecheck + test)",
+    "web build (Next.js)"
+   ],
+   "source_ref": "main",
+   "source_sha": "40832b21ffe99ec193ec2e7732c79b987debcc8e"
+  },
+  "source": "github-readonly"
+ },
+ "mode": "live",
+ "now": "2026-10-12T03:43:21Z",
+ "request": {
+  "action": "merge",
+  "agent_id": "pilot-session",
+  "base_branch": "main",
+  "horizon_id": "ZATCA-COORD",
+  "pr_number": 586,
+  "repository": "safwan5001-source/Nebrax",
+  "task_category": "isolated-bugfix",
+  "task_id": "Q1"
+ },
+ "schema": "horizon-eval-case/1"
+}

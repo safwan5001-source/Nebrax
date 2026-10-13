@@ -1,0 +1,17 @@
+{
+  "_extends": "../base_case.json",
+  "_synthetic_notice": "SYNTHETIC TEST FIXTURE - overlay on base_case(.b).json. Not real evidence, not a grant.",
+  "case_id": "DR-05a",
+  "_expect": {
+    "decision": "BLOCK",
+    "must_include": [
+      "HEAD_SHA_CHANGED_AFTER_REVIEW"
+    ]
+  },
+  "evidence": {
+    "pr": {
+      "head_sha": "ffffffffffffffffffffffffffffffffffffffff",
+      "head_pushed_at": "2026-10-12T11:55:00Z"
+    }
+  }
+}

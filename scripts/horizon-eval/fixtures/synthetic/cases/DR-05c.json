@@ -1,0 +1,31 @@
+{
+  "_extends": "../base_case.json",
+  "_synthetic_notice": "SYNTHETIC TEST FIXTURE - overlay on base_case(.b).json. Not real evidence, not a grant.",
+  "case_id": "DR-05c",
+  "_expect": {
+    "decision": "WAIT",
+    "must_include": [
+      "BASE_MOVED_RETEST"
+    ]
+  },
+  "evidence": {
+    "main": {
+      "sha": "9999999999999999999999999999999999999999"
+    },
+    "required_checks": {
+      "source_sha": "9999999999999999999999999999999999999999"
+    },
+    "grant_store": {
+      "ref_sha": "9999999999999999999999999999999999999999",
+      "grants": {
+        "$index": {
+          "0": {
+            "origin": {
+              "commit_sha": "9999999999999999999999999999999999999999"
+            }
+          }
+        }
+      }
+    }
+  }
+}

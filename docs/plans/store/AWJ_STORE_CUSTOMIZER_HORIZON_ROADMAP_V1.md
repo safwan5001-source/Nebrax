@@ -708,6 +708,8 @@ Avoid inventing a different settings experience for every component.
 
 ## HORIZON CUST-H5 — Undo / Redo, Recovery & Change Confidence
 
+**H5 evidence / architecture / execution authority (Owner-approved 2026-10-12):** `docs/plans/store/CUST-H5-EVIDENCE-ARCHITECTURE-EXECUTION-PLAN.md` — H5-0 approved; guarded sequential implementation and Squash Merge are authorized for H5-1 through H5-6 when all per-slice implementation, test, CI, review and quality gates pass. Deploy and Production release remain separate Owner gates and are not authorized.
+
 > **Sequencing note (2026-10-05):** CUST-H5 follows **CUST-HV**. The HV contract keeps the presentation document plain immutable JSON with media referenced by id so Undo/Redo and version Restore remain cheap; Restore re-validates media references. H5 is **not renumbered**.
 
 **Purpose:** make experimentation safe.

@@ -1,0 +1,550 @@
+{
+ "case_id": "LIVE-PR1350-31bf4f3f",
+ "evidence": {
+  "attestations": [],
+  "checks": [
+   {
+    "app": "github-actions",
+    "completed_at": "2026-10-12T02:54:38Z",
+    "conclusion": "success",
+    "event": "pull_request",
+    "head_sha": "31bf4f3f8f5ddcb412f6a72f497a286b5760e6c9",
+    "id": 114640995467,
+    "name": "php artisan test (L11, sqlite)",
+    "status": "completed",
+    "tested_base_sha": null
+   },
+   {
+    "app": "github-actions",
+    "completed_at": "2026-10-12T02:59:48Z",
+    "conclusion": "success",
+    "event": "pull_request",
+    "head_sha": "31bf4f3f8f5ddcb412f6a72f497a286b5760e6c9",
+    "id": 114640995236,
+    "name": "CI Gate",
+    "status": "completed",
+    "tested_base_sha": null
+   },
+   {
+    "app": "github-actions",
+    "completed_at": "2026-10-12T02:59:34Z",
+    "conclusion": "success",
+    "event": "pull_request",
+    "head_sha": "31bf4f3f8f5ddcb412f6a72f497a286b5760e6c9",
+    "id": 114640995202,
+    "name": "php artisan test (L11, pgsql)",
+    "status": "completed",
+    "tested_base_sha": null
+   },
+   {
+    "app": "github-actions",
+    "completed_at": "2026-10-12T02:56:32Z",
+    "conclusion": "success",
+    "event": "push",
+    "head_sha": "31bf4f3f8f5ddcb412f6a72f497a286b5760e6c9",
+    "id": 114640990893,
+    "name": "php artisan test (L11, sqlite)",
+    "status": "completed",
+    "tested_base_sha": null
+   },
+   {
+    "app": "github-actions",
+    "completed_at": "2026-10-12T03:10:27Z",
+    "conclusion": "success",
+    "event": "push",
+    "head_sha": "31bf4f3f8f5ddcb412f6a72f497a286b5760e6c9",
+    "id": 114640990770,
+    "name": "php artisan test (L11, pgsql)",
+    "status": "completed",
+    "tested_base_sha": null
+   }
+  ],
+  "fetched_at": "2026-10-12T03:43:10Z",
+  "grant_store": {
+   "fetched_at": "2026-10-12T03:43:10Z",
+   "grants": [],
+   "kill_switch": false,
+   "ref": "main",
+   "ref_sha": "40832b21ffe99ec193ec2e7732c79b987debcc8e",
+   "revoked_grant_ids": []
+  },
+  "grant_usage": [],
+  "main": {
+   "sha": "40832b21ffe99ec193ec2e7732c79b987debcc8e"
+  },
+  "other_prs": [
+   {
+    "author": "safwan5001-source",
+    "claim": null,
+    "files": [
+     "AWJ-HORIZON-MEDIA-STORAGE-CLOSURE-REPORT.md",
+     "AWJ-HORIZON-MEDIA-STORAGE-S8-IMPLEMENTATION-REPORT.md",
+     "AWJ-HORIZON-MEDIA-STORAGE-TRACKER.md",
+     "app/Console/Commands/AwjDocumentsStorageVerifyCommand.php",
+     "app/Services/DocumentCenter/DocumentStorageService.php",
+     "tests/Feature/DocumentStorageDiagnoseTest.php",
+     "tests/Feature/DocumentsStorageVerifyTest.php"
+    ],
+    "files_complete": true,
+    "head_ref": "horizon/media-storage-s8-r2-diagnose",
+    "head_repo": "safwan5001-source/Nebrax",
+    "horizon_id": null,
+    "last_activity_at": "2026-10-12T03:29:52Z",
+    "number": 1354,
+    "observed_at": "2026-10-12T03:43:10Z",
+    "state": "open"
+   },
+   {
+    "author": "safwan5001-source",
+    "claim": null,
+    "files": [
+     "app/Http/Controllers/Api/StorefrontConfigController.php",
+     "app/Support/Commerce/StorefrontPresentationNormalizer.php",
+     "docs/plans/store/CUST-HV-V10C-IMPLEMENTATION-REPORT.md",
+     "storefront/src/lib/presentation/__tests__/section-labels.test.ts",
+     "tests/Feature/StorefrontMediaRefTest.php",
+     "tests/Feature/StorefrontSectionLabelsTest.php",
+     "tests/Fixtures/presentation/section-labels.json",
+     "web/e2e/cust-hv-v10c-section-chip.spec.ts",
+     "web/src/modules/store-experience-builder/ControlPanels.tsx",
+     "web/src/modules/store-experience-builder/StorefrontPreviewCanvas.tsx",
+     "web/src/modules/store-experience-builder/__tests__/ControlPanels.deleteConfirm.test.tsx",
+     "web/src/modules/store-experience-builder/__tests__/ControlPanels.sectionName.test.tsx",
+     "web/src/modules/store-experience-builder/__tests__/StorefrontPreviewCanvas.sectionChip.test.tsx",
+     "web/src/modules/store-experience-builder/__tests__/section-labels.test.ts",
+     "web/src/modules/store-experience-builder/__tests__/section-presets.test.tsx",
+     "web/src/modules/store-experience-builder/design/DesignInspector.tsx",
+     "web/src/modules/store-experience-builder/messages.ts",
+     "web/src/modules/store-experience-builder/presentation/config.ts",
+     "web/src/modules/store-experience-builder/store-preview.css",
+     "web/src/modules/store-experience-builder/themes/index.ts",
+     "web/src/modules/store-experience-builder/themes/section-presets.ts"
+    ],
+    "files_complete": true,
+    "head_ref": "cust-hv/v10c-section-workflow",
+    "head_repo": "safwan5001-source/Nebrax",
+    "horizon_id": null,
+    "last_activity_at": "2026-10-12T03:38:06Z",
+    "number": 1353,
+    "observed_at": "2026-10-12T03:43:10Z",
+    "state": "open"
+   },
+   {
+    "author": "safwan5001-source",
+    "claim": null,
+    "files": [
+     "docs/autonomous-engineering/AWJ-HORIZON-V2-1C-DRYRUN-PILOT-IMPLEMENTATION-REPORT.md",
+     "scripts/horizon-eval/README.md",
+     "scripts/horizon-eval/collect_snapshot.py",
+     "scripts/horizon-eval/contract_runner.py",
+     "scripts/horizon-eval/fixtures/synthetic/base_case.json",
+     "scripts/horizon-eval/fixtures/synthetic/base_case_b.json",
+     "scripts/horizon-eval/fixtures/synthetic/cases/DR-01.json",
+     "scripts/horizon-eval/fixtures/synthetic/cases/DR-02.json",
+     "scripts/horizon-eval/fixtures/synthetic/cases/DR-03.json",
+     "scripts/horizon-eval/fixtures/synthetic/cases/DR-04a.json",
+     "scripts/horizon-eval/fixtures/synthetic/cases/DR-04b.json",
+     "scripts/horizon-eval/fixtures/synthetic/cases/DR-04c.json",
+     "scripts/horizon-eval/fixtures/synthetic/cases/DR-05a.json",
+     "scripts/horizon-eval/fixtures/synthetic/cases/DR-05b.json",
+     "scripts/horizon-eval/fixtures/synthetic/cases/DR-05c.json",
+     "scripts/horizon-eval/fixtures/synthetic/cases/DR-06a.json",
+     "scripts/horizon-eval/fixtures/synthetic/cases/DR-06b.json",
+     "scripts/horizon-eval/fixtures/synthetic/cases/DR-06c.json",
+     "scripts/horizon-eval/fixtures/synthetic/cases/DR-07a.json",
+     "scripts/horizon-eval/fixtures/synthetic/cases/DR-07b.json",
+     "scripts/horizon-eval/fixtures/synthetic/cases/DR-07c.json",
+     "scripts/horizon-eval/fixtures/synthetic/cases/DR-08a.json",
+     "scripts/horizon-eval/fixtures/synthetic/cases/DR-08b.json",
+     "scripts/horizon-eval/fixtures/synthetic/cases/DR-08c.json",
+     "scripts/horizon-eval/fixtures/synthetic/cases/DR-08d.json",
+     "scripts/horizon-eval/fixtures/synthetic/cases/DR-09a.json",
+     "scripts/horizon-eval/fixtures/synthetic/cases/DR-09b.json",
+     "scripts/horizon-eval/fixtures/synthetic/cases/DR-10.json",
+     "scripts/horizon-eval/fixtures/synthetic/cases/DR-11.json",
+     "scripts/horizon-eval/fixtures/synthetic/cases/X-01.json",
+     "scripts/horizon-eval/fixtures/synthetic/cases/X-02.json",
+     "scripts/horizon-eval/horizon_eval.py",
+     "scripts/horizon-eval/ledger.py",
+     "scripts/horizon-eval/policy/zone_policy.v1.json",
+     "scripts/horizon-eval/snapshots/live-pr1093.json",
+     "scripts/horizon-eval/snapshots/live-pr1346.json",
+     "scripts/horizon-eval/snapshots/live-pr1349.json",
+     "scripts/horizon-eval/snapshots/live-pr1350.json",
+     "scripts/horizon-eval/snapshots/live-pr586.json",
+     "scripts/horizon-eval/test_contract.py",
+     "scripts/horizon-eval/test_horizon_eval.py",
+     "scripts/horizon-eval/test_live_snapshots.py",
+     "scripts/horizon-eval/test_static_guards.py"
+    ],
+    "files_complete": true,
+    "head_ref": "horizon/v2-1c-dryrun-authorization-evaluator",
+    "head_repo": "safwan5001-source/Nebrax",
+    "horizon_id": null,
+    "last_activity_at": "2026-10-12T03:42:07Z",
+    "number": 1351,
+    "observed_at": "2026-10-12T03:43:10Z",
+    "state": "open"
+   },
+   {
+    "author": "safwan5001-source",
+    "claim": null,
+    "files": [
+     "docs/plans/growth/AWJ_GROWTH_FOUNDATION_HORIZON_V1.md",
+     "docs/plans/growth/AWJ_GROWTH_FOUNDATION_HORIZON_V1_BOOTSTRAP.md"
+    ],
+    "files_complete": true,
+    "head_ref": "docs/awj-growth-foundation-horizon-v1",
+    "head_repo": "safwan5001-source/Nebrax",
+    "horizon_id": null,
+    "last_activity_at": "2026-09-30T18:12:05Z",
+    "number": 1128,
+    "observed_at": "2026-10-12T03:43:10Z",
+    "state": "open"
+   },
+   {
+    "author": "safwan5001-source",
+    "claim": null,
+    "files": [
+     "motion/awj-commercial/.gitignore",
+     "motion/awj-commercial/README.md",
+     "motion/awj-commercial/docs/CREATIVE_TREATMENT.md",
+     "motion/awj-commercial/docs/IMPLEMENTATION_REPORT.md",
+     "motion/awj-commercial/docs/SOUND_CUE_SHEET.md",
+     "motion/awj-commercial/package.json",
+     "motion/awj-commercial/public/fonts/OFL-IBM-Plex.txt",
+     "motion/awj-commercial/public/fonts/OFL-saudi-riyal.txt",
+     "motion/awj-commercial/public/fonts/ibm-plex-mono-latin-400-normal.woff2",
+     "motion/awj-commercial/public/fonts/ibm-plex-mono-latin-500-normal.woff2",
+     "motion/awj-commercial/public/fonts/ibm-plex-mono-latin-600-normal.woff2",
+     "motion/awj-commercial/public/fonts/ibm-plex-mono-latin-700-normal.woff2",
+     "motion/awj-commercial/public/fonts/ibm-plex-sans-arabic-arabic-300-normal.woff2",
+     "motion/awj-commercial/public/fonts/ibm-plex-sans-arabic-arabic-400-normal.woff2",
+     "motion/awj-commercial/public/fonts/ibm-plex-sans-arabic-arabic-500-normal.woff2",
+     "motion/awj-commercial/public/fonts/ibm-plex-sans-arabic-arabic-600-normal.woff2",
+     "motion/awj-commercial/public/fonts/ibm-plex-sans-arabic-arabic-700-normal.woff2",
+     "motion/awj-commercial/public/fonts/ibm-plex-sans-arabic-latin-300-normal.woff2",
+     "motion/awj-commercial/public/fonts/ibm-plex-sans-arabic-latin-400-normal.woff2",
+     "motion/awj-commercial/public/fonts/ibm-plex-sans-arabic-latin-500-normal.woff2",
+     "motion/awj-commercial/public/fonts/ibm-plex-sans-arabic-latin-600-normal.woff2",
+     "motion/awj-commercial/public/fonts/ibm-plex-sans-arabic-latin-700-normal.woff2",
+     "motion/awj-commercial/remotion.config.ts",
+     "motion/awj-commercial/scripts/sheet.py",
+     "motion/awj-commercial/scripts/stills.mjs",
+     "motion/awj-commercial/src/AwjCommercial.tsx",
+     "motion/awj-commercial/src/Root.tsx",
+     "motion/awj-commercial/src/config/demo-data.ts",
+     "motion/awj-commercial/src/config/theme.ts",
+     "motion/awj-commercial/src/config/timeline.ts",
+     "motion/awj-commercial/src/index.ts",
+     "motion/awj-commercial/src/lib/fonts.ts",
+     "motion/awj-commercial/src/lib/motion.ts",
+     "motion/awj-commercial/src/primitives/Camera.tsx",
+     "motion/awj-commercial/src/primitives/Carrier.tsx",
+     "motion/awj-commercial/src/primitives/Mask.tsx",
+     "motion/awj-commercial/src/primitives/Qr.tsx",
+     "motion/awj-commercial/src/primitives/Riyal.tsx",
+     "motion/awj-commercial/src/primitives/RollingNumber.tsx",
+     "motion/awj-commercial/src/scenes/S1Hook.tsx",
+     "motion/awj-commercial/src/scenes/S2Sale.tsx",
+     "motion/awj-commercial/src/scenes/S3Ledger.tsx",
+     "motion/awj-commercial/src/scenes/S4Control.tsx",
+     "motion/awj-commercial/src/scenes/S5Brand.tsx",
+     "motion/awj-commercial/src/ui/Dashboard.tsx",
+     "motion/awj-commercial/src/ui/DocMorph.tsx",
+     "motion/awj-commercial/src/ui/InventoryScreen.tsx",
+     "motion/awj-commercial/src/ui/JournalScreen.tsx",
+     "motion/awj-commercial/src/ui/Panels.tsx",
+     "motion/awj-commercial/src/ui/PosScreen.tsx",
+     "motion/awj-commercial/src/ui/common.tsx",
+     "motion/awj-commercial/tsconfig.json"
+    ],
+    "files_complete": true,
+    "head_ref": "motion/awj-commercial-15s",
+    "head_repo": "safwan5001-source/Nebrax",
+    "horizon_id": null,
+    "last_activity_at": "2026-09-29T05:29:57Z",
+    "number": 1105,
+    "observed_at": "2026-10-12T03:43:10Z",
+    "state": "open"
+   },
+   {
+    "author": "safwan5001-source",
+    "claim": null,
+    "files": [
+     "docs/plans/cloudflare/AWJ_CLOUDFLARE_PLATFORM_BOOTSTRAP.md",
+     "docs/plans/cloudflare/AWJ_CLOUDFLARE_PLATFORM_HORIZON_V1.md",
+     "docs/plans/cloudflare/CF-SAAS-DOMAIN-PROVIDER-1-DECISION-PACKET.md"
+    ],
+    "files_complete": true,
+    "head_ref": "docs/awj-cloudflare-platform-horizon-v1",
+    "head_repo": "safwan5001-source/Nebrax",
+    "horizon_id": null,
+    "last_activity_at": "2026-09-28T21:32:28Z",
+    "number": 1093,
+    "observed_at": "2026-10-12T03:43:10Z",
+    "state": "open"
+   },
+   {
+    "author": "safwan5001-source",
+    "claim": null,
+    "files": [
+     "app/Http/Controllers/Api/CommerceWorkspaceStorefrontPresentationVersionController.php",
+     "app/Http/Requests/PublishStorefrontPresentationVersionRequest.php",
+     "app/Services/Commerce/StorefrontPresentationVersionService.php",
+     "routes/api.php",
+     "tests/Feature/CommerceModuleBoundaryTest.php",
+     "tests/Feature/StorefrontPresentationVersionPublishApiTest.php"
+    ],
+    "files_complete": true,
+    "head_ref": "feat/theme-version-publish",
+    "head_repo": "safwan5001-source/Nebrax",
+    "horizon_id": null,
+    "last_activity_at": "2026-09-28T15:37:50Z",
+    "number": 1089,
+    "observed_at": "2026-10-12T03:43:10Z",
+    "state": "open"
+   },
+   {
+    "author": "safwan5001-source",
+    "claim": null,
+    "files": [
+     "docs/plans/store/AWJ_STORE_CUSTOMIZER_EXTENDED_ARCHITECTURE.md"
+    ],
+    "files_complete": true,
+    "head_ref": "docs/store-customizer-extended-architecture",
+    "head_repo": "safwan5001-source/Nebrax",
+    "horizon_id": null,
+    "last_activity_at": "2026-09-17T10:42:20Z",
+    "number": 853,
+    "observed_at": "2026-10-12T03:43:10Z",
+    "state": "open"
+   },
+   {
+    "author": "safwan5001-source",
+    "claim": null,
+    "files": [
+     "app/Console/Commands/RecoverHistoricalTenantCommand.php"
+    ],
+    "files_complete": true,
+    "head_ref": "feat/awj-taiba-tenant-recovery-platform-admin",
+    "head_repo": "safwan5001-source/Nebrax",
+    "horizon_id": null,
+    "last_activity_at": "2026-09-12T04:21:51Z",
+    "number": 784,
+    "observed_at": "2026-10-12T03:43:10Z",
+    "state": "open"
+   },
+   {
+    "author": "safwan5001-source",
+    "claim": null,
+    "files": [
+     "docs/plans/payments/AWJ_PAY_V2_6A_GATEWAY_REFUND_ACCOUNTING_DESIGN.md",
+     "docs/plans/payments/AWJ_PAY_V2_6B_CUSTOMER_REFUND_EVIDENCE_PASS.md"
+    ],
+    "files_complete": true,
+    "head_ref": "docs/pay-v2-6a-gateway-refund-accounting-design",
+    "head_repo": "safwan5001-source/Nebrax",
+    "horizon_id": null,
+    "last_activity_at": "2026-09-12T01:19:29Z",
+    "number": 778,
+    "observed_at": "2026-10-12T03:43:10Z",
+    "state": "open"
+   },
+   {
+    "author": "safwan5001-source",
+    "claim": null,
+    "files": [
+     "docs/audits/AWJ_ACCOUNTING_SETTINGS_PRODUCT_COMPLETENESS_AUDIT_2026-09.md"
+    ],
+    "files_complete": true,
+    "head_ref": "claude/accounting-settings-product-completeness-audit",
+    "head_repo": "safwan5001-source/Nebrax",
+    "horizon_id": null,
+    "last_activity_at": "2026-09-08T22:37:53Z",
+    "number": 704,
+    "observed_at": "2026-10-12T03:43:10Z",
+    "state": "open"
+   },
+   {
+    "author": "safwan5001-source",
+    "claim": null,
+    "files": [
+     "docs/plans/design/AWJ_DESIGN_SYSTEM_V2_BLUEPRINT.md",
+     "docs/plans/design/references/awj-v2-customer-master-desktop-mobile.jpeg",
+     "docs/plans/design/references/awj-v2-product-master-desktop-mobile.jpeg",
+     "docs/plans/design/references/awj-v2-sales-invoice-desktop.jpeg"
+    ],
+    "files_complete": true,
+    "head_ref": "claude/awj-v2-visual-references-62yiwn",
+    "head_repo": "safwan5001-source/Nebrax",
+    "horizon_id": null,
+    "last_activity_at": "2026-09-08T15:40:55Z",
+    "number": 703,
+    "observed_at": "2026-10-12T03:43:10Z",
+    "state": "open"
+   },
+   {
+    "author": "safwan5001-source",
+    "claim": null,
+    "files": [
+     "app/Services/Accounting/ZatcaSignedInvoiceQrCoordinator.php",
+     "app/Services/Accounting/ZatcaSignedInvoiceQrResult.php",
+     "tests/Feature/ZatcaSignedInvoiceQrCoordinatorTest.php"
+    ],
+    "files_complete": true,
+    "head_ref": "feat/zatca-signed-invoice-qr-coordinator",
+    "head_repo": "safwan5001-source/Nebrax",
+    "horizon_id": null,
+    "last_activity_at": "2026-08-30T14:12:47Z",
+    "number": 586,
+    "observed_at": "2026-10-12T03:43:10Z",
+    "state": "open"
+   },
+   {
+    "author": "safwan5001-source",
+    "claim": null,
+    "files": [
+     "Dockerfile",
+     "app/Console/Commands/DocumentReadinessCommand.php",
+     "deploy/document-worker.sh"
+    ],
+    "files_complete": true,
+    "head_ref": "fix/document-database-queue-readiness",
+    "head_repo": "safwan5001-source/Nebrax",
+    "horizon_id": null,
+    "last_activity_at": "2026-08-30T01:37:44Z",
+    "number": 578,
+    "observed_at": "2026-10-12T03:43:10Z",
+    "state": "open"
+   },
+   {
+    "author": "safwan5001-source",
+    "claim": null,
+    "files": [
+     ".github/workflows/ci.yml",
+     "AGENTS.md",
+     "CLAUDE.md",
+     "deploy/assemble.sh",
+     "setup.sh",
+     "tests/Feature/AccountingGuardTest.php"
+    ],
+    "files_complete": true,
+    "head_ref": "claude/ai-assistant-guidelines-9gxfjs",
+    "head_repo": "safwan5001-source/Nebrax",
+    "horizon_id": null,
+    "last_activity_at": "2026-08-14T23:31:52Z",
+    "number": 202,
+    "observed_at": "2026-10-12T03:43:10Z",
+    "state": "open"
+   }
+  ],
+  "pr": {
+   "additions": 286,
+   "author": "safwan5001-source",
+   "base_ref": "main",
+   "base_repo": "safwan5001-source/Nebrax",
+   "base_sha": "11abda97dd1d25782d27f06f0312a3d5abec57a2",
+   "body": "## المشكلتان (موثَّقتان في S6)\n- **F2:** زر «اختبار الاتصال» يمرّ عبر `settings()` الذي يعيد القرص المحلي ما دام القفل مغلقاً ⇒ نجاح مضلِّل لا يلمس R2.\n- **F3:** `document_files.storage_profile` ثابتة `platform` ⇒ إغلاق `DOCUMENT_DURABLE_STORAGE_ENABLED` بعد إنشاء مستندات على R2 يجعلها غير قابلة للقراءة مؤقتاً.\n\n## الحل (محدود، بلا migration ولا تغيير مخطط)\n- ثابت `PROFILE_DURABLE = 'platform-s3'`: ملفٌّ كُتب على التخزين الدائم المضبوط في تكامل المنصة **يُقرأ ويُحذف من هناك دائماً** بصرف النظر عن القفل. `profile()` (ملف الكتابة الجديدة) يعيده فقط حين يكون القفل مفتوحاً **و**التكامل مفعَّلاً؛ وإلا `platform` كالسابق.\n- `filesystem('platform-s3')` يُبنى من التكامل بمعزل عن القفل؛ تكامل غائب/معطّل ⇒ استثناء صريح، لا سقوط صامت إلى قرص محلي.\n- `healthCheck()`: تكامل مفعَّل ⇒ يُختبَر هو (R2)؛ بلا تكامل ⇒ السلوك القديم حرفياً.\n\n## التوافق الخلفي\nالصفوف القديمة (`platform`) تتبع القفل كما كانت؛ ملف جديد والقفل مغلق = `platform`؛ profile مجهول مرفوض كما كان. جدول الحالات الكامل في `AWJ-HORIZON-MEDIA-STORAGE-S7-IMPLEMENTATION-REPORT.md` §3. لم يُعدَّل أي اختبار قائم.\n\n## الاختبار\n- `DocumentStorageDurableProfileTest` (9): ملف الكتابة حسب القفل/التكامل · **مستند R2 يُقرأ ويُحذف بعد إغلاق القفل** · صف دائم بلا تكامل يفشل صراحة · صف قديم يتبع القفل · profile مجهول مرفوض · الزر يفحص التكامل لا المحلي · تكامل فاشل ⇒ فشل الزر · بلا تكامل السلوك كما كان.\n- محلياً: مجموعة `Document|PlatformIntegration|ProductMedia|StorefrontMedia|Retention` = **739 نجاح** وإخفاق بيئي واحد غير مرتبط (`StorefrontCommerceFirewallTest`: مجلد fixtures غير منسوخ في تجميعة `setup.sh`). المجموعة الكاملة لـS6 (نفس الأساس) = 6360 نجاح و42 إخفاقاً بيئياً (Fuel/بريد/fixtures)؛ CI هو المرجع.\n- لا قيود محاسبية. لا migration. لا علم يتغيّر. **لا تفعيل إنتاجي لمركز المستندات في هذا الـPR.**\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nhttps://claude.ai/code/session_01DPbZ26mZWyogUevXafYJzk\n\n---\n_Generated by [Claude Code](https://claude.ai/code/session_01DPbZ26mZWyogUevXafYJzk)_",
+   "changed_files": 3,
+   "claim": null,
+   "comments": [
+    {
+     "author": "chatgpt-codex-connector[bot]",
+     "body": "<!-- codex-pull-request-review-summary -->\n\n## Codex Review Summary\n\nThis comment shows the latest Codex review activity on this pull request.\n\n| Review | Status | Commit | Review trigger |\n| --- | --- | --- | --- |\n| 📝 **Code Review** | ✅ **Completed** <relative-time datetime=\"2026-10-12T02:42:46.372437Z\">2026-10-12T02:42:46.372437Z</relative-time> | `31bf4f3` | PR opened |\n\n\n\n<details> <summary>ℹ️ About Codex in GitHub</summary>\n<br/>\n\n[Your team has set up Codex to review pull requests in this repo](https://chatgpt.com/codex/cloud/settings/general). Reviews are triggered when you\n- Open a pull request for review\n- Mark a draft as ready\n- Comment \"@codex review\" or \"@codex security review\".\n\nCodex reacts with 👀 while any review is running, comments if it has suggestions, and reacts with 👍 once all reviews finish with no findings.\n\n</details>"
+    }
+   ],
+   "commits": [
+    {
+     "author": "claude",
+     "message": "feat(documents): durable rows stay readable after the lock closes; connection test checks the saved integration (S7, WIP)\n\nCo-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01DPbZ26mZWyogUevXafYJzk",
+     "sha": "2a4a65f1c21c530c7153a2c82d7660109d7e4d91"
+    },
+    {
+     "author": "claude",
+     "message": "feat(documents): S7 tests fix + implementation report\n\nCo-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01DPbZ26mZWyogUevXafYJzk",
+     "sha": "1aae91d4194ff44ca1665a60c48f69be823c76c4"
+    },
+    {
+     "author": "claude",
+     "message": "fix(documents): S7 — make profile() the durable-aware write profile (keeps existing intake mock test valid)\n\nCo-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01DPbZ26mZWyogUevXafYJzk",
+     "sha": "31bf4f3f8f5ddcb412f6a72f497a286b5760e6c9"
+    }
+   ],
+   "deletions": 1,
+   "draft": false,
+   "files": [
+    {
+     "additions": 42,
+     "deletions": 0,
+     "filename": "AWJ-HORIZON-MEDIA-STORAGE-S7-IMPLEMENTATION-REPORT.md",
+     "patch": null,
+     "previous_filename": null,
+     "status": "added"
+    },
+    {
+     "additions": 35,
+     "deletions": 1,
+     "filename": "app/Services/DocumentCenter/DocumentStorageService.php",
+     "patch": null,
+     "previous_filename": null,
+     "status": "modified"
+    },
+    {
+     "additions": 209,
+     "deletions": 0,
+     "filename": "tests/Feature/DocumentStorageDurableProfileTest.php",
+     "patch": null,
+     "previous_filename": null,
+     "status": "added"
+    }
+   ],
+   "head_pushed_at": "2026-10-12T02:40:47Z",
+   "head_ref": "horizon/media-storage-s7-documents-reads",
+   "head_repo": "safwan5001-source/Nebrax",
+   "head_sha": "31bf4f3f8f5ddcb412f6a72f497a286b5760e6c9",
+   "labels": [],
+   "merge_commit_sha": "40832b21ffe99ec193ec2e7732c79b987debcc8e",
+   "merged": true,
+   "number": 1350,
+   "reviews": [],
+   "state": "closed",
+   "title": "fix(documents): durable rows stay readable after the lock closes; connection test checks the saved integration (S7)"
+  },
+  "registry": {
+   "horizons": []
+  },
+  "required_checks": {
+   "always_names": [
+    "php artisan test (L11, pgsql)",
+    "php artisan test (L11, sqlite)"
+   ],
+   "gate_name": "CI Gate",
+   "grace_minutes_no_run": 10,
+   "path_names": [
+    "Docker runtime smoke",
+    "mobile (Android release build proof)",
+    "mobile (analyze + test)",
+    "mobile (iOS release build proof)",
+    "storefront (lint + typecheck + test)",
+    "web build (Next.js)"
+   ],
+   "source_ref": "main",
+   "source_sha": "40832b21ffe99ec193ec2e7732c79b987debcc8e"
+  },
+  "source": "github-readonly"
+ },
+ "mode": "live",
+ "now": "2026-10-12T03:43:10Z",
+ "request": {
+  "action": "merge",
+  "agent_id": "pilot-session",
+  "base_branch": "main",
+  "horizon_id": "MEDIA-STORAGE",
+  "pr_number": 1350,
+  "repository": "safwan5001-source/Nebrax",
+  "task_category": "isolated-bugfix",
+  "task_id": "S7"
+ },
+ "schema": "horizon-eval-case/1"
+}

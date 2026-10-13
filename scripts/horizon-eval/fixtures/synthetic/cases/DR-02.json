@@ -1,0 +1,39 @@
+{
+  "_extends": "../base_case_b.json",
+  "_synthetic_notice": "SYNTHETIC TEST FIXTURE - overlay on base_case(.b).json. Not real evidence, not a grant.",
+  "case_id": "DR-02",
+  "_expect": {
+    "decision": "WAIT",
+    "must_include": [
+      "INDEPENDENT_REVIEW_MISSING"
+    ]
+  },
+  "evidence": {
+    "attestations": [
+      {
+        "type": "PRE_MERGE_REVIEW",
+        "sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "by": "synthetic-agent-1",
+        "result": "PASS"
+      },
+      {
+        "type": "GUARDIAN",
+        "sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "by": "synthetic-guardian",
+        "result": "PASS"
+      },
+      {
+        "type": "REGRESSION_TEST",
+        "sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "by": "synthetic-agent-1",
+        "result": "PASS"
+      },
+      {
+        "type": "INDEPENDENT_REVIEW",
+        "sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "by": "synthetic-author",
+        "result": "PASS"
+      }
+    ]
+  }
+}

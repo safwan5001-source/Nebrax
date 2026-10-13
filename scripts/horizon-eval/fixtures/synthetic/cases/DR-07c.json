@@ -1,0 +1,30 @@
+{
+  "_extends": "../base_case.json",
+  "_synthetic_notice": "SYNTHETIC TEST FIXTURE - overlay on base_case(.b).json. Not real evidence, not a grant.",
+  "case_id": "DR-07c",
+  "_expect": {
+    "decision": "STOP_OWNER_DECISION",
+    "must_include": [
+      "UNREGISTERED_HORIZON_ACTIVE"
+    ]
+  },
+  "evidence": {
+    "other_prs": [
+      {
+        "number": 9103,
+        "state": "open",
+        "horizon_id": null,
+        "head_ref": "claude/misc-branch",
+        "observed_at": "2026-10-12T11:59:00Z",
+        "last_activity_at": "2026-10-12T11:45:00Z",
+        "files": [
+          "docs/guides/synthetic-a.md"
+        ],
+        "claim": null,
+        "files_complete": true,
+        "head_repo": "synthetic-owner/synthetic-repo",
+        "author": "unregistered-author"
+      }
+    ]
+  }
+}

@@ -30,6 +30,14 @@ export function commerceStorefrontPresentationVersionPath(
   return `${commerceStorefrontPresentationVersionsPath(storefrontId)}/${versionId}`;
 }
 
+/** CUST-H5-3/4 — سجلّ المراجعات المحفوظة لنسخة (قراءة فقط). */
+export function commerceStorefrontPresentationVersionRevisionsPath(
+  storefrontId: string,
+  versionId: string,
+): string {
+  return `${commerceStorefrontPresentationVersionPath(storefrontId, versionId)}/revisions`;
+}
+
 export function commerceStorefrontPresentationVersionPublishPath(
   storefrontId: string,
   versionId: string,
@@ -84,8 +92,34 @@ export type PresentationVersionSummary = {
   schedulingRuntimeActive: boolean;
 };
 
+/**
+ * CUST-H5-4 — مرجع وسائط في مستند تاريخي لم يعد صالحاً **اليوم** لهذا المستأجر (`media_missing` | `media_not_ready` |
+ * `derivative_not_ready` | `derivative_failed`). الخادم يعيد فحصه عند كل قراءة لقطة؛ لا يُصلَح ولا يُحذف المرجع صامتاً.
+ */
+export type PresentationMediaIssue = { path: string; code: string; message: string };
+
 export type PresentationVersionDetail = PresentationVersionSummary & {
   config: StorefrontPresentationConfig;
+  /** حاضر فقط حين أُنشئت النسخة من لقطة محفوظة (`source_revision_id`). */
+  mediaIssues?: PresentationMediaIssue[];
+};
+
+/** CUST-H5-3 — لقطة محفوظة (بيانات وصفية فقط؛ المستند بقراءتها المفردة). */
+export type PresentationVersionRevisionSummary = {
+  id: string;
+  versionId: string;
+  /** مراجعة النسخة وقت اللقطة — ليست عنواناً للتاجر (التسمية الأساسية الوقت). */
+  versionRevision: number;
+  schemaVersion: number;
+  sizeBytes: number;
+  createdAt: string | null;
+  /** مطابقة لمحتوى النسخة الآن. */
+  isCurrent: boolean;
+};
+
+export type PresentationVersionRevisionDetail = PresentationVersionRevisionSummary & {
+  config: StorefrontPresentationConfig;
+  mediaIssues: PresentationMediaIssue[];
 };
 
 /**
@@ -110,6 +144,14 @@ export type VersionReadOutcome =
 export type VersionWriteOutcome =
   | { ok: true; data: PresentationVersionDetail }
   | Failure<'not_found' | 'conflict' | 'validation' | 'unsupported_schema'>;
+
+export type VersionRevisionListOutcome =
+  | { ok: true; data: PresentationVersionRevisionSummary[] }
+  | Failure<'not_found'>;
+
+export type VersionRevisionReadOutcome =
+  | { ok: true; data: PresentationVersionRevisionDetail }
+  | Failure<'not_found' | 'unsupported_schema'>;
 
 export type VersionDeleteOutcome =
   | { ok: true }
@@ -174,10 +216,13 @@ export async function createPresentationVersion(
   storefrontId: string,
   name: string,
   sourceVersionId?: string | null,
+  /** CUST-H5-4 — لقطة محفوظة من `sourceVersionId` نفسها تُنشأ منها مسودة جديدة (لا تعديل في مكانها). */
+  sourceRevisionId?: string | null,
 ): Promise<VersionWriteOutcome> {
   try {
     const body: Record<string, unknown> = { name };
     if (sourceVersionId) body.source_version_id = sourceVersionId;
+    if (sourceRevisionId) body.source_revision_id = sourceRevisionId;
     const payload = await api<unknown>(commerceStorefrontPresentationVersionsPath(storefrontId), {
       method: 'POST',
       body,
@@ -201,6 +246,46 @@ export async function showPresentationVersion(
     return { ok: true, data };
   } catch (error) {
     return { ok: false, reason: classifyCreateOrReadFailure(error), message: errorMessage(error, 'load_failed') };
+  }
+}
+
+/** CUST-H5-3 — قائمة اللقطات المحفوظة لنسخة (الأحدث أولاً، بلا مستند). */
+export async function listPresentationVersionRevisions(
+  storefrontId: string,
+  versionId: string,
+): Promise<VersionRevisionListOutcome> {
+  try {
+    const payload = await api<unknown>(commerceStorefrontPresentationVersionRevisionsPath(storefrontId, versionId));
+    const data = mapRevisionList(payload);
+    if (data === null) return { ok: false, reason: 'failed', message: 'invalid_payload' };
+    return { ok: true, data };
+  } catch (error) {
+    return { ok: false, reason: classifyListFailure(error), message: errorMessage(error, 'revisions_failed') };
+  }
+}
+
+/** CUST-H5-3/4 — لقطة واحدة بمستندها المُطبَّع **ومشاكل الوسائط الحالية**. قراءة فقط: لا تغيّر النسخة ولا مراجعتها. */
+export async function showPresentationVersionRevision(
+  storefrontId: string,
+  versionId: string,
+  revisionId: string,
+): Promise<VersionRevisionReadOutcome> {
+  try {
+    const payload = await api<unknown>(
+      `${commerceStorefrontPresentationVersionRevisionsPath(storefrontId, versionId)}/${revisionId}`,
+    );
+    const data = mapRevisionDetail(payload);
+    if (data === null) return { ok: false, reason: 'failed', message: 'invalid_payload' };
+    return { ok: true, data };
+  } catch (error) {
+    const reason = hasApiStatus(error, 409)
+      ? 'unsupported_schema'
+      : hasApiStatus(error, 403)
+        ? 'forbidden'
+        : hasApiStatus(error, 404)
+          ? 'not_found'
+          : 'failed';
+    return { ok: false, reason, message: errorMessage(error, 'revision_failed') };
   }
 }
 
@@ -367,7 +452,68 @@ function mapDetail(payload: unknown): PresentationVersionDetail | null {
   if (summary === null || !data || typeof data !== 'object') return null;
   const row = data as Record<string, unknown>;
   if (!row.config || typeof row.config !== 'object' || Array.isArray(row.config)) return null;
-  return { ...summary, config: normalizePresentationConfig(row.config) };
+  const detail: PresentationVersionDetail = { ...summary, config: normalizePresentationConfig(row.config) };
+  // `media_issues` يأتي فقط عند الإنشاء من لقطة؛ أي شكل غير قائمة صالحة يُتجاهَل (لا يُرفض الصفّ كله).
+  const issues = mapMediaIssues(row.media_issues);
+  if (issues !== null) detail.mediaIssues = issues;
+  return detail;
+}
+
+function mapMediaIssues(value: unknown): PresentationMediaIssue[] | null {
+  if (!Array.isArray(value)) return null;
+  const issues: PresentationMediaIssue[] = [];
+  for (const item of value) {
+    if (!item || typeof item !== 'object') continue;
+    const record = item as Record<string, unknown>;
+    if (typeof record.path === 'string' && typeof record.code === 'string') {
+      issues.push({ path: record.path, code: record.code, message: typeof record.message === 'string' ? record.message : '' });
+    }
+  }
+  return issues;
+}
+
+function mapRevisionSummary(row: unknown): PresentationVersionRevisionSummary | null {
+  if (!row || typeof row !== 'object' || Array.isArray(row)) return null;
+  const record = row as Record<string, unknown>;
+  if (typeof record.id !== 'string' || record.id === '') return null;
+  if (typeof record.version_id !== 'string' || record.version_id === '') return null;
+  if (typeof record.version_revision !== 'number' || !Number.isFinite(record.version_revision)) return null;
+  return {
+    id: record.id,
+    versionId: record.version_id,
+    versionRevision: record.version_revision,
+    schemaVersion: typeof record.schema_version === 'number' ? record.schema_version : 1,
+    sizeBytes: typeof record.size_bytes === 'number' ? record.size_bytes : 0,
+    createdAt: typeof record.created_at === 'string' ? record.created_at : null,
+    // فشلٌ نحو الأكثر تحفظاً: غير مؤكَّد = ليس الحالي (فيُعرَض قابلاً للاسترداد لا محجوباً بخطأ).
+    isCurrent: record.is_current === true,
+  };
+}
+
+function mapRevisionList(payload: unknown): PresentationVersionRevisionSummary[] | null {
+  if (!payload || typeof payload !== 'object') return null;
+  const data = (payload as { data?: unknown }).data;
+  if (!Array.isArray(data)) return null;
+  const rows: PresentationVersionRevisionSummary[] = [];
+  for (const row of data) {
+    const summary = mapRevisionSummary(row);
+    if (summary === null) return null;
+    rows.push(summary);
+  }
+  return rows;
+}
+
+function mapRevisionDetail(payload: unknown): PresentationVersionRevisionDetail | null {
+  if (!payload || typeof payload !== 'object') return null;
+  const data = (payload as { data?: unknown }).data;
+  const summary = mapRevisionSummary(data);
+  if (summary === null || !data || typeof data !== 'object') return null;
+  const row = data as Record<string, unknown>;
+  if (!row.config || typeof row.config !== 'object' || Array.isArray(row.config)) return null;
+  // فشلٌ مغلق: القائمة الصالحة (حتى الفارغة) وحدها تعني «الوسائط سليمة». حقلٌ مفقود/مشوَّه يُسقط القراءة كلها بدل أن يُقرأ سليماً.
+  const mediaIssues = mapMediaIssues(row.media_issues);
+  if (mediaIssues === null) return null;
+  return { ...summary, config: normalizePresentationConfig(row.config), mediaIssues };
 }
 
 function mapSummary(row: unknown): PresentationVersionSummary | null {
