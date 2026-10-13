@@ -21,6 +21,7 @@ use Illuminate\Auth\AuthenticationException;
 use Illuminate\Auth\Middleware\Authenticate;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Contracts\Debug\ExceptionHandler;
+use Illuminate\Contracts\Http\Kernel as HttpKernel;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Foundation\Exceptions\Handler;
 use Illuminate\Http\Request;
@@ -259,8 +260,18 @@ class TenancyServiceProvider extends ServiceProvider
             ? null
             : route('login');
 
-        Authenticate::redirectUsing($guestRedirect);
-        AuthenticationException::redirectUsing($guestRedirect);
+        $applyRedirect = static function () use ($guestRedirect): void {
+            Authenticate::redirectUsing($guestRedirect);
+            AuthenticationException::redirectUsing($guestRedirect);
+        };
+
+        $applyRedirect();
+
+        // حلّ HttpKernel يُنفّذ withMiddleware فيعيد تثبيت الافتراضي route('login')؛
+        // نُعيد التطبيق بعده ليسود الإصلاح أياً كان ترتيب الحلّ (اختبارات/إنتاج).
+        $this->app->afterResolving(HttpKernel::class, static function () use ($applyRedirect): void {
+            $applyRedirect();
+        });
 
         $configure = static function (Handler $handler): void {
             $handler->shouldRenderJsonWhen(
