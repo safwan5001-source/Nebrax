@@ -56,6 +56,15 @@ describe('readManualStatuses (step A)', () => {
     expect(readManualStatuses({ data: [{ platform_key: 'keeta', is_active: true }, { platform_key: 'keeta', is_active: false }] })?.get('keeta')).toBe('set');
   });
 
+  it('a row without a string platform_key makes either read unreadable; well-formed unknown string keys are still ignored', () => {
+    for (const platform_key of [undefined, null, 7, {}]) {
+      expect(readManualStatuses({ data: [{ platform_key, is_active: true }] })).toBeNull();
+      expect(readReadinessRows({ data: [...TODAY, { platform_key, ux_state: 'NOT_SUPPORTED', connect_enabled: false, sync_enabled: false }] })).toBeNull();
+    }
+    expect(readManualStatuses({ data: [{ is_active: true }] })).toBeNull();
+    expect(readManualStatuses({ data: [{ platform_key: 'talabat', is_active: true }] })?.size).toBe(0);
+  });
+
   it('a non-object entry makes the read unreadable, never an empty list', () => {
     expect(readManualStatuses({ data: [null] })).toBeNull();
     expect(readManualStatuses({ data: ['keeta'] })).toBeNull();
