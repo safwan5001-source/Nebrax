@@ -339,7 +339,16 @@ class FailClosed(unittest.TestCase):
         def required_missing(e):
             e["checks"] = [c for c in e["checks"] if c["name"] != "php artisan test (L11, pgsql)"]
 
-        for name, mutate in (("non-gate check failed", failing_extra), ("draft", lambda e: e["pr"].update(draft=True)),
+        def manifest_drops_pgsql(e):
+            e["required_checks"]["always_names"] = ["php artisan test (L11, sqlite)"]
+            e["checks"] = [c for c in e["checks"] if c["name"] != "php artisan test (L11, pgsql)"]
+
+        def touched_web_without_web_build(e):
+            e["pr"]["files"][0].update(filename="web/src/components/x.tsx", patch="@@ -0,0 +1 @@\n+<div>x</div>")
+
+        for name, mutate in (("manifest dropped a floor check with its run", manifest_drops_pgsql),
+                             ("web touched, web build absent", touched_web_without_web_build),
+                             ("non-gate check failed", failing_extra), ("draft", lambda e: e["pr"].update(draft=True)),
                              ("required check absent", required_missing), ("merged", lambda e: e["pr"].update(merged=True, merge_commit_sha="e" * 40))):
             c = green()
             mutate(c["evidence"])
@@ -347,6 +356,11 @@ class FailClosed(unittest.TestCase):
                 rep = obs(c)
             self.assertEqual(rep["recommendation"], "BLOCK", name)
             self.assertIn("SHADOW_READY_PRECONDITION_FAILED", codes(rep), name)
+
+    def test_report_carries_the_real_policy_hash(self):
+        rep = obs(green())
+        self.assertEqual(rep["observation"]["policy_sha256"], he.load_policy()[1])
+        self.assertNotEqual(rep["observation"]["policy_sha256"], "inline")
 
     def test_authorization_codes_never_include_a_safety_signal(self):
         """The carve-out list is the only way a blocker can stop counting: keep it free of anything about CI, state, scope or safety."""

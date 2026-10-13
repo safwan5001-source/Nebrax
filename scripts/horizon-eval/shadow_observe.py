@@ -136,7 +136,7 @@ def _recommend(deciding: list[dict], zone: str) -> tuple[str, list[str]]:
     return "READY_FOR_MANUAL_REVIEW", []
 
 
-def _facts_support_ready(case: dict, ci: dict) -> bool:
+def _facts_support_ready(case: dict, ci: dict, policy: dict) -> bool:
     """READY re-check straight from the evidence, independent of whatever reasons the evaluator did or did not emit:
     PR open/not draft/not merged, the gate and every required always-tier check present on the head, and EVERY observed check green."""
     ev = case["evidence"]
@@ -146,8 +146,14 @@ def _facts_support_ready(case: dict, ci: dict) -> bool:
     if not ci["checks"] or any(c["status"] != "completed" or c["conclusion"] != "success" for c in ci["checks"]):
         return False
     names = {c["name"] for c in ci["checks"]}
-    rc = ev["required_checks"]
-    return {rc["gate_name"], *rc["always_names"]} <= names
+    rc, floor = ev["required_checks"], policy["ci_floor"]
+    # the TRUSTED floor (policy), not only the observed manifest: a manifest that dropped a check must not shrink what READY demands
+    required = {rc["gate_name"], floor["gate_name"], *rc["always_names"], *floor["always"]}
+    touched = [f["filename"] for f in pr["files"]] + [f["previous_filename"] for f in pr["files"] if f.get("previous_filename")]
+    for pattern, name in floor.get("required_when_touched", {}).items():
+        if any(he.any_match([pattern], t) for t in touched):
+            required.add(name)
+    return required <= names
 
 
 def _hard_deny_hits(record: dict, policy: dict) -> list[str]:
@@ -227,7 +233,8 @@ def _observe(case, wall_clock, replay, policy) -> dict:
         extra.append({"severity": "BLOCK", "code": "SHADOW_HORIZON_ID_COLLISION", "detail": "registry contains the reserved shadow id"})
     pol = policy if policy is not None else he.load_policy()[0]
     # allow_synthetic is hard-wired False: shadow mode only ever sees real evidence
-    record = he.evaluate(case, allow_synthetic=False, policy=pol, wall_clock=None if replay else wall_clock)
+    # default path: let the evaluator load the policy itself so the record carries its real SHA (an explicit policy is labelled "inline")
+    record = he.evaluate(case, allow_synthetic=False, policy=policy, wall_clock=None if replay else wall_clock)
 
     pr = record.get("pr", {})
     hits = _hard_deny_hits(record, pol)
@@ -246,7 +253,7 @@ def _observe(case, wall_clock, replay, policy) -> dict:
               and record.get("would_merge") is False and record.get("decision") != "ELIGIBLE_SIMULATED"
               and zone in ("A", "B") and not hits and not replay and not record.get("injection_flags")
               and pr.get("head_sha_reviewed") is not None and all(v == 0 for v in record.get("tool_calls", {}).values())
-              and _facts_support_ready(case, ci))
+              and _facts_support_ready(case, ci, pol))
         if not ok:
             code = "SHADOW_CI_GATE_NOT_CONFIRMED" if ci["ci_gate"]["conclusion"] != "success" else "SHADOW_READY_PRECONDITION_FAILED"
             all_reasons.append({"severity": "BLOCK", "code": code, "detail": "READY preconditions re-check failed"})
