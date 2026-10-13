@@ -13,6 +13,7 @@ use App\Services\DocumentCenter\DocumentFileIntakeService;
 use App\Services\DocumentCenter\DocumentStorageService;
 use App\Support\DocumentScanStatus;
 use App\Tenancy\BranchContext;
+use App\Support\EdgeScheme;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\URL;
@@ -60,11 +61,13 @@ class DocumentIntakeController extends Controller
         $minutes = max(1, min(15, (int) config('document_center.intake.download_url_minutes', 5)));
 
         return response()->json([
-            'url' => URL::temporarySignedRoute(
+            // خلف حافة TLS يرى الخادم الطلب http فيُولَّد الرابط http:// (AWJ-HORIZON-MEDIA-STORAGE O-1/O-4).
+            // المخطّط يُبدَّل بعد التوقيع فقط فيبقى التحقق على ما يراه التطبيق.
+            'url' => EdgeScheme::forBrowser(URL::temporarySignedRoute(
                 'document-files.download',
                 now('UTC')->addMinutes($minutes),
                 ['file' => $file->id],
-            ),
+            )),
             'expires_at' => now('UTC')->addMinutes($minutes)->toIso8601String(),
         ]);
     }
