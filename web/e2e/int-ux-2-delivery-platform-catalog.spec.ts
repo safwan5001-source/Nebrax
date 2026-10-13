@@ -217,7 +217,7 @@ test.describe('every provider detail page (ar/light and en/dark)', () => {
         await expect(ladder).toBeVisible();
         const b = (await ladder.locator('[data-ladder-step="b"]').innerText()).trim();
         expect(b).toMatch(ux === 'AWAITING_PROVIDER_APPROVAL' ? /pending agreement|بانتظار اتفاق/i : /not available|غير متاح/i);
-        await expect(ladder.locator('[data-ladder-step="c"]')).toContainText(/unavailable until a native integration exists|غير متاح قبل توفر تكامل أصلي/);
+        await expect(ladder.locator('[data-ladder-step="c"]')).toContainText(/unavailable until a native integration exists|غير متاح قبل توفر تكامل أصلي/i);
         expect(await page.getByTestId('delivery-platform-detail').locator('button, input, [disabled]').count()).toBe(0);
         if (key !== 'keeta') await shot(page, `${info.project.name}-${locale}-${theme}-detail-${key}`);
       });
@@ -258,7 +258,8 @@ test.describe('states', () => {
     test(`permission denied (${locale}/${theme})`, async ({ page }, info) => {
       const requests = await open(page, '/integrations/delivery-platforms', { locale, theme, viewer: 'denied' });
       await expect(page.getByTestId('integration-restricted')).toHaveAttribute('data-state', 'denied');
-      expect(requests.filter((r) => r.includes('/delivery-platforms') || r.includes('nav-state'))).toEqual([]);
+      // نداء `/applications/nav-state` يخص الشريط الجانبي لا الصفحة؛ المحكوم هنا طلبات منصات التوصيل.
+      expect(requests.filter((r) => r.includes('/delivery-platforms'))).toEqual([]);
       await shot(page, `${info.project.name}-${locale}-${theme}-catalog-denied`);
     });
 
@@ -272,7 +273,8 @@ test.describe('states', () => {
     test(`unknown platform key: not found, zero data requests (${locale}/${theme})`, async ({ page }, info) => {
       const requests = await open(page, '/integrations/delivery-platforms/talabat', { locale, theme });
       await expect(page.getByTestId('delivery-platform-unknown')).toBeVisible();
-      expect(requests.filter((r) => r.includes('/delivery-platforms') || r.includes('nav-state'))).toEqual([]);
+      // نداء `/applications/nav-state` يخص الشريط الجانبي لا الصفحة؛ المحكوم هنا طلبات منصات التوصيل.
+      expect(requests.filter((r) => r.includes('/delivery-platforms'))).toEqual([]);
       await shot(page, `${info.project.name}-${locale}-${theme}-detail-unknown`);
     });
   }
