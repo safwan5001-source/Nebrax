@@ -112,6 +112,11 @@ export function deliverySummary(profiles: unknown, readiness: unknown): Delivery
 // ولا تُعامَل أبداً كنجاح ولا كـ«لا يوجد»: الفشل المغلق هو القاعدة.
 // ─────────────────────────────────────────────────────────────────────────────
 
+/**
+ * إعداد ملف منصة الإسناد اليدوي (إنشاء/تعديل) يتطلب `company.manage` على الخادم (`POST/PUT /delivery-platforms`).
+ * القراءة وحدها `invoices.view`، فمن لا يملك هذه الصلاحية لا يُعرض عليه رابط إعداد لا يستطيع إكماله.
+ */
+export const PROFILE_MANAGE_PERMISSION = 'company.manage';
 export const HUB_VIEW_PERMISSION = 'delivery_hub.view';
 export const DELIVERY_REPORT_PERMISSION = 'reports.view';
 export const DELIVERY_CONNECTOR_VIEW_PERMISSION = 'delivery_connector.view';

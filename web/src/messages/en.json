@@ -10148,6 +10148,7 @@
       "worksTitle": "What works today in AWJ",
       "worksPos": "Record the platform on POS delivery sales.",
       "worksPosLink": "Set up manual attribution",
+      "setupNeedsPermission": "Setting it up needs permission to manage company settings.",
       "worksHub": "Enter and manage delivery orders manually.",
       "worksHubLink": "Delivery Hub",
       "worksReport": "See delivery-channel sales.",
