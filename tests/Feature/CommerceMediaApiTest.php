@@ -332,4 +332,35 @@ class CommerceMediaApiTest extends TestCase
         $this->assertStringNotContainsString('"disk"', $encoded);
         $this->assertStringNotContainsString('"path"', $encoded);
     }
+
+    // ── S15 (AWJ-HORIZON-MEDIA-STORAGE): O-3 nosniff · O-1 https للجوال خلف الحافة ──
+
+    /** @test */
+    public function the_media_route_sends_nosniff_and_keeps_the_stored_content_type(): void
+    {
+        Storage::fake('local');
+        $store = $this->seedMobileStore('s15-nosniff');
+        $product = $this->publishedProduct($store['tenant'], $store['channel']);
+        $media = $this->attachMedia($store['tenant'], $product);
+
+        $this->get("/commerce/v1/media/{$media->id}", $this->bearer($store['token']))
+            ->assertOk()
+            ->assertHeader('Content-Type', 'image/webp')
+            ->assertHeader('X-Content-Type-Options', 'nosniff');
+    }
+
+    /** @test */
+    public function mobile_media_urls_are_https_behind_the_edge_and_unchanged_otherwise(): void
+    {
+        Storage::fake('local');
+        $store = $this->seedMobileStore('s15-https');
+        $product = $this->publishedProduct($store['tenant'], $store['channel']);
+        $this->attachMedia($store['tenant'], $product);
+
+        $plain = $this->getJson("/commerce/v1/products/{$product->id}", $this->bearer($store['token']))->assertOk()->json('data.media.0.url');
+        $this->assertStringStartsWith('http://', $plain);
+
+        $edge = $this->getJson("/commerce/v1/products/{$product->id}", $this->bearer($store['token']) + ['X-Forwarded-Proto' => 'https'])->assertOk()->json('data.media.0.url');
+        $this->assertStringStartsWith('https://', $edge);
+    }
 }

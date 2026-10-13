@@ -686,6 +686,7 @@ class ProductController extends ApiController
                 fclose($stream);
             }, $downloadName, [
                 'Content-Type' => $mimeType ?? 'application/octet-stream',
+                'X-Content-Type-Options' => 'nosniff',
             ]);
         }
 
@@ -700,6 +701,7 @@ class ProductController extends ApiController
                 echo (string) $body;
             }, $downloadName, [
                 'Content-Type' => $mimeType ?? 'application/octet-stream',
+                'X-Content-Type-Options' => 'nosniff',
             ]);
         }
 
@@ -711,6 +713,7 @@ class ProductController extends ApiController
 
         return $disk->download($path, $downloadName, [
             'Content-Type' => $mimeType ?? 'application/octet-stream',
+            'X-Content-Type-Options' => 'nosniff',
         ]);
     }
 

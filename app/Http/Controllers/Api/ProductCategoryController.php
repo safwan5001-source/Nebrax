@@ -194,6 +194,7 @@ class ProductCategoryController extends ApiController
 
         $headers = [
             'Content-Type' => $category->image_mime_type ?: 'application/octet-stream',
+            'X-Content-Type-Options' => 'nosniff',
         ];
 
         if (ProductCategory::isR2ImagePath($category->image_path)) {

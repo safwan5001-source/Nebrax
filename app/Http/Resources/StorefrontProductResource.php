@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources;
 
+use App\Support\EdgeScheme;
 use App\Models\Product;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -217,7 +218,7 @@ class StorefrontProductResource extends JsonResource
     public static function buildCommerceMediaUrl(string $mediaId): string
     {
         return RouteFacade::has('commerce.v1.media.show')
-            ? route('commerce.v1.media.show', ['id' => $mediaId])
+            ? EdgeScheme::forBrowser(route('commerce.v1.media.show', ['id' => $mediaId]))
             : "/commerce/v1/media/{$mediaId}";
     }
 
@@ -246,11 +247,13 @@ class StorefrontProductResource extends JsonResource
      */
     public static function buildWorkspaceMediaUrl(string $mediaId, string $storefrontId): string
     {
-        return URL::temporarySignedRoute(
+        // خلف حافة TLS يرى الخادم الطلب http فيُولَّد الرابط http:// فيحجبه المتصفح في صفحة https (O-1).
+        // المخطّط يُبدَّل بعد التوقيع فقط، فيبقى التحقق على ما يراه التطبيق ولا ينكسر التوقيع.
+        return EdgeScheme::forBrowser(URL::temporarySignedRoute(
             'commerce.workspace.media.show',
             now()->addMinutes(20),
             ['id' => $storefrontId, 'media' => $mediaId],
-        );
+        ));
     }
 
     /**

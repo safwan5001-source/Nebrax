@@ -137,4 +137,23 @@ class ProductMediaR2ReadTest extends TestCase
         $this->withToken($attacker['token'])->get("/api/products/{$product->id}/media/{$media->id}/download")
             ->assertStatus(404);
     }
+
+    /** @test */
+    public function erp_product_media_download_sends_nosniff_and_keeps_the_stored_content_type(): void
+    {
+        Storage::fake('local');
+        $client = $this->mockR2();
+        $auth = $this->registerTenant('s15-nosniff');
+        $product = Product::findOrFail($this->product($auth['token'])['id']);
+
+        $legacy = $this->attachDocumentMedia($product);
+        $r2 = $this->attachR2Media($product, $client);
+
+        foreach ([$legacy, $r2] as $media) {
+            $this->withToken($auth['token'])->get("/api/products/{$product->id}/media/{$media->id}/download")
+                ->assertOk()
+                ->assertHeader('Content-Type', 'image/webp')
+                ->assertHeader('X-Content-Type-Options', 'nosniff');
+        }
+    }
 }

@@ -144,4 +144,24 @@ class CategoryMediaR2Test extends TestCase
         $this->assertNull($category->image_path);
         $this->assertNull($category->image_original_name);
     }
+
+    /** @test */
+    public function category_image_download_sends_nosniff_and_keeps_the_stored_content_type(): void
+    {
+        config()->set('category_media.r2.enabled', false);
+        config()->set('document_center.storage.driver', 'local');
+        config()->set('document_center.storage.disk', 'local');
+        Storage::fake('local');
+
+        $auth = $this->registerTenant('category-s15-nosniff');
+        $category = $this->withToken($auth['token'])->postJson('/api/product-categories', [
+            'name' => 'تصنيف',
+            'image' => UploadedFile::fake()->image('c.png'),
+        ])->assertCreated()['data'];
+
+        $this->withToken($auth['token'])->get("/api/product-categories?image_id={$category['id']}")
+            ->assertOk()
+            ->assertHeader('Content-Type', 'image/png')
+            ->assertHeader('X-Content-Type-Options', 'nosniff');
+    }
 }
