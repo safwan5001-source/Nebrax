@@ -10172,6 +10172,40 @@
       "unknownTitle": "Unknown platform",
       "unknownBody": "There is no delivery platform with this identifier in AWJ.",
       "backToCatalog": "Back to delivery platforms"
+    },
+    "ingressPanel": {
+      "title": "Signed event ingress points",
+      "intro": "Signed event ingress points configured inside AWJ for {platform}. Having one does not indicate a connection to the platform, a linked merchant account, or order synchronization.",
+      "loading": "Loading ingress points",
+      "error": "Ingress points could not be read. This does not mean there are none.",
+      "forbidden": "Ingress points cannot be shown right now: your account lacks the permission, or the POS capability is unavailable. This does not mean there are none.",
+      "empty": {
+        "title": "No signed ingress points are visible to you for {platform}.",
+        "body": "There may be points outside the scope of your branches. This does not change the platform's status or manual attribution."
+      },
+      "caption": "Signed event ingress points for the platform",
+      "columns": {
+        "storeId": "Platform store ID",
+        "branch": "Routed to branch",
+        "status": "Ingress point status",
+        "version": "Signing key version",
+        "created": "Created"
+      },
+      "status": {
+        "configured": "Configured",
+        "disabled": "Disabled"
+      },
+      "branch": {
+        "routed": "Routed to a branch",
+        "unrouted": "Not routed to a branch",
+        "unavailable": "Not available"
+      },
+      "disabledOn": "Disabled on {date}",
+      "unknownDate": "—",
+      "statusNote": "An ingress point's status (configured or disabled) concerns AWJ only. It is not platform readiness or the native integration status shown above.",
+      "branchNote": "An ingress point may be routed to an AWJ branch. That does not map the platform's store to a branch.",
+      "scopeNote": "Points are shown within the scope of your branches only. This panel is read-only.",
+      "retry": "Try again"
     }
   }
 }

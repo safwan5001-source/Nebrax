@@ -23,6 +23,7 @@ const sources = [
   ...walk(join(SRC, 'components/integrations')),
   ...walk(join(SRC, 'app/(app)/integrations')),
   join(SRC, 'lib/integration-center.ts'),
+  join(SRC, 'lib/signed-ingress.ts'),
 ].filter((path) => !isTest(path) && /\.(ts|tsx)$/.test(path));
 
 const files = sources.map((path) => ({ path: relative(SRC, path), code: readFileSync(path, 'utf8') }));
@@ -32,6 +33,9 @@ describe('integration center module sources', () => {
     const names = files.map((f) => f.path);
     expect(names).toEqual(expect.arrayContaining([
       'lib/integration-center.ts',
+      'lib/signed-ingress.ts',
+      'components/integrations/signed-ingress-panel.tsx',
+      'components/integrations/use-signed-ingress.ts',
       'components/integrations/integration-center-landing.tsx',
       'components/integrations/delivery-platform-catalog.tsx',
       'components/integrations/delivery-platform-detail.tsx',
@@ -65,18 +69,38 @@ describe('integration center module sources', () => {
   });
 
   it('never calls the backend with a write method or a connector/credential route', () => {
+    // INT-UX-4: القراءة الحرفية `GET '/delivery-connectors'` (بلا لاحقة) مسموحة في خطّاف اللوحة وحده؛ كل ما عداها ممنوع.
     for (const { path, code } of files) {
       expect(code, path).not.toMatch(/method\s*:\s*['"`](POST|PUT|PATCH|DELETE)/i);
-      expect(code, path).not.toMatch(/delivery-connectors|rotate-secret|\/disable|\/reassign|oauth|authoriz|credential|\/connect\b|\/sync\b/i);
+      const live = code.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+      const scrubbed = path === 'components/integrations/use-signed-ingress.ts' ? live.replace(/api<unknown>\('\/delivery-connectors'\)/g, 'api<unknown>(READ)') : live;
+      expect(scrubbed, path).not.toMatch(/delivery-connectors|rotate-secret|\/disable|\/reassign|oauth|authoriz|credential|\/connect\b|\/sync\b/i);
     }
   });
 
-  it('only reads the three existing endpoints', () => {
+  it('only reads the four existing endpoints, all by GET with no options argument', () => {
     const called = new Set<string>();
-    for (const { code } of files) {
-      for (const match of code.matchAll(/api(?:<[^>]*>)?\(\s*['"`]([^'"`]+)['"`]/g)) called.add(match[1]);
+    for (const { path, code } of files) {
+      for (const match of code.matchAll(/api(?:<[^>]*>)?\(\s*(['"`])([^'"`]+)\1\s*([,)])/g)) {
+        called.add(match[2]);
+        expect(match[3], `${path}: ${match[2]} must be a plain GET (no options)`).toBe(')');
+      }
     }
-    expect([...called].sort()).toEqual(['/applications/nav-state', '/delivery-platforms', '/delivery-platforms/readiness']);
+    expect([...called].sort()).toEqual(['/applications/nav-state', '/branches', '/delivery-connectors', '/delivery-platforms', '/delivery-platforms/readiness']);
+  });
+
+  it('reads delivery-connectors and branches only from the signed ingress hook', () => {
+    for (const { path, code } of files) {
+      const touches = /['"`]\/(delivery-connectors|branches)['"`]/.test(code);
+      expect(touches, path).toBe(path === 'components/integrations/use-signed-ingress.ts');
+    }
+  });
+
+  it('never reads a secret-bearing field from the connector payload (comments excluded)', () => {
+    for (const { path, code } of files) {
+      const live = code.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+      expect(live, path).not.toMatch(/secret_prefix|\bsecretPrefix\b|signing_key|\.secret\b|\btoken\b|authorization/i);
+    }
   });
 
   it('links only to allow-listed destinations', () => {

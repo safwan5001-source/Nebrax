@@ -34,6 +34,8 @@ export interface DeliveryIntegrationData {
   canViewReport: boolean;
   /** يرسل الخادم الحقول الداخلية لمن يملك `delivery_connector.view` وحده؛ الواجهة تعرض ما وصلها فقط. */
   canViewEvidence: boolean;
+  /** يزيد مع كل إعادة محاولة؛ تستعمله القراءات الإضافية (لوحة نقاط الاستقبال) لتعيد نفسها معها. */
+  attempt: number;
   retry: () => void;
 }
 
@@ -119,6 +121,7 @@ export function useDeliveryIntegrationData(enabled = true): DeliveryIntegrationD
     canViewHub: perms.hub,
     canViewReport: perms.report,
     canViewEvidence: perms.evidence,
+    attempt,
     retry,
   };
 }
