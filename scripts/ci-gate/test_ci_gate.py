@@ -17,6 +17,7 @@ M = g.load_manifest()
 DOCS = {c["workflow"]: g.load_yaml(g.ROOT / c["workflow"]) for c in M["checks"]}
 PHP = ["php artisan test (L11, sqlite)", "php artisan test (L11, pgsql)"]
 HORIZON = "Horizon dry-run evaluator (tests)"  # AWJ-HORIZON-V2-1D: tier=always, like the PHP suites
+HZ_WF = ".github/workflows/horizon-eval-ci.yml"
 ALWAYS = PHP + [HORIZON]
 GREEN = {n: "success" for n in ALWAYS}
 _id = iter(range(1, 10_000))
@@ -240,6 +241,19 @@ class Validation(unittest.TestCase):
         errs = g.validate(d)[0]
         self.assertTrue(any("paths-ignore" in e for e in errs), errs)
 
+    def test_duplicate_producer_of_a_required_check_name_is_an_error(self):
+        d = self._sandbox()
+        (d / ".github" / "workflows" / "impostor.yml").write_text(
+            "name: Impostor\non:\n  pull_request:\njobs:\n  fake:\n    name: Horizon dry-run evaluator (tests)\n    runs-on: ubuntu-latest\n    steps:\n      - run: 'true'\n")
+        errs, _ = g.validate(d)
+        self.assertTrue(any("more than one PR-triggered job" in e and HORIZON in e for e in errs), errs)
+        # also inside the declared workflow itself
+        d = self._sandbox()
+        p = d / ".github" / "workflows" / "horizon-eval-ci.yml"
+        p.write_text(p.read_text(encoding="utf-8") + "  second:\n    name: Horizon dry-run evaluator (tests)\n    runs-on: ubuntu-latest\n    steps:\n      - run: 'true'\n", encoding="utf-8")
+        errs, _ = g.validate(d)
+        self.assertTrue(any("more than one PR-triggered job" in e for e in errs), errs)
+
     def test_new_unclassified_workflow_is_flagged(self):
         d = self._sandbox()
         (d / ".github" / "workflows" / "new.yml").write_text(
@@ -291,6 +305,34 @@ class Binding(unittest.TestCase):
         bound, mine = g.bind_check_runs(raw, wf, SHA)
         exp = g.expected_checks(M, DOCS, ["docs/a.md"])
         self.assertEqual(g.evaluate(M, exp, bound, mine, 60, 4200)[0], "fail")
+
+    def test_impostor_check_from_another_workflow_does_not_satisfy_a_required_check(self):
+        """Codex P1: a PR-triggered job in ANOTHER workflow named like a required check (same github-actions app)
+        must not count; only the suite of the manifest-declared workflow does."""
+        wf = [wfr(self.CI, 2), wfr(HZ_WF, 4)]
+        raw = [scr(PHP[0], 2, 20), scr(PHP[1], 2, 21),
+               scr(HORIZON, 2, 90),                       # impostor: same name, reported by the PHP workflow's suite
+               scr(HORIZON, 4, 40, conclusion="failure")]  # the real evaluator job failed
+        bound, mine = g.bind_check_runs(raw, wf, SHA)
+        kept = g.restrict_to_declared_workflows(M, bound, mine)
+        self.assertEqual({r["id"] for r in kept if r["name"] == HORIZON}, {40})
+        exp = g.expected_checks(M, DOCS, ["docs/a.md"])
+        self.assertEqual(g.evaluate(M, exp, kept, mine, 60, 4200)[0], "fail")
+
+    def test_impostor_alone_never_reports_the_required_check(self):
+        wf = [wfr(self.CI, 2)]  # the Horizon workflow never ran
+        raw = [scr(PHP[0], 2, 20), scr(PHP[1], 2, 21), scr(HORIZON, 2, 90)]
+        bound, mine = g.bind_check_runs(raw, wf, SHA)
+        kept = g.restrict_to_declared_workflows(M, bound, mine)
+        self.assertNotIn(HORIZON, {r["name"] for r in kept})
+        exp = g.expected_checks(M, DOCS, ["docs/a.md"])
+        self.assertEqual(g.evaluate(M, exp, kept, mine, 4200, 4200)[0], "fail")
+
+    def test_unknown_suite_is_dropped_and_unlisted_names_pass_through(self):
+        wf = [wfr(self.CI, 2)]
+        stray = scr(PHP[0], 99, 5)
+        other = scr("some unlisted job", 2, 6)
+        self.assertEqual(g.restrict_to_declared_workflows(M, [stray, other], wf), [other])
 
     def test_runs_of_other_sha_are_ignored(self):
         wf = [wfr(self.CI, 7, sha="b" * 40)]
@@ -410,6 +452,8 @@ class FakeApi:
     """Scripted GitHub: one PR (docs-only diff) whose PR-event run reports `results`."""
     head = SHA
 
+    impostor = False  # a green job named like the Horizon check, reported by the PHP workflow's suite
+
     def __init__(self, results, head=None):
         self.results, self.head_now = results, head or SHA
 
@@ -422,16 +466,20 @@ class FakeApi:
             return [{"filename": "docs/a.md"}]
         if path == "actions/runs":
             return [wfr(".github/workflows/ci.yml", 1, event="push"),
-                    wfr(".github/workflows/ci.yml", 2, status="completed", conclusion="success")]
+                    wfr(".github/workflows/ci.yml", 2, status="completed", conclusion="success"),
+                    wfr(HZ_WF, 3, event="push"),
+                    wfr(HZ_WF, 4, status="completed", conclusion="success")]
         if path == f"commits/{SHA}/check-runs":
-            return ([scr(PHP[0], 1, 1), scr(PHP[1], 1, 2), scr(HORIZON, 1, 3)] +  # push-event twins, always green
-                    [scr(n, 2, 10 + i, conclusion=c) for i, (n, c) in enumerate(self.results.items())])
+            return ([scr(PHP[0], 1, 1), scr(PHP[1], 1, 2), scr(HORIZON, 3, 3)] +  # push-event twins, always green
+                    [scr(n, 4 if n == HORIZON else 2, 10 + i, conclusion=c) for i, (n, c) in enumerate(self.results.items())] +
+                    ([scr(HORIZON, 2, 99)] if self.impostor else []))
         raise AssertionError(path)
 
 
 class EndToEnd(unittest.TestCase):
-    def _run(self, results, head=None, timeout=1):
+    def _run(self, results, head=None, timeout=1, impostor=False):
         orig = g.Api
+        FakeApi.impostor = impostor
         g.Api = lambda repo, token: FakeApi(results, head)
         os.environ.update(GITHUB_REPOSITORY="o/r", GITHUB_TOKEN="t")
         os.environ.pop("GITHUB_STEP_SUMMARY", None)
@@ -451,6 +499,10 @@ class EndToEnd(unittest.TestCase):
 
     def test_horizon_failure_fails_the_gate(self):
         self.assertEqual(self._run({**GREEN, HORIZON: "failure"}), 1)
+
+    def test_impostor_horizon_check_from_another_workflow_cannot_pass_the_gate(self):
+        self.assertEqual(self._run({n: "success" for n in PHP}, timeout=0, impostor=True), 1)
+        self.assertEqual(self._run({**GREEN, HORIZON: "failure"}, impostor=True), 1)
 
     def test_horizon_never_reported_fails_the_gate(self):
         # timeout=0: the deadline is already reached, so "not reported yet" becomes a failure instead of a 60 s wait

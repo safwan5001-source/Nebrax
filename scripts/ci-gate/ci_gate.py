@@ -214,6 +214,7 @@ def validate(root: Path = ROOT, manifest: dict | None = None) -> tuple[list[str]
 
     # Discovery: any PR-triggered workflow job nobody classified is a gap, not a pass.
     gate_wf = ".github/workflows/ci-gate.yml"
+    producers: dict[str, list[str]] = {}
     for f in sorted((root / ".github" / "workflows").glob("*.y*ml")):
         rel = f.relative_to(root).as_posix()
         if rel == gate_wf:
@@ -233,8 +234,15 @@ def validate(root: Path = ROOT, manifest: dict | None = None) -> tuple[list[str]
                 warnings.append(f"{rel}: {e}")
                 continue
             for n in names:
+                producers.setdefault(n, []).append(f"{rel}:{jid}")
                 if (rel, n) not in classified:
                     warnings.append(f"unclassified PR check {n!r} ({rel}:{jid}) — add it to required-checks.json (tier required or advisory)")
+    # A required check name must be produced by exactly one job. A second job with the same display name (in this or
+    # another workflow) could report success under it; `latest_by_name` alone cannot tell the two apart.
+    for c in manifest["checks"]:
+        jobs = producers.get(c["name"], [])
+        if len(jobs) > 1:
+            errors.append(f"[{c['name']}] check name is produced by more than one PR-triggered job: {sorted(jobs)}")
     return errors, warnings
 
 
@@ -320,6 +328,21 @@ def bind_check_runs(check_runs: list[dict], wf_runs: list[dict], sha: str) -> tu
     suites = {w["check_suite_id"] for w in mine if w.get("check_suite_id") is not None}
     bound = [r for r in check_runs if (r.get("check_suite") or {}).get("id") in suites]
     return bound, mine
+
+
+def restrict_to_declared_workflows(manifest: dict, check_runs: list[dict], wf_runs: list[dict]) -> list[dict]:
+    """A manifest check only counts when its check run belongs to the suite of the workflow the manifest declares.
+    Without this, any PR-triggered job (another workflow, same display name, same github-actions app) satisfies a
+    required check without running it. Runs whose name is not in the manifest are passed through unchanged;
+    a manifest-named run with an unknown suite or a different workflow is dropped (fail closed: it is then 'not reported')."""
+    path_by_suite = {w["check_suite_id"]: w.get("path") for w in wf_runs if w.get("check_suite_id") is not None}
+    declared = {c["name"]: c["workflow"] for c in manifest["checks"]}
+    kept = []
+    for r in check_runs:
+        want = declared.get(r["name"])
+        if want is None or path_by_suite.get((r.get("check_suite") or {}).get("id")) == want:
+            kept.append(r)
+    return kept
 
 
 def latest_by_name(check_runs: list[dict]) -> dict[str, dict]:
@@ -492,6 +515,7 @@ def run_gate(args) -> int:
         raw = [r for r in api.pages(f"commits/{sha}/check-runs", "check_runs", {"filter": "all"})
                if r["name"] != gate_name]
         check_runs, wf_runs = bind_check_runs(raw, wf_all, sha)
+        check_runs = restrict_to_declared_workflows(manifest, check_runs, wf_runs)
         verdict, rows, warnings = evaluate(manifest, expected, check_runs, wf_runs,
                                            time.monotonic() - start, deadline)
         summary = render_summary(verdict, rows, warnings, expected, sha, files_known)
