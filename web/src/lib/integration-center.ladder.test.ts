@@ -118,6 +118,13 @@ describe('readReadinessRows and nativeStatusOf (step B)', () => {
     expect(readReadinessRows({ data: [] })).toBeNull();
   });
 
+  it('a repeated known provider row makes the read unreadable: row order must never decide the displayed state', () => {
+    const conflicting = { ...TODAY[3], ux_state: 'READY_TO_CONNECT', connect_enabled: true };
+    expect(readReadinessRows({ data: [...TODAY, conflicting] })).toBeNull();
+    expect(readReadinessRows({ data: [conflicting, ...TODAY] })).toBeNull();
+    expect(readReadinessRows({ data: [...TODAY, TODAY[3]] })).toBeNull();
+  });
+
   it('ignores rows of unknown platforms and is null for a non-list payload', () => {
     expect(readReadinessRows({ data: [...TODAY, { platform_key: 'talabat', ux_state: 'READY_TO_CONNECT' }] })?.size).toBe(6);
     expect(readReadinessRows(null)).toBeNull();

@@ -169,7 +169,7 @@ function nullableText(value: unknown): string | null {
 /**
  * صفوف `GET /delivery-platforms/readiness`. الخادم يُرجع المنصات الست دائماً؛ لذا حمولة
  * ينقص فيها صفّ معروف، أو يحمل صفٌّ معروف `ux_state` غير نصّي أو علماً غير منطقي، تعود
- * `null` (قراءة فاشلة بشعار إعادة المحاولة) لا خريطة جزئية تبدو ناجحة. صفوف المنصات
+ * `null` (قراءة فاشلة بشعار إعادة المحاولة) لا خريطة جزئية تبدو ناجحة. تكرار مفتاح معروف مرفوض كذلك. صفوف المنصات
  * المجهولة تُتجاهل.
  */
 export function readReadinessRows(payload: unknown): Map<string, ReadinessRow> | null {
@@ -180,6 +180,8 @@ export function readReadinessRows(payload: unknown): Map<string, ReadinessRow> |
   for (const row of list) {
     if (typeof row.platform_key !== 'string' || !known.has(row.platform_key)) continue;
     if (typeof row.ux_state !== 'string' || typeof row.connect_enabled !== 'boolean' || typeof row.sync_enabled !== 'boolean') return null;
+    // صفّان لمنصة واحدة: ترتيبهما كان سيحدّد الحالة المعروضة، فالحمولة غير موثوقة.
+    if (result.has(row.platform_key)) return null;
     result.set(row.platform_key, {
       platformKey: row.platform_key,
       uxState: row.ux_state,
