@@ -351,6 +351,7 @@ class FailClosed(unittest.TestCase):
         def quiet(case, **kw):
             rec = copy.deepcopy(real(case, **kw))
             rec["reasons"] = []
+            rec["checks"] = [c for c in rec["checks"] if c["name"] != "storefront (lint + typecheck + test)"]  # regression drops it too
             return rec
 
         def failing_extra(e):
@@ -359,6 +360,12 @@ class FailClosed(unittest.TestCase):
         def required_missing(e):
             e["checks"] = [c for c in e["checks"] if c["name"] != "php artisan test (L11, pgsql)"]
 
+        def optional_path_check_failed_but_dropped_by_evaluator(e):
+            e["checks"].append(check(9, "storefront (lint + typecheck + test)", conclusion="failure"))
+
+        def non_actions_app(e):
+            e["checks"][1].update(app="third-party")
+
         def manifest_drops_pgsql(e):
             e["required_checks"]["always_names"] = ["php artisan test (L11, sqlite)"]
             e["checks"] = [c for c in e["checks"] if c["name"] != "php artisan test (L11, pgsql)"]
@@ -366,7 +373,9 @@ class FailClosed(unittest.TestCase):
         def touched_web_without_web_build(e):
             e["pr"]["files"][0].update(filename="web/src/components/x.tsx", patch="@@ -0,0 +1 @@\n+<div>x</div>")
 
-        for name, mutate in (("manifest dropped a floor check with its run", manifest_drops_pgsql),
+        for name, mutate in (("optional path-tier run failed (raw case evidence)", optional_path_check_failed_but_dropped_by_evaluator),
+                             ("required check from a non-Actions app", non_actions_app),
+                             ("manifest dropped a floor check with its run", manifest_drops_pgsql),
                              ("web touched, web build absent", touched_web_without_web_build),
                              ("non-gate check failed", failing_extra), ("draft", lambda e: e["pr"].update(draft=True)),
                              ("required check absent", required_missing), ("merged", lambda e: e["pr"].update(merged=True, merge_commit_sha="e" * 40))):

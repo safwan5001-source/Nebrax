@@ -146,15 +146,21 @@ def _revalidation_problem(case: dict, reval) -> str | None:
 
 
 def _facts_support_ready(case: dict, ci: dict, policy: dict) -> bool:
-    """READY re-check straight from the evidence, independent of whatever reasons the evaluator did or did not emit:
-    PR open/not draft/not merged, the gate and every required always-tier check present on the head, and EVERY observed check green."""
+    """READY re-check straight from the RAW evidence, independent of whatever the evaluator reported or filtered:
+    PR open/not draft/not merged; of every pull_request-event run on the current head, the latest run per check name must be
+    completed + success + from github-actions (so an optional path-tier failure counts too); and the gate, the policy floor and
+    the observed manifest's always-tier checks must all be among them."""
     ev = case["evidence"]
     pr = ev["pr"]
     if pr.get("draft") is not False or pr.get("merged") is not False or pr.get("state") != "open":
         return False
-    if not ci["checks"] or any(c["status"] != "completed" or c["conclusion"] != "success" for c in ci["checks"]):
+    latest: dict[str, dict] = {}
+    for c in ev["checks"]:
+        if c["head_sha"] == pr["head_sha"] and c["event"] == "pull_request":
+            if c["name"] not in latest or c["id"] > latest[c["name"]]["id"]:
+                latest[c["name"]] = c
+    if not latest or any(c["status"] != "completed" or c["conclusion"] != "success" or c["app"] != "github-actions" for c in latest.values()):
         return False
-    names = {c["name"] for c in ci["checks"]}
     rc, floor = ev["required_checks"], policy["ci_floor"]
     # the TRUSTED floor (policy), not only the observed manifest: a manifest that dropped a check must not shrink what READY demands
     required = {rc["gate_name"], floor["gate_name"], *rc["always_names"], *floor["always"]}
@@ -162,7 +168,7 @@ def _facts_support_ready(case: dict, ci: dict, policy: dict) -> bool:
     for pattern, name in floor.get("required_when_touched", {}).items():
         if any(he.any_match([pattern], t) for t in touched):
             required.add(name)
-    return required <= names
+    return required <= set(latest)
 
 
 def _hard_deny_hits(record: dict, policy: dict) -> list[str]:
