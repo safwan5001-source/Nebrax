@@ -19,7 +19,7 @@ Spec: [AWJ-PLATFORM-UX-H1-1-UX-SPEC.md](./AWJ-PLATFORM-UX-H1-1-UX-SPEC.md)
 
 Earlier slices ran in jsdom and a mocked browser. **This report does not count any mocked run as backend evidence.** Items I could not run for real are marked BLOCKED or NOT VERIFIED and are not passes.
 
-Environment note: the session-start hook re-runs `setup.sh` (`migrate:fresh`), which wiped the seeded test database once during this work; I re-seeded it. All results below are from the re-seeded database.
+Environment notes: the container lacked `bcmath`, the AWS SDK and AVIF support for the Laravel suites (see Tests); the session-start hook re-runs `setup.sh` (`migrate:fresh`), which wiped the seeded test database once during this work; I re-seeded it. All results below are from the re-seeded database.
 
 ## Coverage matrix (pages)
 
@@ -120,18 +120,18 @@ Suggested small follow-ups (not built, not P1): H15-03 (page the tenant picker o
 
 | Check | Result |
 |---|---|
-| Laravel `php artisan test`, SQLite (isolated file DB, `migrate:fresh` first) | @@SQLITE@@ |
-| Laravel `php artisan test`, PostgreSQL 16 (local, `migrate:fresh` first) | @@PG@@ |
-| Web full suite (`npm test`), main working tree at the Base SHA plus this report | @@VITEST@@ |
-| Web tests on the fix branch (integrations and document-operations folders) | integrations 6 files / 42 tests passed; document-operations 1 file / 22 tests passed (run before the full-suite pass on that branch) |
-| `tsc --noEmit` against the baseline | @@TSC@@ |
-| Next.js production build | @@BUILD@@ |
-| GitHub CI on this PR | @@CI@@ |
+| Laravel `php artisan test`, SQLite (isolated file DB, `migrate:fresh` first) | **NOT GREEN in this environment, not claimed as a pass.** Full run (after installing `php8.3-bcmath`, which the container lacked; the first run had 154 failures): 6370 passed, 129 failed, 73 skipped (46,800 assertions), 1,178 s. The failures are in 27 classes, all in the media, R2/object-storage, mail and upload families (`StorefrontMedia*`, `ProductMediaR2*`, `AttachmentDurabilityS1`, `AuthRecovery`, `UserInvitation`, `DocumentStorageDiagnose`, …). Causes found: `Aws\Exception\AwsException` is not installed (no AWS SDK in this container) and GD has no AVIF support (`imageavif` missing). The `AuthRecovery`/`UserInvitation` mail failures (11) were not root-caused. No PHP file changed in this branch, so none of these can come from it, but the suite cannot be called green until CI runs it. None of the platform-named or document-operations test classes appear among the failures. |
+| Laravel `php artisan test`, PostgreSQL 16 (local, `migrate:fresh` first) | **Same result family, not claimed as a pass.** PostgreSQL 16 (local), one isolated database per test file cloned from a migrated template, 3 workers, 592 files: 6444 passed, 123 failed, 2 skipped; 25 files fail, all in the same media/R2/mail/storage families as SQLite; one file (`ProductMediaR2ReadTest`) hit the 240 s per-file timeout and has no result. The PostgreSQL-only concurrency tests that SQLite skips ran and passed. Setup notes: the container's PostgreSQL needed `max_locks_per_transaction` raised from 64 to 2048, otherwise `migrate:fresh` dropping 300+ tables fails with "out of shared memory" and most files fail; a first single-database full run also hung 28 minutes on a lock wait and was abandoned, and a first per-file attempt was contaminated by processes sharing databases, so those results were discarded. |
+| Web full suite (`npm test`), main working tree at the Base SHA plus this report | 522 files, 5546 tests passed (exit 0). On the P1 fix branch: 522 files, 5547 tests passed (one new test). |
+| `tsc --noEmit` against the baseline | 48 errors, equal to the baseline on `main`; 47 are in `*.test.ts(x)` files and 1 is in `e2e/pos-ui-v3-visual-verify.spec.ts` (all test/spec files, none in product code). |
+| Next.js production build | `next build` completed (exit 0) on the Base SHA working tree with this report added. |
+| GitHub CI on this PR | See the checks on this PR (not repeated here: they did not exist when this file was committed). Fix PR: #1376. |
 
 The CI of earlier PR branches is not used as evidence for the state of `main`; the table above is from this session's own runs.
 
 ## NOT VERIFIED / BLOCKED (not passes)
 
+- Laravel suites green on SQLite and PostgreSQL (see the table: failures are environment-related but unproven, until CI runs them); the login page's axe scan;
 - Real screen reader; Firefox; WebKit; the browser's native zoom and text-size settings.
 - Stale-response guard under real network latency.
 - R2, ClamAV and AI providers; document operations with real document data; behaviour at hundreds of tenants.
