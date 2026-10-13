@@ -228,6 +228,16 @@ describe("banner section fields", () => {
   });
 });
 
+describe("non-BMP text (emoji) in capped section fields", () => {
+  it("never shows more than the draft stores", async () => {
+    render(<Harness panel="homepage" selectedSection="s1" initial={withSection("banner", { title: "", subtitle: "", ctaLabel: "", ctaHref: "", imageUrl: null })} />);
+    const title = Array.from(document.querySelectorAll("label")).find((l) => l.textContent?.startsWith("Title"))?.querySelector("input") as HTMLInputElement;
+    await userEvent.click(title);
+    await userEvent.paste("😀".repeat(120));
+    expect(title.value).toBe(sectionContent().title);
+  });
+});
+
 describe("benefits section fields", () => {
   it("keeps spaces typed in a benefit title and body", async () => {
     render(<Harness panel="homepage" selectedSection="s1" initial={withSection("benefits", { items: [{ id: "b1", title: "x", body: "x" }] })} />);

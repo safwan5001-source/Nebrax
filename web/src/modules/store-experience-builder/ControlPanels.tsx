@@ -2505,10 +2505,10 @@ function BannerFields({
   return (
     <div className="space-y-3">
       <Field label={t("bannerTitle")}>
-        <BufferedText value={value.title} limit={120} normalize={bannerTitleText} onCommit={(title) => set({ title })} />
+        <BufferedText value={value.title} maxLength={120} normalize={bannerTitleText} onCommit={(title) => set({ title })} />
       </Field>
       <Field label={t("bannerSubtitle")}>
-        <BufferedText multiline className="h-20 py-2" value={value.subtitle} limit={200} normalize={bannerSubtitleText} onCommit={(subtitle) => set({ subtitle })} />
+        <BufferedText multiline className="h-20 py-2" value={value.subtitle} maxLength={200} normalize={bannerSubtitleText} onCommit={(subtitle) => set({ subtitle })} />
       </Field>
       <CtaSlots
         slots={bannerSlots}
@@ -2596,7 +2596,7 @@ export function BenefitsFields({
           <Field label={t("benefitTitle")}>
             <BufferedText
               value={item.title}
-              limit={80}
+              maxLength={80}
               normalize={benefitTitleText}
               onCommit={(title) => onChange(items.map((row, i) => (i === index ? { ...row, title } : row)))}
             />
@@ -2606,7 +2606,7 @@ export function BenefitsFields({
               multiline
               className="h-16 py-2"
               value={item.body}
-              limit={200}
+              maxLength={200}
               normalize={benefitBodyText}
               onCommit={(body) => onChange(items.map((row, i) => (i === index ? { ...row, body } : row)))}
             />
