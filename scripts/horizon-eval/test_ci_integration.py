@@ -51,7 +51,7 @@ class GateManifest(unittest.TestCase):
         self.assertEqual(guard["step_run_contains"], "unittest discover -s scripts/horizon-eval")
         for need in ("set -o pipefail", "MIN_TESTS=", '!= "OK"'):
             self.assertIn(need, guard["require"])
-        for bad in ("|| true", "|| :", "exit 0", " -k ", "--pattern", " -p "):
+        for bad in ("|| true", "|| :", "exit 0", " -k ", "--pattern", " -p ", "set +e", "set +o", "trap ", "exit()", "alias ", "BASH_ENV"):
             self.assertIn(bad, guard["forbidden"])
 
 

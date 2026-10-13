@@ -26,7 +26,7 @@
       "job": "horizon-eval",
       "tier": "always",
       "covers": ["horizon-eval", "authorization-dry-run", "false-eligible", "contract"],
-      "guard": {"step_run_contains": "unittest discover -s scripts/horizon-eval", "require": ["set -o pipefail", "MIN_TESTS=", "!= \"OK\""], "forbidden": ["|| true", "|| :", "exit 0", " -k ", "--pattern", " -p ", "--failfast"]}
+      "guard": {"step_run_contains": "unittest discover -s scripts/horizon-eval", "require": ["set -o pipefail", "MIN_TESTS=", "!= \"OK\""], "forbidden": ["|| true", "|| :", "exit 0", " -k ", "--pattern", " -p ", "--failfast", "set +e", "set +o", "trap ", "exit()", "exit ()", "alias ", "BASH_ENV", "command_not_found"]}
     },
     {"name": "web build (Next.js)", "workflow": ".github/workflows/web-ci.yml", "job": "build", "tier": "paths", "covers": ["web"]},
     {"name": "storefront (lint + typecheck + test)", "workflow": ".github/workflows/storefront-ci.yml", "job": "check", "tier": "paths", "covers": ["storefront"]},

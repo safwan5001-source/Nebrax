@@ -203,6 +203,9 @@ class Validation(unittest.TestCase):
             "pipefail removed": ("set -o pipefail\n          set -eu\n          MIN_TESTS", "set -eu\n          MIN_TESTS", "pipefail"),
             "swallowed failure": ("-v 2>&1 | tee", "-v 2>&1 || true | tee", "|| true"),
             "forced success": ('echo "tests run:', "exit 0\n          echo \"tests run:", "exit 0"),
+            "errexit disabled": ("          set -eu\n          MIN_TESTS", "          set -eu\n          set +e\n          MIN_TESTS", "set +e"),
+            "exit overridden": ("          MIN_TESTS=", "          exit() { return 0; }\n          MIN_TESTS=", "exit()"),
+            "trap": ("          MIN_TESTS=", "          trap 'exit 0' ERR\n          MIN_TESTS=", "trap "),
             "filtered discovery": ("unittest discover -s scripts/horizon-eval -v", "unittest discover -s scripts/horizon-eval -p test_contract.py -v", " -p "),
             "test step removed": ("python -I -B -m unittest discover -s scripts/horizon-eval -v", "python -I -B -m unittest --help", "no step runs"),
         }
