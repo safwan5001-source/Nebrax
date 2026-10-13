@@ -3,6 +3,7 @@ import argparse
 import contextlib
 import io
 import json
+import re
 import os
 import shutil
 import subprocess
@@ -195,13 +196,13 @@ class Validation(unittest.TestCase):
 
     def test_horizon_test_step_cannot_be_neutered(self):
         cases = {
-            "floor removed": ("MIN_TESTS=172", "FLOOR=1", "MIN_TESTS="),
+            "floor removed": (re.search(r"MIN_TESTS=\d+", (g.ROOT / ".github/workflows/horizon-eval-ci.yml").read_text(encoding="utf-8")).group(0), "FLOOR=1", "MIN_TESTS="),
             "clean-OK check removed": ('if [ "$last" != "OK" ]', "if false", '!= \"OK\"'),
             "pipefail removed": ("set -o pipefail\n          set -eu\n          MIN_TESTS", "set -eu\n          MIN_TESTS", "pipefail"),
             "swallowed failure": ("-v 2>&1 | tee", "-v 2>&1 || true | tee", "|| true"),
             "forced success": ('echo "tests run:', "exit 0\n          echo \"tests run:", "exit 0"),
             "filtered discovery": ("unittest discover -s scripts/horizon-eval -v", "unittest discover -s scripts/horizon-eval -p test_contract.py -v", " -p "),
-            "test step removed": ("python -I -m unittest discover -s scripts/horizon-eval -v", "python -I -m unittest --help", "no step runs"),
+            "test step removed": ("python -I -B -m unittest discover -s scripts/horizon-eval -v", "python -I -B -m unittest --help", "no step runs"),
         }
         for label, (old, new, expect) in cases.items():
             errs = self._mutate(self.HZ, old, new)

@@ -44,9 +44,9 @@ jobs:
         run: |
           set -o pipefail
           set -eu
-          MIN_TESTS=180
+          MIN_TESTS=181
           log="$RUNNER_TEMP/horizon-eval-tests.log"
-          python -I -m unittest discover -s scripts/horizon-eval -v 2>&1 | tee "$log"
+          python -I -B -m unittest discover -s scripts/horizon-eval -v 2>&1 | tee "$log"
           total="$(sed -n 's/^Ran \([0-9][0-9]*\) tests\{0,1\} in .*/\1/p' "$log" | tail -n 1)"
           last="$(grep -v '^[[:space:]]*$' "$log" | tail -n 1)"
           echo "tests run: ${total:-none} (floor $MIN_TESTS) · final line: ${last:-none}"
@@ -69,12 +69,13 @@ jobs:
           python contract_runner.py
 
       # الاختبارات لا تكتب داخل المستودع (المخزن خارجه بالحراسة). أثر جانبي هنا = اختبار غير معزول.
+      # `--ignored` يكشف أيضاً ما يخفيه .gitignore (مثل __pycache__؛ -B يمنعه و python -I يتجاهل PYTHONDONTWRITEBYTECODE).
       - name: Working tree stays clean
         shell: bash
         run: |
           set -eu
-          if [ -n "$(git status --porcelain)" ]; then
-            git status --porcelain
+          if [ -n "$(git status --porcelain --ignored)" ]; then
+            git status --porcelain --ignored
             echo "::error::The evaluator tests modified the working tree"
             exit 1
           fi

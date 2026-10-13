@@ -131,6 +131,15 @@ def run_all(ledger_factory=None) -> list[dict]:
     return results
 
 
+EXPECTED_CONTRACT_CASES = 23  # V2-1B: 11 scenarios / 23 cases; a runner that finds fewer must not exit 0
+
+
+def exit_code(results: list[dict]) -> int:
+    contract = [r for r in results if r["case"].startswith("DR-")]
+    ok = len(contract) == EXPECTED_CONTRACT_CASES and all(r["pass"] for r in results) and not any(r["false_eligible"] for r in results)
+    return 0 if ok else 1
+
+
 def render(results: list[dict]) -> str:
     lines = ["| case | expected | got | result | blocking reasons |", "|---|---|---|---|---|"]
     for r in results:
@@ -149,4 +158,4 @@ if __name__ == "__main__":
 
     res = run_all(lambda: Ledger(Path(tempfile.mkdtemp(prefix="horizon-eval-ledger-"))))
     print(render(res))
-    sys.exit(0 if all(r["pass"] for r in res) and not any(r["false_eligible"] for r in res) else 1)
+    sys.exit(exit_code(res))
