@@ -9,7 +9,6 @@ use App\Support\Commerce\StorefrontPresentationNormalizer;
 use App\Support\Commerce\StorefrontPresentationPublishValidator;
 use App\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Mockery;
 use Tests\TestCase;
 
 /**
@@ -29,12 +28,6 @@ class StorefrontMediaPixelProofExportTest extends TestCase
     use StorefrontMediaTestSupport;
 
     private const BASE = '/api/commerce/workspace/storefront-media';
-
-    protected function tearDown(): void
-    {
-        Mockery::close();
-        parent::tearDown();
-    }
 
     /** @return array{int,int,int} */
     private static function rgb(int $r, int $g, int $b): array

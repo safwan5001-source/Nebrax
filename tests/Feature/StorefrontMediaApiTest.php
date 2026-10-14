@@ -7,7 +7,6 @@ use App\Models\StorefrontPresentation;
 use App\Services\Commerce\StorefrontMediaPixelEvidence;
 use App\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Mockery;
 use Tests\TestCase;
 
 /**
@@ -26,12 +25,6 @@ class StorefrontMediaApiTest extends TestCase
     private const BASE = '/api/commerce/workspace/storefront-media';
 
     private string $uploadedBytes = '';
-
-    protected function tearDown(): void
-    {
-        Mockery::close();
-        parent::tearDown();
-    }
 
     /** @return array<string,mixed> */
     private function uploadOne(array $auth, string $bytes, string $name = 'photo.jpg'): array

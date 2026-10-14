@@ -42,12 +42,6 @@ class StorefrontDomainMediaVisibilityTest extends TestCase
 {
     use RefreshDatabase;
 
-    protected function tearDown(): void
-    {
-        Mockery::close();
-        parent::tearDown();
-    }
-
     private function mockR2(): MockInterface
     {
         config()->set('filesystems.disks.r2', [

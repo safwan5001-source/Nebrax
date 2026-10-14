@@ -19,12 +19,6 @@ class DocumentStorageR2CompatTest extends TestCase
 {
     use RefreshDatabase;
 
-    protected function tearDown(): void
-    {
-        Mockery::close();
-        parent::tearDown();
-    }
-
     private function durableS3(string $endpoint): void
     {
         config()->set('document_center.storage', array_merge(config('document_center.storage'), [

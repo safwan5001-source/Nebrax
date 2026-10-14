@@ -10,7 +10,6 @@ use App\Support\Commerce\StorefrontMediaRefNormalizer;
 use App\Support\Commerce\StorefrontPresentationNormalizer;
 use App\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Mockery;
 use Tests\TestCase;
 
 /**
@@ -29,12 +28,6 @@ class StorefrontMediaRefTest extends TestCase
     private const PROXY = '/api/storefront/media/customizer/';
 
     private int $uploads = 0;
-
-    protected function tearDown(): void
-    {
-        Mockery::close();
-        parent::tearDown();
-    }
 
     // ═════════════════ التطبيع (تكافؤ مع التوأمين) ═════════════════
 

@@ -28,12 +28,6 @@ class StorefrontCategoryMediaTest extends TestCase
         config(['document_center.storage.driver' => 'local', 'document_center.storage.disk' => 'local']);
     }
 
-    protected function tearDown(): void
-    {
-        Mockery::close();
-        parent::tearDown();
-    }
-
     /** @return array{tenant: Tenant, category: ProductCategory, domain: StorefrontDomain} */
     private function seedStore(string $hostname, ?string $imagePath = null, ?string $color = null): array
     {

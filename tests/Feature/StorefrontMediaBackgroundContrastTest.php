@@ -9,7 +9,6 @@ use App\Support\Commerce\StorefrontPresentationNormalizer;
 use App\Support\Commerce\StorefrontPresentationPublishValidator;
 use App\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Mockery;
 use Tests\TestCase;
 
 /**
@@ -29,12 +28,6 @@ class StorefrontMediaBackgroundContrastTest extends TestCase
     private const BG = 'homepage.sections[0].design.background';
 
     private int $uploads = 0;
-
-    protected function tearDown(): void
-    {
-        Mockery::close();
-        parent::tearDown();
-    }
 
     /** @param array{left?:array{int,int,int},right?:array{int,int,int}} $colours */
     private function uploadMedia(array $auth, array $colours): array

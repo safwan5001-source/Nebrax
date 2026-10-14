@@ -4,7 +4,6 @@ namespace Tests\Feature;
 
 use App\Support\EdgeScheme;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Mockery;
 use Tests\TestCase;
 
 /**
@@ -21,12 +20,6 @@ class StorefrontMediaEdgeSchemeTest extends TestCase
     use StorefrontMediaTestSupport;
 
     private const BASE = '/api/commerce/workspace/storefront-media';
-
-    protected function tearDown(): void
-    {
-        Mockery::close();
-        parent::tearDown();
-    }
 
     /** @test */
     public function the_helper_only_upgrades_when_the_edge_confirms_https(): void

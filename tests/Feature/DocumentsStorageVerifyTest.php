@@ -20,12 +20,6 @@ class DocumentsStorageVerifyTest extends TestCase
 {
     use RefreshDatabase;
 
-    protected function tearDown(): void
-    {
-        Mockery::close();
-        parent::tearDown();
-    }
-
     private function integration(bool $enabled = true, array $overrides = []): void
     {
         PlatformIntegrationSetting::create([

@@ -11,7 +11,6 @@ use App\Services\Commerce\StorefrontMediaVariantGenerator;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
-use Mockery;
 use Tests\TestCase;
 
 /**
@@ -29,12 +28,6 @@ class StorefrontMediaDerivativeTest extends TestCase
     use StorefrontMediaTestSupport;
 
     private const BASE = '/api/commerce/workspace/storefront-media';
-
-    protected function tearDown(): void
-    {
-        Mockery::close();
-        parent::tearDown();
-    }
 
     /** @param array<string,mixed> $overrides */
     private function transform(array $overrides = []): array

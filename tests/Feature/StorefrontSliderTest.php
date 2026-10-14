@@ -8,7 +8,6 @@ use App\Support\Commerce\StorefrontPresentationPublishValidator;
 use App\Support\Commerce\StorefrontSectionDesignNormalizer;
 use App\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Mockery;
 use Tests\TestCase;
 
 /**
@@ -26,12 +25,6 @@ class StorefrontSliderTest extends TestCase
     private const BASE = '/api/commerce/workspace/storefront-media';
 
     private int $uploads = 0;
-
-    protected function tearDown(): void
-    {
-        Mockery::close();
-        parent::tearDown();
-    }
 
     /** @return array<string,mixed> */
     private static function fixture(): array
