@@ -1,6 +1,6 @@
 # AWJ-COMMERCE-VISUAL-DIMENSIONS-H1 — Decision Register
 
-STATUS: **Owner review 2026-10-14: architecture ACCEPTED IN PRINCIPLE, with amendments to D-04 / D-08 / D-15. The amendments are applied below. G0 closes on the owner's explicit confirmation after this update.**
+STATUS: **APPROVED — the owner explicitly approved D-01..D-17 and closed G0 on 2026-10-14.** Implementing the DB/API changes (VD-1b, VD-1c) still requires a separate explicit approval, and every merge still requires the owner's approval.
 LAST_UPDATED: 2026-10-14
 Evidence: `AWJ-VD-H1-0-EVIDENCE-AND-ARCHITECTURE.md` (sections referenced as §n) · `AWJ-VD-H1-VD3-EDITOR-UX-REQUIREMENTS.md`
 
@@ -21,12 +21,12 @@ Evidence: `AWJ-VD-H1-0-EVIDENCE-AND-ARCHITECTURE.md` (sections referenced as §n
   - Typed columns.
   - A column on the existing tables (mixes data with presentation).
   - Storing it inside the presentation document (ties it to one storefront).
-- **Status:** ACCEPTED-IP
+- **Status:** APPROVED (G0, 2026-10-14)
 
 ### D-02 — Media source
 - **Decision:** reuse `storefront_media` through `MediaRef`.
 - **Alternatives rejected:** `product_media`; category-style columns; a new store.
-- **Status:** ACCEPTED-IP
+- **Status:** APPROVED (G0, 2026-10-14)
 
 ### D-03 — Public serving of facet images
 - **Decision:** a new guarded route, `store/v1/media/facet-visuals/{visualId}/{mediaId}/{file}`.
@@ -36,7 +36,7 @@ Evidence: `AWJ-VD-H1-0-EVIDENCE-AND-ARCHITECTURE.md` (sections referenced as §n
 - **Change after review:** `mediaId` is now part of the URL, so replacing the image changes the URL.
 - **Channel scope (Codex P2, #1472):** the second condition is extended: the value must be visible on the resolved storefront's sales channel. It needs at least one active product published there through `CommerceListing`, which is the same predicate as the product list. For a facet image, any active value must be visible. This stops a URL obtained on storefront A from being replayed against storefront B (tests N17–N19).
 - **Change after Codex P1 (#1472):** the API emits the origin path, matching every other media family. The storefront adds an explicit, validated branch to `toRenderableMediaUrl()`, placed before the generic pattern, that maps it to `/api/storefront/media/facet-visuals/...`. Anything else maps to `null`, which triggers the fallback chain. A raw origin path never reaches `<img>`. This is covered by mapper tests and by real browser loading in VD-5.
-- **Status:** ACCEPTED-IP (the URL change is a technical refinement)
+- **Status:** APPROVED (G0, 2026-10-14)
 
 ### D-04 — Authority to write the visual identity
 - **Decision:**
@@ -49,21 +49,21 @@ Evidence: `AWJ-VD-H1-0-EVIDENCE-AND-ARCHITECTURE.md` (sections referenced as §n
     - guest: 401.
   - **Preview for read-only users:** `GET facets` (`products.view`) carries short-lived `visual_preview` signed URLs, on the existing variant route, only for referenced media. This adds no library access and changes no RBAC (Codex P2, #1472).
   - Details: §3.8-a and VD-3 §3.8.
-- **Status:** **ACCEPTED-IP + AMENDED**
+- **Status:** **APPROVED with owner amendments** (G0, 2026-10-14)
 
 ### D-05 — Public API exposure
 - **Decision:** `storefront.v1` only; `commerce/v1` is unchanged (test N16).
-- **Status:** ACCEPTED-IP
+- **Status:** APPROVED (G0, 2026-10-14)
 
 ### D-06 — Where per-surface display settings live
 - **Decision:** optional fields inside the content of the existing `discovery` section.
-- **Status:** ACCEPTED-IP
+- **Status:** APPROVED (G0, 2026-10-14)
 
 ### D-07 — Display templates
 - **Decision:** a code-owned, append-only registry of **7 templates**.
   - `catalog-rounded` was added, based on the owner's concept image for electronics and general retail.
   - Templates saved by merchants are DEFERRED.
-- **Status:** ACCEPTED-IP (+1 template)
+- **Status:** APPROVED (G0, 2026-10-14)
 
 ### D-08 — Inheritance
 - **Key name:** the key is `showLabel`, singular, in every layer: value, facet, section, resolver, and fixtures (Codex P2, #1472).
@@ -73,27 +73,27 @@ Evidence: `AWJ-VD-H1-0-EVIDENCE-AND-ARCHITECTURE.md` (sections referenced as §n
   - The image itself is not inherited; the icon is.
   - Display-time fallback (image → icon → text) keeps the resolved shape and size.
   - Proven by a shared fixture with one test case per property.
-- **Status:** **ACCEPTED-IP + AMENDED**
+- **Status:** **APPROVED with owner amendments** (G0, 2026-10-14)
 
 ### D-09 — Framing
 - **Decision:** `fit` + `focal` + `zoom`, applied with CSS over existing thumbnails. No `crop` or `rotate`.
-- **Status:** ACCEPTED-IP
+- **Status:** APPROVED (G0, 2026-10-14)
 
 ### D-10 — Icons
 - **Decision:** an append-only extension of `IconRegistry`, plus `IconPicker`.
-- **Status:** ACCEPTED-IP
+- **Status:** APPROVED (G0, 2026-10-14)
 
 ### D-11 — Validation
 - **Decision:** writes are strict (422); reads are tolerant and fail closed.
-- **Status:** ACCEPTED-IP
+- **Status:** APPROVED (G0, 2026-10-14)
 
 ### D-12 — Listing filter chips with images
 - **Decision:** DEFERRED.
-- **Status:** ACCEPTED-IP
+- **Status:** APPROVED (G0, 2026-10-14)
 
 ### D-13 — Storefront dark mode
 - **Decision:** out of scope. Dark and light mode are verified in the admin editor.
-- **Status:** ACCEPTED-IP
+- **Status:** APPROVED (G0, 2026-10-14)
 
 ### D-14 — Merge policy
 - **Decision:** every PR requires explicit owner approval. No stacked PRs.
@@ -117,7 +117,7 @@ Evidence: `AWJ-VD-H1-0-EVIDENCE-AND-ARCHITECTURE.md` (sections referenced as §n
     - no original or library paths in `meta`;
     - `commerce/v1` unchanged.
   - Documented deactivation window: immediate at the origin, ≤ 300 s through the proxy for a URL already served.
-- **Status:** **ACCEPTED-IP + AMENDED**
+- **Status:** **APPROVED with owner amendments** (G0, 2026-10-14)
 
 ### D-17 — Mandatory concurrency token *(new, from Codex P2 on #1472)*
 - **Decision:**
@@ -132,7 +132,7 @@ Evidence: `AWJ-VD-H1-0-EVIDENCE-AND-ARCHITECTURE.md` (sections referenced as §n
 - **Alternatives:**
   - An optional `if_unmodified_since`: it allows silent overwrites.
   - The `updated_at` timestamp: one-second precision cannot detect two writes within the same second.
-- **Status:** **PROPOSED** (part of the DB/API contract that needs approval)
+- **Status:** **APPROVED** (G0, 2026-10-14). Implementation in VD-1b needs the separate DB/API approval.
 
 ### D-16 — Serializing media deletion against visual saves *(new, from the Codex P2 review on #1472)*
 - **Decision:**
@@ -144,7 +144,7 @@ Evidence: `AWJ-VD-H1-0-EVIDENCE-AND-ARCHITECTURE.md` (sections referenced as §n
 - **Alternatives:**
   - A foreign key from the visual to the media: there is no column, the reference is JSON, and media is soft-deleted, so an FK would not prevent it.
   - A periodic cleanup job: it leaves a window where a reference to deleted media stays visible.
-- **Status:** **PROPOSED** (needs G0 confirmation, because it modifies `StorefrontMediaService::delete()`)
+- **Status:** **APPROVED** (G0, 2026-10-14)
 
 ## Open questions (do not block G0)
 

@@ -1,0 +1,795 @@
+{
+    "value": [
+        {
+            "name": "governing example: own image, shape/size/label/icon still inherited",
+            "facet": {
+                "defaults": {
+                    "shape": "arch",
+                    "size": "lg",
+                    "showLabel": true,
+                    "icon": "gift"
+                }
+            },
+            "value": {
+                "image": {
+                    "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                }
+            },
+            "context": {
+                "usableMediaIds": [
+                    "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                ]
+            },
+            "expected": {
+                "visual": {
+                    "content": "image",
+                    "image": {
+                        "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+                        "fit": "cover"
+                    },
+                    "shape": "arch",
+                    "size": "lg",
+                    "showLabel": true
+                },
+                "sources": {
+                    "content": "implicit",
+                    "icon": "facet",
+                    "iconColor": null,
+                    "background": null,
+                    "fallback": null,
+                    "fit": "system",
+                    "shape": "facet",
+                    "size": "facet",
+                    "showLabel": "facet"
+                }
+            }
+        },
+        {
+            "name": "unusable image falls back to the inherited icon and keeps shape and size",
+            "facet": {
+                "defaults": {
+                    "shape": "arch",
+                    "size": "lg",
+                    "icon": "gift"
+                }
+            },
+            "value": {
+                "image": {
+                    "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                }
+            },
+            "context": {
+                "usableMediaIds": []
+            },
+            "expected": {
+                "visual": {
+                    "content": "icon",
+                    "icon": "gift",
+                    "shape": "arch",
+                    "size": "lg",
+                    "showLabel": true
+                },
+                "sources": {
+                    "content": "implicit",
+                    "icon": "facet",
+                    "iconColor": null,
+                    "background": null,
+                    "fallback": "image",
+                    "fit": null,
+                    "shape": "facet",
+                    "size": "facet",
+                    "showLabel": "system"
+                }
+            }
+        },
+        {
+            "name": "unusable image with no icon anywhere falls to text only",
+            "facet": {
+                "defaults": {
+                    "shape": "star"
+                }
+            },
+            "value": {
+                "image": {
+                    "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                }
+            },
+            "context": {
+                "usableMediaIds": [
+                    "1c9a7d3f-4e4b-4b64-8d8f-9a2b3c4d5e6f"
+                ]
+            },
+            "expected": {
+                "visual": {
+                    "content": "none",
+                    "shape": "star",
+                    "size": "md",
+                    "showLabel": true
+                },
+                "sources": {
+                    "content": "implicit",
+                    "icon": null,
+                    "iconColor": null,
+                    "background": null,
+                    "fallback": "image",
+                    "fit": null,
+                    "shape": "facet",
+                    "size": "system",
+                    "showLabel": "system"
+                }
+            }
+        },
+        {
+            "name": "legacy data: no visuals at all",
+            "facet": {},
+            "value": {},
+            "context": {},
+            "expected": {
+                "visual": {
+                    "content": "none",
+                    "shape": "circle",
+                    "size": "md",
+                    "showLabel": true
+                },
+                "sources": {
+                    "content": "system",
+                    "icon": null,
+                    "iconColor": null,
+                    "background": null,
+                    "fallback": null,
+                    "fit": null,
+                    "shape": "system",
+                    "size": "system",
+                    "showLabel": "system"
+                }
+            }
+        },
+        {
+            "name": "value overrides shape only; everything else inherited",
+            "facet": {
+                "defaults": {
+                    "content": "icon",
+                    "icon": "gift",
+                    "iconColor": "#9d2449",
+                    "shape": "arch",
+                    "size": "lg",
+                    "showLabel": false
+                }
+            },
+            "value": {
+                "shape": "heart"
+            },
+            "context": {},
+            "expected": {
+                "visual": {
+                    "content": "icon",
+                    "icon": "gift",
+                    "iconColor": "#9d2449",
+                    "shape": "heart",
+                    "size": "lg",
+                    "showLabel": false
+                },
+                "sources": {
+                    "content": "facet",
+                    "icon": "facet",
+                    "iconColor": "facet",
+                    "background": null,
+                    "fallback": null,
+                    "fit": null,
+                    "shape": "value",
+                    "size": "facet",
+                    "showLabel": "facet"
+                }
+            }
+        },
+        {
+            "name": "value overrides size only",
+            "facet": {
+                "defaults": {
+                    "content": "icon",
+                    "icon": "gift",
+                    "shape": "arch",
+                    "size": "lg"
+                }
+            },
+            "value": {
+                "size": "sm"
+            },
+            "context": {},
+            "expected": {
+                "visual": {
+                    "content": "icon",
+                    "icon": "gift",
+                    "shape": "arch",
+                    "size": "sm",
+                    "showLabel": true
+                },
+                "sources": {
+                    "content": "facet",
+                    "icon": "facet",
+                    "iconColor": null,
+                    "background": null,
+                    "fallback": null,
+                    "fit": null,
+                    "shape": "facet",
+                    "size": "value",
+                    "showLabel": "system"
+                }
+            }
+        },
+        {
+            "name": "value overrides showLabel only",
+            "facet": {
+                "defaults": {
+                    "shape": "arch",
+                    "showLabel": true
+                }
+            },
+            "value": {
+                "showLabel": false
+            },
+            "context": {},
+            "expected": {
+                "visual": {
+                    "content": "none",
+                    "shape": "arch",
+                    "size": "md",
+                    "showLabel": false
+                },
+                "sources": {
+                    "content": "system",
+                    "icon": null,
+                    "iconColor": null,
+                    "background": null,
+                    "fallback": null,
+                    "fit": null,
+                    "shape": "facet",
+                    "size": "system",
+                    "showLabel": "value"
+                }
+            }
+        },
+        {
+            "name": "value icon only: implicit icon content, inherited shape",
+            "facet": {
+                "defaults": {
+                    "content": "image",
+                    "icon": "gift",
+                    "shape": "star"
+                }
+            },
+            "value": {
+                "icon": "cake"
+            },
+            "context": {},
+            "expected": {
+                "visual": {
+                    "content": "icon",
+                    "icon": "cake",
+                    "shape": "star",
+                    "size": "md",
+                    "showLabel": true
+                },
+                "sources": {
+                    "content": "implicit",
+                    "icon": "value",
+                    "iconColor": null,
+                    "background": null,
+                    "fallback": null,
+                    "fit": null,
+                    "shape": "facet",
+                    "size": "system",
+                    "showLabel": "system"
+                }
+            }
+        },
+        {
+            "name": "explicit text-only on a value overrides the facet default content",
+            "facet": {
+                "defaults": {
+                    "content": "icon",
+                    "icon": "gift",
+                    "shape": "arch"
+                }
+            },
+            "value": {
+                "content": "none"
+            },
+            "context": {},
+            "expected": {
+                "visual": {
+                    "content": "none",
+                    "shape": "arch",
+                    "size": "md",
+                    "showLabel": true
+                },
+                "sources": {
+                    "content": "value",
+                    "icon": "facet",
+                    "iconColor": null,
+                    "background": null,
+                    "fallback": null,
+                    "fit": null,
+                    "shape": "facet",
+                    "size": "system",
+                    "showLabel": "system"
+                }
+            }
+        },
+        {
+            "name": "explicit section shape wins over the value shape; size and label keep their own chains",
+            "facet": {
+                "defaults": {
+                    "size": "lg"
+                }
+            },
+            "value": {
+                "shape": "star",
+                "showLabel": false
+            },
+            "context": {
+                "section": {
+                    "shape": "circle"
+                }
+            },
+            "expected": {
+                "visual": {
+                    "content": "none",
+                    "shape": "circle",
+                    "size": "lg",
+                    "showLabel": false
+                },
+                "sources": {
+                    "content": "system",
+                    "icon": null,
+                    "iconColor": null,
+                    "background": null,
+                    "fallback": null,
+                    "fit": null,
+                    "shape": "section",
+                    "size": "facet",
+                    "showLabel": "value"
+                }
+            }
+        },
+        {
+            "name": "template is the fallback below facet defaults",
+            "facet": {
+                "defaults": {
+                    "size": "sm"
+                }
+            },
+            "value": {},
+            "context": {
+                "template": {
+                    "shape": "arch",
+                    "size": "lg",
+                    "showLabel": false
+                }
+            },
+            "expected": {
+                "visual": {
+                    "content": "none",
+                    "shape": "arch",
+                    "size": "sm",
+                    "showLabel": false
+                },
+                "sources": {
+                    "content": "system",
+                    "icon": null,
+                    "iconColor": null,
+                    "background": null,
+                    "fallback": null,
+                    "fit": null,
+                    "shape": "template",
+                    "size": "facet",
+                    "showLabel": "template"
+                }
+            }
+        },
+        {
+            "name": "fit inherits from facet defaults when the image has none",
+            "facet": {
+                "defaults": {
+                    "fit": "contain"
+                }
+            },
+            "value": {
+                "image": {
+                    "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                }
+            },
+            "context": {},
+            "expected": {
+                "visual": {
+                    "content": "image",
+                    "image": {
+                        "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+                        "fit": "contain"
+                    },
+                    "shape": "circle",
+                    "size": "md",
+                    "showLabel": true
+                },
+                "sources": {
+                    "content": "implicit",
+                    "icon": null,
+                    "iconColor": null,
+                    "background": null,
+                    "fallback": null,
+                    "fit": "facet",
+                    "shape": "system",
+                    "size": "system",
+                    "showLabel": "system"
+                }
+            }
+        },
+        {
+            "name": "the image's own fit and framing win",
+            "facet": {
+                "defaults": {
+                    "fit": "contain"
+                }
+            },
+            "value": {
+                "image": {
+                    "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+                    "fit": "cover",
+                    "focal": {
+                        "x": 20,
+                        "y": 80
+                    },
+                    "zoom": 1.4,
+                    "alt": {
+                        "ar": "ورد"
+                    }
+                }
+            },
+            "context": {
+                "usableMediaIds": null
+            },
+            "expected": {
+                "visual": {
+                    "content": "image",
+                    "image": {
+                        "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+                        "fit": "cover",
+                        "focal": {
+                            "x": 20,
+                            "y": 80
+                        },
+                        "zoom": 1.4,
+                        "alt": {
+                            "ar": "ورد"
+                        }
+                    },
+                    "shape": "circle",
+                    "size": "md",
+                    "showLabel": true
+                },
+                "sources": {
+                    "content": "implicit",
+                    "icon": null,
+                    "iconColor": null,
+                    "background": null,
+                    "fallback": null,
+                    "fit": "value",
+                    "shape": "system",
+                    "size": "system",
+                    "showLabel": "system"
+                }
+            }
+        },
+        {
+            "name": "icon content with no icon anywhere falls to text only",
+            "facet": {},
+            "value": {
+                "content": "icon"
+            },
+            "context": {},
+            "expected": {
+                "visual": {
+                    "content": "none",
+                    "shape": "circle",
+                    "size": "md",
+                    "showLabel": true
+                },
+                "sources": {
+                    "content": "value",
+                    "icon": null,
+                    "iconColor": null,
+                    "background": null,
+                    "fallback": "icon",
+                    "fit": null,
+                    "shape": "system",
+                    "size": "system",
+                    "showLabel": "system"
+                }
+            }
+        },
+        {
+            "name": "colours: value icon colour wins, background inherited, both kept for an icon",
+            "facet": {
+                "defaults": {
+                    "icon": "gift",
+                    "iconColor": "#111111",
+                    "background": "#fdf2f4"
+                }
+            },
+            "value": {
+                "content": "icon",
+                "iconColor": "#9d2449"
+            },
+            "context": {},
+            "expected": {
+                "visual": {
+                    "content": "icon",
+                    "icon": "gift",
+                    "iconColor": "#9d2449",
+                    "background": "#fdf2f4",
+                    "shape": "circle",
+                    "size": "md",
+                    "showLabel": true
+                },
+                "sources": {
+                    "content": "value",
+                    "icon": "facet",
+                    "iconColor": "value",
+                    "background": "facet",
+                    "fallback": null,
+                    "fit": null,
+                    "shape": "system",
+                    "size": "system",
+                    "showLabel": "system"
+                }
+            }
+        },
+        {
+            "name": "text-only tile keeps its background and drops the icon colour",
+            "facet": {
+                "defaults": {
+                    "iconColor": "#111111",
+                    "background": "#fdf2f4"
+                }
+            },
+            "value": {
+                "content": "none"
+            },
+            "context": {},
+            "expected": {
+                "visual": {
+                    "content": "none",
+                    "background": "#fdf2f4",
+                    "shape": "circle",
+                    "size": "md",
+                    "showLabel": true
+                },
+                "sources": {
+                    "content": "value",
+                    "icon": null,
+                    "iconColor": "facet",
+                    "background": "facet",
+                    "fallback": null,
+                    "fit": null,
+                    "shape": "system",
+                    "size": "system",
+                    "showLabel": "system"
+                }
+            }
+        },
+        {
+            "name": "the facet's own image is never inherited by values",
+            "facet": {
+                "self": {
+                    "image": {
+                        "mediaId": "1c9a7d3f-4e4b-4b64-8d8f-9a2b3c4d5e6f"
+                    }
+                },
+                "defaults": {
+                    "content": "image"
+                }
+            },
+            "value": {},
+            "context": {},
+            "expected": {
+                "visual": {
+                    "content": "none",
+                    "shape": "circle",
+                    "size": "md",
+                    "showLabel": true
+                },
+                "sources": {
+                    "content": "facet",
+                    "icon": null,
+                    "iconColor": null,
+                    "background": null,
+                    "fallback": "image",
+                    "fit": null,
+                    "shape": "system",
+                    "size": "system",
+                    "showLabel": "system"
+                }
+            }
+        },
+        {
+            "name": "invalid section and template entries are ignored",
+            "facet": {},
+            "value": {},
+            "context": {
+                "section": {
+                    "shape": "blob",
+                    "size": "sm",
+                    "icon": "gift"
+                },
+                "template": {
+                    "showLabel": "no",
+                    "shape": "vase"
+                }
+            },
+            "expected": {
+                "visual": {
+                    "content": "none",
+                    "shape": "vase",
+                    "size": "sm",
+                    "showLabel": true
+                },
+                "sources": {
+                    "content": "system",
+                    "icon": null,
+                    "iconColor": null,
+                    "background": null,
+                    "fallback": null,
+                    "fit": null,
+                    "shape": "template",
+                    "size": "section",
+                    "showLabel": "system"
+                }
+            }
+        },
+        {
+            "name": "raw (un-normalised) input is normalised before resolving",
+            "facet": {
+                "defaults": {
+                    "shape": "ARCH",
+                    "icon": "<svg>",
+                    "size": "lg"
+                }
+            },
+            "value": {
+                "image": {
+                    "mediaId": "0B8F6C2E-3D3A-4A53-9C7E-8F1A2B3C4D5E",
+                    "crop": {
+                        "x": 0
+                    }
+                }
+            },
+            "context": {},
+            "expected": {
+                "visual": {
+                    "content": "image",
+                    "image": {
+                        "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+                        "fit": "cover"
+                    },
+                    "shape": "circle",
+                    "size": "lg",
+                    "showLabel": true
+                },
+                "sources": {
+                    "content": "implicit",
+                    "icon": null,
+                    "iconColor": null,
+                    "background": null,
+                    "fallback": null,
+                    "fit": "system",
+                    "shape": "system",
+                    "size": "facet",
+                    "showLabel": "system"
+                }
+            }
+        }
+    ],
+    "self": [
+        {
+            "name": "facet self: own image and shape, size from template",
+            "facet": {
+                "self": {
+                    "image": {
+                        "mediaId": "1c9a7d3f-4e4b-4b64-8d8f-9a2b3c4d5e6f"
+                    },
+                    "shape": "hexagon"
+                }
+            },
+            "context": {
+                "template": {
+                    "size": "lg"
+                }
+            },
+            "expected": {
+                "visual": {
+                    "content": "image",
+                    "image": {
+                        "mediaId": "1c9a7d3f-4e4b-4b64-8d8f-9a2b3c4d5e6f",
+                        "fit": "cover"
+                    },
+                    "shape": "hexagon",
+                    "size": "lg",
+                    "showLabel": true
+                },
+                "sources": {
+                    "content": "implicit",
+                    "icon": null,
+                    "iconColor": null,
+                    "background": null,
+                    "fallback": null,
+                    "fit": "system",
+                    "shape": "value",
+                    "size": "template",
+                    "showLabel": "system"
+                }
+            }
+        },
+        {
+            "name": "facet self ignores defaults (independent)",
+            "facet": {
+                "defaults": {
+                    "shape": "arch",
+                    "icon": "gift",
+                    "content": "icon"
+                }
+            },
+            "context": {},
+            "expected": {
+                "visual": {
+                    "content": "none",
+                    "shape": "circle",
+                    "size": "md",
+                    "showLabel": true
+                },
+                "sources": {
+                    "content": "system",
+                    "icon": null,
+                    "iconColor": null,
+                    "background": null,
+                    "fallback": null,
+                    "fit": null,
+                    "shape": "system",
+                    "size": "system",
+                    "showLabel": "system"
+                }
+            }
+        },
+        {
+            "name": "facet self icon with label hidden",
+            "facet": {
+                "self": {
+                    "icon": "moon",
+                    "iconColor": "#0f766e",
+                    "showLabel": false
+                }
+            },
+            "context": {},
+            "expected": {
+                "visual": {
+                    "content": "icon",
+                    "icon": "moon",
+                    "iconColor": "#0f766e",
+                    "shape": "circle",
+                    "size": "md",
+                    "showLabel": false
+                },
+                "sources": {
+                    "content": "implicit",
+                    "icon": "value",
+                    "iconColor": "value",
+                    "background": null,
+                    "fallback": null,
+                    "fit": null,
+                    "shape": "system",
+                    "size": "system",
+                    "showLabel": "value"
+                }
+            }
+        }
+    ]
+}

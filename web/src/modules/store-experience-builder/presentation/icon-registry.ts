@@ -38,6 +38,35 @@ export const ICON_KEYS = [
   "users",
   "lock",
   "globe",
+  // AWJ-VD-H1 / VD-1a (D-10): occasion, recipient and activity icons for facet visuals — appended only.
+  "cake",
+  "graduation-cap",
+  "baby",
+  "flower",
+  "gem",
+  "party-popper",
+  "user",
+  "user-round",
+  "briefcase",
+  "house",
+  "hand-heart",
+  "heart-handshake",
+  "moon",
+  "sun",
+  "coffee",
+  "crown",
+  "trophy",
+  "smile",
+  "paw-print",
+  "shirt",
+  "watch",
+  "book-open",
+  "music",
+  "palette",
+  "school",
+  "stethoscope",
+  "utensils",
+  "snowflake",
 ] as const;
 
 export type IconKey = (typeof ICON_KEYS)[number];
@@ -170,6 +199,146 @@ export const ICON_REGISTRY: Readonly<Record<IconKey, IconInfo>> = {
   globe: {
     label: { ar: "عالمي", en: "Globe" },
     tags: ["world", "international", "language", "دولي", "لغة"],
+    directional: false,
+  },
+  cake: {
+    label: { ar: "كعكة", en: "Cake" },
+    tags: ["birthday", "celebration", "عيد ميلاد", "احتفال"],
+    directional: false,
+  },
+  "graduation-cap": {
+    label: { ar: "تخرّج", en: "Graduation" },
+    tags: ["graduation", "school", "certificate", "تخرج", "شهادة"],
+    directional: false,
+  },
+  baby: {
+    label: { ar: "مولود", en: "Baby" },
+    tags: ["newborn", "birth", "kids", "مولود جديد", "أطفال"],
+    directional: false,
+  },
+  flower: {
+    label: { ar: "زهرة", en: "Flower" },
+    tags: ["flowers", "bouquet", "rose", "ورد", "باقة"],
+    directional: false,
+  },
+  gem: {
+    label: { ar: "جوهرة", en: "Gem" },
+    tags: ["jewelry", "diamond", "engagement", "luxury", "مجوهرات", "خطوبة"],
+    directional: false,
+  },
+  "party-popper": {
+    label: { ar: "احتفال", en: "Party" },
+    tags: ["party", "congratulations", "celebration", "تهنئة", "حفلة"],
+    directional: false,
+  },
+  user: {
+    label: { ar: "شخص", en: "Person" },
+    tags: ["him", "man", "father", "husband", "له", "رجل"],
+    directional: false,
+  },
+  "user-round": {
+    label: { ar: "شخص", en: "Person (round)" },
+    tags: ["her", "woman", "mother", "wife", "لها", "امرأة"],
+    directional: false,
+  },
+  briefcase: {
+    label: { ar: "عمل", en: "Work" },
+    tags: ["boss", "colleague", "office", "corporate", "مدير", "زميل"],
+    directional: false,
+  },
+  house: {
+    label: { ar: "منزل", en: "Home" },
+    tags: ["home", "housewarming", "family", "بيت", "عائلة"],
+    directional: false,
+  },
+  "hand-heart": {
+    label: { ar: "عطاء", en: "Care" },
+    tags: ["care", "thanks", "gratitude", "شكر", "امتنان"],
+    directional: false,
+  },
+  "heart-handshake": {
+    label: { ar: "مودّة", en: "Friendship" },
+    tags: ["friend", "friendship", "partner", "صديق", "صداقة"],
+    directional: false,
+  },
+  moon: {
+    label: { ar: "هلال", en: "Moon" },
+    tags: ["ramadan", "eid", "night", "رمضان", "عيد"],
+    directional: false,
+  },
+  sun: {
+    label: { ar: "شمس", en: "Sun" },
+    tags: ["summer", "morning", "day", "صيف", "صباح"],
+    directional: false,
+  },
+  coffee: {
+    label: { ar: "قهوة", en: "Coffee" },
+    tags: ["coffee", "cafe", "hospitality", "ضيافة", "مقهى"],
+    directional: false,
+  },
+  crown: {
+    label: { ar: "تاج", en: "Crown" },
+    tags: ["premium", "vip", "royal", "luxury", "فاخر", "ملكي"],
+    directional: false,
+  },
+  trophy: {
+    label: { ar: "كأس", en: "Trophy" },
+    tags: ["success", "achievement", "winner", "نجاح", "إنجاز"],
+    directional: false,
+  },
+  smile: {
+    label: { ar: "ابتسامة", en: "Smile" },
+    tags: ["happy", "joy", "fun", "سعادة", "فرح"],
+    directional: false,
+  },
+  "paw-print": {
+    label: { ar: "حيوان أليف", en: "Pet" },
+    tags: ["pet", "animal", "cat", "dog", "حيوانات"],
+    directional: false,
+  },
+  shirt: {
+    label: { ar: "ملابس", en: "Clothing" },
+    tags: ["fashion", "clothes", "apparel", "أزياء", "موضة"],
+    directional: false,
+  },
+  watch: {
+    label: { ar: "ساعة يد", en: "Watch" },
+    tags: ["watch", "accessories", "time", "إكسسوارات"],
+    directional: false,
+  },
+  "book-open": {
+    label: { ar: "كتاب", en: "Book" },
+    tags: ["book", "reading", "education", "قراءة", "تعليم"],
+    directional: false,
+  },
+  music: {
+    label: { ar: "موسيقى", en: "Music" },
+    tags: ["music", "song", "audio", "أغاني"],
+    directional: false,
+  },
+  palette: {
+    label: { ar: "فن", en: "Art" },
+    tags: ["art", "colors", "design", "creative", "ألوان", "تصميم"],
+    directional: false,
+  },
+  school: {
+    label: { ar: "مدرسة", en: "School" },
+    tags: ["school", "teacher", "back to school", "معلم", "دراسة"],
+    directional: false,
+  },
+  stethoscope: {
+    label: { ar: "صحة", en: "Health" },
+    tags: ["health", "doctor", "get well", "medical", "طبيب", "شفاء"],
+    directional: false,
+  },
+  utensils: {
+    label: { ar: "طعام", en: "Food" },
+    tags: ["food", "restaurant", "dining", "مطعم", "أكل"],
+    directional: false,
+  },
+  snowflake: {
+    label: { ar: "شتاء", en: "Winter" },
+    tags: ["winter", "cold", "season", "برد", "موسم"],
     directional: false,
   },
 };
