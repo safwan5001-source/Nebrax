@@ -33,7 +33,9 @@ class Rbac
             'cost_centers.view', 'cost_centers.manage',
             // الفروع بنية تنظيمية: العرض متاح للعمل اليومي، والإدارة للمالك/المدير فقط.
             'branches.view',
-            'accounts.view', 'reports.view', 'zatca.view',
+            // REM-37: الإرسال إلى ZATCA سلطة مستقلة عن `zatca.view` (قراءة) وعن
+            // `invoices.manage` — فصلُ مهام. المحاسب يحتفظ بقدرته السابقة؛ staff لا.
+            'accounts.view', 'reports.view', 'zatca.view', 'zatca.submit',
         ],
         'staff' => [
             'partners.view', 'products.view', 'invoices.view', 'delivery_notes.view',
@@ -82,6 +84,11 @@ class Rbac
         'users.view', 'users.manage',
             'roles.view', 'roles.manage',
             'reports.view', 'zatca.view',
+            // REM-37 / SEC-07: إنشاء محاولة الإرسال إلى ZATCA وإرسالها (طابور) — مستقلة عن
+            // `zatca.view` (القراءة) وعن `invoices.manage`. owner/admin عبر `*`؛ ولا تُضاف
+            // لـ staff/self_service. هجرة التوافق أضافتها مرة واحدة لكل دور مخزَّن كان يملك
+            // `invoices.manage`؛ لا مسار بديل عبر `invoices.manage` بعد ذلك.
+            'zatca.submit',
             // استثناء سعري محروس: owner/admin يملكانه عبر `*`، ويُسند صراحةً
             // فقط إلى دور مخصص وافق المستأجر على منحه سلطة البيع تحت الحد.
             'sales.minimum_price_override',
