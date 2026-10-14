@@ -1,4 +1,4 @@
-# نشر واجهة نبراس على Vercel
+# نشر واجهة أَوْج — Railway للإنتاج وVercel كخيار بديل
 
 > **الإنتاج الحالي لأَوْج ليس على Vercel.** الواجهة الحيّة تعمل على **Railway**: مشروع «أَوْج AWJ»، بيئة
 > `production`، خدمة **`Nebrax`** (من `main`، الجذر `/web`؛ النطاقات `awj.up.railway.app` و`awjdev.xyz`
@@ -11,7 +11,7 @@
 
 > الواجهة (Next.js) تعيش في المجلد الفرعي **`web/`** من المستودع.
 > الـ backend (Laravel/PHP) **لا يُنشر على Vercel** — يحتاج استضافة PHP منفصلة
-> (Railway / Render / خادم). Vercel للواجهة فقط.
+> (Railway / Render / خادم). في سيناريو النشر البديل على Vercel، تُنشر الواجهة فقط؛ أما الـbackend (Laravel/PHP) فيحتاج استضافة PHP منفصلة.
 
 ## سبب خطأ `404: NOT_FOUND`
 
