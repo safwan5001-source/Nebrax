@@ -1,6 +1,8 @@
 # REM-06 / ACC-02 — Semantic VAT Account Routing: accounting contract & decision gate
 
-STATUS: **PHASE 1 COMPLETE · OWNER DECISIONS R6-1/R6-2 = OPTION A (APPROVED), R6-3 NOT APPLICABLE · PHASE 2 IMPLEMENTED (see `REM-06-ACC-02-IMPLEMENTATION-REPORT.md`). Draft PR — not merged, not deployed.**
+STATUS: **PHASE 1 COMPLETE · OWNER DECISIONS R6-1/R6-2 = OPTION A (APPROVED), R6-3 NOT APPLICABLE · PHASE 2 IMPLEMENTED AND MERGED (PR #1473, merge `76b05f69a32fb7d2c5d741708661261dfc01d6cf`; see `REM-06-ACC-02-IMPLEMENTATION-REPORT.md`). Production deployment NOT VERIFIED.**
+
+> **Status correction (2026-10-14, post-merge).** This report was authored while the change was a Draft PR ("NOT MERGED"). Current verified state: PR #1473 merged, merge SHA `76b05f69a32fb7d2c5d741708661261dfc01d6cf`, post-merge `CI` run #9596 (sqlite + pgsql) success; **production deployment NOT VERIFIED**. The body below is otherwise unchanged and still describes the state at authoring; where it says "Draft" or "not merged" this note supersedes it. Cross-horizon status: `TAX-ZATCA-RECONCILIATION-AUDIT.md`.
 DATE: 2026-10-14 · ZONE: C — tax / accounting · BASE: `origin/main` @ `a8a950508d533805530c324d51595fe46cdaa682` (REM-05 merge)
 
 > Not legal or tax advice. No statement of ZATCA compliance, filing readiness or production readiness. Owner clarification applied: all current AWJ data is experimental — this removes the need for legacy-data workarounds but **not** for correct, auditable, production-grade accounting. Nothing is deleted, reset, migrated or rewritten.

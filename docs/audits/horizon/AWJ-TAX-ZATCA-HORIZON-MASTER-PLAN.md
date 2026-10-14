@@ -3,7 +3,7 @@
 > **Owner activation decision — 2026-10-11:** Pause AWJ Delivery Platforms & Settlement Horizon V1 and designate TAX-ZATCA the sole active Horizon **effective once this documentation PR merges**. Preserve Delivery evidence and resume point; do not execute both in parallel. The initial approved activity is the read-only TAX-HZ-00 Evidence/Decision Pass. This approval does **not** authorize remediation code, a PR merge without specific owner approval, Deploy, ZATCA submission, or production migration. This decision supersedes the initial proposal's unresolved active-versus-parallel gate below.
 
 
-**Status:** PROPOSED / DOCUMENTED — not activated, not released, not ZATCA-certified  
+**Status:** PROPOSED / DOCUMENTED — not released, not ZATCA-certified. *Activation:* superseded by the owner decision above (TAX-ZATCA active since #1324). *Current task status:* `TAX-ZATCA-RECONCILIATION-AUDIT.md` (2026-10-14).  
 **Prepared:** 2026-10-11  
 **Repository:** `safwan5001-source/Nebrax`
 
@@ -26,6 +26,8 @@ Run the existing VAT / ZATCA remediation programme using **نظام الأفق /
 - PR **#1315** (credit-note print/PDF reconciliation) merged as `3209fcb77cc4e02b729bb74c34adf7e131869a1b`.
 - PR **#1320** (print visual verification evidence) merged as `265974693502bc734ff0e9dbd12123bf3f345b51`.
 These are **merged code/docs** status only, not evidence of production deployment, ZATCA onboarding, live endpoint success or tax compliance.
+
+> *Update 2026-10-14:* this list is the bootstrap snapshot. REM-03/03b, REM-04, REM-05, REM-06, REM-08, REM-11, REM-37 and TAX-N01 have since been merged; see `TAX-ZATCA-RECONCILIATION-AUDIT.md` for the verified merge SHAs, remaining work and the historical (August 2026) ZATCA pipeline PRs.
 
 ## Existing-horizon isolation / activation gate
 At the time this plan was drafted, `docs/autonomous-engineering/CURRENT-STATE.md` designates **AWJ Delivery Platforms & Settlement Horizon V1** as the single ACTIVE horizon, and its task queue has a separate active segment. This plan **does not overwrite or silently terminate that horizon**, nor edit the global `CURRENT-STATE.md`, `TASK-QUEUE.md` or `MASTER-EXECUTION-PLAN.md`.

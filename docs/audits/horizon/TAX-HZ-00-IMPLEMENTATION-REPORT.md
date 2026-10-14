@@ -1,6 +1,6 @@
 # TAX-HZ-00 — Implementation Report (ZATCA Official Evidence & Remediation Priorities)
 
-STATUS: COMPLETE — documentation only; **awaiting owner review; NOT merged**
+STATUS: COMPLETE — documentation only; **merged as PR #1398 (`0c90419874594169d422515e881425e5b3b3fa70`)**. Historical snapshot at `main` `4781a45` (2026-10-13); its task counts pre-date REM-03…REM-37 — current reconciliation: `TAX-ZATCA-RECONCILIATION-AUDIT.md`
 DATE: 2026-10-13
 HORIZON: TAX-ZATCA (active since PR #1324 merge `21fed642f735ec5bcedb55c0f5e10548c7df6d5f`, 2026-10-11T19:31:56Z — verified via GitHub; Delivery Platforms Horizon remains paused)
 ZONE: C (tax, accounting, ZATCA credentials, tenant isolation) — read-only research; no Zone C code touched

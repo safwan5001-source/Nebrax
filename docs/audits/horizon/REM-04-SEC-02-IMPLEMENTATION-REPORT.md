@@ -1,6 +1,8 @@
 # REM-04 / SEC-02 — Implementation Report: PostgreSQL posting deadlock (invoice posting vs payment / draft creation)
 
-STATUS: **DRAFT PR — NOT MERGED — NOT DEPLOYED** (CI on the final head is recorded in the PR comment)
+STATUS: **MERGED** (PR #1450, merge `899bcba4f3ecfbe4bf504c2276db2dc817daff42`) · **CI verified** · **Production deployment NOT VERIFIED**
+
+> **Status correction (2026-10-14, post-merge).** This report was authored while the change was a Draft PR ("NOT MERGED"). Current verified state: PR #1450 merged, merge SHA `899bcba4f3ecfbe4bf504c2276db2dc817daff42`, post-merge `CI` run #9456 success; **production deployment NOT VERIFIED**. Superseded in part by the merged follow-up #1461 (`51851c04ae11ac90c14e223bc44456765d0dc535`, `CI` run #9515 success). The body below is otherwise unchanged and still describes the state at authoring; where it says "Draft" or "not merged" this note supersedes it. Cross-horizon status: `TAX-ZATCA-RECONCILIATION-AUDIT.md`.
 DATE: 2026-10-14
 HORIZON: TAX-ZATCA (origin: AWJ-TAX-ZATCA-AUDIT-1 SEC-02 → TAX-HZ-00 backlog REM-04)
 ZONE: C — financial posting path / PostgreSQL concurrency
