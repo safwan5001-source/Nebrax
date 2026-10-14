@@ -414,12 +414,13 @@ class VatRoleIntegrityTest extends TestCase
     }
 
     /** @test */
-    public function a_credit_note_posted_to_the_hard_coded_account_after_a_remap_is_still_reported(): void
+    public function a_credit_note_after_a_remap_uses_the_current_role_and_the_report_stays_complete(): void
     {
-        // REM-06: الإشعار ما زال يرحّل إلى 2120 بالكود. التقرير يبقى كاملاً بفضل الحساب النظامي في المجموعة.
+        // REM-06 (R6-1): الإشعار يحلّ الدور الحالي وقت الترحيل (2125)، لا حساب الفاتورة الأصلية (2120).
+        // الفاتورة قبل إعادة التعيين ⇒ توزيع الأستاذ منقسم، والتقرير (مجموعة الدور) كاملٌ وموثَّق.
+        $invoice = $this->invoice('2026-01-10');                 // VAT 150.00 دائن 2120
         $custom = $this->account('2125', 'liability');
         $this->map('tax_output', $custom);
-        $invoice = $this->invoice('2026-02-10');   // 15000 على 2125
 
         $noteId = $this->withToken($this->token)->postJson('/api/credit-notes', [
             'partner_id' => $this->customer->id,
@@ -431,11 +432,13 @@ class VatRoleIntegrityTest extends TestCase
 
         $report = $this->tax();
         $this->assertSame(0, $report['output_vat']);          // 15000 دائن − 15000 مدين (إشعار كامل)
-        $this->assertTrue($report['verification']['verified']);
+        $this->assertSame('verified', $report['verification']['status']);
 
-        // التوزيع الدفتري منقسم حتى REM-06: الدائن على 2125 والمدين على 2120.
-        $this->assertSame(15000, $this->net($custom, 'credit'));
-        $this->assertSame(-15000, $this->net($this->byCode('2120'), 'credit'));
+        // الأستاذ: 2120 دائن 150.00 (الفاتورة)، 2125 مدين 150.00 (الإشعار) — الفرق مع سطر الإقفال مُفصَح عنه.
+        $this->assertSame(15000, $this->net($this->byCode('2120'), 'credit'));
+        $this->assertSame(-15000, $this->net($custom, 'credit'));
+        $disclosure = collect($report['disclosures'])->firstWhere('role_key', 'tax_output');
+        $this->assertSame([-15000, 0, 15000], [$disclosure['current_balance'], $disclosure['set_balance'], $disclosure['difference']]);
         $this->balanced();
     }
 
