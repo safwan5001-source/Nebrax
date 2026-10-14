@@ -11,6 +11,7 @@ use App\Models\InvoiceLine;
 use App\Models\InvoiceLineCostCenterAllocation;
 use App\Models\JournalLine;
 use App\Models\Product;
+use App\Models\Tenant;
 use App\Models\User;
 use App\Support\DocumentLineVariantResolver;
 use App\Support\PrintTemplateContract;
@@ -1150,6 +1151,14 @@ class InvoiceService
         if ($invoice->is_paid) {
             return;
         }
+
+        // REM-04 / SEC-02: مِرساة المستأجر **قبل** صف العميل — الترتيب العام (انظر `SourceInvoiceLock`):
+        // الفاتورة ← المِرساة ← العميل. كان العميل يُقفل أولاً ثم تُطلب المِرساة داخل `LedgerService`،
+        // فكانت أي معاملة تمسك المِرساة ثم تُدرج صفاً بمفتاح أجنبي إلى العميل (سند قبض بلا فرع نشط،
+        // أو `settle()` لفاتورة مسدَّدة) تُكوِّن دورةً مع هذا المسار ⇒ `40P01` على PostgreSQL.
+        // المِرساة نفسها يطلبها `LedgerService` لاحقاً (إعادة-دخولية داخل المعاملة)، فلا يتغيّر ما يُقفل،
+        // بل متى. وبذا يُقرأ رصيد الذمم أدناه تحتها: يرى كل ما التزمته معاملةٌ سبقتها على المِرساة.
+        Tenant::whereKey($invoice->tenant_id)->lockForUpdate()->first(['id']);
 
         // قفل صف العميل يسلسل فواتيره الآجلة المتزامنة، فلا تعبر فاتورتان الحد معاً.
         // خارج عزل الفرع: عميلٌ لا يراه الفرع النشط كان سيُقرأ null فيسقط الحدّ الائتماني صامتاً.
