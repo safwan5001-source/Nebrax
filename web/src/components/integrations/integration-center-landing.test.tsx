@@ -17,6 +17,7 @@ function renderLanding(
     summary: DeliverySummary | null;
     summaryStatus: SummaryStatus;
     canOpenApplications: boolean;
+    communicationsAllowed: boolean;
     onRetry: () => void;
   }> = {},
 ) {
@@ -40,7 +41,7 @@ function renderLanding(
 describe.each(TEST_LOCALES)('Integration Center landing (%s)', (locale) => {
   const m = TEST_MESSAGES[locale].integrationCenter;
 
-  it('shows the title and four cards in the approved order', () => {
+  it('shows the title and five cards in the approved order (communications appended last)', () => {
     renderLanding(locale);
 
     expect(screen.getByRole('heading', { level: 1, name: m.title })).toBeTruthy();
@@ -50,8 +51,9 @@ describe.each(TEST_LOCALES)('Integration Center landing (%s)', (locale) => {
       'integration-card-ecommerce',
       'integration-card-payments',
       'integration-card-shipping',
+      'integration-card-communications',
     ]);
-    for (const title of [m.delivery.title, m.ecommerce.title, m.payments.title, m.shipping.title]) {
+    for (const title of [m.delivery.title, m.ecommerce.title, m.payments.title, m.shipping.title, m.communications.title]) {
       expect(screen.getByRole('heading', { level: 2, name: title })).toBeTruthy();
     }
   });
@@ -216,6 +218,52 @@ describe.each(TEST_LOCALES)('Integration Center landing (%s)', (locale) => {
     renderLanding(locale, { summary: READY_SUMMARY });
 
     expect(document.body.textContent ?? '').not.toContain('integrationCenter.');
+  });
+});
+
+describe.each(TEST_LOCALES)('Integration Center landing — communications providers card (%s)', (locale) => {
+  const m = TEST_MESSAGES[locale].integrationCenter;
+
+  it('allowed: a second link to the static catalog with an accessible name, description and a non-active badge', () => {
+    renderLanding(locale, { communicationsAllowed: true });
+
+    const links = screen.getAllByRole('link');
+    expect(links.map((a) => a.getAttribute('href'))).toEqual(['/integrations/delivery-platforms', '/integrations/communications']);
+    const link = screen.getByRole('link', { name: m.communications.title });
+    expect(link.getAttribute('data-testid')).toBe('integration-card-communications');
+    expect(link.getAttribute('aria-describedby')).toBeTruthy();
+    expect(link.textContent).toContain(m.communications.description);
+    expect(link.textContent).toContain(m.communications.badge);
+    expect(link.querySelector('svg.rtl\\:rotate-180')).not.toBeNull();
+    expect(screen.queryAllByRole('button')).toHaveLength(0);
+  });
+
+  it('allowed: keyboard reaches both active cards in order and never the inert ones', async () => {
+    const user = userEvent.setup();
+    renderLanding(locale, { communicationsAllowed: true });
+
+    await user.tab();
+    expect(document.activeElement).toBe(screen.getByTestId('integration-card-delivery'));
+    await user.tab();
+    expect(document.activeElement).toBe(screen.getByTestId('integration-card-communications'));
+  });
+
+  it('denied (the default): inert, no link, with the denial note, in both locales', () => {
+    renderLanding(locale);
+
+    const card = screen.getByTestId('integration-card-communications');
+    expect(card.tagName).toBe('DIV');
+    expect(card.getAttribute('data-state')).toBe('denied');
+    expect(within(card).getByRole('note').textContent).toBe(m.communications.denied);
+    expect(card.querySelectorAll('a, button, [tabindex]')).toHaveLength(0);
+  });
+
+  it('never shows a connected or active claim on the card', () => {
+    renderLanding(locale, { communicationsAllowed: true });
+
+    const text = screen.getByTestId('integration-card-communications').textContent ?? '';
+    expect(text).not.toMatch(/(connected|active|enabled|متصل|مفعّل|نشط)/i);
+    expect(screen.getByText(m.communications.badge).className).not.toMatch(/positive/);
   });
 });
 

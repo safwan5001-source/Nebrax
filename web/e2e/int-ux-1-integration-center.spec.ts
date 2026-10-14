@@ -127,13 +127,17 @@ for (const [locale, dir] of LOCALES) {
 
         // ترتيب البطاقات وتكوينها: شبكة 2×2 على المكتب (RTL: التوصيل يمين المتاجر)، وعمود واحد على الجوال.
         const box = async (id: string) => (await page.getByTestId(`integration-card-${id}`).boundingBox())!;
-        const [d, e, p, s] = [await box('delivery'), await box('ecommerce'), await box('payments'), await box('shipping')];
+        const [d, e, p, s, c] = [await box('delivery'), await box('ecommerce'), await box('payments'), await box('shipping'), await box('communications')];
         if (info.project.name === 'mobile') {
-          expect(new Set([d.x, e.x, p.x, s.x].map(Math.round)).size).toBe(1);
+          expect(new Set([d.x, e.x, p.x, s.x, c.x].map(Math.round)).size).toBe(1);
           expect(d.y).toBeLessThan(e.y);
           expect(e.y).toBeLessThan(p.y);
           expect(p.y).toBeLessThan(s.y);
+          expect(s.y).toBeLessThan(c.y);
         } else {
+          // AWJ-COMMS-UX-01: البطاقة الخامسة تبدأ صفاً ثالثاً عند حافة البداية نفسها، دون أن تحرّك المواضع المعتمدة.
+          expect(c.y).toBeGreaterThan(p.y + p.height - 1);
+          expect(Math.abs(c.x - p.x)).toBeLessThan(2);
           expect(Math.abs(d.y - e.y)).toBeLessThan(2);
           expect(Math.abs(p.y - s.y)).toBeLessThan(2);
           expect(p.y).toBeGreaterThan(d.y + d.height - 1);
@@ -144,11 +148,13 @@ for (const [locale, dir] of LOCALES) {
         // لا تمرير أفقي للصفحة.
         expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
 
-        // مكان تركيز واحد في المركز، والخاملة لا تُركَّز ولا تُنقَر.
-        expect(await root.locator('a[href], button, input, select, textarea, [tabindex]').count()).toBe(1);
+        // مكانا تركيز في المركز (منصات التوصيل ثم مزوّدو الاتصالات)، والخاملة لا تُركَّز ولا تُنقَر.
+        expect(await root.locator('a[href], button, input, select, textarea, [tabindex]').count()).toBe(2);
         const delivery = page.getByTestId('integration-card-delivery');
         await delivery.focus();
         expect(await delivery.evaluate((el) => el === document.activeElement)).toBe(true);
+        await page.keyboard.press('Tab');
+        expect(await page.getByTestId('integration-card-communications').evaluate((el) => el === document.activeElement)).toBe(true);
         await page.keyboard.press('Tab');
         expect(await page.evaluate(() => !!document.activeElement?.closest('[data-testid="integration-center"]'))).toBe(false);
         const urlBefore = page.url();
@@ -170,6 +176,9 @@ for (const [locale, dir] of LOCALES) {
           '[data-testid="integration-card-delivery"] span.bg-primary-soft',
           '[data-testid="integration-center-summary"] li',
           '[data-testid="integration-card-ecommerce"] p',
+          '[data-testid="integration-card-communications"] h2',
+          '[data-testid="integration-card-communications"] p',
+          '[data-testid="integration-card-communications"] span',
           '[data-testid="integration-center-planned-note"]',
         ]) {
           const ratio = await contrast(page, sel);
@@ -203,6 +212,7 @@ test.describe('states (ar/light and en/dark)', () => {
       await open(page, { scenario: 'allowed', locale, theme, role: 'custom', permissions: ['reports.view'] });
       const card = page.getByTestId('integration-card-delivery');
       await expect(card).toHaveAttribute('data-state', 'denied');
+      await expect(page.getByTestId('integration-card-communications')).toHaveAttribute('data-state', 'denied');
       expect(await page.getByTestId('integration-center').locator('a[href]').count()).toBe(0);
       await shot(page, `${info.project.name}-${locale}-${theme}-denied`);
     });
@@ -238,4 +248,108 @@ test('the sidebar lists the entry under Settings for a user with invoices.view',
   await expect(link).toHaveCount(1);
   await expect(link).toContainText('Integration Center');
   await expect(link).toHaveAttribute('aria-current', 'page');
+});
+
+// ── AWJ-COMMS-UX-01: كتالوج مزوّدي الاتصالات (ثابت، بلا شبكة) ──────────────────────────────────────
+const PROVIDER_KEYS = [
+  'unifonic', 'twilio-sms', 'whatsapp-business-platform', 'amazon-ses', 'postmark',
+  'firebase-cloud-messaging', 'apple-push-notification-service',
+];
+
+async function openCommunications(page: Page, opts: { locale: 'ar' | 'en'; theme: 'light' | 'dark'; permissions?: string[]; role?: string }) {
+  await page.context().addCookies([{ name: 'locale', value: opts.locale, url: baseUrl }]);
+  await mockApi(page, 'allowed');
+  const user = {
+    id: 'u1', name: 'المالك', email: 'owner@test', tenant_id: 't1',
+    role: opts.role ?? 'owner', permissions: opts.permissions ?? ['*'],
+  };
+  await page.addInitScript(([theme, userJson]) => {
+    localStorage.setItem('token', 'test-token');
+    localStorage.setItem('user', userJson);
+    localStorage.setItem('theme', theme);
+  }, [opts.theme, JSON.stringify(user)] as const);
+  await page.goto(`${baseUrl}/integrations/communications`, { waitUntil: 'domcontentloaded' });
+}
+
+for (const [locale, dir] of LOCALES) {
+  for (const theme of THEMES) {
+    test.describe(`communications catalog ${locale}/${theme}`, () => {
+      test('lists known providers honestly: no connected claim, no controls, official WhatsApp logo only, responsive, AA contrast', async ({ page }, info) => {
+        const requests: string[] = [];
+        page.on('request', (request) => { if (new URL(request.url()).pathname.includes('/api/')) requests.push(request.url()); });
+        await openCommunications(page, { locale, theme });
+        const root = page.getByTestId('communications-catalog');
+        await expect(root).toBeVisible();
+
+        expect(await page.evaluate(() => document.documentElement.dir)).toBe(dir);
+        expect(await page.evaluate(() => document.documentElement.lang)).toBe(locale);
+        expect(await page.evaluate(() => document.documentElement.classList.contains('dark'))).toBe(theme === 'dark');
+
+        for (const key of PROVIDER_KEYS) await expect(page.getByTestId(`communications-provider-${key}`)).toBeVisible();
+        await expect(page.getByTestId('communications-truth-note')).toBeVisible();
+
+        // لا شيء يُصوَّر متصلاً، ولا عنصر تحكم، والرابط الوحيد مسار التنقّل.
+        expect(await root.locator('[data-status="connected"]').count()).toBe(0);
+        expect(await root.locator('button, input, select, textarea, form').count()).toBe(0);
+        expect(await root.locator('a[href]').count()).toBe(1);
+        expect(await root.locator('[class*="positive"]').count()).toBe(0);
+
+        // الشعار الرسمي لـWhatsApp فقط وقد حُمِّل فعلاً؛ الباقي أيقونة عامة. لا طلب خارجي لصور.
+        const logos = root.locator('img[data-mark="official"]');
+        await expect(logos).toHaveCount(1);
+        expect(await logos.first().evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0)).toBe(true);
+        expect(await root.locator('[data-mark="generic"]').count()).toBe(PROVIDER_KEYS.length - 1);
+
+        // الصفحة ثابتة: لا تطلب شيئاً خاصاً بها (طلبات هيكل التطبيق العامة كالإشعارات والفروع ليست منها).
+        expect(requests.filter((url) => /delivery|communication|provider|integration/i.test(new URL(url).pathname))).toEqual([]);
+
+        // لا تمرير أفقي، وبطاقات المزوّدين داخل حدود الشاشة.
+        expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
+        const widthLimit = await page.evaluate(() => window.innerWidth);
+        for (const key of PROVIDER_KEYS) {
+          const box = (await page.getByTestId(`communications-provider-${key}`).boundingBox())!;
+          expect(box.x).toBeGreaterThanOrEqual(-1);
+          expect(box.x + box.width).toBeLessThanOrEqual(widthLimit + 1);
+        }
+        if (info.project.name === 'mobile') {
+          const first = (await page.getByTestId('communications-provider-unifonic').boundingBox())!;
+          const second = (await page.getByTestId('communications-provider-twilio-sms').boundingBox())!;
+          expect(Math.round(first.x)).toBe(Math.round(second.x));
+        }
+
+        for (const sel of [
+          'h1',
+          '[data-testid="communications-truth-note"]',
+          '[data-testid="communications-provider-unifonic"] p',
+          '[data-testid="communications-provider-unifonic"] span.text-warning',
+          '[data-testid="communications-provider-twilio-sms"] span.text-muted',
+          '[data-testid="communications-provider-whatsapp-business-platform"] span.bg-primary-soft',
+          '[data-testid="communications-provider-amazon-ses"] span.border',
+          '[data-testid="communications-boundary"]',
+          '[data-testid="communications-logo-note"]',
+        ]) {
+          const ratio = await contrast(page, sel);
+          expect(ratio, `${sel} contrast`).not.toBeNull();
+          expect(ratio!, `${sel} contrast ${ratio}`).toBeGreaterThanOrEqual(4.5);
+        }
+
+        await shot(page, `${info.project.name}-comms-${locale}-${theme}`);
+      });
+
+      test('the landing card enters the catalog and the breadcrumb returns', async ({ page }) => {
+        await open(page, { scenario: 'allowed', locale, theme });
+        await page.getByTestId('integration-card-communications').click();
+        await expect(page).toHaveURL(/\/integrations\/communications$/);
+        await expect(page.getByTestId('communications-catalog')).toBeVisible();
+        await page.getByTestId('integration-breadcrumb').locator('a[href="/integrations"]').click();
+        await expect(page).toHaveURL(/\/integrations$/);
+      });
+    });
+  }
+}
+
+test('communications catalog: a user without company.manage gets the denial and no provider', async ({ page }) => {
+  await openCommunications(page, { locale: 'en', theme: 'light', role: 'custom', permissions: ['invoices.view'] });
+  await expect(page.getByTestId('communications-restricted')).toBeVisible();
+  expect(await page.locator('[data-testid^="communications-provider-"]').count()).toBe(0);
 });
