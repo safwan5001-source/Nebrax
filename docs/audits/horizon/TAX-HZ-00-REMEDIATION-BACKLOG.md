@@ -125,6 +125,13 @@ REM-03 and REM-08 touch disjoint controllers (`Invoice/Return/Quote/DocumentRevi
 > **Implemented:** `ExpenseService`, `AssetService`, `ReturnService` (sales), `CreditNoteService` (sales + purchase) resolve the VAT role; missing/inactive mapping fails closed; default tenants post identical journals. `PosExchangeService` posts no VAT and is untouched (its legs go through `ReturnService`/`InvoiceService`).
 > **Remaining:** `FiscalCloseService` VAT line reads only the current role account (disclosed in the REM-05 report; separate follow-up); non-VAT hard-coded accounts; no production audit.
 
+### ACC-02-FC — status update (2026-10-15)
+
+> **ACC-02-FC — IN REVIEW (Draft PR), not closed**; closes only after approved merge and verification. Report: `ACC-02-FC-IMPLEMENTATION-REPORT.md`. Resolves the REM-05/06 residual "Fiscal Close VAT line reads only the current role account".
+> **Owner decisions:** FC-1 Option C · FC-1a warning when unverified (no block) · FC-1b retire `fiscal_close_vat_control_differs` after proven consistency · FC-1c keep `details.tax_output/tax_input` names, changed semantics, add `basis` · FC-1d show unresolved roles with a warning · FC-2 as of `fiscal_years.end_date`.
+> **Implemented:** `VatRoleIntegrityService::balancesAsOf()` (REM-05 role-account set, cumulative `entry_date <= end_date`, posted + reversed, company-wide); `FiscalCloseService::vat_balances` item (info / warning); AR/AP calculation unchanged and labelled `all_time_current_account`. Read-only: no posting, schema or ZATCA change.
+> **Remaining:** FC-3 (no stored close snapshot — live recompute; backdating into a closed year changes the figure absent a period lock) and FC-4 (AR/AP basis). VAT return liability and filing readiness remain REM-28. Production NOT VERIFIED.
+
 ### REM-03 — card (ready for owner approval to start)
 
 | Field | Content |

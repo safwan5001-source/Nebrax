@@ -126,7 +126,16 @@ class VatRoleIntegrityService
      */
     public function reportScope(?string $from = null, ?string $to = null, ?array $branchIds = null): array
     {
-        $s = $this->snapshot();
+        return $this->scopeFor($this->snapshot(), $from, $to, $branchIds);
+    }
+
+    /**
+     * @param  array<string,mixed>  $s  لقطة {@see snapshot()} — تُمرَّر كي لا تُقرأ مرتين حين يحتاجها المستدعي أيضاً.
+     * @param  list<string>|null  $branchIds
+     * @return array<string,mixed>
+     */
+    private function scopeFor(array $s, ?string $from, ?string $to, ?array $branchIds): array
+    {
         $inputSet = array_keys($s['sets']['tax_input']);
         $outputSet = array_keys($s['sets']['tax_output']);
         $overlap = array_values(array_intersect($inputSet, $outputSet));
@@ -183,7 +192,9 @@ class VatRoleIntegrityService
                 'output' => $describe($outputIds, 'tax_output'),
             ],
             'warnings' => $warnings,
-            'disclosures' => $this->fiscalCloseDisclosures($s, $inputIds, $outputIds),
+            // ACC-02-FC: كان يُعلن فرق سطر الإقفال المالي عن التقرير. سطر الإقفال صار يقرأ مجموعة الحسابات نفسها
+            // حتى تاريخ نهاية السنة (`balancesAsOf`) فلا فرق يُعلن. المفتاح باقٍ فارغاً للتوافق مع العقد.
+            'disclosures' => [],
         ];
     }
 
@@ -232,64 +243,82 @@ class VatRoleIntegrityService
     }
 
     /**
-     * إفصاحٌ عن فرق سطر «ضريبة القيمة المضافة» في جاهزية الإقفال المالي: `FiscalCloseService::roleBalance`
-     * يقرأ **الحساب الحالي للدور وحده** (كل الزمن، كل الفروع)، بينما هذا التقرير يجمع مجموعة الحسابات.
-     * بعد إعادة تعيين (أو بحساب نظامي مكتوب بالكود — REM-06) يختلف الرقمان. هنا يُحسب الفرق ويُعلن
-     * بنفس تعريف الإقفال (كل الزمن، بلا مرشّح فروع) كي يُقارن الرقمان بلا لبس؛ لا يغيّر التوثيق ولا الإقفال.
+     * ACC-02-FC — أرصدة ضريبة القيمة المضافة **حتى** تاريخ (نهاية السنة المالية) على مجموعة حسابات REM-05 نفسها.
      *
-     * @param  list<string>  $inputIds
-     * @param  list<string>  $outputIds
-     * @return list<array<string,mixed>>
+     * الأساس (مصدر واحد للإقفال المالي وتقرير الضريبة):
+     *   • مجموعة حسابات كل دور = التعيين الحالي ∪ الحساب النظامي ∪ سجلّ التعيينات، والمتداخل يُنسب بنوعه
+     *     (`scopeFor`) فلا يُعدّ مرتين.
+     *   • تراكمي: `entry_date <= $asOf` بلا حدّ أدنى، قيود `posted` و`reversed` (الأصل + العاكس يتعادلان).
+     *   • مؤسسيّ: بلا مرشّح فرع؛ مقيَّد بالمستأجر عبر نطاق `JournalLine`.
+     *   • الإشارة: مخرجات = دائن − مدين، مدخلات = مدين − دائن (كما تقرير الضريبة).
+     *   • الدور غير القابل للحلّ (غير معيَّن/معطَّل/تجميعي/محذوف) يُعرض برصيده التاريخي مع `mapping_state` لا يُخفى.
+     * القراءة فقط: لا يكتب ولا يعيد تصنيف أي قيد. هذا رصيدٌ دفتريّ حتى تاريخ، لا التزام إقرار ولا جاهزية تقديم.
+     *
+     * @return array{
+     *     as_of: string,
+     *     roles: array<string, array{balance:int, mapping_state:string, accounts:list<array<string,mixed>>, current_account:?array<string,mixed>}>,
+     *     warnings: list<array<string,mixed>>, verification: array<string,mixed>
+     * }
      */
-    private function fiscalCloseDisclosures(array $s, array $inputIds, array $outputIds): array
+    public function balancesAsOf(string $asOf): array
     {
-        $roleIds = ['tax_output' => $outputIds, 'tax_input' => $inputIds];
-        $currentIds = [];
-        foreach ($roleIds as $roleKey => $ids) {
-            $account = isset($s['mappings'][$roleKey]) ? ($s['accounts'][$s['mappings'][$roleKey]] ?? null) : null;
-            if ($account !== null && $account->is_active && ! $account->is_group) {
-                $currentIds[$roleKey] = $account->id; // نفس شرط الحلّ عند الإقفال؛ غير ذلك يتجاهله الإقفال.
-            }
-        }
-        if ($currentIds === []) {
-            return [];
+        $s = $this->snapshot();
+        $scope = $this->scopeFor($s, null, $asOf, null);
+
+        $ids = array_values(array_unique([...array_keys($s['sets']['tax_input']), ...array_keys($s['sets']['tax_output'])]));
+        $nets = [];
+        if ($ids !== []) {
+            $nets = JournalLine::query()
+                ->join('journal_entries as e', 'e.id', '=', 'journal_lines.journal_entry_id')
+                ->whereIn('journal_lines.account_id', $ids)
+                ->whereIn('e.status', ['posted', 'reversed'])
+                ->whereDate('e.entry_date', '<=', $asOf)
+                ->selectRaw('journal_lines.account_id as account_id, SUM(journal_lines.debit) as d, SUM(journal_lines.credit) as c')
+                ->groupBy('journal_lines.account_id')
+                ->get()
+                ->mapWithKeys(fn ($row) => [(string) $row->account_id => (int) $row->d - (int) $row->c])
+                ->all();
         }
 
-        $nets = JournalLine::query()
-            ->join('journal_entries as e', 'e.id', '=', 'journal_lines.journal_entry_id')
-            ->whereIn('journal_lines.account_id', array_values(array_unique([...$currentIds, ...$inputIds, ...$outputIds])))
-            ->whereIn('e.status', ['posted', 'reversed'])
-            ->selectRaw('journal_lines.account_id as account_id, SUM(journal_lines.debit) as d, SUM(journal_lines.credit) as c')
-            ->groupBy('journal_lines.account_id')
-            ->get()
-            ->mapWithKeys(fn ($row) => [(string) $row->account_id => (int) $row->d - (int) $row->c])
-            ->all();
-        $net = fn (array $ids): int => (int) array_sum(array_map(fn (string $id) => $nets[$id] ?? 0, $ids));
+        // مدين − دائن ⇒ الدور: مدخلات تبقى، مخرجات تنعكس.
+        $signed = fn (string $roleKey, string $id): int => $roleKey === 'tax_input' ? ($nets[$id] ?? 0) : -($nets[$id] ?? 0);
 
-        $disclosures = [];
-        foreach ($currentIds as $roleKey => $currentId) {
-            $account = $s['accounts'][$currentId];
-            $currentNet = $nets[$currentId] ?? 0;
-            $current = $account->normal_balance === 'debit' ? $currentNet : -$currentNet;   // كما في roleBalance
-            $set = $roleKey === 'tax_input' ? $net($roleIds[$roleKey]) : -$net($roleIds[$roleKey]);
-            if ($set === $current) {
-                continue;
-            }
-            $fmt = fn (int $h) => number_format($h / 100, 2);
-            $disclosures[] = [
-                'code' => 'fiscal_close_vat_control_differs',
-                'role_key' => $roleKey,
-                'current_account_code' => $account->code,
-                'current_balance' => $current,
-                'set_balance' => $set,
-                'difference' => $set - $current,
-                'message' => 'سطر ضريبة القيمة المضافة في جاهزية الإقفال المالي لدور «'.AccountingRoles::find($roleKey)['label_ar']
-                    .'» يقرأ الحساب الحالي '.$account->code.' وحده ('.$fmt($current).') بينما مجموع حسابات الدور في هذا التقرير (كل الزمن) '
-                    .$fmt($set).' — الفرق '.$fmt($set - $current).' في حسابات سابقة أو نظامية لا يشملها سطر الإقفال (REM-06).',
+        $roles = [];
+        foreach (self::vatRoleKeys() as $roleKey) {
+            $roleIds = $roleKey === 'tax_input' ? $scope['input_ids'] : $scope['output_ids'];
+            $mappedId = $s['mappings'][$roleKey] ?? null;
+            $mapped = $mappedId !== null ? ($s['accounts'][$mappedId] ?? null) : null;
+
+            $accounts = array_map(fn (array $a) => [...$a, 'balance' => $signed($roleKey, $a['account_id'])], $scope['accounts'][$roleKey === 'tax_input' ? 'input' : 'output']);
+            usort($accounts, fn (array $a, array $b) => strcmp((string) $a['code'], (string) $b['code']));   // ترتيب ثابت بالكود
+
+            $roles[$roleKey] = [
+                'balance' => (int) array_sum(array_map(fn (string $id) => $signed($roleKey, $id), $roleIds)),
+                'mapping_state' => match (true) {
+                    $mappedId === null => 'unmapped',
+                    $mapped === null => 'missing',
+                    ! $mapped->is_active => 'inactive',
+                    (bool) $mapped->is_group => 'group',
+                    default => 'resolved',
+                },
+                'accounts' => $accounts,
+                'current_account' => $mapped === null ? null : [
+                    'account_id' => $mapped->id,
+                    'code' => $mapped->code,
+                    'name' => $mapped->name,
+                    'balance' => $signed($roleKey, $mapped->id),
+                ],
             ];
         }
 
-        return $disclosures;
+        $classified = $this->verification($scope['warnings'], array_keys($nets));
+
+        return [
+            'as_of' => $asOf,
+            'roles' => $roles,
+            'warnings' => $classified['warnings'],
+            'verification' => $classified['verification'],
+        ];
     }
 
     // ── قواعد الأهلية ────────────────────────────────────────────────────────
