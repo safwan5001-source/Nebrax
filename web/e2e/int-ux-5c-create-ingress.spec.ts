@@ -17,6 +17,8 @@ interface World {
   rows: Record<string, unknown>[];
   profile: 'active' | 'none';
   create: 'ok' | 'abort' | '409';
+  /** الخادم أنشأ النقطة لكنها خارج نطاق فروع المستخدم فلا تظهر في قائمته. */
+  hideCreated?: boolean;
 }
 
 const row = (over: Record<string, unknown> = {}) => ({
@@ -35,11 +37,11 @@ async function open(page: Page, opts: { locale: 'ar' | 'en'; theme: 'light' | 'd
     if (path === '/delivery-platforms/readiness') return json(route, { data: SIX.map((platform_key) => ({ platform_key, ux_state: 'NOT_SUPPORTED', connect_enabled: false, sync_enabled: false })) });
     if (path === '/delivery-platforms') return json(route, { data: world.profile === 'active' ? [{ id: 'prof-1', platform_key: 'keeta', is_active: true }] : [] });
     if (path === '/branches') return json(route, { data: [{ id: 'br-1', name: 'فرع الدمام', is_active: true }, { id: 'br-2', name: 'فرع الخبر', is_active: true }, { id: 'br-3', name: 'فرع مغلق', is_active: false }] });
-    if (path === '/delivery-connectors' && method === 'GET') return json(route, { data: world.rows });
+    if (path === '/delivery-connectors' && method === 'GET') return json(route, { data: world.rows.filter((r) => !r.hidden) });
     if (path === '/delivery-connectors' && method === 'POST') {
       const body = route.request().postDataJSON() as Record<string, string>;
       if (world.create === '409') return json(route, { message: SERVER_TEXT, error_code: 'mapping_ambiguous' }, 409);
-      world.rows.push(row({ id: 'ing-new', external_store_id: body.external_store_id, branch_id: body.branch_id ?? null, secret_version: 1 }));
+      world.rows.push(row({ id: 'ing-new', external_store_id: body.external_store_id, branch_id: body.branch_id ?? null, secret_version: 1, hidden: world.hideCreated === true }));
       if (world.create === 'abort') return route.abort('connectionreset');
       return json(route, { data: world.rows[world.rows.length - 1], secret: SECRET }, 201);
     }
@@ -159,6 +161,27 @@ for (const [locale, dir] of [['ar', 'rtl'], ['en', 'ltr']] as const) {
         const newRow = page.locator('[data-testid="signed-ingress-row"]:visible', { hasText: 'KTA-RIYADH-0042' });
         await expect(newRow.getByTestId('ingress-rotate')).toBeVisible();
         await shot(page, `create-unknown-${locale}-${theme}-${info.project.name}`);
+      });
+
+      test('a fresh list without the point does NOT mean the creation failed: neutral "could not be confirmed", no failure claim, no retry', async ({ page }, info) => {
+        const w = world({ create: 'abort', hideCreated: true });
+        await open(page, { locale, theme }, w);
+        const before = listReads(w);
+        await page.getByTestId('ingress-create-open').click();
+        await expect(page.getByTestId('ingress-create-branch')).toBeVisible();
+        await page.getByTestId('ingress-create-store-id').fill('KTA-HIDDEN-0099');
+        await page.getByTestId('ingress-create-submit').click();
+
+        const notice = page.getByTestId('ingress-management-notice');
+        await expect(notice).toHaveAttribute('data-kind', 'createUnconfirmed');
+        await expect(notice).toHaveText(new RegExp(locale === 'ar' ? 'تعذّر تأكيد نتيجة الإنشاء\\. لا تُعِد المحاولة قبل التحقق من نقطة الاستقبال أو التواصل مع المسؤول\\.' : 'The creation result could not be confirmed\\. Do not retry until the ingress point has been verified or an administrator has been contacted\\.'));
+        expect(await notice.innerText()).not.toMatch(/not created|was not|لم تُنشأ|فشل الإنشاء|لم تظهر/i);
+        await expect(notice.getByRole('button')).toHaveCount(1);
+        await expect.poll(() => listReads(w)).toBeGreaterThan(before);
+        await expect(page.getByTestId('signed-ingress-panel')).not.toContainText('KTA-HIDDEN-0099');
+        await page.waitForTimeout(400);
+        expect(writes(w)).toHaveLength(1);
+        await shot(page, `create-unconfirmed-${locale}-${theme}-${info.project.name}`);
       });
 
       test('without an active manual profile: guidance with a link to the existing setup, no create action', async ({ page }, info) => {

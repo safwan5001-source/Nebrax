@@ -11,7 +11,7 @@ export type IngressDialogState = { kind: 'rotate' | 'disable'; point: IngressPoi
 
 export type IngressNotice =
   | { kind: 'error'; messageKey: IngressErrorKey }
-  | { kind: 'rotated' | 'disabled' | 'created' | 'createLost' | 'createAbsent'; storeId: string };
+  | { kind: 'rotated' | 'disabled' | 'created' | 'createLost' | 'createUnconfirmed'; storeId: string };
 
 /** السرّ الجديد: يعيش هنا بين نجاح الإنشاء/التدوير وإغلاق حوار الكشف فقط، ثم يصير `null`. */
 export interface IngressReveal {
@@ -244,12 +244,14 @@ export function useIngressManagement(reload: () => void, profileId: string | nul
     if (state.status !== 'ready') return; // تعذّرت إعادة القراءة: يبقى إشعار «النتيجة مجهولة» كما هو.
     knownIds.current = new Set(state.points.map((point) => point.id));
     const born = state.points.find((point) => point.storeId === pending.storeId && !pending.before.has(point.id));
-    if (born === undefined) {
-      setNotice({ kind: 'createAbsent', storeId: pending.storeId });
-    } else if (born.status === 'configured' && born.secretVersion === 1) {
-      // هوية وحالة النقطة التي ظهرت مطابقتان لإنشاء لم يصل سرّه: الخطوة التالية تدوير سرّها (5b) لا تلقائياً.
+    if (born !== undefined && born.status === 'configured' && born.secretVersion === 1) {
+      // هوية وحالة النقطة التي ظهرت مطابقتان لإنشاء لم يصل سرّه: الخطوة التالية تدوير سرّها (5b) يدوياً لا تلقائياً.
       setNotice({ kind: 'createLost', storeId: pending.storeId });
+      return;
     }
+    // **غياب النقطة عن القائمة لا يثبت أنها لم تُنشأ**: القائمة مقيّدة بنطاق فروع المستخدم، والخادم قد يكون أتمّ الإنشاء. فلا
+    // يُستنتج فشل ولا يُشجَّع على إعادة الإنشاء؛ تُعرض رسالة محايدة بأن النتيجة لم تتأكد. (نقطة ظهرت بحالة/إصدار غير متوقعين: الحكم نفسه.)
+    setNotice({ kind: 'createUnconfirmed', storeId: pending.storeId });
   }, []);
 
   const dismissNotice = useCallback(() => setNotice(null), []);

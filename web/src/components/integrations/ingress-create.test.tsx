@@ -13,6 +13,13 @@ vi.mock('@/lib/auth', () => ({ currentUser }));
  * INT-UX-5c: إنشاء نقطة استقبال موقّعة من تفاصيل المنصة. الخادم مُحاكى بحالة قابلة للتعديل (تظهر النقطة المُنشأة في القائمة)
  * كي تُختبر إعادة القراءة والتسوية فعلاً. هذه اختبارات واجهة بـAPI معترَض، لا إثبات تشغيل على Backend حقيقي.
  */
+/** النص المعتمد حرفياً لنتيجة إنشاء لم تتأكد (مراجعة PR #1463). */
+const UNCONFIRMED = {
+  ar: 'تعذّر تأكيد نتيجة الإنشاء. لا تُعِد المحاولة قبل التحقق من نقطة الاستقبال أو التواصل مع المسؤول.',
+  en: 'The creation result could not be confirmed. Do not retry until the ingress point has been verified or an administrator has been contacted.',
+} as const;
+/** عبارات تدّعي أن الإنشاء فشل أو لم يحدث: ممنوعة عند غياب النقطة عن القائمة. */
+const CLAIMS_FAILURE = /not created|was not|did not create|failed to create|nothing was created|لم تُنشأ|لم يتم الإنشاء|فشل الإنشاء|لم تظهر/i;
 const NEW_SECRET = 'dsec_SENTINEL_CREATED_SECRET_0123456789abcdef';
 const SERVER_TEXT = 'RAW_SERVER_TEXT_MUST_NEVER_BE_SHOWN';
 const PROFILE_ID = 'prof-keeta-1';
@@ -35,6 +42,8 @@ let listGate: (() => Promise<void>) | null;
 let listFails: boolean;
 /** ما يفعله الخادم المحاكى بعد استقبال طلب الإنشاء، بصرف النظر عن وصول الاستجابة. */
 let serverCreates: boolean;
+/** الخادم أنشأ النقطة لكنها خارج نطاق فروع المستخدم فلا تظهر في قائمته (تقييد الفروع). */
+let createdHiddenFromList: boolean;
 
 const settle = (outcome: Outcome) => Promise.resolve(typeof outcome === 'function' ? (outcome as () => unknown)() : outcome);
 
@@ -46,13 +55,13 @@ function installBackend() {
     if (path === '/branches') return settle(branches);
     if (path === '/delivery-connectors' && !options) {
       if (listFails) return Promise.reject(Object.assign(new Error('down'), { status: 500 }));
-      const snapshot = rows.map((r) => ({ ...r }));
+      const snapshot = rows.filter((r) => !(r as { hidden?: boolean }).hidden).map((r) => ({ ...r }));
       return (listGate ? listGate() : Promise.resolve()).then(() => ({ data: snapshot }));
     }
     if (path === '/delivery-connectors' && options?.method === 'POST') {
       // الخادم يُنشئ عند الاستقبال بصرف النظر عن وصول الاستجابة (هذا هو الغموض الذي نختبره).
       if (serverCreates) {
-        rows.push(row({ id: 'ing-new', external_store_id: String(options.body?.external_store_id), branch_id: options.body?.branch_id ?? null, secret_version: 1 }));
+        rows.push(row({ id: 'ing-new', external_store_id: String(options.body?.external_store_id), branch_id: options.body?.branch_id ?? null, secret_version: 1, hidden: createdHiddenFromList }));
       }
       return settle(create);
     }
@@ -95,6 +104,7 @@ beforeEach(() => {
   listGate = null;
   listFails = false;
   serverCreates = true;
+  createdHiddenFromList = false;
   localStorage.clear();
   installBackend();
   Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: vi.fn().mockResolvedValue(undefined) } });
@@ -406,19 +416,36 @@ describe.each(TEST_LOCALES)('an unknown outcome (%s)', (locale) => {
     expect(within(newRow).getByTestId('ingress-rotate')).toBeTruthy();
   });
 
-  it('if no point appears after the re-read it says so honestly, and only then is a new creation a fresh deliberate action', async () => {
+  it.each([
+    ['the server did create it but the user\'s branch scope hides it from the list', true, true],
+    ['the server really did not create it', false, false],
+  ] as const)('a fresh list WITHOUT the point never means the creation failed (%s): one neutral, identical "could not be confirmed" notice, no failure claim, no retry', async (_name, serverCreated, hidden) => {
     asOwner();
     create = networkError();
-    serverCreates = false;
+    serverCreates = serverCreated;
+    createdHiddenFromList = hidden;
     const m = await mount(locale);
+    const before = listReads();
     openCreate();
     await screen.findByTestId('ingress-create-branch');
     typeStore('Store-100');
     submit();
-    await waitFor(() => expect(screen.getByTestId('ingress-management-notice').getAttribute('data-kind')).toBe('createAbsent'));
-    expect(screen.getByTestId('ingress-management-notice').textContent).toContain(m.notices.createAbsent.replace('{storeId}', 'Store-100'));
+
+    await waitFor(() => expect(screen.getByTestId('ingress-management-notice').getAttribute('data-kind')).toBe('createUnconfirmed'));
+    await waitFor(() => expect(listReads()).toBeGreaterThan(before));
+    const notice = screen.getByTestId('ingress-management-notice');
+    expect(notice.getAttribute('role')).toBe('alert');
+    expect(m.notices.createUnconfirmed).toBe(UNCONFIRMED[locale]);
+    expect(notice.textContent).toContain(UNCONFIRMED[locale]);
+    // لا ادّعاء فشل، ولا «السرّ ضاع»، ولا زر إعادة محاولة، ولا تدوير تلقائي، ولا طلب ثانٍ.
+    expect(notice.textContent).not.toMatch(CLAIMS_FAILURE);
+    expect(notice.getAttribute('data-kind')).not.toBe('createLost');
+    expect(within(notice).getAllByRole('button')).toHaveLength(1);
+    expect(within(notice).queryByText(/retry again|try again|إعادة المحاولة/i)).toBeNull();
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 50)); });
     expect(posts()).toHaveLength(1);
-    expect(screen.getByTestId('ingress-create-open')).toBeTruthy();
+    expect(api.mock.calls.some((c) => String(c[0]).includes('rotate-secret'))).toBe(false);
+    expect(document.body.innerHTML).not.toContain(NEW_SECRET);
   });
 
   it('the stale list shown at the moment of failure never decides the outcome: nothing is reported until the re-read finishes', async () => {
@@ -467,7 +494,7 @@ describe.each(TEST_LOCALES)('an unknown outcome (%s)', (locale) => {
     await screen.findByTestId('ingress-create-branch');
     typeStore('Store-100');
     submit();
-    await waitFor(() => expect(screen.getByTestId('ingress-management-notice').getAttribute('data-kind')).toBe('createAbsent'));
+    await waitFor(() => expect(screen.getByTestId('ingress-management-notice').getAttribute('data-kind')).toBe('createUnconfirmed'));
     expect(screen.queryByText(TEST_MESSAGES[locale].integrationCenter.ingressManagement.notices.createLost.replace('{storeId}', 'Store-100'))).toBeNull();
   });
 });

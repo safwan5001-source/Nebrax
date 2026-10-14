@@ -118,7 +118,21 @@ describe('useIngressManagement', () => {
       act(() => result.current.openCreate());
       await act(async () => result.current.confirmCreate({ storeId: 'Store-NEW', branchId: null }));
       act(() => result.current.observe(ready([point, { ...born, secretVersion: 2 }])));
-      expect(result.current.notice).toEqual({ kind: 'error', messageKey: 'outcomeUnknown' });
+      expect(result.current.notice).toEqual({ kind: 'createUnconfirmed', storeId: 'Store-NEW' });
+    });
+
+    it('a fresh list that does NOT contain the point never means the creation failed: a neutral "unconfirmed" notice, no failure kind, no rotate, no second create', async () => {
+      createIngressPoint.mockRejectedValue(new TypeError('Failed to fetch'));
+      const { result } = renderHook(() => useIngressManagement(() => {}, 'prof-1'));
+      act(() => result.current.observe(ready([point])));
+      act(() => result.current.openCreate());
+      await act(async () => result.current.confirmCreate({ storeId: 'Store-NEW', branchId: null }));
+      // قائمة جديدة بلا النقطة (قد تكون خارج نطاق فروع المستخدم): غير مؤكَّد، لا «فشل».
+      act(() => result.current.observe(ready([point])));
+      expect(result.current.notice).toEqual({ kind: 'createUnconfirmed', storeId: 'Store-NEW' });
+      expect(JSON.stringify(result.current.notice)).not.toMatch(/absent|failed|notCreated/i);
+      expect(rotateIngressSecret).not.toHaveBeenCalled();
+      expect(createIngressPoint).toHaveBeenCalledTimes(1);
     });
 
     it('sends nothing without an active profile or with an invalid store ID, and never twice at once', async () => {

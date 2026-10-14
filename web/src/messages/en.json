@@ -10351,7 +10351,7 @@
         "dismiss": "Dismiss",
         "created": "Ingress point {storeId} was created. Hand the secret to the party that will send the events.",
         "createLost": "Ingress point {storeId} appears to have been created, but its secret did not reach you. Use \"Rotate secret\" on its row in the list to get a new one.",
-        "createAbsent": "No point for store ID {storeId} appeared after re-reading the list, so it was most likely not created. You can open creation again."
+        "createUnconfirmed": "The creation result could not be confirmed. Do not retry until the ingress point has been verified or an administrator has been contacted."
       },
       "create": {
         "open": "Create ingress point",

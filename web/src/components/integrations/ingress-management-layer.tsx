@@ -35,7 +35,7 @@ export function IngressManagementLayer({ management, platformName }: { managemen
     <>
       {notice ? (
         <div
-          role={notice.kind === 'error' || notice.kind === 'createLost' ? 'alert' : 'status'}
+          role={notice.kind === 'error' || notice.kind === 'createLost' || notice.kind === 'createUnconfirmed' ? 'alert' : 'status'}
           className={`flex flex-wrap items-center justify-between gap-2 rounded border border-border px-3 py-2 text-sm ${notice.kind === 'error' ? 'text-negative' : 'text-text'}`}
           data-testid="ingress-management-notice"
           data-kind={notice.kind}
