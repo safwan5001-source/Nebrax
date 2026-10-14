@@ -565,9 +565,9 @@ export function DocHeader({ model, showLogo = true }: { model: DocumentModel; sh
           <div className="text-xl font-bold" style={{ color: 'var(--doc-brand)' }}>
             {dt(model.type)}
           </div>
-          <div className="text-[11px] text-gray-500">{dtAlt(model.type)}</div>
+          <div className="text-[11px] text-gray-600">{dtAlt(model.type)}</div>
           <div className="mt-2 inline-block rounded-md bg-gray-100 px-3 py-1">
-            <span className="text-gray-500">{numberLabel}: </span>
+            <span className="text-gray-600">{numberLabel}: </span>
             <span className="num font-bold text-black">{meta.number}</span>
           </div>
         </div>

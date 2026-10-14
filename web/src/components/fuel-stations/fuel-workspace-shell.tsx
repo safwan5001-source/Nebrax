@@ -100,6 +100,7 @@ export function FuelWorkspaceShell({ children }: { children: React.ReactNode }) 
         <div className="ms-auto flex items-center gap-1">
           <Link
             href="/dashboard"
+            aria-label={t('backToNebrax')}
             className="inline-flex min-h-11 items-center gap-2 rounded px-2.5 text-sm font-medium text-text hover:bg-primary-soft hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
           >
             <ArrowRight aria-hidden="true" className="h-4 w-4 rtl:rotate-180" strokeWidth={1.7} />

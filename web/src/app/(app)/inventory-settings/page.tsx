@@ -47,7 +47,7 @@ export default function InventorySettingsHubPage() {
                 <div className="flex items-center gap-2">
                   <h3 className="font-medium text-text">{t(`${item.key}_t`)}</h3>
                   {!item.href && (
-                    <span className="shrink-0 rounded bg-border px-1.5 py-0.5 text-[10px] font-normal text-muted">
+                    <span className="shrink-0 rounded border border-border bg-surface px-1.5 py-0.5 text-[10px] font-normal text-muted">
                       {t('soon')}
                     </span>
                   )}
@@ -67,7 +67,7 @@ export default function InventorySettingsHubPage() {
               {body}
             </Link>
           ) : (
-            <div key={item.key} className="flex gap-3 rounded border border-border bg-surface p-4 opacity-70">
+            <div key={item.key} className="flex gap-3 rounded border border-dashed border-border bg-surface p-4">
               {body}
             </div>
           );

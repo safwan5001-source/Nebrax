@@ -91,7 +91,7 @@ export default function JournalEntryDetailsPage() {
               </span>
               <span className="text-muted">{t('effectHint')}</span>
               {entry.lines.slice(1).map((line) => (
-                <span key={line.id} className="rounded bg-muted px-3 py-1.5 text-text">
+                <span key={line.id} className="rounded border border-border bg-background px-3 py-1.5 text-text">
                   {line.account_name ?? t('unknownAccount')}
                 </span>
               ))}
