@@ -10309,7 +10309,8 @@
         "serverError": "The action could not be completed right now. You can try again.",
         "unknown": "The action could not be completed.",
         "demoUnavailable": "Managing ingress points is not available in preview mode.",
-        "disableOutcomeUnknown": "We did not receive the result of the disable, and it may have completed. We re-read the current state; repeat it only if the point still shows as configured and you still want it disabled."
+        "disableOutcomeUnknown": "We did not receive the result of the disable, and it may have completed. We re-read the current state; repeat it only if the point still shows as configured and you still want it disabled.",
+        "createBlocked": "The result of an earlier attempt to create this store ID was never confirmed, so it cannot be sent again now. Verify the ingress point or contact an administrator before trying again."
       },
       "common": {
         "cancel": "Cancel"
@@ -10385,7 +10386,8 @@
           "unreadable": "The manual attribution profile could not be read right now, so nothing can be created. This does not mean it is missing.",
           "setupLink": "Open attribution settings",
           "needsPermission": "Setting up the attribution profile needs the company-management permission; ask your account administrator."
-        }
+        },
+        "blockedNote": "An earlier creation result was never confirmed for these store IDs, and they cannot be created again until verified:"
       }
     }
   }

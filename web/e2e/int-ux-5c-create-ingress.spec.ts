@@ -178,10 +178,54 @@ for (const [locale, dir] of [['ar', 'rtl'], ['en', 'ltr']] as const) {
         expect(await notice.innerText()).not.toMatch(/not created|was not|لم تُنشأ|فشل الإنشاء|لم تظهر/i);
         await expect(notice.getByRole('button')).toHaveCount(1);
         await expect.poll(() => listReads(w)).toBeGreaterThan(before);
-        await expect(page.getByTestId('signed-ingress-panel')).not.toContainText('KTA-HIDDEN-0099');
+        // لا صفّ للنقطة في القائمة (محجوبة بنطاق الفروع)؛ المعرّف يظهر فقط في تذكير الحظر الدائم لا كنقطة.
+        await expect(page.locator('[data-testid="signed-ingress-row"]', { hasText: 'KTA-HIDDEN-0099' })).toHaveCount(0);
         await page.waitForTimeout(400);
         expect(writes(w)).toHaveLength(1);
         await shot(page, `create-unconfirmed-${locale}-${theme}-${info.project.name}`);
+      });
+
+      test('after an unknown outcome the same store ID cannot be re-sent (even after closing the notice and reopening the form), a different one can; a hard reload clears the guard (documented limit)', async ({ page }, info) => {
+        const w = world({ create: 'abort', hideCreated: true });
+        await open(page, { locale, theme }, w);
+        const tag = `${locale}-${theme}-${info.project.name}`;
+        await page.getByTestId('ingress-create-open').click();
+        await expect(page.getByTestId('ingress-create-branch')).toBeVisible();
+        await page.getByTestId('ingress-create-store-id').fill('KTA-HIDDEN-0099');
+        await page.getByTestId('ingress-create-submit').click();
+        const notice = page.getByTestId('ingress-management-notice');
+        await expect(notice).toHaveAttribute('data-kind', 'createUnconfirmed');
+        await notice.getByRole('button').click();
+        await expect(notice).toHaveCount(0);
+        // تذكير دائم بالمعرّف المحظور بعد إغلاق الإشعار.
+        await expect(page.getByTestId('ingress-create-blocked-note')).toContainText('KTA-HIDDEN-0099');
+
+        await page.getByTestId('ingress-create-open').click();
+        await expect(page.getByTestId('ingress-create-branch')).toBeVisible();
+        await page.getByTestId('ingress-create-store-id').fill('KTA-HIDDEN-0099');
+        await expect(page.getByTestId('ingress-create-store-id-error')).toBeVisible();
+        await expect(page.getByTestId('ingress-create-submit')).toBeDisabled();
+        await page.getByTestId('ingress-create-store-id').press('Enter');
+        await page.waitForTimeout(300);
+        expect(writes(w)).toHaveLength(1);
+        await shot(page, `create-blocked-${tag}`);
+
+        // معرّف مختلف مسموح.
+        w.create = 'ok';
+        w.hideCreated = false;
+        await page.getByTestId('ingress-create-store-id').fill('KTA-OTHER-0100');
+        await expect(page.getByTestId('ingress-create-submit')).toBeEnabled();
+        await page.getByTestId('ingress-create-submit').click();
+        await expect(page.getByRole('dialog').locator('code')).toBeVisible();
+        expect(writes(w)).toHaveLength(2);
+        await page.getByRole('dialog').getByRole('checkbox').check();
+        await page.getByRole('dialog').getByRole('button').last().click();
+        await expect(page.getByRole('dialog')).toHaveCount(0);
+
+        // حدّ معلن: إعادة تحميل كاملة تمحو الحارس (ذاكرة الصفحة فقط) — بانتظار قرار المالك.
+        await page.reload({ waitUntil: 'domcontentloaded' });
+        await expect(page.getByTestId('signed-ingress-panel')).toHaveAttribute('data-state', 'ready');
+        await expect(page.getByTestId('ingress-create-blocked-note')).toHaveCount(0);
       });
 
       test('without an active manual profile: guidance with a link to the existing setup, no create action', async ({ page }, info) => {

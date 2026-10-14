@@ -22,7 +22,17 @@ export function IngressCreateEntry({ profile, management, platformName }: { prof
 
   if (profile.state === 'ready') {
     return (
-      <div data-testid="ingress-create-entry">
+      <div className="space-y-2" data-testid="ingress-create-entry">
+        {management.blockedStoreIds.length > 0 ? (
+          <div role="note" className="space-y-1 rounded border border-dashed border-border px-3 py-2 text-xs leading-relaxed text-muted" data-testid="ingress-create-blocked-note">
+            <p>{t('blockedNote')}</p>
+            <ul className="space-y-0.5" role="list">
+              {management.blockedStoreIds.map((storeId) => (
+                <li key={storeId} dir="ltr" className="num break-all text-text">{storeId}</li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
         <Button type="button" variant="outline" size="sm" className="min-h-11 md:min-h-8" onClick={management.openCreate} data-testid="ingress-create-open">
           {t('open')}
         </Button>

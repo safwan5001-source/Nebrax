@@ -23,12 +23,15 @@ export function IngressCreateDialog({
   platformName,
   busy,
   error,
+  isBlocked,
   onCancel,
   onSubmit,
 }: {
   platformName: string;
   busy: boolean;
   error: IngressErrorKey | null;
+  /** معرّف نتيجة إنشائه السابق لم تتأكد؟ يُمنع إرساله (يُتحقق منه في الإدارة أيضاً). */
+  isBlocked: (storeId: string) => boolean;
   onCancel: () => void;
   onSubmit: (request: CreateIngressRequest) => void;
 }) {
@@ -40,12 +43,13 @@ export function IngressCreateDialog({
   const branches = useBranchOptions(true, branchAttempt);
 
   const checked = checkStoreId(storeId);
-  const storeError = touched && !checked.ok ? t(`create.validation.${checked.problem}`) : null;
+  const blocked = checked.ok && isBlocked(checked.value);
+  const storeError = blocked ? t('errors.createBlocked') : touched && !checked.ok ? t(`create.validation.${checked.problem}`) : null;
   const branchBlocked = branches.status === 'loading' || branches.status === 'error';
 
   function submit() {
     setTouched(true);
-    if (!checked.ok || branchBlocked || busy) return;
+    if (!checked.ok || blocked || branchBlocked || busy) return;
     onSubmit({ storeId, branchId: branchId === '' ? null : branchId });
   }
 
@@ -104,7 +108,7 @@ export function IngressCreateDialog({
 
         <div className="flex justify-end gap-2">
           <Button type="button" variant="outline" onClick={onCancel} disabled={busy}>{t('common.cancel')}</Button>
-          <Button type="button" onClick={submit} disabled={busy || branchBlocked} data-testid="ingress-create-submit">{busy ? t('create.busy') : t('create.submit')}</Button>
+          <Button type="button" onClick={submit} disabled={busy || branchBlocked || blocked} data-testid="ingress-create-submit">{busy ? t('create.busy') : t('create.submit')}</Button>
         </div>
       </div>
     </Dialog>

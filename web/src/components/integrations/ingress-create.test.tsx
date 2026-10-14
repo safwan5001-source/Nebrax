@@ -2,6 +2,7 @@
 import { act, cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DeliveryPlatformDetailScreen } from './delivery-platform-detail-screen';
+import { resetUnconfirmedCreatesForTests } from '@/lib/ingress-create-guard';
 import { renderIntl, TEST_LOCALES, TEST_MESSAGES } from '@/test-utils/intl';
 
 const { api, currentUser } = vi.hoisted(() => ({ api: vi.fn(), currentUser: vi.fn() }));
@@ -95,6 +96,8 @@ let storageWrites: ReturnType<typeof vi.spyOn>;
 let consoleSpies: ReturnType<typeof vi.spyOn>[];
 
 beforeEach(() => {
+  // ذاكرة الحارس تعيش مع الوحدة: كل اختبار يبدأ كصفحة محمَّلة حديثاً.
+  resetUnconfirmedCreatesForTests();
   api.mockReset();
   currentUser.mockReset();
   rows = [row()];
@@ -496,6 +499,157 @@ describe.each(TEST_LOCALES)('an unknown outcome (%s)', (locale) => {
     submit();
     await waitFor(() => expect(screen.getByTestId('ingress-management-notice').getAttribute('data-kind')).toBe('createUnconfirmed'));
     expect(screen.queryByText(TEST_MESSAGES[locale].integrationCenter.ingressManagement.notices.createLost.replace('{storeId}', 'Store-100'))).toBeNull();
+  });
+});
+
+const BLOCKED = { ar: 'نتيجة محاولة إنشاء سابقة لمعرّف المتجر هذا لم تتأكد، فلا يمكن إعادة إرساله الآن. تحقّق من نقطة الاستقبال أو تواصل مع المسؤول قبل المحاولة مجدداً.', en: 'The result of an earlier attempt to create this store ID was never confirmed, so it cannot be sent again now. Verify the ingress point or contact an administrator before trying again.' } as const;
+
+/** يُنتج نتيجة إنشاء مجهولة لمعرّف `Store-100` ثم يُغلق الإشعار. */
+async function unknownOutcomeThenDismiss(m: { notices: { dismiss: string } }) {
+  openCreate();
+  await screen.findByTestId('ingress-create-branch');
+  typeStore('Store-100');
+  submit();
+  await waitFor(() => expect(screen.getByTestId('ingress-management-notice').getAttribute('data-kind')).toMatch(/createUnconfirmed|createLost/));
+  fireEvent.click(within(screen.getByTestId('ingress-management-notice')).getByRole('button', { name: m.notices.dismiss }));
+  expect(screen.queryByTestId('ingress-management-notice')).toBeNull();
+}
+
+describe.each(TEST_LOCALES)('no unsafe re-create after an unknown outcome (%s)', (locale) => {
+  const setup = async (hidden = true) => {
+    asOwner();
+    create = networkError();
+    serverCreates = true;
+    createdHiddenFromList = hidden;
+    return mount(locale);
+  };
+
+  it('closing the notice and opening a new form does not allow re-sending the same store ID: inline message, disabled submit, no second request (Enter included)', async () => {
+    const m = await setup();
+    await unknownOutcomeThenDismiss(m);
+    expect(posts()).toHaveLength(1);
+
+    openCreate();
+    await screen.findByTestId('ingress-create-branch');
+    typeStore('Store-100');
+    expect(m.errors.createBlocked).toBe(BLOCKED[locale]);
+    expect(screen.getByTestId('ingress-create-store-id-error').textContent).toBe(BLOCKED[locale]);
+    expect((screen.getByTestId('ingress-create-submit') as HTMLButtonElement).disabled).toBe(true);
+    submit();
+    fireEvent.keyDown(storeInput(), { key: 'Enter' });
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 30)); });
+    expect(posts()).toHaveLength(1);
+  });
+
+  it('is matched on the trimmed store ID, per platform, and a persistent note lists the blocked ID after the notice is gone', async () => {
+    const m = await setup();
+    await unknownOutcomeThenDismiss(m);
+    expect(screen.getByTestId('ingress-create-blocked-note').textContent).toContain(m.create.blockedNote);
+    expect(screen.getByTestId('ingress-create-blocked-note').textContent).toContain('Store-100');
+    openCreate();
+    await screen.findByTestId('ingress-create-branch');
+    typeStore('   Store-100   ');
+    expect(screen.getByTestId('ingress-create-store-id-error').textContent).toBe(BLOCKED[locale]);
+    expect(posts()).toHaveLength(1);
+  });
+
+  it('a different store ID is still allowed and creates normally', async () => {
+    const m = await setup();
+    await unknownOutcomeThenDismiss(m);
+    create = created;
+    openCreate();
+    await screen.findByTestId('ingress-create-branch');
+    typeStore('Store-200');
+    expect(screen.queryByTestId('ingress-create-store-id-error')).toBeNull();
+    expect((screen.getByTestId('ingress-create-submit') as HTMLButtonElement).disabled).toBe(false);
+    submit();
+    await screen.findByRole('dialog', { name: m.secret.title });
+    expect(posts()).toHaveLength(2);
+    expect((posts()[1][1] as { body: Record<string, string> }).body.external_store_id).toBe('Store-200');
+  });
+
+  it('the block is NOT lifted when the point is merely absent from a fresh list (it may be hidden by branch scope)', async () => {
+    const m = await setup(true);
+    await unknownOutcomeThenDismiss(m);
+    // قراءة جديدة أخرى للقائمة (زرّ التحديث/إعادة المحاولة في الصفحة) لا ترفع الحظر.
+    await act(async () => { fireEvent.click(screen.getByTestId('ingress-create-open')); });
+    await screen.findByTestId('ingress-create-branch');
+    typeStore('Store-100');
+    expect(screen.getByTestId('ingress-create-store-id-error').textContent).toBe(BLOCKED[locale]);
+    expect(screen.getByTestId('ingress-create-blocked-note').textContent).toContain('Store-100');
+  });
+
+  it('the block is lifted only when the point itself appears in a fresh list with a verified identity (then the server answers 409 anyway)', async () => {
+    const m = await setup(false);
+    openCreate();
+    await screen.findByTestId('ingress-create-branch');
+    typeStore('Store-100');
+    submit();
+    await waitFor(() => expect(screen.getByTestId('ingress-management-notice').getAttribute('data-kind')).toBe('createLost'));
+    expect(screen.queryByTestId('ingress-create-blocked-note')).toBeNull();
+    fireEvent.click(within(screen.getByTestId('ingress-management-notice')).getByRole('button', { name: m.notices.dismiss }));
+    openCreate();
+    await screen.findByTestId('ingress-create-branch');
+    typeStore('Store-100');
+    expect(screen.queryByTestId('ingress-create-store-id-error')).toBeNull();
+    expect(posts()).toHaveLength(1);
+  });
+
+  it('a definite refusal (nothing was created) never blocks anything', async () => {
+    asOwner();
+    create = httpError(409, { error_code: 'mapping_ambiguous', message: SERVER_TEXT });
+    serverCreates = false;
+    await mount(locale);
+    openCreate();
+    await screen.findByTestId('ingress-create-branch');
+    typeStore('Store-100');
+    submit();
+    await screen.findByTestId('ingress-create-error');
+    expect(screen.queryByTestId('ingress-create-blocked-note')).toBeNull();
+    expect((screen.getByTestId('ingress-create-submit') as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it('the block survives leaving the page and coming back inside the app (SPA navigation) — same page memory', async () => {
+    const m = await setup();
+    await unknownOutcomeThenDismiss(m);
+    cleanup();
+    await mount(locale);
+    expect(screen.getByTestId('ingress-create-blocked-note').textContent).toContain('Store-100');
+    openCreate();
+    await screen.findByTestId('ingress-create-branch');
+    typeStore('Store-100');
+    expect(screen.getByTestId('ingress-create-store-id-error').textContent).toBe(BLOCKED[locale]);
+    expect(posts()).toHaveLength(1);
+  });
+
+  it('another user of the same browser session is not blocked by this user\'s attempt (scope = tenant + user)', async () => {
+    const m = await setup();
+    await unknownOutcomeThenDismiss(m);
+    cleanup();
+    currentUser.mockReturnValue({ id: 'u-other', role: 'owner', permissions: ['*'] });
+    await mount(locale);
+    expect(screen.queryByTestId('ingress-create-blocked-note')).toBeNull();
+  });
+
+  it('DOCUMENTED LIMIT: a hard page reload clears the in-memory guard (a fresh page memory allows the attempt again) — the owner decision on reload protection is pending', async () => {
+    const m = await setup();
+    await unknownOutcomeThenDismiss(m);
+    cleanup();
+    resetUnconfirmedCreatesForTests(); // = ذاكرة صفحة جديدة بعد إعادة تحميل كاملة
+    await mount(locale);
+    expect(screen.queryByTestId('ingress-create-blocked-note')).toBeNull();
+    openCreate();
+    await screen.findByTestId('ingress-create-branch');
+    typeStore('Store-100');
+    expect(screen.queryByTestId('ingress-create-store-id-error')).toBeNull();
+  });
+
+  it('the guard never touches browser storage (nothing is persisted)', async () => {
+    const m = await setup();
+    await unknownOutcomeThenDismiss(m);
+    expect(storageWrites.mock.calls.flat().join('|')).not.toContain('Store-100');
+    expect(localStorage.length).toBe(0);
+    expect(sessionStorage.length).toBe(0);
   });
 });
 

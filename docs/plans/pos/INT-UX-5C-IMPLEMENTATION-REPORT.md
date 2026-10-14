@@ -46,6 +46,35 @@ No backend, API, database, permission, accounting, POS or ZATCA change.
 
 **Fix** (`use-ingress-management.ts`, messages, tests only). The `createAbsent` outcome and its message are removed. Absence from a fresh list now yields `createUnconfirmed`, the neutral message above, identical whether the server created the point or not (the UI cannot tell and no longer pretends to). The verified-identity path is kept (new point, configured, version 1 → "secret lost, rotate manually"), still never automatic. Blind retry stays prevented: no retry control in the notice, no automatic repeat, no second request. A point that appears in an unexpected state (e.g. version ≠ 1) now also gets the neutral notice instead of lingering on the first one. No backend/API/DB/permission change, no change to branch selection or `branch_required`, nothing in 5a/5b touched.
 
+## 2b. Closure round (PR #1463, final review): no unsafe re-create + merge state
+
+### Re-create protection after an unknown outcome
+**Problem.** After a lost `POST /delivery-connectors` response the server may already have created the point. The UI warned, but the user could close the notice, open a new form and submit the same store ID again.
+
+**Mechanism (`lib/ingress-create-guard.ts`, in-memory only).**
+- On an unknown create outcome the attempt (platform, profile id, store ID as typed and trimmed, timestamp — **no secret, no response data**) is recorded in **page memory**, scoped to tenant + user.
+- The same **platform + store ID** cannot be sent again: the form shows the fixed message ("the result of an earlier attempt for this store ID was never confirmed, so it cannot be sent again now — verify or contact an administrator"), the submit button is disabled, Enter does nothing, and the management hook **refuses on its own** even if the dialog is bypassed. Closing the notice or reopening the form changes nothing; a persistent note under the create button lists the blocked IDs.
+- **A different store ID is not affected.** A definite refusal (nothing created) never blocks.
+- **The block is never lifted because the point is absent or disappears** (it may be hidden by branch scope). It is lifted only when the point itself shows up in a fresh list (then it is known and visible, and re-creating it would return 409 anyway). The stale list shown at the moment of failure never lifts anything.
+- No automatic retry, no automatic rotation. Nothing is written to `localStorage`/`sessionStorage`/IndexedDB/cookies, and the source is tested to touch none of them.
+
+**Limits (stated, tested, and decided with the owner pending).**
+- It survives closing/reopening the form and leaving the page and coming back **inside the app** (SPA navigation).
+- It does **not** survive a **hard reload or closing the tab** — page memory is gone. This is a documented-limit test in Vitest and Playwright, not a hidden gap.
+- It is per browser tab: another tab or device is unprotected.
+
+**Reload protection — not implemented; options for the owner** (each needs a decision the brief reserved: a retention policy or a backend contract):
+- **A. Tab-lifetime storage (`sessionStorage`)**: survives reload, dies with the tab; no secrets. Needs a retention decision: what is stored (store ID in clear vs. a hash), maximum age, clearing on sign-out, lift rule. Still per tab.
+- **B. Persistent storage (`localStorage` with an expiry)**: also survives tab close and covers other tabs of the browser. Needs the same decisions plus an expiry and a manual "I verified this" override, otherwise a user can be locked out of a store ID that was truly never created.
+- **C. Backend idempotency key on create** (a `request_id` that makes the repeated request return the same result or the existing point): the only option that is correct across reloads, tabs and devices and could even re-deliver the outcome. It is a backend/API contract change.
+- **D. Accept the in-memory limit** and rely on the server's 409 plus the notice (current state).
+- *Recommendation:* C as the real fix; A as an interim stopgap only if the owner approves its retention policy.
+
+### Merge state of PR #1463
+- **What GitHub showed:** after `main` advanced (9 new commits, `51851c04`) the PR's `mergeable_state` was `unknown` — GitHub had not yet recomputed it and still listed the old base `5ff31353`. `unknown` is what the API returns while it recomputes; it is not a conflict verdict.
+- **Verified locally, not assumed:** `git merge-tree --write-tree` of the PR head against current `origin/main` completes **cleanly (exit 0, no conflict files)**. The only paths both sides touched are `web/src/messages/ar.json` and `en.json` (different regions: access-control/users strings on `main`, ingress strings here); the merged result of both files was parsed — valid JSON, no duplicate keys, both sets of keys present. Everything else `main` changed (accounting, users/roles workspaces, pgsql tests, docs) is outside this slice.
+- **Decision:** no rebase, no merge of `main` into the branch (not needed, and it would pull unrelated files into a Draft PR). GitHub's state is re-read once after this push rather than polled.
+
 ## 3. Changed files
 
 | File | Change |
@@ -59,7 +88,8 @@ No backend, API, database, permission, accounting, POS or ZATCA change.
 | `web/src/components/integrations/use-signed-ingress.ts` | `useBranchOptions` (read on form open, `branches.view` only) |
 | `web/src/components/integrations/ingress-management-layer.tsx`, `ingress-row-actions.tsx`, `signed-ingress-panel.tsx`, `delivery-platform-detail.tsx`, `delivery-platform-detail-screen.tsx`, `use-delivery-integration-data.ts` | wiring (optional props; without them the panel is unchanged) |
 | `web/src/components/shared/plain-text-field.tsx` | **new** — neutral labelled text field |
-| `web/src/messages/ar.json`, `en.json` | create form, guidance, notices (`createUnconfirmed` replaces the removed `createAbsent`) |
+| `web/src/lib/ingress-create-guard.ts` | **new** — in-memory re-create guard (closure round) |
+| `web/src/messages/ar.json`, `en.json` | create form, guidance, notices (`createUnconfirmed` replaces the removed `createAbsent`); `errors.createBlocked`, `create.blockedNote` |
 | Tests | `ingress-create.test.tsx` (screen-level create flows, both locales), `lib/ingress-create.test.ts`, extended `ingress-operations.test.ts`, `use-ingress-management.test.tsx`, `no-connection-controls.test.ts` (structural guard updated), 5b screen test adjusted |
 | `web/e2e/int-ux-5c-create-ingress.spec.ts` | **new** real-browser spec; `int-ux-4-signed-ingress.spec.ts` adjusted (owner now also sees the create action) |
 | `docs/plans/pos/DLV-INTEGRATIONS-UX-DESIGN-1.md` | slice header status |
@@ -67,16 +97,19 @@ No backend, API, database, permission, accounting, POS or ZATCA change.
 ## 4. Tests and results (local)
 
 - **Related first:** `src/components/integrations`, `src/lib`, `src/components/shared` → 101 files / 937 tests ✅ (before the last additions).
-- **Full Vitest:** 583 files / **6323 tests** ✅ (after the review fix). **`npm run build`** ✅.
+- **Full Vitest:** 584 files / **6350 tests** ✅ (after the closure round). **`npm run build`** ✅.
 - **Behavior covered:** permission and demo matrix (manage only; viewer; reassign-only; demo); missing / disabled / unreadable profile guidance and link vs. no link; validation (empty, whitespace, control char, 191-byte boundary, Arabic byte counting); exact request body (trimmed store ID, `branch_id` only when chosen); branch list (active only, `branches.view` gating, failed read blocks submit with a read retry); Enter submits once; success reveal (masked, locked close, list refreshed only after closing, no secret in DOM / storage / console / URL afterwards); **double submit = one request** and no close/edit while busy; explicit refusals 409/422/404/403 (nine contract cases) keep the form open and never show server text, then a corrected submit works; **unknown outcomes** (network, 502, unreadable 2xx, empty secret): one request, no retry control, list re-read, reconciliation to "secret lost" (verified new point only) or the neutral "could not be confirmed" — including an **explicit test that a fresh list without the point (server created it but branch scope hides it, or truly not created) never means failure and renders the same neutral notice** — plus "still unknown" when the re-read fails, stale-list and pre-existing-point cases; 5b rotate/disable suites unchanged and green; AR + EN.
 - **Mutation checks (each made tests fail, then reverted; two more after the review fix — reintroducing a notice only when the point appears, and reporting absence as "secret lost"):** remove the create lock; treat unknown outcomes as explicit refusals; let the stale list decide (needed one new hook-level test to be caught); count characters instead of bytes; show create without `manage`; refresh the list before the secret dialog closes; stop blocking submit on a failed branch read.
 - **Structural guard:** the only code touching the connector routes is `lib/ingress-operations.ts` (now exactly three POST routes: create, rotate, disable; create body limited to the three contract fields; no reassign); only the management hook calls it; buttons allowed in the module are the declared ones only.
-- **Playwright (real Chromium, real clicks/keys):** `int-ux-5c` + `5b` + `5a` + `int-ux-4`, desktop and mobile projects → **134 / 134 passed** (AR/EN × light/dark; includes the new "absence ≠ failure" scenario where the server created the point but the user's list hides it).
+- **Playwright (real Chromium, real clicks/keys):** `int-ux-5c` + `5b` + `5a` + `int-ux-4`, desktop and mobile projects → **142 / 142 passed** (closure round: the 5c spec 50/50 after one stale assertion in my own spec was corrected — the in-panel list no longer lacks the blocked store ID because the persistent block note now shows it, so the check became "no list row for it"; the 5b + 5a + INT-UX-4 suites 92/92 in the same full run, code unchanged since) (AR/EN × light/dark; includes the new "absence ≠ failure" scenario where the server created the point but the user's list hides it).
 - **Important:** these are UI tests with an intercepted API. They are **not** proof of operation against a real backend; the contract was read from the controller, request and service code.
 
 ## 5. Visual verification
 
 Screenshots reviewed (panel, form, validation, locked and revealed secret, created, explicit refusal, unknown outcome, guidance) in AR/EN × light/dark × desktop (1440) / mobile (390). RTL/LTR correct, store ID and secret LTR inside RTL, form and notices readable in dark, ≥ 44 px touch targets, no horizontal overflow. One defect found and fixed during review: on mobile the "secret lost" notice sat **below** the list, out of view — notices/dialogs now render above the list. The red "N Issues" chip is the Next dev-server indicator, not product UI.
+
+### Closure-round tests
+Vitest: guard unit tests (scope, trimmed exact match, per-platform, clear/list, no storage/network/log in the source); hook tests (the hook refuses a blocked ID on its own, a different ID passes, absence never lifts, the stale list never lifts, a later visible point lifts); screen tests, both locales (closing the notice and reopening the form stays blocked incl. Enter and padded input; a persistent note lists the ID; a different store creates; absence does not lift; verified appearance lifts; a definite refusal never blocks; survives leaving and returning inside the app; another user is not blocked; **documented limit — a fresh page memory allows the attempt again**; nothing written to storage). Playwright: the full flow including a real `page.reload()` that clears the guard (the documented limit). Five mutations (remove the hook check, the dialog block, the recording, lift on absence, a scope that ignores the user) each failed the suite, then were reverted.
 
 ## 6. Risks and what remains
 
@@ -86,6 +119,7 @@ Screenshots reviewed (panel, form, validation, locked and revealed secret, creat
 - **The store ID is globally unique per platform** (`platform_key + external_store_id`, no tenant in the key), so a 409 may mean another tenant holds it; the fixed message does not reveal which (DP-A context, unchanged).
 - **Reconciliation never infers failure from absence.** The list is branch-scoped, so a point outside the user's visible scope is simply not shown; the UI says "could not be confirmed, do not retry until verified or an administrator is contacted" and cannot tell the two cases apart. The user must verify out of band (or ask an administrator); there is no UI to confirm it yet (that would need the audit reader, INT-UX-6).
 - **Unchanged and out of scope:** the server still allows rotating a disabled point (UI never offers it); no re-enable; rotate/disable from 5b untouched. Pre-existing unrelated: the INT-UX-1 mobile flake `summary error keeps the card usable`, and TypeScript errors in unrelated test files (none in files touched here).
+- **Reload / other tabs / other devices are not protected from re-creating after an unknown outcome** (§2b). The server still answers 409 to a repeated create and never re-sends the secret, so a duplicate cannot leak or replace a secret, but the user can be misled by the unconfirmed state. Options A–D are in §2b; waiting for the owner's decision (retention policy or a backend idempotency contract).
 - **Remaining in INT-UX-5:** 5d reassign operator. INT-UX-6 and INT-MAP-1 are not started.
 
 ## 7. Git state

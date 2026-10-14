@@ -18,7 +18,7 @@ export function DeliveryPlatformDetailScreen({ platformKey }: { platformKey: str
 
   // تدوير السر والتعطيل (INT-UX-5b): بعد أي نتيجة (أو نتيجة مجهولة) تُعاد قراءة قائمة النقاط.
   const profileId = data.profileIds?.get(platformKey) ?? null;
-  const management = useIngressManagement(ingress.retry, profileId);
+  const management = useIngressManagement(ingress.retry, profileId, platformKey);
   const manualState = data.manual?.get(platformKey);
   const ingressProfile: IngressProfileSupport = {
     state: data.manualFailed || data.profileIds === null ? 'unreadable' : profileId !== null ? 'ready' : manualState === 'disabled' ? 'disabled' : 'missing',

@@ -2,6 +2,7 @@
 import { act, renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useIngressManagement } from './use-ingress-management';
+import { resetUnconfirmedCreatesForTests } from '@/lib/ingress-create-guard';
 import type { IngressPoint } from '@/lib/signed-ingress';
 import type { SignedIngressState } from './use-signed-ingress';
 
@@ -13,7 +14,7 @@ vi.mock('@/lib/ingress-operations', async () => {
 
 const point: IngressPoint = { id: 'ing-1', storeId: 'Store-100', branchId: null, status: 'configured', secretVersion: 1, createdAt: null, disabledAt: null };
 
-beforeEach(() => { rotateIngressSecret.mockReset(); disableIngress.mockReset(); createIngressPoint.mockReset(); });
+beforeEach(() => { resetUnconfirmedCreatesForTests(); rotateIngressSecret.mockReset(); disableIngress.mockReset(); createIngressPoint.mockReset(); });
 
 describe('useIngressManagement', () => {
   it('confirmDisable ignores anything but the exact store ID (a hook-level guard, independent of the dialog)', async () => {
@@ -153,6 +154,49 @@ describe('useIngressManagement', () => {
       expect(createIngressPoint).toHaveBeenCalledTimes(1);
       await act(async () => release({ value: 'S' }));
       expect(withProfile.result.current.reveal).toEqual({ value: 'S', storeId: 'A', kind: 'created' });
+    });
+
+    it('after an unknown outcome the hook itself refuses to send the same store ID again (even if the dialog guard is bypassed), but allows a different one', async () => {
+      createIngressPoint.mockRejectedValueOnce(new TypeError('Failed to fetch'));
+      const { result } = renderHook(() => useIngressManagement(() => {}, 'prof-1', 'keeta'));
+      act(() => result.current.observe(ready([point])));
+      act(() => result.current.openCreate());
+      await act(async () => result.current.confirmCreate({ storeId: 'Store-NEW', branchId: null }));
+      expect(createIngressPoint).toHaveBeenCalledTimes(1);
+      expect(result.current.blockedStoreIds).toEqual(['Store-NEW']);
+      expect(result.current.isCreateBlocked(' Store-NEW ')).toBe(true);
+      expect(result.current.isCreateBlocked('Other')).toBe(false);
+
+      act(() => result.current.dismissNotice());
+      act(() => result.current.openCreate());
+      act(() => result.current.confirmCreate({ storeId: 'Store-NEW', branchId: null }));
+      expect(createIngressPoint).toHaveBeenCalledTimes(1);
+      expect(result.current.createError).toBe('createBlocked');
+
+      createIngressPoint.mockResolvedValueOnce({ value: 'S' });
+      await act(async () => result.current.confirmCreate({ storeId: 'Other', branchId: null }));
+      expect(createIngressPoint).toHaveBeenCalledTimes(2);
+    });
+
+    it('an absent point (fresh list) never lifts the block; the point itself appearing in a later fresh list does', async () => {
+      createIngressPoint.mockRejectedValue(new TypeError('Failed to fetch'));
+      const { result } = renderHook(() => useIngressManagement(() => {}, 'prof-1', 'keeta'));
+      const stale = ready([point]);
+      act(() => result.current.observe(stale));
+      act(() => result.current.openCreate());
+      await act(async () => result.current.confirmCreate({ storeId: 'Store-NEW', branchId: null }));
+      // القائمة القديمة لحظة الفشل (الكائن نفسه) لا ترفع شيئاً حتى لو حوت المعرّف.
+      act(() => result.current.observe(stale));
+      expect(result.current.blockedStoreIds).toEqual(['Store-NEW']);
+      act(() => result.current.observe(ready([point])));
+      expect(result.current.notice).toEqual({ kind: 'createUnconfirmed', storeId: 'Store-NEW' });
+      expect(result.current.blockedStoreIds).toEqual(['Store-NEW']);
+      act(() => result.current.observe(ready([point])));
+      expect(result.current.blockedStoreIds).toEqual(['Store-NEW']);
+      // لاحقاً تظهر النقطة نفسها (مثلاً بعد تحديث يدوي): تُرفع الحماية لأنها معروفة ومرئية، والإشعار المحايد لا يتغيّر.
+      act(() => result.current.observe(ready([point, born])));
+      expect(result.current.blockedStoreIds).toEqual([]);
+      expect(result.current.notice).toEqual({ kind: 'createUnconfirmed', storeId: 'Store-NEW' });
     });
   });
 });

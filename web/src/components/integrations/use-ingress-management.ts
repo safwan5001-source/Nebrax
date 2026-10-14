@@ -1,7 +1,9 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { currentUser } from '@/lib/auth';
 import { checkStoreId } from '@/lib/ingress-create';
+import { clearUnconfirmedCreate, createGuardScope, findUnconfirmedCreate, listUnconfirmedCreates, recordUnconfirmedCreate } from '@/lib/ingress-create-guard';
 import { classifyIngressFailure, type IngressErrorKey } from '@/lib/ingress-management';
 import { IngressRequestInvalid, IngressUnavailableInDemo, createIngressPoint, disableIngress, rotateIngressSecret } from '@/lib/ingress-operations';
 import type { IngressPoint } from '@/lib/signed-ingress';
@@ -31,6 +33,10 @@ export interface IngressManagement {
   busy: boolean;
   reveal: IngressReveal | null;
   notice: IngressNotice | null;
+  /** معرّفات متاجر هذه المنصة التي نتيجة إنشائها السابق لم تتأكد: لا يُعاد إرسالها (الحارس في ذاكرة الصفحة فقط، يزول بإعادة التحميل). */
+  blockedStoreIds: string[];
+  /** هل المعرّف المكتوب (بعد القصّ) محظور؟ */
+  isCreateBlocked: (storeId: string) => boolean;
   /** حوار الإنشاء مفتوح؟ وآخر رفض صريح من الخادم (يبقى الحوار مفتوحاً للتصحيح). */
   createOpen: boolean;
   createError: IngressErrorKey | null;
@@ -59,7 +65,8 @@ export interface IngressManagement {
  *   القائمة فوراً؛ تختفي أزرار الصفوف أثناء إعادة الجلب (حالة تحميل) وتعود بالحالة الحقيقية فقط، فلا محاولة جديدة قبل رؤيتها.
  * - **السرّ:** لا يُكتب إلى أي تخزين ولا سجلّ، ويُمسح عند إغلاق حوار الكشف أو إلغاء تركيب الحوار الأم.
  */
-export function useIngressManagement(reload: () => void, profileId: string | null = null): IngressManagement {
+export function useIngressManagement(reload: () => void, profileId: string | null = null, platformKey = ''): IngressManagement {
+  const [guardTick, setGuardTick] = useState(0);
   const [createOpen, setCreateOpen] = useState(false);
   const [createError, setCreateError] = useState<IngressErrorKey | null>(null);
   const knownIds = useRef<Set<string>>(new Set());
@@ -169,6 +176,18 @@ export function useIngressManagement(reload: () => void, profileId: string | nul
     setReveal(null);
   }, [reveal]);
 
+  const blockedStoreIds = useMemo(
+    () => listUnconfirmedCreates(createGuardScope(currentUser()), platformKey).map((entry) => entry.storeId),
+    // `guardTick` يعلن تغيّر الحارس الخارجي (ذاكرة الوحدة).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [guardTick, platformKey],
+  );
+  const isCreateBlocked = useCallback(
+    (storeId: string) => findUnconfirmedCreate(createGuardScope(currentUser()), platformKey, storeId) !== null,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [platformKey, guardTick],
+  );
+
   const openCreate = useCallback(() => {
     if (lock.current) return;
     setNotice(null);
@@ -191,6 +210,11 @@ export function useIngressManagement(reload: () => void, profileId: string | nul
       return;
     }
     const storeId = checked.value;
+    // حماية من إعادة إرسال معرّف نتيجة إنشائه السابق لم تتأكد (الخادم قد يكون أنشأه ولو لم يظهر في القائمة): لا طلب أبداً.
+    if (findUnconfirmedCreate(createGuardScope(currentUser()), platformKey, storeId) !== null) {
+      setCreateError('createBlocked');
+      return;
+    }
     const before = new Set(knownIds.current);
     lock.current = true;
     setBusy(true);
@@ -217,6 +241,8 @@ export function useIngressManagement(reload: () => void, profileId: string | nul
           // الإنشاء غير idempotent: لا إعادة محاولة. تُقرأ القائمة لنعرف إن وُلدت النقطة ثم تُسوّى النتيجة في `observe`.
           setCreateOpen(false);
           setNotice({ kind: 'error', messageKey: failure.messageKey });
+          recordUnconfirmedCreate(createGuardScope(currentUser()), { platformKey, profileId, storeId, at: Date.now() });
+          setGuardTick((value) => value + 1);
           pendingCreate.current = { storeId, before, stale: lastState.current };
           reloadRef.current();
           return;
@@ -228,10 +254,23 @@ export function useIngressManagement(reload: () => void, profileId: string | nul
         if (mounted.current) setBusy(false);
       }
     })();
-  }, [createOpen, profileId]);
+  }, [createOpen, platformKey, profileId]);
 
   const observe = useCallback((state: SignedIngressState) => {
     lastState.current = state;
+    // ظهور نقطة بمعرّف محظور في قائمة جديدة (من أي قراءة) يرفع حظر ذلك المعرّف: النقطة صارت مرئية ومعروفة (وإعادة الإنشاء ترُدّ 409).
+    // **غيابها لا يرفع شيئاً** (قد تحجبها الفروع).
+    if (state.status === 'ready') {
+      const scope = createGuardScope(currentUser());
+      let lifted = false;
+      for (const entry of listUnconfirmedCreates(scope, platformKey)) {
+        if (state !== pendingCreate.current?.stale && state.points.some((point) => point.storeId === entry.storeId)) {
+          clearUnconfirmedCreate(scope, platformKey, entry.storeId);
+          lifted = true;
+        }
+      }
+      if (lifted) setGuardTick((value) => value + 1);
+    }
     const pending = pendingCreate.current;
     if (pending === null) {
       if (state.status === 'ready') knownIds.current = new Set(state.points.map((point) => point.id));
@@ -245,19 +284,20 @@ export function useIngressManagement(reload: () => void, profileId: string | nul
     knownIds.current = new Set(state.points.map((point) => point.id));
     const born = state.points.find((point) => point.storeId === pending.storeId && !pending.before.has(point.id));
     if (born !== undefined && born.status === 'configured' && born.secretVersion === 1) {
-      // هوية وحالة النقطة التي ظهرت مطابقتان لإنشاء لم يصل سرّه: الخطوة التالية تدوير سرّها (5b) يدوياً لا تلقائياً.
+      // هوية وحالة النقطة التي ظهرت مطابقتان لإنشاء لم يصل سرّه: الخطوة التالية تدوير سرّها (5b) يدوياً لا تلقائياً. ظهورها المتحقَّق وحده
+      // يرفع حظر إعادة الإنشاء (فالنقطة معروفة وإعادة الإنشاء ترُدّ 409)؛ غيابها أو ظهورها بحالة غير متوقعة لا يرفعانه أبداً.
       setNotice({ kind: 'createLost', storeId: pending.storeId });
       return;
     }
     // **غياب النقطة عن القائمة لا يثبت أنها لم تُنشأ**: القائمة مقيّدة بنطاق فروع المستخدم، والخادم قد يكون أتمّ الإنشاء. فلا
     // يُستنتج فشل ولا يُشجَّع على إعادة الإنشاء؛ تُعرض رسالة محايدة بأن النتيجة لم تتأكد. (نقطة ظهرت بحالة/إصدار غير متوقعين: الحكم نفسه.)
     setNotice({ kind: 'createUnconfirmed', storeId: pending.storeId });
-  }, []);
+  }, [platformKey]);
 
   const dismissNotice = useCallback(() => setNotice(null), []);
 
   return {
-    dialog, busy, reveal, notice, createOpen, createError, openCreate, cancelCreate, confirmCreate, observe,
+    dialog, busy, reveal, notice, blockedStoreIds, isCreateBlocked, createOpen, createError, openCreate, cancelCreate, confirmCreate, observe,
     openRotate, openDisable, cancel, confirmRotate, confirmDisable, closeReveal, dismissNotice,
   };
 }

@@ -52,6 +52,7 @@ export function IngressManagementLayer({ management, platformName }: { managemen
           platformName={platformName}
           busy={busy}
           error={management.createError}
+          isBlocked={management.isCreateBlocked}
           onCancel={management.cancelCreate}
           onSubmit={management.confirmCreate}
         />
