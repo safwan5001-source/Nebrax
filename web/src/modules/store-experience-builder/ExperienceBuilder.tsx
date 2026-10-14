@@ -4294,7 +4294,7 @@ function SidebarToggleIcon({
       strokeLinejoin="round"
       aria-hidden="true"
     >
-      <path d={points} />
+      <polyline points={points} />
     </svg>
   );
 }
