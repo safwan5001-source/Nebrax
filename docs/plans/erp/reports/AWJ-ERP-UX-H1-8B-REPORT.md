@@ -15,7 +15,7 @@ Codex posted one finding on #1438, one on #1439 and three on #1443 **before** ea
 | #1441 | Shared forbidden title as `h1` doubles the page `h1` on Developers pages | Already fixed before merge | Answered on the thread |
 | #1443 | The "final" matrix crawled `622783e` + H1-7F, not final `main` (which also has #1419 RBAC/messages and #1411) | **Yes** | **Corrected**: that matrix is relabelled as integration-tree evidence; the actual final tree was re-crawled (below) |
 | #1443 | The closure counts its own merge record before it exists | **Yes** | **Recorded**: #1443 → `f8e7ab8` in the state file; closure wording fixed |
-| #1443 | `compare.py` turns a missing `results.jsonl` into zeros | **Yes** | **Fixed**: aborts with the missing path |
+| #1443 | `compare.py` turns a missing `results.jsonl` into zeros | **Yes** | **Fixed**: aborts when an input is missing or holds no records |
 
 ## Changed files
 `web/src/modules/print-templates/components/print-template-center.tsx`, `.../print-template-studio.tsx`, `web/src/app/not-found.tsx`, `web/src/messages/{ar,en}.json` (`notFound.backPlatform`), `docs/plans/erp/h1-8-evidence/tools/compare.py`. Tests: `web/src/app/not-found.test.tsx`, `web/src/modules/print-templates/components/__tests__/print-template-heading-outline.test.tsx` (new). Docs: state file, closure report, both final matrices (one new), 7B and 7D reports (corrections).
@@ -25,7 +25,7 @@ Codex posted one finding on #1438, one on #1439 and three on #1443 **before** ea
 - Full Vitest on the code commit `f12016a` (`main` `f8e7ab8` + fixes): **570 files / 6,093 tests passed**. Production `next build`: passed.
 - Real browser (production build, EN, 1440): `/document-design` outline `H1 Print template center → H2 Choose a work area → H3 Sales, Purchases and suppliers, Finance and vouchers, Inventory and logistics`; `/no-such-page` → `/dashboard` "Back to the dashboard"; `/platform/no-such-page` → `/platform` "Back to the platform console".
 - **Actual final tree re-crawl**: `main` `f8e7ab8` + `f12016a`, 1,248 loads (v3 AR 1440, EN dark 1440, AR 390, AR 320, legacy AR 1440, staff role). Same counts as the integration-tree matrix on every audited rule, overflow, heading, message and raw-key metric; only the legacy console-error count changed (28 → 27 routes). [REGRESSION-MATRIX-FINAL-MAIN.md](../h1-8-evidence/REGRESSION-MATRIX-FINAL-MAIN.md).
-- `compare.py` with a missing input directory: exits 1 naming the file; with complete input: exit 0.
+- `compare.py`: a missing input or one with only blank lines exits 1 naming the file (blank-only case raised by review on this PR); complete input exits 0; three reruns are byte-identical (tied rows ordered by name).
 
 ## Self-review / Guardian
 - Reviewer: context-only heading change (no class or text change); 404 change is one `usePathname` check; the docs now describe what was actually verified.
