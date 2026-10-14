@@ -28,6 +28,7 @@ import { formatRiyal } from '@/lib/money';
 import { toCsv, downloadCsv } from '@/lib/export';
 import { useCompany } from '@/lib/company';
 import { useToast } from '@/components/ui/toast';
+import { LtrNumber } from '@/components/ui/ltr-number';
 
 export type GeneralAdvancedReportTab = 'ledger' | 'journal' | 'cashflow' | 'tax';
 
@@ -308,7 +309,7 @@ function LedgerTable({ ledger, loading, g }: { ledger: Ledger | null; loading: b
     formatRiyal(row.balance),
   ]);
   return <Card>
-    <CardHeader className="flex flex-row items-center justify-between gap-3"><CardTitle>{ledger.account.name}</CardTitle><Badge tone="neutral" className="num">{g('closingBalance')}: {formatRiyal(ledger.closing_balance)}</Badge></CardHeader>
+    <CardHeader className="flex flex-row items-center justify-between gap-3"><CardTitle>{ledger.account.name}</CardTitle><Badge tone="neutral" className="num">{g('closingBalance')}: <LtrNumber>{formatRiyal(ledger.closing_balance)}</LtrNumber></Badge></CardHeader>
     <CardContent>
       {savedViews.loaded && <div className="no-print mb-3 flex justify-end md:hidden"><ReportSavedViewsMenu controller={savedViews} locale={locale} /></div>}
       <div className="space-y-3 md:hidden">
@@ -475,7 +476,7 @@ export function CashFlowTable({ cashFlow, comparisonCashFlow, loading, g, t, emp
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle>{g('cashFlow')}</CardTitle>
-        <Badge tone={netTone} className="num">{formatRiyal(cashFlow.net_cash_flow)}</Badge>
+        <Badge tone={netTone} className="num"><LtrNumber>{formatRiyal(cashFlow.net_cash_flow)}</LtrNumber></Badge>
       </CardHeader>
       <CardContent>
         <StructuredFinancialStatement

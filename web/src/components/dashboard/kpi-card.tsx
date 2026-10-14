@@ -5,6 +5,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Sparkline } from '@/components/charts/sparkline';
 import { cn } from '@/lib/utils';
+import { LtrNumber } from '@/components/ui/ltr-number';
 
 /**
  * بطاقة مؤشّر — بسطر فرعي اختياري تحت خطّ منقّط.
@@ -83,7 +84,7 @@ export function KpiCard({
                 isNegativeValue ? 'text-negative' : 'text-text'
               )}
             >
-              {value}
+              <LtrNumber>{value}</LtrNumber>
             </span>
             {unit && <span className="text-[13px] font-medium text-muted">{unit}</span>}
           </div>
@@ -114,7 +115,7 @@ export function KpiCard({
               ) : sub.tone === 'muted' ? null : (
                 <ArrowUpRight className="h-3.5 w-3.5 shrink-0" strokeWidth={2.2} aria-hidden />
               )}
-              {sub.value}
+              <LtrNumber>{sub.value}</LtrNumber>
             </span>
           </div>
         )}
