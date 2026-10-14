@@ -94,11 +94,11 @@ No code changed, so no test run was needed for this PR. Existing counts to be pr
 
 | Conclusion | Runs | Note |
 |---|---|---|
-| success | 71 | 40 PR + 31 push (main) |
+| success | 71 | 42 PR + 29 push (main) |
 | failure | 1 | run 9356 — see §8.3 |
 | cancelled | 15 | all 15 superseded by a newer push on the same branch (concurrency); verified one by one |
 
-Gate sample = the 10 most recent completed, non-superseded runs: **9412, 9413, 9414, 9415, 9416, 9417, 9418, 9419, 9422, 9423** (5 push on `main`, 5 PR). Selected by recency, not by outcome; the all-window numbers below confirm the same picture.
+Gate sample = the 10 most recent completed, non-superseded runs: **9412, 9413, 9414, 9415, 9416, 9417, 9418, 9419, 9422, 9423** (6 push on `main`, 4 PR). Selected by recency, not by outcome; the all-window numbers below confirm the same picture.
 
 ### 8.2 Results
 
