@@ -23,6 +23,7 @@ const sources = [
   ...walk(join(SRC, 'components/integrations')),
   ...walk(join(SRC, 'app/(app)/integrations')),
   join(SRC, 'lib/integration-center.ts'),
+  join(SRC, 'lib/communications-providers.ts'),
   join(SRC, 'lib/signed-ingress.ts'),
   join(SRC, 'lib/ingress-management.ts'),
 ].filter((path) => !isTest(path) && /\.(ts|tsx)$/.test(path));
@@ -47,6 +48,10 @@ describe('integration center module sources', () => {
       'components/integrations/delivery-platform-detail.tsx',
       'components/integrations/delivery-ladder.tsx',
       'components/integrations/use-delivery-integration-data.ts',
+      'components/integrations/communications-catalog.tsx',
+      'components/integrations/communications-provider-mark.tsx',
+      'lib/communications-providers.ts',
+      'app/(app)/integrations/communications/page.tsx',
       'app/(app)/integrations/page.tsx',
       'app/(app)/integrations/delivery-platforms/page.tsx',
       'app/(app)/integrations/delivery-platforms/[platformKey]/page.tsx',

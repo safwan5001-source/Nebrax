@@ -8,15 +8,19 @@ import {
 } from '@/lib/integration-center';
 
 describe('integration center categories', () => {
-  it('keeps the approved order and only delivery platforms is enterable', () => {
-    expect(INTEGRATION_CATEGORIES.map((c) => c.key)).toEqual(['delivery', 'ecommerce', 'payments', 'shipping']);
-    expect(INTEGRATION_CATEGORIES.filter((c) => c.href !== null).map((c) => c.key)).toEqual(['delivery']);
+  it('keeps the approved order (communications appended last) and only delivery platforms and communications providers are enterable', () => {
+    expect(INTEGRATION_CATEGORIES.map((c) => c.key)).toEqual(['delivery', 'ecommerce', 'payments', 'shipping', 'communications']);
+    expect(INTEGRATION_CATEGORIES.filter((c) => c.href !== null).map((c) => c.key)).toEqual(['delivery', 'communications']);
   });
 
   it('enters the delivery platforms catalog inside the Integration Center (INT-UX-2); the legacy screen is not duplicated', () => {
     const delivery = INTEGRATION_CATEGORIES.find((c) => c.key === 'delivery');
     expect(delivery?.href).toBe('/integrations/delivery-platforms');
-    expect(INTEGRATION_CATEGORIES.filter((c) => c.href !== null)).toHaveLength(1);
+    expect(INTEGRATION_CATEGORIES.filter((c) => c.href !== null)).toHaveLength(2);
+  });
+
+  it('AWJ-COMMS-UX-01: communications providers enters its own static catalog', () => {
+    expect(INTEGRATION_CATEGORIES.find((c) => c.key === 'communications')?.href).toBe('/integrations/communications');
   });
 });
 

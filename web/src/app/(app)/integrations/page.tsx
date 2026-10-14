@@ -12,6 +12,7 @@ import {
   type DeliveryAccess,
   type DeliverySummary,
 } from '@/lib/integration-center';
+import { COMMUNICATIONS_PERMISSION } from '@/lib/communications-providers';
 import { hasPermission } from '@/lib/permissions';
 
 /**
@@ -27,6 +28,7 @@ export default function IntegrationsPage() {
   const [summaryStatus, setSummaryStatus] = useState<SummaryStatus>('loading');
   const [attempt, setAttempt] = useState(0);
   const [canOpenApplications, setCanOpenApplications] = useState(false);
+  const [communicationsAllowed, setCommunicationsAllowed] = useState(false);
 
   const retry = useCallback(() => setAttempt((value) => value + 1), []);
 
@@ -34,6 +36,8 @@ export default function IntegrationsPage() {
     let cancelled = false;
     const user = currentUser();
     setCanOpenApplications(hasPermission(user?.permissions, user?.role, 'apps.view'));
+    // كتالوج مزوّدي الاتصالات ثابت (لا طلب شبكة) فبوابته الصلاحية وحدها، مستقلةً عن بوابة منصات التوصيل.
+    setCommunicationsAllowed(hasPermission(user?.permissions, user?.role, COMMUNICATIONS_PERMISSION));
 
     // بلا صلاحية: لا طلب بيانات إطلاقاً.
     if (!hasPermission(user?.permissions, user?.role, DELIVERY_PERMISSION)) {
@@ -83,6 +87,7 @@ export default function IntegrationsPage() {
       summary={summary}
       summaryStatus={summaryStatus}
       canOpenApplications={canOpenApplications}
+      communicationsAllowed={communicationsAllowed}
       onRetry={retry}
     />
   );

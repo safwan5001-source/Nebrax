@@ -1,4 +1,5 @@
 import { deliveryPlatformPresentations } from '@/lib/delivery-platform-registry';
+import { COMMUNICATIONS_CATALOG_HREF } from '@/lib/communications-providers';
 
 /**
  * مركز التكاملات (INT-UX-1) — منطق نقيّ لا يلمس الشبكة ولا الواجهة.
@@ -12,7 +13,7 @@ import { deliveryPlatformPresentations } from '@/lib/delivery-platform-registry'
  * ليس ادّعاءً. وبهذا لا يتحوّل خطأ جلب إلى جملة مضلّلة مثل «لا تكاملات متاحة».
  */
 
-export type IntegrationCategoryKey = 'delivery' | 'ecommerce' | 'payments' | 'shipping';
+export type IntegrationCategoryKey = 'delivery' | 'ecommerce' | 'payments' | 'shipping' | 'communications';
 
 export interface IntegrationCategory {
   key: IntegrationCategoryKey;
@@ -33,6 +34,8 @@ export const INTEGRATION_CATEGORIES: readonly IntegrationCategory[] = [
   { key: 'ecommerce', href: null },
   { key: 'payments', href: null },
   { key: 'shipping', href: null },
+  // AWJ-COMMS-UX-01: تُلحَق في النهاية كي لا تتحرك مواضع البطاقات المعتمدة. كتالوج وصفي ثابت بلا قراءة خادم.
+  { key: 'communications', href: COMMUNICATIONS_CATALOG_HREF },
 ];
 
 /** حالة بوابة الدخول إلى منصات التوصيل. */

@@ -3,7 +3,7 @@
 import { useId } from 'react';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
-import { Bike, Check, ChevronRight, CreditCard, LayoutGrid, ShoppingBag, Truck, type LucideIcon } from 'lucide-react';
+import { Bike, Check, ChevronRight, CreditCard, LayoutGrid, MessagesSquare, ShoppingBag, Truck, type LucideIcon } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -30,6 +30,7 @@ const ICONS: Record<IntegrationCategoryKey, LucideIcon> = {
   ecommerce: ShoppingBag,
   payments: CreditCard,
   shipping: Truck,
+  communications: MessagesSquare,
 };
 
 export type SummaryStatus = 'loading' | 'ready' | 'error';
@@ -39,12 +40,15 @@ export function IntegrationCenterLanding({
   summary,
   summaryStatus,
   canOpenApplications,
+  communicationsAllowed = false,
   onRetry,
 }: {
   access: DeliveryAccess;
   summary: DeliverySummary | null;
   summaryStatus: SummaryStatus;
   canOpenApplications: boolean;
+  /** صلاحية كتالوج مزوّدي الاتصالات (`company.manage`) — مستقلة عن بوابة منصات التوصيل. */
+  communicationsAllowed?: boolean;
   onRetry: () => void;
 }) {
   const t = useTranslations('integrationCenter');
@@ -88,6 +92,8 @@ export function IntegrationCenterLanding({
                     summaryStatus={summaryStatus}
                     canOpenApplications={canOpenApplications}
                   />
+                ) : category.key === 'communications' ? (
+                  <CommunicationsCard href={category.href} allowed={communicationsAllowed} />
                 ) : (
                   <PlannedCard categoryKey={category.key} />
                 )}
@@ -216,7 +222,7 @@ function SummaryLines({ summary, status }: { summary: DeliverySummary | null; st
   );
 }
 
-function PlannedCard({ categoryKey }: { categoryKey: Exclude<IntegrationCategoryKey, 'delivery'> }) {
+function PlannedCard({ categoryKey }: { categoryKey: Exclude<IntegrationCategoryKey, 'delivery' | 'communications'> }) {
   const t = useTranslations('integrationCenter');
   const Icon = ICONS[categoryKey];
 
@@ -230,5 +236,54 @@ function PlannedCard({ categoryKey }: { categoryKey: Exclude<IntegrationCategory
       <h2 className="text-base font-semibold text-text">{t(`${categoryKey}.title`)}</h2>
       <p className="text-sm text-muted">{t('planned')}</p>
     </div>
+  );
+}
+
+/**
+ * بطاقة مزوّدي الاتصالات (AWJ-COMMS-UX-01): رابط تنقّل إلى كتالوج وصفي ثابت. لا شارة «متصل/مفعّل»
+ * ولا ملخص أرقام: لا مصدر بيانات اتصال في النظام، فلا نعرض إلا ما هو مكتوب وثابت.
+ * بلا الصلاحية تبقى خاملة بنيوياً (div بلا رابط) كحالة منصات التوصيل المرفوضة.
+ */
+function CommunicationsCard({ href, allowed }: { href: string | null; allowed: boolean }) {
+  const t = useTranslations('integrationCenter');
+  const titleId = useId();
+  const descId = useId();
+  const Icon = ICONS.communications;
+
+  if (!allowed || href === null) {
+    return (
+      <div
+        className="flex w-full flex-col gap-2 rounded-md border border-dashed border-border bg-surface p-4"
+        data-testid="integration-card-communications"
+        data-state="denied"
+      >
+        <Icon className="h-6 w-6 text-muted" strokeWidth={1.6} aria-hidden="true" />
+        <h2 className="text-base font-semibold text-text">{t('communications.title')}</h2>
+        <p role="note" className="text-sm leading-relaxed text-muted">{t('communications.denied')}</p>
+      </div>
+    );
+  }
+
+  return (
+    <Link
+      href={href}
+      aria-labelledby={titleId}
+      aria-describedby={descId}
+      data-testid="integration-card-communications"
+      data-state="allowed"
+      className="group flex w-full flex-col gap-2 rounded-md border border-border bg-surface p-4 transition-colors hover:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+    >
+      <div className="flex items-start justify-between gap-2">
+        <Icon className="h-6 w-6 text-primary" strokeWidth={1.6} aria-hidden="true" />
+        <ChevronRight className="mt-1 h-4 w-4 shrink-0 text-muted rtl:rotate-180" strokeWidth={1.7} aria-hidden="true" />
+      </div>
+      <h2 id={titleId} className="text-base font-semibold text-text">{t('communications.title')}</h2>
+      <div id={descId} className="space-y-1.5">
+        <p className="text-sm leading-relaxed text-muted">{t('communications.description')}</p>
+        <div>
+          <Badge tone="muted">{t('communications.badge')}</Badge>
+        </div>
+      </div>
+    </Link>
   );
 }
