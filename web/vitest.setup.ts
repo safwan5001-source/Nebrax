@@ -1,4 +1,4 @@
-import { vi } from 'vitest';
+import { afterEach, vi } from 'vitest';
 
 /**
  * `next/font/google` resolves through a Next.js-specific SWC/webpack transform
@@ -30,4 +30,23 @@ vi.mock('next/font/google', () => {
     Readex_Pro: loader,
     Rubik: loader,
   };
+});
+
+/**
+ * AWJ-STORE-CTX-1 — المتجر النشط يصمد الآن في `sessionStorage` و`?store=` (هذا هو الإصلاح نفسه)، وبيئة jsdom
+ * مشتركة بين اختبارات الملف الواحد. يُمسح هذا السياق وحده بعد كل اختبار كي لا يرث اختبارٌ متجرَ سابقه؛ بقية
+ * الرابط وذاكرة الجلسة لا تُمسّ.
+ */
+afterEach(() => {
+  if (typeof window === 'undefined') return;
+  try {
+    window.sessionStorage.removeItem('awj-commerce-active-store');
+  } catch {
+    // لا ذاكرة جلسة في هذه البيئة.
+  }
+  const url = new URL(window.location.href);
+  if (url.searchParams.has('store')) {
+    url.searchParams.delete('store');
+    window.history.replaceState(null, '', url.toString());
+  }
 });

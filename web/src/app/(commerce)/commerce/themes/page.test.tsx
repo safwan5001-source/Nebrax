@@ -63,7 +63,7 @@ describe('Theme Gallery (CUST-HV V10b)', () => {
 
     await waitFor(() => {
       const link = document.querySelector('[data-theme-preview-link="awj-market"]');
-      expect(link?.getAttribute('href')).toBe('/commerce/appearance?version=p1&previewTheme=awj-market');
+      expect(link?.getAttribute('href')).toBe('/commerce/appearance?version=p1&previewTheme=awj-market&store=store-1');
     });
   });
 
@@ -75,7 +75,7 @@ describe('Theme Gallery (CUST-HV V10b)', () => {
     const { unmount } = render(<CommerceThemesPage />);
     await waitFor(() => {
       expect(document.querySelector('[data-theme-preview-link="awj-modern"]')?.getAttribute('href')).toBe(
-        '/commerce/appearance?version=d2&previewTheme=awj-modern',
+        '/commerce/appearance?version=d2&previewTheme=awj-modern&store=store-1',
       );
     });
     unmount();
@@ -84,7 +84,7 @@ describe('Theme Gallery (CUST-HV V10b)', () => {
     render(<CommerceThemesPage />);
     await waitFor(() => {
       expect(document.querySelector('[data-theme-preview-link="awj-modern"]')?.getAttribute('href')).toBe(
-        '/commerce/appearance?previewTheme=awj-modern',
+        '/commerce/appearance?previewTheme=awj-modern&store=store-1',
       );
     });
   });

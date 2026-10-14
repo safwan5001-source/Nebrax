@@ -7,6 +7,7 @@ import { EmptyState, ErrorState, LoadingState } from '@/components/nebrax';
 import { Select } from '@/components/ui/select';
 import { commerceWorkspaceMessage } from '@/modules/commerce-workspace/messages';
 import { useCommerceStoreContext } from '@/modules/commerce-workspace/store-context';
+import { StoreContextInvalidNotice } from '@/modules/commerce-workspace/store-context-invalid';
 import type { CommerceStoreOption } from '@/modules/commerce-workspace/stores';
 
 /**
@@ -17,7 +18,7 @@ import type { CommerceStoreOption } from '@/modules/commerce-workspace/stores';
 export function StoreGate({ children }: { children: (store: CommerceStoreOption) => ReactNode }) {
   const locale = useLocale();
   const t = (key: Parameters<typeof commerceWorkspaceMessage>[1]) => commerceWorkspaceMessage(locale, key);
-  const { catalog, selectedStoreId, setSelectedStoreId } = useCommerceStoreContext();
+  const { catalog, selectedStoreId, setSelectedStoreId, storeContextStatus } = useCommerceStoreContext();
 
   if (catalog.status === 'loading') return <LoadingState variant="table" rows={3} />;
   if (catalog.status === 'error' || catalog.status === 'unavailable') {
@@ -28,6 +29,8 @@ export function StoreGate({ children }: { children: (store: CommerceStoreOption)
   }
 
   const store = catalog.stores.find((candidate) => candidate.id === selectedStoreId);
+  // متجرٌ مطلوب صراحةً غير متاح: لا نموذج يُركَّب على متجرٍ بديل، والاختيار يتمّ من الإشعار.
+  if (!store && storeContextStatus === 'invalid') return <StoreContextInvalidNotice />;
   if (!store) return <LoadingState variant="table" rows={3} />;
 
   return (
