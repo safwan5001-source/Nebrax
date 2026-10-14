@@ -275,6 +275,8 @@ export interface FacetVisualContext {
 export interface ResolvedFacetVisual {
   content: FacetVisualContent;
   image?: FacetVisualImage & { fit: FacetVisualFit };
+  /** With an image: the icon to draw if the image fails to load (image → icon → text). */
+  fallbackIcon?: IconKey;
   icon?: IconKey;
   iconColor?: string;
   background?: string;
@@ -380,9 +382,13 @@ function resolve(
     if (image.decorative) resolvedImage.decorative = true;
     visual.image = resolvedImage;
   }
-  if (content === "icon") {
-    visual.icon = icon as IconKey;
-    if (iconColor !== undefined) visual.iconColor = iconColor as string;
+  if (content === "image" && icon !== undefined) {
+    // VD-2: the render fallback if the image fails to load in the browser (image → icon → text).
+    visual.fallbackIcon = icon as IconKey;
+  }
+  if (content === "icon") visual.icon = icon as IconKey;
+  if (iconColor !== undefined && (content === "icon" || visual.fallbackIcon)) {
+    visual.iconColor = iconColor as string;
   }
   // The background shows behind icons, text and a `contain` image, and is the placeholder behind any image until it
   // loads — so it is emitted whenever set and the renderer decides what shows. Absent = theme tokens.

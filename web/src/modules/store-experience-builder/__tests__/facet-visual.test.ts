@@ -33,7 +33,7 @@ const inheritance = JSON.parse(
 
 describe("facet visual twins", () => {
   it("are byte-identical between web and storefront", () => {
-    for (const file of ["facet-visual.ts", "icon-registry.ts"]) {
+    for (const file of ["facet-visual.ts", "facet-visual-style.ts", "icon-registry.ts"]) {
       expect(repo(`web/src/modules/store-experience-builder/presentation/${file}`)).toBe(
         repo(`storefront/src/lib/presentation/${file}`),
       );

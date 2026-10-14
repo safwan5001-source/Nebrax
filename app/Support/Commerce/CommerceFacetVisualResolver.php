@@ -14,7 +14,8 @@ namespace App\Support\Commerce;
  * - `image`: القيمة فقط (**لا تُورث**). `image.fit`: القيمة → افتراضات البُعد → `cover`.
  *
  * ثم **السقوط وقت العرض** (منفصل عن الوراثة ولا يغيّر المخزَّن): `image` بلا صورة صالحة → الأيقونة المحلولة →
- * `none`؛ `icon` بلا أيقونة → `none`. الشكل والحجم والاسم المحلولة تبقى كما هي في كل مرحلة.
+ * `none`؛ `icon` بلا أيقونة → `none`. الشكل والحجم والاسم المحلولة تبقى كما هي في كل مرحلة. وحين يُعرض `image` تُرفَق
+ * `fallbackIcon` (ولونها) إن وُجدت أيقونة محلولة، ليسقط العارض إليها إن فشل تحميل الصورة في المتصفح.
  *
  * دالة نقيّة: لا قاعدة بيانات. صلاحية الصور تُمرَّر في `$context['usableMediaIds']` (قائمة المعرّفات الجاهزة
  * المملوكة للمستأجر؛ `null` = افترض الصلاحية، للمعاينة). توأمها `resolveFacetValueVisual` /
@@ -127,11 +128,15 @@ final class CommerceFacetVisualResolver
         } else {
             $sources['fit'] = null;
         }
+        if ($content === 'image' && $icon !== null) {
+            // VD-2: احتياطي العرض إن فشل تحميل الصورة في المتصفح (صورة ← أيقونة ← نص)؛ الخادم وحده يعرف الأيقونة المحلولة.
+            $visual['fallbackIcon'] = $icon;
+        }
         if ($content === 'icon') {
             $visual['icon'] = $icon;
-            if ($iconColor !== null) {
-                $visual['iconColor'] = $iconColor;
-            }
+        }
+        if ($iconColor !== null && ($content === 'icon' || isset($visual['fallbackIcon']))) {
+            $visual['iconColor'] = $iconColor;
         }
         // الخلفية تظهر خلف الأيقونة والنص وخلف الصورة عند `contain`، وهي أيضاً العنصر النائب خلف أي صورة حتى تُحمَّل؛
         // لذلك تُخرَج كلما عُرِّفت، والعارض يقرّر ما يظهر. غيابها = رموز السمة.
