@@ -5,6 +5,7 @@ namespace App\Providers;
 use App\Http\Controllers\Api\CommerceCategoryPublicationController;
 use App\Http\Controllers\Api\CommerceCollectionController;
 use App\Http\Controllers\Api\CommerceFacetController;
+use App\Http\Controllers\Api\CommerceFacetVisualController;
 use App\Http\Controllers\Api\CommercePersonalizationController;
 use App\Http\Controllers\Api\CommerceProductAddonController;
 use App\Http\Controllers\Api\CommerceProductContentController;
@@ -142,6 +143,14 @@ final class CommerceWorkspaceServiceProvider extends ServiceProvider
             Route::delete('{id}/values/{valueId}', [CommerceFacetController::class, 'destroyValue'])
                 ->whereUuid(['id', 'valueId'])
                 ->middleware(EnsurePermission::class.':products.manage');
+            // AWJ-VD-H1 / VD-1b — the visual identity (L2) is storefront presentation, not catalogue data:
+            // commerce.manage (D-04, no RBAC change), with a write throttle like the media library.
+            Route::put('{id}/visual', [CommerceFacetVisualController::class, 'updateFacet'])
+                ->whereUuid('id')
+                ->middleware([EnsurePermission::class.':commerce.manage', 'throttle:30,1']);
+            Route::put('{id}/values/{valueId}/visual', [CommerceFacetVisualController::class, 'updateValue'])
+                ->whereUuid(['id', 'valueId'])
+                ->middleware([EnsurePermission::class.':commerce.manage', 'throttle:30,1']);
         });
 
         Route::middleware([

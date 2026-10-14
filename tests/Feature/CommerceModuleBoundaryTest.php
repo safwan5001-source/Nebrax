@@ -70,6 +70,9 @@ class CommerceModuleBoundaryTest extends TestCase
         'api/commerce/workspace/facets/{id}',
         'api/commerce/workspace/facets/{id}/values',
         'api/commerce/workspace/facets/{id}/values/{valueId}',
+        // AWJ-VD-H1 / VD-1b — the visual identity of a facet and of a value.
+        'api/commerce/workspace/facets/{id}/values/{valueId}/visual',
+        'api/commerce/workspace/facets/{id}/visual',
         // FLOWERS-H7a / ADR-19 — سياسة جدولة التسليم لقناة جوال.
         'api/commerce/workspace/mobile-channel/delivery-schedule',
         'api/commerce/workspace/mobile-channel/delivery-schedule/blocked-dates',

@@ -2,6 +2,7 @@
 
 namespace App\Services\Commerce;
 
+use App\Models\CommerceFacetVisual;
 use App\Models\StorefrontPresentation;
 use App\Models\StorefrontPresentationVersion;
 use Illuminate\Support\Facades\DB;
@@ -28,6 +29,14 @@ final class StorefrontMediaReferenceScanner
     public const CONTAINER_HEAD_PUBLISHED = 'head_published';
 
     /**
+     * AWJ-VD-H1 / VD-1b (§3.8-d) — a facet or facet-value visual identity. Tenant-level, so `storefront_id` is ''.
+     * Counted by the reference paths only (`referencesFor`, `allReferencedIds`): deletion is refused and the "unused"
+     * filter stays correct. Deliberately **not** part of `liveUsageKeys()` — facet framing is CSS over the base
+     * thumbnails and never creates a baked derivative, so it must not keep one alive.
+     */
+    public const CONTAINER_FACET_VISUAL = 'facet_visual';
+
+    /**
      * @param  list<string>  $mediaIds
      * @return array<string, list<array{container:string,id:string,storefront_id:string,path:string}>>
      */
@@ -39,7 +48,7 @@ final class StorefrontMediaReferenceScanner
             return $found;
         }
 
-        foreach ($this->containers($wanted) as $container) {
+        foreach ($this->referenceContainers($wanted) as $container) {
             foreach ($this->walk($container['config']) as [$id, $path]) {
                 if (isset($found[$id])) {
                     $found[$id][] = [
@@ -63,7 +72,7 @@ final class StorefrontMediaReferenceScanner
     public function allReferencedIds(): array
     {
         $ids = [];
-        foreach ($this->containers(null) as $container) {
+        foreach ($this->referenceContainers(null) as $container) {
             foreach ($this->walk($container['config']) as [$id]) {
                 $ids[$id] = true;
             }
@@ -125,6 +134,27 @@ final class StorefrontMediaReferenceScanner
         }
 
         return $live;
+    }
+
+    /**
+     * Everything that can hold a media reference: the presentation documents plus facet visual identities.
+     *
+     * @param  list<string>|null  $needles  null = كل الصفوف
+     * @return iterable<array{container:string,id:string,storefront_id:string,config:array<mixed>}>
+     */
+    private function referenceContainers(?array $needles): iterable
+    {
+        yield from $this->containers($needles);
+        yield from $this->facetVisualContainers($needles);
+    }
+
+    /**
+     * @param  list<string>|null  $needles  null = كل الصفوف
+     * @return iterable<array{container:string,id:string,storefront_id:string,config:array<mixed>}>
+     */
+    private function facetVisualContainers(?array $needles): iterable
+    {
+        yield from $this->rows(CommerceFacetVisual::query(), 'visual', self::CONTAINER_FACET_VISUAL, $needles);
     }
 
     /**

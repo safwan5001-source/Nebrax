@@ -8,6 +8,7 @@ use App\Support\EdgeScheme;
 use App\Tenancy\TenantContext;
 use Aws\Exception\AwsException;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
 use Throwable;
@@ -153,23 +154,36 @@ class StorefrontMediaService
      *
      * @throws StorefrontMediaException
      */
+    /**
+     * AWJ-VD-H1 / VD-1b (D-16) — the reference check and the soft delete run in one transaction **after** locking the
+     * media row. A facet-visual save locks the same row before writing its reference, so the two never both pass:
+     * whichever locks second sees the other's committed result (in use → 409 here; deleted → 422 there).
+     */
     public function delete(StorefrontMedia $media): void
     {
-        $usage = $this->references->referencesFor([$media->id])[$media->id] ?? [];
-        if ($usage !== []) {
-            throw new StorefrontMediaException(
-                'media_in_use',
-                'لا يمكن حذف وسيطٍ مستخدمٍ في التصميم. أزله من أماكن استخدامه أولاً.',
-                409,
-                ['usage' => $usage],
-            );
-        }
+        DB::transaction(function () use ($media): void {
+            $locked = StorefrontMedia::query()->whereKey($media->id)->lockForUpdate()->first();
+            if ($locked === null || ! $locked->isActive()) {
+                return; // already deleted by a concurrent request: idempotent
+            }
 
-        $media->forceFill([
-            'state' => StorefrontMedia::STATE_DELETED,
-            'deleted_at' => now(),
-            'purge_after' => now()->addDays((int) config('storefront_media.purge_after_days', 30)),
-        ])->save();
+            $usage = $this->references->referencesFor([$locked->id])[$locked->id] ?? [];
+            if ($usage !== []) {
+                throw new StorefrontMediaException(
+                    'media_in_use',
+                    'لا يمكن حذف وسيطٍ مستخدمٍ في التصميم. أزله من أماكن استخدامه أولاً.',
+                    409,
+                    ['usage' => $usage],
+                );
+            }
+
+            $locked->forceFill([
+                'state' => StorefrontMedia::STATE_DELETED,
+                'deleted_at' => now(),
+                'purge_after' => now()->addDays((int) config('storefront_media.purge_after_days', 30)),
+            ])->save();
+            $media->setRawAttributes($locked->getAttributes(), true);
+        });
     }
 
     /** رابط موقَّع قصير الأجل لمتغيّرٍ بعينه (قراءة مساحة العمل). */
