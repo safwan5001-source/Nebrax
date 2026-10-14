@@ -17,6 +17,7 @@ use App\Models\Payment;
 use App\Models\Product;
 use App\Models\PriceList;
 use App\Models\StockMovement;
+use App\Support\ConcurrencyConflict;
 use App\Support\Money;
 use App\Services\Accounting\InvoiceRelationsService;
 use App\Services\Accounting\InvoiceService;
@@ -25,6 +26,7 @@ use App\Services\ClassificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use PDOException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class InvoiceController extends ApiController
@@ -344,7 +346,18 @@ class InvoiceController extends ApiController
         // الحارس قبل أي أثر: لا قيد ولا ICV ولا QR/XML ولا حركة مخزون عند الرفض.
         $invoice = $this->targetInvoice($id);
         $this->assertWarehouseAllowed($invoice->warehouse_id, $invoice->branch_id);
-        $posted = $this->domain(fn () => $this->invoices->post($invoice, null, $request->user()));
+
+        // REM-04 / SEC-02: ضحية جمود/تسلسل (40P01/40001) ⇒ 503 + Retry-After + error_code ثابت —
+        // على هذا المسار وحده. المعاملة أُلغيت كاملةً فإعادة الطلب آمنة؛ أي خطأ قاعدة بيانات آخر يبقى 500.
+        try {
+            $posted = $this->domain(fn () => $this->invoices->post($invoice, null, $request->user()));
+        } catch (PDOException $e) {
+            if (ConcurrencyConflict::matches($e)) {
+                return ConcurrencyConflict::response();
+            }
+
+            throw $e;
+        }
 
         return (new InvoiceResource($posted->load(['priceList', 'lines.product', 'lines.costCenterAllocations.costCenter', 'printTemplateRevision', 'pdfTemplateRevision', 'thermalTemplateRevision', 'printTemplateOverrideRevision', 'pdfTemplateOverrideRevision'])))->response();
     }

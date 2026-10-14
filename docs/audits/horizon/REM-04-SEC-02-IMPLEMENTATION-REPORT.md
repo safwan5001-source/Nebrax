@@ -5,6 +5,8 @@ DATE: 2026-10-14
 HORIZON: TAX-ZATCA (origin: AWJ-TAX-ZATCA-AUDIT-1 SEC-02 → TAX-HZ-00 backlog REM-04)
 ZONE: C — financial posting path / PostgreSQL concurrency
 
+> **SUPERSEDED IN PART (owner decision, post-merge review).** The `FOR NO KEY UPDATE` root-cause fix described here **stays**. Two additions were **removed** by the follow-up change documented in `REM-04-SEC-02-FOLLOWUP-REPORT.md`: (1) the 3-attempt `DB::transaction` retry in `InvoiceService::post()`; (2) the global 409 mapping in `ApiController::domain()`. The current contract is **HTTP 503 + `Retry-After: 1` + `error_code: concurrency_conflict`, on `POST /invoices/{id}/post` only**. Sections of this report that describe retries or the 409 mapping (§1, §4, §5, §6, §7) describe the as-merged #1450 state and are kept for the record.
+
 ## 1. Executive summary
 
 | | |

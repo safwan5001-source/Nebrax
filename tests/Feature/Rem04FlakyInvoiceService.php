@@ -15,16 +15,20 @@ use PDOException;
  */
 class Rem04FlakyInvoiceService extends InvoiceService
 {
-    /** عدد المحاولات القادمة التي ستفشل بـ40P01. */
+    /** عدد النداءات القادمة التي ستفشل بالرمز المحقون. */
     public static int $failures = 0;
 
-    /** عدد مرات الوصول إلى نقطة الحقن (= عدد محاولات المعاملة). */
+    /** عدد مرات الوصول إلى نقطة الحقن (= عدد محاولات المعاملة؛ يجب أن يكون 1 — لا إعادة محاولة). */
     public static int $calls = 0;
 
-    public static function reset(int $failures): void
+    /** SQLSTATE المحقون (`40P01` جمود، `40001` تسلسل، أو أي رمز آخر لإثبات أنه يبقى 500). */
+    public static string $sqlState = '40P01';
+
+    public static function reset(int $failures, string $sqlState = '40P01'): void
     {
         self::$failures = $failures;
         self::$calls = 0;
+        self::$sqlState = $sqlState;
     }
 
     protected function settle(Invoice $invoice, int $total, ?User $actor = null): void
@@ -32,8 +36,11 @@ class Rem04FlakyInvoiceService extends InvoiceService
         self::$calls++;
         if (self::$failures > 0) {
             self::$failures--;
-            $pdo = new PDOException('SQLSTATE[40P01]: Deadlock detected: 7 ERROR:  deadlock detected');
-            $pdo->errorInfo = ['40P01', 7, 'deadlock detected'];
+            // نص الرسالة يتبع الرمز: Laravel يصنّف التزامن أيضاً بنص الرسالة، فلا تحمل الرموز
+            // الأخرى كلمة deadlock وإلا لالتبست بتعارض تزامن.
+            $text = in_array(self::$sqlState, ['40P01', '40001'], true) ? 'deadlock detected' : 'injected database failure';
+            $pdo = new PDOException('SQLSTATE['.self::$sqlState.']: '.$text);
+            $pdo->errorInfo = [self::$sqlState, 7, $text];
 
             throw new QueryException('pgsql', 'update "tenants" set …', [], $pdo);
         }
