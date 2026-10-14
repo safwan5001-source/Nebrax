@@ -53,3 +53,35 @@ describe('currentUser referential stability', () => {
     expect(currentUser()).toBe(second);
   });
 });
+
+describe('persistUser display preferences (ERP-UX-026)', () => {
+  const cookies: string[] = [];
+  beforeEach(() => {
+    store.clear();
+    cookies.length = 0;
+    vi.stubGlobal('window', {});
+    vi.stubGlobal('localStorage', localStorageMock);
+    vi.stubGlobal('document', {
+      set cookie(value: string) { cookies.push(value); },
+      get cookie() { return cookies.join('; '); },
+      documentElement: { setAttribute: vi.fn(), removeAttribute: vi.fn(), dataset: {} },
+    });
+  });
+  afterEach(() => vi.unstubAllGlobals());
+
+  const withPrefs: AuthUser = { ...user, preferences: { locale: 'ar', theme: 'dark', appTheme: 'default' } };
+
+  it('applies the account language and mode at sign-in (default)', () => {
+    persistUser(withPrefs);
+    expect(cookies.some((c) => c.startsWith('locale=ar'))).toBe(true);
+    expect(store.get('theme')).toBe('dark');
+  });
+
+  it('a background refresh keeps the device language and mode', () => {
+    store.set('theme', 'light');
+    persistUser(withPrefs, { applyDisplayPreferences: false });
+    expect(cookies).toEqual([]);
+    expect(store.get('theme')).toBe('light');
+    expect(JSON.parse(store.get('user') as string).preferences.locale).toBe('ar');
+  });
+});

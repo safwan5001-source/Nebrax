@@ -112,12 +112,19 @@ export async function logout(): Promise<void> {
 let cachedUserRaw: string | null = null;
 let cachedUser: AuthUser | null = null;
 
-export function persistUser(user: AuthUser): void {
+/**
+ * `applyDisplayPreferences` (الافتراضي true) يطبّق لغة الحساب ووضعه وسمته على هذا الجهاز —
+ * صحيح عند الدخول وعند حفظ التفضيلات صراحةً. تحديثُ بيانات المستخدم في الخلفية (مثل
+ * إعادة قراءة `/me` في صفحة الإعدادات أو بعد تغيير البريد) يمرّر false، وإلا ألغى
+ * بصمتٍ لغةً أو وضعاً اختاره المستخدم من الشريط العلوي (ERP-UX-026).
+ */
+export function persistUser(user: AuthUser, options: { applyDisplayPreferences?: boolean } = {}): void {
   if (typeof window === 'undefined') return;
   const raw = JSON.stringify(user);
   localStorage.setItem('user', raw);
   cachedUserRaw = raw;
   cachedUser = user;
+  if (options.applyDisplayPreferences === false) return;
   const locale = user.preferences?.locale;
   if (locale) document.cookie = `locale=${locale}; path=/; max-age=31536000; samesite=lax`;
   const theme = user.preferences?.theme;
