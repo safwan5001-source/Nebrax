@@ -7,14 +7,14 @@ Legend: ☐ not started · ◐ in progress / in review · ☑ merged (with Merge
 | # | Slice | Depends on | Status | PR | Base SHA | Merge SHA |
 |---|---|---|---|---|---|---|
 | 00 | Baseline inspection + execution docs + doc corrections | — | ◐ | — | `5ff3135` | — |
-| 01 | Users workspace V2 (route `/users`, permission-gated nav, filters, status, lifecycle confirmations, mobile cards, error states, `/hr?tab=users` redirect) | 00 | ☐ | | | |
+| 01 | Users workspace V2 (route `/users`, permission-gated nav, **own manage gating: view-only viewers get a read-only table**, D-H role-name fallback, D-D scale mitigation, filters, status, lifecycle confirmations, mobile cards, error states, `/hr?tab=users` redirect) | 00 | ☐ | | | |
 | 02 | User editor Sheet (identity · status · role · branch/warehouse scope · pre-save access summary; owner-user select fix) | 01 | ☐ | | | |
-| 03A | Roles workspace shell + catalogue (route `/roles`, master/detail, grouped read-only catalogue, i18n coverage for all 36 modules / 40 actions, `/hr?tab=roles` redirect) | 00 | ☐ | | | |
-| 03B | Role editing (selection model, group select/deselect, search, counts, risk map + drift test, dirty state, unsaved guard, system/owner messaging, "applies to N users") | 03A | ☐ | | | |
+| 03A | Roles workspace shell + catalogue (route `/roles`, **`roles.manage` gating of create/edit/delete from the first slice**, master/detail, grouped read-only catalogue, i18n coverage for all 36 modules / 40 actions, `/hr?tab=roles` redirect) | 00 | ☐ | | | |
+| 03B | Role editing (**editors only for `roles.manage`; view-only viewers see the read-only catalogue**; selection model, group select/deselect, search, counts, risk map + drift test, dirty state, unsaved guard, system/owner messaging, "applies to N users") | 03A | ☐ | | | |
 | 04 | Role create + safe client-side clone (+ tests: source unchanged, only `name`+`permissions` sent) | 03B | ☐ | | | |
 | 05 | Shared scope editor + summary language (All/Selected, counts, search, warehouse↔branch context, limited-view notice) adopted in Users | 02 | ☐ | | | |
 | 06 | Treasury deposit/withdraw access legibility on existing account form | 00 | ☐ | | | |
-| 07 | Capability helper (`useCan`-style over `lib/permissions.ts`), hidden/read-only/disabled/allowed states on nav, create/edit/delete, posting, exports, reports, approvals, treasury, ZATCA, settings; `/me` refresh on shell mount/focus | 01, 03B | ☐ | | | |
+| 07 | Consolidate the capability helper (`useCan`-style over `lib/permissions.ts`, replacing the per-screen `hasPermission` calls from 01/03), extend to the rest of the ERP: hidden/read-only/disabled/allowed states on nav, create/edit/delete, posting, exports, reports, approvals, treasury, ZATCA, settings; `/me` refresh on shell mount/focus | 01, 03B | ☐ | | | |
 | 08 | Per-user access summary (source assignments only) | 02, 05 | ☐ | | | |
 | 09 | Keyboard / RTL / responsive (1440·1280·768·390) / dark+Ink / state QA with existing Playwright; add e2e for Users & Roles | 01–08 | ☐ | | | |
 | 10 | Closure: backend regression matrix, frontend verification, final report | 09 | ☐ | | | |
@@ -25,7 +25,8 @@ Legend: ☐ not started · ◐ in progress / in review · ☑ merged (with Merge
 |---|---|---|---|
 | D-A | F-1 / F-2 backend containment (restricted `users.manage` actor can clear/widen scope; role escalation to `admin`) | **Yes — decision packet, MASTER-PLAN §6** | Does not block slices. Default behaviour = Option 1 (document + risk treatment). |
 | D-B | Permission metadata location | No (default adopted) | Revisit only if owner prefers an additive backend field. |
-| D-D | Server-side pagination for `/users` | Only if plan limits grow | API change. |
+| D-D | Server-side pagination/search for `/users` | If an enterprise / `users: null` tenant grows large | API change; 01 ships client-side mitigation only. |
+| D-H | Role display name for `users.view`-without-`roles.view` viewers | Only if the UI fallback proves inadequate | Additive `role_name` on `UserResource` would be non-breaking. |
 | T-1 | Backend test for a scope-restricted actor calling `/users` (characterises F-1) | Only with D-A Option 2/3 | Not added in this horizon without approval (would pin current behaviour). |
 
 ## Per-slice checklist (copy into each PR)

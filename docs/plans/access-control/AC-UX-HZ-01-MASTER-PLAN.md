@@ -73,6 +73,7 @@ Settings (existing sidebar group "settings"; NO new group, NO new section)
 - `/hr?tab=users` and `/hr?tab=roles` **keep working** (redirect to `/users` / `/roles`) so bookmarks and the "link a user from an employee" flow do not break. The HR tabs are removed only when the redirect ships.
 - `EmployeeDialog`'s unified "employee + login" creation flow is **untouched** (Employee ⊃ User lifecycle separation preserved); the Users workspace links to employees (`/hr/employees/{id}`) and never deletes them.
 - Sidebar gating switches from role-name to `users.view` / `roles.view`. Route-level pages also check the permission and render a proper "no access" state (the API remains the authority).
+- **Each workspace slice gates its own mutating controls** (see §4.8); AC-UX-07 consolidates the helper and extends to the rest of the ERP, it does not retrofit these two screens.
 - Introduced in **AC-UX-01** (Users) and **AC-UX-03A** (Roles). If AC-UX-01 discovers a concrete reason this is wrong (e.g. a canonical-structure conflict), it falls back to keeping the tabs and gating them by permission — this is recorded, not silently chosen.
 
 ---
@@ -110,6 +111,11 @@ Applies to every Access Control screen. A slice's checklist is the relevant subs
 ### 4.6 Themes
 - Light/Dark × Default/Ink where the product supports them, verified in AC-UX-09 with existing Playwright infrastructure (no new visual-regression framework; screenshots reviewed, not committed).
 
+### 4.8 Permission gating inside the workspaces (not deferred to AC-UX-07)
+- A viewer with only `users.view` / `roles.view` gets a **read-only** workspace: no create / edit / activate-deactivate / delete / invite / scope-edit controls are rendered (or, where discoverability matters, they are disabled with a reason). Controls are keyed to `users.manage` / `roles.manage` via the existing `hasPermission` mirror (`lib/permissions.ts`); no new raw-string helper is introduced before 07.
+- Corollary: AC-UX-01 and AC-UX-03A/03B each ship with tests for the three viewer types — `*`, manage-holder, view-only — and a test that the 403 path (stale client / direct API) surfaces a proper error, not a success toast.
+- Backend remains authoritative; this gating is purely to stop offering actions that will 403.
+
 ### 4.7 Semantics-specific
 - **Status:** "Active" / "Inactive" text + indicator; deactivation dialog states: login & API access stop, active tokens are revoked, employee record and history are unchanged, can be reactivated (re-login required).
 - **Scope:** `All branches` · `3 branches` · `Dammam +2`; never a chip wall in tables; editor = `All` / `Selected` radio; `Selected` with zero ticks disables Save with an inline reason; copy says what an unrestricted assignment means. Lists limited by the viewer's own scope are labelled as such (F-3).
@@ -126,7 +132,8 @@ Applies to every Access Control screen. A slice's checklist is the relevant subs
 | D-A | F-1: branch-restricted `users.manage` actor can clear/widen scope (and F-2: role escalation to `admin`) | **Not fixed in this horizon.** UI performs no client-side attempt to compensate. | **Owner decision packet — see §6.** |
 | D-B | Where does permission label/risk/group metadata live? | Frontend presentation map keyed by exact canonical key (display-only), with a drift test against `Rbac::PERMISSIONS` so an unclassified/unknown key degrades to a neutral standard row, never to a hidden or mis-submitted one. | Additive backend field (`meta.permission_meta`) only on owner request. |
 | D-C | IA | §3 | Reversible; recorded in AC-UX-01. |
-| D-D | Users list pagination | No server pagination exists; client-side only, no new API. | Server pagination = API change → owner. |
+| D-D | Users list scale | No server pagination/search exists and enterprise / `users: null` tenants are **unbounded**. AC-UX-01 stays on the existing API but mitigates: render with the existing DataTable (client-side search/filter), keep rows lightweight (no per-row fetches), apply a visible row-count and degrade gracefully (no eager rendering of hidden detail; windowed/"show more" rendering if the list exceeds a threshold chosen in 01 and measured). The accepted residual risk is the unbounded payload itself. | Server pagination/search = API change → owner decision; recommended if a tenant exceeds a few hundred users. |
+| D-H | Role display name when the viewer has `users.view` but not `roles.view` | UI fallback chain, no backend change: (1) system-role translation (`owner/admin/accountant/staff/self_service`); (2) display name from `GET /roles` only when the viewer holds `roles.view` (never request it otherwise — no 403 noise); (3) otherwise a neutral "Custom role" label. The raw `role-xxxxxxxx` slug is never shown as a name. Role **filter** is offered only when names are resolvable. | Additive `role_name` on `UserResource` (non-breaking) removes the limitation — owner approval requested only if the fallback proves inadequate. |
 | D-E | Role clone | Client-side prefill → ordinary `POST /roles`; source never mutated. Verified feasible: `POST /roles` takes `name + permissions` and nothing else. | none |
 | D-F | "No branches/warehouses" state | **Not offered.** | STOP #2 if requested. |
 | D-G | Effective permission preview | Source assignments only (role name, stored scopes, role's explicit permission list, sensitive subset). No client-side authorization engine. | STOP #6/#7 if more is wanted. |
