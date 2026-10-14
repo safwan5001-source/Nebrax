@@ -33,7 +33,8 @@ class ZatcaSubmissionController extends ApiController
     /** يسجل طلباً دائماً ويصفّه فقط عند تفعيل النقل صراحةً في إعداد الخادم. */
     public function store(Request $request, string $id): JsonResponse
     {
-        $invoice = $this->visibleInvoice($request, $id);
+        // REM-03b: إنشاء محاولة إرسال عملية تغييرية ⇒ الفرع النشط فقط، قبل أي محاولة/طابور.
+        $invoice = $this->targetInvoice($id);
         $validated = validator([
             'idempotency_key' => $request->header('Idempotency-Key'),
         ], [
@@ -80,7 +81,9 @@ class ZatcaSubmissionController extends ApiController
 
     public function dispatch(Request $request, string $id, string $attemptId): JsonResponse
     {
-        $invoice = $this->visibleInvoice($request, $id);
+        // REM-03b: الفاتورة بالفرع النشط فقط أولاً؛ ثم المحاولة **مقيَّدة بهذه الفاتورة بعينها**
+        // (وبالمستأجر عبر TenantScope) — معرّف محاولة من فاتورة أخرى/مستأجر آخر ⇒ 404 قبل أي تغيير.
+        $invoice = $this->targetInvoice($id);
         $attempt = ZatcaSubmissionAttempt::query()
             ->where('invoice_id', $invoice->id)
             ->findOrFail($attemptId);
@@ -102,6 +105,12 @@ class ZatcaSubmissionController extends ApiController
     private function visibleInvoice(Request $request, string $id): Invoice
     {
         return $this->scopeToActiveBranch(Invoice::query(), $request)->findOrFail($id);
+    }
+
+    /** REM-03b: هدف عملية تغييرية — الفرع النشط فقط (`ApiController::scopeToCurrentBranchOnly()`). */
+    private function targetInvoice(string $id): Invoice
+    {
+        return $this->scopeToCurrentBranchOnly(Invoice::query())->findOrFail($id);
     }
 
     /** @return array<string, mixed> */

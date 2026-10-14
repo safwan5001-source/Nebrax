@@ -1679,3 +1679,13 @@ document no longer appear in the feed (its branch cannot be proven ⇒ fail clos
 note-attachment download) use `scopeToActiveBranch()` and therefore honour
 `?branch=all` for a user's allowed branches; `duplicate` and `storeNote` are
 mutating. See the implementation report, "Newly discovered / not changed".
+
+## 43. REM-03b / SEC-01 — Active-Branch-Only extended to six more operations (2026-10-14)
+
+> Security-remediation note. **REM-03b extends the targeted Active-Branch-Only rule of §42 to six operations; the general Access Control V2 branch policy is unchanged.** Report: `docs/audits/horizon/REM-03b-SEC-01-IMPLEMENTATION-REPORT.md`.
+
+* **Newly Active-Branch-Only (existing `scopeToCurrentBranchOnly()`):** `POST /invoices/{id}/duplicate`, `POST /invoices/{id}/notes`, `POST /invoices/{id}/zatca/submissions`, `POST /invoices/{id}/zatca/submissions/{attemptId}/dispatch`, `GET /credit-notes/{id}`, `POST /credit-notes/{id}/post`. Wrong active branch ⇒ 404 before any side effect; `?branch=all` does not widen; permission denial stays 403; `compliance.zatca` / credit-note entitlement gates unchanged.
+* **ZATCA dispatch:** the attempt is loaded as `invoice_id = <authorized invoice>` under `TenantScope`, so an attempt of another invoice or tenant is a 404; attempt rows carry no environment column, so environment readiness remains the tenant's active-environment check at enqueue (not a per-attempt binding).
+* **Cross-branch reference workflows preserved:** `ReturnableController` (return-source reference, including `purpose=credit_note`), the credit-note `original_invoice_id` reference check in `CreditNoteController::post` (allowed-branch policy — only the *note itself* became Active-Branch-Only), and `AppointmentController` (`scopeToActiveBranch()`, `?branch=all`) are untouched.
+* **Still on the general read/reference policy (by design):** `notes()`, note-attachment download, invoice `show`/`payments`/`accounting`/`inventory`/`zatca` reads, `ZatcaSubmissionController::index`.
+

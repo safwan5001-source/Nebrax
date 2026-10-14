@@ -220,3 +220,7 @@ Controllers only (5 files, +100/−15 lines); no services, models, migrations, r
 ## Recommended next step
 
 Owner review of PR #1403 → decide on the follow-up scope (`REM-03b`: `duplicate`, `storeNote`, ZATCA `store`/`dispatch`, credit-note `show`/`post`) → then `REM-08`.
+
+## Follow-up: REM-03b (added 2026-10-14; original conclusions above are unchanged)
+
+REM-03 was merged as PR #1403 (merge `c589ced1dcbad88ef023d8be6ead34bc58f489f0`). The out-of-scope table above is addressed, for six of its operations only, by the separate follow-up **REM-03b** (Draft PR; report: `REM-03b-SEC-01-IMPLEMENTATION-REPORT.md`): `InvoiceController::duplicate` and `storeNote`, `ZatcaSubmissionController::store` and `dispatch`, `CreditNoteController::show` and `post`. `ReturnableController`, `AppointmentController` and the credit-note `original_invoice_id` reference policy were deliberately left unchanged. The remaining rows of the table are not part of REM-03b.

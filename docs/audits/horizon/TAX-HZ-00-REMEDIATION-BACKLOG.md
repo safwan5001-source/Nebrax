@@ -69,6 +69,12 @@ REM-03 and REM-08 touch disjoint controllers (`Invoice/Return/Quote/DocumentRevi
 > **Implementation status: IN REVIEW — not closed.** Draft PR and evidence: see `REM-03-SEC-01-IMPLEMENTATION-REPORT.md` (same directory). The task is not marked closed until required tests, independent review and owner-approved merge are done. Access Control note: `docs/plans/access-control/AWJ_USERS_ROLES_PERMISSIONS_DAFTRA_REFERENCE.md` §42.
 > The card below is the original (pre-decision) plan; where it says "the user's allowed branches" the owner decision above supersedes it.
 
+### REM-03b — follow-up (2026-10-14)
+
+> **REM-03 merged** as PR #1403 (`c589ced1dcbad88ef023d8be6ead34bc58f489f0`). **REM-03b — IN REVIEW (Draft PR), not closed**; closes only after approved merge and verification. Report: `REM-03b-SEC-01-IMPLEMENTATION-REPORT.md`.
+> **Exactly six operations** become Active-Branch-Only (same `ApiController::scopeToCurrentBranchOnly()` primitive, no new helper): `InvoiceController::duplicate`, `InvoiceController::storeNote`, `ZatcaSubmissionController::store`, `ZatcaSubmissionController::dispatch` (attempt already bound to the resolved invoice + tenant), `CreditNoteController::show`, `CreditNoteController::post` (target note only).
+> **Explicit exclusions (unchanged by design):** `ReturnableController` (cross-branch return-source reference, incl. `purpose=credit_note` allowed-branch policy), `AppointmentController` (non-accounting CRM read/reference), the credit-note `original_invoice_id` reference authorization (allowed-branch policy), and every read endpoint. Per-attempt environment binding is **not** part of REM-03b (attempt rows carry no environment column — see REM-25).
+
 ### REM-03 — card (ready for owner approval to start)
 
 | Field | Content |
