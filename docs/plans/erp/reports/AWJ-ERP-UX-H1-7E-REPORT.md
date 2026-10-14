@@ -9,7 +9,7 @@ Backlog: ERP-UX-018, ERP-UX-020 (P3) · Audit: [H1-0](../AWJ-ERP-UX-H1-0-AUDIT.m
 - **ERP-UX-020:** the Store Customizer sidebar toggle passed polyline *points* to `<path d>`, so the browser logged `Expected moveto path command` on `/commerce/appearance` and the chevron never rendered. It is now a `<polyline points>` — the intended chevron appears; no other Customizer behavior changes.
 
 ## Changed files
-`web/src/app/globals.css` (one rule), `web/src/modules/store-experience-builder/ExperienceBuilder.tsx` (one element), test `web/src/app/__tests__/erp-ux-h1-7e.test.ts`.
+`web/src/app/globals.css` (one rule), `web/src/modules/store-experience-builder/ExperienceBuilder.tsx` (one element), test `web/src/lib/__tests__/erp-ux-h1-7e.test.ts`.
 
 ## Tests and exact results
 - Guard tests (2): `.num` stays Mono and `.num::placeholder` is Sans; chevron uses `polyline`, never `path d={points}`.
