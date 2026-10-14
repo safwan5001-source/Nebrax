@@ -125,6 +125,8 @@ class CommerceFacetVisualApiTest extends TestCase
         $this->assertNull($emptied->json('data.visual'));
         $this->assertSame(3, $emptied->json('data.version'));
         $this->assertSame(1, CommerceFacetVisual::withoutGlobalScopes()->count());
+        // The tombstone is stored as a JSON object, never an array.
+        $this->assertSame('{}', str_replace(' ', '', (string) DB::table('commerce_facet_visuals')->value('visual')));
 
         // Decision 1: the list shows `visual: null` with the kept version, so the client can write again.
         $listed = $this->listedValue($t['token'], $t['value']->id);
@@ -220,7 +222,11 @@ class CommerceFacetVisualApiTest extends TestCase
         });
 
         $this->withToken($t['token'])->putJson($this->valuePath($t), ['visual' => ['icon' => 'cake'], 'expected_version' => null])
-            ->assertStatus(409)->assertJsonPath('code', 'visual_version_conflict');
+            ->assertStatus(409)
+            ->assertJsonPath('code', 'visual_version_conflict')
+            // The competing row was rolled back with our transaction here; under real concurrency (pgsql test) it
+            // is the winner's committed version.
+            ->assertJsonPath('current_version', null);
     }
 
     /** @test */
@@ -236,10 +242,16 @@ class CommerceFacetVisualApiTest extends TestCase
 
         foreach ([null, $t['value']->id] as $valueId) {
             try {
-                DB::table('commerce_facet_visuals')->insert($row($valueId));
+                // A savepoint per attempt: on PostgreSQL a failed statement aborts the surrounding transaction, so
+                // without it the second attempt would fail with 25P02 instead of proving its own index.
+                DB::transaction(fn () => DB::table('commerce_facet_visuals')->insert($row($valueId)));
                 $this->fail('a second row for the same owner must be rejected');
-            } catch (\Illuminate\Database\QueryException) {
-                $this->assertTrue(true);
+            } catch (\Illuminate\Database\QueryException $e) {
+                $sqlState = $e->errorInfo[0] ?? null;
+                $this->assertTrue(
+                    $sqlState === '23505' || ($sqlState === '23000' && str_contains(strtoupper((string) $e->errorInfo[2]), 'UNIQUE')),
+                    'expected a unique violation, got '.$e->getMessage(),
+                );
             }
         }
     }
@@ -306,6 +318,25 @@ class CommerceFacetVisualApiTest extends TestCase
         $client->putJson($this->valuePath($t), ['expected_version' => null])->assertStatus(422);
         $client->putJson($this->valuePath($t), ['visual' => ['icon' => 'cake'], 'expected_version' => 0])->assertStatus(422);
         $client->putJson($this->valuePath($t), ['visual' => ['icon' => 'cake'], 'expected_version' => 'x'])->assertStatus(422);
+        $client->putJson($this->valuePath($t), ['visual' => ['icon' => 'cake'], 'expected_version' => null])->assertOk();
+
+        // D-17: only a JSON integer is a version token.
+        foreach ([true, '1', 1.5] as $token) {
+            $client->putJson($this->valuePath($t), ['visual' => ['icon' => 'gift'], 'expected_version' => $token])
+                ->assertStatus(422)->assertJsonPath('code', 'visual_invalid');
+        }
+        // A raw body, because PHP would encode 1.0 as 1: JSON `1.0` decodes to a float and is not a token.
+        $server = $this->transformHeadersToServerVars([
+            'Content-Type' => 'application/json', 'Accept' => 'application/json', 'Authorization' => 'Bearer '.$t['token'],
+        ]);
+        $this->call('PUT', $this->valuePath($t), [], [], [], $server, '{"visual":{"icon":"gift"},"expected_version":1.0}')
+            ->assertStatus(422);
+        // A query string never feeds the token or the document.
+        $client->putJson($this->valuePath($t).'?expected_version=1', ['visual' => ['icon' => 'gift']])->assertStatus(422);
+        // `""` is not "remove identity" (the empty-string middleware must not turn it into null).
+        $client->putJson($this->valuePath($t), ['visual' => '', 'expected_version' => 1])
+            ->assertStatus(422)->assertJsonPath('errors', ['visual' => ['invalid_object']]);
+        $this->assertSame(['icon' => 'cake'], CommerceFacetVisual::withoutGlobalScopes()->first()->visual);
     }
 
     /** @test */
@@ -375,11 +406,13 @@ class CommerceFacetVisualApiTest extends TestCase
         $this->assertStringNotContainsString($unrelated, $response->getContent());
         $this->withToken($accountant)->getJson('/api/commerce/workspace/storefront-media')->assertForbidden();
 
-        // The link needs no session (the signature is the authority) and expires.
+        // The link is a valid signature now (the signature is its only authority) and expires after 20 minutes.
+        $this->assertTrue(\Illuminate\Support\Facades\URL::hasValidSignature(\Illuminate\Http\Request::create($preview['thumb_160'])));
+        $this->travel(21)->minutes();
+        $this->assertFalse(\Illuminate\Support\Facades\URL::hasValidSignature(\Illuminate\Http\Request::create($preview['thumb_160'])));
         $this->flushHeaders();
         $this->app['auth']->forgetGuards();
         $path = parse_url($preview['thumb_160'], PHP_URL_PATH).'?'.parse_url($preview['thumb_160'], PHP_URL_QUERY);
-        $this->travel(21)->minutes();
         $this->get($path)->assertForbidden();
     }
 
@@ -452,6 +485,13 @@ class CommerceFacetVisualApiTest extends TestCase
         $client->deleteJson(self::BASE."/{$t['facet']->id}/values/{$t['value']->id}")->assertOk();
         $this->assertSame(2, CommerceFacetVisual::withoutGlobalScopes()->count());
         $this->assertSame(1, CommerceProductFacetValue::withoutGlobalScopes()->count(), 'assignments of other values are untouched');
+
+        // Deleting the facet takes its own row and its values' rows with it.
+        app(TenantContext::class)->set($t['tenant_id']);
+        CommerceProductFacetValue::query()->delete();
+        app(TenantContext::class)->forget();
+        $client->deleteJson(self::BASE."/{$t['facet']->id}")->assertOk();
+        $this->assertSame(0, CommerceFacetVisual::withoutGlobalScopes()->count());
     }
 
     // ───────────────────────────── media protection (§3.8-d, D-16) ─────────────────────────────
@@ -533,6 +573,9 @@ class CommerceFacetVisualApiTest extends TestCase
         $this->assertNotFalse($scan, 'facet visuals are scanned');
         $this->assertLessThan($scan, $lock, 'lock first, then scan');
         $this->assertSame($baseline + 1, $queries[$lock]['level']);
+        if (DB::connection()->getDriverName() === 'pgsql') {
+            $this->assertStringContainsString('for update', $queries[$lock]['sql'], 'the media row is locked, not just read');
+        }
         $this->assertSame($baseline + 1, $queries[$scan]['level']);
         $this->assertSame(StorefrontMedia::STATE_DELETED, StorefrontMedia::find($media)->state);
         $this->assertSame(StorefrontMedia::STATE_DELETED, $asset->state, 'the caller model reflects the deletion');

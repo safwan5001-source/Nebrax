@@ -293,6 +293,9 @@ class StorefrontCommerceFirewallTest extends TestCase
             // the draft / version lifecycle's own exceptions (they carry no price, offer, stock, tax or shipping value)
             'NothingToPublishException', 'StaleDraftRevisionException', 'StaleVersionRevisionException', 'StalePublicationHeadException',
             'VersionLifecycleConflictException', 'StaleScheduleTokenException', 'SourceVersionNotFoundException', 'InvalidScheduleTimeException',
+            // AWJ-VD-H1 / VD-1b — a facet's visual identity (§3.8-d: the media scanner must see its references). Presentation data
+            // only: closed shape / size keys, hex colours, an icon key and a media reference — no price, offer, stock, tax or shipping value.
+            'CommerceFacetVisual',
         ];
         $allowed = array_flip(array_merge(
             $presentationSide,

@@ -52,6 +52,15 @@ class CommerceFacetVisual extends BaseModel implements CompanyWide
         });
     }
 
+    /**
+     * Always store a JSON **object**: the empty document (tombstone, D-17) is `{}`, never the `[]` PHP's empty array
+     * would encode to. Reads still decode to an array through the `array` cast.
+     */
+    public function setVisualAttribute(mixed $value): void
+    {
+        $this->attributes['visual'] = is_array($value) && $value !== [] ? json_encode($value) : '{}';
+    }
+
     public function facet(): BelongsTo
     {
         return $this->belongsTo(CommerceFacet::class, 'commerce_facet_id');

@@ -152,12 +152,12 @@ class StorefrontMediaService
      * حذفٌ ناعم لأصلٍ غير مُشار إليه فقط. المُشار إليه → 409 بقائمة الاستخدام
      * (يشمل المسودة وكل نسخة والمجدولة والمنشورة).
      *
-     * @throws StorefrontMediaException
-     */
-    /**
+     *
      * AWJ-VD-H1 / VD-1b (D-16) — the reference check and the soft delete run in one transaction **after** locking the
      * media row. A facet-visual save locks the same row before writing its reference, so the two never both pass:
      * whichever locks second sees the other's committed result (in use → 409 here; deleted → 422 there).
+     *
+     * @throws StorefrontMediaException
      */
     public function delete(StorefrontMedia $media): void
     {

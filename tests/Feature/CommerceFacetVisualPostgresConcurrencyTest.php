@@ -24,7 +24,7 @@ use Tests\TestCase;
  *  fork) — the method of `ProductVariantPostgresConcurrencyTest`. Production code on both sides; a model event
  *  inside the holder's transaction keeps its row lock for a moment so the other process provably waits on it.
  *
- *  - Two creates of the same identity: one wins, the other is a 409 (never a raw unique-violation 500).
+ *  - Two creates of the same identity: serialized on the facet row; one wins, the other gets 428 (never a 500).
  *  - Delete holds the media lock while a save arrives: the save waits, then sees the deletion → 422 media_not_found.
  *  - Save holds the media lock while a delete arrives: the delete waits, then re-scans → 409 media_in_use.
  *
@@ -163,7 +163,10 @@ class CommerceFacetVisualPostgresConcurrencyTest extends TestCase
 
         $outcomes = array_map(static fn (array $r) => $r['ok'] ? 'created' : ($r['code'] ?? $r['error_class']), $results);
         sort($outcomes);
-        $this->assertSame(['created', 'visual_version_conflict'], $outcomes, json_encode($results));
+        // The facet-row lock serializes the two creates: the second then meets an existing row with a null token,
+        // which is the 428 row of the D-17 table (the unique index → 409 stays as a net; see the SQLite race test).
+        $this->assertSame(['created', 'visual_precondition_required'], $outcomes, json_encode($results));
+        $this->assertGreaterThan(0.7, max(array_column($results, 'elapsed')), 'one create must have waited for the other');
         $this->assertSame(1, CommerceFacetVisual::query()->where('commerce_facet_value_id', $valueId)->count());
     }
 
@@ -179,12 +182,12 @@ class CommerceFacetVisualPostgresConcurrencyTest extends TestCase
             ['delay' => 0.0, 'job' => function () use ($tenantId, $mediaId) {
                 app(TenantContext::class)->set($tenantId);
                 // Inside delete()'s transaction, after the soft delete: keep the media row locked.
-                StorefrontMedia::saved(static fn () => usleep(1_500_000));
+                StorefrontMedia::saved(static fn () => usleep(2_000_000));
                 app(StorefrontMediaService::class)->delete(StorefrontMedia::find($mediaId));
 
                 return 'deleted';
             }],
-            ['delay' => 0.4, 'job' => function () use ($tenantId, $facetId, $valueId, $mediaId) {
+            ['delay' => 0.5, 'job' => function () use ($tenantId, $facetId, $valueId, $mediaId) {
                 app(TenantContext::class)->set($tenantId);
 
                 return app(CommerceFacetVisualService::class)->saveForValue($facetId, $valueId, ['image' => ['mediaId' => $mediaId]], null);
@@ -195,7 +198,7 @@ class CommerceFacetVisualPostgresConcurrencyTest extends TestCase
         $this->assertFalse($results[1]['ok'], json_encode($results));
         $this->assertSame(CommerceFacetVisualException::class, $results[1]['error_class']);
         $this->assertSame(['visual.image.mediaId' => ['media_not_found']], $results[1]['errors']);
-        $this->assertGreaterThan(0.7, $results[1]['elapsed'], 'the save must have waited on the media lock');
+        $this->assertGreaterThan(1.0, $results[1]['elapsed'], 'the save must have waited on the media lock');
         $this->assertSame(0, CommerceFacetVisual::query()->count());
         $this->assertSame(StorefrontMedia::STATE_DELETED, StorefrontMedia::find($mediaId)->state);
     }
@@ -212,11 +215,11 @@ class CommerceFacetVisualPostgresConcurrencyTest extends TestCase
             ['delay' => 0.0, 'job' => function () use ($tenantId, $facetId, $valueId, $mediaId) {
                 app(TenantContext::class)->set($tenantId);
                 // Inside the save's transaction, after the visual row is written: keep the media row locked.
-                CommerceFacetVisual::created(static fn () => usleep(1_500_000));
+                CommerceFacetVisual::created(static fn () => usleep(2_000_000));
 
                 return app(CommerceFacetVisualService::class)->saveForValue($facetId, $valueId, ['image' => ['mediaId' => $mediaId]], null);
             }],
-            ['delay' => 0.4, 'job' => function () use ($tenantId, $mediaId) {
+            ['delay' => 0.5, 'job' => function () use ($tenantId, $mediaId) {
                 app(TenantContext::class)->set($tenantId);
                 app(StorefrontMediaService::class)->delete(StorefrontMedia::find($mediaId));
 
@@ -229,7 +232,7 @@ class CommerceFacetVisualPostgresConcurrencyTest extends TestCase
         $this->assertFalse($results[1]['ok'], json_encode($results));
         $this->assertSame(StorefrontMediaException::class, $results[1]['error_class']);
         $this->assertSame('media_in_use', $results[1]['code']);
-        $this->assertGreaterThan(0.7, $results[1]['elapsed'], 'the delete must have waited on the media lock');
+        $this->assertGreaterThan(1.0, $results[1]['elapsed'], 'the delete must have waited on the media lock');
         $this->assertSame(StorefrontMedia::STATE_ACTIVE, StorefrontMedia::find($mediaId)->state);
     }
 }

@@ -154,7 +154,7 @@ final class StorefrontMediaReferenceScanner
      */
     private function facetVisualContainers(?array $needles): iterable
     {
-        yield from $this->rows(CommerceFacetVisual::query(), 'visual', self::CONTAINER_FACET_VISUAL, $needles);
+        yield from $this->rows(CommerceFacetVisual::query(), 'visual', self::CONTAINER_FACET_VISUAL, $needles, tenantLevel: true);
     }
 
     /**
@@ -171,9 +171,10 @@ final class StorefrontMediaReferenceScanner
     /**
      * @param  \Illuminate\Database\Eloquent\Builder<\Illuminate\Database\Eloquent\Model>  $query
      * @param  list<string>|null  $needles
+     * @param  bool  $tenantLevel  true for containers that belong to no storefront (facet visuals)
      * @return iterable<array{container:string,id:string,storefront_id:string,config:array<mixed>}>
      */
-    private function rows($query, string $column, string $container, ?array $needles): iterable
+    private function rows($query, string $column, string $container, ?array $needles, bool $tenantLevel = false): iterable
     {
         if ($needles !== null) {
             // CAST: عمود JSON في PostgreSQL لا يقبل LIKE مباشرةً؛ SQLite يقبله.
@@ -192,7 +193,8 @@ final class StorefrontMediaReferenceScanner
                 yield [
                     'container' => $container,
                     'id' => (string) $model->getKey(),
-                    'storefront_id' => (string) $model->storefront_id,
+                    // A tenant-level container (facet visuals) has no storefront: '' explicitly, not a missing attribute.
+                    'storefront_id' => $tenantLevel ? '' : (string) $model->storefront_id,
                     'config' => $config,
                 ];
             }

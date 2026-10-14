@@ -25,7 +25,8 @@ use RuntimeException;
  * | present | null / absent | 428 (never overwrite a version the client has not seen) |
  * | present | equal | update, version + 1; `visual: null` empties the document (tombstone) |
  * | present | different | 409 with `current_version` |
- * | concurrent creates | null / null | the unique index rejects the second → 409, never 500 |
+ * | concurrent creates | null / null | serialized on the facet row: the second sees the first's row → 428; should a
+ * |  |  | writer bypass that lock, the unique index rejects it → 409. Never 500 |
  *
  * The API never deletes a row, so a version number is never reused for the same owner (no ABA); rows go only with
  * their facet / value (cascade), whose ids are never reused.
@@ -125,7 +126,10 @@ final class CommerceFacetVisualService
 
         try {
             return DB::transaction(function () use ($facetId, $valueId, $normalized, $expectedVersion, $mediaIds, $kind) {
-                $facet = CommerceFacet::query()->whereKey($facetId)->first();
+                // Facet row first: the documented CommerceFacetService protocol (every change to a facet or its values
+                // locks the facet row first), so a concurrent facet / value deletion either completes before this
+                // lookup (→ 404) or waits for this save. Lock order: facet → visual row → media (by id).
+                $facet = CommerceFacet::query()->whereKey($facetId)->lockForUpdate()->first();
                 if ($facet === null) {
                     return null;
                 }
@@ -309,21 +313,25 @@ final class CommerceFacetVisualService
         return $version === null ? null : (int) $version;
     }
 
+    /** Decided by SQLSTATE (PostgreSQL 23505) or SQLite's own error text — never by the message with bound values. */
     private function isUniqueViolation(QueryException $e): bool
     {
         $sqlState = $e->errorInfo[0] ?? null;
-        $driverCode = $e->errorInfo[1] ?? null;
+        if ($sqlState === '23505') {
+            return true;
+        }
 
-        return $sqlState === '23505'
-            || ($driverCode === 19 && str_contains(strtolower($e->getMessage()), 'unique'))
-            || str_contains(strtolower($e->getMessage()), 'unique constraint');
+        return $sqlState === '23000' && str_contains(strtoupper((string) ($e->errorInfo[2] ?? '')), 'UNIQUE');
     }
 
     private function isForeignKeyViolation(QueryException $e): bool
     {
         $sqlState = $e->errorInfo[0] ?? null;
+        if ($sqlState === '23503') {
+            return true;
+        }
 
-        return $sqlState === '23503' || str_contains(strtolower($e->getMessage()), 'foreign key constraint');
+        return $sqlState === '23000' && str_contains(strtoupper((string) ($e->errorInfo[2] ?? '')), 'FOREIGN KEY');
     }
 
     private function tenantId(): string

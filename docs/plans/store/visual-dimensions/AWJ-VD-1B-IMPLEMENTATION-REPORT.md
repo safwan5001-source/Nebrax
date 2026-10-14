@@ -51,12 +51,14 @@ Indexes:
 | Route | Guard | Behaviour |
 |---|---|---|
 | `GET /api/commerce/workspace/facets` | `products.view` (unchanged) | **Additive:** `visual`, `visual_version`, `visual_preview` on every facet and value |
-| `PUT …/facets/{id}/visual` | `commerce.manage` + self-service denial + `throttle:30,1` | facet row: `{self, defaults}` |
+| `PUT …/facets/{id}/visual` | `commerce.manage` + self-service denial + named throttle `facet-visual-writes` (120/min per user, its own bucket) | facet row: `{self, defaults}` |
 | `PUT …/facets/{id}/values/{valueId}/visual` | same | value row |
 
-**Request body** `{visual: object|null, expected_version: int|null}`:
-- unknown keys are 422;
-- `expected_version` is an integer ≥ 1 or null.
+**Request body** `{visual: object|null, expected_version: int|null}`, read from the JSON body only:
+- unknown keys and **any query-string parameter** are 422;
+- `expected_version` must be a **JSON integer** ≥ 1 or null (`true`, `1.0` and `"1"` are refused);
+- `visual: ""` is a 422 (it is not turned into the `null` remove path);
+- every 422 carries `code: visual_invalid`.
 
 **Responses:**
 - `200 {data:{visual, version}}`;
@@ -71,9 +73,9 @@ Indexes:
 | none | null / absent | create, `version 1` |
 | none | number | 409, `current_version: null` |
 | present | null / absent | 428 `visual_precondition_required` |
-| present | equal | update, `version + 1`; `visual: null` → `{}` tombstone, row kept |
+| present | equal | update, `version + 1`; `visual: null` → `{}` tombstone (stored as a JSON **object**), row kept |
 | present | different | 409 `visual_version_conflict` with `current_version` |
-| concurrent creates | null / null | unique index → **409**, never 500 |
+| concurrent creates | null / null | **serialized on the facet row**: the second meets the first's row → **428**. If a writer bypassed that lock, the unique index → **409**. Never 500 |
 
 - The API never deletes a row, so no version number repeats for the same owner (anti-ABA).
 - Rows go only with their owner, by cascade.
@@ -98,7 +100,9 @@ Indexes:
   - the "unused" filter excludes it.
 
   It is **excluded** from `liveUsageKeys()`, because facet framing is CSS on base thumbnails and must not keep a baked derivative alive.
-- **Save:** one transaction locks the visual row, then the referenced media rows **in id order**, re-checks them **after** the lock, then writes.
+- **Save:** one transaction locks the **facet row** first (the existing `CommerceFacetService` protocol), then the visual row, then the referenced media rows **in id order**. It re-checks them **after** the lock, then writes.
+  - A concurrent facet or value deletion therefore either completes first (→ 404) or waits.
+  - Lock order facet → visual → media matches `deleteFacet`/`deleteValue`, so it adds no deadlock cycle.
 - **Delete** (`StorefrontMediaService::delete()`, an existing path):
   - it now runs in a transaction that locks the media row, then re-scans references after the lock;
   - a media row already deleted by a concurrent request is an idempotent no-op;
@@ -130,10 +134,15 @@ Indexes:
 
 | Suite | Result |
 |---|---|
-| `CommerceFacetVisualApiTest` (SQLite) | VD1B_API |
-| `CommerceFacetVisualPostgresConcurrencyTest` (local PostgreSQL 16, two processes) | VD1B_PG |
-| VD-1b focused on PostgreSQL (`CommerceFacetVisualApiTest`, `CommerceFacetApiTest`, `StorefrontMedia*`) | VD1B_PG_FOCUSED |
-| PHP full (`php artisan test --parallel`, SQLite) | VD1B_FULL |
+| `CommerceFacetVisual*` on SQLite (API + contract; the pgsql-only race tests are skipped) | **36 passed, 3 skipped (447 assertions)** |
+| `CommerceFacetVisual*` on **local PostgreSQL 16** (API + contract + 3 real two-process races) | **39 passed (465 assertions)** |
+| Related suites on PostgreSQL (`CommerceFacetApiTest`, `StorefrontMediaApiTest`, `CommerceModuleBoundaryTest`) | all pass except one **pre-existing local-only** failure (below) |
+| PHP full (`php artisan test --parallel`, SQLite) | first run: 6935 tests, **1 failure** (the firewall classification above, fixed); re-run: **OK — 6935 tests, 52078 assertions, 0 failures, 98 skipped** |
+
+**Pre-existing, local PostgreSQL only:** `StorefrontMediaApiTest › the library lists newest first … searches` fails locally with `SQLSTATE[HY093]`.
+- The cause is the local `pdo_pgsql` (PHP 8.3.6), which misparses the existing `LIKE … ESCAPE '\'` search query next to `?` placeholders.
+- It fails **identically without VD-1b** (verified on the VD-4a branch), and `main` is green on pgsql in CI.
+- Not touched here.
 
 **`CommerceFacetVisualApiTest`** covers:
 - every row of the D-17 table, the ABA sequence and two clients on the same version;
@@ -157,6 +166,43 @@ Indexes:
 - a delete arriving while a save holds the lock waits, then gets 409 `media_in_use`.
 
 It asserts the waiting process actually waited.
+
+## Reviews
+
+### Codex (PR #1491)
+
+| Finding | Decision |
+|---|---|
+| P2: the tombstone was persisted as the JSON array `[]`, not the object `{}` | **Fixed.** A model mutator stores `{}` (and any non-empty document as an object), and a test asserts the raw column value. |
+
+### Independent code review (`505839a`)
+
+Nothing blocking. 6 non-blocking findings and 8 nits; all are handled below.
+
+| # | Finding | Decision |
+|---|---|---|
+| 1 | A create racing a facet/value delete could surface the model guard's `RuntimeException` as 500 | **Fixed:** the save locks the facet row first, so the delete completes before (→ 404) or waits. |
+| 2 | `expected_version` accepted `true`, `1.0`, `"1"` | **Fixed:** strict JSON-integer rule, with tests. |
+| 3 | `throttle:30,1` shared one per-user bucket with media uploads | **Fixed:** named limiter `facet-visual-writes`. The NAT-shared bucket of the existing signed preview route is pre-existing and unchanged (backlog). |
+| 4 | On pgsql the index test passed on 25P02 (aborted transaction), not the unique index | **Fixed:** a savepoint per attempt, and the assertion checks SQLSTATE 23505 or SQLite UNIQUE. |
+| 5 | Preview-expiry test had no positive control | **Fixed:** `URL::hasValidSignature` is asserted true before and false after 21 minutes. |
+| 6 | `visual: ""` became `null` (remove) through the empty-string middleware | **Fixed:** `visual` is read from the raw JSON, so `""` is a 422 (test). |
+| 7 | Unique/FK detection fell back to message text that embeds user values | **Fixed:** decided by SQLSTATE, or SQLite's own `errorInfo[2]`. |
+| 8 | Query-string values bypassed the body allow-list | **Fixed:** any query parameter is a 422 (test). |
+| 9 | Tombstone stored as `[]` | **Fixed** (same as the Codex finding). |
+| 10 | Orphaned docblock on `delete()` | **Fixed.** |
+| 11 | `storefront_id` read from a missing attribute | **Fixed:** set explicitly to `''` for tenant-level containers. |
+| 12 | The lock-order test did not prove `FOR UPDATE` | **Fixed:** asserted on PostgreSQL (SQLite has no row locks). |
+| 13 | Test gaps (facet cascade, `current_version` after a lost race, fork timing) | **Fixed:** facet-deletion cascade added, `current_version` asserted, fork margins widened (2 s hold, 0.5 s arrival, > 1 s wait). |
+| 14 | FormRequest 422s had no `code` | **Fixed:** every 422 carries `code: visual_invalid`. |
+
+**For the owner — a classification in the commerce firewall test.**
+- **What failed:** the first full run failed `StorefrontCommerceFirewallTest › the_presentation_owning_services_name_no_commerce_truth_owner`. That test treats every model not explicitly listed as presentation-side as a possible commerce-truth owner. §3.8-d requires `StorefrontMediaReferenceScanner` to read `CommerceFacetVisual`.
+- **What changed:** `CommerceFacetVisual` is now listed as **presentation-side**, with a comment saying why: closed shape and size keys, hex colours, an icon key and a media reference, with no price, offer, stock, tax or shipping value.
+- **What did not change:** no commercial rule was loosened, and the firewall's word and key policy is untouched.
+- **Decision:** it is a test classification of the new model. If you prefer another approach, it is yours to decide before merge.
+
+**Contract note from fix 1.** Two simultaneous creates are now serialized on the facet row, so the loser receives **428** (the "row exists, token null" row) instead of the 409 the §3.8 table listed for concurrent creates. Both outcomes are correct refusals and never a 500. The unique index → 409 remains a net for any writer that bypasses the facet lock, and the deterministic race test proves it. The real pgsql race test asserts 428 and that one create waited for the other.
 
 ## Accounting impact
 

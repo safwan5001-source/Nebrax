@@ -18,6 +18,9 @@ use App\Http\Middleware\ForceJsonResponse;
 use App\Http\Middleware\IdentifyTenantHostname;
 use App\Http\Middleware\SetBranch;
 use App\Http\Middleware\SetTenant;
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 
@@ -26,6 +29,11 @@ final class CommerceWorkspaceServiceProvider extends ServiceProvider
 {
     public function boot(): void
     {
+        // AWJ-VD-H1 / VD-1b — facet visual writes get their own bucket per user (defined before the route-cache
+        // short-circuit: cached routes still resolve the limiter by name).
+        RateLimiter::for('facet-visual-writes', static fn (Request $request): Limit => Limit::perMinute(120)
+            ->by('facet-visual-writes|'.($request->user()?->getAuthIdentifier() ?? $request->ip())));
+
         if ($this->app->routesAreCached()) {
             return;
         }
@@ -144,13 +152,14 @@ final class CommerceWorkspaceServiceProvider extends ServiceProvider
                 ->whereUuid(['id', 'valueId'])
                 ->middleware(EnsurePermission::class.':products.manage');
             // AWJ-VD-H1 / VD-1b — the visual identity (L2) is storefront presentation, not catalogue data:
-            // commerce.manage (D-04, no RBAC change), with a write throttle like the media library.
+            // commerce.manage (D-04, no RBAC change), with its own named throttle (not the shared per-user bucket of
+            // media uploads: an editor saves value by value).
             Route::put('{id}/visual', [CommerceFacetVisualController::class, 'updateFacet'])
                 ->whereUuid('id')
-                ->middleware([EnsurePermission::class.':commerce.manage', 'throttle:30,1']);
+                ->middleware([EnsurePermission::class.':commerce.manage', 'throttle:facet-visual-writes']);
             Route::put('{id}/values/{valueId}/visual', [CommerceFacetVisualController::class, 'updateValue'])
                 ->whereUuid(['id', 'valueId'])
-                ->middleware([EnsurePermission::class.':commerce.manage', 'throttle:30,1']);
+                ->middleware([EnsurePermission::class.':commerce.manage', 'throttle:facet-visual-writes']);
         });
 
         Route::middleware([
