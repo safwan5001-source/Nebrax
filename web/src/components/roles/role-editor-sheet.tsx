@@ -12,6 +12,7 @@ import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/components/ui/toast';
 import { api, ApiError } from '@/lib/api';
 import { displayLocale } from '@/lib/formatting';
+import { useRestoreFocus } from '@/lib/use-restore-focus';
 import { cn } from '@/lib/utils';
 import {
   filterCatalog,
@@ -103,6 +104,7 @@ export function RoleEditorSheet({
 }) {
   const t = useTranslations('roleEditor');
   const tc = useTranslations('common');
+  const restoreFocus = useRestoreFocus();
   const locale = displayLocale(useLocale());
   const { success } = useToast();
   const num = (n: number) => n.toLocaleString(locale);
@@ -173,7 +175,7 @@ export function RoleEditorSheet({
 
   return (
     <Sheet open={open} onOpenChange={(next) => { if (!next) requestClose(); }}>
-      <SheetContent closeLabel={t('close')} className="sm:max-w-2xl">
+      <SheetContent closeLabel={t('close')} className="sm:max-w-2xl" onCloseAutoFocus={restoreFocus}>
         <header className="shrink-0 border-b border-border px-5 pb-3 pe-14 pt-4">
           <SheetTitle className="text-base font-semibold text-text">
             {role ? `${t('title_edit')} — ${role.name}` : seed ? t('title_clone') : t('title_new')}

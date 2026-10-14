@@ -28,8 +28,8 @@ A slice is marked **Merged** only after tests + exact-head CI + merge. "Post-mer
 | AC-UX-05 Branch & warehouse scope UX | **Merged** | #1471 | `7e8af039de6ac71b571ed8f0208e6ea48a5dc064` |
 | AC-UX-06 Resource access / treasury UX | **Merged** | #1475 | `beaa6bf15b5b2284b0973bf41004dbe76a59afdc` |
 | AC-UX-07 Permission-aware ERP UX | **Merged** | #1480 | `f1bcc67b809617c620c1629831c25eb744a826cd` |
-| AC-UX-08 Access summary & explainability | In review | (this PR) | — |
-| AC-UX-09 Accessibility / responsive / visual QA | Not started | — | — |
+| AC-UX-08 Access summary & explainability | **Merged** | #1481 | `23c1dd3ca6ee4e530205da65227f5e0066baa839` |
+| AC-UX-09 Accessibility / responsive / visual QA | In review | (this PR) | — |
 | AC-UX-10 Closure & security verification | Not started | — | — |
 
 Deploy: **NOT DEPLOYED** (no deploy authority in this horizon).

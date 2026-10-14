@@ -12,6 +12,7 @@ import { useToast } from '@/components/ui/toast';
 import { api, ApiError } from '@/lib/api';
 import { displayLocale } from '@/lib/formatting';
 import { useCan } from '@/lib/use-can';
+import { useRestoreFocus } from '@/lib/use-restore-focus';
 import { coversPermissions, effectivePermissions, resolveRoleLabel, type RoleSummary } from '@/modules/users/model';
 import {
   accessSummary,
@@ -95,6 +96,7 @@ export function UserEditorSheet({
   const { success } = useToast();
 
   const { viewer: me, can } = useCan();
+  const restoreFocus = useRestoreFocus();
   const isSelf = Boolean(user && me?.id && me.id === user.id);
   const caps: EditorCapabilities = {
     role: can('roles.view'),
@@ -243,7 +245,7 @@ export function UserEditorSheet({
   const summary = accessSummary(form);
   return (
     <Sheet open={open} onOpenChange={(next) => { if (!next) requestClose(); }}>
-      <SheetContent closeLabel={t('editor_close')} className="sm:max-w-xl">
+      <SheetContent closeLabel={t('editor_close')} className="sm:max-w-xl" onCloseAutoFocus={restoreFocus}>
         <header className="shrink-0 border-b border-border px-5 pb-3 pe-14 pt-4">
           <SheetTitle className="text-base font-semibold text-text">{user ? `${t('edit_title')} — ${user.name}` : t('add')}</SheetTitle>
           <SheetDescription className="mt-1 text-xs leading-relaxed text-muted">

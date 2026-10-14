@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { displayLocale } from '@/lib/formatting';
 import { useCan } from '@/lib/use-can';
+import { useRestoreFocus } from '@/lib/use-restore-focus';
 import type { RoleSummary, ScopeOption, UserRecord } from '@/modules/users/model';
 import { buildAccessSummary, type RoleKind, type ScopeDetail } from '@/modules/users/summary';
 
@@ -42,6 +43,7 @@ export function UserAccessSummarySheet({
   const tr = useTranslations('rolesPage');
   const locale = displayLocale(useLocale());
   const { can } = useCan();
+  const restoreFocus = useRestoreFocus();
   const num = (n: number) => n.toLocaleString(locale);
 
   const systemNames = useMemo(
@@ -98,7 +100,7 @@ export function UserAccessSummarySheet({
 
   return (
     <Sheet open onOpenChange={(next) => { if (!next) onClose(); }}>
-      <SheetContent closeLabel={t('editor_close')} className="sm:max-w-md">
+      <SheetContent closeLabel={t('editor_close')} className="sm:max-w-md" onCloseAutoFocus={restoreFocus}>
         <header className="shrink-0 border-b border-border px-5 pb-3 pe-14 pt-4">
           <SheetTitle className="text-base font-semibold text-text">
             {t('access_summary_title')} — <bdi>{user.name}</bdi>
