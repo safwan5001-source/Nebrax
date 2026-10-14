@@ -41,20 +41,13 @@ function run(env) {
   child.stdout.on('data', (d) => (out += d));
   child.stderr.on('data', (d) => (err += d));
   const exited = new Promise((resolve) => child.on('exit', (code) => resolve(code)));
-  return { child, exited, output: () => out + err };
+  return { child, exited, output: () => out + err, stderr: () => err, stdout: () => out };
 }
 
-test('process: refuses to start without signing inputs (fail closed), naming variables only', async () => {
-  const p = run({ PORT: '0', ANDROID_APP_LINK_SHA256_FINGERPRINTS: 'SECRETISH-BAD-VALUE' });
-  assert.equal(await p.exited, 1);
-  assert.ok(p.output().includes('ANDROID_APP_LINK_SHA256_FINGERPRINTS'));
-  assert.ok(p.output().includes('APPLE_TEAM_ID'));
-  assert.ok(!p.output().includes('SECRETISH-BAD-VALUE'));
-});
-
-test('process: serves traffic and its stdout/stderr never contain the reference', async () => {
+// Starts the real server.js on a free port and waits until /health answers.
+async function runReady(env) {
   const port = await freePort();
-  const p = run({ PORT: String(port), ANDROID_APP_LINK_SHA256_FINGERPRINTS: FP_A, APPLE_TEAM_ID: TEAM });
+  const p = run({ PORT: String(port), ...env });
   const base = `http://127.0.0.1:${port}`;
   let ready = false;
   for (let i = 0; i < 50 && !ready; i++) {
@@ -65,9 +58,64 @@ test('process: serves traffic and its stdout/stderr never contain the reference'
     }
   }
   assert.ok(ready, 'server did not become ready');
-  assert.equal((await fetch(`${base}/preview/${REF}`)).status, 200);
-  p.child.kill('SIGTERM');
-  assert.equal(await p.exited, 0);
+  const stop = async () => {
+    p.child.kill('SIGTERM');
+    assert.equal(await p.exited, 0);
+  };
+  return { ...p, base, stop };
+}
+
+test('process: invalid PORT still fails startup (exit 1)', async () => {
+  const p = run({ PORT: 'not-a-port', ANDROID_APP_LINK_SHA256_FINGERPRINTS: FP_A, APPLE_TEAM_ID: TEAM });
+  assert.equal(await p.exited, 1);
+  assert.ok(p.stderr().includes('PORT is invalid'));
+});
+
+test('process: Android-only starts; assetlinks 200, AASA 503, preview works', async () => {
+  const p = await runReady({ ANDROID_APP_LINK_SHA256_FINGERPRINTS: FP_A });
+  const links = await fetch(`${p.base}/.well-known/assetlinks.json`);
+  assert.equal(links.status, 200);
+  assert.deepEqual((await links.json())[0].target.sha256_cert_fingerprints, [FP_A]);
+  const aasa = await fetch(`${p.base}/.well-known/apple-app-site-association`);
+  assert.equal(aasa.status, 503);
+  assert.ok(!(await aasa.text()).includes('appIDs'));
+  assert.equal((await fetch(`${p.base}/preview/AndroidOnlyRef123`)).status, 200);
+  await p.stop();
+  assert.ok(p.stderr().includes('APPLE_TEAM_ID'));
+  assert.ok(p.stdout().includes('associations android=enabled apple=disabled'));
+  assert.ok(!p.output().includes(FP_A));
+});
+
+test('process: no signing inputs at all still starts; both associations 503; health and preview OK', async () => {
+  const p = await runReady({});
+  assert.equal((await fetch(`${p.base}/.well-known/assetlinks.json`)).status, 503);
+  assert.equal((await fetch(`${p.base}/.well-known/apple-app-site-association`)).status, 503);
+  assert.equal((await fetch(`${p.base}/preview/NoInputsRef123`)).status, 200);
+  await p.stop();
+  assert.ok(p.stdout().includes('associations android=disabled apple=disabled'));
+});
+
+test('process: malformed inputs start, disable that platform, and are never echoed', async () => {
+  const p = await runReady({ ANDROID_APP_LINK_SHA256_FINGERPRINTS: 'BADFINGERPRINTVALUE', APPLE_TEAM_ID: 'BADTEAM' });
+  assert.equal((await fetch(`${p.base}/.well-known/assetlinks.json`)).status, 503);
+  assert.equal((await fetch(`${p.base}/.well-known/apple-app-site-association`)).status, 503);
+  await p.stop();
+  assert.ok(!p.output().includes('BADFINGERPRINTVALUE'));
+  assert.ok(!p.output().includes('BADTEAM'));
+});
+
+test('process: serves traffic and its stdout/stderr never contain the reference', async () => {
+  const p = await runReady({ ANDROID_APP_LINK_SHA256_FINGERPRINTS: FP_A, APPLE_TEAM_ID: TEAM });
+  assert.equal((await fetch(`${p.base}/preview/${REF}`)).status, 200);
+  await p.stop();
   assert.ok(p.output().includes('GET /preview/[REDACTED] 200'));
   assert.ok(!p.output().includes(REF));
+});
+
+test('process: reference never logged in Android-only mode either', async () => {
+  const p = await runReady({ ANDROID_APP_LINK_SHA256_FINGERPRINTS: FP_A });
+  await fetch(`${p.base}/preview/${REF}?x=QUERYLEAK`);
+  await p.stop();
+  assert.ok(!p.output().includes(REF));
+  assert.ok(!p.output().includes('QUERYLEAK'));
 });

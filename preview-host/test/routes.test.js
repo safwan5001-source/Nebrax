@@ -100,3 +100,53 @@ test('non-GET/HEAD methods are rejected; HEAD returns headers without a body', a
   assert.equal(await head.text(), '');
   await s.close();
 });
+
+// ---- platform-independent configuration matrix ----
+
+const BAD_FP = 'NOT-A-FINGERPRINT-MARKER';
+const BAD_TEAM = 'BADTEAM';
+
+const MATRIX = [
+  { name: 'Android only', env: { ANDROID_APP_LINK_SHA256_FINGERPRINTS: FP_A }, android: 200, apple: 503 },
+  { name: 'Apple only', env: { APPLE_TEAM_ID: TEAM }, android: 503, apple: 200 },
+  { name: 'both valid', env: { ANDROID_APP_LINK_SHA256_FINGERPRINTS: FP_A, APPLE_TEAM_ID: TEAM }, android: 200, apple: 200 },
+  { name: 'both missing', env: {}, android: 503, apple: 503 },
+  { name: 'invalid Android + valid Apple', env: { ANDROID_APP_LINK_SHA256_FINGERPRINTS: BAD_FP, APPLE_TEAM_ID: TEAM }, android: 503, apple: 200 },
+  { name: 'valid Android + invalid Apple', env: { ANDROID_APP_LINK_SHA256_FINGERPRINTS: FP_A, APPLE_TEAM_ID: BAD_TEAM }, android: 200, apple: 503 },
+];
+
+for (const c of MATRIX) {
+  test(`config matrix — ${c.name}: association statuses; health and preview unaffected`, async () => {
+    const s = await start({ PORT: '0', ...c.env });
+    const links = await s.get('/.well-known/assetlinks.json');
+    const aasa = await s.get('/.well-known/apple-app-site-association');
+    assert.equal(links.status, c.android);
+    assert.equal(aasa.status, c.apple);
+    for (const [r, marker] of [[links, 'delegate_permission'], [aasa, 'appIDs']]) {
+      const text = await r.text();
+      if (r.status === 503) {
+        // Fail closed: no association-shaped body, no echoed input, no redirect/cookie.
+        assert.ok(!text.includes(marker));
+        assert.ok(!text.includes(BAD_FP) && !text.includes(BAD_TEAM));
+        assert.notEqual(r.headers.get('content-type'), 'application/json');
+      }
+      assert.equal(r.headers.get('location'), null);
+      assert.equal(r.headers.get('set-cookie'), null);
+    }
+    assert.equal((await s.get('/health')).status, 200);
+    const page = await s.get('/preview/MatrixRef123');
+    assert.equal(page.status, 200);
+    assert.equal(page.headers.get('referrer-policy'), 'no-referrer');
+    assert.equal(page.headers.get('cache-control'), 'no-store');
+    await s.close();
+  });
+}
+
+test('invalid Android fingerprint: no part of the invalid value is emitted anywhere', async () => {
+  const s = await start({ PORT: '0', ANDROID_APP_LINK_SHA256_FINGERPRINTS: `${FP_A},${BAD_FP}` });
+  const r = await s.get('/.well-known/assetlinks.json');
+  assert.equal(r.status, 503);
+  const text = await r.text();
+  assert.ok(!text.includes(BAD_FP) && !text.includes(FP_A));
+  await s.close();
+});

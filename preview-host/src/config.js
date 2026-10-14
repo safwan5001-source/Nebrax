@@ -1,9 +1,15 @@
 // Runtime configuration for the preview host.
 //
-// Nothing here has a default for the two signing inputs: a placeholder would
-// produce an association file that *looks* valid but silently fails platform
-// verification. Missing or malformed values are reported as `errors` and the
-// association routes (and server startup) fail closed.
+// The two platforms are configured independently (Android-only and Apple-only
+// deployments are both valid). Neither signing input has a default: a
+// placeholder would produce an association file that *looks* valid but
+// silently fails platform verification.
+//
+//   - A missing or malformed platform input is a `notice`: the process still
+//     starts, that platform's association route answers 503 (see app.js), and
+//     the other platform and /preview/{reference} are unaffected.
+//   - `errors` are reserved for process-level problems (currently only PORT):
+//     the server must not start.
 
 export const ANDROID_PACKAGE_NAME = 'com.example.awjmobileruntimeproof';
 export const IOS_BUNDLE_ID = 'com.example.awjMobileRuntimeProof';
@@ -21,7 +27,7 @@ export function parseFingerprints(raw) {
     .map((f) => f.toUpperCase());
   const unique = [...new Set(items)];
   if (unique.length === 0) {
-    errors.push('ANDROID_APP_LINK_SHA256_FINGERPRINTS is required (one or more SHA-256 fingerprints, comma-separated)');
+    errors.push('ANDROID_APP_LINK_SHA256_FINGERPRINTS is not set (one or more SHA-256 fingerprints, comma-separated)');
     return { fingerprints: null, errors };
   }
   // Report only the position of a bad entry, never its value.
@@ -35,7 +41,7 @@ export function parseFingerprints(raw) {
 
 export function parseTeamId(raw) {
   const value = (raw ?? '').trim().toUpperCase();
-  if (!value) return { teamId: null, errors: ['APPLE_TEAM_ID is required (10-character Apple Developer Team ID)'] };
+  if (!value) return { teamId: null, errors: ['APPLE_TEAM_ID is not set (10-character Apple Developer Team ID)'] };
   if (!TEAM_ID_RE.test(value)) {
     return { teamId: null, errors: ['APPLE_TEAM_ID is malformed (expected 10 alphanumeric characters)'] };
   }
@@ -46,12 +52,15 @@ export function loadConfig(env = process.env) {
   const android = parseFingerprints(env.ANDROID_APP_LINK_SHA256_FINGERPRINTS);
   const apple = parseTeamId(env.APPLE_TEAM_ID);
   const port = Number.parseInt(env.PORT ?? '3000', 10);
-  const errors = [...android.errors, ...apple.errors];
+  const errors = [];
   if (!Number.isInteger(port) || port < 0 || port > 65535) errors.push('PORT is invalid');
   return {
     port,
     androidFingerprints: android.fingerprints,
     appleTeamId: apple.teamId,
+    // Fatal, process-level.
     errors,
+    // Per-platform; the affected association route fails closed (503).
+    notices: [...android.errors, ...apple.errors],
   };
 }

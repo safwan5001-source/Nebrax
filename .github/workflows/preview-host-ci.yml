@@ -33,24 +33,45 @@ jobs:
       - name: Build image
         run: docker build -t awj-preview-host preview-host
 
-      - name: Image smoke (fail-closed start, then serve)
+      - name: Image smoke (platform-independent start, fail-closed routes)
         run: |
           set -euo pipefail
-          # Without signing inputs the container must refuse to start.
-          if docker run --rm awj-preview-host >/dev/null 2>&1; then
-            echo "container started without ANDROID_APP_LINK_SHA256_FINGERPRINTS / APPLE_TEAM_ID" >&2
+          FP=AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99
+          wait_ready() {
+            for i in $(seq 1 30); do
+              curl -fsS http://127.0.0.1:3000/health >/dev/null && return 0
+              sleep 1
+            done
+            return 1
+          }
+          status() { curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:3000$1"; }
+
+          # A process-level problem (unusable PORT) must still refuse to start.
+          if docker run --rm -e PORT=not-a-port awj-preview-host >/dev/null 2>&1; then
+            echo "container started with an invalid PORT" >&2
             exit 1
           fi
-          docker run -d --name ph -p 3000:3000 \
-            -e ANDROID_APP_LINK_SHA256_FINGERPRINTS=AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99 \
-            -e APPLE_TEAM_ID=ABCDE12345 \
-            awj-preview-host
-          for i in $(seq 1 30); do
-            curl -fsS http://127.0.0.1:3000/health && break
-            sleep 1
-          done
+
+          # Android-only: starts, assetlinks 200, AASA fails closed (503).
+          docker run -d --name ph -p 3000:3000 -e ANDROID_APP_LINK_SHA256_FINGERPRINTS=$FP awj-preview-host
+          wait_ready
           curl -fsS http://127.0.0.1:3000/health | grep -q '"status":"ok"'
           curl -fsS http://127.0.0.1:3000/.well-known/assetlinks.json | grep -q 'com.example.awjmobileruntimeproof'
-          curl -fsS http://127.0.0.1:3000/.well-known/apple-app-site-association | grep -q 'ABCDE12345.com.example.awjMobileRuntimeProof'
+          test "$(status /.well-known/apple-app-site-association)" = 503
+          test "$(status /preview/SmokeReference123)" = 200
           curl -sSI http://127.0.0.1:3000/preview/SmokeReference123 | grep -i '^referrer-policy: no-referrer'
           ! docker logs ph 2>&1 | grep -q SmokeReference123
+          docker rm -f ph >/dev/null
+
+          # Both configured: both associations served.
+          docker run -d --name ph -p 3000:3000 -e ANDROID_APP_LINK_SHA256_FINGERPRINTS=$FP -e APPLE_TEAM_ID=ABCDE12345 awj-preview-host
+          wait_ready
+          test "$(status /.well-known/assetlinks.json)" = 200
+          curl -fsS http://127.0.0.1:3000/.well-known/apple-app-site-association | grep -q 'ABCDE12345.com.example.awjMobileRuntimeProof'
+          docker rm -f ph >/dev/null
+
+          # Nothing configured: still starts, both associations 503.
+          docker run -d --name ph -p 3000:3000 awj-preview-host
+          wait_ready
+          test "$(status /.well-known/assetlinks.json)" = 503
+          test "$(status /.well-known/apple-app-site-association)" = 503
