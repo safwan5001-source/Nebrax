@@ -10342,38 +10342,41 @@
       "badge": "Reference only",
       "denied": "You do not have permission to view communications providers. Ask an owner or admin.",
       "subtitle": "The known providers for each messaging channel and where each stands inside AWJ. This page is for reference only.",
-      "truthNote": "No communications provider is actually connected in AWJ today and no real message is sent. One-time-code (OTP) verification runs through an internal test provider that sends nothing. A provider appearing in this list does not mean it is approved or under contract.",
+      "truthNote": "No communications provider is actually connected in AWJ today, no real message is sent, and no provider has been tested against a real API. One-time-code (OTP) verification runs through an internal test provider that sends nothing. A provider appearing in this list does not mean it is enabled, commercially approved or under contract.",
       "legend": {
         "title": "What the statuses mean",
         "connected": {
           "label": "Actually connected",
-          "description": "No provider has this status today."
-        }
+          "description": "No provider has this status today. No provider is enabled for sending, and none has been tested against a real API."
+        },
+        "futureTitle": "Future options (not connected)",
+        "actualTitle": "Actual state"
       },
       "status": {
         "theoretical": {
-          "label": "Available in theory",
+          "label": "Possible future option",
           "description": "A provider known only from its public documentation, with no commitment and no adapter in AWJ."
         },
-      "planned": {
-        "label": "Planned",
-        "description": "Named as a target in approved AWJ plans; no adapter has been built yet."
+        "planned": {
+          "label": "Planned",
+          "description": "Named as a target in approved AWJ plans; no adapter has been built yet."
+        },
+        "owner_approval": {
+          "label": "Requires owner approval",
+          "description": "A future candidate named by the owner or in AWJ decisions. Not connected; choosing it awaits owner approval."
+        }
       },
-      "owner_approval": {
-        "label": "Requires owner approval",
-        "description": "A candidate named in AWJ decisions; choosing it awaits an owner decision."
-      }
+      "channels": {
+        "sms": "Text messages (SMS)",
+        "whatsapp": "WhatsApp",
+        "email": "Email",
+        "push": "Push notifications"
+      },
+      "vendor": "Owner",
+      "boundary": "Choosing a provider and setting up its connection are separate decisions that have not been made. This section offers no setup, keys or test sending.",
+      "logoNote": "Official logos are shown exactly as their owners publish them, unmodified. A generic icon means no official logo has been adopted for that provider yet (no asset we may use, or permission to use it has not been given).",
+      "notConnected": "Not connected · no real sending"
     },
-    "channels": {
-      "sms": "Text messages (SMS)",
-      "whatsapp": "WhatsApp",
-      "email": "Email",
-      "push": "Push notifications"
-    },
-    "vendor": "Owner",
-    "boundary": "Choosing a provider and setting up its connection are separate decisions that have not been made. This section offers no setup, keys or test sending.",
-    "logoNote": "Only verified official logos are shown. A generic icon means no licensed official asset has been adopted for that provider yet."
-  },
     "planned": "Future expansion",
     "plannedNote": "No integrations with external platforms are available yet in the future-expansion categories.",
     "summaryError": "Could not load the status summary. The delivery platforms card works as usual.",

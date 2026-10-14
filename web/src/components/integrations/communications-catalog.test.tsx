@@ -32,7 +32,7 @@ describe.each(TEST_LOCALES)('Communications providers catalog (%s)', (locale) =>
     const connected = screen.getByTestId('communications-legend-connected');
     expect(connected.textContent).toContain(m.communications.legend.connected.label);
     expect(connected.textContent).toContain(m.communications.legend.connected.description);
-    // لا بطاقة مزوّد تحمل تلك التسمية.
+    // لا بطاقة مزوّد تحمل تلك التسمية (والسطر «غير متصل» ليس تسمية اتصال).
     for (const provider of COMMUNICATION_PROVIDERS) {
       expect(screen.getByTestId(`communications-provider-${provider.key}`).textContent).not.toContain(m.communications.legend.connected.label);
     }
@@ -52,21 +52,64 @@ describe.each(TEST_LOCALES)('Communications providers catalog (%s)', (locale) =>
     expect(document.body.textContent ?? '').not.toMatch(/(ربط|تفويض|مزامنة|مفتاح)/);
   });
 
-  it('shows the official WhatsApp logo only, and the generic channel icon for every other provider', () => {
+  it('shows the official logo for the five providers that have one and the generic channel icon for the three named gaps', () => {
     renderIntl(<CommunicationsCatalog allowed />, locale);
 
+    const official = COMMUNICATION_PROVIDERS.filter((p) => p.logo.kind === 'official');
+    const generic = COMMUNICATION_PROVIDERS.filter((p) => p.logo.kind === 'generic');
+    expect(official).toHaveLength(5);
+    expect(generic.map((p) => p.key).sort()).toEqual(['amazon-ses', 'apple-push-notification-service', 'twilio-sms']);
     const imgs = Array.from(document.querySelectorAll('img'));
-    expect(imgs.map((img) => img.getAttribute('src'))).toEqual(['/brand/social/whatsapp.svg']);
-    expect(imgs[0].getAttribute('alt')).toBe('');
-    const wa = screen.getByTestId('communications-provider-whatsapp-business-platform');
-    expect(wa.querySelector('[data-mark="official"]')).not.toBeNull();
-    for (const provider of COMMUNICATION_PROVIDERS.filter((p) => p.logo.kind === 'generic')) {
+    expect(imgs.map((img) => img.getAttribute('src')).sort()).toEqual(
+      official.map((p) => (p.logo.kind === 'official' ? p.logo.src : '')).sort(),
+    );
+    for (const img of imgs) {
+      expect(img.getAttribute('alt')).toBe('');
+      // لا hotlink: كل مصدر صورة مسار داخلي، والنسبة الطبيعية محجوزة بلا تشويه.
+      expect(img.getAttribute('src')).not.toMatch(/^(https?:)?\/\//);
+      expect(img.className).toContain('object-contain');
+      expect(Number(img.getAttribute('width')) / Number(img.getAttribute('height'))).toBeGreaterThan(0.5);
+    }
+    for (const provider of official) {
+      const card = screen.getByTestId(`communications-provider-${provider.key}`);
+      expect(card.querySelector('[data-mark="official"]'), provider.key).not.toBeNull();
+      expect(card.querySelector('[data-mark="generic"]')).toBeNull();
+    }
+    for (const provider of generic) {
       const card = screen.getByTestId(`communications-provider-${provider.key}`);
       expect(card.querySelector('[data-mark="generic"]'), provider.key).not.toBeNull();
       expect(card.querySelector('img')).toBeNull();
     }
-    // لا يوجد hotlink: كل مصدر صورة مسار داخلي.
-    for (const img of imgs) expect(img.getAttribute('src')).not.toMatch(/^(https?:)?\/\//);
+  });
+
+  it('Taqnyat renders as an SMS card with the wide official logo on a light backing and the owner-approval status', () => {
+    renderIntl(<CommunicationsCatalog allowed />, locale);
+
+    const card = screen.getByTestId('communications-provider-taqnyat');
+    expect(card.closest('[data-channel]')?.getAttribute('data-channel')).toBe('sms');
+    expect(card.getAttribute('data-status')).toBe('owner_approval');
+    expect(card.textContent).toContain('Taqnyat');
+    expect(card.textContent).toContain(m.communications.status.owner_approval.label);
+    const mark = card.querySelector('[data-mark="official"]')!;
+    expect(mark.getAttribute('data-shape')).toBe('wide');
+    expect(mark.getAttribute('data-backing')).toBe('light');
+    expect((mark as HTMLElement).style.backgroundColor).toBe('white');
+    expect(mark.querySelector('img')!.getAttribute('src')).toBe('/comms-providers/taqnyat.svg');
+  });
+
+  it('every one of the eight cards says plainly it is not connected and sends nothing', () => {
+    renderIntl(<CommunicationsCatalog allowed />, locale);
+
+    expect(COMMUNICATION_PROVIDERS).toHaveLength(8);
+    for (const provider of COMMUNICATION_PROVIDERS) {
+      const line = screen.getByTestId(`communications-not-connected-${provider.key}`);
+      expect(line.textContent).toBe(m.communications.notConnected);
+    }
+    expect(screen.getByTestId('communications-truth-note').textContent).toContain(locale === 'ar' ? 'API حقيقي' : 'real API');
+    // «متاح كخيار مستقبلي» مفصول بصرياً ولفظياً عن «متصل فعلاً»: مجموعتان بعنوانين مختلفين.
+    expect(screen.getByTestId('communications-legend-future').textContent).toContain(m.communications.status.theoretical.label);
+    expect(screen.getByTestId('communications-legend-future').textContent).not.toContain(m.communications.legend.connected.label);
+    expect(screen.getByTestId('communications-legend-connected').textContent).toContain(m.communications.legend.connected.label);
   });
 
   it('a failed official asset falls back to the generic icon instead of a broken image', () => {

@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -52,7 +53,9 @@ describe('communications provider registry (AWJ-COMMS-UX-01)', () => {
       if (provider.logo.kind === 'official') {
         expect(provider.logo.src, provider.key).toMatch(/^\/[\w\-./]+$/);
         expect(provider.logo.source.length, provider.key).toBeGreaterThan(20);
-        expect(provider.logo.license.length, provider.key).toBeGreaterThan(20);
+        expect(provider.logo.restrictions.length, provider.key).toBeGreaterThan(20);
+        expect(provider.logo.width, provider.key).toBeGreaterThan(0);
+        expect(provider.logo.height, provider.key).toBeGreaterThan(0);
         expect(existsSync(join(WEB, 'public', provider.logo.src)), `${provider.key}: ${provider.logo.src}`).toBe(true);
       } else {
         expect(provider.logo.gap.length, provider.key).toBeGreaterThan(20);
@@ -60,11 +63,48 @@ describe('communications provider registry (AWJ-COMMS-UX-01)', () => {
     }
   });
 
-  it('the only official logo is the unmodified WhatsApp glyph already committed for the storefront footer', () => {
-    const official = COMMUNICATION_PROVIDERS.filter((p) => p.logo.kind === 'official');
-    expect(official.map((p) => p.key)).toEqual(['whatsapp-business-platform']);
-    // لا نسخة جديدة: المسار هو الأصل القائم نفسه، فلا يمكن أن ينحرف عنه بايتاً.
-    expect(official[0].logo.kind === 'official' && official[0].logo.src).toBe('/brand/social/whatsapp.svg');
-    expect(readFileSync(join(WEB, 'public/brand/social/whatsapp.svg')).length).toBeGreaterThan(0);
+  it('AWJ-COMMS-UX-01 final: eight providers, five official logos, three named gaps', () => {
+    expect(COMMUNICATION_PROVIDERS).toHaveLength(8);
+    expect(COMMUNICATION_PROVIDERS.filter((p) => p.logo.kind === 'official').map((p) => p.key).sort()).toEqual([
+      'firebase-cloud-messaging', 'postmark', 'taqnyat', 'unifonic', 'whatsapp-business-platform',
+    ]);
+    expect(COMMUNICATION_PROVIDERS.filter((p) => p.logo.kind === 'generic').map((p) => p.key).sort()).toEqual([
+      'amazon-ses', 'apple-push-notification-service', 'twilio-sms',
+    ]);
+    // الفجوتان اللتان سببهما سياسة المالك تنصّان على الإذن الكتابي؛ APNs لا أصل له.
+    for (const key of ['twilio-sms', 'amazon-ses']) {
+      const logo = communicationProvider(key)!.logo;
+      expect(logo.kind === 'generic' && logo.gap, key).toMatch(/إذن كتابي|إذناً كتابياً/);
+    }
+  });
+
+  it('official logo bytes are exactly the vendor files: sha256 matches and nothing is redrawn, recoloured or cropped', () => {
+    for (const provider of COMMUNICATION_PROVIDERS) {
+      if (provider.logo.kind !== 'official') continue;
+      const bytes = readFileSync(join(WEB, 'public', provider.logo.src));
+      expect(createHash('sha256').update(bytes).digest('hex'), provider.key).toBe(provider.logo.sha256);
+    }
+  });
+
+  it('SVG assets are inert: no script, foreignObject, event handler or external reference', () => {
+    for (const provider of COMMUNICATION_PROVIDERS) {
+      if (provider.logo.kind !== 'official' || !provider.logo.src.endsWith('.svg')) continue;
+      const svg = readFileSync(join(WEB, 'public', provider.logo.src), 'utf8');
+      expect(svg, provider.key).not.toMatch(/<script|<foreignObject|\son\w+\s*=|xlink:href|href\s*=\s*["']https?:|url\(\s*["']?https?:|@import/i);
+    }
+  });
+
+  it('Taqnyat is a Saudi future candidate: SMS, owner approval, no credential or adapter field', () => {
+    const taqnyat = communicationProvider('taqnyat')!;
+    expect(taqnyat.channel).toBe('sms');
+    expect(taqnyat.status).toBe('owner_approval');
+    expect(taqnyat.name).toContain('تقنيات');
+    expect(Object.keys(taqnyat).sort()).toEqual(['awjEvidence', 'channel', 'identityUrl', 'key', 'logo', 'name', 'status', 'vendor']);
+  });
+
+  it('only the unmodified, already-committed WhatsApp glyph is reused from outside /comms-providers', () => {
+    const outside = COMMUNICATION_PROVIDERS.filter((p) => p.logo.kind === 'official' && !p.logo.src.startsWith('/comms-providers/'));
+    expect(outside.map((p) => p.key)).toEqual(['whatsapp-business-platform']);
+    expect(outside[0].logo.kind === 'official' && outside[0].logo.src).toBe('/brand/social/whatsapp.svg');
   });
 });

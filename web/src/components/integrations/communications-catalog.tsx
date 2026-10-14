@@ -1,7 +1,8 @@
 'use client';
 
+import Link from 'next/link';
 import { useTranslations } from 'next-intl';
-import { Check, Clock, Minus, UserCheck, type LucideIcon } from 'lucide-react';
+import { Clock, Minus, Unplug, UserCheck, type LucideIcon } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import {
   COMMUNICATION_CHANNEL_ORDER,
@@ -11,7 +12,6 @@ import {
 } from '@/lib/communications-providers';
 import { CHANNEL_ICONS, CommunicationProviderMark } from './communications-provider-mark';
 import { IntegrationBreadcrumb } from './integration-shell';
-import Link from 'next/link';
 
 /**
  * كتالوج مزوّدي الاتصالات (AWJ-COMMS-UX-01) — وصفٌ ثابت للاطلاع فقط، بلا شبكة ولا حالة مستأجر.
@@ -66,20 +66,26 @@ export function CommunicationsCatalog({ allowed }: { allowed: boolean }) {
             {t('communications.truthNote')}
           </p>
 
-          <section aria-labelledby="comms-legend" className="rounded-md border border-border bg-surface p-4" data-testid="communications-legend">
+          <section aria-labelledby="comms-legend" className="space-y-3 rounded-md border border-border bg-surface p-4" data-testid="communications-legend">
             <h2 id="comms-legend" className="text-sm font-semibold text-text">{t('communications.legend.title')}</h2>
-            <dl className="mt-2 grid grid-cols-1 gap-x-6 gap-y-2 text-sm md:grid-cols-2">
-              {PROVIDER_STATUS_ORDER.map((status) => (
-                <div key={status} className="space-y-0.5">
-                  <dt className="font-medium text-text">{t(`communications.status.${status}.label`)}</dt>
-                  <dd className="text-xs leading-relaxed text-muted">{t(`communications.status.${status}.description`)}</dd>
-                </div>
-              ))}
-              <div className="space-y-0.5" data-testid="communications-legend-connected">
+            <div className="space-y-1.5" data-testid="communications-legend-future">
+              <h3 className="text-xs font-semibold text-muted">{t('communications.legend.futureTitle')}</h3>
+              <dl className="grid grid-cols-1 gap-x-6 gap-y-2 text-sm md:grid-cols-3">
+                {PROVIDER_STATUS_ORDER.map((status) => (
+                  <div key={status} className="space-y-0.5">
+                    <dt className="font-medium text-text">{t(`communications.status.${status}.label`)}</dt>
+                    <dd className="text-xs leading-relaxed text-muted">{t(`communications.status.${status}.description`)}</dd>
+                  </div>
+                ))}
+              </dl>
+            </div>
+            <div className="space-y-1.5 border-t border-border pt-3" data-testid="communications-legend-connected">
+              <h3 className="text-xs font-semibold text-muted">{t('communications.legend.actualTitle')}</h3>
+              <dl className="text-sm">
                 <dt className="font-medium text-text">{t('communications.legend.connected.label')}</dt>
                 <dd className="text-xs leading-relaxed text-muted">{t('communications.legend.connected.description')}</dd>
-              </div>
-            </dl>
+              </dl>
+            </div>
           </section>
 
           {COMMUNICATION_CHANNEL_ORDER.map((channel) => {
@@ -117,6 +123,13 @@ export function CommunicationsCatalog({ allowed }: { allowed: boolean }) {
                         </div>
                         <p className="text-xs leading-relaxed text-muted">
                           {t(`communications.status.${provider.status}.description`)}
+                        </p>
+                        <p
+                          className="mt-auto flex items-center gap-1 border-t border-border pt-2 text-xs font-medium text-muted"
+                          data-testid={`communications-not-connected-${provider.key}`}
+                        >
+                          <Unplug className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                          {t('communications.notConnected')}
                         </p>
                       </li>
                     );

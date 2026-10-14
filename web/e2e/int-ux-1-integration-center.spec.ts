@@ -252,7 +252,7 @@ test('the sidebar lists the entry under Settings for a user with invoices.view',
 
 // ── AWJ-COMMS-UX-01: كتالوج مزوّدي الاتصالات (ثابت، بلا شبكة) ──────────────────────────────────────
 const PROVIDER_KEYS = [
-  'unifonic', 'twilio-sms', 'whatsapp-business-platform', 'amazon-ses', 'postmark',
+  'unifonic', 'taqnyat', 'twilio-sms', 'whatsapp-business-platform', 'amazon-ses', 'postmark',
   'firebase-cloud-messaging', 'apple-push-notification-service',
 ];
 
@@ -274,7 +274,7 @@ async function openCommunications(page: Page, opts: { locale: 'ar' | 'en'; theme
 for (const [locale, dir] of LOCALES) {
   for (const theme of THEMES) {
     test.describe(`communications catalog ${locale}/${theme}`, () => {
-      test('lists known providers honestly: no connected claim, no controls, official WhatsApp logo only, responsive, AA contrast', async ({ page }, info) => {
+      test('lists known providers honestly: no connected claim, no controls, five official logos and three named gaps, responsive, AA contrast', async ({ page }, info) => {
         const requests: string[] = [];
         page.on('request', (request) => { if (new URL(request.url()).pathname.includes('/api/')) requests.push(request.url()); });
         await openCommunications(page, { locale, theme });
@@ -294,11 +294,22 @@ for (const [locale, dir] of LOCALES) {
         expect(await root.locator('a[href]').count()).toBe(1);
         expect(await root.locator('[class*="positive"]').count()).toBe(0);
 
-        // الشعار الرسمي لـWhatsApp فقط وقد حُمِّل فعلاً؛ الباقي أيقونة عامة. لا طلب خارجي لصور.
-        const logos = root.locator('img[data-mark="official"]');
-        await expect(logos).toHaveCount(1);
-        expect(await logos.first().evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0)).toBe(true);
-        expect(await root.locator('[data-mark="generic"]').count()).toBe(PROVIDER_KEYS.length - 1);
+        // الشعارات الرسمية الخمسة حُمِّلت فعلاً بنسبتها الطبيعية دون تمدد أو قصّ؛ الفجوات الثلاث أيقونة عامة. لا طلب خارجي لصور.
+        const logos = root.locator('[data-mark="official"] img');
+        await expect(logos).toHaveCount(5);
+        for (const img of await logos.all()) {
+          const ok = await img.evaluate((el: HTMLImageElement) => {
+            const rect = el.getBoundingClientRect();
+            const natural = el.naturalWidth / el.naturalHeight;
+            // object-contain داخل صندوقه: لا يتجاوز الصندوق، ويُرسم بارتفاع قابل للقراءة (≥ 20px).
+            return el.complete && el.naturalWidth > 0 && rect.height >= 20 && rect.width > 0 && Number.isFinite(natural);
+          });
+          expect(ok).toBe(true);
+        }
+        expect(await root.locator('[data-mark="generic"]').count()).toBe(3);
+        const external = await page.evaluate(() => Array.from(document.images).filter((img) => /^(https?:)?\/\//.test(img.getAttribute('src') ?? '') && new URL(img.src).origin !== location.origin).length);
+        expect(external).toBe(0);
+        await expect(page.getByTestId('communications-provider-taqnyat').locator('[data-mark="official"]')).toHaveAttribute('data-shape', 'wide');
 
         // الصفحة ثابتة: لا تطلب شيئاً خاصاً بها (طلبات هيكل التطبيق العامة كالإشعارات والفروع ليست منها).
         expect(requests.filter((url) => /delivery|communication|provider|integration/i.test(new URL(url).pathname))).toEqual([]);
@@ -313,7 +324,7 @@ for (const [locale, dir] of LOCALES) {
         }
         if (info.project.name === 'mobile') {
           const first = (await page.getByTestId('communications-provider-unifonic').boundingBox())!;
-          const second = (await page.getByTestId('communications-provider-twilio-sms').boundingBox())!;
+          const second = (await page.getByTestId('communications-provider-taqnyat').boundingBox())!;
           expect(Math.round(first.x)).toBe(Math.round(second.x));
         }
 
