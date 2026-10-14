@@ -34,7 +34,7 @@ Companions: [MASTER-PLAN](./AC-UX-HZ-01-MASTER-PLAN.md) · [TASK-QUEUE](./AC-UX-
 | 07 | `useCan` capability helper + live `/me` refresh | #1480 | `f1bcc67` |
 | 08 | Read-only per-user access summary | #1481 | `23c1dd3` |
 | 09 | Keyboard / RTL / responsive / theme QA + focus restore | #1484 | `e972e5b` |
-| 10 | This closure | (this PR) | — |
+| 10 | Closure + this report | #1486 | `757a7a3` |
 
 Every slice's PR body carries the full implementation report (baseline, scope, contracts, security invariants, tests, visual verification, backward compatibility, risks, **NOT DEPLOYED**, next slice).
 
