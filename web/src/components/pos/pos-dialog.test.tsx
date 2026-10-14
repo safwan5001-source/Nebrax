@@ -57,4 +57,10 @@ describe('PosDialog touch close', () => {
     expect(screen.getByRole('button', { name: 'Cancel' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Confirm' })).toBeTruthy();
   });
+
+  it('names the close target in the interface language (ERP-UX-H1-7D)', async () => {
+    const { renderIntl } = await import('@/test-utils/intl');
+    renderIntl(<PosDialog open onClose={() => {}} title="Held sales"><p>content</p></PosDialog>, 'en');
+    expect(screen.getByRole('button', { name: 'Close' })).toBeTruthy();
+  });
 });

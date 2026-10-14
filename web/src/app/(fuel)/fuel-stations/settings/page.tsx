@@ -14,6 +14,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/components/ui/toast';
 import { api, ApiError } from '@/lib/api';
+import { describeLoadFailure } from '@/lib/load-failure';
 import { currentUser } from '@/lib/auth';
 import { litersToMilliliters, millilitersToLiters } from '@/lib/fuel-quantity';
 import { formatMinorRiyal, isValidRiyal, minorToRiyal, riyalToMinor, SAUDI_RIYAL_SYMBOL } from '@/lib/money';
@@ -52,6 +53,7 @@ const DEVICE_TONES: Record<string, Tone> = { active: 'positive', inactive: 'mute
 
 export default function FuelStationsSettingsPage() {
   const t = useTranslations('fuelStationsSettings');
+  const tc = useTranslations('common');
   const locale = useLocale();
   const { success } = useToast();
   const [tenant, setTenant] = useState<Settings | null>(null);
@@ -71,6 +73,7 @@ export default function FuelStationsSettingsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [forbidden, setForbidden] = useState(false);
 
   const canManage = permissions.includes('*') || permissions.includes('fuel_stations.manage');
   const canManageScope = canManage && (stationId === '' || stationSettings !== null);
@@ -81,7 +84,7 @@ export default function FuelStationsSettingsPage() {
   const patches = isStationScope ? stationPatch : tenantPatch;
 
   const load = useCallback(async () => {
-    setLoading(true); setError(null);
+    setLoading(true); setError(null); setForbidden(false);
     try {
       const [settingsResponse, stationsResponse, accountsResponse, paymentResponse, productResponse, deviceResponse] = await Promise.all([
         api<{ data: Settings }>('/fuel-stations/settings'),
@@ -98,11 +101,14 @@ export default function FuelStationsSettingsPage() {
       setProducts(asList<FuelProduct>(productResponse.data));
       setDevices(asList<Device>(deviceResponse.data));
     } catch (cause) {
-      setError(cause instanceof ApiError ? cause.message : t('loadFailed'));
+      // 403 (استحقاق/صلاحية): رسالة الواجهة بلغتها وبلا «تحديث» عقيم — H1-5A.
+      const failure = describeLoadFailure(cause, { forbidden: tc('capabilityUnavailable'), fallback: t('loadFailed') });
+      setError(failure.message);
+      setForbidden(failure.forbidden);
     } finally {
       setLoading(false);
     }
-  }, [t]);
+  }, [t, tc]);
 
   const loadStationScope = useCallback(async (id: string) => {
     if (!id) { setStationSettings(null); setStationPatch({}); setStationRecordPatch({}); setPrices([]); return; }
@@ -182,7 +188,14 @@ export default function FuelStationsSettingsPage() {
     } finally { setSaving(null); }
   }
 
-  if (loading || !tenant) return <Loading />;
+  if (loading) return <Loading />;
+  // فشل التحميل الأول كان يُبقي الهيكل العظمي إلى الأبد (لا عنوان ولا سبب) — ERP-UX-023.
+  if (!tenant) return <div className="space-y-5">
+    <header><p className="text-sm text-muted">{t('eyebrow')}</p><h1 className="text-xl font-semibold text-text">{t('title')}</h1></header>
+    {forbidden
+      ? <p role="alert" className="rounded-md border border-border bg-surface px-3 py-3 text-sm text-text">{error}</p>
+      : <ErrorBanner message={error ?? t('loadFailed')} retry={() => void load()} label={t('refresh')} />}
+  </div>;
   const scopeLabel = isStationScope ? `${selectedStation?.name ?? ''} · ${selectedStation?.code ?? ''}` : t('tenantScope');
   const activeSettings = scopeValues ?? tenant;
   const selectedPayments = Array.isArray(value('fuel_sales_allowed_payment_method_ids')) ? value('fuel_sales_allowed_payment_method_ids') as string[] : [];

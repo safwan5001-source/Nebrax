@@ -195,7 +195,7 @@ export default function InvoiceSettingsPage() {
                 <Input id="terms" value={form.default_terms} onChange={(e) => set('default_terms', e.target.value)} />
                 <p className="text-xs text-muted">
                   {t('default_terms_hint')}{' '}
-                  <Link href="/sales-settings/designs" className="text-primary hover:underline">{t('designs_link')}</Link>
+                  <Link href="/sales-settings/designs" className="text-primary underline underline-offset-2 hover:no-underline">{t('designs_link')}</Link>
                 </p>
               </div>
 

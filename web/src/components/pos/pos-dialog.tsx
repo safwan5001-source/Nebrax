@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useCommonLabel } from '@/lib/ui-label';
 
 interface PosDialogProps {
   open: boolean;
@@ -17,6 +18,7 @@ interface PosDialogProps {
  * لا يغيّر `components/ui/dialog` العام ولا منطق Esc.
  */
 export function PosDialog({ open, onClose, title, children, className }: PosDialogProps) {
+  const closeLabel = useCommonLabel('close', { ar: 'إغلاق', en: 'Close' });
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
@@ -40,7 +42,7 @@ export function PosDialog({ open, onClose, title, children, className }: PosDial
       >
         <div className="flex shrink-0 items-center justify-between border-b border-border px-4 py-3">
           <h2 className="min-w-0 truncate text-base font-semibold text-text">{title}</h2>
-          <button type="button" onClick={onClose} className="grid min-h-11 min-w-11 shrink-0 place-items-center rounded text-muted hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40" aria-label="إغلاق">
+          <button type="button" onClick={onClose} className="grid min-h-11 min-w-11 shrink-0 place-items-center rounded text-muted hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40" aria-label={closeLabel}>
             <X className="h-4 w-4" strokeWidth={1.7} />
           </button>
         </div>
