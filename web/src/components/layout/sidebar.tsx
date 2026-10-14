@@ -324,6 +324,8 @@ const GROUPS: NavGroup[] = [
       // المستخدمون (AC-UX-01): بوابتها صلاحية العرض `users.view` لا اسم الدور — فمن يملكها دوراً مخصَّصاً يراها،
       // ومن جُرِّد منها (حتى لو `admin`) لا يرى رابطاً يردّ مساره 403. الإدارة داخل الشاشة خلف `users.manage`.
       { href: '/users', icon: UserCog, key: 'users', built: true, permission: 'users.view' },
+      // الأدوار والصلاحيات (AC-UX-03A): بوابتها `roles.view` لا اسم الدور؛ التعديل داخل الشاشة خلف `roles.manage`.
+      { href: '/roles', icon: ShieldCheck, key: 'roles', built: true, permission: 'roles.view' },
       // مركز التكاملات (INT-UX-1): الفئة الوحيدة الفاعلة اليوم هي منصات التوصيل، وتتطلب
       // `invoices.view` — فلا يرى دورٌ بلا هذه الصلاحية (الخدمة الذاتية مثلاً) مدخلاً ينتهي
       // برسالة «لا صلاحية». بلا `appKey`: المركز يمتدّ إلى فئات مستقبلية بقدرات مختلفة،

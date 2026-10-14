@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { type ColumnDef } from '@tanstack/react-table';
-import { Plus, Pencil, Trash2, User, UserCog } from 'lucide-react';
+import { Plus, Pencil, User, UserCog } from 'lucide-react';
 import { DataTable } from '@/components/data-table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -15,7 +15,6 @@ import { ShiftDialog, type Shift } from '@/components/hr/shift-dialog';
 import { AttendanceDialog, type Attendance, type AttendanceStatus } from '@/components/hr/attendance-dialog';
 import { CreateRunDialog } from '@/components/hr/create-run-dialog';
 import { RunDetailDialog, type PayrollRun } from '@/components/hr/run-detail-dialog';
-import { RoleDialog, type Role } from '@/components/hr/role-dialog';
 import { OrgStructureManager } from '@/components/hr/org-structure-manager';
 import { LeaveManager } from '@/components/hr/leave-manager';
 import { RequestsManager } from '@/components/hr/requests-manager';
@@ -26,8 +25,8 @@ import { formatRiyal } from '@/lib/money';
 import { cn } from '@/lib/utils';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 
-type Tab = 'employees' | 'shifts' | 'attendance' | 'runs' | 'leave' | 'requests' | 'roles' | 'org_structure';
-const TABS: Tab[] = ['employees', 'shifts', 'attendance', 'runs', 'leave', 'requests', 'roles', 'org_structure'];
+type Tab = 'employees' | 'shifts' | 'attendance' | 'runs' | 'leave' | 'requests' | 'org_structure';
+const TABS: Tab[] = ['employees', 'shifts', 'attendance', 'runs', 'leave', 'requests', 'org_structure'];
 
 interface TeamUser {
   id: string; name: string; email: string; role: string; is_active: boolean;
@@ -51,10 +50,11 @@ export default function HrPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const requestedTab = searchParams.get('tab');
-  // المستخدمون صاروا شاشةً مستقلة بصلاحية `users.view` (AC-UX-01): الروابط والإشارات
-  // القديمة إلى `?tab=users` تُحوَّل إليها بدل أن تسقط على «الموظفون».
+  // المستخدمون والأدوار صارا شاشتين مستقلتين بصلاحيتَي `users.view` / `roles.view` (AC-UX-01/03A):
+  // الروابط والإشارات القديمة إلى `?tab=users|roles` تُحوَّل إليهما بدل أن تسقط على «الموظفون».
   useEffect(() => {
     if (requestedTab === 'users') router.replace('/users');
+    if (requestedTab === 'roles') router.replace('/roles');
   }, [requestedTab, router]);
   const [tab, setTab] = useState<Tab>(
     TABS.includes(requestedTab as Tab) ? (requestedTab as Tab) : 'employees'
@@ -88,18 +88,6 @@ export default function HrPage() {
   }, []);
   const canManageRoles = role === 'owner' || role === 'admin';
 
-  const [roles, setRoles] = useState<Role[]>([]);
-  const [permCatalog, setPermCatalog] = useState<string[]>([]);
-  const [roleDialog, setRoleDialog] = useState(false);
-  const [editingRole, setEditingRole] = useState<Role | null>(null);
-
-  const reloadRoles = useCallback(() => {
-    api<{ data: Role[]; meta: { permissions: string[] } }>('/roles')
-      .then((r) => { setRoles(r.data); setPermCatalog(r.meta?.permissions ?? []); })
-      .catch(() => {});
-  }, []);
-
-  useEffect(() => { if (canManageRoles) reloadRoles(); }, [canManageRoles, reloadRoles]);
 
   const [team, setTeam] = useState<TeamUser[]>([]);
 
@@ -279,51 +267,6 @@ export default function HrPage() {
     [t]
   );
 
-  const deleteRole = useCallback(async (r: Role) => {
-    if (!(await askConfirm({ message: t('confirm_delete_role'), tone: 'danger' }))) return;
-    api(`/roles/${r.id}`, { method: 'DELETE' })
-      .then(() => { success(tc('deleted')); reloadRoles(); })
-      .catch((e) => error(e instanceof ApiError ? e.message : tc('saveFailed')));
-  }, [t, tc, success, error, reloadRoles, askConfirm]);
-
-  const roleColumns = useMemo<ColumnDef<Role, unknown>[]>(
-    () => [
-      { accessorKey: 'name', header: t('role_name'), cell: ({ row }) => <span className="font-medium text-text">{row.original.name}</span> },
-      {
-        id: 'perms',
-        header: t('role_perms_count'),
-        cell: ({ row }) =>
-          row.original.permissions.includes('*')
-            ? <Badge tone="neutral">{t('full_access')}</Badge>
-            : <span className="num text-muted">{row.original.permissions.length}</span>,
-      },
-      { accessorKey: 'users_count', header: t('role_users_count'), cell: ({ row }) => <span className="num text-muted">{row.original.users_count}</span> },
-      {
-        id: 'kind',
-        header: '',
-        cell: ({ row }) => <Badge tone="muted">{row.original.is_system ? t('role_system') : t('role_custom')}</Badge>,
-      },
-      {
-        id: 'actions',
-        header: '',
-        cell: ({ row }) => (
-          <div className="flex justify-end gap-1">
-            <Button variant="ghost" size="icon" aria-label={row.original.is_owner ? t('view_role') : t('edit')} onClick={() => { setEditingRole(row.original); setRoleDialog(true); }}>
-              <Pencil className="h-4 w-4" strokeWidth={1.7} />
-            </Button>
-            {/* النظامي والمالك لا يُحذفان — نُخفي الزر بدل أن يصطدم بـ422. */}
-            {!row.original.is_system && (
-              <Button variant="ghost" size="icon" aria-label={t('delete')} onClick={() => deleteRole(row.original)}>
-                <Trash2 className="h-4 w-4" strokeWidth={1.7} />
-              </Button>
-            )}
-          </div>
-        ),
-      },
-    ],
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [t, deleteRole]
-  );
 
   const addButton = {
     // زرٌ عام "إضافة" يفتح خيارَي دفترة نفسيهما (موظف / مستخدم) بدل زرٍّ واحد
@@ -342,7 +285,6 @@ export default function HrPage() {
     shifts: () => (<Button onClick={() => { setEditingShift(null); setShiftDialog(true); }}><Plus className="h-4 w-4" strokeWidth={1.8} />{t('add_shift')}</Button>),
     attendance: () => (<Button onClick={() => { setEditingAtt(null); setAttDialog(true); }}><Plus className="h-4 w-4" strokeWidth={1.8} />{t('add_attendance')}</Button>),
     runs: () => (<Button onClick={() => setRunDialog(true)}><Plus className="h-4 w-4" strokeWidth={1.8} />{t('create_run')}</Button>),
-    roles: () => (<Button onClick={() => { setEditingRole(null); setRoleDialog(true); }}><Plus className="h-4 w-4" strokeWidth={1.8} />{t('add_role')}</Button>),
     // أزرّة الإضافة الخاصّة بهذه الأقسام داخلية في مكوّناتها (كلٌّ يتبدّل حسب القسم الفرعي/النوع النشط).
     org_structure: () => null,
     leave: () => null,
@@ -357,7 +299,7 @@ export default function HrPage() {
       </div>
 
       <div className="flex gap-1 border-b border-border">
-        {(['employees', 'shifts', 'attendance', 'runs', 'leave', 'requests', ...(canManageRoles ? ['roles', 'org_structure'] : [])] as Tab[]).map((key) => (
+        {(['employees', 'shifts', 'attendance', 'runs', 'leave', 'requests', ...(canManageRoles ? ['org_structure'] : [])] as Tab[]).map((key) => (
           <button
             key={key}
             onClick={() => setTab(key)}
@@ -385,9 +327,6 @@ export default function HrPage() {
       )}
       {tab === 'leave' && <LeaveManager />}
       {tab === 'requests' && <RequestsManager />}
-      {tab === 'roles' && canManageRoles && (
-        <DataTable columns={roleColumns} data={roles} loading={loading} searchPlaceholder={t('search_roles')} emptyLabel={t('no_roles')} exportName="roles" />
-      )}
       {tab === 'org_structure' && canManageRoles && <OrgStructureManager />}
 
       <EmployeeDialog
@@ -403,7 +342,6 @@ export default function HrPage() {
       <AttendanceDialog open={attDialog} onClose={() => setAttDialog(false)} onSaved={load} attendance={editingAtt} />
       <CreateRunDialog open={runDialog} onClose={() => setRunDialog(false)} onCreated={() => { load(); setTab('runs'); }} />
       <RunDetailDialog runId={activeRun} onClose={() => setActiveRun(null)} onChanged={load} />
-      <RoleDialog open={roleDialog} onClose={() => setRoleDialog(false)} onSaved={reloadRoles} role={editingRole} catalog={permCatalog} />
     </div>
   );
 }

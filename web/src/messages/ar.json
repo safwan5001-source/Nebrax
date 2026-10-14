@@ -1982,7 +1982,26 @@
       "users": "المستخدمون",
       "roles": "الأدوار",
       "reports": "التقارير",
-      "zatca": "الفوترة الإلكترونية"
+      "zatca": "الفوترة الإلكترونية",
+      "accounting_period_locks": "إقفال الفترات المحاسبية",
+      "accounting_settings": "إعدادات المحاسبة",
+      "apps": "التطبيقات",
+      "apps_builder": "منشئ التطبيقات",
+      "commerce": "التجارة الإلكترونية",
+      "customer_access": "وصول العملاء",
+      "customer_refunds": "استردادات العملاء",
+      "delivery_connector": "موصّلات التوصيل",
+      "delivery_hub": "مركز التوصيل",
+      "delivery_notes": "إشعارات التسليم",
+      "developer": "أدوات المطوّرين",
+      "documents": "المستندات",
+      "fiscal_years": "السنوات المالية",
+      "fuel": "عمليات الوقود",
+      "fuel_stations": "محطات الوقود",
+      "pos": "نقطة البيع",
+      "sales": "المبيعات",
+      "self_service": "الخدمة الذاتية للموظفين",
+      "supplier_refunds": "استردادات الموردين"
     },
     "perm_actions": {
       "view": "عرض",
@@ -2021,7 +2040,10 @@
       "access": "وصول",
       "view_cost": "عرض التكلفة",
       "minimum_price_override": "تجاوز الحد الأدنى للسعر",
-      "submit": "إرسال"
+      "submit": "إرسال",
+      "operate": "تشغيل",
+      "publish": "نشر",
+      "reassign": "إعادة إسناد"
     },
     "weekdays": [
       "الأحد",
@@ -2094,7 +2116,34 @@
     "create": "إنشاء",
     "save": "حفظ",
     "cancel": "إلغاء",
-    "close": "إغلاق"
+    "close": "إغلاق",
+    "perm_areas": {
+      "alerts": "التنبيهات",
+      "audit": "التدقيق",
+      "avi": "التعريف الآلي للمركبات (AVI)",
+      "bookmark": "العلامات",
+      "card": "بطاقات الوقود",
+      "cash_drawer": "درج النقد",
+      "cctv": "كاميرات المراقبة",
+      "center": "المركز",
+      "contract": "العقود",
+      "credit": "الائتمان",
+      "device": "الأجهزة",
+      "fleet": "الأسطول",
+      "handover": "التسليم",
+      "integration": "التكاملات",
+      "investigations": "التحقيقات",
+      "maintenance": "الصيانة",
+      "override": "التجاوزات",
+      "price": "التسعير",
+      "reports": "التقارير",
+      "safety": "السلامة",
+      "sale": "المبيعات",
+      "session": "الجلسات",
+      "settings": "الإعدادات",
+      "shift": "الورديات",
+      "variance": "الفروقات"
+    }
   },
   "inventory": {
     "title": "أرصدة المخزون",
@@ -2900,7 +2949,8 @@
     "supplierRefunds": "استردادات الموردين",
     "periodLocks": "أقفال الفترات",
     "fiscalYears": "السنوات المالية",
-    "users": "المستخدمون"
+    "users": "المستخدمون",
+    "roles": "الأدوار والصلاحيات"
   },
   "partnerProfile": {
     "back": "رجوع",
@@ -10434,5 +10484,45 @@
         "dismiss": "إغلاق"
       }
     }
+  },
+  "rolesPage": {
+    "title": "الأدوار والصلاحيات",
+    "description": "ما يستطيع كل دور فعله في المؤسسة. الدور يحدّد الإجراءات؛ أما الوصول إلى الفروع والمستودعات فيُضبط لكل مستخدم.",
+    "new_role": "دور جديد",
+    "search_roles": "ابحث عن دور…",
+    "rail_label": "الأدوار",
+    "select_role": "اختر دوراً",
+    "kind_system": "دور نظامي",
+    "kind_custom": "دور مخصّص",
+    "full_access": "وصول كامل",
+    "perms_summary": "{granted} من {total} صلاحية",
+    "users_summary": "{n, plural, one {مستخدم واحد} two {مستخدمان} few {{count} مستخدمين} many {{count} مستخدماً} other {{count} مستخدم}}",
+    "no_users_assigned": "لا مستخدمين مُسندين",
+    "catalogue_title": "الصلاحيات",
+    "catalogue_search": "ابحث في الصلاحيات…",
+    "granted_only": "الممنوحة فقط",
+    "granted": "ممنوحة",
+    "not_granted": "غير ممنوحة",
+    "group_count": "{granted} من {total}",
+    "no_match": "لا صلاحيات مطابقة",
+    "no_match_hint": "عدّل البحث أو أوقف «الممنوحة فقط».",
+    "no_roles_title": "لا أدوار بعد",
+    "no_roles_hint": "أنشئ دوراً لتجميع الصلاحيات التي تُسندها للمستخدمين.",
+    "no_roles_match": "لا أدوار تطابق بحثك.",
+    "no_access_title": "لا تملك صلاحية عرض الأدوار",
+    "no_access_description": "يلزم تفعيل صلاحية «عرض الأدوار». تواصل مع مالك المؤسسة أو مديرها.",
+    "read_only_note": "عرض فقط — إنشاء الأدوار وتعديلها يتطلب صلاحية «إدارة الأدوار».",
+    "owner_note": "دور المالك محميّ: وصول كامل دائماً، ولا يُعدَّل ولا يُحذف.",
+    "system_note": "الأدوار النظامية قابلة للتعديل وغير قابلة للحذف.",
+    "full_access_note": "لهذا الدور وصول كامل يشمل كل الصلاحيات أدناه، بما فيها ما يُضاف لاحقاً.",
+    "edit": "تعديل الدور",
+    "delete": "حذف الدور",
+    "reason_owner_protected": "لا يمكن تغيير دور المالك.",
+    "reason_role_above_you": "صلاحيات هذا الدور تتجاوز صلاحياتك.",
+    "reason_delete_system": "لا يمكن حذف الأدوار النظامية.",
+    "reason_delete_has_users": "انقل مستخدميه إلى دور آخر قبل حذف هذا الدور.",
+    "confirm_delete_title": "حذف الدور",
+    "confirm_delete": "حذف الدور «{name}»؟ لا مستخدمين مُسندين إليه. لا يمكن التراجع عن ذلك.",
+    "exact_key": "مفتاح الصلاحية"
   }
 }
