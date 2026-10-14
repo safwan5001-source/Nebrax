@@ -56,7 +56,7 @@ Computed per merge commit (`git show --name-only <sha>`), not from the raw range
 ### 3.3 Frontend verification (run on `main` @ `e972e5b`)
 - `vitest`: **612 files / 6767 tests passed.**
 - `npm run build`: passes (also green in Web CI on every PR).
-- Playwright `ac-ux-01` … `ac-ux-09` (desktop 1440 + mobile 390, AR/EN, light/dark/Ink where applicable): **E2E_RESULT_PLACEHOLDER**
+- Playwright `ac-ux-01` … `ac-ux-09` (desktop 1440 + mobile 390, AR/EN, light/dark/Ink where applicable): **177 passed, 60 skipped, 1 failed** in one 8-minute run. The 60 skips are by design (the AC-UX-09 matrix runs only on the `desktop` project and sets its own viewports, so its `mobile`-project instances skip). The single failure was the **first page load of the run** — the cold `next dev` compile of `/users` exceeded the 5 s heading assertion in `ac-ux-02`'s first test; the same spec re-run on its own passed **18/18**, so it is a cold-start timing artefact, not a behaviour regression.
 
 ### 3.4 Visual verification
 Per slice, screenshots were reviewed (AR desktop, EN desktop, AR mobile, dark; Ink in 09) and not committed. AC-UX-09 turned this into a regression guard: `{users, roles} × {1440, 1280, 768, 390} × {EN, AR} × {light, dark, Ink}` asserts heading, `rtl`, applied theme, **no horizontal overflow**, and an accessible name on every visible interactive control in the main content (with a self-test proving the audit really flags an unnamed control).
