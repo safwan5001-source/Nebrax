@@ -17,8 +17,8 @@ Legend: ☐ not started · ◐ in progress / in review · ☑ merged (with Merge
 | 06 | Treasury deposit/withdraw access legibility on existing account form | 00 | ☑ | #1475 | `7e8af03` | `beaa6bf` |
 | 07 | Consolidate the capability helper (`useCan`-style over `lib/permissions.ts`, replacing the per-screen `hasPermission` calls from 01/03), extend to the rest of the ERP: hidden/read-only/disabled/allowed states on nav, create/edit/delete, posting, exports, reports, approvals, treasury, ZATCA, settings; `/me` refresh on shell mount/focus | 01, 03B | ☑ | #1480 | `beaa6bf` | `f1bcc67` |
 | 08 | Per-user access summary (source assignments only) | 02, 05 | ☑ | #1481 | `f1bcc67` | `23c1dd3` |
-| 09 | Keyboard / RTL / responsive (1440·1280·768·390) / dark+Ink / state QA with existing Playwright; add e2e for Users & Roles | 01–08 | ◐ | | `23c1dd3` | |
-| 10 | Closure: backend regression matrix, frontend verification, final report | 09 | ☐ | | | |
+| 09 | Keyboard / RTL / responsive (1440·1280·768·390) / dark+Ink / state QA with existing Playwright; add e2e for Users & Roles | 01–08 | ☑ | #1484 | `23c1dd3` | `e972e5b` |
+| 10 | Closure: backend regression matrix, frontend verification, final report | 09 | ◐ | | `e972e5b` | |
 
 ## Open items carried by the queue
 
