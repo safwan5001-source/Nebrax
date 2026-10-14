@@ -54,12 +54,14 @@ class ReturnController extends ApiController
 
     public function show(string $id): JsonResponse
     {
-        return (new ReturnResource(ReturnDocument::with('lines')->findOrFail($id)))->response();
+        // REM-03: الفرع النشط فقط — 404 لمرتجع فرعٍ آخر (حتى لو كان ضمن فروع المستخدم).
+        return (new ReturnResource($this->scopeToCurrentBranchOnly(ReturnDocument::with('lines'))->findOrFail($id)))->response();
     }
 
     public function post(Request $request, string $id): JsonResponse
     {
-        $return = ReturnDocument::findOrFail($id);
+        // الحارس قبل أي أثر محاسبي/مخزني.
+        $return = $this->scopeToCurrentBranchOnly(ReturnDocument::query())->findOrFail($id);
         $this->assertWarehouseAllowed($return->warehouse_id, $return->branch_id);
         $posted = $this->domain(fn () => $this->returns->post($return));
 
