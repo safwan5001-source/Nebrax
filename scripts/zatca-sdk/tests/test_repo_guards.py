@@ -58,6 +58,30 @@ class WorkflowGuardTest(unittest.TestCase):
         self.assertIn("(advisory)", self.text)
 
 
+class FixtureDigestTest(unittest.TestCase):
+    """The PHP drift test compares generator output with DIGESTS (the CI overlay does not receive fixture files);
+    this guard ties the committed fixture files to the very same digests."""
+
+    def test_committed_fixtures_match_the_digests_in_the_php_drift_test(self):
+        import hashlib
+        php = read(os.path.join(REPO, "tests", "Feature", "ZatcaSdkFixtureDriftTest.php"))
+        block = php.split("private const DIGESTS = [", 1)[1].split("];", 1)[0]
+        digests = dict(re.findall(r"'([a-z0-9-]+)'\s*=>\s*'([0-9a-f]{64})'", block))
+        self.assertTrue(digests)
+        files = sorted(glob.glob(os.path.join(FIXTURES, "awj", "*.xml")))
+        self.assertEqual(sorted(digests), [os.path.basename(f)[:-4] for f in files],
+                         "fixture files and DIGESTS must list the same fixtures")
+        for f in files:
+            with open(f, "rb") as fh:
+                self.assertEqual(hashlib.sha256(fh.read()).hexdigest(), digests[os.path.basename(f)[:-4]], f)
+
+    def test_baseline_lists_exactly_the_fixtures(self):
+        import json
+        base = json.loads(read(os.path.join(FIXTURES, "baseline.json")))
+        files = sorted(os.path.basename(f) for f in glob.glob(os.path.join(FIXTURES, "awj", "*.xml")))
+        self.assertEqual(sorted(base["awj"]), files)
+
+
 class ScopeGuardTest(unittest.TestCase):
     def test_existing_ci_surfaces_are_untouched_by_this_change(self):
         # Informational anchor: the workflow must not be one of the gate-managed files.

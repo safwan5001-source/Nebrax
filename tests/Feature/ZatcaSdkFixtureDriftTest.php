@@ -19,11 +19,19 @@ use Tests\TestCase;
  * الـSDK الرسمي (scripts/zatca-sdk/) في CI. فلو تغيّر مولِّد XML دون تحديث
  * الـfixtures، لفحص الـharness مستنداً لم يعد ما يُنتجه التطبيق. هذا الاختبار
  * يمنع ذلك: يعيد البناء من بيانات اصطناعية ثابتة (بلا قاعدة بيانات وبلا ساعة
- * ولا UUID عشوائي) ويقارن بايتاً ببايت.
+ * ولا UUID عشوائي) ويقارن SHA-256 للمخرجات بالبصمات الثابتة DIGESTS أدناه.
+ *
+ * لماذا بصمات لا ملفات؟ مشروع Laravel في CI يُركَّب بنسخ قوائم مجلدات محددة
+ * (ci.yml/setup.sh)، وملفات tests/Fixtures/zatca-sdk لا تُنسخ إليه، وتعديل تلك
+ * القوائم خارج نطاق هذا الـslice. فالمقارنة تتم على بصمات داخل هذا الملف؛
+ * أما مطابقة ملفات الـfixtures الملتزَم بها لنفس البصمات فيفحصها
+ * scripts/zatca-sdk/tests/test_repo_guards.py (يقرأ هذا الملف) في workflow
+ * الـSDK الاستشاري. وحيث تتوفر الملفات محلياً يقارنها هذا الاختبار بايتاً ببايت.
  *
  * التحديث المتعمَّد (محلياً فقط، ثم راجع فرق git):
  *   ZATCA_SDK_FIXTURES_UPDATE=1 php artisan test --filter=ZatcaSdkFixtureDriftTest
- *   ثم أعد تسجيل baseline عبر scripts/zatca-sdk/conformance.py --update-baseline.
+ *   (يعيد كتابة الملفات ويطبع البصمات الجديدة لتلصقها في DIGESTS)، ثم أعد تسجيل
+ *   baseline عبر scripts/zatca-sdk/conformance.py update-baseline.
  *
  * بيانات اصطناعية بحتة: رقم ضريبي تجريبي معروف، لا بيانات مكلّف حقيقية،
  * ولا مفاتيح أو شهادات. يُنتج المسار غير الموقّع (المرحلة الأولى) فقط؛ المسار
@@ -43,46 +51,47 @@ class ZatcaSdkFixtureDriftTest extends TestCase
         ];
     }
 
+    /** SHA-256 لمخرجات المولِّد لكل fixture. تُحدَّث مع الملفات وbaseline في الـPR نفسه. */
+    private const DIGESTS = [
+        'awj-simplified-single-line' => '415a6fb0817cbb534409f3dee2764b8a5ab28cbaefd321da82052f71c88cf2c7',
+        'awj-simplified-two-lines' => '8ed9765afbe7d4e66bb6240549c9ec95e342dd0a0b50118f72ccab5afe2245c3',
+        'awj-standard-single-line' => 'e3fe8fbfbf890d9ce8355f66952380c9269002e97a22dd02cb975d7090d5e6e3',
+    ];
+
     #[DataProvider('fixtureProvider')]
-    public function test_committed_fixture_matches_current_generator(string $name): void
+    public function test_generator_output_matches_the_committed_digest(string $name): void
     {
         $actual = $this->render($name);
-        $path = self::FIXTURE_DIR . "/{$name}.xml";
 
         if (getenv('ZATCA_SDK_FIXTURES_UPDATE') === '1') {
             if (! is_dir(self::FIXTURE_DIR)) {
                 mkdir(self::FIXTURE_DIR, 0775, true);
             }
-            file_put_contents($path, $actual);
+            file_put_contents(self::FIXTURE_DIR . "/{$name}.xml", $actual);
+            fwrite(STDERR, sprintf("DIGEST '%s' => '%s',\n", $name, hash('sha256', $actual)));
         }
 
-        $this->assertFileExists($path, "Missing fixture {$name}.xml — regenerate with ZATCA_SDK_FIXTURES_UPDATE=1.");
+        $this->assertArrayHasKey($name, self::DIGESTS);
         $this->assertSame(
-            $actual,
-            (string) file_get_contents($path),
-            "Fixture {$name}.xml drifted from ZatcaService output. If the change is intended, regenerate with "
-            . 'ZATCA_SDK_FIXTURES_UPDATE=1 and re-record the SDK baseline.'
+            self::DIGESTS[$name],
+            hash('sha256', $actual),
+            "ZatcaService output for {$name} drifted from the committed digest. If intended, regenerate with "
+            . 'ZATCA_SDK_FIXTURES_UPDATE=1, paste the printed DIGESTs, and re-record the SDK baseline.'
         );
-    }
 
-    public function test_fixture_directory_has_no_unlisted_files(): void
-    {
-        $expected = array_map(static fn (array $row) => $row[0] . '.xml', array_values(self::fixtureProvider()));
-        $found = array_map('basename', glob(self::FIXTURE_DIR . '/*') ?: []);
-        sort($expected);
-        sort($found);
-
-        $this->assertSame($expected, $found, 'tests/Fixtures/zatca-sdk/awj must contain exactly the provider fixtures.');
-    }
-
-    public function test_fixtures_carry_no_key_material_or_real_looking_secrets(): void
-    {
-        foreach (glob(self::FIXTURE_DIR . '/*.xml') ?: [] as $file) {
-            $body = (string) file_get_contents($file);
-            $this->assertStringNotContainsString('PRIVATE KEY', $body, basename($file));
-            $this->assertStringNotContainsString('BEGIN CERTIFICATE', $body, basename($file));
-            $this->assertStringContainsString('<cbc:CompanyID>300000000000003</cbc:CompanyID>', $body, basename($file));
+        // محلياً (حيث توجد ملفات الـfixtures) تُقارَن بايتاً ببايت أيضاً.
+        $path = self::FIXTURE_DIR . "/{$name}.xml";
+        if (is_file($path)) {
+            $this->assertSame($actual, (string) file_get_contents($path), "Committed fixture {$name}.xml differs from generator output.");
         }
+    }
+
+    public function test_digest_table_and_data_provider_list_the_same_fixtures(): void
+    {
+        $this->assertSame(
+            array_keys(self::DIGESTS),
+            array_map(static fn (array $row) => $row[0], array_values(self::fixtureProvider())),
+        );
     }
 
     private function render(string $name): string

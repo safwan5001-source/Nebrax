@@ -34,15 +34,21 @@ Warnings are reported but are not baselined (noisy and not a conformance verdict
 ## Fixtures and the drift test
 
 `tests/Feature/ZatcaSdkFixtureDriftTest.php` regenerates the three AWJ fixtures from fixed synthetic data (no DB,
-no clock, no random UUID) through `ZatcaService::buildXml` + `attachQr` and compares **byte for byte** with the
-committed files. It runs in the normal backend suite, so a change to the XML generator cannot silently desync the
-fixtures the SDK harness validates. It covers the **unsigned (Phase‑1 shaped)** output; the signed path needs
-credentials and stays out of scope until the Phase‑2 work.
+no clock, no random UUID) through `ZatcaService::buildXml` + `attachQr` and compares the **SHA‑256** of the output
+with the `DIGESTS` table inside the test. It runs in the normal (mandatory) backend suite, so a change to the XML
+generator cannot silently desync the fixtures the SDK harness validates. It covers the **unsigned (Phase‑1 shaped)**
+output; the signed path needs credentials and stays out of scope until the Phase‑2 work.
+
+Why digests and not files: the backend job builds a fresh Laravel project and copies only a hard-coded list of
+folders (`ci.yml` / `setup.sh`), so `tests/Fixtures/zatca-sdk/**` never reaches it, and editing those lists is
+outside this slice. The committed fixture files are tied to the same digests by
+`scripts/zatca-sdk/tests/test_repo_guards.py` (it parses the PHP test), which runs in the advisory workflow's
+self-test job; where the files are present (local runs) the PHP test also compares them byte for byte.
 
 Intended change workflow (local only):
 
 ```bash
-ZATCA_SDK_FIXTURES_UPDATE=1 php artisan test --filter=ZatcaSdkFixtureDriftTest   # rewrite fixtures
+ZATCA_SDK_FIXTURES_UPDATE=1 php artisan test --filter=ZatcaSdkFixtureDriftTest   # rewrites fixtures, prints new DIGESTs -> paste into the test
 python3 -I scripts/zatca-sdk/fetch_sdk.py --pin scripts/zatca-sdk/sdk-pin.json --dest /tmp/zatca-sdk
 python3 -I scripts/zatca-sdk/conformance.py update-baseline \
     --sdk-root /tmp/zatca-sdk --pin scripts/zatca-sdk/sdk-pin.json \
