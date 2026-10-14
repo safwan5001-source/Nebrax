@@ -38,10 +38,13 @@ function respond() {
 
 const writes = () => api.mock.calls.filter((c) => (c[1] as { method?: string } | undefined)?.method) as [string, { method: string; body: Record<string, unknown> }][];
 
-function open(linkedUser?: { id: string; name: string; email: string; role: string; branch_ids?: string[]; warehouse_ids?: string[] }) {
+function open(
+  linkedUser?: { id: string; name: string; email: string; role: string; branch_ids?: string[]; warehouse_ids?: string[] },
+  actorScope?: { branches: string[]; warehouses: string[] },
+) {
   return render(
     <NextIntlClientProvider locale="en" messages={messages as never}>
-      <EmployeeDialog open onClose={() => {}} onSaved={() => {}} canManageUsers initialAllowAccess linkedUser={linkedUser as never} />
+      <EmployeeDialog open onClose={() => {}} onSaved={() => {}} canManageUsers initialAllowAccess linkedUser={linkedUser as never} actorScope={actorScope} />
     </NextIntlClientProvider>,
   );
 }
@@ -112,5 +115,29 @@ describe('EmployeeDialog access scope (shared editor)', () => {
     const [, init] = writes().find(([p]) => p === '/users/u1')!;
     expect(init.body).not.toHaveProperty('branch_ids');
     expect(init.body).not.toHaveProperty('warehouse_ids');
+  });
+});
+
+describe('EmployeeDialog access scope for a scope-limited actor', () => {
+  it('cannot pick "All": starts on "Selected", is told why, and cannot save until something is ticked', async () => {
+    open(undefined, { branches: ['b1'], warehouses: [] });
+    const all = (await screen.findByRole('radio', { name: /All branches/ })) as HTMLInputElement;
+    expect(all.disabled).toBe(true);
+    expect((screen.getByRole('radio', { name: /Selected branches only/ }) as HTMLInputElement).checked).toBe(true);
+    expect(screen.getByText(/this list shows only those, and you can only assign branches from within it/)).toBeTruthy();
+
+    await fillNewUser();
+    expect((screen.getByRole('button', { name: 'Save' }) as HTMLButtonElement).disabled).toBe(true);
+    expect(writes()).toEqual([]); // الموظف لا يُحفظ ثم يفشل الدخول
+    await userEvent.click(await screen.findByRole('checkbox', { name: 'Dammam' }));
+    expect((screen.getByRole('button', { name: 'Save' }) as HTMLButtonElement).disabled).toBe(false);
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(writes().some(([p]) => p === '/users')).toBe(true));
+    expect(writes().find(([p]) => p === '/users')![1].body.branch_ids).toEqual(['b1']);
+  });
+
+  it('an unlimited actor is unaffected', async () => {
+    open(undefined, { branches: [], warehouses: [] });
+    expect(((await screen.findByRole('radio', { name: /All branches/ })) as HTMLInputElement).disabled).toBe(false);
   });
 });

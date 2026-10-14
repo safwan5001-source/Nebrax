@@ -141,6 +141,7 @@ export function EmployeeDialog({
   linkedUser,
   initialAllowAccess = false,
   canManageUsers = false,
+  actorScope,
 }: {
   open: boolean;
   onClose: () => void;
@@ -152,6 +153,8 @@ export function EmployeeDialog({
   initialAllowAccess?: boolean;
   /** إظهار قسم الدخول أصلاً — يقتصر على مالك/مدير يديران المستخدمين والأدوار. */
   canManageUsers?: boolean;
+  /** نطاق المشاهد المخزَّن (من صفّه في قائمة المستخدمين): فراغٌ في بُعدٍ = غير مقيَّد. غيابه = غير معروف فيُترك الحسم للخادم. */
+  actorScope?: { branches: string[]; warehouses: string[] };
 }) {
   const t = useTranslations('hr');
   const tu = useTranslations('users');
@@ -174,7 +177,13 @@ export function EmployeeDialog({
 
   const [allowAccess, setAllowAccess] = useState(initialAllowAccess);
   const [loginForm, setLoginForm] = useState({ email: '', password: '', role: 'staff', sendInvitation: false });
-  const blankScope: ScopeForm = { branches: { mode: 'all', ids: [] }, warehouses: { mode: 'all', ids: [] } };
+  // فاعلٌ مقيَّد ببُعدٍ لا يملك «الكل» فيه (سقف المنح AC-UX-00A): يبدأ الإنشاء على «محدَّد» فارغاً ليختار صراحةً،
+  // وإلا حُذف المفتاح فرفضه الخادم بعد أن يكون الموظف قد حُفظ.
+  const actorRestricted = { branches: (actorScope?.branches.length ?? 0) > 0, warehouses: (actorScope?.warehouses.length ?? 0) > 0 };
+  const blankScope: ScopeForm = {
+    branches: { mode: actorRestricted.branches ? 'selected' : 'all', ids: [] },
+    warehouses: { mode: actorRestricted.warehouses ? 'selected' : 'all', ids: [] },
+  };
   const [scope, setScope] = useState<ScopeForm>(blankScope);
   // اللقطة الابتدائية لنطاق المستخدم المرتبط: التعديل يُرسِل البُعد المتغيّر وحده (لغة النطاق الموحَّدة مع شاشة المستخدمين).
   const [initialScope, setInitialScope] = useState<ScopeForm>(blankScope);
@@ -215,10 +224,9 @@ export function EmployeeDialog({
     setForm(employee ?? EMPTY_EMPLOYEE);
     setAllowAccess(!!linkedUser || initialAllowAccess);
     setLoginForm({ email: linkedUser?.email ?? '', password: '', role: linkedUser?.role ?? 'staff', sendInvitation: false });
-    const stored: ScopeForm = {
-      branches: scopeDraftFromStored(linkedUser?.branch_ids),
-      warehouses: scopeDraftFromStored(linkedUser?.warehouse_ids),
-    };
+    const stored: ScopeForm = linkedUser
+      ? { branches: scopeDraftFromStored(linkedUser.branch_ids), warehouses: scopeDraftFromStored(linkedUser.warehouse_ids) }
+      : blankScope;
     setInitialScope(stored);
     setScope(stored);
     setError(null);
@@ -285,7 +293,7 @@ export function EmployeeDialog({
   // «محدَّد» بلا اختيار يُمنع قبل أي طلب (كان سيعني «الكل» صامتاً)؛ لا نحفظ الموظف ثم يفشل الدخول.
   const accessActive = canManageUsers && allowAccess;
   const scopeIssuesNow = accessActive
-    ? scopeIssues(initialScope, scope, scopeCaps, { branches: false, warehouses: false }, Boolean(linkedUser))
+    ? scopeIssues(initialScope, scope, scopeCaps, actorRestricted, Boolean(linkedUser))
     : { branches: null, warehouses: null };
   const scopeBlocked = Boolean(scopeIssuesNow.branches || scopeIssuesNow.warehouses);
 
@@ -479,7 +487,7 @@ export function EmployeeDialog({
                   value={scope}
                   onChange={setScope}
                   caps={scopeCaps}
-                  restricted={{ branches: false, warehouses: false }}
+                  restricted={actorRestricted}
                   issues={scopeIssuesNow}
                   branchOptions={scopeLookups.branches}
                   warehouseOptions={scopeLookups.warehouses}

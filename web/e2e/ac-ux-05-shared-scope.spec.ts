@@ -127,6 +127,27 @@ test.describe('AC-UX-05 shared scope editor', () => {
     await expect(sheet.getByRole('radio', { name: /Selected branches only/ })).toBeChecked();
   });
 
+  test('a scope-limited admin adding a user from HR cannot pick All and is not left with a half-created employee', async ({ page }) => {
+    const w = world();
+    const users = [{
+      id: 'me', name: 'Safwan', email: 'owner@acme.test', role: 'admin', is_active: true,
+      employee_id: null, employee: null, branch_ids: ['b1'], warehouse_ids: [],
+    }];
+    await open(page, w, { path: '/hr', role: 'admin', users });
+    const dialog = await openAddUser(page);
+    await expect(dialog.getByRole('radio', { name: /All branches/ })).toBeDisabled();
+    await expect(dialog.getByRole('radio', { name: /Selected branches only/ })).toBeChecked();
+    await dialog.getByLabel('Name', { exact: true }).fill('Hind');
+    await dialog.locator('#login_email').fill('hind@acme.test');
+    await dialog.locator('#login_password').fill('secret-pass-1');
+    await expect(dialog.getByRole('button', { name: 'Save' })).toBeDisabled();
+    expect(w.writes).toEqual([]);
+    await dialog.getByRole('checkbox', { name: 'Dammam' }).check();
+    await dialog.getByRole('button', { name: 'Save' }).click();
+    await expect.poll(() => w.writes.some((x) => x.path === '/users')).toBe(true);
+    expect(w.writes.find((x) => x.path === '/users')!.body.branch_ids).toEqual(['b1']);
+  });
+
   test('Arabic renders the shared editor RTL with no overflow', async ({ page }, info) => {
     const w = world();
     await open(page, w, { path: '/hr', locale: 'ar' });

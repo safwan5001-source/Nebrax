@@ -98,6 +98,13 @@ export default function HrPage() {
 
   useEffect(() => { if (canManageRoles) loadTeam(); }, [canManageRoles, loadTeam]);
 
+  // نطاق المشاهد المخزَّن من صفّه في قائمة المستخدمين (لا نقطة نهاية للنطاق الفعلي): فراغ = غير مقيَّد.
+  const actorScope = useMemo(() => {
+    const meId = currentUser()?.id;
+    const own = meId ? team.find((u) => u.id === meId) : undefined;
+    return own ? { branches: own.branch_ids ?? [], warehouses: own.warehouse_ids ?? [] } : undefined;
+  }, [team]);
+
   const toLinkedUser = (u: TeamUser): LinkedUser => ({
     id: u.id, name: u.name, email: u.email, role: u.role, is_active: u.is_active,
     branch_ids: u.branch_ids, warehouse_ids: u.warehouse_ids,
@@ -337,6 +344,7 @@ export default function HrPage() {
         linkedUser={empLinkedUser}
         initialAllowAccess={empInitialAccess}
         canManageUsers={canManageRoles}
+        actorScope={actorScope}
       />
       <ShiftDialog open={shiftDialog} onClose={() => setShiftDialog(false)} onSaved={load} shift={editingShift} />
       <AttendanceDialog open={attDialog} onClose={() => setAttDialog(false)} onSaved={load} attendance={editingAtt} />
