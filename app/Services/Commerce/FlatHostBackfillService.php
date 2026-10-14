@@ -106,8 +106,9 @@ final class FlatHostBackfillService
 
             $desiredActive = $this->desiredActive($s);
 
-            $existing = StorefrontDomain::withoutGlobalScope(TenantScope::class)
-                ->where('hostname', $target)->lockForUpdate()->first();
+            // القفل في التنفيذ فقط: dry-run قراءة محضة (جلسات PostgreSQL للقراءة فقط ترفض FOR UPDATE).
+            $existingQuery = StorefrontDomain::withoutGlobalScope(TenantScope::class)->where('hostname', $target);
+            $existing = ($execute ? $existingQuery->lockForUpdate() : $existingQuery)->first();
 
             if ($existing !== null) {
                 if ($existing->tenant_id !== $s['tenant']->id

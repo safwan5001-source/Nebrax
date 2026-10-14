@@ -155,6 +155,21 @@ class FlatHostBackfillTest extends TestCase
         $this->assertSame($snap, $this->snapshot());
     }
 
+    /** @test */
+    public function dry_run_issues_no_locking_selects_even_when_a_target_already_exists(): void
+    {
+        $this->prodShape();
+        $this->backfill(true);
+
+        DB::enableQueryLog();
+        $this->backfill(false);
+        $sql = collect(DB::getQueryLog())->pluck('query')->implode("\n");
+        DB::disableQueryLog();
+
+        $this->assertStringNotContainsStringIgnoringCase('for update', $sql);
+        $this->assertSame(4, DB::table('storefront_domains')->count());
+    }
+
     // ── الخدمة: التنفيذ ───────────────────────────────────────────────────
 
     /** @test */
