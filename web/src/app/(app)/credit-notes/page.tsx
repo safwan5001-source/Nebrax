@@ -44,6 +44,7 @@ function isEmptyFilter(filter: ActiveFilter): boolean {
 }
 
 export default function CreditNotesPage() {
+  const tl = useTranslations('listUi');
   const t = useTranslations('creditNotes');
   const locale = useLocale();
   const router = useRouter();
@@ -115,10 +116,10 @@ export default function CreditNotesPage() {
       emptyText: t('empty'),
       options: partnerOptions,
     },
-    { key: 'date_from', label: `${t('date')} — من`, kind: 'date' },
-    { key: 'date_to', label: `${t('date')} — إلى`, kind: 'date' },
-    { key: 'amount_min', label: `${t('total')} — الحد الأدنى`, kind: 'money' },
-    { key: 'amount_max', label: `${t('total')} — الحد الأعلى`, kind: 'money' },
+    { key: 'date_from', label: tl('fieldFrom', { field: t('date') }), kind: 'date' },
+    { key: 'date_to', label: tl('fieldTo', { field: t('date') }), kind: 'date' },
+    { key: 'amount_min', label: tl('fieldMin', { field: t('total') }), kind: 'money' },
+    { key: 'amount_max', label: tl('fieldMax', { field: t('total') }), kind: 'money' },
   ], [partnerOptions, t]);
 
   const labelledFilters = useMemo(() => explorer.filters.map((filter) => ({
@@ -242,28 +243,28 @@ export default function CreditNotesPage() {
       />
 
       <div className="flex items-center justify-end gap-2">
-        <span className="text-xs text-muted">ترتيب حسب</span>
-        <Select value={explorer.sort ?? '-note_date'} onChange={(event) => setExplorer((current) => ({ ...current, page: 1, sort: event.target.value }))} className="h-9 min-w-44 bg-surface text-sm" aria-label="ترتيب الإشعارات الدائنة">
-          <option value="-note_date">الأحدث أولًا</option>
-          <option value="note_date">الأقدم أولًا</option>
-          <option value="number">الرقم</option>
-          <option value="partner">العميل</option>
-          <option value="-total">الإجمالي: الأعلى</option>
-          <option value="total">الإجمالي: الأقل</option>
-          <option value="status">الحالة</option>
+        <span className="text-xs text-muted">{tl('sortBy')}</span>
+        <Select value={explorer.sort ?? '-note_date'} onChange={(event) => setExplorer((current) => ({ ...current, page: 1, sort: event.target.value }))} className="h-9 min-w-44 bg-surface text-sm" aria-label={tl('sortCreditNotes')}>
+          <option value="-note_date">{tl('newestFirst')}</option>
+          <option value="note_date">{tl('oldestFirst')}</option>
+          <option value="number">{tl('number')}</option>
+          <option value="partner">{tl('customer')}</option>
+          <option value="-total">{tl('totalHighest')}</option>
+          <option value="total">{tl('totalLowest')}</option>
+          <option value="status">{tl('status')}</option>
         </Select>
       </div>
 
       <DataTable columns={columns} data={pageData} loading={loading} emptyLabel={t('empty')} exportName="credit-notes" showToolbar={false} />
 
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-xs text-muted">{sorted.length.toLocaleString(displayLocale(locale))} · صفحة {page.toLocaleString(displayLocale(locale))} من {totalPages.toLocaleString(displayLocale(locale))}</p>
+        <p className="text-xs text-muted">{tl('pageSummary', { count: sorted.length.toLocaleString(displayLocale(locale)), page: page.toLocaleString(displayLocale(locale)), pages: totalPages.toLocaleString(displayLocale(locale)) })}</p>
         <div className="flex items-center gap-2">
-          <Select value={String(perPage)} onChange={(event) => setExplorer((current) => ({ ...current, page: 1, perPage: Number(event.target.value) }))} className="h-9 w-24 bg-surface text-sm" aria-label="عدد النتائج في الصفحة">
+          <Select value={String(perPage)} onChange={(event) => setExplorer((current) => ({ ...current, page: 1, perPage: Number(event.target.value) }))} className="h-9 w-24 bg-surface text-sm" aria-label={tl('perPage')}>
             <option value="25">25</option><option value="50">50</option><option value="100">100</option>
           </Select>
-          <Button variant="outline" size="icon" aria-label="الصفحة السابقة" disabled={loading || page <= 1} onClick={() => setExplorer((current) => ({ ...current, page: Math.max(1, page - 1) }))}><ChevronRight className="h-4 w-4" strokeWidth={1.7} /></Button>
-          <Button variant="outline" size="icon" aria-label="الصفحة التالية" disabled={loading || page >= totalPages} onClick={() => setExplorer((current) => ({ ...current, page: Math.min(totalPages, page + 1) }))}><ChevronLeft className="h-4 w-4" strokeWidth={1.7} /></Button>
+          <Button variant="outline" size="icon" aria-label={tl('previousPage')} disabled={loading || page <= 1} onClick={() => setExplorer((current) => ({ ...current, page: Math.max(1, page - 1) }))}><ChevronRight className="h-4 w-4 ltr:rotate-180" strokeWidth={1.7} /></Button>
+          <Button variant="outline" size="icon" aria-label={tl('nextPage')} disabled={loading || page >= totalPages} onClick={() => setExplorer((current) => ({ ...current, page: Math.min(totalPages, page + 1) }))}><ChevronLeft className="h-4 w-4 ltr:rotate-180" strokeWidth={1.7} /></Button>
         </div>
       </div>
 
