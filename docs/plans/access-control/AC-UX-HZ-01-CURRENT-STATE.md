@@ -20,8 +20,8 @@ A slice is marked **Merged** only after tests + exact-head CI + merge. "Post-mer
 |---|---|---|---|
 | AC-UX-00 baseline & UX contract | **Merged** | #1460 | `58582ce85cfe541bd41df727cce79d2289acad2b` |
 | **AC-UX-00A User administration grant boundaries** (backend, owner-mandated) | **Merged** | #1462 | `f1b7031fae615556149b8e0653247d6f73325827` |
-| AC-UX-01 Users workspace | In review | (this PR) | — |
-| AC-UX-02 User editor & access scope | Not started | — | — |
+| AC-UX-01 Users workspace | **Merged** | #1465 | `cc30b53d63c61ef1ac97d5280b562d67f1036ebb` |
+| AC-UX-02 User editor & access scope | In review | (this PR) | — |
 | AC-UX-03 Roles & Permissions workspace (03A shell/catalogue · 03B editing/risk) | Not started | — | — |
 | AC-UX-04 Role creation & safe cloning | Not started | — | — |
 | AC-UX-05 Branch & warehouse scope UX | Not started | — | — |
