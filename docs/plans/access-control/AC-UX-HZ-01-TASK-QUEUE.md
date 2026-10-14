@@ -19,7 +19,7 @@ Legend: ☐ not started · ◐ in progress / in review · ☑ merged (with Merge
 | 08 | Per-user access summary (source assignments only) | 02, 05 | ☑ | #1481 | `f1bcc67` | `23c1dd3` |
 | 09 | Keyboard / RTL / responsive (1440·1280·768·390) / dark+Ink / state QA with existing Playwright; add e2e for Users & Roles | 01–08 | ☑ | #1484 | `23c1dd3` | `e972e5b` |
 | 10 | Closure: backend regression matrix, frontend verification, final report | 09 | ☑ | #1486 | `e972e5b` | `757a7a3` |
-| 11 | **O-1 follow-up (owner-approved 2026-10-14):** additive `branch_ids` / `warehouse_ids` on `GET /me` (own scope only; empty = unrestricted) + frontend consumes `/me` for the actor scope (removes inference from `GET /users` and the `canReadActorScope` escape hatch). No migration, no authorization change. | 10 | ◐ | | `f509929` | |
+| 11 | **O-1 follow-up (owner-approved 2026-10-14):** additive `branch_ids` / `warehouse_ids` on `GET /me` (own scope only; empty = unrestricted) + frontend consumes `/me` for the actor scope (removes inference from `GET /users` and the `canReadActorScope` escape hatch). No migration, no authorization change. | 10 | ☑ | #1492 | `f509929` | `5ef2bb9` |
 
 ## Open items carried by the queue
 
