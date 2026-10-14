@@ -34,7 +34,7 @@ Same `tenant_id`, `storefront_id` (hence the same sales channel) as the legacy r
 | `app/Services/Commerce/FlatHostBackfillService.php` | new — logic above |
 | `app/Services/Commerce/FlatHostBackfillException.php` | new — typed fail-closed reasons |
 | `app/Console/Commands/StorefrontFlatHostBackfillCommand.php` | new — Artisan command |
-| `tests/Feature/FlatHostBackfillTest.php` | new — 22 tests |
+| `tests/Feature/FlatHostBackfillTest.php` | new — 23 tests |
 | `docs/reports/STOREFRONT-FLAT-HOST-BACKFILL-REPORT.md` | new — this report |
 
 No migration, no schema change, no API/route change, no change to resolution or financial code.
@@ -43,7 +43,7 @@ No migration, no schema change, no API/route change, no change to resolution or 
 
 | Run | Result |
 |---|---|
-| `php artisan test --filter=FlatHostBackfillTest` (local SQLite) | **22 passed** |
+| `php artisan test --filter=FlatHostBackfillTest` (local SQLite) | **23 passed** |
 | Related: `FlatHostBackfillTest\|FlatStorefrontHostTest\|MultiStore\|StorefrontProvisioning\|StorefrontDomain\|StorefrontGateway\|ApplicationCatalog` | **166 passed, 1 skipped, 0 failed** |
 | Mutation check | flipping `is_primary` to `true` made 8 tests fail (partial unique index + tests bite); reverted |
 | PostgreSQL | not available locally — **runs in CI's pgsql leg** (same `RefreshDatabase` tests; this is where `FOR UPDATE` and the partial index are really exercised) |

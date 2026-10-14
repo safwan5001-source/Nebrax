@@ -99,7 +99,12 @@ final class FlatHostBackfillService
         $targets = [];
 
         foreach ($sources as $host => $s) {
-            $target = ManagedStorefrontHostname::forAdditionalStoreSlug($s['storefront']->slug, $s['tenant']->slug, $base);
+            try {
+                $target = ManagedStorefrontHostname::forAdditionalStoreSlug($s['storefront']->slug, $s['tenant']->slug, $base);
+            } catch (StorefrontBaseDomainMisconfiguredException $e) {
+                // مثلاً شريحة مدمجة > 63 حرفاً: فشل متحكَّم به (كما يصنّفه المخطِّط invalid_target)
+                throw new FlatHostBackfillException('invalid_target', "المضيف {$host}: تعذّر توليد هدف صالح — ".$e->getMessage());
+            }
             if (isset($targets[$target])) {
                 throw new FlatHostBackfillException('duplicate_target', "هدفان قديمان يشتركان في {$target}.");
             }

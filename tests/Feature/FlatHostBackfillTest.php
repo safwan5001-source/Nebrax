@@ -399,6 +399,24 @@ class FlatHostBackfillTest extends TestCase
     }
 
     /** @test */
+    public function a_target_label_over_63_chars_is_a_controlled_failure_not_an_unhandled_exception(): void
+    {
+        $t = $this->tenant(str_repeat('t', 40));
+        $this->legacy($t, str_repeat('s', 30)); // كل شريحة صالحة بمفردها، والمدموجة 71 حرفاً
+        $host = str_repeat('s', 30).'.'.str_repeat('t', 40).'.store.awjdev.xyz';
+        $count = DB::table('storefront_domains')->count();
+
+        try {
+            $this->backfill(true, [$host]);
+            $this->fail('expected controlled failure');
+        } catch (FlatHostBackfillException $e) {
+            $this->assertSame('invalid_target', $e->reason);
+        }
+        $this->artisan('storefront:flat-host-backfill', ['--host' => [$host], '--execute' => true])->assertFailed();
+        $this->assertSame($count, DB::table('storefront_domains')->count());
+    }
+
+    /** @test */
     public function first_store_host_and_wrong_shape_rows_are_refused(): void
     {
         $d = $this->tenant('dominah');
