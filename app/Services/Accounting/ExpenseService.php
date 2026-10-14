@@ -17,7 +17,7 @@ use RuntimeException;
  *
  *  مصروف إيجار 1000 + 15% ضريبة، مدفوع نقداً:
  *    مدين  5130 الإيجار            100000
- *    مدين  1150 ضريبة المدخلات      15000
+ *    مدين  `tax_input` ضريبة المدخلات (افتراضياً 1150)  15000
  *    دائن  1110 الصندوق            115000
  *  (طريقة الدفع تحدّد الحساب الدائن: نقد 1110 / بنك 1120 / آجل 2110 الموردون)
  *
@@ -29,9 +29,15 @@ class ExpenseService
     private const ACC_CASH      = '1110';
     private const ACC_BANK      = '1120';
     private const ACC_PAYABLE   = '2110';
-    private const ACC_INPUT_VAT = '1150';
 
-    public function __construct(protected LedgerService $ledger) {}
+    /**
+     * REM-06 / ACC-02: ضريبة المدخلات عبر الدور الدلالي `tax_input` (كما في `PurchaseService` منذ ACC-4)،
+     * لا بالكود 1150. التعيين المفقود أو الفاسد (معطَّل/تجميعي) فشلٌ مغلق قبل أي قيد — لا رجوع صامت إلى 1150.
+     */
+    public function __construct(
+        protected LedgerService $ledger,
+        protected AccountRoleResolver $accountRoles,
+    ) {}
 
     /**
      * @param  array  $data  ['account_id'=>uuid, 'category_id'=>?uuid, 'vendor_name'=>?string,
@@ -150,7 +156,7 @@ class ExpenseService
             // مدين حساب المصروف (موسوماً بمركز التكلفة) + مدين ضريبة المدخلات / دائن نقد أو بنك أو موردون
             $lines = [['account_id' => $expense->account_id, 'debit' => $amount, 'cost_center_id' => $expense->cost_center_id]];
             if ($tax > 0) {
-                $lines[] = ['account_id' => $this->accountId(self::ACC_INPUT_VAT), 'debit' => $tax];
+                $lines[] = ['account_id' => $this->accountRoles->resolve('tax_input')->id, 'debit' => $tax];
             }
 
             $creditLine = ['account_id' => $this->accountId($this->creditCode($expense->payment_method)), 'credit' => $total];
