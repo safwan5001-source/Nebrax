@@ -96,8 +96,9 @@ class UserController extends ApiController
      * سلطة الفاعل نفسه.
      *
      *  1. **الدور:** يُمنح دورٌ جديد فقط إن استطاع الفاعل منحه (`canGrantRole`).
-     *  2. **الهدف:** مستخدمٌ آخر دوره الحالي فوق سقف الفاعل لا يُعدَّل ولا يُحذف —
-     *     وإلا كان إعادة تعيين كلمة مرور `admin` ترقيةً بالمقايضة.
+     *  2. **الهدف:** مستخدمٌ آخر دوره الحالي فوق سقف الفاعل، أو نطاقه أوسع من نطاق
+     *     فاعلٍ مقيَّد، لا يُعدَّل ولا يُحذف — وإلا كان إعادة تعيين كلمة مرور `admin`
+     *     (أو مستخدمٍ في فرع آخر) ترقيةً بالمقايضة.
      *  3. **النطاق:** فاعلٌ مقيَّد بفروع/مستودعات لا يُسند إلا ما هو ضمن نطاقه ولا
      *     يمسح التقييد (`[]` تعني «غير مقيَّد») ولا يُنشئ مستخدماً بلا نطاق.
      *
@@ -108,8 +109,21 @@ class UserController extends ApiController
         /** @var User $actor */
         $actor = $request->user();
 
-        if ($target && $target->id !== $actor->id && ! $this->canGrantRole($actor, $target->role)) {
-            abort(403, 'لا يمكنك إدارة مستخدمٍ دوره يتجاوز صلاحياتك.');
+        if ($target && $target->id !== $actor->id) {
+            if (! $this->canGrantRole($actor, $target->role)) {
+                abort(403, 'لا يمكنك إدارة مستخدمٍ دوره يتجاوز صلاحياتك.');
+            }
+
+            // فاعلٌ مقيَّد لا يمسّ مستخدماً نطاقه أوسع من نطاقه (أو غير مقيَّد): تغيير
+            // كلمة مرور هذا المستخدم أو حالته استيلاءٌ على وصولٍ خارج نطاق الفاعل.
+            foreach ([
+                [$actor->allowedBranchIds(), $target->allowedBranchIds()],
+                [$actor->allowedWarehouseIds(), $target->allowedWarehouseIds()],
+            ] as [$mine, $theirs]) {
+                if ($mine !== null && ($theirs === null || array_diff($theirs, $mine) !== [])) {
+                    abort(403, 'لا يمكنك إدارة مستخدمٍ نطاق وصوله أوسع من نطاقك.');
+                }
+            }
         }
 
         $newRole = $data['role'] ?? null;

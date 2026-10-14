@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Support\Rbac;
 use App\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
 
 /**
@@ -151,13 +152,14 @@ class UserGrantBoundaryTest extends TestCase
         $this->withToken($token)->putJson("/api/users/{$staff}", ['branch_ids' => [$b]])->assertOk();
         $this->assertSame([$b], $this->branchesOf($staff));
 
-        // تضييق نفسه ضمن نطاقه مشروع.
-        $this->withToken($token)->putJson("/api/users/{$me}", ['branch_ids' => [$a]])->assertOk();
-        $this->assertSame([$a], $this->branchesOf($me));
-
         // غياب المفتاح = بلا تغيير (العقد القائم).
         $this->withToken($token)->putJson("/api/users/{$staff}", ['name' => 'اسم جديد'])->assertOk();
         $this->assertSame([$b], $this->branchesOf($staff));
+
+        // تضييق نفسه ضمن نطاقه مشروع — وبعده يخرج `staff` (نطاقه [b]) عن نطاقه فلا يُدار.
+        $this->withToken($token)->putJson("/api/users/{$me}", ['branch_ids' => [$a]])->assertOk();
+        $this->assertSame([$a], $this->branchesOf($me));
+        $this->withToken($token)->putJson("/api/users/{$staff}", ['name' => 'مرفوض'])->assertForbidden();
     }
 
     /** @test */
@@ -247,6 +249,51 @@ class UserGrantBoundaryTest extends TestCase
         // ومستخدمٌ أدنى منه يديره بلا مشكلة.
         [$staff] = $this->userWith($auth, 'staff', 's@acme.test');
         $this->withToken($token)->putJson("/api/users/{$staff}", ['name' => 'أدنى'])->assertOk();
+    }
+
+    /** @test */
+    public function a_restricted_actor_cannot_take_over_a_user_with_broader_scope(): void
+    {
+        [$auth, $a, $b] = $this->tenant();
+        $role = $this->role($auth, self::MANAGER_PERMS);
+        [, $token] = $this->userWith($auth, $role, 'm@acme.test', ['branch_ids' => [$a]]);
+
+        // مستخدمون أدنى دوراً لكن نطاقهم أوسع: غير مقيَّد، فرع آخر، فرعان.
+        [$open] = $this->userWith($auth, 'staff', 'open@acme.test');
+        [$other] = $this->userWith($auth, 'staff', 'other@acme.test', ['branch_ids' => [$b]]);
+        [$both] = $this->userWith($auth, 'staff', 'both@acme.test', ['branch_ids' => [$a, $b]]);
+
+        foreach ([$open, $other, $both] as $victim) {
+            $this->withToken($token)->putJson("/api/users/{$victim}", ['password' => 'hijacked-pass'])->assertForbidden();
+            $this->withToken($token)->putJson("/api/users/{$victim}", ['is_active' => false])->assertForbidden();
+            $this->withToken($token)->putJson("/api/users/{$victim}", ['name' => 'x'])->assertForbidden();
+            $this->withToken($token)->deleteJson("/api/users/{$victim}")->assertForbidden();
+        }
+        foreach (['open@acme.test', 'other@acme.test', 'both@acme.test'] as $email) {
+            $this->assertTrue(Hash::check('password123', User::where('email', $email)->value('password')), $email);
+            $this->assertTrue((bool) User::where('email', $email)->value('is_active'), $email);
+            $this->assertNotNull(User::where('email', $email)->first(), $email);
+        }
+
+        // المستخدم ضمن نطاقه يُدار (كلمة المرور والحالة).
+        [$mine] = $this->userWith($auth, 'staff', 'mine@acme.test', ['branch_ids' => [$a]]);
+        $this->withToken($token)->putJson("/api/users/{$mine}", ['password' => 'new-pass-123'])->assertOk();
+        $this->assertTrue(Hash::check('new-pass-123', User::where('email', 'mine@acme.test')->value('password')));
+        $this->withToken($token)->putJson("/api/users/{$mine}", ['is_active' => false])->assertOk();
+    }
+
+    /** @test */
+    public function a_warehouse_restricted_actor_cannot_manage_a_user_with_broader_warehouse_scope(): void
+    {
+        [$auth] = $this->tenant();
+        $mine = $this->withToken($auth['token'])->getJson('/api/warehouses')['data'][0]['id'];
+        $role = $this->role($auth, self::MANAGER_PERMS);
+        [, $token] = $this->userWith($auth, $role, 'm@acme.test', ['warehouse_ids' => [$mine]]);
+        [$open] = $this->userWith($auth, 'staff', 'open@acme.test');
+        [$inside] = $this->userWith($auth, 'staff', 'inside@acme.test', ['warehouse_ids' => [$mine]]);
+
+        $this->withToken($token)->putJson("/api/users/{$open}", ['password' => 'hijacked-pass'])->assertForbidden();
+        $this->withToken($token)->putJson("/api/users/{$inside}", ['password' => 'new-pass-123'])->assertOk();
     }
 
     // ═══════════════════════════════════════════════════════════
