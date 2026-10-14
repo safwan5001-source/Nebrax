@@ -112,8 +112,8 @@ A second surface had the same defect: `invoice-form.tsx` always offered "create 
 | Web vitest: `components/layout`, `components/invoices`, `lib` | 113 files, **858 passed** |
 | `npm run build` (the Web CI gate) | ✅ (123 s) |
 | `tsc --noEmit` | None of its 48 errors are in this diff; all are in unrelated test files that the build does not type-check |
-| Full PHP suite, pgsql, 4 workers | _see §CI_ |
-| Full PHP suite, sqlite | _see §CI_ |
+| Full PHP suite, pgsql, 4 workers (`PGOPTIONS=-c lock_timeout=60s`) | 7023 tests in 350 s. 24 errors + 3 failures, a set **identical** to the `origin/main` baseline (26 Fuel tests need `bcmath`, absent locally; 1 `StorefrontMediaApiTest` hits a PHP 8.3 PDO limit; CI uses 8.4). **No navigation, application or delivery-note test fails** |
+| Full PHP suite, sqlite | 6898 passed, 99 skipped, 26 failed. All 26 are the `bcmath` Fuel tests (local environment gap, green in CI) |
 
 ## Security / tenant isolation / backward compatibility
 - **Entitlements and RBAC:** no rule changed; nothing is granted. Visibility can only go from `shown` to `hidden`, and only where the route already returns 403. Every route guard is unchanged.
