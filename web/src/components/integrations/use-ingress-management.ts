@@ -5,7 +5,7 @@ import { currentUser } from '@/lib/auth';
 import { checkStoreId } from '@/lib/ingress-create';
 import { clearUnconfirmedCreate, createGuardScope, findUnconfirmedCreate, listUnconfirmedCreates, recordUnconfirmedCreate } from '@/lib/ingress-create-guard';
 import { classifyIngressFailure, type IngressErrorKey } from '@/lib/ingress-management';
-import { eligibleOperators, operatorName, type OperatorEntry } from '@/lib/ingress-operators';
+import { operatorChoices, operatorName, type OperatorEntry } from '@/lib/ingress-operators';
 import { IngressRequestInvalid, IngressUnavailableInDemo, createIngressPoint, disableIngress, reassignIngressOperator, rotateIngressSecret } from '@/lib/ingress-operations';
 import type { IngressPoint } from '@/lib/signed-ingress';
 import type { OperatorDirectoryState, SignedIngressState } from './use-signed-ingress';
@@ -43,8 +43,10 @@ export interface IngressManagement {
   /** دليل المشغّلين (reassign + users.view فقط) وإعادة قراءته. */
   operators: OperatorDirectoryState;
   retryOperators: () => void;
-  /** المرشّحون المؤهلون لنقطة (نشطون، يشمل نطاقهم فرعها، دون المشغّل الحالي) — فارغة إن لم يجهز الدليل. */
+  /** المرشّحون القابلون للاختيار لنقطة (مؤهلون، دون المشغّل الحالي، **واسمهم غير ملتبس**) — فارغة إن لم يجهز الدليل. */
   eligibleFor: (point: IngressPoint) => OperatorEntry[];
+  /** أسماء المؤهلين الذين استُبعدوا لتطابق الاسم (للتنبيه فقط؛ لا معرّفات). */
+  ambiguousFor: (point: IngressPoint) => string[];
   /** اسم المشغّل الحالي لنقطة، أو `null` إن لم يُعرف. */
   currentOperatorName: (point: IngressPoint) => string | null;
   /** نقطة حوار إعادة الإسناد المفتوح، وآخر رفض صريح (يبقى الحوار مفتوحاً للتصحيح). */
@@ -218,7 +220,11 @@ export function useIngressManagement(
   );
 
   const eligibleFor = useCallback(
-    (point: IngressPoint) => (operators.status === 'ready' ? eligibleOperators(operators.entries, point, point.operatedBy) : []),
+    (point: IngressPoint) => (operators.status === 'ready' ? operatorChoices(operators.entries, point, point.operatedBy).selectable : []),
+    [operators],
+  );
+  const ambiguousFor = useCallback(
+    (point: IngressPoint) => (operators.status === 'ready' ? operatorChoices(operators.entries, point, point.operatedBy).ambiguousNames : []),
     [operators],
   );
   const currentOperatorName = useCallback(
@@ -242,9 +248,10 @@ export function useIngressManagement(
   const confirmReassign = useCallback((userId: string) => {
     if (lock.current || reassignPoint === null) return;
     const point = reassignPoint;
-    // المرشّح يجب أن يكون من المؤهلين المعروضين (الدليل جاهز): معرّف خارجهم لا يُرسل أبداً. الخادم يبقى المرجع النهائي.
+    // المرشّح يجب أن يكون من القابلين للاختيار المعروضين (الدليل جاهز): معرّف خارجهم — غير مؤهل أو **مستبعد لتطابق الاسم** — لا يُرسل أبداً
+    // مهما كان مصدر الاستدعاء. الخادم يبقى المرجع النهائي.
     const current = operatorsRef.current;
-    const candidate = current.status === 'ready' ? eligibleOperators(current.entries, point, point.operatedBy).find((entry) => entry.id === userId) : undefined;
+    const candidate = current.status === 'ready' ? operatorChoices(current.entries, point, point.operatedBy).selectable.find((entry) => entry.id === userId) : undefined;
     if (candidate === undefined) return;
     lock.current = true;
     setBusy(true);
@@ -401,7 +408,7 @@ export function useIngressManagement(
   const dismissNotice = useCallback(() => setNotice(null), []);
 
   return {
-    dialog, busy, reveal, notice, operators, retryOperators, eligibleFor, currentOperatorName, reassignPoint, reassignError, openReassign, cancelReassign, confirmReassign, blockedStoreIds, isCreateBlocked, createOpen, createError, openCreate, cancelCreate, confirmCreate, observe,
+    dialog, busy, reveal, notice, operators, retryOperators, eligibleFor, ambiguousFor, currentOperatorName, reassignPoint, reassignError, openReassign, cancelReassign, confirmReassign, blockedStoreIds, isCreateBlocked, createOpen, createError, openCreate, cancelCreate, confirmCreate, observe,
     openRotate, openDisable, cancel, confirmRotate, confirmDisable, closeReveal, dismissNotice,
   };
 }

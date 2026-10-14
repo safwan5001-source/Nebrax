@@ -59,22 +59,43 @@ export function eligibleOperators(entries: OperatorEntry[], point: { branchId: s
 }
 
 /**
- * تسميات القائمة: الاسم وحده. إن تكرر الاسم نفسه بين مرشّحين يُلحق رقم ترتيب `(1)` `(2)` كي لا يُلتبس الاختيار — لا بريد ولا
- * معرّف. (الأسماء المكررة نادرة؛ الاختيار الخاطئ بين متطابقي الاسم خطر معلن في تقرير 5d.)
+ * مفتاح مقارنة الأسماء لكشف التطابق: NFKC ثم إزالة العلامات المركّبة (التشكيل العربي والحركات اللاتينية) والتطويل، وطيّ المسافات،
+ * وحالة أحرف موحّدة. **متحفّظ عمداً**: ما يبدو للعين اسماً واحداً (`Sam` / `sam ` / `Sám`) يُعدّ تطابقاً، لأن الخطأ المقبول هنا هو
+ * الاستبعاد الزائد لا الخلط بين شخصين.
  */
-export function operatorLabels(candidates: OperatorEntry[]): Map<string, string> {
+export function nameKey(name: string): string {
+  return name.normalize('NFKD').replace(/\p{M}/gu, '').replace(/\u0640/g, '').normalize('NFKC').replace(/\s+/g, ' ').trim().toLocaleLowerCase();
+}
+
+export interface OperatorChoices {
+  /** المرشّحون الذين اسمهم فريد بين المؤهلين (ومشغّل النقطة الحالي): وحدهم يُعرضون ويُقبل إرسالهم. */
+  selectable: OperatorEntry[];
+  /** الأسماء المعروضة (مرة واحدة لكل اسم) التي تعذّر تمييز أصحابها؛ مرتّبة. فارغة = لا التباس. لا بريد ولا معرّف ولا أي بيان تمييزي. */
+  ambiguousNames: string[];
+}
+
+/**
+ * يقسّم المؤهلين إلى «قابل للاختيار» و«ملتبس». **لا يُستعمل الترقيم أو أي بيان آخر لتمييز شخصين متطابقي الاسم**: الواجهة لا تملك
+ * وسيلة آمنة لعرض تمييز دون بريد أو معرّف، فيُستبعد **كل** من يتشارك اسمه مع مؤهل آخر، ويُرجع إلى المسؤول. ويُعامل اسم المشغّل
+ * الحالي كأحد الأسماء المقارَنة أيضاً (وإلا ظهر ملخّص «من سامي إلى سامي»)، دون أن يصير هو نفسه مرشّحاً.
+ * القاعدة تضيّق الاختيار فقط ولا تغيّر أهلية الخادم؛ الخادم يبقى المرجع.
+ */
+export function operatorChoices(entries: OperatorEntry[], point: { branchId: string | null }, currentOperatorId: string | null | undefined): OperatorChoices {
+  const candidates = eligibleOperators(entries, point, currentOperatorId);
   const counts = new Map<string, number>();
-  for (const candidate of candidates) counts.set(candidate.name, (counts.get(candidate.name) ?? 0) + 1);
-  const index = new Map<string, number>();
-  const labels = new Map<string, string>();
+  for (const candidate of candidates) counts.set(nameKey(candidate.name), (counts.get(nameKey(candidate.name)) ?? 0) + 1);
+  const current = currentOperatorId ? entries.find((entry) => entry.id === currentOperatorId) : undefined;
+  if (current) counts.set(nameKey(current.name), (counts.get(nameKey(current.name)) ?? 0) + 1);
+
+  const selectable: OperatorEntry[] = [];
+  const ambiguous = new Map<string, string>();
   for (const candidate of candidates) {
-    if ((counts.get(candidate.name) ?? 0) > 1) {
-      const next = (index.get(candidate.name) ?? 0) + 1;
-      index.set(candidate.name, next);
-      labels.set(candidate.id, `${candidate.name} (${next})`);
+    const key = nameKey(candidate.name);
+    if ((counts.get(key) ?? 0) > 1) {
+      if (!ambiguous.has(key)) ambiguous.set(key, candidate.name);
     } else {
-      labels.set(candidate.id, candidate.name);
+      selectable.push(candidate);
     }
   }
-  return labels;
+  return { selectable, ambiguousNames: [...ambiguous.values()].sort((a, b) => a.localeCompare(b)) };
 }

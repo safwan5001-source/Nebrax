@@ -137,6 +137,23 @@ for (const [locale, dir] of [['ar', 'rtl'], ['en', 'ltr']] as const) {
         await shot(page, `reassign-done-${tag}`);
       });
 
+      test('same-name eligible operators are excluded together with a warning; the unique name stays selectable; no email or id is shown', async ({ page }, info) => {
+        const sam = locale === 'en' ? 'Sam Lee' : 'سامي العلي';
+        const w = world({ users: [...usersFor(locale).filter((u) => (u as { id: string }).id !== 'u-bader'), person('u-s1', sam), person('u-s2', sam)] });
+        await open(page, { locale, theme }, w);
+        const dialog = await openDialog(page, CURRENT[locale]);
+        const labels = await dialog.getByTestId('reassign-select').locator('option').allTextContents();
+        expect(labels.slice(1)).toEqual([locale === 'en' ? 'Amal Otaibi' : 'أمل العتيبي']);
+        const warning = dialog.getByTestId('reassign-ambiguous');
+        await expect(warning).toBeVisible();
+        await expect(warning).toContainText(sam);
+        const html = await page.content();
+        expect(html).not.toContain(EMAIL_DOMAIN);
+        expect(html).not.toMatch(/u-s1|u-s2/);
+        expect(writes(w)).toEqual([]);
+        await shot(page, `reassign-ambiguous-${locale}-${theme}-${info.project.name}`);
+      });
+
       test('422 keeps the dialog with a safe message; raw server text never appears', async ({ page }, info) => {
         const w = world({ reassign: '422', users: usersFor(locale) });
         await open(page, { locale, theme }, w);

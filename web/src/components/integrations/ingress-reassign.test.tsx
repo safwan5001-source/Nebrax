@@ -82,6 +82,12 @@ async function mount(locale: 'ar' | 'en' = 'en') {
   return TEST_MESSAGES[locale].integrationCenter.ingressManagement;
 }
 
+/** يفتح الحوار دون انتظار القائمة المنسدلة (حين لا قائمة أصلاً). */
+async function openDialog0(m: Awaited<ReturnType<typeof mount>>) {
+  await waitFor(() => expect(screen.getAllByTestId('signed-ingress-operator')[0].textContent).not.toMatch(/…|Loading|جارٍ/));
+  fireEvent.click(reassignButton());
+  return dialogOf(m.reassign.title);
+}
 const reassignButton = (index = 0) => screen.getAllByTestId('ingress-reassign')[index];
 const dialogOf = (name: string | RegExp) => screen.getByRole('dialog', { name });
 const options = () => within(screen.getByTestId('reassign-select')).getAllByRole('option').map((o) => o.textContent);
@@ -411,13 +417,54 @@ describe('operator directory states are safe', () => {
     expect(screen.getByTestId('reassign-empty').textContent).toBe(m.reassign.empty);
   });
 
-  it('duplicate names are told apart by order, never by email', async () => {
+  it.each(TEST_LOCALES)('same-name eligible operators are excluded together with a warning, never numbered or told apart by email (%s)', async (locale) => {
+    asOwner();
+    users = [person('u-self', 'Olga Current'), person('u-s1', 'Sam'), person('u-s2', 'Sam'), person('u-amal', 'Amal Free')];
+    const m = await mount(locale);
+    await openDialog(m);
+    // الاسمان المتطابقان غائبان معاً؛ الاسم الفريد باقٍ؛ لا ترقيم.
+    expect(options()).toEqual([m.reassign.select.placeholder, 'Amal Free']);
+    expect(document.body.textContent).not.toMatch(/Sam \(\d\)/);
+    const warning = screen.getByTestId('reassign-ambiguous');
+    expect(warning.textContent).toBe(m.reassign.ambiguous.replace('{names}', 'Sam'));
+    expect(warning.textContent).toContain('Sam');
+    expect(document.body.innerHTML).not.toContain(EMAIL_DOMAIN);
+    expect(document.body.innerHTML).not.toMatch(/u-s1|u-s2/);
+    // الاسم الفريد يُرسل عادياً.
+    choose('u-amal');
+    fireEvent.click(within(dialogOf(m.reassign.title)).getByRole('button', { name: m.reassign.confirm }));
+    await waitFor(() => expect(posts()).toHaveLength(1));
+    expect(posts()[0][1]).toEqual({ method: 'POST', body: { user_id: 'u-amal' } });
+  });
+
+  it('when every eligible operator shares a name there is no select, only the warning (not the misleading "no operator" text), and confirm stays disabled', async () => {
     asOwner();
     users = [person('u-self', 'Olga Current'), person('u-s1', 'Sam'), person('u-s2', 'Sam')];
     const m = await mount();
+    const dialog = await openDialog0(m);
+    expect(screen.getByTestId('reassign-ambiguous')).toBeTruthy();
+    expect(screen.queryByTestId('reassign-select')).toBeNull();
+    expect(screen.queryByTestId('reassign-empty')).toBeNull();
+    expect((within(dialog).getByRole('button', { name: m.reassign.confirm }) as HTMLButtonElement).disabled).toBe(true);
+    expect(posts()).toEqual([]);
+  });
+
+  it('different names show no warning (no regression)', async () => {
+    asOwner();
+    const m = await mount();
     await openDialog(m);
-    expect(options()).toEqual([m.reassign.select.placeholder, 'Sam (1)', 'Sam (2)']);
-    expect(document.body.innerHTML).not.toContain(EMAIL_DOMAIN);
+    expect(screen.queryByTestId('reassign-ambiguous')).toBeNull();
+  });
+
+  it('a namesake of the current operator is excluded, so the summary can never read "from Sam to Sam"', async () => {
+    asOwner();
+    users = [person('u-self', 'Sam'), person('u-other', 'Sam'), person('u-amal', 'Amal Free')];
+    const m = await mount();
+    await waitFor(() => expect(screen.getAllByTestId('signed-ingress-operator')[0].textContent).toBe('Sam'));
+    fireEvent.click(reassignButton());
+    await screen.findByTestId('reassign-select');
+    expect(options()).toEqual([m.reassign.select.placeholder, 'Amal Free']);
+    expect(screen.getByTestId('reassign-ambiguous').textContent).toContain('Sam');
   });
 });
 

@@ -300,4 +300,39 @@ describe('useIngressManagement — reassign (5d)', () => {
     expect(result.current.currentOperatorName({ ...operated, operatedBy: 'u-ghost' })).toBeNull();
     expect(result.current.currentOperatorName({ ...operated, operatedBy: null })).toBeNull();
   });
+
+  describe('same-name candidates (excluded together; enforced in the hook, not only in the UI)', () => {
+    const entries = [
+      { id: 'u-old', name: 'Old', active: true, branchIds: [] as string[] },
+      { id: 'u-sam1', name: 'Sam', active: true, branchIds: [] as string[] },
+      { id: 'u-sam2', name: 'sam', active: true, branchIds: [] as string[] },
+      { id: 'u-uniq', name: 'Unique', active: true, branchIds: [] as string[] },
+    ];
+    const mountNamed = () => renderHook(() => useIngressManagement(() => {}, null, 'keeta', { status: 'ready' as const, entries }, () => {}));
+
+    it.each(['u-sam1', 'u-sam2'])('calling confirmReassign directly with the excluded id %s sends nothing', (id) => {
+      const { result } = mountNamed();
+      act(() => result.current.openReassign(operated));
+      act(() => result.current.confirmReassign(id));
+      expect(reassignIngressOperator).not.toHaveBeenCalled();
+      expect(result.current.busy).toBe(false);
+    });
+
+    it('lists only the unique name, reports the ambiguous name, and still sends the unique one', async () => {
+      reassignIngressOperator.mockResolvedValue(undefined);
+      const { result } = mountNamed();
+      expect(result.current.eligibleFor(operated).map((e) => e.id)).toEqual(['u-uniq']);
+      expect(result.current.ambiguousFor(operated).map((n) => n.toLowerCase())).toEqual(['sam']); // الاسم يُذكر مرة واحدة
+      expect(JSON.stringify(result.current.ambiguousFor(operated))).not.toContain('u-sam');
+      act(() => result.current.openReassign(operated));
+      await act(async () => result.current.confirmReassign('u-uniq'));
+      expect(reassignIngressOperator).toHaveBeenCalledWith('ing-1', 'u-uniq');
+    });
+
+    it('distinct names: nothing excluded, nothing reported', () => {
+      const { result } = mountReady();
+      expect(result.current.ambiguousFor(operated)).toEqual([]);
+      expect(result.current.eligibleFor(operated).map((e) => e.id)).toEqual(['u-new']);
+    });
+  });
 });

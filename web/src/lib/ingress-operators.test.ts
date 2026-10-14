@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { eligibleOperators, operatorLabels, operatorName, readOperatorDirectory, type OperatorEntry } from './ingress-operators';
+import { eligibleOperators, nameKey, operatorChoices, operatorName, readOperatorDirectory, type OperatorEntry } from './ingress-operators';
 
 const user = (over: Record<string, unknown> = {}) => ({ id: 'u1', name: 'Amal', email: 'amal@example.test', role: 'cashier', is_active: true, branch_ids: [], employee_id: 'e1', ...over });
 const entry = (over: Partial<OperatorEntry> = {}): OperatorEntry => ({ id: 'u1', name: 'Amal', active: true, branchIds: [], ...over });
@@ -70,11 +70,59 @@ describe('eligibleOperators (mirror of the server rule — convenience, not auth
   });
 });
 
-describe('operatorLabels', () => {
-  it('uses the bare name, and numbers only duplicated names — never an email or id', () => {
-    const labels = operatorLabels([entry({ id: 'a', name: 'Sam' }), entry({ id: 'b', name: 'Sam' }), entry({ id: 'c', name: 'Lina' })]);
-    expect(labels.get('a')).toBe('Sam (1)');
-    expect(labels.get('b')).toBe('Sam (2)');
-    expect(labels.get('c')).toBe('Lina');
+describe('nameKey (conservative: what looks like one name is one name)', () => {
+  it.each([
+    ['Sam', 'sam'], ['Sam', '  Sam  '], ['José', 'Jose'], ['Sam', 'ＳＡＭ'],
+    ['محمد', 'مُحَمَّد'], ['محمد', 'محـمد'], ['Sam   Lee', 'sam lee'],
+  ])('%j and %j collide', (a, b) => {
+    expect(nameKey(a)).toBe(nameKey(b));
+  });
+
+  it.each([['Sam', 'Sami'], ['محمد', 'أحمد'], ['Sam Lee', 'SamLee']])('%j and %j stay different', (a, b) => {
+    expect(nameKey(a)).not.toBe(nameKey(b));
+  });
+});
+
+describe('operatorChoices — same-name candidates are excluded together, never numbered', () => {
+  const point = { branchId: null as string | null };
+
+  it('two eligible operators with the same name are both excluded and the name is reported once', () => {
+    const list = [entry({ id: 'a', name: 'Sam' }), entry({ id: 'b', name: 'sam ' }), entry({ id: 'c', name: 'Lina' })];
+    const { selectable, ambiguousNames } = operatorChoices(list, point, null);
+    expect(selectable.map((e) => e.id)).toEqual(['c']);
+    expect(ambiguousNames).toEqual(['Sam']);
+  });
+
+  it('a unique name next to a colliding pair stays selectable', () => {
+    const list = [entry({ id: 'a', name: 'Amal' }), entry({ id: 'b', name: 'Amal' }), entry({ id: 'c', name: 'Bader' }), entry({ id: 'd', name: 'Cara' })];
+    const { selectable, ambiguousNames } = operatorChoices(list, point, null);
+    expect(selectable.map((e) => e.name)).toEqual(['Bader', 'Cara']);
+    expect(ambiguousNames).toEqual(['Amal']);
+  });
+
+  it('distinct names behave exactly as before (no regression)', () => {
+    const list = [entry({ id: 'a', name: 'Zed' }), entry({ id: 'b', name: 'Abe' }), entry({ id: 'cur', name: 'Current' })];
+    const { selectable, ambiguousNames } = operatorChoices(list, point, 'cur');
+    expect(selectable.map((e) => e.name)).toEqual(['Abe', 'Zed']);
+    expect(ambiguousNames).toEqual([]);
+  });
+
+  it('a candidate sharing the CURRENT operator\'s name is excluded too (no "from Sam to Sam"), while the current operator is never a candidate', () => {
+    const list = [entry({ id: 'cur', name: 'Sam' }), entry({ id: 'x', name: 'Sam' }), entry({ id: 'y', name: 'Lina' })];
+    const { selectable, ambiguousNames } = operatorChoices(list, point, 'cur');
+    expect(selectable.map((e) => e.id)).toEqual(['y']);
+    expect(ambiguousNames).toEqual(['Sam']);
+  });
+
+  it('only ELIGIBLE candidates are compared: an inactive or out-of-scope namesake does not exclude an eligible user', () => {
+    const list = [entry({ id: 'a', name: 'Sam' }), entry({ id: 'off', name: 'Sam', active: false }), entry({ id: 'br', name: 'Sam', branchIds: ['br-9'] })];
+    const { selectable, ambiguousNames } = operatorChoices(list, point, null);
+    expect(selectable.map((e) => e.id)).toEqual(['a']);
+    expect(ambiguousNames).toEqual([]);
+  });
+
+  it('exposes no email, id or any distinguishing data — only names', () => {
+    const list = [entry({ id: 'secret-id-1', name: 'Sam' }), entry({ id: 'secret-id-2', name: 'Sam' })];
+    expect(JSON.stringify(operatorChoices(list, point, null))).not.toContain('secret-id');
   });
 });

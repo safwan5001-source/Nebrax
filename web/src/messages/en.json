@@ -10556,7 +10556,8 @@
         "directoryError": "The operator list could not be loaded. This does not mean there are no operators.",
         "retry": "Try again",
         "empty": "No operator is eligible for this point: it needs an active user whose scope includes its branch (or an unrestricted user if the point is not routed to a branch).",
-        "unknownOperator": "Unknown"
+        "unknownOperator": "Unknown",
+        "ambiguous": "Some names are not listed because more than one eligible operator has the same name and they cannot be told apart safely here: {names}. To assign one of them, ask an administrator to tell the accounts apart."
       }
     }
   },
