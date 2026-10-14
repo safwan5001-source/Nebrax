@@ -124,7 +124,9 @@ class ApplicationNavStateEntitlementTest extends TestCase
 
         $response = $this->withToken($auth['token'])->getJson('/api/applications/nav-state')->assertOk();
 
-        $this->assertArrayNotHasKey('sales.invoicing', $response['data']);
+        // AWJ-BACKEND-NAV-01: إلزامية لكن مساراتها محروسة تجارياً، فتحضر بقيمة الاستحقاق
+        // (لا غياب يُقرأ «ظاهرة دائماً»). التفصيل في SalesInvoicingNavigationParityTest.
+        $this->assertFalse($response['data']['sales.invoicing']);
         $this->assertArrayNotHasKey('accounting.ledger', $response['data']);
         $this->assertArrayNotHasKey('hr.payroll', $response['data']);
     }

@@ -1,6 +1,6 @@
 /* @vitest-environment jsdom */
 import * as React from 'react';
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { InvoiceForm } from './invoice-form';
@@ -732,5 +732,78 @@ describe('InvoiceForm — edit mode', () => {
     render(<InvoiceForm editId="inv-1" />);
 
     expect((await screen.findByRole('alert')).textContent).toContain('Could not save.');
+  });
+});
+
+/**
+ * AWJ-BACKEND-NAV-01: «مسودة من سندات التسليم» تقود إلى مسارٍ يحرسه `delivery_notes.invoice`
+ * والاستحقاق التجاري لـ`sales.invoicing` — فلا تظهر إلا حين يفتح الخادم المسار فعلاً.
+ */
+describe('InvoiceForm — delivery-note draft entry follows the backend gates', () => {
+  afterEach(() => { cleanup(); localStorage.removeItem('user'); });
+  beforeEach(() => { api.mockClear(); push.mockClear(); replace.mockClear(); });
+
+  const signIn = (user: Record<string, unknown>) => localStorage.setItem('user', JSON.stringify(user));
+  const navState = (value: boolean | undefined) => ({
+    '/applications/nav-state': { data: value === undefined ? {} : { 'sales.invoicing': value } },
+  });
+  const draftEntries = () => screen.queryAllByText('invoiceDraftAction');
+  const navStateRequested = () => api.mock.calls.some(([path]) => path === '/applications/nav-state');
+  /** Waits until the nav-state read has resolved, so absence proves an explicit `false`, not the loading state. */
+  const navStateSettled = async () => {
+    await waitFor(() => expect(navStateRequested()).toBe(true));
+    const index = api.mock.calls.findIndex(([path]) => path === '/applications/nav-state');
+    await act(async () => { await api.mock.results[index].value; });
+  };
+
+  it('shows the entry to an entitled tenant whose user may invoice delivery notes', async () => {
+    signIn({ id: 'u1', role: 'accountant', permissions: ['invoices.manage', 'delivery_notes.invoice'] });
+    respond(navState(true));
+    render(<InvoiceForm />);
+
+    await waitFor(() => expect(draftEntries().length).toBeGreaterThan(0));
+  });
+
+  it('hides the entry from a tenant without the sales.invoicing entitlement, whatever the role', async () => {
+    signIn({ id: 'u1', role: 'owner', permissions: ['*'] });
+    respond(navState(false));
+    render(<InvoiceForm />);
+    await firstQty();
+
+    await navStateSettled();
+    expect(draftEntries()).toHaveLength(0);
+  });
+
+  it('hides the entry from a user without delivery_notes.invoice even when the tenant is entitled', async () => {
+    signIn({ id: 'u1', role: 'accountant', permissions: ['invoices.manage'] });
+    respond(navState(true));
+    render(<InvoiceForm />);
+    await firstQty();
+
+    await navStateSettled();
+    expect(draftEntries()).toHaveLength(0);
+  });
+
+  it('keeps the sidebar contract: a missing key or a failed read hides nothing', async () => {
+    signIn({ id: 'u1', role: 'owner', permissions: ['*'] });
+    respond(navState(undefined));
+    render(<InvoiceForm />);
+    await waitFor(() => expect(draftEntries().length).toBeGreaterThan(0));
+    cleanup();
+
+    api.mockImplementation((path: string) => (path === '/applications/nav-state'
+      ? Promise.reject(new Error('network'))
+      : Promise.resolve({ data: [] })));
+    render(<InvoiceForm />);
+    await waitFor(() => expect(draftEntries().length).toBeGreaterThan(0));
+  });
+
+  it('never offers the entry while editing an existing invoice', async () => {
+    signIn({ id: 'u1', role: 'owner', permissions: ['*'] });
+    respond({ ...navState(true), '/invoices/inv-1': { data: { id: 'inv-1', status: 'draft', lines: [] } } });
+    render(<InvoiceForm editId="inv-1" />);
+
+    await navStateSettled();
+    expect(draftEntries()).toHaveLength(0);
   });
 });
