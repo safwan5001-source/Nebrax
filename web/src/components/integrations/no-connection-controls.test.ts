@@ -24,6 +24,7 @@ const sources = [
   ...walk(join(SRC, 'app/(app)/integrations')),
   join(SRC, 'lib/integration-center.ts'),
   join(SRC, 'lib/signed-ingress.ts'),
+  join(SRC, 'lib/ingress-management.ts'),
 ].filter((path) => !isTest(path) && /\.(ts|tsx)$/.test(path));
 
 const files = sources.map((path) => ({ path: relative(SRC, path), code: readFileSync(path, 'utf8') }));
@@ -36,6 +37,8 @@ describe('integration center module sources', () => {
       'lib/signed-ingress.ts',
       'components/integrations/signed-ingress-panel.tsx',
       'components/integrations/use-signed-ingress.ts',
+      'lib/ingress-management.ts',
+      'components/integrations/use-ingress-permissions.ts',
       'components/integrations/integration-center-landing.tsx',
       'components/integrations/delivery-platform-catalog.tsx',
       'components/integrations/delivery-platform-detail.tsx',
@@ -100,6 +103,20 @@ describe('integration center module sources', () => {
     for (const { path, code } of files) {
       const live = code.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
       expect(live, path).not.toMatch(/secret_prefix|\bsecretPrefix\b|signing_key|\.secret\b|\btoken\b|authorization/i);
+    }
+  });
+
+  it('INT-UX-5a foundations make no request and activate no management action', () => {
+    // الأساس (صلاحيات + قاموس أخطاء + هيكل hook) نقيّ: لا `api(` ولا `fetch` ولا أي مسار كتابة، ولا يستورده أي مكوّن عرض بعد.
+    const foundations = files.filter((f) => ['lib/ingress-management.ts', 'components/integrations/use-ingress-permissions.ts'].includes(f.path));
+    expect(foundations).toHaveLength(2);
+    for (const { path, code } of foundations) {
+      const live = code.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+      expect(live, path).not.toMatch(/\bapi\s*[<(]|\bfetch\s*\(|XMLHttpRequest|\/delivery-connectors|rotate-secret|\/disable|\/reassign/);
+    }
+    for (const { path, code } of files) {
+      if (path === 'components/integrations/use-ingress-permissions.ts' || path === 'lib/ingress-management.ts') continue;
+      expect(code, `${path} must not consume the 5a foundations before 5b`).not.toMatch(/ingress-management|use-ingress-permissions/);
     }
   });
 
