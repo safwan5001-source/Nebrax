@@ -1,6 +1,6 @@
 # AWJ-ERP-UX-H1 — ERP UI / UX / Accessibility Horizon (state file)
 
-Status: **IN EXECUTION** — H1-0 audit delivered; slices H1-1 … H1-8 queued (see table)
+Status: **IN EXECUTION** — H1-0 merged (`276ebef`); implementation slices in review (see table)
 Owner: Safwan · Executor: **Claude Code** (sole executor) · Started: 2026-10-14
 Repository: `safwan5001-source/Nebrax` · Protocol: [AWJ Horizon System](../../autonomous-engineering/AWJ-HORIZON-SYSTEM.md), [Execution Protocol](../../engineering/AWJ_HORIZON_EXECUTION_PROTOCOL.md)
 Charter: [AWJ-ERP-UX-H1-CHARTER.md](./AWJ-ERP-UX-H1-CHARTER.md) · H1-0 audit: [AWJ-ERP-UX-H1-0-AUDIT.md](./AWJ-ERP-UX-H1-0-AUDIT.md)
@@ -17,8 +17,8 @@ Charter: [AWJ-ERP-UX-H1-CHARTER.md](./AWJ-ERP-UX-H1-CHARTER.md) · H1-0 audit: [
 
 | Slice | Content | Branch / PR | Status | Merge SHA |
 |---|---|---|---|---|
-| H1-0 | Evidence audit, backlog, queue (docs) | `docs/erp-ux-h1-0-audit` | in review | — |
-| H1-1 | ERP UI contract + acceptance rubric (docs) | — | queued | — |
+| H1-0 | Evidence audit, backlog, queue (docs) | `docs/erp-ux-h1-0-audit` / #1418 | **merged** — PRE/POST_MERGE_REVIEW PASS | `276ebef` |
+| H1-1 | ERP UI contract + acceptance rubric (docs) | `docs/erp-ux-h1-1-ui-contract` | in review | — |
 | H1-2A | Dialog focus management + localized close (ERP-UX-001/002) | — | queued | — |
 | H1-2B | Dropdown inert when closed (ERP-UX-003) | — | queued | — |
 | H1-2C | Toast region, live region, label (ERP-UX-004) | — | queued | — |
@@ -27,6 +27,7 @@ Charter: [AWJ-ERP-UX-H1-CHARTER.md](./AWJ-ERP-UX-H1-CHARTER.md) · H1-0 audit: [
 | H1-3C | Display preferences not re-applied on refresh (ERP-UX-026) | — | queued | — |
 | H1-4A | Bidi-safe names, action header labels (ERP-UX-015/016) | — | queued | — |
 | H1-4B | Product-edit sideways scroll from mis-hidden file input (ERP-UX-022) | — | queued | — |
+| H1-4C | Minus sign left of negative amounts in RTL (ERP-UX-027) | — | queued | — |
 | H1-5A | Localized forbidden state (ERP-UX-009) | — | queued | — |
 | H1-5B | Accessible names for unnamed controls (ERP-UX-010) | — | queued | — |
 | H1-5C | Dashboard KPI amount spill at ≤360 px (ERP-UX-024) | — | queued | — |
@@ -38,6 +39,8 @@ Charter: [AWJ-ERP-UX-H1-CHARTER.md](./AWJ-ERP-UX-H1-CHARTER.md) · H1-0 audit: [
 | H1-8 | Regression crawl, role matrix, closure report | — | queued | — |
 
 Open owner decision (non-blocking): **D-ERP-UX-01** — additive `name_en` on report account rows (ERP-UX-013).
+
+Per-slice PR numbers, head/merge SHAs and review records live on each PR and in `reports/AWJ-ERP-UX-H1-*-REPORT.md`; this table is refreshed at closure (H1-8) to avoid every slice PR editing the same file.
 
 ## Definition of done (from the owner direction, §6)
 
