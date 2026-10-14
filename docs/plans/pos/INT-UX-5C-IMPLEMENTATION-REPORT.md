@@ -54,7 +54,7 @@ No backend, API, database, permission, accounting, POS or ZATCA change.
 | `web/src/components/integrations/ingress-management-layer.tsx`, `ingress-row-actions.tsx`, `signed-ingress-panel.tsx`, `delivery-platform-detail.tsx`, `delivery-platform-detail-screen.tsx`, `use-delivery-integration-data.ts` | wiring (optional props; without them the panel is unchanged) |
 | `web/src/components/shared/plain-text-field.tsx` | **new** — neutral labelled text field |
 | `web/src/messages/ar.json`, `en.json` | create form, guidance, notices |
-| Tests | `ingress-create.test.tsx` (screen, ~110 cases ×2 locales), `lib/ingress-create.test.ts`, extended `ingress-operations.test.ts`, `use-ingress-management.test.tsx`, `no-connection-controls.test.ts` (structural guard updated), 5b screen test adjusted |
+| Tests | `ingress-create.test.tsx` (screen-level create flows, both locales), `lib/ingress-create.test.ts`, extended `ingress-operations.test.ts`, `use-ingress-management.test.tsx`, `no-connection-controls.test.ts` (structural guard updated), 5b screen test adjusted |
 | `web/e2e/int-ux-5c-create-ingress.spec.ts` | **new** real-browser spec; `int-ux-4-signed-ingress.spec.ts` adjusted (owner now also sees the create action) |
 | `docs/plans/pos/DLV-INTEGRATIONS-UX-DESIGN-1.md` | slice header status |
 
@@ -84,7 +84,7 @@ Screenshots reviewed (panel, form, validation, locked and revealed secret, creat
 
 ## 7. Git state
 
-Branch `feat/int-ux-5c-create-ingress` · Draft PR: see the PR · Base SHA `c47fd408200bdfbbb845d6d252d7d93a1fa29392` · Head SHA: the PR head (this report is the last commit; a report cannot name its own SHA).
+Branch `feat/int-ux-5c-create-ingress` · Draft PR #1463 · Base SHA `c47fd408200bdfbbb845d6d252d7d93a1fa29392` · code head `8fb108a30795d28510409bb2e23eccb098f30c07`; this report's own commit is the final head (a report cannot name its own SHA — the final Head SHA is the PR head).
 
 ## 8. Next step
 
