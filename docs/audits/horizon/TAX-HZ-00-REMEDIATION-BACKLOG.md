@@ -111,6 +111,12 @@ REM-03 and REM-08 touch disjoint controllers (`Invoice/Return/Quote/DocumentRevi
 > **Fix (minimal):** customer lock → `FOR NO KEY UPDATE` on PostgreSQL (still serialises credit postings, no longer conflicts with FK checks); posting transaction retries 3×; an exhausted transient concurrency failure (`40P01`/`40001`) is answered **409 + `Retry-After: 1`** by `ApiController::domain()` instead of 500. **Unchanged:** lock order of the financial path, totals/journal/ICV/VAT, schema, routes, permissions.
 > **Not changed (theoretical, needs an owner-approved design):** `InventoryService` stock-state rows locked before the ledger vs after the anchor in `post()`.
 
+### REM-05 / ACC-01 — status update (2026-10-14)
+
+> **REM-05 — PHASE 1 DELIVERED (decision report), awaiting owner policy approval; no implementation.** Report and evidence: `REM-05-ACC-01-ACCOUNTING-DECISION-REPORT.md`.
+> **Confirmed and reproduced:** `AccountRoutingService` accepts any active leaf account for `tax_input`/`tax_output` (incl. wrong types, the same account for both roles, cash/bank accounts); `ReportService::taxReport` reads fixed codes 1150/2120, so after a legitimate remap it reports the old accounts instead of the configured ones.
+> **Owner decisions pending (D-1…D-6):** allowed account types per role, role exclusivity, history rule, grandfathering of existing invalid mappings, history-aware report source, remaps while REM-06 is pending. Phase 2 starts only after approval.
+
 ### REM-03 — card (ready for owner approval to start)
 
 | Field | Content |
