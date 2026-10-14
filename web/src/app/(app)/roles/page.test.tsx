@@ -28,8 +28,8 @@ const { api, toast, auth, FakeApiError } = vi.hoisted(() => {
 vi.mock('@/lib/api', () => ({ api, ApiError: FakeApiError }));
 vi.mock('@/lib/auth', () => ({ currentUser: () => auth.current }));
 vi.mock('@/components/ui/toast', () => ({ useToast: () => toast }));
-vi.mock('@/components/hr/role-dialog', () => ({
-  RoleDialog: ({ role }: { role?: { id: string } | null }) => <div data-testid="role-dialog">{role ? `edit:${role.id}` : 'create'}</div>,
+vi.mock('@/components/roles/role-editor-sheet', () => ({
+  RoleEditorSheet: ({ role }: { role?: { id: string } | null }) => <div data-testid="role-dialog">{role ? `edit:${role.id}` : 'create'}</div>,
 }));
 
 const CATALOG = ['invoices.view', 'invoices.manage', 'users.view', 'pos.audit.export', 'pos.audit.view'];

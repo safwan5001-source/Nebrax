@@ -22,8 +22,8 @@ A slice is marked **Merged** only after tests + exact-head CI + merge. "Post-mer
 | **AC-UX-00A User administration grant boundaries** (backend, owner-mandated) | **Merged** | #1462 | `f1b7031fae615556149b8e0653247d6f73325827` |
 | AC-UX-01 Users workspace | **Merged** | #1465 | `cc30b53d63c61ef1ac97d5280b562d67f1036ebb` |
 | AC-UX-02 User editor & access scope | **Merged** | #1466 | `8c9f411f795ba2b35fb7a79f3d8427e08504f571` |
-| AC-UX-03 Roles & Permissions workspace — **03A shell/catalogue** | In review | (this PR) | — |
-| AC-UX-03B role editing/risk | Not started | — | — |
+| AC-UX-03 Roles & Permissions workspace — **03A shell/catalogue** | **Merged** | #1467 | `cd72408462ced93d3da5431030aab2804b918c34` |
+| AC-UX-03B role editing/risk | In review | (this PR) | — |
 | AC-UX-04 Role creation & safe cloning | Not started | — | — |
 | AC-UX-05 Branch & warehouse scope UX | Not started | — | — |
 | AC-UX-06 Resource access / treasury UX | Not started | — | — |
