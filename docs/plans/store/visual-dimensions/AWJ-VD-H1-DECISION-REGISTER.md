@@ -34,6 +34,7 @@ Evidence: `AWJ-VD-H1-0-EVIDENCE-AND-ARCHITECTURE.md` (sections referenced as §n
   - Only allow-listed files are served; the original never is.
   - Failures return one uniform 404 (§3.8-c).
 - **Change after review:** `mediaId` is now part of the URL, so replacing the image changes the URL.
+- **Change after Codex P1 (#1472):** the API emits the origin path, matching every other media family. The storefront adds an explicit, validated branch to `toRenderableMediaUrl()`, placed before the generic pattern, that maps it to `/api/storefront/media/facet-visuals/...`. Anything else maps to `null`, which triggers the fallback chain. A raw origin path never reaches `<img>`. This is covered by mapper tests and by real browser loading in VD-5.
 - **Status:** ACCEPTED-IP (the URL change is a technical refinement)
 
 ### D-04 — Authority to write the visual identity
@@ -63,6 +64,7 @@ Evidence: `AWJ-VD-H1-0-EVIDENCE-AND-ARCHITECTURE.md` (sections referenced as §n
 - **Status:** ACCEPTED-IP (+1 template)
 
 ### D-08 — Inheritance
+- **Key name:** the key is `showLabel`, singular, in every layer: value, facet, section, resolver, and fixtures (Codex P2, #1472).
 - **Decision:** **each property resolves independently**, along its own chain (table in §3.6).
   - **Customizing the image, or any other property, does not cancel inheritance of the shape, size, label, icon, or anything else.**
   - `content` resolves implicitly from the value's own media before falling back to the facet defaults.
@@ -114,6 +116,20 @@ Evidence: `AWJ-VD-H1-0-EVIDENCE-AND-ARCHITECTURE.md` (sections referenced as §n
     - `commerce/v1` unchanged.
   - Documented deactivation window: immediate at the origin, ≤ 300 s through the proxy for a URL already served.
 - **Status:** **ACCEPTED-IP + AMENDED**
+
+### D-17 — Mandatory concurrency token *(new, from Codex P2 on #1472)*
+- **Decision:**
+  - An integer `version` column on `commerce_facet_visuals`, incremented on every write.
+  - `expected_version` is **required whenever a row exists**:
+    - a missing value returns `428`;
+    - a mismatch returns `409` with `current_version`;
+    - `null` is allowed only to create a row that does not exist yet.
+  - Two creates at the same time: the unique index turns the second into `409`.
+  - Full table in §3.8-a.
+- **Alternatives:**
+  - An optional `if_unmodified_since`: it allows silent overwrites.
+  - The `updated_at` timestamp: one-second precision cannot detect two writes within the same second.
+- **Status:** **PROPOSED** (part of the DB/API contract that needs approval)
 
 ### D-16 — Serializing media deletion against visual saves *(new, from the Codex P2 review on #1472)*
 - **Decision:**

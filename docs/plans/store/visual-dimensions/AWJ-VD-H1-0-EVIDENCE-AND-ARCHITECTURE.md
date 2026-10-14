@@ -239,7 +239,8 @@ HORIZON: AWJ-COMMERCE-VISUAL-DIMENSIONS-H1 (Master Plan: `AWJ-VD-H1-MASTER-PLAN.
 | `commerce_facet_value_id` | uuid FK → commerce_facet_values، cascade | NULL = صفّ البُعد نفسه |
 | `schema_version` | unsignedSmallInteger | default 1 |
 | `visual` | json | NOT NULL؛ مُطبَّع دائماً بـ`CommerceFacetVisualNormalizer` |
-| `created_at`/`updated_at` | timestamps | `updated_at` شرطٌ مسبق للكتابة المتزامنة |
+| `version` | unsignedInteger | default 1. يزيد بواحد مع كل كتابة. **رمز التزامن** للكتابة (انظر §3.8-أ). عدد صحيح لا طابع زمني، لأن دقة الثانية لا تكشف كتابتين في الثانية نفسها |
+| `created_at`/`updated_at` | timestamps | للعرض والتدقيق فقط |
 
 **الفهارس:**
 - `unique(commerce_facet_value_id)`: صف واحد لكل قيمة. الـNULLs لا تتصادم.
@@ -398,7 +399,7 @@ HORIZON: AWJ-COMMERCE-VISUAL-DIMENSIONS-H1 (Master Plan: `AWJ-VD-H1-MASTER-PLAN.
 | `textPosition` | `below` · `overlay` · `beside` | `below` |
 | `contentOrder` | `media-first` · `label-first` | `media-first` |
 | `valueOrder` | `merchant` · `count` | `merchant` (ترتيب `sort_order`) |
-| `shape` / `size` / `showLabels` | كما في §3.4 | ورِّث |
+| `shape` / `size` / `showLabel` | كما في §3.4. **المفتاح نفسه بالمفرد** في L2 (القيمة والبُعد) وL3 (القسم) وفي المحلّل والـfixtures. لا مفتاح بالجمع في أي طبقة | ورِّث |
 | `cardStyle` | `plain` · `outlined` · `elevated` · `filled` | `plain` |
 | `align` | `start` · `center` | `center` |
 | `showCounts` | bool | `false` |
@@ -429,8 +430,8 @@ HORIZON: AWJ-COMMERCE-VISUAL-DIMENSIONS-H1 (Master Plan: `AWJ-VD-H1-MASTER-PLAN.
 
 | المسار | التغيير | الحراسة |
 |---|---|---|
-| `GET /api/commerce/workspace/facets` | **إضافة** `visual` (الوثيقة المخزّنة أو `null`) و`visual_updated_at` لكل بُعد وقيمة | كما هي (`products.view`) |
-| `PUT /api/commerce/workspace/facets/{id}/visual` | **جديد**. الجسم: `{visual: object|null, if_unmodified_since?: ISO8601}` | `commerce.manage` (القرار D-04) + `denySelfService` + throttle |
+| `GET /api/commerce/workspace/facets` | **إضافة** `visual` (الوثيقة المخزّنة أو `null`) و`visual_version` (عدد صحيح، أو `null` إن لم يوجد صف) لكل بُعد وقيمة | كما هي (`products.view`) |
+| `PUT /api/commerce/workspace/facets/{id}/visual` | **جديد**. الجسم: `{visual: object|null, expected_version: int|null}` | `commerce.manage` (القرار D-04) + `denySelfService` + throttle |
 | `PUT /api/commerce/workspace/facets/{id}/values/{valueId}/visual` | **جديد**. الجسم كالسابق | كالسابق |
 
 **الصلاحية (D-04، معتمد):**
@@ -439,10 +440,24 @@ HORIZON: AWJ-COMMERCE-VISUAL-DIMENSIONS-H1 (Master Plan: `AWJ-VD-H1-MASTER-PLAN.
 - الواجهة تعطّل تبويبي الهوية له مع سبب صريح (`AWJ-VD-H1-VD3-EDITOR-UX-REQUIREMENTS.md` §3.8).
 - **اختبارات VD-1b:** المحاسب 403 على الهوية و200 على الاسم · `staff` 403 · `self_service` 403 · ضيف 401 · مالك ومسؤول 200.
 
+**عقد التزامن** (إلزامي، بعد ملاحظة Codex P2 على #1472): المسار جديد ولا مستهلك قديم له، فلا سبب لجعل الرمز اختيارياً.
+
+| حالة الصف | `expected_version` المُرسَل | النتيجة |
+|---|---|---|
+| لا يوجد صف | `null` | إنشاء (`version = 1`) |
+| لا يوجد صف | عدد | `409 visual_version_conflict` (حُذف أو لم يوجد) |
+| يوجد صف | المفتاح غائب أو `null` | `428 visual_precondition_required` (لا كتابة صامتة فوق نسخة لم يرها العميل) |
+| يوجد صف | يطابق `version` | تحديث (`version + 1`)، أو حذف إن كانت `visual: null` |
+| يوجد صف | لا يطابق | `409 visual_version_conflict`، مع `current_version` في الرد |
+| إنشاء متزامن لصفّين | `null` من الطرفين | الفهرس الفريد يرفض الثاني، فيتحوّل إلى `409` (لا 500) |
+
+- الفحص والكتابة داخل معاملة واحدة مع `lockForUpdate` على صف الهوية، ومع أقفال الوسائط (D-16): الهوية أولاً، ثم الوسائط بترتيب المعرّف.
+- **اختبارات VD-1b:** كل صفوف الجدول أعلاه، إضافة إلى «عميلان يقرآن النسخة نفسها: الأول ينجح والثاني 409».
+
 **الردود:**
-- `200 {data:{visual, updated_at}}`.
-- `404` لصف غير موجود أو من مستأجر آخر، بلا كشف لوجوده.
-- `409` عند تعارض `if_unmodified_since`.
+- `200 {data:{visual, version}}`.
+- `404` لصف بُعد أو قيمة غير موجود أو من مستأجر آخر، بلا كشف لوجوده.
+- `409` / `428` كما في الجدول.
 - `422` بأخطاء حقلية.
 
 **ب) المتجر العام.** على `storefront.v1` فقط (القرار D-05)، على نمط صورة التصنيف (`StorefrontCategoryResource.php:60-62`). يبقى `commerce/v1` المغلق في OpenAPI بلا تغيير.
@@ -451,7 +466,7 @@ HORIZON: AWJ-COMMERCE-VISUAL-DIMENSIONS-H1 (Master Plan: `AWJ-VD-H1-MASTER-PLAN.
 - **`meta.facets[].values[]`** يضاف إليه `visual` بهذا الشكل:
   ```jsonc
   { "content": "image"|"icon"|"none",
-    "image": { "sources": [{"width":160,"format":"webp","src":"/store/v1/media/facet-visuals/{visualId}/{mediaId}/thumb-160.webp"}, …],
+    "image": { "sources": [{"width":160,"format":"webp","src":"/store/v1/media/facet-visuals/{visualId}/{mediaId}/thumb-160.webp" /* مسار المصدر — يُعاد كتابته في storefront، انظر أدناه */}, …],
                "alt": "…", "fit": "cover", "focal": {"x":50,"y":40}, "zoom": 1.2 },
     "icon": "cake", "iconColor": "#9d2449", "background": "#fdf2f4",
     "shape": "arch", "size": "md", "showLabel": true }
@@ -488,6 +503,16 @@ HORIZON: AWJ-COMMERCE-VISUAL-DIMENSIONS-H1 (Master Plan: `AWJ-VD-H1-MASTER-PLAN.
   - **لا يخزّن أي رد غير 200.**
   - يمرّر `nosniff`.
   - يرفض المعاملات خارج القائمة قبل الاتصال بالمصدر.
+
+**وصول الرابط إلى المتصفح** (بعد ملاحظة Codex P1 على #1472):
+- **المشكلة:** المسار `/store/v1/...` لا يصل إلى Laravel من أصل المتجر، و`toRenderableMediaUrl()` (`storefront/src/lib/commerce/mappers.ts:164`) لا يعيد اليوم كتابة إلا وسائط المنتج والمُخصِّص. بل إن نمطه العام `^/store/v1/media/([^/]+)…$` لا يطابق مسار `facet-visuals` ذا الأجزاء الثلاثة، فيعيده **خاماً**، فتظهر صورة 404.
+- **القرار:** نلتزم بالنمط القائم لكل العائلات: **الخادم يُصدر مسار المصدر**، فيبقى صالحاً لأي عميل يتصل بالـAPI مباشرة كالجوال لاحقاً، **والمتجر يعيد كتابته إلى مسار البروكسي**.
+- **فرع صريح في `toRenderableMediaUrl()`**، يأتي **قبل** النمط العام. يقبل فقط مساراً بالشكل `^/store/v1/media/facet-visuals/{uuid}/{uuid}/{file}$`، وملفاً ضمن القائمة البيضاء، ويعيده إلى `/api/storefront/media/facet-visuals/{visualId}/{mediaId}/{file}`.
+- **أي شكل آخر يعيد `null`، لا الرابط الخام.** يتلقاه `listing-facets.ts` فيُسقط المصدر، فيعمل تسلسل السقوط (أيقونة، ثم نص). **لا رابط خام إلى المصدر يصل إلى `<img>` أبداً.**
+- **اختبارات (VD-1c):**
+  - vitest للمحوّل: مسار صالح، و`file` غير مسموح، وuuid مشوّه، وأجزاء زائدة، وترميز `..`، وأن الفرع يسبق النمط العام.
+  - اختبار يثبت أن كل `src` يخرج من `normalizeListingFacets` يبدأ بـ`/api/storefront/media/facet-visuals/`.
+  - في VD-5: تحميل فعلي للصورة في المتصفح عبر المتجر المحلي، والتحقق بالرد 200 والعرض.
 
 **نافذة التعطيل الموثّقة:**
 - عند المصدر: فورية.

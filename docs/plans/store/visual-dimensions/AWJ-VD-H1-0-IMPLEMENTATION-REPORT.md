@@ -19,6 +19,14 @@ This slice is **documentation only**. No code, migration, API, or runtime behavi
 | Inspect CI and PR comments | Codex P2: race between media deletion and saving a visual. **Valid.** Addressed by locking the media row in both paths (new D-16) with tests. | §3.8-d · R16 · D-16 |
 | Current-UI screenshots + prototype | Screenshots `IMG_2584`–`IMG_2588` analysed against the code (C1–C12). VD-3 requirements written. Template `catalog-rounded` added from the owner's concept image. | `AWJ-VD-H1-VD3-EDITOR-UX-REQUIREMENTS.md` · §2.8 · §3.7 |
 
+## Codex review round 2 (on `c247566`) — changes applied
+
+| Finding | Assessment | Change |
+|---|---|---|
+| P1: the `src` origin path does not reach Laravel from the storefront origin, and the mapper has no facet branch | **Valid.** Verified in `mappers.ts:164`: the generic pattern does not match three segments, so the URL is returned raw. | An explicit, validated branch in `toRenderableMediaUrl()` before the generic pattern. Anything invalid maps to `null`, which triggers the fallback chain. Tests added. Recorded under D-03. |
+| P2: the optional concurrency token allows silent overwrites | **Valid.** | `version` column and `expected_version` required whenever a row exists (428/409). New decision D-17. |
+| P2: `showLabels` versus `showLabel` | **Valid.** | Standardized on `showLabel` in every layer (D-08). |
+
 ## Repository evidence / root cause
 
 See `AWJ-VD-H1-0-EVIDENCE-AND-ARCHITECTURE.md` §2. Key facts:
