@@ -5,7 +5,7 @@ import { useLocale, useTranslations } from 'next-intl';
 import { Check, Minus, Pencil, Plus, Search, ShieldAlert, Trash2 } from 'lucide-react';
 import { PageHeader, type PageAction } from '@/components/nebrax';
 import { EmptyState, ErrorState, LoadingState } from '@/components/nebrax/states';
-import { RoleDialog } from '@/components/hr/role-dialog';
+import { RoleEditorSheet } from '@/components/roles/role-editor-sheet';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useConfirm } from '@/components/ui/confirm-dialog';
@@ -71,13 +71,15 @@ export default function RolesPage() {
   const [editor, setEditor] = useState<{ role: RoleRecord | null } | null>(null);
   const [deleting, setDeleting] = useState(false);
 
-  const load = useCallback(() => {
+  const load = useCallback((selectId?: string) => {
     setLoading(true);
     setLoadError(null);
     api<{ data: RoleRecord[]; meta?: { permissions?: string[] } }>('/roles')
       .then((response) => {
         setRoles(response.data);
         setCatalog(response.meta?.permissions ?? []);
+        // بعد الحفظ نُحدِّد الدور المحفوظ (مفيد للدور الجديد)؛ وإلا يبقى التحديد كما هو.
+        if (selectId && response.data.some((role) => role.id === selectId)) setSelectedId(selectId);
       })
       .catch((err) => setLoadError(err instanceof ApiError && err.message ? err.message : tc('loadFailed')))
       .finally(() => setLoading(false));
@@ -178,7 +180,7 @@ export default function RolesPage() {
       {loading && roles.length === 0 ? (
         <LoadingState variant="table" rows={8} />
       ) : loadError ? (
-        <ErrorState message={loadError} onRetry={load} />
+        <ErrorState message={loadError} onRetry={() => load()} />
       ) : roles.length === 0 ? (
         <EmptyState
           title={t('no_roles_title')}
@@ -358,12 +360,15 @@ export default function RolesPage() {
       )}
 
       {editor ? (
-        <RoleDialog
+        <RoleEditorSheet
+          key={editor.role?.id ?? 'new'}
           open
           onClose={() => setEditor(null)}
-          onSaved={load}
+          onSaved={(savedId) => load(savedId)}
           role={editor.role}
           catalog={catalog}
+          labels={labels}
+          actorPermissions={mine}
         />
       ) : null}
     </div>
