@@ -5,7 +5,10 @@ namespace App\Services\Accounting;
 use App\Models\Invoice;
 use App\Models\ZatcaSubmissionAttempt;
 use DOMDocument;
+use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use PDOException;
 use RuntimeException;
 use Throwable;
 
@@ -26,16 +29,24 @@ final class ZatcaSubmissionDispatcher
                 return $locked;
             }
 
+            // TAX-N01: المرحلة الجارية تُسجَّل لتصنيف السبب عند الفشل — لا تغيّر مسار التنفيذ.
+            $stage = 'load';
+
             try {
                 $invoice = Invoice::query()->whereKey($locked->invoice_id)->firstOrFail();
+                $stage = 'snapshot';
                 $this->assertSnapshot($locked, $invoice);
+                $stage = 'credentials';
+                $credential = $this->credentials->resolve();
+                $stage = 'transport';
                 $result = $this->transport->submit(
-                    $this->credentials->resolve(),
+                    $credential,
                     $locked->submission_type,
                     (string) $invoice->zatca_hash,
                     (string) $invoice->zatca_xml,
                 );
 
+                $stage = 'completion';
                 if ($result->status === 'accepted' && $locked->submission_type === 'clearance') {
                     $clearedXml = $this->clearedXml($result->clearedInvoice);
                     if ($clearedXml === null) {
@@ -60,7 +71,11 @@ final class ZatcaSubmissionDispatcher
                     $result->message,
                     [...$result->auditPayload, 'retryable' => $result->retryable],
                 );
-            } catch (Throwable) {
+            } catch (Throwable $e) {
+                // السبب يُسجَّل **قبل** التثبيت: على PostgreSQL قد تكون المعاملة المحيطة
+                // مجهَضة بعد خطأ SQL فيفشل `complete()` أدناه (25P02) ويضيع السبب الأصلي.
+                $this->logFailure($locked, $e, $this->classifyFailure($e, $stage));
+
                 return $this->submissions->complete(
                     $locked,
                     'failed',
@@ -71,6 +86,47 @@ final class ZatcaSubmissionDispatcher
                 );
             }
         }, 1);
+    }
+
+    /**
+     * رمز سبب تشخيصي ثابت ومحدود (TAX-N01). لا يُشتق من نص الاستثناء ولا يحمل بيانات؛
+     * يُستنتج من **صنف** الاستثناء ثم من مرحلة التنفيذ التي أُلقي فيها. وهو منفصل عمداً عن
+     * `response_code` المحفوظ (`submission_preflight_failed`) الذي لا يتغيّر.
+     */
+    private function classifyFailure(Throwable $e, string $stage): string
+    {
+        if ($e instanceof PDOException) { // يشمل QueryException وفروعها
+            return 'database_error';
+        }
+        if ($e instanceof DecryptException) {
+            return 'credential_unreadable';
+        }
+
+        return match ($stage) {
+            'load', 'snapshot' => 'snapshot_mismatch',
+            'credentials' => 'credential_unusable',
+            'transport' => 'transport_error',
+            default => 'preflight_error',
+        };
+    }
+
+    /**
+     * سطر سجل مهيكل واحد لكل فشل: المعرّفات وصنف الاستثناء والسبب فقط. لا رسالة استثناء
+     * ولا تتبّع مكدّس (قد يحملان SQL بقيمه أو مسارات) ولا XML ولا اعتماد ولا ردّ. وفشل
+     * التسجيل نفسه لا يغيّر مسار الحالة.
+     */
+    private function logFailure(ZatcaSubmissionAttempt $attempt, Throwable $e, string $causeCode): void
+    {
+        try {
+            Log::error('zatca_submission_dispatch_failed', [
+                'attempt_id' => $attempt->id,
+                'tenant_id' => $attempt->tenant_id,
+                'exception_class' => $e::class,
+                'cause_code' => $causeCode,
+            ]);
+        } catch (Throwable) {
+            // التشخيص لا يُفشل الإرسال.
+        }
     }
 
     private function assertSnapshot(ZatcaSubmissionAttempt $attempt, Invoice $invoice): void
