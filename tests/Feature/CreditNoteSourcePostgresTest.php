@@ -321,7 +321,9 @@ class CreditNoteSourcePostgresTest extends TestCase
     {
         $base = config('database.default');
         $connection = 'rem02_private_ddl';
-        $database = substr(config("database.connections.{$base}.database").'_ddl_'.getmypid().'_'.bin2hex(random_bytes(4)), 0, 63);
+        // اللاحقة تُحفظ كاملة (حدّ PostgreSQL للمعرّف 63 بايتاً): يُقتطع من اسم القاعدة الأساسية لا منها.
+        $suffix = '_ddl_'.getmypid().'_'.bin2hex(random_bytes(4));
+        $database = substr((string) config("database.connections.{$base}.database"), 0, 63 - strlen($suffix)).$suffix;
 
         config(["database.connections.{$connection}" => array_merge(config("database.connections.{$base}"), ['database' => $database])]);
         DB::statement("CREATE DATABASE \"{$database}\"");
