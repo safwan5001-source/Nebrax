@@ -150,7 +150,7 @@ None of these is built, stubbed or implied by the UI. Each needs an owner/ADR de
 
 ## 10. Follow-up: AC-UX-11 — own scope on `/me` (owner decision O-1, approved 2026-10-14)
 
-Delivered as a separate small slice from fresh `main` (base `f509929`), under the existing Access Control follow-up authority. **NOT DEPLOYED.**
+Delivered as a separate small slice from fresh `main` (base `f509929`) — PR #1492, merge `5ef2bb9` — under the existing Access Control follow-up authority. **NOT DEPLOYED.**
 
 - **Backend (additive, `/me` only):** `user.branch_ids` and `user.warehouse_ids` — the authenticated actor's **own** stored assignments. **Empty array = unrestricted**, exactly as in `GET /users` (the raw relation is read, not `allowedBranchIds()`, so "unrestricted" can never be mistaken for "unknown"). No other user's scope is exposed; no `users.view` is required; the relations go through the tenant global scope, so a stray pivot row pointing at another tenant's branch/warehouse is never returned. `/login` is unchanged. No migration; no authorization, permission, tenant-isolation or grant-boundary logic touched.
 - **Frontend:** a new `useActorScope()` reads the scope from the stored user (filled by the shell's `/me` refresh) or fetches `/me` once (shared in-flight request); `null` = could not be read, never "unrestricted". Users page, HR page and the employee page no longer infer the scope from `GET /users`; the `canReadActorScope` escape hatch in the employee dialog is **removed** (an unreadable scope now blocks granting login for everyone, uniformly).
