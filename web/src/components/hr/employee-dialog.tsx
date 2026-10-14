@@ -142,6 +142,7 @@ export function EmployeeDialog({
   initialAllowAccess = false,
   canManageUsers = false,
   actorScope,
+  canReadActorScope = true,
 }: {
   open: boolean;
   onClose: () => void;
@@ -161,6 +162,12 @@ export function EmployeeDialog({
    * - كائنٌ = معروف.
    */
   actorScope?: { branches: string[]; warehouses: string[] } | null;
+  /**
+   * هل يستطيع المشاهد قراءة قائمة المستخدمين (`users.view`) أصلاً؟ بدونها لا مصدر لنطاقه (`GET /users` خلف `users.view` بينما
+   * إنشاء المستخدم خلف `users.manage` فقط)، فلا نحجب عنه سير العمل كلّه: يُترك الحسم للخادم ورسالته تُعرض كما هي.
+   * الافتراضي `true` (فيُشترط معرفة النطاق).
+   */
+  canReadActorScope?: boolean;
 }) {
   const t = useTranslations('hr');
   const tu = useTranslations('users');
@@ -307,8 +314,8 @@ export function EmployeeDialog({
   const scopeIssuesNow = accessActive
     ? scopeIssues(initialScope, scope, scopeCaps, actorRestricted, Boolean(linkedUser))
     : { branches: null, warehouses: null };
-  const scopeLoading = accessActive && actorScope === undefined;
-  const scopeUnavailable = accessActive && actorScope === null;
+  const scopeLoading = accessActive && canReadActorScope && actorScope === undefined;
+  const scopeUnavailable = accessActive && canReadActorScope && actorScope === null;
   const scopeBlocked = Boolean(scopeIssuesNow.branches || scopeIssuesNow.warehouses) || scopeLoading || scopeUnavailable;
 
   async function submit(e: React.FormEvent) {

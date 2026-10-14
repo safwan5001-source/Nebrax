@@ -211,3 +211,16 @@ describe('EmployeeDialog: login access is blocked until the actor scope is known
     expect((screen.getByRole('button', { name: 'Save' }) as HTMLButtonElement).disabled).toBe(false);
   });
 });
+
+describe('EmployeeDialog: a manager who cannot read the users list (no users.view)', () => {
+  it('is not locked out — the scope cannot be obtained for them, so the server decides', async () => {
+    render(
+      <NextIntlClientProvider locale="en" messages={messages as never}>
+        <EmployeeDialog open onClose={() => {}} onSaved={() => {}} canManageUsers initialAllowAccess actorScope={null} canReadActorScope={false} />
+      </NextIntlClientProvider>,
+    );
+    await fillNewUser();
+    expect(screen.queryByText(/couldn't verify your own access scope/)).toBeNull();
+    expect((screen.getByRole('button', { name: 'Save' }) as HTMLButtonElement).disabled).toBe(false);
+  });
+});

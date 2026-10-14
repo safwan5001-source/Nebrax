@@ -21,6 +21,7 @@ import { type PayrollRun } from '@/components/hr/run-detail-dialog';
 import { SYSTEM_ROLE_KEYS } from '@/components/users/user-editor-sheet';
 import { api, ApiError, downloadFile } from '@/lib/api';
 import { currentUser } from '@/lib/auth';
+import { hasPermission } from '@/lib/permissions';
 import { formatRiyal } from '@/lib/money';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 
@@ -116,7 +117,12 @@ export default function EmployeeProfilePage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [role, setRole] = useState<string | null>(null);
-  useEffect(() => { setRole(currentUser()?.role ?? null); }, []);
+  const [canReadUsers, setCanReadUsers] = useState(false);
+  useEffect(() => {
+    const me = currentUser();
+    setRole(me?.role ?? null);
+    setCanReadUsers(hasPermission(me?.permissions, me?.role, 'users.view'));
+  }, []);
   const canManageUsers = role === 'owner' || role === 'admin';
 
   const loadAttachments = useCallback(() => {
@@ -710,6 +716,7 @@ export default function EmployeeProfilePage() {
         initialAllowAccess={!!linkedUser}
         canManageUsers={canManageUsers}
         actorScope={actorScope}
+        canReadActorScope={canReadUsers}
       />
 
       <ContractDialog

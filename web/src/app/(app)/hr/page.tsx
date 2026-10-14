@@ -21,6 +21,7 @@ import { RequestsManager } from '@/components/hr/requests-manager';
 import { useToast } from '@/components/ui/toast';
 import { api, ApiError } from '@/lib/api';
 import { currentUser } from '@/lib/auth';
+import { hasPermission } from '@/lib/permissions';
 import { formatRiyal } from '@/lib/money';
 import { cn } from '@/lib/utils';
 import { useConfirm } from '@/components/ui/confirm-dialog';
@@ -81,10 +82,12 @@ export default function HrPage() {
   // يُقرآن بعد التركيب لتفادي اختلاف الترطيب (localStorage غائب أثناء العرض على الخادم).
   const [role, setRole] = useState<string | null>(null);
   const [meId, setMeId] = useState<string | null>(null);
+  const [canReadUsers, setCanReadUsers] = useState(false);
   useEffect(() => {
     const me = currentUser();
     setRole(me?.role ?? null);
     setMeId(me?.id ?? null);
+    setCanReadUsers(hasPermission(me?.permissions, me?.role, 'users.view'));
   }, []);
   const canManageRoles = role === 'owner' || role === 'admin';
 
@@ -348,6 +351,7 @@ export default function HrPage() {
         initialAllowAccess={empInitialAccess}
         canManageUsers={canManageRoles}
         actorScope={actorScope}
+        canReadActorScope={canReadUsers}
       />
       <ShiftDialog open={shiftDialog} onClose={() => setShiftDialog(false)} onSaved={load} shift={editingShift} />
       <AttendanceDialog open={attDialog} onClose={() => setAttDialog(false)} onSaved={load} attendance={editingAtt} />
