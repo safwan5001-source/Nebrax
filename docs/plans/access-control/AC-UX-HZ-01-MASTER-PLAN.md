@@ -91,7 +91,7 @@ Applies to every Access Control screen. A slice's checklist is the relevant subs
 - No local state that can become permission authority; admin queries re-fetch after every mutation; nothing permission-bearing is cached across logout/login/tenant switch (reuse existing auth invalidation).
 
 ### 4.2 Desktop (≥1280, verify 1440)
-- **Users:** DataTable, row ≈ 40–48px per v3 grid tokens, sticky header, columns: identity (name+email 2-line), employee link, role (display name), status (text+indicator), branch scope summary, warehouse scope summary, row actions (≤2 icon actions + ⋯). Search + status/role filters + result count. 1280×720 shows ≥ 6 rows.
+- **Users:** DataTable, row ≈ 40–48px per v3 grid tokens, sticky header, columns: identity (name+email 2-line), employee link, role (name per D-H fallback: system translation → /roles name only if `roles.view` → "Custom role"; never the raw slug), status (text+indicator), branch scope summary, warehouse scope summary, row actions (≤2 icon actions + ⋯). Search + status/role filters + result count. 1280×720 shows ≥ 6 rows.
 - **Roles:** master/detail — role rail (name, system/custom, users count, permission count) + detail pane (identity, permission catalogue, sensitive summary, assigned-users count). No giant undifferentiated checkbox wall; ≤ 3 nesting levels (module → area → permission).
 - Editors use Sheet/workspace (not a small modal) when they hold role + scopes or the catalogue.
 - Footer/toolbar for dirty state: **Save**, **Reset/Cancel**, unsaved-changes guard on navigation/close.
