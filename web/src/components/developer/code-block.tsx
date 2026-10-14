@@ -46,7 +46,8 @@ export function CodeBlock({
           {copied ? t('copied') : t('copy')}
         </button>
       </div>
-      <pre dir="ltr" className="min-w-0 overflow-x-auto p-3 text-start text-xs leading-relaxed text-text">
+      {/* قابل للتمرير أفقياً، فيجب أن يبلغه من يستعمل لوحة المفاتيح (scrollable-region-focusable). */}
+      <pre dir="ltr" tabIndex={0} aria-label={label} className="min-w-0 overflow-x-auto p-3 text-start text-xs leading-relaxed text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/40">
         <code className="font-mono">{code}</code>
       </pre>
     </div>

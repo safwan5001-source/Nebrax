@@ -31,7 +31,8 @@ export function AccordionItem({
 }) {
   return (
     <div className="overflow-hidden rounded border border-border bg-surface">
-      <h3>
+      {/* قسمٌ من أقسام صفحة التفاصيل مباشرةً تحت `h1` — ERP-UX-014. */}
+      <h2>
         <button
           type="button"
           onClick={onToggle}
@@ -55,7 +56,7 @@ export function AccordionItem({
             strokeWidth={2}
           />
         </button>
-      </h3>
+      </h2>
       {/* المحتوى لا يُركَّب إلا وهو مفتوح — لا طلبات ولا جداول مخفيّة تستهلك الجوال. */}
       {open && (
         <div id={`acc-${id}`} className="border-t border-border">

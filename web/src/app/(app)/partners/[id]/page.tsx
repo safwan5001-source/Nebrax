@@ -442,7 +442,8 @@ export default function PartnerProfilePage() {
     return (
       <>
         <SubHead>{t('account_summary')}</SubHead>
-        <div className="overflow-x-auto">
+        {/* جدولٌ يتمرّر أفقياً على الجوال — يبلغه التبويب ويُسمّى للقارئ الآلي. */}
+        <div role="region" tabIndex={0} aria-label={t('account_summary')} className="overflow-x-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40">
           <table className="w-full border-collapse">
             <thead>
               <tr className="border-b border-border bg-background text-xs text-muted">

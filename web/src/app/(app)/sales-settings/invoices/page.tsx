@@ -136,7 +136,7 @@ export default function InvoiceSettingsPage() {
                   <p className="num text-sm text-text" dir="ltr">{form.invoice_prefix || 'INV'}</p>
                   <p className="text-xs leading-relaxed text-muted">
                     {t('prefix_moved')}{' '}
-                    <Link href="/numbering-settings" className="text-primary hover:underline">{t('prefix_moved_link')}</Link>
+                    <Link href="/numbering-settings" className="text-primary underline underline-offset-2 hover:no-underline">{t('prefix_moved_link')}</Link>
                   </p>
                 </div>
 
