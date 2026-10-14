@@ -60,6 +60,9 @@ Not inventoried: amount paths that use **other** parsers (for example `lib/fuel-
 | `0,5` / `0,50` | 500 → **5.00** / 5000 → **50.00** | **10× / 100×** |
 | `12,34` | 123400 → **1234.00** | **100×** |
 | `3,14` | 31400 → **314.00** | **100×** |
+| `12,000` | 1200000 → **12000.00** | **1000× if a comma-decimal user meant 12.000** (three-digit tail) |
+| `0,500` | 50000 → **500.00** | **1000×** if meant 0.500 |
+| `1,500`, `999,999` | 150000, 99999900 | grouping; ambiguous with a three-decimal comma number |
 | `1 500` | 150000 → 1500.00 | grouping by space accepted |
 | `1 500,50` | 15005000 → **150050.00** | **100×** (European style) |
 | `1,,5` / `,5` / `5,` | 1500 / 500 / 500 | malformed commas **accepted** |
@@ -74,7 +77,7 @@ Not inventoried: amount paths that use **other** parsers (for example `lib/fuel-
 ### 2.3 Why this is a locale problem, not an edge case
 
 - In many locales (and in a comma-decimal style used by some Arabic and European users), the comma is the **decimal** separator. `riyalToMinor` strips every comma, so a one- or two-digit tail after a comma is read as part of the integer: a **silent 10× or 100× error**, with no NaN and no message.
-- The ambiguity is resolvable for SAR because halalas have exactly 2 decimals: a comma followed by 3 digits can only be grouping; a comma followed by 1–2 digits at the end of the number cannot be grouping and is almost certainly a decimal comma.
+- Partly resolvable for SAR because halalas have 2 decimals: a comma followed by 1–2 digits at the end of the number cannot be grouping and is almost certainly a decimal comma. **A comma followed by exactly 3 digits is NOT safely resolvable** (`12,000`, `1,500`, `0,500`): a thousands-grouping user means 12,000 / 1,500 / 500, while a comma-decimal user who writes three decimals (as with some other currencies, or by habit) means 12.000 / 1.500 / 0.500 — the parser accepts it as grouping and the error is **1000×**. Only a second comma group (`1,234,567`) or an explicit `.`/`٫` decimal part (`1,500.00`) disambiguates.
 - Mobile numeric keypads (`inputMode="decimal"` is used in 43 files) show the device locale's decimal key, which may produce `,` (device region) or `٫` (Arabic keyboards). `٫` is handled; `,` is not. **How many real users type `,` as a decimal is not measured**, and no device was tested.
 
 ### 2.4 Financial and accounting risk
@@ -91,16 +94,17 @@ Under the project rule that a policy with more than one reasonable answer is put
 
 | Option | Rule | Pros | Cons |
 |---|---|---|---|
-| **A (recommended)** | **Reject ambiguous input; keep unambiguous input.** Accept `.` and `٫` as the decimal separator (max 2 decimals); accept `,`, `٬` or space only as **thousands grouping with groups of exactly 3 digits** (`1,234,567.89`, `1,500`); **reject** a comma followed by 1–2 trailing digits (`1,5`, `12,50`), malformed commas (`1,,5`, `,5`, `5,`), and mixed styles (`1 500,50`, `1.500,50`); show a clear bilingual message ("use a dot for the decimal"). Empty stays a deliberate case per form. | Removes the silent 10×/100× error; valid inputs unchanged; no setting needed | Users typing `12,50` get an error until they retype; consumers must show NaN visibly |
+| **A1 (recommended)** | **Reject every ambiguous form; accept only unambiguous ones.** Decimal separator `.` or `٫` (max 2 decimals). A comma/`٬`/space is accepted as thousands grouping **only when it is unambiguous**: (i) two or more groups of exactly 3 digits (`1,234,567`, `12,000,000`) **or** (ii) the number also has an explicit `.`/`٫` decimal part (`1,500.00`, `12,000.50`). **Rejected:** a comma followed by 1–2 trailing digits (`1,5`, `12,50`), a single comma followed by exactly 3 digits with no decimal part (`12,000`, `1,500`, `0,500`, `999,999`), any group after a leading `0` (`0,500`, `0,500.00`), malformed commas (`1,,5`, `,5`, `5,`) and mixed styles (`1 500,50`, `1.500,50`). Clear bilingual message ("type the amount with a dot for decimals, e.g. 1500.00"). | Removes the silent 10×/100×/1000× errors; plain `1500` and `1500.00` keep working | Users who type `1,500` get an error and must retype (`1500` or `1,500.00`); consumers must show NaN visibly |
+| A2 | Like A1 but a single-comma three-digit tail is **accepted only after an explicit confirmation** showing the parsed amount ("Read as 1,500.00 SAR — confirm?") | Keeps `1,500` usable | Relies on the user's attention; extra UI on every money form; still ambiguous in bulk/import paths |
 | B | Locale-driven interpretation from a tenant/user setting (decimal separator) | Matches each user's habit | New settings, more blast radius, still ambiguous without explicit setup; a wrong setting recreates the error |
 | C | Keep parsing, add a **parsed-amount preview** next to every amount field | No rejection | Mitigation only; relies on the user reading it; 40+ forms to change |
 
-Recommended direction: **A**, with **C** on the highest-risk forms (invoices, payments, journals) and **B** only if the owner wants it as a later business setting. Decision belongs to Safwan.
+Recommended direction: **A1**, with **C** on the highest-risk forms (invoices, payments, journals) and **B** only if the owner wants it as a later business setting. Decision belongs to Safwan.
 
 **Acceptance tests (to be run when an implementation is approved; none has been executed):**
-1. *Unit, `riyalToMinor`:* every row of §2.2 under Option A — valid rows unchanged (`1000.50`→100050, `1,234,567.89`, `١٬٢٣٤٫٥٠`, `0.30`, `100.5`); ambiguous rows (`1,5`, `1,50`, `12,34`, `0,5`, `3,14`, `1 500,50`, `1,,5`, `,5`, `5,`) → NaN; already-rejected rows still NaN; 15-digit bound unchanged; no float arithmetic.
+1. *Unit, `riyalToMinor`:* every row of §2.2 under Option A1 — valid rows unchanged (`1000`, `1000.50`→100050, `1500.00`, `1,500.00`→150000, `12,000.00`→1200000, `1,234,567`→123456700, `12,000,000`, `1,234,567.89`, `١٬٢٣٤٫٥٠`, `0.30`, `100.5`); **ambiguous rows → NaN:** two-digit/one-digit comma tails (`1,5`, `1,50`, `12,34`, `0,5`, `0,50`, `3,14`), **three-digit single-comma tails (`12,000`, `0,500`, `1,500`, `999,999`)**, leading-zero groups (`0,500.00`), malformed commas (`1,,5`, `,5`, `5,`) and mixed styles (`1 500,50`, `1.500,50`); already-rejected rows still NaN; 15-digit bound unchanged; no float arithmetic. (Under A2 the three-digit single-comma rows instead return a value flagged `needsConfirmation`.)
 2. *Property test:* for every integer minor amount m, `riyalToMinor(format(m)) === m` for the formats the UI itself produces (with and without grouping).
-3. *Per-category UI tests (one representative per group in §2.1 A):* typing `12,50` shows the bilingual error, does not enable submit/post, and sends no request; typing `12.50` and `1,250.50` works exactly as today; mutation check: removing the guard makes the test fail.
+3. *Per-category UI tests (one representative per group in §2.1 A):* typing `12,50` **and `12,000`** each show the bilingual error, does not enable submit/post, and sends no request; typing `12.50` and `1,250.50` works exactly as today; mutation check: removing the guard makes the test fail.
 4. *NaN handling audit:* a test (or checklist with evidence) per consumer proving that NaN is surfaced, never silently dropped or summed (`purchase-form.tsx` and the `>= 0` filter sites first).
 5. *Platform prices:* the preview shows the error for `1,5`; `199.5` → 19950 and the Arabic-digit cases unchanged (they are covered today).
 6. *Device check (NOT VERIFIED today):* on real iOS and Android keyboards with comma-decimal regions and Arabic keyboards, record which character the decimal key produces in a representative field, and confirm the outcome is the error (A) rather than a wrong amount.
