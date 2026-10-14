@@ -47,8 +47,8 @@ const tree = (linkedUser?: LinkedArg, actorScope?: ScopeArg) => (
   </NextIntlClientProvider>
 );
 
-// الافتراضي `null` = انتهى تحميل نطاق الفاعل ولم يُعرف (يحسم الخادم)؛ `undefined` الصريح = ما زال يُحمَّل.
-function open(linkedUser?: LinkedArg, actorScope: ScopeArg = null) {
+// الافتراضي = نطاقٌ معروف غير مقيَّد؛ `undefined` الصريح = ما زال يُحمَّل؛ `null` = تعذّر معرفته.
+function open(linkedUser?: LinkedArg, actorScope: ScopeArg = { branches: [], warehouses: [] }) {
   return render(tree(linkedUser, actorScope));
 }
 
@@ -183,9 +183,21 @@ describe('EmployeeDialog: login access is blocked until the actor scope is known
     expect(screen.queryByText(/Checking your own access scope/)).toBeNull();
   });
 
-  it('a lookup that finished without a usable scope (null) never blocks creation — the server decides', async () => {
+  it('a lookup that finished without a usable scope (null) also blocks login access, with a distinct reason, and writes nothing', async () => {
     open(undefined, null);
     await fillNewUser();
+    expect((await screen.findByRole('alert')).textContent).toContain("couldn't verify your own access scope");
+    expect((screen.getByRole('button', { name: 'Save' }) as HTMLButtonElement).disabled).toBe(true);
+    expect(writes()).toEqual([]);
+  });
+
+  it('but an employee save that grants no login access is never blocked by an unknown scope', async () => {
+    render(
+      <NextIntlClientProvider locale="en" messages={messages as never}>
+        <EmployeeDialog open onClose={() => {}} onSaved={() => {}} canManageUsers actorScope={null} />
+      </NextIntlClientProvider>,
+    );
+    await userEvent.type(screen.getByLabelText('Name'), 'Hind');
     expect((screen.getByRole('button', { name: 'Save' }) as HTMLButtonElement).disabled).toBe(false);
   });
 

@@ -6828,7 +6828,8 @@
     "discard": "Discard",
     "no_changes": "No changes yet",
     "saving": "Saving…",
-    "actor_scope_loading": "Checking your own access scope before login access can be granted…"
+    "actor_scope_loading": "Checking your own access scope before login access can be granted…",
+    "actor_scope_unavailable": "We couldn't verify your own access scope, so login access can't be granted from here. Reload the page and try again."
   },
   "voucherDoc": {
     "received_from": "Received from",

@@ -30,7 +30,9 @@ async function open(
     if (path === '/applications/nav-state') return json(route, { data: {} });
     if (path === '/employees' && method === 'POST') return json(route, { data: { id: 'e9', name: 'Hind' } }, 201);
     if (path === '/users' && method === 'POST') return json(route, { data: { id: 'u9' } }, 201);
-    if (path === '/users' && method === 'GET') return json(route, { data: opts.users ?? [] });
+    // الافتراضي: صفّ المشاهد نفسه بلا تقييد (نموذج الموظف يحتاج معرفة نطاقه قبل منح الدخول).
+    const ownRow = { id: 'me', name: 'Safwan', email: 'owner@acme.test', role: opts.role ?? 'owner', is_active: true, employee_id: null, employee: null, branch_ids: [], warehouse_ids: [] };
+    if (path === '/users' && method === 'GET') return json(route, { data: opts.users ?? [ownRow] });
     if (path === '/roles') return json(route, { data: [
       { id: 'r3', slug: 'staff', name: 'Staff', is_owner: false, is_system: true, permissions: ['invoices.view'] },
     ], meta: { permissions: [] } });
@@ -146,6 +148,18 @@ test.describe('AC-UX-05 shared scope editor', () => {
     await dialog.getByRole('button', { name: 'Save' }).click();
     await expect.poll(() => w.writes.some((x) => x.path === '/users')).toBe(true);
     expect(w.writes.find((x) => x.path === '/users')!.body.branch_ids).toEqual(['b1']);
+  });
+
+  test('when the access scope cannot be verified, login access is blocked with a reason (employee-only saves stay possible)', async ({ page }) => {
+    const w = world();
+    await open(page, w, { path: '/hr', users: [] }); // لا صفّ للمشاهد ⇒ تعذّر معرفة نطاقه
+    const dialog = await openAddUser(page);
+    await expect(dialog.getByText(/couldn't verify your own access scope/)).toBeVisible();
+    await dialog.getByLabel('Name', { exact: true }).fill('Hind');
+    await dialog.locator('#login_email').fill('hind@acme.test');
+    await dialog.locator('#login_password').fill('secret-pass-1');
+    await expect(dialog.getByRole('button', { name: 'Save' })).toBeDisabled();
+    expect(w.writes).toEqual([]);
   });
 
   test('Arabic renders the shared editor RTL with no overflow', async ({ page }, info) => {
