@@ -118,15 +118,30 @@ Effects: trial balance, balance sheet, ledger and every account balance are **un
 
 ## 8. Tests and results
 
-SEE_TEST_RESULTS
+| Suite | Result |
+|---|---|
+| `VatRoleIntegrityTest` (27) — each invalid category ⇒ 422 + `reason` (every non-liability/non-asset type, other VAT role's system account, cash/bank by record and by system code, other-role account, shared account, other-role history, VAT-reserved account to another role, unclean target; clean/system/own-history exemptions; inactive/group/foreign); valid custom mappings (+ posting lands there); reset; default tenant unchanged & verified; **report before/after remap and per period**; multiple remaps (history chain, input & output); reversal nets to zero; credit note via hard-coded `2120` after remap still counted; branch filter; overlap, type/cash-bank/other-role contamination, pre-mapping activity, unaudited history, non-VAT source (period-scoped); legacy invalid mapping still posts + flagged; no mapping/event/ledger rewrite (full snapshot compare); tenant isolation; Fiscal Close dependency | SQLite ✅ 27/27 · PostgreSQL ✅ 27/27 (local) |
+| `VatRoleIntegrityPostgresTest` (2) — 5 rounds of `tax_input` vs another role racing for one account via forked processes (exactly one winner, no 40P01); mapping vs ledger post on the same clean account | PostgreSQL ✅. **Mutation check:** with the tenant lock removed both mappings win and the test fails ⇒ the test is live |
+| Existing accounting regressions (`AccountRoutingTest`, `SalesPaymentAccountRoutingTest`, `PurchaseAccountRoutingTest`, `InventoryCogsAccountRoutingTest`, `GeneralReportTest`, credit-note/return/fiscal-year suites) | ✅ unchanged and green (no existing test was edited) |
+| Web: `account-routing` page (6), `TaxCard` (2 new), accounting-settings + reports + lib suites (73 files / 456 tests) | ✅ · `next build` ✅ |
+| Local full `php artisan test` (SQLite) | 6,725 passed · 91 skipped · 38 failed — **all 38 environmental, none in touched code**: 26 Fuel tests need PHP `bcmath` (absent in this sandbox; CI installs it, `ci.yml` L97); 12 (`AuthRecoveryTest`, `UserInvitationTest`, `ResendMailTransportTest`) failed only because the local Laravel overlay lacked `app/Mail` + `resources/views` — after syncing them those 24 tests pass |
+| Local PostgreSQL accounting subset | no failure outside the same Fuel/`bcmath` cases |
+
+**CI (GitHub Actions) is the authoritative full run** — see §9.
 
 ## 9. CI / Build status
 
-SEE_CI_STATUS
+On code head `3a5951e` (PR #1457): `php artisan test (L11, sqlite)` ✅ · `php artisan test (L11, pgsql)` ✅ · `CI Gate` ✅ · `web build (Next.js)` ✅. The ZATCA SDK advisory workflow is not triggered (no path match).
 
 ## 10. Branch / PR / SHAs
 
-SEE_BRANCH_INFO
+| Item | Value |
+|---|---|
+| Branch | `feat/rem05-acc01-vat-role-integrity` |
+| PR | #1457 (Draft) → `main`. Supersedes Phase-1 docs PR #1453 (its commit is included here). |
+| Base | `main` @ `a9f4acfc7a8b4fbc4353dccb04705184c1f5d10c` |
+| Code head (verified by CI) | `3a5951e3f5156f8e96bddbba6b8a718c673d2f5b` |
+| Final head | the head of PR #1457; it adds only this report's §8–§10 on top of the verified code head (docs-only, no code change) |
 
 ## 11. Next recommended step
 
