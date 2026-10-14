@@ -102,7 +102,26 @@ php artisan storefront:flat-host-backfill --host=zhor-tyb.dominah.store.awjdev.x
 # expect: inserted ×2; re-running → already_present ×2
 ```
 Post-check (SELECT only): the two new rows exist with the legacy `tenant_id`/`storefront_id`, `is_primary=false`, `dominah-h` inactive, legacy rows unchanged (compare with your pre-run S1 output); `GET https://dominah-zhor-tyb.store.awjdev.xyz/` should serve; `dominah-h…` should 404.
-**Rollback** (needs your approval, it is a DELETE): `DELETE FROM storefront_domains WHERE hostname IN ('dominah-zhor-tyb.store.awjdev.xyz','dominah-h.store.awjdev.xyz');` — nothing else depends on these rows and legacy rows are untouched.
+**Pre-check (before `--execute`, SELECT only — record the output):**
+```sql
+SELECT id, hostname, tenant_id, storefront_id, is_active, is_primary, created_at
+FROM storefront_domains
+WHERE hostname IN ('dominah-zhor-tyb.store.awjdev.xyz','dominah-h.store.awjdev.xyz');
+```
+Expected: 0 rows (inventory S2 said both are free). If any row exists, `--execute` reports it as `already_present` and will **not** have created it — it must never be rolled back.
+
+**Rollback** (needs your approval; it is a DELETE) — **only rows this specific run reported as `inserted`**, by id, after re-validating ownership/state:
+```sql
+-- 1) find the rows this run created: present now, absent from the pre-check, created after the run started
+SELECT d.id, d.hostname, d.tenant_id, d.storefront_id, d.is_active, d.is_primary, d.created_at
+FROM storefront_domains d
+WHERE d.hostname IN ('dominah-zhor-tyb.store.awjdev.xyz','dominah-h.store.awjdev.xyz')
+  AND d.created_at >= '<run start timestamp>'          -- excludes anything that pre-existed
+  AND d.type = 'awj_subdomain' AND d.is_primary = false;
+-- 2) after comparing with the command's `inserted` lines and the pre-check, delete by id only:
+DELETE FROM storefront_domains WHERE id IN ('<id-from-step-1>', ...);
+```
+Rows reported `already_present` are never deleted. Nothing else depends on the inserted rows and the legacy rows are untouched.
 
 ## 7. Risks / residual
 - Open Store: after backfill `zhor-tyb` shows the flat URL (P1). Until the backfill is executed in production the legacy URL is still what is shown (nothing to prefer yet).
