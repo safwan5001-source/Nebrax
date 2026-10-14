@@ -313,12 +313,12 @@ export default function LandingPage() {
         </section>
 
         <section className="px-4 py-16 sm:px-6 lg:px-8 lg:py-20">
-          <div className="mx-auto max-w-5xl rounded-lg border border-primary bg-primary px-6 py-10 text-white sm:px-10 sm:py-12">
+          <div className="mx-auto max-w-5xl rounded-lg border border-primary bg-primary px-6 py-10 text-primary-foreground sm:px-10 sm:py-12">
             <div className="grid items-center gap-8 md:grid-cols-[1fr_auto]">
               <div>
-                <ShieldCheck className="h-7 w-7 text-white/85" strokeWidth={1.8} aria-hidden="true" />
+                <ShieldCheck className="h-7 w-7 text-primary-foreground/85" strokeWidth={1.8} aria-hidden="true" />
                 <h2 className="mt-4 text-2xl font-bold leading-tight sm:text-3xl">{t('final_title')}</h2>
-                <p className="mt-3 max-w-2xl text-sm leading-7 text-white/75 sm:text-base">{t('final_subtitle')}</p>
+                <p className="mt-3 max-w-2xl text-sm leading-7 text-primary-foreground/90 sm:text-base">{t('final_subtitle')}</p>
               </div>
             </div>
           </div>

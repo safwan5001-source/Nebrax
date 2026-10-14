@@ -78,6 +78,7 @@ export function EmptyState({
   action,
   surface = 'panel',
   className,
+  titleAs: TitleTag = 'p',
 }: {
   title: React.ReactNode;
   description?: React.ReactNode;
@@ -85,11 +86,13 @@ export function EmptyState({
   action?: React.ReactNode;
   surface?: Surface;
   className?: string;
+  /** حين تكون الحالة هي الصفحة كلها (منعٌ بالصلاحية) يصير عنوانها `h1` الصفحة. */
+  titleAs?: 'p' | 'h1' | 'h2';
 }) {
   return (
     <div className={cn(surfaceClass(surface), 'flex flex-col items-center gap-2 px-4 py-12 text-center', className)}>
       <Icon className="h-8 w-8 text-muted opacity-60" strokeWidth={1.5} aria-hidden="true" />
-      <p className="text-sm font-medium text-text">{title}</p>
+      <TitleTag className="text-sm font-medium text-text">{title}</TitleTag>
       {description ? <p className="max-w-md text-sm leading-relaxed text-muted">{description}</p> : null}
       {action ? <div className="mt-2">{action}</div> : null}
     </div>

@@ -152,7 +152,7 @@ export default function AccountRoutingPage() {
   if (!mounted) return <LoadingState variant="cards" rows={5} />;
 
   if (!canView) {
-    return <EmptyState icon={Lock} title={t('forbidden')} description={t('forbiddenHint')} />;
+    return <EmptyState titleAs="h1" icon={Lock} title={t('forbidden')} description={t('forbiddenHint')} />;
   }
 
   return (
