@@ -1,6 +1,20 @@
 # REM-37 / SEC-07 — Implementation Report: dedicated `zatca.submit` permission (separation of duties)
 
-STATUS: **PASS locally (pending CI on the final head and owner review)** — **DRAFT PR — NOT MERGED — NOT DEPLOYED**
+STATUS: **REM-37 core (PR #1419): MERGED** (`ff8e2332d23d156de2ca6f79646da2eccc7da4e8`) · **CI verified** · **Production deployment NOT VERIFIED**
+STATUS: **Review-fix follow-up (Codex P1 + P2): Draft PR — NOT MERGED — NOT DEPLOYED** — see *Post-merge review fixes* below
+
+> **Lifecycle (updated 2026-10-14).** PR #1419 was merged at 07:16:29Z, two minutes before the automated review posted two findings (07:18:53Z) that therefore never reached the merged code. They are fixed in a **follow-up PR from latest `main`** (a merged PR is finished and is not reused). Wording below that says "Draft / not merged" describes PR #1419 as authored.
+>
+> | Stage | State | Evidence |
+> |---|---|---|
+> | Implementation completed | ✅ core · ✅ review fixes (follow-up PR) | 22 core tests; review-fix tests listed below |
+> | PR merged | ✅ #1419 · ❌ follow-up (Draft) | merge SHA `ff8e2332d23d156de2ca6f79646da2eccc7da4e8` |
+> | CI verified | ✅ #1419 | head `e9dba0c`: sqlite ✅ pgsql ✅ web build ✅ CI Gate ✅ (run 38503529305); post-merge `main` push run 38527265627 ✅. Follow-up PR: see *CI* |
+> | Production deployment | **NOT VERIFIED** | No deployment evidence reviewed; the backfill migration must deploy with the code |
+>
+> This is not a statement of ZATCA Phase 2 compliance or production readiness.
+>
+> *CI-Gate note:* a second `CI Gate` run on #1419's head (job 115730414804, 07:16:44Z) shows ❌ `stale gate: PR head … (state closed)`; it was triggered by the draft→ready transition at the moment of merge and evaluated a closed PR. The gate run on the same head before merge was ✅.
 DATE: 2026-10-14
 HORIZON: TAX-ZATCA (origin: TAX-HZ-00 → REM-37)
 ZONE: C — security / authorization / ZATCA
@@ -24,7 +38,7 @@ ZONE: C — security / authorization / ZATCA
 | PR | recorded in the PR itself and the hand-back message (**Draft**) |
 | Code + tests head | `8620d2ad8c157a5e8e9954415a819e014fb2a7a4` |
 | Final Head SHA | recorded in the PR and the hand-back message (a file cannot contain its own commit hash); it adds only this report on top of the code head |
-| Merge SHA | N/A |
+| Merge SHA | `ff8e2332d23d156de2ca6f79646da2eccc7da4e8` (PR #1419; was "N/A" at authoring) |
 
 ## Original defect
 
@@ -178,9 +192,54 @@ Only message strings changed (`hr.perm_actions.submit` in `ar.json`/`en.json`). 
 5. Reads (`GET …/zatca/submissions`, `…/zatca`) are intentionally unchanged; the separate observation that `zatca-settings` metadata is visible to `invoices.view` (backlog REM-37 card) is **not** addressed here — out of the approved scope.
 6. The REM-08 backlog entry on `main` still reads "IN REVIEW (Draft PR)" although #1415 merged; not edited here to keep this PR to REM-37.
 
+## Post-merge review fixes (Codex P1 + P2) — follow-up PR
+
+Two findings were posted on #1419 (`chatgpt-codex-connector`, 07:18:53Z, after the merge). Both were verified against `main` and are fixed here, nothing else.
+
+### P1 — failure alerts still keyed on `invoices.manage` (fixed)
+
+`ZatcaNotificationBridge::resolveRecipients()` selected recipients with `hasPermission('invoices.manage')` while submission (`store`/`dispatch`) requires `zatca.submit` since REM-37. Effect after separation of duties: invoice managers who can no longer retry still got `critical` rejection/failure alerts, and a submit-only role (the very users who can act) got none.
+
+**Contract now:** a recipient is an **active user of the same tenant** who **holds `zatca.submit`** (resolved through `Rbac::allows` under the tenant context, so stored role rows — not only `MATRIX` — decide) **and** can access the attempt's branch (`branch_id IS NULL` ⇒ visible to all; unchanged). Unchanged by design: notification payload (no raw response), dedupe key, `afterCommit` deferral, failure isolation, tenant-scoped delivery. `invoices.manage` and `zatca.view` do **not** receive alerts.
+
+| Role (stored permissions) | Can submit (route) | Notified |
+|---|---|---|
+| owner/admin (`*`) | ✅ | ✅ |
+| `zatca.submit` only | ✅ | ✅ (was ❌) |
+| `invoices.manage` + `zatca.submit` | ✅ | ✅ |
+| `invoices.manage` only | ❌ 403 | ❌ (was ✅) |
+| `zatca.view` only / `invoices.view` only | ❌ 403 | ❌ |
+| submit-capable but inactive | — | ❌ |
+| submit-capable in another tenant | — | ❌ |
+| submit-capable, restricted to another branch | — | ❌ (branch visibility kept) |
+
+Tests (`tests/Feature/ZatcaNotificationBridgeTest.php`, 14 total, 6 new/rewritten): `only_zatca_submit_holders_are_notified`, `separated_permissions_notify_only_whoever_can_actually_submit` (submit-only / manage-only / view-only / both / none), `the_recipient_predicate_matches_the_actual_route_authorization_for_every_role` (drives the **real routes**: HTTP 202 ⇔ notified, 403 ⇔ not notified), `inactive_submitters_are_never_notified`, `a_submitter_in_another_tenant_never_receives_this_tenants_alert`, `branch_visibility_still_applies_on_top_of_the_submit_permission`. **Negative control:** reverting the predicate to `invoices.manage` fails 3 of them.
+
+### P2 — demo Role Matrix lacked `zatca.submit` (fixed)
+
+`web/src/lib/mock-data.ts`: `mockPermissionCatalogue` gains `zatca.submit` (after `zatca.view`); the demo `accountant` role gains `zatca.view` + `zatca.submit` (mirrors `Rbac::MATRIX['accountant']` for the ZATCA group). `staff` and the custom `role-cashier` (which holds `invoices.manage`) deliberately **do not** get it; owner/admin stay `['*']`.
+
+Tests: new `web/src/lib/__tests__/mock-zatca-submit-rbac.test.ts` (6) — parity with the backend is checked by **reading `app/Support/Rbac.php`** (ZATCA keys of `PERMISSIONS` and of `MATRIX['accountant']`/`staff`), so future drift fails the web suite; also asserts no other demo role gains submission and that `GET /roles` (mock router) serves it. `role-dialog.test.tsx` gains 3 tests (zatca.submit is its own toggle, never implied by `zatca.view`, canonical key submitted only when explicitly toggled, editing keeps it off/on correctly). **Negative control:** with the old `mock-data.ts` 3 of the 6 parity tests fail.
+
+### Verification requested by the owner
+
+| Question | Answer / evidence |
+|---|---|
+| Migration preserves existing tenant role permissions? | Yes — per-row, append-only: existing keys keep value **and order**; only `zatca.submit` is appended (`unrelated_permissions_keep_their_exact_values_and_order`, `roles_without_invoices_manage_are_untouched_byte_for_byte`). Unreadable JSON is left alone; soft-deleted roles are included so a restore loses nothing. Re-read in this review; **not modified**. |
+| Idempotent? | Yes — a role already holding `zatca.submit` is skipped; no write for unchanged rows (`already_upgraded_roles_get_no_duplicate_and_rerunning_is_a_no_op`). |
+| No role gains unintended submission access? | By design only roles that **already held `invoices.manage`** (the previous submission authority) receive it (owner-approved Option B); roles without it, `staff`, `self_service`, and `*` roles are untouched. Residual, accepted: custom roles with `invoices.manage` (e.g. a cashier) keep the capability they had until an admin removes `zatca.submit`. |
+| Submission authorization and notifications consistent? | Yes — same permission, proven against the real routes (above). |
+| App-entitlement and active-branch guards still effective? | Yes — route middleware untouched (`zatca.submit` + `compliance.zatca` + throttle); `Rem37ZatcaSubmitPermissionTest`, `Rem03/03b ActiveBranchOnly`, `Rem08`, and the `Application*` enforcement/fail-closed/semantics suites all pass. |
+| SQLite and PostgreSQL | Focused matrix (filter on the names Rem37, ZatcaNotificationBridge, ZatcaSubmission, Rem03, Rem08, ApiRbac, RoleTest, Application, PublicApiScope): **281 passed (2944 assertions) on SQLite and 281 passed (2944) on PostgreSQL 16**, local. |
+| Web tests/build | local: new + changed suites 17 pass; full vitest and build: see *CI*; CI is authoritative. |
+
+Files changed by the follow-up: `app/Services/Accounting/ZatcaNotificationBridge.php` (predicate + docblock), `tests/Feature/ZatcaNotificationBridgeTest.php`, `web/src/lib/mock-data.ts`, `web/src/lib/__tests__/mock-zatca-submit-rbac.test.ts` (new), `web/src/components/hr/role-dialog.test.tsx`, this report. No migration, route, `Rbac`, schema, accounting, ICV/PIH/QR/XML, transport, CI Gate or settings change.
+
+Remaining risks of the follow-up: (1) alert recipients now exclude `invoices.manage`-only users — intended, but a tenant whose only submitters are not yet assigned `zatca.submit` will see **no** alerts (fail-quiet); the migration covers existing stored roles. (2) `ZatcaSubmissionRecovery`/other notifiers were checked: only this bridge used `invoices.manage` for ZATCA alerts. (3) The web parity test reads the PHP file by relative path; moving `Rbac.php` makes it fail loudly (by intent).
+
 ## CI
 
-Recorded in the hand-back message against the exact final head (a file cannot contain its own head's CI result).
+PR #1419: see the lifecycle table at the top. Follow-up PR: recorded in the PR comment against the exact final head (a file cannot contain its own head's CI result).
 
 ## Merge / Deploy
 

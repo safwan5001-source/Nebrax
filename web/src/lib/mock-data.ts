@@ -2287,7 +2287,8 @@ export const mockPermissionCatalogue = [
   'assets.view', 'assets.manage', 'cost_centers.view', 'cost_centers.manage',
   'accounts.view', 'accounts.manage', 'branches.view', 'branches.manage',
   'company.manage', 'users.view', 'users.manage', 'roles.view', 'roles.manage',
-  'reports.view', 'zatca.view',
+  // REM-37 / SEC-07: الإرسال إلى ZATCA سلطة مستقلة عن `zatca.view` (القراءة) وعن `invoices.manage`.
+  'reports.view', 'zatca.view', 'zatca.submit',
 ];
 
 export const mockRoles = [
@@ -2296,6 +2297,8 @@ export const mockRoles = [
   { id: 'ro-acc', slug: 'accountant', name: 'محاسب', permissions: [
     'partners.view', 'partners.manage', 'invoices.view', 'invoices.manage',
     'payments.view', 'payments.manage', 'reports.view', 'accounts.view',
+    // REM-37: نظير المحاسب المدمج في Rbac::MATRIX — يرى حالة ZATCA ويرسل؛ لا staff ولا الأدوار المخصصة.
+    'zatca.view', 'zatca.submit',
   ], is_system: true, is_owner: false, users_count: 2 },
   { id: 'ro-staff', slug: 'staff', name: 'موظف', permissions: [
     'partners.view', 'products.view', 'invoices.view', 'reports.view',
