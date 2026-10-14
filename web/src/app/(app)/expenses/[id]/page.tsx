@@ -13,6 +13,7 @@ import {
 } from '@/components/nebrax';
 import { api, ApiError, downloadFile } from '@/lib/api';
 import { formatRiyal } from '@/lib/money';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 
 interface Attachment { id: string; original_name: string; mime_type?: string | null; size: number }
 interface Expense {
@@ -51,6 +52,7 @@ function bytes(value: number): string {
 
 export default function ExpenseDetailPage() {
   const t = useTranslations('expenses');
+  const askConfirm = useConfirm();
   const tc = useTranslations('common');
   const params = useParams<{ id: string }>();
   const router = useRouter();
@@ -76,7 +78,7 @@ export default function ExpenseDetailPage() {
 
   async function postExpense() {
     if (!expense || expense.status !== 'draft') return;
-    if (!window.confirm(t('confirm_post_expense'))) return;
+    if (!(await askConfirm({ message: t('confirm_post_expense') }))) return;
 
     setPosting(true);
     try {
@@ -110,7 +112,7 @@ export default function ExpenseDetailPage() {
       setError(t('linked_draft_delete_blocked'));
       return;
     }
-    if (!window.confirm(t('confirm_delete_expense'))) return;
+    if (!(await askConfirm({ message: t('confirm_delete_expense'), tone: 'danger' }))) return;
     setActing(true);
     try {
       await api(`/expenses/${expense.id}`, { method: 'DELETE' });

@@ -13,11 +13,13 @@ import { useToast } from '@/components/ui/toast';
 import { api, ApiError } from '@/lib/api';
 import { type CashBankAccount, type CashBankTransfer } from '@/lib/cash-bank';
 import { formatRiyal } from '@/lib/money';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 
 type Section = 'details' | 'permissions' | 'transfers' | 'activity';
 
 export default function CashBankDetailPage() {
   const t = useTranslations('cashBank');
+  const askConfirm = useConfirm();
   const tc = useTranslations('common');
   const params = useParams<{ id: string }>();
   const router = useRouter();
@@ -45,14 +47,14 @@ export default function CashBankDetailPage() {
   const isOpen = (target: Section) => !collapsed && section === target;
 
   async function deactivate() {
-    if (!item || !window.confirm(t('confirm_deactivate'))) return;
+    if (!item || !(await askConfirm({ message: t('confirm_deactivate'), tone: 'danger' }))) return;
     setActing(true); try { await api(`/cash-bank-accounts/${item.id}/deactivate`, { method: 'POST' }); success(t('deactivated')); load(); } catch (err) { toastError(err instanceof ApiError ? err.message : tc('saveFailed')); } finally { setActing(false); }
   }
   async function makeMain() {
     if (!item) return; setActing(true); try { await api(`/cash-bank-accounts/${item.id}/make-main`, { method: 'POST' }); success(t('main_updated')); load(); } catch (err) { toastError(err instanceof ApiError ? err.message : tc('saveFailed')); } finally { setActing(false); }
   }
   async function remove() {
-    if (!item || !window.confirm(t('confirm_delete'))) return;
+    if (!item || !(await askConfirm({ message: t('confirm_delete'), tone: 'danger' }))) return;
     setActing(true); try { await api(`/cash-bank-accounts/${item.id}`, { method: 'DELETE' }); success(t('deleted')); router.push('/cash-and-bank'); } catch (err) { toastError(err instanceof ApiError ? err.message : tc('saveFailed')); } finally { setActing(false); }
   }
 

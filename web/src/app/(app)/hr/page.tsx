@@ -26,6 +26,7 @@ import { api, ApiError } from '@/lib/api';
 import { currentUser } from '@/lib/auth';
 import { formatRiyal } from '@/lib/money';
 import { cn } from '@/lib/utils';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 
 type Tab = 'employees' | 'shifts' | 'attendance' | 'runs' | 'leave' | 'requests' | 'roles' | 'users' | 'org_structure';
 const TABS: Tab[] = ['employees', 'shifts', 'attendance', 'runs', 'leave', 'requests', 'roles', 'users', 'org_structure'];
@@ -43,6 +44,7 @@ const attStatusTone: Record<AttendanceStatus, 'positive' | 'warning' | 'muted' |
 
 export default function HrPage() {
   const t = useTranslations('hr');
+  const askConfirm = useConfirm();
   const tu = useTranslations('users');
   const ts = useTranslations('status');
   const tc = useTranslations('common');
@@ -115,7 +117,7 @@ export default function HrPage() {
   }
 
   async function sendInvitation(user: TeamUser) {
-    if (!window.confirm(tu('send_invitation_confirm', { email: user.email }))) return;
+    if (!(await askConfirm({ message: tu('send_invitation_confirm', { email: user.email }) }))) return;
     try {
       await api(`/users/${user.id}/send-invitation`, { method: 'POST' });
       success(tu('invitation_sent'));
@@ -312,12 +314,12 @@ export default function HrPage() {
     [t]
   );
 
-  const deleteRole = useCallback((r: Role) => {
-    if (!window.confirm(t('confirm_delete_role'))) return;
+  const deleteRole = useCallback(async (r: Role) => {
+    if (!(await askConfirm({ message: t('confirm_delete_role'), tone: 'danger' }))) return;
     api(`/roles/${r.id}`, { method: 'DELETE' })
       .then(() => { success(tc('deleted')); reloadRoles(); })
       .catch((e) => error(e instanceof ApiError ? e.message : tc('saveFailed')));
-  }, [t, tc, success, error, reloadRoles]);
+  }, [t, tc, success, error, reloadRoles, askConfirm]);
 
   const roleColumns = useMemo<ColumnDef<Role, unknown>[]>(
     () => [

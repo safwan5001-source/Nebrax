@@ -17,6 +17,7 @@ import { api, ApiError } from '@/lib/api';
 import { branchViewQuery, type BranchView } from '@/lib/branch-view';
 import type { ActiveFilter, DataExplorerState, FilterDefinition } from '@/lib/data-explorer/types';
 import { parseExplorerState, removeFilter, replaceFilter, serializeExplorerState } from '@/lib/data-explorer/url-state';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 
 interface ManualJournal {
   id: string;
@@ -44,6 +45,7 @@ function isEmptyFilter(filter: ActiveFilter): boolean {
 
 export default function ManualJournalsPage() {
   const t = useTranslations('manualJournals');
+  const askConfirm = useConfirm();
   const tc = useTranslations('common');
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -95,7 +97,7 @@ export default function ManualJournalsPage() {
   }, [router, success, t, tc, toastError]);
 
   const remove = useCallback(async (id: string) => {
-    if (!window.confirm(t('confirmDelete'))) return;
+    if (!(await askConfirm({ message: t('confirmDelete'), tone: 'danger' }))) return;
     setActing(id);
     try {
       await api(`/manual-journals/${id}`, { method: 'DELETE' });
@@ -104,7 +106,7 @@ export default function ManualJournalsPage() {
     } catch (err) {
       toastError(err instanceof ApiError ? err.message : tc('saveFailed'));
     } finally { setActing(null); }
-  }, [load, success, t, tc, toastError]);
+  }, [askConfirm, load, success, t, tc, toastError]);
 
   const statusOptions = useMemo(() => Array.from(new Set(data.map((item) => item.status).filter(Boolean)))
     .sort()

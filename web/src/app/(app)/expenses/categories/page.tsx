@@ -12,6 +12,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/components/ui/toast';
 import { api, ApiError } from '@/lib/api';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 
 interface ExpenseCategory {
   id: string;
@@ -25,6 +26,7 @@ const emptyForm = { name: '', description: '', is_active: true };
 
 export default function ExpenseCategoriesPage() {
   const t = useTranslations('expenses');
+  const askConfirm = useConfirm();
   const { success, error: toastError } = useToast();
   const [categories, setCategories] = useState<ExpenseCategory[]>([]);
   const [loading, setLoading] = useState(true);
@@ -85,7 +87,7 @@ export default function ExpenseCategoriesPage() {
   }
 
   async function remove(category: ExpenseCategory) {
-    if (!window.confirm(t('confirm_delete_category', { name: category.name }))) return;
+    if (!(await askConfirm({ message: t('confirm_delete_category', { name: category.name }), tone: 'danger' }))) return;
 
     setDeleting(category.id);
     try {

@@ -13,6 +13,7 @@ import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/toast';
 import { api, ApiError } from '@/lib/api';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 
 type SettlementType = 'cash' | 'bank';
 
@@ -30,6 +31,7 @@ const EMPTY_FORM: FormState = { name: '', name_en: '', settlement_type: 'cash', 
 
 export default function PaymentMethodsPage() {
   const t = useTranslations('paymentMethods');
+  const askConfirm = useConfirm();
   const tc = useTranslations('common');
   const { success, error: toastError } = useToast();
   const [methods, setMethods] = useState<PaymentMethod[]>([]);
@@ -89,7 +91,7 @@ export default function PaymentMethodsPage() {
     catch (err) { toastError(err instanceof ApiError ? err.message : t('saveFailed')); }
   }
   async function remove(method: PaymentMethod) {
-    if (!window.confirm(t('confirmDelete', { name: method.name }))) return;
+    if (!(await askConfirm({ message: t('confirmDelete', { name: method.name }), tone: 'danger' }))) return;
     setDeleting(method.id);
     try { await api(`/payment-methods/${method.id}`, { method: 'DELETE' }); success(t('deleted')); load(); }
     catch (err) { toastError(err instanceof ApiError ? err.message : t('deleteFailed')); } finally { setDeleting(null); }

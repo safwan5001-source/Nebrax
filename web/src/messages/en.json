@@ -864,7 +864,9 @@
     "all": "All",
     "themeToggle": "Toggle color mode",
     "languageToggle": "Switch language",
-    "close": "Close"
+    "close": "Close",
+    "confirm": "Confirm",
+    "confirmTitle": "Confirm action"
   },
   "contacts": {
     "title": "Contact list",
