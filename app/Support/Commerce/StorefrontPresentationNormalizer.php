@@ -114,6 +114,36 @@ final class StorefrontPresentationNormalizer
      */
     public const DISCOVERY_AXES = ['facet', 'brand'];
 
+    /**
+     * AWJ-VD-H1 / VD-4a (§3.7) — optional display settings of a `discovery` section. Every key is emitted only when
+     * present and valid, so a document without them normalizes byte-for-byte as before. Twins of the same constants
+     * in both section-content.ts files; templates live in `DiscoveryTemplateRegistry`.
+     */
+    public const DISCOVERY_LAYOUTS = ['image-grid', 'image-cards', 'carousel', 'icon-grid', 'text-list'];
+
+    /** @var array<string, array{0: int, 1: int}> device => [min, max] */
+    public const DISCOVERY_COLUMN_RANGES = ['mobile' => [1, 4], 'tablet' => [2, 6], 'desktop' => [2, 8]];
+
+    public const DISCOVERY_ROWS_MIN = 1;
+
+    public const DISCOVERY_ROWS_MAX = 2;
+
+    public const DISCOVERY_GAPS = ['tight', 'normal', 'loose'];
+
+    public const DISCOVERY_TEXT_POSITIONS = ['below', 'overlay', 'beside'];
+
+    public const DISCOVERY_CONTENT_ORDERS = ['media-first', 'label-first'];
+
+    public const DISCOVERY_VALUE_ORDERS = ['merchant', 'count'];
+
+    public const DISCOVERY_CARD_STYLES = ['plain', 'outlined', 'elevated', 'filled'];
+
+    public const DISCOVERY_ALIGNS = ['start', 'center'];
+
+    public const DISCOVERY_MAX_ITEMS_MIN = 4;
+
+    public const DISCOVERY_MAX_ITEMS_MAX = 24;
+
     /** CUST-H4-4 — banner `imageAlt`. Twin of MAX_BANNER_IMAGE_ALT_LENGTH in both section-content.ts files. */
     public const MAX_BANNER_IMAGE_ALT_LENGTH = 150;
 
@@ -1013,7 +1043,7 @@ final class StorefrontPresentationNormalizer
                 'axis' => $axis,
                 'dimension' => $axis === 'facet' ? $dimension : null,
                 'display' => $this->inList($source['display'] ?? null, self::DISCOVERY_DISPLAYS, 'tiles'),
-            ], static fn ($v) => $v !== null);
+            ], static fn ($v) => $v !== null) + $this->discoveryDisplayOptions($source);
         }
 
         if ($type === 'deliveryPromise') {
@@ -1546,6 +1576,74 @@ final class StorefrontPresentationNormalizer
         }
 
         return $out;
+    }
+
+    /**
+     * AWJ-VD-H1 / VD-4a — the optional display settings of a `discovery` section, in canonical key order.
+     *
+     * Read-tolerant like the rest of this normalizer (saving a presentation never 422s on content): an unknown or
+     * mistyped value drops its key, so the renderer falls back to the template, then to the system default. Integers
+     * follow the `productShelf.limit` rule: an integral number (`6` or `6.0`) is clamped into its range; anything
+     * else drops the key.
+     *
+     * @param  array<string, mixed>  $source
+     * @return array<string, mixed>
+     */
+    private function discoveryDisplayOptions(array $source): array
+    {
+        $out = [];
+        $pick = static function (string $key, array $list) use ($source, &$out): void {
+            $value = $source[$key] ?? null;
+            if (is_string($value) && in_array($value, $list, true)) {
+                $out[$key] = $value;
+            }
+        };
+        $flag = static function (string $key) use ($source, &$out): void {
+            if (is_bool($source[$key] ?? null)) {
+                $out[$key] = $source[$key];
+            }
+        };
+
+        $pick('layout', self::DISCOVERY_LAYOUTS);
+        $pick('template', DiscoveryTemplateRegistry::ids());
+        $columns = [];
+        foreach (self::DISCOVERY_COLUMN_RANGES as $device => [$min, $max]) {
+            $count = $this->clampedInteger($this->object($source['columns'] ?? null)[$device] ?? null, $min, $max);
+            if ($count !== null) {
+                $columns[$device] = $count;
+            }
+        }
+        if ($columns !== []) {
+            $out['columns'] = $columns;
+        }
+        $rows = $this->clampedInteger($source['rows'] ?? null, self::DISCOVERY_ROWS_MIN, self::DISCOVERY_ROWS_MAX);
+        if ($rows !== null) {
+            $out['rows'] = $rows;
+        }
+        $pick('gap', self::DISCOVERY_GAPS);
+        $pick('textPosition', self::DISCOVERY_TEXT_POSITIONS);
+        $pick('contentOrder', self::DISCOVERY_CONTENT_ORDERS);
+        $pick('valueOrder', self::DISCOVERY_VALUE_ORDERS);
+        $pick('shape', FacetVisualRegistry::SHAPES);
+        $pick('size', FacetVisualRegistry::SIZES);
+        $flag('showLabel');
+        $pick('cardStyle', self::DISCOVERY_CARD_STYLES);
+        $pick('align', self::DISCOVERY_ALIGNS);
+        $flag('showCounts');
+        $maxItems = $this->clampedInteger($source['maxItems'] ?? null, self::DISCOVERY_MAX_ITEMS_MIN, self::DISCOVERY_MAX_ITEMS_MAX);
+        if ($maxItems !== null) {
+            $out['maxItems'] = $maxItems;
+        }
+
+        return $out;
+    }
+
+    /** A JSON integer (`6` or `6.0`; PHP decodes the latter as float) clamped into [min, max]; anything else is null. */
+    private function clampedInteger(mixed $value, int $min, int $max): ?int
+    {
+        $integral = is_int($value) || (is_float($value) && is_finite($value) && floor($value) === $value);
+
+        return $integral ? (int) max($min, min($max, $value)) : null;
     }
 
     private function safeId(mixed $value, string $fallback): string

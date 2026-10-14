@@ -166,6 +166,27 @@ describe("Store Builder — data-backed section editors (ADR-21)", () => {
       expect(screen.queryByLabelText("Dimension")).toBeNull();
     });
 
+    it("keeps the display settings it does not edit when the merchant changes the title or display (VD-4a)", () => {
+      const stored = {
+        title: "Occasions",
+        axis: "facet",
+        dimension: "occasion",
+        display: "tiles",
+        layout: "image-cards",
+        template: "boutique-arches",
+        columns: { mobile: 2, desktop: 6 },
+        shape: "arch",
+        showCounts: true,
+        maxItems: 16,
+      };
+      const onChange = renderPanel(withSection("discovery", stored));
+      fireEvent.change(screen.getByLabelText("Display"), { target: { value: "chips" } });
+      expect(lastContent(onChange)).toEqual({ ...stored, display: "chips" });
+      fireEvent.change(screen.getByLabelText("Browse by"), { target: { value: "brand" } });
+      const { dimension: _dimension, ...withoutDimension } = stored;
+      expect(lastContent(onChange)).toEqual({ ...withoutDimension, axis: "brand", display: "chips" });
+    });
+
     it("flags an incomplete facet section", () => {
       const onChange = renderPanel(withSection("discovery"));
       expect(document.querySelector("[data-section-incomplete]")).not.toBeNull();

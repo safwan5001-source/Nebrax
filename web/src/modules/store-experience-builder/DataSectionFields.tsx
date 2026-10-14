@@ -422,11 +422,21 @@ export function DiscoveryFields({
       onChange(undefined);
       return;
     }
+    // AWJ-VD-H1 / VD-4a — keep the display settings this panel does not edit (layout, template, columns, …), so
+    // renaming a section never erases them.
+    const {
+      title: _title,
+      axis: _axis,
+      dimension: _dimension,
+      display: _display,
+      ...displayOptions
+    } = content;
     onChange({
       title: nextTitle,
       axis: nextAxis,
       ...(nextAxis === "facet" ? { dimension: nextDimension } : {}),
       display: nextDisplay,
+      ...displayOptions,
     });
   };
 

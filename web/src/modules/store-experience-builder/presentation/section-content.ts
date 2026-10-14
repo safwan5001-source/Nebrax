@@ -1,4 +1,14 @@
 import { normalizeWindowEdges } from "./announcements";
+import {
+  DISCOVERY_TEMPLATE_IDS,
+  type DiscoveryTemplateId,
+} from "./discovery-templates";
+import {
+  FACET_VISUAL_SHAPES,
+  FACET_VISUAL_SIZES,
+  type FacetVisualShape,
+  type FacetVisualSize,
+} from "./facet-visual";
 import { type ContentBlock, MAX_CONTENT_BLOCKS, normalizeContentBlocks } from "./content-blocks";
 import { type IconKey, normalizeIconKey } from "./icon-registry";
 import { type GalleryContent, normalizeGalleryContent } from "./gallery-content";
@@ -108,6 +118,52 @@ export type DiscoveryDisplay = (typeof DISCOVERY_DISPLAYS)[number];
  */
 export const DISCOVERY_AXES = ["facet", "brand"] as const;
 export type DiscoveryAxis = (typeof DISCOVERY_AXES)[number];
+/**
+ * AWJ-VD-H1 / VD-4a (§3.7) — optional display settings of a discovery
+ * section. Each key is emitted only when present and valid, so a document
+ * without them normalizes exactly as before. Twins of the PHP normalizer
+ * constants; templates live in `discovery-templates.ts`.
+ */
+export const DISCOVERY_LAYOUTS = [
+  "image-grid",
+  "image-cards",
+  "carousel",
+  "icon-grid",
+  "text-list",
+] as const;
+export type DiscoveryLayout = (typeof DISCOVERY_LAYOUTS)[number];
+/** device => [min, max] columns. */
+export const DISCOVERY_COLUMN_RANGES = {
+  mobile: [1, 4],
+  tablet: [2, 6],
+  desktop: [2, 8],
+} as const;
+export interface DiscoveryColumns {
+  mobile?: number;
+  tablet?: number;
+  desktop?: number;
+}
+export const DISCOVERY_ROWS_MIN = 1;
+export const DISCOVERY_ROWS_MAX = 2;
+export const DISCOVERY_GAPS = ["tight", "normal", "loose"] as const;
+export type DiscoveryGap = (typeof DISCOVERY_GAPS)[number];
+export const DISCOVERY_TEXT_POSITIONS = ["below", "overlay", "beside"] as const;
+export type DiscoveryTextPosition = (typeof DISCOVERY_TEXT_POSITIONS)[number];
+export const DISCOVERY_CONTENT_ORDERS = ["media-first", "label-first"] as const;
+export type DiscoveryContentOrder = (typeof DISCOVERY_CONTENT_ORDERS)[number];
+export const DISCOVERY_VALUE_ORDERS = ["merchant", "count"] as const;
+export type DiscoveryValueOrder = (typeof DISCOVERY_VALUE_ORDERS)[number];
+export const DISCOVERY_CARD_STYLES = [
+  "plain",
+  "outlined",
+  "elevated",
+  "filled",
+] as const;
+export type DiscoveryCardStyle = (typeof DISCOVERY_CARD_STYLES)[number];
+export const DISCOVERY_ALIGNS = ["start", "center"] as const;
+export type DiscoveryAlign = (typeof DISCOVERY_ALIGNS)[number];
+export const DISCOVERY_MAX_ITEMS_MIN = 4;
+export const DISCOVERY_MAX_ITEMS_MAX = 24;
 
 export type ShelfSource =
   | { kind: "collection"; slug: string }
@@ -126,6 +182,22 @@ export interface DiscoveryContent {
   /** The facet key; present only for the `facet` axis. */
   dimension?: string;
   display: DiscoveryDisplay;
+  /** VD-4a — optional display settings (absent = template, then system default). */
+  layout?: DiscoveryLayout;
+  template?: DiscoveryTemplateId;
+  columns?: DiscoveryColumns;
+  rows?: number;
+  gap?: DiscoveryGap;
+  textPosition?: DiscoveryTextPosition;
+  contentOrder?: DiscoveryContentOrder;
+  valueOrder?: DiscoveryValueOrder;
+  shape?: FacetVisualShape;
+  size?: FacetVisualSize;
+  showLabel?: boolean;
+  cardStyle?: DiscoveryCardStyle;
+  align?: DiscoveryAlign;
+  showCounts?: boolean;
+  maxItems?: number;
 }
 
 export interface DeliveryPromiseContent {
@@ -640,7 +712,85 @@ function normalizeDiscovery(
     axis,
     ...(axis === "facet" ? { dimension } : {}),
     display: display ?? "tiles",
+    ...discoveryDisplayOptions(source),
   };
+}
+
+/**
+ * AWJ-VD-H1 / VD-4a — the optional display settings, in canonical key order.
+ * Read-tolerant like the PHP authority: an unknown or mistyped value drops its
+ * key. Integers follow the shelf `limit` rule — an integral number is clamped
+ * into range, anything else drops the key.
+ */
+function discoveryDisplayOptions(
+  source: Record<string, unknown>,
+): Partial<DiscoveryContent> {
+  const out: Partial<DiscoveryContent> = {};
+  const pick = <T extends string>(
+    list: readonly T[],
+    value: unknown,
+  ): T | undefined => list.find((candidate) => candidate === value);
+
+  const layout = pick(DISCOVERY_LAYOUTS, source.layout);
+  if (layout) out.layout = layout;
+  const template = pick(DISCOVERY_TEMPLATE_IDS, source.template);
+  if (template) out.template = template;
+  const rawColumns =
+    source.columns &&
+    typeof source.columns === "object" &&
+    !Array.isArray(source.columns)
+      ? (source.columns as Record<string, unknown>)
+      : {};
+  const columns: DiscoveryColumns = {};
+  for (const device of ["mobile", "tablet", "desktop"] as const) {
+    const [min, max] = DISCOVERY_COLUMN_RANGES[device];
+    const count = clampedInteger(rawColumns[device], min, max);
+    if (count !== undefined) columns[device] = count;
+  }
+  if (Object.keys(columns).length > 0) out.columns = columns;
+  const rows = clampedInteger(
+    source.rows,
+    DISCOVERY_ROWS_MIN,
+    DISCOVERY_ROWS_MAX,
+  );
+  if (rows !== undefined) out.rows = rows;
+  const gap = pick(DISCOVERY_GAPS, source.gap);
+  if (gap) out.gap = gap;
+  const textPosition = pick(DISCOVERY_TEXT_POSITIONS, source.textPosition);
+  if (textPosition) out.textPosition = textPosition;
+  const contentOrder = pick(DISCOVERY_CONTENT_ORDERS, source.contentOrder);
+  if (contentOrder) out.contentOrder = contentOrder;
+  const valueOrder = pick(DISCOVERY_VALUE_ORDERS, source.valueOrder);
+  if (valueOrder) out.valueOrder = valueOrder;
+  const shape = pick(FACET_VISUAL_SHAPES, source.shape);
+  if (shape) out.shape = shape;
+  const size = pick(FACET_VISUAL_SIZES, source.size);
+  if (size) out.size = size;
+  if (typeof source.showLabel === "boolean") out.showLabel = source.showLabel;
+  const cardStyle = pick(DISCOVERY_CARD_STYLES, source.cardStyle);
+  if (cardStyle) out.cardStyle = cardStyle;
+  const align = pick(DISCOVERY_ALIGNS, source.align);
+  if (align) out.align = align;
+  if (typeof source.showCounts === "boolean")
+    out.showCounts = source.showCounts;
+  const maxItems = clampedInteger(
+    source.maxItems,
+    DISCOVERY_MAX_ITEMS_MIN,
+    DISCOVERY_MAX_ITEMS_MAX,
+  );
+  if (maxItems !== undefined) out.maxItems = maxItems;
+  return out;
+}
+
+/** A JSON integer (JS cannot tell `6` from `6.0`) clamped into [min, max]. */
+function clampedInteger(
+  value: unknown,
+  min: number,
+  max: number,
+): number | undefined {
+  return typeof value === "number" && Number.isInteger(value)
+    ? Math.max(min, Math.min(max, value))
+    : undefined;
 }
 
 function normalizeDeliveryPromise(
