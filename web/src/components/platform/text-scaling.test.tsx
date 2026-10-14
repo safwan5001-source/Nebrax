@@ -190,7 +190,7 @@ describe('platform sources keep the contract (H15-09)', () => {
     expect(read(path.join(root, 'app/platform/(console)/integrations/page.tsx'))).toContain('xl:grid-cols-[repeat(auto-fit,minmax(min(100%,19rem),1fr))]');
     for (const name of ['global-application-controls-card.tsx', 'application-override-card.tsx']) {
       const source = read(path.join(root, 'components/platform', name));
-      expect(source).toMatch(/break-words font-medium text-text">\{tApps/);
+      expect(source).toMatch(/break-words font-medium text-text">\{applicationLabel\(tApps/);
       expect(source).toMatch(/font-mono text-xs text-muted break-words|text-xs text-muted break-words/);
     }
   });
