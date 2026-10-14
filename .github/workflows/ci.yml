@@ -255,6 +255,24 @@ jobs:
           echo "max_locks_per_transaction=$LIMIT"
           [ "$LIMIT" = "1024" ] || { echo "::error::لم يُطبَّق حدّ الأقفال (القيمة: $LIMIT)"; exit 1; }
 
+      # AWJ-BACKEND-CI-04: دورٌ للقراءة فقط يستعمله مراقب تعليق الاختبارات ليرى pg_stat_activity
+      # (الحالة، wait_event، الحاجبين) لكل الجلسات — عضوية pg_monitor وحدها، بلا SUPERUSER ولا كتابة.
+      # يتصل عبر docker exec على المقبس المحلي فلا كلمة مرور ولا سلسلة اتصال في أي سجل.
+      - name: دور مراقبة PostgreSQL للقراءة فقط (pgsql فقط)
+        if: matrix.db == 'pgsql'
+        run: |
+          set -euo pipefail
+          CID="$(docker ps -q --filter ancestor=postgres:16)"
+          docker exec "$CID" psql -U nibras -d nibras -v ON_ERROR_STOP=1 -c "CREATE ROLE awj_ci_watchdog LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION IN ROLE pg_monitor"
+
+      # اختبارات المراقب نفسه (تعليق مصطنع، تنظيف العمليات، فشل أدوات التشخيص، منع تسرّب الأسرار،
+      # ثبات رمز الخروج، وأن الدور أعلاه يرى wait_event لجلسةٍ أخرى على هذا الخادم فعلاً).
+      - name: اختبارات مراقب تعليق الاختبارات (pgsql فقط)
+        if: matrix.db == 'pgsql'
+        env:
+          AWJ_WATCHDOG_TEST_PG_DOCKER_FILTER: ancestor=postgres:16
+        run: python3 -m unittest discover -s scripts/ci-watchdog -v
+
       - name: تهيئة قاعدة البيانات (${{ matrix.db }})
         working-directory: ${{ env.APP_DIR }}
         run: |
@@ -283,7 +301,17 @@ jobs:
             # 60s > أطول انتظار مقصود (20s) بهامش واسع، و> deadlock_timeout فيبقى الـDeadlock 40P01.
             # يحرسه PostgresTestLockTimeoutTest.
             export PGOPTIONS="-c lock_timeout=60s"
-            php artisan test --parallel --processes="$PROCS" 2>&1 | tee test-output-${{ matrix.db }}.txt
+            # AWJ-BACKEND-CI-04: مراقبٌ للرصد فقط (لا يقتل ولا يعيد). عاملٌ لم يُكمل اختباراً واحداً طوال
+            # --stall-seconds يُصوَّر: اسم الاختبار الجاري، PID وحالة العمليات، وأين الانتظار (PHP/PostgreSQL/
+            # عملية فرعية/مقبس)، إلى سجل الـjob والـartifact. التقدّم = نموّ ملف progress لعامل ParaTest
+            # (بايت لكل اختبار مكتمل)، لذا --tmp-dir و--log-teamcity (اسم الاختبار الجاري حيّاً). المهلة:
+            # انظر docs/reports/implementation/AWJ-BACKEND-CI-04.md. خطّاف EXIT يحفظ رمز خروج الاختبارات كما هو.
+            WD_DIR="$PWD/pgsql-watchdog"; mkdir -p "$WD_DIR/paratest"
+            source "$GITHUB_WORKSPACE/scripts/ci-watchdog/hooks.sh"
+            trap awj_watchdog_stop EXIT
+            awj_watchdog_start --out-dir "$WD_DIR" --paratest-tmp-dir "$WD_DIR/paratest" --teamcity-log "$WD_DIR/teamcity.log" \
+              --stall-seconds 240 --pg-docker-filter ancestor=postgres:16 --pg-user awj_ci_watchdog --pg-db nibras --privileged-proc
+            php artisan test --parallel --processes="$PROCS" --log-teamcity "$WD_DIR/teamcity.log" --tmp-dir "$WD_DIR/paratest" 2>&1 | tee test-output-${{ matrix.db }}.txt
           else
             php artisan test 2>&1 | tee test-output-${{ matrix.db }}.txt
           fi
@@ -293,5 +321,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: test-output-${{ matrix.db }}
-          path: ${{ env.APP_DIR }}/test-output-${{ matrix.db }}.txt
-          retention-days: 1
+          # pgsql-watchdog/ (pgsql فقط): لقطات التعليق وsummary.json وسجل teamcity وملفات ParaTest إن لم يكتمل التشغيل.
+          # الاحتفاظ 7 أيام لا يوماً: تحليل حادثٍ متقطّع قد يتأخر عن يوم الفشل.
+          path: |
+            ${{ env.APP_DIR }}/test-output-${{ matrix.db }}.txt
+            ${{ env.APP_DIR }}/pgsql-watchdog/
+          retention-days: 7
