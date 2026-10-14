@@ -10,7 +10,9 @@ import { Select } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/components/ui/toast';
 import { api, ApiError } from '@/lib/api';
-import { AccessScopeFields, type AccessScope } from './access-scope-fields';
+import { currentUser } from '@/lib/auth';
+import { hasPermission } from '@/lib/permissions';
+import { AccessScopeFields, useScopeAvailability, type AccessScope } from './access-scope-fields';
 
 interface EmployeeOption {
   id: string;
@@ -72,17 +74,29 @@ export function UserDialog({
 
   const set = (k: string, v: string | boolean) => setForm((f) => ({ ...f, [k]: v }));
 
-  // تُحمَّلان عند الفتح فقط — لا حاجة لهما إن لم يُفتح النموذج بعد.
+  // كل قائمة مرجعية خلف صلاحيتها المستقلة (D-J). بلا صلاحيتها لا نطلبها (فلا 403 معروف سلفاً)
+  // ولا نُرسل حقلها: غياب المفتاح = «بلا تغيير» في الخادم، فلا يُمحى شيءٌ بالسهو.
+  const me = currentUser();
+  const canListRoles = hasPermission(me?.permissions, me?.role, 'roles.view');
+  const canListEmployees = hasPermission(me?.permissions, me?.role, 'hr.view');
+  const scopeAvailability = useScopeAvailability();
+
+  // تُحمَّلان عند الفتح فقط — ولمن يملك صلاحية عرضهما.
   useEffect(() => {
     if (!open) return;
-    api<{ data: EmployeeOption[] }>('/employees')
-      .then((r) => setEmployees(r.data))
-      .catch(() => {});
-    // دور المالك مستبعَد: منحه حكرٌ على المالك نفسه (`guardOwnerRole` بالخادم).
-    api<{ data: RoleOption[] }>('/roles')
-      .then((r) => setRoles(r.data.filter((role) => !role.is_owner)))
-      .catch(() => {});
-  }, [open]);
+    if (canListEmployees) {
+      api<{ data: EmployeeOption[] }>('/employees')
+        .then((r) => setEmployees(r.data))
+        .catch(() => {});
+    }
+    // دور المالك مستبعَد من الإسناد: منحه حكرٌ على المالك نفسه (`guardOwnerRole` بالخادم) —
+    // إلا حين يكون هو دور الحساب المعدَّل نفسه، فيبقى خياراً وحيداً مطابقاً لقيمته.
+    if (canListRoles) {
+      api<{ data: RoleOption[] }>('/roles')
+        .then((r) => setRoles(r.data.filter((role) => !role.is_owner || role.slug === user?.role)))
+        .catch(() => {});
+    }
+  }, [open, canListEmployees, canListRoles, user?.role]);
 
   // تعبئة النموذج عند فتحه لمستخدمٍ قائم؛ تفريغه عند فتحه للإضافة.
   useEffect(() => {
@@ -105,10 +119,19 @@ export function UserDialog({
     setSaving(true);
     setError(null);
     try {
+      const scopeBody: Partial<AccessScope> = {
+        ...(scopeAvailability.branches ? { branch_ids: scope.branch_ids } : {}),
+        ...(scopeAvailability.warehouses ? { warehouse_ids: scope.warehouse_ids } : {}),
+      };
       if (user) {
-        const { email: _email, password, ...rest } = form;
+        const { email: _email, password, role, employee_id, ...rest } = form;
         void _email; // البريد مقفلٌ عند التعديل — لا يُرسَل.
-        const body: Record<string, unknown> = { ...rest, employee_id: form.employee_id || null, ...scope };
+        const body: Record<string, unknown> = {
+          ...rest,
+          ...(canListRoles ? { role } : {}),
+          ...(canListEmployees ? { employee_id: employee_id || null } : {}),
+          ...scopeBody,
+        };
         if (password) body.password = password;
         await api(`/users/${user.id}`, { method: 'PUT', body });
         success(tc('updated'));
@@ -118,8 +141,8 @@ export function UserDialog({
           ...rest,
           password: sendInvitation ? undefined : rest.password,
           send_invitation: sendInvitation,
-          employee_id: employee_id || undefined,
-          ...scope,
+          employee_id: canListEmployees ? employee_id || undefined : undefined,
+          ...scopeBody,
         } });
         success(tc('created'));
       }
@@ -160,13 +183,25 @@ export function UserDialog({
         )}
         <div className="space-y-1.5">
           <Label htmlFor="urole">{t('role')}</Label>
-          <Select id="urole" value={form.role} onChange={(e) => set('role', e.target.value)}>
-            {roles.map((r) => (
-              <option key={r.id} value={r.slug}>
-                {SYSTEM_ROLE_KEYS[r.slug] ? t(SYSTEM_ROLE_KEYS[r.slug]) : r.name}
-              </option>
-            ))}
-          </Select>
+          {canListRoles ? (
+            <Select id="urole" value={form.role} onChange={(e) => set('role', e.target.value)}>
+              {roles.map((r) => (
+                <option key={r.id} value={r.slug}>
+                  {SYSTEM_ROLE_KEYS[r.slug] ? t(SYSTEM_ROLE_KEYS[r.slug]) : r.name}
+                </option>
+              ))}
+            </Select>
+          ) : (
+            <>
+              <Input
+                id="urole"
+                readOnly
+                value={user ? (SYSTEM_ROLE_KEYS[user.role] ? t(SYSTEM_ROLE_KEYS[user.role]) : t('role_custom')) : ''}
+                aria-describedby="urole-note"
+              />
+              <p id="urole-note" className="text-xs text-muted">{user ? t('role_needs_view_edit') : t('role_needs_view_create')}</p>
+            </>
+          )}
         </div>
         {user && (
           <div className="space-y-1.5">
@@ -178,20 +213,22 @@ export function UserDialog({
           </div>
         )}
 
-        <div className="space-y-1.5">
-          <Label htmlFor="uemployee">{t('link_employee')}</Label>
-          <Select id="uemployee" value={form.employee_id} onChange={(e) => set('employee_id', e.target.value)}>
-            <option value="">{t('no_employee_link')}</option>
-            {availableEmployees.map((emp) => (
-              <option key={emp.id} value={emp.id}>
-                {emp.employee_no ? `${emp.employee_no} — ${emp.name}` : emp.name}
-              </option>
-            ))}
-          </Select>
-          <p className="text-xs text-muted">{t('link_employee_hint')}</p>
-        </div>
+        {canListEmployees ? (
+          <div className="space-y-1.5">
+            <Label htmlFor="uemployee">{t('link_employee')}</Label>
+            <Select id="uemployee" value={form.employee_id} onChange={(e) => set('employee_id', e.target.value)}>
+              <option value="">{t('no_employee_link')}</option>
+              {availableEmployees.map((emp) => (
+                <option key={emp.id} value={emp.id}>
+                  {emp.employee_no ? `${emp.employee_no} — ${emp.name}` : emp.name}
+                </option>
+              ))}
+            </Select>
+            <p className="text-xs text-muted">{t('link_employee_hint')}</p>
+          </div>
+        ) : null}
 
-        <AccessScopeFields value={scope} onChange={setScope} />
+        <AccessScopeFields value={scope} onChange={setScope} availability={scopeAvailability} />
 
         {error && <p className="rounded bg-negative/10 px-3 py-2 text-xs text-negative">{error}</p>}
 
@@ -199,7 +236,7 @@ export function UserDialog({
           <Button type="button" variant="outline" onClick={onClose}>
             {t('cancel')}
           </Button>
-          <Button type="submit" disabled={saving}>
+          <Button type="submit" disabled={saving || (!user && !canListRoles)}>
             {t('save')}
           </Button>
         </div>
