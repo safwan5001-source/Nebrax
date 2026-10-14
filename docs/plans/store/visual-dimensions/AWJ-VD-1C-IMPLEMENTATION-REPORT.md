@@ -1,6 +1,6 @@
 # AWJ-VD-1C — Implementation Report (Public facet visuals and guarded image delivery)
 
-STATUS: **MERGED** — PR #1499 merged by the owner as `b1b7988b907bc2f437cb2ef6d31ff34c70ece606`. POST_MERGE_REVIEW: PENDING (post-merge CI running on main). Production deployment still needs the owner's explicit approval.
+STATUS: **MERGED** — PR #1499 merged by the owner as `b1b7988b907bc2f437cb2ef6d31ff34c70ece606`. POST_MERGE_REVIEW: PASS — CI (sqlite + pgsql) and Storefront CI green on main. Production deployment still needs the owner's explicit approval.
 DATE: 2026-10-14
 HORIZON: AWJ-COMMERCE-VISUAL-DIMENSIONS-H1 · slice VD-1c (H1-1)
 AUTHORITY:
