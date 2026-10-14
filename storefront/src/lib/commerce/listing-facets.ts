@@ -11,8 +11,9 @@
  * AWJ-VD-H1 / VD-1c (D1): `storefront.v1` also sends each facet's and value's
  * stored visual document, normalized but not resolved, with `sources` on its
  * image. It is re-normalized here with the VD-1a twin; each source must
- * rewrite to the facet-visuals proxy path (`toRenderableMediaUrl`) for this
- * very media, otherwise it is dropped. An image left without sources is
+ * rewrite to the canonical facet-visuals proxy path for this very media,
+ * otherwise it is dropped. Like the API, a value at count 0 (listed only
+ * because it is selected) and a facet with no counted value get no visual. An image left without sources is
  * removed from the document, so the VD-1a resolver falls back (icon, then
  * text) instead of requesting a URL that cannot load. Inheritance and the
  * section/template levels stay with the renderer (VD-1a + VD-4a).
@@ -24,8 +25,7 @@ import {
   normalizeFacetValueVisual,
   normalizeFacetVisual,
 } from "@/lib/presentation/facet-visual";
-import { AWJ_FACET_VISUAL_MEDIA_PROXY_PATH_PREFIX } from "./facet-visual-media";
-import { toRenderableMediaUrl } from "./mappers";
+import { toRenderableFacetVisualMediaUrl } from "./facet-visual-media";
 
 /** One renderable file of a facet visual image: always a same-origin proxy path. */
 export interface ListingFacetImageSource {
@@ -117,10 +117,11 @@ function parseSources(
     ) {
       continue;
     }
-    const src = toRenderableMediaUrl(entry.src);
-    // Only the proxy path of this very media and of a file in this format.
+    // Only the canonical proxy path (strictly validated segments) of this
+    // very media and of a file in this format.
+    const src = toRenderableFacetVisualMediaUrl(entry.src);
     if (
-      !src?.startsWith(AWJ_FACET_VISUAL_MEDIA_PROXY_PATH_PREFIX) ||
+      src === null ||
       src.split("/")[6] !== mediaId ||
       !src.endsWith(`.${format}`)
     ) {
@@ -194,7 +195,9 @@ function parseValues(raw: unknown, locale: string): ListingFacetValue[] {
       slug,
       name,
       count: Math.trunc(count),
-      ...parseValueVisual(entry.visual),
+      // A value listed only because it is selected (count 0) is not proven
+      // visible on this channel: no visual, even if one were sent.
+      ...(count > 0 ? parseValueVisual(entry.visual) : {}),
     });
   }
   return values;
@@ -222,7 +225,9 @@ export function parseListingFacets(
         systemKey,
         name,
         values,
-        ...parseFacetVisual(row.visual),
+        ...(values.some((value) => value.count > 0)
+          ? parseFacetVisual(row.visual)
+          : {}),
       });
     }
   }

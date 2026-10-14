@@ -12,6 +12,7 @@ use App\Services\Commerce\StorefrontFacetVisualProjector;
 use App\Services\Commerce\StorefrontMediaException;
 use App\Services\Commerce\StorefrontMediaService;
 use App\Services\Commerce\StorefrontMediaVariantGenerator;
+use App\Support\Commerce\CommerceFacetVisualNormalizer;
 use App\Support\PublicApiErrorCode;
 use App\Support\PublicApiResponse;
 use App\Tenancy\BranchScope;
@@ -41,6 +42,10 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  *  5. the document references this very media id (`image` for a value, `self.image` for a facet), so the route never
  *     becomes a reader of the tenant's library;
  *  6. the media belongs to the tenant (`TenantScope`), is active and ready, and has this file.
+ *
+ * Out of D4's scope: a request whose Host resolves no storefront is refused by `ResolveStorefrontDomain`, and a rate
+ * limited one by its middleware, before this controller runs; those responses come from the shared renderer. Neither
+ * carries data, and the storefront proxy turns every non-200/304 into `no-store`.
  *
  * Success: `private, no-store` + a content ETag + `nosniff` (the only shared-cacheable layer is the storefront proxy,
  * ≤ 300 s, AMEND-16). Any failure is one uniform, non-revealing 404 carrying `Cache-Control: no-store` (D4) — built
@@ -147,10 +152,10 @@ class StorefrontFacetVisualMediaController extends PublicApiController
 
     private function referencedMediaId(CommerceFacetVisual $visual): ?string
     {
-        $document = is_array($visual->visual) ? $visual->visual : [];
+        // The same normalization as the projection, so a source emitted in meta and this check always agree.
         $id = $visual->commerce_facet_value_id === null
-            ? ($document['self']['image']['mediaId'] ?? null)
-            : ($document['image']['mediaId'] ?? null);
+            ? (CommerceFacetVisualNormalizer::normalizeFacet($visual->visual)['self']['image']['mediaId'] ?? null)
+            : (CommerceFacetVisualNormalizer::normalizeValue($visual->visual)['image']['mediaId'] ?? null);
 
         return is_string($id) ? $id : null;
     }

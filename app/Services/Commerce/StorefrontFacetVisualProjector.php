@@ -21,6 +21,9 @@ use App\Support\Commerce\CommerceFacetVisualNormalizer;
  * active and ready is removed, so the storefront falls back (icon, then text) without a request that would 404.
  * Never an original, never the admin signed preview.
  *
+ * Only what is visible on this channel gets a visual: a value with `count > 0`, a facet with at least one such value
+ * (a selected value listed at count 0 gets `null`).
+ *
  * D2: without a storefront context (legacy `{tenantSlug}` routes) channel visibility cannot be proven, so every
  * `visual` is `null` and no image URL is emitted.
  *
@@ -130,12 +133,18 @@ final class StorefrontFacetVisualProjector
             return $document === [] ? null : $document;
         };
 
+        // Visibility on this channel: `meta()` counts over the channel-gated, active-only base query, so `count > 0`
+        // proves an active product published on this channel carries the value (and, for the facet, one of its active
+        // values) — the route's own guard. A value listed only because it is selected (`count === 0`) proves nothing,
+        // so it gets no visual, and a facet with no counted value gets none either. Conservative by construction:
+        // meta never emits what the route would refuse.
         return array_map(function (array $facet) use ($models, $byFacet, $byValue, $valueIdBySlug, $public): array {
             $model = $models[$facet['key']] ?? null;
-            $facet['visual'] = $model === null ? null : $public($byFacet[$model->id] ?? null, true);
+            $visible = array_filter($facet['values'], static fn (array $value): bool => $value['count'] > 0) !== [];
+            $facet['visual'] = $model === null || ! $visible ? null : $public($byFacet[$model->id] ?? null, true);
             $facet['values'] = array_map(function (array $value) use ($facet, $byValue, $valueIdBySlug, $public): array {
                 $valueId = $valueIdBySlug[$facet['key']][$value['slug']] ?? null;
-                $value['visual'] = $valueId === null ? null : $public($byValue[$valueId] ?? null, false);
+                $value['visual'] = $valueId === null || $value['count'] <= 0 ? null : $public($byValue[$valueId] ?? null, false);
 
                 return $value;
             }, $facet['values']);

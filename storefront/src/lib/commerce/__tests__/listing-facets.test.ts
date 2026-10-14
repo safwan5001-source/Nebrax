@@ -409,3 +409,90 @@ describe("parseListingFacets — facet visuals (AWJ-VD-H1 VD-1c, D1)", () => {
     expect(parseListingFacets(withVisual("x", 3), "en")).toEqual(expected);
   });
 });
+
+describe("parseListingFacets — visibility and canonical sources (VD-1c review)", () => {
+  const VISUAL = "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e";
+  const MEDIA = "1c9a7d3f-4e4b-4b64-8d8f-9a2b3c4d5e6f";
+  const src = (file: string) =>
+    `/store/v1/media/facet-visuals/${VISUAL}/${MEDIA}/${file}`;
+  const imageVisual = (sources: unknown[]) => ({
+    image: { mediaId: MEDIA, sources },
+    icon: "cake",
+  });
+
+  it("gives no visual to a value listed only because it is selected, nor to a facet without a counted value", () => {
+    const parsed = parseListingFacets(
+      {
+        facets: [
+          facet({
+            visual: { self: { icon: "gift" }, defaults: { shape: "arch" } },
+            values: [
+              {
+                slug: "birthday",
+                name: "Birthday",
+                count: 0,
+                selected: true,
+                visual: imageVisual([
+                  { width: 480, format: "webp", src: src("480w.webp") },
+                ]),
+              },
+            ],
+          }),
+        ],
+      },
+      "en",
+    );
+    const group = parsed.groups[0];
+    expect(group.values[0]).toEqual({
+      slug: "birthday",
+      name: "Birthday",
+      count: 0,
+    });
+    expect(group).not.toHaveProperty("visual");
+  });
+
+  it("accepts only the canonical origin path, never a proxy-looking or dot-segment path", () => {
+    const parsed = parseListingFacets(
+      {
+        facets: [
+          facet({
+            values: [
+              {
+                slug: "birthday",
+                name: "Birthday",
+                count: 2,
+                selected: false,
+                visual: imageVisual([
+                  {
+                    width: 480,
+                    format: "webp",
+                    src: `/api/storefront/media/facet-visuals/../${MEDIA}/x.webp`,
+                  },
+                  {
+                    width: 480,
+                    format: "webp",
+                    src: `/api/storefront/media/facet-visuals/${VISUAL}/${MEDIA}/480w.webp`,
+                  },
+                  {
+                    width: 480,
+                    format: "webp",
+                    src: `/store/v1/media/facet-visuals/${VISUAL}/${MEDIA}/../480w.webp`,
+                  },
+                  { width: 768, format: "webp", src: src("768w.webp") },
+                ]),
+              },
+            ],
+          }),
+        ],
+      },
+      "en",
+    );
+    expect(parsed.groups[0].values[0].imageSources).toEqual([
+      {
+        width: 768,
+        format: "webp",
+        src: `/api/storefront/media/facet-visuals/${VISUAL}/${MEDIA}/768w.webp`,
+      },
+    ]);
+  });
+});

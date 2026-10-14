@@ -443,10 +443,15 @@ class StorefrontFacetVisualPublicTest extends TestCase
             StorefrontMedia::withoutGlobalScopes()->whereKey($served['mediaId'])->update(['variants_state' => $variantsState]);
             $this->assertUniform404($this->image($store, $served['visualId'], $served['mediaId']), "N8 {$variantsState}");
         }
+        $this->assertSame(['shape' => 'arch'], $this->metaValue($this->products($store), 'birthday')['visual'], 'meta drops the image too');
         StorefrontMedia::withoutGlobalScopes()->whereKey($served['mediaId'])->update(['variants_state' => 'ready', 'state' => 'deleted']);
         $this->assertUniform404($this->image($store, $served['visualId'], $served['mediaId']), 'N8 deleted');
+        $this->assertSame(['shape' => 'arch'], $this->metaValue($this->products($store), 'birthday')['visual']);
         StorefrontMedia::withoutGlobalScopes()->whereKey($served['mediaId'])->update(['state' => 'purged']);
         $this->assertUniform404($this->image($store, $served['visualId'], $served['mediaId']), 'N8 purged');
+        $response = $this->products($store);
+        $this->assertSame(['shape' => 'arch'], $this->metaValue($response, 'birthday')['visual']);
+        $this->assertStringNotContainsString($served['mediaId'], $response->getContent());
     }
 
     /** @test */
@@ -665,6 +670,15 @@ class StorefrontFacetVisualPublicTest extends TestCase
         $this->assertNull($this->metaValue($metaB, 'birthday'), 'B does not list the value');
         $this->assertStringNotContainsString($served['visualId'], $metaB->getContent());
 
+        // Selected on B, the value is listed at count 0 (so it can be removed) — still without any visual.
+        $selected = $this->products($storeB, 'facet[occasion]=birthday');
+        $birthdayB = $this->metaValue($selected, 'birthday');
+        $this->assertSame(0, $birthdayB['count']);
+        $this->assertTrue($birthdayB['selected']);
+        $this->assertNull($birthdayB['visual']);
+        $this->assertStringNotContainsString($served['visualId'], $selected->getContent());
+        $this->assertStringNotContainsString($served['mediaId'], $selected->getContent());
+
         // And A still serves it.
         $this->image($store, $served['visualId'], $served['mediaId'])->assertOk();
     }
@@ -700,6 +714,12 @@ class StorefrontFacetVisualPublicTest extends TestCase
         // The only product moves off birthday/wedding: no active value of the facet has a visible product left.
         CommerceProductFacetValue::withoutGlobalScopes()->where('product_id', $store['product']->id)->delete();
         $this->assertUniform404($this->image($store, $facetVisualId, $facetMedia), 'N19 no products');
+        $this->assertNull($this->metaFacet($this->products($store)), 'no counted value: the facet is not listed');
+        // Selecting a value lists the facet at count 0 — without its visual.
+        $selected = $this->products($store, 'facet[occasion]=party');
+        $this->assertSame(0, $this->metaValue($selected, 'party')['count']);
+        $this->assertNull($this->metaFacet($selected)['visual']);
+        $this->assertStringNotContainsString('facet-visuals', $selected->getContent());
 
         // A product assigned only to an inactive value does not count either.
         app(TenantContext::class)->set($store['tenant_id']);
@@ -710,6 +730,69 @@ class StorefrontFacetVisualPublicTest extends TestCase
 
         CommerceFacetValue::withoutGlobalScopes()->whereKey($store['values']['party']->id)->update(['is_active' => true]);
         $this->image($store, $facetVisualId, $facetMedia)->assertOk();
+    }
+
+    /** @test */
+    public function a_store_without_visible_products_never_emits_visuals_even_for_selected_values(): void
+    {
+        $this->fakeStorefrontMediaR2();
+        $store = $this->store('vd1c-empty');
+        $valueMedia = $this->uploadMedia($store);
+        $facetMedia = $this->uploadMedia($store);
+        $this->putValueVisual($store, 'birthday', ['image' => ['mediaId' => $valueMedia], 'icon' => 'cake'], null);
+        $this->putFacetVisual($store, ['self' => ['image' => ['mediaId' => $facetMedia]], 'defaults' => ['shape' => 'arch']], null);
+
+        // Store B of the same tenant: its own channel, no product at all.
+        app(TenantContext::class)->set($store['tenant_id']);
+        $channelB = SalesChannel::create(['slug' => 'web-empty', 'name' => 'فارغ', 'type' => SalesChannel::TYPE_WEB, 'is_active' => true]);
+        $storefrontB = Storefront::create(['slug' => 'empty', 'name' => 'فارغ', 'sales_channel_id' => $channelB->id, 'is_active' => true]);
+        StorefrontDomain::create([
+            'storefront_id' => $storefrontB->id, 'hostname' => 'vd1c-empty-b.example.com',
+            'type' => StorefrontDomain::TYPE_CUSTOM, 'is_active' => true,
+            'verification_status' => StorefrontDomain::VERIFICATION_VERIFIED,
+        ]);
+        app(TenantContext::class)->forget();
+        $storeB = ['host' => 'vd1c-empty-b.example.com'] + $store;
+
+        foreach (['facet[occasion]=birthday', 'facet[occasion]=birthday,party'] as $query) {
+            $response = $this->products($storeB, $query);
+            $facet = $this->metaFacet($response);
+            $this->assertNotNull($facet, 'selected values keep the facet listed');
+            $this->assertNull($facet['visual'], $query);
+            foreach ($facet['values'] as $value) {
+                $this->assertSame(0, $value['count']);
+                $this->assertNull($value['visual'], $query);
+            }
+            foreach (['facet-visuals', $valueMedia, $facetMedia, 'cake'] as $needle) {
+                $this->assertStringNotContainsString($needle, $response->getContent(), "{$query}: {$needle}");
+            }
+        }
+        $this->assertUniform404($this->image($storeB, $this->visualRow($store, 'birthday')->id, $valueMedia), 'route agrees');
+        $this->assertUniform404($this->image($storeB, $this->visualRow($store, null)->id, $facetMedia), 'route agrees (facet)');
+
+        // On A the same selection is visible (count 1) and keeps its visuals.
+        $onA = $this->products($store, 'facet[occasion]=birthday');
+        $this->assertSame(1, $this->metaValue($onA, 'birthday')['count']);
+        $this->assertNotNull($this->metaValue($onA, 'birthday')['visual']);
+        $this->assertNotNull($this->metaFacet($onA)['visual']);
+    }
+
+    /** @test */
+    public function the_route_and_the_projection_read_the_same_normalized_document(): void
+    {
+        $this->fakeStorefrontMediaR2();
+        $store = $this->store('vd1c-normalized');
+        $served = $this->servedValueImage($store);
+
+        // A row stored outside the write path, with a non-canonical id (uppercase, padded).
+        CommerceFacetVisual::withoutGlobalScopes()->whereKey($served['visualId'])
+            ->update(['visual' => json_encode(['image' => ['mediaId' => '  '.strtoupper($served['mediaId']).' ']])]);
+
+        $sources = $this->metaValue($this->products($store), 'birthday')['visual']['image']['sources'];
+        $this->assertStringContainsString("/{$served['mediaId']}/", $sources[0]['src']);
+        foreach ($sources as $source) {
+            $this->image($store, $served['visualId'], $served['mediaId'], basename($source['src']))->assertOk();
+        }
     }
 
     // ═════════════════ success headers ═════════════════
