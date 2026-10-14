@@ -20,7 +20,7 @@ Same `tenant_id`, `storefront_id` (hence the same sales channel) as the legacy r
 2. **Insert-only.** No UPDATE/DELETE of any existing row, no other table touched. Legacy rows, storefronts, channels and tenants are asserted byte-identical before/after.
 3. **One DB transaction per execute, all-or-nothing.** Tenant rows locked (`FOR UPDATE`, sorted ids — the same anchor `CreateStorefrontForCurrentTenant`/`StorefrontProvisioningService` use) plus the legacy domain rows; sources re-read after locking; `UNIQUE(hostname)` is the last line. Any conflict rolls back every host.
 4. **Dry-run:** no transaction, no locks, no write; prints `would_insert`.
-5. **Idempotent.** Existing target with the same tenant+storefront+`awj_subdomain` → `already_present`, no write. If its `is_active` differs from the desired state → reported as `drift`, **not corrected**, command exits non-zero (e.g. someone activated `dominah-h`).
+5. **Idempotent.** Existing target with the same tenant+storefront+`awj_subdomain` → `already_present`, no write. If its `is_active` **or `verification_status`** differs from the desired state → reported as `drift`, **not corrected**, command exits non-zero (e.g. someone activated `dominah-h`).
 6. **No inactive→active.** New row is active only if domain, verification, storefront (not deleted) and sales channel (not deleted) are all active/verified; otherwise inactive. The original `h` storefront/domain stay inactive (asserted).
 7. **Tenant isolation.** Tenant/storefront/channel come from the legacy row and must agree three ways (`tenant_mismatch` otherwise); a same-named store under another tenant is neither read nor created for (asserted); no cross-tenant target is accepted (`target_taken`).
 8. **Global uniqueness / reserved labels.** Target taken by any other row → `target_taken`; label equal to any tenant slug (incl. soft-deleted) → `target_is_tenant_slug`; two legacy hosts mapping to one target (`a`+`b-c` vs `a-b`+`c`) → `duplicate_target`.
@@ -34,7 +34,7 @@ Same `tenant_id`, `storefront_id` (hence the same sales channel) as the legacy r
 | `app/Services/Commerce/FlatHostBackfillService.php` | new — logic above |
 | `app/Services/Commerce/FlatHostBackfillException.php` | new — typed fail-closed reasons |
 | `app/Console/Commands/StorefrontFlatHostBackfillCommand.php` | new — Artisan command |
-| `tests/Feature/FlatHostBackfillTest.php` | new — 19 tests |
+| `tests/Feature/FlatHostBackfillTest.php` | new — 20 tests |
 | `docs/reports/STOREFRONT-FLAT-HOST-BACKFILL-REPORT.md` | new — this report |
 
 No migration, no schema change, no API/route change, no change to resolution or financial code.
@@ -43,7 +43,7 @@ No migration, no schema change, no API/route change, no change to resolution or 
 
 | Run | Result |
 |---|---|
-| `php artisan test --filter=FlatHostBackfillTest` (local SQLite) | **19 passed** (70 assertions) |
+| `php artisan test --filter=FlatHostBackfillTest` (local SQLite) | **20 passed** |
 | Related: `FlatHostBackfillTest\|FlatStorefrontHostTest\|MultiStore\|StorefrontProvisioning\|StorefrontDomain\|StorefrontGateway\|ApplicationCatalog` | **166 passed, 1 skipped, 0 failed** |
 | Mutation check | flipping `is_primary` to `true` made 8 tests fail (partial unique index + tests bite); reverted |
 | PostgreSQL | not available locally — **runs in CI's pgsql leg** (same `RefreshDatabase` tests; this is where `FOR UPDATE` and the partial index are really exercised) |
@@ -78,6 +78,7 @@ Post-check (SELECT only): the two new rows exist with the legacy `tenant_id`/`st
 - Open Store still shows the legacy URL until §5 is decided.
 - Production-only conditions I cannot see: a row inserted between your S1–S5 inventory and the run (handled: `target_taken`/conflict abort); legacy `zhor-tyb` primary state (irrelevant to insert).
 - Only the two listed hosts are in scope; the fleet-wide backfill (if any other legacy hosts exist) would reuse the same command with more `--host` values after its own inventory.
+- **Registration race (Codex P2, accepted, not coded):** a tenant registering the slug `dominah-h` / `dominah-zhor-tyb` *during the few seconds of `--execute`* could pass validation and insert its tenant while the backfill inserts the domain (two tables, independent unique constraints) → that tenant could not provision its own first-store host. Closing it needs a DB-enforced cross-table reservation (schema) or a global lock — disproportionate for a one-off run on two known hosts. Mitigation: run `--execute` once in a quiet window; after the run `RegisterRequest` rejects those slugs (it checks existing `awj_subdomain` hosts); post-check `SELECT id, slug FROM tenants WHERE slug IN ('dominah-h','dominah-zhor-tyb');` must return 0 rows.
 - PostgreSQL locking/index behaviour is verified by CI, not locally.
 - The new `zhor-tyb` host serves the storefront immediately on `--execute` (it is active by design).
 

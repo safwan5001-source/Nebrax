@@ -231,6 +231,22 @@ class FlatHostBackfillTest extends TestCase
     }
 
     /** @test */
+    public function an_existing_target_with_different_verification_is_drift_not_accepted_as_present(): void
+    {
+        $this->prodShape();
+        $this->backfill(true);
+        DB::table('storefront_domains')->where('hostname', 'dominah-zhor-tyb.store.awjdev.xyz')->update(['verification_status' => 'pending']);
+        $snap = DB::table('storefront_domains')->orderBy('hostname')->get()->toJson();
+
+        $out = $this->backfill(true);
+
+        $this->assertTrue($out['has_drift']);
+        $this->assertSame('drift', collect($out['results'])->firstWhere('legacy_host', self::Z)['flag']);
+        $this->assertSame($snap, DB::table('storefront_domains')->orderBy('hostname')->get()->toJson(), 'no correction');
+        $this->artisan('storefront:flat-host-backfill', ['--host' => [self::Z], '--execute' => true])->assertFailed();
+    }
+
+    /** @test */
     public function primary_constraint_is_respected_legacy_stays_the_only_active_primary(): void
     {
         [, $z] = $this->prodShape();

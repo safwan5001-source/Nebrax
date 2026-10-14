@@ -33,7 +33,7 @@ use Illuminate\Support\Facades\DB;
  *  - عدم الانتقال بين المستأجرين: المستأجر/المتجر/القناة تُقرأ من الصف القديم وتُتحقق
  *    ثلاثياً (نطاق = متجر = قناة)، ولا يُقبل أي معرّف من المدخلات.
  *  - Idempotent: هدف موجود مسبقاً لنفس (tenant, storefront, awj_subdomain) = `already_present`
- *    (بلا كتابة). إن اختلفت حالته عن المطلوب يُبلَّغ `drift` ويُرفض النجاح الصامت، دون تعديل.
+ *    (بلا كتابة). إن اختلف التفعيل أو التوثيق عن المطلوب يُبلَّغ `drift` ويُرفض النجاح الصامت، دون تعديل.
  *  - روابط HTTPS القديمة لا تصبح صالحة: لا يُلمس شيء من DNS/الشهادة، والصفوف القديمة كما هي.
  */
 final class FlatHostBackfillService
@@ -115,7 +115,10 @@ final class FlatHostBackfillService
                     || $existing->type !== StorefrontDomain::TYPE_AWJ_SUBDOMAIN) {
                     throw new FlatHostBackfillException('target_taken', "الهدف {$target} مسجَّل لصفٍّ آخر — لا كتابة.");
                 }
-                $drift = (bool) $existing->is_active !== $desiredActive;
+                // drift = أي اختلاف في ما يحسم الحسم فعلاً: التفعيل أو التوثيق عن المصدر
+                // (نطاق نشط غير موثَّق يرفضه ResolveStorefrontDomain رغم `new_row_active=true`).
+                $drift = (bool) $existing->is_active !== $desiredActive
+                    || $existing->verification_status !== $s['domain']->verification_status;
                 $hasDrift = $hasDrift || $drift;
                 $results[] = $this->result($host, $target, 'already_present', $desiredActive, $s, $drift ? 'drift' : null);
 
