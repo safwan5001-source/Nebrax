@@ -15,6 +15,10 @@ export const COMMERCE_WORKSPACE_MESSAGES = {
       'تعذر تحميل قائمة المتاجر من أَوْج. لن يُخترع مصدر بيانات موازٍ.',
     storeSelectorEmpty: 'لا يوجد متجر يمكن اختياره',
     storeSelectorLoading: 'جارٍ تحميل المتاجر',
+    storeSelectorChoose: 'اختر متجراً',
+    storeContextInvalidTitle: 'المتجر المطلوب غير متاح',
+    storeContextInvalidDescription:
+      'الرابط أو الجلسة تشير إلى متجر غير موجود في حسابك أو لا تملك صلاحيته. لن يُفتح متجر آخر بدلاً منه؛ اختر المتجر الذي تريد العمل عليه.',
     viewStore: 'عرض المتجر',
     viewStoreUnavailable: 'رابط المتجر غير متاح',
     viewStoreUnavailableHint: 'لا يمكن بناء رابط معاينة موثوق دون نطاق متجر مُثبت من الخادم.',
@@ -359,6 +363,10 @@ export const COMMERCE_WORKSPACE_MESSAGES = {
       'The store list could not be loaded from AWJ. A parallel data source will not be invented here.',
     storeSelectorEmpty: 'No store is available to select',
     storeSelectorLoading: 'Loading stores',
+    storeSelectorChoose: 'Choose a store',
+    storeContextInvalidTitle: 'The requested store is not available',
+    storeContextInvalidDescription:
+      'The link or session points to a store that does not exist in your account or that you cannot access. No other store will be opened in its place; choose the store you want to work on.',
     viewStore: 'View store',
     viewStoreUnavailable: 'Store URL is unavailable',
     viewStoreUnavailableHint: 'A preview link cannot be built without a server-authoritative storefront domain.',

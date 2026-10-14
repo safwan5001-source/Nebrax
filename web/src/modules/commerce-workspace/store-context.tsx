@@ -1,10 +1,17 @@
 'use client';
 
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
+import { usePathname } from 'next/navigation';
+import {
+  readInitialStoreRequest,
+  rememberActiveStore,
+  resolveActiveStore,
+  syncStoreParamInUrl,
+  type ActiveStoreRequest,
+} from './active-store';
 import {
   loadCommerceStoreCatalog,
   resolveViewStoreUrl,
-  selectStoreId,
   type CommerceStoreCatalog,
 } from './stores';
 import { confirmDiscardUnsaved } from './unsaved-registry';
@@ -14,6 +21,11 @@ type CommerceStoreContextValue = {
   selectedStoreId: string | null;
   setSelectedStoreId: (id: string) => void;
   viewStoreUrl: string | null;
+  /**
+   * AWJ-STORE-CTX-1 — `invalid`: طُلب متجرٌ صراحةً (رابط أو ذاكرة التبويب) وليس في قائمة المستأجر الحالي؛
+   * `selectedStoreId` عندها `null` فلا قراءة ولا حفظ حتى يختار المستخدم متجراً. لا سقوط صامت إلى متجر آخر.
+   */
+  storeContextStatus: 'pending' | 'ready' | 'invalid';
   /**
    * COM-STORE-PROVISION-1 — يعيد تحميل القائمة الموثوقة من الخادم بعد نجاح
    * التزويد (لا يُحدَّث الكتالوج محلياً من استجابة الإنشاء وحدها). يقبل معرّف
@@ -26,7 +38,9 @@ const CommerceStoreContext = createContext<CommerceStoreContextValue | null>(nul
 
 export function CommerceStoreProvider({ children }: { children: ReactNode }) {
   const [catalog, setCatalog] = useState<CommerceStoreCatalog>({ status: 'loading' });
-  const [requestedId, setRequestedId] = useState<string | null>(null);
+  // يُقرأ مرة عند التركيب: `?store=` ثم ذاكرة هذا التبويب. بعد ذلك الاختيار الصريح وحده يغيّر المتجر.
+  const [request, setRequest] = useState<ActiveStoreRequest>(() => readInitialStoreRequest());
+  const pathname = usePathname();
 
   const load = useCallback(async (guard?: () => boolean) => {
     const next = await loadCommerceStoreCatalog();
@@ -46,17 +60,27 @@ export function CommerceStoreProvider({ children }: { children: ReactNode }) {
   const refresh = useCallback(
     async (selectAfter?: string) => {
       await load();
-      if (selectAfter) setRequestedId(selectAfter);
+      if (selectAfter) setRequest({ id: selectAfter, source: 'user' });
     },
     [load],
   );
 
-  const selectedStoreId = selectStoreId(catalog, requestedId);
+  const resolution = resolveActiveStore(catalog, request);
+  const selectedStoreId = resolution.storeId;
+
+  // المتجر المحسوم يُثبَّت في هذا التبويب وفي الرابط بعد كل تنقّل، فيصمد أمام التحديث والتنقّل الصلب والروابط
+  // المنسوخة. لا كتابة في `invalid`/`pending`: لا يُمحى اختيارٌ صالح سابق بسبب رابط خاطئ.
+  useEffect(() => {
+    if (!selectedStoreId) return;
+    rememberActiveStore(selectedStoreId);
+    if (window.location.pathname.startsWith('/commerce')) syncStoreParamInUrl(selectedStoreId);
+  }, [selectedStoreId, pathname]);
+
   // مبدِّل المتجر يسأل قبل إسقاط مسوّدة غير محفوظة (تُسجَّل في `unsaved-registry` من `useUnsavedGuard`).
   const selectStore = useCallback(
     (id: string) => {
       if (id !== selectedStoreId && !confirmDiscardUnsaved()) return;
-      setRequestedId(id);
+      setRequest({ id, source: 'user' });
     },
     [selectedStoreId],
   );
@@ -69,6 +93,7 @@ export function CommerceStoreProvider({ children }: { children: ReactNode }) {
         selectedStoreId,
         setSelectedStoreId: selectStore,
         viewStoreUrl,
+        storeContextStatus: resolution.status,
         refresh,
       }}
     >

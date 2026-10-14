@@ -21,6 +21,8 @@ import { currentUser } from '@/lib/auth';
 import { api } from '@/lib/api';
 import { hiddenApplicationKeys, isNavEntryVisible } from '@/components/layout/nav-visibility';
 import { cn } from '@/lib/utils';
+import { withStoreParam } from '@/modules/commerce-workspace/active-store';
+import { useOptionalCommerceStoreContext } from '@/modules/commerce-workspace/store-context';
 import {
   COMMERCE_WORKSPACE_NAV_GROUPS,
   isCommerceNavItemActive,
@@ -58,6 +60,8 @@ export function CommerceWorkspaceNav({
   const t = (key: CommerceWorkspaceMessageKey) => commerceWorkspaceMessage(locale, key);
   const viewer = currentUser();
   const [hiddenAppKeys, setHiddenAppKeys] = useState<Set<string>>(new Set());
+  // AWJ-STORE-CTX-1 — الروابط تحمل المتجر النشط، فيفتح «تبويب جديد» أو نسخ الرابط على المتجر نفسه لا على أول متجر.
+  const storeId = useOptionalCommerceStoreContext()?.selectedStoreId ?? null;
 
   useEffect(() => {
     let cancelled = false;
@@ -83,6 +87,7 @@ export function CommerceWorkspaceNav({
                 key={item.href}
                 item={item}
                 pathname={pathname}
+                storeId={storeId}
                 label={t(item.labelKey as CommerceWorkspaceMessageKey)}
                 onNavigate={onNavigate}
                 collapsed={collapsed}
@@ -98,12 +103,14 @@ export function CommerceWorkspaceNav({
 function WorkspaceLink({
   item,
   pathname,
+  storeId,
   label,
   onNavigate,
   collapsed,
 }: {
   item: CommerceWorkspaceNavItem;
   pathname: string;
+  storeId: string | null;
   label: string;
   onNavigate?: () => void;
   collapsed: boolean;
@@ -113,7 +120,7 @@ function WorkspaceLink({
 
   return (
     <Link
-      href={item.href}
+      href={item.href.startsWith('/commerce') ? withStoreParam(item.href, storeId) : item.href}
       aria-current={active ? 'page' : undefined}
       data-awj-apex=""
       data-awj-apex-on={active ? '' : undefined}

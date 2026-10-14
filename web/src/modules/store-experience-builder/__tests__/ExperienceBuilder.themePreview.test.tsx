@@ -128,7 +128,7 @@ describe('ExperienceBuilder — Theme Preview (V10b)', () => {
     await ready();
 
     await user.click(document.querySelector('[data-theme-apply]') as HTMLElement);
-    await waitFor(() => expect(hrefSet).toHaveBeenCalledWith('/commerce/appearance?version=v-new'));
+    await waitFor(() => expect(hrefSet).toHaveBeenCalledWith('/commerce/appearance?store=store-1&version=v-new'));
     expect(createMock).toHaveBeenCalledWith('store-1', 'AWJ Market — Theme preview');
     expect(saveMock.mock.calls[0][2]).toMatchObject({ themePreset: 'awj-market', primaryColor: '#0f766e' });
     expect(saveMock.mock.calls[0][1]).toBe('v-new');
@@ -285,7 +285,7 @@ describe('ExperienceBuilder — Theme Preview (V10b)', () => {
     expect((document.querySelector('[data-builder-exit]') as HTMLButtonElement).disabled).toBe(true);
     expect((document.querySelector('[data-theme-exit]') as HTMLButtonElement).disabled).toBe(true);
     releaseSave({ ok: true, data: {} });
-    await waitFor(() => expect(hrefSet).toHaveBeenCalledWith('/commerce/appearance?version=v-new'));
+    await waitFor(() => expect(hrefSet).toHaveBeenCalledWith('/commerce/appearance?store=store-1&version=v-new'));
   });
 
   it('read-only on a phone too: no mobile editing bar or sheets, and no way to restore the default into the draft', async () => {

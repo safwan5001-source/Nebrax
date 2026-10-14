@@ -3,7 +3,9 @@
 import { useEffect, useState } from 'react';
 import { useLocale } from 'next-intl';
 import { ExperienceBuilder } from '@/modules/store-experience-builder/ExperienceBuilder';
+import { readStoreParam } from '@/modules/commerce-workspace/active-store';
 import { useCommerceStoreContext } from '@/modules/commerce-workspace/store-context';
+import { StoreContextInvalidNotice } from '@/modules/commerce-workspace/store-context-invalid';
 import { useCompany } from '@/lib/company';
 import { commerceWorkspaceMessage } from '@/modules/commerce-workspace/messages';
 import { loadFacets } from '@/modules/commerce-workspace/merchandising/client';
@@ -16,16 +18,20 @@ export default function CommerceAppearancePage() {
   // The query is read AFTER mount: on a client-side navigation (e.g. from the Theme Gallery) `window.location` is only updated once
   // the new page has committed, so reading it during render would miss `?version=` / `?previewTheme=`. The builder mounts once the
   // parameters are known, so it never loads twice.
-  const [query, setQuery] = useState<{ versionId: string | null; previewThemeId: string | null } | null>(null);
+  const [query, setQuery] = useState<{ storeId: string | null; versionId: string | null; previewThemeId: string | null } | null>(null);
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     setQuery({
+      // AWJ-STORE-CTX-1 — المتجر الذي يخصّه `?version=`. يُقرأ قبل أن يكتب المزوّد المتجر النشط في الرابط.
+      storeId: readStoreParam(window.location.search),
       versionId: params.get('version'),
       // CUST-HV V10b — `?previewTheme=<id>` opens the builder in Theme Preview (Preview → Apply summary → new Draft Version).
       previewThemeId: params.get('previewTheme'),
     });
   }, []);
-  const { catalog, selectedStoreId, viewStoreUrl } = useCommerceStoreContext();
+  const { catalog, selectedStoreId, viewStoreUrl, storeContextStatus } = useCommerceStoreContext();
+  // نسخةٌ في الرابط تخصّ متجراً بعينه: لا تُفتح تحت متجرٍ نشط مختلف (رجوع في السجلّ بعد تبديل المتجر، مثلاً).
+  const queryMatchesStore = !query?.storeId || query.storeId === selectedStoreId;
   const selectedStore =
     catalog.status === 'ready'
       ? catalog.stores.find((store) => store.id === selectedStoreId)
@@ -49,9 +55,18 @@ export default function CommerceAppearancePage() {
     });
   }
 
+  if (storeContextStatus === 'invalid') {
+    return (
+      <div className="grid h-full min-h-0 place-items-center overflow-y-auto p-4">
+        <div className="w-full max-w-xl"><StoreContextInvalidNotice /></div>
+      </div>
+    );
+  }
+
   return (
     <div className="h-full min-h-0" data-store-experience-builder="">
-      {query ? <ExperienceBuilder
+      {/* لا يُركَّب البنّاء قبل حسم المتجر: لا تحرير «محلي» يُمحى ثم يُستبدل بمتجرٍ لم يظهر بعد. */}
+      {query && catalog.status !== 'loading' ? <ExperienceBuilder
         storefrontId={selectedStoreId}
         liveStoreName={selectedStore?.name ?? null}
         businessIdentity={{
@@ -61,8 +76,8 @@ export default function CommerceAppearancePage() {
         }}
         initialLocale={locale === 'en' ? 'en' : 'ar'}
         storefrontUrl={viewStoreUrl}
-        versionId={query.versionId}
-        previewThemeId={query.previewThemeId}
+        versionId={queryMatchesStore ? query.versionId : null}
+        previewThemeId={queryMatchesStore ? query.previewThemeId : null}
         themePackSections={themePackSections}
       /> : null}
     </div>

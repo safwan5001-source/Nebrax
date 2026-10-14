@@ -1615,7 +1615,8 @@ export function ExperienceBuilder({
       setThemeError(result.reason === "assets_unsupported" ? "themeApplyUnsupported" : "themeApplyFailed");
       return;
     }
-    window.location.href = `/commerce/appearance?version=${encodeURIComponent(result.versionId)}`;
+    // AWJ-STORE-CTX-1 — تنقّل صلب يعيد تركيب المزوّد: الرابط يحمل المتجر صراحةً فلا يُفتح المسوّد الجديد تحت متجرٍ آخر.
+    window.location.href = `/commerce/appearance?store=${encodeURIComponent(storefrontId)}&version=${encodeURIComponent(result.versionId)}`;
   }
 
   function handleExitThemePreview() {
@@ -2946,7 +2947,7 @@ export function ExperienceBuilder({
           // A theme apply is two requests (create, then save); a full-page navigation in between would abort the save and
           // skip the rollback, leaving an empty draft behind.
           disabled={themeApplying}
-          onClick={() => { if (!themeApplying) window.location.href = "/commerce"; }}
+          onClick={() => { if (!themeApplying) window.location.href = storefrontId ? `/commerce?store=${encodeURIComponent(storefrontId)}` : "/commerce"; }}
           className="inline-flex min-h-10 shrink-0 items-center gap-2 rounded-md border border-border px-2.5 text-xs font-medium text-text hover:bg-primary-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-not-allowed disabled:opacity-50 md:px-3 md:text-sm"
         >
           <span aria-hidden="true" className="rtl:-scale-x-100">←</span>

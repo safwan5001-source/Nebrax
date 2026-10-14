@@ -9,6 +9,7 @@ import { PageHeader } from '@/components/nebrax';
 import { currentUser } from '@/lib/auth';
 import { hasPermission } from '@/lib/permissions';
 import { commerceWorkspaceMessage, type CommerceWorkspaceMessageKey } from '@/modules/commerce-workspace/messages';
+import { withStoreParam } from '@/modules/commerce-workspace/active-store';
 import { useCommerceStoreContext } from '@/modules/commerce-workspace/store-context';
 import { listPresentationVersions } from '@/modules/commerce-workspace/presentation-versions';
 import { BUILT_IN_THEMES, previewBaseVersion, themePreviewHref, type ThemeDefinition } from '@/modules/store-experience-builder/themes';
@@ -79,7 +80,8 @@ export default function CommerceThemesPage() {
             locale={locale}
             canPreview={Boolean(selectedStoreId) && canManage && base.state === 'ready'}
             baseState={selectedStoreId ? base.state : 'ready'}
-            href={themePreviewHref(theme.id, baseVersionId)}
+            href={withStoreParam(themePreviewHref(theme.id, baseVersionId), selectedStoreId)}
+            customizeHref={withStoreParam('/commerce/appearance', selectedStoreId)}
             t={t}
           />
         ))}
@@ -94,6 +96,7 @@ function ThemeCard({
   canPreview,
   baseState,
   href,
+  customizeHref,
   t,
 }: {
   theme: ThemeDefinition;
@@ -101,6 +104,7 @@ function ThemeCard({
   canPreview: boolean;
   baseState: 'loading' | 'ready' | 'error';
   href: string;
+  customizeHref: string;
   t: (key: CommerceWorkspaceMessageKey) => string;
 }) {
   return (
@@ -152,7 +156,7 @@ function ThemeCard({
               </p>
             ) : null}
             <Link
-              href="/commerce/appearance"
+              href={customizeHref}
               className="inline-flex min-h-11 items-center justify-center rounded-md border border-border bg-surface px-4 text-sm font-medium text-text hover:bg-primary-soft hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
             >
               {t('themeGalleryCustomize')}

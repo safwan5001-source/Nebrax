@@ -11,7 +11,9 @@ import { ThemeToggle } from '@/components/layout/theme-toggle';
 import { Dropdown, DropdownItem } from '@/components/ui/dropdown';
 import { useCompany } from '@/lib/company';
 import { commerceWorkspaceMessage } from '@/modules/commerce-workspace/messages';
+import { withStoreParam } from '@/modules/commerce-workspace/active-store';
 import { useCommerceStoreContext } from '@/modules/commerce-workspace/store-context';
+import { StoreContextInvalidNotice } from '@/modules/commerce-workspace/store-context-invalid';
 import { installUnsavedNavigationGuard } from '@/modules/commerce-workspace/unsaved-registry';
 import { CommerceWorkspaceNav } from './commerce-workspace-nav';
 
@@ -21,7 +23,8 @@ export function CommerceWorkspaceShell({ children }: { children: React.ReactNode
   const pathname = usePathname();
   const t = (key: Parameters<typeof commerceWorkspaceMessage>[1]) => commerceWorkspaceMessage(locale, key);
   const company = useCompany();
-  const { catalog, selectedStoreId, setSelectedStoreId, viewStoreUrl } = useCommerceStoreContext();
+  const { catalog, selectedStoreId, setSelectedStoreId, viewStoreUrl, storeContextStatus } = useCommerceStoreContext();
+  const storeContextInvalid = storeContextStatus === 'invalid';
   const [navigationOpen, setNavigationOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [sidebarPreferenceLoaded, setSidebarPreferenceLoaded] = useState(false);
@@ -105,7 +108,7 @@ export function CommerceWorkspaceShell({ children }: { children: React.ReactNode
         </button>
 
         <Link
-          href="/commerce"
+          href={withStoreParam('/commerce', selectedStoreId)}
           className="flex min-w-0 items-center gap-2 rounded px-1 py-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
           aria-label={t('workspaceHome')}
         >
@@ -118,7 +121,7 @@ export function CommerceWorkspaceShell({ children }: { children: React.ReactNode
 
         <div className="hidden min-w-0 items-center gap-2 border-s border-border ps-3 md:flex">
           <span className="text-xs text-muted">{t('storeSelectorLabel')}</span>
-          {catalog.status === 'ready' && catalog.stores.length > 1 ? (
+          {catalog.status === 'ready' && (catalog.stores.length > 1 || storeContextInvalid) ? (
             <Dropdown
               align="start"
               menuLabel={t('storeSelectorLabel')}
@@ -127,7 +130,7 @@ export function CommerceWorkspaceShell({ children }: { children: React.ReactNode
               trigger={(
                 <>
                   <Store className="h-4 w-4 shrink-0" strokeWidth={1.7} />
-                  <span className="truncate">{selectedStore?.name ?? t('storeSelectorLoading')}</span>
+                  <span className="truncate">{selectedStore?.name ?? (storeContextInvalid ? t('storeSelectorChoose') : t('storeSelectorLoading'))}</span>
                   <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted" strokeWidth={1.7} />
                 </>
               )}
@@ -246,7 +249,8 @@ export function CommerceWorkspaceShell({ children }: { children: React.ReactNode
             <div className="flex h-full min-h-0 flex-col">{children}</div>
           ) : (
             <div className="mx-auto w-full max-w-7xl p-4 sm:p-6">
-              {children}
+              {/* لا متجر نشط ⇒ لا تُعرض الصفحة أصلاً: لا قراءة ولا حفظ على متجرٍ لم يُختر صراحةً. */}
+              {storeContextInvalid ? <StoreContextInvalidNotice /> : children}
             </div>
           )}
         </main>
