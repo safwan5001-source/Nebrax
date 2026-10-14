@@ -862,7 +862,8 @@
     "no": "لا",
     "all": "الكل",
     "themeToggle": "تبديل الوضع",
-    "languageToggle": "تبديل اللغة"
+    "languageToggle": "تبديل اللغة",
+    "close": "إغلاق"
   },
   "contacts": {
     "title": "قائمة الاتصال",
