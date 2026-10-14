@@ -1,6 +1,6 @@
 # INT-AUDIT-1 — Scope Gate and Decision Report
 
-STATUS: **BLOCKED — owner decision required.** Investigation only. **No code, migration, API or test was changed.** Not merged, not deployed.
+STATUS: **RESOLVED — owner decisions received 2026-10-14; implemented in PR #1411** (see `INT-AUDIT-1-IMPLEMENTATION-REPORT.md` on that branch). This document is the scope-gate record as it stood **before** implementation (investigation only; no code, migration, API or test was changed by this PR). Not merged, not deployed.
 DATE: 2026-10-14
 HORIZON: Integrations Center — Slice 6 (after INT-UX-4, PR #1408, merge `176965d086dd60dbd98208d4f4580da91b9a07b0`)
 BASE VERIFIED: `main` @ `176965d086dd60dbd98208d4f4580da91b9a07b0` (equals the stated last merge SHA).
@@ -96,8 +96,21 @@ Smallest change that satisfies DP-F and the Horizon acceptance, mirroring `Deliv
 - **Changed files:** this report only (`docs/plans/pos/INT-AUDIT-1-SCOPE-AND-DECISION-REPORT.md`). No code, migration, API, RBAC or test change.
 - **Tests / build:** none run — nothing to verify (documentation only). CI on the docs PR is not claimed here.
 - **Branch:** `docs/int-audit-1-scope-gate` · **Base:** `main` @ `176965d086dd60dbd98208d4f4580da91b9a07b0` · **PR / head SHA:** reported in the final message (a document cannot embed the hash of its own commit).
-- **Status: BLOCKED — awaiting D1–D6.** Nothing merged, nothing deployed.
+- **Status (at the time): BLOCKED — awaiting D1–D6; since resolved (§7a).** Nothing merged, nothing deployed.
+
+## 7a. Owner decisions received (2026-10-14)
+
+| # | Decision | Outcome |
+|---|---|---|
+| D1 | Approve DP-F and the new table/migration within INT-AUDIT-1 only | **Approved** |
+| D2 | Cascade — conditional | **Approved with condition.** Checked: no code path deletes an account today (no route, no soft delete; profile and branch FKs are `restrict`), so the only removal is tenant erasure. Resolution: account and user ids carry **no FK** (no cascade erasing security events, no restrict blocking deletion); tenant FK keeps its cascade. No conflict raised |
+| D3 | Idempotent repeated disable | **Approved** (200, original `disabled_at`, no extra event, same response contract) |
+| D4 | No new read API | **Approved** |
+| D5 | No IP / Request ID | **Approved** |
+| D6 | Branch re-route out of scope | **Approved** |
+
+Handling of this PR: it stays **documentation-only** and is kept as the scope-gate record; the code lives in the separate implementation PR so neither duplicates nor conflicts with the other (different files; this PR touches only this document).
 
 ## 8. Next step
 
-On approval of D1 (and answers to D2–D6): implement INT-AUDIT-1 as one small backend-only PR per §4, record DP-F as decided, run related tests then the full suite (sqlite + pgsql), and stop for review. **INT-UX-5 is not started by this** and needs its own assignment; INT-MAP-1 stays blocked.
+Done as planned in PR #1411 (backend-only, DP-F recorded as decided). **INT-UX-5 is not started by this** and needs its own assignment; INT-MAP-1 stays blocked.
