@@ -3,10 +3,12 @@
 import json, sys, os, collections, re
 base = sys.argv[1]
 def load(dirs, ui):
+    # A missing or empty crawl must abort: zero rows would read as a clean result.
     rows = []
     for d in dirs:
         p = os.path.join(base, d, 'results.jsonl')
-        if not os.path.exists(p): continue
+        if not os.path.isfile(p) or os.path.getsize(p) == 0:
+            sys.exit(f'compare.py: required crawl result missing or empty: {p}')
         for l in open(p, encoding='utf8'):
             if l.strip():
                 r = json.loads(l); r['_ui'] = ui; rows.append(r)

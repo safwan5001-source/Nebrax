@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { CircleAlert, FileText, Landmark, ReceiptText, RotateCcw, Search, ShoppingCart, Truck, type LucideIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardTitleLevel } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import type { DocumentTypeId } from '@/modules/documents/types';
@@ -115,54 +115,57 @@ export function PrintTemplateCenter({ templates, loadState, onOpenDocumentType, 
           <p className="mt-1 text-sm text-muted">{loading ? t('center_loading_types') : t('center_families_hint')}</p>
         </div>
 
-        {families.length ? (
-          <div className="grid gap-4 lg:grid-cols-2">
-            {families.map((family) => {
-              const Icon = FAMILY_ICONS[family.id];
-              return (
-                <Card key={family.id} className={loading ? 'animate-pulse overflow-hidden' : 'overflow-hidden'}>
-                  <CardHeader className="border-b border-border py-4">
-                    <div className="flex items-start gap-3">
-                      <Icon className="mt-0.5 h-5 w-5 shrink-0 text-primary" strokeWidth={1.7} aria-hidden="true" />
-                      <div className="min-w-0">
-                        <CardTitle className="text-base">{t(`center_family_${family.id}_title`)}</CardTitle>
-                        <p className="mt-1 text-sm leading-relaxed text-muted">{t(`center_family_${family.id}_description`)}</p>
+        {/* بطاقات العائلات أبناءُ عنوان «العائلات» h2 أعلاه، لا أشقّاؤه (ERP-UX-014). */}
+        <CardTitleLevel level="h3">
+          {families.length ? (
+            <div className="grid gap-4 lg:grid-cols-2">
+              {families.map((family) => {
+                const Icon = FAMILY_ICONS[family.id];
+                return (
+                  <Card key={family.id} className={loading ? 'animate-pulse overflow-hidden' : 'overflow-hidden'}>
+                    <CardHeader className="border-b border-border py-4">
+                      <div className="flex items-start gap-3">
+                        <Icon className="mt-0.5 h-5 w-5 shrink-0 text-primary" strokeWidth={1.7} aria-hidden="true" />
+                        <div className="min-w-0">
+                          <CardTitle className="text-base">{t(`center_family_${family.id}_title`)}</CardTitle>
+                          <p className="mt-1 text-sm leading-relaxed text-muted">{t(`center_family_${family.id}_description`)}</p>
+                        </div>
                       </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="p-3">
-                    <ul className="grid gap-2 sm:grid-cols-2" aria-label={t('center_family_types', { family: t(`center_family_${family.id}_title`) })}>
-                      {family.documentTypes.map((type) => {
-                        const count = templateCountForType(type);
-                        return (
-                          <li key={type}>
-                            <button
-                              type="button"
-                              disabled={!canOpenDocumentType}
-                              onClick={() => onOpenDocumentType(type)}
-                              className="flex min-h-11 w-full items-center gap-2 rounded border border-border bg-surface px-3 py-2 text-start transition-colors hover:border-primary focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-not-allowed disabled:opacity-60"
-                            >
-                              <FileText className="h-4 w-4 shrink-0 text-muted" strokeWidth={1.7} aria-hidden="true" />
-                              <span className="min-w-0 flex-1 truncate text-sm font-medium text-text">{tTypes(type)}</span>
-                              <span className="shrink-0 text-xs text-muted">{loading ? '—' : t('center_template_count', { count })}</span>
-                            </button>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
-        ) : (
-          <Card>
-            <CardContent className="p-6 text-center">
-              <p className="font-medium text-text">{t('center_no_results_title')}</p>
-              <p className="mt-1 text-sm leading-relaxed text-muted">{t('center_no_results_hint')}</p>
-            </CardContent>
-          </Card>
-        )}
+                    </CardHeader>
+                    <CardContent className="p-3">
+                      <ul className="grid gap-2 sm:grid-cols-2" aria-label={t('center_family_types', { family: t(`center_family_${family.id}_title`) })}>
+                        {family.documentTypes.map((type) => {
+                          const count = templateCountForType(type);
+                          return (
+                            <li key={type}>
+                              <button
+                                type="button"
+                                disabled={!canOpenDocumentType}
+                                onClick={() => onOpenDocumentType(type)}
+                                className="flex min-h-11 w-full items-center gap-2 rounded border border-border bg-surface px-3 py-2 text-start transition-colors hover:border-primary focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-not-allowed disabled:opacity-60"
+                              >
+                                <FileText className="h-4 w-4 shrink-0 text-muted" strokeWidth={1.7} aria-hidden="true" />
+                                <span className="min-w-0 flex-1 truncate text-sm font-medium text-text">{tTypes(type)}</span>
+                                <span className="shrink-0 text-xs text-muted">{loading ? '—' : t('center_template_count', { count })}</span>
+                              </button>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          ) : (
+            <Card>
+              <CardContent className="p-6 text-center">
+                <p className="font-medium text-text">{t('center_no_results_title')}</p>
+                <p className="mt-1 text-sm leading-relaxed text-muted">{t('center_no_results_hint')}</p>
+              </CardContent>
+            </Card>
+          )}
+        </CardTitleLevel>
       </section>
     </div>
   );
