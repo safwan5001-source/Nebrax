@@ -1,0 +1,14 @@
+{
+  "name": "awj-preview-host",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Isolated mobile-preview host: App Links / Universal Links association files and a safe browser fallback. No dependencies.",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "node src/server.js",
+    "test": "node --test \"test/*.test.js\""
+  }
+}
