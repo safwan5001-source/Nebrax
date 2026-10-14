@@ -1,6 +1,6 @@
 # AWJ-VD-2 — Implementation Report (Shape engine, FacetVisualTile, IconPicker)
 
-STATUS: **PR-READY — in review, not merged** (merge needs explicit owner approval, D-14)
+STATUS: **PR #1482 — in review.** Low-risk under the amended D-14 (no DB, API, permissions, security, tenant, accounting or inventory change): it auto-merges by squash once CI is green, the review has passed and nothing substantive is open.
 DATE: 2026-10-14
 HORIZON: AWJ-COMMERCE-VISUAL-DIMENSIONS-H1 · slice VD-2 (H1-2)
 AUTHORITY: G0 closed by the owner (D-01..D-17 approved). VD-1a merged as `8801af9` (post-merge CI green). VD-2 has no DB or API change, so it continues the horizon without the separate DB/API approval that VD-1b, VD-1c and VD-4a still need.
