@@ -47,6 +47,7 @@ Evidence: `AWJ-VD-H1-0-EVIDENCE-AND-ARCHITECTURE.md` (sections referenced as §n
     - accountant: 403 on the visual, 200 on the name;
     - `staff` and `self_service`: 403;
     - guest: 401.
+  - **Preview for read-only users:** `GET facets` (`products.view`) carries short-lived `visual_preview` signed URLs, on the existing variant route, only for referenced media. This adds no library access and changes no RBAC (Codex P2, #1472).
   - Details: §3.8-a and VD-3 §3.8.
 - **Status:** **ACCEPTED-IP + AMENDED**
 

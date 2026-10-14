@@ -13,7 +13,7 @@ BASE: `origin/main` @ `f147fb6063d36952971724609250f9ba1baf42f5`
 | `AWJ-VD-H1-MASTER-PLAN.md` | هذا الملف: الهدف، النطاق، تعريف الإنجاز، البوابات |
 | `AWJ-VD-H1-0-EVIDENCE-AND-ARCHITECTURE.md` | الأدلة، المخطط المعماري، تغييرات DB/API، التوافق، المخاطر |
 | `AWJ-VD-H1-0-EXTERNAL-EVIDENCE.md` | البحث الخارجي البصري والتقني |
-| `AWJ-VD-H1-DECISION-REGISTER.md` | القرارات D-01..D-15 |
+| `AWJ-VD-H1-DECISION-REGISTER.md` | القرارات D-01..D-17 |
 | `AWJ-VD-H1-TASK-QUEUE.md` | الشرائح والاعتماديات والحالة |
 | `AWJ-VD-H1-VD3-EDITOR-UX-REQUIREMENTS.md` | متطلبات محرر VD-3 المبنية على صور الواجهة الحالية والنموذج |
 | `AWJ-VD-H1-0-IMPLEMENTATION-REPORT.md` | تقرير شريحة H1-0 |

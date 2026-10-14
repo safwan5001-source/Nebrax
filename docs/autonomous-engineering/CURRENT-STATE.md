@@ -5,7 +5,7 @@ LAYER_VERSION: V1
 STATUS: TAX-ZATCA HORIZON ACTIVE UPON MERGE OF ACTIVATION PR #1324 — use `docs/audits/horizon/AWJ-TAX-ZATCA-HORIZON-{MASTER-PLAN,TASK-QUEUE,BOOTSTRAP}.md`. **TAX-HZ-00 is the only first task; read-only Evidence/Decision Pass.** Separate owner approval is required for every PR merge. The Delivery entries below are historical frozen snapshots, not the active queue.
 
 ## Parallel Horizon — AWJ-COMMERCE-VISUAL-DIMENSIONS-H1 (launched by owner 2026-10-14)
-- H1-0 Evidence & Architecture delivered for review; **stopped at Decision Gate G0** (approval of D-01..D-15 before any migration/API contract).
+- H1-0 Evidence & Architecture delivered for review; **stopped at Decision Gate G0** (approval of D-01..D-17 — including D-16 media-delete serialization and D-17 mandatory versioning — before any migration/API contract).
 - Plan / queue / decisions: `docs/plans/store/visual-dimensions/`. Per-PR owner merge approval; no deploy. Does not touch TAX-ZATCA files.
 
 ## Paused Horizon handoff — Delivery Platforms & Settlement

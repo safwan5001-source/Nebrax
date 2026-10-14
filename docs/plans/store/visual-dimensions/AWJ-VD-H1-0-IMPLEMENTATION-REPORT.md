@@ -5,7 +5,7 @@ DATE: 2026-10-14
 
 ## Outcome
 
-H1-0 delivers the evidence pass, the proposed architecture, the DB/API changes, the backward-compatibility and risk analysis, the Decision Register (D-01..D-15) and the Task Queue (VD-1a..VD-6).
+H1-0 delivers the evidence pass, the proposed architecture, the DB/API changes, the backward-compatibility and risk analysis, the Decision Register (D-01..D-17) and the Task Queue (VD-1a..VD-6).
 
 This slice is **documentation only**. No code, migration, API, or runtime behaviour changed.
 
@@ -33,6 +33,14 @@ This slice is **documentation only**. No code, migration, API, or runtime behavi
 |---|---|---|
 | P1: ABA after delete and recreate resets `version` | **Valid.** | The API never deletes a visual row; "remove" empties it and increments `version`. Deletion happens only by cascade with the owner, and a recreated owner gets a new UUID (D-17). Dedicated test. |
 | P2: the image gate authorizes a value at tenant level, not per storefront channel | **Valid** for multi-storefront tenants. | The second condition now reuses the same `CommerceListing` + `is_active` predicate the product list applies on the resolved channel. Tests N17–N19 (D-03). |
+
+## Codex review round 4 (on `fd58681`) — changes applied
+
+| Finding | Assessment | Change |
+|---|---|---|
+| P1: the lifecycle text in §3.2 still deletes the row on `visual: null` | **Valid** (internal contradiction). | §3.2 and §3.6 now require the tombstone. Cascade deletion is the only path that removes a row. |
+| P2: `CURRENT-STATE.md` defines G0 as D-01..D-15 | **Valid.** | Updated to D-01..D-17 in every pointer. |
+| P2: no image preview for a read-only user (no `commerce.manage`) | **Valid.** | `visual_preview` signed URLs on the existing variant route, only for referenced media, with tests. No new endpoint and no RBAC change (D-04). |
 
 ## Repository evidence / root cause
 
