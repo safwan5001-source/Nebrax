@@ -1700,3 +1700,17 @@ mutating. See the implementation report, "Newly discovered / not changed".
 * **Default roles.** `accountant` gains `zatca.submit` (it already held `invoices.manage`, the only non-wildcard built-in that did). `staff` and `self_service` do not. `owner`/`admin` hold `*`, which already covers it.
 * **Backward compatibility (owner decision: Option B).** Existing tenants resolve permissions from their stored `roles` rows, not from `MATRIX`. A one-time additive migration appends `zatca.submit` to every stored role (all tenants) whose explicit list contains `invoices.manage`; wildcard roles and roles without `invoices.manage` are untouched; re-running is a no-op. It is a transition only — afterwards the two permissions are managed independently, and removing `zatca.submit` from a role takes effect on the next request even if `invoices.manage` stays.
 * **Role editing note.** Roles created after the migration do **not** inherit `zatca.submit` from `invoices.manage`; grant it explicitly in the Role Matrix.
+
+## 45. AC-UX-HZ-01 / AC-UX-00 — baseline delta (2026-10-14)
+
+Documentation-only. Execution of the Users/Roles/Scope UX horizon is tracked in
+[`AC-UX-HZ-01-MASTER-PLAN.md`](./AC-UX-HZ-01-MASTER-PLAN.md),
+[`AC-UX-HZ-01-TASK-QUEUE.md`](./AC-UX-HZ-01-TASK-QUEUE.md) and
+[`AC-UX-HZ-01-CURRENT-STATE.md`](./AC-UX-HZ-01-CURRENT-STATE.md); those files track execution and are not a second source of truth.
+
+Corrections to earlier sections, verified against `main` @ `5ff3135` via `artisan tinker`:
+
+- **Catalogue size:** `Rbac::PERMISSIONS` holds **134** unique keys (68 two-segment, 62 three-segment, 4 four-segment), not the 122 / "56 + 66" recorded in §39 at the time of PR-ACL-ROLE-UI-1. The growth is REM-37 `zatca.submit` and later modules; §39's description of the *defect and its fix* is unchanged.
+- **Label coverage (§39 "deferred"):** 17 of 36 permission modules have a label in `hr.perm_modules` (101 of 134 keys sit in unlabelled modules); `operate`, `reassign`, `publish` have no `hr.perm_actions` entry. Planned in AC-UX-03A.
+- **New finding (backend; owner classified it High and chose Option 2 on 2026-10-14 — fixed by AC-UX-00A, see AC-UX-HZ-01 MASTER-PLAN §6):** `UserController` applies no actor-scope or role-ceiling check. A scope-restricted holder of `users.manage` can clear their own `branch_ids`/`warehouse_ids` (`[]` ⇒ unrestricted), assign branches outside their own scope, and assign any tenant role other than `owner` (including `admin` = `*`). Reproduced with a throwaway probe against current `main` (not committed). A related chain was found in review: a `roles.manage` holder could add any permission (including `users.manage`) to their own role. Owner decision D-I: the role-definition ceiling is part of AC-UX-00A. `users.manage` and `roles.manage` remain the highest-risk class and are presented as such.
+- **UI gating (§39/§6):** the HR page gates its Users/Roles tabs by role name (`owner`/`admin`), not by `users.view`/`roles.view`; the Users table never confirms deletes and reports success on failed deletes. Both are queued in AC-UX-01.
