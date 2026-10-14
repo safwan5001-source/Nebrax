@@ -6,6 +6,7 @@ import type {
   Variant,
 } from "@spree/sdk";
 import { toRenderableCustomizerMediaUrl } from "./customizer-media";
+import { toRenderableFacetVisualMediaUrl } from "./facet-visual-media";
 import { parseProductGifting } from "./pdp-gifting";
 import type {
   AwjCategory,
@@ -169,6 +170,13 @@ export function toRenderableMediaUrl(url: string | null): string | null {
   // or dropped when it is outside the contract (never guessed).
   if (/\/store\/v1\/media\/customizer\//.test(url)) {
     return toRenderableCustomizerMediaUrl(url);
+  }
+
+  // AWJ-VD-H1 / VD-1c: facet visual images, before the generic pattern (which
+  // would otherwise hand the raw three-segment path back unchanged). Same
+  // rule: the proxy path or nothing.
+  if (/\/store\/v1\/media\/facet-visuals(?:[/?#]|$)/.test(url)) {
+    return toRenderableFacetVisualMediaUrl(url);
   }
 
   try {

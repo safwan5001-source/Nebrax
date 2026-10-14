@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\StorefrontCheckoutController;
 use App\Http\Controllers\Api\StorefrontConfigController;
 use App\Http\Controllers\Api\StorefrontDeliveryScheduleController;
 use App\Http\Controllers\Api\StorefrontCustomizerMediaController;
+use App\Http\Controllers\Api\StorefrontFacetVisualMediaController;
 use App\Http\Controllers\Api\StorefrontMediaController;
 use App\Http\Controllers\Api\StorefrontOfferController;
 use App\Http\Controllers\Api\StorefrontProductController;
@@ -57,6 +58,14 @@ Route::middleware([
     // مقطعان ثابتان بعد `media/customizer` فلا يتقاطع مع `media/{id}/derivatives/{x}`.
     Route::get('media/customizer/{id}/{file}', [StorefrontCustomizerMediaController::class, 'show'])
         ->where('id', '[0-9a-fA-F-]{32,36}')->where('file', '[A-Za-z0-9._-]{1,40}')->name('media.customizer.show');
+
+    // AWJ-VD-H1 / VD-1c — صور الأبعاد وقيمها (§3.8-c): المضيف وحده لأن الرؤية على القناة تحتاج سياق المتجر (D2).
+    // القيود متساهلة عمداً: التحقق كله داخل المتحكّم، فكل إخفاق 404 موحّد بـ`no-store` (D4)، وأي شكلٍ آخر تحت
+    // البادئة يصل إلى `missing` بالرد نفسه بدل 404 الإطار.
+    Route::get('media/facet-visuals/{visualId}/{mediaId}/{file}', [StorefrontFacetVisualMediaController::class, 'show'])
+        ->where(['visualId' => '[^/]+', 'mediaId' => '[^/]+', 'file' => '[^/]+'])->name('media.facet_visual.show');
+    Route::get('media/facet-visuals/{rest?}', [StorefrontFacetVisualMediaController::class, 'missing'])
+        ->where('rest', '.*')->name('media.facet_visual.missing');
 
     Route::get('media/categories/{id}', [StorefrontMediaController::class, 'showCategory'])->whereUuid('id')->name('media.category.show');
     Route::get('media/{id}/derivatives/{derivative}', [StorefrontMediaController::class, 'showDerivative'])

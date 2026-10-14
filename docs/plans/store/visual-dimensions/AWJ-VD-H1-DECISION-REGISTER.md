@@ -160,6 +160,15 @@ Evidence: `AWJ-VD-H1-0-EVIDENCE-AND-ARCHITECTURE.md` (sections referenced as §n
   - A periodic cleanup job: it leaves a window where a reference to deleted media stays visible.
 - **Status:** **APPROVED** (G0, 2026-10-14)
 
+## VD-1c owner decisions (2026-10-14)
+
+Approved with the VD-1c authorization; they refine D-05 and D-15 and are implemented and tested in VD-1c (`AWJ-VD-1C-IMPLEMENTATION-REPORT.md`).
+
+- **VD1C-D1 — projection format.** `meta.facets[].visual` and `values[].visual` carry the stored documents **normalized, not resolved** (`{self?, defaults?}` / the value's own keys), every image reference enriched with `sources`. Inheritance and precedence stay with the VD-1a resolver in the storefront, because the section's explicit values (above the value) and the section template (below the facet defaults) are VD-4a context the server does not have. §3.8-b updated.
+- **VD1C-D2 — legacy routes.** The guarded image route is registered in the host group only. Legacy `{tenantSlug}` routes, where channel visibility cannot be proven, emit `visual: null`.
+- **VD1C-D3 — proxy caching.** 200 and 304 get `public, max-age=300, must-revalidate`; a 304 only exists after the origin re-ran every guard. Every other status (404, 5xx, unexpected) is `no-store`. Refines D-15 ("200 only").
+- **VD1C-D4 — 404 mechanism.** One `notFound()` in the new controller sets `Cache-Control: no-store`; the shared public API error renderer is unchanged.
+
 ## Open questions (do not block G0)
 
 1. The 7 template names and their meanings (§3.7).

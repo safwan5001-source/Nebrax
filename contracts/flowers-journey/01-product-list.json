@@ -114,9 +114,11 @@
                         "name": "عيد ميلاد",
                         "name_en": "Birthday",
                         "count": 1,
-                        "selected": false
+                        "selected": false,
+                        "visual": null
                     }
-                ]
+                ],
+                "visual": null
             },
             {
                 "key": "recipient",
@@ -129,9 +131,11 @@
                         "name": "لها",
                         "name_en": "For her",
                         "count": 1,
-                        "selected": false
+                        "selected": false,
+                        "visual": null
                     }
-                ]
+                ],
+                "visual": null
             }
         ],
         "brands": [],

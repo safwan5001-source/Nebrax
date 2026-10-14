@@ -18,6 +18,7 @@ use App\Services\Commerce\FulfillmentPolicyService;
 use App\Services\Commerce\ProductAddonService;
 use App\Services\Commerce\ProductContentService;
 use App\Services\Commerce\ProductPersonalizationService;
+use App\Services\Commerce\StorefrontFacetVisualProjector;
 use App\Services\ProductMediaGalleryService;
 use App\Support\DocumentLineVariantResolver;
 use App\Support\Commerce\CatalogFacetFilter;
@@ -170,11 +171,17 @@ class StorefrontProductController extends PublicApiController
             ))->withDeliveryPromise($promises[$product->id] ?? null)->resolve($request);
         })->all();
 
+        // AWJ-VD-H1 / VD-1c (D1/D2) — `visual` on facets and values, storefront.v1 only: this controller is not the
+        // commerce/v1 one, whose closed contract is untouched. Legacy routes (no storefront) get `visual: null`.
+        $facetMeta = $facetFilter->meta($baseQuery, $facetSelection);
+        $facetMeta['facets'] = app(StorefrontFacetVisualProjector::class)
+            ->project($facetMeta['facets'], $facetFilter->activeFacetModels(), $storefront->hasStorefront());
+
         return new JsonResponse([
             'data' => $data,
             'meta' => [
                 'request_id' => PublicApiResponse::requestId($request),
-                ...$facetFilter->meta($baseQuery, $facetSelection),
+                ...$facetMeta,
                 'pagination' => [
                     'page' => $paginator->currentPage(),
                     'per_page' => $paginator->perPage(),
