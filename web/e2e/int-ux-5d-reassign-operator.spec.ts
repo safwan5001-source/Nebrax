@@ -68,6 +68,9 @@ async function open(page: Page, opts: { locale: 'ar' | 'en'; theme: 'light' | 'd
   await expect(page.getByTestId('signed-ingress-panel')).toHaveAttribute('data-state', 'ready');
 }
 
+const usersFor = (locale: 'ar' | 'en') => (locale === 'en'
+  ? [person('u-self', 'Noura Salem'), person('u-amal', 'Amal Otaibi'), person('u-bader', 'Bader Branch', { branch_ids: ['br-1'] }), person('u-dina', 'Dina Off', { is_active: false })]
+  : [person('u-self', 'نورة السالم'), person('u-amal', 'أمل العتيبي'), person('u-bader', 'بدر الفرع', { branch_ids: ['br-1'] }), person('u-dina', 'دينا المعطّلة', { is_active: false })]);
 const world = (over: Partial<World> = {}): World => ({
   requests: [], bodies: [], reassign: 'ok',
   rows: [row(), row({ id: 'ing-2', external_store_id: 'KTA-OLD-0001', status: 'disabled', disabled_at: '2026-10-05T00:00:00Z' })],
@@ -80,11 +83,12 @@ const visible = (page: Page, testId: string) => page.locator(`[data-testid="${te
 const rowOf = (page: Page, storeId: string) => page.locator('[data-testid="signed-ingress-row"]:visible', { hasText: storeId });
 const operatorOf = (page: Page, storeId: string) => rowOf(page, storeId).getByTestId('signed-ingress-operator');
 const STORE = 'KTA-RIYADH-0042';
+const CURRENT = { ar: 'نورة السالم', en: 'Noura Salem' } as const;
 async function shot(page: Page, name: string) {
   if (shots) await page.screenshot({ path: `${shots}/${name}.png`, fullPage: false });
 }
-async function openDialog(page: Page) {
-  await expect(operatorOf(page, STORE)).toHaveText('نورة السالم');
+async function openDialog(page: Page, currentName: string) {
+  await expect(operatorOf(page, STORE)).toHaveText(currentName);
   await rowOf(page, STORE).getByTestId('ingress-reassign').click();
   const dialog = page.getByRole('dialog');
   await expect(dialog).toBeVisible();
@@ -96,8 +100,7 @@ for (const [locale, dir] of [['ar', 'rtl'], ['en', 'ltr']] as const) {
   for (const theme of ['light', 'dark'] as const) {
     test.describe(`${locale}/${theme}`, () => {
       test('reassign: names only, eligible only, confirm → one request → the shown operator changes', async ({ page }, info) => {
-        const w = world();
-        if (locale === 'en') w.users = [person('u-self', 'Noura Salem'), person('u-amal', 'Amal Otaibi'), person('u-bader', 'Bader Branch', { branch_ids: ['br-1'] }), person('u-dina', 'Dina Off', { is_active: false })];
+        const w = world({ users: usersFor(locale) });
         const self = locale === 'en' ? 'Noura Salem' : 'نورة السالم';
         const amal = locale === 'en' ? 'Amal Otaibi' : 'أمل العتيبي';
         await open(page, { locale, theme }, w);
@@ -108,7 +111,7 @@ for (const [locale, dir] of [['ar', 'rtl'], ['en', 'ltr']] as const) {
         await expect(visible(page, 'ingress-reassign')).toHaveCount(1); // نقطة مهيّأة واحدة فقط
         await shot(page, `panel-${tag}`);
 
-        const dialog = await openDialog(page);
+        const dialog = await openDialog(page, CURRENT[locale]);
         // نقطة غير موجّهة لفرع: الأمل وحدها (المقيَّد بفرع والمعطّل والحالي خارج القائمة).
         const labels = await dialog.getByTestId('reassign-select').locator('option').allTextContents();
         expect(labels.slice(1)).toEqual([amal]);
@@ -134,9 +137,9 @@ for (const [locale, dir] of [['ar', 'rtl'], ['en', 'ltr']] as const) {
       });
 
       test('422 keeps the dialog with a safe message; raw server text never appears', async ({ page }, info) => {
-        const w = world({ reassign: '422' });
+        const w = world({ reassign: '422', users: usersFor(locale) });
         await open(page, { locale, theme }, w);
-        const dialog = await openDialog(page);
+        const dialog = await openDialog(page, CURRENT[locale]);
         await dialog.getByTestId('reassign-select').selectOption({ index: 1 });
         await dialog.getByRole('button').last().click();
         await expect(dialog.getByTestId('reassign-error')).toBeVisible();
@@ -148,9 +151,9 @@ for (const [locale, dir] of [['ar', 'rtl'], ['en', 'ltr']] as const) {
 
       test('403 and 409 close with a safe notice (no raw text)', async ({ page }) => {
         for (const outcome of ['403', '409'] as const) {
-          const w = world({ reassign: outcome });
+          const w = world({ reassign: outcome, users: usersFor(locale) });
           await open(page, { locale, theme }, w);
-          const dialog = await openDialog(page);
+          const dialog = await openDialog(page, CURRENT[locale]);
           await dialog.getByTestId('reassign-select').selectOption({ index: 1 });
           await dialog.getByRole('button').last().click();
           if (outcome === '403') {
@@ -166,9 +169,9 @@ for (const [locale, dir] of [['ar', 'rtl'], ['en', 'ltr']] as const) {
       });
 
       test('a lost response is an unknown outcome: one request, list re-read, no retry control, the real operator is shown', async ({ page }, info) => {
-        const w = world({ reassign: 'abort' });
+        const w = world({ reassign: 'abort', users: usersFor(locale) });
         await open(page, { locale, theme }, w);
-        const dialog = await openDialog(page);
+        const dialog = await openDialog(page, CURRENT[locale]);
         await dialog.getByTestId('reassign-select').selectOption({ index: 1 });
         const readsBefore = w.requests.filter((r) => r === 'GET /delivery-connectors').length;
         await dialog.getByRole('button').last().click();
