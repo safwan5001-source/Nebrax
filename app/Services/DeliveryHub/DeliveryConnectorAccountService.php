@@ -4,6 +4,7 @@ namespace App\Services\DeliveryHub;
 
 use App\Models\Branch;
 use App\Models\DeliveryConnectorAccount;
+use App\Models\DeliveryConnectorLifecycleEvent;
 use App\Models\DeliveryConnectorOperatorEvent;
 use App\Models\DeliveryPlatformProfile;
 use App\Models\User;
@@ -15,6 +16,10 @@ use Illuminate\Support\Str;
 /**
  * إعداد ربط الموصّل. السر يُولَّد على الخادم ويُعاد مرة واحدة، ويُخزَّن
  * مشفَّراً. لا يُفعّل مزوّداً ولا ينشئ فاتورة.
+ *
+ * INT-AUDIT-1: الإنشاء والتدوير والتعطيل تكتب حدثاً إلحاقياً (`DeliveryConnectorLifecycleEvent`)
+ * **داخل معاملة العملية نفسها** وقبل تعديل الحساب: فشل الكتابة يُلغي العملية كلها، وفشل العملية
+ * لا يترك حدثاً. الحدث بلا سر ولا بادئة ولا بيانات طلب.
  */
 class DeliveryConnectorAccountService
 {
@@ -27,6 +32,7 @@ class DeliveryConnectorAccountService
     public function create(User $actor, array $input): array
     {
         $this->assertTenant();
+        $this->assertActor($actor);
         $profile = $this->profileOrFail((string) $input['delivery_platform_profile_id']);
         $branchId = $this->destinationOrFail($actor, $input['branch_id'] ?? null);
         $storeId = $this->storeIdOrFail($input['external_store_id'] ?? null);
@@ -49,6 +55,8 @@ class DeliveryConnectorAccountService
                     'status' => DeliveryConnectorAccount::STATUS_CONFIGURED,
                 ])->save();
 
+                $this->recordEvent($account, $actor, DeliveryConnectorLifecycleEvent::CREATED, null, 1);
+
                 return $account;
             });
         } catch (UniqueConstraintViolationException) {
@@ -63,36 +71,58 @@ class DeliveryConnectorAccountService
     }
 
     /** @return array{0: DeliveryConnectorAccount, 1: string} */
-    public function rotateSecret(DeliveryConnectorAccount $account): array
+    public function rotateSecret(DeliveryConnectorAccount $account, User $actor): array
     {
         $this->assertTenant();
+        $this->assertActor($actor);
 
-        return DB::transaction(function () use ($account) {
+        return DB::transaction(function () use ($account, $actor) {
             $locked = DeliveryConnectorAccount::query()->whereKey($account->id)->lockForUpdate()->first();
             if ($locked === null || (string) $locked->tenant_id !== (string) app(TenantContext::class)->id()) {
                 throw new DeliveryConnectorException('connector_unavailable', 'الربط غير متاح.', 404);
             }
 
             [$secret, $prefix] = $this->generateSecret();
+            $from = (int) $locked->secret_version;
+            // الحدث قبل تعديل الحساب: إن فشل لم يُلمس السر أصلاً (ولا يظهر السر الجديد في أي رسالة خطأ).
+            $this->recordEvent($locked, $actor, DeliveryConnectorLifecycleEvent::SECRET_ROTATED, $from, $from + 1);
             $locked->forceFill([
                 'secret' => $secret,
                 'secret_prefix' => $prefix,
-                'secret_version' => ((int) $locked->secret_version) + 1,
+                'secret_version' => $from + 1,
             ])->save();
 
             return [$locked, $secret];
         });
     }
 
-    public function disable(DeliveryConnectorAccount $account): DeliveryConnectorAccount
+    /**
+     * تعطيل نهائي (لا إعادة تفعيل). **idempotent**: تعطيل حساب معطَّل يعيده كما هو بلا تحديث
+     * `disabled_at` الأصلي وبلا حدث تدقيق جديد (200 كما كان). الحدث يُكتب عند الانتقال الفعلي فقط.
+     */
+    public function disable(DeliveryConnectorAccount $account, User $actor): DeliveryConnectorAccount
     {
         $this->assertTenant();
-        $account->forceFill([
-            'status' => DeliveryConnectorAccount::STATUS_DISABLED,
-            'disabled_at' => now(),
-        ])->save();
+        $this->assertActor($actor);
 
-        return $account;
+        return DB::transaction(function () use ($account, $actor) {
+            $locked = DeliveryConnectorAccount::query()->whereKey($account->id)->lockForUpdate()->first();
+            if ($locked === null || (string) $locked->tenant_id !== (string) app(TenantContext::class)->id()) {
+                throw new DeliveryConnectorException('connector_unavailable', 'الربط غير متاح.', 404);
+            }
+            if ($locked->status === DeliveryConnectorAccount::STATUS_DISABLED) {
+                return $locked;
+            }
+
+            $version = (int) $locked->secret_version;
+            $this->recordEvent($locked, $actor, DeliveryConnectorLifecycleEvent::DISABLED, $version, $version);
+            $locked->forceFill([
+                'status' => DeliveryConnectorAccount::STATUS_DISABLED,
+                'disabled_at' => now(),
+            ])->save();
+
+            return $locked;
+        });
     }
 
     /**
@@ -225,6 +255,32 @@ class DeliveryConnectorAccountService
         $secret = self::SECRET_PREFIX . bin2hex(random_bytes(32));
 
         return [$secret, Str::substr($secret, 0, 14)];
+    }
+
+    /**
+     * حدث تدقيق إلحاقي داخل معاملة المستدعي. معرّفات وأرقام إصدار فقط؛ لا سر ولا بادئة ولا طلب.
+     * الفرع هو فرع توجيه الحساب وقت العملية (للتصفية لاحقاً)، وليس فرع الفاعل.
+     */
+    private function recordEvent(DeliveryConnectorAccount $account, User $actor, string $code, ?int $from, ?int $to): void
+    {
+        (new DeliveryConnectorLifecycleEvent())->forceFill([
+            'delivery_connector_account_id' => $account->id,
+            'platform_key' => $account->platform_key,
+            'external_store_id' => $account->external_store_id,
+            'event_code' => $code,
+            'actor_user_id' => $actor->id,
+            'branch_id' => $account->branch_id,
+            'secret_version_from' => $from,
+            'secret_version_to' => $to,
+        ])->save();
+    }
+
+    /** الفاعل من المستأجر الحالي دائماً: سجل التدقيق لا يقبل معرّف فاعل من مستأجر آخر. */
+    private function assertActor(User $actor): void
+    {
+        if ((string) $actor->tenant_id !== (string) app(TenantContext::class)->id()) {
+            throw new DeliveryConnectorException('tenant_required', 'سياق المستأجر مطلوب.', 403);
+        }
     }
 
     private function assertTenant(): void
