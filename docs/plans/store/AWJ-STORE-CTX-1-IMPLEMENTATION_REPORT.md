@@ -121,7 +121,7 @@ docs/plans/store/AWJ-STORE-CTX-1-IMPLEMENTATION_REPORT.md               (هذا 
 | `CommerceActiveStoreIsolationTest` (جديد) | **6/6 ✓ — 56 تأكيداً** |
 | Vitest — مساحة التجارة + الهيكل + صفحات `(commerce)` + البنّاء | **204 ملفاً / 3178 اختباراً ✓** |
 | Vitest — المستودع كاملاً (`npm test`) | **613 ملفاً / 6781 اختباراً ✓** |
-| `php artisan test` كاملاً (SQLite محلياً) | PHP_FULL_PLACEHOLDER |
+| `php artisan test` كاملاً (SQLite محلياً) | **6758 ✓ / 95 skipped / 61 ✗** — تفصيل الفشل:<br>• **26** في `Fuel*` (6 ملفات): `Call to undefined function bcmul()` — امتداد `bcmath` غير مثبّت في الحاوية المحلية (ينبّه إليه `setup.sh`، ومثبّت في CI). لا كود PHP في هذا التغيير.<br>• **35** في `StorefrontMedia*` (5 ملفات): `database disk image is malformed` / `no such table` — تلف SQLite لأن تشغيلاً تشخيصياً ثانياً استعمل ملف القاعدة نفسه أثناء التشغيل الكامل. **أُعيد تشغيلها منفردةً: 65/65 ✓ (998 تأكيداً).**<br>⇒ لا فشل ناتج عن هذا التغيير. |
 
 ## 5. Build وCI
 
@@ -143,7 +143,7 @@ docs/plans/store/AWJ-STORE-CTX-1-IMPLEMENTATION_REPORT.md               (هذا 
 
 - **Branch:** `fix/commerce-active-store-isolation`
 - **Base:** `main` @ `757a7a39823eb9d26a8c11d2f755c8af81c52876`
-- **Head / PR:** HEAD_PLACEHOLDER
+- **Head / PR:** PR [#1489](https://github.com/safwan5001-source/Nebrax/pull/1489) — Head (أول commit): `9c25cc66c4c2fab661406e0337467748325dfce5`؛ يحمل الـcommit التالي تحديث هذا التقرير فقط
 - **Merge/Deploy:** لم يُنفَّذ أيٌّ منهما — بانتظار موافقة صريحة.
 
 ## 8. الخطوة التالية
