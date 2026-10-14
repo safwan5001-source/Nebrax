@@ -15,6 +15,7 @@ import { useToast } from '@/components/ui/toast';
 import { api, ApiError } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { type LeaveRequest } from '@/components/hr/leave-request-dialog';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 
 interface LeaveType {
   id: string;
@@ -37,6 +38,7 @@ const statusTone: Record<LeaveRequest['status'], 'positive' | 'warning' | 'muted
  */
 export function LeaveManager() {
   const t = useTranslations('hr');
+  const askConfirm = useConfirm();
   const tc = useTranslations('common');
   const { success, error: toastError } = useToast();
 
@@ -97,7 +99,7 @@ export function LeaveManager() {
     }
   }
   async function removeType(lt: LeaveType) {
-    if (!window.confirm(t('confirm_delete_leave_type', { name: lt.name }))) return;
+    if (!(await askConfirm({ message: t('confirm_delete_leave_type', { name: lt.name }), tone: 'danger' }))) return;
     try {
       await api(`/leave-types/${lt.id}`, { method: 'DELETE' });
       success(tc('deleted'));

@@ -14,6 +14,7 @@ import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/components/ui/toast';
 import { api, ApiError } from '@/lib/api';
 import { cn } from '@/lib/utils';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 
 interface OrgItem {
   id: string;
@@ -32,6 +33,7 @@ type Endpoint = (typeof ENDPOINTS)[number];
  */
 export function OrgStructureManager() {
   const t = useTranslations('hr');
+  const askConfirm = useConfirm();
   const tc = useTranslations('common');
   const { success, error: toastError } = useToast();
 
@@ -112,7 +114,7 @@ export function OrgStructureManager() {
   }
 
   async function remove(item: OrgItem) {
-    if (!window.confirm(t('confirm_delete_org_item', { name: item.name }))) return;
+    if (!(await askConfirm({ message: t('confirm_delete_org_item', { name: item.name }), tone: 'danger' }))) return;
     try {
       await api(`/${active}/${item.id}`, { method: 'DELETE' });
       success(tc('deleted'));

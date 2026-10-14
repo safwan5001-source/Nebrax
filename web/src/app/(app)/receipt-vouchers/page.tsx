@@ -18,6 +18,7 @@ import { branchViewQuery, type BranchView } from '@/lib/branch-view';
 import type { ActiveFilter, DataExplorerState, FilterDefinition } from '@/lib/data-explorer/types';
 import { parseExplorerState, removeFilter, replaceFilter, serializeExplorerState } from '@/lib/data-explorer/url-state';
 import { formatRiyal } from '@/lib/money';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 
 interface Voucher { id: string; number: string; partner_name?: string | null; method: string; payment_date: string; amount: string; status: string }
 const tone: Record<string, 'positive' | 'warning' | 'muted'> = { posted: 'positive', draft: 'warning', cancelled: 'muted' };
@@ -35,6 +36,7 @@ function isEmptyFilter(filter: ActiveFilter): boolean {
 
 export default function ReceiptVouchersPage() {
   const t = useTranslations('receiptVouchers');
+  const askConfirm = useConfirm();
   const tc = useTranslations('common');
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -88,7 +90,7 @@ export default function ReceiptVouchersPage() {
   }, [router, success, t, tc, toastError]);
 
   const remove = useCallback(async (id: string) => {
-    if (!window.confirm(t('confirm_delete'))) return;
+    if (!(await askConfirm({ message: t('confirm_delete'), tone: 'danger' }))) return;
     setActing(id);
     try {
       await api(`/payments/${id}`, { method: 'DELETE' });
@@ -97,10 +99,10 @@ export default function ReceiptVouchersPage() {
     } catch (err) {
       toastError(err instanceof ApiError ? err.message : tc('saveFailed'));
     } finally { setActing(null); }
-  }, [load, success, t, tc, toastError]);
+  }, [askConfirm, load, success, t, tc, toastError]);
 
   const post = useCallback(async (id: string) => {
-    if (!window.confirm(t('confirm_post'))) return;
+    if (!(await askConfirm({ message: t('confirm_post') }))) return;
     setActing(id);
     try {
       await api(`/payments/${id}/post`, { method: 'POST' });
@@ -109,7 +111,7 @@ export default function ReceiptVouchersPage() {
     } catch (err) {
       toastError(err instanceof ApiError ? err.message : tc('saveFailed'));
     } finally { setActing(null); }
-  }, [load, success, t, tc, toastError]);
+  }, [askConfirm, load, success, t, tc, toastError]);
 
   const methodOptions = useMemo(() => Array.from(new Set(data.map((voucher) => voucher.method).filter(Boolean)))
     .sort()

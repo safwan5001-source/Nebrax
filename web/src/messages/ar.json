@@ -865,7 +865,9 @@
     "dismissNotification": "إغلاق التنبيه",
     "themeToggle": "تبديل الوضع",
     "languageToggle": "تبديل اللغة",
-    "close": "إغلاق"
+    "close": "إغلاق",
+    "confirm": "تأكيد",
+    "confirmTitle": "تأكيد الإجراء"
   },
   "contacts": {
     "title": "قائمة الاتصال",

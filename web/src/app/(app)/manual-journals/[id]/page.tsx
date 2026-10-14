@@ -14,6 +14,7 @@ import { useToast } from '@/components/ui/toast';
 import { DetailPage, ErrorState, FormAlert, LoadingState, type PageAction } from '@/components/nebrax';
 import { LedgerLinesTable } from '@/components/accounting/ledger-lines-table';
 import { api, ApiError } from '@/lib/api';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 
 interface ManualJournalLine {
   id: string;
@@ -43,6 +44,7 @@ const statusTone: Record<string, 'positive' | 'muted' | 'negative'> = {
 
 export default function ManualJournalDetailsPage() {
   const t = useTranslations('manualJournals');
+  const askConfirm = useConfirm();
   const tc = useTranslations('common');
   const params = useParams<{ id: string }>();
   const router = useRouter();
@@ -91,7 +93,7 @@ export default function ManualJournalDetailsPage() {
   };
 
   const remove = async () => {
-    if (!journal || !window.confirm(t('confirmDelete'))) return;
+    if (!journal || !(await askConfirm({ message: t('confirmDelete'), tone: 'danger' }))) return;
     setActing(true);
     try {
       await api(`/manual-journals/${journal.id}`, { method: 'DELETE' });

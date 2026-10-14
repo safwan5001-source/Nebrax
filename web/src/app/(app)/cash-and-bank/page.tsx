@@ -18,6 +18,7 @@ import { type CashBankAccount } from '@/lib/cash-bank';
 import type { ActiveFilter, DataExplorerState, FilterDefinition } from '@/lib/data-explorer/types';
 import { parseExplorerState, removeFilter, replaceFilter, serializeExplorerState } from '@/lib/data-explorer/url-state';
 import { formatRiyal } from '@/lib/money';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 
 function filterValue(filter?: ActiveFilter): string {
   if (!filter || Array.isArray(filter.value)) return '';
@@ -32,6 +33,7 @@ function isEmptyFilter(filter: ActiveFilter): boolean {
 
 export default function CashAndBankPage() {
   const t = useTranslations('cashBank');
+  const askConfirm = useConfirm();
   const tc = useTranslations('common');
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -71,7 +73,7 @@ export default function CashAndBankPage() {
   }, [explorer, router]);
 
   const deactivate = useCallback(async (item: CashBankAccount) => {
-    if (!window.confirm(t('confirm_deactivate'))) return;
+    if (!(await askConfirm({ message: t('confirm_deactivate'), tone: 'danger' }))) return;
     setActing(item.id);
     try {
       await api(`/cash-bank-accounts/${item.id}/deactivate`, { method: 'POST' });
@@ -79,7 +81,7 @@ export default function CashAndBankPage() {
       load();
     } catch (err) { toastError(err instanceof ApiError ? err.message : tc('saveFailed')); }
     finally { setActing(null); }
-  }, [load, success, t, tc, toastError]);
+  }, [askConfirm, load, success, t, tc, toastError]);
 
   const makeMain = useCallback(async (item: CashBankAccount) => {
     setActing(item.id);
@@ -92,7 +94,7 @@ export default function CashAndBankPage() {
   }, [load, success, t, tc, toastError]);
 
   const remove = useCallback(async (item: CashBankAccount) => {
-    if (!window.confirm(t('confirm_delete'))) return;
+    if (!(await askConfirm({ message: t('confirm_delete'), tone: 'danger' }))) return;
     setActing(item.id);
     try {
       await api(`/cash-bank-accounts/${item.id}`, { method: 'DELETE' });
@@ -100,7 +102,7 @@ export default function CashAndBankPage() {
       load();
     } catch (err) { toastError(err instanceof ApiError ? err.message : tc('saveFailed')); }
     finally { setActing(null); }
-  }, [load, success, t, tc, toastError]);
+  }, [askConfirm, load, success, t, tc, toastError]);
 
   const definitions = useMemo<FilterDefinition[]>(() => [
     {
