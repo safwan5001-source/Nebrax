@@ -2,6 +2,7 @@
 
 import { DeliveryPlatformDetail } from './delivery-platform-detail';
 import { useDeliveryIntegrationData } from './use-delivery-integration-data';
+import { useSignedIngress } from './use-signed-ingress';
 import { deliveryLadder } from '@/lib/integration-center';
 
 /**
@@ -10,6 +11,8 @@ import { deliveryLadder } from '@/lib/integration-center';
  */
 export function DeliveryPlatformDetailScreen({ platformKey }: { platformKey: string }) {
   const data = useDeliveryIntegrationData();
+  // قراءة نقاط الاستقبال تبدأ بعد أن تتيح الصفحة الوصول وتنتهي قراءتاها، ولا تبدأ بلا `delivery_connector.view`.
+  const ingress = useSignedIngress(platformKey, data.access === 'allowed' && data.status === 'ready', data.attempt);
 
   return (
     <DeliveryPlatformDetail
@@ -25,6 +28,8 @@ export function DeliveryPlatformDetailScreen({ platformKey }: { platformKey: str
       canViewHub={data.canViewHub}
       canViewReport={data.canViewReport}
       canViewEvidence={data.canViewEvidence}
+      ingress={ingress.state}
+      onIngressRetry={ingress.retry}
       onRetry={data.retry}
     />
   );

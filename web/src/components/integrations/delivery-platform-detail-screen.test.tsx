@@ -24,6 +24,9 @@ function backend(readiness: unknown = { data: TODAY }, profiles: unknown = { dat
     if (path === '/applications/nav-state') return Promise.resolve({ data: { 'sales.pos': true } });
     if (path === '/delivery-platforms') return Promise.resolve(profiles);
     if (path === '/delivery-platforms/readiness') return Promise.resolve(readiness);
+    // INT-UX-4: قراءة اللوحة الإضافية (فارغة هنا؛ سلوكها في signed-ingress-panel.test.tsx).
+    if (path === '/delivery-connectors') return Promise.resolve({ data: [] });
+    if (path === '/branches') return Promise.resolve({ data: [] });
     return Promise.reject(new Error(`unexpected ${path}`));
   });
 }

@@ -9,6 +9,8 @@ import { deliveryPlatformLabel } from '@/lib/delivery-platform-registry';
 import type { DeliveryAccess, DeliveryLadder, ReadinessRow } from '@/lib/integration-center';
 import { CapabilityLadder } from './delivery-ladder';
 import { IntegrationBreadcrumb, RestrictedNotice } from './integration-shell';
+import { SignedIngressPanel } from './signed-ingress-panel';
+import type { SignedIngressState } from './use-signed-ingress';
 
 const LINK = 'font-medium text-primary hover:underline focus-visible:rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary';
 
@@ -17,7 +19,7 @@ const LINK = 'font-medium text-primary hover:underline focus-visible:rounded foc
  *
  * يشرح سُلّم القدرات الأربع ويميّز بوضوح بين «نقطة استقبال الأحداث الموقّعة» (قدرة تقنية داخلية)
  * و«حساب تاجر متصل بمنصة خارجية» (غير موجود). لا أي زر ربط أو تفويض أو إعادة ربط أو مزامنة،
- * ولا حقل اعتماد، ولا لوحة نقطة استقبال: كل ذلك خارج هذه الشريحة. الزر الوحيد «إعادة المحاولة».
+ * ولا حقل اعتماد. لوحة نقاط الاستقبال (INT-UX-4) للقراءة فقط. الزر الوحيد «إعادة المحاولة».
  */
 export function DeliveryPlatformDetail({
   platformKey,
@@ -32,6 +34,8 @@ export function DeliveryPlatformDetail({
   canViewHub,
   canViewReport,
   canViewEvidence,
+  ingress = { status: 'idle' },
+  onIngressRetry = () => {},
   onRetry,
 }: {
   platformKey: string;
@@ -46,6 +50,9 @@ export function DeliveryPlatformDetail({
   canViewHub: boolean;
   canViewReport: boolean;
   canViewEvidence: boolean;
+  /** حالة لوحة نقاط الاستقبال (INT-UX-4). الافتراضي `idle` = اللوحة غائبة، فلا تتغيّر الشاشة لمن لا يمرّرها. */
+  ingress?: SignedIngressState;
+  onIngressRetry?: () => void;
   onRetry: () => void;
 }) {
   const t = useTranslations('integrationCenter');
@@ -102,6 +109,8 @@ export function DeliveryPlatformDetail({
             <h2 id="ingress-heading" className="text-sm font-semibold text-text">{t('detail.ingressTitle')}</h2>
             <p className="text-sm leading-relaxed text-muted">{t('detail.ingressBody', { platform: name })}</p>
           </section>
+
+          <SignedIngressPanel platformName={name} state={ingress} onRetry={onIngressRetry} />
 
           <section aria-labelledby="works-heading" className="space-y-2">
             <h2 id="works-heading" className="text-sm font-semibold text-text">{t('detail.worksTitle')}</h2>

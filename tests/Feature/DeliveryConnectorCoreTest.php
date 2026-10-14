@@ -162,6 +162,53 @@ class DeliveryConnectorCoreTest extends TestCase
         ])->assertStatus(422)->assertJsonPath('error_code', 'branch_required');
     }
 
+    /**
+     * INT-UX-4 — لوحة القراءة في الواجهة تعتمد قراءة القائمة هذه وحدها. تُثبَّت هنا: الرفض بلا
+     * `delivery_connector.view`، وحجب القراءة عند تعطيل `sales.pos` (والسماح بها عند التعليق لأنه قراءة
+     * فقط)، وتقييد الفرع (لا فرع آخر ولا الربط بلا توجيه)، وشكل الاستجابة الثابت: أي حقل جديد يظهر هنا
+     * يكسر الاختبار فيُراجَع قبل أن تعرضه الواجهة. السر الكامل لا يظهر أبداً.
+     *
+     * @test
+     */
+    public function the_connector_list_requires_view_and_an_enabled_sales_pos_and_keeps_a_fixed_non_secret_shape(): void
+    {
+        $auth = $this->registerTenant('listgate', 'owner@listgate.test');
+        [$first, $second] = $this->twoBranches($auth['token']);
+        $profile = $this->platform($auth['token']);
+        $inFirst = $this->connector($auth['token'], $profile, 'store-first', $first);
+        $inSecond = $this->connector($auth['token'], $profile, 'store-second', $second);
+        $unrouted = $this->connector($auth['token'], $profile, 'store-unrouted', null);
+
+        $listed = $this->withToken($auth['token'])->getJson('/api/delivery-connectors')->assertOk();
+        $this->assertCount(3, $listed->json('data'));
+        $this->assertEqualsCanonicalizing(
+            [
+                'id', 'delivery_platform_profile_id', 'platform_key', 'external_store_id', 'branch_id',
+                'configured_by', 'operated_by', 'status', 'secret_prefix', 'secret_version', 'disabled_at', 'created_at',
+            ],
+            array_keys($listed->json('data.0')),
+        );
+        foreach ([$inFirst, $inSecond, $unrouted] as $account) {
+            $this->assertStringNotContainsString($account['secret'], $listed->getContent());
+        }
+
+        $limited = $this->restricted($auth, [$first], 'limited@listgate.test');
+        $visible = $this->withToken($limited)->getJson('/api/delivery-connectors')->assertOk();
+        $this->assertSame([$inFirst['data']['id']], array_column($visible->json('data'), 'id'));
+
+        foreach (['staff', 'accountant', 'self_service'] as $role) {
+            $token = $this->tokenForRole($auth['tenant_id'], $role, $role.'@listgate.test');
+            $this->withToken($token)->getJson('/api/delivery-connectors')->assertForbidden();
+        }
+
+        $this->setApplicationStatus($auth['tenant_id'], 'disabled');
+        $this->withToken($auth['token'])->getJson('/api/delivery-connectors')->assertForbidden();
+        $this->setApplicationStatus($auth['tenant_id'], 'suspended');
+        $this->withToken($auth['token'])->getJson('/api/delivery-connectors')->assertOk()->assertJsonCount(3, 'data');
+        $this->setApplicationStatus($auth['tenant_id'], 'enabled');
+        $this->withToken($auth['token'])->getJson('/api/delivery-connectors')->assertOk()->assertJsonCount(3, 'data');
+    }
+
     /** @test */
     public function an_invalid_signature_or_expired_timestamp_is_rejected(): void
     {
