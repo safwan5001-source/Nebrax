@@ -299,6 +299,17 @@ final class CatalogFacetFilter
             ->exists();
     }
 
+    /**
+     * AWJ-VD-H1 / VD-1c — the facet models behind `meta()` (already loaded for the counts), so the storefront
+     * visual projection maps keys and slugs to ids without another query. Read-only; changes no output.
+     *
+     * @return array<string, CommerceFacet>
+     */
+    public function activeFacetModels(): array
+    {
+        return $this->activeFacets();
+    }
+
     /** @return array<string, CommerceFacet> نشطة بقيمها النشطة، مفهرسة بالمفتاح — تُحمَّل مرة لكل طلب. */
     private function activeFacets(): array
     {

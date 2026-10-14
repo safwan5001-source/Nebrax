@@ -7,12 +7,40 @@
  * selected value stays listed even at count 0. This module only *normalizes*
  * that payload for the UI — it never computes counts, availability or
  * meaning. Anything malformed is dropped rather than repaired.
+ *
+ * AWJ-VD-H1 / VD-1c (D1): `storefront.v1` also sends each facet's and value's
+ * stored visual document, normalized but not resolved, with `sources` on its
+ * image. It is re-normalized here with the VD-1a twin; each source must
+ * rewrite to the canonical facet-visuals proxy path for this very media,
+ * otherwise it is dropped. Like the API, a value at count 0 (listed only
+ * because it is selected) and a facet with no counted value get no visual. An image left without sources is
+ * removed from the document, so the VD-1a resolver falls back (icon, then
+ * text) instead of requesting a URL that cannot load. Inheritance and the
+ * section/template levels stay with the renderer (VD-1a + VD-4a).
  */
+
+import {
+  type FacetValueVisual,
+  type FacetVisual,
+  normalizeFacetValueVisual,
+  normalizeFacetVisual,
+} from "@/lib/presentation/facet-visual";
+import { toRenderableFacetVisualMediaUrl } from "./facet-visual-media";
+
+/** One renderable file of a facet visual image: always a same-origin proxy path. */
+export interface ListingFacetImageSource {
+  width: number;
+  format: "webp" | "jpg";
+  src: string;
+}
 
 export interface ListingFacetValue {
   slug: string;
   name: string;
   count: number;
+  /** The value's own visual (absent = none). Its `image`, if any, has `imageSources`. */
+  visual?: FacetValueVisual;
+  imageSources?: ListingFacetImageSource[];
 }
 
 export interface ListingFacetGroup {
@@ -22,6 +50,9 @@ export interface ListingFacetGroup {
   systemKey: string | null;
   name: string;
   values: ListingFacetValue[];
+  /** `{self?, defaults?}` (absent = none). `self.image`, if any, has `selfImageSources`. */
+  visual?: FacetVisual;
+  selfImageSources?: ListingFacetImageSource[];
 }
 
 export interface ListingBrand {
@@ -46,6 +77,10 @@ const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const FACET_KEY = /^[a-z0-9]+(?:[-_][a-z0-9]+)*$/;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+/** Bounds a hostile `sources` list; the origin sends at most eight. */
+export const MAX_IMAGE_SOURCES = 8;
+const MAX_SOURCE_WIDTH = 4096;
+
 /** Built-in dimensions are shown first, in this order. */
 const SYSTEM_ORDER = ["occasion", "recipient"] as const;
 
@@ -60,6 +95,78 @@ function text(value: unknown): string | null {
 function localized(name: unknown, nameEn: unknown, locale: string) {
   const en = text(nameEn);
   return locale.toLowerCase().startsWith("en") && en ? en : text(name);
+}
+
+function parseSources(
+  raw: unknown,
+  mediaId: string,
+): ListingFacetImageSource[] {
+  if (!Array.isArray(raw)) return [];
+  const sources: ListingFacetImageSource[] = [];
+  for (const entry of raw) {
+    if (sources.length >= MAX_IMAGE_SOURCES) break;
+    if (!isRecord(entry)) continue;
+    const { width, format } = entry;
+    if (
+      typeof width !== "number" ||
+      !Number.isInteger(width) ||
+      width < 1 ||
+      width > MAX_SOURCE_WIDTH ||
+      (format !== "webp" && format !== "jpg") ||
+      typeof entry.src !== "string"
+    ) {
+      continue;
+    }
+    // Only the canonical proxy path (strictly validated segments) of this
+    // very media and of a file in this format.
+    const src = toRenderableFacetVisualMediaUrl(entry.src);
+    if (
+      src === null ||
+      src.split("/")[6] !== mediaId ||
+      !src.endsWith(`.${format}`)
+    ) {
+      continue;
+    }
+    sources.push({ width, format, src });
+  }
+  return sources;
+}
+
+/** The image's raw `sources`, read next to the normalized document (the normalizer drops unknown keys). */
+function rawImage(raw: unknown): Record<string, unknown> | null {
+  return isRecord(raw) && isRecord(raw.image) ? raw.image : null;
+}
+
+function parseValueVisual(
+  raw: unknown,
+): Pick<ListingFacetValue, "visual" | "imageSources"> {
+  const visual = normalizeFacetValueVisual(raw);
+  let imageSources: ListingFacetImageSource[] = [];
+  if (visual.image) {
+    imageSources = parseSources(rawImage(raw)?.sources, visual.image.mediaId);
+    if (imageSources.length === 0) delete visual.image;
+  }
+  if (Object.keys(visual).length === 0) return {};
+  return visual.image ? { visual, imageSources } : { visual };
+}
+
+function parseFacetVisual(
+  raw: unknown,
+): Pick<ListingFacetGroup, "visual" | "selfImageSources"> {
+  const visual = normalizeFacetVisual(raw);
+  let selfImageSources: ListingFacetImageSource[] = [];
+  if (visual.self?.image) {
+    selfImageSources = parseSources(
+      rawImage(isRecord(raw) ? raw.self : null)?.sources,
+      visual.self.image.mediaId,
+    );
+    if (selfImageSources.length === 0) {
+      delete visual.self.image;
+      if (Object.keys(visual.self).length === 0) delete visual.self;
+    }
+  }
+  if (Object.keys(visual).length === 0) return {};
+  return visual.self?.image ? { visual, selfImageSources } : { visual };
 }
 
 function parseValues(raw: unknown, locale: string): ListingFacetValue[] {
@@ -84,7 +191,14 @@ function parseValues(raw: unknown, locale: string): ListingFacetValue[] {
     // A zero-count value is only useful while it is selected (so it can be
     // removed); the API already omits other empty values.
     if (count === 0 && entry.selected !== true) continue;
-    values.push({ slug, name, count: Math.trunc(count) });
+    values.push({
+      slug,
+      name,
+      count: Math.trunc(count),
+      // A value listed only because it is selected (count 0) is not proven
+      // visible on this channel: no visual, even if one were sent.
+      ...(count > 0 ? parseValueVisual(entry.visual) : {}),
+    });
   }
   return values;
 }
@@ -106,7 +220,15 @@ export function parseListingFacets(
       if (values.length === 0) continue;
       seen.add(key);
       const systemKey = text(row.system_key);
-      groups.push({ key, systemKey, name, values });
+      groups.push({
+        key,
+        systemKey,
+        name,
+        values,
+        ...(values.some((value) => value.count > 0)
+          ? parseFacetVisual(row.visual)
+          : {}),
+      });
     }
   }
   groups.sort((a, b) => {
