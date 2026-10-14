@@ -32,7 +32,7 @@ const world = (over: Partial<World> = {}): World => ({
   ...over,
 });
 
-async function open(page: Page, w: World, opts: { locale?: 'ar' | 'en'; permissions?: string[]; role?: string } = {}) {
+async function open(page: Page, w: World, opts: { locale?: 'ar' | 'en'; permissions?: string[]; role?: string; theme?: 'light' | 'dark' } = {}) {
   const locale = opts.locale ?? 'en';
   await page.context().addCookies([{ name: 'locale', value: locale, url: baseUrl }]);
   const json = (route: Route, body: unknown, status = 200) =>
@@ -68,12 +68,16 @@ async function open(page: Page, w: World, opts: { locale?: 'ar' | 'en'; permissi
   });
 
   const user = { id: 'me', name: 'Safwan', email: 'owner@acme.test', tenant_id: 't1', role: opts.role ?? 'owner', permissions: opts.permissions ?? ['*'] };
-  await page.addInitScript(([userJson]) => {
+  await page.addInitScript(([userJson, theme]) => {
     localStorage.setItem('token', 'test-token');
     localStorage.setItem('user', userJson);
-  }, [JSON.stringify(user)] as const);
+    localStorage.setItem('theme', theme);
+  }, [JSON.stringify(user), opts.theme ?? 'light'] as const);
   await page.goto(`${baseUrl}/users`, { waitUntil: 'domcontentloaded' });
 }
+
+/** أول مطابقة ظاهرة: نسخة الجدول على سطح المكتب، ونسخة البطاقة على الجوال (الأخرى مخفية بـ CSS). */
+const shown = (page: Page, text: string) => page.getByText(text).locator('visible=true').first();
 
 const noHorizontalOverflow = async (page: Page) => {
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
@@ -93,13 +97,13 @@ test.describe('AC-UX-01 users workspace', () => {
     const w = world();
     await open(page, w);
     await expect(page.getByRole('heading', { name: 'Users' })).toBeVisible();
-    await expect(page.getByText('Hind Alharbi').first()).toBeVisible();
+    await expect(shown(page, 'Hind Alharbi')).toBeVisible();
 
-    await expect(page.getByText('Branch manager').first()).toBeVisible();       // اسم الدور لا slug
+    await expect(shown(page, 'Branch manager')).toBeVisible();       // اسم الدور لا slug
     await expect(page.getByText('role-ab12cd34')).toHaveCount(0);
-    await expect(page.getByText('Dammam +2').first()).toBeVisible();            // ملخّص النطاق
-    await expect(page.getByText('All branches').first()).toBeVisible();         // الفراغ = الكل
-    await expect(page.getByText('Inactive').first()).toBeVisible();             // الحالة نصّاً
+    await expect(shown(page, 'Dammam +2')).toBeVisible();            // ملخّص النطاق
+    await expect(shown(page, 'All branches')).toBeVisible();         // الفراغ = الكل
+    await expect(shown(page, 'Inactive')).toBeVisible();             // الحالة نصّاً
     await noHorizontalOverflow(page);
     await shot(page, `en-${info.project.name}-owner`);
   });
@@ -107,7 +111,7 @@ test.describe('AC-UX-01 users workspace', () => {
   test('deactivation asks first, explains the consequences, then sends is_active=false', async ({ page }) => {
     const w = world();
     await open(page, w);
-    await expect(page.getByText('Hind Alharbi').first()).toBeVisible();
+    await expect(shown(page, 'Hind Alharbi')).toBeVisible();
 
     await rowOf(page, 'Hind Alharbi').getByRole('button', { name: 'More actions' }).click();
     await page.getByRole('menuitem', { name: 'Deactivate account' }).first().click();
@@ -125,27 +129,28 @@ test.describe('AC-UX-01 users workspace', () => {
   test('a refused delete shows the server message and the row stays', async ({ page }) => {
     const w = world({ deleteStatus: 403 });
     await open(page, w);
-    await expect(page.getByText('Amal Qahtani').first()).toBeVisible();
+    await expect(shown(page, 'Amal Qahtani')).toBeVisible();
 
     await rowOf(page, 'Amal Qahtani').getByRole('button', { name: 'More actions' }).click();
     await page.getByRole('menuitem', { name: 'Remove' }).first().click();
     await page.getByRole('dialog').getByRole('button', { name: 'Remove' }).click();
 
-    await expect(page.getByText('You cannot manage a user whose role exceeds your permissions.').first()).toBeVisible();
+    await expect(shown(page, 'You cannot manage a user whose role exceeds your permissions.')).toBeVisible();
     await expect(page.getByText('Deleted successfully')).toHaveCount(0);
-    await expect(page.getByText('Amal Qahtani').first()).toBeVisible();
+    await expect(shown(page, 'Amal Qahtani')).toBeVisible();
   });
 
   test('a view-only viewer gets a read-only workspace and no lookups it cannot read', async ({ page }) => {
     const w = world();
     await open(page, w, { role: 'role-x', permissions: ['users.view'] });
-    await expect(page.getByText('Hind Alharbi').first()).toBeVisible();
+    await expect(shown(page, 'Hind Alharbi')).toBeVisible();
 
     await expect(page.getByRole('note')).toContainText('View only');
     await expect(page.getByRole('button', { name: 'Add user' })).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'More actions' })).toHaveCount(0);
-    expect(w.requests.filter((r) => /^GET \/(roles|branches|warehouses)$/.test(r))).toEqual([]);
-    await expect(page.getByText('Custom role').first()).toBeVisible();
+    // (`GET /branches` يطلبه مبدّل الفرع في القشرة لا هذه الشاشة؛ طلبات الصفحة نفسها مغطاة في اختبار المكوّن.)
+    expect(w.requests.filter((r) => /^GET \/(roles|warehouses)$/.test(r))).toEqual([]);
+    await expect(shown(page, 'Custom role')).toBeVisible();
     await noHorizontalOverflow(page);
   });
 
@@ -154,8 +159,8 @@ test.describe('AC-UX-01 users workspace', () => {
     await open(page, w, { locale: 'ar' });
     await expect(page.getByRole('heading', { name: 'المستخدمون' })).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.dir)).toBe('rtl');
-    await expect(page.getByText('كل الفروع').first()).toBeVisible();
-    await expect(page.getByText('hind@acme.test').first()).toHaveAttribute('dir', 'ltr');
+    await expect(shown(page, 'كل الفروع')).toBeVisible();
+    await expect(shown(page, 'hind@acme.test')).toHaveAttribute('dir', 'ltr');
     await noHorizontalOverflow(page);
     await shot(page, `ar-${info.project.name}-owner`);
   });
@@ -163,7 +168,7 @@ test.describe('AC-UX-01 users workspace', () => {
   test('keyboard: the row menu opens with Enter and closes with Escape returning focus', async ({ page }) => {
     const w = world();
     await open(page, w);
-    await expect(page.getByText('Hind Alharbi').first()).toBeVisible();
+    await expect(shown(page, 'Hind Alharbi')).toBeVisible();
 
     const trigger = rowOf(page, 'Hind Alharbi').getByRole('button', { name: 'More actions' });
     await trigger.focus();
@@ -171,5 +176,15 @@ test.describe('AC-UX-01 users workspace', () => {
     await expect(page.getByRole('menuitem', { name: 'Remove' }).first()).toBeVisible();
     await page.keyboard.press('Escape');
     await expect(trigger).toBeFocused();
+  });
+
+  test('dark theme keeps status, scope and actions legible without overflow', async ({ page }, info) => {
+    const w = world();
+    await open(page, w, { theme: 'dark' });
+    await expect(shown(page, 'Hind Alharbi')).toBeVisible();
+    await expect(shown(page, 'Inactive')).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.classList.contains('dark'))).toBe(true);
+    await noHorizontalOverflow(page);
+    await shot(page, `en-${info.project.name}-dark`);
   });
 });
