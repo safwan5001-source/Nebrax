@@ -1,6 +1,6 @@
 # AWJ-VD-4A — Implementation Report (Discovery display contract and templates)
 
-STATUS: **PR — in review, not merged.** VD-4a adds optional fields to the public `store/v1/storefront` presentation document, so its merge needs the owner's explicit approval (amended D-14).
+STATUS: **MERGED** — PR #1490 merged by the owner as `c57f4be1746fdf6ce92df2ea2adba2a075d2b3c6`. POST_MERGE_REVIEW: PENDING (post-merge CI running).
 DATE: 2026-10-14
 HORIZON: AWJ-COMMERCE-VISUAL-DIMENSIONS-H1 · slice VD-4a (H1-4)
 AUTHORITY: the owner authorized VD-1b and VD-4a in parallel, on their approved contracts. That approval covers only these two slices' DB/API changes. Decision 4 set the rule for out-of-range numbers (see "Numbers" below).
