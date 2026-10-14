@@ -61,11 +61,14 @@ describe('integration center module sources', () => {
     }
   });
 
-  it('uses the shared Button component only for the retry action, plus the two INT-UX-5b row actions and the notice dismissal', () => {
+  it('uses the shared Button component only for the retry action and the declared INT-UX-5b/5c actions', () => {
     // INT-UX-5b: ثلاثة مواضع استثنائية معلنة بأسمائها، لكلٍّ معالج واحد معروف. أي زر آخر (إنشاء، إعادة إسناد، إعادة تفعيل…) يفشل هنا.
     const allowed: Record<string, RegExp[]> = {
       'components/integrations/ingress-row-actions.tsx': [/onClick=\{\(\) => management\.openRotate\(point\)\}/, /onClick=\{\(\) => management\.openDisable\(point\)\}/],
       'components/integrations/ingress-management-layer.tsx': [/onClick=\{management\.dismissNotice\}/],
+      // INT-UX-5c: مدخل الإنشاء زرّ واحد، ونموذج الإنشاء ثلاثة (إعادة قراءة الفروع، إلغاء، إرسال).
+      'components/integrations/ingress-create-entry.tsx': [/onClick=\{management\.openCreate\}/],
+      'components/integrations/ingress-create-dialog.tsx': [/onClick=\{\(\) => setBranchAttempt\(\(value\) => value \+ 1\)\}/, /onClick=\{onCancel\}/, /onClick=\{submit\}/],
     };
     for (const { path, code } of files) {
       const uses = code.match(/<Button\b/g)?.length ?? 0;
@@ -130,7 +133,8 @@ describe('integration center module sources', () => {
     }
     const consumers = (pattern: RegExp) => files.filter((f) => pattern.test(f.code)).map((f) => f.path).filter((p) => p !== 'lib/ingress-management.ts' && p !== 'components/integrations/use-ingress-permissions.ts').sort();
     expect(consumers(/use-ingress-permissions/)).toEqual(['components/integrations/ingress-row-actions.tsx']);
-    expect(consumers(/@\/lib\/ingress-management/)).toEqual(['components/integrations/use-ingress-management.ts']);
+    // `ingress-create-dialog` يستورد النوع `IngressErrorKey` وحده (لا منطق).
+    expect(consumers(/@\/lib\/ingress-management/)).toEqual(['components/integrations/ingress-create-dialog.tsx', 'components/integrations/use-ingress-management.ts']);
   });
 
   it('INT-UX-5b: the only code that talks to the rotate/disable routes is lib/ingress-operations.ts, and only the management hook calls it', () => {
@@ -147,13 +151,15 @@ describe('integration center module sources', () => {
     expect(callers).toEqual(['components/integrations/use-ingress-management.ts', 'lib/ingress-operations.ts']);
   });
 
-  it('INT-UX-5b: ingress-operations has exactly two POST routes (rotate, disable), no create/reassign, and never stores, logs or tracks', () => {
+  it('INT-UX-5b/5c: ingress-operations has exactly three POST routes (create, rotate, disable), no reassign, and never stores, logs or tracks', () => {
     const code = readFileSync(join(SRC, 'lib/ingress-operations.ts'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
-    expect(code.match(/method\s*:\s*'POST'/g)).toHaveLength(2);
+    expect(code.match(/method\s*:\s*'POST'/g)).toHaveLength(3);
     expect(code.match(/target\(id, '([a-z-]+)'\)/g)).toEqual(["target(id, 'rotate-secret')", "target(id, 'disable')"]);
     expect(code).not.toMatch(/reassign|oauth|authoriz|credential|\/connect\b|\/sync\b|method\s*:\s*'(PUT|PATCH|DELETE)'/i);
     expect(code).not.toMatch(/console\.|localStorage|sessionStorage|indexedDB|document\.cookie|navigator\.|window\.|location|history\.|analytics|track|fetch\s*\(|XMLHttpRequest|sendBeacon/i);
-    expect(code).not.toMatch(/delivery-connectors['"`](\s*[,)])/);
+    // مسار الإنشاء الحرفي مرة واحدة فقط، وجسمه الحقول الثلاثة التي يقبلها الخادم وحدها.
+    expect(code.match(/api<unknown>\('\/delivery-connectors', \{ method: 'POST', body \}\)/g)).toHaveLength(1);
+    expect(code.match(/delivery_platform_profile_id|external_store_id|branch_id/g)?.sort()).toEqual(['branch_id', 'delivery_platform_profile_id', 'external_store_id']);
   });
 
   it('links only to allow-listed destinations', () => {

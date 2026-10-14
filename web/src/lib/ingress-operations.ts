@@ -1,9 +1,8 @@
 /**
- * عمليتا إدارة نقطة الاستقبال الموقّعة المسموح بهما في INT-UX-5b: **تدوير السر** و**التعطيل**، عبر المسارين القائمين
- * `POST /delivery-connectors/{id}/rotate-secret` و`POST /delivery-connectors/{id}/disable`. لا إنشاء ولا إعادة إسناد
- * (5c/5d)، ولا مسار آخر.
+ * عمليات إدارة نقطة الاستقبال الموقّعة المسموح بها: **الإنشاء** (INT-UX-5c) و**تدوير السر** و**التعطيل** (INT-UX-5b)، عبر
+ * المسارات القائمة `POST /delivery-connectors` و`…/{id}/rotate-secret` و`…/{id}/disable`. لا إعادة إسناد (5d) ولا مسار آخر.
  *
- * هذا الملف هو **المكان الوحيد** في الواجهة الذي يقرأ حقل السرّ من استجابة التدوير. القواعد:
+ * هذا الملف هو **المكان الوحيد** في الواجهة الذي يقرأ حقل السرّ من استجابة الإنشاء أو التدوير. القواعد:
  *  - السرّ قيمة تُعاد من الدالة ولا يُخزَّن هنا ولا في أي وحدة؛ لا `console` ولا تخزين متصفح ولا عنوان URL ولا تحليلات.
  *  - الأخطاء المرمية لا تحمل السرّ ولا جسم الاستجابة المنحرفة: حمولة نجاح غير مفهومة تُرمى خطأً **بلا حالة HTTP**
  *    فيصنَّف «نتيجة مجهولة» (الخادم قد دوّر فعلاً) ولا تُعاد المحاولة تلقائياً.
@@ -30,12 +29,51 @@ export class IngressResponseUnreadable extends Error {
   }
 }
 
+/** مدخل لا يصلح للإرسال أصلاً (لم يُرسل شيء): نتيجته معلومة، لا مجهولة. */
+export class IngressRequestInvalid extends Error {
+  constructor() {
+    super('ingress request invalid');
+    this.name = 'IngressRequestInvalid';
+  }
+}
+
 /** وضع المعاينة: لا طلب ولا سرّ مختلق. */
 export class IngressUnavailableInDemo extends Error {
   constructor() {
     super('ingress management unavailable in demo');
     this.name = 'IngressUnavailableInDemo';
   }
+}
+
+function readSecret(payload: unknown): RotatedSecret {
+  const value = (payload as { secret?: unknown } | null)?.secret;
+  if (typeof value !== 'string' || value.length === 0 || value.length > SECRET_MAX || /\s/.test(value)) {
+    throw new IngressResponseUnreadable();
+  }
+  return { value };
+}
+
+export interface CreateIngressInput {
+  /** ملف الإسناد اليدوي المفعّل للمنصة (من `GET /delivery-platforms`). */
+  profileId: string;
+  /** معرّف المتجر بعد `checkStoreId` (مقصوص، ≤191 بايت، بلا أحرف تحكم). */
+  storeId: string;
+  /** فرع الوجهة من خيارات المستخدم، أو `null` = بلا فرع (الخادم يقرّر إن كان ذلك جائزاً لهذا المستخدم). */
+  branchId: string | null;
+}
+
+/**
+ * ينشئ نقطة استقبال ويعيد السرّ مرة واحدة. **غير idempotent**: تكرار الطلب بعد استجابة ضائعة يردّ 409 ولا يعيد السرّ، فلا يُكرَّر
+ * تلقائياً أبداً. الجسم هو الحقول الثلاثة التي يقبلها الخادم وحدها؛ المستأجر من الجلسة.
+ */
+export async function createIngressPoint(input: CreateIngressInput): Promise<RotatedSecret> {
+  if (isDemo()) throw new IngressUnavailableInDemo();
+  if (!ID_PATTERN.test(input.profileId) || (input.branchId !== null && !ID_PATTERN.test(input.branchId)) || input.storeId.length === 0) {
+    throw new IngressRequestInvalid();
+  }
+  const body: Record<string, string> = { delivery_platform_profile_id: input.profileId, external_store_id: input.storeId };
+  if (input.branchId !== null) body.branch_id = input.branchId;
+  return readSecret(await api<unknown>('/delivery-connectors', { method: 'POST', body }));
 }
 
 function target(id: string, action: 'rotate-secret' | 'disable'): string {
@@ -46,12 +84,7 @@ function target(id: string, action: 'rotate-secret' | 'disable'): string {
 /** يدوّر السرّ ويعيد القيمة الجديدة. أي فشل يُرمى كما هو؛ التصنيف في `classifyIngressFailure`. */
 export async function rotateIngressSecret(id: string): Promise<RotatedSecret> {
   if (isDemo()) throw new IngressUnavailableInDemo();
-  const payload = await api<unknown>(target(id, 'rotate-secret'), { method: 'POST' });
-  const value = (payload as { secret?: unknown } | null)?.secret;
-  if (typeof value !== 'string' || value.length === 0 || value.length > SECRET_MAX || /\s/.test(value)) {
-    throw new IngressResponseUnreadable();
-  }
-  return { value };
+  return readSecret(await api<unknown>(target(id, 'rotate-secret'), { method: 'POST' }));
 }
 
 /**

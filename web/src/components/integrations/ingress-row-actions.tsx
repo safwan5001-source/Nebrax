@@ -54,3 +54,9 @@ export function useCanManageIngress(): boolean {
   const allowed = useIngressPermissions({ status: 'configured' });
   return !isDemo() && allowed.rotate;
 }
+
+/** هل يظهر إجراء «إنشاء»؟ `delivery_connector.manage` وحدها، وغائب في وضع المعاينة. */
+export function useCanCreateIngress(): boolean {
+  const allowed = useIngressPermissions(null);
+  return !isDemo() && allowed.create;
+}

@@ -137,16 +137,18 @@ describe('who sees which action (absent, never disabled)', () => {
     expect(posts()).toEqual([]);
   });
 
-  it('never offers create, reassign or re-enable', async () => {
+  it('never offers reassign or re-enable; create appears only as the 5c entry (here: guidance, since no manual profile is active)', async () => {
     asOwner();
     rows = [row(), row({ id: 'ing-2', external_store_id: 'Store-200', status: 'disabled' })];
     await mount();
     const panel = screen.getByTestId('signed-ingress-panel');
-    // الأزرار في اللوحة كلها تدوير أو تعطيل لنقطة مهيّأة؛ لا شيء آخر (لا إنشاء ولا إعادة إسناد ولا إعادة تفعيل).
+    // أزرار الصفوف: تدوير أو تعطيل لنقطة مهيّأة فقط. لا إعادة إسناد ولا إعادة تفعيل.
     const names = within(panel).getAllByRole('button').map((b) => b.getAttribute('data-testid'));
     expect(new Set(names)).toEqual(new Set(['ingress-rotate', 'ingress-disable']));
-    expect(within(panel).queryAllByRole('button', { name: /add|new|reassign|operator|re-?enable|reactivate|إنشاء|إضافة|إعادة إسناد|إعادة تفعيل/i })).toHaveLength(0);
-    expect(within(panel).queryAllByRole('link')).toHaveLength(0);
+    expect(within(panel).queryAllByRole('button', { name: /reassign|operator|re-?enable|reactivate|إعادة إسناد|إعادة تفعيل/i })).toHaveLength(0);
+    // بلا ملف إسناد يدوي مفعّل (الخادم المحاكى يعيد قائمة فارغة): حالة إرشادية برابط الإعداد القائم، بلا زرّ إنشاء.
+    expect(screen.getByTestId('ingress-create-guidance').getAttribute('data-state')).toBe('missing');
+    expect(screen.queryByTestId('ingress-create-open')).toBeNull();
   });
 });
 
