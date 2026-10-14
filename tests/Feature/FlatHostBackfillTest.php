@@ -287,6 +287,44 @@ class FlatHostBackfillTest extends TestCase
     }
 
     /** @test */
+    public function an_existing_primary_target_is_drift_because_backfill_targets_are_never_primary(): void
+    {
+        $this->prodShape();
+        $this->backfill(true);
+        // h الجديد غير نشط، فيسمح الفهرس الجزئي بكونه primary — لكنه مخالف لعقد الـbackfill
+        DB::table('storefront_domains')->where('hostname', 'dominah-h.store.awjdev.xyz')->update(['is_primary' => true]);
+        $snap = DB::table('storefront_domains')->orderBy('hostname')->get()->toJson();
+
+        $this->assertTrue($this->backfill(false)['has_drift']);
+        try {
+            $this->backfill(true);
+            $this->fail('expected drift abort');
+        } catch (FlatHostBackfillException $e) {
+            $this->assertSame('drift', $e->reason);
+        }
+        $this->assertSame($snap, DB::table('storefront_domains')->orderBy('hostname')->get()->toJson());
+    }
+
+    /** @test */
+    public function inactive_or_soft_deleted_tenants_get_inactive_targets_even_if_everything_else_is_active(): void
+    {
+        $inactive = $this->tenant('idle');
+        $this->legacy($inactive, 'shop', true);
+        DB::table('tenants')->where('id', $inactive->id)->update(['is_active' => false]);
+        $gone = $this->tenant('gone');
+        $this->legacy($gone, 'shop', true);
+        Tenant::where('id', $gone->id)->delete(); // soft delete
+
+        $out = $this->backfill(true, ['shop.idle.store.awjdev.xyz', 'shop.gone.store.awjdev.xyz']);
+
+        foreach ($out['results'] as $r) {
+            $this->assertFalse($r['new_row_active'], $r['legacy_host']);
+        }
+        $this->assertFalse((bool) $this->newRow('idle-shop.store.awjdev.xyz')->is_active);
+        $this->assertFalse((bool) $this->newRow('gone-shop.store.awjdev.xyz')->is_active);
+    }
+
+    /** @test */
     public function primary_constraint_is_respected_legacy_stays_the_only_active_primary(): void
     {
         [, $z] = $this->prodShape();

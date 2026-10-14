@@ -25,7 +25,7 @@ use Illuminate\Support\Facades\DB;
  *  - مرساة التسلسل: قفل صفّ المستأجر (نفس مرساة `CreateStorefrontForCurrentTenant` و
  *    `StorefrontProvisioningService`) + قفل صف النطاق القديم، بترتيب ثابت لمنع deadlock.
  *    القيد الفريد `storefront_domains.hostname` خط الدفاع الأخير.
- *  - لا حالة «أكثر امتيازاً» من المصدر: الصف الجديد نشط **فقط** إن كان نطاق المصدر ومتجره
+ *  - لا حالة «أكثر امتيازاً» من المصدر: الصف الجديد نشط **فقط** إن كان المستأجر ونطاق المصدر ومتجره
  *    نشطَين وموثَّقَين وغير محذوفَين؛ وإلا يُدرَج غير نشط (لا يُفعَّل متجر أو نطاق قديم أبداً).
  *  - `is_primary = false` دائماً: الفهرس الجزئي `(storefront_id) WHERE is_primary AND is_active`
  *    يمنع نطاقَين أساسيَّين نشطَين، والصف القديم يبقى أساسياً (لا نعدّله). تبديل الأساسي
@@ -33,7 +33,7 @@ use Illuminate\Support\Facades\DB;
  *  - عدم الانتقال بين المستأجرين: المستأجر/المتجر/القناة تُقرأ من الصف القديم وتُتحقق
  *    ثلاثياً (نطاق = متجر = قناة)، ولا يُقبل أي معرّف من المدخلات.
  *  - Idempotent: هدف موجود مسبقاً لنفس (tenant, storefront, awj_subdomain) = `already_present`
- *    (بلا كتابة). إن اختلف التفعيل أو التوثيق عن المطلوب: dry-run يُبلّغ `drift`، و`--execute` يرمي
+ *    (بلا كتابة). إن اختلف التفعيل أو التوثيق أو `is_primary` عن المطلوب: dry-run يُبلّغ `drift`، و`--execute` يرمي
  *    `drift` فيُرجع المعاملة كلها (لا إدراج جزئي) — دون أي تعديل للصف.
  *  - روابط HTTPS القديمة لا تصبح صالحة: لا يُلمس شيء من DNS/الشهادة، والصفوف القديمة كما هي.
  */
@@ -125,7 +125,8 @@ final class FlatHostBackfillService
                 // drift = أي اختلاف في ما يحسم الحسم فعلاً: التفعيل أو التوثيق عن المصدر
                 // (نطاق نشط غير موثَّق يرفضه ResolveStorefrontDomain رغم `new_row_active=true`).
                 $drift = (bool) $existing->is_active !== $desiredActive
-                    || $existing->verification_status !== $s['domain']->verification_status;
+                    || $existing->verification_status !== $s['domain']->verification_status
+                    || (bool) $existing->is_primary; // كل هدف يُنتجه الـbackfill غير أساسي دائماً
                 $hasDrift = $hasDrift || $drift;
                 if ($drift && $execute) {
                     // all-or-nothing: أي drift يُرجع المعاملة كلها (لا يبقى إدراج سابق لمضيف آخر).
@@ -194,10 +195,13 @@ final class FlatHostBackfillService
         return compact('domain', 'storefront', 'channel', 'tenant');
     }
 
-    /** @param array{domain: StorefrontDomain, storefront: Storefront, channel: SalesChannel} $s */
+    /** @param array{domain: StorefrontDomain, storefront: Storefront, channel: SalesChannel, tenant: Tenant} $s */
     private function desiredActive(array $s): bool
     {
-        return (bool) $s['domain']->is_active
+        // مستأجر معطَّل/محذوف ناعماً ⇒ لا مضيف جديد نشط (لا يصبح عاماً بشهادة صالحة).
+        return (bool) $s['tenant']->is_active
+            && $s['tenant']->deleted_at === null
+            && (bool) $s['domain']->is_active
             && $s['domain']->isVerified()
             && (bool) $s['storefront']->is_active
             && $s['storefront']->deleted_at === null
