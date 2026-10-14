@@ -3,7 +3,7 @@
 > **Owner decision 2026-10-11:** TAX-ZATCA designated as the sole active Horizon on merge of activation PR #1324. Delivery execution is paused. TAX-HZ-00 is the first permitted read-only evidence pass. Candidate REM implementation remains gated on that pass and subsequent owner-approved task scope and merge approvals.
 
 
-**Status:** PROPOSED / NOT ACTIVATED. This file is an *overlay* on the canonical 40-task audit remediation queue; it does not replace that queue or the current active Delivery Horizon in `docs/autonomous-engineering/TASK-QUEUE.md`.
+**Status:** ~~PROPOSED / NOT ACTIVATED~~ — **superseded by the owner activation decision above (TAX-ZATCA is the sole active Horizon since the merge of #1324).** Current task status: `TAX-ZATCA-RECONCILIATION-AUDIT.md` (audited at `main` `76b05f6`, 2026-10-14). This file is an *overlay* on the canonical 40-task audit remediation queue; it does not replace that queue or the current active Delivery Horizon in `docs/autonomous-engineering/TASK-QUEUE.md`.
 
 ## State vocabulary
 - `merged`: PR merged on GitHub; not automatically deployed.
@@ -22,6 +22,18 @@
 | REM-02 | #1304, merge `56fcac621411a10506ed626f43b4d5a99b2ed798` | merged, production not verified |
 | PRINT-01 | #1315, merge `3209fcb77cc4e02b729bb74c34adf7e131869a1b` | merged, physical printer not verified |
 | PRINT-02 | #1320, merge `265974693502bc734ff0e9dbd12123bf3f345b51` | merged, evidence/docs only |
+| TAX-HZ-00 | #1398, merge `0c90419874594169d422515e881425e5b3b3fa70` | merged (evidence pass documents) |
+| REM-03 | #1403, merge `c589ced1dcbad88ef023d8be6ead34bc58f489f0` | merged, post-merge `CI` run #9327 success, production not verified |
+| REM-03b | #1410, merge `322c20cf009e0f1c917566e4930b689764651b60` | merged, post-merge `CI` run #9351 success, production not verified |
+| REM-08 | #1415, merge `6670a9a7e5df063d8d42ad6872a0b5599ae8bb11` | merged, post-merge `CI` run #9359 success, production not verified |
+| REM-11 | #1416, merge `cb87e17d7583d8b24eab76e87ae5dad1d78484b3` | merged (advisory SDK harness), `CI` run #9365 success; D-03a open; production not verified |
+| REM-37 | #1419, merge `ff8e2332d23d156de2ca6f79646da2eccc7da4e8`; review fixes #1445, merge `38e259c8a7b2776f0f00da8ff1d14b9453e9f139` | merged, `CI` runs #9424 / #9444 success, production not verified |
+| TAX-N01 | #1444, merge `17dc59af83c44ed3f4b3a4f9c59f61a5f5d3ea36` | merged, `CI` run #9437 success, production not verified |
+| REM-04 | #1450, merge `899bcba4f3ecfbe4bf504c2276db2dc817daff42`; follow-up #1461, merge `51851c04ae11ac90c14e223bc44456765d0dc535` | merged, `CI` runs #9456 / #9515 success, production not verified |
+| REM-05 | #1457, merge `a8a950508d533805530c324d51595fe46cdaa682` | merged, `CI` run #9532 success, production not verified |
+| REM-06 | #1473, merge `76b05f69a32fb7d2c5d741708661261dfc01d6cf` | merged, `CI` run #9596 success (sqlite + pgsql), production not verified; Fiscal Close VAT line follow-up open |
+
+> **Status update (2026-10-14).** "Merged" is not "deployed", "SDK-validated" or "compliant". The foundation list is limited to merged PRs; for everything else (including the August 2026 ZATCA pipeline PRs #503–#593 and the closed-without-merge drafts #587–#591, whose implementation was incorporated through #592) see `TAX-ZATCA-RECONCILIATION-AUDIT.md`.
 
 ## Initial queue (not an authorization to implement)
 | Order | ID | Source | Depends on | Initial status | Definition of next gate |
@@ -42,6 +54,8 @@
 | 13 | REM-17 | Audit stamp/QR findings | REM-11/13 | blocked | SDK oracle and issue time |
 | 14 | REM-18 | Audit note e-invoicing | REM-16 + REM-02 | blocked | Valid UBL invoice + sourced notes |
 | 15 | REM-19–38 | Canonical remediation plan | per source matrix | blocked / unassessed | Recompute per item from current evidence; do not promote in bulk |
+
+> **Status update (2026-10-14).** The *Initial status* column above is the bootstrap snapshot and is kept as authored. Since then REM-03 (+03b), REM-04 (+follow-up), REM-05, REM-06, REM-08 and REM-11 were merged (see the foundation table); REM-09, 12, 13, 14 and 16–18 remain unmerged. REM-06 was unblocked by REM-05. Current per-task status, counts and the dependency graph: `TAX-ZATCA-RECONCILIATION-AUDIT.md`.
 
 Other independent tasks REM-07, REM-20, REM-37, REM-38 and tier dependencies stay in the **canonical** remediation plan; not omission or closure.
 

@@ -1,6 +1,8 @@
 # TAX-N01 — Implementation Report: dispatcher failure-cause diagnostics (no state-machine change)
 
-STATUS: **PASS locally (pending CI on the final head and owner review)** — **DRAFT PR — NOT MERGED — NOT DEPLOYED**
+STATUS: **MERGED** (PR #1444, merge `17dc59af83c44ed3f4b3a4f9c59f61a5f5d3ea36`) · **CI verified** · **Production deployment NOT VERIFIED**
+
+> **Status correction (2026-10-14, post-merge).** This report was authored while the change was a Draft PR ("NOT MERGED"). Current verified state: PR #1444 merged, merge SHA `17dc59af83c44ed3f4b3a4f9c59f61a5f5d3ea36`, post-merge `CI` run #9437 success; **production deployment NOT VERIFIED**. The body below is otherwise unchanged and still describes the state at authoring; where it says "Draft" or "not merged" this note supersedes it. Cross-horizon status: `TAX-ZATCA-RECONCILIATION-AUDIT.md`.
 DATE: 2026-10-14
 HORIZON: TAX-ZATCA (origin: TAX-HZ-00 → TAX-N01)
 ZONE: C — ZATCA / observability
@@ -24,7 +26,7 @@ ZONE: C — ZATCA / observability
 | PR | recorded in the PR and the hand-back message (**Draft**) |
 | Code + tests head | `1afe80dfb667734759c76d78172a431a49e9ee26` (backlog entry: `26cfb2ab024d782c2a01ef9f367ebd89184e4033`) |
 | Final Head SHA | recorded in the PR and the hand-back message (a file cannot contain its own commit hash); it adds only this report |
-| Merge SHA | N/A |
+| Merge SHA | `17dc59af83c44ed3f4b3a4f9c59f61a5f5d3ea36` (was "N/A" at authoring) |
 
 ## Original defect
 

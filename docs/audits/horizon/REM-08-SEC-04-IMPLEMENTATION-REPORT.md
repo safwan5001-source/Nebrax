@@ -1,6 +1,8 @@
 # REM-08 / SEC-04 — Implementation Report: deactivated users lose API access immediately
 
-STATUS: **PASS locally (pending CI on the final head and owner review)** — **DRAFT PR — NOT MERGED — NOT DEPLOYED**
+STATUS: **MERGED** (PR #1415, merge `6670a9a7e5df063d8d42ad6872a0b5599ae8bb11`) · **CI verified** · **Production deployment NOT VERIFIED**
+
+> **Status correction (2026-10-14, post-merge).** This report was authored while the change was a Draft PR ("NOT MERGED"). Current verified state: PR #1415 merged, merge SHA `6670a9a7e5df063d8d42ad6872a0b5599ae8bb11`, post-merge `CI` run #9359 success; **production deployment NOT VERIFIED**. The body below is otherwise unchanged and still describes the state at authoring; where it says "Draft" or "not merged" this note supersedes it. Cross-horizon status: `TAX-ZATCA-RECONCILIATION-AUDIT.md`.
 DATE: 2026-10-14
 HORIZON: TAX-ZATCA (origin: TAX-HZ-00 → REM-08)
 ZONE: C — security / authentication
@@ -24,7 +26,7 @@ ZONE: C — security / authentication
 | PR | #1415 — https://github.com/safwan5001-source/Nebrax/pull/1415 (**Draft**) |
 | Code + tests head | `aedeee387cb05a8ace7bd7b7419648e1af38598c` |
 | Final Head SHA | recorded in the PR and in the hand-back message (a file cannot contain its own commit hash); it adds only this report and the backlog wording on top of the code head |
-| Merge SHA | N/A |
+| Merge SHA | `6670a9a7e5df063d8d42ad6872a0b5599ae8bb11` (was "N/A" at authoring) |
 
 ## Original defect
 

@@ -1,5 +1,6 @@
 # TAX-HZ-00 — AWJ implementation and gap assessment (current `main`)
 
+> **Historical snapshot (2026-10-13, `main` `4781a45`) — kept as authored.** Task statuses below pre-date REM-03…REM-37; current reconciliation: `TAX-ZATCA-RECONCILIATION-AUDIT.md`.
 > **Status:** read-only evidence. `main` = `4781a4525a97e463b2a2f3cd59c055de8474d7d7` (2026-10-13). Companion to `TAX-HZ-00-EXTERNAL-EVIDENCE-REGISTER.md` (what the rules say), `TAX-HZ-00-REMEDIATION-BACKLOG.md` (what to do) and `TAX-HZ-00-IMPLEMENTATION-REPORT.md` (summary and handoff).
 > Nothing here states or implies that AWJ is ZATCA-compliant, certified or approved. "Verified" means verified against AWJ's own code and tests unless the reality class says *official SDK*.
 

@@ -1,7 +1,9 @@
 # REM-37 / SEC-07 — Implementation Report: dedicated `zatca.submit` permission (separation of duties)
 
 STATUS: **REM-37 core (PR #1419): MERGED** (`ff8e2332d23d156de2ca6f79646da2eccc7da4e8`) · **CI verified** · **Production deployment NOT VERIFIED**
-STATUS: **Review-fix follow-up (Codex P1 + P2): Draft PR — NOT MERGED — NOT DEPLOYED** — see *Post-merge review fixes* below
+STATUS: **Review-fix follow-up (Codex P1 + P2): MERGED** (PR #1445, merge `38e259c8a7b2776f0f00da8ff1d14b9453e9f139`) · **CI verified** · **Production deployment NOT VERIFIED** — see *Post-merge review fixes* below
+
+> **Status correction (2026-10-14, post-merge).** This report was authored while the change was a Draft PR ("NOT MERGED"). Current verified state: PR #1445 merged, merge SHA `38e259c8a7b2776f0f00da8ff1d14b9453e9f139`, post-merge `CI` run #9444 success; **production deployment NOT VERIFIED**. The core change #1419 (`ff8e2332d23d156de2ca6f79646da2eccc7da4e8`, `CI` run #9424 success) was already recorded as merged. The body below is otherwise unchanged and still describes the state at authoring; where it says "Draft" or "not merged" this note supersedes it. Cross-horizon status: `TAX-ZATCA-RECONCILIATION-AUDIT.md`.
 
 > **Lifecycle (updated 2026-10-14).** PR #1419 was merged at 07:16:29Z, two minutes before the automated review posted two findings (07:18:53Z) that therefore never reached the merged code. They are fixed in a **follow-up PR from latest `main`** (a merged PR is finished and is not reused). Wording below that says "Draft / not merged" describes PR #1419 as authored.
 >
