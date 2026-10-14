@@ -21,7 +21,7 @@ import { type PayrollRun } from '@/components/hr/run-detail-dialog';
 import { SYSTEM_ROLE_KEYS } from '@/components/users/user-editor-sheet';
 import { api, ApiError, downloadFile } from '@/lib/api';
 import { currentUser } from '@/lib/auth';
-import { useCan } from '@/lib/use-can';
+import { useActorScope, useCan } from '@/lib/use-can';
 import { formatRiyal } from '@/lib/money';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 
@@ -100,7 +100,6 @@ export default function EmployeeProfilePage() {
   const [leaveBalances, setLeaveBalances] = useState<LeaveBalance[]>([]);
   const [employeeRequests, setEmployeeRequests] = useState<EmployeeRequest[]>([]);
   const [linkedUser, setLinkedUser] = useState<LinkedUser | null>(null);
-  const [actorScope, setActorScope] = useState<{ branches: string[]; warehouses: string[] } | null | undefined>(undefined);
   const [loading, setLoading] = useState(true);
   const [section, setSection] = useState<SectionId>('details');
   const [editOpen, setEditOpen] = useState(false);
@@ -120,6 +119,8 @@ export default function EmployeeProfilePage() {
   const canReadUsers = can('users.view');
   // إدارة الدخول تتبع صلاحيات الخادم لا اسم الدور (القراءة لعرض الحالة، والكتابة لإنشائه).
   const canManageUsers = canReadUsers && can('users.manage');
+  // نطاق المشاهد نفسه من `/me` (AC-UX-11) — لا استنتاج من قائمة المستخدمين؛ يُطلب لمن يرى قسم الدخول فقط.
+  const actorScope = useActorScope({ enabled: canManageUsers });
 
   const loadAttachments = useCallback(() => {
     if (!id) return;
@@ -282,14 +283,8 @@ export default function EmployeeProfilePage() {
   useEffect(() => {
     if (!canManageUsers || !id) { setLinkedUser(null); return; }
     api<{ data: (LinkedUser & { id: string; employee_id?: string | null })[] }>('/users')
-      .then((r) => {
-        setLinkedUser(r.data.find((u) => u.employee_id === id) ?? null);
-        // نطاق المشاهد المخزَّن من صفّه (فراغ = غير مقيَّد) — يلزم نموذج الموظف ليعرف إن كان «الكل» متاحاً له.
-        const meId = currentUser()?.id;
-        const own = meId ? r.data.find((u) => u.id === meId) : undefined;
-        setActorScope(own ? { branches: own.branch_ids ?? [], warehouses: own.warehouse_ids ?? [] } : null);
-      })
-      .catch(() => setActorScope(null));
+      .then((r) => setLinkedUser(r.data.find((u) => u.employee_id === id) ?? null))
+      .catch(() => setLinkedUser(null));
   }, [canManageUsers, id]);
 
   const fmtHours = (m: number) => `${Math.floor(m / 60)} ${t('hours_short')} ${m % 60} ${t('minutes_short')}`;
@@ -712,7 +707,6 @@ export default function EmployeeProfilePage() {
         initialAllowAccess={!!linkedUser}
         canManageUsers={canManageUsers}
         actorScope={actorScope}
-        canReadActorScope={canReadUsers}
       />
 
       <ContractDialog

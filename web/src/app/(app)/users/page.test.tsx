@@ -37,8 +37,8 @@ vi.mock('next/link', () => ({
   default: ({ href, children, ...rest }: { href: string; children: React.ReactNode }) => <a href={href} {...rest}>{children}</a>,
 }));
 vi.mock('@/components/users/user-editor-sheet', () => ({
-  UserEditorSheet: ({ user, focusAccess }: { user?: { id: string } | null; focusAccess?: boolean }) => (
-    <div data-testid="user-editor">{user ? `edit:${user.id}${focusAccess ? ':access' : ''}` : 'create'}</div>
+  UserEditorSheet: ({ user, focusAccess, actorScope }: { user?: { id: string } | null; focusAccess?: boolean; actorScope?: unknown }) => (
+    <div data-testid="user-editor" data-scope={JSON.stringify(actorScope ?? null)}>{user ? `edit:${user.id}${focusAccess ? ':access' : ''}` : 'create'}</div>
   ),
 }));
 
@@ -377,4 +377,24 @@ describe('Users workspace (AC-UX-01)', () => {
     expect((await screen.findByTestId('user-editor')).textContent).toBe('edit:u1');
     expect(screen.queryByRole('dialog')).toBeNull();
   });
+
+  it('AC-UX-11: the editor gets the actor scope from /me (stored user), not from the actor row in the list', async () => {
+    auth.current = { id: 'v', role: 'role-x', permissions: ['users.view', 'users.manage'], branch_ids: ['b1'], warehouse_ids: [] } as never;
+    // قائمة المستخدمين لا تحوي صفّ المشاهد إطلاقاً — كان النطاق سيبقى «غير معروف» سابقاً.
+    world([user({ id: 'u1' })]);
+    renderPage();
+    await screen.findAllByText('Hind Alharbi');
+    await userEvent.click(screen.getByRole('button', { name: 'Add user' }));
+    expect(JSON.parse((await screen.findByTestId('user-editor')).getAttribute('data-scope')!)).toEqual({ branches: ['b1'], warehouses: [] });
+  });
+
+  it('AC-UX-11: an unrestricted actor (empty arrays on /me) is passed as unrestricted, not as unknown', async () => {
+    auth.current = { id: 'v', role: 'role-x', permissions: ['users.view', 'users.manage'], branch_ids: [], warehouse_ids: [] } as never;
+    world([user({ id: 'u1' })]);
+    renderPage();
+    await screen.findAllByText('Hind Alharbi');
+    await userEvent.click(screen.getByRole('button', { name: 'Add user' }));
+    expect(JSON.parse((await screen.findByTestId('user-editor')).getAttribute('data-scope')!)).toEqual({ branches: [], warehouses: [] });
+  });
 });
+

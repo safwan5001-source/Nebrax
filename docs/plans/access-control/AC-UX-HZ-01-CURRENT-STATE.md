@@ -31,6 +31,7 @@ A slice is marked **Merged** only after tests + exact-head CI + merge. "Post-mer
 | AC-UX-08 Access summary & explainability | **Merged** | #1481 | `23c1dd3ca6ee4e530205da65227f5e0066baa839` |
 | AC-UX-09 Accessibility / responsive / visual QA | **Merged** | #1484 | `e972e5ba949a57c3716b53d6bd75894c7e262989` |
 | AC-UX-10 Closure & security verification | **Merged** — see [`AC-UX-HZ-01-FINAL-REPORT.md`](./AC-UX-HZ-01-FINAL-REPORT.md) | #1486 | `757a7a39823eb9d26a8c11d2f755c8af81c52876` |
+| AC-UX-11 O-1 follow-up — own scope on `/me` (owner-approved) | In review | (this PR) | — |
 
 Deploy: **NOT DEPLOYED** (no deploy authority in this horizon).
 

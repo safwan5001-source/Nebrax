@@ -96,7 +96,7 @@ Per slice, screenshots were reviewed (AR desktop, EN desktop, AR mobile, dark; I
 
 ## 6. Accepted residuals and known limits (stated, not hidden)
 
-1. **#1471 residual — own scope unknown for a restricted actor without `users.view`.** The editor learns the actor's own stored scope from the actor's row in `GET /users`. A branch/warehouse-restricted actor who holds `users.manage`/`hr.manage` but **not** `users.view` cannot read that row, so the UI treats the scope as *unknown* and **blocks granting login access** from the HR flow rather than guess. Safe (fail-closed, and the server enforces 00A regardless); the cost is a missing capability for that unusual role shape. → see Owner decision **O-1**.
+1. **(Resolved by the AC-UX-11 follow-up — see §10.)** **#1471 residual — own scope unknown for a restricted actor without `users.view`.** The editor learns the actor's own stored scope from the actor's row in `GET /users`. A branch/warehouse-restricted actor who holds `users.manage`/`hr.manage` but **not** `users.view` cannot read that row, so the UI treats the scope as *unknown* and **blocks granting login access** from the HR flow rather than guess. Safe (fail-closed, and the server enforces 00A regardless); the cost is a missing capability for that unusual role shape. → see Owner decision **O-1**.
 2. **HR org-structure tab stays owner/admin by role name.** The default accountant holds `hr.manage` and never saw that tab; widening it is a product decision, not a technical fix (07). → **O-4**.
 3. **Remaining direct `hasPermission` importers** (commerce and POS route groups, a few non-React helpers) were not migrated to `useCan` to avoid a broad refactor. They are listed in `capabilities.guard.test.ts`, which fails on any **new** importer and on stale entries — the list can only shrink.
 4. **`GET /users` is unpaginated** (U-8): `enterprise`/`users: null` tenants have no cap; the table filters/sorts client-side. → **O-2** (API change).
@@ -111,7 +111,7 @@ Per slice, screenshots were reviewed (AR desktop, EN desktop, AR mobile, dark; I
 
 | ID | Decision | Recommendation | Cost / note |
 |---|---|---|---|
-| **O-1** | Expose the actor's **own** branch/warehouse scope on `/me` (additive field) | **Yes** — removes residual 6.1 and the "unknown scope" fail-closed path; also lets the editor stop inferring scope from the users list | **Backend/API change** (additive, non-breaking); needs PostgreSQL tests; not authorised in this horizon |
+| **O-1** — ✅ **approved 2026-10-14, delivered in AC-UX-11 (§10)** | Expose the actor's **own** branch/warehouse scope on `/me` (additive field) | **Yes** — removes residual 6.1 and the "unknown scope" fail-closed path; also lets the editor stop inferring scope from the users list | **Backend/API change** (additive, non-breaking); needs PostgreSQL tests; not authorised in this horizon |
 | O-2 | Server-side pagination/search for `/users` | Only when a large tenant appears | API change (D-D) |
 | O-3 | Additive `role_name` on `UserResource` | Only if the fallback chain proves inadequate | Non-breaking (D-H) |
 | O-4 | Show the HR org-structure tab by permission (`hr.manage`) instead of owner/admin | Product call; default accountants would newly see it | UI-only |
@@ -145,3 +145,15 @@ None of these is built, stubbed or implied by the UI. Each needs an owner/ADR de
 - [x] No migration · no API break · no authorization weakening · no financial/TAX/ZATCA change · tenant isolation intact · backward-compatible
 - [x] Every slice: PR report, exact-head CI, no unresolved thread, squash-merged, SHA recorded
 - [x] **Nothing deployed**
+
+---
+
+## 10. Follow-up: AC-UX-11 — own scope on `/me` (owner decision O-1, approved 2026-10-14)
+
+Delivered as a separate small slice from fresh `main` (base `f509929`), under the existing Access Control follow-up authority. **NOT DEPLOYED.**
+
+- **Backend (additive, `/me` only):** `user.branch_ids` and `user.warehouse_ids` — the authenticated actor's **own** stored assignments. **Empty array = unrestricted**, exactly as in `GET /users` (the raw relation is read, not `allowedBranchIds()`, so "unrestricted" can never be mistaken for "unknown"). No other user's scope is exposed; no `users.view` is required; the relations go through the tenant global scope, so a stray pivot row pointing at another tenant's branch/warehouse is never returned. `/login` is unchanged. No migration; no authorization, permission, tenant-isolation or grant-boundary logic touched.
+- **Frontend:** a new `useActorScope()` reads the scope from the stored user (filled by the shell's `/me` refresh) or fetches `/me` once (shared in-flight request); `null` = could not be read, never "unrestricted". Users page, HR page and the employee page no longer infer the scope from `GET /users`; the `canReadActorScope` escape hatch in the employee dialog is **removed** (an unreadable scope now blocks granting login for everyone, uniformly).
+- **Tests:** `MeActorScopeTest` (15: unrestricted / branch / warehouse / both, no `users.view`, `users.manage` + `hr.manage`, no leakage of other users' scope, cross-tenant + corrupted-pivot isolation, backward-compatible `/me`, `/login` unchanged, no authorization change, 401) — passes on sqlite **and on a real PostgreSQL 16** locally, and in the CI pgsql job (which runs the whole suite); frontend unit + e2e coverage as listed in the PR.
+- **Still deliberately open (new, small): O-6.** The HR login-access section still requires `users.view` **and** `users.manage` (it also reads `GET /users` to show whether an employee already has a login). A role holding `users.manage`/`hr.manage` **without** `users.view` therefore still cannot grant login from the HR screen even though the scope is now known. Relaxing that needs a decision on how the dialog should behave when it cannot see existing logins; it is not part of O-1.
+

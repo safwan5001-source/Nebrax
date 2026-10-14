@@ -286,10 +286,34 @@ class AuthController extends ApiController
     {
         $tenant = Tenant::find(app(TenantContext::class)->id());
 
+        $user = $request->user();
+
         return response()->json([
-            'user'    => $this->userPayload($request->user()),
+            'user'    => $this->userPayload($user) + $this->ownScopePayload($user),
             'company' => $this->companyPayload($tenant),
         ]);
+    }
+
+    /**
+     * نطاق الوصول **الخاص بالمستخدم المصادَق وحده** (AC-UX-11، قرار المالك O-1) — حقلان إضافيان على `/me` فقط.
+     *
+     * - **الدلالة مطابقة لما في `GET /users` حرفياً:** المصفوفة الفارغة تعني «غير مقيَّد» (كل الفروع/المستودعات)، لا «لا شيء».
+     *   لذلك تُقرأ العلاقة الخام لا `allowedBranchIds()` (التي تُعيد `null` للفراغ) — لئلا تتبدّل دلالة الفراغ عند
+     *   العميل، وليبقى الحقل مصفوفةً دائماً فلا يُلتبس «غير مقيَّد» بـ«غير معروف».
+     * - **لا يكشف نطاق غيره:** يُقرأ من `$request->user()` وحده؛ ولا يعتمد على `users.view` (من لا يملكها يعرف نطاقه).
+     * - **العزل:** العلاقتان تمرّان بنطاق المستأجر الشامل على `Branch`/`Warehouse` (`TenantScope`)، فصفٌّ في الجدول
+     *   الوسيط يشير إلى فرع مستأجرٍ آخر لا يظهر أبداً.
+     * - للعرض وحده: لا يُبنى عليه أي قرار تخويل في الخادم (الحدود في `UserController`/`Rbac` كما هي).
+     * - الترتيب مرتَّب لثباتٍ في الاستجابة عبر المحرّكات (sqlite/pgsql).
+     *
+     * @return array{branch_ids: array<int, string>, warehouse_ids: array<int, string>}
+     */
+    private function ownScopePayload(User $user): array
+    {
+        return [
+            'branch_ids'    => $user->branches()->pluck('branches.id')->sort()->values()->all(),
+            'warehouse_ids' => $user->warehouses()->pluck('warehouses.id')->sort()->values()->all(),
+        ];
     }
 
     private function issueToken(User $user): string

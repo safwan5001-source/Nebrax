@@ -19,6 +19,12 @@ export interface AuthUser {
   permissions?: string[];
   employee_id?: string | null;
   tenant_id: string;
+  /**
+   * نطاق المستخدم نفسه من `/me` (AC-UX-11): **الفراغ = غير مقيَّد**. غيابُ الحقل = لم يُقرأ بعد (تخزين أقدم) لا «غير مقيَّد».
+   * للعرض فقط — الخادم هو السلطة.
+   */
+  branch_ids?: string[];
+  warehouse_ids?: string[];
   preferences?: { locale: 'ar' | 'en'; theme: 'system' | 'light' | 'dark'; appTheme?: 'default' | 'ink' };
 }
 
