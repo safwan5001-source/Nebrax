@@ -24,8 +24,8 @@ A slice is marked **Merged** only after tests + exact-head CI + merge. "Post-mer
 | AC-UX-02 User editor & access scope | **Merged** | #1466 | `8c9f411f795ba2b35fb7a79f3d8427e08504f571` |
 | AC-UX-03 Roles & Permissions workspace — **03A shell/catalogue** | **Merged** | #1467 | `cd72408462ced93d3da5431030aab2804b918c34` |
 | AC-UX-03B role editing/risk | **Merged** | #1468 | `db93a7034ef7786e61c525adf5d8b36b431819c0` |
-| AC-UX-04 Role creation & safe cloning | In review | (this PR) | — |
-| AC-UX-05 Branch & warehouse scope UX | Not started | — | — |
+| AC-UX-04 Role creation & safe cloning | **Merged** | #1469 | `f147fb6063d36952971724609250f9ba1baf42f5` |
+| AC-UX-05 Branch & warehouse scope UX | In review | (this PR) | — |
 | AC-UX-06 Resource access / treasury UX | Not started | — | — |
 | AC-UX-07 Permission-aware ERP UX | Not started | — | — |
 | AC-UX-08 Access summary & explainability | Not started | — | — |

@@ -87,6 +87,62 @@ export interface EditorCapabilities {
  * حمولة التعديل: **الحقول المتغيّرة وحدها**. غياب المفتاح = «بلا تغيير» في الخادم، فلا
  * يُعاد إرسال نطاقٍ أو دورٍ لم يلمسه المستخدم (فلا مجال لـ`[]` عرَضيّة ولا لرفضٍ لا صلة له).
  */
+export interface ScopeForm {
+  branches: ScopeDraft;
+  warehouses: ScopeDraft;
+}
+
+export interface ScopeCaps {
+  branches: boolean;
+  warehouses: boolean;
+}
+
+/**
+ * حمولة النطاق (مشتركة بين محرّر المستخدم ونموذج الموظف): لا مفتاح لبُعدٍ لا يملك المشاهد قائمته.
+ * - التعديل: البُعد المتغيّر وحده؛ «الكل» ⇒ `[]` (إلغاء التقييد).
+ * - الإنشاء: «الكل» يُحذف مفتاحه (= غير مقيَّد)، و«محدَّد» يُرسَل غير فارغ دائماً.
+ */
+export function scopePayload(
+  initial: ScopeForm,
+  current: ScopeForm,
+  caps: ScopeCaps,
+  isEdit: boolean,
+): Record<string, string[]> {
+  const body: Record<string, string[]> = {};
+  const add = (key: 'branch_ids' | 'warehouse_ids', before: ScopeDraft, after: ScopeDraft, allowed: boolean) => {
+    if (!allowed) return;
+    if (isEdit ? scopeChanged(before, after) : after.mode === 'selected') body[key] = scopeToPayload(after);
+  };
+  add('branch_ids', initial.branches, current.branches, caps.branches);
+  add('warehouse_ids', initial.warehouses, current.warehouses, caps.warehouses);
+  return body;
+}
+
+export interface ScopeIssues {
+  branches: ScopeIssue | null;
+  warehouses: ScopeIssue | null;
+}
+
+/**
+ * أخطاء الحفظ لبُعدَي النطاق. «لم يُلمَس» (نفس الوضع ونفس الاختيار) عند التعديل لا يُتحقَّق منه لأنه لا يُرسَل؛
+ * التبديل إلى «محدَّد» الفارغ يُحتسب لمساً (حمولته `[]` المطابقة لـ«الكل» كانت ستُخفي الخطأ).
+ */
+export function scopeIssues(
+  initial: ScopeForm,
+  current: ScopeForm,
+  caps: ScopeCaps,
+  restricted: ScopeCaps,
+  isEdit: boolean,
+): ScopeIssues {
+  const untouched = (a: ScopeDraft, b: ScopeDraft) => a.mode === b.mode && !scopeChanged(a, b);
+  const one = (before: ScopeDraft, after: ScopeDraft, allowed: boolean, limited: boolean) =>
+    !allowed || (isEdit && untouched(before, after)) ? null : scopeIssue(after, limited);
+  return {
+    branches: one(initial.branches, current.branches, caps.branches, restricted.branches),
+    warehouses: one(initial.warehouses, current.warehouses, caps.warehouses, restricted.warehouses),
+  };
+}
+
 export function diffPayload(
   initial: EditorForm,
   current: EditorForm,
@@ -98,9 +154,7 @@ export function diffPayload(
   if (current.password) body.password = current.password;
   if (caps.role && current.role !== initial.role) body.role = current.role;
   if (caps.employee && current.employeeId !== initial.employeeId) body.employee_id = current.employeeId || null;
-  if (caps.branches && scopeChanged(initial.branches, current.branches)) body.branch_ids = scopeToPayload(current.branches);
-  if (caps.warehouses && scopeChanged(initial.warehouses, current.warehouses)) body.warehouse_ids = scopeToPayload(current.warehouses);
-  return body;
+  return { ...body, ...scopePayload(initial, current, caps, true) };
 }
 
 /** حمولة الإنشاء. النطاق «الكل» يُحذف مفتاحه (= غير مقيَّد)، و«محدَّد» يُرسَل غير فارغ دائماً. */
@@ -114,9 +168,7 @@ export function createPayload(current: EditorForm, caps: EditorCapabilities): Re
   };
   if (!current.sendInvitation) body.password = current.password;
   if (caps.employee && current.employeeId) body.employee_id = current.employeeId;
-  if (caps.branches && current.branches.mode === 'selected') body.branch_ids = scopeToPayload(current.branches);
-  if (caps.warehouses && current.warehouses.mode === 'selected') body.warehouse_ids = scopeToPayload(current.warehouses);
-  return body;
+  return { ...body, ...scopePayload(current, current, caps, false) };
 }
 
 export function isDirty(initial: EditorForm, current: EditorForm): boolean {

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
@@ -19,29 +19,19 @@ import {
   createPayload,
   diffPayload,
   isDirty,
-  scopeChanged,
   scopeDraftFromStored,
-  scopeIssue,
+  scopeIssues,
   type EditorCapabilities,
   type EditorForm,
   type ScopeDraft,
 } from '@/modules/users/editor';
-import { ScopePicker, type PickerOption } from './scope-picker';
+import { AccessScopeEditor, useScopeLookups } from './access-scope-editor';
+import { useScopeText } from './scope-language';
 
 interface EmployeeOption {
   id: string;
   name: string;
   employee_no?: string;
-}
-
-interface BranchOption {
-  id: string;
-  name: string;
-  code?: string;
-}
-
-interface WarehouseOption extends BranchOption {
-  branch_id?: string | null;
 }
 
 export interface EditableUser {
@@ -149,8 +139,8 @@ export function UserEditorSheet({
   const [employees, setEmployees] = useState<EmployeeOption[]>([]);
   const [roles, setRoles] = useState<RoleSummary[] | null>(null);
   const [roleOptions, setRoleOptions] = useState<RoleSummary[] | null>(null);
-  const [branchOptions, setBranchOptions] = useState<BranchOption[] | null>(null);
-  const [warehouseOptions, setWarehouseOptions] = useState<WarehouseOption[] | null>(null);
+  const lookups = useScopeLookups(open, caps);
+  const scopeText = useScopeText();
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [confirmingDiscard, setConfirmingDiscard] = useState(false);
@@ -165,12 +155,6 @@ export function UserEditorSheet({
     if (!open) return;
     if (caps.employee) {
       api<{ data: EmployeeOption[] }>('/employees').then((r) => setEmployees(r.data)).catch(() => {});
-    }
-    if (caps.branches) {
-      api<{ data: BranchOption[] }>('/branches').then((r) => setBranchOptions(r.data)).catch(() => setBranchOptions([]));
-    }
-    if (caps.warehouses) {
-      api<{ data: WarehouseOption[] }>('/warehouses').then((r) => setWarehouseOptions(r.data)).catch(() => setWarehouseOptions([]));
     }
     if (caps.role) {
       api<{ data: RoleSummary[] }>('/roles')
@@ -205,25 +189,16 @@ export function UserEditorSheet({
 
   const availableEmployees = employees.filter((e) => !linkedEmployeeIds.includes(e.id));
 
-  const branchName = useMemo(() => new Map((branchOptions ?? []).map((b) => [b.id, b.name])), [branchOptions]);
-  const warehousePicker: PickerOption[] | null = warehouseOptions
-    ? warehouseOptions.map((w) => ({
-        id: w.id,
-        name: w.name,
-        code: w.code,
-        context: w.branch_id ? branchName.get(w.branch_id) : undefined,
-      }))
-    : null;
-
   // الإنشاء: «الكل» يُحذف مفتاحه فيكون الخادم هو المرجع؛ «محدَّد» الفارغ ممنوع دائماً. التعديل: لا نتحقق إلا مما سيُرسَل فعلاً.
-  // «لم يُلمَس» = نفس الوضع ونفس الاختيار؛ التبديل إلى «محدَّد» الفارغ يُحتسب لمساً (حمولته `[]` المطابقة لـ«الكل» كانت ستخفي الخطأ).
-  const untouched = (a: ScopeDraft, b: ScopeDraft) => a.mode === b.mode && !scopeChanged(a, b);
-  const branchIssue = !caps.branches || (user && untouched(initial.branches, form.branches))
-    ? null
-    : scopeIssue(form.branches, actorBranchesRestricted);
-  const warehouseIssue = !caps.warehouses || (user && untouched(initial.warehouses, form.warehouses))
-    ? null
-    : scopeIssue(form.warehouses, actorWarehousesRestricted);
+  const issues = scopeIssues(
+    initial,
+    form,
+    caps,
+    { branches: actorBranchesRestricted, warehouses: actorWarehousesRestricted },
+    Boolean(user),
+  );
+  const branchIssue = issues.branches;
+  const warehouseIssue = issues.warehouses;
 
   const createBlocked = !user && !caps.role; // الدور إلزامي عند الإنشاء ولا يُختار بلا roles.view.
   const nothingToSave = Boolean(user) && !dirty;
@@ -257,12 +232,6 @@ export function UserEditorSheet({
     return label.kind === 'name' ? label.name : t('role_custom');
   })();
   const summary = accessSummary(form);
-  const scopeText = (kind: 'branches' | 'warehouses') => {
-    const part = summary[kind];
-    if (part.kind === 'all') return t(kind === 'branches' ? 'scope_all_branches' : 'scope_all_warehouses');
-    return t(kind === 'branches' ? 'scope_n_branches' : 'scope_n_warehouses', { n: part.count, count: part.count.toLocaleString(locale) });
-  };
-
   return (
     <Sheet open={open} onOpenChange={(next) => { if (!next) requestClose(); }}>
       <SheetContent closeLabel={t('editor_close')} className="sm:max-w-xl">
@@ -366,30 +335,15 @@ export function UserEditorSheet({
             <section className={SECTION} aria-labelledby="ue-access" ref={accessRef}>
               <h3 id="ue-access" className="text-sm font-semibold text-text">{t('section_access')}</h3>
               <p className="text-xs leading-relaxed text-muted">{t('access_intro')}</p>
-              <div className="space-y-1.5">
-                <Label>{t('scope_branches')}</Label>
-                <ScopePicker
-                  kind="branches"
-                  draft={form.branches}
-                  onChange={(next) => set('branches', next)}
-                  options={branchOptions}
-                  editable={caps.branches}
-                  actorRestricted={actorBranchesRestricted}
-                  issue={branchIssue}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label>{t('scope_warehouses')}</Label>
-                <ScopePicker
-                  kind="warehouses"
-                  draft={form.warehouses}
-                  onChange={(next) => set('warehouses', next)}
-                  options={warehousePicker}
-                  editable={caps.warehouses}
-                  actorRestricted={actorWarehousesRestricted}
-                  issue={warehouseIssue}
-                />
-              </div>
+              <AccessScopeEditor
+                value={{ branches: form.branches, warehouses: form.warehouses }}
+                onChange={(next) => setForm((f) => ({ ...f, ...next }))}
+                caps={caps}
+                restricted={{ branches: actorBranchesRestricted, warehouses: actorWarehousesRestricted }}
+                issues={issues}
+                branchOptions={lookups.branches}
+                warehouseOptions={lookups.warehouses}
+              />
             </section>
 
             <section className={SECTION} aria-labelledby="ue-summary">
@@ -400,9 +354,9 @@ export function UserEditorSheet({
                 <dt className="text-muted">{t('status_label')}</dt>
                 <dd className="text-text">{form.isActive ? t('active') : t('inactive')}</dd>
                 <dt className="text-muted">{t('scope_branches')}</dt>
-                <dd className="text-text">{scopeText('branches')}</dd>
+                <dd className="text-text">{scopeText(summary.branches, 'branches')}</dd>
                 <dt className="text-muted">{t('scope_warehouses')}</dt>
-                <dd className="text-text">{scopeText('warehouses')}</dd>
+                <dd className="text-text">{scopeText(summary.warehouses, 'warehouses')}</dd>
               </dl>
               <p className="text-xs text-muted">{t('summary_note')}</p>
             </section>

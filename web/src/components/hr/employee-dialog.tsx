@@ -13,7 +13,8 @@ import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/components/ui/toast';
 import { api, ApiError, fetchImageUrl } from '@/lib/api';
 import { useNumberPreview } from '@/lib/use-number-preview';
-import { AccessScopeFields, type AccessScope } from '@/components/users/access-scope-fields';
+import { AccessScopeEditor, useScopeCaps, useScopeLookups } from '@/components/users/access-scope-editor';
+import { scopeDraftFromStored, scopeIssues, scopePayload, type ScopeForm } from '@/modules/users/editor';
 import { SYSTEM_ROLE_KEYS } from '@/components/users/user-editor-sheet';
 import type { Shift } from './shift-dialog';
 
@@ -173,7 +174,12 @@ export function EmployeeDialog({
 
   const [allowAccess, setAllowAccess] = useState(initialAllowAccess);
   const [loginForm, setLoginForm] = useState({ email: '', password: '', role: 'staff', sendInvitation: false });
-  const [scope, setScope] = useState<AccessScope>({ branch_ids: [], warehouse_ids: [] });
+  const blankScope: ScopeForm = { branches: { mode: 'all', ids: [] }, warehouses: { mode: 'all', ids: [] } };
+  const [scope, setScope] = useState<ScopeForm>(blankScope);
+  // اللقطة الابتدائية لنطاق المستخدم المرتبط: التعديل يُرسِل البُعد المتغيّر وحده (لغة النطاق الموحَّدة مع شاشة المستخدمين).
+  const [initialScope, setInitialScope] = useState<ScopeForm>(blankScope);
+  const scopeCaps = useScopeCaps();
+  const scopeLookups = useScopeLookups(open && canManageUsers && allowAccess, scopeCaps);
   const [roles, setRoles] = useState<RoleOption[]>([]);
 
   const set = (k: keyof Employee, v: string | boolean) => setForm((f) => ({ ...f, [k]: v }));
@@ -209,7 +215,12 @@ export function EmployeeDialog({
     setForm(employee ?? EMPTY_EMPLOYEE);
     setAllowAccess(!!linkedUser || initialAllowAccess);
     setLoginForm({ email: linkedUser?.email ?? '', password: '', role: linkedUser?.role ?? 'staff', sendInvitation: false });
-    setScope({ branch_ids: linkedUser?.branch_ids ?? [], warehouse_ids: linkedUser?.warehouse_ids ?? [] });
+    const stored: ScopeForm = {
+      branches: scopeDraftFromStored(linkedUser?.branch_ids),
+      warehouses: scopeDraftFromStored(linkedUser?.warehouse_ids),
+    };
+    setInitialScope(stored);
+    setScope(stored);
     setError(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, employee?.id, linkedUser?.id]);
@@ -271,8 +282,16 @@ export function EmployeeDialog({
 
   const managerOptions = colleagues.filter((c) => c.id !== employee?.id);
 
+  // «محدَّد» بلا اختيار يُمنع قبل أي طلب (كان سيعني «الكل» صامتاً)؛ لا نحفظ الموظف ثم يفشل الدخول.
+  const accessActive = canManageUsers && allowAccess;
+  const scopeIssuesNow = accessActive
+    ? scopeIssues(initialScope, scope, scopeCaps, { branches: false, warehouses: false }, Boolean(linkedUser))
+    : { branches: null, warehouses: null };
+  const scopeBlocked = Boolean(scopeIssuesNow.branches || scopeIssuesNow.warehouses);
+
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    if (scopeBlocked) return;
     setSaving(true);
     setError(null);
     const addressBody = Object.fromEntries(
@@ -318,7 +337,7 @@ export function EmployeeDialog({
         try {
           if (allowAccess) {
             if (linkedUser) {
-              const userBody: Record<string, unknown> = { name: form.name, role: loginForm.role, ...scope };
+              const userBody: Record<string, unknown> = { name: form.name, role: loginForm.role, ...scopePayload(initialScope, scope, scopeCaps, true) };
               if (loginForm.password) userBody.password = loginForm.password;
               await api(`/users/${linkedUser.id}`, { method: 'PUT', body: userBody });
             } else {
@@ -331,7 +350,7 @@ export function EmployeeDialog({
                   send_invitation: loginForm.sendInvitation,
                   role: loginForm.role,
                   employee_id: savedEmployeeId,
-                  ...scope,
+                  ...scopePayload(initialScope, scope, scopeCaps, false),
                 },
               });
             }
@@ -456,7 +475,15 @@ export function EmployeeDialog({
                     ))}
                   </Select>
                 </div>
-                <AccessScopeFields value={scope} onChange={setScope} />
+                <AccessScopeEditor
+                  value={scope}
+                  onChange={setScope}
+                  caps={scopeCaps}
+                  restricted={{ branches: false, warehouses: false }}
+                  issues={scopeIssuesNow}
+                  branchOptions={scopeLookups.branches}
+                  warehouseOptions={scopeLookups.warehouses}
+                />
               </div>
             )}
           </fieldset>
@@ -580,7 +607,7 @@ export function EmployeeDialog({
           <Button type="button" variant="outline" onClick={onClose}>
             {t('cancel')}
           </Button>
-          <Button type="submit" disabled={saving}>
+          <Button type="submit" disabled={saving || scopeBlocked}>
             {t('save')}
           </Button>
         </div>
