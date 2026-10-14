@@ -21,7 +21,8 @@ use Illuminate\Support\Str;
  *  4. الدور المخصَّص لا يملك `*` — الوصول الكامل محصورٌ في الأدوار النظامية.
  *  5. سقف المنح (AC-UX-00A): فاعلٌ بلا `*` لا يُنشئ ولا يعدّل دوراً بصلاحيات تتجاوز
  *     صلاحياته هو (دوره هو داخلاً)، ولا يعدّل دوراً قائماً يتجاوز سقفه — وإلا
- *     كان `roles.manage` طريقاً لترقية النفس فوق ما مُنح.
+ *     كان `roles.manage` طريقاً لترقية النفس فوق ما مُنح. وفاعلٌ مقيَّد بنطاق لا
+ *     يعدّل دوراً مُسنَداً لمن نطاقه أوسع (الدور يُقرأ حيّاً لكل حامليه).
  */
 class RoleController extends ApiController
 {
@@ -62,6 +63,24 @@ class RoleController extends ApiController
 
         if (! Rbac::covers($mine, $requested)) {
             abort(403, 'لا يمكنك منح صلاحياتٍ تتجاوز صلاحياتك.');
+        }
+
+        // الدور مشتركٌ ويُقرأ حيّاً: فاعلٌ مقيَّد بنطاق لا يعدّل دوراً مُسنَداً لمن نطاقه
+        // أوسع من نطاقه (أو غير مقيَّد)، وإلا ورث هذا المستخدم صلاحياتٍ خارج نطاق الفاعل.
+        if ($existing !== null) {
+            $actor = $request->user();
+            $mineScope = [$actor->allowedBranchIds(), $actor->allowedWarehouseIds()];
+
+            if ($mineScope !== [null, null]) {
+                User::where('tenant_id', $existing->tenant_id)->where('role', $existing->slug)->get()
+                    ->each(function (User $assignee) use ($mineScope): void {
+                        foreach ([[$mineScope[0], $assignee->allowedBranchIds()], [$mineScope[1], $assignee->allowedWarehouseIds()]] as [$mine, $theirs]) {
+                            if ($mine !== null && ($theirs === null || array_diff($theirs, $mine) !== [])) {
+                                abort(403, 'لا يمكنك تعديل دورٍ مُسنَدٍ إلى مستخدمين نطاقهم أوسع من نطاقك.');
+                            }
+                        }
+                    });
+            }
         }
     }
 

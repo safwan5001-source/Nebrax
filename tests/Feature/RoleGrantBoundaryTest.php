@@ -161,6 +161,43 @@ class RoleGrantBoundaryTest extends TestCase
     }
 
     /** @test */
+    public function a_scope_restricted_role_manager_cannot_edit_a_role_held_by_broader_scoped_users(): void
+    {
+        $auth = $this->tenant();
+        $main = $this->withToken($auth['token'])->getJson('/api/branches')['data'][0]['id'];
+        $perms = ['roles.view', 'roles.manage', 'products.view', 'payments.manage'];
+        $manager = $this->withToken($auth['token'])->postJson('/api/roles', ['name' => 'مدير فرع', 'permissions' => $perms])->assertCreated()['data'];
+        $shared = $this->withToken($auth['token'])->postJson('/api/roles', ['name' => 'مشترك', 'permissions' => ['products.view']])->assertCreated()['data'];
+        $mine = $this->withToken($auth['token'])->postJson('/api/roles', ['name' => 'خاص بفرعي', 'permissions' => ['products.view']])->assertCreated()['data'];
+
+        $this->withToken($auth['token'])->postJson('/api/users', [
+            'name' => 'm', 'email' => 'bm@acme.test', 'password' => 'password123', 'role' => $manager['slug'], 'branch_ids' => [$main],
+        ])->assertCreated();
+        // `shared` مُسنَد لمستخدمٍ غير مقيَّد؛ و`mine` لمستخدمٍ ضمن فرع المدير.
+        $this->withToken($auth['token'])->postJson('/api/users', [
+            'name' => 'open', 'email' => 'open@acme.test', 'password' => 'password123', 'role' => $shared['slug'],
+        ])->assertCreated();
+        $this->withToken($auth['token'])->postJson('/api/users', [
+            'name' => 'in', 'email' => 'in@acme.test', 'password' => 'password123', 'role' => $mine['slug'], 'branch_ids' => [$main],
+        ])->assertCreated();
+        $token = $this->postJson('/api/login', ['email' => 'bm@acme.test', 'password' => 'password123'])->assertOk()['token'];
+
+        // إضافة payments.manage (يملكها) لدورٍ يحمله مستخدمٌ غير مقيَّد: ممنوع.
+        $this->withToken($token)->putJson("/api/roles/{$shared['id']}", [
+            'name' => 'مشترك', 'permissions' => ['products.view', 'payments.manage'],
+        ])->assertForbidden();
+        $this->assertSame(['products.view'], $this->permsOf($shared['id']));
+
+        // دورٌ كل حامليه ضمن نطاقه: مشروع.
+        $this->withToken($token)->putJson("/api/roles/{$mine['id']}", [
+            'name' => 'خاص بفرعي', 'permissions' => ['products.view', 'payments.manage'],
+        ])->assertOk();
+
+        // وإنشاء دور جديد (بلا حاملين) مشروع.
+        $this->withToken($token)->postJson('/api/roles', ['name' => 'جديد', 'permissions' => ['products.view']])->assertCreated();
+    }
+
+    /** @test */
     public function owner_and_admin_keep_full_role_management(): void
     {
         $auth = $this->tenant();
