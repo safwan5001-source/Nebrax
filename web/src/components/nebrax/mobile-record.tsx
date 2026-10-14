@@ -40,9 +40,9 @@ export function MobileRecordItem({ record, className }: { record: MobileRecord; 
     <div className={cn('flex flex-col gap-2 p-3.5', className)}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <div className="truncate text-sm font-medium text-text">{record.title}</div>
+          <div className="truncate text-sm font-medium text-text">{isolate(record.title)}</div>
           {record.subtitle != null ? (
-            <div className="mt-0.5 truncate text-sm text-muted">{record.subtitle}</div>
+            <div className="mt-0.5 truncate text-sm text-muted">{isolate(record.subtitle)}</div>
           ) : null}
           {record.caption != null ? (
             <div className="mt-0.5 truncate text-xs text-muted/80">{record.caption}</div>
@@ -79,4 +79,12 @@ export function MobileRecordItem({ record, className }: { record: MobileRecord; 
       ) : null}
     </div>
   );
+}
+
+/**
+ * نصٌّ حرّ (اسم طرف/صنف) قد يكون لاتينياً داخل واجهة عربية أو العكس: يُعزل اتجاهه كي لا
+ * تقفز علامات الترقيم إلى الطرف الآخر («.Al Khobar Trading Est»). العُقد غير النصية تمرّ كما هي.
+ */
+function isolate(value: React.ReactNode): React.ReactNode {
+  return typeof value === 'string' ? <bdi>{value}</bdi> : value;
 }

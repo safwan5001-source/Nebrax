@@ -288,7 +288,7 @@ export default function PurchasesPage() {
     {
       id: 'partner', header: t('supplier'), enableSorting: false,
       accessorFn: (row) => partnerNames[row.partner_id] ?? '—',
-      cell: ({ row }) => partnerNames[row.original.partner_id] ?? '—',
+      cell: ({ row }) => <bdi>{partnerNames[row.original.partner_id] ?? '—'}</bdi>,
     },
     {
       accessorKey: 'purchase_date', header: t('date'),

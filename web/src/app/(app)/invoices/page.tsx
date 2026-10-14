@@ -302,7 +302,7 @@ export default function InvoicesPage() {
       // النص كاملٌ في الـ DOM (فيقرأه القارئ الصوتي) وفي `title` عند التحويم.
       cell: ({ row }) => {
         const name = partnerNames[row.original.partner_id] ?? '—';
-        return <span className="block max-w-64 truncate" title={name}>{name}</span>;
+        return <span className="block max-w-64 truncate" title={name}><bdi>{name}</bdi></span>;
       },
     },
     {

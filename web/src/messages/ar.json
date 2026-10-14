@@ -7376,6 +7376,7 @@
     "resultCount": "<num>{count}</num> نتيجة",
     "filteredCount": "<num>{count}</num> من أصل <num>{total}</num>",
     "moreActions": "إجراءات إضافية",
+    "rowActionsHeader": "إجراءات الصف",
     "loading": "جارٍ التحميل…",
     "noResults": "لا توجد نتائج",
     "retry": "إعادة المحاولة",
