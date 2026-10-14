@@ -56,18 +56,18 @@ In the incident the other workers kept draining the queue, so a global counter w
 - Per worker: token, PID, alive, tests completed, seconds since last progress, **current class and test** (teamcity), seconds the test has been observed running, last finished tests with durations, tail of ParaTest's unexpected-output file.
 - Process tree of the test command (descendants of the step shell): PID, PPID, state, elapsed, CPU seconds, **CPU used since the previous sample**, RSS, kernel wait channel, syscall, child processes, sockets (PostgreSQL vs other remote endpoints).
 - PostgreSQL: `pg_stat_activity` for the `nibras*` databases (state, `wait_event_type`/`wait_event`, transaction/query/state ages, blocking PIDs, redacted query prefix) and ungranted locks — through a dedicated **`pg_monitor`** role created for CI only, via `docker exec` on the local socket (no password, no connection string).
-- A heuristic **verdict** per stalled worker: waiting on PostgreSQL / waiting on a child process / busy on CPU in PHP / blocked holding an idle transaction / blocked in PHP or on an external socket — always printed with its evidence.
+- A heuristic **verdict** per stalled worker: waiting on PostgreSQL / waiting on a child process / busy on CPU in PHP / sleeping in PHP / blocked in PHP or on an external socket — always printed with its evidence. *(Amended during implementation: an "idle open transaction" verdict was dropped, because `RefreshDatabase` keeps every test inside one; it is listed as evidence only.)*
 - Host: load average, available memory.
 
 ### Output
-- Job log: one `::warning::` per stall plus the first snapshot in a collapsible group.
-- Artifact `pgsql-watchdog` (uploaded with `if: always()`, so also after a job timeout): `watchdog.log`, `snapshot-NN.txt`, `summary.json` (per-worker gap statistics — this also collects evidence for `S` on every healthy run), ParaTest's per-worker files if the run did not finish, and the merged teamcity log (per-test durations).
+- Job log: one `::warning::` per stall, plus the first snapshot with every line prefixed `│ `. *(Amended after review: no `::group::`/`::stop-commands::`; see §6.)*
+- Directory `pgsql-watchdog/` inside the existing `test-output-pgsql` artifact (uploaded with `if: always()`, so also after a job timeout): `watchdog.log`, `snapshot-NN.txt`, `summary.json` (per-worker gap statistics — this also collects evidence for `S` on every healthy run), ParaTest's per-worker files if the run did not finish, and the merged teamcity log (per-test durations).
 
 ### Safety contract
 - **Observe only.** It never signals, kills or restarts a test process. (Guarded by a static test.)
 - **Cannot change the test result.** It runs as a background process of the test step; the stop hook is written so that no failure of the watchdog (missing, crashed, slow) can change the step's exit code.
 - **Guaranteed cleanup:** stopped by an `EXIT` trap in the test step (SIGTERM, then summary); exits by itself if its parent shell disappears or after a maximum lifetime; the runner's orphan cleanup is the last resort.
-- **No secrets:** never reads `/proc/*/environ`; command lines and SQL are redacted (`password=`, URL credentials, bearer/GitHub tokens, quoted SQL literals) and truncated; `psql` commands are never printed.
+- **No secrets:** never reads `/proc/*/environ`; everything the watchdog itself writes (job log, snapshots, `watchdog.log`) has command lines, SQL and output redacted (`password=`, URL credentials, bearer/GitHub tokens, quoted SQL literals) and truncated; `psql` commands are never printed. The raw `teamcity.log` and leftover ParaTest files are copied unredacted: they hold the same test names and failure messages that `test-output-pgsql.txt` already holds.
 - **PostgreSQL CI only;** SQLite job unchanged. `PGOPTIONS="-c lock_timeout=60s"` (CI-02) unchanged.
 - Every external call has a timeout; a failed diagnostic is recorded as unavailable and the watchdog continues.
 
@@ -87,6 +87,8 @@ Measured with the watchdog itself (record-only, threshold 900 s) on a full local
 
 CI runs the same suite in ~10–13 min against ~6 min locally, so CPU-bound tests can take ~2× longer there; a lock wait is wall-clock bounded at 60 s.
 
+**Confirmed on the GitHub runner** (PR #1488, head `938b60e`, run `38632798597`, `summary.json` from the artifact): 6908 tests in 8:27, **0 stalls**. Per-worker maximum gaps: 55.1 / 55.1 / 20.0 / 15.0 s (sampled every 5 s). Slowest tests: 60.0 s (lock-timeout test), **56.7 s** (`PlatformGlobalApplicationOverrideTest::global_summary_scales…`, 23.8 s locally, so ~2.4× slower on CI), 43.8 s (`ImportJobApplyTest`). 240 s stays ≥ 4× every legitimate value seen on CI.
+
 A deliberately low threshold (30 s) on the same suite produced **two false stalls** on legitimate tests (the 36 s import test and the 60 s lock-timeout test) — see §5.
 
 **Decision: `--stall-seconds 240`.**
@@ -99,7 +101,7 @@ A deliberately low threshold (30 s) on the same suite produced **two false stall
 
 | Piece | What it does |
 |---|---|
-| `scripts/ci-watchdog/watchdog.py` | Polls every 5 s: `/proc` process table of the test command's tree (descendants of the step shell), ParaTest `*_progress` sizes (progress), per-worker `*_teamcity` (current class/test, last finished tests and durations). On a stall: snapshot file + `::warning` + first snapshot in a fenced, collapsible group in the job log. On SIGTERM/SIGINT/SIGHUP: writes `summary.json`, exits 0 |
+| `scripts/ci-watchdog/watchdog.py` | Polls every 5 s: `/proc` process table of the test command's tree (descendants of the step shell), ParaTest `*_progress` sizes (progress), per-worker `*_teamcity` (current class/test, last finished tests and durations). On a stall: snapshot file + `::warning` + first snapshot quoted (`│ ` per line) in the job log; every job-log write starts on a fresh line and is one atomic `write()` below `PIPE_BUF`. On SIGTERM/SIGINT/SIGHUP: writes `summary.json`, exits 0 |
 | `scripts/ci-watchdog/hooks.sh` | `awj_watchdog_start` (background, never fails the step) / `awj_watchdog_stop` (EXIT trap: capture `$?`, `set +e`, SIGTERM, bounded 10 s wait, SIGKILL to the watchdog only, `exit "$status"`) |
 | `.github/workflows/ci.yml` | (1) creates `awj_ci_watchdog` (`LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION IN ROLE pg_monitor`); (2) runs the watchdog's own tests on the runner, including a real PostgreSQL check of that role; (3) pgsql branch of the test step: start hook, EXIT trap, `--log-teamcity` + `--tmp-dir` on the test command; (4) the existing `if: always()` upload also takes `pgsql-watchdog/`, retention 1 → 7 days |
 | `scripts/ci-watchdog/test_watchdog.py` | 31 tests (below) |

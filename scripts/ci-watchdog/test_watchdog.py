@@ -105,9 +105,10 @@ class WatchdogCase(unittest.TestCase):
         self.wd: subprocess.Popen | None = None
 
     def tearDown(self):
-        if self.wd and self.wd.poll() is None:
-            self.wd.kill()
-            self.wd.wait()
+        if self.wd:
+            if self.wd.poll() is None:
+                self.wd.kill()
+            self.wd.communicate()
         self.fake.close()
         shutil.rmtree(self.base, ignore_errors=True)
 
@@ -136,7 +137,7 @@ class WatchdogCase(unittest.TestCase):
         self.wd.send_signal(signal.SIGTERM)
         out, _ = self.wd.communicate(timeout=10)
         self.assertEqual(self.wd.returncode, 0, out)
-        return out
+        return out or ""
 
     def everything_written(self, stdout: str) -> str:
         texts = [stdout]
@@ -149,7 +150,7 @@ class WatchdogCase(unittest.TestCase):
 class HealthyRun(WatchdogCase):
     def test_steady_progress_never_snapshots_and_stops_cleanly(self):
         _, prefix = self.fake.worker(1)
-        self.start(stall=1.5)
+        self.start(stall=2.5)
         self.keep_progressing(prefix, every=0.3)
         time.sleep(4)
         out = self.stop()
@@ -157,7 +158,7 @@ class HealthyRun(WatchdogCase):
         summary = json.loads((self.out / "summary.json").read_text())
         self.assertEqual(summary["stalls"], [])
         self.assertGreaterEqual(summary["tests_completed"], 8)
-        self.assertLess(summary["workers"][0]["max_gap_s"], 1.5)
+        self.assertLess(summary["workers"][0]["max_gap_s"], 2.5)
         self.assertIn("AWJ watchdog: stopped (SIGTERM)", out)
         self.assertNotIn("::warning", out)
         self.assertIn("heartbeat:", (self.out / "watchdog.log").read_text())
@@ -177,12 +178,12 @@ class HealthyRun(WatchdogCase):
         self.fake.procs.append(runner)
         p, prefix = self.fake.worker(1)
         self.fake.progress(prefix, 3)
-        self.start(stall=1.0)
-        time.sleep(0.6)
+        self.start(stall=2.5)
+        time.sleep(0.5)
         p.kill()
         p.wait()
-        # the runner is still alive with no worker: after 1s that is a runner stall, never a worker stall
-        time.sleep(2)
+        # the runner is still alive with no worker: that becomes a runner stall, never a worker stall
+        self.assertTrue(wait_for(lambda: (self.out / "snapshot-01.txt").exists(), 10))
         self.stop()
         snaps = [s.read_text() for s in self.out.glob("snapshot-*")]
         self.assertTrue(all("worker 1 (pid" not in s for s in snaps), snaps)
@@ -194,11 +195,11 @@ class HealthyRun(WatchdogCase):
         self.fake.procs.append(runner)
         p, prefix = self.fake.worker(1)
         self.fake.progress(prefix)
-        self.start(stall=1.5)
-        time.sleep(0.6)
+        self.start(stall=2.5)
+        time.sleep(0.5)
         for f in self.fake.tmp.iterdir():   # ParaTest's clearFiles(); the worker process may linger briefly
             f.unlink()
-        time.sleep(2.5)
+        self.assertTrue(wait_for(lambda: (self.out / "snapshot-01.txt").exists(), 10))  # the runner stall
         self.stop()
         snaps = [s.read_text() for s in self.out.glob("snapshot-*")]
         self.assertTrue(all("worker 1 (pid" not in s for s in snaps), snaps)
@@ -232,14 +233,31 @@ class ArtificialStall(WatchdogCase):
         # snapshot cap: 2 written, further repeats only logged
         self.assertFalse((self.out / "snapshot-03.txt").exists())
         self.assertIn("snapshot cap 2 reached", (self.out / "watchdog.log").read_text())
-        # job log: one annotation per stall event, first snapshot inside a fenced group
-        self.assertIn("::warning title=PostgreSQL test stall (AWJ watchdog)::worker 3", out)
-        fence = re.search(r"::stop-commands::([0-9a-f]{32})", out)
-        self.assertTrue(fence, out)
-        self.assertIn(f"::{fence.group(1)}::", out)
+        # job log: one annotation per stall event; the first snapshot quoted line by line
+        self.assertIn("\n::warning title=PostgreSQL test stall (AWJ watchdog)::worker 3", out)
+        self.assertIn("│ AWJ PostgreSQL CI stall snapshot #1", out)
+        self.assertIn("│ worker 3: pid", out)
+        self.assertNotIn("stop-commands", out)
         summary = json.loads((self.out / "summary.json").read_text())
         self.assertGreaterEqual(len(summary["stalls"]), 2)
         self.assertEqual(summary["snapshots"], 2)
+
+    def test_annotation_survives_an_unterminated_progress_line(self):
+        """ParaTest leaves its dots line open; the warning must still start a line, and no snapshot line may."""
+        log = self.base / "job.log"
+        with open(log, "ab", buffering=0) as job:
+            job.write(b"........................")          # what tee has written so far, no newline
+            self.fake.worker(2)
+            self.wd = subprocess.Popen(
+                [sys.executable, str(WATCHDOG), "--out-dir", str(self.out), "--paratest-tmp-dir", str(self.fake.tmp),
+                 "--stall-seconds", "1", "--poll-seconds", "0.2"], stdout=job, stderr=subprocess.STDOUT)
+            self.assertTrue(wait_for(lambda: (self.out / "snapshot-01.txt").exists(), 10))
+            job.write(b"....")
+            self.stop()
+        lines = log.read_text().splitlines()
+        self.assertTrue(any(l.startswith("::warning title=PostgreSQL test stall") for l in lines), lines)
+        self.assertFalse([l for l in lines if l.lstrip().startswith("::") and not l.startswith("::warning")], lines)
+        self.assertFalse([l for l in lines if "::warning" in l and not l.startswith("::warning")], lines)
 
     def test_resumed_progress_closes_the_stall(self):
         p, prefix = self.fake.worker(1)
@@ -339,7 +357,7 @@ class Secrets(WatchdogCase):
         # redaction must not hide what the snapshot is for
         self.assertIn("Tests\\Feature\\TokenTest::test_api_token_rotates", snap)
         self.assertIn("VERDICT (heuristic): waiting on a PostgreSQL lock", snap)
-        self.assertIn("update users set password = *** where api_token = ***", snap)
+        self.assertIn("update users set password = '?' where api_token = '?'", snap)
 
     def test_redaction_rules(self):
         cases = {
@@ -373,6 +391,20 @@ class ObserveOnly(unittest.TestCase):
             self.assertIn('"$AWJ_WATCHDOG_PID"', line, line)
 
 
+class HooksStayInert(unittest.TestCase):
+    """hooks.sh is sourced into the guarded test step, which the CI Gate cannot see into."""
+
+    def test_hooks_cannot_change_the_exit_status_or_shell_options(self):
+        code = [l.split("#", 1)[0].strip() for l in HOOKS.read_text().splitlines()]
+        code = [l for l in code if l]
+        self.assertFalse([l for l in code if re.search(r"(^|[;&|]\s*)exit\b", l)], "hooks.sh must not call exit")
+        self.assertFalse([l for l in code if re.search(r"\b(trap|shopt|alias)\b", l)])
+        self.assertEqual([l for l in code if re.match(r"set\b", l)], ["set +e"])
+        lines = HOOKS.read_text().splitlines()
+        set_line = next(i for i, l in enumerate(lines) if l.strip() == "set +e")
+        self.assertLess(lines.index("awj_watchdog_stop() {"), set_line)  # only inside the stop hook
+
+
 class StepExitCode(unittest.TestCase):
     """The hook contract, run exactly as GitHub runs the step: bash -e -o pipefail."""
 
@@ -384,13 +416,14 @@ class StepExitCode(unittest.TestCase):
         shutil.rmtree(self.base, ignore_errors=True)
 
     def step(self, test_exit: int, watchdog: str | None = None, path: str | None = None) -> tuple[int, str, int | None]:
+        out = Path(tempfile.mkdtemp(dir=self.base))
         override = f'AWJ_WATCHDOG_PY={shlex.quote(watchdog)}\n' if watchdog else ""
         script = (
             f"source {shlex.quote(str(HOOKS))}\n{override}"
             "trap awj_watchdog_stop EXIT\n"
-            f"awj_watchdog_start --out-dir {self.base}/out --paratest-tmp-dir {self.base}/paratest --stall-seconds 60 --poll-seconds 0.2\n"
+            f"awj_watchdog_start --out-dir {out} --paratest-tmp-dir {self.base}/paratest --stall-seconds 60 --poll-seconds 0.2\n"
             "echo \"WDPID=$AWJ_WATCHDOG_PID\"\n"
-            "sleep 0.5\n"
+            f"for i in $(seq 1 100); do [ -s {out}/watchdog.log ] && break; sleep 0.1; done\n"
             f"(echo running tests; exit {test_exit}) | tee {self.base}/test-output.txt\n"
             "echo not-reached-on-failure\n")
         env = dict(os.environ)
@@ -461,7 +494,7 @@ class CiWiring(unittest.TestCase):
         self.assertIn('export PGOPTIONS="-c lock_timeout=60s"', self.step)
 
     def test_watchdog_wraps_only_the_pgsql_branch(self):
-        pg, sqlite = self.step.split("else", 1)
+        pg, sqlite = re.split(r"^\s*else\s*$", self.step, maxsplit=1, flags=re.M)
         self.assertIn("trap awj_watchdog_stop EXIT", pg)
         self.assertLess(pg.index("trap awj_watchdog_stop EXIT"), pg.index("awj_watchdog_start"))
         self.assertLess(pg.index("awj_watchdog_start"), pg.index("php artisan test --parallel"))
@@ -512,6 +545,9 @@ class RealPostgres(WatchdogCase):
         sleeper = subprocess.Popen(super_cmd + ["-X", "-q", "-c", "SELECT pg_sleep(20) /* awj-watchdog-probe */"],
                                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         try:
+            probe = wd.Postgres(wd.parse_args(["--out-dir", "x", "--paratest-tmp-dir", "x", "--stall-seconds", "1", *pg_args]))
+            self.assertTrue(wait_for(lambda: any("awj-watchdog-probe" in r[-1] for r in probe.query(wd.ACTIVITY_SQL)), 15),
+                            "the probe session never became visible to the monitoring role")
             self.fake.worker(1)
             self.start(*pg_args, stall=1.0)
             self.assertTrue(wait_for(lambda: (self.out / "snapshot-01.txt").exists(), 15))

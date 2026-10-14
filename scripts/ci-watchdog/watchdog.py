@@ -33,13 +33,13 @@ import subprocess
 import sys
 import threading
 import time
-import uuid
 from pathlib import Path
 
 CLK_TCK = os.sysconf("SC_CLK_TCK")
 PAGE_KB = os.sysconf("SC_PAGE_SIZE") // 1024
-CMD_TIMEOUT = 10  # seconds, every external command
+CMD_TIMEOUT = 5   # seconds, every external command (the stop hook waits 10 s in total)
 MAX_FIELD = 400   # characters kept from any single command line / query
+PIPE_CHUNK = 3500  # bytes per write to the job log; below PIPE_BUF (4096) so it is atomic
 
 WORKER_FILE = re.compile(r"worker_(\d+)_stdout_([0-9a-f]+)_progress$")
 
@@ -64,7 +64,10 @@ def redact(text: str) -> str:
 
 def redact_sql(sql: str) -> str:
     """SQL text: drop every quoted literal (values may be test data), then the generic rules."""
-    return redact(_SQL_LITERAL.sub("'?'", sql))[:MAX_FIELD]
+    text = _SQL_LITERAL.sub("'?'", sql)
+    for rx, repl in _REDACTIONS[1:]:  # the key=value rule would turn "password is null" into "password ***"
+        text = rx.sub(repl, text)
+    return text[:MAX_FIELD]
 
 
 def short_cmdline(argv: list[str]) -> str:
@@ -150,10 +153,13 @@ SYSCALLS_X86_64 = {
 }
 
 
-def wait_channel(pid: int) -> str:
-    """Kernel function the process sleeps in; "0" means it is runnable (on CPU)."""
+def wait_channel(pid: int, state: str) -> str:
+    """Kernel function the process sleeps in. The kernel also prints "0" when it cannot resolve it,
+    so "0" means "on CPU" only for a runnable (R) process."""
     w = (_read(f"/proc/{pid}/wchan") or "").strip()
-    return "(on CPU)" if w == "0" else w
+    if w == "0":
+        return "(on CPU)" if state == "R" else "(unresolved)"
+    return w
 
 
 def privileged_read(path: str, use_sudo: bool) -> str:
@@ -269,6 +275,7 @@ class Worker:
         self.tc_offset = 0
         self.tc_partial = ""
         self.suite = ""
+        self.depth = 0
         self.current: dict | None = None
         self.finished: collections.deque = collections.deque(maxlen=5)
         self.stall_open_at: float | None = None
@@ -289,8 +296,12 @@ class Worker:
             if not ev:
                 continue
             kind, a = ev
-            if kind == "testSuiteStarted" and "::" in a.get("locationHint", ""):
-                self.suite = test_id(a)
+            if kind == "testSuiteStarted":
+                self.depth += 1
+                if "::" in a.get("locationHint", ""):
+                    self.suite = test_id(a)
+            elif kind == "testSuiteFinished":
+                self.depth = max(0, self.depth - 1)
             elif kind == "testStarted":
                 self.current = {"test": test_id(a), "seen": now}
             elif kind in ("testFailed", "testIgnored") and self.current:
@@ -399,9 +410,25 @@ class Watchdog:
         self.log_f.write(f"{stamp} +{self.elapsed():7.1f}s {msg}\n")
         self.log_f.flush()
 
-    def say(self, msg: str) -> None:
+    def say(self, msg: str, quoted: bool = False) -> None:
+        """Write to the job log, sharing stdout with `php artisan test | tee`.
+
+        ParaTest leaves its progress-dots line unterminated, so every write starts with a newline (a
+        workflow command must begin a line). Each write is one os.write() below PIPE_BUF, which the
+        kernel never interleaves with tee's writes. `quoted` prefixes every line so no snapshot line
+        can be read as a workflow command; no ::stop-commands:: / ::group:: state to leave broken."""
+        lines = msg.splitlines() or [""]
+        if quoted:
+            lines = ["│ " + x for x in lines]
+        chunk: list[str] = []
         try:
-            print(msg, flush=True)
+            for line in lines + [None]:
+                if line is None or sum(len(x.encode()) + 1 for x in chunk) + len(line.encode()) > PIPE_CHUNK:
+                    if chunk:
+                        os.write(1, ("\n" + "\n".join(chunk) + "\n").encode())
+                    chunk = []
+                if line is not None:
+                    chunk.append(line.encode()[:1000].decode("utf-8", "ignore"))
         except (OSError, ValueError):  # the step's stdout may already be closed
             self.log("job log unavailable; message kept in watchdog.log only: " + msg[:300])
 
@@ -536,7 +563,9 @@ class Watchdog:
         L.append(f"host: loadavg {load}; MemAvailable {int(mem.group(1)) // 1024 if mem else '?'} MiB")
 
         pg_rows, pg_locks, pg_err = [], [], None
-        if self.pg.enabled:
+        if self.pg.enabled and self.stop_event.is_set():
+            pg_err = "skipped: stop requested while snapshotting"
+        elif self.pg.enabled:
             try:
                 pg_rows = self.pg.query(ACTIVITY_SQL)
                 pg_locks = self.pg.query(LOCKS_SQL)
@@ -554,6 +583,9 @@ class Watchdog:
             L.append(f"  class: {w.suite or '(unknown — teamcity log unavailable)'}")
             if w.current:
                 L.append(f"  running test: {w.current['test']} (observed running {now - w.current['seen']:.0f}s)")
+            elif w.depth == 0 and w.finished:
+                L.append("  running test: none — the worker finished its assigned file (all suites closed); it is "
+                         "waiting for ParaTest to assign the next file or to stop it, or is in PHPUnit/Laravel teardown")
             else:
                 L.append("  running test: none started since the last finished test "
                          "(between tests: setUp/tearDown of a test, class setup, or worker bootstrap)")
@@ -581,7 +613,7 @@ class Watchdog:
             p = table[pid]
             d = depth.get(p["ppid"], 0) + 1
             depth[pid] = d
-            wchan = wait_channel(pid) or "?"
+            wchan = wait_channel(pid, p["state"]) or "?"
             el = up - p["start_ticks"] / CLK_TCK
             rate = self.cpu_rate.get(pid)
             L.append(f"{pid:>7} {p['ppid']:>7} {p['state']} {el:>8.0f} {p['cpu_ticks'] / CLK_TCK:>8.1f} "
@@ -596,11 +628,11 @@ class Watchdog:
             for pid in [w.pid] + descendants(table, w.pid, self.me):
                 fds = open_fds(pid, sockets)
                 L.append(f"pid {pid} ({table[pid]['comm']}): state {table[pid]['state']}; "
-                         f"syscall {describe_syscall(privileged_read(f'/proc/{pid}/syscall', self.a.privileged_proc))}; "
+                         f"syscall {describe_syscall(privileged_read(f'/proc/{pid}/syscall', self.a.privileged_proc and not self.stop_event.is_set()))}; "
                          f"pipes {fds['pipes']}; files {fds['files']}")
                 for s in fds["sockets"]:
                     L.append(f"  socket: {s}{'   [postgres]' if s.split(' -> ')[-1].split(' ')[0].endswith(':5432') else ''}")
-                stack = privileged_read(f"/proc/{pid}/stack", self.a.privileged_proc)
+                stack = privileged_read(f"/proc/{pid}/stack", self.a.privileged_proc and not self.stop_event.is_set())
                 L.append("  kernel stack: " + " < ".join(x.split("]", 1)[-1].strip().split("+")[0]
                                                          for x in stack.splitlines()[:8]) if "[<" in stack else f"  kernel stack: {stack}")
 
@@ -629,12 +661,7 @@ class Watchdog:
         for r in reasons:
             self.say(f"::warning title=PostgreSQL test stall (AWJ watchdog)::{gh_escape(r)} — see {path.name} in the artifact")
         if self.snapshots == 1 or self.a.print_all_snapshots:
-            fence = uuid.uuid4().hex
-            self.say(f"::group::AWJ watchdog {path.name}")
-            self.say(f"::stop-commands::{fence}")
-            self.say(text.rstrip("\n"))
-            self.say(f"::{fence}::")
-            self.say("::endgroup::")
+            self.say(text.rstrip("\n"), quoted=True)
         return path
 
     def verdict(self, w, p, table, sockets, pg_rows, pg_err, idle, cpu_since):
@@ -654,7 +681,7 @@ class Watchdog:
         ext = [s for s in fds["sockets"] if s.startswith("tcp") and ":5432" not in s and "LISTEN" not in s]
         if ext:
             ev.append("non-PostgreSQL TCP sockets: " + "; ".join(ext[:5]))
-        wchan = wait_channel(w.pid)
+        wchan = wait_channel(w.pid, p["state"])
         if wchan:
             ev.append(f"kernel wait channel: {wchan}")
         if any(r[3].startswith("idle in transaction") for r in mine):
@@ -789,19 +816,31 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 
 def main(argv: list[str] | None = None) -> int:
+    # Handlers first: a stop that arrives during start-up still ends in a clean exit 0.
+    early: list[str] = []
+    holder: dict = {}
+
+    def on_signal(signum, _frame):
+        name = signal.Signals(signum).name
+        if "wd" in holder:
+            holder["wd"].request_stop(name)
+        else:
+            early.append(name)
+    for sig in (signal.SIGTERM, signal.SIGINT, signal.SIGHUP):
+        signal.signal(sig, on_signal)
     try:
-        wd = Watchdog(parse_args(argv))
+        wd = holder["wd"] = Watchdog(parse_args(argv))
     except SystemExit:
         raise
     except Exception as e:
-        print(f"::warning::AWJ watchdog could not start ({type(e).__name__}); tests continue unobserved", flush=True)
+        print(f"\n::warning::AWJ watchdog could not start ({type(e).__name__}); tests continue unobserved", flush=True)
         return 0
-    for sig in (signal.SIGTERM, signal.SIGINT, signal.SIGHUP):
-        signal.signal(sig, lambda s, _f: wd.request_stop(signal.Signals(s).name))
+    if early:
+        wd.request_stop(early[0])
     try:
         wd.run()
     except Exception as e:
-        print(f"::warning::AWJ watchdog stopped on an internal error ({type(e).__name__})", flush=True)
+        print(f"\n::warning::AWJ watchdog stopped on an internal error ({type(e).__name__})", flush=True)
     return 0
 
 

@@ -9,7 +9,9 @@
 # Contract: nothing here may change the step's exit status. GitHub runs the step
 # with `bash -e -o pipefail`, and under errexit a failing command inside an EXIT
 # trap replaces the exit status (verified: `exit 0` + failing trap -> 1). So the
-# stop hook captures `$?` first, turns errexit off, and re-exits with it.
+# stop hook turns errexit off first and never calls `exit`: bash then keeps the
+# status the step already had (verified for 0/1/3/137). test_watchdog.py forbids
+# `exit` and shell-option changes other than that `set +e` in this file.
 
 AWJ_WATCHDOG_PID=""
 AWJ_WATCHDOG_PY="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/watchdog.py"
@@ -24,9 +26,8 @@ awj_watchdog_start() {
   return 0
 }
 
-# EXIT trap. Always ends with `exit <the status the step already had>`.
+# EXIT trap. Leaves the step's exit status untouched.
 awj_watchdog_stop() {
-  local status=$?
   set +e
   if [ -n "$AWJ_WATCHDOG_PID" ]; then
     kill -TERM "$AWJ_WATCHDOG_PID" 2>/dev/null
@@ -44,5 +45,4 @@ awj_watchdog_stop() {
     [ "$wd" -eq 0 ] || echo "::warning::AWJ watchdog exited with status $wd (ignored; the test result is unchanged)"
     AWJ_WATCHDOG_PID=""
   fi
-  exit "$status"
 }
