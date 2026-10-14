@@ -50,6 +50,12 @@ This slice is **documentation only**. No code, migration, API, or runtime behavi
 | P2: reusing `MediaRefField` as-is emits `crop`/`rotate` and `crop.zoom` | **Valid.** | Optional `framing={false}` (default `true`, so the customizer is unchanged) + a `toFacetImage()` adapter that drops `crop`/`rotate`. Framing lives in the appearance tab. Tests added. |
 | P2: `self` has no `shape`/`size`/`showLabel` | **Valid.** | Added to `self`, independent of `defaults`, and covered in fixtures. |
 
+## Codex review round 6 (on `c9ab189`) — changes applied
+
+| Finding | Assessment | Change |
+|---|---|---|
+| P2: adding facet visuals to `containers()` feeds `liveUsageKeys()` and keeps unrelated derivatives alive | **Valid.** Facet framing is CSS with no derivatives. | The `facet_visual` container is used only by `referencesFor()`/`allReferencedIds()`, through a separate `facetVisualContainers()`, and is excluded from `liveUsageKeys()`. Test added (§3.8-d). |
+
 ## Repository evidence / root cause
 
 See `AWJ-VD-H1-0-EVIDENCE-AND-ARCHITECTURE.md` §2. Key facts:
