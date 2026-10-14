@@ -16,6 +16,7 @@ use App\Support\PlanGate;
 use App\Tenancy\TenantContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 
@@ -193,7 +194,20 @@ class UserController extends ApiController
         // الغياب يُبقي الربط الحالي؛ `null` صريحة تفكّه؛ ومعرّفٌ يُتحقّق ثم يُربط.
         $this->assertLinkableEmployee($data['employee_id'] ?? null, $user->id);
 
-        $user->update($data);
+        // REM-08 / SEC-04: الانتقال active → inactive وحده يسحب التوكنات، وفي المعاملة
+        // نفسها — فلا تُحفظ حالة التعطيل ويبقى التوكن حيّاً بسبب استثناء لاحق.
+        // إعادة التفعيل لا تُنشئ توكناً: يلزم دخولٌ جديد. الحارس الفعلي وقت
+        // الطلب في `SetTenant` وليس هذا الحذف وحده.
+        $wasActive = (bool) $user->is_active;
+
+        DB::transaction(function () use ($user, $data, $wasActive): void {
+            $user->update($data);
+
+            if ($wasActive && ! $user->is_active) {
+                $user->tokens()->delete();
+            }
+        });
+
         $this->syncAccessScope($user, $data);
 
         return (new UserResource($user->load('employee', 'branches', 'warehouses')))->response();
@@ -207,7 +221,13 @@ class UserController extends ApiController
 
         $user = User::where('tenant_id', $this->tenantId())->findOrFail($id);
         $this->guardOwnerRole($request, $user);
-        $user->delete();
+
+        // REM-08 / SEC-04: الحذف ناعم (`SoftDeletes`) وجدول التوكنات polymorphic بلا
+        // FK متتالٍ، فلا يسقط التوكن تبعاً للمستخدم — يُسحب صراحةً قبل الحذف.
+        DB::transaction(function () use ($user): void {
+            $user->tokens()->delete();
+            $user->delete();
+        });
 
         return response()->json(['message' => 'تم الحذف.']);
     }

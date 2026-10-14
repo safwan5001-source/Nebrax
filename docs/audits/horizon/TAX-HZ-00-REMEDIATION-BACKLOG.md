@@ -75,6 +75,13 @@ REM-03 and REM-08 touch disjoint controllers (`Invoice/Return/Quote/DocumentRevi
 > **Exactly six operations** become Active-Branch-Only (same `ApiController::scopeToCurrentBranchOnly()` primitive, no new helper): `InvoiceController::duplicate`, `InvoiceController::storeNote`, `ZatcaSubmissionController::store`, `ZatcaSubmissionController::dispatch` (attempt already bound to the resolved invoice + tenant), `CreditNoteController::show`, `CreditNoteController::post` (target note only).
 > **Explicit exclusions (unchanged by design):** `ReturnableController` (cross-branch return-source reference, incl. `purpose=credit_note` allowed-branch policy), `AppointmentController` (non-accounting CRM read/reference), the credit-note `original_invoice_id` reference authorization (allowed-branch policy), and every read endpoint. Per-attempt environment binding is **not** part of REM-03b (attempt rows carry no environment column — see REM-25).
 
+### REM-08 / SEC-04 — status update (2026-10-14)
+
+> **REM-03 / REM-03b merged** (PR #1403, PR #1410). **REM-08 — IN REVIEW (Draft PR), not closed**; closes only after approved merge and verification. Report and evidence: `REM-08-SEC-04-IMPLEMENTATION-REPORT.md`.
+> **What changed (3 production files' worth of logic, no schema/route/RBAC change):** (1) `SetTenant` rejects an authenticated `User` whose `is_active === false` with `403 {"message":"الحساب غير مفعّل."}` — the exact status/message `login()` already uses — before the tenant context is set; (2) `UserController::update` deletes that user's Sanctum tokens, in the same transaction as the update, **only** on the `active → inactive` transition; (3) `UserController::destroy` deletes the user's tokens before the soft delete (`personal_access_tokens` is `uuidMorphs` with no FK, so nothing cascades).
+> **Status-code note for the owner:** the card's "403 on the next request" holds when the token row survives (guard path). Through the normal API path the tokens are already gone, so the same old token gets **401** from `auth:sanctum` before `SetTenant` runs. Both are denials before any tenant logic; no envelope was changed to force one code.
+> **Unchanged by design:** `AuthController` (login/handoff/logout/password-reset), owner/self-deactivation policy, RBAC, Access Control V2, tenant-inactive handling, non-`User` principals (`ApiClient`, `PreviewSession`, `CustomerIdentity`). Reactivation does not revive tokens (a fresh login is required).
+
 ### REM-03 — card (ready for owner approval to start)
 
 | Field | Content |

@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\User;
 use App\Tenancy\HostnameTenantContext;
 use App\Tenancy\TenantContext;
 use Closure;
@@ -38,6 +39,15 @@ class SetTenant
 
         if (! $user->tenant->is_active) {
             return response()->json(['message' => 'الاشتراك غير مفعّل.'], 403);
+        }
+
+        // REM-08 / SEC-04: التوكن الصادر قبل التعطيل يجب أن يموت عند أول طلب تالٍ.
+        // هذا الحارس هو المرجع وقت التشغيل؛ حذف التوكنات في `UserController` طبقة
+        // إضافية لا بديل (قد يسبقها دخولٌ متزامن يُصدر توكناً بعد قراءة قديمة).
+        // يقتصر على `User` — ApiClient وغيره من principals الآلة لهم حراسهم الخاصون،
+        // ومساراتهم التي تمرّ بهذا الـmiddleware لا يتغيّر سلوكها.
+        if ($user instanceof User && $user->is_active === false) {
+            return response()->json(['message' => 'الحساب غير مفعّل.'], 403);
         }
 
         $this->tenant->set($user->tenant_id);
