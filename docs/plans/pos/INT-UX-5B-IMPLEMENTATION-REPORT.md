@@ -83,7 +83,7 @@ Screenshots reviewed for the panel, rotate confirm, locked secret (masked and re
 
 ## 7. Git state
 
-Branch `feat/int-ux-5b-rotate-disable` · PR: see below · Base SHA `13ba94b56b34f4aacc81da6c49963701a9747124` · Head SHA: see the PR (this report is the last commit).
+Branch `feat/int-ux-5b-rotate-disable` · Draft PR #1456 · Base SHA `13ba94b56b34f4aacc81da6c49963701a9747124` · code head `7d3efb88f1c88f02f6b9d50258a15de2f10d8709`; this report is the last commit (a report cannot name its own SHA — the final Head SHA is the PR head).
 
 ## 8. Next step
 
