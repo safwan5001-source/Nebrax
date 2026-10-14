@@ -18,7 +18,7 @@ import { LeaveRequestDialog, type LeaveRequest } from '@/components/hr/leave-req
 import { EmployeeRequestDialog, type EmployeeRequest } from '@/components/hr/employee-request-dialog';
 import { type Attendance, type AttendanceStatus } from '@/components/hr/attendance-dialog';
 import { type PayrollRun } from '@/components/hr/run-detail-dialog';
-import { SYSTEM_ROLE_KEYS } from '@/components/users/user-dialog';
+import { SYSTEM_ROLE_KEYS } from '@/components/users/user-editor-sheet';
 import { api, ApiError, downloadFile } from '@/lib/api';
 import { currentUser } from '@/lib/auth';
 import { formatRiyal } from '@/lib/money';

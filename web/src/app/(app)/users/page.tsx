@@ -14,8 +14,7 @@ import { Button } from '@/components/ui/button';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 import { Dropdown, DropdownItem } from '@/components/ui/dropdown';
 import { useToast } from '@/components/ui/toast';
-import { UserDialog } from '@/components/users/user-dialog';
-import { UserScopeDialog } from '@/components/users/user-scope-dialog';
+import { UserEditorSheet } from '@/components/users/user-editor-sheet';
 import { api, ApiError } from '@/lib/api';
 import { currentUser } from '@/lib/auth';
 import type { ActiveFilter, DataExplorerState, FilterDefinition } from '@/lib/data-explorer/types';
@@ -95,9 +94,9 @@ export default function UsersPage() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
-  const [editing, setEditing] = useState<UserRecord | null>(null);
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [scopeUser, setScopeUser] = useState<UserRecord | null>(null);
+  // المحرّر مفتوح ⇔ `editor` غير null؛ `user: null` = إضافة. `focusAccess` يفتحه عند قسم الوصول.
+  const [editor, setEditor] = useState<{ user: UserRecord | null; focusAccess: boolean } | null>(null);
+  const editing = editor?.user ?? null;
   const [busyId, setBusyId] = useState<string | null>(null);
 
   const [explorer, setExplorer] = useState<DataExplorerState>(() => {
@@ -320,10 +319,7 @@ export default function UsersPage() {
     [askConfirm, run, t],
   );
 
-  const openEdit = (user: UserRecord | null) => {
-    setEditing(user);
-    setDialogOpen(true);
-  };
+  const openEdit = (user: UserRecord | null, focusAccess = false) => setEditor({ user, focusAccess });
 
   // نطاق المشاهد المخزَّن يُقرأ من صفّه في القائمة (لا نقطة نهاية للنطاق الفعلي): فراغ = غير مقيَّد.
   const actorScope = useMemo(() => {
@@ -370,7 +366,7 @@ export default function UsersPage() {
           aria-label={t('scope_title')}
           title={reasonText(caps.scope.reason)}
           disabled={!caps.scope.allowed || busy}
-          onClick={() => setScopeUser(user)}
+          onClick={() => openEdit(user, true)}
         >
           <MapPin className="h-4 w-4 text-muted" strokeWidth={1.7} />
         </Button>
@@ -571,19 +567,17 @@ export default function UsersPage() {
         />
       ) : null}
 
-      {dialogOpen ? (
-        <UserDialog
-          key={editing?.id ?? 'new'}
-          open={dialogOpen}
-          onClose={() => setDialogOpen(false)}
+      {editor ? (
+        <UserEditorSheet
+          key={editor.user?.id ?? 'new'}
+          open
+          onClose={() => setEditor(null)}
           onSaved={load}
-          user={editing}
+          user={editor.user}
           linkedEmployeeIds={linkedEmployeeIds}
+          actorScope={actorScope}
+          focusAccess={editor.focusAccess}
         />
-      ) : null}
-
-      {scopeUser ? (
-        <UserScopeDialog user={scopeUser} onClose={() => setScopeUser(null)} onSaved={load} />
       ) : null}
     </div>
   );

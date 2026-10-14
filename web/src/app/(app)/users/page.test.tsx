@@ -36,11 +36,10 @@ vi.mock('next/navigation', () => ({
 vi.mock('next/link', () => ({
   default: ({ href, children, ...rest }: { href: string; children: React.ReactNode }) => <a href={href} {...rest}>{children}</a>,
 }));
-vi.mock('@/components/users/user-dialog', () => ({
-  UserDialog: ({ user }: { user?: { id: string } | null }) => <div data-testid="user-dialog">{user ? `edit:${user.id}` : 'create'}</div>,
-}));
-vi.mock('@/components/users/user-scope-dialog', () => ({
-  UserScopeDialog: ({ user }: { user: { id: string } }) => <div data-testid="scope-dialog">{user.id}</div>,
+vi.mock('@/components/users/user-editor-sheet', () => ({
+  UserEditorSheet: ({ user, focusAccess }: { user?: { id: string } | null; focusAccess?: boolean }) => (
+    <div data-testid="user-editor">{user ? `edit:${user.id}${focusAccess ? ':access' : ''}` : 'create'}</div>
+  ),
 }));
 
 const user = (over: Record<string, unknown> = {}) => ({
@@ -314,7 +313,25 @@ describe('Users workspace (AC-UX-01)', () => {
     await screen.findAllByText('Hind Alharbi');
 
     await userEvent.click(screen.getByRole('button', { name: 'Add user' }));
-    expect((await screen.findByTestId('user-dialog')).textContent).toBe('create');
+    expect((await screen.findByTestId('user-editor')).textContent).toBe('create');
+  });
+
+  it('the pencil opens the editor, and the access action opens it focused on the access section', async () => {
+    world([OWNER, user()]);
+    renderPage();
+    await screen.findAllByText('Hind Alharbi');
+    const row = screen.getAllByRole('row').find((r) => within(r).queryByText('Hind Alharbi'))!;
+
+    await userEvent.click(within(row).getByRole('button', { name: 'Edit' }));
+    expect((await screen.findByTestId('user-editor')).textContent).toBe('edit:u1');
+
+    cleanup();
+    world([OWNER, user()]);
+    renderPage();
+    await screen.findAllByText('Hind Alharbi');
+    const again = screen.getAllByRole('row').find((r) => within(r).queryByText('Hind Alharbi'))!;
+    await userEvent.click(within(again).getByRole('button', { name: 'Access scope' }));
+    expect((await screen.findByTestId('user-editor')).textContent).toBe('edit:u1:access');
   });
 
   it('renders the Arabic locale with RTL-safe isolated email and Arabic copy', async () => {
