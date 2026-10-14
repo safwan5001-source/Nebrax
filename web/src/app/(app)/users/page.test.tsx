@@ -70,7 +70,7 @@ const pick = (all: Record<string, unknown>) => ({ users: all.users, common: all.
 function renderPage(locale: 'en' | 'ar' = 'en') {
   const all = (locale === 'en' ? enMessages : arMessages) as unknown as Record<string, unknown>;
   return render(
-    <NextIntlClientProvider locale={locale} messages={pick(all)}>
+    <NextIntlClientProvider locale={locale} messages={pick(all) as never}>
       <ConfirmProvider>
         <UsersPage />
       </ConfirmProvider>

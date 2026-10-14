@@ -38,7 +38,7 @@ function respond() {
 
 function open(user: typeof existing | null) {
   return render(
-    <NextIntlClientProvider locale="en" messages={messages}>
+    <NextIntlClientProvider locale="en" messages={messages as never}>
       <UserDialog open onClose={() => {}} onSaved={() => {}} user={user} />
     </NextIntlClientProvider>,
   );
