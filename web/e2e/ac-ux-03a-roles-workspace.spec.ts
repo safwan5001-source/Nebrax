@@ -42,7 +42,7 @@ async function open(
       if (w.deleteStatus === 403) return json(route, { message: 'You cannot delete a role above your own permissions.' }, 403);
       return json(route, { message: 'deleted' });
     }
-    if (path === '/me') return json(route, { user: { id: 'me', name: 'Safwan', role: 'owner', permissions: ['*'] }, company: { name: 'Acme' } });
+    if (path === '/me') return json(route, { user, company: { name: 'Acme' } });
     return json(route, { data: [] });
   });
 

@@ -38,7 +38,7 @@ async function open(
     ], meta: { permissions: [] } });
     if (path === '/branches') return json(route, { data: [{ id: 'b1', name: 'Dammam' }, { id: 'b2', name: 'Khobar' }] });
     if (path === '/warehouses') return json(route, { data: [{ id: 'w1', name: 'Main store', branch_id: 'b1' }] });
-    if (path === '/me') return json(route, { user: { id: 'me', name: 'Safwan', role: 'owner', permissions: ['*'] }, company: { name: 'Acme' } });
+    if (path === '/me') return json(route, { user, company: { name: 'Acme' } });
     return json(route, { data: [] });
   });
 

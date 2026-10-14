@@ -63,7 +63,7 @@ async function open(page: Page, w: World, opts: { locale?: 'ar' | 'en'; permissi
     ] });
     if (path === '/branches') return json(route, { data: [{ id: 'b1', name: 'Dammam' }, { id: 'b2', name: 'Khobar' }, { id: 'b3', name: 'Jubail' }] });
     if (path === '/warehouses') return json(route, { data: [{ id: 'w1', name: 'Main store' }] });
-    if (path === '/me') return json(route, { user: { id: 'me', name: 'Safwan', role: 'owner', permissions: ['*'] }, company: { name: 'Acme' } });
+    if (path === '/me') return json(route, { user, company: { name: 'Acme' } });
     return json(route, { data: [] });
   });
 

@@ -26,8 +26,8 @@ A slice is marked **Merged** only after tests + exact-head CI + merge. "Post-mer
 | AC-UX-03B role editing/risk | **Merged** | #1468 | `db93a7034ef7786e61c525adf5d8b36b431819c0` |
 | AC-UX-04 Role creation & safe cloning | **Merged** | #1469 | `f147fb6063d36952971724609250f9ba1baf42f5` |
 | AC-UX-05 Branch & warehouse scope UX | **Merged** | #1471 | `7e8af039de6ac71b571ed8f0208e6ea48a5dc064` |
-| AC-UX-06 Resource access / treasury UX | In review | (this PR) | — |
-| AC-UX-07 Permission-aware ERP UX | Not started | — | — |
+| AC-UX-06 Resource access / treasury UX | **Merged** | #1475 | `beaa6bf15b5b2284b0973bf41004dbe76a59afdc` |
+| AC-UX-07 Permission-aware ERP UX | In review | (this PR) | — |
 | AC-UX-08 Access summary & explainability | Not started | — | — |
 | AC-UX-09 Accessibility / responsive / visual QA | Not started | — | — |
 | AC-UX-10 Closure & security verification | Not started | — | — |
@@ -56,7 +56,7 @@ There is **no dedicated Access Control area today**. Users and Roles are two tab
 
 | # | Defect | Where | Severity | Planned in |
 |---|---|---|---|---|
-| U-1 | Tab visibility is hard-coded to role **name** (`owner`/`admin`), not `users.view`/`roles.view`. A custom role holding `roles.view` cannot reach the screen; an `admin` whose permissions were edited down still sees tabs the API then 403s. | `hr/page.tsx:86,448` | Med (UX/correctness; backend still authoritative) | 01, 07 |
+| U-1 | Tab visibility is hard-coded to role **name** (`owner`/`admin`), not `users.view`/`roles.view`. A custom role holding `roles.view` cannot reach the screen; an `admin` whose permissions were edited down still sees tabs the API then 403s. | `hr/page.tsx:86,448` | Med (UX/correctness; backend still authoritative) | 01, 07 — **07 fixed the users-login gating** (`users.view` + `users.manage`); the HR *org-structure* tab intentionally stays owner/admin (accountant holds `hr.manage` by default — product decision) |
 | U-2 | Delete has **no confirmation** and the call is `await api(...).catch(() => {}); success(...)` — a failed delete (e.g. 422/403) still shows the "deleted" toast. | `hr/page.tsx:113-117` | Med (misleading success on a security-relevant action) | 01 |
 | U-3a | `GET /users` returns only the role **slug**; display names exist only in `GET /roles`, guarded by `roles.view`. A custom role may hold `users.view` without `roles.view`, so the Users table cannot always resolve a role name. | `UserResource`, `routes/api.php` | Med | 01 |
 | U-3 | Role column renders `tu('roles.${role}')`; only `owner/admin/accountant/staff` have messages. Custom roles (`role-xxxxxxxx` slug) and `self_service` hit a missing-message path. | `hr/page.tsx:367` | Med | 01 |
@@ -70,7 +70,7 @@ There is **no dedicated Access Control area today**. Users and Roles are two tab
 | R-3 | No "this change applies to N users immediately" warning on edit, although roles are bound by `slug` and `users_count` is already returned. | `role-dialog.tsx` | Low-Med | 03 |
 | R-4 | Delete button is hidden for system roles (correct), but the **owner** immutability and the **wildcard-downgrade** consequence are communicated only via small notes. | `hr/page.tsx:344`, `role-dialog.tsx` | Low | 03 |
 | P-1 | `permission_modules` i18n coverage is partial: **19 of 36** modules have no label → **101 of 134** keys render under a raw key such as `fuel`, `pos`, `documents`. 3 terminal actions (`operate`, `reassign`, `publish`) have no label in either locale. | `messages/{ar,en}.json` `hr.perm_modules/perm_actions` | Med | 03 |
-| P-2 | Stale session permissions: `currentUser().permissions` is written at login and refreshed only by a few screens that call `/me`. After a role edit, affected users keep stale nav until re-login. Backend remains authoritative, so this is a UX/staleness issue, not a bypass. | `lib/auth.ts` | Low-Med | 07 |
+| P-2 | Stale session permissions: `currentUser().permissions` is written at login and refreshed only by a few screens that call `/me`. After a role edit, affected users keep stale nav until re-login. Backend remains authoritative, so this is a UX/staleness issue, not a bypass. | `lib/auth.ts` | Low-Med | 07 — **fixed**: `/me` re-read on shell mount/focus (role+permissions only, throttled 30 s) |
 
 ### Backend/security findings surfaced by the inspection (not UI defects) — F-1/F-2 owner-classified **High**, fixed by AC-UX-00A
 

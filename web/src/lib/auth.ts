@@ -3,9 +3,9 @@
 import { api, setToken, clearToken, getToken } from './api';
 import { isDemo } from './demo';
 import { applyAwjTheme, isAwjTheme, writeAwjThemePreference } from './awj-theme';
+import { AUTH_SESSION_CHANGED_EVENT, USER_CHANGED_EVENT } from './user-events';
 
-/** تغيّر جلسة المصادقة: يمسح المستهلكون الذاكرة المقيدة بالهوية السابقة. */
-export const AUTH_SESSION_CHANGED_EVENT = 'nibras:auth-session-changed';
+export { AUTH_SESSION_CHANGED_EVENT };
 
 export function notifyAuthSessionChanged(): void {
   if (typeof window !== 'undefined') window.dispatchEvent(new Event(AUTH_SESSION_CHANGED_EVENT));
@@ -124,6 +124,7 @@ export function persistUser(user: AuthUser, options: { applyDisplayPreferences?:
   localStorage.setItem('user', raw);
   cachedUserRaw = raw;
   cachedUser = user;
+  window.dispatchEvent(new Event(USER_CHANGED_EVENT));
   if (options.applyDisplayPreferences === false) return;
   const locale = user.preferences?.locale;
   if (locale) document.cookie = `locale=${locale}; path=/; max-age=31536000; samesite=lax`;

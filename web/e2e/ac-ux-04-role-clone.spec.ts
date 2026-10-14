@@ -32,7 +32,7 @@ async function open(page: Page, w: World, opts: { locale?: 'ar' | 'en'; permissi
     if (path === '/applications/nav-state') return json(route, { data: {} });
     if (path === '/roles' && method === 'GET') return json(route, { data: ROLES, meta: { permissions: CATALOG } });
     if (path === '/roles' && method === 'POST') return json(route, { data: { id: 'r9' } }, 201);
-    if (path === '/me') return json(route, { user: { id: 'me', name: 'Safwan', role: 'owner', permissions: ['*'] }, company: { name: 'Acme' } });
+    if (path === '/me') return json(route, { user, company: { name: 'Acme' } });
     return json(route, { data: [] });
   });
 

@@ -15,9 +15,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/toast';
 import { EmptyState, LoadingState } from '@/components/nebrax';
 import { api, ApiError } from '@/lib/api';
-import { currentUser } from '@/lib/auth';
 import { formatDateTime } from '@/lib/formatting';
-import { hasPermission } from '@/lib/permissions';
+import { useCan } from '@/lib/use-can';
 
 /**
  * FISCAL-2: السنوات المالية والإقفال السنوي.
@@ -82,13 +81,13 @@ function useAccess() {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
-  const user = currentUser();
+  const { can } = useCan();
   return {
     mounted,
-    canView: hasPermission(user?.permissions, user?.role, 'fiscal_years.view'),
-    canManage: hasPermission(user?.permissions, user?.role, 'fiscal_years.manage'),
-    canClose: hasPermission(user?.permissions, user?.role, 'fiscal_years.close'),
-    canReopen: hasPermission(user?.permissions, user?.role, 'fiscal_years.reopen'),
+    canView: can('fiscal_years.view'),
+    canManage: can('fiscal_years.manage'),
+    canClose: can('fiscal_years.close'),
+    canReopen: can('fiscal_years.reopen'),
   };
 }
 
