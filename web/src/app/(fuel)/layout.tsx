@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { FuelWorkspaceShell } from '@/components/fuel-stations/fuel-workspace-shell';
 import { AuthenticatedCompanyBrowserIdentity } from '@/components/layout/company-browser-identity';
 import { currentUser, isAuthenticated } from '@/lib/auth';
+import { CardTitleLevel } from '@/components/ui/card';
 
 /**
  * Fuel Stations route group مستقل عن `(app)`: لا Sidebar ولا Topbar عامين.
@@ -31,7 +32,9 @@ export default function FuelLayout({ children }: { children: React.ReactNode }) 
   return (
     <>
       <AuthenticatedCompanyBrowserIdentity />
-      <FuelWorkspaceShell>{children}</FuelWorkspaceShell>
+      <FuelWorkspaceShell>
+        <CardTitleLevel level="h2">{children}</CardTitleLevel>
+      </FuelWorkspaceShell>
     </>
   );
 }

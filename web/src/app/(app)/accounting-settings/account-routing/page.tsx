@@ -13,6 +13,7 @@ import { EmptyState, LoadingState } from '@/components/nebrax';
 import { api, ApiError } from '@/lib/api';
 import { currentUser } from '@/lib/auth';
 import { hasPermission } from '@/lib/permissions';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 
 /**
  * ACC-2: توجيه الحسابات — تعيين كل دور محاسبي دلالي إلى حساب فعلي في دليل
@@ -74,6 +75,7 @@ function useAccountRoutingAccess(): { mounted: boolean; canView: boolean; canMan
 
 export default function AccountRoutingPage() {
   const t = useTranslations('accountingSettings');
+  const askConfirm = useConfirm();
   const locale = useLocale();
   const isEn = locale.toLowerCase().startsWith('en');
   const { success, error: toastError } = useToast();
@@ -128,7 +130,7 @@ export default function AccountRoutingPage() {
   }
 
   async function resetMapping(roleKey: string) {
-    if (!window.confirm(t('routingResetConfirm'))) return;
+    if (!(await askConfirm({ message: t('routingResetConfirm') }))) return;
 
     setSavingKey(roleKey);
     try {
@@ -212,6 +214,7 @@ export default function AccountRoutingPage() {
 
                       <div className="flex shrink-0 items-center gap-2">
                         <Select
+                          aria-label={label}
                           className="w-56"
                           disabled={!canManage || saving}
                           value={currentAccountId}

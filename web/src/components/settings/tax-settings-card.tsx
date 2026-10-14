@@ -95,6 +95,7 @@ export function TaxSettingsCard({ canManage }: { canManage: boolean }) {
                 className="grid grid-cols-2 items-center gap-2 rounded-lg border border-border p-2 sm:grid-cols-[1fr_96px_150px_40px] sm:border-0 sm:p-0"
               >
                 <Input
+                  aria-label={t('name')}
                   value={row.name}
                   disabled={!canManage}
                   onChange={(e) => patch(i, { name: e.target.value })}
@@ -102,6 +103,7 @@ export function TaxSettingsCard({ canManage }: { canManage: boolean }) {
                 />
                 <div className="relative">
                   <Input
+                    aria-label={t('rate')}
                     className="num pe-7 text-end"
                     type="number"
                     min={0}
@@ -110,9 +112,10 @@ export function TaxSettingsCard({ canManage }: { canManage: boolean }) {
                     value={row.rate}
                     onChange={(e) => patch(i, { rate: e.target.value })}
                   />
-                  <span className="pointer-events-none absolute inset-y-0 end-2 flex items-center text-xs text-muted">%</span>
+                  <span aria-hidden="true" className="pointer-events-none absolute inset-y-0 end-2 flex items-center text-xs text-muted">%</span>
                 </div>
                 <Select
+                  aria-label={t('inclusive_col')}
                   value={row.inclusive ? '1' : '0'}
                   disabled={!canManage}
                   onChange={(e) => patch(i, { inclusive: e.target.value === '1' })}

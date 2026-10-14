@@ -259,7 +259,7 @@ export function DataTable<T>({
             value={globalFilter}
             onChange={(e) => setGlobalFilter(e.target.value)}
             placeholder={searchPlaceholder}
-            aria-label={searchLabel ?? searchPlaceholder}
+            aria-label={searchLabel || searchPlaceholder || t('search')}
             data-awj-grid-search=""
             className="h-8 w-full max-w-xs bg-transparent text-sm text-text placeholder:text-muted focus:outline-none"
           />
@@ -361,6 +361,9 @@ export function DataTable<T>({
                                 strokeWidth={1.7}
                               />
                             </button>
+                          ) : header.column.id === 'actions' && header.column.columnDef.header === '' ? (
+                            // عمود إجراءات الصف بلا عنوان مرئي: اسمٌ لقارئ الشاشة وحده (ERP-UX-015).
+                            <span className="sr-only">{t('rowActionsHeader')}</span>
                           ) : (
                             <span className="inline-flex items-center">
                               {flexRender(header.column.columnDef.header, header.getContext())}

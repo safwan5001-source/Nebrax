@@ -46,8 +46,8 @@ class MultiStoreCreationTest extends TestCase
 
         $this->assertNotSame($second['id'], $third['id']);
         $this->assertNotSame($second['sales_channel_id'], $third['sales_channel_id']);
-        $this->assertSame('https://gifts.multi.store.awjdev.xyz/', $second['preview_url']);
-        $this->assertSame('https://gifts-2.multi.store.awjdev.xyz/', $third['preview_url']);
+        $this->assertSame('https://multi-gifts.store.awjdev.xyz/', $second['preview_url']);
+        $this->assertSame('https://multi-gifts-2.store.awjdev.xyz/', $third['preview_url']);
 
         app(TenantContext::class)->set($tenant->id);
         $this->assertSame(2, SalesChannel::query()->where('type', SalesChannel::TYPE_WEB)->count());
@@ -68,7 +68,7 @@ class MultiStoreCreationTest extends TestCase
         $additional = $this->create($tenant, 'Second');
         $firstDomain = StorefrontDomain::withoutGlobalScopes()->where('hostname', 'legacy.store.awjdev.xyz')->sole();
         $this->assertSame('legacy.store.awjdev.xyz', $firstDomain->hostname);
-        $this->assertSame('https://second.legacy.store.awjdev.xyz/', $additional['preview_url']);
+        $this->assertSame('https://legacy-second.store.awjdev.xyz/', $additional['preview_url']);
     }
 
     /** @test */

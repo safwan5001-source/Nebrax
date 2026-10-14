@@ -22,6 +22,7 @@ import { SYSTEM_ROLE_KEYS } from '@/components/users/user-dialog';
 import { api, ApiError, downloadFile } from '@/lib/api';
 import { currentUser } from '@/lib/auth';
 import { formatRiyal } from '@/lib/money';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 
 interface EmployeeProfile extends Employee {
   branch_id?: string | null;
@@ -81,6 +82,7 @@ function formatBytes(value: number): string {
 
 export default function EmployeeProfilePage() {
   const { id } = useParams<{ id: string }>();
+  const askConfirm = useConfirm();
   const router = useRouter();
   const t = useTranslations('hr');
   const tu = useTranslations('users');
@@ -139,7 +141,7 @@ export default function EmployeeProfilePage() {
   useEffect(() => load(), [load]);
 
   async function deleteContract(contract: Contract) {
-    if (!id || !window.confirm(t('confirm_delete_contract'))) return;
+    if (!id || !(await askConfirm({ message: t('confirm_delete_contract'), tone: 'danger' }))) return;
     setBusyContractId(contract.id);
     try {
       await api(`/employees/${id}/contracts/${contract.id}`, { method: 'DELETE' });
@@ -179,7 +181,7 @@ export default function EmployeeProfilePage() {
   }
 
   async function cancelLeave(r: LeaveRequest) {
-    if (!window.confirm(t('confirm_cancel_leave_request'))) return;
+    if (!(await askConfirm({ message: t('confirm_cancel_leave_request'), tone: 'danger' }))) return;
     setBusyLeaveId(r.id);
     try {
       await api(`/leave-requests/${r.id}`, { method: 'DELETE' });
@@ -219,7 +221,7 @@ export default function EmployeeProfilePage() {
   }
 
   async function cancelRequest(r: EmployeeRequest) {
-    if (!window.confirm(t('confirm_cancel_employee_request'))) return;
+    if (!(await askConfirm({ message: t('confirm_cancel_employee_request'), tone: 'danger' }))) return;
     setBusyRequestId(r.id);
     try {
       await api(`/requests/${r.id}`, { method: 'DELETE' });
@@ -261,7 +263,7 @@ export default function EmployeeProfilePage() {
   }
 
   async function deleteAttachment(attachment: EmployeeAttachment) {
-    if (!id || !window.confirm(t('confirm_delete_attachment'))) return;
+    if (!id || !(await askConfirm({ message: t('confirm_delete_attachment'), tone: 'danger' }))) return;
     setBusyAttachmentId(attachment.id);
     try {
       await api(`/employees/${id}/attachments/${attachment.id}`, { method: 'DELETE' });

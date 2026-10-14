@@ -2,12 +2,13 @@
 
 import { useRouter } from 'next/navigation';
 import { useRef, type RefObject } from 'react';
-import { useTranslations } from 'next-intl';
-import { LogOut, Search, Menu, Plus, Settings, ChevronDown, FilePlus, FilePlus2, UserPlus, Building2, Check } from 'lucide-react';
+import { useLocale, useTranslations } from 'next-intl';
+import { useTheme } from 'next-themes';
+import { LogOut, Search, Menu, Plus, Settings, ChevronDown, FilePlus, FilePlus2, UserPlus, Building2, Check, Languages, Moon, Sun } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Dropdown, DropdownItem } from '../ui/dropdown';
 import { ThemeToggle } from './theme-toggle';
-import { LangToggle } from './lang-toggle';
+import { LangToggle, switchLocale } from './lang-toggle';
 import { NotificationBell } from './notification-bell';
 import { CompanyLogoMark } from '@/components/layout/company-logo-mark';
 import { useCompany } from '@/lib/company';
@@ -18,11 +19,17 @@ import { ContextualHelpTrigger } from '@/components/help-center/contextual-help-
 export function Topbar({
   onMenuClick,
   menuButtonRef,
+  menuExpanded,
 }: {
   onMenuClick: () => void;
   menuButtonRef: RefObject<HTMLButtonElement>;
+  /** حالة درج التنقّل على الجوال — يُعلنها زر القائمة (`aria-expanded`). */
+  menuExpanded?: boolean;
 }) {
   const t = useTranslations('topbar');
+  const tc = useTranslations('common');
+  const locale = useLocale();
+  const { theme, setTheme } = useTheme();
   const tb = useTranslations('branches');
   const router = useRouter();
   const user = currentUser();
@@ -38,12 +45,15 @@ export function Topbar({
   }
 
   return (
-    <header data-awj-shell="topbar" className="no-print flex h-14 shrink-0 items-center gap-3 border-b border-border bg-surface px-4">
+    // على 320px: هامش وفجوات أضيق، ولا يُضغط أي زر تحت مقاسه (shrink-0) — كان زر
+    // القائمة ينضغط إلى 20px والشريط يتجاوز الشاشة بـ12px (ERP-UX-005).
+    <header data-awj-shell="topbar" className="no-print flex h-14 shrink-0 items-center gap-2 border-b border-border bg-surface px-3 sm:gap-3 sm:px-4">
       <Button
         variant="ghost"
         size="icon"
-        className="h-11 w-11 lg:hidden"
+        className="h-11 w-11 shrink-0 lg:hidden"
         aria-label={t('menu')}
+        aria-expanded={menuExpanded}
         onClick={onMenuClick}
         ref={menuButtonRef}
       >
@@ -52,7 +62,7 @@ export function Topbar({
 
       {/* علامة الشركة — على الجوال وحده: الشاشة الواسعة تعرضها في ترويسة
           الشريط الجانبي، وتكرارها في الشريطين ضجيجٌ بلا فائدة. */}
-      <CompanyLogoMark logo={company?.logo} name={company?.name} size="sm" className="lg:hidden" />
+      <CompanyLogoMark logo={company?.logo} name={company?.name} size="sm" className="shrink-0 lg:hidden" />
 
       <div
         data-awj-shell-field=""
@@ -66,7 +76,7 @@ export function Topbar({
         />
       </div>
 
-      <div className="ms-auto flex items-center gap-1">
+      <div className="ms-auto flex shrink-0 items-center gap-0.5 sm:gap-1">
         {/* قائمة الإنشاء السريع (+) */}
         <Dropdown
           align="end"
@@ -83,8 +93,12 @@ export function Topbar({
         <ContextualHelpTrigger placement="topbar" />
 
         <NotificationBell />
-        <LangToggle />
-        <ThemeToggle />
+        {/* اللغة والوضع في الشريط من sm فما فوق؛ تحتها ينتقلان إلى قائمة الحساب
+            فلا تضيع وظيفة ولا يتجاوز الشريط عرض 320px (WCAG 1.4.10). */}
+        <div className="hidden items-center gap-1 sm:flex">
+          <LangToggle />
+          <ThemeToggle />
+        </div>
 
         {/* قائمة المستخدم */}
         <Dropdown
@@ -132,6 +146,14 @@ export function Topbar({
           )}
 
           <ContextualHelpTrigger placement="menu" restoreFocusRef={userMenuButtonRef} />
+          <div className="sm:hidden">
+            <DropdownItem icon={Languages} onClick={() => switchLocale(locale, () => router.refresh())}>
+              {tc('languageToggle')}
+            </DropdownItem>
+            <DropdownItem icon={theme === 'dark' ? Sun : Moon} onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>
+              {tc('themeToggle')}
+            </DropdownItem>
+          </div>
           <DropdownItem icon={Settings} href="/settings">{t('settings')}</DropdownItem>
           <DropdownItem icon={LogOut} tone="danger" onClick={handleLogout}>{t('logout')}</DropdownItem>
         </Dropdown>

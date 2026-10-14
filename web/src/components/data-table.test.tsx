@@ -144,6 +144,11 @@ describe.each(TEST_LOCALES)('DataTable default labels (%s)', (locale) => {
     expect(screen.getByTitle(nebraxText(locale, 'exportCsv'))).toBeTruthy();
   });
 
+  it('names the toolbar search even when the page passes no placeholder (ERP-UX-H1-5B)', () => {
+    renderIntl(<DataTable columns={columns} data={rows} />, locale);
+    expect(screen.getByRole('textbox', { name: nebraxText(locale, 'search') })).toBeTruthy();
+  });
+
   it('offers a translated retry on a load failure', () => {
     renderIntl(<DataTable columns={columns} data={[]} error="x" onRetry={() => {}} showToolbar={false} />, locale);
     expect(screen.getByRole('button', { name: nebraxText(locale, 'retry') })).toBeTruthy();
@@ -419,5 +424,27 @@ describe('DataTable CSV column order (H1-4A, additive)', () => {
 
   it('exports in the declared order when exportColumnOrder is given; unlisted columns follow in display order', async () => {
     expect(await csvOf({ exportColumnOrder: ['status', 'number'] })).toBe('الحالة,الرقم,العميل,الإجمالي');
+  });
+});
+
+describe('DataTable row-actions header (ERP-UX-015)', () => {
+  const withActions: ColumnDef<Row, unknown>[] = [
+    ...columns,
+    { id: 'actions', header: '', cell: () => <button type="button">view</button> },
+  ];
+
+  it.each(TEST_LOCALES)('names an empty actions header for assistive technology (%s)', (locale) => {
+    renderIntl(<DataTable columns={withActions} data={rows} showToolbar={false} />, locale);
+    const headers = within(screen.getByRole('table')).getAllByRole('columnheader');
+    const last = headers[headers.length - 1];
+    expect(last.textContent).toBe(locale === 'ar' ? 'إجراءات الصف' : 'Row actions');
+    expect(last.querySelector('.sr-only')).not.toBeNull();
+  });
+
+  it('leaves a labelled actions header untouched', () => {
+    const labelled: ColumnDef<Row, unknown>[] = [...columns, { id: 'actions', header: 'Tools', cell: () => null }];
+    renderIntl(<DataTable columns={labelled} data={rows} showToolbar={false} />, 'en');
+    const headers = within(screen.getByRole('table')).getAllByRole('columnheader');
+    expect(headers[headers.length - 1].textContent).toBe('Tools');
   });
 });

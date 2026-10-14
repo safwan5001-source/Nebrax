@@ -13,6 +13,7 @@ import {
 } from '@/components/nebrax';
 import { api, ApiError, downloadFile } from '@/lib/api';
 import { formatRiyal } from '@/lib/money';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 
 interface Allocation { id: string; label: string; amount: string }
 interface Voucher {
@@ -41,6 +42,7 @@ const tone: Record<string, 'positive' | 'warning' | 'muted'> = {
 
 export default function ReceiptVoucherDetailPage() {
   const t = useTranslations('receiptVouchers');
+  const askConfirm = useConfirm();
   const tc = useTranslations('common');
   const params = useParams<{ id: string }>();
   const router = useRouter();
@@ -69,7 +71,7 @@ export default function ReceiptVoucherDetailPage() {
   useEffect(() => load(), [load]);
 
   async function post() {
-    if (!voucher || voucher.status !== 'draft' || !window.confirm(t('confirm_post'))) return;
+    if (!voucher || voucher.status !== 'draft' || !(await askConfirm({ message: t('confirm_post') }))) return;
     setActing(true);
     try {
       const response = await api<{ data: Voucher }>(`/payments/${voucher.id}/post`, { method: 'POST' });
@@ -97,7 +99,7 @@ export default function ReceiptVoucherDetailPage() {
   }
 
   async function remove() {
-    if (!voucher || voucher.status !== 'draft' || !window.confirm(t('confirm_delete'))) return;
+    if (!voucher || voucher.status !== 'draft' || !(await askConfirm({ message: t('confirm_delete'), tone: 'danger' }))) return;
     setActing(true);
     try {
       await api(`/payments/${voucher.id}`, { method: 'DELETE' });

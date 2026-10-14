@@ -73,7 +73,10 @@ class CreditNoteController extends ApiController
 
     public function show(string $id): JsonResponse
     {
-        $note = CreditNote::with(['lines', 'printTemplateRevision', 'pdfTemplateRevision', 'thermalTemplateRevision'])->findOrFail($id);
+        // REM-03b: الإشعار نفسه بالفرع النشط فقط (يبقى `assertRecordAccessible` طبقةً ثانية).
+        $note = $this->scopeToCurrentBranchOnly(
+            CreditNote::with(['lines', 'printTemplateRevision', 'pdfTemplateRevision', 'thermalTemplateRevision'])
+        )->findOrFail($id);
         $this->assertRecordAccessible($note->branch_id, []);
 
         return (new CreditNoteResource($note))->response();
@@ -81,7 +84,9 @@ class CreditNoteController extends ApiController
 
     public function post(string $id): JsonResponse
     {
-        $note = CreditNote::findOrFail($id);
+        // REM-03b: الحارس قبل أي أثر محاسبي. **الإشعار نفسه** بالفرع النشط فقط؛ أما الفاتورة المصدر
+        // (`original_invoice_id`) فتبقى على سياسة المرجع القائمة (الفروع المسموحة) — لا تشديد هنا.
+        $note = $this->scopeToCurrentBranchOnly(CreditNote::query())->findOrFail($id);
         $this->assertRecordAccessible($note->branch_id, []);
         // فرع الفاتورة المصدر يُعاد فحصه عند الترحيل لا عند الإنشاء فقط: المسوّدة قد تكون أُنشئت بصلاحية أوسع
         // أو تغيّر نطاق فروع المستخدم بعدها (نفس قاعدة `store`، 404 غير مُسرِّب).

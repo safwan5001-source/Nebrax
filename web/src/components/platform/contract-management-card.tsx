@@ -144,7 +144,7 @@ export function ContractManagementCard({ tenantId, subscriptions, onChanged }: P
   return (
     <>
       <Card>
-        <CardHeader><CardTitle>{t('contractManagement')}</CardTitle></CardHeader>
+        <CardHeader><CardTitle as="h2">{t('contractManagement')}</CardTitle></CardHeader>
         <CardContent className="space-y-5">
           <p className="text-sm leading-relaxed text-muted">{t('contractNotice')}</p>
           {error && <p className="text-sm text-negative" role="alert">{error}</p>}
@@ -161,7 +161,7 @@ export function ContractManagementCard({ tenantId, subscriptions, onChanged }: P
       </Card>
 
       <Card>
-        <CardHeader><CardTitle>{t('subscriptionHistory')}</CardTitle></CardHeader>
+        <CardHeader><CardTitle as="h2">{t('subscriptionHistory')}</CardTitle></CardHeader>
         <CardContent>
           {subscriptions.length === 0 ? <p className="text-sm text-muted">{t('noSubscriptionHistory')}</p> : <>
             <div className="hidden overflow-x-auto lg:block"><Table><THead><TR><TH>{t('plan')}</TH><TH>{t('status')}</TH><TH className="text-end">{t('monthlyAmount')}</TH><TH>{t('startsOn')}</TH><TH>{t('endsOn')}</TH><TH>{t('action')}</TH></TR></THead><TBody>{subscriptions.map((subscription) => <SubscriptionRow key={subscription.id} subscription={subscription} onAction={openAction} onEvents={loadEvents} t={t} />)}</TBody></Table></div>

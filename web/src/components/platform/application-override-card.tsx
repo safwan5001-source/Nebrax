@@ -13,6 +13,7 @@ import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { ApiError } from '@/lib/api';
+import { applicationLabel } from './application-label';
 import { platformApi } from '@/lib/platform-api';
 
 type CommercialMode = 'inherit' | 'granted' | 'denied';
@@ -62,10 +63,6 @@ const operationalTone: Record<OperationalState, 'positive' | 'negative' | 'warni
   suspended: 'warning',
 };
 
-function catalogKeyLabel(key: string): string {
-  return key.replaceAll('.', '_');
-}
-
 export function ApplicationOverrideCard({ tenantId, onChanged }: { tenantId: string; onChanged?: () => void }) {
   const t = useTranslations('platform.applicationOverrides');
   const filterId = useId();
@@ -98,7 +95,7 @@ export function ApplicationOverrideCard({ tenantId, onChanged }: { tenantId: str
   useEffect(() => { load(); }, [load]);
 
   const filtered = useMemo(() => applications.filter((app) => {
-    const label = tApps(`keys.${catalogKeyLabel(app.key)}`);
+    const label = applicationLabel(tApps, app.key);
     const matchesSearch = !search || app.key.includes(search) || label.includes(search);
     const matchesFilter = filter === 'all'
       || (filter === 'commercial' && app.access === 'commercial')
@@ -179,7 +176,7 @@ export function ApplicationOverrideCard({ tenantId, onChanged }: { tenantId: str
     <Card>
       <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <CardTitle className="flex items-center gap-2">
+          <CardTitle as="h2" className="flex items-center gap-2">
             <Shield className="h-5 w-5 text-primary" strokeWidth={1.7} aria-hidden="true" />
             {t('title')}
           </CardTitle>
@@ -232,8 +229,8 @@ export function ApplicationOverrideCard({ tenantId, onChanged }: { tenantId: str
                 {filtered.map((app) => (
                   <tr key={app.key} className="border-t border-border">
                     <td className="px-3 py-2">
-                      <div className="break-words font-medium text-text">{tApps(`keys.${catalogKeyLabel(app.key)}`)}</div>
-                      <div className="text-xs text-muted break-words" dir="ltr">{app.key}</div>
+                      <div className="max-w-[min(20rem,70vw)] break-words font-medium text-text">{applicationLabel(tApps, app.key)}</div>
+                      <div className="max-w-[min(20rem,70vw)] text-xs text-muted break-words" dir="ltr">{app.key}</div>
                     </td>
                     <td className="px-3 py-2">
                       <Badge wrap tone={commercialModeTone[app.commercial_mode]}>{t(`commercialMode.${app.commercial_mode}`)}</Badge>
@@ -291,7 +288,7 @@ export function ApplicationOverrideCard({ tenantId, onChanged }: { tenantId: str
               <tbody>
                 {previewRows.map((row) => (
                   <tr key={row.application_key} className="border-t border-border">
-                    <td className="px-3 py-2">{tApps(`keys.${catalogKeyLabel(row.application_key)}`)}</td>
+                    <td className="break-words px-3 py-2">{applicationLabel(tApps, row.application_key)}</td>
                     <td className="px-3 py-2">
                       <Badge wrap tone={row.outcome === 'applied' ? 'positive' : 'muted'}>
                         {row.outcome === 'applied' ? t('outcomeApplied') : t('outcomeSkipped')}

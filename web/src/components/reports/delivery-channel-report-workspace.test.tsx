@@ -249,7 +249,8 @@ describe('DeliveryChannelReportWorkspace', () => {
     const rtl = render(<div dir="rtl"><DeliveryChannelReportWorkspace /></div>);
     await waitFor(() => expect(screen.getByTestId('delivery-channel-metrics')).toBeTruthy());
     expect(rtl.container.querySelector('[dir="rtl"] [data-testid="delivery-channel-report"]')).toBeTruthy();
-    expect(rtl.container.querySelector('[dir="ltr"]')).toBeNull();
+    // Amounts are isolated inline with <bdi dir="ltr"> (ERP-UX-027); no LTR layout wrapper otherwise.
+    expect(rtl.container.querySelector('[dir="ltr"]:not(bdi)')).toBeNull();
     expect(rtl.container.querySelector('.overflow-auto')).toBeTruthy();
     expect(rtl.container.querySelector('.md\\:hidden')).toBeTruthy();
     expect(rtl.container.querySelector('.bg-surface')).toBeTruthy();

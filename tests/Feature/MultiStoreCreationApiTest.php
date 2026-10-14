@@ -31,8 +31,8 @@ class MultiStoreCreationApiTest extends TestCase
 
         $this->assertSame('Gifts', $first->json('data.store.name'));
         $this->assertSame('en', $first->json('data.store.default_locale'));
-        $this->assertSame('https://gifts.api-multi.store.awjdev.xyz/', $first->json('data.store.preview_url'));
-        $this->assertSame('https://gifts-2.api-multi.store.awjdev.xyz/', $second->json('data.store.preview_url'));
+        $this->assertSame('https://api-multi-gifts.store.awjdev.xyz/', $first->json('data.store.preview_url'));
+        $this->assertSame('https://api-multi-gifts-2.store.awjdev.xyz/', $second->json('data.store.preview_url'));
         $this->assertNotSame($first->json('data.store.id'), $second->json('data.store.id'));
 
         $this->assertSame(2, Storefront::withoutGlobalScopes()->where('tenant_id', $auth['tenant_id'])->count());
@@ -54,7 +54,7 @@ class MultiStoreCreationApiTest extends TestCase
         ])->assertCreated();
 
         $storeId = $response->json('data.store.id');
-        $this->assertSame('https://local.api-a.store.awjdev.xyz/', $response->json('data.store.preview_url'));
+        $this->assertSame('https://api-a-local.store.awjdev.xyz/', $response->json('data.store.preview_url'));
         $this->assertSame($a['tenant_id'], Storefront::withoutGlobalScopes()->findOrFail($storeId)->tenant_id);
         $this->assertStringNotContainsString('attacker.example.com', $response->getContent());
     }

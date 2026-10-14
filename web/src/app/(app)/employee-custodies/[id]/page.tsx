@@ -18,6 +18,7 @@ import { useToast } from '@/components/ui/toast';
 import { api, ApiError } from '@/lib/api';
 import { type CustodySettlement, type EmployeeCustody } from '@/lib/employee-custody';
 import { formatRiyal, riyalToMinor } from '@/lib/money';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 
 type MobileSection = 'details' | 'financial' | 'settlements' | 'summary';
 
@@ -43,6 +44,7 @@ const tone: Record<EmployeeCustody['status'], 'positive' | 'warning'> = {
 
 export default function EmployeeCustodyDetailPage() {
   const t = useTranslations('employeeCustodies');
+  const askConfirm = useConfirm();
   const tc = useTranslations('common');
   const params = useParams<{ id: string }>();
   const router = useRouter();
@@ -89,7 +91,7 @@ export default function EmployeeCustodyDetailPage() {
   }
 
   async function post() {
-    if (!custody || custody.status !== 'draft' || !window.confirm(t('confirmPost'))) return;
+    if (!custody || custody.status !== 'draft' || !(await askConfirm({ message: t('confirmPost') }))) return;
     setActing(true);
     try {
       const response = await api<{ data: EmployeeCustody }>(`/employee-custodies/${custody.id}/post`, { method: 'POST' });
@@ -117,7 +119,7 @@ export default function EmployeeCustodyDetailPage() {
   }
 
   async function remove() {
-    if (!custody || custody.status !== 'draft' || !window.confirm(t('confirmDelete'))) return;
+    if (!custody || custody.status !== 'draft' || !(await askConfirm({ message: t('confirmDelete'), tone: 'danger' }))) return;
     setActing(true);
     try {
       await api(`/employee-custodies/${custody.id}`, { method: 'DELETE' });

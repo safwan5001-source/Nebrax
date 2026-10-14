@@ -163,7 +163,7 @@ export default function SelfServicePortal() {
         <TabPanel id="overview">
           <div className="grid gap-4 sm:grid-cols-2">
             <Card>
-              <CardHeader><CardTitle>{t('profile_title')}</CardTitle></CardHeader>
+              <CardHeader><CardTitle as="h2">{t('profile_title')}</CardTitle></CardHeader>
               <CardContent className="space-y-2 text-sm">
                 <Row label={t('employee_no')} value={employee?.employee_no ?? '—'} />
                 <Row label={t('hire_date')} value={employee?.hire_date ?? '—'} />
@@ -173,7 +173,7 @@ export default function SelfServicePortal() {
             </Card>
 
             <Card>
-              <CardHeader><CardTitle>{t('contract_title')}</CardTitle></CardHeader>
+              <CardHeader><CardTitle as="h2">{t('contract_title')}</CardTitle></CardHeader>
               <CardContent className="space-y-2 text-sm">
                 {!contract && <p className="text-muted">{t('no_active_contract')}</p>}
                 {contract && (

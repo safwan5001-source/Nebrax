@@ -107,7 +107,8 @@ export default function SettingsPage() {
       .then((response) => {
         setCompany(response.company);
         if (response.user) {
-          persistUser(response.user);
+          // تحديث بيانات فقط: لا يُعاد تطبيق لغة الحساب ووضعه فوق اختيار الجهاز الحالي.
+          persistUser(response.user, { applyDisplayPreferences: false });
           setUser(response.user);
         }
       })

@@ -41,6 +41,7 @@ function uniqueOptions(values: Array<string | null | undefined>) {
  */
 export default function SuppliersPage() {
   const ts = useTranslations('suppliers');
+  const tl = useTranslations('listUi');
   const tp = useTranslations('partners');
   const locale = useLocale();
   const router = useRouter();
@@ -89,8 +90,8 @@ export default function SuppliersPage() {
       ],
     },
     { key: 'city', label: tp('city'), kind: 'entity', quick: true, searchPlaceholder: ts('search'), emptyText: ts('empty'), options: cityOptions },
-    { key: 'has_phone', label: tp('phone'), kind: 'select', options: [{ value: 'yes', label: 'يوجد' }, { value: 'no', label: 'غير موجود' }] },
-    { key: 'has_email', label: tp('email'), kind: 'select', options: [{ value: 'yes', label: 'يوجد' }, { value: 'no', label: 'غير موجود' }] },
+    { key: 'has_phone', label: tp('phone'), kind: 'select', options: [{ value: 'yes', label: tl('present') }, { value: 'no', label: tl('absent') }] },
+    { key: 'has_email', label: tp('email'), kind: 'select', options: [{ value: 'yes', label: tl('present') }, { value: 'no', label: tl('absent') }] },
   ], [cityOptions, tp, ts]);
 
   const labelledFilters = useMemo(() => explorer.filters.map((filter) => ({
@@ -202,25 +203,25 @@ export default function SuppliersPage() {
     />
 
     <div className="flex items-center justify-end gap-2">
-      <span className="text-xs text-muted">ترتيب حسب</span>
-      <Select value={explorer.sort ?? 'name'} onChange={(event) => setExplorer((current) => ({ ...current, page: 1, sort: event.target.value }))} className="h-9 min-w-44 bg-surface text-sm" aria-label="ترتيب الموردين">
-        <option value="name">الاسم: أ–ي</option>
-        <option value="-name">الاسم: ي–أ</option>
-        <option value="city">المدينة</option>
-        <option value="phone">الهاتف</option>
+      <span className="text-xs text-muted">{tl('sortBy')}</span>
+      <Select value={explorer.sort ?? 'name'} onChange={(event) => setExplorer((current) => ({ ...current, page: 1, sort: event.target.value }))} className="h-9 min-w-44 bg-surface text-sm" aria-label={tl('sortSuppliers')}>
+        <option value="name">{tl('nameAsc')}</option>
+        <option value="-name">{tl('nameDesc')}</option>
+        <option value="city">{tl('city')}</option>
+        <option value="phone">{tl('phone')}</option>
       </Select>
     </div>
 
     <DataTable columns={columns} data={pageData} loading={loading} emptyLabel={ts('empty')} exportName="suppliers" showToolbar={false} />
 
     <div className="flex flex-wrap items-center justify-between gap-3">
-      <p className="text-xs text-muted">{sorted.length.toLocaleString(displayLocale(locale))} مورد · صفحة {page.toLocaleString(displayLocale(locale))} من {totalPages.toLocaleString(displayLocale(locale))}</p>
+      <p className="text-xs text-muted">{tl('suppliersPageSummary', { count: sorted.length.toLocaleString(displayLocale(locale)), page: page.toLocaleString(displayLocale(locale)), pages: totalPages.toLocaleString(displayLocale(locale)) })}</p>
       <div className="flex items-center gap-2">
-        <Select value={String(perPage)} onChange={(event) => setExplorer((current) => ({ ...current, page: 1, perPage: Number(event.target.value) }))} className="h-9 w-24 bg-surface text-sm" aria-label="عدد النتائج في الصفحة">
+        <Select value={String(perPage)} onChange={(event) => setExplorer((current) => ({ ...current, page: 1, perPage: Number(event.target.value) }))} className="h-9 w-24 bg-surface text-sm" aria-label={tl('perPage')}>
           <option value="25">25</option><option value="50">50</option><option value="100">100</option>
         </Select>
-        <Button variant="outline" size="icon" aria-label="الصفحة السابقة" disabled={loading || page <= 1} onClick={() => setExplorer((current) => ({ ...current, page: Math.max(1, page - 1) }))}><ChevronRight className="h-4 w-4" /></Button>
-        <Button variant="outline" size="icon" aria-label="الصفحة التالية" disabled={loading || page >= totalPages} onClick={() => setExplorer((current) => ({ ...current, page: Math.min(totalPages, page + 1) }))}><ChevronLeft className="h-4 w-4" /></Button>
+        <Button variant="outline" size="icon" aria-label={tl('previousPage')} disabled={loading || page <= 1} onClick={() => setExplorer((current) => ({ ...current, page: Math.max(1, page - 1) }))}><ChevronRight className="h-4 w-4 ltr:rotate-180" /></Button>
+        <Button variant="outline" size="icon" aria-label={tl('nextPage')} disabled={loading || page >= totalPages} onClick={() => setExplorer((current) => ({ ...current, page: Math.min(totalPages, page + 1) }))}><ChevronLeft className="h-4 w-4 ltr:rotate-180" /></Button>
       </div>
     </div>
 

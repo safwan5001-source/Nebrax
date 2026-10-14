@@ -1,8 +1,16 @@
-# نشر واجهة نبراس على Vercel
+# نشر واجهة أَوْج — Railway للإنتاج وVercel كخيار بديل
+
+> **الإنتاج الحالي لأَوْج ليس على Vercel.** الواجهة الحيّة تعمل على **Railway**: مشروع «أَوْج AWJ»، بيئة
+> `production`، خدمة **`Nebrax`** (من `main`، الجذر `/web`؛ النطاقات `awj.up.railway.app` و`awjdev.xyz`
+> و`*.awjdev.xyz`)، ومتغيّراتها (`NEXT_PUBLIC_API_URL`، `NEXT_PUBLIC_TENANT_BASE_DOMAIN`،
+> `NEXT_PUBLIC_AWJ_UI_DEFAULT`) متغيّرات خدمة في Railway. بقية هذا الدليل يصف Vercel كهدف نشر بديل.
+>
+> **الواجهة الافتراضية v3:** `NEXT_PUBLIC_AWJ_UI_DEFAULT=3` على خدمة `Nebrax` (Production) يجعل AWJ v3
+> الافتراضي لكل متصفح لم يختر صراحةً؛ غيابه أو أي قيمة أخرى = القديم. يُدمج وقت البناء، فيلزم إعادة
+> البناء/النشر بعد أي تغيير؛ والتراجع = حذفه أو تغييره ثم إعادة النشر. انظر `design-system/v3/MIGRATION.md` §6 و§9.
 
 > الواجهة (Next.js) تعيش في المجلد الفرعي **`web/`** من المستودع.
-> الـ backend (Laravel/PHP) **لا يُنشر على Vercel** — يحتاج استضافة PHP منفصلة
-> (Railway / Render / خادم). Vercel للواجهة فقط.
+> في سيناريو النشر البديل على Vercel، تُنشر الواجهة فقط؛ أما الـbackend (Laravel/PHP) فيحتاج استضافة PHP منفصلة (Railway / Render / خادم).
 
 ## سبب خطأ `404: NOT_FOUND`
 

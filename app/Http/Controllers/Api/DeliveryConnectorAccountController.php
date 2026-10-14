@@ -62,7 +62,7 @@ class DeliveryConnectorAccountController extends ApiController
         }
 
         try {
-            [$account, $secret] = $this->accounts->rotateSecret($account);
+            [$account, $secret] = $this->accounts->rotateSecret($account, $request->user());
         } catch (DeliveryConnectorException $e) {
             return $this->failure($e);
         }
@@ -80,7 +80,7 @@ class DeliveryConnectorAccountController extends ApiController
         }
 
         try {
-            $account = $this->accounts->disable($account);
+            $account = $this->accounts->disable($account, $request->user());
         } catch (DeliveryConnectorException $e) {
             return $this->failure($e);
         }

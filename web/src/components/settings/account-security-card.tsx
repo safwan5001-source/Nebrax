@@ -34,7 +34,7 @@ export function AccountSecurityCard({ user, onUserChanged }: { user: AuthUser | 
     setSaving(true);
     try {
       const response = await api<{ user: AuthUser }>('/account/email', { method: 'PUT', body: { email, current_password: emailPassword } });
-      persistUser(response.user);
+      persistUser(response.user, { applyDisplayPreferences: false });
       onUserChanged(response.user);
       success(t('email_updated'), t('sessions_revoked'));
       close();

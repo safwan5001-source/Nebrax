@@ -2,6 +2,7 @@ import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { Table, TBody, TD, TH, THead, TR } from '@/components/ui/table';
 import { formatRiyal } from '@/lib/money';
+import { LtrNumber } from '@/components/ui/ltr-number';
 
 export type FinancialStatementRowKind = 'detail' | 'subtotal' | 'grand-total' | 'equation' | 'empty';
 export type FinancialSemanticTone = 'auto' | 'positive' | 'negative';
@@ -112,7 +113,7 @@ function ValueCell({ value, column, strong = false }: { value?: FinancialStateme
   const formatted = formatValue(value, column);
   return (
     <TD className={`num px-3 py-2 text-end tabular-nums ${strong || column.priority === 'primary' ? 'font-semibold' : ''} ${columnClassName(column)} ${amountClassName(value)}`}>
-      <span aria-label={`${column.label}: ${formatted}`}>{formatted}</span>
+      <span aria-label={`${column.label}: ${formatted}`}><LtrNumber>{formatted}</LtrNumber></span>
     </TD>
   );
 }
@@ -149,7 +150,7 @@ function MobileValues({ columns, values, strong = false }: { columns: FinancialS
           <div key={column.id} className="min-w-0">
             <dt className="truncate text-muted">{column.label}</dt>
             <dd aria-label={`${column.label}: ${formatted}`} className={`num mt-1 text-end tabular-nums ${strong || column.priority === 'primary' ? 'font-semibold' : 'font-medium'} ${columnClassName(column)} ${amountClassName(value)}`}>
-              {formatted}
+              <LtrNumber>{formatted}</LtrNumber>
             </dd>
           </div>
         );
@@ -179,7 +180,7 @@ function StatementMobileRow({ row, columns }: { row: FinancialStatementRow; colu
   return (
     <li className={`flex min-h-10 items-center justify-between gap-4 px-3 py-2.5 text-sm ${isSubtotal ? 'border-t border-border bg-background font-semibold text-text' : ''}`}>
       <div className="min-w-0">{rowLabel(row)}</div>
-      <span className={`num shrink-0 text-end tabular-nums ${isSubtotal ? 'font-semibold' : 'font-medium'} ${amountClassName(value)}`}>{formatValue(value, columns[0])}</span>
+      <span className={`num shrink-0 text-end tabular-nums ${isSubtotal ? 'font-semibold' : 'font-medium'} ${amountClassName(value)}`}><LtrNumber>{formatValue(value, columns[0])}</LtrNumber></span>
     </li>
   );
 }
@@ -193,7 +194,7 @@ function GrandTotal({ row, columns, mobile = false }: { row: FinancialStatementR
       return <div className="mt-3 rounded border border-primary/20 bg-primary-soft px-3 py-3 text-sm"><span className="font-semibold text-text">{row.label}</span><MobileValues columns={columns} values={values} strong /></div>;
     }
     const value = values[0];
-    return <div className="mt-3 flex min-h-12 items-center justify-between gap-4 rounded border border-primary/20 bg-primary-soft px-3 py-3 text-sm"><span className="min-w-0 font-semibold text-text">{row.label}</span><span className={`num shrink-0 text-end font-semibold tabular-nums ${amountClassName(value)}`}>{formatValue(value, columns[0])}</span></div>;
+    return <div className="mt-3 flex min-h-12 items-center justify-between gap-4 rounded border border-primary/20 bg-primary-soft px-3 py-3 text-sm"><span className="min-w-0 font-semibold text-text">{row.label}</span><span className={`num shrink-0 text-end font-semibold tabular-nums ${amountClassName(value)}`}><LtrNumber>{formatValue(value, columns[0])}</LtrNumber></span></div>;
   }
 
   return (
@@ -211,7 +212,7 @@ function Equation({ row, columns, mobile = false }: { row: FinancialStatementRow
   if (mobile) {
     if (isMultiValue) return <div className="mt-2 border-t border-border px-3 py-2.5 text-xs"><span className="text-muted">{row.label}</span><MobileValues columns={columns} values={values} /></div>;
     const value = values[0];
-    return <div className="mt-2 flex min-h-10 items-center justify-between gap-4 border-t border-border px-3 py-2.5 text-xs"><span className="min-w-0 text-muted">{row.label}</span><span className={`num shrink-0 text-end tabular-nums ${amountClassName(value)}`}>{formatValue(value, columns[0])}</span></div>;
+    return <div className="mt-2 flex min-h-10 items-center justify-between gap-4 border-t border-border px-3 py-2.5 text-xs"><span className="min-w-0 text-muted">{row.label}</span><span className={`num shrink-0 text-end tabular-nums ${amountClassName(value)}`}><LtrNumber>{formatValue(value, columns[0])}</LtrNumber></span></div>;
   }
 
   return <TR className="border-t border-border text-sm hover:bg-transparent"><TH scope="row" className="px-3 py-2.5 text-start font-medium text-muted">{row.label}</TH>{values.map((value, index) => <ValueCell key={columns[index].id} value={value} column={columns[index]} />)}</TR>;

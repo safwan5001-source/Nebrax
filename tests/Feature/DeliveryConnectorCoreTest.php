@@ -383,7 +383,8 @@ class DeliveryConnectorCoreTest extends TestCase
             $armed = false;
             app(TenantContext::class)->set($auth['tenant_id']);
             $fresh = DeliveryConnectorAccount::query()->findOrFail($account['data']['id']);
-            [, $issued] = app(DeliveryConnectorAccountService::class)->rotateSecret($fresh);
+            $owner = User::query()->where('email', 'owner@relock.test')->firstOrFail();
+            [, $issued] = app(DeliveryConnectorAccountService::class)->rotateSecret($fresh, $owner);
         });
 
         $event = $this->event('P-relock', ['sku' => 'locked']);
@@ -511,8 +512,9 @@ class DeliveryConnectorCoreTest extends TestCase
         DB::flushQueryLog();
         DB::enableQueryLog();
         $service = app(DeliveryConnectorAccountService::class);
-        [$rotatedA, $secretA] = $service->rotateSecret($first);
-        [$rotatedB, $secretB] = $service->rotateSecret($second);
+        $owner = User::query()->where('email', 'owner@versions.test')->firstOrFail();
+        [$rotatedA, $secretA] = $service->rotateSecret($first, $owner);
+        [$rotatedB, $secretB] = $service->rotateSecret($second, $owner);
         if (DB::connection()->getDriverName() === 'pgsql') {
             $sql = strtolower(implode("\n", array_column(DB::getQueryLog(), 'query')));
             $this->assertStringContainsString('for update', $sql);

@@ -13,6 +13,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/toast';
 import { api, ApiError } from '@/lib/api';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 
 interface SettlementType {
   id: string;
@@ -26,6 +27,7 @@ const EMPTY_FORM = { name: '', description: '', is_active: true };
 
 export default function SettlementTypesPage() {
   const t = useTranslations('financeSettings');
+  const askConfirm = useConfirm();
   const { success, error: toastError } = useToast();
   const [types, setTypes] = useState<SettlementType[]>([]);
   const [loading, setLoading] = useState(true);
@@ -93,7 +95,7 @@ export default function SettlementTypesPage() {
   }
 
   async function remove(type: SettlementType) {
-    if (!window.confirm(t('confirmDeleteSettlementType', { name: type.name }))) return;
+    if (!(await askConfirm({ message: t('confirmDeleteSettlementType', { name: type.name }), tone: 'danger' }))) return;
 
     setDeleting(type.id);
     try {

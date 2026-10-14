@@ -180,8 +180,8 @@ export default function NewQuotePage() {
                   searchPlaceholder={tf('search_partner')}
                   emptyText={tf('no_partner_found')}
                 />
-                <Button type="button" variant="outline" onClick={() => setNewPartner(true)}>
-                  <Plus className="h-4 w-4" strokeWidth={1.7} />
+                <Button type="button" variant="outline" aria-label={tf('new_partner_title')} onClick={() => setNewPartner(true)}>
+                  <Plus className="h-4 w-4" strokeWidth={1.7} aria-hidden="true" />
                 </Button>
               </div>
             </div>
@@ -246,10 +246,10 @@ export default function NewQuotePage() {
                   onFooterClick={() => setNewProductFor(l.key)}
                   aria-label={tf('product')}
                 />
-                <Input className="col-span-2 md:col-span-3" placeholder={tf('description')} value={l.description} onChange={(e) => setLine(l.key, { description: e.target.value, productId: null })} />
-                <Input className="num text-end md:col-span-1" type="number" min={1} value={l.qty} onChange={(e) => setLine(l.key, { qty: e.target.value })} />
-                <Input className="num text-end md:col-span-2" inputMode="decimal" placeholder={tf('price')} value={l.price} onChange={(e) => setLine(l.key, { price: e.target.value })} />
-                <Input className="num text-end md:col-span-1" type="number" min={0} max={100} value={l.tax} onChange={(e) => setLine(l.key, { tax: e.target.value })} />
+                <Input aria-label={tf('description')} className="col-span-2 md:col-span-3" placeholder={tf('description')} value={l.description} onChange={(e) => setLine(l.key, { description: e.target.value, productId: null })} />
+                <Input aria-label={tf('qty')} className="num text-end md:col-span-1" type="number" min={1} value={l.qty} onChange={(e) => setLine(l.key, { qty: e.target.value })} />
+                <Input aria-label={tf('price')} className="num text-end md:col-span-2" inputMode="decimal" placeholder={tf('price')} value={l.price} onChange={(e) => setLine(l.key, { price: e.target.value })} />
+                <Input aria-label={tf('tax')} className="num text-end md:col-span-1" type="number" min={0} max={100} value={l.tax} onChange={(e) => setLine(l.key, { tax: e.target.value })} />
                 <div className="num col-span-1 text-end text-sm md:col-span-1">{formatRiyal(lineDisplayTotal / 100)}</div>
                 <Button type="button" variant="ghost" size="icon" className="col-span-1 ms-auto md:col-span-1" aria-label={tf('remove_line')} onClick={() => removeLine(l.key)}>
                   <Trash2 className="h-4 w-4 text-negative" strokeWidth={1.7} />

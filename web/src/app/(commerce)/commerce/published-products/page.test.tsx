@@ -90,6 +90,15 @@ describe('COM-CATALOG-1 Product Publication Workspace', () => {
     expect(screen.getAllByRole('button', { name: /إلغاء النشر · المتجر/ }).length).toBeGreaterThan(0);
   });
 
+  it('points the selected tab at a panel that exists (ERP-UX-019)', async () => {
+    listMock.mockResolvedValue(publishedPage);
+    render(<CommercePublishedProductsPage />);
+    const tab = screen.getAllByRole('tab').find((el) => el.getAttribute('aria-selected') === 'true') as HTMLElement;
+    const panel = document.getElementById(tab.getAttribute('aria-controls') ?? '');
+    expect(panel?.getAttribute('role')).toBe('tabpanel');
+    expect(panel?.getAttribute('aria-labelledby')).toBe(tab.id);
+  });
+
   it('shows the empty state when nothing matches', async () => {
     listMock.mockResolvedValue(emptyPage);
     render(<CommercePublishedProductsPage />);

@@ -196,16 +196,17 @@ export default function NewStockPermitPage() {
             const lineTotal = (Number(l.qty) || 0) * costOf(l);
             return (
               <div key={l.key} className="grid grid-cols-2 items-center gap-2 rounded border border-border p-2 md:grid-cols-12 md:border-0 md:p-0">
-                <Select className="col-span-2 md:col-span-5" value={l.productId} onChange={(e) => setLine(l.key, { productId: e.target.value })}>
+                <Select aria-label={tf('product')} className="col-span-2 md:col-span-5" value={l.productId} onChange={(e) => setLine(l.key, { productId: e.target.value })}>
                   <option value="">{t('choose_product')}</option>
                   {products.map((p) => (<option key={p.id} value={p.id}>{p.name}</option>))}
                 </Select>
                 <div className="num col-span-1 text-end text-sm text-muted md:col-span-2">
                   {product ? product.quantity_on_hand : '—'}
                 </div>
-                <Input className="num text-end md:col-span-1" type="number" min={1} value={l.qty} onChange={(e) => setLine(l.key, { qty: e.target.value })} />
+                <Input aria-label={tf('qty')} className="num text-end md:col-span-1" type="number" min={1} value={l.qty} onChange={(e) => setLine(l.key, { qty: e.target.value })} />
                 {/* الصرف والتحويل: التكلفة من المتوسط، معروضة لا مُدخَلة. */}
                 <Input
+                  aria-label={t('unit_cost')}
                   className="num text-end md:col-span-2"
                   inputMode="decimal"
                   disabled={!isReceipt}

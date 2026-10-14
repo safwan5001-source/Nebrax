@@ -18,6 +18,7 @@ import { branchViewQuery, type BranchView } from '@/lib/branch-view';
 import type { ActiveFilter, DataExplorerState, FilterDefinition } from '@/lib/data-explorer/types';
 import { parseExplorerState, removeFilter, replaceFilter, serializeExplorerState } from '@/lib/data-explorer/url-state';
 import { formatRiyal } from '@/lib/money';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 
 interface Expense {
   id: string;
@@ -56,6 +57,7 @@ function uniqueOptions(values: Array<string | null | undefined>) {
 
 export default function ExpensesPage() {
   const t = useTranslations('expenses');
+  const askConfirm = useConfirm();
   const tc = useTranslations('common');
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -125,7 +127,7 @@ export default function ExpensesPage() {
   }, [router, success, t, tc, toastError]);
 
   const deleteExpense = useCallback(async (id: string) => {
-    if (!window.confirm(t('confirm_delete_expense'))) return;
+    if (!(await askConfirm({ message: t('confirm_delete_expense'), tone: 'danger' }))) return;
     setActing(id);
     try {
       await api(`/expenses/${id}`, { method: 'DELETE' });
@@ -136,7 +138,7 @@ export default function ExpensesPage() {
     } finally {
       setActing(null);
     }
-  }, [load, success, t, tc, toastError]);
+  }, [askConfirm, load, success, t, tc, toastError]);
 
   const accountOptions = useMemo(() => uniqueOptions(data.map((expense) => expense.account_name)), [data]);
   const categoryOptions = useMemo(() => uniqueOptions(data.map((expense) => expense.category_name)), [data]);

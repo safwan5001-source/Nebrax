@@ -133,6 +133,18 @@ describe('JournalEntryDetailsPage', () => {
     expect(within(footer).getAllByText(/5,750\.00/)).toHaveLength(2);
   });
 
+  it('never sets account chips on the solid muted text colour (ERP-UX-011)', async () => {
+    respond(entry);
+    const { container } = render(<JournalEntryDetailsPage />);
+    await screen.findByRole('heading', { name: 'JE-2026-0005' });
+
+    for (const name of ['Sales revenue', 'Output VAT']) {
+      const chips = [...container.querySelectorAll('span.rounded')].filter((el) => el.textContent === name);
+      expect(chips.length).toBeGreaterThan(0);
+      for (const chip of chips) expect(chip.className).not.toMatch(/(^|\s)bg-muted(\s|$)/);
+    }
+  });
+
   it('gives the lines a mobile record view, not just a wide table', async () => {
     respond(entry);
     const { container } = render(<JournalEntryDetailsPage />);

@@ -565,7 +565,7 @@ export function ProductWorkspace({
                 <Label htmlFor="ws-discount">{t('discount')}</Label>
                 <div className="flex gap-2">
                   <Input id="ws-discount" type="number" min={0} dir="ltr" className="num text-end" value={form.discount} onChange={(e) => set('discount', e.target.value)} disabled={saving} />
-                  <Select className="w-24" value={form.discount_type} onChange={(e) => set('discount_type', e.target.value)} disabled={saving}>
+                  <Select aria-label={t('discount_type')} className="w-24" value={form.discount_type} onChange={(e) => set('discount_type', e.target.value)} disabled={saving}>
                     <option value="percent">%</option>
                     <option value="amount">﷼</option>
                   </Select>

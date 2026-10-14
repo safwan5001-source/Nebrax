@@ -7,15 +7,20 @@ import { useTranslations } from 'next-intl';
 import { Languages } from 'lucide-react';
 import { Button } from '../ui/button';
 
+/** يبدّل لغة الواجهة (ملف تعريف الارتباط + إعادة الرسم من الخادم) — مصدر واحد للزر وقائمة الحساب. */
+export function switchLocale(current: string, refresh: () => void): void {
+  const next = current === 'ar' ? 'en' : 'ar';
+  document.cookie = `locale=${next};path=/;max-age=31536000`;
+  refresh();
+}
+
 export function LangToggle() {
   const locale = useLocale();
   const router = useRouter();
   const t = useTranslations('common');
 
   function toggle() {
-    const next = locale === 'ar' ? 'en' : 'ar';
-    document.cookie = `locale=${next};path=/;max-age=31536000`;
-    router.refresh();
+    switchLocale(locale, () => router.refresh());
   }
 
   return (

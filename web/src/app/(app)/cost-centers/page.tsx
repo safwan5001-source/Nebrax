@@ -15,6 +15,7 @@ import { CostCenterDialog, type CostCenter } from '@/components/cost-centers/cos
 import { api, ApiError } from '@/lib/api';
 import type { ActiveFilter, DataExplorerState, FilterDefinition } from '@/lib/data-explorer/types';
 import { parseExplorerState, removeFilter, replaceFilter, serializeExplorerState } from '@/lib/data-explorer/url-state';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 
 function filterValue(filter?: ActiveFilter): string {
   if (!filter || Array.isArray(filter.value)) return '';
@@ -29,6 +30,7 @@ function isEmptyFilter(filter: ActiveFilter): boolean {
 
 export default function CostCentersPage() {
   const t = useTranslations('costCenters');
+  const askConfirm = useConfirm();
   const tc = useTranslations('common');
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -69,7 +71,7 @@ export default function CostCentersPage() {
 
   const remove = useCallback(
     async (id: string) => {
-      if (!confirm(t('confirm_delete'))) return;
+      if (!(await askConfirm({ message: t('confirm_delete'), tone: 'danger' }))) return;
       try {
         await api(`/cost-centers/${id}`, { method: 'DELETE' });
         success(tc('deleted'));
@@ -78,7 +80,7 @@ export default function CostCentersPage() {
         toastError(err instanceof ApiError ? err.message : tc('saveFailed'));
       }
     },
-    [load, success, toastError, t, tc],
+    [askConfirm, load, success, toastError, t, tc],
   );
 
   const definitions = useMemo<FilterDefinition[]>(() => [

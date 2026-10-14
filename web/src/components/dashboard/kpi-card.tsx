@@ -5,6 +5,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Sparkline } from '@/components/charts/sparkline';
 import { cn } from '@/lib/utils';
+import { LtrNumber } from '@/components/ui/ltr-number';
 
 /**
  * بطاقة مؤشّر — بسطر فرعي اختياري تحت خطّ منقّط.
@@ -67,7 +68,7 @@ export function KpiCard({
       {/* حشوٌ وخطٌّ أصغر على الجوال: أربع بطاقات في شبكة ٢×٢ تأكل الشاشة قبل
           أن يصل المستخدم إلى الرسم البياني. الديسكتوب يبقى على مقاسه — عنده
           المساحة، والرقم الأكبر أسهل قراءةً من بُعد. */}
-      <CardContent className="flex h-full flex-col p-3.5 sm:p-[18px]">
+      <CardContent className="flex h-full flex-col p-3.5 [container-type:inline-size] sm:p-[18px]">
         <div className="flex items-center justify-between">
           <span className="text-[12px] font-medium text-muted sm:text-[13px]">{label}</span>
           <Icon className="h-4 w-4 shrink-0 text-muted" strokeWidth={1.7} />
@@ -79,11 +80,13 @@ export function KpiCard({
           <div className="mt-1.5 flex items-baseline gap-1.5 sm:mt-2.5">
             <span
               className={cn(
-                'num text-[21px] font-bold leading-tight sm:text-[26px]',
+                // على الجوال يتبع الحجمُ عرضَ البطاقة (container query) فلا يخرج مبلغٌ
+                // كبير عن بطاقته ولا يُقصّ؛ التنسيق نفسه لا يتغيّر أبداً (ERP-UX-024).
+                'num text-[length:clamp(14px,12.5cqi,21px)] font-bold leading-tight sm:text-[26px]',
                 isNegativeValue ? 'text-negative' : 'text-text'
               )}
             >
-              {value}
+              <LtrNumber>{value}</LtrNumber>
             </span>
             {unit && <span className="text-[13px] font-medium text-muted">{unit}</span>}
           </div>
@@ -100,7 +103,7 @@ export function KpiCard({
         )}
 
         {sub && !loading && (
-          <div className="mt-auto flex items-center justify-between gap-2 border-t border-dashed border-border pt-2 sm:pt-2.5">
+          <div className="mt-auto flex flex-wrap items-center justify-between gap-x-2 gap-y-0.5 border-t border-dashed border-border pt-2 sm:pt-2.5">
             <span className="text-[11px] leading-snug text-muted">{sub.label}</span>
             {/* ═══════════════════════════════════════════════════════════
                 إشارة + لون، لا لون وحده
@@ -114,7 +117,7 @@ export function KpiCard({
               ) : sub.tone === 'muted' ? null : (
                 <ArrowUpRight className="h-3.5 w-3.5 shrink-0" strokeWidth={2.2} aria-hidden />
               )}
-              {sub.value}
+              <LtrNumber>{sub.value}</LtrNumber>
             </span>
           </div>
         )}

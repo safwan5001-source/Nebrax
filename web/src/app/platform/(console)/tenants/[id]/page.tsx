@@ -199,7 +199,7 @@ export default function PlatformTenantDetailPage() {
           <section aria-labelledby="tenant-identity">
             <Card>
               <CardHeader>
-                <CardTitle id="tenant-identity">{t('detailTitle')}</CardTitle>
+                <CardTitle as="h2" id="tenant-identity">{t('detailTitle')}</CardTitle>
               </CardHeader>
               <CardContent className="grid grid-cols-1 gap-4 text-sm sm:grid-cols-2 lg:grid-cols-3">
                 <Info label={t('accountNumber')}>
@@ -229,7 +229,7 @@ export default function PlatformTenantDetailPage() {
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
             <section aria-labelledby="tenant-plan">
               <Card className="h-full">
-                <CardHeader><CardTitle id="tenant-plan">{t('changePlan')}</CardTitle></CardHeader>
+                <CardHeader><CardTitle as="h2" id="tenant-plan">{t('changePlan')}</CardTitle></CardHeader>
                 <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-end">
                   <div className="sm:w-44">
                     <label htmlFor="tenant-plan-select" className="mb-1.5 block text-sm font-medium text-muted">{t('currentPlan')}</label>
@@ -248,7 +248,7 @@ export default function PlatformTenantDetailPage() {
 
             <section aria-labelledby="tenant-trial">
               <Card className="h-full">
-                <CardHeader><CardTitle id="tenant-trial">{t('trialManagement')}</CardTitle></CardHeader>
+                <CardHeader><CardTitle as="h2" id="tenant-trial">{t('trialManagement')}</CardTitle></CardHeader>
                 <CardContent className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
                   <div className="sm:w-44">
                     <label htmlFor="tenant-trial-date" className="mb-1.5 block text-sm font-medium text-muted">{t('newTrialEndDate')}</label>
@@ -274,7 +274,7 @@ export default function PlatformTenantDetailPage() {
           <section aria-labelledby="tenant-access">
             <Card className="border-negative/40">
               <CardHeader>
-                <CardTitle id="tenant-access" className="flex items-center gap-2 text-text">
+                <CardTitle as="h2" id="tenant-access" className="flex items-center gap-2 text-text">
                   <ShieldAlert className="h-4 w-4 text-negative" strokeWidth={1.7} aria-hidden="true" />
                   {t('accessManagement')}
                   <span className="min-w-0 rounded border border-negative/40 px-1.5 py-0.5 text-xs font-medium text-negative">{t('sensitiveAction')}</span>

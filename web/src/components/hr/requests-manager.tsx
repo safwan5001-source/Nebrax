@@ -15,6 +15,7 @@ import { useToast } from '@/components/ui/toast';
 import { api, ApiError } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { type EmployeeRequest } from '@/components/hr/employee-request-dialog';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 
 interface RequestType {
   id: string;
@@ -36,6 +37,7 @@ const statusTone: Record<EmployeeRequest['status'], 'positive' | 'warning' | 'mu
  */
 export function RequestsManager() {
   const t = useTranslations('hr');
+  const askConfirm = useConfirm();
   const tc = useTranslations('common');
   const { success, error: toastError } = useToast();
 
@@ -92,7 +94,7 @@ export function RequestsManager() {
     }
   }
   async function removeType(rt: RequestType) {
-    if (!window.confirm(t('confirm_delete_request_type', { name: rt.name }))) return;
+    if (!(await askConfirm({ message: t('confirm_delete_request_type', { name: rt.name }), tone: 'danger' }))) return;
     try {
       await api(`/request-types/${rt.id}`, { method: 'DELETE' });
       success(tc('deleted'));

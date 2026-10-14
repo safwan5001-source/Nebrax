@@ -19,6 +19,7 @@ import type { ActiveFilter, DataExplorerState, FilterDefinition } from '@/lib/da
 import { parseExplorerState, removeFilter, replaceFilter, serializeExplorerState } from '@/lib/data-explorer/url-state';
 import { type EmployeeCustody } from '@/lib/employee-custody';
 import { formatRiyal } from '@/lib/money';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 
 const tone: Record<EmployeeCustody['status'], 'positive' | 'warning'> = {
   draft: 'warning',
@@ -38,6 +39,7 @@ function isEmptyFilter(filter: ActiveFilter): boolean {
 
 export default function EmployeeCustodiesPage() {
   const t = useTranslations('employeeCustodies');
+  const askConfirm = useConfirm();
   const tc = useTranslations('common');
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -91,7 +93,7 @@ export default function EmployeeCustodiesPage() {
   }, [router, success, t, tc, toastError]);
 
   const remove = useCallback(async (id: string) => {
-    if (!window.confirm(t('confirmDelete'))) return;
+    if (!(await askConfirm({ message: t('confirmDelete'), tone: 'danger' }))) return;
     setActing(id);
     try {
       await api(`/employee-custodies/${id}`, { method: 'DELETE' });
@@ -102,10 +104,10 @@ export default function EmployeeCustodiesPage() {
     } finally {
       setActing(null);
     }
-  }, [load, success, t, tc, toastError]);
+  }, [askConfirm, load, success, t, tc, toastError]);
 
   const post = useCallback(async (id: string) => {
-    if (!window.confirm(t('confirmPost'))) return;
+    if (!(await askConfirm({ message: t('confirmPost') }))) return;
     setActing(id);
     try {
       await api(`/employee-custodies/${id}/post`, { method: 'POST' });
@@ -116,7 +118,7 @@ export default function EmployeeCustodiesPage() {
     } finally {
       setActing(null);
     }
-  }, [load, success, t, tc, toastError]);
+  }, [askConfirm, load, success, t, tc, toastError]);
 
   const employeeOptions = useMemo(() => Array.from(new Map(data
     .filter((item) => item.employee_id)

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { CircleAlert, Download, FileBarChart2, RefreshCw } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { api, ApiError, downloadFile } from '@/lib/api';
+import { describeLoadFailure } from '@/lib/load-failure';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -25,13 +26,16 @@ export default function DocumentUsagePage() {
   const [data, setData] = useState<Usage | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // 403 (صلاحية/استحقاق): رسالة من الكتالوج وبلا إعادة محاولة (ERP-UX-009).
+  const [forbidden, setForbidden] = useState(false);
+  const tCommon = useTranslations('common');
   const [notice, setNotice] = useState<string | null>(null);
 
   const path = useMemo(() => `/document-usage?${new URLSearchParams({ from, to }).toString()}`, [from, to]);
   const load = useCallback(async () => {
-    setLoading(true); setError(null);
+    setLoading(true); setError(null); setForbidden(false);
     try { setData((await api<{ data: Usage }>(path)).data); }
-    catch (exception) { setError(exception instanceof ApiError ? exception.message : t('loadFailed')); }
+    catch (exception) { { const failure = describeLoadFailure(exception, { forbidden: tCommon('capabilityUnavailable'), fallback: t('loadFailed') }); setError(failure.message); setForbidden(failure.forbidden); } }
     finally { setLoading(false); }
   }, [path, t]);
   useEffect(() => { void load(); }, [load]);
@@ -55,7 +59,7 @@ export default function DocumentUsagePage() {
     <DocumentOperationsNav />
     <Card><CardContent className="flex flex-col gap-3 py-4 sm:flex-row sm:items-end"><label className="grid gap-1 text-sm text-text"><span>{t('rangeFrom')}</span><input type="date" value={from} max={to} onChange={(e) => setFrom(e.target.value)} className="h-10 rounded border border-border bg-surface px-3 text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" /></label><label className="grid gap-1 text-sm text-text"><span>{t('rangeTo')}</span><input type="date" value={to} min={from} onChange={(e) => setTo(e.target.value)} className="h-10 rounded border border-border bg-surface px-3 text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" /></label><Button onClick={() => void load()}>{t('refresh')}</Button></CardContent></Card>
     {notice && <div role="status" className="rounded border border-primary/20 bg-primary-soft px-3 py-2 text-sm text-text">{notice}</div>}
-    {loading ? <Card><CardContent className="py-10 text-sm text-muted">{t('loading')}</CardContent></Card> : error ? <Card><CardContent className="flex items-center gap-3 py-10 text-sm text-muted"><CircleAlert className="h-5 w-5" aria-hidden="true" />{error}<Button variant="outline" onClick={() => void load()}>{t('retry')}</Button></CardContent></Card> : data ? <>
+    {loading ? <Card><CardContent className="py-10 text-sm text-muted">{t('loading')}</CardContent></Card> : error ? <Card><CardContent className="flex items-center gap-3 py-10 text-sm text-muted"><CircleAlert className="h-5 w-5" aria-hidden="true" />{error}{!forbidden && (<Button variant="outline" onClick={() => void load()}>{t('retry')}</Button>)}</CardContent></Card> : data ? <>
       <section aria-label={t('usageTitle')} className="grid grid-cols-2 gap-3 lg:grid-cols-4">{cards.map(([label, value]) => <Card key={label}><CardContent className="py-4"><p className="text-xs text-muted">{t(label)}</p><p className="mt-1 text-xl font-semibold tabular-nums text-text">{value}</p></CardContent></Card>)}</section>
       <Card><CardContent className="py-4"><div className="flex items-center gap-2"><FileBarChart2 className="h-5 w-5 text-primary" aria-hidden="true" /><h2 className="font-medium text-text">{t('cost')}</h2></div>{data.cost_available ? <div className="mt-3 flex flex-wrap gap-2">{data.cost_by_currency.map((cost) => <Badge key={cost.currency} tone="neutral">{cost.currency}: {cost.cost_minor}</Badge>)}</div> : <p className="mt-2 text-sm text-muted">{t('costUnavailable')}</p>}</CardContent></Card>
       <Card><CardContent className="py-4"><h2 className="font-medium text-text">{t('providerModel')}</h2>{data.by_provider_model.length === 0 ? <p className="mt-3 text-sm text-muted">{t('empty')}</p> : <><div className="mt-3 hidden overflow-hidden rounded border border-border md:block"><table className="w-full text-sm"><thead className="bg-surface text-muted"><tr><th className="px-3 py-2 text-start">{t('providerModel')}</th><th className="px-3 py-2 text-start">{t('operations')}</th><th className="px-3 py-2 text-start">{t('pages')}</th><th className="px-3 py-2 text-start">{t('totalTokens')}</th></tr></thead><tbody>{data.by_provider_model.map((row) => <tr key={`${row.provider}:${row.model}`} className="border-t border-border"><td className="px-3 py-2">{row.provider} / {row.model}</td><td className="px-3 py-2 tabular-nums">{row.operations}</td><td className="px-3 py-2 tabular-nums">{row.pages}</td><td className="px-3 py-2 tabular-nums">{row.input_tokens + row.output_tokens}</td></tr>)}</tbody></table></div><div className="mt-3 grid gap-2 md:hidden">{data.by_provider_model.map((row) => <div key={`${row.provider}:${row.model}`} className="rounded border border-border p-3 text-sm"><p className="font-medium text-text">{row.provider} / {row.model}</p><p className="mt-1 text-muted">{t('operations')}: {row.operations} · {t('pages')}: {row.pages}</p></div>)}</div></>}</CardContent></Card>

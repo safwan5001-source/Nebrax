@@ -360,6 +360,19 @@ describe('ProductWorkspace', () => {
     expect(await screen.findByRole('button', { name: 'إضافة خيارات' })).toBeTruthy();
   });
 
+  it('ERP-UX-022: the live media file input is hidden natively — no layout width, no tab stop', async () => {
+    render(wrapAr(<ProductWorkspace mode="edit" product={EXISTING_PRODUCT} />));
+    await screen.findByDisplayValue('منتج قائم');
+    const input = await waitFor(() => {
+      const el = document.getElementById('ws-media-live') as HTMLInputElement | null;
+      expect(el).not.toBeNull();
+      return el as HTMLInputElement;
+    });
+    expect(input.hidden).toBe(true);
+    expect(input.className).not.toContain('w-full');
+    expect(input.type).toBe('file');
+  });
+
   // PR-PROD-UX-4: الوسائط — قسمٌ واحد ضمن مساحة العمل نفسها، بنمط «وضعان
   // بمكوّنٍ واحد» المطابق لـ `ProductMultiBarcodeTable` حرفياً.
   describe('PR-PROD-UX-4: media', () => {

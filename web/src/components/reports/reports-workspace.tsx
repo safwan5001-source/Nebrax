@@ -29,6 +29,7 @@ import { ReportResultsTable } from '@/components/reports/report-results-table';
 import { reportCellToneFromValue } from '@/components/reports/report-data-table';
 import { StructuredFinancialStatement, type FinancialStatementSection, type FinancialStatementValue } from '@/components/reports/structured-financial-statement';
 import { balanceComparisonAsOf, compareAmounts, comparisonPeriod, type ComparisonMode, unionAccountRows } from '@/components/reports/financial-comparison';
+import { LtrNumber } from '@/components/ui/ltr-number';
 
 export type ReportTab = 'trial' | 'income' | 'balance' | 'costcenter' | 'aging';
 type Tab = ReportTab;
@@ -591,7 +592,7 @@ export function ReportsWorkspace({
             <CardTitle>{t('income_statement')}</CardTitle>
             {income && (
               <Badge tone={Number(income.net_income) >= 0 ? 'positive' : 'negative'}>
-                {formatRiyal(income.net_income)}
+                <LtrNumber>{formatRiyal(income.net_income)}</LtrNumber>
               </Badge>
             )}
           </CardHeader>
@@ -677,7 +678,7 @@ export function ReportsWorkspace({
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>{t('cost_profit')}</CardTitle>
             {cc && (
-              <Badge tone={Number(cc.total_profit) >= 0 ? 'positive' : 'negative'}>{formatRiyal(cc.total_profit)}</Badge>
+              <Badge tone={Number(cc.total_profit) >= 0 ? 'positive' : 'negative'}><LtrNumber>{formatRiyal(cc.total_profit)}</LtrNumber></Badge>
             )}
           </CardHeader>
           <CardContent>

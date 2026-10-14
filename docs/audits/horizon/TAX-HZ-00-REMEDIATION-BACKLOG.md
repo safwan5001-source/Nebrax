@@ -69,6 +69,26 @@ REM-03 and REM-08 touch disjoint controllers (`Invoice/Return/Quote/DocumentRevi
 > **Implementation status: IN REVIEW — not closed.** Draft PR and evidence: see `REM-03-SEC-01-IMPLEMENTATION-REPORT.md` (same directory). The task is not marked closed until required tests, independent review and owner-approved merge are done. Access Control note: `docs/plans/access-control/AWJ_USERS_ROLES_PERMISSIONS_DAFTRA_REFERENCE.md` §42.
 > The card below is the original (pre-decision) plan; where it says "the user's allowed branches" the owner decision above supersedes it.
 
+### REM-03b — follow-up (2026-10-14)
+
+> **REM-03 merged** as PR #1403 (`c589ced1dcbad88ef023d8be6ead34bc58f489f0`). **REM-03b — IN REVIEW (Draft PR), not closed**; closes only after approved merge and verification. Report: `REM-03b-SEC-01-IMPLEMENTATION-REPORT.md`.
+> **Exactly six operations** become Active-Branch-Only (same `ApiController::scopeToCurrentBranchOnly()` primitive, no new helper): `InvoiceController::duplicate`, `InvoiceController::storeNote`, `ZatcaSubmissionController::store`, `ZatcaSubmissionController::dispatch` (attempt already bound to the resolved invoice + tenant), `CreditNoteController::show`, `CreditNoteController::post` (target note only).
+> **Explicit exclusions (unchanged by design):** `ReturnableController` (cross-branch return-source reference, incl. `purpose=credit_note` allowed-branch policy), `AppointmentController` (non-accounting CRM read/reference), the credit-note `original_invoice_id` reference authorization (allowed-branch policy), and every read endpoint. Per-attempt environment binding is **not** part of REM-03b (attempt rows carry no environment column — see REM-25).
+
+### REM-08 / SEC-04 — status update (2026-10-14)
+
+> **REM-03 / REM-03b merged** (PR #1403, PR #1410). **REM-08 — IN REVIEW (Draft PR), not closed**; closes only after approved merge and verification. Report and evidence: `REM-08-SEC-04-IMPLEMENTATION-REPORT.md`.
+> **What changed (3 production files' worth of logic, no schema/route/RBAC change):** (1) `SetTenant` rejects an authenticated `User` whose `is_active === false` with `403 {"message":"الحساب غير مفعّل."}` — the exact status/message `login()` already uses — before the tenant context is set; (2) `UserController::update` deletes that user's Sanctum tokens, in the same transaction as the update, **only** on the `active → inactive` transition; (3) `UserController::destroy` deletes the user's tokens before the soft delete (`personal_access_tokens` is `uuidMorphs` with no FK, so nothing cascades).
+> **Status-code note for the owner:** the card's "403 on the next request" holds when the token row survives (guard path). Through the normal API path the tokens are already gone, so the same old token gets **401** from `auth:sanctum` before `SetTenant` runs. Both are denials before any tenant logic; no envelope was changed to force one code.
+> **Unchanged by design:** `AuthController` (login/handoff/logout/password-reset), owner/self-deactivation policy, RBAC, Access Control V2, tenant-inactive handling, non-`User` principals (`ApiClient`, `PreviewSession`, `CustomerIdentity`). Reactivation does not revive tokens (a fresh login is required).
+
+### REM-37 / SEC-07 — status update (2026-10-14)
+
+> **REM-03, REM-03b and REM-08 merged.** **REM-37 — IN REVIEW (Draft PR), not closed**; closes only after approved merge and verification. Report and evidence: `REM-37-SEC-07-IMPLEMENTATION-REPORT.md`.
+> **Owner decision recorded: Option B — additive one-time backfill migration approved.** Stored `roles` rows (not `Rbac::MATRIX`) are the runtime source for every existing tenant, so adding `zatca.submit` without a backfill would have silently removed ZATCA submission from every existing accountant and custom role holding `invoices.manage`.
+> **What changed:** (1) new canonical permission `zatca.submit` in `Rbac::PERMISSIONS`, and in `MATRIX['accountant']` only (not `staff`, not `self_service`; `owner`/`admin` via `*`); (2) `POST /invoices/{id}/zatca/submissions` and `…/{attemptId}/dispatch` now require `zatca.submit` + `compliance.zatca` + the existing throttle — **`invoices.manage` is no longer an authorization path for them**; `GET …/submissions` stays `zatca.view`; (3) migration `2026_11_08_010000_backfill_zatca_submit_permission_for_invoice_managers.php` appends `zatca.submit` (last) to every stored role, in any tenant, whose explicit permissions contain `invoices.manage` — skipping wildcard roles, roles lacking `invoices.manage`, and roles already holding it; `down()` is intentionally a no-op; (4) `submit` action label added to the `hr.perm_actions` messages (ar/en) so the Role Matrix renders it under the existing E-invoicing group.
+> **Unchanged by design:** `ZatcaSubmissionController` and all ZATCA services/jobs/credentials/ICV/PIH, REM-03b `scopeToCurrentBranchOnly()` and attempt binding, tenant/branch primitives, schema, `invoices.view`/`invoices.manage` semantics outside the two routes. Middleware order is characterised, not changed: permission 403 → entitlement 403 → branch/tenant/attempt 404.
+
 ### REM-03 — card (ready for owner approval to start)
 
 | Field | Content |

@@ -10,6 +10,7 @@ import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { formatRiyal, isNegative } from '@/lib/money';
 import { cn } from '@/lib/utils';
+import { LtrNumber } from '@/components/ui/ltr-number';
 
 /** صفّ «تسمية ← قيمة» — وحدة عرض البيانات في هذه الشاشة. */
 export function KeyValue({
@@ -28,7 +29,7 @@ export function KeyValue({
       <span className="text-muted">{label}</span>
       <span className={cn('font-medium text-text', mono && 'num')}>
         {href ? (
-          <Link href={href} className="text-primary hover:underline">
+          <Link href={href} className="inline-flex min-h-6 min-w-6 items-center justify-end text-primary hover:underline">
             {value}
           </Link>
         ) : (
@@ -102,7 +103,7 @@ export function DocTable({
         {rows.map((r) => (
           <TR key={r.id}>
             <TD>
-              <Link href={href(r.id)} className="num font-medium text-primary hover:underline">
+              <Link href={href(r.id)} className="num inline-flex min-h-6 items-center font-medium text-primary hover:underline">
                 {r.number}
               </Link>
             </TD>
@@ -110,10 +111,10 @@ export function DocTable({
             <TD>
               <Badge tone={STATUS_TONE[r.status] ?? 'muted'}>{statusLabel(r.status)}</Badge>
             </TD>
-            <TD className="num text-end">{formatRiyal(r.total)}</TD>
+            <TD className="num text-end"><LtrNumber>{formatRiyal(r.total)}</LtrNumber></TD>
             {withRemaining && (
               <TD className={cn('num text-end', Number(r.remaining ?? 0) > 0 && 'text-negative')}>
-                {formatRiyal(r.remaining ?? '0')}
+                <LtrNumber>{formatRiyal(r.remaining ?? '0')}</LtrNumber>
               </TD>
             )}
           </TR>
@@ -178,7 +179,7 @@ export function LedgerTable({
       <div className="space-y-2 md:hidden">
         <article className="rounded border border-border bg-primary-soft p-3.5">
           <p className="text-xs font-medium text-muted">{labels.opening}</p>
-          <p className="num mt-1 text-lg font-semibold text-text">{formatRiyal(displayBalance(opening))}</p>
+          <p className="num mt-1 text-lg font-semibold text-text"><LtrNumber>{formatRiyal(displayBalance(opening))}</LtrNumber></p>
         </article>
         {rows.map((row, index) => {
           const source = row.source?.label;
@@ -191,12 +192,12 @@ export function LedgerTable({
                   <p className="num mt-1 text-xs text-muted">{row.date} · {row.number}</p>
                 </div>
                 <p className={cn('num text-sm font-semibold', !creditBalance && isNegative(row.balance) ? 'text-negative' : 'text-text')}>
-                  {formatRiyal(displayBalance(row.balance))}
+                  <LtrNumber>{formatRiyal(displayBalance(row.balance))}</LtrNumber>
                 </p>
               </div>
               <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-3">
-                <div><dt className="text-[11px] font-medium text-muted">{labels.debit}</dt><dd className="num mt-1 text-sm font-medium text-text">{row.debit !== '0.00' ? formatRiyal(row.debit) : '—'}</dd></div>
-                <div><dt className="text-[11px] font-medium text-muted">{labels.credit}</dt><dd className="num mt-1 text-sm font-medium text-text">{row.credit !== '0.00' ? formatRiyal(row.credit) : '—'}</dd></div>
+                <div><dt className="text-[11px] font-medium text-muted">{labels.debit}</dt><dd className="num mt-1 text-sm font-medium text-text"><LtrNumber>{row.debit !== '0.00' ? formatRiyal(row.debit) : '—'}</LtrNumber></dd></div>
+                <div><dt className="text-[11px] font-medium text-muted">{labels.credit}</dt><dd className="num mt-1 text-sm font-medium text-text"><LtrNumber>{row.credit !== '0.00' ? formatRiyal(row.credit) : '—'}</LtrNumber></dd></div>
                 {source && <div className="col-span-2"><dt className="text-[11px] font-medium text-muted">{labels.source}</dt><dd className="mt-1 text-sm font-medium text-text">{sourceLink ? <Link href={sourceLink} className="text-primary hover:underline">{source}</Link> : source}</dd></div>}
               </dl>
               {row.source?.allocations?.length ? <div className="mt-3 border-t border-border pt-3"><p className="text-[11px] font-medium text-muted">{labels.settlement}</p><div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1">{row.source.allocations.map((allocation, allocationIndex) => { const label = `${allocation.number ?? '—'} · ${formatRiyal(allocation.amount)}`; const href = allocationHref?.(allocation); return href ? <Link key={`${allocation.id}-${allocationIndex}`} href={href} className="num text-xs text-primary hover:underline">{label}</Link> : <span key={`${allocation.id}-${allocationIndex}`} className="num text-xs text-muted">{label}</span>; })}</div></div> : null}
@@ -227,7 +228,7 @@ export function LedgerTable({
           <TD />
           <TD />
           <TD />
-          <TD className="num text-end">{formatRiyal(displayBalance(opening))}</TD>
+          <TD className="num text-end"><LtrNumber>{formatRiyal(displayBalance(opening))}</LtrNumber></TD>
         </TR>
         {rows.map((r, i) => (
           <TR key={i}>
@@ -256,10 +257,10 @@ export function LedgerTable({
                 </div>
               ) : '—'}
             </TD>
-            <TD className="num text-end">{r.debit !== '0.00' ? formatRiyal(r.debit) : '—'}</TD>
-            <TD className="num text-end">{r.credit !== '0.00' ? formatRiyal(r.credit) : '—'}</TD>
+            <TD className="num text-end"><LtrNumber>{r.debit !== '0.00' ? formatRiyal(r.debit) : '—'}</LtrNumber></TD>
+            <TD className="num text-end"><LtrNumber>{r.credit !== '0.00' ? formatRiyal(r.credit) : '—'}</LtrNumber></TD>
             <TD className={cn('num text-end', !creditBalance && isNegative(r.balance) && 'text-negative')}>
-              {formatRiyal(displayBalance(r.balance))}
+              <LtrNumber>{formatRiyal(displayBalance(r.balance))}</LtrNumber>
             </TD>
           </TR>
         ))}

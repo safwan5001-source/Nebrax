@@ -688,10 +688,12 @@ Route::middleware([ForceJsonResponse::class, IdentifyTenantHostname::class])->gr
         Route::get('invoices/{id}/zatca', [InvoiceController::class, 'zatca'])->middleware([$perm('zatca.view'), $app('compliance.zatca')]);
         Route::get('invoices/{id}/zatca/submissions', [ZatcaSubmissionController::class, 'index'])
             ->middleware([$perm('zatca.view'), $app('compliance.zatca')]);
+        // REM-37 / SEC-07: الإرسال (إنشاء محاولة + إرسالها للطابور) يتطلب `zatca.submit` وحدها —
+        // لا `invoices.manage` مساراً بديلاً. القراءة تبقى `zatca.view`.
         Route::post('invoices/{id}/zatca/submissions', [ZatcaSubmissionController::class, 'store'])
-            ->middleware([$perm('invoices.manage'), $app('compliance.zatca'), 'throttle:10,1']);
+            ->middleware([$perm('zatca.submit'), $app('compliance.zatca'), 'throttle:10,1']);
         Route::post('invoices/{id}/zatca/submissions/{attemptId}/dispatch', [ZatcaSubmissionController::class, 'dispatch'])
-            ->middleware([$perm('invoices.manage'), $app('compliance.zatca'), 'throttle:10,1']);
+            ->middleware([$perm('zatca.submit'), $app('compliance.zatca'), 'throttle:10,1']);
         Route::post('invoices', [InvoiceController::class, 'store'])->middleware([$perm('invoices.manage'), EnforcePlanLimit::class . ':invoices']);
         Route::post('invoices/{id}/notes', [InvoiceController::class, 'storeNote'])->middleware($perm('invoices.manage'));
         Route::post('invoices/{id}/duplicate', [InvoiceController::class, 'duplicate'])->middleware([$perm('invoices.manage'), EnforcePlanLimit::class . ':invoices']);

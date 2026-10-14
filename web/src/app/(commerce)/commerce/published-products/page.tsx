@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { Table, TBody, TD, TH, THead, TR } from '@/components/ui/table';
-import { Tabs } from '@/components/ui/tabs';
+import { TabPanel, Tabs } from '@/components/ui/tabs';
 import { useToast } from '@/components/ui/toast';
 import { EmptyState, ErrorState, LoadingState, MobileRecordItem, PageHeader, Pagination } from '@/components/nebrax';
 import { currentUser } from '@/lib/auth';
@@ -74,6 +74,7 @@ export default function CommercePublishedProductsPage() {
         onChange={(id) => setTab(id as WorkspaceTab)}
       />
 
+      <TabPanel id={tab}>
       {tab === 'products' ? (
         <ProductsPublicationSection
           t={t}
@@ -87,6 +88,7 @@ export default function CommercePublishedProductsPage() {
           showStorefrontFilter={showStorefrontFilter}
         />
       )}
+      </TabPanel>
     </div>
   );
 }

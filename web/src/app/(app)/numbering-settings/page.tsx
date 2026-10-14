@@ -147,7 +147,7 @@ export default function NumberingSettingsPage() {
               {/* الالتباس المتوقَّع يُقطع هنا لا في التوثيق. */}
               <p className="text-xs leading-relaxed text-muted">
                 {t('excludes_icv')}{' '}
-                <Link href="/sales-settings/invoices" className="text-primary hover:underline">
+                <Link href="/sales-settings/invoices" className="text-primary underline underline-offset-2 hover:no-underline">
                   {t('excludes_icv_link')}
                 </Link>
               </p>

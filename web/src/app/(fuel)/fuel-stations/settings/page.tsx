@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, useId } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import { formatDateTime } from '@/lib/formatting';
 import { BadgeDollarSign, CircleAlert, Cog, Database, Radio, RefreshCw, Save, Settings2, ShieldCheck, SlidersHorizontal, Timer, WalletCards } from 'lucide-react';
@@ -14,6 +14,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/components/ui/toast';
 import { api, ApiError } from '@/lib/api';
+import { describeLoadFailure } from '@/lib/load-failure';
 import { currentUser } from '@/lib/auth';
 import { litersToMilliliters, millilitersToLiters } from '@/lib/fuel-quantity';
 import { formatMinorRiyal, isValidRiyal, minorToRiyal, riyalToMinor, SAUDI_RIYAL_SYMBOL } from '@/lib/money';
@@ -52,6 +53,7 @@ const DEVICE_TONES: Record<string, Tone> = { active: 'positive', inactive: 'mute
 
 export default function FuelStationsSettingsPage() {
   const t = useTranslations('fuelStationsSettings');
+  const tc = useTranslations('common');
   const locale = useLocale();
   const { success } = useToast();
   const [tenant, setTenant] = useState<Settings | null>(null);
@@ -71,6 +73,7 @@ export default function FuelStationsSettingsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [forbidden, setForbidden] = useState(false);
 
   const canManage = permissions.includes('*') || permissions.includes('fuel_stations.manage');
   const canManageScope = canManage && (stationId === '' || stationSettings !== null);
@@ -81,7 +84,7 @@ export default function FuelStationsSettingsPage() {
   const patches = isStationScope ? stationPatch : tenantPatch;
 
   const load = useCallback(async () => {
-    setLoading(true); setError(null);
+    setLoading(true); setError(null); setForbidden(false);
     try {
       const [settingsResponse, stationsResponse, accountsResponse, paymentResponse, productResponse, deviceResponse] = await Promise.all([
         api<{ data: Settings }>('/fuel-stations/settings'),
@@ -98,11 +101,14 @@ export default function FuelStationsSettingsPage() {
       setProducts(asList<FuelProduct>(productResponse.data));
       setDevices(asList<Device>(deviceResponse.data));
     } catch (cause) {
-      setError(cause instanceof ApiError ? cause.message : t('loadFailed'));
+      // 403 (استحقاق/صلاحية): رسالة الواجهة بلغتها وبلا «تحديث» عقيم — H1-5A.
+      const failure = describeLoadFailure(cause, { forbidden: tc('capabilityUnavailable'), fallback: t('loadFailed') });
+      setError(failure.message);
+      setForbidden(failure.forbidden);
     } finally {
       setLoading(false);
     }
-  }, [t]);
+  }, [t, tc]);
 
   const loadStationScope = useCallback(async (id: string) => {
     if (!id) { setStationSettings(null); setStationPatch({}); setStationRecordPatch({}); setPrices([]); return; }
@@ -182,7 +188,14 @@ export default function FuelStationsSettingsPage() {
     } finally { setSaving(null); }
   }
 
-  if (loading || !tenant) return <Loading />;
+  if (loading) return <Loading />;
+  // فشل التحميل الأول كان يُبقي الهيكل العظمي إلى الأبد (لا عنوان ولا سبب) — ERP-UX-023.
+  if (!tenant) return <div className="space-y-5">
+    <header><p className="text-sm text-muted">{t('eyebrow')}</p><h1 className="text-xl font-semibold text-text">{t('title')}</h1></header>
+    {forbidden
+      ? <p role="alert" className="rounded-md border border-border bg-surface px-3 py-3 text-sm text-text">{error}</p>
+      : <ErrorBanner message={error ?? t('loadFailed')} retry={() => void load()} label={t('refresh')} />}
+  </div>;
   const scopeLabel = isStationScope ? `${selectedStation?.name ?? ''} · ${selectedStation?.code ?? ''}` : t('tenantScope');
   const activeSettings = scopeValues ?? tenant;
   const selectedPayments = Array.isArray(value('fuel_sales_allowed_payment_method_ids')) ? value('fuel_sales_allowed_payment_method_ids') as string[] : [];
@@ -257,8 +270,8 @@ function PriceList({ prices, products, locale, t }: { prices: Price[]; products:
 function AdvancedRow({ settingKey, label, value, t }: { settingKey: string; label: string; value: Settings[string]; t: ReturnType<typeof useTranslations> }) { if (typeof value === 'boolean') return <div className="flex min-h-14 items-center justify-between rounded-md border border-border px-3 py-2"><span className="text-sm text-text">{label}</span><Switch checked={value} onCheckedChange={() => {}} disabled aria-label={label} /></div>; return <ReadOnlyRow label={label} value={advancedValue(settingKey, value, t)} />; }
 function ReadOnlyRow({ label, value, description }: { label: string; value: string; description?: string }) { return <div className="rounded-md border border-border px-3 py-3"><p className="text-xs text-muted">{label}</p><p className="mt-1 text-sm font-medium text-text">{value}</p>{description && <p className="mt-1 text-xs leading-relaxed text-muted">{description}</p>}</div>; }
 function Detail({ label, value }: { label: string; value: string }) { return <div><dt className="text-xs text-muted">{label}</dt><dd className="mt-1 break-words text-text">{value}</dd></div>; }
-function FieldInput({ label, value, onChange, type = 'text', min, step, hint, placeholder, disabled }: { label: string; value: string; onChange: (value: string) => void; type?: string; min?: string; step?: string; hint?: string; placeholder?: string; disabled?: boolean }) { return <div className="space-y-1.5"><Label>{label}</Label><Input value={value} type={type} min={min} step={step} placeholder={placeholder} disabled={disabled} onChange={(event) => onChange(event.target.value)} />{hint && <p className="text-xs text-muted">{hint}</p>}</div>; }
-function FieldSelect({ label, value, onChange, options, disabled }: { label: string; value: string; onChange: (value: string) => void; options: { value: string; label: string }[]; disabled?: boolean }) { return <div className="space-y-1.5"><Label>{label}</Label><Select value={value} disabled={disabled} onChange={(event) => onChange(event.target.value)}>{options.map((option) => <option key={option.value || 'empty'} value={option.value}>{option.label}</option>)}</Select></div>; }
+function FieldInput({ label, value, onChange, type = 'text', min, step, hint, placeholder, disabled }: { label: string; value: string; onChange: (value: string) => void; type?: string; min?: string; step?: string; hint?: string; placeholder?: string; disabled?: boolean }) { const fieldId = useId(); return <div className="space-y-1.5"><Label htmlFor={fieldId}>{label}</Label><Input id={fieldId} value={value} type={type} min={min} step={step} placeholder={placeholder} disabled={disabled} onChange={(event) => onChange(event.target.value)} />{hint && <p className="text-xs text-muted">{hint}</p>}</div>; }
+function FieldSelect({ label, value, onChange, options, disabled }: { label: string; value: string; onChange: (value: string) => void; options: { value: string; label: string }[]; disabled?: boolean }) { const fieldId = useId(); return <div className="space-y-1.5"><Label htmlFor={fieldId}>{label}</Label><Select id={fieldId} value={value} disabled={disabled} onChange={(event) => onChange(event.target.value)}>{options.map((option) => <option key={option.value || 'empty'} value={option.value}>{option.label}</option>)}</Select></div>; }
 function VolumeInput({ label, value, onChange, disabled, hint }: { label: string; value: string; onChange: (value: string) => void; disabled: boolean; hint: string }) { return <FieldInput label={label} value={value} type="number" min="0" step="0.001" onChange={onChange} disabled={disabled} hint={hint} />; }
 function MoneyInput({ label, value, onChange, disabled }: { label: string; value: string; onChange: (value: string) => void; disabled: boolean }) { return <FieldInput label={label} value={value} type="number" min="0" step="0.01" onChange={onChange} disabled={disabled} hint={SAUDI_RIYAL_SYMBOL} />; }
 function SecondsInput({ label, value, onChange, disabled, hint }: { label: string; value: number; onChange: (value: number) => void; disabled: boolean; hint: string }) { return <FieldInput label={label} value={String(value)} type="number" min="0" step="1" onChange={(next) => { const parsed = asNonNegativeInteger(next); if (parsed !== null) onChange(parsed); }} disabled={disabled} hint={hint} />; }

@@ -122,4 +122,20 @@ describe('DocumentsPage intake entry', () => {
     });
     expect(screen.queryByRole('button', { name: 'documentCenterIntake.upload' })).toBeNull();
   });
+
+  it('ERP-UX-009: a 403 shows one localized forbidden state — no raw server text, retry or upload', async () => {
+    currentUser.mockReturnValue({ role: 'owner', permissions: ['documents.center.manage', 'documents.center.view'] });
+    const { ApiError } = await import('@/lib/api');
+    api.mockImplementation((path: string) => {
+      if (path === '/document-batches/eligible-reviewers') return Promise.resolve({ data: [] });
+      return Promise.reject(new (ApiError as unknown as new (s: number, m: string) => Error)(403, 'لا تتوفر صلاحية فعالة لهذه القدرة.'));
+    });
+
+    render(<DocumentsPage />);
+
+    expect(await screen.findByText('capabilityUnavailable')).toBeTruthy();
+    expect(screen.queryByText('لا تتوفر صلاحية فعالة لهذه القدرة.')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'documentCenterReview.retry' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'documentCenterIntake.upload' })).toBeNull();
+  });
 });
