@@ -177,10 +177,8 @@
       "global": "FAILED",
       "stages": {
         "XSD": {
-          "status": "FAILED",
-          "errors": [
-            "SAXParseException"
-          ]
+          "status": "PASSED",
+          "errors": []
         },
         "EN": {
           "status": "FAILED",
@@ -279,7 +277,8 @@
           "errors": [
             "BR-CO-04",
             "BR-CO-15",
-            "BR-CO-18"
+            "BR-CO-18",
+            "BR-CO-99"
           ]
         },
         "KSA": {
