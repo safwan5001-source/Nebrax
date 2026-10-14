@@ -1,6 +1,6 @@
 # AWJ-BACKEND-CI-01 — Implementation Report
 
-STATUS: review
+STATUS: review (PR-ready; merge gated on final-head CI + pre-merge review)
 DATE: 2026-10-14
 
 ## Outcome
@@ -111,10 +111,36 @@ Environment: local PostgreSQL 16, PHP 8.3, Laravel 11.57.0, PHPUnit 11.5.57, Par
 | Full class | 7 passed (41 assertions) |
 | Mutation: `down()` rebinds `RESTRICT` instead of `SET NULL` | Test **fails** ("two strings are identical"); private DB still dropped |
 | Mutation: `up()` does nothing | Test **fails**; private DB still dropped |
-| Full PostgreSQL suite, parallel `--processes=4` (CI mode) | see below |
-| Full SQLite suite (sequential, CI mode) | see below |
 
-FULL_SUITE_RESULTS_PLACEHOLDER
+### Full suites
+
+**Authoritative: CI on head `b266237`** (PR merge ref `5c6b2a3` = `b266237` into `main` `899bcba`), run `38544894490`:
+
+| Job | Result |
+|---|---|
+| `php artisan test (L11, pgsql)` (parallel, 4 workers) | **success**: 6825 tests, 51141 assertions, 0 errors/failures, 3 skipped |
+| `php artisan test (L11, sqlite)` | **success** |
+| `CI Gate` | **success** |
+
+Same-day `main` `899bcba` pgsql run `38544283391`: 6825 tests, **51133** assertions, 3 skipped. The PR run has the same test count and skip count, with **+8 assertions**. That matches the rewritten test exactly (10 assertions instead of 2), so the DDL test ran in CI on PostgreSQL rather than being skipped.
+
+The PR's pgsql server log still contains one `deadlock detected`. It is `insert into payments` vs `select … from tenants … for update`, which is the deliberate REM-04/SEC-02 reproduction merged in #1450. That test retries by design and passed. There is no deadlock on `credit_notes`.
+
+**Supplementary: local, same parallel mode, `--processes=4`** (app tree at `ee42630`, 6809 tests):
+
+| Tree | Errors | Failures | Failing tests | `CreditNoteSourcePostgresTest` |
+|---|---|---|---|---|
+| this branch | 123 | 28 | 164 | not failing |
+| `main` (test file reverted) | 123 | 29 | 165 | not failing |
+
+The branch's failing set is a **strict subset** of `main`'s (`diff`: one extra R2 failure on `main`). All of them are local-sandbox gaps that CI provisions:
+- `Call to undefined function bcmul()`: no `bcmath` locally.
+- `Class "Aws\Exception\AwsException" not found`: no AWS SDK, which CI installs in its S3/R2 step.
+- The resulting 500/503 and mail assertions.
+
+None of them are in the classes this PR touches. Local SQLite: `phpunit --filter CreditNote` gave 107 tests, 0 failures, 11 skipped (the PostgreSQL-only tests skip there by design).
+
+Local finding recorded for backlog: on the first local run, an errored test leaked an open `RefreshDatabase` transaction. The next test in the same worker then waited **indefinitely** on `tenant_reference_number_sequences … FOR UPDATE` (42 min, 2 workers), because the test connection has no `lock_timeout`. With `ALTER SYSTEM SET lock_timeout = '60s'` the same suite completed in 6 min.
 
 ## Build / lint / typecheck
 
@@ -122,19 +148,23 @@ FULL_SUITE_RESULTS_PLACEHOLDER
 
 ## CI
 
-CI_PLACEHOLDER
+| Head | Run | sqlite | pgsql | CI Gate |
+|---|---|---|---|---|
+| `3bbd773` | superseded by `b266237` before completion | — | — | — |
+| `b266237` | `38544894490` / gate `38544894462` | success | success | success |
 
 ## Pre-merge review
-- PRE_MERGE_REVIEW: PENDING
-- Reviewed Head SHA: PENDING
-- Findings / resolution: PENDING
+- PRE_MERGE_REVIEW: recorded as a PR #1451 comment against the final head (a file cannot carry its own commit hash).
+- Codex review on `3bbd773`, 2 findings (P2), both accepted:
+  1. A long base database name could truncate away the unique suffix: fixed in `b266237`.
+  2. Report placeholders: filled in this commit.
 
 ## Merge
 - Merge status: not merged
 - Merge SHA: —
 
 ## Post-merge review
-- POST_MERGE_REVIEW: PENDING
+- POST_MERGE_REVIEW: recorded as a PR #1451 comment with the Merge SHA.
 - Reviewed Merge SHA: —
 - Target-branch checks/smoke: —
 - Findings / resolution: —
@@ -185,13 +215,15 @@ None. Migration `2026_11_04_020000_restrict_credit_note_original_invoice_delete.
 - The ~20 other fork-based PostgreSQL classes also share the base database across workers. They do not do DDL and passed in every observed run, but their teardown purges still contend on table locks. See Discovered backlog.
 
 ## Discovered backlog
-- **AWJ-BACKEND-CI-02 (candidate):** shared-base-database purges in fork-based PostgreSQL tests. Each `DELETE FROM tenants` locks ~307 tables across workers. Candidate: a shared trait for the per-test purge, with deterministic table order and an advisory-lock-free design. Needs evidence of actual failures first; none were observed in this task.
+- **AWJ-BACKEND-CI-02 — fail fast instead of hanging on PostgreSQL test locks.** The test connection has no `lock_timeout`, so one errored test that leaks an open transaction freezes its worker until the job timeout (observed locally: 42 min in 2 workers). A test-only `lock_timeout` (CI and `setup.sh`), set comfortably above the longest intentional wait in the concurrency tests, turns that into a named failure. Needs a survey of tests that rely on unbounded waits first.
+- **AWJ-BACKEND-CI-03 — local test-environment parity.** `setup.sh` does not provision what CI does (`bcmath`, AWS SDK), so a local full run shows ~150 false failures and hides real ones.
+- **Shared-base-database purges** in ~20 fork-based PostgreSQL classes: each `DELETE FROM tenants` locks ~307 tables across workers. No failure was observed in this task; keep under watch only.
 
 ## Git state
 - Branch: `fix/backend-ci-01-pg-ddl-deadlock`
-- PR: PR_PLACEHOLDER
+- PR: #1451
 - Base SHA: `ee42630` (`origin/main`)
 - Head SHA: recorded in the PR description (a file cannot contain its own commit hash)
 
 ## Recommended next dependency-ready task
-NEXT_PLACEHOLDER
+**AWJ-BACKEND-CI-02** (above): highest leverage among Backend/CI items. Today one real test error can turn the pgsql job into an opaque hang. It is test-infrastructure only and has no production or accounting impact.
