@@ -1,6 +1,17 @@
 # REM-03 / SEC-01 — Implementation Report: Active-Branch-Only authorization for sales documents
 
-STATUS: **PASS (pending CI on the final head and owner review)** — Draft PR, **NOT MERGED, NOT DEPLOYED**
+STATUS: **MERGED** (PR #1403, merge `c589ced1dcbad88ef023d8be6ead34bc58f489f0`) · **CI verified** · **Production deployment NOT VERIFIED**
+
+> **Status correction (2026-10-14, post-merge housekeeping).** This report was written while PR #1403 was a Draft ("pending CI … NOT MERGED"). The lifecycle below is the current, verified state. The body of the report is otherwise unchanged and describes the work as it stood at authoring.
+>
+> | Stage | State | Evidence |
+> |---|---|---|
+> | Implementation completed | ✅ | 5 controllers + `Rem03ActiveBranchOnlyTest` (21 tests); local SQLite + PostgreSQL evidence in this report |
+> | PR merged | ✅ | PR #1403 merged 2026-10-14T00:02:42Z, merge SHA `c589ced1dcbad88ef023d8be6ead34bc58f489f0` (contained in `origin/main`) |
+> | CI verified | ✅ | Final PR head `9fd0ce93e7f9e1220b784c714f5463f7739b1778`: `php artisan test (L11, sqlite)` ✅, `(L11, pgsql)` ✅, `CI Gate` ✅ (runs 38484795349 / 38484795346, per the PR description). Post-merge `CI` push run on `main` at the merge commit: success (run 38487863684). |
+> | Production deployment | **NOT VERIFIED** — no deployment evidence was reviewed or produced for this change; merging to `main` is not a production release. |
+>
+> This is not a statement of ZATCA Phase 2 compliance or production readiness.
 DATE: 2026-10-13
 HORIZON: TAX-ZATCA (origin: TAX-HZ-00, PR #1398)
 ZONE: C — security / authorization / financial operations
@@ -9,7 +20,7 @@ ZONE: C — security / authorization / financial operations
 
 | | |
 |---|---|
-| Verdict | **PASS** — implementation, local evidence on SQLite and PostgreSQL, and CI on the code head are green (see *Full suite / CI*); CI on the final docs-only head is recorded in the PR. Not closed until independent owner review and an owner-approved merge. |
+| Verdict | **PASS** — implementation, local evidence on SQLite and PostgreSQL, and CI on the code head are green (see *Full suite / CI*); CI on the final docs-only head was recorded in the PR. *Update 2026-10-14:* owner-approved merge done (PR #1403, `c589ced…`); production deployment not verified. |
 | Scope completed | Invoice (`update`, `updateClassification`, `destroy`, `post`), Return (`show`, `post`), Quote (`show`, `update`, `destroy`, `issue`, `revise`, `convert`) and Document-revision (`feed`, `index`) are **Active-Branch-Only**. One reusable primitive, 5 controllers, 21 new tests, 2 docs updated. |
 | What changed for callers | Another branch's document — even one in the user's allowed set, and even for an unrestricted owner — now returns **404** unless that branch is the active branch (`X-Branch-Id`). `?branch=all` never widens these operations. |
 | What did *not* change | `allowedBranchIds()`/`canAccessBranch()`, `SetBranch`, RBAC, TenantScope, `scopeToActiveBranch()` (lists/reads/reports), `BelongsToBranch` (no global scope), accounting, VAT, ICV/PIH, QR/XML, ZATCA, migrations, API schema, CI. |
@@ -23,7 +34,7 @@ ZONE: C — security / authorization / financial operations
 | Repository | `safwan5001-source/Nebrax` |
 | Base SHA | `0c90419874594169d422515e881425e5b3b3fa70` (`origin/main` at start; includes TAX-HZ-00 PR #1398) |
 | Branch | `fix/security-rem03-active-branch-only` |
-| PR | #1403 — https://github.com/safwan5001-source/Nebrax/pull/1403 (Draft) |
+| PR | #1403 — https://github.com/safwan5001-source/Nebrax/pull/1403 (was Draft at authoring; **merged** `c589ced1dcbad88ef023d8be6ead34bc58f489f0`) |
 | Final Head SHA | recorded in the PR description / hand-back message (a file cannot contain its own commit hash). Code + tests head: `6bc971b3394a74aff62f53f7cd5125acc5ed13a3`; the report commit follows it (docs only). |
 
 ## Confirmed root cause
@@ -198,7 +209,7 @@ Recommendation: a follow-up `REM-03b` applying `scopeToCurrentBranchOnly` to `du
 
 ## Documentation updated
 
-* `docs/audits/horizon/TAX-HZ-00-REMEDIATION-BACKLOG.md` — owner decision recorded; REM-03 *in review*, not closed; links this report.
+* `docs/audits/horizon/TAX-HZ-00-REMEDIATION-BACKLOG.md` — owner decision recorded; REM-03 status was *in review* at authoring and is now recorded as merged (PR #1403); links this report.
 * `docs/plans/access-control/AWJ_USERS_ROLES_PERMISSIONS_DAFTRA_REFERENCE.md` §42 — security-remediation note (no new master document).
 
 ## Risks / remaining
@@ -215,12 +226,12 @@ Controllers only (5 files, +100/−15 lines); no services, models, migrations, r
 
 ## Merge / Deploy status
 
-**NOT MERGED. NOT DEPLOYED.** Draft PR #1403 awaiting owner review. No production action, migration, ZATCA transmission, OTP or credential operation was performed.
+**MERGED** as PR #1403 (`c589ced1dcbad88ef023d8be6ead34bc58f489f0`); **production deployment NOT VERIFIED**. (At authoring: Draft, not merged, awaiting owner review.) No production action, migration, ZATCA transmission, OTP or credential operation was performed by this work.
 
 ## Recommended next step
 
-Owner review of PR #1403 → decide on the follow-up scope (`REM-03b`: `duplicate`, `storeNote`, ZATCA `store`/`dispatch`, credit-note `show`/`post`) → then `REM-08`.
+*(Historical, at authoring; completed — see the follow-up below.)* Owner review of PR #1403 → decide on the follow-up scope (`REM-03b`: `duplicate`, `storeNote`, ZATCA `store`/`dispatch`, credit-note `show`/`post`) → then `REM-08`.
 
 ## Follow-up: REM-03b (added 2026-10-14; original conclusions above are unchanged)
 
-REM-03 was merged as PR #1403 (merge `c589ced1dcbad88ef023d8be6ead34bc58f489f0`). The out-of-scope table above is addressed, for six of its operations only, by the separate follow-up **REM-03b** (Draft PR; report: `REM-03b-SEC-01-IMPLEMENTATION-REPORT.md`): `InvoiceController::duplicate` and `storeNote`, `ZatcaSubmissionController::store` and `dispatch`, `CreditNoteController::show` and `post`. `ReturnableController`, `AppointmentController` and the credit-note `original_invoice_id` reference policy were deliberately left unchanged. The remaining rows of the table are not part of REM-03b.
+REM-03 was merged as PR #1403 (merge `c589ced1dcbad88ef023d8be6ead34bc58f489f0`). The out-of-scope table above is addressed, for six of its operations only, by the separate follow-up **REM-03b** (merged as PR #1410, `322c20cf009e0f1c917566e4930b689764651b60`; report: `REM-03b-SEC-01-IMPLEMENTATION-REPORT.md`): `InvoiceController::duplicate` and `storeNote`, `ZatcaSubmissionController::store` and `dispatch`, `CreditNoteController::show` and `post`. `ReturnableController`, `AppointmentController` and the credit-note `original_invoice_id` reference policy were deliberately left unchanged. The remaining rows of the table are not part of REM-03b.
