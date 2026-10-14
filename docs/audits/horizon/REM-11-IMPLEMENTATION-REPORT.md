@@ -2,12 +2,26 @@
 
 | | |
 |---|---|
-| Status | **DRAFT PR #1416 — NOT MERGED — NOT DEPLOYED** |
+| Status | **MERGED** (PR #1416, merge `cb87e17d7583d8b24eab76e87ae5dad1d78484b3`, 2026-10-14T02:42:50Z) · **CI verified** · **Production deployment NOT VERIFIED** (status corrected 2026-10-14; at authoring this was a Draft, not merged) |
 | Base | `main` @ `22f2ee5` (includes REM-03b `322c20c`) |
 | Code head evidenced below | `9a7bc235df64c3524281cb19c41f63f9601a0d2e` (earlier heads `66687c5`, `c662bcc` are documented as findings in §5/§9a) |
 | Final-head CI status | Posted as a PR comment after the last push (this report is a docs-only commit on top of the code head and cannot name its own SHA) |
 | Zone | C (tax / ZATCA) — no financial, VAT, ICV, PIH, QR, XML-generation, transport, schema, route or permission change |
 | Evidence class | Local runs are labelled **local**; GitHub-hosted-runner runs are labelled **runner** with run/job IDs |
+
+---
+
+## 0. Lifecycle status (post-merge correction, 2026-10-14)
+
+| Stage | State | Evidence |
+|---|---|---|
+| Implementation completed | ✅ | Advisory workflow, `scripts/zatca-sdk/` (66 unit tests), 3 AWJ fixtures + baseline, digest-based drift test |
+| PR merged | ✅ | PR #1416, merge SHA `cb87e17d7583d8b24eab76e87ae5dad1d78484b3` (contained in `origin/main`); approved trigger = path-filtered `push` + `workflow_dispatch` |
+| CI verified | ✅ | Final PR head `ac72e0a7a071b3e65c6f57be87351fbd11256e18`: `php artisan test (L11, sqlite)` ✅, `(L11, pgsql)` ✅, `CI Gate` ✅ (PR comment). Advisory jobs ✅ on code head `9a7bc23` (run 38498583686). Post-merge on `main` at the merge commit: `CI` push run success (38502470576) and `ZATCA SDK conformance (advisory)` push run success (38502470621) |
+| Production deployment | **NOT VERIFIED** | No deployment evidence reviewed; nothing here deploys anything — the harness is a CI-only advisory check |
+| Open items | **D-03a OPEN** | Legal / terms questions remain open (§8): no SDK vendoring, caching, mirroring, redistribution or promotion to blocking without counsel/ZATCA clarification. `CI Gate` / `required-checks.json` unchanged by design (D-03e) |
+
+The harness is an **advisory development oracle**, not a statement of ZATCA Phase 2 compliance or production readiness. Sections below are the report as authored; where they say "Draft" or "not merged" the lifecycle above supersedes them.
 
 ---
 
@@ -172,8 +186,8 @@ Delete `.github/workflows/zatca-sdk-conformance.yml` (or revert the PR). No stat
 |---|---|---|
 | D-03e′ | Classify the two jobs as `advisory` in `.github/ci-gate/required-checks.json` and restore `pull_request` + `paths`, **or** keep the push trigger. | Keep push for now; revisit when promoting. |
 | D-03a | Counsel/ZATCA answer on licensor, automated download, caching. | Obtain before any vendoring/mirroring/promotion. |
-| Housekeeping | Delete `claude/rem-11-negative-probe`. | Yes. |
-| Follow-up | Mark REM-03/03b merged in the backlog/reports (stale "in review" wording). | Small docs PR, on request. |
+| Housekeeping | Delete `claude/rem-11-negative-probe` (and the merged feature branch). | Authorized by the owner after verification; see the post-merge housekeeping report for the outcome. |
+| Follow-up | Mark REM-03/03b/11 merged in the backlog/reports (stale "in review" wording). | Done in the post-merge housekeeping docs PR. |
 | Next | REM-12+ (UBL rebuild) can now use this oracle; baseline shrink is the acceptance signal. | — |
 
 ## 12. Acceptance matrix

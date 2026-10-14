@@ -1,6 +1,17 @@
 # REM-03b / SEC-01 — Implementation Report: close the remaining Active-Branch-Only gaps
 
-STATUS: **PASS (pending CI on the final head and owner review)** — **DRAFT PR — NOT MERGED — NOT DEPLOYED**
+STATUS: **MERGED** (PR #1410, merge `322c20cf009e0f1c917566e4930b689764651b60`) · **CI verified** · **Production deployment NOT VERIFIED**
+
+> **Status correction (2026-10-14, post-merge housekeeping).** This report was written while PR #1410 was a Draft ("pending CI … DRAFT — NOT MERGED"). The lifecycle below is the current, verified state; the body is otherwise unchanged and describes the work as it stood at authoring.
+>
+> | Stage | State | Evidence |
+> |---|---|---|
+> | Implementation completed | ✅ | 3 controllers (six operations) + `Rem03bActiveBranchOnlyTest` (16 tests); local SQLite + PostgreSQL evidence in this report |
+> | PR merged | ✅ | PR #1410 merged 2026-10-14T01:12:36Z, merge SHA `322c20cf009e0f1c917566e4930b689764651b60` (contained in `origin/main`) |
+> | CI verified | ✅ | Final PR head `e9716fca4fef0e2608898832bd7e8ba8dabd7c0e`: `php artisan test (L11, sqlite)` ✅, `(L11, pgsql)` ✅, `CI Gate` ✅ (runs 38492312262 / 38492312338, per the PR description). Post-merge `CI` push run on `main` at the merge commit: success (run 38494456889). |
+> | Production deployment | **NOT VERIFIED** — no deployment evidence was reviewed or produced for this change; merging to `main` is not a production release. |
+>
+> This is not a statement of ZATCA Phase 2 compliance or production readiness.
 DATE: 2026-10-14
 HORIZON: TAX-ZATCA (origin: TAX-HZ-00 → REM-03 / PR #1403)
 ZONE: C — security / authorization / accounting / ZATCA
@@ -22,10 +33,10 @@ ZONE: C — security / authorization / accounting / ZATCA
 | Repository | `safwan5001-source/Nebrax` |
 | Base SHA | `176965d086dd60dbd98208d4f4580da91b9a07b0` (`origin/main` at start; contains REM-03 merge `c589ced1dcbad88ef023d8be6ead34bc58f489f0`) |
 | Branch | `fix/security/rem03b-active-branch-only` |
-| PR | #1410 — https://github.com/safwan5001-source/Nebrax/pull/1410 (**Draft**) |
+| PR | #1410 — https://github.com/safwan5001-source/Nebrax/pull/1410 (was **Draft** at authoring; **merged** `322c20cf009e0f1c917566e4930b689764651b60`) |
 | Code+tests head | `3b90b50b98c5032b2d02ca2b5add12e2da30059b` |
 | Final Head SHA | recorded in the PR description and hand-back message (a file cannot contain its own commit hash); it adds only this report and three test assertions on top of the code head |
-| Merge SHA | N/A |
+| Merge SHA | `322c20cf009e0f1c917566e4930b689764651b60` (was "N/A" at authoring) |
 
 ## Scope — exactly six operations
 
@@ -132,7 +143,7 @@ The diff is guards only (3 controllers) plus tests and docs. **No change** to: a
 | `app/Http/Controllers/Api/CreditNoteController.php` | `show`, `post` resolve the note through `scopeToCurrentBranchOnly`; existing checks kept |
 | `tests/Feature/Rem03bActiveBranchOnlyTest.php` | new — 16 tests |
 | `docs/audits/horizon/REM-03-SEC-01-IMPLEMENTATION-REPORT.md` | appended "Follow-up: REM-03b" pointer (original conclusions unchanged) |
-| `docs/audits/horizon/TAX-HZ-00-REMEDIATION-BACKLOG.md` | REM-03b entry: six operations, exclusions, *in review*, not closed |
+| `docs/audits/horizon/TAX-HZ-00-REMEDIATION-BACKLOG.md` | REM-03b entry: six operations, exclusions (status at authoring: *in review*; now recorded as merged) |
 | `docs/plans/access-control/AWJ_USERS_ROLES_PERMISSIONS_DAFTRA_REFERENCE.md` | §43 remediation note |
 | `docs/audits/horizon/REM-03b-SEC-01-IMPLEMENTATION-REPORT.md` | this report |
 
@@ -161,8 +172,8 @@ The diff is guards only (3 controllers) plus tests and docs. **No change** to: a
 
 ## Merge / Deploy status
 
-**DRAFT PR — NOT MERGED — NOT DEPLOYED.** No migration, no GitHub setting/ruleset/CI change, no Horizon grant or policy change, no ZATCA transmission, OTP or credential operation, no production action.
+**MERGED** as PR #1410 (`322c20cf009e0f1c917566e4930b689764651b60`); **production deployment NOT VERIFIED**. (At authoring: Draft, not merged.) No migration, no GitHub setting/ruleset/CI change, no Horizon grant or policy change, no ZATCA transmission, OTP or credential operation, no production action.
 
 ## Recommended next step
 
-Owner review of PR #1410 only. Optional later: a tiny follow-up for the credit-note route-middleware 403-vs-404 observation, and REM-25 for per-attempt environment binding. Then REM-08.
+*(Historical, at authoring; owner review and merge are done.)* Optional later: a tiny follow-up for the credit-note route-middleware 403-vs-404 observation, and REM-25 for per-attempt environment binding. Then REM-08.
