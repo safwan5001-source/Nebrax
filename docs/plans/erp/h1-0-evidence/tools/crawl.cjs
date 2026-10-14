@@ -2,7 +2,7 @@
 // Usage: node crawl.cjs <routes.json> <outDir> <configs csv> [axe=1] [shots=1]
 const fs = require('fs');
 const path = require('path');
-const { chromium } = require('/home/user/Nebrax/web/node_modules/playwright-core');
+const { chromium } = require(process.env.PLAYWRIGHT_CORE || 'playwright-core');
 
 const [, , routesFile, outDir, configsCsv, axeFlag = '1', shotFlag = '0'] = process.argv;
 const BASE = process.env.BASE ?? 'http://127.0.0.1:3001';
@@ -83,7 +83,7 @@ async function measure(page, mobile) {
 }
 
 (async () => {
-  const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--no-sandbox'] });
+  const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || undefined, args: ['--no-sandbox'] });
   const configs = configsCsv.split(',');
   for (const cfgName of configs) {
     const cfg = CONFIGS[cfgName];

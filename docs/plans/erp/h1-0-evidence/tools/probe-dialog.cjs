@@ -1,6 +1,6 @@
-const {chromium}=require('/home/user/Nebrax/web/node_modules/playwright-core');
+const {chromium}=require(process.env.PLAYWRIGHT_CORE || 'playwright-core');
 const route=process.argv[2], btn=process.argv[3], locale=process.argv[4]||'en', width=+(process.argv[5]||1440);
-(async()=>{const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium',args:['--no-sandbox']});
+(async()=>{const b=await chromium.launch({executablePath: process.env.CHROMIUM_PATH || undefined,args:['--no-sandbox']});
 const c=await b.newContext({viewport:{width,height:900}});await c.addCookies([{name:'locale',value:locale,url:'http://127.0.0.1:3001'}]);
 await c.addInitScript(({t,u})=>{localStorage.setItem('token',t);localStorage.setItem('user',u);localStorage.setItem('awj:ui-version','3')},{t:process.env.TOKEN,u:require('fs').readFileSync(__dirname+'/../user.json','utf8')});
 const p=await c.newPage();await p.goto('http://127.0.0.1:3001'+route);await p.waitForTimeout(2500);

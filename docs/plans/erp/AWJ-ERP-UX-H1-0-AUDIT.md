@@ -8,7 +8,7 @@ Executor: Claude Code (sole executor for this horizon, per owner direction of 20
 
 ## الملخص التنفيذي (عربي)
 
-- جُرد **231 مساراً** في بناء الواجهة خارج `/platform`، وفُحص منها **207 مساراً** فعلياً في متصفح Chromium حقيقي مقابل Laravel حقيقي على بيانات اختبار معزولة، عبر **1,871 تحميل صفحة** إضافةً إلى فحوص تفاعل لوحة المفاتيح: v3 وlegacy، عربي وإنجليزي، فاتح وداكن، وعروض 320 و360 و390 و768 و1440.
+- جُرد **231 مساراً** في بناء الواجهة خارج `/platform`، وفُحص منها فعلياً **207 عنوان URL تغطي 204 مدخلاً من 231** (203 صفحات + أيقونة الموقع) في متصفح Chromium حقيقي مقابل Laravel حقيقي على بيانات اختبار معزولة، عبر **1,871 تحميل صفحة** إضافةً إلى فحوص تفاعل لوحة المفاتيح: v3 وlegacy، عربي وإنجليزي، فاتح وداكن، وعروض 320 و360 و390 و768 و1440.
 - **لا يوجد خلل P0.** لم يُرصد أي خطر على البيانات أو المحاسبة أو العزل أو الصلاحيات من جهة الواجهة.
 - **P1 واحد مثبت:** حوار `Dialog` المشترك (123 استخداماً) لا ينقل التركيز إليه، ولا يحبسه، ولا يعيده عند الإغلاق — قارئ الشاشة قد لا يصل إلى الحوار أصلاً.
 - أهم P2 مشتركة: القوائم المغلقة قابلة للتركيز وهي مخفية (`aria-hidden-focus`)، تجاوز أفقي **في كل صفحات ERP عند 320px** سببه الشريط العلوي، منطقة التنبيهات (Toast) تخرج عن الشاشة على الجوال، عناصر «قريباً» في الشريط الجانبي روابط إلى صفحات 404، زر إغلاق الحوار يُقرأ «إغلاق» بالعربية في الواجهة الإنجليزية، وحالة «لا صلاحية» تُعرض مع حالة «فارغ» وزر إنشاء في آن واحد، وصفحة تعديل المنتج تتمرر أفقياً 264px حتى على 1440، ومبلغ صافي الدخل في لوحة التحكم يخرج عن بطاقته على عرض 360 ويُقص عند 320.
@@ -64,7 +64,7 @@ Full table: [`ROUTE-INVENTORY.md`](./h1-0-evidence/ROUTE-INVENTORY.md). Summary 
 | Commerce / App Builder (separate posture, owned by Commerce horizons) | 13 | Audited for shared defects only; changes stay minimal and outside Commerce contracts |
 | Fuel stations (separate workspace) | 13 | All data endpoints 403 for the test tenant (entitlement); shell-level findings only |
 | Auth / self-service / dev | 12 | `/login`, `/register`, `/me`, dev QA pages |
-| **Total** | **207** crawled manifest entries (+27 dynamic routes not fixtured; `/platform/**` and `/api/**` excluded) | |
+| **Total** | **207** crawled URLs = **204 of 231** manifest entries (203 pages + the favicon route; the four `/reports/general/*` URLs are one dynamic entry). 27 dynamic entries not fixtured; `/platform/**` and `/api/**` excluded | |
 
 Not-implemented modules shown in the sidebar (no route exists): `/cheques`, `/work-orders`, `/workflow`, `/bookings`, `/rentals`, `/leases`, `/time-tracking`, `/manufacturing`, `/fleet`, `/shipping` (ERP-UX-007). H1 does **not** build these; it only stops them from navigating to a 404.
 
@@ -171,7 +171,7 @@ Effort: S ≤ ½ day, M ≤ 1½ days. "Accept" = acceptance test that must pass 
 
 | Dimension | Tested | Not tested |
 |---|---|---|
-| Routes | 207 manifest entries crawled (206 pages + the favicon route) of 231 non-platform entries | 27 dynamic detail routes without fixtures |
+| Routes | 207 URLs covering 204 of 231 non-platform manifest entries (203 pages + favicon; 26 dynamic entries via fixtures) | 27 dynamic entries without fixtures |
 | Roles | owner | restricted roles (sales, accountant, cashier, self-service) — H1-8 |
 | Devices (emulated widths) | 320, 360, 390, 768, 1440 | 1024, 1280 measured only in H1-8; physical devices |
 | Locales / directions | AR-RTL, EN-LTR | — |
