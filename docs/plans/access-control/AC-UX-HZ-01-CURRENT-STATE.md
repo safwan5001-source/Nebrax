@@ -18,9 +18,9 @@ A slice is marked **Merged** only after tests + exact-head CI + merge. "Post-mer
 
 | Slice | Status | PR | Merge SHA |
 |---|---|---|---|
-| AC-UX-00 baseline & UX contract | In review (this PR) | — | — |
-| **AC-UX-00A User administration grant boundaries** (backend, owner-mandated, **blocks AC-UX-01**) | Not started | — | — |
-| AC-UX-01 Users workspace (blocked by 00A) | Not started | — | — |
+| AC-UX-00 baseline & UX contract | **Merged** | #1460 | `58582ce85cfe541bd41df727cce79d2289acad2b` |
+| **AC-UX-00A User administration grant boundaries** (backend, owner-mandated) | **Merged** | #1462 | `f1b7031fae615556149b8e0653247d6f73325827` |
+| AC-UX-01 Users workspace | In review | (this PR) | — |
 | AC-UX-02 User editor & access scope | Not started | — | — |
 | AC-UX-03 Roles & Permissions workspace (03A shell/catalogue · 03B editing/risk) | Not started | — | — |
 | AC-UX-04 Role creation & safe cloning | Not started | — | — |

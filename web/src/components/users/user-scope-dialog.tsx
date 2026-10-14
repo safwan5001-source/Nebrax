@@ -6,7 +6,7 @@ import { Dialog } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/toast';
 import { api, ApiError } from '@/lib/api';
-import { AccessScopeFields, type AccessScope } from './access-scope-fields';
+import { AccessScopeFields, useScopeAvailability, type AccessScope } from './access-scope-fields';
 
 /**
  * تعديل نطاق وصول مستخدم **قائم**.
@@ -33,6 +33,7 @@ export function UserScopeDialog({
     branch_ids: user.branch_ids ?? [],
     warehouse_ids: user.warehouse_ids ?? [],
   });
+  const availability = useScopeAvailability();
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -41,7 +42,12 @@ export function UserScopeDialog({
     setSaving(true);
     setError(null);
     try {
-      await api(`/users/${user.id}`, { method: 'PUT', body: scope });
+      // كل بُعدٍ لا يستطيع المشاهد تحميل قائمته لا يُرسَل: غياب المفتاح = بلا تغيير.
+      const body: Partial<AccessScope> = {
+        ...(availability.branches ? { branch_ids: scope.branch_ids } : {}),
+        ...(availability.warehouses ? { warehouse_ids: scope.warehouse_ids } : {}),
+      };
+      await api(`/users/${user.id}`, { method: 'PUT', body });
       success(tc('updated'));
       onSaved();
       onClose();
@@ -55,7 +61,7 @@ export function UserScopeDialog({
   return (
     <Dialog open onClose={onClose} title={`${t('scope_title')} — ${user.name}`}>
       <form onSubmit={submit} className="space-y-3">
-        <AccessScopeFields value={scope} onChange={setScope} />
+        <AccessScopeFields value={scope} onChange={setScope} availability={availability} />
 
         {error && <p className="rounded bg-negative/10 px-3 py-2 text-xs text-negative">{error}</p>}
 
@@ -63,7 +69,7 @@ export function UserScopeDialog({
           <Button type="button" variant="outline" onClick={onClose}>
             {t('cancel')}
           </Button>
-          <Button type="submit" disabled={saving}>
+          <Button type="submit" disabled={saving || (!availability.branches && !availability.warehouses)}>
             {t('save')}
           </Button>
         </div>

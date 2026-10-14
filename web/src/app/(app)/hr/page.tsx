@@ -2,10 +2,10 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { type ColumnDef } from '@tanstack/react-table';
-import { Plus, Pencil, Trash2, MapPin, User, UserCog, Mail } from 'lucide-react';
+import { Plus, Pencil, Trash2, User, UserCog } from 'lucide-react';
 import { DataTable } from '@/components/data-table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -19,8 +19,6 @@ import { RoleDialog, type Role } from '@/components/hr/role-dialog';
 import { OrgStructureManager } from '@/components/hr/org-structure-manager';
 import { LeaveManager } from '@/components/hr/leave-manager';
 import { RequestsManager } from '@/components/hr/requests-manager';
-import { UserDialog } from '@/components/users/user-dialog';
-import { UserScopeDialog } from '@/components/users/user-scope-dialog';
 import { useToast } from '@/components/ui/toast';
 import { api, ApiError } from '@/lib/api';
 import { currentUser } from '@/lib/auth';
@@ -28,8 +26,8 @@ import { formatRiyal } from '@/lib/money';
 import { cn } from '@/lib/utils';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 
-type Tab = 'employees' | 'shifts' | 'attendance' | 'runs' | 'leave' | 'requests' | 'roles' | 'users' | 'org_structure';
-const TABS: Tab[] = ['employees', 'shifts', 'attendance', 'runs', 'leave', 'requests', 'roles', 'users', 'org_structure'];
+type Tab = 'employees' | 'shifts' | 'attendance' | 'runs' | 'leave' | 'requests' | 'roles' | 'org_structure';
+const TABS: Tab[] = ['employees', 'shifts', 'attendance', 'runs', 'leave', 'requests', 'roles', 'org_structure'];
 
 interface TeamUser {
   id: string; name: string; email: string; role: string; is_active: boolean;
@@ -45,14 +43,19 @@ const attStatusTone: Record<AttendanceStatus, 'positive' | 'warning' | 'muted' |
 export default function HrPage() {
   const t = useTranslations('hr');
   const askConfirm = useConfirm();
-  const tu = useTranslations('users');
   const ts = useTranslations('status');
   const tc = useTranslations('common');
   const { success, error } = useToast();
   // رابط الشريط الجانبي لبعض التبويبات (الحضور، الرواتب، الطلبات) يفتح
   // مباشرة على تبويبها عبر `?tab=` — بدل صفحة منفصلة كانت 404 من قبل.
   const searchParams = useSearchParams();
+  const router = useRouter();
   const requestedTab = searchParams.get('tab');
+  // المستخدمون صاروا شاشةً مستقلة بصلاحية `users.view` (AC-UX-01): الروابط والإشارات
+  // القديمة إلى `?tab=users` تُحوَّل إليها بدل أن تسقط على «الموظفون».
+  useEffect(() => {
+    if (requestedTab === 'users') router.replace('/users');
+  }, [requestedTab, router]);
   const [tab, setTab] = useState<Tab>(
     TABS.includes(requestedTab as Tab) ? (requestedTab as Tab) : 'employees'
   );
@@ -99,9 +102,6 @@ export default function HrPage() {
   useEffect(() => { if (canManageRoles) reloadRoles(); }, [canManageRoles, reloadRoles]);
 
   const [team, setTeam] = useState<TeamUser[]>([]);
-  const [userDialog, setUserDialog] = useState(false);
-  const [editingUser, setEditingUser] = useState<TeamUser | null>(null);
-  const [scopeUser, setScopeUser] = useState<TeamUser | null>(null);
 
   const loadTeam = useCallback(() => {
     if (!canManageRoles) return;
@@ -109,22 +109,6 @@ export default function HrPage() {
   }, [canManageRoles]);
 
   useEffect(() => { if (canManageRoles) loadTeam(); }, [canManageRoles, loadTeam]);
-
-  async function removeUser(id: string) {
-    await api(`/users/${id}`, { method: 'DELETE' }).catch(() => {});
-    success(tc('deleted'));
-    loadTeam();
-  }
-
-  async function sendInvitation(user: TeamUser) {
-    if (!(await askConfirm({ message: tu('send_invitation_confirm', { email: user.email }) }))) return;
-    try {
-      await api(`/users/${user.id}/send-invitation`, { method: 'POST' });
-      success(tu('invitation_sent'));
-    } catch (err) {
-      error(err instanceof ApiError ? err.message : tc('saveFailed'));
-    }
-  }
 
   const toLinkedUser = (u: TeamUser): LinkedUser => ({
     id: u.id, name: u.name, email: u.email, role: u.role, is_active: u.is_active,
@@ -139,25 +123,6 @@ export default function HrPage() {
     setEmpLinkedUser(linked ? toLinkedUser(linked) : null);
     setEmpInitialAccess(!!linked);
     setEmpDialog(true);
-  }
-
-  // فتح نموذج الموظف الموحّد لتعديل مستخدمٍ من تبويب "المستخدمون": يجلب سجلّ
-  // الموظف الكامل إن كان مرتبطاً؛ وإلا يقع على الحوار القديم لمستخدمٍ بلا موظف.
-  async function openUserEdit(row: TeamUser) {
-    if (!row.employee_id) {
-      setEditingUser(row);
-      setUserDialog(true);
-      return;
-    }
-    try {
-      const res = await api<{ data: Employee }>(`/employees/${row.employee_id}`);
-      setEditing(res.data);
-      setEmpLinkedUser(toLinkedUser(row));
-      setEmpInitialAccess(true);
-      setEmpDialog(true);
-    } catch {
-      error(tc('loadFailed'));
-    }
   }
 
   const load = useCallback(() => {
@@ -360,58 +325,6 @@ export default function HrPage() {
     [t, deleteRole]
   );
 
-  const userColumns = useMemo<ColumnDef<TeamUser, unknown>[]>(
-    () => [
-      { accessorKey: 'name', header: tu('name') },
-      { accessorKey: 'email', header: tu('email'), cell: ({ row }) => <span className="num text-muted">{row.original.email}</span> },
-      { accessorKey: 'role', header: tu('role'), cell: ({ row }) => <Badge tone="muted">{tu(`roles.${row.original.role}`)}</Badge> },
-      {
-        id: 'employee',
-        header: tu('link_employee'),
-        accessorFn: (r) => r.employee?.name ?? '',
-        cell: ({ row }) => {
-          const emp = row.original.employee;
-          if (!emp) return <span className="text-muted">—</span>;
-          const label = `${emp.employee_no ? `${emp.employee_no} — ` : ''}${emp.name}`;
-          return (
-            <Link href={`/hr/employees/${emp.id}`} className="text-primary hover:underline">
-              {label}
-            </Link>
-          );
-        },
-      },
-      {
-        accessorKey: 'is_active',
-        header: tu('status_label'),
-        cell: ({ row }) => <Badge tone={row.original.is_active ? 'positive' : 'muted'}>{row.original.is_active ? tu('active') : tu('inactive')}</Badge>,
-      },
-      {
-        id: 'actions',
-        header: '',
-        cell: ({ row }) => (
-          <div className="flex justify-end gap-1">
-            <Button variant="ghost" size="icon" aria-label={tu('edit')} onClick={() => openUserEdit(row.original)}>
-              <Pencil className="h-4 w-4" strokeWidth={1.7} />
-            </Button>
-            <Button variant="ghost" size="icon" aria-label={tu('scope_title')} onClick={() => setScopeUser(row.original)}>
-              <MapPin className="h-4 w-4 text-muted" strokeWidth={1.7} />
-            </Button>
-            <Button variant="ghost" size="icon" aria-label={tu('send_login_details')} onClick={() => sendInvitation(row.original)}>
-              <Mail className="h-4 w-4 text-muted" strokeWidth={1.7} />
-            </Button>
-            {row.original.id !== meId && (
-              <Button variant="ghost" size="icon" aria-label={tu('remove')} onClick={() => removeUser(row.original.id)}>
-                <Trash2 className="h-4 w-4 text-negative" strokeWidth={1.7} />
-              </Button>
-            )}
-          </div>
-        ),
-      },
-    ],
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [tu, meId]
-  );
-
   const addButton = {
     // زرٌ عام "إضافة" يفتح خيارَي دفترة نفسيهما (موظف / مستخدم) بدل زرٍّ واحد
     // يفترض موظفاً دائماً — إنشاء حساب دخول لا يحتاج المرور بنموذج الموظف أولاً.
@@ -430,7 +343,6 @@ export default function HrPage() {
     attendance: () => (<Button onClick={() => { setEditingAtt(null); setAttDialog(true); }}><Plus className="h-4 w-4" strokeWidth={1.8} />{t('add_attendance')}</Button>),
     runs: () => (<Button onClick={() => setRunDialog(true)}><Plus className="h-4 w-4" strokeWidth={1.8} />{t('create_run')}</Button>),
     roles: () => (<Button onClick={() => { setEditingRole(null); setRoleDialog(true); }}><Plus className="h-4 w-4" strokeWidth={1.8} />{t('add_role')}</Button>),
-    users: () => (<Button onClick={() => { setEditing(null); setEmpLinkedUser(null); setEmpInitialAccess(true); setEmpDialog(true); }}><Plus className="h-4 w-4" strokeWidth={1.8} />{tu('add')}</Button>),
     // أزرّة الإضافة الخاصّة بهذه الأقسام داخلية في مكوّناتها (كلٌّ يتبدّل حسب القسم الفرعي/النوع النشط).
     org_structure: () => null,
     leave: () => null,
@@ -445,7 +357,7 @@ export default function HrPage() {
       </div>
 
       <div className="flex gap-1 border-b border-border">
-        {(['employees', 'shifts', 'attendance', 'runs', 'leave', 'requests', ...(canManageRoles ? ['roles', 'users', 'org_structure'] : [])] as Tab[]).map((key) => (
+        {(['employees', 'shifts', 'attendance', 'runs', 'leave', 'requests', ...(canManageRoles ? ['roles', 'org_structure'] : [])] as Tab[]).map((key) => (
           <button
             key={key}
             onClick={() => setTab(key)}
@@ -476,9 +388,6 @@ export default function HrPage() {
       {tab === 'roles' && canManageRoles && (
         <DataTable columns={roleColumns} data={roles} loading={loading} searchPlaceholder={t('search_roles')} emptyLabel={t('no_roles')} exportName="roles" />
       )}
-      {tab === 'users' && canManageRoles && (
-        <DataTable columns={userColumns} data={team} loading={loading} searchPlaceholder={t('search_users')} emptyLabel={t('no_users')} exportName="users" />
-      )}
       {tab === 'org_structure' && canManageRoles && <OrgStructureManager />}
 
       <EmployeeDialog
@@ -495,19 +404,6 @@ export default function HrPage() {
       <CreateRunDialog open={runDialog} onClose={() => setRunDialog(false)} onCreated={() => { load(); setTab('runs'); }} />
       <RunDetailDialog runId={activeRun} onClose={() => setActiveRun(null)} onChanged={load} />
       <RoleDialog open={roleDialog} onClose={() => setRoleDialog(false)} onSaved={reloadRoles} role={editingRole} catalog={permCatalog} />
-      <UserDialog
-        open={userDialog}
-        onClose={() => setUserDialog(false)}
-        onSaved={loadTeam}
-        user={editingUser}
-        linkedEmployeeIds={team
-          .filter((u) => u.id !== editingUser?.id)
-          .map((u) => u.employee_id)
-          .filter((id): id is string => !!id)}
-      />
-      {scopeUser && (
-        <UserScopeDialog user={scopeUser} onClose={() => setScopeUser(null)} onSaved={loadTeam} />
-      )}
     </div>
   );
 }
