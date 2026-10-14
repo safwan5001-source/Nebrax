@@ -238,7 +238,7 @@ export function GlobalApplicationControlsCard() {
     <Card className="mb-6">
       <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <CardTitle className="flex items-center gap-2">
+          <CardTitle as="h2" className="flex items-center gap-2">
             <Globe className="h-5 w-5 text-primary" strokeWidth={1.7} aria-hidden="true" />
             {t('title')}
           </CardTitle>

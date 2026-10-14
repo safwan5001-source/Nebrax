@@ -390,7 +390,7 @@ export function CommercialOperationsCard({ tenantId, onChanged }: { tenantId: st
       <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-3">
         <div className="flex items-start gap-3">
           <Boxes className="mt-0.5 h-5 w-5 shrink-0 text-primary" strokeWidth={1.7} aria-hidden="true" />
-          <div><CardTitle>{t('subscriptionApplications')}</CardTitle><p className="mt-1 text-sm text-muted">{t('subscriptionApplicationsNotice')}</p></div>
+          <div><CardTitle as="h2">{t('subscriptionApplications')}</CardTitle><p className="mt-1 text-sm text-muted">{t('subscriptionApplicationsNotice')}</p></div>
         </div>
         <div className="flex flex-wrap gap-2"><Button size="sm" variant="outline" wrap onClick={load} disabled={loading || acting}><RefreshCw className="h-4 w-4" strokeWidth={1.7} aria-hidden="true" />{t('retry')}</Button><Button size="sm" wrap onClick={openAssign} disabled={loading}><Plus className="h-4 w-4" strokeWidth={1.7} aria-hidden="true" />{t('assignApplication')}</Button></div>
       </CardHeader>
