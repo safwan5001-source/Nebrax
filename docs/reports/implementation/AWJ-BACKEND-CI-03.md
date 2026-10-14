@@ -82,6 +82,17 @@ A first draft of the guard matched its own regex line in `ci.yml` and read `[^` 
 ## CI
 Recorded in the PR and the PRE_MERGE_REVIEW comment.
 
+## Review findings and resolution
+**Codex was unavailable on this PR** (the account hit its usage limit; bot comment on #1474). An **independent reviewer agent** reviewed the diff instead. It extracted the guard from `ci.yml`, executed it against both `setup.sh` versions, and restored the tree. It found **no blocking defects**, and 3 non-blocking findings:
+
+| # | Finding | Resolution |
+|---|---|---|
+| 1 | The package check was a substring match: `…:4.1.10` in `setup.sh` would satisfy `…:4.1.1` | **Fixed:** whole-word match (`tr ' ' '\n' \| grep -qxF`). A `4.1.10` mutant now fails the guard (verified) |
+| 2 | The guard depends on the format of CI's `composer require laravel/sanctum …` line. It fails safe, but the error would be unrelated to the editor's change | **Fixed:** a comment on that line says the guard reads it (sanctum first, single line) |
+| 3 | Only the quoted **source** path is compared, not the glob suffix or destination; an unquoted `$CORE/x` source in `ci.yml` is not covered | **Accepted, documented here.** All 46 current sources are quoted, and destination drift would surface as local test failures |
+
+Both fixes were re-verified locally: branch → exit 0; `main`'s `setup.sh` → exit 1 with 4 errors; version mutant → exit 1.
+
 ## Pre-merge review / Merge / Post-merge review
 - PRE_MERGE_REVIEW and POST_MERGE_REVIEW: PR comments.
 - Merge status: not merged. Merge SHA: —.
