@@ -40,7 +40,7 @@ export function useDeveloperAccess(): DeveloperAccess {
 /** حالة «ممنوع» موحّدة — لمن لا يملك `developer.view` (وصولٌ مباشر رغم إخفاء الشريط). */
 export function DeveloperForbidden() {
   const t = useTranslations('developer.common');
-  return <EmptyState icon={LockKeyhole} title={t('forbidden')} description={t('forbiddenHint')} />;
+  return <EmptyState titleAs="h1" icon={LockKeyhole} title={t('forbidden')} description={t('forbiddenHint')} />;
 }
 
 /** حالة «غير متاح في المعاينة» — أدوات المطوّرين تعمل على الحساب الحقيقي فقط (§39: لا بيانات وهمية). */

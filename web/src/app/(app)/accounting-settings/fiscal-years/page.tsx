@@ -217,7 +217,7 @@ export default function FiscalYearsPage() {
   if (!mounted) return <LoadingState variant="cards" rows={4} />;
 
   if (!canView) {
-    return <EmptyState icon={Lock} title={t('forbidden')} description={t('fyForbiddenHint')} />;
+    return <EmptyState titleAs="h1" icon={Lock} title={t('forbidden')} description={t('fyForbiddenHint')} />;
   }
 
   const statusTone = (status: FiscalYearRow['status']) =>

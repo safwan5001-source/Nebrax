@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { cleanup, render, screen } from '@testing-library/react';
 import { AccordionItem } from '@/components/ui/accordion';
 import { CodeBlock } from '@/components/developer/code-block';
+import { EmptyState } from '@/components/nebrax';
 import { renderIntl } from '@/test-utils/intl';
 
 afterEach(cleanup);
@@ -30,5 +31,14 @@ describe('ERP-UX-H1-7F residual fixes', () => {
     const landing = src('app/page.tsx');
     expect(landing).toMatch(/bg-primary px-6 py-10 text-primary-foreground/);
     expect(landing).not.toMatch(/text-white\/75/);
+  });
+
+  it('a page-level forbidden state is the page h1; other empty states keep a plain title', () => {
+    render(<><EmptyState titleAs="h1" title="No access" /><EmptyState title="No rows" /></>);
+    expect(screen.getByRole('heading', { level: 1, name: 'No access' })).toBeTruthy();
+    expect(screen.queryByRole('heading', { name: 'No rows' })).toBeNull();
+    for (const page of ['app/(app)/accounting-settings/page.tsx', 'app/(app)/accounting-settings/fiscal-years/page.tsx', 'app/(app)/accounting-settings/period-locks/page.tsx', 'app/(app)/accounting-settings/account-routing/page.tsx', 'components/developer/developer-shell.tsx']) {
+      expect(src(page)).toMatch(/<EmptyState titleAs="h1" icon=\{(Lock|LockKeyhole)\} title=\{t\('forbidden'\)\}/);
+    }
   });
 });
