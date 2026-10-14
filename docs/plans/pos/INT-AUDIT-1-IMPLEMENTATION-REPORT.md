@@ -80,7 +80,7 @@ Codex automated review on that head: completed, no findings, no review threads. 
 
 - **Append-only is enforced at the model layer**, as for every existing event table. A raw query-builder delete/update (or a DBA) bypasses it. A database trigger would harden it; that is a separate decision.
 - **Tenant erasure removes the audit rows** (FK cascade) — consistent with the rest of the schema, but it means audit history does not outlive a tenant.
-- **No reader yet** (D4): the events are written and queryable by the database/support only; surfacing them needs its own permission/contract decision (DP-E). **Ownership gap:** Horizon puts the reader in INT-AUDIT-1 while INT-UX-6 *excludes* the configuration-change log (it waits on this reader), so after D4 the reader has **no owning slice** — the owner must assign one; INT-AUDIT-1 as delivered is the table and writers only.
+- **No reader yet** (D4): the events are written and queryable by the database/support only; surfacing them needs its own permission/contract decision (DP-E). **Ownership gap — resolved after merge (owner, 2026-10-14):** the reader is **owned by INT-UX-6** (its exclusion was removed in Horizon) and deferred until the DP-E read permission is approved; INT-AUDIT-1 as delivered is the table and writers only.
 - **No backfill** (Horizon exclusion): history before this change cannot be reconstructed (`secret_version > 1` and `disabled_at` prove rotations/disables of unknown actor). Any future UI must say so.
 - **Observation, not changed:** `rotateSecret` does not check status, so a *disabled* account can still be rotated (now audited when it happens). Disable stays irreversible (no re-enable route).
 - **Rollout:** the migration is additive and runs on deploy; the change touches only the three management endpoints, not ingestion, POS or finance. Deploy needs its own approval.
@@ -116,4 +116,4 @@ Code: CI green on the code head, automated review without findings, no conflict.
 
 ## 13. Decisions needed / next step
 
-Review of #1411 (and #1409). Optional follow-ups, each needing its own assignment: a DB-level append-only trigger; assigning an owning slice to the deferred audit reader (after a permission decision; INT-UX-6 excludes it); a decision on rotating a disabled account (A5). **INT-UX-5 is not started and needs a separate assignment**; INT-MAP-1 remains blocked.
+Review of #1411 (and #1409). Optional follow-ups, each needing its own assignment: a DB-level append-only trigger; the audit reader, now owned by INT-UX-6 and deferred until the DP-E read permission is approved; a decision on rotating a disabled account (A5). **INT-UX-5 is not started and needs a separate assignment**; INT-MAP-1 remains blocked.

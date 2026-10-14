@@ -458,7 +458,7 @@ For the existing ingress, `disable` flips `status` to `disabled`, records `disab
 **Two logs, never merged:**
 
 1. **Events** (from connector attempts): time, short event id, outcome, error code (+ localized message), provider order reference, link to the Hub order, secret version. **Never** the raw body (it is encrypted and `hidden`; a "view payload" action is explicitly out of scope).
-2. **Configuration changes** (audit, needs `DP-F`/`INT-AUDIT-1`): who, when, what (connect, authorize, reauthorize, map, pause/resume, rotate, reassign, disable/disconnect). `operator reassigned` already exists in `delivery_connector_operator_events`.
+2. **Configuration changes** (audit; **reader owned by `INT-UX-6`, deferred until the DP-E read permission is approved**): who, when, what. **Populated today** (by `INT-AUDIT-1`, merged): `ingress.created`, `secret.rotated`, `ingress.disabled` in `delivery_connector_lifecycle_events`, plus operator reassignment in the separate `delivery_connector_operator_events`. **Not populated — still need future writers (Track P):** connect, authorize, reauthorize, map, pause/resume, disconnect. Screen 8 must not present the log as complete while those writers do not exist.
 
 **Desktop.** `DataTable` with server pagination and sort (`serverSort`), filters: outcome, error code, date range, store. Row opens a `Sheet` with details inside `TechnicalDetails` (ids, checksums, `http_status`).
 **Mobile.** Cards; filters in a `Sheet`.
@@ -874,6 +874,7 @@ Each is raised because the design needs a change to an existing financial/securi
 - **Context.** `delivery_connector.*` is owner/admin only; accountants use the delivery report but cannot see connection health. "No new permissions" in this task.
 - **Options.** (1) Keep owner/admin only. (2) Read-only health via an existing permission such as `reports.view`. (3) New read permission in a later task.
 - **Recommendation.** (1) now. Revisit when health data exists.
+- **Pending sub-decision (2026-10-14): read access to lifecycle audit rows.** Who may read `delivery_connector_lifecycle_events` / operator events is a DP-E decision that is **not yet made**. `INT-UX-6` owns the reader and is deferred until it is. Until then the rows are not exposed by any API or UI, and DP-E stays as recommended above (owner/admin only).
 
 ### DP-F — Connection-lifecycle audit
 
@@ -951,14 +952,16 @@ Two tracks. **Track U** (UX/catalog) is safe to build now and never touches prov
 
 #### INT-UX-6 — Activity & errors tab and error-code dictionary
 - **Scope.** Screen 8 events log; Appendix C dictionary; filters; detail `Sheet`.
-- **Depends on.** INT-ACT-1, INT-UX-4.
+- **Depends on.** INT-ACT-1, INT-UX-4, INT-AUDIT-1 (done — the events are written) and, **for the configuration-change log only, the DP-E read-permission decision** (see below).
 - **Acceptance.** Replays and `state_not_applied` labeled correctly; unknown codes show a neutral fallback plus the code.
 - **Security.** Only allow-listed fields; localized text from dictionary, never raw server text.
-- **Tests.** Dictionary completeness against the backend code list; RTL/LTR; stale-response handling like Hub UI.
-- **Excludes.** Configuration-change log (needs INT-AUDIT-1).
+- **Tests.** Dictionary completeness against the backend code list; RTL/LTR; stale-response handling like Hub UI. **For the audit reader (when it is built):** permission matrix (no read without the approved DP-E permission; finance roles denied by default); cross-tenant isolation (another tenant's events and ids are invisible / 404); branch-restricted users see only events of accounts on their branches; **unrouted** accounts' events are hidden from restricted users; both audit tables are covered; no secret, prefix, token or payload in any response; the reader is read-only (no write route).
+- **Owns the audit reader (owner decision, 2026-10-14).** The read side of the connection-lifecycle audit — the *configuration-change log* (Screen 8's second log, §5.8) over `delivery_connector_lifecycle_events` and the existing `delivery_connector_operator_events` — belongs to **INT-UX-6**, not to INT-AUDIT-1. This replaces the earlier exclusion ("Configuration-change log (needs INT-AUDIT-1)"), which contradicted INT-AUDIT-1's own scope and left the reader without an owner. Allow-listed fields only (event code, actor, time, store/platform, secret *version* numbers) — never a secret, prefix, token or payload; tenant-scoped and branch-scoped like the connector list.
+- **Deferred; not authorized.** Implementing the reader is **deferred until the read permission is approved under DP-E** (who may read lifecycle audit rows; finance roles must not gain visibility by default). **This edit assigns ownership only. It does not authorize starting INT-UX-6**, which still needs its own assignment (and INT-ACT-1 for the events log).
+- **Excludes.** Writing audit events (INT-AUDIT-1, done); a new audit API contract is part of this slice's own design, not assumed here.
 
-#### INT-AUDIT-1 — Connection-lifecycle audit *(DP-F approved 2026-10-14; implemented — pending review/merge)*
-- **Scope.** Append-only audit table and writers for ingress create/rotate/disable; reader for the activity tab's second log. **Delivered 2026-10-14: table + writers. The reader was deferred by owner decision D4 and has no owning slice yet** — INT-UX-6 explicitly excludes the configuration-change log (it waits on this reader), so the owner must assign one (not decided here).
+#### INT-AUDIT-1 — Connection-lifecycle audit *(DP-F approved 2026-10-14; implemented and merged — PR #1411, `af82fcb0`)*
+- **Scope.** Append-only audit table and writers for ingress create/rotate/disable; reader for the activity tab's second log. **Delivered 2026-10-14: table + writers.** The reader was deferred by owner decision D4 and is **owned by INT-UX-6** (owner decision, 2026-10-14), implementation deferred until the DP-E read permission is approved; INT-AUDIT-1 is complete without it.
 - **Depends on.** DP-F.
 - **Acceptance.** No secrets/payloads recorded; model rejects update/delete; existing operator events remain valid.
 - **Security.** Uuid user columns without FKs; tenant scoped.
@@ -981,7 +984,7 @@ Each Track P task, when promoted, must carry its own Scope / Dependencies / Acce
 
 ### Suggested order
 
-`INT-READY-1` → `INT-UX-1` → `INT-UX-2` → `INT-UX-3` ⟶ (decide DP-C, DP-F) ⟶ `INT-ACT-1` → `INT-UX-4`/`6` → `INT-AUDIT-1` → `INT-UX-5`. Track P starts only when an owner packet satisfies G1-G6 for one provider.
+`INT-READY-1` → `INT-UX-1` → `INT-UX-2` → `INT-UX-3` ⟶ (decide DP-C, DP-F) ⟶ `INT-ACT-1` → `INT-UX-4`/`6` → `INT-AUDIT-1` → `INT-UX-5`. *(Update 2026-10-14: `INT-AUDIT-1` is done; `INT-UX-6`'s configuration-change log now follows it and the DP-E read-permission decision.)* Track P starts only when an owner packet satisfies G1-G6 for one provider.
 
 ---
 
