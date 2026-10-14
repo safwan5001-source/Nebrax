@@ -446,6 +446,167 @@
     "axis": "products"
    },
    "expected": null
+  },
+  {
+   "name": "discovery (VD-4a): every display setting, shuffled input, canonical key order",
+   "type": "discovery",
+   "input": {
+    "maxItems": 16,
+    "showCounts": true,
+    "align": "start",
+    "cardStyle": "outlined",
+    "showLabel": false,
+    "size": "lg",
+    "shape": "arch",
+    "valueSort": "count",
+    "contentSequence": "label-first",
+    "textPosition": "overlay",
+    "gap": "loose",
+    "rows": 2,
+    "columns": {
+     "desktop": 6,
+     "tablet": 4,
+     "mobile": 2
+    },
+    "template": "boutique-arches",
+    "layout": "image-cards",
+    "display": "chips",
+    "dimension": "occasion",
+    "axis": "facet",
+    "title": "المناسبات"
+   },
+   "expected": {
+    "title": "المناسبات",
+    "axis": "facet",
+    "dimension": "occasion",
+    "display": "chips",
+    "layout": "image-cards",
+    "template": "boutique-arches",
+    "columns": {
+     "mobile": 2,
+     "tablet": 4,
+     "desktop": 6
+    },
+    "rows": 2,
+    "gap": "loose",
+    "textPosition": "overlay",
+    "contentSequence": "label-first",
+    "valueSort": "count",
+    "shape": "arch",
+    "size": "lg",
+    "showLabel": false,
+    "cardStyle": "outlined",
+    "align": "start",
+    "showCounts": true,
+    "maxItems": 16
+   }
+  },
+  {
+   "name": "discovery (VD-4a): integral numbers clamp into range, anything else drops its key",
+   "type": "discovery",
+   "input": {
+    "dimension": "recipient",
+    "columns": {
+     "mobile": 9,
+     "tablet": 1,
+     "desktop": "6",
+     "phone": 3
+    },
+    "rows": 5,
+    "maxItems": 2
+   },
+   "expected": {
+    "title": "",
+    "axis": "facet",
+    "dimension": "recipient",
+    "display": "tiles",
+    "columns": {
+     "mobile": 4,
+     "tablet": 2
+    },
+    "rows": 2,
+    "maxItems": 4
+   }
+  },
+  {
+   "name": "discovery (VD-4a): an integral float (6.0) is an integer; a fraction, NaN-like string or boolean is not",
+   "type": "discovery",
+   "input": {
+    "dimension": "recipient",
+    "columns": {
+     "mobile": 2.0,
+     "tablet": 3.5,
+     "desktop": true
+    },
+    "rows": 1.5,
+    "maxItems": 24.0
+   },
+   "expected": {
+    "title": "",
+    "axis": "facet",
+    "dimension": "recipient",
+    "display": "tiles",
+    "columns": {
+     "mobile": 2
+    },
+    "maxItems": 24
+   }
+  },
+  {
+   "name": "discovery (VD-4a): unknown values, unknown template, mistyped flags and a list of columns all drop",
+   "type": "discovery",
+   "input": {
+    "dimension": "recipient",
+    "layout": "masonry",
+    "template": "my-template",
+    "columns": [
+     3,
+     4,
+     6
+    ],
+    "gap": "huge",
+    "textPosition": "left",
+    "contentSequence": "random",
+    "valueSort": "price",
+    "shape": "blob",
+    "size": "xl",
+    "showLabel": "yes",
+    "cardStyle": 3,
+    "align": "end",
+    "showCounts": 1,
+    "maxItems": "12"
+   },
+   "expected": {
+    "title": "",
+    "axis": "facet",
+    "dimension": "recipient",
+    "display": "tiles"
+   }
+  },
+  {
+   "name": "discovery (VD-4a): the brand axis keeps its display settings",
+   "type": "discovery",
+   "input": {
+    "axis": "brand",
+    "template": "market-icons",
+    "maxItems": 8
+   },
+   "expected": {
+    "title": "",
+    "axis": "brand",
+    "display": "tiles",
+    "template": "market-icons",
+    "maxItems": 8
+   }
+  },
+  {
+   "name": "discovery (VD-4a): no section is created from display settings alone",
+   "type": "discovery",
+   "input": {
+    "layout": "image-grid",
+    "template": "gift-circles"
+   },
+   "expected": null
   }
  ]
 }

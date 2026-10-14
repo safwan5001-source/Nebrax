@@ -166,6 +166,48 @@ describe("Store Builder — data-backed section editors (ADR-21)", () => {
       expect(screen.queryByLabelText("Dimension")).toBeNull();
     });
 
+    it("keeps the display settings it does not edit when the merchant changes the title or display (VD-4a)", () => {
+      const stored = {
+        title: "Occasions",
+        axis: "facet",
+        dimension: "occasion",
+        display: "tiles",
+        layout: "image-cards",
+        template: "boutique-arches",
+        columns: { mobile: 2, desktop: 6 },
+        shape: "arch",
+        showCounts: true,
+        maxItems: 16,
+      };
+      const onChange = renderPanel(withSection("discovery", stored));
+      fireEvent.change(screen.getByLabelText("Display"), { target: { value: "chips" } });
+      expect(lastContent(onChange)).toEqual({ ...stored, display: "chips" });
+      fireEvent.change(screen.getByLabelText("Browse by"), { target: { value: "brand" } });
+      const { dimension: _dimension, ...withoutDimension } = stored;
+      expect(lastContent(onChange)).toEqual({ ...withoutDimension, axis: "brand", display: "chips" });
+    });
+
+    it("keeps the display settings through an edit that briefly empties the section (VD-4a review)", () => {
+      const stored = { title: "Brands", axis: "brand", display: "tiles", template: "market-icons", maxItems: 8 };
+      const config = withSection("discovery", stored);
+      const onChange = vi.fn((next: StorefrontPresentationConfig) => {
+        rerenderWith(next);
+      });
+      const { rerender } = render(
+        <ControlPanels panel="homepage" config={config} locale="en" liveStoreName={null} onChange={onChange} selectedSection="s1" />,
+      );
+      function rerenderWith(next: StorefrontPresentationConfig) {
+        rerender(
+          <ControlPanels panel="homepage" config={next} locale="en" liveStoreName={null} onChange={onChange} selectedSection="s1" />,
+        );
+      }
+      // brand → facet (no dimension yet: the section is emptied) → brand again.
+      fireEvent.change(screen.getByLabelText("Browse by"), { target: { value: "facet" } });
+      expect(lastContent(onChange)).toBeUndefined();
+      fireEvent.change(screen.getByLabelText("Browse by"), { target: { value: "brand" } });
+      expect(lastContent(onChange)).toEqual(stored);
+    });
+
     it("flags an incomplete facet section", () => {
       const onChange = renderPanel(withSection("discovery"));
       expect(document.querySelector("[data-section-incomplete]")).not.toBeNull();
