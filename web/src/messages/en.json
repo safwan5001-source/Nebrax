@@ -917,6 +917,7 @@
     "routingStateDefault": "Default",
     "routingStateCustom": "Custom",
     "routingStateInvalid": "Invalid — needs remapping",
+    "routingViolationsTitle": "Mapping violates the VAT role rules — still usable for posting but needs correction",
     "routingStateUnmapped": "Unmapped",
     "routingResetAction": "Reset to default",
     "routingResetConfirm": "This role will be reset to its default account. Continue?",
@@ -5426,6 +5427,8 @@
       "taxPayable": "VAT payable",
       "taxRecoverable": "VAT recoverable or carried forward",
       "taxHint": "A control summary of the input and output VAT account movements in posted entries; it is not a tax filing or a submission to the authority.",
+      "taxUnverified": "Unverified",
+      "taxUnverifiedHint": "These figures may include non-VAT movements or overlapping roles; do not rely on them for a filing until the warnings below are reviewed.",
       "loadFailed": "The report could not be loaded. Check your connection and try again.",
       "retry": "Try again"
     },

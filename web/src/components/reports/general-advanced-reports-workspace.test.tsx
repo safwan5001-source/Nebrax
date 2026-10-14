@@ -1,7 +1,7 @@
 import { cleanup, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 import { NextIntlClientProvider, type useTranslations } from 'next-intl';
-import { JournalTable } from './general-advanced-reports-workspace';
+import { JournalTable, TaxCard } from './general-advanced-reports-workspace';
 
 afterEach(cleanup);
 
@@ -88,5 +88,41 @@ describe('JournalTable', () => {
     expect(within(entryCards[1]).getByText('JV-002')).toBeTruthy();
     expect(within(entryCards[2]).getByText('Total')).toBeTruthy();
     expect(within(entryCards[2]).getAllByText(/200\.00/)).toHaveLength(2);
+  });
+});
+
+describe('TaxCard', () => {
+  const tax = { input_vat: '75.00', output_vat: '150.00', net_vat: '75.00', status: 'payable' as const };
+  const labels: Record<string, string> = {
+    taxReport: 'VAT report', outputVat: 'Output VAT', inputVat: 'Input VAT', netVat: 'Net VAT', taxPayable: 'Payable',
+    taxRecoverable: 'Recoverable', taxUnverified: 'Unverified', taxUnverifiedHint: 'Figures may include non-VAT movements',
+  };
+  const gTax = ((key: string) => labels[key] ?? key) as ReturnType<typeof useTranslations>;
+
+  it('shows no warning for a verified report or an older API without the verification field', () => {
+    const { rerender } = render(<TaxCard tax={{ ...tax, verification: { verified: true, status: 'verified', issues: 0 }, warnings: [] }} loading={false} g={gTax} />);
+    expect(screen.queryByText('Unverified')).toBeNull();
+    expect(screen.queryByRole('alert')).toBeNull();
+
+    rerender(<TaxCard tax={tax} loading={false} g={gTax} />);
+    expect(screen.queryByText('Unverified')).toBeNull();
+  });
+
+  it('never presents a contaminated total as verified: badge, notice and each warning are visible', () => {
+    render(
+      <TaxCard
+        tax={{
+          ...tax,
+          verification: { verified: false, status: 'unverified', issues: 1 },
+          warnings: [{ code: 'vat_role_accounts_overlap', account_code: '2120', message: 'Account 2120 overlaps both VAT roles' }],
+        }}
+        loading={false}
+        g={gTax}
+      />
+    );
+    expect(screen.getByText('Unverified')).not.toBeNull();
+    const alert = screen.getByRole('alert');
+    expect(within(alert).getByText('Figures may include non-VAT movements')).not.toBeNull();
+    expect(within(alert).getByText('Account 2120 overlaps both VAT roles')).not.toBeNull();
   });
 });

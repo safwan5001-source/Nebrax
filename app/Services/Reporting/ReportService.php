@@ -12,6 +12,7 @@ use App\Models\Partner;
 use App\Models\Payment;
 use App\Models\Purchase;
 use App\Models\ReturnDocument;
+use App\Services\Accounting\VatRoleIntegrityService;
 use App\Support\FiscalCloseJournals;
 use App\Tenancy\BranchScope;
 use Illuminate\Support\Carbon;
@@ -469,20 +470,41 @@ class ReportService
     }
 
     /**
-     * تقرير الضريبة من الحسابين النظاميين فقط: 1150 ضريبة المدخلات و2120 ضريبة
-     * المخرجات. صافي موجب = مستحق للهيئة، وسالب = رصيد قابل للاسترداد/الترحيل.
+     * تقرير الضريبة (REM-05 / ACC-01): مجموعة حسابات كل دور ضريبي = التعيين الحالي ∪ الحساب النظامي
+     * (1150/2120) ∪ كل حساب ورد في سجلّ تعيينات الدور. فالأرصدة المرحَّلة قبل إعادة التعيين تبقى محسوبة،
+     * وتبقى القيود المرمَّزة يدوياً بـ1150/2120 (REM-06) داخل النطاق. المدخلات = مدين − دائن على مجموعة
+     * المدخلات، والمخرجات = دائن − مدين على مجموعة المخرجات. صافي موجب = مستحق للهيئة، وسالب = قابل للاسترداد.
+     *
+     * الحقول الأربعة الأصلية بلا تغيير. إضافياً: `verification` (موثَّق/غير موثَّق) و`warnings` (تداخل أدوار،
+     * حسابات ملوّثة أو بلا أثر تدقيق، حركات من مصادر غير ضريبية) و`accounts` (الحسابات المجموعة ومصدر كل منها).
+     * مستأجر بتعيينات افتراضية نظيفة: الأرقام نفسها و`verified = true`.
      */
     public function taxReport(array $filters = []): array
     {
-        $movements = $this->movementsByAccount($filters)->keyBy(fn ($m) => $m['account']->code);
-        $input = (int) ($movements->get('1150')['net'] ?? 0);       // مدين − دائن
-        $output = -(int) ($movements->get('2120')['net'] ?? 0);    // دائن − مدين
+        $scope = app(VatRoleIntegrityService::class)->reportScope(
+            $filters['from'] ?? null,
+            $filters['to'] ?? null,
+            $this->branchIds($filters),
+        );
+
+        $movements = $this->movementsByAccount($filters)->keyBy(fn ($m) => $m['account']->id);
+        $net = fn (array $ids): int => (int) collect($ids)->sum(fn (string $id) => $movements->get($id)['net'] ?? 0);
+
+        $input = $net($scope['input_ids']);        // مدين − دائن
+        $output = -$net($scope['output_ids']);     // دائن − مدين
 
         return [
             'input_vat'  => $input,
             'output_vat' => $output,
             'net_vat'    => $output - $input,
             'status'     => $output - $input >= 0 ? 'payable' : 'recoverable',
+            'verification' => [
+                'verified' => $scope['warnings'] === [],
+                'status'   => $scope['warnings'] === [] ? 'verified' : 'unverified',
+                'issues'   => count($scope['warnings']),
+            ],
+            'warnings'   => $scope['warnings'],
+            'accounts'   => $scope['accounts'],
         ];
     }
 

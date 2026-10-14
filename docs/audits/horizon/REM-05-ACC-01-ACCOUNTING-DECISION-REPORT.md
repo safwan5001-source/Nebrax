@@ -1,12 +1,12 @@
 # REM-05 / ACC-01 — Accounting Decision Report: VAT account roles & tax-report accuracy
 
-STATUS: **PHASE 1 ONLY — DECISION REPORT FOR OWNER APPROVAL. NO IMPLEMENTATION. NOT MERGED. NOT DEPLOYED.**
+STATUS: **PHASE 1 DECISION REPORT — D-1…D-6 APPROVED BY THE OWNER (see §11). PHASE 2 IMPLEMENTED IN A SEPARATE DRAFT PR — see `REM-05-ACC-01-IMPLEMENTATION-REPORT.md`. NOT MERGED. NOT DEPLOYED.**
 DATE: 2026-10-14
 HORIZON: TAX-ZATCA (origin: AWJ-TAX-ZATCA-AUDIT-1 ACC-01 → backlog REM-05)
 ZONE: C — tax / accounting
 BASE: `origin/main` @ `899bcba4f3ecfbe4bf504c2276db2dc817daff42` (includes REM-04)
 
-> Not legal or tax advice. This report makes **no** statement of ZATCA Phase 2 compliance or production readiness. The accounting policy below is a recommendation; every item in §6 needs an explicit owner decision before any code is written (CLAUDE.md rule 6: policy is configured/decided, not assumed).
+> Not legal or tax advice. This report makes **no** statement of ZATCA Phase 2 compliance or production readiness. The accounting policy below was a recommendation; the owner has since decided every item in §6 (outcome and the safeguards added to D-5 are recorded in §11).
 
 ## 0. Verdict in five lines
 
@@ -169,3 +169,28 @@ Approve, amend or reject **D-1 … D-6** (recommendations in §6). Nothing will 
 * Audit: `AWJ-TAX-ZATCA-AUDIT-1.md` ACC-01 (L933-958), ACC-02; backlog card REM-05.
 * Probe: scratch test on the Laravel overlay (SQLite), run 2026-10-14, **not committed**; outputs reproduced in §3.
 * Existing tests that pin current behaviour: `GeneralReportTest::tax_report_uses_only_posted_vat_account_movements`, `AccountRoutingTest` (inactive/group/unknown/tenant isolation), `SalesPaymentAccountRoutingTest::mapped_tax_output_is_used_with_unchanged_vat_amount` (asserts only that the mapped account receives the VAT — no type check anywhere).
+
+## 11. Owner decisions (recorded after Phase 1) and how the implementation honours them
+
+| ID | Owner decision | Implemented as |
+|---|---|---|
+| D-1 | **APPROVED** — `tax_output` = liability, `tax_input` = asset | `VatRoleIntegrityService::ROLE_TYPES`; wrong type ⇒ 422 `reason: vat_type_mismatch` |
+| D-2 | **APPROVED** — distinct accounts; not cash/bank; not assigned to incompatible roles | `vat_roles_must_differ`, `vat_account_reserved_by_other_vat_role`, `vat_cash_bank_account` (bound `cash_bank_accounts` row **or** system cash/bank `1110`/`1120`), `vat_account_in_other_role`; and the reverse rule `account_reserved_for_vat` (no other role may take 1150/2120 or any account in a VAT role's history) |
+| D-3 | **APPROVED** — new VAT targets must be clean, except system VAT accounts and accounts already associated with that VAT role | `vat_account_not_clean` (any journal line on the account) unless the account is in the role's own set (current ∪ system default ∪ history) |
+| D-4 | **APPROVED** — preserve mappings and posted entries; no rewrite; explicit warnings for legacy invalid mappings | No migration, no rewrite; posting resolver untouched; `GET account-routing` returns an additive `mapping.violations` list per role; the tax report returns `warnings` |
+| D-5 | **APPROVED WITH SAFEGUARDS** — current + historical + system-default accounts; detect overlapping roles and potentially non-VAT movements; never present contaminated totals as verified | Report set = current ∪ system default ∪ history. Additive `verification {verified,status,issues}`, `warnings[]`, `accounts{input,output}`. `verified` is `false` whenever any warning exists. Detectors: role overlap, type mismatch, cash/bank account, account also mapped to a non-VAT role, activity predating the association (or no audit trail), lines from sources that never carry VAT (period-scoped) |
+| D-6 | **APPROVED** — allow valid remapping now; document and test the remaining REM-06 / Fiscal Close dependency | No freeze. Tests prove: the report stays complete via the system accounts after a remap even though credit notes still post to hard-coded `2120`; and Fiscal Close's VAT-control line reads **only the current role account** (documented, **not modified**) |
+
+### Deviations from the Phase-1 wording (all within the approved decisions)
+
+1. **`state` is not changed to `invalid` for a rule-violating legacy mapping.** `state: "invalid"` already means "posting fails closed" (inactive/group account). A legacy mapping that still posts correctly must not claim that, so the violation is carried by the **additive** `mapping.violations` array (empty when compliant) and `state` keeps its meaning.
+2. **`reset` is checked too** (type/exclusivity only; cleanliness is waived because the default is a system account). Phase 1 said "reset always allowed"; the narrow exception is a default account that another role currently occupies (it would create an overlap), which is rejected with an explicit reason instead of silently merging roles.
+3. **Overlap attribution.** An account that sits in both role sets (legacy invalid state) is attributed by its **type** (asset ⇒ input, liability ⇒ output; anything else counted in neither) instead of being counted twice, and the report is marked `unverified`. For default tenants this reproduces the old code-based split exactly (`1150` input, `2120` output).
+4. **Warnings are sticky for contaminated history.** An account that already carried activity before it joined a VAT role stays in that role's history forever, so the report remains `unverified` after the tenant remaps away. Clearing that requires an attestation mechanism (schema + owner policy) — **deferred, not implemented** (§12).
+5. **Out-of-scope follow-ups confirmed:** non-VAT roles still have no *type* validation (only the VAT-reserved rule); hard-coded VAT posters (REM-06) and Fiscal Close (reads the current role account only) are untouched.
+
+## 12. Deferred / not decided here
+
+* Attestation to clear `unverified` for a historically contaminated account (needs schema + owner decision).
+* A read-only operator audit command for production tenants (specified in §5.3, **not shipped**: no production database operation is authorised by this work).
+* Cash/bank records: `CashBankAccountService` creates a **new** ledger account for every cash/bank record (and the bootstrap binds only the system `1110`/`1120`), so product flows cannot bind an existing VAT-role account afterwards; a pre-existing or hand-edited binding is still caught by the mapping rules and flagged by the report (`vat_account_cash_bank`).

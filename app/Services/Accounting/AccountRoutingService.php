@@ -26,7 +26,10 @@ use RuntimeException;
  */
 class AccountRoutingService
 {
-    public function __construct(private TenantContext $tenantContext) {}
+    public function __construct(
+        private TenantContext $tenantContext,
+        private VatRoleIntegrityService $vatIntegrity,
+    ) {}
 
     /**
      * @return array{roles: list<array<string, mixed>>, domains: array<string, array{label_ar:string,label_en:string}>, eligible_accounts: list<array<string, mixed>>}
@@ -48,9 +51,10 @@ class AccountRoutingService
             ])
             ->all();
 
+        $violations = $this->vatIntegrity->violationsByRole();
         $roles = [];
         foreach (AccountingRoles::keys() as $key) {
-            $roles[] = $this->describeRoleFromMapping($key, $mappings->get($key));
+            $roles[] = $this->describeRoleFromMapping($key, $mappings->get($key), $violations[$key] ?? []);
         }
 
         return [
@@ -64,10 +68,14 @@ class AccountRoutingService
     public function setMapping(string $roleKey, string $accountId, ?User $actor): array
     {
         $this->assertConfigurableRole($roleKey);
-        $account = $this->assertEligibleAccount($accountId);
 
-        DB::transaction(function () use ($roleKey, $account, $actor) {
+        DB::transaction(function () use ($roleKey, $accountId, $actor) {
             $this->lockActiveTenant();
+
+            // REM-05: الأهلية تُفحص بعد قفل المستأجر وداخل المعاملة نفسها، فلا يستطيع تعيينان متزامنان
+            // (على PostgreSQL) حجز الحساب نفسه لدورين متعارضين — الثاني يرى التعيين الذي أتمّه الأول.
+            $account = $this->assertEligibleAccount($accountId);
+            $this->vatIntegrity->assertMappingAllowed($roleKey, $account);
 
             $previous = AccountRoleMapping::query()->where('role_key', $roleKey)->first();
             $previousAccount = $previous === null ? null : Account::query()->whereKey($previous->account_id)->first();
@@ -115,6 +123,9 @@ class AccountRoutingService
         DB::transaction(function () use ($roleKey, $defaultAccount, $actor) {
             $this->lockActiveTenant();
 
+            // الافتراضي النظامي يستوفي قواعد النوع والنظافة دائماً؛ يُفحص التعارض وحده (دور آخر يشغله).
+            $this->vatIntegrity->assertMappingAllowed($roleKey, $defaultAccount);
+
             $previous = AccountRoleMapping::query()->where('role_key', $roleKey)->first();
             $previousAccount = $previous === null ? null : Account::query()->whereKey($previous->account_id)->first();
 
@@ -142,11 +153,14 @@ class AccountRoutingService
     {
         $mapping = AccountRoleMapping::query()->where('role_key', $roleKey)->first();
 
-        return $this->describeRoleFromMapping($roleKey, $mapping);
+        return $this->describeRoleFromMapping($roleKey, $mapping, $this->vatIntegrity->violationsByRole()[$roleKey] ?? []);
     }
 
-    /** @return array<string, mixed> */
-    private function describeRoleFromMapping(string $roleKey, ?AccountRoleMapping $mapping): array
+    /**
+     * @param  list<array{code:string,message:string}>  $violations
+     * @return array<string, mixed>
+     */
+    private function describeRoleFromMapping(string $roleKey, ?AccountRoleMapping $mapping, array $violations = []): array
     {
         $meta = AccountingRoles::find($roleKey);
 
@@ -159,7 +173,7 @@ class AccountRoutingService
             'domain' => $meta['domain'],
             'legacy_code' => $meta['legacy_code'],
             'configurable' => $meta['configurable'],
-            'mapping' => $this->mappingStateFor($roleKey, $mapping),
+            'mapping' => $this->mappingStateFor($roleKey, $mapping, $violations),
         ];
     }
 
@@ -202,11 +216,17 @@ class AccountRoutingService
         }
     }
 
-    /** @return array{state:string, account: array<string,mixed>|null, is_default: bool} */
-    private function mappingStateFor(string $roleKey, ?AccountRoleMapping $mapping): array
+    /**
+     * `violations` (REM-05، إضافي): مخالفات تعيين قائم لقواعد الأدوار الضريبية. لا يغيّر `state` ولا
+     * يمنع الترحيل — التعيين القديم المخالف يبقى صالحاً للترحيل ويُعلَّم فقط (D-4).
+     *
+     * @param  list<array{code:string,message:string}>  $violations
+     * @return array{state:string, account: array<string,mixed>|null, is_default: bool, violations: list<array{code:string,message:string}>}
+     */
+    private function mappingStateFor(string $roleKey, ?AccountRoleMapping $mapping, array $violations = []): array
     {
         if ($mapping === null) {
-            return ['state' => 'unmapped', 'account' => null, 'is_default' => false];
+            return ['state' => 'unmapped', 'account' => null, 'is_default' => false, 'violations' => []];
         }
 
         $account = Account::query()->whereKey($mapping->account_id)->first();
@@ -215,6 +235,7 @@ class AccountRoutingService
                 'state' => 'invalid',
                 'account' => $account === null ? null : $this->accountSummary($account),
                 'is_default' => false,
+                'violations' => $violations,
             ];
         }
 
@@ -222,6 +243,7 @@ class AccountRoutingService
             'state' => 'mapped',
             'account' => $this->accountSummary($account),
             'is_default' => $account->code === AccountingRoles::legacyCodeFor($roleKey),
+            'violations' => $violations,
         ];
     }
 

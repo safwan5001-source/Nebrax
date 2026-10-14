@@ -41,6 +41,8 @@ interface RoleMapping {
   state: 'mapped' | 'invalid' | 'unmapped';
   account: RoleMappingAccount | null;
   is_default: boolean;
+  /** REM-05: مخالفات تعيين قائم لقواعد الأدوار الضريبية (إضافي؛ قد يغيب في خوادم أقدم). */
+  violations?: { code: string; message: string }[];
 }
 
 interface RoleRow {
@@ -210,6 +212,16 @@ export default function AccountRoutingPage() {
                           )}
                         </div>
                         <p className="mt-1 text-sm leading-relaxed text-muted">{description}</p>
+                        {(role.mapping.violations?.length ?? 0) > 0 && (
+                          <div role="alert" className="mt-2 rounded border border-negative/40 bg-negative/5 p-2 text-sm text-negative">
+                            <p className="font-medium">{t('routingViolationsTitle')}</p>
+                            <ul className="mt-1 list-disc space-y-0.5 ps-5">
+                              {role.mapping.violations?.map((violation) => (
+                                <li key={violation.code}>{violation.message}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
                       </div>
 
                       <div className="flex shrink-0 items-center gap-2">

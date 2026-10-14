@@ -113,9 +113,9 @@ REM-03 and REM-08 touch disjoint controllers (`Invoice/Return/Quote/DocumentRevi
 
 ### REM-05 / ACC-01 — status update (2026-10-14)
 
-> **REM-05 — PHASE 1 DELIVERED (decision report), awaiting owner policy approval; no implementation.** Report and evidence: `REM-05-ACC-01-ACCOUNTING-DECISION-REPORT.md`.
-> **Confirmed and reproduced:** `AccountRoutingService` accepts any active leaf account for `tax_input`/`tax_output` (incl. wrong types, the same account for both roles, cash/bank accounts); `ReportService::taxReport` reads fixed codes 1150/2120, so after a legitimate remap it reports the old accounts instead of the configured ones.
-> **Owner decisions pending (D-1…D-6):** allowed account types per role, role exclusivity, history rule, grandfathering of existing invalid mappings, history-aware report source, remaps while REM-06 is pending. Phase 2 starts only after approval.
+> **REM-05 — IN REVIEW (Draft PR), not closed**; closes only after approved merge and verification. Decisions D-1…D-6 approved by the owner (D-5 with safeguards). Reports: `REM-05-ACC-01-ACCOUNTING-DECISION-REPORT.md` (§11–§12) and `REM-05-ACC-01-IMPLEMENTATION-REPORT.md`.
+> **Implemented:** VAT-role eligibility (liability/asset, distinct, not cash/bank, not in another role, clean target; other roles cannot take VAT-reserved accounts) ⇒ **422 + `reason`**, evaluated under the tenant-row lock (PostgreSQL race proven); `taxReport` over the role-account set (current ∪ system default ∪ mapping history); additive `verification` / `warnings` / `accounts` and `mapping.violations`; legacy invalid mappings keep posting and are flagged. No schema change, no posting change.
+> **Remaining:** REM-06 (hard-coded VAT posters; GL split after a remap) and Fiscal Close VAT line (reads only the current role account) — documented and tested, not modified. Operator audit of remapped production tenants not run (no production access).
 
 ### REM-03 — card (ready for owner approval to start)
 
