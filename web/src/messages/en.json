@@ -7378,6 +7378,7 @@
     "resultCount": "{n, plural, one {<num>{count}</num> result} other {<num>{count}</num> results}}",
     "filteredCount": "<num>{count}</num> of <num>{total}</num>",
     "moreActions": "More actions",
+    "rowActionsHeader": "Row actions",
     "loading": "Loading…",
     "noResults": "No results",
     "retry": "Try again",

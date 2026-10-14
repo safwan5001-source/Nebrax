@@ -421,3 +421,25 @@ describe('DataTable CSV column order (H1-4A, additive)', () => {
     expect(await csvOf({ exportColumnOrder: ['status', 'number'] })).toBe('الحالة,الرقم,العميل,الإجمالي');
   });
 });
+
+describe('DataTable row-actions header (ERP-UX-015)', () => {
+  const withActions: ColumnDef<Row, unknown>[] = [
+    ...columns,
+    { id: 'actions', header: '', cell: () => <button type="button">view</button> },
+  ];
+
+  it.each(TEST_LOCALES)('names an empty actions header for assistive technology (%s)', (locale) => {
+    renderIntl(<DataTable columns={withActions} data={rows} showToolbar={false} />, locale);
+    const headers = within(screen.getByRole('table')).getAllByRole('columnheader');
+    const last = headers[headers.length - 1];
+    expect(last.textContent).toBe(locale === 'ar' ? 'إجراءات الصف' : 'Row actions');
+    expect(last.querySelector('.sr-only')).not.toBeNull();
+  });
+
+  it('leaves a labelled actions header untouched', () => {
+    const labelled: ColumnDef<Row, unknown>[] = [...columns, { id: 'actions', header: 'Tools', cell: () => null }];
+    renderIntl(<DataTable columns={labelled} data={rows} showToolbar={false} />, 'en');
+    const headers = within(screen.getByRole('table')).getAllByRole('columnheader');
+    expect(headers[headers.length - 1].textContent).toBe('Tools');
+  });
+});

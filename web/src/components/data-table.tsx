@@ -361,6 +361,9 @@ export function DataTable<T>({
                                 strokeWidth={1.7}
                               />
                             </button>
+                          ) : header.column.id === 'actions' && header.column.columnDef.header === '' ? (
+                            // عمود إجراءات الصف بلا عنوان مرئي: اسمٌ لقارئ الشاشة وحده (ERP-UX-015).
+                            <span className="sr-only">{t('rowActionsHeader')}</span>
                           ) : (
                             <span className="inline-flex items-center">
                               {flexRender(header.column.columnDef.header, header.getContext())}
