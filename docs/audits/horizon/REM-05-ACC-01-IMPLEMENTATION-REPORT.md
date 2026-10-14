@@ -127,21 +127,39 @@ Effects: trial balance, balance sheet, ledger and every account balance are **un
 | Local full `php artisan test` (SQLite) | 6,725 passed · 91 skipped · 38 failed — **all 38 environmental, none in touched code**: 26 Fuel tests need PHP `bcmath` (absent in this sandbox; CI installs it, `ci.yml` L97); 12 (`AuthRecoveryTest`, `UserInvitationTest`, `ResendMailTransportTest`) failed only because the local Laravel overlay lacked `app/Mail` + `resources/views` — after syncing them those 24 tests pass |
 | Local PostgreSQL accounting subset | run interrupted before its summary; the only failures seen were the same Fuel/`bcmath` cases. CI pgsql (full suite) is authoritative |
 
+#### Final verification after review rounds 1–2 (code head `0a76049`, `main` @ `51851c0` merged in)
+
+| Run | Result |
+|---|---|
+| `VatRoleIntegrityTest` (36) + `VatRoleIntegrityPostgresTest` (2) | SQLite ✅ 36/36 · PostgreSQL ✅ (forked-process concurrency included) |
+| Local full `php artisan test` (SQLite) | 6,774 passed · 93 skipped · **26 failed — all in 6 Fuel test classes that need PHP `bcmath`** (not installed in this sandbox; `ci.yml` installs it). None in accounting/report/routing code |
+| Local PostgreSQL accounting subset (`VatRole`, `AccountRouting`, `GeneralReport`, `FiscalYear`, `CreditNote`, `ReturnSourceVat`, Sales/Purchase routing) | 314 passed · 1 skipped · 0 failed |
+| Web (`vitest run`, all) | 591 files · 6,362 tests ✅ · `next build` ✅ (`tsc` clean for the touched files) |
+| `FiscalCloseService`, Fiscal Close screen | **not modified** (`git diff origin/main` empty for both) |
+
 **CI (GitHub Actions) is the authoritative full run** — see §9.
 
 ## 9. CI / Build status
 
-On code head `3a5951e` (PR #1457): `php artisan test (L11, sqlite)` ✅ · `php artisan test (L11, pgsql)` ✅ · `CI Gate` ✅ · `web build (Next.js)` ✅. The ZATCA SDK advisory workflow is not triggered (no path match).
+| Head | `php artisan test (L11, sqlite)` | `(L11, pgsql)` | `CI Gate` | `web build (Next.js)` |
+|---|---|---|---|---|
+| `3a5951e` (first implementation) | ✅ | ✅ | ✅ | ✅ |
+| `faa9308` (docs) | ✅ | ✅ | ✅ | ✅ |
+| `72a27b8` (review round 1 + main merge) | superseded | superseded | superseded | superseded (its check suite completed with no failure; per-job results not recorded here) |
+| **`0a76049` (code head, review round 2)** | ✅ | ✅ | ✅ | ✅ (both web jobs) |
+
+The ZATCA SDK advisory workflow is not triggered (no path match). The final head adds only this report on top of `0a76049`; its CI is re-checked and noted on the PR.
 
 ## 10. Branch / PR / SHAs
 
 | Item | Value |
 |---|---|
 | Branch | `feat/rem05-acc01-vat-role-integrity` |
-| PR | #1457 (Draft) → `main`. Supersedes Phase-1 docs PR #1453 (its commit is included here). |
-| Base | `main` @ `a9f4acfc7a8b4fbc4353dccb04705184c1f5d10c` |
-| Code head (verified by CI) | `3a5951e3f5156f8e96bddbba6b8a718c673d2f5b` |
-| Final head | the head of PR #1457; it adds only this report's §8–§10 on top of the verified code head (docs-only, no code change) |
+| PR | #1457 (Draft, **not merged, not deployed**) → `main`. Supersedes Phase-1 docs PR #1453 (its commit is included; #1453 left open) |
+| Original base | `main` @ `a9f4acfc7a8b4fbc4353dccb04705184c1f5d10c` |
+| Current base merged in | `main` @ `51851c0` (REM-04 follow-up #1461), merge commit `d3a6774` — no conflicts |
+| Code head (verified by CI, all four checks green) | `0a7604913ecb85cb8f440b6b0c178bf01942361a` |
+| Final head | head of PR #1457 = `0a76049` + one docs-only commit (this report); no code change |
 
 ## 12. Review round 1 — verification semantics, historical overlap, Fiscal Close disclosure
 
@@ -180,9 +198,18 @@ Review-round-2 tests (SQLite + PostgreSQL), all asserting both sides of the boun
 `the_branch_filter_decides_whether_a_contaminated_account_moved_in_scope` (movement in branch A / unallocated line; branch B ⇒ notice; no filter ⇒ unverified) ·
 `verification_and_warnings_never_cross_tenants` · plus `not_checked` asserted in the notices state. Web: 5 `TaxCard` tests (states, scope caption, disclosure kept in every state).
 
+### Outstanding risks after review rounds 1–2
+
+1. **REM-06 / Fiscal Close (unchanged, deferred by owner decision).** After a remap the ledger is split across old/new accounts and the Fiscal Close readiness line still shows the current role account only. REM-05 *discloses* the difference in the VAT report; it does not show it on the Fiscal Close screen and does not reconcile it.
+2. **`verified_with_notices` is not clearance.** It means only that role-account checks passed and the warnings concern accounts with no movement in the requested scope; the report's `not_checked` list and the scope caption say so. A downstream consumer must not treat it as filing readiness.
+3. **Movement-based scoping is conservative, not exhaustive.** A warning on an account that moved in scope always keeps the figures `unverified`, even if the contaminating lines are outside the scope (pre-mapping activity cannot be dated per line). A durable clean verdict still needs an attestation mechanism — deferred.
+4. **Deny-list source detector** (`vat_account_non_vat_source`) only catches known non-VAT sources; unknown contamination by a legitimate-looking source is not detectable here.
+5. **Local environment gaps** (not product issues): PHP `bcmath` absent (26 Fuel tests); CI is authoritative for those.
+6. **Production blast radius unknown** — no production access; the read-only operator audit is specified, not run.
+
 ## 11. Next recommended step
 
-1. Owner review of this Draft PR (accounting rules in §3, report contract in §4).
+1. Owner review of this Draft PR (accounting rules in §3, report contract in §4 and §12). **Stop here — no merge/deploy without explicit approval.**
 2. **REM-06** (semantic routing of the remaining hard-coded VAT posters and the Fiscal Close VAT control line) — removes risks 1–2.
 3. Operator-run read-only audit of remapped tenants (no production access from this work) before rollout.
 4. Optional: attestation to clear historical `unverified`, and type validation for the remaining roles.
