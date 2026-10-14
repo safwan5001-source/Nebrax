@@ -9,7 +9,7 @@ This file records the owner's closure decision (as supplied by Safwan) and the r
 
 Defer the remaining H1 risks and improvements to an independent Backlog, preparing a **conditional** closure of the Horizon. Proposed outcome: **READY FOR CONDITIONAL CLOSURE**. Actual state: **OPEN**.
 
-H1 closes only after: (1) the deferred items are recorded in a Backlog (this register is the repository reference); (2) H15-13 has its own independent treatment (§4); (3) the owner explicitly approves the final closure document.
+H1 closes only after: (1) the deferred items are recorded in a Backlog **with an owner per item or an owner-approved waiver** (this register is the repository reference); (2) H15-13 has its own independent treatment (§4); (3) **every unverified check in §3 has real test evidence or an individually recorded written waiver by the owner**; (4) the owner explicitly approves the final closure document. Approving the closure document (4) does **not** by itself waive any item of (1) or (3).
 
 ## 2. Register of deferred items
 
@@ -84,6 +84,7 @@ What was **not** done: neither state ("valid token + missing profile" and "valid
 |---|---|---|
 | 1 | Deferred items documented in a Backlog, **each with an owner** | **PENDING — not satisfied.** The register is written, but every item still has a `TBD` owner. This condition is complete **only** when, for **each** item, an owner/ticket is recorded **or** the owner records an explicit waiver with the owner's approval (a schedule alone does not complete it). Until then H1 cannot be closed, whatever the state of conditions 2 and 3 |
 | 2 | Independent treatment defined for H15-13 | **Facts and proposed scope written (§4); the task itself and its owner are for the owner to approve** |
-| 3 | Final closure document explicitly approved by the owner | **Pending** |
+| 3 | **Every §3 unverified check has evidence or a recorded written waiver** — real screen readers; Firefox; WebKit; native browser zoom; production build with the production Backend; real external integrations and real documents; concurrent PostgreSQL cases; stale-response guard under out-of-order latency (BL-H1-11) | **PENDING — not satisfied.** None of these has real test evidence and none has a recorded waiver. Each needs either (a) evidence recorded in a report, or (b) an individual written waiver by the owner naming the check (a bundle waiver or approval of this document is not sufficient). Basis: the H1-5 report records these checks as NOT VERIFIED / BLOCKED "not passes", and Final Acceptance §8 closes H1 only after the owner "accepts the unverified environments or runs them" |
+| 4 | Final closure document explicitly approved by the owner | **Pending** |
 
 Horizon state: **OPEN.** Nothing in this document merges, deploys or releases anything automatically.
