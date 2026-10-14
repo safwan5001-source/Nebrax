@@ -176,10 +176,12 @@ class SalesInvoicingNavigationParityTest extends TestCase
     }
 
     /** @test */
-    public function navigation_matches_the_route_guard_for_every_commercial_key(): void
+    public function navigation_matches_the_route_guard_for_every_commercial_key_under_uniform_grants(): void
     {
         // حارس شامل: لكل قدرة محروسة تجارياً، «ظاهرة في الشريط» ⇔ «قرار القراءة ليس DENIED»،
-        // في ثلاث حالات استحقاق متجانسة. أي قدرة تجارية جديدة تُغطّى تلقائياً.
+        // في ثلاث حالات استحقاق **متجانسة** (المنحة نفسها لكل القدرات). لا يغطّي المنح المختلطة
+        // عبر الاعتماديات: `navVisibility()` لا تقيّم الاعتماديات والحارس يقيّمها — فجوةٌ سابقة
+        // لا تمسّ `sales.invoicing` (بلا اعتماديات)، موثّقة في تقرير NAV-01 كمهمة مستقلة.
         $commercial = array_keys(array_filter(
             ApplicationCatalog::all(),
             fn (array $application) => $application['access'] === ApplicationCatalog::ACCESS_COMMERCIAL,

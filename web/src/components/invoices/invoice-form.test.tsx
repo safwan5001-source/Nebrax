@@ -1,6 +1,6 @@
 /* @vitest-environment jsdom */
 import * as React from 'react';
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { InvoiceForm } from './invoice-form';
@@ -749,6 +749,12 @@ describe('InvoiceForm — delivery-note draft entry follows the backend gates', 
   });
   const draftEntries = () => screen.queryAllByText('invoiceDraftAction');
   const navStateRequested = () => api.mock.calls.some(([path]) => path === '/applications/nav-state');
+  /** Waits until the nav-state read has resolved, so absence proves an explicit `false`, not the loading state. */
+  const navStateSettled = async () => {
+    await waitFor(() => expect(navStateRequested()).toBe(true));
+    const index = api.mock.calls.findIndex(([path]) => path === '/applications/nav-state');
+    await act(async () => { await api.mock.results[index].value; });
+  };
 
   it('shows the entry to an entitled tenant whose user may invoice delivery notes', async () => {
     signIn({ id: 'u1', role: 'accountant', permissions: ['invoices.manage', 'delivery_notes.invoice'] });
@@ -764,7 +770,7 @@ describe('InvoiceForm — delivery-note draft entry follows the backend gates', 
     render(<InvoiceForm />);
     await firstQty();
 
-    await waitFor(() => expect(navStateRequested()).toBe(true));
+    await navStateSettled();
     expect(draftEntries()).toHaveLength(0);
   });
 
@@ -774,7 +780,7 @@ describe('InvoiceForm — delivery-note draft entry follows the backend gates', 
     render(<InvoiceForm />);
     await firstQty();
 
-    await waitFor(() => expect(navStateRequested()).toBe(true));
+    await navStateSettled();
     expect(draftEntries()).toHaveLength(0);
   });
 
@@ -797,7 +803,7 @@ describe('InvoiceForm — delivery-note draft entry follows the backend gates', 
     respond({ ...navState(true), '/invoices/inv-1': { data: { id: 'inv-1', status: 'draft', lines: [] } } });
     render(<InvoiceForm editId="inv-1" />);
 
-    await waitFor(() => expect(navStateRequested()).toBe(true));
+    await navStateSettled();
     expect(draftEntries()).toHaveLength(0);
   });
 });

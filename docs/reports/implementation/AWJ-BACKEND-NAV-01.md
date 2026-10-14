@@ -132,5 +132,30 @@ A second surface had the same defect: `invoice-form.tsx` always offered "create 
 ## Remaining work (not in scope)
 - `navVisibility()` does not evaluate **dependencies**; `ApplicationAccessDecision` does. Example: a tenant entitled to `fuel_stations.avi` but not `fuel_stations.core` would see the AVI entry while its route guard denies it. This is pre-existing and does not involve `sales.invoicing` (which has no dependencies). It should be its own task, because aligning it changes behavior for non-mandatory keys.
 
-## CI / reviews / merge
-_Filled after CI and reviews._
+## Reviews
+
+### Implementer review
+- Every `nav-state` consumer was checked: only the sidebar's Delivery Notes item is keyed on `sales.invoicing`.
+- Demo mode (`mock-data.ts`) already reports the key as `true`.
+- No backend code emits bell notifications for delivery notes. "إشعارات التسليم" is the module itself.
+
+### Independent review (separate reviewer agent; Codex unavailable on recent PRs due to its usage limit)
+**No P1 or P2.** The reviewer confirmed nav-state matches the route guard in every entitlement state: none, FULL, READ_ONLY, revoked, expired, future-dated, lifecycle read-only, and legacy tenants. It also confirmed there are no collateral consumers and no grants.
+
+| # | P3 finding | Resolution |
+|---|---|---|
+| 1 | The "every commercial key" test only covers uniform grants; the dependency gap is hidden | Renamed to `…_under_uniform_grants` and the docblock now states the limit. The gap stays a separate task (Remaining work) |
+| 2 | Two web "hidden" tests could pass in the loading state (`null` also hides) | **Fixed:** the tests now wait for the nav-state read to resolve (`navStateSettled`). Mutation check: a hook that ignores `false` now fails the unentitled test |
+| 3 | The invoice form used the role-lenient `hasPermission` from `lib/delivery-notes` | **Fixed:** it now uses `@/lib/permissions`, which mirrors `Rbac::allows` like the sidebar |
+| 4 | One extra nav-state request per invoice-form mount; the banner appears after it resolves | Accepted: one small GET, no hydration mismatch. A shared nav-state cache would be a separate refactor |
+| 5 | Direct visits to `/delivery-notes*` rely on the page's 403 handling | Already handled by the pages (H1-5A: forbidden state, Retry and actions hidden on 403) |
+
+### AWJ Guardian review
+- **Entitlements and RBAC:** no rule changed and nothing granted; route guards untouched. Visibility only goes from shown to hidden, and only where the route already returns 403.
+- **Tenant isolation:** `TenantContext` + per-tenant grants; cross-tenant test included.
+- **Backward compatibility:** same response shape, one added key, all consumers verified.
+- **Accounting:** none. No financial operation, so no journal entries.
+- **Production:** no deploy.
+
+## CI / merge
+_Filled after CI._
