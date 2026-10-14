@@ -32,7 +32,7 @@ use RuntimeException;
  *              ويعالج المخزون.
  *
  *  مرتجع مبيعات (sales) — عكس البيع:
- *    مدين 4110 المبيعات + مدين 2120 ضريبة المخرجات │ دائن 1130/1110 (الإجمالي)
+ *    مدين 4110 المبيعات + مدين `tax_output` ضريبة المخرجات (افتراضياً 2120) │ دائن 1130/1110 (الإجمالي)
  *    وللبضاعة المتابَعة: قيد عكس التكلفة (مدين دور `inventory_asset` / دائن
  *    دور `cogs` — ACC-5) + إرجاع للمخزون.
  *    فإن كانت البضاعة **لا تعود للبيع** (سياسة المستأجر أو تصريح المستند):
@@ -65,12 +65,13 @@ class ReturnService
 {
     use ComputesLineTax;
 
-    // ACC-5: حسابات المخزون والتكلفة والتلف صارت أدواراً دلالية. الباقي هنا
-    // أكوادٌ ثابتة عمداً: طرفا مرتجع المبيعات التجاريان (1110/1130/2120/4110)
-    // خارج نطاق ACC-5، و5116 ليس دوراً معتمَداً في أي شريحة حتى اليوم.
+    // ACC-5: حسابات المخزون والتكلفة والتلف صارت أدواراً دلالية. REM-06: ضريبة مرتجع المبيعات
+    // تُحلّ من الدور الحالي `tax_output` عند الترحيل (R6-1، كما يفعل مرتجع المشتريات مع `tax_input`
+    // منذ ACC-4) — لا وراثة لحساب الفاتورة الأصلية؛ والعكس المحاسبي الحقيقي (`LedgerService::reverse`)
+    // يعكس الحسابات الأصلية. الباقي هنا أكوادٌ ثابتة عمداً: طرفا مرتجع المبيعات التجاريان
+    // (1110/1130/4110) خارج النطاق، و5116 ليس دوراً معتمَداً في أي شريحة حتى اليوم.
     private const ACC_CASH        = '1110';
     private const ACC_RECEIVABLE  = '1130';
-    private const ACC_OUTPUT_VAT  = '2120';
     private const ACC_SALES       = '4110';
     // PURCHASE_RETURN_VALUATION_VARIANCE (المعنى المحاسبي المستقبلي لميزة Account
     // Mapping القادمة): فرقٌ تقييمي بحت — اعتماد المورّد التجاري مقابل القيمة
@@ -595,10 +596,10 @@ class ReturnService
         $taxAmount = (int) $return->lines->sum('line_tax');
         $total = $subtotal + $taxAmount;
 
-        // قيد عكس البيع: مدين 4110 + مدين 2120 / دائن 1130 أو 1110
+        // قيد عكس البيع: مدين 4110 + مدين tax_output (افتراضياً 2120) / دائن 1130 أو 1110
         $lines = [['account_id' => $this->accountId(self::ACC_SALES), 'debit' => $subtotal]];
         if ($taxAmount > 0) {
-            $lines[] = ['account_id' => $this->accountId(self::ACC_OUTPUT_VAT), 'debit' => $taxAmount];
+            $lines[] = ['account_id' => $this->accountRoles->resolve('tax_output')->id, 'debit' => $taxAmount];
         }
         $creditLine = [
             'account_id' => $this->accountId($return->payment_type === 'cash' ? self::ACC_CASH : self::ACC_RECEIVABLE),

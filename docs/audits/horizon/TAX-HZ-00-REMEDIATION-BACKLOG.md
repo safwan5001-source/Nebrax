@@ -117,6 +117,13 @@ REM-03 and REM-08 touch disjoint controllers (`Invoice/Return/Quote/DocumentRevi
 > **Implemented:** VAT-role eligibility (liability/asset, distinct, not cash/bank, not in another role, clean target; other roles cannot take VAT-reserved accounts) ⇒ **422 + `reason`**, evaluated under the tenant-row lock (PostgreSQL race proven); `taxReport` over the role-account set (current ∪ system default ∪ mapping history); additive `verification` / `warnings` / `accounts` and `mapping.violations`; legacy invalid mappings keep posting and are flagged. No schema change, no posting change.
 > **Remaining:** REM-06 (hard-coded VAT posters; GL split after a remap) and Fiscal Close VAT line (reads only the current role account) — documented and tested, not modified. Operator audit of remapped production tenants not run (no production access).
 
+### REM-06 / ACC-02 — status update (2026-10-14)
+
+> **REM-06 — IN REVIEW (Draft PR #1473), not closed**; closes only after approved merge and verification. Reports: `REM-06-ACC-02-ACCOUNTING-DECISION-REPORT.md` and `REM-06-ACC-02-IMPLEMENTATION-REPORT.md`.
+> **Owner decisions:** R6-1/R6-2 = Option A (current `tax_output` / `tax_input` at posting time); R6-3 not applicable; ACC-4 purchase-return policy and `LedgerService::reverse` (original accounts) preserved.
+> **Implemented:** `ExpenseService`, `AssetService`, `ReturnService` (sales), `CreditNoteService` (sales + purchase) resolve the VAT role; missing/inactive mapping fails closed; default tenants post identical journals. `PosExchangeService` posts no VAT and is untouched (its legs go through `ReturnService`/`InvoiceService`).
+> **Remaining:** `FiscalCloseService` VAT line reads only the current role account (disclosed in the REM-05 report; separate follow-up); non-VAT hard-coded accounts; no production audit.
+
 ### REM-03 — card (ready for owner approval to start)
 
 | Field | Content |
