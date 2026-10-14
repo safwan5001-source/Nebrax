@@ -12,6 +12,7 @@ use App\Support\HostnameNormalizer;
 use App\Support\IcannRegistrableDomain;
 use App\Support\InvalidHostnameException;
 use App\Support\ManagedStorefrontHostname;
+use App\Support\StorefrontBaseDomainMisconfiguredException;
 use App\Tenancy\TenantContext;
 use App\Tenancy\TenantScope;
 use Illuminate\Database\QueryException;
@@ -1022,7 +1023,12 @@ final class CommerceWorkspaceStorefrontsService
                     && $domain->is_active
                     && $domain->isVerified();
             })
-            ->sortBy(fn (StorefrontDomain $domain) => ($domain->is_primary ? '0' : '1').$domain->hostname)
+            // P1 (Open Store): نطاق مُدار متداخل قديم (`{store}.{tenant}.{base}`) لا تغطّيه شهادة
+            // `*.{base}` فيفشل TLS — يُنزَل خلف أي مرشَّح آخر (مسطّح موثّق/مخصَّص)، ويبقى احتياطاً أخيراً
+            // إن لم يوجد غيره (توافق رجعي). الأفضلية بعدها كما كانت: الأساسي ثم الاسم. لا نعدّل is_primary.
+            // المرشَّحون أصلاً نشطون وموثَّقون ومن نفس المتجر والمستأجر (المرشِّح أعلاه).
+            ->sortBy(fn (StorefrontDomain $domain) => ($this->isLegacyNestedManagedHost((string) $domain->hostname) ? '1' : '0')
+                .($domain->is_primary ? '0' : '1').$domain->hostname)
             ->values();
 
         foreach ($candidates as $domain) {
@@ -1036,5 +1042,20 @@ final class CommerceWorkspaceStorefrontsService
         }
 
         return null;
+    }
+
+    /** مضيف داخل نطاق أَوْج المُدار لكن بأكثر من شريحة فوق الأساس (لا تغطيه شهادة wildcard). */
+    private function isLegacyNestedManagedHost(string $hostname): bool
+    {
+        try {
+            $base = ManagedStorefrontHostname::configuredBaseDomain();
+            $host = HostnameNormalizer::normalize($hostname);
+        } catch (StorefrontBaseDomainMisconfiguredException|InvalidHostnameException) {
+            return false;
+        }
+
+        return ManagedStorefrontHostname::isWithinBaseDomain($host, $base)
+            && $host !== $base
+            && ! ManagedStorefrontHostname::isUnderBaseDomain($host, $base);
     }
 }

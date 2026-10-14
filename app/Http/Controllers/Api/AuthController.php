@@ -8,6 +8,8 @@ use App\Mail\AuthActionMail;
 use App\Models\Branch;
 use App\Models\Warehouse;
 use App\Models\Tenant;
+use App\Services\Commerce\ManagedHostnameAvailability;
+use App\Support\ManagedHostNamespaceLock;
 use App\Support\CompanyProfile;
 use App\Models\Role;
 use App\Models\User;
@@ -45,6 +47,11 @@ class AuthController extends ApiController
         // ذرّية: المستأجر + دليل الحسابات + المالك في معاملة واحدة —
         // فشل أي خطوة لا يترك مستأجراً يتيماً بلا مالك (كان يحدث قبل).
         [$tenant, $user] = DB::transaction(function () use ($data) {
+            // فضاء أسماء المضيف المُدار مشترك مع storefront_domains: قفل مشترك يسلسلنا مع أي
+            // Backfill (قفل حصري) ثم إعادة فحص التصادم بعد القفل — يغلق سباق «فحص ثم إدراج».
+            ManagedHostNamespaceLock::shared();
+            app(ManagedHostnameAvailability::class)->assertTenantSlugFree($data['slug']);
+
             $tenant = Tenant::create([
                 'name'          => $data['company_name'],
                 'slug'          => $data['slug'],
