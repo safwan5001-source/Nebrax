@@ -2,11 +2,8 @@
 
 namespace App\Http\Requests;
 
-use App\Models\StorefrontDomain;
-use App\Support\ManagedStorefrontHostname;
-use App\Support\StorefrontBaseDomainMisconfiguredException;
+use App\Services\Commerce\ManagedHostnameAvailability;
 use App\Tenancy\ReservedTenantSlugs;
-use App\Tenancy\TenantScope;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -44,16 +41,8 @@ class RegisterRequest extends FormRequest
     private function slugNotUsedByManagedStorefrontHost(): \Closure
     {
         return function (string $attribute, mixed $value, \Closure $fail): void {
-            if (! is_string($value) || $value === '') {
-                return;
-            }
-            try {
-                $hostname = ManagedStorefrontHostname::forSlug($value);
-            } catch (StorefrontBaseDomainMisconfiguredException) {
-                return; // بيئة بلا نطاق متاجر مضبوط: لا مضيفات مُدارة أصلاً
-            }
-            if (StorefrontDomain::withoutGlobalScope(TenantScope::class)->where('hostname', $hostname)
-                ->where('type', StorefrontDomain::TYPE_AWJ_SUBDOMAIN)->exists()) {
+            if (is_string($value) && $value !== ''
+                && app(ManagedHostnameAvailability::class)->tenantSlugCollidesWithManagedHost($value)) {
                 $fail('هذا المعرّف غير متاح.');
             }
         };

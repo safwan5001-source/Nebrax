@@ -8,6 +8,7 @@ use App\Models\StorefrontDomain;
 use App\Models\Tenant;
 use App\Support\HostnameNormalizer;
 use App\Support\InvalidHostnameException;
+use App\Support\ManagedHostNamespaceLock;
 use App\Support\ManagedStorefrontHostname;
 use App\Support\StorefrontBaseDomainMisconfiguredException;
 use App\Tenancy\TenantScope;
@@ -79,6 +80,10 @@ final class FlatHostBackfillService
         }
 
         if ($execute) {
+            // أولاً وقبل أي قفل صف (ترتيب ثابت: advisory ← tenants ← domains ← storefronts ← channels):
+            // ينتظر تسجيلات المستأجرين الجارية ويحجب الجديدة حتى الالتزام. انظر ManagedHostNamespaceLock.
+            ManagedHostNamespaceLock::exclusive();
+
             $tenantIds = array_values(array_unique(array_map(fn ($s) => $s['tenant']->id, $sources)));
             sort($tenantIds);
             foreach ($tenantIds as $tenantId) {

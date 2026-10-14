@@ -392,6 +392,27 @@ class FlatHostBackfillTest extends TestCase
     }
 
     /** @test */
+    public function the_registration_transaction_recheck_rejects_a_slug_that_collides_with_a_backfilled_host(): void
+    {
+        $this->prodShape();
+        $this->backfill(true);
+
+        $this->expectException(\Illuminate\Validation\ValidationException::class);
+        app(\App\Services\Commerce\ManagedHostnameAvailability::class)->assertTenantSlugFree('dominah-h');
+    }
+
+    /** @test */
+    public function the_registration_recheck_ignores_custom_rows_and_unrelated_slugs(): void
+    {
+        $this->prodShape();
+        $svc = app(\App\Services\Commerce\ManagedHostnameAvailability::class);
+
+        $svc->assertTenantSlugFree('brand-new-tenant');
+        $this->assertFalse($svc->tenantSlugCollidesWithManagedHost('dominah-h')); // لم يُنفَّذ الـbackfill بعد
+        $this->addToAssertionCount(1);
+    }
+
+    /** @test */
     public function ambiguous_dash_concatenation_between_two_legacy_hosts_aborts(): void
     {
         $a = $this->tenant('a');
