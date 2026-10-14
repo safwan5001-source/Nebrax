@@ -85,7 +85,7 @@ interface NavItem {
   href: string;
   icon: LucideIcon;
   key: string;
-  /** الوحدات الجاهزة لها شاشة؛ غيرها رابط بشارة «قريباً» حتى تُبنى. */
+  /** الوحدات الجاهزة لها شاشة؛ غيرها عنصر ظاهر بشارة «قريباً» بلا رابط حتى تُبنى (ERP-UX-007). */
   built?: boolean;
   /**
    * مفتاح `ApplicationCatalog` الذي يتحكم بظهور هذا العنصر وحده — يختفي إن
@@ -361,6 +361,39 @@ const SUPER_GROUPS: { label: string; titles: string[] }[] = [
   { label: 'finance', titles: ['accounting', 'finance', 'hr', 'operations'] },
   { label: 'admin', titles: ['branches', 'settings', 'developer'] },
 ];
+
+/**
+ * وحدة غير مبنية: تبقى ظاهرة بشارة «قريباً» (DESIGN_SYSTEM.md) لكنها **ليست رابطاً** —
+ * كان الرابط يقود إلى صفحة 404 خارج الهيكل، ويُبقي طلب prefetch معلّقاً يؤخّر استقرار
+ * الصفحة الحالية. لا تنقّل ولا تركيز؛ `aria-disabled` يعلن الحالة لقارئ الشاشة.
+ */
+export function SoonNavEntry({
+  icon: Icon,
+  label,
+  soonLabel,
+  variant,
+}: {
+  icon: LucideIcon;
+  label: string;
+  soonLabel: string;
+  variant: 'list' | 'menu';
+}) {
+  return (
+    <div
+      role={variant === 'menu' ? 'menuitem' : undefined}
+      aria-disabled="true"
+      data-awj-nav-soon=""
+      className={cn(
+        'flex cursor-default items-center gap-2 rounded text-muted',
+        variant === 'list' ? 'h-11 pe-2 ps-2 text-[13px]' : 'px-2.5 py-1.5 text-sm'
+      )}
+    >
+      <Icon className={variant === 'list' ? 'h-[15px] w-[15px] shrink-0' : 'h-4 w-4 shrink-0'} strokeWidth={1.7} aria-hidden />
+      <span className="truncate">{label}</span>
+      <span className="ms-auto shrink-0 rounded bg-border px-1.5 py-0.5 text-[10px] font-normal text-muted">{soonLabel}</span>
+    </div>
+  );
+}
 
 export function Sidebar({
   open,
@@ -658,6 +691,11 @@ export function Sidebar({
                     {items.map((item) => {
                       const Icon = item.icon;
                       const active = isActive(item.href);
+                      if (!item.built) {
+                        return (
+                          <SoonNavEntry key={item.key} icon={Icon} label={t(item.key)} soonLabel={t('soon')} variant="list" />
+                        );
+                      }
                       return (
                         <Link
                           key={item.key}
@@ -677,11 +715,6 @@ export function Sidebar({
                         >
                           <Icon className="h-[15px] w-[15px] shrink-0" strokeWidth={1.7} />
                           <span className="truncate">{t(item.key)}</span>
-                          {!item.built && (
-                            <span className="ms-auto shrink-0 rounded bg-border px-1.5 py-0.5 text-[10px] font-normal text-muted">
-                              {t('soon')}
-                            </span>
-                          )}
                         </Link>
                       );
                     })}
@@ -716,6 +749,9 @@ export function Sidebar({
           })().map((item) => {
             const Icon = item.icon;
             const active = isActive(item.href);
+            if (!item.built) {
+              return <SoonNavEntry key={item.key} icon={Icon} label={t(item.key)} soonLabel={t('soon')} variant="menu" />;
+            }
             return (
               <Link
                 key={item.key}
@@ -731,11 +767,6 @@ export function Sidebar({
               >
                 <Icon className="h-4 w-4 shrink-0" strokeWidth={1.7} />
                 <span className="truncate">{t(item.key)}</span>
-                {!item.built && (
-                  <span className="ms-auto shrink-0 rounded bg-border px-1.5 py-0.5 text-[10px] text-muted">
-                    {t('soon')}
-                  </span>
-                )}
               </Link>
             );
           })}
