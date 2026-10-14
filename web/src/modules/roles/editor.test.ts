@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   canGrantKey,
+  cloneSeed,
   diffSelection,
   groupState,
   initialSelection,
@@ -96,5 +97,36 @@ describe('canGrantKey (display mirror of the grant ceiling)', () => {
     expect(canGrantKey(['invoices.view'], 'invoices.view')).toBe(true);
     expect(canGrantKey(['invoices.view'], 'invoices.manage')).toBe(false);
     expect(canGrantKey([], 'invoices.view')).toBe(false);
+  });
+});
+
+describe('cloneSeed (safe client-side clone)', () => {
+  const source = { permissions: ['products.view', 'pos.audit.export'] };
+
+  it('copies only catalogue keys, in catalogue order, and never mutates or aliases the source', () => {
+    const before = JSON.stringify(source);
+    const seed = cloneSeed(source, CATALOG, ['*'], 'Auditor (copy)');
+    expect(seed).toEqual({ name: 'Auditor (copy)', permissions: ['products.view', 'pos.audit.export'], skipped: 0 });
+    expect(seed.permissions).not.toBe(source.permissions);
+    seed.permissions.push('zatca.submit');
+    expect(JSON.stringify(source)).toBe(before);
+  });
+
+  it('expands the wildcard to explicit keys (custom roles cannot hold *)', () => {
+    const seed = cloneSeed({ permissions: ['*'] }, CATALOG, ['*'], 'Admin (copy)');
+    expect(seed.permissions).toEqual(CATALOG);
+    expect(seed.permissions).not.toContain('*');
+  });
+
+  it('leaves out what the actor cannot grant and counts it', () => {
+    const seed = cloneSeed(source, CATALOG, ['products.view'], 'X');
+    expect(seed.permissions).toEqual(['products.view']);
+    expect(seed.skipped).toBe(1);
+  });
+
+  it('ignores keys the catalogue no longer has', () => {
+    const seed = cloneSeed({ permissions: ['products.view', 'retired.key'] }, CATALOG, ['*'], 'X');
+    expect(seed.permissions).toEqual(['products.view']);
+    expect(seed.skipped).toBe(0);
   });
 });

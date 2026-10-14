@@ -92,3 +92,28 @@ export function canGrantKey(actorPermissions: string[], key: string): boolean {
 export function visibleKeys(groups: PermissionGroup[]): string[] {
   return groups.flatMap((group) => group.entries.map((entry) => entry.key));
 }
+
+export interface CloneSeed {
+  name: string;
+  /** مفاتيح الكتالوج بترتيبه — نسخةٌ جديدة لا تشارك مرجعاً مع الدور المصدر. */
+  permissions: string[];
+  /** صلاحيات المصدر التي استُبعدت لأن الفاعل لا يملك منحها (سقف المنح — عرضٌ لا أمان). */
+  skipped: number;
+}
+
+/**
+ * بذرة نسخ دورٍ على جانب العميل. **لا تلمس المصدر**: تقرأ منه المفاتيح فقط وتبني مصفوفة جديدة؛
+ * ولا يُنقل منه شيءٌ غير الصلاحيات (لا id ولا slug ولا نظامي/مالك ولا عدد مستخدمين) — فالنتيجة دائماً
+ * دورٌ مخصَّص جديد بلا مستخدمين. الوصول الكامل `*` يتحوّل إلى كل صلاحيات الكتالوج الصريحة (الدور المخصَّص
+ * لا يحمل `*`)، ثم يُستبعد ما يتجاوز صلاحيات الفاعل كي لا يُرفض الحفظ بـ403 سلفاً.
+ */
+export function cloneSeed(
+  source: Pick<RoleRecord, 'permissions'>,
+  catalog: string[],
+  actorPermissions: string[],
+  name: string,
+): CloneSeed {
+  const granted = grantedKeys(source, catalog);
+  const permissions = catalog.filter((key) => granted.has(key) && canGrantKey(actorPermissions, key));
+  return { name, permissions, skipped: granted.size - permissions.length };
+}

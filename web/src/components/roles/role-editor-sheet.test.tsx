@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import enMessages from '@/messages/en.json';
 import arMessages from '@/messages/ar.json';
 import type { CatalogLabels, RoleRecord } from '@/modules/roles/catalog';
+import { cloneSeed, type CloneSeed } from '@/modules/roles/editor';
 import { RoleEditorSheet } from './role-editor-sheet';
 
 const { api, toast, FakeApiError } = vi.hoisted(() => ({
@@ -46,7 +47,7 @@ const pick = (all: Record<string, unknown>) => ({ roleEditor: all.roleEditor, co
 
 function open(
   r: RoleRecord | null,
-  extra: { actor?: string[]; onClose?: () => void; onSaved?: (id?: string) => void; locale?: 'en' | 'ar' } = {},
+  extra: { actor?: string[]; onClose?: () => void; onSaved?: (id?: string) => void; locale?: 'en' | 'ar'; seed?: CloneSeed; source?: string } = {},
 ) {
   const locale = extra.locale ?? 'en';
   const all = (locale === 'en' ? enMessages : arMessages) as unknown as Record<string, unknown>;
@@ -60,6 +61,8 @@ function open(
         catalog={CATALOG}
         labels={LABELS}
         actorPermissions={extra.actor ?? ['*']}
+        seed={extra.seed}
+        sourceName={extra.source}
       />
     </NextIntlClientProvider>,
   );
@@ -292,5 +295,70 @@ describe('Arabic', () => {
     open(role(), { locale: 'ar' });
     expect(screen.getByText('اسم الدور')).toBeTruthy();
     expect(screen.getByText(/تسري التغييرات فوراً على المستخدمَين/)).toBeTruthy();
+  });
+});
+
+describe('safe client-side clone (AC-UX-04)', () => {
+  const source = role({ id: 'src', slug: 'role-src', name: 'Auditor', is_system: true, users_count: 7, permissions: ['products.view', 'pos.audit.export'] });
+  const seedFor = (actor: string[] = ['*']) => cloneSeed(source, CATALOG, actor, 'Auditor (copy)');
+
+  it('opens as a pre-filled NEW role: copy notice, seeded name and selection, Save enabled, and no source-only notes', () => {
+    open(null, { seed: seedFor(), source: 'Auditor' });
+    expect(screen.getByRole('heading', { name: 'Duplicate role' })).toBeTruthy();
+    expect(screen.getByRole('note').textContent).toBe('Copied from "Auditor". Review the permissions before saving.');
+    expect((screen.getByLabelText('Role name') as HTMLInputElement).value).toBe('Auditor (copy)');
+    expect(box('View', 'Products').checked).toBe(true);
+    expect(box(/Audit — Export/).checked).toBe(true);
+    expect(box(/Audit — View/).checked).toBe(false);
+    expect(save().disabled).toBe(false);
+    // لا ملاحظة «تسري على N مستخدم» ولا «دور نظامي»: النسخة دورٌ جديد بلا مستخدمين
+    expect(screen.queryByText(/Changes apply immediately/)).toBeNull();
+    expect(screen.queryByText(/System role/)).toBeNull();
+  });
+
+  it('POSTs only name and permissions — no id, slug, system flag or user count — and never PUTs the source', async () => {
+    const before = JSON.stringify(source);
+    open(null, { seed: seedFor(), source: 'Auditor' });
+    await userEvent.click(save());
+    await waitFor(() => expect(api).toHaveBeenCalledTimes(1));
+    const [path, init] = api.mock.calls[0] as [string, { method: string; body: Record<string, unknown> }];
+    expect(path).toBe('/roles');
+    expect(init.method).toBe('POST');
+    expect(Object.keys(init.body).sort()).toEqual(['name', 'permissions']);
+    expect(init.body).toEqual({ name: 'Auditor (copy)', permissions: ['products.view', 'pos.audit.export'] });
+    expect(JSON.stringify(source)).toBe(before);
+  });
+
+  it('editing the copy never alters the source role', async () => {
+    const before = JSON.stringify(source);
+    open(null, { seed: seedFor(), source: 'Auditor' });
+    await userEvent.click(box(/Audit — View/));
+    await userEvent.click(box('View', 'Products'));
+    await userEvent.click(save());
+    await waitFor(() => expect(api).toHaveBeenCalled());
+    expect(lastBody().permissions).toEqual(['pos.audit.view', 'pos.audit.export']);
+    expect(JSON.stringify(source)).toBe(before);
+  });
+
+  it('tells a limited actor what was left out, and the left-out permission cannot be re-added', async () => {
+    open(null, { seed: seedFor(['products.view']), source: 'Auditor', actor: ['products.view'] });
+    expect(screen.getByRole('note').textContent).toContain('1 permission you cannot grant was left out.');
+    expect(box('View', 'Products').checked).toBe(true);
+    expect(box(/Audit — Export/).checked).toBe(false);
+    expect(box(/Audit — Export/).disabled).toBe(true);
+  });
+
+  it('an untouched copy is still unsaved work: closing asks first', async () => {
+    const onClose = vi.fn();
+    open(null, { seed: seedFor(), source: 'Auditor', onClose });
+    await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(onClose).not.toHaveBeenCalled();
+    expect(await screen.findByText('Discard unsaved changes?')).toBeTruthy();
+  });
+
+  it('a copy of an empty selection still requires a permission', async () => {
+    open(null, { seed: { name: 'Empty (copy)', permissions: [], skipped: 3 }, source: 'Wide' });
+    expect(save().disabled).toBe(true);
+    expect(await screen.findByText('Select at least one permission.')).toBeTruthy();
   });
 });

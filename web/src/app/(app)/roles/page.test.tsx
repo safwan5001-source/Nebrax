@@ -29,7 +29,11 @@ vi.mock('@/lib/api', () => ({ api, ApiError: FakeApiError }));
 vi.mock('@/lib/auth', () => ({ currentUser: () => auth.current }));
 vi.mock('@/components/ui/toast', () => ({ useToast: () => toast }));
 vi.mock('@/components/roles/role-editor-sheet', () => ({
-  RoleEditorSheet: ({ role }: { role?: { id: string } | null }) => <div data-testid="role-dialog">{role ? `edit:${role.id}` : 'create'}</div>,
+  RoleEditorSheet: ({ role, seed, sourceName }: { role?: { id: string } | null; seed?: { name: string; permissions: string[]; skipped: number }; sourceName?: string }) => (
+    <div data-testid="role-dialog" data-seed={seed ? JSON.stringify(seed) : ''} data-source={sourceName ?? ''}>
+      {role ? `edit:${role.id}` : seed ? 'clone' : 'create'}
+    </div>
+  ),
 }));
 
 const CATALOG = ['invoices.view', 'invoices.manage', 'users.view', 'pos.audit.export', 'pos.audit.view'];
@@ -153,6 +157,47 @@ describe('viewer types (§4.8)', () => {
 
     await userEvent.click(within(detail).getByRole('button', { name: 'Edit role' }));
     expect((await screen.findByTestId('role-dialog')).textContent).toBe('edit:r3');
+  });
+
+  it('Duplicate opens a seeded create (not an edit) and leaves the source role untouched', async () => {
+    world();
+    renderPage();
+    await selectRole('Branch manager');
+    const detail = await screen.findByRole('region', { name: 'Branch manager' });
+    const before = JSON.stringify(ROLES);
+
+    await userEvent.click(within(detail).getByRole('button', { name: 'Duplicate role' }));
+    const editor = await screen.findByTestId('role-dialog');
+    expect(editor.textContent).toBe('clone');
+    expect(editor.getAttribute('data-source')).toBe('Branch manager');
+    expect(JSON.parse(editor.getAttribute('data-seed')!)).toEqual({
+      name: 'Branch manager (copy)',
+      permissions: ['invoices.view', 'invoices.manage', 'pos.audit.view'],
+      skipped: 0,
+    });
+    expect(JSON.stringify(ROLES)).toBe(before);
+    // لا نداء كتابة عند مجرد فتح المحرّر
+    expect(api.mock.calls.filter((c) => (c[1] as { method?: string } | undefined)?.method)).toEqual([]);
+  });
+
+  it('Duplicate drops permissions a limited manager cannot grant, and counts them', async () => {
+    auth.current = { id: 'me', role: 'role-mgr', permissions: ['roles.view', 'roles.manage', 'invoices.view', 'pos.audit.view'] };
+    world();
+    renderPage();
+    await selectRole('Branch manager'); // يحمل invoices.manage خارج صلاحياته
+    const detail = await screen.findByRole('region', { name: 'Branch manager' });
+    await userEvent.click(within(detail).getByRole('button', { name: 'Duplicate role' }));
+    const seed = JSON.parse((await screen.findByTestId('role-dialog')).getAttribute('data-seed')!);
+    expect(seed.permissions).toEqual(['invoices.view', 'pos.audit.view']);
+    expect(seed.skipped).toBe(1);
+  });
+
+  it('view-only holders get no Duplicate control', async () => {
+    auth.current = { id: 'me', role: 'role-x', permissions: ['roles.view'] };
+    world();
+    renderPage();
+    await screen.findByRole('region', { name: 'Owner' });
+    expect(screen.queryByRole('button', { name: 'Duplicate role' })).toBeNull();
   });
 
   it('disables with a reason what the server would refuse: owner, system delete, role with users', async () => {

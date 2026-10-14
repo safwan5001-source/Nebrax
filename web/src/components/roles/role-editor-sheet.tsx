@@ -24,6 +24,7 @@ import {
 } from '@/modules/roles/catalog';
 import {
   canGrantKey,
+  type CloneSeed,
   diffSelection,
   groupState,
   initialSelection,
@@ -82,6 +83,8 @@ export function RoleEditorSheet({
   catalog,
   labels,
   actorPermissions,
+  seed,
+  sourceName,
 }: {
   open: boolean;
   onClose: () => void;
@@ -93,6 +96,10 @@ export function RoleEditorSheet({
   labels: CatalogLabels;
   /** صلاحيات المشاهد الفعلية (مرآة سقف المنح). */
   actorPermissions: string[];
+  /** نسخٌ لدور: يبدأ الإنشاء باسمٍ وصلاحياتٍ مبذورة (يُحسب «تغييراً» فيحميه حارس التجاهل). */
+  seed?: CloneSeed;
+  /** اسم الدور المنسوخ للإشعار. */
+  sourceName?: string;
 }) {
   const t = useTranslations('roleEditor');
   const tc = useTranslations('common');
@@ -105,8 +112,8 @@ export function RoleEditorSheet({
   const initial = useMemo(() => initialSelection(role, catalog), [role, catalog]);
   const initialName = role?.name ?? '';
 
-  const [name, setName] = useState(initialName);
-  const [selected, setSelected] = useState<Set<string>>(initial);
+  const [name, setName] = useState(seed?.name ?? initialName);
+  const [selected, setSelected] = useState<Set<string>>(() => (seed ? new Set(seed.permissions) : initial));
   const [query, setQuery] = useState('');
   const [selectedOnly, setSelectedOnly] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -169,15 +176,21 @@ export function RoleEditorSheet({
       <SheetContent closeLabel={t('close')} className="sm:max-w-2xl">
         <header className="shrink-0 border-b border-border px-5 pb-3 pe-14 pt-4">
           <SheetTitle className="text-base font-semibold text-text">
-            {role ? `${t('title_edit')} — ${role.name}` : t('title_new')}
+            {role ? `${t('title_edit')} — ${role.name}` : seed ? t('title_clone') : t('title_new')}
           </SheetTitle>
           <SheetDescription className="mt-1 text-xs leading-relaxed text-muted">
-            {role ? t('description_edit') : t('description_new')}
+            {role ? t('description_edit') : seed ? t('description_clone') : t('description_new')}
           </SheetDescription>
         </header>
 
         <form onSubmit={submit} className="flex min-h-0 flex-1 flex-col">
           <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4">
+            {seed ? (
+              <p role="note" className="rounded border border-border bg-background px-3 py-2 text-xs text-text">
+                {t('cloned_from', { name: sourceName ?? '' })}
+                {seed.skipped > 0 ? ` ${t('clone_skipped', { n: seed.skipped, count: num(seed.skipped) })}` : ''}
+              </p>
+            ) : null}
             {readOnly ? <p className="rounded bg-primary-soft px-3 py-2 text-xs text-primary">{t('owner_note')}</p> : null}
             {!readOnly && role?.is_system ? (
               <p className="rounded border border-border px-3 py-2 text-xs text-muted">{t('system_note')}</p>
