@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import { BranchScope, useBranchVersion } from '@/components/layout/branch-scope';
 import { Sidebar } from '@/components/layout/sidebar';
 import { Topbar } from '@/components/layout/topbar';
@@ -17,6 +18,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [collapsed, setCollapsed] = useState(false);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const branchVersion = useBranchVersion();
+  const t = useTranslations('topbar');
 
   useEffect(() => {
     if (!isAuthenticated()) {
@@ -54,6 +56,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div data-posture="ledger" className="flex min-h-screen flex-col bg-background">
+      {/* أول عنصر قابل للتركيز: يتخطّى الشريط الجانبي والعلوي (~40 ضغطة Tab) إلى المحتوى (ERP-UX-006). */}
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:start-3 focus:top-3 focus:z-[200] focus:rounded focus:bg-surface focus:px-3 focus:py-2 focus:text-sm focus:font-medium focus:text-primary focus:shadow-md focus:outline-none focus:ring-2 focus:ring-primary"
+      >
+        {t('skip_to_content')}
+      </a>
       <AuthenticatedCompanyBrowserIdentity />
       <DemoBanner />
       <div className="flex min-h-0 flex-1">
@@ -65,8 +74,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           onToggleCollapse={() => setCollapsed((c) => !c)}
         />
         <div className="flex min-w-0 flex-1 flex-col">
-          <Topbar onMenuClick={() => setSidebarOpen(true)} menuButtonRef={menuButtonRef} />
-          <main className="min-w-0 flex-1 overflow-auto p-4 sm:p-6">
+          <Topbar onMenuClick={() => setSidebarOpen(true)} menuButtonRef={menuButtonRef} menuExpanded={sidebarOpen} />
+          <main id="main-content" tabIndex={-1} className="min-w-0 flex-1 overflow-auto p-4 outline-none sm:p-6">
             {/* تبديل الفرع يُعيد جلب بيانات الصفحة فوراً — بلا إعادة تحميل. */}
             <BranchScope>{children}</BranchScope>
           </main>

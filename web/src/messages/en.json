@@ -6559,7 +6559,8 @@
     "create": "Quick create",
     "new_invoice": "New invoice",
     "new_quote": "New quote",
-    "new_customer": "New customer"
+    "new_customer": "New customer",
+    "skip_to_content": "Skip to main content"
   },
   "helpCenter": {
     "title": "AWJ Help Center",
