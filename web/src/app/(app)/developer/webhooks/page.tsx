@@ -6,7 +6,7 @@ import { WebhooksWorkspace } from '@/components/developer/webhooks/webhooks-work
 export default function DeveloperWebhooksPage() {
   const access = useDeveloperAccess();
   return (
-    <DeveloperGate access={access} demoGate>
+    <DeveloperGate access={access} demoGate pageLevel>
       <WebhooksWorkspace canManage={access.canManage} />
     </DeveloperGate>
   );

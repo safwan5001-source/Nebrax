@@ -6,7 +6,7 @@ import { KeysWorkspace } from '@/components/developer/keys/keys-workspace';
 export default function DeveloperKeysPage() {
   const access = useDeveloperAccess();
   return (
-    <DeveloperGate access={access} demoGate>
+    <DeveloperGate access={access} demoGate pageLevel>
       <KeysWorkspace canManage={access.canManage} />
     </DeveloperGate>
   );

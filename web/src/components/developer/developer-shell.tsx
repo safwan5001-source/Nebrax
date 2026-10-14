@@ -38,9 +38,10 @@ export function useDeveloperAccess(): DeveloperAccess {
 }
 
 /** حالة «ممنوع» موحّدة — لمن لا يملك `developer.view` (وصولٌ مباشر رغم إخفاء الشريط). */
-export function DeveloperForbidden() {
+export function DeveloperForbidden({ pageLevel = false }: { pageLevel?: boolean }) {
   const t = useTranslations('developer.common');
-  return <EmptyState titleAs="h1" icon={LockKeyhole} title={t('forbidden')} description={t('forbiddenHint')} />;
+  // تحت `PageHeader` الصفحة يكون `h2`؛ وحين تكون الحالة هي الصفحة كلها يكون `h1` الصفحة.
+  return <EmptyState titleAs={pageLevel ? 'h1' : 'h2'} icon={LockKeyhole} title={t('forbidden')} description={t('forbiddenHint')} />;
 }
 
 /** حالة «غير متاح في المعاينة» — أدوات المطوّرين تعمل على الحساب الحقيقي فقط (§39: لا بيانات وهمية). */
@@ -56,14 +57,17 @@ export function DeveloperDemoUnavailable() {
 export function DeveloperGate({
   access,
   demoGate = false,
+  pageLevel = false,
   children,
 }: {
   access: DeveloperAccess;
   demoGate?: boolean;
+  /** الصفحة لا تعرض `PageHeader` خارج البوابة، فعنوان «ممنوع» هو `h1` الصفحة. */
+  pageLevel?: boolean;
   children: React.ReactNode;
 }) {
   if (!access.mounted) return <LoadingState rows={5} />;
-  if (!access.canView) return <DeveloperForbidden />;
+  if (!access.canView) return <DeveloperForbidden pageLevel={pageLevel} />;
   if (demoGate && access.demo) return <DeveloperDemoUnavailable />;
   return <>{children}</>;
 }
