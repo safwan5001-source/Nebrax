@@ -283,10 +283,17 @@ HORIZON: AWJ-COMMERCE-VISUAL-DIMENSIONS-H1 (Master Plan: `AWJ-VD-H1-MASTER-PLAN.
 **صفّ البُعد.** هويته الذاتية + افتراضات للقيم:
 ```jsonc
 {
-  "self":     { "content": …, "image": MediaRef, "icon": …, "iconColor": …, "background": … },
+  "self":     { "content": …, "image": MediaRef, "icon": …, "iconColor": …, "background": …,
+                "shape": …, "size": …, "showLabel": … },   // مظهر البُعد نفسه (بطاقة/غلاف البُعد)
   "defaults": { "content": …, "icon": …, "iconColor": …, "background": …, "shape": …, "size": …, "fit": …, "showLabel": … }
 }
 ```
+
+**مظهر البُعد نفسه مقابل افتراضات قيمه** (بعد ملاحظة Codex P2 على #1472):
+- `self` يحمل هوية البُعد **ومظهره**: المحتوى، والصورة، والأيقونة، والألوان، و`shape`، و`size`، و`showLabel`. ويحلّه المحلّل بالسلسلة نفسها: `self` → القالب → النظام.
+- `defaults` يحمل ما **ترثه القيم**.
+- **الاثنان مستقلان تماماً:** تغيير شكل بطاقة البُعد لا يغيّر شكل قيمه، والعكس.
+- fixtures الـnormalizer والمحلّل تغطي حقول `self` الثلاثة (VD-1a).
 
 **قواعد التطبيع** (ثلاثية التوأمة: PHP سلطة + TS web + TS storefront، مع fixture مشترك `tests/Fixtures/presentation/facet-visual.json`):
 - المفاتيح المجهولة تُسقط.
@@ -609,6 +616,17 @@ HORIZON: AWJ-COMMERCE-VISUAL-DIMENSIONS-H1 (Master Plan: `AWJ-VD-H1-MASTER-PLAN.
   - عند غياب `commerce.manage`: تبويبا الهوية للقراءة فقط مع تفسير.
   - عند تعطّل مكتبة الوسائط (`use-media-capability`): خيار الصورة معطّل مع سبب صريح.
 - **فك الارتباط:** `MediaRefField` يربطه نوع `t` بكتالوج رسائل المُخصِّص. يُفك بمحوّل رسائل صغير دون تكرار المكوّن.
+- **وضع «اختيار فقط» لـ`MediaRefField`** (بعد ملاحظة Codex P2 على #1472):
+  - **المشكلة:** إجراء «تعديل الصورة» القائم يفتح `MediaFramingEditor` (`MediaRefField.tsx:229-243`). ذلك المحرر يُصدر `crop` و`rotate`، ويخزّن التكبير داخل `crop.zoom` (`presentation/media-ref.ts:33-55`). أما عقد الهوية فيرفض `crop`/`rotate`، ويتوقع `zoom` في مستوى `image` نفسه. استعماله كما هو يؤدي إلى 422 من الكتابة الصارمة، أو إلى فقدان التكبير.
+  - **الحل:**
+    - خاصية إضافية اختيارية `framing={false}` على `MediaRefField`، بافتراض `true` فيبقى سلوك المُخصِّص حرفياً. عند `false` يُخفى إجراء «تعديل الصورة» ولا يُركَّب `MediaFramingEditor`. يبقى الاختيار والاستبدال والإزالة والنص البديل والشارة الزخرفية.
+    - **محوّل صريح** `toFacetImage(ref)` يأخذ من `MediaRef` الحقول `mediaId` و`alt` و`decorative` **فقط**، ويُسقط `crop` و`rotate` وكل ما سواها. والاتجاه المعاكس `fromFacetImage()` لا يُنتج `crop` أبداً.
+    - **التأطير** (`fit`/`focal`/`zoom`) يُحرَّر بأدوات تبويب «المظهر» الخاصة، ويُكتب في `image.fit` و`image.focal` و`image.zoom` مباشرةً.
+  - **اختبارات VD-3:**
+    - `framing={false}` لا يعرض زر التعديل.
+    - المحوّل لا يُخرج `crop` ولا `rotate` أبداً، حتى من `MediaRef` يحملهما.
+    - حفظ تكبير 1.4 يُرسل `image.zoom: 1.4`.
+    - سلوك المُخصِّص الافتراضي بلا تغيير (اختبار انحدار).
 
 **المتجر (VD-4b):**
 - `FacetVisualTile` يعرض:
@@ -687,7 +705,7 @@ HORIZON: AWJ-COMMERCE-VISUAL-DIMENSIONS-H1 (Master Plan: `AWJ-VD-H1-MASTER-PLAN.
 
 ## 7. التوصية
 
-اعتماد القرارات D-01 حتى D-15 في `AWJ-VD-H1-DECISION-REGISTER.md` كما هي مقترحة.
+اعتماد القرارات **D-01 حتى D-17** في `AWJ-VD-H1-DECISION-REGISTER.md`، **بما فيها D-16** (تسلسل حذف الوسيط مع الحفظ بقفل الصف) **وD-17** (رمز النسخة الإلزامي وعدم حذف صف الهوية). القراران الجديدان PROPOSED، ويجب اعتمادهما صراحةً لإغلاق G0.
 
 بعد الاعتماد:
 - تبدأ VD-1a (العقد والسجلّات، بلا DB ولا API).

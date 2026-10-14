@@ -42,6 +42,14 @@ This slice is **documentation only**. No code, migration, API, or runtime behavi
 | P2: `CURRENT-STATE.md` defines G0 as D-01..D-15 | **Valid.** | Updated to D-01..D-17 in every pointer. |
 | P2: no image preview for a read-only user (no `commerce.manage`) | **Valid.** | `visual_preview` signed URLs on the existing variant route, only for referenced media, with tests. No new endpoint and no RBAC change (D-04). |
 
+## Codex review round 5 (on `242d7f7`) — changes applied
+
+| Finding | Assessment | Change |
+|---|---|---|
+| P2: §7's final recommendation still says D-01..D-15 | **Valid.** | Updated to D-01..D-17, naming D-16 and D-17. |
+| P2: reusing `MediaRefField` as-is emits `crop`/`rotate` and `crop.zoom` | **Valid.** | Optional `framing={false}` (default `true`, so the customizer is unchanged) + a `toFacetImage()` adapter that drops `crop`/`rotate`. Framing lives in the appearance tab. Tests added. |
+| P2: `self` has no `shape`/`size`/`showLabel` | **Valid.** | Added to `self`, independent of `defaults`, and covered in fixtures. |
+
 ## Repository evidence / root cause
 
 See `AWJ-VD-H1-0-EVIDENCE-AND-ARCHITECTURE.md` §2. Key facts:
