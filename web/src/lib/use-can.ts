@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useSyncExternalStore } from 'react';
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { api } from './api';
 import { currentUser, persistUser, type AuthUser } from './auth';
 import { createCapabilities, type Capabilities } from './capabilities';
@@ -50,33 +50,38 @@ export function useCan(): UseCan {
 /** أقل فاصل بين قراءتين لـ`/me` من أحداث التركيز (الأولى عند التركيب غير مقيَّدة). */
 export const PERMISSION_REFRESH_MIN_INTERVAL_MS = 30_000;
 
+let refreshInFlight: Promise<void> | null = null;
+
 /**
- * يعيد قراءة `/me` عند تركيب الغلاف وعند عودة التركيز/الظهور للتبويب، ويحدّث الدور والصلاحيات المخزَّنة
- * إن تغيّرت فقط. فشل الشبكة أو استجابة غير صالحة تُتجاهل بصمت — لا يُمسّ المخزَّن ولا يُسجَّل الخروج
- * من هنا (ذلك شأن طبقة `api` عند 401).
+ * قراءة `/me` واحدة تُحدِّث الدور والصلاحيات **والنطاق** المخزَّنة إن تغيّرت فقط. طلبٌ واحد قيد التنفيذ يُشارَك بين كل
+ * مستدعٍ (غلاف التطبيق و`useActorScope`)، فلا طلبان متزامنان. الفشل أو استجابة غير صالحة تُتجاهل بصمت — لا يُمسّ
+ * المخزَّن ولا يُسجَّل الخروج من هنا (ذلك شأن طبقة `api` عند 401).
  */
+export function refreshAccessFromMe(): Promise<void> {
+  if (refreshInFlight) return refreshInFlight;
+  refreshInFlight = api<{ user?: Partial<AuthUser> }>('/me')
+    .then((response) => {
+      const next = mergeRefreshedAccess(currentUser(), response?.user);
+      if (next) persistUser(next, { applyDisplayPreferences: false });
+    })
+    .catch(() => {})
+    .finally(() => {
+      refreshInFlight = null;
+    });
+  return refreshInFlight;
+}
+
+/** يعيد قراءة `/me` عند تركيب الغلاف وعند عودة التركيز/الظهور للتبويب (مع تقييد زمني للأحداث). */
 export function usePermissionRefresh(enabled: boolean): void {
   useEffect(() => {
     if (!enabled || isDemo()) return;
-    let inFlight = false;
     let lastStartedAt = 0;
-    let disposed = false;
 
     const refresh = (force: boolean) => {
       const now = Date.now();
-      if (inFlight || (!force && now - lastStartedAt < PERMISSION_REFRESH_MIN_INTERVAL_MS)) return;
-      inFlight = true;
+      if (refreshInFlight || (!force && now - lastStartedAt < PERMISSION_REFRESH_MIN_INTERVAL_MS)) return;
       lastStartedAt = now;
-      api<{ user?: Partial<AuthUser> }>('/me')
-        .then((response) => {
-          if (disposed) return;
-          const next = mergeRefreshedAccess(currentUser(), response?.user);
-          if (next) persistUser(next, { applyDisplayPreferences: false });
-        })
-        .catch(() => {})
-        .finally(() => {
-          inFlight = false;
-        });
+      void refreshAccessFromMe();
     };
 
     const onFocus = () => refresh(false);
@@ -88,9 +93,64 @@ export function usePermissionRefresh(enabled: boolean): void {
     window.addEventListener('focus', onFocus);
     document.addEventListener('visibilitychange', onVisibility);
     return () => {
-      disposed = true;
       window.removeEventListener('focus', onFocus);
       document.removeEventListener('visibilitychange', onVisibility);
     };
   }, [enabled]);
+}
+
+export interface ActorScope {
+  /** **الفراغ = غير مقيَّد** (كل الفروع)، لا «لا شيء». */
+  branches: string[];
+  warehouses: string[];
+}
+
+/**
+ * نطاق المستخدم الحالي نفسه من `/me` (AC-UX-11) — بلا استنتاج من `GET /users` وبلا حاجة إلى `users.view`.
+ *
+ * - `undefined` = ما زال يُقرأ (أو لم يُرطَّب بعد)؛
+ * - `null` = انتهت القراءة ولم يُعرف النطاق (فشل `/me` أو خادم لا يرسله) — يعامله المستدعي بحذر؛
+ * - كائنٌ = معروف.
+ *
+ * يقرأ المخزَّن أولاً (يُملأ من تحديث الغلاف)، وإن لم يوجد يطلب `/me` بنفسه عبر الطلب المشترك — إلا إن مُرِّر `enabled: false`
+ * (شاشةٌ لا تحتاج النطاق، كمشاهد قراءة فقط) فلا طلب إضافي. وضع المعاينة (demo)
+ * مالكٌ غير مقيَّد. المرجع المُعاد ثابتٌ ما دامت المصفوفتان نفسيهما لم تتغيّرا. للعرض وحده — الخادم هو السلطة.
+ */
+export function useActorScope({ enabled = true }: { enabled?: boolean } = {}): ActorScope | null | undefined {
+  const user = useCurrentUser();
+  const hydrated = useHydrated();
+  const [settled, setSettled] = useState(false);
+  const demo = hydrated && isDemo();
+  const branches = user?.branch_ids;
+  const warehouses = user?.warehouse_ids;
+  const known = Array.isArray(branches) && Array.isArray(warehouses);
+  const userId = user?.id ?? null;
+
+  useEffect(() => {
+    if (!enabled || !hydrated || userId === null || known || demo) return;
+    let live = true;
+    void refreshAccessFromMe().finally(() => {
+      if (live) setSettled(true);
+    });
+    return () => {
+      live = false;
+    };
+  }, [enabled, hydrated, userId, known, demo]);
+
+  const previous = useRef<ActorScope | null | undefined>(undefined);
+  const next = useMemo<ActorScope | null | undefined>(() => {
+    if (!hydrated) return undefined;
+    if (demo) return { branches: [], warehouses: [] };
+    if (userId === null) return null;
+    if (Array.isArray(branches) && Array.isArray(warehouses)) return { branches, warehouses };
+    return settled ? null : undefined;
+  }, [hydrated, demo, userId, branches, warehouses, settled]);
+
+  // ثبات بالقيمة: مصفوفاتٌ جديدة بالمحتوى نفسه (مثلاً بعد إعادة قراءة التخزين) لا تُنتج مرجعاً جديداً يُعيد تشغيل المستهلكين.
+  const prior = previous.current;
+  if (prior && next && prior.branches.join('\u0000') === next.branches.join('\u0000') && prior.warehouses.join('\u0000') === next.warehouses.join('\u0000')) {
+    return prior;
+  }
+  previous.current = next;
+  return next;
 }

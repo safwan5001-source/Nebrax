@@ -142,7 +142,6 @@ export function EmployeeDialog({
   initialAllowAccess = false,
   canManageUsers = false,
   actorScope,
-  canReadActorScope = true,
 }: {
   open: boolean;
   onClose: () => void;
@@ -155,19 +154,13 @@ export function EmployeeDialog({
   /** إظهار قسم الدخول أصلاً — يقتصر على مالك/مدير يديران المستخدمين والأدوار. */
   canManageUsers?: boolean;
   /**
-   * نطاق المشاهد المخزَّن (من صفّه في قائمة المستخدمين): فراغٌ في بُعدٍ = غير مقيَّد.
+   * نطاق المشاهد نفسه من `/me` (`useActorScope`، AC-UX-11): فراغٌ في بُعدٍ = غير مقيَّد. لا يتطلب `users.view`.
    * الموظف يُحفظ قبل طلب المستخدم، فلا نمنح الدخول إلا حين يكون النطاق **معروفاً فعلاً** (وإلا لَرُفض الطلب الثاني وبقي موظفٌ بلا دخول):
-   * - `undefined` = ما زال يُحمَّل ⇒ يُمنع مؤقتاً؛
-   * - `null` = انتهى البحث ولم يُعرف النطاق (فشل الطلب أو لا صفّ) ⇒ يُمنع منح الدخول بسببٍ صريح (حفظ الموظف وحده يبقى ممكناً)؛
+   * - `undefined` = ما زال يُقرأ ⇒ يُمنع مؤقتاً؛
+   * - `null` = انتهت القراءة ولم يُعرف النطاق (فشل `/me`) ⇒ يُمنع منح الدخول بسببٍ صريح (حفظ الموظف وحده يبقى ممكناً)؛
    * - كائنٌ = معروف.
    */
   actorScope?: { branches: string[]; warehouses: string[] } | null;
-  /**
-   * هل يستطيع المشاهد قراءة قائمة المستخدمين (`users.view`) أصلاً؟ بدونها لا مصدر لنطاقه (`GET /users` خلف `users.view` بينما
-   * إنشاء المستخدم خلف `users.manage` فقط)، فلا نحجب عنه سير العمل كلّه: يُترك الحسم للخادم ورسالته تُعرض كما هي.
-   * الافتراضي `true` (فيُشترط معرفة النطاق).
-   */
-  canReadActorScope?: boolean;
 }) {
   const t = useTranslations('hr');
   const tu = useTranslations('users');
@@ -314,8 +307,8 @@ export function EmployeeDialog({
   const scopeIssuesNow = accessActive
     ? scopeIssues(initialScope, scope, scopeCaps, actorRestricted, Boolean(linkedUser))
     : { branches: null, warehouses: null };
-  const scopeLoading = accessActive && canReadActorScope && actorScope === undefined;
-  const scopeUnavailable = accessActive && canReadActorScope && actorScope === null;
+  const scopeLoading = accessActive && actorScope === undefined;
+  const scopeUnavailable = accessActive && actorScope === null;
   const scopeBlocked = Boolean(scopeIssuesNow.branches || scopeIssuesNow.warehouses) || scopeLoading || scopeUnavailable;
 
   async function submit(e: React.FormEvent) {

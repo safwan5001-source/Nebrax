@@ -21,7 +21,7 @@ import { RequestsManager } from '@/components/hr/requests-manager';
 import { useToast } from '@/components/ui/toast';
 import { api, ApiError } from '@/lib/api';
 import { currentUser } from '@/lib/auth';
-import { useCan } from '@/lib/use-can';
+import { useActorScope, useCan } from '@/lib/use-can';
 import { formatRiyal } from '@/lib/money';
 import { cn } from '@/lib/utils';
 import { useConfirm } from '@/components/ui/confirm-dialog';
@@ -100,14 +100,9 @@ export default function HrPage() {
 
   useEffect(() => { if (canManageUsers) loadTeam(); }, [canManageUsers, loadTeam]);
 
-  // نطاق المشاهد المخزَّن من صفّه في قائمة المستخدمين (لا نقطة نهاية للنطاق الفعلي): فراغ = غير مقيَّد.
-  // `undefined` = ما زالت القائمة تُحمَّل؛ `null` = انتهت ولم يوجد صفّه/فشلت (يحسم الخادم).
-  const actorScope = useMemo(() => {
-    if (!teamLoaded) return undefined;
-    const meId = currentUser()?.id;
-    const own = meId ? team.find((u) => u.id === meId) : undefined;
-    return own ? { branches: own.branch_ids ?? [], warehouses: own.warehouse_ids ?? [] } : null;
-  }, [team, teamLoaded]);
+  // نطاق المشاهد نفسه من `/me` (AC-UX-11): فراغ = غير مقيَّد. `undefined` = يُقرأ؛ `null` = تعذّرت القراءة (يحسم الخادم).
+  // لا يتطلب `users.view` ولا صفّاً في قائمة المستخدمين.
+  const actorScope = useActorScope({ enabled: canManageUsers });
 
   const toLinkedUser = (u: TeamUser): LinkedUser => ({
     id: u.id, name: u.name, email: u.email, role: u.role, is_active: u.is_active,
@@ -349,7 +344,6 @@ export default function HrPage() {
         initialAllowAccess={empInitialAccess}
         canManageUsers={canManageUsers}
         actorScope={actorScope}
-        canReadActorScope={canReadUsers}
       />
       <ShiftDialog open={shiftDialog} onClose={() => setShiftDialog(false)} onSaved={load} shift={editingShift} />
       <AttendanceDialog open={attDialog} onClose={() => setAttDialog(false)} onSaved={load} attendance={editingAtt} />

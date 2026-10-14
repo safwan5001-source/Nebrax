@@ -212,15 +212,26 @@ describe('EmployeeDialog: login access is blocked until the actor scope is known
   });
 });
 
-describe('EmployeeDialog: a manager who cannot read the users list (no users.view)', () => {
-  it('is not locked out — the scope cannot be obtained for them, so the server decides', async () => {
+describe('EmployeeDialog: the actor scope no longer depends on users.view (AC-UX-11)', () => {
+  it('a known scope (read from /me) unblocks login access for an unrestricted actor', async () => {
     render(
       <NextIntlClientProvider locale="en" messages={messages as never}>
-        <EmployeeDialog open onClose={() => {}} onSaved={() => {}} canManageUsers initialAllowAccess actorScope={null} canReadActorScope={false} />
+        <EmployeeDialog open onClose={() => {}} onSaved={() => {}} canManageUsers initialAllowAccess actorScope={{ branches: [], warehouses: [] }} />
       </NextIntlClientProvider>,
     );
     await fillNewUser();
     expect(screen.queryByText(/couldn't verify your own access scope/)).toBeNull();
     expect((screen.getByRole('button', { name: 'Save' }) as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it('there is no escape hatch any more: an unreadable scope blocks login access whoever the viewer is', async () => {
+    render(
+      <NextIntlClientProvider locale="en" messages={messages as never}>
+        <EmployeeDialog open onClose={() => {}} onSaved={() => {}} canManageUsers initialAllowAccess actorScope={null} />
+      </NextIntlClientProvider>,
+    );
+    await fillNewUser();
+    expect(screen.getByText(/couldn't verify your own access scope/)).toBeTruthy();
+    expect((screen.getByRole('button', { name: 'Save' }) as HTMLButtonElement).disabled).toBe(true);
   });
 });

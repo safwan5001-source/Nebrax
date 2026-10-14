@@ -20,7 +20,7 @@ import { UserEditorSheet } from '@/components/users/user-editor-sheet';
 import { api, ApiError } from '@/lib/api';
 import type { ActiveFilter, DataExplorerState, FilterDefinition } from '@/lib/data-explorer/types';
 import { parseExplorerState, removeFilter, replaceFilter, serializeExplorerState } from '@/lib/data-explorer/url-state';
-import { useCan } from '@/lib/use-can';
+import { useActorScope, useCan } from '@/lib/use-can';
 import {
   effectivePermissions,
   filterUsers,
@@ -296,11 +296,9 @@ export default function UsersPage() {
 
   const openEdit = (user: UserRecord | null, focusAccess = false) => setEditor({ user, focusAccess });
 
-  // نطاق المشاهد المخزَّن يُقرأ من صفّه في القائمة (لا نقطة نهاية للنطاق الفعلي): فراغ = غير مقيَّد.
-  const actorScope = useMemo(() => {
-    const own = users.find((candidate) => candidate.id === actor?.id);
-    return own ? { branches: own.branch_ids ?? [], warehouses: own.warehouse_ids ?? [] } : undefined;
-  }, [users, actor]);
+  // نطاق المشاهد نفسه من `/me` (AC-UX-11): فراغ = غير مقيَّد، ولا يتطلب صفّه في القائمة. غير المعروف يُمرَّر `undefined` كما كان.
+  // لا طلب إضافي لمن لا يملك التعديل (النطاق يلزم المحرّر وقدرات الصف فقط).
+  const actorScope = useActorScope({ enabled: canManage }) ?? undefined;
 
   const capsFor = useCallback(
     (user: UserRecord): RowCapabilities =>

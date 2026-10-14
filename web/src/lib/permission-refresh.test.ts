@@ -46,4 +46,48 @@ describe('mergeRefreshedAccess', () => {
   it('keeps the stored role when the response carries none', () => {
     expect(mergeRefreshedAccess(me(), { id: 'u1', permissions: ['x.view'] })?.role).toBe('staff');
   });
+
+  describe('own scope (AC-UX-11)', () => {
+    it('adopts the scope for a stored user that has none — empty arrays included (empty = unrestricted)', () => {
+      const next = mergeRefreshedAccess(me(), { id: 'u1', role: 'staff', permissions: ['invoices.view'], branch_ids: [], warehouse_ids: [] });
+      expect(next).toEqual(me({ branch_ids: [], warehouse_ids: [] }));
+    });
+
+    it('detects a scope change alone (permissions untouched) and treats [] as a real value, not as absent', () => {
+      const current = me({ branch_ids: ['b1'], warehouse_ids: ['w1'] });
+      const next = mergeRefreshedAccess(current, { id: 'u1', role: 'staff', permissions: ['invoices.view'], branch_ids: [], warehouse_ids: ['w1'] });
+      expect(next?.branch_ids).toEqual([]);
+      expect(next?.warehouse_ids).toEqual(['w1']);
+      expect(next?.permissions).toBe(current.permissions);
+    });
+
+    it('returns null when the scope is unchanged (order does not matter)', () => {
+      const current = me({ branch_ids: ['b1', 'b2'], warehouse_ids: [] });
+      expect(mergeRefreshedAccess(current, { id: 'u1', role: 'staff', permissions: ['invoices.view'], branch_ids: ['b2', 'b1'], warehouse_ids: [] })).toBeNull();
+    });
+
+    it('a server that sends no scope leaves the stored scope untouched', () => {
+      const current = me({ branch_ids: ['b1'], warehouse_ids: ['w1'] });
+      const next = mergeRefreshedAccess(current, { id: 'u1', role: 'owner', permissions: ['*'] });
+      expect(next?.branch_ids).toEqual(['b1']);
+      expect(next?.warehouse_ids).toEqual(['w1']);
+    });
+
+    it('ignores malformed scope values instead of storing them', () => {
+      const current = me({ branch_ids: ['b1'], warehouse_ids: [] });
+      const bad = { id: 'u1', role: 'staff', permissions: ['invoices.view'], branch_ids: 'all', warehouse_ids: [1, 2] } as unknown as Partial<AuthUser>;
+      expect(mergeRefreshedAccess(current, bad)).toBeNull();
+    });
+
+    it('each dimension is adopted independently', () => {
+      const next = mergeRefreshedAccess(me(), { id: 'u1', role: 'staff', permissions: ['invoices.view'], branch_ids: ['b1'] });
+      expect(next?.branch_ids).toEqual(['b1']);
+      expect(next).not.toHaveProperty('warehouse_ids');
+    });
+
+    it('never adopts another user\'s scope', () => {
+      expect(mergeRefreshedAccess(me(), { id: 'other', role: 'staff', permissions: ['invoices.view'], branch_ids: ['b9'], warehouse_ids: [] })).toBeNull();
+    });
+  });
 });
+
