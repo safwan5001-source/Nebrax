@@ -95,7 +95,7 @@ Six automated review findings were found unanswered after closure. Dispositions 
 
 | PR | Finding | Disposition |
 |---|---|---|
-| #1438 | Layout-wide `CardTitleLevel h2` made the print template center's family cards siblings of their section `h2` | **Fixed**: nested cards are `h3` (template center families, template governance tab) |
+| #1438 | Layout-wide `CardTitleLevel h2` made the print template center's family cards siblings of their section `h2` | **Fixed**: nested cards are `h3` (template center families, template governance tab), and the governance cards' inner headings moved down one level with them |
 | #1439 | Unknown `/platform/...` URLs sent platform administrators to the ERP dashboard (separate session → ERP login) | **Fixed**: the 404 page links to the platform console for `/platform` paths |
 | #1441 | Shared forbidden title as `h1` doubled the page `h1` on Developers pages | Already fixed before merge (`DeveloperGate pageLevel`, `bc1f56e`); now answered |
 | #1443 | Final matrix claimed to cover final `main` | **Corrected** and re-crawled on the actual final tree (§3 item 5) |
