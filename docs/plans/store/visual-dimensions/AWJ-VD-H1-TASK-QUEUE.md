@@ -60,6 +60,10 @@ VD-0 ──► VD-1a ──┬──► VD-1b ──► VD-1c ──────
 
 - `EnsureApplicationActive` غير مطبّق على مسارات الأبعاد ومساحة عمل Commerce (R14).
 - حفظ وثائق العرض في المُخصِّص لا يقفل الوسيط، فيبقى عرضة لسباق الحذف نفسه (D-16، خارج النطاق).
+- `StorefrontMediaApiTest › the library lists newest first … searches` يفشل على PostgreSQL **المحلي فقط** بـ`SQLSTATE[HY093]`.
+  - السبب: `pdo_pgsql` في PHP 8.3.6 يسيء تحليل `LIKE … ESCAPE '\'` القائم بجوار المعاملات `?`.
+  - يفشل بالطريقة نفسها من دون VD-1b، وmain أخضر عليه في CI.
+  - خارج نطاق هذا الأفق بقرار المالك.
 - لا واجهة لإعادة ترتيب قيم البُعد (C12).
 - `setup.sh` (بيئة الاختبار المحلية) لا يطابق `ci.yml`: لا يثبّت `league/flysystem-aws-s3-v3`/`predis`/ParaTest، ولا يفعّل `bcmath`، ولا ينسخ `app/Mail` و`resources/views`. ظهر ذلك في VD-1a كفشل محلي غير مرتبط بالتغيير. **محلول** في `cf58c96` (AWJ-BACKEND-CI-03).
 - توحيد اختيار الأيقونة المكرّر (`<select>` في 3 مواضع) على `IconPicker`.

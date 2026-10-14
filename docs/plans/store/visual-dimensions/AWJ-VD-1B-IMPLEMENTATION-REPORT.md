@@ -142,7 +142,7 @@ Indexes:
 **Pre-existing, local PostgreSQL only:** `StorefrontMediaApiTest › the library lists newest first … searches` fails locally with `SQLSTATE[HY093]`.
 - The cause is the local `pdo_pgsql` (PHP 8.3.6), which misparses the existing `LIKE … ESCAPE '\'` search query next to `?` placeholders.
 - It fails **identically without VD-1b** (verified on the VD-4a branch), and `main` is green on pgsql in CI.
-- Not touched here.
+- Not touched here; recorded as out of scope in the task-queue backlog (owner decision).
 
 **`CommerceFacetVisualApiTest`** covers:
 - every row of the D-17 table, the ABA sequence and two clients on the same version;
@@ -196,13 +196,13 @@ Nothing blocking. 6 non-blocking findings and 8 nits; all are handled below.
 | 13 | Test gaps (facet cascade, `current_version` after a lost race, fork timing) | **Fixed:** facet-deletion cascade added, `current_version` asserted, fork margins widened (2 s hold, 0.5 s arrival, > 1 s wait). |
 | 14 | FormRequest 422s had no `code` | **Fixed:** every 422 carries `code: visual_invalid`. |
 
-**For the owner — a classification in the commerce firewall test.**
+**A classification in the commerce firewall test (approved by the owner on 2026-10-14, limited to this one model, no general exemption).**
 - **What failed:** the first full run failed `StorefrontCommerceFirewallTest › the_presentation_owning_services_name_no_commerce_truth_owner`. That test treats every model not explicitly listed as presentation-side as a possible commerce-truth owner. §3.8-d requires `StorefrontMediaReferenceScanner` to read `CommerceFacetVisual`.
 - **What changed:** `CommerceFacetVisual` is now listed as **presentation-side**, with a comment saying why: closed shape and size keys, hex colours, an icon key and a media reference, with no price, offer, stock, tax or shipping value.
 - **What did not change:** no commercial rule was loosened, and the firewall's word and key policy is untouched.
 - **Decision:** it is a test classification of the new model. If you prefer another approach, it is yours to decide before merge.
 
-**Contract note from fix 1.** Two simultaneous creates are now serialized on the facet row, so the loser receives **428** (the "row exists, token null" row) instead of the 409 the §3.8 table listed for concurrent creates. Both outcomes are correct refusals and never a 500. The unique index → 409 remains a net for any writer that bypasses the facet lock, and the deterministic race test proves it. The real pgsql race test asserts 428 and that one create waited for the other.
+**Contract note from fix 1 (approved by the owner on 2026-10-14; recorded in D-17 and §3.8-a).** Two simultaneous creates are now serialized on the facet row, so the loser receives **428** (the "row exists, token null" row) instead of the 409 the §3.8 table listed for concurrent creates. Both outcomes are correct refusals and never a 500. The unique index → 409 remains a net for any writer that bypasses the facet lock, and the deterministic race test proves it. The real pgsql race test asserts 428 and that one create waited for the other.
 
 ## Accounting impact
 
