@@ -6,7 +6,7 @@ BASE: `origin/main` @ `f147fb6063d36952971724609250f9ba1baf42f5`
 HORIZON: AWJ-COMMERCE-VISUAL-DIMENSIONS-H1 (Master Plan: `AWJ-VD-H1-MASTER-PLAN.md`)
 
 > المصطلحات: «البُعد» = `CommerceFacet`، «القيمة» = `CommerceFacetValue` (ADR-14). الواجهة العربية تسمّيها «الأبعاد الوصفية».
-> كل ادعاء أدناه موسوم: **[REPO]** دليل من المستودع بمسار وسطر · **[EXT]** دليل خارجي (`AWJ-VD-H1-0-EXTERNAL-EVIDENCE.md`) · **[AWJ DECISION — PROPOSED]** قرار مقترح ينتظر الاعتماد.
+> كل ادعاء أدناه موسوم: **[REPO]** دليل من المستودع بمسار وسطر · **[EXT]** دليل خارجي (`AWJ-VD-H1-0-EXTERNAL-EVIDENCE.md` — FNP، Salla Raed، Shopify Dawn وSearch & Discovery، MDN، WCAG 2.2، OWASP) · **[AWJ DECISION — PROPOSED]** قرار مقترح ينتظر الاعتماد.
 
 ---
 
@@ -355,7 +355,8 @@ HORIZON: AWJ-COMMERCE-VISUAL-DIMENSIONS-H1 (Master Plan: `AWJ-VD-H1-MASTER-PLAN.
 |---|---|---|
 | `layout` | `image-grid` · `image-cards` · `carousel` · `icon-grid` · `text-list` | **غياب = السلوك القديم حسب `display`** (`tiles`/`chips`) |
 | `template` | معرّف من سجل القوالب (أدناه) | لا قالب |
-| `columns` | `{mobile:2–4, tablet:2–6, desktop:2–8}` | من القالب، وإلا `2/3/4` |
+| `columns` | `{mobile:1–4, tablet:2–6, desktop:2–8}` | من القالب، وإلا `2/3/4` |
+| `rows` | `1` · `2` (لـ`carousel` على الجوال فقط — نمط FNP المرصود) | `1` |
 | `gap` | `tight` · `normal` · `loose` | `normal` |
 | `textPosition` | `below` · `overlay` · `beside` | `below` |
 | `contentOrder` | `media-first` · `label-first` | `media-first` |
@@ -374,7 +375,7 @@ HORIZON: AWJ-COMMERCE-VISUAL-DIMENSIONS-H1 (Master Plan: `AWJ-VD-H1-MASTER-PLAN.
 | `boutique-arches` | عطور، أزياء، فاخر | image-cards | arch | lg | below | plain | 2/3/4 |
 | `editorial-portrait` | أزياء ومحتوى | image-cards | portrait | lg | overlay | plain | 2/3/4 |
 | `market-icons` | بقالة، صيدلية، خدمات | icon-grid | rounded | sm | below | filled | 4/6/8 |
-| `swipe-rail` | عام للجوال | carousel | circle | md | below | plain | — |
+| `swipe-rail` | عام للجوال | carousel (صفّان على الجوال) | circle | md | below | plain | — |
 | `minimal-text` | أي نشاط | text-list | — | — | beside | outlined | 1/2/3 |
 
 **التوافق الخلفي (بوابة إصدار):**
