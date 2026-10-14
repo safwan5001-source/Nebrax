@@ -10,6 +10,7 @@ import { DemoBanner } from '@/components/layout/demo-banner';
 import { AuthenticatedCompanyBrowserIdentity } from '@/components/layout/company-browser-identity';
 import { currentUser, isAuthenticated } from '@/lib/auth';
 import { applyAwjUiGate } from '@/lib/awj-ui-gate';
+import { CardTitleLevel } from '@/components/ui/card';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -77,7 +78,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           <Topbar onMenuClick={() => setSidebarOpen(true)} menuButtonRef={menuButtonRef} menuExpanded={sidebarOpen} />
           <main id="main-content" tabIndex={-1} className="min-w-0 flex-1 overflow-auto p-4 outline-none sm:p-6">
             {/* تبديل الفرع يُعيد جلب بيانات الصفحة فوراً — بلا إعادة تحميل. */}
-            <BranchScope>{children}</BranchScope>
+            <CardTitleLevel level="h2">
+              <BranchScope>{children}</BranchScope>
+            </CardTitleLevel>
           </main>
         </div>
       </div>

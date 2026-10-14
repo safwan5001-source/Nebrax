@@ -156,7 +156,7 @@ function OperationDetail({ operation }: { operation: ApiOperation }) {
           <MethodBadge method={operation.method.toUpperCase()} />
           <code dir="ltr" className="break-all font-mono text-sm text-text">{operation.path}</code>
         </div>
-        {operation.summary ? <h3 dir="auto" className="text-base font-semibold text-text">{operation.summary}</h3> : null}
+        {operation.summary ? <h2 dir="auto" className="text-base font-semibold text-text">{operation.summary}</h2> : null}
         <MetaRow operation={operation} />
         {/* نصّ العقد إنجليزيّ؛ dir="auto" يجعله يُقرأ LTR طبيعياً داخل قشرة RTL (§15). */}
         {operation.description ? <p dir="auto" className="text-sm leading-relaxed text-muted">{operation.description}</p> : null}
