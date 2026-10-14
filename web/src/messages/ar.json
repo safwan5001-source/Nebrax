@@ -861,6 +861,7 @@
     "yes": "نعم",
     "no": "لا",
     "all": "الكل",
+    "dismissNotification": "إغلاق التنبيه",
     "themeToggle": "تبديل الوضع",
     "languageToggle": "تبديل اللغة",
     "close": "إغلاق"

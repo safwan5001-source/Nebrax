@@ -861,6 +861,7 @@
     "yes": "Yes",
     "no": "No",
     "all": "All",
+    "dismissNotification": "Dismiss notification",
     "themeToggle": "Toggle color mode",
     "languageToggle": "Switch language",
     "close": "Close"
