@@ -21,7 +21,7 @@ import { type PayrollRun } from '@/components/hr/run-detail-dialog';
 import { SYSTEM_ROLE_KEYS } from '@/components/users/user-editor-sheet';
 import { api, ApiError, downloadFile } from '@/lib/api';
 import { currentUser } from '@/lib/auth';
-import { hasPermission } from '@/lib/permissions';
+import { useCan } from '@/lib/use-can';
 import { formatRiyal } from '@/lib/money';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 
@@ -116,14 +116,10 @@ export default function EmployeeProfilePage() {
   const [busyAttachmentId, setBusyAttachmentId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [role, setRole] = useState<string | null>(null);
-  const [canReadUsers, setCanReadUsers] = useState(false);
-  useEffect(() => {
-    const me = currentUser();
-    setRole(me?.role ?? null);
-    setCanReadUsers(hasPermission(me?.permissions, me?.role, 'users.view'));
-  }, []);
-  const canManageUsers = role === 'owner' || role === 'admin';
+  const { can } = useCan();
+  const canReadUsers = can('users.view');
+  // إدارة الدخول تتبع صلاحيات الخادم لا اسم الدور (القراءة لعرض الحالة، والكتابة لإنشائه).
+  const canManageUsers = canReadUsers && can('users.manage');
 
   const loadAttachments = useCallback(() => {
     if (!id) return;

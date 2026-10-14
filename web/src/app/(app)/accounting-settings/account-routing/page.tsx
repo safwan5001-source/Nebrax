@@ -11,8 +11,7 @@ import { Select } from '@/components/ui/select';
 import { useToast } from '@/components/ui/toast';
 import { EmptyState, LoadingState } from '@/components/nebrax';
 import { api, ApiError } from '@/lib/api';
-import { currentUser } from '@/lib/auth';
-import { hasPermission } from '@/lib/permissions';
+import { useCan } from '@/lib/use-can';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 
 /**
@@ -67,11 +66,11 @@ function useAccountRoutingAccess(): { mounted: boolean; canView: boolean; canMan
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
-  const user = currentUser();
+  const { can } = useCan();
   return {
     mounted,
-    canView: hasPermission(user?.permissions, user?.role, 'accounting_settings.view'),
-    canManage: hasPermission(user?.permissions, user?.role, 'accounting_settings.manage'),
+    canView: can('accounting_settings.view'),
+    canManage: can('accounting_settings.manage'),
   };
 }
 

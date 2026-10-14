@@ -23,7 +23,7 @@ const user: AuthUser = {
 describe('currentUser referential stability', () => {
   beforeEach(() => {
     store.clear();
-    vi.stubGlobal('window', {});
+    vi.stubGlobal('window', { dispatchEvent: vi.fn() });
     vi.stubGlobal('localStorage', localStorageMock);
   });
 
@@ -59,7 +59,7 @@ describe('persistUser display preferences (ERP-UX-026)', () => {
   beforeEach(() => {
     store.clear();
     cookies.length = 0;
-    vi.stubGlobal('window', {});
+    vi.stubGlobal('window', { dispatchEvent: vi.fn() });
     vi.stubGlobal('localStorage', localStorageMock);
     vi.stubGlobal('document', {
       set cookie(value: string) { cookies.push(value); },
@@ -75,6 +75,13 @@ describe('persistUser display preferences (ERP-UX-026)', () => {
     persistUser(withPrefs);
     expect(cookies.some((c) => c.startsWith('locale=ar'))).toBe(true);
     expect(store.get('theme')).toBe('dark');
+  });
+
+  it('announces the stored-user change (AC-UX-07) even for a background refresh', () => {
+    persistUser(withPrefs, { applyDisplayPreferences: false });
+    const dispatch = (globalThis as unknown as { window: { dispatchEvent: ReturnType<typeof vi.fn> } }).window.dispatchEvent;
+    expect(dispatch).toHaveBeenCalledTimes(1);
+    expect((dispatch.mock.calls[0][0] as Event).type).toBe('nibras:user-changed');
   });
 
   it('a background refresh keeps the device language and mode', () => {

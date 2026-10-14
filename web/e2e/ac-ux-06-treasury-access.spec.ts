@@ -41,7 +41,7 @@ async function open(page: Page, w: World, opts: { path: string; locale?: 'ar' | 
       { id: USER_ID, name: 'Hind Alharbi', email: 'hind@acme.test', role: 'staff', is_active: true, employee: null, branch_ids: [], warehouse_ids: [] },
     ] });
     if (path === '/branches') return json(route, { data: [{ id: 'b1', name: 'Dammam' }, { id: 'b2', name: 'Khobar' }] });
-    if (path === '/me') return json(route, { user: { id: 'me', name: 'Safwan', role: 'owner', permissions: ['*'] }, company: { name: 'Acme' } });
+    if (path === '/me') return json(route, { user, company: { name: 'Acme' } });
     return json(route, { data: [] });
   });
 

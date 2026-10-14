@@ -9,6 +9,7 @@ import { Topbar } from '@/components/layout/topbar';
 import { DemoBanner } from '@/components/layout/demo-banner';
 import { AuthenticatedCompanyBrowserIdentity } from '@/components/layout/company-browser-identity';
 import { currentUser, isAuthenticated } from '@/lib/auth';
+import { usePermissionRefresh } from '@/lib/use-can';
 import { applyAwjUiGate } from '@/lib/awj-ui-gate';
 import { CardTitleLevel } from '@/components/ui/card';
 
@@ -31,6 +32,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       setReady(true);
     }
   }, [router]);
+
+  // الصلاحيات المخزَّنة تُعاد قراءتها من `/me` عند التركيب وعودة التركيز (تغيير دور أثناء الجلسة).
+  usePermissionRefresh(ready);
 
   // تبديل الفرع يُعيد الشريط لحالته الموسّعة — بلا تذكّر ولا تخزين محلي:
   // كل دخول جديد وكل تبديل فرع يبدأ من الافتراضي المتّفق عليه.

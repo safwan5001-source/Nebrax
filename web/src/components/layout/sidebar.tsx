@@ -77,7 +77,7 @@ import { CompanyLogoMark } from '@/components/layout/company-logo-mark';
 import { useCompany } from '@/lib/company';
 import { cn } from '@/lib/utils';
 import { api } from '@/lib/api';
-import { currentUser } from '@/lib/auth';
+import { useCurrentUser } from '@/lib/use-can';
 import { hiddenApplicationKeys, isNavEntryVisible } from '@/components/layout/nav-visibility';
 import { POS_SIDEBAR_LAUNCH_ITEMS, posNavNewTabAnchorProps } from '@/lib/pos-workspace';
 
@@ -446,7 +446,7 @@ export function Sidebar({
     };
   }, []);
 
-  const user = currentUser();
+  const user = useCurrentUser();
   const groupHidden = (group: NavGroup) => !isNavEntryVisible({ appKey: group.appKey, permission: group.permission }, hiddenAppKeys, user);
   const visibleItems = (group: NavGroup) =>
     group.items.filter((item) => isNavEntryVisible(item, hiddenAppKeys, user));
