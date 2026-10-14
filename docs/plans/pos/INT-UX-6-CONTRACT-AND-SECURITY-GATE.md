@@ -1,13 +1,13 @@
 # INT-UX-6 / DP-E — Contract & Security Gate
 
-STATUS: **Documentation only — awaiting owner review.** No production code, test, migration, route, permission or API was changed. Not merged. Not deployed.
+STATUS: **Documentation only — owner decisions D1–D9 recorded as Approved (2026-10-14); awaiting review of the closure.** No production code, test, migration, route, permission or API was changed. Not merged. Not deployed.
 DATE: 2026-10-14
 TASK: Prepare the contract and security gate for the **configuration-change audit reader** of the AWJ-signed ingress (`INT-UX-6`, audit side only), before any implementation starts.
 HORIZON: Integrations Center — INT-UX-6 (after INT-UX-5a–5d, all merged).
-INPUTS (as stated in the assignment, 2026-10-14): INT-UX-5a/5b/5c/5d merged (5d merge SHA `24affdc91cbc72524699cb9061eeeb7a940e21c5`); INT-AUDIT-1 merged; **DP-E approved, option A**; the new permission is **`delivery_connector.audit.view`**.
+INPUTS (as stated in the assignments, 2026-10-14): INT-UX-5a/5b/5c/5d merged (5d merge SHA `24affdc91cbc72524699cb9061eeeb7a940e21c5`); INT-AUDIT-1 merged; **DP-E approved**; the new permission is **`delivery_connector.audit.view`**. **Decision closure:** the owner formally approved **D1–D9** exactly as listed in §6; this revision records them and re-checks the contract against them (§6.2). A revision history is at the end of §9.
 NOT STARTED: the reader (backend or UI), INT-ACT-1 (attempts/events API), INT-MAP-1, native provider connect/sync, Backend idempotency for create.
 
-> **Wording check needed (D1).** The repository does not contain the text of "DP-E option A" for the audit-read sub-decision: `DLV-INTEGRATIONS-UX-DESIGN-1.md` §DP-E still records it as *"not yet made"* (the other "Option A" in `DELIVERY-DECISION-PASS-1-REPORT.md` is DG-1, unrelated). This document takes the assignment at its word — **a dedicated, read-only permission `delivery_connector.audit.view`** — and asks the owner to confirm that is what "option A" means so the decision record can be written exactly (see §6, D1).
+> **D1 closed.** The owner approved a dedicated, read-only permission **`delivery_connector.audit.view`** that grants no management authority. (Earlier revisions of this document noted that the repository did not spell out "option A"; the approved decision below is now the record, and `DLV-INTEGRATIONS-UX-DESIGN-1.md` §DP-E carries it.)
 
 ---
 
@@ -62,12 +62,12 @@ Pre-existing tests that already pin the write side: `DeliveryConnectorLifecycleA
 
 - Sidebar entry `/integrations` is gated by **`invoices.view`** with no `appKey` (`sidebar.tsx:333`); the center page (`app/(app)/integrations/page.tsx`) and the shared data hook (`use-delivery-integration-data.ts:77`) deny anyone without `invoices.view` (`DELIVERY_PERMISSION = 'invoices.view'`, `integration-center.ts:41`). The readiness and platform endpoints the center reads are also `invoices.view` + `sales.pos`.
 - The signed-ingress panel (INT-UX-4/5) lives on `/integrations/delivery-platforms/[platformKey]`, reads `GET /delivery-connectors` (`delivery_connector.view`), and hosts the 5b/5c/5d actions. It exposes **no audit surface** and the structural guard `no-connection-controls.test.ts` allow-lists the exact endpoints it may read.
-- **Consequence:** a user holding only `delivery_connector.audit.view` **cannot reach any Integration Center page today** (no `invoices.view`) — the page-access gap the assignment asks to close (§3.3).
+- **Consequence:** a user holding only `delivery_connector.audit.view` **cannot reach any Integration Center page today** (no `invoices.view`) — the page-access gap the assignment asks to close (§3.2).
 - The role editor derives module/area/action **generically from the key** (`modules/roles/catalog.ts` `parsePermission`: `delivery_connector.audit.view` → module `delivery_connector`, area `audit`, action `view`); sensitive grants are flagged from an explicit map (`modules/roles/risk.ts`), where unknown keys are simply not flagged.
 
 ### 1.6 Horizon text to reconcile
 
-`DLV-INTEGRATIONS-UX-DESIGN-1.md` defines `INT-UX-6` as *"Activity & errors tab and error-code dictionary"* (events log from INT-ACT-1 **plus** the configuration-change log), and §5.8 says the two logs are **never merged**. INT-ACT-1 (attempts read API) is **not built**. This gate covers **only the configuration-change (audit) reader**; the attempts log stays blocked on INT-ACT-1 (D8).
+`DLV-INTEGRATIONS-UX-DESIGN-1.md` defines `INT-UX-6` as *"Activity & errors tab and error-code dictionary"* (events log from INT-ACT-1 **plus** the configuration-change log), and §5.8 says the two logs are **never merged**. INT-ACT-1 (attempts read API) is **not built**. This gate covers **only the configuration-change (audit) reader**; the attempts log stays under INT-ACT-1 (**D8 approved**). The Horizon text should be re-scoped accordingly when PR-6e closes the work.
 
 ---
 
@@ -75,14 +75,14 @@ Pre-existing tests that already pin the write side: `DeliveryConnectorLifecycleA
 
 | # | Finding | Severity | Where handled |
 |---|---|---|---|
-| **G1** | **Operator events carry no event-time branch or store context.** Their branch scope can only be derived from the *live* account row, and an account-row delete **cascades** and erases them (`cascadeOnDelete`) — unlike lifecycle events, which survive (`events_outlive_a_deleted_account_row`). Today this is accurate only because of two invariants held by application code (immutable `branch_id`, no delete path). | **Decision gate — BLOCKER-1** | §4.4, D2 |
+| **G1** | **Operator events carry no event-time branch or store context.** Their branch scope could only be derived from the *live* account row, and an account-row delete **cascades** and erases them (`cascadeOnDelete`) — unlike lifecycle events, which survive (`events_outlive_a_deleted_account_row`). | **Resolved for new events by approved D2 = A** (snapshot at write, PR-6b0). **Residual:** events written before PR-6b0 have no recorded context (never inferred; hidden from branch-restricted users), and the FK cascade is unchanged (separate future decision). | §4.4, §6 |
 | G2 | Both tables are `CompanyWide`: an Eloquent query on them is **not** branch-filtered. A reader that forgets the explicit filter leaks other branches' history to restricted users. | High (by construction) | §4.2, tests T-B* |
-| G3 | `GET /delivery-connectors` is unpaginated and returns `secret_prefix`. The audit DTO must not follow that precedent. | Medium (pre-existing; out of scope) | §3.2 DTO allow-list |
-| G4 | No index serves *tenant-wide, newest-first* listing (`(tenant_id, account_id, created_at)` leads with the account; the operator table has no time column in its index). Correct but may degrade with volume. | Low–Medium | §3.2 (index recommendation) |
-| G5 | `delivery_connector_operator_events.created_at` is **nullable**; a cursor over a nullable sort key is unsafe. | Low | §3.2 (null handling) |
+| G3 | `GET /delivery-connectors` is unpaginated and returns `secret_prefix`. The audit DTO must not follow that precedent. | Medium (pre-existing; out of scope) | §3.3.2 DTO allow-list |
+| G4 | No index serves *tenant-wide, newest-first* listing (`(tenant_id, account_id, created_at)` leads with the account; the operator table has no time column in its index). Correct but may degrade with volume. | Low–Medium | §3.3 (indexes) |
+| G5 | `delivery_connector_operator_events.created_at` is **nullable**; a cursor over a nullable sort key is unsafe. | Low | §3.3 (null handling) |
 | G6 | `*` holders (owner/admin) receive the permission automatically; there are no deny rules, so an admin can read the audit of their own actions. Inherent to the RBAC model. | Accepted / documented | §3.4 |
-| G7 | Users are soft-deleted and ids have no FK: events can reference deleted or unknown users. | Medium | §3.2 (person states) |
-| G8 | Sort tie-break: timestamps are second-precision and ids are UUIDs; the relative order of two events in the same second is deterministic but **not causal**. | Low | §3.2 ordering |
+| G7 | Users are soft-deleted and ids have no FK: events can reference deleted or unknown users. | Medium | §3.3.2 (person states) |
+| G8 | Sort tie-break: timestamps are second-precision and ids are UUIDs; the relative order of two events in the same second is deterministic but **not causal**. | Low | §3.3 ordering |
 | G9 | Existing UI allow-list guard (`no-connection-controls.test.ts`) will fail on any new read; it must be extended **deliberately**, not loosened. | Process | §7 PR-6d |
 | G10 | The model for operator events lacks the tenant-forging guard the lifecycle model has (asymmetry). Not exploitable today (the only writer takes the tenant from the locked account). | Low | noted; not required for the reader |
 
@@ -96,13 +96,13 @@ Pre-existing tests that already pin the write side: `DeliveryConnectorLifecycleA
 
 | Rule | Contract |
 |---|---|
-| Meaning | **Read-only** access to the configuration-change audit of AWJ-signed ingress points (the four event kinds in §3.2). Nothing else. |
+| Meaning | **Read-only** access to the configuration-change audit of AWJ-signed ingress points (the four event kinds in §3.3). Nothing else. |
 | Independence | It does **not** include and is **not** implied by `delivery_connector.view`, `.manage`, `.reassign`, `users.view`, `invoices.view`, `reports.view`, `delivery_hub.*`, or any `pos.audit.*`. None of those grants it, and it grants none of them. |
 | `view` alone | A role with `delivery_connector.view` and no `audit.view` gets **403** on the audit endpoint (middleware, before any query). |
 | `manage` / `reassign` alone | Same: **403**. Managing or reassigning does not entitle reading history. |
 | `audit.view` alone | Allowed to read the audit endpoint and **nothing else** in the delivery-connector API (the connector list/detail, secret-bearing routes, attempts and users stay 403). |
-| Application gate | Same as its siblings: `$app('sales.pos')`. A *suspended* app keeps it readable (read-only), a *disabled* app returns 403 (D4). |
-| Role editor | The key appears automatically in the catalog once it is in `Rbac::PERMISSIONS`. It is **not** a write/secret authority, but it reveals *who did what and when* and (per D5) user names → classify as `data` in the editor's risk map so granting it is flagged. |
+| Application gate (**D4 approved**) | `$app('sales.pos')`, same as its siblings. A *suspended* app keeps it readable (read-only); a *disabled* app returns 403. |
+| Role editor | The key appears automatically in the catalog once it is in `Rbac::PERMISSIONS`. It is **not** a write/secret authority, but it reveals *who did what and when* and (per approved D5) user names → classified **`data`** in the editor's risk map (**D6 approved**) so granting it is flagged. |
 | Grant ceiling | Unchanged: an actor can grant it only if they hold it (or `*`). |
 
 ### 3.2 Page / navigation access contract
@@ -110,14 +110,14 @@ Pre-existing tests that already pin the write side: `DeliveryConnectorLifecycleA
 | Question | Contract |
 |---|---|
 | Who sees the entry | Holders of `delivery_connector.audit.view` (checked client-side from the server-computed permission list — convenience only; the API 403 is the authority). Hidden in Demo, as in 5a–5d. |
-| Can `audit.view` alone reach the page? | **Yes — recommended (P1):** a **dedicated route `/integrations/audit`**, gated by `delivery_connector.audit.view` **only**, whose only network dependency is the audit endpoint (plus the session/navigation calls every page makes). It must **not** import the center's shared data hook (that hook denies without `invoices.view` and reads readiness/platform endpoints the auditor may not hold). |
+| Can `audit.view` alone reach the page? | **Yes — approved (D3, P1):** a **dedicated route `/integrations/audit`**, gated by `delivery_connector.audit.view` **only**, whose only network dependency is the audit endpoint (plus the session/navigation calls every page makes). It must **not** import the center's shared data hook (that hook denies without `invoices.view` and reads readiness/platform endpoints the auditor may not hold). |
 | Sidebar | A child/secondary entry under the Integrations group gated by `delivery_connector.audit.view` (the existing `/integrations` entry stays `invoices.view`). Because the parent entry is hidden without `invoices.view`, the audit entry must be able to stand on its own (an auditor-only role sees the group with this single entry). |
 | Landing page | Users who hold **both** `invoices.view` and `audit.view` also get a quiet link from the Integration Center landing and a filtered deep link (`?platform=<key>`) from the platform detail page. A deep link is a navigation aid, never a precondition. |
-| Alternative (P2) | Require `invoices.view` **and** `audit.view` and host the log inside the center. Simpler, but it forces granting a broader permission to an auditor and contradicts "audit.view alone must be usable". Not recommended; listed in D3. |
+| Alternative (P2) — **not adopted (D3)** | Require `invoices.view` **and** `audit.view` and host the log inside the center. Simpler, but it forces granting a broader permission to an auditor and contradicts "audit.view alone must be usable". Not recommended; listed in D3. |
 | Server vs client | Absent link ≠ protection. A forged request without the permission gets 403; a request with it but for another tenant/branch gets an empty/filtered result. |
 | Stale permission list | The permission list is read at login/refresh (`permission-refresh`); a role change takes effect on refresh. The API is never trusted to the client list. |
 
-### 3.3 API contract (read-only, proposed)
+### 3.3 API contract (read-only; shaped by the approved D2, D4, D5, D7, D9)
 
 **`GET /api/delivery-connectors/audit-events`**
 (registered **before** `delivery-connectors/{id}`; `{id}` is `whereUuid`, so `audit-events` can never match it.)
@@ -129,12 +129,12 @@ Pre-existing tests that already pin the write side: `DeliveryConnectorLifecycleA
 | Sources | Merges `delivery_connector_lifecycle_events` and `delivery_connector_operator_events` into **one** DTO (§3.3.2). Other event kinds do not exist yet (connect/authorize/map/pause/disconnect have no writers — the UI must say the log is not complete for those, as §5.8 requires). |
 | Filters (all optional, all validated) | `event_code[]` ∈ {`ingress.created`,`secret.rotated`,`ingress.disabled`,`operator.reassigned`}; `platform_key` ∈ the central platform registry; `account_id` (uuid); `external_store_id` (exact, ≤191 bytes, no control characters); `branch_id` (uuid); `from` / `to` (ISO-8601 instants, `from ≤ to`); `per_page`; `cursor`. **No free-text search, no client-chosen sort, no total count.** |
 | Ordering (stable) | Fixed: `occurred_at DESC, kind DESC, id DESC` where `kind` ∈ {`lifecycle`,`operator`}. Keyset, never offset. Within one second the order is deterministic, **not causal** (documented in the response docs and the UI help). |
-| Pagination | Cursor-based. `per_page` default **25**, min 1, max **100** (out of range → 422, not clamped). Response `meta`: `{ per_page, has_more, next_cursor }` (`next_cursor` is opaque, `null` when `has_more=false`). No `total`. |
+| Pagination (**D7 approved**) | Cursor-based. `per_page` default **25**, min 1, max **100** (out of range → 422, not clamped). Response `meta`: `{ per_page, has_more, next_cursor }` (`next_cursor` is opaque, `null` when `has_more=false`). No `total`. |
 | Cursor | Opaque base64url of `(occurred_at, kind, id)`. It only encodes a **position**; tenant, branch scope and filters are **always re-applied server-side**, so a forged or replayed cursor cannot widen scope. Malformed/unknown cursor → 422. |
 | Merge algorithm (portable SQLite/PostgreSQL) | Two **bounded** queries (one per source), each `ORDER BY created_at DESC, id DESC LIMIT per_page+1` with the keyset predicate for that source (`ts < c.ts OR (ts = c.ts AND (kind < c.kind OR (kind = c.kind AND id < c.id)))` per the global order), then an in-memory merge-and-cut to `per_page`. Cost is bounded at `2 × (per_page+1)` rows per request. (A SQL `UNION ALL` is an acceptable alternative if proven equivalent on both engines.) |
 | Null times | An operator event with `created_at = null` sorts **last**, is returned with `occurred_at: null`, and never participates in a cursor tie-break except as the end sentinel. (Not expected in practice; handled defensively.) |
-| N+1 control | At most **3 batched lookups per page** after the two page queries: users `whereIn(ids)` (explicit `tenant_id`, `withTrashed`, `select id,name,is_active,deleted_at`), branches `whereIn(ids)` (`id,name`), and — operator events only, if the account context is not snapshotted (D2) — accounts `whereIn(ids)` (`id,platform_key,external_store_id,branch_id`). No lazy relations in the resource. |
-| Unbounded queries | Impossible: every source query has a tenant predicate, the keyset predicate and `LIMIT`. Index recommendation: additive `(tenant_id, created_at, id)` on both tables so the newest-first tenant-wide scan is index-served (PR-6b, with an EXPLAIN check on PostgreSQL; correctness does not depend on it). |
+| N+1 control | At most **2 batched lookups per page** after the two page queries: users `whereIn(ids)` (explicit `tenant_id`, `withTrashed`, `select id,name,is_active,deleted_at`) and branches `whereIn(ids)` (`id,name`). **No account lookup**: lifecycle and (new) operator events carry their own platform/store/branch snapshot, and a missing context is **never** reconstructed from the live account (approved D2). No lazy relations in the resource. |
+| Unbounded queries / indexes (**D9 approved**) | Impossible: every source query has a tenant predicate, the keyset predicate and `LIMIT`. Indexes suited to newest-first reads are part of PR-6b: additive `(tenant_id, created_at, id)` on both tables, and — to be confirmed by the plan check, not assumed — a branch-aware variant for restricted users on the snapshot column (e.g. `(tenant_id, branch_id, created_at, id)`). **Mandatory evidence:** an `EXPLAIN` of the unrestricted and the branch-restricted page queries on **PostgreSQL** (with representative volume) showing index use and no full tenant-partition sort, recorded in the PR-6b report. Correctness never depends on the index. |
 
 #### 3.3.1 Status codes
 
@@ -157,11 +157,12 @@ Pre-existing tests that already pin the write side: `DeliveryConnectorLifecycleA
       "kind": "lifecycle" | "operator",
       "event_code": "ingress.created" | "secret.rotated" | "ingress.disabled" | "operator.reassigned",
       "occurred_at": "2026-10-14T18:03:00Z" | null,
-      "platform_key": "keeta" | null,      // lifecycle: snapshot; operator: see D2
+      "context_recorded": true | false,    // lifecycle: always true; operator: false for events written before PR-6b0
+      "platform_key": "keeta" | null,      // snapshot taken at event time; null when context_recorded=false (never inferred)
       "external_store_id": "KTA-…" | null, // same
       "account_id": "uuid",                // opaque reference; never a link to a management action
       "account_available": true | false,   // false when the account row no longer exists
-      "branch": { "id": "uuid", "name": "…" | null } | null,   // null ⇒ unrouted at event time
+      "branch": { "id": "uuid", "name": "…" | null } | null,   // null ⇒ unrouted at event time (only when context_recorded=true); null+context_recorded=false ⇒ unknown
       "actor": { "id": "uuid", "name": "…" | null, "state": "active"|"inactive"|"deleted"|"unknown" },
       "detail": {
         "secret_version_from": 3 | null,   // lifecycle only
@@ -176,13 +177,14 @@ Pre-existing tests that already pin the write side: `DeliveryConnectorLifecycleA
 ```
 
 - **Never present** (and a test asserts the exact key set plus a forbidden-substring scan of the raw JSON): `secret`, `secret_prefix`, any token, `delivery_connector_accounts.secret*`, raw request payload, headers, IP, request id, email, role, employee link, phone.
-- People are rendered as `{id, name, state}` only. **Name only, never email** (same rule as 5d D2). `name = null` with `state = unknown` when the row is gone (ids have no FK); `deleted` for a soft-deleted user (name still shown, labelled by the UI); `inactive` for a deactivated user. Whether the server may resolve names for a holder who lacks `users.view` is **D5**.
+- People are rendered as `{id, name, state}` only. **Name only, never email** (same rule as 5d D2). **Approved D5:** a holder of `audit.view` receives these names **without needing `users.view`**; no email, role, employee link, phone or any other user data. `name = null` with `state = unknown` when the row is gone (ids have no FK); `deleted` for a soft-deleted user (name still shown, labelled by the UI); `inactive` for a deactivated user. Accepted consequence: a branch-restricted auditor sees the *names* of actors/operators from events in their scope regardless of those people's own branches.
 - `account_id` is returned as a stable reference only; **the audit UI offers no action** on it.
-- Events whose account was deleted: lifecycle events still return (snapshot), `account_available=false`; operator events cannot outlive the account today (cascade) — see G1.
+- Events whose account was deleted: lifecycle events still return (snapshot), `account_available=false`. **Operator events are still erased with the account row** (FK cascade is unchanged by D2 and its change is deferred to a separate decision); once erased they are simply absent.
+- **`context_recorded=false` operator events** (written before PR-6b0): platform, store and branch are `null`; the row is returned **only to unrestricted users**, never to a branch-restricted user (their scope cannot be proven), and the account id is not used to fill the gaps.
 - Events whose actor/user reference is missing: shown with `state=unknown`, never dropped (an audit log must not hide its own gaps).
 
 #### 3.3.3 Explicit non-goals of the API
-No export, no write, no delete/redact, no event detail endpoint, no search, no backfill. **No backfill of historical context is proposed** unless D2 selects it with its own approval.
+No export, no write, no delete/redact, no event detail endpoint, no search, **no backfill** (approved D2: no speculative backfill of historical context; any backfill would need its own evidence and approval).
 
 ### 3.4 Registry / migration / seeder impact (documented, **not executed**)
 
@@ -193,9 +195,11 @@ No export, no write, no delete/redact, no event detail endpoint, no search, no b
 | Migration for roles | **None.** Do **not** copy `REM-37`'s backfill. Stored owner/admin roles already hold `*`; custom roles and system accountant/staff keep their explicit lists and therefore **do not** gain the key. | This is the "no implicit grant to old custom roles" requirement. Granting it to an existing custom role is a deliberate admin action in the role editor. |
 | Seeder | **None.** `Rbac::systemRoles()` derives from `MATRIX`, which does not change. | |
 | `routes/api.php` | One `GET` route (PR-6b). | |
-| Frontend `modules/roles/risk.ts` | Classify the key as `data` (sensitive-grant flag in the editor) — see D6. | Labels derive from existing module/area/action messages; the area label `audit` already exists in both locales (`hr.perm_areas.audit` — "Audit" / «التدقيق»), so the editor renders it without a message change (the implementation PR re-verifies with the catalog test). |
+| Frontend `modules/roles/risk.ts` | Classify the key as `data` (sensitive-grant flag in the editor) — **D6 approved**. | Labels derive from existing module/area/action messages; the area label `audit` already exists in both locales (`hr.perm_areas.audit` — "Audit" / «التدقيق»), so the editor renders it without a message change (the implementation PR re-verifies with the catalog test). |
 | Frontend sidebar / messages | New entry + dictionary (PR-6d). | |
-| Docs | Record DP-E (audit-read sub-decision) in `DLV-INTEGRATIONS-UX-DESIGN-1.md` (D1) — wording must come from the owner. | |
+| Docs | DP-E (audit-read sub-decision) recorded as approved in `DLV-INTEGRATIONS-UX-DESIGN-1.md` §DP-E (done in this revision; no other decision touched). | |
+| Migration — operator-event snapshot (**PR-6b0, D2**) | Additive columns on `delivery_connector_operator_events`: `branch_id` (nullable uuid, no FK), `platform_key`, `external_store_id`, `branch_context_recorded` (boolean default `false`). **No backfill, no FK or index drop.** | Not executed here. |
+| Migration — read indexes (**PR-6b, D9**) | Additive time-ordered indexes (`(tenant_id, created_at, id)` and, if the plan check shows it helps, a branch-aware variant) on both event tables. | Not executed here; PostgreSQL EXPLAIN evidence required. |
 | Residual (G6) | `*` holders always have it; no deny rule exists; an admin can read the audit of their own actions. | Inherent; documented in the permission description. |
 
 ---
@@ -210,43 +214,50 @@ No export, no write, no delete/redact, no event detail endpoint, no search, no b
 | Operator reassignment | `tenant_id` column (FK, cascade) written from the locked account; `TenantScope` on reads; no model-level forging guard | Adequate (own column + scope); weaker model guard (G10) |
 | Names / branches / accounts used to enrich rows | `User` is **not** tenant-scoped ⇒ explicit `where tenant_id = <context>` on every user lookup; `Branch` and `DeliveryConnectorAccount` are `BaseModel` (scoped) but the reader still states the tenant predicate explicitly (defence in depth) | Must be enforced + tested |
 
-Answers to the assignment's questions, from the code:
+Answers to the assignment's questions, from the code and the approved D2:
 
-- **Events with `branch_id = null`?** Yes, by design: lifecycle events of **unrouted** accounts carry `branch_id = null`; operator events have no branch column at all.
-- **How is branch scope enforced on read?** Mirror `visibleTo`: unrestricted user ⇒ no branch predicate; restricted user ⇒ `branch ∈ allowed`; **null-branch events are hidden from restricted users**. Lifecycle: `whereIn('branch_id', allowed)`. Operator: via the account's branch (live join today — see 4.4).
-- **Branch of the point changes after the event?** It cannot today (model-level immutability), so the lifecycle snapshot equals the current branch. If a future feature re-routes, **lifecycle events stay correct (snapshot)** while a join-based operator filter would silently re-attribute history — hence G1.
-- **Point or user deleted?** *Point:* lifecycle events survive (snapshot of platform/store/branch; `account_available=false`); operator events are **erased by the FK cascade** (G1). *User:* no FK ⇒ ids remain; the reader shows `state=deleted|unknown` and never drops the row.
-- **Can another company's events appear through filters or pagination?** Not by design: every source query has the tenant scope **and** an explicit tenant predicate; the cursor carries position only; filters (`account_id`, `branch_id`, `external_store_id`) intersect with the tenant+branch scope and can only narrow. Proven by tests T-T1…T-T6 (§8).
-- **Must the branch context be frozen at event time for historical accuracy?** For lifecycle: already done. For operator events: **not done** ⇒ BLOCKER-1.
+- **Events with `branch_id = null`?** Yes, by design: events of **unrouted** accounts carry `branch_id = null` (lifecycle today; operator events from PR-6b0 on, with `branch_context_recorded = true`). Operator events written **before** PR-6b0 have no branch column value either, but there the `null` means **unknown**, not "unrouted" — distinguished by `branch_context_recorded = false`.
+- **How is branch scope enforced on read?** Mirror `visibleTo`: unrestricted user ⇒ no branch predicate; restricted user ⇒ `branch_id ∈ allowed` **and** context recorded; **null-branch events and unrecorded-context events are hidden from restricted users**. Both source queries filter on their own stored `branch_id` (no join to the account).
+- **Branch of the point changes after the event?** It cannot today (model-level immutability). Both event tables now hold the **event-time** branch, so a future re-route could not re-attribute history; the reader never consults the live account for scope.
+- **Point or user deleted?** *Point:* lifecycle events survive (snapshot of platform/store/branch; `account_available=false`); operator events are **still erased by the FK cascade** (unchanged by D2; changing it needs its own decision). *User:* no FK ⇒ ids remain; the reader shows `state=deleted|unknown` and never drops the row.
+- **Can another company's events appear through filters or pagination?** Not by design: every source query has the tenant scope **and** an explicit tenant predicate; the cursor carries position only; filters (`account_id`, `branch_id`, `external_store_id`) intersect with the tenant+branch scope and can only narrow. Proven by tests T-T1…T-T6 (§8) on **SQLite and PostgreSQL before the reader route exists in a merged state**.
+- **Must the branch context be frozen at event time for historical accuracy?** Lifecycle: already done. Operator events: **now required and approved** (D2 = A): `branch_id`, `platform_key`, `external_store_id` are recorded inside the reassignment transaction.
 
 ### 4.2 Required rules (apply to the whole reader)
 
 1. One service class owns the read; controllers never query the event models directly.
 2. Every query: tenant predicate (scope **and** explicit), branch predicate (for restricted users), keyset predicate, `LIMIT`.
 3. Branch predicate is applied **in SQL**, never as a post-filter (post-filtering breaks pagination and can leak page boundaries).
-4. A restricted user never receives null-branch events, never receives events of branches outside their set, and never learns that hidden events exist (no counts, no `has_more` influenced by hidden rows: `has_more` is computed **after** the scope is applied).
+4. A restricted user never receives null-branch events, never receives events of branches outside their set, **never receives an event whose scope cannot be proven (`context_recorded = false`)**, and never learns that hidden events exist (no counts; `has_more` is computed **after** the scope is applied).
 5. Branch scope is evaluated at **read time** from the user's current branches (identical to the connector list). Losing a branch removes its events from that user's view immediately.
 6. Fail closed: a row whose branch context cannot be established is shown only to unrestricted users.
+7. **No inference:** missing historical context (platform, store, branch) is never reconstructed from the current account row, from the account's current state, or from any other source, and nothing is backfilled speculatively.
 
-### 4.3 What the data guarantees today
+### 4.3 What the data guarantees
 
 | Event class | Historical isolation guaranteed by the row itself? |
 |---|---|
 | Lifecycle | **Yes** — tenant, branch (event-time), platform and store are in the row; survives account deletion. |
-| Operator | **No (conditional)** — tenant yes; branch/store only through the live account row; correct **only while** (I1) `branch_id` is immutable and (I2) no code path deletes an account. Neither invariant is enforced by the database or by the event row. |
+| Operator — written from PR-6b0 on | **Yes (approved D2 = A)** — tenant, branch (event-time), platform and store are recorded in the row inside the reassignment transaction. |
+| Operator — written before PR-6b0 | **No, and not inferred.** Tenant yes; branch/store unknown. Shown only to unrestricted users, with `context_recorded=false`; hidden from branch-restricted users. |
 
-### 4.4 BLOCKER-1 — historical branch scope of operator events (decision D2)
+### 4.4 D2 — historical context of operator events (**Approved: Option A**)
 
-> **Not decided here.** The three options below are compared; one is recommended; the owner chooses.
+**Approved decision (owner, 2026-10-14).** Take a historical snapshot of the operator-reassignment context with **additive** columns, **without backfill** and **without changing the FK** in this phase.
 
-| Option | What changes | Pros | Cons / risks |
-|---|---|---|---|
-| **A — Snapshot at write (recommended)** | Additive migration on `delivery_connector_operator_events`: nullable `branch_id`, `platform_key`, `external_store_id`, plus `branch_context_recorded` boolean (default `false`). `reassign()` writes them (a few lines, same transaction). Legacy rows (flag `false`) keep using the live-join fallback under I1/I2. **No backfill; no FK change.** | Same principle as the lifecycle table (event-time facts in the row); closes the asymmetry; new rows stay correct even if re-route/delete ever ships; reader has one clean path for new data. | A migration + writer change + tests (a separate small PR, **PR-6b0**); two read paths (snapshot / legacy-join) until legacy rows age out; the FK-cascade erasure of operator events is **not** fixed by this alone. |
-| **B — Join under invariants (no schema change)** | None. Reader derives operator-event branch/store from the live account row (SQL join through a scoped relation). Add **guard tests** that fail if immutability (I1) or deletion (I2) ever changes, and a documented rule: any feature that re-routes or deletes accounts **must first** ship Option A. | Zero schema/writer change; fastest. | History correctness depends on application invariants outside the log; a raw SQL change or future feature silently corrupts attribution; operator history disappears with the account row. |
-| **C — Restrict operator events to unrestricted users in v1** | None. Branch-restricted users see lifecycle events only; operator-reassignment rows are shown to unrestricted audit holders. | Trivially isolation-safe, no schema change. | Restricted auditors get an incomplete log (must be stated in the UI); defers rather than solves. |
+**Specification (PR-6b0, to be implemented later — not now):**
 
-**Recommendation: A.** If the owner prefers zero schema change for the first release, **B with the guard tests** is acceptable as long as it is recorded as a conscious, time-boxed acceptance; **C** is the safe interim if neither can be approved.
-**Optional, separate decision (not recommended now):** drop the `cascadeOnDelete` FK on operator events and/or backfill the snapshot for legacy rows. Backfill would copy the *current* account branch (equal to the event-time branch **only because of I1**); per the assignment it needs its own documented reason and approval.
+1. **Schema (additive only):** on `delivery_connector_operator_events` add nullable `branch_id` (uuid, no FK), `platform_key` (string 32), `external_store_id` (string 191), and `branch_context_recorded` (boolean, `NOT NULL`, default `false`). No existing column, index or FK changes; `cascadeOnDelete` on the account link stays as is.
+2. **Writer:** `DeliveryConnectorAccountService::reassign()` sets the four values from the **locked** account row **inside the same transaction** that updates `operated_by` and appends the event (`branch_context_recorded = true`; `branch_id = null` is a recorded "unrouted"). A same-operator no-op still writes no event. If the write fails the whole operation rolls back (same fail-closed rule as lifecycle events).
+3. **Evidence rule:** the snapshot is taken from the locked row at event time; it is **never** derived later from the account's current state. Rows written before the migration keep `branch_context_recorded = false` and null context forever (no backfill).
+4. **Reader:** uses only the stored values (§4.2); legacy rows are returned to unrestricted users with `context_recorded=false` and hidden from restricted users.
+5. **Deferred to a separate decision (not part of this phase):** dropping or changing the account FK / event retention-on-delete policy, and any backfill.
+6. **Merge gate:** the reader route must not ship until the tenant-isolation and branch-isolation suites (§8.1 T-T*, T-B*, T-W*) are green on **SQLite and PostgreSQL** in CI.
+
+**Residual risks (accepted by the approved scope, recorded for the owner):**
+- Pre-PR-6b0 reassignments are invisible to branch-restricted auditors (and have no context for anyone). The UI must say so (§5).
+- Operator events disappear when an account row is deleted (FK cascade unchanged); there is no application path that does this today.
+- The immutable-branch rule is enforced by the model only; the new snapshot makes the log independent of it for new events.
 
 ---
 
@@ -271,28 +282,47 @@ Answers to the assignment's questions, from the code:
 | Empty | "No configuration changes recorded yet." (and, with filters, "No events match these filters." + clear-filters). |
 | Forbidden (403) | Neutral "You don't have permission to view this log." — no data, no retry loop; also shown if permission is lost mid-session. |
 | Error / network / 5xx | Inline error with **Retry** (a read — retry is safe). Never "no events". Fail-closed like 4/5. |
-| Partial data | Rows are never dropped: unknown person → "Unknown user"; missing store/platform → "—"; `occurred_at = null` → "Time unknown". A visible note when any row has partial data. |
+| Partial data | Rows are never dropped: unknown person → "Unknown user"; missing store/platform → "—"; `occurred_at = null` → "Time unknown"; `context_recorded=false` → "Context was not recorded for this older event". A visible note when any row has partial data. **Branch-restricted users** also see a standing note that reassignments made before context recording started are visible only to users with all-branch access (approved D2: their scope cannot be proven). |
 | Stale response | Latest-request-wins guard (filters/cursor changes cancel older responses). |
 
 **Hard rules.** No management action anywhere on the screen (no rotate/disable/reassign/copy-secret; no link to a manage dialog); no secret, prefix, token or payload; no export in v1; Demo mode shows nothing and sends nothing; AR/EN with RTL/LTR logical properties; light/dark with AA contrast; ≥44 px touch targets; the link and the data request both respect `delivery_connector.audit.view` (absent link for non-holders; 403 handled if forged).
 
 ---
 
-## 6. Owner decisions required
+## 6. Owner decisions — **Approved (2026-10-14)**
 
-| # | Decision | Recommendation | Blocks |
+### 6.1 Decision record
+
+| # | Decision (as approved by the owner) | Status | Where it lands in this contract |
 |---|---|---|---|
-| **D1** | Confirm "DP-E option A" = dedicated `delivery_connector.audit.view` (read-only, owner/admin via `*`, nobody else by default); supply the wording for the decision record in `DLV-INTEGRATIONS-UX-DESIGN-1.md`. | Confirm. | Record only; PR-6a can proceed once confirmed. |
-| **D2 (BLOCKER-1)** | Historical branch scope of operator events: **A** snapshot, **B** join under invariants, **C** unrestricted-only (§4.4). | **A** (B acceptable as a recorded interim; C as safe fallback). | **PR-6b** (and PR-6b0 if A). |
-| **D3** | Page access: **P1** dedicated `/integrations/audit` gated by `audit.view` alone, vs **P2** require `invoices.view` + `audit.view`. | **P1.** | PR-6d. |
-| **D4** | Application gate on the audit endpoint: `sales.pos` like siblings (suspended ⇒ readable, disabled ⇒ 403) vs no app gate. | Same as siblings. | PR-6b. |
-| **D5** | May the server resolve **user names** (not emails) for a holder of `audit.view` who lacks `users.view`? **N1** yes — `audit.view` is an explicit authority over "who did what" (documented in the permission description); **N2** no — require `users.view` too, else show "User" with no name. | **N1** (names only, never email). | PR-6b DTO. |
-| **D6** | Classify the key as a **sensitive `data` grant** in the role editor. | Yes. | PR-6d (frontend). |
-| **D7** | Cursor pagination (recommended) vs offset (`page`/`per_page` as the Commerce endpoints). Offset shifts under inserts and needs a total. | Cursor. | PR-6b. |
-| **D8** | Re-scope the Horizon `INT-UX-6` text: this slice = **audit reader only**; the attempts/events log stays under **INT-ACT-1**. | Yes. | Docs. |
-| **D9** | Additive `(tenant_id, created_at, id)` indexes on both tables in PR-6b (index-only migration, no data change). | Yes, with an EXPLAIN check on PostgreSQL. | PR-6b. |
+| **D1** | Dedicated permission **`delivery_connector.audit.view`**, read-only; it grants **no** management permission. | **Approved** | §3.1, §3.4 |
+| **D2** | **Option A** — historical snapshot of operator-reassignment context with **additive** columns; **no backfill**, **no FK change** in this phase. Requirements: record `branch_id`, `platform_key`, `external_store_id` at event time **inside the reassignment transaction**; never infer missing historical context from the current account state without evidence; do not expose old events to a branch-restricted user if their scope cannot be proven; no speculative backfill; any FK / event-deletion-policy change deferred to a separate decision; tenant- and branch-isolation tests on SQLite **and** PostgreSQL before the reader opens. | **Approved** | §4.2–§4.4, §3.3, §7 (PR-6b0), §8 (T-W*, T-L*, T-B3, T-B5, T-F1) |
+| **D3** | Dedicated route **`/integrations/audit`** that works with the audit permission alone. | **Approved** | §3.2, §7 (PR-6d) |
+| **D4** | `sales.pos` gate: a **suspended** app allows reading, a **disabled** app blocks it. | **Approved** | §3.1, §3.3 (T-P8) |
+| **D5** | Show the **names** of people tied to audit events to holders of `audit.view` **without requiring `users.view`**; no email and no extra user data. | **Approved** | §3.3.2, §8 (T-S1, T-T5) |
+| **D6** | Classify the permission as **`data`** in the role editor. | **Approved** | §3.1, §3.4, §7 (PR-6d) |
+| **D7** | **Cursor pagination**, default page size **25**, maximum **100**. | **Approved** | §3.3 (T-O*) |
+| **D8** | INT-UX-6 scope = the **configuration-change log only**; the attempts log belongs to **INT-ACT-1**. | **Approved** | §1.6, §5 scope note |
+| **D9** | Indexes suited to time-ordered reads, **with the query plan verified on PostgreSQL**. | **Approved** | §3.3 (indexes), §8 (T-D2) |
 
-No decision above requires a backend *behaviour* change to existing endpoints.
+No approved decision requires a behaviour change to any existing endpoint.
+
+### 6.2 Compatibility review — approved decisions vs. the contract
+
+Each item was checked against the approved decisions. Where the earlier draft of this document went beyond or against an approved decision, **the contract text was corrected; no decision was changed.**
+
+| # | Finding | Type | Resolution |
+|---|---|---|---|
+| **C1** | The earlier Option-A text kept a **live-join fallback** for legacy operator events (derive branch/store from the current account row under invariants I1/I2). That contradicts the approved D2 rule *"do not infer missing historical context from the current account state without evidence"* and *"do not expose old events to a restricted user if scope cannot be proven"*. | **Contract corrected (draft only)** | Removed. Legacy events (`branch_context_recorded=false`) carry `null` context, are returned only to unrestricted users and never to branch-restricted users; the reader never joins or looks up the account (§3.3, §4.2 rule 7, §4.4). The "account lookup" in the N+1 budget was dropped. |
+| **C2** | Consequence of C1 + "no backfill": **pre-PR-6b0 reassignments are invisible to branch-restricted auditors forever** and have no context for anyone. | **Impact of the approved decision (not a contradiction)** | Accepted by D2; UI must state it (§5); recorded as residual risk (§4.4). Owner may later approve a backfill **only with documented evidence** (separate decision). |
+| **C3** | D2 leaves `cascadeOnDelete` on `delivery_connector_operator_events.delivery_connector_account_id`: operator events are still erased with an account row, while lifecycle events survive. | **Residual risk, by decision** | Deferred to a separate decision as approved. No application path deletes an account today. Pinned by a test that documents current behaviour (T-F1) so a future change is deliberate. |
+| **C4** | D5 shows person **names** without `users.view`. A **branch-restricted** auditor therefore learns names of actors/operators (who may belong to other branches) for events in the auditor's own scope. | **Accepted consequence of D5** | Documented in §3.3.2; email and all other user data stay excluded; tenant predicate on user lookups is mandatory and tested (T-T5). |
+| **C5** | D4 makes the endpoint 403 when `sales.pos` is **disabled**, while the sidebar entry for `/integrations/audit` is gated by permission only (the existing `/integrations` entry has no `appKey`). A user could see the entry and get a forbidden state. | **Implementation detail to settle in PR-6d (not a contradiction)** | The screen already has a neutral forbidden state; PR-6d decides whether to hide the entry when navigation state reports the app **disabled** (keeping it for **suspended**). No contract change. |
+| **C6** | D9 requires the **PostgreSQL query plan** to be verified; CI proves correctness on PostgreSQL but not plan quality. | **Process requirement** | PR-6b must attach EXPLAIN evidence for the unrestricted and the branch-restricted page queries (§3.3, T-D2). |
+| **C7** | D2's "isolation tests on SQLite and PostgreSQL **before opening the reader**" requires an ordering inside the work, not only a test list. | **Process requirement** | PR-6b is **not mergeable** without T-T*, T-B*, T-W*, T-L* green on both engines; the suites are written first in the PR (test-first commit) and the route is registered last (§7, §8.3). |
+| **C8** | The snapshot flag `branch_context_recorded` is a design detail added by this document, not named in D2. | **Design detail within D2 ("additive columns")** | Kept because it is the only evidence-based way to tell "unrouted" (recorded `null`) from "unknown" (legacy `null`). Owner may substitute an equivalent marker without affecting the decision. |
+
+**No technically impactful contradiction remains between the approved decisions and the contract.** C1 was the only place where the contract itself had to change.
 
 ---
 
@@ -300,14 +330,14 @@ No decision above requires a backend *behaviour* change to existing endpoints.
 
 | PR | Scope | Depends on | Notes |
 |---|---|---|---|
-| **PR-6a** Permission registry | `Rbac::PERMISSIONS` += `delivery_connector.audit.view`; tests: not in `MATRIX` for accountant/staff/self_service; role editor/`StoreRoleRequest` accept it; grant-ceiling test; stored custom roles unchanged; **no route** (inert) | D1 | Backend, ~1 line + tests. No migration/seeder. |
-| **PR-6b0** *(only if D2 = A)* Operator-event context snapshot | Additive migration (3 nullable cols + flag), `reassign()` writes them in the same transaction, tests (written, null-branch, legacy rows untouched, no secret, same-operator no-op still writes nothing) | D2 | Separate so the schema change is reviewed alone. |
-| **PR-6b** Audit reader API | Route + controller + form request + service + resource + `(tenant_id, created_at, id)` indexes (D9) + the full backend matrix (§8) on SQLite **and** PostgreSQL | PR-6a, D2–D5, D7 | Read-only; adds no write path. |
+| **PR-6a** Permission registry | `Rbac::PERMISSIONS` += `delivery_connector.audit.view`; tests: not in `MATRIX` for accountant/staff/self_service; role editor/`StoreRoleRequest` accept it; grant-ceiling test; stored custom roles unchanged; **no route** (inert) | D1 ✅ | Backend, ~1 line + tests. No migration/seeder. |
+| **PR-6b0** Operator-event context snapshot (**required — D2 = A**) | Additive migration (`branch_id`, `platform_key`, `external_store_id`, `branch_context_recorded` default `false`); `reassign()` writes them from the **locked** account row in the same transaction; **no backfill, no FK change**; tests T-W*, T-L*, T-F1 on SQLite + PostgreSQL | D2 ✅ | Separate so the schema change is reviewed alone. Must merge **before** PR-6b. |
+| **PR-6b** Audit reader API | Route + controller + form request + service + resource + time-ordered indexes (D9) + the full backend matrix (§8) on SQLite **and** PostgreSQL + **PostgreSQL EXPLAIN evidence**. Test-first: isolation suites (T-T*, T-B*) land in the first commit; the route is registered last. | PR-6a, PR-6b0, D2–D5, D7, D9 ✅ | Read-only; adds no write path. **Not mergeable** unless the isolation suites are green on both engines (C7). |
 | **PR-6c** UI data layer | `lib/connector-audit.ts` (allow-list reader, dictionary, cursor handling), hook with latest-request-wins, permission gate helper, messages AR/EN, extend `no-connection-controls.test.ts` deliberately (one new GET route, zero write verbs, no actions) | PR-6b | No screen yet; pure + hook tests. |
-| **PR-6d** Screen + navigation | `/integrations/audit` screen (desktop table / mobile cards, filters, all states), sidebar entry, landing + platform deep links, role-editor risk flag (D6), Playwright AR/EN × light/dark × desktop/mobile | PR-6c, D3, D6 | Real clicks; API-intercepted vs real-backend runs labelled separately. |
-| **PR-6e** Docs close-out | Decision record in the design doc, closure report, Horizon status | PR-6d | Docs only. |
+| **PR-6d** Screen + navigation | `/integrations/audit` screen (desktop table / mobile cards, filters, all states), sidebar entry, landing + platform deep links, role-editor risk flag (D6), Playwright AR/EN × light/dark × desktop/mobile | PR-6c, D3 ✅, D6 ✅ | Real clicks; API-intercepted vs real-backend runs labelled separately. |
+| **PR-6e** Docs close-out | Closure report and Horizon status; **re-sync the design doc's remaining pointers** that still say the reader is "deferred until the DP-E read permission is approved" (§5.8 item 2, the `INT-UX-6` slice's *Depends on* / *Deferred* lines) — intentionally **not** edited in this revision, which touches only the DP-E record | PR-6d | Docs only. |
 
-Order: 6a → (6b0) → 6b → 6c → 6d → 6e. None starts without its own assignment.
+Order: 6a → 6b0 → 6b → 6c → 6d → 6e (PR-6b0 is now mandatory). Decisions are closed; **each PR still starts only on its own explicit assignment**, and none is merged or deployed without explicit approval.
 
 ---
 
@@ -324,18 +354,18 @@ Order: 6a → (6b0) → 6b → 6c → 6d → 6e. None starts without its own ass
 | T-P5 | System `accountant`, `staff`, `self_service` | 403; `Rbac::MATRIX` does not contain the key |
 | T-P6 | Custom role created **before** the key existed / stored without it | 403 (no implicit grant); after an explicit grant → 200 |
 | T-P7 | Role editor / `StoreRoleRequest` | accepts the key; unknown key still 422; grant ceiling blocks an actor lacking it |
-| T-P8 | `sales.pos` enabled / suspended / disabled | 200 / 200 (read-only) / 403 |
+| T-P8 | `sales.pos` enabled / suspended / disabled (**D4**) | 200 / 200 (read-only) / 403 |
 | T-T1 | Two tenants, events in both | each tenant sees only its own, in every filter combination |
 | T-T2 | Foreign `account_id` / `branch_id` / `external_store_id` filter | **200 empty**, not 404/403/422 (no oracle) |
 | T-T3 | Forged / replayed cursor from another tenant | cannot widen scope; malformed ⇒ 422 |
 | T-T4 | Pagination across a tenant boundary (interleaved timestamps) | no foreign row on any page; `has_more` unaffected by hidden rows |
-| T-T5 | Name/branch/account enrichment lookups | never return another tenant's name (explicit tenant predicate on `User`) |
+| T-T5 | Name/branch enrichment lookups (**D5**) | never return another tenant's name (explicit tenant predicate on `User`, `withTrashed`); a holder of `audit.view` **without** `users.view` still gets names; no email/role/other user field in any response |
 | T-T6 | Query-level assertion | every source query carries the tenant predicate (SQL log assertion) |
 | T-B1 | Unrestricted user | sees all branches **and** null-branch events |
 | T-B2 | Branch-restricted user | only events of their branches; **null-branch events hidden** |
-| T-B3 | Restricted user, operator events | scope per decision D2 (A: snapshot; B: join; C: hidden) |
+| T-B3 | Restricted user, **new** operator events (context recorded) | scoped by the **stored** `branch_id`; no join to the account; null-branch (recorded unrouted) hidden; other-branch hidden |
 | T-B4 | Branch scope changed after events were written | visibility follows the user's **current** branches immediately |
-| T-B5 | Account deleted (raw delete) | lifecycle events still returned with `account_available=false` and correct snapshot branch; restricted scoping still correct; operator events per D2 |
+| T-B5 | Account deleted (raw delete) | lifecycle events still returned with `account_available=false` and correct snapshot branch (restricted scoping still correct); operator events are erased by the unchanged cascade (documents current behaviour — see T-F1) |
 | T-B6 | Point routed to branch X then (hypothetically) re-routed | lifecycle events keep the snapshot branch (guard test for G1) |
 | T-E1 | All four event kinds appear with the right `event_code`, versions and operators | pass |
 | T-E2 | No-op same-operator reassign | writes/returns no event |
@@ -346,10 +376,19 @@ Order: 6a → (6b0) → 6b → 6c → 6d → 6e. None starts without its own ass
 | T-O3 | Same-second events from both tables | deterministic order; no loss at page boundaries |
 | T-S1 | Response key allow-list | exact key set; **no** `secret`, `secret_prefix`, token, payload, ip, request id, email, role, employee link anywhere in the raw JSON |
 | T-S2 | Existing responses | `GET /delivery-connectors` contract unchanged |
-| T-N1 | Query count | constant (≤ 2 page queries + ≤ 3 lookups) regardless of page size / actors (assert query log) |
+| T-N1 | Query count | constant (≤ 2 page queries + ≤ 2 lookups: users, branches) regardless of page size / actors; **no account lookup** (assert query log) |
 | T-R1 | Read-only | no non-GET verb exists on `delivery-connectors/audit-events*`; the reader writes nothing (event row counts unchanged) |
 | T-D1 | PostgreSQL parity | keyset predicate, null ordering and timestamp equality behave identically to SQLite |
-| T-X1 | *(guard)* | model/table invariants I1/I2 (immutable branch, no delete path) pinned by tests if D2 = B |
+| T-D2 | Query plan (**D9**) | EXPLAIN of the unrestricted and the branch-restricted page queries on **PostgreSQL** (representative volume) attached to the PR-6b report: index used, no full tenant-partition sort |
+| T-W1 | Writer (PR-6b0): a reassignment | the operator event stores `branch_id`, `platform_key`, `external_store_id` taken from the **locked** account row, `branch_context_recorded = true`, inside the same transaction |
+| T-W2 | Writer: unrouted account | `branch_id = null` with `branch_context_recorded = true` (recorded unrouted) |
+| T-W3 | Writer: failure after the snapshot / forced rollback | no `operated_by` change and no event row (fail-closed) |
+| T-W4 | Writer: same-operator reassign | still writes **no** event |
+| T-W5 | Writer: no secret / prefix / token / request data stored; additive migration only | existing columns, indexes and the account FK unchanged |
+| T-L1 | Legacy operator events (rows with `branch_context_recorded = false`) | returned to an unrestricted user with `context_recorded=false` and null platform/store/branch; **hidden from every branch-restricted user** |
+| T-L2 | No inference | a legacy row's context is never filled from the current account (assert no account query; mutate the account and re-read: output unchanged) |
+| T-L3 | No backfill | the migration touches no existing row (all legacy rows keep `false` and null context) |
+| T-F1 | FK / deletion policy (deferred decision) | the account FK on operator events is still `cascadeOnDelete`; a test pins this so any future change is deliberate |
 
 ### 8.2 Frontend (Vitest + Playwright)
 
@@ -366,18 +405,22 @@ Order: 6a → (6b0) → 6b → 6c → 6d → 6e. None starts without its own ass
 1. `audit.view` is the only way (besides `*`) to read the audit; no other permission opens it, and it opens nothing else.
 2. No implicit grant to any existing non-`*` role; no migration/seeder touches stored roles.
 3. A tenant never sees another tenant's events — at the query level and at the API level, including via filters and cursors.
-4. A branch-restricted user never sees events of other branches or null-branch events; the chosen D2 option is implemented and proven (including deleted-account and re-route guard cases).
+4. A branch-restricted user never sees events of other branches, null-branch events, or events whose scope cannot be proven (legacy operator events); the approved D2 = A snapshot is implemented (inside the reassignment transaction, additive columns, no backfill, no FK change) and proven, including deleted-account and no-inference cases.
 5. The DTO matches the allow-list; secrets, prefixes, tokens, payloads, emails and ids-of-people-as-names never appear.
 6. Stable ordering and cursor pagination with a hard page cap; bounded queries; no N+1.
 7. The reader is strictly read-only; the UI offers no management action.
-8. All tests green on SQLite and PostgreSQL; existing INT-UX-4/5 behaviour unchanged; CI green on the final head.
+8. All tests green on SQLite **and** PostgreSQL — the tenant- and branch-isolation suites **before** the reader route is merged; existing INT-UX-4/5 behaviour unchanged; CI green on the final head.
+9. PostgreSQL query-plan evidence (D9) attached to the PR-6b report.
+10. Names of people are shown to `audit.view` holders without `users.view` (D5), with no email or other user data.
 
 ---
 
 ## 9. Git state
 
-Branch `docs/int-ux-6-contract-security-gate` · Base SHA `28c8a20e4a928587315266b515feed091b8f0f33` · Draft PR and final Head SHA: recorded in the PR description (a document cannot name its own commit). Documentation-only: **this file is the only change.**
+Branch `docs/int-ux-6-contract-security-gate` · Draft PR #1483 · Base SHA `28c8a20e4a928587315266b515feed091b8f0f33` · final Head SHA: recorded in the PR description (a document cannot name its own commit). Documentation-only.
+
+**Revision history.** *r1 (2026-10-14)* — contract and security gate, decisions proposed. *r2 (2026-10-14)* — owner decisions D1–D9 recorded as **Approved**; §4.4 rewritten to the approved Option A (legacy live-join fallback removed, finding C1); §6 turned into a decision record with a compatibility review; §3.3, §7 and §8 aligned; `DLV-INTEGRATIONS-UX-DESIGN-1.md` §DP-E updated (no other decision touched).
 
 ## 10. Next step
 
-Owner review of this gate. Decisions D1–D9 (above all **D2 / BLOCKER-1**) are needed before **PR-6b**; **PR-6a** needs only D1. Nothing is implemented, merged or deployed, and INT-UX-6 implementation does not start until the owner assigns PR-6a (or the chosen first PR) explicitly.
+Owner review of this closure. The decisions are closed, so the first implementation PR can be assigned: **PR-6a** (permission registry, inert) and then **PR-6b0** (operator-event context snapshot) before **PR-6b** (reader). Nothing is implemented, merged or deployed, and no implementation PR starts until the owner assigns it explicitly.
