@@ -135,7 +135,12 @@ Evidence: `AWJ-VD-H1-0-EVIDENCE-AND-ARCHITECTURE.md` (sections referenced as §n
     - a missing value returns `428`;
     - a mismatch returns `409` with `current_version`;
     - `null` is allowed only to create a row that does not exist yet.
-  - Two creates at the same time: the unique index turns the second into `409`.
+  - Two creates at the same time (amended in VD-1b, owner-approved 2026-10-14):
+    - The save locks the **facet row first**, so the two creates are serialized.
+    - The second then meets the first's row with a `null` token and gets **`428`** (the "row exists, token missing" rule).
+    - The unique index stays as a net: any writer that bypasses the facet lock is turned into **`409`**.
+    - Neither path returns `500`.
+    - Pinned by `CommerceFacetVisualPostgresConcurrencyTest` (real race → 428, the waiter provably waited) and `CommerceFacetVisualApiTest` (unique-index net → 409).
   - **No ABA (Codex P1, #1472):** the API never deletes a visual row. "Remove" empties it to `{}` and increments `version`. Rows disappear only by cascade when the facet or value itself is deleted, and a recreated owner gets a new UUID. So a version number never repeats for the same owner.
   - Full table in §3.8-a.
 - **Alternatives:**

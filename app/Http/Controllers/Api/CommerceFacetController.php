@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Models\CommerceFacet;
 use App\Models\Product;
 use App\Services\Commerce\CommerceFacetService;
+use App\Services\Commerce\CommerceFacetVisualService;
 use App\Services\Commerce\CommerceTaxonomyConflictException;
 use DomainException;
 use Illuminate\Http\JsonResponse;
@@ -21,11 +22,12 @@ final class CommerceFacetController extends ApiController
 {
     private const SLUG = 'regex:/^[a-z0-9]+(?:-[a-z0-9]+)*$/';
 
-    public function index(Request $request, CommerceFacetService $facets): JsonResponse
+    public function index(Request $request, CommerceFacetService $facets, CommerceFacetVisualService $visuals): JsonResponse
     {
         $this->denySelfService($request);
 
-        return response()->json(['data' => ['facets' => $facets->list()]]);
+        // AWJ-VD-H1 / VD-1b — additive: `visual`, `visual_version`, `visual_preview` on every facet and value.
+        return response()->json(['data' => ['facets' => $visuals->decorate($facets->list())]]);
     }
 
     public function store(Request $request, CommerceFacetService $facets): JsonResponse
