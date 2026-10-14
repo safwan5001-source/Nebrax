@@ -4,6 +4,10 @@ LAST_UPDATED: 2026-10-11 (OWNER DECISION: **AWJ Delivery Platforms & Settlement 
 LAYER_VERSION: V1
 STATUS: TAX-ZATCA HORIZON ACTIVE UPON MERGE OF ACTIVATION PR #1324 — use `docs/audits/horizon/AWJ-TAX-ZATCA-HORIZON-{MASTER-PLAN,TASK-QUEUE,BOOTSTRAP}.md`. **TAX-HZ-00 is the only first task; read-only Evidence/Decision Pass.** Separate owner approval is required for every PR merge. The Delivery entries below are historical frozen snapshots, not the active queue.
 
+## Parallel Horizon — AWJ-COMMERCE-VISUAL-DIMENSIONS-H1 (launched by owner 2026-10-14)
+- H1-0 Evidence & Architecture delivered for review; **stopped at Decision Gate G0** (approval of D-01..D-17 — including D-16 media-delete serialization and D-17 mandatory versioning — before any migration/API contract).
+- Plan / queue / decisions: `docs/plans/store/visual-dimensions/`. Per-PR owner merge approval; no deploy. Does not touch TAX-ZATCA files.
+
 ## Paused Horizon handoff — Delivery Platforms & Settlement
 - Owner instruction: pause implementation, do not close/delete prior progress. No new delivery PR, merge, execution, or deploy is authorized by the TAX activation.
 - Last durable Delivery snapshot (2026-10-04): DELIVERY-DECISION-PASS-6 merged at `aea1e9290503da1325be5713654dd98ad4beb5c8`; OD-DG-3-POSTING-GATE accepted, DG-3 **NOT CLOSED**; DLV-FINANCIAL-ROLE-CONFIG-1 was **in review / not merged at that snapshot**. Its **live PR state must be reverified at resumption**. Do not infer it has merged or authorize invoice posting.
