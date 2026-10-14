@@ -1,23 +1,17 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import { CommunicationsCatalog } from '@/components/integrations/communications-catalog';
-import { currentUser } from '@/lib/auth';
 import { COMMUNICATIONS_PERMISSION } from '@/lib/communications-providers';
-import { hasPermission } from '@/lib/permissions';
+import { useCan } from '@/lib/use-can';
 
 /**
  * الإعدادات › مركز التكاملات › مزودو الاتصالات (AWJ-COMMS-UX-01). وصف ثابت — لا طلب شبكة إطلاقاً.
- * الصلاحية `company.manage` (قرار اختيار مزوّد للمالك/المدير)؛ قبل حسمها لا يُعرض شيء.
+ * الصلاحية `company.manage` (قرار اختيار مزوّد للمالك/المدير) عبر `useCan` (AC-UX-07)؛ قبل الترطيب لا يُعرض شيء
+ * كي لا يومض رفضٌ كاذب قبل قراءة الجلسة.
  */
 export default function CommunicationsProvidersPage() {
-  const [allowed, setAllowed] = useState<boolean | null>(null);
+  const { can, hydrated } = useCan();
 
-  useEffect(() => {
-    const user = currentUser();
-    setAllowed(hasPermission(user?.permissions, user?.role, COMMUNICATIONS_PERMISSION));
-  }, []);
-
-  if (allowed === null) return null;
-  return <CommunicationsCatalog allowed={allowed} />;
+  if (!hydrated) return null;
+  return <CommunicationsCatalog allowed={can(COMMUNICATIONS_PERMISSION)} />;
 }
