@@ -23,11 +23,6 @@ abstract class ApiController extends Controller
         try {
             return $fn();
         } catch (PDOException $e) {
-            // REM-04 / SEC-02: تعارض تزامن عابر (deadlock 40P01 / serialization 40001) بعد نفاد
-            // محاولات المعاملة ⇒ 409 قابل لإعادة المحاولة، لا 500 — الاستثناء نفسه (نص SQL) لا يُعرض.
-            if ($this->isTransientConcurrencyFailure($e)) {
-                abort(409, 'تعذّر إتمام العملية بسبب تعارض مؤقت مع عملية متزامنة. أعد المحاولة.', ['Retry-After' => '1']);
-            }
             throw $e;
         } catch (\App\Services\Pos\PosIdempotencyConflictException $e) {
             // تعارض idempotency → 409 من المتحكّم، لا 422 عام.
@@ -39,29 +34,6 @@ abstract class ApiController extends Controller
         } catch (RuntimeException $e) {
             abort(422, $e->getMessage());
         }
-    }
-
-    /**
-     * هل سببُ الاستثناء تعارضَ تزامنٍ عابراً تُجدي فيه إعادة الطلب؟ حالتان فقط (SQLSTATE):
-     * `40P01` deadlock_detected و`40001` serialization_failure. أي خطأ قاعدة بيانات آخر يبقى
-     * 500 كما كان (لا نُخفي عطلاً حقيقياً خلف 409).
-     */
-    private function isTransientConcurrencyFailure(\Throwable $e): bool
-    {
-        for ($cause = $e; $cause !== null; $cause = $cause->getPrevious()) {
-            // Laravel يلفّ ضحية الجمود داخل معاملة متداخلة بـDeadlockException (بلا errorInfo، والأصل في previous).
-            if ($cause instanceof \Illuminate\Database\DeadlockException) {
-                return true;
-            }
-            $state = $cause instanceof \Illuminate\Database\QueryException
-                ? ($cause->errorInfo[0] ?? null)
-                : ($cause instanceof PDOException ? ($cause->errorInfo[0] ?? null) : null);
-            if (in_array((string) ($state ?? $cause->getCode()), ['40P01', '40001'], true)) {
-                return true;
-            }
-        }
-
-        return false;
     }
 
     /**

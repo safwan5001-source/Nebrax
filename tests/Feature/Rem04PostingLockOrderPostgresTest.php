@@ -540,54 +540,41 @@ class Rem04PostingLockOrderPostgresTest extends TestCase
         $this->assertLedgerBalanced();
     }
 
-    // ───────────────────── إعادة المحاولة واستنفادها ─────────────────────
+    // ───────────────── محاولة واحدة: لا إعادة محاولة (قرار المالك) ─────────────────
 
     /** @test */
-    public function a_transient_deadlock_victim_is_rolled_back_completely_and_retried_to_a_single_posting(): void
+    public function a_deadlock_victim_is_rolled_back_completely_in_a_single_attempt_and_the_post_can_be_repeated(): void
     {
         $draft = $this->creditDraft();
-        Rem04FlakyInvoiceService::reset(2); // المحاولتان 1 و2 تفشلان بعد أن كتبتا القيد وICV والحالة
-
-        $posted = app()->build(Rem04FlakyInvoiceService::class)->post(Invoice::findOrFail($draft->id));
-
-        $this->assertSame(3, Rem04FlakyInvoiceService::$calls);
-        $this->assertSame('posted', $posted->status);
-        $this->assertInvoicePostedExactlyOnce($draft->id, 1);
-        $this->assertSame(1, JournalEntry::count(), 'لا قيود يتيمة من المحاولات الملغاة.');
-        $this->assertLedgerBalanced();
-
-        // السلسلة سليمة: التالية تأخذ ICV 2 دون فجوة.
-        $next = app(InvoiceService::class)->post($this->creditDraft());
-        $this->assertSame(2, (int) $next->zatca_icv);
-    }
-
-    /** @test */
-    public function when_retries_are_exhausted_nothing_is_persisted_and_the_post_can_be_repeated(): void
-    {
-        $draft = $this->creditDraft();
-        Rem04FlakyInvoiceService::reset(3);
+        Rem04FlakyInvoiceService::reset(1); // تفشل بعد أن كتبت المعاملة القيد وICV والحالة
 
         try {
             app()->build(Rem04FlakyInvoiceService::class)->post(Invoice::findOrFail($draft->id));
-            $this->fail('كان يجب أن يصل استثناء الجمود بعد نفاد المحاولات.');
+            $this->fail('كان يجب أن يصل استثناء الجمود فوراً — لا إعادة محاولة.');
         } catch (QueryException $e) {
             $this->assertSame('40P01', $e->errorInfo[0]);
         }
 
-        $this->assertSame(3, Rem04FlakyInvoiceService::$calls, 'ثلاث محاولات بالضبط.');
+        $this->assertSame(1, Rem04FlakyInvoiceService::$calls, 'محاولة واحدة بالضبط — لا إعادة محاولة داخل المعاملة.');
         $invoice = Invoice::findOrFail($draft->id);
         $this->assertSame('draft', $invoice->status);
         $this->assertNull($invoice->journal_entry_id);
         $this->assertNull($invoice->zatca_icv);
-        $this->assertSame(0, JournalEntry::count());
+        $this->assertSame(0, JournalEntry::count(), 'لا قيود يتيمة من المعاملة الملغاة.');
 
+        // إعادة الطلب من العميل تنجح: قيد واحد وICV 1 بلا فجوة.
         Rem04FlakyInvoiceService::reset(0);
         app()->build(Rem04FlakyInvoiceService::class)->post(Invoice::findOrFail($draft->id));
         $this->assertInvoicePostedExactlyOnce($draft->id, 1);
+        $this->assertSame(1, JournalEntry::count());
+        $this->assertLedgerBalanced();
+
+        $next = app(InvoiceService::class)->post($this->creditDraft());
+        $this->assertSame(2, (int) $next->zatca_icv, 'السلسلة سليمة: التالية ICV 2.');
     }
 
     /** @test */
-    public function the_api_answers_409_with_retry_after_when_retries_are_exhausted_never_500_and_recovers(): void
+    public function the_post_endpoint_answers_503_with_retry_after_and_error_code_rolls_back_fully_and_recovers(): void
     {
         $auth = $this->registerTenant('rem04-http-'.uniqid(), 'rem04http'.uniqid().'@example.test');
         $this->tenantsToPurge[] = $auth['tenant_id'];
@@ -601,20 +588,29 @@ class Rem04PostingLockOrderPostgresTest extends TestCase
         ])->assertCreated()['data'];
 
         app()->bind(InvoiceService::class, fn ($app) => $app->build(Rem04FlakyInvoiceService::class));
-        Rem04FlakyInvoiceService::reset(3);
+        Rem04FlakyInvoiceService::reset(1); // جمود بعد أن كتبت المعاملة القيد وICV والحالة
 
         $response = $this->withToken($token)->postJson("/api/invoices/{$invoice['id']}/post");
-        $response->assertStatus(409);
+        $response->assertStatus(503)->assertJsonPath('error_code', 'concurrency_conflict');
         $this->assertSame('1', $response->headers->get('Retry-After'));
+        $this->assertSame(1, Rem04FlakyInvoiceService::$calls, 'محاولة واحدة — لا إعادة محاولة.');
         $body = (string) $response->getContent();
         $this->assertStringNotContainsString('40P01', $body);
         $this->assertStringNotContainsString('update "tenants"', $body);
-        $this->assertSame('draft', Invoice::findOrFail($invoice['id'])->status);
 
-        // إعادة الطلب نفسه تنجح (لا ترحيل جزئي، لا ICV مستهلك).
+        // المعاملة أُلغيت كاملةً: لا قيد ولا ICV ولا تغيير حالة.
+        $row = Invoice::findOrFail($invoice['id']);
+        $this->assertSame('draft', $row->status);
+        $this->assertNull($row->journal_entry_id);
+        $this->assertNull($row->zatca_icv);
+        $this->assertSame(0, JournalEntry::count());
+
+        // إعادة الطلب نفسه تنجح: قيد واحد متوازن وICV 1.
         Rem04FlakyInvoiceService::reset(0);
         $this->withToken($token)->postJson("/api/invoices/{$invoice['id']}/post")->assertOk();
-        $this->assertSame(1, (int) Invoice::findOrFail($invoice['id'])->zatca_icv);
+        $this->assertInvoicePostedExactlyOnce($invoice['id'], 1);
+        $this->assertSame(1, JournalEntry::count());
+        $this->assertLedgerBalanced($auth['tenant_id']);
     }
 
     // ───────────────────────── ثوابت مالية ─────────────────────────
@@ -638,12 +634,12 @@ class Rem04PostingLockOrderPostgresTest extends TestCase
         );
     }
 
-    private function assertLedgerBalanced(): void
+    private function assertLedgerBalanced(?string $tenantId = null): void
     {
         $unbalanced = DB::select(
             'SELECT e.id FROM journal_entries e JOIN journal_lines l ON l.journal_entry_id = e.id
               WHERE e.tenant_id = ? GROUP BY e.id HAVING SUM(l.debit) <> SUM(l.credit)',
-            [$this->tenant->id]
+            [$tenantId ?? $this->tenant->id]
         );
         $this->assertSame([], $unbalanced, 'كل قيد متوازن (Σ مدين = Σ دائن).');
     }

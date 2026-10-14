@@ -84,15 +84,27 @@ describe('neutral SecretRevealDialog (security-critical)', () => {
   });
 
   describe('requireConfirmToClose (opt-in lock for secrets that cannot be recovered)', () => {
-    it('Escape, backdrop and the top close button do not close before confirmation, and a hint appears', () => {
+    it('Escape and backdrop do not close before confirmation, a hint appears, and the top X is hidden (not a dead button)', () => {
       const { onClose, container } = mount({ requireConfirmToClose: true });
+      expect(screen.queryByRole('button', { name: /close|إغلاق/i })).toBeNull();
       fireEvent.keyDown(document, { key: 'Escape' });
-      fireEvent.click(screen.getByRole('button', { name: /close|إغلاق/i }));
       const backdrop = container.ownerDocument.querySelector('[aria-hidden="true"].absolute') as HTMLElement | null;
       expect(backdrop).not.toBeNull();
       fireEvent.click(backdrop as HTMLElement);
       expect(onClose).not.toHaveBeenCalled();
       expect(screen.getByTestId('secret-dismiss-hint').textContent).toBe('Confirm you saved it first.');
+    });
+
+    it('the top X returns once the save is confirmed and then closes; without the lock the X is always there (developer behavior unchanged)', () => {
+      const locked = mount({ requireConfirmToClose: true });
+      fireEvent.click(screen.getByRole('checkbox'));
+      fireEvent.click(screen.getByRole('button', { name: /close|إغلاق/i }));
+      expect(locked.onClose).toHaveBeenCalledTimes(1);
+      cleanup();
+
+      const plain = mount();
+      fireEvent.click(screen.getByRole('button', { name: /close|إغلاق/i }));
+      expect(plain.onClose).toHaveBeenCalledTimes(1);
     });
 
     it('after the explicit confirmation Escape and the done button close it', () => {

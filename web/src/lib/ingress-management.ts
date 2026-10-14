@@ -82,6 +82,8 @@ export type IngressErrorKey =
   | 'conflict'
   | 'outcomeUnknown'
   | 'serverError'
+  | 'disableOutcomeUnknown'
+  | 'demoUnavailable'
   | 'unknown';
 
 const CODE_TO_KEY: Record<KnownIngressErrorCode, IngressErrorKey> = {

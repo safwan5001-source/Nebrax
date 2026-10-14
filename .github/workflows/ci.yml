@@ -261,6 +261,12 @@ jobs:
             # PostgreSQL: متوازٍ بعمّال بعدد أنوية العدّاد (≤4) وقاعدة معزولة لكل عامل. المجموعة كاملة
             # بلا أي تصفية؛ SQLite أدناه تسلسلي كما كان.
             PROCS="$(nproc)"; [ "$PROCS" -le 4 ] || PROCS=4
+            # AWJ-BACKEND-CI-02: سقفٌ لانتظار الأقفال في اتصالات الاختبار وحدها. معاملةٌ متروكة من
+            # اختبارٍ فاشل كانت تعلّق عاملاً بلا حدّ (رُصد 42 دقيقة)؛ الآن يفشل المنتظر بـ55P03 مسمّى.
+            # تقرؤه libpq عند كل اتصال (Laravel وPDO المنافس وأطفال pcntl_fork)، ولا يمسّ الخادم.
+            # 60s > أطول انتظار مقصود (20s) بهامش واسع، و> deadlock_timeout فيبقى الـDeadlock 40P01.
+            # يحرسه PostgresTestLockTimeoutTest.
+            export PGOPTIONS="-c lock_timeout=60s"
             php artisan test --parallel --processes="$PROCS" 2>&1 | tee test-output-${{ matrix.db }}.txt
           else
             php artisan test 2>&1 | tee test-output-${{ matrix.db }}.txt

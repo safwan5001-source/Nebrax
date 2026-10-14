@@ -14,7 +14,7 @@ import { useToast } from '@/components/ui/toast';
 import { api, ApiError, fetchImageUrl } from '@/lib/api';
 import { useNumberPreview } from '@/lib/use-number-preview';
 import { AccessScopeFields, type AccessScope } from '@/components/users/access-scope-fields';
-import { SYSTEM_ROLE_KEYS } from '@/components/users/user-dialog';
+import { SYSTEM_ROLE_KEYS } from '@/components/users/user-editor-sheet';
 import type { Shift } from './shift-dialog';
 
 interface RoleOption {

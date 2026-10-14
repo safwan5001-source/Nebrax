@@ -7,6 +7,9 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TBody, TD, TH, THead, TR } from '@/components/ui/table';
 import { formatDate } from '@/lib/formatting';
 import { branchLabel, type IngressPoint } from '@/lib/signed-ingress';
+import { IngressManagementLayer } from './ingress-management-layer';
+import { IngressRowActions, useCanManageIngress } from './ingress-row-actions';
+import type { IngressManagement } from './use-ingress-management';
 import type { SignedIngressState } from './use-signed-ingress';
 
 /**
@@ -16,19 +19,24 @@ import type { SignedIngressState } from './use-signed-ingress';
  * «مرتبط» ولا «مزامنة»، ولا لون أخضر لحالة النقطة (الأخضر يُحجز لحالة فعلية مُثبتة). حالة النقطة (مهيّأة/معطّلة)
  * غير جاهزية المنصة، وهذا مكتوب في اللوحة. الفرع المعروض وجهة توجيه فقط، لا ربط متجر المزوّد بفرع.
  *
- * لا زر في اللوحة سوى «إعادة المحاولة»: لا إنشاء ولا تعطيل ولا تدوير ولا إعادة توجيه ولا اختبار. ولا تُعرض
- * قيمة سرّ ولا بادئته ولا معرّف النقطة ولا أسماء المشغّلين (انظر `lib/signed-ingress.ts`).
+ * بلا خاصية `management` (الافتراضي) لا زر في اللوحة سوى «إعادة المحاولة». ومع `management` (INT-UX-5b) يظهر لمن يحق له
+ * وحده **تدوير السر** و**تعطيل** النقطة المهيّأة؛ لا إنشاء ولا إعادة إسناد ولا إعادة تفعيل ولا اختبار. ولا تُعرض قيمة سرّ
+ * (إلا في حوار الكشف لمرة واحدة بعد التدوير) ولا بادئته ولا معرّف النقطة ولا أسماء المشغّلين (انظر `lib/signed-ingress.ts`).
  */
 export function SignedIngressPanel({
   platformName,
   state,
   onRetry,
+  management,
 }: {
   platformName: string;
   state: SignedIngressState;
   onRetry: () => void;
+  /** إدارة التدوير والتعطيل (INT-UX-5b). غيابها = لوحة قراءة فقط كما كانت. */
+  management?: IngressManagement;
 }) {
   const t = useTranslations('integrationCenter.ingressPanel');
+  const canManage = useCanManageIngress() && management !== undefined;
 
   // لا صلاحية عرض (أو الصفحة لم تُتح): اللوحة غائبة لا معطّلة، بلا طلب.
   if (state.status === 'idle') return null;
@@ -58,13 +66,16 @@ export function SignedIngressPanel({
           <p className="text-sm leading-relaxed text-muted">{t('empty.body')}</p>
         </div>
       ) : (
-        <IngressRows points={state.points} canViewBranches={state.canViewBranches} branchNames={state.branchNames} />
+        <IngressRows points={state.points} canViewBranches={state.canViewBranches} branchNames={state.branchNames} management={canManage ? management : undefined} />
       )}
+
+      {management ? <IngressManagementLayer management={management} /> : null}
 
       <div className="space-y-1 text-xs leading-relaxed text-muted" data-testid="signed-ingress-notes">
         <p>{t('statusNote')}</p>
         <p>{t('branchNote')}</p>
         <p>{t('scopeNote')}</p>
+        <p data-testid={canManage ? 'signed-ingress-manage-note' : 'signed-ingress-readonly-note'}>{canManage ? t('manageNote') : t('readOnlyNote')}</p>
       </div>
     </section>
   );
@@ -74,10 +85,12 @@ function IngressRows({
   points,
   canViewBranches,
   branchNames,
+  management,
 }: {
   points: IngressPoint[];
   canViewBranches: boolean;
   branchNames: Map<string, string> | null;
+  management?: IngressManagement;
 }) {
   const t = useTranslations('integrationCenter.ingressPanel');
   const locale = useLocale();
@@ -107,6 +120,7 @@ function IngressRows({
                 <TH scope="col">{t('columns.status')}</TH>
                 <TH scope="col">{t('columns.version')}</TH>
                 <TH scope="col">{t('columns.created')}</TH>
+                {management ? <TH scope="col"><span className="sr-only">{t('columns.actions')}</span></TH> : null}
               </TR>
             </THead>
             <TBody>
@@ -122,6 +136,7 @@ function IngressRows({
                   </TD>
                   <TD><span className="num">{point.secretVersion}</span></TD>
                   <TD>{created(point)}</TD>
+                  {management ? <TD className="text-end"><IngressRowActions point={point} management={management} /></TD> : null}
                 </TR>
               ))}
             </TBody>
@@ -153,6 +168,7 @@ function IngressRows({
                 <div className="py-1.5 text-muted">{disabledOn(point)}</div>
               ) : null}
             </dl>
+            {management ? <div className="mt-2 empty:hidden"><IngressRowActions point={point} management={management} /></div> : null}
           </li>
         ))}
       </ul>

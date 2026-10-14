@@ -1,0 +1,56 @@
+name: Preview Host CI
+
+# MOBILE-PREVIEW-10B-2A — خدمة مضيف المعاينة المعزولة (preview-host/).
+# اختبارات node:test بلا أي اعتماديات خارجية + بناء صورة Docker وفحص دخان لها.
+# لا نشر ولا أسرار هنا: بصمة Android ومعرّف فريق Apple في الدخان قيم اختبارية بحتة.
+
+on:
+  push:
+    branches: ['**']
+    paths: ['preview-host/**', '.github/workflows/preview-host-ci.yml']
+  pull_request:
+    branches: ['**']
+    paths: ['preview-host/**', '.github/workflows/preview-host-ci.yml']
+
+jobs:
+  check:
+    name: preview-host (test + image smoke)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Unit + integration tests
+        working-directory: preview-host
+        run: npm test
+
+      - name: Build image
+        run: docker build -t awj-preview-host preview-host
+
+      - name: Image smoke (fail-closed start, then serve)
+        run: |
+          set -euo pipefail
+          # Without signing inputs the container must refuse to start.
+          if docker run --rm awj-preview-host >/dev/null 2>&1; then
+            echo "container started without ANDROID_APP_LINK_SHA256_FINGERPRINTS / APPLE_TEAM_ID" >&2
+            exit 1
+          fi
+          docker run -d --name ph -p 3000:3000 \
+            -e ANDROID_APP_LINK_SHA256_FINGERPRINTS=AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99 \
+            -e APPLE_TEAM_ID=ABCDE12345 \
+            awj-preview-host
+          for i in $(seq 1 30); do
+            curl -fsS http://127.0.0.1:3000/health && break
+            sleep 1
+          done
+          curl -fsS http://127.0.0.1:3000/health | grep -q '"status":"ok"'
+          curl -fsS http://127.0.0.1:3000/.well-known/assetlinks.json | grep -q 'com.example.awjmobileruntimeproof'
+          curl -fsS http://127.0.0.1:3000/.well-known/apple-app-site-association | grep -q 'ABCDE12345.com.example.awjMobileRuntimeProof'
+          curl -sSI http://127.0.0.1:3000/preview/SmokeReference123 | grep -i '^referrer-policy: no-referrer'
+          ! docker logs ph 2>&1 | grep -q SmokeReference123

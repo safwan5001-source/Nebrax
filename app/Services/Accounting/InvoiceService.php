@@ -54,17 +54,6 @@ class InvoiceService
      */
     private const PAYMENT_METHODS = ['cash' => 'cash', 'transfer' => 'bank', 'card' => 'bank'];
 
-    /**
-     * REM-04 / SEC-02 — محاولات معاملة الترحيل عند تعارض تزامن عابر (PostgreSQL `40P01`
-     * deadlock / `40001` serialization). Laravel يعيد المحاولة **لاستثناءات التزامن
-     * وحدها** وعلى المعاملة الخارجية وحدها (داخل معاملة أكبر يُرمى الاستثناء كما هو)؛
-     * المعاملة الفاشلة تُلغى كاملة قبل الإعادة (لا قيد ولا ICV ولا حركة مخزون جزئية)،
-     * والإعادة تقرأ الفاتورة بقفلها من جديد فلا ترحيل مزدوج. أخطاء العمل
-     * (`RuntimeException`) لا تُعاد أبداً. عند نفاد المحاولات يصل الاستثناء إلى
-     * `ApiController::domain()` فيُحوَّل إلى 409 قابل لإعادة المحاولة لا 500.
-     */
-    private const POST_TRANSACTION_ATTEMPTS = 3;
-
     public function __construct(
         protected LedgerService $ledger,
         protected InventoryService $inventory,
@@ -1075,7 +1064,7 @@ class InvoiceService
             $this->settle($invoice, $total, $actor);
 
             return $invoice->fresh('lines.costCenterAllocations.costCenter');
-        }, self::POST_TRANSACTION_ATTEMPTS);
+        });
     }
 
     /**

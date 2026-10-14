@@ -82,8 +82,9 @@ export function SecretRevealDialog({
     close();
   }
 
+  // قبل التأكيد مع القفل: زرّ X لا يغلق شيئاً فيُخفى بدل أن يوهم بعطل (يبقى Escape/الخلفية بالتلميح).
   return (
-    <Dialog open={open} onClose={dismiss} title={title}>
+    <Dialog open={open} onClose={dismiss} title={title} hideClose={requireConfirmToClose && !confirmed}>
       <div className="space-y-4">
         {/* تحذير لا لبس فيه بنبرة تنبيه — لا لون وحده (أيقونة + نصّ). */}
         <div className="flex items-start gap-2.5 rounded border border-warning/40 bg-warning/10 p-3">

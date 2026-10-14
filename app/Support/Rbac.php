@@ -225,6 +225,24 @@ class Rbac
         return in_array('*', $perms, true) || in_array($permission, $perms, true);
     }
 
+    /**
+     * هل تغطّي صلاحيات `$holder` كلَّ `$wanted`؟ (سقف المنح — AC-UX-00A)
+     *
+     * حاملُ `*` يغطّي كل شيء؛ وغيره لا يغطّي `*` أبداً، ولا مفتاحاً خارج ما يملكه.
+     * دالة نقية: لا تقرأ قاعدة البيانات ولا تغيّر `allows()` أو مصفوفة الأدوار.
+     *
+     * @param array<int, string> $holder
+     * @param array<int, string> $wanted
+     */
+    public static function covers(array $holder, array $wanted): bool
+    {
+        if (in_array('*', $holder, true)) {
+            return true;
+        }
+
+        return ! in_array('*', $wanted, true) && array_diff($wanted, $holder) === [];
+    }
+
     /** @return array<int,string> قائمة الصلاحيات الفعلية للعميل المصادق، للعرض فقط. */
     public static function permissionsForRole(string $role): array
     {

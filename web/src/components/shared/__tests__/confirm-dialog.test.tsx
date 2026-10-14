@@ -55,4 +55,22 @@ describe('neutral ConfirmDialog', () => {
     rerender(<ConfirmDialog {...base} onClose={() => {}} onConfirm={() => {}} />);
     expect(screen.queryByText('store-100')).toBeNull();
   });
+
+  it('optional slots: children render before the buttons, confirmDisabled blocks only confirm, hideClose removes only the top X', () => {
+    const onConfirm = vi.fn();
+    const onClose = vi.fn();
+    const { rerender } = renderIntl(<ConfirmDialog {...base} onClose={onClose} onConfirm={onConfirm} />, 'en');
+    // الافتراضي = السلوك القديم: زرّ X موجود، التأكيد ممكن، لا محتوى إضافي.
+    expect(screen.getByRole('button', { name: /close/i })).toBeTruthy();
+    expect((screen.getByRole('button', { name: 'Disable' }) as HTMLButtonElement).disabled).toBe(false);
+
+    rerender(<ConfirmDialog {...base} onClose={onClose} onConfirm={onConfirm} confirmDisabled hideClose><p>extra slot</p></ConfirmDialog>);
+    expect(screen.getByText('extra slot')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /close/i })).toBeNull();
+    const confirm = screen.getByRole('button', { name: 'Disable' }) as HTMLButtonElement;
+    expect(confirm.disabled).toBe(true);
+    fireEvent.click(confirm);
+    expect(onConfirm).not.toHaveBeenCalled();
+    expect((screen.getByRole('button', { name: 'Back' }) as HTMLButtonElement).disabled).toBe(false);
+  });
 });

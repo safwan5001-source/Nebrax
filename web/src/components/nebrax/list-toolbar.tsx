@@ -42,6 +42,7 @@ export function ListToolbar({
   onRemoveFilter,
   onClearFilters,
   onOpenAdvanced,
+  formatFilter,
   sort,
   resultCount,
   totalCount,
@@ -59,6 +60,11 @@ export function ListToolbar({
   onRemoveFilter: (key: string) => void;
   onClearFilters: () => void;
   onOpenAdvanced?: () => void;
+  /**
+   * نصّ شريحة الفلتر النشط. الافتراضي `التسمية: القيمة المخزَّنة`؛ تمرّره الشاشة التي قيمتها
+   * معرّفٌ تقني (slug دور مثلاً) لتعرض اسم الخيار لا المعرّف. اختياري ولا يغيّر غيرها.
+   */
+  formatFilter?: (filter: ActiveFilter) => string;
   sort?: ListSortControl;
   resultCount?: number;
   totalCount?: number;
@@ -122,7 +128,7 @@ export function ListToolbar({
 
       {filters.length > 0 || typeof resultCount === 'number' ? (
         <div data-awj-listbar-meta="" className="flex flex-wrap items-center justify-between gap-2 border-t border-border pt-3">
-          <ActiveFilterChips filters={filters} onRemove={onRemoveFilter} onClear={onClearFilters} />
+          <ActiveFilterChips filters={filters} onRemove={onRemoveFilter} onClear={onClearFilters} formatValue={formatFilter} />
 
           {typeof resultCount === 'number' ? (
             <p className="ms-auto text-xs text-muted" aria-live="polite">
