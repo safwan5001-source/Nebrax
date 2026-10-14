@@ -125,7 +125,7 @@ Effects: trial balance, balance sheet, ledger and every account balance are **un
 | Existing accounting regressions (`AccountRoutingTest`, `SalesPaymentAccountRoutingTest`, `PurchaseAccountRoutingTest`, `InventoryCogsAccountRoutingTest`, `GeneralReportTest`, credit-note/return/fiscal-year suites) | ✅ unchanged and green (no existing test was edited) |
 | Web: `account-routing` page (6), `TaxCard` (2 new), accounting-settings + reports + lib suites (73 files / 456 tests) | ✅ · `next build` ✅ |
 | Local full `php artisan test` (SQLite) | 6,725 passed · 91 skipped · 38 failed — **all 38 environmental, none in touched code**: 26 Fuel tests need PHP `bcmath` (absent in this sandbox; CI installs it, `ci.yml` L97); 12 (`AuthRecoveryTest`, `UserInvitationTest`, `ResendMailTransportTest`) failed only because the local Laravel overlay lacked `app/Mail` + `resources/views` — after syncing them those 24 tests pass |
-| Local PostgreSQL accounting subset | no failure outside the same Fuel/`bcmath` cases |
+| Local PostgreSQL accounting subset | run interrupted before its summary; the only failures seen were the same Fuel/`bcmath` cases. CI pgsql (full suite) is authoritative |
 
 **CI (GitHub Actions) is the authoritative full run** — see §9.
 
