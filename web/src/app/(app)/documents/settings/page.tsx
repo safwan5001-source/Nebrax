@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { CircleAlert, Lock, Server, ShieldCheck, Unlock } from 'lucide-react';
-import { api, ApiError } from '@/lib/api';
+import { api } from '@/lib/api';
+import { describeLoadFailure } from '@/lib/load-failure';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -40,10 +41,13 @@ export default function DocumentSettingsPage() {
   const [operations, setOperations] = useState<OperationsSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // 403 (صلاحية/استحقاق): رسالة من الكتالوج وبلا إعادة محاولة (ERP-UX-009).
+  const [forbidden, setForbidden] = useState(false);
+  const tCommon = useTranslations('common');
 
   const load = useCallback(async () => {
     setLoading(true);
-    setError(null);
+    setError(null); setForbidden(false);
     setGovernance(null);
     setOperations(null);
 
@@ -54,7 +58,7 @@ export default function DocumentSettingsPage() {
 
     if (govResult.status === 'rejected') {
       const exception = govResult.reason;
-      setError(exception instanceof ApiError ? exception.message : t('loadFailed'));
+      { const failure = describeLoadFailure(exception, { forbidden: tCommon('capabilityUnavailable'), fallback: t('loadFailed') }); setError(failure.message); setForbidden(failure.forbidden); }
       setLoading(false);
       return;
     }
@@ -97,7 +101,7 @@ export default function DocumentSettingsPage() {
           <CardContent className="flex flex-wrap items-center gap-3 py-10 text-sm text-muted">
             <CircleAlert className="h-5 w-5" aria-hidden="true" />
             {error}
-            <Button variant="outline" onClick={() => void load()}>{t('retry')}</Button>
+            {!forbidden && (<Button variant="outline" onClick={() => void load()}>{t('retry')}</Button>)}
           </CardContent>
         </Card>
       ) : (
