@@ -68,7 +68,16 @@ A first draft of the guard matched its own regex line in `ci.yml` and read `[^` 
 - The only remaining failures in these classes are the **26 Fuel tests (`bcmul`)**, which is the missing `bcmath` extension that `setup.sh` now names.
 
 ### Full local suite
-SQLITE_FULL_PLACEHOLDER
+`php artisan test` on SQLite (what `setup.sh` provisions), tree rebased on `main` `c9f8bc5` (includes CI-02b #1470 and REM-05 #1457):
+
+| `setup.sh` | Passed | Failed | Skipped | Duration |
+|---|---|---|---|---|
+| **this branch** | **6775** | **26** | 95 | 634 s |
+
+- **All 26 failures are the 6 Fuel classes** (`FuelAviRfidService`, `FuelReconciliation`, `FuelSaleApi`, `FuelSaleService`, `FuelSupplyReceivingApi`, `FuelSupplyReceiving`), failing on `bcmul()` because `bcmath` is missing. `setup.sh` warns about this by name.
+- **There are no other local-only failures.**
+- **For comparison:** the same machine with the old `setup.sh` showed 123 errors + 24 failures in the affected classes alone, and ~150 across the PostgreSQL parallel suite (CI-01 / CI-02 / CI-02b reports).
+- **One intermediate run** showed a 27th failure: the CI-02b guard. The branch had been cut before #1470 merged, and the stale app directory still held the new guard test. Rebasing onto the latest `main` removed it.
 
 ## CI
 Recorded in the PR and the PRE_MERGE_REVIEW comment.
