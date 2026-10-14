@@ -351,8 +351,14 @@ function resolve(
   const [background, backgroundSource] = pick("background", own, inherited);
 
   const image = own.image as FacetVisualImage | undefined;
+  // Stored ids are lowercase; the incoming list is normalised the same way so case never drops a valid image.
   const imageUsable =
-    image !== undefined && (usable == null || usable.includes(image.mediaId));
+    image !== undefined &&
+    (usable == null ||
+      usable.some(
+        (id) =>
+          typeof id === "string" && id.trim().toLowerCase() === image.mediaId,
+      ));
   let content: FacetVisualContent = requested;
   if (content === "image" && !imageUsable) content = "icon";
   if (content === "icon" && icon === undefined) content = "none";
@@ -378,7 +384,8 @@ function resolve(
     visual.icon = icon as IconKey;
     if (iconColor !== undefined) visual.iconColor = iconColor as string;
   }
-  // The background shows behind icons and text, and behind a `contain` image; absent = theme tokens.
+  // The background shows behind icons, text and a `contain` image, and is the placeholder behind any image until it
+  // loads — so it is emitted whenever set and the renderer decides what shows. Absent = theme tokens.
   if (background !== undefined) visual.background = background as string;
 
   const layoutSources = {} as Record<

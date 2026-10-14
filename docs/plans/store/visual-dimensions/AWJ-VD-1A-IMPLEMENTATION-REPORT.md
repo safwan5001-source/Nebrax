@@ -64,7 +64,7 @@ This slice delivers the **pure, shared contract** for facet and facet-value visu
 - `storefront/src/lib/presentation/facet-visual.ts`
 - `web/src/modules/store-experience-builder/presentation/facet-visual.ts` (byte-identical twin)
 - `tests/Fixtures/presentation/facet-visual.json` (29 value + 8 facet cases)
-- `tests/Fixtures/presentation/facet-visual-inheritance.json` (19 value + 3 facet-self cases)
+- `tests/Fixtures/presentation/facet-visual-inheritance.json` (20 value + 3 facet-self cases)
 - `tests/Feature/CommerceFacetVisualContractTest.php`
 - `storefront/src/lib/presentation/__tests__/facet-visual.test.ts`
 - `web/src/modules/store-experience-builder/__tests__/facet-visual.test.ts`
@@ -89,7 +89,7 @@ This slice delivers the **pure, shared contract** for facet and facet-value visu
 
 | Suite | Command | Result |
 |---|---|---|
-| PHP focused | `php artisan test --filter='CommerceFacetVisualContractTest\|StorefrontNavigationTest'` | **16 passed (311 assertions)** |
+| PHP focused | `php artisan test --filter='CommerceFacetVisualContractTest\|StorefrontNavigationTest'` | **17 passed (292 assertions)** after the review fixes (16 before) |
 | PHP full | `php artisan test --parallel --processes=4` (SQLite, CI-parity environment) | **OK — 6907 tests, 51901 assertions, 0 failures, 95 skipped** |
 | Storefront focused | `vitest run facet-visual, icon-registry, store-icon` | **69 passed** |
 | Storefront full | `pnpm test` | **197 files passed / 15 skipped; 2523 tests passed / 15 skipped** |
@@ -134,6 +134,21 @@ All fixture expectations were written by hand from the contract, not generated f
 - Biome's import-order and formatting fixes were applied to the new files only, and the twins were re-synced afterwards. A byte-identity test guards them.
 - The PHP/TS closed lists, including the 52 icon keys, are cross-checked by parsing the PHP sources from vitest.
 - A PHP test inside the `setup.sh` app cannot read the TS files, which is why the check runs from vitest.
+
+### Independent code review (substitute for Codex, which is out of review quota on this PR)
+
+A `code-review` pass on `origin/main...HEAD` raised 8 findings:
+
+| # | Finding | Decision |
+|---|---|---|
+| 1 | A value's own icon makes `content` implicitly `icon`, even when the facet defaults say `none` | **Kept.** This is the approved D-08 contract (§3.6): the value's own media is implied before facet defaults. It is surfaced to the owner rather than changed silently. |
+| 2 | `usableMediaIds` was matched case-sensitively | **Fixed** in PHP and TS. The list is normalized trim + lowercase, plus a new shared fixture case. |
+| 3 | Colours are hex only, with no theme roles | **Kept.** Hex-only is the approved contract. Theme-role colours are a possible later extension. |
+| 4 | Loose `assertEquals` could hide `2.0` versus `2` | **Fixed.** Normalization and resolved visuals now use `assertSame` (types and key order). |
+| 5 | `[]` is accepted as an empty visual | **Kept.** Laravel decodes `{}` and `[]` identically, and an empty visual is the valid D-17 tombstone. |
+| 6 | An unknown `$kind` silently ran the facet schema | **Fixed.** It now throws `InvalidArgumentException`. Test added. |
+| 7 | The facet visual is re-normalized for every value | **Kept.** Microseconds even at the 200-value cap. VD-1c may normalize once if profiling shows a need. |
+| 8 | The background comment contradicted the behaviour | **Fixed (comment).** The background is also the image placeholder until the image loads, so it is emitted whenever set. |
 
 ### AWJ Guardian
 

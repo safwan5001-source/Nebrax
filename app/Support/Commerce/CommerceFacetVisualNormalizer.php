@@ -157,6 +157,9 @@ final class CommerceFacetVisualNormalizer
      */
     public static function errors(mixed $raw, string $kind): array
     {
+        if ($kind !== 'value' && $kind !== 'facet') {
+            throw new InvalidArgumentException("Unknown facet visual kind [{$kind}].");
+        }
         if (! self::object($raw)) {
             return [['field' => 'visual', 'code' => 'invalid_object']];
         }

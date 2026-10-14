@@ -26,6 +26,14 @@ class CommerceFacetVisualContractTest extends TestCase
         return json_decode((string) file_get_contents(base_path("tests/Fixtures/presentation/{$name}.json")), true, flags: JSON_THROW_ON_ERROR);
     }
 
+    /** @param  array<string,mixed>  $map */
+    private function sorted(array $map): array
+    {
+        ksort($map);
+
+        return $map;
+    }
+
     // ═════════════════ التطبيع: تكافؤ الفيكستشر ═════════════════
 
     /** @test */
@@ -36,7 +44,8 @@ class CommerceFacetVisualContractTest extends TestCase
 
         foreach ($cases as $case) {
             $actual = CommerceFacetVisualNormalizer::normalizeValue($case['input']);
-            $this->assertEquals($case['expected'], $actual, $case['name']);
+            // assertSame: الأنواع والترتيب معاً (zoom 2 لا 2.0) — شرط تطابق JSON بايتاً ببايت مع TS.
+            $this->assertSame($case['expected'], $actual, $case['name']);
             $this->assertSame(array_keys($case['expected']), array_keys($actual), $case['name'].' (key order)');
             if (isset($actual['image'])) {
                 $this->assertSame(array_keys($case['expected']['image']), array_keys($actual['image']), $case['name'].' (image key order)');
@@ -50,7 +59,7 @@ class CommerceFacetVisualContractTest extends TestCase
     {
         foreach ($this->fixture('facet-visual')['facet'] as $case) {
             $actual = CommerceFacetVisualNormalizer::normalizeFacet($case['input']);
-            $this->assertEquals($case['expected'], $actual, $case['name']);
+            $this->assertSame($case['expected'], $actual, $case['name']);
             $this->assertSame(array_keys($case['expected']), array_keys($actual), $case['name'].' (key order)');
             foreach (['self', 'defaults'] as $part) {
                 if (isset($actual[$part])) {
@@ -83,9 +92,8 @@ class CommerceFacetVisualContractTest extends TestCase
 
         foreach ($cases as $case) {
             $actual = CommerceFacetVisualResolver::resolveValue($case['facet'], $case['value'], $case['context']);
-            $this->assertEquals($case['expected']['visual'], $actual['visual'], $case['name'].' (visual)');
-            $this->assertSame(array_keys($case['expected']['visual']), array_keys($actual['visual']), $case['name'].' (visual key order)');
-            $this->assertEquals($case['expected']['sources'], $actual['sources'], $case['name'].' (sources)');
+            $this->assertSame($case['expected']['visual'], $actual['visual'], $case['name'].' (visual, types and key order)');
+            $this->assertSame($this->sorted($case['expected']['sources']), $this->sorted($actual['sources']), $case['name'].' (sources)');
         }
     }
 
@@ -94,9 +102,8 @@ class CommerceFacetVisualContractTest extends TestCase
     {
         foreach ($this->fixture('facet-visual-inheritance')['self'] as $case) {
             $actual = CommerceFacetVisualResolver::resolveFacetSelf($case['facet'], $case['context']);
-            $this->assertEquals($case['expected']['visual'], $actual['visual'], $case['name'].' (visual)');
-            $this->assertSame(array_keys($case['expected']['visual']), array_keys($actual['visual']), $case['name'].' (visual key order)');
-            $this->assertEquals($case['expected']['sources'], $actual['sources'], $case['name'].' (sources)');
+            $this->assertSame($case['expected']['visual'], $actual['visual'], $case['name'].' (visual, types and key order)');
+            $this->assertSame($this->sorted($case['expected']['sources']), $this->sorted($actual['sources']), $case['name'].' (sources)');
         }
     }
 
@@ -212,6 +219,13 @@ class CommerceFacetVisualContractTest extends TestCase
         // null لأي مفتاح = «ورِّث»، و{} = تفريغ صالح (tombstone، D-17).
         $this->assertSame([], CommerceFacetVisualNormalizer::errors(['shape' => null, 'image' => null], 'value'));
         $this->assertSame([], CommerceFacetVisualNormalizer::errors([], 'facet'));
+    }
+
+    /** @test */
+    public function strict_validation_refuses_an_unknown_kind_instead_of_guessing_a_schema(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        CommerceFacetVisualNormalizer::errors(['shape' => 'heart'], 'values');
     }
 
     // ═════════════════ القوائم المغلقة ═════════════════

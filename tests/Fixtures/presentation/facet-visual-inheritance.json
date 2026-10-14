@@ -687,6 +687,43 @@
                     "showLabel": "system"
                 }
             }
+        },
+        {
+            "name": "usable ids are matched case-insensitively (stored ids are lowercase)",
+            "facet": {},
+            "value": {
+                "image": {
+                    "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e"
+                }
+            },
+            "context": {
+                "usableMediaIds": [
+                    "  0B8F6C2E-3D3A-4A53-9C7E-8F1A2B3C4D5E "
+                ]
+            },
+            "expected": {
+                "visual": {
+                    "content": "image",
+                    "image": {
+                        "mediaId": "0b8f6c2e-3d3a-4a53-9c7e-8f1a2b3c4d5e",
+                        "fit": "cover"
+                    },
+                    "shape": "circle",
+                    "size": "md",
+                    "showLabel": true
+                },
+                "sources": {
+                    "content": "implicit",
+                    "icon": null,
+                    "iconColor": null,
+                    "background": null,
+                    "fallback": null,
+                    "fit": "system",
+                    "shape": "system",
+                    "size": "system",
+                    "showLabel": "system"
+                }
+            }
         }
     ],
     "self": [

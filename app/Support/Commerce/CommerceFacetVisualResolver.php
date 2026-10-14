@@ -99,7 +99,9 @@ final class CommerceFacetVisualResolver
 
         // ── السقوط وقت العرض ──
         $image = $own['image'] ?? null;
-        $imageUsable = $image !== null && ($usable === null || in_array($image['mediaId'], $usable, true));
+        // المعرّفات المخزَّنة مطبَّعة بحروف صغيرة؛ القائمة الواردة تُطبَّع مثلها فلا يسقط وسيطٌ صالح بسبب حالة الأحرف.
+        $imageUsable = $image !== null && ($usable === null
+            || in_array($image['mediaId'], array_map(static fn ($id) => is_string($id) ? strtolower(trim($id)) : $id, $usable), true));
         $content = $requested;
         if ($content === 'image' && ! $imageUsable) {
             $content = 'icon';
@@ -131,7 +133,8 @@ final class CommerceFacetVisualResolver
                 $visual['iconColor'] = $iconColor;
             }
         }
-        // الخلفية تظهر خلف الأيقونة والنص، وخلف الصورة عند `contain`؛ غيابها = رموز السمة.
+        // الخلفية تظهر خلف الأيقونة والنص وخلف الصورة عند `contain`، وهي أيضاً العنصر النائب خلف أي صورة حتى تُحمَّل؛
+        // لذلك تُخرَج كلما عُرِّفت، والعارض يقرّر ما يظهر. غيابها = رموز السمة.
         if ($background !== null) {
             $visual['background'] = $background;
         }
