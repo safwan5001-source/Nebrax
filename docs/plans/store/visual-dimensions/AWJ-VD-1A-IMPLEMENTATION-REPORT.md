@@ -90,7 +90,7 @@ This slice delivers the **pure, shared contract** for facet and facet-value visu
 | Suite | Command | Result |
 |---|---|---|
 | PHP focused | `php artisan test --filter='CommerceFacetVisualContractTest\|StorefrontNavigationTest'` | **16 passed (311 assertions)** |
-| PHP full | `php artisan test --parallel --processes=4` (SQLite, CI-parity deps) | PHP_FULL_RESULT |
+| PHP full | `php artisan test --parallel --processes=4` (SQLite, CI-parity environment) | **OK — 6907 tests, 51901 assertions, 0 failures, 95 skipped** |
 | Storefront focused | `vitest run facet-visual, icon-registry, store-icon` | **69 passed** |
 | Storefront full | `pnpm test` | **197 files passed / 15 skipped; 2523 tests passed / 15 skipped** |
 | Storefront static | `pnpm check` (Biome) · `pnpm check:locales` · `npx tsc --noEmit` | Biome: 0 errors (2 warnings + 2 infos are pre-existing, in files this PR does not touch) · locales in sync · tsc exit 0 |
@@ -99,7 +99,13 @@ This slice delivers the **pure, shared contract** for facet and facet-value visu
 | Web build | `npm run build` | **Compiled successfully; 189/189 static pages** |
 
 **Notes on local verification:**
-- A first full PHP run showed 148 failures across 30 classes (R2/attachment/storefront-media/Resend). Root cause: the local `setup.sh` app does not install `league/flysystem-aws-s3-v3` (AWS SDK), `predis` or ParaTest, which CI's `ci.yml` installs (`Class "Aws\Exception\AwsException" not found`). After installing exactly the CI set, the suite was re-run; see the PHP full row.
+- **The local test app was brought to CI parity before the full run.** Earlier full runs failed for environmental reasons only, all traced to differences between the local `setup.sh` and `.github/workflows/ci.yml`, never to this change:
+  - **148 failures:** `Class "Aws\Exception\AwsException" not found`. CI installs `league/flysystem-aws-s3-v3`, `predis` and ParaTest; `setup.sh` does not.
+  - **38 failures:**
+    - `bcmul()` undefined: CI enables the `bcmath` extension.
+    - `App\Mail\AuthActionMail` and the view `emails.auth-action` were missing: CI copies `app/Mail` and `resources/views`, and `setup.sh` copies neither.
+  - After matching CI exactly, the previously failing classes passed (55 + 24 tests), and the final full run above is clean.
+  - The `setup.sh` gap is recorded as backlog. It is outside this slice and was not changed.
 - `web`: `npx tsc --noEmit` reports 48 errors, all pre-existing in test files. The count is identical with this change stashed, and none are in files this PR touches. Web CI runs `npm test` + `npm run build`, and both pass. `npm run lint` is not configured in this repo (it opens an interactive ESLint setup), so it was not run.
 - PostgreSQL was not run locally. CI runs it.
 
