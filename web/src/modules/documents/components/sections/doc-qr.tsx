@@ -36,7 +36,7 @@ export function DocQr({ model }: { model: DocumentModel }) {
           <div className={isErpV2 ? 'border border-black p-0.5' : isClassicV2 ? 'border border-black p-1' : isModernV2 || isMinimalV2 || isRetailV2 ? 'border border-[color:var(--border)] p-1' : 'rounded-lg border border-gray-200 p-2'}>
             <QRCodeSVG value={qr} size={size} level="M" />
           </div>
-          <div className={usesV2Labels ? 'text-[9px] text-[color:var(--muted)]' : 'text-[9px] text-gray-400'}>
+          <div className={usesV2Labels ? 'text-[9px] text-[color:var(--muted)]' : 'text-[9px] text-gray-600'}>
             {model.qr?.note ?? (usesV2Labels ? <ModernFieldLabel field="zatca_note" mode={mode} /> : t('zatca_note'))}
           </div>
         </>

@@ -29,6 +29,7 @@ export function ThermalLayout({
       id={rootId ?? undefined}
       dir={dir}
       style={{ ...themeCssVars(theme), width: `${widthMm}mm` }}
+      data-doc-paper
       className="mx-auto bg-white p-3 text-[11px] leading-snug text-black shadow-lg print:shadow-none"
     >
       {children}

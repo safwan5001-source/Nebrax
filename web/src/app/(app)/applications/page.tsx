@@ -285,7 +285,7 @@ export default function ApplicationsPage() {
               aria-pressed={statusFilter === item.id}
               className={`rounded border px-3 py-2.5 text-start transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${statusFilter === item.id ? 'border-primary bg-primary-soft' : 'border-border bg-surface hover:bg-background'}`}
             >
-              <span className="block truncate text-xs text-muted">{item.label}</span>
+              <span className={`block truncate text-xs ${statusFilter === item.id ? 'text-text' : 'text-muted'}`}>{item.label}</span>
               <span className="num mt-1 block text-lg font-semibold text-text">{item.count}</span>
             </button>
           ))}
@@ -341,7 +341,7 @@ export default function ApplicationsPage() {
                   {groupApps.map((app) => {
                     const action = actionFor(app);
                     return (
-                      <article key={app.key} className={`flex items-start justify-between gap-3 px-4 py-3 sm:min-h-[72px] sm:items-center sm:gap-4 ${app.maturity !== 'built' ? 'opacity-70' : ''}`}>
+                      <article key={app.key} className={`flex items-start justify-between gap-3 px-4 py-3 sm:min-h-[72px] sm:items-center sm:gap-4`}>
                         <div className="min-w-0 flex-1">
                           <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                             <h3 className="font-medium text-text">{labelFor(app.key)}</h3>
