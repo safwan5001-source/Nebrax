@@ -110,6 +110,7 @@ for (const [locale, dir] of [['ar', 'rtl'], ['en', 'ltr']] as const) {
         await expect(operatorOf(page, STORE)).toHaveText(self);
         await expect(visible(page, 'ingress-reassign')).toHaveCount(1); // نقطة مهيّأة واحدة فقط
         await shot(page, `panel-${tag}`);
+        if (shots) await rowOf(page, STORE).screenshot({ path: `${shots}/row-${tag}.png` });
 
         const dialog = await openDialog(page, CURRENT[locale]);
         // نقطة غير موجّهة لفرع: الأمل وحدها (المقيَّد بفرع والمعطّل والحالي خارج القائمة).
