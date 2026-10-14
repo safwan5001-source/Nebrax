@@ -1,6 +1,6 @@
 # AWJ-VD-H1-0 — Implementation Report (Evidence & Architecture)
 
-STATUS: **COMPLETE — PR in review, stopped at Decision Gate G0**
+STATUS: **COMPLETE — owner accepted the architecture in principle (2026-10-14). Amendments applied. Awaiting G0 close confirmation.**
 DATE: 2026-10-14
 
 ## Outcome
@@ -8,6 +8,16 @@ DATE: 2026-10-14
 H1-0 delivers the evidence pass, the proposed architecture, the DB/API changes, the backward-compatibility and risk analysis, the Decision Register (D-01..D-15) and the Task Queue (VD-1a..VD-6).
 
 This slice is **documentation only**. No code, migration, API, or runtime behaviour changed.
+
+## Owner review round 1 (2026-10-14) — changes applied
+
+| Owner request | Change | Where |
+|---|---|---|
+| D-04: keep `commerce.manage`; block edits in the UI and explain why; no RBAC change | Status matrix for the UI, a clear message, and server-side tests (accountant 403 / name 200 …). `Rbac` unchanged. | Register D-04 · §3.8-a · VD-3 §3.8 |
+| D-08: document inheritance per property; customizing the image must not cancel inheritance of shape and size | A separate resolution chain for each property. Governing example. Implicit `content` from the value's own media. A fallback that keeps shape and size. A fixture with one case per property. | §3.6 · Register D-08 · Queue VD-1a |
+| D-15: negative cache tests and no leakage | `mediaId` in the URL. The gate is checked before 304. `no-store` on 404. The proxy does not cache failures. Mandatory tests N1–N16. | §3.8-c/f · Register D-15 · Queue VD-1c |
+| Inspect CI and PR comments | Codex P2: race between media deletion and saving a visual. **Valid.** Addressed by locking the media row in both paths (new D-16) with tests. | §3.8-d · R16 · D-16 |
+| Current-UI screenshots + prototype | Screenshots `IMG_2584`–`IMG_2588` analysed against the code (C1–C12). VD-3 requirements written. Template `catalog-rounded` added from the owner's concept image. | `AWJ-VD-H1-VD3-EDITOR-UX-REQUIREMENTS.md` · §2.8 · §3.7 |
 
 ## Repository evidence / root cause
 
@@ -43,6 +53,7 @@ The design reuses the media library, `MediaRef`, `IconRegistry`, the existing pi
 - `docs/plans/store/visual-dimensions/AWJ-VD-H1-DECISION-REGISTER.md` (new)
 - `docs/plans/store/visual-dimensions/AWJ-VD-H1-TASK-QUEUE.md` (new)
 - `docs/plans/store/visual-dimensions/AWJ-VD-H1-0-IMPLEMENTATION-REPORT.md` (new)
+- `docs/plans/store/visual-dimensions/AWJ-VD-H1-VD3-EDITOR-UX-REQUIREMENTS.md` (new, review round 1)
 - `docs/autonomous-engineering/CURRENT-STATE.md` (pointer section only)
 - `docs/autonomous-engineering/TASK-QUEUE.md` (pointer section only)
 
@@ -56,7 +67,7 @@ Not applicable (docs only).
 
 ## CI
 
-To be observed on the PR head. Docs-only changes are expected to trigger only path-relevant workflows.
+Observed on the first head `675878d`: `php artisan test (L11, pgsql)` passed. `sqlite` and `CI Gate` were still running at the time of the review round. The final head status is recorded in the PR comment/summary after the round-1 push. No failure related to this slice was observed.
 
 ## Pre-merge review
 
@@ -126,7 +137,8 @@ Nothing is implemented.
 ## Risks / remaining work
 
 - R1–R15 in the architecture report §5.
-- Screenshots of the current UI mentioned by the owner were not received. Only the prototype zip arrived.
+- R16 (race) and R17 (caching) were added after review.
+- The same pre-existing race in the customizer presentation documents is out of scope (backlog).
 
 ## Discovered backlog
 

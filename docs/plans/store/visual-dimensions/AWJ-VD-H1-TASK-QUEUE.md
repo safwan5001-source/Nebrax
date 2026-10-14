@@ -1,7 +1,7 @@
 # AWJ-COMMERCE-VISUAL-DIMENSIONS-H1 — Task Queue
 
 LAST_UPDATED: 2026-10-14
-STATUS: **H1-0 in review. Every slice after it is BLOCKED pending owner approval of the Decision Register.**
+STATUS: **H1-0: architecture accepted in principle with amendments (applied). G0 awaits the owner's closing confirmation. Every slice after it is BLOCKED until G0 closes, and DB/API slices need explicit approval.**
 
 ## قواعد الطابور
 
@@ -22,12 +22,12 @@ STATUS: **H1-0 in review. Every slice after it is BLOCKED pending owner approval
 
 | ID | المرحلة | الشريحة | النطاق | يلمس DB/API؟ | يعتمد على | الحالة |
 |---|---|---|---|---|---|---|
-| **VD-0** | H1-0 | Evidence & Architecture | الوثائق الخمس فقط | لا | — | **IN REVIEW** (بوابة قرار) |
-| **VD-1a** | H1-1 | عقد الهوية المرئية | `CommerceFacetVisualNormalizer` + `CommerceFacetVisualResolver` (PHP نقيّة) + سجلّا الأشكال والأحجام + إضافة مفاتيح `IconRegistry` (ثلاثي) + توائم TS + fixture `facet-visual.json` + اختبارات وحدة | لا (كود نقيّ) | VD-0 معتمد | BLOCKED |
-| **VD-1b** | H1-1 | التخزين وAPI الإدارة | migration `commerce_facet_visuals` + نموذج `CommerceFacetVisual` + `PUT …/visual` (مساران) + `visual` في `GET facets` + حاوية `facet_visual` في الماسح + اختبارات العزل، RBAC، 409/422، cascade، منع حذف الوسيط، fresh migrate على SQLite وpgsql | **نعم** | VD-1a مدموج | BLOCKED |
-| **VD-1c** | H1-1 | الإسقاط العام والتقديم | `visual` في `meta.facets` (storefront.v1 فقط) + مسار `store/v1/media/facet-visuals/{id}/{file}` + بروكسي storefront + اختبارات سلبية (مستأجر أجنبي، قيمة/بُعد معطّل، وسيط محذوف أو غير جاهز، ملف غير مسموح، الأصل) + اختبار عدم تغيّر `commerce/v1` | **نعم** | VD-1b مدموج | BLOCKED |
+| **VD-0** | H1-0 | Evidence & Architecture | وثائق فقط (PR #1472) | لا | — | **IN REVIEW** — مقبول مبدئياً، والتعديلات مطبّقة |
+| **VD-1a** | H1-1 | عقد الهوية المرئية | `CommerceFacetVisualNormalizer` + `CommerceFacetVisualResolver` (PHP نقيّة) + سجلّا الأشكال والأحجام + إضافة مفاتيح `IconRegistry` (ثلاثي) + توائم TS + fixtures `facet-visual.json` و`facet-visual-inheritance.json` (حالة لكل خاصية: تخصيص خاصية واحدة لا يلغي وراثة البقية — D-08) + اختبارات وحدة | لا (كود نقيّ) | VD-0 معتمد | BLOCKED |
+| **VD-1b** | H1-1 | التخزين وAPI الإدارة | migration `commerce_facet_visuals` + نموذج `CommerceFacetVisual` + `PUT …/visual` (مساران) + `visual` في `GET facets` + حاوية `facet_visual` في الماسح + قفل `storefront_media` في `delete()` والحفظ (D-16) + اختبارات: العزل · RBAC (المحاسب 403 على الهوية و200 على الاسم، staff/self_service 403، ضيف 401 — D-04) · 409/422 · cascade · منع حذف الوسيط · سباق الحذف/الحفظ (حتمي + pgsql باتصالين) · fresh migrate على SQLite وpgsql | **نعم** | VD-1a مدموج | BLOCKED |
+| **VD-1c** | H1-1 | الإسقاط العام والتقديم | `visual` في `meta.facets` (storefront.v1 فقط) + مسار `store/v1/media/facet-visuals/{visualId}/{mediaId}/{file}` + بروكسي storefront + **الاختبارات السلبية N1–N16 كاملة** (§3.8-و: التعطيل، الحذف، الاستبدال، 304 بعد التعطيل، المستأجر الأجنبي، الحقن، غير المشار إليه، الأصل والمسار، البروكسي لا يخزّن الفشل، لا روابط أصلية في `meta`، `commerce/v1` بلا تغيير) | **نعم** | VD-1b مدموج | BLOCKED |
 | **VD-2** | H1-2 | محرك الأشكال والبلاطة | سجل هندسة الأشكال (CSS/polygon/SVG objectBoundingBox) + `FacetVisualTile` (web + storefront) + سلسلة السقوط + `@supports` + `IconPicker` + اختبارات vitest | لا | VD-1a مدموج | BLOCKED |
-| **VD-3** | H1-3 | محرر الإدارة | `FacetVisualEditor` بثلاثة تبويبات + معاينة حيّة + وراثة/استرجاع + محوّل رسائل `MediaRefField` + الجوال + حالات الصلاحية والقدرة + بحث بصري إلزامي + تحقق بصري | يستهلك | VD-1b + VD-2 مدموجان | BLOCKED |
+| **VD-3** | H1-3 | محرر الإدارة | وفق `AWJ-VD-H1-VD3-EDITOR-UX-REQUIREMENTS.md`: محرر بثلاثة تبويبات + معاينة حيّة + وراثة/استرجاع لكل خاصية + منع التعديل بلا `commerce.manage` مع السبب + معالجة C4/C6/C7/C9 + الجوال + تحقق بصري (فاتح/داكن، عربي/إنجليزي، 4 عروض) | يستهلك | VD-1b + VD-2 مدموجان | BLOCKED |
 | **VD-4a** | H1-4 | عقد العرض والقوالب | حقول `discovery` الاختيارية (§3.7) + سجل القوالب (ثلاثي) + توسيع `data-sections.json` + إثبات التطابق البايتي للوثائق القديمة + فحص تعارض #1089/#853 | وثيقة العرض فقط | VD-1a مدموج | BLOCKED |
 | **VD-4b** | H1-4 | عارض المتجر | 5 تخطيطات + القوالب + الأعمدة لكل جهاز + الروابط القائمة + الوصولية + الأداء (lazy، srcset، بلا CLS) + بحث بصري + تحقق بصري RTL/LTR | يستهلك | VD-1c + VD-2 + VD-4a مدموجة | BLOCKED |
 | **VD-4c** | H1-4 | واجهة الباني | محرر إعدادات `discovery` في `DataSectionFields.tsx` + معاينة اللوحة | لا | VD-4a + VD-2 مدموجان | BLOCKED |
@@ -56,6 +56,8 @@ VD-0 ──► VD-1a ──┬──► VD-1b ──► VD-1c ──────
 ## Backlog مكتشف (خارج النطاق)
 
 - `EnsureApplicationActive` غير مطبّق على مسارات الأبعاد ومساحة عمل Commerce (R14).
+- حفظ وثائق العرض في المُخصِّص لا يقفل الوسيط، فيبقى عرضة لسباق الحذف نفسه (D-16، خارج النطاق).
+- لا واجهة لإعادة ترتيب قيم البُعد (C12).
 - توحيد اختيار الأيقونة المكرّر (`<select>` في 3 مواضع) على `IconPicker`.
 - صور التصنيفات تُقدَّم بايتاتٍ خاماً مع EXIF (§2.3). يستحق نقلها لنمط المكتبة في أفق مستقل.
 - `product_media` بلا فحص finfo ولا حدود أبعاد (`AWJ-UPLOAD-RELIABILITY-1` F4).

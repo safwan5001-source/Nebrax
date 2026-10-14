@@ -1,6 +1,6 @@
 # AWJ-COMMERCE-VISUAL-DIMENSIONS-H1 — Horizon Master Plan
 
-STATUS: **H1-0 COMPLETE — at owner Decision Gate** (no implementation authorized yet)
+STATUS: **H1-0 — owner accepted the architecture in principle (2026-10-14); amendments to D-04/D-08/D-15 + D-16 applied; awaiting the owner's final confirmation to close G0.** No migration, API, or deploy without explicit approval.
 DATE: 2026-10-14
 OWNER: Safwan
 EXECUTION SYSTEM: AWJ Horizon (`docs/autonomous-engineering/AWJ-HORIZON-SYSTEM.md`)
@@ -15,6 +15,7 @@ BASE: `origin/main` @ `f147fb6063d36952971724609250f9ba1baf42f5`
 | `AWJ-VD-H1-0-EXTERNAL-EVIDENCE.md` | البحث الخارجي البصري والتقني |
 | `AWJ-VD-H1-DECISION-REGISTER.md` | القرارات D-01..D-15 |
 | `AWJ-VD-H1-TASK-QUEUE.md` | الشرائح والاعتماديات والحالة |
+| `AWJ-VD-H1-VD3-EDITOR-UX-REQUIREMENTS.md` | متطلبات محرر VD-3 المبنية على صور الواجهة الحالية والنموذج |
 | `AWJ-VD-H1-0-IMPLEMENTATION-REPORT.md` | تقرير شريحة H1-0 |
 
 ## الهدف
@@ -32,7 +33,7 @@ BASE: `origin/main` @ `f147fb6063d36952971724609250f9ba1baf42f5`
 | # | التعديل | التحقيق في التصميم |
 |---|---|---|
 | 1 | فصل بيانات الأبعاد عن إعدادات العرض مع التوافق الخلفي | ثلاث طبقات L1/L2/L3 (§3.1). جداول الأبعاد بلا تعديل. كل التغيير إضافي (§4) |
-| 2 | قوالب عرض قابلة لإعادة الاستخدام حسب طبيعة المتجر | سجل قوالب مغلق من 6 قوالب (§3.7، D-07) |
+| 2 | قوالب عرض قابلة لإعادة الاستخدام حسب طبيعة المتجر | سجل قوالب مغلق من 7 قوالب (§3.7، D-07) |
 | 3 | الصورة الأصلية مستقلة عن أشكال القص وقابلة لأشكال متعددة | الأصل مرة واحدة في `storefront_media`. الشكل قناع عرض لا بكسلات. التأطير لكل استخدام (§3.4، D-09) |
 | 4 | إعدادات عرض مستقلة لكل واجهة | حقول `discovery` لكل نسخة قسم: الأعمدة لكل جهاز، المسافات، موضع النص، ترتيب العناصر والقيم (§3.7، D-06) |
 
@@ -62,7 +63,7 @@ BASE: `origin/main` @ `f147fb6063d36952971724609250f9ba1baf42f5`
 
 | البوابة | الشرط | الحالة |
 |---|---|---|
-| **G0 — اعتماد المعمارية** | موافقة صريحة على D-01..D-15 (أو تعديلها) | **OPEN — بانتظار المالك** |
+| **G0 — اعتماد المعمارية** | موافقة صريحة على D-01..D-16 | **مقبول مبدئياً مع تعديلات (2026-10-14). التعديلات مطبّقة، وبانتظار تأكيد الإغلاق** |
 | G-merge | موافقة المالك على دمج كل PR (D-14) | لكل PR |
 | G-deploy | خارج هذا الأفق | — |
 

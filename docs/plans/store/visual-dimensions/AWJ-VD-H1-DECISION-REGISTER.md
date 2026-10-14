@@ -1,31 +1,134 @@
 # AWJ-COMMERCE-VISUAL-DIMENSIONS-H1 — Decision Register
 
-STATUS: **All decisions PROPOSED — awaiting owner approval (Decision Gate H1-0)**
-DATE: 2026-10-14
-Evidence: `AWJ-VD-H1-0-EVIDENCE-AND-ARCHITECTURE.md` (sections referenced as §n)
+STATUS: **Owner review 2026-10-14: architecture ACCEPTED IN PRINCIPLE, with amendments to D-04 / D-08 / D-15. The amendments are applied below. G0 closes on the owner's explicit confirmation after this update.**
+LAST_UPDATED: 2026-10-14
+Evidence: `AWJ-VD-H1-0-EVIDENCE-AND-ARCHITECTURE.md` (sections referenced as §n) · `AWJ-VD-H1-VD3-EDITOR-UX-REQUIREMENTS.md`
 
-> Approval of this register authorizes **only** the listed DB/API changes in the listed slices. Merge requires owner approval for each PR. Deploy/Production stays outside this horizon.
+> Even after G0 closes, implementing the DB/API changes requires the owner's explicit approval, as instructed. Merging every PR requires owner approval. Deploy/Production is outside this horizon.
 
-| ID | Decision | Recommended option | Alternatives considered (rejected / deferred) | Why | Status |
-|---|---|---|---|---|---|
-| **D-01** | Where visual identity lives | **New additive table `commerce_facet_visuals`, 1:1 optional per facet/value, normalized `visual` JSON** (§3.2) | (a) Typed columns on a new table — every new field needs a migration, and the scanner would need a special case for the media FK. (b) A `visual` column on the two existing tables — mixes data with presentation (violates amendment 1), shares writes with name edits under different RBAC, and touches the hot filter tables. (c) Inside the presentation document — tied to one storefront, so the identity cannot be shared across surfaces or the app. | Separation (amendment 1), the established presentation pattern (closed JSON + PHP authority + twins + fixture), the scanner needs no logic change, purely additive rollback | PROPOSED |
-| **D-02** | Media source | **Reuse `storefront_media` (library + validation + variants) via `MediaRef`** | `product_media` (owner-scoped, weaker validation, no library). Category-style columns (raw bytes with EXIF, no derivatives; the master plan rejects the pattern). A new store (explicitly forbidden by D-01 of the CUST-HV contract). | The strongest existing validation, original stored once, WebP derivatives, existing library and picker | PROPOSED |
-| **D-03** | Public serving gate for facet images | **New guarded route `store/v1/media/facet-visuals/{visualId}/{file}` with 4 conditions and a file allow-list (no original)** (§3.8-c) | Extend `StorefrontPublishedMediaIndex`: it is per storefront and rebuilt from the published document, while visuals are tenant-wide data. Mixing them breaks its single choke point. | The same precedent as `showCategory`, a data-state gate, simple isolation tests | PROPOSED |
-| **D-04** | Write authority for visuals | **`commerce.manage`** (+ `denySelfService`). Facet data stays on `products.manage`. | `products.manage`: it would let the accountant role choose media they cannot list in the library (the library is `commerce.manage`). | The visual is storefront presentation, the same authority as the customizer and the media library. The separation is clear and RBAC is unchanged. | PROPOSED |
-| **D-05** | Public API exposure | **`storefront.v1` only (additive `visual`); `commerce/v1` unchanged** | Updating the OpenAPI for `commerce/v1` now: the schema is closed and the mobile app does not consume it yet. | The same precedent as category images. Mobile is a separate later decision. | PROPOSED |
-| **D-06** | Where per-surface display settings live | **Optional new fields inside the content of the existing `discovery` section** (§3.7) | A new section type: contradicts ADR-21 rule 0. Display settings on the facet: breaks amendment 4 (two sections showing the same facet differently). | Independence per surface, unchanged legacy documents, no table | PROPOSED |
-| **D-07** | Display templates | **Code-owned, append-only registry (6 templates)** | Merchant-saved templates: need new persistence and a CRUD UI. **DEFERRED.** | Delivers "reusable templates by store type" without new persistence | PROPOSED |
-| **D-08** | Inheritance precedence | Section (explicit) > value > facet defaults > template > system. **Images are not inherited**; icons are. Fallback chain: image → icon → text (§3.6) | Section always overrides: ignores the merchant's per-value customization. Inheriting the image: identical images with no meaning. | Predictable and documented, and never renders a broken image | PROPOSED |
-| **D-09** | Image framing | **`fit` + `focal` + `zoom` (1–3) applied via CSS to existing thumbnails; `crop`/`rotate` excluded** | Pixel-baked derivatives: synchronous generation cost (`QUEUE_CONNECTION=sync`) and new derivatives per shape. | The original stays single, the shape is presentation only, zero generation cost | PROPOSED |
-| **D-10** | Icons | **Append-only extension of the existing `IconRegistry` (~28 keys verified in lucide 0.460) + new `IconPicker` component** | A separate facet icon registry: a second source of truth. Uploaded SVG: forbidden (D-22 + OWASP). | One source, three-way twinning already tested | PROPOSED |
-| **D-11** | Validation | **Strict writes (422 with field errors), fail-closed tolerant reads** | Tolerant writes with silent drops: the merchant would not know why an image or shape was not saved. | A dedicated API, not a full presentation document | PROPOSED |
-| **D-12** | Listing filter chips (`GiftingFilters`) with images/icons | **DEFERRED** to a later slice/horizon | Including it now: widens scope into the filter page and its tests. | Acceptance criteria are met by the home sections | PROPOSED |
-| **D-13** | Storefront dark mode | **Out of scope.** The storefront has no dark mode today; dark/light is verified in the admin editor; the storefront respects theme tokens. | Building a storefront dark mode: a separate horizon. | Evidence §2.5 | PROPOSED |
-| **D-14** | Merge policy | **Every PR requires explicit owner approval before merge** (the owner's instruction for this horizon), with no stacked PRs. Independent slices run in parallel. | Standing merge authority: stopped by owner instruction. | The owner's instruction for this horizon | **OWNER-SET** |
-| **D-15** | Cache for facet images | **Origin `private, no-store` + ETag + `nosniff`; the Next proxy holds 300 s** | `public, max-age=3600` as for categories: deactivating a value would leave the image in caches for an hour. | The same customizer pattern (AMEND-16) | PROPOSED |
+## Status legend
 
-## Open questions for the owner (do not block the recommendation)
+- **ACCEPTED-IP**: accepted in principle by the owner.
+- **ACCEPTED-IP + AMENDED**: accepted in principle, with an owner amendment applied.
+- **PROPOSED**: new, or modified after review, and awaiting confirmation at G0 close.
+- **OWNER-SET**: set by explicit owner instruction.
 
-1. **The 6 templates' names and meanings** (§3.7). Should any be added or renamed before VD-4a?
-2. **The proposed icon list** (§3.5). Is there a business-required icon (e.g. a specific Ramadan or Eid icon) to add?
-3. **The current-UI screenshots** mentioned in the request did not arrive (only the prototype was received). If they matter, they can be attached before VD-3.
+## Decisions
+
+### D-01 — Where the visual identity lives
+- **Decision:** a new, additive `commerce_facet_visuals` table. It is an optional 1:1 per facet or per value and holds normalized `visual` JSON (§3.2).
+- **Alternatives rejected:**
+  - Typed columns.
+  - A column on the existing tables (mixes data with presentation).
+  - Storing it inside the presentation document (ties it to one storefront).
+- **Status:** ACCEPTED-IP
+
+### D-02 — Media source
+- **Decision:** reuse `storefront_media` through `MediaRef`.
+- **Alternatives rejected:** `product_media`; category-style columns; a new store.
+- **Status:** ACCEPTED-IP
+
+### D-03 — Public serving of facet images
+- **Decision:** a new guarded route, `store/v1/media/facet-visuals/{visualId}/{mediaId}/{file}`.
+  - 4 conditions are checked before any 304.
+  - Only allow-listed files are served; the original never is.
+  - Failures return one uniform 404 (§3.8-c).
+- **Change after review:** `mediaId` is now part of the URL, so replacing the image changes the URL.
+- **Status:** ACCEPTED-IP (the URL change is a technical refinement)
+
+### D-04 — Authority to write the visual identity
+- **Decision:**
+  - **`commerce.manage` for this phase, with no change to existing RBAC** (`Rbac::MATRIX`, roles, permissions).
+  - Facet data stays on `products.manage`.
+  - **The UI blocks editing without the permission and states why.** The two visual-identity tabs are read-only, with a message naming the missing permission and who can grant it. Upload and select buttons are hidden. The preview keeps working.
+  - Server tests:
+    - accountant: 403 on the visual, 200 on the name;
+    - `staff` and `self_service`: 403;
+    - guest: 401.
+  - Details: §3.8-a and VD-3 §3.8.
+- **Status:** **ACCEPTED-IP + AMENDED**
+
+### D-05 — Public API exposure
+- **Decision:** `storefront.v1` only; `commerce/v1` is unchanged (test N16).
+- **Status:** ACCEPTED-IP
+
+### D-06 — Where per-surface display settings live
+- **Decision:** optional fields inside the content of the existing `discovery` section.
+- **Status:** ACCEPTED-IP
+
+### D-07 — Display templates
+- **Decision:** a code-owned, append-only registry of **7 templates**.
+  - `catalog-rounded` was added, based on the owner's concept image for electronics and general retail.
+  - Templates saved by merchants are DEFERRED.
+- **Status:** ACCEPTED-IP (+1 template)
+
+### D-08 — Inheritance
+- **Decision:** **each property resolves independently**, along its own chain (table in §3.6).
+  - **Customizing the image, or any other property, does not cancel inheritance of the shape, size, label, icon, or anything else.**
+  - `content` resolves implicitly from the value's own media before falling back to the facet defaults.
+  - The image itself is not inherited; the icon is.
+  - Display-time fallback (image → icon → text) keeps the resolved shape and size.
+  - Proven by a shared fixture with one test case per property.
+- **Status:** **ACCEPTED-IP + AMENDED**
+
+### D-09 — Framing
+- **Decision:** `fit` + `focal` + `zoom`, applied with CSS over existing thumbnails. No `crop` or `rotate`.
+- **Status:** ACCEPTED-IP
+
+### D-10 — Icons
+- **Decision:** an append-only extension of `IconRegistry`, plus `IconPicker`.
+- **Status:** ACCEPTED-IP
+
+### D-11 — Validation
+- **Decision:** writes are strict (422); reads are tolerant and fail closed.
+- **Status:** ACCEPTED-IP
+
+### D-12 — Listing filter chips with images
+- **Decision:** DEFERRED.
+- **Status:** ACCEPTED-IP
+
+### D-13 — Storefront dark mode
+- **Decision:** out of scope. Dark and light mode are verified in the admin editor.
+- **Status:** ACCEPTED-IP
+
+### D-14 — Merge policy
+- **Decision:** every PR requires explicit owner approval. No stacked PRs.
+- **Status:** OWNER-SET
+
+### D-15 — Caching and leakage
+- **Decision:**
+  - The origin sends `private, no-store` + ETag + `nosniff` on success, and `no-store` on every 404.
+  - The Next proxy keeps **200 responses only**, for at most 300 s.
+  - The gate runs before any 304, and `mediaId` is in the URL.
+  - **Mandatory negative tests N1–N16** (§3.8-f), covering:
+    - deactivating a value or facet;
+    - deletion;
+    - removing or replacing the image;
+    - 304 after deactivation;
+    - a foreign tenant;
+    - an injected `mediaId`;
+    - a media item that is not referenced;
+    - the original file and path traversal;
+    - the proxy not caching failures;
+    - no original or library paths in `meta`;
+    - `commerce/v1` unchanged.
+  - Documented deactivation window: immediate at the origin, ≤ 300 s through the proxy for a URL already served.
+- **Status:** **ACCEPTED-IP + AMENDED**
+
+### D-16 — Serializing media deletion against visual saves *(new, from the Codex P2 review on #1472)*
+- **Decision:**
+  - Both paths take a `lockForUpdate` on the `storefront_media` row(s) inside a transaction:
+    - `StorefrontMediaService::delete()` re-scans after the lock;
+    - saving a visual re-checks the media state after the lock, locking rows in id order.
+  - Deterministic tests plus a two-connection pgsql test (§3.8-d).
+  - The same pre-existing race in presentation documents is recorded as backlog, outside scope.
+- **Alternatives:**
+  - A foreign key from the visual to the media: there is no column, the reference is JSON, and media is soft-deleted, so an FK would not prevent it.
+  - A periodic cleanup job: it leaves a window where a reference to deleted media stays visible.
+- **Status:** **PROPOSED** (needs G0 confirmation, because it modifies `StorefrontMediaService::delete()`)
+
+## Open questions (do not block G0)
+
+1. The 7 template names and their meanings (§3.7).
+2. The proposed icon list (§3.5).
+3. ~~Current-UI screenshots~~: **resolved**. They arrived (`IMG_2584`–`IMG_2588`) and are analysed in `AWJ-VD-H1-VD3-EDITOR-UX-REQUIREMENTS.md`.
