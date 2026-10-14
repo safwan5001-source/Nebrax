@@ -83,6 +83,17 @@ export function Dropdown({
     };
   }, [open, setOpenState]);
 
+  // مغلقة = خارج ترتيب Tab وشجرة الوصول بالكامل، بما فيها المحتوى المخصّص (لوحة
+  // الإشعارات مثلاً) الذي لا يمرّ عبر DropdownItem (ERP-UX-003). يُضبط `inert`
+  // مباشرة على العنصر: React 18 يُسقط `inert={true}` بصمت، وأنواعه لا تقبل نصاً.
+  // وإن أُغلقت والتركيز داخلها يعود إلى الزر أولاً، وإلا سقط إلى جسم الصفحة.
+  useEffect(() => {
+    const menu = menuRef.current;
+    if (!menu) return;
+    if (!open && menu.contains(document.activeElement)) triggerRef.current?.focus();
+    menu.toggleAttribute('inert', !open);
+  }, [open, triggerRef]);
+
   useEffect(() => {
     if (!open || !mobilePopover) return;
     const placeWithinViewport = () => {

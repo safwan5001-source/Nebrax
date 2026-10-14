@@ -78,3 +78,41 @@ describe('DropdownItem — choice and external-link items', () => {
     expect(document.activeElement).toBe(trigger);
   });
 });
+
+describe('Dropdown — closed menu is inert (ERP-UX-003)', () => {
+  afterEach(cleanup);
+
+  it('marks the closed menu inert, including custom children, and lifts it while open', async () => {
+    const user = userEvent.setup();
+    render(
+      <Dropdown triggerLabel="Notifications" trigger="Bell" popupRole="dialog" menuLabel="Notifications panel">
+        <div>
+          <button type="button">Mark all read</button>
+          <a href="/notifications">View all</a>
+        </div>
+      </Dropdown>,
+    );
+    const custom = screen.getByText('Mark all read');
+    const menu = custom.closest('[aria-hidden]') as HTMLElement;
+    expect(menu.hasAttribute('inert')).toBe(true);
+
+    await user.click(screen.getByRole('button', { name: 'Notifications' }));
+    expect(menu.hasAttribute('inert')).toBe(false);
+    expect(menu.getAttribute('aria-hidden')).toBe('false');
+  });
+
+  it('returns focus to the trigger when it closes with focus inside', async () => {
+    const user = userEvent.setup();
+    render(
+      <Dropdown triggerLabel="More" trigger="More">
+        <DropdownItem onClick={() => {}}>One</DropdownItem>
+      </Dropdown>,
+    );
+    const trigger = screen.getByRole('button', { name: 'More' });
+    await user.click(trigger);
+    const item = screen.getByRole('menuitem', { name: 'One' });
+    item.focus();
+    await user.click(item);
+    expect(document.activeElement).toBe(trigger);
+  });
+});
