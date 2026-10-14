@@ -1,0 +1,24 @@
+{
+  "_comment": "REM-11 / D-03. Pin for the official ZATCA e-invoicing SDK (Java). The SDK is NEVER committed, cached, mirrored or uploaded: CI downloads it from the official source and verifies size + SHA-256 before extraction. A mismatch or an unreachable source fails closed (no fallback). Changing this file is an owner-reviewed event (new SDK version = re-baseline).",
+  "version": "238-R3.4.8",
+  "source_of_link": "https://sandbox.zatca.gov.sa/env-config.js (key REACT_APP_DOWNLOAD_SDK_JAVA), verified 2026-10-14",
+  "url": "https://sadzit.sharepoint.com/:u:/s/EXTERNALZATCA/IQCVzjXNpLTOTZbrYhs_w7aIAb7pPg1wfwl6wACeu1xCPAQ?e=pn3riq",
+  "allowed_host": "sadzit.sharepoint.com",
+  "sha256": "91d079b4a6c21c8ed7fb6ec434227409537119cae8b74de34dc150f91793d1f6",
+  "size": 49169499,
+  "max_download_bytes": 104857600,
+  "jar": "Apps/zatca-einvoicing-sdk-238-R3.4.8.jar",
+  "extract_allowlist": [
+    "Apps/zatca-einvoicing-sdk-238-R3.4.8.jar",
+    "Apps/global.json",
+    "Configuration/usage.txt",
+    "Data/Schemas/",
+    "Data/Rules/",
+    "Data/Certificates/",
+    "Data/PIH/",
+    "Data/Samples/Simplified/",
+    "Data/Samples/Standard/"
+  ],
+  "java_major": 11,
+  "java_flags": ["-Dfile.encoding=UTF-8", "-Dsun.jnu.encoding=UTF-8"]
+}
