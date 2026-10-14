@@ -131,6 +131,17 @@ describe.each(TEST_LOCALES)('Communications providers catalog (%s)', (locale) =>
     }
   });
 
+  it('F-05: the vendor label names the provider company and cannot be read as the AWJ owner who approves', () => {
+    renderIntl(<CommunicationsCatalog allowed />, locale);
+
+    // «المالك/Owner» محجوز لمالك أَوْج في «يتطلب موافقة المالك»؛ تسمية الشركة لا تشاركه الكلمة.
+    expect(m.communications.vendor).not.toMatch(/owner|مالك/i);
+    expect(m.communications.status.owner_approval.label).toMatch(/owner|المالك/i);
+    const card = screen.getByTestId('communications-provider-unifonic');
+    expect(card.textContent).toContain(`${m.communications.vendor}: Unifonic`);
+    expect(card.textContent).toContain(m.communications.status.owner_approval.label);
+  });
+
   it('uses logical direction only and mirrors nothing physical', () => {
     renderIntl(<CommunicationsCatalog allowed />, locale);
 

@@ -59,7 +59,7 @@ export interface CommunicationProvider {
   channel: CommunicationChannelKey;
   /** الاسم التجاري كما ينشره صاحبه، بلا ترجمة. */
   name: string;
-  /** الجهة المالكة كما تنشرها. */
+  /** الشركة المزوّدة (صاحبة الخدمة) كما تنشرها — لا «مالك أَوْج» الذي يوافق على الاختيار. */
   vendor: string;
   status: ProviderStatus;
   /** دليل الهوية: صفحة المزوّد الرسمية التي تثبت وجوده وفئته (لا تُعرض في الواجهة). */

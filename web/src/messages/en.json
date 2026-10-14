@@ -10391,7 +10391,7 @@
         "email": "Email",
         "push": "Push notifications"
       },
-      "vendor": "Owner",
+      "vendor": "Vendor",
       "boundary": "Choosing a provider and setting up its connection are separate decisions that have not been made. This section offers no setup, keys or test sending.",
       "logoNote": "Official logos are shown exactly as their owners publish them, unmodified. A generic icon means no official logo has been adopted for that provider yet (no asset we may use, or permission to use it has not been given).",
       "notConnected": "Not connected · no real sending"

@@ -263,12 +263,23 @@ async function openCommunications(page: Page, opts: { locale: 'ar' | 'en'; theme
     id: 'u1', name: 'المالك', email: 'owner@test', tenant_id: 't1',
     role: opts.role ?? 'owner', permissions: opts.permissions ?? ['*'],
   };
+  // AC-UX-07 يعيد قراءة `/me` ويتبنّى دورها وصلاحياتها متى تطابق المعرّف. محاكاة `mockApi` تعيد دائماً مالكاً `['*']`،
+  // فكانت ترفع المستخدم «المقيَّد» حيّاً وتقلب الصفحة من الرفض إلى المسموح (سباق). الخادم الحقيقي يعيد صلاحيات المستخدم نفسه،
+  // فنعترض `/me` هنا لنعيد المستخدم المخزَّن بعينه (يُسجَّل بعد `mockApi` فتسبقه في المطابقة).
+  await page.route(/\/api\/me(\?.*)?$/, (route) => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({ user: { id: user.id, name: user.name, role: user.role, permissions: user.permissions }, company: { name: 'نبراس الطموح' } }),
+  }));
+  // أول استجابة `/me` (التحديث الحي): يستعملها اختبار الرفض ليثبت أن الرفض يصمد بعد التحديث. لا تُرفض إن لم تصل.
+  const meRefreshed = page.waitForResponse((response) => /\/api\/me(\?|$)/.test(response.url()), { timeout: 10_000 }).catch(() => null);
   await page.addInitScript(([theme, userJson]) => {
     localStorage.setItem('token', 'test-token');
     localStorage.setItem('user', userJson);
     localStorage.setItem('theme', theme);
   }, [opts.theme, JSON.stringify(user)] as const);
   await page.goto(`${baseUrl}/integrations/communications`, { waitUntil: 'domcontentloaded' });
+  return meRefreshed;
 }
 
 for (const [locale, dir] of LOCALES) {
@@ -360,7 +371,10 @@ for (const [locale, dir] of LOCALES) {
 }
 
 test('communications catalog: a user without company.manage gets the denial and no provider', async ({ page }) => {
-  await openCommunications(page, { locale: 'en', theme: 'light', role: 'custom', permissions: ['invoices.view'] });
+  const meRefreshed = await openCommunications(page, { locale: 'en', theme: 'light', role: 'custom', permissions: ['invoices.view'] });
+  // الرفض يجب أن يصمد بعد التحديث الحي للصلاحيات (AC-UX-07)، لا قبله فقط.
+  expect(await meRefreshed, 'the live /me permission refresh must have run').not.toBeNull();
   await expect(page.getByTestId('communications-restricted')).toBeVisible();
   expect(await page.locator('[data-testid^="communications-provider-"]').count()).toBe(0);
+  await expect(page.getByTestId('communications-catalog')).toBeVisible();
 });
