@@ -82,10 +82,6 @@ class UserController extends ApiController
      */
     private function canGrantRole(User $actor, string $slug): bool
     {
-        // يُقفل صفّ الدور المفحوص (داخل معاملة الكتابة) ليتسلسل مع `RoleController::update`
-        // الذي يقفله أيضاً — فلا يتّسع الدور بين الفحص والكتابة.
-        Role::where('slug', $slug)->lockForUpdate()->first();
-
         return Rbac::covers(Rbac::permissionsForRole($actor->role), Rbac::permissionsForRole($slug));
     }
 
@@ -106,6 +102,15 @@ class UserController extends ApiController
     {
         /** @var User $actor */
         $actor = $request->user();
+
+        // تُقفل صفوف الأدوار التي ستُفحص (الحالي والمطلوب) بترتيب ثابت (slug تصاعدياً) قبل
+        // تقييم أيٍّ منها — يتسلسل ذلك مع `RoleController::update` الذي يقفل صفّه، ولا
+        // يتشابك طلبان يبدّلان A→B وB→A.
+        $slugs = array_values(array_unique(array_filter([$target?->role, $data['role'] ?? null])));
+        sort($slugs);
+        foreach ($slugs as $slug) {
+            Role::where('slug', $slug)->lockForUpdate()->first();
+        }
 
         if ($target && $target->id !== $actor->id) {
             if (! $this->canGrantRole($actor, $target->role)) {
@@ -198,37 +203,45 @@ class UserController extends ApiController
     public function store(StoreUserRequest $request): JsonResponse
     {
         $data = $request->validated();
-        $this->guardOwnerRole($request, null, $data['role'] ?? null);
-        $this->guardGrantBoundary($request, $data);
         $tenantId = $this->tenantId();
 
-        // فرض حدّ الخطة لعدد المستخدمين
-        $tenant = Tenant::find($tenantId);
-        $limit = PlanGate::limit($tenant, 'users');
-        if ($limit !== null && User::where('tenant_id', $tenantId)->count() >= $limit) {
-            abort(422, "تجاوزت حدّ خطتك ({$limit} مستخدمين). رقِّ خطتك للمزيد.");
-        }
+        // فحص سقف المنح والإنشاء ومزامنة النطاق في معاملةٍ واحدة تُبقي أقفال الأدوار —
+        // فلا يتّسع دورٌ بين الفحص والإنشاء (انظر `guardGrantBoundary`). الدعوة بالبريد
+        // بعدها خارج المعاملة.
+        $user = DB::transaction(function () use ($request, $data, $tenantId): User {
+            $this->guardOwnerRole($request, null, $data['role'] ?? null);
+            $this->guardGrantBoundary($request, $data);
 
-        // البريد فريد عالمياً (الدخول بالبريد وحده)
-        if (User::where('email', $data['email'])->exists()) {
-            abort(422, 'البريد الإلكتروني مستخدم بالفعل.');
-        }
+            // فرض حدّ الخطة لعدد المستخدمين
+            $tenant = Tenant::find($tenantId);
+            $limit = PlanGate::limit($tenant, 'users');
+            if ($limit !== null && User::where('tenant_id', $tenantId)->count() >= $limit) {
+                abort(422, "تجاوزت حدّ خطتك ({$limit} مستخدمين). رقِّ خطتك للمزيد.");
+            }
 
-        $this->assertLinkableEmployee($data['employee_id'] ?? null);
+            // البريد فريد عالمياً (الدخول بالبريد وحده)
+            if (User::where('email', $data['email'])->exists()) {
+                abort(422, 'البريد الإلكتروني مستخدم بالفعل.');
+            }
 
-        $user = User::create([
-            'tenant_id'   => $tenantId,
-            'employee_id' => $data['employee_id'] ?? null,
-            'name'        => $data['name'],
-            'email'       => $data['email'],
-            // لا تُخزَّن كلمة مرور مؤقتة معروفة عند اختيار الدعوة؛ القيمة
-            // العشوائية لا تصل إلى البريد أو أي استجابة.
-            'password'    => $data['password'] ?? Str::random(64),
-            'role'        => $data['role'],
-            'is_active'   => $data['is_active'] ?? true,
-        ]);
+            $this->assertLinkableEmployee($data['employee_id'] ?? null);
 
-        $this->syncAccessScope($user, $data);
+            $user = User::create([
+                'tenant_id'   => $tenantId,
+                'employee_id' => $data['employee_id'] ?? null,
+                'name'        => $data['name'],
+                'email'       => $data['email'],
+                // لا تُخزَّن كلمة مرور مؤقتة معروفة عند اختيار الدعوة؛ القيمة
+                // العشوائية لا تصل إلى البريد أو أي استجابة.
+                'password'    => $data['password'] ?? Str::random(64),
+                'role'        => $data['role'],
+                'is_active'   => $data['is_active'] ?? true,
+            ]);
+
+            $this->syncAccessScope($user, $data);
+
+            return $user;
+        });
 
         $invitationSent = true;
         if ((bool) ($data['send_invitation'] ?? false)) {
