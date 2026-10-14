@@ -89,6 +89,20 @@ jobs:
           done
           [ "$MISSING" -eq 0 ] || exit 1
           echo "✔ كل ملفات النواة مشمولة بقائمة النسخ."
+          # AWJ-BACKEND-CI-03: setup.sh يبني البيئة المحلية (وخطّاف بدء الجلسة) بقائمة يدوية مستقلة؛
+          # انحرافها لا يظهر هنا فيمرّ بصمت (حدث مع app/Mail وresources/views وحزمة AWS). نتحقق أنه
+          # ينسخ كل مصدر ‹$CORE/…› تنسخه خطوة الدمج في هذا الملف، ويثبّت كل حزمة يثبّتها.
+          for src in $(grep -oE '"\$CORE/[^"]+"' .github/workflows/ci.yml | sed 's/^"\$CORE\///; s/"$//' | sort -u); do
+            grep -qF "\"\$CORE_DIR/$src\"" setup.sh || { echo "::error file=setup.sh::setup.sh لا ينسخ «$src» — أضفه كما في ci.yml"; MISSING=1; }
+          done
+          # السطر الفعلي في خطوة «تثبيت Sanctum…» (مرسوٌّ ببداية السطر كي لا يطابق هذا الحارس نفسه).
+          PKGS="$(grep -m1 -E '^[[:space:]]+composer require laravel/sanctum ' .github/workflows/ci.yml | sed -E 's/^[[:space:]]+composer require //; s/ --.*$//')"
+          [ -n "$PKGS" ] || { echo "::error::تعذّر قراءة حزم composer require من ci.yml"; exit 1; }
+          for p in $PKGS; do
+            grep -E '^composer require ' setup.sh | grep -qF -- "$p" || { echo "::error file=setup.sh::setup.sh لا يثبّت «$p» — أضفها كما في ci.yml"; MISSING=1; }
+          done
+          [ "$MISSING" -eq 0 ] || exit 1
+          echo "✔ setup.sh مطابق لقائمة النسخ وحزم CI."
 
       - name: Setup PHP 8.4
         uses: shivammathur/setup-php@v2

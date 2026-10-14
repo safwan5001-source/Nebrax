@@ -16,6 +16,17 @@ command -v xmllint  >/dev/null || { echo "✗ xmllint غير مثبت (حزمة 
 php -m | grep -qi '^dom$' || { echo "✗ إضافة PHP DOM غير مفعّلة."; exit 1; }
 PHP_VER=$(php -r 'echo PHP_MAJOR_VERSION.".".PHP_MINOR_VERSION;')
 echo "  PHP $PHP_VER ✓"
+# امتدادات PHP التي يحمّلها CI (ci.yml → Setup PHP). غيابها لا يمنع التجهيز (هذا السكربت
+# يعمل أيضاً كخطّاف بدء جلسة)، لكنه يُفشل اختبارات بعينها محلياً فيخفي الإخفاقات الحقيقية
+# بين إخفاقاتٍ زائفة — لذا تحذيرٌ صريح يسمّي الامتداد بدل الصمت.
+MISSING_EXT=""
+for ext in mbstring pdo_sqlite sqlite3 pgsql pdo_pgsql bcmath intl fileinfo zip dom gd; do
+  php -m | grep -qi "^$ext\$" || MISSING_EXT="$MISSING_EXT $ext"
+done
+if [ -n "$MISSING_EXT" ]; then
+  echo "  ⚠ امتدادات PHP يحمّلها CI وتنقص هنا:$MISSING_EXT"
+  echo "    اختبارات تعتمد عليها ستفشل محلياً وتنجح في CI (مثلاً bcmath ← اختبارات الوقود: bcmul)."
+fi
 
 echo "▶ 2/6  إنشاء مشروع Laravel..."
 if [ ! -d "$APP_DIR" ]; then
@@ -23,8 +34,10 @@ if [ ! -d "$APP_DIR" ]; then
 fi
 cd "$APP_DIR"
 
-echo "▶ 3/6  تثبيت Sanctum + تفعيل مسارات API..."
-composer require laravel/sanctum resend/resend-php intervention/image-laravel:4.1.1 --quiet
+echo "▶ 3/6  تثبيت Sanctum + تخزين S3/R2 + تفعيل مسارات API..."
+# الحزم نفسها التي يثبّتها CI (ci.yml) والتجميع الإنتاجي (deploy/assemble.sh). بلا
+# flysystem-aws-s3-v3 لا توجد فئات Aws\… فتفشل اختبارات R2 ووسائط المتجر محلياً فقط.
+composer require laravel/sanctum league/flysystem-aws-s3-v3:^3.0 predis/predis:^2.2 resend/resend-php intervention/image-laravel:4.1.1 --quiet
 php "$CORE_DIR/tests/Fixtures/intervention-image-runtime-smoke.php" "$APP_DIR"
 php artisan install:api --no-interaction --quiet || true
 # لدينا جدول personal_access_tokens ضمن migration النواة — نحذف نسخة Sanctum المنشورة لتجنّب التكرار
@@ -36,10 +49,11 @@ cp -r "$CORE_DIR/app/Models/"*.php        app/Models/
 # السمات في مجلد فرعي لا يلتقطها glob النماذج أعلاه؛ يجب أن تطابق CI والإنتاج.
 # قائمة المجلدات هنا يدوية ويجب أن تبقى مطابقة لقائمة .github/workflows/ci.yml
 # (كلاهما ينسخ من نفس النواة بمنطق مستقل) — نسيان مجلد هنا لا يظهر في CI فيمر بصمت.
-mkdir -p app/Contracts app/Models/Concerns app/Jobs/Accounting app/Jobs/DocumentCenter app/Services app/Services/Accounting app/Services/Commerce app/Services/Commerce/Edge app/Services/Commerce/Otp app/Services/DocumentCenter app/Services/AppBuilder app/Services/DeliveryHub app/Services/Pos app/Services/Pos/Hardware app/Services/Reporting app/Services/PrintTemplates app/Support app/Support/Inventory app/Support/Dns app/Support/Commerce \
+mkdir -p app/Contracts app/Mail app/Models/Concerns app/Jobs/Accounting app/Jobs/DocumentCenter app/Services app/Services/Accounting app/Services/Commerce app/Services/Commerce/Edge app/Services/Commerce/Otp app/Services/DocumentCenter app/Services/AppBuilder app/Services/DeliveryHub app/Services/Pos app/Services/Pos/Hardware app/Services/Reporting app/Services/PrintTemplates app/Support app/Support/Inventory app/Support/Dns app/Support/Commerce \
          app/Tenancy app/Http/Middleware app/Http/Controllers/Api config \
          app/Http/Requests app/Http/Resources app/Console/Commands tests/Feature tests/Fixtures/presentation routes docs/openapi contracts/app-builder contracts/flowers-journey contracts/flowers-admin-journey/responses
 cp -r "$CORE_DIR/app/Contracts/"*.php app/Contracts/
+cp -r "$CORE_DIR/app/Mail/"*.php     app/Mail/ 2>/dev/null || true
 cp -r "$CORE_DIR/app/Jobs/DocumentCenter/"*.php app/Jobs/DocumentCenter/
 cp -r "$CORE_DIR/app/Jobs/Accounting/"*.php app/Jobs/Accounting/
 cp -r "$CORE_DIR/app/Models/Concerns/"*.php app/Models/Concerns/
@@ -75,6 +89,8 @@ cp -r "$CORE_DIR/routes/api_storefront.php"      routes/api_storefront.php
 cp -r "$CORE_DIR/routes/api_commerce.php"        routes/api_commerce.php
 cp -r "$CORE_DIR/routes/api_preview.php"         routes/api_preview.php
 cp -r "$CORE_DIR/routes/console.php"             routes/console.php
+# قوالب البريد (emails.*) — يقرؤها UserInvitationTest/ResendMailTransportTest (تطابق ci.yml وassemble.sh)
+cp -r "$CORE_DIR/resources/views/"*              resources/views/ 2>/dev/null || true
 cp -r "$CORE_DIR/tests/Feature/"*.php            tests/Feature/
 cp -r "$CORE_DIR/tests/Fixtures/presentation/"*.json tests/Fixtures/presentation/ 2>/dev/null || true
 # عقد OpenAPI (توثيق فقط) — يقرأه اختبار المطابقة عبر base_path('docs/openapi/…')
@@ -136,4 +152,8 @@ echo ""
 echo "════════════════════════════════════════════════════════"
 echo "✓ جاهز. لتشغيل الخادم:"
 echo "    cd $APP_DIR && php artisan serve"
+echo ""
+echo "  لمطابقة فرع PostgreSQL في CI (بعد ضبط DB_CONNECTION=pgsql في .env وتثبيت brianium/paratest):"
+echo "    PGOPTIONS='-c lock_timeout=60s' php artisan test --parallel --processes=4"
+echo "    (المهلة نفسها التي يضبطها ci.yml — يحرسها PostgresTestLockTimeoutTest، AWJ-BACKEND-CI-02)"
 echo "════════════════════════════════════════════════════════"
