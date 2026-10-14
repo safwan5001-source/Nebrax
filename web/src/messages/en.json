@@ -860,6 +860,7 @@
     "loadFailed": "Could not load",
     "yes": "Yes",
     "no": "No",
+    "capabilityUnavailable": "This capability isn't available for your organization or role. Ask the account owner to enable it.",
     "all": "All",
     "themeToggle": "Toggle color mode",
     "languageToggle": "Switch language"

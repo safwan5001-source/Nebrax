@@ -5,7 +5,8 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { CircleAlert, FileSearch, Filter, RefreshCw, SlidersHorizontal, Upload } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import { api, ApiError } from '@/lib/api';
+import { api } from '@/lib/api';
+import { describeLoadFailure } from '@/lib/load-failure';
 import { currentUser } from '@/lib/auth';
 import { canManageDocumentCenter } from '@/lib/document-review-access';
 import {
@@ -65,6 +66,9 @@ export default function DocumentsPage() {
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // 403 (صلاحية/استحقاق): رسالة من الكتالوج وبلا إعادة محاولة (ERP-UX-009).
+  const [forbidden, setForbidden] = useState(false);
+  const tCommon = useTranslations('common');
   const [filters, setFilters] = useState<DocumentBatchFilters>(() => filtersFromSearchParams(searchParams));
   const [page, setPage] = useState(1);
   const [meta, setMeta] = useState<PaginatedResponse['meta']>();
@@ -98,14 +102,14 @@ export default function DocumentsPage() {
   const load = useCallback(async () => {
     if (page === 1) setLoading(true);
     else setLoadingMore(true);
-    setError(null);
+    setError(null); setForbidden(false);
 
     try {
       const response = await api<PaginatedResponse>(requestPath);
       setBatches((current) => page === 1 ? response.data : [...current, ...response.data]);
       setMeta(response.meta);
     } catch (exception) {
-      setError(exception instanceof ApiError ? exception.message : t('loadFailed'));
+      { const failure = describeLoadFailure(exception, { forbidden: tCommon('capabilityUnavailable'), fallback: t('loadFailed') }); setError(failure.message); setForbidden(failure.forbidden); }
     } finally {
       setLoading(false);
       setLoadingMore(false);
@@ -167,7 +171,7 @@ export default function DocumentsPage() {
             placeholder={t('search')}
             className="h-10 w-full rounded border border-border bg-surface px-3 text-sm text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary sm:min-w-64"
           />
-          {canManage && (
+          {canManage && !forbidden && (
             <Button className="w-full shrink-0 sm:w-auto" onClick={() => setUploadOpen(true)}>
               <Upload className="h-4 w-4" aria-hidden="true" />
               {ti('upload')}
@@ -246,10 +250,10 @@ export default function DocumentsPage() {
           <CardContent className="flex flex-wrap items-center gap-3 py-10 text-sm text-muted">
             <CircleAlert className="h-5 w-5" aria-hidden="true" />
             {error}
-            <Button variant="outline" onClick={() => void load()}>
+            {!forbidden && (<Button variant="outline" onClick={() => void load()}>
               <RefreshCw className="h-4 w-4" aria-hidden="true" />
               {t('retry')}
-            </Button>
+            </Button>)}
           </CardContent>
         </Card>
       ) : batches.length === 0 ? (

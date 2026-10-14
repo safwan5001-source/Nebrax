@@ -10,7 +10,8 @@ import { Combobox, type ComboOption } from '@/components/ui/combobox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
-import { api, ApiError } from '@/lib/api';
+import { api } from '@/lib/api';
+import { describeLoadFailure } from '@/lib/load-failure';
 import { currentUser } from '@/lib/auth';
 import { DELIVERY_NOTE_PERMISSIONS, hasPermission, type DeliveryNote, statusTone } from '@/lib/delivery-notes';
 
@@ -39,6 +40,8 @@ export default function DeliveryNotesPage() {
   const [pagination, setPagination] = useState<Paginator>({ current_page: 1, last_page: 1, total: 0 });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // 403 (صلاحية/استحقاق): حالة واحدة صريحة — بلا إعادة محاولة ولا دعوة إنشاء (ERP-UX-009).
+  const [forbidden, setForbidden] = useState(false);
 
   const customerOptions = useMemo<ComboOption[]>(() => partners.filter((partner) => partner.is_active !== false && (partner.type === 'customer' || partner.type === 'both')).map((partner) => ({ value: partner.id, label: partner.name })), [partners]);
   const warehouseOptions = useMemo<ComboOption[]>(() => warehouses.filter((warehouse) => warehouse.is_active).map((warehouse) => ({ value: warehouse.id, label: warehouse.name, sub: warehouse.code ?? undefined })), [warehouses]);
@@ -54,13 +57,14 @@ export default function DeliveryNotesPage() {
     if (query.trim()) params.set('search', query.trim());
     setLoading(true);
     setError(null);
+    setForbidden(false);
     api<{ data: DeliveryNote[]; meta?: Paginator }>(`/delivery-notes?${params.toString()}`)
       .then((result) => {
         setNotes(result.data);
         setSelectedForInvoice((current) => current.filter((id) => result.data.some((note) => note.id === id && note.status === 'confirmed' && !note.invoice_draft)));
         setPagination(result.meta ?? { current_page: 1, last_page: 1, total: result.data.length });
       })
-      .catch((caught) => setError(caught instanceof ApiError ? caught.message : tc('saveFailed')))
+      .catch((caught) => { const failure = describeLoadFailure(caught, { forbidden: tc('capabilityUnavailable'), fallback: tc('saveFailed') }); setError(failure.message); setForbidden(failure.forbidden); })
       .finally(() => setLoading(false));
   }, [customerId, dateFrom, dateTo, page, query, status, tc, warehouseId]);
 
@@ -92,7 +96,7 @@ export default function DeliveryNotesPage() {
   return <div className="space-y-5 pb-20 md:pb-0">
     <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
       <div><h1 className="text-xl font-semibold text-text">{t('title')}</h1><p className="mt-1 text-sm text-muted">{t('listSubtitle')}</p></div>
-      <div className="flex flex-wrap gap-2">{canInvoice && <Button asChild variant="outline"><Link href={invoiceHref}><FileText className="h-4 w-4" strokeWidth={1.8} />{t('invoiceDraftAction')}</Link></Button>}{canManage && <Button asChild><Link href="/delivery-notes/new"><FilePlus2 className="h-4 w-4" strokeWidth={1.8} />{t('create')}</Link></Button>}</div>
+      <div className="flex flex-wrap gap-2">{!forbidden && canInvoice && <Button asChild variant="outline"><Link href={invoiceHref}><FileText className="h-4 w-4" strokeWidth={1.8} />{t('invoiceDraftAction')}</Link></Button>}{!forbidden && canManage && <Button asChild><Link href="/delivery-notes/new"><FilePlus2 className="h-4 w-4" strokeWidth={1.8} />{t('create')}</Link></Button>}</div>
     </div>
 
     <section aria-label={t('filters')} className="rounded border border-border bg-surface p-4">
@@ -106,7 +110,7 @@ export default function DeliveryNotesPage() {
       </form>
     </section>
 
-    {error && <section role="alert" className="flex items-center justify-between gap-3 rounded border border-negative/30 bg-negative/10 p-4 text-sm text-negative"><span>{error}</span><Button variant="outline" size="sm" onClick={load}><RefreshCw className="h-4 w-4" strokeWidth={1.7} />{t('retry')}</Button></section>}
+    {error && <section role="alert" className="flex items-center justify-between gap-3 rounded border border-negative/30 bg-negative/10 p-4 text-sm text-negative"><span>{error}</span>{!forbidden && <Button variant="outline" size="sm" onClick={load}><RefreshCw className="h-4 w-4" strokeWidth={1.7} />{t('retry')}</Button>}</section>}
 
     <section className="overflow-hidden rounded border border-border bg-surface">
       <div className="hidden overflow-x-auto md:block">
@@ -115,7 +119,7 @@ export default function DeliveryNotesPage() {
         </table>
       </div>
       <div className="divide-y divide-border md:hidden">{loading ? Array.from({ length: 4 }).map((_, index) => <div className="p-4" key={index}><div className="h-20 animate-pulse rounded bg-muted" /></div>) : notes.map((note) => { const unavailable = invoiceAvailability(note); return <div key={note.id} className="flex items-start gap-3 p-4">{canInvoice && <input className="mt-1" type="checkbox" checked={selectedForInvoice.includes(note.id)} disabled={!!unavailable} onChange={() => toggleInvoiceSelection(note)} aria-label={t('invoiceDraftSelectNote', { number: note.number })} />}<Link href={`/delivery-notes/${note.id}`} className="block min-w-0 flex-1 transition-colors hover:text-primary"><div className="flex items-center justify-between gap-3"><span className="num font-medium text-primary">{note.number}</span><Badge tone={statusTone(note.status)}>{statusLabel(note.status)}</Badge></div><p className="mt-2 font-medium text-text">{note.customer?.name ?? '—'}</p><div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted"><span>{note.warehouse?.name ?? '—'}</span><span dir="ltr">{note.delivery_date}</span></div>{canInvoice && <p className={`mt-1 text-xs ${unavailable ? 'text-negative' : 'text-positive'}`}>{unavailable ?? t('invoiceDraftAvailable')}</p>}</Link></div>; })}</div>
-      {!loading && notes.length === 0 && <div className="px-6 py-16 text-center"><p className="font-medium text-text">{t('emptyTitle')}</p><p className="mt-1 text-sm text-muted">{t('emptyHint')}</p>{canManage && <Button asChild className="mt-4"><Link href="/delivery-notes/new">{t('create')}</Link></Button>}</div>}
+      {!loading && !error && notes.length === 0 && <div className="px-6 py-16 text-center"><p className="font-medium text-text">{t('emptyTitle')}</p><p className="mt-1 text-sm text-muted">{t('emptyHint')}</p>{canManage && <Button asChild className="mt-4"><Link href="/delivery-notes/new">{t('create')}</Link></Button>}</div>}
     </section>
 
     {canInvoice && selectedForInvoice.length > 0 && <div className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-surface/95 p-3 backdrop-blur md:hidden"><Button asChild className="w-full"><Link href={invoiceHref}><FileText className="h-4 w-4" strokeWidth={1.7} />{t('invoiceDraftCreateSelected', { count: selectedForInvoice.length })}</Link></Button></div>}
