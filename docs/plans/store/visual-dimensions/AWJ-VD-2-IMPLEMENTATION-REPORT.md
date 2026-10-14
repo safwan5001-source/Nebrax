@@ -1,6 +1,6 @@
 # AWJ-VD-2 — Implementation Report (Shape engine, FacetVisualTile, IconPicker)
 
-STATUS: **MERGED** — PR #1482 squash-merged as `d568bf681c2615e36fb6cd43ce2ac8390ab30320` under the owner's amended D-14 (low risk: no DB, API, permissions, security, tenant, accounting or inventory change). POST_MERGE_REVIEW: PENDING (post-merge CI running).
+STATUS: **MERGED** — PR #1482 squash-merged as `d568bf681c2615e36fb6cd43ce2ac8390ab30320` under the owner's amended D-14 (low risk: no DB, API, permissions, security, tenant, accounting or inventory change). POST_MERGE_REVIEW: PASS.
 DATE: 2026-10-14
 HORIZON: AWJ-COMMERCE-VISUAL-DIMENSIONS-H1 · slice VD-2 (H1-2)
 AUTHORITY: G0 closed by the owner (D-01..D-17 approved). VD-1a merged as `8801af9` (post-merge CI green). VD-2 has no DB or API change, so it continues the horizon without the separate DB/API approval that VD-1b, VD-1c and VD-4a still need.
@@ -195,7 +195,7 @@ No endpoints. The picker's `disabled` state is the hook for VD-3's "no `commerce
   - **Mergeability:** `clean`.
   - **Review:** no open review threads; all independent-review findings fixed.
 - **Merge:** squash, `d568bf681c2615e36fb6cd43ce2ac8390ab30320`.
-- **POST_MERGE_REVIEW: PENDING (post-merge CI running)** (CI, Web CI and Storefront CI on `main` at `d568bf6`).
+- **POST_MERGE_REVIEW: PASS** — CI (PHP sqlite + pgsql), Web CI and Storefront CI all green on `main` at `d568bf6`.
 
 ## Git state
 
