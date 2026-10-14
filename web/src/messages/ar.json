@@ -2018,7 +2018,8 @@
       "invoice": "فوترة",
       "access": "وصول",
       "view_cost": "عرض التكلفة",
-      "minimum_price_override": "تجاوز الحد الأدنى للسعر"
+      "minimum_price_override": "تجاوز الحد الأدنى للسعر",
+      "submit": "إرسال"
     },
     "weekdays": [
       "الأحد",

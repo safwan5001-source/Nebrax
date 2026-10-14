@@ -82,6 +82,13 @@ REM-03 and REM-08 touch disjoint controllers (`Invoice/Return/Quote/DocumentRevi
 > **Status-code note for the owner:** the card's "403 on the next request" holds when the token row survives (guard path). Through the normal API path the tokens are already gone, so the same old token gets **401** from `auth:sanctum` before `SetTenant` runs. Both are denials before any tenant logic; no envelope was changed to force one code.
 > **Unchanged by design:** `AuthController` (login/handoff/logout/password-reset), owner/self-deactivation policy, RBAC, Access Control V2, tenant-inactive handling, non-`User` principals (`ApiClient`, `PreviewSession`, `CustomerIdentity`). Reactivation does not revive tokens (a fresh login is required).
 
+### REM-37 / SEC-07 — status update (2026-10-14)
+
+> **REM-03, REM-03b and REM-08 merged.** **REM-37 — IN REVIEW (Draft PR), not closed**; closes only after approved merge and verification. Report and evidence: `REM-37-SEC-07-IMPLEMENTATION-REPORT.md`.
+> **Owner decision recorded: Option B — additive one-time backfill migration approved.** Stored `roles` rows (not `Rbac::MATRIX`) are the runtime source for every existing tenant, so adding `zatca.submit` without a backfill would have silently removed ZATCA submission from every existing accountant and custom role holding `invoices.manage`.
+> **What changed:** (1) new canonical permission `zatca.submit` in `Rbac::PERMISSIONS`, and in `MATRIX['accountant']` only (not `staff`, not `self_service`; `owner`/`admin` via `*`); (2) `POST /invoices/{id}/zatca/submissions` and `…/{attemptId}/dispatch` now require `zatca.submit` + `compliance.zatca` + the existing throttle — **`invoices.manage` is no longer an authorization path for them**; `GET …/submissions` stays `zatca.view`; (3) migration `2026_11_08_010000_backfill_zatca_submit_permission_for_invoice_managers.php` appends `zatca.submit` (last) to every stored role, in any tenant, whose explicit permissions contain `invoices.manage` — skipping wildcard roles, roles lacking `invoices.manage`, and roles already holding it; `down()` is intentionally a no-op; (4) `submit` action label added to the `hr.perm_actions` messages (ar/en) so the Role Matrix renders it under the existing E-invoicing group.
+> **Unchanged by design:** `ZatcaSubmissionController` and all ZATCA services/jobs/credentials/ICV/PIH, REM-03b `scopeToCurrentBranchOnly()` and attempt binding, tenant/branch primitives, schema, `invoices.view`/`invoices.manage` semantics outside the two routes. Middleware order is characterised, not changed: permission 403 → entitlement 403 → branch/tenant/attempt 404.
+
 ### REM-03 — card (ready for owner approval to start)
 
 | Field | Content |

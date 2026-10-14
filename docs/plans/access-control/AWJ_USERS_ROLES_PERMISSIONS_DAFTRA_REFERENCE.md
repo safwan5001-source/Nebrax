@@ -1689,3 +1689,14 @@ mutating. See the implementation report, "Newly discovered / not changed".
 * **Cross-branch reference workflows preserved:** `ReturnableController` (return-source reference, including `purpose=credit_note`), the credit-note `original_invoice_id` reference check in `CreditNoteController::post` (allowed-branch policy — only the *note itself* became Active-Branch-Only), and `AppointmentController` (`scopeToActiveBranch()`, `?branch=all`) are untouched.
 * **Still on the general read/reference policy (by design):** `notes()`, note-attachment download, invoice `show`/`payments`/`accounting`/`inventory`/`zatca` reads, `ZatcaSubmissionController::index`.
 
+
+## 44. REM-37 / SEC-07 — dedicated `zatca.submit` permission (2026-10-14)
+
+> Security-remediation note (separation of duties). The general Access Control V2 model is unchanged. Report: `docs/audits/horizon/REM-37-SEC-07-IMPLEMENTATION-REPORT.md`.
+
+* **Two ZATCA permissions, one catalogue.** `zatca.view` = read-only status/submissions. `zatca.submit` = create a submission attempt and dispatch it to the queue. Both live in `Rbac::PERMISSIONS` (the single source for `StoreRoleRequest` validation and the Role Matrix `meta.permissions`) and group under the existing `zatca` module (`hr.perm_modules.zatca`); the action label is `hr.perm_actions.submit`.
+* **Route split.** `GET /invoices/{id}/zatca/submissions` → `zatca.view` + `compliance.zatca`. `POST /invoices/{id}/zatca/submissions` and `POST …/{attemptId}/dispatch` → `zatca.submit` + `compliance.zatca` + `throttle:10,1`. **`invoices.manage` is no longer an alternate path** to either POST. The two permissions are independent: neither implies the other.
+* **Order of denial (unchanged).** Missing permission → 403; entitlement disabled → 403; valid permission but wrong *active* branch (REM-03b), foreign tenant, or an attempt of another invoice → 404.
+* **Default roles.** `accountant` gains `zatca.submit` (it already held `invoices.manage`, the only non-wildcard built-in that did). `staff` and `self_service` do not. `owner`/`admin` hold `*`, which already covers it.
+* **Backward compatibility (owner decision: Option B).** Existing tenants resolve permissions from their stored `roles` rows, not from `MATRIX`. A one-time additive migration appends `zatca.submit` to every stored role (all tenants) whose explicit list contains `invoices.manage`; wildcard roles and roles without `invoices.manage` are untouched; re-running is a no-op. It is a transition only — afterwards the two permissions are managed independently, and removing `zatca.submit` from a role takes effect on the next request even if `invoices.manage` stays.
+* **Role editing note.** Roles created after the migration do **not** inherit `zatca.submit` from `invoices.manage`; grant it explicitly in the Role Matrix.
