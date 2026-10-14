@@ -149,10 +149,10 @@ export const DISCOVERY_GAPS = ["tight", "normal", "loose"] as const;
 export type DiscoveryGap = (typeof DISCOVERY_GAPS)[number];
 export const DISCOVERY_TEXT_POSITIONS = ["below", "overlay", "beside"] as const;
 export type DiscoveryTextPosition = (typeof DISCOVERY_TEXT_POSITIONS)[number];
-export const DISCOVERY_CONTENT_ORDERS = ["media-first", "label-first"] as const;
-export type DiscoveryContentOrder = (typeof DISCOVERY_CONTENT_ORDERS)[number];
-export const DISCOVERY_VALUE_ORDERS = ["merchant", "count"] as const;
-export type DiscoveryValueOrder = (typeof DISCOVERY_VALUE_ORDERS)[number];
+export const DISCOVERY_CONTENT_SEQUENCES = ["media-first", "label-first"] as const;
+export type DiscoveryContentSequence = (typeof DISCOVERY_CONTENT_SEQUENCES)[number];
+export const DISCOVERY_VALUE_SORTS = ["merchant", "count"] as const;
+export type DiscoveryValueSort = (typeof DISCOVERY_VALUE_SORTS)[number];
 export const DISCOVERY_CARD_STYLES = [
   "plain",
   "outlined",
@@ -189,8 +189,8 @@ export interface DiscoveryContent {
   rows?: number;
   gap?: DiscoveryGap;
   textPosition?: DiscoveryTextPosition;
-  contentOrder?: DiscoveryContentOrder;
-  valueOrder?: DiscoveryValueOrder;
+  contentSequence?: DiscoveryContentSequence;
+  valueSort?: DiscoveryValueSort;
   shape?: FacetVisualShape;
   size?: FacetVisualSize;
   showLabel?: boolean;
@@ -758,10 +758,10 @@ function discoveryDisplayOptions(
   if (gap) out.gap = gap;
   const textPosition = pick(DISCOVERY_TEXT_POSITIONS, source.textPosition);
   if (textPosition) out.textPosition = textPosition;
-  const contentOrder = pick(DISCOVERY_CONTENT_ORDERS, source.contentOrder);
-  if (contentOrder) out.contentOrder = contentOrder;
-  const valueOrder = pick(DISCOVERY_VALUE_ORDERS, source.valueOrder);
-  if (valueOrder) out.valueOrder = valueOrder;
+  const contentSequence = pick(DISCOVERY_CONTENT_SEQUENCES, source.contentSequence);
+  if (contentSequence) out.contentSequence = contentSequence;
+  const valueSort = pick(DISCOVERY_VALUE_SORTS, source.valueSort);
+  if (valueSort) out.valueSort = valueSort;
   const shape = pick(FACET_VISUAL_SHAPES, source.shape);
   if (shape) out.shape = shape;
   const size = pick(FACET_VISUAL_SIZES, source.size);

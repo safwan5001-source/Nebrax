@@ -17,11 +17,11 @@ import type {
   DiscoveryCardStyle,
   DiscoveryColumns,
   DiscoveryContent,
-  DiscoveryContentOrder,
+  DiscoveryContentSequence,
   DiscoveryGap,
   DiscoveryLayout,
   DiscoveryTextPosition,
-  DiscoveryValueOrder,
+  DiscoveryValueSort,
 } from "./section-content";
 
 export interface DiscoveryTemplate {
@@ -103,8 +103,8 @@ export const DISCOVERY_DISPLAY_DEFAULTS = {
   rows: 1,
   gap: "normal",
   textPosition: "below",
-  contentOrder: "media-first",
-  valueOrder: "merchant",
+  contentSequence: "media-first",
+  valueSort: "merchant",
   cardStyle: "plain",
   align: "center",
   showCounts: false,
@@ -118,8 +118,8 @@ export interface ResolvedDiscoveryDisplay {
   rows: number;
   gap: DiscoveryGap;
   textPosition: DiscoveryTextPosition;
-  contentOrder: DiscoveryContentOrder;
-  valueOrder: DiscoveryValueOrder;
+  contentSequence: DiscoveryContentSequence;
+  valueSort: DiscoveryValueSort;
   cardStyle: DiscoveryCardStyle;
   align: DiscoveryAlign;
   showCounts: boolean;
@@ -137,7 +137,9 @@ export interface ResolvedDiscoveryDisplay {
 export function discoveryTemplateOf(
   id: string | undefined,
 ): DiscoveryTemplate | undefined {
-  return id !== undefined && Object.hasOwn(DISCOVERY_TEMPLATES, id)
+  // An explicit id list, not a property lookup: no prototype keys (`constructor`) and no newer built-ins.
+  return id !== undefined &&
+    (DISCOVERY_TEMPLATE_IDS as readonly string[]).includes(id)
     ? (DISCOVERY_TEMPLATES as Record<string, DiscoveryTemplate>)[id]
     : undefined;
 }
@@ -161,19 +163,24 @@ export function resolveDiscoveryDisplay(
   if (template?.shape !== undefined) visualTemplate.shape = template.shape;
   if (template?.size !== undefined) visualTemplate.size = template.size;
 
+  const layout = content.layout ?? template?.layout ?? null;
   return {
-    layout: content.layout ?? template?.layout ?? null,
+    layout,
     columns: {
       mobile: column("mobile"),
       tablet: column("tablet"),
       desktop: column("desktop"),
     },
-    rows: content.rows ?? template?.rows ?? defaults.rows,
+    // §3.7 — a second row exists only for the carousel (mobile); any other layout is a single flow.
+    rows:
+      layout === "carousel"
+        ? (content.rows ?? template?.rows ?? defaults.rows)
+        : defaults.rows,
     gap: content.gap ?? defaults.gap,
     textPosition:
       content.textPosition ?? template?.textPosition ?? defaults.textPosition,
-    contentOrder: content.contentOrder ?? defaults.contentOrder,
-    valueOrder: content.valueOrder ?? defaults.valueOrder,
+    contentSequence: content.contentSequence ?? defaults.contentSequence,
+    valueSort: content.valueSort ?? defaults.valueSort,
     cardStyle: content.cardStyle ?? template?.cardStyle ?? defaults.cardStyle,
     align: content.align ?? defaults.align,
     showCounts: content.showCounts ?? defaults.showCounts,

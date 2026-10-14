@@ -404,13 +404,15 @@ HORIZON: AWJ-COMMERCE-VISUAL-DIMENSIONS-H1 (Master Plan: `AWJ-VD-H1-MASTER-PLAN.
 | `rows` | `1` · `2` (لـ`carousel` على الجوال فقط — نمط FNP المرصود) | `1` |
 | `gap` | `tight` · `normal` · `loose` | `normal` |
 | `textPosition` | `below` · `overlay` · `beside` | `below` |
-| `contentOrder` | `media-first` · `label-first` | `media-first` |
-| `valueOrder` | `merchant` · `count` | `merchant` (ترتيب `sort_order`) |
+| `contentSequence` | `media-first` · `label-first` | `media-first` |
+| `valueSort` | `merchant` · `count` | `merchant` (ترتيب `sort_order`) |
 | `shape` / `size` / `showLabel` | كما في §3.4. **المفتاح نفسه بالمفرد** في L2 (القيمة والبُعد) وL3 (القسم) وفي المحلّل والـfixtures. لا مفتاح بالجمع في أي طبقة | ورِّث |
 | `cardStyle` | `plain` · `outlined` · `elevated` · `filled` | `plain` |
 | `align` | `start` · `center` | `center` |
 | `showCounts` | bool | `false` |
 | `maxItems` | 4–24 | 12 (الحد الحالي) |
+
+> **تعديل تنفيذي (VD-4a):** المفتاحان سُمّيا في الأصل `contentOrder` و`valueOrder`. كلمة `order` في قائمة الكلمات التجارية لجدار الحماية التجاري (`commerce-firewall.json`)، فيُرفض أي مفتاح آخر كلمة فيه `order`. لذلك أُعيدت تسميتهما إلى `contentSequence` و`valueSort`، بالقيم والمعنى نفسهما، ولم تُعدَّل سياسة الجدار. لا بيانات مخزّنة بالاسم القديم. البديل، أي إضافتهما إلى `allowedKeys`، تغيير في سياسة أمنية يحتاج قرار المالك. التفصيل في `AWJ-VD-4A-IMPLEMENTATION-REPORT.md`.
 
 **سجل القوالب** (code-owned، ثلاثي التوأمة، يُضاف إليه ولا يُحذف منه). القالب **حزمة افتراضات** تتجاوزها أي قيمة صريحة في القسم:
 

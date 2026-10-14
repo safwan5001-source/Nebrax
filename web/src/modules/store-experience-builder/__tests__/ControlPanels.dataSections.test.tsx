@@ -187,6 +187,27 @@ describe("Store Builder — data-backed section editors (ADR-21)", () => {
       expect(lastContent(onChange)).toEqual({ ...withoutDimension, axis: "brand", display: "chips" });
     });
 
+    it("keeps the display settings through an edit that briefly empties the section (VD-4a review)", () => {
+      const stored = { title: "Brands", axis: "brand", display: "tiles", template: "market-icons", maxItems: 8 };
+      const config = withSection("discovery", stored);
+      const onChange = vi.fn((next: StorefrontPresentationConfig) => {
+        rerenderWith(next);
+      });
+      const { rerender } = render(
+        <ControlPanels panel="homepage" config={config} locale="en" liveStoreName={null} onChange={onChange} selectedSection="s1" />,
+      );
+      function rerenderWith(next: StorefrontPresentationConfig) {
+        rerender(
+          <ControlPanels panel="homepage" config={next} locale="en" liveStoreName={null} onChange={onChange} selectedSection="s1" />,
+        );
+      }
+      // brand → facet (no dimension yet: the section is emptied) → brand again.
+      fireEvent.change(screen.getByLabelText("Browse by"), { target: { value: "facet" } });
+      expect(lastContent(onChange)).toBeUndefined();
+      fireEvent.change(screen.getByLabelText("Browse by"), { target: { value: "brand" } });
+      expect(lastContent(onChange)).toEqual(stored);
+    });
+
     it("flags an incomplete facet section", () => {
       const onChange = renderPanel(withSection("discovery"));
       expect(document.querySelector("[data-section-incomplete]")).not.toBeNull();

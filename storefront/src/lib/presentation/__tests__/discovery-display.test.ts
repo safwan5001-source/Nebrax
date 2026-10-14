@@ -11,7 +11,7 @@ import {
   DISCOVERY_ALIGNS,
   DISCOVERY_CARD_STYLES,
   DISCOVERY_COLUMN_RANGES,
-  DISCOVERY_CONTENT_ORDERS,
+  DISCOVERY_CONTENT_SEQUENCES,
   DISCOVERY_GAPS,
   DISCOVERY_LAYOUTS,
   DISCOVERY_MAX_ITEMS_MAX,
@@ -19,7 +19,7 @@ import {
   DISCOVERY_ROWS_MAX,
   DISCOVERY_ROWS_MIN,
   DISCOVERY_TEXT_POSITIONS,
-  DISCOVERY_VALUE_ORDERS,
+  DISCOVERY_VALUE_SORTS,
   type DiscoveryContent,
   normalizeOptionalSectionContent,
 } from "../section-content";
@@ -92,11 +92,11 @@ describe("discovery display contract (VD-4a)", () => {
     expect([...DISCOVERY_TEXT_POSITIONS]).toEqual(
       phpList("DISCOVERY_TEXT_POSITIONS"),
     );
-    expect([...DISCOVERY_CONTENT_ORDERS]).toEqual(
-      phpList("DISCOVERY_CONTENT_ORDERS"),
+    expect([...DISCOVERY_CONTENT_SEQUENCES]).toEqual(
+      phpList("DISCOVERY_CONTENT_SEQUENCES"),
     );
-    expect([...DISCOVERY_VALUE_ORDERS]).toEqual(
-      phpList("DISCOVERY_VALUE_ORDERS"),
+    expect([...DISCOVERY_VALUE_SORTS]).toEqual(
+      phpList("DISCOVERY_VALUE_SORTS"),
     );
     expect([...DISCOVERY_CARD_STYLES]).toEqual(
       phpList("DISCOVERY_CARD_STYLES"),
@@ -159,8 +159,8 @@ describe("resolveDiscoveryDisplay (VD-4a)", () => {
       rows: 1,
       gap: "normal",
       textPosition: "below",
-      contentOrder: "media-first",
-      valueOrder: "merchant",
+      contentSequence: "media-first",
+      valueSort: "merchant",
       cardStyle: "plain",
       align: "center",
       showCounts: false,
@@ -186,6 +186,22 @@ describe("resolveDiscoveryDisplay (VD-4a)", () => {
     // `section` context (above the value), the template's is its `template` context (below the value).
     expect(resolved.visualSection).toEqual({ shape: "circle" });
     expect(resolved.visualTemplate).toEqual({ shape: "arch", size: "lg" });
+  });
+
+  it("rows apply to the carousel only (§3.7); a grid over the carousel template is one flow", () => {
+    expect(
+      resolveDiscoveryDisplay({
+        ...base,
+        template: "swipe-rail",
+        layout: "image-grid",
+      }).rows,
+    ).toBe(1);
+    expect(
+      resolveDiscoveryDisplay({ ...base, layout: "image-grid", rows: 2 }).rows,
+    ).toBe(1);
+    expect(
+      resolveDiscoveryDisplay({ ...base, layout: "carousel", rows: 2 }).rows,
+    ).toBe(2);
   });
 
   it("the carousel template brings two rows; an unknown template id is ignored", () => {

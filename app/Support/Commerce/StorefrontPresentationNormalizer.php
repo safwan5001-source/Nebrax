@@ -132,9 +132,9 @@ final class StorefrontPresentationNormalizer
 
     public const DISCOVERY_TEXT_POSITIONS = ['below', 'overlay', 'beside'];
 
-    public const DISCOVERY_CONTENT_ORDERS = ['media-first', 'label-first'];
+    public const DISCOVERY_CONTENT_SEQUENCES = ['media-first', 'label-first'];
 
-    public const DISCOVERY_VALUE_ORDERS = ['merchant', 'count'];
+    public const DISCOVERY_VALUE_SORTS = ['merchant', 'count'];
 
     public const DISCOVERY_CARD_STYLES = ['plain', 'outlined', 'elevated', 'filled'];
 
@@ -1622,8 +1622,8 @@ final class StorefrontPresentationNormalizer
         }
         $pick('gap', self::DISCOVERY_GAPS);
         $pick('textPosition', self::DISCOVERY_TEXT_POSITIONS);
-        $pick('contentOrder', self::DISCOVERY_CONTENT_ORDERS);
-        $pick('valueOrder', self::DISCOVERY_VALUE_ORDERS);
+        $pick('contentSequence', self::DISCOVERY_CONTENT_SEQUENCES);
+        $pick('valueSort', self::DISCOVERY_VALUE_SORTS);
         $pick('shape', FacetVisualRegistry::SHAPES);
         $pick('size', FacetVisualRegistry::SIZES);
         $flag('showLabel');
