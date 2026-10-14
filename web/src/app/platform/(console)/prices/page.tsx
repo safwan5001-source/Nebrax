@@ -8,6 +8,7 @@ import { Tag } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useHorizontalOverflow } from '@/components/platform/use-horizontal-overflow';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -99,6 +100,8 @@ export default function PlatformPricesPage() {
   }, [load, router]);
 
   const today = useToday();
+  // H1-N1: the history table is the scroller; it needs a keyboard stop only while it really scrolls (large text, narrow widths).
+  const [historyScrollRef, historyScrolls] = useHorizontalOverflow<HTMLDivElement>();
   const classification = useMemo(() => classifyPriceVersions(prices, today), [prices, today]);
 
   // نص المعاينة يُشتق من كتالوج طازج لا من مقارنة التاريخ باليوم وحده: نسخة بأثر رجعي خلف نسخة أحدث سارية «سابقة».
@@ -280,8 +283,13 @@ export default function PlatformPricesPage() {
               <p className="text-sm text-muted">{t('empty')}</p>
             ) : (
               <div aria-busy={loading}>
-                <div className="hidden overflow-x-auto md:block">
-                  <Table>
+                <div
+                  ref={historyScrollRef}
+                  {...(historyScrolls ? { role: 'region', tabIndex: 0, 'aria-label': t('historyScrollRegion') } : {})}
+                  className="hidden overflow-x-auto rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary md:block"
+                >
+                  {/* This div is the single scroller; the Table wrapper must not scroll on its own (an inner scroller would hide the overflow from it). */}
+                  <Table wrapperProps={{ className: 'overflow-x-visible' }}>
                     <THead>
                       <TR>
                         <TH>{t('plan')}</TH>
