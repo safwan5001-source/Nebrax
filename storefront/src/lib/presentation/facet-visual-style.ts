@@ -26,6 +26,8 @@ export interface FacetShapeGeometry {
   polygon?: string;
   /** SVG path in a 0..100 × 0..100 viewBox, used as an alpha mask (stretched to the frame). */
   maskPath?: string;
+  /** Icon box (percent of the frame) when the shape's open interior is narrower than the default 46%. */
+  iconBox?: string;
 }
 
 export const FACET_SHAPE_GEOMETRY: Readonly<
@@ -41,6 +43,7 @@ export const FACET_SHAPE_GEOMETRY: Readonly<
     aspect: "1 / 1",
     polygon:
       "50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 95%, 50% 73%, 21% 95%, 32% 57%, 2% 35%, 39% 35%",
+    iconBox: "34%",
   },
   heart: {
     aspect: "1 / 1",
@@ -63,6 +66,14 @@ export const FACET_SHAPE_GEOMETRY: Readonly<
     maskPath: "M0 100 V42 C0 22 22 8 50 0 C78 8 100 22 100 42 V100 Z",
   },
 };
+
+/** The icon box inside a shape's frame, sized so the glyph stays inside the shape. */
+export function facetIconBox(shape: FacetVisualShape): string {
+  return (
+    (FACET_SHAPE_GEOMETRY[shape] ?? FACET_SHAPE_GEOMETRY.circle).iconBox ??
+    "46%"
+  );
+}
 
 /** Frame width in CSS pixels per size; layouts may shrink a tile but never grow it past this. */
 export const FACET_VISUAL_SIZE_PX: Readonly<Record<FacetVisualSize, number>> = {
@@ -150,17 +161,37 @@ export function contrastRatio(a: string, b: string): number {
 /** Non-text contrast minimum for an icon that identifies the tile. */
 export const FACET_ICON_MIN_CONTRAST = 3;
 
+/** Dark and light icon colours used when the merchant's colour cannot be read on the merchant's background. */
+export const FACET_ICON_DARK = "#111827";
+export const FACET_ICON_LIGHT = "#ffffff";
+
+/** A `#rrggbb` colour: the only colour form a visual document may carry, re-checked at the render boundary. */
+export function isFacetHexColor(value: unknown): value is string {
+  return typeof value === "string" && HEX.test(value);
+}
+
 /**
- * The merchant's icon colour when it is readable on the tile background, else `undefined` (the renderer falls back
- * to theme tokens). With no explicit background the colour is kept: the theme surface is the renderer's concern.
+ * The icon colour to render, or `undefined` for the theme colour.
+ *
+ * - With an explicit merchant background (known hex), the result is **always readable** (≥ 3:1): the merchant's colour
+ *   when it passes, otherwise the better of dark/light. The theme primary is never trusted there, because its value is
+ *   unknown here and could match the background.
+ * - Without one, the merchant's colour is kept and the theme colour applies otherwise; the theme pairs its own surface
+ *   and primary.
  */
 export function readableIconColor(
   iconColor: string | undefined,
   background: string | undefined,
 ): string | undefined {
-  if (!iconColor || !HEX.test(iconColor)) return undefined;
-  if (!background || !HEX.test(background)) return iconColor;
-  return contrastRatio(iconColor, background) >= FACET_ICON_MIN_CONTRAST
-    ? iconColor
-    : undefined;
+  const merchant = isFacetHexColor(iconColor) ? iconColor : undefined;
+  if (!isFacetHexColor(background)) return merchant;
+  if (
+    merchant &&
+    contrastRatio(merchant, background) >= FACET_ICON_MIN_CONTRAST
+  )
+    return merchant;
+  return contrastRatio(FACET_ICON_DARK, background) >=
+    contrastRatio(FACET_ICON_LIGHT, background)
+    ? FACET_ICON_DARK
+    : FACET_ICON_LIGHT;
 }

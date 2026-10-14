@@ -2,11 +2,15 @@ import { describe, expect, it } from "vitest";
 import { FACET_VISUAL_SHAPES, FACET_VISUAL_SIZES } from "../facet-visual";
 import {
   contrastRatio,
+  FACET_ICON_DARK,
+  FACET_ICON_LIGHT,
   FACET_ICON_MIN_CONTRAST,
   FACET_SHAPE_GEOMETRY,
   FACET_VISUAL_SIZE_PX,
+  facetIconBox,
   facetImageStyle,
   facetShapeFrameStyle,
+  isFacetHexColor,
   readableIconColor,
 } from "../facet-visual-style";
 
@@ -61,6 +65,13 @@ describe("facet shape engine (VD-2)", () => {
     }
   });
 
+  it("shrinks the icon box only where the shape's interior is narrow (star)", () => {
+    expect(facetIconBox("star")).toBe("34%");
+    expect(facetIconBox("circle")).toBe("46%");
+    // @ts-expect-error — defensive fallback, as for the frame.
+    expect(facetIconBox("blob")).toBe("46%");
+  });
+
   it("an unknown shape falls back to the circle", () => {
     // @ts-expect-error — defensive: data could carry a shape added in a later release.
     expect(facetShapeFrameStyle("blob")).toEqual(
@@ -102,14 +113,42 @@ describe("icon colour contrast guard (WCAG 2.2 SC 1.4.11)", () => {
     expect(contrastRatio("#ffffff", "#ffffff")).toBeCloseTo(1, 5);
   });
 
-  it("keeps a readable colour, drops an unreadable one, and ignores invalid input", () => {
+  it("keeps a readable merchant colour, and replaces an unreadable one on a merchant background", () => {
     expect(readableIconColor("#9d2449", "#fdf2f4")).toBe("#9d2449");
     expect(contrastRatio("#f5f5f5", "#ffffff")).toBeLessThan(
       FACET_ICON_MIN_CONTRAST,
     );
-    expect(readableIconColor("#f5f5f5", "#ffffff")).toBeUndefined();
+    expect(readableIconColor("#f5f5f5", "#ffffff")).toBe(FACET_ICON_DARK);
+    // Review case: navy on navy is not handed to an unknown theme primary.
+    expect(readableIconColor("#1e40af", "#1e3a8a")).toBe(FACET_ICON_LIGHT);
+    expect(readableIconColor(undefined, "#ffffff")).toBe(FACET_ICON_DARK);
+    expect(readableIconColor("red", "#ffffff")).toBe(FACET_ICON_DARK);
+  });
+
+  it("without a merchant background, keeps a valid merchant colour and otherwise defers to the theme", () => {
     expect(readableIconColor("#9d2449", undefined)).toBe("#9d2449");
-    expect(readableIconColor(undefined, "#ffffff")).toBeUndefined();
-    expect(readableIconColor("red", "#ffffff")).toBeUndefined();
+    expect(readableIconColor(undefined, undefined)).toBeUndefined();
+    expect(readableIconColor("red", undefined)).toBeUndefined();
+    expect(readableIconColor("#9d2449", "red;x:y")).toBe("#9d2449");
+  });
+
+  it("is always readable on any merchant background", () => {
+    for (let v = 0; v <= 255; v += 5) {
+      const hex = v.toString(16).padStart(2, "0");
+      const background = `#${hex}${hex}${hex}`;
+      for (const merchant of [undefined, "#808080", background]) {
+        const colour = readableIconColor(merchant, background) as string;
+        expect(contrastRatio(colour, background)).toBeGreaterThanOrEqual(
+          FACET_ICON_MIN_CONTRAST,
+        );
+      }
+    }
+  });
+
+  it("accepts only #rrggbb at the render boundary", () => {
+    expect(isFacetHexColor("#a1b2c3")).toBe(true);
+    for (const bad of ["red", "#fff", "#a1b2c3;x", "url(x)", undefined, 1]) {
+      expect(isFacetHexColor(bad)).toBe(false);
+    }
   });
 });

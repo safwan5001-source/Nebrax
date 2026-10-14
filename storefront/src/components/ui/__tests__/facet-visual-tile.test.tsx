@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { ResolvedFacetVisual } from "@/lib/presentation/facet-visual";
 import { FacetVisualTile } from "../facet-visual-tile";
 
@@ -60,20 +60,92 @@ describe("FacetVisualTile (VD-2)", () => {
     expect(frame.style.width).toBe("112px");
   });
 
-  it("with no image source and no fallback icon it shows the name only", () => {
+  it("with no image source and no fallback icon it keeps the shaped frame with the name's initial", () => {
     const visual: ResolvedFacetVisual = {
       ...imageVisual,
       fallbackIcon: undefined,
       showLabel: false,
     };
     const { container } = render(
-      <FacetVisualTile visual={visual} label="زفاف" image={null} />,
+      <FacetVisualTile visual={visual} label="  زفاف" image={null} />,
     );
     expect(container.querySelector("img")).toBeNull();
-    expect(container.querySelector("[aria-hidden='true']")).toBeNull();
-    // Nothing visual is left, so the label is shown even though showLabel is false.
+    const frame = container.querySelector(
+      "[aria-hidden='true']",
+    ) as HTMLElement;
+    // D-08: shape and size survive every fallback stage, so a grid row stays aligned.
+    expect(frame.style.aspectRatio).toBe("3 / 4");
+    expect(frame.style.width).toBe("112px");
+    expect(frame.textContent).toBe("ز");
+    // Nothing visual names the value, so the label is shown even though showLabel is false.
     expect(screen.getByText("زفاف").className).not.toContain("sr-only");
-    expect(tile(container).dataset.facetContent).toBe("none");
+    expect(tile(container).dataset.facetContent).toBe("initial");
+  });
+
+  it("detects an image that failed before hydration (no onError replay) and falls back", () => {
+    const complete = vi
+      .spyOn(HTMLImageElement.prototype, "complete", "get")
+      .mockReturnValue(true);
+    const natural = vi
+      .spyOn(HTMLImageElement.prototype, "naturalWidth", "get")
+      .mockReturnValue(0);
+    const { container } = render(
+      <FacetVisualTile visual={imageVisual} label="x" image={{ src: SRC }} />,
+    );
+    expect(container.querySelector("img")).toBeNull();
+    expect(tile(container).dataset.facetContent).toBe("icon");
+    complete.mockRestore();
+    natural.mockRestore();
+  });
+
+  it("keeps an image that loaded before hydration", () => {
+    const complete = vi
+      .spyOn(HTMLImageElement.prototype, "complete", "get")
+      .mockReturnValue(true);
+    const natural = vi
+      .spyOn(HTMLImageElement.prototype, "naturalWidth", "get")
+      .mockReturnValue(160);
+    const { container } = render(
+      <FacetVisualTile visual={imageVisual} label="x" image={{ src: SRC }} />,
+    );
+    expect(container.querySelector("img")).not.toBeNull();
+    complete.mockRestore();
+    natural.mockRestore();
+  });
+
+  it("requests a sharper variant for a zoomed image and survives an unknown size", () => {
+    const { container, rerender } = render(
+      <FacetVisualTile
+        visual={{
+          ...imageVisual,
+          image: { mediaId: M1, fit: "cover", zoom: 2 },
+        }}
+        label="x"
+        image={{ src: SRC }}
+      />,
+    );
+    expect(container.querySelector("img")?.getAttribute("sizes")).toBe("224px");
+    rerender(
+      <FacetVisualTile
+        visual={
+          { ...imageVisual, size: "xl" } as unknown as ResolvedFacetVisual
+        }
+        label="x"
+        image={{ src: SRC }}
+      />,
+    );
+    expect(container.querySelector("img")?.getAttribute("width")).toBe("80");
+  });
+
+  it("never writes a non-hex background into CSS", () => {
+    const visual = {
+      ...imageVisual,
+      background: "red;background-image:url(//x)",
+    } as unknown as ResolvedFacetVisual;
+    const { container } = render(
+      <FacetVisualTile visual={visual} label="x" image={null} />,
+    );
+    expect(container.innerHTML).not.toContain("url(//x)");
   });
 
   it("a hidden label stays as the accessible name", () => {
@@ -110,6 +182,14 @@ describe("FacetVisualTile (VD-2)", () => {
         label="x"
       />,
     );
+    // Unreadable on the merchant's own background: a guaranteed-readable colour, not the unknown theme primary.
+    expect(iconWrap().style.color).toBe("rgb(17, 24, 39)");
+    rerender(
+      <FacetVisualTile
+        visual={{ ...readable, iconColor: undefined, background: undefined }}
+        label="x"
+      />,
+    );
     expect(iconWrap().style.color).toBe("var(--store-primary, currentColor)");
   });
 
@@ -129,7 +209,7 @@ describe("FacetVisualTile (VD-2)", () => {
     expect(screen.getByText("أخرى")).toBeTruthy();
   });
 
-  it("an unknown icon key draws nothing rather than injecting markup", () => {
+  it("an unknown icon key draws no glyph and never injects markup", () => {
     const visual = {
       content: "icon",
       icon: "<svg onload=alert(1)>",
@@ -140,7 +220,13 @@ describe("FacetVisualTile (VD-2)", () => {
     const { container } = render(<FacetVisualTile visual={visual} label="x" />);
     expect(container.innerHTML).not.toContain("onload");
     expect(container.querySelector("svg")).toBeNull();
-    expect(container.querySelector("[aria-hidden='true']")).toBeNull();
-    expect(screen.getByText("x").className).not.toContain("sr-only");
+    expect(
+      (container.querySelector("[aria-hidden='true']") as HTMLElement)
+        .textContent,
+    ).toBe("x");
+    // The initial is decorative (inside the aria-hidden frame); the visible label stays the name.
+    const [initial, name] = screen.getAllByText("x");
+    expect(initial.closest("[aria-hidden='true']")).not.toBeNull();
+    expect(name.className).not.toContain("sr-only");
   });
 });

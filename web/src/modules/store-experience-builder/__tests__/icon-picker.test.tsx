@@ -28,6 +28,13 @@ describe('filterIconKeys (VD-2)', () => {
     expect(filterIconKeys('CAKE')).toContain('cake');
   });
 
+  it('folds hamza, alef maqsura, taa marbuta and tatweel the way merchants type', () => {
+    expect(filterIconKeys('اطفال')).toContain('baby'); // tag «أطفال»
+    expect(filterIconKeys('موسيقي')).toContain('music'); // label «موسيقى»
+    expect(filterIconKeys('امان')).toContain('lock'); // label «أمان»
+    expect(filterIconKeys('قهـوة')).toContain('coffee'); // tatweel
+  });
+
   it('returns nothing for an unknown term', () => {
     expect(filterIconKeys('zzzz-not-an-icon')).toEqual([]);
   });
@@ -69,6 +76,47 @@ describe('IconPicker (VD-2)', () => {
     rerender(<IconPicker value="gift" onChange={onChange} locale="ar" labels={labels} allowNone />);
     fireEvent.click(screen.getByRole('button', { name: 'بلا أيقونة' }));
     expect(onChange).toHaveBeenCalledWith(undefined);
+  });
+
+  it('is a single Tab stop on the selected option (roving tabindex)', () => {
+    render(<IconPicker value="cake" onChange={() => {}} locale="ar" labels={labels} />);
+    const tabbable = screen.getByRole('group').querySelectorAll('button[tabindex="0"]');
+    expect(tabbable).toHaveLength(1);
+    expect(tabbable[0].getAttribute('aria-label')).toBe('كعكة');
+  });
+
+  it('moves focus with the arrow keys, mirrored in RTL, and with Home/End', () => {
+    const order = ICON_KEYS.map((key) => key);
+    const { container } = render(
+      <div dir="rtl">
+        <IconPicker value={order[1]} onChange={() => {}} locale="en" labels={labels} />
+      </div>,
+    );
+    const grid = container.querySelector('button[data-icon-option]')?.parentElement as HTMLElement;
+    const option = (key: string) => container.querySelector(`button[data-icon-option="${key}"]`) as HTMLButtonElement;
+    option(order[1]).focus();
+    // RTL: ArrowLeft goes forward in reading order.
+    fireEvent.keyDown(grid, { key: 'ArrowLeft' });
+    expect(document.activeElement).toBe(option(order[2]));
+    fireEvent.keyDown(grid, { key: 'ArrowRight' });
+    expect(document.activeElement).toBe(option(order[1]));
+    fireEvent.keyDown(grid, { key: 'End' });
+    expect(document.activeElement).toBe(option(order[order.length - 1]));
+    // Past the end it stays put.
+    fireEvent.keyDown(grid, { key: 'ArrowLeft' });
+    expect(document.activeElement).toBe(option(order[order.length - 1]));
+    fireEvent.keyDown(grid, { key: 'Home' });
+    expect(document.activeElement).toBe(option(order[0]));
+    expect(option(order[0]).tabIndex).toBe(0);
+    expect(option(order[1]).tabIndex).toBe(-1);
+  });
+
+  it('announces an empty search in a live region', () => {
+    render(<IconPicker value={undefined} onChange={() => {}} locale="ar" labels={labels} />);
+    const status = screen.getByRole('status');
+    expect(status.textContent).toBe('');
+    fireEvent.change(screen.getByLabelText('ابحث عن أيقونة'), { target: { value: 'zzzz' } });
+    expect(status.textContent).toBe('لا نتائج');
   });
 
   it('can be read-only', () => {

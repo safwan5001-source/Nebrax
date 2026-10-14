@@ -37,27 +37,37 @@ The D-08 render fallback is image → icon → text, but an image can fail **at 
 | Image framing | `object-fit` + `object-position` + `transform: scale()` with matching origin | D-09: one original, no crop, nothing baked. |
 | Geometry ownership | Code constants; documents carry only the shape key | No merchant input can reach CSS or SVG. A test pins mask paths to plain path commands. |
 | RTL | All shapes are horizontally symmetric | No mirroring needed; verified in RTL and LTR screenshots. |
-| Icon colour | WCAG 2.2 SC 1.4.11 non-text contrast ≥ 3:1 against an explicit background; an unreadable or invalid colour falls back to `--store-primary` | The merchant cannot make an icon invisible. |
+| Icon colour | WCAG 2.2 SC 1.4.11 non-text contrast ≥ 3:1. On an explicit merchant background, the merchant colour is kept only if it passes; otherwise the better of dark (`#111827`) or white is used, never the unknown theme primary (property-tested over the whole grey ramp). With no merchant background, the theme pairs its own surface and primary. | The merchant cannot make an icon invisible on their own background. |
+| Icon box | 46% of the frame, 34% for the star | The glyph stays inside the star's narrow top spike. |
 
 **Deviation from the task-queue wording:** the queue named "SVG objectBoundingBox" and `@supports`. The mask data URI replaces `objectBoundingBox` for the reason above. No `@supports` guard is used because `mask-image` and `clip-path: polygon()` are Baseline widely available, and the `-webkit-` mask props cover older Safari and Chromium. A browser that ignored the mask would still show an unbroken rectangular frame, not a broken tile.
 
 ### `FacetVisualTile` behaviour
 
 - The shape frames the media only; the tile has no card (cards belong to the section layout, VD-4).
-- **Never a broken image:** no source, or a load error, falls back to `fallbackIcon` and then to text, keeping the shape and size.
+- **Never a broken image:** no source, or a load error, falls back to `fallbackIcon` and then to the name's **initial**, keeping the shape, size and background (D-08). A grid row therefore stays aligned at every fallback stage. Only `content: "none"` (text by choice) draws no frame.
+- **Images that fail before hydration:** with SSR, React attaches `onError` only during hydration and does not replay an earlier error. On mount, the tile checks `complete && naturalWidth === 0` and falls back.
+- **Render boundary:** `background` is re-checked as `#rrggbb` before it reaches CSS. An unknown `size` falls back to `md`, as an unknown shape falls back to circle.
 - **Accessibility:**
   - The frame is `aria-hidden`; the image is decorative (`alt=""`) because the name is always present.
   - A hidden label stays in the DOM as `sr-only`.
   - When nothing visual is left to draw, the label is shown regardless of `showLabel`.
-- **Performance:** `loading="lazy"`, `decoding="async"`, explicit `width`/`height` plus `aspect-ratio` (no layout shift), and `srcSet`/`sizes` passthrough.
+- **Performance:** `loading="lazy"`, `decoding="async"`, explicit `width`/`height` plus `aspect-ratio` (no layout shift), and `srcSet` passthrough. The default `sizes` is multiplied by the zoom, so a zoomed image picks a sharp enough variant.
 - **Not a link:** the section renderer wraps it, so filtering keeps the existing `facet[key]=slug` URLs.
-- **Defensive:** an icon key outside the registry draws nothing (no empty frame, no markup).
+- **Defensive:** an icon key outside the registry draws no glyph and never markup; the tile falls back to the initial.
 - **Tokens only, no raw hex:** the frame uses `--store-muted → --store-surface-muted → transparent`, and the icon uses `--store-primary → currentColor`. The admin drift ratchet (`drift-ratchet.test.ts`) caught the first draft's hex fallbacks, and they were removed from both twins.
 
 ### `IconPicker` behaviour
 
 - A grid of 44px buttons (`size-11`) with `aria-pressed` and the localized name as `aria-label` and `title`.
-- Search matches the key, the Arabic and English labels and the tags. All words must match, and Arabic diacritics and case are ignored («تَخرّج» finds «تخرّج»).
+- **Search:**
+  - It matches the key, the Arabic and English labels and the tags, and all words must match.
+  - It ignores case, diacritics and tatweel, and folds أ/إ/آ/ٱ → ا, ى → ي and ة → ه. So «اطفال» finds «أطفال», «موسيقي» finds «موسيقى», and «تخرج» finds «تخرّج».
+- **Keyboard:** the grid is a single Tab stop (roving tabindex).
+  - The arrow keys move focus, mirrored in RTL. Up and Down move by a row, using the layout's column count.
+  - Home and End jump to either end, and a move past an end stays put.
+  - Enter or Space selects.
+- The empty-search message lives in a `role="status"` live region.
 - An optional "no icon" choice (`allowNone`), a `disabled` read-only state (for VD-3's permission handling, D-04), and an empty-results message.
 - Icons are drawn bare; the selection uses the semantic `primary` / `primary-soft` tokens (DESIGN_SYSTEM.md).
 
@@ -70,9 +80,9 @@ The D-08 render fallback is image → icon → text, but an image can fail **at 
 - `web/src/modules/store-experience-builder/FacetVisualTile.tsx` (twin; body identical from `export function`, test-enforced)
 - `web/src/modules/store-experience-builder/IconPicker.tsx`
 - Tests:
-  - `storefront/src/lib/presentation/__tests__/facet-visual-style.test.ts` (8)
-  - `storefront/src/components/ui/__tests__/facet-visual-tile.test.tsx` (7)
-  - `web/src/modules/store-experience-builder/__tests__/icon-picker.test.tsx` (9)
+  - `storefront/src/lib/presentation/__tests__/facet-visual-style.test.ts` (12)
+  - `storefront/src/components/ui/__tests__/facet-visual-tile.test.tsx` (11)
+  - `web/src/modules/store-experience-builder/__tests__/icon-picker.test.tsx` (13)
   - `web/src/modules/store-experience-builder/__tests__/facet-visual-tile.test.tsx` (2: twin mirror + preview behaviour)
 - `docs/plans/store/visual-dimensions/AWJ-VD-2-IMPLEMENTATION-REPORT.md`
 
@@ -90,14 +100,14 @@ The D-08 render fallback is image → icon → text, but an image can fail **at 
 |---|---|---|
 | PHP focused | `php artisan test --filter=CommerceFacetVisualContractTest` | **12 passed** |
 | PHP full | `php artisan test --parallel` (SQLite; `setup.sh` now at CI parity since `cf58c96`) | **OK — 6908 tests, 51884 assertions, 0 failures, 95 skipped** |
-| Storefront full | `pnpm test` | **199 files passed / 15 skipped; 2540 tests passed / 15 skipped** |
+| Storefront full | `pnpm test` | **199 files passed / 15 skipped; 2548 tests passed / 15 skipped** (after the review fixes) |
 | Storefront static | `pnpm check` (Biome) · `pnpm check:locales` · `npx tsc --noEmit` | Biome 0 errors (2 warnings + 2 infos, pre-existing in files this PR does not touch) · locales in sync · tsc exit 0 |
-| Web full | `npm run test` (merged head) | **607 files / 6643 tests passed** (includes the semantic-token drift ratchet) |
+| Web full | `npm run test` (merged head, after the review fixes) | **607 files / 6647 tests passed** (includes the semantic-token drift ratchet) |
 | Web build | `npm run build` (merged head) | **Compiled successfully; 189/189 static pages** |
 
 **Notes:**
 - `web`: `npx tsc --noEmit` reports errors only in pre-existing test files (none touched by this PR). Web CI runs `npm test` + `npm run build`. `npm run lint` is not configured in this repo (it opens an interactive ESLint setup).
-- The branch merged `origin/main` at `f1bcc67` (web and docs only). PHP and storefront results were taken before that merge, and the merge touches neither.
+- The branch merged `origin/main` at `f1bcc67` (web and docs only). The full PHP run predates that merge and the review fixes; neither touches PHP.
 - PostgreSQL was not run locally. CI runs it; this slice has no SQL.
 
 ## Visual verification
@@ -106,8 +116,12 @@ A throwaway SSR harness (not committed) rendered every shape as an image tile an
 
 - All 12 shapes render correctly as image and icon tiles, at every size, with no stretching and no horizontal overflow (`scrollWidth ≤ clientWidth` at both widths).
 - Long Arabic labels clamp to two lines. The hidden-label hexagon keeps its name as `sr-only`. An unreadable merchant colour falls back to the theme primary. Vase sm/md/lg render with focal point and zoom.
-- **Known screenshot limit:** the "broken image" tile shows an empty arch frame in the static capture because the harness does not hydrate, so `onError` never runs. The fallback to the icon is verified by unit tests in both apps (`fireEvent.error` → icon drawn, shape and size kept).
-- The `IconPicker` is verified by unit tests (roles, names, `aria-pressed`, 44px, search, read-only). Its light/dark visual check happens in VD-3, where it is mounted in the real editor shell; it uses only semantic tokens.
+- **The first capture showed a real defect, not a harness artifact:** the "broken image" tile rendered as an empty arch frame because an image that fails before hydration never fires `onError`. The independent review confirmed production would behave the same way. It is fixed with the mount-time check, and unit tests cover both "failed before hydration" and "loaded before hydration".
+- **Second capture, after the review fixes** (RTL and LTR, 1280 and 390, no overflow):
+  - The initial fallback appears in 8 shapes, keeping shape, size and background.
+  - Navy icon on a navy background resolves to white; no merchant colour on yellow resolves to dark.
+  - The star icon now stays inside the shape.
+- The `IconPicker` is verified by unit tests (roles, names, `aria-pressed`, 44px, search folding, roving tabindex, RTL arrows, live region, read-only). Its light/dark visual check happens in VD-3, where it is mounted in the real editor shell; it uses only semantic tokens.
 
 ## Self-review
 
@@ -123,12 +137,30 @@ A throwaway SSR harness (not committed) rendered every shape as an image tile an
   - geometry key order;
   - leaked React renders in web tests (`afterEach(cleanup)`);
   - an unknown icon key drawing an empty frame (now `normalizeIconKey`).
-- **Residual, by design:** `readableIconColor` checks contrast only against an **explicit** merchant background. With no background, the frame uses the theme token, whose value is only known at render time. VD-4b's browser checks (VD-5) cover theme surfaces.
+- **Residual, by design:** with **no** merchant background, the frame uses the theme's muted surface and the icon uses the theme primary (or a valid merchant colour). That pair is only known at render time, so VD-5's browser checks cover theme surfaces.
+
+### Independent code review (substitute for Codex, which is out of review quota on this PR)
+
+A separate review of the PR's own commits found nothing blocking. It raised 4 non-blocking findings and 4 nits; **all are addressed in this PR**:
+
+| # | Finding | Decision |
+|---|---|---|
+| 1 | An image that fails before hydration never fires React's `onError`, leaving an empty shaped frame in production | **Fixed:** mount-time check `complete && naturalWidth === 0`, plus tests. |
+| 2 | The text fallback dropped the frame, so shape and size were lost, contradicting D-08 | **Fixed:** the frame stays, with the name's initial (decorative) and the visible label. |
+| 3 | An unreadable colour on a merchant background was replaced by the unchecked theme primary, which can be equally unreadable (e.g. navy on navy) | **Fixed:** dark or white, whichever has the higher contrast. Property-tested ≥ 3:1. |
+| 4a | 53 Tab stops in the picker | **Fixed:** roving tabindex with arrow keys, mirrored in RTL. |
+| 4b | No live region for the search outcome | **Fixed:** `role="status"`. |
+| 4c | Search did not fold hamza, alef maqsura or taa marbuta | **Fixed**, with tests on real registry labels and tags. |
+| 5 | `background` reached CSS without a render-boundary hex check | **Fixed:** `isFacetHexColor`. |
+| 6 | An unknown `size` produced `undefinedpx` | **Fixed:** falls back to `md`. |
+| 7 | The default `sizes` ignored zoom | **Fixed:** multiplied by the zoom. |
+| 8 | The report called the empty-frame capture a harness artifact | **Fixed:** the wording now records it as the real defect it was. |
+| — | The star clipped the icon's corners (cosmetic) | **Fixed:** 34% icon box for the star. |
 
 ### AWJ Guardian
 
 - No accounting, tax, inventory, order, tenant, branch, RBAC or persistence change.
-- No merchant string reaches CSS or SVG: shape keys index code constants, colours are validated `#rrggbb` (VD-1a), and icon keys go through the registry.
+- No merchant string reaches CSS or SVG: shape keys index code constants, colours are validated `#rrggbb` by the normaliser (VD-1a) **and again at the render boundary**, and icon keys go through the registry.
 
 ## Accounting impact
 
@@ -160,7 +192,7 @@ No endpoints. The picker's `disabled` state is the hook for VD-3's "no `commerce
 
 - Branch: `feat/vd-2-facet-shape-engine`
 - Base: `8801af9` (VD-1a), with `origin/main` merged at `f1bcc67`
-- Head SHA / PR: recorded on the PR
+- PR: #1482. Head SHA: recorded on the PR.
 
 ## Recommended next dependency-ready task
 
@@ -169,4 +201,4 @@ The remaining dependency-ready slices all need the owner's **separate** approval
 - **VD-1b** (migration + admin API) and **VD-4a** (optional `discovery` fields in the public `store/v1/storefront` document).
 - VD-3 needs VD-1b + VD-2, and VD-4b needs VD-1c + VD-2 + VD-4a.
 
-With VD-2 in review, **the horizon is paused at the DB/API approval gate.**
+After VD-2 merges, **the horizon pauses at the DB/API approval gate**: no other slice is authorized under the amended D-14.
