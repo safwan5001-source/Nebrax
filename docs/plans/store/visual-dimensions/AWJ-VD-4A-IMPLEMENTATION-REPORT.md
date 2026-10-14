@@ -94,11 +94,11 @@ The existing discovery panel (`DataSectionFields.tsx`) **rebuilt** the content f
 | Suite | Result |
 |---|---|
 | PHP focused (`DiscoveryDisplayContractTest`, `StorefrontPresentationDataSectionsTest`, `StorefrontCommerceFirewall*`) | **15 passed (3942 assertions)** |
-| PHP full (`php artisan test --parallel`, SQLite) | PHP_RESULT |
-| Storefront full (`pnpm test`) | SF_RESULT |
-| Storefront static (Biome · locales · `tsc`) | SF_STATIC |
-| Web full (`npm run test`) | WEB_RESULT |
-| Web build | WEB_BUILD |
+| PHP full (`php artisan test --parallel`, SQLite) | **OK — 6913 tests, 52059 assertions, 0 failures, 95 skipped** |
+| Storefront full (`pnpm test`) | **200 files passed / 15 skipped; 2562 tests passed / 15 skipped** |
+| Storefront static (Biome · locales · `tsc`) | Biome 0 errors (2 warnings + 2 infos, pre-existing, untouched files) · locales in sync · tsc exit 0 |
+| Web full (`npm run test`) | **613 files / 6794 tests passed** (includes the drift ratchet) |
+| Web build | **Compiled; 189/189 static pages** |
 
 **What the tests pin:**
 - **PHP:** exact key order with `assertSame` (no key sorting), idempotency, the legacy document byte-identical, the registry `===` its fixture, append-only ids, and every template valid as content.
