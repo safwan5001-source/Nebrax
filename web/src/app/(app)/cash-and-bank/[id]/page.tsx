@@ -14,6 +14,8 @@ import { api, ApiError } from '@/lib/api';
 import { type CashBankAccount, type CashBankTransfer } from '@/lib/cash-bank';
 import { formatRiyal } from '@/lib/money';
 import { useConfirm } from '@/components/ui/confirm-dialog';
+import { useAccessLookups, useAccessSummary, useSystemRoleNames } from '@/components/treasury/access-rules';
+import { describeAccess } from '@/modules/treasury/access';
 
 type Section = 'details' | 'permissions' | 'transfers' | 'activity';
 
@@ -30,6 +32,9 @@ export default function CashBankDetailPage() {
   const [acting, setActing] = useState(false);
   const [section, setSection] = useState<Section>('details');
   const [collapsed, setCollapsed] = useState(false);
+  const accessLookups = useAccessLookups(true);
+  const accessSummary = useAccessSummary();
+  const systemRoleNames = useSystemRoleNames();
 
   const load = useCallback(() => {
     if (!params.id) return;
@@ -71,7 +76,8 @@ export default function CashBankDetailPage() {
   const details = <div className="grid grid-cols-1 gap-x-8 gap-y-4 p-4 sm:grid-cols-2 lg:p-0">
     {[[t('name'), item.name], [t('type'), t(item.type)], [t('ledger_account'), [item.account_code, item.account_name].filter(Boolean).join(' — ') || '—'], [t('currency'), item.currency], ...(item.type === 'bank' ? [[t('bank_name'), item.bank_name || '—'], [t('account_number'), item.account_number || '—']] : []), [t('description'), item.description || '—']].map(([label, value]) => <div key={String(label)} className="space-y-1"><dt className="text-sm font-medium text-muted">{label}</dt><dd className="text-sm text-text">{value}</dd></div>)}
   </div>;
-  const permissions = <div className="grid gap-4 p-4 sm:grid-cols-2 lg:p-0">{(['deposit', 'withdraw'] as const).map((action) => <div key={action} className="rounded-md border border-border p-3"><p className="text-sm font-medium text-text">{t(action)}</p><p className="mt-1 text-sm text-muted">{t(item[`${action}_scope`])}{item[`${action}_scope_subject`] ? ` — ${item[`${action}_scope_subject`]}` : ''}</p></div>)}</div>;
+  // القاعدة بجملةٍ مفهومة وبالأسماء (لا slug ولا UUID خاماً)؛ ما لا يمكن حلّ اسمه يُقال عنه «محدَّد» دون كشف معرّفه.
+  const permissions = <div className="grid gap-4 p-4 sm:grid-cols-2 lg:p-0">{(['deposit', 'withdraw'] as const).map((action) => <div key={action} className="rounded-md border border-border p-3"><p className="text-sm font-medium text-text">{t(`who_${action}`)}</p><p className="mt-1 text-sm text-muted">{accessSummary(describeAccess(item[`${action}_scope`], item[`${action}_scope_subject`], accessLookups, systemRoleNames), action)}</p></div>)}</div>;
   const transferContent = <div className="p-4 lg:p-0">{transfers.length === 0 ? <p className="py-5 text-center text-sm text-muted">{t('empty')}</p> : <div className="divide-y divide-border rounded-md border border-border">{transfers.map((transfer) => <div key={transfer.id} className="flex flex-wrap items-center justify-between gap-3 px-3 py-3"><div><p className="text-sm font-medium text-text">{transfer.number}</p><p className="text-xs text-muted">{transfer.source_name} ← {transfer.destination_name}</p></div><span className="num text-sm font-medium">{formatRiyal(transfer.amount)}</span></div>)}</div>}</div>;
   const summary = <div className="space-y-3 p-4 lg:p-0"><div className="flex justify-between gap-3"><span className="text-sm text-muted">{t('balance')}</span><span className="num text-lg font-bold text-text">{formatRiyal(item.balance)}</span></div><div className="flex flex-wrap gap-2"><Badge tone={item.is_active ? 'positive' : 'muted'}>{t(item.is_active ? 'active' : 'inactive')}</Badge>{item.is_main && <Badge tone="warning">{t('main')}</Badge>}</div></div>;
 
