@@ -41,6 +41,7 @@ const { api, translate } = vi.hoisted(() => {
       review: 'Review',
       approve: 'Approve',
       build_draft: 'Build draft',
+      submit: 'Submit',
     },
   };
   const translator = Object.assign(
@@ -88,10 +89,10 @@ const catalog = [
   'future.module.frobnicate',
 ];
 
-function renderDialog(role: Role | null = null) {
+function renderDialog(role: Role | null = null, permissionCatalog: string[] = catalog) {
   const onClose = vi.fn();
   const onSaved = vi.fn();
-  render(<RoleDialog open onClose={onClose} onSaved={onSaved} role={role} catalog={catalog} />);
+  render(<RoleDialog open onClose={onClose} onSaved={onSaved} role={role} catalog={permissionCatalog} />);
   return { onClose, onSaved };
 }
 
@@ -230,5 +231,53 @@ describe('RoleDialog — canonical permission integrity (ACL-ROLE-UI-1)', () => 
     const sent = lastSubmittedPermissions();
     expect(sent).not.toContain('products.view');
     expect(sent).toHaveLength(2);
+  });
+});
+
+// كتالوج مقتصر على مجموعة ZATCA (من Rbac::PERMISSIONS) لئلا تتصادم أزرار «View» مع بقية الاختبارات.
+const zatcaCatalog = ['zatca.view', 'zatca.submit'];
+
+describe('RoleDialog — zatca.submit is a separate, explicit grant (REM-37)', () => {
+  beforeEach(() => {
+    api.mockReset();
+    api.mockResolvedValue({ data: { id: 'role-new' } });
+  });
+  afterEach(cleanup);
+
+  it('renders zatca.submit as its own toggle next to zatca.view, and never selects it implicitly', async () => {
+    renderDialog(null, zatcaCatalog);
+    const view = screen.getByRole('button', { name: 'View' });
+    const submit = screen.getByRole('button', { name: 'Submit' });
+    expect(view).not.toBe(submit);
+
+    await userEvent.click(view);
+    // اختيار القراءة لا يمنح الإرسال.
+    expect(submit.getAttribute('aria-pressed')).toBe('false');
+
+    await fillNameAndSave();
+    await waitFor(() => expect(api).toHaveBeenCalled());
+    expect(lastSubmittedPermissions()).toEqual(['zatca.view']);
+  });
+
+  it('submits the canonical key zatca.submit only when it is explicitly toggled on', async () => {
+    renderDialog(null, zatcaCatalog);
+    await userEvent.click(screen.getByRole('button', { name: 'Submit' }));
+
+    await fillNameAndSave();
+    await waitFor(() => expect(api).toHaveBeenCalled());
+    expect(lastSubmittedPermissions()).toEqual(['zatca.submit']);
+  });
+
+  it('editing a role that does not hold zatca.submit leaves it off; one that holds it shows it on', () => {
+    const base: Role = {
+      id: 'role-1', slug: 'cashier', name: 'Cashier', permissions: ['zatca.view'],
+      is_system: false, is_owner: false, users_count: 1,
+    };
+    renderDialog(base, zatcaCatalog);
+    expect(screen.getByRole('button', { name: 'Submit' }).getAttribute('aria-pressed')).toBe('false');
+    cleanup();
+
+    renderDialog({ ...base, permissions: ['zatca.view', 'zatca.submit'] }, zatcaCatalog);
+    expect(screen.getByRole('button', { name: 'Submit' }).getAttribute('aria-pressed')).toBe('true');
   });
 });

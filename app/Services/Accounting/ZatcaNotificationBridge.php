@@ -109,9 +109,13 @@ class ZatcaNotificationBridge
     }
 
     /**
-     * مستلمون محافظون: من يملك `invoices.manage` فعلياً (نفس صلاحية إنشاء/إعادة
-     * إرسال محاولة ZATCA على هذه الفاتورة بالذات)، مع احترام رؤية فرع المحاولة
-     * (عمود مباشر على `zatca_submission_attempts`) — بلا فرع = مرئية للجميع.
+     * مستلمون محافظون: من يملك `zatca.submit` فعلاً — نفس الصلاحية التي تفرضها
+     * مسارا إنشاء محاولة ZATCA وإرسالها (`POST …/zatca/submissions` و`…/dispatch`
+     * منذ REM-37) — فيصل التنبيه إلى من يستطيع اتخاذ الإجراء، ولا يصل إلى من فقد
+     * ذلك المسار (`invoices.manage` وحدها، أو `zatca.view` وحدها). يحتفظ بالمعيارين
+     * القائمين: مستخدم نشط من المستأجر نفسه، ورؤية فرع المحاولة (عمود مباشر على
+     * `zatca_submission_attempts`) — بلا فرع = مرئية للجميع. الصلاحية تُحلّ من
+     * صفّ دور المستخدم في المستأجر نفسه (`Rbac::allows` تحت سياق `$tenantId`).
      *
      * @return Collection<int, User>
      */
@@ -121,7 +125,7 @@ class ZatcaNotificationBridge
             ->where('tenant_id', $tenantId)
             ->where('is_active', true)
             ->get()
-            ->filter(fn (User $user): bool => $user->hasPermission('invoices.manage')
+            ->filter(fn (User $user): bool => $user->hasPermission('zatca.submit')
                 && ($attempt->branch_id === null || $user->canAccessBranch($attempt->branch_id)))
             ->values();
     }
