@@ -26,6 +26,24 @@ export interface RoleSummary {
   name: string;
   is_owner: boolean;
   is_system: boolean;
+  /** `["*"]` = وصول كامل. يُستعمل لعرض ما يقبله الخادم فقط (سقف المنح) — لا لإصدار قرار. */
+  permissions?: string[];
+}
+
+/**
+ * مرآة `Rbac::covers` (سقف المنح AC-UX-00A): صلاحيات `holder` تغطّي كل `wanted`؟
+ * حاملُ `*` يغطّي كل شيء؛ وغيره لا يغطّي `*` ولا مفتاحاً خارج ما يملكه. **عرضٌ لا أمان** —
+ * الخادم هو الذي يرفض (403)؛ هذه الدالة تمنع فقط عرض خياراتٍ يُعرف سلفاً أنها سترفض.
+ */
+export function coversPermissions(holder: string[], wanted: string[]): boolean {
+  if (holder.includes('*')) return true;
+  return !wanted.includes('*') && wanted.every((permission) => holder.includes(permission));
+}
+
+/** صلاحيات المشاهد الفعلية؛ غياب القائمة (تخزين قديم) يسقط إلى owner/admin = `*` كما في `hasPermission`. */
+export function effectivePermissions(permissions: string[] | undefined, role: string | null | undefined): string[] {
+  if (permissions !== undefined) return permissions;
+  return role === 'owner' || role === 'admin' ? ['*'] : [];
 }
 
 export interface ScopeOption {
@@ -115,7 +133,7 @@ export function sortUsers(users: UserRecord[], sort: string, locale: string): Us
   return [...users].sort((a, b) => direction * a.name.localeCompare(b.name, locale, { sensitivity: 'base' }));
 }
 
-export type DisabledReason = 'owner_protected' | 'self_delete' | 'self_deactivate' | 'no_email';
+export type DisabledReason = 'owner_protected' | 'role_above_you' | 'scope_wider' | 'self_delete' | 'self_deactivate' | 'no_email';
 
 export interface Capability {
   allowed: boolean;
@@ -130,29 +148,71 @@ export interface RowCapabilities {
   remove: Capability;
 }
 
+export interface RowActor {
+  id: string | null;
+  role: string | null;
+  canManage: boolean;
+  /** صلاحيات المشاهد الفعلية (`["*"]` للمالك/المدير). غيابها = لا تقييم بالدور. */
+  permissions?: string[];
+  /** نطاق المشاهد المخزَّن (من صفّه في القائمة): فراغ = غير مقيَّد. غيابه = لا تقييم بالنطاق. */
+  scope?: { branches: string[]; warehouses: string[] };
+}
+
 /**
  * قدرات الصف بحسب المشاهد. `canManage=false` ⇒ لا أيٌّ منها (الشاشة تُخفي الضوابط).
- * الأسباب تعكس حراسات الخادم القائمة (`guardOwnerRole`، منع حذف النفس) وسياسة تجنّب
- * القفل الذاتي — **عرضٌ لا أمان**؛ الخادم يرفض بذاته.
+ * الأسباب تعكس حراسات الخادم القائمة — `guardOwnerRole`، سقف المنح على الهدف
+ * (`guardGrantBoundary`: دوره فوق سقف المشاهد، أو نطاقه أوسع من نطاق مشاهدٍ مقيَّد)،
+ * منع حذف النفس — وسياسة تجنّب القفل الذاتي. **عرضٌ لا أمان**: حين تنقص المعطيات
+ * (لا `roles.view` مثلاً) لا نعطّل بالتخمين؛ الخادم يرفض برسالةٍ مقروءة.
  */
 export function rowCapabilities(
-  actor: { id: string | null; role: string | null; canManage: boolean },
+  actor: RowActor,
   target: UserRecord,
+  roles: RoleSummary[] | null = null,
 ): RowCapabilities {
   const none: Capability = { allowed: false };
   if (!actor.canManage) return { edit: none, scope: none, invite: none, toggle: none, remove: none };
+
+  const isSelf = actor.id !== null && actor.id === target.id;
 
   if (target.role === 'owner' && actor.role !== 'owner') {
     const blocked: Capability = { allowed: false, reason: 'owner_protected' };
     return { edit: blocked, scope: blocked, invite: blocked, toggle: blocked, remove: blocked };
   }
 
-  const isSelf = actor.id !== null && actor.id === target.id;
   const hasEmail = target.email.trim() !== '';
+  const invite: Capability = hasEmail ? { allowed: true } : { allowed: false, reason: 'no_email' };
+
+  // سقف الهدف (غير الذات): الخادم يرفض تعديل/حذف من دوره فوق سقف الفاعل أو نطاقه أوسع.
+  let ceiling: DisabledReason | undefined;
+  if (!isSelf) {
+    const targetRole = roles?.find((role) => role.slug === target.role);
+    if (actor.permissions && targetRole?.permissions && !coversPermissions(actor.permissions, targetRole.permissions)) {
+      ceiling = 'role_above_you';
+    } else if (actor.scope) {
+      const dims: [string[], string[] | undefined][] = [
+        [actor.scope.branches, target.branch_ids],
+        [actor.scope.warehouses, target.warehouse_ids],
+      ];
+      for (const [mine, theirs] of dims) {
+        const restricted = mine.length > 0;
+        const targetIds = theirs ?? [];
+        if (restricted && (targetIds.length === 0 || targetIds.some((id) => !mine.includes(id)))) {
+          ceiling = 'scope_wider';
+          break;
+        }
+      }
+    }
+  }
+  if (ceiling) {
+    const blocked: Capability = { allowed: false, reason: ceiling };
+    return { edit: blocked, scope: blocked, invite, toggle: blocked, remove: blocked };
+  }
+
   return {
     edit: { allowed: true },
     scope: { allowed: true },
-    invite: hasEmail ? { allowed: true } : { allowed: false, reason: 'no_email' },
+    invite,
     toggle: isSelf ? { allowed: false, reason: 'self_deactivate' } : { allowed: true },
     remove: isSelf ? { allowed: false, reason: 'self_delete' } : { allowed: true },
   };

@@ -121,4 +121,24 @@ describe('UserDialog — independently gated inputs (D-J)', () => {
     open(existing);
     expect(((await screen.findByLabelText('Status')) as HTMLSelectElement).disabled).toBe(false);
   });
+
+  it('offers only roles the actor can grant (server ceiling), keeping the edited account\'s current role', async () => {
+    auth.current = { id: 'me', role: 'role-mgr', permissions: ['users.manage', 'roles.view', 'invoices.view'] };
+    api.mockImplementation((path: string) => {
+      if (path === '/roles') return Promise.resolve({ data: [
+        { id: 'r0', slug: 'owner', name: 'Owner', is_owner: true, permissions: ['*'] },
+        { id: 'r1', slug: 'admin', name: 'Admin', is_owner: false, permissions: ['*'] },
+        { id: 'r2', slug: 'staff', name: 'Staff', is_owner: false, permissions: ['invoices.view'] },
+        { id: 'r3', slug: 'wide', name: 'Wide custom', is_owner: false, permissions: ['invoices.view', 'payments.manage'] },
+        { id: 'r4', slug: 'role-ab12cd34', name: 'Branch manager', is_owner: false, permissions: ['invoices.view', 'users.manage'] },
+      ] });
+      return Promise.resolve({ data: [] });
+    });
+    open(null);
+
+    const select = (await screen.findByLabelText('Role')) as HTMLSelectElement;
+    await waitFor(() => expect(select.options.length).toBeGreaterThan(0));
+    // admin (`*`) والدور الأوسع والمالك لا تظهر؛ staff والدور الأضيق يظهران
+    expect(Array.from(select.options).map((o) => o.value).sort()).toEqual(['role-ab12cd34', 'staff']);
+  });
 });

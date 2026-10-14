@@ -6741,7 +6741,9 @@
     "no_results_hint": "Adjust the search or remove the active filters.",
     "no_access_title": "You don't have permission to view users",
     "no_access_description": "The \"view users\" permission is required. Contact your organization's owner or admin.",
-    "read_only_note": "View only — adding and editing users requires the \"manage users\" permission."
+    "read_only_note": "View only — adding and editing users requires the \"manage users\" permission.",
+    "reason_role_above_you": "This user's role exceeds your permissions.",
+    "reason_scope_wider": "This user's access scope is wider than yours."
   },
   "voucherDoc": {
     "received_from": "Received from",

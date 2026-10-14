@@ -214,6 +214,33 @@ describe('Users workspace (AC-UX-01)', () => {
     expect(edit.title).toBe('Owner accounts can only be changed by an owner.');
   });
 
+  it('a custom manager gets no controls on an admin row (the server would answer 403) but keeps them on a lower user', async () => {
+    auth.current = { id: 'mgr', role: 'role-mgr', permissions: ['users.view', 'users.manage', 'roles.view', 'invoices.view'] };
+    api.mockImplementation((path: string) => {
+      if (path === '/users') return Promise.resolve({ data: [
+        user({ id: 'mgr', name: 'Manager', role: 'role-mgr' }),
+        user({ id: 'a1', name: 'Big Admin', role: 'admin' }),
+        user({ id: 's1', name: 'Plain Staff', role: 'staff' }),
+      ] });
+      if (path === '/roles') return Promise.resolve({ data: [
+        { id: 'r1', slug: 'admin', name: 'Admin', is_owner: false, is_system: true, permissions: ['*'] },
+        { id: 'r2', slug: 'staff', name: 'Staff', is_owner: false, is_system: true, permissions: ['invoices.view'] },
+        { id: 'r3', slug: 'role-mgr', name: 'Manager', is_owner: false, is_system: false, permissions: ['users.view', 'users.manage', 'roles.view', 'invoices.view'] },
+      ] });
+      return Promise.resolve({ data: [] });
+    });
+    renderPage();
+    await screen.findAllByText('Big Admin');
+
+    const adminRow = screen.getAllByRole('row').find((r) => within(r).queryByText('Big Admin'))!;
+    const edit = within(adminRow).getByRole('button', { name: 'Edit' }) as HTMLButtonElement;
+    expect(edit.disabled).toBe(true);
+    expect(edit.title).toBe("This user's role exceeds your permissions.");
+
+    const staffRow = screen.getAllByRole('row').find((r) => within(r).queryByText('Plain Staff'))!;
+    expect((within(staffRow).getByRole('button', { name: 'Edit' }) as HTMLButtonElement).disabled).toBe(false);
+  });
+
   it('does not allow deleting or deactivating your own account', async () => {
     world([OWNER, user()]);
     renderPage();

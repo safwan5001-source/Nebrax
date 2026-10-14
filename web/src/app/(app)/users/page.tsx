@@ -23,6 +23,7 @@ import { parseExplorerState, removeFilter, replaceFilter, serializeExplorerState
 import { displayLocale } from '@/lib/formatting';
 import { hasPermission } from '@/lib/permissions';
 import {
+  effectivePermissions,
   filterUsers,
   resolveRoleLabel,
   rowCapabilities,
@@ -324,10 +325,26 @@ export default function UsersPage() {
     setDialogOpen(true);
   };
 
+  // نطاق المشاهد المخزَّن يُقرأ من صفّه في القائمة (لا نقطة نهاية للنطاق الفعلي): فراغ = غير مقيَّد.
+  const actorScope = useMemo(() => {
+    const own = users.find((candidate) => candidate.id === actor?.id);
+    return own ? { branches: own.branch_ids ?? [], warehouses: own.warehouse_ids ?? [] } : undefined;
+  }, [users, actor]);
+
   const capsFor = useCallback(
     (user: UserRecord): RowCapabilities =>
-      rowCapabilities({ id: actor?.id ?? null, role: actor?.role ?? null, canManage }, user),
-    [actor, canManage],
+      rowCapabilities(
+        {
+          id: actor?.id ?? null,
+          role: actor?.role ?? null,
+          canManage,
+          permissions: actor ? effectivePermissions(actor.permissions, actor.role) : undefined,
+          scope: actorScope,
+        },
+        user,
+        roles,
+      ),
+    [actor, actorScope, canManage, roles],
   );
 
   // دالة عرض لا مكوّن: مكوّنٌ معرَّف داخل الصفحة يُعاد تركيبه كل عرض فيفقد القائمة المنسدلة حالتها وتركيزها.
@@ -456,7 +473,7 @@ export default function UsersPage() {
       { id: 'actions', header: '', enableSorting: false, cell: ({ row }) => rowActions(row.original) },
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [t, actor, roles, branches, warehouses, canManage, canOpenEmployee, busyId, roleText, scopeText],
+    [t, actor, roles, branches, warehouses, canManage, canOpenEmployee, busyId, roleText, scopeText, capsFor],
   );
 
   const sortOptions: SortOption[] = [

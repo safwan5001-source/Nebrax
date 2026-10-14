@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  coversPermissions,
+  effectivePermissions,
   filterUsers,
   resolveRoleLabel,
   rowCapabilities,
@@ -106,5 +108,56 @@ describe('rowCapabilities', () => {
 
   it('cannot invite a user without an email', () => {
     expect(rowCapabilities(manager, user({ email: ' ' })).invite).toEqual({ allowed: false, reason: 'no_email' });
+  });
+});
+
+describe('grant-boundary mirror (AC-UX-00A, display only)', () => {
+  it('coversPermissions mirrors Rbac::covers', () => {
+    expect(coversPermissions(['*'], ['*'])).toBe(true);
+    expect(coversPermissions(['*'], ['a.view', 'b.manage'])).toBe(true);
+    expect(coversPermissions(['a.view', 'b.manage'], ['a.view'])).toBe(true);
+    expect(coversPermissions(['a.view'], ['a.view', 'b.manage'])).toBe(false);
+    expect(coversPermissions(['a.view', 'b.manage'], ['*'])).toBe(false);
+  });
+
+  it('effectivePermissions falls back to owner/admin wildcard only when the list is absent', () => {
+    expect(effectivePermissions(undefined, 'admin')).toEqual(['*']);
+    expect(effectivePermissions(undefined, 'staff')).toEqual([]);
+    expect(effectivePermissions([], 'admin')).toEqual([]);
+  });
+
+  const roles: RoleSummary[] = [
+    { id: '1', slug: 'admin', name: 'Admin', is_owner: false, is_system: true, permissions: ['*'] },
+    { id: '2', slug: 'staff', name: 'Staff', is_owner: false, is_system: true, permissions: ['a.view'] },
+    { id: '3', slug: 'wide', name: 'Wide', is_owner: false, is_system: false, permissions: ['a.view', 'b.manage', 'c.manage'] },
+  ];
+  const manager = { id: 'me', role: 'role-mgr', canManage: true, permissions: ['a.view', 'b.manage', 'users.manage'] };
+
+  it('disables edit/scope/toggle/remove for a target whose role exceeds the actor — but never self', () => {
+    const admin = rowCapabilities(manager, user({ id: 'x', role: 'admin' }), roles);
+    for (const key of ['edit', 'scope', 'toggle', 'remove'] as const) {
+      expect(admin[key]).toEqual({ allowed: false, reason: 'role_above_you' });
+    }
+    expect(rowCapabilities(manager, user({ id: 'x', role: 'wide' }), roles).edit.reason).toBe('role_above_you');
+    expect(rowCapabilities(manager, user({ id: 'x', role: 'staff' }), roles).edit.allowed).toBe(true);
+    expect(rowCapabilities(manager, user({ id: 'me', role: 'admin' }), roles).edit.allowed).toBe(true);
+  });
+
+  it('does not guess when role data is unavailable (the server decides, with a readable 403)', () => {
+    expect(rowCapabilities(manager, user({ id: 'x', role: 'admin' }), null).edit.allowed).toBe(true);
+  });
+
+  it('a scope-restricted actor cannot act on empty, other-branch or wider-scoped targets', () => {
+    const restricted = { ...manager, permissions: ['*'], scope: { branches: ['b1'], warehouses: [] } };
+    expect(rowCapabilities(restricted, user({ id: 'x', branch_ids: [] })).edit.reason).toBe('scope_wider');
+    expect(rowCapabilities(restricted, user({ id: 'x', branch_ids: ['b2'] })).edit.reason).toBe('scope_wider');
+    expect(rowCapabilities(restricted, user({ id: 'x', branch_ids: ['b1', 'b2'] })).edit.reason).toBe('scope_wider');
+    expect(rowCapabilities(restricted, user({ id: 'x', branch_ids: ['b1'] })).edit.allowed).toBe(true);
+    // البُعد غير المقيَّد عند الفاعل لا يُفرض
+    expect(rowCapabilities(restricted, user({ id: 'x', branch_ids: ['b1'], warehouse_ids: [] })).edit.allowed).toBe(true);
+  });
+
+  it('keeps invitations available on ceiling-blocked targets (the invitation endpoint has no ceiling)', () => {
+    expect(rowCapabilities(manager, user({ id: 'x', role: 'admin' }), roles).invite.allowed).toBe(true);
   });
 });

@@ -12,6 +12,7 @@ import { useToast } from '@/components/ui/toast';
 import { api, ApiError } from '@/lib/api';
 import { currentUser } from '@/lib/auth';
 import { hasPermission } from '@/lib/permissions';
+import { coversPermissions, effectivePermissions } from '@/modules/users/model';
 import { AccessScopeFields, useScopeAvailability, type AccessScope } from './access-scope-fields';
 
 interface EmployeeOption {
@@ -25,6 +26,7 @@ interface RoleOption {
   slug: string;
   name: string;
   is_owner: boolean;
+  permissions?: string[];
 }
 
 export interface EditableUser {
@@ -94,7 +96,16 @@ export function UserDialog({
     // إلا حين يكون هو دور الحساب المعدَّل نفسه، فيبقى خياراً وحيداً مطابقاً لقيمته.
     if (canListRoles) {
       api<{ data: RoleOption[] }>('/roles')
-        .then((r) => setRoles(r.data.filter((role) => !role.is_owner || role.slug === user?.role)))
+        .then((r) => {
+          // الخيارات = ما يقبله الخادم فعلاً (سقف المنح AC-UX-00A): المالك محجوز، ودورٌ صلاحياته
+          // خارج صلاحيات المشاهد يُرفض بـ403 فلا يُعرض. دور الحساب الحالي يبقى دائماً (تغييرٌ بلا أثر).
+          const mine = effectivePermissions(me?.permissions, me?.role);
+          setRoles(
+            r.data.filter(
+              (role) => role.slug === user?.role || (!role.is_owner && coversPermissions(mine, role.permissions ?? [])),
+            ),
+          );
+        })
         .catch(() => {});
     }
   }, [open, canListEmployees, canListRoles, user?.role]);
