@@ -135,7 +135,7 @@ class PreviewExchangePostgresConcurrencyTest extends TestCase
         } catch (QueryException $e) {
             $this->assertStringContainsString('lock timeout', strtolower($e->getMessage()));
         } finally {
-            DB::statement("SET lock_timeout = '0'");
+            DB::statement('RESET lock_timeout');
         }
     }
 
