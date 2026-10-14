@@ -5,8 +5,7 @@ import { useTranslations } from 'next-intl';
 import { TriangleAlert } from 'lucide-react';
 import { Select } from '@/components/ui/select';
 import { api } from '@/lib/api';
-import { currentUser } from '@/lib/auth';
-import { hasPermission } from '@/lib/permissions';
+import { useCan } from '@/lib/use-can';
 import { cn } from '@/lib/utils';
 import {
   changeScope,
@@ -37,21 +36,22 @@ export function useSystemRoleNames(): Record<string, string> {
  * جديد لذلك النطاق (والقيمة المحفوظة تبقى كما هي). `null` = غير متاحة.
  */
 export function useAccessLookups(enabled: boolean): AccessLookups {
-  const me = currentUser();
-  const can = (permission: string) => hasPermission(me?.permissions, me?.role, permission);
+  const { can } = useCan();
+  const canRoles = can('roles.view');
+  const canUsers = can('users.view');
+  const canBranches = can('branches.view');
   const [lookups, setLookups] = useState<AccessLookups>({ roles: null, users: null, branches: null });
 
   useEffect(() => {
     if (!enabled) return;
-    if (can('roles.view')) api<{ data: RoleSummary[] }>('/roles').then((r) => setLookups((l) => ({ ...l, roles: r.data }))).catch(() => {});
-    if (can('users.view')) {
+    if (canRoles) api<{ data: RoleSummary[] }>('/roles').then((r) => setLookups((l) => ({ ...l, roles: r.data }))).catch(() => {});
+    if (canUsers) {
       api<{ data: { id: string; name: string; email?: string }[] }>('/users')
         .then((r) => setLookups((l) => ({ ...l, users: r.data })))
         .catch(() => {});
     }
-    if (can('branches.view')) api<{ data: { id: string; name: string }[] }>('/branches').then((r) => setLookups((l) => ({ ...l, branches: r.data }))).catch(() => {});
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- تُحمَّل عند التفعيل فقط
-  }, [enabled]);
+    if (canBranches) api<{ data: { id: string; name: string }[] }>('/branches').then((r) => setLookups((l) => ({ ...l, branches: r.data }))).catch(() => {});
+  }, [enabled, canRoles, canUsers, canBranches]);
 
   return lookups;
 }
@@ -94,7 +94,7 @@ export function AccessRuleField({
   const summarise = useAccessSummary();
   const systemRoleNames = useSystemRoleNames();
   const groupId = useId();
-  const me = currentUser();
+  const { viewer: me } = useCan();
 
   const description = describeAccess(value.scope, value.subject, lookups, systemRoleNames);
   const options = subjectOptions(value.scope, lookups, systemRoleNames);

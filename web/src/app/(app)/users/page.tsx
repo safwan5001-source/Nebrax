@@ -17,10 +17,9 @@ import { useToast } from '@/components/ui/toast';
 import { useScopeText } from '@/components/users/scope-language';
 import { UserEditorSheet } from '@/components/users/user-editor-sheet';
 import { api, ApiError } from '@/lib/api';
-import { currentUser } from '@/lib/auth';
 import type { ActiveFilter, DataExplorerState, FilterDefinition } from '@/lib/data-explorer/types';
 import { parseExplorerState, removeFilter, replaceFilter, serializeExplorerState } from '@/lib/data-explorer/url-state';
-import { hasPermission } from '@/lib/permissions';
+import { useCan } from '@/lib/use-can';
 import {
   effectivePermissions,
   filterUsers,
@@ -37,13 +36,6 @@ import {
   type UserScopeFilter,
   type UserStatusFilter,
 } from '@/modules/users/model';
-
-/** مشاهد الصفحة: يُقرأ بعد التركيب (localStorage غائب أثناء العرض على الخادم). */
-interface Actor {
-  id: string | null;
-  role: string | null;
-  permissions: string[] | undefined;
-}
 
 const SYSTEM_ROLE_SLUGS = ['owner', 'admin', 'accountant', 'staff', 'self_service'] as const;
 
@@ -68,16 +60,7 @@ export default function UsersPage() {
   const askConfirm = useConfirm();
   const { success, error: toastError } = useToast();
 
-  const [actor, setActor] = useState<Actor | null | undefined>(undefined);
-  useEffect(() => {
-    const me = currentUser();
-    setActor(me ? { id: me.id ?? null, role: me.role ?? null, permissions: me.permissions } : null);
-  }, []);
-
-  const can = useCallback(
-    (permission: string) => Boolean(actor) && hasPermission(actor!.permissions, actor!.role ?? undefined, permission),
-    [actor],
-  );
+  const { viewer: actor, can, hydrated } = useCan();
   const canView = can('users.view');
   const canManage = can('users.manage');
   // كل قائمة مرجعية خلف صلاحيتها المستقلة (D-J): لا طلب يُعرف سلفاً أنه سيُرفض.
@@ -114,9 +97,9 @@ export default function UsersPage() {
   }, [tc]);
 
   useEffect(() => {
-    if (actor === undefined || !canView) return;
+    if (!hydrated || !canView) return;
     load();
-  }, [actor, canView, load]);
+  }, [hydrated, canView, load]);
 
   // المراجع اختيارية: فشلها يُسقط الواجهة إلى العدّ/الترجمة، لا يُعطّل القائمة.
   useEffect(() => {
@@ -471,7 +454,7 @@ export default function UsersPage() {
     ? [{ key: 'create', label: t('add'), icon: Plus, onClick: () => openEdit(null), variant: 'primary' }]
     : [];
 
-  if (actor === undefined) return null;
+  if (!hydrated) return null;
 
   if (!canView) {
     return (

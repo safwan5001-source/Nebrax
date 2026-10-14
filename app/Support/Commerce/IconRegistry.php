@@ -13,5 +13,10 @@ final class IconRegistry
         'truck', 'shield-check', 'credit-card', 'gift', 'clock', 'phone', 'message-circle', 'mail',
         'map-pin', 'store', 'star', 'heart', 'tag', 'percent', 'package', 'refresh-ccw',
         'headphones', 'leaf', 'sparkles', 'badge-check', 'calendar', 'users', 'lock', 'globe',
+        // AWJ-VD-H1 / VD-1a (D-10): أيقونات المناسبات والمُهدى إليهم والأنشطة للأبعاد الوصفية — إلحاقٌ فقط.
+        'cake', 'graduation-cap', 'baby', 'flower', 'gem', 'party-popper', 'user', 'user-round',
+        'briefcase', 'house', 'hand-heart', 'heart-handshake', 'moon', 'sun', 'coffee', 'crown',
+        'trophy', 'smile', 'paw-print', 'shirt', 'watch', 'book-open', 'music', 'palette',
+        'school', 'stethoscope', 'utensils', 'snowflake',
     ];
 }
