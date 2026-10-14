@@ -325,3 +325,23 @@ describe('UserEditorSheet — dirty state and failure handling', () => {
     expect(save().disabled).toBe(false); // يمكن المحاولة ثانيةً بعد التصحيح
   });
 });
+
+describe('actor scope arriving after the editor opened (create)', () => {
+  it('reseeds the untouched scope from the now-known restriction', async () => {
+    auth.current = { id: 'me', role: 'role-mgr', permissions: ['users.manage', 'roles.view', 'branches.view'] };
+    const tree = (actor?: ActorScope) => (
+      <NextIntlClientProvider locale="en" messages={messages as never}>
+        <RoleEditorHarness actor={actor} />
+      </NextIntlClientProvider>
+    );
+    const view = render(tree(undefined));
+    expect(((await screen.findByRole('radio', { name: /All branches/ })) as HTMLInputElement).disabled).toBe(false);
+    view.rerender(tree({ branches: ['b1'], warehouses: [] }));
+    await waitFor(() => expect((screen.getByRole('radio', { name: /All branches/ }) as HTMLInputElement).disabled).toBe(true));
+    expect((screen.getByRole('radio', { name: /Selected branches only/ }) as HTMLInputElement).checked).toBe(true);
+  });
+});
+
+function RoleEditorHarness({ actor }: { actor?: ActorScope }) {
+  return <UserEditorSheet open onClose={() => {}} onSaved={() => {}} user={null} actorScope={actor} />;
+}

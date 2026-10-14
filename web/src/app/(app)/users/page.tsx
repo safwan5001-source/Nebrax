@@ -14,12 +14,12 @@ import { Button } from '@/components/ui/button';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 import { Dropdown, DropdownItem } from '@/components/ui/dropdown';
 import { useToast } from '@/components/ui/toast';
+import { useScopeText } from '@/components/users/scope-language';
 import { UserEditorSheet } from '@/components/users/user-editor-sheet';
 import { api, ApiError } from '@/lib/api';
 import { currentUser } from '@/lib/auth';
 import type { ActiveFilter, DataExplorerState, FilterDefinition } from '@/lib/data-explorer/types';
 import { parseExplorerState, removeFilter, replaceFilter, serializeExplorerState } from '@/lib/data-explorer/url-state';
-import { displayLocale } from '@/lib/formatting';
 import { hasPermission } from '@/lib/permissions';
 import {
   effectivePermissions,
@@ -32,7 +32,6 @@ import {
   type RoleSummary,
   type RowCapabilities,
   type ScopeOption,
-  type ScopeSummary,
   type UserListQuery,
   type UserRecord,
   type UserScopeFilter,
@@ -159,17 +158,7 @@ export default function UsersPage() {
     [roles, systemRoleNames, t],
   );
 
-  const num = useCallback((value: number) => value.toLocaleString(displayLocale(locale)), [locale]);
-  const scopeText = useCallback(
-    (summary: ScopeSummary, kind: 'branches' | 'warehouses') => {
-      if (summary.kind === 'all') return t(kind === 'branches' ? 'scope_all_branches' : 'scope_all_warehouses');
-      if (summary.kind === 'names') {
-        return summary.more === 0 ? summary.first : t('scope_first_plus', { name: summary.first, count: num(summary.more) });
-      }
-      return t(kind === 'branches' ? 'scope_n_branches' : 'scope_n_warehouses', { n: summary.count, count: num(summary.count) });
-    },
-    [num, t],
-  );
+  const scopeText = useScopeText();
 
   const definitions = useMemo<FilterDefinition[]>(() => {
     const list: FilterDefinition[] = [

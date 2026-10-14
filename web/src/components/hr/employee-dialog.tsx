@@ -13,7 +13,8 @@ import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/components/ui/toast';
 import { api, ApiError, fetchImageUrl } from '@/lib/api';
 import { useNumberPreview } from '@/lib/use-number-preview';
-import { AccessScopeFields, type AccessScope } from '@/components/users/access-scope-fields';
+import { AccessScopeEditor, useScopeCaps, useScopeLookups } from '@/components/users/access-scope-editor';
+import { adoptActorScope, blankScopeFor, scopeDraftFromStored, scopeIssues, scopePayload, type ScopeForm } from '@/modules/users/editor';
 import { SYSTEM_ROLE_KEYS } from '@/components/users/user-editor-sheet';
 import type { Shift } from './shift-dialog';
 
@@ -140,6 +141,8 @@ export function EmployeeDialog({
   linkedUser,
   initialAllowAccess = false,
   canManageUsers = false,
+  actorScope,
+  canReadActorScope = true,
 }: {
   open: boolean;
   onClose: () => void;
@@ -151,6 +154,20 @@ export function EmployeeDialog({
   initialAllowAccess?: boolean;
   /** إظهار قسم الدخول أصلاً — يقتصر على مالك/مدير يديران المستخدمين والأدوار. */
   canManageUsers?: boolean;
+  /**
+   * نطاق المشاهد المخزَّن (من صفّه في قائمة المستخدمين): فراغٌ في بُعدٍ = غير مقيَّد.
+   * الموظف يُحفظ قبل طلب المستخدم، فلا نمنح الدخول إلا حين يكون النطاق **معروفاً فعلاً** (وإلا لَرُفض الطلب الثاني وبقي موظفٌ بلا دخول):
+   * - `undefined` = ما زال يُحمَّل ⇒ يُمنع مؤقتاً؛
+   * - `null` = انتهى البحث ولم يُعرف النطاق (فشل الطلب أو لا صفّ) ⇒ يُمنع منح الدخول بسببٍ صريح (حفظ الموظف وحده يبقى ممكناً)؛
+   * - كائنٌ = معروف.
+   */
+  actorScope?: { branches: string[]; warehouses: string[] } | null;
+  /**
+   * هل يستطيع المشاهد قراءة قائمة المستخدمين (`users.view`) أصلاً؟ بدونها لا مصدر لنطاقه (`GET /users` خلف `users.view` بينما
+   * إنشاء المستخدم خلف `users.manage` فقط)، فلا نحجب عنه سير العمل كلّه: يُترك الحسم للخادم ورسالته تُعرض كما هي.
+   * الافتراضي `true` (فيُشترط معرفة النطاق).
+   */
+  canReadActorScope?: boolean;
 }) {
   const t = useTranslations('hr');
   const tu = useTranslations('users');
@@ -173,7 +190,15 @@ export function EmployeeDialog({
 
   const [allowAccess, setAllowAccess] = useState(initialAllowAccess);
   const [loginForm, setLoginForm] = useState({ email: '', password: '', role: 'staff', sendInvitation: false });
-  const [scope, setScope] = useState<AccessScope>({ branch_ids: [], warehouse_ids: [] });
+  // فاعلٌ مقيَّد ببُعدٍ لا يملك «الكل» فيه (سقف المنح AC-UX-00A): يبدأ الإنشاء على «محدَّد» فارغاً ليختار صراحةً،
+  // وإلا حُذف المفتاح فرفضه الخادم بعد أن يكون الموظف قد حُفظ.
+  const actorRestricted = { branches: (actorScope?.branches.length ?? 0) > 0, warehouses: (actorScope?.warehouses.length ?? 0) > 0 };
+  const blankScope: ScopeForm = blankScopeFor(actorRestricted);
+  const [scope, setScope] = useState<ScopeForm>(blankScope);
+  // اللقطة الابتدائية لنطاق المستخدم المرتبط: التعديل يُرسِل البُعد المتغيّر وحده (لغة النطاق الموحَّدة مع شاشة المستخدمين).
+  const [initialScope, setInitialScope] = useState<ScopeForm>(blankScope);
+  const scopeCaps = useScopeCaps();
+  const scopeLookups = useScopeLookups(open && canManageUsers && allowAccess, scopeCaps);
   const [roles, setRoles] = useState<RoleOption[]>([]);
 
   const set = (k: keyof Employee, v: string | boolean) => setForm((f) => ({ ...f, [k]: v }));
@@ -209,10 +234,23 @@ export function EmployeeDialog({
     setForm(employee ?? EMPTY_EMPLOYEE);
     setAllowAccess(!!linkedUser || initialAllowAccess);
     setLoginForm({ email: linkedUser?.email ?? '', password: '', role: linkedUser?.role ?? 'staff', sendInvitation: false });
-    setScope({ branch_ids: linkedUser?.branch_ids ?? [], warehouse_ids: linkedUser?.warehouse_ids ?? [] });
+    const stored: ScopeForm = linkedUser
+      ? { branches: scopeDraftFromStored(linkedUser.branch_ids), warehouses: scopeDraftFromStored(linkedUser.warehouse_ids) }
+      : blankScope;
+    setInitialScope(stored);
+    setScope(stored);
     setError(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, employee?.id, linkedUser?.id]);
+
+  // نطاق الفاعل يصل غير متزامنٍ بعد فتح النموذج: البُعد غير الملموس في إنشاءٍ جديد يُعاد بذره بحسب القيد المعروف الآن.
+  useEffect(() => {
+    if (!open || linkedUser) return;
+    const next = adoptActorScope(initialScope, scope, actorRestricted);
+    setInitialScope(next.initial);
+    setScope(next.current);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- يتفاعل مع وصول القيد فقط
+  }, [actorRestricted.branches, actorRestricted.warehouses]);
 
   // معاينة الصورة الحالية — رابط كائنٍ محلّي يُفكّ عند تبديل الموظف أو إغلاق الحوار.
   useEffect(() => {
@@ -271,8 +309,18 @@ export function EmployeeDialog({
 
   const managerOptions = colleagues.filter((c) => c.id !== employee?.id);
 
+  // «محدَّد» بلا اختيار يُمنع قبل أي طلب (كان سيعني «الكل» صامتاً)؛ لا نحفظ الموظف ثم يفشل الدخول.
+  const accessActive = canManageUsers && allowAccess;
+  const scopeIssuesNow = accessActive
+    ? scopeIssues(initialScope, scope, scopeCaps, actorRestricted, Boolean(linkedUser))
+    : { branches: null, warehouses: null };
+  const scopeLoading = accessActive && canReadActorScope && actorScope === undefined;
+  const scopeUnavailable = accessActive && canReadActorScope && actorScope === null;
+  const scopeBlocked = Boolean(scopeIssuesNow.branches || scopeIssuesNow.warehouses) || scopeLoading || scopeUnavailable;
+
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    if (scopeBlocked) return;
     setSaving(true);
     setError(null);
     const addressBody = Object.fromEntries(
@@ -318,7 +366,7 @@ export function EmployeeDialog({
         try {
           if (allowAccess) {
             if (linkedUser) {
-              const userBody: Record<string, unknown> = { name: form.name, role: loginForm.role, ...scope };
+              const userBody: Record<string, unknown> = { name: form.name, role: loginForm.role, ...scopePayload(initialScope, scope, scopeCaps, true) };
               if (loginForm.password) userBody.password = loginForm.password;
               await api(`/users/${linkedUser.id}`, { method: 'PUT', body: userBody });
             } else {
@@ -331,7 +379,7 @@ export function EmployeeDialog({
                   send_invitation: loginForm.sendInvitation,
                   role: loginForm.role,
                   employee_id: savedEmployeeId,
-                  ...scope,
+                  ...scopePayload(initialScope, scope, scopeCaps, false),
                 },
               });
             }
@@ -456,7 +504,17 @@ export function EmployeeDialog({
                     ))}
                   </Select>
                 </div>
-                <AccessScopeFields value={scope} onChange={setScope} />
+                {scopeLoading ? <p role="status" className="text-xs text-muted">{tu('actor_scope_loading')}</p> : null}
+                {scopeUnavailable ? <p role="alert" className="text-xs text-negative">{tu('actor_scope_unavailable')}</p> : null}
+                <AccessScopeEditor
+                  value={scope}
+                  onChange={setScope}
+                  caps={scopeCaps}
+                  restricted={actorRestricted}
+                  issues={scopeIssuesNow}
+                  branchOptions={scopeLookups.branches}
+                  warehouseOptions={scopeLookups.warehouses}
+                />
               </div>
             )}
           </fieldset>
@@ -580,7 +638,7 @@ export function EmployeeDialog({
           <Button type="button" variant="outline" onClick={onClose}>
             {t('cancel')}
           </Button>
-          <Button type="submit" disabled={saving}>
+          <Button type="submit" disabled={saving || scopeBlocked}>
             {t('save')}
           </Button>
         </div>

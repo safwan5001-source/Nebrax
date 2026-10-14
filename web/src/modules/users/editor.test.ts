@@ -1,16 +1,21 @@
 import { describe, expect, it } from 'vitest';
 import {
   accessSummary,
+  adoptActorScope,
+  blankScopeFor,
   createPayload,
   diffPayload,
   hiddenIds,
   isDirty,
   scopeDraftFromStored,
   scopeIssue,
+  scopeIssues,
+  scopePayload,
   scopeToPayload,
   toggleId,
   type EditorCapabilities,
   type EditorForm,
+  type ScopeForm,
 } from './editor';
 
 const form = (over: Partial<EditorForm> = {}): EditorForm => ({
@@ -101,5 +106,77 @@ describe('dirty state and summary', () => {
   it('summarises source assignments only', () => {
     expect(accessSummary(form())).toEqual({ branches: { kind: 'all' }, warehouses: { kind: 'all' } });
     expect(accessSummary(form({ branches: { mode: 'selected', ids: ['a', 'b', 'c'] } })).branches).toEqual({ kind: 'selected', count: 3 });
+  });
+});
+
+describe('shared scope payload (users editor + employee dialog)', () => {
+  const scope = (b: ScopeForm['branches'], w: ScopeForm['warehouses']): ScopeForm => ({ branches: b, warehouses: w });
+  const ALLS = scope({ mode: 'all', ids: [] }, { mode: 'all', ids: [] });
+  const caps = { branches: true, warehouses: true };
+
+  it('edit: only the changed dimension, "All" as [] (unrestricted)', () => {
+    const initial = scope({ mode: 'selected', ids: ['b1'] }, { mode: 'all', ids: [] });
+    expect(scopePayload(initial, initial, caps, true)).toEqual({});
+    expect(scopePayload(initial, scope({ mode: 'all', ids: ['b1'] }, initial.warehouses), caps, true)).toEqual({ branch_ids: [] });
+    expect(scopePayload(initial, scope(initial.branches, { mode: 'selected', ids: ['w1'] }), caps, true)).toEqual({ warehouse_ids: ['w1'] });
+  });
+
+  it('create: "All" omits the key, "Selected" sends ids', () => {
+    expect(scopePayload(ALLS, ALLS, caps, false)).toEqual({});
+    expect(scopePayload(ALLS, scope({ mode: 'selected', ids: ['b2'] }, ALLS.warehouses), caps, false)).toEqual({ branch_ids: ['b2'] });
+  });
+
+  it('never emits a dimension the viewer cannot read', () => {
+    const next = scope({ mode: 'selected', ids: ['b2'] }, { mode: 'selected', ids: ['w1'] });
+    expect(scopePayload(ALLS, next, { branches: false, warehouses: true }, true)).toEqual({ warehouse_ids: ['w1'] });
+    expect(scopePayload(ALLS, next, { branches: false, warehouses: false }, false)).toEqual({});
+  });
+});
+
+describe('scopeIssues', () => {
+  const caps = { branches: true, warehouses: true };
+  const none = { branches: false, warehouses: false };
+  const blank: ScopeForm = { branches: { mode: 'all', ids: [] }, warehouses: { mode: 'all', ids: [] } };
+
+  it('flags an empty "Selected" even when it equals the stored "All" payload, on edit and create', () => {
+    const empty: ScopeForm = { ...blank, branches: { mode: 'selected', ids: [] } };
+    expect(scopeIssues(blank, empty, caps, none, true)).toEqual({ branches: 'selected_empty', warehouses: null });
+    expect(scopeIssues(blank, empty, caps, none, false)).toEqual({ branches: 'selected_empty', warehouses: null });
+  });
+
+  it('ignores untouched dimensions on edit but checks them on create for restricted actors', () => {
+    expect(scopeIssues(blank, blank, caps, { branches: true, warehouses: false }, true)).toEqual({ branches: null, warehouses: null });
+    expect(scopeIssues(blank, blank, caps, { branches: true, warehouses: false }, false)).toEqual({ branches: 'all_not_allowed', warehouses: null });
+  });
+
+  it('skips dimensions the viewer cannot edit', () => {
+    const empty: ScopeForm = { ...blank, branches: { mode: 'selected', ids: [] } };
+    expect(scopeIssues(blank, empty, { branches: false, warehouses: true }, none, true).branches).toBeNull();
+  });
+});
+
+describe('adoptActorScope (the actor scope arrives after the form opens)', () => {
+  const none = { branches: false, warehouses: false };
+  const limitedBranches = { branches: true, warehouses: false };
+
+  it('reseeds untouched dimensions from the now-known restriction', () => {
+    const blank = blankScopeFor(none);
+    const next = adoptActorScope(blank, blank, limitedBranches);
+    expect(next.current.branches).toEqual({ mode: 'selected', ids: [] });
+    expect(next.initial.branches).toEqual({ mode: 'selected', ids: [] });
+    expect(next.current.warehouses).toEqual({ mode: 'all', ids: [] });
+  });
+
+  it('keeps a dimension the user already changed', () => {
+    const blank = blankScopeFor(none);
+    const touched = { ...blank, branches: { mode: 'selected' as const, ids: ['b2'] } };
+    const next = adoptActorScope(blank, touched, limitedBranches);
+    expect(next.current.branches).toEqual({ mode: 'selected', ids: ['b2'] });
+    expect(next.initial.branches).toEqual({ mode: 'all', ids: [] });
+  });
+
+  it('is a no-op when nothing is restricted', () => {
+    const blank = blankScopeFor(none);
+    expect(adoptActorScope(blank, blank, none)).toEqual({ initial: blank, current: blank });
   });
 });

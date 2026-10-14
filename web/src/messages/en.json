@@ -6746,9 +6746,7 @@
     },
     "scope_title": "Access scope",
     "scope_branches": "Allowed branches",
-    "scope_branches_hint": "Leave empty to give access to all branches. When set, the user works in and sees only their branches — reports included.",
     "scope_warehouses": "Allowed warehouses",
-    "scope_warehouses_hint": "Leave empty to give access to all warehouses. When set, dealing with any other is refused and they are hidden from lists.",
     "scope_loading": "Loading…",
     "scope_none": "No items available.",
     "link_employee": "Link to employee",
@@ -6819,8 +6817,8 @@
     "mode_all_warehouses_hint": "Works with every warehouse, including warehouses added later.",
     "mode_selected_warehouses": "Selected warehouses only",
     "mode_selected_warehouses_hint": "Other warehouses are refused and hidden from lists.",
-    "scope_all_not_allowed_branches": "Your own access is limited to specific branches, so you can only assign branches from within it.",
-    "scope_all_not_allowed_warehouses": "Your own access is limited to specific warehouses, so you can only assign warehouses from within it.",
+    "scope_all_not_allowed_branches": "Your own access is limited to specific branches: this list shows only those, and you can only assign branches from within it.",
+    "scope_all_not_allowed_warehouses": "Your own access is limited to specific warehouses: this list shows only those, and you can only assign warehouses from within it.",
     "scope_search_branches": "Search branches",
     "scope_search_warehouses": "Search warehouses",
     "scope_select_all": "Select all",
@@ -6836,7 +6834,9 @@
     "keep_editing": "Keep editing",
     "discard": "Discard",
     "no_changes": "No changes yet",
-    "saving": "Saving…"
+    "saving": "Saving…",
+    "actor_scope_loading": "Checking your own access scope before login access can be granted…",
+    "actor_scope_unavailable": "We couldn't verify your own access scope, so login access can't be granted from here. Reload the page and try again."
   },
   "voucherDoc": {
     "received_from": "Received from",

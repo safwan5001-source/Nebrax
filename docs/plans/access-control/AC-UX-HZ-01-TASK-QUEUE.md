@@ -12,8 +12,8 @@ Legend: ☐ not started · ◐ in progress / in review · ☑ merged (with Merge
 | 02 | User editor Sheet (identity · status · role · branch/warehouse scope as explicit All/Selected · pre-save access summary · dirty-state guard · diff-only payload; owner-user select fix) | 01 | ☑ | #1466 | `cc30b53` | `8c9f411` |
 | 03A | Roles workspace shell + catalogue (route `/roles`, **`roles.manage` gating of create/edit/delete from the first slice**, master/detail, grouped read-only catalogue, i18n coverage for all 36 modules / 40 actions, `/hr?tab=roles` redirect) | 00, **00A** | ☑ | #1467 | `8c9f411` | `cd72408` |
 | 03B | Role editing (**editors only for `roles.manage`; view-only viewers see the read-only catalogue**; selection model, group select/deselect, search, counts, risk map + drift test, dirty state, unsaved guard, system/owner messaging, "applies to N users") | 03A, **00A** | ☑ | #1468 | `cd72408` | `db93a70` |
-| 04 | Role create + safe client-side clone (+ tests: source unchanged, only `name`+`permissions` sent) | 03B, **00A** | ◐ | | `db93a70` | |
-| 05 | Shared scope editor + summary language (All/Selected, counts, search, warehouse↔branch context, limited-view notice) adopted in Users | 02 | ☐ | | | |
+| 04 | Role create + safe client-side clone (+ tests: source unchanged, only `name`+`permissions` sent) | 03B, **00A** | ☑ | #1469 | `db93a70` | `f147fb6` |
+| 05 | Shared scope editor + summary language (All/Selected, counts, search, warehouse↔branch context, limited-view notice) adopted in Users | 02 | ◐ | | `f147fb6` | |
 | 06 | Treasury deposit/withdraw access legibility on existing account form | 00 | ☐ | | | |
 | 07 | Consolidate the capability helper (`useCan`-style over `lib/permissions.ts`, replacing the per-screen `hasPermission` calls from 01/03), extend to the rest of the ERP: hidden/read-only/disabled/allowed states on nav, create/edit/delete, posting, exports, reports, approvals, treasury, ZATCA, settings; `/me` refresh on shell mount/focus | 01, 03B | ☐ | | | |
 | 08 | Per-user access summary (source assignments only) | 02, 05 | ☐ | | | |

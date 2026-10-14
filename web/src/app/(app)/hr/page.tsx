@@ -21,6 +21,7 @@ import { RequestsManager } from '@/components/hr/requests-manager';
 import { useToast } from '@/components/ui/toast';
 import { api, ApiError } from '@/lib/api';
 import { currentUser } from '@/lib/auth';
+import { hasPermission } from '@/lib/permissions';
 import { formatRiyal } from '@/lib/money';
 import { cn } from '@/lib/utils';
 import { useConfirm } from '@/components/ui/confirm-dialog';
@@ -81,22 +82,34 @@ export default function HrPage() {
   // يُقرآن بعد التركيب لتفادي اختلاف الترطيب (localStorage غائب أثناء العرض على الخادم).
   const [role, setRole] = useState<string | null>(null);
   const [meId, setMeId] = useState<string | null>(null);
+  const [canReadUsers, setCanReadUsers] = useState(false);
   useEffect(() => {
     const me = currentUser();
     setRole(me?.role ?? null);
     setMeId(me?.id ?? null);
+    setCanReadUsers(hasPermission(me?.permissions, me?.role, 'users.view'));
   }, []);
   const canManageRoles = role === 'owner' || role === 'admin';
 
 
   const [team, setTeam] = useState<TeamUser[]>([]);
+  const [teamLoaded, setTeamLoaded] = useState(false);
 
   const loadTeam = useCallback(() => {
     if (!canManageRoles) return;
-    api<{ data: TeamUser[] }>('/users').then((r) => setTeam(r.data)).catch(() => {});
+    api<{ data: TeamUser[] }>('/users').then((r) => setTeam(r.data)).catch(() => {}).finally(() => setTeamLoaded(true));
   }, [canManageRoles]);
 
   useEffect(() => { if (canManageRoles) loadTeam(); }, [canManageRoles, loadTeam]);
+
+  // نطاق المشاهد المخزَّن من صفّه في قائمة المستخدمين (لا نقطة نهاية للنطاق الفعلي): فراغ = غير مقيَّد.
+  // `undefined` = ما زالت القائمة تُحمَّل؛ `null` = انتهت ولم يوجد صفّه/فشلت (يحسم الخادم).
+  const actorScope = useMemo(() => {
+    if (!teamLoaded) return undefined;
+    const meId = currentUser()?.id;
+    const own = meId ? team.find((u) => u.id === meId) : undefined;
+    return own ? { branches: own.branch_ids ?? [], warehouses: own.warehouse_ids ?? [] } : null;
+  }, [team, teamLoaded]);
 
   const toLinkedUser = (u: TeamUser): LinkedUser => ({
     id: u.id, name: u.name, email: u.email, role: u.role, is_active: u.is_active,
@@ -337,6 +350,8 @@ export default function HrPage() {
         linkedUser={empLinkedUser}
         initialAllowAccess={empInitialAccess}
         canManageUsers={canManageRoles}
+        actorScope={actorScope}
+        canReadActorScope={canReadUsers}
       />
       <ShiftDialog open={shiftDialog} onClose={() => setShiftDialog(false)} onSaved={load} shift={editingShift} />
       <AttendanceDialog open={attDialog} onClose={() => setAttDialog(false)} onSaved={load} attendance={editingAtt} />
