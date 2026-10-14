@@ -2,6 +2,7 @@
 
 import { DeliveryPlatformDetail } from './delivery-platform-detail';
 import { useDeliveryIntegrationData } from './use-delivery-integration-data';
+import type { IngressProfileSupport } from './ingress-create-entry';
 import { useIngressManagement } from './use-ingress-management';
 import { useSignedIngress } from './use-signed-ingress';
 import { deliveryLadder } from '@/lib/integration-center';
@@ -16,7 +17,13 @@ export function DeliveryPlatformDetailScreen({ platformKey }: { platformKey: str
   const ingress = useSignedIngress(platformKey, data.access === 'allowed' && data.status === 'ready', data.attempt);
 
   // تدوير السر والتعطيل (INT-UX-5b): بعد أي نتيجة (أو نتيجة مجهولة) تُعاد قراءة قائمة النقاط.
-  const management = useIngressManagement(ingress.retry);
+  const profileId = data.profileIds?.get(platformKey) ?? null;
+  const management = useIngressManagement(ingress.retry, profileId);
+  const manualState = data.manual?.get(platformKey);
+  const ingressProfile: IngressProfileSupport = {
+    state: data.manualFailed || data.profileIds === null ? 'unreadable' : profileId !== null ? 'ready' : manualState === 'disabled' ? 'disabled' : 'missing',
+    canSetup: data.canManageProfiles,
+  };
 
   return (
     <DeliveryPlatformDetail
@@ -35,6 +42,7 @@ export function DeliveryPlatformDetailScreen({ platformKey }: { platformKey: str
       ingress={ingress.state}
       onIngressRetry={ingress.retry}
       management={management}
+      ingressProfile={ingressProfile}
       onRetry={data.retry}
     />
   );

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { currentUser } from '@/lib/auth';
+import { readBranchOptions, type BranchOption } from '@/lib/ingress-create';
 import { hasPermission } from '@/lib/permissions';
 import {
   BRANCHES_VIEW_PERMISSION,
@@ -79,4 +80,50 @@ export function useSignedIngress(platformKey: string, enabled: boolean, reloadKe
   }, [platformKey, enabled, attempt, reloadKey]);
 
   return { state, retry };
+}
+
+export type BranchOptionsState =
+  /** لا `branches.view` أو الحوار مغلق: لا قراءة، ولا حقل فرع. */
+  | { status: 'idle' }
+  | { status: 'loading' }
+  | { status: 'ready'; options: BranchOption[] }
+  /** تعذّرت القراءة: ليس «لا فروع». */
+  | { status: 'error' };
+
+/**
+ * خيارات الفرع لنموذج إنشاء نقطة الاستقبال (INT-UX-5c): قراءة `GET /branches` **عند فتح النموذج فقط** وبـ`branches.view` وحدها.
+ * الخادم يصفّي القائمة بنطاق المستخدم، لكنها للراحة لا للحكم: قبول الفرع أو رفضه عند الإنشاء من اختصاص الخادم. `reloadKey`
+ * يعيد القراءة (زرّ إعادة المحاولة في النموذج: قراءة لا كتابة).
+ */
+export function useBranchOptions(enabled: boolean, reloadKey = 0): BranchOptionsState {
+  const [state, setState] = useState<BranchOptionsState>({ status: 'idle' });
+
+  useEffect(() => {
+    if (!enabled) {
+      setState({ status: 'idle' });
+      return;
+    }
+    const user = currentUser();
+    if (!hasPermission(user?.permissions, user?.role, BRANCHES_VIEW_PERMISSION)) {
+      setState({ status: 'idle' });
+      return;
+    }
+    let cancelled = false;
+    setState({ status: 'loading' });
+    api<unknown>('/branches').then(
+      (payload) => {
+        if (cancelled) return;
+        const options = readBranchOptions(payload);
+        setState(options === null ? { status: 'error' } : { status: 'ready', options });
+      },
+      () => {
+        if (!cancelled) setState({ status: 'error' });
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [enabled, reloadKey]);
+
+  return state;
 }

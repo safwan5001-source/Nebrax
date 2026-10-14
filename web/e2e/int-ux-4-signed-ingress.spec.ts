@@ -133,7 +133,7 @@ const THEMES = ['light', 'dark'] as const;
 for (const [locale, dir] of LOCALES) {
   for (const theme of THEMES) {
     test.describe(`${locale}/${theme}`, () => {
-      test('ready: rows, one layout per viewport, no secret in the DOM, only rotate/disable actions, AA contrast', async ({ page }, info) => {
+      test('ready: rows, one layout per viewport, no secret in the DOM, only create/rotate/disable actions, AA contrast', async ({ page }, info) => {
         const requests = await open(page, { locale, theme });
         const panel = page.getByTestId('signed-ingress-panel');
         await expect(panel).toBeVisible();
@@ -152,9 +152,9 @@ for (const [locale, dir] of LOCALES) {
 
         const html = await page.content();
         for (const sentinel of SENTINELS) expect(html, sentinel).not.toContain(sentinel);
-        // INT-UX-5b: المالك يرى تدوير السر والتعطيل لنقطة مهيّأة فقط (لا إنشاء ولا غيره)؛ لا طلب كتابة قبل أي نقرة.
+        // INT-UX-5b: المالك يرى الإنشاء (ملف إسناد مفعّل) وتدوير السر والتعطيل لنقطة مهيّأة فقط (لا إعادة إسناد ولا غيره)؛ لا طلب كتابة قبل أي نقرة.
         const buttonIds = await panel.getByRole('button').evaluateAll((els) => els.map((el) => el.getAttribute('data-testid')));
-        expect([...new Set(buttonIds)].sort()).toEqual(['ingress-disable', 'ingress-rotate']);
+        expect([...new Set(buttonIds)].sort()).toEqual(['ingress-create-open', 'ingress-disable', 'ingress-rotate']);
         expect(requests.filter((r) => !r.startsWith('GET '))).toEqual([]);
         // مع branches.view تُقرأ أسماء الفروع بعد قراءة النقاط (طلب اللوحة، لا طلب الغلاف).
         expect(requests.slice(requests.indexOf('GET /delivery-connectors') + 1)).toContain('GET /branches');

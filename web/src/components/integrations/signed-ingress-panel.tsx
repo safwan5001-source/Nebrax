@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -8,7 +9,8 @@ import { Table, TBody, TD, TH, THead, TR } from '@/components/ui/table';
 import { formatDate } from '@/lib/formatting';
 import { branchLabel, type IngressPoint } from '@/lib/signed-ingress';
 import { IngressManagementLayer } from './ingress-management-layer';
-import { IngressRowActions, useCanManageIngress } from './ingress-row-actions';
+import { IngressCreateEntry, type IngressProfileSupport } from './ingress-create-entry';
+import { IngressRowActions, useCanCreateIngress, useCanManageIngress } from './ingress-row-actions';
 import type { IngressManagement } from './use-ingress-management';
 import type { SignedIngressState } from './use-signed-ingress';
 
@@ -28,15 +30,24 @@ export function SignedIngressPanel({
   state,
   onRetry,
   management,
+  profile,
 }: {
   platformName: string;
   state: SignedIngressState;
   onRetry: () => void;
+  /** ملف الإسناد اليدوي للمنصة (INT-UX-5c): بدونه لا مدخل إنشاء. */
+  profile?: IngressProfileSupport;
   /** إدارة التدوير والتعطيل (INT-UX-5b). غيابها = لوحة قراءة فقط كما كانت. */
   management?: IngressManagement;
 }) {
   const t = useTranslations('integrationCenter.ingressPanel');
   const canManage = useCanManageIngress() && management !== undefined;
+  const canCreate = useCanCreateIngress() && management !== undefined && profile !== undefined;
+  const observe = management?.observe;
+  // اللوحة تُبلّغ الإدارة بكل حالة قراءة: تحفظ المعروف، وتُسوّي إنشاءً مجهولاً بعد إعادة القراءة.
+  useEffect(() => {
+    observe?.(state);
+  }, [observe, state]);
 
   // لا صلاحية عرض (أو الصفحة لم تُتح): اللوحة غائبة لا معطّلة، بلا طلب.
   if (state.status === 'idle') return null;
@@ -47,6 +58,13 @@ export function SignedIngressPanel({
         <h2 id="signed-ingress-heading" className="text-sm font-semibold text-text">{t('title')}</h2>
         <p className="text-sm leading-relaxed text-muted">{t('intro', { platform: platformName })}</p>
       </header>
+
+      {/* الإشعار والحوارات أعلى القائمة: نتيجة العملية (خصوصاً «السرّ ضاع») يجب أن تُرى على الجوال دون تمرير. الحوارات ثابتة الموضع فلا يتأثر موضعها. */}
+      {management ? <IngressManagementLayer management={management} platformName={platformName} /> : null}
+
+      {canCreate && (state.status === 'ready') && management && profile ? (
+        <IngressCreateEntry profile={profile} management={management} platformName={platformName} />
+      ) : null}
 
       {state.status === 'loading' ? (
         <div role="status" aria-busy="true" aria-label={t('loading')} className="space-y-2" data-testid="signed-ingress-loading">
@@ -68,8 +86,6 @@ export function SignedIngressPanel({
       ) : (
         <IngressRows points={state.points} canViewBranches={state.canViewBranches} branchNames={state.branchNames} management={canManage ? management : undefined} />
       )}
-
-      {management ? <IngressManagementLayer management={management} /> : null}
 
       <div className="space-y-1 text-xs leading-relaxed text-muted" data-testid="signed-ingress-notes">
         <p>{t('statusNote')}</p>

@@ -943,7 +943,7 @@ Two tracks. **Track U** (UX/catalog) is safe to build now and never touches prov
 - **Tests.** Role/branch fixtures; resource-field assertion; wording test (forbidden words).
 - **Excludes.** Create/rotate/disable/reassign.
 
-#### INT-UX-5 — Ingress management actions *(DP-C option 3 approved 2026-10-14 for this slice only — see `DP-C`; delivered as 5a → 5b → 5c → 5d, each its own approval; 5a = neutral dialogs + foundations, no visible action — merged 2026-10-14; 5b = rotate + disable on the existing panel — implemented in a Draft PR, see `INT-UX-5B-IMPLEMENTATION-REPORT.md`)*
+#### INT-UX-5 — Ingress management actions *(DP-C option 3 approved 2026-10-14 for this slice only — see `DP-C`; delivered as 5a → 5b → 5c → 5d, each its own approval; 5a = neutral dialogs + foundations, no visible action — merged 2026-10-14; 5b = rotate + disable on the existing panel — merged 2026-10-14; 5c = create — implemented in a Draft PR, see `INT-UX-5C-IMPLEMENTATION-REPORT.md`)*
 - **Scope.** Create, rotate (with one-time reveal), disable (with irreversibility warning), reassign operator, using the **existing** endpoints; extract/neutralize `ConfirmDialog` and `SecretRevealDialog` for shared use.
 - **Depends on.** INT-UX-4, DP-C, **INT-AUDIT-1 (hard dependency: no rotate/disable/create/reassign UI ships before lifecycle audit exists)**.
 - **Acceptance.** Secret appears only in the reveal dialog and is cleared on close; disable dialog states irreversibility; reassign copy per §5.7.

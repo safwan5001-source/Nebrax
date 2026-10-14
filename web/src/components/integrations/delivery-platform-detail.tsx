@@ -9,6 +9,7 @@ import { deliveryPlatformLabel } from '@/lib/delivery-platform-registry';
 import type { DeliveryAccess, DeliveryLadder, ReadinessRow } from '@/lib/integration-center';
 import { CapabilityLadder } from './delivery-ladder';
 import { IntegrationBreadcrumb, RestrictedNotice } from './integration-shell';
+import type { IngressProfileSupport } from './ingress-create-entry';
 import { SignedIngressPanel } from './signed-ingress-panel';
 import type { IngressManagement } from './use-ingress-management';
 import type { SignedIngressState } from './use-signed-ingress';
@@ -38,6 +39,7 @@ export function DeliveryPlatformDetail({
   ingress = { status: 'idle' },
   onIngressRetry = () => {},
   management,
+  ingressProfile,
   onRetry,
 }: {
   platformKey: string;
@@ -57,6 +59,8 @@ export function DeliveryPlatformDetail({
   onIngressRetry?: () => void;
   /** تدوير السر والتعطيل (INT-UX-5b). غيابها = اللوحة للقراءة فقط. */
   management?: IngressManagement;
+  /** ملف الإسناد اليدوي للمنصة لمدخل الإنشاء (INT-UX-5c). */
+  ingressProfile?: IngressProfileSupport;
   onRetry: () => void;
 }) {
   const t = useTranslations('integrationCenter');
@@ -114,7 +118,7 @@ export function DeliveryPlatformDetail({
             <p className="text-sm leading-relaxed text-muted">{t('detail.ingressBody', { platform: name })}</p>
           </section>
 
-          <SignedIngressPanel platformName={name} state={ingress} onRetry={onIngressRetry} management={management} />
+          <SignedIngressPanel platformName={name} state={ingress} onRetry={onIngressRetry} management={management} profile={ingressProfile} />
 
           <section aria-labelledby="works-heading" className="space-y-2">
             <h2 id="works-heading" className="text-sm font-semibold text-text">{t('detail.worksTitle')}</h2>

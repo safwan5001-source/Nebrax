@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/shared/confirm-dialog';
 import { SecretRevealDialog } from '@/components/shared/secret-reveal-dialog';
 import { TypedConfirmationField } from '@/components/shared/typed-confirmation-field';
+import { IngressCreateDialog } from './ingress-create-dialog';
 import type { IngressManagement } from './use-ingress-management';
 
 /**
@@ -15,7 +16,7 @@ import type { IngressManagement } from './use-ingress-management';
  * النصوص كلها من قاموس `integrationCenter.ingressManagement`؛ لا نصّ خادم يُعرض أبداً. ولا يوجد هنا زرّ «إعادة محاولة»:
  * النتيجة المجهولة تُعاد قراءة القائمة بعدها ويقرّر المستخدم من الحالة الحقيقية.
  */
-export function IngressManagementLayer({ management }: { management: IngressManagement }) {
+export function IngressManagementLayer({ management, platformName }: { management: IngressManagement; platformName: string }) {
   const t = useTranslations('integrationCenter.ingressManagement');
   const { dialog, busy, reveal, notice } = management;
   // حقل التأكيد مربوط بالحوار المفتوح: حوار جديد (أو نقطة أخرى) يبدأ فارغاً في الرسم نفسه، ولا يبقى منه شيء بعد الإغلاق.
@@ -34,7 +35,7 @@ export function IngressManagementLayer({ management }: { management: IngressMana
     <>
       {notice ? (
         <div
-          role={notice.kind === 'error' ? 'alert' : 'status'}
+          role={notice.kind === 'error' || notice.kind === 'createLost' ? 'alert' : 'status'}
           className={`flex flex-wrap items-center justify-between gap-2 rounded border border-border px-3 py-2 text-sm ${notice.kind === 'error' ? 'text-negative' : 'text-text'}`}
           data-testid="ingress-management-notice"
           data-kind={notice.kind}
@@ -44,6 +45,16 @@ export function IngressManagementLayer({ management }: { management: IngressMana
           </span>
           <Button type="button" variant="ghost" size="sm" onClick={management.dismissNotice}>{t('notices.dismiss')}</Button>
         </div>
+      ) : null}
+
+      {management.createOpen ? (
+        <IngressCreateDialog
+          platformName={platformName}
+          busy={busy}
+          error={management.createError}
+          onCancel={management.cancelCreate}
+          onSubmit={management.confirmCreate}
+        />
       ) : null}
 
       <ConfirmDialog
@@ -92,7 +103,7 @@ export function IngressManagementLayer({ management }: { management: IngressMana
           onClose={management.closeReveal}
           title={t('secret.title')}
           secret={reveal.value}
-          description={t('secret.description', { storeId: reveal.storeId })}
+          description={t(reveal.kind === 'created' ? 'secret.descriptionCreated' : 'secret.description', { storeId: reveal.storeId })}
           requireConfirmToClose
           labels={{
             warning: t('secret.warning'),

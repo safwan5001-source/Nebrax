@@ -10342,12 +10342,50 @@
         "confirmHint": "Confirm that you saved the secret first; it cannot be recovered after closing.",
         "reveal": "Show secret",
         "hide": "Hide secret",
-        "copy": "Copy secret"
+        "copy": "Copy secret",
+        "descriptionCreated": "Ingress point ⁨{storeId}⁩: put this secret in the signing setup of the party that sends the events."
       },
       "notices": {
         "rotated": "The secret of ingress point {storeId} was rotated. The previous secret no longer works.",
         "disabled": "Ingress point {storeId} was disabled.",
-        "dismiss": "Dismiss"
+        "dismiss": "Dismiss",
+        "created": "Ingress point {storeId} was created. Hand the secret to the party that will send the events.",
+        "createLost": "Ingress point {storeId} appears to have been created, but its secret did not reach you. Use \"Rotate secret\" on its row in the list to get a new one.",
+        "createAbsent": "No point for store ID {storeId} appeared after re-reading the list, so it was most likely not created. You can open creation again."
+      },
+      "create": {
+        "open": "Create ingress point",
+        "title": "Create signed event ingress point",
+        "intro": "Created inside AWJ to receive signed events from {platform}. After creation the signing secret is shown once only.",
+        "storeId": {
+          "label": "Platform store ID",
+          "hint": "As it appears at the platform (up to 191 bytes). It cannot be reused once it is mapped."
+        },
+        "branch": {
+          "label": "Routed to branch (optional)",
+          "none": "No branch",
+          "hint": "The AWJ branch this point's events are routed to. Your account may require a branch; the server decides.",
+          "loading": "Loading branches…",
+          "error": "Branches could not be loaded.",
+          "retry": "Try again",
+          "noPermission": "You do not have permission to view branches, so a branch cannot be chosen. If your account is limited to specific branches, creation will be refused and a branch requested."
+        },
+        "boundary": "This sets up an ingress point inside AWJ only. It does not link a merchant account to the platform or enable order synchronization.",
+        "validation": {
+          "required": "Enter the store ID.",
+          "tooLong": "The store ID is longer than allowed (191 bytes).",
+          "invalidChars": "The store ID contains characters that are not allowed (line breaks or control characters)."
+        },
+        "submit": "Create",
+        "busy": "Creating…",
+        "guidance": {
+          "title": "An ingress point cannot be created right now",
+          "missing": "There is no active manual attribution profile for {platform}. Set it up first in the attribution settings, then come back to create the point.",
+          "disabled": "The manual attribution profile for {platform} is disabled. Enable it first in the attribution settings.",
+          "unreadable": "The manual attribution profile could not be read right now, so nothing can be created. This does not mean it is missing.",
+          "setupLink": "Open attribution settings",
+          "needsPermission": "Setting up the attribution profile needs the company-management permission; ask your account administrator."
+        }
       }
     }
   }

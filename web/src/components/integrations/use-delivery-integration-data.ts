@@ -12,6 +12,7 @@ import {
   PROFILE_MANAGE_PERMISSION,
   isApplicationHidden,
   nativeStatusOf,
+  readActiveProfileIds,
   readManualStatuses,
   readReadinessRows,
   type DeliveryAccess,
@@ -24,6 +25,8 @@ export interface DeliveryIntegrationData {
   /** `loading` حتى تنتهي القراءتان؛ بعدها `ready` (حتى لو فشلت إحداهما — انظر العلمين). */
   status: 'loading' | 'ready';
   manual: Map<string, 'set' | 'disabled'> | null;
+  /** معرّف ملف الإسناد اليدوي المفعّل لكل منصة (INT-UX-5c)، أو `null` إن تعذّرت القراءة. */
+  profileIds: Map<string, string> | null;
   readiness: Map<string, ReadinessRow> | null;
   manualFailed: boolean;
   readinessFailed: boolean;
@@ -50,6 +53,7 @@ export function useDeliveryIntegrationData(enabled = true): DeliveryIntegrationD
   const [access, setAccess] = useState<DeliveryAccess>('checking');
   const [status, setStatus] = useState<'loading' | 'ready'>('loading');
   const [manual, setManual] = useState<Map<string, 'set' | 'disabled'> | null>(null);
+  const [profileIds, setProfileIds] = useState<Map<string, string> | null>(null);
   const [readiness, setReadiness] = useState<Map<string, ReadinessRow> | null>(null);
   const [manualFailed, setManualFailed] = useState(false);
   const [readinessFailed, setReadinessFailed] = useState(false);
@@ -97,6 +101,7 @@ export function useDeliveryIntegrationData(enabled = true): DeliveryIntegrationD
       const manualRead = profiles.status === 'fulfilled' ? readManualStatuses(profiles.value) : null;
       const readinessRead = readinessResult.status === 'fulfilled' ? readReadinessRows(readinessResult.value) : null;
       setManual(manualRead);
+      setProfileIds(profiles.status === 'fulfilled' ? readActiveProfileIds(profiles.value) : null);
       setReadiness(readinessRead);
       setManualFailed(manualRead === null);
       // صف متناقض أو بحالة لا نعرفها يبقى «تعذّرت القراءة» لمنصته فقط، لكن يظهر معه إشعار الفشل وإعادة المحاولة.
@@ -113,6 +118,7 @@ export function useDeliveryIntegrationData(enabled = true): DeliveryIntegrationD
     access: enabled ? access : 'checking',
     status: enabled ? status : 'ready',
     manual,
+    profileIds,
     readiness,
     manualFailed,
     readinessFailed,

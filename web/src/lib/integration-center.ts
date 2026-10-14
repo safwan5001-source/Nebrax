@@ -179,6 +179,28 @@ export function readManualStatuses(payload: unknown): Map<string, 'set' | 'disab
   return result;
 }
 
+const PROFILE_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
+
+/**
+ * معرّف ملف الإسناد اليدوي **المفعّل** لكل منصة معروفة (INT-UX-5c): يحتاجه الإنشاء لأن الخادم يطلب `delivery_platform_profile_id`.
+ * القراءة صارمة كـ`readManualStatuses`: حمولة منحرفة ⇒ `null`. منصة بلا ملف مفعّل لا تظهر في الخريطة.
+ */
+export function readActiveProfileIds(payload: unknown): Map<string, string> | null {
+  const list = strictRows(payload);
+  if (list === null) return null;
+  const known = new Set(deliveryPlatformKeys());
+  const result = new Map<string, string>();
+  for (const row of list) {
+    if (typeof row.platform_key !== 'string') return null;
+    if (!known.has(row.platform_key)) continue;
+    if (typeof row.is_active !== 'boolean') return null;
+    if (row.is_active !== true || result.has(row.platform_key)) continue;
+    if (typeof row.id !== 'string' || !PROFILE_ID_PATTERN.test(row.id)) return null;
+    result.set(row.platform_key, row.id);
+  }
+  return result;
+}
+
 /** القيم التقنية التي يُرجعها الخادم (`DeliveryProviderReadiness::TECHNICAL_STATUSES`). */
 const TECHNICAL_VALUES: ReadonlySet<string> = new Set(['READY', 'BLOCKED', 'OWNER_GATE']);
 const EVIDENCE_REF_PATTERN = /^[^\u0000-\u001f\u007f]{1,300}$/;
