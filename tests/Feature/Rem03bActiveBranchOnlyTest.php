@@ -352,9 +352,11 @@ class Rem03bActiveBranchOnlyTest extends TestCase
         Queue::assertNothingPushed();
         Http::assertNothingSent();
 
-        // مالك غير مقيَّد + مقيَّد خارج النطاق (ترويسة مزوّرة لفرع غير مسموح).
+        // مالك غير مقيَّد (مع `?branch=all` أيضاً) + مقيَّد خارج النطاق (ترويسة مزوّرة لفرع غير مسموح).
         $this->withToken($w['owner'])->withHeaders(['X-Branch-Id' => $w['a'], 'Idempotency-Key' => 'k-owner'])
             ->postJson("/api/invoices/{$invB['id']}/zatca/submissions")->assertNotFound();
+        $this->withToken($w['owner'])->withHeaders(['X-Branch-Id' => $w['a'], 'Idempotency-Key' => 'k-owner-all'])
+            ->postJson("/api/invoices/{$invB['id']}/zatca/submissions?branch=all")->assertNotFound();
         $this->withToken($w['onlyA'])->withHeaders(['X-Branch-Id' => $w['b'], 'Idempotency-Key' => 'k-onlya'])
             ->postJson("/api/invoices/{$invB['id']}/zatca/submissions")->assertNotFound();
         $this->assertSame(0, DB::table('zatca_submission_attempts')->count());
@@ -435,6 +437,7 @@ class Rem03bActiveBranchOnlyTest extends TestCase
             $dispatch($w['multi'], $w['a'], $invB['id'], $attB, '?branch=all')->assertNotFound();
         }
         $dispatch($w['owner'], $w['a'], $invB['id'], $attB)->assertNotFound();           // مالك غير مقيَّد
+        $dispatch($w['owner'], $w['a'], $invB['id'], $attB, '?branch=all')->assertNotFound(); // …و?branch=all
         $dispatch($w['onlyA'], $w['b'], $invB['id'], $attB)->assertNotFound();           // مقيَّد + ترويسة مزوّرة
         $this->assertSame($attemptRow, $this->row('zatca_submission_attempts', $attB), 'الصف كاملاً (queue_count/queued_at/…) بلا تغيير');
         $this->assertSame($invoiceRow, $this->row('invoices', $invB['id']));
@@ -610,6 +613,7 @@ class Rem03bActiveBranchOnlyTest extends TestCase
             $this->assertSame($before, $this->counts(), 'لا قيد/سطر/مخزون/دفعة/مراجعة');
         }
         $this->call_($w['owner'], $w['a'], 'POST', "/api/credit-notes/{$noteB}/post")->assertNotFound(); // مالك غير مقيَّد
+        $this->call_($w['owner'], $w['a'], 'POST', "/api/credit-notes/{$noteB}/post?branch=all")->assertNotFound(); // …ولا يوسّعه ?branch=all
         $this->call_($w['onlyA'], $w['b'], 'POST', "/api/credit-notes/{$noteB}/post")->assertNotFound();  // مقيَّد + مزوّرة
 
         // الصلاحية: 403 لـ staff، وبلا أثر.
