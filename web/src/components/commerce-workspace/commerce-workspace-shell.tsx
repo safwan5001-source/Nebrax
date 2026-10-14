@@ -11,7 +11,7 @@ import { ThemeToggle } from '@/components/layout/theme-toggle';
 import { Dropdown, DropdownItem } from '@/components/ui/dropdown';
 import { useCompany } from '@/lib/company';
 import { commerceWorkspaceMessage } from '@/modules/commerce-workspace/messages';
-import { withStoreParam } from '@/modules/commerce-workspace/active-store';
+import { isStoreAgnosticCommercePath, withStoreParam } from '@/modules/commerce-workspace/active-store';
 import { useCommerceStoreContext } from '@/modules/commerce-workspace/store-context';
 import { StoreContextInvalidNotice } from '@/modules/commerce-workspace/store-context-invalid';
 import { installUnsavedNavigationGuard } from '@/modules/commerce-workspace/unsaved-registry';
@@ -24,7 +24,9 @@ export function CommerceWorkspaceShell({ children }: { children: React.ReactNode
   const t = (key: Parameters<typeof commerceWorkspaceMessage>[1]) => commerceWorkspaceMessage(locale, key);
   const company = useCompany();
   const { catalog, selectedStoreId, setSelectedStoreId, viewStoreUrl, storeContextStatus } = useCommerceStoreContext();
-  const storeContextInvalid = storeContextStatus === 'invalid';
+  // لا متجر محسوم: رابط/جلسة لمتجر غير متاح، أو (AWJ-STORE-CTX-2) أكثر من متجر بلا اختيار في هذا التبويب.
+  const storeContextInvalid = storeContextStatus === 'invalid' || storeContextStatus === 'needs_selection';
+  const blockStoreScopedPage = storeContextInvalid && !isStoreAgnosticCommercePath(pathname);
   const [navigationOpen, setNavigationOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [sidebarPreferenceLoaded, setSidebarPreferenceLoaded] = useState(false);
@@ -250,7 +252,7 @@ export function CommerceWorkspaceShell({ children }: { children: React.ReactNode
           ) : (
             <div className="mx-auto w-full max-w-7xl p-4 sm:p-6">
               {/* لا متجر نشط ⇒ لا تُعرض الصفحة أصلاً: لا قراءة ولا حفظ على متجرٍ لم يُختر صراحةً. */}
-              {storeContextInvalid ? <StoreContextInvalidNotice /> : children}
+              {blockStoreScopedPage ? <StoreContextInvalidNotice /> : children}
             </div>
           )}
         </main>

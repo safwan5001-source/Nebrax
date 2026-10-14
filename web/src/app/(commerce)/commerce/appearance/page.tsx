@@ -55,7 +55,7 @@ export default function CommerceAppearancePage() {
     });
   }
 
-  if (storeContextStatus === 'invalid') {
+  if (storeContextStatus === 'invalid' || storeContextStatus === 'needs_selection') {
     return (
       <div className="grid h-full min-h-0 place-items-center overflow-y-auto p-4">
         <div className="w-full max-w-xl"><StoreContextInvalidNotice /></div>

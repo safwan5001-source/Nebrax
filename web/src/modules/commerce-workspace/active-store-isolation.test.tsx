@@ -105,6 +105,12 @@ function renderWorkspace(page: React.ReactNode = null) {
   );
 }
 
+async function needsSelection(label = 'active') {
+  // AWJ-STORE-CTX-2: متجران ولا سياق في التبويب ⇒ لا متجر افتراضي.
+  await waitFor(() => expect(screen.getByTestId(`${label}-status`).textContent).toBe('needs_selection'));
+  expect(screen.getByTestId(label).textContent).toBe('');
+}
+
 async function activeIs(id: string) {
   await waitFor(() => expect(screen.getByTestId('active').textContent).toBe(id));
 }
@@ -148,8 +154,10 @@ describe('resolveActiveStore', () => {
     expect(resolveActiveStore(catalog, { id: FOREIGN, source: 'session' }).storeId).toBeNull();
   });
 
-  it('keeps the legacy first-store default only when the tab has no store context at all', () => {
-    expect(resolveActiveStore(catalog, null)).toEqual({ status: 'ready', storeId: RASHD });
+  it('requires an explicit choice for a multi-store tenant without context, and auto-selects a single store (AWJ-STORE-CTX-2)', () => {
+    expect(resolveActiveStore(catalog, null)).toEqual({ status: 'needs_selection', storeId: null });
+    expect(resolveActiveStore({ status: 'ready', stores: [catalog.status === 'ready' ? catalog.stores[1] : null!] }, null))
+      .toEqual({ status: 'ready', storeId: TAIBA });
     expect(resolveActiveStore({ status: 'loading' }, { id: TAIBA, source: 'url' })).toEqual({ status: 'pending', storeId: null });
     expect(resolveActiveStore({ status: 'empty' }, null).storeId).toBeNull();
   });
@@ -166,7 +174,7 @@ describe('resolveActiveStore', () => {
 describe('active store across Commerce navigation (زهور طيبة / زهور الرشد)', () => {
   it('selecting زهور طيبة then opening the Theme Gallery stays on زهور طيبة and reads only its versions', async () => {
     renderWorkspace();
-    await activeIs(RASHD);
+    await needsSelection();
     fireEvent.click(screen.getByText('active-taiba'));
     await activeIs(TAIBA);
 
@@ -186,7 +194,7 @@ describe('active store across Commerce navigation (زهور طيبة / زهور 
 
   it('selecting زهور طيبة then opening the Store Experience builder hands the builder زهور طيبة', async () => {
     renderWorkspace();
-    await activeIs(RASHD);
+    await needsSelection();
     fireEvent.click(screen.getByText('active-taiba'));
     await activeIs(TAIBA);
 
@@ -199,7 +207,7 @@ describe('active store across Commerce navigation (زهور طيبة / زهور 
 
   it('keeps the store through every Commerce section (client navigation)', async () => {
     const view = renderWorkspace();
-    await activeIs(RASHD);
+    await needsSelection();
     fireEvent.click(screen.getByText('active-taiba'));
     await activeIs(TAIBA);
     for (const path of [
@@ -218,7 +226,7 @@ describe('active store across Commerce navigation (زهور طيبة / زهور 
 
   it('switches between زهور طيبة and زهور الرشد only on an explicit choice, and each switch is persisted', async () => {
     renderWorkspace();
-    await activeIs(RASHD);
+    await needsSelection();
     fireEvent.click(screen.getByText('active-taiba'));
     await activeIs(TAIBA);
     await waitFor(() => expect(readStoreParam(window.location.search)).toBe(TAIBA));
@@ -257,7 +265,7 @@ describe('active store across Commerce navigation (زهور طيبة / زهور 
         <CommerceStoreProvider><Probe label="tabB" /></CommerceStoreProvider>
       </>,
     );
-    await waitFor(() => expect(screen.getByTestId('tabA').textContent).toBe(RASHD));
+    await needsSelection('tabA');
     fireEvent.click(screen.getByText('tabA-taiba'));
     await waitFor(() => expect(screen.getByTestId('tabA').textContent).toBe(TAIBA));
     fireEvent.click(screen.getByText('tabB-rashd'));
@@ -338,5 +346,72 @@ describe('active store across Commerce navigation (زهور طيبة / زهور 
     expect(screen.getByTestId('builder').getAttribute('data-version')).toBe('');
     expect(builderProps.mock.calls.some(([props]) => props.versionId === 'v-taiba')).toBe(false);
     await waitFor(() => expect(readStoreParam(window.location.search)).toBe(RASHD));
+  });
+});
+
+describe('explicit store selection for multi-store tenants (AWJ-STORE-CTX-2)', () => {
+  function renderShell(page: React.ReactNode) {
+    return render(
+      <CommerceStoreProvider>
+        <Probe />
+        <CommerceWorkspaceShell>{page}</CommerceWorkspaceShell>
+      </CommerceStoreProvider>,
+    );
+  }
+
+  it('opens no store by default: the store-scoped page is replaced by the chooser and nothing is read or persisted', async () => {
+    hardLoad('/commerce/themes');
+    renderShell(<CommerceThemesPage />);
+    await needsSelection();
+    expect(document.querySelector('[data-store-selection-required]')).toBeTruthy();
+    expect(screen.getByText('اختر المتجر الذي تعمل عليه')).toBeTruthy();
+    expect(document.querySelector('[data-theme-card]')).toBeNull();
+    expect(listVersionsMock).not.toHaveBeenCalled();
+    expect(readStoreParam(window.location.search)).toBeNull();
+    expect(window.sessionStorage.getItem(ACTIVE_STORE_SESSION_KEY)).toBeNull();
+  });
+
+  it('the explicit choice opens the page on that store and pins it to the tab and URL', async () => {
+    hardLoad('/commerce/themes');
+    renderShell(<CommerceThemesPage />);
+    await needsSelection();
+    fireEvent.change(screen.getAllByRole('combobox', { name: 'اختر متجراً' })[0], { target: { value: TAIBA } });
+    await activeIs(TAIBA);
+    await waitFor(() => expect(listVersionsMock).toHaveBeenCalledWith(TAIBA));
+    expect(listVersionsMock).not.toHaveBeenCalledWith(RASHD);
+    await waitFor(() => expect(readStoreParam(window.location.search)).toBe(TAIBA));
+    expect(window.sessionStorage.getItem(ACTIVE_STORE_SESSION_KEY)).toBe(TAIBA);
+
+    hardLoad('/commerce/themes');
+    renderShell(<CommerceThemesPage />);
+    await activeIs(TAIBA);
+  });
+
+  it('never mounts the builder before a store is chosen, and never under a default store', async () => {
+    hardLoad('/commerce/appearance?version=v-any');
+    renderWorkspace(<CommerceAppearancePage />);
+    await needsSelection();
+    expect(screen.queryByTestId('builder')).toBeNull();
+    expect(builderProps).not.toHaveBeenCalled();
+    expect(document.querySelector('[data-store-selection-required]')).toBeTruthy();
+  });
+
+  it('keeps tenant-wide pages reachable without a chosen store', async () => {
+    hardLoad('/commerce/stores');
+    renderShell(<div data-testid="stores-page">stores</div>);
+    await needsSelection();
+    expect(screen.getByTestId('stores-page')).toBeTruthy();
+    expect(document.querySelector('[data-store-selection-required]')).toBeNull();
+  });
+
+  it('a single-store tenant is still selected automatically (no extra step)', async () => {
+    apiMock.mockImplementation(async (path: string) => (
+      path === '/commerce/workspace/storefronts' ? { data: { stores: [storesPayload.data.stores[1]] } } : { data: {} }
+    ));
+    hardLoad('/commerce/themes');
+    renderShell(<CommerceThemesPage />);
+    await activeIs(TAIBA);
+    await waitFor(() => expect(listVersionsMock).toHaveBeenCalledWith(TAIBA));
+    expect(document.querySelector('[data-store-selection-required]')).toBeNull();
   });
 });

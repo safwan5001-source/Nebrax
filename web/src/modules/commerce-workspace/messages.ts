@@ -16,6 +16,9 @@ export const COMMERCE_WORKSPACE_MESSAGES = {
     storeSelectorEmpty: 'لا يوجد متجر يمكن اختياره',
     storeSelectorLoading: 'جارٍ تحميل المتاجر',
     storeSelectorChoose: 'اختر متجراً',
+    storeSelectionRequiredTitle: 'اختر المتجر الذي تعمل عليه',
+    storeSelectionRequiredDescription:
+      'لديك أكثر من متجر. اختر المتجر الذي تريد إدارته؛ يبقى اختيارك ثابتاً في هذا التبويب حتى تغيّره بنفسك.',
     storeContextInvalidTitle: 'المتجر المطلوب غير متاح',
     storeContextInvalidDescription:
       'الرابط أو الجلسة تشير إلى متجر غير موجود في حسابك أو لا تملك صلاحيته. لن يُفتح متجر آخر بدلاً منه؛ اختر المتجر الذي تريد العمل عليه.',
@@ -364,6 +367,9 @@ export const COMMERCE_WORKSPACE_MESSAGES = {
     storeSelectorEmpty: 'No store is available to select',
     storeSelectorLoading: 'Loading stores',
     storeSelectorChoose: 'Choose a store',
+    storeSelectionRequiredTitle: 'Choose the store to work on',
+    storeSelectionRequiredDescription:
+      'You have more than one store. Choose the store you want to manage; your choice stays fixed in this tab until you change it.',
     storeContextInvalidTitle: 'The requested store is not available',
     storeContextInvalidDescription:
       'The link or session points to a store that does not exist in your account or that you cannot access. No other store will be opened in its place; choose the store you want to work on.',

@@ -30,7 +30,7 @@ export function StoreGate({ children }: { children: (store: CommerceStoreOption)
 
   const store = catalog.stores.find((candidate) => candidate.id === selectedStoreId);
   // متجرٌ مطلوب صراحةً غير متاح: لا نموذج يُركَّب على متجرٍ بديل، والاختيار يتمّ من الإشعار.
-  if (!store && storeContextStatus === 'invalid') return <StoreContextInvalidNotice />;
+  if (!store && (storeContextStatus === 'invalid' || storeContextStatus === 'needs_selection')) return <StoreContextInvalidNotice />;
   if (!store) return <LoadingState variant="table" rows={3} />;
 
   return (

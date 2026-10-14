@@ -10,19 +10,21 @@ import { useCommerceStoreContext } from './store-context';
 /**
  * AWJ-STORE-CTX-1 — يظهر حين يُطلب متجر صراحةً (رابط/جلسة التبويب) ولا يوجد في قائمة المستأجر. لا يُفتح متجر
  * بديل تلقائياً: الصفحة بلا متجر نشط (فلا قراءة ولا حفظ) حتى يختار المستخدم من هذه القائمة.
+ * AWJ-STORE-CTX-2 — ويظهر أيضاً لمستأجر بأكثر من متجر بلا سياق في التبويب (`needs_selection`) بصياغة «اختر متجراً».
  */
 export function StoreContextInvalidNotice() {
   const locale = useLocale();
   const t = (key: Parameters<typeof commerceWorkspaceMessage>[1]) => commerceWorkspaceMessage(locale, key);
-  const { catalog, setSelectedStoreId } = useCommerceStoreContext();
+  const { catalog, setSelectedStoreId, storeContextStatus } = useCommerceStoreContext();
+  const needsSelection = storeContextStatus === 'needs_selection';
   const stores = catalog.status === 'ready' ? catalog.stores : [];
 
   return (
-    <div data-store-context-invalid="">
+    <div data-store-context-invalid={needsSelection ? undefined : ''} data-store-selection-required={needsSelection ? '' : undefined}>
       <EmptyState
         icon={Store}
-        title={t('storeContextInvalidTitle')}
-        description={t('storeContextInvalidDescription')}
+        title={needsSelection ? t('storeSelectionRequiredTitle') : t('storeContextInvalidTitle')}
+        description={needsSelection ? t('storeSelectionRequiredDescription') : t('storeContextInvalidDescription')}
         action={stores.length > 0 ? (
           <Select
             aria-label={t('storeSelectorChoose')}

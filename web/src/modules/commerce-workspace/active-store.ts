@@ -8,7 +8,8 @@
  * ترتيب الحسم (أول ما يتوفّر يحكم، ولا سقوط صامت بينها):
  *   1. `?store=` في الرابط — رابط مباشر أو تبويب جديد من رابط يحمل المتجر.
  *   2. ذاكرة **هذا التبويب** (`sessionStorage`) — تحديث الصفحة أو تنقّل صلب داخل التبويب نفسه.
- *   3. لا سياق إطلاقاً (أول دخول للتبويب) — السلوك السابق: أول متجر في القائمة.
+ *   3. لا سياق إطلاقاً (أول دخول للتبويب): متجرٌ وحيد يُختار تلقائياً؛ وأكثر من متجر ⇒ `needs_selection`
+ *      (AWJ-STORE-CTX-2، قرار المالك): لا متجر افتراضي — يختار المستخدم صراحةً.
  *
  * طلبٌ صريح (1 أو 2) لمتجر غير موجود في قائمة المستأجر الحالي يصير `invalid`: لا متجر نشط، ولا قراءة ولا حفظ،
  * حتى يختار المستخدم متجراً صراحةً. لا `localStorage` ولا مستمع `storage`: تبويبٌ لا يغيّر متجر تبويب آخر.
@@ -27,7 +28,24 @@ export type ActiveStoreRequest = { id: string; source: ActiveStoreRequestSource 
 export type ActiveStoreResolution =
   | { status: 'pending'; storeId: null }
   | { status: 'ready'; storeId: string }
-  | { status: 'invalid'; storeId: null; requestedId: string };
+  | { status: 'invalid'; storeId: null; requestedId: string }
+  | { status: 'needs_selection'; storeId: null };
+
+/**
+ * صفحات على مستوى المستأجر لا تقرأ المتجر النشط (قائمة المتاجر، المنتجات المنشورة، التصنيفات، التكاملات): تبقى
+ * متاحة بلا متجر محسوم. أي صفحة غيرها — وكل صفحة جديدة افتراضياً — محجوبة حتى يُحسم المتجر.
+ */
+export const STORE_AGNOSTIC_COMMERCE_PATHS = [
+  '/commerce/stores',
+  '/commerce/published-products',
+  '/commerce/merchandising',
+  '/commerce/integrations',
+] as const;
+
+export function isStoreAgnosticCommercePath(pathname: string | null | undefined): boolean {
+  if (!pathname) return false;
+  return STORE_AGNOSTIC_COMMERCE_PATHS.some((path) => pathname === path || pathname.startsWith(`${path}/`));
+}
 
 /** معرّف معقول الشكل فقط؛ أي قيمة أخرى في الرابط/الذاكرة تُعامَل كأنها غير موجودة لا كطلب. */
 function normalizeId(value: string | null | undefined): string | null {
@@ -46,8 +64,8 @@ export function resolveActiveStore(
       ? { status: 'ready', storeId: request.id }
       : { status: 'invalid', storeId: null, requestedId: request.id };
   }
-  const first = catalog.stores[0]?.id;
-  return first ? { status: 'ready', storeId: first } : { status: 'pending', storeId: null };
+  if (catalog.stores.length === 1) return { status: 'ready', storeId: catalog.stores[0].id };
+  return catalog.stores.length > 1 ? { status: 'needs_selection', storeId: null } : { status: 'pending', storeId: null };
 }
 
 export function readStoreParam(search: string): string | null {

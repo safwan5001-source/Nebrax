@@ -22,10 +22,11 @@ type CommerceStoreContextValue = {
   setSelectedStoreId: (id: string) => void;
   viewStoreUrl: string | null;
   /**
-   * AWJ-STORE-CTX-1 — `invalid`: طُلب متجرٌ صراحةً (رابط أو ذاكرة التبويب) وليس في قائمة المستأجر الحالي؛
-   * `selectedStoreId` عندها `null` فلا قراءة ولا حفظ حتى يختار المستخدم متجراً. لا سقوط صامت إلى متجر آخر.
+   * AWJ-STORE-CTX-1 — `invalid`: طُلب متجرٌ صراحةً (رابط أو ذاكرة التبويب) وليس في قائمة المستأجر الحالي.
+   * AWJ-STORE-CTX-2 — `needs_selection`: أكثر من متجر ولا سياق في التبويب إطلاقاً.
+   * في الحالتين `selectedStoreId` = `null` فلا قراءة ولا حفظ حتى يختار المستخدم متجراً. لا سقوط صامت إلى متجر آخر.
    */
-  storeContextStatus: 'pending' | 'ready' | 'invalid';
+  storeContextStatus: 'pending' | 'ready' | 'invalid' | 'needs_selection';
   /**
    * COM-STORE-PROVISION-1 — يعيد تحميل القائمة الموثوقة من الخادم بعد نجاح
    * التزويد (لا يُحدَّث الكتالوج محلياً من استجابة الإنشاء وحدها). يقبل معرّف
