@@ -3,6 +3,7 @@
 import json, sys, os, re, collections
 
 base, out, skipped_file = sys.argv[1], sys.argv[2], sys.argv[3]
+manifest_file = sys.argv[4] if len(sys.argv) > 4 else None
 rows = []
 for d in ['v3a', 'v3b', 'v3c', 'legacy']:
     p = os.path.join(base, d, 'results.jsonl')
@@ -61,7 +62,20 @@ L.append('| Module group | Routes crawled |\n|---|---|')
 for g, _ in GROUPS + [('Other', '')]:
     if counts.get(g):
         L.append(f'| {g} | {counts[g]} |')
-L.append(f'| **Total** | **{len(by)}** |\n')
+entries_line = ''
+if manifest_file:
+    manifest = [r for r in set(json.load(open(manifest_file)).values()) if not r.startswith(('/api', '/platform'))]
+    statics = {r for r in manifest if '[' not in r}
+    dynamics = [r for r in manifest if '[' in r]
+    covered = set()
+    for k in by:
+        if k in statics:
+            covered.add(k); continue
+        for r in dynamics:
+            if re.fullmatch(re.sub(r'\[[^\]]+\]', '[^/]+', r), k):
+                covered.add(r); break
+    entries_line = f' = **{len(covered)} of {len(manifest)}** manifest entries'
+L.append(f'| **Total** | **{len(by)}** URLs{entries_line} |\n')
 for g, _ in GROUPS + [('Other', '')]:
     ks = [k for k in by if group(k) == g]
     if not ks:

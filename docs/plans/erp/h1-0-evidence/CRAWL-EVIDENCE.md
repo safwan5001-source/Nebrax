@@ -1,6 +1,6 @@
 # AWJ-ERP-UX-H1-0 — Crawl evidence (generated)
 
-Page loads recorded: **1869**
+Page loads recorded: **2077**
 
 Gate check: loads whose `data-awj-ui` attribute disagreed with the requested mode (excluding gate-excluded routes): **7** /icon.ico
 
@@ -14,6 +14,7 @@ Gate check: loads whose `data-awj-ui` attribute disagreed with the requested mod
 | 3 | en-dark-1440 | 207 |
 | 3 | en-light-390 | 207 |
 | legacy | ar-light-1440 | 208 |
+| legacy | ar-light-320 | 208 |
 | legacy | ar-light-390 | 208 |
 
 ## axe-core 4.10.2 violations (WCAG 2.0/2.1/2.2 A+AA + best-practice)
@@ -99,6 +100,7 @@ Gate check: loads whose `data-awj-ui` attribute disagreed with the requested mod
 | `/products/:id/edit` | ar-light-320 | 3 | 32 |
 | `/products/:id/edit` | ar-dark-360 | 3 | 32 |
 | `/products/:id/edit` | ar-light-390 | legacy | 32 |
+| `/products/:id/edit` | ar-light-320 | legacy | 32 |
 | `/accounting-settings` | ar-light-320 | 3 | 12 |
 | `/accounting-settings/account-routing` | ar-light-320 | 3 | 12 |
 | `/accounting-settings/fiscal-years` | ar-light-320 | 3 | 12 |
@@ -265,8 +267,175 @@ Gate check: loads whose `data-awj-ui` attribute disagreed with the requested mod
 | `/reports/general/income-statement` | ar-light-320 | 3 | 12 |
 | `/reports/general/balance-sheet` | ar-light-320 | 3 | 12 |
 | `/reports/general/account-ledger` | ar-light-320 | 3 | 12 |
+| `/accounting-settings` | ar-light-320 | legacy | 12 |
+| `/accounting-settings/account-routing` | ar-light-320 | legacy | 12 |
+| `/accounting-settings/fiscal-years` | ar-light-320 | legacy | 12 |
+| `/accounting-settings/period-locks` | ar-light-320 | legacy | 12 |
+| `/accounts` | ar-light-320 | legacy | 12 |
+| `/applications` | ar-light-320 | legacy | 12 |
+| `/appointments` | ar-light-320 | legacy | 12 |
+| `/assets` | ar-light-320 | legacy | 12 |
+| `/assets/new` | ar-light-320 | legacy | 12 |
+| `/branches` | ar-light-320 | legacy | 12 |
+| `/branches/:id` | ar-light-320 | legacy | 12 |
+| `/branches/new` | ar-light-320 | legacy | 12 |
+| `/branches/settings` | ar-light-320 | legacy | 12 |
+| `/cash-and-bank` | ar-light-320 | legacy | 12 |
+| `/cash-and-bank/new` | ar-light-320 | legacy | 12 |
+| `/cash-and-bank/transfer` | ar-light-320 | legacy | 12 |
+| `/contacts` | ar-light-320 | legacy | 12 |
+| `/cost-centers` | ar-light-320 | legacy | 12 |
+| `/credit-notes` | ar-light-320 | legacy | 12 |
+| `/credit-notes/new` | ar-light-320 | legacy | 12 |
+| `/crm` | ar-light-320 | legacy | 12 |
+| `/customer-refunds` | ar-light-320 | legacy | 12 |
+| `/customer-settings` | ar-light-320 | legacy | 12 |
+| `/dashboard` | ar-light-320 | legacy | 12 |
+| `/debit-notes` | ar-light-320 | legacy | 12 |
+| `/debit-notes/new` | ar-light-320 | legacy | 12 |
+| `/delivery-hub` | ar-light-320 | legacy | 12 |
+| `/delivery-notes` | ar-light-320 | legacy | 12 |
+| `/delivery-notes/invoice-draft` | ar-light-320 | legacy | 12 |
+| `/delivery-notes/new` | ar-light-320 | legacy | 12 |
+| `/delivery-platforms` | ar-light-320 | legacy | 12 |
+| `/developer` | ar-light-320 | legacy | 12 |
+| `/developer/docs` | ar-light-320 | legacy | 12 |
+| `/developer/keys` | ar-light-320 | legacy | 12 |
+| `/developer/security` | ar-light-320 | legacy | 12 |
+| `/developer/webhooks` | ar-light-320 | legacy | 12 |
+| `/document-design` | ar-light-320 | legacy | 12 |
+| `/documents` | ar-light-320 | legacy | 12 |
+| `/documents/governance` | ar-light-320 | legacy | 12 |
+| `/documents/operations` | ar-light-320 | legacy | 12 |
+| `/documents/settings` | ar-light-320 | legacy | 12 |
+| `/documents/usage` | ar-light-320 | legacy | 12 |
+| `/employee-custodies` | ar-light-320 | legacy | 12 |
+| `/employee-custodies/new` | ar-light-320 | legacy | 12 |
+| `/expenses` | ar-light-320 | legacy | 12 |
+| `/expenses/categories` | ar-light-320 | legacy | 12 |
+| `/expenses/new` | ar-light-320 | legacy | 12 |
+| `/finance-settings` | ar-light-320 | legacy | 12 |
+| `/finance-settings/financial-alerts` | ar-light-320 | legacy | 12 |
+| `/finance-settings/settlement-types` | ar-light-320 | legacy | 12 |
+| `/financial-alerts` | ar-light-320 | legacy | 12 |
+| `/help` | ar-light-320 | legacy | 12 |
+| `/help/create-sales-invoice` | ar-light-320 | legacy | 12 |
+| `/hr` | ar-light-320 | legacy | 12 |
+| `/integrations` | ar-light-320 | legacy | 12 |
+| `/integrations/delivery-platforms` | ar-light-320 | legacy | 12 |
+| `/integrations/delivery-platforms/jahez` | ar-light-320 | legacy | 12 |
+| `/inventory` | ar-light-320 | legacy | 12 |
+| `/inventory-openings` | ar-light-320 | legacy | 12 |
+| `/inventory-openings/import` | ar-light-320 | legacy | 12 |
+| `/inventory-settings` | ar-light-320 | legacy | 12 |
+| `/inventory-settings/brands` | ar-light-320 | legacy | 12 |
+| `/inventory-settings/categories` | ar-light-320 | legacy | 12 |
+| `/inventory-settings/products` | ar-light-320 | legacy | 12 |
+| `/inventory-settings/units` | ar-light-320 | legacy | 12 |
+| `/invoices` | ar-light-320 | legacy | 12 |
+| `/invoices/:id` | ar-light-320 | legacy | 12 |
+| `/invoices/:id/edit` | ar-light-320 | legacy | 12 |
+| `/invoices/:id/payments/new` | ar-light-320 | legacy | 12 |
+| `/invoices/new` | ar-light-320 | legacy | 12 |
+| `/journal-entries` | ar-light-320 | legacy | 12 |
+| `/journal-entries/:id` | ar-light-320 | legacy | 12 |
+| `/manual-journals` | ar-light-320 | legacy | 12 |
+| `/manual-journals/new` | ar-light-320 | legacy | 12 |
+| `/notifications` | ar-light-320 | legacy | 12 |
+| `/numbering-settings` | ar-light-320 | legacy | 12 |
+| `/partners` | ar-light-320 | legacy | 12 |
+| `/partners/:id` | ar-light-320 | legacy | 12 |
+| `/partners/:id/edit` | ar-light-320 | legacy | 12 |
+| `/partners/:id/statement` | ar-light-320 | legacy | 12 |
+| `/partners/new` | ar-light-320 | legacy | 12 |
+| `/payment-methods` | ar-light-320 | legacy | 12 |
+| `/payments` | ar-light-320 | legacy | 12 |
+| `/payments/:id` | ar-light-320 | legacy | 12 |
+| `/payments/new` | ar-light-320 | legacy | 12 |
+| `/pos` | ar-light-320 | legacy | 12 |
+| `/pos/audit` | ar-light-320 | legacy | 12 |
+| `/pos/report` | ar-light-320 | legacy | 12 |
+| `/pos/sessions` | ar-light-320 | legacy | 12 |
+| `/pos/settings` | ar-light-320 | legacy | 12 |
+| `/pos/settings/cash-drawer` | ar-light-320 | legacy | 12 |
+| `/pos/settings/configuration` | ar-light-320 | legacy | 12 |
+| `/pos/settings/devices` | ar-light-320 | legacy | 12 |
+| `/pos/settings/printing` | ar-light-320 | legacy | 12 |
+| `/pos/settings/shifts` | ar-light-320 | legacy | 12 |
+| `/pos/settings/sound-feedback` | ar-light-320 | legacy | 12 |
+| `/pos/start` | ar-light-320 | legacy | 12 |
+| `/products` | ar-light-320 | legacy | 12 |
+| `/products/:id` | ar-light-320 | legacy | 12 |
+| `/products/import` | ar-light-320 | legacy | 12 |
+| `/products/new` | ar-light-320 | legacy | 12 |
+| `/products/workbook-import` | ar-light-320 | legacy | 12 |
+| `/purchase-orders` | ar-light-320 | legacy | 12 |
+| `/purchase-orders/new` | ar-light-320 | legacy | 12 |
+| `/purchase-quotes` | ar-light-320 | legacy | 12 |
+| `/purchase-quotes/new` | ar-light-320 | legacy | 12 |
+| `/purchase-requests` | ar-light-320 | legacy | 12 |
+| `/purchase-requests/new` | ar-light-320 | legacy | 12 |
+| `/purchase-returns` | ar-light-320 | legacy | 12 |
+| `/purchase-settings` | ar-light-320 | legacy | 12 |
+| `/purchases` | ar-light-320 | legacy | 12 |
+| `/purchases/:id` | ar-light-320 | legacy | 12 |
+| `/purchases/:id/edit` | ar-light-320 | legacy | 12 |
+| `/purchases/:id/payments/new` | ar-light-320 | legacy | 12 |
+| `/purchases/new` | ar-light-320 | legacy | 12 |
+| `/quotes` | ar-light-320 | legacy | 12 |
+| `/quotes/new` | ar-light-320 | legacy | 12 |
+| `/receipt-vouchers` | ar-light-320 | legacy | 12 |
+| `/receipt-vouchers/new` | ar-light-320 | legacy | 12 |
+| `/recurring-invoices` | ar-light-320 | legacy | 12 |
+| `/recurring-invoices/new` | ar-light-320 | legacy | 12 |
+| `/reports` | ar-light-320 | legacy | 12 |
+| `/reports/sales` | ar-light-320 | legacy | 12 |
+| `/reports/classification-analytics` | ar-light-320 | legacy | 12 |
+| `/reports/customers/balances` | ar-light-320 | legacy | 12 |
+| `/reports/customers/aging` | ar-light-320 | legacy | 12 |
+| `/reports/general/trial-balance` | ar-light-320 | legacy | 12 |
+| `/reports/inventory/value` | ar-light-320 | legacy | 12 |
+| `/reports/purchases/balances` | ar-light-320 | legacy | 12 |
+| `/reports/purchases/aging` | ar-light-320 | legacy | 12 |
+| `/reports/sales/by-customer` | ar-light-320 | legacy | 12 |
+| `/reports/sales/delivery-channel` | ar-light-320 | legacy | 12 |
+| `/reports/settings/classifications` | ar-light-320 | legacy | 12 |
+| `/returns` | ar-light-320 | legacy | 12 |
+| `/rfq` | ar-light-320 | legacy | 12 |
+| `/rfq/new` | ar-light-320 | legacy | 12 |
+| `/sales-settings` | ar-light-320 | legacy | 12 |
+| `/sales-settings/designs` | ar-light-320 | legacy | 12 |
+| `/sales-settings/einvoice` | ar-light-320 | legacy | 12 |
+| `/sales-settings/fields` | ar-light-320 | legacy | 12 |
+| `/sales-settings/invoices` | ar-light-320 | legacy | 12 |
+| `/sales-settings/orders` | ar-light-320 | legacy | 12 |
+| `/sales-settings/pricelists` | ar-light-320 | legacy | 12 |
+| `/sales-settings/quotes` | ar-light-320 | legacy | 12 |
+| `/sales-settings/shipping` | ar-light-320 | legacy | 12 |
+| `/sales-settings/sources` | ar-light-320 | legacy | 12 |
+| `/sales-settings/statuses` | ar-light-320 | legacy | 12 |
+| `/settings` | ar-light-320 | legacy | 12 |
+| `/stock-permits` | ar-light-320 | legacy | 12 |
+| `/stock-permits/new` | ar-light-320 | legacy | 12 |
+| `/stocktaking` | ar-light-320 | legacy | 12 |
+| `/stocktaking/new` | ar-light-320 | legacy | 12 |
+| `/supplier-payments` | ar-light-320 | legacy | 12 |
+| `/supplier-refunds` | ar-light-320 | legacy | 12 |
+| `/suppliers` | ar-light-320 | legacy | 12 |
+| `/suppliers/:id/ledger` | ar-light-320 | legacy | 12 |
+| `/suppliers/:id/statement` | ar-light-320 | legacy | 12 |
+| `/tax-settings` | ar-light-320 | legacy | 12 |
+| `/warehouses` | ar-light-320 | legacy | 12 |
+| `/warehouses/:id` | ar-light-320 | legacy | 12 |
+| `/warehouses/:id/stock` | ar-light-320 | legacy | 12 |
+| `/warehouses/new` | ar-light-320 | legacy | 12 |
+| `/whats-new` | ar-light-320 | legacy | 12 |
+| `/reports/general/income-statement` | ar-light-320 | legacy | 12 |
+| `/reports/general/balance-sheet` | ar-light-320 | legacy | 12 |
+| `/reports/general/account-ledger` | ar-light-320 | legacy | 12 |
+| `/reports/customers/aging` | ar-light-320 | legacy | 12 |
 
-Total overflowing loads: 175 of 1869
+Total overflowing loads: 343 of 2077
 
 ## API responses >= 400 during page load
 
