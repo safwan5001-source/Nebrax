@@ -77,7 +77,7 @@ No code, no migration, no route, no permission, no provider credential, no Conne
 |---|---|---|---|
 | **GAP-1** | Provider readiness not machine-readable; no server-side gate | Catalog, state derivation, Connect gating | Task `INT-READY-1` (§11). Additive, no tenant data. |
 | **GAP-2** | No read API for connector attempts / activity | Activity & error history (screen 8), health (screen 6) | Task `INT-ACT-1`. Additive, sanitized. |
-| **GAP-3** | No audit trail for connection lifecycle (create, rotate, disable, connect, disconnect) | "Auditable connection changes" | `DP-F`, then `INT-AUDIT-1`. |
+| **GAP-3** | No audit trail for connection lifecycle (create, rotate, disable, connect, disconnect) | "Auditable connection changes" | `DP-F`, then `INT-AUDIT-1`. **Ingress create / rotate / disable closed by `INT-AUDIT-1` (2026-10-14)**; connect/disconnect events remain future (Track P). |
 | **GAP-4** | No re-enable / reconnect path for a disabled mapping | Disconnect → reconnect | `DP-A`. |
 | **GAP-5** | Store→branch mapping is immutable and the store id is permanently reserved | Screen 5 "change mapping" | `DP-A`. |
 | **GAP-6** | No health data model (token expiry, last success, last failure) | Screen 6 | `DP-B`, after a provider is READY. |
@@ -880,7 +880,8 @@ Each is raised because the design needs a change to an existing financial/securi
 - **Context.** Rotate and disable are unaudited today (the service writes no event); only reassignment is audited.
 - **Recommendation.** One append-only table, cataloged in §7.4, added **before** any UI or new endpoint that rotates, disables, enables, connects or disconnects. Back-fills nothing.
 - **Rules.** (1) The audit row is written in the **same database transaction** as the operation; if the audit insert fails, the operation rolls back (fail-closed). (2) Writers live in the backend service layer, not the UI, so direct API calls to `rotate-secret`/`disable` are covered too. (3) Rows hold ids, version numbers (e.g. `secret_version` old→new) and reason codes only — never secrets, tokens, payloads or provider bodies. (4) Model rejects update/delete, like `DeliveryConnectorOperatorEvent`.
-- **Interim state (honest).** Until `INT-AUDIT-1` ships, rotate and disable through the **existing API** remain unaudited; this design adds no new UI or caller for them before then (INT-UX-5 hard-depends on INT-AUDIT-1).
+- **Decision (owner, 2026-10-14): approved, implemented by `INT-AUDIT-1` (this PR).** New append-only table `delivery_connector_lifecycle_events` (`ingress.created`, `secret.rotated`, `ingress.disabled`), written in the operation's own transaction (audit failure ⇒ rollback; a failed operation writes no event), in the backend service layer so direct API calls are covered. Limits recorded with the approval: **no new read API** (the reader waits for its own permission decision, `DP-E`), **no IP and no Request ID**, no secret / `secret_prefix` / token / request data, **branch re-route is out of scope** (the mapping is immutable and the operation does not exist), repeated `disable` is idempotent (200, original `disabled_at` kept, no second event). **Account/user ids carry no foreign key** (events must survive deletion of an account row; a cascade would erase security history and a restrict would block legitimate deletion); `platform_key` and `external_store_id` are copied so an event stays intelligible alone. The tenant column keeps its cascade (tenant erasure removes all tenant data, as in every other table).
+- **Interim state (historical, before `INT-AUDIT-1`).** Rotate and disable through the **existing API** were unaudited; this design adds no new UI or caller for them before then (INT-UX-5 hard-depends on INT-AUDIT-1).
 
 ---
 
@@ -956,8 +957,8 @@ Two tracks. **Track U** (UX/catalog) is safe to build now and never touches prov
 - **Tests.** Dictionary completeness against the backend code list; RTL/LTR; stale-response handling like Hub UI.
 - **Excludes.** Configuration-change log (needs INT-AUDIT-1).
 
-#### INT-AUDIT-1 — Connection-lifecycle audit *(after DP-F)*
-- **Scope.** Append-only audit table and writers for ingress create/rotate/disable; reader for the activity tab's second log.
+#### INT-AUDIT-1 — Connection-lifecycle audit *(DP-F approved 2026-10-14; implemented — pending review/merge)*
+- **Scope.** Append-only audit table and writers for ingress create/rotate/disable; reader for the activity tab's second log. **Delivered 2026-10-14: table + writers. The reader was deferred by owner decision D4 and has no owning slice yet** — INT-UX-6 explicitly excludes the configuration-change log (it waits on this reader), so the owner must assign one (not decided here).
 - **Depends on.** DP-F.
 - **Acceptance.** No secrets/payloads recorded; model rejects update/delete; existing operator events remain valid.
 - **Security.** Uuid user columns without FKs; tenant scoped.
