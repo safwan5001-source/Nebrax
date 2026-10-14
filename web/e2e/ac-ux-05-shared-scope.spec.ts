@@ -17,7 +17,11 @@ interface World {
 async function open(
   page: Page,
   w: World,
-  opts: { path: string; locale?: 'ar' | 'en'; role?: string; permissions?: string[]; users?: unknown[] },
+  opts: {
+    path: string; locale?: 'ar' | 'en'; role?: string; permissions?: string[]; users?: unknown[];
+    /** نطاق المشاهد على `/me` (AC-UX-11، الفراغ = غير مقيَّد)؛ `'unavailable'` = الخادم لا يرسله. الافتراضي: غير مقيَّد. */
+    scope?: { branch_ids: string[]; warehouse_ids: string[] } | 'unavailable';
+  },
 ) {
   await page.context().addCookies([{ name: 'locale', value: opts.locale ?? 'en', url: baseUrl }]);
   const json = (route: Route, body: unknown, status = 200) =>
@@ -38,7 +42,7 @@ async function open(
     ], meta: { permissions: [] } });
     if (path === '/branches') return json(route, { data: [{ id: 'b1', name: 'Dammam' }, { id: 'b2', name: 'Khobar' }] });
     if (path === '/warehouses') return json(route, { data: [{ id: 'w1', name: 'Main store', branch_id: 'b1' }] });
-    if (path === '/me') return json(route, { user, company: { name: 'Acme' } });
+    if (path === '/me') return json(route, { user: { ...user, ...(opts.scope === 'unavailable' ? {} : (opts.scope ?? { branch_ids: [], warehouse_ids: [] })) }, company: { name: 'Acme' } });
     return json(route, { data: [] });
   });
 
@@ -119,7 +123,7 @@ test.describe('AC-UX-05 shared scope editor', () => {
       employee_id: null, employee: null, branch_ids: ['b1'], warehouse_ids: [],
     }];
     await open(page, w, {
-      path: '/users', role: 'role-mgr', users,
+      path: '/users', role: 'role-mgr', users, scope: { branch_ids: ['b1'], warehouse_ids: [] },
       permissions: ['users.view', 'users.manage', 'roles.view', 'branches.view', 'products.view'],
     });
     await page.getByRole('button', { name: 'Add user' }).click();
@@ -135,7 +139,7 @@ test.describe('AC-UX-05 shared scope editor', () => {
       id: 'me', name: 'Safwan', email: 'owner@acme.test', role: 'admin', is_active: true,
       employee_id: null, employee: null, branch_ids: ['b1'], warehouse_ids: [],
     }];
-    await open(page, w, { path: '/hr', role: 'admin', users });
+    await open(page, w, { path: '/hr', role: 'admin', users, scope: { branch_ids: ['b1'], warehouse_ids: [] } });
     const dialog = await openAddUser(page);
     await expect(dialog.getByRole('radio', { name: /All branches/ })).toBeDisabled();
     await expect(dialog.getByRole('radio', { name: /Selected branches only/ })).toBeChecked();
@@ -152,7 +156,7 @@ test.describe('AC-UX-05 shared scope editor', () => {
 
   test('when the access scope cannot be verified, login access is blocked with a reason (employee-only saves stay possible)', async ({ page }) => {
     const w = world();
-    await open(page, w, { path: '/hr', users: [] }); // لا صفّ للمشاهد ⇒ تعذّر معرفة نطاقه
+    await open(page, w, { path: '/hr', scope: 'unavailable' }); // `/me` بلا نطاق ⇒ تعذّر معرفة نطاقه
     const dialog = await openAddUser(page);
     await expect(dialog.getByText(/couldn't verify your own access scope/)).toBeVisible();
     await dialog.getByLabel('Name', { exact: true }).fill('Hind');
