@@ -34,6 +34,7 @@ Evidence: `AWJ-VD-H1-0-EVIDENCE-AND-ARCHITECTURE.md` (sections referenced as §n
   - Only allow-listed files are served; the original never is.
   - Failures return one uniform 404 (§3.8-c).
 - **Change after review:** `mediaId` is now part of the URL, so replacing the image changes the URL.
+- **Channel scope (Codex P2, #1472):** the second condition is extended: the value must be visible on the resolved storefront's sales channel. It needs at least one active product published there through `CommerceListing`, which is the same predicate as the product list. For a facet image, any active value must be visible. This stops a URL obtained on storefront A from being replayed against storefront B (tests N17–N19).
 - **Change after Codex P1 (#1472):** the API emits the origin path, matching every other media family. The storefront adds an explicit, validated branch to `toRenderableMediaUrl()`, placed before the generic pattern, that maps it to `/api/storefront/media/facet-visuals/...`. Anything else maps to `null`, which triggers the fallback chain. A raw origin path never reaches `<img>`. This is covered by mapper tests and by real browser loading in VD-5.
 - **Status:** ACCEPTED-IP (the URL change is a technical refinement)
 
@@ -102,7 +103,7 @@ Evidence: `AWJ-VD-H1-0-EVIDENCE-AND-ARCHITECTURE.md` (sections referenced as §n
   - The origin sends `private, no-store` + ETag + `nosniff` on success, and `no-store` on every 404.
   - The Next proxy keeps **200 responses only**, for at most 300 s.
   - The gate runs before any 304, and `mediaId` is in the URL.
-  - **Mandatory negative tests N1–N16** (§3.8-f), covering:
+  - **Mandatory negative tests N1–N19** (§3.8-f), covering:
     - deactivating a value or facet;
     - deletion;
     - removing or replacing the image;
@@ -125,6 +126,7 @@ Evidence: `AWJ-VD-H1-0-EVIDENCE-AND-ARCHITECTURE.md` (sections referenced as §n
     - a mismatch returns `409` with `current_version`;
     - `null` is allowed only to create a row that does not exist yet.
   - Two creates at the same time: the unique index turns the second into `409`.
+  - **No ABA (Codex P1, #1472):** the API never deletes a visual row. "Remove" empties it to `{}` and increments `version`. Rows disappear only by cascade when the facet or value itself is deleted, and a recreated owner gets a new UUID. So a version number never repeats for the same owner.
   - Full table in §3.8-a.
 - **Alternatives:**
   - An optional `if_unmodified_since`: it allows silent overwrites.

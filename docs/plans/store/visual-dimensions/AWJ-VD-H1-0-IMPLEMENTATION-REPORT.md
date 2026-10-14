@@ -15,7 +15,7 @@ This slice is **documentation only**. No code, migration, API, or runtime behavi
 |---|---|---|
 | D-04: keep `commerce.manage`; block edits in the UI and explain why; no RBAC change | Status matrix for the UI, a clear message, and server-side tests (accountant 403 / name 200 …). `Rbac` unchanged. | Register D-04 · §3.8-a · VD-3 §3.8 |
 | D-08: document inheritance per property; customizing the image must not cancel inheritance of shape and size | A separate resolution chain for each property. Governing example. Implicit `content` from the value's own media. A fallback that keeps shape and size. A fixture with one case per property. | §3.6 · Register D-08 · Queue VD-1a |
-| D-15: negative cache tests and no leakage | `mediaId` in the URL. The gate is checked before 304. `no-store` on 404. The proxy does not cache failures. Mandatory tests N1–N16. | §3.8-c/f · Register D-15 · Queue VD-1c |
+| D-15: negative cache tests and no leakage | `mediaId` in the URL. The gate is checked before 304. `no-store` on 404. The proxy does not cache failures. Mandatory tests N1–N19. | §3.8-c/f · Register D-15 · Queue VD-1c |
 | Inspect CI and PR comments | Codex P2: race between media deletion and saving a visual. **Valid.** Addressed by locking the media row in both paths (new D-16) with tests. | §3.8-d · R16 · D-16 |
 | Current-UI screenshots + prototype | Screenshots `IMG_2584`–`IMG_2588` analysed against the code (C1–C12). VD-3 requirements written. Template `catalog-rounded` added from the owner's concept image. | `AWJ-VD-H1-VD3-EDITOR-UX-REQUIREMENTS.md` · §2.8 · §3.7 |
 
@@ -26,6 +26,13 @@ This slice is **documentation only**. No code, migration, API, or runtime behavi
 | P1: the `src` origin path does not reach Laravel from the storefront origin, and the mapper has no facet branch | **Valid.** Verified in `mappers.ts:164`: the generic pattern does not match three segments, so the URL is returned raw. | An explicit, validated branch in `toRenderableMediaUrl()` before the generic pattern. Anything invalid maps to `null`, which triggers the fallback chain. Tests added. Recorded under D-03. |
 | P2: the optional concurrency token allows silent overwrites | **Valid.** | `version` column and `expected_version` required whenever a row exists (428/409). New decision D-17. |
 | P2: `showLabels` versus `showLabel` | **Valid.** | Standardized on `showLabel` in every layer (D-08). |
+
+## Codex review round 3 (on `17ec6c3`) — changes applied
+
+| Finding | Assessment | Change |
+|---|---|---|
+| P1: ABA after delete and recreate resets `version` | **Valid.** | The API never deletes a visual row; "remove" empties it and increments `version`. Deletion happens only by cascade with the owner, and a recreated owner gets a new UUID (D-17). Dedicated test. |
+| P2: the image gate authorizes a value at tenant level, not per storefront channel | **Valid** for multi-storefront tenants. | The second condition now reuses the same `CommerceListing` + `is_active` predicate the product list applies on the resolved channel. Tests N17–N19 (D-03). |
 
 ## Repository evidence / root cause
 
