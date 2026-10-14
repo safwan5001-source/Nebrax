@@ -96,7 +96,7 @@ describe('TaxCard', () => {
   const labels: Record<string, string> = {
     taxReport: 'VAT report', outputVat: 'Output VAT', inputVat: 'Input VAT', netVat: 'Net VAT', taxPayable: 'Payable',
     taxRecoverable: 'Recoverable', taxUnverified: 'Unverified', taxUnverifiedHint: 'Figures may include non-VAT movements',
-    taxVerifiedWithNotices: 'Verified with notices', taxNoticesHint: 'History notices, no movement in this period', taxFiscalCloseDisclosure: 'Difference from the Fiscal Close line',
+    taxVerifiedWithNotices: 'Role-account checks passed, with notices', taxVerificationScope: 'Verification covers VAT role-account integrity only', taxNoticesHint: 'History notices, no movement in this period', taxFiscalCloseDisclosure: 'Difference from the Fiscal Close line',
   };
   const gTax = ((key: string) => labels[key] ?? key) as ReturnType<typeof useTranslations>;
 
@@ -139,7 +139,8 @@ describe('TaxCard', () => {
         g={gTax}
       />
     );
-    expect(screen.getByText('Verified with notices')).not.toBeNull();
+    expect(screen.getByText('Role-account checks passed, with notices')).not.toBeNull();
+    expect(screen.getByTestId('verification-scope').textContent).toContain('integrity only'); // لا يوحي بجاهزية الإقرار
     expect(screen.queryByText('Unverified')).toBeNull();
     expect(screen.queryByRole('alert')).toBeNull();
     expect(within(screen.getByRole('status')).getByText('Account 4999 has the wrong type')).not.toBeNull();
@@ -179,6 +180,20 @@ describe('TaxCard', () => {
       />
     );
     expect(screen.queryByText('Unverified')).toBeNull();
+    expect(screen.getByTestId('verification-scope')).not.toBeNull();
     expect(within(screen.getByTestId('fiscal-close-disclosure')).getByText('Close shows 150.00, report 300.00')).not.toBeNull();
+  });
+
+  it('keeps a real reconciliation discrepancy disclosed even when the report is unverified or has notices', () => {
+    const disclosure = [{ code: 'fiscal_close_vat_control_differs', role_key: 'tax_output', message: 'Close 150.00 vs report 300.00' }];
+    const { rerender } = render(
+      <TaxCard tax={{ ...tax, verification: { verified: false, status: 'unverified', issues: 1 }, warnings: [{ code: 'x', account_code: '1', message: 'm', affects_totals: true }], disclosures: disclosure }} loading={false} g={gTax} />
+    );
+    expect(screen.getByTestId('fiscal-close-disclosure')).not.toBeNull();
+    rerender(
+      <TaxCard tax={{ ...tax, verification: { verified: false, status: 'verified_with_notices', issues: 0, notices: 1 }, warnings: [{ code: 'x', account_code: '1', message: 'm', affects_totals: false }], disclosures: disclosure }} loading={false} g={gTax} />
+    );
+    expect(screen.getByTestId('fiscal-close-disclosure')).not.toBeNull();
+    expect(screen.getByTestId('verification-scope')).not.toBeNull();
   });
 });

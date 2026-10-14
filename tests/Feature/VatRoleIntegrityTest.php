@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Account;
+use App\Models\Branch;
 use App\Models\AccountRoleMapping;
 use App\Models\AccountRoleMappingEvent;
 use App\Models\CashBankAccount;
@@ -652,6 +653,10 @@ class VatRoleIntegrityTest extends TestCase
         $this->assertFalse($feb['verification']['verified']);                 // المنطقي محافظ: true لا يكون إلا بلا أي تحذير
         $this->assertSame(0, $feb['verification']['issues']);
         $this->assertGreaterThan(0, $feb['verification']['notices']);
+        // «مع ملاحظات» لا يوحي بجاهزية الإقرار ولا بمطابقة الدفاتر: ما لم يُفحص يُعلن في كل حالة.
+        foreach (['vat_return_filing', 'invoice_to_ledger_reconciliation', 'zatca_clearance'] as $notChecked) {
+            $this->assertContains($notChecked, $feb['verification']['not_checked']);
+        }
         $mismatch = collect($feb['warnings'])->firstWhere('code', 'vat_account_type_mismatch');
         $this->assertNotNull($mismatch);
         $this->assertFalse($mismatch['affects_totals']);
@@ -682,6 +687,129 @@ class VatRoleIntegrityTest extends TestCase
         $this->assertTrue(collect($feb['warnings'])->firstWhere('code', 'vat_role_accounts_overlap')['affects_totals']);
         $this->assertSame(15000, $feb['output_vat']);                             // يُنسب بنوعه (التزام ⇒ مخرجات)، لا ازدواج
         $this->assertSame(0, $feb['input_vat']);
+    }
+
+    // ───────────── 3b-2. أثر النطاق: حدود التواريخ، العكس، التداخل التاريخي، الفروع، المستأجرون ─────────────
+
+    /** يرحّل سطر «ضريبة» على الحساب المعطوب (بديل عن فاتورة) بتاريخ وفرع محدَّدين. */
+    private function vatLine(Account $account, int $amount, string $date, ?string $branchId = null): JournalEntry
+    {
+        return app(LedgerService::class)->post([
+            ['account_id' => $this->byCode('1130')->id, 'debit' => $amount],
+            ['account_id' => $account->id, 'credit' => $amount],
+        ], ['entry_date' => $date, 'branch_id' => $branchId]);
+    }
+
+    private function statusFor(array $filters): string
+    {
+        return $this->tax($filters)['verification']['status'];
+    }
+
+    /** @test */
+    public function period_boundaries_are_inclusive_and_any_movement_in_scope_keeps_the_figures_unverified(): void
+    {
+        $legacy = $this->account('4999', 'revenue');
+        $this->legacyMap('tax_output', $legacy);
+        $this->vatLine($legacy, 15000, '2026-02-15');
+        $this->vatLine($legacy, 5000, '2026-01-31');
+
+        $this->assertSame('unverified', $this->statusFor(['from' => '2026-02-15', 'to' => '2026-02-15']));   // يوم واحد = يوم الحركة
+        $this->assertSame('unverified', $this->statusFor(['from' => '2026-02-15', 'to' => '2026-02-28']));   // الحد الأدنى مشمول
+        $this->assertSame('unverified', $this->statusFor(['from' => '2026-02-01', 'to' => '2026-02-15']));   // الحد الأعلى مشمول
+        $this->assertSame('verified_with_notices', $this->statusFor(['from' => '2026-02-16', 'to' => '2026-02-28']));
+        $this->assertSame('verified_with_notices', $this->statusFor(['from' => '2026-02-01', 'to' => '2026-02-14']));
+
+        // الحدّ بين شهرين: حركة 31 كانون الثاني ملوِّثة لكانون الثاني فقط.
+        $this->assertSame('unverified', $this->statusFor(['from' => '2026-01-01', 'to' => '2026-01-31']));
+        $this->assertSame('unverified', $this->statusFor(['from' => '2026-01-31', 'to' => '2026-01-31']));
+        $this->assertSame('verified_with_notices', $this->statusFor(['from' => '2026-02-01', 'to' => '2026-02-14']));
+
+        // بلا مرشّح (كل الزمن) = كل الحركات ⇒ غير موثَّق.
+        $this->assertSame('unverified', $this->statusFor([]));
+        $this->balanced();
+    }
+
+    /** @test */
+    public function a_reversed_movement_still_counts_as_movement_in_both_the_original_and_the_reversal_period(): void
+    {
+        $legacy = $this->account('4999', 'revenue');
+        $this->legacyMap('tax_output', $legacy);
+        $entry = $this->vatLine($legacy, 15000, '2026-01-10');
+        app(LedgerService::class)->reverse($entry, '2026-02-05', 'عكس');
+
+        // صافي كل الزمن صفر، لكن الحساب تحرّك: لا يُعدّ «نظيفاً» لمجرد التصفية.
+        $all = $this->tax();
+        $this->assertSame(0, $all['output_vat']);
+        $this->assertSame('unverified', $all['verification']['status']);
+
+        $this->assertSame('unverified', $this->statusFor(['from' => '2026-01-01', 'to' => '2026-01-31']));     // الأصل
+        $feb = $this->tax(['from' => '2026-02-01', 'to' => '2026-02-28']);                                   // العكس وحده
+        $this->assertSame('unverified', $feb['verification']['status']);
+        $this->assertSame(-15000, $feb['output_vat']);
+        $this->assertSame('verified_with_notices', $this->statusFor(['from' => '2026-03-01', 'to' => '2026-03-31']));
+    }
+
+    /** @test */
+    public function a_historical_overlap_respects_the_same_inclusive_boundaries(): void
+    {
+        $shared = $this->account('2125', 'liability');
+        $this->legacyMap('tax_input', $shared);
+        AccountRoleMapping::where('role_key', 'tax_input')->update(['account_id' => $this->byCode('1150')->id]);
+        $this->legacyMap('tax_output', $shared);
+        $this->vatLine($shared, 15000, '2026-02-10');
+
+        $this->assertSame('unverified', $this->statusFor(['from' => '2026-02-10', 'to' => '2026-02-10']));
+        $this->assertSame('verified_with_notices', $this->statusFor(['from' => '2026-02-11', 'to' => '2026-02-28']));
+        $this->assertSame('verified_with_notices', $this->statusFor(['from' => '2026-01-01', 'to' => '2026-02-09']));
+        $this->assertSame('unverified', $this->statusFor([]));
+    }
+
+    /** @test */
+    public function the_branch_filter_decides_whether_a_contaminated_account_moved_in_scope(): void
+    {
+        $branchA = Branch::create(['code' => '00002', 'name' => 'فرع أ', 'is_main' => false]);
+        $branchB = Branch::create(['code' => '00003', 'name' => 'فرع ب', 'is_main' => false]);
+        $legacy = $this->account('4999', 'revenue');
+        $this->legacyMap('tax_output', $legacy);
+        $this->vatLine($legacy, 15000, '2026-02-10', $branchA->id);
+        $this->vatLine($legacy, 5000, '2026-02-11', null);                         // غير موزَّع على فرع
+
+        $this->assertSame('unverified', $this->statusFor(['branch_id' => [$branchA->id]]));
+        $this->assertSame('verified_with_notices', $this->statusFor(['branch_id' => [$branchB->id]]));   // لا حركة للفرع ب
+        $this->assertSame('unverified', $this->statusFor([]));                                          // كل الفروع تشمل الحركتين
+        $b = $this->tax(['branch_id' => [$branchB->id]]);
+        $this->assertSame(0, $b['output_vat']);
+        $this->assertFalse($b['verification']['verified']);                                              // لا «موثَّق» نظيف
+    }
+
+    /** @test */
+    public function verification_and_warnings_never_cross_tenants(): void
+    {
+        $legacy = $this->account('4999', 'revenue');
+        $this->legacyMap('tax_output', $legacy);
+        $this->vatLine($legacy, 15000, '2026-02-10');
+        $this->assertSame('unverified', $this->statusFor([]));
+
+        // مستأجر ب نظيف: لا يرث تحذيرات أ ولا حركاتها، ولو كان بالفترة نفسها.
+        $other = $this->registerTenant('vat-clean', 'owner@vat-clean.test');
+        app(TenantContext::class)->set($other['tenant_id']);
+        $clean = $this->tax(['from' => '2026-02-01', 'to' => '2026-02-28']);
+        $this->assertSame('verified', $clean['verification']['status']);
+        $this->assertSame([], $clean['warnings']);
+        $this->assertSame([], $clean['disclosures']);
+
+        // ولوثةُ ب لا تنعكس على أ.
+        $dirty = Account::create([
+            'tenant_id' => $other['tenant_id'], 'code' => '4998', 'name' => 'ب', 'type' => 'revenue',
+            'normal_balance' => 'credit', 'is_group' => false, 'is_active' => true,
+        ]);
+        AccountRoleMapping::where('role_key', 'tax_output')->update(['account_id' => $dirty->id]);
+        $this->assertSame('verified_with_notices', $this->statusFor([]));   // نوع خاطئ بلا حركة في ب ⇒ ملاحظة فقط، مستقلة عن حركة أ
+        app(TenantContext::class)->set($this->tenantId);
+        $a = $this->tax(['from' => '2026-02-01', 'to' => '2026-02-28']);
+        $this->assertSame('unverified', $a['verification']['status']);
+        $this->assertSame(15000, $a['output_vat']);
+        $this->assertSame(['4999'], collect($a['warnings'])->pluck('account_code')->unique()->values()->all());
     }
 
     // ───────────── 3c. إفصاح فرق سطر الإقفال المالي ─────────────

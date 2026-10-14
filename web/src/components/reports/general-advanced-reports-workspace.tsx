@@ -547,6 +547,7 @@ export function TaxCard({ tax, loading, g }: { tax: TaxReport | null; loading: b
       <CardContent>
         {loading || !tax ? <Skeleton className="h-32 w-full" /> : (
           <>
+            {tax.verification && <p data-testid="verification-scope" className="mb-2 text-xs leading-relaxed text-muted">{g('taxVerificationScope')}</p>}
             {unverified && (
               <div role="alert" className="mb-3 rounded border border-negative/40 bg-negative/5 p-3 text-sm text-negative">
                 <p className="font-medium">{g('taxUnverifiedHint')}</p>
@@ -564,7 +565,7 @@ export function TaxCard({ tax, loading, g }: { tax: TaxReport | null; loading: b
               </div>
             )}
             {disclosures.length > 0 && (
-              <div data-testid="fiscal-close-disclosure" className="mb-3 rounded border border-border bg-background p-3 text-sm text-muted">
+              <div role="note" data-testid="fiscal-close-disclosure" className="mb-3 rounded border border-warning/40 bg-warning/10 p-3 text-sm text-warning">
                 <p className="font-medium">{g('taxFiscalCloseDisclosure')}</p>
                 <ul className="mt-1 list-disc space-y-0.5 ps-5">
                   {disclosures.map((disclosure) => <li key={`${disclosure.code}-${disclosure.role_key}`}>{disclosure.message}</li>)}

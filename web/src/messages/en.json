@@ -5480,8 +5480,9 @@
       "taxHint": "A control summary of the input and output VAT account movements in posted entries; it is not a tax filing or a submission to the authority.",
       "taxUnverified": "Unverified",
       "taxUnverifiedHint": "These figures may include non-VAT movements or overlapping roles; do not rely on them for a filing until the warnings below are reviewed.",
-      "taxVerifiedWithNotices": "Verified with notices",
+      "taxVerifiedWithNotices": "Role-account checks passed, with notices",
       "taxNoticesHint": "Warnings about the history of the VAT accounts; the accounts have no movement in this period, so these figures are not affected.",
+      "taxVerificationScope": "Verification covers VAT role-account integrity only; it does not mean filing readiness, ledger reconciliation, Fiscal Close reconciliation or ZATCA compliance.",
       "taxFiscalCloseDisclosure": "Difference from the Fiscal Close line",
       "loadFailed": "The report could not be loaded. Check your connection and try again.",
       "retry": "Try again"

@@ -165,7 +165,20 @@ Accounting example (default chart; sale 1,000.00 + 15 % on 2026-01-10 credited t
 
 Journal impact: none (read-only). Tests added (4, SQLite + PostgreSQL): `verification_declares_what_was_checked_and_what_was_not`, `a_contaminated_historical_account_only_taints_the_periods_it_moved_in`, `a_historical_role_overlap_is_a_notice_without_movement_and_a_failure_with_movement`, `the_report_discloses_the_fiscal_close_vat_line_difference_with_the_same_numbers_the_close_shows`; web: 3 new `TaxCard` tests.
 
-**Decision requested (not implemented):** showing the same disclosure on the Fiscal Close readiness screen requires an additive info item in `FiscalCloseService`, which the Phase-2 scope excluded. Approve or leave it to REM-06.
+### Owner decisions on review round 1 (recorded)
+
+1. **Verification semantics — APPROVED.** `verified` refers only to VAT role-account integrity; never filing readiness, ledger reconciliation or ZATCA compliance. Enforced in the contract (`basis`, `checks`, `not_checked` in every status) and in the UI (a permanent scope caption under the report heading).
+2. **Period-aware warnings — APPROVED CONDITIONALLY.** An issue outside the requested figures may be a historical notice; **any issue that affects the requested figures keeps them `unverified`**. Condition met and tested (see below).
+3. **Fiscal Close disclosure — APPROVED IN THE VAT REPORT ONLY.** `FiscalCloseService` and the Fiscal Close screen are **not** modified in REM-05; showing the disclosure there is deferred to REM-06 or a separate approved task.
+
+`verified_with_notices` therefore means only *"role-account checks passed; some warnings concern accounts with no movement in this scope"*. It never implies filing readiness or a completed Fiscal Close reconciliation, and a real reconciliation discrepancy stays disclosed (`disclosures[]`, warning-toned block) in every status.
+
+Review-round-2 tests (SQLite + PostgreSQL), all asserting both sides of the boundary:
+`period_boundaries_are_inclusive_and_any_movement_in_scope_keeps_the_figures_unverified` (single-day scope, inclusive `from`/`to`, month boundary 31 Jan/1 Feb, all-time) ·
+`a_reversed_movement_still_counts_as_movement_in_both_the_original_and_the_reversal_period` (net-zero all-time stays unverified; reversal-only month unverified; later month notice) ·
+`a_historical_role_overlap_respects_the_same_inclusive_boundaries` ·
+`the_branch_filter_decides_whether_a_contaminated_account_moved_in_scope` (movement in branch A / unallocated line; branch B ⇒ notice; no filter ⇒ unverified) ·
+`verification_and_warnings_never_cross_tenants` · plus `not_checked` asserted in the notices state. Web: 5 `TaxCard` tests (states, scope caption, disclosure kept in every state).
 
 ## 11. Next recommended step
 
