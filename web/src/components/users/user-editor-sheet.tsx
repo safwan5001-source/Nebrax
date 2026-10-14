@@ -16,6 +16,7 @@ import { hasPermission } from '@/lib/permissions';
 import { coversPermissions, effectivePermissions, resolveRoleLabel, type RoleSummary } from '@/modules/users/model';
 import {
   accessSummary,
+  adoptActorScope,
   createPayload,
   diffPayload,
   isDirty,
@@ -178,6 +179,16 @@ export function UserEditorSheet({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- تُحمَّل عند الفتح فقط
   }, [open]);
 
+
+  // نطاق الفاعل يصل غير متزامنٍ: بُعد الإنشاء غير الملموس يُعاد بذره بحسب القيد المعروف الآن (انظر `adoptActorScope`).
+  useEffect(() => {
+    if (user) return;
+    const restricted = { branches: actorBranchesRestricted, warehouses: actorWarehousesRestricted };
+    const next = adoptActorScope(initial, form, restricted);
+    setInitial((i) => ({ ...i, ...next.initial }));
+    setForm((f) => ({ ...f, ...next.current }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- يتفاعل مع وصول القيد فقط
+  }, [actorBranchesRestricted, actorWarehousesRestricted]);
 
   const dirty = isDirty(initial, form);
 

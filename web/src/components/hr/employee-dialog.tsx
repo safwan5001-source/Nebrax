@@ -14,7 +14,7 @@ import { useToast } from '@/components/ui/toast';
 import { api, ApiError, fetchImageUrl } from '@/lib/api';
 import { useNumberPreview } from '@/lib/use-number-preview';
 import { AccessScopeEditor, useScopeCaps, useScopeLookups } from '@/components/users/access-scope-editor';
-import { scopeDraftFromStored, scopeIssues, scopePayload, type ScopeForm } from '@/modules/users/editor';
+import { adoptActorScope, blankScopeFor, scopeDraftFromStored, scopeIssues, scopePayload, type ScopeForm } from '@/modules/users/editor';
 import { SYSTEM_ROLE_KEYS } from '@/components/users/user-editor-sheet';
 import type { Shift } from './shift-dialog';
 
@@ -180,10 +180,7 @@ export function EmployeeDialog({
   // فاعلٌ مقيَّد ببُعدٍ لا يملك «الكل» فيه (سقف المنح AC-UX-00A): يبدأ الإنشاء على «محدَّد» فارغاً ليختار صراحةً،
   // وإلا حُذف المفتاح فرفضه الخادم بعد أن يكون الموظف قد حُفظ.
   const actorRestricted = { branches: (actorScope?.branches.length ?? 0) > 0, warehouses: (actorScope?.warehouses.length ?? 0) > 0 };
-  const blankScope: ScopeForm = {
-    branches: { mode: actorRestricted.branches ? 'selected' : 'all', ids: [] },
-    warehouses: { mode: actorRestricted.warehouses ? 'selected' : 'all', ids: [] },
-  };
+  const blankScope: ScopeForm = blankScopeFor(actorRestricted);
   const [scope, setScope] = useState<ScopeForm>(blankScope);
   // اللقطة الابتدائية لنطاق المستخدم المرتبط: التعديل يُرسِل البُعد المتغيّر وحده (لغة النطاق الموحَّدة مع شاشة المستخدمين).
   const [initialScope, setInitialScope] = useState<ScopeForm>(blankScope);
@@ -232,6 +229,15 @@ export function EmployeeDialog({
     setError(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, employee?.id, linkedUser?.id]);
+
+  // نطاق الفاعل يصل غير متزامنٍ بعد فتح النموذج: البُعد غير الملموس في إنشاءٍ جديد يُعاد بذره بحسب القيد المعروف الآن.
+  useEffect(() => {
+    if (!open || linkedUser) return;
+    const next = adoptActorScope(initialScope, scope, actorRestricted);
+    setInitialScope(next.initial);
+    setScope(next.current);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- يتفاعل مع وصول القيد فقط
+  }, [actorRestricted.branches, actorRestricted.warehouses]);
 
   // معاينة الصورة الحالية — رابط كائنٍ محلّي يُفكّ عند تبديل الموظف أو إغلاق الحوار.
   useEffect(() => {

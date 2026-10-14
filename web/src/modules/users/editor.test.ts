@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   accessSummary,
+  adoptActorScope,
+  blankScopeFor,
   createPayload,
   diffPayload,
   hiddenIds,
@@ -150,5 +152,31 @@ describe('scopeIssues', () => {
   it('skips dimensions the viewer cannot edit', () => {
     const empty: ScopeForm = { ...blank, branches: { mode: 'selected', ids: [] } };
     expect(scopeIssues(blank, empty, { branches: false, warehouses: true }, none, true).branches).toBeNull();
+  });
+});
+
+describe('adoptActorScope (the actor scope arrives after the form opens)', () => {
+  const none = { branches: false, warehouses: false };
+  const limitedBranches = { branches: true, warehouses: false };
+
+  it('reseeds untouched dimensions from the now-known restriction', () => {
+    const blank = blankScopeFor(none);
+    const next = adoptActorScope(blank, blank, limitedBranches);
+    expect(next.current.branches).toEqual({ mode: 'selected', ids: [] });
+    expect(next.initial.branches).toEqual({ mode: 'selected', ids: [] });
+    expect(next.current.warehouses).toEqual({ mode: 'all', ids: [] });
+  });
+
+  it('keeps a dimension the user already changed', () => {
+    const blank = blankScopeFor(none);
+    const touched = { ...blank, branches: { mode: 'selected' as const, ids: ['b2'] } };
+    const next = adoptActorScope(blank, touched, limitedBranches);
+    expect(next.current.branches).toEqual({ mode: 'selected', ids: ['b2'] });
+    expect(next.initial.branches).toEqual({ mode: 'all', ids: [] });
+  });
+
+  it('is a no-op when nothing is restricted', () => {
+    const blank = blankScopeFor(none);
+    expect(adoptActorScope(blank, blank, none)).toEqual({ initial: blank, current: blank });
   });
 });

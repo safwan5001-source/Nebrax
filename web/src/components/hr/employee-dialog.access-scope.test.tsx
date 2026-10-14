@@ -38,15 +38,17 @@ function respond() {
 
 const writes = () => api.mock.calls.filter((c) => (c[1] as { method?: string } | undefined)?.method) as [string, { method: string; body: Record<string, unknown> }][];
 
-function open(
-  linkedUser?: { id: string; name: string; email: string; role: string; branch_ids?: string[]; warehouse_ids?: string[] },
-  actorScope?: { branches: string[]; warehouses: string[] },
-) {
-  return render(
-    <NextIntlClientProvider locale="en" messages={messages as never}>
-      <EmployeeDialog open onClose={() => {}} onSaved={() => {}} canManageUsers initialAllowAccess linkedUser={linkedUser as never} actorScope={actorScope} />
-    </NextIntlClientProvider>,
-  );
+type LinkedArg = { id: string; name: string; email: string; role: string; branch_ids?: string[]; warehouse_ids?: string[] };
+type ScopeArg = { branches: string[]; warehouses: string[] };
+
+const tree = (linkedUser?: LinkedArg, actorScope?: ScopeArg) => (
+  <NextIntlClientProvider locale="en" messages={messages as never}>
+    <EmployeeDialog open onClose={() => {}} onSaved={() => {}} canManageUsers initialAllowAccess linkedUser={linkedUser as never} actorScope={actorScope} />
+  </NextIntlClientProvider>
+);
+
+function open(linkedUser?: LinkedArg, actorScope?: ScopeArg) {
+  return render(tree(linkedUser, actorScope));
 }
 
 beforeEach(() => {
@@ -139,5 +141,30 @@ describe('EmployeeDialog access scope for a scope-limited actor', () => {
   it('an unlimited actor is unaffected', async () => {
     open(undefined, { branches: [], warehouses: [] });
     expect(((await screen.findByRole('radio', { name: /All branches/ })) as HTMLInputElement).disabled).toBe(false);
+  });
+});
+
+describe('EmployeeDialog: the actor scope arrives after the dialog opened', () => {
+  it('reseeds the untouched scope so a limited actor cannot submit "All" in the gap', async () => {
+    const view = open(undefined, undefined); // قائمة المستخدمين لم تصل بعد
+    expect(((await screen.findByRole('radio', { name: /All branches/ })) as HTMLInputElement).disabled).toBe(false);
+
+    view.rerender(tree(undefined, { branches: ['b1'], warehouses: [] }));
+    await waitFor(() => expect((screen.getByRole('radio', { name: /All branches/ }) as HTMLInputElement).disabled).toBe(true));
+    expect((screen.getByRole('radio', { name: /Selected branches only/ }) as HTMLInputElement).checked).toBe(true);
+
+    await fillNewUser();
+    expect((screen.getByRole('button', { name: 'Save' }) as HTMLButtonElement).disabled).toBe(true);
+    expect(writes()).toEqual([]);
+  });
+
+  it('keeps a dimension the user already changed when the scope arrives', async () => {
+    const view = open(undefined, undefined);
+    await userEvent.click(await screen.findByRole('radio', { name: /Selected branches only/ }));
+    await userEvent.click(await screen.findByRole('checkbox', { name: 'Khobar' }));
+
+    view.rerender(tree(undefined, { branches: ['b1', 'b2'], warehouses: [] }));
+    await waitFor(() => expect((screen.getByRole('radio', { name: /All branches/ }) as HTMLInputElement).disabled).toBe(true));
+    expect((screen.getByRole('checkbox', { name: 'Khobar' }) as HTMLInputElement).checked).toBe(true);
   });
 });

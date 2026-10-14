@@ -118,6 +118,39 @@ export function scopePayload(
   return body;
 }
 
+/** البذرة الابتدائية لنطاق إنشاء: فاعلٌ مقيَّد ببُعدٍ يبدأ على «محدَّد» فارغاً (لا يملك «الكل»)، وغيره على «الكل». */
+export function blankScopeFor(restricted: ScopeCaps): ScopeForm {
+  return {
+    branches: { mode: restricted.branches ? 'selected' : 'all', ids: [] },
+    warehouses: { mode: restricted.warehouses ? 'selected' : 'all', ids: [] },
+  };
+}
+
+const sameDraft = (a: ScopeDraft, b: ScopeDraft) => a.mode === b.mode && sameIds(a.ids, b.ids);
+
+/**
+ * نطاق الفاعل يصل غير متزامنٍ (من قائمة المستخدمين) وقد يتأخر عن فتح النموذج: البُعد **الذي لم يلمسه المستخدم**
+ * يُعاد بذره بحسب القيد المعروف الآن؛ والمُلامَس يبقى كما هو. وإلا بقي «الكل» مختاراً لفاعلٍ مقيَّد فحُذف المفتاح
+ * ورفضه الخادم بعد أن حُفظ الموظف.
+ */
+export function adoptActorScope(
+  initial: ScopeForm,
+  current: ScopeForm,
+  restricted: ScopeCaps,
+): { initial: ScopeForm; current: ScopeForm } {
+  const blank = blankScopeFor(restricted);
+  const pick = (key: keyof ScopeForm): { initial: ScopeDraft; current: ScopeDraft } =>
+    sameDraft(initial[key], current[key])
+      ? { initial: blank[key], current: blank[key] }
+      : { initial: initial[key], current: current[key] };
+  const b = pick('branches');
+  const w = pick('warehouses');
+  return {
+    initial: { branches: b.initial, warehouses: w.initial },
+    current: { branches: b.current, warehouses: w.current },
+  };
+}
+
 export interface ScopeIssues {
   branches: ScopeIssue | null;
   warehouses: ScopeIssue | null;
