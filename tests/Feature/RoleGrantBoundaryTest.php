@@ -138,6 +138,26 @@ class RoleGrantBoundaryTest extends TestCase
     }
 
     /** @test */
+    public function a_role_manager_cannot_delete_an_unused_role_beyond_their_ceiling(): void
+    {
+        $auth = $this->tenant();
+        [, , $token] = $this->roleManager($auth);
+        $wide = $this->withToken($auth['token'])->postJson('/api/roles', [
+            'name' => 'واسع غير مستخدم', 'permissions' => ['products.view', 'payments.manage'],
+        ])->assertCreated()['data']['id'];
+        $narrow = $this->withToken($auth['token'])->postJson('/api/roles', [
+            'name' => 'ضيق غير مستخدم', 'permissions' => ['products.view'],
+        ])->assertCreated()['data']['id'];
+
+        $this->withToken($token)->deleteJson("/api/roles/{$wide}")->assertForbidden();
+        $this->assertNotNull(Role::find($wide));
+
+        // ضمن سقفه يُحذف كما كان، والمالك يحذف أيّاً منهما.
+        $this->withToken($token)->deleteJson("/api/roles/{$narrow}")->assertOk();
+        $this->withToken($auth['token'])->deleteJson("/api/roles/{$wide}")->assertOk();
+    }
+
+    /** @test */
     public function a_restricted_user_manager_cannot_chain_role_edit_into_scope_unrestriction(): void
     {
         $auth = $this->tenant();

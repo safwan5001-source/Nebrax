@@ -132,6 +132,11 @@ class RoleController extends ApiController
             abort(422, 'الأدوار النظامية لا تُحذف.');
         }
 
+        // سقف المنح يشمل الحذف: فاعلٌ ممنوعٌ من تعديل دورٍ لا يُتلفه كذلك.
+        if (! Rbac::covers(Rbac::permissionsForRole(request()->user()->role), $role->permissions ?? [])) {
+            abort(403, 'لا يمكنك حذف دورٍ صلاحياته تتجاوز صلاحياتك.');
+        }
+
         // دورٌ مسنَدٌ لمستخدمٍ لا يُحذف — لئلّا يبقى مستخدمٌ بلا دور.
         // العزل يدويّ بالمستأجر (User لا يرث BaseModel).
         if (User::where('tenant_id', $role->tenant_id)->where('role', $role->slug)->exists()) {
