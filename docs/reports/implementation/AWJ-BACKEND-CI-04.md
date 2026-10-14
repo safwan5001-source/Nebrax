@@ -1,6 +1,6 @@
 # AWJ-BACKEND-CI-04 — PostgreSQL CI Hang Diagnostics & Watchdog
 
-STATUS: implemented; PR #1488 (merge and post-merge results: §9)
+STATUS: closed (merged, post-merge CI green, POST_MERGE_REVIEW: PASS)
 DATE: 2026-10-14
 
 ## 1. Evidence pass (before any change)
@@ -200,3 +200,33 @@ No P1. Resolution:
 - The verdict is a heuristic and is always printed with its evidence.
 - The `sudo -n` reads depend on GitHub-hosted runners keeping passwordless sudo; without it the fields read `unavailable`.
 - If the job is cancelled during a stall, snapshots already written are uploaded (`if: always()`); `summary.json` may be missing if the runner kills the watchdog before its handler runs.
+
+## 9. Merge, post-merge and closure
+
+| Item | Value |
+|---|---|
+| Branch | `claude/postgresql-ci-hang-watchdog-cc1nw1` |
+| PR | [#1488](https://github.com/safwan5001-source/Nebrax/pull/1488) (squash) |
+| Base SHA | `757a7a3` |
+| Head SHA | `ef3dc81495e0099b068b4e04c59064633667ac75` |
+| **Merge SHA** | **`ad3ddfbe038bc076c37ff8fe03e08a4c2405f0c5`** |
+| PRE_MERGE_REVIEW | PASS (PR comment): CI on `ef3dc81` all green (run `38639834295`; pgsql self-tests 33/33 in 40.6 s, 6936 tests, 0 failures, 0 stalls); no open P1/P2 |
+| POST_MERGE_REVIEW | PASS (PR comment) |
+| Production deploy | **None** |
+
+### CI on the merge SHA (`main`, run `38642347684`)
+| Job | Job id | Result |
+|---|---|---|
+| pgsql (4 workers) | `116120720413` | ✅ watchdog self-tests 33 in 41.1 s; **6957 tests, 52986 assertions, 0 errors/failures, 3 skipped** (13:47); watchdog started and stopped cleanly, **stalls 0**, no warnings |
+| sqlite | `116120720623` | ✅ (watchdog steps skipped by design) |
+
+### Threshold margin after four CI runs
+Slowest legitimate test per run, always `PlatformGlobalApplicationOverrideTest::global_summary_scales_with_bounded_queries_and_matches_reference_aggregates`: **60.0 → 75.6 → 69.8 → 98.0 s**. The longest sampled gap was 95.3 s. The test takes 23.8 s locally. 240 s still leaves 2.4× headroom. Exceeding it would cost one `::warning` and a snapshot, never a failed job. This is the margin to watch (see Next).
+
+### Root cause
+**Not established.** The #1477 stall has not recurred in the 5 CI runs since. This task adds the capability to diagnose the next incident, not a fix.
+
+### Next recommended task
+1. **sales.invoicing** — the owner's next planned item.
+2. Small follow-up, not urgent: profile `PlatformGlobalApplicationOverrideTest::global_summary_scales…` (4× slower on CI than locally, variance 56–98 s). It is the main input to the stall threshold and the slowest test in the suite.
+3. If a stall recurs, read the snapshot verdict. If it says "blocked in PHP", decide on an opt-in per-worker PHP stack dump (§8).
