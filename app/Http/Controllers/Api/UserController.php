@@ -81,14 +81,7 @@ class UserController extends ApiController
      */
     private function canGrantRole(User $actor, string $slug): bool
     {
-        $mine = Rbac::permissionsForRole($actor->role);
-        if (in_array('*', $mine, true)) {
-            return true;
-        }
-
-        $wanted = Rbac::permissionsForRole($slug);
-
-        return ! in_array('*', $wanted, true) && array_diff($wanted, $mine) === [];
+        return Rbac::covers(Rbac::permissionsForRole($actor->role), Rbac::permissionsForRole($slug));
     }
 
     /**

@@ -9,6 +9,7 @@ use App\Models\User;
 use App\Support\Rbac;
 use App\Tenancy\TenantContext;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 
 /**
@@ -18,6 +19,9 @@ use Illuminate\Support\Str;
  *  2. الدور النظامي (`is_system`) لا يُحذف أبداً — يبقى ركيزة التوافق الرجعي.
  *  3. دورٌ يشير إليه مستخدمٌ لا يُحذف — لئلّا يصير مستخدمٌ بلا دور.
  *  4. الدور المخصَّص لا يملك `*` — الوصول الكامل محصورٌ في الأدوار النظامية.
+ *  5. سقف المنح (AC-UX-00A): فاعلٌ بلا `*` لا يُنشئ ولا يعدّل دوراً بصلاحيات تتجاوز
+ *     صلاحياته هو (دوره هو داخلاً)، ولا يعدّل دوراً قائماً يتجاوز سقفه — وإلا
+ *     كان `roles.manage` طريقاً لترقية النفس فوق ما مُنح.
  */
 class RoleController extends ApiController
 {
@@ -42,9 +46,29 @@ class RoleController extends ApiController
             ->response();
     }
 
+    /**
+     * سقف المنح: يُقارَن ما سيُحفظ (والدور القائم إن وُجد) بصلاحيات الفاعل الفعلية.
+     * الفاعل ذو `*` (owner/admin) لا يتأثر.
+     *
+     * @param array<int, string> $requested
+     */
+    private function guardGrantCeiling(Request $request, array $requested, ?Role $existing = null): void
+    {
+        $mine = Rbac::permissionsForRole($request->user()->role);
+
+        if ($existing !== null && ! Rbac::covers($mine, $existing->permissions ?? [])) {
+            abort(403, 'لا يمكنك تعديل دورٍ صلاحياته تتجاوز صلاحياتك.');
+        }
+
+        if (! Rbac::covers($mine, $requested)) {
+            abort(403, 'لا يمكنك منح صلاحياتٍ تتجاوز صلاحياتك.');
+        }
+    }
+
     public function store(StoreRoleRequest $request): JsonResponse
     {
         $data = $request->validated();
+        $this->guardGrantCeiling($request, $data['permissions']);
 
         $role = Role::create([
             'slug'        => $this->uniqueSlug(),
@@ -68,6 +92,7 @@ class RoleController extends ApiController
         }
 
         $data = $request->validated();
+        $this->guardGrantCeiling($request, $data['permissions'], $role);
 
         $role->update([
             'name'        => trim($data['name']),
