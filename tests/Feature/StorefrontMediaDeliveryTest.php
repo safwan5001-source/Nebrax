@@ -12,7 +12,6 @@ use App\Support\Commerce\StorefrontPresentationPublishValidator;
 use App\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
-use Mockery;
 use Tests\TestCase;
 
 /**
@@ -28,12 +27,6 @@ class StorefrontMediaDeliveryTest extends TestCase
     use StorefrontMediaTestSupport;
 
     private const BASE = '/api/commerce/workspace/storefront-media';
-
-    protected function tearDown(): void
-    {
-        Mockery::close();
-        parent::tearDown();
-    }
 
     /** @return array{auth:array<string,mixed>,storefront:\App\Models\Storefront,host:string} */
     private function store(string $slug, ?string $host = null): array

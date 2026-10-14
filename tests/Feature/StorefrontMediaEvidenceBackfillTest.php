@@ -9,7 +9,6 @@ use App\Services\Commerce\StorefrontMediaPixelEvidence;
 use App\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
-use Mockery;
 use Symfony\Component\Console\Command\Command;
 use Tests\TestCase;
 
@@ -28,12 +27,6 @@ class StorefrontMediaEvidenceBackfillTest extends TestCase
     private const BASE = '/api/commerce/workspace/storefront-media';
 
     private int $uploads = 0;
-
-    protected function tearDown(): void
-    {
-        Mockery::close();
-        parent::tearDown();
-    }
 
     /** @return array<string,mixed> */
     private function uploadMedia(array $auth): array

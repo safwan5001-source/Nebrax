@@ -30,12 +30,6 @@ class PlatformStorageTestTargetTest extends TestCase
 
     private const KEY_ID = 'H1510-KEY-ID';
 
-    protected function tearDown(): void
-    {
-        Mockery::close();
-        parent::tearDown();
-    }
-
     private function saved(bool $enabled): void
     {
         PlatformIntegrationSetting::create([

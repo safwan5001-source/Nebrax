@@ -16,7 +16,6 @@ class R2StorageServiceTest extends TestCase
     protected function tearDown(): void
     {
         app(TenantContext::class)->forget();
-        Mockery::close();
         parent::tearDown();
     }
 

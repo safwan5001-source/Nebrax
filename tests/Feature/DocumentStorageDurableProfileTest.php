@@ -21,12 +21,6 @@ class DocumentStorageDurableProfileTest extends TestCase
 {
     use RefreshDatabase;
 
-    protected function tearDown(): void
-    {
-        Mockery::close();
-        parent::tearDown();
-    }
-
     private function integration(bool $enabled = true): void
     {
         PlatformIntegrationSetting::create([

@@ -14,12 +14,6 @@ use Tests\TestCase;
 
 class R2SmokeTestCommandTest extends TestCase
 {
-    protected function tearDown(): void
-    {
-        Mockery::close();
-        parent::tearDown();
-    }
-
     public function test_happy_path_uses_internal_system_key_and_only_allowed_operations(): void
     {
         $this->fakeR2Config();
