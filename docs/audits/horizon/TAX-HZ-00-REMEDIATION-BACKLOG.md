@@ -111,6 +111,12 @@ REM-03 and REM-08 touch disjoint controllers (`Invoice/Return/Quote/DocumentRevi
 > **Fix (minimal):** customer lock → `FOR NO KEY UPDATE` on PostgreSQL (still serialises credit postings, no longer conflicts with FK checks); (#1450's 3× retry and global 409 mapping were **removed** by the owner-directed follow-up: single-attempt transaction; `POST /invoices/{id}/post` alone answers **503 + `Retry-After: 1` + `error_code: concurrency_conflict`** on `40P01`/`40001`; every other endpoint is unchanged — see `REM-04-SEC-02-FOLLOWUP-REPORT.md`). **Unchanged:** lock order of the financial path, totals/journal/ICV/VAT, schema, routes, permissions.
 > **Not changed (theoretical, needs an owner-approved design):** `InventoryService` stock-state rows locked before the ledger vs after the anchor in `post()`.
 
+### REM-05 / ACC-01 — status update (2026-10-14)
+
+> **REM-05 — IN REVIEW (Draft PR), not closed**; closes only after approved merge and verification. Decisions D-1…D-6 approved by the owner (D-5 with safeguards). Reports: `REM-05-ACC-01-ACCOUNTING-DECISION-REPORT.md` (§11–§12) and `REM-05-ACC-01-IMPLEMENTATION-REPORT.md`.
+> **Implemented:** VAT-role eligibility (liability/asset, distinct, not cash/bank, not in another role, clean target; other roles cannot take VAT-reserved accounts) ⇒ **422 + `reason`**, evaluated under the tenant-row lock (PostgreSQL race proven); `taxReport` over the role-account set (current ∪ system default ∪ mapping history); additive `verification` / `warnings` / `accounts` and `mapping.violations`; legacy invalid mappings keep posting and are flagged. No schema change, no posting change.
+> **Remaining:** REM-06 (hard-coded VAT posters; GL split after a remap) and Fiscal Close VAT line (reads only the current role account) — documented and tested, not modified. Operator audit of remapped production tenants not run (no production access).
+
 ### REM-03 — card (ready for owner approval to start)
 
 | Field | Content |

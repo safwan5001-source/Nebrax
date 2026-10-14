@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Requests\UpdateAccountRoleMappingRequest;
 use App\Services\Accounting\AccountRoutingService;
+use App\Services\Accounting\VatRoleMappingException;
 use Illuminate\Http\JsonResponse;
 
 /**
@@ -21,17 +22,30 @@ class AccountRoutingController extends ApiController
 
     public function update(UpdateAccountRoleMappingRequest $request, string $roleKey): JsonResponse
     {
-        $mapping = $this->domain(
+        return $this->mappingResponse(
             fn () => $this->routing->setMapping($roleKey, $request->validated('account_id'), $request->user())
         );
-
-        return response()->json(['data' => $mapping]);
     }
 
     public function reset(string $roleKey): JsonResponse
     {
-        $mapping = $this->domain(fn () => $this->routing->reset($roleKey, request()->user()));
+        return $this->mappingResponse(fn () => $this->routing->reset($roleKey, request()->user()));
+    }
 
-        return response()->json(['data' => $mapping]);
+    /**
+     * رفضُ تعيينٍ ضريبي غير مؤهَّل ⇒ 422 بنفس شكل `domain()` (`message`) مع `reason` إضافي ثابت.
+     * أيّ RuntimeException آخر يبقى على مساره القائم (422 برسالته).
+     */
+    private function mappingResponse(\Closure $fn): JsonResponse
+    {
+        $result = $this->domain(function () use ($fn) {
+            try {
+                return $fn();
+            } catch (VatRoleMappingException $e) {
+                return response()->json(['message' => $e->getMessage(), 'reason' => $e->reason], 422);
+            }
+        });
+
+        return $result instanceof JsonResponse ? $result : response()->json(['data' => $result]);
     }
 }

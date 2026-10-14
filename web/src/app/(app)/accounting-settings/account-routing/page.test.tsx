@@ -2,6 +2,7 @@
 import * as React from 'react';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { ApiError } from '@/lib/api';
 import AccountRoutingPage from './page';
 
 const { api, currentUser, translate, toastSuccess, toastError } = vi.hoisted(() => {
@@ -19,6 +20,7 @@ const { api, currentUser, translate, toastSuccess, toastError } = vi.hoisted(() 
     routingStateDefault: 'Default',
     routingStateCustom: 'Custom',
     routingStateInvalid: 'Invalid',
+    routingViolationsTitle: 'Mapping violates the VAT role rules',
     routingStateUnmapped: 'Unmapped',
     routingResetAction: 'Reset',
     routingResetConfirm: 'Confirm reset?',
@@ -40,7 +42,14 @@ vi.mock('next/link', () => ({
   default: ({ href, children, ...rest }: { href: string; children: React.ReactNode }) => <a href={href} {...rest}>{children}</a>,
 }));
 vi.mock('@/lib/auth', () => ({ currentUser }));
-vi.mock('@/lib/api', () => ({ api, ApiError: class ApiError extends Error {} }));
+vi.mock('@/lib/api', () => ({
+  api,
+  ApiError: class ApiError extends Error {
+    constructor(public status: number, message: string, public body?: unknown) {
+      super(message);
+    }
+  },
+}));
 vi.mock('@/components/ui/toast', () => ({ useToast: () => ({ success: toastSuccess, error: toastError }) }));
 vi.mock('lucide-react', () => {
   const iconStub = () => <span />;
@@ -147,5 +156,41 @@ describe('AccountRoutingPage', () => {
       })
     );
     await waitFor(() => expect(toastSuccess).toHaveBeenCalledWith('Saved'));
+  });
+
+  it('flags an existing mapping that violates the VAT role rules while keeping its state', async () => {
+    currentUser.mockReturnValue({ role: 'owner', permissions: undefined });
+    const flagged = {
+      ...routingData,
+      roles: [
+        {
+          ...routingData.roles[0],
+          mapping: {
+            ...routingData.roles[0].mapping,
+            violations: [{ code: 'vat_type_mismatch', message: 'حساب دور «ضريبة المخرجات» يجب أن يكون من نوع «التزامات»' }],
+          },
+        },
+      ],
+    };
+    api.mockResolvedValueOnce({ data: flagged });
+
+    render(<AccountRoutingPage />);
+
+    await waitFor(() => screen.getByText('Mapping violates the VAT role rules'));
+    expect(screen.getByText(/يجب أن يكون من نوع «التزامات»/)).not.toBeNull();
+    expect(screen.getByText('Default')).not.toBeNull(); // الحالة نفسها لم تتغيّر
+  });
+
+  it('shows the server 422 message when a VAT mapping is rejected', async () => {
+    currentUser.mockReturnValue({ role: 'owner', permissions: undefined });
+    api.mockResolvedValueOnce({ data: routingData });
+    api.mockRejectedValueOnce(new ApiError(422, 'حساب دور «ضريبة المخرجات» يجب أن يكون من نوع «التزامات»', {}));
+
+    render(<AccountRoutingPage />);
+
+    await waitFor(() => screen.getByText('Sales Revenue'));
+    fireEvent.change((screen.getAllByRole('combobox') as HTMLSelectElement[])[0], { target: { value: 'acc-2' } });
+
+    await waitFor(() => expect(toastError).toHaveBeenCalledWith('حساب دور «ضريبة المخرجات» يجب أن يكون من نوع «التزامات»'));
   });
 });

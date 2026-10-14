@@ -204,6 +204,17 @@ class ReportController extends ApiController
             'output_vat' => Money::toRiyal($report['output_vat']),
             'net_vat'    => Money::toRiyal($report['net_vat']),
             'status'     => $report['status'],
+            // إضافي (REM-05): توثيق الإجمالي وتحذيراته ونطاق الحسابات المجموعة.
+            'verification' => $report['verification'],
+            'warnings'   => $report['warnings'],
+            // فرق سطر الإقفال المالي (REM-06): المبالغ بالريال كباقي الاستجابة.
+            'disclosures' => array_map(fn (array $d) => [
+                ...$d,
+                'current_balance' => Money::toRiyal($d['current_balance']),
+                'set_balance'     => Money::toRiyal($d['set_balance']),
+                'difference'      => Money::toRiyal($d['difference']),
+            ], $report['disclosures']),
+            'accounts'   => $report['accounts'],
         ]);
     }
 
