@@ -209,7 +209,11 @@ export function ProductMediaSection({
           </>
         ) : (
           <>
-            <Input ref={fileInputRef} id="ws-media-live" type="file" accept={PRODUCT_IMAGE_TYPES.join(',')} multiple disabled={uploading || loading || atLimit} onChange={uploadLiveFiles} className="sr-only" />
+            {/* يُفتح برمجياً من أزرار ظاهرة فقط. `Input` المشترك يفرض w-full وحشواً يغلبان
+                `sr-only`، فكان الحقل المطلق يمتدّ بعرض سلفٍ بعيد ويمرّر الصفحة أفقياً 264px
+                (ERP-UX-022)، ويبقى محطة Tab غير مرئية بلا اسم. عنصر أصلي `hidden`: لا تخطيط
+                ولا تركيز، و`.click()` البرمجي يعمل عليه في المتصفحات الحديثة. */}
+            <input ref={fileInputRef} id="ws-media-live" type="file" accept={PRODUCT_IMAGE_TYPES.join(',')} multiple disabled={uploading || loading || atLimit} onChange={uploadLiveFiles} hidden />
             <div className="grid gap-6 lg:grid-cols-[minmax(15rem,0.5fr)_minmax(0,0.5fr)]">
               <div className="space-y-3">
                 <div className="relative flex aspect-square items-center justify-center overflow-hidden rounded border border-border bg-muted/20">
