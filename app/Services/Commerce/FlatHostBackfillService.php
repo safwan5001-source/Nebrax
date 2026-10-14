@@ -82,7 +82,7 @@ final class FlatHostBackfillService
             $tenantIds = array_values(array_unique(array_map(fn ($s) => $s['tenant']->id, $sources)));
             sort($tenantIds);
             foreach ($tenantIds as $tenantId) {
-                Tenant::query()->whereKey($tenantId)->lockForUpdate()->first();
+                Tenant::withTrashed()->whereKey($tenantId)->lockForUpdate()->first();
             }
             foreach ($sources as $host => $s) {
                 StorefrontDomain::withoutGlobalScope(TenantScope::class)
