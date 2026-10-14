@@ -71,10 +71,12 @@ async function open(page: Page, w: World, opts: { locale?: 'ar' | 'en'; permissi
     localStorage.setItem('theme', theme);
   }, [JSON.stringify(user), opts.theme ?? 'light'] as const);
   await page.goto(`${baseUrl}/users`, { waitUntil: 'domcontentloaded' });
+  // مؤشّر Next في وضع التطوير يعلو تذييل اللوحة على الجوال ويعترض النقر؛ ليس جزءاً من المنتج.
+  await page.addStyleTag({ content: 'nextjs-portal{display:none!important}' });
 }
 
 const rowOf = (page: Page, name: string) =>
-  page.locator('tr, [data-awj-mobile-record], div.p-3\\.5').filter({ hasText: name }).filter({ has: page.getByRole('button', { name: 'More actions' }) }).first();
+  page.locator('tr, [data-awj-mobile-record], div.p-3\\.5').filter({ hasText: name }).filter({ has: page.getByRole('button', { name: /More actions|المزيد من الإجراءات/ }) }).first();
 
 const noHorizontalOverflow = async (page: Page) => {
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
@@ -163,12 +165,13 @@ test.describe('AC-UX-02 user editor', () => {
     await expect(page.getByText('Updated successfully')).toHaveCount(0);
   });
 
-  test('the row access action opens the editor scrolled to the access scope', async ({ page }) => {
+  test('the row access action opens the editor scrolled to the access scope', async ({ page }, info) => {
     const w = world();
     await open(page, w);
     await rowOf(page, 'Hind Alharbi').getByRole('button', { name: 'Access scope' }).click();
     const sheet = page.getByRole('dialog');
     await expect(sheet.getByRole('heading', { name: 'Access scope' })).toBeInViewport();
+    await shot(page, `en-${info.project.name}-access`);
   });
 
   test('a manage-only viewer gets the editor without lookups: scope is read-only and not sent', async ({ page }) => {
@@ -184,7 +187,7 @@ test.describe('AC-UX-02 user editor', () => {
     expect(w.writes[0].body).toEqual({ name: 'Hind B.' });
   });
 
-  test('Arabic renders RTL with the sheet opening from the start edge and no overflow', async ({ page }, info) => {
+  test('Arabic renders RTL with the editor mirrored and no overflow', async ({ page }, info) => {
     const w = world();
     await open(page, w, { locale: 'ar' });
     await expect(page.getByRole('heading', { name: 'المستخدمون' })).toBeVisible();
@@ -192,6 +195,7 @@ test.describe('AC-UX-02 user editor', () => {
     const sheet = page.getByRole('dialog');
     await expect(sheet.getByRole('heading', { name: 'نطاق الوصول' })).toBeVisible();
     await expect(sheet.getByRole('radio', { name: /كل المستودعات/ })).toBeChecked();
+    await sheet.getByRole('heading', { name: 'نطاق الوصول' }).scrollIntoViewIfNeeded();
     expect(await page.evaluate(() => document.documentElement.dir)).toBe('rtl');
     await noHorizontalOverflow(page);
     await shot(page, `ar-${info.project.name}-editor`);

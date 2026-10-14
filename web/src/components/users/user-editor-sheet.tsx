@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
@@ -154,7 +154,10 @@ export function UserEditorSheet({
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [confirmingDiscard, setConfirmingDiscard] = useState(false);
-  const accessRef = useRef<HTMLElement | null>(null);
+  // محتوى اللوحة يُركَّب في بوابة بعد العرض الأول، فيُمرَّر إلى قسم الوصول لحظة ظهوره لا قبلها.
+  const accessRef = (node: HTMLElement | null) => {
+    if (node && focusAccess) node.scrollIntoView?.({ block: 'start' });
+  };
 
   const set = <K extends keyof EditorForm>(key: K, value: EditorForm[K]) => setForm((f) => ({ ...f, [key]: value }));
 
@@ -191,9 +194,6 @@ export function UserEditorSheet({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- تُحمَّل عند الفتح فقط
   }, [open]);
 
-  useEffect(() => {
-    if (open && focusAccess) accessRef.current?.scrollIntoView?.({ block: 'start' });
-  }, [open, focusAccess]);
 
   const dirty = isDirty(initial, form);
 
