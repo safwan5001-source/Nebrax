@@ -10,6 +10,7 @@ use App\Models\JournalEntry;
 use App\Models\JournalLine;
 use App\Models\Tenant;
 use App\Models\User;
+use App\Support\AccountingRoles;
 use App\Support\FiscalCloseJournals;
 use App\Tenancy\TenantContext;
 use Illuminate\Support\Carbon;
@@ -80,6 +81,7 @@ class FiscalCloseService
         private AccountRoleResolver $accountRoles,
         private AccountingDateGuard $dateGuard,
         private FiscalYearService $years,
+        private VatRoleIntegrityService $vatIntegrity,
     ) {}
 
     // ───────────────────────────── الجاهزية ─────────────────────────────
@@ -166,25 +168,21 @@ class FiscalCloseService
         $receivable = $this->roleBalance('accounts_receivable');
         $payable    = $this->roleBalance('accounts_payable');
         if ($receivable !== null || $payable !== null) {
+            // ACC-02-FC: أساس هذين الرقمين **تراكمي حتى اليوم لحساب الدور الحالي وحده** — لا «كما في نهاية السنة».
+            // يُعلَن صراحةً لئلا يُقارَن بسطر الضريبة أدناه (حتى نهاية السنة) على أنهما أساسٌ واحد. توحيد الأساس
+            // قرارٌ محاسبي منفصل (FC-4) ولم يُتَّخذ.
             $items[] = $this->item(self::SEVERITY_INFO, 'open_ar_ap', sprintf(
-                'أرصدة قائمة تنتقل للسنة التالية — العملاء: %s، الموردون: %s. أرصدة ميزانية طبيعية لا تمنع الإقفال.',
+                'أرصدة قائمة تنتقل للسنة التالية — العملاء: %s، الموردون: %s. أرصدة ميزانية طبيعية لا تمنع الإقفال. '
+                . 'هذه الأرصدة تراكمية حتى اليوم للحساب الحالي للدور وحده، وليست كما في نهاية السنة المالية.',
                 $this->money($receivable ?? 0),
                 $this->money($payable ?? 0),
-            ), ['receivable' => $receivable, 'payable' => $payable]);
+            ), ['receivable' => $receivable, 'payable' => $payable, 'basis' => 'all_time_current_account']);
         }
 
         // الضريبة: أرصدة **محاسبية محلية** لا حالة إقرار لدى الهيئة. لا تُقفل
         // (حسابا أصل/خصم)، ولا يدّعي النظام معرفة حالة ZATCA بلا تكامل موثوق.
-        $taxOutput = $this->roleBalance('tax_output');
-        $taxInput  = $this->roleBalance('tax_input');
-        if ($taxOutput !== null || $taxInput !== null) {
-            $items[] = $this->item(self::SEVERITY_INFO, 'vat_balances', sprintf(
-                'أرصدة ضريبة القيمة المضافة المحاسبية — مخرجات: %s، مدخلات: %s. '
-                . 'هذه أرصدة دفترية داخل أَوْج فقط، وليست حالة إقرار أو تقديم لدى هيئة الزكاة والضريبة والجمارك. '
-                . 'حسابات الضريبة أصول/خصوم فلا تُقفل ضمن الإقفال السنوي، ودورة الإقرار الضريبي مستقلّة عن السنة المالية.',
-                $this->money($taxOutput ?? 0),
-                $this->money($taxInput ?? 0),
-            ), ['tax_output' => $taxOutput, 'tax_input' => $taxInput]);
+        foreach ($this->vatItems($year) as $item) {
+            $items[] = $item;
         }
 
         $generations = $year->closes()->with(['closer:id,name', 'reopener:id,name'])->get();
@@ -598,6 +596,75 @@ class FiscalCloseService
     private function columns(string $table): array
     {
         return $this->columnCache[$table] ??= DB::getSchemaBuilder()->getColumnListing($table);
+    }
+
+    /**
+     * سطر ضريبة القيمة المضافة في الجاهزية (ACC-02-FC): أرصدة **حتى نهاية السنة المالية** (`entry_date <= end_date`)
+     * على مجموعة حسابات REM-05 كلها — لا الحساب الحالي وحده — مؤسسياً بلا مرشّح فروع.
+     *
+     * `details.tax_output` / `details.tax_input` احتفظا باسميهما لكن قيمتهما صارت رصيد **المجموعة** كما في نهاية السنة
+     * (كانت رصيد الحساب الحالي تراكمياً حتى اليوم). التعريف الكامل في `details.basis`، وأرصدة الحساب الحالي
+     * في `details.current_account` للمقارنة.
+     *
+     * الشدّة: معلومة، وتصير **تحذيراً** (يتطلب إقراراً في الواجهة دون أن يمنع الإقفال) إذا كانت سلامة الحسابات
+     * غير مثبتة أو دورٌ غير قابل للحلّ. لا تُعرض هنا حالة إقرار ولا التزام فترة ضريبية ولا جاهزية تقديم.
+     *
+     * @return list<array<string,mixed>>
+     */
+    private function vatItems(FiscalYear $year): array
+    {
+        $asOf = $year->end_date->toDateString();
+        $vat = $this->vatIntegrity->balancesAsOf($asOf);
+        $roles = $vat['roles'];
+        $verification = $vat['verification'];
+
+        $unresolved = array_keys(array_filter($roles, fn (array $r) => $r['mapping_state'] !== 'resolved'));
+        $unverified = $verification['status'] === 'unverified';
+
+        $message = sprintf(
+            'أرصدة ضريبة القيمة المضافة المحاسبية حتى %s (تراكمية، كل الفروع، على كل حسابات الدور) — مخرجات: %s، مدخلات: %s. '
+            . 'هذه أرصدة دفترية داخل أَوْج فقط، وليست حالة إقرار أو تقديم لدى هيئة الزكاة والضريبة والجمارك، '
+            . 'ولا تمثّل التزام فترة إقرار ولا جاهزية تقديم. '
+            . 'حسابات الضريبة أصول/خصوم فلا تُقفل ضمن الإقفال السنوي، ودورة الإقرار الضريبي مستقلّة عن السنة المالية. ',
+            $asOf,
+            $this->money($roles['tax_output']['balance']),
+            $this->money($roles['tax_input']['balance']),
+        );
+        $message .= match ($verification['status']) {
+            'unverified' => 'تحذير: سلامة حسابات الدور غير مثبتة — الرصيد قد يضمّ مبالغ غير ضريبية؛ راجع التحذيرات قبل الاعتماد عليه.',
+            'verified_with_notices' => 'سلامة حسابات الدور: ملاحظات لا تمسّ أرقام هذا التاريخ.',
+            default => 'سلامة حسابات الدور: مجتازة لفحوص الهيكل المعلنة فقط (لا مطابقة للفواتير ولا لمحتوى القيود اليدوية).',
+        };
+        foreach ($unresolved as $roleKey) {
+            $message .= sprintf(
+                ' الدور «%s» غير قابل للحلّ (%s): الرصيد المعروض تاريخيّ، وترحيل ضريبة جديدة سيفشل حتى يُعالَج التعيين.',
+                AccountingRoles::find($roleKey)['label_ar'],
+                $roles[$roleKey]['mapping_state'],
+            );
+        }
+
+        $severity = ($unverified || $unresolved !== []) ? self::SEVERITY_WARNING : self::SEVERITY_INFO;
+
+        return [$this->item($severity, 'vat_balances', $message, [
+            // مفتاحان قائمان: القيمة الآن رصيد مجموعة الحسابات حتى نهاية السنة.
+            'tax_output' => $roles['tax_output']['balance'],
+            'tax_input'  => $roles['tax_input']['balance'],
+            'basis' => [
+                'accounts' => 'vat_role_account_set',
+                'as_of' => $asOf,
+                'cutoff' => 'entry_date',
+                'cumulative' => true,
+                'statuses' => ['posted', 'reversed'],
+                'branches' => 'all',
+                'sign' => ['tax_output' => 'credit_minus_debit', 'tax_input' => 'debit_minus_credit'],
+            ],
+            'mapping_state' => array_map(fn (array $r) => $r['mapping_state'], $roles),
+            'accounts' => array_map(fn (array $r) => $r['accounts'], $roles),
+            'current_account' => array_map(fn (array $r) => $r['current_account'], $roles),
+            'verification' => $verification,
+            'warnings' => $vat['warnings'],
+            'not_checked' => $verification['not_checked'],
+        ])];
     }
 
     /** صافي رصيد الحساب المعيَّن لدور، بطبيعته. `null` إن كان الدور غير قابل للحل. */

@@ -6,6 +6,7 @@ use App\Models\Account;
 use App\Models\AccountRoleMapping;
 use App\Models\Branch;
 use App\Models\CreditNote;
+use App\Models\FiscalYear;
 use App\Models\Invoice;
 use App\Models\JournalEntry;
 use App\Models\JournalLine;
@@ -17,6 +18,8 @@ use App\Models\Tenant;
 use App\Models\User;
 use App\Services\Accounting\AccountRoutingService;
 use App\Services\Accounting\ChartOfAccountsSeeder;
+use App\Services\Accounting\FiscalCloseService;
+use App\Services\Accounting\FiscalYearService;
 use App\Services\Accounting\InvoiceService;
 use App\Services\Accounting\LedgerService;
 use App\Services\Accounting\PurchaseService;
@@ -277,14 +280,22 @@ class VatAdjustmentRoutingTest extends TestCase
         $this->assertSame(-15000, $this->balanceOf('2120'));
         $this->assertSame(15000, $this->balanceOf('2125'));
 
-        // تقرير REM-05: مجموع حسابات الدور = صفر (فاتورة − مرتجع)، موثَّق، والفرق مع سطر الإقفال مُفصَح عنه.
+        // تقرير REM-05: مجموع حسابات الدور = صفر (فاتورة − مرتجع)، موثَّق.
         $report = $this->tax();
         $this->assertSame(0, $report['output_vat']);
         $this->assertSame('verified', $report['verification']['status']);
-        $d = collect($report['disclosures'])->firstWhere('role_key', 'tax_output');
-        // الحساب الحالي 2125 مدين 150.00 (رصيد دائن طبيعي = −150.00)، ومجموعة الدور صفر ⇒ فرق 150.00 مُعلَن.
-        $this->assertSame([-15000, 0, 15000], [$d['current_balance'], $d['set_balance'], $d['difference']]);
-        $this->assertSame('2125', $d['current_account_code']);
+        // ACC-02-FC: كان هذا الاختبار يثبّت الإفصاح {−15000، 0، 15000} لأن سطر الإقفال كان يقرأ 2125 وحده. صار الإقفال
+        // يقرأ مجموعة الحسابات حتى نهاية السنة فيطابق التقرير (0) ويُسحب الإفصاح؛ ويبقى −15000 مرجعاً للحساب الحالي.
+        $this->assertSame([], $report['disclosures']);
+        $year = FiscalYear::findOrFail(app(FiscalYearService::class)->create(
+            ['name' => '2026', 'start_date' => '2026-01-01', 'end_date' => '2026-12-31'], null
+        )['id']);
+        $vat = collect(app(FiscalCloseService::class)->readiness($year)['info'])->firstWhere('code', 'vat_balances');
+        $this->assertSame($report['output_vat'], $vat['details']['tax_output']);
+        $this->assertSame(['2125', -15000], [
+            $vat['details']['current_account']['tax_output']['code'],
+            $vat['details']['current_account']['tax_output']['balance'],
+        ]);
         $this->assertBooksBalanced();
     }
 

@@ -434,11 +434,18 @@ class VatRoleIntegrityTest extends TestCase
         $this->assertSame(0, $report['output_vat']);          // 15000 دائن − 15000 مدين (إشعار كامل)
         $this->assertSame('verified', $report['verification']['status']);
 
-        // الأستاذ: 2120 دائن 150.00 (الفاتورة)، 2125 مدين 150.00 (الإشعار) — الفرق مع سطر الإقفال مُفصَح عنه.
+        // الأستاذ: 2120 دائن 150.00 (الفاتورة)، 2125 مدين 150.00 (الإشعار).
         $this->assertSame(15000, $this->net($this->byCode('2120'), 'credit'));
         $this->assertSame(-15000, $this->net($custom, 'credit'));
-        $disclosure = collect($report['disclosures'])->firstWhere('role_key', 'tax_output');
-        $this->assertSame([-15000, 0, 15000], [$disclosure['current_balance'], $disclosure['set_balance'], $disclosure['difference']]);
+        // ACC-02-FC: لا إفصاح فرق بعد الآن — سطر الإقفال المالي يقرأ مجموعة الحسابات نفسها فيتطابق مع التقرير (0)،
+        // بعد أن كان يرى 2125 وحده (−15000) فيفترق عن المجموعة (0). التطابق مثبَّت أيضاً في FiscalCloseVatAsOfTest.
+        $this->assertSame([], $report['disclosures']);
+        $year = FiscalYear::findOrFail(app(FiscalYearService::class)->create(
+            ['name' => '2026', 'start_date' => '2026-01-01', 'end_date' => '2026-12-31'], null
+        )['id']);
+        $vat = collect(app(FiscalCloseService::class)->readiness($year)['info'])->firstWhere('code', 'vat_balances');
+        $this->assertSame($report['output_vat'], $vat['details']['tax_output']);
+        $this->assertSame(-15000, $vat['details']['current_account']['tax_output']['balance']);   // الحساب الحالي وحده، للمقارنة
         $this->balanced();
     }
 
@@ -818,9 +825,12 @@ class VatRoleIntegrityTest extends TestCase
     // ───────────── 3c. إفصاح فرق سطر الإقفال المالي ─────────────
 
     /** @test */
-    public function the_report_discloses_the_fiscal_close_vat_line_difference_with_the_same_numbers_the_close_shows(): void
+    public function the_report_no_longer_discloses_a_fiscal_close_difference_because_both_read_the_same_set(): void
     {
-        $this->assertSame([], $this->tax()['disclosures']);                       // مستأجر افتراضي: لا فرق
+        // ACC-02-FC (FC-1b): كان هذا الاختبار يثبّت الإفصاح `fiscal_close_vat_control_differs` وقيمه {15000، 30000، 15000}
+        // لأن سطر الإقفال كان يقرأ الحساب الحالي وحده. صار يقرأ مجموعة الحسابات حتى نهاية السنة، فالإفصاح متقادم
+        // ويُسحب بعد إثبات التطابق أدناه. مفتاح `disclosures` باقٍ في العقد فارغاً.
+        $this->assertSame([], $this->tax()['disclosures']);                       // مستأجر افتراضي
 
         $out = $this->account('2125', 'liability');
         $in = $this->account('1158', 'asset');
@@ -828,38 +838,38 @@ class VatRoleIntegrityTest extends TestCase
         $this->map('tax_output', $out); $this->map('tax_input', $in);
         $this->invoice('2026-02-10'); $this->purchase('2026-02-11', 50000);       // 2125: 150.00 · 1158: 75.00
 
-        // التقرير في فترة لا تحوي الحركات لا يغيّر الإفصاح: يُقاس كما يقيس الإقفال (كل الزمن).
-        $disclosures = collect($this->tax(['from' => '2026-03-01', 'to' => '2026-03-31'])['disclosures'])->keyBy('role_key');
-        $this->assertSame(['tax_input', 'tax_output'], $disclosures->keys()->sort()->values()->all());
-        $o = $disclosures['tax_output'];
-        $this->assertSame('fiscal_close_vat_control_differs', $o['code']);
-        $this->assertSame('2125', $o['current_account_code']);
-        $this->assertSame([15000, 30000, 15000], [$o['current_balance'], $o['set_balance'], $o['difference']]);
-        $this->assertSame([7500, 15000, 7500], [$disclosures['tax_input']['current_balance'], $disclosures['tax_input']['set_balance'], $disclosures['tax_input']['difference']]);
+        $this->assertSame([], $this->tax(['from' => '2026-03-01', 'to' => '2026-03-31'])['disclosures']);
 
-        // نفس رقم الإقفال حرفياً (FiscalCloseService غير معدَّل).
         $year = FiscalYear::findOrFail(app(FiscalYearService::class)->create(
             ['name' => '2026', 'start_date' => '2026-01-01', 'end_date' => '2026-12-31'], null
         )['id']);
         $vat = collect(app(FiscalCloseService::class)->readiness($year)['info'])->firstWhere('code', 'vat_balances');
-        $this->assertSame($vat['details']['tax_output'], $o['current_balance']);
-        $this->assertSame($vat['details']['tax_input'], $disclosures['tax_input']['current_balance']);
 
-        // العقد عبر الـAPI: مبالغ بالريال، وتوثيق الأرقام يبقى مستقلاً عن الإفصاح.
+        // التطابق مع التقرير غير المقيَّد حتى نهاية السنة (الأرقام التي كانت مفترقة: 15000 ↔ 30000 و7500 ↔ 15000).
+        $report = $this->tax(['to' => '2026-12-31']);
+        $this->assertSame([30000, 15000], [$report['output_vat'], $report['input_vat']]);
+        $this->assertSame([30000, 15000], [$vat['details']['tax_output'], $vat['details']['tax_input']]);
+        // والحساب الحالي وحده (الرقم القديم) محفوظ للمقارنة.
+        $this->assertSame([15000, 7500], [
+            $vat['details']['current_account']['tax_output']['balance'],
+            $vat['details']['current_account']['tax_input']['balance'],
+        ]);
+
+        // العقد عبر الـAPI: `disclosures` فارغ، وتوثيق الأرقام مستقل.
         $res = $this->withToken($this->token)->getJson('/api/reports/tax-report')->assertOk();
         $res->assertJsonPath('output_vat', '300.00')
             ->assertJsonPath('verification.status', 'verified')
-            ->assertJsonPath('disclosures.0.code', 'fiscal_close_vat_control_differs');
-        $apiOut = collect($res->json('disclosures'))->firstWhere('role_key', 'tax_output');
-        $this->assertSame(['150.00', '300.00', '150.00'], [$apiOut['current_balance'], $apiOut['set_balance'], $apiOut['difference']]);
+            ->assertJsonPath('disclosures', []);
         $this->balanced();
     }
 
     // ───────────── 6. REM-06 / الإقفال المالي: الاعتماد الموثَّق ─────────────
 
     /** @test */
-    public function fiscal_close_reads_only_the_current_role_account_which_is_a_documented_rem06_dependency(): void
+    public function fiscal_close_reads_the_full_role_account_set_as_of_the_year_end(): void
     {
+        // ACC-02-FC: كان الاختبار يوثّق اعتماداً (REM-06) على أن الإقفال يقرأ الحساب الحالي وحده (15000 مقابل 30000).
+        // استُبدل لأن ذلك السلوك هو ما يُزال: الإقفال يقرأ الآن مجموعة الحسابات حتى نهاية السنة فيطابق التقرير (30000).
         $custom = $this->account('2125', 'liability');
         $this->invoice('2026-01-10');          // 15000 على 2120
         $this->map('tax_output', $custom);
@@ -870,10 +880,9 @@ class VatRoleIntegrityTest extends TestCase
         )['id']);
         $vat = collect(app(FiscalCloseService::class)->readiness($year)['info'])->firstWhere('code', 'vat_balances');
 
-        // خط التحكم في الإقفال يرى الحساب الحالي وحده (15000) بينما تقرير الضريبة الكامل 30000.
-        // لا يعدّل REM-05 الإقفال؛ توحيده ضمن REM-06.
-        $this->assertSame(15000, $vat['details']['tax_output']);
-        $this->assertSame(30000, $this->tax()['output_vat']);
+        $this->assertSame(30000, $vat['details']['tax_output']);
+        $this->assertSame($this->tax(['to' => '2026-12-31'])['output_vat'], $vat['details']['tax_output']);
+        $this->assertSame(15000, $vat['details']['current_account']['tax_output']['balance']);
     }
 
     // ───────────── مساعدات تأكيد ─────────────

@@ -6,11 +6,14 @@ use App\Models\Account;
 use App\Models\AccountRoleMapping;
 use App\Models\Asset;
 use App\Models\Expense;
+use App\Models\FiscalYear;
 use App\Models\JournalEntry;
 use App\Models\JournalLine;
 use App\Services\Accounting\AccountRoutingService;
 use App\Services\Accounting\AssetService;
 use App\Services\Accounting\ExpenseService;
+use App\Services\Accounting\FiscalCloseService;
+use App\Services\Accounting\FiscalYearService;
 use App\Services\Reporting\ReportService;
 use App\Tenancy\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -290,8 +293,10 @@ class VatSemanticRoutingTest extends TestCase
     }
 
     /** @test */
-    public function post_remap_expenses_close_the_fiscal_close_gap_for_new_input_vat(): void
+    public function post_remap_expenses_feed_the_input_vat_set_and_the_fiscal_close_line_matches_the_report(): void
     {
+        // ACC-02-FC: كان الاختبار يثبّت إفصاح الفرق {15000، 30000، 15000} بين سطر الإقفال (1158 وحده) ومجموعة الدور.
+        // الإقفال يقرأ الآن المجموعة نفسها حتى نهاية السنة فلا فرق؛ والرصيد القديم محفوظ في current_account.
         $this->expense(date: '2026-01-10');                     // 150.00 على 1150 قبل إعادة التعيين
         $custom = $this->inputAccount('1158');
         $this->remapInput($custom);
@@ -299,9 +304,19 @@ class VatSemanticRoutingTest extends TestCase
 
         $report = app(ReportService::class)->taxReport();
         $this->assertSame(30000, $report['input_vat']);
-        $disclosure = collect($report['disclosures'])->firstWhere('role_key', 'tax_input');
+        $this->assertSame([], $report['disclosures']);
 
-        // الحساب الحالي يحمل ضريبة ما بعد إعادة التعيين فعلاً؛ الفرق المتبقي = ما رُحِّل قبلها فقط.
-        $this->assertSame([15000, 30000, 15000], [$disclosure['current_balance'], $disclosure['set_balance'], $disclosure['difference']]);
+        $year = FiscalYear::findOrFail(app(FiscalYearService::class)->create(
+            ['name' => '2026', 'start_date' => '2026-01-01', 'end_date' => '2026-12-31'], null
+        )['id']);
+        $vat = collect(app(FiscalCloseService::class)->readiness($year)['info'])->firstWhere('code', 'vat_balances');
+
+        $this->assertSame(30000, $vat['details']['tax_input']);
+        $this->assertSame($report['input_vat'], $vat['details']['tax_input']);
+        // الحساب الحالي يحمل ضريبة ما بعد إعادة التعيين فعلاً (الرقم القديم)؛ الباقي على 1150 قبلها.
+        $this->assertSame(['1158', 15000], [
+            $vat['details']['current_account']['tax_input']['code'],
+            $vat['details']['current_account']['tax_input']['balance'],
+        ]);
     }
 }
