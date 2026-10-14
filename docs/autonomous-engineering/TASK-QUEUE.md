@@ -21,6 +21,12 @@ Authoritative TAX programme plan/queue:
 
 **Delivery handoff:** Historical Delivery tasks and open gates remain below unchanged. No Delivery task is eligible for selection while paused; do not update their old row statuses without a new evidence pass when resumed.
 
+## PARALLEL HORIZON — AWJ-COMMERCE-VISUAL-DIMENSIONS-H1 (Owner launch 2026-10-14)
+
+**Status:** H1-0 (Evidence & Architecture) in review — **at owner Decision Gate G0**. No DB/API/runtime slice is authorized until the Decision Register is approved. Every merge needs explicit owner approval; no deploy.
+
+Authoritative plan/queue: `docs/plans/store/visual-dimensions/AWJ-VD-H1-MASTER-PLAN.md` · `AWJ-VD-H1-TASK-QUEUE.md` · `AWJ-VD-H1-DECISION-REGISTER.md`. No file overlap with the TAX-ZATCA horizon.
+
 ---
 
 ## Purpose
