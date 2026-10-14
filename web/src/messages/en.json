@@ -862,6 +862,7 @@
     "no": "No",
     "capabilityUnavailable": "This capability isn't available for your organization or role. Ask the account owner to enable it.",
     "all": "All",
+    "dismissNotification": "Dismiss notification",
     "themeToggle": "Toggle color mode",
     "languageToggle": "Switch language",
     "close": "Close"

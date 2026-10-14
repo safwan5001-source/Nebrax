@@ -862,6 +862,7 @@
     "no": "لا",
     "capabilityUnavailable": "هذه القدرة غير متاحة لمؤسستك أو لدورك. تواصل مع مالك الحساب لتفعيلها.",
     "all": "الكل",
+    "dismissNotification": "إغلاق التنبيه",
     "themeToggle": "تبديل الوضع",
     "languageToggle": "تبديل اللغة",
     "close": "إغلاق"
