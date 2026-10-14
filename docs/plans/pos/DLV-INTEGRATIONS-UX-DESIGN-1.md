@@ -863,6 +863,15 @@ Each is raised because the design needs a change to an existing financial/securi
   - **Wording limits.** An ingress point is never described as «متصل بالمنصة», «حساب التاجر مرتبط», «المزامنة مفعّلة» or «جاهز للتكامل الأصلي». The panel states that a point may be routed to a branch and that this does not map the provider's store to a branch, and that ingress status is not provider readiness.
   - **Data limits.** Shown: store id, branch name (only with `branches.view`; otherwise a neutral «موجّهة إلى فرع»), the server's status, secret *version*, creation date. **Never** shown or held in UI state: the secret, `secret_prefix`, signing keys, tokens, the ingress id, operator/configurer identifiers. This **supersedes** the "secret prefix … operator" list in §5.3 and the INT-UX-4 scope line below: the prefix is a fragment of the signing secret, and there is no approved source for operator names in this slice.
   - **`DP-E` is unchanged**: owner/admin only through the existing `delivery_connector.view`; finance roles do not gain visibility.
+- **Decision (owner, 2026-10-14): option 3 approved for `INT-UX-5` only**, to manage the **AWJ-signed ingress** — never a native provider integration. Not a standing approval and not a precedent for any other slice. Decisions D1–D10 of `INT-UX-5-SCOPE-AND-READINESS-REPORT.md` are adopted as recommended, with these controls:
+  - **Audience (D1).** `owner`/`admin` and holders of the existing `delivery_connector.manage` (reassign: `delivery_connector.reassign`). **No new permission, no API or database change.**
+  - **Operator identity (D2/D3).** Only the operator's **name** is shown (never email or other identifiers), and only to a user who holds `delivery_connector.reassign` **and** `users.view`. This **amends** the DP-C 2026-10-13 data limits for the reassign flow of this slice only.
+  - **Delivery (D4).** Slices **5a → 5b → 5c → 5d**, each its own PR with its own approval.
+  - **Rotate (D5).** Never offered for a disabled point (the server's permissiveness is a separate backend matter).
+  - **Disable (D6).** Confirmed by typing the store ID; the dialog states irreversibility.
+  - **Create (D7/D8).** If the tenant has no active manual profile, explain and link to the existing setup (no profile is created here). A lost create/rotate response is treated as **outcome unknown**: **no blind retry**; refresh the list and rotate if the secret was not saved.
+  - **Copy (D9) and demo mode (D10).** The approved term «نقطة استقبال أحداث موقّعة» and the forbidden-phrase rules stand; demo mode shows a neutral unavailable state and never a fabricated secret.
+  - **Secrets.** Never stored, logged, tracked, put in a URL, or shown outside the one-time reveal dialog.
 
 ### DP-D — Provider merchant-account uniqueness across tenants
 
@@ -934,7 +943,7 @@ Two tracks. **Track U** (UX/catalog) is safe to build now and never touches prov
 - **Tests.** Role/branch fixtures; resource-field assertion; wording test (forbidden words).
 - **Excludes.** Create/rotate/disable/reassign.
 
-#### INT-UX-5 — Ingress management actions *(only if DP-C option 3 is approved)*
+#### INT-UX-5 — Ingress management actions *(DP-C option 3 approved 2026-10-14 for this slice only — see `DP-C`; delivered as 5a → 5b → 5c → 5d, each its own approval; 5a = neutral dialogs + foundations, no visible action)*
 - **Scope.** Create, rotate (with one-time reveal), disable (with irreversibility warning), reassign operator, using the **existing** endpoints; extract/neutralize `ConfirmDialog` and `SecretRevealDialog` for shared use.
 - **Depends on.** INT-UX-4, DP-C, **INT-AUDIT-1 (hard dependency: no rotate/disable/create/reassign UI ships before lifecycle audit exists)**.
 - **Acceptance.** Secret appears only in the reveal dialog and is cleared on close; disable dialog states irreversibility; reassign copy per §5.7.
