@@ -85,6 +85,9 @@ one-time and 5-minute TTL on the backend, which bounds the impact.
 No secrets, DB, Redis, R2 or backend credentials. `PREVIEW_HOST` is not needed by this service (it serves whatever
 host reaches it) and was not introduced.
 
+> **Superseded by `MOBILE-PREVIEW-10B-2C-ANDROID-ONLY-HOST-FOLLOWUP.md`:** startup is no longer fatal for a missing/malformed
+> platform input; each association route fails closed (503) independently. The paragraph below describes the original #1454 behavior.
+
 **Fail-closed decision:** `server.js` **refuses to start (exit 1)** if either input is missing or malformed, printing the
 variable name only. A deployed-but-healthy-looking service with unusable association files is the worse failure mode;
 Railway keeps the previous deployment instead. Defence in depth: `createApp` itself answers `503` (no body resembling an
