@@ -25,7 +25,7 @@ use RuntimeException;
  *
  *  إشعار دائن (آجل) بقيمة 1000 + 15%:
  *    مدين  4110 إيرادات المبيعات   100000
- *    مدين  2120 ضريبة المخرجات      15000
+ *    مدين  `tax_output` ضريبة المخرجات (افتراضياً 2120)      15000
  *    دائن  1130 العملاء            115000
  *  (للاسترداد النقدي يُستبدل 1130 بـ 1110 الصندوق)
  *
@@ -50,16 +50,15 @@ class CreditNoteService
 {
     private const ACC_CASH       = '1110';
     private const ACC_RECEIVABLE = '1130';
-    private const ACC_OUTPUT_VAT = '2120';
     private const ACC_SALES      = '4110';
     private const ACC_PAYABLE    = '2110'; // الموردون — جانب الإشعار المدين
-    private const ACC_INPUT_VAT  = '1150'; // ضريبة المدخلات — تُعكس مع الخصم
     private const ACC_ALLOWANCE  = '5115'; // مردودات ومسموحات المشتريات (مصروف مقابل)
 
     public function __construct(
         protected LedgerService $ledger,
         protected PrintTemplateService $printTemplates,
         protected CreditNoteOwnershipResolver $ownership,
+        protected AccountRoleResolver $accountRoles,
     ) {}
 
     /**
@@ -467,14 +466,15 @@ class CreditNoteService
 
     /**
      * إشعار دائن (للعميل): عكس الإيراد وضريبة المخرجات مقابل الذمّة أو النقد.
-     *   مدين 4110 المبيعات + مدين 2120 ضريبة المخرجات / دائن 1130 أو 1110
+     *   مدين 4110 المبيعات + مدين `tax_output` ضريبة المخرجات (افتراضياً 2120) / دائن 1130 أو 1110
+     *   REM-06 (R6-1): الدور الحالي وقت الترحيل، لا حساب الفاتورة الأصلية؛ تعيين مفقود/فاسد = فشل مغلق.
      */
     protected function salesLines(CreditNote $note, int $subtotal, int $taxAmount, int $total): array
     {
         $lines = [['account_id' => $this->accountId(self::ACC_SALES), 'debit' => $subtotal]];
 
         if ($taxAmount > 0) {
-            $lines[] = ['account_id' => $this->accountId(self::ACC_OUTPUT_VAT), 'debit' => $taxAmount];
+            $lines[] = ['account_id' => $this->accountRoles->resolve('tax_output')->id, 'debit' => $taxAmount];
         }
 
         $creditLine = [
@@ -493,7 +493,8 @@ class CreditNoteService
     /**
      * إشعار مدين (للمورّد): تخفيض ذمّة المورّد مقابل عكس الخصم وضريبة المدخلات.
      *   مدين 2110 الموردون (أو 1110 عند الاسترداد النقدي)
-     *   دائن 5115 مردودات ومسموحات المشتريات + دائن 1150 ضريبة المدخلات
+     *   دائن 5115 مردودات ومسموحات المشتريات + دائن `tax_input` ضريبة المدخلات (افتراضياً 1150)
+     *   REM-06 (R6-2): الدور الحالي وقت الترحيل.
      *
      * **لا يُحمَّل على 1140 عمداً**: لا حركة مخزون هنا، فخصمُه من حساب المراقبة
      * كان يفصله عن دفتر المخزون المساعد (Σ كمية × متوسط تكلفة) بلا إنذار.
@@ -513,7 +514,7 @@ class CreditNoteService
         $lines = [$debitLine, ['account_id' => $this->accountId(self::ACC_ALLOWANCE), 'credit' => $subtotal]];
 
         if ($taxAmount > 0) {
-            $lines[] = ['account_id' => $this->accountId(self::ACC_INPUT_VAT), 'credit' => $taxAmount];
+            $lines[] = ['account_id' => $this->accountRoles->resolve('tax_input')->id, 'credit' => $taxAmount];
         }
 
         return $lines;

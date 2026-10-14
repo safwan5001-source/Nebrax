@@ -119,9 +119,10 @@ REM-03 and REM-08 touch disjoint controllers (`Invoice/Return/Quote/DocumentRevi
 
 ### REM-06 / ACC-02 — status update (2026-10-14)
 
-> **REM-06 — IN PROGRESS (Draft PR), decision gate open.** Report: `REM-06-ACC-02-ACCOUNTING-DECISION-REPORT.md`.
-> **Implemented (policy-determined):** `ExpenseService` and `AssetService` route input VAT through the `tax_input` role (as `PurchaseService` does since ACC-4); unmapped/invalid mapping fails closed; default tenants post identical journals.
-> **Awaiting owner decision R6-1/R6-2:** VAT account of sales returns and sales/purchase credit notes after a remap — current role (recommended, matches ACC-4) vs inheriting the source document's account. `PosExchangeService` posts no VAT (its return/replacement legs go through `ReturnService`/`InvoiceService`). `FiscalCloseService` untouched.
+> **REM-06 — IN REVIEW (Draft PR #1473), not closed**; closes only after approved merge and verification. Reports: `REM-06-ACC-02-ACCOUNTING-DECISION-REPORT.md` and `REM-06-ACC-02-IMPLEMENTATION-REPORT.md`.
+> **Owner decisions:** R6-1/R6-2 = Option A (current `tax_output` / `tax_input` at posting time); R6-3 not applicable; ACC-4 purchase-return policy and `LedgerService::reverse` (original accounts) preserved.
+> **Implemented:** `ExpenseService`, `AssetService`, `ReturnService` (sales), `CreditNoteService` (sales + purchase) resolve the VAT role; missing/inactive mapping fails closed; default tenants post identical journals. `PosExchangeService` posts no VAT and is untouched (its legs go through `ReturnService`/`InvoiceService`).
+> **Remaining:** `FiscalCloseService` VAT line reads only the current role account (disclosed in the REM-05 report; separate follow-up); non-VAT hard-coded accounts; no production audit.
 
 ### REM-03 — card (ready for owner approval to start)
 
