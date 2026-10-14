@@ -482,6 +482,7 @@
     "effectiveWord": "effective",
     "savedSuperseded": "Superseded: a later version is already in effect",
     "history": "Price version history",
+    "historyScrollRegion": "Price version history, scrollable table",
     "empty": "No price versions recorded yet.",
     "price": "Monthly price",
     "currency": "Currency",
