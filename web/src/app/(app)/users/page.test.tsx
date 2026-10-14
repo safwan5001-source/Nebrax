@@ -65,7 +65,7 @@ function world(users: unknown[], extra: Record<string, unknown> = {}) {
 }
 
 // نحمّل النطاقات التي تستعملها الشاشة فقط من الملفات الحقيقية — فتُختبر مفاتيح الواجهة الفعلية.
-const pick = (all: Record<string, unknown>) => ({ users: all.users, common: all.common, nebrax: all.nebrax, status: all.status });
+const pick = (all: Record<string, unknown>) => ({ users: all.users, common: all.common, nebrax: all.nebrax, status: all.status, rolesPage: all.rolesPage });
 
 function renderPage(locale: 'en' | 'ar' = 'en') {
   const all = (locale === 'en' ? enMessages : arMessages) as unknown as Record<string, unknown>;
@@ -342,5 +342,39 @@ describe('Users workspace (AC-UX-01)', () => {
     expect(screen.getAllByText('نشط').length).toBeGreaterThan(0);
     const email = screen.getAllByText('hind@acme.test')[0];
     expect(email.getAttribute('dir')).toBe('ltr');
+  });
+
+  it('AC-UX-08: a view-only viewer can open a read-only access summary from the row, with no edit button', async () => {
+    auth.current = { id: 'v', role: 'role-x', permissions: ['users.view'] };
+    world([OWNER, user({ id: 'u1', branch_ids: ['b1'], role: 'role-ab12cd34' })]);
+    renderPage();
+    await screen.findAllByText('Hind Alharbi');
+    const row = screen.getAllByRole('row').find((r) => within(r).queryByText('Hind Alharbi'))!;
+    expect(within(row).queryByRole('button', { name: 'Edit' })).toBeNull();
+
+    await userEvent.click(within(row).getByRole('button', { name: 'Access summary' }));
+    const sheet = await screen.findByRole('dialog');
+    expect(within(sheet).getByText(/Access summary/)).toBeTruthy();
+    expect(within(sheet).getByText('Can sign in.')).toBeTruthy();
+    expect(within(sheet).queryByRole('button', { name: 'Edit' })).toBeNull();
+    // لا `roles.view` → لا طلب `/roles` ولا تفاصيل صلاحيات؛ والدور المخصَّص عام لا slug خام.
+    expect(paths()).not.toContain('/roles');
+    expect(within(sheet).queryByText('role-ab12cd34')).toBeNull();
+    expect(within(sheet).getByText(/Role permission details need access/)).toBeTruthy();
+  });
+
+  it('AC-UX-08: a manager can go from the summary to the editor', async () => {
+    world([OWNER, user({ id: 'u1', branch_ids: ['b1', 'b2'] })]);
+    renderPage();
+    await screen.findAllByText('Hind Alharbi');
+    const row = screen.getAllByRole('row').find((r) => within(r).queryByText('Hind Alharbi'))!;
+    await userEvent.click(within(row).getByRole('button', { name: 'Access summary' }));
+    const sheet = await screen.findByRole('dialog');
+    expect(await within(sheet).findByText('Dammam')).toBeTruthy();
+    expect(within(sheet).getByText('Khobar')).toBeTruthy();
+
+    await userEvent.click(within(sheet).getByRole('button', { name: 'Edit' }));
+    expect((await screen.findByTestId('user-editor')).textContent).toBe('edit:u1');
+    expect(screen.queryByRole('dialog')).toBeNull();
   });
 });

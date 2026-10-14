@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useLocale, useTranslations } from 'next-intl';
 import { type ColumnDef } from '@tanstack/react-table';
-import { CircleCheck, CircleSlash, Mail, MapPin, MoreHorizontal, Pencil, Plus, ShieldAlert, Trash2, UserCheck, UserX } from 'lucide-react';
+import { CircleCheck, CircleSlash, Eye, Mail, MapPin, MoreHorizontal, Pencil, Plus, ShieldAlert, Trash2, UserCheck, UserX } from 'lucide-react';
 import { DataTable } from '@/components/data-table';
 import { ListToolbar, PageHeader, Pagination, type PageAction, type SortOption } from '@/components/nebrax';
 import { EmptyState } from '@/components/nebrax/states';
@@ -15,6 +15,7 @@ import { useConfirm } from '@/components/ui/confirm-dialog';
 import { Dropdown, DropdownItem } from '@/components/ui/dropdown';
 import { useToast } from '@/components/ui/toast';
 import { useScopeText } from '@/components/users/scope-language';
+import { UserAccessSummarySheet } from '@/components/users/user-access-summary-sheet';
 import { UserEditorSheet } from '@/components/users/user-editor-sheet';
 import { api, ApiError } from '@/lib/api';
 import type { ActiveFilter, DataExplorerState, FilterDefinition } from '@/lib/data-explorer/types';
@@ -78,6 +79,8 @@ export default function UsersPage() {
 
   // المحرّر مفتوح ⇔ `editor` غير null؛ `user: null` = إضافة. `focusAccess` يفتحه عند قسم الوصول.
   const [editor, setEditor] = useState<{ user: UserRecord | null; focusAccess: boolean } | null>(null);
+  /** معرّف المستخدم المعروض ملخّصه؛ الصف يُقرأ حيّاً من القائمة فيتحدّث مع إعادة التحميل. */
+  const [summaryId, setSummaryId] = useState<string | null>(null);
   const editing = editor?.user ?? null;
   const [busyId, setBusyId] = useState<string | null>(null);
 
@@ -318,10 +321,22 @@ export default function UsersPage() {
   // دالة عرض لا مكوّن: مكوّنٌ معرَّف داخل الصفحة يُعاد تركيبه كل عرض فيفقد القائمة المنسدلة حالتها وتركيزها.
   const rowActions = (user: UserRecord) => {
     const caps = capsFor(user);
-    if (!canManage) return null;
     const busy = busyId === user.id;
+    const summaryButton = (
+      <Button
+        variant="ghost"
+        size="icon"
+        aria-label={t('access_summary_open')}
+        title={t('access_summary_open')}
+        onClick={() => setSummaryId(user.id)}
+      >
+        <Eye className="h-4 w-4 text-muted" strokeWidth={1.7} />
+      </Button>
+    );
+    if (!canManage) return <div className="flex items-center justify-end gap-0.5">{summaryButton}</div>;
     return (
       <div className="flex items-center justify-end gap-0.5">
+        {summaryButton}
         <Button
           variant="ghost"
           size="icon"
@@ -406,6 +421,8 @@ export default function UsersPage() {
       <span>{label}</span>
     );
   };
+
+  const summaryUser = summaryId ? users.find((candidate) => candidate.id === summaryId) ?? null : null;
 
   const columns = useMemo<ColumnDef<UserRecord, unknown>[]>(
     () => [
@@ -536,6 +553,26 @@ export default function UsersPage() {
           disabled={loading}
           onPageChange={(next) => setExplorer((current) => ({ ...current, page: next }))}
           onPerPageChange={(next) => setExplorer((current) => ({ ...current, page: 1, perPage: next }))}
+        />
+      ) : null}
+
+      {summaryUser ? (
+        <UserAccessSummarySheet
+          key={summaryUser.id}
+          user={summaryUser}
+          onClose={() => setSummaryId(null)}
+          onEdit={
+            canManage && capsFor(summaryUser).edit.allowed
+              ? () => {
+                  setSummaryId(null);
+                  openEdit(summaryUser);
+                }
+              : undefined
+          }
+          roles={roles}
+          branches={branches}
+          warehouses={warehouses}
+          isSelf={summaryUser.id === actor?.id}
         />
       ) : null}
 
