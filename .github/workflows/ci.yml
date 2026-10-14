@@ -89,6 +89,21 @@ jobs:
           done
           [ "$MISSING" -eq 0 ] || exit 1
           echo "✔ كل ملفات النواة مشمولة بقائمة النسخ."
+          # AWJ-BACKEND-CI-03: setup.sh يبني البيئة المحلية (وخطّاف بدء الجلسة) بقائمة يدوية مستقلة؛
+          # انحرافها لا يظهر هنا فيمرّ بصمت (حدث مع app/Mail وresources/views وحزمة AWS). نتحقق أنه
+          # ينسخ كل مصدر ‹$CORE/…› تنسخه خطوة الدمج في هذا الملف، ويثبّت كل حزمة يثبّتها.
+          for src in $(grep -oE '"\$CORE/[^"]+"' .github/workflows/ci.yml | sed 's/^"\$CORE\///; s/"$//' | sort -u); do
+            grep -qF "\"\$CORE_DIR/$src\"" setup.sh || { echo "::error file=setup.sh::setup.sh لا ينسخ «$src» — أضفه كما في ci.yml"; MISSING=1; }
+          done
+          # السطر الفعلي في خطوة «تثبيت Sanctum…» (مرسوٌّ ببداية السطر كي لا يطابق هذا الحارس نفسه).
+          PKGS="$(grep -m1 -E '^[[:space:]]+composer require laravel/sanctum ' .github/workflows/ci.yml | sed -E 's/^[[:space:]]+composer require //; s/ --.*$//')"
+          [ -n "$PKGS" ] || { echo "::error::تعذّر قراءة حزم composer require من ci.yml"; exit 1; }
+          for p in $PKGS; do
+            # مطابقة كلمة كاملة: «…:4.1.10» لا تُرضي «…:4.1.1».
+            grep -E '^composer require ' setup.sh | tr ' ' '\n' | grep -qxF -- "$p" || { echo "::error file=setup.sh::setup.sh لا يثبّت «$p» — أضفها كما في ci.yml"; MISSING=1; }
+          done
+          [ "$MISSING" -eq 0 ] || exit 1
+          echo "✔ setup.sh مطابق لقائمة النسخ وحزم CI."
 
       - name: Setup PHP 8.4
         uses: shivammathur/setup-php@v2
@@ -120,6 +135,7 @@ jobs:
       - name: تثبيت Sanctum + تخزين S3/R2 + تفعيل مسارات API
         working-directory: ${{ env.APP_DIR }}
         run: |
+          # يقرأ «حارس قائمة النسخ» هذا السطر (laravel/sanctum أولاً، سطرٌ واحد) ليطابق حزم setup.sh.
           composer require laravel/sanctum league/flysystem-aws-s3-v3:^3.0 predis/predis:^2.2 resend/resend-php intervention/image-laravel:4.1.1 --quiet
           php "$GITHUB_WORKSPACE/tests/Fixtures/intervention-image-runtime-smoke.php" "$APP_DIR"
           php artisan install:api --no-interaction --quiet || true
