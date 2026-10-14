@@ -38,17 +38,6 @@ interface PaginationMeta {
   total: number;
 }
 
-const sortOptions: SortOption[] = [
-  { value: 'name', label: 'الاسم: أ-ي' },
-  { value: '-name', label: 'الاسم: ي-أ' },
-  { value: 'sku', label: 'SKU' },
-  { value: '-sale_price', label: 'سعر البيع: الأعلى' },
-  { value: 'sale_price', label: 'سعر البيع: الأقل' },
-  { value: '-purchase_price', label: 'سعر الشراء: الأعلى' },
-  { value: '-quantity_on_hand', label: 'المخزون: الأعلى' },
-  { value: 'quantity_on_hand', label: 'المخزون: الأقل' },
-];
-
 function isEmptyFilter(filter: ActiveFilter): boolean {
   return Array.isArray(filter.value)
     ? filter.value.every((value) => String(value).trim() === '')
@@ -57,6 +46,18 @@ function isEmptyFilter(filter: ActiveFilter): boolean {
 
 export default function ProductsPage() {
   const t = useTranslations('products');
+  const tl = useTranslations('listUi');
+  // خيارات الترتيب من الكتالوج (ERP-UX-025).
+  const sortOptions: SortOption[] = useMemo(() => [
+    { value: 'name', label: tl('nameAsc') },
+    { value: '-name', label: tl('nameDesc') },
+    { value: 'sku', label: 'SKU' },
+    { value: '-sale_price', label: tl('salePriceHighest') },
+    { value: 'sale_price', label: tl('salePriceLowest') },
+    { value: '-purchase_price', label: tl('purchasePriceHighest') },
+    { value: '-quantity_on_hand', label: tl('stockHighest') },
+    { value: 'quantity_on_hand', label: tl('stockLowest') },
+  ], [tl]);
   const router = useRouter();
   const searchParams = useSearchParams();
   const { success, error } = useToast();
@@ -139,14 +140,14 @@ export default function ProductsPage() {
 
   const definitions = useMemo<FilterDefinition[]>(() => [
     {
-      key: 'category_id', label: 'التصنيف', kind: 'entity', quick: true,
-      searchPlaceholder: 'ابحث باسم التصنيف',
-      emptyText: 'لا يوجد تصنيف مطابق',
+      key: 'category_id', label: tl('category'), kind: 'entity', quick: true,
+      searchPlaceholder: tl('searchCategoriesPlaceholder'),
+      emptyText: tl('noMatchingCategory'),
       options: categories.map((category) => ({
         value: category.id,
         label: category.name,
         sub: category.parent_id ? categoryNames[category.parent_id] : undefined,
-        hint: category.products_count != null ? `${category.products_count} منتج` : undefined,
+        hint: category.products_count != null ? tl('productsCount', { count: category.products_count }) : undefined,
       })),
     },
     {
@@ -158,17 +159,17 @@ export default function ProductsPage() {
       options: [{ value: '1', label: t('active') }, { value: '0', label: t('inactive') }],
     },
     {
-      key: 'stock_state', label: 'المخزون', kind: 'select',
+      key: 'stock_state', label: tl('stock'), kind: 'select',
       options: [
-        { value: 'tracked', label: 'متتبع للمخزون' },
-        { value: 'not_tracked', label: 'غير متتبع' },
-        { value: 'low', label: 'منخفض' },
-        { value: 'out', label: 'نفد المخزون' },
+        { value: 'tracked', label: tl('stockTracked') },
+        { value: 'not_tracked', label: tl('stockNotTracked') },
+        { value: 'low', label: tl('stockLow') },
+        { value: 'out', label: tl('stockOut') },
       ],
     },
     { key: 'sale_price', label: t('sale_price'), kind: 'money', operators: ['gte', 'lte', 'eq'] },
-    { key: 'purchase_price', label: 'سعر الشراء', kind: 'money', operators: ['gte', 'lte', 'eq'] },
-  ], [categories, categoryNames, t]);
+    { key: 'purchase_price', label: tl('purchasePrice'), kind: 'money', operators: ['gte', 'lte', 'eq'] },
+  ], [categories, categoryNames, t, tl]);
 
   const labelledFilters = useMemo(
     () => explorer.filters.map((filter) => ({
