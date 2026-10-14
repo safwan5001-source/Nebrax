@@ -260,33 +260,40 @@ class UserController extends ApiController
 
     public function update(UpdateUserRequest $request, string $id): JsonResponse
     {
-        $user = User::where('tenant_id', $this->tenantId())->findOrFail($id);
         $data = $request->validated();
-        $this->guardOwnerRole($request, $user, $data['role'] ?? null);
-        $this->guardGrantBoundary($request, $data, $user);
 
         if (empty($data['password'])) {
             unset($data['password']);
         }
 
-        // الغياب يُبقي الربط الحالي؛ `null` صريحة تفكّه؛ ومعرّفٌ يُتحقّق ثم يُربط.
-        $this->assertLinkableEmployee($data['employee_id'] ?? null, $user->id);
+        // AC-UX-00A: الهدف يُقفل ويُفحص سقف المنح عليه **داخل** المعاملة نفسها التي
+        // تكتب — فلا يُرقّيه مالكٌ متزامن (دوراً أو نطاقاً) بين الفحص والكتابة فتقع
+        // كلمة المرور/الحالة على مستخدمٍ صار خارج سقف الفاعل. ومزامنة النطاق في
+        // المعاملة نفسها فلا يبقى تحديثٌ نصفيّ.
+        $user = DB::transaction(function () use ($request, $id, $data): User {
+            $user = User::where('tenant_id', $this->tenantId())->lockForUpdate()->findOrFail($id);
+            $this->guardOwnerRole($request, $user, $data['role'] ?? null);
+            $this->guardGrantBoundary($request, $data, $user);
 
-        // REM-08 / SEC-04: الانتقال active → inactive وحده يسحب التوكنات، وفي المعاملة
-        // نفسها — فلا تُحفظ حالة التعطيل ويبقى التوكن حيّاً بسبب استثناء لاحق.
-        // إعادة التفعيل لا تُنشئ توكناً: يلزم دخولٌ جديد. الحارس الفعلي وقت
-        // الطلب في `SetTenant` وليس هذا الحذف وحده.
-        $wasActive = (bool) $user->is_active;
+            // الغياب يُبقي الربط الحالي؛ `null` صريحة تفكّه؛ ومعرّفٌ يُتحقّق ثم يُربط.
+            $this->assertLinkableEmployee($data['employee_id'] ?? null, $user->id);
 
-        DB::transaction(function () use ($user, $data, $wasActive): void {
+            // REM-08 / SEC-04: الانتقال active → inactive وحده يسحب التوكنات، وفي المعاملة
+            // نفسها — فلا تُحفظ حالة التعطيل ويبقى التوكن حيّاً بسبب استثناء لاحق.
+            // إعادة التفعيل لا تُنشئ توكناً: يلزم دخولٌ جديد. الحارس الفعلي وقت
+            // الطلب في `SetTenant` وليس هذا الحذف وحده.
+            $wasActive = (bool) $user->is_active;
+
             $user->update($data);
 
             if ($wasActive && ! $user->is_active) {
                 $user->tokens()->delete();
             }
-        });
 
-        $this->syncAccessScope($user, $data);
+            $this->syncAccessScope($user, $data);
+
+            return $user;
+        });
 
         return (new UserResource($user->load('employee', 'branches', 'warehouses')))->response();
     }
@@ -297,13 +304,14 @@ class UserController extends ApiController
             abort(422, 'لا يمكنك حذف حسابك الخاص.');
         }
 
-        $user = User::where('tenant_id', $this->tenantId())->findOrFail($id);
-        $this->guardOwnerRole($request, $user);
-        $this->guardGrantBoundary($request, [], $user);
-
         // REM-08 / SEC-04: الحذف ناعم (`SoftDeletes`) وجدول التوكنات polymorphic بلا
         // FK متتالٍ، فلا يسقط التوكن تبعاً للمستخدم — يُسحب صراحةً قبل الحذف.
-        DB::transaction(function () use ($user): void {
+        // والهدف مقفولٌ ومفحوصٌ داخل المعاملة نفسها (انظر `update`).
+        DB::transaction(function () use ($request, $id): void {
+            $user = User::where('tenant_id', $this->tenantId())->lockForUpdate()->findOrFail($id);
+            $this->guardOwnerRole($request, $user);
+            $this->guardGrantBoundary($request, [], $user);
+
             $user->tokens()->delete();
             $user->delete();
         });
