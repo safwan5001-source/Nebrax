@@ -32,7 +32,18 @@ function renderGate(stores: unknown[]) {
 }
 
 describe('StoreGate', () => {
+  it('asks for an explicit store first when there are several stores, mounting no child before the choice (AWJ-STORE-CTX-2)', async () => {
+    renderGate([store('s1', 'Rose House'), store('s2', 'Gift Corner')]);
+    expect(await screen.findByText('Choose the store to work on')).toBeTruthy();
+    expect(screen.queryByTestId('child')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Select store' })?.hasAttribute('disabled')).toBe(true);
+    await userEvent.click(screen.getByRole('radio', { name: 'Gift Corner' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Select store' }));
+    expect((await screen.findByTestId('child')).textContent).toBe('child for s2');
+  });
+
   it('shows a switchable store context on small screens when there are several stores, and remounts the child on switch', async () => {
+    window.sessionStorage.setItem('awj-commerce-active-store', 's1');
     renderGate([store('s1', 'Rose House'), store('s2', 'Gift Corner')]);
     expect((await screen.findByTestId('child')).textContent).toBe('child for s1');
     const select = screen.getByLabelText('Current store') as HTMLSelectElement;

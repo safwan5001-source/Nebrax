@@ -7,7 +7,7 @@ import { EmptyState, ErrorState, LoadingState } from '@/components/nebrax';
 import { Select } from '@/components/ui/select';
 import { commerceWorkspaceMessage } from '@/modules/commerce-workspace/messages';
 import { useCommerceStoreContext } from '@/modules/commerce-workspace/store-context';
-import { StoreContextInvalidNotice } from '@/modules/commerce-workspace/store-context-invalid';
+import { StoreSelectionScreen } from '@/modules/commerce-workspace/store-selection-screen';
 import type { CommerceStoreOption } from '@/modules/commerce-workspace/stores';
 
 /**
@@ -30,7 +30,7 @@ export function StoreGate({ children }: { children: (store: CommerceStoreOption)
 
   const store = catalog.stores.find((candidate) => candidate.id === selectedStoreId);
   // متجرٌ مطلوب صراحةً غير متاح: لا نموذج يُركَّب على متجرٍ بديل، والاختيار يتمّ من الإشعار.
-  if (!store && storeContextStatus === 'invalid') return <StoreContextInvalidNotice />;
+  if (!store && (storeContextStatus === 'invalid' || storeContextStatus === 'needs_selection')) return <StoreSelectionScreen />;
   if (!store) return <LoadingState variant="table" rows={3} />;
 
   return (
