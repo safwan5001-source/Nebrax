@@ -54,6 +54,17 @@ class InvoiceService
      */
     private const PAYMENT_METHODS = ['cash' => 'cash', 'transfer' => 'bank', 'card' => 'bank'];
 
+    /**
+     * REM-04 / SEC-02 — محاولات معاملة الترحيل عند تعارض تزامن عابر (PostgreSQL `40P01`
+     * deadlock / `40001` serialization). Laravel يعيد المحاولة **لاستثناءات التزامن
+     * وحدها** وعلى المعاملة الخارجية وحدها (داخل معاملة أكبر يُرمى الاستثناء كما هو)؛
+     * المعاملة الفاشلة تُلغى كاملة قبل الإعادة (لا قيد ولا ICV ولا حركة مخزون جزئية)،
+     * والإعادة تقرأ الفاتورة بقفلها من جديد فلا ترحيل مزدوج. أخطاء العمل
+     * (`RuntimeException`) لا تُعاد أبداً. عند نفاد المحاولات يصل الاستثناء إلى
+     * `ApiController::domain()` فيُحوَّل إلى 409 قابل لإعادة المحاولة لا 500.
+     */
+    private const POST_TRANSACTION_ATTEMPTS = 3;
+
     public function __construct(
         protected LedgerService $ledger,
         protected InventoryService $inventory,
@@ -1064,7 +1075,7 @@ class InvoiceService
             $this->settle($invoice, $total, $actor);
 
             return $invoice->fresh('lines.costCenterAllocations.costCenter');
-        });
+        }, self::POST_TRANSACTION_ATTEMPTS);
     }
 
     /**
@@ -1153,7 +1164,7 @@ class InvoiceService
 
         // قفل صف العميل يسلسل فواتيره الآجلة المتزامنة، فلا تعبر فاتورتان الحد معاً.
         // خارج عزل الفرع: عميلٌ لا يراه الفرع النشط كان سيُقرأ null فيسقط الحدّ الائتماني صامتاً.
-        $partner = BranchScope::reference(Partner::class)->lockForUpdate()->find($invoice->partner_id);
+        $partner = $this->lockPartnerForCreditCheck((string) $invoice->partner_id);
         $limit   = (int) ($partner?->credit_limit ?? 0);
         if ($limit <= 0) {
             return; // بلا حد محدَّد
@@ -1177,6 +1188,35 @@ class InvoiceService
                 $limit,
             ));
         }
+    }
+
+    /**
+     * ═══════════════════════════════════════════════════════════════
+     *  REM-04 / SEC-02 — قفل صف العميل **بلا** تعارض مع فحوص المفاتيح الأجنبية
+     * ═══════════════════════════════════════════════════════════════
+     *  الجمود المؤكَّد (PostgreSQL، SQLSTATE 40P01): الترحيل كان يأخذ `FOR UPDATE` على صف
+     *  العميل ثم يطلب مِرساة المستأجر (`LedgerService`/الترقيم)، بينما عمليةٌ أخرى (سند قبض،
+     *  مسودة فاتورة، مسودة تسليم…) تأخذ مِرساة المستأجر أولاً ثم `INSERT` بمفتاح أجنبي
+     *  `partner_id` — وPostgreSQL يفحص المفتاح بـ`FOR KEY SHARE` على صف العميل، وهو **يتعارض**
+     *  مع `FOR UPDATE`. فصار كلٌّ ينتظر الآخر.
+     *
+     *  `FOR NO KEY UPDATE` يؤدي الغرض الوحيد لهذا القفل — تسلسل الترحيلات الآجلة للعميل
+     *  نفسه (يتعارض مع نفسه ومع `UPDATE` للصف) — لكنه **لا** يتعارض مع `FOR KEY SHARE`.
+     *  فلا يعود صف العميل حافةً حاجبة في أي دورة قفل، دون تغيير ترتيب الأقفال المالية
+     *  (فاتورة ← عميل ← مِرساة) ودون أي أثر على الإجماليات أو القيد أو الحدّ الائتماني.
+     *  على SQLite لا أقفال صفوف فيُبقى `lockForUpdate()` (يُتجاهَل هناك) — سلوكه كما كان.
+     *
+     *  محمي لا خاص: تُبدّله الاختبارات بالقفل القديم لإثبات أن الاختبار الحتمي يرصد الجمود.
+     */
+    protected function lockPartnerForCreditCheck(string $partnerId): ?Partner
+    {
+        $query = BranchScope::reference(Partner::class);
+
+        $query = DB::connection()->getDriverName() === 'pgsql'
+            ? $query->lock('for no key update')
+            : $query->lockForUpdate();
+
+        return $query->find($partnerId);
     }
 
     /**

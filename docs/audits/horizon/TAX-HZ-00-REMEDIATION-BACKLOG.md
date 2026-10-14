@@ -104,6 +104,13 @@ REM-03 and REM-08 touch disjoint controllers (`Invoice/Return/Quote/DocumentRevi
 > **PostgreSQL transaction-abort hypothesis — confirmed, characterised, not fixed here.** A SQL error at the dispatcher's own transaction level aborts it on PostgreSQL; the failure handler's `complete()` then raises `25P02`, the whole dispatch rolls back, the attempt stays `pending` and the *secondary* error escapes (SQLite persists `failed`). TAX-N01 logs the root cause before that point; making the failure persistable is a transaction-structure change and belongs to **REM-22**.
 > **Observations deliberately left unchanged (not exceptions, so not in this log):** `ConnectionException` is mapped by `ZatcaHttpTransport` to `failed / connection_failed / retryable=true`; a clearance-200 with unusable XML is recorded `failed / invalid_clearance_response / retryable=true` (A2 N2). `ZatcaNotificationBridge` logs a raw `$e->getMessage()` — reported, not changed.
 
+### REM-04 / SEC-02 — status update (2026-10-14)
+
+> **REM-04 — IN REVIEW (Draft PR), not closed**; closes only after approved merge and verification. Report and evidence: `REM-04-SEC-02-IMPLEMENTATION-REPORT.md`.
+> **Confirmed and reproduced deterministically on PostgreSQL (SQLSTATE 40P01):** the credit-limit guard locked the customer row `FOR UPDATE`; the FK check of any concurrent `INSERT` referencing that customer (`payments`, draft `invoices`, …) takes `FOR KEY SHARE` on the same row after the writer already holds the tenant anchor, while the poster still needs that anchor.
+> **Fix (minimal):** customer lock → `FOR NO KEY UPDATE` on PostgreSQL (still serialises credit postings, no longer conflicts with FK checks); posting transaction retries 3×; an exhausted transient concurrency failure (`40P01`/`40001`) is answered **409 + `Retry-After: 1`** by `ApiController::domain()` instead of 500. **Unchanged:** lock order of the financial path, totals/journal/ICV/VAT, schema, routes, permissions.
+> **Not changed (theoretical, needs an owner-approved design):** `InventoryService` stock-state rows locked before the ledger vs after the anchor in `post()`.
+
 ### REM-03 — card (ready for owner approval to start)
 
 | Field | Content |
